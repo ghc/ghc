@@ -601,6 +601,17 @@ def test_common_work (name, opts, func, args):
     if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
         framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
 
+    try:
+        for f in files_written[name]:
+            if os.path.exists(f):
+                try:
+                    if not f in files_written_not_removed[name]:
+                        files_written_not_removed[name].append(f)
+                except:
+                    files_written_not_removed[name] = [f]
+    except:
+        pass
+
 def clean(strs):
     for str in strs:
         for name in glob.glob(in_testdir(str)):
@@ -1564,18 +1575,6 @@ def runCmdExitCode( cmd ):
 # -----------------------------------------------------------------------------
 # checking for files being written to by multiple tests
 
-# Work in progress, but largely works. Known issues:
-# * only supported when using the timeout program
-# * Some .strace lines aren't understood yet, causing framework failures
-# * One .strace file can cause muiltiple framework failures, if it
-#   contains lots of lines that aren't understood
-# * Should detect file that are written but aren't cleaned
-
-# Performance:
-# Threads       fast testsuite time     fast testsuite time with checks
-# 1             16:36.14                25:16.07
-# 5              5:33.95                 8:04.05
-
 re_strace_call_end = '(\) += ([0-9]+|-1 E.*)| <unfinished ...>)$'
 re_strace_unavailable       = re.compile('^\) += \? <unavailable>$')
 re_strace_pid               = re.compile('^([0-9]+) +(.*)')
@@ -1594,8 +1593,16 @@ re_strace_ignore_sigfpe     = re.compile('^--- SIGFPE \(Floating point exception
 re_strace_ignore_sigsegv    = re.compile('^--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
 re_strace_ignore_sigpipe    = re.compile('^--- SIGPIPE \(Broken pipe\) @ 0 \(0\) ---$')
 
+# Files that are read or written but shouldn't be:
+# * ghci_history shouldn't be read or written by tests
+# * things under package.conf.d shouldn't be written by tests
 bad_file_usages = {}
-files_used = {}
+
+# Mapping from tests to the list of files that they write
+files_written = {}
+
+# Mapping from tests to the list of files that they write but don't clean
+files_written_not_removed = {}
 
 def add_bad_file_usage(name, file):
     try:
@@ -1652,10 +1659,10 @@ def addTestFilesWrittenHelper(name, fn):
                             add_bad_file_usage(name, file)
                         else:
                             try:
-                                if not name in files_used[file]:
-                                    files_used[file].append(name)
+                                if not file in files_written[name]:
+                                    files_written[name].append(file)
                             except:
-                                files_used[file] = [name]
+                                files_written[name] = [file]
                     elif 'O_RDONLY' in flags:
                         pass
                     else:
@@ -1694,16 +1701,37 @@ def addTestFilesWrittenHelper(name, fn):
 def checkForFilesWrittenProblems(file):
     foundProblem = False
 
-    for f in files_used.keys():
-        if len(files_used[f]) > 1:
+    files_written_inverted = {}
+    for t in files_written.keys():
+        for f in files_written[t]:
+            try:
+                files_written_inverted[f].append(t)
+            except:
+                files_written_inverted[f] = [t]
+
+    for f in files_written_inverted.keys():
+        if len(files_written_inverted[f]) > 1:
             if not foundProblem:
                 foundProblem = True
                 file.write("\n")
                 file.write("\nSome files are written by multiple tests:\n")
-            file.write("    " + f + " (" + str(files_used[f]) + ")\n")
-
+            file.write("    " + f + " (" + str(files_written_inverted[f]) + ")\n")
     if foundProblem:
         file.write("\n")
+
+    # -----
+
+    if len(files_written_not_removed) > 0:
+        file.write("\n")
+        file.write("\nSome files written but not removed:\n")
+        tests = files_written_not_removed.keys()
+        tests.sort()
+        for t in tests:
+            for f in files_written_not_removed[t]:
+                file.write("    " + t + ": " + f + "\n")
+        file.write("\n")
+
+    # -----
 
     if len(bad_file_usages) > 0:
         file.write("\n")
