@@ -2,8 +2,8 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-EXECUTABLE = Main$(exeext)
-CLEAN_FILES = c.c c.o Main.o Main.hi $(EXECUTABLE)
+EXECUTABLE = MainX$(exeext)
+CLEAN_FILES = c.c c.o MainX.o MainX.hi $(EXECUTABLE)
 
 clean:
 	$(RM) $(CLEAN_FILES)
@@ -12,13 +12,14 @@ clean:
 recomp004:
 	$(RM) $(CLEAN_FILES)
 	$(CP) c1.c c.c
+	$(CP) Main.hs MainX.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c c.c -o c.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Main.hs c.o -o $(EXECUTABLE)
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make MainX.hs c.o -o $(EXECUTABLE)
 	./$(EXECUTABLE)
 	$(CP) c2.c c.c
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c c.c -o c.o
 	# Hack to make sure c.o is really newer
-	touch -t 01010000 Main.hs Main.hi Main.o c.c $(EXECUTABLE)
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Main.hs c.o -o $(EXECUTABLE)
+	touch -t 01010000 MainX.hs MainX.hi MainX.o c.c $(EXECUTABLE)
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make MainX.hs c.o -o $(EXECUTABLE)
 	./$(EXECUTABLE)
 
