@@ -70,7 +70,7 @@ test('misc001',
 
 test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  exit_code(1), compile_and_run, [''])
-test('openFile003',  normal, compile_and_run, [''])
+test('openFile003',  extra_clean(['openFile003Dir']), compile_and_run, [''])
 test('openFile004',  extra_clean(['openFile004.out']), compile_and_run, [''])
 test('openFile005',
      [if_compiler_type('hugs', expect_fail),

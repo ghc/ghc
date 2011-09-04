@@ -1,4 +1,4 @@
-Left .: openFile: inappropriate type (is a directory)
-Left .: openFile: invalid argument (Invalid argument)
-Left .: openFile: invalid argument (Invalid argument)
-Left .: openFile: invalid argument (Invalid argument)
+Left openFile003Dir: openFile: inappropriate type (is a directory)
+Left openFile003Dir: openFile: invalid argument (Invalid argument)
+Left openFile003Dir: openFile: invalid argument (Invalid argument)
+Left openFile003Dir: openFile: invalid argument (Invalid argument)
