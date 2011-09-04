@@ -142,9 +142,9 @@ shadow:
 	rm -rf $(PKGCONFSHADOW1) $(PKGCONFSHADOW2) shadow.hs shadow.o shadow.hi shadow.out shadow.hs shadow.hi
 	$(LOCAL_GHC_PKGSHADOW1) init $(PKGCONFSHADOW1)
 	$(LOCAL_GHC_PKGSHADOW2) init $(PKGCONFSHADOW2)
-	$(LOCAL_GHC_PKGSHADOW1) register --force shadow1.pkg >shadow1.out 2>&1
-	$(LOCAL_GHC_PKGSHADOW1) register --force shadow2.pkg >shadow2.out 2>&1
-	$(LOCAL_GHC_PKGSHADOW2) register --force shadow3.pkg >shadow3.out 2>&1
+	$(LOCAL_GHC_PKGSHADOW1) register -v0 --force shadow1.pkg
+	$(LOCAL_GHC_PKGSHADOW1) register -v0 --force shadow2.pkg
+	$(LOCAL_GHC_PKGSHADOW2) register -v0 --force shadow3.pkg
 	$(LOCAL_GHC_PKGSHADOW3) list
 	echo "main = return ()" >shadow.hs
 # 
