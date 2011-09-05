@@ -45,3 +45,4 @@ test('T3972', extra_clean(['T3972A.hi', 'T3972A.o']),
               compile_and_run,
               [''])
 test('T5315', normal, compile_and_run, [''])
+test('T5453', normal, compile_and_run, [''])
