@@ -217,7 +217,7 @@ back to it.  (This is an error too.)
 Hi-boot types
 ~~~~~~~~~~~~~
 A data type read from an hi-boot file will have an AbstractTyCon as its AlgTyConRhs
-and will respond True to isHiBootTyCon. The idea is that we treat these as if one
+and will respond True to isAbstractTyCon. The idea is that we treat these as if one
 could get from these types to anywhere.  So when we see
 
         module Baz where

@@ -436,7 +436,7 @@ mkStgAltType bndr alts
   = case tyConAppTyCon_maybe (repType (idType bndr)) of
         Just tc | isUnboxedTupleTyCon tc -> UbxTupAlt tc
                 | isUnLiftedTyCon tc     -> PrimAlt tc
-                | isHiBootTyCon tc       -> look_for_better_tycon
+                | isAbstractTyCon tc     -> look_for_better_tycon
                 | isAlgTyCon tc          -> AlgAlt tc
                 | otherwise              -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
                                             PolyAlt
@@ -450,8 +450,8 @@ mkStgAltType bndr alts
                             -- function application where argument has a
                             -- type-family type
 
-   -- Sometimes, the TyCon is a HiBootTyCon which may not have any
-   -- constructors inside it.  Then we can get a better TyCon by
+   -- Sometimes, the TyCon is a AbstractTyCon which may not have any
+   -- constructors inside it.  Then we may get a better TyCon by
    -- grabbing the one from a constructor alternative
    -- if one exists.
    look_for_better_tycon

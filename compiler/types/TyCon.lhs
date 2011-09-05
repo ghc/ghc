@@ -48,7 +48,6 @@ module TyCon(
 	isGadtSyntaxTyCon, isDistinctTyCon, isDistinctAlgRhs,
 	isTyConAssoc, tyConAssoc_maybe,
 	isRecursiveTyCon,
-	isHiBootTyCon,
         isImplicitTyCon, 
 
         -- ** Extracting information out of TyCons
@@ -1137,12 +1136,6 @@ tupleTyConArity tc = tyConArity tc
 isRecursiveTyCon :: TyCon -> Bool
 isRecursiveTyCon (AlgTyCon {algTcRec = Recursive}) = True
 isRecursiveTyCon _                                 = False
-
--- | Did this 'TyCon' originate from type-checking a .h*-boot file?
-isHiBootTyCon :: TyCon -> Bool
--- Used for knot-tying in hi-boot files
-isHiBootTyCon (AlgTyCon {algTcRhs = AbstractTyCon False}) = True
-isHiBootTyCon _                                           = False
 
 -- | Is this the 'TyCon' of a foreign-imported type constructor?
 isForeignTyCon :: TyCon -> Bool
