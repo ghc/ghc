@@ -59,6 +59,7 @@ if (ghc_with_llvm == 1):
     config.run_ways.append('optllvm')
 
 config.in_tree_compiler = in_tree_compiler
+config.clean_only       = clean_only
 
 config.way_flags = {
     'normal'       : [],

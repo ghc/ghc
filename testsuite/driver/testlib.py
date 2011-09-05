@@ -562,15 +562,16 @@ def test_common_work (name, opts, func, args):
     if config.fast and len(do_ways) > 0:
         do_ways = [do_ways[0]]
 
-    # Run the required tests...
-    for way in do_ways:
-        do_test (name, way, func, args)
+    if not config.clean_only:
+        # Run the required tests...
+        for way in do_ways:
+            do_test (name, way, func, args)
 
-    for way in all_ways:
-        if way not in do_ways:
-            skiptest (name,way)
+        for way in all_ways:
+            if way not in do_ways:
+                skiptest (name,way)
 
-    if getTestOpts().cleanup != '':
+    if getTestOpts().cleanup != '' and (config.clean_only or do_ways != []):
         clean(map (lambda suff: name + suff,
                   ['', '.exe', '.exe.manifest', '.genscript',
                    '.stderr.normalised',        '.stdout.normalised',
