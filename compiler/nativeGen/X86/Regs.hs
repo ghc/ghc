@@ -63,7 +63,7 @@ import FastTypes
 import FastBool
 
 
-#if  defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
+#if  defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH) || defined(powerpc_TARGET_ARCH)
 import Constants
 #endif
 
