@@ -211,7 +211,9 @@ test('driver062d',
      run_command,
      ['$MAKE -s --no-print-directory test062d'])
 test('driver062e',
-     extra_clean(['B062e/Hello062e.hs']),
+     extra_clean(['B062e/Hello062e.hi', 'B062e/Hello062e.o',
+                  'B062e/Hello062e.hs', 'B062e/',
+                  'hello062e']),
      run_command,
      ['$MAKE -s --no-print-directory test062e'])
 
@@ -252,12 +254,14 @@ test('driver071',
      ['$MAKE -s --no-print-directory test071'])
 
 test('driver081a',
-     normal,
+     extra_clean(['Test_081a.hs', 'Test_081a.hi', 'Test_081a.o',
+                  'Test_081a', 'Test_081a.exe']),
      run_command,
      ['$MAKE -s --no-print-directory test081a'])
 
 test('driver081b',
-     normal,
+     extra_clean(['Test.081b.hs', 'Test.081b.hi', 'Test.081b.o',
+                  'Test.081b', 'Test.081b.exe']),
      run_command,
      ['$MAKE -s --no-print-directory test081b'])
 
@@ -268,7 +272,7 @@ test('driver100',
      ['$MAKE -s --no-print-directory test100'])
 
 test('driver200',
-     extra_clean(['depend200']),
+     extra_clean(['depend200', 'depend200.bak']),
      run_command,
      ['$MAKE -s --no-print-directory test200'])
 
