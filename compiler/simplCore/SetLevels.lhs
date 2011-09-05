@@ -341,13 +341,25 @@ lvlExpr ctxt_lvl env (_, AnnLet bind body) = do
     return (Let bind' body')
 
 lvlExpr ctxt_lvl env (_, AnnCase scrut@(scrut_fvs,_) case_bndr ty alts)
+  = do { scrut' <- lvlMFE True ctxt_lvl env scrut
+       ; lvlCase ctxt_lvl env scrut_fvs scrut' case_bndr ty alts }
+
+-------------------------------------------
+lvlCase :: Level		-- ctxt_lvl: Level of enclosing expression
+	-> LevelEnv		-- Level of in-scope names/tyvars
+        -> VarSet		-- Free vars of input scrutinee
+        -> LevelledExpr		-- Processed scrutinee
+	-> Id -> Type		-- Case binder and result type
+	-> [AnnAlt Id VarSet]	-- Input alternatives
+	-> LvlM LevelledExpr	-- Result expression
+lvlCase ctxt_lvl env scrut_fvs scrut' case_bndr ty alts
   | [(con@(DataAlt {}), bs, rhs)] <- alts
-  , exprOkForSpeculation (deAnnotate scrut)
-  , not (isTopLvl dest_lvl)	-- Can't have top-level cases
-  = 	-- Always float the case if possible
+  , exprOkForSpeculation scrut'	  -- See Note [Check the output scrutinee for okForSpec]
+  , not (isTopLvl dest_lvl)	  -- Can't have top-level cases
+  =     -- See Note [Case floating]
+    	-- Always float the case if possible
   	-- Unlike lets we don't insist that it escapes a value lambda
-    do { scrut' <- lvlMFE True ctxt_lvl env scrut
-       ; (rhs_env, (case_bndr':bs')) <- cloneVars env (case_bndr:bs) dest_lvl
+    do { (rhs_env, (case_bndr':bs')) <- cloneVars env (case_bndr:bs) dest_lvl
        	 	   -- We don't need to use extendCaseBndrLvlEnv here
 		   -- because we are floating the case outwards so
 		   -- no need to do the binder-swap thing
@@ -356,8 +368,7 @@ lvlExpr ctxt_lvl env (_, AnnCase scrut@(scrut_fvs,_) case_bndr ty alts)
        ; return (Case scrut' (TB case_bndr' (FloatMe dest_lvl)) ty [alt']) }
 
   | otherwise	  -- Stays put
-  = do { scrut' <- lvlMFE True ctxt_lvl env scrut
-       ; let case_bndr' = TB case_bndr bndr_spec
+  = do { let case_bndr' = TB case_bndr bndr_spec
              alts_env   = extendCaseBndrLvlEnv env scrut' case_bndr'
        ; alts' <- mapM (lvl_alt alts_env) alts
        ; return (Case scrut' case_bndr' ty alts') }
@@ -375,51 +386,46 @@ lvlExpr ctxt_lvl env (_, AnnCase scrut@(scrut_fvs,_) case_bndr ty alts)
           new_env = extendLvlEnv alts_env bs'
 \end{code}
 
-@lvlMFE@ is just like @lvlExpr@, except that it might let-bind
-the expression, so that it can itself be floated.
+Note [Floating cases]
+~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+  data T a = MkT !a
+  f :: T Int -> blah
+  f x vs = case x of { MkT y -> 
+             let f vs = ...(case y of I# w -> e)...f..
+             in f vs
+Here we can float the (case y ...) out , because y is sure
+to be evaluated, to give
+  f x vs = case x of { MkT y -> 
+           caes y of I# w ->
+             let f vs = ...(e)...f..
+             in f vs
 
-Note [Unlifted MFEs]
-~~~~~~~~~~~~~~~~~~~~
-We don't float unlifted MFEs, which potentially loses big opportunites.
-For example:
-	\x -> f (h y)
-where h :: Int -> Int# is expensive. We'd like to float the (h y) outside
-the \x, but we don't because it's unboxed.  Possible solution: box it.
+That saves unboxing it every time round the loop.  It's important in
+some DPH stuff where we really want to avoid that repeated unboxing in
+the inner loop.
 
-Note [Bottoming floats]
-~~~~~~~~~~~~~~~~~~~~~~~
-If we see
-	f = \x. g (error "urk")
-we'd like to float the call to error, to get
-	lvl = error "urk"
-	f = \x. g lvl
-Furthermore, we want to float a bottoming expression even if it has free
-variables:
-	f = \x. g (let v = h x in error ("urk" ++ v))
-Then we'd like to abstact over 'x' can float the whole arg of g:
-	lvl = \x. let v = h x in error ("urk" ++ v)
-	f = \x. g (lvl x)
-See Maessen's paper 1999 "Bottom extraction: factoring error handling out
-of functional programs" (unpublished I think).
+Things to note
+ * We can't float a case to top level
+ * It's worth doing this float even if we don't float
+   the case outside a value lambda
+ * We only do this with a single-alternative case
 
-When we do this, we set the strictness and arity of the new bottoming 
-Id, so that it's properly exposed as such in the interface file, even if
-this is all happening after strictness analysis.  
+Note [Check the output scrutinee for okForSpec]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+  case x of y { 
+    A -> ....(case y of alts)....
+  }
+Because of the binder-swap, the inner case will get substituted to
+(case x of ..).  So when testing whether the scrutinee is
+okForSpecuation we must be careful to test the *result* scrutinee ('x'
+in this case), not the *input* one 'y'.  The latter *is* ok for
+speculation here, but the former is not -- and ideed we can't float
+the inner case out, at least not unless x is also evaluated at its
+binding site.
 
-Note [Bottoming floats: eta expansion] c.f Note [Bottoming floats]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Tiresomely, though, the simplifier has an invariant that the manifest
-arity of the RHS should be the same as the arity; but we can't call
-etaExpand during SetLevels because it works over a decorated form of
-CoreExpr.  So we do the eta expansion later, in FloatOut.
-
-Note [Case MFEs]
-~~~~~~~~~~~~~~~~
-We don't float a case expression as an MFE from a strict context.  Why not?
-Because in doing so we share a tiny bit of computation (the switch) but
-in exchange we build a thunk, which is bad.  This case reduces allocation 
-by 7% in spectral/puzzle (a rather strange benchmark) and 1.2% in real/fem.
-Doesn't change any other allocation at all.
+That's why we apply exprOkForSpeculation to scrut' and not to scrut.
 
 \begin{code}
 lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
@@ -427,6 +433,8 @@ lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
 	-> LevelEnv		-- Level of in-scope names/tyvars
 	-> CoreExprWithFVs	-- input expression
 	-> LvlM LevelledExpr	-- Result expression
+-- lvlMFE is just like lvlExpr, except that it might let-bind
+-- the expression, so that it can itself be floated.
 
 lvlMFE _ _ _ (_, AnnType ty)
   = return (Type ty)
@@ -492,7 +500,52 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 	  -- 
 	  -- Also a strict contxt includes uboxed values, and they
 	  -- can't be bound at top level
+\end{code}
 
+Note [Unlifted MFEs]
+~~~~~~~~~~~~~~~~~~~~
+We don't float unlifted MFEs, which potentially loses big opportunites.
+For example:
+	\x -> f (h y)
+where h :: Int -> Int# is expensive. We'd like to float the (h y) outside
+the \x, but we don't because it's unboxed.  Possible solution: box it.
+
+Note [Bottoming floats]
+~~~~~~~~~~~~~~~~~~~~~~~
+If we see
+	f = \x. g (error "urk")
+we'd like to float the call to error, to get
+	lvl = error "urk"
+	f = \x. g lvl
+Furthermore, we want to float a bottoming expression even if it has free
+variables:
+	f = \x. g (let v = h x in error ("urk" ++ v))
+Then we'd like to abstact over 'x' can float the whole arg of g:
+	lvl = \x. let v = h x in error ("urk" ++ v)
+	f = \x. g (lvl x)
+See Maessen's paper 1999 "Bottom extraction: factoring error handling out
+of functional programs" (unpublished I think).
+
+When we do this, we set the strictness and arity of the new bottoming 
+Id, so that it's properly exposed as such in the interface file, even if
+this is all happening after strictness analysis.  
+
+Note [Bottoming floats: eta expansion] c.f Note [Bottoming floats]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Tiresomely, though, the simplifier has an invariant that the manifest
+arity of the RHS should be the same as the arity; but we can't call
+etaExpand during SetLevels because it works over a decorated form of
+CoreExpr.  So we do the eta expansion later, in FloatOut.
+
+Note [Case MFEs]
+~~~~~~~~~~~~~~~~
+We don't float a case expression as an MFE from a strict context.  Why not?
+Because in doing so we share a tiny bit of computation (the switch) but
+in exchange we build a thunk, which is bad.  This case reduces allocation 
+by 7% in spectral/puzzle (a rather strange benchmark) and 1.2% in real/fem.
+Doesn't change any other allocation at all.
+
+\begin{code}
 annotateBotStr :: Id -> Maybe (Arity, StrictSig) -> Id
 annotateBotStr id Nothing            = id
 annotateBotStr id (Just (arity,sig)) = id `setIdArity` arity

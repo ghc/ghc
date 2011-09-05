@@ -688,7 +688,9 @@ it's applied only to dictionaries.
 -- 
 -- We can only do this if the @y + 1@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
-exprOkForSpeculation :: CoreExpr -> Bool
+exprOkForSpeculation :: Expr b -> Bool
+  -- Polymorphic in binder type
+  -- There is one call at a non-Id binder type, in SetLevels
 exprOkForSpeculation (Lit _)      = True
 exprOkForSpeculation (Type _)     = True
 exprOkForSpeculation (Coercion _) = True
@@ -706,6 +708,7 @@ exprOkForSpeculation (Cast e _)  = exprOkForSpeculation e
 exprOkForSpeculation (Case e _ _ alts) 
   =  exprOkForSpeculation e  -- Note [exprOkForSpeculation: case expressions]
   && all (\(_,_,rhs) -> exprOkForSpeculation rhs) alts
+  && altsAreExhaustive alts	-- Note [exprOkForSpeculation: exhaustive alts]
 
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
@@ -739,6 +742,21 @@ exprOkForSpeculation other_expr
 	 -- in which case they may not
 
     spec_ok _ _ = False
+
+altsAreExhaustive :: [Alt b] -> Bool
+-- True  <=> the case alterantives are definiely exhaustive
+-- False <=> they may or may not be
+altsAreExhaustive []
+  = False    -- Should not happen
+altsAreExhaustive ((con1,_,_) : alts)
+  = case con1 of
+      DEFAULT   -> True
+      LitAlt {} -> False
+      DataAlt c -> 1 + length alts == tyConFamilySize (dataConTyCon c)
+      -- It is possible to have an exhaustive case that does not
+      -- enumerate all constructors, notably in a GADT match, but
+      -- we behave conservatively here -- I don't think it's important
+      -- enough to deserve special treatment
 
 -- | True of dyadic operators that can fail only if the second arg is zero!
 isDivOp :: PrimOp -> Bool
@@ -781,6 +799,28 @@ If exprOkForSpeculation doesn't look through case expressions, you get this:
         }
 
 The inner case is redundant, and should be nuked.
+
+Note [exprOkForSpeculation: exhaustive alts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We might have something like
+  case x of { 
+    A -> ...
+    _ -> ...(case x of { B -> ...; C -> ... })...
+Here, the inner case is fine, becuase the A alternative 
+can't happen, but it's not ok to float the inner case outside 
+the outer one (even if we know x is evaluated outside), because
+then it would be non-exhaustive. See Trac #5453.
+
+Similarly, this is a valid program (albeit a slightly dodgy one)
+   let v = case x of { B -> ...; C -> ... }
+   in case x of 
+         A -> ...
+         _ ->  ...v...v....
+But we don't want to speculate the v binding.
+
+One could try to be clever, but the easy fix is simpy to regard
+a non-exhaustive case as *not* okForSpeculation.
+
 
 Note [dataToTag speculation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
