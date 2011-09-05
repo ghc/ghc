@@ -5,7 +5,7 @@
 
 module Parse where
 
-import Char
+import Data.Char
 import Text.ParserCombinators.Parsec hiding (token)
 
 import Data
@@ -24,7 +24,7 @@ tokenList = many token <?> "list of tokens"
 
 token :: Parser GMLToken
 token =
-       do { ts <- braces   tokenList          ; return (TBody ts) } 
+       do { ts <- braces   tokenList          ; return (TBody ts) }
   <|>  do { ts <- brackets tokenList          ; return (TArray ts) }
   <|> (do { s  <- gmlString                   ; return (TString s) } <?> "string")
   <|> (do { t <- pident False                 ; return t }           <?> "identifier")
@@ -57,7 +57,7 @@ test_number = "1234 -1234 1 -0 0" ++
               " -1234.5678e12 -1234.5678E-12 -1234.5678E12" ++
               " 1234e11 1234E33 -1234e33 1234e-33" ++
               " 123e 123.4e 123ee 123.4ee 123E 123.4E 123EE 123.4EE"
-              
+
 
 -- Always int or real
 number :: Parser GMLToken
@@ -100,7 +100,7 @@ symbol name = lexeme (string name)
 lexeme p = do{ x <- p; whiteSpace; return x  }
 
 whiteSpace  = skipMany (simpleSpace <|> oneLineComment <?> "")
-  where simpleSpace = skipMany1 (oneOf " \t\n\r\v")    
+  where simpleSpace = skipMany1 (oneOf " \t\n\r\v")
         oneLineComment =
             do{ string "%"
               ; skipMany (noneOf "\n\r\v")

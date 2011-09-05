@@ -4,6 +4,6 @@
 test('hs-boot',
      extra_clean(['A.hi', 'A.hi-boot', 'A.o', 'A.o-boot',
                   'B.hi', 'B.o', 'C.hi', 'C.o',
-                  'Main.hi', 'Main.o']),
+                  'Main', 'Main.exe', 'Main.hi', 'Main.o']),
      multimod_compile,
      ['Main -v0', ''])

@@ -5,7 +5,7 @@
 
 module Eval where
 
-import Array
+import Data.Array
 
 import Geometry
 import CSG
@@ -28,7 +28,7 @@ instance Monad Pure where
     fail s       = error s
 
 instance MonadEval Pure where
-  doOp   = doPureOp 
+  doOp   = doPureOp
   err  s = error s
 
 instance MonadEval IO where
@@ -62,7 +62,7 @@ eval st =
             }
         else return (stack st)
      }
-     
+
 moreCode :: State -> Bool
 moreCode (State {code = []}) = False
 moreCode _                   = True
@@ -73,13 +73,13 @@ moreCode _                   = True
 step :: MonadEval m => State -> m State
 
 -- Rule 1: Pushing BaseValues
-step st@(State{ stack = stack, code = (TBool b):cs })    
+step st@(State{ stack = stack, code = (TBool b):cs })
     = return (st { stack = (VBool b):stack,    code = cs })
-step st@(State{ stack = stack, code = (TInt i):cs })     
+step st@(State{ stack = stack, code = (TInt i):cs })
     = return (st { stack = (VInt i):stack,     code = cs })
-step st@(State{ stack = stack, code = (TReal r):cs })    
+step st@(State{ stack = stack, code = (TReal r):cs })
     = return (st { stack = (VReal r):stack,    code = cs })
-step st@(State{ stack = stack, code = (TString s):cs })  
+step st@(State{ stack = stack, code = (TString s):cs })
     = return (st { stack = (VString s):stack,  code = cs })
 
 -- Rule 2: Name binding
@@ -142,14 +142,14 @@ step _ = err "Tripped on sidewalk while stepping."
 -- Operator code
 
 opFnTable :: Array GMLOp PrimOp
-opFnTable = array (minBound,maxBound) 
+opFnTable = array (minBound,maxBound)
 	          [ (op,prim) | (_,TOp op,prim) <- opcodes ]
 
 
 
 
 doPureOp :: (MonadEval m) => PrimOp -> GMLOp -> Stack -> m Stack
-doPureOp _ Op_render _ = 
+doPureOp _ Op_render _ =
     err ("\nAttempting to call render from inside a purely functional callback.")
 doPureOp primOp op stk = doPrimOp primOp op stk -- call the purely functional operators
 
@@ -171,21 +171,21 @@ doPrimOp (Point_Real fn) _ (VPoint x y z:stk)
 -- This is where the callbacks happen from...
 doPrimOp (Surface_Obj fn) _ (VClosure env code:stk)
   = case absapply env code [VAbsObj AbsFACE,VAbsObj AbsU,VAbsObj AbsV] of
-      Just [VReal r3,VReal r2,VReal r1,VPoint c1 c2 c3] -> 
+      Just [VReal r3,VReal r2,VReal r1,VPoint c1 c2 c3] ->
            let
 	       res = prop (color c1 c2 c3) r1 r2 r3
            in
                return ((VObject (fn (SConst res))) : stk)
       _ -> return ((VObject (fn (SFun call))) : stk)
-  where 
+  where
         -- The most general case
         call i r1 r2 =
           case callback env code [VReal r2,VReal r1,VInt i] of
-             [VReal r3,VReal r2,VReal r1,VPoint c1 c2 c3] 
+             [VReal r3,VReal r2,VReal r1,VPoint c1 c2 c3]
 		 -> prop (color c1 c2 c3) r1 r2 r3
              stk -> error ("callback failed: incorrectly typed return arguments"
                          ++ show stk)
-       
+
 doPrimOp (Real_Int fn) _ (VReal r1:stk)
   = return ((VInt (fn r1)) : stk)
 doPrimOp (Int_Real fn) _ (VInt r1:stk)
@@ -213,7 +213,7 @@ doPrimOp (Obj_Obj_Obj fn) _ (VObject o2:VObject o1:stk)
   = return ((VObject (fn o1 o2)) : stk)
 doPrimOp (Point_Color_Light fn) _ (VPoint r g b:VPoint x y z : stk)
   = return (VLight (fn (x,y,z) (color r g b)) : stk)
-doPrimOp (Point_Point_Color_Real_Real_Light fn) _ 
+doPrimOp (Point_Point_Color_Real_Real_Light fn) _
          (VReal r2:VReal r1:VPoint r g b:VPoint x2 y2 z2:VPoint x1 y1 z1 : stk)
   = return (VLight (fn (x1,y1,z1) (x2,y2,z2) (color r g b) r1 r2) : stk)
 doPrimOp (Real_Real_Real_Point fn) _ (VReal r3:VReal r2:VReal r1:stk)
@@ -229,15 +229,15 @@ doPrimOp (Value_String_Value fn) _ (VString s:o:stk)
   where
      res = fn o s
 
-doPrimOp primOp op args 
+doPrimOp primOp op args
   = err ("\n\ntype error when attempting to execute builtin primitive \"" ++
           show op ++ "\"\n\n| " ++
           show op ++ " takes " ++ show (length types) ++ " argument" ++ s
 	           ++ " with" ++ the ++ " type" ++ s ++ "\n|\n|" ++
-          "      " ++ unwords [ show ty | ty <- types ]  ++ "\n|\n|" ++ 
-          " currently, the relevent argument" ++ s ++ " on the stack " ++ 
-	          are ++ "\n|\n| " ++ 
-          unwords [ "(" ++ show arg ++ ")" 
+          "      " ++ unwords [ show ty | ty <- types ]  ++ "\n|\n|" ++
+          " currently, the relevent argument" ++ s ++ " on the stack " ++
+	          are ++ "\n|\n| " ++
+          unwords [ "(" ++ show arg ++ ")"
                   | arg <-  reverse (take (length types) args) ]  ++ "\n|\n| "
           ++ "    (top of stack is on the right hand side)\n\n")
   where
@@ -268,7 +268,7 @@ doAllOp primOp op stk = doPrimOp primOp op stk -- call the purely functional ope
 {-
  - Abstract evaluation.
  -
- - The idea is you check for constant code that 
+ - The idea is you check for constant code that
  - (1) does not look at its arguments
  - (2) gives a fixed result
  -
@@ -277,7 +277,7 @@ doAllOp primOp op stk = doPrimOp primOp op stk -- call the purely functional ope
  -}
 
 absapply :: Env -> Code -> Stack -> Maybe Stack
-absapply env code stk = 
+absapply env code stk =
      case runAbs (eval (State env stk code)) 100 of
        AbsState stk _ -> Just stk
        AbsFail m      -> Nothing
@@ -301,7 +301,7 @@ instance MonadEval Abs where
                      else AbsState () (n-1))
 
 doAbsOp :: PrimOp -> GMLOp -> Stack -> Abs Stack
-doAbsOp _ Op_point (VReal r3:VReal r2:VReal r1:stk) 
+doAbsOp _ Op_point (VReal r3:VReal r2:VReal r1:stk)
                = return ((VPoint r1 r2 r3) : stk)
  -- here, you could have an (AbsPoint :: AbsObj) which you put on the
  -- stack, with any object in the three fields.
@@ -311,12 +311,12 @@ doAbsOp _ op _ = err ("operator not understood (" ++ show op ++ ")")
 -- Driver
 
 mainEval :: Code -> IO ()
-mainEval prog = do { stk <- eval (State emptyEnv [] prog) 
+mainEval prog = do { stk <- eval (State emptyEnv [] prog)
                    ; return ()
                    }
-{- 
+{-
   * Oops, one of the example actually has something
-  * on the stack at the end. 
+  * on the stack at the end.
   * Oh well...
 		   ; if null stk
                      then return ()
@@ -338,13 +338,13 @@ testF is = do prog <- rayParseF is
               eval (State emptyEnv [] prog)
 
 testA :: String -> Either String (Stack,Int)
-testA is = case runAbs (eval (State emptyEnv 
+testA is = case runAbs (eval (State emptyEnv
                                     [VAbsObj AbsFACE,VAbsObj AbsU,VAbsObj AbsV]
                                     (rayParse is))) 100 of
              AbsState a n -> Right (a,n)
              AbsFail m -> Left m
 
-abstest1 = "1.0 0.0 0.0 point /red { /v /u /face red 1.0 0.0 1.0 } apply" 
+abstest1 = "1.0 0.0 0.0 point /red { /v /u /face red 1.0 0.0 1.0 } apply"
 
 -- should be [3:: Int]
 et1 = test "1 /x { x } /f 2 /x f apply x addi"

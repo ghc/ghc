@@ -1,14 +1,17 @@
+import System.Directory
 import System.IO
 import System.IO.Error
 
 -- !!! Open a directory (should fail)
 
 main = do
-  r <- tryIOError (openFile "." ReadMode)
+  let dir = "openFile003Dir"
+  createDirectoryIfMissing False dir
+  r <- tryIOError (openFile dir ReadMode)
   print r
-  r <- tryIOError (openFile "." WriteMode)
+  r <- tryIOError (openFile dir WriteMode)
   print r
-  r <- tryIOError (openFile "." AppendMode)
+  r <- tryIOError (openFile dir AppendMode)
   print r
-  r <- tryIOError (openFile "." ReadWriteMode)
+  r <- tryIOError (openFile dir ReadWriteMode)
   print r

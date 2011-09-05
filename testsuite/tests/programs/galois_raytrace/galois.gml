@@ -70,7 +70,7 @@
     i 63 eqi { 62 } { i } if          % return max(2, i)
   } /toIntCoord
   galois u toIntCoord apply get  % val = texture[u][v]
-    v toIntCoord apply get 
+    v toIntCoord apply get
     real 100.0 divf /gal
   gal gal gal point               % b/w galois
   1.0                             % kd = 1.0
@@ -80,19 +80,19 @@
 
 
 galoisface cube
--0.5 -0.5 -0.5 translate	% center 
+-0.5 -0.5 -0.5 translate	% center
 2.5 uscale			% make it bigger
 -25.0 rotatex -25.0 rotatey	% rotate
 0.0 -1.0 7.0 translate		% move to final position
 
 %galoisface cylinder
-%-0.5 -0.5 -0.5 translate	% center 
+%-0.5 -0.5 -0.5 translate	% center
 %1.5 uscale			% make it bigger
 %0.0 rotatex 90.0 rotatey	        % rotate
 %0.0 0.0 5.0 translate		% move to final position
 
 %galoisface sphere
-%-0.5 -0.5 -0.5 translate	% center 
+%-0.5 -0.5 -0.5 translate	% center
 %1.5 uscale			% make it bigger
 %-25.0 rotatex 25.0 rotatey	% rotate
 %-3.0 0.0 5.0 translate		% move to final position
@@ -102,14 +102,14 @@ galoisface cube
 { /v /u /face
   v 5.0 divf /v
   u 5.0 divf /u
-  v floor 2 modi 0 eqi 
+  v floor 2 modi 0 eqi
     { 1.0 }
     { 0.8 }
-  if /r   
-  u floor 2 modi 0 eqi 
+  if /r
+  u floor 2 modi 0 eqi
     { 1.0 }
     { 0.8 }
-  if /g   
+  if /g
   v frac /v
   u frac /u
   v 0.0 lessf { v 1.0 addf } { v } if /v
@@ -119,7 +119,7 @@ galoisface cube
     i 63 eqi { 62 } { i } if          % return max(2, i)
   } /toIntCoord
   galois u toIntCoord apply get  % val = texture[u][v]
-    v toIntCoord apply get 
+    v toIntCoord apply get
     real 100.0 divf /gal
   r gal mulf g gal mulf gal point               % b/w galois
   0.0                             % kd = 1.0

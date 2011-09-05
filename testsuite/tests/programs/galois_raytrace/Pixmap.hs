@@ -5,9 +5,9 @@
 
 module Pixmap where
 
-import Char
-import IO hiding (try)
-import Parsec
+import Data.Char
+import System.IO hiding (try)
+import Text.ParserCombinators.Parsec
 
 readPPM f
   = do  h <- openFile f ReadMode
@@ -48,7 +48,7 @@ number
 
 whiteSpace
   = skipMany (simpleSpace <|> oneLineComment <?> "")
-    where simpleSpace = skipMany1 (oneOf " \t\n\r\v")    
+    where simpleSpace = skipMany1 (oneOf " \t\n\r\v")
 	  oneLineComment =
 	      do  char '#'
 		  skipMany (noneOf "\n\r\v")

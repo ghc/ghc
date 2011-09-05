@@ -5,6 +5,7 @@
 
 -- first, tidy up:
 :shell rm -f *.hi *.o *~
+:shell cp C1.hs C.hs
 :shell cp D1.hs D.hs
 
 -- load the program (all interpreted)

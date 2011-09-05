@@ -10,14 +10,14 @@ import System.Exit
 
 file = "encoding001"
 
-encodings = [(utf8,   "utf8"), 
-             (utf8_bom,"utf8_bom"),
-             (utf16,  "utf16"),
-             (utf16le,"utf16le"),
-             (utf16be,"utf16be"),
-             (utf32,  "utf32"),
-             (utf32le,"utf32le"),
-             (utf32be,"utf32be")]
+encodings = [(utf8,     "utf8"),
+             (utf8_bom, "utf8_bom"),
+             (utf16,    "utf16"),
+             (utf16le,  "utf16le"),
+             (utf16be,  "utf16be"),
+             (utf32,    "utf32"),
+             (utf32le,  "utf32le"),
+             (utf32be,  "utf32be")]
 
 main = do
   -- make a UTF-32BE file

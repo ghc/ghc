@@ -43,7 +43,7 @@ test('ghci024',
 test('ghci025', normal, ghci_script, ['ghci025.script'])
 test('ghci026', normal, ghci_script, ['ghci026.script'])
 
-test('ghci027', normal, ghci_script, ['ghci027.script'])
+test('ghci027', extra_clean(['ghci027.hs']), ghci_script, ['ghci027.script'])
 test('ghci028', normal, ghci_script, ['ghci028.script'])
 test('ghci029', normal, ghci_script, ['ghci029.script'])
 test('ghci030', normal, ghci_script, ['ghci030.script'])

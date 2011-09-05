@@ -7,8 +7,6 @@
 
 module Main where
 
-import System
-
 import Parse
 import Eval
 
