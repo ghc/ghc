@@ -88,3 +88,4 @@ test('T5252',
      extra_clean(['T5252a.hi', 'T5252a.o']),
      run_command, 
      ['$MAKE -s --no-print-directory T5252'])
+test('T5455', normal, compile, [''])
