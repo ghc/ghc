@@ -209,29 +209,31 @@ These data types are the heart of the compiler
 --    This is one of the more complicated elements of the Core language, 
 --    and comes with a number of restrictions:
 --    
---    The 'DEFAULT' case alternative must be first in the list, 
---    if it occurs at all.
+--    1. The list of alternatives is non-empty
+--
+--    2. The 'DEFAULT' case alternative must be first in the list, 
+--       if it occurs at all.
 --    
---    The remaining cases are in order of increasing 
+--    3. The remaining cases are in order of increasing 
 --         tag	(for 'DataAlts') or
 --         lit	(for 'LitAlts').
---    This makes finding the relevant constructor easy, 
---    and makes comparison easier too.
+--       This makes finding the relevant constructor easy, 
+--       and makes comparison easier too.
 --    
---    The list of alternatives must be exhaustive. An /exhaustive/ case 
---    does not necessarily mention all constructors:
+--    4. The list of alternatives must be exhaustive. An /exhaustive/ case 
+--       does not necessarily mention all constructors:
 --    
---    @
---         data Foo = Red | Green | Blue
---    ... case x of 
---         Red   -> True
---         other -> f (case x of 
---                         Green -> ...
---                         Blue  -> ... ) ...
---    @
+--    	 @
+--    	      data Foo = Red | Green | Blue
+--    	 ... case x of 
+--    	      Red   -> True
+--    	      other -> f (case x of 
+--    	                      Green -> ...
+--    	                      Blue  -> ... ) ...
+--    	 @
 --    
---    The inner case does not need a @Red@ alternative, because @x@ 
---    can't be @Red@ at that program point.
+--    	 The inner case does not need a @Red@ alternative, because @x@ 
+--    	 can't be @Red@ at that program point.
 --
 -- *  Cast an expression to a particular type. 
 --    This is used to implement @newtype@s (a @newtype@ constructor or 
@@ -249,7 +251,7 @@ data Expr b
   | App   (Expr b) (Arg b)
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
-  | Case  (Expr b) b Type [Alt b]
+  | Case  (Expr b) b Type [Alt b]	-- See #case_invariant#
   | Cast  (Expr b) Coercion
   | Note  Note (Expr b)
   | Type  Type
