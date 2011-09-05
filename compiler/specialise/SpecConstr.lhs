@@ -1501,7 +1501,8 @@ via 'a' itself, or be in scope at f's defn.  Hence we just take
 
 BUT phantom type synonums can mess this reasoning up, 
   eg   x::T b   with  type T b = Int
-So we apply expandTypeSynonyms to the bound Ids.  Yuk.
+So we apply expandTypeSynonyms to the bound Ids.  
+See Trac # 5458.  Yuk.
 
 \begin{code}
 type CallPat = ([Var], [CoreExpr])	-- Quantified variables and arguments
