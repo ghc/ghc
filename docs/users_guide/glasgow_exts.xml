@@ -3580,7 +3580,7 @@ GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
 
 
 <sect3 id="class-default-signatures">
-<title>Default signatures</title>
+<title>Default method signatures</title>
 
 <para>
 Haskell 98 allows you to define a default implementation when declaring a class:
