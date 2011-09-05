@@ -541,6 +541,32 @@ Boring!  Boring!  One error message per binder.  The above ToDo is
 even more helpful.  Something very similar happens for pattern-bound
 expressions.
 
+Note [mkSelectorBinds]
+~~~~~~~~~~~~~~~~~~~~~~
+Given   p = e, where p binds x,y
+we are going to make EITHER
+
+EITHER (A)   v = e   (where v is fresh)
+             x = case v of p -> x
+             y = case v of p -> x
+
+OR (B)       t = case e of p -> (x,y)
+             x = case t of (x,_) -> x
+             y = case t of (_,y) -> y
+
+We do (A) when 
+ * Matching the pattern is cheap so we don't mind
+   doing it twice.  
+ * Or if the pattern binds only one variable (so we'll only
+   match once)
+ * AND the pattern can't fail (else we tiresomely get two inexhaustive 
+   pattern warning messages)
+
+Otherwise we do (B).  Really (A) is just an optimisation for very common
+cases like
+     Just x = e
+     (p,q) = e
+
 \begin{code}
 mkSelectorBinds :: LPat Id	-- The pattern
 		-> CoreExpr	-- Expression to which the pattern is bound
@@ -550,14 +576,13 @@ mkSelectorBinds (L _ (VarPat v)) val_expr
   = return [(v, val_expr)]
 
 mkSelectorBinds pat val_expr
-  | isSingleton binders || is_simple_lpat pat = do
-        -- Given   p = e, where p binds x,y
-        -- we are going to make
-        --      v = p   (where v is fresh)
-        --      x = case v of p -> x
-        --      y = case v of p -> x
+  | null binders 
+  = return []
 
-        -- Make up 'v'
+  | isSingleton binders || is_simple_lpat pat
+    -- See Note [mkSelectorBinds]
+  = do { val_var <- newSysLocalDs (hsLPatType pat)
+        -- Make up 'v' in Note [mkSelectorBinds]
         -- NB: give it the type of *pattern* p, not the type of the *rhs* e.
         -- This does not matter after desugaring, but there's a subtle 
         -- issue with implicit parameters. Consider
@@ -569,25 +594,23 @@ mkSelectorBinds pat val_expr
         --
         -- So to get the type of 'v', use the pattern not the rhs.  Often more
         -- efficient too.
-      val_var <- newSysLocalDs (hsLPatType pat)
 
         -- For the error message we make one error-app, to avoid duplication.
         -- But we need it at different types... so we use coerce for that
-      err_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID  unitTy (ppr pat)
-      err_var <- newSysLocalDs unitTy
-      binds <- mapM (mk_bind val_var err_var) binders
-      return ( (val_var, val_expr) : 
-               (err_var, err_expr) :
-               binds )
+       ; err_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID  unitTy (ppr pat)
+       ; err_var <- newSysLocalDs unitTy
+       ; binds <- mapM (mk_bind val_var err_var) binders
+       ; return ( (val_var, val_expr) : 
+                  (err_var, err_expr) :
+                  binds ) }
 
-
-  | otherwise = do
-      error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID   tuple_ty (ppr pat)
-      tuple_expr <- matchSimply val_expr PatBindRhs pat local_tuple error_expr
-      tuple_var <- newSysLocalDs tuple_ty
-      let mk_tup_bind binder
-            = (binder, mkTupleSelector local_binders binder tuple_var (Var tuple_var))
-      return ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
+  | otherwise
+  = do { error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID   tuple_ty (ppr pat)
+       ; tuple_expr <- matchSimply val_expr PatBindRhs pat local_tuple error_expr
+       ; tuple_var <- newSysLocalDs tuple_ty
+       ; let mk_tup_bind binder
+              = (binder, mkTupleSelector local_binders binder tuple_var (Var tuple_var))
+       ; return ( (tuple_var, tuple_expr) : map mk_tup_bind binders ) }
   where
     binders       = collectPatBinders pat
     local_binders = map localiseId binders	-- See Note [Localise pattern binders]
@@ -607,8 +630,9 @@ mkSelectorBinds pat val_expr
 
     is_simple_lpat p = is_simple_pat (unLoc p)
 
-    is_simple_pat (TuplePat ps Boxed _)        = all is_triv_lpat ps
-    is_simple_pat (ConPatOut{ pat_args = ps }) = all is_triv_lpat (hsConPatArgs ps)
+    is_simple_pat (TuplePat ps Boxed _) = all is_triv_lpat ps
+    is_simple_pat pat@(ConPatOut{})     =  isProductTyCon (dataConTyCon (unLoc (pat_con pat)))
+                                        && all is_triv_lpat (hsConPatArgs (pat_args pat))
     is_simple_pat (VarPat _)                   = True
     is_simple_pat (ParPat p)                   = is_simple_lpat p
     is_simple_pat _                                    = False
@@ -619,7 +643,6 @@ mkSelectorBinds pat val_expr
     is_triv_pat (WildPat _) = True
     is_triv_pat (ParPat p)  = is_triv_lpat p
     is_triv_pat _           = False
-
 \end{code}
 
 Creating big tuples and their types for full Haskell expressions.
