@@ -52,20 +52,20 @@ test('T3234',
      compile,
      ['-ddump-simpl-stats -dsuppress-uniques'])
 
-test('T3717', only_ways(['optasm']), 
-              compile, 
+test('T3717', only_ways(['optasm']),
+              compile,
               ['-ddump-simpl -dsuppress-uniques'])
 
-test('spec-inline', only_ways(['optasm']), 
-              	    compile, 
+test('spec-inline', only_ways(['optasm']),
+              	    compile,
               	    ['-O2 -ddump-simpl -dsuppress-uniques'])
-test('T4908', only_ways(['optasm']), 
-              compile, 
+test('T4908', only_ways(['optasm']),
+              compile,
               ['-O2 -ddump-simpl -dsuppress-uniques'])
 
 test('T4930', [if_compiler_lt('ghc', '7.1', expect_fail),
                only_ways(['optasm'])],
-              compile, 
+              compile,
               ['-O -ddump-simpl -dsuppress-uniques'])
 
 test('T3055',
@@ -84,13 +84,13 @@ test('T4201',
      ['$MAKE -s --no-print-directory T4201'])
 
 test('T3772',
-#      only_ways(['optasm']), 
+#      only_ways(['optasm']),
      extra_clean(['T3772_A.hi', 'T3772_A.o']),
      run_command, ['$MAKE -s --no-print-directory T3772'])
 
 test('EvalTest',
      normal,
-     run_command, 
+     run_command,
      ['$MAKE -s --no-print-directory EvalTest'])
 
 test('T3831', normal, compile, [''])
@@ -127,4 +127,4 @@ test('T5303', reqlib('mtl'), compile, [''])   # Coercion-optimiation test
 test('T5342', normal, compile, [''])   # Lint error with -prof
 test('T5359a', normal, compile, [''])  # Lint error with -O (OccurAnal)
 test('T5359b', normal, compile, [''])  # Lint error with -O (OccurAnal)
-test('TT5458', normal, compile, ['']) 
+test('TT5458', normal, compile, [''])
