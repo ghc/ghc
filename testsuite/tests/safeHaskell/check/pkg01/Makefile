@@ -2,7 +2,7 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-clean:
+cleanSafePkg01:
 	rm -rf setup a.out
 	rm -rf dist
 	find . -name "*.o" | xargs rm -f
@@ -21,7 +21,7 @@ PKGCONF = local.db
 LGHC_PKG = '$(GHC_PKG)' --no-user-package-conf -f '$(PKGCONF)'
 
 safePkg01:
-	'$(MAKE)' clean
+	'$(MAKE)' cleanSafePkg01
 	'$(TEST_HC)' --make -o setup Setup.hs -v0
 
 	'$(GHC_PKG)' init local.db

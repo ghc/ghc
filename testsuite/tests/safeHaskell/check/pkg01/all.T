@@ -10,7 +10,9 @@ else:
     prof = ''
 
 test('safePkg01',
-     [normal, alone],
+     [# TODO: The other tests in here depend on this one not being cleaned
+      # clean_cmd('$MAKE -s --no-print-directory cleanSafePkg01'),
+      alone],
      run_command, 
      ['$MAKE -s --no-print-directory safePkg01 PROF=' + prof])
 
