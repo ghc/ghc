@@ -183,7 +183,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
 	; returnL $ 
             TyClD $ ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
 	    	              , tcdFDs = fds', tcdSigs = sigs', tcdMeths = binds'
-			      , tcdATs = ats', tcdDocs = [] }
+			      , tcdATs = ats', tcdATDefs = [], tcdDocs = [] }
                                         -- no docs in TH ^^
 	}
 	

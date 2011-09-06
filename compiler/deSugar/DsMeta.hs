@@ -214,7 +214,7 @@ repTyClD (L loc (TySynonym { tcdLName = tc, tcdTyVars = tvs, tcdTyPats = opt_tys
 repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, 
 		             tcdTyVars = tvs, tcdFDs = fds,
 		             tcdSigs = sigs, tcdMeths = meth_binds, 
-                             tcdATs = ats }))
+                             tcdATs = ats, tcdATDefs = [] }))
   = do { cls1 <- lookupLOcc cls 	-- See note [Binders and occurrences] 
        ; dec  <- addTyVarBinds tvs $ \bndrs -> 
            do { cxt1   <- repLContext cxt

@@ -744,7 +744,7 @@ declExtras fix_fn rule_env inst_env decl
                         (map (id_extras . ifConOcc) (visibleIfConDecls cons))
       IfaceClass{ifSigs=sigs, ifATs=ats} -> 
                      IfaceClassExtras (fix_fn n)
-                        (map ifDFun $ (concatMap (lookupOccEnvL inst_env . ifName) ats)
+                        (map ifDFun $ (concatMap at_extras ats)
                                     ++ lookupOccEnvL inst_env n)
 		           -- Include instances of the associated types
 			   -- as well as instances of the class (Trac #5147)
@@ -754,6 +754,7 @@ declExtras fix_fn rule_env inst_env decl
   where
         n = ifName decl
         id_extras occ = (fix_fn occ, lookupOccEnvL rule_env occ)
+        at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (ifName decl)
 
 --
 -- When hashing an instance, we hash only the DFunId, because that
@@ -1330,13 +1331,21 @@ tyThingToIfaceDecl (AClass clas)
 		 ifName	  = getOccName clas,
 		 ifTyVars = toIfaceTvBndrs clas_tyvars,
 		 ifFDs    = map toIfaceFD clas_fds,
-		 ifATs	  = map (tyThingToIfaceDecl . ATyCon) clas_ats,
+		 ifATs	  = map toIfaceAT clas_ats,
 		 ifSigs	  = map toIfaceClassOp op_stuff,
 	  	 ifRec    = boolToRecFlag (isRecursiveTyCon tycon) }
   where
     (clas_tyvars, clas_fds, sc_theta, _, clas_ats, op_stuff) 
       = classExtraBigSig clas
     tycon = classTyCon clas
+
+    toIfaceAT :: ClassATItem -> IfaceAT
+    toIfaceAT (tc, defs)
+      = IfaceAT (tyThingToIfaceDecl (ATyCon tc))
+                (map to_if_at_def defs)
+      where
+        to_if_at_def (ATD tvs pat_tys ty)
+          = IfaceATD (toIfaceTvBndrs tvs) (map toIfaceType pat_tys) (toIfaceType ty)
 
     toIfaceClassOp (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)

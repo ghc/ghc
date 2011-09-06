@@ -73,7 +73,7 @@ import Maybes
 import Control.Applicative ((<$>))       
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
-import Data.List        ( nubBy )
+import Data.List        ( nubBy, partition )
 import Data.Char
 
 #include "HsVersions.h"
@@ -179,14 +179,15 @@ mkClassDecl :: SrcSpan
 	    -> P (LTyClDecl RdrName)
 
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
-  = do { let (binds, sigs, ats, docs) = cvBindsAndSigs (unLoc where_cls)
-       ; let cxt = fromMaybe (noLoc []) mcxt
+  = do { let (binds, sigs, at_stuff, docs) = cvBindsAndSigs (unLoc where_cls)
+             (at_defs, ats) = partition (isTypeDecl . unLoc) at_stuff
+             cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
        ; tyvars <- checkTyVars tycl_hdr tparams      -- Only type vars allowed
        ; checkKindSigs ats
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars,
 		             	    tcdFDs = unLoc fds, tcdSigs = sigs, tcdMeths = binds,
-			     	    tcdATs   = ats, tcdDocs  = docs })) }
+			     	    tcdATs   = ats, tcdATDefs = at_defs, tcdDocs  = docs })) }
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -566,7 +567,7 @@ checkKindSigs = mapM_ check
   where
     check (L l tydecl) 
       | isFamilyDecl tydecl
-        || isSynDecl tydecl  = return ()
+        || isTypeDecl tydecl = return ()
       | otherwise	     = 
 	parseErrorSDoc l (text "Type declaration in a class must be a kind signature or synonym default:" $$ ppr tydecl)
 
