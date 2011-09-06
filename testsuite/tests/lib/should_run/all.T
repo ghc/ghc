@@ -1,4 +1,4 @@
-test('array001', 	normal, compile_and_run, [''])
+test('array001', 	extra_clean(['array001.data']), compile_and_run, [''])
 
 test('char001', 	normal, compile_and_run, [''])
 test('char002', 	normal, compile_and_run, [''])
