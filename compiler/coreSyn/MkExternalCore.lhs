@@ -14,7 +14,6 @@ import CoreSyn
 import HscTypes	
 import TyCon
 -- import Class
--- import TysPrim( eqPredPrimTyCon )
 import TypeRep
 import Type
 import PprExternalCore () -- Instances
@@ -227,8 +226,6 @@ make_ty' (TyConApp tc ts) 	 = make_tyConApp tc ts
 -- Another solution would be to expand newtypes before tidying; but that would
 -- expose the representation in interface files, which definitely isn't right.
 -- Maybe CoreTidy should know whether to expand newtypes or not?
-
-make_ty' (PredTy p)	= make_ty (predTypeRep p)
 
 make_tyConApp :: TyCon -> [Type] -> C.Ty
 make_tyConApp tc ts =

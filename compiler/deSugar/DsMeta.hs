@@ -312,14 +312,16 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
 	    -- the selector Ids, not to fresh names (Trac #5410)
 	    --
             do { cxt1 <- repContext cxt
-               ; inst_ty1 <- repPredTy (HsClassP cls tys)
+               ; cls_tcon <- repTy (HsTyVar cls)
+               ; cls_tys <- repLTys tys
+               ; inst_ty1 <- repTapps cls_tcon cls_tys
                ; binds1 <- rep_binds binds
                ; ats1 <- repLAssocFamInst ats
                ; decls <- coreList decQTyConName (ats1 ++ binds1)
                ; repInst cxt1 inst_ty1 decls }
        ; return (loc, dec) }
  where
-   (tvs, cxt, L _ cls, tys) = splitHsInstDeclTy ty
+   Just (tvs, cxt, cls, tys) = splitHsInstDeclTy_maybe (unLoc ty)
 
 repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
 repForD (L loc (ForeignImport name typ (CImport cc s ch cis)))
@@ -420,7 +422,7 @@ mkGadtCtxt data_tvs (ResTyGADT res_ty)
        = go (eq_pred : cxt) subst rest
        where
          loc = getLoc ty
-         eq_pred = L loc (HsEqualP (L loc (HsTyVar data_tv)) ty)
+         eq_pred = L loc (HsEqTy (L loc (HsTyVar data_tv)) ty)
 
     is_hs_tyvar (L _ (HsTyVar n))  = Just n   -- Type variables *and* tycons
     is_hs_tyvar (L _ (HsParTy ty)) = is_hs_tyvar ty
@@ -450,8 +452,11 @@ repDerivs (Just ctxt)
   where
     rep_deriv :: LHsType Name -> DsM (Core TH.Name)
 	-- Deriving clauses must have the simple H98 form
-    rep_deriv (L _ (HsPredTy (HsClassP cls []))) = lookupOcc cls
-    rep_deriv other = notHandled "Non-H98 deriving clause" (ppr other)
+    rep_deriv ty
+      | Just (cls, []) <- splitHsClassTy_maybe (unLoc ty)
+      = lookupOcc cls
+      | otherwise
+      = notHandled "Non-H98 deriving clause" (ppr ty)
 
 
 -------------------------------------------------------
@@ -602,30 +607,24 @@ repContext ctxt = do
 
 -- represent a type predicate
 --
-repLPred :: LHsPred Name -> DsM (Core TH.PredQ)
+repLPred :: LHsType Name -> DsM (Core TH.PredQ)
 repLPred (L _ p) = repPred p
 
-repPred :: HsPred Name -> DsM (Core TH.PredQ)
-repPred (HsClassP cls tys) 
+repPred :: HsType Name -> DsM (Core TH.PredQ)
+repPred ty
+  | Just (cls, tys) <- splitHsClassTy_maybe ty
   = do
       cls1 <- lookupOcc cls
       tys1 <- repLTys tys
       tys2 <- coreList typeQTyConName tys1
       repClassP cls1 tys2
-repPred (HsEqualP tyleft tyright) 
+repPred (HsEqTy tyleft tyright) 
   = do
       tyleft1  <- repLTy tyleft
       tyright1 <- repLTy tyright
       repEqualP tyleft1 tyright1
-repPred p@(HsIParam _ _) = notHandled "Implicit parameter constraint" (ppr p)
-
-repPredTy :: HsPred Name -> DsM (Core TH.TypeQ)
-repPredTy (HsClassP cls tys) 
-  = do
-      tcon <- repTy (HsTyVar cls)
-      tys1 <- repLTys tys
-      repTapps tcon tys1
-repPredTy _ = panic "DsMeta.repPredTy: unexpected equality: internal error"
+repPred ty
+  = notHandled "Exotic predicate type" (ppr ty)
 
 -- yield the representation of a list of types
 --
@@ -669,18 +668,18 @@ repTy (HsPArrTy t)          = do
 			        t1   <- repLTy t
 			        tcon <- repTy (HsTyVar (tyConName parrTyCon))
 			        repTapp tcon t1
-repTy (HsTupleTy Boxed tys)	    = do
+repTy (HsTupleTy (HsBoxyTuple kind) tys)
+  | kind `eqKind` liftedTypeKind = do
 			        tys1 <- repLTys tys 
 			        tcon <- repTupleTyCon (length tys)
 			        repTapps tcon tys1
-repTy (HsTupleTy Unboxed tys)	    = do
+repTy (HsTupleTy HsUnboxedTuple tys) = do
 			        tys1 <- repLTys tys
 			        tcon <- repUnboxedTupleTyCon (length tys)
 			        repTapps tcon tys1
 repTy (HsOpTy ty1 n ty2)    = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1) 
 			    	   `nlHsAppTy` ty2)
 repTy (HsParTy t)  	    = repLTy t
-repTy (HsPredTy pred)       = repPredTy pred
 repTy (HsKindSig t k)       = do
                                 t1 <- repLTy t
                                 k1 <- repKind k

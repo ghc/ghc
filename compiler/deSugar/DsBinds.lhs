@@ -11,8 +11,8 @@ lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
-		 dsHsWrapper, dsTcEvBinds, dsEvBinds, wrapDsEvBinds, 
-		 DsEvBind(..), AutoScc(..)
+		 dsHsWrapper, dsTcEvBinds, dsEvBinds, 
+		 AutoScc(..)
   ) where
 
 #include "HsVersions.h"
@@ -34,15 +34,16 @@ import CoreUnfold
 import CoreFVs
 import Digraph
 
+import TyCon      ( isTupleTyCon, tyConDataCons_maybe )
 import TcType
 import Type
-import Coercion
+import Coercion hiding (substCo)
+import TysWiredIn ( eqBoxDataCon, tupleCon )
 import CostCentre
 import Module
 import Id
-import TyCon	( tyConDataCons )
 import Class
-import DataCon	( dataConRepType )
+import DataCon	( dataConWorkId )
 import Name	( localiseName )
 import MkId	( seqId )
 import Var
@@ -133,7 +134,7 @@ dsHsBind auto_scc (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 	        rhs       = addAutoScc auto_scc global $
 			    wrap_fn $  -- Usually the identity
 			    mkLams tyvars $ mkLams dicts $ 
-	                    wrapDsEvBinds ds_ev_binds $
+	                    mkCoreLets ds_ev_binds $
                             Let core_bind $
                             Var local
     
@@ -161,7 +162,7 @@ dsHsBind auto_scc (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 	      tup_expr     = mkBigCoreVarTup locals
 	      tup_ty	   = exprType tup_expr
 	      poly_tup_rhs = mkLams tyvars $ mkLams dicts $
-	      		     wrapDsEvBinds ds_ev_binds $
+	      		     mkCoreLets ds_ev_binds $
 			     Let core_bind $
 	 	     	     tup_expr
 	      locals       = map abe_mono exports
@@ -187,28 +188,11 @@ dsHsBind auto_scc (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 		    concatOL export_binds_s) }
 
 --------------------------------------
-data DsEvBind 
-  = LetEvBind		-- Dictionary or coercion
-      CoreBind		-- recursive or non-recursive
-
-  | CaseEvBind		-- Coercion binding by superclass selection
-    			-- Desugars to case d of d { K _ g _ _ _ -> ... } 			
-      DictId 		   -- b   The dictionary
-      AltCon 		   -- K   Its constructor
-      [CoreBndr] 	   -- _ g _ _ _   The binders in the alternative
-
-wrapDsEvBinds :: [DsEvBind] -> CoreExpr -> CoreExpr
-wrapDsEvBinds ds_ev_binds body = foldr wrap_one body ds_ev_binds
-  where
-    body_ty = exprType body
-    wrap_one (LetEvBind b)       body = Let b body
-    wrap_one (CaseEvBind x k xs) body = Case (Var x) x body_ty [(k,xs,body)]
-
-dsTcEvBinds :: TcEvBinds -> DsM [DsEvBind]
+dsTcEvBinds :: TcEvBinds -> DsM [CoreBind]
 dsTcEvBinds (TcEvBinds {}) = panic "dsEvBinds"	-- Zonker has got rid of this
 dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
 
-dsEvBinds :: Bag EvBind -> DsM [DsEvBind]
+dsEvBinds :: Bag EvBind -> DsM [CoreBind]
 dsEvBinds bs = return (map dsEvGroup sccs)
   where
     sccs :: [SCC EvBind]
@@ -223,45 +207,60 @@ dsEvBinds bs = return (map dsEvGroup sccs)
     free_vars_of :: EvTerm -> [EvVar]
     free_vars_of (EvId v)           = [v]
     free_vars_of (EvCast v co)      = v : varSetElems (tyCoVarsOfCo co)
-    free_vars_of (EvCoercion co)    = varSetElems (tyCoVarsOfCo co)
+    free_vars_of (EvCoercionBox co) = varSetElems (tyCoVarsOfCo co)
     free_vars_of (EvDFunApp _ _ vs) = vs
+    free_vars_of (EvTupleSel v _)   = [v]
+    free_vars_of (EvTupleMk vs)     = vs
     free_vars_of (EvSuperClass d _) = [d]
 
-dsEvGroup :: SCC EvBind -> DsEvBind
-dsEvGroup (AcyclicSCC (EvBind co_var (EvSuperClass dict n)))
-  | isCoVar co_var	 -- An equality superclass
-  = ASSERT( null other_data_cons )
-    CaseEvBind dict (DataAlt data_con) bndrs
-  where
-    (cls, tys) = getClassPredTys (evVarPred dict)
-    (data_con:other_data_cons) = tyConDataCons (classTyCon cls)
-    (ex_tvs, theta, rho) = tcSplitSigmaTy (applyTys (dataConRepType data_con) tys)
-    (arg_tys, _) = splitFunTys rho
-    bndrs = ex_tvs ++ map mk_wild_pred (theta `zip` [0..])
-                   ++ map mkWildValBinder arg_tys
-    mk_wild_pred (p, i) | i==n      = ASSERT( p `eqPred` (coVarPred co_var)) 
-                                      co_var
-                        | otherwise = mkWildEvBinder p
-    
+dsEvGroup :: SCC EvBind -> CoreBind
+
 dsEvGroup (AcyclicSCC (EvBind v r))
-  = LetEvBind (NonRec v (dsEvTerm r))
+  = NonRec v (dsEvTerm r)
 
 dsEvGroup (CyclicSCC bs)
-  = LetEvBind (Rec (map ds_pair bs))
+  = Rec (map ds_pair bs)
   where
     ds_pair (EvBind v r) = (v, dsEvTerm r)
 
+dsLCoercion :: LCoercion -> (Coercion -> CoreExpr) -> CoreExpr
+dsLCoercion co k = foldr go (k (substCo subst co)) eqvs_covs
+  where
+    -- We use the same uniques for the EqVars and the CoVars, and just change
+    -- the type. So the CoVars shadow the EqVars
+    --
+    -- NB: DON'T try to cheat and not substitute into the LCoercion to change the
+    -- types of the free variables: -ddump-ds will panic if you do this since it
+    -- runs before we substitute CoVar occurrences out for their binding sites.
+    eqvs_covs = [(eqv, eqv `setIdType` mkCoercionType ty1 ty2)
+                | eqv <- varSetElems (coVarsOfCo co)
+                , let (ty1, ty2) = getEqPredTys (evVarPred eqv)]
+
+    subst = extendCvSubstList (mkEmptySubst (mkInScopeSet (tyCoVarsOfCo co)))
+                              [(eqv, mkCoVarCo cov) | (eqv, cov) <- eqvs_covs]
+
+    go (eqv, cov) e = Case (Var eqv) (mkWildValBinder (varType eqv)) (exprType e)
+                           [(DataAlt eqBoxDataCon, [cov], e)]
+
 dsEvTerm :: EvTerm -> CoreExpr
 dsEvTerm (EvId v)                = Var v
-dsEvTerm (EvCast v co)           = Cast (Var v) co
+dsEvTerm (EvCast v co)           = dsLCoercion co $ Cast (Var v)
 dsEvTerm (EvDFunApp df tys vars) = Var df `mkTyApps` tys `mkVarApps` vars
-dsEvTerm (EvCoercion co)         = Coercion co
+dsEvTerm (EvCoercionBox co)      = dsLCoercion co mkEqBox
+dsEvTerm (EvTupleSel v n)
+   = ASSERT( isTupleTyCon tc )
+     Case (Var v) (mkWildValBinder (varType v)) (tys !! n) [(DataAlt dc, xs, Var v')]
+  where
+    (tc, tys) = splitTyConApp (evVarPred v)
+    Just [dc] = tyConDataCons_maybe tc
+    v' = v `setVarType` ty_want
+    xs = map mkWildValBinder tys_before ++ v' : map mkWildValBinder tys_after
+    (tys_before, ty_want:tys_after) = splitAt n tys
+dsEvTerm (EvTupleMk vs) = Var (dataConWorkId dc) `mkTyApps` tys `mkVarApps` vs
+  where dc = tupleCon FactTuple (length vs)
+        tys = map varType vs
 dsEvTerm (EvSuperClass d n)
-  = ASSERT( isClassPred (classSCTheta cls !! n) )
-    	    -- We can only select *dictionary* superclasses
-	    -- in terms.  Equality superclasses are dealt with
-	    -- in dsEvGroup, where they can generate a case expression
-    Var sc_sel_id `mkTyApps` tys `App` Var d
+  = Var sc_sel_id `mkTyApps` tys `App` Var d
   where
     sc_sel_id  = classSCSelId cls n	-- Zero-indexed
     (cls, tys) = getClassPredTys (evVarPred d)    
@@ -736,12 +735,14 @@ dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
 dsHsWrapper WpHole 	      = return (\e -> e)
 dsHsWrapper (WpTyApp ty)      = return (\e -> App e (Type ty))
 dsHsWrapper (WpLet ev_binds)  = do { ds_ev_binds <- dsTcEvBinds ev_binds
-                                   ; return (wrapDsEvBinds ds_ev_binds) }
+                                   ; return (mkCoreLets ds_ev_binds) }
 dsHsWrapper (WpCompose c1 c2) = do { k1 <- dsHsWrapper c1 
                                    ; k2 <- dsHsWrapper c2
                                    ; return (k1 . k2) }
-dsHsWrapper (WpCast co)       = return (\e -> Cast e co) 
+dsHsWrapper (WpCast co)
+  = return (\e -> dsLCoercion co (Cast e)) 
 dsHsWrapper (WpEvLam ev)      = return (\e -> Lam ev e) 
 dsHsWrapper (WpTyLam tv)      = return (\e -> Lam tv e) 
-dsHsWrapper (WpEvApp evtrm)   = return (\e -> App e (dsEvTerm evtrm))
+dsHsWrapper (WpEvApp evtrm)
+  = return (\e -> App e (dsEvTerm evtrm))
 \end{code}

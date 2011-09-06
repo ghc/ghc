@@ -155,15 +155,15 @@ matchNameMaker ctxt = LamMk report_unused
                       StmtCtxt GhciStmt -> False
                       _                 -> True
 
-newName :: NameMaker -> Located RdrName -> CpsRn Name
-newName (LamMk report_unused) rdr_name
+newPatName :: NameMaker -> Located RdrName -> CpsRn Name
+newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside -> 
 	do { name <- newLocalBndrRn rdr_name
 	   ; (res, fvs) <- bindLocalName name (thing_inside name)
 	   ; when report_unused $ warnUnusedMatches [name] fvs
 	   ; return (res, name `delFV` fvs) })
 
-newName (LetMk is_top fix_env) rdr_name
+newPatName (LetMk is_top fix_env) rdr_name
   = CpsRn (\ thing_inside -> 
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
@@ -253,7 +253,7 @@ rnPat ctxt pat thing_inside
   = rnPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
 
 applyNameMaker :: NameMaker -> Located RdrName -> RnM Name
-applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newName mk rdr); return n }
+applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatName mk rdr); return n }
 
 -- ----------- Entry point 2: rnBindPat -------------------
 -- Binds local names; in a recursive scope that involves other bound vars
@@ -298,7 +298,7 @@ rnPatAndThen mk (ParPat pat)  = do { pat' <- rnLPatAndThen mk pat; return (ParPa
 rnPatAndThen mk (LazyPat pat) = do { pat' <- rnLPatAndThen mk pat; return (LazyPat pat') }
 rnPatAndThen mk (BangPat pat) = do { pat' <- rnLPatAndThen mk pat; return (BangPat pat') }
 rnPatAndThen mk (VarPat rdr)  = do { loc <- liftCps getSrcSpanM
-                                   ; name <- newName mk (L loc rdr)
+                                   ; name <- newPatName mk (L loc rdr)
                                    ; return (VarPat name) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
@@ -334,7 +334,7 @@ rnPatAndThen _ (NPat lit mb_neg _eq)
        ; return (NPat lit' mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat rdr lit _ _)
-  = do { new_name <- newName mk rdr
+  = do { new_name <- newPatName mk rdr
        ; lit'  <- liftCpsFV $ rnOverLit lit
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
@@ -342,7 +342,7 @@ rnPatAndThen mk (NPlusKPat rdr lit _ _)
 	   	-- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat rdr pat)
-  = do { new_name <- newName mk rdr
+  = do { new_name <- newPatName mk rdr
        ; pat' <- rnLPatAndThen mk pat
        ; return (AsPat (L (nameSrcSpan new_name) new_name) pat') }
 

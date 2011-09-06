@@ -22,7 +22,7 @@ module Class (
 #include "Typeable.h"
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCon	( TyCon )
+import {-# SOURCE #-} TyCon	( TyCon, tyConName, tyConUnique )
 import {-# SOURCE #-} TypeRep	( PredType )
 
 import Var
@@ -49,14 +49,14 @@ A @Class@ corresponds to a Greek kappa in the static semantics:
 data Class
   = Class {
 	classKey  :: Unique,		-- Key for fast comparison
-	className :: Name,
+	className :: Name,              -- Just the cached name of the TyCon
 	
 	classTyVars  :: [TyVar],	-- The class type variables
 	classFunDeps :: [FunDep TyVar],	-- The functional dependencies
 
 	-- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
-        -- We need value-level selectors for the dictionary 
-	-- superclasses, but not for the equality superclasses
+        -- We need value-level selectors for both the dictionary 
+	-- superclasses and the equality superclasses
 	classSCTheta :: [PredType],	-- Immediate superclasses, 
 	classSCSels  :: [Id],		-- Selector functions to extract the
 		     			--   superclasses from a 
@@ -98,7 +98,7 @@ defMethSpecOfDefMeth meth
 The @mkClass@ function fills in the indirect superclasses.
 
 \begin{code}
-mkClass :: Name -> [TyVar]
+mkClass :: [TyVar]
 	-> [([TyVar], [TyVar])]
 	-> [PredType] -> [Id]
 	-> [TyCon]
@@ -106,10 +106,10 @@ mkClass :: Name -> [TyVar]
 	-> TyCon
 	-> Class
 
-mkClass name tyvars fds super_classes superdict_sels ats 
+mkClass tyvars fds super_classes superdict_sels ats 
 	op_stuff tycon
-  = Class {	classKey     = getUnique name, 
-		className    = name,
+  = Class {	classKey     = tyConUnique tycon, 
+		className    = tyConName tycon,
 		classTyVars  = tyvars,
 		classFunDeps = fds,
 		classSCTheta = super_classes,
@@ -222,4 +222,3 @@ instance Data.Data Class where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "Class"
 \end{code}
-

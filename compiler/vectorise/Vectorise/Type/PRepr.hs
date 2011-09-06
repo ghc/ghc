@@ -13,7 +13,6 @@ import CoreUtils
 import MkCore		 ( mkWildCase )
 import TyCon
 import Type
-import Kind
 import BuildTyCl
 import OccName
 import Coercion

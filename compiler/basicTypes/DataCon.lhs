@@ -47,11 +47,11 @@ import TyCon
 import Class
 import Name
 import Var
-import BasicTypes
 import Outputable
 import Unique
 import ListSetOps
 import Util
+import BasicTypes
 import FastString
 import Module
 
@@ -535,7 +535,7 @@ mkDataCon name declared_infix
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
     full_theta   = eqSpecPreds eq_spec ++ theta
-    real_arg_tys = mkPredTys full_theta               ++ orig_arg_tys
+    real_arg_tys = full_theta                         ++ orig_arg_tys
     real_stricts = map mk_dict_strict_mark full_theta ++ arg_stricts
 
 	-- Representation arguments and demands
@@ -551,8 +551,9 @@ eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
 
 mk_dict_strict_mark :: PredType -> HsBang
-mk_dict_strict_mark pred | isStrictPred pred = HsStrict
-		         | otherwise	     = HsNoBang
+mk_dict_strict_mark pred | isEqPred pred = HsUnpack
+			 | otherwise     = HsNoBang
+
 \end{code}
 
 \begin{code}
@@ -658,7 +659,7 @@ dataConStrictMarks = dcStrictMarks
 -- | Strictness of evidence arguments to the wrapper function
 dataConExStricts :: DataCon -> [HsBang]
 -- Usually empty, so we don't bother to cache this
-dataConExStricts dc = map mk_dict_strict_mark $ (dataConTheta dc)
+dataConExStricts dc = map mk_dict_strict_mark (dataConTheta dc)
 
 -- | Source-level arity of the data constructor
 dataConSourceArity :: DataCon -> Arity
@@ -746,7 +747,7 @@ dataConUserType  (MkData { dcUnivTyVars = univ_tvs,
 			   dcOtherTheta = theta, dcOrigArgTys = arg_tys,
 			   dcOrigResTy = res_ty })
   = mkForAllTys ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs) $
-    mkFunTys (mkPredTys theta) $
+    mkFunTys theta $
     mkFunTys arg_tys $
     res_ty
 
@@ -841,11 +842,16 @@ dataConCannotMatch tys con
   | all isTyVarTy tys = False	-- Also common
   | otherwise
   = typesCantMatch [(Type.substTy subst ty1, Type.substTy subst ty2)
-                   | EqPred ty1 ty2 <- theta ]
+                   | (ty1, ty2) <- concatMap (predEqs . predTypePredTree) theta ]
   where
     dc_tvs  = dataConUnivTyVars con
     theta   = dataConTheta con
     subst   = zipTopTvSubst dc_tvs tys
+
+    -- TODO: could gather equalities from superclasses too
+    predEqs (EqPred ty1 ty2) = [(ty1, ty2)]
+    predEqs (TuplePred ts)   = concatMap predEqs ts
+    predEqs _                = []
 \end{code}
 
 %************************************************************************

@@ -104,7 +104,6 @@ listModuleTags m = do
     tyThing2TagKind (AnId _)     = 'v'
     tyThing2TagKind (ADataCon _) = 'd'
     tyThing2TagKind (ATyCon _)   = 't'
-    tyThing2TagKind (AClass _)   = 'c'
     tyThing2TagKind (ACoAxiom _) = 'x'
 
 

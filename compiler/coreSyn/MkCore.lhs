@@ -13,6 +13,12 @@ module MkCore (
         mkIntegerExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS,
+
+        -- * Constructing/deconstructing implicit parameter boxes
+        mkIPUnbox, mkIPBox,
+
+        -- * Constructing/deconstructing equality evidence boxes
+        mkEqBox,
         
         -- * Constructing general big tuples
         -- $big_tuples
@@ -45,7 +51,7 @@ module MkCore (
 #include "HsVersions.h"
 
 import Id
-import Var      ( EvVar, setTyVarUnique )
+import Var      ( IpId, EvVar, setTyVarUnique )
 
 import CoreSyn
 import CoreUtils        ( exprType, needsCaseBinding, bindNonRec )
@@ -55,19 +61,21 @@ import HscTypes
 import TysWiredIn
 import PrelNames
 
-import TcType		( mkSigmaTy )
+import IParam           ( ipCoAxiom )
+import TcType		( mkSigmaTy, evVarPred )
 import Type
 import Coercion
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
 import IdInfo		( vanillaIdInfo, setStrictnessInfo, setArityInfo )
 import Demand
-import Name
+import Name      hiding ( varName )
 import Outputable
 import FastString
 import UniqSupply
 import BasicTypes
 import Util             ( notNull, zipEqual )
+import Pair
 import Constants
 
 import Data.Char        ( ord )
@@ -151,7 +159,7 @@ mk_val_app fun arg arg_ty res_ty
 	-- fragmet of it as the fun part of a 'mk_val_app'.
 
 mkWildEvBinder :: PredType -> EvVar
-mkWildEvBinder pred = mkWildValBinder (mkPredTy pred)
+mkWildEvBinder pred = mkWildValBinder pred
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder 
 -- that you expect to use only at a *binding* site.  Do not use it at
@@ -286,6 +294,29 @@ mkStringExprFS str
     safeChar c = ord c >= 1 && ord c <= 0x7F
 \end{code}
 
+\begin{code}
+
+mkIPBox :: IPName IpId -> CoreExpr -> CoreExpr
+mkIPBox ipx e = e `Cast` mkSymCo (mkAxInstCo (ipCoAxiom ip) [ty])
+  where x = ipNameName ipx
+        Just (ip, ty) = getIPPredTy_maybe (evVarPred x)
+        -- NB: don't use the DataCon work id because we don't generate code for it
+
+mkIPUnbox :: IPName IpId -> CoreExpr
+mkIPUnbox ipx = Var x `Cast` mkAxInstCo (ipCoAxiom ip) [ty]
+  where x = ipNameName ipx
+        Just (ip, ty) = getIPPredTy_maybe (evVarPred x)
+
+\end{code}
+
+\begin{code}
+
+mkEqBox :: Coercion -> CoreExpr
+mkEqBox co = Var (dataConWorkId eqBoxDataCon) `mkTyApps` [ty1, ty2] `App` Coercion co
+  where Pair ty1 ty2 = coercionKind co
+
+\end{code}
+
 %************************************************************************
 %*                                                                      *
 \subsection{Tuple constructors}
@@ -360,7 +391,7 @@ mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 mkCoreTup :: [CoreExpr] -> CoreExpr
 mkCoreTup []  = Var unitDataConId
 mkCoreTup [c] = c
-mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
+mkCoreTup cs  = mkConApp (tupleCon BoxedTuple (length cs))
                          (map (Type . exprType) cs ++ cs)
 
 -- | Build a big tuple holding the specified variables
@@ -444,7 +475,7 @@ mkSmallTupleSelector [var] should_be_the_same_var _ scrut
 mkSmallTupleSelector vars the_var scrut_var scrut
   = ASSERT( notNull vars )
     Case scrut scrut_var (idType the_var)
-         [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
+         [(DataAlt (tupleCon BoxedTuple (length vars)), vars, Var the_var)]
 \end{code}
 
 \begin{code}
@@ -501,7 +532,7 @@ mkSmallTupleCase [var] body _scrut_var scrut
   = bindNonRec var scrut body
 mkSmallTupleCase vars body scrut_var scrut
 -- One branch no refinement?
-  = Case scrut scrut_var (exprType body) [(DataAlt (tupleCon Boxed (length vars)), vars, body)]
+  = Case scrut scrut_var (exprType body) [(DataAlt (tupleCon BoxedTuple (length vars)), vars, body)]
 \end{code}
 
 %************************************************************************

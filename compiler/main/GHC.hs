@@ -145,7 +145,7 @@ module GHC (
 	TyCon, 
 	tyConTyVars, tyConDataCons, tyConArity,
 	isClassTyCon, isSynTyCon, isNewTyCon, isPrimTyCon, isFunTyCon,
-	isFamilyTyCon,
+	isFamilyTyCon, tyConClass_maybe,
 	synTyConDefn, synTyConType, synTyConResKind,
 
 	-- ** Type variables
@@ -173,7 +173,7 @@ module GHC (
 	pprParendType, pprTypeApp, 
 	Kind,
 	PredType,
-	ThetaType, pprForAll, pprThetaArrow, pprThetaArrowTy,
+	ThetaType, pprForAll, pprThetaArrowTy,
 
 	-- ** Entities
 	TyThing(..), 
@@ -254,7 +254,7 @@ import NameSet
 import RdrName
 import qualified HsSyn -- hack as we want to reexport the whole module
 import HsSyn hiding ((<.>))
-import Type
+import Type     hiding( typeKind )
 import Coercion		( synTyConResKind )
 import TcType		hiding( typeKind )
 import Id

@@ -17,7 +17,7 @@ module RnEnv (
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
 	getLookupOccRn, addUsedRdrNames,
 
-	newLocalBndrRn, newLocalBndrsRn, newIPNameRn,
+	newLocalBndrRn, newLocalBndrsRn,
 	bindLocalName, bindLocalNames, bindLocalNamesFV, 
 	MiniFixityEnv, emptyFsEnv, extendFsEnv, lookupFsEnv,
 	addLocalFixities,
@@ -36,7 +36,7 @@ module RnEnv (
 #include "HsVersions.h"
 
 import LoadIface	( loadInterfaceForName, loadSrcInterface )
-import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName, updNameCache, extendNameCache )
+import IfaceEnv		( lookupOrig, newGlobalBinder, updNameCache, extendNameCache )
 import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
@@ -351,9 +351,6 @@ lookupSubBndrGREs env parent rdr_name
 
     parent_is p (GRE { gre_par = ParentIs p' }) = p == p'
     parent_is _ _                               = False
-
-newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
-newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
 \end{code}
 
 Note [Looking up Exact RdrNames]

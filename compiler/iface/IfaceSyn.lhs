@@ -40,6 +40,7 @@ import BasicTypes
 import Outputable
 import FastString
 import Module
+import TysWiredIn ( eqTyConName )
 
 infixl 3 &&&
 \end{code}
@@ -84,7 +85,7 @@ data IfaceDecl
     }
 
   | IfaceClass { ifCtxt    :: IfaceContext,     -- Context...
-                 ifName    :: OccName,          -- Name of the class
+                 ifName    :: OccName,          -- Name of the class TyCon
                  ifTyVars  :: [IfaceTvBndr],    -- Type variables
                  ifFDs     :: [FunDep FastString], -- Functional dependencies
                  ifATs     :: [IfaceDecl],      -- Associated type families
@@ -224,9 +225,10 @@ data IfaceUnfolding
 data IfaceExpr
   = IfaceLcl    IfLclName
   | IfaceExt    IfExtName
+  | IfaceTupId  TupleSort Arity
   | IfaceType   IfaceType
   | IfaceCo     IfaceType		-- We re-use IfaceType for coercions
-  | IfaceTuple 	Boxity [IfaceExpr]	-- Saturated; type arguments omitted
+  | IfaceTuple 	TupleSort [IfaceExpr]	-- Saturated; type arguments omitted
   | IfaceLam 	IfaceBndr IfaceExpr
   | IfaceApp 	IfaceExpr IfaceExpr
   | IfaceCase	IfaceExpr IfLclName [IfaceAlt]
@@ -247,7 +249,7 @@ type IfaceAlt = (IfaceConAlt, [IfLclName], IfaceExpr)
 
 data IfaceConAlt = IfaceDefault
                  | IfaceDataAlt IfExtName
-                 | IfaceTupleAlt Boxity
+                 | IfaceTupleAlt TupleSort
                  | IfaceLitAlt Literal
 
 data IfaceBinding
@@ -371,12 +373,9 @@ ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
           has_wrapper = ifConWrapper con_decl     -- This is the reason for
                                                   -- having the ifConWrapper field!
 
-ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ,
+ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_tc_occ,
                                ifSigs = sigs, ifATs = ats })
-  = -- dictionary datatype:
-    --   type constructor
-    tc_occ :
-    --   (possibly) newtype coercion
+  = --   (possibly) newtype coercion
     co_occs ++
     --    data constructor (DataCon namespace)
     --    data worker (Id namespace)
@@ -385,17 +384,16 @@ ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ,
     -- associated types
     [ifName at | at <- ats ] ++
     -- superclass selectors
-    [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] ++
+    [mkSuperDictSelOcc n cls_tc_occ | n <- [1..n_ctxt]] ++
     -- operation selectors
     [op | IfaceClassOp op  _ _ <- sigs]
   where
     n_ctxt = length sc_ctxt
     n_sigs = length sigs
-    tc_occ  = mkClassTyConOcc cls_occ
-    dc_occ  = mkClassDataConOcc cls_occ
-    co_occs | is_newtype = [mkNewTyCoOcc tc_occ]
+    co_occs | is_newtype = [mkNewTyCoOcc cls_tc_occ]
             | otherwise  = []
     dcww_occ = mkDataConWorkerOcc dc_occ
+    dc_occ = mkClassDataConOcc cls_tc_occ
     is_newtype = n_sigs + n_ctxt == 1 -- Sigh
 
 ifaceDeclSubBndrs (IfaceSyn {ifName = tc_occ,
@@ -478,6 +476,9 @@ pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
                                                             (map (pprIfaceConDecl tc) cs))
 
+mkIfaceEqPred :: IfaceType -> IfaceType -> IfacePredType
+mkIfaceEqPred ty1 ty2 = IfaceTyConApp (IfaceTc eqTyConName) [ty1, ty2]
+
 pprIfaceConDecl :: OccName -> IfaceConDecl -> SDoc
 pprIfaceConDecl tc
         (IfCon { ifConOcc = name, ifConInfix = is_infix, ifConWrapper = has_wrap,
@@ -498,7 +499,7 @@ pprIfaceConDecl tc
     main_payload = ppr name <+> dcolon <+>
                    pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) pp_tau
 
-    eq_ctxt = [(IfaceEqPred (IfaceTyVar (occNameFS tv)) ty)
+    eq_ctxt = [(mkIfaceEqPred (IfaceTyVar (occNameFS tv)) ty)
               | (tv,ty) <- eq_spec]
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
@@ -555,6 +556,7 @@ pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 
 pprIfaceExpr _       (IfaceLcl v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
+pprIfaceExpr _       (IfaceTupId c n)   = tupleParens c (hcat (replicate (n - 1) (char ',')))
 pprIfaceExpr _       (IfaceLit l)       = ppr l
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprIfaceExpr _       (IfaceTick m ix)   = braces (text "tick" <+> ppr m <+> ppr ix)
@@ -720,7 +722,7 @@ freeNamesIfTcFam Nothing =
   emptyNameSet
 
 freeNamesIfContext :: IfaceContext -> NameSet
-freeNamesIfContext = fnList freeNamesIfPredType
+freeNamesIfContext = fnList freeNamesIfType
 
 freeNamesIfDecls :: [IfaceDecl] -> NameSet
 freeNamesIfDecls = fnList freeNamesIfDecl
@@ -741,18 +743,9 @@ freeNamesIfConDecl c =
   fnList freeNamesIfType (ifConArgTys c) &&&
   fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints
 
-freeNamesIfPredType :: IfacePredType -> NameSet
-freeNamesIfPredType (IfaceClassP cl tys) =
-   unitNameSet cl &&& fnList freeNamesIfType tys
-freeNamesIfPredType (IfaceIParam _n ty) =
-   freeNamesIfType ty
-freeNamesIfPredType (IfaceEqPred ty1 ty2) =
-   freeNamesIfType ty1 &&& freeNamesIfType ty2
-
 freeNamesIfType :: IfaceType -> NameSet
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
-freeNamesIfType (IfacePredTy st)      = freeNamesIfPredType st
 freeNamesIfType (IfaceTyConApp tc ts) =
    freeNamesIfTc tc &&& fnList freeNamesIfType ts
 freeNamesIfType (IfaceForAllTy tv t)  =
@@ -800,6 +793,7 @@ freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr vs
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)      = unitNameSet v
+freeNamesIfExpr (IfaceTupId _ _)  = emptyNameSet
 freeNamesIfExpr (IfaceFCall _ ty) = freeNamesIfType ty
 freeNamesIfExpr (IfaceType ty)    = freeNamesIfType ty
 freeNamesIfExpr (IfaceCo co)      = freeNamesIfType co
@@ -839,6 +833,7 @@ freeNamesIfTc _ = emptyNameSet
 
 freeNamesIfCo :: IfaceCoCon -> NameSet
 freeNamesIfCo (IfaceCoAx tc) = unitNameSet tc
+-- ToDo: include IfaceIPCoAx? Probably not necessary.
 freeNamesIfCo _ = emptyNameSet
 
 freeNamesIfRule :: IfaceRule -> NameSet

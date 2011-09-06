@@ -43,17 +43,17 @@ import Control.Monad
 \begin{code}
 tcProc :: InPat Name -> LHsCmdTop Name		-- proc pat -> expr
        -> TcRhoType				-- Expected type of whole proc expression
-       -> TcM (OutPat TcId, LHsCmdTop TcId, Coercion)
+       -> TcM (OutPat TcId, LHsCmdTop TcId, LCoercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
-    do	{ (coi, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty 
-	; (coi1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
+    do	{ (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty 
+	; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
 			  tcCmdTop cmd_env cmd [] res_ty
-        ; let res_coi = mkTransCo coi (mkAppCo coi1 (mkReflCo res_ty))
-        ; return (pat', cmd', res_coi) }
+        ; let res_co = mkTransCo co (mkAppCo co1 (mkReflCo res_ty))
+        ; return (pat', cmd', res_co) }
 \end{code}
 
 

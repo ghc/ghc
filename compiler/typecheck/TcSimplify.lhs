@@ -444,7 +444,7 @@ quantifyMe :: TyVarSet      -- Quantifying over these
 	   -> Bool	    -- True <=> quantify over this wanted
 quantifyMe qtvs wev
   | isIPPred pred = True  -- Note [Inheriting implicit parameters]
-  | otherwise	  = tyVarsOfPred pred `intersectsVarSet` qtvs
+  | otherwise	  = tyVarsOfType pred `intersectsVarSet` qtvs
   where
     pred = evVarOfPred wev
 \end{code}
@@ -885,8 +885,8 @@ floatEqualities skols can_given wantders
   
 
   where is_floatable :: FlavoredEvVar -> Bool
-        is_floatable (EvVarX cv _fl)
-          | isCoVar cv = skols `disjointVarSet` predTvs_under_fsks (coVarPred cv)
+        is_floatable (EvVarX eqv _fl)
+          | isEqPred (evVarPred eqv) = skols `disjointVarSet` tvs_under_fsks (evVarPred eqv)
         is_floatable _flev = False
 
         tvs_under_fsks :: Type -> TyVarSet
@@ -896,7 +896,6 @@ floatEqualities skols can_given wantders
           | FlatSkol ty <- tcTyVarDetails tv = tvs_under_fsks ty
           | otherwise                        = unitVarSet tv
         tvs_under_fsks (TyConApp _ tys) = unionVarSets (map tvs_under_fsks tys)
-        tvs_under_fsks (PredTy sty)     = predTvs_under_fsks sty
         tvs_under_fsks (FunTy arg res)  = tvs_under_fsks arg `unionVarSet` tvs_under_fsks res
         tvs_under_fsks (AppTy fun arg)  = tvs_under_fsks fun `unionVarSet` tvs_under_fsks arg
         tvs_under_fsks (ForAllTy tv ty) -- The kind of a coercion binder 
@@ -906,11 +905,6 @@ floatEqualities skols can_given wantders
                                         inner_tvs `unionVarSet` tvs_under_fsks (tyVarKind tv)
           where
             inner_tvs = tvs_under_fsks ty
-
-        predTvs_under_fsks :: PredType -> TyVarSet
-        predTvs_under_fsks (IParam _ ty)    = tvs_under_fsks ty
-        predTvs_under_fsks (ClassP _ tys)   = unionVarSets (map tvs_under_fsks tys)
-        predTvs_under_fsks (EqPred ty1 ty2) = tvs_under_fsks ty1 `unionVarSet` tvs_under_fsks ty2
 \end{code}
 
 Note [Preparing inert set for implications]
@@ -1051,7 +1045,7 @@ solveCTyFunEqs cts
       ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
   where
     solve_one (cv,tv,ty) = do { setWantedTyBind tv ty
-                              ; setCoBind cv (mkReflCo ty) }
+                              ; setEqBind cv (mkReflCo ty) }
 
 ------------
 type FunEqBinds = (TvSubstEnv, [(CoVar, TcTyVar, TcType)])
@@ -1201,9 +1195,9 @@ defaultTyVar :: TcsUntouchables -> TcTyVar -> TcS (Bag FlavoredEvVar)
 defaultTyVar untch the_tv 
   | isTouchableMetaTyVar_InRange untch the_tv
   , not (k `eqKind` default_k)
-  = do { ev <- TcSMonad.newKindConstraint the_tv default_k
+  = do { eqv <- TcSMonad.newKindConstraint the_tv default_k
        ; let loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
-       ; return (unitBag (mkEvVarX ev (Wanted loc))) }
+       ; return (unitBag (mkEvVarX eqv (Wanted loc))) }
   | otherwise            
   = return emptyBag	 -- The common case
   where
@@ -1274,9 +1268,9 @@ disambigGroup [] _inert _grp
   = return emptyBag
 disambigGroup (default_ty:default_tys) inert group
   = do { traceTcS "disambigGroup" (ppr group $$ ppr default_ty)
-       ; ev <- TcSMonad.newCoVar (mkTyVarTy the_tv) default_ty
+       ; eqv <- TcSMonad.newEqVar (mkTyVarTy the_tv) default_ty
        ; let der_flav = mk_derived_flavor (cc_flavor the_ct)
-             derived_eq = mkEvVarX ev der_flav
+             derived_eq = mkEvVarX eqv der_flav
 
        ; success <- tryTcS $
                     do { (_,final_inert) <- solveInteract inert $ listToBag $

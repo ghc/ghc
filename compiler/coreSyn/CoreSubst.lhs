@@ -51,6 +51,7 @@ import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substC
 
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
+import PrelNames   ( eqBoxDataConKey )
 import Module	   ( Module )
 import VarSet
 import VarEnv
@@ -768,12 +769,37 @@ InlVanilla.  The WARN is just so I can see if it happens a lot.
 %*									*
 %************************************************************************
 
+Note [Optimise coercion boxes agressively]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The simple expression optimiser has special cases for Eq# boxes as follows:
+ 1. If the result of optimising the RHS of a non-recursive binding is an
+    Eq# box, that box is substituted rather than turned into a let, just as
+    if it were trivial.
+
+ 2. If the result of optimising a case scrutinee is a Eq# box and the case
+    deconstructs it in a trivial way, we evaluate the case then and there.
+
+We do this for two reasons:
+
+ 1. Bindings/case scrutinisation of this form is often created by the
+    evidence-binding mechanism and we need them to be inlined to be able
+    desugar RULE LHSes that involve equalities (see e.g. T2291)
+
+ 2. The test T4356 fails Lint because it creates a coercion between types
+    of kind (* -> * -> *) and (?? -> ? -> *), which differ. If we do this
+    inlining agressively we can collapse away the intermediate coercion between
+    these two types and hence pass Lint again. (This is a sort of a hack.)
+
 \begin{code}
 simpleOptExpr :: CoreExpr -> CoreExpr
 -- Do simple optimisation on an expression
 -- The optimisation is very straightforward: just
 -- inline non-recursive bindings that are used only once, 
 -- or where the RHS is trivial
+--
+-- We also inline bindings that bind a Eq# box: see
+-- See Note [Optimise coercion boxes agressively].
 --
 -- The result is NOT guaranteed occurence-analysed, becuase
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
@@ -849,10 +875,19 @@ simple_opt_expr' subst expr
                            (subst', Just bind) -> Let bind (simple_opt_expr subst' body)
 
     go lam@(Lam {})     = go_lam [] subst lam
-    go (Case e b ty as) = Case (go e) b' (substTy subst ty)
-       			       (map (go_alt subst') as)
-       		        where
-       		  	  (subst', b') = subst_opt_bndr subst b
+    go (Case e b ty as)
+      | [(DataAlt dc, [cov], e_alt)] <- as -- See Note [Optimise coercion boxes agressively]
+      , dc `hasKey` eqBoxDataConKey
+      , (Var fun, [Type _, Type _, Coercion co]) <- collectArgs e'
+      , isDataConWorkId fun
+      , isDeadBinder b
+      = simple_opt_expr (extendCvSubst subst cov co) e_alt
+      | otherwise
+      = Case (go e) b' (substTy subst ty)
+       		       (map (go_alt subst') as)
+        where
+          e' = go e
+          (subst', b') = subst_opt_bndr subst b
 
     ----------------------
     go_alt subst (con, bndrs, rhs) 
@@ -944,8 +979,14 @@ maybe_substitute subst b r
     safe_to_inline :: OccInfo -> Bool
     safe_to_inline (IAmALoopBreaker {})     = False
     safe_to_inline IAmDead                  = True
-    safe_to_inline (OneOcc in_lam one_br _) = (not in_lam && one_br) || exprIsTrivial r
-    safe_to_inline NoOccInfo                = exprIsTrivial r
+    safe_to_inline (OneOcc in_lam one_br _) = (not in_lam && one_br) || trivial
+    safe_to_inline NoOccInfo                = trivial
+
+    trivial | exprIsTrivial r = True
+            | (Var fun, _args) <- collectArgs r
+            , Just dc <- isDataConWorkId_maybe fun
+            , dc `hasKey` eqBoxDataConKey = True -- See Note [Optimise coercion boxes agressively]
+            | otherwise = False
 
 ----------------------
 subst_opt_bndr :: Subst -> InVar -> (Subst, OutVar)

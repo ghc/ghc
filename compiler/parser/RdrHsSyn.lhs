@@ -33,17 +33,17 @@ module RdrHsSyn (
 	-- checking and constructing values
 	checkPrecP, 	      -- Int -> P Int
 	checkContext,	      -- HsType -> P HsContext
-	checkPred,	      -- HsType -> P HsPred
 	checkTyVars,          -- [LHsType RdrName] -> P ()
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
 	checkInstType,	      -- HsType -> P HsType
 	checkPattern,	      -- HsExp -> P HsPat
-	bang_RDR,
+        bang_RDR,
 	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
 	checkMonadComp,       -- P (HsStmtContext RdrName)
 	checkValDef,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	checkValSig,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	checkDoAndIfThenElse,
+        checkKindName,
 	parseError,	    
 	parseErrorSDoc,	    
     ) where
@@ -53,13 +53,15 @@ import Class            ( FunDep )
 import TypeRep          ( Kind )
 import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
-import Name             ( Name )
+import OccName          ( occNameFS )
+import Name             ( Name, nameOccName )
 import BasicTypes	( maxPrecedence, Activation(..), RuleMatchInfo,
                           InlinePragma(..), InlineSpec(..) )
 import Lexer
-import TysWiredIn	( unitTyCon ) 
+import TysWiredIn	( unitTyCon )
+import TysPrim          ( constraintKindTyConName, constraintKind )
 import ForeignCall
-import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
+import OccName  	( srcDataName, varName, isDataOcc, isTcOcc,
 			  occNameString )
 import PrelNames	( forall_tv_RDR )
 import DynFlags
@@ -102,13 +104,8 @@ extractHsRhoRdrTyVars :: LHsContext RdrName -> LHsType RdrName -> [Located RdrNa
 extractHsRhoRdrTyVars ctxt ty 
  = nubBy eqLocated $ extract_lctxt ctxt (extract_lty ty [])
 
-extract_lctxt :: Located [LHsPred RdrName] -> [Located RdrName] -> [Located RdrName]
-extract_lctxt ctxt acc = foldr (extract_pred . unLoc) acc (unLoc ctxt)
-
-extract_pred :: HsPred RdrName -> [Located RdrName] -> [Located RdrName]
-extract_pred (HsClassP _   tys) acc = extract_ltys tys acc
-extract_pred (HsEqualP ty1 ty2) acc = extract_lty ty1 (extract_lty ty2 acc)
-extract_pred (HsIParam _   ty ) acc = extract_lty ty acc
+extract_lctxt :: LHsContext RdrName -> [Located RdrName] -> [Located RdrName]
+extract_lctxt ctxt acc = foldr extract_lty acc (unLoc ctxt)
 
 extract_ltys :: [LHsType RdrName] -> [Located RdrName] -> [Located RdrName]
 extract_ltys tys acc = foldr extract_lty acc tys
@@ -124,7 +121,8 @@ extract_lty (L loc ty) acc
       HsPArrTy ty              	-> extract_lty ty acc
       HsTupleTy _ tys          	-> extract_ltys tys acc
       HsFunTy ty1 ty2          	-> extract_lty ty1 (extract_lty ty2 acc)
-      HsPredTy p		-> extract_pred p acc
+      HsIParamTy _ ty		-> extract_lty ty acc
+      HsEqTy ty1 ty2            -> extract_lty ty1 (extract_lty ty2 acc)
       HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty               	-> extract_lty ty acc
       HsCoreTy {}               -> acc  -- The type is closed
@@ -473,15 +471,9 @@ checkInstType (L l t)
 	      	   return (L l (HsForAllTy Implicit [] (noLoc []) dict_ty))
 
 checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
-checkDictTy (L spn ty) = check ty []
-  where
-  check (HsTyVar tc)            args | isRdrTc tc = done tc args
-  check (HsOpTy t1 (L _ tc) t2) args | isRdrTc tc = done tc (t1:t2:args)
-  check (HsAppTy l r) args = check (unLoc l) (r:args)
-  check (HsParTy t)   args = check (unLoc t) args
-  check _ _ = parseErrorSDoc spn (text "Malformed instance header:" <+> ppr ty)
-
-  done tc args = return (L spn (HsPredTy (HsClassP tc args)))
+checkDictTy lty@(L l ty) = case splitLHsClassTy_maybe lty of
+    Nothing -> parseErrorSDoc l (text "Malformed instance header:" <+> ppr ty)
+    Just _  -> return lty
 
 checkTParams :: Bool	  -- Type/data family
 	     -> LHsType RdrName
@@ -570,12 +562,11 @@ checkKindSigs = mapM_ check
 	parseErrorSDoc l (text "Type declaration in a class must be a kind signature:" $$ ppr tydecl)
 
 checkContext :: LHsType RdrName -> P (LHsContext RdrName)
-checkContext (L l t)
-  = check t
+checkContext (L l orig_t)
+  = check orig_t
  where
   check (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type
-    = do ctx <- mapM checkPred ts
-	 return (L l ctx)
+    = return (L l ts)
 
   check (HsParTy ty)	-- to be sure HsParTy doesn't get into the way
     = check (unLoc ty)
@@ -583,32 +574,8 @@ checkContext (L l t)
   check (HsTyVar t)	-- Empty context shows up as a unit type ()
     | t == getRdrName unitTyCon = return (L l [])
 
-  check t 
-    = do p <- checkPred (L l t)
-         return (L l [p])
-
-
-checkPred :: LHsType RdrName -> P (LHsPred RdrName)
--- Watch out.. in ...deriving( Show )... we use checkPred on 
--- the list of partially applied predicates in the deriving,
--- so there can be zero args.
-checkPred (L spn (HsPredTy (HsIParam n ty)))
-  = return (L spn (HsIParam n ty))
-checkPred (L spn ty)
-  = check spn ty []
-  where
-    checkl (L l ty) args = check l ty args
-
-    check _loc (HsPredTy pred@(HsEqualP _ _)) 
-                                       args | null args
-					    = return $ L spn pred
-    check _loc (HsTyVar t)             args | not (isRdrTyVar t) 
-		 		  	    = return (L spn (HsClassP t args))
-    check _loc (HsAppTy l r)           args = checkl l (r:args)
-    check _loc (HsOpTy l (L loc tc) r) args = check loc (HsTyVar tc) (l:r:args)
-    check _loc (HsParTy t)  	       args = checkl t args
-    check loc _                        _    = parseErrorSDoc loc
-                                (text "malformed class assertion:" <+> ppr ty)
+  check _
+    = return (L l [L l orig_t])
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.
@@ -816,6 +783,17 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
           expr = text "if"   <+> ppr guardExpr <> pprOptSemi semiThen <+>
                  text "then" <+> ppr thenExpr  <> pprOptSemi semiElse <+>
                  text "else" <+> ppr elseExpr
+
+checkKindName :: Located FastString -> P (Located Kind)
+checkKindName (L l fs) = do
+    pState <- getPState
+    let ext_enabled = xopt Opt_ConstraintKind (dflags pState)
+        is_kosher = fs == occNameFS (nameOccName constraintKindTyConName)
+    if not ext_enabled || not is_kosher
+     then parseErrorSDoc l (text "Unexpected named kind:"
+                         $$ nest 4 (ppr fs)
+                         $$ if (not ext_enabled && is_kosher) then text "Perhaps you meant to use -XConstraintKind?" else empty)
+     else return (L l constraintKind)
 \end{code}
 
 

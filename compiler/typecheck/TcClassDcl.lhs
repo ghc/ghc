@@ -21,6 +21,7 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
+import Type     ( getClassPredTys_maybe )
 import TcType
 import TcRnMonad
 import BuildTyCl( TcMethInfo )

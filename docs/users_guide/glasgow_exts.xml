@@ -5137,6 +5137,98 @@ class (F a ~ b) => C a b where
     </para>
   </sect1>
 
+<sect1 id="constraint-kind">
+<title>The <literal>Constraint</literal> kind</title>
+
+<para>
+	Normally, <emphasis>constraints</emphasis> (which appear in types to the left of the
+	<literal>=></literal> arrow) have a very restricted syntax. They can only be:
+	<itemizedlist>
+		<listitem>
+			<para>Class constraints, e.g. <literal>Show a</literal></para>
+		</listitem>
+		<listitem>
+			<para><link linkend="implicit-parameters">Implicit parameter</link> constraints,
+				  e.g. <literal>?x::Int</literal> (with the <option>-XImplicitParams</option> flag)</para>
+		</listitem>
+		<listitem>
+			<para><link linkend="equality-constraints">Equality constraints</link>,
+				  e.g. <literal>a ~ Int</literal> (with the <option>-XTypeFamilies</option> or
+				  <option>-XGADTs</option> flag)</para>
+		</listitem>
+	</itemizedlist>
+</para>
+
+<para>
+	With the <option>-XConstraintKind</option> flag, GHC becomes more liberal in
+	what it accepts as constraints in your program. To be precise, with this flag any
+	<emphasis>type</emphasis> of the new kind <literal>Constraint</literal> can be used as a constraint.
+	The following things have kind <literal>Constraint</literal>:
+
+	<itemizedlist>
+		<listitem>
+			Anything which is already valid as a constraint without the flag: saturated applications to type classes,
+			implicit parameter and equality constraints.
+		</listitem>
+		<listitem>
+			Tuples, all of whose component types have kind <literal>Constraint</literal>. So for example the
+			type <literal>(Show a, Ord a)</literal> is of kind <literal>Constraint</literal>.
+		</listitem>
+		<listitem>
+			Anything whose form is not yet know, but the user has declared to have kind <literal>Constraint</literal>.
+			So for example <literal>type Foo (f :: * -> Constraint) = forall b. f b => b -> b</literal> is allowed, as
+			well as examples involving type families:
+<programlisting>
+type family Typ a b :: Constraint
+type instance Typ Int  b = Show b
+type instance Typ Bool b = Num b
+
+func :: Typ a b => a -> b -> b
+func = ...
+</programlisting>
+		</listitem>
+	</itemizedlist>
+</para>
+
+<para>
+	Note that because constraints are just handled as types of a particular kind, this extension allows type
+	constraint synonyms:
+</para>
+
+<programlisting>
+type Stringy a = (Read a, Show a)
+foo :: Stringy a => a -> (String, String -> a)
+foo x = (show x, read)
+</programlisting>
+
+<para>
+	Presently, only standard constraints, tuples and type synonyms for those two sorts of constraint are
+	permitted in instance contexts and superclasses (without extra flags). The reason is that permitting more general
+	constraints can cause type checking to loop, as it would with these two programs:
+</para>
+
+<programlisting>
+type family Clsish u a 
+type instance Clsish () a = Cls a
+class Clsish () a => Cls a where
+</programlisting>
+
+<programlisting>
+class OkCls a where
+
+type family OkClsish u a 
+type instance OkClsish () a = OkCls a
+instance OkClsish () a => OkCls a where
+</programlisting>
+
+<para>
+   You may write programs that use exotic sorts of constraints in instance contexts and superclasses, but
+   to do so you must use <option>-XUndecidableInstances</option> to signal that you don't mind if the type checker
+   fails to terminate.
+</para>
+
+</sect1>
+
 <sect1 id="other-type-extensions">
 <title>Other type system extensions</title>
 

@@ -1,13 +1,14 @@
 \begin{code}
 module TypeRep where
 
+import Outputable (Outputable)
+
 data Type
-data Pred a
 data TyThing
 
-type PredType = Pred Type
+type PredType = Type
 type Kind = Type
 
-isCoercionKind :: Kind -> Bool
+instance Outputable Type
 \end{code}
 

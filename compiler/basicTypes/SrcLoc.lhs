@@ -99,6 +99,10 @@ data RealSrcLoc
 		{-# UNPACK #-} !Int		-- line number, begins at 1
 		{-# UNPACK #-} !Int		-- column number, begins at 1
 
+#ifdef DEBUG
+  deriving Show -- debugging
+#endif
+
 data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
   | UnhelpfulLoc FastString	-- Just a general indication

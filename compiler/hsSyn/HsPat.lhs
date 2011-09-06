@@ -252,7 +252,7 @@ pprPat (ViewPat expr pat _) = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat pat)	    = parens (ppr pat)
 pprPat (ListPat pats _)     = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
-pprPat (TuplePat pats bx _) = tupleParens bx (interpp'SP pats)
+pprPat (TuplePat pats bx _) = tupleParens (boxityNormalTupleSort bx) (interpp'SP pats)
 
 pprPat (ConPatIn con details) = pprUserCon con details
 pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts, 

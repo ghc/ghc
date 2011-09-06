@@ -8,8 +8,8 @@ module BuildTyCl (
 	buildSynTyCon, 
         buildAlgTyCon, 
         buildDataCon,
-	TcMethInfo, buildClass,
-	distinctAbstractTyConRhs, totallyAbstractTyConRhs, 
+        TcMethInfo, buildClass,
+	distinctAbstractTyConRhs, totallyAbstractTyConRhs,
 	mkNewTyConRhs, mkDataTyConRhs, 
         newImplicitBinder
     ) where
@@ -216,7 +216,7 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
     arg_tyvars      = tyVarsOfTypes arg_tys
     in_arg_tys pred = not $ isEmptyVarSet $ 
-		      tyVarsOfPred pred `intersectVarSet` arg_tyvars
+		      tyVarsOfType pred `intersectVarSet` arg_tyvars
 \end{code}
 
 
@@ -236,10 +236,9 @@ buildClass :: Bool		-- True <=> do not include unfoldings
 	   -> RecFlag			   -- Info for type constructor
 	   -> TcRnIf m n Class
 
-buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
+buildClass no_unf tycon_name tvs sc_theta fds ats sig_stuff tc_isrec
   = do	{ traceIf (text "buildClass")
-	; tycon_name <- newImplicitBinder class_name mkClassTyConOcc
-	; datacon_name <- newImplicitBinder class_name mkClassDataConOcc
+	; datacon_name <- newImplicitBinder tycon_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
 		-- because one should import the class to get the binding for 
 		-- the datacon
@@ -250,7 +249,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	  		-- Build the selector id and default method id
 
 	      -- Make selectors for the superclasses 
-	; sc_sel_names <- mapM  (newImplicitBinder class_name . mkSuperDictSelOcc) 
+	; sc_sel_names <- mapM  (newImplicitBinder tycon_name . mkSuperDictSelOcc) 
 				[1..length sc_theta]
         ; let sc_sel_ids = [ mkDictSelId no_unf sc_name rec_clas 
                            | sc_name <- sc_sel_names]
@@ -262,13 +261,12 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	      -- (We used to call them D_C, but now we can have two different
 	      --  superclasses both called C!)
 	
-	; let use_newtype = isSingleton arg_tys && not (any isEqPred sc_theta)
+	; let use_newtype = isSingleton arg_tys
 		-- Use a newtype if the data constructor 
 		--   (a) has exactly one value field
 		--       i.e. exactly one operation or superclass taken together
-                --   (b) it's of lifted type 
-		-- (NB: for (b) don't look at the classes in sc_theta, because
-		--      they are part of the knot!  Hence isEqPred.)
+                --   (b) that value is of lifted type (which they always are, because
+                --       we box equality superclasses)
 		-- See note [Class newtypes and equality predicates]
 
 		-- We treat the dictionary superclasses as ordinary arguments.  
@@ -278,7 +276,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	      args      = sc_sel_names ++ op_names
 	      op_tys	= [ty | (_,_,ty) <- sig_stuff]
 	      op_names  = [op | (op,_,_) <- sig_stuff]
-	      arg_tys   = map mkPredTy sc_theta ++ op_tys
+	      arg_tys   = sc_theta ++ op_tys
               rec_tycon = classTyCon rec_clas
                
 	; dict_con <- buildDataCon datacon_name
@@ -296,7 +294,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 		 then mkNewTyConRhs tycon_name rec_tycon dict_con
 		 else return (mkDataTyConRhs [dict_con])
 
-	; let {	clas_kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
+	; let {	clas_kind = mkArrowKinds (map tyVarKind tvs) constraintKind
 
  	      ; tycon = mkClassTyCon tycon_name clas_kind tvs
  	                             rhs rec_clas tc_isrec
@@ -310,7 +308,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 		-- type]
 	      ; atTyCons = [tycon | ATyCon tycon <- ats]
 
-	      ; result = mkClass class_name tvs fds 
+	      ; result = mkClass tvs fds 
 			         sc_theta sc_sel_ids atTyCons
 				 op_items tycon
 	      }
@@ -344,4 +342,3 @@ Moreover,
 Here we can't use a newtype either, even though there is only
 one field, because equality predicates are unboxed, and classes
 are boxed.
-
