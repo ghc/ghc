@@ -4878,7 +4878,21 @@ instance GMapKey Flob where
         the free indexed parameter is of a kind with a finite number of alternatives
         (unlike <literal>*</literal>).
       </para>
-    </sect3>
+      <para>
+      	It is possible for the class defining the associated type to specify a default for
+      	associated type instances. So for example, this is OK:
+<programlisting>
+class IsBoolMap v where
+  type Key v
+  type Key v = Int
+
+  lookupKey :: Key v -> v -> Maybe Bool
+
+instance IsBoolMap [(Int, Bool)] where
+  lookupKey = lookup
+</programlisting>
+      </para>
+	</sect3>
 
     <sect3 id="scoping-class-params">
       <title>Scoping of class parameters</title>
