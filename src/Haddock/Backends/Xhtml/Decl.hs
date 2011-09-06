@@ -352,7 +352,7 @@ ppFds fds unicode qual =
 ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
                  -> [(DocName, DocForDecl DocName)] -> Bool -> Qualification
                  -> Html
-ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc
+ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _ _) loc
     subdocs unicode qual = 
   if null sigs && null ats
     then (if summary then id else topDeclElem links loc [nm]) hdr
@@ -381,7 +381,7 @@ ppClassDecl :: Bool -> LinksInfo -> [DocInstance DocName] -> SrcSpan
             -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> Qualification -> Html
 ppClassDecl summary links instances loc mbDoc subdocs
-        decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode qual
+        decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _ _) unicode qual
   | summary = ppShortClassDecl summary links decl loc subdocs unicode qual
   | otherwise = classheader +++ maybeDocSection qual mbDoc
                   +++ atBit +++ methodBit  +++ instancesBit

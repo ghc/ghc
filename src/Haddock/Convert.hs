@@ -68,14 +68,21 @@ tyThingToLHsDecl t = noLoc $ case t of
       (map (noLoc . synifyIdSig DeleteTopLevelQuantification)
            (classMethods cl))
       emptyBag --ignore default method definitions, they don't affect signature
-      (map synifyClassAT (classATs cl))
+      ats
+      (concat at_defss)
       [] --we don't have any docs at this point
+    where (ats, at_defss) = unzip $ map synifyClassAT (classATItems cl)
 
 
 -- class associated-types are a subset of TyCon
 -- (mainly only type/data-families)
-synifyClassAT :: TyCon -> LTyClDecl Name
-synifyClassAT = noLoc . synifyTyCon
+synifyClassAT :: ClassATItem -> (LTyClDecl Name, [LTyClDecl Name])
+synifyClassAT (tc, _mb_defs) = (noLoc (synifyTyCon tc), [])
+  -- ignore the mb_defs since we ignore default methods
+
+synifyATDefault :: TyCon -> LTyClDecl Name
+synifyATDefault tc = noLoc (synifyAxiom ax)
+  where Just ax = tyConFamilyCoercion_maybe tc
 
 synifyAxiom :: CoAxiom -> TyClDecl Name
 synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })

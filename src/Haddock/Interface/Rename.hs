@@ -351,15 +351,16 @@ renameTyClD d = case d of
     typats'  <- mapM (mapM renameLType) typats
     return (TySynonym lname' ltyvars' typats' ltype')
 
-  ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats _ -> do
+  ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats at_defs _ -> do
     lcontext' <- renameLContext lcontext
     lname'    <- renameL lname
     ltyvars'  <- mapM renameLTyVarBndr ltyvars
     lfundeps' <- mapM renameLFunDep lfundeps
     lsigs'    <- mapM renameLSig lsigs
     ats'      <- mapM renameLTyClD ats
+    at_defs'  <- mapM renameLTyClD at_defs
     -- we don't need the default methods or the already collected doc entities
-    return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag ats' [])
+    return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag ats' at_defs' [])
 
   where
     renameLCon (L loc con) = return . L loc =<< renameCon con

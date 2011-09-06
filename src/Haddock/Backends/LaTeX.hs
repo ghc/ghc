@@ -473,7 +473,7 @@ ppClassDecl :: [DocInstance DocName] -> SrcSpan
             -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> LaTeX
 ppClassDecl instances loc mbDoc subdocs
-  (ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
+  (ClassDecl lctxt lname ltyvars lfds lsigs _ ats at_defs _) unicode
   = declWithDoc classheader (if null body then Nothing else Just (vcat body)) $$
     instancesBit
   where
@@ -486,8 +486,8 @@ ppClassDecl instances loc mbDoc subdocs
     body = catMaybes [fmap docToLaTeX mbDoc, body_]
 
     body_
-      | null lsigs, null ats = Nothing
-      | null ats  = Just methodTable
+      | null lsigs, null ats, null at_defs = Nothing
+      | null ats, null at_defs = Just methodTable
 ---     | otherwise = atTable $$ methodTable
       | otherwise = error "LaTeX.ppClassDecl"
 
