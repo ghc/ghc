@@ -1,0 +1,7 @@
+
+AssocTyDef04.hs:6:18:
+    `Maybe' is not applied to enough type arguments
+    Expected kind `*', but `Maybe' has kind `* -> *'
+    In the type `Maybe'
+    In the type synonym instance declaration for `Typ'
+    In the class declaration for `Cls'

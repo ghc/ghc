@@ -1,0 +1,5 @@
+
+AssocTyDef06.hs:6:5:
+    Family instance has too many parameters: `Typ'
+    In the type synonym instance declaration for `Typ'
+    In the class declaration for `Cls'
