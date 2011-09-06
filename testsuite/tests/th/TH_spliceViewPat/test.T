@@ -8,4 +8,7 @@ setTestOpts(only_compiler_types(['ghc']))
 setTestOpts(only_ways(['normal','ghci']))
 setTestOpts(if_compiler_profiled(skip))
 
-test('TH_spliceViewPat', normal, multimod_compile_and_run, [ 'Main', '' ])
+test('TH_spliceViewPat',
+     extra_clean(['Main.o', 'Main.hi', 'A.o', 'A.hi']),
+     multimod_compile_and_run,
+     ['Main', ''])

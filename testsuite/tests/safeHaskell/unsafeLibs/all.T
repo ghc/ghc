@@ -16,6 +16,12 @@ test('Dep09', normal, compile, [''])
 test('Dep10', normal, compile, [''])
 
 test('BadImport01', normal, compile_fail, [''])
-test('BadImport02', normal, multimod_compile_and_run, ['BadImport02', ''])
-test('BadImport03', normal, multimod_compile_fail, ['BadImport03', ''])
+test('BadImport02',
+     extra_clean(['BadImport02_A.o', 'BadImport02_A.hi']),
+     multimod_compile_and_run,
+     ['BadImport02', ''])
+test('BadImport03',
+     extra_clean(['BadImport03_A.o', 'BadImport03_A.hi']),
+     multimod_compile_fail,
+     ['BadImport03', ''])
 
