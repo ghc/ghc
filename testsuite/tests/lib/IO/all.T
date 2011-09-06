@@ -152,5 +152,5 @@ test('T4144', normal, compile_and_run, [''])
 
 test('encodingerror001', normal, compile_and_run, [''])
 
-test('4808', exit_code(1), compile_and_run, [''])
+test('4808', [exit_code(1), extra_clean(['4808.test'])], compile_and_run, [''])
 test('4895', normal, compile_and_run, [''])
