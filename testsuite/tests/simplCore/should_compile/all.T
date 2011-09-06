@@ -98,12 +98,12 @@ test('T4345', normal, compile, [''])
 test('T4398', normal, compile, [''])
 
 test('T4903',
-     extra_clean(['T4903a.hi']),
+     extra_clean(['T4903a.hi', 'T4903a.o']),
      run_command,
      ['$MAKE -s --no-print-directory T4903'])
 
 test('T4918',
-     normal,
+     extra_clean(['T4918a.hi', 'T4918a.o']),
      run_command,
      ['$MAKE -s --no-print-directory T4918'])
 

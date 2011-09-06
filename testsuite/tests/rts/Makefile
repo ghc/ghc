@@ -23,9 +23,9 @@ T2615-prep:
 
 .PHONY: T4059
 T4059:
-	$(RM) 4059_c.o 4059.o 4059.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make 4059 4059_c.c
-	./4059
+	$(RM) T4059_c.o T4059.o T4059.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make T4059 T4059_c.c
+	./T4059
 
 exec_signals-prep:
 	$(CC) -o exec_signals_child exec_signals_child.c

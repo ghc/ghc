@@ -52,7 +52,10 @@ else:
 
 test('T4321', omit_ways(['ghci']), compile_and_run, ['-O ' + sse2_opts])
 
-test('T3736', normal, run_command, ['$MAKE -s --no-print-directory T3736'])
+test('T3736',
+     extra_clean(['T3736.speed.f32']),
+     run_command,
+     ['$MAKE -s --no-print-directory T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
       stats_num_field('peak_megabytes_allocated', 1,

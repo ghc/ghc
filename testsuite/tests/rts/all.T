@@ -83,7 +83,7 @@ test('T2615',
        cmd_prefix('$MAKE T2615-prep && ' +
                   # Add current directory to dlopen search path
                   'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
-       extra_clean(['libfoo_T2615.so'])],
+       extra_clean(['libfoo_T2615.so', 'libfoo_T2615.o'])],
      compile_and_run,
      ['-package ghc'])
 
@@ -93,7 +93,10 @@ test('traceEvent', [ omit_ways(['dyn'] + prof_ways),
                      extra_run_opts('+RTS -ls -RTS') ], 
                    compile_and_run, ['-eventlog'])
 
-test('T4059', normal, run_command, ['$MAKE -s --no-print-directory T4059'])
+test('T4059',
+     extra_clean(['T4059_c.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T4059'])
 
 # Test for #4274
 test('exec_signals', [

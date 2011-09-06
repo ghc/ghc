@@ -113,7 +113,7 @@ size = 10000000
 
 mainMonolithic1Composed :: IO ()
 mainMonolithic1Composed =
-   writeFile "speed.f32"
+   writeFile "T3736.speed.f32"
       (fst $ unfoldrN size
           (let (f0,f1,f2) = dl
            in  generator0Freq f0 `mix`
@@ -124,7 +124,7 @@ mainMonolithic1Composed =
 
 mainMonolithic1Generator :: IO ()
 mainMonolithic1Generator =
-   writeFile "speed.f32"
+   writeFile "T3736.speed.f32"
       (runGeneratorMonolithic size
           (let (f0,f1,f2) = dl
                (p0,p1,p2) = fst initPhase2

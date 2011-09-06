@@ -321,8 +321,11 @@ test('5313', extra_run_opts('\'' + libdir + '\''), compile_and_run, ['-package g
 # extra_run_opts: be careful about quoting on Windows!
 
 test('2464', normal, compile, [''])
-test('3674', ignore_output, run_command, 
-             ['$MAKE -s --no-print-directory 3674'])
+test('3674',
+     [ignore_output,
+      extra_clean(['3674_pre.hi', '3674_pre.o', '3674_pre', '3674_pre.exe'])],
+     run_command, 
+     ['$MAKE -s --no-print-directory 3674'])
 
 test('rtsopts001',
      extra_clean(['rtsOpts.hi', 'rtsOpts.o', 'rtsOpts', 'rtsOpts.exe']),
@@ -343,4 +346,8 @@ test('T4437', only_ways(['normal']), compile_and_run, ['-package ghc'])
 
 test('werror', normal, compile_fail, [''])
 
-test('T706', req_interp, run_command, ['$MAKE -s --no-print-directory T706'])
+test('T706',
+     [req_interp,
+      extra_clean(['T706.hs'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T706'])

@@ -1,6 +1,7 @@
 :unset +s
 :unset +t
 
+:!cp A1.hs A.hs
 :load B
 
 -- eval something that isn't exported from B

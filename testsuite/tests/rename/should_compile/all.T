@@ -146,18 +146,17 @@ test('T4003',
 test('T1789', normal, compile, [''])
 test('T1789_2', normal, compile, [''])
 test('T3449',
-     extra_clean(['T3449.hi-boot', 'T3449.hi',
-                  'T3449.o-boot',  'T3449.o']),
+     extra_clean(['T3449.hi-boot', 'T3449A.hi',
+                  'T3449.o-boot',  'T3449A.o']),
      run_command,
      ['$MAKE -s --no-print-directory T3449'])
 test('T4239',
      [expect_broken(4239),
-      extra_clean(['T4239A.hi', 'T4239A.o', 'T4239.hi', 'T4239.o',
-                   'T4239.imports'])],
+      extra_clean(['T4239A.hi', 'T4239A.o', 'T4239.imports'])],
      run_command,
      ['$MAKE -s --no-print-directory T4239'])
 test('T4240',
-     [extra_clean(['T4240A.hi', 'T4240A.o', 'T4240.hi', 'T4240.o',
+     [extra_clean(['T4240A.hi', 'T4240A.o', 'T4240B.hi', 'T4240B.o',
                    'T4240.imports'])],
      run_command,
      ['$MAKE -s --no-print-directory T4240'])
