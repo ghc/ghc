@@ -245,12 +245,15 @@ tickyDynAlloc :: ClosureInfo -> Code
 -- Called when doing a dynamic heap allocation
 tickyDynAlloc cl_info
   = ifTicky $
-    case closureLFInfo cl_info of
+    case cl_info of {
+      ConInfo {} -> tick_alloc_con ;
+      ClosureInfo { closureLFInfo = lf_info } -> 
+    case lf_info of
 	LFCon {}        -> tick_alloc_con
 	LFReEntrant {}  -> tick_alloc_fun
 	LFThunk {}      -> tick_alloc_thk
         -- black hole
-        _               -> return ()
+        _               -> return () }
   where
 	-- will be needed when we fill in stubs
     _cl_size   = closureSize cl_info
