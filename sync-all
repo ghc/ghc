@@ -499,7 +499,7 @@ any extra arguments to git:
   sync-all behaves.  Flags given *after* the command are passed to
   git.
 
-  -q says to be quite, and -s to be silent.
+  -q says to be quiet, and -s to be silent.
 
   --resume will restart a command that failed, from the repo at which
   it failed. This means you don't need to wait while, e.g., "pull"
@@ -522,7 +522,7 @@ any extra arguments to git:
   all of the repos bare. Requires packages.conf to be present in the current
   directory (a renamed packages file from the main ghc repo).
 
-  Note: --cheched-out and --bare flags are NOT the opposite of each other.
+  Note: --checked-out and --bare flags are NOT the opposite of each other.
         --checked-out: describes the layout of the remote repository tree.
         --bare:        describes the layout of the local repository tree.
 
@@ -679,7 +679,7 @@ ATTENTION!
 You have an old haddock repository in your GHC tree!
 
 Please remove it (e.g. "rm -r utils/haddock"), and then run
-"./syncs-all get" to get the new repository.
+"./sync-all get" to get the new repository.
 ============================
 EOF
         }
@@ -697,7 +697,7 @@ ATTENTION!
 You have an old binary repository in your GHC tree!
 
 Please remove it (e.g. "rm -r libraries/binary"), and then run
-"./syncs-all get" to get the new repository.
+"./sync-all get" to get the new repository.
 ============================
 EOF
         }
