@@ -536,7 +536,7 @@ mkDataCon name declared_infix
 	-- dictionary arguments right here.
     full_theta   = eqSpecPreds eq_spec ++ theta
     real_arg_tys = full_theta                         ++ orig_arg_tys
-    real_stricts = map mk_dict_strict_mark full_theta ++ arg_stricts
+    real_stricts = map mk_pred_strict_mark full_theta ++ arg_stricts
 
 	-- Representation arguments and demands
 	-- To do: eliminate duplication with MkId
@@ -550,11 +550,20 @@ mkDataCon name declared_infix
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
 
-mk_dict_strict_mark :: PredType -> HsBang
-mk_dict_strict_mark pred | isEqPred pred = HsUnpack
-			 | otherwise     = HsNoBang
-
+mk_pred_strict_mark :: PredType -> HsBang
+mk_pred_strict_mark pred 
+  | isEqPred pred = HsUnpack	-- Note [Unpack equality predicates]
+  | otherwise     = HsNoBang
 \end{code}
+
+Note [Unpack equality predicates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have a GADT with a contructor C :: (a~[b]) => b -> T a
+we definitely want that equality predicate *unboxed* so that it
+takes no space at all.  This is easily done: just give it
+an UNPACK pragma. The rest of the unpack/repack code does the
+heavy lifting.  This one line makes every GADT take a word less
+space for each equality predicate, so it's pretty important!
 
 \begin{code}
 -- | The 'Name' of the 'DataCon', giving it a unique, rooted identification
@@ -659,7 +668,7 @@ dataConStrictMarks = dcStrictMarks
 -- | Strictness of evidence arguments to the wrapper function
 dataConExStricts :: DataCon -> [HsBang]
 -- Usually empty, so we don't bother to cache this
-dataConExStricts dc = map mk_dict_strict_mark (dataConTheta dc)
+dataConExStricts dc = map mk_pred_strict_mark (dataConTheta dc)
 
 -- | Source-level arity of the data constructor
 dataConSourceArity :: DataCon -> Arity

@@ -294,7 +294,7 @@ isCoVar :: Var -> Bool
 isCoVar v = isCoVarType (varType v)
 
 isCoVarType :: Type -> Bool
-isCoVarType ty 
+isCoVarType ty 	    -- Tests for t1 ~# t2, the unboxed equality
   | Just tc <- tyConAppTyCon_maybe ty = tc `hasKey` eqPrimTyConKey
   | otherwise                         = False
 \end{code}

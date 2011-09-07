@@ -48,10 +48,14 @@ A @Class@ corresponds to a Greek kappa in the static semantics:
 \begin{code}
 data Class
   = Class {
-	classKey  :: Unique,		-- Key for fast comparison
+	classTyCon :: TyCon,		-- The data type constructor for
+					-- dictionaries of this class
+
 	className :: Name,              -- Just the cached name of the TyCon
+	classKey  :: Unique,		-- Cached unique of TyCon
 	
-	classTyVars  :: [TyVar],	-- The class type variables
+	classTyVars  :: [TyVar],	-- The class type variables;
+		     			-- identical to those of the TyCon
 	classFunDeps :: [FunDep TyVar],	-- The functional dependencies
 
 	-- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
@@ -65,10 +69,7 @@ data Class
         classATs     :: [TyCon],	-- Associated type families
 
         -- Class operations (methods, not superclasses)
-	classOpStuff :: [ClassOpItem],	-- Ordered by tag
-
-	classTyCon :: TyCon		-- The data type constructor for
-					-- dictionaries of this class
+	classOpStuff :: [ClassOpItem]	-- Ordered by tag
      }
   deriving Typeable
 
