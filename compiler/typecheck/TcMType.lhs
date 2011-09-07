@@ -1155,10 +1155,10 @@ check_pred_ty' _ _ctxt (IPPred _ ty) = checkValidMonoType ty
         -- Happily this is not an issue in the new constraint solver.
 
 check_pred_ty' dflags ctxt t@(TuplePred ts)
-  = do { checkTc (xopt Opt_ConstraintKind dflags)
+  = do { checkTc (xopt Opt_ConstraintKinds dflags)
                  (predTupleErr (predTreePredType t))
        ; mapM_ (check_pred_ty' dflags ctxt) ts }
-    -- This case will not normally be executed because without ConstraintKind
+    -- This case will not normally be executed because without -XConstraintKinds
     -- tuple types are only kind-checked as *
 
 check_pred_ty' dflags ctxt (IrredPred pred)
@@ -1178,7 +1178,7 @@ check_pred_ty' dflags ctxt (IrredPred pred)
     --
     -- In both cases it's OK if the predicate is actually a synonym, though.
     -- We'll also allow it if
-  = do checkTc (xopt Opt_ConstraintKind dflags)
+  = do checkTc (xopt Opt_ConstraintKinds dflags)
                (predIrredErr pred)
        case tcView pred of
          Just pred' -> 
@@ -1338,9 +1338,9 @@ eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprType pre
 predTyVarErr pred  = sep [ptext (sLit "Non type-variable argument"),
 			  nest 2 (ptext (sLit "in the constraint:") <+> pprType pred)]
 predTupleErr pred  = ptext (sLit "Illegal tuple constraint") <+> pprType pred $$
-                     parens (ptext (sLit "Use -XConstraintKind to permit this"))
+                     parens (ptext (sLit "Use -XConstraintKinds to permit this"))
 predIrredErr pred  = ptext (sLit "Illegal irreducible constraint") <+> pprType pred $$
-                     parens (ptext (sLit "Use -XConstraintKind to permit this"))
+                     parens (ptext (sLit "Use -XConstraintKinds to permit this"))
 predIrredBadCtxtErr pred = ptext (sLit "Illegal irreducible constraint") <+> pprType pred $$
                            ptext (sLit "in superclass/instance head context") <+>
                            parens (ptext (sLit "Use -XUndecidableInstances to permit this"))

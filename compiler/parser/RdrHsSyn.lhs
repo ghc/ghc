@@ -787,12 +787,12 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
 checkKindName :: Located FastString -> P (Located Kind)
 checkKindName (L l fs) = do
     pState <- getPState
-    let ext_enabled = xopt Opt_ConstraintKind (dflags pState)
+    let ext_enabled = xopt Opt_ConstraintKinds (dflags pState)
         is_kosher = fs == occNameFS (nameOccName constraintKindTyConName)
     if not ext_enabled || not is_kosher
      then parseErrorSDoc l (text "Unexpected named kind:"
                          $$ nest 4 (ppr fs)
-                         $$ if (not ext_enabled && is_kosher) then text "Perhaps you meant to use -XConstraintKind?" else empty)
+                         $$ if (not ext_enabled && is_kosher) then text "Perhaps you meant to use -XConstraintKinds?" else empty)
      else return (L l constraintKind)
 \end{code}
 

@@ -50,7 +50,7 @@ import NameSet
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag(Opt_ConstraintKind) )
+import DynFlags ( ExtensionFlag( Opt_ConstraintKinds ) )
 import Util
 import UniqSupply
 import Outputable
@@ -373,7 +373,7 @@ kc_hs_type (HsKindSig ty k) = do
     return (HsKindSig ty' k, k)
 
 kc_hs_type (HsTupleTy (HsBoxyTuple _) tys) = do
-    fact_tup_ok <- xoptM Opt_ConstraintKind
+    fact_tup_ok <- xoptM Opt_ConstraintKinds
     if not fact_tup_ok
      then do tys' <- mapM kcLiftedType tys
              return (HsTupleTy (HsBoxyTuple liftedTypeKind) tys', liftedTypeKind)

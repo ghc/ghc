@@ -383,7 +383,7 @@ data ExtensionFlag
    | Opt_NPlusKPatterns
    | Opt_DoAndIfThenElse
    | Opt_RebindableSyntax
-   | Opt_ConstraintKind
+   | Opt_ConstraintKinds
    
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
@@ -1862,7 +1862,7 @@ xFlags = [
   ( "NPlusKPatterns",                   AlwaysAllowed, Opt_NPlusKPatterns, nop ),
   ( "DoAndIfThenElse",                  AlwaysAllowed, Opt_DoAndIfThenElse, nop ),
   ( "RebindableSyntax",                 AlwaysAllowed, Opt_RebindableSyntax, nop ),
-  ( "ConstraintKind",                   AlwaysAllowed, Opt_ConstraintKind, nop ),
+  ( "ConstraintKinds",                  AlwaysAllowed, Opt_ConstraintKinds, nop ),
   ( "MonoPatBinds",                     AlwaysAllowed, Opt_MonoPatBinds, 
     \ turn_on -> when turn_on $ deprecate "Experimental feature now removed; has no effect" ),
   ( "ExplicitForAll",                   AlwaysAllowed, Opt_ExplicitForAll, nop ),
