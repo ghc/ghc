@@ -223,15 +223,26 @@ dsEvGroup (CyclicSCC bs)
   where
     ds_pair (EvBind v r) = (v, dsEvTerm r)
 
+---------------------------------------
 dsLCoercion :: LCoercion -> (Coercion -> CoreExpr) -> CoreExpr
-dsLCoercion co k = foldr go (k (substCo subst co)) eqvs_covs
+-- This is the crucial function that moves 
+-- from LCoercions to Coercions; see Note [LCoercions] in Coercion
+-- e.g.  dsLCoercion (trans g1 g2) k
+--       = case g1 of EqBox g1# ->
+--         case g2 of EqBox g2# ->
+--         k (trans g1# g2#)
+dsLCoercion co k 
+  = foldr wrap_in_case result_expr eqvs_covs
   where
+    result_expr = k (substCo subst co)
+    result_ty   = exprType result_expr
+
     -- We use the same uniques for the EqVars and the CoVars, and just change
     -- the type. So the CoVars shadow the EqVars
     --
     -- NB: DON'T try to cheat and not substitute into the LCoercion to change the
     -- types of the free variables: -ddump-ds will panic if you do this since it
-    -- runs before we substitute CoVar occurrences out for their binding sites.
+    -- runs Lint before we substitute CoVar occurrences out for their binding sites.
     eqvs_covs = [(eqv, eqv `setIdType` mkCoercionType ty1 ty2)
                 | eqv <- varSetElems (coVarsOfCo co)
                 , let (ty1, ty2) = getEqPredTys (evVarPred eqv)]
@@ -239,9 +250,10 @@ dsLCoercion co k = foldr go (k (substCo subst co)) eqvs_covs
     subst = extendCvSubstList (mkEmptySubst (mkInScopeSet (tyCoVarsOfCo co)))
                               [(eqv, mkCoVarCo cov) | (eqv, cov) <- eqvs_covs]
 
-    go (eqv, cov) e = Case (Var eqv) (mkWildValBinder (varType eqv)) (exprType e)
-                           [(DataAlt eqBoxDataCon, [cov], e)]
+    wrap_in_case (eqv, cov) body 
+      = Case (Var eqv) eqv result_ty [(DataAlt eqBoxDataCon, [cov], body)]
 
+---------------------------------------
 dsEvTerm :: EvTerm -> CoreExpr
 dsEvTerm (EvId v)                = Var v
 dsEvTerm (EvCast v co)           = dsLCoercion co $ Cast (Var v)

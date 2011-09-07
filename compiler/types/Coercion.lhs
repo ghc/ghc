@@ -155,13 +155,17 @@ data Coercion
 \end{code}
 
 \begin{code}
--- | LCoercions are a hack used by the typechecker. Normally, Coercions have free
--- variables of type (a ~# b): we call these CoVars. However, the type checker passes
--- around equality evidence (boxed up) at type (a ~ b).
+-- Note [LCoercions]
+-- ~~~~~~~~~~~~~~~~~
+-- | LCoercions are a hack used by the typechecker. Normally,
+-- Coercions have free variables of type (a ~# b): we call these
+-- CoVars. However, the type checker passes around equality evidence
+-- (boxed up) at type (a ~ b).
 --
--- An LCoercion is simply a Coercion whose free variables have that boxed type. After
--- we are done with typechecking the desugarer finds the free variables, unboxes them,
--- and creates a resulting real Coercion with kosher free variables.
+-- An LCoercion is simply a Coercion whose free variables have the
+-- boxed type (a ~ b). After we are done with typechecking the
+-- desugarer finds the free variables, unboxes them, and creates a
+-- resulting real Coercion with kosher free variables.
 --
 -- We can use most of the Coercion "smart constructors" to build LCoercions. However,
 -- mkCoVarCo will not work! The equivalent is mkEqVarLCo.
