@@ -401,6 +401,10 @@ sub scmall {
             scm ($localpath, $scm, "config", @args)
                 unless $scm eq "darcs";
         }
+        elsif ($command =~ /^repack$/) {
+            scm ($localpath, $scm, "repack", @args)
+                if $scm eq "git"
+        }
         else {
             die "Unknown command: $command";
         }
@@ -485,6 +489,7 @@ any extra arguments to git:
   new
   pull
   push
+  repack
   reset
   send
   status
