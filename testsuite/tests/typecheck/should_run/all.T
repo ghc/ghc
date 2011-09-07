@@ -68,6 +68,7 @@ test('tcrun042', normal, compile_and_run, [''])
 test('tcrun043', normal, compile_and_run, [''])
 test('tcrun044', normal, compile_and_run, [''])
 test('tcrun045', normal, compile_and_run, [''])
+test('tcrun046', normal, compile_and_run, [''])
 
 test('church', normal, compile_and_run, [''])
 test('testeq2', normal, compile_and_run, [''])
