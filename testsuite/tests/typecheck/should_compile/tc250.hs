@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKind, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, ConstraintKinds, UndecidableInstances #-}
 module Ctx where
 
 type family Indirect :: * -> Constraint

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeFamilies, ConstraintKind #-}
+{-# LANGUAGE GADTs, TypeFamilies, ConstraintKinds #-}
 
 type Showish = Show
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKind #-}
+{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 module ShouldFail where
 
 type family F a :: Constraint

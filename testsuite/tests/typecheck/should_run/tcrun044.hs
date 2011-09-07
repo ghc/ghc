@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, ConstraintKind #-}
+{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 
 import qualified Data.Set as S
 

@@ -1,9 +1,9 @@
-{-# LANGUAGE ConstraintKind, MagicHash #-}
+{-# LANGUAGE ConstraintKinds, MagicHash #-}
 module ShouldFail where
 
 import GHC.Exts
 
--- If we turn on ConstraintKind the typing rule for
+-- If we turn on ConstraintKinds the typing rule for
 -- tuple types is generalised. This test checks that
 -- we get a reasonable error for unreasonable tuples.
 
