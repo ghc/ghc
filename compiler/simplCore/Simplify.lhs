@@ -1051,23 +1051,6 @@ simplCast env body co0 cont0
            arg_ty' | isSimplified dup = arg_ty
                    | otherwise        = substTy (arg_se `setInScope` env) arg_ty
 
-{-
-       add_coerce co (Pair s1s2 _t1t2) (ApplyTo dup (Coercion arg_co) arg_se cont)
-                -- This implements the PushC rule from the paper
-         | Just (covar,_) <- splitForAllTy_maybe s1s2
-         = ASSERT( isCoVar covar )
-           ApplyTo Simplified (Coercion new_arg_co) (zapSubstEnv arg_se) (addCoerce co1 cont)
-         where
-           [co0, co1]   = decomposeCo 2 co
-           [co00, co01] = decomposeCo 2 co0
-
-           arg_co' | isSimplified dup = arg_co
-                   | otherwise        = substCo (arg_se `setInScope` env) arg_co
-           new_arg_co = co00    `mkTransCo`
-                        arg_co' `mkTransCo`
-                        mkSymCo co01
--}
-
        add_coerce co (Pair s1s2 t1t2) (ApplyTo dup arg arg_se cont)
          | isFunTy s1s2   -- This implements the Push rule from the paper
          , isFunTy t1t2   -- Check t1t2 to ensure 'arg' is a value arg
