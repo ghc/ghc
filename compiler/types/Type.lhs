@@ -61,7 +61,7 @@ module Type (
         funTyCon,
 
         -- ** Predicates on types
-        isTyVarTy, isFunTy, isDictTy, isCertainlyPredReprTy, isPredTy,
+        isTyVarTy, isFunTy, isDictTy, isPredTy,
 
 	-- (Lifting and boxity)
 	isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
@@ -774,6 +774,9 @@ noParenPred :: PredType -> Bool
 -- But   (?x::Int) => Int -> Int
 noParenPred p = isClassPred p || isEqPred p
 
+isPredTy :: Type -> Bool
+isPredTy ty = typeKind ty `eqKind` constraintKind
+
 isClassPred, isEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
     Just tyCon | isClassTyCon tyCon -> True
@@ -787,20 +790,6 @@ isIPPred ty = case tyConAppTyCon_maybe ty of
 \end{code}
 
 Make PredTypes
-
-\begin{code}
--- We can't tell if a type originated from an IParam predicate, so
--- this function is conservative. It is only used in the eta-contraction/expansion
--- logic at the moment, so this doesn't matter a great deal.
-isCertainlyPredReprTy :: Type -> Bool
-isCertainlyPredReprTy ty | Just ty' <- coreView ty = isCertainlyPredReprTy ty'
-isCertainlyPredReprTy ty = case tyConAppTyCon_maybe ty of
-	Just tc -> tc `hasKey` eqPrimTyConKey || isClassTyCon tc
-	Nothing -> False
-
-isPredTy :: Type -> Bool
-isPredTy ty = typeKind ty `eqKind` constraintKind
-\end{code}
 
 --------------------- Equality types ---------------------------------
 \begin{code}
