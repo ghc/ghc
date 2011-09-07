@@ -401,6 +401,7 @@ $(eval $(call addPackage,filepath))
 $(eval $(call addPackage,array))
 $(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,containers))
+$(eval $(call addPackage,deepseq))
 
 $(eval $(call addPackage,Win32,($$(Windows),YES)))
 $(eval $(call addPackage,unix,($$(Windows),NO)))
