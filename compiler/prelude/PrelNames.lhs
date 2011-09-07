@@ -1591,7 +1591,8 @@ kindKeys = [ liftedTypeKindTyConKey
            , openTypeKindTyConKey
            , unliftedTypeKindTyConKey
            , ubxTupleKindTyConKey
-           , argTypeKindTyConKey ]
+           , argTypeKindTyConKey
+           , constraintKindTyConKey ]
 \end{code}
 
 
