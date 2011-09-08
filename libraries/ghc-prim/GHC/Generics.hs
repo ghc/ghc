@@ -1,11 +1,12 @@
 {-# LANGUAGE Trustworthy            #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE EmptyDataDecls         #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE KindSignatures         #-}
 {-# LANGUAGE TypeFamilies           #-}
+{-# LANGUAGE StandaloneDeriving     #-}
+{-# LANGUAGE DeriveGeneric          #-}
 
 module GHC.Generics  (
   -- * Generic representation types
@@ -26,7 +27,7 @@ module GHC.Generics  (
   ) where
 
 -- We use some base types
-import {-# SOURCE #-} GHC.Types
+import GHC.Types
 -- We need this to give the Generic instances in ghc-prim
 import GHC.CString ()
 
@@ -164,3 +165,79 @@ class Generic1 f where
   -- | Convert from the representation to the datatype
   to1    :: (Rep1 f) a -> f a
 
+--------------------------------------------------------------------------------
+-- Generic representations
+--------------------------------------------------------------------------------
+
+-- Int
+data D_Int
+data C_Int
+
+instance Datatype D_Int where
+  datatypeName _ = "Int"
+  moduleName   _ = "GHC.Int"
+
+instance Constructor C_Int where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+instance Generic Int where
+  type Rep Int = D1 D_Int (C1 C_Int (S1 NoSelector (Rec0 Int)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x
+
+
+-- Float
+data D_Float
+data C_Float
+
+instance Datatype D_Float where
+  datatypeName _ = "Float"
+  moduleName   _ = "GHC.Float"
+
+instance Constructor C_Float where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+instance Generic Float where
+  type Rep Float = D1 D_Float (C1 C_Float (S1 NoSelector (Rec0 Float)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x
+
+
+-- Double
+data D_Double
+data C_Double
+
+instance Datatype D_Double where
+  datatypeName _ = "Double"
+  moduleName   _ = "GHC.Float"
+
+instance Constructor C_Double where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+instance Generic Double where
+  type Rep Double = D1 D_Double (C1 C_Double (S1 NoSelector (Rec0 Double)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x
+
+
+-- Char
+data D_Char
+data C_Char
+
+instance Datatype D_Char where
+  datatypeName _ = "Char"
+  moduleName   _ = "GHC.Base"
+
+instance Constructor C_Char where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+instance Generic Char where
+  type Rep Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x
+
+
+-- Derived instances
+deriving instance Generic [a]
+deriving instance Generic Bool
+deriving instance Generic Ordering

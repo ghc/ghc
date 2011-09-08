@@ -20,7 +20,7 @@ module GHC.CString (
         unpackCStringUtf8#, unpackNBytes#
     ) where
 
-import {-# SOURCE #-} GHC.Types
+import GHC.Types
 import GHC.Prim
 
 -----------------------------------------------------------------------------
