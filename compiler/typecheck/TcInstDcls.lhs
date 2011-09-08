@@ -25,7 +25,6 @@ import FamInst
 import FamInstEnv
 import TcDeriv
 import TcEnv
-import RnSource   ( addTcgDUs )
 import TcHsType
 import TcUnify
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
@@ -398,17 +397,22 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
          failIfErrsM    -- If the addInsts stuff gave any errors, don't
                         -- try the deriving stuff, because that may give
                         -- more errors still
+{-
        ; (deriv_inst_info, deriv_binds, deriv_dus, deriv_tys, deriv_ty_insts)
+              <- tcDeriving tycl_decls inst_decls deriv_decls
+-}
+       ; (gbl_env, deriv_inst_info, deriv_binds)
               <- tcDeriving tycl_decls inst_decls deriv_decls
 
        -- Extend the global environment also with the generated datatypes for
        -- the generic representation
+{-
        ; let all_tycons = map ATyCon (deriv_tys ++ deriv_ty_insts)
        ; gbl_env <- tcExtendGlobalEnv all_tycons $
                     tcExtendGlobalEnv (concatMap implicitTyThings all_tycons) $
                     addFamInsts deriv_ty_insts $
                     addInsts deriv_inst_info getGblEnv
-
+-}
        -- Check that if the module is compiled with -XSafe, there are no
        -- hand written instances of Typeable as then unsafe casts could be
        -- performed. Derivied instances are OK.
@@ -418,8 +422,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                                (addErrAt (getSrcSpan $ iSpec x) typInstErr))
                    local_info
 
-       ; return ( addTcgDUs gbl_env deriv_dus,
-                  deriv_inst_info ++ local_info,
+       ; return ( gbl_env,
+                  (bagToList deriv_inst_info) ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
     }}}
   where
