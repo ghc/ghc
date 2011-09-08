@@ -312,7 +312,7 @@ data Promise f = P {
 instance MonadStatics ScpBM where
     bindCapturedFloats = bindFloats
     monitorFVs mx = ScpM $ \e s k -> unScpM mx e s (\x s' -> let (fss_delta, _fss_common) = splitByReverse (pTreeHole s) (pTreeHole s')
-                                                             in k (unionVarSets [fvedTermFreeVars e' | (_, Fulfilled e') <- Foldable.toList (Comp (Comp fss_delta))], x) s')
+                                                             in k (unionVarSets [fvedTermFreeVars e' | (_, Fulfilled e') <- concatMap fulfilmentTreeFulfilments fss_delta], x) s')
 
 -- Note [Floating h-functions past the let-bound variables to which they refer]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -442,7 +442,7 @@ getPromises :: ScpM () () [Promise Identity]
 getPromises = ScpM $ \e s k -> k (pTreeContextPromises (pTreeContext e)) s
 
 getPromiseNames :: ScpM FulfilmentTree FulfilmentTree [Var]
-getPromiseNames = ScpM $ \e s k -> k (map (fun . fst) (Foldable.toList (Comp (pTreeHole s))) ++ map fun (pTreeContextPromises (pTreeContext e))) s
+getPromiseNames = ScpM $ \e s k -> k (map (fun . fst) (fulfilmentTreeFulfilments (pTreeHole s)) ++ map fun (pTreeContextPromises (pTreeContext e))) s
 
 promise :: Promise Identity -> Name -> ScpBM (a, Out FVedTerm) -> ScpPM (a, Out FVedTerm)
 promise p x' opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted p) $ -} unScpM (mx p) (e { pTreeContext = Promise p : pTreeContext e, depth = 1 + depth e }) (s { pTreeHole = [] }) k
@@ -498,12 +498,14 @@ fulfillableFreeVars RolledBack     = emptyVarSet
 data Capturable a = Captured      -- ^ Already residualised because captured by a BV or similar
                   | NotCaptured a -- ^ Not yet residualised: floated, eligible for further tiebacks
 
+{-
 instance Functor Capturable where fmap = Traversable.fmapDefault
 instance Foldable Capturable where foldMap = Traversable.foldMapDefault
 
 instance Traversable Capturable where
     traverse _ Captured        = pure Captured
     traverse f (NotCaptured x) = NotCaptured <$> f x
+-}
 
 data PTree a = Tieback Var              -- ^ Didn't promise or drive extra stuff: just tied back
              | Split Bool [a] [PTree a] -- ^ Made a promise, fulfiling it like so (with 1 or 2 fulfilments..)
@@ -545,10 +547,14 @@ data ScpState f = ScpState {
 pTreeContextPromises :: PTreeContext -> [Promise Identity]
 pTreeContextPromises = foldMap $ \tci -> case tci of
     Promise p                -> [p]
-    BindCapturedFloats _ fts -> fulfilmentsPromises (Foldable.toList (Comp (Comp fts)))
+    BindCapturedFloats _ fts -> fulfilmentsPromises (concatMap fulfilmentTreeFulfilments fts)
 
 fulfilmentsPromises :: [Fulfilment] -> [Promise Identity]
-fulfilmentsPromises fs = [P { fun = f, abstracted = a, meaning = I m } | (P { fun = f, abstracted = a, meaning = Just m }, _) <- fs]
+fulfilmentsPromises fs = [p { meaning = I m } | (p@(P { meaning = Just m }), _) <- fs]
+
+-- Only returns those fulfilments that are still floating and eligible for tieback
+fulfilmentTreeFulfilments :: FulfilmentTree -> [Fulfilment]
+fulfilmentTreeFulfilments t = [f | NotCaptured f <- Foldable.toList t]
 
 class IMonad m where
     return :: a -> m s s a
@@ -619,8 +625,9 @@ pprScpM :: ScpBM SDoc
 pprScpM = ScpM $ \e s k -> k (pprTrees (unwindContext (pTreeContext e) (map unwindTree (pTreeHole s)))) s
   where
     unwindTree :: FulfilmentTree -> PrettyTree
-    unwindTree = fmap (\mb_f -> case mb_f of Captured      -> (??, ??, Nothing)
-                                             NotCaptured f -> unwindFulfilment f)
+    unwindTree = undefined
+    --unwindTree = fmap (\mb_f -> case mb_f of Captured      -> (??, ??, Nothing)
+    --                                         NotCaptured f -> unwindFulfilment f)
 
     unwindFulfilment (p, mb_e') = (fun p, ppr (meaning p), case mb_e' of RolledBack -> Nothing
                                                                          Fulfilled e' -> Just (ppr e'))
