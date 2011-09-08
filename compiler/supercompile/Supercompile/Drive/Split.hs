@@ -35,9 +35,8 @@ import qualified Data.IntSet as IS
 
 class Monad m => MonadStatics m where
     bindCapturedFloats :: FreeVars -> m a -> m (Out [(Var, FVedTerm)], a)
-    bindCapturedFloats fvs mx = bindCapturedFloats' fvs mx (\hes x -> return (hes, x))
-    
-    bindCapturedFloats' :: FreeVars -> m a -> (Out [(Var, FVedTerm)] -> a -> m r) -> m r
+    -- Free variables of h-functions generated in this context
+    monitorFVs :: m a -> m (FreeVars, a)
 
 
 -- | Implementation of Kleene fixed-point theorem <http://en.wikipedia.org/wiki/Kleene_fixed-point_theorem>
@@ -422,9 +421,9 @@ rigidizeBracketed (TailsUnknown  shell    holes) = RBracketed shell         hole
 
 
 optimiseMany :: Monad m
-             => ((Deeds, a) -> m (Deeds, Out FVedTerm))
+             => ((Deeds, a) -> m (Deeds, b))
              -> (Deeds, [a])
-             -> m (Deeds, [Out FVedTerm])
+             -> m (Deeds, [b])
 optimiseMany opt (deeds, xs) = mapAccumLM (curry opt) deeds xs
 
 optimiseBracketed :: MonadStatics m
@@ -476,28 +475,23 @@ optimiseSplit opt deeds bracketeds_heap bracketed_focus = do
                       (sumMap (sumMap releaseStateDeed) bracketeds_deeded_heap + sumMap releaseStateDeed bracketed_deeded_focus + deeds_initial),
              ppr deeds)
     
-    -- 1) Recursively drive the focus itself
-    let extra_statics = dataSetToVarSet (M.keysSet bracketeds_heap)
-    bindCapturedFloats' extra_statics (optimiseBracketed opt (deeds_initial, bracketed_deeded_focus)) $ \hes (leftover_deeds, e_focus) -> do    
+    (hes, (deeds, xes, e_focus)) <- bindCapturedFloats (dataSetToVarSet (M.keysSet bracketeds_heap)) $ do
+        -- 1) Recursively drive the focus itself
+        (fvs_focus_hs, (leftover_deeds, e_focus)) <- monitorFVs $ optimiseBracketed opt (deeds_initial, bracketed_deeded_focus)
+        
         -- 2) We now need to think about how we are going to residualise the letrec. In fact, we need to loop adding
         -- stuff to the letrec because it might be the case that:
         --  * One of the hes from above refers to some heap binding that is not referred to by the let body
         --  * So after we do withStatics above we need to drive some element of the bracketeds_heap
         --  * And after driving that we find in our new hes a new h function referring to a new free variable
         --    that refers to some binding that is as yet unbound...
-        (leftover_deeds, bracketeds_deeded_heap, xes, _fvs) <- go hes extra_statics leftover_deeds bracketeds_deeded_heap [] (fvedTermFreeVars e_focus)
+        let resid_fvs = fvs_focus_hs `unionVarSet` fvedTermFreeVars e_focus
+        (leftover_deeds, bracketeds_deeded_heap, _fvs, xes) <- optimiseLetBinds opt leftover_deeds bracketeds_deeded_heap resid_fvs
     
-        -- 3) Combine the residualised let bindings with the let body
-        return (sumMap (sumMap releaseStateDeed) bracketeds_deeded_heap + leftover_deeds,
-                bindManyMixedLiftedness fvedTermFreeVars xes e_focus)
-  where
-    -- TODO: clean up this incomprehensible loop
-    -- TODO: investigate the possibility of just fusing in the optimiseLetBinds loop with this one
-    go hes extra_statics leftover_deeds bracketeds_deeded_heap xes fvs = do
-        let extra_statics' = extra_statics `unionVarSet` mkVarSet (map fst hes) -- NB: the statics already include all the binders from bracketeds_deeded_heap, so no need to add xes stuff
-        -- TODO: no need to get FVs in this way (they are in Promise)
-        bindCapturedFloats' extra_statics' (optimiseLetBinds opt leftover_deeds bracketeds_deeded_heap (fvs `unionVarSet` unionVarSets (map (fvedTermFreeVars . snd) hes))) $ \hes' (leftover_deeds, bracketeds_deeded_heap, fvs, xes') -> do
-            (if null hes' then (\a b c d -> return (a,b,c,d)) else go hes' extra_statics') leftover_deeds bracketeds_deeded_heap (xes ++ [(x', e') | (x', e') <- hes, x' `elemVarSet` fvs] ++ xes') fvs
+        return (sumMap (sumMap releaseStateDeed) bracketeds_deeded_heap + leftover_deeds, xes, e_focus)
+    
+    -- 3) Combine the residualised let bindings with the let body
+    return (deeds, bindManyMixedLiftedness fvedTermFreeVars (xes ++ hes) e_focus)
 
 
 -- We only want to drive (and residualise) as much as we actually refer to. This loop does this: it starts
@@ -516,12 +510,12 @@ optimiseLetBinds opt leftover_deeds bracketeds_heap fvs' = -- traceRender ("opti
       | M.null h_resid = return (leftover_deeds, bracketeds_deeded_heap_not_resid, resid_fvs, xes_resid)
       | otherwise = {- traceRender ("optimiseSplit", xs_resid') $ -} do
         -- Recursively drive the new residuals arising from the need to bind the resid_fvs
-        (leftover_deeds, es_resid') <- optimiseMany (optimiseBracketed opt) (leftover_deeds, bracks_resid)
-        let extra_resid_fvs' = unionVarSets (map fvedTermFreeVars es_resid')
-        -- Recurse, because we might now need to residualise and drive even more stuff (as we have added some more FVs and BVs)
+        (fvs_es_hs, (leftover_deeds, es_resid')) <- monitorFVs $ optimiseMany (optimiseBracketed opt) (leftover_deeds, bracks_resid)
+        -- Recurse, because we might now need to residualise and drive even more stuff (as we have added some more FVs)
+        let resid_fvs_delta = fvs_es_hs `unionVarSet` unionVarSets (map fvedTermFreeVars es_resid')
         go leftover_deeds bracketeds_deeded_heap_not_resid'
                           (xes_resid ++ zip xs_resid' es_resid')
-                          (resid_fvs `unionVarSet` extra_resid_fvs')
+                          (resid_fvs `unionVarSet` resid_fvs_delta)
       where
         -- When assembling the final list of things to drive, ensure that we exclude already-driven things
         (h_resid, bracketeds_deeded_heap_not_resid') = M.partitionWithKey (\x _br -> x `elemVarSet` resid_fvs) bracketeds_deeded_heap_not_resid

@@ -309,7 +309,9 @@ data Promise f = P {
   }
 
 instance MonadStatics ScpBM where
-    bindCapturedFloats' = bindFloats
+    bindCapturedFloats = bindFloats
+    monitorFVs mx = ScpM $ \e s k -> unScpM mx e s (\x s' -> let (fss_delta, _fss_common) = splitByReverse (pTreeHole s) (pTreeHole s')
+                                                             in k (unionVarSets [fvedTermFreeVars e' | (_, Just e') <- Foldable.toList (Comp (Comp fss_delta))], x) s')
 
 -- Note [Floating h-functions past the let-bound variables to which they refer]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -414,15 +416,14 @@ partitionFulfilments p combine = go
 -- The right thing to do is to make sure that fulfilments created in different "branches" of the process tree aren't eligible for early binding in
 -- that manner, but we still want to tie back to them if possible. The bindFloats function achieves this by carefully shuffling information between the
 -- fulfilments and promises parts of the monadic-carried state.
-bindFloats :: FreeVars -> ScpBM a -> (Out [(Var, FVedTerm)] -> a -> ScpBM r) {- These h-functions are still visible in this continuation! -} -> ScpBM r
-bindFloats extra_statics mx mcont
+bindFloats :: FreeVars -> ScpBM a -> ScpBM ([(Var, FVedTerm)], a)
+bindFloats extra_statics mx
   = ScpM $ \e s k -> unScpM mx (e { pTreeContext = BindCapturedFloats extra_statics (pTreeHole s) : pTreeContext e })
-                               (s { pTreeHole = [] }) (kontinue e s k)
+                               (s { pTreeHole = [] }) (kontinue s k)
   where
-    kontinue e s k x s' = -- traceRender ("bindFloats", [(fun p, fvedTermFreeVars e) | (p, e) <- fs_now], [(fun p, fvedTermFreeVars e) | (p, e) <- fs_later]) $
-                          --k (fulfilmentsToBinds fs_now, x) (s' { fulfilment = fs_later ++ fulfilment s })
-                          unScpM (mcont (fulfilmentsToBinds fs_now) x) (e { pTreeContext = BoundCapturedFloats fs_now : pTreeContext e }) (s' { pTreeHole = unComp fs_later ++ pTreeHole s }) k
-      where (fs_now, fs_later) = partitionFulfilments fulfilmentRefersTo mkVarSet extra_statics (Comp (pTreeHole s')) -- FIXME: should record pre-modification tree in BoundCapturedFloats?
+    kontinue s k x s' = -- traceRender ("bindFloats", [(fun p, fvedTermFreeVars e) | (p, e) <- fs_now], [(fun p, fvedTermFreeVars e) | (p, e) <- fs_later]) $
+                        k (fulfilmentsToBinds fs_now, x) (s' { pTreeHole = unComp fs_later ++ pTreeHole s })
+      where (fs_now, fs_later) = partitionFulfilments fulfilmentRefersTo mkVarSet extra_statics (Comp (pTreeHole s'))
 
 fulfilmentsToBinds :: [Fulfilment] -> Out [(Var, FVedTerm)]
 fulfilmentsToBinds fs = sortBy (comparing ((read :: String -> Int) . dropLastWhile (== '\'') . drop 1 . varString . fst)) [(fun p, e') | (p, Just e') <- fs]
@@ -500,7 +501,6 @@ instance Traversable PTree where
 -- level) for nice pretty-printed logging.
 data PTreeContextItem = Promise (Promise Identity)
                       | BindCapturedFloats FreeVars [FulfilmentTree]
-                      | BoundCapturedFloats [Fulfilment]
 type PTreeContext = [PTreeContextItem]
 
 data ScpEnv = ScpEnv {
@@ -518,7 +518,6 @@ pTreeContextPromises :: PTreeContext -> [Promise Identity]
 pTreeContextPromises = foldMap $ \tci -> case tci of
     Promise p                -> [p]
     BindCapturedFloats _ fts -> fulfilmentsPromises (Foldable.toList (Comp (Comp fts)))
-    BoundCapturedFloats  fs  -> fulfilmentsPromises fs
 
 fulfilmentsPromises :: [Fulfilment] -> [Promise Identity]
 fulfilmentsPromises fs = [P { fun = f, abstracted = a, meaning = I m } | (P { fun = f, abstracted = a, meaning = Just m }, _) <- fs]
@@ -577,7 +576,6 @@ catchScpM f_try f_abort = ScpM $ \e s k -> unScpM (f_try (\c -> ScpM $ \e' s' _k
                                    go (partial_not_completed, fs_floating) (Promise p) = (partial_not_completed `extendVarSet` fun p, [Split True [Just (p { meaning = Nothing }, Nothing)] fs_floating])
                                    go (partial_not_completed, fs_floating) (BindCapturedFloats extra_statics fs_pre_bind) = (partial_not_completed, unComp fs_ok)
                                       where (_fs_discard, fs_ok) = partitionFulfilments fulfilmentRefersTo mkVarSet (not_completed `unionVarSet` extra_statics) (Comp (fs_pre_bind ++ fs_floating))
-                                   go (partial_not_completed, fs_floating) (BoundCapturedFloats _fs_pre_bound) = (partial_not_completed, fs_floating)
 
                                    (not_completed, fs_floating) = foldl' go (emptyVarSet, []) fss_candidates
                                in s' { pTreeHole = fs_floating ++ pTreeHole s })
