@@ -17,7 +17,8 @@ import DataCon
 
 import TyCon
 import Name hiding (varName)
-import Module (moduleName, moduleNameString)
+import Module (Module, moduleName, moduleNameString)
+import IfaceEnv (newGlobalBinder)
 import RdrName
 import BasicTypes
 import TysWiredIn
@@ -73,9 +74,7 @@ canDoGenerics tycon
                           then (Just (ppr dc <+> text "must be a vanilla data constructor"))
                           else Nothing)
 
-
 	-- Nor can we do the job if it's an existential data constructor,
-
 	-- Nor if the args are polymorphic types (I don't think)
     bad_arg_type ty = isUnLiftedType ty || not (isTauTy ty)
     
@@ -119,10 +118,11 @@ mkBindsRep tycon =
 --       type Rep_D a b = ...representation type for D ...
 --------------------------------------------------------------------------------
 
-tc_mkRepTyCon :: TyCon           -- The type to generate representation for
+tc_mkRepTyCon :: TyCon            -- The type to generate representation for
                -> MetaTyCons      -- Metadata datatypes to refer to
+               -> Module          -- JPM TODO
                -> TcM TyCon       -- Generated representation0 type
-tc_mkRepTyCon tycon metaDts = 
+tc_mkRepTyCon tycon metaDts mod = 
 -- Consider the example input tycon `D`, where data D a b = D_ a
   do { -- `rep0` = GHC.Generics.Rep (type family)
        rep0 <- tcLookupTyCon repTyConName
@@ -131,7 +131,9 @@ tc_mkRepTyCon tycon metaDts =
      ; rep0Ty <- tc_mkRepTy tycon metaDts
     
        -- `rep_name` is a name we generate for the synonym
-     ; rep_name <- newImplicitBinder (tyConName tycon) mkGenR
+--     ; rep_name <- newImplicitBinder (tyConName tycon) mkGenR
+     ; rep_name <- newGlobalBinder mod (mkGenR (nameOccName (tyConName tycon)))
+                     (nameSrcSpan (tyConName tycon))
      ; let -- `tyvars` = [a,b]
            tyvars  = tyConTyVars tycon
 
@@ -143,6 +145,8 @@ tc_mkRepTyCon tycon metaDts =
 
      ; buildSynTyCon rep_name tyvars (SynonymTyCon rep0Ty) rep_kind
                      NoParentTyCon (Just (rep0, appT)) }
+
+
 
 --------------------------------------------------------------------------------
 -- Type representation
