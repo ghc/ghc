@@ -156,7 +156,7 @@ instance Binary Literal where
               8 -> do
                     ai <- get bh
                     return (MachDouble ai)
-              9 -> do
+              _ -> do
                     aj <- get bh
                     mb <- get bh
                     fod <- get bh
@@ -257,29 +257,45 @@ word2IntLit, int2WordLit,
 word2IntLit (MachWord w)
   | w > tARGET_MAX_INT = MachInt (w - tARGET_MAX_WORD - 1)
   | otherwise          = MachInt w
+word2IntLit l = pprPanic "word2IntLit" (ppr l)
 
 int2WordLit (MachInt i)
   | i < 0     = MachWord (1 + tARGET_MAX_WORD + i)      -- (-1)  --->  tARGET_MAX_WORD
   | otherwise = MachWord i
+int2WordLit l = pprPanic "int2WordLit" (ppr l)
 
 narrow8IntLit    (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int8))
+narrow8IntLit    l            = pprPanic "narrow8IntLit" (ppr l)
 narrow16IntLit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int16))
+narrow16IntLit   l            = pprPanic "narrow16IntLit" (ppr l)
 narrow32IntLit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int32))
+narrow32IntLit   l            = pprPanic "narrow32IntLit" (ppr l)
 narrow8WordLit   (MachWord w) = MachWord (toInteger (fromInteger w :: Word8))
+narrow8WordLit   l            = pprPanic "narrow8WordLit" (ppr l)
 narrow16WordLit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word16))
+narrow16WordLit  l            = pprPanic "narrow16WordLit" (ppr l)
 narrow32WordLit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word32))
+narrow32WordLit  l            = pprPanic "narrow32WordLit" (ppr l)
 
 char2IntLit (MachChar c) = MachInt  (toInteger (ord c))
+char2IntLit l            = pprPanic "char2IntLit" (ppr l)
 int2CharLit (MachInt  i) = MachChar (chr (fromInteger i))
+int2CharLit l            = pprPanic "int2CharLit" (ppr l)
 
 float2IntLit (MachFloat f) = MachInt   (truncate    f)
+float2IntLit l             = pprPanic "float2IntLit" (ppr l)
 int2FloatLit (MachInt   i) = MachFloat (fromInteger i)
+int2FloatLit l             = pprPanic "int2FloatLit" (ppr l)
 
 double2IntLit (MachDouble f) = MachInt    (truncate    f)
-int2DoubleLit (MachInt   i) = MachDouble (fromInteger i)
+double2IntLit l              = pprPanic "double2IntLit" (ppr l)
+int2DoubleLit (MachInt    i) = MachDouble (fromInteger i)
+int2DoubleLit l              = pprPanic "int2DoubleLit" (ppr l)
 
 float2DoubleLit (MachFloat  f) = MachDouble f
+float2DoubleLit l              = pprPanic "float2DoubleLit" (ppr l)
 double2FloatLit (MachDouble d) = MachFloat  d
+double2FloatLit l              = pprPanic "double2FloatLit" (ppr l)
 
 nullAddrLit :: Literal
 nullAddrLit = MachNullAddr
