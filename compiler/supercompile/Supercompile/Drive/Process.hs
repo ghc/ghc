@@ -34,6 +34,7 @@ import Id         (idType, mkLocalId)
 import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
+import qualified State as State
 import State hiding (State, mapAccumLM)
 
 import qualified Control.Monad as Monad
@@ -311,7 +312,7 @@ data Promise f = P {
 instance MonadStatics ScpBM where
     bindCapturedFloats = bindFloats
     monitorFVs mx = ScpM $ \e s k -> unScpM mx e s (\x s' -> let (fss_delta, _fss_common) = splitByReverse (pTreeHole s) (pTreeHole s')
-                                                             in k (unionVarSets [fvedTermFreeVars e' | (_, Just e') <- Foldable.toList (Comp (Comp fss_delta))], x) s')
+                                                             in k (unionVarSets [fvedTermFreeVars e' | (_, Fulfilled e') <- Foldable.toList (Comp (Comp fss_delta))], x) s')
 
 -- Note [Floating h-functions past the let-bound variables to which they refer]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -354,7 +355,7 @@ instance MonadStatics ScpBM where
 -- y, but doing so is pointless (just hides information from GHC) since the result will be trapped under the x binding anyway.
 fulfilmentRefersTo :: FreeVars -> Fulfilment -> Maybe (Out Var)
 fulfilmentRefersTo extra_statics (promise, mb_e')
-  = if Foldable.any (`elemVarSet` extra_statics) (maybe emptyVarSet fvedTermFreeVars mb_e' `unionVarSet` extra_fvs)
+  = if Foldable.any (`elemVarSet` extra_statics) (fulfillableFreeVars mb_e' `unionVarSet` extra_fvs)
      then Just (fun promise)
      else Nothing
   where
@@ -367,14 +368,13 @@ fulfilmentRefersTo extra_statics (promise, mb_e')
       Just s  -> stateLetBounders s
       Nothing -> emptyVarSet
 
-
 -- Used at the end of supercompilation to extract just those h functions that are actually referred to.
 -- More often than not, this will be *all* the h functions, but if we don't discard h functions on rollback
 -- then this is not necessarily the case!
 fulfilmentReferredTo :: FreeVars -> Fulfilment -> Maybe FreeVars
 fulfilmentReferredTo fvs (promise, mb_e')
   = if fun promise `elemVarSet` fvs
-     then Just (maybe emptyVarSet fvedTermFreeVars mb_e')
+     then Just (fulfillableFreeVars mb_e')
      else Nothing
 
 -- We do need a fixed point here to identify the full set of h-functions to residualise.
@@ -383,20 +383,26 @@ fulfilmentReferredTo fvs (promise, mb_e')
 -- of the static variables.
 -- See also Note [Phantom variables and bindings introduced by scrutinisation]
 partitionFulfilments :: forall t fulfilment a b. Traversable t
-                     => (a -> fulfilment -> Maybe b)         -- ^ Decide whether a fulfilment should be residualised given our current a, returning a new b if so
-                     -> ([b] -> a)                           -- ^ Combine bs of those fufilments being residualised into a new a
-                     -> a                                    -- ^ Used to decide whether the fufilments right here are suitable for residulising
-                     -> t (Maybe fulfilment)                 -- ^ Fulfilments to partition
-                     -> ([fulfilment], t (Maybe fulfilment)) -- ^ Fulfilments that should be bound and those that should continue to float, respectively
+                     => (a -> fulfilment -> Maybe b)              -- ^ Decide whether a fulfilment should be residualised given our current a, returning a new b if so
+                     -> ([b] -> a)                                -- ^ Combine bs of those fufilments being residualised into a new a
+                     -> a                                         -- ^ Used to decide whether the fufilments right here are suitable for residulising
+                     -> t (Capturable fulfilment)                 -- ^ Fulfilments to partition
+                     -> ([fulfilment], t (Capturable fulfilment)) -- ^ Fulfilments that should be bound and those that should continue to float, respectively
 partitionFulfilments p combine = go
   where
-    go :: a -> t (Maybe fulfilment) -> ([fulfilment], t (Maybe fulfilment))
+    go :: a -> t (Capturable fulfilment) -> ([fulfilment], t (Capturable fulfilment))
     go x fs
       -- | traceRender ("partitionFulfilments", x, map (fun . fst) fs) False = undefined
       | null fs_now' = ([], fs)
       | otherwise    = first (fs_now' ++) $ go (combine xs') fs'
-      where (fs', fs_now_xs') = runState (traverse (\mb_f -> case (mb_f Monad.>>= \f -> liftM ((,) f) $ p x f) of Just (f, x) -> modify ((f, x):) Monad.>> pure Nothing; Nothing -> pure mb_f) fs) []
+      where (fs', fs_now_xs') = runState (traverse one_captured fs) []
             (fs_now', xs') = unzip fs_now_xs'
+
+            one_captured :: Capturable fulfilment -> State.State [(fulfilment, b)] (Capturable fulfilment)
+            one_captured Captured = pure Captured
+            one_captured (NotCaptured f) = case p x f of
+                Just y  -> modify ((f, y):) Monad.>> pure Captured
+                Nothing -> pure (NotCaptured f)
 
 -- Note [Where to residualise fulfilments with FVs]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -426,7 +432,7 @@ bindFloats extra_statics mx
       where (fs_now, fs_later) = partitionFulfilments fulfilmentRefersTo mkVarSet extra_statics (Comp (pTreeHole s'))
 
 fulfilmentsToBinds :: [Fulfilment] -> Out [(Var, FVedTerm)]
-fulfilmentsToBinds fs = sortBy (comparing ((read :: String -> Int) . dropLastWhile (== '\'') . drop 1 . varString . fst)) [(fun p, e') | (p, Just e') <- fs]
+fulfilmentsToBinds fs = sortBy (comparing ((read :: String -> Int) . dropLastWhile (== '\'') . drop 1 . varString . fst)) [(fun p, e') | (p, Fulfilled e') <- fs]
 
 freshHName :: ScpM f f (Name, Name)
 freshHName = ScpM $ \_e s k -> k (expectHead "freshHName" (names s)) (s { names = tail (names s) })
@@ -463,12 +469,12 @@ promise p x' opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted
       pprTrace "promise" (ppr optimised_fvs $$ ppr optimised_e) $
        ScpM $ \_e s k -> let fs' | abstracted_set == abstracted'_set || not rEFINE_FULFILMENT_FVS
                                  -- If the free variables are totally unchanged, there is nothing to be gained from clever fiddling
-                                = [(p { meaning = Just (unI (meaning p)) }, Just $ tyVarIdLambdas (abstracted p) optimised_e)]
+                                = [(p { meaning = Just (unI (meaning p)) }, Fulfilled $ tyVarIdLambdas (abstracted p) optimised_e)]
                                 | otherwise
                                  -- If the free variable set has got smaller, we can fulfill our old promise with a simple wrapper around a new one with fewer free variables
-                                = [(p { meaning = Nothing },                                                           Just $ tyVarIdLambdas (abstracted p) (var fun' `tyVarIdApps` abstracted'_list)),
-                                   (P { fun = fun', abstracted = abstracted'_list, meaning = Just (unI (meaning p)) }, Just $ tyVarIdLambdas abstracted'_list optimised_e)]
-                        in k () (s { pTreeHole = Split False (map Just fs') (pTreeHole s) })
+                                = [(p { meaning = Nothing },                                                           Fulfilled $ tyVarIdLambdas (abstracted p) (var fun' `tyVarIdApps` abstracted'_list)),
+                                   (P { fun = fun', abstracted = abstracted'_list, meaning = Just (unI (meaning p)) }, Fulfilled $ tyVarIdLambdas abstracted'_list optimised_e)]
+                        in k () (s { pTreeHole = Split False (map NotCaptured fs') (pTreeHole s) })
       
       fmap (((abstracted_set `unionVarSet` stateLetBounders (unI (meaning p))) `unionVarSet`) . mkVarSet) getPromiseNames >>=
         \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr (fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
@@ -479,8 +485,25 @@ promise p x' opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted
 -- No meaning, no term: rolled back while still a promise
 -- Meaning, term: standard
 -- Meaning, no term: rolled back after being fulfilled for some other reason
-type Fulfilment = (Promise Maybe, Maybe (Out FVedTerm))
-type FulfilmentTree = PTree (Maybe Fulfilment) -- Maybe because some fulfilments may have been captured
+type Fulfilment = (Promise Maybe, Fulfilable (Out FVedTerm))
+type FulfilmentTree = PTree (Capturable Fulfilment)
+
+data Fulfilable a = RolledBack  -- ^ Rolled back past the promise before we could fulfil it
+                  | Fulfilled a -- ^ Completed normally
+
+fulfillableFreeVars :: Fulfilable (Out FVedTerm) -> FreeVars
+fulfillableFreeVars (Fulfilled e') = fvedTermFreeVars e'
+fulfillableFreeVars RolledBack     = emptyVarSet
+
+data Capturable a = Captured      -- ^ Already residualised because captured by a BV or similar
+                  | NotCaptured a -- ^ Not yet residualised: floated, eligible for further tiebacks
+
+instance Functor Capturable where fmap = Traversable.fmapDefault
+instance Foldable Capturable where foldMap = Traversable.foldMapDefault
+
+instance Traversable Capturable where
+    traverse _ Captured        = pure Captured
+    traverse f (NotCaptured x) = NotCaptured <$> f x
 
 data PTree a = Tieback Var | Split Bool [a] [PTree a]
 
@@ -573,13 +596,24 @@ catchScpM f_try f_abort = ScpM $ \e s k -> unScpM (f_try (\c -> ScpM $ \e' s' _k
                                    -- The approach is to accumulate a set of floating fulfilments that I try to move past each statics set one at a time,
                                    -- from inside (deeper in the tree) to the outside (closer to top level).
                                    go :: (VarSet, [FulfilmentTree]) -> PTreeContextItem -> (VarSet, [FulfilmentTree])
-                                   go (partial_not_completed, fs_floating) (Promise p) = (partial_not_completed `extendVarSet` fun p, [Split True [Just (p { meaning = Nothing }, Nothing)] fs_floating])
+                                   go (partial_not_completed, fs_floating) (Promise p) = (partial_not_completed `extendVarSet` fun p, [Split True [NotCaptured (p { meaning = Nothing }, RolledBack)] fs_floating])
                                    go (partial_not_completed, fs_floating) (BindCapturedFloats extra_statics fs_pre_bind) = (partial_not_completed, unComp fs_ok)
                                       where (_fs_discard, fs_ok) = partitionFulfilments fulfilmentRefersTo mkVarSet (not_completed `unionVarSet` extra_statics) (Comp (fs_pre_bind ++ fs_floating))
 
                                    (not_completed, fs_floating) = foldl' go (emptyVarSet, []) fss_candidates
                                in s' { pTreeHole = fs_floating ++ pTreeHole s })
                          k)) e s k
+
+{-
+pprScpM :: ScpBM String
+pprScpM = ScpM $ \e s k -> k (ppr (unwind (pTreeContext e) (pTreeHole s)))
+  where
+    
+
+    ppr ctxt fs
+
+type PrettyTree = 
+-}
 
 addStats :: SCStats -> ScpM f f ()
 addStats scstats = ScpM $ \_e s k -> k () (let scstats' = stats s `mappend` scstats in scstats' `seqSCStats` s { stats = scstats' })
