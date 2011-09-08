@@ -46,3 +46,5 @@ test('T3972', extra_clean(['T3972A.hi', 'T3972A.o']),
               [''])
 test('T5315', normal, compile_and_run, [''])
 test('T5453', normal, compile_and_run, [''])
+test('T5441', extra_clean(['T5441a.o','T5441a.hi']), 
+              multimod_compile_and_run, ['T5441',''])
