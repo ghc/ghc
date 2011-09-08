@@ -505,7 +505,11 @@ instance Traversable Capturable where
     traverse _ Captured        = pure Captured
     traverse f (NotCaptured x) = NotCaptured <$> f x
 
-data PTree a = Tieback Var | Split Bool [a] [PTree a]
+data PTree a = Tieback Var              -- ^ Didn't promise or drive extra stuff: just tied back
+             | Split Bool [a] [PTree a] -- ^ Made a promise, fulfiling it like so (with 1 or 2 fulfilments..)
+                                        --   and where the children are these
+             | BoundCapturedFloats FreeVars [PTree a]
+                                        -- ^ Produced these children within the context of these BVs
 
 instance Functor PTree where fmap = Traversable.fmapDefault
 instance Foldable PTree where foldMap = Traversable.foldMapDefault
@@ -513,6 +517,7 @@ instance Foldable PTree where foldMap = Traversable.foldMapDefault
 instance Traversable PTree where
     traverse _ (Tieback n)  = pure (Tieback n)
     traverse f (Split rb x ts) = Split rb <$> traverse f x <*> traverse (traverse f) ts
+    traverse f (BoundCapturedFloats bvs ts) = BoundCapturedFloats bvs <$> traverse (traverse f) ts
 
 -- Fulfilments at each level and the free variables of bindCapturedFloats that caused them to pushed.
 -- We guarantee that promises for each these are already present in the promises field.
@@ -597,26 +602,38 @@ catchScpM f_try f_abort = ScpM $ \e s k -> unScpM (f_try (\c -> ScpM $ \e' s' _k
                                    -- from inside (deeper in the tree) to the outside (closer to top level).
                                    go :: (VarSet, [FulfilmentTree]) -> PTreeContextItem -> (VarSet, [FulfilmentTree])
                                    go (partial_not_completed, fs_floating) (Promise p) = (partial_not_completed `extendVarSet` fun p, [Split True [NotCaptured (p { meaning = Nothing }, RolledBack)] fs_floating])
-                                   go (partial_not_completed, fs_floating) (BindCapturedFloats extra_statics fs_pre_bind) = (partial_not_completed, unComp fs_ok)
-                                      where (_fs_discard, fs_ok) = partitionFulfilments fulfilmentRefersTo mkVarSet (not_completed `unionVarSet` extra_statics) (Comp (fs_pre_bind ++ fs_floating))
+                                   go (partial_not_completed, fs_floating) (BindCapturedFloats extra_statics fs_pre_bind) = (partial_not_completed, fs_pre_bind ++ [BoundCapturedFloats extra_statics (unComp fs_ok)])
+                                      where (_fs_discard, fs_ok) = partitionFulfilments fulfilmentRefersTo mkVarSet (not_completed `unionVarSet` extra_statics) (Comp fs_floating)
 
                                    (not_completed, fs_floating) = foldl' go (emptyVarSet, []) fss_candidates
                                in s' { pTreeHole = fs_floating ++ pTreeHole s })
                          k)) e s k
 
-{-
-pprScpM :: ScpBM String
-pprScpM = ScpM $ \e s k -> k (ppr (unwind (pTreeContext e) (pTreeHole s)))
-  where
-    
-
-    ppr ctxt fs
-
-type PrettyTree = 
--}
-
 addStats :: SCStats -> ScpM f f ()
 addStats scstats = ScpM $ \_e s k -> k () (let scstats' = stats s `mappend` scstats in scstats' `seqSCStats` s { stats = scstats' })
+
+
+type PrettyTree = PTree (Var, SDoc, Maybe SDoc)
+
+pprScpM :: ScpBM SDoc
+pprScpM = ScpM $ \e s k -> k (pprTrees (unwindContext (pTreeContext e) (map unwindTree (pTreeHole s)))) s
+  where
+    unwindTree :: FulfilmentTree -> PrettyTree
+    unwindTree = fmap (\mb_f -> case mb_f of Captured      -> (??, ??, Nothing)
+                                             NotCaptured f -> unwindFulfilment f)
+
+    unwindFulfilment (p, mb_e') = (fun p, ppr (meaning p), case mb_e' of RolledBack -> Nothing
+                                                                         Fulfilled e' -> Just (ppr e'))
+
+    unwindContext :: PTreeContext -> [PrettyTree] -> [PrettyTree]
+    unwindContext = flip $ foldl (flip unwindContextItem)
+
+    unwindContextItem :: PTreeContextItem -> [PrettyTree] -> [PrettyTree]
+    unwindContextItem (Promise p)                  ts = [Split True [(fun p, ppr (meaning p), Nothing)] ts]
+    unwindContextItem (BindCapturedFloats fvs ts') ts = map unwindTree ts' ++ [BoundCapturedFloats fvs ts]
+
+    pprTrees :: [PrettyTree] -> SDoc
+    pprTrees = undefined
 
 
 type RollbackScpM = Generaliser -> ScpBM (Deeds, Out FVedTerm)
