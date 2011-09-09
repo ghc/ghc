@@ -23,7 +23,7 @@ module Class (
 #include "Typeable.h"
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TyCon	( TyCon )
+import {-# SOURCE #-} TyCon	( TyCon, tyConName, tyConUnique )
 import {-# SOURCE #-} TypeRep	( Type, PredType )
 
 import Var
@@ -49,15 +49,19 @@ A @Class@ corresponds to a Greek kappa in the static semantics:
 \begin{code}
 data Class
   = Class {
-	classKey  :: Unique,		-- Key for fast comparison
-	className :: Name,
+	classTyCon :: TyCon,		-- The data type constructor for
+					-- dictionaries of this class
+
+	className :: Name,              -- Just the cached name of the TyCon
+	classKey  :: Unique,		-- Cached unique of TyCon
 	
-	classTyVars  :: [TyVar],	-- The class type variables
+	classTyVars  :: [TyVar],	-- The class type variables;
+		     			-- identical to those of the TyCon
 	classFunDeps :: [FunDep TyVar],	-- The functional dependencies
 
 	-- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
-        -- We need value-level selectors for the dictionary 
-	-- superclasses, but not for the equality superclasses
+        -- We need value-level selectors for both the dictionary 
+	-- superclasses and the equality superclasses
 	classSCTheta :: [PredType],	-- Immediate superclasses, 
 	classSCSels  :: [Id],		-- Selector functions to extract the
 		     			--   superclasses from a 
@@ -66,10 +70,7 @@ data Class
         classATStuff :: [ClassATItem],	-- Associated type families
 
         -- Class operations (methods, not superclasses)
-	classOpStuff :: [ClassOpItem],	-- Ordered by tag
-
-	classTyCon :: TyCon		-- The data type constructor for
-					-- dictionaries of this class
+	classOpStuff :: [ClassOpItem]	-- Ordered by tag
      }
   deriving Typeable
 
@@ -110,7 +111,7 @@ defMethSpecOfDefMeth meth
 The @mkClass@ function fills in the indirect superclasses.
 
 \begin{code}
-mkClass :: Name -> [TyVar]
+mkClass :: [TyVar]
 	-> [([TyVar], [TyVar])]
 	-> [PredType] -> [Id]
 	-> [ClassATItem]
@@ -118,10 +119,10 @@ mkClass :: Name -> [TyVar]
 	-> TyCon
 	-> Class
 
-mkClass name tyvars fds super_classes superdict_sels at_stuff
+mkClass tyvars fds super_classes superdict_sels at_stuff
 	op_stuff tycon
-  = Class {	classKey     = getUnique name, 
-		className    = name,
+  = Class {	classKey     = tyConUnique tycon, 
+		className    = tyConName tycon,
 		classTyVars  = tyvars,
 		classFunDeps = fds,
 		classSCTheta = super_classes,
@@ -240,4 +241,3 @@ instance Data.Data Class where
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "Class"
 \end{code}
-

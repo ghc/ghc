@@ -976,7 +976,7 @@ pprEvVarTheta :: [EvVar] -> SDoc
 pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
                               
 pprEvVarWithType :: EvVar -> SDoc
-pprEvVarWithType v = ppr v <+> dcolon <+> pprPredTy (evVarPred v)
+pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
 
 pprWantedsWithLocs :: WantedConstraints -> SDoc
 pprWantedsWithLocs wcs

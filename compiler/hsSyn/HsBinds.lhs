@@ -432,9 +432,6 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
 %************************************************************************
 
 \begin{code}
--- A HsWrapper is an expression with a hole in it
--- We need coercions to have concrete form so that we can zonk them
-
 data HsWrapper
   = WpHole			-- The identity coercion
 
@@ -444,8 +441,8 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpCast Coercion		-- A cast:  [] `cast` co
-				-- Guaranteed not the identity coercion
+  | WpCast LCoercion          -- A cast:  [] `cast` co
+                              -- Guaranteed not the identity coercion
 
 	-- Evidence abstraction and application
         -- (both dictionaries and coercions)
@@ -502,24 +499,24 @@ data EvBind = EvBind EvVar EvTerm
 
 data EvTerm
   = EvId EvId                  -- Term-level variable-to-variable bindings 
-                               -- (no coercion variables! they come via EvCoercion)
+                               -- (no coercion variables! they come via EvCoercionBox)
 
-  | EvCoercion Coercion        -- Coercion bindings
+  | EvCoercionBox LCoercion    -- (Boxed) coercion bindings
 
-  | EvCast EvVar Coercion      -- d |> co
+  | EvCast EvVar LCoercion     -- d |> co
 
   | EvDFunApp DFunId           -- Dictionary instance application
-       [Type] [EvVar] 
+       [Type] [EvVar]
+
+  | EvTupleSel EvId  Int       -- n'th component of the tuple
+
+  | EvTupleMk [EvId]           -- tuple built from this stuff
 
   | EvSuperClass DictId Int    -- n'th superclass. Used for both equalities and
                                -- dictionaries, even though the former have no
 			       -- selector Id.  We count up from _0_ 
 			       
   deriving( Data, Typeable)
-
-evVarTerm :: EvVar -> EvTerm
-evVarTerm v | isCoVar v = EvCoercion (mkCoVarCo v)
-            | otherwise = EvId v
 \end{code}
 
 Note [EvBinds/EvTerm]
@@ -560,7 +557,7 @@ mkWpEvApps :: [EvTerm] -> HsWrapper
 mkWpEvApps args = mk_co_app_fn WpEvApp args
 
 mkWpEvVarApps :: [EvVar] -> HsWrapper
-mkWpEvVarApps vs = mkWpEvApps (map evVarTerm vs)
+mkWpEvVarApps vs = mkWpEvApps (map EvId vs)
 
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
@@ -630,11 +627,14 @@ instance Outputable EvBindsVar where
 
 instance Outputable EvBind where
   ppr (EvBind v e)   = ppr v <+> equals <+> ppr e
+   -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
   ppr (EvId v)        	 = ppr v
   ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendCo co
-  ppr (EvCoercion co)    = ptext (sLit "CO") <+> ppr co
+  ppr (EvCoercionBox co) = ptext (sLit "CO") <+> ppr co
+  ppr (EvTupleSel v n)   = ptext (sLit "tupsel") <> parens (ppr (v,n))
+  ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
 \end{code}

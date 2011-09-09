@@ -56,13 +56,13 @@ module HscTypes (
 
         -- * TyThings and type environments
 	TyThing(..),
-	tyThingClass, tyThingTyCon, tyThingDataCon, 
+	tyThingTyCon, tyThingDataCon,
         tyThingId, tyThingCoAxiom, tyThingParent_maybe,
 	implicitTyThings, implicitTyConThings, implicitClassThings, isImplicitTyThing,
 	
 	TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
 	extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
-	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
+	typeEnvElts, typeEnvTyCons, typeEnvIds,
 	typeEnvDataCons, typeEnvCoAxioms,
 
         -- * MonadThings
@@ -158,8 +158,8 @@ import System.FilePath
 import System.Time	( ClockTime )
 import Data.IORef
 import Data.Array       ( Array, array )
+import Data.Map         ( Map )
 import Data.List
-import Data.Map (Map)
 import Data.Word
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
@@ -1066,7 +1066,6 @@ implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId _)       = []
 implicitTyThings (ACoAxiom _cc) = []
 implicitTyThings (ATyCon tc)    = implicitTyConThings tc
-implicitTyThings (AClass cl)    = implicitClassThings cl
 implicitTyThings (ADataCon dc)  = map AnId (dataConImplicitIds dc)
     -- For data cons add the worker and (possibly) wrapper
     
@@ -1074,15 +1073,6 @@ implicitClassThings :: Class -> [TyThing]
 implicitClassThings cl 
   = -- Does not include default methods, because those Ids may have
     --    their own pragmas, unfoldings etc, not derived from the Class object
-    -- Dictionary datatype:
-    --    [extras_plus:]
-    --      type constructor 
-    --    [recursive call:]
-    --      (possibly) newtype coercion; definitely no family coercion here
-    --      data constructor
-    --      worker
-    --      (no wrapper by invariant)
-    extras_plus (ATyCon (classTyCon cl)) ++
     -- associated types 
     --    No extras_plus (recursive call) for the classATs, because they
     --    are only the family decls; they have no implicit things
@@ -1092,14 +1082,18 @@ implicitClassThings cl
 
 implicitTyConThings :: TyCon -> [TyThing]
 implicitTyConThings tc 
-  =   -- fields (names of selectors)
+  = class_stuff ++
+      -- fields (names of selectors)
       -- (possibly) implicit coercion and family coercion
       --   depending on whether it's a newtype or a family instance or both
     implicitCoTyCon tc ++
       -- for each data constructor in order,
       --   the contructor, worker, and (possibly) wrapper
     concatMap (extras_plus . ADataCon) (tyConDataCons tc)
-
+  where
+    class_stuff = case tyConClass_maybe tc of
+        Nothing -> []
+        Just cl -> implicitClassThings cl
 
 -- add a thing and recursive call
 extras_plus :: TyThing -> [TyThing]
@@ -1124,7 +1118,6 @@ implicitCoTyCon tc
 isImplicitTyThing :: TyThing -> Bool
 isImplicitTyThing (ADataCon {}) = True
 isImplicitTyThing (AnId id)     = isImplicitId id
-isImplicitTyThing (AClass {})   = False
 isImplicitTyThing (ATyCon tc)   = isImplicitTyCon tc
 isImplicitTyThing (ACoAxiom {}) = True
 
@@ -1141,11 +1134,11 @@ tyThingParent_maybe :: TyThing -> Maybe TyThing
 -- might have a parent.
 tyThingParent_maybe (ADataCon dc) = Just (ATyCon (dataConTyCon dc))
 tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
-                                      Just cls -> Just (AClass cls)
+                                      Just cls -> Just (ATyCon (classTyCon cls))
                                       Nothing  -> Nothing
 tyThingParent_maybe (AnId id)     = case idDetails id of
       				      	 RecSelId { sel_tycon = tc } -> Just (ATyCon tc)
-      				      	 ClassOpId cls               -> Just (AClass cls)
+      				      	 ClassOpId cls               -> Just (ATyCon (classTyCon cls))
                                       	 _other                      -> Nothing
 tyThingParent_maybe _other = Nothing
 \end{code}
@@ -1163,7 +1156,6 @@ type TypeEnv = NameEnv TyThing
 
 emptyTypeEnv    :: TypeEnv
 typeEnvElts     :: TypeEnv -> [TyThing]
-typeEnvClasses  :: TypeEnv -> [Class]
 typeEnvTyCons   :: TypeEnv -> [TyCon]
 typeEnvCoAxioms :: TypeEnv -> [CoAxiom]
 typeEnvIds      :: TypeEnv -> [Id]
@@ -1172,7 +1164,6 @@ lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
 
 emptyTypeEnv 	    = emptyNameEnv
 typeEnvElts     env = nameEnvElts env
-typeEnvClasses  env = [cl | AClass cl   <- typeEnvElts env]
 typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env] 
 typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env] 
 typeEnvIds      env = [id | AnId id     <- typeEnvElts env] 
@@ -1235,11 +1226,6 @@ tyThingCoAxiom :: TyThing -> CoAxiom
 tyThingCoAxiom (ACoAxiom ax) = ax
 tyThingCoAxiom other	     = pprPanic "tyThingCoAxiom" (pprTyThing other)
 
--- | Get the 'Class' from a 'TyThing' if it is a class thing. Panics otherwise
-tyThingClass :: TyThing -> Class
-tyThingClass (AClass cls) = cls
-tyThingClass other	  = pprPanic "tyThingClass" (pprTyThing other)
-
 -- | Get the 'DataCon' from a 'TyThing' if it is a data constructor thing. Panics otherwise
 tyThingDataCon :: TyThing -> DataCon
 tyThingDataCon (ADataCon dc) = dc
@@ -1274,9 +1260,6 @@ class Monad m => MonadThings m where
 
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
-
-        lookupClass :: Name -> m Class
-        lookupClass = liftM tyThingClass . lookupThing
 \end{code}
 
 \begin{code}
@@ -1640,15 +1623,15 @@ data NameCache
 		-- ^ Supply of uniques
 		nsNames :: OrigNameCache,
 		-- ^ Ensures that one original name gets one unique
-		nsIPs   :: OrigIParamCache
-		-- ^ Ensures that one implicit parameter name gets one unique
+                nsIPs   :: OrigIParamCache
+                -- ^ Ensures that one implicit parameter name gets one unique
    }
 
 -- | Per-module cache of original 'OccName's given 'Name's
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 
 -- | Module-local cache of implicit parameter 'OccName's given 'Name's
-type OrigIParamCache = Map (IPName OccName) (IPName Name)
+type OrigIParamCache = Map FastString (IPName Name)
 \end{code}
 
 

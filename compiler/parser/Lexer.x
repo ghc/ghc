@@ -495,6 +495,7 @@ data Token
   | ITrarrow
   | ITat
   | ITtilde
+  | ITtildehsh
   | ITdarrow
   | ITminus
   | ITbang
@@ -661,6 +662,7 @@ reservedSymsFM = listToUFM $
        ,("->",  ITrarrow,   always)
        ,("@",   ITat,       always)
        ,("~",   ITtilde,    always)
+       ,("~#",  ITtildehsh, always)
        ,("=>",  ITdarrow,   always)
        ,("-",   ITminus,    always)
        ,("!",   ITbang,     always)

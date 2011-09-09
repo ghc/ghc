@@ -38,6 +38,7 @@ import TcExpr
 import TcHsSyn
 import TcSimplify
 import TcUnify
+import Type
 import TcType
 import TcEnv
 import TcMType
@@ -980,12 +981,13 @@ reifyInstances th_nm th_tys
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { thing <- getThing th_nm
         ; case thing of
-            AGlobal (AClass cls) 
+            AGlobal (ATyCon tc) 
+              | Just cls <- tyConClass_maybe tc
               -> do { tys <- tc_types (classTyCon cls) th_tys
                     ; inst_envs <- tcGetInstEnvs
                     ; let (matches, unifies, _) = lookupInstEnv inst_envs cls tys
                     ; mapM reifyClassInstance (map fst matches ++ unifies) }
-            AGlobal (ATyCon tc) 
+              | otherwise
               -> do { tys <- tc_types tc th_tys
                     ; inst_envs <- tcGetFamInstEnvs
                     ; let matches = lookupFamInstEnv inst_envs tc tys
@@ -1141,7 +1143,6 @@ reifyThing (AGlobal (AnId id))
 
 reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
 reifyThing (AGlobal (ACoAxiom ax)) = reifyAxiom ax
-reifyThing (AGlobal (AClass cls))  = reifyClass cls
 reifyThing (AGlobal (ADataCon dc))
   = do	{ let name = dataConName dc
 	; ty <- reifyType (idType (dataConWrapId dc))
@@ -1177,6 +1178,9 @@ reifyAxiom ax@(CoAxiom { co_ax_lhs = lhs, co_ax_rhs = rhs })
 
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
+  | Just cls <- tyConClass_maybe tc
+  = reifyClass cls
+
   | isFunTyCon tc  
   = return (TH.PrimTyConI (reifyName tc) 2 		  False)
 
@@ -1295,12 +1299,12 @@ reifyFamilyInstance fi
 reifyType :: TypeRep.Type -> TcM TH.Type
 -- Monadic only because of failure
 reifyType ty@(ForAllTy _ _)        = reify_for_all ty
-reifyType ty@(PredTy {} `FunTy` _) = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
 reifyType (TyVarTy tv)	    = return (TH.VarT (reifyName tv))
 reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
-reifyType (FunTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
-reifyType ty@(PredTy {})    = pprPanic "reifyType PredTy" (ppr ty)
+reifyType ty@(FunTy t1 t2)
+  | isPredTy t1 = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
+  | otherwise   = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 
 reify_for_all :: TypeRep.Type -> TcM TH.Type
 reify_for_all ty
@@ -1356,16 +1360,16 @@ reify_tc_app tc tys
          | otherwise                = TH.ConT (reifyName tc)
 
 reifyPred :: TypeRep.PredType -> TcM TH.Pred
-reifyPred (ClassP cls tys) 
-  = do { tys' <- reifyTypes tys 
-       ; return $ TH.ClassP (reifyName cls) tys' }
-
-reifyPred p@(IParam _ _)   = noTH (sLit "implicit parameters") (ppr p)
-reifyPred (EqPred ty1 ty2) 
-  = do { ty1' <- reifyType ty1
-       ; ty2' <- reifyType ty2
-       ; return $ TH.EqualP ty1' ty2'
-       }
+reifyPred ty = case predTypePredTree ty of
+  ClassPred cls tys -> do { tys' <- reifyTypes tys 
+                          ; return $ TH.ClassP (reifyName cls) tys' }
+  IPPred _ _        -> noTH (sLit "implicit parameters") (ppr ty)
+  EqPred ty1 ty2    -> do { ty1' <- reifyType ty1
+                          ; ty2' <- reifyType ty2
+                          ; return $ TH.EqualP ty1' ty2'
+                          }
+  TuplePred _ -> noTH (sLit "tuple predicates") (ppr ty)
+  IrredPred _ -> noTH (sLit "irreducible predicates") (ppr ty)
 
 
 ------------------------------

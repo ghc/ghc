@@ -651,23 +651,16 @@ instance Binary HsBang where
 	      2 -> do return HsUnpack
 	      _ -> do return HsUnpackFailed
 
-instance Binary Boxity where
-    put_ bh Boxed   = putByte bh 0
-    put_ bh Unboxed = putByte bh 1
+instance Binary TupleSort where
+    put_ bh BoxedTuple      = putByte bh 0
+    put_ bh UnboxedTuple    = putByte bh 1
+    put_ bh ConstraintTuple = putByte bh 2
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do return Boxed
-	      _ -> do return Unboxed
-
-instance Binary TupCon where
-    put_ bh (TupCon ab ac) = do
-	    put_ bh ab
-	    put_ bh ac
-    get bh = do
-	  ab <- get bh
-	  ac <- get bh
-	  return (TupCon ab ac)
+      h <- getByte bh
+      case h of
+        0 -> do return BoxedTuple
+        1 -> do return UnboxedTuple
+        _ -> do return ConstraintTuple
 
 instance Binary RecFlag where
     put_ bh Recursive = do
@@ -896,24 +889,22 @@ instance Binary IfaceType where
 	    putByte bh 3
 	    put_ bh ag
 	    put_ bh ah
-    put_ bh (IfacePredTy aq) = do
-	    putByte bh 5
-	    put_ bh aq
-
+    
 	-- Simple compression for common cases of TyConApp
     put_ bh (IfaceTyConApp IfaceIntTc  [])   = putByte bh 6
     put_ bh (IfaceTyConApp IfaceCharTc [])   = putByte bh 7
     put_ bh (IfaceTyConApp IfaceBoolTc [])   = putByte bh 8
     put_ bh (IfaceTyConApp IfaceListTc [ty]) = do { putByte bh 9; put_ bh ty }
 	-- Unit tuple and pairs
-    put_ bh (IfaceTyConApp (IfaceTupTc Boxed 0) []) 	 = putByte bh 10
-    put_ bh (IfaceTyConApp (IfaceTupTc Boxed 2) [t1,t2]) = do { putByte bh 11; put_ bh t1; put_ bh t2 }
+    put_ bh (IfaceTyConApp (IfaceTupTc BoxedTuple 0) []) 	 = putByte bh 10
+    put_ bh (IfaceTyConApp (IfaceTupTc BoxedTuple 2) [t1,t2]) = do { putByte bh 11; put_ bh t1; put_ bh t2 }
         -- Kind cases
     put_ bh (IfaceTyConApp IfaceLiftedTypeKindTc [])   = putByte bh 12
     put_ bh (IfaceTyConApp IfaceOpenTypeKindTc [])     = putByte bh 13
     put_ bh (IfaceTyConApp IfaceUnliftedTypeKindTc []) = putByte bh 14
     put_ bh (IfaceTyConApp IfaceUbxTupleKindTc [])     = putByte bh 15
     put_ bh (IfaceTyConApp IfaceArgTypeKindTc [])      = putByte bh 16
+    put_ bh (IfaceTyConApp IfaceConstraintKindTc [])   = putByte bh 21
     put_ bh (IfaceTyConApp (IfaceAnyTc k) []) 	       = do { putByte bh 17; put_ bh k }
 
 	-- Generic cases
@@ -936,21 +927,20 @@ instance Binary IfaceType where
 	      3 -> do ag <- get bh
 		      ah <- get bh
 		      return (IfaceFunTy ag ah)
-	      5 -> do ap <- get bh
-		      return (IfacePredTy ap)
-
+	      
 		-- Now the special cases for TyConApp
 	      6 -> return (IfaceTyConApp IfaceIntTc [])
 	      7 -> return (IfaceTyConApp IfaceCharTc [])
 	      8 -> return (IfaceTyConApp IfaceBoolTc [])
 	      9 -> do { ty <- get bh; return (IfaceTyConApp IfaceListTc [ty]) }
-	      10 -> return (IfaceTyConApp (IfaceTupTc Boxed 0) [])
-	      11 -> do { t1 <- get bh; t2 <- get bh; return (IfaceTyConApp (IfaceTupTc Boxed 2) [t1,t2]) }
+	      10 -> return (IfaceTyConApp (IfaceTupTc BoxedTuple 0) [])
+	      11 -> do { t1 <- get bh; t2 <- get bh; return (IfaceTyConApp (IfaceTupTc BoxedTuple 2) [t1,t2]) }
               12 -> return (IfaceTyConApp IfaceLiftedTypeKindTc [])
               13 -> return (IfaceTyConApp IfaceOpenTypeKindTc [])
               14 -> return (IfaceTyConApp IfaceUnliftedTypeKindTc [])
               15 -> return (IfaceTyConApp IfaceUbxTupleKindTc [])
               16 -> return (IfaceTyConApp IfaceArgTypeKindTc [])
+              21 -> return (IfaceTyConApp IfaceConstraintKindTc [])
               17 -> do { k <- get bh; return (IfaceTyConApp (IfaceAnyTc k) []) }
 
 	      18 -> do { tc <- get bh; tys <- get bh; return (IfaceTyConApp (IfaceTc tc) tys) }
@@ -969,9 +959,11 @@ instance Binary IfaceTyCon where
    put_ bh IfaceUnliftedTypeKindTc = putByte bh 8
    put_ bh IfaceUbxTupleKindTc     = putByte bh 9
    put_ bh IfaceArgTypeKindTc      = putByte bh 10
+   put_ bh IfaceConstraintKindTc   = putByte bh 15
    put_ bh (IfaceTupTc bx ar)  = do { putByte bh 11; put_ bh bx; put_ bh ar }
    put_ bh (IfaceTc ext)       = do { putByte bh 12; put_ bh ext }
-   put_ bh (IfaceAnyTc k)      = do { putByte bh 13; put_ bh k }
+   put_ bh (IfaceIPTc n)       = do { putByte bh 13; put_ bh n }
+   put_ bh (IfaceAnyTc k)      = do { putByte bh 14; put_ bh k }
 
    get bh = do
 	h <- getByte bh
@@ -986,9 +978,11 @@ instance Binary IfaceTyCon where
           8 -> return IfaceUnliftedTypeKindTc
           9 -> return IfaceUbxTupleKindTc
           10 -> return IfaceArgTypeKindTc
+          15 -> return IfaceConstraintKindTc
 	  11 -> do { bx <- get bh; ar <- get bh; return (IfaceTupTc bx ar) }
 	  12 -> do { ext <- get bh; return (IfaceTc ext) }
-	  _ -> do { k <- get bh; return (IfaceAnyTc k) }
+	  13 -> do { n <- get bh; return (IfaceIPTc n) }
+          _  -> do { k <- get bh; return (IfaceAnyTc k) }
 
 instance Binary IfaceCoCon where
    put_ bh (IfaceCoAx n)       = do { putByte bh 0; put_ bh n }
@@ -998,6 +992,7 @@ instance Binary IfaceCoCon where
    put_ bh IfaceTransCo        = putByte bh 4
    put_ bh IfaceInstCo         = putByte bh 5
    put_ bh (IfaceNthCo d)      = do { putByte bh 6; put_ bh d }
+   put_ bh (IfaceIPCoAx ip)    = do { putByte bh 7; put_ bh ip }
   
    get bh = do
 	h <- getByte bh
@@ -1008,34 +1003,8 @@ instance Binary IfaceCoCon where
 	  3 -> return IfaceSymCo
 	  4 -> return IfaceTransCo
 	  5 -> return IfaceInstCo
-          _ -> do { d <- get bh; return (IfaceNthCo d) }
-
-instance Binary IfacePredType where
-    put_ bh (IfaceClassP aa ab) = do
-	    putByte bh 0
-	    put_ bh aa
-	    put_ bh ab
-    put_ bh (IfaceIParam ac ad) = do
-	    putByte bh 1
-	    put_ bh ac
-	    put_ bh ad
-    put_ bh (IfaceEqPred ac ad) = do
-	    putByte bh 2
-	    put_ bh ac
-	    put_ bh ad
-    get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do aa <- get bh
-		      ab <- get bh
-		      return (IfaceClassP aa ab)
-	      1 -> do ac <- get bh
-		      ad <- get bh
-		      return (IfaceIParam ac ad)
-	      2 -> do ac <- get bh
-		      ad <- get bh
-		      return (IfaceEqPred ac ad)
-	      _ -> panic ("get IfacePredType " ++ show h)
+          6 -> do { d <- get bh; return (IfaceNthCo d) }
+          _ -> do { ip <- get bh; return (IfaceIPCoAx ip) }
 
 -------------------------------------------------------------------------
 --		IfaceExpr and friends
@@ -1094,6 +1063,10 @@ instance Binary IfaceExpr where
             putByte bh 13
             put_ bh m
             put_ bh ix
+    put_ bh (IfaceTupId aa ab) = do
+      putByte bh 14
+      put_ bh aa
+      put_ bh ab
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -1135,6 +1108,9 @@ instance Binary IfaceExpr where
               13 -> do m <- get bh
                        ix <- get bh
                        return (IfaceTick m ix)
+              14 -> do aa <- get bh
+                       ab <- get bh
+                       return (IfaceTupId aa ab)
               _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceConAlt where

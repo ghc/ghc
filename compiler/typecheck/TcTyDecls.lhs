@@ -11,7 +11,7 @@ files for imported data types.
 \begin{code}
 module TcTyDecls(
         calcRecFlags,
-        calcClassCycles, calcSynCycles
+        calcSynCycles, calcClassCycles
     ) where
 
 #include "HsVersions.h"
@@ -22,7 +22,6 @@ import RnHsSyn
 import Type
 import HscTypes
 import TyCon
-import Class
 import DataCon
 import Name
 import NameEnv
@@ -92,8 +91,6 @@ synTyConsOfType ty
      go (TyConApp tc tys)         = go_tc tc tys
      go (AppTy a b)               = go a `plusNameEnv` go b
      go (FunTy a b)               = go a `plusNameEnv` go b
-     go (PredTy (IParam _ ty))    = go ty
-     go (PredTy (ClassP cls tys)) = go_s tys    -- Ignore class
      go (ForAllTy _ ty)           = go ty
 
      go_tc tc tys | isSynTyCon tc = extendNameEnv (go_s tys) (tyConName tc) tc
@@ -102,27 +99,34 @@ synTyConsOfType ty
 ---------------------------------------- END NOTE ]
 
 \begin{code}
-calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
-calcSynCycles decls
-  = stronglyConnCompFromEdgedVertices syn_edges
+mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
+mkSynEdges syn_decls = [ (ldecl, unLoc (tcdLName decl),
+                                 mk_syn_edges (tcdSynRhs decl))
+                       | ldecl@(L _ decl) <- syn_decls ]
   where
-    syn_edges = [ (ldecl, unLoc (tcdLName decl),
-                          mk_syn_edges (tcdSynRhs decl))
-                | ldecl@(L _ decl) <- decls ]
-
     mk_syn_edges rhs = [ tc | tc <- nameSetToList (extractHsTyNames rhs),
                               not (isTyVarName tc) ]
 
+calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
+calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
 
-calcClassCycles :: [LTyClDecl Name] -> [[LTyClDecl Name]]
-calcClassCycles decls
-  = [decls | CyclicSCC decls <- stronglyConnCompFromEdgedVertices cls_edges]
+-- We can't allow cycles via superclasses because it would result in the
+-- type checker looping when it canonicalises a class constraint (superclasses
+-- are added during canonicalisation)
+--
+-- It is OK for superclasses to be type synonyms for other classes, so look for cycles
+-- through there too.
+calcClassCycles :: [LTyClDecl Name] -> [LTyClDecl Name] -> [[LTyClDecl Name]]
+calcClassCycles syn_decls alg_decls
+  = [decls | CyclicSCC decls <- stronglyConnCompFromEdgedVertices (mkSynEdges syn_decls ++ cls_edges)]
   where
     cls_edges = [ (ldecl, unLoc (tcdLName decl),
                           mk_cls_edges (unLoc (tcdCtxt decl)))
-                | ldecl@(L _ decl) <- decls, isClassDecl decl ]
+                | ldecl@(L _ decl) <- alg_decls, isClassDecl decl ]
 
-    mk_cls_edges ctxt = [ cls | L _ (HsClassP cls _) <- ctxt ]
+    mk_cls_edges :: HsContext Name -> [Name]
+    mk_cls_edges ctxt = [ tc | tc <- nameSetToList (extractHsTyNames_s ctxt)
+                             , not (isTyVarName tc) ]
 \end{code}
 
 
@@ -322,7 +326,6 @@ new_tc_rhs tc = snd (newTyConRhs tc)    -- Ignore the type variables
 
 getTyCon :: TyThing -> Maybe TyCon
 getTyCon (ATyCon tc) = Just tc
-getTyCon (AClass cl) = Just (classTyCon cl)
 getTyCon _           = Nothing
 
 findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
@@ -353,9 +356,6 @@ tcTyConsOfType ty
      go (TyConApp tc tys)          = go_tc tc tys
      go (AppTy a b)                = go a `plusNameEnv` go b
      go (FunTy a b)                = go a `plusNameEnv` go b
-     go (PredTy (IParam _ ty))     = go ty
-     go (PredTy (ClassP cls tys))  = go_tc (classTyCon cls) tys
-     go (PredTy (EqPred ty1 ty2))  = go ty1 `plusNameEnv` go ty2
      go (ForAllTy _ ty)            = go ty
 
      go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc

@@ -1,0 +1,10 @@
+\begin{code}
+module TysWiredIn where
+
+import {-# SOURCE #-} TyCon      (TyCon)
+import {-# SOURCE #-} TypeRep    (Type)
+
+
+eqTyCon :: TyCon
+mkBoxedTupleTy :: [Type] -> Type
+\end{code}

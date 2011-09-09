@@ -413,6 +413,7 @@ Library
         TcCanonical
         TcSMonad
         Class
+        IParam
         Coercion
         FamInstEnv
         FunDeps

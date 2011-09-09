@@ -97,7 +97,7 @@ tcTyAndClassDecls boot_details decls_s
                 ; let rec_flags = calcRecFlags boot_details rec_tyclss
                 ; concatMapM (tcTyClDecl rec_flags) kc_decls }
 
-       ; traceTc "tcTyAndCl3" (ppr tyclss)
+       ; traceTc "tcTyAndCl" (ppr tyclss)
 
        ; tcExtendGlobalEnv tyclss $ do
        {  -- Perform the validity check
@@ -126,7 +126,7 @@ zipRecTyClss :: [[LTyClDecl Name]]
              -> [(Name,TyThing)]
 -- Build a name-TyThing mapping for the things bound by decls
 -- being careful not to look at the [TyThing]
--- The TyThings in the result list must have a visible ATyCon/AClass,
+-- The TyThings in the result list must have a visible ATyCon,
 -- because typechecking types (in, say, tcTyClDecl) looks at this outer constructor
 zipRecTyClss decls_s rec_things
   = [ get decl | decls <- decls_s, L _ decl <- flattenATs decls ]
@@ -135,9 +135,6 @@ zipRecTyClss decls_s rec_things
     rec_type_env = mkTypeEnv rec_things
 
     get :: TyClDecl Name -> (Name, TyThing)
-    get (ClassDecl {tcdLName = L _ name}) = (name, AClass cl)
-      where
-        Just (AClass cl) = lookupTypeEnv rec_type_env name
     get decl = (name, ATyCon tc)
       where
         name = tcdName decl
@@ -222,14 +219,15 @@ kcTyClDecls1 decls
 	; mod <- getModule
 	; traceTc "tcTyAndCl" (ptext (sLit "module") <+> ppr mod $$ vcat (map ppr decls))
 
-        	-- First check for cyclic classes
-	; checkClassCycleErrs alg_decls
-
-	   -- Kind checking; see Note [Kind checking for type and class decls]
+          -- Kind checking; see Note [Kind checking for type and class decls]
 	; alg_kinds <- mapM getInitialKind alg_at_decls
 	; tcExtendKindEnv alg_kinds $  do
 
         { (kc_syn_decls, tcl_env) <- kcSynDecls (calcSynCycles syn_decls)
+
+          -- Now check for cyclic classes
+        ; checkClassCycleErrs syn_decls alg_decls
+
         ; setLclEnv tcl_env $  do
         { kc_alg_decls <- mapM (wrapLocM kcTyClDecl) alg_decls
                 
@@ -261,7 +259,8 @@ getInitialKind (L _ decl)
     mk_res_kind (TyData   { tcdKindSig = Just kind }) = return kind
 	-- On GADT-style declarations we allow a kind signature
 	--	data T :: *->* where { ... }
-    mk_res_kind _ = return liftedTypeKind
+    mk_res_kind (ClassDecl {}) = return constraintKind
+    mk_res_kind _              = return liftedTypeKind
 
 
 ----------------
@@ -515,29 +514,27 @@ tcTyClDecl1 _parent calc_isrec
     h98_syntax = consUseH98Syntax cons
 
 tcTyClDecl1 _parent calc_isrec 
-  (ClassDecl {tcdLName = L _ class_name, tcdTyVars = tvs, 
+  (ClassDecl {tcdLName = L _ class_tycon_name, tcdTyVars = tvs, 
 	      tcdCtxt = ctxt, tcdMeths = meths,
 	      tcdFDs = fundeps, tcdSigs = sigs, tcdATs = ats, tcdATDefs = at_defs} )
   = ASSERT( isNoParent _parent )
     tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mapM (addLocM tc_fundep) fundeps
-  ; (sig_stuff, gen_dm_env) <- tcClassSigs class_name sigs meths
+  ; (sig_stuff, gen_dm_env) <- tcClassSigs class_tycon_name sigs meths
   ; clas <- fixM $ \ clas -> do
 	    { let 	-- This little knot is just so we can get
 			-- hold of the name of the class TyCon, which we
 			-- need to look up its recursiveness
 		    tycon_name = tyConName (classTyCon clas)
 		    tc_isrec = calc_isrec tycon_name
-            ; traceTc "tcTyClDecl1:before ATs" (ppr class_name)
-
+            
             ; at_stuff <- tcClassATs clas tvs' ats at_defs
             -- NB: 'ats' only contains "type family" and "data family" declarations
             -- and 'at_defs' only contains associated-type defaults
-            ; traceTc "tcTyClDecl1:before build class" (ppr class_name)
-
+            
             ; buildClass False {- Must include unfoldings for selectors -}
-			 class_name tvs' ctxt' fds' at_stuff
+			 class_tycon_name tvs' ctxt' fds' at_stuff
 			 sig_stuff tc_isrec }
 
   ; let gen_dm_ids = [ AnId (mkExportedLocalId gen_dm_name gen_dm_ty)
@@ -550,7 +547,7 @@ tcTyClDecl1 _parent calc_isrec
                      ]
         class_ats = map ATyCon (classATs clas)
 
-  ; return (AClass clas : gen_dm_ids ++ class_ats )
+  ; return (ATyCon (classTyCon clas) : gen_dm_ids ++ class_ats )
       -- NB: Order is important due to the call to `mkGlobalThings' when
       --     tying the the type and class declaration type checking knot.
   }
@@ -970,16 +967,16 @@ Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 
 \begin{code}
-checkClassCycleErrs :: [LTyClDecl Name] -> TcM ()
-checkClassCycleErrs tyclss
+checkClassCycleErrs :: [LTyClDecl Name] -> [LTyClDecl Name] -> TcM ()
+checkClassCycleErrs syn_decls alg_decls
   | null cls_cycles
   = return ()
   | otherwise
-  = do	{ mapM_ recClsErr cls_cycles
-	; failM	}	-- Give up now, because later checkValidTyCl
-			-- will loop if the synonym is recursive
+  = do { mapM_ recClsErr cls_cycles
+       ; failM }       -- Give up now, because later checkValidTyCl
+                       -- will loop if the synonym is recursive
   where
-    cls_cycles = calcClassCycles tyclss
+    cls_cycles = calcClassCycles syn_decls alg_decls
 
 checkValidTyCl :: TyClDecl Name -> TcM ()
 -- We do the validity check over declarations, rather than TyThings
@@ -989,9 +986,11 @@ checkValidTyCl decl
     do	{ thing <- tcLookupLocatedGlobal (tcdLName decl)
 	; traceTc "Validity of" (ppr thing)	
 	; case thing of
-	    ATyCon tc -> checkValidTyCon tc
-	    AClass cl -> do { checkValidClass cl 
-                            ; mapM_ (addLocM checkValidTyCl) (tcdATs decl) }
+	    ATyCon tc -> do
+                checkValidTyCon tc
+                case decl of
+                  ClassDecl { tcdATs = ats } -> mapM_ (addLocM checkValidTyCl) ats
+                  _                          -> return ()
             AnId _    -> return ()  -- Generic default methods are checked
 	    	      	 	    -- with their parent class
             _         -> panic "checkValidTyCl"
@@ -1015,6 +1014,9 @@ checkValidTyCl decl
 
 checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc 
+  | Just cl <- tyConClass_maybe tc
+  = checkValidClass cl
+
   | isSynTyCon tc 
   = case synTyConRhs tc of
       SynFamilyTyCon {} -> return ()
@@ -1224,7 +1226,8 @@ mkDefaultMethodIds :: [TyThing] -> [Id]
 -- See Note [Default method Ids and Template Haskell]
 mkDefaultMethodIds things
   = [ mkExportedLocalId dm_name (idType sel_id)
-    | AClass cls <- things
+    | ATyCon tc <- things
+    , Just cls <- [tyConClass_maybe tc]
     , (sel_id, DefMeth dm_name) <- classOpItems cls ]
 \end{code}
 
@@ -1476,7 +1479,7 @@ recClsErr :: [Located (TyClDecl Name)] -> TcRn ()
 recClsErr cls_decls
   = setSrcSpan (getLoc (head sorted_decls)) $
     addErr (sep [ptext (sLit "Cycle in class declarations (via superclasses):"),
-		 nest 2 (vcat (map ppr_decl sorted_decls))])
+                nest 2 (vcat (map ppr_decl sorted_decls))])
   where
     sorted_decls = sortLocated cls_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr (decl { tcdSigs = [] })

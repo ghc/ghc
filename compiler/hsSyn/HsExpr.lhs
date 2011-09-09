@@ -425,7 +425,7 @@ ppr_expr (SectionR op expr)
     pp_infixly v = sep [pprHsInfix v, pp_expr]
 
 ppr_expr (ExplicitTuple exprs boxity)
-  = tupleParens boxity (fcat (ppr_tup_args exprs))
+  = tupleParens (boxityNormalTupleSort boxity) (fcat (ppr_tup_args exprs))
   where
     ppr_tup_args []               = []
     ppr_tup_args (Present e : es) = (ppr_lexpr e <> punc es) : ppr_tup_args es

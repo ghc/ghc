@@ -32,7 +32,7 @@ vectTyConDecl tycon
   -- a type class constructor.
   -- TODO: check for no stupid theta, fds, assoc types. 
   | isClassTyCon tycon
-  , Just cls <- tyConClass_maybe tycon
+  , Just cls		<- tyConClass_maybe tycon
 
   = do  -- make the name of the vectorised class tycon.
         name'       <- mkLocalisedName mkVectTyConOcc (tyConName tycon)
@@ -88,12 +88,12 @@ vectTyConDecl tycon
                         NoParentTyCon
                         Nothing             -- not a family instance
 
-  -- some other crazy thing that we don't handle.
-  | otherwise
-  = cantVectorise "Can't vectorise type constructor: " (ppr tycon)
+    -- some other crazy thing that we don't handle.
+    | otherwise
+    = cantVectorise "Can't vectorise type constructor: " (ppr tycon)
 
--- |Vectorise a class method.
---
+
+-- | Vectorise a class method.
 vectMethod :: (Id, DefMethSpec) -> VM (Name, DefMethSpec, Type)
 vectMethod (id, defMeth)
  = do {   -- Vectorise the method type.

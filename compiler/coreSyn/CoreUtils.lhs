@@ -630,7 +630,7 @@ isExpandableApp fn n_val_args
      go n_val_args ty 
        | Just (_, ty) <- splitForAllTy_maybe ty   = go n_val_args ty
        | Just (arg, ty) <- splitFunTy_maybe ty
-       , isCertainlyPredReprTy arg                = go (n_val_args-1) ty
+       , isPredTy arg                             = go (n_val_args-1) ty
        | otherwise                                = False
 \end{code}
 
@@ -1435,7 +1435,7 @@ tryEtaReduce bndrs body
        | otherwise = idArity fun   	      
 
     ---------------
-    ok_lam v = isTyVar v || isCertainlyEvVar v
+    ok_lam v = isTyVar v || isEvVar v
 
     ---------------
     ok_arg :: Var              -- Of type bndr_t

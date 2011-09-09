@@ -156,7 +156,7 @@ sumTyCon 	= indexBuiltin "sumTyCon" sumTyCons
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n _
 	| n >= 2 && n <= mAX_DPH_PROD 
-	= tupleTyCon Boxed n
+	= tupleTyCon BoxedTuple n
 
   	| otherwise
 	= pprPanic "prodTyCon" (ppr n)

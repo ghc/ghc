@@ -37,6 +37,7 @@ import Maybes
 import Util
 import Name
 import Outputable
+import BasicTypes ( boxityNormalTupleSort )
 import FastString
 
 import Control.Monad( when )
@@ -515,7 +516,7 @@ tidy1 _ (TuplePat pats boxity ty)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
-    tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats ty
+    tuple_ConPat = mkPrefixConPat (tupleCon (boxityNormalTupleSort boxity) arity) pats ty
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
 tidy1 _ (LitPat lit)
@@ -911,17 +912,17 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     --        equating different ways of writing a coercion)
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpCast c)  (WpCast c')     = coreEqCoercion c c'
-    wrap (WpEvApp et1) (WpEvApp et2) = ev_term et1 et2
-    wrap (WpTyApp t) (WpTyApp t')    = eqType t t'
+    wrap (WpCast co)       (WpCast co')        = co `coreEqCoercion` co'
+    wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
+    wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'
     -- Enhancement: could implement equality for more wrappers
     --   if it seems useful (lams and lets)
     wrap _ _ = False
 
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool
-    ev_term (EvId a)       (EvId b)       = a==b
-    ev_term (EvCoercion a) (EvCoercion b) = coreEqCoercion a b
+    ev_term (EvId a)          (EvId b)          = a==b
+    ev_term (EvCoercionBox a) (EvCoercionBox b) = coreEqCoercion a b
     ev_term _ _ = False	
 
     ---------

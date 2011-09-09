@@ -17,7 +17,7 @@ module RnEnv (
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
 	getLookupOccRn, addUsedRdrNames,
 
-	newLocalBndrRn, newLocalBndrsRn, newIPNameRn,
+	newLocalBndrRn, newLocalBndrsRn,
 	bindLocalName, bindLocalNames, bindLocalNamesFV, 
 	MiniFixityEnv, emptyFsEnv, extendFsEnv, lookupFsEnv,
 	addLocalFixities,
@@ -36,7 +36,7 @@ module RnEnv (
 #include "HsVersions.h"
 
 import LoadIface	( loadInterfaceForName, loadSrcInterface )
-import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName, updNameCache, extendNameCache )
+import IfaceEnv		( lookupOrig, newGlobalBinder, updNameCache, extendNameCache )
 import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
@@ -50,9 +50,7 @@ import NameEnv
 import Module           ( ModuleName, moduleName )
 import UniqFM
 import DataCon		( dataConFieldLabels )
-import PrelNames        ( mkUnboundName, rOOT_MAIN, consDataConKey, forall_tv_RDR )
-import Unique
-import BasicTypes
+import PrelNames        ( mkUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils		( Message )
 import SrcLoc
 import Outputable
@@ -353,9 +351,6 @@ lookupSubBndrGREs env parent rdr_name
 
     parent_is p (GRE { gre_par = ParentIs p' }) = p == p'
     parent_is _ _                               = False
-
-newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
-newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
 \end{code}
 
 Note [Looking up Exact RdrNames]
@@ -675,21 +670,11 @@ dataTcOccs :: RdrName -> [RdrName]
 -- constructor.  This is useful when we aren't sure which we are
 -- looking at.
 dataTcOccs rdr_name
-  | Just n <- isExact_maybe rdr_name		-- Ghastly special case
-  , n `hasKey` consDataConKey = [rdr_name]	-- see note below
   | isDataOcc occ 	      = [rdr_name, rdr_name_tc]
   | otherwise 	  	      = [rdr_name]
   where    
     occ 	= rdrNameOcc rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
-
--- If the user typed "[]" or "(,,)", we'll generate an Exact RdrName,
--- and setRdrNameSpace generates an Orig, which is fine
--- But it's not fine for (:), because there *is* no corresponding type
--- constructor.  If we generate an Orig tycon for GHC.Base.(:), it'll
--- appear to be in scope (because Orig's simply allocate a new name-cache
--- entry) and then we get an error when we use dataTcOccs in 
--- TcRnDriver.tcRnGetInfo.  Large sigh.
 \end{code}
 
 

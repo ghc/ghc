@@ -45,7 +45,7 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
       | isLiftedTypeKind k
       = do
           pa_cls <- builtin paClass
-          return $ Just $ PredTy $ ClassP pa_cls [ty]
+          return $ Just $ mkClassPred pa_cls [ty]
 
     go _ _ = return Nothing
 

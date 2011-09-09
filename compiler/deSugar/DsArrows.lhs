@@ -135,7 +135,7 @@ coreCaseTuple uniqs scrut_var vars body
 coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
 coreCasePair scrut_var var1 var2 body
   = Case (Var scrut_var) scrut_var (exprType body)
-         [(DataAlt (tupleCon Boxed 2), [var1, var2], body)]
+         [(DataAlt (tupleCon BoxedTuple 2), [var1, var2], body)]
 \end{code}
 
 \begin{code}

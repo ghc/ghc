@@ -185,18 +185,16 @@ dsImpSpecs imp_specs
       ; let (spec_binds, spec_rules) = unzip spec_prs
       ; return (concatOL spec_binds, spec_rules) }
 
-combineEvBinds :: [DsEvBind] -> [(Id,CoreExpr)] -> [CoreBind]
+combineEvBinds :: [CoreBind] -> [(Id,CoreExpr)] -> [CoreBind]
 -- Top-level bindings can include coercion bindings, but not via superclasses
 -- See Note [Top-level evidence]
 combineEvBinds [] val_prs 
   = [Rec val_prs]
-combineEvBinds (LetEvBind (NonRec b r) : bs) val_prs
+combineEvBinds (NonRec b r : bs) val_prs
   | isId b    = combineEvBinds bs ((b,r):val_prs)
   | otherwise = NonRec b r : combineEvBinds bs val_prs
-combineEvBinds (LetEvBind (Rec prs) : bs) val_prs 
+combineEvBinds (Rec prs : bs) val_prs 
   = combineEvBinds bs (prs ++ val_prs)
-combineEvBinds (CaseEvBind x _ _ : _) _
-  = pprPanic "topEvBindPairs" (ppr x)
 \end{code}
 
 Note [Top-level evidence]

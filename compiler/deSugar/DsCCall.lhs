@@ -263,7 +263,7 @@ boxResult result_ty
 		     _ -> []
 
 	      return_result state anss
-		= mkConApp (tupleCon Unboxed (2 + length extra_result_tys))
+		= mkConApp (tupleCon UnboxedTuple (2 + length extra_result_tys))
 	         	   (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
 			      ++ (state : anss)) 
 
@@ -327,9 +327,9 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     let
         the_rhs = return_result (Var state_id) 
                                 (wrap_result (Var result_id) : map Var as)
-        ccall_res_ty = mkTyConApp (tupleTyCon Unboxed arity)
+        ccall_res_ty = mkTyConApp (tupleTyCon UnboxedTuple arity)
                                   (realWorldStatePrimTy : ls)
-        the_alt      = ( DataAlt (tupleCon Unboxed arity)
+        the_alt      = ( DataAlt (tupleCon UnboxedTuple arity)
                        , (state_id : args_ids)
                        , the_rhs
                        )

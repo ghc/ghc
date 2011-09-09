@@ -32,9 +32,10 @@ import RdrHsSyn
 import HscTypes		( IsBootInterface, WarningTxt(..) )
 import Lexer
 import RdrName
+import TysPrim		( eqPrimTyCon )
 import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
 			  unboxedSingletonTyCon, unboxedSingletonDataCon,
-			  listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR )
+			  listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 import Type		( funTyCon )
 import ForeignCall	( Safety(..), CExportSpec(..), CLabelString,
 			  CCallConv(..), CCallTarget(..), defaultCCallConv
@@ -278,6 +279,7 @@ incorrect.
  '->'		{ L _ ITrarrow }
  '@'		{ L _ ITat }
  '~'		{ L _ ITtilde }
+ '~#'		{ L _ ITtildehsh }
  '=>'		{ L _ ITdarrow }
  '-'		{ L _ ITminus }
  '!'		{ L _ ITbang }
@@ -967,7 +969,7 @@ ctype	:: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctype	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
 	| context '=>' ctype		{ LL $ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
-	| ipvar '::' type		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
+	| ipvar '::' type		{ LL (HsIParamTy (unLoc $1) $3) }
 	| type  			{ $1 }
 
 ----------------------
@@ -985,7 +987,7 @@ ctypedoc :: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctypedoc	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
 	| context '=>' ctypedoc		{ LL $ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
-	| ipvar '::' type		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
+	| ipvar '::' type		{ LL (HsIParamTy (unLoc $1) $3) }
 	| typedoc			{ $1 }
 
 ----------------------
@@ -1001,7 +1003,7 @@ ctypedoc :: { LHsType RdrName }
 -- but not 	                    f :: ?x::Int => blah
 context :: { LHsContext RdrName }
         : btype '~'      btype  	{% checkContext
-					     (LL $ HsPredTy (HsEqualP $1 $3)) }
+					     (LL $ HsEqTy $1 $3) }
 	| btype 			{% checkContext $1 }
 
 type :: { LHsType RdrName }
@@ -1009,7 +1011,7 @@ type :: { LHsType RdrName }
         | btype qtyconop type           { LL $ HsOpTy $1 $2 $3 }
         | btype tyvarop  type     	{ LL $ HsOpTy $1 $2 $3 }
  	| btype '->'     ctype		{ LL $ HsFunTy $1 $3 }
-        | btype '~'      btype  	{ LL $ HsPredTy (HsEqualP $1 $3) }
+        | btype '~'      btype  	{ LL $ HsEqTy $1 $3 }
 
 typedoc :: { LHsType RdrName }
         : btype                          { $1 }
@@ -1020,7 +1022,7 @@ typedoc :: { LHsType RdrName }
         | btype tyvarop  type docprev    { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
         | btype '->'     ctypedoc        { LL $ HsFunTy $1 $3 }
         | btype docprev '->' ctypedoc    { LL $ HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2)) $4 }
-        | btype '~'      btype           { LL $ HsPredTy (HsEqualP $1 $3) }
+        | btype '~'      btype           { LL $ HsEqTy $1 $3 }
 
 btype :: { LHsType RdrName }
 	: btype atype			{ LL $ HsAppTy $1 $2 }
@@ -1031,8 +1033,8 @@ atype :: { LHsType RdrName }
 	| tyvar				{ L1 (HsTyVar (unLoc $1)) }
 	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
 	| '{' fielddecls '}'		{ LL $ HsRecTy $2 }              -- Constructor sigs only
-	| '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy Boxed  ($2:$4) }
-	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy Unboxed $2     }
+	| '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy (HsBoxyTuple placeHolderKind)  ($2:$4) }
+	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy HsUnboxedTuple $2     }
 	| '[' ctype ']'			{ LL $ HsListTy  $2 }
 	| '[:' ctype ':]'		{ LL $ HsPArrTy  $2 }
 	| '(' ctype ')'		        { LL $ HsParTy   $2 }
@@ -1096,6 +1098,7 @@ kind	:: { Located Kind }
 akind	:: { Located Kind }
 	: '*'			{ L1 liftedTypeKind }
 	| '!'			{ L1 unliftedTypeKind }
+	| CONID         	{% checkKindName (L1 (getCONID $1)) }
 	| '(' kind ')'		{ LL (unLoc $2) }
 
 
@@ -1716,9 +1719,9 @@ con_list : con                  { L1 [$1] }
 
 sysdcon	:: { Located DataCon }	-- Wired in data constructors
 	: '(' ')'		{ LL unitDataCon }
-	| '(' commas ')'	{ LL $ tupleCon Boxed ($2 + 1) }
+	| '(' commas ')'	{ LL $ tupleCon BoxedTuple ($2 + 1) }
 	| '(#' '#)'		{ LL $ unboxedSingletonDataCon }
-	| '(#' commas '#)'	{ LL $ tupleCon Unboxed ($2 + 1) }
+	| '(#' commas '#)'	{ LL $ tupleCon UnboxedTuple ($2 + 1) }
 	| '[' ']'		{ LL nilDataCon }
 
 conop :: { Located RdrName }
@@ -1735,16 +1738,18 @@ qconop :: { Located RdrName }
 gtycon 	:: { Located RdrName }	-- A "general" qualified tycon
 	: oqtycon			{ $1 }
 	| '(' ')'			{ LL $ getRdrName unitTyCon }
-	| '(' commas ')'		{ LL $ getRdrName (tupleTyCon Boxed ($2 + 1)) }
+	| '(' commas ')'		{ LL $ getRdrName (tupleTyCon BoxedTuple ($2 + 1)) }
 	| '(#' '#)'			{ LL $ getRdrName unboxedSingletonTyCon }
-	| '(#' commas '#)'		{ LL $ getRdrName (tupleTyCon Unboxed ($2 + 1)) }
+	| '(#' commas '#)'		{ LL $ getRdrName (tupleTyCon UnboxedTuple ($2 + 1)) }
 	| '(' '->' ')'			{ LL $ getRdrName funTyCon }
 	| '[' ']'			{ LL $ listTyCon_RDR }
 	| '[:' ':]'			{ LL $ parrTyCon_RDR }
+	| '(' '~#' ')'   		{ LL $ getRdrName eqPrimTyCon }
 
 oqtycon :: { Located RdrName }	-- An "ordinary" qualified tycon
 	: qtycon			{ $1 }
  	| '(' qtyconsym ')'		{ LL (unLoc $2) }
+	| '(' '~' ')'			{ LL $ eqTyCon_RDR } -- In here rather than gtycon because I want to write it in the GHC.Types export list
 
 qtyconop :: { Located RdrName }	-- Qualified or unqualified
 	: qtyconsym			{ $1 }

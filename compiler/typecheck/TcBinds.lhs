@@ -459,7 +459,7 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
   = do  { mono_ty <- zonkTcTypeCarefully (idType mono_id)
         ; let inferred_poly_ty = mkSigmaTy my_tvs theta mono_ty
               my_tvs   = filter (`elemVarSet` used_tvs) qtvs
-              used_tvs = tyVarsOfTheta theta `unionVarSet` tyVarsOfType mono_ty
+              used_tvs = tyVarsOfTypes theta `unionVarSet` tyVarsOfType mono_ty
 
               poly_id  = case mb_sig of
                            Nothing  -> mkLocalId poly_name inferred_poly_ty
@@ -919,7 +919,7 @@ unifyCtxts (sig1 : sigs)
     unify_ctxt sig@(TcSigInfo { sig_theta = theta })
         = setSrcSpan (sig_loc sig)                      $
           addErrCtxt (sigContextsCtxt sig1 sig)         $
-          do { cois <- unifyTheta theta1 theta
+          do { mk_cos <- unifyTheta theta1 theta
              ; -- Check whether all coercions are identity coercions
                -- That can happen if we have, say
                --         f :: C [a]   => ...
@@ -927,7 +927,7 @@ unifyCtxts (sig1 : sigs)
                -- where F is a type function and (F a ~ [a])
                -- Then unification might succeed with a coercion.  But it's much
                -- much simpler to require that such signatures have identical contexts
-               checkTc (all isReflCo cois)
+               checkTc (isReflMkCos mk_cos)
                        (ptext (sLit "Mutually dependent functions have syntactically distinct contexts"))
              }
 

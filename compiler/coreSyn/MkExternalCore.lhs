@@ -14,7 +14,6 @@ import CoreSyn
 import HscTypes	
 import TyCon
 -- import Class
--- import TysPrim( eqPredPrimTyCon )
 import TypeRep
 import Type
 import PprExternalCore () -- Instances
@@ -228,15 +227,12 @@ make_ty' (TyConApp tc ts) 	 = make_tyConApp tc ts
 -- expose the representation in interface files, which definitely isn't right.
 -- Maybe CoreTidy should know whether to expand newtypes or not?
 
-make_ty' (PredTy p)	= make_ty (predTypeRep p)
-
 make_tyConApp :: TyCon -> [Type] -> C.Ty
 make_tyConApp tc ts =
   foldl C.Tapp (C.Tcon (qtc tc)) 
 	    (map make_ty ts)
 
 make_kind :: Kind -> C.Kind
-make_kind (PredTy (EqPred t1 t2)) = C.Keq (make_ty t1) (make_ty t2)
 make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
 make_kind k
   | isLiftedTypeKind k   = C.Klifted

@@ -580,8 +580,8 @@ getImplicitBinds :: TypeEnv -> [CoreBind]
 getImplicitBinds type_env
   = map get_defn (concatMap implicit_ids (typeEnvElts type_env))
   where
-    implicit_ids (ATyCon tc)  = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
-    implicit_ids (AClass cls) = classAllSelIds cls
+    implicit_ids (ATyCon tc)  = class_ids ++ mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
+      where class_ids = maybe [] classAllSelIds (tyConClass_maybe tc)
     implicit_ids _            = []
     
     get_defn :: Id -> CoreBind

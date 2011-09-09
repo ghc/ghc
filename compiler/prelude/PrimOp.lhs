@@ -37,7 +37,7 @@ import OccName		( OccName, pprOccName, mkVarOccFS )
 import TyCon		( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
 import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
 			  typePrimRep )
-import BasicTypes	( Arity, Boxity(..) )
+import BasicTypes	( Arity, TupleSort(..) )
 import ForeignCall	( CLabelString )
 import Unique		( Unique, mkPrimOpIdUnique )
 import Outputable

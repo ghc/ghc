@@ -44,7 +44,7 @@ import HsSyn
 import HscTypes
 import RnNames          (gresFromAvails)
 import InstEnv
-import Type
+import Type     hiding( typeKind )
 import TcType		hiding( typeKind )
 import Var
 import Id
