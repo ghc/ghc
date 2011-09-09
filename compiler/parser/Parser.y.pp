@@ -670,6 +670,12 @@ at_decl_cls :: { LTyClDecl RdrName }
 		-- infix type constructors to be declared
  		{% mkTyFamily (comb3 $1 $2 $3) TypeFamily $2 (unLoc $3) }
 
+           -- default type instance
+        | 'type' type '=' ctype
+		-- Note the use of type for the head; this allows
+		-- infix type constructors and type patterns
+ 		{% mkTySynonym (comb2 $1 $4) True $2 $4 }
+
           -- data/newtype family declaration
         | 'data' type opt_kind_sig
 		{% mkTyFamily (comb3 $1 $2 $3) DataFamily $2 (unLoc $3) }

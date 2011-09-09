@@ -479,7 +479,7 @@ tc_iface_decl _parent ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; cls  <- fixM $ \ cls -> do
-              { ats  <- mapM (tc_iface_decl (AssocFamilyTyCon cls) ignore_prags) rdr_ats
+              { ats  <- mapM (tc_at cls) rdr_ats
               ; buildClass ignore_prags cls_name tyvars ctxt fds ats sigs tc_isrec }
     ; return (AClass cls) }
   where
@@ -490,6 +490,18 @@ tc_iface_decl _parent ignore_prags
 		-- type of a data con; to avoid sucking in types that
 		-- it mentions unless it's necessray to do so
 	  ; return (op_name, dm, op_ty) }
+
+   tc_at cls (IfaceAT tc_decl defs_decls)
+     = do tc <- tc_iface_tc_decl (AssocFamilyTyCon cls) tc_decl
+          defs <- mapM tc_iface_at_def defs_decls
+          return (tc, defs)
+
+   tc_iface_tc_decl parent decl = do
+       ATyCon tc <- tc_iface_decl parent ignore_prags decl
+       return tc
+
+   tc_iface_at_def (IfaceATD tvs pat_tys ty) =
+       bindIfaceTyVars_AT tvs $ \tvs' -> liftM2 (ATD tvs') (mapM tcIfaceType pat_tys) (tcIfaceType ty)
 
    mk_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
 

@@ -133,18 +133,14 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 # register assignment or tail-calls, and is therefore a good way to get
 # started when porting GHC to new architectures.
 #
-# If this is set to NO, you can still use the unregisterised way
-# (way 'u') to get unregisterised code, but the default way will be
-# registerised.
-#
 # NOTE: the stage1 compiler will be a registerised binary (assuming
 # the compiler you build with is generating registerised binaries), but
 # the stage2 compiler will be an unregisterised binary.
 #
-ifneq "$(findstring $(HostArch_CPP), alpha hppa)" ""
-GhcUnregisterised=YES
-else
+ifneq "$(findstring $(HostArch_CPP), i386 x86_64 powerpc)" ""
 GhcUnregisterised=NO
+else
+GhcUnregisterised=YES
 endif
 
 # Build a compiler with a native code generator backend
@@ -173,7 +169,7 @@ GhcWithSMP=$(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
 
-OsSupportsGHCi=$(strip $(patsubst $(HostOS_CPP), YES, $(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd darwin)))
+OsSupportsGHCi=$(strip $(patsubst $(HostOS_CPP), YES, $(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
 ArchSupportsGHCi=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64 powerpc sparc sparc64)))
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"

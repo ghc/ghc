@@ -59,7 +59,7 @@ sub getrepo {
         #   http://darcs.haskell.org
         #
         # rather than
-        #   
+        #
         #   http://darcs.haskell.org/ghc
         #
         if (!$defaultrepo) {
@@ -153,7 +153,7 @@ sub scm {
 
 sub scmall {
     my $command = shift;
-    
+
     my $localpath;
     my $tag;
     my $remotepath;
@@ -271,7 +271,7 @@ sub scmall {
             if ($tags{$tag} == 0) {
                 next;
             }
-            
+
             if (-d $localpath) {
                 warning("$localpath already present; omitting")
                     if $localpath ne ".";
@@ -401,6 +401,10 @@ sub scmall {
             scm ($localpath, $scm, "config", @args)
                 unless $scm eq "darcs";
         }
+        elsif ($command =~ /^repack$/) {
+            scm ($localpath, $scm, "repack", @args)
+                if $scm eq "git"
+        }
         else {
             die "Unknown command: $command";
         }
@@ -485,6 +489,7 @@ any extra arguments to git:
   new
   pull
   push
+  repack
   reset
   send
   status
@@ -494,7 +499,7 @@ any extra arguments to git:
   sync-all behaves.  Flags given *after* the command are passed to
   git.
 
-  -q says to be quite, and -s to be silent.
+  -q says to be quiet, and -s to be silent.
 
   --resume will restart a command that failed, from the repo at which
   it failed. This means you don't need to wait while, e.g., "pull"
@@ -517,7 +522,7 @@ any extra arguments to git:
   all of the repos bare. Requires packages.conf to be present in the current
   directory (a renamed packages file from the main ghc repo).
 
-  Note: --cheched-out and --bare flags are NOT the opposite of each other.
+  Note: --checked-out and --bare flags are NOT the opposite of each other.
         --checked-out: describes the layout of the remote repository tree.
         --bare:        describes the layout of the local repository tree.
 
@@ -526,16 +531,16 @@ any extra arguments to git:
 
 ------------ Which repos to use -------------
   sync-all uses the following algorithm to decide which remote repos to use
- 
+
   It always computes the remote repos from a single base, <repo_base>
   How is <repo_base> set?
     If you say "-r repo", then that's <repo_base>
     otherwise <repo_base> is set by asking git where the ghc repo came
     from, and removing the last component (e.g. /ghc.git/ or /ghc/).
- 
+
   Then sync-all iterates over the package found in the file
   ./packages; see that file for a description of the contents.
- 
+
     If <repo_base> looks like a local filesystem path, or if you give
     the --checked-out flag, sync-all works on repos of form
           <repo_base>/<local-path>
@@ -570,7 +575,7 @@ END
             }
         }
         close IN;
-        
+
         # Show those tags and the help text
         my @available_tags = keys %available_tags;
         print "$help@available_tags\n\n";
@@ -674,7 +679,7 @@ ATTENTION!
 You have an old haddock repository in your GHC tree!
 
 Please remove it (e.g. "rm -r utils/haddock"), and then run
-"./syncs-all get" to get the new repository.
+"./sync-all get" to get the new repository.
 ============================
 EOF
         }
@@ -692,7 +697,7 @@ ATTENTION!
 You have an old binary repository in your GHC tree!
 
 Please remove it (e.g. "rm -r libraries/binary"), and then run
-"./syncs-all get" to get the new repository.
+"./sync-all get" to get the new repository.
 ============================
 EOF
         }

@@ -47,6 +47,8 @@ import Constants
 import Outputable
 import FastString
 import Maybes
+import DynFlags
+import StaticFlags
 
 ------------------------------------------------------------------------
 --		Top-level bindings
@@ -475,8 +477,7 @@ thunkCode cl_info fv_details cc node arity body
         ; entryHeapCheck cl_info 0 node' arity [] $ do
         { -- Overwrite with black hole if necessary
           -- but *after* the heap-overflow check
-          dflags <- getDynFlags
-        ; whenC (blackHoleOnEntry dflags cl_info && node_points)
+        ; whenC (blackHoleOnEntry cl_info && node_points)
                 (blackHoleIt cl_info)
 
           -- Push update frame
@@ -503,13 +504,39 @@ blackHoleIt closure_info = emitBlackHoleCode (closureSingleEntry closure_info)
 
 emitBlackHoleCode :: Bool -> FCode ()
 emitBlackHoleCode is_single_entry = do
-  tickyBlackHole (not is_single_entry)
-  emit (mkStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize) (CmmReg (CmmGlobal CurrentTSO)))
-  emitPrimCall [] MO_WriteBarrier []
-  emit (mkStore (CmmReg nodeReg) (CmmLit (CmmLabel bh_lbl)))
-  where
-    bh_lbl | is_single_entry = mkCmmDataLabel rtsPackageId (fsLit "stg_SE_BLACKHOLE_info")
-	   | otherwise	     = mkCmmDataLabel rtsPackageId (fsLit "stg_BLACKHOLE_info")
+  dflags <- getDynFlags
+
+  -- Eager blackholing is normally disabled, but can be turned on with
+  -- -feager-blackholing.  When it is on, we replace the info pointer
+  -- of the thunk with stg_EAGER_BLACKHOLE_info on entry.
+  
+  -- If we wanted to do eager blackholing with slop filling, we'd need
+  -- to do it at the *end* of a basic block, otherwise we overwrite
+  -- the free variables in the thunk that we still need.  We have a
+  -- patch for this from Andy Cheadle, but not incorporated yet. --SDM
+  -- [6/2004]
+  --
+  -- Previously, eager blackholing was enabled when ticky-ticky was
+  -- on. But it didn't work, and it wasn't strictly necessary to bring
+  -- back minimal ticky-ticky, so now EAGER_BLACKHOLING is
+  -- unconditionally disabled. -- krc 1/2007
+  
+  -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
+  -- because emitBlackHoleCode is called from CmmParse.
+
+  let  eager_blackholing =  not opt_SccProfilingOn
+                         && dopt Opt_EagerBlackHoling dflags
+             -- Profiling needs slop filling (to support LDV
+             -- profiling), so currently eager blackholing doesn't
+             -- work with profiling.
+
+  whenC eager_blackholing $ do
+    tickyBlackHole (not is_single_entry)
+    emit (mkStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
+                  (CmmReg (CmmGlobal CurrentTSO)))
+    emitPrimCall [] MO_WriteBarrier []
+    emit (mkStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo)))
+
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
 	-- Nota Bene: this function does not change Node (even if it's a CAF),
 	-- so that the cost centre in the original closure can still be

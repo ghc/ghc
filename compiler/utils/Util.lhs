@@ -32,6 +32,7 @@ module Util (
 
         -- * Tuples
         fstOf3, sndOf3, thirdOf3,
+        uncurry3,
 
         -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
@@ -44,7 +45,7 @@ module Util (
         sortLe, sortWith, minWith, on,
 
         -- * Comparisons
-        isEqual, eqListBy,
+        isEqual, eqListBy, eqMaybeBy,
         thenCmp, cmpList,
         removeSpaces,
         
@@ -208,6 +209,9 @@ thirdOf3 :: (a,b,c) -> c
 fstOf3      (a,_,_) =  a
 sndOf3      (_,b,_) =  b
 thirdOf3    (_,_,c) =  c
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (a, b, c) = f a b c
 \end{code}
 
 %************************************************************************
@@ -676,6 +680,11 @@ eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool
 eqListBy _  []     []     = True
 eqListBy eq (x:xs) (y:ys) = eq x y && eqListBy eq xs ys
 eqListBy _  _      _      = False
+
+eqMaybeBy :: (a ->a->Bool) -> Maybe a -> Maybe a -> Bool
+eqMaybeBy _  Nothing  Nothing  = True
+eqMaybeBy eq (Just x) (Just y) = eq x y
+eqMaybeBy _  _        _        = False
 
 cmpList :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
     -- `cmpList' uses a user-specified comparer

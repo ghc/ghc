@@ -708,27 +708,9 @@ getCallMethod _ name _ (LFLetNoEscape arity) n_args
   | otherwise = pprPanic "let-no-escape: " (ppr name <+> ppr arity)
 
 
--- Eager blackholing is normally disabled, but can be turned on with
--- -feager-blackholing.  When it is on, we replace the info pointer of
--- the thunk with stg_EAGER_BLACKHOLE_info on entry.
-
--- If we wanted to do eager blackholing with slop filling,
--- we'd need to do it at the *end* of a basic block, otherwise
--- we overwrite the free variables in the thunk that we still
--- need.  We have a patch for this from Andy Cheadle, but not
--- incorporated yet. --SDM [6/2004]
---
---
--- Previously, eager blackholing was enabled when ticky-ticky
--- was on. But it didn't work, and it wasn't strictly necessary 
--- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING 
--- is unconditionally disabled. -- krc 1/2007
-
--- Static closures are never themselves black-holed.
-
-blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
-blackHoleOnEntry _ ConInfo{} = False
-blackHoleOnEntry dflags cl_info
+blackHoleOnEntry :: ClosureInfo -> Bool
+blackHoleOnEntry ConInfo{} = False
+blackHoleOnEntry cl_info
   | isStaticRep (closureSMRep cl_info)
   = False	-- Never black-hole a static closure
 
@@ -736,18 +718,7 @@ blackHoleOnEntry dflags cl_info
   = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
         LFLetNoEscape _           -> False
-        LFThunk _ no_fvs _updatable _ _
-          | eager_blackholing  -> doingTickyProfiling dflags || not no_fvs
-                  -- the former to catch double entry,
-                  -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
-          | otherwise          -> False
-
-           where eager_blackholing =  not opt_SccProfilingOn
-                                   && dopt Opt_EagerBlackHoling dflags
-                        -- Profiling needs slop filling (to support
-                        -- LDV profiling), so currently eager
-                        -- blackholing doesn't work with profiling.
-
+        LFThunk _ no_fvs _updatable _ _ -> not no_fvs -- to plug space-leaks.
         _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isKnownFun :: LambdaFormInfo -> Bool

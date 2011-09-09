@@ -703,8 +703,8 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info val_descr
 
 -- Static closures are never themselves black-holed.
 
-blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
-blackHoleOnEntry dflags cl_info
+blackHoleOnEntry :: ClosureInfo -> Bool
+blackHoleOnEntry cl_info
   | isStaticRep (closureSMRep cl_info)
   = False	-- Never black-hole a static closure
 
@@ -712,18 +712,7 @@ blackHoleOnEntry dflags cl_info
   = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
 	LFLetNoEscape 		  -> False
-        LFThunk _ no_fvs _updatable _ _
-          | eager_blackholing  -> doingTickyProfiling dflags || not no_fvs
-                  -- the former to catch double entry,
-                  -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
-          | otherwise          -> False
-
-           where eager_blackholing =  not opt_SccProfilingOn
-                                   && dopt Opt_EagerBlackHoling dflags
-                        -- Profiling needs slop filling (to support
-                        -- LDV profiling), so currently eager
-                        -- blackholing doesn't work with profiling.
-
+        LFThunk _ no_fvs _updatable _ _ -> not no_fvs -- to plug space-leaks.
         _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isStaticClosure :: ClosureInfo -> Bool
