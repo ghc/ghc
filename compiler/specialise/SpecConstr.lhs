@@ -1491,15 +1491,15 @@ they are constructor applications.
 
 Note [Free type variables of the qvar types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a call (f @a x True), that we want to specialise, what varaibles should
+In a call (f @a x True), that we want to specialise, what variables should
 we quantify over.  Clearly over 'a' and 'x', but what about any type variables
 free in x's type?  In fact we don't need to worry about them because (f @a)
 can only be a well-typed application if its type is compatible with x, so any
-varaibles free in x's type must be free in (f @a), and hence either be gathered
+variables free in x's type must be free in (f @a), and hence either be gathered
 via 'a' itself, or be in scope at f's defn.  Hence we just take 
   (exprsFreeVars pats).
 
-BUT phantom type synonums can mess this reasoning up, 
+BUT phantom type synonyms can mess this reasoning up, 
   eg   x::T b   with  type T b = Int
 So we apply expandTypeSynonyms to the bound Ids.  
 See Trac # 5458.  Yuk.

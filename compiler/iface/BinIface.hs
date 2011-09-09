@@ -1456,6 +1456,21 @@ instance Binary IfaceConDecl where
 		a10 <- get bh
 	        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
 
+instance Binary IfaceAT where
+    put_ bh (IfaceAT dec defs) = do
+            put_ bh dec
+            put_ bh defs
+    get bh = do dec <- get bh
+                defs <- get bh
+                return (IfaceAT dec defs)
+
+instance Binary IfaceATDefault where
+    put_ bh (IfaceATD tvs pat_tys ty) = do
+        put_ bh tvs
+        put_ bh pat_tys
+        put_ bh ty
+    get bh = liftM3 IfaceATD (get bh) (get bh) (get bh)
+
 instance Binary IfaceClassOp where
    put_ bh (IfaceClassOp n def ty) = do	
 	put_ bh (occNameFS n)

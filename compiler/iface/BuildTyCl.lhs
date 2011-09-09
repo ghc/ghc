@@ -231,12 +231,12 @@ buildClass :: Bool		-- True <=> do not include unfoldings
 				-- Used when importing a class without -O
 	   -> Name -> [TyVar] -> ThetaType
 	   -> [FunDep TyVar]		   -- Functional dependencies
-	   -> [TyThing]			   -- Associated types
+	   -> [ClassATItem]		   -- Associated types
 	   -> [TcMethInfo]                 -- Method info
 	   -> RecFlag			   -- Info for type constructor
 	   -> TcRnIf m n Class
 
-buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
+buildClass no_unf class_name tvs sc_theta fds at_items sig_stuff tc_isrec
   = do	{ traceIf (text "buildClass")
 	; tycon_name <- newImplicitBinder class_name mkClassTyConOcc
 	; datacon_name <- newImplicitBinder class_name mkClassDataConOcc
@@ -308,10 +308,9 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 		-- [If we don't make it a recursive newtype, we'll expand the
 		-- newtype like a synonym, but that will lead to an infinite
 		-- type]
-	      ; atTyCons = [tycon | ATyCon tycon <- ats]
 
 	      ; result = mkClass class_name tvs fds 
-			         sc_theta sc_sel_ids atTyCons
+			         sc_theta sc_sel_ids at_items
 				 op_items tycon
 	      }
 	; traceIf (text "buildClass" <+> ppr tycon) 

@@ -8,7 +8,7 @@ Typechecking class declarations
 \begin{code}
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
-		    mkGenericDefMethBind,
+                    mkGenericDefMethBind,
 		    tcAddDeclCtxt, badMethodErr
 		  ) where
 

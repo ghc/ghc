@@ -7,7 +7,8 @@
 module IfaceSyn (
         module IfaceType,
 
-        IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), IfaceConDecls(..),
+        IfaceDecl(..), IfaceClassOp(..), IfaceAT(..), IfaceATDefault(..),
+        IfaceConDecl(..), IfaceConDecls(..),
         IfaceExpr(..), IfaceAlt, IfaceNote(..), IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
@@ -87,7 +88,7 @@ data IfaceDecl
                  ifName    :: OccName,          -- Name of the class
                  ifTyVars  :: [IfaceTvBndr],    -- Type variables
                  ifFDs     :: [FunDep FastString], -- Functional dependencies
-                 ifATs     :: [IfaceDecl],      -- Associated type families
+                 ifATs     :: [IfaceAT],      -- Associated type families
                  ifSigs    :: [IfaceClassOp],   -- Method signatures
                  ifRec     :: RecFlag           -- Is newtype/datatype associated
                                                 --   with the class recursive?
@@ -101,6 +102,16 @@ data IfaceClassOp = IfaceClassOp OccName DefMethSpec IfaceType
         -- Nothing    => no default method
         -- Just False => ordinary polymorphic default method
         -- Just True  => generic default method
+
+data IfaceAT = IfaceAT IfaceDecl [IfaceATDefault]
+        -- Nothing => no default associated type instance
+        -- Just ds => default associated type instance from these templates
+
+data IfaceATDefault = IfaceATD [IfaceTvBndr] [IfaceType] IfaceType
+        -- Each associated type default template is a triple of:
+        --   1. TyVars of the RHS and family arguments (including the class TVs)
+        --   3. The instantiated family arguments
+        --   2. The RHS of the synonym
 
 data IfaceConDecls
   = IfAbstractTyCon Bool        -- c.f TyCon.AbstractTyCon
@@ -383,7 +394,7 @@ ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ,
     --    no wrapper (class dictionaries never have a wrapper)
     [dc_occ, dcww_occ] ++
     -- associated types
-    [ifName at | at <- ats ] ++
+    [ifName at | IfaceAT at _ <- ats ] ++
     -- superclass selectors
     [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] ++
     -- operation selectors
@@ -465,6 +476,12 @@ pprFamily (Just famInst) = ptext (sLit "FamilyInstance:") <+> ppr famInst
 
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
+
+instance Outputable IfaceAT where
+   ppr (IfaceAT d defs) = hang (ppr d) 2 (vcat (map ppr defs))
+
+instance Outputable IfaceATDefault where
+   ppr (IfaceATD tvs pat_tys ty) = ppr tvs <+> hsep (map ppr pat_tys) <+> char '=' <+> ppr ty
 
 pprIfaceDeclHead :: IfaceContext -> OccName -> [IfaceTvBndr] -> SDoc
 pprIfaceDeclHead context thing tyvars
@@ -701,7 +718,7 @@ freeNamesIfDecl d@IfaceSyn{} =
 freeNamesIfDecl d@IfaceClass{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfContext (ifCtxt d) &&&
-  freeNamesIfDecls   (ifATs d) &&&
+  fnList freeNamesIfAT     (ifATs d) &&&
   fnList freeNamesIfClsSig (ifSigs d)
 
 freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
@@ -722,8 +739,15 @@ freeNamesIfTcFam Nothing =
 freeNamesIfContext :: IfaceContext -> NameSet
 freeNamesIfContext = fnList freeNamesIfPredType
 
-freeNamesIfDecls :: [IfaceDecl] -> NameSet
-freeNamesIfDecls = fnList freeNamesIfDecl
+freeNamesIfAT :: IfaceAT -> NameSet
+freeNamesIfAT (IfaceAT decl defs)
+  = freeNamesIfDecl decl &&&
+    fnList fn_at_def defs
+  where
+    fn_at_def (IfaceATD tvs pat_tys ty)
+      = freeNamesIfTvBndrs tvs &&&
+        fnList freeNamesIfType pat_tys &&&
+        freeNamesIfType ty
 
 freeNamesIfClsSig :: IfaceClassOp -> NameSet
 freeNamesIfClsSig (IfaceClassOp _n _dm ty) = freeNamesIfType ty

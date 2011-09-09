@@ -52,6 +52,7 @@ libraries/binary                -           packages/binary.git                 
 libraries/bytestring            -           packages/bytestring.git             git
 libraries/Cabal                 -           packages/Cabal.git                  git
 libraries/containers            -           packages/containers.git             git
+libraries/deepseq               -           packages/deepseq.git                git
 libraries/directory             -           packages/directory.git              git
 libraries/extensible-exceptions -           packages/extensible-exceptions.git  git
 libraries/filepath              -           packages/filepath.git               git
@@ -76,7 +77,6 @@ libraries/Win32                 -           packages/Win32.git                  
 libraries/xhtml                 -           packages/xhtml.git                  git
 testsuite                       testsuite   testsuite.git                       git
 nofib                           nofib       nofib.git                           git
-libraries/deepseq               extra       packages/deepseq.git                git
 libraries/parallel              extra       packages/parallel.git               git
 libraries/stm                   extra       packages/stm.git                    git
 libraries/random                dph         packages/random.git                 git
