@@ -756,9 +756,9 @@ mkTupleOcc ns sort ar = OccName ns (mkFastString str)
  	-- no need to cache these, the caching is done in the caller
 	-- (TysWiredIn.mk_tuple)
     str = case sort of
-		UnboxedTuple -> '(' : '#' : commas ++ "#)"
-		BoxedTuple   -> '(' : commas ++ ")"
-                FactTuple    -> '(' : commas ++ ")"
+		UnboxedTuple    -> '(' : '#' : commas ++ "#)"
+		BoxedTuple      -> '(' : commas ++ ")"
+                ConstraintTuple -> '(' : commas ++ ")"
                   -- Cute hack: reuse the standard tuple OccNames (and hence code)
                   -- for fact tuples, but give them different Uniques so they are not equal.
                   --

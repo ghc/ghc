@@ -274,23 +274,41 @@ pcDataConWithFixity' declared_infix dc_name wrk_key tyvars arg_tys tycon
 %*									*
 %************************************************************************
 
+Note [How tuples work]
+~~~~~~~~~~~~~~~~~~~~~~
+* There are three families of tuple TyCons and corresponding
+  DataCons, (boxed, unboxed, and constraint tuples), expressed by the
+  type BasicTypes.TupleSort.
+
+* DataCons (and workers etc) for BoxedTuple and ConstraintTuple have
+    - distinct Uniques
+    - the same OccName
+  Using the same OccName means (hack!) that a single copy of the
+  runtime library code (info tables etc) works for both.
+
+* When looking up an OccName in the original-name cache
+  (IfaceEnv.lookupOrigNameCache), we spot the tuple OccName to make sure
+  we get the right wired-in name.  This guy can't tell the difference
+  betweeen BoxedTuple and ConstraintTuple (same OccName!), so tuples
+  are not serialised into interface files using OccNames at all. 
+
 \begin{code}
 tupleTyCon :: TupleSort -> Arity -> TyCon
 tupleTyCon sort i | i > mAX_TUPLE_SIZE = fst (mk_tuple sort i)	-- Build one specially
 tupleTyCon BoxedTuple   i = fst (boxedTupleArr   ! i)
 tupleTyCon UnboxedTuple i = fst (unboxedTupleArr ! i)
-tupleTyCon FactTuple    i = fst (factTupleArr    ! i)
+tupleTyCon ConstraintTuple    i = fst (factTupleArr    ! i)
 
 tupleCon :: TupleSort -> Arity -> DataCon
 tupleCon sort i | i > mAX_TUPLE_SIZE = snd (mk_tuple sort i)	-- Build one specially
 tupleCon BoxedTuple   i = snd (boxedTupleArr   ! i)
 tupleCon UnboxedTuple i = snd (unboxedTupleArr ! i)
-tupleCon FactTuple    i = snd (factTupleArr    ! i)
+tupleCon ConstraintTuple    i = snd (factTupleArr    ! i)
 
 boxedTupleArr, unboxedTupleArr, factTupleArr :: Array Int (TyCon,DataCon)
 boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple BoxedTuple i | i <- [0..mAX_TUPLE_SIZE]]
 unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple UnboxedTuple i | i <- [0..mAX_TUPLE_SIZE]]
-factTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple FactTuple i | i <- [0..mAX_TUPLE_SIZE]]
+factTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple ConstraintTuple i | i <- [0..mAX_TUPLE_SIZE]]
 
 mk_tuple :: TupleSort -> Int -> (TyCon,DataCon)
 mk_tuple sort arity = (tycon, tuple_con)
@@ -301,14 +319,14 @@ mk_tuple sort arity = (tycon, tuple_con)
 				(ATyCon tycon) BuiltInSyntax
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
 	res_kind = case sort of
-	  BoxedTuple   -> liftedTypeKind
-	  UnboxedTuple -> ubxTupleKind
-	  FactTuple    -> constraintKind
+	  BoxedTuple   	  -> liftedTypeKind
+	  UnboxedTuple 	  -> ubxTupleKind
+	  ConstraintTuple -> constraintKind
 
 	tyvars = take arity $ case sort of
 	  BoxedTuple   -> alphaTyVars
 	  UnboxedTuple -> openAlphaTyVars
-	  FactTuple    -> tyVarList constraintKind
+	  ConstraintTuple    -> tyVarList constraintKind
 
 	tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
 	tyvar_tys = mkTyVarTys tyvars

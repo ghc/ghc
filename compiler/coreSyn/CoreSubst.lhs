@@ -775,10 +775,11 @@ Note [Optimise coercion boxes agressively]
 The simple expression optimiser has special cases for Eq# boxes as follows:
  1. If the result of optimising the RHS of a non-recursive binding is an
     Eq# box, that box is substituted rather than turned into a let, just as
-    if it were trivial.
+    if it were trivial.   let x = Eq# e in b  ==>  b[e/x]
 
  2. If the result of optimising a case scrutinee is a Eq# box and the case
     deconstructs it in a trivial way, we evaluate the case then and there.
+        case (Eq# e) of { Eq# y -> b }   ==>  b[e/y]
 
 We do this for two reasons:
 

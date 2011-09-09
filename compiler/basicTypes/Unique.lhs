@@ -325,7 +325,7 @@ mkPreludeClassUnique i          = mkUnique '2' i
 mkPreludeTyConUnique i		= mkUnique '3' (3*i)
 mkTupleTyConUnique BoxedTuple   a	= mkUnique '4' (3*a)
 mkTupleTyConUnique UnboxedTuple a	= mkUnique '5' (3*a)
-mkTupleTyConUnique FactTuple    a	= mkUnique 'k' (3*a)
+mkTupleTyConUnique ConstraintTuple a	= mkUnique 'k' (3*a)
 
 -- Data constructor keys occupy *two* slots.  The first is used for the
 -- data constructor itself and its wrapper function (the function that
@@ -335,8 +335,8 @@ mkTupleTyConUnique FactTuple    a	= mkUnique 'k' (3*a)
 
 mkPreludeDataConUnique i	= mkUnique '6' (2*i)	-- Must be alphabetic
 mkTupleDataConUnique BoxedTuple   a = mkUnique '7' (2*a)	-- ditto (*may* be used in C labels)
-mkTupleDataConUnique UnboxedTuple a = mkUnique '8' (2*a)
-mkTupleDataConUnique FactTuple    a = mkUnique 'h' (2*a)
+mkTupleDataConUnique UnboxedTuple    a = mkUnique '8' (2*a)
+mkTupleDataConUnique ConstraintTuple a = mkUnique 'h' (2*a)
 
 mkPrimOpIdUnique op         = mkUnique '9' op
 mkPreludeMiscIdUnique  i    = mkUnique '0' i

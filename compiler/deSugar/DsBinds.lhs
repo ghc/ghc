@@ -269,7 +269,7 @@ dsEvTerm (EvTupleSel v n)
     xs = map mkWildValBinder tys_before ++ v' : map mkWildValBinder tys_after
     (tys_before, ty_want:tys_after) = splitAt n tys
 dsEvTerm (EvTupleMk vs) = Var (dataConWorkId dc) `mkTyApps` tys `mkVarApps` vs
-  where dc = tupleCon FactTuple (length vs)
+  where dc = tupleCon ConstraintTuple (length vs)
         tys = map varType vs
 dsEvTerm (EvSuperClass d n)
   = Var sc_sel_id `mkTyApps` tys `App` Var d
@@ -572,7 +572,7 @@ specUnfolding _ _ _
 
 \begin{code}
 decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
--- Take apart the LHS of a RULE.  It's suuposed to look like
+-- Take apart the LHS of a RULE.  It's supposed to look like
 --     /\a. f a Int dOrdInt
 -- or  /\a.\d:Ord a. let { dl::Ord [a] = dOrdList a d } in f [a] dl
 -- That is, the RULE binders are lambda-bound

@@ -575,7 +575,7 @@ ds_type (HsTupleTy hs_con tys) = do
         HsBoxyTuple kind -> do
           kind' <- zonkTcKindToKind kind
           case () of
-            _ | kind' `eqKind` constraintKind -> return FactTuple
+            _ | kind' `eqKind` constraintKind -> return ConstraintTuple
             _ | kind' `eqKind` liftedTypeKind -> return BoxedTuple
             _ | otherwise
               -> failWithTc (ptext (sLit "Unexpected tuple component kind:") <+> ppr kind')

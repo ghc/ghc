@@ -405,7 +405,7 @@ mkMainModule_ m = mkModule mainPackageId m
 \begin{code}
 mkTupleModule :: TupleSort -> Arity -> Module
 mkTupleModule BoxedTuple   _ = gHC_TUPLE
-mkTupleModule FactTuple    _ = gHC_TUPLE
+mkTupleModule ConstraintTuple    _ = gHC_TUPLE
 mkTupleModule UnboxedTuple _ = gHC_PRIM
 \end{code}
 

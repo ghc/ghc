@@ -387,21 +387,22 @@ pprSafeOverlap False = empty
 data TupleSort
   = BoxedTuple
   | UnboxedTuple
-  | FactTuple
+  | ConstraintTuple
   deriving( Eq, Data, Typeable )
 
 tupleSortBoxity :: TupleSort -> Boxity
-tupleSortBoxity BoxedTuple   = Boxed
-tupleSortBoxity UnboxedTuple = Unboxed
-tupleSortBoxity FactTuple    = Boxed
+tupleSortBoxity BoxedTuple     = Boxed
+tupleSortBoxity UnboxedTuple   = Unboxed
+tupleSortBoxity ConstraintTuple = Boxed
 
 boxityNormalTupleSort :: Boxity -> TupleSort
 boxityNormalTupleSort Boxed   = BoxedTuple
 boxityNormalTupleSort Unboxed = UnboxedTuple
 
 tupleParens :: TupleSort -> SDoc -> SDoc
-tupleParens BoxedTuple   p = parens p
-tupleParens FactTuple    p = parens p -- The user can't write fact tuples directly, we overload the (,,) syntax
+tupleParens BoxedTuple      p = parens p
+tupleParens ConstraintTuple p = parens p -- The user can't write fact tuples 
+                                         -- directly, we overload the (,,) syntax
 tupleParens UnboxedTuple p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
 \end{code}
 

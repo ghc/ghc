@@ -652,15 +652,15 @@ instance Binary HsBang where
 	      _ -> do return HsUnpackFailed
 
 instance Binary TupleSort where
-    put_ bh BoxedTuple   = putByte bh 0
-    put_ bh UnboxedTuple = putByte bh 1
-    put_ bh FactTuple    = putByte bh 2
+    put_ bh BoxedTuple      = putByte bh 0
+    put_ bh UnboxedTuple    = putByte bh 1
+    put_ bh ConstraintTuple = putByte bh 2
     get bh = do
       h <- getByte bh
       case h of
         0 -> do return BoxedTuple
         1 -> do return UnboxedTuple
-        _ -> do return FactTuple
+        _ -> do return ConstraintTuple
 
 instance Binary RecFlag where
     put_ bh Recursive = do
