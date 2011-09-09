@@ -535,6 +535,16 @@ type CheapFun = CoreExpr -> Maybe Type -> Bool
 	-- of the expression; Nothing means "don't know"
 
 arityType :: CheapFun -> CoreExpr -> ArityType
+arityType cheap_fn (Note n e) 
+  | notSccNote n              = arityType cheap_fn e
+arityType cheap_fn (Cast e co) 
+  = arityType cheap_fn e
+    `andArityType` ATop (typeArity (pSnd (coercionKind co)))
+    -- See Note [exprArity invariant]; must be true of
+    -- arityType too, since that is how we compute the arity
+    -- of variables, and they in turn affect result of exprArity
+    -- Trac #5441 is a nice demo
+
 arityType _ (Var v)
   | Just strict_sig <- idStrictness_maybe v
   , (ds, res) <- splitStrictSig strict_sig
@@ -576,9 +586,6 @@ arityType cheap_fn (Let b e)
     cheap_bind (Rec prs)    = all is_cheap prs
     is_cheap (b,e) = cheap_fn e (Just (idType b))
 
-arityType cheap_fn (Note n e) 
-  | notSccNote n              = arityType cheap_fn e
-arityType cheap_fn (Cast e _) = arityType cheap_fn e
 arityType _           _       = vanillaArityType
 \end{code}
   
@@ -616,7 +623,6 @@ We may have to sandwich some coerces between the lambdas
 to make the types work.   exprEtaExpandArity looks through coerces
 when computing arity; and etaExpand adds the coerces as necessary when
 actually computing the expansion.
-
 
 Note [No crap in eta-expanded code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
