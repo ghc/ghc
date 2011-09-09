@@ -116,7 +116,6 @@ getAllInfo name = withSession $ \hsc_env -> do
 data SimpleType = SimpleType Name [SimpleType] deriving (Eq,Ord)
 
 
--- TODO: should we support PredTy here?
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], Name, [SimpleType])
 instHead (_, _, cls, args)
   = (map argCount args, className cls, map simplify args)
@@ -134,7 +133,6 @@ instHead (_, _, cls, args)
       where (SimpleType s ts) = simplify t1
     simplify (TyVarTy v) = SimpleType (tyVarName v) []
     simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
-    simplify _ = error "simplify"
 
 
 -- sortImage f = sortBy (\x y -> compare (f x) (f y))

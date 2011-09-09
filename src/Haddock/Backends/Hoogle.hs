@@ -143,10 +143,10 @@ ppClass x = out x{tcdSigs=[]} :
         addContext (TypeSig name (L l sig)) = TypeSig name (L l $ f sig)
         addContext _ = error "expected TypeSig"
 
-        f (HsForAllTy a b con d) = HsForAllTy a b (reL $ context : unL con) d
+        f (HsForAllTy a b con d) = HsForAllTy a b (reL (context : unLoc con)) d
         f t = HsForAllTy Implicit [] (reL [context]) (reL t)
 
-        context = reL $ HsClassP (unL $ tcdLName x)
+        context = nlHsTyConApp (unL $ tcdLName x)
             (map (reL . HsTyVar . hsTyVarName . unL) (tcdTyVars x))
 
 
