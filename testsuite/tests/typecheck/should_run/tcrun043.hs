@@ -24,6 +24,9 @@ g Fish x = Right (x + 1)
 
 type TwoConstraints a = (Show a, Num a)
 
+-- We'll NOINLINE h so that we test the code generation for
+-- constraint tuples
+{-# NOINLINE h #-}
 h :: TwoConstraints a => a -> String
 h x = show (x + 1)
 
