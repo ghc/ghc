@@ -24,4 +24,3 @@ test('BadImport03',
      extra_clean(['BadImport03_A.o', 'BadImport03_A.hi']),
      multimod_compile_fail,
      ['BadImport03', ''])
-

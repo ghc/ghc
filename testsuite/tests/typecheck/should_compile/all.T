@@ -346,6 +346,8 @@ test('tc251', extra_clean(['Tc251_Help.hi', 'Tc251_Help.o']),
 test('tc252', normal, compile, [''])
 test('tc253', normal, compile, [''])
 test('tc254', normal, compile, [''])
+test('tc255', normal, compile, [''])
+test('tc256', normal, compile, [''])
 
 test('GivenOverlapping', normal, compile, [''])
 test('SilentParametersOverlapping', normal, compile, [''])

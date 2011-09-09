@@ -66,6 +66,7 @@ test('rnfail055',
      multimod_compile_fail,
      ['RnFail055','-v0'])
 test('rnfail056', normal, compile_fail, [''])
+test('rnfail057', normal, compile_fail, [''])
 
 test('rn_dup', normal, compile_fail, [''])
 test('T2310', normal, compile_fail, [''])

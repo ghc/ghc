@@ -1,0 +1,4 @@
+
+rnfail057.hs:3:16:
+    Unexpected named kind:
+        DontExistKind

@@ -4,5 +4,5 @@ tcfail151.hs:1:14:
 
 tcfail151.hs:8:6:
     `Name a' is not applied to enough type arguments
-    Expected kind `?', but `Name a' has kind `* -> *'
+    Expected kind `Constraint', but `Name a' has kind `* -> Constraint'
     In the data type declaration for `Exp'

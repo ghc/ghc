@@ -1,5 +1,5 @@
 
 tcfail063.hs:6:9:
     `Num' is not applied to enough type arguments
-    Expected kind `?', but `Num' has kind `* -> *'
+    Expected kind `Constraint', but `Num' has kind `* -> Constraint'
     In the type signature for `moby': moby :: Num => Int -> a -> Int

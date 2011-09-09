@@ -1,5 +1,5 @@
 
 tcfail057.hs:5:7:
-    Class `RealFrac' used as a type
-    In the type signature for `f':
-      f :: (RealFrac a) -> a -> a
+    Predicate `RealFrac a' used as a type
+    Expected kind `??', but `RealFrac a' has kind `Constraint'
+    In the type signature for `f': f :: (RealFrac a) -> a -> a

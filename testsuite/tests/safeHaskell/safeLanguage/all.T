@@ -46,4 +46,3 @@ test('SafeLang15',
       extra_clean(['SafeLang15_A.o', 'SafeLang15_A.hi'])],
      multimod_compile_and_run,
      ['SafeLang15', '-trust base -XSafe'])
-

@@ -1,6 +1,6 @@
 
 tcfail134.hs:5:33:
     `XML' is not applied to enough type arguments
-    Expected kind `?', but `XML' has kind `* -> *'
+    Expected kind `?', but `XML' has kind `* -> Constraint'
     In the type `a -> XML'
     In the class declaration for `XML'

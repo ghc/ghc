@@ -13,10 +13,11 @@ TYPE CONSTRUCTORS
       RecFlag NonRecursive
       = Z :: forall a. a -> Z a Stricts: _
       FamilyInstance: none
+  class Zork s a b | a -> b
+      RecFlag NonRecursive
+      huh :: forall chain. Q s a chain -> ST s ()
 COERCION AXIOMS
-  axiom ShouldCompile.NTCo:T:Zork [s, a, b]
-    :: ShouldCompile.T:Zork s a b
-         ~
-       (forall chain. Q s a chain -> ST s ())
+  axiom ShouldCompile.NTCo:Zork [s, a, b]
+    :: Zork s a b ~ (forall chain. Q s a chain -> ST s ())
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]
