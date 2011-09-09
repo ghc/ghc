@@ -31,7 +31,8 @@ module CoreSubst (
 	cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
 	-- ** Simple expression optimiser
-        simpleOptPgm, simpleOptExpr, simpleOptExprWith
+        simpleOptPgm, simpleOptExpr, simpleOptExprWith,
+        exprIsConApp_maybe
     ) where
 
 #include "HsVersions.h"
@@ -49,9 +50,12 @@ import Type     hiding ( substTy, extendTvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
 import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substCoVarBndr )
 
+import TcType      ( tcSplitDFunTy )
+import TyCon       ( tyConArity )
+import DataCon
+import PrelNames   ( eqBoxDataConKey )
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings, pprRules )
-import PrelNames   ( eqBoxDataConKey )
 import Module	   ( Module )
 import VarSet
 import VarEnv
@@ -65,6 +69,8 @@ import Maybes
 import ErrUtils
 import DynFlags   ( DynFlags, DynFlag(..) )
 import BasicTypes ( isAlwaysActive )
+import Util
+import Pair
 import Outputable
 import PprCore		()		-- Instances
 import FastString
@@ -772,14 +778,15 @@ InlVanilla.  The WARN is just so I can see if it happens a lot.
 Note [Optimise coercion boxes agressively]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The simple expression optimiser has special cases for Eq# boxes as follows:
+The simple expression optimiser needs to deal with Eq# boxes as follows:
  1. If the result of optimising the RHS of a non-recursive binding is an
     Eq# box, that box is substituted rather than turned into a let, just as
-    if it were trivial.   let x = Eq# e in b  ==>  b[e/x]
+    if it were trivial.
+       let eqv = Eq# co in e ==> e[Eq# co/eqv]
 
  2. If the result of optimising a case scrutinee is a Eq# box and the case
     deconstructs it in a trivial way, we evaluate the case then and there.
-        case (Eq# e) of { Eq# y -> b }   ==>  b[e/y]
+      case Eq# co of Eq# cov -> e ==> e[co/cov]
 
 We do this for two reasons:
 
@@ -791,6 +798,33 @@ We do this for two reasons:
     of kind (* -> * -> *) and (?? -> ? -> *), which differ. If we do this
     inlining agressively we can collapse away the intermediate coercion between
     these two types and hence pass Lint again. (This is a sort of a hack.)
+
+In fact, our implementation uses slightly liberalised versions of the second rule
+rule so that the optimisations are a bit more generally applicable. Precisely:
+ 2a. We reduce any situation where we can spot a case-of-known-constructor
+
+As a result, the only time we should get residual coercion boxes in the code is
+when the type checker generates something like:
+
+  \eqv -> let eqv' = Eq# (case eqv of Eq# cov -> ... cov ...)
+
+However, the case of lambda-bound equality evidence is fairly rare, so these two
+rules should suffice for solving the rule LHS problem for now.
+
+Annoyingly, we cannot use this modified rule 1a instead of 1:
+
+ 1a. If we come across a let-bound constructor application with trivial arguments,
+     add an appropriate unfolding to the let binder.  We spot constructor applications
+     by using exprIsConApp_maybe, so this would actually let rule 2a reduce more.
+
+The reason is that we REALLY NEED coercion boxes to be substituted away. With rule 1a
+we wouldn't simplify this expression at all:
+
+  let eqv = Eq# co
+  in foo eqv (bar eqv)
+
+The rule LHS desugarer can't deal with Let at all, so we need to push that box into
+the use sites.
 
 \begin{code}
 simpleOptExpr :: CoreExpr -> CoreExpr
@@ -877,15 +911,18 @@ simple_opt_expr' subst expr
 
     go lam@(Lam {})     = go_lam [] subst lam
     go (Case e b ty as)
-      | [(DataAlt dc, [cov], e_alt)] <- as -- See Note [Optimise coercion boxes agressively]
-      , dc `hasKey` eqBoxDataConKey
-      , (Var fun, [Type _, Type _, Coercion co]) <- collectArgs e'
-      , isDataConWorkId fun
-      , isDeadBinder b
-      = simple_opt_expr (extendCvSubst subst cov co) e_alt
+       -- See Note [Optimise coercion boxes agressively]
+      | isDeadBinder b
+      , Just (con, _tys, es) <- expr_is_con_app e'
+      , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
+      = case altcon of
+          DEFAULT -> go rhs
+          _       -> mkLets (catMaybes mb_binds) $ simple_opt_expr subst' rhs
+            where (subst', mb_binds) = mapAccumL simple_opt_out_bind subst (zipEqual "simpleOptExpr" bs es)
+
       | otherwise
-      = Case (go e) b' (substTy subst ty)
-       		       (map (go_alt subst') as)
+      = Case e' b' (substTy subst ty)
+       		   (map (go_alt subst') as)
         where
           e' = go e
           (subst', b') = subst_opt_bndr subst b
@@ -944,11 +981,14 @@ simple_opt_bind' subst (Rec prs)
          r2 = simple_opt_expr subst r
 
 simple_opt_bind' subst (NonRec b r)
-  = case maybe_substitute subst b r' of
+  = simple_opt_out_bind subst (b, simple_opt_expr subst r)
+
+----------------------
+simple_opt_out_bind :: Subst -> (InVar, OutExpr) -> (Subst, Maybe CoreBind)
+simple_opt_out_bind subst (b, r') = case maybe_substitute subst b r' of
       Just ext_subst -> (ext_subst, Nothing)
       Nothing        -> (subst', Just (NonRec b2 r'))
   where
-    r' = simple_opt_expr subst r
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
 
@@ -971,6 +1011,7 @@ maybe_substitute subst b r
   , isAlwaysActive (idInlineActivation b)	-- Note [Inline prag in simplOpt]
   , not (isStableUnfolding (idUnfolding b))
   , not (isExportedId b)
+  , not (isUnLiftedType (idType b)) || exprOkForSpeculation r
   = Just (extendIdSubst subst b r)
   
   | otherwise
@@ -984,9 +1025,10 @@ maybe_substitute subst b r
     safe_to_inline NoOccInfo                = trivial
 
     trivial | exprIsTrivial r = True
-            | (Var fun, _args) <- collectArgs r
+            | (Var fun, args) <- collectArgs r
             , Just dc <- isDataConWorkId_maybe fun
-            , dc `hasKey` eqBoxDataConKey = True -- See Note [Optimise coercion boxes agressively]
+            , dc `hasKey` eqBoxDataConKey
+            , all exprIsTrivial args = True -- See Note [Optimise coercion boxes agressively]
             | otherwise = False
 
 ----------------------
@@ -1031,8 +1073,10 @@ add_info :: Subst -> InVar -> OutVar -> OutVar
 add_info subst old_bndr new_bndr
  | isTyVar old_bndr = new_bndr
  | otherwise        = maybeModifyIdInfo mb_new_info new_bndr
- where
-   mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+ where mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+
+expr_is_con_app :: OutExpr -> Maybe (DataCon, [Type], [OutExpr])
+expr_is_con_app = exprIsConApp_maybe (\id -> if isAlwaysActive (idInlineActivation id) then idUnfolding id else noUnfolding)
 \end{code}
 
 Note [Inline prag in simplOpt]
@@ -1055,3 +1099,169 @@ When inlining 'foo' in 'bar' we want the let-binding for 'inner'
 to remain visible until Phase 1
 
 
+%************************************************************************
+%*                                                                      *
+         exprIsConApp_maybe
+%*                                                                      *
+%************************************************************************
+
+Note [exprIsConApp_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+exprIsConApp_maybe is a very important function.  There are two principal
+uses:
+  * case e of { .... }
+  * cls_op e, where cls_op is a class operation
+
+In both cases you want to know if e is of form (C e1..en) where C is
+a data constructor.
+
+However e might not *look* as if 
+
+\begin{code}
+data ConCont = CC [CoreExpr] Coercion   
+                  -- Substitution already applied
+
+-- | Returns @Just (dc, [t1..tk], [x1..xn])@ if the argument expression is 
+-- a *saturated* constructor application of the form @dc t1..tk x1 .. xn@,
+-- where t1..tk are the *universally-qantified* type args of 'dc'
+exprIsConApp_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
+exprIsConApp_maybe id_unf expr
+  = go (Left in_scope) expr (CC [] (mkReflCo (exprType expr)))
+  where
+    in_scope = mkInScopeSet (exprFreeVars expr)
+
+    go :: Either InScopeSet Subst 
+       -> CoreExpr -> ConCont 
+       -> Maybe (DataCon, [Type], [CoreExpr])
+    go subst (Note note expr) cont 
+       | notSccNote note = go subst expr cont
+    go subst (Cast expr co1) (CC [] co2)
+       = go subst expr (CC [] (subst_co subst co1 `mkTransCo` co2))
+    go subst (App fun arg) (CC args co)
+       = go subst fun (CC (subst_arg subst arg : args) co)
+    go subst (Lam var body) (CC (arg:args) co)
+       | exprIsTrivial arg          -- Don't duplicate stuff!
+       = go (extend subst var arg) body (CC args co)
+    go (Right sub) (Var v) cont
+       = go (Left (substInScope sub)) 
+            (lookupIdSubst (text "exprIsConApp" <+> ppr expr) sub v) 
+            cont
+
+    go (Left in_scope) (Var fun) cont@(CC args co)
+        | Just con <- isDataConWorkId_maybe fun
+        , count isValArg args == idArity fun
+        , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars con) args
+        = dealWithCoercion co (con, stripTypeArgs univ_ty_args, rest_args)
+
+        -- Look through dictionary functions; see Note [Unfolding DFuns]
+        | DFunUnfolding dfun_nargs con ops <- unfolding
+        , length args == dfun_nargs    -- See Note [DFun arity check]
+        , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
+              subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
+              mk_arg e = mkApps e args
+        = dealWithCoercion co (con, substTys subst dfun_res_tys, map mk_arg ops)
+
+        -- Look through unfoldings, but only cheap ones, because
+        -- we are effectively duplicating the unfolding
+        | Just rhs <- expandUnfolding_maybe unfolding
+        = -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
+          let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
+              res = go (Left in_scope') rhs cont
+          in WARN( unfoldingArity unfolding > 0 && isJust res,
+                   text "Interesting! exprIsConApp_maybe:" 
+                   <+> ppr fun <+> ppr expr)
+             res
+        where
+          unfolding = id_unf fun
+
+    go _ _ _ = Nothing
+
+    ----------------------------
+    -- Operations on the (Either InScopeSet CoreSubst)
+    -- The Left case is wildly dominant
+    subst_co (Left {}) co = co
+    subst_co (Right s) co = CoreSubst.substCo s co
+
+    subst_arg (Left {}) e = e
+    subst_arg (Right s) e = substExpr (text "exprIsConApp") s e
+
+    extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
+    extend (Right s)       v e = Right (extendSubst s v e)
+
+dealWithCoercion :: Coercion
+                 -> (DataCon, [Type], [CoreExpr])
+                 -> Maybe (DataCon, [Type], [CoreExpr])
+dealWithCoercion co stuff@(dc, _dc_univ_args, dc_args)
+  | isReflCo co 
+  = Just stuff
+
+  | Pair _from_ty to_ty <- coercionKind co
+  , Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
+  , to_tc == dataConTyCon dc
+        -- These two tests can fail; we might see 
+        --      (C x y) `cast` (g :: T a ~ S [a]),
+        -- where S is a type function.  In fact, exprIsConApp
+        -- will probably not be called in such circumstances,
+        -- but there't nothing wrong with it 
+
+  =     -- Here we do the KPush reduction rule as described in the FC paper
+        -- The transformation applies iff we have
+        --      (C e1 ... en) `cast` co
+        -- where co :: (T t1 .. tn) ~ to_ty
+        -- The left-hand one must be a T, because exprIsConApp returned True
+        -- but the right-hand one might not be.  (Though it usually will.)
+    let
+        tc_arity       = tyConArity to_tc
+        dc_univ_tyvars = dataConUnivTyVars dc
+        dc_ex_tyvars   = dataConExTyVars dc
+        arg_tys        = dataConRepArgTys dc
+
+        (ex_args, val_args) = splitAtList dc_ex_tyvars dc_args
+
+        -- Make the "theta" from Fig 3 of the paper
+        gammas = decomposeCo tc_arity co
+        theta_subst = liftCoSubstWith 
+                         (dc_univ_tyvars ++ dc_ex_tyvars)
+                         (gammas         ++ map mkReflCo (stripTypeArgs ex_args))
+
+          -- Cast the value arguments (which include dictionaries)
+        new_val_args = zipWith cast_arg arg_tys val_args
+        cast_arg arg_ty arg = mkCoerce (theta_subst arg_ty) arg
+    in
+#ifdef DEBUG
+    let dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
+                         ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
+                         ppr ex_args, ppr val_args]
+    in
+    ASSERT2( eqType _from_ty (mkTyConApp to_tc _dc_univ_args), dump_doc )
+    ASSERT2( all isTypeArg ex_args, dump_doc )
+    ASSERT2( equalLength val_args arg_tys, dump_doc )
+#endif
+    Just (dc, to_tc_arg_tys, ex_args ++ new_val_args)
+
+  | otherwise
+  = Nothing
+
+stripTypeArgs :: [CoreExpr] -> [Type]
+stripTypeArgs args = ASSERT2( all isTypeArg args, ppr args )
+                     [ty | Type ty <- args]
+  -- We really do want isTypeArg here, not isTyCoArg!
+\end{code}
+
+Note [Unfolding DFuns]
+~~~~~~~~~~~~~~~~~~~~~~
+DFuns look like
+
+  df :: forall a b. (Eq a, Eq b) -> Eq (a,b)
+  df a b d_a d_b = MkEqD (a,b) ($c1 a b d_a d_b)
+                               ($c2 a b d_a d_b)
+
+So to split it up we just need to apply the ops $c1, $c2 etc
+to the very same args as the dfun.  It takes a little more work
+to compute the type arguments to the dictionary constructor.
+
+Note [DFun arity check]
+~~~~~~~~~~~~~~~~~~~~~~~
+Here we check that the total number of supplied arguments (inclding 
+type args) matches what the dfun is expecting.  This may be *less*
+than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
