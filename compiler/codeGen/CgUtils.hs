@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Code generator utilities; mostly monadic
@@ -74,11 +67,9 @@ import ListSetOps
 import Util
 import DynFlags
 import FastString
-import PackageConfig
 import Outputable
 
 import Data.Char
-import Data.Bits
 import Data.Word
 import Data.Maybe
 
@@ -116,6 +107,7 @@ mkSimpleLit (MachLabel fs ms fod)
         where
                 -- TODO: Literal labels might not actually be in the current package...
                 labelSrc = ForeignLabelInThisPackage
+mkSimpleLit (MachStr _) = panic "mkSimpleLit: MachStr"
 
 mkLtOp :: Literal -> MachOp
 -- On signed literals we must do a signed comparison
@@ -144,8 +136,10 @@ mkLtOp lit            = MO_U_Lt (typeWidth (cmmLitType (mkSimpleLit lit)))
    Big families only use the tag value 1 to represent
    evaluatedness.
 -}
+isSmallFamily :: Int -> Bool
 isSmallFamily fam_size = fam_size <= mAX_PTR_TAG
 
+tagForCon :: DataCon -> ConTagZ
 tagForCon con = tag
     where
     con_tag           = dataConTagZ con
@@ -154,6 +148,7 @@ tagForCon con = tag
         | otherwise              = 1
 
 --Tag an expression, to do: refactor, this appears in some other module.
+tagCons :: DataCon -> CmmExpr -> CmmExpr
 tagCons con expr = cmmOffsetB expr (tagForCon con)
 
 --------------------------------------------------------------------------
@@ -440,7 +435,7 @@ emitDataLits lbl lits = emitDecl (mkDataLits Data lbl lits)
 
 emitRODataLits :: String -> CLabel -> [CmmLit] -> Code
 -- Emit a read-only data block
-emitRODataLits caller lbl lits
+emitRODataLits _caller lbl lits
   = emitDecl (mkRODataLits lbl lits)
 
 newStringCLit :: String -> FCode CmmLit
@@ -503,7 +498,7 @@ emitSwitch
         -> Code
 
 -- ONLY A DEFAULT BRANCH: no case analysis to do
-emitSwitch tag_expr [] (Just stmts) _ _
+emitSwitch _ [] (Just stmts) _ _
   = emitCgStmts stmts
 
 -- Right, off we go
@@ -531,13 +526,13 @@ mk_switch :: CmmExpr -> [(ConTagZ, CgStmts)]
           -> FCode CgStmts
 
 -- SINGLETON TAG RANGE: no case analysis to do
-mk_switch tag_expr [(tag,stmts)] _ lo_tag hi_tag via_C
+mk_switch _tag_expr [(tag,stmts)] _ lo_tag hi_tag _via_C
   | lo_tag == hi_tag
   = ASSERT( tag == lo_tag )
     return stmts
 
--- SINGLETON BRANCH, NO DEFUALT: no case analysis to do
-mk_switch tag_expr [(tag,stmts)] Nothing lo_tag hi_tag via_C
+-- SINGLETON BRANCH, NO DEFAULT: no case analysis to do
+mk_switch _tag_expr [(_tag,stmts)] Nothing _lo_tag _hi_tag _via_C
   = return stmts
         -- The simplifier might have eliminated a case
         --       so we may have e.g. case xs of
@@ -546,7 +541,7 @@ mk_switch tag_expr [(tag,stmts)] Nothing lo_tag hi_tag via_C
         -- can't happen, so no need to test
 
 -- SINGLETON BRANCH: one equality check to do
-mk_switch tag_expr [(tag,stmts)] (Just deflt) lo_tag hi_tag via_C
+mk_switch tag_expr [(tag,stmts)] (Just deflt) _lo_tag _hi_tag _via_C
   = return (CmmCondBranch cond deflt `consCgStmt` stmts)
   where
     cond  =  cmmNeWord tag_expr (CmmLit (mkIntCLit tag))
@@ -670,7 +665,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
     (lo_branches, hi_branches) = span is_lo branches
     is_lo (t,_) = t < mid_tag
 
-
+assignTemp' :: CmmExpr -> FCode (CmmStmt, CmmExpr)
 assignTemp' e
   | isTrivialCmmExpr e = return (CmmNop, e)
   | otherwise          = do { reg <- newTemp (cmmExprType e)
@@ -686,8 +681,7 @@ emitLitSwitch :: CmmExpr                        -- Tag to switch on
 --
 -- ToDo: for integers we could do better here, perhaps by generalising
 -- mk_switch and using that.  --SDM 15/09/2004
-emitLitSwitch scrut [] deflt
-  = emitCgStmts deflt
+emitLitSwitch _     []       deflt = emitCgStmts deflt
 emitLitSwitch scrut branches deflt_blk
   = do  { scrut' <- assignTemp scrut
         ; deflt_blk_id <- forkCgStmts deflt_blk
@@ -771,12 +765,14 @@ doSimultaneously1 vertices
 
         -- do_components deal with one strongly-connected component
         -- Not cyclic, or singleton?  Just do it
-        do_component (AcyclicSCC (n,stmt))  = stmtC stmt
-        do_component (CyclicSCC [(n,stmt)]) = stmtC stmt
+        do_component (AcyclicSCC (_n, stmt))  = stmtC stmt
+        do_component (CyclicSCC [])
+            = panic "doSimultaneously1: do_component (CyclicSCC [])"
+        do_component (CyclicSCC [(_n, stmt)]) = stmtC stmt
 
                 -- Cyclic?  Then go via temporaries.  Pick one to
                 -- break the loop and try again with the rest.
-        do_component (CyclicSCC ((n,first_stmt) : rest))
+        do_component (CyclicSCC ((_n, first_stmt) : rest))
           = do  { from_temp <- go_via_temp first_stmt
                 ; doSimultaneously1 rest
                 ; stmtC from_temp }
@@ -786,50 +782,53 @@ doSimultaneously1 vertices
                 ; stmtC (CmmAssign (CmmLocal tmp) src)
                 ; return (CmmAssign dest (CmmReg (CmmLocal tmp))) }
         go_via_temp (CmmStore dest src)
-          = do  { tmp <- newTemp (cmmExprType src) -- TODO FIXME NOW if the pair of assignemnts move across a call this will be wrong
+          = do  { tmp <- newTemp (cmmExprType src) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
                 ; stmtC (CmmAssign (CmmLocal tmp) src)
                 ; return (CmmStore dest (CmmReg (CmmLocal tmp))) }
+        go_via_temp _ = panic "doSimultaneously1: go_via_temp"
     in
     mapCs do_component components
 
 mustFollow :: CmmStmt -> CmmStmt -> Bool
 CmmAssign reg _  `mustFollow` stmt = anySrc (reg `regUsedIn`) stmt
 CmmStore loc e   `mustFollow` stmt = anySrc (locUsedIn loc (cmmExprType e)) stmt
-CmmNop           `mustFollow` stmt = False
-CmmComment _     `mustFollow` stmt = False
+CmmNop           `mustFollow` _    = False
+CmmComment _     `mustFollow` _    = False
+_                `mustFollow` _    = panic "mustFollow"
 
 
 anySrc :: (CmmExpr -> Bool) -> CmmStmt -> Bool
 -- True if the fn is true of any input of the stmt
 anySrc p (CmmAssign _ e)    = p e
 anySrc p (CmmStore e1 e2)   = p e1 || p e2      -- Might be used in either side
-anySrc p (CmmComment _)     = False
-anySrc p CmmNop             = False
-anySrc p other              = True              -- Conservative
+anySrc _ (CmmComment _)     = False
+anySrc _ CmmNop             = False
+anySrc _ _                  = True              -- Conservative
 
 locUsedIn :: CmmExpr -> CmmType -> CmmExpr -> Bool
 -- (locUsedIn a r e) checks whether writing to r[a] could affect the value of
 -- 'e'.  Returns True if it's not sure.
-locUsedIn loc rep (CmmLit _)         = False
+locUsedIn _   _   (CmmLit _)         = False
 locUsedIn loc rep (CmmLoad e ld_rep) = possiblySameLoc loc rep e ld_rep
-locUsedIn loc rep (CmmReg reg')      = False
-locUsedIn loc rep (CmmRegOff reg' _) = False
+locUsedIn _   _   (CmmReg _)         = False
+locUsedIn _   _   (CmmRegOff _ _)    = False
 locUsedIn loc rep (CmmMachOp _ es)   = any (locUsedIn loc rep) es
+locUsedIn _   _   (CmmStackSlot _ _) = panic "locUsedIn: CmmStackSlot"
 
 possiblySameLoc :: CmmExpr -> CmmType -> CmmExpr -> CmmType -> Bool
 -- Assumes that distinct registers (eg Hp, Sp) do not
 -- point to the same location, nor any offset thereof.
-possiblySameLoc (CmmReg r1)       rep1 (CmmReg r2)      rep2  = r1==r2
-possiblySameLoc (CmmReg r1)       rep1 (CmmRegOff r2 0) rep2  = r1==r2
-possiblySameLoc (CmmRegOff r1 0)  rep1 (CmmReg r2)      rep2  = r1==r2
+possiblySameLoc (CmmReg r1)           _    (CmmReg r2)           _ = r1 == r2
+possiblySameLoc (CmmReg r1)           _    (CmmRegOff r2 0)      _ = r1 == r2
+possiblySameLoc (CmmRegOff r1 0)      _    (CmmReg r2)           _ = r1 == r2
 possiblySameLoc (CmmRegOff r1 start1) rep1 (CmmRegOff r2 start2) rep2
   = r1==r2 && end1 > start2 && end2 > start1
   where
     end1 = start1 + widthInBytes (typeWidth rep1)
     end2 = start2 + widthInBytes (typeWidth rep2)
 
-possiblySameLoc l1 rep1 (CmmLit _) rep2 = False
-possiblySameLoc l1 rep1 l2         rep2 = True  -- Conservative
+possiblySameLoc _  _    (CmmLit _) _    = False
+possiblySameLoc _  _    _          _    = True  -- Conservative
 
 -------------------------------------------------------------------------
 --
@@ -860,12 +859,12 @@ getSRTInfo = do
                : map mkWordCLit bmp)
             return (C_SRT srt_desc_lbl 0 srt_escape)
 
-    SRT off len bmp
       | otherwise
       -> return (C_SRT srt_lbl off (fromIntegral (head bmp)))
                 -- The fromIntegral converts to StgHalfWord
 
-srt_escape = (-1) :: StgHalfWord
+srt_escape :: StgHalfWord
+srt_escape = -1
 
 -- -----------------------------------------------------------------------------
 --
@@ -947,11 +946,12 @@ get_GlobalReg_addr mid     = get_Regtable_addr_from_offset
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
+regTableOffset :: Int -> CmmExpr
 regTableOffset n =
   CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
 
 get_Regtable_addr_from_offset   :: CmmType -> Int -> CmmExpr
-get_Regtable_addr_from_offset rep offset =
+get_Regtable_addr_from_offset _ offset =
 #ifdef REG_Base
   CmmRegOff (CmmGlobal BaseReg) offset
 #else
