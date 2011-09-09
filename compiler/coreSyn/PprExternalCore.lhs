@@ -85,8 +85,6 @@ pakind (Kopen) = char '?'
 pakind k = parens (pkind k)
 
 pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
-pkind (Keq t1 t2) = parens (parens (pty t1) <+> text ":=:" <+> 
-                            parens (pty t2))
 pkind k = pakind k
 
 paty, pbty, pty :: Ty -> Doc

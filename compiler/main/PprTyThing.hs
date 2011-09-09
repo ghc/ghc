@@ -89,7 +89,6 @@ pprTyThingHdr pefas (AnId id)          = pprId         pefas id
 pprTyThingHdr pefas (ADataCon dataCon) = pprDataConSig pefas dataCon
 pprTyThingHdr pefas (ATyCon tyCon)     = pprTyConHdr   pefas tyCon
 pprTyThingHdr _     (ACoAxiom ax)      = pprCoAxiom ax
-pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
 
 ------------------------
 ppr_ty_thing :: PrintExplicitForalls -> ShowSub -> TyThing -> SDoc
@@ -97,12 +96,12 @@ ppr_ty_thing pefas _  (AnId id)          = pprId         pefas id
 ppr_ty_thing pefas _  (ADataCon dataCon) = pprDataConSig pefas dataCon
 ppr_ty_thing pefas ss (ATyCon tyCon)   	 = pprTyCon      pefas ss tyCon
 ppr_ty_thing _     _  (ACoAxiom ax)    	 = pprCoAxiom    ax
-ppr_ty_thing pefas ss (AClass cls)     	 = pprClass      pefas ss cls
-
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
-pprTyConHdr _ tyCon
+pprTyConHdr pefas tyCon
   | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
   = ptext keyword <+> ptext (sLit "instance") <+> pprTypeApp fam_tc tys
+  | Just cls <- tyConClass_maybe tyCon
+  = pprClassHdr pefas cls
   | otherwise
   = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
@@ -166,6 +165,8 @@ pprTyCon pefas ss tyCon
     else
       let rhs_type = GHC.synTyConType tyCon
       in hang (pprTyConHdr pefas tyCon <+> equals) 2 (pprTypeForUser pefas rhs_type)
+  | Just cls <- GHC.tyConClass_maybe tyCon
+  = pprClass pefas ss cls
   | otherwise
   = pprAlgTyCon pefas ss tyCon
 

@@ -7,7 +7,7 @@ This module converts Template Haskell syntax into HsSyn
 
 \begin{code}
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
-                convertToHsType, convertToHsPred,
+                convertToHsType,
                 thRdrNameGuesses ) where
 
 import HsSyn as Hs
@@ -58,10 +58,6 @@ convertToPat loc p
 convertToHsType :: SrcSpan -> TH.Type -> Either Message (LHsType RdrName)
 convertToHsType loc t
   = initCvt loc $ wrapMsg "type" t $ cvtType t
-
-convertToHsPred :: SrcSpan -> TH.Pred -> Either Message (LHsPred RdrName)
-convertToHsPred loc t
-  = initCvt loc $ wrapMsg "type" t $ cvtPred t
 
 -------------------------------------------------------------------
 newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either Message a }
@@ -190,8 +186,8 @@ cvtDec (ClassD ctxt cl tvs fds decs)
 cvtDec (InstanceD ctxt ty decs)
   = do 	{ (binds', sigs', ats') <- cvt_ci_decs (ptext (sLit "an instance declaration")) decs
 	; ctxt' <- cvtContext ctxt
-	; L loc pred' <- cvtPredTy ty
-	; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc $ HsPredTy pred'
+	; L loc ty' <- cvtType ty
+	; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc ty'
 	; returnL $ InstD (InstDecl inst_ty' binds' sigs' ats') }
 
 cvtDec (ForeignD ford) 
@@ -356,7 +352,7 @@ cvtDerivs cs = do { cs' <- mapM cvt_one cs
 		  ; return (Just cs') }
 	where
 	  cvt_one c = do { c' <- tconName c
-			 ; returnL $ HsPredTy $ HsClassP c' [] }
+			 ; returnL $ HsTyVar c' }
 
 cvt_fundep :: FunDep -> CvtM (Located (Class.FunDep RdrName))
 cvt_fundep (FunDep xs ys) = do { xs' <- mapM tName xs; ys' <- mapM tName ys; returnL (xs', ys') }
@@ -783,26 +779,17 @@ cvt_tv (TH.KindedTV nm ki)
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
 
-cvtPred :: TH.Pred -> CvtM (LHsPred RdrName)
+cvtPred :: TH.Pred -> CvtM (LHsType RdrName)
 cvtPred (TH.ClassP cla tys)
   = do { cla' <- if isVarName cla then tName cla else tconName cla
        ; tys' <- mapM cvtType tys
-       ; returnL $ HsClassP cla' tys'
+       ; mk_apps (HsTyVar cla') tys'
        }
 cvtPred (TH.EqualP ty1 ty2)
   = do { ty1' <- cvtType ty1
        ; ty2' <- cvtType ty2
-       ; returnL $ HsEqualP ty1' ty2'
+       ; returnL $ HsEqTy ty1' ty2'
        }
-
-cvtPredTy :: TH.Type -> CvtM (LHsPred RdrName)
-cvtPredTy ty 
-  = do	{ (head, tys') <- split_ty_app ty
-	; case head of
-	    ConT tc -> do { tc' <- tconName tc; returnL $ HsClassP tc' tys' }
-	    VarT tv -> do { tv' <- tName tv;    returnL $ HsClassP tv' tys' }
-	    _       -> failWith (ptext (sLit "Malformed predicate") <+> 
-                       text (TH.pprint ty)) }
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
 cvtType ty 
@@ -812,18 +799,18 @@ cvtType ty
              | length tys' == n 	-- Saturated
              -> if n==1 then return (head tys')	-- Singleton tuples treated 
                                                 -- like nothing (ie just parens)
-                        else returnL (HsTupleTy Boxed tys')
+                        else returnL (HsTupleTy (HsBoxyTuple liftedTypeKind) tys')
              | n == 1    
              -> failWith (ptext (sLit "Illegal 1-tuple type constructor"))
              | otherwise 
-             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
+             -> mk_apps (HsTyVar (getRdrName (tupleTyCon BoxedTuple n))) tys'
            UnboxedTupleT n
              | length tys' == n 	-- Saturated
              -> if n==1 then return (head tys')	-- Singleton tuples treated
                                                 -- like nothing (ie just parens)
-                        else returnL (HsTupleTy Unboxed tys')
+                        else returnL (HsTupleTy HsUnboxedTuple tys')
              | otherwise
-             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Unboxed n))) tys'
+             -> mk_apps (HsTyVar (getRdrName (tupleTyCon UnboxedTuple n))) tys'
            ArrowT 
              | [x',y'] <- tys' -> returnL (HsFunTy x' y')
              | otherwise       -> mk_apps (HsTyVar (getRdrName funTyCon)) tys'
@@ -848,10 +835,11 @@ cvtType ty
 
            _ -> failWith (ptext (sLit "Malformed type") <+> text (show ty))
     }
-  where
-    mk_apps head_ty []       = returnL head_ty
-    mk_apps head_ty (ty:tys) = do { head_ty' <- returnL head_ty
-				  ; mk_apps (HsAppTy head_ty' ty) tys }
+
+mk_apps :: HsType RdrName -> [LHsType RdrName] -> CvtM (LHsType RdrName)
+mk_apps head_ty []       = returnL head_ty
+mk_apps head_ty (ty:tys) = do { head_ty' <- returnL head_ty
+                              ; mk_apps (HsAppTy head_ty' ty) tys }
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsType RdrName])
 split_ty_app ty = go ty []
@@ -992,8 +980,8 @@ isBuiltInOcc ctxt_ns occ
     go_tuple _ _            = Nothing
 
     tup_name n 
-	| OccName.isTcClsNameSpace ctxt_ns = Name.getName (tupleTyCon Boxed n)
-	| otherwise 		           = Name.getName (tupleCon Boxed n)
+	| OccName.isTcClsNameSpace ctxt_ns = Name.getName (tupleTyCon BoxedTuple n)
+	| otherwise 		           = Name.getName (tupleCon BoxedTuple n)
 
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> String -> OccName.OccName

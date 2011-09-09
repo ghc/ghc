@@ -662,7 +662,7 @@ mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 mkVanillaTuplePat :: [OutPat Id] -> Boxity -> Pat Id
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
 mkVanillaTuplePat pats box 
-  = TuplePat pats box (mkTupleTy box (map hsLPatType pats))
+  = TuplePat pats box (mkTupleTy (boxityNormalTupleSort box) (map hsLPatType pats))
 
 -- The Big equivalents for the source tuple expressions
 mkBigLHsVarTup :: [Id] -> LHsExpr Id

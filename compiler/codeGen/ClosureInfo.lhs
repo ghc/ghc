@@ -1091,15 +1091,9 @@ getTyDescription ty
       AppTy fun _      	     -> getTyDescription fun
       FunTy _ res      	     -> '-' : '>' : fun_result res
       TyConApp tycon _ 	     -> getOccString tycon
-      PredTy sty	     -> getPredTyDescription sty
       ForAllTy _ ty          -> getTyDescription ty
     }
   where
     fun_result (FunTy _ res) = '>' : fun_result res
     fun_result other	     = getTyDescription other
-
-getPredTyDescription :: PredType -> String
-getPredTyDescription (ClassP cl _) = getOccString cl
-getPredTyDescription (IParam ip _) = getOccString (ipNameName ip)
-getPredTyDescription (EqPred _ _)  = "Type equality"
 \end{code}

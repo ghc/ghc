@@ -81,8 +81,6 @@ vectType ty@(ForAllTy _ _)
       traceVt "vect ForAllTy: " $ ppr (abstractType tyvars (dictsPA ++ dictsVect) tyBody'')
       return $ abstractType tyvars (dictsPA ++ dictsVect) tyBody''
 
-vectType ty = cantVectorise "Can't vectorise type" (ppr ty)
-
 -- |Add quantified vars and dictionary parameters to the front of a type.
 --
 abstractType :: [TyVar] -> [Type] -> Type -> Type

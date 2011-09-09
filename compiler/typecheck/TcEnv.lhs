@@ -155,8 +155,8 @@ tcLookupClass :: Name -> TcM Class
 tcLookupClass name = do
     thing <- tcLookupGlobal name
     case thing of
-	AClass cls -> return cls
-	_          -> wrongThingErr "class" (AGlobal thing) name
+	ATyCon tc | Just cls <- tyConClass_maybe tc -> return cls
+	_                                           -> wrongThingErr "class" (AGlobal thing) name
 
 tcLookupTyCon :: Name -> TcM TyCon
 tcLookupTyCon name = do

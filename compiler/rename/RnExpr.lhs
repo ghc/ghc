@@ -27,7 +27,7 @@ import HsSyn
 import TcRnMonad
 import TcEnv		( thRnBrack )
 import RnEnv
-import RnTypes		( rnHsTypeFVs, rnSplice, checkTH,
+import RnTypes		( rnHsTypeFVs, rnSplice, rnIPName, checkTH,
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
 import RnPat
 import DynFlags
@@ -105,8 +105,8 @@ rnExpr (HsVar v)
        finishHsVar name
 
 rnExpr (HsIPVar v)
-  = newIPNameRn v		`thenM` \ name ->
-    return (HsIPVar name, emptyFVs)
+  = do v' <- rnIPName v
+       return (HsIPVar v', emptyFVs)
 
 rnExpr (HsLit lit@(HsString s))
   = do {

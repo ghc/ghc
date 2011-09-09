@@ -6,7 +6,7 @@ module TcSMonad (
     CanonicalCts, emptyCCan, andCCan, andCCans, 
     singleCCan, extendCCans, isEmptyCCan, isCTyEqCan, 
     isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe,
-    isCFrozenErr,
+    isCIrredEvCan, isCFrozenErr,
 
     WorkList, unionWorkList, unionWorkLists, isEmptyWorkList, emptyWorkList,
     workListFromEq, workListFromNonEq,
@@ -32,12 +32,15 @@ module TcSMonad (
     SimplContext(..), isInteractive, simplEqsOnly, performDefaulting,
 
        -- Creation of evidence variables
-    newEvVar, newCoVar, newGivenCoVar,
-    newDerivedId, 
-    newIPVar, newDictVar, newKindConstraint,
+    newEvVar,
+    newDerivedId, newGivenEqVar,
+    newEqVar, newIPVar, newDictVar, newKindConstraint,
 
        -- Setting evidence variables 
-    setCoBind, setIPBind, setDictBind, setEvBind,
+    setEqBind,
+    setIPBind,
+    setDictBind,
+    setEvBind,
 
     setWantedTyBind,
 
@@ -153,6 +156,12 @@ data CanonicalCt
       cc_ip_ty  :: TcTauType
     }
 
+  | CIrredEvCan {
+      cc_id     :: EvVar,
+      cc_flavor :: CtFlavor,
+      cc_ty     :: Xi
+    }
+
   | CTyEqCan {  -- tv ~ xi	(recall xi means function free)
        -- Invariant: 
        --   * tv not in tvs(xi)   (occurs check)
@@ -197,6 +206,7 @@ tyVarsOfCanonical (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })    = extendVarSet (t
 tyVarsOfCanonical (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCanonical (CDictCan { cc_tyargs = tys }) 	       = tyVarsOfTypes tys
 tyVarsOfCanonical (CIPCan { cc_ip_ty = ty })                   = tyVarsOfType ty
+tyVarsOfCanonical (CIrredEvCan { cc_ty = ty })                 = tyVarsOfType ty
 tyVarsOfCanonical (CFrozenErr { cc_id = ev })                  = tyVarsOfEvVar ev
 
 tyVarsOfCDict :: CanonicalCt -> TcTyVarSet 
@@ -214,6 +224,8 @@ instance Outputable CanonicalCt where
       = ppr fl <+> ppr d  <+> dcolon <+> pprClassPred cls tys
   ppr (CIPCan ip fl ip_nm ty)     
       = ppr fl <+> ppr ip <+> dcolon <+> parens (ppr ip_nm <> dcolon <> ppr ty)
+  ppr (CIrredEvCan v fl ty)
+      = ppr fl <+> ppr v <+> dcolon <+> ppr ty
   ppr (CTyEqCan co fl tv ty)      
       = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (Pair (mkTyVarTy tv) ty)
   ppr (CFunEqCan co fl tc tys ty) 
@@ -264,6 +276,10 @@ isCDictCan_Maybe _              = Nothing
 isCIPCan_Maybe :: CanonicalCt -> Maybe (IPName Name)
 isCIPCan_Maybe  (CIPCan {cc_ip_nm = nm }) = Just nm
 isCIPCan_Maybe _                = Nothing
+
+isCIrredEvCan :: CanonicalCt -> Bool
+isCIrredEvCan (CIrredEvCan {}) = True
+isCIrredEvCan _                = False
 
 isCFunEqCan_Maybe :: CanonicalCt -> Maybe TyCon
 isCFunEqCan_Maybe (CFunEqCan { cc_fun = tc }) = Just tc
@@ -437,9 +453,9 @@ data TcSEnv
     }
 
 data FlatCache 
-  = FlatCache { givenFlatCache  :: Map.Map FunEqHead (TcType,Coercion,CtFlavor)
+  = FlatCache { givenFlatCache  :: Map.Map FunEqHead (TcType,EqVar,CtFlavor)
                 -- Invariant: all CtFlavors here satisfy isGiven
-              , wantedFlatCache :: Map.Map FunEqHead (TcType,Coercion,CtFlavor) }
+              , wantedFlatCache :: Map.Map FunEqHead (TcType,EqVar,CtFlavor) }
                 -- Invariant: all CtFlavors here satisfy isWanted
 
 emptyFlatCache :: FlatCache
@@ -662,7 +678,7 @@ getFlatCacheMapVar
   = TcS (return . tcs_flat_map)
 
 lookupFlatCacheMap :: TyCon -> [Xi] -> CtFlavor 
-                   -> TcS (Maybe (TcType,Coercion,CtFlavor))
+                   -> TcS (Maybe (TcType,EqVar,CtFlavor))
 -- For givens, we lookup in given flat cache
 lookupFlatCacheMap tc xis (Given {})
   = do { cache_ref <- getFlatCacheMapVar
@@ -679,18 +695,18 @@ lookupFlatCacheMap tc xis (Wanted {})
 lookupFlatCacheMap _tc _xis (Derived {}) = return Nothing
 
 updateFlatCacheMap :: TyCon -> [Xi]
-                   -> TcType -> CtFlavor -> Coercion -> TcS ()
-updateFlatCacheMap _tc _xis _tv (Derived {}) _co
+                   -> TcType -> CtFlavor -> EqVar -> TcS ()
+updateFlatCacheMap _tc _xis _tv (Derived {}) _eqv
   = return () -- Not caching deriveds
-updateFlatCacheMap tc xis ty fl co
+updateFlatCacheMap tc xis ty fl eqv
   = do { cache_ref <- getFlatCacheMapVar
        ; cache_map <- wrapTcS $ TcM.readTcRef cache_ref
        ; let new_cache_map
               | isGivenOrSolved fl
-              = cache_map { givenFlatCache = Map.insert (FunEqHead (tc,xis)) (ty,co,fl) $
+              = cache_map { givenFlatCache = Map.insert (FunEqHead (tc,xis)) (ty,eqv,fl) $
                                              givenFlatCache cache_map }
               | isWanted fl
-              = cache_map { wantedFlatCache = Map.insert (FunEqHead (tc,xis)) (ty,co,fl) $
+              = cache_map { wantedFlatCache = Map.insert (FunEqHead (tc,xis)) (ty,eqv,fl) $
                                               wantedFlatCache cache_map }
               | otherwise = pprPanic "updateFlatCacheMap, met Derived!" $ empty
        ; wrapTcS $ TcM.writeTcRef cache_ref new_cache_map }
@@ -701,9 +717,8 @@ getTcEvBindsBag
   = do { EvBindsVar ev_ref _ <- getTcEvBinds 
        ; wrapTcS $ TcM.readTcRef ev_ref }
 
-
-setCoBind :: CoVar -> Coercion -> TcS () 
-setCoBind cv co = setEvBind cv (EvCoercion co)
+setEqBind :: EqVar -> LCoercion -> TcS () 
+setEqBind eqv co = setEvBind eqv (EvCoercionBox co)
 
 setWantedTyBind :: TcTyVar -> TcType -> TcS () 
 -- Add a type binding
@@ -728,9 +743,9 @@ setDictBind = setEvBind
 
 setEvBind :: EvVar -> EvTerm -> TcS () 
 -- Internal
-setEvBind ev rhs 
+setEvBind ev t
   = do { tc_evbinds <- getTcEvBinds
-       ; wrapTcS (TcM.addTcEvBind tc_evbinds ev rhs) }
+       ; wrapTcS $ TcM.addTcEvBind tc_evbinds ev t }
 
 warnTcS :: CtLoc orig -> Bool -> SDoc -> TcS ()
 warnTcS loc warn_if doc 
@@ -771,7 +786,7 @@ checkWellStagedDFun pred dfun_id loc
     bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
-pprEq ty1 ty2 = pprPredTy $ mkEqPred (ty1,ty2)
+pprEq ty1 ty2 = pprType $ mkEqPred (ty1,ty2)
 
 isTouchableMetaTyVar :: TcTyVar -> TcS Bool
 isTouchableMetaTyVar tv 
@@ -858,8 +873,8 @@ newKindConstraint :: TcTyVar -> Kind -> TcS CoVar
 newKindConstraint tv knd 
   = do { tv_k <- instFlexiTcSHelper (tyVarName tv) knd 
        ; let ty_k = mkTyVarTy tv_k
-       ; co_var <- newCoVar (mkTyVarTy tv) ty_k
-       ; return co_var }
+       ; eqv <- newEqVar (mkTyVarTy tv) ty_k
+       ; return eqv }
 
 instFlexiTcSHelper :: Name -> Kind -> TcS TcTyVar
 instFlexiTcSHelper tvname tvkind
@@ -879,18 +894,18 @@ newEvVar pty = wrapTcS $ TcM.newEvVar pty
 newDerivedId :: TcPredType -> TcS EvVar 
 newDerivedId pty = wrapTcS $ TcM.newEvVar pty
 
-newGivenCoVar :: TcType -> TcType -> Coercion -> TcS EvVar 
+newGivenEqVar :: TcType -> TcType -> Coercion -> TcS EvVar 
 -- Note we create immutable variables for given or derived, since we
 -- must bind them to TcEvBinds (because their evidence may involve 
 -- superclasses). However we should be able to override existing
 -- 'derived' evidence, even in TcEvBinds 
-newGivenCoVar ty1 ty2 co 
-  = do { cv <- newCoVar ty1 ty2
-       ; setEvBind cv (EvCoercion co) 
+newGivenEqVar ty1 ty2 co 
+  = do { cv <- newEqVar ty1 ty2
+       ; setEvBind cv (EvCoercionBox co) 
        ; return cv } 
 
-newCoVar :: TcType -> TcType -> TcS EvVar
-newCoVar ty1 ty2 = wrapTcS $ TcM.newCoVar ty1 ty2 
+newEqVar :: TcType -> TcType -> TcS EvVar
+newEqVar ty1 ty2 = wrapTcS $ TcM.newEq ty1 ty2 
 
 newIPVar :: IPName Name -> TcType -> TcS EvVar 
 newIPVar nm ty = wrapTcS $ TcM.newIP nm ty 

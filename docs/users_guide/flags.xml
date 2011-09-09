@@ -791,6 +791,12 @@
 	      <entry><option>-XNoTypeFamilies</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XConstraintKind</option></entry>
+	      <entry>Enable a <link linkend="constraint-kind">kind of constraints</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoConstraintKind</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XScopedTypeVariables</option></entry>
 	      <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
 	      Implied by <option>-fglasgow-exts</option>.</entry>

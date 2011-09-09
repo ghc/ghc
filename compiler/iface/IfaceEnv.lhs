@@ -2,10 +2,10 @@
 
 \begin{code}
 module IfaceEnv (
-	newGlobalBinder, newIPName, newImplicitBinder, 
+	newGlobalBinder, newImplicitBinder, 
 	lookupIfaceTop,
 	lookupOrig, lookupOrigNameCache, extendNameCache,
-	newIfaceName, newIfaceNames,
+	newIPName, newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv, 
 	tcIfaceLclId, tcIfaceTyVar, lookupIfaceTyVar,
 	tcIfaceTick,
@@ -23,6 +23,7 @@ import TcRnMonad
 import TysWiredIn
 import HscTypes
 import TyCon
+import Type
 import DataCon
 import Var
 import Name
@@ -31,9 +32,9 @@ import Module
 import UniqFM
 import FastString
 import UniqSupply
-import BasicTypes
 import SrcLoc
 import MkId
+import BasicTypes
 
 import Outputable
 import Exception     ( evaluate )
@@ -148,21 +149,19 @@ lookupOrig mod occ
                   in (name_cache{ nsUniqs = us, nsNames = new_cache }, name)
     }}}
 
-newIPName :: IPName OccName -> TcRnIf m n (IPName Name)
-newIPName occ_name_ip =
+newIPName :: FastString -> TcRnIf m n (IPName Name)
+newIPName ip =
   updNameCache $ \name_cache ->
-    let
-	ipcache = nsIPs name_cache
-        key = occ_name_ip  -- Ensures that ?x and %x get distinct Names
-    in
-    case Map.lookup key ipcache of
-      Just name_ip -> (name_cache, name_ip)
-      Nothing      -> (new_ns, name_ip)
-	  where
-	    (uniq, us') = takeUniqFromSupply (nsUniqs name_cache)
-	    name_ip     = mapIPName (mkIPName uniq) occ_name_ip
-	    new_ipcache = Map.insert key name_ip ipcache
-	    new_ns      = name_cache {nsUniqs = us', nsIPs = new_ipcache}
+    let ipcache = nsIPs name_cache
+    in case Map.lookup ip ipcache of
+         Just name_ip -> (name_cache, name_ip)
+         Nothing      -> (new_ns, name_ip)
+            where
+              (us_here, us') = splitUniqSupply (nsUniqs name_cache)
+              tycon_u:datacon_u:dc_wrk_u:co_ax_u:_ = uniqsFromSupply us_here
+              name_ip     = mkIPName ip tycon_u datacon_u dc_wrk_u co_ax_u
+              new_ipcache = Map.insert ip name_ip ipcache
+              new_ns      = name_cache {nsUniqs = us', nsIPs = new_ipcache}
 \end{code}
 
 %************************************************************************
@@ -174,16 +173,18 @@ newIPName occ_name_ip =
 \begin{code}
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache _ mod occ
+  -- Don't need to mention gHC_UNIT here because it is explicitly
+  -- included in TysWiredIn.wiredInTyCons
   | mod == gHC_TUPLE || mod == gHC_PRIM,		-- Boxed tuples from one, 
     Just tup_info <- isTupleOcc_maybe occ	-- unboxed from the other
   = 	-- Special case for tuples; there are too many
 	-- of them to pre-populate the original-name cache
     Just (mk_tup_name tup_info)
   where
-    mk_tup_name (ns, boxity, arity)
-	| ns == tcName   = tyConName (tupleTyCon boxity arity)
-	| ns == dataName = dataConName (tupleCon boxity arity)
-	| otherwise      = Var.varName (dataConWorkId (tupleCon boxity arity))
+    mk_tup_name (ns, sort, arity)
+	| ns == tcName   = tyConName (tupleTyCon sort arity)
+	| ns == dataName = dataConName (tupleCon sort arity)
+	| otherwise      = Var.varName (dataConWorkId (tupleCon sort arity))
 
 lookupOrigNameCache nc mod occ	-- The normal case
   = case lookupModuleEnv nc mod of
@@ -231,7 +232,7 @@ initNameCache :: UniqSupply -> [Name] -> NameCache
 initNameCache us names
   = NameCache { nsUniqs = us,
 		nsNames = initOrigNames names,
-		nsIPs   = Map.empty }
+                nsIPs   = Map.empty }
 
 initOrigNames :: [Name] -> OrigNameCache
 initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names

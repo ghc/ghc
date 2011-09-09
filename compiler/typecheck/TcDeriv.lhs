@@ -482,10 +482,9 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
           let allTyNames = [ tcdName d | L _ d <- tycl_decls, isDataDecl d ]
         -- Select only those types that derive Generic
         ; let sel_tydata = [ tcdName t | (L _ c, L _ t) <- all_tydata
-                                       , getClassName c == Just genClassName ]
+                                       , isGenClassName c ]
         ; let sel_deriv_decls = catMaybes [ getTypeName t
-                                  | L _ (DerivDecl (L _ t)) <- deriv_decls
-                                  , getClassName t == Just genClassName ] 
+                                  | L _ (DerivDecl (L _ t)) <- deriv_decls ] 
         ; derTyDecls <- mapM tcLookupTyCon $ 
                          filter (needsExtras xDerRep
                                   (sel_tydata ++ sel_deriv_decls)) allTyNames
@@ -504,25 +503,21 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
       -- deriving Generic
     needsExtras xDerRep tydata tc_name = xDerRep && tc_name `elem` tydata
 
-    -- Extracts the name of the class in the deriving
-    getClassName :: HsType Name -> Maybe Name
-    getClassName (HsForAllTy _ _ _ (L _ n)) = getClassName n
-    getClassName (HsPredTy (HsClassP n _))  = Just n
-    getClassName _                          = Nothing
+    -- Extracts the name of the class in the deriving and makes sure it is ours
+    isGenClassName :: HsType Name -> Bool
+    isGenClassName ty = case splitHsInstDeclTy_maybe ty of
+        Just (_, _, cls_name, _) -> cls_name == genClassName
+        _                        -> False
 
     -- Extracts the name of the type in the deriving
     -- This function (and also getClassName above) is not really nice, and I
     -- might not have covered all possible cases. I wonder if there is no easier
     -- way to extract class and type name from a LDerivDecl...
     getTypeName :: HsType Name -> Maybe Name
-    getTypeName (HsForAllTy _ _ _ (L _ n))      = getTypeName n
-    getTypeName (HsTyVar n)                     = Just n
-    getTypeName (HsOpTy _ (L _ n) _)            = Just n
-    getTypeName (HsPredTy (HsClassP _ [L _ n])) = getTypeName n
-    getTypeName (HsAppTy (L _ n) _)             = getTypeName n
-    getTypeName (HsParTy (L _ n))               = getTypeName n
-    getTypeName (HsKindSig (L _ n) _)           = getTypeName n
-    getTypeName _                               = Nothing
+    getTypeName ty = do
+        (_, _, cls_name, [ty]) <- splitHsInstDeclTy_maybe ty
+        guard (cls_name == genClassName)
+        fmap fst $ splitHsClassTy_maybe (unLoc ty)
 
     extractTyDataPreds decls
       = [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
@@ -1042,7 +1037,7 @@ cond_functorOK allowFunctions (_, rep_tc)
     tc_tvs            = tyConTyVars rep_tc
     Just (_, last_tv) = snocView tc_tvs
     bad_stupid_theta  = filter is_bad (tyConStupidTheta rep_tc)
-    is_bad pred       = last_tv `elemVarSet` tyVarsOfPred pred
+    is_bad pred       = last_tv `elemVarSet` tyVarsOfType pred
 
     data_cons = tyConDataCons rep_tc
     check_con con = msum (check_vanilla con : foldDataConArgs (ft_check con) con)
@@ -1360,7 +1355,10 @@ inferInstanceContexts oflag infer_specs
 	     		  extendLocalInstEnv inst_specs $
 	     		  mapM gen_soln infer_specs
 
-	   ; if (current_solns == new_solns) then
+           ; let eqList :: (a -> b -> Bool) -> [a] -> [b] -> Bool
+                 eqList f xs ys = length xs == length ys && and (zipWith f xs ys)
+
+	   ; if (eqList (eqList eqType) current_solns new_solns) then
 		return [ spec { ds_theta = soln } 
                        | (spec, soln) <- zip infer_specs current_solns ]
 	     else
@@ -1381,7 +1379,7 @@ inferInstanceContexts oflag infer_specs
 		-- Claim: the result instance declaration is guaranteed valid
 		-- Hence no need to call:
 		--   checkValidInstance tyvars theta clas inst_tys
-	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the solution
+	   ; return (sortLe (\p1 p2 -> cmpType p1 p2 /= GT) theta) }	-- Canonicalise before returning the solution
       where
         the_pred = mkClassPred clas inst_tys
 

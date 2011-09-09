@@ -665,7 +665,7 @@ ppType (TyApp "MVar#" [x,y])     = "mkMVarPrimTy " ++ ppType x
                                    ++ " " ++ ppType y
 ppType (TyApp "TVar#" [x,y])     = "mkTVarPrimTy " ++ ppType x 
                                    ++ " " ++ ppType y
-ppType (TyUTup ts)               = "(mkTupleTy Unboxed " 
+ppType (TyUTup ts)               = "(mkTupleTy UnboxedTuple " 
                                    ++ listify (map ppType ts) ++ ")"
 
 ppType (TyF s d) = "(mkFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"

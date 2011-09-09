@@ -145,9 +145,9 @@ matchFunTys
 -- could probably be un-CPSd, like matchExpectedTyConApp
 
 matchFunTys herald arity res_ty thing_inside
-  = do	{ (coi, pat_tys, res_ty) <- matchExpectedFunTys herald arity res_ty
+  = do	{ (co, pat_tys, res_ty) <- matchExpectedFunTys herald arity res_ty
 	; res <- thing_inside pat_tys res_ty
-        ; return (coToHsWrapper (mkSymCo coi), res) }
+        ; return (coToHsWrapper (mkSymCo co), res) }
 \end{code}
 
 %************************************************************************
@@ -245,16 +245,16 @@ tcDoStmts :: HsStmtContext Name
 	  -> TcRhoType
 	  -> TcM (HsExpr TcId)		-- Returns a HsDo
 tcDoStmts ListComp stmts res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedListTy res_ty
+  = do	{ (co, elt_ty) <- matchExpectedListTy res_ty
         ; let list_ty = mkListTy elt_ty
 	; stmts' <- tcStmts ListComp (tcLcStmt listTyCon) stmts elt_ty
-	; return $ mkHsWrapCo coi (HsDo ListComp stmts' list_ty) }
+	; return $ mkHsWrapCo co (HsDo ListComp stmts' list_ty) }
 
 tcDoStmts PArrComp stmts res_ty
-  = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
+  = do	{ (co, elt_ty) <- matchExpectedPArrTy res_ty
         ; let parr_ty = mkPArrTy elt_ty
 	; stmts' <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts elt_ty
-	; return $ mkHsWrapCo coi (HsDo PArrComp stmts' parr_ty) }
+	; return $ mkHsWrapCo co (HsDo PArrComp stmts' parr_ty) }
 
 tcDoStmts DoExpr stmts res_ty
   = do	{ stmts' <- tcStmts DoExpr tcDoStmt stmts res_ty
@@ -729,8 +729,8 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op return_op) res_ty thing_insi
 	-- but we don't have any good way to incorporate the coercion
 	-- so for now we just check that it's the identity
     check_same actual expected
-      = do { coi <- unifyType actual expected
-	   ; unless (isReflCo coi) $
+      = do { co <- unifyType actual expected
+	   ; unless (isReflCo co) $
              failWithMisMatch [UnifyOrigin { uo_expected = expected
                                            , uo_actual = actual }] }
 

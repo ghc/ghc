@@ -520,19 +520,4 @@ normaliseType env (ForAllTy tyvar ty1)
     in  (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
 normaliseType _   ty@(TyVarTy _)
   = (Refl ty,ty)
-normaliseType env (PredTy predty)
-  = normalisePred env predty
-
----------------
-normalisePred :: FamInstEnvs -> PredType -> (Coercion,Type)
-normalisePred env (ClassP cls tys)
-  = let (cos,tys') = mapAndUnzip (normaliseType env) tys
-    in  (mkPredCo $ ClassP cls cos, PredTy $ ClassP cls tys')
-normalisePred env (IParam ipn ty)
-  = let (co,ty') = normaliseType env ty
-    in  (mkPredCo $ (IParam ipn co), PredTy $ IParam ipn ty')
-normalisePred env (EqPred ty1 ty2)
-  = let (co1,ty1') = normaliseType env ty1
-        (co2,ty2') = normaliseType env ty2
-    in  (mkPredCo $ (EqPred co1 co2), PredTy $ EqPred ty1' ty2')
 \end{code}

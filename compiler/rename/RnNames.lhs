@@ -544,7 +544,7 @@ getLocalNonValBinders fixity_env
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
            ; mapM (new_ti (Just cls_nm)) ats }
       where
-        (_, _, L loc cls_rdr, _) = splitHsInstDeclTy inst_ty
+        Just (_, _, L loc cls_rdr, _) = splitLHsInstDeclTy_maybe inst_ty
 
 lookupTcdName :: Maybe Name -> TyClDecl RdrName -> RnM (Located Name)
 -- Used for TyData and TySynonym only

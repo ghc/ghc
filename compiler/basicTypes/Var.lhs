@@ -32,7 +32,7 @@
 
 module Var (
         -- * The main data type and synonyms
-        Var, TyVar, CoVar, Id, DictId, DFunId, EvVar, EvId, IpId,
+        Var, TyVar, CoVar, Id, DictId, DFunId, EvVar, EqVar, EvId, IpId,
 
 	-- ** Taking 'Var's apart
 	varName, varUnique, varType, 
@@ -90,20 +90,34 @@ import Data.Data
 -- large number of SOURCE imports of Id.hs :-(
 
 \begin{code}
-type EvVar = Var        -- An evidence variable: dictionary or equality constraint
-     	       		-- Could be an DictId or a CoVar
+type Id    = Var       -- A term-level identifier
+type TyVar = Var
 
-type Id     = Var       -- A term-level identifier
+-- See Note [Evidence: EvIds and CoVars]
+type EvId   = Id        -- Term-level evidence: DictId, IpId, or EqVar
+type EvVar  = EvId	-- ...historical name for EvId
 type DFunId = Id	-- A dictionary function
-type EvId   = Id        -- Term-level evidence: DictId or IpId
 type DictId = EvId	-- A dictionary variable
 type IpId   = EvId      -- A term-level implicit parameter
+type EqVar  = EvId      -- Boxed equality evidence
 
-type TyVar = Var
-type CoVar = Id		-- A coercion variable is simply an Id
-			-- variable of kind @ty1 ~ ty2@. Hence its
-			-- 'varType' is always @PredTy (EqPred t1 t2)@
+type CoVar = Id		-- See Note [Evidence: EvIds and CoVars]
 \end{code}
+
+Note [Evidence: EvIds and CoVars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* An EvId (evidence Id) is a *boxed*, term-level evidence variable 
+  (dictionary, implicit parameter, or equality).
+
+* DictId, IpId, and EqVar are synonyms when we know what kind of
+  evidence we are talking about.  For example, an EqVar has type (t1 ~ t2).
+
+* A CoVar (coercion variable) is an *unboxed* term-level evidence variable
+  of type (t1 ~# t2).  So it's the unboxed version of an EqVar.
+
+* Only CoVars can occur in Coercions (but NB the LCoercion hack; see
+  Note [LCoercions] in Coercion).
+
 
 %************************************************************************
 %*									*

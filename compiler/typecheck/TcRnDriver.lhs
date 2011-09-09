@@ -697,7 +697,19 @@ checkBootDecl (AnId id1) (AnId id2)
 checkBootDecl (ATyCon tc1) (ATyCon tc2)
   = checkBootTyCon tc1 tc2
 
-checkBootDecl (AClass c1)  (AClass c2)
+checkBootDecl (ADataCon dc1) (ADataCon _)
+  = pprPanic "checkBootDecl" (ppr dc1)
+
+checkBootDecl _ _ = False -- probably shouldn't happen
+
+----------------
+checkBootTyCon :: TyCon -> TyCon -> Bool
+checkBootTyCon tc1 tc2
+  | not (eqKind (tyConKind tc1) (tyConKind tc2))
+  = False	-- First off, check the kind
+
+  | Just c1 <- tyConClass_maybe tc1
+  , Just c2 <- tyConClass_maybe tc2
   = let 
        (clas_tyvars1, clas_fds1, sc_theta1, _, ats1, op_stuff1) 
           = classExtraBigSig c1
@@ -712,9 +724,9 @@ checkBootDecl (AClass c1)  (AClass c2)
            eqTypeX env op_ty1 op_ty2 &&
            def_meth1 == def_meth2
          where
-	  (_, rho_ty1) = splitForAllTys (idType id1)
-	  op_ty1 = funResultTy rho_ty1
-	  (_, rho_ty2) = splitForAllTys (idType id2)
+          (_, rho_ty1) = splitForAllTys (idType id1)
+          op_ty1 = funResultTy rho_ty1
+          (_, rho_ty2) = splitForAllTys (idType id2)
           op_ty2 = funResultTy rho_ty2
 
        eqAT (tc1, def_ats1) (tc2, def_ats2)
@@ -734,24 +746,13 @@ checkBootDecl (AClass c1)  (AClass c2)
        same_kind tv1 tv2 = eqKind (tyVarKind tv1) (tyVarKind tv2)
     in
        eqListBy same_kind clas_tyvars1 clas_tyvars2 &&
-       	     -- Checks kind of class
+             -- Checks kind of class
        eqListBy eqFD clas_fds1 clas_fds2 &&
        (null sc_theta1 && null op_stuff1 && null ats1
         ||   -- Above tests for an "abstract" class
         eqListBy (eqPredX env) sc_theta1 sc_theta2 &&
         eqListBy eqSig op_stuff1 op_stuff2 &&
         eqListBy eqAT ats1 ats2) 
-
-checkBootDecl (ADataCon dc1) (ADataCon _)
-  = pprPanic "checkBootDecl" (ppr dc1)
-
-checkBootDecl _ _ = False -- probably shouldn't happen
-
-----------------
-checkBootTyCon :: TyCon -> TyCon -> Bool
-checkBootTyCon tc1 tc2
-  | not (eqKind (tyConKind tc1) (tyConKind tc2))
-  = False	-- First off, check the kind
 
   | isSynTyCon tc1 && isSynTyCon tc2
   = ASSERT(tc1 == tc2)
@@ -1498,12 +1499,13 @@ tcRnGetInfo' hsc_env name
     return (thing, fixity, ispecs)
 
 lookupInsts :: TyThing -> TcM [Instance]
-lookupInsts (AClass cls)
-  = do	{ inst_envs <- tcGetInstEnvs
-	; return (classInstances inst_envs cls) }
-
 lookupInsts (ATyCon tc)
-  = do 	{ (pkg_ie, home_ie) <- tcGetInstEnvs
+  | Just cls <- tyConClass_maybe tc
+  = do  { inst_envs <- tcGetInstEnvs
+        ; return (classInstances inst_envs cls) }
+
+  | otherwise
+  = do  { (pkg_ie, home_ie) <- tcGetInstEnvs
 	   	-- Load all instances for all classes that are
 		-- in the type environment (which are all the ones
 		-- we've seen in any interface file so far)

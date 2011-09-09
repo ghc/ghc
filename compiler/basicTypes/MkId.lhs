@@ -293,20 +293,23 @@ mkDataConIds wrap_name wkr_name data_con
         -- extra constraints where necessary.
     wrap_tvs    = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
     res_ty_args = substTyVars (mkTopTvSubst eq_spec) univ_tvs
-    ev_tys      = mkPredTys other_theta
+    ev_tys      = other_theta
     wrap_ty     = mkForAllTys wrap_tvs $ 
                   mkFunTys ev_tys $
                   mkFunTys orig_arg_tys $ res_ty
 
         ----------- Wrappers for algebraic data types -------------- 
     alg_wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty alg_wrap_info
-    alg_wrap_info = noCafIdInfo         -- The NoCaf-ness is set by noCafIdInfo
+    alg_wrap_info = noCafIdInfo
                     `setArityInfo`         wrap_arity
                         -- It's important to specify the arity, so that partial
                         -- applications are treated as values
 		    `setInlinePragInfo`    alwaysInlinePragma
                     `setUnfoldingInfo`     wrap_unf
                     `setStrictnessInfo` Just wrap_sig
+                        -- We need to get the CAF info right here because TidyPgm
+                        -- does not tidy the IdInfo of implicit bindings (like the wrapper)
+                        -- so it not make sure that the CAF info is sane
 
     all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
     wrap_sig = mkStrictSig (mkTopDmdType wrap_arg_dmds cpr_info)
@@ -339,6 +342,8 @@ mkDataConIds wrap_name wkr_name data_con
                                      `mkVarApps` ex_tvs                 
                                      `mkCoApps`  map (mkReflCo . snd) eq_spec
                                      `mkVarApps` reverse rep_ids
+                            -- Dont box the eq_spec coercions since they are
+                            -- marked as HsUnpack by mk_dict_strict_mark
 
     (ev_args,i2) = mkLocals 1  ev_tys
     (id_args,i3) = mkLocals i2 orig_arg_tys
@@ -481,7 +486,7 @@ mkDictSelId no_unf name clas
 
     the_arg_id     = arg_ids !! val_index
     pred       	   = mkClassPred clas (mkTyVarTys tyvars)
-    dict_id    	   = mkTemplateLocal 1 $ mkPredTy pred
+    dict_id    	   = mkTemplateLocal 1 pred
     arg_ids    	   = mkTemplateLocalsNum 2 arg_tys
 
     rhs = mkLams tyvars  (Lam dict_id   rhs_body)
@@ -838,7 +843,7 @@ mkDictFunId dfun_name tvs theta clas tys
 
 mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> Type
 mkDictFunTy tvs theta clas tys
-  = mkSigmaTy tvs theta (mkDictTy clas tys)
+  = mkSigmaTy tvs theta (mkClassPred clas tys)
 \end{code}
 
 
@@ -1038,7 +1043,7 @@ voidArgId       -- :: State# RealWorld
 coercionTokenId :: Id 	      -- :: () ~ ()
 coercionTokenId -- Used to replace Coercion terms when we go to STG
   = pcMiscPrelId coercionTokenName 
-                 (mkTyConApp eqPredPrimTyCon [unitTy, unitTy])
+                 (mkTyConApp eqPrimTyCon [unitTy, unitTy])
                  noCafIdInfo
 \end{code}
 

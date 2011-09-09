@@ -681,8 +681,8 @@ zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
 				    ; return (env2, WpCompose c1' c2') }
-zonkCoFn env (WpCast co)    = do { co' <- zonkTcCoToCo env co
-				 ; return (env, WpCast co') }
+zonkCoFn env (WpCast co) = do { co' <- zonkTcLCoToLCo env co
+			      ; return (env, WpCast co') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
 				 ; return (env', WpEvLam ev') }
 zonkCoFn env (WpEvApp arg)  = do { arg' <- zonkEvTerm env arg 
@@ -1048,11 +1048,13 @@ zonkVect _ (HsVectTypeIn _ _) = panic "TcHsSyn.zonkVect: HsVectTypeIn"
 zonkEvTerm :: ZonkEnv -> EvTerm -> TcM EvTerm
 zonkEvTerm env (EvId v)           = ASSERT2( isId v, ppr v ) 
                                     return (EvId (zonkIdOcc env v))
-zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcCoToCo env co
-                                       ; return (EvCoercion co') }
+zonkEvTerm env (EvCoercionBox co) = do { co' <- zonkTcLCoToLCo env co
+                                       ; return (EvCoercionBox co') }
 zonkEvTerm env (EvCast v co)      = ASSERT( isId v) 
-                                    do { co' <- zonkTcCoToCo env co
+                                    do { co' <- zonkTcLCoToLCo env co
                                        ; return (EvCast (zonkIdOcc env v) co') }
+zonkEvTerm env (EvTupleSel v n)   = return (EvTupleSel (zonkIdOcc env v) n)
+zonkEvTerm env (EvTupleMk vs)     = return (EvTupleMk (map (zonkIdOcc env) vs))
 zonkEvTerm env (EvSuperClass d n) = return (EvSuperClass (zonkIdOcc env d) n)
 zonkEvTerm env (EvDFunApp df tys tms)
   = do { tys' <- zonkTcTypeToTypes env tys
@@ -1127,8 +1129,8 @@ zonkTypeZapping ty
 			       ; writeMetaTyVar tv ty
 			       ; return ty }
 
-zonkTcCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
-zonkTcCoToCo env co
+zonkTcLCoToLCo :: ZonkEnv -> LCoercion -> TcM LCoercion
+zonkTcLCoToLCo env co
   = go co
   where
     go (CoVarCo cv)         = return (CoVarCo (zonkEvVarOcc env cv))

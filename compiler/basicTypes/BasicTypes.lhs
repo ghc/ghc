@@ -44,7 +44,8 @@ module BasicTypes(
 
 	Boxity(..), isBoxed, 
 
-	TupCon(..), tupleParens,
+        TupleSort(..), tupleSortBoxity, boxityNormalTupleSort,
+        tupleParens,
 
 	OccInfo(..), seqOccInfo, zapFragileOcc, isOneOcc, 
 	isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isNoOcc,
@@ -168,9 +169,10 @@ early in the hierarchy), but also in HsSyn.
 
 \begin{code}
 newtype IPName name = IPName name	-- ?x
-  deriving( Eq, Ord, Data, Typeable )
-  -- Ord is used in the IP name cache finite map
-  -- (used in HscTypes.OrigIParamCache)
+  deriving( Eq, Data, Typeable )
+
+instance Functor IPName where
+    fmap = mapIPName
 
 ipNameName :: IPName name -> name
 ipNameName (IPName n) = n
@@ -284,7 +286,7 @@ instance Outputable TopLevelFlag where
 
 %************************************************************************
 %*									*
-		Top-level/not-top level flag
+		Boxity flag
 %*									*
 %************************************************************************
 
@@ -382,14 +384,26 @@ pprSafeOverlap False = empty
 %************************************************************************
 
 \begin{code}
-data TupCon = TupCon Boxity Arity
+data TupleSort
+  = BoxedTuple
+  | UnboxedTuple
+  | ConstraintTuple
+  deriving( Eq, Data, Typeable )
 
-instance Eq TupCon where
-  (TupCon b1 a1) == (TupCon b2 a2) = b1==b2 && a1==a2
-   
-tupleParens :: Boxity -> SDoc -> SDoc
-tupleParens Boxed   p = parens p
-tupleParens Unboxed p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
+tupleSortBoxity :: TupleSort -> Boxity
+tupleSortBoxity BoxedTuple     = Boxed
+tupleSortBoxity UnboxedTuple   = Unboxed
+tupleSortBoxity ConstraintTuple = Boxed
+
+boxityNormalTupleSort :: Boxity -> TupleSort
+boxityNormalTupleSort Boxed   = BoxedTuple
+boxityNormalTupleSort Unboxed = UnboxedTuple
+
+tupleParens :: TupleSort -> SDoc -> SDoc
+tupleParens BoxedTuple      p = parens p
+tupleParens ConstraintTuple p = parens p -- The user can't write fact tuples 
+                                         -- directly, we overload the (,,) syntax
+tupleParens UnboxedTuple p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
 \end{code}
 
 %************************************************************************

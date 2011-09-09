@@ -25,6 +25,7 @@ import DataCon
 import TcType
 import DsMonad
 import DsUtils
+import MkCore   ( mkCoreLets )
 import Util	( all2, takeList, zipEqual )
 import ListSetOps ( runs )
 import Id
@@ -140,7 +141,7 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
       = do { ds_ev_binds <- dsTcEvBinds bind
 	   ; return (wrapBinds (tvs `zip` tvs1) 
 		    . wrapBinds (ds  `zip` dicts1)
-		    . wrapDsEvBinds ds_ev_binds,
+		    . mkCoreLets ds_ev_binds,
 		    eqn { eqn_pats = conArgPats arg_tys args ++ pats }) }
 
     -- Choose the right arg_vars in the right order for this group

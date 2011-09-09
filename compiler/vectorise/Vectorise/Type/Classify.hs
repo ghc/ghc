@@ -24,7 +24,6 @@ import TyCon
 import TypeRep
 import Type
 import Digraph
-import Outputable
 
 
 -- |From a list of type constructors, extract those thatcan be vectorised, returning them in two
@@ -102,4 +101,3 @@ tyConsOfType (AppTy a b)       = tyConsOfType a `unionUniqSets` tyConsOfType b
 tyConsOfType (FunTy a b)       = (tyConsOfType a `unionUniqSets` tyConsOfType b)
                                  `addOneToUniqSet` funTyCon
 tyConsOfType (ForAllTy _ ty)   = tyConsOfType ty
-tyConsOfType other             = pprPanic "ClosureConv.tyConsOfType" $ ppr other

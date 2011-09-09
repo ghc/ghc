@@ -15,7 +15,8 @@ import TcMType
 import TcSMonad
 import TcType
 import TypeRep
-import Type( isTyVarTy )
+import Type
+import Class
 import Unify ( tcMatchTys )
 import Inst
 import InstEnv
@@ -28,6 +29,7 @@ import VarSet
 import VarEnv
 import SrcLoc
 import Bag
+import BasicTypes ( IPName )
 import ListSetOps( equivClasses )
 import Maybes( mapCatMaybes )
 import Util
@@ -35,7 +37,7 @@ import FastString
 import Outputable
 import DynFlags
 import Data.List( partition )
-import Control.Monad( when, unless )
+import Control.Monad( when, unless, filterM )
 \end{code}
 
 %************************************************************************
@@ -114,8 +116,8 @@ reportTidyWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = impli
 
   | otherwise          -- No insoluble ones
   = ASSERT( isEmptyBag insols )
-    do { let (ambigs, non_ambigs) = partition is_ambiguous (bagToList flats)
-       	     (tv_eqs, others)     = partition is_tv_eq non_ambigs
+    do { let (ambigs, non_ambigs) = partition     is_ambiguous (bagToList flats)
+       	     (tv_eqs, others)     = partitionWith is_tv_eq     non_ambigs
 
        ; groupErrs (reportEqErrs ctxt) tv_eqs
        ; when (null tv_eqs) $ groupErrs (reportFlat ctxt) others
@@ -128,9 +130,11 @@ reportTidyWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = impli
 	-- Report equalities of form (a~ty) first.  They are usually
 	-- skolem-equalities, and they cause confusing knock-on 
 	-- effects in other errors; see test T4093b.
-    is_tv_eq c | EqPred ty1 ty2 <- evVarOfPred c
-               = tcIsTyVarTy ty1 || tcIsTyVarTy ty2
-               | otherwise = False
+    is_tv_eq c | Just (ty1, ty2) <- getEqPredTys_maybe (evVarOfPred c)
+               , tcIsTyVarTy ty1 || tcIsTyVarTy ty2
+               = Left (c, (ty1, ty2))
+               | otherwise
+               = Right (c, evVarOfPred c)
 
 	-- Treat it as "ambiguous" if 
 	--   (a) it is a class constraint
@@ -138,13 +142,13 @@ reportTidyWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = impli
 	--       (else we'd prefer to report it as "no instance for...")
         --   (c) it mentions a (presumably un-filled-in) meta type variable
     is_ambiguous d = isTyVarClassPred pred
-                  && any isAmbiguousTyVar (varSetElems (tyVarsOfPred pred))
+                  && any isAmbiguousTyVar (varSetElems (tyVarsOfType pred))
 		  where   
                      pred = evVarOfPred d
 
 reportInsoluble :: ReportErrCtxt -> FlavoredEvVar -> TcM ()
 reportInsoluble ctxt (EvVarX ev flav)
-  | EqPred ty1 ty2 <- evVarPred ev
+  | Just (ty1, ty2) <- getEqPredTys_maybe (evVarPred ev)
   = setCtFlavorLoc flav $
     do { let ctxt2 = ctxt { cec_extra = cec_extra ctxt $$ inaccessible_msg }
        ; reportEqErr ctxt2 ty1 ty2 }
@@ -160,36 +164,47 @@ reportInsoluble ctxt (EvVarX ev flav)
 reportFlat :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()
 -- The [PredType] are already tidied
 reportFlat ctxt flats origin
-  = do { unless (null dicts) $ reportDictErrs ctxt dicts origin
-       ; unless (null eqs)   $ reportEqErrs   ctxt eqs   origin
-       ; unless (null ips)   $ reportIPErrs   ctxt ips   origin
-       ; ASSERT( null others ) return () }
+  = do { unless (null dicts)  $ reportDictErrs   ctxt dicts  origin
+       ; unless (null eqs)    $ reportEqErrs     ctxt eqs    origin
+       ; unless (null ips)    $ reportIPErrs     ctxt ips    origin
+       ; unless (null irreds) $ reportIrredsErrs ctxt irreds origin }
   where
-    (dicts, non_dicts) = partition isClassPred flats
-    (eqs, non_eqs)     = partition isEqPred    non_dicts
-    (ips, others)      = partition isIPPred    non_eqs
+    (dicts, eqs, ips, irreds) = go_many (map predTypePredTree flats)
+
+    go_many []     = ([], [], [], [])
+    go_many (t:ts) = (as ++ as', bs ++ bs', cs ++ cs', ds ++ ds')
+      where (as, bs, cs, ds) = go t
+            (as', bs', cs', ds') = go_many ts
+
+    go (ClassPred cls tys) = ([(cls, tys)], [], [], [])
+    go (EqPred ty1 ty2)    = ([], [(ty1, ty2)], [], [])
+    go (IPPred ip ty)      = ([], [], [(ip, ty)], [])
+    go (IrredPred ty)      = ([], [], [], [ty])
+    go (TuplePred {})      = panic "reportFlat"
+    -- TuplePreds should have been expanded away by the constraint
+    -- simplifier, so they shouldn't show up at this point
 
 --------------------------------------------
 --      Support code 
 --------------------------------------------
 
-groupErrs :: ([PredType] -> CtOrigin -> TcM ()) -- Deal with one group
-	  -> [WantedEvVar]	                -- Unsolved wanteds
+groupErrs :: ([a] -> CtOrigin -> TcM ()) -- Deal with one group
+	  -> [(WantedEvVar, a)]	                -- Unsolved wanteds
           -> TcM ()
 -- Group together insts with the same origin
 -- We want to report them together in error messages
 
 groupErrs _ [] 
   = return ()
-groupErrs report_err (wanted : wanteds)
+groupErrs report_err ((wanted, x) : wanteds)
   = do  { setCtLoc the_loc $
-          report_err the_vars (ctLocOrigin the_loc)
+          report_err the_xs (ctLocOrigin the_loc)
 	; groupErrs report_err others }
   where
    the_loc           = evVarX wanted
    the_key	     = mk_key the_loc
-   the_vars          = map evVarOfPred (wanted:friends)
-   (friends, others) = partition is_friend wanteds
+   the_xs            = x:map snd friends
+   (friends, others) = partition (is_friend . fst) wanteds
    is_friend friend  = mk_key (evVarX friend) `same_key` the_key
 
    mk_key :: WantedLoc -> (SrcSpan, CtOrigin)
@@ -221,7 +236,7 @@ pprWithArising ev_vars
   where
     first_loc = evVarX (head ev_vars)
     ppr_one (EvVarX v loc)
-       = hang (parens (pprPredTy (evVarPred v))) 2 (pprArisingAt loc)
+       = hang (parens (pprType (evVarPred v))) 2 (pprArisingAt loc)
 
 addErrorReport :: ReportErrCtxt -> SDoc -> TcM ()
 addErrorReport ctxt msg = addErrTcM (cec_tidy ctxt, msg $$ cec_extra ctxt)
@@ -234,6 +249,21 @@ getUserGivens (CEC {cec_encl = ctxt})
                     , not (null givens) ]
 \end{code}
 
+%************************************************************************
+%*                  *
+                Irreducible predicate errors
+%*                  *
+%************************************************************************
+
+\begin{code}
+reportIrredsErrs :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()
+reportIrredsErrs ctxt irreds orig
+  = addErrorReport ctxt msg
+  where
+    givens = getUserGivens ctxt
+    msg = couldNotDeduce givens (irreds, orig)
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -242,7 +272,7 @@ getUserGivens (CEC {cec_encl = ctxt})
 %************************************************************************
 
 \begin{code}
-reportIPErrs :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()
+reportIPErrs :: ReportErrCtxt -> [(IPName Name, Type)] -> CtOrigin -> TcM ()
 reportIPErrs ctxt ips orig
   = addErrorReport ctxt msg
   where
@@ -250,9 +280,9 @@ reportIPErrs ctxt ips orig
     msg | null givens
         = addArising orig $
           sep [ ptext (sLit "Unbound implicit parameter") <> plural ips
-              , nest 2 (pprTheta ips) ] 
+              , nest 2 (pprTheta (map (uncurry mkIPPred) ips)) ] 
         | otherwise
-        = couldNotDeduce givens (ips, orig)
+        = couldNotDeduce givens (map (uncurry mkIPPred) ips, orig)
 \end{code}
 
 
@@ -263,18 +293,16 @@ reportIPErrs ctxt ips orig
 %************************************************************************
 
 \begin{code}
-reportEqErrs :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()
+reportEqErrs :: ReportErrCtxt -> [(Type, Type)] -> CtOrigin -> TcM ()
 -- The [PredType] are already tidied
 reportEqErrs ctxt eqs orig
   = do { orig' <- zonkTidyOrigin ctxt orig
        ; mapM_ (report_one orig') eqs }
   where
-    report_one orig (EqPred ty1 ty2)
+    report_one orig (ty1, ty2)
       = do { let extra = getWantedEqExtra orig ty1 ty2
                  ctxt' = ctxt { cec_extra = extra $$ cec_extra ctxt }
            ; reportEqErr ctxt' ty1 ty2 }
-    report_one _ pred
-      = pprPanic "reportEqErrs" (ppr pred)    
 
 getWantedEqExtra ::  CtOrigin -> TcType -> TcType -> SDoc
 getWantedEqExtra (TypeEqOrigin (UnifyOrigin { uo_actual = act, uo_expected = exp }))
@@ -392,7 +420,7 @@ misMatchOrCND ctxt ty1 ty2
   | cec_insol ctxt = misMatchMsg ty1 ty2    -- If the equality is unconditionally
                                             -- insoluble, don't report the context
   | null givens    = misMatchMsg ty1 ty2
-  | otherwise      = couldNotDeduce givens ([EqPred ty1 ty2], orig)
+  | otherwise      = couldNotDeduce givens ([mkEqPred (ty1, ty2)], orig)
   where
     givens = getUserGivens ctxt
     orig   = TypeEqOrigin (UnifyOrigin ty1 ty2)
@@ -487,14 +515,14 @@ Warn of loopy local equalities that were dropped.
 %************************************************************************
 
 \begin{code}
-reportDictErrs :: ReportErrCtxt -> [PredType] -> CtOrigin -> TcM ()	
+reportDictErrs :: ReportErrCtxt -> [(Class, [Type])] -> CtOrigin -> TcM ()	
 reportDictErrs ctxt wanteds orig
   = do { inst_envs <- tcGetInstEnvs
-       ; non_overlaps <- mapMaybeM (reportOverlap ctxt inst_envs orig) wanteds
+       ; non_overlaps <- filterM (reportOverlap ctxt inst_envs orig) wanteds
        ; unless (null non_overlaps) $
          addErrorReport ctxt (mk_no_inst_err non_overlaps) }
   where
-    mk_no_inst_err :: [PredType] -> SDoc
+    mk_no_inst_err :: [(Class, [Type])] -> SDoc
     mk_no_inst_err wanteds
       | null givens     -- Top level
       = vcat [ addArising orig $
@@ -507,7 +535,7 @@ reportDictErrs ctxt wanteds orig
              , show_fixes (fixes1 ++ fixes2 ++ fixes3) ]
       where
         givens = getUserGivens ctxt
-        min_wanteds = mkMinimalBySCs wanteds
+        min_wanteds = mkMinimalBySCs (map (uncurry mkClassPred) wanteds)
 
         fixes2 = case instance_dicts of
                    []  -> []
@@ -549,23 +577,23 @@ reportDictErrs ctxt wanteds orig
                              origin                    -> Just origin
 
 reportOverlap :: ReportErrCtxt -> (InstEnv,InstEnv) -> CtOrigin
-              -> PredType -> TcM (Maybe PredType)
+              -> (Class, [Type]) -> TcM Bool
 -- Report an overlap error if this class constraint results
 -- from an overlap (returning Nothing), otherwise return (Just pred)
-reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
+reportOverlap ctxt inst_envs orig (clas, tys)
   = do { tys_flat <- mapM quickFlattenTy tys
            -- Note [Flattening in error message generation]
 
        ; case lookupInstEnv inst_envs clas tys_flat of
-                ([], _, _) -> return (Just pred)            -- No match
+                ([], _, _) -> return True            -- No match
                 res        -> do { addErrorReport ctxt (mk_overlap_msg res)
-                                 ; return Nothing } }
+                                 ; return False } }
   where
     -- Normal overlap error
     mk_overlap_msg (matches, unifiers, False)
       = ASSERT( not (null matches) )
         vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
-				<+> pprPredTy pred)
+				<+> pprType (mkClassPred clas tys))
     	     ,	sep [ptext (sLit "Matching instances") <> colon,
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
 
@@ -590,7 +618,7 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
 		     empty
     		else 	-- One match
 		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
-	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
+	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfTypes tys))),
 			      if null (matching_givens) then
                                    vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
 			                  ptext (sLit "when compiling the other instance declarations")]
@@ -608,20 +636,21 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
                                     2 (sep [ ptext (sLit "bound by") <+> ppr (ctLocOrigin gloc)
                                            , ptext (sLit "at") <+> ppr (ctLocSpan gloc)])
                 where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
-                      ev_var_matches (ClassP clas' tys')
-                        | clas' == clas
-                        , Just _ <- tcMatchTys (tyVarsOfTypes tys) tys tys'
-                        = True 
-                      ev_var_matches (ClassP clas' tys') =
-                        any ev_var_matches (immSuperClasses clas' tys')
-                      ev_var_matches _ = False
+                      ev_var_matches ty = case getClassPredTys_maybe ty of
+                         Just (clas', tys')
+                           | clas' == clas
+                           , Just _ <- tcMatchTys (tyVarsOfTypes tys) tys tys'
+                           -> True 
+                           | otherwise
+                           -> any ev_var_matches (immSuperClasses clas' tys')
+                         Nothing -> False
 
     -- Overlap error because of Safe Haskell (first match should be the most
     -- specific match)
     mk_overlap_msg (matches, _unifiers, True)
       = ASSERT( length matches > 1 )
         vcat [ addArising orig (ptext (sLit "Unsafe overlapping instances for") 
-                        <+> pprPredTy pred)
+                        <+> pprType (mkClassPred clas tys))
              , sep [ptext (sLit "The matching instance is") <> colon,
                     nest 2 (pprInstance $ head ispecs)]
              , vcat [ ptext $ sLit "It is compiled in a Safe module and as such can only"
@@ -633,16 +662,12 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
         where
             ispecs = [ispec | (ispec, _) <- matches]
 
-
-reportOverlap _ _ _ _ = panic "reportOverlap"    -- Not a ClassP
-
 ----------------------
 quickFlattenTy :: TcType -> TcM TcType
 -- See Note [Flattening in error message generation]
 quickFlattenTy ty | Just ty' <- tcView ty = quickFlattenTy ty'
 quickFlattenTy ty@(TyVarTy {})  = return ty
 quickFlattenTy ty@(ForAllTy {}) = return ty     -- See
-quickFlattenTy ty@(PredTy {})   = return ty     -- Note [Quick-flatten polytypes]
   -- Don't flatten because of the danger or removing a bound variable
 quickFlattenTy (AppTy ty1 ty2) = do { fy1 <- quickFlattenTy ty1
                                     ; fy2 <- quickFlattenTy ty2

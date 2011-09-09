@@ -86,14 +86,14 @@ dsValBinds (ValBindsOut binds _) body = foldrM ds_val_bind body binds
 dsIPBinds :: HsIPBinds Id -> CoreExpr -> DsM CoreExpr
 dsIPBinds (IPBinds ip_binds ev_binds) body
   = do	{ ds_ev_binds <- dsTcEvBinds ev_binds
-	; let inner = wrapDsEvBinds ds_ev_binds body
+	; let inner = mkCoreLets ds_ev_binds body
 		-- The dict bindings may not be in 
 		-- dependency order; hence Rec
 	; foldrM ds_ip_bind inner ip_binds }
   where
     ds_ip_bind (L _ (IPBind n e)) body
       = do e' <- dsLExpr e
-           return (Let (NonRec (ipNameName n) e') body)
+           return (Let (NonRec (ipNameName n) (mkIPBox n e')) body)
 
 -------------------------
 ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
@@ -139,7 +139,7 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlBagM (\body bind -> dsStrictBind (unLoc bind) body) 
                             body1 binds 
-       ; return (wrapDsEvBinds ds_ev_binds body2) }
+       ; return (mkCoreLets ds_ev_binds body2) }
 
 dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn 
 	              , fun_tick = tick, fun_infix = inf }) body
@@ -218,7 +218,7 @@ dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e) 	      = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar var)     	      = return (varToCoreExpr var)   -- See Note [Desugaring vars]
-dsExpr (HsIPVar ip)    	      = return (Var (ipNameName ip))
+dsExpr (HsIPVar ip)    	      = return (mkIPUnbox ip)
 dsExpr (HsLit lit)     	      = dsLit lit
 dsExpr (HsOverLit lit) 	      = dsOverLit lit
 
@@ -312,7 +312,7 @@ dsExpr (ExplicitTuple tup_args boxity)
 		-- The reverse is because foldM goes left-to-right
 
        ; return $ mkCoreLams lam_vars $ 
-                  mkConApp (tupleCon boxity (length tup_args))
+                  mkConApp (tupleCon (boxityNormalTupleSort boxity) (length tup_args))
                            (map (Type . exprType) args ++ args) }
 
 dsExpr (HsSCC cc expr) = do
@@ -550,21 +550,21 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 
 			-- Tediously wrap the application in a cast
 			-- Note [Update for GADTs]
-		 wrapped_rhs | null eq_spec = rhs
-			     | otherwise    = mkLHsWrap (WpCast wrap_co) rhs
-		 wrap_co = mkTyConAppCo tycon [ lookup tv ty
-					      | (tv,ty) <- univ_tvs `zip` out_inst_tys]
+		 wrap_co = mkTyConAppCo tycon
+                                [ lookup tv ty | (tv,ty) <- univ_tvs `zip` out_inst_tys ]
 		 lookup univ_tv ty = case lookupVarEnv wrap_subst univ_tv of
 					Just co' -> co'
 					Nothing  -> mkReflCo ty
-		 wrap_subst = mkVarEnv [ (tv, mkSymCo (mkCoVarCo co_var))
-				       | ((tv,_),co_var) <- eq_spec `zip` eqs_vars ]
+		 wrap_subst = mkVarEnv [ (tv, mkSymCo (mkEqVarLCo eq_var))
+				       | ((tv,_),eq_var) <- eq_spec `zip` eqs_vars ]
 
     	         pat = noLoc $ ConPatOut { pat_con = noLoc con, pat_tvs = ex_tvs
 					 , pat_dicts = eqs_vars ++ theta_vars
 					 , pat_binds = emptyTcEvBinds
 					 , pat_args = PrefixCon $ map nlVarPat arg_ids
 					 , pat_ty = in_ty }
+           ; let wrapped_rhs | null eq_spec = rhs
+                             | otherwise    = mkLHsWrap (WpCast wrap_co) rhs
 	   ; return (mkSimpleMatch [pat] wrapped_rhs) }
 
 \end{code}

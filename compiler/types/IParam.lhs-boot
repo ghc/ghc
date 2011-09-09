@@ -1,0 +1,10 @@
+\begin{code}
+module IParam where
+
+import Name
+import BasicTypes
+import {-# SOURCE #-} TyCon (TyCon)
+
+ipTyConName :: IPName Name -> Name
+ipTyCon :: IPName Name -> TyCon
+\end{code}

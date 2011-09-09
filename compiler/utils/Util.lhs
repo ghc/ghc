@@ -32,6 +32,7 @@ module Util (
 
         -- * Tuples
         fstOf3, sndOf3, thirdOf3,
+        firstM, first3M,
         uncurry3,
 
         -- * List operations controlled by another list
@@ -105,7 +106,7 @@ import Data.List        hiding (group)
 import FastTypes
 #endif
 
-import Control.Monad    ( unless )
+import Control.Monad    ( unless, liftM )
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, createDirectory,
                           getModificationTime )
@@ -212,6 +213,14 @@ thirdOf3    (_,_,c) =  c
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
+\end{code}
+
+\begin{code}
+firstM :: Monad m => (a -> m c) -> (a, b) -> m (c, b)
+firstM f (x, y) = liftM (\x' -> (x', y)) (f x)
+
+first3M :: Monad m => (a -> m d) -> (a, b, c) -> m (d, b, c)
+first3M f (x, y, z) = liftM (\x' -> (x', y, z)) (f x)
 \end{code}
 
 %************************************************************************

@@ -557,7 +557,7 @@ dataToTagRule _ _ = Nothing
 -- seq# :: forall a s . a -> State# s -> (# State# s, a #)
 seqRule :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 seqRule _ [ty_a, Type ty_s, a, s] | exprIsHNF a
-   = Just (mkConApp (tupleCon Unboxed 2)
+   = Just (mkConApp (tupleCon UnboxedTuple 2)
                     [Type (mkStatePrimTy ty_s), ty_a, s, a])
 seqRule _ _ = Nothing
 
