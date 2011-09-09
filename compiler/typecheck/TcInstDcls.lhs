@@ -502,6 +502,157 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
 
 %************************************************************************
 %*                                                                      *
+               Type checking family instances
+%*                                                                      *
+%************************************************************************
+
+Family instances are somewhat of a hybrid.  They are processed together with
+class instance heads, but can contain data constructors and hence they share a
+lot of kinding and type checking code with ordinary algebraic data types (and
+GADTs).
+
+\begin{code}
+tcTopFamInstDecl :: LTyClDecl Name -> TcM TyCon
+tcTopFamInstDecl (L loc decl)
+  = setSrcSpan loc      $
+    tcAddDeclCtxt decl  $
+    tcFamInstDecl TopLevel decl
+
+tcFamInstDecl :: TopLevelFlag -> TyClDecl Name -> TcM TyCon
+tcFamInstDecl top_lvl decl
+  = do { -- type family instances require -XTypeFamilies
+         -- and can't (currently) be in an hs-boot file
+       ; let fam_tc_lname = tcdLName decl
+       ; type_families <- xoptM Opt_TypeFamilies
+       ; is_boot <- tcIsHsBoot   -- Are we compiling an hs-boot file?
+       ; checkTc type_families $ badFamInstDecl fam_tc_lname
+       ; checkTc (not is_boot) $ badBootFamInstDeclErr
+
+       -- Look up the family TyCon and check for validity including
+       -- check that toplevel type instances are not for associated types.
+       ; fam_tc <- tcLookupLocatedTyCon fam_tc_lname
+       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+       ; when (isTopLevel top_lvl && isTyConAssoc fam_tc)
+              (addErr $ assocInClassErr fam_tc_lname)
+
+         -- Now check the type/data instance itself
+         -- This is where type and data decls are treated separately
+       ; tc <- tcFamInstDecl1 fam_tc decl
+       ; checkValidTyCon tc     -- Remember to check validity;
+                                -- no recursion to worry about here
+
+       ; return tc }
+
+tcFamInstDecl1 :: TyCon -> TyClDecl Name -> TcM TyCon
+
+  -- "type instance"
+tcFamInstDecl1 fam_tc (decl@TySynonym {})
+  = do { -- (1) do the work of verifying the synonym
+       ; (t_tvs, t_typats, t_rhs) <- tcSynFamInstDecl fam_tc decl
+
+         -- (2) check the well-formedness of the instance
+       ; checkValidFamInst t_typats t_rhs
+
+         -- (3) construct representation tycon
+       ; rep_tc_name <- newFamInstTyConName (tcdLName decl) t_typats
+       ; buildSynTyCon rep_tc_name t_tvs
+                       (SynonymTyCon t_rhs)
+                       (typeKind t_rhs)
+                       NoParentTyCon (Just (fam_tc, t_typats))
+       }
+
+  -- "newtype instance" and "data instance"
+tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data
+                                   , tcdCons = cons})
+  = kcFamTyPats fam_tc decl $ \k_tvs k_typats resKind ->
+    do { -- check that the family declaration is for the right kind
+         checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+       ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
+
+       ; -- (1) kind check the data declaration as usual
+       ; k_decl <- kcDataDecl decl k_tvs
+       ; let k_ctxt = tcdCtxt k_decl
+             k_cons = tcdCons k_decl
+
+         -- result kind must be '*' (otherwise, we have too few patterns)
+       ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr (tyConArity fam_tc)
+
+         -- (2) type check indexed data type declaration
+       ; tcTyVarBndrs k_tvs $ \t_tvs -> do   -- turn kinded into proper tyvars
+
+         -- kind check the type indexes and the context
+       { t_typats     <- mapM tcHsKindedType k_typats
+       ; stupid_theta <- tcHsKindedContext k_ctxt
+
+         -- (3) Check that
+         --     (a) left-hand side contains no type family applications
+         --         (vanilla synonyms are fine, though, and we checked for
+         --         foralls earlier)
+       ; mapM_ checkTyFamFreeness t_typats
+
+       ; dataDeclChecks (tcdName decl) new_or_data stupid_theta k_cons
+
+         -- (4) construct representation tycon
+       ; rep_tc_name <- newFamInstTyConName (tcdLName decl) t_typats
+       ; let ex_ok = True       -- Existentials ok for type families!
+       ; fixM (\ rep_tycon -> do
+             { let orig_res_ty = mkTyConApp fam_tc t_typats
+             ; data_cons <- tcConDecls ex_ok rep_tycon
+                                       (t_tvs, orig_res_ty) k_cons
+             ; tc_rhs <-
+                 case new_or_data of
+                   DataType -> return (mkDataTyConRhs data_cons)
+                   NewType  -> ASSERT( not (null data_cons) )
+                               mkNewTyConRhs rep_tc_name rep_tycon (head data_cons)
+             ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
+                             h98_syntax NoParentTyCon (Just (fam_tc, t_typats))
+                 -- We always assume that indexed types are recursive.  Why?
+                 -- (1) Due to their open nature, we can never be sure that a
+                 -- further instance might not introduce a new recursive
+                 -- dependency.  (2) They are always valid loop breakers as
+                 -- they involve a coercion.
+             })
+       }}
+       where
+         h98_syntax = case cons of      -- All constructors have same shape
+                        L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
+                        _ -> True
+
+tcFamInstDecl1 _ d = pprPanic "tcFamInstDecl1" (ppr d)
+
+
+----------------
+tcAssocDecl :: Class           -- ^ Class of associated type
+            -> VarEnv Type     -- ^ Instantiation of class TyVars
+            -> LTyClDecl Name  -- ^ RHS
+            -> TcM TyCon
+tcAssocDecl clas mini_env (L loc decl)
+  = setSrcSpan loc      $
+    tcAddDeclCtxt decl  $
+    do { at_tc <- tcFamInstDecl NotTopLevel decl
+       ; let Just (fam_tc, at_tys) = tyConFamInst_maybe at_tc
+  
+       -- Check that the associated type comes from this class
+       ; checkTc (Just clas == tyConAssoc_maybe fam_tc)
+                 (badATErr clas (tyConName at_tc))
+
+       -- See Note [Checking consistent instantiation]
+       ; zipWithM_ check_arg (tyConTyVars fam_tc) at_tys
+
+       ; return at_tc }
+  where
+    check_arg fam_tc_tv at_ty
+      | Just inst_ty <- lookupVarEnv mini_env fam_tc_tv
+      = checkTc (inst_ty `eqType` at_ty) 
+                (wrongATArgErr at_ty inst_ty)
+      | otherwise
+      = return ()   -- Allow non-type-variable instantiation
+                    -- See Note [Associated type instances]
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
       Type-checking instance declarations, pass 2
 %*                                                                      *
 %************************************************************************
@@ -1151,4 +1302,29 @@ inst_decl_ctxt doc = ptext (sLit "In the instance declaration for") <+> quotes d
 omittedATWarn :: Name -> SDoc
 omittedATWarn at
   = ptext (sLit "No explicit AT declaration for") <+> quotes (ppr at)
+
+badBootFamInstDeclErr :: SDoc
+badBootFamInstDeclErr
+  = ptext (sLit "Illegal family instance in hs-boot file")
+
+notFamily :: TyCon -> SDoc
+notFamily tycon
+  = vcat [ ptext (sLit "Illegal family instance for") <+> quotes (ppr tycon)
+         , nest 2 $ parens (ppr tycon <+> ptext (sLit "is not an indexed type family"))]
+
+tooFewParmsErr :: Arity -> SDoc
+tooFewParmsErr arity
+  = ptext (sLit "Family instance has too few parameters; expected") <+>
+    ppr arity
+
+assocInClassErr :: Located Name -> SDoc
+assocInClassErr name
+ = ptext (sLit "Associated type") <+> quotes (ppr name) <+>
+   ptext (sLit "must be inside a class instance")
+
+badFamInstDecl :: Located Name -> SDoc
+badFamInstDecl tc_name
+  = vcat [ ptext (sLit "Illegal family instance for") <+>
+           quotes (ppr tc_name)
+         , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
 \end{code}

@@ -43,7 +43,7 @@ module TcMType (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   SourceTyCtxt(..), checkValidTheta, 
   checkValidInstHead, checkValidInstance, validDerivPred,
-  checkInstTermination, checkValidTypeInst, checkTyFamFreeness, 
+  checkInstTermination, checkValidFamInst, checkTyFamFreeness, 
   arityErr, 
   growPredTyVars, growThetaTyVars, 
 
@@ -1502,8 +1502,8 @@ undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidTypeInst :: [Type] -> Type -> TcM ()
-checkValidTypeInst typats rhs
+checkValidFamInst :: [Type] -> Type -> TcM ()
+checkValidFamInst typats rhs
   = do { -- left-hand side contains no type family applications
          -- (vanilla synonyms are fine, though)
        ; mapM_ checkTyFamFreeness typats
@@ -1514,7 +1514,7 @@ checkValidTypeInst typats rhs
          -- we have a decidable instance unless otherwise permitted
        ; undecidable_ok <- xoptM Opt_UndecidableInstances
        ; unless undecidable_ok $
-	   mapM_ addErrTc (checkFamInst typats (tcTyFamInsts rhs))
+	   mapM_ addErrTc (checkFamInstRhs typats (tcTyFamInsts rhs))
        }
 
 -- Make sure that each type family instance is 
@@ -1522,10 +1522,10 @@ checkValidTypeInst typats rhs
 --   (2) mentions no type variable more often than the lhs, and
 --   (3) does not contain any further type family instances.
 --
-checkFamInst :: [Type]                  -- lhs
-             -> [(TyCon, [Type])]       -- type family instances
-             -> [Message]
-checkFamInst lhsTys famInsts
+checkFamInstRhs :: [Type]                  -- lhs
+             	-> [(TyCon, [Type])]       -- type family instances
+             	-> [Message]
+checkFamInstRhs lhsTys famInsts
   = mapCatMaybes check famInsts
   where
    size = sizeTypes lhsTys
