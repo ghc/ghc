@@ -82,7 +82,6 @@ identityConv (TyVarTy _)    = noV $ text "identityConv: type variable changes un
 identityConv (AppTy   _ _)  = noV $ text "identityConv: type appl. changes under vectorisation"
 identityConv (FunTy    _ _) = noV $ text "identityConv: function type changes under vectorisation"
 identityConv (ForAllTy _ _) = noV $ text "identityConv: quantified type changes under vectorisation"
-identityConv (PredTy   _)   = noV $ text "identityConv: predicate type changes under vectorisation"
 
 -- |Check that this type constructor is neutral under type vectorisation — i.e., it is not altered
 -- by vectorisation as they contain no parallel arrays.
