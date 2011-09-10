@@ -1648,15 +1648,9 @@ toIfaceAlt (c,bs,r) = (toIfaceCon c, map getFS bs, toIfaceExpr r)
 
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt
-toIfaceCon (DataAlt dc) | isTupleTyCon tc
-                        = IfaceTupleAlt (tupleTyConSort tc)
-                        | otherwise
-                        = IfaceDataAlt (getName dc)
-	   		where
-	   		  tc = dataConTyCon dc
-	   
-toIfaceCon (LitAlt l) = IfaceLitAlt l
-toIfaceCon DEFAULT    = IfaceDefault
+toIfaceCon (DataAlt dc) = IfaceDataAlt (getName dc)
+toIfaceCon (LitAlt l)   = IfaceLitAlt l
+toIfaceCon DEFAULT      = IfaceDefault
 
 ---------------------
 toIfaceApp :: Expr CoreBndr -> [Arg CoreBndr] -> IfaceExpr
@@ -1681,15 +1675,11 @@ mkIfaceApps f as = foldl (\f a -> IfaceApp f (toIfaceExpr a)) f as
 
 ---------------------
 toIfaceVar :: Id -> IfaceExpr
-toIfaceVar v = case isDataConWorkId_maybe v of
-    Just dc | isTupleTyCon tc -> IfaceTupId (tupleTyConSort tc) (tupleTyConArity tc)
-      where tc = dataConTyCon dc
-          -- Tuple workers also have special syntax, so we get their
-          -- Uniques right (they are wired-in but infinite)
-    _ | Just fcall <- isFCallId_maybe v            -> IfaceFCall fcall (toIfaceType (idType v))
-	  -- Foreign calls have special syntax
-      | isExternalName name		           -> IfaceExt name
-      | Just (TickBox m ix) <- isTickBoxOp_maybe v -> IfaceTick m ix
-      | otherwise			           -> IfaceLcl (getFS name)
+toIfaceVar v
+    | Just fcall <- isFCallId_maybe v            = IfaceFCall fcall (toIfaceType (idType v))
+       -- Foreign calls have special syntax
+    | isExternalName name		         = IfaceExt name
+    | Just (TickBox m ix) <- isTickBoxOp_maybe v = IfaceTick m ix
+    | otherwise		                         = IfaceLcl (getFS name)
   where name = idName v
 \end{code}

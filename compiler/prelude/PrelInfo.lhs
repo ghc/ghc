@@ -68,7 +68,7 @@ Notes about wired in things
 wiredInThings :: [TyThing]
 -- This list is used only to initialise HscMain.knownKeyNames
 -- to ensure that when you say "Prelude.map" in your source code, you
--- get a Name with the correct known key
+-- get a Name with the correct known key (See Note [Known-key names])
 wiredInThings		
   = concat
     [		-- Wired in TyCons and their implicit Ids

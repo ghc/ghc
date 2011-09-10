@@ -629,7 +629,7 @@ lintInCo co
 lintKind :: Kind -> LintM ()
 -- Check well-formedness of kinds: *, *->*, etc
 lintKind (TyConApp tc []) 
-  | getUnique tc `elem` kindKeys
+  | tyConKind tc `eqKind` tySuperKind
   = return ()
 lintKind (FunTy k1 k2)
   = lintKind k1 >> lintKind k2

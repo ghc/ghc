@@ -105,6 +105,9 @@ instance Monad Ghc where
 instance MonadIO Ghc where
   liftIO ioA = Ghc $ \_ -> ioA
 
+instance MonadFix Ghc where
+  mfix f = Ghc $ \s -> mfix (\x -> unGhc (f x) s)
+
 instance ExceptionMonad Ghc where
   gcatch act handle =
       Ghc $ \s -> unGhc act s `gcatch` \e -> unGhc (handle e) s

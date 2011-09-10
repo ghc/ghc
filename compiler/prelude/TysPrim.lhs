@@ -121,6 +121,13 @@ primTyCons
     , word64PrimTyCon
     , anyTyCon
     , eqPrimTyCon
+
+    , liftedTypeKindTyCon
+    , unliftedTypeKindTyCon
+    , openTypeKindTyCon
+    , argTypeKindTyCon
+    , ubxTupleKindTyCon
+    , constraintKindTyCon
     ]
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
