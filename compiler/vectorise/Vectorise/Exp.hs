@@ -200,7 +200,8 @@ vectScalarFun forceScalar recFns expr
       ; let scalarVars = gscalarVars `extendVarSetList` recFns
             (arg_tys, res_ty) = splitFunTys (exprType expr)
       ; MASSERT( not $ null arg_tys )
-      ; onlyIfV (forceScalar                              -- user asserts the functions is scalar
+      ; onlyIfV empty
+                (forceScalar                              -- user asserts the functions is scalar
                  ||
                  all (is_scalar_ty scalarTyCons) arg_tys  -- check whether the function is scalar
                   && is_scalar_ty scalarTyCons res_ty
@@ -389,7 +390,7 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
           $ vectExpr body
       let (vect_bndrs, lift_bndrs) = unzip vbndrs
       (vscrut, lscrut, pdata_tc, _arg_tys) <- mkVScrut (vVar vbndr)
-      vect_dc <- maybeV (lookupDataCon dc)
+      vect_dc <- maybeV dataConErr (lookupDataCon dc)
       let [pdata_dc] = tyConDataCons pdata_tc
 
       let vcase = mk_wild_case vscrut vty vect_dc  vect_bndrs vect_body
@@ -402,10 +403,12 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
 
     mk_wild_case expr ty dc bndrs body
       = mkWildCase expr (exprType expr) ty [(DataAlt dc, bndrs, body)]
+      
+    dataConErr = (text "vectAlgCase: data constructor not vectorised" <+> ppr dc)
 
 vectAlgCase tycon _ty_args scrut bndr ty alts
   = do
-      vect_tc     <- maybeV (lookupTyCon tycon)
+      vect_tc     <- maybeV tyConErr (lookupTyCon tycon)
       (vty, lty)  <- vectAndLiftType ty
 
       let arity = length (tyConDataCons vect_tc)
@@ -437,6 +440,8 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
       return . vLet (vNonRec vbndr vexpr)
              $ (vect_case, lift_case)
   where
+    tyConErr = (text "vectAlgCase: type constructor not vectorised" <+> ppr tycon)
+
     vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr (fsLit "scrut")
                     | otherwise         = vectBndrIn bndr
 
@@ -450,7 +455,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
 
     proc_alt arity sel _ lty (DataAlt dc, bndrs, body)
       = do
-          vect_dc <- maybeV (lookupDataCon dc)
+          vect_dc <- maybeV dataConErr (lookupDataCon dc)
           let ntag = dataConTagZ vect_dc
               tag  = mkDataConTag vect_dc
               fvs  = freeVarsOf body `delVarSetList` bndrs
@@ -476,6 +481,9 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
                  --               (LitAlt (mkMachInt 0), [], empty)])
           let (vect_bndrs, lift_bndrs) = unzip vbndrs
           return (vect_dc, vect_bndrs, lift_bndrs, vbody)
+      where
+        dataConErr = (text "vectAlgCase: data constructor not vectorised" <+> ppr dc)
+
 
     proc_alt _ _ _ _ _ = panic "vectAlgCase/proc_alt"
 

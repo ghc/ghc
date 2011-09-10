@@ -146,8 +146,10 @@ vectTopBind b@(NonRec var expr)
          ; hs <- takeHoisted
          ; return . Rec $ (var, cexpr) : (var', expr') : hs
          }
-     `orElseV`
-       return b
+     `orElseErrV`
+     do { emitVt "  Could NOT vectorise top-level binding" $ ppr var
+        ; return b
+        }
   where
     unlessNoVectDecl vectorise
       = do { hasNoVectDecl <- noVectDecl var
@@ -184,7 +186,7 @@ vectTopBind b@(Rec bs)
          ; cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
          ; return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
          }
-     `orElseV`
+     `orElseErrV`
        return b    
   where
     (vars, exprs) = unzip bs
@@ -309,8 +311,8 @@ vectTopRhs recFs var expr
     info False vectDecl | isJust vectDecl = " [VECTORISE]"
                         | otherwise       = " (no pragma)"
 
--- | Project out the vectorised version of a binding from some closure,
---   or return the original body if that doesn't work or the binding is scalar. 
+-- |Project out the vectorised version of a binding from some closure,
+-- or return the original body if that doesn't work or the binding is scalar. 
 --
 tryConvert :: Var       -- ^ Name of the original binding (eg @foo@)
            -> Var       -- ^ Name of vectorised version of binding (eg @$vfoo@)
@@ -322,5 +324,9 @@ tryConvert var vect_var rhs
          then
            return rhs
          else
-           fromVect (idType var) (Var vect_var) `orElseV` return rhs
+           fromVect (idType var) (Var vect_var) 
+           `orElseErrV` 
+           do { emitVt "  Could NOT call vectorised from original version" $ ppr var
+              ; return rhs
+              }
        }

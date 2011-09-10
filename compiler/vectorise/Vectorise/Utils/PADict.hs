@@ -128,8 +128,9 @@ prDictOfPReprInstTyCon ty prepr_tc prepr_args
 
   | otherwise = cantVectorise "Invalid PRepr type instance" (ppr ty)
 
--- | Get the PR dictionary for a type. The argument must be a representation
+-- |Get the PR dictionary for a type. The argument must be a representation
 -- type.
+--
 prDictOfReprType :: Type -> VM CoreExpr
 prDictOfReprType ty
   | Just (tycon, tyargs) <- splitTyConApp_maybe ty
@@ -143,7 +144,8 @@ prDictOfReprType ty
                  return $ Var sel `App` Type ty' `App` pa
           else do 
                  -- a representation tycon must have a PR instance
-                 dfun <- maybeV $ lookupTyConPR tycon
+                 dfun <- maybeV (text "look up PR dictionary for" <+> ppr tycon) $ 
+                           lookupTyConPR tycon
                  prDFunApply dfun tyargs
 
   | otherwise
