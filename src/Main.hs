@@ -60,6 +60,8 @@ import DynFlags hiding (flags, verbosity)
 import Panic (panic, handleGhcException)
 import Module
 
+import Control.Monad.Fix (MonadFix)
+
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -251,7 +253,7 @@ render flags ifaces installedIfaces srcMap = do
 -------------------------------------------------------------------------------
 
 
-readInterfaceFiles :: MonadIO m =>
+readInterfaceFiles :: (MonadFix m, MonadIO m) =>
                       NameCacheAccessor m
                    -> [(DocPaths, FilePath)] ->
                       m [(DocPaths, InterfaceFile)]
