@@ -29,14 +29,17 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
-import Var        (isTyVar, varType)
-import Id         (idType, mkLocalId, mkVanillaGlobal)
+import Var        (isTyVar, varType, isId)
+import Id         (idType, mkLocalId, mkVanillaGlobal, isDeadBinder, idOccInfo, setIdOccInfo)
+import Type       (isUnLiftedType, mkTyVarTy)
+import Coercion   (isCoVar, mkCoVarCo)
 import Name       (Name, mkSystemVarName)
 import PrelNames  (undefinedName)
 import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
 import qualified State as State
 import State hiding (State, mapAccumLM)
+import BasicTypes (OccInfo(..))
 
 import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
@@ -304,8 +307,27 @@ reduce orig_state = go (mkHistory rEDUCE_WQO) orig_state
 -- == The drive loop ==
 --
 
-data AbsVar = Dead Type -- ^ Type of the provably-dead binder
-            | Live Var  -- ^ Actual binder
+-- As Var, BUT we promise that the deadness information is correct on Ids. This lets
+-- us apply "undefined" instead of an actual argument.
+type AbsVar = Var
+
+applyAbsVars :: Symantics ann => ann (TermF ann) -> [AbsVar] -> ann (TermF ann)
+applyAbsVars e []     = e
+applyAbsVars e (x:xs)
+  | isTyVar x
+  = applyAbsVars (e `tyApp` mkTyVarTy x) xs
+
+  | isCoVar x
+  = applyAbsVars (e `coApp` mkCoVarCo x) xs
+
+   -- FIXME: sort of a hack! Lie about the type of undefined.
+  | isDeadBinder x, not (isUnLiftedType ty)
+  = applyAbsVars (e `app` mkVanillaGlobal undefinedName (idType x)) xs
+
+  | otherwise
+  = applyAbsVars (e `app` x) xs
+
+  where ty = idType x
 
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
@@ -466,21 +488,20 @@ promise p opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted p)
       -- TODO: we can generate the wrappers in a smarter way now that we can always see all possible fulfilments?
       let optimised_fvs_incomplete = fvedTermFreeVars optimised_e
           optimised_fvs = optimised_fvs_incomplete `unionVarSet` tyVarsOfTypes (map idType (varSetElems optimised_fvs_incomplete))
-          abstracted_xs = [x | v <- abstracted p, let Live x = v] -- Pattern match guaranteed not to fail
-          abstracted' 
+          abstracted'
             | not rEFINE_FULFILMENT_FVS = abstracted p
             | otherwise = [if x `elemVarSet` optimised_fvs
-                            then Live x
-                            else Dead (idType x)
-                          | x <- abstracted_xs]
+                            then x
+                            else x `setIdOccInfo` IAmDead
+                          | x <- abstracted p]
       pprTrace "promise" (ppr optimised_fvs $$ ppr optimised_e) $
        ScpM $ \_e s k -> k () (s { pTreeHole = Split False [(p { abstracted = abstracted' },
-                               Fulfilled (tyVarIdLambdas abstracted_xs optimised_e))] (pTreeHole s) })
+                               Fulfilled (tyVarIdLambdas abstracted' optimised_e))] (pTreeHole s) })
       
-      fmap (((mkVarSet abstracted_xs `unionVarSet` stateLetBounders (meaning p)) `unionVarSet`) . mkVarSet) getPromiseNames >>=
+      fmap (((mkVarSet abstracted' `unionVarSet` stateLetBounders (meaning p)) `unionVarSet`) . mkVarSet) getPromiseNames >>=
         \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr (fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
       
-      return (a, var (fun p) `tyVarIdApps` abstracted_xs)
+      return (a, var (fun p) `applyAbsVars` abstracted')
 
 -- No meaning, term: "legacy" term that can no longer be tied back to
 -- No meaning, no term: rolled back while still a promise
@@ -650,15 +671,18 @@ memo opt speculated state0 = do
     let (_, state1) = gc state0 -- Necessary because normalisation might have made some stuff dead
     
     ps <- getPromises
-    case [ (p, (releaseStateDeed state0, var (fun p) `tyVarIdApps` tb_dynamic_vs))
+    case [ (p, (releaseStateDeed state0, var (fun p) `applyAbsVars` tb_dynamic_vs))
          | p <- ps
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                            match (meaning p) state1]
           -- NB: because I can trim reduce the set of things abstracted over above, it's OK if the renaming derived from the meanings renames vars that aren't in the abstracted list, but NOT vice-versa
          -- , let bad_renames = S.fromList (abstracted p) S.\\ M.keysSet (unRenaming rn_lr) in ASSERT2(S.null bad_renames, text "Renaming was inexhaustive:" <+> pPrint bad_renames $$ pPrint (fun p) $$ pPrintFullState (unI (meaning p)) $$ pPrint rn_lr $$ pPrintFullState state3) True
           -- ("tieback: FVs for " ++ showSDoc (pPrint (fun p) $$ text "Us:" $$ pPrint state3 $$ text "Them:" $$ pPrint (meaning p)))
-         , let rn_fv (Live x)  = M.findWithDefault (pprPanic "memo" (ppr x)) x rn_lr -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that I can't rename, so "rename" will cause an error. Not observed in practice yet.
-               rn_fv (Dead ty) = mkVanillaGlobal undefinedName ty -- FIXME: sort of a hack! Lie about the type of undefined.
+         , let rn_fv x | isId x    = x' `setIdOccInfo` idOccInfo x -- Transfer deadness information from the old AbsVar
+                       | otherwise = x'
+                 where x' = M.findWithDefault (pprPanic "memo" (ppr x)) x rn_lr
+                       -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
+                       -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
                tb_dynamic_vs = map rn_fv (abstracted p)
          ] of
       (p, res):_ -> {- traceRender ("tieback", pPrintFullState state3, fst res) $ -} do
@@ -670,7 +694,7 @@ memo opt speculated state0 = do
         
         -- NB: promises are lexically scoped because they may refer to FVs
         x <- freshHName
-        promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = map Live vs_list, meaning = state1 }) $
+        promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = vs_list, meaning = state1 }) $
           do
             traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState state1))
             -- FIXME: this is the site of the Dreadful Hack that makes it safe to match on reduced terms yet *drive* unreduced ones

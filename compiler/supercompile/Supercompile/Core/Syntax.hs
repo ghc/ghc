@@ -13,7 +13,7 @@ import Name     (Name, nameOccName)
 import OccName  (occNameString)
 import Id       (Id)
 import Literal  (Literal)
-import Type     (Type, mkTyVarTy, splitTyConApp_maybe, mkPredTy, mkEqPred)
+import Type     (Type, splitTyConApp_maybe, mkPredTy, mkEqPred)
 import TysPrim  (eqPredPrimTyCon)
 import Coercion (CoVar, Coercion, coercionKind)
 import PrimOp   (PrimOp)
@@ -268,11 +268,6 @@ tyApps = foldl tyApp
 
 apps :: Symantics ann => ann (TermF ann) -> [Id] -> ann (TermF ann)
 apps = foldl app
-
-tyVarIdApps :: Symantics ann => ann (TermF ann) -> [Var] -> ann (TermF ann)
-tyVarIdApps = foldl tyVarIdApp
-  where tyVarIdApp e x | isTyVar x = tyApp e (mkTyVarTy x)
-                       | otherwise = app   e x
 
 {-
 strictLet :: Symantics ann => Var -> ann (TermF ann) -> ann (TermF ann) -> ann (TermF ann)
