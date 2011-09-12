@@ -41,6 +41,8 @@ import qualified State as State
 import State hiding (State, mapAccumLM)
 import BasicTypes (OccInfo(..))
 
+import Text.XHtml hiding (text)
+
 import qualified Control.Monad as Monad
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
@@ -48,6 +50,8 @@ import qualified Data.Map as M
 import Data.Monoid
 import Data.Ord
 import qualified Data.Set as S
+
+import System.IO.Unsafe (unsafePerformIO)
 
 import Prelude hiding (Monad(..))
 
@@ -585,7 +589,7 @@ instance IMonad ScpM where
     (!mx) >>= fxmy = ScpM $ \e s k -> unScpM mx e s (\x s -> unScpM (fxmy x) e s k)
 
 runScpM :: ScpPM (Out FVedTerm) -> (SCStats, Out FVedTerm)
-runScpM me = unScpM me init_e init_s (\e' s -> (stats s, bindManyMixedLiftedness fvedTermFreeVars (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (fvedTermFreeVars e') (pTreeHole s)) e'))
+runScpM me = unScpM (tracePprScpPM me) init_e init_s (\e' s -> (stats s, bindManyMixedLiftedness fvedTermFreeVars (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (fvedTermFreeVars e') (pTreeHole s)) e'))
   where
     init_e = ScpEnv { pTreeContext = [], depth = 0 }
     init_s = ScpState { names = h_names, pTreeHole = (), stats = mempty }
@@ -622,13 +626,36 @@ addStats scstats = ScpM $ \_e s k -> k () (let scstats' = stats s `mappend` scst
 
 type PrettyTree = PTree (Var, SDoc, Maybe SDoc)
 
-pprScpM :: ScpBM SDoc
-pprScpM = ScpM $ \e s k -> k (pprTrees (unwindContext (pTreeContext e) (map unwindTree (pTreeHole s)))) s
+tracePprScpPM :: ScpPM a -> ScpPM a
+tracePprScpPM mx = do
+  x <- mx
+  s <- pprScpPM
+  unsafePerformIO (writeFile "sc.htm" s Monad.>> Monad.return (return x))
+  -- pprTraceSC "tracePprScpM" (text s) $ return x
+
+pprScpBM :: ScpBM String
+pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
+(pprScpBM, pprScpPM) = (go (map unwindTree), go (\t -> [unwindTree t]))
   where
+    go :: forall f. (f -> [PrettyTree]) -> ScpM f f String
+    go xtract = ScpM $ \e s k -> k (html (pTreeContext e) (xtract (pTreeHole s))) s
+
+    html ctxt hole = show $ thehtml $ toHtmlFromList
+      [header (toHtmlFromList [thetitle (stringToHtml "Supercompilation"),
+                               script mempty ! [thetype "text/javascript", src "http://www.omega-prime.co.uk/files/chsc/jquery-1.6.3.min.js"],
+                               script mempty ! [thetype "text/javascript", src "http://www.omega-prime.co.uk/files/chsc/jstree_pre1.0_fix_1/jquery.jstree.js"],
+                               script js]),
+       body (toHtmlFromList [thediv htm ! [identifier "tree"],
+                             pre mempty ! [identifier "content-in"],
+                             pre mempty ! [identifier "content-out"]])]
+      where htm = pprTrees (unwindContext ctxt hole)
+            -- NB: must use primHtml so that entities in the script are not escaped
+            js = primHtml "$(function () { $(\"#tree\").jstree({ \"plugins\" : [\"themes\", \"html_data\"], \"core\" : { \"animation\" : 0 } }).bind(\"loaded.jstree\", function (event, data) { data.inst.open_all(-1, false); }); });"
+
     unwindTree :: FulfilmentTree -> PrettyTree
     unwindTree = fmap unwindPromiseFulfilment
 
-    unwindPromiseFulfilment (p, f) = (fun p, ppr (meaning p),
+    unwindPromiseFulfilment (p, f) = (fun p, pPrintFullState (meaning p),
                                       case f of Captured         -> Nothing
                                                 RolledBack mb_e' -> fmap ppr mb_e'
                                                 Fulfilled e'     -> Just (ppr e'))
@@ -640,8 +667,16 @@ pprScpM = ScpM $ \e s k -> k (pprTrees (unwindContext (pTreeContext e) (map unwi
     unwindContextItem (Promise p)                  ts = [Split True [(fun p, ppr (meaning p), Nothing)] ts]
     unwindContextItem (BindCapturedFloats fvs ts') ts = map unwindTree ts' ++ [BoundCapturedFloats fvs ts]
 
-    pprTrees :: [PrettyTree] -> SDoc
-    pprTrees = undefined
+    pprTrees :: [PrettyTree] -> Html
+    pprTrees ts = ulist $ toHtmlFromList $ map pprTree ts
+
+    pprTree :: PrettyTree -> Html
+    pprTree t = li $ case t of
+      Tieback x                  -> anchor (stringToHtml ("Tieback " ++ show x)) ! [href ("#" ++ show x)]
+      Split rb fs ts             -> toHtmlFromList ([thediv (anchor (stringToHtml (show x)) ! [strAttr "onclick" $ "document.getElementById(\"content-in\").innerText=" ++ show (showSDoc in_code) ++ ";document.getElementById(\"content-out\").innerText=" ++ show (maybe "" showSDoc mb_out_code) ++ ";return false"]) !
+                                                            [identifier (show x)]
+                                                    | (x, in_code, mb_out_code) <- fs] ++ [pprTrees ts])
+      BoundCapturedFloats fvs ts -> toHtmlFromList [stringToHtml ("Capture " ++ showSDoc (ppr fvs)), pprTrees ts]
 
 
 type RollbackScpM = Generaliser -> ScpBM (Deeds, Out FVedTerm)
