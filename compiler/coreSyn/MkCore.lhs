@@ -219,39 +219,7 @@ mkWordExprWord w = mkConApp wordDataCon [mkWordLitWord w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: MonadThings m => Integer    -> m CoreExpr  -- Result :: Integer
-mkIntegerExpr i
-  | inIntRange i        -- Small enough, so start from an Int
-    = do integer_id <- lookupId smallIntegerName
-         return (mkSmallIntegerLit integer_id i)
-
--- Special case for integral literals with a large magnitude:
--- They are transformed into an expression involving only smaller
--- integral literals. This improves constant folding.
-
-  | otherwise = do       -- Big, so start from a string
-      plus_id <- lookupId plusIntegerName
-      times_id <- lookupId timesIntegerName
-      integer_id <- lookupId smallIntegerName
-      let
-           lit i = mkSmallIntegerLit integer_id i
-           plus a b  = Var plus_id  `App` a `App` b
-           times a b = Var times_id `App` a `App` b
-
-           -- Transform i into (x1 + (x2 + (x3 + (...) * b) * b) * b) with abs xi <= b
-           horner :: Integer -> Integer -> CoreExpr
-           horner b i | abs q <= 1 = if r == 0 || r == i 
-                                     then lit i 
-                                     else lit r `plus` lit (i-r)
-                      | r == 0     =               horner b q `times` lit b
-                      | otherwise  = lit r `plus` (horner b q `times` lit b)
-                      where
-                        (q,r) = i `quotRem` b
-
-      return (horner tARGET_MAX_INT i)
-  where
-    mkSmallIntegerLit :: Id -> Integer -> CoreExpr
-    mkSmallIntegerLit small_integer i = mkApps (Var small_integer) [mkIntLit i]
-
+mkIntegerExpr i = return (Lit (LitInteger i))
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr

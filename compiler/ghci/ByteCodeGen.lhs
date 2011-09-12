@@ -1241,6 +1241,10 @@ pushAtom _ _ (AnnLit lit)
         MachChar _    -> code NonPtrArg
         MachNullAddr  -> code NonPtrArg
         MachStr s     -> pushStr s
+        -- No LitInteger's should be left by the time this is called.
+        -- CorePrep should have converted them all to a real core
+        -- representation.
+        LitInteger _  -> panic "pushAtom: LitInteger"
      where
         code rep
            = let size_host_words = fromIntegral (cgRepSizeW rep)

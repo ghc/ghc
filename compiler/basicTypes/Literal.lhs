@@ -40,6 +40,7 @@ module Literal
 
 import TysPrim
 import PrelNames
+import TysWiredIn
 import Type
 import TyCon
 import Outputable
@@ -106,6 +107,11 @@ data Literal
                                 --    the label expects. Only applicable with
                                 --    @stdcall@ labels. @Just x@ => @\<x\>@ will
                                 --    be appended to label name when emitting assembly.
+
+  | LitInteger Integer
+   -- ^ We treat @Integer@s as literals, to make it easier to write
+   --   RULEs for them. They only get converted into real Core during
+   --   the CorePrep phase.
   deriving (Data, Typeable)
 \end{code}
 
@@ -127,6 +133,7 @@ instance Binary Literal where
              put_ bh aj
              put_ bh mb
              put_ bh fod
+    put_ bh (LitInteger i) = do putByte bh 10; put_ bh i
     get bh = do
             h <- getByte bh
             case h of
@@ -156,11 +163,14 @@ instance Binary Literal where
               8 -> do
                     ai <- get bh
                     return (MachDouble ai)
-              _ -> do
+              9 -> do
                     aj <- get bh
                     mb <- get bh
                     fod <- get bh
                     return (MachLabel aj mb fod)
+              _ -> do
+                    i <- get bh
+                    return (LitInteger i)
 \end{code}
 
 \begin{code}
@@ -308,15 +318,17 @@ nullAddrLit = MachNullAddr
 -- False principally of strings
 litIsTrivial :: Literal -> Bool
 --      c.f. CoreUtils.exprIsTrivial
-litIsTrivial (MachStr _) = False
-litIsTrivial _           = True
+litIsTrivial (MachStr _)    = False
+litIsTrivial (LitInteger _) = False
+litIsTrivial _              = True
 
 -- | True if code space does not go bad if we duplicate this literal
 -- Currently we treat it just like 'litIsTrivial'
 litIsDupable :: Literal -> Bool
 --      c.f. CoreUtils.exprIsDupable
-litIsDupable (MachStr _) = False
-litIsDupable _           = True
+litIsDupable (MachStr _)    = False
+litIsDupable (LitInteger i) = inIntRange i
+litIsDupable _              = True
 
 litFitsInChar :: Literal -> Bool
 litFitsInChar (MachInt i)
@@ -340,6 +352,7 @@ literalType (MachWord64  _) = word64PrimTy
 literalType (MachFloat _)   = floatPrimTy
 literalType (MachDouble _)  = doublePrimTy
 literalType (MachLabel _ _ _) = addrPrimTy
+literalType (LitInteger _)    = integerTy
 
 absentLiteralOf :: TyCon -> Maybe Literal
 -- Return a literal of the appropriate primtive
@@ -372,6 +385,7 @@ cmpLit (MachWord64    a)   (MachWord64     b)   = a `compare` b
 cmpLit (MachFloat     a)   (MachFloat      b)   = a `compare` b
 cmpLit (MachDouble    a)   (MachDouble     b)   = a `compare` b
 cmpLit (MachLabel     a _ _) (MachLabel      b _ _) = a `compare` b
+cmpLit (LitInteger    a)     (LitInteger     b)     = a `compare` b
 cmpLit lit1                lit2                 | litTag lit1 <# litTag lit2 = LT
                                                 | otherwise                  = GT
 
@@ -386,6 +400,7 @@ litTag (MachWord64    _)   = _ILIT(7)
 litTag (MachFloat     _)   = _ILIT(8)
 litTag (MachDouble    _)   = _ILIT(9)
 litTag (MachLabel _ _ _)   = _ILIT(10)
+litTag (LitInteger    _)   = _ILIT(11)
 \end{code}
 
         Printing
@@ -408,6 +423,7 @@ pprLit (MachLabel l mb fod) = ptext (sLit "__label") <+> b <+> ppr fod
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
+pprLit (LitInteger i)   = ptext (sLit "__integer") <+> integer i
 
 pprIntVal :: Integer -> SDoc
 -- ^ Print negative integers with parens to be sure it's unambiguous
@@ -437,6 +453,7 @@ hashLiteral (MachWord64 i)      = hashInteger i
 hashLiteral (MachFloat r)       = hashRational r
 hashLiteral (MachDouble r)      = hashRational r
 hashLiteral (MachLabel s _ _)     = hashFS s
+hashLiteral (LitInteger i)      = hashInteger i
 
 hashRational :: Rational -> Int
 hashRational r = hashInteger (numerator r)

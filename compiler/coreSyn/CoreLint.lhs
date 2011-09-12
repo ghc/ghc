@@ -511,10 +511,13 @@ lintCoreAlt _ alt_ty (DEFAULT, args, rhs) =
   do { checkL (null args) (mkDefaultArgsMsg args)
      ; checkAltExpr rhs alt_ty }
 
-lintCoreAlt scrut_ty alt_ty (LitAlt lit, args, rhs) = 
-  do { checkL (null args) (mkDefaultArgsMsg args)
-     ; checkTys lit_ty scrut_ty (mkBadPatMsg lit_ty scrut_ty)	
-     ; checkAltExpr rhs alt_ty } 
+lintCoreAlt scrut_ty alt_ty (LitAlt lit, args, rhs)
+  | integerTy `eqType` scrut_ty
+    = failWithL integerScrutinisedMsg
+  | otherwise
+    = do { checkL (null args) (mkDefaultArgsMsg args)
+         ; checkTys lit_ty scrut_ty (mkBadPatMsg lit_ty scrut_ty)
+         ; checkAltExpr rhs alt_ty }
   where
     lit_ty = literalType lit
 
@@ -1069,6 +1072,10 @@ mkBadPatMsg con_result_ty scrut_ty
 	text "Pattern result type:" <+> ppr con_result_ty,
 	text "Scrutinee type:" <+> ppr scrut_ty
     ]
+
+integerScrutinisedMsg :: Message
+integerScrutinisedMsg
+  = text "In a case alternative, scrutinee type is Integer"
 
 mkBadAltMsg :: Type -> CoreAlt -> Message
 mkBadAltMsg scrut_ty alt

@@ -611,8 +611,6 @@ builtinRules
                     ru_nargs = 2, ru_try = match_eq_string },
       BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                     ru_nargs = 2, ru_try = match_inline },
-      -- TODO: All the below rules need to handle target platform
-      -- having a different wordsize than the host platform
       rule_Integer_convert    "integerToWord" integerToWordName mkWordLitWord,
       rule_Integer_convert    "integerToInt"  integerToIntName  mkIntLitInt,
       rule_Integer_binop      "plusInteger"   plusIntegerName   (+),
@@ -660,7 +658,6 @@ builtinRules
           rule_Integer_binop_Ordering str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop_Ordering op }
-
 
 ---------------------------------------------------
 -- The rule is this:
@@ -729,75 +726,48 @@ match_Integer_convert :: Num a
                       -> IdUnfoldingFun
                       -> [Expr CoreBndr]
                       -> Maybe (Expr CoreBndr)
-match_Integer_convert convert _ [x]
- | (Var fx, [Lit (MachInt ix)]) <- collectArgs x,
-   idName fx == smallIntegerName
-    = Just (convert (fromIntegral ix))
+match_Integer_convert convert _ [Lit (LitInteger x)]
+    = Just (convert (fromIntegral x))
 match_Integer_convert _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer)
                    -> IdUnfoldingFun
                    -> [Expr CoreBndr]
                    -> Maybe (Expr CoreBndr)
-match_Integer_unop unop _ [x]
- | (Var fx, [Lit (MachInt ix)]) <- collectArgs x,
-   idName fx == smallIntegerName,
-   let iz = unop ix,
-   iz >= fromIntegral (minBound :: Int),
-   iz <= fromIntegral (maxBound :: Int)
-    = Just (Var fx `App` Lit (MachInt iz))
+match_Integer_unop unop _ [Lit (LitInteger x)]
+    = Just (Lit (LitInteger (unop x)))
 match_Integer_unop _ _ _ = Nothing
 
 match_Integer_binop :: (Integer -> Integer -> Integer)
                     -> IdUnfoldingFun
                     -> [Expr CoreBndr]
                     -> Maybe (Expr CoreBndr)
-match_Integer_binop binop _ [x, y]
- | (Var fx, [Lit (MachInt ix)]) <- collectArgs x,
-   (Var fy, [Lit (MachInt iy)]) <- collectArgs y,
-   idName fx == smallIntegerName,
-   idName fy == smallIntegerName,
-   let iz = ix `binop` iy,
-   iz >= fromIntegral (minBound :: Int),
-   iz <= fromIntegral (maxBound :: Int)
-    = Just (Var fx `App` Lit (MachInt iz))
+match_Integer_binop binop _ [Lit (LitInteger x), Lit (LitInteger y)]
+    = Just (Lit (LitInteger (x `binop` y)))
 match_Integer_binop _ _ _ = Nothing
 
 match_Integer_Int_binop :: (Integer -> Int -> Integer)
                         -> IdUnfoldingFun
                         -> [Expr CoreBndr]
                         -> Maybe (Expr CoreBndr)
-match_Integer_Int_binop binop _ [x, Lit (MachInt iy)]
- | (Var fx, [Lit (MachInt ix)]) <- collectArgs x,
-   idName fx == smallIntegerName,
-   let iz = ix `binop` fromIntegral iy,
-   iz >= fromIntegral (minBound :: Int),
-   iz <= fromIntegral (maxBound :: Int)
-    = Just (Var fx `App` Lit (MachInt iz))
+match_Integer_Int_binop binop _ [Lit (LitInteger x), Lit (MachInt y)]
+    = Just (Lit (LitInteger (x `binop` fromIntegral y)))
 match_Integer_Int_binop _ _ _ = Nothing
 
 match_Integer_binop_Bool :: (Integer -> Integer -> Bool)
                          -> IdUnfoldingFun
                          -> [Expr CoreBndr]
                          -> Maybe (Expr CoreBndr)
-match_Integer_binop_Bool binop _ [x, y]
- | (Var fx, [Lit (MachInt ix)]) <- collectArgs x,
-   (Var fy, [Lit (MachInt iy)]) <- collectArgs y,
-   idName fx == smallIntegerName,
-   idName fy == smallIntegerName
-    = Just (if ix `binop` iy then trueVal else falseVal)
+match_Integer_binop_Bool binop _ [Lit (LitInteger x), Lit (LitInteger y)]
+    = Just (if x `binop` y then trueVal else falseVal)
 match_Integer_binop_Bool _ _ _ = Nothing
 
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering)
                              -> IdUnfoldingFun
                              -> [Expr CoreBndr]
                              -> Maybe (Expr CoreBndr)
-match_Integer_binop_Ordering binop _ [x, y]
- | (Var fx, [Lit (MachInt ix)]) <- collectArgs x,
-   (Var fy, [Lit (MachInt iy)]) <- collectArgs y,
-   idName fx == smallIntegerName,
-   idName fy == smallIntegerName
-    = Just $ case ix `binop` iy of
+match_Integer_binop_Ordering binop _ [Lit (LitInteger x), Lit (LitInteger y)]
+    = Just $ case x `binop` y of
              LT -> ltVal
              EQ -> eqVal
              GT -> gtVal

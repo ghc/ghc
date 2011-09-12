@@ -51,6 +51,8 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                               >> $@
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
+	@echo 'data IntegerLibrary = IntegerGMP | IntegerSimple'            >> $@
+	@echo                                                               >> $@
 	@echo 'cBuildPlatformString :: String'                              >> $@
 	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
 	@echo 'cHostPlatformString :: String'                               >> $@
@@ -76,6 +78,14 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cLdLinkerOpts         = words "$(CONF_LD_LINKER_OPTS_STAGE$*)"'  >> $@
 	@echo 'cIntegerLibrary       :: String'                             >> $@
 	@echo 'cIntegerLibrary       = "$(INTEGER_LIBRARY)"'                >> $@
+	@echo 'cIntegerLibraryType   :: IntegerLibrary'                     >> $@
+ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
+	@echo 'cIntegerLibraryType   = IntegerGMP'                          >> $@
+else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
+	@echo 'cIntegerLibraryType   = IntegerSimple'                       >> $@
+else ifneq "$(CLEANING)" "YES"
+$(error Unknown integer library)
+endif
 	@echo 'cSupportsSplitObjs    :: String'                             >> $@
 	@echo 'cSupportsSplitObjs    = "$(SupportsSplitObjs)"'              >> $@
 	@echo 'cGhcWithInterpreter   :: String'                             >> $@

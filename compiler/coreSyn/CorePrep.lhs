@@ -11,7 +11,7 @@ module CorePrep (
 
 #include "HsVersions.h"
 
-import PrelNames	( lazyIdKey, hasKey )
+import PrelNames
 import CoreUtils
 import CoreArity
 import CoreFVs
@@ -20,6 +20,7 @@ import CoreSyn
 import CoreSubst
 import OccurAnal        ( occurAnalyseExpr )
 import Type
+import Literal
 import Coercion
 import TyCon
 import Demand
@@ -28,6 +29,7 @@ import VarSet
 import VarEnv
 import Id
 import IdInfo
+import MkId
 import DataCon
 import PrimOp
 import BasicTypes
@@ -41,7 +43,10 @@ import Pair
 import Outputable
 import MonadUtils
 import FastString
+import Config
+import Data.Bits
 import Data.List	( mapAccumL )
+import Data.Word
 import Control.Monad
 \end{code}
 
@@ -446,6 +451,7 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 
 cpeRhsE _env expr@(Type {})     = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {}) = return (emptyFloats, expr)
+cpeRhsE env (Lit (LitInteger i)) = cpeInteger env i
 cpeRhsE _env expr@(Lit {})      = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})       = cpeApp env expr
 
@@ -494,6 +500,41 @@ cpeRhsE env (Case scrut bndr ty alts)
        = do { (env2, bs') <- cpCloneBndrs env bs
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
+
+cpeInteger :: CorePrepEnv -> Integer -> UniqSM (Floats, CpeRhs)
+cpeInteger env i
+    = let expr = case cIntegerLibraryType of
+                  IntegerGMP ->
+                      let mkSmallInteger x = App (Var integerGmpSId)
+                                                 (Lit (mkMachInt x))
+                          negateInteger x = App (Var negateIntegerId) x
+                          f x = let low  = x .&. mask
+                                    high = x `shiftR` bits
+                                    highExpr = mkApps (Var shiftLIntegerId)
+                                                      [f high,
+                                                       Lit (mkMachInt (fromIntegral bits))]
+                                in if high == 0 then mkSmallInteger x
+                                   else if low == 0 then highExpr
+                                   else mkApps (Var orIntegerId)
+                                               [mkSmallInteger low, highExpr]
+                          bits = bitSize (undefined :: Int) - 2
+                          mask = 2 ^ bits - 1
+                      in if inIntRange i then mkSmallInteger i
+                         else if i < 0 then negateInteger (f (negate i))
+                         else f i
+                  IntegerSimple ->
+                      let bits = bitSize (undefined :: Word)
+                          mask = 2 ^ bits - 1
+                          f 0 = Var digitsNoneId
+                          f x = let low  = x .&. mask
+                                    high = x `shiftR` bits
+                                in mkApps (Var digitsSomeId)
+                                          [Lit (mkMachWord low), f high]
+                      in case i `compare` 0 of
+                         EQ -> Var integerSimpleNaughtId
+                         GT -> App (Var integerSimplePositiveId) (f i)
+                         LT -> App (Var integerSimpleNegativeId) (f (negate i))
+      in cpeRhsE env expr
 
 -- ---------------------------------------------------------------------------
 --		CpeBody: produces a result satisfying CpeBody

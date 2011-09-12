@@ -108,6 +108,9 @@ mkSimpleLit (MachLabel fs ms fod)
                 -- TODO: Literal labels might not actually be in the current package...
                 labelSrc = ForeignLabelInThisPackage
 mkSimpleLit (MachStr _) = panic "mkSimpleLit: MachStr"
+-- No LitInteger's should be left by the time this is called. CorePrep
+-- should have converted them all to a real core representation.
+mkSimpleLit (LitInteger _) = panic "mkSimpleLit: LitInteger"
 
 mkLtOp :: Literal -> MachOp
 -- On signed literals we must do a signed comparison

@@ -24,6 +24,15 @@ module TysWiredIn (
 	charTyCon, charDataCon, charTyCon_RDR,
 	charTy, stringTy, charTyConName,
 
+        -- * Integer
+        integerTy, integerTyConName,
+        -- integer-gmp only:
+        integerGmpSDataConName,
+        -- integer-simple only:
+        integerSimpleNaughtDataConName,
+        integerSimplePositiveDataConName, integerSimpleNegativeDataConName,
+        digitsTy, digitsSomeDataConName, digitsNoneDataConName,
+
 	-- * Double
 	doubleTyCon, doubleDataCon, doubleTy, doubleTyConName, 
 	
@@ -88,6 +97,7 @@ import Unique           ( incrUnique, mkTupleTyConUnique,
 import Data.Array
 import FastString
 import Outputable
+import Config
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -132,6 +142,8 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
     	      , doubleTyCon
     	      , floatTyCon
     	      , intTyCon
+    	      , integerTyCon
+    	      , digitsTyCon
     	      , listTyCon
 	      , parrTyCon
               , eqTyCon
@@ -176,6 +188,25 @@ floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Float") fl
 floatDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "F#") floatDataConKey floatDataCon
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") doubleTyConKey doubleTyCon
 doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#") doubleDataConKey doubleDataCon
+
+-- For all integer implementations:
+integerTyConName :: Name
+integerTyConName    = mkWiredInTyConName   UserSyntax gHC_INTEGER_TYPE (fsLit "Integer") integerTyConKey integerTyCon
+-- For integer-gmp only:
+integerGmpSDataConName, integerGmpJDataConName :: Name
+integerGmpSDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "S#") integerGmpSDataConKey integerGmpSDataCon
+integerGmpJDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "J#") integerGmpJDataConKey integerGmpJDataCon
+-- For integer-simple only:
+integerSimpleNaughtDataConName,
+    integerSimplePositiveDataConName, integerSimpleNegativeDataConName :: Name
+integerSimpleNaughtDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "Naught") integerSimpleNaughtDataConKey integerSimpleNaughtDataCon
+integerSimplePositiveDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "Positive") integerSimplePositiveDataConKey integerSimplePositiveDataCon
+integerSimpleNegativeDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "Negative") integerSimpleNegativeDataConKey integerSimpleNegativeDataCon
+digitsTyConName :: Name
+digitsTyConName    = mkWiredInTyConName   UserSyntax gHC_INTEGER_TYPE (fsLit "Digits") digitsTyConKey digitsTyCon
+digitsSomeDataConName, digitsNoneDataConName :: Name
+digitsSomeDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "Some") digitsSomeDataConKey digitsSomeDataCon
+digitsNoneDataConName = mkWiredInDataConName UserSyntax gHC_INTEGER_TYPE (fsLit "None") digitsNoneDataConKey digitsNoneDataCon
 
 parrTyConName, parrDataConName :: Name
 parrTyConName   = mkWiredInTyConName   BuiltInSyntax 
@@ -421,6 +452,66 @@ charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
 stringTy :: Type
 stringTy = mkListTy charTy -- convenience only
+\end{code}
+
+\begin{code}
+integerTy :: Type
+integerTy = mkTyConTy integerTyCon
+
+integerTyCon :: TyCon
+integerTyCon = case cIntegerLibraryType of
+               IntegerGMP ->
+                   pcNonRecDataTyCon integerTyConName []
+                                     [integerGmpSDataCon, integerGmpJDataCon]
+               IntegerSimple ->
+                   pcNonRecDataTyCon integerTyConName []
+                                     [integerSimplePositiveDataCon,
+                                      integerSimpleNegativeDataCon,
+                                      integerSimpleNaughtDataCon]
+
+integerGmpSDataCon :: DataCon
+integerGmpSDataCon = pcDataCon integerGmpSDataConName []
+                               [intPrimTy]
+                               integerTyCon
+
+-- integerGmpJDataCon isn't exported, but we need to define it to fill
+-- out integerTyCon
+integerGmpJDataCon :: DataCon
+integerGmpJDataCon = pcDataCon integerGmpJDataConName []
+                               [intPrimTy, byteArrayPrimTy]
+                               integerTyCon
+
+integerSimplePositiveDataCon :: DataCon
+integerSimplePositiveDataCon = pcDataCon integerSimplePositiveDataConName []
+                                         [digitsTy]
+                                         integerTyCon
+
+integerSimpleNegativeDataCon :: DataCon
+integerSimpleNegativeDataCon = pcDataCon integerSimpleNegativeDataConName []
+                                         [digitsTy]
+                                         integerTyCon
+
+integerSimpleNaughtDataCon :: DataCon
+integerSimpleNaughtDataCon = pcDataCon integerSimpleNaughtDataConName []
+                                       []
+                                       integerTyCon
+
+digitsTy :: Type
+digitsTy = mkTyConTy digitsTyCon
+
+digitsTyCon :: TyCon
+digitsTyCon = pcNonRecDataTyCon digitsTyConName []
+                                [digitsSomeDataCon, digitsNoneDataCon]
+
+digitsSomeDataCon :: DataCon
+digitsSomeDataCon = pcDataCon digitsSomeDataConName []
+                              [wordPrimTy, digitsTy]
+                              digitsTyCon
+
+digitsNoneDataCon :: DataCon
+digitsNoneDataCon = pcDataCon digitsNoneDataConName []
+                              []
+                              digitsTyCon
 \end{code}
 
 \begin{code}

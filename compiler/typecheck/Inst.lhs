@@ -54,6 +54,7 @@ import Var      ( Var, EvVar, varType, setVarType )
 import VarEnv
 import VarSet
 import PrelNames
+import TysWiredIn
 import SrcLoc
 import DynFlags
 import Bag
