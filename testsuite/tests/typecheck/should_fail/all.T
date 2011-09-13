@@ -262,3 +262,5 @@ test('AssocTyDef06', normal, compile_fail, [''])
 test('AssocTyDef07', normal, compile_fail, [''])
 test('AssocTyDef08', normal, compile_fail, [''])
 test('AssocTyDef09', normal, compile_fail, [''])
+
+test('T3592', normal, compile_fail, [''])
