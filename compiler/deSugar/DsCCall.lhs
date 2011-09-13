@@ -176,43 +176,6 @@ unboxArg arg
                \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,vars,body)]
               )
 
-  ----- Cases for .NET; almost certainly bit-rotted ---------
-  | Just (tc, [arg_ty]) <- splitTyConApp_maybe arg_ty,
-    tc == listTyCon,
-    Just (cc,[]) <- splitTyConApp_maybe arg_ty,
-    cc == charTyCon
-    -- String; dotnet only
-  = do unpack_id <- dsLookupGlobalId marshalStringName
-       prim_string <- newSysLocalDs addrPrimTy
-       return (Var prim_string,
-               \ body ->
-                 let
-                  io_ty = exprType body
-                  Just (_,io_arg,_) = tcSplitIOType_maybe io_ty
-                 in
-                 mkApps (Var unpack_id)
-                        [ Type io_arg
-                        , arg
-                        , Lam prim_string body
-                        ])
-  | Just (tc, [_]) <- splitTyConApp_maybe arg_ty,
-    tyConName tc == objectTyConName
-    -- Object; dotnet only
-  = do unpack_id <- dsLookupGlobalId marshalObjectName
-       prim_obj <- newSysLocalDs addrPrimTy
-       return (Var prim_obj,
-               \ body ->
-                 let
-                  io_ty = exprType body
-                  Just (_,io_arg,_) = tcSplitIOType_maybe io_ty
-                 in
-                 mkApps (Var unpack_id)
-                        [ Type io_arg
-                        , arg
-                        , Lam prim_obj body
-                        ])
-  --------------- End of cases for .NET --------------------
-
   | otherwise
   = do l <- getSrcSpanDs
        pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
@@ -391,20 +354,6 @@ resultWrapper result_ty
        return
          (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con)) 
                                  (map Type tycon_arg_tys ++ [wrapper (narrow_wrapper e)]))
-
-    -- Strings; 'dotnet' only.
-  | Just (tc, [arg_ty]) <- maybe_tc_app,               tc == listTyCon,
-    Just (cc,[])        <- splitTyConApp_maybe arg_ty, cc == charTyCon
-  = do pack_id <- dsLookupGlobalId unmarshalStringName
-       return (Just addrPrimTy,
-                 \ e -> App (Var pack_id) e)
-
-    -- Objects; 'dotnet' only.
-  | Just (tc, [_]) <- maybe_tc_app, 
-    tyConName tc == objectTyConName
-  = do pack_id <- dsLookupGlobalId unmarshalObjectName
-       return (Just addrPrimTy,
-                 \ e -> App (Var pack_id) e)
 
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
