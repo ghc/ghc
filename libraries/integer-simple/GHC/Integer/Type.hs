@@ -24,9 +24,8 @@ module GHC.Integer.Type where
 
 import GHC.Prim
 import GHC.Classes
-import GHC.Ordering
 import GHC.Types
-import GHC.Unit ()
+import GHC.Tuple ()
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
 #endif
