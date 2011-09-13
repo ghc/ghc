@@ -72,11 +72,11 @@ data Integer
    = S# Int#                            -- small integers
    | J# Int# ByteArray#                 -- large integers
 
-{-# INLINE [0] smallInteger #-}
+{-# NOINLINE smallInteger #-}
 smallInteger :: Int# -> Integer
 smallInteger i = S# i
 
-{-# INLINE [0] wordToInteger #-}
+{-# NOINLINE wordToInteger #-}
 wordToInteger :: Word# -> Integer
 wordToInteger w = case word2Integer# w of (# s, d #) -> J# s d
 
