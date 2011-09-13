@@ -608,9 +608,6 @@ dnl ** check for installed alex binary + version
 dnl    (don't do it if we're booting from .hc files though.)
 if test "$BootingFromHc" = "NO"; then
 FPTOOLS_ALEX
-if test "${Alex3}" = "YES"; then
-  AC_MSG_ERROR([GHC does not build with Alex 3 yet; please install an older version (we hope to fix this soon).])
-fi
 fi;
 
 dnl --------------------------------------------------
