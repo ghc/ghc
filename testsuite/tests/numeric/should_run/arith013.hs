@@ -1,7 +1,7 @@
 -- Test gcdInt/gcdInteger
 
-import GHC.Real	( gcdInt )
-import GHC.Num	( gcdInteger )
+import GHC.Real ( gcdInt )
+import GHC.Integer.GMP.Internals ( gcdInteger )
 
 main :: IO ()
 main = do
