@@ -27,6 +27,10 @@ import GHC.Enum
 import GHC.Show
 import GHC.Err
 
+#ifdef OPTIMISE_INTEGER_GCD_LCM
+import GHC.Integer.GMP.Internals
+#endif
+
 infixr 8  ^, ^^
 infixl 7  /, `quot`, `rem`, `div`, `mod`
 infixl 7  %
