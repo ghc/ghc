@@ -35,7 +35,7 @@ T4918:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4918.hi | grep 'C#'
 
 EvalTest:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O EvalTest.hs -ddump-simpl -dsuppress-uniques | grep 'rght.*Dmd'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O EvalTest.hs -ddump-simpl -dsuppress-uniques | grep 'rght.*Dmd' | sed 's/^ *//'
 
 T5168:
 	-('$(TEST_HC)' $(TEST_HC_OPTS) -c -O T5168.hs -ddump-simpl -dsuppress-uniques | grep 'patError')
