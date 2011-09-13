@@ -1157,12 +1157,6 @@ loadModule_ fs = loadModule (zip fs (repeat Nothing)) >> return ()
 
 loadModule' :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule' files = do
-  -- unload first
-  _ <- GHC.abandonAll
-  lift discardActiveBreakPoints
-  GHC.setTargets []
-  _ <- GHC.load LoadAllTargets
-
   let (filenames, phases) = unzip files
   exp_filenames <- mapM expandPath filenames
   let files' = zip exp_filenames phases
@@ -1172,6 +1166,12 @@ loadModule' files = do
   -- fails we didn't throw away the current set of modules.  This would
   -- require some re-working of the GHC interface, so we'll leave it
   -- as a ToDo for now.
+
+  -- unload first
+  _ <- GHC.abandonAll
+  lift discardActiveBreakPoints
+  GHC.setTargets []
+  _ <- GHC.load LoadAllTargets
 
   GHC.setTargets targets
   doLoad False LoadAllTargets
