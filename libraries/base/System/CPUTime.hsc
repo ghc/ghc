@@ -15,6 +15,9 @@
 --
 -----------------------------------------------------------------------------
 
+#include "HsFFI.h"
+#include "HsBaseConfig.h"
+
 module System.CPUTime 
         (
          getCPUTime,       -- :: IO Integer
@@ -39,8 +42,6 @@ import Foreign.C
 #if !defined(CLK_TCK)
 import System.IO.Unsafe (unsafePerformIO)
 #endif
-
-#include "HsBaseConfig.h"
 
 -- For _SC_CLK_TCK
 #if HAVE_UNISTD_H
