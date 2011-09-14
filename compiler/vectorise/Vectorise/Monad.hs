@@ -45,6 +45,7 @@ import Outputable
 import FastString
 
 import Control.Monad
+import System.IO
 
 -- |Run a vectorisation computation.
 --
@@ -101,7 +102,12 @@ initV hsc_env guts info thing_inside
            ; r <- runVM thing_inside' builtins genv emptyLocalEnv
            ; case r of
                Yes genv _ x -> return $ Just (new_info genv, x)
-               No           -> return Nothing
+               No reason    -> do { unqual <- mkPrintUnqualifiedDs
+                                  ; liftIO $ 
+                                      printForUser stderr unqual $ 
+                                        mkDumpDoc "Warning: vectorisation failure:" reason
+                                  ; return Nothing
+                                  }
            } }
 
     new_info genv = modVectInfo genv (mg_types guts) (mg_vect_decls guts) info

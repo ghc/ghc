@@ -1052,7 +1052,7 @@ occAnal :: OccEnv
             CoreExpr)
 
 occAnal _   expr@(Type _) = (emptyDetails, 	   expr)
-occAnal _   expr@(Lit _)  = (emptyDetails, 	   expr)   
+occAnal _   expr@(Lit _)  = (emptyDetails, 	   expr)
 occAnal env expr@(Var v)  = (mkOneOcc env v False, expr)
     -- At one stage, I gathered the idRuleVars for v here too,
     -- which in a way is the right thing to do.

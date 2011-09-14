@@ -1,8 +1,9 @@
+module Vectorise.Monad.InstEnv 
+  ( lookupInst
+  , lookupFamInst
+  ) 
+where
 
-module Vectorise.Monad.InstEnv (
-	lookupInst,
-	lookupFamInst
-) where
 import Vectorise.Monad.Global
 import Vectorise.Monad.Base
 import Vectorise.Env
@@ -38,15 +39,15 @@ lookupInst :: Class -> [Type] -> VM (DFunId, [Type])
 lookupInst cls tys
   = do { instEnv <- getInstEnv
        ; case lookupInstEnv instEnv cls tys of
-	   ([(inst, inst_tys)], _, _) 
+           ([(inst, inst_tys)], _, _) 
              | noFlexiVar -> return (instanceDFunId inst, inst_tys')
-             | otherwise  -> pprPanic "VectMonad.lookupInst: flexi var: " 
-                                      (ppr $ mkTyConApp (classTyCon cls) tys)
+             | otherwise  -> cantVectorise "VectMonad.lookupInst: flexi var: " 
+                                           (ppr $ mkTyConApp (classTyCon cls) tys)
              where
                inst_tys'  = [ty | Right ty <- inst_tys]
                noFlexiVar = all isRight inst_tys
-	   _other         ->
-             pprPanic "VectMonad.lookupInst: not found " (ppr cls <+> ppr tys)
+           _other         ->
+             cantVectorise "VectMonad.lookupInst: not found " (ppr cls <+> ppr tys)
        }
   where
     isRight (Left  _) = False
@@ -73,8 +74,8 @@ lookupFamInst tycon tys
   = ASSERT( isFamilyTyCon tycon )
     do { instEnv <- getFamInstEnv
        ; case lookupFamInstEnv instEnv tycon tys of
-	   [(fam_inst, rep_tys)] -> return (famInstTyCon fam_inst, rep_tys)
-	   _other                -> 
-             pprPanic "VectMonad.lookupFamInst: not found: " 
-                      (ppr $ mkTyConApp tycon tys)
+           [(fam_inst, rep_tys)] -> return (famInstTyCon fam_inst, rep_tys)
+           _other                -> 
+             cantVectorise "VectMonad.lookupFamInst: not found: " 
+                           (ppr $ mkTyConApp tycon tys)
        }

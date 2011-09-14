@@ -205,7 +205,7 @@ basicKnownKeyNames
         printName, fstName, sndName,
 
         -- Integer
-        integerTyConName, plusIntegerName, timesIntegerName, smallIntegerName,
+        plusIntegerName, timesIntegerName, smallIntegerName,
         integerToWordName, integerToIntName, minusIntegerName,
         negateIntegerName, eqIntegerName, neqIntegerName,
         absIntegerName, signumIntegerName,
@@ -786,7 +786,7 @@ fromIntegerName   = methName gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = methName gHC_NUM (fsLit "-") minusClassOpKey
 negateName        = methName gHC_NUM (fsLit "negate") negateClassOpKey
 
-integerTyConName, plusIntegerName, timesIntegerName, smallIntegerName,
+plusIntegerName, timesIntegerName, smallIntegerName,
     integerToWordName, integerToIntName, minusIntegerName,
     negateIntegerName, eqIntegerName, neqIntegerName,
     absIntegerName, signumIntegerName,
@@ -795,7 +795,6 @@ integerTyConName, plusIntegerName, timesIntegerName, smallIntegerName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
-integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
 plusIntegerName       = varQual gHC_INTEGER_TYPE (fsLit "plusInteger")       plusIntegerIdKey
 timesIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "timesInteger")      timesIntegerIdKey
 smallIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "smallInteger")      smallIntegerIdKey
@@ -1133,7 +1132,8 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
     charPrimTyConKey, charTyConKey, doublePrimTyConKey, doubleTyConKey,
     floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
     intTyConKey, int8TyConKey, int16TyConKey, int32PrimTyConKey,
-    int32TyConKey, int64PrimTyConKey, int64TyConKey, integerTyConKey,
+    int32TyConKey, int64PrimTyConKey, int64TyConKey,
+    integerTyConKey, digitsTyConKey,
     listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
     mutableArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
     orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
@@ -1159,8 +1159,9 @@ int32TyConKey                           = mkPreludeTyConUnique 19
 int64PrimTyConKey                       = mkPreludeTyConUnique 20
 int64TyConKey                           = mkPreludeTyConUnique 21
 integerTyConKey                         = mkPreludeTyConUnique 22
-listTyConKey                            = mkPreludeTyConUnique 23
-foreignObjPrimTyConKey                  = mkPreludeTyConUnique 24
+digitsTyConKey                          = mkPreludeTyConUnique 23
+listTyConKey                            = mkPreludeTyConUnique 24
+foreignObjPrimTyConKey                  = mkPreludeTyConUnique 25
 weakPrimTyConKey                        = mkPreludeTyConUnique 27
 mutableArrayPrimTyConKey                = mkPreludeTyConUnique 28
 mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 29
@@ -1349,6 +1350,22 @@ ltDataConKey, eqDataConKey, gtDataConKey :: Unique
 ltDataConKey                            = mkPreludeDataConUnique 27
 eqDataConKey                            = mkPreludeDataConUnique 28
 gtDataConKey                            = mkPreludeDataConUnique 29
+
+-- For integer-gmp only
+integerGmpSDataConKey, integerGmpJDataConKey :: Unique
+integerGmpSDataConKey                   = mkPreludeDataConUnique 30
+integerGmpJDataConKey                   = mkPreludeDataConUnique 31
+
+-- For integer-simple only
+integerSimpleNaughtDataConKey,
+    integerSimplePositiveDataConKey, integerSimpleNegativeDataConKey :: Unique
+integerSimpleNaughtDataConKey           = mkPreludeDataConUnique 32
+integerSimplePositiveDataConKey         = mkPreludeDataConUnique 33
+integerSimpleNegativeDataConKey         = mkPreludeDataConUnique 34
+
+digitsSomeDataConKey, digitsNoneDataConKey :: Unique
+digitsSomeDataConKey                    = mkPreludeDataConUnique 35
+digitsNoneDataConKey                    = mkPreludeDataConUnique 36
 \end{code}
 
 %************************************************************************

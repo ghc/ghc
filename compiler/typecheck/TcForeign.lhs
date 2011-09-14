@@ -31,12 +31,18 @@ import ForeignCall
 import ErrUtils
 import Id
 import Name
+import RdrName
+import DataCon
+import TyCon
 import TcType
+import Coercion
+import PrelNames
 import DynFlags
 import Outputable
 import SrcLoc
 import Bag
 import FastString
+import Util
 \end{code}
 
 \begin{code}
@@ -259,13 +265,48 @@ mustBeIO = False
 
 checkForeignRes non_io_result_ok safehs_check pred_res_ty ty
         -- (IO t) is ok, and so is any newtype wrapping thereof
-  | Just (_, res_ty, _) <- tcSplitIOType_maybe ty,
-    pred_res_ty res_ty
-  = return ()
+  = do m <- tcSplitVisibleIOType_maybe ty
+       case m of
+           Just (_, res_ty, _)
+            | pred_res_ty res_ty ->
+               return ()
+           _ ->
+               check (non_io_result_ok && pred_res_ty ty)
+                     (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
 
-  | otherwise
-  = check (non_io_result_ok && pred_res_ty ty)
-          (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
+-- This is mostly a copy of TcType.tcSplitIOType_maybe, except it checks
+-- that it doesn't look through any newtypes for which the constructor
+-- is not exported.
+tcSplitVisibleIOType_maybe :: Type -> TcM (Maybe (TyCon, Type, Coercion))
+tcSplitVisibleIOType_maybe ty
+  = case tcSplitTyConApp_maybe ty of
+        -- This split absolutely has to be a tcSplit, because we must
+        -- see the IO type; and it's a newtype which is transparent to
+        -- splitTyConApp.
+
+        Just (io_tycon, [io_res_ty])
+           |  io_tycon `hasKey` ioTyConKey
+           -> return $ Just (io_tycon, io_res_ty, mkReflCo ty)
+
+        Just (tc, tys)
+           | not (isRecursiveTyCon tc)
+           , Just (ty, co1) <- instNewTyCon_maybe tc tys
+                  -- Newtypes that require a coercion are ok
+           -> do newtypeOK <- do env <- getGblEnv
+                                 case tyConSingleDataCon_maybe tc of
+                                     Just dataCon ->
+                                         return $ notNull $ lookupGRE_Name (tcg_rdr_env env) $ dataConName dataCon
+                                     Nothing ->
+                                         return False
+                 if newtypeOK
+                     then do m <- tcSplitVisibleIOType_maybe ty
+                             return $ case m of
+                                      Nothing             -> Nothing
+                                      Just (tc, ty', co2) -> Just (tc, ty', co1 `mkTransCo` co2)
+                     else return Nothing
+
+        _ -> return Nothing
+
 \end{code}
 
 \begin{code}

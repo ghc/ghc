@@ -871,8 +871,8 @@ interactWithInertsStage depth workItem inert
     getISRelevant (CIPCan { cc_ip_nm = nm }) is 
       = let (relevant, residual_map) = getRelevantCts nm (inert_ips is)
         in (relevant, is { inert_ips = residual_map }) 
-    getISRelevant (CIrredEvCan {}) is -- Irreducible, nothing is relevant! Only interacts with equalities.
-      = (emptyCCan, is)
+    getISRelevant (CIrredEvCan {}) is
+      = (inert_irreds is, is { inert_irreds = emptyCCan })
     -- An equality, finally, may kick everything except equalities out 
     -- because we have already interacted the equalities in interactWithInertEqsStage
     getISRelevant _eq_ct is  -- Equality, everything is relevant for this one 
@@ -1037,8 +1037,8 @@ doInteractWithInert (CDictCan { cc_id = dv, cc_flavor = ifl, cc_class = cl, cc_t
   = do { rewritten_dict <- rewriteDict (eqv,tv,xi) (dv,ifl,cl,xis)
        ; mkIRContinue "Cls/Eq" workItem DropInert (workListFromNonEq rewritten_dict) }
 
--- Class constraint and given equality: use the equality to rewrite
--- the class constraint.
+-- Irreducible evidence and given equality: use the equality to rewrite
+-- the irreducible evidence.
 doInteractWithInert (CTyEqCan { cc_id = eqv, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi }) 
                     (CIrredEvCan { cc_id = id, cc_flavor = wfl, cc_ty = ty })
   | ifl `canRewrite` wfl
@@ -1053,6 +1053,16 @@ doInteractWithInert (CIrredEvCan { cc_id = id, cc_flavor = ifl, cc_ty = ty })
   = do { rewritten_irred <- rewriteIrred (eqv,tv,xi) (id,ifl,ty) 
        ; mkIRContinue "Irred/Eq" workItem DropInert rewritten_irred }
 
+-- Two pieces of irreducible evidence: if their types are *exactly identical* we can
+-- rewrite them. We can never improve using this: if we want ty1 :: Constraint and have
+-- ty2 :: Constraint it clearly does not mean that (ty1 ~ ty2)
+doInteractWithInert (CIrredEvCan { cc_id = id1, cc_flavor = ifl, cc_ty = ty1 })
+           workItem@(CIrredEvCan { cc_ty = ty2 })
+  | ty1 `eqType` ty2
+  = solveOneFromTheOther "Irred/Irred" (EvId id1,ifl) workItem
+
+-- Implicit param and given equality: use the equality to rewrite
+-- the implicit param.
 doInteractWithInert (CTyEqCan { cc_id = eqv, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi }) 
                     (CIPCan { cc_id = ipid, cc_flavor = wfl, cc_ip_nm = nm, cc_ip_ty = ty }) 
   | ifl `canRewrite` wfl

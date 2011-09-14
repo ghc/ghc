@@ -618,12 +618,12 @@ tcDefaultAssocDecl fam_tc clas_tvs (L loc decl)
        -- See Note [Checking consistent instantiation]
        -- We only want to check this on the *class* TyVars,
        -- not the *family* TyVars (there may be more of these)
-       ; zipWithM_ check_arg clas_tvs at_tys
+       ; zipWithM_ check_arg (tyConTyVars fam_tc) at_tys
 
        ; return (ATD at_tvs at_tys at_rhs) }
   where
     check_arg fam_tc_tv at_ty
-      = checkTc (mkTyVarTy fam_tc_tv `eqType` at_ty) 
+      = checkTc (not (fam_tc_tv `elem` clas_tvs) || mkTyVarTy fam_tc_tv `eqType` at_ty) 
                 (wrongATArgErr at_ty (mkTyVarTy fam_tc_tv))
 
 -------------------------
