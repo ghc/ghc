@@ -819,7 +819,7 @@ inferConstraints _ cls inst_tys rep_tc rep_tc_args
     		 	dataConInstOrigArgTys data_con all_rep_tc_args,
           not (isUnLiftedType arg_ty) ]
     		-- No constraints for unlifted types
-    		-- Where they are legal we generate specilised function calls
+    		-- See Note [Deriving and unboxed types]
 
     		-- For functor-like classes, two things are different
     		-- (a) We recurse over argument types to generate constraints
@@ -860,7 +860,24 @@ inferConstraints _ cls inst_tys rep_tc rep_tc_args
       = [mkClassPred cls [ty] | ty <- rep_tc_args]
       | otherwise 
       = []
+\end{code}
 
+Note [Deriving and unboxed types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have some special hacks to support things like
+   data T = MkT Int# deriving( Ord, Show )
+
+Specifically
+  * For Show we use TcGenDeriv.box_if_necy to box the Int# into an Int
+    (which we know how to show)
+
+  * For Eq, Ord, we ust TcGenDeriv.primOrdOps to give Ord operations
+    on some primitive types
+
+It's all a bit ad hoc.
+
+
+\begin{code}
 ------------------------------------------------------------------
 -- Check side conditions that dis-allow derivability for particular classes
 -- This is *apart* from the newtype-deriving mechanism
@@ -894,15 +911,15 @@ nonStdErr cls = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
 sideConditions :: DerivContext -> Class -> Maybe Condition
 sideConditions mtheta cls
-  | cls_key == eqClassKey      	   = Just cond_std
-  | cls_key == ordClassKey     	   = Just cond_std
-  | cls_key == showClassKey    	   = Just cond_std
-  | cls_key == readClassKey    	   = Just (cond_std `andCond` cond_noUnliftedArgs)
+  | cls_key == eqClassKey      	   = Just (cond_std `andCond` cond_args cls)
+  | cls_key == ordClassKey     	   = Just (cond_std `andCond` cond_args cls)
+  | cls_key == showClassKey    	   = Just (cond_std `andCond` cond_args cls)
+  | cls_key == readClassKey    	   = Just (cond_std `andCond` cond_args cls)
   | cls_key == enumClassKey    	   = Just (cond_std `andCond` cond_isEnumeration)
-  | cls_key == ixClassKey      	   = Just (cond_std `andCond` cond_enumOrProduct)
-  | cls_key == boundedClassKey 	   = Just (cond_std `andCond` cond_enumOrProduct)
+  | cls_key == ixClassKey      	   = Just (cond_std `andCond` cond_enumOrProduct cls)
+  | cls_key == boundedClassKey 	   = Just (cond_std `andCond` cond_enumOrProduct cls)
   | cls_key == dataClassKey    	   = Just (checkFlag Opt_DeriveDataTypeable `andCond` 
-                                           cond_std `andCond` cond_noUnliftedArgs)
+                                           cond_std `andCond` cond_args cls)
   | cls_key == functorClassKey 	   = Just (checkFlag Opt_DeriveFunctor `andCond`
     	                                   cond_functorOK True)	 -- NB: no cond_std!
   | cls_key == foldableClassKey	   = Just (checkFlag Opt_DeriveFoldable `andCond`
@@ -964,20 +981,34 @@ no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
 cond_RepresentableOk :: Condition
 cond_RepresentableOk (_,t) = canDoGenerics t
 
-cond_enumOrProduct :: Condition
-cond_enumOrProduct = cond_isEnumeration `orCond` 
-		       (cond_isProduct `andCond` cond_noUnliftedArgs)
+cond_enumOrProduct :: Class -> Condition
+cond_enumOrProduct cls = cond_isEnumeration `orCond` 
+		         (cond_isProduct `andCond` cond_args cls)
 
-cond_noUnliftedArgs :: Condition
+cond_args :: Class -> Condition
 -- For some classes (eg Eq, Ord) we allow unlifted arg types
 -- by generating specilaised code.  For others (eg Data) we don't.
-cond_noUnliftedArgs (_, tc)
-  | null bad_cons = Nothing
-  | otherwise     = Just why
+cond_args cls (_, tc)
+  = case bad_args of 
+      []      -> Nothing
+      (ty:_) -> Just (hang (ptext (sLit "Don't know how to derive") <+> quotes (ppr cls))
+                         2 (ptext (sLit "for type") <+> quotes (ppr ty)))
   where
-    bad_cons = [ con | con <- tyConDataCons tc
-		     , any isUnLiftedType (dataConOrigArgTys con) ]
-    why = badCon (head bad_cons) (ptext (sLit "must have only arguments of lifted type"))
+    bad_args = [ arg_ty | con <- tyConDataCons tc
+		        , arg_ty <- dataConOrigArgTys con
+			, isUnLiftedType arg_ty 
+                     	, not (ok_ty arg_ty) ]
+
+    cls_key = classKey cls
+    ok_ty arg_ty
+     | cls_key == eqClassKey   = check_in arg_ty ordOpTbl
+     | cls_key == ordClassKey  = check_in arg_ty ordOpTbl
+     | cls_key == showClassKey = check_in arg_ty boxConTbl
+     | otherwise               = False    -- Read, Ix etc
+
+    check_in :: Type -> [(Type,a)] -> Bool
+    check_in arg_ty tbl = any (eqType arg_ty . fst) tbl
+
 
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
