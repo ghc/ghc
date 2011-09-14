@@ -1,5 +1,5 @@
 
 T2701.hs:10:32:
     Can't make a derived instance of `Data Foo':
-      Constructor `MkFoo' must have only arguments of lifted type
+      Don't know how to derive `Data' for type `Int#'
     In the data type declaration for `Foo'
