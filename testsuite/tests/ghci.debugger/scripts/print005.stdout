@@ -1,10 +1,10 @@
 Breakpoint 0 activated at ../QSort.hs:5:16-51
 Stopped at ../QSort.hs:5:16-51
-_result :: [a] = _
-a :: a = _
-left :: [a] = _
-right :: [a] = _
-right = (_t1::[a])
+_result :: [Integer] = _
+a :: Integer = 8
+left :: [Integer] = _
+right :: [Integer] = _
+right = (_t1::[Integer])
 ()
 right = []
 left = (_t2::[Integer])
