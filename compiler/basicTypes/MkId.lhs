@@ -28,14 +28,13 @@ module MkId (
         voidArgId, nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId,
 
-        -- integer-gmp only Id:
-        integerGmpSId,
         -- integer-simple only Id's:
         integerSimpleNaughtId,
         integerSimplePositiveId,
         integerSimpleNegativeId,
         digitsNoneId,
         digitsSomeId,
+
         -- Common Integer Id's:
         shiftLIntegerId,
         negateIntegerId,
@@ -1058,11 +1057,6 @@ coercionTokenId -- Used to replace Coercion terms when we go to STG
   = pcMiscPrelId coercionTokenName 
                  (mkTyConApp eqPrimTyCon [unitTy, unitTy])
                  noCafIdInfo
-
--- integer-gmp only Id:
-integerGmpSId :: Id
-integerGmpSId = mkVanillaGlobal integerGmpSDataConName
-                                (mkFunTy intPrimTy integerTy)
 
 -- integer-simple only Id's:
 integerSimpleNaughtId, integerSimplePositiveId, integerSimpleNegativeId,

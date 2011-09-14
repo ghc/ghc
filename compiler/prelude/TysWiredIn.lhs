@@ -26,8 +26,10 @@ module TysWiredIn (
 
         -- * Integer
         integerTy, integerTyConName,
+
         -- integer-gmp only:
-        integerGmpSDataConName,
+        integerGmpSDataCon,
+
         -- integer-simple only:
         integerSimpleNaughtDataConName,
         integerSimplePositiveDataConName, integerSimpleNegativeDataConName,
