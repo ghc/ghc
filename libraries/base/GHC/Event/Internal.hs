@@ -129,7 +129,7 @@ delete (Backend bState _ _ bDelete) = bDelete bState
 -- 'getErrno' is not 'eINTR'.  If the result value is -1 and
 -- 'getErrno' returns 'eINTR' 0 is returned.  Otherwise the result
 -- value is returned.
-throwErrnoIfMinus1NoRetry :: Num a => String -> IO a -> IO a
+throwErrnoIfMinus1NoRetry :: (Eq a, Num a) => String -> IO a -> IO a
 throwErrnoIfMinus1NoRetry loc f = do
     res <- f
     if res == -1

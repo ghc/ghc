@@ -73,7 +73,7 @@ Minimal complete definition: '.&.', '.|.', 'xor', 'complement',
 ('shift' or ('shiftL' and 'shiftR')), ('rotate' or ('rotateL' and 'rotateR')),
 'bitSize' and 'isSigned'.
 -}
-class Num a => Bits a where
+class (Eq a, Num a) => Bits a where
     -- | Bitwise \"and\"
     (.&.) :: a -> a -> a
 

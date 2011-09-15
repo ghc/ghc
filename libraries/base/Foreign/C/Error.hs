@@ -401,34 +401,36 @@ throwErrnoIfRetryMayBlock_ pred loc f on_block
 -- | Throw an 'IOError' corresponding to the current value of 'getErrno'
 -- if the 'IO' action returns a result of @-1@.
 --
-throwErrnoIfMinus1 :: Num a => String -> IO a -> IO a
+throwErrnoIfMinus1 :: (Eq a, Num a) => String -> IO a -> IO a
 throwErrnoIfMinus1  = throwErrnoIf (== -1)
 
 -- | as 'throwErrnoIfMinus1', but discards the result.
 --
-throwErrnoIfMinus1_ :: Num a => String -> IO a -> IO ()
+throwErrnoIfMinus1_ :: (Eq a, Num a) => String -> IO a -> IO ()
 throwErrnoIfMinus1_  = throwErrnoIf_ (== -1)
 
 -- | Throw an 'IOError' corresponding to the current value of 'getErrno'
 -- if the 'IO' action returns a result of @-1@, but retries in case of
 -- an interrupted operation.
 --
-throwErrnoIfMinus1Retry :: Num a => String -> IO a -> IO a
+throwErrnoIfMinus1Retry :: (Eq a, Num a) => String -> IO a -> IO a
 throwErrnoIfMinus1Retry  = throwErrnoIfRetry (== -1)
 
 -- | as 'throwErrnoIfMinus1', but discards the result.
 --
-throwErrnoIfMinus1Retry_ :: Num a => String -> IO a -> IO ()
+throwErrnoIfMinus1Retry_ :: (Eq a, Num a) => String -> IO a -> IO ()
 throwErrnoIfMinus1Retry_  = throwErrnoIfRetry_ (== -1)
 
 -- | as 'throwErrnoIfMinus1Retry', but checks for operations that would block.
 --
-throwErrnoIfMinus1RetryMayBlock :: Num a => String -> IO a -> IO b -> IO a
+throwErrnoIfMinus1RetryMayBlock :: (Eq a, Num a)
+                                => String -> IO a -> IO b -> IO a
 throwErrnoIfMinus1RetryMayBlock  = throwErrnoIfRetryMayBlock (== -1)
 
 -- | as 'throwErrnoIfMinus1RetryMayBlock', but discards the result.
 --
-throwErrnoIfMinus1RetryMayBlock_ :: Num a => String -> IO a -> IO b -> IO ()
+throwErrnoIfMinus1RetryMayBlock_ :: (Eq a, Num a)
+                                 => String -> IO a -> IO b -> IO ()
 throwErrnoIfMinus1RetryMayBlock_  = throwErrnoIfRetryMayBlock_ (== -1)
 
 -- | Throw an 'IOError' corresponding to the current value of 'getErrno'
@@ -481,13 +483,13 @@ throwErrnoPathIfNull  = throwErrnoPathIf (== nullPtr)
 -- | as 'throwErrnoIfMinus1', but exceptions include the given path when
 --   appropriate.
 --
-throwErrnoPathIfMinus1 :: Num a => String -> FilePath -> IO a -> IO a
+throwErrnoPathIfMinus1 :: (Eq a, Num a) => String -> FilePath -> IO a -> IO a
 throwErrnoPathIfMinus1 = throwErrnoPathIf (== -1)
 
 -- | as 'throwErrnoIfMinus1_', but exceptions include the given path when
 --   appropriate.
 --
-throwErrnoPathIfMinus1_ :: Num a => String -> FilePath -> IO a -> IO ()
+throwErrnoPathIfMinus1_ :: (Eq a, Num a) => String -> FilePath -> IO a -> IO ()
 throwErrnoPathIfMinus1_  = throwErrnoPathIf_ (== -1)
 
 -- conversion of an "errno" value into IO error

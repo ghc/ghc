@@ -90,16 +90,16 @@ readInt :: Num a
 readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
 
 -- | Read an unsigned number in octal notation.
-readOct :: Num a => ReadS a
+readOct :: (Eq a, Num a) => ReadS a
 readOct = readP_to_S L.readOctP
 
 -- | Read an unsigned number in decimal notation.
-readDec :: Num a => ReadS a
+readDec :: (Eq a, Num a) => ReadS a
 readDec = readP_to_S L.readDecP
 
 -- | Read an unsigned number in hexadecimal notation.
 -- Both upper or lower case letters are allowed.
-readHex :: Num a => ReadS a
+readHex :: (Eq a, Num a) => ReadS a
 readHex = readP_to_S L.readHexP 
 
 -- | Reads an /unsigned/ 'RealFrac' value,

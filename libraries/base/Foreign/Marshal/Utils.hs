@@ -108,7 +108,7 @@ fromBool True   = 1
 
 -- |Convert a Boolean in numeric representation to a Haskell value
 --
-toBool :: Num a => a -> Bool
+toBool :: (Eq a, Num a) => a -> Bool
 toBool  = (/= 0)
 
 

@@ -413,7 +413,7 @@ fracExp exp mant (d:ds) = exp' `seq` mant' `seq` fracExp exp' mant' ds
     exp'  = exp - 1
     mant' = mant * 10 + fromIntegral d
 
-valDig :: Num a => a -> Char -> Maybe Int
+valDig :: (Eq a, Num a) => a -> Char -> Maybe Int
 valDig 8 c
   | '0' <= c && c <= '7' = Just (ord c - ord '0')
   | otherwise            = Nothing
@@ -441,13 +441,13 @@ readIntP base isDigit valDigit =
   do s <- munch1 isDigit
      return (val base 0 (map valDigit s))
 
-readIntP' :: Num a => a -> ReadP a
+readIntP' :: (Eq a, Num a) => a -> ReadP a
 readIntP' base = readIntP base isDigit valDigit
  where
   isDigit  c = maybe False (const True) (valDig base c)
   valDigit c = maybe 0     id           (valDig base c)
 
-readOctP, readDecP, readHexP :: Num a => ReadP a
+readOctP, readDecP, readHexP :: (Eq a, Num a) => ReadP a
 readOctP = readIntP' 8
 readDecP = readIntP' 10
 readHexP = readIntP' 16
