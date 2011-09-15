@@ -1265,7 +1265,8 @@ mkRecSelBind (tycon, sel_name)
   = (L loc (IdSig sel_id), unitBag (L loc sel_bind))
   where
     loc    	= getSrcSpan tycon    
-    sel_id 	= Var.mkLocalVar rec_details sel_name sel_ty vanillaIdInfo
+    sel_id 	= Var.mkExportedLocalVar rec_details sel_name 
+                                         sel_ty vanillaIdInfo
     rec_details = RecSelId { sel_tycon = tycon, sel_naughty = is_naughty }
 
     -- Find a representative constructor, con1

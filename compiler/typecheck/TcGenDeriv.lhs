@@ -28,7 +28,8 @@ module TcGenDeriv (
 	deepSubtypesContaining, foldDataConArgs,
 	gen_Foldable_binds,
 	gen_Traversable_binds,
-	genAuxBind
+	genAuxBind,
+        ordOpTbl, boxConTbl
     ) where
 
 #include "HsVersions.h"
@@ -1821,21 +1822,23 @@ box_if_necy :: String		-- The class involved
 	    -> LHsExpr RdrName	-- The argument
 	    -> Type		-- The argument type
 	    -> LHsExpr RdrName	-- Boxed version of the arg
+-- See Note [Deriving and unboxed types]
 box_if_necy cls_str tycon arg arg_ty
   | isUnLiftedType arg_ty = nlHsApp (nlHsVar box_con) arg
   | otherwise		  = arg
   where
-    box_con = assoc_ty_id cls_str tycon box_con_tbl arg_ty
+    box_con = assoc_ty_id cls_str tycon boxConTbl arg_ty
 
 ---------------------
 primOrdOps :: String	-- The class involved
 	   -> TyCon	-- The tycon involved
 	   -> Type	-- The type
 	   -> (PrimOp, PrimOp, PrimOp, PrimOp, PrimOp)	-- (lt,le,eq,ge,gt)
-primOrdOps str tycon ty = assoc_ty_id str tycon ord_op_tbl ty
+-- See Note [Deriving and unboxed types]
+primOrdOps str tycon ty = assoc_ty_id str tycon ordOpTbl ty
 
-ord_op_tbl :: [(Type, (PrimOp, PrimOp, PrimOp, PrimOp, PrimOp))]
-ord_op_tbl
+ordOpTbl :: [(Type, (PrimOp, PrimOp, PrimOp, PrimOp, PrimOp))]
+ordOpTbl
  =  [(charPrimTy,	(CharLtOp,   CharLeOp,   CharEqOp,   CharGeOp,	 CharGtOp))
     ,(intPrimTy,	(IntLtOp,    IntLeOp,    IntEqOp,    IntGeOp,	 IntGtOp))
     ,(wordPrimTy,	(WordLtOp,   WordLeOp,   WordEqOp,   WordGeOp,	 WordGtOp))
@@ -1843,9 +1846,9 @@ ord_op_tbl
     ,(floatPrimTy,	(FloatLtOp,  FloatLeOp,  FloatEqOp,  FloatGeOp,  FloatGtOp))
     ,(doublePrimTy,	(DoubleLtOp, DoubleLeOp, DoubleEqOp, DoubleGeOp, DoubleGtOp)) ]
 
-box_con_tbl :: [(Type, RdrName)]
-box_con_tbl =
-    [(charPrimTy,	getRdrName charDataCon)
+boxConTbl :: [(Type, RdrName)]
+boxConTbl
+  = [(charPrimTy,	getRdrName charDataCon)
     ,(intPrimTy,	getRdrName intDataCon)
     ,(wordPrimTy,	wordDataCon_RDR)
     ,(floatPrimTy,	getRdrName floatDataCon)
