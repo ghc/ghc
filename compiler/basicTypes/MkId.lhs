@@ -1074,18 +1074,21 @@ digitsSomeId = mkVanillaGlobal digitsSomeDataConName
                                         (mkFunTy digitsTy digitsTy))
 
 shiftLIntegerId :: Id
-shiftLIntegerId = mkVanillaGlobal shiftLIntegerName
-                                  (mkFunTy integerTy
-                                           (mkFunTy intPrimTy integerTy))
+shiftLIntegerId = mkVanillaGlobalWithInfo shiftLIntegerName
+                     (mkFunTy integerTy (mkFunTy intPrimTy integerTy))
+	             noCafIdInfo
+-- ToDo: we should not really be relying on noCafInfo here.
+-- What if it's wrong?!
 
 negateIntegerId :: Id
-negateIntegerId = mkVanillaGlobal negateIntegerName
-                                  (mkFunTy integerTy integerTy)
+negateIntegerId = mkVanillaGlobalWithInfo negateIntegerName
+                     (mkFunTy integerTy integerTy)
+                     noCafIdInfo
 
 orIntegerId :: Id
-orIntegerId = mkVanillaGlobal orIntegerName
-                              (mkFunTy integerTy
-                                       (mkFunTy integerTy integerTy))
+orIntegerId = mkVanillaGlobalWithInfo orIntegerName
+                     (mkFunTy integerTy (mkFunTy integerTy integerTy))
+                     noCafIdInfo
 \end{code}
 
 
