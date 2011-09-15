@@ -198,7 +198,7 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 
 -- | Shows a /non-negative/ 'Integral' number using the base specified by the
 -- first argument, and the character representation specified by the second.
-showIntAtBase :: Integral a => a -> (Int -> Char) -> a -> ShowS
+showIntAtBase :: (Integral a, Show a) => a -> (Int -> Char) -> a -> ShowS
 showIntAtBase base toChr n0 r0
   | base <= 1 = error ("Numeric.showIntAtBase: applied to unsupported base " ++ show base)
   | n0 <  0   = error ("Numeric.showIntAtBase: applied to negative number " ++ show n0)
@@ -213,9 +213,9 @@ showIntAtBase base toChr n0 r0
       r' = c : r
 
 -- | Show /non-negative/ 'Integral' numbers in base 16.
-showHex :: Integral a => a -> ShowS
+showHex :: (Integral a,Show a) => a -> ShowS
 showHex = showIntAtBase 16 intToDigit
 
 -- | Show /non-negative/ 'Integral' numbers in base 8.
-showOct :: Integral a => a -> ShowS
+showOct :: (Integral a, Show a) => a -> ShowS
 showOct = showIntAtBase 8  intToDigit

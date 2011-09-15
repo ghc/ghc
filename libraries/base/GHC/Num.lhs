@@ -57,7 +57,7 @@ default ()              -- Double isn't available yet,
 -- | Basic numeric class.
 --
 -- Minimal complete definition: all except 'negate' or @(-)@
-class  (Eq a, Show a) => Num a  where
+class  (Eq a) => Num a  where
     (+), (-), (*)       :: a -> a -> a
     -- | Unary negation.
     negate              :: a -> a

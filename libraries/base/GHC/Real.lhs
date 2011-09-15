@@ -362,7 +362,7 @@ instance  (Integral a)  => RealFrac (Ratio a)  where
     properFraction (x:%y) = (fromInteger (toInteger q), r:%y)
                           where (q,r) = quotRem x y
 
-instance  (Integral a)  => Show (Ratio a)  where
+instance  (Integral a, Show a)  => Show (Ratio a)  where
     {-# SPECIALIZE instance Show Rational #-}
     showsPrec p (x:%y)  =  showParen (p > ratioPrec) $
                            showsPrec ratioPrec1 x .
