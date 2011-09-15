@@ -20,6 +20,7 @@
 module GHC.Enum(
         Bounded(..), Enum(..),
         boundedEnumFrom, boundedEnumFromThen,
+        toEnumError, fromEnumError, succError, predError,
 
         -- Instances for Bounded and Enum: (), Char, Int
 
@@ -28,6 +29,7 @@ module GHC.Enum(
 import GHC.Base
 import GHC.Integer
 import GHC.Num
+import GHC.Show
 import Data.Tuple       ()              -- for dependencies
 default ()              -- Double isn't available yet
 \end{code}
@@ -121,6 +123,38 @@ boundedEnumFromThen n1 n2
   where
     i_n1 = fromEnum n1
     i_n2 = fromEnum n2
+\end{code}
+
+\begin{code}
+------------------------------------------------------------------------
+-- Helper functions
+------------------------------------------------------------------------
+
+{-# NOINLINE toEnumError #-}
+toEnumError :: (Show a) => String -> Int -> (a,a) -> b
+toEnumError inst_ty i bnds =
+    error $ "Enum.toEnum{" ++ inst_ty ++ "}: tag (" ++
+            show i ++
+            ") is outside of bounds " ++
+            show bnds
+
+{-# NOINLINE fromEnumError #-}
+fromEnumError :: (Show a) => String -> a -> b
+fromEnumError inst_ty x =
+    error $ "Enum.fromEnum{" ++ inst_ty ++ "}: value (" ++
+            show x ++
+            ") is outside of Int's bounds " ++
+            show (minBound::Int, maxBound::Int)
+
+{-# NOINLINE succError #-}
+succError :: String -> a
+succError inst_ty =
+    error $ "Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of maxBound"
+
+{-# NOINLINE predError #-}
+predError :: String -> a
+predError inst_ty =
+    error $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound"
 \end{code}
 
 

@@ -22,7 +22,6 @@
 -- #hide
 module GHC.Word (
     Word(..), Word8(..), Word16(..), Word32(..), Word64(..),
-    toEnumError, fromEnumError, succError, predError,
     uncheckedShiftL64#,
     uncheckedShiftRL64#
     ) where
@@ -42,36 +41,6 @@ import GHC.Arr
 import GHC.Show
 import GHC.Err
 import GHC.Float ()     -- for RealFrac methods
-
-------------------------------------------------------------------------
--- Helper functions
-------------------------------------------------------------------------
-
-{-# NOINLINE toEnumError #-}
-toEnumError :: (Show a) => String -> Int -> (a,a) -> b
-toEnumError inst_ty i bnds =
-    error $ "Enum.toEnum{" ++ inst_ty ++ "}: tag (" ++
-            show i ++
-            ") is outside of bounds " ++
-            show bnds
-
-{-# NOINLINE fromEnumError #-}
-fromEnumError :: (Show a) => String -> a -> b
-fromEnumError inst_ty x =
-    error $ "Enum.fromEnum{" ++ inst_ty ++ "}: value (" ++
-            show x ++
-            ") is outside of Int's bounds " ++
-            show (minBound::Int, maxBound::Int)
-
-{-# NOINLINE succError #-}
-succError :: String -> a
-succError inst_ty =
-    error $ "Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of maxBound"
-
-{-# NOINLINE predError #-}
-predError :: String -> a
-predError inst_ty =
-    error $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound"
 
 ------------------------------------------------------------------------
 -- type Word
