@@ -66,7 +66,7 @@ is32BitInteger i
 
 
 -- | Sadness.
-largeOffsetError :: Integral a => a -> b
+largeOffsetError :: (Integral a, Show a) => a -> b
 largeOffsetError i
   = panic ("ERROR: SPARC native-code generator cannot handle large offset ("
 		++ show i ++ ");\nprobably because of large constant data structures;" ++ 

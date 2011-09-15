@@ -406,7 +406,7 @@ showTotalSummary modSummary =
    showSummary (expTicked modSummary) (expTotal modSummary) ++
   "</tr>\n"
 
-showSummary :: (Integral t) => t -> t -> String
+showSummary :: (Integral t, Show t) => t -> t -> String
 showSummary ticked total =
                 "<td align=\"right\">" ++ showP (percent ticked total) ++ "</td>" ++
                 "<td>" ++ show ticked ++ "/" ++ show total ++ "</td>" ++
