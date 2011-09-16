@@ -128,3 +128,8 @@ test('T5342', normal, compile, [''])   # Lint error with -prof
 test('T5359a', normal, compile, [''])  # Lint error with -O (OccurAnal)
 test('T5359b', normal, compile, [''])  # Lint error with -O (OccurAnal)
 test('T5458', normal, compile, [''])
+test('simpl021',
+     extra_clean(['Simpl021A.hi', 'Simpl021A.o',
+                  'Simpl021B.hi', 'Simpl021B.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory simpl021'])

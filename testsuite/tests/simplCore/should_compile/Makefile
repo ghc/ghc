@@ -49,3 +49,10 @@ T4945:
 # When this one works there are no 'lets' at all
 T4957:
 	-('$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4957.hs -ddump-simpl -dsuppress-uniques | grep 'let')
+
+.PHONY: simpl021
+simpl021:
+	$(RM) -f Simpl021A.hi Simpl021A.o Simpl021B.hi Simpl021B.o
+	'$(TEST_HC)' -c Simpl021A.hs -O
+	'$(TEST_HC)' -c Simpl021B.hs -O
+
