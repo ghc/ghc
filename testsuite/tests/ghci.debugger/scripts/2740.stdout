@@ -1,10 +1,10 @@
 Stopped at 2740.hs:(3,1)-(4,25)
 _result :: a = _
 Stopped at 2740.hs:3:11-13
-_result :: a = _
-x :: a = _
-y :: a = _
-x = (_t1::a)
-y = (_t2::a)
+_result :: Integer = _
+x :: Integer = 1
+y :: Integer = 2
+x = 1
+y = 2
 x = 1
 y = 2

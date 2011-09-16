@@ -2,8 +2,8 @@ Breakpoint 0 activated at ../QSort.hs:(4,1)-(6,55)
 Stopped at ../QSort.hs:(4,1)-(6,55)
 _result :: [a] = _
 Stopped at ../QSort.hs:5:16-51
-_result :: [a] = _
-a :: a = _
-left :: [a] = _
-right :: [a] = _
-a :: a 	-- Defined at <no location info>
+_result :: [Integer] = _
+a :: Integer = 3
+left :: [Integer] = _
+right :: [Integer] = _
+a :: Integer 	-- Defined at <no location info>

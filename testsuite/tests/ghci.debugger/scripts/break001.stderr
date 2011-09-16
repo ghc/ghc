@@ -1,7 +1,0 @@
-
-<interactive>:1:1:
-    Ambiguous type variable `t' in the constraint:
-      (Show t) arising from a use of `print'
-    Cannot resolve unknown runtime types: t
-    Use :print or :force to determine these types
-    In a stmt of an interactive GHCi command: print it

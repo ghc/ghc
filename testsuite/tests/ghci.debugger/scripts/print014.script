@@ -5,5 +5,3 @@
 
 let e = Exist 1
 :p e
-seq _t1 ()
-:p e
