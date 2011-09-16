@@ -442,7 +442,7 @@ tc_pat penv vpat@(ViewPat expr pat _) overall_pat_ty thing_inside
          -- we will only be able to use view at one instantation in the
          -- rest of the view
 	; (expr_co, pat_ty) <- tcInfer $ \ pat_ty -> 
-		unifyPatType expr'_inferred (mkFunTy overall_pat_ty pat_ty)
+		unifyType expr'_inferred (mkFunTy overall_pat_ty pat_ty)
         
          -- pattern must have pat_ty
         ; (pat', res) <- tc_lpat pat pat_ty penv thing_inside
