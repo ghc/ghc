@@ -12,7 +12,7 @@ module TcEnv(
 	InstBindings(..),
 
 	-- Global environment
-	tcExtendGlobalEnv, setGlobalTypeEnv,
+        tcExtendGlobalEnv, tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
 	tcExtendGlobalValEnv,
 	tcLookupLocatedGlobal,	tcLookupGlobal, 
 	tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
@@ -274,10 +274,28 @@ setGlobalTypeEnv tcg_env new_type_env
     	   writeMutVar (tcg_type_env_var tcg_env) new_type_env
 	 ; return (tcg_env { tcg_type_env = new_type_env }) }
 
+
 tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
-  -- Given a mixture of Ids, TyCons, Classes, all from the
+  -- Given a mixture of Ids, TyCons, Classes, all defined in the
   -- module being compiled, extend the global environment
 tcExtendGlobalEnv things thing_inside
+  = do { env <- getGblEnv
+       ; let env' = env { tcg_tcs  = [ tc | ATyCon tc <- things,
+                                            not (isClassTyCon tc)]
+                                      ++ tcg_tcs env
+                        , tcg_clss = [ cl | ATyCon tc <- things,
+                                            Just cl <- [tyConClass_maybe tc]]
+                                      ++ tcg_clss env }
+       ; setGblEnv env' $
+            tcExtendGlobalEnvImplicit things thing_inside
+       }
+
+tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
+  -- Extend the global environment with some TyThings that can be obtained
+  -- via implicitTyThings from other entities in the environment.  Examples
+  -- are dfuns, famInstTyCons, data cons, etc.
+  -- These TyThings are not added to tcg_tcs or tcg_clss.
+tcExtendGlobalEnvImplicit things thing_inside
    = do	{ tcg_env <- getGblEnv
 	; let ge'  = extendTypeEnvList (tcg_type_env tcg_env) things
 	; tcg_env' <- setGlobalTypeEnv tcg_env ge'

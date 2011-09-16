@@ -51,14 +51,10 @@ module PrelNames (
 
 import Module
 import OccName
-import RdrName    ( RdrName, nameRdrName, mkOrig, rdrNameOcc, mkUnqual )
-import Unique     ( Unique, Uniquable(..), hasKey,
-                    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
-                    mkPreludeTyConUnique, mkPreludeClassUnique,
-                    mkTupleTyConUnique
-                  )
-import BasicTypes ( TupleSort(..), Arity )
-import Name       ( Name, mkInternalName, mkExternalName, mkSystemVarName )
+import RdrName
+import Unique
+import BasicTypes
+import Name
 import SrcLoc
 import FastString
 \end{code}

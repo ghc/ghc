@@ -254,7 +254,7 @@ lookupIE ie con_nm
 linkFail :: String -> String -> IO a
 linkFail who what
    = ghcError (ProgramError $
-        unlines [ ""
+        unlines [ "",who
 	        , "During interactive linking, GHCi couldn't find the following symbol:"
 		, ' ' : ' ' : what 
 		, "This may be due to you not asking GHCi to load extra object files,"

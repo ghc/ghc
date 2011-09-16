@@ -69,10 +69,10 @@ import Data.List
 \begin{code}
 
 tcTyAndClassDecls :: ModDetails 
-                   -> [[LTyClDecl Name]]     -- Mutually-recursive groups in dependency order
-   	           -> TcM (TcGblEnv,   	     -- Input env extended by types and classes 
-					     -- and their implicit Ids,DataCons
-		           HsValBinds Name)  -- Renamed bindings for record selectors
+                   -> [[LTyClDecl Name]]    -- Mutually-recursive groups in dependency order
+                   -> TcM (TcGblEnv,   	    -- Input env extended by types and classes 
+                                            -- and their implicit Ids,DataCons
+                           HsValBinds Name) -- Renamed bindings for record selectors
 -- Fails if there are any errors
 
 tcTyAndClassDecls boot_details decls_s
@@ -114,12 +114,13 @@ tcTyAndClassDecls boot_details decls_s
 	--     the same.
 	; let {	implicit_things = concatMap implicitTyThings tyclss
 	      ; rec_sel_binds   = mkRecSelBinds [tc | ATyCon tc <- tyclss]
-              ; dm_ids          = mkDefaultMethodIds tyclss }
+          ; dm_ids          = mkDefaultMethodIds tyclss }
 
-  	; env <- tcExtendGlobalEnv implicit_things $
-                 tcExtendGlobalValEnv dm_ids $
-                 getGblEnv
-        ; return (env, rec_sel_binds) } }
+        ; tcg_env <- tcExtendGlobalEnvImplicit implicit_things $
+                     tcExtendGlobalValEnv dm_ids $
+                     getGblEnv
+
+        ; return (tcg_env, rec_sel_binds) } }
                     
 zipRecTyClss :: [[LTyClDecl Name]]
              -> [TyThing]           -- Knot-tied

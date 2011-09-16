@@ -61,7 +61,7 @@ vectoriseIO hsc_env guts
 -- Vectorise a single module, in the VM monad.
 --
 vectModule :: ModGuts -> VM ModGuts
-vectModule guts@(ModGuts { mg_types      = types
+vectModule guts@(ModGuts { mg_tcs        = tycons
                          , mg_binds      = binds
                          , mg_fam_insts  = fam_insts
                          , mg_vect_decls = vect_decls
@@ -69,12 +69,14 @@ vectModule guts@(ModGuts { mg_types      = types
  = do { dumpOptVt Opt_D_dump_vt_trace "Before vectorisation" $ 
           pprCoreBindings binds
  
-          -- Vectorise the type environment.  This will add vectorised type constructors, their
-          -- representaions, and the conrresponding data constructors.  Moreover, we produce
-          -- bindings for dfuns and family instances of the classes and type families used in the
-          -- DPH library to represent array types.
-      ; (types', new_fam_insts, tc_binds) <- vectTypeEnv types [vd 
-                                                               | vd@(VectType _ _) <- vect_decls]
+          -- Vectorise the type environment.  This will add vectorised
+          -- type constructors, their representaions, and the
+          -- conrresponding data constructors.  Moreover, we produce
+          -- bindings for dfuns and family instances of the classes
+          -- and type families used in the DPH library to represent
+          -- array types.
+      ; (tycons', new_fam_insts, tc_binds) <- vectTypeEnv tycons [vd
+                                                                | vd@(VectType _ _) <- vect_decls]
 
       ; (_, fam_inst_env) <- readGEnv global_fam_inst_env
 
@@ -82,7 +84,7 @@ vectModule guts@(ModGuts { mg_types      = types
       ; binds_top <- mapM vectTopBind binds
       ; binds_imp <- mapM vectImpBind [imp_id | Vect imp_id _ <- vect_decls, isGlobalId imp_id]
 
-      ; return $ guts { mg_types        = types'
+      ; return $ guts { mg_tcs          = tycons'
                       , mg_binds        = Rec tc_binds : (binds_top ++ binds_imp)
                       , mg_fam_inst_env = fam_inst_env
                       , mg_fam_insts    = fam_insts ++ new_fam_insts

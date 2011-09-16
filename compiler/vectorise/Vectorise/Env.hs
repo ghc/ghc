@@ -202,8 +202,8 @@ setPRFunsEnv ps genv
 -- data constructors referenced in VECTORISE pragmas, even if they are defined in an imported
 -- module.
 --
-modVectInfo :: GlobalEnv -> TypeEnv -> [CoreVect]-> VectInfo -> VectInfo
-modVectInfo env tyenv vectDecls info
+modVectInfo :: GlobalEnv -> [TyCon] -> [CoreVect]-> VectInfo -> VectInfo
+modVectInfo env tycons vectDecls info
   = info 
     { vectInfoVar          = mk_env ids      (global_vars     env)
     , vectInfoTyCon        = mk_env tyCons   (global_tycons   env)
@@ -216,9 +216,10 @@ modVectInfo env tyenv vectDecls info
     vectIds        = [id    | Vect     id    _ <- vectDecls]
     vectTypeTyCons = [tycon | VectType tycon _ <- vectDecls]
     vectDataCons   = concatMap tyConDataCons vectTypeTyCons
-    ids            = typeEnvIds      tyenv ++ vectIds
-    tyCons         = typeEnvTyCons   tyenv ++ vectTypeTyCons
-    dataCons       = typeEnvDataCons tyenv ++ vectDataCons
+    ids            = {- typeEnvIds      tyenv ++ -} vectIds
+                     -- XXX: what Ids do you want here?
+    tyCons         = tycons ++ vectTypeTyCons
+    dataCons       = concatMap tyConDataCons tycons ++ vectDataCons
     
     -- Produce an entry for every declaration that is mentioned in the domain of the 'inspectedEnv'
     mk_env decls inspectedEnv

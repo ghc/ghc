@@ -55,7 +55,11 @@ initV :: HscEnv
       -> VM a
       -> IO (Maybe (VectInfo, a))
 initV hsc_env guts info thing_inside
-  = do { (_, Just res) <- initDs hsc_env (mg_module guts) (mg_rdr_env guts) (mg_types guts) go
+  = do {
+         let type_env = typeEnvFromEntities [] (mg_tcs guts) (mg_clss guts) (mg_fam_insts guts)
+                        -- XXX should we try to get the Ids here?
+       ; (_, Just res) <- initDs hsc_env (mg_module guts)
+                                         (mg_rdr_env guts) type_env go
 
        ; dumpIfVtTrace "Incoming VectInfo" (ppr info)
        ; case res of
@@ -110,7 +114,7 @@ initV hsc_env guts info thing_inside
                                   }
            } }
 
-    new_info genv = modVectInfo genv (mg_types guts) (mg_vect_decls guts) info
+    new_info genv = modVectInfo genv (mg_tcs guts) (mg_vect_decls guts) info
 
     selectBackendErr = sLit "To use -fvectorise select a DPH backend with -fdph-par or -fdph-seq"
 

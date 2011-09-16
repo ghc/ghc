@@ -65,6 +65,7 @@ import HsSyn
 import HscTypes
 import Type
 import Class    ( Class )
+import TyCon    ( TyCon )
 import DataCon  ( DataCon, dataConUserType )
 import TcType
 import Annotations
@@ -266,6 +267,8 @@ data TcGblEnv
         tcg_imp_specs :: [LTcSpecPrag],     -- ...SPECIALISE prags for imported Ids
 	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
 	tcg_anns      :: [Annotation],      -- ...Annotations
+        tcg_tcs       :: [TyCon],           -- ...TyCons
+        tcg_clss      :: [Class],           -- ...Classes
 	tcg_insts     :: [Instance],	    -- ...Instances
         tcg_fam_insts :: [FamInst],         -- ...Family instances
         tcg_rules     :: [LRuleDecl Id],    -- ...Rules

@@ -449,7 +449,7 @@ runGHCi paths maybe_exprs = do
         Nothing ->
           do
             -- enter the interactive loop
-            runGHCiInput $ runCommands True $ nextInputLine show_prompt is_tty
+            runGHCiInput $ runCommands False $ nextInputLine show_prompt is_tty
         Just exprs -> do
             -- just evaluate the expression we were given
             enqueueCommands exprs
@@ -463,7 +463,7 @@ runGHCi paths maybe_exprs = do
                                    -- this used to be topHandlerFastExit, see #2228
                                      $ topHandler e
             runInputTWithPrefs defaultPrefs defaultSettings $ do
-                runCommands' handle True (return Nothing)
+                runCommands' handle False (return Nothing)
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -723,6 +723,10 @@ enqueueCommands cmds = do
   st <- getGHCiState
   setGHCiState st{ cmdqueue = cmds ++ cmdqueue st }
 
+-- | If we one of these strings prefixes a command, then we treat it as a decl
+-- rather than a stmt.
+declPrefixes :: [String]
+declPrefixes = ["class ","data ","newtype ","type ","instance ", "deriving "]
 
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
@@ -730,6 +734,10 @@ runStmt stmt step
  = return False
  | "import " `isPrefixOf` stmt
  = do addImportToContext stmt; return False
+ | any (flip isPrefixOf stmt) declPrefixes
+ = do _ <- liftIO $ tryIO $ hFlushAll stdin
+      result <- GhciMonad.runDecls stmt
+      afterRunStmt (const True) (GHC.RunOk result)
  | otherwise
  = do -- In the new IO library, read handles buffer data even if the Handle
       -- is set to NoBuffering.  This causes problems for GHCi where there
@@ -737,8 +745,10 @@ runStmt stmt step
       -- GHCi's stdin Handle here (only relevant if stdin is attached to
       -- a file, otherwise the read buffer can't be flushed).
       _ <- liftIO $ tryIO $ hFlushAll stdin
-      result <- GhciMonad.runStmt stmt step
-      afterRunStmt (const True) result
+      m_result <- GhciMonad.runStmt stmt step
+      case m_result of
+        Nothing     -> return False
+        Just result -> afterRunStmt (const True) result
 
 --afterRunStmt :: GHC.RunResult -> GHCi Bool
                                  -- False <=> the statement failed to compile
@@ -791,8 +801,8 @@ printStoppedAtBreakInfo resume names = do
   --  printTypeOfNames session names
   let namesSorted = sortBy compareNames names
   tythings <- catMaybes `liftM` mapM GHC.lookupName namesSorted
-  docs <- pprTypeAndContents [id | AnId id <- tythings]
-  printForUserPartWay docs
+  docs <- mapM pprTypeAndContents [id | AnId id <- tythings]
+  printForUserPartWay $ vcat docs
 
 printTypeOfNames :: [Name] -> GHCi ()
 printTypeOfNames names
@@ -918,20 +928,19 @@ help _ = liftIO (putStr helpText)
 
 info :: String -> InputT GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
-info s  = handleSourceError GHC.printException $
-          do { let names = words s
-             ; dflags <- getDynFlags
-             ; let pefas = dopt Opt_PrintExplicitForalls dflags
-             ; mapM_ (infoThing pefas) names }
-  where
-    infoThing pefas str = do
-        names     <- GHC.parseName str
-        mb_stuffs <- mapM GHC.getInfo names
-        let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
-        unqual <- GHC.getPrintUnqual
-        liftIO $ putStrLn $ showSDocForUser unqual $
-                     vcat (intersperse (text "") $
-                           map (pprInfo pefas) filtered)
+info s  = handleSourceError GHC.printException $ do
+    unqual <- GHC.getPrintUnqual
+    sdocs  <- mapM infoThing (words s)
+    mapM_ (liftIO . putStrLn . showSDocForUser unqual) sdocs
+
+infoThing :: GHC.GhcMonad m => String -> m SDoc
+infoThing str = do
+    dflags    <- getDynFlags
+    let pefas = dopt Opt_PrintExplicitForalls dflags
+    names     <- GHC.parseName str
+    mb_stuffs <- mapM GHC.getInfo names
+    let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
+    return $ vcat (intersperse (text "") $ map (pprInfo pefas) filtered)
 
   -- Filter out names whose parent is also there Good
   -- example is '[]', which is both a type and data
@@ -1947,13 +1956,30 @@ getLoadedModules = do
 
 showBindings :: GHCi ()
 showBindings = do
-  bindings <- GHC.getBindings
-  docs     <- pprTypeAndContents
-                  [ id | AnId id <- sortBy compareTyThings bindings]
-  printForUserPartWay docs
+    bindings <- GHC.getBindings
+    (insts, finsts) <- GHC.getInsts
+    docs     <- mapM makeDoc ({- sortBy compareTyThings -} bindings)
+--    docs     <- mapM pprTypeAndContents
+--                  [ id | AnId id <- sortBy compareTyThings bindings]
+    let idocs  = map GHC.pprInstanceHdr insts
+        fidocs = map GHC.pprFamInstHdr finsts
+    mapM_ printForUserPartWay (docs ++ idocs ++ fidocs)
+  where
+    makeDoc (AnId id) = pprTypeAndContents id
+    makeDoc tt = do
+        dflags    <- getDynFlags
+        let pefas = dopt Opt_PrintExplicitForalls dflags
+        mb_stuff <- GHC.getInfo (getName tt)
+        return $ maybe (text "") (pprTT pefas) mb_stuff
+    pprTT :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.Instance]) -> SDoc
+    pprTT pefas (thing, fixity, _insts) = 
+        pprTyThing pefas thing
+        $$ show_fixity fixity
+      where
+        show_fixity fix 
+            | fix == GHC.defaultFixity  = empty
+            | otherwise                 = ppr fix <+> ppr (GHC.getName thing)
 
-compareTyThings :: TyThing -> TyThing -> Ordering
-t1 `compareTyThings` t2 = getName t1 `compareNames` getName t2
 
 printTyThing :: TyThing -> GHCi ()
 printTyThing tyth = do dflags <- getDynFlags

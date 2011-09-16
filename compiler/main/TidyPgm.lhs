@@ -4,13 +4,13 @@
 \section{Tidying up Core}
 
 \begin{code}
-module TidyPgm( mkBootModDetailsDs, mkBootModDetailsTc, 
-       		tidyProgram, globaliseAndTidyId ) where
+module TidyPgm (
+       mkBootModDetailsTc, tidyProgram, globaliseAndTidyId
+   ) where
 
 #include "HsVersions.h"
 
 import TcRnTypes
-import FamInstEnv
 import DynFlags
 import CoreSyn
 import CoreUnfold
@@ -20,13 +20,13 @@ import CoreMonad
 import CoreUtils
 import Rules
 import CoreArity	( exprArity, exprBotStrictness_maybe )
-import Class		( classAllSelIds )
 import VarEnv
 import VarSet
 import Var
 import Id
 import IdInfo
 import InstEnv
+import FamInstEnv
 import Demand
 import BasicTypes
 import Name hiding (varName)
@@ -36,6 +36,7 @@ import NameEnv
 import TcType
 import DataCon
 import TyCon
+import Class
 import Module
 import Packages( isDllName )
 import HscTypes
@@ -117,30 +118,19 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 mkBootModDetailsTc :: HscEnv -> TcGblEnv -> IO ModDetails
 mkBootModDetailsTc hsc_env 
         TcGblEnv{ tcg_exports   = exports,
-                  tcg_type_env  = type_env,
+                  tcg_type_env  = type_env, -- just for the Ids
+                  tcg_tcs       = tcs,
+                  tcg_clss      = clss,
                   tcg_insts     = insts,
                   tcg_fam_insts = fam_insts
                 }
-  = mkBootModDetails hsc_env exports type_env insts fam_insts
-
-mkBootModDetailsDs :: HscEnv -> ModGuts -> IO ModDetails
-mkBootModDetailsDs hsc_env 
-        ModGuts{ mg_exports   = exports,
-                 mg_types     = type_env,
-                 mg_insts     = insts,
-                 mg_fam_insts = fam_insts
-                }
-  = mkBootModDetails hsc_env exports type_env insts fam_insts
-  
-mkBootModDetails :: HscEnv -> [AvailInfo] -> NameEnv TyThing
-                 -> [Instance] -> [FamInstEnv.FamInst] -> IO ModDetails
-mkBootModDetails hsc_env exports type_env insts fam_insts
-  = do	{ let dflags = hsc_dflags hsc_env 
+  = do  { let dflags = hsc_dflags hsc_env
 	; showPass dflags CoreTidy
 
 	; let { insts'     = tidyInstances globaliseAndTidyId insts
 	      ; dfun_ids   = map instanceDFunId insts'
-	      ; type_env1  = tidyBootTypeEnv (availsToNameSet exports) type_env
+              ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
+                                (typeEnvIds type_env) tcs clss fam_insts
 	      ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
 	      }
 	; return (ModDetails { md_types     = type_env'
@@ -154,21 +144,26 @@ mkBootModDetails hsc_env exports type_env insts fam_insts
 	}
   where
 
-tidyBootTypeEnv :: NameSet -> TypeEnv -> TypeEnv
-tidyBootTypeEnv exports type_env 
-  = tidyTypeEnv True False exports type_env final_ids
+mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [Class] -> [FamInst] -> TypeEnv
+mkBootTypeEnv exports ids tcs clss fam_insts
+  = tidyTypeEnv True False exports $
+       typeEnvFromEntities final_ids tcs clss fam_insts
   where
-	-- Find the LocalIds in the type env that are exported
+        -- Find the LocalIds in the type env that are exported
 	-- Make them into GlobalIds, and tidy their types
 	--
 	-- It's very important to remove the non-exported ones
 	-- because we don't tidy the OccNames, and if we don't remove
 	-- the non-exported ones we'll get many things with the
 	-- same name in the interface file, giving chaos.
-    final_ids = [ globaliseAndTidyId id
-		| id <- typeEnvIds type_env
-		, isLocalId id
-		, keep_it id ]
+        --
+        -- Do make sure that we keep Ids that are already Global.
+        -- When typechecking an .hs-boot file, the Ids come through as
+        -- GlobalIds.
+    final_ids = [ if isLocalId id then globaliseAndTidyId id
+                                  else id
+                | id <- ids
+                , keep_it id ]
 
         -- default methods have their export flag set, but everything
         -- else doesn't (yet), because this is pre-desugaring, so we
@@ -289,7 +284,8 @@ RHSs, so that they print nicely in interfaces.
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_exports   = exports
-                              , mg_types     = type_env
+                              , mg_tcs       = tcs
+                              , mg_clss      = clss
                               , mg_insts     = insts
                               , mg_fam_insts = fam_insts
                               , mg_binds     = binds
@@ -309,12 +305,16 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               }
         ; showPass dflags CoreTidy
 
-        ; let { implicit_binds = getImplicitBinds type_env }
+        ; let { type_env = typeEnvFromEntities [] tcs clss fam_insts
+
+              ; implicit_binds
+                  = concatMap getClassImplicitBinds (typeEnvClasses type_env) ++
+                    concatMap getTyConImplicitBinds (typeEnvTyCons type_env)
+              }
 
         ; (unfold_env, tidy_occ_env)
               <- chooseExternalIds hsc_env mod omit_prags expose_all 
                                    binds implicit_binds imp_rules (vectInfoVar vect_info)
-
         ; let { ext_rules = findExternalRules omit_prags binds imp_rules unfold_env }
                 -- Glom together imp_rules and rules currently attached to binders
                 -- Then pick just the ones we need to expose
@@ -326,9 +326,11 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 	; let { export_set = availsToNameSet exports
 	      ; final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
 				    isExternalName (idName id)]
+
               ; tidy_type_env = tidyTypeEnv omit_prags th export_set
-					    type_env final_ids
-	      ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
+                                      (extendTypeEnvWithIds type_env final_ids)
+
+              ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
 		-- A DFunId will have a binding in tidy_binds, and so
 		-- will now be in final_env, replete with IdInfo
 		-- Its name will be unchanged since it was born, but
@@ -345,12 +347,21 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               -- See Note [Injecting implicit bindings]
               ; all_tidy_binds = implicit_binds ++ tidy_binds
 
+              -- get the TyCons to generate code for.  Careful!  We must use
+              -- the untidied TypeEnv here, because we need
+              --  (a) implicit TyCons arising from types and classes defined
+              --      in this module
+              --  (b) wired-in TyCons, which are normally removed from the
+              --      TypeEnv we put in the ModDetails
+              --  (c) Constructors even if they are not exported (the
+              --      tidied TypeEnv has trimmed these away)
               ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
               }
 
         ; endPass dflags CoreTidy all_tidy_binds tidy_rules
 
-	  -- If the endPass didn't print the rules, but ddump-rules is on, print now
+          -- If the endPass didn't print the rules, but ddump-rules is
+          -- on, print now
 	; dumpIfSet (dopt Opt_D_dump_rules dflags 
                      && (not (dopt Opt_D_dump_simpl dflags))) 
 		    CoreTidy
@@ -374,7 +385,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                            cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks }, 
 
-		   ModDetails { md_types     = tidy_type_env,
+                   ModDetails { md_types     = tidy_type_env,
 				md_rules     = tidy_rules,
 				md_insts     = tidy_insts,
                                 md_vect_info = tidy_vect_info,
@@ -391,40 +402,29 @@ lookup_dfun type_env dfun_id
 	_other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
 --------------------------
-tidyTypeEnv :: Bool 	-- Compiling without -O, so omit prags
-	    -> Bool	-- Template Haskell is on
-	    -> NameSet -> TypeEnv -> [Id] -> TypeEnv
+tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
+            -> Bool       -- Template Haskell is on
+            -> NameSet -> TypeEnv -> TypeEnv
 
 -- The competed type environment is gotten from
---	Dropping any wired-in things, and then
--- 	a) keeping the types and classes
---	b) removing all Ids, 
---	c) adding Ids with correct IdInfo, including unfoldings,
+--      a) the types and classes defined here (plus implicit things)
+--      b) adding Ids with correct IdInfo, including unfoldings,
 --		gotten from the bindings
--- From (c) we keep only those Ids with External names;
+-- From (b) we keep only those Ids with External names;
 --	    the CoreTidy pass makes sure these are all and only
 --	    the externally-accessible ones
 -- This truncates the type environment to include only the 
 -- exported Ids and things needed from them, which saves space
 
-tidyTypeEnv omit_prags th exports type_env final_ids
- = let  type_env1 = filterNameEnv keep_it type_env
-	type_env2 = extendTypeEnvWithIds type_env1 final_ids
-	type_env3 | omit_prags = mapNameEnv (trimThing th exports) type_env2
-		  | otherwise  = type_env2
-    in 
-    type_env3
-  where
-   	-- We keep GlobalIds, because they won't appear 
-	-- in the bindings from which final_ids are derived!
-	-- (The bindings bind LocalIds.)
-    keep_it thing | isWiredInThing thing = False
-    keep_it (AnId id) = isGlobalId id	-- Keep GlobalIds (e.g. class ops)
-    keep_it _other    = True		-- Keep all TyCons, DataCons, and Classes
-
---------------------------
-isWiredInThing :: TyThing -> Bool
-isWiredInThing thing = isWiredInName (getName thing)
+tidyTypeEnv omit_prags th exports type_env
+ = let
+        type_env1 = filterNameEnv (not . isWiredInName . getName) type_env
+          -- (1) remove wired-in things
+        type_env2 | omit_prags = mapNameEnv (trimThing th exports) type_env1
+                  | otherwise  = type_env1
+          -- (2) trimmed if necessary
+    in
+    type_env2
 
 --------------------------
 trimThing :: Bool -> NameSet -> TyThing -> TyThing
@@ -576,16 +576,14 @@ really just a code generation trick.... binding itself makes no sense.
 See CorePrep Note [Data constructor workers].
 
 \begin{code}
-getImplicitBinds :: TypeEnv -> [CoreBind]
-getImplicitBinds type_env
-  = map get_defn (concatMap implicit_ids (typeEnvElts type_env))
-  where
-    implicit_ids (ATyCon tc)  = class_ids ++ mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
-      where class_ids = maybe [] classAllSelIds (tyConClass_maybe tc)
-    implicit_ids _            = []
-    
-    get_defn :: Id -> CoreBind
-    get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))
+getTyConImplicitBinds :: TyCon -> [CoreBind]
+getTyConImplicitBinds tc = map get_defn (mapCatMaybes dataConWrapId_maybe (tyConDataCons tc))
+
+getClassImplicitBinds :: Class -> [CoreBind]
+getClassImplicitBinds cls = map get_defn (classAllSelIds cls)
+
+get_defn :: Id -> CoreBind
+get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))
 \end{code}
 
 

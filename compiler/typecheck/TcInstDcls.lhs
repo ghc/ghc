@@ -361,7 +361,7 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
                                 -- contains all dfuns for this module
            HsValBinds Name)     -- Supporting bindings for derived instances
 
-tcInstDecls1 tycl_decls inst_decls deriv_decls
+tcInstDecls1 tycl_decls inst_decls deriv_decls 
   = checkNoErrs $
     do {        -- Stop if addInstInfos etc discovers any errors
                 -- (they recover, so that we get more than one error each
@@ -380,7 +380,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
                 -- (2) Add the tycons of indexed types and their implicit
                 --     tythings to the global environment
-       ; tcExtendGlobalEnv (map ATyCon at_idx_tycons ++ implicit_things) $ do {
+       ; tcExtendGlobalEnvImplicit
+             (map ATyCon at_idx_tycons ++ implicit_things) $ do {
 
 
                 -- Next, construct the instance environment so far, consisting
@@ -405,7 +406,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        -- the generic representation
        ; let all_tycons = map ATyCon (deriv_tys ++ deriv_ty_insts)
        ; gbl_env <- tcExtendGlobalEnv all_tycons $
-                    tcExtendGlobalEnv (concatMap implicitTyThings all_tycons) $
+                    tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
                     addFamInsts deriv_ty_insts $
                     addInsts deriv_inst_info getGblEnv
 

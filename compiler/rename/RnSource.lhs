@@ -163,6 +163,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
       -- Haddock docs; no free vars
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
+    last_tcg_env <- getGblEnv ;
    -- (I) Compute the results and return
    let {rn_group = HsGroup { hs_valds  	= rn_val_decls,
 			     hs_tyclds 	= rn_tycl_decls,
@@ -189,7 +190,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 		-- Instance decls may have occurrences of things bound in bind_dus
 		-- so we must put other_fvs last
 
-        final_tcg_env = let tcg_env' = (tcg_env `addTcgDUs` src_dus)
+        final_tcg_env = let tcg_env' = (last_tcg_env `addTcgDUs` src_dus)
                         in -- we return the deprecs in the env, not in the HsGroup above
                         tcg_env' { tcg_warns = tcg_warns tcg_env' `plusWarns` rn_warns };
        } ;

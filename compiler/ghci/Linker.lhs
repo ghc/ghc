@@ -12,7 +12,7 @@
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 module Linker ( HValue, getHValue, showLinkerState,
-		linkExpr, unload, withExtendedLinkEnv,
+		linkExpr, linkDecls, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs, 
 		linkPackages,initDynLinker,linkModule,
@@ -52,6 +52,7 @@ import UniqSet
 import FastString
 import Config
 import SysTools
+import PrelNames
 
 -- Standard libraries
 import Control.Monad
@@ -427,9 +428,9 @@ linkExpr hsc_env span root_ul_bco
 
      needed_mods :: [Module]
      needed_mods = [ nameModule n | n <- free_names, 
-				    isExternalName n,	 	-- Names from other modules
-				    not (isWiredInName n)	-- Exclude wired-in names
-		   ]						-- (see note below)
+                     isExternalName n,      -- Names from other modules
+                     not (isWiredInName n)  -- Exclude wired-in names
+                   ]                        -- (see note below)
 	-- Exclude wired-in names because we may not have read
 	-- their interface files, so getLinkDeps will fail
 	-- All wired-in names are in the base package, which we link
@@ -476,7 +477,9 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
 	-- 1.  Find the dependent home-pkg-modules/packages from each iface
-        (mods_s, pkgs_s) <- follow_deps mods emptyUniqSet emptyUniqSet;
+        -- (omitting iINTERACTIVE, which is already linked)
+        (mods_s, pkgs_s) <- follow_deps (filter ((/=) iNTERACTIVE) mods)
+                                        emptyUniqSet emptyUniqSet;
 
 	let {
 	-- 2.  Exclude ones already linked
@@ -488,7 +491,6 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
                                 (objs_loaded pls ++ bcos_loaded pls)
 	} ;
 	
---        putStrLn (showSDoc (ppr mods_s)) ;
 	-- 3.  For each dependent module, find its linkable
 	--     This will either be in the HPT or (in the case of one-shot
 	--     compilation) we may need to use maybe_getFileLinkable
@@ -593,6 +595,53 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 		   else return (DotO new_file)
 	    adjust_ul _ _ = panic "adjust_ul"
 \end{code}
+
+
+%************************************************************************
+%*									*
+              Loading a Decls statement
+%*									*
+%************************************************************************
+\begin{code}
+linkDecls :: HscEnv -> SrcSpan -> CompiledByteCode -> IO () --[HValue]
+linkDecls hsc_env span (ByteCode unlinkedBCOs itblEnv) = do
+    -- Initialise the linker (if it's not been done already)
+    let dflags = hsc_dflags hsc_env
+    initDynLinker dflags
+
+    -- Take lock for the actual work.
+    modifyPLS $ \pls0 -> do
+
+    -- Link the packages and modules required
+    (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
+    if failed ok
+      then ghcError (ProgramError "")
+      else do
+
+    -- Link the expression itself
+    let ie = plusNameEnv (itbl_env pls) itblEnv
+        ce = closure_env pls
+
+    -- Link the necessary packages and linkables
+    (final_gce, _) <- linkSomeBCOs False ie ce unlinkedBCOs
+    let pls2 = pls { closure_env = final_gce,
+                     itbl_env    = ie }
+    return (pls2, ()) --hvals)
+  where
+    free_names =  concatMap (nameSetToList . bcoFreeNames) unlinkedBCOs
+
+    needed_mods :: [Module]
+    needed_mods = [ nameModule n | n <- free_names, 
+                    isExternalName n,       -- Names from other modules
+                    not (isWiredInName n)   -- Exclude wired-in names
+                  ]                         -- (see note below)
+    -- Exclude wired-in names because we may not have read
+    -- their interface files, so getLinkDeps will fail
+    -- All wired-in names are in the base package, which we link
+    -- by default, so we can safely ignore them here.
+\end{code}
+
+
 
 %************************************************************************
 %*									*

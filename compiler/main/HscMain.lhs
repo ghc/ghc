@@ -63,6 +63,7 @@ module HscMain
     , hscRnImportDecls
     , hscTcRnLookupRdrName
     , hscStmt, hscStmtWithLocation
+    , hscDecls, hscDeclsWithLocation
     , hscTcExpr, hscImport, hscKcType
     , hscCompileCoreExpr
 #endif
@@ -71,13 +72,11 @@ module HscMain
 
 #ifdef GHCI
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
-import Linker		( HValue, linkExpr )
+import Linker
 import CoreTidy		( tidyExpr )
 import Type		( Type )
-import TcType           ( tyVarsOfTypes )
-import PrelNames	( iNTERACTIVE )
+import PrelNames
 import {- Kind parts of -} Type		( Kind )
-import Id      	     	( idType )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
 import VarSet
@@ -85,7 +84,7 @@ import VarEnv		( emptyTidyEnv )
 import Panic
 #endif
 
-import Id		( Id )
+import Id
 import Module
 import Packages
 import RdrName
@@ -100,7 +99,7 @@ import TcIface		( typecheckIface )
 import TcRnMonad
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
-import PrelInfo		( wiredInThings, basicKnownKeyNames )
+import PrelInfo
 import MkIface
 import Desugar
 import SimplCore
@@ -111,8 +110,9 @@ import qualified StgCmm	( codeGen )
 import StgSyn
 import CostCentre
 import ProfInit
-import TyCon            ( TyCon, isDataTyCon )
-import Name		( Name, NamedThing(..) )
+import TyCon
+import Class
+import Name
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import OldCmm as Old    ( CmmGroup )
@@ -127,7 +127,7 @@ import CodeOutput
 import NameEnv          ( emptyNameEnv )
 import NameSet          ( emptyNameSet )
 import InstEnv
-import FamInstEnv       ( emptyFamInstEnv )
+import FamInstEnv
 import Fingerprint      ( Fingerprint )
 
 import DynFlags
@@ -1287,8 +1287,8 @@ hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
                             tcRnStmt hsc_env icontext parsed_stmt
 	    -- Desugar it
 	let rdr_env  = ic_rn_gbl_env icontext
-	    type_env = mkTypeEnv (map AnId (ic_tmp_ids icontext))
-	ds_expr <- ioMsgMaybe $
+            type_env = mkTypeEnvWithImplicits (ic_tythings icontext)
+        ds_expr <- ioMsgMaybe $
                      deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
         handleWarnings
 
@@ -1297,7 +1297,90 @@ hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
         hsc_env <- getHscEnv
 	hval <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
 
-	return $ Just (ids, hval)
+        return $ Just (ids, hval)
+
+hscDecls                -- Compile a decls
+  :: HscEnv
+  -> String             -- The statement
+  -> IO ([TyThing], InteractiveContext)
+hscDecls hsc_env str = hscDeclsWithLocation hsc_env str "<interactive>" 1
+
+hscDeclsWithLocation    -- Compile a decls
+  :: HscEnv
+  -> String             -- The statement
+  -> String             -- the source
+  -> Int                -- ^ starting line
+  -> IO ([TyThing], InteractiveContext)
+hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do 
+    L _ (HsModule{hsmodDecls=decls}) <-
+        hscParseThingWithLocation source linenumber parseModule str
+    
+    -- Rename and typecheck it
+    let icontext = hsc_IC hsc_env
+    tc_gblenv <- ioMsgMaybe $ tcRnDeclsi hsc_env icontext decls
+
+    -- Grab the new instances
+    -- We grab the whole environment because of the overlapping that may have 
+    -- been done.  See the notes at the definition of InteractiveContext
+    -- (ic_instances) for more details.
+    let finsts  = famInstEnvElts $ tcg_fam_inst_env tc_gblenv
+        insts   = instEnvElts $ tcg_inst_env tc_gblenv
+
+	-- Desugar it
+    -- We use a basically null location for iNTERACTIVE
+    let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
+                                      ml_hi_file   = undefined,
+                                      ml_obj_file  = undefined}
+    ds_result <- ioMsgMaybe $ deSugar hsc_env iNTERACTIVELoc tc_gblenv
+    handleWarnings
+
+        -- Simplify
+    simpl_mg <- liftIO $ hscSimplify hsc_env ds_result
+
+        -- Tidy
+    (tidy_cg, _mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
+
+    let dflags = hsc_dflags hsc_env
+        CgGuts{ cg_binds     = core_binds,
+                cg_tycons    = tycons,
+                cg_modBreaks = mod_breaks } = tidy_cg
+        data_tycons = filter isDataTyCon tycons
+
+	-------------------
+	-- PREPARE FOR CODE GENERATION
+	-- Do saturation and convert to A-normal form
+    prepd_binds <- {-# SCC "CorePrep" #-}
+                    liftIO $ corePrepPgm dflags core_binds data_tycons
+
+    -----------------  Generate byte code ------------------
+    cbc <- liftIO $ byteCodeGen dflags prepd_binds data_tycons mod_breaks
+
+    let src_span = srcLocSpan interactiveSrcLoc
+    hsc_env <- getHscEnv
+    liftIO $ linkDecls hsc_env src_span cbc
+
+    -- pprTrace "te" (ppr te) $ return ()
+
+    let
+        tcs     = filter (not . isImplicitTyCon) $ mg_tcs simpl_mg
+        clss    = mg_clss simpl_mg
+        tythings = map ATyCon tcs ++ map (ATyCon . classTyCon) clss
+        sys_vars = filter (isExternalName . idName) $
+                      bindersOfBinds (cg_binds tidy_cg)
+                   -- we only need to keep around the external bindings
+                   -- (as decided by TidyPgm), since those are the only ones
+                   -- that might be referenced elsewhere.
+
+    -- pprTrace "new tycons"  (ppr tcs) $ return ()
+    -- pprTrace "new classes" (ppr clss) $ return ()
+    -- pprTrace "new sys Ids" (ppr sys_vars) $ return ()
+
+    let ictxt1 = extendInteractiveContext icontext tythings
+        ictxt = ictxt1 {
+            ic_sys_vars   = sys_vars ++ ic_sys_vars ictxt1,
+            ic_instances  = (insts, finsts) }
+    
+    return $ (tythings, ictxt)
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
 hscImport hsc_env str = runHsc hsc_env $ do
@@ -1311,7 +1394,7 @@ hscImport hsc_env str = runHsc hsc_env $ do
 
 hscTcExpr	-- Typecheck an expression (but don't run it)
   :: HscEnv
-  -> String			-- The expression
+  -> String                     -- The expression
   -> IO Type
 
 hscTcExpr hsc_env expr = runHsc hsc_env $ do
@@ -1326,7 +1409,7 @@ hscTcExpr hsc_env expr = runHsc hsc_env $ do
 -- | Find the kind of a type
 hscKcType
   :: HscEnv
-  -> String			-- ^ The type
+  -> String                     -- ^ The type
   -> IO Kind
 
 hscKcType hsc_env str = runHsc hsc_env $ do
@@ -1414,7 +1497,8 @@ mkModGuts mod binds = ModGuts {
   mg_used_th = False,
   mg_rdr_env = emptyGlobalRdrEnv,
   mg_fix_env = emptyFixityEnv,
-  mg_types = emptyTypeEnv,
+  mg_tcs   = [],
+  mg_clss  = [],
   mg_insts = [],
   mg_fam_insts = [],
   mg_rules = [],
@@ -1463,9 +1547,11 @@ hscCompileCoreExpr hsc_env srcspan ds_expr
   	-- ToDo: improve SrcLoc
     when lint_on $
        let ictxt = hsc_IC hsc_env
-           tyvars = varSetElems (tyVarsOfTypes (map idType (ic_tmp_ids ictxt)))
+           te     = mkTypeEnvWithImplicits (ic_tythings ictxt ++ map AnId (ic_sys_vars ictxt))
+           tyvars = varSetElems $ tyThingsTyVars $ typeEnvElts $ te
+           vars   = typeEnvIds te
        in
-           case lintUnfolding noSrcLoc tyvars prepd_expr of
+           case lintUnfolding noSrcLoc (tyvars ++ vars) prepd_expr of
   	      Just err -> pprPanic "hscCompileCoreExpr" err
   	      Nothing  -> return ()
 

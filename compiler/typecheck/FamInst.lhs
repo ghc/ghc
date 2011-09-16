@@ -147,18 +147,25 @@ tcExtendLocalFamInstEnv fam_insts thing_inside
 -- Check that the proposed new instance is OK, 
 -- and then add it to the home inst env
 addLocalFamInst :: FamInstEnv -> FamInst -> TcM FamInstEnv
-addLocalFamInst home_fie famInst
-  = do {       -- Load imported instances, so that we report
-	       -- overlaps correctly
-       ; eps <- getEps
-       ; let inst_envs = (eps_fam_inst_env eps, home_fie)
+addLocalFamInst home_fie famInst = do
+        -- Load imported instances, so that we report
+        -- overlaps correctly
+    eps <- getEps
+    let inst_envs = (eps_fam_inst_env eps, home_fie)
 
-	       -- Check for conflicting instance decls
-       ; checkForConflicts inst_envs famInst
-
-	       -- OK, now extend the envt
-       ; return (extendFamInstEnv home_fie famInst) 
-       }
+        -- Check for conflicting instance decls
+    skol_tvs <- tcInstSkolTyVars (tyConTyVars (famInstTyCon famInst))
+    let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
+    -- If there are any conflicts, we should probably error
+    -- But, if we're allowed to overwrite and the conflict is in the home FIE,
+    -- then overwrite instead of error.
+    isGHCi <- getIsGHCi
+    case conflicts of
+        dup : _ ->  case (isGHCi, home_conflicts) of
+                        (True, _ : _) -> return (overwriteFamInstEnv home_fie famInst)
+                        (_, _)        -> conflictInstErr famInst (fst dup) >> return (extendFamInstEnv home_fie famInst)
+                    where home_conflicts = lookupFamInstEnvConflicts' home_fie famInst skol_tvs
+        []      ->  return (extendFamInstEnv home_fie famInst)
 \end{code}
 
 %************************************************************************
@@ -186,7 +193,6 @@ checkForConflicts inst_envs famInst
        ; unless (null conflicts) $
 	   conflictInstErr famInst (fst (head conflicts))
        }
-  where
 
 conflictInstErr :: FamInst -> FamInst -> TcRn ()
 conflictInstErr famInst conflictingFamInst

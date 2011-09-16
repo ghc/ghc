@@ -288,6 +288,7 @@ data TyThing = AnId     Id
 	     | ADataCon DataCon
 	     | ATyCon   TyCon
              | ACoAxiom CoAxiom
+        deriving (Eq, Ord)
 
 instance Outputable TyThing where 
   ppr = pprTyThing
@@ -302,6 +303,7 @@ pprTyThingCategory (ATyCon tc)
 pprTyThingCategory (ACoAxiom _) = ptext (sLit "Coercion axiom")
 pprTyThingCategory (AnId   _)   = ptext (sLit "Identifier")
 pprTyThingCategory (ADataCon _) = ptext (sLit "Data constructor")
+
 
 instance NamedThing TyThing where	-- Can't put this with the type
   getName (AnId id)     = getName id	-- decl, because the DataCon instance

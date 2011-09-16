@@ -14,6 +14,7 @@ module TcRnMonad(
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
+import Coercion
 import HsSyn hiding (LIE)
 import HscTypes
 import Module
@@ -23,8 +24,7 @@ import Type
 import TcType
 import InstEnv
 import FamInstEnv
-import PrelNames        ( iNTERACTIVE )
-import Coercion
+import PrelNames
 
 import Var
 import Id
@@ -117,6 +117,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_ev_binds  = emptyBag,
 		tcg_warns     = NoWarnings,
 		tcg_anns      = [],
+                tcg_tcs       = [],
+                tcg_clss      = [],
 		tcg_insts     = [],
                 tcg_fam_insts = [],
                 tcg_rules     = [],
@@ -1144,19 +1146,6 @@ initIfaceTc iface do_this
   where
     mod = mi_module iface
     doc = ptext (sLit "The interface for") <+> quotes (ppr mod)
-
-initIfaceRules :: HscEnv -> ModGuts -> IfG a -> IO a
--- Used when sucking in new Rules in SimplCore
--- We have available the type envt of the module being compiled, and we must use it
-initIfaceRules hsc_env guts do_this
- = do	{ let {
-	     type_info = (mg_module guts, return (mg_types guts))
-	   ; gbl_env = IfGblEnv { if_rec_types = Just type_info } ;
-	   }
-
-	-- Run the thing; any exceptions just bubble out from here
-	; initTcRnIf 'i' hsc_env gbl_env () do_this
-    }
 
 initIfaceLcl :: Module -> SDoc -> IfL a -> IfM lcl a
 initIfaceLcl mod loc_doc thing_inside 

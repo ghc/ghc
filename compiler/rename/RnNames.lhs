@@ -397,6 +397,7 @@ extendGlobalRdrEnvRn :: [AvailInfo]
 extendGlobalRdrEnvRn avails new_fixities
   = do  { (gbl_env, lcl_env) <- getEnvs
         ; stage <- getStage
+        ; isGHCi <- getIsGHCi
         ; let rdr_env = tcg_rdr_env gbl_env
               fix_env = tcg_fix_env gbl_env
 
@@ -406,10 +407,12 @@ extendGlobalRdrEnvRn avails new_fixities
               -- See Note [Top-level Names in Template Haskell decl quotes]
               shadowP  = isBrackStage stage
               new_occs = map (nameOccName . gre_name) gres
-              rdr_env1 = transformGREs qual_gre new_occs rdr_env
+              rdr_env_TH = transformGREs qual_gre new_occs rdr_env
+              rdr_env_GHCi = delListFromOccEnv rdr_env new_occs
               lcl_env1 = lcl_env { tcl_rdr = delListFromOccEnv (tcl_rdr lcl_env) new_occs }
-              (rdr_env2, lcl_env2) | shadowP   = (rdr_env1, lcl_env1)
-                                   | otherwise = (rdr_env,  lcl_env)
+              (rdr_env2, lcl_env2) | shadowP   = (rdr_env_TH,   lcl_env1)
+                                   | isGHCi    = (rdr_env_GHCi, lcl_env1)
+                                   | otherwise = (rdr_env,      lcl_env)
 
               rdr_env3 = foldl extendGlobalRdrEnv rdr_env2 gres
               fix_env' = foldl extend_fix_env     fix_env  gres
@@ -802,20 +805,6 @@ catMaybeErr ms =  [ a | Succeeded a <- ms ]
 %************************************************************************
 
 \begin{code}
--- | make a 'GlobalRdrEnv' where all the elements point to the same
--- import declaration (useful for "hiding" imports, or imports with
--- no details).
-gresFromAvails :: Provenance -> [AvailInfo] -> [GlobalRdrElt]
-gresFromAvails prov avails
-  = concatMap (gresFromAvail (const prov)) avails
-
-gresFromAvail :: (Name -> Provenance) -> AvailInfo -> [GlobalRdrElt]
-gresFromAvail prov_fn avail
-  = [ GRE {gre_name = n,
-           gre_par = availParent n avail,
-           gre_prov = prov_fn n}
-    | n <- availNames avail ]
-
 greExportAvail :: GlobalRdrElt -> AvailInfo
 greExportAvail gre 
   = case gre_par gre of
@@ -839,11 +828,6 @@ plusAvail (AvailTC n1 (s1:ss1)) (AvailTC n2 (s2:ss2))
        (False,True)  -> AvailTC n1 (s2 : ((s1:ss1) `unionLists` ss2))
        (False,False) -> AvailTC n1 ((s1:ss1) `unionLists` (s2:ss2))
 plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
-
-availParent :: Name -> AvailInfo -> Parent
-availParent _ (Avail _)                 = NoParent
-availParent n (AvailTC m _) | n == m    = NoParent
-                            | otherwise = ParentIs m
 
 trimAvail :: AvailInfo -> Name -> AvailInfo
 trimAvail (Avail n)      _ = Avail n
@@ -1734,8 +1718,13 @@ addDupDeclErr []
 addDupDeclErr names@(name : _)
   = addErrAt (getSrcSpan (last sorted_names)) $
     -- Report the error at the later location
-    vcat [ptext (sLit "Multiple declarations of") <+> quotes (ppr name),
-          ptext (sLit "Declared at:") <+> vcat (map (ppr . nameSrcLoc) sorted_names)]
+    vcat [ptext (sLit "Multiple declarations of") <+>
+             quotes (ppr (nameOccName name)),
+             -- NB. print the OccName, not the Name, because the
+             -- latter might not be in scope in the RdrEnv and so will
+             -- be printed qualified.
+          ptext (sLit "Declared at:") <+>
+                   vcat (map (ppr . nameSrcLoc) sorted_names)]
   where
     sorted_names = sortWith nameSrcLoc names
 

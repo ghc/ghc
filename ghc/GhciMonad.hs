@@ -247,16 +247,27 @@ printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   liftIO $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
 
-runStmt :: String -> GHC.SingleStep -> GHCi GHC.RunResult
+runStmt :: String -> GHC.SingleStep -> GHCi (Maybe GHC.RunResult)
 runStmt expr step = do
   st <- getGHCiState
   reifyGHCi $ \x ->
     withProgName (progname st) $
     withArgs (args st) $
       reflectGHCi x $ do
-        GHC.handleSourceError (\e -> do GHC.printException e
-                                        return GHC.RunFailed) $ do
-          GHC.runStmtWithLocation (progname st) (line_number st) expr step 
+        GHC.handleSourceError (\e -> do GHC.printException e; 
+                                        return Nothing) $ do
+          r <- GHC.runStmtWithLocation (progname st) (line_number st) expr step
+          return (Just r)
+
+runDecls :: String -> GHCi [GHC.Name]
+runDecls decls = do
+  st <- getGHCiState
+  reifyGHCi $ \x ->
+    withProgName (progname st) $
+    withArgs (args st) $
+      reflectGHCi x $ do
+        GHC.handleSourceError (\e -> do GHC.printException e; return []) $ do
+          GHC.runDeclsWithLocation (progname st) (line_number st) decls
 
 resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.RunResult
 resume canLogSpan step = do

@@ -87,7 +87,7 @@ pprintClosureCommand bindThings force str = do
    tidyTermTyVars :: GhcMonad m => Term -> m Term
    tidyTermTyVars t =
      withSession $ \hsc_env -> do
-     let env_tvs      = tyVarsOfTypes (map idType (ic_tmp_ids (hsc_IC hsc_env)))
+     let env_tvs      = tyThingsTyVars $ ic_tythings $ hsc_IC hsc_env
          my_tvs       = termTyVars t
          tvs          = env_tvs `minusVarSet` my_tvs
          tyvarOccName = nameOccName . tyVarName
@@ -110,7 +110,7 @@ bindSuspensions t = do
       let (names, tys, hvals) = unzip3 stuff
       let ids = [ mkVanillaGlobal name ty 
                 | (name,ty) <- zip names tys]
-          new_ic = extendInteractiveContext ictxt ids
+          new_ic = extendInteractiveContext ictxt (map AnId ids)
       liftIO $ extendLinkEnv (zip names hvals)
       modifySession $ \_ -> hsc_env {hsc_IC = new_ic }
       return t'
@@ -187,10 +187,8 @@ showTerm term = do
 
   bindToFreshName hsc_env ty userName = do
     name <- newGrimName userName
-    let ictxt    = hsc_IC hsc_env
-        tmp_ids  = ic_tmp_ids ictxt
-        id       = mkVanillaGlobal name ty 
-        new_ic   = ictxt { ic_tmp_ids = id : tmp_ids }
+    let id       = AnId $ mkVanillaGlobal name ty 
+        new_ic   = extendInteractiveContext (hsc_IC hsc_env) [id]
     return (hsc_env {hsc_IC = new_ic }, name)
 
 --    Create new uniques and give them sequentially numbered names
@@ -202,20 +200,19 @@ newGrimName userName  = do
         name    = mkInternalName unique occname noSrcSpan
     return name
 
-pprTypeAndContents :: GhcMonad m => [Id] -> m SDoc
-pprTypeAndContents ids = do
+pprTypeAndContents :: GhcMonad m => Id -> m SDoc
+pprTypeAndContents id = do
   dflags  <- GHC.getSessionDynFlags
   let pefas     = dopt Opt_PrintExplicitForalls dflags
       pcontents = dopt Opt_PrintBindContents dflags
+      pprdId    = (pprTyThing pefas . AnId) id
   if pcontents 
     then do
       let depthBound = 100
-      terms      <- mapM (GHC.obtainTermFromId depthBound False) ids
-      docs_terms <- mapM showTerm terms
-      return $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
-                             (map (pprTyThing pefas . AnId) ids)
-                             docs_terms
-    else return $  vcat $ map (pprTyThing pefas . AnId) ids
+      term      <- GHC.obtainTermFromId depthBound False id
+      docs_term <- showTerm term
+      return $ pprdId <+> equals <+> docs_term
+    else return pprdId
 
 --------------------------------------------------------------
 -- Utils 

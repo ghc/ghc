@@ -70,7 +70,7 @@ module Outputable (
     ) where
 
 import {-# SOURCE #-} 	Module( Module, ModuleName, moduleName )
-import {-# SOURCE #-} 	OccName( OccName )
+import {-# SOURCE #-}   Name( Name, nameModule )
 
 import StaticFlags
 import FastString 
@@ -145,7 +145,7 @@ data Depth = AllTheWay
 -- as @Exception.catch@, this fuction will return @Just "Exception"@.
 -- Note that the return value is a ModuleName, not a Module, because
 -- in source code, names are qualified by ModuleNames.
-type QueryQualifyName = Module -> OccName -> QualifyName
+type QueryQualifyName = Name -> QualifyName
 
 -- See Note [Printing original names] in HscTypes
 data QualifyName                        -- given P:M.T
@@ -166,10 +166,10 @@ type QueryQualifyModule = Module -> Bool
 type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
 
 alwaysQualifyNames :: QueryQualifyName
-alwaysQualifyNames m _ = NameQual (moduleName m)
+alwaysQualifyNames n = NameQual (moduleName (nameModule n))
 
 neverQualifyNames :: QueryQualifyName
-neverQualifyNames _ _ = NameUnqual
+neverQualifyNames _ = NameUnqual
 
 alwaysQualifyModules :: QueryQualifyModule
 alwaysQualifyModules _ = True
@@ -278,8 +278,8 @@ getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
 
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser (qual_name,_) _) m  n = qual_name m n
-qualName _other		           m _n = NameQual (moduleName m)
+qualName (PprUser (qual_name,_) _)  n = qual_name n
+qualName _other                     n = NameQual (moduleName (nameModule n))
 
 qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser (_,qual_mod) _)  m = qual_mod m

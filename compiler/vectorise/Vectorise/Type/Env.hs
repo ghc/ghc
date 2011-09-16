@@ -22,7 +22,6 @@ import Vectorise.Type.PRepr
 import Vectorise.Type.Repr
 import Vectorise.Utils
 
-import HscTypes
 import CoreSyn
 import CoreUtils
 import CoreUnfold
@@ -90,13 +89,13 @@ import Data.List
 
 -- |Vectorise a type environment.
 --
-vectTypeEnv :: TypeEnv                  -- Original type environment
+vectTypeEnv :: [TyCon]                  -- TyCons defined in this module
             -> [CoreVect]               -- All 'VECTORISE [SCALAR] type' declarations in this module
-            -> VM ( TypeEnv             -- Vectorised type environment.
+            -> VM ( [TyCon]             -- old TyCons ++ new TyCons
                   , [FamInst]           -- New type family instances.
                   , [(Var, CoreExpr)])  -- New top level bindings.
-vectTypeEnv env vectTypeDecls
-  = do { traceVt "** vectTypeEnv" $ ppr env
+vectTypeEnv tycons vectTypeDecls
+  = do { traceVt "** vectTypeEnv" $ ppr tycons
 
          -- Build a map containing all vectorised type constructor.  If they are scalar, they are
          -- mapped to 'False' (vectorised type constructor == original type constructor).
@@ -115,7 +114,7 @@ vectTypeEnv env vectTypeDecls
              localScalarTyConNames  = mkNameSet (map tyConName localScalarTyCons)
              notLocalScalarTyCon tc = not $ (tyConName tc) `elemNameSet` localScalarTyConNames
 
-             maybeVectoriseTyCons   = filter notLocalScalarTyCon (typeEnvTyCons env)
+             maybeVectoriseTyCons   = filter notLocalScalarTyCon tycons
              (conv_tcs, keep_tcs)   = classifyTyCons vectTyConFlavour maybeVectoriseTyCons
              orig_tcs               = keep_tcs ++ conv_tcs
              keep_dcs               = concatMap tyConDataCons keep_tcs
@@ -166,16 +165,11 @@ vectTypeEnv env vectTypeDecls
               ; return (dfuns, binds)
               }
 
-           -- We add to the type environment: (1) the vectorised type constructors, (2) their
-           -- 'PRepr' & 'PData' instance constructors, and (3) the data constructors of the fomer
-           -- two.
-       ; let all_new_tcs = new_tcs ++ inst_tcs
-             new_env     = extendTypeEnvList env
-                         $ map ATyCon all_new_tcs ++
-                           [ADataCon dc | tc <- all_new_tcs
-                                        , dc <- tyConDataCons tc]
+           -- We return: (1) the vectorised type constructors, (2)
+           -- their 'PRepr' & 'PData' instance constructors two.
+       ; let new_tycons = tycons ++ new_tcs ++ inst_tcs
 
-       ; return (new_env, fam_insts, binds)
+       ; return (new_tycons, fam_insts, binds)
        }
 
 
