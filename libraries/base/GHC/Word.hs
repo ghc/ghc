@@ -50,7 +50,14 @@ import GHC.Float ()     -- for RealFrac methods
 data Word = W# Word# deriving (Eq, Ord)
 
 instance Show Word where
-    showsPrec p x = showsPrec p (toInteger x)
+    showsPrec _ (W# w) = showWord w
+
+showWord :: Word# -> ShowS
+showWord w# cs
+ | w# `ltWord#` 10## = C# (chr# (ord# '0'# +# word2Int# w#)) : cs
+ | otherwise = case chr# (ord# '0'# +# word2Int# (w# `remWord#` 10##)) of
+               c# ->
+                   showWord (w# `quotWord#` 10##) (C# c# : cs)
 
 instance Num Word where
     (W# x#) + (W# y#)      = W# (x# `plusWord#` y#)
