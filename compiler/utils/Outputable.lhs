@@ -914,7 +914,7 @@ pprPanic :: String -> SDoc -> a
 pprPanic    = pprAndThen panic
 
 pprSorry :: String -> SDoc -> a
--- ^ Throw an exceptio saying "this isn't finished yet"
+-- ^ Throw an exception saying "this isn't finished yet"
 pprSorry    = pprAndThen sorry
 
 
