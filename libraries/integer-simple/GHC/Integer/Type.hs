@@ -51,6 +51,16 @@ type Digit = Word#
 -- XXX Could move [] above us
 data List a = Nil | Cons a (List a)
 
+mkInteger :: Bool   -- non-negative?
+          -> [Int]  -- absolute value in 31 bit chunks, least significant first
+                    -- ideally these would be Words rather than Ints, but
+                    -- we don't have Word available at the moment.
+          -> Integer
+mkInteger nonNegative is = let abs = f is
+                           in if nonNegative then abs else negateInteger abs
+    where f [] = S# 0#
+          f (I# i : is') = S# i `orInteger` shiftLInteger (f is') 31#
+
 errorInteger :: Integer
 errorInteger = Positive errorPositive
 
