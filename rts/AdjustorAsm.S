@@ -192,3 +192,7 @@ adjustorCode:
     ret
 #endif
 
+/* mark stack as nonexecutable */
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",@progbits
+#endif
