@@ -27,6 +27,7 @@ import GHC
 import Outputable
 import PprTyThing
 import MonadUtils
+import Exception
 
 import Control.Monad
 import Data.List
@@ -209,8 +210,13 @@ pprTypeAndContents id = do
   if pcontents 
     then do
       let depthBound = 100
-      term      <- GHC.obtainTermFromId depthBound False id
-      docs_term <- showTerm term
+      -- If the value is an exception, make sure we catch it and
+      -- show the exception, rather than propagating the exception out.
+      e_term <- gtry $ GHC.obtainTermFromId depthBound False id
+      docs_term <- case e_term of
+                      Right term -> showTerm term
+                      Left  exn  -> return (text "*** Exception:" <+>
+                                            text (show (exn :: SomeException)))
       return $ pprdId <+> equals <+> docs_term
     else return pprdId
 
