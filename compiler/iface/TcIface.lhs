@@ -39,9 +39,11 @@ import Class
 import IParam
 import TyCon
 import DataCon
+import PrelNames
 import TysWiredIn
 import TysPrim          ( anyTyConOfKind )
 import BasicTypes       ( Arity, strongLoopBreaker )
+import Literal
 import qualified Var
 import VarEnv
 import VarSet
@@ -895,6 +897,10 @@ tcIfaceExpr (IfaceExt gbl)
 tcIfaceExpr (IfaceTupId boxity arity)
   = return $ Var (dataConWorkId (tupleCon boxity arity))
 
+tcIfaceExpr (IfaceLit (LitInteger i _))
+  = do mkIntegerId <- tcIfaceExtId mkIntegerName
+       return (Lit (mkLitInteger i mkIntegerId))
+
 tcIfaceExpr (IfaceLit lit)
   = return (Lit lit)
 
@@ -981,8 +987,14 @@ tcIfaceAlt _ _ (IfaceDefault, names, rhs)
   
 tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
   = ASSERT( null names ) do
+    lit' <- case lit of
+            LitInteger i _ ->
+                do mkIntegerId <- tcIfaceExtId mkIntegerName
+                   return (mkLitInteger i mkIntegerId)
+            _ ->
+                return lit
     rhs' <- tcIfaceExpr rhs
-    return (LitAlt lit, [], rhs')
+    return (LitAlt lit', [], rhs')
 
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can

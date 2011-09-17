@@ -34,6 +34,7 @@ import Kind
 import Type
 import TypeRep
 import TyCon
+import TcType
 import BasicTypes
 import StaticFlags
 import ListSetOps
@@ -512,7 +513,7 @@ lintCoreAlt _ alt_ty (DEFAULT, args, rhs) =
      ; checkAltExpr rhs alt_ty }
 
 lintCoreAlt scrut_ty alt_ty (LitAlt lit, args, rhs)
-  | integerTy `eqType` scrut_ty
+  | isIntegerTy scrut_ty
     = failWithL integerScrutinisedMsg
   | otherwise
     = do { checkL (null args) (mkDefaultArgsMsg args)

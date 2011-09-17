@@ -117,6 +117,7 @@ basicKnownKeyNames
         stringTyConName,
         ratioDataConName,
         ratioTyConName,
+        integerTyConName,
 
         --  Classes.  *Must* include:
         --      classes that are grabbed by key (e.g., eqClassKey)
@@ -205,6 +206,7 @@ basicKnownKeyNames
         printName, fstName, sndName,
 
         -- Integer
+        integerTyConName, mkIntegerName,
         plusIntegerName, timesIntegerName, smallIntegerName,
         integerToWordName, integerToIntName, minusIntegerName,
         negateIntegerName, eqIntegerName, neqIntegerName,
@@ -786,7 +788,8 @@ fromIntegerName   = methName gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = methName gHC_NUM (fsLit "-") minusClassOpKey
 negateName        = methName gHC_NUM (fsLit "negate") negateClassOpKey
 
-plusIntegerName, timesIntegerName, smallIntegerName,
+integerTyConName, mkIntegerName,
+    plusIntegerName, timesIntegerName, smallIntegerName,
     integerToWordName, integerToIntName, minusIntegerName,
     negateIntegerName, eqIntegerName, neqIntegerName,
     absIntegerName, signumIntegerName,
@@ -795,6 +798,8 @@ plusIntegerName, timesIntegerName, smallIntegerName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
+integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 plusIntegerName       = varQual gHC_INTEGER_TYPE (fsLit "plusInteger")       plusIntegerIdKey
 timesIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "timesInteger")      timesIntegerIdKey
 smallIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "smallInteger")      smallIntegerIdKey
@@ -1355,17 +1360,6 @@ gtDataConKey                            = mkPreludeDataConUnique 29
 integerGmpSDataConKey, integerGmpJDataConKey :: Unique
 integerGmpSDataConKey                   = mkPreludeDataConUnique 30
 integerGmpJDataConKey                   = mkPreludeDataConUnique 31
-
--- For integer-simple only
-integerSimpleNaughtDataConKey,
-    integerSimplePositiveDataConKey, integerSimpleNegativeDataConKey :: Unique
-integerSimpleNaughtDataConKey           = mkPreludeDataConUnique 32
-integerSimplePositiveDataConKey         = mkPreludeDataConUnique 33
-integerSimpleNegativeDataConKey         = mkPreludeDataConUnique 34
-
-digitsSomeDataConKey, digitsNoneDataConKey :: Unique
-digitsSomeDataConKey                    = mkPreludeDataConUnique 35
-digitsNoneDataConKey                    = mkPreludeDataConUnique 36
 \end{code}
 
 %************************************************************************
@@ -1434,7 +1428,7 @@ smallIntegerIdKey, integerToWordIdKey, integerToIntIdKey,
     compareIntegerIdKey,
     gcdIntegerIdKey, lcmIntegerIdKey,
     andIntegerIdKey, orIntegerIdKey, xorIntegerIdKey, complementIntegerIdKey,
-    shiftLIntegerIdKey, shiftRIntegerIdKey :: Unique
+    shiftLIntegerIdKey, shiftRIntegerIdKey, mkIntegerIdKey :: Unique
 smallIntegerIdKey             = mkPreludeMiscIdUnique 60
 integerToWordIdKey            = mkPreludeMiscIdUnique 61
 integerToIntIdKey             = mkPreludeMiscIdUnique 62
@@ -1459,6 +1453,7 @@ xorIntegerIdKey               = mkPreludeMiscIdUnique 89
 complementIntegerIdKey        = mkPreludeMiscIdUnique 90
 shiftLIntegerIdKey            = mkPreludeMiscIdUnique 91
 shiftRIntegerIdKey            = mkPreludeMiscIdUnique 92
+mkIntegerIdKey                = mkPreludeMiscIdUnique 93
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 100

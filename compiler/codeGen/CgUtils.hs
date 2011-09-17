@@ -110,7 +110,7 @@ mkSimpleLit (MachLabel fs ms fod)
 mkSimpleLit (MachStr _) = panic "mkSimpleLit: MachStr"
 -- No LitInteger's should be left by the time this is called. CorePrep
 -- should have converted them all to a real core representation.
-mkSimpleLit (LitInteger _) = panic "mkSimpleLit: LitInteger"
+mkSimpleLit (LitInteger {}) = panic "mkSimpleLit: LitInteger"
 
 mkLtOp :: Literal -> MachOp
 -- On signed literals we must do a signed comparison

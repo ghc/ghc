@@ -52,6 +52,7 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
 	@echo 'data IntegerLibrary = IntegerGMP | IntegerSimple'            >> $@
+	@echo '    deriving Eq'                                             >> $@
 	@echo                                                               >> $@
 	@echo 'cBuildPlatformString :: String'                              >> $@
 	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@

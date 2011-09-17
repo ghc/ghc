@@ -218,8 +218,9 @@ mkWordExprWord :: Word       -> CoreExpr
 mkWordExprWord w = mkConApp wordDataCon [mkWordLitWord w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
-mkIntegerExpr  :: MonadThings m => Integer    -> m CoreExpr  -- Result :: Integer
-mkIntegerExpr i = return (Lit (LitInteger i))
+mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
+mkIntegerExpr i = do mkIntegerId <- lookupId mkIntegerName
+                     return (Lit (mkLitInteger i mkIntegerId))
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr

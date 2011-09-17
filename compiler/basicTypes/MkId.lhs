@@ -28,18 +28,6 @@ module MkId (
         voidArgId, nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId,
 
-        -- integer-simple only Id's:
-        integerSimpleNaughtId,
-        integerSimplePositiveId,
-        integerSimpleNegativeId,
-        digitsNoneId,
-        digitsSomeId,
-
-        -- Common Integer Id's:
-        shiftLIntegerId,
-        negateIntegerId,
-        orIntegerId,
-
 	-- Re-export error Ids
 	module PrelRules
     ) where
@@ -1057,38 +1045,6 @@ coercionTokenId -- Used to replace Coercion terms when we go to STG
   = pcMiscPrelId coercionTokenName 
                  (mkTyConApp eqPrimTyCon [unitTy, unitTy])
                  noCafIdInfo
-
--- integer-simple only Id's:
-integerSimpleNaughtId, integerSimplePositiveId, integerSimpleNegativeId,
-    digitsNoneId, digitsSomeId :: Id
-integerSimpleNaughtId = mkVanillaGlobal integerSimpleNaughtDataConName
-                                        integerTy
-integerSimplePositiveId = mkVanillaGlobal integerSimplePositiveDataConName
-                                          (mkFunTy digitsTy integerTy)
-integerSimpleNegativeId = mkVanillaGlobal integerSimpleNegativeDataConName
-                                          (mkFunTy digitsTy integerTy)
-digitsNoneId = mkVanillaGlobal digitsNoneDataConName
-                               digitsTy
-digitsSomeId = mkVanillaGlobal digitsSomeDataConName
-                               (mkFunTy wordPrimTy
-                                        (mkFunTy digitsTy digitsTy))
-
-shiftLIntegerId :: Id
-shiftLIntegerId = mkVanillaGlobalWithInfo shiftLIntegerName
-                     (mkFunTy integerTy (mkFunTy intPrimTy integerTy))
-	             noCafIdInfo
--- ToDo: we should not really be relying on noCafInfo here.
--- What if it's wrong?!
-
-negateIntegerId :: Id
-negateIntegerId = mkVanillaGlobalWithInfo negateIntegerName
-                     (mkFunTy integerTy integerTy)
-                     noCafIdInfo
-
-orIntegerId :: Id
-orIntegerId = mkVanillaGlobalWithInfo orIntegerName
-                     (mkFunTy integerTy (mkFunTy integerTy integerTy))
-                     noCafIdInfo
 \end{code}
 
 

@@ -726,7 +726,7 @@ match_Integer_convert :: Num a
                       -> IdUnfoldingFun
                       -> [Expr CoreBndr]
                       -> Maybe (Expr CoreBndr)
-match_Integer_convert convert _ [Lit (LitInteger x)]
+match_Integer_convert convert _ [Lit (LitInteger x _)]
     = Just (convert (fromIntegral x))
 match_Integer_convert _ _ _ = Nothing
 
@@ -734,31 +734,31 @@ match_Integer_unop :: (Integer -> Integer)
                    -> IdUnfoldingFun
                    -> [Expr CoreBndr]
                    -> Maybe (Expr CoreBndr)
-match_Integer_unop unop _ [Lit (LitInteger x)]
-    = Just (Lit (LitInteger (unop x)))
+match_Integer_unop unop _ [Lit (LitInteger x i)]
+    = Just (Lit (LitInteger (unop x) i))
 match_Integer_unop _ _ _ = Nothing
 
 match_Integer_binop :: (Integer -> Integer -> Integer)
                     -> IdUnfoldingFun
                     -> [Expr CoreBndr]
                     -> Maybe (Expr CoreBndr)
-match_Integer_binop binop _ [Lit (LitInteger x), Lit (LitInteger y)]
-    = Just (Lit (LitInteger (x `binop` y)))
+match_Integer_binop binop _ [Lit (LitInteger x i), Lit (LitInteger y _)]
+    = Just (Lit (LitInteger (x `binop` y) i))
 match_Integer_binop _ _ _ = Nothing
 
 match_Integer_Int_binop :: (Integer -> Int -> Integer)
                         -> IdUnfoldingFun
                         -> [Expr CoreBndr]
                         -> Maybe (Expr CoreBndr)
-match_Integer_Int_binop binop _ [Lit (LitInteger x), Lit (MachInt y)]
-    = Just (Lit (LitInteger (x `binop` fromIntegral y)))
+match_Integer_Int_binop binop _ [Lit (LitInteger x i), Lit (MachInt y)]
+    = Just (Lit (LitInteger (x `binop` fromIntegral y) i))
 match_Integer_Int_binop _ _ _ = Nothing
 
 match_Integer_binop_Bool :: (Integer -> Integer -> Bool)
                          -> IdUnfoldingFun
                          -> [Expr CoreBndr]
                          -> Maybe (Expr CoreBndr)
-match_Integer_binop_Bool binop _ [Lit (LitInteger x), Lit (LitInteger y)]
+match_Integer_binop_Bool binop _ [Lit (LitInteger x _), Lit (LitInteger y _)]
     = Just (if x `binop` y then trueVal else falseVal)
 match_Integer_binop_Bool _ _ _ = Nothing
 
@@ -766,7 +766,7 @@ match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering)
                              -> IdUnfoldingFun
                              -> [Expr CoreBndr]
                              -> Maybe (Expr CoreBndr)
-match_Integer_binop_Ordering binop _ [Lit (LitInteger x), Lit (LitInteger y)]
+match_Integer_binop_Ordering binop _ [Lit (LitInteger x _), Lit (LitInteger y _)]
     = Just $ case x `binop` y of
              LT -> ltVal
              EQ -> eqVal

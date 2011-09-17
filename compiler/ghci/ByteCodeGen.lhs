@@ -1244,7 +1244,7 @@ pushAtom _ _ (AnnLit lit)
         -- No LitInteger's should be left by the time this is called.
         -- CorePrep should have converted them all to a real core
         -- representation.
-        LitInteger _  -> panic "pushAtom: LitInteger"
+        LitInteger {} -> panic "pushAtom: LitInteger"
      where
         code rep
            = let size_host_words = fromIntegral (cgRepSizeW rep)

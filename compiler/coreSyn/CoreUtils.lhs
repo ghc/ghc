@@ -1539,7 +1539,7 @@ rhsIsStatic _is_dynamic_name rhs = is_static False rhs
   is_static in_arg (Note n e) 		= notSccNote n && is_static in_arg e
   is_static in_arg (Cast e _) 		= is_static in_arg e
   is_static _      (Coercion {})	= True   -- Behaves just like a literal
-  is_static _      (Lit (LitInteger _)) = False
+  is_static _      (Lit (LitInteger {})) = False
   is_static _      (Lit (MachLabel {})) = False
   is_static _      (Lit _)              = True
   	-- A MachLabel (foreign import "&foo") in an argument
