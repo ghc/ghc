@@ -195,7 +195,7 @@ showCTag ti =
 showETag :: TagInfo -> String
 showETag TagInfo{ tagName = tag, tagLine = lineNo, tagCol = colNo,
                   tagSrcInfo = Just (srcLine,charPos) }
-    =  take colNo srcLine ++ tag
+    =  take (colNo - 1) srcLine ++ tag
     ++ "\x7f" ++ tag
     ++ "\x01" ++ show lineNo
     ++ "," ++ show charPos
