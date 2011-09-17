@@ -72,6 +72,16 @@ data Integer
    = S# Int#                            -- small integers
    | J# Int# ByteArray#                 -- large integers
 
+mkInteger :: Bool   -- non-negative?
+          -> [Int]  -- absolute value in 31 bit chunks, least significant first
+                    -- ideally these would be Words rather than Ints, but
+                    -- we don't have Word available at the moment.
+          -> Integer
+mkInteger nonNegative is = let abs = f is
+                           in if nonNegative then abs else negateInteger abs
+    where f [] = S# 0#
+          f (I# i : is') = S# i `orInteger` shiftLInteger (f is') 31#
+
 {-# NOINLINE smallInteger #-}
 smallInteger :: Int# -> Integer
 smallInteger i = S# i

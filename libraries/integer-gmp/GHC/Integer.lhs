@@ -18,7 +18,7 @@
 #include "MachDeps.h"
 
 module GHC.Integer (
-    Integer,
+    Integer, mkInteger,
     smallInteger, wordToInteger, integerToWord, integerToInt,
 #if WORD_SIZE_IN_BITS < 64
     integerToWord64, word64ToInteger,
