@@ -42,14 +42,11 @@ data Integer = Positive !Positive | Negative !Positive | Naught
 -- Positive's have the property that they contain at least one Bit,
 -- and their last Bit is One.
 type Positive = Digits
-type Positives = List Positive
+type Positives = [Positive]
 
 data Digits = Some !Digit !Digits
             | None
 type Digit = Word#
-
--- XXX Could move [] above us
-data List a = Nil | Cons a (List a)
 
 mkInteger :: Bool   -- non-negative?
           -> [Int]  -- absolute value in 31 bit chunks, least significant first
@@ -743,9 +740,9 @@ quotRemPositive :: Positive -> Positive -> (# Integer, Integer #)
           subtractors = mkSubtractors (WORD_SIZE_IN_BITS# -# 1#)
 
           mkSubtractors (!n) = if n ==# 0#
-                               then Cons ys Nil
-                               else Cons (ys `smallShiftLPositive` n)
-                                         (mkSubtractors (n -# 1#))
+                               then [ys]
+                               else (ys `smallShiftLPositive` n)
+                                  : (mkSubtractors (n -# 1#))
 
           -- The main function. Go the the end of xs, then walk
           -- back trying to divide the number we accumulate by ys.
@@ -761,8 +758,8 @@ quotRemPositive :: Positive -> Positive -> (# Integer, Integer #)
                         (# some d ds, m'' #)
 
           g :: Digit -> Positives -> Digits -> (# Digit, Digits #)
-          g (!d) Nil             (!m) = (# d, m #)
-          g (!d) (Cons sub subs) (!m)
+          g (!d) []           (!m) = (# d, m #)
+          g (!d) (sub : subs) (!m)
               = case d `uncheckedShiftL#` 1# of
                 d' ->
                  case m `comparePositive` sub of
