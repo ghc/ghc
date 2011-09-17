@@ -16,6 +16,7 @@ import TcRnTypes
 import MkIface
 import Id
 import Name
+import Avail
 import CoreSyn
 import CoreSubst
 import PprCore

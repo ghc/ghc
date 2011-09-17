@@ -49,6 +49,7 @@ import Var
 import Id
 import Name             hiding ( varName )
 import NameSet
+import Avail
 import RdrName
 import PrelNames (pRELUDE)
 import VarSet

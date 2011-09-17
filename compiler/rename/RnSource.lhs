@@ -20,11 +20,9 @@ import RdrName
 import RdrHsSyn		( extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes
-import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, 
-                          renameSigs, mkSigTvFn, makeMiniFixityEnv )
+import RnBinds
 import RnEnv
-import RnNames       	( getLocalNonValBinders, extendGlobalRdrEnvRn, lookupTcdName )
-import HscTypes      	( AvailInfo(..) )
+import RnNames
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 import Kind             ( liftedTypeKind )
@@ -33,9 +31,10 @@ import ForeignCall	( CCallTarget(..) )
 import Module
 import HscTypes		( Warnings(..), plusWarns )
 import Class		( FunDep )
-import Name		( Name, nameOccName )
+import Name
 import NameSet
 import NameEnv
+import Avail
 import Outputable
 import Bag
 import FastString

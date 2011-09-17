@@ -27,6 +27,7 @@ import Type
 import DataCon
 import Var
 import Name
+import Avail
 import PrelNames
 import Module
 import UniqFM

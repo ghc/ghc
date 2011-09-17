@@ -75,6 +75,7 @@ import VarEnv
 import VarSet
 import Var
 import Name
+import Avail
 import RdrName
 import NameEnv
 import NameSet

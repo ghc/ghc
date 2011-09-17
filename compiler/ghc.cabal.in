@@ -146,6 +146,7 @@ Library
         vectorise
 
     Exposed-Modules:
+        Avail
         BasicTypes
         DataCon
         Demand

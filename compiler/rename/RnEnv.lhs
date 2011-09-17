@@ -36,17 +36,18 @@ module RnEnv (
 #include "HsVersions.h"
 
 import LoadIface	( loadInterfaceForName, loadSrcInterface )
-import IfaceEnv		( lookupOrig, newGlobalBinder, updNameCache, extendNameCache )
+import IfaceEnv
 import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
-import HscTypes		( NameCache(..), availNames, ModIface(..), FixItem(..), lookupFixity)
+import HscTypes
 import TcEnv		( tcLookupDataCon, tcLookupField, isBrackStage )
 import TcRnMonad
 import Id		( isRecordSelector )
 import Name
 import NameSet
 import NameEnv
+import Avail
 import Module           ( ModuleName, moduleName )
 import UniqFM
 import DataCon		( dataConFieldLabels )

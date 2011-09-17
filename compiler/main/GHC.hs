@@ -265,6 +265,7 @@ import TyCon
 import Class
 import DataCon
 import Name             hiding ( varName )
+import Avail
 import InstEnv
 import FamInstEnv
 import SrcLoc
@@ -276,8 +277,7 @@ import HscTypes
 import DynFlags
 import StaticFlagParser
 import qualified StaticFlags
-import SysTools     ( initSysTools, cleanTempFiles, 
-                      cleanTempDirs )
+import SysTools
 import Annotations
 import Module
 import UniqFM

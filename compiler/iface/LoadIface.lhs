@@ -43,6 +43,7 @@ import InstEnv
 import FamInstEnv
 import Name
 import NameEnv
+import Avail
 import Module
 import Maybes
 import ErrUtils

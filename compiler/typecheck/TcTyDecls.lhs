@@ -26,6 +26,7 @@ import DataCon
 import Name
 import NameEnv
 import NameSet
+import Avail
 import Digraph
 import BasicTypes
 import SrcLoc

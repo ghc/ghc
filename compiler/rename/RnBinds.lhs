@@ -29,16 +29,13 @@ import HsSyn
 import RnHsSyn
 import TcRnMonad
 import RnTypes        ( rnIPName, rnHsSigType, rnLHsType, checkPrecMatch )
-import RnPat          (rnPats, rnBindPat,
-                       NameMaker, localRecNameMaker, topRecNameMaker, applyNameMaker
-                      )
-                      
+import RnPat
 import RnEnv
 import DynFlags
 import Name
 import NameEnv
 import NameSet
-import RdrName		( RdrName, rdrNameOcc )
+import RdrName          ( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps	( findDupsEq )
 import BasicTypes	( RecFlag(..) )

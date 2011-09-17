@@ -25,6 +25,7 @@ import Module
 import Name
 import NameEnv
 import NameSet
+import Avail
 import HscTypes
 import RdrName
 import Outputable

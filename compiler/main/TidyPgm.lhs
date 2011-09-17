@@ -31,8 +31,9 @@ import Demand
 import BasicTypes
 import Name hiding (varName)
 import NameSet
-import IfaceEnv
 import NameEnv
+import Avail
+import IfaceEnv
 import TcType
 import DataCon
 import TyCon

@@ -66,6 +66,7 @@ import UniqFM
 import Name
 import NameEnv
 import NameSet
+import Avail
 import TyCon
 import SrcLoc
 import HscTypes

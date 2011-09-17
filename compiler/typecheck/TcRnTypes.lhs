@@ -76,6 +76,7 @@ import RdrName
 import Name
 import NameEnv
 import NameSet
+import Avail
 import Var
 import VarEnv
 import Module
