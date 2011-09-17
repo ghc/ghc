@@ -139,7 +139,7 @@ instance (Outputable name) => Outputable (IE name) where
     ppr (IEThingAbs     thing)  = ppr thing
     ppr (IEThingAll     thing)  = hcat [ppr thing, text "(..)"]
     ppr (IEThingWith thing withs)
-        = ppr thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
+        = pprHsVar thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
     ppr (IEModuleContents mod')
         = ptext (sLit "module") <+> ppr mod'
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")
