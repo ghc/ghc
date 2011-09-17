@@ -81,28 +81,28 @@ test('T4801',
       # expected value: 11 (x86/OSX):
       if_wordsize(32,
           compiler_stats_num_field('peak_megabytes_allocated', 30, 40)),
-      # expected value: 66 (amd64/Linux):
-      # expected value: 72 (amd64/OS X):
+      # expected value: 52 (amd64/Linux):
+      # expected value: 72 (out of date) (amd64/OS X):
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 55, 75)),
+          compiler_stats_num_field('peak_megabytes_allocated', 50, 60)),
       # expected value: 353463196 (x86/Windows)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 330000000,
                                                       370000000)),
-      # expected value: 145038576 (amd64/Linux):  ?? makes no sense -=chak
-      # expected value: 813714032 (amd64/OS X):
+      # expected value: 458700632 (amd64/Linux):
+      # expected value: 813714032 (out of date) (amd64/OS X):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 600000000,
-                                                      850000000)),
+          compiler_stats_num_field('bytes allocated', 400000000,
+                                                      500000000)),
       # expected value: 14181360 (x86/Linux)
       if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 11000000,
                                                      14000000)),
-      # expected value: 7001696 (amd64/Linux, bindist)
-      # expected value: 7189848 (amd64/Linux, intree):
+      # expected value: 18188272 (amd64/Linux, bindist)
+      # expected value: 7189848 (wrong?) (amd64/Linux, intree):
       if_wordsize(64,
-          compiler_stats_num_field('max_bytes_used', 20000000,
-                                                     30000000)),
+          compiler_stats_num_field('max_bytes_used', 15000000,
+                                                     20000000)),
        only_ways(['normal'])
       ],
      compile,
