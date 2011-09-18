@@ -224,13 +224,17 @@ def stats_num_field( field, min, max ):
     return lambda opts, f=field, x=min, y=max: _stats_num_field(opts, f, x, y);
 
 def _stats_num_field( opts, f, x, y ):
-    opts.stats_num_fields = opts.stats_num_fields + [(f, x, y)]
+    # copy the dictionary, as the config gets shared between all tests
+    opts.stats_num_fields = opts.stats_num_fields.copy()
+    opts.stats_num_fields[f] = (x, y)
 
 def compiler_stats_num_field( field, min, max ):
     return lambda opts, f=field, x=min, y=max: _compiler_stats_num_field(opts, f, x, y);
 
 def _compiler_stats_num_field( opts, f, x, y ):
-    opts.compiler_stats_num_fields = opts.compiler_stats_num_fields + [(f, x, y)]
+    # copy the dictionary, as the config gets shared between all tests
+    opts.compiler_stats_num_fields = opts.compiler_stats_num_fields.copy()
+    opts.compiler_stats_num_fields[f] = (x, y)
 
 # -----
 
@@ -907,12 +911,12 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def checkStats(stats_file, num_fields):
     result = passed()
-    if num_fields != []:
+    if len(num_fields) > 0:
         f = open(in_testdir(stats_file))
         contents = f.read()
         f.close()
 
-        for (field, min, max) in num_fields:
+        for (field, (min, max)) in num_fields.items():
             m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
             if m == None:
                 print 'Failed to find field: ', field
@@ -978,7 +982,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
         to_do = '-c' # just compile
 
     stats_file = name + '.comp.stats'
-    if opts.compiler_stats_num_fields != []:
+    if len(opts.compiler_stats_num_fields) > 0:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     if getTestOpts().compile_cmd_prefix == '':
@@ -1054,7 +1058,7 @@ def simple_run( name, way, prog, args ):
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
-    if opts.stats_num_fields != []:
+    if len(opts.stats_num_fields) > 0:
         args += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     if opts.no_stdin:
