@@ -195,8 +195,8 @@ class TestOptions:
        # ('bytes allocated',
        #   9300000000,
        #   9400000000)
-       self.compiler_stats_num_fields = []
-       self.stats_num_fields = []
+       self.compiler_stats_num_fields = {}
+       self.stats_num_fields = {}
 
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
