@@ -243,7 +243,7 @@ numericEnumFromThenTo e1 e2 e3
 
 \begin{code}
 instance  Real Int  where
-    toRational x        =  toInteger x % 1
+    toRational x        =  toInteger x :% 1
 
 instance  Integral Int  where
     toInteger (I# i) = smallInteger i
@@ -298,7 +298,7 @@ instance  Integral Int  where
 
 \begin{code}
 instance  Real Integer  where
-    toRational x        =  x % 1
+    toRational x        =  x :% 1
 
 instance  Integral Integer where
     toInteger n      = n
