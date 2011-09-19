@@ -40,8 +40,8 @@ import GHC.Show( Show(..) )
 #ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
 #endif
-import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral,
-                 toInteger, (^), (^^), infinity, notANumber )
+import GHC.Real( Integral, Rational, (%), fromIntegral,
+                 toInteger, (^), infinity, notANumber )
 import GHC.List
 import GHC.Enum( maxBound )
 #else
@@ -346,17 +346,13 @@ lexDecNumber =
     = Int a                                             -- 43
   valueFracExp a Nothing (Just exp)
     | exp >= 0  = Int (a * (10 ^ exp))                  -- 43e7
-    | otherwise = Rat (valExp (fromInteger a) exp)      -- 43e-7
-  valueFracExp a (Just fs) mExp
-     = case mExp of
-         Nothing  -> Rat rat                            -- 4.3
-         Just exp -> Rat (valExp rat exp)               -- 4.3e-4
-     where
-        rat :: Rational
-        rat = fromInteger a + frac 10 0 1 fs
-
-  valExp :: Rational -> Integer -> Rational
-  valExp rat exp = rat * (10 ^^ exp)
+    | otherwise = Rat (a % (10 ^ (-exp)))               -- 43e-7
+  valueFracExp a (Just fs) mExp                         -- 4.3[e2]
+    = Rat (fracExp (fromMaybe 0 mExp) a fs)
+    -- Be a bit more efficient in calculating the Rational.
+    -- Instead of calculating the fractional part alone, then
+    -- adding the integral part and finally multiplying with
+    -- 10 ^ exp if an exponent was given, do it all at once.
 
 lexFrac :: ReadP (Maybe Digits)
 -- Read the fractional part; fail if it doesn't
@@ -400,12 +396,22 @@ val base y (x:xs) = y' `seq` val base y' xs
  where
   y' = y * base + fromIntegral x
 
-frac :: Integral a => a -> a -> a -> Digits -> Ratio a
-frac _    a b []     = a % b
-frac base a b (x:xs) = a' `seq` b' `seq` frac base a' b' xs
- where
-  a' = a * base + fromIntegral x
-  b' = b * base
+-- Calculate a Rational from the exponent [of 10 to multiply with],
+-- the integral part of the mantissa and the digits of the fractional
+-- part. Leaving the calculation of the power of 10 until the end,
+-- when we know the effective exponent, saves multiplications.
+-- More importantly, this way we need at most one gcd instead of three.
+--
+-- frac was never used with anything but Integer and base 10, so
+-- those are hardcoded now (trivial to change if necessary).
+fracExp :: Integer -> Integer -> Digits -> Rational
+fracExp exp mant []
+  | exp < 0     = mant % (10 ^ (-exp))
+  | otherwise   = fromInteger (mant * 10 ^ exp)
+fracExp exp mant (d:ds) = exp' `seq` mant' `seq` fracExp exp' mant' ds
+  where
+    exp'  = exp - 1
+    mant' = mant * 10 + fromIntegral d
 
 valDig :: Num a => a -> Char -> Maybe Int
 valDig 8 c
