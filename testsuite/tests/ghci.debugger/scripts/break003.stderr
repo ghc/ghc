@@ -1,5 +1,5 @@
 
-<interactive>:1:1:
+<interactive>:5:1:
     No instance for (Show (t -> a))
       arising from a use of `print'
     Possible fix: add an instance declaration for (Show (t -> a))

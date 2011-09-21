@@ -1,3 +1,3 @@
 *** Exception: Prelude.undefined
-y :: Integer = _
 x :: a = *** Exception: Prelude.undefined
+y :: Integer = 3

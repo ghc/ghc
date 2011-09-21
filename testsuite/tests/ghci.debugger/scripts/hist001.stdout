@@ -18,9 +18,9 @@ Logged breakpoint at ../Test3.hs:2:22-31
 _result :: [a]
 f :: t -> a
 xs :: [t]
-_result :: [a] = _
-f :: t -> a = _
 xs :: [t] = []
+f :: t -> a = _
+_result :: [a] = _
 *** Ignoring breakpoint
 _result = []
 Logged breakpoint at ../Test3.hs:2:18-20

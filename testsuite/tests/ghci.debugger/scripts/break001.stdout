@@ -10,8 +10,8 @@ _result :: t = _
 Stopped at ../Test2.hs:5:7
 _result :: Integer = _
 y :: Integer = 1
-_result :: Integer = _
 y :: Integer = 1
+_result :: Integer = _
 1
 y = 1
 ()

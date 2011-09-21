@@ -1,9 +1,11 @@
-data T = C | D  -- Defined at <interactive>:0:10
-type T' = :Interactive.T        -- Defined at <interactive>:0:6-7
-data :Interactive.T = A | ...   -- Defined at <interactive>:0:10
-data :Interactive.T = B | ...   -- Defined at <interactive>:0:12
-data T = C | ...        -- Defined at <interactive>:0:14
-data T = ... | D        -- Defined at <interactive>:0:18
-b :: T'         -- Defined at <interactive>:0:5
-c :: :Interactive.T     -- Defined at <interactive>:0:5
-d :: T  -- Defined at <interactive>:0:5
+data T = C | D 	-- Defined at <interactive>:9:10
+type T' = main::Interactive.T 	-- Defined at <interactive>:4:6
+data main::Interactive.T = A | ...
+  	-- Defined at <interactive>:3:10
+data main::Interactive.T = B | ...
+  	-- Defined at <interactive>:6:12
+data T = C | ... 	-- Defined at <interactive>:9:14
+data T = ... | D 	-- Defined at <interactive>:9:18
+b :: T' 	-- Defined at <interactive>:5:5
+c :: main::Interactive.T 	-- Defined at <interactive>:8:5
+d :: T 	-- Defined at <interactive>:10:5
