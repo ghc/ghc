@@ -48,6 +48,9 @@ endif
 # (ghc-cabal is an order-only dependency, we don't need to rebuild ghc-pkg
 # if ghc-cabal is newer).
 # The binary package is not warning-clean, so we need a few -fno-warns here.
+#
+# ToDo: we might want to do this using ghc-cabal instead.
+#
 utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs | bootstrapping/. $$(dir $$@)/. $(GHC_CABAL_INPLACE) 
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
 	       -no-user-package-conf \
