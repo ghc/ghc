@@ -33,7 +33,6 @@ import TysPrim
 import TysWiredIn
 import HscTypes
 import Class
-import Type
 import TyCon
 import Util
 

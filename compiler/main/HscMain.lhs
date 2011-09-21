@@ -82,6 +82,7 @@ import DsMeta		( templateHaskellNames )
 import VarSet
 import VarEnv		( emptyTidyEnv )
 import Panic
+import Class
 #endif
 
 import Id
@@ -111,7 +112,6 @@ import StgSyn
 import CostCentre
 import ProfInit
 import TyCon
-import Class
 import Name
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
