@@ -1958,9 +1958,8 @@ showBindings :: GHCi ()
 showBindings = do
     bindings <- GHC.getBindings
     (insts, finsts) <- GHC.getInsts
-    docs     <- mapM makeDoc ({- sortBy compareTyThings -} bindings)
---    docs     <- mapM pprTypeAndContents
---                  [ id | AnId id <- sortBy compareTyThings bindings]
+    docs     <- mapM makeDoc (reverse bindings)
+                  -- reverse so the new ones come last
     let idocs  = map GHC.pprInstanceHdr insts
         fidocs = map GHC.pprFamInstHdr finsts
     mapM_ printForUserPartWay (docs ++ idocs ++ fidocs)
