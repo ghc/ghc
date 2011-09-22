@@ -72,6 +72,15 @@ test('ghci052', normal, ghci_script, ['ghci052.script'])
 test('ghci053', normal, ghci_script, ['ghci053.script'])
 test('ghci054', normal, ghci_script, ['ghci054.script'])
 test('ghci055', normal, ghci_script, ['ghci055.script'])
+
+test('ghci056',
+     [
+       cmd_prefix('$MAKE --no-print-directory ghci056_setup && '),
+       extra_run_opts('ghci056_c.o'),
+       extra_clean('ghci056_c.o')
+     ],
+     ghci_script, ['ghci056.script'])
+
 test('2452', normal, ghci_script, ['2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
 

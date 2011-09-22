@@ -31,3 +31,5 @@ ghci037:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci                   < ghci037.script
 	'$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-sandbox < ghci037.script
 
+ghci056_setup:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c ghci056_c.c

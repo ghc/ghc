@@ -1,0 +1,2 @@
+foreign import ccall "f" f :: Int -> Int -> Int
+f 2 3

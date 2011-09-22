@@ -796,6 +796,9 @@ def ghci_script( name, way, script ):
           ' --interactive -v0 -ignore-dot-ghci ' + \
           join(flags,' ')
 
+    if getTestOpts().cmd_prefix != '':
+        cmd = getTestOpts().cmd_prefix + ' ' + cmd;
+
     getTestOpts().stdin = script
     return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
