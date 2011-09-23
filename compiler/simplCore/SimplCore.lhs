@@ -18,7 +18,7 @@ import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 import PprCore		( pprCoreBindings, pprCoreExpr )
 import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
-import CoreUtils	( coreBindsSize )
+import CoreUtils	( coreBindsSize, exprSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplUtils	( simplEnvForGHCi, activeRule )
 import SimplEnv
@@ -478,7 +478,8 @@ simplifyExpr dflags expr
 
 	; us <-  mkSplitUniqSupply 's'
 
-	; let (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
+	; let sz = exprSize expr
+              (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
 				 simplExprGently (simplEnvForGHCi dflags) expr
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
@@ -581,7 +582,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
-      | let sz = coreBindsSize binds in sz == sz
+      | let sz = coreBindsSize binds 
+      , sz == sz     -- Force it
       = do {
                 -- Occurrence analysis
            let {   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
@@ -620,7 +622,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 		-- 	case t of {(_,counts1) -> if counts1=0 then ... }
 		-- So the conditional didn't force counts1, because the
 		-- selection got duplicated.  Sigh!
-	   case initSmpl dflags rule_base2 fam_envs us1 simpl_binds of {
+	   case initSmpl dflags rule_base2 fam_envs us1 sz simpl_binds of {
 	  	(env1, counts1) -> do {
 
 	   let	{ binds1 = getFloats env1

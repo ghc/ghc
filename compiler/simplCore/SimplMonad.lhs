@@ -14,7 +14,7 @@ module SimplMonad (
         MonadUnique(..), newId,
 
 	-- Counting
-	SimplCount, tick, freeTick,
+	SimplCount, tick, freeTick, checkedTick,
 	getSimplCount, zeroSimplCount, pprSimplCount, 
         plusSimplCount, isZeroSimplCount
     ) where
@@ -24,8 +24,9 @@ import Type             ( Type )
 import FamInstEnv	( FamInstEnv )
 import Rules		( RuleBase )
 import UniqSupply
-import DynFlags		( DynFlags )
+import DynFlags		( DynFlags( simplTickFactor ) )
 import CoreMonad
+import Outputable
 import FastString
 \end{code}
 
@@ -46,22 +47,37 @@ newtype SimplM result
 		-> SimplCount 
 		-> (result, UniqSupply, SimplCount)}
 
-data SimplTopEnv = STE	{ st_flags :: DynFlags 
-			, st_rules :: RuleBase
-			, st_fams  :: (FamInstEnv, FamInstEnv) }
+data SimplTopEnv 
+  = STE	{ st_flags :: DynFlags 
+     	, st_max_ticks :: Int  -- Max #ticks in this simplifier run
+	  	       	       -- Zero means infinity!
+	, st_rules :: RuleBase
+	, st_fams  :: (FamInstEnv, FamInstEnv) }
 \end{code}
 
 \begin{code}
 initSmpl :: DynFlags -> RuleBase -> (FamInstEnv, FamInstEnv) 
 	 -> UniqSupply		-- No init count; set to 0
+	 -> Int			-- Size of the bindings
 	 -> SimplM a
 	 -> (a, SimplCount)
 
-initSmpl dflags rules fam_envs us m
+initSmpl dflags rules fam_envs us size m
   = case unSM m env us (zeroSimplCount dflags) of 
 	(result, _, count) -> (result, count)
   where
-    env = STE { st_flags = dflags, st_rules = rules, st_fams = fam_envs }
+    -- Compute the max simplifier ticks as
+    --     pgm-size * k * tick-factor/100
+    -- where k is a constant that gives reasonable results
+    max_ticks = fromInteger ((toInteger size * toInteger (simplTickFactor dflags * k)) 
+                             `div` 100)
+    k = 20	-- MAGIC NUMBER, multiplies the simplTickFactor
+      		-- We can afford to be generous; this is really
+		-- just checking for loops, and shouldn't usually fire
+
+    env = STE { st_flags = dflags, st_rules = rules
+    	      , st_max_ticks = max_ticks
+              , st_fams = fam_envs }
 
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
@@ -141,9 +157,26 @@ getSimplCount :: SimplM SimplCount
 getSimplCount = SM (\_st_env us sc -> (sc, us, sc))
 
 tick :: Tick -> SimplM ()
-tick t 
-   = SM (\_st_env us sc -> let sc' = doSimplTick t sc 
-                           in sc' `seq` ((), us, sc'))
+tick t = SM (\_st_env us sc -> let sc' = doSimplTick t sc 
+                               in sc' `seq` ((), us, sc'))
+
+checkedTick :: Tick -> SimplM ()
+-- Try to take a tick, but fail if too many
+checkedTick t 
+  = SM (\st_env us sc -> if st_max_ticks st_env <= simplCountN sc
+                         then pprPanic "Simplifier ticks exhausted" (msg sc)
+                         else let sc' = doSimplTick t sc 
+                              in sc' `seq` ((), us, sc'))
+  where
+    msg sc = vcat [ ptext (sLit "When trying") <+> ppr t
+                  , ptext (sLit "To increase the limit, use -fsimpl-tick-factor=N (default 100)")
+                  , ptext (sLit "If you need to do this, let GHC HQ know, and what factor you needed")
+                  , pp_details sc
+                  , pprSimplCount sc ]
+    pp_details sc
+      | hasDetailedCounts sc = empty
+      | otherwise = ptext (sLit "To see detailed counts use -ddump-simpl-stats")
+                   
 
 freeTick :: Tick -> SimplM ()
 -- Record a tick, but don't add to the total tick count, which is

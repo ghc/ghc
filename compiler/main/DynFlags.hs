@@ -444,6 +444,7 @@ data DynFlags = DynFlags {
   ruleCheck             :: Maybe String,
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
 
+  simplTickFactor       :: Int,		-- ^ Multiplier for simplifier ticks
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
@@ -800,6 +801,7 @@ defaultDynFlags mySettings =
         maxSimplIterations      = 4,
         shouldDumpSimplPhase    = Nothing,
         ruleCheck               = Nothing,
+        simplTickFactor         = 100,  
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
         liberateCaseThreshold   = Just 2000,
@@ -1545,6 +1547,7 @@ dynamic_flags = [
 
   , flagA "fsimplifier-phases"          (intSuffix (\n d -> d{ simplPhases = n }))
   , flagA "fmax-simplifier-iterations"  (intSuffix (\n d -> d{ maxSimplIterations = n }))
+  , flagA "fsimpl-tick-factor"          (intSuffix (\n d -> d{ simplTickFactor = n }))
   , flagA "fspec-constr-threshold"      (intSuffix (\n d -> d{ specConstrThreshold = Just n }))
   , flagA "fno-spec-constr-threshold"   (noArg (\d -> d{ specConstrThreshold = Nothing }))
   , flagA "fspec-constr-count"          (intSuffix (\n d -> d{ specConstrCount = Just n }))

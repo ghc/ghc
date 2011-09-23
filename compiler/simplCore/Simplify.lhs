@@ -1260,7 +1260,7 @@ completeCall env var cont
                                              lone_variable arg_infos interesting_cont
         ; case maybe_inline of {
             Just expr      -- There is an inlining!
-              ->  do { tick (UnfoldingDone var)
+              ->  do { checkedTick (UnfoldingDone var)
                      ; trace_inline dflags expr cont $
                        simplExprF (zapSubstEnv env) expr cont }
 
@@ -1420,7 +1420,7 @@ tryRules env rules fn args call_cont
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
 
-             do { tick (RuleFired (ru_name rule))
+             do { checkedTick (RuleFired (ru_name rule))
                 ; dflags <- getDOptsSmpl
                 ; trace_dump dflags rule rule_rhs $
                   return (Just (ruleArity rule, rule_rhs)) }}}

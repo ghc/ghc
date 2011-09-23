@@ -19,7 +19,8 @@ module CoreMonad (
 
     -- * Counting
     SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
-    pprSimplCount, plusSimplCount, zeroSimplCount, isZeroSimplCount, Tick(..),
+    pprSimplCount, plusSimplCount, zeroSimplCount, 
+    isZeroSimplCount, hasDetailedCounts, Tick(..),
 
     -- * The monad
     CoreM, runCoreM,
@@ -87,7 +88,8 @@ import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
 
-import Util		( split )
+import Util		( split, sortLe )
+import ListSetOps	( runs )
 import Data.List	( intersperse )
 import Data.Dynamic
 import Data.IORef
@@ -461,6 +463,7 @@ verboseSimplStats = opt_PprStyle_Debug		-- For now, anyway
 
 zeroSimplCount	   :: DynFlags -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
+hasDetailedCounts  :: SimplCount -> Bool
 pprSimplCount	   :: SimplCount -> SDoc
 doSimplTick, doFreeSimplTick :: Tick -> SimplCount -> SimplCount
 plusSimplCount     :: SimplCount -> SimplCount -> SimplCount
@@ -499,6 +502,9 @@ zeroSimplCount dflags
 
 isZeroSimplCount (VerySimplCount n)    	    = n==0
 isZeroSimplCount (SimplCount { ticks = n }) = n==0
+
+hasDetailedCounts (VerySimplCount {}) = False
+hasDetailedCounts (SimplCount {})     = True
 
 doFreeSimplTick tick sc@SimplCount { details = dts } 
   = sc { details = dts `addTick` tick }
@@ -540,7 +546,7 @@ pprSimplCount (VerySimplCount n) = ptext (sLit "Total ticks:") <+> int n
 pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
   = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
 	  blankLine,
-	  pprTickCounts (Map.toList dts),
+	  pprTickCounts dts,
 	  if verboseSimplStats then
 		vcat [blankLine,
 		      ptext (sLit "Log (most recent first)"),
@@ -548,23 +554,23 @@ pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
 	  else empty
     ]
 
-pprTickCounts :: [(Tick,Int)] -> SDoc
-pprTickCounts [] = empty
-pprTickCounts ((tick1,n1):ticks)
-  = vcat [int tot_n <+> text (tickString tick1),
-	  pprTCDetails real_these,
-	  pprTickCounts others
-    ]
+pprTickCounts :: Map Tick Int -> SDoc
+pprTickCounts counts
+  = vcat (map pprTickGroup groups)
   where
-    tick1_tag		= tickToTag tick1
-    (these, others)	= span same_tick ticks
-    real_these		= (tick1,n1):these
-    same_tick (tick2,_) = tickToTag tick2 == tick1_tag
-    tot_n		= sum [n | (_,n) <- real_these]
+    groups :: [[(Tick,Int)]]	-- Each group shares a comon tag
+    	      			-- toList returns common tags adjacent
+    groups = runs same_tag (Map.toList counts)
+    same_tag (tick1,_) (tick2,_) = tickToTag tick1 == tickToTag tick2
 
-pprTCDetails :: [(Tick, Int)] -> SDoc
-pprTCDetails ticks
-  = nest 4 (vcat [int n <+> pprTickCts tick | (tick,n) <- ticks])
+pprTickGroup :: [(Tick, Int)] -> SDoc
+pprTickGroup group@((tick1,_):_)
+  = hang (int (sum [n | (_,n) <- group]) <+> text (tickString tick1))
+       2 (vcat [ int n <+> pprTickCts tick  
+               | (tick,n) <- sortLe le group])
+  where
+    le (_,n1) (_,n2) = n2 <= n1   -- We want largest first
+pprTickGroup [] = panic "pprTickGroup"
 \end{code}
 
 
