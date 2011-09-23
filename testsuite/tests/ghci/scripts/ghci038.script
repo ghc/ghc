@@ -2,11 +2,11 @@
 :show imports
 import Prelude
 :show imports
-:!echo -- map in scope due to explicit 'import Prelude'
+:!echo -- map in scope due to explicit import Prelude
 :t map
 import Prelude ()
 :show imports
-:!echo -- still in scope, 'import Prelude ()' is subsumed by 'import Prelude'
+:!echo -- still in scope, import Prelude () is subsumed by import Prelude
 :t map
 :module -Prelude
 :show imports
