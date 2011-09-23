@@ -320,7 +320,7 @@ checkSeekableHandle act handle_@Handle__{haDevice=dev} =
 
 ioe_closedHandle, ioe_EOF,
   ioe_notReadable, ioe_notWritable, ioe_cannotFlushNotSeekable,
-  ioe_notSeekable, ioe_invalidCharacter :: IO a
+  ioe_notSeekable :: IO a
 
 ioe_closedHandle = ioException
    (IOError Nothing IllegalOperation ""
@@ -340,9 +340,6 @@ ioe_cannotFlushNotSeekable = ioException
    (IOError Nothing IllegalOperation ""
       "cannot flush the read buffer: underlying device is not seekable"
         Nothing Nothing)
-ioe_invalidCharacter = ioException
-   (IOError Nothing InvalidArgument ""
-        ("invalid byte sequence for this encoding") Nothing Nothing)
 
 ioe_finalizedHandle :: FilePath -> Handle__
 ioe_finalizedHandle fp = throw
@@ -369,9 +366,6 @@ ioe_bufsiz n = ioException
 -- FIXME: it is possible that Handle code using the haDecoder/haEncoder fields
 -- could be made clearer by using the 'encode' interface directly. I have not
 -- looked into this.
---
--- FIXME: we should use recover to deal with EOF, rather than always throwing an
--- IOException (ioe_invalidCharacter).
 
 streamEncode :: BufferCodec from to state
              -> Buffer from -> Buffer to
@@ -846,36 +840,46 @@ readTextDevice h_@Handle__{..} cbuf = do
 -- we have an incomplete byte sequence at the end of the buffer: try to
 -- read more bytes.
 readTextDevice' :: Handle__ -> Buffer Word8 -> CharBuffer -> IO CharBuffer
-readTextDevice' h_@Handle__{..} bbuf0 cbuf = do
+readTextDevice' h_@Handle__{..} bbuf0 cbuf0 = do
   --
   -- copy the partial sequence to the beginning of the buffer, so we have
   -- room to read more bytes.
   bbuf1 <- slideContents bbuf0
 
-  bbuf2 <- do (r,bbuf2) <- Buffered.fillReadBuffer haDevice bbuf1
-              if r == 0 
-                 then ioe_invalidCharacter
-                 else return bbuf2
-
-  debugIO ("readTextDevice' after reading: bbuf=" ++ summaryBuffer bbuf2)
-
-  (bbuf3,cbuf') <- 
-      case haDecoder of
-          Nothing      -> do
-               writeIORef haLastDecode (error "codec_state", bbuf2)
-               latin1_decode bbuf2 cbuf
-          Just decoder -> do
-               state <- getState decoder
-               writeIORef haLastDecode (state, bbuf2)
-               (streamEncode decoder) bbuf2 cbuf
-
-  debugIO ("readTextDevice' after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
-        " bbuf=" ++ summaryBuffer bbuf3)
-
-  writeIORef haByteBuffer bbuf3
-  if bufR cbuf == bufR cbuf'
-     then readTextDevice' h_ bbuf3 cbuf'
-     else return cbuf'
+  -- readTextDevice only calls us if we got some bytes but not some characters.
+  -- This can't occur if haDecoder is Nothing because latin1_decode accepts all bytes.
+  let Just decoder = haDecoder
+  
+  (r,bbuf2) <- Buffered.fillReadBuffer haDevice bbuf1
+  if r == 0
+   then do
+     (bbuf3, cbuf1) <- recover decoder bbuf2 cbuf0
+     writeIORef haByteBuffer bbuf3
+     -- We should recursively invoke readTextDevice after recovery,
+     -- if recovery did not add at least one new character to the buffer:
+     --  1. If we were using IgnoreCodingFailure it might be the case that
+     --     cbuf1 is the same length as cbuf0 and we need to raise ioe_EOF
+     --  2. If we were using TransliterateCodingFailure we might have *mutated*
+     --     the byte buffer without changing the pointers into either buffer.
+     --     We need to try and decode it again - it might just go through this time.
+     if bufR cbuf1 == bufR cbuf0
+      then readTextDevice h_ cbuf1
+      else return cbuf1
+   else do
+    debugIO ("readTextDevice' after reading: bbuf=" ++ summaryBuffer bbuf2)
+  
+    (bbuf3,cbuf1) <- do
+       state <- getState decoder
+       writeIORef haLastDecode (state, bbuf2)
+       (streamEncode decoder) bbuf2 cbuf0
+  
+    debugIO ("readTextDevice' after decoding: cbuf=" ++ summaryBuffer cbuf1 ++ 
+          " bbuf=" ++ summaryBuffer bbuf3)
+  
+    writeIORef haByteBuffer bbuf3
+    if bufR cbuf0 == bufR cbuf1
+       then readTextDevice' h_ bbuf3 cbuf1
+       else return cbuf1
 
 -- Read characters into the provided buffer.  Do not block;
 -- return zero characters instead.  Raises an exception on end-of-file.
