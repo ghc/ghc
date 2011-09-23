@@ -30,6 +30,7 @@ import TcUnify
 import BasicTypes
 import Inst
 import TcBinds
+import FamInst( tcLookupFamInst )
 import TcEnv
 import TcArrows
 import TcMatches

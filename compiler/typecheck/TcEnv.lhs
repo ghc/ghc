@@ -18,7 +18,6 @@ module TcEnv(
 	tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
 	tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
 	tcLookupLocatedClass, 
-	tcLookupFamInst, tcLookupDataFamInst,
 	
 	-- Local environment
 	tcExtendKindEnv, tcExtendKindEnvTvs,
@@ -66,7 +65,6 @@ import Var
 import VarSet
 import RdrName
 import InstEnv
-import FamInstEnv
 import DataCon
 import TyCon
 import TypeRep
@@ -173,84 +171,7 @@ tcLookupLocatedClass = addLocM tcLookupClass
 
 tcLookupLocatedTyCon :: Located Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocM tcLookupTyCon
-
--- Look up the instance tycon of a family instance.
---
--- The match may be ambiguous (as we know that overlapping instances have
--- identical right-hand sides under overlapping substitutions - see
--- 'FamInstEnv.lookupFamInstEnvConflicts').  However, the type arguments used
--- for matching must be equal to or be more specific than those of the family
--- instance declaration.  We pick one of the matches in case of ambiguity; as
--- the right-hand sides are identical under the match substitution, the choice
--- does not matter.
---
--- Return the instance tycon and its type instance.  For example, if we have
---
---  tcLookupFamInst 'T' '[Int]' yields (':R42T', 'Int')
---
--- then we have a coercion (ie, type instance of family instance coercion)
---
---  :Co:R42T Int :: T [Int] ~ :R42T Int
---
--- which implies that :R42T was declared as 'data instance T [a]'.
---
-tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (TyCon, [Type]))
-tcLookupFamInst tycon tys
-  | not (isFamilyTyCon tycon)
-  = return Nothing
-  | otherwise
-  = do { env <- getGblEnv
-       ; eps <- getEps
-       ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
-       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ ppr instEnv)
-       ; case lookupFamInstEnv instEnv tycon tys of
-	   []                      -> return Nothing
-	   ((fam_inst, rep_tys):_) 
-             -> return $ Just (famInstTyCon fam_inst, rep_tys)
-       }
-
-tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
--- Find the instance of a data family
--- Note [Looking up family instances for deriving]
-tcLookupDataFamInst tycon tys
-  | not (isFamilyTyCon tycon)
-  = return (tycon, tys)
-  | otherwise
-  = ASSERT( isAlgTyCon tycon )
-    do { maybeFamInst <- tcLookupFamInst tycon tys
-       ; case maybeFamInst of
-           Nothing      -> famInstNotFound tycon tys
-           Just famInst -> return famInst }
-
-famInstNotFound :: TyCon -> [Type] -> TcM a
-famInstNotFound tycon tys 
-  = failWithTc (ptext (sLit "No family instance for")
-			<+> quotes (pprTypeApp tycon tys))
 \end{code}
-
-Note [Looking up family instances for deriving]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-tcLookupFamInstExact is an auxiliary lookup wrapper which requires
-that looked-up family instances exist.  If called with a vanilla
-tycon, the old type application is simply returned.
-
-If we have
-  data instance F () = ... deriving Eq
-  data instance F () = ... deriving Eq
-then tcLookupFamInstExact will be confused by the two matches;
-but that can't happen because tcInstDecls1 doesn't call tcDeriving
-if there are any overlaps.
-
-There are two other things that might go wrong with the lookup.
-First, we might see a standalone deriving clause
-	deriving Eq (F ())
-when there is no data instance F () in scope. 
-
-Note that it's OK to have
-  data instance F [a] = ...
-  deriving Eq (F [(a,b)])
-where the match is not exact; the same holds for ordinary data types
-with standalone deriving declrations.
 
 \begin{code}
 instance MonadThings (IOEnv (Env TcGblEnv TcLclEnv)) where

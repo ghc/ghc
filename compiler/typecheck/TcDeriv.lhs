@@ -15,6 +15,7 @@ import DynFlags
 
 import Generics
 import TcRnMonad
+import FamInst
 import TcEnv
 import TcClassDcl( tcAddDeclCtxt )	-- Small helper
 import TcGenDeriv			-- Deriv stuff
