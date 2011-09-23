@@ -17,7 +17,7 @@ module FamInstEnv (
 	lookupFamInstEnv, lookupFamInstEnvConflicts, lookupFamInstEnvConflicts',
 	
 	-- Normalisation
-	topNormaliseType
+	topNormaliseType, normaliseType
     ) where
 
 #include "HsVersions.h"
@@ -550,8 +550,10 @@ topNormaliseType env ty
 
 	| isFamilyTyCon tc		-- Expand open tycons
 	, (co, ty) <- normaliseTcApp env tc tys
-		-- Note that normaliseType fully normalises, 
-		-- but it has do to so to be sure that 
+		-- Note that normaliseType fully normalises 'tys', 
+		-- It has do to so to be sure that nested calls like
+		--    F (G Int)
+		-- are correctly top-normalised
         , not (isReflCo co)
         = add_co co rec_nts ty
         where

@@ -1409,12 +1409,13 @@ hscTcExpr hsc_env expr = runHsc hsc_env $ do
 -- | Find the kind of a type
 hscKcType
   :: HscEnv
-  -> String                     -- ^ The type
-  -> IO Kind
+  -> Bool			-- ^ Normalise the type
+  -> String			-- ^ The type as a string
+  -> IO (Type, Kind)		-- ^ Resulting type (possibly normalised) and kind
 
-hscKcType hsc_env str = runHsc hsc_env $ do
+hscKcType hsc_env normalise str = runHsc hsc_env $ do
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env (hsc_IC hsc_env) ty
+    ioMsgMaybe $ tcRnType hsc_env (hsc_IC hsc_env) normalise ty
 
 #endif
 \end{code}

@@ -942,9 +942,9 @@ exprType expr = withSession $ \hsc_env -> do
 -- Getting the kind of a type
 
 -- | Get the kind of a  type
-typeKind  :: GhcMonad m => String -> m Kind
-typeKind str = withSession $ \hsc_env -> do
-   liftIO $ hscKcType hsc_env str
+typeKind  :: GhcMonad m => Bool -> String -> m (Type, Kind)
+typeKind normalise str = withSession $ \hsc_env -> do
+   liftIO $ hscKcType hsc_env normalise str
 
 -----------------------------------------------------------------------------
 -- cmCompileExpr: compile an expression and deliver an HValue

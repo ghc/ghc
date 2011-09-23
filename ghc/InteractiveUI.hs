@@ -47,7 +47,8 @@ import Panic hiding ( showException )
 import Config
 import StaticFlags
 import Linker
-import Util
+import Util( on, global, toArgs, toCmdArgs, removeSpaces, getCmd,
+             filterOut, seqList, looksLikeModuleName, partitionWith )
 import NameSet
 import Maybes ( orElse, expectJust )
 import FastString
@@ -130,7 +131,8 @@ builtin_commands = [
   ("history",   keepGoing historyCmd,           noCompletion),
   ("info",      keepGoing' info,                completeIdentifier),
   ("issafe",    keepGoing' isSafeCmd,           completeModule),
-  ("kind",      keepGoing' kindOfType,          completeIdentifier),
+  ("kind",      keepGoing' (kindOfType False),  completeIdentifier),
+  ("kind!",     keepGoing' (kindOfType True),   completeIdentifier),
   ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
   ("list",      keepGoing' listCmd,             noCompletion),
   ("module",    keepGoing moduleCmd,            completeSetModule),
@@ -1325,12 +1327,13 @@ typeOfExpr str
 -----------------------------------------------------------------------------
 -- :kind
 
-kindOfType :: String -> InputT GHCi ()
-kindOfType str 
+kindOfType :: Bool -> String -> InputT GHCi ()
+kindOfType normalise str 
   = handleSourceError GHC.printException
   $ do
-       ty <- GHC.typeKind str
-       printForUser $ text str <+> dcolon <+> ppr ty
+       (ty, kind) <- GHC.typeKind normalise str
+       printForUser $ vcat [ text str <+> dcolon <+> ppr kind
+                           , ppWhen normalise $ equals <+> ppr ty ]
 
 
 -----------------------------------------------------------------------------

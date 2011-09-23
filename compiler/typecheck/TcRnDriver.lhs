@@ -1408,19 +1408,28 @@ tcRnType just finds the kind of a type
 
 \begin{code}
 tcRnType :: HscEnv
-         -> InteractiveContext
+	 -> InteractiveContext
+	 -> Bool	-- Normalise the returned type
 	 -> LHsType RdrName
-	 -> IO (Messages, Maybe Kind)
-tcRnType hsc_env ictxt rdr_type
-  = initTcPrintErrors hsc_env iNTERACTIVE $
+	 -> IO (Messages, Maybe (Type, Kind))
+tcRnType hsc_env ictxt normalise rdr_type
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env ictxt $ do {
 
     rn_type <- rnLHsType doc rdr_type ;
     failIfErrsM ;
 
 	-- Now kind-check the type
-    (_ty', kind) <- kcLHsType rn_type ;
-    return kind
+    ty <- tcHsSigType GenSigCtxt rn_type ;
+
+    ty' <- if normalise 
+           then do { fam_envs <- tcGetFamInstEnvs 
+                   ; return (snd (normaliseType fam_envs ty)) }
+		   -- normaliseType returns a coercion
+		   -- which we discard
+           else return ty ;
+            
+    return (ty', typeKind ty)
     }
   where
     doc = ptext (sLit "In GHCi input")
