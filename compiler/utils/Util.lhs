@@ -43,7 +43,7 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortLe, sortWith, minWith, on,
+        sortLe, sortWith, minWith, on, 
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
@@ -465,7 +465,7 @@ To: partain@dcs.gla.ac.uk
 Subject: natural merge sort beats quick sort [ and it is prettier ]
 
 Here is a piece of Haskell code that I'm rather fond of. See it as an
-attempt to get rid of the ridiculous quick-sort routine. group is
+attempt to get rid of the ridiculous quick-sort routine. groupUpdown is
 quite useful by itself I think it was John's idea originally though I
 believe the lazy version is due to me [surprisingly complicated].
 gamma [used to be called] is called gamma because I got inspired by
@@ -487,24 +487,24 @@ rising subsequences = approx 2 ] mergesort still wins and natural
 merge sort is marginally beaten by Lennart's soqs. The space
 consumption of merge sort is a bit worse than Lennart's quick sort
 approx a factor of 2. And a lot worse if Sparud's bug-fix [see his
-fpca article ] isn't used because of group.
+fpca article ] isn't used because of groupUpdown.
 
 have fun
 Carsten
 \end{display}
 
 \begin{code}
-group :: (a -> a -> Bool) -> [a] -> [[a]]
--- Given a <= function, group finds maximal contiguous up-runs
+groupUpdown :: (a -> a -> Bool) -> [a] -> [[a]]
+-- Given a <= function, groupUpdown finds maximal contiguous up-runs
 -- or down-runs in the input list.
 -- It's stable, in the sense that it never re-orders equal elements
 --
 -- Date: Mon, 12 Feb 1996 15:09:41 +0000
 -- From: Andy Gill <andy@dcs.gla.ac.uk>
--- Here is a `better' definition of group.
+-- Here is a `better' definition of groupUpdown.
 
-group _ []     = []
-group p (x:xs) = group' xs x x (x :)
+groupUpdown _ []     = []
+groupUpdown p (x:xs) = group' xs x x (x :)
   where
     group' []     _     _     s  = [s []]
     group' (x:xs) x_min x_max s
@@ -533,7 +533,7 @@ balancedFold' _ xs = xs
 
 generalNaturalMergeSort :: (a -> a -> Bool) -> [a] -> [a]
 generalNaturalMergeSort _ [] = []
-generalNaturalMergeSort p xs = (balancedFold (generalMerge p) . group p) xs
+generalNaturalMergeSort p xs = (balancedFold (generalMerge p) . groupUpdown p) xs
 
 #if NOT_USED
 generalMergeSort p [] = []
