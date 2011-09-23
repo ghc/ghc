@@ -897,12 +897,9 @@ tcIfaceExpr (IfaceExt gbl)
 tcIfaceExpr (IfaceTupId boxity arity)
   = return $ Var (dataConWorkId (tupleCon boxity arity))
 
-tcIfaceExpr (IfaceLit (LitInteger i _))
-  = do mkIntegerId <- tcIfaceExtId mkIntegerName
-       return (Lit (mkLitInteger i mkIntegerId))
-
 tcIfaceExpr (IfaceLit lit)
-  = return (Lit lit)
+  = do lit' <- tcIfaceLit lit
+       return (Lit lit')
 
 tcIfaceExpr (IfaceFCall cc ty) = do
     ty' <- tcIfaceType ty
@@ -977,6 +974,16 @@ tcIfaceExpr (IfaceNote note expr) = do
         IfaceCoreNote n   -> return (Note (CoreNote n) expr')
 
 -------------------------
+tcIfaceLit :: Literal -> IfL Literal
+-- Integer literals deserialise to (LitInteeger i <error thunk>) 
+-- so tcIfaceLit just fills in the mkInteger Id 
+-- See Note [Integer literals] in Literal
+tcIfaceLit (LitInteger i _)
+  = do mkIntegerId <- tcIfaceExtId mkIntegerName
+       return (mkLitInteger i mkIntegerId)
+tcIfaceLit lit = return lit
+
+-------------------------
 tcIfaceAlt :: CoreExpr -> (TyCon, [Type])
            -> (IfaceConAlt, [FastString], IfaceExpr)
            -> IfL (AltCon, [TyVar], CoreExpr)
@@ -987,12 +994,7 @@ tcIfaceAlt _ _ (IfaceDefault, names, rhs)
   
 tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
   = ASSERT( null names ) do
-    lit' <- case lit of
-            LitInteger i _ ->
-                do mkIntegerId <- tcIfaceExtId mkIntegerName
-                   return (mkLitInteger i mkIntegerId)
-            _ ->
-                return lit
+    lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
     return (LitAlt lit', [], rhs')
 
