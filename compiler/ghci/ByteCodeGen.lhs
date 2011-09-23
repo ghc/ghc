@@ -65,7 +65,7 @@ import qualified FiniteMap as Map
 -- Generating byte code for a complete module
 
 byteCodeGen :: DynFlags
-            -> [CoreBind]
+            -> CoreProgram
             -> [TyCon]
             -> ModBreaks
             -> IO CompiledByteCode

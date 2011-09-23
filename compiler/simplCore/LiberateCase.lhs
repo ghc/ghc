@@ -117,7 +117,7 @@ and the level of @h@ is zero (NB not one).
 %************************************************************************
 
 \begin{code}
-liberateCase :: DynFlags -> [CoreBind] -> [CoreBind]
+liberateCase :: DynFlags -> CoreProgram -> CoreProgram
 liberateCase dflags binds = do_prog (initEnv dflags) binds
   where
     do_prog _   [] = []

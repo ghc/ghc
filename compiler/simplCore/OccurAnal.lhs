@@ -55,7 +55,7 @@ Here's the externally-callable interface:
 occurAnalysePgm :: Module	-- Used only in debug output
                 -> (Activation -> Bool) 
                 -> [CoreRule] -> [CoreVect]
-                -> [CoreBind] -> [CoreBind]
+                -> CoreProgram -> CoreProgram
 occurAnalysePgm this_mod active_rule imp_rules vects binds
   | isEmptyVarEnv final_usage
   = binds'

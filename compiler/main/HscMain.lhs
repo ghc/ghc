@@ -1211,7 +1211,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
         ; return prog' }
 
 
-myCoreToStg :: DynFlags -> Module -> [CoreBind]
+myCoreToStg :: DynFlags -> Module -> CoreProgram
             -> IO ( [(StgBinding,[(Id,[Id])])]  -- output program
 	          , CollectedCCs) -- cost centre info (declared and used)
 
@@ -1473,7 +1473,7 @@ hscParseThingWithLocation source linenumber parser str
 hscCompileCore :: HscEnv
                -> Bool
                -> ModSummary
-               -> [CoreBind]
+               -> CoreProgram
                -> IO ()
 
 hscCompileCore hsc_env simplify mod_summary binds
@@ -1487,7 +1487,7 @@ hscCompileCore hsc_env simplify mod_summary binds
       return ()
 
 -- Makes a "vanilla" ModGuts.
-mkModGuts :: Module -> [CoreBind] -> ModGuts
+mkModGuts :: Module -> CoreProgram -> ModGuts
 mkModGuts mod binds = ModGuts {
   mg_module = mod,
   mg_boot = False,

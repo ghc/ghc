@@ -121,7 +121,7 @@ import Module
 import InstEnv          ( InstEnv, Instance )
 import FamInstEnv
 import Rules            ( RuleBase )
-import CoreSyn          ( CoreBind )
+import CoreSyn          ( CoreProgram )
 import VarEnv
 import VarSet
 import Var
@@ -757,7 +757,7 @@ data ModGuts
 	mg_fam_insts :: ![FamInst],	 -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],	 -- ^ Before the core pipeline starts, contains 
 		     			 -- See Note [Overall plumbing for rules] in Rules.lhs
-	mg_binds     :: ![CoreBind],	 -- ^ Bindings for this module
+	mg_binds     :: !CoreProgram,	 -- ^ Bindings for this module
 	mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
 	mg_warns     :: !Warnings,	 -- ^ Warnings declared in the module
         mg_anns      :: [Annotation],    -- ^ Annotations declared in this module
@@ -813,7 +813,7 @@ data CgGuts
 		-- tables. Includes newtypes, just for the benefit of
 		-- External Core
 
-	cg_binds    :: [CoreBind],
+	cg_binds    :: CoreProgram,
 		-- ^ The tidied main bindings, including
 		-- previously-implicit bindings for record and class
 		-- selectors, and data construtor wrappers.  But *not*

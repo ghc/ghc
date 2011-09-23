@@ -32,7 +32,7 @@ Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
 
 \begin{code}
-floatInwards :: [CoreBind] -> [CoreBind]
+floatInwards :: CoreProgram -> CoreProgram
 floatInwards = map fi_top_bind
   where
     fi_top_bind (NonRec binder rhs)

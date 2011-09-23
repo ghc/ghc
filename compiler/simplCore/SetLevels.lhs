@@ -206,7 +206,7 @@ instance Eq Level where
 
 \begin{code}
 setLevels :: FloatOutSwitches
-	  -> [CoreBind]
+	  -> CoreProgram
 	  -> UniqSupply
 	  -> [LevelledBind]
 

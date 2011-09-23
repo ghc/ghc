@@ -1028,7 +1028,7 @@ tcIfaceDataAlt con inst_tys arg_strs rhs
 
 
 \begin{code}
-tcExtCoreBindings :: [IfaceBinding] -> IfL [CoreBind]	-- Used for external core
+tcExtCoreBindings :: [IfaceBinding] -> IfL CoreProgram	-- Used for external core
 tcExtCoreBindings []     = return []
 tcExtCoreBindings (b:bs) = do_one b (tcExtCoreBindings bs)
 

@@ -128,7 +128,7 @@ stuff before and after core passes, and do Core Lint when necessary.
 showPass :: DynFlags -> CoreToDo -> IO ()
 showPass dflags pass = Err.showPass dflags (showSDoc (ppr pass))
 
-endPass :: DynFlags -> CoreToDo -> [CoreBind] -> [CoreRule] -> IO ()
+endPass :: DynFlags -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
 endPass dflags pass binds rules
   = do { dumpPassResult dflags mb_flag (ppr pass) empty binds rules
        ; lintPassResult dflags pass binds }      
@@ -147,7 +147,7 @@ dumpPassResult :: DynFlags
 	       	  			--            name is specified by df
                -> SDoc 			-- Header
                -> SDoc 			-- Extra info to appear after header
-               -> [CoreBind] -> [CoreRule] 
+               -> CoreProgram -> [CoreRule] 
                -> IO ()
 dumpPassResult dflags mb_flag hdr extra_info binds rules
   | Just dflag <- mb_flag
@@ -169,7 +169,7 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
                     , ptext (sLit "------ Local rules for imported ids --------")
                     , pprRules rules ]
 
-lintPassResult :: DynFlags -> CoreToDo -> [CoreBind] -> IO ()
+lintPassResult :: DynFlags -> CoreToDo -> CoreProgram -> IO ()
 lintPassResult dflags pass binds
   = when (dopt Opt_DoCoreLinting dflags) $
     do { let (warns, errs) = lintCoreBindings binds
@@ -177,7 +177,7 @@ lintPassResult dflags pass binds
        ; displayLintResults dflags pass warns errs binds  }
 
 displayLintResults :: DynFlags -> CoreToDo
-                   -> Bag Err.Message -> Bag Err.Message -> [CoreBind]
+                   -> Bag Err.Message -> Bag Err.Message -> CoreProgram
                    -> IO ()
 displayLintResults dflags pass warns errs binds
   | not (isEmptyBag errs)
@@ -444,7 +444,7 @@ defaultPlugin = Plugin {
 -- | A description of the plugin pass itself
 type PluginPass = ModGuts -> CoreM ModGuts
 
-bindsOnlyPass :: ([CoreBind] -> CoreM [CoreBind]) -> ModGuts -> CoreM ModGuts
+bindsOnlyPass :: (CoreProgram -> CoreM CoreProgram) -> ModGuts -> CoreM ModGuts
 bindsOnlyPass pass guts
   = do { binds' <- pass (mg_binds guts)
        ; return (guts { mg_binds = binds' }) }

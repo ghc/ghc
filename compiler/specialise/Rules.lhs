@@ -1014,7 +1014,7 @@ is so important.
 ruleCheckProgram :: CompilerPhase               -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
                  -> RuleBase                    -- ^ Database of rules
-                 -> [CoreBind]                  -- ^ Bindings to check in
+                 -> CoreProgram                 -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
 ruleCheckProgram phase rule_pat rule_base binds 
   | isEmptyBag results

@@ -997,8 +997,8 @@ rules are externalised (see init_ext_ids in function
 tidyTopBinds :: HscEnv
 	     -> UnfoldEnv
              -> TidyOccEnv
-	     -> [CoreBind]
-	     -> (TidyEnv, [CoreBind])
+	     -> CoreProgram
+	     -> (TidyEnv, CoreProgram)
 
 tidyTopBinds hsc_env unfold_env init_occ_env binds
   = tidy init_env binds

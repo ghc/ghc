@@ -10,7 +10,7 @@
 module CoreSyn (
 	-- * Main data types
 	Expr(..), Alt, Bind(..), AltCon(..), Arg, Note(..),
-	CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
+	CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
 	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..),
 
         -- ** 'Expr' construction
@@ -831,7 +831,29 @@ cmpAltCon con1 con2 = WARN( True, text "Comparing incomparable AltCons" <+>
 %*									*
 %************************************************************************
 
+Note [CoreProgram]
+~~~~~~~~~~~~~~~~~~
+The top level bindings of a program, a CoreProgram, are represented as
+a list of CoreBind
+
+ * Later bindings in the list can refer to earlier ones, but not vice
+   versa.  So this is OK
+      NonRec { x = 4 }
+      Rec { p = ...q...x...
+          ; q = ...p...x }
+      Rec { f = ...p..x..f.. }
+      NonRec { g = ..f..q...x.. }
+   But it would NOT be ok for 'f' to refer to 'g'.
+
+ * The occurrence analyser does strongly-connected component analysis
+   on each Rec binding, and splits it into a sequence of smaller
+   bindings where possible.  So the program typically starts life as a
+   single giant Rec, which is then dependency-analysed into smaller
+   chunks.  
+
 \begin{code}
+type CoreProgram = [CoreBind]	-- See Note [CoreProgram]
+
 -- | The common case for the type of binders and variables when
 -- we are manipulating the Core language within GHC
 type CoreBndr = Var

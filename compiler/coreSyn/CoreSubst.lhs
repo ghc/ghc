@@ -436,7 +436,7 @@ substBind subst (Rec pairs) = (subst', Rec (bndrs' `zip` rhss'))
 --
 -- [Aug 09] This function is not used in GHC at the moment, but seems so 
 --          short and simple that I'm going to leave it here
-deShadowBinds :: [CoreBind] -> [CoreBind]
+deShadowBinds :: CoreProgram -> CoreProgram
 deShadowBinds binds = snd (mapAccumL substBind emptySubst binds)
 \end{code}
 
@@ -860,8 +860,8 @@ simpleOptExprWith subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
 
 ----------------------
 simpleOptPgm :: DynFlags -> Module 
-             -> [CoreBind] -> [CoreRule] -> [CoreVect] 
-             -> IO ([CoreBind], [CoreRule], [CoreVect])
+             -> CoreProgram -> [CoreRule] -> [CoreVect] 
+             -> IO (CoreProgram, [CoreRule], [CoreVect])
 simpleOptPgm dflags this_mod binds rules vects
   = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                        (pprCoreBindings occ_anald_binds $$ pprRules rules );

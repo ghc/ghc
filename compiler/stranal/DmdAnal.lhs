@@ -62,14 +62,14 @@ To think about
 %************************************************************************
 
 \begin{code}
-dmdAnalPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
+dmdAnalPgm :: DynFlags -> CoreProgram -> IO CoreProgram
 dmdAnalPgm _ binds
   = do {
 	let { binds_plus_dmds = do_prog binds } ;
 	return binds_plus_dmds
     }
   where
-    do_prog :: [CoreBind] -> [CoreBind]
+    do_prog :: CoreProgram -> CoreProgram
     do_prog binds = snd $ mapAccumL dmdAnalTopBind emptySigEnv binds
 
 dmdAnalTopBind :: SigEnv

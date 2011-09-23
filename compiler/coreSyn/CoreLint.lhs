@@ -99,7 +99,7 @@ find an occurence of an Id, we fetch it from the in-scope set.
 
 
 \begin{code}
-lintCoreBindings :: [CoreBind] -> (Bag Message, Bag Message)
+lintCoreBindings :: CoreProgram -> (Bag Message, Bag Message)
 --   Returns (warnings, errors)
 lintCoreBindings binds
   = initL $ 

@@ -185,7 +185,7 @@ happen now that we don't look inside INLINEs (which wrappers are).
 %************************************************************************
 
 \begin{code}
-cseProgram :: [CoreBind] -> [CoreBind]
+cseProgram :: CoreProgram -> CoreProgram
 cseProgram binds = cseBinds emptyCSEnv binds
 
 cseBinds :: CSEnv -> [CoreBind] -> [CoreBind]

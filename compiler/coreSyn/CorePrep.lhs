@@ -144,7 +144,7 @@ type CpeRhs  = CoreExpr	   -- Non-terminal 'rhs'
 %************************************************************************
 
 \begin{code}
-corePrepPgm :: DynFlags -> [CoreBind] -> [TyCon] -> IO [CoreBind]
+corePrepPgm :: DynFlags -> CoreProgram -> [TyCon] -> IO CoreProgram
 corePrepPgm dflags binds data_tycons = do
     showPass dflags "CorePrep"
     us <- mkSplitUniqSupply 's'

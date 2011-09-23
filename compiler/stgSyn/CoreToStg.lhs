@@ -140,7 +140,7 @@ for x, solely to put in the SRTs lower down.
 %************************************************************************
 
 \begin{code}
-coreToStg :: PackageId -> [CoreBind] -> IO [StgBinding]
+coreToStg :: PackageId -> CoreProgram -> IO [StgBinding]
 coreToStg this_pkg pgm
   = return pgm'
   where (_, _, pgm') = coreTopBindsToStg this_pkg emptyVarEnv pgm
@@ -153,7 +153,7 @@ coreExprToStg expr
 coreTopBindsToStg
     :: PackageId
     -> IdEnv HowBound           -- environment for the bindings
-    -> [CoreBind]
+    -> CoreProgram
     -> (IdEnv HowBound, FreeVarsInfo, [StgBinding])
 
 coreTopBindsToStg _        env [] = (env, emptyFVInfo, [])

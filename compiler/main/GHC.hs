@@ -769,7 +769,7 @@ data CoreModule
       -- | Type environment for types declared in this module
       cm_types    :: !TypeEnv,
       -- | Declarations
-      cm_binds    :: [CoreBind]
+      cm_binds    :: CoreProgram
     }
 
 instance Outputable CoreModule where

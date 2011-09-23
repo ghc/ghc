@@ -114,7 +114,7 @@ Well, maybe.  We don't do this at the moment.
 floatOutwards :: FloatOutSwitches
 	      -> DynFlags
 	      -> UniqSupply 
-	      -> [CoreBind] -> IO [CoreBind]
+	      -> CoreProgram -> IO CoreProgram
 
 floatOutwards float_sws dflags us pgm
   = do {

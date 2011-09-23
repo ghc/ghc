@@ -75,7 +75,7 @@ import FastString
 \end{code}
 
 \begin{code}
-doStaticArgs :: UniqSupply -> [CoreBind] -> [CoreBind]
+doStaticArgs :: UniqSupply -> CoreProgram -> CoreProgram
 doStaticArgs us binds = snd $ mapAccumL sat_bind_threaded_us us binds
   where
     sat_bind_threaded_us us bind =
