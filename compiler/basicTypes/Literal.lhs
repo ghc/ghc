@@ -110,14 +110,31 @@ data Literal
                                 --    @stdcall@ labels. @Just x@ => @\<x\>@ will
                                 --    be appended to label name when emitting assembly.
 
-  | LitInteger Integer Id
-   -- ^ We treat @Integer@s as literals, to make it easier to write
-   --   RULEs for them. They only get converted into real Core during
-   --   the CorePrep phase.
-   --   The Id is for mkInteger, which we use when finally creating the
-   --   core.
+  | LitInteger Integer Id	--  ^ Integer literals
+    	       	       		-- See Note [Integer literals]
   deriving (Data, Typeable)
 \end{code}
+
+Note [Integer literals]
+~~~~~~~~~~~~~~~~~~~~~~~
+An Integer literal is represented using, well, an Integer, to make it
+easier to write RULEs for them. 
+
+ * The Id is for mkInteger, which we use when finally creating the core.
+
+ * They only get converted into real Core,
+      mkInteger [c1, c2, .., cn]
+   during the CorePrep phase.
+
+ * When we initally build an Integer literal, notably when
+   deserialising it from an interface file (see the Binary instance
+   below), we don't have convenient access to the mkInteger Id.  So we
+   just use an error thunk, and fill in the real Id when we do tcIfaceLit
+   in TcIface.
+
+ * When looking for CAF-hood (in TidyPgm), we must take account of the
+   CAF-hood of the mk_integer field in LitInteger; see TidyPgm.cafRefsL
+
 
 Binary instance
 
@@ -175,6 +192,7 @@ instance Binary Literal where
               _ -> do
                     i <- get bh
                     return $ mkLitInteger i (panic "Evaluated the place holder for mkInteger")
+		    	   -- See Note [Integer literals] in Literal
 \end{code}
 
 \begin{code}

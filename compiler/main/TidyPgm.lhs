@@ -18,6 +18,7 @@ import CoreFVs
 import CoreTidy
 import CoreMonad
 import CoreUtils
+import Literal
 import Rules
 import CoreArity	( exprArity, exprBotStrictness_maybe )
 import VarEnv
@@ -1187,7 +1188,7 @@ hasCafRefs this_pkg p arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise 		    = NoCafRefs
  where
-  mentions_cafs = isFastTrue (cafRefs p expr)
+  mentions_cafs = isFastTrue (cafRefsE p expr)
   is_dynamic_name = isDllName this_pkg 
   is_caf = not (arity > 0 || rhsIsStatic is_dynamic_name expr)
 
@@ -1197,29 +1198,33 @@ hasCafRefs this_pkg p arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefs :: VarEnv Id -> Expr a -> FastBool
-cafRefs p (Var id)
-	-- imported Ids first:
-  | not (isLocalId id) = fastBool (mayHaveCafRefs (idCafInfo id))
-	-- now Ids local to this module:
-  | otherwise =
-     case lookupVarEnv p id of
-	Just id' -> fastBool (mayHaveCafRefs (idCafInfo id'))
-	Nothing  -> fastBool False
+cafRefsE :: VarEnv Id -> Expr a -> FastBool
+cafRefsE p (Var id)            = cafRefsV p id
+cafRefsE p (Lit lit) 	       = cafRefsL p lit
+cafRefsE p (App f a) 	       = fastOr (cafRefsE p f) (cafRefsE p) a
+cafRefsE p (Lam _ e) 	       = cafRefsE p e
+cafRefsE p (Let b e) 	       = fastOr (cafRefsEs p (rhssOfBind b)) (cafRefsE p) e
+cafRefsE p (Case e _bndr _ alts) = fastOr (cafRefsE p e) (cafRefsEs p) (rhssOfAlts alts)
+cafRefsE p (Note _n e) 	       = cafRefsE p e
+cafRefsE p (Cast e _co)         = cafRefsE p e
+cafRefsE _ (Type _) 	       = fastBool False
+cafRefsE _ (Coercion _)         = fastBool False
 
-cafRefs _ (Lit _) 	       = fastBool False
-cafRefs p (App f a) 	       = fastOr (cafRefs p f) (cafRefs p) a
-cafRefs p (Lam _ e) 	       = cafRefs p e
-cafRefs p (Let b e) 	       = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
-cafRefs p (Case e _bndr _ alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
-cafRefs p (Note _n e) 	       = cafRefs p e
-cafRefs p (Cast e _co)         = cafRefs p e
-cafRefs _ (Type _) 	       = fastBool False
-cafRefs _ (Coercion _)         = fastBool False
+cafRefsEs :: VarEnv Id -> [Expr a] -> FastBool
+cafRefsEs _ [] 	  = fastBool False
+cafRefsEs p (e:es) = fastOr (cafRefsE p e) (cafRefsEs p) es
 
-cafRefss :: VarEnv Id -> [Expr a] -> FastBool
-cafRefss _ [] 	  = fastBool False
-cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es
+cafRefsL :: VarEnv Id -> Literal -> FastBool
+-- Don't forget that the embeded mk_integer id might have Caf refs!
+-- See Note [Integer literals] in Literal
+cafRefsL p (LitInteger _ mk_integer) = cafRefsV p mk_integer
+cafRefsL _ _                         = fastBool False
+
+cafRefsV :: VarEnv Id -> Id -> FastBool
+cafRefsV p id 
+  | not (isLocalId id)            = fastBool (mayHaveCafRefs (idCafInfo id))
+  | Just id' <- lookupVarEnv p id = fastBool (mayHaveCafRefs (idCafInfo id'))
+  | otherwise                     = fastBool False
 
 fastOr :: FastBool -> (a -> FastBool) -> a -> FastBool
 -- hack for lazy-or over FastBool.

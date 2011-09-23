@@ -451,8 +451,8 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
-cpeRhsE env (Lit (LitInteger i mkIntegerId))
-    = cpeRhsE env (cvtLitInteger i mkIntegerId)
+cpeRhsE env (Lit (LitInteger i mk_integer))
+    = cpeRhsE env (cvtLitInteger i mk_integer)
 cpeRhsE _env expr@(Lit {})       = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})        = cpeApp env expr
 
@@ -507,11 +507,14 @@ cvtLitInteger :: Integer -> Id -> CoreExpr
 -- represenation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we 
 -- use the S# data constructor for small literals.  
-cvtLitInteger i mkIntegerId
-  | cIntegerLibraryType == IntegerGMP && inIntRange i
+-- See Note [Integer literals] in Literal
+cvtLitInteger i mk_integer
+  | cIntegerLibraryType == IntegerGMP
+  , inIntRange i       -- Special case for small integers in GMP
     = mkConApp integerGmpSDataCon [Lit (mkMachInt i)]
+
   | otherwise
-    = mkApps (Var mkIntegerId) [isNonNegative, ints]
+    = mkApps (Var mk_integer) [isNonNegative, ints]
   where isNonNegative = if i < 0 then mkConApp falseDataCon []
                                  else mkConApp trueDataCon  []
         ints = mkListExpr intTy (f (abs i))
