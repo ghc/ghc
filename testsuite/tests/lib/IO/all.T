@@ -126,6 +126,7 @@ test('4855', normal, compile_and_run, [''])
 
 test('hSetEncoding001',extra_run_opts('hSetEncoding001.in'), compile_and_run, [''])
 test('decodingerror001',normal, compile_and_run, [''])
+test('decodingerror002',normal, compile_and_run, [''])
 
 encoding001Encodings = ["utf8", "utf8_bom", "utf16", "utf16le",
                         "utf16be", "utf32", "utf32le", "utf32be"]
