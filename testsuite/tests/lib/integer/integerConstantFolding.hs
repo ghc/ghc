@@ -40,6 +40,10 @@ main = do p "plusInteger"        plusInteger
           p "orInteger"         orInteger
           p "xorInteger"        xorInteger
           p "complementInteger" complementInteger
+          p "quotRemInteger"    quotRemInteger
+          p "divModInteger"     divModInteger
+          p "shiftLInteger"     shiftLInteger
+          p "shiftRInteger"     shiftRInteger
 
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
@@ -134,4 +138,16 @@ xorInteger = 100056 `xor` 140057
 
 complementInteger :: Integer
 complementInteger = complement 200058
+
+quotRemInteger :: (Integer, Integer)
+quotRemInteger = 100059 `quotRem` 123
+
+divModInteger :: (Integer, Integer)
+divModInteger = 100060 `divMod` 456
+
+shiftLInteger :: Integer
+shiftLInteger = 100061 `shiftL` 4
+
+shiftRInteger :: Integer
+shiftRInteger = 100062 `shiftR` 4
 

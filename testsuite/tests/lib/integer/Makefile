@@ -22,5 +22,11 @@ integerConstantFolding:
 	$(call CHECK,\<239575\>,orInteger)
 	$(call CHECK,\<239041\>,xorInteger)
 	$(call CHECK,-200059\>,complementInteger)
+	$(call CHECK,\<813\>,quotRemInteger)
+	$(call CHECK,\<60\>,quotRemInteger)
+	$(call CHECK,\<219\>,divModInteger)
+	$(call CHECK,\<196\>,divModInteger)
+	$(call CHECK,\<1600976\>,shiftLInteger)
+	$(call CHECK,\<6253\>,shiftRInteger)
 	./integerConstantFolding
 
