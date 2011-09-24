@@ -1623,8 +1623,15 @@ def mkPath(curdir, path):
 
 def addTestFilesWritten(name, fn):
     if config.use_threads:
-        with t.lockFilesWritten:
+        # We would use
+        #     with t.lockFilesWritten:
+        #         addTestFilesWrittenHelper(name, fn)
+        # but old versions of python fail with "SyntaxError: invalid syntax"
+        t.lockFilesWritten.acquire()
+        try:
             addTestFilesWrittenHelper(name, fn)
+        finally:
+            t.lockFilesWritten.release()
     else:
         addTestFilesWrittenHelper(name, fn)
 
