@@ -2,6 +2,9 @@
 # (c) Simon Marlow 2002
 #
 
+# This allows us to use the "with X:" syntax with python 2.5:
+from __future__ import with_statement
+
 import sys
 import os
 import errno
@@ -1623,15 +1626,8 @@ def mkPath(curdir, path):
 
 def addTestFilesWritten(name, fn):
     if config.use_threads:
-        # We would use
-        #     with t.lockFilesWritten:
-        #         addTestFilesWrittenHelper(name, fn)
-        # but old versions of python fail with "SyntaxError: invalid syntax"
-        t.lockFilesWritten.acquire()
-        try:
+        with t.lockFilesWritten:
             addTestFilesWrittenHelper(name, fn)
-        finally:
-            t.lockFilesWritten.release()
     else:
         addTestFilesWrittenHelper(name, fn)
 
