@@ -137,6 +137,13 @@ FP_CHECK_CONSTS([SIGINT], [
 dnl ** can we open files in binary mode?
 FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 
+# We don't use iconv or libcharset on Windows, but if configure finds
+# them then it can cause problems. So we don't even try looking if
+# we are on Windows.
+# See http://www.haskell.org/pipermail/cvs-ghc/2011-September/065980.html
+if test "$WINDOWS" = "NO"
+then
+
 # We can't just use AC_SEARCH_LIBS for this, as on OpenBSD the iconv.h
 # header needs to be included as iconv_open is #define'd to something
 # else. We therefore use our own FP_SEARCH_LIBS_PROTO, which allows us
@@ -152,10 +159,7 @@ FP_SEARCH_LIBS_PROTO(iconv,
                       iconv_close(cd);],
                      iconv,
                      [EXTRA_LIBS="$EXTRA_LIBS $ac_lib"],
-                     [if test "$WINDOWS" = "NO"
-                      then
-                          AC_MSG_ERROR([iconv is required on non-Windows platforms])
-                      fi])
+                     [AC_MSG_ERROR([iconv is required on non-Windows platforms])])
 
 # If possible, we use libcharset instead of nl_langinfo(CODESET) to
 # determine the current locale's character encoding.
@@ -166,6 +170,8 @@ FP_SEARCH_LIBS_PROTO(
     [charset],
     [AC_DEFINE([HAVE_LIBCHARSET], [1], [Define to 1 if you have libcharset.])
      EXTRA_LIBS="$EXTRA_LIBS $ac_lib"])
+
+fi
 
 # Hack - md5.h needs HsFFI.h.  Is there a better way to do this?
 CFLAGS="-I../../includes $CFLAGS"
