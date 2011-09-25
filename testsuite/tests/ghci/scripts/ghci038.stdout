@@ -1,15 +1,15 @@
 import Prelude -- implicit
 import Prelude
--- map in scope due to explicit import Prelude
+== map in scope due to explicit 'import Prelude'
 map :: (a -> b) -> [a] -> [b]
 import Prelude
--- still in scope, import Prelude () is subsumed by import Prelude
+== still in scope, 'import Prelude ()' is subsumed by 'import Prelude'
 map :: (a -> b) -> [a] -> [b]
 import Prelude -- implicit
--- still in scope, implicit import of Prelude
+== still in scope, implicit import of Prelude
 map :: (a -> b) -> [a] -> [b]
 import Prelude ()
--- not in scope now
+== not in scope now
 import Prelude -- implicit
 x :: (a -> b) -> [a] -> [b]
 :module +*Foo -- added automatically

@@ -2,19 +2,19 @@
 :show imports
 import Prelude
 :show imports
-:!echo -- map in scope due to explicit 'import Prelude'
+:!printf "== map in scope due to explicit 'import Prelude'\n"
 :t map
 import Prelude ()
 :show imports
-:!echo -- still in scope, 'import Prelude ()' is subsumed by 'import Prelude'
+:!printf "== still in scope, 'import Prelude ()' is subsumed by 'import Prelude'\n"
 :t map
 :module -Prelude
 :show imports
-:!echo -- still in scope, implicit import of Prelude
+:!printf "== still in scope, implicit import of Prelude\n"
 :t map
 import Prelude ()
 :show imports
-:!echo -- not in scope now
+:!printf "== not in scope now\n"
 :t map
 
 :module -Prelude
@@ -23,11 +23,11 @@ import Prelude ()
 
 :t x
 :show imports
-:!echo :m -Foo
+:!printf ":m -Foo\n"
 :m -Foo
 :show imports
 :t x
-:!echo :m +*Foo
+:!printf ":m +*Foo\n"
 :m +*Foo
 :show imports
 :t x
