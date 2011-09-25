@@ -9,7 +9,7 @@ Desugaring foreign declarations (see also DsCCall).
 module DsForeign ( dsForeigns ) where
 
 #include "HsVersions.h"
-import TcRnMonad	-- temp
+import TcRnMonad        -- temp
 
 import CoreSyn
 
@@ -50,7 +50,7 @@ import Data.List
 \end{code}
 
 Desugaring of @foreign@ declarations is naturally split up into
-parts, an @import@ and an @export@  part. A @foreign import@ 
+parts, an @import@ and an @export@  part. A @foreign import@
 declaration
 \begin{verbatim}
   foreign import cc nm f :: prim_args -> IO prim_res
@@ -63,12 +63,12 @@ is the same as
 so we reuse the desugaring code in @DsCCall@ to deal with these.
 
 \begin{code}
-type Binding = (Id, CoreExpr)	-- No rec/nonrec structure;
-				-- the occurrence analyser will sort it all out
+type Binding = (Id, CoreExpr)   -- No rec/nonrec structure;
+                                -- the occurrence analyser will sort it all out
 
-dsForeigns :: [LForeignDecl Id] 
-	   -> DsM (ForeignStubs, OrdList Binding)
-dsForeigns [] 
+dsForeigns :: [LForeignDecl Id]
+           -> DsM (ForeignStubs, OrdList Binding)
+dsForeigns []
   = return (NoStubs, nilOL)
 dsForeigns fos = do
     fives <- mapM do_ldecl fos
@@ -77,13 +77,13 @@ dsForeigns fos = do
         fe_ids = concat idss
         fe_init_code = map foreignExportInitialiser fe_ids
     --
-    return (ForeignStubs 
+    return (ForeignStubs
              (vcat hs)
              (vcat cs $$ vcat fe_init_code),
             foldr (appOL . toOL) nilOL bindss)
   where
    do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
-            
+
    do_decl (ForeignImport id _ spec) = do
       traceIf (text "fi start" <+> ppr id)
       (bs, h, c) <- dsFImport (unLoc id) spec
@@ -97,9 +97,9 @@ dsForeigns fos = do
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Foreign import}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Desugaring foreign imports is just the matter of creating a binding
@@ -108,31 +108,31 @@ that on its RHS unboxes its arguments, performs the external call
 
 However, we create a worker/wrapper pair, thus:
 
-	foreign import f :: Int -> IO Int
+        foreign import f :: Int -> IO Int
 ==>
-	f x = IO ( \s -> case x of { I# x# ->
-			 case fw s x# of { (# s1, y# #) ->
-			 (# s1, I# y# #)}})
+        f x = IO ( \s -> case x of { I# x# ->
+                         case fw s x# of { (# s1, y# #) ->
+                         (# s1, I# y# #)}})
 
-	fw s x# = ccall f s x#
+        fw s x# = ccall f s x#
 
 The strictness/CPR analyser won't do this automatically because it doesn't look
-inside returned tuples; but inlining this wrapper is a Really Good Idea 
+inside returned tuples; but inlining this wrapper is a Really Good Idea
 because it exposes the boxing to the call site.
 
 \begin{code}
 dsFImport :: Id
-	  -> ForeignImport
-	  -> DsM ([Binding], SDoc, SDoc)
+          -> ForeignImport
+          -> DsM ([Binding], SDoc, SDoc)
 dsFImport id (CImport cconv safety _ spec) = do
     (ids, h, c) <- dsCImport id spec cconv safety
     return (ids, h, c)
 
 dsCImport :: Id
-	  -> CImportSpec
-	  -> CCallConv
-	  -> Safety
-	  -> DsM ([Binding], SDoc, SDoc)
+          -> CImportSpec
+          -> CCallConv
+          -> Safety
+          -> DsM ([Binding], SDoc, SDoc)
 dsCImport id (CLabel cid) cconv _ = do
    let ty = idType id
        fod = case tyConAppTyCon_maybe (repType ty) of
@@ -172,9 +172,9 @@ fun_type_arg_stdcall_info _other_conv _
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Foreign calls}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -209,15 +209,15 @@ dsFCall fn_id fcall = do
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
         fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfolding (Just (length args)) wrap_rhs
-    
+
     return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs)], empty, empty)
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Primitive calls}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 This is for `@foreign import prim@' declarations.
@@ -248,9 +248,9 @@ dsPrimCall fn_id fcall = do
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Foreign export}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 The function that does most of the work for `@foreign export@' declarations.
@@ -265,29 +265,29 @@ For each `@foreign export foo@' in a module M we generate:
 the user-written Haskell function `@M.foo@'.
 
 \begin{code}
-dsFExport :: Id			-- Either the exported Id, 
-				-- or the foreign-export-dynamic constructor
-	  -> Type		-- The type of the thing callable from C
-	  -> CLabelString	-- The name to export to C land
-	  -> CCallConv
-	  -> Bool		-- True => foreign export dynamic
-				-- 	   so invoke IO action that's hanging off 
-				-- 	   the first argument's stable pointer
-	  -> DsM ( SDoc		-- contents of Module_stub.h
-		 , SDoc		-- contents of Module_stub.c
-		 , String       -- string describing type to pass to createAdj.
-		 , Int		-- size of args to stub function
-		 )
+dsFExport :: Id                 -- Either the exported Id,
+                                -- or the foreign-export-dynamic constructor
+          -> Type               -- The type of the thing callable from C
+          -> CLabelString       -- The name to export to C land
+          -> CCallConv
+          -> Bool               -- True => foreign export dynamic
+                                --         so invoke IO action that's hanging off
+                                --         the first argument's stable pointer
+          -> DsM ( SDoc         -- contents of Module_stub.h
+                 , SDoc         -- contents of Module_stub.c
+                 , String       -- string describing type to pass to createAdj.
+                 , Int          -- size of args to stub function
+                 )
 
 dsFExport fn_id ty ext_name cconv isDyn=  do
     let
        (_tvs,sans_foralls)             = tcSplitForAllTys ty
        (fe_arg_tys', orig_res_ty)      = tcSplitFunTys sans_foralls
-       -- We must use tcSplits here, because we want to see 
+       -- We must use tcSplits here, because we want to see
        -- the (IO t) in the corner of the type!
        fe_arg_tys | isDyn     = tail fe_arg_tys'
                   | otherwise = fe_arg_tys'
-    
+
        -- Look at the result type of the exported function, orig_res_ty
        -- If it's IO t, return         (t, True)
        -- If it's plain t, return      (t, False)
@@ -297,9 +297,9 @@ dsFExport fn_id ty ext_name cconv isDyn=  do
            Just (_ioTyCon, res_ty, _co) -> return (res_ty, True)
                    -- The function already returns IO t
                    -- ToDo: what about the coercion?
-           Nothing                    -> return (orig_res_ty, False) 
+           Nothing                    -> return (orig_res_ty, False)
                    -- The function returns t
-    
+
     dflags <- getDOpts
     return $
       mkFExportCBits dflags ext_name
@@ -332,15 +332,15 @@ foreign import "&f_helper" f_helper :: FunPtr (StablePtr Fun -> Fun)
 
 f_helper(StablePtr s, HsBool b, HsInt i)
 {
-	rts_evalIO(rts_apply(rts_apply(deRefStablePtr(s), 
-				       rts_mkBool(b)), rts_mkInt(i)));
+        rts_evalIO(rts_apply(rts_apply(deRefStablePtr(s),
+                                       rts_mkBool(b)), rts_mkInt(i)));
 }
 \end{verbatim}
 
 \begin{code}
 dsFExportDynamic :: Id
-		 -> CCallConv
-		 -> DsM ([Binding], SDoc, SDoc)
+                 -> CCallConv
+                 -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id cconv = do
     fe_id <-  newSysLocalDs ty
     mod <- getModuleDs
@@ -371,9 +371,9 @@ dsFExportDynamic id cconv = do
                         , Lit (mkMachString typestring)
                         ]
           -- name of external entry point providing these services.
-          -- (probably in the RTS.) 
+          -- (probably in the RTS.)
         adjustor   = fsLit "createAdjustor"
-        
+
           -- Determine the number of bytes of arguments to the stub function,
           -- so that we can attach the '@N' suffix to its label if it is a
           -- stdcall on Windows.
@@ -389,7 +389,7 @@ dsFExportDynamic id cconv = do
                  mkCoerce (mkSymCo co) $
                  mkApps (Var bindIOId)
                         [ Type stable_ptr_ty
-                        , Type res_ty       
+                        , Type res_ty
                         , mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
                         , Lam stbl_value ccall_adj
                         ]
@@ -405,8 +405,8 @@ dsFExportDynamic id cconv = do
   (tvs,sans_foralls)       = tcSplitForAllTys ty
   ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty, co) = tcSplitIOType_maybe fn_res_ty
-	-- Must have an IO type; hence Just
-	-- co : fn_res_ty ~ IO res_ty
+        -- Must have an IO type; hence Just
+        -- co : fn_res_ty ~ IO res_ty
 
 toCName :: Id -> String
 toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
@@ -419,48 +419,48 @@ toCName i = showSDoc (pprCode CStyle (ppr (idName i)))
 %*
 
 For each @foreign export@ function, a C stub function is generated.
-The C stub constructs the application of the exported Haskell function 
+The C stub constructs the application of the exported Haskell function
 using the hugs/ghc rts invocation API.
 
 \begin{code}
 mkFExportCBits :: DynFlags
                -> FastString
-	       -> Maybe Id 	-- Just==static, Nothing==dynamic
-	       -> [Type] 
-	       -> Type 
-               -> Bool		-- True <=> returns an IO type
-	       -> CCallConv 
-	       -> (SDoc, 
-		   SDoc,
-		   String, 	-- the argument reps
-		   Int		-- total size of arguments
-		  )
-mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
+               -> Maybe Id      -- Just==static, Nothing==dynamic
+               -> [Type]
+               -> Type
+               -> Bool          -- True <=> returns an IO type
+               -> CCallConv
+               -> (SDoc,
+                   SDoc,
+                   String,      -- the argument reps
+                   Int          -- total size of arguments
+                  )
+mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
  = (header_bits, c_bits, type_string,
     sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- aug_arg_info] -- all the args
-	 -- NB. the calculation here isn't strictly speaking correct.
-	 -- We have a primitive Haskell type (eg. Int#, Double#), and
-	 -- we want to know the size, when passed on the C stack, of
-	 -- the associated C type (eg. HsInt, HsDouble).  We don't have
-	 -- this information to hand, but we know what GHC's conventions
-	 -- are for passing around the primitive Haskell types, so we
-	 -- use that instead.  I hope the two coincide --SDM
+         -- NB. the calculation here isn't strictly speaking correct.
+         -- We have a primitive Haskell type (eg. Int#, Double#), and
+         -- we want to know the size, when passed on the C stack, of
+         -- the associated C type (eg. HsInt, HsDouble).  We don't have
+         -- this information to hand, but we know what GHC's conventions
+         -- are for passing around the primitive Haskell types, so we
+         -- use that instead.  I hope the two coincide --SDM
     )
  where
   -- list the arguments to the C function
-  arg_info :: [(SDoc, 		-- arg name
-		SDoc,		-- C type
-	        Type,		-- Haskell type
-		CmmType)]	-- the CmmType
+  arg_info :: [(SDoc,           -- arg name
+                SDoc,           -- C type
+                Type,           -- Haskell type
+                CmmType)]       -- the CmmType
   arg_info  = [ let stg_type = showStgType ty in
                 (arg_cname n stg_type,
                  stg_type,
-                 ty, 
-		 typeCmmType (getPrimTyOf ty))
-	      | (ty,n) <- zip arg_htys [1::Int ..] ]
+                 ty,
+                 typeCmmType (getPrimTyOf ty))
+              | (ty,n) <- zip arg_htys [1::Int ..] ]
 
   arg_cname n stg_ty
-        | libffi    = char '*' <> parens (stg_ty <> char '*') <> 
+        | libffi    = char '*' <> parens (stg_ty <> char '*') <>
                       ptext (sLit "args") <> brackets (int (n-1))
         | otherwise = text ('a':show n)
 
@@ -481,15 +481,15 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
     | isNothing maybe_target = stable_ptr_arg : insertRetAddr dflags cc arg_info
     | otherwise              = arg_info
 
-  stable_ptr_arg = 
-	(text "the_stableptr", text "StgStablePtr", undefined,
-	 typeCmmType (mkStablePtrPrimTy alphaTy))
+  stable_ptr_arg =
+        (text "the_stableptr", text "StgStablePtr", undefined,
+         typeCmmType (mkStablePtrPrimTy alphaTy))
 
   -- stuff to do with the return type of the C function
-  res_hty_is_unit = res_hty `eqType` unitTy	-- Look through any newtypes
+  res_hty_is_unit = res_hty `eqType` unitTy     -- Look through any newtypes
 
   cResType | res_hty_is_unit = text "void"
-	   | otherwise	     = showStgType res_hty
+           | otherwise       = showStgType res_hty
 
   -- when the return type is integral and word-sized or smaller, it
   -- must be assigned as type ffi_arg (#3516).  To see what type
@@ -506,8 +506,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   -- Now we can cook up the prototype for the exported function.
   pprCconv = case cc of
-		CCallConv   -> empty
-		StdCallConv -> text (ccallConvAttribute cc)
+                CCallConv   -> empty
+                StdCallConv -> text (ccallConvAttribute cc)
                 _           -> panic ("mkFExportCBits/pprCconv " ++ showPpr cc)
 
   header_bits = ptext (sLit "extern") <+> fun_proto <> semi
@@ -519,7 +519,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   fun_proto
     | libffi
-      = ptext (sLit "void") <+> ftext c_nm <> 
+      = ptext (sLit "void") <+> ftext c_nm <>
           parens (ptext (sLit "void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr"))
     | otherwise
       = cResType <+> pprCconv <+> ftext c_nm <> parens fun_args
@@ -536,8 +536,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   expr_to_run
      = foldl appArg the_cfun arg_info -- NOT aug_arg_info
        where
-          appArg acc (arg_cname, _, arg_hty, _) 
-             = text "rts_apply" 
+          appArg acc (arg_cname, _, arg_hty, _)
+             = text "rts_apply"
                <> parens (cap <> acc <> comma <> mkHObj arg_hty <> parens (cap <> arg_cname))
 
   -- various other bits for inside the fn
@@ -546,8 +546,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                  | otherwise       = cResType <+> text "cret;"
 
   assignCResult | res_hty_is_unit = empty
-	        | otherwise       =
-	        	text "cret=" <> unpackHObj res_hty <> parens (text "ret") <> semi
+                | otherwise       =
+                        text "cret=" <> unpackHObj res_hty <> parens (text "ret") <> semi
 
   -- an extern decl for the fn being called
   extern_decl
@@ -555,38 +555,38 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
           Nothing -> empty
           Just hs_fn -> text "extern StgClosure " <> ppr hs_fn <> text "_closure" <> semi
 
-   
+
   -- finally, the whole darn thing
   c_bits =
     space $$
     extern_decl $$
     fun_proto  $$
-    vcat 
+    vcat
      [ lbrace
      ,   ptext (sLit "Capability *cap;")
      ,   declareResult
      ,   declareCResult
      ,   text "cap = rts_lock();"
-	  -- create the application + perform it.
+          -- create the application + perform it.
      ,   ptext (sLit "cap=rts_evalIO") <> parens (
-		cap <>
-		ptext (sLit "rts_apply") <> parens (
-		    cap <>
-		    text "(HaskellObj)"
-	         <> ptext (if is_IO_res_ty 
-				then (sLit "runIO_closure")
-				else (sLit "runNonIO_closure"))
-		 <> comma
-        	 <> expr_to_run
-		) <+> comma
-	       <> text "&ret"
-	     ) <> semi
+                cap <>
+                ptext (sLit "rts_apply") <> parens (
+                    cap <>
+                    text "(HaskellObj)"
+                 <> ptext (if is_IO_res_ty
+                                then (sLit "runIO_closure")
+                                else (sLit "runNonIO_closure"))
+                 <> comma
+                 <> expr_to_run
+                ) <+> comma
+               <> text "&ret"
+             ) <> semi
      ,   ptext (sLit "rts_checkSchedStatus") <> parens (doubleQuotes (ftext c_nm)
-						<> comma <> text "cap") <> semi
+                                                <> comma <> text "cap") <> semi
      ,   assignCResult
      ,   ptext (sLit "rts_unlock(cap);")
      ,   ppUnless res_hty_is_unit $
-         if libffi 
+         if libffi
                   then char '*' <> parens (ffi_cResType <> char '*') <>
                        ptext (sLit "resp = cret;")
                   else ptext (sLit "return cret;")
@@ -629,7 +629,7 @@ showFFIType t = getOccString (getName (typeTyCon t))
 typeTyCon :: Type -> TyCon
 typeTyCon ty = case tcSplitTyConApp_maybe (repType ty) of
                  Just (tc,_) -> tc
-	         Nothing     -> pprPanic "DsForeign.typeTyCon" (ppr ty)
+                 Nothing     -> pprPanic "DsForeign.typeTyCon" (ppr ty)
 
 insertRetAddr :: DynFlags -> CCallConv
               -> [(SDoc, SDoc, Type, CmmType)]
@@ -654,8 +654,8 @@ insertRetAddr dflags CCallConv args
 insertRetAddr _ _ args = args
 
 ret_addr_arg :: (SDoc, SDoc, Type, CmmType)
-ret_addr_arg = (text "original_return_addr", text "void*", undefined, 
-		typeCmmType addrPrimTy)
+ret_addr_arg = (text "original_return_addr", text "void*", undefined,
+                typeCmmType addrPrimTy)
 
 -- This function returns the primitive type associated with the boxed
 -- type argument to a foreign export (eg. Int ==> Int#).
@@ -667,12 +667,12 @@ getPrimTyOf ty
   | otherwise =
   case splitProductType_maybe rep_ty of
      Just (_, _, data_con, [prim_ty]) ->
-	ASSERT(dataConSourceArity data_con == 1)
-	ASSERT2(isUnLiftedType prim_ty, ppr prim_ty)
-	prim_ty
+        ASSERT(dataConSourceArity data_con == 1)
+        ASSERT2(isUnLiftedType prim_ty, ppr prim_ty)
+        prim_ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
   where
-	rep_ty = repType ty
+        rep_ty = repType ty
 
 -- represent a primitive type as a Char, for building a string that
 -- described the foreign function type.  The types are size-dependent,
@@ -682,7 +682,7 @@ primTyDescChar ty
  | ty `eqType` unitTy = 'v'
  | otherwise
  = case typePrimRep (getPrimTyOf ty) of
-     IntRep	 -> signed_word
+     IntRep      -> signed_word
      WordRep     -> unsigned_word
      Int64Rep    -> 'L'
      Word64Rep   -> 'l'
