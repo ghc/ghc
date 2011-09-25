@@ -88,7 +88,6 @@ The goal of this pass is to prepare for code generation.
     and doing so would be tiresome because then we'd need
     to substitute in types and coercions.
 
-
 7.  Give each dynamic CCall occurrence a fresh unique; this is
     rather like the cloning step above.
 
@@ -99,6 +98,12 @@ The goal of this pass is to prepare for code generation.
     aren't inlined by some caller.
 	
 9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.lhs
+
+10. Convert (LitInteger i mkInteger) into the core representation
+    for the Integer i. Normally this uses the mkInteger Id, but if
+    we are using the integer-gmp implementation then there is a
+    special case where we use the S# constructor for Integers that
+    are in the range of Int.
 
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
