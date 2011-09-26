@@ -22,7 +22,6 @@ import TcGenDeriv			-- Deriv stuff
 import InstEnv
 import Inst
 import FamInstEnv
-import FamInst
 import TcHsType
 import TcMType
 import TcSimplify
