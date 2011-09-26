@@ -1,26 +1,54 @@
 
 module Main (main) where
 
+import Control.Monad
 import Data.List
 import DynFlags
 import Language.Haskell.Extension
 
 main :: IO ()
-main = do let ghcExtensions = [ ext | (ext, _, _, _) <- xFlags ]
-              cabalExtensions = map show [ toEnum 0 :: KnownExtension .. ]
-              ghcOnlyExtensions = ghcExtensions \\ cabalExtensions
-              -- These are extensions which are deliberately not yet
-              -- registered with Cabal
-              expectedGhcOnlyExtensions
-                  = ["ParallelArrays",
-                     "RelaxedLayout",
-                     "DeriveGeneric",
-                     "DefaultSignatures",
-                     "InterruptibleFFI",
-                     "AlternativeLayoutRule",
-                     "AlternativeLayoutRuleTransitional",
-                     "MonadComprehensions"]
-              unexpectedGhcOnlyExtension = ghcOnlyExtensions
-                                        \\ expectedGhcOnlyExtensions
-          mapM_ putStrLn unexpectedGhcOnlyExtension
+main = do
+    let ghcExtensions = [ ext | (ext, _, _, _) <- xFlags ]
+        cabalExtensions = map show [ toEnum 0 :: KnownExtension .. ]
+        ghcOnlyExtensions = ghcExtensions \\ cabalExtensions
+        cabalOnlyExtensions = cabalExtensions \\ ghcExtensions
+    check "GHC-only flags" expectedGhcOnlyExtensions ghcOnlyExtensions
+    check "Cabal-only flags" expectedCabalOnlyExtensions cabalOnlyExtensions
+
+check :: String -> [String] -> [String] -> IO ()
+check title expected got
+    = do let unexpected = got \\ expected
+             missing = expected \\ got
+             showProblems problemType problems
+                 = unless (null problems) $
+                       do putStrLn (title ++ ": " ++ problemType)
+                          putStrLn "-----"
+                          mapM_ putStrLn problems
+                          putStrLn "-----"
+                          putStrLn ""
+         showProblems "Unexpected flags" unexpected
+         showProblems "Missing flags" missing
+
+expectedGhcOnlyExtensions :: [String]
+expectedGhcOnlyExtensions = ["ParallelArrays",
+                             "RelaxedLayout",
+                             "DeriveGeneric",
+                             "DefaultSignatures",
+                             "InterruptibleFFI",
+                             "AlternativeLayoutRule",
+                             "AlternativeLayoutRuleTransitional",
+                             "MonadComprehensions",
+                             "TraditionalRecordSyntax"]
+
+expectedCabalOnlyExtensions :: [String]
+expectedCabalOnlyExtensions = ["Generics",
+                               "ExtensibleRecords",
+                               "RestrictedTypeSynonyms",
+                               "HereDocuments",
+                               "NewQualifiedOperators",
+                               "XmlSyntax",
+                               "RegularPatterns",
+                               "SafeImports",
+                               "Safe",
+                               "Trustworthy"]
 
