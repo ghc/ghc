@@ -44,6 +44,7 @@ module RdrHsSyn (
         checkValSig,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkDoAndIfThenElse,
         checkKindName,
+        checkRecordSyntax,
         parseError,
         parseErrorSDoc,
     ) where
@@ -530,6 +531,15 @@ checkDatatypeContext (Just (L loc c))
              parseErrorSDoc loc
                  (text "Illegal datatype context (use -XDatatypeContexts):" <+>
                   pprHsContext c)
+
+checkRecordSyntax :: Outputable a => Located a -> P (Located a)
+checkRecordSyntax lr@(L loc r)
+    = do allowed <- extension traditionalRecordSyntaxEnabled
+         if allowed
+             then return lr
+             else parseErrorSDoc loc
+                      (text "Illegal record syntax (use -XTraditionalRecordSyntax):" <+>
+                       ppr r)
 
 checkTyClHdr :: LHsType RdrName
              -> P (Located RdrName,          -- the head symbol (type or class name)

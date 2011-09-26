@@ -55,6 +55,7 @@ module Lexer (
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
    extension, bangPatEnabled, datatypeContextsEnabled,
+   traditionalRecordSyntaxEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -1783,6 +1784,8 @@ nondecreasingIndentationBit :: Int
 nondecreasingIndentationBit = 25
 safeHaskellBit :: Int
 safeHaskellBit = 26
+traditionalRecordSyntaxBit :: Int
+traditionalRecordSyntaxBit = 27
 
 always :: Int -> Bool
 always           _     = True
@@ -1824,6 +1827,8 @@ relaxedLayout :: Int -> Bool
 relaxedLayout flags = testBit flags relaxedLayoutBit
 nondecreasingIndentation :: Int -> Bool
 nondecreasingIndentation flags = testBit flags nondecreasingIndentationBit
+traditionalRecordSyntaxEnabled :: Int -> Bool
+traditionalRecordSyntaxEnabled flags = testBit flags traditionalRecordSyntaxBit
 
 -- PState for parsing options pragmas
 --
@@ -1880,6 +1885,7 @@ mkPState flags buf loc =
                .|. relaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
                .|. safeHaskellBit              `setBitIf` safeHaskellOn                     flags
+               .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
