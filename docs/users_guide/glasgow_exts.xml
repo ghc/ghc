@@ -822,11 +822,11 @@ y)</literal> will not be coalesced.
 
 <sect2 id="n-k-patterns">
 <title>n+k patterns</title>
-<indexterm><primary><option>-XNoNPlusKPatterns</option></primary></indexterm>
+<indexterm><primary><option>-XNPlusKPatterns</option></primary></indexterm>
 
 <para>
-<literal>n+k</literal> pattern support is enabled by default. To disable
-it, you can use the <option>-XNoNPlusKPatterns</option> flag.
+<literal>n+k</literal> pattern support is disabled by default. To enable
+it, you can use the <option>-XNPlusKPatterns</option> flag.
 </para>
 
 </sect2>
