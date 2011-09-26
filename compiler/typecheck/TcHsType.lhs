@@ -20,6 +20,7 @@ module TcHsType (
 	tcDataKindSig,
 
         ExpKind(..), EkCtxt(..), ekConstraint,
+        checkExpectedKind,
 
 		-- Pattern type signatures
 	tcHsPatSigType, tcPatSig
@@ -904,6 +905,7 @@ data EkCtxt  = EkUnk		-- Unknown context
       	     | EkKindSig	-- Kind signature
      	     | EkArg SDoc Int   -- Function, arg posn, expected kind
              | EkIParam         -- Implicit parameter type
+             | EkFamInst        -- Family instance
 
 
 ekLifted, ekOpen, ekConstraint :: ExpKind
@@ -969,6 +971,7 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt) = do
                expected_herald EkKindSig = ptext (sLit "An enclosing kind signature specified")
                expected_herald EkEqPred  = ptext (sLit "The left argument of the equality predicate had")
                expected_herald EkIParam  = ptext (sLit "The type argument of the implicit parameter had")
+               expected_herald EkFamInst = ptext (sLit "The family instance required")
                expected_herald (EkArg fun arg_no)
 	         = ptext (sLit "The") <+> speakNth arg_no <+> ptext (sLit "argument of")
 		   <+> quotes fun <+> ptext (sLit ("should have"))

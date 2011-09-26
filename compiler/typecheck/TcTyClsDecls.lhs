@@ -263,6 +263,14 @@ getInitialKind (L _ decl)
     mk_res_kind (ClassDecl {}) = return constraintKind
     mk_res_kind _              = return liftedTypeKind
 
+kcLookupKind :: Located Name -> TcM Kind
+kcLookupKind nm = do
+    tc_ty_thing <- tcLookupLocated nm
+    case tc_ty_thing of
+        AThing k            -> return k
+        AGlobal (ATyCon tc) -> return (tyConKind tc)
+        _                   -> pprPanic "kcLookupKind" (ppr tc_ty_thing)
+
 
 ----------------
 kcSynDecls :: [SCC (LTyClDecl Name)] 
@@ -306,19 +314,8 @@ kcTyClDecl decl@(TyData {})
 kcTyClDecl decl@(TyFamily {})
   = kcFamilyDecl [] decl      -- the empty list signals a toplevel decl      
 
-kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
-  = kcTyClDeclBody decl	$ \ tvs' ->
-    do	{ ctxt' <- kcHsContext ctxt	
-	; ats'  <- mapM (wrapLocM (kcFamilyDecl tvs')) ats
-	; sigs' <- mapM (wrapLocM kc_sig) sigs
-	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs',
-		        tcdATs = ats'}) }
-  where
-    kc_sig (TypeSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
-				   ; return (TypeSig nm op_ty') }
-    kc_sig (GenericSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
-				      ; return (GenericSig nm op_ty') }
-    kc_sig other_sig	      = return other_sig
+kcTyClDecl decl@(ClassDecl {})
+  = kcClassDecl decl
 
 kcTyClDecl decl@(ForeignType {})
   = return decl
@@ -335,11 +332,8 @@ kcTyClDeclBody :: TyClDecl Name
 -- check the result kind matches
 kcTyClDeclBody decl thing_inside
   = tcAddDeclCtxt decl		$
-    do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
-	; let tc_kind	 = case tc_ty_thing of
-                             AThing k -> k
-                             _ -> pprPanic "kcTyClDeclBody" (ppr tc_ty_thing)
-	      (kinds, _) = splitKindFunTys tc_kind
+    do 	{ tc_kind <- kcLookupKind (tcdLName decl)
+	; let (kinds, _) = splitKindFunTys tc_kind
 	      hs_tvs 	 = tcdTyVars decl
 	      kinded_tvs = ASSERT( length kinds >= length hs_tvs )
 			   zipWith add_kind hs_tvs kinds
@@ -418,6 +412,31 @@ kcFamilyDecl _ decl@(TySynonym {})
    -- We don't have to do anything here for type family defaults:
    -- tcClassATs will use tcAssocDecl to check them
 kcFamilyDecl _ d = pprPanic "kcFamilyDecl" (ppr d)
+
+kcClassDecl :: TyClDecl Name -> TcM (TyClDecl Name)
+kcClassDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats, tcdATDefs = atds})
+  = kcTyClDeclBody decl $ \ tvs' ->
+    do  { ctxt' <- kcHsContext ctxt
+        ; ats'  <- mapM (wrapLocM (kcFamilyDecl tvs')) ats
+        ; atds' <- mapM (\def_ldecl@(L loc def_decl) -> setSrcSpan loc $ tcAddDefaultAssocDeclCtxt def_decl $ wrapLocM kcFamInstDecl def_ldecl) atds
+        ; sigs' <- mapM (wrapLocM kc_sig) sigs
+        ; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs',
+                        tcdATs = ats', tcdATDefs = atds'}) }
+  where
+    kc_sig (TypeSig nm op_ty)    = do { op_ty' <- kcHsLiftedSigType op_ty
+                                      ; return (TypeSig nm op_ty') }
+    kc_sig (GenericSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
+                                      ; return (GenericSig nm op_ty') }
+    kc_sig other_sig             = return other_sig
+
+kcClassDecl d = pprPanic "kcClassDecl" (ppr d)
+
+kcFamInstDecl :: TyClDecl Name -> TcM (TyClDecl Name)
+kcFamInstDecl decl = kcFamTyPats decl $ \k_tvs k_typats resKind -> do
+    -- kind check the right-hand side of the type equation
+    k_rhs <- kcCheckLHsType (tcdSynRhs decl) (EK resKind EkUnk)
+      -- ToDo: the ExpKind could be better
+    return (decl { tcdTyVars = k_tvs, tcdTyPats = Just k_typats, tcdSynRhs = k_rhs })
 \end{code}
 
 
@@ -612,9 +631,10 @@ tcDefaultAssocDecl :: TyCon              -- ^ Family TyCon
                    -> LTyClDecl Name     -- ^ RHS
                    -> TcM ATDefault      -- ^ Type checked RHS and free TyVars
 tcDefaultAssocDecl fam_tc clas_tvs (L loc decl)
-  = setSrcSpan loc      $
-    tcAddDeclCtxt decl  $
-    do { (at_tvs, at_tys, at_rhs) <- tcSynFamInstDecl fam_tc decl
+  = setSrcSpan loc $
+    tcAddDefaultAssocDeclCtxt decl $
+    do { traceTc "tcDefaultAssocDecl" (ppr decl)
+       ; (at_tvs, at_tys, at_rhs) <- tcSynFamInstDecl fam_tc decl
        
        -- See Note [Checking consistent instantiation]
        -- We only want to check this on the *class* TyVars,
@@ -630,24 +650,20 @@ tcDefaultAssocDecl fam_tc clas_tvs (L loc decl)
 -------------------------
 tcSynFamInstDecl :: TyCon -> TyClDecl Name -> TcM ([TyVar], [Type], Type)
 tcSynFamInstDecl fam_tc (decl@TySynonym {})
-  = kcFamTyPats fam_tc decl $ \k_tvs k_typats resKind ->
-    do { -- check that the family declaration is for a synonym
+  = do { -- check that the family declaration is for a synonym
          checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
-
-       ; -- (1) kind check the right-hand side of the type equation
-       ; k_rhs <- kcCheckLHsType (tcdSynRhs decl) (EK resKind EkUnk)
-                  -- ToDo: the ExpKind could be better
 
          -- we need the exact same number of type parameters as the family
          -- declaration
        ; let famArity = tyConArity fam_tc
+             Just k_typats = tcdTyPats decl
        ; checkTc (length k_typats == famArity) $
                  wrongNumberOfParmsErr famArity
 
-         -- (2) type check type equation
-       ; tcTyVarBndrs k_tvs $ \t_tvs -> do   -- turn kinded into proper tyvars
+         -- type check type equation
+       ; tcTyVarBndrs (tcdTyVars decl) $ \t_tvs -> do   -- turn kinded into proper tyvars
        { t_typats <- mapM tcHsKindedType k_typats
-       ; t_rhs    <- tcHsKindedType k_rhs
+       ; t_rhs    <- tcHsKindedType (tcdSynRhs decl)
 
         -- NB: we don't check well-formedness of the instance here because we call
         -- this function from within the TcTyClsDecls fixpoint. The callers must do
@@ -664,26 +680,30 @@ tcSynFamInstDecl _ decl = pprPanic "tcSynFamInstDecl" (ppr decl)
 --   not check whether there is a pattern for each type index; the latter
 --   check is only required for type synonym instances.
 
-kcFamTyPats :: TyCon
-            -> TyClDecl Name
-            -> ([LHsTyVarBndr Name] -> [LHsType Name] -> Kind -> TcM a)
+kcFamTyPats :: TyClDecl Name
+            -> ([LHsTyVarBndr Name] -> [LHsType Name] -> TcKind -> TcM a)
                -- ^^kinded tvs         ^^kinded ty pats  ^^res kind
             -> TcM a
-kcFamTyPats fam_tc decl thing_inside
+kcFamTyPats decl thing_inside
   = kcHsTyVars (tcdTyVars decl) $ \tvs ->
-    do { let { (kinds, resKind) = splitKindFunTys (tyConKind fam_tc)
-             ; hs_typats        = fromJust $ tcdTyPats decl }
+    do { fam_tc_kind <- kcLookupKind (tcdLName decl)
+       
+         -- First, check that the shape of the kind implied by the
+         -- instance syntax matches that of the corresponding family
+       ; let hs_typats = fromJust $ tcdTyPats decl
+       ; pat_kinds <- mapM (\_ -> newKindVar) hs_typats
+       ; res_kind <- newKindVar
+       ; checkExpectedKind (tcdLName decl) fam_tc_kind (EK (mkArrowKinds pat_kinds res_kind) EkUnk)
+          -- TODO: better expected kind error?
 
-         -- We may not have more parameters than the kind indicates
-       ; checkTc (length kinds >= length hs_typats) $
-                 tooManyParmsErr (tcdLName decl)
-
-         -- Type functions can have a higher-kinded result
-       ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
+         -- Next, ensure that the types in given patterns have the right kind
        ; typats <- zipWithM kcCheckLHsType hs_typats
-                            [ EK kind (EkArg (ppr fam_tc) n)
-                            | (kind,n) <- kinds `zip` [1..]]
-       ; thing_inside tvs typats resultKind 
+                            [ EK kind (EkArg (ppr (tcdLName decl)) n)
+                            | (kind,n) <- pat_kinds `zip` [1..]]
+
+         -- It is the responsibliity of the thing_inside to check that the instance
+         -- RHS has a kind matching that implied by the family
+       ; thing_inside tvs typats res_kind 
        }
 \end{code}
 
@@ -1425,6 +1445,13 @@ gotten by appying the eq_spec to the univ_tvs of the data con.
 %************************************************************************
 
 \begin{code}
+tcAddDefaultAssocDeclCtxt :: TyClDecl Name -> TcM a -> TcM a
+tcAddDefaultAssocDeclCtxt decl thing_inside
+  = addErrCtxt ctxt thing_inside
+  where
+     ctxt = hsep [ptext (sLit "In the type synonym instance default declaration for"),
+                  quotes (ppr (tcdName decl))]
+
 resultTypeMisMatch :: Name -> DataCon -> DataCon -> SDoc
 resultTypeMisMatch field_name con1 con2
   = vcat [sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2, 
@@ -1559,11 +1586,6 @@ wrongATArgErr ty instTy =
       , ptext (sLit "Found") <+> quotes (ppr ty)
         <+> ptext (sLit "but expected") <+> quotes (ppr instTy)
       ]
-
-tooManyParmsErr :: Located Name -> SDoc
-tooManyParmsErr tc_name
-  = ptext (sLit "Family instance has too many parameters:") <+>
-    quotes (ppr tc_name)
 
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr exp_arity
