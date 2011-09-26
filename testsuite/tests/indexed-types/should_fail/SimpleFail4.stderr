@@ -2,5 +2,5 @@
 SimpleFail4.hs:8:3:
     Type indexes must match class instance head
     Found `Int' but expected `a'
-    In the type synonym instance declaration for `S2'
+    In the type synonym instance default declaration for `S2'
     In the class declaration for `C2'
