@@ -1,29 +1,28 @@
 --------------------------------------------
--- Haddock 2.9.0
+-- Haddock 2.9.3
 --------------------------------------------
 
 A new version of Haddock, the Haskell documentation tool, is out!
 
-This version is compatible with .haddock files produced by the version of
-Haddock that comes with GHC 7.0.1.
+This is the version that comes with GHC 7.2.1 (although that executable claims
+it is version 2.9.2!)
+
+Apologies to people who have sent in patches that haven't made it into this
+release, they will go into the next one.
 
 --------------------------------------------
--- Changes in version 2.9.0
+-- Changes in version 2.9.3
 --------------------------------------------
 
-Changes in version 2.9.0
+Changes in version 2.9.3
 
-  * Drop support for ghc < 7
+  * Build with GHC 7.2.1
 
-  * New flag --qual for qualification of names
+  * Support blank lines in results of examples
 
-  * Print doc coverage information to stdout when generating docs
+  * A type signatures for multiple names generates one signature in the output
 
-  * Include an 'All' option in the A-Z subdivided index
-
-  * Make TOC group header identifiers validate
-
-  * Minor changes to the API
+  * Minor bug fixes
 
 --------------------------------------------
 -- Links
@@ -50,12 +49,12 @@ Code repository:
 
 The following people contributed patches to this release:
 
-Tobias Brandt
-Mark Lentczner
+Max Bolingbroke
 Ian Lynagh
-Simon Marlow
-Simon Michael
-Ryan Newton
+Simon Hengel
+Jose Pedro Magalhaes
+Simon Peyton Jones
+Michal Terepeta
 David Waern
 
 --------------------------------------------
