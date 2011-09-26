@@ -831,6 +831,19 @@ it, you can use the <option>-XNoNPlusKPatterns</option> flag.
 
 </sect2>
 
+    <!-- ===================== Traditional record syntax ===================  -->
+
+<sect2 id="traditional-record-syntax">
+<title>Traditional record syntax</title>
+<indexterm><primary><option>-XNoTraditionalRecordSyntax</option></primary></indexterm>
+
+<para>
+Traditional record syntax, such as <literal>C {f = x}</literal>, is enabled by default.
+To disable it, you can use the <option>-XNoTraditionalRecordSyntax</option> flag.
+</para>
+
+</sect2>
+
     <!-- ===================== Recursive do-notation ===================  -->
 
 <sect2 id="recursive-do-notation">
