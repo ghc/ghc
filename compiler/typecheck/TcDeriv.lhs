@@ -314,16 +314,16 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; overlap_flag <- getOverlapFlag
 	; let (infer_specs, given_specs) = splitEithers early_specs
-	; insts1 <- flatMapBagM (genInst True overlap_flag) (listToBag given_specs)
-	; let (insts1',_) = partitionBagWith unDerivInst insts1
+	; deriv1 <- flatMapBagM (genInst True overlap_flag) (listToBag given_specs)
+	; let (insts,_) = partitionBagWith unDerivInst deriv1
 
-	; final_specs <- extendLocalInstEnv (map iSpec (bagToList insts1')) $
+	; final_specs <- extendLocalInstEnv (map iSpec (bagToList insts)) $
 			 inferInstanceContexts overlap_flag infer_specs
 
-	; insts2 <- flatMapBagM (genInst False overlap_flag) (listToBag final_specs)
+	; deriv2 <- flatMapBagM (genInst False overlap_flag) (listToBag final_specs)
 
 	; (inst_info, rn_binds, rn_dus)
-                <- renameDeriv is_boot (insts1 `unionBags` insts2)
+                <- renameDeriv is_boot (deriv1 `unionBags` deriv2)
 
 	; dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
@@ -333,11 +333,11 @@ tcDeriving tycl_decls inst_decls deriv_decls
           dumpDerivingInfo (ddump_deriving inst_info rn_binds)
 -}
 
-  ; let f (DerivGenMetaTyCons x) = Left (Right x)
-        f (DerivGenRepTyCon x)   = Left (Left x)
-        f x                      = Right x
-
-        (genBinds, _) = partitionBagWith f (insts1 `unionBags` insts2)
+  ; let unGenBinds (DerivGenMetaTyCons x) = Left (Right x)
+        unGenBinds (DerivGenRepTyCon x)   = Left (Left x)
+        unGenBinds x                      = Right x
+        -- JPM: All this partitioning should perhaps be refactored
+        (genBinds, _) = partitionBagWith unGenBinds (deriv1 `unionBags` deriv2)
         (repTyConsB, repMetaTysB) = partitionBagWith id genBinds
         (repTyCons, repMetaTys) = (bagToList repTyConsB, bagToList repMetaTysB)
         all_tycons = map ATyCon (repTyCons ++ concat (map metaTyCons2TyCons repMetaTys))

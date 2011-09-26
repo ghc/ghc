@@ -95,7 +95,6 @@ isDupAux (DerivTag2Con tc1)       (DerivTag2Con tc2)       = tc1 == tc2
 isDupAux (DerivMaxTag tc1)        (DerivMaxTag tc2)        = tc1 == tc2
 isDupAux (DerivDataCon dc1)       (DerivDataCon dc2)       = dc1 == dc2
 isDupAux (DerivTyCon tc1)         (DerivTyCon tc2)         = tc1 == tc2
--- isDupAux (DerivGenRepTyCon tc1)   (DerivGenRepTyCon tc2)   = tc1 == tc2
 -- We are certain we do not introduce duplicates for the other cases
 isDupAux  _                        _                       = False
 
@@ -177,7 +176,7 @@ instance ... Eq (Foo ...) where
 
 
 \begin{code}
-gen_Eq_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Eq_binds :: SrcSpan -> TyCon -> BagDerivStuff
 gen_Eq_binds loc tycon
   = method_binds `unionBags` aux_binds
   where
@@ -335,7 +334,7 @@ gtResult OrdGE      = true_Expr
 gtResult OrdGT      = true_Expr
 
 ------------
-gen_Ord_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Ord_binds :: SrcSpan -> TyCon -> BagDerivStuff
 gen_Ord_binds loc tycon
   | null tycon_data_cons	-- No data-cons => invoke bale-out case
   = unitBag $ DerivHsBind $ mk_FunBind loc compare_RDR []
@@ -564,7 +563,7 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 
 \begin{code}
-gen_Enum_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Enum_binds :: SrcSpan -> TyCon -> BagDerivStuff
 gen_Enum_binds loc tycon
   = method_binds `unionBags` aux_binds
   where
@@ -643,7 +642,7 @@ gen_Enum_binds loc tycon
 %************************************************************************
 
 \begin{code}
-gen_Bounded_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Bounded_binds :: SrcSpan -> TyCon -> BagDerivStuff
 gen_Bounded_binds loc tycon
   | isEnumerationTyCon tycon
   = listToBag (map DerivHsBind [min_bound_enum, max_bound_enum])
@@ -730,7 +729,7 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 
 \begin{code}
-gen_Ix_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Ix_binds :: SrcSpan -> TyCon -> BagDerivStuff
 
 gen_Ix_binds loc tycon
   | isEnumerationTyCon tycon
@@ -890,7 +889,7 @@ instance Read T where
 
 
 \begin{code}
-gen_Read_binds :: FixityEnv -> SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Read_binds :: FixityEnv -> SrcSpan -> TyCon -> BagDerivStuff
 
 gen_Read_binds get_fixity loc tycon
   = listToBag (map DerivHsBind [read_prec, default_readlist, default_readlistprec])
@@ -1059,7 +1058,7 @@ Example
 		    -- the most tightly-binding operator
 
 \begin{code}
-gen_Show_binds :: FixityEnv -> SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Show_binds :: FixityEnv -> SrcSpan -> TyCon -> BagDerivStuff
 
 gen_Show_binds get_fixity loc tycon
   = listToBag (map DerivHsBind [shows_prec, show_list])
@@ -1431,7 +1430,7 @@ This is pretty much the same as $fmap, only without the $(cofmap 'a 'a) case:
   $(cofmap 'a '(b -> c))  x  =  \b -> $(cofmap 'a' 'c) (x ($(fmap 'a 'c) b))
 
 \begin{code}
-gen_Functor_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Functor_binds :: SrcSpan -> TyCon -> BagDerivStuff
 gen_Functor_binds loc tycon
   = unitBag fmap_bind
   where
@@ -1602,7 +1601,7 @@ Note that the arguments to the real foldr function are the wrong way around,
 since (f :: a -> b -> b), while (foldr f :: b -> t a -> b).
 
 \begin{code}
-gen_Foldable_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Foldable_binds :: SrcSpan -> TyCon -> BagDerivStuff
 gen_Foldable_binds loc tycon
   = unitBag foldr_bind
   where
@@ -1654,7 +1653,7 @@ gives the function: traverse f (T x y) = T <$> pure x <*> f y
 instead of:         traverse f (T x y) = T x <$> f y
 
 \begin{code}
-gen_Traversable_binds :: SrcSpan -> TyCon -> BagDerivStuff --(LHsBinds RdrName, DerivAuxBinds)
+gen_Traversable_binds :: SrcSpan -> TyCon -> BagDerivStuff
 gen_Traversable_binds loc tycon
   = unitBag traverse_bind
   where
@@ -1787,18 +1786,18 @@ genAuxBind loc (DerivDataCon dc)	--  $cT1 etc
     fixity | is_infix  = infix_RDR
 	   | otherwise = prefix_RDR
 
-genAuxBind _ _ = error "JPM: TODO"
+-- We know we do not call genAuxBind with the generics stuff
+genAuxBind _ _ = panic "genAuxBind"
 
 genAuxBinds :: Monad m => SrcSpan -> BagDerivStuff -> m ( Bag (LHsBind RdrName)
                                                         , Bag (LSig RdrName))
 genAuxBinds loc bs = mapAndUnzipBagM (return . genAuxBind loc) auxBinds where
-  f x@(DerivGenMetaTyCons _) = Left x
-  f x@(DerivGenRepTyCon _)   = Left x
-  f x@(DerivInst _)          = Left x
-  f x@(DerivHsBind _)        = Left x
-  f x                        = Right x
-
-  (_, auxBinds) = partitionBagWith f bs
+  partf x@(DerivGenMetaTyCons _) = Left x
+  partf x@(DerivGenRepTyCon _)   = Left x
+  partf x@(DerivInst _)          = Left x
+  partf x@(DerivHsBind _)        = Left x
+  partf x                        = Right x
+  (_, auxBinds) = partitionBagWith partf bs
 
 mk_data_type_name :: TyCon -> RdrName 	-- "$tT"
 mk_data_type_name tycon = mkAuxBinderName (tyConName tycon) mkDataTOcc
