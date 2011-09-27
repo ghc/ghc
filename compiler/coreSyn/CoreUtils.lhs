@@ -6,13 +6,6 @@
 Utility functions on @Core@ syntax
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
         -- * Constructing expressions
@@ -1267,6 +1260,7 @@ hash_expr _   (Lit lit)               = fromIntegral (hashLiteral lit)
 hash_expr env (App f e)               = hash_expr env f * fast_hash_expr env e
 hash_expr env (Let (NonRec b r) e)    = hash_expr (extend_env env b) e * fast_hash_expr env r
 hash_expr env (Let (Rec ((b,_):_)) e) = hash_expr (extend_env env b) e
+hash_expr _   (Let (Rec []) _)        = panic "hash_expr: Let (Rec []) _"
 hash_expr env (Case e _ _ _)          = hash_expr env e
 hash_expr env (Lam b e)               = hash_expr (extend_env env b) e
 hash_expr env (Coercion co)           = fast_hash_co env co
