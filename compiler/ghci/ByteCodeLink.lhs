@@ -7,15 +7,9 @@ ByteCodeLink: Bytecode assembler and linker
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module ByteCodeLink (
-        HValue,
+        HValue(..), -- We don't want to export the constructor, but
+                    -- we get a warning that it's unsed if we don't
         ClosureEnv, emptyClosureEnv, extendClosureEnv,
         linkBCO, lookupStaticPtr, lookupName
        ,lookupIE
@@ -29,10 +23,8 @@ import ObjLink
 
 import Name
 import NameEnv
-import OccName
 import PrimOp
 import Module
-import PackageConfig
 import FastString
 import Panic
 import Outputable
@@ -41,15 +33,13 @@ import Outputable
 
 import Data.Array.Base
 
-import Control.Monad    ( zipWithM )
+import Control.Monad
 import Control.Monad.ST ( stToIO )
 
 import GHC.Arr          ( Array(..), STArray(..) )
-import GHC.Base         ( writeArray#, RealWorld, Int(..), Word# )
-import GHC.IOBase       ( IO(..) )
+import GHC.IO           ( IO(..) )
 import GHC.Exts
-import GHC.Ptr          ( Ptr(..), castPtr )
-import GHC.Word         ( Word(..) )
+import GHC.Ptr          ( castPtr )
 
 import Data.Word
 \end{code}
@@ -65,6 +55,7 @@ import Data.Word
 type ClosureEnv = NameEnv (Name, HValue)
 newtype HValue = HValue Any
 
+emptyClosureEnv :: ClosureEnv
 emptyClosureEnv = emptyNameEnv
 
 extendClosureEnv :: ClosureEnv -> [(Name,HValue)] -> ClosureEnv
@@ -109,7 +100,7 @@ linkBCO ie ce ul_bco
 
 
 linkBCO' :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO BCO
-linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
+linkBCO' ie ce (UnlinkedBCO _ arity insns_barr bitmap literalsSS ptrsSS)
    -- Raises an IO exception on failure
    = do let literals = ssElts literalsSS
             ptrs     = ssElts ptrsSS
@@ -158,7 +149,7 @@ mkPtrsArray ie ce n_ptrs ptrs = do
         unsafeWrite marr i (unsafeCoerce# brkInfo)
     fill (BCOPtrArray brkArray) i =
         unsafeWrite marr i (unsafeCoerce# brkArray)
-  zipWithM fill ptrs [0..]
+  zipWithM_ fill ptrs [0..]
   unsafeFreeze marr
 
 newtype IOArray i e = IOArray (STArray RealWorld i e)
@@ -195,8 +186,8 @@ newBCO instrs lits ptrs arity bitmap
 
 
 lookupLiteral :: ItblEnv -> BCONPtr -> IO Word
-lookupLiteral ie (BCONPtrWord lit) = return lit
-lookupLiteral ie (BCONPtrLbl  sym) = do Ptr a# <- lookupStaticPtr sym
+lookupLiteral _  (BCONPtrWord lit) = return lit
+lookupLiteral _  (BCONPtrLbl  sym) = do Ptr a# <- lookupStaticPtr sym
                                         return (W# (int2Word# (addr2Int# a#)))
 lookupLiteral ie (BCONPtrItbl nm)  = do Ptr a# <- lookupIE ie nm
                                         return (W# (int2Word# (addr2Int# a#)))
