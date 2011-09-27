@@ -69,3 +69,7 @@ test('T3811f', normal, compile_fail, [''])
 test('T3811g', normal, compile_fail, [''])
 test('NoDoAndIfThenElse', normal, compile_fail, [''])
 test('NondecreasingIndentationFail', normal, compile_fail, [''])
+test('readFailTraditionalRecords1', normal, compile_fail, [''])
+test('readFailTraditionalRecords2', normal, compile_fail, [''])
+test('readFailTraditionalRecords3', normal, compile_fail, [''])
+
