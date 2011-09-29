@@ -12,16 +12,16 @@
 -- for details
 
 module PrimOp (
-	PrimOp(..), allThePrimOps,
-	primOpType, primOpSig,
-	primOpTag, maxPrimOpTag, primOpOcc,
+        PrimOp(..), allThePrimOps,
+        primOpType, primOpSig,
+        primOpTag, maxPrimOpTag, primOpOcc,
 
-	tagToEnumKey,
+        tagToEnumKey,
 
         primOpOutOfLine, primOpCodeSize,
         primOpOkForSpeculation, primOpIsCheap,
 
-	getPrimOpResultInfo,  PrimOpResultInfo(..),
+        getPrimOpResultInfo,  PrimOpResultInfo(..),
 
         PrimCall(..)
     ) where
@@ -32,31 +32,31 @@ import TysPrim
 import TysWiredIn
 
 import Demand
-import Var		( TyVar )
-import OccName		( OccName, pprOccName, mkVarOccFS )
-import TyCon		( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
-import Type		( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
-			  typePrimRep )
-import BasicTypes	( Arity, TupleSort(..) )
-import ForeignCall	( CLabelString )
-import Unique		( Unique, mkPrimOpIdUnique )
+import Var              ( TyVar )
+import OccName          ( OccName, pprOccName, mkVarOccFS )
+import TyCon            ( TyCon, isPrimTyCon, tyConPrimRep, PrimRep(..) )
+import Type             ( Type, mkForAllTys, mkFunTy, mkFunTys, tyConAppTyCon,
+                          typePrimRep )
+import BasicTypes       ( Arity, TupleSort(..) )
+import ForeignCall      ( CLabelString )
+import Unique           ( Unique, mkPrimOpIdUnique )
 import Outputable
 import FastTypes
 import FastString
-import Module		( PackageId )
+import Module           ( PackageId )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[PrimOp-datatype]{Datatype for @PrimOp@ (an enumeration)}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 These are in \tr{state-interface.verb} order.
 
 \begin{code}
 
--- supplies: 
+-- supplies:
 -- data PrimOp = ...
 #include "primop-data-decl.hs-incl"
 \end{code}
@@ -67,7 +67,7 @@ Used for the Ord instance
 primOpTag :: PrimOp -> Int
 primOpTag op = iBox (tagOf_PrimOp op)
 
--- supplies   
+-- supplies
 -- tagOf_PrimOp :: PrimOp -> FastInt
 #include "primop-tag.hs-incl"
 
@@ -81,8 +81,8 @@ instance Ord PrimOp where
     op1 >= op2 =  tagOf_PrimOp op1 >=# tagOf_PrimOp op2
     op1 >  op2 =  tagOf_PrimOp op1 ># tagOf_PrimOp op2
     op1 `compare` op2 | op1 < op2  = LT
-		      | op1 == op2 = EQ
-		      | otherwise  = GT
+                      | op1 == op2 = EQ
+                      | otherwise  = GT
 
 instance Outputable PrimOp where
     ppr op = pprPrimOp op
@@ -107,9 +107,9 @@ tagToEnumKey = mkPrimOpIdUnique (primOpTag TagToEnumOp)
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[PrimOp-info]{The essential info about each @PrimOp@}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 The @String@ in the @PrimOpInfos@ is the ``base name'' by which the user may
@@ -123,17 +123,17 @@ We use @PrimKinds@ for the ``type'' information, because they're
 (slightly) more convenient to use than @TyCons@.
 \begin{code}
 data PrimOpInfo
-  = Dyadic	OccName		-- string :: T -> T -> T
-		Type
-  | Monadic	OccName		-- string :: T -> T
-		Type
-  | Compare	OccName		-- string :: T -> T -> Bool
-		Type
+  = Dyadic      OccName         -- string :: T -> T -> T
+                Type
+  | Monadic     OccName         -- string :: T -> T
+                Type
+  | Compare     OccName         -- string :: T -> T -> Bool
+                Type
 
-  | GenPrimOp   OccName  	-- string :: \/a1..an . T1 -> .. -> Tk -> T
-		[TyVar] 
-		[Type] 
-		Type 
+  | GenPrimOp   OccName         -- string :: \/a1..an . T1 -> .. -> Tk -> T
+                [TyVar]
+                [Type]
+                Type
 
 mkDyadic, mkMonadic, mkCompare :: FastString -> Type -> PrimOpInfo
 mkDyadic str  ty = Dyadic  (mkVarOccFS str) ty
@@ -145,25 +145,25 @@ mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection{Strictness}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Not all primops are strict!
 
 \begin{code}
 primOpStrictness :: PrimOp -> Arity -> StrictSig
-	-- See Demand.StrictnessInfo for discussion of what the results
-	-- The arity should be the arity of the primop; that's why
-	-- this function isn't exported.
+        -- See Demand.StrictnessInfo for discussion of what the results
+        -- The arity should be the arity of the primop; that's why
+        -- this function isn't exported.
 #include "primop-strictness.hs-incl"
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection[PrimOp-comparison]{PrimOpInfo basic comparison ops}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 @primOpInfo@ gives all essential information (from which everything
@@ -187,39 +187,39 @@ is done with plain ccalls now (see PrelNumExtra.lhs).
 
 A @Weak@ Pointer is created by the @mkWeak#@ primitive:
 
-	mkWeak# :: k -> v -> f -> State# RealWorld 
-			-> (# State# RealWorld, Weak# v #)
+        mkWeak# :: k -> v -> f -> State# RealWorld
+                        -> (# State# RealWorld, Weak# v #)
 
 In practice, you'll use the higher-level
 
-	data Weak v = Weak# v
-	mkWeak :: k -> v -> IO () -> IO (Weak v)
+        data Weak v = Weak# v
+        mkWeak :: k -> v -> IO () -> IO (Weak v)
 
 The following operation dereferences a weak pointer.  The weak pointer
 may have been finalized, so the operation returns a result code which
 must be inspected before looking at the dereferenced value.
 
-	deRefWeak# :: Weak# v -> State# RealWorld ->
-			(# State# RealWorld, v, Int# #)
+        deRefWeak# :: Weak# v -> State# RealWorld ->
+                        (# State# RealWorld, v, Int# #)
 
 Only look at v if the Int# returned is /= 0 !!
 
 The higher-level op is
 
-	deRefWeak :: Weak v -> IO (Maybe v)
+        deRefWeak :: Weak v -> IO (Maybe v)
 
 Weak pointers can be finalized early by using the finalize# operation:
-	
-	finalizeWeak# :: Weak# v -> State# RealWorld -> 
-	   		   (# State# RealWorld, Int#, IO () #)
+
+        finalizeWeak# :: Weak# v -> State# RealWorld ->
+                           (# State# RealWorld, Int#, IO () #)
 
 The Int# returned is either
 
-	0 if the weak pointer has already been finalized, or it has no
-	  finalizer (the third component is then invalid).
+        0 if the weak pointer has already been finalized, or it has no
+          finalizer (the third component is then invalid).
 
-	1 if the weak pointer is still alive, with the finalizer returned
-	  as the third component.
+        1 if the weak pointer is still alive, with the finalizer returned
+          as the third component.
 
 A {\em stable name/pointer} is an index into a table of stable name
 entries.  Since the garbage collector is told about stable pointers,
@@ -257,23 +257,23 @@ Stable Names
 
 A stable name is like a stable pointer, but with three important differences:
 
-	(a) You can't deRef one to get back to the original object.
-	(b) You can convert one to an Int.
-	(c) You don't need to 'freeStableName'
+        (a) You can't deRef one to get back to the original object.
+        (b) You can convert one to an Int.
+        (c) You don't need to 'freeStableName'
 
 The existence of a stable name doesn't guarantee to keep the object it
 points to alive (unlike a stable pointer), hence (a).
 
 Invariants:
-	
-	(a) makeStableName always returns the same value for a given
-	    object (same as stable pointers).
 
-	(b) if two stable names are equal, it implies that the objects
-	    from which they were created were the same.
+        (a) makeStableName always returns the same value for a given
+            object (same as stable pointers).
 
-	(c) stableNameToInt always returns the same Int for a given
-	    stable name.
+        (b) if two stable names are equal, it implies that the objects
+            from which they were created were the same.
+
+        (c) stableNameToInt always returns the same Int for a given
+            stable name.
 
 
 -- HWL: The first 4 Int# in all par... annotations denote:
@@ -284,16 +284,16 @@ Invariants:
 
 These primops are pretty wierd.
 
-	dataToTag# :: a -> Int    (arg must be an evaluated data type)
-	tagToEnum# :: Int -> a    (result type must be an enumerated type)
+        dataToTag# :: a -> Int    (arg must be an evaluated data type)
+        tagToEnum# :: Int -> a    (result type must be an enumerated type)
 
 The constraints aren't currently checked by the front end, but the
 code generator will fall over if they aren't satisfied.
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection[PrimOp-ool]{Which PrimOps are out-of-line}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Some PrimOps need to be called out-of-line because they either need to
@@ -318,8 +318,8 @@ PrimOps that have side effects also should not be executed speculatively.
 
 Ok-for-speculation also means that it's ok *not* to execute the
 primop. For example
-	case op a b of
-	  r -> 3
+        case op a b of
+          r -> 3
 Here the result is not used, so we can discard the primop.  Anything
 that has side effects mustn't be dicarded in this way, of course!
 
@@ -328,8 +328,8 @@ See also @primOpIsCheap@ (below).
 
 \begin{code}
 primOpOkForSpeculation :: PrimOp -> Bool
-	-- See comments with CoreUtils.exprOkForSpeculation
-primOpOkForSpeculation op 
+        -- See comments with CoreUtils.exprOkForSpeculation
+primOpOkForSpeculation op
   = not (primOpHasSideEffects op || primOpOutOfLine op || primOpCanFail op)
 \end{code}
 
@@ -345,19 +345,19 @@ behaviour of 'seq' for primops that can fail, so we don't treat them as cheap.
 \begin{code}
 primOpIsCheap :: PrimOp -> Bool
 primOpIsCheap op = primOpOkForSpeculation op
--- In March 2001, we changed this to 
---	primOpIsCheap op = False
+-- In March 2001, we changed this to
+--      primOpIsCheap op = False
 -- thereby making *no* primops seem cheap.  But this killed eta
--- expansion on case (x ==# y) of True -> \s -> ... 
+-- expansion on case (x ==# y) of True -> \s -> ...
 -- which is bad.  In particular a loop like
---	doLoop n = loop 0
+--      doLoop n = loop 0
 --     where
 --         loop i | i == n    = return ()
 --                | otherwise = bar i >> loop (i+1)
 -- allocated a closure every time round because it doesn't eta expand.
--- 
+--
 -- The problem that originally gave rise to the change was
---	let x = a +# b *# c in x +# x
+--      let x = a +# b *# c in x +# x
 -- were we don't want to inline x. But primopIsCheap doesn't control
 -- that (it's exprIsDupable that does) so the problem doesn't occur
 -- even if primOpIsCheap sometimes says 'True'.
@@ -434,7 +434,7 @@ primOpType op
     Monadic _occ ty -> monadic_fun_ty ty
     Compare _occ ty -> compare_fun_ty ty
 
-    GenPrimOp _occ tyvars arg_tys res_ty -> 
+    GenPrimOp _occ tyvars arg_tys res_ty ->
         mkForAllTys tyvars (mkFunTys arg_tys res_ty)
 
 primOpOcc :: PrimOp -> OccName
@@ -463,8 +463,8 @@ primOpSig op
 
 \begin{code}
 data PrimOpResultInfo
-  = ReturnsPrim	    PrimRep
-  | ReturnsAlg	    TyCon
+  = ReturnsPrim     PrimRep
+  | ReturnsAlg      TyCon
 
 -- Some PrimOps need not return a manifest primitive or algebraic value
 -- (i.e. they might return a polymorphic value).  These PrimOps *must*
@@ -473,16 +473,16 @@ data PrimOpResultInfo
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 getPrimOpResultInfo op
   = case (primOpInfo op) of
-      Dyadic  _ ty		 	  -> ReturnsPrim (typePrimRep ty)
-      Monadic _ ty		 	  -> ReturnsPrim (typePrimRep ty)
-      Compare _ _		 	  -> ReturnsAlg boolTyCon
+      Dyadic  _ ty                        -> ReturnsPrim (typePrimRep ty)
+      Monadic _ ty                        -> ReturnsPrim (typePrimRep ty)
+      Compare _ _                         -> ReturnsAlg boolTyCon
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep tc)
-			 | otherwise      -> ReturnsAlg tc
-			 where
-			   tc = tyConAppTyCon ty
-			-- All primops return a tycon-app result
-			-- The tycon can be an unboxed tuple, though, which
-			-- gives rise to a ReturnAlg
+                         | otherwise      -> ReturnsAlg tc
+                         where
+                           tc = tyConAppTyCon ty
+                        -- All primops return a tycon-app result
+                        -- The tycon can be an unboxed tuple, though, which
+                        -- gives rise to a ReturnAlg
 \end{code}
 
 The commutable ops are those for which we will try to move constants
@@ -509,16 +509,16 @@ pprPrimOp other_op = pprOccName (primOpOcc other_op)
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection[PrimCall]{User-imported primitive calls}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 data PrimCall = PrimCall CLabelString PackageId
 
 instance Outputable PrimCall where
-  ppr (PrimCall lbl pkgId) 
-  	= text "__primcall" <+> ppr pkgId <+> ppr lbl
+  ppr (PrimCall lbl pkgId)
+        = text "__primcall" <+> ppr pkgId <+> ppr lbl
 
 \end{code}
