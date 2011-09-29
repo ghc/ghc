@@ -207,3 +207,4 @@ test('TH_lookupName',
 test('T5452', normal, compile, ['-v0'])
 test('T5434', extra_clean(['T5434a.hi','T5434a.o']), 
               multimod_compile, ['T5434','-v0 -Wall'])
+test('T5508', normal, compile, ['-v0 -ddump-splices'])
