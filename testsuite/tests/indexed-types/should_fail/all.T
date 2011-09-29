@@ -71,3 +71,5 @@ test('T2664a', normal, compile, [''])
 test('T2544', normal, compile_fail, [''])
 test('T1897b', normal, compile_fail, [''])
 test('T5439', normal, compile_fail, [''])
+test('T5515', normal, compile_fail, [''])
+
