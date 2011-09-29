@@ -532,9 +532,14 @@ tcdTyPats = Just tys
    This is a data/type family instance declaration
    tcdTyVars are fv(tys)
 
-   Eg   instance C (a,b) where
-          type F a x y = x->y
-   After the renamer, the tcdTyVars of the F decl are {x,y}
+   Eg   class C a b where
+          type F a x :: *
+        instance D p s => C (p,q) [r] where
+          type F (p,q) x = p -> x
+   The tcdTyVars of the F instance decl are {p,q,x},
+   i.e. not including s, nor r 
+        (and indeed neither s nor should be mentioned
+         on the RHS of the F instance decl; Trac #5515)
 
 ------------------------------
 Simple classifiers

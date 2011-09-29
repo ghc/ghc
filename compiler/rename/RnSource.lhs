@@ -436,8 +436,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 					          mbinds    
 
        -- Rename the associated types
-       -- Here the instance variables always scope, regardless of -XScopedTypeVariables					
-       -- NB: we allow duplicate associated-type decls; 
+       -- NB: We allow duplicate associated-type decls; 
        --     See Note [Associated type instances] in TcInstDcls
        ; (ats', at_fvs) <- extendTyVarEnvFVRn (map hsLTyVarName inst_tyvars) $
                            rnATInsts cls ats
@@ -866,23 +865,34 @@ bindQTvs mb_cls tyvars thing_inside
        ; mapM_ dupBoundTyVar (findDupRdrNames tv_rdr_names)
 
        ; rdr_env <- getLocalRdrEnv
-       ; tv_nbs <- mapM (mk_tv_name rdr_env) tv_rdr_names
-       ; let tv_ns, fresh_ns :: [Name]
-             tv_ns = map fst tv_nbs
-	     fresh_ns = [n | (n,True)  <- tv_nbs]
-
-       ; (thing, fvs) <- bindLocalNames tv_ns $
+       ; tv_ns <- mapM (mk_tv_name rdr_env) tv_rdr_names
+       ; (thing, fvs) <- bindLocalNamesFV tv_ns $
                          thing_inside (zipWith replaceLTyVarName tyvars tv_ns)
-       ; return (thing, delFVs fresh_ns fvs) }
+
+	-- Check that the RHS of the decl mentions only type variables
+	-- bound on the LHS.  For example, this is not ok
+	-- 	 class C a b where
+	--         type F a x :: *
+	--	 instance C (p,q) r where
+        --	   type F (p,q) x = (x, r)	-- BAD: mentions 'r'
+	-- c.f. Trac #5515
+       ; let bad_tvs = filterNameSet (isTvOcc . nameOccName) fvs
+       ; unless (isEmptyNameSet bad_tvs) (badAssocRhs (nameSetToList bad_tvs))
+
+       ; return (thing, fvs) }
   where
-    mk_tv_name :: LocalRdrEnv -> Located RdrName -> RnM (Name, Bool)
-	       -- False <=> already in scope
-    	       -- True  <=> fresh
+    mk_tv_name :: LocalRdrEnv -> Located RdrName -> RnM Name
     mk_tv_name rdr_env (L l tv_rdr)
-      = do { case lookupLocalRdrEnv rdr_env tv_rdr of 
-               Just n  -> return (n, False)
-               Nothing -> do { n <- newLocalBndrRn (L l tv_rdr)
-                             ; return (n, True) } }
+      = case lookupLocalRdrEnv rdr_env tv_rdr of 
+          Just n  -> return n
+          Nothing -> newLocalBndrRn (L l tv_rdr)
+
+badAssocRhs :: [Name] -> RnM ()
+badAssocRhs ns
+  = addErr (hang (ptext (sLit "The RHS of an associated type declaration mentions type variable") 
+                  <> plural ns 
+                  <+> pprWithCommas (quotes . ppr) ns)
+               2 (ptext (sLit "All such variables must be bound on the LHS")))
 
 dupBoundTyVar :: [Located RdrName] -> RnM ()
 dupBoundTyVar (L loc tv : _) 
