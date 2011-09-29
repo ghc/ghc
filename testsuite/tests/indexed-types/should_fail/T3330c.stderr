@@ -5,7 +5,7 @@ T3330c.hs:23:43:
            a pattern with constructor
              RSum :: forall (f :: * -> *) (g :: * -> *).
                      R f -> R g -> R (f :+: g),
-           in an equation for `plug''
+           in an equation for plug'
            at T3330c.hs:23:8
     In the first argument of `plug', namely `rf'
     In the first argument of `Inl', namely `(plug rf df x)'

@@ -9,7 +9,7 @@ T3208b.hs:15:10:
     Expected type: STerm a0
       Actual type: OTerm a0
     In the expression: fce (apply f)
-    In an equation for `fce'': fce' f = fce (apply f)
+    In an equation for fce': fce' f = fce (apply f)
 
 T3208b.hs:15:15:
     Could not deduce (OTerm a0 ~ STerm a)
@@ -19,4 +19,4 @@ T3208b.hs:15:15:
       at T3208b.hs:15:1-22
     In the first argument of `fce', namely `(apply f)'
     In the expression: fce (apply f)
-    In an equation for `fce'': fce' f = fce (apply f)
+    In an equation for fce': fce' f = fce (apply f)

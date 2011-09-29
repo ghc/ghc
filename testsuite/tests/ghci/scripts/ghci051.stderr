@@ -1,5 +1,5 @@
 
 <interactive>:7:9:
-    Couldn't match expected type `T'' with actual type `T'
+    Couldn't match expected type T' with actual type `T'
     In the expression: C :: T'
     In an equation for `c': c = C :: T'

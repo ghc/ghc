@@ -1,7 +1,7 @@
 
 DoParamM.hs:146:25:
     Couldn't match expected type `Int' with actual type `Char'
-    In the second argument of `(==)', namely `v''
+    In the second argument of `(==)', namely v'
     In the first argument of `return', namely `(v == v')'
     In a stmt of a 'do' block: return (v == v')
 

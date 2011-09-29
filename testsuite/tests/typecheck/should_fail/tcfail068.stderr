@@ -56,7 +56,7 @@ tcfail068.hs:24:35:
            at tcfail068.hs:24:29
     Expected type: GHC.ST.ST s1 (IndTree s a)
       Actual type: GHC.ST.ST s (IndTree s a)
-    In the return type of a call of `itrap''
+    In the return type of a call of itrap'
     In the first argument of `runST', namely `(itrap' i k)'
 
 tcfail068.hs:36:46:
@@ -88,5 +88,5 @@ tcfail068.hs:36:46:
            at tcfail068.hs:36:40
     Expected type: GHC.ST.ST s1 (c, IndTree s b)
       Actual type: GHC.ST.ST s (c, IndTree s b)
-    In the return type of a call of `itrapstate''
+    In the return type of a call of itrapstate'
     In the first argument of `runST', namely `(itrapstate' i k s)'
