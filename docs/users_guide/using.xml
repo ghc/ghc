@@ -1755,6 +1755,28 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
+            <option>-fignore-interface-pragmas</option>
+	    <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Tells GHC to ignore all inessential information when reading interface files.
+	    That is, even if <filename>M.hi</filename> contains unfolding or strictness information
+	    for a function, GHC will ignore that information.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fliberate-case</option>
+            <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turn on the liberate-case transformation.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
             <option>-fno-cse</option>
             <indexterm><primary><option>-fno-cse</option></primary></indexterm>
           </term>
@@ -1820,36 +1842,6 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
-            <option>-fspec-constr</option>
-            <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>Turn on call-pattern specialisation.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
-            <option>-fliberate-case</option>
-            <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>Turn on the liberate-case transformation.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
-            <option>-fstatic-argument-transformation</option>
-            <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>Turn on the static argument transformation.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
             <option>-fno-state-hack</option>
             <indexterm><primary><option>-fno-state-hack</option></primary></indexterm>
           </term>
@@ -1882,13 +1874,43 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
-            <option>-fignore-interface-pragmas</option>
-	    <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
+            <option>-fsimpl-tick-factor=<replaceable>n</replaceable></option>
+            <indexterm><primary><option>-fsimpl-tick-factor</option></primary></indexterm>
           </term>
 	  <listitem>
-	    <para>Tells GHC to ignore all inessential information when reading interface files.
-	    That is, even if <filename>M.hi</filename> contains unfolding or strictness information
-	    for a function, GHC will ignore that information.</para>
+	    <para>GHC's optimiser can diverge if you write rewrite rules (<xref linkend="rewrite-rules"/>) 
+              that don't terminate, or (less satisfactorily) if you
+              code up recursion through data types
+              (<xref linkend="bugs-ghc"/>).  To avoid making the compiler fall into an infinite
+	      loop, the optimiser carries a "tick count" and stops inlining and applying rewrite rules
+              when this count is exceeded.  The limit is set as a multiple of the program size, so 
+              bigger programs get more ticks. The <option>-fsimpl-tick-factor</option> flag lets
+              you change the multiplier. The default is 100; numbers larger than 100 give more ticks,
+              and numbers smaller than 100 give fewer.</para>
+            <para>If the tick-count expires, GHC summarises what simplifier steps it has done; 
+            you can use <option>-fddump-simpl-stats</option> to generate a much more detailed list.
+            Usually that identifies the loop quite accurately, because some numbers are very large.
+	      </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fstatic-argument-transformation</option>
+            <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turn on the static argument transformation.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fspec-constr</option>
+            <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turn on call-pattern specialisation.</para>
 	  </listitem>
 	</varlistentry>
 
