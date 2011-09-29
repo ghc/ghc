@@ -504,7 +504,11 @@ cvtl e = wrapL (cvt e)
                                        -- Can I indicate this is an infix thing?
                                        -- Note [Dropping constructors]
 
-    cvt (UInfixE x s y)  = do { x' <- cvtl x; cvtOpApp x' s y } --  Note [Converting UInfix]
+    cvt (UInfixE x s y)  = do { x' <- cvtl x
+                              ; let x'' = case x' of 
+                                            L _ (OpApp {}) -> x'
+                                            _ -> mkLHsPar x'
+                              ; cvtOpApp x'' s y } --  Note [Converting UInfix]
 
     cvt (ParensE e)      = do { e' <- cvtl e; return $ HsPar e' }
     cvt (SigE e t)	 = do { e' <- cvtl e; t' <- cvtType t
