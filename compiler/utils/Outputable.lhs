@@ -77,6 +77,7 @@ import FastString
 import FastTypes
 import Platform
 import qualified Pretty
+import Util		( snocView )
 import Pretty		( Doc, Mode(..) )
 import Panic
 
@@ -451,14 +452,14 @@ cparen :: Bool -> SDoc -> SDoc
 
 cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 
--- quotes encloses something in single quotes...
+-- 'quotes' encloses something in single quotes...
 -- but it omits them if the thing ends in a single quote
 -- so that we don't get `foo''.  Instead we just have foo'.
 quotes d = SDoc $ \sty -> 
            let pp_d = runSDoc d sty in
-           case show pp_d of
-             ('\'' : _) -> pp_d
-             _other     -> Pretty.quotes pp_d
+           case snocView (show pp_d) of
+             Just (_, '\'') -> pp_d
+             _other         -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
 darrow, lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
