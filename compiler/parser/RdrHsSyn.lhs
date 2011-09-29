@@ -35,7 +35,6 @@ module RdrHsSyn (
         checkContext,         -- HsType -> P HsContext
         checkTyVars,          -- [LHsType RdrName] -> P ()
         checkKindSigs,        -- [LTyClDecl RdrName] -> P ()
-        checkInstType,        -- HsType -> P HsType
         checkPattern,         -- HsExp -> P HsPat
         bang_RDR,
         checkPatterns,        -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -457,26 +456,6 @@ we can bring x,y into scope.  So:
    * For RecCon we do not
 
 \begin{code}
-----------------------------------------------------------------------------
--- Various Syntactic Checks
-
-checkInstType :: LHsType RdrName -> P (LHsType RdrName)
-checkInstType (L l t)
-  = case t of
-        HsForAllTy exp tvs ctxt ty -> do
-                dict_ty <- checkDictTy ty
-                return (L l (HsForAllTy exp tvs ctxt dict_ty))
-
-        HsParTy ty -> checkInstType ty
-
-        ty ->   do dict_ty <- checkDictTy (L l ty)
-                   return (L l (HsForAllTy Implicit [] (noLoc []) dict_ty))
-
-checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
-checkDictTy lty@(L l ty) = case splitLHsClassTy_maybe lty of
-    Nothing -> parseErrorSDoc l (text "Malformed instance header:" <+> ppr ty)
-    Just _  -> return lty
-
 checkTParams :: Bool      -- Type/data family
              -> LHsType RdrName
              -> [LHsType RdrName]

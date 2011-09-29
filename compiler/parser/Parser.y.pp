@@ -1049,7 +1049,7 @@ atype :: { LHsType RdrName }
 -- It's kept as a single type, with a MonoDictTy at the right
 -- hand corner, for convenience.
 inst_type :: { LHsType RdrName }
-	: sigtype			{% checkInstType $1 }
+	: sigtype			{ $1 }
 
 inst_types1 :: { [LHsType RdrName] }
 	: inst_type			{ [$1] }
@@ -1183,9 +1183,8 @@ fielddecl :: { [ConDeclField RdrName] }    -- A list because of   f,g :: Int
 -- We don't allow a context, but that's sorted out by the type checker.
 deriving :: { Located (Maybe [LHsType RdrName]) }
 	: {- empty -}				{ noLoc Nothing }
-	| 'deriving' qtycon	{% do { let { L loc tv = $2 }
-				      ; p <- checkInstType (L loc (HsTyVar tv))
-				      ; return (LL (Just [p])) } }
+	| 'deriving' qtycon			{ let { L loc tv = $2 }
+						  in LL (Just [L loc (HsTyVar tv)]) } 
 	| 'deriving' '(' ')'	 		{ LL (Just []) }
 	| 'deriving' '(' inst_types1 ')' 	{ LL (Just $3) }
              -- Glasgow extension: allow partial 

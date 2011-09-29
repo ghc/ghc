@@ -423,7 +423,7 @@ patchCCallTarget packageId callTarget
 rnSrcInstDecl :: InstDecl RdrName -> RnM (InstDecl Name, FreeVars)
 rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- Used for both source and interface file decls
-  = do { inst_ty' <- rnHsSigType (text "an instance decl") inst_ty
+  = do { inst_ty' <- rnLHsInstType (text "In an instance declaration") inst_ty
        ; let Just (inst_tyvars, _, L _ cls,_) = splitLHsInstDeclTy_maybe inst_ty'
 
 	-- Rename the bindings
@@ -507,7 +507,7 @@ rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
 rnSrcDerivDecl (DerivDecl ty)
   = do { standalone_deriv_ok <- xoptM Opt_StandaloneDeriving
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
-       ; ty' <- rnLHsType (text "In a deriving declaration") ty
+       ; ty' <- rnLHsInstType (text "In a deriving declaration") ty
        ; let fvs = extractHsTyNames ty'
        ; return (DerivDecl ty', fvs) }
 
