@@ -1418,18 +1418,18 @@ lex_quasiquote_tok span buf len = do
                 -- 'tail' drops the initial '[',
                 -- while the -1 drops the trailing '|'
   quoteStart <- getSrcLoc
-  quote <- lex_quasiquote ""
+  quote <- lex_quasiquote quoteStart ""
   end <- getSrcLoc
   return (L (mkRealSrcSpan (realSrcSpanStart span) end)
            (ITquasiQuote (mkFastString quoter,
                           mkFastString (reverse quote),
                           mkRealSrcSpan quoteStart end)))
 
-lex_quasiquote :: String -> P String
-lex_quasiquote s = do
+lex_quasiquote :: RealSrcLoc -> String -> P String
+lex_quasiquote start s = do
   i <- getInput
   case alexGetChar' i of
-    Nothing -> lit_error i
+    Nothing -> quasiquote_error start
 
     -- NB: The string "|]" terminates the quasiquote,
     -- with absolutely no escaping. See the extensive
@@ -1440,7 +1440,12 @@ lex_quasiquote s = do
         -> do { setInput i; return s }
 
     Just (c, i) -> do
-         setInput i; lex_quasiquote (c : s)
+         setInput i; lex_quasiquote start (c : s)
+
+quasiquote_error :: RealSrcLoc -> P a
+quasiquote_error start = do
+  (AI end buf) <- getInput
+  reportLexError start end buf "unterminated quasiquotation"
 
 -- -----------------------------------------------------------------------------
 -- Warnings
