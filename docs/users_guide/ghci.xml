@@ -2256,14 +2256,18 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
-          <literal>:kind</literal> <replaceable>type</replaceable>
+          <literal>:kind</literal><optional><literal>!</literal></optional> 
+                        <replaceable>type</replaceable>
           <indexterm><primary><literal>:kind</literal></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Infers and prints the kind of
 	  <replaceable>type</replaceable>. The latter can be an arbitrary
 	    type expression, including a partial application of a type constructor,
-	    such as <literal>Either Int</literal>.</para>
+	    such as <literal>Either Int</literal>.  If you specify the 
+            optional "<literal>!</literal>", GHC will in addition normalise the type
+            by expanding out type synonyms and evaluating type-function applications,
+            and display the normalised result.</para>
 	</listitem>
       </varlistentry>
 
