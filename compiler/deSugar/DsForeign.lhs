@@ -18,7 +18,6 @@ import DsMonad
 
 import HsSyn
 import DataCon
-import CoreUtils
 import CoreUnfold
 import Id
 import Literal
@@ -45,6 +44,7 @@ import Platform
 import Config
 import Constants
 import OrdList
+import Pair
 import Data.Maybe
 import Data.List
 \end{code}
@@ -84,14 +84,14 @@ dsForeigns fos = do
   where
    do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
 
-   do_decl (ForeignImport id _ spec) = do
+   do_decl (ForeignImport id _ co spec) = do
       traceIf (text "fi start" <+> ppr id)
-      (bs, h, c) <- dsFImport (unLoc id) spec
+      (bs, h, c) <- dsFImport (unLoc id) co spec
       traceIf (text "fi end" <+> ppr id)
       return (h, c, [], bs)
 
-   do_decl (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv))) = do
-      (h, c, _, _) <- dsFExport id (idType id) ext_nm cconv False
+   do_decl (ForeignExport (L _ id) _ co (CExport (CExportStatic ext_nm cconv))) = do
+      (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
 \end{code}
 
@@ -122,20 +122,22 @@ because it exposes the boxing to the call site.
 
 \begin{code}
 dsFImport :: Id
+          -> Coercion
           -> ForeignImport
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id (CImport cconv safety _ spec) = do
-    (ids, h, c) <- dsCImport id spec cconv safety
+dsFImport id co (CImport cconv safety _ spec) = do
+    (ids, h, c) <- dsCImport id co spec cconv safety
     return (ids, h, c)
 
 dsCImport :: Id
+          -> Coercion
           -> CImportSpec
           -> CCallConv
           -> Safety
           -> DsM ([Binding], SDoc, SDoc)
-dsCImport id (CLabel cid) cconv _ = do
-   let ty = idType id
-       fod = case tyConAppTyCon_maybe (repType ty) of
+dsCImport id co (CLabel cid) cconv _ = do
+   let ty = pFst $ coercionKind co
+       fod = case tyConAppTyCon_maybe ty of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
                  IsFunction
@@ -144,23 +146,24 @@ dsCImport id (CLabel cid) cconv _ = do
    ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
     let
         rhs = foRhs (Lit (MachLabel cid stdcall_info fod))
+        rhs' = Cast rhs co
         stdcall_info = fun_type_arg_stdcall_info cconv ty
     in
-    return ([(id, rhs)], empty, empty)
+    return ([(id, rhs')], empty, empty)
 
-dsCImport id (CFunction target) cconv@PrimCallConv safety
-  = dsPrimCall id (CCall (CCallSpec target cconv safety))
-dsCImport id (CFunction target) cconv safety
-  = dsFCall id (CCall (CCallSpec target cconv safety))
-dsCImport id CWrapper cconv _
-  = dsFExportDynamic id cconv
+dsCImport id co (CFunction target) cconv@PrimCallConv safety
+  = dsPrimCall id co (CCall (CCallSpec target cconv safety))
+dsCImport id co (CFunction target) cconv safety
+  = dsFCall id co (CCall (CCallSpec target cconv safety))
+dsCImport id co CWrapper cconv _
+  = dsFExportDynamic id co cconv
 
 -- For stdcall labels, if the type was a FunPtr or newtype thereof,
 -- then we need to calculate the size of the arguments in order to add
 -- the @n suffix to the label.
 fun_type_arg_stdcall_info :: CCallConv -> Type -> Maybe Int
 fun_type_arg_stdcall_info StdCallConv ty
-  | Just (tc,[arg_ty]) <- splitTyConApp_maybe (repType ty),
+  | Just (tc,[arg_ty]) <- splitTyConApp_maybe ty,
     tyConUnique tc == funPtrTyConKey
   = let
        (_tvs,sans_foralls)        = tcSplitForAllTys arg_ty
@@ -178,10 +181,10 @@ fun_type_arg_stdcall_info _other_conv _
 %************************************************************************
 
 \begin{code}
-dsFCall :: Id -> ForeignCall -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsFCall fn_id fcall = do
+dsFCall :: Id -> Coercion -> ForeignCall -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
+dsFCall fn_id co fcall = do
     let
-        ty                   = idType fn_id
+        ty                   = pFst $ coercionKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
                 -- Must use tcSplit* functions because we want to
@@ -208,9 +211,10 @@ dsFCall fn_id fcall = do
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
-        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfolding (Just (length args)) wrap_rhs
+        wrap_rhs'    = Cast wrap_rhs co
+        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfolding (Just (length args)) wrap_rhs'
 
-    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs)], empty, empty)
+    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], empty, empty)
 \end{code}
 
 
@@ -228,10 +232,11 @@ kind of Id, or perhaps to bundle them with PrimOps since semantically and
 for calling convention they are really prim ops.
 
 \begin{code}
-dsPrimCall :: Id -> ForeignCall -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsPrimCall fn_id fcall = do
+dsPrimCall :: Id -> Coercion -> ForeignCall
+           -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
+dsPrimCall fn_id co fcall = do
     let
-        ty                   = idType fn_id
+        ty                   = pFst $ coercionKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
                 -- Must use tcSplit* functions because we want to
@@ -243,7 +248,8 @@ dsPrimCall fn_id fcall = do
     let
         call_app = mkFCall ccall_uniq fcall (map Var args) io_res_ty
         rhs      = mkLams tvs (mkLams args call_app)
-    return ([(fn_id, rhs)], empty, empty)
+        rhs'     = Cast rhs co
+    return ([(fn_id, rhs')], empty, empty)
 
 \end{code}
 
@@ -267,7 +273,8 @@ the user-written Haskell function `@M.foo@'.
 \begin{code}
 dsFExport :: Id                 -- Either the exported Id,
                                 -- or the foreign-export-dynamic constructor
-          -> Type               -- The type of the thing callable from C
+          -> Coercion           -- Coercion between the Haskell type callable
+                                -- from C, and its representation type
           -> CLabelString       -- The name to export to C land
           -> CCallConv
           -> Bool               -- True => foreign export dynamic
@@ -279,8 +286,9 @@ dsFExport :: Id                 -- Either the exported Id,
                  , Int          -- size of args to stub function
                  )
 
-dsFExport fn_id ty ext_name cconv isDyn=  do
+dsFExport fn_id co ext_name cconv isDyn = do
     let
+       ty                              = pSnd $ coercionKind co
        (_tvs,sans_foralls)             = tcSplitForAllTys ty
        (fe_arg_tys', orig_res_ty)      = tcSplitFunTys sans_foralls
        -- We must use tcSplits here, because we want to see
@@ -294,9 +302,8 @@ dsFExport fn_id ty ext_name cconv isDyn=  do
     (res_ty,             -- t
      is_IO_res_ty) <-    -- Bool
         case tcSplitIOType_maybe orig_res_ty of
-           Just (_ioTyCon, res_ty, _co) -> return (res_ty, True)
+           Just (_ioTyCon, res_ty) -> return (res_ty, True)
                    -- The function already returns IO t
-                   -- ToDo: what about the coercion?
            Nothing                    -> return (orig_res_ty, False)
                    -- The function returns t
 
@@ -339,9 +346,10 @@ f_helper(StablePtr s, HsBool b, HsInt i)
 
 \begin{code}
 dsFExportDynamic :: Id
+                 -> Coercion
                  -> CCallConv
                  -> DsM ([Binding], SDoc, SDoc)
-dsFExportDynamic id cconv = do
+dsFExportDynamic id co0 cconv = do
     fe_id <-  newSysLocalDs ty
     mod <- getModuleDs
     let
@@ -356,7 +364,7 @@ dsFExportDynamic id cconv = do
         export_ty     = mkFunTy stable_ptr_ty arg_ty
     bindIOId <- dsLookupGlobalId bindIOName
     stbl_value <- newSysLocalDs stable_ptr_ty
-    (h_code, c_code, typestring, args_size) <- dsFExport id export_ty fe_nm cconv True
+    (h_code, c_code, typestring, args_size) <- dsFExport id (Refl export_ty) fe_nm cconv True
     let
          {-
           The arguments to the external function which will
@@ -386,7 +394,6 @@ dsFExportDynamic id cconv = do
 
     let io_app = mkLams tvs                  $
                  Lam cback                   $
-                 mkCoerce (mkSymCo co) $
                  mkApps (Var bindIOId)
                         [ Type stable_ptr_ty
                         , Type res_ty
@@ -394,19 +401,18 @@ dsFExportDynamic id cconv = do
                         , Lam stbl_value ccall_adj
                         ]
 
-        fed = (id `setInlineActivation` NeverActive, io_app)
+        fed = (id `setInlineActivation` NeverActive, Cast io_app co0)
                -- Never inline the f.e.d. function, because the litlit
                -- might not be in scope in other modules.
 
     return ([fed], h_code, c_code)
 
  where
-  ty                       = idType id
+  ty                       = pFst (coercionKind co0)
   (tvs,sans_foralls)       = tcSplitForAllTys ty
   ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
-  Just (io_tc, res_ty, co) = tcSplitIOType_maybe fn_res_ty
+  Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
-        -- co : fn_res_ty ~ IO res_ty
 
 toCName :: Id -> String
 toCName i = showSDoc (pprCode CStyle (ppr (idName i)))

@@ -363,7 +363,7 @@ rnDefaultDecl (DefaultDecl tys)
 
 \begin{code}
 rnHsForeignDecl :: ForeignDecl RdrName -> RnM (ForeignDecl Name, FreeVars)
-rnHsForeignDecl (ForeignImport name ty spec)
+rnHsForeignDecl (ForeignImport name ty _ spec)
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRn name
        ; (ty', fvs) <- rnHsTypeFVs (fo_decl_msg name) ty
@@ -372,12 +372,12 @@ rnHsForeignDecl (ForeignImport name ty spec)
        ; let packageId = thisPackage $ hsc_dflags topEnv
 	     spec'     = patchForeignImport packageId spec
 
-       ; return (ForeignImport name' ty' spec', fvs) }
+       ; return (ForeignImport name' ty' noForeignImportCoercionYet spec', fvs) }
 
-rnHsForeignDecl (ForeignExport name ty spec)
+rnHsForeignDecl (ForeignExport name ty _ spec)
   = do { name' <- lookupLocatedOccRn name
        ; (ty', fvs) <- rnHsTypeFVs (fo_decl_msg name) ty
-       ; return (ForeignExport name' ty' spec, fvs `addOneFV` unLoc name') }
+       ; return (ForeignExport name' ty' noForeignExportCoercionYet spec, fvs `addOneFV` unLoc name') }
 	-- NB: a foreign export is an *occurrence site* for name, so 
 	--     we add it to the free-variable list.  It might, for example,
 	--     be imported from another module

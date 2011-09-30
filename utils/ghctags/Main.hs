@@ -257,7 +257,7 @@ boundValues mod group =
                 , n <- map found ns ]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of
-                                      ForeignImport n _ _ -> [found n]
+                                      ForeignImport n _ _ _ -> [found n]
                                       ForeignExport { } -> []
   in vals ++ tys ++ fors
   where found = foundOfLName mod

@@ -610,7 +610,7 @@ hsGroupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
 
 hsForeignDeclsBinders :: [LForeignDecl Name] -> [Name]
 hsForeignDeclsBinders foreign_decls
-  = [n | L _ (ForeignImport (L _ n) _ _) <- foreign_decls]
+  = [n | L _ (ForeignImport (L _ n) _ _ _) <- foreign_decls]
 
 hsTyClDeclsBinders :: [[LTyClDecl Name]] -> [Located (InstDecl Name)] -> [Name]
 hsTyClDeclsBinders tycl_decls inst_decls

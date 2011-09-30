@@ -1230,28 +1230,17 @@ restricted set of types as arguments and results (the restricting factor
 being the )
 
 \begin{code}
-tcSplitIOType_maybe :: Type -> Maybe (TyCon, Type, Coercion)
--- (isIOType t) returns Just (IO,t',co)
---				if co : t ~ IO t'
---		returns Nothing otherwise
-tcSplitIOType_maybe ty 
+tcSplitIOType_maybe :: Type -> Maybe (TyCon, Type)
+-- (tcSplitIOType_maybe t) returns Just (IO,t',co)
+--              if co : t ~ IO t'
+--              returns Nothing otherwise
+tcSplitIOType_maybe ty
   = case tcSplitTyConApp_maybe ty of
-	-- This split absolutely has to be a tcSplit, because we must
-	-- see the IO type; and it's a newtype which is transparent to splitTyConApp.
-
-	Just (io_tycon, [io_res_ty]) 
-	   |  io_tycon `hasKey` ioTyConKey 
-           -> Just (io_tycon, io_res_ty, mkReflCo ty)
-
-	Just (tc, tys)
-	   | not (isRecursiveTyCon tc)
-	   , Just (ty, co1) <- instNewTyCon_maybe tc tys
-		  -- Newtypes that require a coercion are ok
-	   -> case tcSplitIOType_maybe ty of
-		Nothing		    -> Nothing
-		Just (tc, ty', co2) -> Just (tc, ty', co1 `mkTransCo` co2)
-
-	_ -> Nothing
+        Just (io_tycon, [io_res_ty])
+         | io_tycon `hasKey` ioTyConKey ->
+            Just (io_tycon, io_res_ty)
+        _ ->
+            Nothing
 
 isFFITy :: Type -> Bool
 -- True for any TyCon that can possibly be an arg or result of an FFI call
@@ -1318,20 +1307,15 @@ isFFIDotnetObjTy ty
 isFunPtrTy :: Type -> Bool
 isFunPtrTy = checkRepTyConKey [funPtrTyConKey]
 
+-- normaliseFfiType gets run before checkRepTyCon, so we don't
+-- need to worry about looking through newtypes or type functions
+-- here; that's already been taken care of.
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
--- Look through newtypes, but *not* foralls
--- Should work even for recursive newtypes
--- eg Manuel had:	newtype T = MkT (Ptr T)
 checkRepTyCon check_tc ty
-  = go emptyNameSet ty
-  where
-    go rec_nts ty
-      | Just (tc,tys) <- splitTyConApp_maybe ty
-      = case carefullySplitNewType_maybe rec_nts tc tys of
-      	   Just (rec_nts', ty') -> go rec_nts' ty'
-	   Nothing	   	-> check_tc tc
-      | otherwise
-      = False
+    | Just (tc, _) <- splitTyConApp_maybe ty
+    = check_tc tc
+    | otherwise
+    = False
 
 checkRepTyConKey :: [Unique] -> Type -> Bool
 -- Like checkRepTyCon, but just looks at the TyCon key

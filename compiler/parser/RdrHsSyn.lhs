@@ -920,12 +920,12 @@ mkImport cconv safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget entity Nothing)
       importSpec = CImport PrimCallConv safety nilFS funcTarget
-  return (ForD (ForeignImport v ty importSpec))
+  return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
 
   | otherwise = do
     case parseCImport cconv safety (mkExtName (unLoc v)) (unpackFS entity) of
       Nothing         -> parseErrorSDoc loc (text "Malformed entity string")
-      Just importSpec -> return (ForD (ForeignImport v ty importSpec))
+      Just importSpec -> return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
 
 -- the string "foo" is ambigous: either a header or a C identifier.  The
 -- C identifier case comes first in the alternatives below, so we pick
@@ -970,7 +970,7 @@ mkExport :: CCallConv
          -> (Located FastString, Located RdrName, LHsType RdrName)
          -> P (HsDecl RdrName)
 mkExport cconv (L _ entity, v, ty) = return $
-  ForD (ForeignExport v ty (CExport (CExportStatic entity' cconv)))
+  ForD (ForeignExport v ty noForeignExportCoercionYet (CExport (CExportStatic entity' cconv)))
   where
     entity' | nullFS entity = mkExtName (unLoc v)
             | otherwise     = entity

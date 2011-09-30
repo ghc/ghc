@@ -324,7 +324,7 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
    Just (tvs, cxt, cls, tys) = splitHsInstDeclTy_maybe (unLoc ty)
 
 repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
-repForD (L loc (ForeignImport name typ (CImport cc s ch cis)))
+repForD (L loc (ForeignImport name typ _ (CImport cc s ch cis)))
  = do MkC name' <- lookupLOcc name
       MkC typ' <- repLTy typ
       MkC cc' <- repCCallConv cc

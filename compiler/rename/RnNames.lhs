@@ -521,7 +521,7 @@ getLocalNonValBinders fixity_env
         ; return (envs, new_bndrs) } }
   where
     for_hs_bndrs :: [Located RdrName]
-    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
+    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders

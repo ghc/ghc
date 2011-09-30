@@ -370,7 +370,7 @@ cvtForD (ImportF callconv safety from nm ty)
                                  (mkFastString (TH.nameBase nm)) from
   = do { nm' <- vNameL nm
        ; ty' <- cvtType ty
-       ; return (ForeignImport nm' ty' impspec)
+       ; return (ForeignImport nm' ty' noForeignImportCoercionYet impspec)
        }
   | otherwise
   = failWith $ text (show from) <+> ptext (sLit "is not a valid ccall impent")
@@ -384,7 +384,7 @@ cvtForD (ExportF callconv as nm ty)
   = do	{ nm' <- vNameL nm
 	; ty' <- cvtType ty
 	; let e = CExport (CExportStatic (mkFastString as) (cvt_conv callconv))
- 	; return $ ForeignExport nm' ty' e }
+ 	; return $ ForeignExport nm' ty' noForeignExportCoercionYet e }
 
 cvt_conv :: TH.Callconv -> CCallConv
 cvt_conv TH.CCall   = CCallConv

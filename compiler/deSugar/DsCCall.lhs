@@ -209,7 +209,7 @@ boxResult :: Type
 --	State# RealWorld -> (# State# RealWorld #)
 
 boxResult result_ty
-  | Just (io_tycon, io_res_ty, co) <- tcSplitIOType_maybe result_ty
+  | Just (io_tycon, io_res_ty) <- tcSplitIOType_maybe result_ty
 	-- isIOType_maybe handles the case where the type is a 
 	-- simple wrapping of IO.  E.g.
 	-- 	newtype Wrap a = W (IO a)
@@ -236,7 +236,7 @@ boxResult result_ty
 	; let io_data_con = head (tyConDataCons io_tycon)
 	      toIOCon     = dataConWrapId io_data_con
 
-	      wrap the_call = mkCoerce (mkSymCo co) $
+	      wrap the_call =
 			      mkApps (Var toIOCon)
 			    	     [ Type io_res_ty, 
 			    	       Lam state_id $
