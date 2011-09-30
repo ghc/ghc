@@ -72,15 +72,15 @@ integer_cbits_encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e 
 
     /* Convert MP_INT to a double; knows a lot about internal rep! */
     for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
-	r = (r * GMP_BASE) + arr[i];
+        r = (r * GMP_BASE) + arr[i];
 
     /* Now raise to the exponent */
     if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-	r = ldexp(r, e);
+        r = ldexp(r, e);
 
     /* sign is encoded in the size */
     if (size < 0)
-	r = -r;
+        r = -r;
 
     return r;
 }
@@ -94,15 +94,15 @@ integer_cbits_encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e *
 
     /* Convert MP_INT to a float; knows a lot about internal rep! */
     for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
-	r = (r * GMP_BASE) + arr[i];
+        r = (r * GMP_BASE) + arr[i];
 
     /* Now raise to the exponent */
     if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-	r = ldexp(r, e);
+        r = ldexp(r, e);
 
     /* sign is encoded in the size */
     if (size < 0)
-	r = -r;
+        r = -r;
 
     return r;
 }
@@ -113,58 +113,58 @@ void
 integer_cbits_decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
 {
     /* Do some bit fiddling on IEEE */
-    unsigned int low, high; 	     	/* assuming 32 bit ints */
+    unsigned int low, high;                      /* assuming 32 bit ints */
     int sign, iexp;
-    union { double d; unsigned int i[2]; } u;	/* assuming 32 bit ints, 64 bit double */
+    union { double d; unsigned int i[2]; } u;    /* assuming 32 bit ints, 64 bit double */
 
     ASSERT(sizeof(unsigned int ) == 4            );
     ASSERT(sizeof(dbl          ) == SIZEOF_DOUBLE);
     ASSERT(sizeof(man->_mp_d[0]) == SIZEOF_LIMB_T);
     ASSERT(DNBIGIT*SIZEOF_LIMB_T >= SIZEOF_DOUBLE);
 
-    u.d = dbl;	    /* grab chunks of the double */
+    u.d = dbl;            /* grab chunks of the double */
     low = u.i[L];
     high = u.i[H];
 
     /* we know the MP_INT* passed in has size zero, so we realloc
-    	no matter what.
+            no matter what.
     */
     man->_mp_alloc = DNBIGIT;
 
     if (low == 0 && (high & ~DMSBIT) == 0) {
-	man->_mp_size = 0;
-	*exp = 0L;
+        man->_mp_size = 0;
+        *exp = 0L;
     } else {
-	man->_mp_size = DNBIGIT;
-	iexp = ((high >> 20) & 0x7ff) + MY_DMINEXP;
-	sign = high;
+        man->_mp_size = DNBIGIT;
+        iexp = ((high >> 20) & 0x7ff) + MY_DMINEXP;
+        sign = high;
 
-	high &= DHIGHBIT-1;
-	if (iexp != MY_DMINEXP)	/* don't add hidden bit to denorms */
-	    high |= DHIGHBIT;
-	else {
-	    iexp++;
-	    /* A denorm, normalize the mantissa */
-	    while (! (high & DHIGHBIT)) {
-		high <<= 1;
-		if (low & DMSBIT)
-		    high++;
-		low <<= 1;
-		iexp--;
-	    }
-	}
+        high &= DHIGHBIT-1;
+        if (iexp != MY_DMINEXP)        /* don't add hidden bit to denorms */
+            high |= DHIGHBIT;
+        else {
+            iexp++;
+            /* A denorm, normalize the mantissa */
+            while (! (high & DHIGHBIT)) {
+                high <<= 1;
+                if (low & DMSBIT)
+                    high++;
+                low <<= 1;
+                iexp--;
+            }
+        }
         *exp = (I_) iexp;
 #if DNBIGIT == 2
-	man->_mp_d[0] = (mp_limb_t)low;
-	man->_mp_d[1] = (mp_limb_t)high;
+        man->_mp_d[0] = (mp_limb_t)low;
+        man->_mp_d[1] = (mp_limb_t)high;
 #else
 #if DNBIGIT == 1
-	man->_mp_d[0] = ((mp_limb_t)high) << 32 | (mp_limb_t)low;
+        man->_mp_d[0] = ((mp_limb_t)high) << 32 | (mp_limb_t)low;
 #else
 #error Cannot cope with DNBIGIT
 #endif
 #endif
-	if (sign < 0)
-	    man->_mp_size = -man->_mp_size;
+        if (sign < 0)
+            man->_mp_size = -man->_mp_size;
     }
 }
