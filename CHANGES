@@ -1,3 +1,15 @@
+Changes in version 2.9.3
+
+  [This is the version that comes with GHC 7.2.1 although it claims it's 2.9.2!]
+
+  * Build with GHC 7.2.1
+
+  * Support blank lines in results of examples
+
+  * A type signature for multiple names generates one signature in the output
+
+  * Minor bug fixes
+
 Changes in version 2.9.2
 
   * Build with GHC 7.0.2
