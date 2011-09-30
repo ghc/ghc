@@ -50,11 +50,43 @@ toggleCollapser = makeClassToggle("collapser", "expander");
 
 function toggleSection(id)
 {
-  var b = toggleShow(document.getElementById("section." + id))
-  toggleCollapser(document.getElementById("control." + id), b)
+  var b = toggleShow(document.getElementById("section." + id));
+  toggleCollapser(document.getElementById("control." + id), b);
+  rememberCollapsed(id, b);
   return b;
 }
 
+var collapsed = {};
+function rememberCollapsed(id, b)
+{
+  if(b)
+    delete collapsed[id]
+  else
+    collapsed[id] = null;
+
+  var sections = [];
+  for(var i in collapsed)
+  {
+    if(collapsed.hasOwnProperty(i))
+      sections.push(i);
+  }
+  // cookie specific to this page; don't use setCookie which sets path=/
+  document.cookie = "collapsed=" + escape(sections.join('+'));
+}
+
+function restoreCollapsed()
+{
+  var cookie = getCookie("collapsed");
+  if(!cookie)
+    return;
+
+  var ids = cookie.split('+');
+  for(var i in ids)
+  {
+    if(document.getElementById("section." + ids[i]))
+      toggleSection(ids[i]);
+  }
+}
 
 function setCookie(name, value) {
   document.cookie = name + "=" + escape(value) + ";path=/;";
@@ -307,5 +339,6 @@ function pageLoad() {
   addStyleMenu();
   adjustForFrames();
   resetStyle();
+  restoreCollapsed();
 }
 
