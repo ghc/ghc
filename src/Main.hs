@@ -157,7 +157,7 @@ readPackagesAndProcessModules flags files = do
 
   -- Catches all GHC source errors, then prints and re-throws them.
   let handleSrcErrors action' = flip handleSourceError action' $ \err -> do
-        printExceptionAndWarnings err
+        printException err
         liftIO exitFailure
 
   -- Initialize GHC.
