@@ -41,6 +41,7 @@ import System.FilePath hiding ( (</>) )
 import System.Directory
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
+import qualified Data.Set as Set hiding ( Set )
 import Data.Function
 import Data.Ord              ( comparing )
 
@@ -415,9 +416,11 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
     getIfaceIndex iface =
       [ (getOccString name
-         , Map.fromList [(name, [(mdl, name `elem` instVisibleExports iface)])])
+         , Map.fromList [(name, [(mdl, name `Set.member` visible)])])
          | name <- instExports iface ]
-      where mdl = instMod iface
+      where
+        mdl = instMod iface
+        visible = Set.fromList (instVisibleExports iface)
 
     indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
     indexElt (str, entities) =
