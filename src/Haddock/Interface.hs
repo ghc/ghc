@@ -142,6 +142,7 @@ createIfaces0 verbosity modules flags instIfaceMap =
 createIfaces :: Verbosity -> [Flag] -> InstIfaceMap -> ModuleGraph -> Ghc [Interface]
 createIfaces verbosity flags instIfaceMap mods = do
   let sortedMods = flattenSCCs $ topSortModuleGraph False mods Nothing
+  out verbosity normal "Haddock coverage:"
   (ifaces, _) <- foldM f ([], Map.empty) sortedMods
   return (reverse ifaces)
   where
@@ -162,11 +163,9 @@ processModule verbosity modsum flags modMap instIfaceMap = do
     liftIO $ mapM_ putStrLn msg
     let (haddockable, haddocked) = ifaceHaddockCoverage interface
         percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
-        coveragemsg = printf "haddock coverage for %s: %7s %3d%%"
-                        (ifaceOrigFilename interface)
-                        (printf "%d/%d" haddocked haddockable ::  String)
-                        percentage
-    out verbosity normal coveragemsg
+        modString = moduleString (ifaceMod interface)
+        coverageMsg = printf " %3d%% (%3d /%3d) in '%s'" percentage haddocked haddockable modString
+    out verbosity normal coverageMsg
     interface' <- liftIO $ evaluate interface
     return (Just interface')
   else
