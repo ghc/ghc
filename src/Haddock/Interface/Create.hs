@@ -263,7 +263,7 @@ declsFromClass class_ = docs ++ defs ++ sigs ++ ats
 
 declNames :: HsDecl a -> [a]
 declNames (TyClD d) = [tcdName d]
-declNames (ForD (ForeignImport n _ _)) = [unLoc n]
+declNames (ForD (ForeignImport n _ _ _)) = [unLoc n]
 -- we have normal sigs only (since they are taken from ValBindsOut)
 declNames (SigD sig) = sigNameNoLoc sig
 declNames _ = error "unexpected argument to declNames"

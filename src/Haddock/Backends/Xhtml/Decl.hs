@@ -114,7 +114,7 @@ tyvarNames = map (getName . hsTyVarName . unLoc)
 
 ppFor :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName
       -> ForeignDecl DocName -> Bool -> Qualification -> Html
-ppFor summary links loc doc (ForeignImport (L _ name) (L _ typ) _) unicode qual
+ppFor summary links loc doc (ForeignImport (L _ name) (L _ typ) _ _) unicode qual
   = ppFunSig summary links loc doc [name] typ unicode qual
 ppFor _ _ _ _ _ _ _ = error "ppFor"
 

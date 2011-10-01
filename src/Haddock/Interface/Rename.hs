@@ -392,14 +392,14 @@ renameSig sig = case sig of
 
 
 renameForD :: ForeignDecl Name -> RnM (ForeignDecl DocName)
-renameForD (ForeignImport lname ltype x) = do
+renameForD (ForeignImport lname ltype co x) = do
   lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignImport lname' ltype' x)
-renameForD (ForeignExport lname ltype x) = do
+  return (ForeignImport lname' ltype' co x)
+renameForD (ForeignExport lname ltype co x) = do
   lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignExport lname' ltype' x)
+  return (ForeignExport lname' ltype' co x)
 
 
 renameInstD :: InstDecl Name -> RnM (InstDecl DocName)
