@@ -1,18 +1,19 @@
 name:                 haddock
 version:              2.9.3
-cabal-version:        >= 1.10
-license:              BSD3
-build-type:           Simple
-license-file:         LICENSE
-copyright:            (c) Simon Marlow, David Waern
-author:               Simon Marlow, David Waern
-maintainer:           David Waern <david.waern@gmail.com>
-stability:            experimental
-homepage:             http://www.haskell.org/haddock/
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
-category:             Development
+license:              BSD3
+license-file:         LICENSE
+author:               Simon Marlow, David Waern
+maintainer:           David Waern <david.waern@gmail.com>
+homepage:             http://www.haskell.org/haddock/
+bug-reports:          http://trac.haskell.org/haddock
+copyright:            (c) Simon Marlow, David Waern
+category:             Documentation
+build-type:           Simple
+cabal-version:        >= 1.10
+stability:            experimental
 
 extra-source-files:
   CHANGES
@@ -209,3 +210,6 @@ test-suite html-tests
   hs-source-dirs:   tests/html-tests
   build-depends:    base, directory, process, filepath, Cabal, regex-compat
 
+source-repository head
+  type:     git
+  location: http://darcs.haskell.org/haddock.git
