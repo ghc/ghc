@@ -33,8 +33,10 @@
 
 #if SIZEOF_LIMB_T == 4
 #define GMP_BASE 4294967296.0
+#define LIMBBITS_LOG_2 5
 #elif SIZEOF_LIMB_T == 8
 #define GMP_BASE 18446744073709551616.0
+#define LIMBBITS_LOG_2 6
 #else
 #error Cannot cope with SIZEOF_LIMB_T -- please add definition of GMP_BASE
 #endif
@@ -71,8 +73,49 @@ integer_cbits_encodeDouble (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e 
     I_ i;
 
     /* Convert MP_INT to a double; knows a lot about internal rep! */
-    for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
-        r = (r * GMP_BASE) + arr[i];
+    i = __abs(size)-1;
+    if ((i < 15) || (e >= 0)) /* overflows only if the final result does */
+    {
+        /* This would cause overflow if a large MP_INT is passed, even if the
+         * exponent would scale it back into range, so we do it only when it's safe. */
+        for(r = 0.0; i >= 0; i--)
+            r = (r * GMP_BASE) + arr[i];
+
+    } else { /* possibly more than 1024 bits in the MP_INT, but gets scaled down */
+
+        /* Find the first nonzero limb; normally it would be the first */
+        r = 0.0;
+        while((i >= 0) && (r == 0.0))
+        {
+            r = arr[i--];
+        }
+        if (i >= 0)
+            r = (r * GMP_BASE) + arr[i];
+#if SIZEOF_LIMB_T < 8
+        if (i > 0)
+            r = (r * GMP_BASE) + arr[--i];
+#endif
+        /* Now we have at least the 65 leading bits of the MP_INT or all of it.
+         * Any further bits would be rounded down, so from now on everything is
+         * multiplication by powers of 2.
+         * If i is positive, arr contains i limbs we haven't looked at yet, so
+         * adjust the exponent by i*8*SIZEOF_LIMB_T. Unfortunately, we must
+         * beware of overflow, so we can't simply add this to e. */
+        if (i > 0)
+        {
+            /* first add the number of whole limbs that would be cancelled */
+            i = i + e / (8 * SIZEOF_LIMB_T);
+            /* check for overflow */
+            if ((i > 0) && ((i >> (8*sizeof(I_) - 1 - LIMBBITS_LOG_2)) > 0))
+            {
+                /* overflow, give e a large dummy value */
+                e = 2147483647;
+            } else {
+                /* no overflow, get the exact value */
+                e = i * (8 * SIZEOF_LIMB_T) + (e % (8 * SIZEOF_LIMB_T));
+            }
+        }
+    }
 
     /* Now raise to the exponent */
     if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
@@ -93,8 +136,51 @@ integer_cbits_encodeFloat (I_ size, StgByteArray ba, I_ e) /* result = s * 2^e *
     I_ i;
 
     /* Convert MP_INT to a float; knows a lot about internal rep! */
-    for(r = 0.0, i = __abs(size)-1; i >= 0; i--)
-        r = (r * GMP_BASE) + arr[i];
+    i = __abs(size)-1;
+    /* just in case StgFloat is a double, check sizes */
+#if SIZEOF_FLOAT == 4
+    if ((i < 2) || (e >= 0))
+#else
+    if ((i < 15) || (e >= 0))
+#endif
+    {
+        for(r = 0.0; i >= 0; i--)
+            r = (r * GMP_BASE) + arr[i];
+    } else {
+
+        /* Find the first nonzero limb; normally it would be the first */
+        r = 0.0;
+        while((i >= 0) && (r == 0.0))
+        {
+            r = arr[i--];
+        }
+        if (i >= 0)
+            r = (r * GMP_BASE) + arr[i];
+#if (SIZEOF_LIMB_T < 8) && (SIZEOF_FLOAT > 4)
+        if (i > 0)
+            r = (r * GMP_BASE) + arr[--i];
+#endif
+        /* Now we have enough leading bits of the MP_INT.
+         * Any further bits would be rounded down, so from now on everything is
+         * multiplication by powers of 2.
+         * If i is positive, arr contains i limbs we haven't looked at yet, so
+         * adjust the exponent by i*8*SIZEOF_LIMB_T. Unfortunately, we must
+         * beware of overflow, so we can't simply add this to e. */
+        if (i > 0)
+        {
+            /* first add the number of whole limbs that would be cancelled */
+            i = i + e / (8 * SIZEOF_LIMB_T);
+            /* check for overflow */
+            if ((i > 0) && ((i >> (8*sizeof(I_) - 1 - LIMBBITS_LOG_2)) > 0))
+            {
+                /* overflow, give e a large dummy value */
+                e = 2147483647;
+            } else {
+                /* no overflow, get the exact value */
+                e = i * (8 * SIZEOF_LIMB_T) + (e % (8 * SIZEOF_LIMB_T));
+            }
+        }
+    }
 
     /* Now raise to the exponent */
     if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
