@@ -128,6 +128,7 @@ import CostCentre
 import Outputable
 import FastString
 import DynFlags
+import Platform
 import UniqSet
 
 -- -----------------------------------------------------------------------------
@@ -773,42 +774,48 @@ idInfoLabelType info =
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
 
-labelDynamic :: PackageId -> CLabel -> Bool
-labelDynamic this_pkg lbl =
+labelDynamic :: DynFlags -> PackageId -> CLabel -> Bool
+labelDynamic dflags this_pkg lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _  	     	-> not opt_Static && (this_pkg /= rtsPackageId)
 
    IdLabel n _ k     	-> isDllName this_pkg n
 
-#if mingw32_TARGET_OS
-   -- When compiling in the "dyn" way, eack package is to be linked into its own shared library.
+   -- When compiling in the "dyn" way, eack package is to be linked into
+   -- its own shared library.
    CmmLabel pkg _ _
-    -> not opt_Static && (this_pkg /= pkg)
+    | os == OSMinGW32 ->
+       not opt_Static && (this_pkg /= pkg)
+    | otherwise ->
+       True
 
-   -- Foreign label is in some un-named foreign package (or DLL)
-   ForeignLabel _ _ ForeignLabelInExternalPackage _  -> True
+   ForeignLabel _ _ source _  ->
+       if os == OSMinGW32
+       then case source of
+            -- Foreign label is in some un-named foreign package (or DLL).
+            ForeignLabelInExternalPackage -> True
 
-   -- Foreign label is linked into the same package as the source file currently being compiled.
-   ForeignLabel _ _ ForeignLabelInThisPackage  _     -> False
-      
-   -- Foreign label is in some named package.
-   --	When compiling in the "dyn" way, each package is to be linked into its own DLL.
-   ForeignLabel _ _ (ForeignLabelInPackage pkgId) _
-    -> (not opt_Static) && (this_pkg /= pkgId)
+            -- Foreign label is linked into the same package as the
+            -- source file currently being compiled.
+            ForeignLabelInThisPackage -> False
 
-#else
-   -- On Mac OS X and on ELF platforms, false positives are OK,
-   -- so we claim that all foreign imports come from dynamic libraries
-   ForeignLabel _ _ _ _ -> True
+            -- Foreign label is in some named package.
+            -- When compiling in the "dyn" way, each package is to be
+            -- linked into its own DLL.
+            ForeignLabelInPackage pkgId ->
+                (not opt_Static) && (this_pkg /= pkgId)
 
-   CmmLabel pkg _ _     -> True 
+       else -- On Mac OS X and on ELF platforms, false positives are OK,
+            -- so we claim that all foreign imports come from dynamic
+            -- libraries
+            True
 
-#endif
    PlainModuleInitLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
 
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _ 		     -> False
+  where os = platformOS (targetPlatform dflags)
 
 {-
 OLD?: These GRAN functions are needed for spitting out GRAN_FETCH() at the

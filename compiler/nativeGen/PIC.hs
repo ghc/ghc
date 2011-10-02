@@ -225,7 +225,7 @@ howToAccessLabel dflags _ OSMinGW32 _ lbl
 	
 	-- If the target symbol is in another PE we need to access it via the
 	--	appropriate __imp_SYMBOL pointer.
-	| labelDynamic (thisPackage dflags) lbl	
+	| labelDynamic dflags (thisPackage dflags) lbl	
 	= AccessViaSymbolPtr
 
 	-- Target symbol is in the same PE as the caller, so just access it directly.
@@ -243,7 +243,7 @@ howToAccessLabel dflags _ OSMinGW32 _ lbl
 --
 howToAccessLabel dflags arch OSDarwin DataReference lbl
 	-- data access to a dynamic library goes via a symbol pointer
-	| labelDynamic (thisPackage dflags) lbl 
+	| labelDynamic dflags (thisPackage dflags) lbl 
 	= AccessViaSymbolPtr
 
 	-- when generating PIC code, all cross-module data references must
@@ -267,7 +267,7 @@ howToAccessLabel dflags arch OSDarwin JumpReference lbl
 	-- stack alignment is only right for regular calls.
 	-- Therefore, we have to go via a symbol pointer:
 	| arch == ArchX86 || arch == ArchX86_64
-	, labelDynamic (thisPackage dflags) lbl
+	, labelDynamic dflags (thisPackage dflags) lbl
 	= AccessViaSymbolPtr
 	    
 
@@ -276,7 +276,7 @@ howToAccessLabel dflags arch OSDarwin _ lbl
 	-- not needed on x86_64 because Apple's new linker, ld64, generates
 	-- them automatically.
 	| arch /= ArchX86_64
-	, labelDynamic (thisPackage dflags) lbl
+	, labelDynamic dflags (thisPackage dflags) lbl
 	= AccessViaStub
 
 	| otherwise
@@ -313,7 +313,7 @@ howToAccessLabel dflags arch os DataReference lbl
 	| osElfTarget os
 	= case () of
 	    -- A dynamic label needs to be accessed via a symbol pointer.
-          _ | labelDynamic (thisPackage dflags) lbl 
+          _ | labelDynamic dflags (thisPackage dflags) lbl 
 	    -> AccessViaSymbolPtr
 
  	    -- For PowerPC32 -fPIC, we have to access even static data
@@ -341,17 +341,17 @@ howToAccessLabel dflags arch os DataReference lbl
 
 howToAccessLabel dflags arch os CallReference lbl
 	| osElfTarget os
-	, labelDynamic (thisPackage dflags) lbl && not opt_PIC
+	, labelDynamic dflags (thisPackage dflags) lbl && not opt_PIC
 	= AccessDirectly
 
 	| osElfTarget os
 	, arch /= ArchX86
-	, labelDynamic (thisPackage dflags) lbl && opt_PIC
+	, labelDynamic dflags (thisPackage dflags) lbl && opt_PIC
 	= AccessViaStub
 
 howToAccessLabel dflags _ os _ lbl
 	| osElfTarget os
-	= if labelDynamic (thisPackage dflags) lbl 
+	= if labelDynamic dflags (thisPackage dflags) lbl 
 	    then AccessViaSymbolPtr
 	    else AccessDirectly
 
