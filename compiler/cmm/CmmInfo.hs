@@ -16,6 +16,7 @@ import Bitmap
 import Maybes
 import Constants
 import Panic
+import Platform
 import StaticFlags
 import UniqSupply
 import MonadUtils
@@ -30,10 +31,10 @@ mkEmptyContInfoTable info_lbl
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = NoC_SRT }
 
-cmmToRawCmm :: [Old.CmmGroup] -> IO [Old.RawCmmGroup]
-cmmToRawCmm cmms
+cmmToRawCmm :: Platform -> [Old.CmmGroup] -> IO [Old.RawCmmGroup]
+cmmToRawCmm platform cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
-       ; return (initUs_ uniqs (mapM (concatMapM mkInfoTable) cmms)) }
+       ; return (initUs_ uniqs (mapM (concatMapM (mkInfoTable platform)) cmms)) }
 
 -- Make a concrete info table, represented as a list of CmmStatic
 -- (it can't be simply a list of Word, because the SRT field is
@@ -68,16 +69,16 @@ cmmToRawCmm cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: CmmDecl -> UniqSM [RawCmmDecl]
-mkInfoTable (CmmData sec dat) 
+mkInfoTable :: Platform -> CmmDecl -> UniqSM [RawCmmDecl]
+mkInfoTable _ (CmmData sec dat) 
   = return [CmmData sec dat]
 
-mkInfoTable (CmmProc (CmmInfo _ _ info) entry_label blocks)
+mkInfoTable platform (CmmProc (CmmInfo _ _ info) entry_label blocks)
   | CmmNonInfoTable <- info   -- Code without an info table.  Easy.
   = return [CmmProc Nothing entry_label blocks]
                                
   | CmmInfoTable { cit_lbl = info_lbl } <- info
-  = do { (top_decls, info_cts) <- mkInfoTableContents info Nothing
+  = do { (top_decls, info_cts) <- mkInfoTableContents platform info Nothing
        ; return (top_decls  ++
                  mkInfoTableAndCode info_lbl info_cts
                                     entry_label blocks) }
@@ -88,18 +89,20 @@ type InfoTableContents = ( [CmmLit]	     -- The standard part
                          , [CmmLit] )	     -- The "extra bits"
 -- These Lits have *not* had mkRelativeTo applied to them
 
-mkInfoTableContents :: CmmInfoTable
+mkInfoTableContents :: Platform
+                    -> CmmInfoTable
                     -> Maybe StgHalfWord    -- Override default RTS type tag?
                     -> UniqSM ([RawCmmDecl],             -- Auxiliary top decls
                                InfoTableContents)	-- Info tbl + extra bits
 
-mkInfoTableContents info@(CmmInfoTable { cit_lbl  = info_lbl
+mkInfoTableContents platform
+                    info@(CmmInfoTable { cit_lbl  = info_lbl
                                        , cit_rep  = smrep
                                        , cit_prof = prof
                                        , cit_srt = srt }) 
                     mb_rts_tag
   | RTSRep rts_tag rep <- smrep
-  = mkInfoTableContents info{cit_rep = rep} (Just rts_tag)
+  = mkInfoTableContents platform info{cit_rep = rep} (Just rts_tag)
     -- Completely override the rts_tag that mkInfoTableContents would
     -- otherwise compute, with the rts_tag stored in the RTSRep
     -- (which in turn came from a handwritten .cmm file)
@@ -156,7 +159,7 @@ mkInfoTableContents info@(CmmInfoTable { cit_lbl  = info_lbl
                               , srt_lit, liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
       where
-        slow_entry = CmmLabel (toSlowEntryLbl info_lbl)
+        slow_entry = CmmLabel (toSlowEntryLbl platform info_lbl)
         srt_lit = case srt_label of
                     []          -> mkIntCLit 0
                     (lit:_rest) -> ASSERT( null _rest ) lit
@@ -164,7 +167,7 @@ mkInfoTableContents info@(CmmInfoTable { cit_lbl  = info_lbl
     mk_pieces BlackHole _ = panic "mk_pieces: BlackHole"
 
 
-mkInfoTableContents _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
+mkInfoTableContents _ _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 
 mkSRTLit :: C_SRT
          -> ([CmmLit],    -- srt_label, if any

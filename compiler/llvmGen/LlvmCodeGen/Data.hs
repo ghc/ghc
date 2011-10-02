@@ -37,10 +37,10 @@ structStr = fsLit "_struct"
 -- complete this completely though as we need to pass all CmmStatic
 -- sections before all references can be resolved. This last step is
 -- done by 'resolveLlvmData'.
-genLlvmData :: (Section, CmmStatics) -> LlvmUnresData
-genLlvmData (sec, Statics lbl xs) =
+genLlvmData :: LlvmEnv -> (Section, CmmStatics) -> LlvmUnresData
+genLlvmData env (sec, Statics lbl xs) =
     let static  = map genData xs
-        label   = strCLabel_llvm lbl
+        label   = strCLabel_llvm env lbl
 
         types   = map getStatTypes static
         getStatTypes (Left  x) = cmmToLlvmType $ cmmLitType x
@@ -66,7 +66,7 @@ resolveLlvmData env (lbl, sec, alias, unres) =
     let (env', static, refs) = resDatas env unres ([], [])
         refs'          = catMaybes refs
         struct         = Just $ LMStaticStruc static alias
-        label          = strCLabel_llvm lbl
+        label          = strCLabel_llvm env lbl
         link           = if (externallyVisibleCLabel lbl)
                             then ExternallyVisible else Internal
         const          = isSecConstant sec
@@ -111,7 +111,7 @@ resData :: LlvmEnv -> UnresStatic -> (LlvmEnv, LlvmStatic, [Maybe LMGlobal])
 resData env (Right stat) = (env, stat, [Nothing])
 
 resData env (Left cmm@(CmmLabel l)) =
-    let label = strCLabel_llvm l
+    let label = strCLabel_llvm env l
         ty = funLookup label env
         lmty = cmmToLlvmType $ cmmLitType cmm
     in case ty of

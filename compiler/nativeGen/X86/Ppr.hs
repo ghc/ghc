@@ -66,7 +66,7 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
   pprSectionHeader platform Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
-       pprCLabel_asm (mkDeadStripPreventer info_lbl)
+       pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
            <> char ':' $$
 #endif
        vcat (map (pprData platform) info) $$
@@ -83,9 +83,9 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
         -- so that the linker will not think it is unreferenced and dead-strip
         -- it. That's why the label is called a DeadStripPreventer (_dsp).
   $$ text "\t.long "
-       <+> pprCLabel_asm info_lbl
+       <+> pprCLabel_asm platform info_lbl
        <+> char '-'
-       <+> pprCLabel_asm (mkDeadStripPreventer info_lbl)
+       <+> pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
 #endif
    $$ pprSizeDecl platform info_lbl
 
@@ -93,8 +93,8 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
 pprSizeDecl :: Platform -> CLabel -> Doc
 pprSizeDecl platform lbl
  | osElfTarget (platformOS platform) =
-    ptext (sLit "\t.size") <+> pprCLabel_asm lbl
-    <> ptext (sLit ", .-") <> pprCLabel_asm lbl
+    ptext (sLit "\t.size") <+> pprCLabel_asm platform lbl
+    <> ptext (sLit ", .-") <> pprCLabel_asm platform lbl
  | otherwise = empty
 
 pprBasicBlock :: Platform -> NatBasicBlock Instr -> Doc
@@ -117,22 +117,22 @@ pprData platform (CmmUninitialised bytes)
 
 pprData platform (CmmStaticLit lit) = pprDataItem platform lit
 
-pprGloblDecl :: CLabel -> Doc
-pprGloblDecl lbl
+pprGloblDecl :: Platform -> CLabel -> Doc
+pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".globl ") <> pprCLabel_asm lbl
+  | otherwise = ptext (sLit ".globl ") <> pprCLabel_asm platform lbl
 
 pprTypeAndSizeDecl :: Platform -> CLabel -> Doc
 pprTypeAndSizeDecl platform lbl
  | osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
     = ptext (sLit ".type ") <>
-      pprCLabel_asm lbl <> ptext (sLit ", @object")
+      pprCLabel_asm platform lbl <> ptext (sLit ", @object")
  | otherwise = empty
 
 pprLabel :: Platform -> CLabel -> Doc
-pprLabel platform lbl = pprGloblDecl lbl
+pprLabel platform lbl = pprGloblDecl platform lbl
                      $$ pprTypeAndSizeDecl platform lbl
-                     $$ (pprCLabel_asm lbl <> char ':')
+                     $$ (pprCLabel_asm platform lbl <> char ':')
 
 
 pprASCII :: [Word8] -> Doc
@@ -314,25 +314,25 @@ pprCond c
                 ALWAYS  -> sLit "mp"})
 
 
-pprImm :: Imm -> Doc
-pprImm (ImmInt i)     = int i
-pprImm (ImmInteger i) = integer i
-pprImm (ImmCLbl l)    = pprCLabel_asm l
-pprImm (ImmIndex l i) = pprCLabel_asm l <> char '+' <> int i
-pprImm (ImmLit s)     = s
+pprImm :: Platform -> Imm -> Doc
+pprImm _        (ImmInt i)     = int i
+pprImm _        (ImmInteger i) = integer i
+pprImm platform (ImmCLbl l)    = pprCLabel_asm platform l
+pprImm platform (ImmIndex l i) = pprCLabel_asm platform l <> char '+' <> int i
+pprImm _        (ImmLit s)     = s
 
-pprImm (ImmFloat _)  = ptext (sLit "naughty float immediate")
-pprImm (ImmDouble _) = ptext (sLit "naughty double immediate")
+pprImm _        (ImmFloat _)  = ptext (sLit "naughty float immediate")
+pprImm _        (ImmDouble _) = ptext (sLit "naughty double immediate")
 
-pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
-pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
-                            <> lparen <> pprImm b <> rparen
+pprImm platform (ImmConstantSum a b) = pprImm platform a <> char '+' <> pprImm platform b
+pprImm platform (ImmConstantDiff a b) = pprImm platform a <> char '-'
+                                     <> lparen <> pprImm platform b <> rparen
 
 
 
 pprAddr :: Platform -> AddrMode -> Doc
-pprAddr _ (ImmAddr imm off)
-  = let pp_imm = pprImm imm
+pprAddr platform (ImmAddr imm off)
+  = let pp_imm = pprImm platform imm
     in
     if (off == 0) then
         pp_imm
@@ -358,7 +358,7 @@ pprAddr platform (AddrBaseIndex base index displacement)
 
   where
     ppr_disp (ImmInt 0) = empty
-    ppr_disp imm        = pprImm imm
+    ppr_disp imm        = pprImm platform imm
 
 
 pprSectionHeader :: Platform -> Section -> Doc
@@ -413,17 +413,17 @@ pprDataItem platform lit
         imm = litToImm lit
 
         -- These seem to be common:
-        ppr_item II8   _ = [ptext (sLit "\t.byte\t") <> pprImm imm]
-        ppr_item II16  _ = [ptext (sLit "\t.word\t") <> pprImm imm]
-        ppr_item II32  _ = [ptext (sLit "\t.long\t") <> pprImm imm]
+        ppr_item II8   _ = [ptext (sLit "\t.byte\t") <> pprImm platform imm]
+        ppr_item II16  _ = [ptext (sLit "\t.word\t") <> pprImm platform imm]
+        ppr_item II32  _ = [ptext (sLit "\t.long\t") <> pprImm platform imm]
 
         ppr_item FF32  (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm platform (ImmInt b)) bs
 
         ppr_item FF64 (CmmFloat r _)
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm platform (ImmInt b)) bs
 
         ppr_item II64 _
             = case platformOS platform of
@@ -438,10 +438,10 @@ pprDataItem platform lit
                               (fromIntegral (x `shiftR` 32) :: Word32))]
                   _ -> panic "X86.Ppr.ppr_item: no match for II64"
                | otherwise ->
-                  [ptext (sLit "\t.quad\t") <> pprImm imm]
+                  [ptext (sLit "\t.quad\t") <> pprImm platform imm]
               _
                | target32Bit platform ->
-                  [ptext (sLit "\t.quad\t") <> pprImm imm]
+                  [ptext (sLit "\t.quad\t") <> pprImm platform imm]
                | otherwise ->
                   -- x86_64: binutils can't handle the R_X86_64_PC64
                   -- relocation type, which means we can't do
@@ -456,10 +456,10 @@ pprDataItem platform lit
                   case lit of
                   -- A relative relocation:
                   CmmLabelDiffOff _ _ _ ->
-                      [ptext (sLit "\t.long\t") <> pprImm imm,
+                      [ptext (sLit "\t.long\t") <> pprImm platform imm,
                        ptext (sLit "\t.long\t0")]
                   _ ->
-                      [ptext (sLit "\t.quad\t") <> pprImm imm]
+                      [ptext (sLit "\t.quad\t") <> pprImm platform imm]
 
         ppr_item _ _
                 = panic "X86.Ppr.ppr_item: no match"
@@ -591,16 +591,16 @@ pprInstr _ (CLTD II64) = ptext (sLit "\tcqto")
 
 pprInstr platform (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand platform II8 op)
 
-pprInstr _ (JXX cond blockid)
-  = pprCondInstr (sLit "j") cond (pprCLabel_asm lab)
+pprInstr platform (JXX cond blockid)
+  = pprCondInstr (sLit "j") cond (pprCLabel_asm platform lab)
   where lab = mkAsmTempLabel (getUnique blockid)
 
-pprInstr _ (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
+pprInstr platform (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm platform imm)
 
-pprInstr _ (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
+pprInstr platform (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm platform imm)
 pprInstr platform (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand platform archWordSize op)
 pprInstr platform (JMP_TBL op _ _ _)  = pprInstr platform (JMP op)
-pprInstr _ (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
+pprInstr platform (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm platform imm)
 pprInstr platform (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg platform archWordSize reg)
 
 pprInstr platform (IDIV sz op)   = pprSizeOp platform (sLit "idiv") sz op
@@ -779,13 +779,13 @@ pprInstr platform g@(GSQRT sz src dst)
                       hcat [gtab, gcoerceto sz, gpop dst 1])
 
 pprInstr platform g@(GSIN sz l1 l2 src dst)
-   = pprG platform g (pprTrigOp "fsin" False l1 l2 src dst sz)
+   = pprG platform g (pprTrigOp platform "fsin" False l1 l2 src dst sz)
 
 pprInstr platform g@(GCOS sz l1 l2 src dst)
-   = pprG platform g (pprTrigOp "fcos" False l1 l2 src dst sz)
+   = pprG platform g (pprTrigOp platform "fcos" False l1 l2 src dst sz)
 
 pprInstr platform g@(GTAN sz l1 l2 src dst)
-   = pprG platform g (pprTrigOp "fptan" True l1 l2 src dst sz)
+   = pprG platform g (pprTrigOp platform "fptan" True l1 l2 src dst sz)
 
 -- In the translations for GADD, GMUL, GSUB and GDIV,
 -- the first two cases are mere optimisations.  The otherwise clause
@@ -860,8 +860,10 @@ pprInstr _ _
         = panic "X86.Ppr.pprInstr: no match"
 
 
-pprTrigOp :: String -> Bool -> CLabel -> CLabel -> Reg -> Reg -> Size -> Doc
-pprTrigOp op -- fsin, fcos or fptan
+pprTrigOp :: Platform -> String -> Bool -> CLabel -> CLabel
+          -> Reg -> Reg -> Size -> Doc
+pprTrigOp platform
+          op -- fsin, fcos or fptan
           isTan -- we need a couple of extra steps if we're doing tan
           l1 l2 -- internal labels for us to use
           src dst sz
@@ -875,7 +877,7 @@ pprTrigOp op -- fsin, fcos or fptan
       hcat [gtab, text "fnstsw %ax"] $$
       hcat [gtab, text "test   $0x400,%eax"] $$
       -- If we were in bounds then jump to the end
-      hcat [gtab, text "je     " <> pprCLabel_asm l1] $$
+      hcat [gtab, text "je     " <> pprCLabel_asm platform l1] $$
       -- Otherwise we need to shrink the value. Start by
       -- loading pi, doubleing it (by adding it to itself),
       -- and then swapping pi with the value, so the value we
@@ -885,16 +887,16 @@ pprTrigOp op -- fsin, fcos or fptan
       hcat [gtab, text "fxch   %st(1)"] $$
       -- Now we have a loop in which we make the value smaller,
       -- see if it's small enough, and loop if not
-      (pprCLabel_asm l2 <> char ':') $$
+      (pprCLabel_asm platform l2 <> char ':') $$
       hcat [gtab, text "fprem1"] $$
       -- My Debian libc uses fstsw here for the tan code, but I can't
       -- see any reason why it should need to be different for tan.
       hcat [gtab, text "fnstsw %ax"] $$
       hcat [gtab, text "test   $0x400,%eax"] $$
-      hcat [gtab, text "jne    " <> pprCLabel_asm l2] $$
+      hcat [gtab, text "jne    " <> pprCLabel_asm platform l2] $$
       hcat [gtab, text "fstp   %st(1)"] $$
       hcat [gtab, text op] $$
-      (pprCLabel_asm l1 <> char ':') $$
+      (pprCLabel_asm platform l1 <> char ':') $$
       -- Pop the 1.0 tan gave us
       (if isTan then hcat [gtab, text "fstp %st(0)"] else empty) $$
       -- Restore %eax
@@ -970,13 +972,13 @@ pprGInstr platform (GDIV sz src1 src2 dst) = pprSizeRegRegReg platform (sLit "gd
 
 pprGInstr _ _ = panic "X86.Ppr.pprGInstr: no match"
 
-pprDollImm :: Imm -> Doc
-pprDollImm i =  ptext (sLit "$") <> pprImm i
+pprDollImm :: Platform -> Imm -> Doc
+pprDollImm platform i = ptext (sLit "$") <> pprImm platform i
 
 
 pprOperand :: Platform -> Size -> Operand -> Doc
 pprOperand platform s (OpReg r)   = pprReg platform s r
-pprOperand _        _ (OpImm i)   = pprDollImm i
+pprOperand platform _ (OpImm i)   = pprDollImm platform i
 pprOperand platform _ (OpAddr ea) = pprAddr platform ea
 
 
@@ -995,7 +997,7 @@ pprSizeImmOp platform name size imm op1
   = hcat [
         pprMnemonic name size,
         char '$',
-        pprImm imm,
+        pprImm platform imm,
         comma,
         pprOperand platform size op1
     ]

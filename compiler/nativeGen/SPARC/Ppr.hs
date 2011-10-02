@@ -49,29 +49,29 @@ import Data.Word
 -- Printing this stuff out
 
 pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> Doc
-pprNatCmmDecl _ (CmmData section dats) =
-  pprSectionHeader section $$ pprDatas dats
+pprNatCmmDecl platform (CmmData section dats) =
+  pprSectionHeader section $$ pprDatas platform dats
 
  -- special case for split markers:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph [])) = pprLabel platform lbl
 
  -- special case for code without info table:
-pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph blocks)) =
+pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
-  pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-  vcat (map pprBasicBlock blocks)
+  pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
+  vcat (map (pprBasicBlock platform) blocks)
 
-pprNatCmmDecl _ (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
-       pprCLabel_asm (mkDeadStripPreventer info_lbl)
+       pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
            <> char ':' $$
 #endif
-       vcat (map pprData info) $$
-       pprLabel info_lbl
+       vcat (map (pprData platform) info) $$
+       pprLabel platform info_lbl
   ) $$
-  vcat (map pprBasicBlock blocks)
+  vcat (map (pprBasicBlock platform) blocks)
      -- above: Even the first block gets a label, because with branch-chain
      -- elimination, it might be the target of a goto.
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
@@ -82,44 +82,46 @@ pprNatCmmDecl _ (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph bl
         -- so that the linker will not think it is unreferenced and dead-strip
         -- it. That's why the label is called a DeadStripPreventer (_dsp).
   $$ text "\t.long "
-	<+> pprCLabel_asm info_lbl
+	<+> pprCLabel_asm platform info_lbl
 	<+> char '-'
-	<+> pprCLabel_asm (mkDeadStripPreventer info_lbl)
+	<+> pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
 #endif
 
 
-pprBasicBlock :: NatBasicBlock Instr -> Doc
-pprBasicBlock (BasicBlock blockid instrs) =
-  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
-  vcat (map pprInstr instrs)
+pprBasicBlock :: Platform -> NatBasicBlock Instr -> Doc
+pprBasicBlock platform (BasicBlock blockid instrs) =
+  pprLabel platform (mkAsmTempLabel (getUnique blockid)) $$
+  vcat (map (pprInstr platform) instrs)
 
 
-pprDatas :: CmmStatics -> Doc
-pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+pprDatas :: Platform -> CmmStatics -> Doc
+pprDatas platform (Statics lbl dats) = vcat (pprLabel platform lbl : map (pprData platform) dats)
 
-pprData :: CmmStatic -> Doc
-pprData (CmmString str)          = pprASCII str
-pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
-pprData (CmmStaticLit lit)       = pprDataItem lit
+pprData :: Platform -> CmmStatic -> Doc
+pprData _        (CmmString str)          = pprASCII str
+pprData _        (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
+pprData platform (CmmStaticLit lit)       = pprDataItem platform lit
 
-pprGloblDecl :: CLabel -> Doc
-pprGloblDecl lbl
+pprGloblDecl :: Platform -> CLabel -> Doc
+pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".global ") <> pprCLabel_asm lbl
+  | otherwise = ptext (sLit ".global ") <> pprCLabel_asm platform lbl
 
-pprTypeAndSizeDecl :: CLabel -> Doc
+pprTypeAndSizeDecl :: Platform -> CLabel -> Doc
 #if linux_TARGET_OS
-pprTypeAndSizeDecl lbl
+pprTypeAndSizeDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
   | otherwise = ptext (sLit ".type ") <>
-		pprCLabel_asm lbl <> ptext (sLit ", @object")
+                pprCLabel_asm platform lbl <> ptext (sLit ", @object")
 #else
-pprTypeAndSizeDecl _
+pprTypeAndSizeDecl _ _
   = empty
 #endif
 
-pprLabel :: CLabel -> Doc
-pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
+pprLabel :: Platform -> CLabel -> Doc
+pprLabel platform lbl = pprGloblDecl platform lbl
+                     $$ pprTypeAndSizeDecl platform lbl
+                     $$ (pprCLabel_asm platform lbl <> char ':')
 
 
 pprASCII :: [Word8] -> Doc
@@ -134,7 +136,7 @@ pprASCII str
 -- pprInstr: print an 'Instr'
 
 instance PlatformOutputable Instr where
-    pprPlatform _ instr = Outputable.docToSDoc $ pprInstr instr
+    pprPlatform platform instr = Outputable.docToSDoc $ pprInstr platform instr
 
 
 -- | Pretty print a register.
@@ -257,8 +259,8 @@ pprCond c
 
 
 -- | Pretty print an address mode.
-pprAddr :: AddrMode -> Doc
-pprAddr am
+pprAddr :: Platform -> AddrMode -> Doc
+pprAddr platform am
  = case am of
  	AddrRegReg r1 (RegReal (RealRegSingle 0))
 	 -> pprReg r1
@@ -281,30 +283,30 @@ pprAddr am
 		pp_sign = if i > 0 then char '+' else empty
 
 	AddrRegImm r1 imm
-	 -> hcat [ pprReg r1, char '+', pprImm imm ]
+	 -> hcat [ pprReg r1, char '+', pprImm platform imm ]
 
 
 -- | Pretty print an immediate value.
-pprImm :: Imm -> Doc
-pprImm imm
+pprImm :: Platform -> Imm -> Doc
+pprImm platform imm
  = case imm of
  	ImmInt i	-> int i
 	ImmInteger i	-> integer i
-	ImmCLbl l	-> pprCLabel_asm l
-	ImmIndex l i	-> pprCLabel_asm l <> char '+' <> int i
+	ImmCLbl l	-> pprCLabel_asm platform l
+	ImmIndex l i	-> pprCLabel_asm platform l <> char '+' <> int i
 	ImmLit s	-> s
 
 	ImmConstantSum a b	
-	 -> pprImm a <> char '+' <> pprImm b
+	 -> pprImm platform a <> char '+' <> pprImm platform b
 
 	ImmConstantDiff a b	
-	 -> pprImm a <> char '-' <> lparen <> pprImm b <> rparen
+	 -> pprImm platform a <> char '-' <> lparen <> pprImm platform b <> rparen
 
 	LO i
-	 -> hcat [ text "%lo(", pprImm i, rparen ]
+	 -> hcat [ text "%lo(", pprImm platform i, rparen ]
 	
 	HI i
-	 -> hcat [ text "%hi(", pprImm i, rparen ]
+	 -> hcat [ text "%hi(", pprImm platform i, rparen ]
 
 	-- these should have been converted to bytes and placed
 	--	in the data section.
@@ -329,124 +331,124 @@ pprSectionHeader seg
 
 
 -- | Pretty print a data item.
-pprDataItem :: CmmLit -> Doc
-pprDataItem lit
+pprDataItem :: Platform -> CmmLit -> Doc
+pprDataItem platform lit
   = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
 	imm = litToImm lit
 
-	ppr_item II8   _ 	= [ptext (sLit "\t.byte\t") <> pprImm imm]
-	ppr_item II32  _	= [ptext (sLit "\t.long\t") <> pprImm imm]
+	ppr_item II8   _ 	= [ptext (sLit "\t.byte\t") <> pprImm platform imm]
+	ppr_item II32  _	= [ptext (sLit "\t.long\t") <> pprImm platform imm]
 
 	ppr_item FF32  (CmmFloat r _)
          = let bs = floatToBytes (fromRational r)
-           in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+           in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm platform (ImmInt b)) bs
 
     	ppr_item FF64 (CmmFloat r _)
          = let bs = doubleToBytes (fromRational r)
-           in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
+           in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm platform (ImmInt b)) bs
 
-	ppr_item II16  _	= [ptext (sLit "\t.short\t") <> pprImm imm]
-	ppr_item II64  _	= [ptext (sLit "\t.quad\t") <> pprImm imm]
+	ppr_item II16  _	= [ptext (sLit "\t.short\t") <> pprImm platform imm]
+	ppr_item II64  _	= [ptext (sLit "\t.quad\t") <> pprImm platform imm]
 	ppr_item _ _		= panic "SPARC.Ppr.pprDataItem: no match"
 
 
 -- | Pretty print an instruction.
-pprInstr :: Instr -> Doc
+pprInstr :: Platform -> Instr -> Doc
 
 -- nuke comments.
-pprInstr (COMMENT _) 
+pprInstr _        (COMMENT _) 
 	= empty 
 
-pprInstr (DELTA d)
-	= pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
+pprInstr platform (DELTA d)
+	= pprInstr platform (COMMENT (mkFastString ("\tdelta = " ++ show d)))
 
 -- Newblocks and LData should have been slurped out before producing the .s file.
-pprInstr (NEWBLOCK _)
+pprInstr _        (NEWBLOCK _)
 	= panic "X86.Ppr.pprInstr: NEWBLOCK"
 
-pprInstr (LDATA _ _)
+pprInstr _        (LDATA _ _)
 	= panic "PprMach.pprInstr: LDATA"
 
 -- 64 bit FP loads are expanded into individual instructions in CodeGen.Expand
-pprInstr (LD FF64 _ reg)
+pprInstr _        (LD FF64 _ reg)
 	| RegReal (RealRegSingle{})	<- reg
  	= panic "SPARC.Ppr: not emitting potentially misaligned LD FF64 instr"
 
-pprInstr (LD size addr reg)
+pprInstr platform (LD size addr reg)
 	= hcat [
 	       ptext (sLit "\tld"),
 	       pprSize size,
 	       char '\t',
 	       lbrack,
-	       pprAddr addr,
+	       pprAddr platform addr,
 	       pp_rbracket_comma,
 	       pprReg reg
 	    ]
 
 -- 64 bit FP storees are expanded into individual instructions in CodeGen.Expand
-pprInstr (ST FF64 reg _)
+pprInstr _        (ST FF64 reg _)
 	| RegReal (RealRegSingle{})	<- reg
  	= panic "SPARC.Ppr: not emitting potentially misaligned ST FF64 instr"
 
 -- no distinction is made between signed and unsigned bytes on stores for the
 -- Sparc opcodes (at least I cannot see any, and gas is nagging me --SOF),
 -- so we call a special-purpose pprSize for ST..
-pprInstr (ST size reg addr)
+pprInstr platform (ST size reg addr)
 	= hcat [
 	       ptext (sLit "\tst"),
 	       pprStSize size,
 	       char '\t',
 	       pprReg reg,
 	       pp_comma_lbracket,
-	       pprAddr addr,
+	       pprAddr platform addr,
 	       rbrack
 	    ]
 
 
-pprInstr (ADD x cc reg1 ri reg2)
+pprInstr platform (ADD x cc reg1 ri reg2)
 	| not x && not cc && riZero ri
 	= hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
 
 	| otherwise
-	= pprRegRIReg (if x then sLit "addx" else sLit "add") cc reg1 ri reg2
+	= pprRegRIReg platform (if x then sLit "addx" else sLit "add") cc reg1 ri reg2
 
 
-pprInstr (SUB x cc reg1 ri reg2)
+pprInstr platform (SUB x cc reg1 ri reg2)
 	| not x && cc && reg2 == g0
-	= hcat [ ptext (sLit "\tcmp\t"), pprReg reg1, comma, pprRI ri ]
+	= hcat [ ptext (sLit "\tcmp\t"), pprReg reg1, comma, pprRI platform ri ]
 
 	| not x && not cc && riZero ri
 	= hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
 	
 	| otherwise
-	= pprRegRIReg (if x then sLit "subx" else sLit "sub") cc reg1 ri reg2
+	= pprRegRIReg platform (if x then sLit "subx" else sLit "sub") cc reg1 ri reg2
 
-pprInstr (AND  b reg1 ri reg2)	= pprRegRIReg (sLit "and")  b reg1 ri reg2
+pprInstr platform (AND  b reg1 ri reg2)	= pprRegRIReg platform (sLit "and")  b reg1 ri reg2
 
-pprInstr (ANDN b reg1 ri reg2)	= pprRegRIReg (sLit "andn") b reg1 ri reg2
+pprInstr platform (ANDN b reg1 ri reg2)	= pprRegRIReg platform (sLit "andn") b reg1 ri reg2
 
-pprInstr (OR b reg1 ri reg2)
+pprInstr platform (OR b reg1 ri reg2)
 	| not b && reg1 == g0
-	= let doit = hcat [ ptext (sLit "\tmov\t"), pprRI ri, comma, pprReg reg2 ]
+	= let doit = hcat [ ptext (sLit "\tmov\t"), pprRI platform ri, comma, pprReg reg2 ]
 	  in  case ri of
 	           RIReg rrr | rrr == reg2 -> empty
 	           _                       -> doit
 
 	| otherwise
-	= pprRegRIReg (sLit "or") b reg1 ri reg2
+	= pprRegRIReg platform (sLit "or") b reg1 ri reg2
 
-pprInstr (ORN b reg1 ri reg2)	= pprRegRIReg (sLit "orn") b reg1 ri reg2
+pprInstr platform (ORN b reg1 ri reg2)	= pprRegRIReg platform (sLit "orn") b reg1 ri reg2
 
-pprInstr (XOR  b reg1 ri reg2)	= pprRegRIReg (sLit "xor")  b reg1 ri reg2
-pprInstr (XNOR b reg1 ri reg2)	= pprRegRIReg (sLit "xnor") b reg1 ri reg2
+pprInstr platform (XOR  b reg1 ri reg2)	= pprRegRIReg platform (sLit "xor")  b reg1 ri reg2
+pprInstr platform (XNOR b reg1 ri reg2)	= pprRegRIReg platform (sLit "xnor") b reg1 ri reg2
 
-pprInstr (SLL reg1 ri reg2)	= pprRegRIReg (sLit "sll") False reg1 ri reg2
-pprInstr (SRL reg1 ri reg2)	= pprRegRIReg (sLit "srl") False reg1 ri reg2
-pprInstr (SRA reg1 ri reg2)	= pprRegRIReg (sLit "sra") False reg1 ri reg2
+pprInstr platform (SLL reg1 ri reg2)	= pprRegRIReg platform (sLit "sll") False reg1 ri reg2
+pprInstr platform (SRL reg1 ri reg2)	= pprRegRIReg platform (sLit "srl") False reg1 ri reg2
+pprInstr platform (SRA reg1 ri reg2)	= pprRegRIReg platform (sLit "sra") False reg1 ri reg2
 
-pprInstr (RDY rd) 		= ptext (sLit "\trd\t%y,") <> pprReg rd
-pprInstr (WRY reg1 reg2) 	
+pprInstr _        (RDY rd) 		= ptext (sLit "\trd\t%y,") <> pprReg rd
+pprInstr _        (WRY reg1 reg2) 	
 	= ptext (sLit "\twr\t") 
 		<> pprReg reg1 
 		<> char ','
@@ -454,50 +456,50 @@ pprInstr (WRY reg1 reg2)
 		<> char ','
 		<> ptext (sLit "%y") 
 
-pprInstr (SMUL b reg1 ri reg2)	= pprRegRIReg (sLit "smul")  b reg1 ri reg2
-pprInstr (UMUL b reg1 ri reg2)	= pprRegRIReg (sLit "umul")  b reg1 ri reg2
-pprInstr (SDIV b reg1 ri reg2)	= pprRegRIReg (sLit "sdiv")  b reg1 ri reg2
-pprInstr (UDIV b reg1 ri reg2)	= pprRegRIReg (sLit "udiv")  b reg1 ri reg2
+pprInstr platform (SMUL b reg1 ri reg2)	= pprRegRIReg platform (sLit "smul")  b reg1 ri reg2
+pprInstr platform (UMUL b reg1 ri reg2)	= pprRegRIReg platform (sLit "umul")  b reg1 ri reg2
+pprInstr platform (SDIV b reg1 ri reg2)	= pprRegRIReg platform (sLit "sdiv")  b reg1 ri reg2
+pprInstr platform (UDIV b reg1 ri reg2)	= pprRegRIReg platform (sLit "udiv")  b reg1 ri reg2
 
-pprInstr (SETHI imm reg)
+pprInstr platform (SETHI imm reg)
   = hcat [
 	ptext (sLit "\tsethi\t"),
-	pprImm imm,
+	pprImm platform imm,
 	comma,
 	pprReg reg
     ]
 
-pprInstr NOP 
+pprInstr _        NOP 
 	= ptext (sLit "\tnop")
 
-pprInstr (FABS size reg1 reg2)	
+pprInstr _        (FABS size reg1 reg2)	
  	= pprSizeRegReg (sLit "fabs") size reg1 reg2
 
-pprInstr (FADD size reg1 reg2 reg3)	
+pprInstr _        (FADD size reg1 reg2 reg3)	
 	= pprSizeRegRegReg (sLit "fadd") size reg1 reg2 reg3
 
-pprInstr (FCMP e size reg1 reg2)
+pprInstr _        (FCMP e size reg1 reg2)
 	= pprSizeRegReg (if e then sLit "fcmpe" else sLit "fcmp") size reg1 reg2
 
-pprInstr (FDIV size reg1 reg2 reg3)
+pprInstr _        (FDIV size reg1 reg2 reg3)
 	= pprSizeRegRegReg (sLit "fdiv") size reg1 reg2 reg3
 
-pprInstr (FMOV size reg1 reg2)	
+pprInstr _        (FMOV size reg1 reg2)	
 	= pprSizeRegReg (sLit "fmov") size reg1 reg2
 
-pprInstr (FMUL size reg1 reg2 reg3)
+pprInstr _        (FMUL size reg1 reg2 reg3)
 	= pprSizeRegRegReg (sLit "fmul") size reg1 reg2 reg3
 
-pprInstr (FNEG size reg1 reg2) 
+pprInstr _        (FNEG size reg1 reg2) 
 	= pprSizeRegReg (sLit "fneg") size reg1 reg2
 
-pprInstr (FSQRT size reg1 reg2)     
+pprInstr _        (FSQRT size reg1 reg2)     
 	= pprSizeRegReg (sLit "fsqrt") size reg1 reg2
 
-pprInstr (FSUB size reg1 reg2 reg3) 
+pprInstr _        (FSUB size reg1 reg2 reg3) 
 	= pprSizeRegRegReg (sLit "fsub") size reg1 reg2 reg3
 
-pprInstr (FxTOy size1 size2 reg1 reg2)
+pprInstr _        (FxTOy size1 size2 reg1 reg2)
   = hcat [
     	ptext (sLit "\tf"),
 	ptext
@@ -517,36 +519,36 @@ pprInstr (FxTOy size1 size2 reg1 reg2)
     ]
 
 
-pprInstr (BI cond b blockid)
+pprInstr platform (BI cond b blockid)
   = hcat [
 	ptext (sLit "\tb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprCLabel_asm (mkAsmTempLabel (getUnique blockid))
+	pprCLabel_asm platform (mkAsmTempLabel (getUnique blockid))
     ]
 
-pprInstr (BF cond b blockid)
+pprInstr platform (BF cond b blockid)
   = hcat [
 	ptext (sLit "\tfb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprCLabel_asm (mkAsmTempLabel (getUnique blockid))
+	pprCLabel_asm platform (mkAsmTempLabel (getUnique blockid))
     ]
 
-pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)
-pprInstr (JMP_TBL op _ _)  = pprInstr (JMP op)
+pprInstr platform (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr platform addr)
+pprInstr platform (JMP_TBL op _ _)  = pprInstr platform (JMP op)
 
-pprInstr (CALL (Left imm) n _)
-  = hcat [ ptext (sLit "\tcall\t"), pprImm imm, comma, int n ]
+pprInstr platform (CALL (Left imm) n _)
+  = hcat [ ptext (sLit "\tcall\t"), pprImm platform imm, comma, int n ]
 
-pprInstr (CALL (Right reg) n _)
+pprInstr _        (CALL (Right reg) n _)
   = hcat [ ptext (sLit "\tcall\t"), pprReg reg, comma, int n ]
 
 
 -- | Pretty print a RI
-pprRI :: RI -> Doc
-pprRI (RIReg r) = pprReg r
-pprRI (RIImm r) = pprImm r
+pprRI :: Platform -> RI -> Doc
+pprRI _        (RIReg r) = pprReg r
+pprRI platform (RIImm r) = pprImm platform r
 
 
 -- | Pretty print a two reg instruction.
@@ -585,15 +587,15 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 
 
 -- | Pretty print an instruction of two regs and a ri.
-pprRegRIReg :: LitString -> Bool -> Reg -> RI -> Reg -> Doc
-pprRegRIReg name b reg1 ri reg2
+pprRegRIReg :: Platform -> LitString -> Bool -> Reg -> RI -> Reg -> Doc
+pprRegRIReg platform name b reg1 ri reg2
   = hcat [
 	char '\t',
 	ptext name,
 	if b then ptext (sLit "cc\t") else char '\t',
 	pprReg reg1,
 	comma,
-	pprRI ri,
+	pprRI platform ri,
 	comma,
 	pprReg reg2
     ]

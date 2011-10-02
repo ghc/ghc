@@ -104,7 +104,7 @@ pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
                       else Internal
             lmblocks = map (\(BasicBlock id stmts) ->
                                 LlvmBlock (getUnique id) stmts) blks
-            fun = mkLlvmFunc lbl' link  sec' lmblocks
+            fun = mkLlvmFunc env lbl' link  sec' lmblocks
         in ppLlvmFunction fun
     ), ivar)
 
@@ -112,12 +112,12 @@ pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
 -- | Pretty print CmmStatic
 pprInfoTable :: LlvmEnv -> Int -> CLabel -> CmmStatics -> (Doc, [LlvmVar])
 pprInfoTable env count info_lbl stat
-  = let unres = genLlvmData (Text, stat)
+  = let unres = genLlvmData env (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres
 
         setSection ((LMGlobalVar _ ty l _ _ c), d)
             = let sec = mkLayoutSection count
-                  ilabel = strCLabel_llvm info_lbl
+                  ilabel = strCLabel_llvm env info_lbl
                               `appendFS` fsLit iTableSuf
                   gv = LMGlobalVar ilabel ty l sec llvmInfAlign c
                   v = if l == Internal then [gv] else []

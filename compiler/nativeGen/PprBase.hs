@@ -18,6 +18,7 @@ module PprBase (
 where
 
 import qualified Outputable
+import Platform
 import CLabel
 import Pretty
 
@@ -40,9 +41,9 @@ asmSDoc d
 	= Outputable.withPprStyleDoc (Outputable.mkCodeStyle Outputable.AsmStyle) d
 
 
-pprCLabel_asm :: CLabel -> Doc
-pprCLabel_asm l 
-	= asmSDoc (pprCLabel l)
+pprCLabel_asm :: Platform -> CLabel -> Doc
+pprCLabel_asm platform l
+    = asmSDoc (pprCLabel platform l)
 
 
 -- -----------------------------------------------------------------------------

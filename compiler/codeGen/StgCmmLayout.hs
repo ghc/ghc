@@ -44,6 +44,7 @@ import Id
 import Name
 import TyCon		( PrimRep(..) )
 import BasicTypes	( Arity )
+import DynFlags
 import StaticFlags
 
 import Constants
@@ -142,9 +143,12 @@ direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [ArgRep] -> FCode ()
 -- NB2: 'arity' refers to the *reps* 
 direct_call caller lbl arity args reps
   | debugIsOn && arity > length reps	-- Too few args
-  =  	    -- Caller should ensure that there enough args!  
-    pprPanic "direct_call" (text caller <+> ppr arity <+> ppr lbl <+> ppr (length reps)
-	     	  	    <+> ppr args <+> ppr reps )
+  = do -- Caller should ensure that there enough args!
+       dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       pprPanic "direct_call" (text caller <+> ppr arity
+                           <+> pprPlatform platform lbl <+> ppr (length reps)
+                           <+> pprPlatform platform args <+> ppr reps )
 
   | null rest_reps     -- Precisely the right number of arguments
   = emitCall (NativeDirectCall, NativeReturn) target args
@@ -165,8 +169,10 @@ direct_call caller lbl arity args reps
 --------------
 slow_call :: CmmExpr -> [CmmExpr] -> [ArgRep] -> FCode ()
 slow_call fun args reps
-  = do call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
-       emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc (ppr fun) ++
+  = do dflags <- getDynFlags
+       let platform = targetPlatform dflags
+       call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
+       emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc (pprPlatform platform fun) ++
                                         " with pat " ++ showSDoc (ftext rts_fun))
        emit (mkAssign nodeReg fun <*> call)
   where
@@ -395,8 +401,9 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
 emitClosureAndInfoTable ::
   CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
 emitClosureAndInfoTable info_tbl conv args body
-  = do { blks <- getCode body
-       ; let entry_lbl = toEntryLbl (cit_lbl info_tbl)
+  = do { dflags <- getDynFlags
+       ; blks <- getCode body
+       ; let entry_lbl = toEntryLbl (targetPlatform dflags) (cit_lbl info_tbl)
        ; emitProcWithConvention conv info_tbl entry_lbl args blks
        }
 

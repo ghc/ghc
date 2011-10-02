@@ -65,7 +65,7 @@ data RegAllocStats statics instr
 	, raFinal	  :: [NatCmmDecl statics instr] 			-- ^ final code
 	, raSRMs	  :: (Int, Int, Int) }				-- ^ spill\/reload\/reg-reg moves present in this code
 
-instance (Outputable statics, PlatformOutputable instr) => PlatformOutputable (RegAllocStats statics instr) where
+instance (PlatformOutputable statics, PlatformOutputable instr) => PlatformOutputable (RegAllocStats statics instr) where
 
  pprPlatform platform (s@RegAllocStatsStart{})
  	=  text "#  Start"

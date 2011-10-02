@@ -213,12 +213,12 @@ instance PlatformOutputable instr
                  | isEmptyUniqSet regs  = empty
                  | otherwise            = name <> (hcat $ punctuate space $ map ppr $ uniqSetToList regs)
 
-instance Outputable LiveInfo where
-        ppr (LiveInfo mb_static firstId liveVRegsOnEntry liveSlotsOnEntry)
-                =  (maybe empty ppr mb_static)
-                $$ text "# firstId          = " <> ppr firstId
-                $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
-                $$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
+instance PlatformOutputable LiveInfo where
+    pprPlatform platform (LiveInfo mb_static firstId liveVRegsOnEntry liveSlotsOnEntry)
+        =  (maybe empty (pprPlatform platform) mb_static)
+        $$ text "# firstId          = " <> ppr firstId
+        $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
+        $$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
 
 
 
@@ -460,7 +460,9 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmDecl
 stripLive
-        :: (Outputable statics, PlatformOutputable instr, Instruction instr)
+        :: (PlatformOutputable statics,
+            PlatformOutputable instr,
+            Instruction instr)
         => Platform
         -> LiveCmmDecl statics instr
         -> NatCmmDecl statics instr
@@ -468,7 +470,11 @@ stripLive
 stripLive platform live
         = stripCmm live
 
- where  stripCmm (CmmData sec ds)       = CmmData sec ds
+ where  stripCmm :: (PlatformOutputable statics,
+                     PlatformOutputable instr,
+                     Instruction instr)
+                 => LiveCmmDecl statics instr -> NatCmmDecl statics instr
+        stripCmm (CmmData sec ds)       = CmmData sec ds
         stripCmm (CmmProc (LiveInfo info (Just first_id) _ _) label sccs)
          = let  final_blocks    = flattenSCCs sccs
 

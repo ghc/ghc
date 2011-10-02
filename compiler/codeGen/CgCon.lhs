@@ -47,6 +47,7 @@ import Outputable
 import ListSetOps
 import Util
 import Module
+import DynFlags
 import FastString
 import StaticFlags
 \end{code}
@@ -64,7 +65,7 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> [StgArg]		-- Args
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
-  = do { 
+  = do { dflags <- getDynFlags
 #if mingw32_TARGET_OS
         -- Windows DLLs have a problem with static cross-DLL refs.
 	; this_pkg <- getThisPackage
@@ -76,6 +77,7 @@ cgTopRhsCon id con args
 	; amodes <- getArgAmodes args
 
 	; let
+	    platform = targetPlatform dflags
 	    name          = idName id
 	    lf_info	  = mkConLFInfo con
     	    closure_label = mkClosureLabel name $ idCafInfo id
@@ -89,7 +91,7 @@ cgTopRhsCon id con args
 
 	    payload = map get_lit amodes_w_offsets	
 	    get_lit (CmmLit lit, _offset) = lit
-	    get_lit other = pprPanic "CgCon.get_lit" (ppr other)
+	    get_lit other = pprPanic "CgCon.get_lit" (pprPlatform platform other)
 		-- NB1: amodes_w_offsets is sorted into ptrs first, then non-ptrs
 		-- NB2: all the amodes should be Lits!
 

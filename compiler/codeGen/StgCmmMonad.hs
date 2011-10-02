@@ -190,13 +190,13 @@ data CgLoc
 	-- To tail-call it, assign to these locals, 
 	-- and branch to the block id
 
-instance Outputable CgIdInfo where
-  ppr (CgIdInfo { cg_id = id, cg_loc = loc })
-    = ppr id <+> ptext (sLit "-->") <+> ppr loc
+instance PlatformOutputable CgIdInfo where
+  pprPlatform platform (CgIdInfo { cg_id = id, cg_loc = loc })
+    = ppr id <+> ptext (sLit "-->") <+> pprPlatform platform loc
 
-instance Outputable CgLoc where
-  ppr (CmmLoc e)    = ptext (sLit "cmm") <+> ppr e
-  ppr (LneLoc b rs) = ptext (sLit "lne") <+> ppr b <+> ppr rs
+instance PlatformOutputable CgLoc where
+  pprPlatform platform (CmmLoc e)    = ptext (sLit "cmm") <+> pprPlatform platform e
+  pprPlatform _        (LneLoc b rs) = ptext (sLit "lne") <+> ppr b <+> ppr rs
 
 
 -- Sequel tells what to do with the result of this expression

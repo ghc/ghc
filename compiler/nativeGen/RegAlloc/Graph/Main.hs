@@ -45,7 +45,7 @@ maxSpinCount	= 10
 
 -- | The top level of the graph coloring register allocator.
 regAlloc
-	:: (Outputable statics, PlatformOutputable instr, Instruction instr)
+	:: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
 	=> DynFlags
 	-> UniqFM (UniqSet RealReg)	-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
@@ -72,14 +72,20 @@ regAlloc dflags regsFree slotsFree code
 	return	( code_final
 		, reverse debug_codeGraphs )
 
-regAlloc_spin 
-	dflags 
-	spinCount 
-	(triv 		:: Color.Triv VirtualReg RegClass RealReg)
-	(regsFree 	:: UniqFM (UniqSet RealReg))
-	slotsFree 
-	debug_codeGraphs 
-	code
+regAlloc_spin :: (Instruction instr,
+                  PlatformOutputable instr,
+                  PlatformOutputable statics)
+              => DynFlags
+              -> Int
+              -> Color.Triv VirtualReg RegClass RealReg
+              -> UniqFM (UniqSet RealReg)
+              -> UniqSet Int
+              -> [RegAllocStats statics instr]
+              -> [LiveCmmDecl statics instr]
+              -> UniqSM ([NatCmmDecl statics instr],
+                         [RegAllocStats statics instr],
+                         Color.Graph VirtualReg RegClass RealReg)
+regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
  = do
         let platform = targetPlatform dflags
  	-- if any of these dump flags are turned on we want to hang on to
@@ -323,7 +329,7 @@ graphAddCoalesce _ _
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph 
-	:: (Outputable statics, PlatformOutputable instr, Instruction instr)
+	:: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
 	=> Platform -> Color.Graph VirtualReg RegClass RealReg
 	-> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 

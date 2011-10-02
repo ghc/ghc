@@ -12,7 +12,7 @@ module LlvmCodeGen.Base (
         LlvmVersion, defaultLlvmVersion,
 
         LlvmEnv, initLlvmEnv, clearVars, varLookup, varInsert,
-        funLookup, funInsert, getLlvmVer, setLlvmVer,
+        funLookup, funInsert, getLlvmVer, setLlvmVer, getLlvmPlatform,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
@@ -34,6 +34,7 @@ import Constants
 import FastString
 import OldCmm
 import qualified Outputable as Outp
+import Platform
 import UniqFM
 import Unique
 
@@ -89,8 +90,8 @@ llvmFunTy :: LlvmType
 llvmFunTy = LMFunction $ llvmFunSig' (fsLit "a") ExternallyVisible
 
 -- | Llvm Function signature
-llvmFunSig :: CLabel -> LlvmLinkageType -> LlvmFunctionDecl
-llvmFunSig lbl link = llvmFunSig' (strCLabel_llvm lbl) link
+llvmFunSig :: LlvmEnv -> CLabel -> LlvmLinkageType -> LlvmFunctionDecl
+llvmFunSig env lbl link = llvmFunSig' (strCLabel_llvm env lbl) link
 
 llvmFunSig' :: LMString -> LlvmLinkageType -> LlvmFunctionDecl
 llvmFunSig' lbl link
@@ -100,10 +101,10 @@ llvmFunSig' lbl link
                         (map (toParams . getVarType) llvmFunArgs) llvmFunAlign
 
 -- | Create a Haskell function in LLVM.
-mkLlvmFunc :: CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks
+mkLlvmFunc :: LlvmEnv -> CLabel -> LlvmLinkageType -> LMSection -> LlvmBlocks
            -> LlvmFunction
-mkLlvmFunc lbl link sec blks
-  = let funDec = llvmFunSig lbl link
+mkLlvmFunc env lbl link sec blks
+  = let funDec = llvmFunSig env lbl link
         funArgs = map (fsLit . getPlainName) llvmFunArgs
     in LlvmFunction funDec funArgs llvmStdFunAttrs sec blks
 
@@ -148,46 +149,51 @@ defaultLlvmVersion = 28
 --
 
 -- two maps, one for functions and one for local vars.
-newtype LlvmEnv = LlvmEnv (LlvmEnvMap, LlvmEnvMap, LlvmVersion)
+newtype LlvmEnv = LlvmEnv (LlvmEnvMap, LlvmEnvMap, LlvmVersion, Platform)
 type LlvmEnvMap = UniqFM LlvmType
 
 -- | Get initial Llvm environment.
-initLlvmEnv :: LlvmEnv
-initLlvmEnv = LlvmEnv (emptyUFM, emptyUFM, defaultLlvmVersion)
+initLlvmEnv :: Platform -> LlvmEnv
+initLlvmEnv platform = LlvmEnv (emptyUFM, emptyUFM, defaultLlvmVersion, platform)
 
 -- | Clear variables from the environment.
 clearVars :: LlvmEnv -> LlvmEnv
-clearVars (LlvmEnv (e1, _, n)) = LlvmEnv (e1, emptyUFM, n)
+clearVars (LlvmEnv (e1, _, n, p)) = LlvmEnv (e1, emptyUFM, n, p)
 
 -- | Insert functions into the environment.
 varInsert, funInsert :: Uniquable key => key -> LlvmType -> LlvmEnv -> LlvmEnv
-varInsert s t (LlvmEnv (e1, e2, n)) = LlvmEnv (e1, addToUFM e2 s t, n)
-funInsert s t (LlvmEnv (e1, e2, n)) = LlvmEnv (addToUFM e1 s t, e2, n)
+varInsert s t (LlvmEnv (e1, e2, n, p)) = LlvmEnv (e1, addToUFM e2 s t, n, p)
+funInsert s t (LlvmEnv (e1, e2, n, p)) = LlvmEnv (addToUFM e1 s t, e2, n, p)
 
 -- | Lookup functions in the environment.
 varLookup, funLookup :: Uniquable key => key -> LlvmEnv -> Maybe LlvmType
-varLookup s (LlvmEnv (_, e2, _)) = lookupUFM e2 s
-funLookup s (LlvmEnv (e1, _, _)) = lookupUFM e1 s
+varLookup s (LlvmEnv (_, e2, _, _)) = lookupUFM e2 s
+funLookup s (LlvmEnv (e1, _, _, _)) = lookupUFM e1 s
 
 -- | Get the LLVM version we are generating code for
 getLlvmVer :: LlvmEnv -> LlvmVersion
-getLlvmVer (LlvmEnv (_, _, n)) = n
+getLlvmVer (LlvmEnv (_, _, n, _)) = n
 
 -- | Set the LLVM version we are generating code for
 setLlvmVer :: LlvmVersion -> LlvmEnv -> LlvmEnv
-setLlvmVer n (LlvmEnv (e1, e2, _)) = LlvmEnv (e1, e2, n)
+setLlvmVer n (LlvmEnv (e1, e2, _, p)) = LlvmEnv (e1, e2, n, p)
+
+-- | Get the platform we are generating code for
+getLlvmPlatform :: LlvmEnv -> Platform
+getLlvmPlatform (LlvmEnv (_, _, _, p)) = p
 
 -- ----------------------------------------------------------------------------
 -- * Label handling
 --
 
 -- | Pretty print a 'CLabel'.
-strCLabel_llvm :: CLabel -> LMString
-strCLabel_llvm l = (fsLit . show . llvmSDoc . pprCLabel) l
+strCLabel_llvm :: LlvmEnv -> CLabel -> LMString
+strCLabel_llvm env l
+    = (fsLit . show . llvmSDoc . pprCLabel (getLlvmPlatform env)) l
 
 -- | Create an external definition for a 'CLabel' defined in another module.
-genCmmLabelRef :: CLabel -> LMGlobal
-genCmmLabelRef = genStringLabelRef . strCLabel_llvm
+genCmmLabelRef :: LlvmEnv -> CLabel -> LMGlobal
+genCmmLabelRef env = genStringLabelRef . strCLabel_llvm env
 
 -- | As above ('genCmmLabelRef') but taking a 'LMString', not 'CLabel'.
 genStringLabelRef :: LMString -> LMGlobal

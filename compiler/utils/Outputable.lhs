@@ -622,6 +622,8 @@ instance Outputable Bool where
 
 instance Outputable Int where
    ppr n = int n
+instance PlatformOutputable Int where
+   pprPlatform _ = ppr
 
 instance Outputable Word16 where
    ppr n = integer $ fromIntegral n
@@ -651,6 +653,9 @@ instance (PlatformOutputable a, PlatformOutputable b) => PlatformOutputable (a, 
 instance Outputable a => Outputable (Maybe a) where
   ppr Nothing = ptext (sLit "Nothing")
   ppr (Just x) = ptext (sLit "Just") <+> ppr x
+instance PlatformOutputable a => PlatformOutputable (Maybe a) where
+  pprPlatform _        Nothing  = ptext (sLit "Nothing")
+  pprPlatform platform (Just x) = ptext (sLit "Just") <+> pprPlatform platform x
 
 instance (Outputable a, Outputable b) => Outputable (Either a b) where
   ppr (Left x)  = ptext (sLit "Left")  <+> ppr x

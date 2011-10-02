@@ -70,7 +70,8 @@ cmmPipeline hsc_env (topSRT, rst) prog =
      -- folding over the groups
      (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
 
-     let cmms = reverse (concat tops)
+     let cmms :: CmmGroup
+         cmms = reverse (concat tops)
 
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (pprPlatform (targetPlatform dflags) cmms)
 
@@ -148,9 +149,9 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        mapM_ (dumpPlatform platform Opt_D_dump_cmmz_split "Post splitting") gs
 
        ------------- More CAFs and foreign calls ------------
-       cafEnv <- run $ cafAnal g
-       let localCAFs = catMaybes $ map (localCAFInfo cafEnv) gs
-       mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
+       cafEnv <- run $ cafAnal platform g
+       let localCAFs = catMaybes $ map (localCAFInfo platform cafEnv) gs
+       mbpprTrace "localCAFs" (pprPlatform platform localCAFs) $ return ()
 
        gs <- run $ mapM (lowerSafeForeignCalls areaMap) gs
        mapM_ (dumpPlatform platform Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls") gs
