@@ -365,7 +365,7 @@ showMultiLineString :: String -> [String]
 -- escape conventions), but
 --   * break the string into multiple lines
 --   * wrap the entire thing in double quotes
--- Example:  @showLitString "hello\ngoodbye\nblah"@
+-- Example:  @showMultiLineString "hello\ngoodbye\nblah"@
 -- returns   @["\"hello\\", "\\goodbye\\", "\\blah\""]@
 showMultiLineString str
   = go '\"' str
