@@ -110,8 +110,6 @@ module CLabel (
         pprCLabel
     ) where
 
-#include "HsVersions.h"
-
 import IdInfo
 import StaticFlags
 import BasicTypes
@@ -896,11 +894,11 @@ instance PlatformOutputable CLabel where
 
 pprCLabel :: Platform -> CLabel -> SDoc
 
-pprCLabel _ (AsmTempLabel u)
+pprCLabel platform (AsmTempLabel u)
  | cGhcWithNativeCodeGen == "YES"
   =  getPprStyle $ \ sty ->
      if asmStyle sty then 
-	ptext asmTempLabelPrefix <> pprUnique u
+	ptext (asmTempLabelPrefix platform) <> pprUnique u
      else
 	char '_' <> pprUnique u
 
@@ -916,23 +914,22 @@ pprCLabel platform (DeadStripPreventer lbl)
  | cGhcWithNativeCodeGen == "YES"
    = pprCLabel platform lbl <> ptext (sLit "_dsp")
 
-pprCLabel _ lbl
+pprCLabel platform lbl
    = getPprStyle $ \ sty ->
      if cGhcWithNativeCodeGen == "YES" && asmStyle sty
-     then maybe_underscore (pprAsmCLbl lbl)
+     then maybe_underscore (pprAsmCLbl platform lbl)
      else pprCLbl lbl
 
 maybe_underscore doc
   | underscorePrefix = pp_cSEP <> doc
   | otherwise        = doc
 
-#ifdef mingw32_TARGET_OS
--- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
--- (The C compiler does this itself).
-pprAsmCLbl (ForeignLabel fs (Just sz) _ _)
-   = ftext fs <> char '@' <> int sz
-#endif
-pprAsmCLbl lbl
+pprAsmCLbl platform (ForeignLabel fs (Just sz) _ _)
+ | platformOS platform == OSMinGW32
+    -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
+    -- (The C compiler does this itself).
+    = ftext fs <> char '@' <> int sz
+pprAsmCLbl _ lbl
    = pprCLbl lbl
 
 pprCLbl (StringLitLabel u)
@@ -1056,19 +1053,11 @@ instance Outputable ForeignLabelSource where
 underscorePrefix :: Bool   -- leading underscore on assembler labels?
 underscorePrefix = (cLeadingUnderscore == "YES")
 
-asmTempLabelPrefix :: LitString  -- for formatting labels
-asmTempLabelPrefix =
-#if alpha_TARGET_OS
-     {- The alpha assembler likes temporary labels to look like $L123
-	instead of L123.  (Don't toss the L, because then Lf28
-	turns into $f28.)
-     -}
-     (sLit "$")
-#elif darwin_TARGET_OS
-     (sLit "L")
-#else
-     (sLit ".L")
-#endif
+asmTempLabelPrefix :: Platform -> LitString  -- for formatting labels
+asmTempLabelPrefix platform =
+    if platformOS platform == OSDarwin
+    then sLit "L"
+    else sLit ".L"
 
 pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> CLabel -> SDoc
 pprDynamicLinkerAsmLabel platform dllInfo lbl
