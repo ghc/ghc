@@ -124,7 +124,8 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     -- The behaviour is unspecified on infinite or @NaN@ values.
     exponent            :: a -> Int
     -- | The first component of 'decodeFloat', scaled to lie in the open
-    -- interval (@-1@,@1@), either @0.0@ or of absolute value @>= 0.5@.
+    -- interval (@-1@,@1@), either @0.0@ or of absolute value @>= 1\/b@,
+    -- where @b@ is the floating-point radix.
     -- The behaviour is unspecified on infinite or @NaN@ values.
     significand         :: a -> a
     -- | multiplies a floating-point number by an integer power of the radix
@@ -909,7 +910,7 @@ these brings a huge speedup since we need only shift and add instead
 of division.
 
 The below is an adaption of fromRat' for the conversion to
-Float or Double exploiting the know floatRadix and avoiding
+Float or Double exploiting the known floatRadix and avoiding
 divisions as much as possible.
 
 \begin{code}
