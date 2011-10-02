@@ -14,12 +14,12 @@
 
 module ForeignCall (
         ForeignCall(..), isSafeForeignCall,
-	Safety(..), playSafe, playInterruptible,
+        Safety(..), playSafe, playInterruptible,
 
-	CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
-	CCallSpec(..), 
-	CCallTarget(..), isDynamicTarget,
-	CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
+        CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
+        CCallSpec(..), 
+        CCallTarget(..), isDynamicTarget,
+        CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
     ) where
 
 import FastString
@@ -33,9 +33,9 @@ import Data.Data
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection{Data types}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -49,28 +49,28 @@ isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 -- We may need more clues to distinguish foreign calls
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
-  ppr (CCall cc)  = ppr cc		
+  ppr (CCall cc)  = ppr cc              
 \end{code}
 
   
 \begin{code}
 data Safety
-  = PlaySafe		-- Might invoke Haskell GC, or do a call back, or
-			-- switch threads, etc.  So make sure things are
-			-- tidy before the call. Additionally, in the threaded
-			-- RTS we arrange for the external call to be executed
-			-- by a separate OS thread, i.e., _concurrently_ to the
-			-- execution of other Haskell threads.
+  = PlaySafe            -- Might invoke Haskell GC, or do a call back, or
+                        -- switch threads, etc.  So make sure things are
+                        -- tidy before the call. Additionally, in the threaded
+                        -- RTS we arrange for the external call to be executed
+                        -- by a separate OS thread, i.e., _concurrently_ to the
+                        -- execution of other Haskell threads.
 
   | PlayInterruptible   -- Like PlaySafe, but additionally
                         -- the worker thread running this foreign call may
                         -- be unceremoniously killed, so it must be scheduled
                         -- on an unbound thread.
 
-  | PlayRisky		-- None of the above can happen; the call will return
-			-- without interacting with the runtime system at all
+  | PlayRisky           -- None of the above can happen; the call will return
+                        -- without interacting with the runtime system at all
   deriving ( Eq, Show, Data, Typeable )
-	-- Show used just for Show Lex.Token, I think
+        -- Show used just for Show Lex.Token, I think
   {-! derive: Binary !-}
 
 instance Outputable Safety where
@@ -90,23 +90,23 @@ playInterruptible _ = False
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection{Calling C}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 data CExportSpec
-  = CExportStatic		-- foreign export ccall foo :: ty
-	CLabelString		-- C Name of exported function
-	CCallConv
+  = CExportStatic               -- foreign export ccall foo :: ty
+        CLabelString            -- C Name of exported function
+        CCallConv
   deriving (Data, Typeable)
   {-! derive: Binary !-}
 
 data CCallSpec
-  =  CCallSpec	CCallTarget	-- What to call
-		CCallConv	-- Calling convention to use.
-		Safety
+  =  CCallSpec  CCallTarget     -- What to call
+                CCallConv       -- Calling convention to use.
+                Safety
   deriving( Eq )
   {-! derive: Binary !-}
 \end{code}
@@ -119,18 +119,18 @@ The call target:
 data CCallTarget
   -- An "unboxed" ccall# to named function in a particular package.
   = StaticTarget  
-	CLabelString  			-- C-land name of label.
+        CLabelString                    -- C-land name of label.
 
-	(Maybe PackageId)		-- What package the function is in.
-					-- If Nothing, then it's taken to be in the current package.
-					-- Note: This information is only used for PrimCalls on Windows.
-					--	 See CLabel.labelDynamic and CoreToStg.coreToStgApp 
-					--	 for the difference in representation between PrimCalls
-					--	 and ForeignCalls. If the CCallTarget is representing
-					--	 a regular ForeignCall then it's safe to set this to Nothing.
+        (Maybe PackageId)               -- What package the function is in.
+                                        -- If Nothing, then it's taken to be in the current package.
+                                        -- Note: This information is only used for PrimCalls on Windows.
+                                        --       See CLabel.labelDynamic and CoreToStg.coreToStgApp 
+                                        --       for the difference in representation between PrimCalls
+                                        --       and ForeignCalls. If the CCallTarget is representing
+                                        --       a regular ForeignCall then it's safe to set this to Nothing.
 
   -- The first argument of the import is the name of a function pointer (an Addr#).
-  --	Used when importing a label as "foreign import ccall "dynamic" ..."
+  --    Used when importing a label as "foreign import ccall "dynamic" ..."
   | DynamicTarget
   
   deriving( Eq, Data, Typeable )
@@ -144,11 +144,11 @@ isDynamicTarget _             = False
 
 Stuff to do with calling convention:
 
-ccall:		Caller allocates parameters, *and* deallocates them.
+ccall:          Caller allocates parameters, *and* deallocates them.
 
-stdcall: 	Caller allocates parameters, callee deallocates.
-		Function name has @N after it, where N is number of arg bytes
-		e.g.  _Foo@8
+stdcall:        Caller allocates parameters, callee deallocates.
+                Function name has @N after it, where N is number of arg bytes
+                e.g.  _Foo@8
 
 ToDo: The stdcall calling convention is x86 (win32) specific,
 so perhaps we should emit a warning if it's being used on other
@@ -185,18 +185,18 @@ ccallConvAttribute CCallConv   = ""
 \end{code}
 
 \begin{code}
-type CLabelString = FastString		-- A C label, completely unencoded
+type CLabelString = FastString          -- A C label, completely unencoded
 
 pprCLabelString :: CLabelString -> SDoc
 pprCLabelString lbl = ftext lbl
 
-isCLabelString :: CLabelString -> Bool	-- Checks to see if this is a valid C label
+isCLabelString :: CLabelString -> Bool  -- Checks to see if this is a valid C label
 isCLabelString lbl 
   = all ok (unpackFS lbl)
   where
     ok c = isAlphaNum c || c == '_' || c == '.'
-	-- The '.' appears in e.g. "foo.so" in the 
-	-- module part of a ExtName.  Maybe it should be separate
+        -- The '.' appears in e.g. "foo.so" in the 
+        -- module part of a ExtName.  Maybe it should be separate
 \end{code}
 
 
@@ -213,13 +213,13 @@ instance Outputable CCallSpec where
       callconv = text "{-" <> ppr cconv <> text "-}"
 
       gc_suf | playSafe safety = text "_GC"
-	     | otherwise       = empty
+             | otherwise       = empty
 
       ppr_fun (StaticTarget fn Nothing)
-     	= text "__pkg_ccall" <> gc_suf <+> pprCLabelString fn
+        = text "__pkg_ccall" <> gc_suf <+> pprCLabelString fn
 
       ppr_fun (StaticTarget fn (Just pkgId))
-     	= text "__pkg_ccall" <> gc_suf <+> ppr pkgId <+> pprCLabelString fn
+        = text "__pkg_ccall" <> gc_suf <+> ppr pkgId <+> pprCLabelString fn
 
       ppr_fun DynamicTarget     
         = text "__dyn_ccall" <> gc_suf <+> text "\"\""
@@ -227,9 +227,9 @@ instance Outputable CCallSpec where
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection{Misc}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -240,64 +240,64 @@ instance Binary ForeignCall where
 
 instance Binary Safety where
     put_ bh PlaySafe = do
-	    putByte bh 0
+            putByte bh 0
     put_ bh PlayInterruptible = do
-	    putByte bh 1
+            putByte bh 1
     put_ bh PlayRisky = do
-	    putByte bh 2
+            putByte bh 2
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do return PlaySafe
-	      1 -> do return PlayInterruptible
-	      _ -> do return PlayRisky
+            h <- getByte bh
+            case h of
+              0 -> do return PlaySafe
+              1 -> do return PlayInterruptible
+              _ -> do return PlayRisky
 
 instance Binary CExportSpec where
     put_ bh (CExportStatic aa ab) = do
-	    put_ bh aa
-	    put_ bh ab
+            put_ bh aa
+            put_ bh ab
     get bh = do
-	  aa <- get bh
-	  ab <- get bh
-	  return (CExportStatic aa ab)
+          aa <- get bh
+          ab <- get bh
+          return (CExportStatic aa ab)
 
 instance Binary CCallSpec where
     put_ bh (CCallSpec aa ab ac) = do
-	    put_ bh aa
-	    put_ bh ab
-	    put_ bh ac
+            put_ bh aa
+            put_ bh ab
+            put_ bh ac
     get bh = do
-	  aa <- get bh
-	  ab <- get bh
-	  ac <- get bh
-	  return (CCallSpec aa ab ac)
+          aa <- get bh
+          ab <- get bh
+          ac <- get bh
+          return (CCallSpec aa ab ac)
 
 instance Binary CCallTarget where
     put_ bh (StaticTarget aa ab) = do
-	    putByte bh 0
-	    put_ bh aa
+            putByte bh 0
+            put_ bh aa
             put_ bh ab
     put_ bh DynamicTarget = do
-	    putByte bh 1
+            putByte bh 1
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do aa <- get bh
+            h <- getByte bh
+            case h of
+              0 -> do aa <- get bh
                       ab <- get bh
-		      return (StaticTarget aa ab)
-	      _ -> do return DynamicTarget
+                      return (StaticTarget aa ab)
+              _ -> do return DynamicTarget
 
 instance Binary CCallConv where
     put_ bh CCallConv = do
-	    putByte bh 0
+            putByte bh 0
     put_ bh StdCallConv = do
-	    putByte bh 1
+            putByte bh 1
     put_ bh PrimCallConv = do
-	    putByte bh 2
+            putByte bh 2
     get bh = do
-	    h <- getByte bh
-	    case h of
-	      0 -> do return CCallConv
-	      1 -> do return StdCallConv
-	      _ -> do return PrimCallConv
+            h <- getByte bh
+            case h of
+              0 -> do return CCallConv
+              1 -> do return StdCallConv
+              _ -> do return PrimCallConv
 \end{code}
