@@ -4,12 +4,6 @@
 \section[Foreign]{Foreign calls}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module ForeignCall (
@@ -173,6 +167,8 @@ defaultCCallConv = CCallConv
 ccallConvToInt :: CCallConv -> Int
 ccallConvToInt StdCallConv = 0
 ccallConvToInt CCallConv   = 1
+ccallConvToInt (CmmCallConv {})  = panic "ccallConvToInt CmmCallConv"
+ccallConvToInt (PrimCallConv {}) = panic "ccallConvToInt PrimCallConv"
 \end{code}
 
 Generate the gcc attribute corresponding to the given
@@ -182,6 +178,8 @@ calling convention (used by PprAbsC):
 ccallConvAttribute :: CCallConv -> String
 ccallConvAttribute StdCallConv = "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv   = ""
+ccallConvAttribute (CmmCallConv {})  = panic "ccallConvAttribute CmmCallConv"
+ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
 \end{code}
 
 \begin{code}
