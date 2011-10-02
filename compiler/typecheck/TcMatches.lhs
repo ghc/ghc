@@ -6,7 +6,6 @@
 TcMatches: Typecheck some @Matches@
 
 \begin{code}
-{-# OPTIONS_GHC -w #-}   -- debugging
 module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 		   TcMatchCtxt(..), TcStmtChecker,
 		   tcStmts, tcStmtsAndThen, tcDoStmts, tcBody,
