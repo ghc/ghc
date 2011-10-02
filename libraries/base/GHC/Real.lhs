@@ -406,10 +406,6 @@ fromIntegral = fromInteger . toInteger
 -- | general coercion to fractional types
 realToFrac :: (Real a, Fractional b) => a -> b
 realToFrac = fromRational . toRational
-
-{-# RULES
-"realToFrac/Int->Int" realToFrac = id :: Int -> Int
-    #-}
 \end{code}
 
 %*********************************************************
