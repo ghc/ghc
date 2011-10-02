@@ -112,8 +112,10 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     -- | 'encodeFloat' performs the inverse of 'decodeFloat' in the
     -- sense that for finite @x@ with the exception of @-0.0@,
     -- @'uncurry' 'encodeFloat' ('decodeFloat' x) = x@.
-    -- @'encodeFloat' m n@ is the closest representable floating-point
-    -- number to @m*b^^n@ (or @&#177;Infinity@ if overflow occurs).
+    -- @'encodeFloat' m n@ is one of the two closest representable
+    -- floating-point numbers to @m*b^^n@ (or @&#177;Infinity@ if overflow
+    -- occurs); usually the closer, but if @m@ contains too many bits,
+    -- the result may be rounded in the wrong direction.
     encodeFloat         :: Integer -> Int -> a
     -- | 'exponent' corresponds to the second component of 'decodeFloat'.
     -- @'exponent' 0 = 0@ and for finite nonzero @x@,
