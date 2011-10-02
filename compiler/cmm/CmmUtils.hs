@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -w #-}   
+{-# OPTIONS_GHC -fno-warn-deprecations #-}
 -- Warnings from deprecated blockToNodeList
 
 
