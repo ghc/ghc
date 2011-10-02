@@ -68,7 +68,7 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
   pprSectionHeader Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
-       pprCLabel_asm (mkDeadStripPreventer info_lbl)
+       pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
            <> char ':' $$
 #endif
        vcat (map (pprData platform) info) $$
@@ -85,9 +85,9 @@ pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListG
         -- so that the linker will not think it is unreferenced and dead-strip
         -- it. That's why the label is called a DeadStripPreventer (_dsp).
   $$ text "\t.long "
-	<+> pprCLabel_asm info_lbl
+	<+> pprCLabel_asm platform info_lbl
 	<+> char '-'
-	<+> pprCLabel_asm (mkDeadStripPreventer info_lbl)
+	<+> pprCLabel_asm platform (mkDeadStripPreventer info_lbl)
 #endif
 
 
