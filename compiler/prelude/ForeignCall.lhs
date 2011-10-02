@@ -17,7 +17,7 @@ module ForeignCall (
         Safety(..), playSafe, playInterruptible,
 
         CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
-        CCallSpec(..), 
+        CCallSpec(..),
         CCallTarget(..), isDynamicTarget,
         CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
     ) where
@@ -49,10 +49,10 @@ isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 -- We may need more clues to distinguish foreign calls
 -- but this simple printer will do for now
 instance Outputable ForeignCall where
-  ppr (CCall cc)  = ppr cc              
+  ppr (CCall cc)  = ppr cc
 \end{code}
 
-  
+
 \begin{code}
 data Safety
   = PlaySafe            -- Might invoke Haskell GC, or do a call back, or
@@ -118,13 +118,13 @@ The call target:
 -- | How to call a particular function in C-land.
 data CCallTarget
   -- An "unboxed" ccall# to named function in a particular package.
-  = StaticTarget  
+  = StaticTarget
         CLabelString                    -- C-land name of label.
 
         (Maybe PackageId)               -- What package the function is in.
                                         -- If Nothing, then it's taken to be in the current package.
                                         -- Note: This information is only used for PrimCalls on Windows.
-                                        --       See CLabel.labelDynamic and CoreToStg.coreToStgApp 
+                                        --       See CLabel.labelDynamic and CoreToStg.coreToStgApp
                                         --       for the difference in representation between PrimCalls
                                         --       and ForeignCalls. If the CCallTarget is representing
                                         --       a regular ForeignCall then it's safe to set this to Nothing.
@@ -132,7 +132,7 @@ data CCallTarget
   -- The first argument of the import is the name of a function pointer (an Addr#).
   --    Used when importing a label as "foreign import ccall "dynamic" ..."
   | DynamicTarget
-  
+
   deriving( Eq, Data, Typeable )
   {-! derive: Binary !-}
 
@@ -153,7 +153,7 @@ stdcall:        Caller allocates parameters, callee deallocates.
 ToDo: The stdcall calling convention is x86 (win32) specific,
 so perhaps we should emit a warning if it's being used on other
 platforms.
- 
+
 See: http://www.programmersheaven.com/2/Calling-conventions
 
 \begin{code}
@@ -191,11 +191,11 @@ pprCLabelString :: CLabelString -> SDoc
 pprCLabelString lbl = ftext lbl
 
 isCLabelString :: CLabelString -> Bool  -- Checks to see if this is a valid C label
-isCLabelString lbl 
+isCLabelString lbl
   = all ok (unpackFS lbl)
   where
     ok c = isAlphaNum c || c == '_' || c == '.'
-        -- The '.' appears in e.g. "foo.so" in the 
+        -- The '.' appears in e.g. "foo.so" in the
         -- module part of a ExtName.  Maybe it should be separate
 \end{code}
 
@@ -221,7 +221,7 @@ instance Outputable CCallSpec where
       ppr_fun (StaticTarget fn (Just pkgId))
         = text "__pkg_ccall" <> gc_suf <+> ppr pkgId <+> pprCLabelString fn
 
-      ppr_fun DynamicTarget     
+      ppr_fun DynamicTarget
         = text "__dyn_ccall" <> gc_suf <+> text "\"\""
 \end{code}
 
@@ -294,10 +294,13 @@ instance Binary CCallConv where
             putByte bh 1
     put_ bh PrimCallConv = do
             putByte bh 2
+    put_ bh CmmCallConv = do
+            putByte bh 3
     get bh = do
             h <- getByte bh
             case h of
               0 -> do return CCallConv
               1 -> do return StdCallConv
-              _ -> do return PrimCallConv
+              2 -> do return PrimCallConv
+              _ -> do return CmmCallConv
 \end{code}
