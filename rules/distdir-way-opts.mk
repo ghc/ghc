@@ -51,6 +51,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg)) \
  $$(if $$(findstring YES,$$($1_$2_SplitObjs)),$$(if $$(findstring dyn,$3),,-split-objs),) \
  $$($1_$2_HC_OPTS) \
+ $$(CONF_HC_OPTS_STAGE$4) \
  $$($1_$2_MORE_HC_OPTS) \
  $$($1_$2_EXTRA_HC_OPTS) \
  $$($1_$2_$3_HC_OPTS) \
