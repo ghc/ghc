@@ -4,13 +4,6 @@
 \section[PrimOp]{Primitive operations (machine-level)}
 
 \begin{code}
-{-# OPTIONS -fno-warn-unused-binds #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module PrimOp (
         PrimOp(..), allThePrimOps,
         primOpType, primOpSig,
@@ -485,12 +478,16 @@ getPrimOpResultInfo op
                         -- gives rise to a ReturnAlg
 \end{code}
 
-The commutable ops are those for which we will try to move constants
-to the right hand side for strength reduction.
+We do not currently make use of whether primops are commutable.
+
+We used to try to move constants to the right hand side for strength
+reduction.
 
 \begin{code}
+{-
 commutableOp :: PrimOp -> Bool
 #include "primop-commutable.hs-incl"
+-}
 \end{code}
 
 Utils:
