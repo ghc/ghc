@@ -8,8 +8,7 @@ ByteCodeLink: Bytecode assembler and linker
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module ByteCodeLink (
-        HValue(..), -- We don't want to export the constructor, but
-                    -- we get a warning that it's unsed if we don't
+        HValue,
         ClosureEnv, emptyClosureEnv, extendClosureEnv,
         linkBCO, lookupStaticPtr, lookupName
        ,lookupIE
@@ -95,8 +94,8 @@ linkBCO ie ce ul_bco
         --       non-zero arity BCOs in an AP thunk.
         --
         if (unlinkedBCOArity ul_bco > 0)
-           then return (unsafeCoerce# bco#)
-           else case mkApUpd0# bco# of { (# final_bco #) -> return final_bco }
+           then return (HValue (unsafeCoerce# bco#))
+           else case mkApUpd0# bco# of { (# final_bco #) -> return (HValue final_bco) }
 
 
 linkBCO' :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO BCO
@@ -146,9 +145,9 @@ mkPtrsArray ie ce n_ptrs ptrs = do
         BCO bco# <- linkBCO' ie ce ul_bco
         writeArrayBCO marr i bco#
     fill (BCOPtrBreakInfo brkInfo) i =
-        unsafeWrite marr i (unsafeCoerce# brkInfo)
+        unsafeWrite marr i (HValue (unsafeCoerce# brkInfo))
     fill (BCOPtrArray brkArray) i =
-        unsafeWrite marr i (unsafeCoerce# brkArray)
+        unsafeWrite marr i (HValue (unsafeCoerce# brkArray))
   zipWithM_ fill ptrs [0..]
   unsafeFreeze marr
 
@@ -206,8 +205,8 @@ lookupPrimOp primop
    = do let sym_to_find = primopToCLabel primop "closure"
         m <- lookupSymbol sym_to_find
         case m of
-           Just (Ptr addr) -> case addrToHValue# addr of
-                                 (# hval #) -> return hval
+           Just (Ptr addr) -> case addrToAny# addr of
+                                 (# a #) -> return (HValue a)
            Nothing -> linkFail "ByteCodeLink.lookupCE(primop)" sym_to_find
 
 lookupName :: ClosureEnv -> Name -> IO HValue
@@ -219,8 +218,8 @@ lookupName ce nm
               do let sym_to_find = nameToCLabel nm "closure"
                  m <- lookupSymbol sym_to_find
                  case m of
-                    Just (Ptr addr) -> case addrToHValue# addr of
-                                          (# hval #) -> return hval
+                    Just (Ptr addr) -> case addrToAny# addr of
+                                          (# a #) -> return (HValue a)
                     Nothing         -> linkFail "ByteCodeLink.lookupCE" sym_to_find
 
 lookupIE :: ItblEnv -> Name -> IO (Ptr a)

@@ -67,7 +67,7 @@ module TysPrim(
         eqPrimTyCon,            -- ty1 ~# ty2
 
 	-- * Any
-	anyTyCon, anyTyConOfKind, anyTypeOfKind
+	anyTy, anyTyCon, anyTyConOfKind, anyTypeOfKind
   ) where
 
 #include "HsVersions.h"
@@ -670,6 +670,9 @@ This commit uses
 \begin{code}
 anyTyConName :: Name
 anyTyConName = mkPrimTc (fsLit "Any") anyTyConKey anyTyCon
+
+anyTy :: Type
+anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
 anyTyCon = mkLiftedPrimTyCon anyTyConName liftedTypeKind 0 PtrRep
