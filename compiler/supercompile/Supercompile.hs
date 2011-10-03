@@ -304,15 +304,15 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
     -- It doesn't matter if we reuse Uniques here because by construction they can't shadow other uses of the anfUniqSupply'
     bv_uniques = uniqsFromSupply anfUniqSupply'
 
-supercompile :: CoreExpr -> CoreExpr
-supercompile e = termToCoreExpr (snd (S.supercompile (M.fromList unfs) e'))
+supercompile :: CoreExpr -> IO CoreExpr
+supercompile e = liftM (termToCoreExpr . snd) (S.supercompile (M.fromList unfs) e')
   where unfs = termUnfoldings e'
         e' = runParseM (coreExprToTerm e)
 
-supercompileProgram :: [CoreBind] -> [CoreBind]
+supercompileProgram :: [CoreBind] -> IO [CoreBind]
 supercompileProgram = supercompileProgramSelective (const True)
 
-supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> [CoreBind]
-supercompileProgramSelective should_sc binds = NonRec x (supercompile e) : rebuild (Var x)
+supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> IO [CoreBind]
+supercompileProgramSelective should_sc binds = liftM (\e' -> NonRec x e' : rebuild (Var x)) (supercompile e)
   where x = mkSysLocal (fsLit "sc") topUnique (exprType e)
         (e, rebuild) = coreBindsToCoreTerm should_sc binds

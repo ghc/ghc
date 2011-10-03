@@ -402,7 +402,7 @@ doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
 
 doCorePass CoreDoSupercomp           = {-# SCC "Supercomp" #-}
-                                       doPass supercompileProgram
+                                       doPassDM (\_ -> supercompileProgram)
 
 doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
                                        vectorise

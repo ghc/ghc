@@ -44,6 +44,7 @@ import BasicTypes (OccInfo(..))
 import Text.XHtml hiding (text)
 
 import qualified Control.Monad as Monad
+import Control.Exception (handleJust, AsyncException(UserInterrupt))
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 import qualified Data.Map as M
@@ -107,10 +108,10 @@ instance Monoid SCStats where
       }
 
 
-supercompile :: M.Map Var Term -> Term -> (SCStats, Term)
+supercompile :: M.Map Var Term -> Term -> IO (SCStats, Term)
 supercompile unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
                             pprTraceSC "all input FVs" (ppr input_fvs) $
-                            second fVedTermToTerm $ runScpM $ fmap snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
+                            liftM (second fVedTermToTerm) $ runScpM $ fmap snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
         anned_e = toAnnedTerm tag_ids0 e
         
@@ -336,7 +337,8 @@ applyAbsVars e (x:xs)
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
     abstracted :: [AbsVar], -- Abstracted over these variables
-    meaning    :: State     -- Minimum adequate term
+    meaning    :: State,    -- Minimum adequate term
+    embedded   :: Maybe SDoc
   }
 
 instance MonadStatics ScpBM where
@@ -572,7 +574,8 @@ class IMonad m where
     mx >> my = mx >>= \_ -> my
     fail = error
 
-newtype ScpM f f' a = ScpM { unScpM :: ScpEnv -> ScpState f -> (a -> ScpState f' -> (SCStats, Out FVedTerm)) -> (SCStats, Out FVedTerm) }
+-- The IO monad is used to catch Ctrl+C for pretty-printing purposes
+newtype ScpM f f' a = ScpM { unScpM :: ScpEnv -> ScpState f -> (a -> ScpState f' -> IO (SCStats, Out FVedTerm)) -> IO (SCStats, Out FVedTerm) }
 
 type ScpPM = ScpM ()                FulfilmentTree
 type ScpBM = ScpM [FulfilmentTree] [FulfilmentTree]
@@ -588,8 +591,23 @@ instance IMonad ScpM where
     return x = ScpM $ \_e s k -> k x s
     (!mx) >>= fxmy = ScpM $ \e s k -> unScpM mx e s (\x s -> unScpM (fxmy x) e s k)
 
-runScpM :: ScpPM (Out FVedTerm) -> (SCStats, Out FVedTerm)
-runScpM me = unScpM (tracePprScpPM me) init_e init_s (\e' s -> (stats s, bindManyMixedLiftedness fvedTermFreeVars (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (fvedTermFreeVars e') (pTreeHole s)) e'))
+class Printable f where
+    handlePrint :: ScpM f f' a -> ScpM f f' a
+
+instance Printable FulfilmentTree where
+    handlePrint = handlePrint' pprScpPM
+
+instance Printable [FulfilmentTree] where
+    handlePrint = handlePrint' pprScpBM
+
+instance Printable () where
+    handlePrint = id
+
+handlePrint' :: ScpM f f String -> ScpM f f' a -> ScpM f f' a
+handlePrint' prnt act = ScpM $ \e s k -> handleJust (\e -> case e of UserInterrupt -> Just (); _ -> Nothing) (\() -> unScpM prnt e s (\res _ -> writeFile "sc.htm" res Monad.>> error "Ctrl+C-ed")) (unScpM act e s k)
+
+runScpM :: ScpPM (Out FVedTerm) -> IO (SCStats, Out FVedTerm)
+runScpM me = unScpM (tracePprScpPM me) init_e init_s (\e' s -> Monad.return (stats s, bindManyMixedLiftedness fvedTermFreeVars (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (fvedTermFreeVars e') (pTreeHole s)) e'))
   where
     init_e = ScpEnv { pTreeContext = [], depth = 0 }
     init_s = ScpState { names = h_names, pTreeHole = (), stats = mempty }
@@ -623,15 +641,21 @@ catchScpM f_try f_abort = ScpM $ \e s k -> unScpM (f_try (\c -> ScpM $ \e' s' _k
 addStats :: SCStats -> ScpM f f ()
 addStats scstats = ScpM $ \_e s k -> k () (let scstats' = stats s `mappend` scstats in scstats' `seqSCStats` s { stats = scstats' })
 
+recordStopped :: State -> ScpBM a -> ScpBM a
+recordStopped state mx = ScpM $ \e s k -> unScpM mx (e { pTreeContext = case pTreeContext e of (Promise p:rest) -> Promise p { embedded = Just (pPrintFullState state) }:rest }) s k
 
-type PrettyTree = PTree (Var, SDoc, Maybe SDoc)
+
+type PrettyTree = PTree (Var, SDoc, Maybe SDoc, Maybe SDoc)
 
 tracePprScpPM :: ScpPM a -> ScpPM a
+tracePprScpPM = id
+{-
 tracePprScpPM mx = do
   x <- mx
   s <- pprScpPM
   unsafePerformIO (writeFile "sc.htm" s Monad.>> Monad.return (return x))
   -- pprTraceSC "tracePprScpM" (text s) $ return x
+-}
 
 pprScpBM :: ScpBM String
 pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
@@ -647,6 +671,7 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
                                script js]),
        body (toHtmlFromList [thediv htm ! [identifier "tree"],
                              pre mempty ! [identifier "content-in"],
+                             pre mempty ! [identifier "content-embed"],
                              pre mempty ! [identifier "content-out"]])]
       where htm = pprTrees (unwindContext ctxt hole)
             -- NB: must use primHtml so that entities in the script are not escaped
@@ -655,7 +680,7 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     unwindTree :: FulfilmentTree -> PrettyTree
     unwindTree = fmap unwindPromiseFulfilment
 
-    unwindPromiseFulfilment (p, f) = (fun p, pPrintFullState (meaning p),
+    unwindPromiseFulfilment (p, f) = (fun p, pPrintFullState (meaning p), embedded p,
                                       case f of Captured         -> Nothing
                                                 RolledBack mb_e' -> fmap ppr mb_e'
                                                 Fulfilled e'     -> Just (ppr e'))
@@ -664,7 +689,7 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     unwindContext = flip $ foldl (flip unwindContextItem)
 
     unwindContextItem :: PTreeContextItem -> [PrettyTree] -> [PrettyTree]
-    unwindContextItem (Promise p)                  ts = [Split True [(fun p, ppr (meaning p), Nothing)] ts]
+    unwindContextItem (Promise p)                  ts = [Split True [(fun p, pPrintFullState (meaning p), embedded p, Nothing)] ts]
     unwindContextItem (BindCapturedFloats fvs ts') ts = map unwindTree ts' ++ [BoundCapturedFloats fvs ts]
 
     pprTrees :: [PrettyTree] -> Html
@@ -673,9 +698,13 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     pprTree :: PrettyTree -> Html
     pprTree t = li $ case t of
       Tieback x                  -> anchor (stringToHtml ("Tieback " ++ show x)) ! [href ("#" ++ show x)]
-      Split rb fs ts             -> toHtmlFromList ([thediv (anchor (stringToHtml (show x)) ! [strAttr "onclick" $ "document.getElementById(\"content-in\").innerText=" ++ show (showSDoc in_code) ++ ";document.getElementById(\"content-out\").innerText=" ++ show (maybe "" showSDoc mb_out_code) ++ ";return false"]) !
+      Split rb fs ts             -> toHtmlFromList ([thediv (anchor (stringToHtml (show x ++ if isJust mb_emb_code then " (sc-stop)" else "")) !
+                                                                [strAttr "onclick" $ "document.getElementById(\"content-in\").innerText=" ++ show (showSDoc in_code) ++
+                                                                                    ";document.getElementById(\"content-out\").innerText=" ++ show (maybe "" showSDoc mb_out_code) ++
+                                                                                    ";document.getElementById(\"content-embed\").innerText=" ++ show (maybe "" showSDoc mb_emb_code) ++
+                                                                                    ";return false"]) !
                                                             [identifier (show x)]
-                                                    | (x, in_code, mb_out_code) <- fs] ++ [pprTrees ts])
+                                                    | (x, in_code, mb_emb_code, mb_out_code) <- fs] ++ [pprTrees ts])
       BoundCapturedFloats fvs ts -> toHtmlFromList [stringToHtml ("Capture " ++ showSDoc (ppr fvs)), pprTrees ts]
 
 
@@ -687,14 +716,15 @@ lift act = ScpM $ \e s k -> unScpM act e (s { pTreeHole = () }) (\x s' -> k x (s
 sc  :: History (State, RollbackScpM) -> AlreadySpeculated -> State -> ScpPM (Deeds, Out FVedTerm)
 sc' :: History (State, RollbackScpM) -> AlreadySpeculated -> State -> ScpBM (Deeds, Out FVedTerm)
 sc  hist = rollbackBig (memo (sc' hist))
-sc' hist speculated state = (\raise -> check raise) `catchScpM` \gen -> stop gen state hist -- TODO: I want to use the original history here, but I think doing so leads to non-term as it contains rollbacks from "below us" (try DigitsOfE2)
+sc' hist speculated state = handlePrint $ (\raise -> check raise) `catchScpM` \gen -> stop gen state hist -- TODO: I want to use the original history here, but I think doing so leads to non-term as it contains rollbacks from "below us" (try DigitsOfE2)
   where
     check this_rb = case terminate hist (state, this_rb) of
                       Continue hist' -> continue hist'
                       Stop (shallower_state, rb) -> maybe (stop gen state hist) ($ gen) $ guard sC_ROLLBACK Monad.>> Just rb
                         where gen = mK_GENERALISER shallower_state state
     stop gen state hist = do addStats $ mempty { stat_sc_stops = 1 }
-                             maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (lift . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
+                             recordStopped state $
+                               maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (lift . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
     continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState state'))
                        addStats stats
                        split state' (lift . sc hist speculated')
@@ -729,7 +759,7 @@ memo opt speculated state0 = do
         
         -- NB: promises are lexically scoped because they may refer to FVs
         x <- freshHName
-        promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = vs_list, meaning = state1 }) $
+        promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = vs_list, meaning = state1, embedded = Nothing }) $
           do
             traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState state1))
             -- FIXME: this is the site of the Dreadful Hack that makes it safe to match on reduced terms yet *drive* unreduced ones
