@@ -78,15 +78,17 @@ data DerivStuff     -- Please add these auxiliary top-level bindings
   -- All these generate ZERO-BASED tag operations
   -- I.e first constructor has tag 0
 
-  -- Scrap your boilerplate
-  | DerivDataCon DataCon    -- For constructor C we get $cC :: Constr
-  | DerivTyCon   TyCon      -- For tycon T we get       $tT :: DataType
 
   -- Generics
-  | DerivGenMetaTyCons MetaTyCons
-  | DerivGenRepTyCon TyCon
-  | DerivInst (InstInfo RdrName)
-  | DerivHsBind (LHsBind RdrName)
+  | DerivGenMetaTyCons MetaTyCons   -- New data types
+  | DerivGenRepTyCon TyCon	    -- New type family instances
+
+  | DerivHsBind (LHsBind RdrName)  -- Yes, but not for the method bindings
+    			 	   -- Rather for top-level auxiliary bindings
+
+  -- Scrap your boilerplate (replaced  by DerivHsBind)
+--  | DerivDataCon DataCon    -- For constructor C we get $cC :: Constr
+--  | DerivTyCon   TyCon      -- For tycon T we get       $tT :: DataType
 
 
 isDupAux :: DerivStuff -> DerivStuff -> Bool
