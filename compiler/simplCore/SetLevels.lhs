@@ -358,7 +358,7 @@ lvlCase ctxt_lvl env scrut_fvs scrut' case_bndr ty alts
   | [(con@(DataAlt {}), bs, rhs)] <- alts
   , exprOkForSpeculation scrut'	  -- See Note [Check the output scrutinee for okForSpec]
   , not (isTopLvl dest_lvl)	  -- Can't have top-level cases
-  =     -- See Note [Case floating]
+  =     -- See Note [Floating cases]
     	-- Always float the case if possible
   	-- Unlike lets we don't insist that it escapes a value lambda
     do { (rhs_env, (case_bndr':bs')) <- cloneVars env (case_bndr:bs) dest_lvl
