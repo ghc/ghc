@@ -611,7 +611,7 @@ The type constructor Any::* has these properties
 
   * It is inhabited by at least one value, namely bottom
 
-  * You can unsafely coerce any lifted type to Ayny, and back.
+  * You can unsafely coerce any lifted type to Any, and back.
 
   * It does not claim to be a *data* type, and that's important for
     the code generator, because the code gen may *enter* a data value
