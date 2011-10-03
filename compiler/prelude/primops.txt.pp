@@ -1849,7 +1849,7 @@ pseudoop   "lazy"
 
 	Like {\tt seq}, the argument of {\tt lazy} can have an unboxed type. }
 
-primtype Any a
+primtype Any
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
 	lifted type, and back. 
 
