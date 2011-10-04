@@ -186,7 +186,7 @@ thread.
 The new thread will be a lightweight thread; if you want to use a foreign
 library that uses thread-local storage, use 'Control.Concurrent.forkOS' instead.
 
-GHC note: the new thread inherits the /masked/ state of the parent 
+GHC note: the new thread inherits the /masked/ state of the parent
 (see 'Control.Exception.mask').
 
 The newly created thread has an exception handler that discards the
@@ -269,7 +269,7 @@ forkOnWithUnmask cpu io = forkOn cpu (io unsafeUnmask)
 -- Haskell threads that can run truly simultaneously at any given
 -- time, and is typically set to the number of physical processor cores on
 -- the machine.
--- 
+--
 -- Strictly speaking it is better to use 'getNumCapabilities', because
 -- the number of capabilities might vary at runtime.
 --
@@ -654,7 +654,7 @@ alwaysSucceeds i = do ( i >> retry ) `orElse` ( return () )
 -- False or raising an exception are both treated as invariant failures.
 always :: STM Bool -> STM ()
 always i = alwaysSucceeds ( do v <- i
-                               if (v) then return () else ( error "Transacional invariant violation" ) )
+                               if (v) then return () else ( error "Transactional invariant violation" ) )
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)
