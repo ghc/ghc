@@ -3,23 +3,38 @@
   <title>Known bugs and infelicities</title>
 
   <sect1 id="vs-Haskell-defn">
-    <title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
+    <title>Haskell&nbsp;standards vs.&nbsp;Glasgow Haskell: language non-compliance
 </title>
 
-    <indexterm><primary>GHC vs the Haskell 98 language</primary></indexterm>
-    <indexterm><primary>Haskell 98 language vs GHC</primary></indexterm>
+    <indexterm><primary>GHC vs the Haskell standards</primary></indexterm>
+    <indexterm><primary>Haskell standards vs GHC</primary></indexterm>
 
-  <para>This section lists Glasgow Haskell infelicities in its
-  implementation of Haskell&nbsp;98.  See also the &ldquo;when things
-  go wrong&rdquo; section (<xref linkend="wrong"/>) for information
-  about crashes, space leaks, and other undesirable phenomena.</para>
+    <para>
+        This section lists Glasgow Haskell infelicities in its
+        implementation of Haskell&nbsp;98 and Haskell&nbsp;2010.
+        See also the &ldquo;when things go wrong&rdquo; section
+        (<xref linkend="wrong"/>) for information about crashes,
+        space leaks, and other undesirable phenomena.
+    </para>
 
-  <para>The limitations here are listed in Haskell Report order
-  (roughly).</para>
+    <para>
+        The limitations here are listed in Haskell Report order
+        (roughly).
+    </para>
 
-  <sect2 id="haskell98-divergence">
-    <title>Divergence from Haskell&nbsp;98</title>
+  <sect2 id="haskell-standards-divergence">
+    <title>Divergence from Haskell&nbsp;98 and Haskell&nbsp;2010</title>
 
+    <para>
+        By default, GHC mainly aims to behave (mostly) like a Haskell&nbsp;2010
+        compiler, although you can tell it to try to behave like a
+        particular version of the langauge with the
+        <literal>-XHaskell98</literal> and
+        <literal>-XHaskell2010</literal> flags. The known deviations
+        from the standards are described below. Unless otherwise stated,
+        the deviation applies in Haskell&nbsp;98, Haskell&nbsp;2010 and
+        the default modes.
+    </para>
 
     <sect3 id="infelicities-lexical">
       <title>Lexical syntax</title>
@@ -42,7 +57,9 @@
 
 	<itemizedlist>
 	  <listitem>
-	    <para>GHC is a little less strict about the layout rule when used
+	    <para>In Haskell&nbsp;98 mode and by default (but not in
+          Haskell&nbsp;2010 mode), GHC is a little less strict about the
+          layout rule when used
 	      in <literal>do</literal> expressions.  Specifically, the
 	      restriction that "a nested context must be indented further to
 	      the right than the enclosing context" is relaxed to allow the
@@ -58,13 +75,16 @@ main = do args &lt;- getArgs
           ps &lt;- mapM process args
           mapM print ps</programlisting>
 
+        This behaviour is controlled by the
+        <literal>NondecreasingIndentation</literal> extension.
 	      </para>
 	  </listitem>
 
 	<listitem>
-	  <para>GHC doesn't do fixity resolution in expressions during
-	  parsing.  For example, according to the Haskell report, the
-	  following expression is legal Haskell:
+	  <para>GHC doesn't do the fixity resolution in expressions during
+	  parsing as required by Haskell&nbsp;98 (but not by Haskell&nbsp;2010).
+      For example, according to the Haskell&nbsp;98 report, the
+	  following expression is legal:
 <programlisting>
     let x = 42 in x == 42 == True</programlisting>
 	and parses as:
@@ -79,10 +99,7 @@ main = do args &lt;- getArgs
 	  <literal>let</literal>-expression must terminate there.  GHC
 	  simply gobbles up the whole expression, parsing like this:
 <programlisting>
-    (let x = 42 in x == 42 == True)</programlisting>
-
-          The Haskell report is arguably wrong here, but nevertheless
-          it's a difference between GHC &amp; Haskell 98.</para>
+    (let x = 42 in x == 42 == True)</programlisting></para>
 	</listitem>
       </itemizedlist>
     </sect3>
@@ -100,6 +117,12 @@ main = do args &lt;- getArgs
       by default; this behaviour can be disabled with
       <option>-XNoMonoPatBinds</option>.  See <xref
       linkend="options-language" />.</para>
+
+      <para>In its default mode, GHC does not accept datatype contexts,
+      as it has been decided to remove them from the next version of the
+      language standard. This behaviour can be controlled with the
+      <option>DatatypeContexts</option> extension.
+      See <xref linkend="datatype-contexts" />.</para>
     </sect3>
 
       <sect3 id="infelicities-Modules">
@@ -211,9 +234,9 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
     </sect3>
   </sect2>
 
-  <sect2 id="haskell98-undefined">
+  <sect2 id="haskell-98-2010-undefined">
     <title>GHC's interpretation of undefined behaviour in
-    Haskell&nbsp;98</title>
+    Haskell&nbsp;98 and Haskell&nbsp;2010</title>
 
     <para>This section documents GHC's take on various issues that are
     left undefined or implementation specific in Haskell 98.</para>
@@ -273,7 +296,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 	     <literal>-2147483648::Int</literal>.  The <literal>negate</literal> operation then
 	     overflows, but it is unchecked, so <literal>negate (-2147483648::Int)</literal> is just
 	     <literal>-2147483648</literal>.  In short, one can write <literal>minBound::Int</literal> as
-	     a literal with the expected meaning (but that is not in general guaranteed.
+	     a literal with the expected meaning (but that is not in general guaranteed).
              </para>
 
 	  <para>The <literal>fromIntegral</literal> function also
@@ -293,7 +316,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 	  <para>Operations on <literal>Float</literal> and
           <literal>Double</literal> numbers are
           <emphasis>unchecked</emphasis> for overflow, underflow, and
-          other sad occurrences.  (note, however that some
+          other sad occurrences.  (note, however, that some
           architectures trap floating-point overflow and
           loss-of-precision and report a floating-point exception,
           probably terminating the
@@ -301,14 +324,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
           exceptions</primary></indexterm>.</para>
 	</listitem>
       </varlistentry>
-    </variablelist>
 
-    </sect2>
-
-  <sect2 id="ffi-divergence">
-    <title>Divergence from the FFI specification</title>
-
-    <variablelist>
       <varlistentry>
         <term><literal>hs_init()</literal> not allowed
         after <literal>hs_exit()</literal></term>
