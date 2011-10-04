@@ -2830,10 +2830,10 @@ bar
 
       <para>Normal GHC command-line options may also be set using
       <literal>:set</literal>.  For example, to turn on
-      <option>-fglasgow-exts</option>, you would say:</para>
+      <option>-fwarn-missing-signatures</option>, you would say:</para>
 
 <screen>
-Prelude> :set -fglasgow-exts
+Prelude> :set -fwarn-missing-signatures
 </screen>
 
       <para>Any GHC command-line option that is designated as
@@ -2844,7 +2844,7 @@ Prelude> :set -fglasgow-exts
       <indexterm><primary>dynamic</primary><secondary>options</secondary></indexterm>
 
 <screen>
-Prelude> :set -fno-glasgow-exts
+Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
 </screen>
 
       <para><xref linkend="flag-reference"/> lists the reverse for each
@@ -2890,13 +2890,14 @@ Prelude> :set -fno-glasgow-exts
     defining useful macros.  Placing a <filename>.ghci</filename> file
     in a directory with a Haskell project is a useful way to set
     certain project-wide options so you don't have to type them
-    every time you start GHCi: eg. if your project uses GHC extensions
+    every time you start GHCi: eg. if your project uses multi-parameter 
+    type classes, scoped type variables,
     and CPP, and has source files in three subdirectories A, B and C,
     you might put the following lines in
     <filename>.ghci</filename>:</para>
 
 <screen>
-:set -fglasgow-exts -cpp
+:set -XMultiParamTypeClasses -XScopedTypeVariables -cpp
 :set -iA:B:C
 </screen>
 

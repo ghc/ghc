@@ -206,8 +206,8 @@ since <literal>b</literal> has type <literal>Int#</literal>.
 </title>
 
 <para>
-Unboxed tuples aren't really exported by <literal>GHC.Exts</literal>,
-they're available by default with <option>-fglasgow-exts</option>.  An
+Unboxed tuples aren't really exported by <literal>GHC.Exts</literal>;
+they are a syntactic extension enabled by the language flag <option>-XUnboxedTuples</option>.  An
 unboxed tuple looks like this:
 </para>
 
@@ -954,8 +954,7 @@ class Monad m => MonadFix m where
 Here are some other important points in using the recursive-do notation:
 <itemizedlist>
 <listitem><para>
-It is enabled with the flag <literal>-XDoRec</literal>, which is in turn implied by
-<literal>-fglasgow-exts</literal>.
+It is enabled with the flag <literal>-XDoRec</literal>.
 </para></listitem>
 
 <listitem><para>
@@ -2096,8 +2095,8 @@ The following syntax is stolen:
 <sect2 id="nullary-types">
 <title>Data types with no constructors</title>
 
-<para>With the <option>-fglasgow-exts</option> flag, GHC lets you declare
-a data type with no constructors.  For example:</para>
+<para>With the <option>-XEmptyDataDecls</option> flag (or equivalent LANGUAGE pragma), 
+GHC lets you declare a data type with no constructors.  For example:</para>
 
 <programlisting>
   data S      -- S :: *
@@ -3503,9 +3502,6 @@ There's lots of background in the paper <ulink
 url="http://research.microsoft.com/~simonpj/Papers/type-class-design-space/">Type
 classes: exploring the design space</ulink> (Simon Peyton Jones, Mark
 Jones, Erik Meijer).
-</para>
-<para>
-All the extensions are enabled by the <option>-fglasgow-exts</option> flag.
 </para>
 
 <sect3>

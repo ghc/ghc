@@ -650,7 +650,7 @@
 	  <tbody>
 	    <row>
 	      <entry><option>-fglasgow-exts</option></entry>
-	      <entry>Enable most language extensions</entry>
+	      <entry>Enable most language extensions; see <xref linkend="options-language"/> for exactly which ones.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-glasgow-exts</option></entry>
 	    </row>
