@@ -813,7 +813,7 @@ labelDynamic dflags this_pkg lbl =
 
    IdLabel n _ _        -> isDllName this_pkg n
 
-   -- When compiling in the "dyn" way, eack package is to be linked into
+   -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
     | os == OSMinGW32 ->
