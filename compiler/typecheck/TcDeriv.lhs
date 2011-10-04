@@ -314,16 +314,20 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; overlap_flag <- getOverlapFlag
 	; let (infer_specs, given_specs) = splitEithers early_specs
-	; deriv1 <- flatMapBagM (genInst True overlap_flag) (listToBag given_specs)
-	; let (insts,_) = partitionBagWith unDerivInst deriv1
+	; insts1 <- mapM (genInst True overlap_flag) given_specs
+--	; let (insts,_) = partitionBagWith unDerivInst deriv1
 
-	; final_specs <- extendLocalInstEnv (map iSpec (bagToList insts)) $
-			 inferInstanceContexts overlap_flag infer_specs
+	; final_specs <- extendLocalInstEnv (map (iSpec . fst) insts1) $
+                           inferInstanceContexts overlap_flag infer_specs
 
-	; deriv2 <- flatMapBagM (genInst False overlap_flag) (listToBag final_specs)
+	; insts2 <- mapM (genInst False overlap_flag) final_specs
 
-	; (inst_info, rn_binds, rn_dus)
-                <- renameDeriv is_boot (deriv1 `unionBags` deriv2)
+        ; let (inst_infos, deriv_stuff) = unzip (insts1 ++ insts2)
+        ; loc <- getSrcSpanM
+        ; let (binds, newTyCons, famInsts, extraInstances) = 
+                genAuxBinds loc (rm_dups (unionManyBags deriv_stuff))
+        ; (inst_info, rn_binds, rn_dus) <-
+            renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
 
 	; dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
@@ -332,7 +336,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; when (not (null inst_info)) $
           dumpDerivingInfo (ddump_deriving inst_info rn_binds)
 -}
-
+{-
   ; let unGenBinds (DerivGenMetaTyCons x) = Left (Right x)
         unGenBinds (DerivGenRepTyCon x)   = Left (Left x)
         unGenBinds x                      = Right x
@@ -341,14 +345,19 @@ tcDeriving tycl_decls inst_decls deriv_decls
         (repTyConsB, repMetaTysB) = partitionBagWith id genBinds
         (repTyCons, repMetaTys) = (bagToList repTyConsB, bagToList repMetaTysB)
         all_tycons = map ATyCon (repTyCons ++ concat (map metaTyCons2TyCons repMetaTys))
-
+-}
+  ; let all_tycons = map ATyCon (bagToList newTyCons)
   ; gbl_env <- tcExtendGlobalEnv all_tycons $
                tcExtendGlobalEnv (concatMap implicitTyThings all_tycons) $
-               tcExtendLocalFamInstEnv (map mkLocalFamInst repTyCons) $
+               tcExtendLocalFamInstEnv (map mkLocalFamInst (bagToList famInsts)) $
                tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
 
   ; return (addTcgDUs gbl_env rn_dus, inst_info, rn_binds) }
   where
+    -- Remove duplicate requests for auxilliary bindings
+    rm_dups = foldrBag dup_check emptyBag
+    dup_check a b = if anyBag (isDupAux a) b then b else consBag a b
+
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name 
                    -> [MetaTyCons] -- ^ Empty data constructors
                    -> [TyCon]      -- ^ Rep type family instances
@@ -372,14 +381,16 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 
 renameDeriv :: Bool
-	    -> BagDerivStuff --[(InstInfo RdrName, DerivAuxBinds)]
+	    -> [InstInfo RdrName]
+	    -> Bag (LHsBind RdrName, LSig RdrName)
  	    -> TcM (Bag (InstInfo Name), HsValBinds Name, DefUses)
-renameDeriv is_boot insts
+renameDeriv is_boot inst_infos bagBinds
   | is_boot	-- If we are compiling a hs-boot file, don't generate any derived bindings
 		-- The inst-info bindings will all be empty, but it's easier to
 		-- just use rn_inst_info to change the type appropriately
-  = do	{ (rn_inst_infos, fvs) <- mapAndUnzipBagM rn_inst_info inst_infos
-	; return (rn_inst_infos, emptyValBindsOut, usesOnly (plusFVs (bagToList fvs))) }
+  = do	{ (rn_inst_infos, fvs) <- mapAndUnzipM rn_inst_info inst_infos
+	; return ( listToBag rn_inst_infos
+                 , emptyValBindsOut, usesOnly (plusFVs fvs)) }
 
   | otherwise
   = discardWarnings $ 	 -- Discard warnings about unused bindings etc
@@ -387,22 +398,21 @@ renameDeriv is_boot insts
 		-- Generate and rename any extra not-one-inst-decl-specific binds, 
 		-- notably "con2tag" and/or "tag2con" functions.  
 		-- Bring those names into scope before renaming the instances themselves
-	  loc <- getSrcSpanM	-- Generic loc for shared bindings
-	; (aux_binds, aux_sigs) <- genAuxBinds loc (rm_dups other_binds)
+--	  loc <- getSrcSpanM	-- Generic loc for shared bindings
+	; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
 	; let aux_val_binds = ValBindsIn aux_binds (bagToList aux_sigs)
 	; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
 	; bindLocalNames (collectHsValBinders rn_aux_lhs) $ 
     do	{ (rn_aux, dus_aux) <- rnTopBindsRHS rn_aux_lhs
-	; (rn_inst_infos, fvs_insts) <- mapAndUnzipBagM rn_inst_info inst_infos
-	; return (rn_inst_infos, rn_aux,
-                  dus_aux `plusDU` usesOnly (plusFVs (bagToList fvs_insts))) } }
+	; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
+	; return (listToBag rn_inst_infos, rn_aux,
+                  dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }
 
   where
-    (inst_infos, other_binds) = partitionBagWith unDerivInst insts
-
-	-- Remove duplicate requests for auxilliary bindings
-    rm_dups = foldrBag dup_check emptyBag
-    dup_check a b = if anyBag (isDupAux a) b then b else consBag a b
+{-
+    --(inst_infos, other_binds) = partitionBagWith unDerivInst insts
+    (inst_infos, other_binds) = unzip insts
+-}
 
     rn_inst_info :: InstInfo RdrName -> TcM (InstInfo Name, FreeVars)
     rn_inst_info info@(InstInfo { iBinds = NewTypeDerived coi tc })
@@ -421,10 +431,11 @@ renameDeriv is_boot insts
 	where
 	  (tyvars,_, clas,_) = instanceHead inst
 	  clas_nm            = className clas
-
+{-
 unDerivInst :: DerivStuff -> Either (InstInfo RdrName) DerivStuff
 unDerivInst (DerivInst x) = Left x
 unDerivInst  x            = Right x
+-}
 \end{code}
 
 Note [Newtype deriving and unused constructors]
@@ -456,16 +467,6 @@ stored in NewTypeDerived.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 
 \begin{code}
--- Make the "extras" for the generic representation
-mkGenDerivExtras :: TyCon -> Module
-                 -> TcRn BagDerivStuff
-mkGenDerivExtras tc mod = do
-        { (metaTyCons, rep0TyInst) <- genGenericRepExtras tc mod
-        ; metaInsts                <- genDtMeta (tc, metaTyCons)
-        ; return (            unitBag (DerivGenMetaTyCons metaTyCons)
-                  `unionBags` unitBag (DerivGenRepTyCon rep0TyInst)
-                  `unionBags` metaInsts) }
-
 makeDerivSpecs :: Bool 
 	       -> [LTyClDecl Name] 
 	       -> [LInstDecl Name]
@@ -1469,41 +1470,45 @@ the renamer.  What a great hack!
 --
 genInst :: Bool             -- True <=> standalone deriving
         -> OverlapFlag
-        -> DerivSpec -> TcM BagDerivStuff
+        -> DerivSpec -> TcM (InstInfo RdrName, BagDerivStuff)
 genInst standalone_deriv oflag
         spec@(DS { ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype
                  , ds_name = name, ds_cls = clas })
   | is_newtype
-  = return $ unitBag $ DerivInst $ 
-      InstInfo { iSpec   = inst_spec
-               , iBinds  = NewTypeDerived co rep_tycon }
+  = return (InstInfo { iSpec   = inst_spec
+                     , iBinds  = NewTypeDerived co rep_tycon }, emptyBag)
 
   | otherwise
   = do { fix_env <- getFixityEnv
-       ; let { loc = getSrcSpan name
-             ; deriv_stuff = genDerivStuff loc fix_env clas rep_tycon
+       ; (meth_binds, deriv_stuff) <- genDerivStuff (getSrcSpan name) 
+                                        fix_env clas name rep_tycon
+       ; let { 
+{-
              ; (meth_binds', aux_binds) = partitionBag isDerivHsBind deriv_stuff
              ; meth_binds = mapBag unDerivHsBind meth_binds'
+-}
                   -- In case of a family instance, we need to use the representation
                   -- tycon (after all, it has the data constructors)
 
              ; inst_info = InstInfo { iSpec   = inst_spec
                                     , iBinds  = VanillaInst meth_binds []
                                                   standalone_deriv } }
+{-
        -- Generate the extra representation types and instances needed for a
        -- `Generic` instance
        ; generics_extras <- if classKey clas == genClassKey
-                             then mkGenDerivExtras rep_tycon (nameModule name)
+                             then gen_Generic_binds rep_tycon (nameModule name)
                               else return emptyBag
-
-       ; return (unitBag (DerivInst inst_info)
-                   `unionBags` aux_binds `unionBags` generics_extras) }
+-}
+       ; return ( inst_info, deriv_stuff) }
   where
+{-
     isDerivHsBind (DerivHsBind _) = True
     isDerivHsBind  _              = False
     unDerivHsBind (DerivHsBind x) = x
     unDerivHsBind _               = panic "unDerivHsBind"
+-}
     inst_spec = mkInstance oflag theta spec
     co1 = case tyConFamilyCoercion_maybe rep_tycon of
               Just co_con -> mkAxInstCo co_con rep_tc_args
@@ -1521,18 +1526,21 @@ genInst standalone_deriv oflag
 --    co2 : R1:N (b,b) ~ Tree (b,b)
 --    co  : N [(b,b)] ~ Tree (b,b)
 
-genDerivStuff :: SrcSpan -> FixityEnv -> Class -> TyCon
-              -> BagDerivStuff -- (LHsBinds RdrName, DerivAuxBinds)
-genDerivStuff loc fix_env clas tycon
+genDerivStuff :: SrcSpan -> FixityEnv -> Class -> Name -> TyCon
+              -> TcM (LHsBinds RdrName, BagDerivStuff)
+genDerivStuff loc fix_env clas name tycon
   | className clas `elem` typeableClassNames
-  = gen_Typeable_binds loc tycon
+  = return (gen_Typeable_binds loc tycon, emptyBag)
+
+  | classKey clas == genClassKey
+  = gen_Generic_binds tycon (nameModule name)
 
   | otherwise
   = case assocMaybe gen_list (getUnique clas) of
-	Just gen_fn -> gen_fn loc tycon
+	Just gen_fn -> return (gen_fn loc tycon)
 	Nothing	    -> pprPanic "genDerivStuff: bad derived class" (ppr clas)
   where
-    gen_list :: [(Unique, SrcSpan -> TyCon -> BagDerivStuff)]
+    gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff))]
     gen_list = [(eqClassKey,            gen_Eq_binds)
  	       ,(ordClassKey,           gen_Ord_binds)
  	       ,(enumClassKey,          gen_Enum_binds)
@@ -1544,7 +1552,6 @@ genDerivStuff loc fix_env clas tycon
 	       ,(functorClassKey,       gen_Functor_binds)
 	       ,(foldableClassKey,      gen_Foldable_binds)
 	       ,(traversableClassKey,   gen_Traversable_binds)
-	       ,(genClassKey,           genGenericBinds)
  	       ]
 \end{code}
 
@@ -1566,9 +1573,19 @@ For the generic representation we need to generate:
 @genGenericAll@ does all of them
 
 \begin{code}
+gen_Generic_binds :: TyCon -> Module
+                 -> TcM (LHsBinds RdrName, BagDerivStuff)
+gen_Generic_binds tc mod = do
+        { (metaTyCons, rep0TyInst) <- genGenericRepExtras tc mod
+        ; metaInsts                <- genDtMeta (tc, metaTyCons)
+        ; return ( mkBindsRep tc
+                 ,           (DerivFamInst rep0TyInst)
+                   `consBag` ((mapBag DerivTyCon (metaTyCons2TyCons metaTyCons))
+                   `unionBags` metaInsts)) }
+{-
 genGenericBinds :: SrcSpan -> TyCon -> BagDerivStuff
 genGenericBinds _ tc = mapBag DerivHsBind $ mkBindsRep tc
-
+-}
 genGenericRepExtras :: TyCon -> Module -> TcM (MetaTyCons, TyCon)
 genGenericRepExtras tc mod =
   do  uniqS <- newUniqueSupply

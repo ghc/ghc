@@ -224,8 +224,8 @@ data MetaTyCons = MetaTyCons { -- One meta datatype per dataype
 instance Outputable MetaTyCons where
   ppr (MetaTyCons d c s) = ppr d $$ vcat (map ppr c) $$ vcat (map ppr (concat s))
                                    
-metaTyCons2TyCons :: MetaTyCons -> [TyCon]
-metaTyCons2TyCons (MetaTyCons d c s) = d : c ++ concat s
+metaTyCons2TyCons :: MetaTyCons -> Bag TyCon
+metaTyCons2TyCons (MetaTyCons d c s) = listToBag (d : c ++ concat s)
 
 
 -- Bindings for Datatype, Constructor, and Selector instances
