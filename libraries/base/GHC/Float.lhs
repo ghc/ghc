@@ -849,18 +849,18 @@ fromRat' x = r
         p = floatDigits r
         (minExp0, _) = floatRange r
         minExp = minExp0 - p            -- the real minimum exponent
-        xMin   = toRational (expt b (p-1))
         xMax   = toRational (expt b p)
         p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
         f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
-        (x', p') = scaleRat (toRational b) minExp xMin xMax p0 (x / f)
+        x0 = x / f
+        (x', p') = if x0 >= xMax then (x0 / toRational b, p0+1) else (x0, p0)
         r = encodeFloat (round x') p'
 
 -- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
 scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
 scaleRat b minExp xMin xMax p x
- | p <= minExp = (x, p)
  | x >= xMax   = scaleRat b minExp xMin xMax (p+1) (x/b)
+ | p <= minExp = (x, p)
  | x < xMin    = scaleRat b minExp xMin xMax (p-1) (x*b)
  | otherwise   = (x, p)
 
@@ -924,7 +924,7 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
       (# ld#, pw# #)
         | pw# ==# 0# ->
           case integerLog2# n of
-            ln# | ln# ># (ld# +# me#) ->
+            ln# | ln# >=# (ld# +# me# -# 1#) ->
                   if ln# <# md#
                     then encodeFloat (n `shiftL` (I# (md# -# 1# -# ln#)))
                                         (I# (ln# +# 1# -# ld# -# md#))
@@ -962,8 +962,6 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                 | p0 == mantDigs = (n, d)
                 | otherwise     = (n, d `shiftL` (p0 - mantDigs))
               scale p a b
-                | p <= minEx-mantDigs = (p,a,b)
-                | a < (b `shiftL` (mantDigs-1)) = (p-1, a `shiftL` 1, b)
                 | (b `shiftL` mantDigs) <= a = (p+1, a, b `shiftL` 1)
                 | otherwise = (p, a, b)
               (p', n'', d'') = scale (p0-mantDigs) n' d'
