@@ -853,7 +853,7 @@ fromRat' x = r
         p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
         -- if x = n/d and ln = integerLogBase b n, ld = integerLogBase b d,
         -- then b^(ln-ld-1) < x < b^(ln-ld+1)
-        f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
+        f = if p0 < 0 then 1 :% expt b (-p0) else expt b p0 :% 1
         x0 = x / f
         -- if ln - ld >= minExp0, then b^(p-1) < x0 < b^(p+1), so there's at most
         -- one scaling step needed, otherwise, x0 < b^p and no scaling is needed
