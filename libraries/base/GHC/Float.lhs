@@ -851,11 +851,16 @@ fromRat' x = r
         minExp = minExp0 - p            -- the real minimum exponent
         xMax   = toRational (expt b p)
         p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
+        -- if x = n/d and ln = integerLogBase b n, ld = integerLogBase b d,
+        -- then b^(ln-ld-1) < x < b^(ln-ld+1)
         f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
         x0 = x / f
+        -- if ln - ld >= minExp0, then b^(p-1) < x0 < b^(p+1), so there's at most
+        -- one scaling step needed, otherwise, x0 < b^p and no scaling is needed
         (x', p') = if x0 >= xMax then (x0 / toRational b, p0+1) else (x0, p0)
         r = encodeFloat (round x') p'
 
+-- We don't need this helper anymore, TODO: remove?
 -- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
 scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
 scaleRat b minExp xMin xMax p x
@@ -919,12 +924,15 @@ divisions as much as possible.
 {-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Float,
                             Int -> Int -> Integer -> Integer -> Double #-}
 fromRat'' :: RealFloat a => Int -> Int -> Integer -> Integer -> a
+-- Invariant: n and d strictly positive
 fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
     case integerLog2IsPowerOf2# d of
       (# ld#, pw# #)
         | pw# ==# 0# ->
           case integerLog2# n of
             ln# | ln# >=# (ld# +# me# -# 1#) ->
+                  -- this means n/d >= 2^(minEx-1), i.e. we are guaranteed to get
+                  -- a normalised number, round to mantDigs bits
                   if ln# <# md#
                     then encodeFloat (n `shiftL` (I# (md# -# 1# -# ln#)))
                                         (I# (ln# +# 1# -# ld# -# md#))
@@ -937,13 +945,16 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                                             _ -> n' + 1
                          in encodeFloat n'' (I# (ln# -# ld# +# 1# -# md#))
                 | otherwise ->
+                  -- n/d < 2^(minEx-1), a denorm or rounded to 2^(minEx-1)
+                  -- the exponent for encoding is always minEx-mantDigs
+                  -- so we must shift right by (minEx-mantDigs) - (-ld)
                   case ld# +# (me# -# md#) of
-                    ld'# | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0
-                         | ld'# ==# (ln# +# 1#) ->
+                    ld'# | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0 -- result of shift < 0.5
+                         | ld'# ==# (ln# +# 1#) ->  -- first bit of n shifted to 0.5 place
                            case integerLog2IsPowerOf2# n of
-                            (# _, 0# #) -> encodeFloat 0 0
+                            (# _, 0# #) -> encodeFloat 0 0  -- round to even
                             (# _, _ #)  -> encodeFloat 1 (minEx - mantDigs)
-                         | ld'# <=# 0#  ->
+                         | ld'# <=# 0#  -> -- we would shift left, so we don't shift
                            encodeFloat n (I# ((me# -# md#) -# ld'#))
                          | otherwise    ->
                            let n' = n `shiftR` (I# ld'#)
@@ -956,15 +967,20 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
         | otherwise ->
           let ln = I# (integerLog2# n)
               ld = I# ld#
+              -- 2^(ln-ld-1) < n/d < 2^(ln-ld+1)
               p0 = max minEx (ln - ld)
               (n', d')
                 | p0 < mantDigs = (n `shiftL` (mantDigs - p0), d)
                 | p0 == mantDigs = (n, d)
                 | otherwise     = (n, d `shiftL` (p0 - mantDigs))
+              -- if ln-ld < minEx, then n'/d' < 2^mantDigs, else
+              -- 2^(mantDigs-1) < n'/d' < 2^(mantDigs+1) and we
+              -- may need one scaling step
               scale p a b
                 | (b `shiftL` mantDigs) <= a = (p+1, a, b `shiftL` 1)
                 | otherwise = (p, a, b)
               (p', n'', d'') = scale (p0-mantDigs) n' d'
+              -- n''/d'' < 2^mantDigs and p' == minEx-mantDigs or n''/d'' >= 2^(mantDigs-1)
               rdq = case n'' `quotRem` d'' of
                      (q,r) -> case compare (r `shiftL` 1) d'' of
                                 LT -> q
