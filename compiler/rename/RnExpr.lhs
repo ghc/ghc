@@ -147,7 +147,7 @@ rnExpr (OpApp e1 (L op_loc (HsVar op_rdr)) _ e2)
 	; final_e <- mkOpAppRn e1' (L op_loc op') fixity e2'
 	; return (final_e, fv_e1 `plusFV` fv_op `plusFV` fv_e2) }
 rnExpr (OpApp _ other_op _ _)
-  = failWith (vcat [ hang (ptext (sLit "Operator application with a non-variable operator:"))
+  = failWith (vcat [ hang (ptext (sLit "Infix application with a non-variable operator:"))
                         2 (ppr other_op)
                    , ptext (sLit "(Probably resulting from a Template Haskell splice)") ])
 
