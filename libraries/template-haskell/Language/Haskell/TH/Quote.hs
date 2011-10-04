@@ -25,8 +25,24 @@ dataToQa mkCon mkLit appCon antiQ t =
     case antiQ t of
       Nothing ->
           case constrRep constr of
-            AlgConstr _  ->
-                appCon con conArgs
+            AlgConstr _ ->
+                appCon (mkCon conName) conArgs
+              where
+                conName :: Name
+                conName =
+                    case showConstr constr of
+                      "(:)"       -> Name (mkOccName ":") NameS
+                      con@"[]"    -> Name (mkOccName con) NameS
+                      con@('(':_) -> Name (mkOccName con) NameS
+                      con         -> mkNameG_d (tyConPackage tycon)
+                                               (tyConModule tycon)
+                                               con
+                  where
+                    tycon :: TyCon
+                    tycon = (typeRepTyCon . typeOf) t
+
+                conArgs :: [Q q]
+                conArgs = gmapQ (dataToQa mkCon mkLit appCon antiQ) t
             IntConstr n ->
                 mkLit $ integerL n
             FloatConstr n ->
@@ -36,15 +52,6 @@ dataToQa mkCon mkLit appCon antiQ t =
         where
           constr :: Constr
           constr = toConstr t
-          constrName :: Constr -> String
-          constrName k =
-              case showConstr k of
-                "(:)"  -> ":"
-                name   -> name
-          con :: k
-          con = mkCon (mkName (constrName constr))
-          conArgs :: [Q q]
-          conArgs = gmapQ (dataToQa mkCon mkLit appCon antiQ) t
 
       Just y -> y
 
