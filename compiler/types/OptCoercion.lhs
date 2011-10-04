@@ -10,7 +10,10 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
-module OptCoercion ( optCoercion ) where 
+module OptCoercion (
+    NormalCo, optCoercion,
+    opt_trans, opt_nth, opt_inst
+  ) where
 
 #include "HsVersions.h"
 
@@ -143,14 +146,7 @@ opt_co' env sym (TransCo co1 co2)
     in_scope = getCvInScope env
 
 opt_co' env sym (NthCo n co)
-  | TyConAppCo tc cos <- co'
-  , isDecomposableTyCon tc		-- Not synonym families
-  = ASSERT( n < length cos )
-    cos !! n
-  | otherwise
-  = NthCo n co'
-  where
-    co' = opt_co env sym co
+  = opt_nth n (opt_co env sym co)
 
 opt_co' env sym (InstCo co ty)
     -- See if the first arg is already a forall
@@ -158,18 +154,37 @@ opt_co' env sym (InstCo co ty)
   | Just (tv, co_body) <- splitForAllCo_maybe co
   = opt_co (extendTvSubst env tv ty') sym co_body
 
-     -- See if it is a forall after optimization
-     -- If so, do an inefficient one-variable substitution
-  | Just (tv, co'_body) <- splitForAllCo_maybe co'
-  = substCoWithTy (getCvInScope env) tv ty' co'_body   
-
-  | otherwise = InstCo co' ty'
+  | otherwise
+  = opt_inst (getCvInScope env) co' ty'
 
   where
     co' = opt_co env sym co
     ty' = substTy env ty
 
 -------------
+
+opt_nth :: Int -> NormalCo -> NormalCo
+opt_nth n co'
+  | TyConAppCo tc cos <- co'
+  , isDecomposableTyCon tc              -- Not synonym families
+  = ASSERT( n < length cos )
+    cos !! n
+  | otherwise
+  = NthCo n co'
+
+-------------
+
+opt_inst :: InScopeSet -> NormalCo -> Type -> NormalCo
+opt_inst iss co' ty'
+     -- See if it is a forall after optimization
+     -- If so, do an inefficient one-variable substitution
+  | Just (tv, co'_body) <- splitForAllCo_maybe co'
+  = substCoWithTy iss tv ty' co'_body
+
+  | otherwise = InstCo co' ty'
+
+-------------
+
 opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
 opt_transList is = zipWith (opt_trans is)
 

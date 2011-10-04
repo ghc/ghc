@@ -36,10 +36,11 @@ import Supercompile.Core.Syntax
 import Supercompile.Utilities
 
 import CoreSubst
-import Coercion (CvSubstEnv, isCoVar, mkCoVarCo)
+import OptCoercion (optCoercion)
+import Coercion    (CvSubst(..), CvSubstEnv, isCoVar, mkCoVarCo)
 import qualified CoreSyn as CoreSyn (CoreExpr, Expr(Var))
-import Type     (mkTyVarTy)
-import Var      (Id, TyVar, CoVar, isTyVar)
+import Type        (mkTyVarTy)
+import Var         (Id, TyVar, CoVar, isTyVar)
 import VarEnv
 
 
@@ -167,8 +168,8 @@ renameFreeVars rn fvs = mkVarSet (map (renameId rn) id_list) `unionVarSet`
 renameType :: InScopeSet -> Renaming -> Type -> Type
 renameType iss rn = substTy (joinSubst iss rn)
 
-renameCoercion :: InScopeSet -> Renaming -> Coercion -> Coercion
-renameCoercion iss rn = substCo (joinSubst iss rn)
+renameCoercion :: InScopeSet -> Renaming -> Coercion -> NormalCo
+renameCoercion iss (_, tv_subst, co_subst) = optCoercion (CvSubst iss tv_subst co_subst)
 
 
 renameIn :: (Renaming -> a -> a) -> In a -> a

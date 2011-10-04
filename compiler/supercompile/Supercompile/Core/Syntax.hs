@@ -1,12 +1,15 @@
 {-# LANGUAGE Rank2Types #-}
 module Supercompile.Core.Syntax (
     module Supercompile.Core.Syntax,
-    DataCon, Var, Literal, Type, Coercion, PrimOp
+    Coercion, NormalCo, mkAxInstCo, mkReflCo,
+    DataCon, Var, Literal, Type, PrimOp
   ) where
 
 import Supercompile.Utilities
 import Supercompile.StaticFlags
 
+import OptCoercion
+import VarEnv   (InScopeSet)
 import DataCon  (DataCon)
 import Var      (TyVar, Var, varName, isTyVar, varType)
 import Name     (Name, nameOccName)
@@ -15,10 +18,26 @@ import Id       (Id)
 import Literal  (Literal)
 import Type     (Type, splitTyConApp_maybe, mkPredTy, mkEqPred)
 import TysPrim  (eqPredPrimTyCon)
-import Coercion (CoVar, Coercion, coercionKind)
+import Coercion (CoVar, Coercion, coercionKind, mkCvSubst, mkAxInstCo, mkReflCo)
 import PrimOp   (PrimOp)
 import PprCore  ()
 import Pair
+
+
+mkSymCo :: InScopeSet -> NormalCo -> NormalCo
+mkSymCo iss co = optCoercion (mkCvSubst iss) co
+
+mkTransCo :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
+mkTransCo = opt_trans
+
+mkNthCo :: Int -> NormalCo -> NormalCo
+mkNthCo = opt_nth
+
+mkInstCo :: InScopeSet -> NormalCo -> Type -> NormalCo
+mkInstCo = opt_inst
+
+decomposeCo :: Int -> NormalCo -> [NormalCo]
+decomposeCo arity co = [mkNthCo n co | n <- [0..(arity-1)] ]
 
 
 -- NB: don't use GHC's pprBndr because its way too noisy, printing unfoldings etc
@@ -187,7 +206,7 @@ nameString :: Name -> String
 nameString = occNameString . nameOccName
 
 
-type Coerced a = (Maybe (Coercion, Tag), a)
+type Coerced a = (Maybe (NormalCo, Tag), a)
 
 
 class Functor ann => Symantics ann where
