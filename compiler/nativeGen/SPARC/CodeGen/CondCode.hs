@@ -19,6 +19,7 @@ import Size
 
 import OldCmm
 
+import DynFlags
 import OrdList
 import Outputable
 
@@ -54,9 +55,11 @@ getCondCode (CmmMachOp mop [x, y])
       MO_U_Lt _   -> condIntCode LU   x y
       MO_U_Le _   -> condIntCode LEU  x y
 
-      _ 	  -> pprPanic "SPARC.CodeGen.CondCode.getCondCode" (ppr (CmmMachOp mop [x,y]))
+      _           -> do dflags <- getDynFlagsNat
+                        pprPanic "SPARC.CodeGen.CondCode.getCondCode" (pprPlatform (targetPlatform dflags) (CmmMachOp mop [x,y]))
 
-getCondCode other =  pprPanic "SPARC.CodeGen.CondCode.getCondCode" (ppr other)
+getCondCode other = do dflags <- getDynFlagsNat
+                       pprPanic "SPARC.CodeGen.CondCode.getCondCode" (pprPlatform (targetPlatform dflags) other)
 
 
 

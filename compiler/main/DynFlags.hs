@@ -426,6 +426,7 @@ data ExtensionFlag
    | Opt_DatatypeContexts
    | Opt_NondecreasingIndentation
    | Opt_RelaxedLayout
+   | Opt_TraditionalRecordSyntax
    deriving (Eq, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
@@ -928,6 +929,7 @@ languageExtensions (Just Haskell98)
        Opt_MonomorphismRestriction,
        Opt_NPlusKPatterns,
        Opt_DatatypeContexts,
+       Opt_TraditionalRecordSyntax,
        Opt_NondecreasingIndentation
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
@@ -940,6 +942,7 @@ languageExtensions (Just Haskell2010)
     = [Opt_ImplicitPrelude,
        Opt_MonomorphismRestriction,
        Opt_DatatypeContexts,
+       Opt_TraditionalRecordSyntax,
        Opt_EmptyDataDecls,
        Opt_ForeignFunctionInterface,
        Opt_PatternGuards,
@@ -1875,6 +1878,7 @@ xFlags = [
     \ turn_on -> when turn_on $ deprecate "It was widely considered a misfeature, and has been removed from the Haskell language." ),
   ( "NondecreasingIndentation",         AlwaysAllowed, Opt_NondecreasingIndentation, nop ),
   ( "RelaxedLayout",                    AlwaysAllowed, Opt_RelaxedLayout, nop ),
+  ( "TraditionalRecordSyntax",          AlwaysAllowed, Opt_TraditionalRecordSyntax, nop ),
   ( "MonoLocalBinds",                   AlwaysAllowed, Opt_MonoLocalBinds, nop ),
   ( "RelaxedPolyRec",                   AlwaysAllowed, Opt_RelaxedPolyRec, 
     \ turn_on -> if not turn_on 

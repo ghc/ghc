@@ -621,6 +621,7 @@ ppTyVar "o" = "openAlphaTyVar"
 ppTyVar _   = error "Unknown type var"
 
 ppType :: Ty -> String
+ppType (TyApp "Any"         []) = "anyTy"
 ppType (TyApp "Bool"        []) = "boolTy"
 
 ppType (TyApp "Int#"        []) = "intPrimTy"

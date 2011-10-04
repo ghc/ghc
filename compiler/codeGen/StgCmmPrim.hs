@@ -269,7 +269,7 @@ emitPrimOp [res] ReallyUnsafePtrEqualityOp [arg1,arg2]
    = emit (mkAssign (CmmLocal res) (CmmMachOp mo_wordEq [arg1,arg2]))
 
 --  #define addrToHValuezh(r,a) r=(P_)a
-emitPrimOp [res] AddrToHValueOp [arg]
+emitPrimOp [res] AddrToAnyOp [arg]
    = emit (mkAssign (CmmLocal res) arg)
 
 --  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))

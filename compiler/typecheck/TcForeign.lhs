@@ -27,6 +27,10 @@ import TcHsType
 import TcExpr
 import TcEnv
 
+import FamInst
+import FamInstEnv
+import Type
+import TypeRep
 import ForeignCall
 import ErrUtils
 import Id
@@ -48,13 +52,94 @@ import Util
 \begin{code}
 -- Defines a binding
 isForeignImport :: LForeignDecl name -> Bool
-isForeignImport (L _ (ForeignImport _ _ _)) = True
-isForeignImport _                           = False
+isForeignImport (L _ (ForeignImport _ _ _ _)) = True
+isForeignImport _                             = False
 
 -- Exports a binding
 isForeignExport :: LForeignDecl name -> Bool
-isForeignExport (L _ (ForeignExport _ _ _)) = True
-isForeignExport _                           = False
+isForeignExport (L _ (ForeignExport _ _ _ _)) = True
+isForeignExport _                             = False
+\end{code}
+
+\begin{code}
+-- normaliseFfiType takes the type from an FFI declaration, and
+-- evaluates any type synonyms, type functions, and newtypes. However,
+-- we are only allowed to look through newtypes if the constructor is
+-- in scope.
+normaliseFfiType :: Type -> TcM (Coercion, Type)
+normaliseFfiType ty
+    = do fam_envs <- tcGetFamInstEnvs
+         normaliseFfiType' fam_envs ty
+
+normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Coercion, Type)
+normaliseFfiType' env ty0 = go [] ty0
+  where
+    go :: [TyCon] -> Type -> TcM (Coercion, Type)
+    go rec_nts ty | Just ty' <- coreView ty     -- Expand synonyms
+        = go rec_nts ty'
+
+    go rec_nts ty@(TyConApp tc tys)
+        -- We don't want to look through the IO newtype, even if it is
+        -- in scope, so we have a special case for it:
+        | tc `hasKey` ioTyConKey
+        = children_only
+        | isNewTyCon tc         -- Expand newtypes
+        -- We can't just use isRecursiveTyCon here, as we need to allow
+        -- some recursive types as described below
+        = if tc `elem` rec_nts  -- See Note [Expanding newtypes] in Type.lhs
+          then -- If this is a recursive newtype then it will normally
+               -- be rejected later as not being a valid FFI type.
+               -- Sometimes recursion is OK though, e.g. with
+               --     newtype T = T (Ptr T)
+               -- we don't reject the type for being recursive.
+               return (Refl ty, ty)
+          else do newtypeOK <- do env <- getGblEnv
+                                  case tyConSingleDataCon_maybe tc of
+                                      Just dataCon ->
+                                          return $ notNull $ lookupGRE_Name (tcg_rdr_env env) $ dataConName dataCon
+                                      _ ->
+                                          return False
+                  let newtypeForeign = nameModule_maybe (tyConName tc) `elem`
+                                       [Just (mkBaseModule (fsLit "Foreign.C.Types")),
+                                        Just (mkBaseModule (fsLit "System.Posix.Types"))]
+                  if newtypeOK || newtypeForeign
+                      then do let nt_co = mkAxInstCo (newTyConCo tc) tys
+                              add_co nt_co rec_nts' nt_rhs
+                      else children_only
+        | isFamilyTyCon tc              -- Expand open tycons
+        , (co, ty) <- normaliseTcApp env tc tys
+        , not (isReflCo co)
+        = add_co co rec_nts ty
+        | otherwise
+        = children_only
+        where
+          children_only = do xs <- mapM (go rec_nts) tys
+                             let (cos, tys') = unzip xs
+                             return (mkTyConAppCo tc cos, mkTyConApp tc tys')
+          nt_rhs = newTyConInstRhs tc tys
+          rec_nts' | isRecursiveTyCon tc = tc:rec_nts
+                   | otherwise           = rec_nts
+
+    go rec_nts (AppTy ty1 ty2)
+      = do (coi1, nty1) <- go rec_nts ty1
+           (coi2, nty2) <- go rec_nts ty2
+           return (mkAppCo coi1 coi2, mkAppTy nty1 nty2)
+
+    go rec_nts (FunTy ty1 ty2)
+      = do (coi1,nty1) <- go rec_nts ty1
+           (coi2,nty2) <- go rec_nts ty2
+           return (mkFunCo coi1 coi2, mkFunTy nty1 nty2)
+
+    go rec_nts (ForAllTy tyvar ty1)
+      = do (coi,nty1) <- go rec_nts ty1
+           return (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
+
+    go _ ty@(TyVarTy _)
+      = return (Refl ty, ty)
+
+    add_co co rec_nts ty
+        = do (co', ty') <- go rec_nts ty
+             return (mkTransCo co co', ty')
 \end{code}
 
 %************************************************************************
@@ -69,13 +154,14 @@ tcForeignImports decls
   = mapAndUnzipM (wrapLocSndM tcFImport) (filter isForeignImport decls)
 
 tcFImport :: ForeignDecl Name -> TcM (Id, ForeignDecl Id)
-tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl)
+tcFImport fo@(ForeignImport (L loc nm) hs_ty _ imp_decl)
   = addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
+       ; (norm_co, norm_sig_ty) <- normaliseFfiType sig_ty
        ; let
            -- Drop the foralls before inspecting the
            -- structure of the foreign type.
-             (_, t_ty)         = tcSplitForAllTys sig_ty
+             (_, t_ty)         = tcSplitForAllTys norm_sig_ty
              (arg_tys, res_ty) = tcSplitFunTys t_ty
              id                = mkLocalId nm sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
@@ -85,7 +171,7 @@ tcFImport fo@(ForeignImport (L loc nm) hs_ty imp_decl)
        ; imp_decl' <- tcCheckFIType sig_ty arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
-       ; return (id, ForeignImport (L loc id) undefined imp_decl') }
+       ; return (id, ForeignImport (L loc id) undefined (mkSymCo norm_co) imp_decl') }
 tcFImport d = pprPanic "tcFImport" (ppr d)
 \end{code}
 
@@ -198,13 +284,15 @@ tcForeignExports decls
        return (b `consBag` binds, f:fs)
 
 tcFExport :: ForeignDecl Name -> TcM (LHsBind Id, ForeignDecl Id)
-tcFExport fo@(ForeignExport (L loc nm) hs_ty spec)
+tcFExport fo@(ForeignExport (L loc nm) hs_ty _ spec)
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
     rhs <- tcPolyExpr (nlHsVar nm) sig_ty
 
-    tcCheckFEType sig_ty spec
+    (norm_co, norm_sig_ty) <- normaliseFfiType sig_ty
+
+    tcCheckFEType norm_sig_ty spec
 
            -- we're exporting a function, but at a type possibly more
            -- constrained than its declared/inferred type. Hence the need
@@ -216,7 +304,7 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec)
     -- is *stable* (i.e. the compiler won't change it later),
     -- because this name will be referred to by the C code stub.
     id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
-    return (mkVarBind id rhs, ForeignExport (L loc id) undefined spec)
+    return (mkVarBind id rhs, ForeignExport (L loc id) undefined norm_co spec)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 \end{code}
 
@@ -264,49 +352,15 @@ nonIOok  = True
 mustBeIO = False
 
 checkForeignRes non_io_result_ok safehs_check pred_res_ty ty
-        -- (IO t) is ok, and so is any newtype wrapping thereof
-  = do m <- tcSplitVisibleIOType_maybe ty
-       case m of
-           Just (_, res_ty, _)
-            | pred_res_ty res_ty ->
-               return ()
-           _ ->
-               check (non_io_result_ok && pred_res_ty ty)
-                     (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
-
--- This is mostly a copy of TcType.tcSplitIOType_maybe, except it checks
--- that it doesn't look through any newtypes for which the constructor
--- is not exported.
-tcSplitVisibleIOType_maybe :: Type -> TcM (Maybe (TyCon, Type, Coercion))
-tcSplitVisibleIOType_maybe ty
-  = case tcSplitTyConApp_maybe ty of
-        -- This split absolutely has to be a tcSplit, because we must
-        -- see the IO type; and it's a newtype which is transparent to
-        -- splitTyConApp.
-
-        Just (io_tycon, [io_res_ty])
-           |  io_tycon `hasKey` ioTyConKey
-           -> return $ Just (io_tycon, io_res_ty, mkReflCo ty)
-
-        Just (tc, tys)
-           | not (isRecursiveTyCon tc)
-           , Just (ty, co1) <- instNewTyCon_maybe tc tys
-                  -- Newtypes that require a coercion are ok
-           -> do newtypeOK <- do env <- getGblEnv
-                                 case tyConSingleDataCon_maybe tc of
-                                     Just dataCon ->
-                                         return $ notNull $ lookupGRE_Name (tcg_rdr_env env) $ dataConName dataCon
-                                     Nothing ->
-                                         return False
-                 if newtypeOK
-                     then do m <- tcSplitVisibleIOType_maybe ty
-                             return $ case m of
-                                      Nothing             -> Nothing
-                                      Just (tc, ty', co2) -> Just (tc, ty', co1 `mkTransCo` co2)
-                     else return Nothing
-
-        _ -> return Nothing
-
+    -- We need an (IO t) result. Any newtype wrappers of type functions
+    -- have already been dealt with by normaliseFfiType.
+  = case tcSplitIOType_maybe ty of
+    Just (_, res_ty)
+     | pred_res_ty res_ty ->
+        return ()
+    _ ->
+        check (non_io_result_ok && pred_res_ty ty)
+              (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
 \end{code}
 
 \begin{code}

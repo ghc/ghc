@@ -13,8 +13,8 @@ module IfaceEnv (
 	ifaceExportNames,
 
 	-- Name-cache stuff
-	allocateGlobalBinder, initNameCache, updNameCache,
-        getNameCache, mkNameCacheUpdater, NameCacheUpdater
+	allocateGlobalBinder, allocateIPName, initNameCache, updNameCache,
+        getNameCache, mkNameCacheUpdater, NameCacheUpdater(..)
    ) where
 
 #include "HsVersions.h"
@@ -160,19 +160,20 @@ lookupOrig mod occ
                   in (name_cache{ nsUniqs = us, nsNames = new_cache }, name)
     }}}
 
+allocateIPName :: NameCache -> FastString -> (NameCache, IPName Name)
+allocateIPName name_cache ip = case Map.lookup ip ipcache of
+    Just name_ip -> (name_cache, name_ip)
+    Nothing      -> (new_ns, name_ip)
+       where
+         (us_here, us') = splitUniqSupply (nsUniqs name_cache)
+         tycon_u:datacon_u:dc_wrk_u:co_ax_u:_ = uniqsFromSupply us_here
+         name_ip     = mkIPName ip tycon_u datacon_u dc_wrk_u co_ax_u
+         new_ipcache = Map.insert ip name_ip ipcache
+         new_ns      = name_cache {nsUniqs = us', nsIPs = new_ipcache}
+  where ipcache = nsIPs name_cache
+
 newIPName :: FastString -> TcRnIf m n (IPName Name)
-newIPName ip =
-  updNameCache $ \name_cache ->
-    let ipcache = nsIPs name_cache
-    in case Map.lookup ip ipcache of
-         Just name_ip -> (name_cache, name_ip)
-         Nothing      -> (new_ns, name_ip)
-            where
-              (us_here, us') = splitUniqSupply (nsUniqs name_cache)
-              tycon_u:datacon_u:dc_wrk_u:co_ax_u:_ = uniqsFromSupply us_here
-              name_ip     = mkIPName ip tycon_u datacon_u dc_wrk_u co_ax_u
-              new_ipcache = Map.insert ip name_ip ipcache
-              new_ns      = name_cache {nsUniqs = us', nsIPs = new_ipcache}
+newIPName ip = updNameCache $ flip allocateIPName ip
 \end{code}
 
 %************************************************************************
@@ -225,16 +226,16 @@ updNameCache upd_fn = do
 -- | A function that atomically updates the name cache given a modifier
 -- function.  The second result of the modifier function will be the result
 -- of the IO action.
-type NameCacheUpdater c = (NameCache -> (NameCache, c)) -> IO c
+data NameCacheUpdater = NCU { updateNameCache :: forall c. (NameCache -> (NameCache, c)) -> IO c }
 
 -- | Return a function to atomically update the name cache.
-mkNameCacheUpdater :: TcRnIf a b (NameCacheUpdater c)
+mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
 mkNameCacheUpdater = do
   nc_var <- hsc_NC `fmap` getTopEnv
   let update_nc f = do r <- atomicModifyIORef nc_var f
                        _ <- evaluate =<< readIORef nc_var
                        return r
-  return update_nc
+  return (NCU update_nc)
 \end{code}
 
 

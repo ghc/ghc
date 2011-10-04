@@ -81,7 +81,8 @@ deSugar hsc_env
                             tcg_fam_insts    = fam_insts,
                             tcg_hpc          = other_hpc_info })
 
-  = do	{ let dflags = hsc_dflags hsc_env
+  = do { let dflags = hsc_dflags hsc_env
+             platform = targetPlatform dflags
         ; showPass dflags "Desugar"
 
 	-- Desugar the program
@@ -109,7 +110,7 @@ deSugar hsc_env
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; ds_vects <- mapM dsVect vects
                           ; let hpc_init
-                                  | opt_Hpc   = hpcInitCode mod ds_hpc_info
+                                  | opt_Hpc   = hpcInitCode platform mod ds_hpc_info
                                   | otherwise = empty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs

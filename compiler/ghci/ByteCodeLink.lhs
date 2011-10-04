@@ -7,17 +7,10 @@ ByteCodeLink: Bytecode assembler and linker
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
-module ByteCodeLink ( 
-	HValue, 
-	ClosureEnv, emptyClosureEnv, extendClosureEnv,
-	linkBCO, lookupStaticPtr, lookupName
+module ByteCodeLink (
+        HValue,
+        ClosureEnv, emptyClosureEnv, extendClosureEnv,
+        linkBCO, lookupStaticPtr, lookupName
        ,lookupIE
   ) where
 
@@ -29,10 +22,8 @@ import ObjLink
 
 import Name
 import NameEnv
-import OccName
 import PrimOp
 import Module
-import PackageConfig
 import FastString
 import Panic
 import Outputable
@@ -41,30 +32,29 @@ import Outputable
 
 import Data.Array.Base
 
-import Control.Monad	( zipWithM )
+import Control.Monad
 import Control.Monad.ST ( stToIO )
 
 import GHC.Arr          ( Array(..), STArray(..) )
-import GHC.Base		( writeArray#, RealWorld, Int(..), Word# )  
-import GHC.IOBase	( IO(..) )
+import GHC.IO           ( IO(..) )
 import GHC.Exts
-import GHC.Ptr		( Ptr(..), castPtr )
-import GHC.Word		( Word(..) )
+import GHC.Ptr          ( castPtr )
 
 import Data.Word
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Linking interpretables into something we can run}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 type ClosureEnv = NameEnv (Name, HValue)
 newtype HValue = HValue Any
 
+emptyClosureEnv :: ClosureEnv
 emptyClosureEnv = emptyNameEnv
 
 extendClosureEnv :: ClosureEnv -> [(Name,HValue)] -> ClosureEnv
@@ -74,45 +64,45 @@ extendClosureEnv cl_env pairs
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Linking interpretables into something we can run}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-{- 
-data BCO# = BCO# ByteArray# 		-- instrs   :: Array Word16#
-                 ByteArray# 		-- literals :: Array Word32#
-                 PtrArray# 		-- ptrs     :: Array HValue
-                 ByteArray#		-- itbls    :: Array Addr#
+{-
+data BCO# = BCO# ByteArray#             -- instrs   :: Array Word16#
+                 ByteArray#             -- literals :: Array Word32#
+                 PtrArray#              -- ptrs     :: Array HValue
+                 ByteArray#             -- itbls    :: Array Addr#
 -}
 
 linkBCO :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO HValue
 linkBCO ie ce ul_bco
    = do BCO bco# <- linkBCO' ie ce ul_bco
-	-- SDM: Why do we need mkApUpd0 here?  I *think* it's because
-	-- otherwise top-level interpreted CAFs don't get updated 
- 	-- after evaluation.   A top-level BCO will evaluate itself and
-	-- return its value when entered, but it won't update itself.
-	-- Wrapping the BCO in an AP_UPD thunk will take care of the
-	-- update for us.
-	--
-	-- Update: the above is true, but now we also have extra invariants:
-	--   (a) An AP thunk *must* point directly to a BCO
-	--   (b) A zero-arity BCO *must* be wrapped in an AP thunk
-	--   (c) An AP is always fully saturated, so we *can't* wrap
-	--       non-zero arity BCOs in an AP thunk.
-	-- 
-	if (unlinkedBCOArity ul_bco > 0) 
-	   then return (unsafeCoerce# bco#)
-	   else case mkApUpd0# bco# of { (# final_bco #) -> return final_bco }
+        -- SDM: Why do we need mkApUpd0 here?  I *think* it's because
+        -- otherwise top-level interpreted CAFs don't get updated
+        -- after evaluation.   A top-level BCO will evaluate itself and
+        -- return its value when entered, but it won't update itself.
+        -- Wrapping the BCO in an AP_UPD thunk will take care of the
+        -- update for us.
+        --
+        -- Update: the above is true, but now we also have extra invariants:
+        --   (a) An AP thunk *must* point directly to a BCO
+        --   (b) A zero-arity BCO *must* be wrapped in an AP thunk
+        --   (c) An AP is always fully saturated, so we *can't* wrap
+        --       non-zero arity BCOs in an AP thunk.
+        --
+        if (unlinkedBCOArity ul_bco > 0)
+           then return (HValue (unsafeCoerce# bco#))
+           else case mkApUpd0# bco# of { (# final_bco #) -> return (HValue final_bco) }
 
 
 linkBCO' :: ItblEnv -> ClosureEnv -> UnlinkedBCO -> IO BCO
-linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
+linkBCO' ie ce (UnlinkedBCO _ arity insns_barr bitmap literalsSS ptrsSS)
    -- Raises an IO exception on failure
    = do let literals = ssElts literalsSS
-	    ptrs     = ssElts ptrsSS
+            ptrs     = ssElts ptrsSS
 
         linked_literals <- mapM (lookupLiteral ie) literals
 
@@ -123,7 +113,7 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
                     then panic "linkBCO: >= 64k ptrs"
                     else mkPtrsArray ie ce (fromIntegral n_ptrs) ptrs
 
-        let 
+        let
             !ptrs_parr = case ptrs_arr of Array _lo _hi _n parr -> parr
 
             litRange
@@ -134,7 +124,7 @@ linkBCO' ie ce (UnlinkedBCO nm arity insns_barr bitmap literalsSS ptrsSS)
             literals_arr = listArray litRange linked_literals
             !literals_barr = case literals_arr of UArray _lo _hi _n barr -> barr
 
-	    !(I# arity#)  = arity
+            !(I# arity#)  = arity
 
         newBCO insns_barr literals_barr ptrs_parr arity# bitmap
 
@@ -144,21 +134,21 @@ mkPtrsArray :: ItblEnv -> ClosureEnv -> Word16 -> [BCOPtr] -> IO (Array Word16 H
 mkPtrsArray ie ce n_ptrs ptrs = do
   let ptrRange = if n_ptrs > 0 then (0, n_ptrs-1) else (1, 0)
   marr <- newArray_ ptrRange
-  let 
+  let
     fill (BCOPtrName n)     i = do
-	ptr <- lookupName ce n
-	unsafeWrite marr i ptr
+        ptr <- lookupName ce n
+        unsafeWrite marr i ptr
     fill (BCOPtrPrimOp op)  i = do
- 	ptr <- lookupPrimOp op
-	unsafeWrite marr i ptr
+        ptr <- lookupPrimOp op
+        unsafeWrite marr i ptr
     fill (BCOPtrBCO ul_bco) i = do
-	BCO bco# <- linkBCO' ie ce ul_bco
-	writeArrayBCO marr i bco#
-    fill (BCOPtrBreakInfo brkInfo) i =                    
-        unsafeWrite marr i (unsafeCoerce# brkInfo)
-    fill (BCOPtrArray brkArray) i =                    
-        unsafeWrite marr i (unsafeCoerce# brkArray)
-  zipWithM fill ptrs [0..]
+        BCO bco# <- linkBCO' ie ce ul_bco
+        writeArrayBCO marr i bco#
+    fill (BCOPtrBreakInfo brkInfo) i =
+        unsafeWrite marr i (HValue (unsafeCoerce# brkInfo))
+    fill (BCOPtrArray brkArray) i =
+        unsafeWrite marr i (HValue (unsafeCoerce# brkArray))
+  zipWithM_ fill ptrs [0..]
   unsafeFreeze marr
 
 newtype IOArray i e = IOArray (STArray RealWorld i e)
@@ -190,24 +180,24 @@ data BCO = BCO BCO#
 
 newBCO :: ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> IO BCO
 newBCO instrs lits ptrs arity bitmap
-   = IO $ \s -> case newBCO# instrs lits ptrs arity bitmap s of 
-		  (# s1, bco #) -> (# s1, BCO bco #)
+   = IO $ \s -> case newBCO# instrs lits ptrs arity bitmap s of
+                  (# s1, bco #) -> (# s1, BCO bco #)
 
 
 lookupLiteral :: ItblEnv -> BCONPtr -> IO Word
-lookupLiteral ie (BCONPtrWord lit) = return lit
-lookupLiteral ie (BCONPtrLbl  sym) = do Ptr a# <- lookupStaticPtr sym
-			                return (W# (int2Word# (addr2Int# a#)))
+lookupLiteral _  (BCONPtrWord lit) = return lit
+lookupLiteral _  (BCONPtrLbl  sym) = do Ptr a# <- lookupStaticPtr sym
+                                        return (W# (int2Word# (addr2Int# a#)))
 lookupLiteral ie (BCONPtrItbl nm)  = do Ptr a# <- lookupIE ie nm
-			                return (W# (int2Word# (addr2Int# a#)))
+                                        return (W# (int2Word# (addr2Int# a#)))
 
 lookupStaticPtr :: FastString -> IO (Ptr ())
-lookupStaticPtr addr_of_label_string 
+lookupStaticPtr addr_of_label_string
    = do let label_to_find = unpackFS addr_of_label_string
-        m <- lookupSymbol label_to_find 
+        m <- lookupSymbol label_to_find
         case m of
            Just ptr -> return ptr
-           Nothing  -> linkFail "ByteCodeLink: can't find label" 
+           Nothing  -> linkFail "ByteCodeLink: can't find label"
                                 label_to_find
 
 lookupPrimOp :: PrimOp -> IO HValue
@@ -215,25 +205,25 @@ lookupPrimOp primop
    = do let sym_to_find = primopToCLabel primop "closure"
         m <- lookupSymbol sym_to_find
         case m of
-           Just (Ptr addr) -> case addrToHValue# addr of
-                                 (# hval #) -> return hval
+           Just (Ptr addr) -> case addrToAny# addr of
+                                 (# a #) -> return (HValue a)
            Nothing -> linkFail "ByteCodeLink.lookupCE(primop)" sym_to_find
 
 lookupName :: ClosureEnv -> Name -> IO HValue
 lookupName ce nm
    = case lookupNameEnv ce nm of
         Just (_,aa) -> return aa
-        Nothing 
+        Nothing
            -> ASSERT2(isExternalName nm, ppr nm)
-	      do let sym_to_find = nameToCLabel nm "closure"
+              do let sym_to_find = nameToCLabel nm "closure"
                  m <- lookupSymbol sym_to_find
                  case m of
-                    Just (Ptr addr) -> case addrToHValue# addr of
-                                          (# hval #) -> return hval
+                    Just (Ptr addr) -> case addrToAny# addr of
+                                          (# a #) -> return (HValue a)
                     Nothing         -> linkFail "ByteCodeLink.lookupCE" sym_to_find
 
 lookupIE :: ItblEnv -> Name -> IO (Ptr a)
-lookupIE ie con_nm 
+lookupIE ie con_nm
    = case lookupNameEnv ie con_nm of
         Just (_, a) -> return (castPtr (itblCode a))
         Nothing
@@ -242,29 +232,29 @@ lookupIE ie con_nm
                  m <- lookupSymbol sym_to_find1
                  case m of
                     Just addr -> return addr
-                    Nothing 
+                    Nothing
                        -> do -- perhaps a nullary constructor?
                              let sym_to_find2 = nameToCLabel con_nm "static_info"
                              n <- lookupSymbol sym_to_find2
                              case n of
                                 Just addr -> return addr
-                                Nothing   -> linkFail "ByteCodeLink.lookupIE" 
+                                Nothing   -> linkFail "ByteCodeLink.lookupIE"
                                                 (sym_to_find1 ++ " or " ++ sym_to_find2)
 
 linkFail :: String -> String -> IO a
 linkFail who what
    = ghcError (ProgramError $
         unlines [ "",who
-	        , "During interactive linking, GHCi couldn't find the following symbol:"
-		, ' ' : ' ' : what 
-		, "This may be due to you not asking GHCi to load extra object files,"
-		, "archives or DLLs needed by your current session.  Restart GHCi, specifying"
-		, "the missing library using the -L/path/to/object/dir and -lmissinglibname"
-		, "flags, or simply by naming the relevant files on the GHCi command line."
-		, "Alternatively, this link failure might indicate a bug in GHCi."
-		, "If you suspect the latter, please send a bug report to:"
-		, "  glasgow-haskell-bugs@haskell.org"
-		])
+                , "During interactive linking, GHCi couldn't find the following symbol:"
+                , ' ' : ' ' : what
+                , "This may be due to you not asking GHCi to load extra object files,"
+                , "archives or DLLs needed by your current session.  Restart GHCi, specifying"
+                , "the missing library using the -L/path/to/object/dir and -lmissinglibname"
+                , "flags, or simply by naming the relevant files on the GHCi command line."
+                , "Alternatively, this link failure might indicate a bug in GHCi."
+                , "If you suspect the latter, please send a bug report to:"
+                , "  glasgow-haskell-bugs@haskell.org"
+                ])
 
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String

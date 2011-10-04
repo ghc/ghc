@@ -236,7 +236,6 @@ data IfaceUnfolding
 data IfaceExpr
   = IfaceLcl    IfLclName
   | IfaceExt    IfExtName
-  | IfaceTupId  TupleSort Arity
   | IfaceType   IfaceType
   | IfaceCo     IfaceType		-- We re-use IfaceType for coercions
   | IfaceTuple 	TupleSort [IfaceExpr]	-- Saturated; type arguments omitted
@@ -260,7 +259,6 @@ type IfaceAlt = (IfaceConAlt, [IfLclName], IfaceExpr)
 
 data IfaceConAlt = IfaceDefault
                  | IfaceDataAlt IfExtName
-                 | IfaceTupleAlt TupleSort
                  | IfaceLitAlt Literal
 
 data IfaceBinding
@@ -573,7 +571,6 @@ pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 
 pprIfaceExpr _       (IfaceLcl v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
-pprIfaceExpr _       (IfaceTupId c n)   = tupleParens c (hcat (replicate (n - 1) (char ',')))
 pprIfaceExpr _       (IfaceLit l)       = ppr l
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprIfaceExpr _       (IfaceTick m ix)   = braces (text "tick" <+> ppr m <+> ppr ix)
@@ -628,8 +625,7 @@ ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs,
                          arrow <+> pprIfaceExpr noParens rhs]
 
 ppr_con_bs :: IfaceConAlt -> [IfLclName] -> SDoc
-ppr_con_bs (IfaceTupleAlt tup_con) bs = tupleParens tup_con (interpp'SP bs)
-ppr_con_bs con bs                     = ppr con <+> hsep (map ppr bs)
+ppr_con_bs con bs = ppr con <+> hsep (map ppr bs)
 
 ppr_bind :: (IfaceLetBndr, IfaceExpr) -> SDoc
 ppr_bind (IfLetBndr b ty info, rhs)
@@ -653,8 +649,6 @@ instance Outputable IfaceConAlt where
     ppr IfaceDefault      = text "DEFAULT"
     ppr (IfaceLitAlt l)   = ppr l
     ppr (IfaceDataAlt d)  = ppr d
-    ppr (IfaceTupleAlt _) = panic "ppr IfaceConAlt"
-    -- IfaceTupleAlt is handled by the case-alternative printer
 
 ------------------
 instance Outputable IfaceIdDetails where
@@ -817,7 +811,6 @@ freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr vs
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)      = unitNameSet v
-freeNamesIfExpr (IfaceTupId _ _)  = emptyNameSet
 freeNamesIfExpr (IfaceFCall _ ty) = freeNamesIfType ty
 freeNamesIfExpr (IfaceType ty)    = freeNamesIfType ty
 freeNamesIfExpr (IfaceCo co)      = freeNamesIfType co

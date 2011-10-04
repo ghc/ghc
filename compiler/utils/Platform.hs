@@ -28,6 +28,7 @@ data Platform
         = Platform
         { platformArch  :: Arch
         , platformOS    :: OS }
+        deriving (Show, Eq)
 
 
 -- | Architectures that the native code generator knows about.

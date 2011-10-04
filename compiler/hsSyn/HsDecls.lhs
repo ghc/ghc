@@ -35,6 +35,7 @@ module HsDecls (
   SpliceDecl(..),
   -- ** Foreign function interface declarations
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
+  noForeignImportCoercionYet, noForeignExportCoercionYet,
   CImportSpec(..),
   -- ** Data-constructor declarations
   ConDecl(..), LConDecl, ResType(..), 
@@ -64,6 +65,7 @@ import NameSet
 import Name
 import {- Kind parts of -} Type
 import BasicTypes
+import Coercion
 import ForeignCall
 
 -- others:
@@ -532,9 +534,14 @@ tcdTyPats = Just tys
    This is a data/type family instance declaration
    tcdTyVars are fv(tys)
 
-   Eg   instance C (a,b) where
-          type F a x y = x->y
-   After the renamer, the tcdTyVars of the F decl are {x,y}
+   Eg   class C a b where
+          type F a x :: *
+        instance D p s => C (p,q) [r] where
+          type F (p,q) x = p -> x
+   The tcdTyVars of the F instance decl are {p,q,x},
+   i.e. not including s, nor r 
+        (and indeed neither s nor should be mentioned
+         on the RHS of the F instance decl; Trac #5515)
 
 ------------------------------
 Simple classifiers
@@ -906,9 +913,31 @@ instance (OutputableBndr name)
 type LForeignDecl name = Located (ForeignDecl name)
 
 data ForeignDecl name
-  = ForeignImport (Located name) (LHsType name) ForeignImport  -- defines name
-  | ForeignExport (Located name) (LHsType name) ForeignExport  -- uses name
+  = ForeignImport (Located name) -- defines this name
+                  (LHsType name) -- sig_ty
+                  Coercion       -- rep_ty ~ sig_ty
+                  ForeignImport
+  | ForeignExport (Located name) -- uses this name
+                  (LHsType name) -- sig_ty
+                  Coercion       -- sig_ty ~ rep_ty
+                  ForeignExport
   deriving (Data, Typeable)
+{-
+    In both ForeignImport and ForeignExport:
+        sig_ty is the type given in the Haskell code
+        rep_ty is the representation for this type, i.e. with newtypes
+               coerced away and type functions evaluated.
+    Thus if the declaration is valid, then rep_ty will only use types
+    such as Int and IO that we know how to make foreign calls with.
+-}
+
+noForeignImportCoercionYet :: Coercion
+noForeignImportCoercionYet
+    = panic "ForeignImport coercion evaluated before typechecking"
+
+noForeignExportCoercionYet :: Coercion
+noForeignExportCoercionYet
+    = panic "ForeignExport coercion evaluated before typechecking"
 
 -- Specification Of an imported external entity in dependence on the calling
 -- convention 
@@ -951,10 +980,10 @@ data ForeignExport = CExport  CExportSpec    -- contains the calling convention
 --
 
 instance OutputableBndr name => Outputable (ForeignDecl name) where
-  ppr (ForeignImport n ty fimport) =
+  ppr (ForeignImport n ty _ fimport) =
     hang (ptext (sLit "foreign import") <+> ppr fimport <+> ppr n)
        2 (dcolon <+> ppr ty)
-  ppr (ForeignExport n ty fexport) =
+  ppr (ForeignExport n ty _ fexport) =
     hang (ptext (sLit "foreign export") <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 

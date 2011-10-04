@@ -27,7 +27,8 @@ module Unique (
 	pprUnique, 
 
 	mkUniqueGrimily,		-- Used in UniqSupply only!
-	getKey, getKeyFastInt,		-- Used in Var, UniqFM, Name only!
+        getKey, getKeyFastInt,		-- Used in Var, UniqFM, Name only!
+        mkUnique, unpkUnique,           -- Used in BinIface only
 
 	incrUnique,			-- Used for renumbering
 	deriveUnique,			-- Ditto

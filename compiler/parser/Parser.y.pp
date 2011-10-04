@@ -1032,7 +1032,7 @@ atype :: { LHsType RdrName }
 	: gtycon			{ L1 (HsTyVar (unLoc $1)) }
 	| tyvar				{ L1 (HsTyVar (unLoc $1)) }
 	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
-	| '{' fielddecls '}'		{ LL $ HsRecTy $2 }              -- Constructor sigs only
+	| '{' fielddecls '}'		{% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
 	| '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy (HsBoxyTuple placeHolderKind)  ($2:$4) }
 	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy HsUnboxedTuple $2     }
 	| '[' ctype ']'			{ LL $ HsListTy  $2 }
@@ -1049,7 +1049,7 @@ atype :: { LHsType RdrName }
 -- It's kept as a single type, with a MonoDictTy at the right
 -- hand corner, for convenience.
 inst_type :: { LHsType RdrName }
-	: sigtype			{% checkInstType $1 }
+	: sigtype			{ $1 }
 
 inst_types1 :: { [LHsType RdrName] }
 	: inst_type			{ [$1] }
@@ -1128,7 +1128,8 @@ gadt_constr :: { [LConDecl RdrName] }	-- Returns a list because of:   C,D :: ty
 		-- Deprecated syntax for GADT record declarations
 	| oqtycon '{' fielddecls '}' '::' sigtype
 		{% do { cd <- mkDeprecatedGadtRecordDecl (comb2 $1 $6) $1 $3 $6
-                      ; return [cd] } }
+                      ; cd' <- checkRecordSyntax cd
+                      ; return [cd'] } }
 
 constrs :: { Located [LConDecl RdrName] }
         : maybe_docnext '=' constrs1    { L (comb2 $2 $3) (addConDocs (unLoc $3) $1) }
@@ -1182,9 +1183,8 @@ fielddecl :: { [ConDeclField RdrName] }    -- A list because of   f,g :: Int
 -- We don't allow a context, but that's sorted out by the type checker.
 deriving :: { Located (Maybe [LHsType RdrName]) }
 	: {- empty -}				{ noLoc Nothing }
-	| 'deriving' qtycon	{% do { let { L loc tv = $2 }
-				      ; p <- checkInstType (L loc (HsTyVar tv))
-				      ; return (LL (Just [p])) } }
+	| 'deriving' qtycon			{ let { L loc tv = $2 }
+						  in LL (Just [L loc (HsTyVar tv)]) } 
 	| 'deriving' '(' ')'	 		{ LL (Just []) }
 	| 'deriving' '(' inst_types1 ')' 	{ LL (Just $3) }
              -- Glasgow extension: allow partial 
@@ -1357,7 +1357,7 @@ aexp	:: { LHsExpr RdrName }
 
 aexp1	:: { LHsExpr RdrName }
         : aexp1 '{' fbinds '}' 	{% do { r <- mkRecConstrOrUpdate $1 (comb2 $2 $4) $3
-				      ; return (LL r) }}
+				      ; checkRecordSyntax (LL r) }}
   	| aexp2			{ $1 }
 
 -- Here was the syntax for type applications that I was planning

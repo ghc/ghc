@@ -537,6 +537,7 @@ instance Outputable TcTyThing where	-- Debugging only
    ppr elt@(ATcId {})   = text "Identifier" <> 
 			  brackets (ppr (tct_id elt) <> dcolon 
                                  <> ppr (varType (tct_id elt)) <> comma
+				 <+> ppr (tct_closed elt) <> comma
 				 <+> ppr (tct_level elt))
    ppr (ATyVar tv _)    = text "Type variable" <+> quotes (ppr tv)
    ppr (AThing k)       = text "AThing" <+> ppr k

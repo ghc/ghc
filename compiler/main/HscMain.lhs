@@ -1107,7 +1107,7 @@ hscGenHardCode cgguts mod_summary
              <- {-# SCC "CoreToStg" #-}
                 myCoreToStg dflags this_mod prepd_binds	
 
-         let prof_init = profilingInitCode this_mod cost_centre_info
+         let prof_init = profilingInitCode platform this_mod cost_centre_info
              foreign_stubs = foreign_stubs0 `appendStubC` prof_init
 
          ------------------  Code generation ------------------
@@ -1123,7 +1123,7 @@ hscGenHardCode cgguts mod_summary
 
                  -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
-         rawcmms <- cmmToRawCmm cmms
+         rawcmms <- cmmToRawCmm platform cmms
          dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (pprPlatform platform rawcmms)
          (_stub_h_exists, stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
@@ -1175,7 +1175,7 @@ hscCompileCmmFile hsc_env filename
       let dflags = hsc_dflags hsc_env
       cmm <- ioMsgMaybe $ parseCmmFile dflags filename
       liftIO $ do
-        rawCmms <- cmmToRawCmm [cmm]
+        rawCmms <- cmmToRawCmm (targetPlatform dflags) [cmm]
         _ <- codeOutput dflags no_mod no_loc NoStubs [] rawCmms
         return ()
   where

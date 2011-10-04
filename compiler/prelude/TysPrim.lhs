@@ -67,7 +67,7 @@ module TysPrim(
         eqPrimTyCon,            -- ty1 ~# ty2
 
 	-- * Any
-	anyTyCon, anyTyConOfKind, anyTypeOfKind
+	anyTy, anyTyCon, anyTyConOfKind, anyTypeOfKind
   ) where
 
 #include "HsVersions.h"
@@ -121,6 +121,13 @@ primTyCons
     , word64PrimTyCon
     , anyTyCon
     , eqPrimTyCon
+
+    , liftedTypeKindTyCon
+    , unliftedTypeKindTyCon
+    , openTypeKindTyCon
+    , argTypeKindTyCon
+    , ubxTupleKindTyCon
+    , constraintKindTyCon
     ]
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
@@ -604,7 +611,7 @@ The type constructor Any::* has these properties
 
   * It is inhabited by at least one value, namely bottom
 
-  * You can unsafely coerce any lifted type to Ayny, and back.
+  * You can unsafely coerce any lifted type to Any, and back.
 
   * It does not claim to be a *data* type, and that's important for
     the code generator, because the code gen may *enter* a data value
@@ -663,6 +670,9 @@ This commit uses
 \begin{code}
 anyTyConName :: Name
 anyTyConName = mkPrimTc (fsLit "Any") anyTyConKey anyTyCon
+
+anyTy :: Type
+anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
 anyTyCon = mkLiftedPrimTyCon anyTyConName liftedTypeKind 0 PtrRep

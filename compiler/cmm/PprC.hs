@@ -36,6 +36,7 @@ import Unique
 import UniqSet
 import FastString
 import Outputable
+import Platform
 import Constants
 import Util
 
@@ -67,7 +68,7 @@ import Control.Monad.ST
 
 pprCs :: DynFlags -> [RawCmmGroup] -> SDoc
 pprCs dflags cmms
- = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
+ = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC (targetPlatform dflags) c) cmms)
  where
    split_marker
      | dopt Opt_SplitObjs dflags = ptext (sLit "__STG_SPLIT_MARKER")
@@ -83,57 +84,57 @@ writeCs dflags handle cmms
 -- for fun, we could call cmmToCmm over the tops...
 --
 
-pprC :: RawCmmGroup -> SDoc
-pprC tops = vcat $ intersperse blankLine $ map pprTop tops
+pprC :: Platform -> RawCmmGroup -> SDoc
+pprC platform tops = vcat $ intersperse blankLine $ map (pprTop platform) tops
 
 --
 -- top level procs
 -- 
-pprTop :: RawCmmDecl -> SDoc
-pprTop (CmmProc mb_info clbl (ListGraph blocks)) =
+pprTop :: Platform -> RawCmmDecl -> SDoc
+pprTop platform (CmmProc mb_info clbl (ListGraph blocks)) =
     (case mb_info of
        Nothing -> empty
-       Just (Statics info_clbl info_dat) -> pprDataExterns info_dat $$
-                                            pprWordArray info_clbl info_dat) $$
+       Just (Statics info_clbl info_dat) -> pprDataExterns platform info_dat $$
+                                            pprWordArray platform info_clbl info_dat) $$
     (vcat [
            blankLine,
            extern_decls,
            (if (externallyVisibleCLabel clbl)
-                    then mkFN_ else mkIF_) (pprCLabel clbl) <+> lbrace,
+                    then mkFN_ else mkIF_) (pprCLabel platform clbl) <+> lbrace,
            nest 8 temp_decls,
            nest 8 mkFB_,
            case blocks of
                [] -> empty
                -- the first block doesn't get a label:
                (BasicBlock _ stmts : rest) ->
-                    nest 8 (vcat (map pprStmt stmts)) $$
-                       vcat (map pprBBlock rest),
+                    nest 8 (vcat (map (pprStmt platform) stmts)) $$
+                       vcat (map (pprBBlock platform) rest),
            nest 8 mkFE_,
            rbrace ]
     )
   where
-        (temp_decls, extern_decls) = pprTempAndExternDecls blocks 
+        (temp_decls, extern_decls) = pprTempAndExternDecls platform blocks
 
 
 -- Chunks of static data.
 
 -- We only handle (a) arrays of word-sized things and (b) strings.
 
-pprTop (CmmData _section (Statics lbl [CmmString str])) = 
+pprTop platform (CmmData _section (Statics lbl [CmmString str])) =
   hcat [
-    pprLocalness lbl, ptext (sLit "char "), pprCLabel lbl,
+    pprLocalness lbl, ptext (sLit "char "), pprCLabel platform lbl,
     ptext (sLit "[] = "), pprStringInCStyle str, semi
   ]
 
-pprTop (CmmData _section (Statics lbl [CmmUninitialised size])) = 
+pprTop platform (CmmData _section (Statics lbl [CmmUninitialised size])) =
   hcat [
-    pprLocalness lbl, ptext (sLit "char "), pprCLabel lbl,
+    pprLocalness lbl, ptext (sLit "char "), pprCLabel platform lbl,
     brackets (int size), semi
   ]
 
-pprTop (CmmData _section (Statics lbl lits)) = 
-  pprDataExterns lits $$
-  pprWordArray lbl lits
+pprTop platform (CmmData _section (Statics lbl lits)) =
+  pprDataExterns platform lits $$
+  pprWordArray platform lbl lits
 
 -- --------------------------------------------------------------------------
 -- BasicBlocks are self-contained entities: they always end in a jump.
@@ -142,24 +143,24 @@ pprTop (CmmData _section (Statics lbl lits)) =
 -- as many jumps as possible into fall throughs.
 --
 
-pprBBlock :: CmmBasicBlock -> SDoc
-pprBBlock (BasicBlock lbl stmts) = 
+pprBBlock :: Platform -> CmmBasicBlock -> SDoc
+pprBBlock platform (BasicBlock lbl stmts) =
     if null stmts then
         pprTrace "pprC.pprBBlock: curious empty code block for" 
                         (pprBlockId lbl) empty
     else 
         nest 4 (pprBlockId lbl <> colon) $$
-        nest 8 (vcat (map pprStmt stmts))
+        nest 8 (vcat (map (pprStmt platform) stmts))
 
 -- --------------------------------------------------------------------------
 -- Info tables. Just arrays of words. 
 -- See codeGen/ClosureInfo, and nativeGen/PprMach
 
-pprWordArray :: CLabel -> [CmmStatic] -> SDoc
-pprWordArray lbl ds
+pprWordArray :: Platform -> CLabel -> [CmmStatic] -> SDoc
+pprWordArray platform lbl ds
   = hcat [ pprLocalness lbl, ptext (sLit "StgWord")
-         , space, pprCLabel lbl, ptext (sLit "[] = {") ] 
-    $$ nest 8 (commafy (pprStatics ds))
+         , space, pprCLabel platform lbl, ptext (sLit "[] = {") ] 
+    $$ nest 8 (commafy (pprStatics platform ds))
     $$ ptext (sLit "};")
 
 --
@@ -173,9 +174,9 @@ pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext (sLit "static ")
 -- Statements.
 --
 
-pprStmt :: CmmStmt -> SDoc
+pprStmt :: Platform -> CmmStmt -> SDoc
 
-pprStmt stmt = case stmt of
+pprStmt platform stmt = case stmt of
     CmmReturn _  -> panic "pprStmt: return statement should have been cps'd away"
     CmmNop       -> empty
     CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
@@ -184,16 +185,16 @@ pprStmt stmt = case stmt of
                           -- some debugging option is on.  They can get quite
                           -- large.
 
-    CmmAssign dest src -> pprAssign dest src
+    CmmAssign dest src -> pprAssign platform dest src
 
     CmmStore  dest src
  	| typeWidth rep == W64 && wordWidth /= W64
  	-> (if isFloatType rep then ptext (sLit "ASSIGN_DBL")
  			       else ptext (sLit ("ASSIGN_Word64"))) <> 
- 	   parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
+ 	   parens (mkP_ <> pprExpr1 platform dest <> comma <> pprExpr platform src) <> semi
 
  	| otherwise
-	-> hsep [ pprExpr (CmmLoad dest rep), equals, pprExpr src <> semi ]
+	-> hsep [ pprExpr platform (CmmLoad dest rep), equals, pprExpr platform src <> semi ]
 	where
 	  rep = cmmExprType src
 
@@ -201,14 +202,14 @@ pprStmt stmt = case stmt of
         maybe_proto $$
 	fnCall
 	where
-        cast_fn = parens (cCast (pprCFunType (char '*') cconv results args) fn)
+        cast_fn = parens (cCast platform (pprCFunType (char '*') cconv results args) fn)
 
         real_fun_proto lbl = char ';' <> 
-                        pprCFunType (pprCLabel lbl) cconv results args <> 
+                        pprCFunType (pprCLabel platform lbl) cconv results args <> 
                         noreturn_attr <> semi
 
         fun_proto lbl = ptext (sLit ";EF_(") <>
-                         pprCLabel lbl <> char ')' <> semi
+                         pprCLabel platform lbl <> char ')' <> semi
 
         noreturn_attr = case ret of
                           CmmNeverReturns -> text "__attribute__ ((noreturn))"
@@ -219,7 +220,7 @@ pprStmt stmt = case stmt of
             case fn of
 	      CmmLit (CmmLabel lbl) 
                 | StdCallConv <- cconv ->
-                    let myCall = pprCall (pprCLabel lbl) cconv results args safety
+                    let myCall = pprCall platform (pprCLabel platform lbl) cconv results args safety
                     in (real_fun_proto lbl, myCall)
                         -- stdcall functions must be declared with
                         -- a function type, otherwise the C compiler
@@ -227,22 +228,22 @@ pprStmt stmt = case stmt of
                         -- can't add the @n suffix ourselves, because
                         -- it isn't valid C.
                 | CmmNeverReturns <- ret ->
-                    let myCall = pprCall (pprCLabel lbl) cconv results args safety
+                    let myCall = pprCall platform (pprCLabel platform lbl) cconv results args safety
                     in (real_fun_proto lbl, myCall)
                 | not (isMathFun lbl) ->
                     let myCall = braces (
                                      pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
                                   $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
-                                  $$ pprCall (text "ghcFunPtr") cconv results args safety <> semi
+                                  $$ pprCall platform (text "ghcFunPtr") cconv results args safety <> semi
                                  )
                     in (fun_proto lbl, myCall)
 	      _ -> 
                    (empty {- no proto -},
-                    pprCall cast_fn cconv results args safety <> semi)
+                    pprCall platform cast_fn cconv results args safety <> semi)
 			-- for a dynamic call, no declaration is necessary.
 
     CmmCall (CmmPrim op) results args safety _ret ->
-	pprCall ppr_fn CCallConv results args' safety
+	pprCall platform ppr_fn CCallConv results args' safety
 	where
     	ppr_fn = pprCallishMachOp_for_C op
     	-- The mem primops carry an extra alignment arg, must drop it.
@@ -251,9 +252,9 @@ pprStmt stmt = case stmt of
                | otherwise = args
 
     CmmBranch ident          -> pprBranch ident
-    CmmCondBranch expr ident -> pprCondBranch expr ident
-    CmmJump lbl _params      -> mkJMP_(pprExpr lbl) <> semi
-    CmmSwitch arg ids        -> pprSwitch arg ids
+    CmmCondBranch expr ident -> pprCondBranch platform expr ident
+    CmmJump lbl _params      -> mkJMP_(pprExpr platform lbl) <> semi
+    CmmSwitch arg ids        -> pprSwitch platform arg ids
 
 pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
@@ -275,9 +276,9 @@ pprBranch ident = ptext (sLit "goto") <+> pprBlockId ident <> semi
 
 -- ---------------------------------------------------------------------
 -- conditional branches to local labels
-pprCondBranch :: CmmExpr -> BlockId -> SDoc
-pprCondBranch expr ident 
-        = hsep [ ptext (sLit "if") , parens(pprExpr expr) ,
+pprCondBranch :: Platform -> CmmExpr -> BlockId -> SDoc
+pprCondBranch platform expr ident
+        = hsep [ ptext (sLit "if") , parens(pprExpr platform expr) ,
                         ptext (sLit "goto") , (pprBlockId ident) <> semi ]
 
 
@@ -290,12 +291,12 @@ pprCondBranch expr ident
 -- 'undefined'. However, they may be defined one day, so we better
 -- document this behaviour.
 --
-pprSwitch :: CmmExpr -> [ Maybe BlockId ] -> SDoc
-pprSwitch e maybe_ids 
+pprSwitch :: Platform -> CmmExpr -> [ Maybe BlockId ] -> SDoc
+pprSwitch platform e maybe_ids 
   = let pairs  = [ (ix, ident) | (ix,Just ident) <- zip [0..] maybe_ids ]
 	pairs2 = [ (map fst as, snd (head as)) | as <- groupBy sndEq pairs ]
     in 
-        (hang (ptext (sLit "switch") <+> parens ( pprExpr e ) <+> lbrace)
+        (hang (ptext (sLit "switch") <+> parens ( pprExpr platform e ) <+> lbrace)
                 4 (vcat ( map caseify pairs2 )))
         $$ rbrace
 
@@ -329,12 +330,12 @@ pprSwitch e maybe_ids
 --
 -- (similar invariants apply to the rest of the pretty printer).
 
-pprExpr :: CmmExpr -> SDoc
-pprExpr e = case e of
-    CmmLit lit -> pprLit lit
+pprExpr :: Platform -> CmmExpr -> SDoc
+pprExpr platform e = case e of
+    CmmLit lit -> pprLit platform lit
 
 
-    CmmLoad e ty -> pprLoad e ty
+    CmmLoad e ty -> pprLoad platform e ty
     CmmReg reg      -> pprCastReg reg
     CmmRegOff reg 0 -> pprCastReg reg
 
@@ -344,17 +345,17 @@ pprExpr e = case e of
       where
 	pprRegOff op i' = pprCastReg reg <> op <> int i'
 
-    CmmMachOp mop args -> pprMachOpApp mop args
+    CmmMachOp mop args -> pprMachOpApp platform mop args
 
     CmmStackSlot _ _   -> panic "pprExpr: CmmStackSlot not supported!"
 
 
-pprLoad :: CmmExpr -> CmmType -> SDoc
-pprLoad e ty
+pprLoad :: Platform -> CmmExpr -> CmmType -> SDoc
+pprLoad platform e ty
   | width == W64, wordWidth /= W64
   = (if isFloatType ty then ptext (sLit "PK_DBL")
 	    	       else ptext (sLit "PK_Word64"))
-    <> parens (mkP_ <> pprExpr1 e)
+    <> parens (mkP_ <> pprExpr1 platform e)
 
   | otherwise 
   = case e of
@@ -370,32 +371,32 @@ pprLoad e ty
         --       (For tagging to work, I had to avoid unaligned loads. --ARY)
 			-> pprAsPtrReg r <> brackets (ppr (off `shiftR` wordShift))
 
-	_other -> cLoad e ty
+	_other -> cLoad platform e ty
   where
     width = typeWidth ty
 
-pprExpr1 :: CmmExpr -> SDoc
-pprExpr1 (CmmLit lit) 	  = pprLit1 lit
-pprExpr1 e@(CmmReg _reg)  = pprExpr e
-pprExpr1 other            = parens (pprExpr other)
+pprExpr1 :: Platform -> CmmExpr -> SDoc
+pprExpr1 platform (CmmLit lit)     = pprLit1 platform lit
+pprExpr1 platform e@(CmmReg _reg)  = pprExpr platform e
+pprExpr1 platform other            = parens (pprExpr platform other)
 
 -- --------------------------------------------------------------------------
 -- MachOp applications
 
-pprMachOpApp :: MachOp -> [CmmExpr] -> SDoc
+pprMachOpApp :: Platform -> MachOp -> [CmmExpr] -> SDoc
 
-pprMachOpApp op args
+pprMachOpApp platform op args
   | isMulMayOfloOp op
-  = ptext (sLit "mulIntMayOflo") <> parens (commafy (map pprExpr args))
+  = ptext (sLit "mulIntMayOflo") <> parens (commafy (map (pprExpr platform) args))
   where isMulMayOfloOp (MO_U_MulMayOflo _) = True
 	isMulMayOfloOp (MO_S_MulMayOflo _) = True
 	isMulMayOfloOp _ = False
 
-pprMachOpApp mop args
+pprMachOpApp platform mop args
   | Just ty <- machOpNeedsCast mop 
-  = ty <> parens (pprMachOpApp' mop args)
+  = ty <> parens (pprMachOpApp' platform mop args)
   | otherwise
-  = pprMachOpApp' mop args
+  = pprMachOpApp' platform mop args
 
 -- Comparisons in C have type 'int', but we want type W_ (this is what
 -- resultRepOfMachOp says).  The other C operations inherit their type
@@ -405,8 +406,8 @@ machOpNeedsCast mop
   | isComparisonMachOp mop = Just mkW_
   | otherwise              = Nothing
 
-pprMachOpApp' :: MachOp -> [CmmExpr] -> SDoc
-pprMachOpApp' mop args
+pprMachOpApp' :: Platform -> MachOp -> [CmmExpr] -> SDoc
+pprMachOpApp' platform mop args
  = case args of
     -- dyadic
     [x,y] -> pprArg x <+> pprMachOp_for_C mop <+> pprArg y
@@ -418,9 +419,9 @@ pprMachOpApp' mop args
 
   where
 	-- Cast needed for signed integer ops
-    pprArg e | signedOp    mop = cCast (machRep_S_CType (typeWidth (cmmExprType e))) e
-             | needsFCasts mop = cCast (machRep_F_CType (typeWidth (cmmExprType e))) e
- 	     | otherwise    = pprExpr1 e
+    pprArg e | signedOp    mop = cCast platform (machRep_S_CType (typeWidth (cmmExprType e))) e
+             | needsFCasts mop = cCast platform (machRep_F_CType (typeWidth (cmmExprType e))) e
+ 	     | otherwise    = pprExpr1 platform e
     needsFCasts (MO_F_Eq _)   = False
     needsFCasts (MO_F_Ne _)   = False
     needsFCasts (MO_F_Neg _)  = True
@@ -430,8 +431,8 @@ pprMachOpApp' mop args
 -- --------------------------------------------------------------------------
 -- Literals
 
-pprLit :: CmmLit -> SDoc
-pprLit lit = case lit of
+pprLit :: Platform -> CmmLit -> SDoc
+pprLit platform lit = case lit of
     CmmInt i rep      -> pprHexVal i rep
 
     CmmFloat f w       -> parens (machRep_F_CType w) <> str
@@ -457,54 +458,54 @@ pprLit lit = case lit of
         -> mkW_ <> pprCLabelAddr clbl1 <> char '+' <> int i
 
     where
-        pprCLabelAddr lbl = char '&' <> pprCLabel lbl
+        pprCLabelAddr lbl = char '&' <> pprCLabel platform lbl
 
-pprLit1 :: CmmLit -> SDoc
-pprLit1 lit@(CmmLabelOff _ _) = parens (pprLit lit)
-pprLit1 lit@(CmmLabelDiffOff _ _ _) = parens (pprLit lit)
-pprLit1 lit@(CmmFloat _ _)    = parens (pprLit lit)
-pprLit1 other = pprLit other
+pprLit1 :: Platform -> CmmLit -> SDoc
+pprLit1 platform lit@(CmmLabelOff _ _) = parens (pprLit platform lit)
+pprLit1 platform lit@(CmmLabelDiffOff _ _ _) = parens (pprLit platform lit)
+pprLit1 platform lit@(CmmFloat _ _)    = parens (pprLit platform lit)
+pprLit1 platform other = pprLit platform other
 
 -- ---------------------------------------------------------------------------
 -- Static data
 
-pprStatics :: [CmmStatic] -> [SDoc]
-pprStatics [] = []
-pprStatics (CmmStaticLit (CmmFloat f W32) : rest) 
+pprStatics :: Platform -> [CmmStatic] -> [SDoc]
+pprStatics _ [] = []
+pprStatics platform (CmmStaticLit (CmmFloat f W32) : rest) 
   -- floats are padded to a word, see #1852
   | wORD_SIZE == 8, CmmStaticLit (CmmInt 0 W32) : rest' <- rest
-  = pprLit1 (floatToWord f) : pprStatics rest'
+  = pprLit1 platform (floatToWord f) : pprStatics platform rest'
   | wORD_SIZE == 4
-  = pprLit1 (floatToWord f) : pprStatics rest
+  = pprLit1 platform (floatToWord f) : pprStatics platform rest
   | otherwise
   = pprPanic "pprStatics: float" (vcat (map ppr' rest))
     where ppr' (CmmStaticLit l) = ppr (cmmLitType l)
           ppr' _other           = ptext (sLit "bad static!")
-pprStatics (CmmStaticLit (CmmFloat f W64) : rest)
-  = map pprLit1 (doubleToWords f) ++ pprStatics rest
-pprStatics (CmmStaticLit (CmmInt i W64) : rest)
+pprStatics platform (CmmStaticLit (CmmFloat f W64) : rest)
+  = map (pprLit1 platform) (doubleToWords f) ++ pprStatics platform rest
+pprStatics platform (CmmStaticLit (CmmInt i W64) : rest)
   | wordWidth == W32
 #ifdef WORDS_BIGENDIAN
-  = pprStatics (CmmStaticLit (CmmInt q W32) : 
+  = pprStatics platform (CmmStaticLit (CmmInt q W32) :
 		CmmStaticLit (CmmInt r W32) : rest)
 #else
-  = pprStatics (CmmStaticLit (CmmInt r W32) : 
+  = pprStatics platform (CmmStaticLit (CmmInt r W32) :
 		CmmStaticLit (CmmInt q W32) : rest)
 #endif
   where r = i .&. 0xffffffff
 	q = i `shiftR` 32
-pprStatics (CmmStaticLit (CmmInt _ w) : _)
+pprStatics _ (CmmStaticLit (CmmInt _ w) : _)
   | w /= wordWidth
   = panic "pprStatics: cannot emit a non-word-sized static literal"
-pprStatics (CmmStaticLit lit : rest)
-  = pprLit1 lit : pprStatics rest
-pprStatics (other : _)
-  = pprPanic "pprWord" (pprStatic other)
+pprStatics platform (CmmStaticLit lit : rest)
+  = pprLit1 platform lit : pprStatics platform rest
+pprStatics platform (other : _)
+  = pprPanic "pprWord" (pprStatic platform other)
 
-pprStatic :: CmmStatic -> SDoc
-pprStatic s = case s of
+pprStatic :: Platform -> CmmStatic -> SDoc
+pprStatic platform s = case s of
 
-    CmmStaticLit lit   -> nest 4 (pprLit lit)
+    CmmStaticLit lit   -> nest 4 (pprLit platform lit)
     CmmUninitialised i -> nest 4 (mkC_ <> brackets (int i))
 
     -- these should be inlined, like the old .hc
@@ -691,15 +692,15 @@ mkP_  = ptext (sLit "(P_)")        -- StgWord*
 --
 -- Generating assignments is what we're all about, here
 --
-pprAssign :: CmmReg -> CmmExpr -> SDoc
+pprAssign :: Platform -> CmmReg -> CmmExpr -> SDoc
 
 -- dest is a reg, rhs is a reg
-pprAssign r1 (CmmReg r2)
+pprAssign _ r1 (CmmReg r2)
    | isPtrReg r1 && isPtrReg r2
    = hcat [ pprAsPtrReg r1, equals, pprAsPtrReg r2, semi ]
 
 -- dest is a reg, rhs is a CmmRegOff
-pprAssign r1 (CmmRegOff r2 off)
+pprAssign _ r1 (CmmRegOff r2 off)
    | isPtrReg r1 && isPtrReg r2 && (off `rem` wORD_SIZE == 0)
    = hcat [ pprAsPtrReg r1, equals, pprAsPtrReg r2, op, int off', semi ]
   where
@@ -711,10 +712,10 @@ pprAssign r1 (CmmRegOff r2 off)
 -- dest is a reg, rhs is anything.
 -- We can't cast the lvalue, so we have to cast the rhs if necessary.  Casting
 -- the lvalue elicits a warning from new GCC versions (3.4+).
-pprAssign r1 r2
-  | isFixedPtrReg r1             = mkAssign (mkP_ <> pprExpr1 r2)
-  | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 r2)
-  | otherwise                    = mkAssign (pprExpr r2)
+pprAssign platform r1 r2
+  | isFixedPtrReg r1             = mkAssign (mkP_ <> pprExpr1 platform r2)
+  | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 platform r2)
+  | otherwise                    = mkAssign (pprExpr platform r2)
     where mkAssign x = if r1 == CmmGlobal BaseReg
                        then ptext (sLit "ASSIGN_BaseReg") <> parens x <> semi
                        else pprReg r1 <> ptext (sLit " = ") <> x <> semi
@@ -810,10 +811,11 @@ pprLocalReg (LocalReg uniq _) = char '_' <> ppr uniq
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> CmmSafety
-	-> SDoc
+pprCall :: Platform -> SDoc -> CCallConv
+        -> [HintedCmmFormal] -> [HintedCmmActual] -> CmmSafety
+        -> SDoc
 
-pprCall ppr_fn cconv results args _
+pprCall platform ppr_fn cconv results args _
   | not (is_cishCC cconv)
   = panic $ "pprCall: unknown calling convention"
 
@@ -828,12 +830,12 @@ pprCall ppr_fn cconv results args _
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
      pprArg (CmmHinted expr AddrHint)
-   	= cCast (ptext (sLit "void *")) expr
+   	= cCast platform (ptext (sLit "void *")) expr
 	-- see comment by machRepHintCType below
      pprArg (CmmHinted expr SignedHint)
-	= cCast (machRep_S_CType $ typeWidth $ cmmExprType expr) expr
+	= cCast platform (machRep_S_CType $ typeWidth $ cmmExprType expr) expr
      pprArg (CmmHinted expr _other)
-	= pprExpr expr
+	= pprExpr platform expr
 
      pprUnHint AddrHint   rep = parens (machRepCType rep)
      pprUnHint SignedHint rep = parens (machRepCType rep)
@@ -851,29 +853,30 @@ is_cishCC PrimCallConv = False
 -- Find and print local and external declarations for a list of
 -- Cmm statements.
 -- 
-pprTempAndExternDecls :: [CmmBasicBlock] -> (SDoc{-temps-}, SDoc{-externs-})
-pprTempAndExternDecls stmts 
+pprTempAndExternDecls :: Platform -> [CmmBasicBlock]
+                      -> (SDoc{-temps-}, SDoc{-externs-})
+pprTempAndExternDecls platform stmts
   = (vcat (map pprTempDecl (uniqSetToList temps)), 
-     vcat (map (pprExternDecl False{-ToDo-}) (Map.keys lbls)))
+     vcat (map (pprExternDecl platform False{-ToDo-}) (Map.keys lbls)))
   where (temps, lbls) = runTE (mapM_ te_BB stmts)
 
-pprDataExterns :: [CmmStatic] -> SDoc
-pprDataExterns statics
-  = vcat (map (pprExternDecl False{-ToDo-}) (Map.keys lbls))
+pprDataExterns :: Platform -> [CmmStatic] -> SDoc
+pprDataExterns platform statics
+  = vcat (map (pprExternDecl platform False{-ToDo-}) (Map.keys lbls))
   where (_, lbls) = runTE (mapM_ te_Static statics)
 
 pprTempDecl :: LocalReg -> SDoc
 pprTempDecl l@(LocalReg _ rep)
   = hcat [ machRepCType rep, space, pprLocalReg l, semi ]
 
-pprExternDecl :: Bool -> CLabel -> SDoc
-pprExternDecl _in_srt lbl
+pprExternDecl :: Platform -> Bool -> CLabel -> SDoc
+pprExternDecl platform _in_srt lbl
   -- do not print anything for "known external" things
   | not (needsCDecl lbl) = empty
   | Just sz <- foreignLabelStdcallInfo lbl = stdcall_decl sz
   | otherwise =
 	hcat [ visibility, label_type lbl,
-	       lparen, pprCLabel lbl, text ");" ]
+	       lparen, pprCLabel platform lbl, text ");" ]
  where
   label_type lbl | isCFunctionLabel lbl = ptext (sLit "F_")
 		 | otherwise		= ptext (sLit "I_")
@@ -886,7 +889,7 @@ pprExternDecl _in_srt lbl
   -- we must generate an appropriate prototype for it, so that the C compiler will
   -- add the @n suffix to the label (#2276)
   stdcall_decl sz =
-        ptext (sLit "extern __attribute__((stdcall)) void ") <> pprCLabel lbl
+        ptext (sLit "extern __attribute__((stdcall)) void ") <> pprCLabel platform lbl
         <> parens (commafy (replicate (sz `quot` wORD_SIZE) (machRep_U_CType wordWidth)))
         <> semi
 
@@ -945,19 +948,19 @@ te_Reg _            = return ()
 -- ---------------------------------------------------------------------
 -- C types for MachReps
 
-cCast :: SDoc -> CmmExpr -> SDoc
-cCast ty expr = parens ty <> pprExpr1 expr
+cCast :: Platform -> SDoc -> CmmExpr -> SDoc
+cCast platform ty expr = parens ty <> pprExpr1 platform expr
 
-cLoad :: CmmExpr -> CmmType -> SDoc
+cLoad :: Platform -> CmmExpr -> CmmType -> SDoc
 #ifdef BEWARE_LOAD_STORE_ALIGNMENT
-cLoad expr rep =
+cLoad platform expr rep =
     let decl = machRepCType rep <+> ptext (sLit "x") <> semi
         struct = ptext (sLit "struct") <+> braces (decl)
         packed_attr = ptext (sLit "__attribute__((packed))")
         cast = parens (struct <+> packed_attr <> char '*')
     in parens (cast <+> pprExpr1 expr) <> ptext (sLit "->x")
 #else
-cLoad expr rep = char '*' <> parens (cCast (machRepPtrCType rep) expr)
+cLoad platform expr rep = char '*' <> parens (cCast platform (machRepPtrCType rep) expr)
 #endif
 
 isCmmWordType :: CmmType -> Bool

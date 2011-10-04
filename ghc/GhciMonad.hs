@@ -373,4 +373,4 @@ turnOffBuffering
 getHandle :: IORef (Ptr ()) -> IO Handle
 getHandle ref = do
   (Ptr addr) <- readIORef ref
-  case addrToHValue# addr of (# hval #) -> return (unsafeCoerce# hval)
+  case addrToAny# addr of (# hval #) -> return (unsafeCoerce# hval)

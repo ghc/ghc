@@ -26,8 +26,8 @@ runghc [runghc flags] [GHC flags] module [program args]
     <literal>[program args]</literal> and
     <literal>module</literal> are, but you can use a
     <literal>--</literal> flag if it doesn't get it right. For example,
-    <literal>runghc -- -fglasgow-exts Foo</literal> means runghc
-    won't try to use <literal>glasgow-exts</literal> as the path to GHC,
+    <literal>runghc -- -fwarn-unused-bindings Foo</literal> means runghc
+    won't try to use <literal>warn-unused-bindings</literal> as the path to GHC,
     but instead will pass the flag to GHC. If a GHC flag doesn't start
     with a dash then you need to prefix it with
     <literal>--ghc-arg=</literal> or runghc will think that it is the

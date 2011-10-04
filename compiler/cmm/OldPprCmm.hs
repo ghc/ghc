@@ -63,20 +63,18 @@ instance PlatformOutputable instr => PlatformOutputable (ListGraph instr) where
 instance PlatformOutputable instr => PlatformOutputable (GenBasicBlock instr) where
     pprPlatform platform b = pprBBlock platform b
 
-instance Outputable CmmStmt where
-    ppr s = pprStmt s
 instance PlatformOutputable CmmStmt where
-    pprPlatform _ = ppr
+    pprPlatform = pprStmt
 
-instance Outputable CmmInfo where
-    ppr e = pprInfo e
+instance PlatformOutputable CmmInfo where
+    pprPlatform = pprInfo
 
 
 -- --------------------------------------------------------------------------
-instance Outputable CmmSafety where
-  ppr CmmUnsafe = ptext (sLit "_unsafe_call_")
-  ppr CmmInterruptible = ptext (sLit "_interruptible_call_")
-  ppr (CmmSafe srt) = ppr srt
+instance PlatformOutputable CmmSafety where
+  pprPlatform _ CmmUnsafe = ptext (sLit "_unsafe_call_")
+  pprPlatform _ CmmInterruptible = ptext (sLit "_interruptible_call_")
+  pprPlatform platform (CmmSafe srt) = pprPlatform platform srt
 
 -- --------------------------------------------------------------------------
 -- Info tables. The current pretty printer needs refinement
@@ -85,13 +83,15 @@ instance Outputable CmmSafety where
 -- For ideas on how to refine it, they used to be printed in the
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
-pprInfo :: CmmInfo -> SDoc
-pprInfo (CmmInfo _gc_target update_frame info_table) =
+pprInfo :: Platform -> CmmInfo -> SDoc
+pprInfo platform (CmmInfo _gc_target update_frame info_table) =
     vcat [{-ptext (sLit "gc_target: ") <>
                 maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>
-                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame,
-          ppr info_table]
+                maybe (ptext (sLit "<none>"))
+                      (pprUpdateFrame platform)
+                      update_frame,
+          pprPlatform platform info_table]
 
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.
@@ -103,8 +103,8 @@ pprBBlock platform (BasicBlock ident stmts) =
 -- --------------------------------------------------------------------------
 -- Statements. C-- usually, exceptions to this should be obvious.
 --
-pprStmt :: CmmStmt -> SDoc
-pprStmt stmt = case stmt of
+pprStmt :: Platform -> CmmStmt -> SDoc
+pprStmt platform stmt = case stmt of
 
     -- ;
     CmmNop -> semi
@@ -113,10 +113,10 @@ pprStmt stmt = case stmt of
     CmmComment s -> text "//" <+> ftext s
 
     -- reg = expr;
-    CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
+    CmmAssign reg expr -> ppr reg <+> equals <+> pprPlatform platform expr <> semi
 
     -- rep[lv] = expr;
-    CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
+    CmmStore lv expr -> rep <> brackets(pprPlatform platform lv) <+> equals <+> pprPlatform platform expr <> semi
         where
           rep = ppr ( cmmExprType expr )
 
@@ -124,9 +124,9 @@ pprStmt stmt = case stmt of
     -- ToDo ppr volatile
     CmmCall (CmmCallee fn cconv) results args safety ret ->
         sep  [ pp_lhs <+> pp_conv
-             , nest 2 (pprExpr9 fn <>
+             , nest 2 (pprExpr9 platform fn <>
                        parens (commafy (map ppr_ar args)))
-               <> brackets (ppr safety)
+               <> brackets (pprPlatform platform safety)
              , case ret of CmmMayReturn -> empty
                            CmmNeverReturns -> ptext $ sLit (" never returns")
              ] <> semi
@@ -135,16 +135,16 @@ pprStmt stmt = case stmt of
                  | otherwise    = commafy (map ppr_ar results) <+> equals
                 -- Don't print the hints on a native C-- call
           ppr_ar (CmmHinted ar k) = case cconv of
-                            CmmCallConv -> ppr ar
-                            _           -> ppr (ar,k)
+                            CmmCallConv -> pprPlatform platform ar
+                            _           -> pprPlatform platform (ar,k)
           pp_conv = case cconv of
                       CmmCallConv -> empty
                       _           -> ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
 
     -- Call a CallishMachOp, like sin or cos that might be implemented as a library call.
     CmmCall (CmmPrim op) results args safety ret ->
-        pprStmt (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
-                        results args safety ret)
+        pprStmt platform (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
+                                  results args safety ret)
         where
           -- HACK: A CallishMachOp doesn't really correspond to a ForeignLabel, but we
           --       use one to get the label printed.
@@ -153,27 +153,29 @@ pprStmt stmt = case stmt of
                                 Nothing ForeignLabelInThisPackage IsFunction)
 
     CmmBranch ident          -> genBranch ident
-    CmmCondBranch expr ident -> genCondBranch expr ident
-    CmmJump expr params      -> genJump expr params
-    CmmReturn params         -> genReturn params
-    CmmSwitch arg ids        -> genSwitch arg ids
+    CmmCondBranch expr ident -> genCondBranch platform expr ident
+    CmmJump expr params      -> genJump platform expr params
+    CmmReturn params         -> genReturn platform params
+    CmmSwitch arg ids        -> genSwitch platform arg ids
 
 -- Just look like a tuple, since it was a tuple before
 -- ... is that a good idea? --Isaac Dupree
 instance (Outputable a) => Outputable (CmmHinted a) where
   ppr (CmmHinted a k) = ppr (a, k)
+instance (PlatformOutputable a) => PlatformOutputable (CmmHinted a) where
+  pprPlatform platform (CmmHinted a k) = pprPlatform platform (a, k)
 
-pprUpdateFrame :: UpdateFrame -> SDoc
-pprUpdateFrame (UpdateFrame expr args) =
+pprUpdateFrame :: Platform -> UpdateFrame -> SDoc
+pprUpdateFrame platform (UpdateFrame expr args) =
     hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
-                then pprExpr expr
+                then pprExpr platform expr
                 else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr expr
-                    _ -> parens (pprExpr expr)
+                    CmmLoad (CmmReg _) _ -> pprExpr platform expr
+                    _ -> parens (pprExpr platform expr)
          , space
-         , parens  ( commafy $ map ppr args ) ]
+         , parens  ( commafy $ map (pprPlatform platform) args ) ]
 
 
 -- --------------------------------------------------------------------------
@@ -190,10 +192,10 @@ genBranch ident =
 --
 --     if (expr) { goto lbl; }
 --
-genCondBranch :: CmmExpr -> BlockId -> SDoc
-genCondBranch expr ident =
+genCondBranch :: Platform -> CmmExpr -> BlockId -> SDoc
+genCondBranch platform expr ident =
     hsep [ ptext (sLit "if")
-         , parens(ppr expr)
+         , parens(pprPlatform platform expr)
          , ptext (sLit "goto")
          , ppr ident <> semi ]
 
@@ -202,17 +204,17 @@ genCondBranch expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: CmmExpr -> [CmmHinted CmmExpr] -> SDoc
-genJump expr args =
+genJump :: Platform -> CmmExpr -> [CmmHinted CmmExpr] -> SDoc
+genJump platform expr args =
     hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
-                then pprExpr expr
+                then pprExpr platform expr
                 else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr expr
-                    _ -> parens (pprExpr expr)
+                    CmmLoad (CmmReg _) _ -> pprExpr platform expr
+                    _ -> parens (pprExpr platform expr)
          , space
-         , parens  ( commafy $ map ppr args )
+         , parens  ( commafy $ map (pprPlatform platform) args )
          , semi ]
 
 
@@ -221,11 +223,11 @@ genJump expr args =
 --
 --     return (a, b, c);
 --
-genReturn :: [CmmHinted CmmExpr] -> SDoc
-genReturn args =
+genReturn :: Platform -> [CmmHinted CmmExpr] -> SDoc
+genReturn platform args =
     hcat [ ptext (sLit "return")
          , space
-         , parens  ( commafy $ map ppr args )
+         , parens  ( commafy $ map (pprPlatform platform) args )
          , semi ]
 
 -- --------------------------------------------------------------------------
@@ -235,8 +237,8 @@ genReturn args =
 --
 --      switch [0 .. n] (expr) { case ... ; }
 --
-genSwitch :: CmmExpr -> [Maybe BlockId] -> SDoc
-genSwitch expr maybe_ids
+genSwitch :: Platform -> CmmExpr -> [Maybe BlockId] -> SDoc
+genSwitch platform expr maybe_ids
 
     = let pairs = groupBy snds (zip [0 .. ] maybe_ids )
 
@@ -244,8 +246,8 @@ genSwitch expr maybe_ids
                     , int (length maybe_ids - 1)
                     , ptext (sLit "] ")
                     , if isTrivialCmmExpr expr
-                        then pprExpr expr
-                        else parens (pprExpr expr)
+                        then pprExpr platform expr
+                        else parens (pprExpr platform expr)
                     , ptext (sLit " {")
                     ])
             4 (vcat ( map caseify pairs )) $$ rbrace

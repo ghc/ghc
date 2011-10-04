@@ -39,6 +39,8 @@ module Literal
         , nullAddrLit, float2DoubleLit, double2FloatLit
         ) where
 
+#include "HsVersions.h"
+
 import TysPrim
 import PrelNames
 import Type
@@ -220,16 +222,12 @@ instance Ord Literal where
 \begin{code}
 -- | Creates a 'Literal' of type @Int#@
 mkMachInt :: Integer -> Literal
-mkMachInt  x   = -- ASSERT2( inIntRange x,  integer x )
-                 -- Not true: you can write out of range Int# literals
-                 -- For example, one can write (intToWord# 0xffff0000) to
-                 -- get a particular Word bit-pattern, and there's no other
-                 -- convenient way to write such literals, which is why we allow it.
+mkMachInt  x   = ASSERT2( inIntRange x,  integer x )
                  MachInt x
 
 -- | Creates a 'Literal' of type @Word#@
 mkMachWord :: Integer -> Literal
-mkMachWord x   = -- ASSERT2( inWordRange x, integer x )
+mkMachWord x   = ASSERT2( inWordRange x, integer x )
                  MachWord x
 
 -- | Creates a 'Literal' of type @Int64#@

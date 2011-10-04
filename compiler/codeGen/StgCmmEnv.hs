@@ -44,6 +44,7 @@ import VarEnv
 import Control.Monad
 import Name
 import StgSyn
+import DynFlags
 import Outputable
 
 -------------------------------------
@@ -174,7 +175,8 @@ getCgIdInfo id
     
 cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
-  = do	static_binds <- getStaticBinds
+  = do	dflags <- getDynFlags
+      	static_binds <- getStaticBinds
 	local_binds <- getBinds
 	srt <- getSRTLabel
 	pprPanic "StgCmmEnv: variable not found"
@@ -183,7 +185,7 @@ cgLookupPanic id
 		vcat [ ppr (cg_id info) | info <- varEnvElts static_binds ],
 		ptext (sLit "local binds for:"),
 		vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ],
-	        ptext (sLit "SRT label") <+> pprCLabel srt
+	        ptext (sLit "SRT label") <+> pprCLabel (targetPlatform dflags) srt
 	      ])
 
 

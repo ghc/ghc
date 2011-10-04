@@ -521,7 +521,7 @@ getLocalNonValBinders fixity_env
         ; return (envs, new_bndrs) } }
   where
     for_hs_bndrs :: [Located RdrName]
-    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
+    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _ _) <- foreign_decls]
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
@@ -545,10 +545,14 @@ getLocalNonValBinders fixity_env
 
     new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
     new_assoc (L _ (InstDecl inst_ty _ _ ats))
-      = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
-           ; mapM (new_ti (Just cls_nm)) ats }
+      = do { mb_cls_nm <- get_cls_parent inst_ty 
+           ; mapM (new_ti mb_cls_nm) ats }
       where
-        Just (_, _, L loc cls_rdr, _) = splitLHsInstDeclTy_maybe inst_ty
+        get_cls_parent inst_ty
+          | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
+          = setSrcSpan loc $ do { nm <- lookupGlobalOccRn cls_rdr; return (Just nm) }
+          | otherwise
+          = return Nothing
 
 lookupTcdName :: Maybe Name -> TyClDecl RdrName -> RnM (Located Name)
 -- Used for TyData and TySynonym only

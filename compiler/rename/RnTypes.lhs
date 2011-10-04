@@ -7,7 +7,7 @@
 module RnTypes ( 
 	-- Type related stuff
 	rnHsType, rnLHsType, rnLHsTypes, rnContext,
-	rnHsSigType, rnHsTypeFVs, rnConDeclFields,
+	rnHsSigType, rnLHsInstType, rnHsTypeFVs, rnConDeclFields,
         rnIPName,
 
 	-- Precence related stuff
@@ -68,6 +68,21 @@ rnHsSigType :: SDoc -> LHsType RdrName -> RnM (LHsType Name)
 	-- which use *implicit* universal quantification.
 rnHsSigType doc_str ty
   = rnLHsType (text "In the type signature for" <+> doc_str) ty
+
+rnLHsInstType :: SDoc -> LHsType RdrName -> RnM (LHsType Name)
+-- Rename the type in an instance or standalone deriving decl
+rnLHsInstType doc_str ty 
+  = do { ty' <- rnLHsType doc_str ty
+       ; unless good_inst_ty (addErrAt (getLoc ty) (badInstTy ty))
+       ; return ty' }
+  where
+    good_inst_ty
+      | Just (_, _, L _ cls, _) <- splitLHsInstDeclTy_maybe ty
+      , isTcOcc (rdrNameOcc cls) = True
+      | otherwise                = False
+
+badInstTy :: LHsType RdrName -> SDoc
+badInstTy ty = ptext (sLit "Malformed instance:") <+> ppr ty 
 \end{code}
 
 rnHsType is here because we call it from loadInstDecl, and I didn't

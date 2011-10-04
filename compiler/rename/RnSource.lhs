@@ -363,7 +363,7 @@ rnDefaultDecl (DefaultDecl tys)
 
 \begin{code}
 rnHsForeignDecl :: ForeignDecl RdrName -> RnM (ForeignDecl Name, FreeVars)
-rnHsForeignDecl (ForeignImport name ty spec)
+rnHsForeignDecl (ForeignImport name ty _ spec)
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRn name
        ; (ty', fvs) <- rnHsTypeFVs (fo_decl_msg name) ty
@@ -372,12 +372,12 @@ rnHsForeignDecl (ForeignImport name ty spec)
        ; let packageId = thisPackage $ hsc_dflags topEnv
 	     spec'     = patchForeignImport packageId spec
 
-       ; return (ForeignImport name' ty' spec', fvs) }
+       ; return (ForeignImport name' ty' noForeignImportCoercionYet spec', fvs) }
 
-rnHsForeignDecl (ForeignExport name ty spec)
+rnHsForeignDecl (ForeignExport name ty _ spec)
   = do { name' <- lookupLocatedOccRn name
        ; (ty', fvs) <- rnHsTypeFVs (fo_decl_msg name) ty
-       ; return (ForeignExport name' ty' spec, fvs `addOneFV` unLoc name') }
+       ; return (ForeignExport name' ty' noForeignExportCoercionYet spec, fvs `addOneFV` unLoc name') }
 	-- NB: a foreign export is an *occurrence site* for name, so 
 	--     we add it to the free-variable list.  It might, for example,
 	--     be imported from another module
@@ -423,7 +423,7 @@ patchCCallTarget packageId callTarget
 rnSrcInstDecl :: InstDecl RdrName -> RnM (InstDecl Name, FreeVars)
 rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- Used for both source and interface file decls
-  = do { inst_ty' <- rnHsSigType (text "an instance decl") inst_ty
+  = do { inst_ty' <- rnLHsInstType (text "In an instance declaration") inst_ty
        ; let Just (inst_tyvars, _, L _ cls,_) = splitLHsInstDeclTy_maybe inst_ty'
 
 	-- Rename the bindings
@@ -436,8 +436,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 					          mbinds    
 
        -- Rename the associated types
-       -- Here the instance variables always scope, regardless of -XScopedTypeVariables					
-       -- NB: we allow duplicate associated-type decls; 
+       -- NB: We allow duplicate associated-type decls; 
        --     See Note [Associated type instances] in TcInstDcls
        ; (ats', at_fvs) <- extendTyVarEnvFVRn (map hsLTyVarName inst_tyvars) $
                            rnATInsts cls ats
@@ -508,7 +507,7 @@ rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
 rnSrcDerivDecl (DerivDecl ty)
   = do { standalone_deriv_ok <- xoptM Opt_StandaloneDeriving
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
-       ; ty' <- rnLHsType (text "In a deriving declaration") ty
+       ; ty' <- rnLHsInstType (text "In a deriving declaration") ty
        ; let fvs = extractHsTyNames ty'
        ; return (DerivDecl ty', fvs) }
 
@@ -866,23 +865,34 @@ bindQTvs mb_cls tyvars thing_inside
        ; mapM_ dupBoundTyVar (findDupRdrNames tv_rdr_names)
 
        ; rdr_env <- getLocalRdrEnv
-       ; tv_nbs <- mapM (mk_tv_name rdr_env) tv_rdr_names
-       ; let tv_ns, fresh_ns :: [Name]
-             tv_ns = map fst tv_nbs
-	     fresh_ns = [n | (n,True)  <- tv_nbs]
-
-       ; (thing, fvs) <- bindLocalNames tv_ns $
+       ; tv_ns <- mapM (mk_tv_name rdr_env) tv_rdr_names
+       ; (thing, fvs) <- bindLocalNamesFV tv_ns $
                          thing_inside (zipWith replaceLTyVarName tyvars tv_ns)
-       ; return (thing, delFVs fresh_ns fvs) }
+
+	-- Check that the RHS of the decl mentions only type variables
+	-- bound on the LHS.  For example, this is not ok
+	-- 	 class C a b where
+	--         type F a x :: *
+	--	 instance C (p,q) r where
+        --	   type F (p,q) x = (x, r)	-- BAD: mentions 'r'
+	-- c.f. Trac #5515
+       ; let bad_tvs = filterNameSet (isTvOcc . nameOccName) fvs
+       ; unless (isEmptyNameSet bad_tvs) (badAssocRhs (nameSetToList bad_tvs))
+
+       ; return (thing, fvs) }
   where
-    mk_tv_name :: LocalRdrEnv -> Located RdrName -> RnM (Name, Bool)
-	       -- False <=> already in scope
-    	       -- True  <=> fresh
+    mk_tv_name :: LocalRdrEnv -> Located RdrName -> RnM Name
     mk_tv_name rdr_env (L l tv_rdr)
-      = do { case lookupLocalRdrEnv rdr_env tv_rdr of 
-               Just n  -> return (n, False)
-               Nothing -> do { n <- newLocalBndrRn (L l tv_rdr)
-                             ; return (n, True) } }
+      = case lookupLocalRdrEnv rdr_env tv_rdr of 
+          Just n  -> return n
+          Nothing -> newLocalBndrRn (L l tv_rdr)
+
+badAssocRhs :: [Name] -> RnM ()
+badAssocRhs ns
+  = addErr (hang (ptext (sLit "The RHS of an associated type declaration mentions type variable") 
+                  <> plural ns 
+                  <+> pprWithCommas (quotes . ppr) ns)
+               2 (ptext (sLit "All such variables must be bound on the LHS")))
 
 dupBoundTyVar :: [Located RdrName] -> RnM ()
 dupBoundTyVar (L loc tv : _) 

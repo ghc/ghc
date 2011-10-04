@@ -43,6 +43,7 @@ import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Module
 import FastString( mkFastString, fsLit )
 import Constants
+import DynFlags
 
 -----------------------------------------------------------
 --              Initialise dynamic heap objects
@@ -332,34 +333,37 @@ entryHeapCheck :: ClosureInfo
                -> FCode ()
 
 entryHeapCheck cl_info offset nodeSet arity args code
-  = do updfr_sz <- getUpdFrameOff
+  = do dflags <- getDynFlags
+
+       let platform = targetPlatform dflags
+
+           is_thunk = arity == 0
+           is_fastf = case closureFunInfo cl_info of
+                           Just (_, ArgGen _) -> False
+                           _otherwise         -> True
+
+           args' = map (CmmReg . CmmLocal) args
+           setN = case nodeSet of
+                          Just n  -> mkAssign nodeReg (CmmReg $ CmmLocal n)
+                          Nothing -> mkAssign nodeReg $
+                              CmmLit (CmmLabel $ staticClosureLabel platform cl_info)
+
+           {- Thunks:          Set R1 = node, jump GCEnter1
+              Function (fast): Set R1 = node, jump GCFun
+              Function (slow): Set R1 = node, call generic_gc -}
+           gc_call upd = setN <*> gc_lbl upd
+           gc_lbl upd
+               | is_thunk  = mkDirectJump (CmmReg $ CmmGlobal GCEnter1) [] sp
+               | is_fastf  = mkDirectJump (CmmReg $ CmmGlobal GCFun) [] sp
+               | otherwise = mkForeignJump Slow (CmmReg $ CmmGlobal GCFun) args' upd
+               where sp = max offset upd
+           {- DT (12/08/10) This is a little fishy, mainly the sp fix up amount.
+            - This is since the ncg inserts spills before the stack/heap check.
+            - This should be fixed up and then we won't need to fix up the Sp on
+            - GC calls, but until then this fishy code works -}
+
+       updfr_sz <- getUpdFrameOff
        heapCheck True (gc_call updfr_sz) code
-
-  where
-    is_thunk = arity == 0
-    is_fastf = case closureFunInfo cl_info of
-                    Just (_, ArgGen _) -> False
-                    _otherwise         -> True
-
-    args' = map (CmmReg . CmmLocal) args
-    setN = case nodeSet of
-                   Just n  -> mkAssign nodeReg (CmmReg $ CmmLocal n)
-                   Nothing -> mkAssign nodeReg $
-                       CmmLit (CmmLabel $ staticClosureLabel cl_info)
-
-    {- Thunks:          Set R1 = node, jump GCEnter1
-       Function (fast): Set R1 = node, jump GCFun
-       Function (slow): Set R1 = node, call generic_gc -}
-    gc_call upd = setN <*> gc_lbl upd
-    gc_lbl upd
-        | is_thunk  = mkDirectJump (CmmReg $ CmmGlobal GCEnter1) [] sp
-        | is_fastf  = mkDirectJump (CmmReg $ CmmGlobal GCFun) [] sp
-        | otherwise = mkForeignJump Slow (CmmReg $ CmmGlobal GCFun) args' upd
-        where sp = max offset upd
-    {- DT (12/08/10) This is a little fishy, mainly the sp fix up amount.
-     - This is since the ncg inserts spills before the stack/heap check.
-     - This should be fixed up and then we won't need to fix up the Sp on
-     - GC calls, but until then this fishy code works -}
 
 {-
     -- This code is slightly outdated now and we could easily keep the above

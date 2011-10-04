@@ -150,7 +150,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
 --------------------
 nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 nativeCodeGen dflags h us cmms
- = let nCG' :: (Outputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
+ = let nCG' :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
        x86NcgImpl = NcgImpl {
                          cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
@@ -206,7 +206,7 @@ nativeCodeGen dflags h us cmms
                  ArchUnknown ->
                      panic "nativeCodeGen: No NCG for unknown arch"
 
-nativeCodeGen' :: (Outputable statics, PlatformOutputable instr, Instruction instr)
+nativeCodeGen' :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
                -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
@@ -273,7 +273,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 
 -- | Do native code generation on all these cmms.
 --
-cmmNativeGens :: (Outputable statics, PlatformOutputable instr, Instruction instr)
+cmmNativeGens :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
               => DynFlags
               -> NcgImpl statics instr jumpDest
               -> BufHandle
@@ -294,11 +294,13 @@ cmmNativeGens _ _ _ _ [] impAcc profAcc _
 
 cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
  = do
+        let platform = targetPlatform dflags
+
  	(us', native, imports, colorStats, linearStats)
 		<- cmmNativeGen dflags ncgImpl us cmm count
 
 	Pretty.bufLeftRender h
-		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map (pprNatCmmDecl ncgImpl (targetPlatform dflags)) native
+		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map (pprNatCmmDecl ncgImpl platform) native
 
            -- carefully evaluate this strictly.  Binding it with 'let'
            -- and then using 'seq' doesn't work, because the let
@@ -312,7 +314,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 	count' <- return $! count + 1;
 
 	-- force evaulation all this stuff to avoid space leaks
-	seqString (showSDoc $ vcat $ map ppr imports) `seq` return ()
+	seqString (showSDoc $ vcat $ map (pprPlatform platform) imports) `seq` return ()
 
 	cmmNativeGens dflags ncgImpl
             h us' cmms
@@ -328,7 +330,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 --	Dumping the output of each stage along the way.
 --	Global conflict graph and NGC stats
 cmmNativeGen
-	:: (Outputable statics, PlatformOutputable instr, Instruction instr)
+	:: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr)
     => DynFlags
     -> NcgImpl statics instr jumpDest
 	-> UniqSupply
@@ -528,8 +530,9 @@ makeImportsDoc dflags imports
 {-      dyld_stubs imps = Pretty.vcat $ map pprDyldSymbolStub $
 				    map head $ group $ sort imps-}
 
-	arch	= platformArch	$ targetPlatform dflags
-	os	= platformOS	$ targetPlatform dflags
+	platform = targetPlatform dflags
+	arch = platformArch platform
+	os   = platformOS   platform
 	
 	-- (Hack) sometimes two Labels pretty-print the same, but have
 	-- different uniques; so we compare their text versions...
@@ -537,7 +540,7 @@ makeImportsDoc dflags imports
 		| needImportedSymbols arch os
 		= Pretty.vcat $
 			(pprGotDeclaration arch os :) $
-			map ( pprImportedSymbol arch os . fst . head) $
+			map ( pprImportedSymbol platform . fst . head) $
 			groupBy (\(_,a) (_,b) -> a == b) $
 			sortBy (\(_,a) (_,b) -> compare a b) $
 			map doPpr $
@@ -545,7 +548,7 @@ makeImportsDoc dflags imports
 		| otherwise
 		= Pretty.empty
 
-	doPpr lbl = (lbl, renderWithStyle (pprCLabel lbl) astyle)
+	doPpr lbl = (lbl, renderWithStyle (pprCLabel platform lbl) astyle)
 	astyle = mkCodeStyle AsmStyle
 
 
@@ -879,10 +882,12 @@ cmmStmtConFold stmt
 
         CmmCondBranch test dest
            -> do test' <- cmmExprConFold DataReference test
+                 dflags <- getDynFlagsCmmOpt
+                 let platform = targetPlatform dflags
 	         return $ case test' of
 		   CmmLit (CmmInt 0 _) -> 
 		     CmmComment (mkFastString ("deleted: " ++ 
-					showSDoc (pprStmt stmt)))
+					showSDoc (pprStmt platform stmt)))
 
 		   CmmLit (CmmInt _ _) -> CmmBranch dest
 		   _other -> CmmCondBranch test' dest

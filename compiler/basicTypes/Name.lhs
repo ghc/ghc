@@ -87,9 +87,7 @@ import FastTypes
 import FastString
 import Outputable
 
-import Data.Array
 import Data.Data
-import Data.Word        ( Word32 )
 \end{code}
 
 %************************************************************************
@@ -416,9 +414,9 @@ instance Binary Name where
       case getUserData bh of 
         UserData{ ud_put_name = put_name } -> put_name bh name
 
-   get bh = do
-        i <- get bh
-        return $! (ud_symtab (getUserData bh) ! fromIntegral (i::Word32))
+   get bh =
+      case getUserData bh of
+        UserData { ud_get_name = get_name } -> get_name bh
 \end{code}
 
 %************************************************************************

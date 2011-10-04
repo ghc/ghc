@@ -1226,9 +1226,7 @@ decideGeneralisationPlan
    -> [LHsBind Name] -> TcSigFun -> GeneralisationPlan
 decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
   | bang_pat_binds                         = NoGen
-  | Just sig <- one_funbind_with_sig binds = if null (sig_tvs sig) && null (sig_theta sig)
-                                             then NoGen	      -- Optimise common case
-                                             else CheckGen sig
+  | Just sig <- one_funbind_with_sig binds = CheckGen sig
   | mono_local_binds      	           = NoGen
   | otherwise                              = InferGen mono_restriction closed_flag
 

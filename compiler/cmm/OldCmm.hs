@@ -12,7 +12,6 @@ module OldCmm (
         CmmInfo(..), UpdateFrame(..), CmmInfoTable(..), ClosureTypeInfo(..),
         CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
         cmmMapGraph, cmmTopMapGraph,
-        cmmMapGraphM, cmmTopMapGraphM,
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
         CmmStmt(..), CmmReturnInfo(..), CmmHinted(..),
         HintedCmmFormal, HintedCmmActual,
@@ -35,7 +34,6 @@ import BlockId
 import CmmExpr
 import ForeignCall
 import ClosureInfo
-import Outputable
 import FastString
 
 
@@ -121,18 +119,9 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 cmmMapGraph    :: (g -> g') -> GenCmmGroup d h g -> GenCmmGroup d h g'
 cmmTopMapGraph :: (g -> g') -> GenCmmDecl d h g -> GenCmmDecl d h g'
 
-cmmMapGraphM    :: Monad m => (String -> g -> m g') -> GenCmmGroup d h g -> m (GenCmmGroup d h g')
-cmmTopMapGraphM :: Monad m => (String -> g -> m g') -> GenCmmDecl d h g -> m (GenCmmDecl d h g')
-
 cmmMapGraph f tops = map (cmmTopMapGraph f) tops
 cmmTopMapGraph f (CmmProc h l g) = CmmProc h l (f g)
 cmmTopMapGraph _ (CmmData s ds)  = CmmData s ds
-
-cmmMapGraphM f tops = mapM (cmmTopMapGraphM f) tops
-cmmTopMapGraphM f (CmmProc h l g) =
-  f (showSDoc $ ppr l) g >>= return . CmmProc h l
-cmmTopMapGraphM _ (CmmData s ds)  = return $ CmmData s ds
-
 
 data CmmReturnInfo = CmmMayReturn
                    | CmmNeverReturns

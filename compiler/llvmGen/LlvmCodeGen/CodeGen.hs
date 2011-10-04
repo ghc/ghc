@@ -313,7 +313,7 @@ genCall env target res args ret = do
 getFunPtr :: LlvmEnv -> (LMString -> LlvmType) -> CmmCallTarget
           -> UniqSM ExprData
 getFunPtr env funTy targ = case targ of
-    CmmCallee (CmmLit (CmmLabel lbl)) _ -> litCase $ strCLabel_llvm lbl
+    CmmCallee (CmmLit (CmmLabel lbl)) _ -> litCase $ strCLabel_llvm env lbl
 
     CmmCallee expr _ -> do
         (env', v1, stmts, top) <- exprToVar env expr
@@ -614,7 +614,7 @@ genStore_slow env addr val = do
 
         other ->
             pprPanic "genStore: ptr not right type!"
-                    (PprCmm.pprExpr addr <+> text (
+                    (PprCmm.pprExpr (getLlvmPlatform env) addr <+> text (
                         "Size of Ptr: " ++ show llvmPtrBits ++
                         ", Size of var: " ++ show (llvmWidthInBits other) ++
                         ", Var: " ++ show vaddr))
@@ -880,7 +880,7 @@ genMachOp_slow env opt op [x, y] = case op of
                 else do
                     -- XXX: Error. Continue anyway so we can debug the generated
                     -- ll file.
-                    let cmmToStr = (lines . show . llvmSDoc . PprCmm.pprExpr)
+                    let cmmToStr = (lines . show . llvmSDoc . PprCmm.pprExpr (getLlvmPlatform env))
                     let dx = Comment $ map fsLit $ cmmToStr x
                     let dy = Comment $ map fsLit $ cmmToStr y
                     (v1, s1) <- doExpr (ty vx) $ binOp vx vy
@@ -894,8 +894,8 @@ genMachOp_slow env opt op [x, y] = case op of
                     --         _              -> "unknown"
                     -- panic $ "genMachOp: comparison between different types ("
                     --         ++ o ++ " "++ show vx ++ ", " ++ show vy ++ ")"
-                    --         ++ "\ne1: " ++ (show.llvmSDoc.PprCmm.pprExpr $ x)
-                    --         ++ "\ne2: " ++ (show.llvmSDoc.PprCmm.pprExpr $ y)
+                    --         ++ "\ne1: " ++ (show.llvmSDoc.PprCmm.pprExpr (getLlvmPlatform env) $ x)
+                    --         ++ "\ne2: " ++ (show.llvmSDoc.PprCmm.pprExpr (getLlvmPlatform env) $ y)
 
         -- | Need to use EOption here as Cmm expects word size results from
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
@@ -1042,7 +1042,7 @@ genLoad_slow env e ty = do
                     return (env', dvar, stmts `snocOL` cast `snocOL` load, tops)
 
          other -> pprPanic "exprToVar: CmmLoad expression is not right type!"
-                        (PprCmm.pprExpr e <+> text (
+                        (PprCmm.pprExpr (getLlvmPlatform env) e <+> text (
                             "Size of Ptr: " ++ show llvmPtrBits ++
                             ", Size of var: " ++ show (llvmWidthInBits other) ++
                             ", Var: " ++ show iptr))
@@ -1088,7 +1088,7 @@ genLit env (CmmFloat r w)
               nilOL, [])
 
 genLit env cmm@(CmmLabel l)
-  = let label = strCLabel_llvm l
+  = let label = strCLabel_llvm env l
         ty = funLookup label env
         lmty = cmmToLlvmType $ cmmLitType cmm
     in case ty of
@@ -1193,7 +1193,7 @@ trashStmts = concatOL $ map trashReg activeStgRegs
 -- with foreign functions.
 getHsFunc :: LlvmEnv -> CLabel -> UniqSM ExprData
 getHsFunc env lbl
-  = let fn = strCLabel_llvm lbl
+  = let fn = strCLabel_llvm env lbl
         ty    = funLookup fn env
     in case ty of
         -- Function in module in right form
@@ -1211,7 +1211,7 @@ getHsFunc env lbl
 
         -- label not in module, create external reference
         Nothing  -> do
-            let ty' = LMFunction $ llvmFunSig lbl ExternallyVisible
+            let ty' = LMFunction $ llvmFunSig env lbl ExternallyVisible
             let fun = LMGlobalVar fn ty' ExternallyVisible Nothing Nothing False
             let top = CmmData Data [([],[ty'])]
             let env' = funInsert fn ty' env
