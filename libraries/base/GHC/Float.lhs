@@ -934,8 +934,7 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                   -- this means n/d >= 2^(minEx-1), i.e. we are guaranteed to get
                   -- a normalised number, round to mantDigs bits
                   if ln# <# md#
-                    then encodeFloat (n `shiftL` (I# (md# -# 1# -# ln#)))
-                                        (I# (ln# +# 1# -# ld# -# md#))
+                    then encodeFloat n (I# (negateInt# ld#))
                     else let n'  = n `shiftR` (I# (ln# +# 1# -# md#))
                              n'' = case roundingMode# n (ln# -# md#) of
                                     0# -> n'
@@ -949,14 +948,9 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                   -- the exponent for encoding is always minEx-mantDigs
                   -- so we must shift right by (minEx-mantDigs) - (-ld)
                   case ld# +# (me# -# md#) of
-                    ld'# | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0 -- result of shift < 0.5
-                         | ld'# ==# (ln# +# 1#) ->  -- first bit of n shifted to 0.5 place
-                           case integerLog2IsPowerOf2# n of
-                            (# _, 0# #) -> encodeFloat 0 0  -- round to even
-                            (# _, _ #)  -> encodeFloat 1 (minEx - mantDigs)
-                         | ld'# <=# 0#  -> -- we would shift left, so we don't shift
+                    ld'# | ld'# <=# 0#  -> -- we would shift left, so we don't shift
                            encodeFloat n (I# ((me# -# md#) -# ld'#))
-                         | otherwise    ->
+                         | ld'# <=# ln#  ->
                            let n' = n `shiftR` (I# ld'#)
                            in case roundingMode# n (ld'# -# 1#) of
                                 0# -> encodeFloat n' (minEx - mantDigs)
@@ -964,6 +958,11 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                                         then encodeFloat n' (minEx-mantDigs)
                                         else encodeFloat (n' + 1) (minEx-mantDigs)
                                 _  -> encodeFloat (n' + 1) (minEx-mantDigs)
+                         | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0 -- result of shift < 0.5
+                         | otherwise ->  -- first bit of n shifted to 0.5 place
+                           case integerLog2IsPowerOf2# n of
+                            (# _, 0# #) -> encodeFloat 0 0  -- round to even
+                            (# _, _ #)  -> encodeFloat 1 (minEx - mantDigs)
         | otherwise ->
           let ln = I# (integerLog2# n)
               ld = I# ld#
