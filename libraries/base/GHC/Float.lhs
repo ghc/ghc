@@ -380,12 +380,12 @@ instance  Real Double  where
     toRational (D# x#)  =
         case decodeDoubleInteger x# of
           (# m, e# #)
-            | e# >=# 0#                                         ->
+            | e# >=# 0#                                     ->
                 shiftLInteger m e# :% 1
-            | (integerToWord m `and#` 1##) `eqWord#` 0##   ->
+            | (integerToWord m `and#` 1##) `eqWord#` 0##    ->
                 case elimZerosInteger m (negateInt# e#) of
                     (# n, d# #) ->  n :% shiftLInteger 1 d#
-            | otherwise                                         ->
+            | otherwise                                     ->
                 m :% shiftLInteger 1 (negateInt# e#)
 
 instance  Fractional Double  where
