@@ -964,9 +964,22 @@ compileExpr expr = withSession $ \hsc_env -> do
 
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
 dynCompileExpr expr = do
+    iis <- getContext
+    let importDecl = ImportDecl {
+                         ideclName = noLoc (mkModuleName "Data.Dynamic"),
+                         ideclPkgQual = Nothing,
+                         ideclSource = False,
+                         ideclSafe = False,
+                         ideclQualified = True,
+                         ideclImplicit = False,
+                         ideclAs = Nothing,
+                         ideclHiding = Nothing
+                     }
+    setContext (IIDecl importDecl : iis)
     let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
     Just (ids, hvals) <- withSession $ \hsc_env -> 
                            liftIO $ hscStmt hsc_env stmt
+    setContext iis
     vals <- liftIO (unsafeCoerce# hvals :: IO [Dynamic])
     case (ids,vals) of
         (_:[], v:[])    -> return v
