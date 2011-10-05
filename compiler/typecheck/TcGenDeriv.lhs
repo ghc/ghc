@@ -68,23 +68,9 @@ import Data.List        ( partition, intersperse )
 \end{code}
 
 \begin{code}
-{-
-type DerivAuxBinds = [DerivAuxBind]
-
-data DerivAuxBind		-- Please add these auxiliary top-level bindings
-  = DerivCon2Tag TyCon		-- The con2Tag for given TyCon
-  | DerivTag2Con TyCon		-- ...ditto tag2Con
-  | DerivMaxTag  TyCon		-- ...and maxTag
-	-- All these generate ZERO-BASED tag operations
-	-- I.e first constructor has tag 0
-
-	-- Scrap your boilerplate
-  | MkDataCon DataCon		-- For constructor C we get $cC :: Constr
-  | MkTyCon   TyCon		-- For tycon T we get       $tT :: DataType
--}
 type BagDerivStuff = Bag DerivStuff
 
-data DerivStuff     -- Please add these auxiliary stuff
+data DerivStuff     -- Please add this auxiliary stuff
   = DerivCon2Tag TyCon  -- The con2Tag for given TyCon
   | DerivTag2Con TyCon  -- ...ditto tag2Con
   | DerivMaxTag  TyCon  -- ...and maxTag
@@ -95,15 +81,9 @@ data DerivStuff     -- Please add these auxiliary stuff
   | DerivTyCon TyCon      -- New data types
   | DerivFamInst TyCon    -- New type family instances
 
-  | DerivHsBind (LHsBind RdrName)  -- New top-level auxiliary bindings
-  | DerivInst (InstInfo RdrName)   -- New, auxiliary instances
-
-  -- Scrap your boilerplate (replaced  by DerivHsBind)
---  | DerivDataCon DataCon    -- For constructor C we get $cC :: Constr
---  | DerivTyCon   TyCon      -- For tycon T we get       $tT :: DataType
-
-  
-  
+  -- New top-level auxiliary bindings 
+  | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB
+  | DerivInst (InstInfo RdrName)                -- New, auxiliary instances
 
 isDupAux :: DerivStuff -> DerivStuff -> Bool
 isDupAux (DerivCon2Tag tc1) (DerivCon2Tag tc2) = tc1 == tc2
@@ -1283,9 +1263,8 @@ gen_Data_binds loc tycon
   = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
      `unionBags` gcast_binds,
 		-- Auxiliary definitions: the data type and constructors
-     listToBag ( DerivHsBind (fst genDataTyCon)
-               : map (DerivHsBind . fst . genDataDataCon) data_cons))
-                -- JPM: We are dropping the signatures. Is this a problem?
+     listToBag ( DerivHsBind (genDataTyCon)
+               : map (DerivHsBind . genDataDataCon) data_cons))
   where
     data_cons  = tyConDataCons tycon
     n_cons     = length data_cons
@@ -1800,32 +1779,25 @@ genAuxBind loc (DerivMaxTag tycon)
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
-genAuxBind loc _ = panic "genAuxBind"
+-- The other cases never happen (we filter them in genAuxBinds)
+genAuxBind _ _ = panic "genAuxBind"
 
-genAuxBinds :: SrcSpan -> BagDerivStuff
-            -> ( Bag (LHsBind RdrName, LSig RdrName)
-               , Bag TyCon
-               , Bag TyCon
-               , Bag (InstInfo RdrName))
-{-
-genAuxBinds loc = mapBag (genAuxBind loc) . filterBag (not . isGen)
-  isGen (DerivCon2Tag _) = True
-  isGen (DerivTag2Con _) = True
-  isGen (DerivMaxTag _)  = True
-  isGen (DerivTyCon t) =             = False
-  isGen (DerivFamInst t) =             = False
--}
+type SeparateBagsDerivStuff = ( Bag (LHsBind RdrName, LSig RdrName)
+                                -- New bindings
+                              , Bag TyCon -- New top-level datatypes
+                              , Bag TyCon -- New family instances
+                              , Bag (InstInfo RdrName)) -- New instances
+
+genAuxBinds :: SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
 genAuxBinds loc s = foldrBag f (emptyBag, emptyBag, emptyBag, emptyBag) s where
-  f :: DerivStuff
-    -> (Bag (LHsBind RdrName, LSig RdrName), Bag TyCon, Bag TyCon, Bag (InstInfo RdrName))
-    -> (Bag (LHsBind RdrName, LSig RdrName), Bag TyCon, Bag TyCon, Bag (InstInfo RdrName))
+  f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
   f x@(DerivCon2Tag   _) = add1 (genAuxBind loc x)
   f x@(DerivTag2Con   _) = add1 (genAuxBind loc x)
   f x@(DerivMaxTag    _) = add1 (genAuxBind loc x)
-  f   (DerivTyCon   t) = add2 t
-  f   (DerivFamInst t) = add3 t
-  f   (DerivInst    i) = add4 i
-  f    _               = id
+  f   (DerivHsBind    b) = add1 b
+  f   (DerivTyCon     t) = add2 t
+  f   (DerivFamInst   t) = add3 t
+  f   (DerivInst      i) = add4 i
 
   add1 x (a,b,c,d) = (x `consBag` a,b,c,d)
   add2 x (a,b,c,d) = (a,x `consBag` b,c,d)
