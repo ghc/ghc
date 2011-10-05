@@ -105,8 +105,6 @@ $(libffi_STAMP_CONFIGURE):
 	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
-	# don't report nonselinux systems as selinux
-	cd libffi/build && "$(PATCH_CMD)" -p0 < ../libffi.selinux-detection-3.0.8.patch
 
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
@@ -125,29 +123,31 @@ $(libffi_STAMP_CONFIGURE):
 	          --enable-shared=$(libffi_EnableShared) \
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 
+	cp libffi/build/*/libtool libffi/build
+
 	# libffi.so needs to be built with the correct soname.
 	# NOTE: this builds libffi_convience.so with the incorrect
 	# soname, but we don't need that anyway!
 	cd libffi && \
-	  "$(CP)" build/libtool build/libtool.orig; \
+	  "$(CP)" build/libtool build/libtool.orig && \
 	  sed -e s/soname_spec=.*/soname_spec="$(libffi_HS_DYN_LIB_NAME)"/ build/libtool.orig > build/libtool
 
 	# We don't want libtool's cygwin hacks
 	cd libffi && \
-	  "$(CP)" build/libtool build/libtool.orig; \
+	  "$(CP)" build/libtool build/libtool.orig && \
 	  sed -e s/dlname=\'\$$tdlname\'/dlname=\'\$$dlname\'/ build/libtool.orig > build/libtool
 
 	touch $@
 
 libffi/dist-install/build/ffi.h: $(libffi_STAMP_CONFIGURE) libffi/dist-install/build/ffitarget.h | $$(dir $$@)/.
-	"$(CP)" libffi/build/include/ffi.h $@
+	"$(CP)" libffi/build/*/include/ffi.h $@
 
 libffi/dist-install/build/ffitarget.h: $(libffi_STAMP_CONFIGURE) | $$(dir $$@)/.
-	"$(CP)" libffi/build/include/ffitarget.h $@
+	"$(CP)" libffi/build/*/include/ffitarget.h $@
 
 $(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE) | libffi/dist-install/build/.
 	$(MAKE) -C libffi/build MAKEFLAGS=
-	cd libffi/build && ./libtool --mode=install cp libffi.la $(TOP)/libffi/dist-install/build
+	cd libffi/build && ./libtool --mode=install cp */libffi.la $(TOP)/libffi/dist-install/build
 
 	# We actually want both static and dllized libraries, because we build
 	#   the runtime system both ways. libffi_convenience.a is the static version.
