@@ -1,0 +1,66 @@
+
+==================== Derived instances ====================
+Derived instances:
+  instance GHC.Generics.Generic (GenDerivOutput.List a) where
+    GHC.Generics.from GenDerivOutput.Nil
+      = GHC.Generics.M1
+          (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1))
+    GHC.Generics.from (GenDerivOutput.Cons g1 g2)
+      = GHC.Generics.M1
+          (GHC.Generics.R1
+             (GHC.Generics.M1
+                ((GHC.Generics.:*:)
+                   (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                   (GHC.Generics.M1 (GHC.Generics.K1 g2)))))
+    GHC.Generics.to
+      (GHC.Generics.M1 (GHC.Generics.L1 (GHC.Generics.M1 GHC.Generics.U1)))
+      = GenDerivOutput.Nil
+    GHC.Generics.to
+      (GHC.Generics.M1 (GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.:*: (GHC.Generics.M1 (GHC.Generics.K1 g1))
+                                                                           (GHC.Generics.M1 (GHC.Generics.K1 g2))))))
+      = GenDerivOutput.Cons g1 g2
+  
+  instance GHC.Generics.Datatype GenDerivOutput.D1List where
+    GHC.Generics.datatypeName _ = "List"
+    GHC.Generics.moduleName _ = "GenDerivOutput"
+  
+  instance GHC.Generics.Constructor GenDerivOutput.C1_0List where
+    GHC.Generics.conName _ = "Nil"
+  
+  instance GHC.Generics.Constructor GenDerivOutput.C1_1List where
+    GHC.Generics.conName _ = "Cons"
+    GHC.Generics.conIsRecord _ = GHC.Types.True
+  
+  instance GHC.Generics.Selector GenDerivOutput.S1_1_0List where
+    GHC.Generics.selName _ = "element"
+  
+  instance GHC.Generics.Selector GenDerivOutput.S1_1_1List where
+    GHC.Generics.selName _ = "rest"
+  
+
+Generic representation:
+  
+  Generated datatypes for meta-information:
+    GenDerivOutput.D1List
+    GenDerivOutput.C1_0List
+    GenDerivOutput.C1_1List
+    GenDerivOutput.S1_1_0List
+    GenDerivOutput.S1_1_1List
+  
+  Representation types: GenDerivOutput.Rep_List
+  
+  Meta-information instances:
+    instance GHC.Generics.Datatype GenDerivOutput.D1List where
+      GHC.Generics.datatypeName _ = "List"
+      GHC.Generics.moduleName _ = "GenDerivOutput"
+    instance GHC.Generics.Constructor GenDerivOutput.C1_0List where
+      GHC.Generics.conName _ = "Nil"
+    instance GHC.Generics.Constructor GenDerivOutput.C1_1List where
+      GHC.Generics.conName _ = "Cons"
+      GHC.Generics.conIsRecord _ = GHC.Types.True
+    instance GHC.Generics.Selector GenDerivOutput.S1_1_0List where
+      GHC.Generics.selName _ = "element"
+    instance GHC.Generics.Selector GenDerivOutput.S1_1_1List where
+      GHC.Generics.selName _ = "rest"
+
+
