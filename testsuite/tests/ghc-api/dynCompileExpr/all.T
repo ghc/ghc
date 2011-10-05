@@ -1,4 +1,3 @@
 test('dynCompileExpr',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory dynCompileExpr'])
+     extra_run_opts('"' + config.libdir + '"'),
+     compile_and_run, ['-package ghc'])
