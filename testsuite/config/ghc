@@ -132,6 +132,9 @@ def get_compiler_info():
     h.close()
     rtsInfoDict = dict(eval(s))
 
+    # We use a '/'-separated path for libdir, even on Windows
+    config.libdir = re.sub('\\\\','/',compilerInfoDict['LibDir'])
+
     v = compilerInfoDict["Project version"].split('-')
     config.compiler_version = v[0]
     config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])

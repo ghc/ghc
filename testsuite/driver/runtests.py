@@ -170,7 +170,7 @@ from testlib import *
 # in order for the dynamic library tests to work.
 if windows or darwin:
     pkginfo = getStdout([config.ghc_pkg, 'dump'])
-    topdir = re.sub('\\\\','/',getStdout([config.compiler, '--print-libdir'])).rstrip()
+    topdir = config.libdir
     for line in pkginfo.split('\n'):
         if line.startswith('library-dirs:'):
             path = line.rstrip()
