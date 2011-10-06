@@ -127,8 +127,8 @@ step' normalising ei_state =
         Case e x ty alts -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts))                 : k, (rn, e))
           where (ids', rn', x') = renameNonRecBinder ids rn x
         Cast e co        
-          | isReflCo co' -> go (deeds, heap,                                                                                       k, (rn, e))
-          | otherwise    -> go (deeds, heap,        Tagged tg (CastIt co')                                                       : k, (rn, e))
+          | isReflCo co' -> go (deeds + 1, heap,                                                                                   k, (rn, e))
+          | otherwise    -> go (deeds,     heap,    Tagged tg (CastIt co')                                                       : k, (rn, e))
           where co' = renameCoercion ids rn co
         Let x e1 e2
           | isUnLiftedType (idType x) -> go (deeds,     Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) : k, in_e1)
