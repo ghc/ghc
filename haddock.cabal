@@ -78,6 +78,7 @@ flag test
 
 executable haddock
   default-language:     Haskell2010
+  build-tools: alex >= 2.3, happy >= 1.18
   build-depends:
     base >= 4.3 && < 4.5,
     filepath,
@@ -138,6 +139,7 @@ executable haddock
    
 library
   default-language:     Haskell2010
+  build-tools: alex >= 2.3, happy >= 1.18
   build-depends:
     base >= 4.3 && < 4.5,
     filepath,
