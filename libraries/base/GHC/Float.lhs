@@ -860,15 +860,6 @@ fromRat' x = r
         (x', p') = if x0 >= xMax then (x0 / toRational b, p0+1) else (x0, p0)
         r = encodeFloat (round x') p'
 
--- We don't need this helper anymore, TODO: remove?
--- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
-scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
-scaleRat b minExp xMin xMax p x
- | x >= xMax   = scaleRat b minExp xMin xMax (p+1) (x/b)
- | p <= minExp = (x, p)
- | x < xMin    = scaleRat b minExp xMin xMax (p-1) (x*b)
- | otherwise   = (x, p)
-
 -- Exponentiation with a cache for the most common numbers.
 minExpt, maxExpt :: Int
 minExpt = 0
