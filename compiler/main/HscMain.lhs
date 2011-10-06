@@ -83,6 +83,7 @@ import VarSet
 import VarEnv		( emptyTidyEnv )
 import Panic
 import Class
+import Data.List
 #endif
 
 import Id
@@ -145,7 +146,7 @@ import Bag
 import Exception
 
 import Control.Monad
-import Data.Maybe       ( catMaybes )
+import Data.Maybe
 import Data.IORef
 \end{code}
 #include "HsVersions.h"
@@ -1364,16 +1365,26 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     let
         tcs     = filter (not . isImplicitTyCon) $ mg_tcs simpl_mg
         clss    = mg_clss simpl_mg
-        tythings = map ATyCon tcs ++ map (ATyCon . classTyCon) clss
-        sys_vars = filter (isExternalName . idName) $
+
+        ext_vars = filter (isExternalName . idName) $
                       bindersOfBinds (cg_binds tidy_cg)
+
+        (sys_vars, user_vars) = partition is_sys_var ext_vars
+        is_sys_var id =  isDFunId id
+                      || isRecordSelector id
+                      || isJust (isClassOpId_maybe id)
                    -- we only need to keep around the external bindings
                    -- (as decided by TidyPgm), since those are the only ones
                    -- that might be referenced elsewhere.
 
+        tythings =  map AnId user_vars
+                 ++ map ATyCon tcs
+                 ++ map (ATyCon . classTyCon) clss
+
     -- pprTrace "new tycons"  (ppr tcs) $ return ()
     -- pprTrace "new classes" (ppr clss) $ return ()
     -- pprTrace "new sys Ids" (ppr sys_vars) $ return ()
+    -- pprTrace "new user Ids" (ppr user_vars) $ return ()
 
     let ictxt1 = extendInteractiveContext icontext tythings
         ictxt = ictxt1 {

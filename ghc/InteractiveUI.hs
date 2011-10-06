@@ -728,7 +728,8 @@ enqueueCommands cmds = do
 -- | If we one of these strings prefixes a command, then we treat it as a decl
 -- rather than a stmt.
 declPrefixes :: [String]
-declPrefixes = ["class ","data ","newtype ","type ","instance ", "deriving "]
+declPrefixes = ["class ","data ","newtype ","type ","instance ", "deriving ",
+                "foreign "]
 
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
