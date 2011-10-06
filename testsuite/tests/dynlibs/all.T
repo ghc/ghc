@@ -6,8 +6,7 @@ test('T3807',
                    'T3807-export.o', 'T3807-load.o',
                    'T3807test.so',
                    'T3807-load']),
-      if_os('mingw32', skip),
-      if_os('darwin', expect_broken(4264))],
+      if_os('mingw32', skip)],
      run_command,
      ['$MAKE --no-print-directory -s T3807'])
 

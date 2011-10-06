@@ -10,7 +10,7 @@ T3807:
 	$(RM) T3807test.so
 	$(RM) T3807-load
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version`
-	'$(TEST_HC)' $(TEST_HC_OPTS) T3807-load.c -o T3807-load -ldl
+	'$(TEST_HC)' $(TEST_HC_OPTS) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
 	./T3807-load
 
 .PHONY: T4464
