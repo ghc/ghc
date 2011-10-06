@@ -785,7 +785,7 @@ transitiveInline :: PureHeap          -- ^ What to inline. We have not claimed d
 transitiveInline init_h_inlineable _state@(deeds, Heap h ids, k, in_e)
     = -- (if not (S.null not_inlined_vs') then traceRender ("transitiveInline: generalise", not_inlined_vs') else id) $
       -- traceRender ("transitiveInline", "had bindings for", pureHeapBoundVars init_h_inlineable, "FVs were", state_fvs, "so inlining", pureHeapBoundVars h') $
-      ASSERT2(isEmptyVarSet (unnormalisedStateUncoveredVars final_state), ppr (M.keysSet h_inlineable, PrettyDoc $ pPrintFullUnnormalisedState _state, PrettyDoc $ pPrintFullUnnormalisedState final_state, unnormalisedStateUncoveredVars final_state, M.keysSet h', live'))
+      ASSERT2(isEmptyVarSet (unnormalisedStateUncoveredVars final_state), ppr (M.keysSet h_inlineable, PrettyDoc $ pPrintFullUnnormalisedState False _state, PrettyDoc $ pPrintFullUnnormalisedState False final_state, unnormalisedStateUncoveredVars final_state, M.keysSet h', live'))
       final_state
   where
     final_state = (deeds', Heap h' ids, k, in_e)

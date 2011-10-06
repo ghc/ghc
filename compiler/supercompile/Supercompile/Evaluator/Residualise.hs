@@ -59,10 +59,10 @@ pPrintHeap :: Heap -> SDoc
 pPrintHeap (Heap h ids) = pPrint $ map (first (PrettyDoc . pPrintBndr LetBind)) $ floats_static_h ++ [(x, asPrettyFunction1 e) | (x, e) <- floats_nonstatic_h]
   where (floats_static_h, floats_nonstatic_h) = residualisePureHeap ids h
 
-pPrintFullState :: State -> SDoc
-pPrintFullState = pPrintFullUnnormalisedState . denormalise
+pPrintFullState :: Bool -> State -> SDoc
+pPrintFullState include_statics = pPrintFullUnnormalisedState include_statics . denormalise
 
-pPrintFullUnnormalisedState :: UnnormalisedState -> SDoc
-pPrintFullUnnormalisedState state = text "Deeds:" <+> pPrint deeds $$ pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) $$ body
+pPrintFullUnnormalisedState :: Bool -> UnnormalisedState -> SDoc
+pPrintFullUnnormalisedState include_statics state = text "Deeds:" <+> pPrint deeds $$ (if include_statics then pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) else empty) $$ body
   where (deeds, floats_static, floats_nonstatic, e) = residualiseUnnormalisedState state
         body = pPrintPrecLetRec noPrec floats_nonstatic (PrettyDoc (angleBrackets (pPrint e)))

@@ -160,7 +160,7 @@ supercompile unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
 --
 -- TODO: have the garbage collector collapse (let x = True in x) to (True) -- but note that this requires onceness analysis
 gc :: State -> (PureHeap, State)
-gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredVars gced_state), ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState _state), PrettyDoc (pPrintFullState gced_state)))
+gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredVars gced_state), ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState False _state), PrettyDoc (pPrintFullState False gced_state)))
                                           (h_dead, gced_state)
   where
     gced_state = (deeds2, Heap h' ids, k', in_e)
@@ -302,7 +302,7 @@ reduce orig_state = go (mkHistory rEDUCE_WQO) orig_state
         Nothing -> (mempty, state)
         Just state' -> case terminate hist state of
           Continue hist' -> go hist' state'
-          Stop old_state -> pprTrace "reduce-stop" (pPrintFullState old_state $$ pPrintFullState state) 
+          Stop old_state -> pprTrace "reduce-stop" (pPrintFullState False old_state $$ pPrintFullState False state) 
                             -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
                             -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
                             (mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
@@ -642,7 +642,7 @@ addStats :: SCStats -> ScpM f f ()
 addStats scstats = ScpM $ \_e s k -> k () (let scstats' = stats s `mappend` scstats in scstats' `seqSCStats` s { stats = scstats' })
 
 recordStopped :: State -> ScpBM a -> ScpBM a
-recordStopped state mx = ScpM $ \e s k -> unScpM mx (e { pTreeContext = case pTreeContext e of (Promise p:rest) -> Promise p { embedded = Just (pPrintFullState state) }:rest }) s k
+recordStopped state mx = ScpM $ \e s k -> unScpM mx (e { pTreeContext = case pTreeContext e of (Promise p:rest) -> Promise p { embedded = Just (pPrintFullState False state) }:rest }) s k
 
 
 type PrettyTree = PTree (Var, SDoc, Maybe SDoc, Maybe SDoc)
@@ -680,7 +680,7 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     unwindTree :: FulfilmentTree -> PrettyTree
     unwindTree = fmap unwindPromiseFulfilment
 
-    unwindPromiseFulfilment (p, f) = (fun p, pPrintFullState (meaning p), embedded p,
+    unwindPromiseFulfilment (p, f) = (fun p, pPrintFullState False (meaning p), embedded p,
                                       case f of Captured         -> Nothing
                                                 RolledBack mb_e' -> fmap ppr mb_e'
                                                 Fulfilled e'     -> Just (ppr e'))
@@ -689,7 +689,8 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     unwindContext = flip $ foldl (flip unwindContextItem)
 
     unwindContextItem :: PTreeContextItem -> [PrettyTree] -> [PrettyTree]
-    unwindContextItem (Promise p)                  ts = [Split True [(fun p, pPrintFullState (meaning p), embedded p, Nothing)] ts]
+    unwindContextItem (Promise p)                  ts = [Split False [(fun p, pPrintFullState False (meaning p), embedded p, Nothing)] ts]
+     -- NB: don't put (Split True) here because otherwise it looks like everything on the way back to the root has been rolled back, when it fact it is only "in progress"
     unwindContextItem (BindCapturedFloats fvs ts') ts = map unwindTree ts' ++ [BoundCapturedFloats fvs ts]
 
     pprTrees :: [PrettyTree] -> Html
@@ -698,7 +699,7 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     pprTree :: PrettyTree -> Html
     pprTree t = li $ case t of
       Tieback x                  -> anchor (stringToHtml ("Tieback " ++ show x)) ! [href ("#" ++ show x)]
-      Split rb fs ts             -> toHtmlFromList ([thediv (anchor (stringToHtml (show x ++ if isJust mb_emb_code then " (sc-stop)" else "")) !
+      Split rb fs ts             -> toHtmlFromList ([thediv (anchor (stringToHtml (show x ++ (if isJust mb_emb_code then " (sc-stop)" else "") ++ if rb then " (rolled back)" else "")) !
                                                                 [strAttr "onclick" $ "document.getElementById(\"content-in\").innerText=" ++ show (showSDoc in_code) ++
                                                                                     ";document.getElementById(\"content-out\").innerText=" ++ show (maybe "" showSDoc mb_out_code) ++
                                                                                     ";document.getElementById(\"content-embed\").innerText=" ++ show (maybe "" showSDoc mb_emb_code) ++
@@ -725,7 +726,7 @@ sc' hist speculated state = handlePrint $ (\raise -> check raise) `catchScpM` \g
     stop gen state hist = do addStats $ mempty { stat_sc_stops = 1 }
                              recordStopped state $
                                maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (lift . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
-    continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState state'))
+    continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState False state'))
                        addStats stats
                        split state' (lift . sc hist speculated')
       where (speculated', (stats, state')) = (if sPECULATION then speculate speculated else ((,) speculated)) $ reduce state -- TODO: experiment with doing admissability-generalisation on reduced terms. My suspicion is that it won't help, though (such terms are already stuck or non-stuck but loopy: throwing stuff away does not necessarily remove loopiness).
@@ -751,7 +752,7 @@ memo opt speculated state0 = do
                tb_dynamic_vs = map rn_fv (abstracted p)
          ] of
       (p, res):_ -> {- traceRender ("tieback", pPrintFullState state3, fst res) $ -} do
-        traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState state1), res)
+        traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state1), res)
         ScpM $ \_ s k -> k res (s { pTreeHole = Tieback (fun p) })
       [] -> {- traceRender ("new drive", pPrintFullState state3) $ -} do
         let vs = stateLambdaBounders state1
@@ -761,7 +762,7 @@ memo opt speculated state0 = do
         x <- freshHName
         promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = vs_list, meaning = state1, embedded = Nothing }) $
           do
-            traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState state1))
+            traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState True state1))
             -- FIXME: this is the site of the Dreadful Hack that makes it safe to match on reduced terms yet *drive* unreduced ones
             -- I only add non-internally bound junk to the input heap because:
             --  a) Thats the only stuff I *need* to add to make sure the FVs etc match up properly
@@ -772,7 +773,7 @@ memo opt speculated state0 = do
             --
             -- FIXME: I'm not acquiring deeds for these....
             res <- opt speculated state1
-            traceRenderScpM "<sc" (x, PrettyDoc (pPrintFullState state1), res)
+            traceRenderScpM "<sc" (x, PrettyDoc (pPrintFullState False state1), res)
             return res
 
 sortLambdaBounds :: [Var] -> [Var]
