@@ -170,7 +170,7 @@ opt_nth n co'
   = ASSERT( n < length cos )
     cos !! n
   | otherwise
-  = NthCo n co'
+  = mkNthCo n co'
 
 -------------
 
@@ -181,7 +181,7 @@ opt_inst iss co' ty'
   | Just (tv, co'_body) <- splitForAllCo_maybe co'
   = substCoWithTy iss tv ty' co'_body
 
-  | otherwise = InstCo co' ty'
+  | otherwise = mkInstCo co' ty'
 
 -------------
 
