@@ -17,7 +17,7 @@ import qualified Data.Map as M
 
 import qualified CoreSyn as CoreSyn
 import CoreUnfold (exprIsConApp_maybe)
-import Coercion (liftCoSubstWith, coercionKind)
+import Coercion (liftCoSubstWith, coercionKind, isReflCo)
 import TyCon
 import Type
 import PrelRules
@@ -126,7 +126,10 @@ step' normalising ei_state =
           | otherwise    -> pprPanic "step': nullary primops unsupported" (ppr pop)
         Case e x ty alts -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts))                 : k, (rn, e))
           where (ids', rn', x') = renameNonRecBinder ids rn x
-        Cast e co        -> go (deeds, heap,        Tagged tg (CastIt (renameCoercion ids rn co))                                : k, (rn, e))
+        Cast e co        
+          | isReflCo co' -> go (deeds, heap,                                                                                       k, (rn, e))
+          | otherwise    -> go (deeds, heap,        Tagged tg (CastIt co')                                                       : k, (rn, e))
+          where co' = renameCoercion ids rn co
         Let x e1 e2
           | isUnLiftedType (idType x) -> go (deeds,     Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) : k, in_e1)
           | otherwise                 -> go (deeds + 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                      k, (rn', e2))
