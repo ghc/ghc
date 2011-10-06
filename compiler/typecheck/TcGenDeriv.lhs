@@ -70,12 +70,16 @@ import Data.List        ( partition, intersperse )
 \begin{code}
 type BagDerivStuff = Bag DerivStuff
 
-data DerivStuff     -- Please add this auxiliary stuff
+data AuxBindSpec
   = DerivCon2Tag TyCon  -- The con2Tag for given TyCon
   | DerivTag2Con TyCon  -- ...ditto tag2Con
   | DerivMaxTag  TyCon  -- ...and maxTag
+  deriving( Eq )
   -- All these generate ZERO-BASED tag operations
   -- I.e first constructor has tag 0
+
+data DerivStuff     -- Please add this auxiliary stuff
+  = DerivAuxBind AuxBindSpec
 
   -- Generics
   | DerivTyCon TyCon      -- New data types
@@ -84,14 +88,6 @@ data DerivStuff     -- Please add this auxiliary stuff
   -- New top-level auxiliary bindings 
   | DerivHsBind (LHsBind RdrName, LSig RdrName) -- Also used for SYB
   | DerivInst (InstInfo RdrName)                -- New, auxiliary instances
-
-isDupAux :: DerivStuff -> DerivStuff -> Bool
-isDupAux (DerivCon2Tag tc1) (DerivCon2Tag tc2) = tc1 == tc2
-isDupAux (DerivTag2Con tc1) (DerivTag2Con tc2) = tc1 == tc2
-isDupAux (DerivMaxTag tc1)  (DerivMaxTag tc2)  = tc1 == tc2
-isDupAux (DerivTyCon tc1)   (DerivTyCon tc2)   = tc1 == tc2
-isDupAux (DerivFamInst tc1) (DerivFamInst tc2) = tc1 == tc2
-isDupAux _                   _                 = False
 \end{code}
 
 

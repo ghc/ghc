@@ -2,6 +2,9 @@
 % (c) The University of Glasgow 2011
 %
 
+The deriving code for the Generic class
+(equivalent to the code in TcGenDeriv, for other classes)
+
 \begin{code}
 
 module Generics ( canDoGenerics,

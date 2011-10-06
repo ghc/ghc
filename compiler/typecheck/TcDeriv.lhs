@@ -1491,10 +1491,10 @@ genDerivStuff loc fix_env clas name tycon
   | className clas `elem` typeableClassNames
   = return (gen_Typeable_binds loc tycon, emptyBag)
 
-  | classKey clas == genClassKey
+  | classKey clas == genClassKey   -- Special case because monadic
   = gen_Generic_binds tycon (nameModule name)
 
-  | otherwise
+  | otherwise	                   -- Non-monadic generators
   = case assocMaybe gen_list (getUnique clas) of
         Just gen_fn -> return (gen_fn loc tycon)
         Nothing	    -> pprPanic "genDerivStuff: bad derived class" (ppr clas)
