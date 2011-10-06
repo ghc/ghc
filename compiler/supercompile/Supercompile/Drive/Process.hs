@@ -516,7 +516,7 @@ promise p opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted p)
 type FulfilmentTree = PTree (Promise, Fulfilment)
 
 data Fulfilment = Captured                           -- ^ Already residualised because captured by a BV or similar
-                | RolledBack (Maybe (Out FVedTerm))  -- ^ Rolled back so will never be residualised, but we might know what it is anyway
+                | RolledBack (Maybe (Out FVedTerm))  -- ^ Rolled back so will never be residualised, but we might know what it is anyway (FIXME: always Nothing)
                 | Fulfilled (Out FVedTerm)           -- ^ Not yet residualised: floated, eligible for further tiebacks
 
 data PTree a = Tieback Var              -- ^ Didn't promise or drive extra stuff: just tied back
@@ -721,11 +721,10 @@ sc' hist speculated state = handlePrint $ (\raise -> check raise) `catchScpM` \g
   where
     check this_rb = case terminate hist (state, this_rb) of
                       Continue hist' -> continue hist'
-                      Stop (shallower_state, rb) -> maybe (stop gen state hist) ($ gen) $ guard sC_ROLLBACK Monad.>> Just rb
+                      Stop (shallower_state, rb) -> recordStopped shallower_state $maybe (stop gen state hist) ($ gen) $ guard sC_ROLLBACK Monad.>> Just rb
                         where gen = mK_GENERALISER shallower_state state
     stop gen state hist = do addStats $ mempty { stat_sc_stops = 1 }
-                             recordStopped state $
-                               maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (lift . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
+                             maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (lift . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
     continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState False state'))
                        addStats stats
                        split state' (lift . sc hist speculated')
