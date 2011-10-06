@@ -12,7 +12,7 @@ This is where we do all the grimy bindings' generation.
 
 \begin{code}
 module TcGenDeriv (
-	BagDerivStuff, DerivStuff(..), isDupAux,
+	BagDerivStuff, DerivStuff(..),
 
 	gen_Bounded_binds,
 	gen_Enum_binds,
@@ -28,7 +28,7 @@ module TcGenDeriv (
 	deepSubtypesContaining, foldDataConArgs,
 	gen_Foldable_binds,
 	gen_Traversable_binds,
-	genAuxBind, genAuxBinds,
+	genAuxBinds,
         ordOpTbl, boxConTbl
     ) where
 
@@ -187,7 +187,7 @@ gen_Eq_binds loc tycon
     	               (genOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
     aux_binds | no_nullary_cons = emptyBag
-	      | otherwise       = unitBag $ DerivCon2Tag tycon
+	      | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
     method_binds = listToBag [eq_bind, ne_bind]
     eq_bind = mk_FunBind loc eq_RDR (map pats_etc nonnullary_cons ++ rest)
@@ -332,7 +332,7 @@ gen_Ord_binds loc tycon
   = (unitBag (mkOrdOp OrdCompare) `unionBags` other_ops, aux_binds)
   where
     aux_binds | single_con_type = emptyBag
-              | otherwise       = unitBag $ DerivCon2Tag tycon
+              | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
 	-- Note [Do not rely on compare]
     other_ops | (last_tag - first_tag) <= 2 	-- 1-3 constructors
@@ -559,7 +559,8 @@ gen_Enum_binds loc tycon
 			enum_from_then,
 			from_enum
 		    ]
-    aux_binds = listToBag [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon]
+    aux_binds = listToBag $ map DerivAuxBind
+                  [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon]
 
     occ_nm = getOccString tycon
 
@@ -717,9 +718,11 @@ gen_Ix_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 
 gen_Ix_binds loc tycon
   | isEnumerationTyCon tycon
-  = (enum_ixes, listToBag [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon])
+  = ( enum_ixes
+    , listToBag $ map DerivAuxBind
+                   [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon])
   | otherwise
-  = (single_con_ixes, unitBag (DerivCon2Tag tycon))
+  = (single_con_ixes, unitBag (DerivAuxBind (DerivCon2Tag tycon)))
   where
     --------------------------------------------------------------
     enum_ixes = listToBag [ enum_range, enum_index, enum_inRange ]
@@ -1730,8 +1733,8 @@ The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
 fiddling around.
 
 \begin{code}
-genAuxBind :: SrcSpan -> DerivStuff -> (LHsBind RdrName, LSig RdrName)
-genAuxBind loc (DerivCon2Tag tycon)
+genAuxBindSpec :: SrcSpan -> AuxBindSpec -> (LHsBind RdrName, LSig RdrName)
+genAuxBindSpec loc (DerivCon2Tag tycon)
   = (mk_FunBind loc rdr_name eqns, 
      L loc (TypeSig [L loc rdr_name] (L loc sig_ty)))
   where
@@ -1754,7 +1757,7 @@ genAuxBind loc (DerivCon2Tag tycon)
     mk_eqn con = ([nlWildConPat con], 
 		  nlHsLit (HsIntPrim (toInteger ((dataConTag con) - fIRST_TAG))))
 
-genAuxBind loc (DerivTag2Con tycon)
+genAuxBindSpec loc (DerivTag2Con tycon)
   = (mk_FunBind loc rdr_name 
 	[([nlConVarPat intDataCon_RDR [a_RDR]], 
 	   nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
@@ -1765,7 +1768,7 @@ genAuxBind loc (DerivTag2Con tycon)
 
     rdr_name = tag2con_RDR tycon
 
-genAuxBind loc (DerivMaxTag tycon)
+genAuxBindSpec loc (DerivMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
      L loc (TypeSig [L loc rdr_name] (L loc sig_ty)))
   where
@@ -1775,25 +1778,31 @@ genAuxBind loc (DerivMaxTag tycon)
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
--- The other cases never happen (we filter them in genAuxBinds)
-genAuxBind _ _ = panic "genAuxBind"
-
-type SeparateBagsDerivStuff = ( Bag (LHsBind RdrName, LSig RdrName)
-                                -- New bindings
-                              , Bag TyCon -- New top-level datatypes
-                              , Bag TyCon -- New family instances
-                              , Bag (InstInfo RdrName)) -- New instances
+type SeparateBagsDerivStuff = -- AuxBinds and SYB bindings
+                              ( Bag (LHsBind RdrName, LSig RdrName)
+                                -- Extra bindings (used by Generic only)
+                              , Bag TyCon -- Extra top-level datatypes
+                              , Bag TyCon -- Extra family instances
+                              , Bag (InstInfo RdrName)) -- Extra instances
 
 genAuxBinds :: SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
-genAuxBinds loc s = foldrBag f (emptyBag, emptyBag, emptyBag, emptyBag) s where
+genAuxBinds loc b = genAuxBinds' b2 where
+  (b1,b2) = partitionBagWith splitDerivAuxBind b
+  splitDerivAuxBind (DerivAuxBind x) = Left x
+  splitDerivAuxBind  x               = Right x
+
+  rm_dups = foldrBag dup_check emptyBag
+  dup_check a b = if anyBag (== a) b then b else consBag a b
+  
+  genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
+  genAuxBinds' = foldrBag f ( mapBag (genAuxBindSpec loc) (rm_dups b1)
+                            , emptyBag, emptyBag, emptyBag)
   f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
-  f x@(DerivCon2Tag   _) = add1 (genAuxBind loc x)
-  f x@(DerivTag2Con   _) = add1 (genAuxBind loc x)
-  f x@(DerivMaxTag    _) = add1 (genAuxBind loc x)
-  f   (DerivHsBind    b) = add1 b
-  f   (DerivTyCon     t) = add2 t
-  f   (DerivFamInst   t) = add3 t
-  f   (DerivInst      i) = add4 i
+  f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before
+  f (DerivHsBind  b) = add1 b
+  f (DerivTyCon   t) = add2 t
+  f (DerivFamInst t) = add3 t
+  f (DerivInst    i) = add4 i
 
   add1 x (a,b,c,d) = (x `consBag` a,b,c,d)
   add2 x (a,b,c,d) = (a,x `consBag` b,c,d)
