@@ -38,12 +38,11 @@ Prelude>
 
     <para>There may be a short pause while GHCi loads the prelude and
     standard libraries, after which the prompt is shown. As the banner
-    says, you can type <literal>:?</literal> to see the list of commands
-    available, and a half line description of each of them.</para>
-
-    <para>We'll explain most of these commands as we go along.  For
-    Hugs users: many things work the same as in Hugs, so you should be
-    able to get going straight away.</para>
+    says, you can type <literal>:?</literal> to see the list of
+    commands available, and a half line description of each of them.
+    We'll explain most of these commands as we go along, and there is
+    complete documentation for all the commands in
+      <xref linkend="ghci-commands" />.</para>
 
     <para>Haskell expressions can be typed at the prompt:</para>
     <indexterm><primary>prompt</primary><secondary>GHCi</secondary>
@@ -61,49 +60,12 @@ Prelude>
     The expression may not span several lines - as soon as you press enter,
     GHCi will attempt to evaluate it.</para>
 
-    <para>GHCi also has a multiline mode,
-    <indexterm><primary><literal>:set +m</literal></primary></indexterm>,
-    which is terminated by an empty line:</para>
-
-<screen>
-Prelude> :set +m
-Prelude> let x = 42 in x / 9
-Prelude|
-4.666666666666667
-Prelude>
-</screen>
-
     <para>In Haskell, a <literal>let</literal> expression is followed
     by <literal>in</literal>.  However, in GHCi, since the expression
     can also be interpreted in the <literal>IO</literal> monad,
     a <literal>let</literal> binding with no accompanying
     <literal>in</literal> statement can be signalled by an empty line,
     as in the above example.</para>
-
-    <para>Multiline mode is useful when entering monadic
-    <literal>do</literal> statements:</para>
-
-<screen>
-Control.Monad.State> flip evalStateT 0 $ do
-Control.Monad.State| i &lt;- get
-Control.Monad.State| lift $ do
-Control.Monad.State|   putStrLn "Hello World!"
-Control.Monad.State|   print i
-Control.Monad.State|
-"Hello World!"
-0
-Control.Monad.State>
-</screen>
-
-   <para>During a multiline interaction, the user can interrupt and
-   return to the top-level prompt.</para>
-
-<screen>
-Prelude> do
-Prelude| putStrLn "Hello, World!"
-Prelude| ^C
-Prelude>
-</screen>
   </sect1>
 
   <sect1 id="loading-source-files">
@@ -567,6 +529,132 @@ Prelude> let (x:xs) = [1..]
 x :: Integer
 xs :: [Integer]
 </screen>
+
+    </sect2>
+
+    <sect2 id="ghci-multiline">
+      <title>Multiline input</title>
+
+      <para>Apart from the <literal>:{ ... :}</literal> syntax for
+        multi-line input mentioned above, GHCi also has a multiline
+        mode, enabled by <literal>:set +m</literal>,
+        <indexterm><primary><literal>:set +m</literal></primary></indexterm>
+        in which GHCi detects automatically when the current statement
+        is unfinished and allows further lines to be added.  A
+        multi-line input is terminated with an empty line.  For example:</para>
+
+<screen>
+Prelude> :set +m
+Prelude> let x = 42
+Prelude|
+</screen>
+
+       <para>Further bindings can be added to
+       this <literal>let</literal> statement, so GHCi indicates that
+       the next line continues the previous one by changing the
+       prompt.  Note that layout is in effect, so to add more bindings
+         to this <literal>let</literal> we have to line them up:</para>
+
+<screen>
+Prelude> :set +m
+Prelude> let x = 42
+Prelude|     y = 3
+Prelude| 
+Prelude>
+</screen>
+
+       <para>Explicit braces and semicolons can be used instead of
+         layout, as usual:</para>
+
+<screen>
+Prelude> do {
+Prelude| putStrLn "hello"
+Prelude| ;putStrLn "world"
+Prelude| }
+hello
+world
+Prelude>
+</screen>
+
+       <para>Note that after the closing brace, GHCi knows that the
+         current statement is finished, so no empty line is required.</para>
+
+       <para>Multiline mode is useful when entering monadic
+         <literal>do</literal> statements:</para>
+
+<screen>
+Control.Monad.State> flip evalStateT 0 $ do
+Control.Monad.State| i &lt;- get
+Control.Monad.State| lift $ do
+Control.Monad.State|   putStrLn "Hello World!"
+Control.Monad.State|   print i
+Control.Monad.State|
+"Hello World!"
+0
+Control.Monad.State>
+</screen>
+
+   <para>During a multiline interaction, the user can interrupt and
+   return to the top-level prompt.</para>
+
+<screen>
+Prelude> do
+Prelude| putStrLn "Hello, World!"
+Prelude| ^C
+Prelude>
+</screen>
+    </sect2>
+
+    <sect2 id="ghci-decls">
+      <title>Type, class and other declarations</title>
+
+      <para>[<emphasis role="bold">New in version 7.4.1</emphasis>] At the GHCi
+      prompt you can also enter any top-level Haskell declaration,
+      including <literal>data</literal>, <literal>type</literal>, <literal>newtype</literal>, <literal>class</literal>, <literal>instance</literal>, <literal>deriving</literal>,
+      and <literal>foreign</literal> declarations.  For
+      example:</para>
+
+<screen>
+Prelude> data T = A | B | C deriving (Eq, Ord, Show, Enum)
+Prelude> [A ..]
+[A,B,C]
+Prelude> :i T
+data T = A | B | C      -- Defined at &lt;interactive>:2:6
+instance Enum T -- Defined at &lt;interactive>:2:45
+instance Eq T -- Defined at &lt;interactive>:2:30
+instance Ord T -- Defined at &lt;interactive>:2:34
+instance Show T -- Defined at &lt;interactive>:2:39
+</screen>
+
+    <para>As with ordinary variable bindings, later definitions shadow
+    earlier ones, so you can re-enter a declaration to fix a problem
+    with it or extend it.  But there's a gotcha: when a new type
+    declaration shadows an older one, there might be other
+    declarations that refer to the old type.  The thing to remember is
+    that the old type still exists, and these other declarations still
+    refer to the old type.  However, while the old and the new type
+    have the same name, GHCi will treat them as distinct.  For
+    example:</para>
+
+<screen>
+Prelude> data T = A | B
+Prelude> let f A = True; f B = False
+Prelude> data T = A | B | C
+Prelude> f A
+
+&lt;interactive>:2:3:
+    Couldn't match expected type `main::Interactive.T'
+                with actual type `T'
+    In the first argument of `f', namely `A'
+    In the expression: f A
+    In an equation for `it': it = f A
+Prelude> 
+</screen>
+
+    <para>The old, shadowed, version of <literal>T</literal> is
+      displayed as <literal>main::Interactive.T</literal> by GHCi in
+      an attempt to distinguish it from the new <literal>T</literal>,
+      which is displayed as simply <literal>T</literal>.</para>
 
     </sect2>
 
@@ -2768,7 +2856,7 @@ bar
 	  <listitem>
 	    <para>Enable parsing of multiline commands.  A multiline command
 	    is prompted for when the current input line contains open layout
-	    contexts.</para>
+            contexts (see <xref linkend="ghci-multiline" />).</para>
 	  </listitem>
 	</varlistentry>
 
