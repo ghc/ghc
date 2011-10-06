@@ -1680,11 +1680,15 @@ linkBinary dflags o_files dep_packages = do
                           else [])
 
                       -- '-no_compact_unwind'
-                      --           - C++/Objective-C exceptions cannot use optimised stack
-                      --             unwinding code (the optimised form is the default in Xcode 4 on
-                      --             x86_64).
+                      -- C++/Objective-C exceptions cannot use optimised
+                      -- stack unwinding code. The optimised form is the
+                      -- default in Xcode 4 on at least x86_64, and
+                      -- without this flag we're also seeing warnings
+                      -- like
+                      --     ld: warning: could not create compact unwind for .LFB3: non-standard register 5 being saved in prolog
+                      -- on x86.
                       ++ (if platformOS   (targetPlatform dflags) == OSDarwin   &&
-                             platformArch (targetPlatform dflags) == ArchX86_64
+                             platformArch (targetPlatform dflags) `elem` [ArchX86, ArchX86_64]
                           then ["-Wl,-no_compact_unwind"]
                           else [])
 
