@@ -15,7 +15,7 @@ import Coercion
 import Var        (varType, TyVar, isTyVar, tyVarKind)
 import Id         (Id, idType)
 import VarEnv
-import TypeRep    (Kind, Type(..), PredType, Pred(..))
+import TypeRep    (Kind, Type(..))
 import MonadUtils (mapMaybeM)
 
 import Control.Monad.Fix
@@ -83,7 +83,7 @@ matchAnswer rn2 = matchCoerced (matchIn renameAnnedValue' matchValue) rn2
 
 matchCoerced :: (RnEnv2 -> a -> a -> Match [(Var, Var)])
              -> RnEnv2 -> Coerced a -> Coerced a -> Match [(Var, Var)]
-matchCoerced f rn2 (mb_co_l, x_l) (mb_co_r, x_r) = liftM2 (++) (matchMaybe (\(co_l, _tg_l) (co_r, _tg_r) -> matchCoercion rn2 co_l co_r) mb_co_l mb_co_r) (f rn2 x_l x_r) -- TODO: should match (Just Id) against Nothing
+matchCoerced f rn2 (mb_co_l, x_l) (mb_co_r, x_r) = liftM2 (++) (matchMaybe (\co_l co_r -> matchCoercion rn2 co_l co_r) (castByCo mb_co_l) (castByCo mb_co_r)) (f rn2 x_l x_r) -- TODO: should match (Just Id) against Nothing
 
 matchKind :: Kind -> Kind -> Match [(Var, Var)]
 matchKind k_l k_r = guard "matchKind" (k_l `isSubKind` k_r && k_r `isSubKind` k_l) >> return []
@@ -94,14 +94,7 @@ matchType rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 (++) (matchTy
 matchType rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = guard "matchType: TyConApp" (tc_l == tc_r) >> matchList (matchType rn2) tys_l tys_r
 matchType rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = liftM2 (++) (matchType rn2 ty1_l ty1_r) (matchType rn2 ty2_l ty2_r)
 matchType rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchType rn2 ty_l ty_r
-matchType rn2 (PredTy pred_l)       (PredTy pred_r)       = matchPredType rn2 pred_l pred_r
 matchType _ _ _ = fail "matchType"
-
-matchPredType :: RnEnv2 -> PredType -> PredType -> Match [(Var, Var)]
-matchPredType rn2 (ClassP cls_l tys_l) (ClassP cls_r tys_r) = guard "matchPredType: ClassP" (cls_l == cls_r) >> matchList (matchType rn2) tys_l tys_r
-matchPredType rn2 (IParam nm_l ty_l)   (IParam nm_r ty_r)   = guard "matchPredType: IParam" (nm_l == nm_r) >> matchType rn2 ty_l ty_r
-matchPredType rn2 (EqPred ty1_l ty2_l) (EqPred ty1_r ty2_r) = liftM2 (++) (matchType rn2 (ty1_l) (ty1_r)) (matchType rn2 ty2_l ty2_r)
-matchPredType _ _ _ = fail "matchType"
 
 matchCoercion :: RnEnv2 -> Coercion -> Coercion -> Match [(Var, Var)]
 matchCoercion rn2 (Refl ty_l)              (Refl ty_r)              = matchType rn2 (ty_l) (ty_r)

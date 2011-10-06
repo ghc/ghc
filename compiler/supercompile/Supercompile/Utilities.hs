@@ -368,11 +368,6 @@ fmapEither f g = either (Left . f) (Right . g)
 orElse :: Maybe a -> a -> a
 orElse = flip fromMaybe
 
-plusMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
-plusMaybe f (Just x) (Just y) = Just (f x y)
-plusMaybe _ Nothing  mb_y     = mb_y
-plusMaybe _ mb_x     Nothing  = mb_x
-
 extractJusts :: (a -> Maybe b) -> [a] -> ([b], [a])
 extractJusts p = foldr step ([], [])
   where step x rest | Just y <- p x = first  (y:) rest

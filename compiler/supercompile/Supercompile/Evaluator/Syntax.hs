@@ -19,7 +19,7 @@ import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType, isU
 import Pair     (pSnd)
 import DataCon  (dataConWorkId)
 import Literal  (literalType)
-import Coercion (coercionType)
+import Coercion (coercionType, coercionKind)
 
 import qualified Data.Map as M
 
@@ -102,9 +102,9 @@ answerFreeVars' = annedTermFreeVars' . answerToAnnedTerm' emptyInScopeSet
 
 termToAnswer :: InScopeSet -> In AnnedTerm -> Maybe (Anned Answer)
 termToAnswer iss in_anned_e = flip traverse (renameAnned in_anned_e) $ \(rn, e) -> case e of
-    Value v          -> Just (Nothing, (rn, v))
+    Value v          -> Just (Uncast, (rn, v))
     Cast anned_e' co -> case extract anned_e' of
-        Value v -> Just (Just (renameCoercion iss rn co, annedTag anned_e'), (rn, v))
+        Value v -> Just (castBy (renameCoercion iss rn co) (annedTag anned_e'), (rn, v))
         _       -> Nothing
     _ -> Nothing
 
@@ -118,10 +118,11 @@ annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
 annedAnswerToInAnnedTerm iss = renamedTerm . fmap (answerToAnnedTerm' iss)
 
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
-answerToAnnedTerm' iss (mb_co, (rn, v)) = maybe Value castValueToAnnedTerm' mb_co $ renameAnnedValue' iss rn v
+answerToAnnedTerm' iss (mb_co, (rn, v)) = castValueToAnnedTerm' mb_co $ renameAnnedValue' iss rn v
 
-castValueToAnnedTerm' :: (Coercion, Tag) -> ValueF Anned -> TermF Anned
-castValueToAnnedTerm' (co, tg) v' = Cast (annedTerm tg (Value v')) co
+castValueToAnnedTerm' :: CastBy -> ValueF Anned -> TermF Anned
+castValueToAnnedTerm' Uncast         v' = Value v'
+castValueToAnnedTerm' (CastBy co tg) v' = Cast (annedTerm tg (Value v')) co
 
 qaToAnnedTerm' :: InScopeSet -> QA -> TermF Anned
 qaToAnnedTerm' _   (Question x) = Var x
@@ -137,7 +138,7 @@ type State = (Deeds, Heap, Stack, Anned QA)
 denormalise :: State -> UnnormalisedState
 denormalise (deeds, h, k, qa) = case extract qa of
     Question x              -> (deeds, h, k, (mkIdentityRenaming (unitVarSet x), annedTerm tg (Var x)))
-    Answer (mb_co, (rn, v)) -> (deeds, h, maybe id (\(co, tg) -> (Tagged tg (CastIt co) :)) mb_co k, (rn, annedTerm tg (Value v)))
+    Answer (mb_co, (rn, v)) -> (deeds, h, (case mb_co of Uncast -> id; CastBy co tg -> (Tagged tg (CastIt co) :)) k, (rn, annedTerm tg (Value v)))
   where tg = annedTag qa
 
 
@@ -174,9 +175,9 @@ pPrintPrecAnnedTerm prec in_e = pprPrec prec $ renameIn (renameAnnedTerm (mkInSc
 pPrintPrecAnnedAnswer :: Rational -> Anned Answer -> SDoc
 pPrintPrecAnnedAnswer prec a = pprPrec prec $ fmap (\a -> PrettyFunction $ \prec -> pPrintPrecAnswer prec a) a
 
-pPrintPrecAnswer :: (Outputable a) => Rational -> (Maybe (Coercion, Tag), a) -> SDoc
-pPrintPrecAnswer prec (Nothing,       v) = pPrintPrec prec v
-pPrintPrecAnswer prec (Just (co, tg), v) = pPrintPrecCast prec (Tagged tg v) co
+pPrintPrecAnswer :: (Outputable a) => Rational -> (CastBy, a) -> SDoc
+pPrintPrecAnswer prec (Uncast,       v) = pPrintPrec prec v
+pPrintPrecAnswer prec (CastBy co tg, v) = pPrintPrecCast prec (Tagged tg v) co
 
 instance Outputable HeapBinding where
     pprPrec prec (HB how mb_in_e) = case how of
@@ -241,7 +242,7 @@ stackFrameType kf hole_ty = case tagee kf of
     PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
     StrictLet _ in_e@(rn, e)      -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
     Update _                      -> hole_ty
-    CastIt co                     -> pSnd (coercionKindNonRepr co)
+    CastIt co                     -> pSnd (coercionKind co)
 
 qaType :: Anned QA -> Type
 qaType anned_qa = case traverse (\qa -> case qa of Question x' -> Left (idType x'); Answer a -> Right a) anned_qa of
@@ -250,8 +251,8 @@ qaType anned_qa = case traverse (\qa -> case qa of Question x' -> Left (idType x
 
 answerType :: Anned Answer -> Type
 answerType a = case annee a of
-    (Just (co, _), _)       -> pSnd (coercionKindNonRepr co)
-    (Nothing,      (rn, v)) -> valueType (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
+    (CastBy co _, _)       -> pSnd (coercionKind co)
+    (Uncast,      (rn, v)) -> valueType (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
 
 valueType :: Copointed ann => ValueF ann -> Type
 valueType (Indirect x)        = idType x
@@ -272,7 +273,7 @@ termType e = case extract e of
     Case _ _ ty _     -> ty
     Let _ _ e         -> termType e
     LetRec _ e        -> termType e
-    Cast _ co         -> pSnd (coercionKindNonRepr co)
+    Cast _ co         -> pSnd (coercionKind co)
 
 applyFunTy :: Type -> Type -> Type
 applyFunTy fun_ty got_arg_ty = ASSERT2(got_arg_ty `eqType` expected_arg_ty, text "applyFunTy:" <+> ppr got_arg_ty <+> ppr expected_arg_ty) res_ty

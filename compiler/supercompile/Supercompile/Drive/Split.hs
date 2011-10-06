@@ -1016,8 +1016,8 @@ splitLambdaLike rebuild ids (rn, (x, e)) = zipBracketeds $ TailsUnknown (Shell e
 
 splitCoerced :: (a -> Bracketed (Entered, UnnormalisedState))
              -> Coerced a -> Bracketed (Entered, UnnormalisedState)
-splitCoerced f (Nothing,         x) = f x
-splitCoerced f (Just (co', _tg), x) = zipBracketeds $ TailsUnknown (Shell (tyCoVarsOfCo co') $ \[e'] -> cast e' co') [Hole [] (f x)]
+splitCoerced f (Uncast,         x) = f x
+splitCoerced f (CastBy co' _tg, x) = zipBracketeds $ TailsUnknown (Shell (tyCoVarsOfCo co') $ \[e'] -> cast e' co') [Hole [] (f x)]
 
 splitQA :: InScopeSet -> QA -> Bracketed (Entered, UnnormalisedState)
 splitQA _   (Question x') = noneBracketed (var x')

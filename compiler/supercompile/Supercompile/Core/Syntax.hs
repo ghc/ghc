@@ -16,12 +16,10 @@ import Name     (Name, nameOccName)
 import OccName  (occNameString)
 import Id       (Id)
 import Literal  (Literal)
-import Type     (Type, splitTyConApp_maybe, mkPredTy, mkEqPred)
-import TysPrim  (eqPredPrimTyCon)
-import Coercion (CoVar, Coercion, coercionKind, mkCvSubst, mkAxInstCo, mkReflCo)
+import Type     (Type)
+import Coercion (CoVar, Coercion, mkCvSubst, mkAxInstCo, mkReflCo, isReflCo)
 import PrimOp   (PrimOp)
 import PprCore  ()
-import Pair
 
 
 mkSymCo :: InScopeSet -> NormalCo -> NormalCo
@@ -206,7 +204,16 @@ nameString :: Name -> String
 nameString = occNameString . nameOccName
 
 
-type Coerced a = (Maybe (NormalCo, Tag), a)
+data CastBy = Uncast | CastBy NormalCo Tag -- INVARIANT: NormalCo is not Refl
+type Coerced a = (CastBy, a)
+
+castBy :: NormalCo -> Tag -> CastBy
+castBy co tg | isReflCo co = Uncast
+             | otherwise   = CastBy co tg
+
+castByCo :: CastBy -> Maybe NormalCo
+castByCo Uncast        = Nothing
+castByCo (CastBy co _) = Just co
 
 
 class Functor ann => Symantics ann where
@@ -306,28 +313,3 @@ freshFloatVars ids s es = reassociate $ mapAccumL (\ids -> associate . freshFloa
   where reassociate (ids, floats_xs) = let (mb_floats, xs) = unzip floats_xs in (ids, catMaybes mb_floats, xs)
         associate (ids, mb_float, x) = (ids, (mb_float, x))
 -}
-
--- OK, this is a bit bizarre.
---
--- The coercion handling stuff in GHC sometimes rewrites an equality PredTy
--- into its representation using eqPredPrimTyCon. We might observe such a type
--- in one of the return types of the coercionKind.
---
--- We CANNOT let this "representation" type reach the top level, e.g. be set
--- as the type of a variable. Reason: a variable with a type of ((~) ty1 ty2)
--- is NOT a CoVar is the sense of isCoVar
---
--- Our (slightly hacky) solution is to try to undo this representation type
--- rubbish right here. TODO: perhaps I should do it for other PredTy as well?
----
--- Simon says that the fact that things with ((~) ty1 ty2) types are not detected
--- as CoVars is actually a bug, and he will fix it. We need to keep this workaround
--- if we want to work on earlier GHCs (e.g. the GHC 7.2 RC).
-coercionKindNonRepr :: Coercion -> Pair Type
-coercionKindNonRepr co = Pair (repair from_ty) (repair to_ty)
-  where Pair from_ty to_ty = coercionKind co
-        repair ty | Just (tc, [ty1, ty2]) <- splitTyConApp_maybe ty
-                  , tc == eqPredPrimTyCon
-                  = mkPredTy (mkEqPred (ty1, ty2))
-                  | otherwise
-                  = ty
