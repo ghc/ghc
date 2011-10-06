@@ -1688,6 +1688,17 @@ linkBinary dflags o_files dep_packages = do
                           then ["-Wl,-no_compact_unwind"]
                           else [])
 
+                      -- '-Wl,-read_only_relocs,suppress'
+                      -- ld gives loads of warnings like:
+                      --     ld: warning: text reloc in _base_GHCziArr_unsafeArray_info to _base_GHCziArr_unsafeArray_closure
+                      -- when linking any program. We're not sure
+                      -- whether this is something we ought to fix, but
+                      -- for now this flags silences them.
+                      ++ (if platformOS   (targetPlatform dflags) == OSDarwin   &&
+                             platformArch (targetPlatform dflags) == ArchX86
+                          then ["-Wl,-read_only_relocs,suppress"]
+                          else [])
+
                       ++ o_files
                       ++ extra_ld_inputs
                       ++ lib_path_opts
