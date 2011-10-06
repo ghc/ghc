@@ -137,6 +137,11 @@ $(libffi_STAMP_CONFIGURE):
 	  "$(CP)" build/libtool build/libtool.orig && \
 	  sed -e s/dlname=\'\$$tdlname\'/dlname=\'\$$dlname\'/ build/libtool.orig > build/libtool
 
+	# wc on OS X has spaces in its output, which libffi's Makefile
+	# doesn't expect, so we tweak it to sed them out
+	mv libffi/build/Makefile libffi/build/Makefile.orig
+	sed "s#wc -w#wc -w | sed 's/ //g'#" < libffi/build/Makefile.orig > libffi/build/Makefile
+
 	touch $@
 
 libffi/dist-install/build/ffi.h: $(libffi_STAMP_CONFIGURE) libffi/dist-install/build/ffitarget.h | $$(dir $$@)/.

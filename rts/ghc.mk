@@ -460,10 +460,10 @@ $(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h $(DTRACEPROBES_H)
 #-----------------------------------------------------------------------------
 # libffi stuff
 
-rts_CC_OPTS     += -Ilibffi/build/include
-rts_HC_OPTS     += -Ilibffi/build/include
-rts_HSC2HS_OPTS += -Ilibffi/build/include
-rts_LD_OPTS     += -Llibffi/build/include
+rts_CC_OPTS     += -Ilibffi/dist-install/build
+rts_HC_OPTS     += -Ilibffi/dist-install/build
+rts_HSC2HS_OPTS += -Ilibffi/dist-install/build
+rts_LD_OPTS     += -Llibffi/dist-install/build
 
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported
