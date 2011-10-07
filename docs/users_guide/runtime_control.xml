@@ -543,26 +543,34 @@ char *ghc_rts_opts = "-H128m -K1m";
 
       <varlistentry>
 	<term>
-          <option>-H</option><replaceable>size</replaceable>
+          <option>-H</option><optional><replaceable>size</replaceable></optional>
           <indexterm><primary><option>-H</option></primary><secondary>RTS option</secondary></indexterm>
           <indexterm><primary>heap size, suggested</primary></indexterm>
         </term>
 	<listitem>
 	  <para>&lsqb;Default: 0&rsqb; This option provides a
-          &ldquo;suggested heap size&rdquo; for the garbage collector.  The
-          garbage collector will use about this much memory until the
-          program residency grows and the heap size needs to be
-          expanded to retain reasonable performance.</para>
+            &ldquo;suggested heap size&rdquo; for the garbage
+            collector.  Think
+            of <option>-H<replaceable>size</replaceable></option> as a
+            variable <option>-A</option> option.  It says: I want to
+            use at least <replaceable>size</replaceable> bytes, so use
+            whatever is left over to increase the <option>-A</option>
+            value.</para>
 
-	  <para>By default, the heap will start small, and grow and
-          shrink as necessary.  This can be bad for performance, so if
-          you have plenty of memory it's worthwhile supplying a big
-          <option>-H</option><replaceable>size</replaceable>.  For
-          improving GC performance, using
-          <option>-H</option><replaceable>size</replaceable> is
-          usually a better bet than
-          <option>-A</option><replaceable>size</replaceable>.</para>
-	</listitem>
+          <para>This option does not put
+            a <emphasis>limit</emphasis> on the heap size: the heap
+            may grow beyond the given size as usual.</para>
+
+          <para>If <replaceable>size</replaceable> is omitted, then
+            the garbage collector will take the size of the heap at
+            the previous GC as the <replaceable>size</replaceable>.
+            This has the effect of allowing for a
+            larger <option>-A</option> value but without increasing
+            the overall memory requirements of the program.  It can be
+            useful when the default small <option>-A</option> value is
+            suboptimal, as it can be in programs that create large
+            amounts of long-lived data.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
