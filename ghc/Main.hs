@@ -478,7 +478,7 @@ parseModeFlags :: [Located String]
                       [Located String])
 parseModeFlags args = do
   let ((leftover, errs1, warns), (mModeFlag, errs2, flags')) =
-          runCmdLine (processArgs mode_flags args CmdLineOnly True)
+          runCmdLine (processArgs mode_flags args)
                      (Nothing, [], [])
       mode = case mModeFlag of
              Nothing     -> doMakeMode
@@ -494,16 +494,16 @@ type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
 mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-    flagC "?"                     (PassFlag (setMode showGhcUsageMode))
-  , flagC "-help"                 (PassFlag (setMode showGhcUsageMode))
-  , flagC "V"                     (PassFlag (setMode showVersionMode))
-  , flagC "-version"              (PassFlag (setMode showVersionMode))
-  , flagC "-numeric-version"      (PassFlag (setMode showNumVersionMode))
-  , flagC "-info"                 (PassFlag (setMode showInfoMode))
-  , flagC "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
-  , flagC "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+    Flag "?"                     (PassFlag (setMode showGhcUsageMode))
+  , Flag "-help"                 (PassFlag (setMode showGhcUsageMode))
+  , Flag "V"                     (PassFlag (setMode showVersionMode))
+  , Flag "-version"              (PassFlag (setMode showVersionMode))
+  , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
+  , Flag "-info"                 (PassFlag (setMode showInfoMode))
+  , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
+  , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
   ] ++
-  [ flagC k'                      (PassFlag (setMode (printSetting k)))
+  [ Flag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
           "Booter version",
           "Stage",
@@ -529,21 +529,21 @@ mode_flags =
         replaceSpace c   = c
   ] ++
       ------- interfaces ----------------------------------------------------
-  [ flagC "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
+  [ Flag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  , flagC "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
-                                             addFlag "-no-link" f))
-  , flagC "M"            (PassFlag (setMode doMkDependHSMode))
-  , flagC "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , flagC "C"            (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
-                                             addFlag "-fvia-C" f))
-  , flagC "S"            (PassFlag (setMode (stopBeforeMode As)))
-  , flagC "-make"        (PassFlag (setMode doMakeMode))
-  , flagC "-interactive" (PassFlag (setMode doInteractiveMode))
-  , flagC "-abi-hash"    (PassFlag (setMode doAbiHashMode))
-  , flagC "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
+  , Flag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
+                                            addFlag "-no-link" f))
+  , Flag "M"            (PassFlag (setMode doMkDependHSMode))
+  , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
+  , Flag "C"            (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
+                                            addFlag "-fvia-C" f))
+  , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
+  , Flag "-make"        (PassFlag (setMode doMakeMode))
+  , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
+  , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
+  , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()

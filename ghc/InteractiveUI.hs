@@ -1728,17 +1728,17 @@ setCmd ""
               nest 2 (vcat (map (warnSetting dflags) DynFlags.fWarningFlags))
           ))
 
-  where flagSetting dflags (str, _, f, _)
+  where flagSetting dflags (str, f, _)
           | dopt f dflags = fstr str
           | otherwise     = fnostr str
-        warnSetting dflags (str, _, f, _)
+        warnSetting dflags (str, f, _)
           | wopt f dflags = fstr str
           | otherwise     = fnostr str
 
         fstr   str = text "-f"    <> text str
         fnostr str = text "-fno-" <> text str
 
-        (ghciFlags,others)  = partition (\(_, _, f, _) -> f `elem` flags)
+        (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flags)
                                         DynFlags.fFlags
         flags = [Opt_PrintExplicitForalls
                 ,Opt_PrintBindResult
@@ -2021,7 +2021,7 @@ showLanguages = do
    dflags <- getDynFlags
    liftIO $ putStrLn $ showSDoc $ vcat $
       text "active language flags:" :
-      [text ("  -X" ++ str) | (str, _, f, _) <- DynFlags.xFlags, xopt f dflags]
+      [text ("  -X" ++ str) | (str, f, _) <- DynFlags.xFlags, xopt f dflags]
 
 
 -- -----------------------------------------------------------------------------

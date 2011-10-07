@@ -12,8 +12,8 @@
 module CmdLineParser (
         processArgs, OptKind(..),
         CmdLineP(..), getCmdLineState, putCmdLineState,
-        Flag(..), FlagSafety(..), flagA, flagR, flagC, flagN,
-        errorsToGhcException, determineSafeLevel,
+        Flag(..),
+        errorsToGhcException,
 
         EwM, addErr, addWarn, getArg, liftEwM, deprecate
   ) where
@@ -29,43 +29,16 @@ import SrcLoc
 import Data.List
 
 --------------------------------------------------------
---	   The Flag and OptKind types
+--         The Flag and OptKind types
 --------------------------------------------------------
 
 data Flag m = Flag
     {   flagName    :: String,       -- Flag, without the leading "-"
-        flagSafety  :: FlagSafety,   -- Flag safety level (Safe Haskell)
         flagOptKind :: OptKind m     -- What to do if we see it
     }
 
--- | This determines how a flag should behave when Safe Haskell
--- mode is on.
-data FlagSafety
- = EnablesSafe         -- ^ This flag is a little bit of a hack. We give
-                       -- the safe haskell flags (-XSafe and -XSafeLanguage)
-                       -- this safety type so we can easily detect when safe
-                       -- haskell mode has been enable in a module pragma
-                       -- as this changes how the rest of the parsing should
-                       -- happen.
-
- | AlwaysAllowed       -- ^ Flag is always allowed
- | RestrictedFunction  -- ^ Flag is allowed but functions in a reduced way
- | CmdLineOnly         -- ^ Flag is only allowed on command line, not in pragma
- | NeverAllowed        -- ^ Flag isn't allowed at all
- deriving ( Eq, Ord )
-
-determineSafeLevel :: Bool -> FlagSafety
-determineSafeLevel False = RestrictedFunction
-determineSafeLevel True  = CmdLineOnly
-
-flagA, flagR, flagC, flagN :: String -> OptKind m -> Flag m
-flagA n o = Flag n AlwaysAllowed o
-flagR n o = Flag n RestrictedFunction o
-flagC n o = Flag n CmdLineOnly o
-flagN n o = Flag n NeverAllowed o
-
 -------------------------------
-data OptKind m                      -- Suppose the flag is -f
+data OptKind m                       -- Suppose the flag is -f
  = NoArg     (EwM m ())                 -- -f all by itself
  | HasArg    (String -> EwM m ())       -- -farg or -f arg
  | SepArg    (String -> EwM m ())       -- -f arg
@@ -80,7 +53,7 @@ data OptKind m                      -- Suppose the flag is -f
 
 
 --------------------------------------------------------
---	   The EwM monad 
+--         The EwM monad 
 --------------------------------------------------------
 
 type Err   = Located String
@@ -90,46 +63,36 @@ type Warns = Bag Warn
 
 -- EwM (short for "errors and warnings monad") is a
 -- monad transformer for m that adds an (err, warn) state
-newtype EwM m a = EwM { unEwM :: Located String	    -- Current arg
-                              -> FlagSafety         -- arg safety level
-                              -> FlagSafety         -- global safety level
+newtype EwM m a = EwM { unEwM :: Located String     -- Current arg
                               -> Errs -> Warns
                               -> m (Errs, Warns, a) }
 
 instance Monad m => Monad (EwM m) where
-  (EwM f) >>= k = EwM (\l s c e w -> do { (e', w', r) <- f l s c e w
-                                        ; unEwM (k r) l s c e' w' })
-  return v = EwM (\_ _ _ e w -> return (e, w, v))
+  (EwM f) >>= k = EwM (\l e w -> do (e', w', r) <- f l e w
+                                    unEwM (k r) l e' w')
+  return v = EwM (\_ e w -> return (e, w, v))
 
-setArg :: Monad m => Located String -> FlagSafety -> EwM m () -> EwM m ()
-setArg l s (EwM f) = EwM (\_ _ c es ws ->
-    let check | s <= c    = f l s c es ws
-              | otherwise = err l es ws
-        err (L loc ('-' : arg)) es ws =
-            let msg = "Warning: " ++ arg ++ " is not allowed in "
-                   ++ "Safe Haskell; ignoring " ++ arg
-            in return (es, ws `snocBag` L loc msg, ())
-        err _ _ _ = error "Bad pattern match in setArg"
-    in check)
+setArg :: Monad m => Located String -> EwM m () -> EwM m ()
+setArg l (EwM f) = EwM (\_ es ws -> f l es ws)
 
 addErr :: Monad m => String -> EwM m ()
-addErr e = EwM (\(L loc _) _ _ es ws -> return (es `snocBag` L loc e, ws, ()))
+addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` L loc e, ws, ()))
 
 addWarn :: Monad m => String -> EwM m ()
-addWarn msg = EwM (\(L loc _) _ _ es ws -> return (es, ws `snocBag` L loc w, ()))
+addWarn msg = EwM (\(L loc _) es ws -> return (es, ws `snocBag` L loc w, ()))
   where
     w = "Warning: " ++ msg
 
 deprecate :: Monad m => String -> EwM m ()
 deprecate s 
-  = do { arg <- getArg
-       ; addWarn (arg ++ " is deprecated: " ++ s) }
+  = do arg <- getArg
+       addWarn (arg ++ " is deprecated: " ++ s)
 
 getArg :: Monad m => EwM m String
-getArg = EwM (\(L _ arg) _ _ es ws -> return (es, ws, arg))
+getArg = EwM (\(L _ arg) es ws -> return (es, ws, arg))
 
 liftEwM :: Monad m => m a -> EwM m a
-liftEwM action = EwM (\_ _ _ es ws -> do { r <- action; return (es, ws, r) })
+liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
 
 -- -----------------------------------------------------------------------------
 -- A state monad for use in the command-line parser
@@ -150,47 +113,42 @@ putCmdLineState s = CmdLineP $ \_ -> ((),s)
 
 
 --------------------------------------------------------
---	   Processing arguments
+--         Processing arguments
 --------------------------------------------------------
 
 processArgs :: Monad m
             => [Flag m] -- cmdline parser spec
             -> [Located String]      -- args
-            -> FlagSafety            -- flag clearance lvl
-            -> Bool
             -> m (
                   [Located String],  -- spare args
                   [Located String],  -- errors
                   [Located String]   -- warnings
                  )
-processArgs spec args clvl0 cmdline
-  = let (clvl1, action) = process clvl0 args []
-    in do { (errs, warns, spare) <- unEwM action (panic "processArgs: no arg yet")
-                                    AlwaysAllowed clvl1 emptyBag emptyBag
-          ; return (spare, bagToList errs, bagToList warns) }
+processArgs spec args
+  = let action = process args []
+    in do (errs, warns, spare) <- unEwM action (panic "processArgs: no arg yet")
+                                  emptyBag emptyBag
+          return (spare, bagToList errs, bagToList warns)
   where
-    -- process :: FlagSafety -> [Located String] -> [Located String] -> (FlagSafety, EwM m [Located String])
+    -- process :: [Located String] -> [Located String] -> EwM m [Located String]
     --
-    process clvl [] spare = (clvl, return (reverse spare))
+    process [] spare = return (reverse spare)
 
-    process clvl (locArg@(L _ ('-' : arg)) : args) spare =
+    process (locArg@(L _ ('-' : arg)) : args) spare =
       case findArg spec arg of
-        Just (rest, opt_kind, fsafe) ->
-           let clvl1 = if fsafe == EnablesSafe then determineSafeLevel cmdline else clvl
-           in case processOneArg opt_kind rest arg args of
+        Just (rest, opt_kind) ->
+           case processOneArg opt_kind rest arg args of
                Left err ->
-                   let (clvl2,b) = process clvl1 args spare
-                       clvl3 = min clvl1 clvl2
-                   in (clvl3, (setArg locArg fsafe $ addErr err) >> b)
+                   let b = process args spare
+                   in (setArg locArg $ addErr err) >> b
 
                Right (action,rest) ->
-                   let (clvl2,b) = process clvl1 rest spare
-                       clvl3 = min clvl1 clvl2
-                   in (clvl3, (setArg locArg fsafe $ action) >> b)
+                   let b = process rest spare
+                   in (setArg locArg $ action) >> b
 
-        Nothing -> process clvl args (locArg : spare) 
+        Nothing -> process args (locArg : spare) 
 
-    process clvl (arg : args) spare = process clvl args (arg : spare) 
+    process (arg : args) spare = process args (arg : spare) 
 
 
 processOneArg :: OptKind m -> String -> String -> [Located String]
@@ -231,12 +189,11 @@ processOneArg opt_kind rest arg args
         AnySuffixPred _ f -> Right (f dash_arg, args)
 
 
-findArg :: [Flag m] -> String -> Maybe (String, OptKind m, FlagSafety)
+findArg :: [Flag m] -> String -> Maybe (String, OptKind m)
 findArg spec arg
-  = case [ (removeSpaces rest, optKind, flagSafe)
+  = case [ (removeSpaces rest, optKind)
          | flag <- spec,
            let optKind  = flagOptKind flag,
-           let flagSafe = flagSafety flag,
            Just rest <- [stripPrefix (flagName flag) arg],
            arg_ok optKind rest arg ]
     of
