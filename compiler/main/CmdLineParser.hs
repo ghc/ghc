@@ -53,7 +53,7 @@ data OptKind m                       -- Suppose the flag is -f
 
 
 --------------------------------------------------------
---         The EwM monad 
+--         The EwM monad
 --------------------------------------------------------
 
 type Err   = Located String
@@ -84,7 +84,7 @@ addWarn msg = EwM (\(L loc _) es ws -> return (es, ws `snocBag` L loc w, ()))
     w = "Warning: " ++ msg
 
 deprecate :: Monad m => String -> EwM m ()
-deprecate s 
+deprecate s
   = do arg <- getArg
        addWarn (arg ++ " is deprecated: " ++ s)
 
@@ -146,9 +146,9 @@ processArgs spec args
                    let b = process rest spare
                    in (setArg locArg $ action) >> b
 
-        Nothing -> process args (locArg : spare) 
+        Nothing -> process args (locArg : spare)
 
-    process (arg : args) spare = process args (arg : spare) 
+    process (arg : args) spare = process args (arg : spare)
 
 
 processOneArg :: OptKind m -> String -> String -> [Located String]

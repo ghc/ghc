@@ -81,7 +81,7 @@ module DynFlags (
         -- * Compiler configuration suitable for display to the user
         compilerInfo
 #ifdef GHCI
--- Only in stage 2 can we be sure that the RTS 
+-- Only in stage 2 can we be sure that the RTS
 -- exposes the appropriate runtime boolean
         , rtsIsProfiled
 #endif
@@ -384,7 +384,7 @@ data ExtensionFlag
    | Opt_DoAndIfThenElse
    | Opt_RebindableSyntax
    | Opt_ConstraintKinds
-   
+
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
    | Opt_DeriveFunctor
@@ -802,7 +802,7 @@ defaultDynFlags mySettings =
         maxSimplIterations      = 4,
         shouldDumpSimplPhase    = Nothing,
         ruleCheck               = Nothing,
-        simplTickFactor         = 100,  
+        simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
         liberateCaseThreshold   = Just 2000,
@@ -1303,9 +1303,9 @@ allFlags = map ('-':) $
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
     Flag "n"        (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
-  , Flag "cpp"      (NoArg (setExtensionFlag Opt_Cpp)) 
-  , Flag "F"        (NoArg (setDynFlag Opt_Pp)) 
-  , Flag "#include" 
+  , Flag "cpp"      (NoArg (setExtensionFlag Opt_Cpp))
+  , Flag "F"        (NoArg (setDynFlag Opt_Pp))
+  , Flag "#include"
          (HasArg (\s -> do addCmdlineHCInclude s
                            addWarn "-#include and INCLUDE pragmas are deprecated: They no longer have any effect"))
   , Flag "v"        (OptIntSuffix setVerbosity)
@@ -1338,7 +1338,7 @@ dynamic_flags = [
   , Flag "optwindres"     (hasArg (\f -> alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
 
   , Flag "split-objs"
-         (NoArg (if can_split 
+         (NoArg (if can_split
                  then setDynFlag Opt_SplitObjs
                  else addWarn "ignoring -fsplit-objs"))
 
@@ -1532,7 +1532,7 @@ dynamic_flags = [
         ------ Plugin flags ------------------------------------------------
   , Flag "fplugin-opt" (hasArg addPluginModuleNameOption)
   , Flag "fplugin"     (hasArg addPluginModuleName)
-    
+
         ------ Optimisation flags ------------------------------------------
   , Flag "O"      (noArgM (setOptLevel 1))
   , Flag "Onot"   (noArgM (\dflags -> do deprecate "Use -O0 instead"
@@ -1646,7 +1646,7 @@ mkFlag turn_on flagPrefix f (name, flag, extra_action)
 deprecatedForExtension :: String -> TurnOnFlag -> DynP ()
 deprecatedForExtension lang turn_on
     = deprecate ("use -X"  ++ flag ++ " or pragma {-# LANGUAGE " ++ flag ++ " #-} instead")
-    where 
+    where
       flag | turn_on    = lang
            | otherwise = "No"++lang
 
@@ -1833,11 +1833,11 @@ xFlags = [
   ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, nop ),
   ( "Rank2Types",                       Opt_Rank2Types, nop ),
   ( "RankNTypes",                       Opt_RankNTypes, nop ),
-  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop), 
+  ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
   ( "RecursiveDo",                      Opt_RecursiveDo,     -- Enables 'mdo'
     deprecatedForExtension "DoRec"),
-  ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword 
+  ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword
   ( "Arrows",                           Opt_Arrows, nop ),
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
@@ -1859,7 +1859,7 @@ xFlags = [
   ( "DoAndIfThenElse",                  Opt_DoAndIfThenElse, nop ),
   ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
   ( "ConstraintKinds",                  Opt_ConstraintKinds, nop ),
-  ( "MonoPatBinds",                     Opt_MonoPatBinds, 
+  ( "MonoPatBinds",                     Opt_MonoPatBinds,
     \ turn_on -> when turn_on $ deprecate "Experimental feature now removed; has no effect" ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),
@@ -1870,15 +1870,15 @@ xFlags = [
   ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
   ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
-  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, 
-    \ turn_on -> if not turn_on 
+  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
+    \ turn_on -> if not turn_on
                  then deprecate "You can't turn off RelaxedPolyRec any more"
                  else return () ),
   ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules, nop ),
   ( "ImplicitParams",                   Opt_ImplicitParams, nop ),
   ( "ScopedTypeVariables",              Opt_ScopedTypeVariables, nop ),
 
-  ( "PatternSignatures",                Opt_ScopedTypeVariables, 
+  ( "PatternSignatures",                Opt_ScopedTypeVariables,
     deprecatedForExtension "ScopedTypeVariables" ),
 
   ( "UnboxedTuples",                    Opt_UnboxedTuples, nop ),
@@ -1903,7 +1903,7 @@ xFlags = [
   ]
 
 defaultFlags :: [DynFlag]
-defaultFlags 
+defaultFlags
   = [ Opt_AutoLinkPackages,
       Opt_ReadUserPackageConf,
 
@@ -1951,7 +1951,7 @@ impliedFlags
         -- stuff like " 'a' not in scope ", which is a bit silly
         -- if the compiler has just filled in field 'a' of constructor 'C'
     , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
-    
+
     , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
   ]
 
@@ -2189,8 +2189,8 @@ setDumpFlag' dump_flag
                                        Opt_D_dump_hi_diffs]
 
 forceRecompile :: DynP ()
--- Whenver we -ddump, force recompilation (by switching off the 
--- recompilation checker), else you don't see the dump! However, 
+-- Whenver we -ddump, force recompilation (by switching off the
+-- recompilation checker), else you don't see the dump! However,
 -- don't switch it off in --make mode, else *everything* gets
 -- recompiled which probably isn't what you want
 forceRecompile = do dfs <- liftEwM getCmdLineState
@@ -2200,7 +2200,7 @@ forceRecompile = do dfs <- liftEwM getCmdLineState
 
 setVerboseCore2Core :: DynP ()
 setVerboseCore2Core = do forceRecompile
-                         setDynFlag Opt_D_verbose_core2core 
+                         setDynFlag Opt_D_verbose_core2core
                          upd (\dfs -> dfs { shouldDumpSimplPhase = Nothing })
 
 setDumpSimplPhases :: String -> DynP ()
@@ -2313,7 +2313,7 @@ setDPHBackend backend = upd $ \dflags -> dflags { dphBackend = backend }
 -- Query the DPH backend package to be used by the vectoriser and desugaring of DPH syntax.
 --
 dphPackageMaybe :: DynFlags -> Maybe PackageId
-dphPackageMaybe dflags 
+dphPackageMaybe dflags
   = case dphBackend dflags of
       DPHPar  -> Just dphParPackageId
       DPHSeq  -> Just dphSeqPackageId

@@ -77,7 +77,7 @@ parseStaticFlags args = do
                | otherwise        = []
 
     -- HACK: -fexcess-precision is both a static and a dynamic flag.  If
-    -- the static flag parser has slurped it, we must return it as a 
+    -- the static flag parser has slurped it, we must return it as a
     -- leftover too.  ToDo: make -fexcess-precision dynamic only.
   let excess_prec
        | opt_SimplExcessPrecision = map (mkGeneralLocated "in excess_prec")
@@ -104,11 +104,11 @@ static_flags :: [Flag IO]
 
 static_flags = [
         ------- GHCi -------------------------------------------------------
-    Flag "ignore-dot-ghci" (PassFlag addOpt) 
+    Flag "ignore-dot-ghci" (PassFlag addOpt)
   , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
 
         ------- ways --------------------------------------------------------
-  , Flag "prof"           (NoArg (addWay WayProf)) 
+  , Flag "prof"           (NoArg (addWay WayProf))
   , Flag "eventlog"       (NoArg (addWay WayEventLog))
   , Flag "parallel"       (NoArg (addWay WayPar))
   , Flag "gransim"        (NoArg (addWay WayGran))
@@ -147,7 +147,7 @@ static_flags = [
 
         ----- RTS opts ------------------------------------------------------
   , Flag "H"              (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
-        
+
   , Flag "Rghc-timing"    (NoArg (liftEwM enableTimingStats))
 
         ------ Compiler flags -----------------------------------------------
@@ -159,7 +159,7 @@ static_flags = [
         -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
   , Flag "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
-        
+
 
         -- Pass all remaining "-f<blah>" options to hsc
   , Flag "f" (AnySuffixPred isStaticFlag addOpt)
