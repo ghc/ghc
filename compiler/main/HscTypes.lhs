@@ -803,12 +803,6 @@ data ModGuts
 --      mg_rules        Orphan rules only (local ones now attached to binds)
 --      mg_binds        With rules attached
 
--- The ModGuts takes on several slightly different forms:
---
--- After simplification, the following fields change slightly:
---      mg_rules        Orphan rules only (local ones now attached to binds)
---      mg_binds        With rules attached
-
 
 ---------------------------------------------------------
 -- The Tidy pass forks the information about this module: 
