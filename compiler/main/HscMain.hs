@@ -1517,7 +1517,8 @@ mkModGuts mod binds =
         mg_vect_info    = noVectInfo,
         mg_inst_env     = emptyInstEnv,
         mg_fam_inst_env = emptyFamInstEnv,
-        mg_trust_pkg    = False
+        mg_trust_pkg    = False,
+        mg_dependent_files = []
     }
 
 

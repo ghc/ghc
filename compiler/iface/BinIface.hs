@@ -60,6 +60,7 @@ import Data.Word
 import Data.Array
 import Data.IORef
 import Control.Monad
+import System.Time ( ClockTime(..) )
 
 data CheckHiWay = CheckHiWay | IgnoreHiWay
     deriving Eq
@@ -621,19 +622,35 @@ instance Binary AvailInfo where
 		      ac <- get bh
 		      return (AvailTC ab ac)
 
+    
+-- where should this be located?
+instance Binary ClockTime where
+    put_ bh (TOD x y) = put_ bh x >> put_ bh y
+    
+    get bh = do
+        x <- get bh
+        y <- get bh
+        return $ TOD x y
+
 instance Binary Usage where
     put_ bh usg@UsagePackageModule{} = do 
         putByte bh 0
-	put_ bh (usg_mod usg)
-	put_ bh (usg_mod_hash usg)
-	put_ bh (usg_safe     usg)
+        put_ bh (usg_mod usg)
+        put_ bh (usg_mod_hash usg)
+        put_ bh (usg_safe     usg)
+
     put_ bh usg@UsageHomeModule{} = do 
         putByte bh 1
-	put_ bh (usg_mod_name usg)
-	put_ bh (usg_mod_hash usg)
-	put_ bh (usg_exports  usg)
-	put_ bh (usg_entities usg)
-	put_ bh (usg_safe     usg)
+        put_ bh (usg_mod_name usg)
+        put_ bh (usg_mod_hash usg)
+        put_ bh (usg_exports  usg)
+        put_ bh (usg_entities usg)
+        put_ bh (usg_safe     usg)
+
+    put_ bh usg@UsageFile{} = do 
+        putByte bh 2
+        put_ bh (usg_file_path usg)
+        put_ bh (usg_mtime     usg)
 
     get bh = do
         h <- getByte bh
@@ -643,7 +660,7 @@ instance Binary Usage where
             mod   <- get bh
             safe  <- get bh
             return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod, usg_safe = safe }
-          _ -> do
+          1 -> do
             nm    <- get bh
             mod   <- get bh
             exps  <- get bh
@@ -651,6 +668,11 @@ instance Binary Usage where
             safe  <- get bh
             return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
                      usg_exports = exps, usg_entities = ents, usg_safe = safe }
+          2 -> do
+            fp    <- get bh
+            mtime <- get bh
+            return UsageFile { usg_file_path = fp, usg_mtime = mtime }
+          i -> error ("Binary.get(Usage): " ++ show i)
 
 instance Binary Warnings where
     put_ bh NoWarnings     = putByte bh 0
