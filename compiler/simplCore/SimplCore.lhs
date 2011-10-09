@@ -12,70 +12,70 @@ import DynFlags
 import CoreSyn
 import CoreSubst
 import HscTypes
-import CSE		( cseProgram )
-import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
-			  extendRuleBaseList, ruleCheckProgram, addSpecInfo, )
-import PprCore		( pprCoreBindings, pprCoreExpr )
-import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
+import CSE              ( cseProgram )
+import Rules            ( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
+                          extendRuleBaseList, ruleCheckProgram, addSpecInfo, )
+import PprCore          ( pprCoreBindings, pprCoreExpr )
+import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
-import CoreUtils	( coreBindsSize, exprSize )
-import Simplify		( simplTopBinds, simplExpr )
-import SimplUtils	( simplEnvForGHCi, activeRule )
+import CoreUtils        ( coreBindsSize, exprSize )
+import Simplify         ( simplTopBinds, simplExpr )
+import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
 import SimplMonad
 import CoreMonad
-import qualified ErrUtils as Err 
-import FloatIn		( floatInwards )
-import FloatOut		( floatOutwards )
+import qualified ErrUtils as Err
+import FloatIn          ( floatInwards )
+import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
 import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma )
 import VarSet
 import VarEnv
-import LiberateCase	( liberateCase )
-import SAT		( doStaticArgs )
-import Specialise	( specProgram)
-import SpecConstr	( specConstrProgram)
-import DmdAnal		( dmdAnalPgm )
-import WorkWrap	        ( wwTopBinds )
+import LiberateCase     ( liberateCase )
+import SAT              ( doStaticArgs )
+import Specialise       ( specProgram)
+import SpecConstr       ( specConstrProgram)
+import DmdAnal          ( dmdAnalPgm )
+import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
 import FastString
 import Util
 
-import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
+import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 import Control.Monad
 
 #ifdef GHCI
-import Type		( mkTyConTy )
-import RdrName		( mkRdrQual )
-import OccName		( mkVarOcc )
-import PrelNames	( pluginTyConName )
+import Type             ( mkTyConTy )
+import RdrName          ( mkRdrQual )
+import OccName          ( mkVarOcc )
+import PrelNames        ( pluginTyConName )
 import DynamicLoading   ( forceLoadTyCon, lookupRdrNameInModule, getValueSafely )
-import Module		( ModuleName )
+import Module           ( ModuleName )
 import Panic
 #endif
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The driver for the simplifier}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 core2core :: HscEnv -> ModGuts -> IO ModGuts
-core2core hsc_env guts 
+core2core hsc_env guts
   = do { us <- mkSplitUniqSupply 's'
-       -- make sure all plugins are loaded 
+       -- make sure all plugins are loaded
 
        ; let builtin_passes = getCoreToDo dflags
-       ; 
+       ;
        ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod $
                         do { all_passes <- addPluginPasses dflags builtin_passes
                            ; runCorePasses all_passes guts }
 
-{--                           
+{--
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_core_pipeline
              "Plugin information" "" -- TODO FIXME: dump plugin info
 --}
@@ -98,9 +98,9 @@ core2core hsc_env guts
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
            Generating the main optimisation pipeline
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -112,10 +112,10 @@ getCoreToDo dflags
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
-    strictness    = dopt Opt_Strictness   		  dflags
-    full_laziness = dopt Opt_FullLaziness 		  dflags
-    do_specialise = dopt Opt_Specialise   		  dflags
-    do_float_in   = dopt Opt_FloatIn      		  dflags          
+    strictness    = dopt Opt_Strictness                   dflags
+    full_laziness = dopt Opt_FullLaziness                 dflags
+    do_specialise = dopt Opt_Specialise                   dflags
+    do_float_in   = dopt Opt_FloatIn                      dflags
     cse           = dopt Opt_CSE                          dflags
     spec_constr   = dopt Opt_SpecConstr                   dflags
     liberate_case = dopt Opt_LiberateCase                 dflags
@@ -144,14 +144,14 @@ getCoreToDo dflags
 
           , maybe_rule_check (Phase phase) ]
 
-          -- Vectorisation can introduce a fair few common sub expressions involving 
+          -- Vectorisation can introduce a fair few common sub expressions involving
           --  DPH primitives. For example, see the Reverse test from dph-examples.
           --  We need to eliminate these common sub expressions before their definitions
-          --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings, 
+          --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings,
           --  so we also run simpl_gently to inline them.
       ++  (if dopt Opt_Vectorise dflags && phase == 3
-	    then [CoreCSE, simpl_gently]
-	    else [])
+            then [CoreCSE, simpl_gently]
+            else [])
 
     vectorisation
       = runWhen (dopt Opt_Vectorise dflags) $
@@ -210,16 +210,16 @@ getCoreToDo dflags
                                  floatOutLambdas   = Just 0,
                                  floatOutConstants = True,
                                  floatOutPartialApplications = False },
-      		-- Was: gentleFloatOutSwitches	
+                -- Was: gentleFloatOutSwitches
                 --
-		-- I have no idea why, but not floating constants to
-		-- top level is very bad in some cases.
+                -- I have no idea why, but not floating constants to
+                -- top level is very bad in some cases.
                 --
-		-- Notably: p_ident in spectral/rewrite
-		-- 	    Changing from "gentle" to "constantsOnly"
-		-- 	    improved rewrite's allocation by 19%, and
-		-- 	    made 0.0% difference to any other nofib
-		-- 	    benchmark
+                -- Notably: p_ident in spectral/rewrite
+                --          Changing from "gentle" to "constantsOnly"
+                --          improved rewrite's allocation by 19%, and
+                --          made 0.0% difference to any other nofib
+                --          benchmark
                 --
                 -- Not doing floatOutPartialApplications yet, we'll do
                 -- that later on when we've had a chance to get more
@@ -298,13 +298,13 @@ addPluginPasses :: DynFlags -> [CoreToDo] -> CoreM [CoreToDo]
 addPluginPasses _ builtin_passes = return builtin_passes
 #else
 addPluginPasses dflags builtin_passes
-  = do { hsc_env <- getHscEnv 
+  = do { hsc_env <- getHscEnv
        ; named_plugins <- liftIO (loadPlugins hsc_env)
        ; foldM query_plug builtin_passes named_plugins }
   where
-    query_plug todos (mod_nm, plug) 
+    query_plug todos (mod_nm, plug)
        = installCoreToDos plug options todos
-       where 
+       where
          options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
 
@@ -319,17 +319,17 @@ loadPlugin hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
        ; mb_name <- lookupRdrNameInModule hsc_env mod_name plugin_rdr_name
        ; case mb_name of {
-            Nothing -> throwGhcException (CmdLineError $ showSDoc $ hsep 
+            Nothing -> throwGhcException (CmdLineError $ showSDoc $ hsep
                           [ ptext (sLit "The module"), ppr mod_name
                           , ptext (sLit "did not export the plugin name")
                           , ppr plugin_rdr_name ]) ;
-            Just name -> 
+            Just name ->
 
      do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
         ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
         ; case mb_plugin of
             Nothing -> throwGhcException (CmdLineError $ showSDoc $ hsep
-                          [ ptext (sLit "The value"), ppr name 
+                          [ ptext (sLit "The value"), ppr name
                           , ptext (sLit "did not have the type")
                           , ppr pluginTyConName, ptext (sLit "as required")])
             Just plugin -> return plugin } } }
@@ -337,31 +337,31 @@ loadPlugin hsc_env mod_name
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                   The CoreToDo interpreter
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 runCorePasses :: [CoreToDo] -> ModGuts -> CoreM ModGuts
-runCorePasses passes guts 
+runCorePasses passes guts
   = foldM do_pass guts passes
   where
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
-    do_pass guts pass 
+    do_pass guts pass
        = do { dflags <- getDynFlags
-       	    ; liftIO $ showPass dflags pass
-       	    ; guts' <- doCorePass pass guts
-       	    ; liftIO $ endPass dflags pass (mg_binds guts') (mg_rules guts')
-       	    ; return guts' }
+            ; liftIO $ showPass dflags pass
+            ; guts' <- doCorePass pass guts
+            ; liftIO $ endPass dflags pass (mg_binds guts') (mg_rules guts')
+            ; return guts' }
 
 doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
 doCorePass pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
                                        simplifyPgm pass
 
-doCorePass CoreCSE                   = {-# SCC "CommonSubExpr" #-}   
-				       doPass cseProgram
+doCorePass CoreCSE                   = {-# SCC "CommonSubExpr" #-}
+                                       doPass cseProgram
 
 doCorePass CoreLiberateCase          = {-# SCC "LiberateCase" #-}
                                        doPassD liberateCase
@@ -403,9 +403,9 @@ doCorePass pass = pprPanic "doCorePass" (ppr pass)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Core pass combinators}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -459,43 +459,43 @@ observe do_pass = doPassM $ \binds -> do
 
 
 %************************************************************************
-%*									*
-	Gentle simplification
-%*									*
+%*                                                                      *
+        Gentle simplification
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
-	     -> CoreExpr
-	     -> IO CoreExpr
+             -> CoreExpr
+             -> IO CoreExpr
 -- simplifyExpr is called by the driver to simplify an
 -- expression typed in at the interactive prompt
 --
 -- Also used by Template Haskell
 simplifyExpr dflags expr
-  = do	{
-	; Err.showPass dflags "Simplify"
+  = do  {
+        ; Err.showPass dflags "Simplify"
 
-	; us <-  mkSplitUniqSupply 's'
+        ; us <-  mkSplitUniqSupply 's'
 
-	; let sz = exprSize expr
+        ; let sz = exprSize expr
               (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
-				 simplExprGently (simplEnvForGHCi dflags) expr
+                                 simplExprGently (simplEnvForGHCi dflags) expr
 
-	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
-			(pprCoreExpr expr')
+        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+                        (pprCoreExpr expr')
 
-	; return expr'
-	}
+        ; return expr'
+        }
 
 simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
--- Simplifies an expression 
--- 	does occurrence analysis, then simplification
---	and repeats (twice currently) because one pass
---	alone leaves tons of crud.
+-- Simplifies an expression
+--      does occurrence analysis, then simplification
+--      and repeats (twice currently) because one pass
+--      alone leaves tons of crud.
 -- Used (a) for user expressions typed in at the interactive prompt
---	(b) the LHS and RHS of a RULE
---	(c) Template Haskell splices
+--      (b) the LHS and RHS of a RULE
+--      (c) Template Haskell splices
 --
 -- The name 'Gently' suggests that the SimplifierMode is SimplGently,
 -- and in fact that is so.... but the 'Gently' in simplExprGently doesn't
@@ -513,9 +513,9 @@ simplExprGently env expr = do
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The driver for the simplifier}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -524,31 +524,31 @@ simplifyPgm pass guts
   = do { hsc_env <- getHscEnv
        ; us <- getUniqueSupplyM
        ; rb <- getRuleBase
-       ; liftIOWithCount $  
-       	 simplifyPgmIO pass hsc_env us rb guts }
+       ; liftIOWithCount $
+         simplifyPgmIO pass hsc_env us rb guts }
 
 simplifyPgmIO :: CoreToDo
-	      -> HscEnv
-	      -> UniqSupply
-	      -> RuleBase
-	      -> ModGuts
-	      -> IO (SimplCount, ModGuts)  -- New bindings
+              -> HscEnv
+              -> UniqSupply
+              -> RuleBase
+              -> ModGuts
+              -> IO (SimplCount, ModGuts)  -- New bindings
 
 simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
-              hsc_env us hpt_rule_base 
+              hsc_env us hpt_rule_base
               guts@(ModGuts { mg_module = this_mod
                             , mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
-  = do { (termination_msg, it_count, counts_out, guts') 
-	   <- do_iteration us 1 [] binds rules 
+  = do { (termination_msg, it_count, counts_out, guts')
+           <- do_iteration us 1 [] binds rules
 
-	; Err.dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
-		  "Simplifier statistics for following pass"
-		  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
-			 blankLine,
-			 pprSimplCount counts_out])
+        ; Err.dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
+                  "Simplifier statistics for following pass"
+                  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
+                         blankLine,
+                         pprSimplCount counts_out])
 
-	; return (counts_out, guts')
+        ; return (counts_out, guts')
     }
   where
     dflags      = hsc_dflags hsc_env
@@ -557,146 +557,146 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     active_rule = activeRule simpl_env
 
     do_iteration :: UniqSupply
-                 -> Int		 -- Counts iterations
-		 -> [SimplCount] -- Counts from earlier iterations, reversed
-		 -> CoreProgram	 -- Bindings in
-		 -> [CoreRule]	 -- and orphan rules
-		 -> IO (String, Int, SimplCount, ModGuts)
+                 -> Int          -- Counts iterations
+                 -> [SimplCount] -- Counts from earlier iterations, reversed
+                 -> CoreProgram  -- Bindings in
+                 -> [CoreRule]   -- and orphan rules
+                 -> IO (String, Int, SimplCount, ModGuts)
 
     do_iteration us iteration_no counts_so_far binds rules
-	-- iteration_no is the number of the iteration we are
-	-- about to begin, with '1' for the first
-      | iteration_no > max_iterations	-- Stop if we've run out of iterations
+        -- iteration_no is the number of the iteration we are
+        -- about to begin, with '1' for the first
+      | iteration_no > max_iterations   -- Stop if we've run out of iterations
       = WARN( debugIsOn && (max_iterations > 2)
             , ptext (sLit "Simplifier baling out after") <+> int max_iterations
-              <+> ptext (sLit "iterations") 
-              <+> (brackets $ hsep $ punctuate comma $ 
+              <+> ptext (sLit "iterations")
+              <+> (brackets $ hsep $ punctuate comma $
                    map (int . simplCountN) (reverse counts_so_far))
               <+> ptext (sLit "Size =") <+> int (coreBindsSize binds) )
 
-		-- Subtract 1 from iteration_no to get the
-		-- number of iterations we actually completed
-	return ( "Simplifier baled out", iteration_no - 1 
+                -- Subtract 1 from iteration_no to get the
+                -- number of iterations we actually completed
+        return ( "Simplifier baled out", iteration_no - 1
                , totalise counts_so_far
                , guts { mg_binds = binds, mg_rules = rules } )
 
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
-      | let sz = coreBindsSize binds 
+      | let sz = coreBindsSize binds
       , sz == sz     -- Force it
       = do {
                 -- Occurrence analysis
            let {   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
-                   -- that the right-hand sides of vectorisation declarations are taken into 
+                   -- that the right-hand sides of vectorisation declarations are taken into
                    -- account during occurence analysis.
                  maybeVects   = case sm_phase mode of
                                   InitialPhase -> mg_vect_decls guts
                                   _            -> []
-               ; tagged_binds = {-# SCC "OccAnal" #-} 
-                     occurAnalysePgm this_mod active_rule rules maybeVects binds 
+               ; tagged_binds = {-# SCC "OccAnal" #-}
+                     occurAnalysePgm this_mod active_rule rules maybeVects binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      (pprCoreBindings tagged_binds);
 
-	   	-- Get any new rules, and extend the rule base
-		-- See Note [Overall plumbing for rules] in Rules.lhs
-		-- We need to do this regularly, because simplification can
-		-- poke on IdInfo thunks, which in turn brings in new rules
-		-- behind the scenes.  Otherwise there's a danger we'll simply
-		-- miss the rules for Ids hidden inside imported inlinings
-	   eps <- hscEPS hsc_env ;
-	   let	{ rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
-	        ; rule_base2 = extendRuleBaseList rule_base1 rules
-		; simpl_binds = {-# SCC "SimplTopBinds" #-} 
-				simplTopBinds simpl_env tagged_binds
-		; fam_envs = (eps_fam_inst_env eps, fam_inst_env) } ;
-	   
-		-- Simplify the program
-		-- We do this with a *case* not a *let* because lazy pattern
-		-- matching bit us with bad space leak!
-		-- With a let, we ended up with
-		--   let
-		--	t = initSmpl ...
-		--	counts1 = snd t
-		--   in
-		-- 	case t of {(_,counts1) -> if counts1=0 then ... }
-		-- So the conditional didn't force counts1, because the
-		-- selection got duplicated.  Sigh!
-	   case initSmpl dflags rule_base2 fam_envs us1 sz simpl_binds of {
-	  	(env1, counts1) -> do {
+                -- Get any new rules, and extend the rule base
+                -- See Note [Overall plumbing for rules] in Rules.lhs
+                -- We need to do this regularly, because simplification can
+                -- poke on IdInfo thunks, which in turn brings in new rules
+                -- behind the scenes.  Otherwise there's a danger we'll simply
+                -- miss the rules for Ids hidden inside imported inlinings
+           eps <- hscEPS hsc_env ;
+           let  { rule_base1 = unionRuleBase hpt_rule_base (eps_rule_base eps)
+                ; rule_base2 = extendRuleBaseList rule_base1 rules
+                ; simpl_binds = {-# SCC "SimplTopBinds" #-}
+                                simplTopBinds simpl_env tagged_binds
+                ; fam_envs = (eps_fam_inst_env eps, fam_inst_env) } ;
 
-	   let	{ binds1 = getFloats env1
+                -- Simplify the program
+                -- We do this with a *case* not a *let* because lazy pattern
+                -- matching bit us with bad space leak!
+                -- With a let, we ended up with
+                --   let
+                --      t = initSmpl ...
+                --      counts1 = snd t
+                --   in
+                --      case t of {(_,counts1) -> if counts1=0 then ... }
+                -- So the conditional didn't force counts1, because the
+                -- selection got duplicated.  Sigh!
+           case initSmpl dflags rule_base2 fam_envs us1 sz simpl_binds of {
+                (env1, counts1) -> do {
+
+           let  { binds1 = getFloats env1
                 ; rules1 = substRulesForImportedIds (mkCoreSubst (text "imp-rules") env1) rules
-	        } ;
+                } ;
 
-		-- Stop if nothing happened; don't dump output
-	   if isZeroSimplCount counts1 then
-		return ( "Simplifier reached fixed point", iteration_no
-                       , totalise (counts1 : counts_so_far)  -- Include "free" ticks	
-		       , guts { mg_binds = binds1, mg_rules = rules1 } )
-	   else do {
-		-- Short out indirections
-		-- We do this *after* at least one run of the simplifier 
-		-- because indirection-shorting uses the export flag on *occurrences*
-		-- and that isn't guaranteed to be ok until after the first run propagates
-		-- stuff from the binding site to its occurrences
-		--
-		-- ToDo: alas, this means that indirection-shorting does not happen at all
-		--	 if the simplifier does nothing (not common, I know, but unsavoury)
-	   let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
+                -- Stop if nothing happened; don't dump output
+           if isZeroSimplCount counts1 then
+                return ( "Simplifier reached fixed point", iteration_no
+                       , totalise (counts1 : counts_so_far)  -- Include "free" ticks
+                       , guts { mg_binds = binds1, mg_rules = rules1 } )
+           else do {
+                -- Short out indirections
+                -- We do this *after* at least one run of the simplifier
+                -- because indirection-shorting uses the export flag on *occurrences*
+                -- and that isn't guaranteed to be ok until after the first run propagates
+                -- stuff from the binding site to its occurrences
+                --
+                -- ToDo: alas, this means that indirection-shorting does not happen at all
+                --       if the simplifier does nothing (not common, I know, but unsavoury)
+           let { binds2 = {-# SCC "ZapInd" #-} shortOutIndirections binds1 } ;
 
-		-- Dump the result of this iteration
-	   end_iteration dflags pass iteration_no counts1 binds2 rules1 ;
+                -- Dump the result of this iteration
+           end_iteration dflags pass iteration_no counts1 binds2 rules1 ;
 
-		-- Loop
-  	   do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
+                -- Loop
+           do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
            } } } }
       | otherwise = panic "do_iteration"
       where
-  	(us1, us2) = splitUniqSupply us
+        (us1, us2) = splitUniqSupply us
 
-	-- Remember the counts_so_far are reversed
+        -- Remember the counts_so_far are reversed
         totalise :: [SimplCount] -> SimplCount
-        totalise = foldr (\c acc -> acc `plusSimplCount` c) 
-                         (zeroSimplCount dflags) 
+        totalise = foldr (\c acc -> acc `plusSimplCount` c)
+                         (zeroSimplCount dflags)
 
 simplifyPgmIO _ _ _ _ _ = panic "simplifyPgmIO"
 
 -------------------
-end_iteration :: DynFlags -> CoreToDo -> Int 
+end_iteration :: DynFlags -> CoreToDo -> Int
              -> SimplCount -> CoreProgram -> [CoreRule] -> IO ()
 end_iteration dflags pass iteration_no counts binds rules
   = do { dumpPassResult dflags mb_flag hdr pp_counts binds rules
        ; lintPassResult dflags pass binds }
   where
-    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases 
-    	    | otherwise			       	      = Nothing
-	    -- Show details if Opt_D_dump_simpl_iterations is on
+    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases
+            | otherwise                               = Nothing
+            -- Show details if Opt_D_dump_simpl_iterations is on
 
     hdr = ptext (sLit "Simplifier iteration=") <> int iteration_no
     pp_counts = vcat [ ptext (sLit "---- Simplifier counts for") <+> hdr
- 		     , pprSimplCount counts
+                     , pprSimplCount counts
                      , ptext (sLit "---- End of simplifier counts for") <+> hdr ]
 \end{code}
 
 
 %************************************************************************
-%*									*
-		Shorting out indirections
-%*									*
+%*                                                                      *
+                Shorting out indirections
+%*                                                                      *
 %************************************************************************
 
 If we have this:
 
-	x_local = <expression>
-	...bindings...
-	x_exported = x_local
+        x_local = <expression>
+        ...bindings...
+        x_exported = x_local
 
 where x_exported is exported, and x_local is not, then we replace it with this:
 
-	x_exported = <expression>
-	x_local = x_exported
-	...bindings...
+        x_exported = <expression>
+        x_local = x_exported
+        ...bindings...
 
 Without this we never get rid of the x_exported = x_local thing.  This
 save a gratuitous jump (from \tr{x_exported} to \tr{x_local}), and
@@ -718,41 +718,41 @@ Note [Messing up the exported Id's RULES]
 We must be careful about discarding (obviously) or even merging the
 RULES on the exported Id. The example that went bad on me at one stage
 was this one:
-	
+
     iterate :: (a -> a) -> a -> [a]
-	[Exported]
-    iterate = iterateList	
-    
+        [Exported]
+    iterate = iterateList
+
     iterateFB c f x = x `c` iterateFB c f (f x)
     iterateList f x =  x : iterateList f (f x)
-    	[Not exported]
-    
+        [Not exported]
+
     {-# RULES
-    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
-    "iterateFB" 		iterateFB (:) = iterateList
+    "iterate"   forall f x.     iterate f x = build (\c _n -> iterateFB c f x)
+    "iterateFB"                 iterateFB (:) = iterateList
      #-}
 
 This got shorted out to:
 
     iterateList :: (a -> a) -> a -> [a]
     iterateList = iterate
-    
+
     iterateFB c f x = x `c` iterateFB c f (f x)
     iterate f x =  x : iterate f (f x)
-    
+
     {-# RULES
-    "iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
-    "iterateFB" 		iterateFB (:) = iterate
+    "iterate"   forall f x.     iterate f x = build (\c _n -> iterateFB c f x)
+    "iterateFB"                 iterateFB (:) = iterate
      #-}
 
-And now we get an infinite loop in the rule system 
-	iterate f x -> build (\cn -> iterateFB c f x)
-		    -> iterateFB (:) f x
-		    -> iterate f x
+And now we get an infinite loop in the rule system
+        iterate f x -> build (\cn -> iterateFB c f x)
+                    -> iterateFB (:) f x
+                    -> iterate f x
 
-Old "solution": 
-	use rule switching-off pragmas to get rid 
-	of iterateList in the first place
+Old "solution":
+        use rule switching-off pragmas to get rid
+        of iterateList in the first place
 
 But in principle the user *might* want rules that only apply to the Id
 he says.  And inline pragmas are similar
@@ -768,9 +768,9 @@ Note [Rules and indirection-zapping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Problem: what if x_exported has a RULE that mentions something in ...bindings...?
 Then the things mentioned can be out of scope!  Solution
- a) Make sure that in this pass the usage-info from x_exported is 
-	available for ...bindings...
- b) If there are any such RULES, rec-ify the entire top-level. 
+ a) Make sure that in this pass the usage-info from x_exported is
+        available for ...bindings...
+ b) If there are any such RULES, rec-ify the entire top-level.
     It'll get sorted out next time round
 
 Other remarks
@@ -778,88 +778,88 @@ Other remarks
 If more than one exported thing is equal to a local thing (i.e., the
 local thing really is shared), then we do one only:
 \begin{verbatim}
-	x_local = ....
-	x_exported1 = x_local
-	x_exported2 = x_local
+        x_local = ....
+        x_exported1 = x_local
+        x_exported2 = x_local
 ==>
-	x_exported1 = ....
+        x_exported1 = ....
 
-	x_exported2 = x_exported1
+        x_exported2 = x_exported1
 \end{verbatim}
 
 We rely on prior eta reduction to simplify things like
 \begin{verbatim}
-	x_exported = /\ tyvars -> x_local tyvars
+        x_exported = /\ tyvars -> x_local tyvars
 ==>
-	x_exported = x_local
+        x_exported = x_local
 \end{verbatim}
 Hence,there's a possibility of leaving unchanged something like this:
 \begin{verbatim}
-	x_local = ....
-	x_exported1 = x_local Int
+        x_local = ....
+        x_exported1 = x_local Int
 \end{verbatim}
-By the time we've thrown away the types in STG land this 
+By the time we've thrown away the types in STG land this
 could be eliminated.  But I don't think it's very common
-and it's dangerous to do this fiddling in STG land 
+and it's dangerous to do this fiddling in STG land
 because we might elminate a binding that's mentioned in the
 unfolding for something.
 
 \begin{code}
-type IndEnv = IdEnv Id		-- Maps local_id -> exported_id
+type IndEnv = IdEnv Id          -- Maps local_id -> exported_id
 
 shortOutIndirections :: CoreProgram -> CoreProgram
 shortOutIndirections binds
   | isEmptyVarEnv ind_env = binds
-  | no_need_to_flatten	  = binds'			-- See Note [Rules and indirect-zapping]
-  | otherwise 		  = [Rec (flattenBinds binds')]	-- for this no_need_to_flatten stuff
+  | no_need_to_flatten    = binds'                      -- See Note [Rules and indirect-zapping]
+  | otherwise             = [Rec (flattenBinds binds')] -- for this no_need_to_flatten stuff
   where
-    ind_env 	       = makeIndEnv binds
-    exp_ids 	       = varSetElems ind_env	-- These exported Ids are the subjects
-    exp_id_set	       = mkVarSet exp_ids	-- of the indirection-elimination
+    ind_env            = makeIndEnv binds
+    exp_ids            = varSetElems ind_env    -- These exported Ids are the subjects
+    exp_id_set         = mkVarSet exp_ids       -- of the indirection-elimination
     no_need_to_flatten = all (null . specInfoRules . idSpecialisation) exp_ids
-    binds' 	       = concatMap zap binds
+    binds'             = concatMap zap binds
 
     zap (NonRec bndr rhs) = [NonRec b r | (b,r) <- zapPair (bndr,rhs)]
-    zap (Rec pairs)	  = [Rec (concatMap zapPair pairs)]
+    zap (Rec pairs)       = [Rec (concatMap zapPair pairs)]
 
     zapPair (bndr, rhs)
-	| bndr `elemVarSet` exp_id_set 		   = []
-	| Just exp_id <- lookupVarEnv ind_env bndr = [(transferIdInfo exp_id bndr, rhs),
-						      (bndr, Var exp_id)]
-	| otherwise				   = [(bndr,rhs)]
-			     
+        | bndr `elemVarSet` exp_id_set             = []
+        | Just exp_id <- lookupVarEnv ind_env bndr = [(transferIdInfo exp_id bndr, rhs),
+                                                      (bndr, Var exp_id)]
+        | otherwise                                = [(bndr,rhs)]
+
 makeIndEnv :: [CoreBind] -> IndEnv
 makeIndEnv binds
   = foldr add_bind emptyVarEnv binds
   where
     add_bind :: CoreBind -> IndEnv -> IndEnv
     add_bind (NonRec exported_id rhs) env = add_pair (exported_id, rhs) env
-    add_bind (Rec pairs)	      env = foldr add_pair env pairs
+    add_bind (Rec pairs)              env = foldr add_pair env pairs
 
     add_pair :: (Id,CoreExpr) -> IndEnv -> IndEnv
     add_pair (exported_id, Var local_id) env
-	| shortMeOut env exported_id local_id = extendVarEnv env local_id exported_id
+        | shortMeOut env exported_id local_id = extendVarEnv env local_id exported_id
     add_pair _ env = env
-			
+
 -----------------
 shortMeOut :: IndEnv -> Id -> Id -> Bool
 shortMeOut ind_env exported_id local_id
 -- The if-then-else stuff is just so I can get a pprTrace to see
 -- how often I don't get shorting out becuase of IdInfo stuff
-  = if isExportedId exported_id &&		-- Only if this is exported
+  = if isExportedId exported_id &&              -- Only if this is exported
 
-       isLocalId local_id &&			-- Only if this one is defined in this
-						-- 	module, so that we *can* change its
-				 	 	-- 	binding to be the exported thing!
+       isLocalId local_id &&                    -- Only if this one is defined in this
+                                                --      module, so that we *can* change its
+                                                --      binding to be the exported thing!
 
-       not (isExportedId local_id) &&		-- Only if this one is not itself exported,
-					   	--	since the transformation will nuke it
-   
-       not (local_id `elemVarEnv` ind_env)	-- Only if not already substituted for
+       not (isExportedId local_id) &&           -- Only if this one is not itself exported,
+                                                --      since the transformation will nuke it
+
+       not (local_id `elemVarEnv` ind_env)      -- Only if not already substituted for
     then
-	if hasShortableIdInfo exported_id
-	then True	-- See Note [Messing up the exported Id's IdInfo]
-	else WARN( True, ptext (sLit "Not shorting out:") <+> ppr exported_id )
+        if hasShortableIdInfo exported_id
+        then True       -- See Note [Messing up the exported Id's IdInfo]
+        else WARN( True, ptext (sLit "Not shorting out:") <+> ppr exported_id )
              False
     else
         False
@@ -879,9 +879,9 @@ hasShortableIdInfo id
 transferIdInfo :: Id -> Id -> Id
 -- See Note [Transferring IdInfo]
 -- If we have
---	lcl_id = e; exp_id = lcl_id
+--      lcl_id = e; exp_id = lcl_id
 -- and lcl_id has useful IdInfo, we don't want to discard it by going
---	gbl_id = e; lcl_id = gbl_id
+--      gbl_id = e; lcl_id = gbl_id
 -- Instead, transfer IdInfo from lcl_id to exp_id
 -- Overwriting, rather than merging, seems to work ok.
 transferIdInfo exported_id local_id
@@ -889,11 +889,11 @@ transferIdInfo exported_id local_id
   where
     local_info = idInfo local_id
     transfer exp_info = exp_info `setStrictnessInfo` strictnessInfo local_info
-				 `setUnfoldingInfo`     unfoldingInfo local_info
-				 `setInlinePragInfo`	inlinePragInfo local_info
-				 `setSpecInfo`	        addSpecInfo (specInfo exp_info) new_info
-    new_info = setSpecInfoHead (idName exported_id) 
-			       (specInfo local_info)
-	-- Remember to set the function-name field of the
-	-- rules as we transfer them from one function to another
+                                 `setUnfoldingInfo`     unfoldingInfo local_info
+                                 `setInlinePragInfo`    inlinePragInfo local_info
+                                 `setSpecInfo`          addSpecInfo (specInfo exp_info) new_info
+    new_info = setSpecInfoHead (idName exported_id)
+                               (specInfo local_info)
+        -- Remember to set the function-name field of the
+        -- rules as we transfer them from one function to another
 \end{code}
