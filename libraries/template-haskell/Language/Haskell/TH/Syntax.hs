@@ -98,6 +98,7 @@ class (Monad m, Applicative m) => Quasi m where
   qRunIO :: IO a -> m a
   -- ^ Input/output (dangerous)
 
+  qAddDependentFile :: FilePath -> m ()
 
 -----------------------------------------------------
 --	The IO instance of Quasi
@@ -123,6 +124,7 @@ instance Quasi IO where
   qReifyInstances _ _ = badIO "classInstances"
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
+  qAddDependentFile _ = badIO "addDependentFile"
 
   qRunIO m = m
   
@@ -209,15 +211,23 @@ location = Q qLocation
 runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)
 
+-- | Record external files that runIO is using (dependent upon).
+-- The compiler can then recognize that it should re-compile the file using this TH when the external file changes.
+-- Note that ghc -M will still not know about these dependencies - it does not execute TH.
+-- Expects an absolute file path.
+addDependentFile :: FilePath -> Q ()
+addDependentFile fp = Q (qAddDependentFile fp)
+
 instance Quasi Q where
-  qNewName  	  = newName
-  qReport   	  = report
-  qRecover  	  = recover 
-  qReify    	  = reify
-  qReifyInstances = reifyInstances
-  qLookupName     = lookupName
-  qLocation 	  = location
-  qRunIO    	  = runIO
+  qNewName  	    = newName
+  qReport   	    = report
+  qRecover  	    = recover 
+  qReify    	    = reify
+  qReifyInstances   = reifyInstances
+  qLookupName       = lookupName
+  qLocation 	    = location
+  qRunIO    	    = runIO
+  qAddDependentFile = addDependentFile
 
 
 ----------------------------------------------------
