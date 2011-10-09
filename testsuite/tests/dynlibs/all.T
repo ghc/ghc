@@ -18,3 +18,11 @@ test('T4464',
      run_command,
      ['$MAKE --no-print-directory -s T4464'])
 
+test('T5373',
+     extra_clean(['T5373A.hi',  'T5373B.hi',  'T5373C.hi',
+                  'T5373A.o',   'T5373B.o',   'T5373C.o',
+                  'T5373A',     'T5373B',     'T5373C',
+                  'T5373A.exe', 'T5373B.exe', 'T5373C.exe']),
+     run_command,
+     ['$MAKE --no-print-directory -s T5373'])
+
