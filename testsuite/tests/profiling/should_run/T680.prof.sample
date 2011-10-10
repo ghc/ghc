@@ -1,0 +1,35 @@
+	Wed Oct 26 14:10 2011 Time and Allocation Profiling Report  (Final)
+
+	   T680 +RTS -p -RTS
+
+	total time  =        0.38 secs   (19 ticks @ 20 ms)
+	total alloc = 224,788,720 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE  %time %alloc
+
+foo.\       Main    100.0   99.8
+
+
+                                                               individual     inherited
+COST CENTRE          MODULE                  no.     entries  %time %alloc   %time %alloc
+
+MAIN                 MAIN                    102           0    0.0    0.0   100.0  100.0
+ CAF                 Main                    203           0    0.0    0.0   100.0  100.0
+  k                  Main                    206           1    0.0    0.0     0.0    0.0
+   foo               Main                    207           1    0.0    0.0     0.0    0.0
+    foo.bar          Main                    211           1    0.0    0.0     0.0    0.0
+     foo.bar.k'      Main                    215           1    0.0    0.0     0.0    0.0
+      k.\            Main                    216           1    0.0    0.0     0.0    0.0
+  r                  Main                    205           1    0.0    0.0   100.0  100.0
+   k                 Main                    208           0    0.0    0.0   100.0  100.0
+    foo              Main                    209           0    0.0    0.0   100.0  100.0
+     foo.bar         Main                    212           0    0.0    0.0     0.0    0.1
+      foo.bar.k'     Main                    217           0    0.0    0.0     0.0    0.0
+      foo.bar.\      Main                    213        4001    0.0    0.1     0.0    0.1
+       foo.bar.\.k'' Main                    214        4000    0.0    0.0     0.0    0.0
+     foo.\           Main                    210        4001  100.0   99.8   100.0   99.8
+  main               Main                    204           1    0.0    0.0     0.0    0.0
+ CAF                 GHC.Conc.Signal         200           0    0.0    0.0     0.0    0.0
+ CAF                 GHC.IO.Encoding.Iconv   190           0    0.0    0.0     0.0    0.0
+ CAF                 GHC.IO.Handle.FD        182           0    0.0    0.0     0.0    0.0
+ CAF                 GHC.Show                170           0    0.0    0.0     0.0    0.0

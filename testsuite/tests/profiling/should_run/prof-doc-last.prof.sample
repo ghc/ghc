@@ -1,0 +1,31 @@
+	Thu Oct 27 09:37 2011 Time and Allocation Profiling Report  (Final)
+
+	   prof-doc-last +RTS -hc -p -RTS
+
+	total time  =        0.34 secs   (17 ticks @ 20 ms)
+	total alloc = 204,047,104 bytes  (excludes profiling overheads)
+
+COST CENTRE  MODULE  %time %alloc
+
+main.ys      Main     35.3   39.2
+main.xs      Main     29.4   19.6
+last_init_ys Main     23.5   27.4
+last_init_xs Main     11.8   13.7
+
+
+                                                          individual     inherited
+COST CENTRE     MODULE                  no.     entries  %time %alloc   %time %alloc
+
+MAIN            MAIN                    101           0    0.0    0.0   100.0  100.0
+ main           Main                    203           0    0.0    0.0     0.0    0.0
+ CAF            Main                    201           0    0.0    0.0   100.0  100.0
+  main          Main                    202           1    0.0    0.0   100.0  100.0
+   last_init_ys Main                    209           1   23.5   27.4    23.5   27.4
+   main.ys      Main                    208           1   35.3   39.2    35.3   39.2
+   last_ys      Main                    207           1    0.0    0.0     0.0    0.0
+   last_init_xs Main                    206           1   11.8   13.7    11.8   13.7
+   main.xs      Main                    205           1   29.4   19.6    29.4   19.6
+   last_xs      Main                    204           1    0.0    0.0     0.0    0.0
+ CAF            GHC.Conc.Signal         199           0    0.0    0.0     0.0    0.0
+ CAF            GHC.IO.Encoding.Iconv   188           0    0.0    0.0     0.0    0.0
+ CAF            GHC.IO.Handle.FD        180           0    0.0    0.0     0.0    0.0

@@ -14,4 +14,3 @@ g x = x
 
 h :: Char -> Char
 Just h = Just id
-

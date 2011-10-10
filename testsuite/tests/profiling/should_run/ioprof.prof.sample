@@ -1,0 +1,38 @@
+	Wed Oct 26 14:25 2011 Time and Allocation Profiling Report  (Final)
+
+	   ioprof +RTS -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 20 ms)
+	total alloc =      46,804 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE                %time %alloc
+
+CAF         GHC.IO.Handle.FD        0.0   73.0
+CAF         GHC.IO.Encoding.Iconv   0.0    1.5
+main        Main                    0.0   18.2
+errorM.\    Main                    0.0    5.1
+
+
+                                                          individual     inherited
+COST CENTRE     MODULE                  no.     entries  %time %alloc   %time %alloc
+
+MAIN            MAIN                    102           0    0.0    0.0     0.0  100.0
+ CAF            Main                    203           0    0.0    0.6     0.0   24.1
+  main          Main                    204           1    0.0   18.2     0.0   23.5
+   bar          Main                    206           1    0.0    0.2     0.0    0.2
+    foo         Main                    211           1    0.0    0.0     0.0    0.0
+     errorM     Main                    212           1    0.0    0.0     0.0    0.0
+    >>=         Main                    207           1    0.0    0.0     0.0    0.0
+   runM         Main                    205           1    0.0    0.0     0.0    5.1
+    bar         Main                    208           0    0.0    0.0     0.0    5.1
+     foo        Main                    213           0    0.0    0.0     0.0    5.1
+      errorM    Main                    214           0    0.0    0.0     0.0    5.1
+       errorM.\ Main                    215           1    0.0    5.1     0.0    5.1
+     >>=        Main                    209           0    0.0    0.0     0.0    0.0
+      >>=.\     Main                    210           1    0.0    0.0     0.0    0.0
+ CAF            GHC.Conc.Signal         200           0    0.0    0.7     0.0    0.7
+ CAF            GHC.Conc.Sync           199           0    0.0    0.3     0.0    0.3
+ CAF            GHC.Exception           197           0    0.0    0.2     0.0    0.2
+ CAF            GHC.IO.Encoding         192           0    0.0    0.4     0.0    0.4
+ CAF            GHC.IO.Encoding.Iconv   190           0    0.0    1.5     0.0    1.5
+ CAF            GHC.IO.Handle.FD        182           0    0.0   73.0     0.0   73.0

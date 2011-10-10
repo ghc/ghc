@@ -1521,6 +1521,10 @@ def normalise_prof (str):
     # strip results for CAFs, these tend to change unpredictably
     str = re.sub('[ \t]*CAF.*\n','',str)
 
+    # XXX Ignore Main.main.  Sometimes this appears under CAF, and
+    # sometimes under MAIN.
+    str = re.sub('[ \t]*main[ \t]+Main.*\n','',str)
+
     # We have somthing like this:
 
     # MAIN      MAIN                 101      0    0.0    0.0   100.0  100.0
