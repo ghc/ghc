@@ -42,6 +42,7 @@ import ListSetOps
 import BasicTypes
 import Util
 import Outputable
+import StaticFlags
 \end{code}
 
 This module provides the support code for @StgToAbstractC@ to deal
@@ -382,6 +383,9 @@ mkRhsClosure    bndr cc bi
  	&& all isFollowableArg (map idCgRep fvs) 
  	&& isUpdatable upd_flag
  	&& arity <= mAX_SPEC_AP_SIZE 
+        && not opt_SccProfilingOn -- not when profiling: we don't want to
+                                  -- lose information about this particular
+                                  -- thunk (e.g. its type) (#949)
 
  		   -- Ha! an Ap thunk
 	= cgStdRhsClosure bndr cc bi fvs [] body lf_info payload

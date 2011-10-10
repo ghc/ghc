@@ -247,8 +247,11 @@ mkRhsClosure    bndr cc bi
  	&& all (isGcPtrRep . idPrimRep . stripNV) fvs
  	&& isUpdatable upd_flag
  	&& arity <= mAX_SPEC_AP_SIZE
+        && not opt_SccProfilingOn -- not when profiling: we don't want to
+                                  -- lose information about this particular
+                                  -- thunk (e.g. its type) (#949)
 
- 		   -- Ha! an Ap thunk
+                   -- Ha! an Ap thunk
   = cgStdThunk bndr cc bi body lf_info payload
   where
 	lf_info = mkApLFInfo bndr upd_flag arity
