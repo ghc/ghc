@@ -433,7 +433,7 @@ Representation of desugared vectorisation declarations that are fed to the vecto
 \begin{code}
 data CoreVect = Vect     Id    (Maybe CoreExpr)
               | NoVect   Id
-              | VectType TyCon (Maybe Type)
+              | VectType Bool TyCon (Maybe TyCon)
 \end{code}
 
 

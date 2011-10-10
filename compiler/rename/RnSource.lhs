@@ -653,18 +653,17 @@ rnHsVectDecl (HsNoVect var)
   = do { var' <- lookupLocatedTopBndrRn var           -- only applies to local (not imported) names
        ; return (HsNoVect var', unitFV (unLoc var'))
        }
-rnHsVectDecl (HsVectTypeIn tycon Nothing)
+rnHsVectDecl (HsVectTypeIn isScalar tycon Nothing)
   = do { tycon' <- lookupLocatedOccRn tycon
-       ; return (HsVectTypeIn tycon' Nothing, unitFV (unLoc tycon'))
+       ; return (HsVectTypeIn isScalar tycon' Nothing, unitFV (unLoc tycon'))
        }
-rnHsVectDecl (HsVectTypeIn tycon (Just ty))
-  = do { tycon' <- lookupLocatedOccRn tycon
-       ; (ty', fv_ty) <- rnHsTypeFVs vect_doc ty
-       ; return (HsVectTypeIn tycon' (Just ty'), fv_ty `addOneFV` unLoc tycon')
+rnHsVectDecl (HsVectTypeIn isScalar tycon (Just rhs_tycon))
+  = do { tycon'     <- lookupLocatedOccRn tycon
+       ; rhs_tycon' <- lookupLocatedOccRn rhs_tycon
+       ; return ( HsVectTypeIn isScalar tycon' (Just rhs_tycon')
+                , mkFVs [unLoc tycon', unLoc rhs_tycon'])
        }
-  where
-    vect_doc = ptext (sLit "In the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
-rnHsVectDecl (HsVectTypeOut _ _)
+rnHsVectDecl (HsVectTypeOut _ _ _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectTypeOut'"
 \end{code}
 

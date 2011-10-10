@@ -23,7 +23,7 @@ module Vectorise.Builtins (
   closureCtrFun,
 
   -- * Initialisation
-  initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
+  initBuiltins, initBuiltinVars, initBuiltinTyCons, 
   initBuiltinPAs, initBuiltinPRs,
   
   -- * Lookup

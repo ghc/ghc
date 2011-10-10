@@ -76,7 +76,7 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
           -- and type families used in the DPH library to represent
           -- array types.
       ; (tycons', new_fam_insts, tc_binds) <- vectTypeEnv tycons [vd
-                                                                | vd@(VectType _ _) <- vect_decls]
+                                                                | vd@(VectType _ _ _) <- vect_decls]
 
       ; (_, fam_inst_env) <- readGEnv global_fam_inst_env
 

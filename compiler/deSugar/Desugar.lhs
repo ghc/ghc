@@ -408,8 +408,8 @@ dsVect (L loc (HsVect (L _ v) rhs))
        }
 dsVect (L _loc (HsNoVect (L _ v)))
   = return $ NoVect v
-dsVect (L _loc (HsVectTypeOut tycon ty))
-  = return $ VectType tycon ty
-dsVect vd@(L _ (HsVectTypeIn _ _ty))
+dsVect (L _loc (HsVectTypeOut isScalar tycon rhs_tycon))
+  = return $ VectType isScalar tycon rhs_tycon
+dsVect vd@(L _ (HsVectTypeIn _ _ _))
   = pprPanic "Desugar.dsVect: unexpected 'HsVectTypeIn'" (ppr vd)
 \end{code}

@@ -1,7 +1,8 @@
 
 module Vectorise.Type.PData
-  (buildPDataTyCon
-  ) where
+  ( buildPDataTyCon
+  ) 
+where
 
 import Vectorise.Monad
 import Vectorise.Builtins
@@ -17,7 +18,6 @@ import Name
 import Util
 import MonadUtils
 import Control.Monad
-
 
 
 buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM TyCon

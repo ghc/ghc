@@ -580,10 +580,15 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | '{-# VECTORISE_SCALAR' qvar '#-}'     { unitOL $ LL $ VectD (HsVect       $2 Nothing) }
         | '{-# VECTORISE' qvar '=' exp '#-}'    { unitOL $ LL $ VectD (HsVect       $2 (Just $4)) }
         | '{-# NOVECTORISE' qvar '#-}'          { unitOL $ LL $ VectD (HsNoVect     $2) }
-        | '{-# VECTORISE_SCALAR' 'type' qtycon '#-}'     
-                                                { unitOL $ LL $ VectD (HsVectTypeIn $3 Nothing) }
-        | '{-# VECTORISE' 'type' qtycon '=' ctype '#-}'     
-                                                { unitOL $ LL $ VectD (HsVectTypeIn $3 (Just $5)) }
+        | '{-# VECTORISE' 'type' gtycon '#-}'     
+                                                { unitOL $ LL $ 
+                                                    VectD (HsVectTypeIn False $3 Nothing) }
+        | '{-# VECTORISE_SCALAR' 'type' gtycon '#-}'     
+                                                { unitOL $ LL $ 
+                                                    VectD (HsVectTypeIn True $3 Nothing) }
+        | '{-# VECTORISE' 'type' gtycon '=' gtycon '#-}'     
+                                                { unitOL $ LL $ 
+                                                    VectD (HsVectTypeIn False $3 (Just $5)) }
         | annotation { unitOL $1 }
         | decl                                  { unLoc $1 }
 

@@ -1031,11 +1031,9 @@ zonkVect env (HsNoVect v)
   = do { v' <- wrapLocM (zonkIdBndr env) v
        ; return $ HsNoVect v'
        }
-zonkVect _env (HsVectTypeOut t ty)
-  = do { ty' <- fmapMaybeM zonkTypeZapping ty
-       ; return $ HsVectTypeOut t ty'
-       }
-zonkVect _ (HsVectTypeIn _ _) = panic "TcHsSyn.zonkVect: HsVectTypeIn"
+zonkVect _env (HsVectTypeOut s t rt)
+  = return $ HsVectTypeOut s t rt
+zonkVect _ (HsVectTypeIn _ _ _) = panic "TcHsSyn.zonkVect: HsVectTypeIn"
 \end{code}
 
 %************************************************************************

@@ -2,7 +2,7 @@
 
 module Vectorise.Builtins.Initialise (
   -- * Initialisation
-  initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
+  initBuiltins, initBuiltinVars, initBuiltinTyCons,
   initBuiltinPAs, initBuiltinPRs
 ) where
 
@@ -221,13 +221,9 @@ initBuiltinVars :: Builtins -> DsM [(Var, Var)]
 initBuiltinVars (Builtins { dphModules = mods })
   = do
       cvars <- zipWithM externalVar cmods cfs
-      return $ [(v,v) | v <- map dataConWorkId defaultDataConWorkers]
-               ++ zip (map dataConWorkId cons) cvars
+      return $ zip (map dataConWorkId cons) cvars
   where
     (cons, cmods, cfs) = unzip3 (preludeDataCons mods)
-
-    defaultDataConWorkers :: [DataCon]
-    defaultDataConWorkers = [trueDataCon, falseDataCon, unitDataCon]
 
     preludeDataCons :: Modules -> [(DataCon, Module, FastString)]
     preludeDataCons (Modules { dph_Prelude_Tuple = dph_Prelude_Tuple })
@@ -241,27 +237,12 @@ initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
   = do
       -- parr <- externalTyCon dph_Prelude_PArr (fsLit "PArr")
-      dft_tcs <- defaultTyCons
       return $ (tyConName funTyCon, closureTyCon bi)
              : (parrTyConName,      parrayTyCon bi)
 
              -- FIXME: temporary
              : (tyConName $ parrayTyCon bi, parrayTyCon bi)
-
-             : [(tyConName tc, tc) | tc <- dft_tcs]
-
-  where 
-    defaultTyCons :: DsM [TyCon]
-    defaultTyCons = return [boolTyCon]
-
--- |Get a list of names to `DataCon`s in the mock prelude.
---
-initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
-initBuiltinDataCons _
-  = [(dataConName dc, dc)| dc <- defaultDataCons]
-  where 
-    defaultDataCons :: [DataCon]
-    defaultDataCons = [trueDataCon, falseDataCon, unitDataCon]
+             : []
 
 -- |Get the names of all buildin instance functions for the PA class.
 --

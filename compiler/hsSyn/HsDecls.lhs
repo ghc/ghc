@@ -1076,18 +1076,20 @@ data VectDecl name
   | HsNoVect
       (Located name)
   | HsVectTypeIn                -- pre type-checking
+      Bool                      -- 'TRUE' => SCALAR declaration
       (Located name)
-      (Maybe (LHsType name))    -- 'Nothing' => SCALAR declaration
+      (Maybe (Located name))    -- 'Nothing' => no right-hand side
   | HsVectTypeOut               -- post type-checking
+      Bool                      -- 'TRUE' => SCALAR declaration
       TyCon
-      (Maybe Type)              -- 'Nothing' => SCALAR declaration
+      (Maybe TyCon)             -- 'Nothing' => no right-hand side
   deriving (Data, Typeable)
 
 lvectDeclName :: NamedThing name => LVectDecl name -> Name
-lvectDeclName (L _ (HsVect        (L _ name) _)) = getName name
-lvectDeclName (L _ (HsNoVect      (L _ name)))   = getName name
-lvectDeclName (L _ (HsVectTypeIn  (L _ name) _)) = getName name
-lvectDeclName (L _ (HsVectTypeOut tycon _))      = getName tycon
+lvectDeclName (L _ (HsVect        (L _ name) _))   = getName name
+lvectDeclName (L _ (HsNoVect      (L _ name)))     = getName name
+lvectDeclName (L _ (HsVectTypeIn  _ (L _ name) _)) = getName name
+lvectDeclName (L _ (HsVectTypeOut _ tycon _))      = getName tycon
 
 instance OutputableBndr name => Outputable (VectDecl name) where
   ppr (HsVect v Nothing)
@@ -1098,18 +1100,22 @@ instance OutputableBndr name => Outputable (VectDecl name) where
              pprExpr (unLoc rhs) <+> text "#-}" ]
   ppr (HsNoVect v)
     = sep [text "{-# NOVECTORISE" <+> ppr v <+> text "#-}" ]
-  ppr (HsVectTypeIn t Nothing)
+  ppr (HsVectTypeIn False t Nothing)
+    = sep [text "{-# VECTORISE type" <+> ppr t <+> text "#-}" ]
+  ppr (HsVectTypeIn False t (Just t'))
+    = sep [text "{-# VECTORISE type" <+> ppr t, text "=", ppr t', text "#-}" ]
+  ppr (HsVectTypeIn True t Nothing)
     = sep [text "{-# VECTORISE SCALAR type" <+> ppr t <+> text "#-}" ]
-  ppr (HsVectTypeIn t (Just ty))
-    = sep [text "{-# VECTORISE type" <+> ppr t,
-           nest 4 $ 
-             ppr (unLoc ty) <+> text "#-}" ]
-  ppr (HsVectTypeOut t Nothing)
+  ppr (HsVectTypeIn True t (Just t'))
+    = sep [text "{-# VECTORISE SCALAR type" <+> ppr t, text "=", ppr t', text "#-}" ]
+  ppr (HsVectTypeOut False t Nothing)
+    = sep [text "{-# VECTORISE type" <+> ppr t <+> text "#-}" ]
+  ppr (HsVectTypeOut False t (Just t'))
+    = sep [text "{-# VECTORISE type" <+> ppr t, text "=", ppr t', text "#-}" ]
+  ppr (HsVectTypeOut True t Nothing)
     = sep [text "{-# VECTORISE SCALAR type" <+> ppr t <+> text "#-}" ]
-  ppr (HsVectTypeOut t (Just ty))
-    = sep [text "{-# VECTORISE type" <+> ppr t,
-           nest 4 $ 
-             ppr ty <+> text "#-}" ]
+  ppr (HsVectTypeOut True t (Just t'))
+    = sep [text "{-# VECTORISE SCALAR type" <+> ppr t, text "=", ppr t', text "#-}" ]
 \end{code}
 
 %************************************************************************
