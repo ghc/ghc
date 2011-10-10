@@ -1206,7 +1206,7 @@ lex_string s = do
         | Just ('&',i) <- next -> do
                 setInput i; lex_string s
         | Just (c,i) <- next, c <= '\x7f' && is_space c -> do
-                           -- is_space only works for <= '\x7f' (#3751)
+                           -- is_space only works for <= '\x7f' (#3751, #5425)
                 setInput i; lex_stringgap s
         where next = alexGetChar' i
 
@@ -1222,7 +1222,8 @@ lex_stringgap s = do
   c <- getCharOrFail i
   case c of
     '\\' -> lex_string s
-    c | is_space c -> lex_stringgap s
+    c | c <= '\x7f' && is_space c -> lex_stringgap s
+                           -- is_space only works for <= '\x7f' (#3751, #5425)
     _other -> lit_error i
 
 
