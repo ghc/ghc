@@ -1442,16 +1442,11 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
                                                   -- keep gcc happy
 
   where
-    mk_rts_opts_enabled val
+    rts_opts_enabled
          = vcat [text "#include \"Rts.h\"",
                  text "#include \"RtsOpts.h\"",
                  text "const RtsOptsEnabledEnum rtsOptsEnabled = " <>
-                       text val <> semi ]
-
-    rts_opts_enabled = case rtsOptsEnabled dflags of
-          RtsOptsNone     -> mk_rts_opts_enabled "RtsOptsNone"
-          RtsOptsSafeOnly -> empty -- The default
-          RtsOptsAll      -> mk_rts_opts_enabled "RtsOptsAll"
+                       text (show (rtsOptsEnabled dflags)) <> semi ]
 
     extra_rts_opts = case rtsOpts dflags of
           Nothing   -> empty
