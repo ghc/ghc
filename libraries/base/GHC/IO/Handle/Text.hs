@@ -273,6 +273,10 @@ unpack !buf !r !w acc0
         unpackRB acc !i
          | i < r  = return acc
          | otherwise = do
+              -- Here, we are rather careful to only put an *evaluated* character
+              -- in the output string. Due to pointer tagging, this allows the consumer
+              -- to avoid ping-ponging between the actual consumer code and the
+              -- code of desurrogatifyRoundtripCharacter
 #ifdef CHARBUF_UTF16
               -- reverse-order decoding of UTF-16
               c2 <- peekElemOff pbuf i
@@ -281,10 +285,12 @@ unpack !buf !r !w acc0
                  else do c1 <- peekElemOff pbuf (i-1)
                          let c = (fromIntegral c1 - 0xd800) * 0x400 +
                                  (fromIntegral c2 - 0xdc00) + 0x10000
-                         unpackRB (desurrogatifyRoundtripCharacter (unsafeChr c) : acc) (i-2)
+                             c' = desurrogatifyRoundtripCharacter (unsafeChr c)
+                         c' `seq` unpackRB (c' : acc) (i-2)
 #else
               c <- peekElemOff pbuf i
-              unpackRB (desurrogatifyRoundtripCharacter c:acc) (i-1)
+              let c' = desurrogatifyRoundtripCharacter c
+              c' `seq` unpackRB (c':acc) (i-1)
 #endif
      in
      unpackRB acc0 (w-1)
@@ -307,7 +313,8 @@ unpack_nl !buf !r !w acc0
                             then unpackRB ('\n':acc) (i-2)
                             else unpackRB ('\n':acc) (i-1)
                  else do
-                         unpackRB (desurrogatifyRoundtripCharacter c:acc) (i-1)
+                         let c' = desurrogatifyRoundtripCharacter c
+                         c' `seq` unpackRB (c':acc) (i-1)
      in do
      c <- peekElemOff pbuf (w-1)
      if (c == '\r')

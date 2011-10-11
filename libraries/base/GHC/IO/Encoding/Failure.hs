@@ -75,43 +75,54 @@ codingFailureModeSuffix RoundtripFailure           = "//ROUNDTRIP"
 unrepresentableChar :: Char
 unrepresentableChar = '\xFFFD'
 
+-- It is extraordinarily important that this series of predicates/transformers gets inlined, because
+-- they tend to be used in inner loops related to text encoding. In particular, surrogatifyRoundtripCharacter
+-- must be inlined (see #5536)
+
 -- | Some characters are actually "surrogate" codepoints defined for use in UTF-16. We need to signal an
 -- invalid character if we detect them when encoding a sequence of 'Char's into 'Word8's because they won't
 -- give valid Unicode.
 --
 -- We may also need to signal an invalid character if we detect them when encoding a sequence of 'Char's into 'Word8's
 -- because the 'RoundtripFailure' mode creates these to round-trip bytes through our internal UTF-16 encoding.
+{-# INLINE isSurrogate #-}
 isSurrogate :: Char -> Bool
 isSurrogate c = (0xD800 <= x && x <= 0xDBFF) || (0xDC00 <= x && x <= 0xDFFF)
   where x = ord c
 
 -- | We use some private-use characters for roundtripping unknown bytes through a String
+{-# INLINE isRoundtripEscapeChar #-}
 isRoundtripEscapeChar :: Char -> Bool
 isRoundtripEscapeChar c = 0xEF00 <= x && x < 0xF000
   where x = ord c
 
 -- | We use some surrogate characters for roundtripping unknown bytes through a String
+{-# INLINE isRoundtripEscapeSurrogateChar #-}
 isRoundtripEscapeSurrogateChar :: Char -> Bool
 isRoundtripEscapeSurrogateChar c = 0xDC00 <= x && x < 0xDD00
   where x = ord c
 
 -- Private use characters (in Strings) --> lone surrogates (in Buffer CharBufElem)
+{-# INLINE surrogatifyRoundtripCharacter #-}
 surrogatifyRoundtripCharacter :: Char -> Char
-surrogatifyRoundtripCharacter c | isRoundtripEscapeChar c = chr (ord c - 0xEF00 + 0xDC00)
+surrogatifyRoundtripCharacter c | isRoundtripEscapeChar c = chr (ord c - (0xEF00 - 0xDC00))
                                 | otherwise               = c
 
 -- Lone surrogates (in Buffer CharBufElem) --> private use characters (in Strings)
+{-# INLINE desurrogatifyRoundtripCharacter #-}
 desurrogatifyRoundtripCharacter :: Char -> Char
-desurrogatifyRoundtripCharacter c | isRoundtripEscapeSurrogateChar c = chr (ord c - 0xDC00 + 0xEF00)
+desurrogatifyRoundtripCharacter c | isRoundtripEscapeSurrogateChar c = chr (ord c - (0xDC00 - 0xEF00))
                                   | otherwise                        = c
 
 -- Bytes (in Buffer Word8) --> lone surrogates (in Buffer CharBufElem)
+{-# INLINE escapeToRoundtripCharacterSurrogate #-}
 escapeToRoundtripCharacterSurrogate :: Word8 -> Char
 escapeToRoundtripCharacterSurrogate b
   | b < 128   = chr (fromIntegral b) -- Disallow 'smuggling' of ASCII bytes. For roundtripping to work, this assumes encoding is ASCII-superset.
   | otherwise = chr (0xDC00 + fromIntegral b)
 
 -- Lone surrogates (in Buffer CharBufElem) --> bytes (in Buffer Word8)
+{-# INLINE unescapeRoundtripCharacterSurrogate #-}
 unescapeRoundtripCharacterSurrogate :: Char -> Maybe Word8
 unescapeRoundtripCharacterSurrogate c
     | 0xDC80 <= x && x < 0xDD00 = Just (fromIntegral x) -- Discard high byte
