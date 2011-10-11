@@ -90,29 +90,21 @@ isSurrogate :: Char -> Bool
 isSurrogate c = (0xD800 <= x && x <= 0xDBFF) || (0xDC00 <= x && x <= 0xDFFF)
   where x = ord c
 
--- | We use some private-use characters for roundtripping unknown bytes through a String
-{-# INLINE isRoundtripEscapeChar #-}
-isRoundtripEscapeChar :: Char -> Bool
-isRoundtripEscapeChar c = 0xEF00 <= x && x < 0xF000
-  where x = ord c
-
--- | We use some surrogate characters for roundtripping unknown bytes through a String
-{-# INLINE isRoundtripEscapeSurrogateChar #-}
-isRoundtripEscapeSurrogateChar :: Char -> Bool
-isRoundtripEscapeSurrogateChar c = 0xDC00 <= x && x < 0xDD00
-  where x = ord c
-
--- Private use characters (in Strings) --> lone surrogates (in Buffer CharBufElem)
+-- | Private use characters (in Strings) --> lone surrogates (in Buffer CharBufElem)
+-- (We use some private-use characters for roundtripping unknown bytes through a String)
 {-# INLINE surrogatifyRoundtripCharacter #-}
 surrogatifyRoundtripCharacter :: Char -> Char
-surrogatifyRoundtripCharacter c | isRoundtripEscapeChar c = chr (ord c - (0xEF00 - 0xDC00))
-                                | otherwise               = c
+surrogatifyRoundtripCharacter c | 0xEF00 <= x && x < 0xF000 = chr (x - (0xEF00 - 0xDC00))
+                                | otherwise                 = c
+  where x = ord c
 
--- Lone surrogates (in Buffer CharBufElem) --> private use characters (in Strings)
+-- | Lone surrogates (in Buffer CharBufElem) --> private use characters (in Strings)
+-- (We use some surrogate characters for roundtripping unknown bytes through a String)
 {-# INLINE desurrogatifyRoundtripCharacter #-}
 desurrogatifyRoundtripCharacter :: Char -> Char
-desurrogatifyRoundtripCharacter c | isRoundtripEscapeSurrogateChar c = chr (ord c - (0xDC00 - 0xEF00))
-                                  | otherwise                        = c
+desurrogatifyRoundtripCharacter c | 0xDC00 <= x && x < 0xDD00 = chr (x - (0xDC00 - 0xEF00))
+                                  | otherwise                 = c
+  where x = ord c
 
 -- Bytes (in Buffer Word8) --> lone surrogates (in Buffer CharBufElem)
 {-# INLINE escapeToRoundtripCharacterSurrogate #-}
