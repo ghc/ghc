@@ -9,7 +9,7 @@ T3807:
 	$(RM) T3807-export.o T3807-load.o
 	$(RM) T3807test.so
 	$(RM) T3807-load
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version`
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version` -rtsopts
 	'$(TEST_HC)' $(TEST_HC_OPTS) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
 	./T3807-load
 
@@ -29,4 +29,15 @@ T4464:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -shared T4464H.hs T4464B.c -o HS4464.dll -rtsopts
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 T4464C.c HS4464.dll.a -o t4464.exe
 	./t4464.exe
+
+.PHONY: T5373
+T5373:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373A
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373B -rtsopts
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373C -rtsopts=some
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373D -rtsopts=none
+	-./T5373A +RTS -\? 2>&1 | grep disabled
+	-./T5373B +RTS -\? 2>&1 | grep disabled
+	-./T5373C +RTS -\? 2>&1 | grep disabled
+	-./T5373D +RTS -\? 2>&1 | grep disabled
 
