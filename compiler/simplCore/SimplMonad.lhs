@@ -67,13 +67,16 @@ initSmpl dflags rules fam_envs us size m
 	(result, _, count) -> (result, count)
   where
     -- Compute the max simplifier ticks as
-    --     pgm-size * k * tick-factor/100
-    -- where k is a constant that gives reasonable results
-    max_ticks = fromInteger ((toInteger size * toInteger (simplTickFactor dflags * k)) 
+    --     pgm-size * magic-multiplier * tick-factor/100
+    -- where magic-multiplier is a constant that gives reasonable results
+    max_ticks = fromInteger ((toInteger size * toInteger (simplTickFactor dflags 
+                                                          * magic_multiplier)) 
                              `div` 100)
-    k = 20	-- MAGIC NUMBER, multiplies the simplTickFactor
-      		-- We can afford to be generous; this is really
-		-- just checking for loops, and shouldn't usually fire
+    magic_multiplier = 40
+	-- MAGIC NUMBER, multiplies the simplTickFactor
+	-- We can afford to be generous; this is really
+	-- just checking for loops, and shouldn't usually fire
+	-- A figure of 20 was too small: see Trac #553
 
     env = STE { st_flags = dflags, st_rules = rules
     	      , st_max_ticks = max_ticks
