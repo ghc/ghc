@@ -12,7 +12,7 @@
 
 dir = ghc
 TOP = ..
-SPEC_TARGETS = 1 2 3
+SPEC_TARGETS = 1 2 3 re1 re2 re3
 include $(TOP)/mk/sub-makefile.mk
 
 FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES \
