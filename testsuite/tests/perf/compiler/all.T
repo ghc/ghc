@@ -81,9 +81,9 @@ test('T4801',
       # expected value: 11 (x86/OSX):
       if_wordsize(32,
           compiler_stats_num_field('peak_megabytes_allocated', 30, 40)),
-      # expected value: 52 (amd64/Linux):
+      # expected value: 48-49 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 50, 54)),
+          compiler_stats_num_field('peak_megabytes_allocated', 47, 50)),
       # expected value: 64 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
           compiler_stats_num_field('peak_megabytes_allocated', 62, 66)),
