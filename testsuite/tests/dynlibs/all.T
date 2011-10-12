@@ -6,8 +6,7 @@ test('T3807',
                    'T3807-export.o', 'T3807-load.o',
                    'T3807test.so',
                    'T3807-load']),
-      if_os('mingw32', skip),
-      if_os('darwin', expect_broken(4264))],
+      if_os('mingw32', skip)],
      run_command,
      ['$MAKE --no-print-directory -s T3807'])
 
@@ -18,4 +17,14 @@ test('T4464',
       unless_os('mingw32', skip)],
      run_command,
      ['$MAKE --no-print-directory -s T4464'])
+
+test('T5373',
+     [extra_clean(['T5373A.hi',  'T5373B.hi',  'T5373C.hi',  'T5373D.hi',
+                   'T5373A.o',   'T5373B.o',   'T5373C.o',   'T5373D.o',
+                   'T5373A',     'T5373B',     'T5373C',     'T5373D',
+                   'T5373A.exe', 'T5373B.exe', 'T5373C.exe', 'T5373D.exe']),
+      if_os('mingw32', expect_broken(5373)),
+      if_os('darwin', expect_broken(5373))],
+     run_command,
+     ['$MAKE --no-print-directory -s T5373'])
 
