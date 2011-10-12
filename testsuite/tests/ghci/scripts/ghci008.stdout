@@ -1,9 +1,9 @@
-class (Eq a, Show a) => Num a where
+class Num a where
   (+) :: a -> a -> a
   ...
   	-- Defined in `GHC.Num'
 infixl 6 +
-class (Eq a, Show a) => Num a where
+class Num a where
   (+) :: a -> a -> a
   ...
   	-- Defined in `GHC.Num'

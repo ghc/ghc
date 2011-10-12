@@ -10,7 +10,7 @@ main
 	showit (do_ops integer_ops)
     	)
 
-showit :: Integral a => [(String, a, a, a)] -> String
+showit :: (Show a, Integral a) => [(String, a, a, a)] -> String
 showit stuff = concat
        [ str ++ " " ++ show l ++ " " ++ show r ++ " = " ++ show result ++ "\n"
          | (str, l, r, result) <- stuff

@@ -22,7 +22,7 @@ test = do
    testIntlike "Word64" (0::Word64)
    testInteger
 
-testIntlike :: (Bounded a, Integral a, Ix a, Read a, Bits a) => String -> a -> IO ()
+testIntlike :: (Bounded a, Integral a, Ix a, Show a, Read a, Bits a) => String -> a -> IO ()
 testIntlike name zero = do
   putStrLn $ "--------------------------------"
   putStrLn $ "--Testing " ++ name

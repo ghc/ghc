@@ -53,7 +53,7 @@ test_popCnt64 = test popcnt64 (slowPopcnt . fromIntegral . (mask 64 .&.))
 
 mask n = (2 ^ n) - 1
 
-test :: Num a => (a -> Word) -> (a -> Word) -> String
+test :: (Show a, Num a) => (a -> Word) -> (a -> Word) -> String
 test fast slow = case failing of
     [] -> "OK"
     ((_, e, a, i):xs) ->

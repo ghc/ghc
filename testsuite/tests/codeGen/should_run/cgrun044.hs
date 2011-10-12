@@ -98,7 +98,7 @@ float_numbers =
 
 -------------
 
-denorm :: RealFloat a => [a] -> String
+denorm :: (Show a, RealFloat a) => [a] -> String
 denorm numbers =
   unlines
      ( ""
@@ -109,7 +109,7 @@ denorm numbers =
  where
    showPerform = showAndPerform (isDenormalized) "isDenormalised"
 
-pos_inf :: RealFloat a => [a] -> String
+pos_inf :: (Show a, RealFloat a) => [a] -> String
 pos_inf numbers =
   unlines
      ( ""
@@ -120,7 +120,7 @@ pos_inf numbers =
  where
    showPerform = showAndPerform (isInfinite) "isInfinite"
 
-neg_inf :: RealFloat a => [a] -> String
+neg_inf :: (Show a, RealFloat a) => [a] -> String
 neg_inf numbers =
   unlines
      ( ""
@@ -131,7 +131,7 @@ neg_inf numbers =
  where
    showPerform = showAndPerform (\ x -> isInfinite x && x < 0) "isNegInfinite"
 
-nan :: RealFloat a => [a] -> String
+nan :: (Show a, RealFloat a) => [a] -> String
 nan numbers =
   unlines
      ( ""
@@ -142,7 +142,7 @@ nan numbers =
  where
    showPerform = showAndPerform (isNaN) "isNaN"
 
-pos_zero :: RealFloat a => [a] -> String
+pos_zero :: (Show a, RealFloat a) => [a] -> String
 pos_zero numbers =
   unlines
      ( ""
@@ -153,7 +153,7 @@ pos_zero numbers =
  where
    showPerform = showAndPerform (==0) "isPosZero"
 
-neg_zero :: RealFloat a => [a] -> String
+neg_zero :: (Show a, RealFloat a) => [a] -> String
 neg_zero numbers =
   unlines
      ( ""
