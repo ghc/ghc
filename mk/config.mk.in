@@ -137,7 +137,7 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 # the compiler you build with is generating registerised binaries), but
 # the stage2 compiler will be an unregisterised binary.
 #
-ifneq "$(findstring $(HostArch_CPP), i386 x86_64 powerpc)" ""
+ifneq "$(findstring $(HostArch_CPP), i386 x86_64 powerpc arm)" ""
 GhcUnregisterised=NO
 else
 GhcUnregisterised=YES
