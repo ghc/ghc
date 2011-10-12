@@ -407,8 +407,11 @@ GarbageCollect (rtsBool force_major_gc,
   // We call processHeapClosureForDead() on every closure destroyed during
   // the current garbage collection, so we invoke LdvCensusForDead().
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
-      || RtsFlags.ProfFlags.bioSelector != NULL)
-    LdvCensusForDead(N);
+      || RtsFlags.ProfFlags.bioSelector != NULL) {
+      RELEASE_SM_LOCK; // LdvCensusForDead may need to take the lock
+      LdvCensusForDead(N);
+      ACQUIRE_SM_LOCK;
+  }
 #endif
 
   // NO MORE EVACUATION AFTER THIS POINT!
