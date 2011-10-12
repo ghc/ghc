@@ -593,6 +593,12 @@ def test_common_work (name, opts, func, args):
                    '_stub.h', '_stub.c', '_stub.o',
                    '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
 
+        if func == multisrc_compile or func == multisrc_compile_fail \
+            or func == multi_compile or func == multi_compile_fail:
+                extra_mods = args[1]
+                clean(map (lambda (f,x): replace_suffix(f, 'o'), extra_mods))
+                clean(map (lambda (f,x): replace_suffix(f, 'hi'), extra_mods))
+
         clean(getTestOpts().clean_files)
 
         try:
