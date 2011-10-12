@@ -23,7 +23,7 @@ main = do
  sequence_ (map putStrLn float_tests)
   where
    double_tests = run_tests double_numbers
-   float_tests  = run_tests float_numbers  
+   float_tests  = run_tests float_numbers
 
    run_tests nums =
     map ($ nums)
@@ -41,39 +41,39 @@ double_numbers =
       [ 0
       , encodeFloat 0 0     -- 0 using encodeFloat method
       , mkDouble (reverse_if_bigendian [0,0,0,0,0,0, 0xf0, 0x7f])  -- +inf
-      , encodeFloat 1 2047  -- +Inf 
+      , encodeFloat 1 2047  -- +Inf
       , encodeFloat 1 2048
-      , encodeFloat 1  2047		  -- signalling NaN
+      , encodeFloat 1  2047               -- signalling NaN
       , encodeFloat 0xf000000000000 2047  -- quiet NaN
       , 0/(0::Double)
         -- misc
       , 1.82173691287639817263897126389712638972163e-300
       , 1.82173691287639817263897126389712638972163e+300
-      , 4.9406564558412465e-324  -- smallest possible denorm number 
-				 -- (as reported by enquire running
-				 --  on a i686-pc-linux.)
+      , 4.9406564558412465e-324  -- smallest possible denorm number
+                                 -- (as reported by enquire running
+                                 --  on a i686-pc-linux.)
       , 2.2250738585072014e-308
       , 0.11
       , 0.100
       , -3.4
-        -- smallest 
+        -- smallest
       , let (l, _) = floatRange x
             x = encodeFloat 1 (l-1)
-	in x
+        in x
         -- largest
       , let (_, u) = floatRange x
-	    d = floatDigits x
-	    x = encodeFloat (floatRadix x ^ d - 1) (u - d)
-	in x
+            d = floatDigits x
+            x = encodeFloat (floatRadix x ^ d - 1) (u - d)
+        in x
       ]
 
 float_numbers :: [Float]
 float_numbers =
       [ 0
       , encodeFloat 0 0     -- 0 using encodeFloat method
-      , encodeFloat 1 255  -- +Inf 
+      , encodeFloat 1 255  -- +Inf
       , encodeFloat 1 256
-      , encodeFloat 11 255	  -- signalling NaN
+      , encodeFloat 11 255        -- signalling NaN
       , encodeFloat 0xf00000 255  -- quiet NaN
       , 0/(0::Float)
         -- misc
@@ -85,15 +85,15 @@ float_numbers =
       , 0.11
       , 0.100
       , -3.4
-        -- smallest 
+        -- smallest
       , let (l, _) = floatRange x
             x = encodeFloat 1 (l-1)
-	in x
+        in x
         -- largest
       , let (_, u) = floatRange x
-	    d = floatDigits x
-	    x = encodeFloat (floatRadix x ^ d - 1) (u - d)
-	in x
+            d = floatDigits x
+            x = encodeFloat (floatRadix x ^ d - 1) (u - d)
+        in x
       ]
 
 -------------
@@ -176,7 +176,7 @@ doubleOrFloat ls
 -- make a double from a list of 8 bytes
 -- (caller deals with byte ordering.)
 mkDouble :: [Word8] -> Double
-mkDouble ls = 
+mkDouble ls =
  runST (( do
    arr <- newArray_ (0,7)
    sequence (zipWith (writeArray arr) [(0::Int)..] (take 8 ls))
@@ -185,10 +185,10 @@ mkDouble ls =
  ) :: ST s Double )
 
 showAndPerform :: (Show a, Show b)
-	       => (a -> b)
-	       -> String
-	       -> a
-	       -> String
+               => (a -> b)
+               -> String
+               -> a
+               -> String
 showAndPerform fun name_fun val =
   name_fun ++ ' ':show val ++ " = " ++ show (fun val)
 
