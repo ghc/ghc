@@ -26,7 +26,7 @@ check empty		=  do
     out (pqSort empty [1 .. 99])
     out (pqSort empty [1.0, 1.1 ..99.9])
 
-out				:: (Num a) => [a] -> IO ()
+out				:: (Eq a, Num a) => [a] -> IO ()
 out x | sum x == 0		=  putStr "ok\n"
       | otherwise		=  putStr "ok\n"
 

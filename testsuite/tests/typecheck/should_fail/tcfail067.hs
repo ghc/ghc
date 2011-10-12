@@ -64,7 +64,7 @@ instance Num a => Num (SubRange a) where
   (*) = numSubRangeMultiply
   fromInteger a = SubRange (fromInteger a, fromInteger a) (fromInteger a)
 
-numSubRangeNegate :: (Ord a, Num a) => SubRange a -> SubRange a
+numSubRangeNegate :: (Ord a, Show a, Num a) => SubRange a -> SubRange a
 numSubRangeNegate (SubRange (lower, upper) value)
   = checkRange (SubRange (lower, upper) (-value))
 

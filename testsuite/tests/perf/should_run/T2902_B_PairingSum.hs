@@ -7,7 +7,7 @@ import T2902_Sum
 
 data PSum a b = Empty | Tree a b [PSum a b]
 
-instance (Ord a, Num b) ⇒ Sum PSum a b where
+instance (Ord a, Eq b, Num b) ⇒ Sum PSum a b where
 
   insert v r = union $ Tree v r []
 

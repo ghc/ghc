@@ -29,22 +29,13 @@ tcfail067.hs:46:12:
         showRange (SubRange (lower, upper) value)
           = show value ++ " :" ++ show lower ++ ".." ++ show upper
 
-tcfail067.hs:60:10:
-    Could not deduce (Show (SubRange a))
-      arising from the superclasses of an instance declaration
-    from the context (Num a)
-      bound by the instance declaration at tcfail067.hs:60:10-34
-    Possible fix:
-      add (Show (SubRange a)) to the context of the instance declaration
-      or add an instance declaration for (Show (SubRange a))
-    In the instance declaration for `Num (SubRange a)'
-
 tcfail067.hs:61:12:
-    Could not deduce (Ord a) arising from a use of `numSubRangeNegate'
+    Could not deduce (Ord a, Show a)
+      arising from a use of `numSubRangeNegate'
     from the context (Num a)
       bound by the instance declaration at tcfail067.hs:60:10-34
     Possible fix:
-      add (Ord a) to the context of the instance declaration
+      add (Ord a, Show a) to the context of the instance declaration
     In the expression: numSubRangeNegate
     In an equation for `negate': negate = numSubRangeNegate
     In the instance declaration for `Num (SubRange a)'

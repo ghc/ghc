@@ -19,7 +19,7 @@ instance MyClass Baz
 data Quux a  = Quux a   deriving Eq
 data Quux2 a = Quux2 a  deriving Eq
 instance Eq a  => MyClass (Quux a)
-instance Num a => MyClass (Quux2 a)
+instance Ord a => MyClass (Quux2 a)
 
 class MyClass2 a b
 instance MyClass2 Int Bool

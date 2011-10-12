@@ -8,11 +8,11 @@ module T4203 where
 newtype NonNegative a = NonNegative a
  deriving (Eq, Num, Show)
 
-instance Num a => Arbitrary (NonNegative a) where
+instance (Eq a, Num a) => Arbitrary (NonNegative a) where
   arbitrary = return (rubble (rubble 0))
   coarbitrary = error "urk"
 
-rubble :: Num a => a -> a
+rubble :: (Eq a, Num a) => a -> a
 rubble 0 = 1
 rubble n = n * rubble (n-1)
 
