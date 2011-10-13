@@ -285,12 +285,12 @@ unpack !buf !r !w acc0
                  else do c1 <- peekElemOff pbuf (i-1)
                          let c = (fromIntegral c1 - 0xd800) * 0x400 +
                                  (fromIntegral c2 - 0xdc00) + 0x10000
-                             c' = desurrogatifyRoundtripCharacter (unsafeChr c)
-                         c' `seq` unpackRB (c' : acc) (i-2)
+                         case desurrogatifyRoundtripCharacter (unsafeChr c) of
+                           { C# c# -> unpackRB (C# c# : acc) (i-2) }
 #else
               c <- peekElemOff pbuf i
-              let c' = desurrogatifyRoundtripCharacter c
-              c' `seq` unpackRB (c':acc) (i-1)
+              case desurrogatifyRoundtripCharacter c of { C# c# ->
+              unpackRB (C# c# : acc) (i-1) } -- Note [#5536]
 #endif
      in
      unpackRB acc0 (w-1)
@@ -313,8 +313,8 @@ unpack_nl !buf !r !w acc0
                             then unpackRB ('\n':acc) (i-2)
                             else unpackRB ('\n':acc) (i-1)
                  else do
-                         let c' = desurrogatifyRoundtripCharacter c
-                         c' `seq` unpackRB (c':acc) (i-1)
+                         case desurrogatifyRoundtripCharacter c of { C# c# ->
+                         unpackRB (C# c# : acc) (i-1) } -- Note [#5536]
      in do
      c <- peekElemOff pbuf (w-1)
      if (c == '\r')
@@ -328,6 +328,24 @@ unpack_nl !buf !r !w acc0
                 str <- unpackRB acc0 (w-1)
                 return (str, w)
 
+-- Note [#5536]
+--
+-- We originally had
+--
+--    let c' = desurrogatifyRoundtripCharacter c in
+--    c' `seq` unpackRB (c':acc) (i-1)
+--
+-- but this resulted in Core like
+--
+--    case (case x <# y of True -> C# e1; False -> C# e2) of c
+--      C# _ -> unpackRB (c:acc) (i-1)
+--
+-- which compiles into a continuation for the outer case, with each
+-- branch of the inner case building a C# and then jumping to the
+-- continuation.  We'd rather not have this extra jump, which makes
+-- quite a difference to performance (see #5536) It turns out that
+-- matching on the C# directly causes GHC to do the case-of-case,
+-- giving much straighter code.
 
 -- -----------------------------------------------------------------------------
 -- hGetContents
