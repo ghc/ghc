@@ -322,7 +322,7 @@ int main(int argc, char *argv[])
 	<literal>hs_exit()</literal> will actually de-initialise the
 	system.  NOTE that currently GHC's runtime cannot reliably
 	re-initialise after this has happened,
-	see <xref linkend="ffi-divergence" />.</para>
+        see <xref linkend="infelicities-ffi" />.</para>
 	</footnote>.</para>
 
 	<para>NOTE: when linking the final program, it is normally
