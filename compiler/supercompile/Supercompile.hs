@@ -19,14 +19,17 @@ import CoreUnfold (exprIsConApp_maybe)
 import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo, mkAxInstCo)
 import DataCon    (DataCon, dataConWorkId, dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConName)
 import VarSet
-import Name       (localiseName)
-import Var        (Var, isTyVar, varName, setVarName)
-import Id         (Id, mkSysLocal, idType, mkSysLocalM, realIdUnfolding, idInlinePragma, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
+import VarEnv
+import Name       (localiseName, mkSystemName)
+import OccName    (mkVarOcc)
+import Var        (Var, isTyVar, varUnique, varName, setVarName)
+import Id
 import MkId       (mkPrimOpId)
-import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString, fsLit)
+import PrelNames  (undefinedName)
 import PrimOp     (primOpSig)
-import Type       (mkTyVarTy, isUnLiftedType)
+import Type       (mkTyVarTy, mkForAllTy, mkFunTys, isUnLiftedType)
+import TysPrim    (alphaTyVar, argAlphaTyVar)
 import TyCon      (newTyConCo_maybe)
 
 import Control.Monad
@@ -228,14 +231,18 @@ partitionBinds should_sc initial_binds = go initial_inside [(b, unionVarSets (ma
         (inside', undecided') = partition (\(_, fvs) -> inside_bs `intersectsVarSet` fvs) undecided
         inside_bs = mkVarSet [x | b <- inside, x <- bindersOf b]
 
-coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, CoreExpr -> [CoreBind])
+coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, Var -> [CoreBind])
 coreBindsToCoreTerm should_sc binds
-  = (mkLets internal_sc_binds (mkBigCoreVarTup sc_internal_xs),
-     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector sc_internal_xs internal_x wild_id e) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
+  = (mkLets internal_sc_binds (mkChurchVarTup sc_internal_xs),
+     \y -> [NonRec x (mkChurchTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
   where
-    -- We put all the sc_binds into a local let, and use a tuple to bind back to the top level the names of
+    -- We put all the sc_binds into a local let, and use Church-encoded tuples to bind back to the top level the names of
     -- any of those sc_binds that are either exported *or* in the free variables of something from dont_sc_binds.
     -- Making that list as small as possible allows the supercompiler to determine that more things are used linearly.
+    --
+    -- We used to use a standard "big tuple" to do the binding-back, but this breaks down if we need to include
+    -- some variables of unlifted type (of kind #) or a dictionary (of kind Constraint) since the type arguments of
+    -- the (,..,) tycon must be of kind *.
     (sc_binds, dont_sc_binds, dont_sc_binds_fvs) = partitionBinds should_sc binds
     
     -- This is a sweet hack. Most of the top-level binders will be External names. It is a Bad Idea to locally-bind
@@ -254,6 +261,23 @@ coreBindsToCoreTerm should_sc binds
     sc_internal_xs = map snd sc_xs_internal_xs
     localiseVar x = setIdNotExported (x `setVarName` localiseName (varName x))
      -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
+
+mkChurchVarTup :: [Id] -> CoreExpr
+mkChurchVarTup []             = Var (mkVanillaGlobal undefinedName (mkForAllTy alphaTyVar (mkTyVarTy alphaTyVar)))
+mkChurchVarTup xs@(first_x:_) = Lam argAlphaTyVar $ Lam k $ Var k `mkVarApps` xs
+  where iss = mkInScopeSet (mkVarSet xs)
+        -- Gin up a name for the continuation argument from spit, glue, and an exhaustive set of shadowed names
+        --
+        -- FIXME: We have to lie and use argAlphaTyVar here because we want to instantiate it with types of
+        -- kind * and of kind Constraint.
+        --
+        -- The lie is that instantiation with types of kind # would be very bad!! Luckily this never happens
+        -- since the top level can never bind an unlifted value.
+        k = uniqAway iss $ mkLocalId (mkSystemName (varUnique first_x) (mkVarOcc "k"))
+                                     (map idType xs `mkFunTys` mkTyVarTy argAlphaTyVar)
+
+mkChurchTupleSelector :: [Var] -> Var -> CoreExpr -> CoreExpr
+mkChurchTupleSelector xs want_x tup_e = tup_e `App` Type (idType want_x) `App` mkLams xs (Var want_x)
 
 termUnfoldings :: S.Term -> [(Var, S.Term)]
 termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
@@ -313,6 +337,6 @@ supercompileProgram :: [CoreBind] -> IO [CoreBind]
 supercompileProgram = supercompileProgramSelective (const True)
 
 supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> IO [CoreBind]
-supercompileProgramSelective should_sc binds = liftM (\e' -> NonRec x e' : rebuild (Var x)) (supercompile e)
+supercompileProgramSelective should_sc binds = liftM (\e' -> NonRec x e' : rebuild x) (supercompile e)
   where x = mkSysLocal (fsLit "sc") topUnique (exprType e)
         (e, rebuild) = coreBindsToCoreTerm should_sc binds

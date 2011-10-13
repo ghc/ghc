@@ -30,7 +30,7 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
 import Var        (isTyVar, varType, isId)
-import Id         (idType, mkLocalId, mkVanillaGlobal, isDeadBinder, idOccInfo, setIdOccInfo)
+import Id         (idType, mkLocalId, mkVanillaGlobal, isDeadBinder, idOccInfo, setIdOccInfo, zapIdOccInfo)
 import Type       (isUnLiftedType, mkTyVarTy)
 import Coercion   (isCoVar, mkCoVarCo)
 import Name       (Name, mkSystemVarName)
@@ -329,8 +329,9 @@ applyAbsVars e (x:xs)
   | isDeadBinder x, not (isUnLiftedType ty)
   = applyAbsVars (e `app` mkVanillaGlobal undefinedName (idType x)) xs
 
+   -- NB: Lint will choke on occurrences of dead Ids, so make sure we zap the deadness flag
   | otherwise
-  = applyAbsVars (e `app` x) xs
+  = applyAbsVars (e `app` zapIdOccInfo x) xs
 
   where ty = idType x
 

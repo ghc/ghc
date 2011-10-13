@@ -19,7 +19,7 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
 import Var       (varType)
-import Id        (idUnique, idType)
+import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo)
 import PrelNames (undefinedName)
 import Type      (splitTyConApp_maybe)
 import Util      (zipWithEqual, zipWith3Equal, zipWith4Equal)
@@ -952,23 +952,28 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
                                     -- (if not (null k_not_inlined) then traceRender ("splitStack: generalise", k_not_inlined) else id) $
                                     zipBracketeds $ TailsKnown ty' (\final_ty' -> Shell (tyVarsOfType final_ty') $ \(e_hole:es_alts) -> case_ e_hole x' final_ty' (alt_cons' `zip` es_alts)) (TailishHole False (Hole [] bracketed_hole) : zipWithEqual "Scrutinise" (\alt_bvs -> TailishHole True . Hole (x':alt_bvs)) alt_bvss bracketed_alts)
       where (alt_cons, alt_es) = unzip alts
-            
+            scruts' = x':scruts
+
             -- 0) Manufacture context identifier
             ctxt_id = uniqFromSupply ctxt_ids
             
             -- 1) Construct the floats for each case alternative
-            (alt_idss, alt_rns, alt_cons') = unzip3 $ map (renameAltCon ids rn) alt_cons
+            -- We have to carefully zap OccInfo here because one of the case binders might be marked as dead,
+            -- yet could become live due to positive information propagation!    
+            (alt_idss, alt_rns, alt_cons') = unzip3 $ map (renameAltCon ids rn) $ if any (not . isDeadBinder) scruts'
+                                                                                   then map zapAltConIdOccInfo alt_cons
+                                                                                   else alt_cons
             -- Bind something to the case scrutinee (if possible). This means that:
             --  let y = (\z -> case z of C -> ...) unk
             --  in y
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith4Equal "alt_hs" (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- alt_bvs] `M.union`
-                                                                               M.fromList (do Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
+            alt_hs = zipWith4Equal "alt_hs" (\alt_rn alt_con alt_bvs alt_tg -> M.fromList (do Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
                                                                                               let in_scrut_e@(_, scrut_e) = renamedTerm (annedTerm alt_tg (Value scrut_v))
-                                                                                              scrut <- (x':scruts)
-                                                                                              return (scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)) ))
+                                                                                              scrut <- scruts'
+                                                                                              return (scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
+                                                                               `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
                                             alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
             bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed ty' (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
@@ -989,6 +994,11 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
         Just (Data dc (univ_tys' ++ map (lookupTyVarSubst rn) as) (map (lookupCoVarSubst rn) qs) (map (renameId rn) xs))
     altConToValue _  (_,  LiteralAlt l) = Just (Literal l)
     altConToValue _  (_,  DefaultAlt)   = Nothing
+
+    zapAltConIdOccInfo :: AltCon -> AltCon
+    zapAltConIdOccInfo (DataAlt dc as qs xs) = DataAlt dc as qs (map zapIdOccInfo xs)
+    zapAltConIdOccInfo (LiteralAlt l)        = LiteralAlt l
+    zapAltConIdOccInfo DefaultAlt            = DefaultAlt
 
 -- I'm making use of a clever trick: after splitting an update frame for x, instead of continuing to split the stack with a
 -- noneBracketed for x in the focus, I split the stack with a oneBracketed for it in the focus.
