@@ -18,7 +18,8 @@ parseEnum prefix def opts = fromMaybe def $ listToMaybe [parse opt | arg <- aRGS
 
 
 dEEDS :: Bool
-dEEDS = "--deeds" `elem` aRGS
+--dEEDS = "--deeds" `elem` aRGS
+dEEDS = True
 
 data DeedsPolicy = FCFS | Proportional
                  deriving (Read)
