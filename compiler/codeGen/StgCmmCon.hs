@@ -33,18 +33,19 @@ import CostCentre
 import Module
 import Constants
 import DataCon
+import DynFlags
 import FastString
 import Id
 import Literal
 import PrelInfo
 import Outputable
+import Platform
+import StaticFlags
 import Util             ( lengthIs )
 
+import Control.Monad
 import Data.Char
 
-#if defined(mingw32_TARGET_OS)
-import StaticFlags      ( opt_PIC )
-#endif
 
 
 ---------------------------------------------------------------
@@ -57,11 +58,12 @@ cgTopRhsCon :: Id               -- Name of thing bound to this RHS
             -> FCode CgIdInfo
 cgTopRhsCon id con args
   = do {
-#if mingw32_TARGET_OS
-        -- Windows DLLs have a problem with static cross-DLL refs.
-        ; this_pkg <- getThisPackage
-        ; ASSERT( not (isDllConApp this_pkg con args) ) return ()
-#endif
+          dflags <- getDynFlags
+        ; when (platformOS (targetPlatform dflags) == OSMinGW32) $ do {
+              -- Windows DLLs have a problem with static cross-DLL refs.
+                this_pkg <- getThisPackage
+              ; ASSERT( not (isDllConApp this_pkg con args) ) return ()
+              }
         ; ASSERT( args `lengthIs` dataConRepArity con ) return ()
 
         -- LAY IT OUT
@@ -113,6 +115,16 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
             -> [StgArg]           -- Its args
             -> FCode (CgIdInfo, CmmAGraph)
                -- Return details about how to find it and initialization code
+buildDynCon binder cc con args
+    = do dflags <- getDynFlags
+         buildDynCon' (targetPlatform dflags) binder cc con args
+
+buildDynCon' :: Platform
+             -> Id
+             -> CostCentreStack
+             -> DataCon
+             -> [StgArg]
+             -> FCode (CgIdInfo, CmmAGraph)
 
 {- We used to pass a boolean indicating whether all the
 args were of size zero, so we could use a static
@@ -126,7 +138,7 @@ premature looking at the args will cause the compiler to black-hole!
 -}
 
 
--------- buildDynCon: Nullary constructors --------------
+-------- buildDynCon': Nullary constructors --------------
 -- First we deal with the case of zero-arity constructors.  They
 -- will probably be unfolded, so we don't expect to see this case much,
 -- if at all, but it does no harm, and sets the scene for characters.
@@ -135,12 +147,12 @@ premature looking at the args will cause the compiler to black-hole!
 -- which have exclusively size-zero (VoidRep) args, we generate no code
 -- at all.
 
-buildDynCon binder _cc con []
+buildDynCon' _ binder _cc con []
   = return (litIdInfo binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
             mkNop)
 
--------- buildDynCon: Charlike and Intlike constructors -----------
+-------- buildDynCon': Charlike and Intlike constructors -----------
 {- The following three paragraphs about @Char@-like and @Int@-like
 closures are obsolete, but I don't understand the details well enough
 to properly word them, sorry. I've changed the treatment of @Char@s to
@@ -166,11 +178,9 @@ We don't support this optimisation when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-buildDynCon binder _cc con [arg]
+buildDynCon' platform binder _cc con [arg]
   | maybeIntLikeCon con
-#if defined(mingw32_TARGET_OS)
-  , not opt_PIC
-#endif
+  , platformOS platform /= OSMinGW32 || not opt_PIC
   , StgLitArg (MachInt val) <- arg
   , val <= fromIntegral mAX_INTLIKE     -- Comparisons at type Integer!
   , val >= fromIntegral mIN_INTLIKE     -- ...ditto...
@@ -181,11 +191,9 @@ buildDynCon binder _cc con [arg]
               intlike_amode = cmmLabelOffW intlike_lbl offsetW
         ; return (litIdInfo binder (mkConLFInfo con) intlike_amode, mkNop) }
 
-buildDynCon binder _cc con [arg]
+buildDynCon' platform binder _cc con [arg]
   | maybeCharLikeCon con
-#if defined(mingw32_TARGET_OS)
-  , not opt_PIC
-#endif
+  , platformOS platform /= OSMinGW32 || not opt_PIC
   , StgLitArg (MachChar val) <- arg
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE
@@ -196,8 +204,8 @@ buildDynCon binder _cc con [arg]
               charlike_amode = cmmLabelOffW charlike_lbl offsetW
         ; return (litIdInfo binder (mkConLFInfo con) charlike_amode, mkNop) }
 
--------- buildDynCon: the general case -----------
-buildDynCon binder ccs con args
+-------- buildDynCon': the general case -----------
+buildDynCon' _ binder ccs con args
   = do  { let (tot_wds, ptr_wds, args_w_offsets)
                 = mkVirtConstrOffsets (addArgReps args)
                 -- No void args in args_w_offsets
