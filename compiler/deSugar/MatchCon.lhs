@@ -6,13 +6,6 @@
 Pattern-matching constructors
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module MatchCon ( matchConFamily ) where
 
 #include "HsVersions.h"
@@ -93,6 +86,7 @@ matchConFamily :: [Id]
 matchConFamily (var:vars) ty groups
   = do	{ alts <- mapM (matchOneCon vars ty) groups
 	; return (mkCoAlgCaseMatchResult var ty alts) }
+matchConFamily [] _ _ = panic "matchConFamily []"
 
 type ConArgPats = HsConDetails (LPat Id) (HsRecFields Id (LPat Id))
 
@@ -143,6 +137,7 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
 		    . wrapBinds (ds  `zip` dicts1)
 		    . mkCoreLets ds_ev_binds,
 		    eqn { eqn_pats = conArgPats arg_tys args ++ pats }) }
+    shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
 
     -- Choose the right arg_vars in the right order for this group
     -- Note [Record patterns]
@@ -159,6 +154,8 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
         fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
 	lookup_fld rpat = lookupNameEnv_NF fld_var_env 
 		   	  		   (idName (unLoc (hsRecFieldId rpat)))
+    select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
+matchOneCon _ _ [] = panic "matchOneCon []"
 
 -----------------
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool
