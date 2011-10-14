@@ -277,7 +277,7 @@ start_console_handler r =
                     return ()
      Nothing -> return ()
 
-toWin32ConsoleEvent :: Num a => a -> Maybe ConsoleEvent
+toWin32ConsoleEvent :: (Eq a, Num a) => a -> Maybe ConsoleEvent
 toWin32ConsoleEvent ev =
    case ev of
        0 {- CTRL_C_EVENT-}        -> Just ControlC
