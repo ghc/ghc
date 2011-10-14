@@ -334,10 +334,6 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 # so we don't have to include it below.
 PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/cabal hpc extensible-exceptions binary bin-package-db hoopl
 
-# These packages are installed, but are installed hidden
-# Why install them at all?  Because the 'ghc' package depends on them
-PKGS_THAT_ARE_HIDDEN = binary
-
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
 #                    It is set in rules/extra-package.mk, 
@@ -901,10 +897,6 @@ install_packages: rts/package.conf.install
 	                                  '$(ghclibdir)'              \
 	                                  '$(docdir)/html/libraries'  \
 	                                  $(RelocatableBuild)))
-	$(foreach p, $(PKGS_THAT_ARE_HIDDEN),                              \
-	    $(call make-command,                                           \
-	           "$(INSTALLED_GHC_PKG_REAL)"                             \
-	               --global-conf "$(INSTALLED_PACKAGE_CONF)" hide $p))
 # when we install the packages above, ghc-pkg obeys umask when creating
 # the package.conf files, but for everything else we specify the
 # permissions. We therefore now fix the permissions of package.cache.
