@@ -1415,7 +1415,20 @@ def check_prof_ok(name):
         print prof_file + " is empty"
         return(False)
 
-    return(True)
+    if getTestOpts().with_namebase == None:
+        namebase = name
+    else:
+        namebase = getTestOpts().with_namebase
+
+    (platform_specific, expected_prof_file) = \
+        platform_wordsize_qualify(namebase, 'prof.sample')
+
+    # sample prof file is not required
+    if not os.path.exists(expected_prof_file):
+        return True
+    else:
+        return compare_outputs('prof', normalise_prof, normalise_whitespace, \
+                                  expected_prof_file, prof_file)
 
 # Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
@@ -1424,6 +1437,7 @@ def compare_outputs( kind, normaliser, extra_normaliser,
                      expected_file, actual_file ):
     if os.path.exists(expected_file):
         expected_raw = read_no_crs(expected_file)
+        # print "norm:", normaliser(expected_raw)
         expected_str = extra_normaliser(normaliser(expected_raw))
         expected_file_for_diff = expected_file
     else:
@@ -1455,6 +1469,11 @@ def compare_outputs( kind, normaliser, extra_normaliser,
         # would be normalised away.
         r = os.system( 'diff -uw ' + expected_file_for_diff + \
                                ' ' + actual_file )
+
+        print "\ndiff between normalised outputs:\n"
+
+        r = os.system( 'diff -uw ' + expected_normalised_file + \
+                               ' ' + actual_normalised_file )
 
         # If for some reason there were no non-whitespace differences,
         # then do a full diff
@@ -1490,6 +1509,34 @@ def normalise_errmsg( str ):
     # but this can change (either the implementation name or the
     # version number), so we canonicalise it here
     str = re.sub('integer-[a-z]+', 'integer-impl', str)
+    return str
+
+# normalise a .prof file, so that we can reasonably compare it against
+# a sample.  This doesn't compare any of the actual profiling data,
+# only the shape of the profile and the number of entries.
+def normalise_prof (str):
+    # strip everything up to the line beginning "COST CENTRE"
+    str = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',str)
+
+    # strip results for CAFs, these tend to change unpredictably
+    str = re.sub('[ \t]*CAF.*\n','',str)
+
+    # We have somthing like this:
+
+    # MAIN      MAIN                 101      0    0.0    0.0   100.0  100.0
+    # k         Main                 204      1    0.0    0.0     0.0    0.0
+    #  foo      Main                 205      1    0.0    0.0     0.0    0.0
+    #   foo.bar Main                 207      1    0.0    0.0     0.0    0.0
+
+    # then we remove all the specific profiling data, leaving only the
+    # cost centre name, module, and entries, to end up with this:
+
+    # MAIN                MAIN            0
+    #   k                 Main            1
+    #    foo              Main            1
+    #     foo.bar         Main            1
+
+    str = re.sub('\n([ \t]*[^ \t]+)([ \t]+[^ \t]+)([ \t]+\\d+)([ \t]+\\d+)[ \t]+([\\d\\.]+)[ \t]+([\\d\\.]+)[ \t]+([\\d\\.]+)[ \t]+([\\d\\.]+)','\n\\1 \\2 \\4',str)
     return str
 
 def normalise_slashes_( str ):
