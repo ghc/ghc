@@ -27,7 +27,12 @@ GhcStage2HcOpts += -O
 # running of the tests, and faster building of the utils to be installed
 
 GhcLibHcOpts    += -O -dcore-lint
+ifeq "$(Windows)" "YES"
+# This is a temporary hack to workaround a libffi build problem
+GhcLibWays     := $(filter v,$(GhcLibWays))
+else
 GhcLibWays     := $(filter v dyn,$(GhcLibWays))
+endif
 SplitObjs       = NO
 NoFibWays       =
 STRIP_CMD       = :
