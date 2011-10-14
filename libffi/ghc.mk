@@ -11,24 +11,12 @@
 # -----------------------------------------------------------------------------
 
 
-ifeq "$(BuildSharedLibs)" "YES"
-libffi_STAMP_CONFIGURE = libffi/stamp.ffi.configure-shared
-libffi_STAMP_BUILD     = libffi/stamp.ffi.build-shared
-libffi_STAMP_INSTALL   = libffi/stamp.ffi.install-shared
-else
 libffi_STAMP_CONFIGURE = libffi/stamp.ffi.configure
 libffi_STAMP_BUILD     = libffi/stamp.ffi.build
 libffi_STAMP_INSTALL   = libffi/stamp.ffi.install
-endif
 
 libffi_STATIC_LIB  = libffi/build/inst/lib/libffi.a
 ffi_HEADER         = rts/dist/build/ffi.h
-
-ifeq "$(BuildSharedLibs)" "YES"
-libffi_EnableShared=yes
-else
-libffi_EnableShared=no
-endif
 
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE):
@@ -55,8 +43,9 @@ $(libffi_STAMP_CONFIGURE):
         LDFLAGS="$(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE1) -w" \
         "$(SHELL)" configure \
 	          --prefix=$(TOP)/libffi/build/inst \
+	          --with-pic \
 	          --enable-static=yes \
-	          --enable-shared=$(libffi_EnableShared) \
+	          --enable-shared=no \
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 
 	# wc on OS X has spaces in its output, which libffi's Makefile
