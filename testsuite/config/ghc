@@ -22,6 +22,7 @@ config.run_ways           = ['normal', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways         = ['extcore','optextcore',
+                             'prof',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
                              'threaded1_ls', 'threaded2_hT',
@@ -67,8 +68,9 @@ config.way_flags = {
     'llvm'         : ['-fllvm'],
     'optllvm'      : ['-O -fllvm'],
     'debugllvm'    : ['-fllvm -keep-llvm-files'],
-    'profasm'      : ['-O -prof -auto-all -fasm'],
-    'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
+    'prof'         : ['-prof -auto-all -fasm'],
+    'profasm'      : ['-O -prof -auto-all'],
+    'profthreaded' : ['-O -prof -auto-all -threaded'],
     'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
     'extcore'      : ['-fext-core'],
     'optextcore'   : ['-O -fext-core'],
@@ -92,7 +94,8 @@ config.way_rts_flags = {
     'llvm'         : [],
     'optllvm'      : [],
     'debugllvm'    : [],
-    'profasm'      : ['-hc'], # test heap profiling too
+    'prof'         : ['-p'],
+    'profasm'      : ['-hc', '-p'], # test heap profiling too
     'profthreaded' : ['-p'],
     'ghci'         : [],
     'extcore'      : [],
@@ -113,7 +116,7 @@ config.way_rts_flags = {
 # Useful classes of ways:
 
 prof_ways = filter(lambda x: x in config.run_ways, 
-                   ['profasm','profthreaded'])
+                   ['prof', 'profasm','profthreaded'])
 
 threaded_ways = filter(lambda x: x in config.run_ways, 
                        ['threaded1','threaded2','ghci','profthreaded'])
