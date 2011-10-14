@@ -2458,37 +2458,30 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 -- platform.
 
 picCCOpts :: DynFlags -> [String]
-picCCOpts _dflags
-#if darwin_TARGET_OS
-      -- Apple prefers to do things the other way round.
-      -- PIC is on by default.
-      -- -mdynamic-no-pic:
-      --     Turn off PIC code generation.
-      -- -fno-common:
-      --     Don't generate "common" symbols - these are unwanted
-      --     in dynamic libraries.
+picCCOpts dflags
+    = case platformOS (targetPlatform dflags) of
+      OSDarwin
+          -- Apple prefers to do things the other way round.
+          -- PIC is on by default.
+          -- -mdynamic-no-pic:
+          --     Turn off PIC code generation.
+          -- -fno-common:
+          --     Don't generate "common" symbols - these are unwanted
+          --     in dynamic libraries.
 
-    | opt_PIC
-        = ["-fno-common", "-U __PIC__","-D__PIC__"]
-    | otherwise
-        = ["-mdynamic-no-pic"]
-#elif mingw32_TARGET_OS
-      -- no -fPIC for Windows
-    | opt_PIC
-        = ["-U __PIC__","-D__PIC__"]
-    | otherwise
-        = []
-#else
+       | opt_PIC   -> ["-fno-common", "-U __PIC__", "-D__PIC__"]
+       | otherwise -> ["-mdynamic-no-pic"]
+      OSMinGW32 -- no -fPIC for Windows
+       | opt_PIC   -> ["-U __PIC__", "-D__PIC__"]
+       | otherwise -> []
+      _
       -- we need -fPIC for C files when we are compiling with -dynamic,
       -- otherwise things like stub.c files don't get compiled
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- http://hackage.haskell.org/trac/ghc/wiki/Commentary/PositionIndependentCode
-    | opt_PIC || not opt_Static
-        = ["-fPIC", "-U __PIC__", "-D__PIC__"]
-    | otherwise
-        = []
-#endif
+       | opt_PIC || not opt_Static -> ["-fPIC", "-U __PIC__", "-D__PIC__"]
+       | otherwise                 -> []
 
 -- -----------------------------------------------------------------------------
 -- Splitting
