@@ -55,7 +55,6 @@ include-dirs:		TOP"/includes"
 #endif
 
 includes:		Stg.h
-depends:	 	builtin_ffi
 hugs-options:
 cc-options:
 

@@ -265,7 +265,7 @@ PRIMOP_BITS = compiler/primop-data-decl.hs-incl        \
 compiler_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
 compiler_CPP_OPTS += ${GhcCppOpts}
 
-compiler/stage2/build/LibFFI.hs : libffi/dist-install/build/ffi.h
+compiler/stage2/build/LibFFI.hs : $(ffi_HEADER)
 
 $(PRIMOPS_TXT) compiler/parser/Parser.y: %: %.pp compiler/stage1/$(PLATFORM_H)
 	$(CPP) $(RAWCPP_FLAGS) -P $(compiler_CPP_OPTS) -x c $< | grep -v '^#pragma GCC' > $@

@@ -257,7 +257,7 @@ include rules/tags-package.mk
 include rules/extra-packages.mk
 
 # -----------------------------------------------------------------------------
-# Registering hand-written package descriptions (used in libffi and rts)
+# Registering hand-written package descriptions (used in rts)
 
 include rules/manual-package-config.mk
 
@@ -471,10 +471,8 @@ utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/compare_sizes/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/runghc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
-# add the final two package.conf dependencies: ghc-prim depends on RTS,
-# and RTS depends on libffi.
+# add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/package.conf.inplace
-rts/package.conf.inplace : libffi/package.conf.inplace
 endif
 
 # --------------------------------
@@ -491,11 +489,6 @@ ifeq "$(BuildSharedLibs)" "YES"
 ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_dyn_LIB))
 endif
 BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB))
-
-OTHER_LIBS = libffi/dist-install/build/libHSffi$(v_libsuf) libffi/dist-install/build/HSffi.o
-ifeq "$(BuildSharedLibs)" "YES"
-OTHER_LIBS  += libffi/dist-install/build/libHSffi$(dyn_libsuf)
-endif
 
 # ----------------------------------------
 # Special magic for the ghc-prim package
@@ -890,11 +883,10 @@ INSTALL_DISTDIR_compiler = stage2
 
 # Now we can do the installation
 install_packages: install_libexecs
-install_packages: libffi/package.conf.install rts/package.conf.install
+install_packages: rts/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	"$(RM)" $(RM_OPTS_REC) "$(INSTALLED_PACKAGE_CONF)"
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
-	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
@@ -1219,7 +1211,6 @@ maintainer-clean : distclean
 .PHONY: all_libraries
 
 .PHONY: bootstrapping-files
-bootstrapping-files: $(OTHER_LIBS)
 bootstrapping-files: includes/ghcautoconf.h
 bootstrapping-files: includes/DerivedConstants.h
 bootstrapping-files: includes/GHCConstants.h
