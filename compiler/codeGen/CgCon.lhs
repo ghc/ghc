@@ -49,7 +49,10 @@ import Util
 import Module
 import DynFlags
 import FastString
+import Platform
 import StaticFlags
+
+import Control.Monad
 \end{code}
 
 
@@ -66,11 +69,11 @@ cgTopRhsCon :: Id               -- Name of thing bound to this RHS
             -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
   = do { dflags <- getDynFlags
-#if mingw32_TARGET_OS
-        -- Windows DLLs have a problem with static cross-DLL refs.
-        ; this_pkg <- getThisPackage
-        ; ASSERT( not (isDllConApp this_pkg con args) ) return ()
-#endif
+        ; when (platformOS (targetPlatform dflags) == OSMinGW32) $ do {
+              -- Windows DLLs have a problem with static cross-DLL refs.
+            ; this_pkg <- getThisPackage
+            ; ASSERT( not (isDllConApp this_pkg con args) ) return ()
+            }
         ; ASSERT( args `lengthIs` dataConRepArity con ) return ()
 
         -- LAY IT OUT
@@ -117,6 +120,16 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
             -> DataCon            -- The data constructor
             -> [(CgRep,CmmExpr)] -- Its args
             -> FCode CgIdInfo     -- Return details about how to find it
+buildDynCon binder ccs con args
+    = do dflags <- getDynFlags
+         buildDynCon' (targetPlatform dflags) binder ccs con args
+
+buildDynCon' :: Platform
+             -> Id
+             -> CostCentreStack
+             -> DataCon
+             -> [(CgRep,CmmExpr)]
+             -> FCode CgIdInfo
 
 -- We used to pass a boolean indicating whether all the
 -- args were of size zero, so we could use a static
@@ -138,7 +151,7 @@ which have exclusively size-zero (VoidRep) args, we generate no code
 at all.
 
 \begin{code}
-buildDynCon binder _ con []
+buildDynCon' _ binder _ con []
   = returnFC (taggedStableIdInfo binder
                            (mkLblExpr (mkClosureLabel (dataConName con)
                                       (idCafInfo binder)))
@@ -173,11 +186,9 @@ because they don't support cross package data references well.
 \begin{code}
 
 
-buildDynCon binder _ con [arg_amode]
+buildDynCon' platform binder _ con [arg_amode]
   | maybeIntLikeCon con
-#if defined(mingw32_TARGET_OS)
-  , not opt_PIC
-#endif
+  , platformOS platform /= OSMinGW32 || not opt_PIC
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
@@ -187,11 +198,9 @@ buildDynCon binder _ con [arg_amode]
               intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
         ; returnFC (taggedStableIdInfo binder intlike_amode (mkConLFInfo con) con) }
 
-buildDynCon binder _ con [arg_amode]
+buildDynCon' platform binder _ con [arg_amode]
   | maybeCharLikeCon con
-#if defined(mingw32_TARGET_OS)
-  , not opt_PIC
-#endif
+  , platformOS platform /= OSMinGW32 || not opt_PIC
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
@@ -206,7 +215,7 @@ buildDynCon binder _ con [arg_amode]
 Now the general case.
 
 \begin{code}
-buildDynCon binder ccs con args
+buildDynCon' _ binder ccs con args
   = do  {
         ; let
             (closure_info, amodes_w_offsets) = layOutDynConstr con args
