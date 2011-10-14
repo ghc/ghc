@@ -10,13 +10,13 @@
 -----------------------------------------------------------------------------
 
 module StgCmmCon (
-	cgTopRhsCon, buildDynCon, bindConArgs 
+        cgTopRhsCon, buildDynCon, bindConArgs
     ) where
 
 #include "HsVersions.h"
 
 import StgSyn
-import CoreSyn	( AltCon(..) )
+import CoreSyn  ( AltCon(..) )
 
 import StgCmmMonad
 import StgCmmEnv
@@ -43,36 +43,36 @@ import Util             ( lengthIs )
 import Data.Char
 
 #if defined(mingw32_TARGET_OS)
-import StaticFlags	( opt_PIC )
+import StaticFlags      ( opt_PIC )
 #endif
 
 
 ---------------------------------------------------------------
---	Top-level constructors
+--      Top-level constructors
 ---------------------------------------------------------------
 
-cgTopRhsCon :: Id		-- Name of thing bound to this RHS
-	    -> DataCon		-- Id
-	    -> [StgArg]		-- Args
-	    -> FCode CgIdInfo
+cgTopRhsCon :: Id               -- Name of thing bound to this RHS
+            -> DataCon          -- Id
+            -> [StgArg]         -- Args
+            -> FCode CgIdInfo
 cgTopRhsCon id con args
-  = do { 
+  = do {
 #if mingw32_TARGET_OS
         -- Windows DLLs have a problem with static cross-DLL refs.
-	; this_pkg <- getThisPackage
+        ; this_pkg <- getThisPackage
         ; ASSERT( not (isDllConApp this_pkg con args) ) return ()
 #endif
-	; ASSERT( args `lengthIs` dataConRepArity con ) return ()
+        ; ASSERT( args `lengthIs` dataConRepArity con ) return ()
 
-	-- LAY IT OUT
-	; let
+        -- LAY IT OUT
+        ; let
             name          = idName id
             caffy         = idCafInfo id -- any stgArgHasCafRefs args
             closure_label = mkClosureLabel name caffy
 
             (tot_wds, --  #ptr_wds + #nonptr_wds
-    	     ptr_wds, --  #ptr_wds
-    	     nv_args_w_offsets) = mkVirtConstrOffsets (addArgReps args)
+             ptr_wds, --  #ptr_wds
+             nv_args_w_offsets) = mkVirtConstrOffsets (addArgReps args)
 
             nonptr_wds = tot_wds - ptr_wds
 
@@ -81,37 +81,37 @@ cgTopRhsCon id con args
              -- needs to poke around inside it.
             info_tbl = mkDataConInfoTable con True ptr_wds nonptr_wds
 
-	    get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
-				        ; return lit }
+            get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
+                                        ; return lit }
 
-	; payload <- mapM get_lit nv_args_w_offsets
-		-- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
-		-- NB2: all the amodes should be Lits!
+        ; payload <- mapM get_lit nv_args_w_offsets
+                -- NB1: nv_args_w_offsets is sorted into ptrs then non-ptrs
+                -- NB2: all the amodes should be Lits!
 
-	; let closure_rep = mkStaticClosureFields
+        ; let closure_rep = mkStaticClosureFields
                              info_tbl
-	    		     dontCareCCS		-- Because it's static data
-	    		     caffy			-- Has CAF refs
-			     payload
+                             dontCareCCS                -- Because it's static data
+                             caffy                      -- Has CAF refs
+                             payload
 
-		-- BUILD THE OBJECT
-	; emitDataLits closure_label closure_rep
+                -- BUILD THE OBJECT
+        ; emitDataLits closure_label closure_rep
 
                 -- RETURN
         ; return $ litIdInfo id (mkConLFInfo con) (CmmLabel closure_label) }
 
 
 ---------------------------------------------------------------
---	Lay out and allocate non-top-level constructors
+--      Lay out and allocate non-top-level constructors
 ---------------------------------------------------------------
 
-buildDynCon :: Id		  -- Name of the thing to which this constr will
-				  -- be bound
-	    -> CostCentreStack	  -- Where to grab cost centre from;
-				  -- current CCS if currentOrSubsumedCCS
-	    -> DataCon		  -- The data constructor
-	    -> [StgArg] 	  -- Its args
-	    -> FCode (CgIdInfo, CmmAGraph)
+buildDynCon :: Id                 -- Name of the thing to which this constr will
+                                  -- be bound
+            -> CostCentreStack    -- Where to grab cost centre from;
+                                  -- current CCS if currentOrSubsumedCCS
+            -> DataCon            -- The data constructor
+            -> [StgArg]           -- Its args
+            -> FCode (CgIdInfo, CmmAGraph)
                -- Return details about how to find it and initialization code
 
 {- We used to pass a boolean indicating whether all the
@@ -130,14 +130,14 @@ premature looking at the args will cause the compiler to black-hole!
 -- First we deal with the case of zero-arity constructors.  They
 -- will probably be unfolded, so we don't expect to see this case much,
 -- if at all, but it does no harm, and sets the scene for characters.
--- 
+--
 -- In the case of zero-arity constructors, or, more accurately, those
 -- which have exclusively size-zero (VoidRep) args, we generate no code
 -- at all.
 
 buildDynCon binder _cc con []
   = return (litIdInfo binder (mkConLFInfo con)
-		(CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
+                (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
             mkNop)
 
 -------- buildDynCon: Charlike and Intlike constructors -----------
@@ -160,26 +160,26 @@ work with any old argument, but for @Int@-like ones the argument has
 to be a literal.  Reason: @Char@ like closures have an argument type
 which is guaranteed in range.
 
-Because of this, we use can safely return an addressing mode. 
+Because of this, we use can safely return an addressing mode.
 
 We don't support this optimisation when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
 buildDynCon binder _cc con [arg]
-  | maybeIntLikeCon con 
+  | maybeIntLikeCon con
 #if defined(mingw32_TARGET_OS)
   , not opt_PIC
 #endif
   , StgLitArg (MachInt val) <- arg
-  , val <= fromIntegral mAX_INTLIKE 	-- Comparisons at type Integer!
-  , val >= fromIntegral mIN_INTLIKE	-- ...ditto...
-  = do 	{ let intlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_INTLIKE_closure")
-	      val_int = fromIntegral val :: Int
-	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
-		-- INTLIKE closures consist of a header and one word payload
-	      intlike_amode = cmmLabelOffW intlike_lbl offsetW
-	; return (litIdInfo binder (mkConLFInfo con) intlike_amode, mkNop) }
+  , val <= fromIntegral mAX_INTLIKE     -- Comparisons at type Integer!
+  , val >= fromIntegral mIN_INTLIKE     -- ...ditto...
+  = do  { let intlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_INTLIKE_closure")
+              val_int = fromIntegral val :: Int
+              offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
+                -- INTLIKE closures consist of a header and one word payload
+              intlike_amode = cmmLabelOffW intlike_lbl offsetW
+        ; return (litIdInfo binder (mkConLFInfo con) intlike_amode, mkNop) }
 
 buildDynCon binder _cc con [arg]
   | maybeCharLikeCon con
@@ -190,34 +190,34 @@ buildDynCon binder _cc con [arg]
   , let val_int = ord val :: Int
   , val_int <= mAX_CHARLIKE
   , val_int >= mIN_CHARLIKE
-  = do 	{ let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
-	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
-		-- CHARLIKE closures consist of a header and one word payload
-	      charlike_amode = cmmLabelOffW charlike_lbl offsetW
-	; return (litIdInfo binder (mkConLFInfo con) charlike_amode, mkNop) }
+  = do  { let charlike_lbl   = mkCmmGcPtrLabel rtsPackageId (fsLit "stg_CHARLIKE_closure")
+              offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
+                -- CHARLIKE closures consist of a header and one word payload
+              charlike_amode = cmmLabelOffW charlike_lbl offsetW
+        ; return (litIdInfo binder (mkConLFInfo con) charlike_amode, mkNop) }
 
 -------- buildDynCon: the general case -----------
 buildDynCon binder ccs con args
-  = do	{ let (tot_wds, ptr_wds, args_w_offsets) 
+  = do  { let (tot_wds, ptr_wds, args_w_offsets)
                 = mkVirtConstrOffsets (addArgReps args)
-		-- No void args in args_w_offsets
+                -- No void args in args_w_offsets
               nonptr_wds = tot_wds - ptr_wds
               info_tbl = mkDataConInfoTable con False ptr_wds nonptr_wds
         ; (tmp, init) <- allocDynClosure info_tbl lf_info
                                          use_cc blame_cc args_w_offsets
-	; regIdInfo binder lf_info tmp init }
+        ; regIdInfo binder lf_info tmp init }
   where
     lf_info = mkConLFInfo con
 
-    use_cc	-- cost-centre to stick in the object
+    use_cc      -- cost-centre to stick in the object
       | currentOrSubsumedCCS ccs = curCCS
-      | otherwise		 = CmmLit (mkCCostCentreStack ccs)
+      | otherwise                = CmmLit (mkCCostCentreStack ccs)
 
     blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
 
 
 ---------------------------------------------------------------
---	Binding constructor arguments
+--      Binding constructor arguments
 ---------------------------------------------------------------
 
 bindConArgs :: AltCon -> LocalReg -> [Id] -> FCode [LocalReg]
@@ -236,12 +236,10 @@ bindConArgs (DataAlt con) base args
           -- The binding below forces the masking out of the tag bits
           -- when accessing the constructor field.
     bind_arg :: (NonVoid Id, VirtualHpOffset) -> FCode LocalReg
-    bind_arg (arg, offset) 
-	= do { emit $ mkTaggedObjectLoad (idToReg arg) base offset tag
-	     ; bindArgToReg arg }
+    bind_arg (arg, offset)
+        = do { emit $ mkTaggedObjectLoad (idToReg arg) base offset tag
+             ; bindArgToReg arg }
 
 bindConArgs _other_con _base args
   = ASSERT( null args ) return []
-
-
 
