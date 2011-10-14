@@ -43,10 +43,13 @@ import Coercion
 import PrelNames
 import DynFlags
 import Outputable
+import Platform
 import SrcLoc
 import Bag
 import FastString
 import Util
+
+import Control.Monad
 \end{code}
 
 \begin{code}
@@ -404,12 +407,11 @@ Calling conventions
 \begin{code}
 checkCConv :: CCallConv -> TcM ()
 checkCConv CCallConv    = return ()
-#if i386_TARGET_ARCH
-checkCConv StdCallConv  = return ()
-#else
--- This is a warning, not an error. see #3336
-checkCConv StdCallConv  = addWarnTc (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
-#endif
+checkCConv StdCallConv  = do dflags <- getDOpts
+                             let platform = targetPlatform dflags
+                             unless (platformArch platform == ArchX86) $
+                                 -- This is a warning, not an error. see #3336
+                                 addWarnTc (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
 checkCConv PrimCallConv = addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
 checkCConv CmmCallConv  = panic "checkCConv CmmCallConv"
 \end{code}
