@@ -45,13 +45,12 @@ import DynFlags
 \begin{code}
 stgMassageForProfiling
         :: DynFlags
-        -> PackageId
         -> Module                       -- module name
         -> UniqSupply                   -- unique supply
         -> [StgBinding]                 -- input
         -> (CollectedCCs, [StgBinding])
 
-stgMassageForProfiling dflags this_pkg mod_name us stg_binds
+stgMassageForProfiling dflags mod_name us stg_binds
   = let
         ((local_ccs, extern_ccs, cc_stacks),
          stg_binds2)
@@ -100,7 +99,7 @@ stgMassageForProfiling dflags this_pkg mod_name us stg_binds
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
     do_top_rhs _ (StgRhsClosure _ _ _ _ _ [] (StgSCC cc (StgConApp con args)))
-      | not (isSccCountCostCentre cc) && not (isDllConApp this_pkg con args)
+      | not (isSccCountCostCentre cc) && not (isDllConApp dflags con args)
         -- Trivial _scc_ around nothing but static data
         -- Eliminate _scc_ ... and turn into StgRhsCon
 

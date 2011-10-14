@@ -30,11 +30,11 @@ import Name             ( getOccName, isExternalName, nameOccName )
 import OccName          ( occNameString, occNameFS )
 import BasicTypes       ( Arity )
 import Literal
-import Module
 import Outputable
 import MonadUtils
 import FastString
 import Util
+import DynFlags
 import ForeignCall
 import PrimOp           ( PrimCall(..) )
 \end{code}
@@ -140,10 +140,10 @@ for x, solely to put in the SRTs lower down.
 %************************************************************************
 
 \begin{code}
-coreToStg :: PackageId -> CoreProgram -> IO [StgBinding]
-coreToStg this_pkg pgm
+coreToStg :: DynFlags -> CoreProgram -> IO [StgBinding]
+coreToStg dflags pgm
   = return pgm'
-  where (_, _, pgm') = coreTopBindsToStg this_pkg emptyVarEnv pgm
+  where (_, _, pgm') = coreTopBindsToStg dflags emptyVarEnv pgm
 
 coreExprToStg :: CoreExpr -> StgExpr
 coreExprToStg expr
@@ -151,36 +151,36 @@ coreExprToStg expr
 
 
 coreTopBindsToStg
-    :: PackageId
+    :: DynFlags
     -> IdEnv HowBound           -- environment for the bindings
     -> CoreProgram
     -> (IdEnv HowBound, FreeVarsInfo, [StgBinding])
 
 coreTopBindsToStg _        env [] = (env, emptyFVInfo, [])
-coreTopBindsToStg this_pkg env (b:bs)
+coreTopBindsToStg dflags env (b:bs)
   = (env2, fvs2, b':bs')
   where
         -- Notice the mutually-recursive "knot" here:
         --   env accumulates down the list of binds,
         --   fvs accumulates upwards
-        (env1, fvs2, b' ) = coreTopBindToStg this_pkg env fvs1 b
-        (env2, fvs1, bs') = coreTopBindsToStg this_pkg env1 bs
+        (env1, fvs2, b' ) = coreTopBindToStg dflags env fvs1 b
+        (env2, fvs1, bs') = coreTopBindsToStg dflags env1 bs
 
 coreTopBindToStg
-        :: PackageId
+        :: DynFlags
         -> IdEnv HowBound
         -> FreeVarsInfo         -- Info about the body
         -> CoreBind
         -> (IdEnv HowBound, FreeVarsInfo, StgBinding)
 
-coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
+coreTopBindToStg dflags env body_fvs (NonRec id rhs)
   = let
         env'      = extendVarEnv env id how_bound
         how_bound = LetBound TopLet $! manifestArity rhs
 
         (stg_rhs, fvs') =
             initLne env $ do
-              (stg_rhs, fvs') <- coreToTopStgRhs this_pkg body_fvs (id,rhs)
+              (stg_rhs, fvs') <- coreToTopStgRhs dflags body_fvs (id,rhs)
               return (stg_rhs, fvs')
 
         bind = StgNonRec id stg_rhs
@@ -192,7 +192,7 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
       --     assertion again!
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
-coreTopBindToStg this_pkg env body_fvs (Rec pairs)
+coreTopBindToStg dflags env body_fvs (Rec pairs)
   = ASSERT( not (null pairs) )
     let
         binders = map fst pairs
@@ -203,7 +203,7 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 
         (stg_rhss, fvs')
           = initLne env' $ do
-               (stg_rhss, fvss') <- mapAndUnzipM (coreToTopStgRhs this_pkg body_fvs) pairs
+               (stg_rhss, fvss') <- mapAndUnzipM (coreToTopStgRhs dflags body_fvs) pairs
                let fvs' = unionFVInfos fvss'
                return (stg_rhss, fvs')
 
@@ -231,16 +231,16 @@ consistentCafInfo id bind
 
 \begin{code}
 coreToTopStgRhs
-        :: PackageId
+        :: DynFlags
         -> FreeVarsInfo         -- Free var info for the scope of the binding
         -> (Id,CoreExpr)
         -> LneM (StgRhs, FreeVarsInfo)
 
-coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs)
+coreToTopStgRhs dflags scope_fv_info (bndr, rhs)
   = do { (new_rhs, rhs_fvs, _) <- coreToStgExpr rhs
        ; lv_info <- freeVarsToLiveVars rhs_fvs
 
-       ; let stg_rhs   = mkTopStgRhs this_pkg rhs_fvs (mkSRT lv_info) bndr_info new_rhs
+       ; let stg_rhs   = mkTopStgRhs dflags rhs_fvs (mkSRT lv_info) bndr_info new_rhs
              stg_arity = stgRhsArity stg_rhs
        ; return (ASSERT2( arity_ok stg_arity, mk_arity_msg stg_arity) stg_rhs,
                  rhs_fvs) }
@@ -266,7 +266,7 @@ coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs)
                 ptext (sLit "Id arity:") <+> ppr id_arity,
                 ptext (sLit "STG arity:") <+> ppr stg_arity]
 
-mkTopStgRhs :: PackageId -> FreeVarsInfo
+mkTopStgRhs :: DynFlags -> FreeVarsInfo
             -> SRT -> StgBinderInfo -> StgExpr
             -> StgRhs
 
@@ -277,8 +277,8 @@ mkTopStgRhs _ rhs_fvs srt binder_info (StgLam _ bndrs body)
                   srt
                   bndrs body
 
-mkTopStgRhs this_pkg _ _ _ (StgConApp con args)
-  | not (isDllConApp this_pkg con args)  -- Dynamic StgConApps are updatable
+mkTopStgRhs dflags _ _ _ (StgConApp con args)
+  | not (isDllConApp dflags con args)  -- Dynamic StgConApps are updatable
   = StgRhsCon noCCS con args
 
 mkTopStgRhs _ rhs_fvs srt binder_info rhs

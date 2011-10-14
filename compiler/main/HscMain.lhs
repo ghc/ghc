@@ -1219,7 +1219,7 @@ myCoreToStg :: DynFlags -> Module -> CoreProgram
 myCoreToStg dflags this_mod prepd_binds
  = do 
       stg_binds <- {-# SCC "Core2Stg" #-}
-	     coreToStg (thisPackage dflags) prepd_binds
+	     coreToStg dflags prepd_binds
 
       (stg_binds2, cost_centre_info) <- {-# SCC "Stg2Stg" #-}
 	     stg2stg dflags this_mod stg_binds

@@ -62,15 +62,15 @@ import TyCon            ( TyCon )
 import UniqSet
 import Unique		( Unique )
 import Bitmap
+import DynFlags
+import Platform
 import StaticFlags	( opt_SccProfilingOn )
 import Module
 import FastString
 
-#if mingw32_TARGET_OS
 import Packages		( isDllName )
 import Type		( typePrimRep )
 import TyCon		( PrimRep(..) )
-#endif
 \end{code}
 
 %************************************************************************
@@ -110,18 +110,21 @@ isStgTypeArg :: StgArg -> Bool
 isStgTypeArg (StgTypeArg _) = True
 isStgTypeArg _              = False
 
-isDllConApp :: PackageId -> DataCon -> [StgArg] -> Bool
+isDllConApp :: DynFlags -> DataCon -> [StgArg] -> Bool
 -- Does this constructor application refer to 
 -- anything in a different *Windows* DLL?
 -- If so, we can't allocate it statically
-#if mingw32_TARGET_OS
-isDllConApp this_pkg con args
-  = isDllName this_pkg (dataConName con) || any is_dll_arg args
+isDllConApp dflags con args
+ | platformOS (targetPlatform dflags) == OSMinGW32
+    = isDllName this_pkg (dataConName con) || any is_dll_arg args
+ | otherwise = False
   where
-    is_dll_arg ::StgArg -> Bool
+    is_dll_arg :: StgArg -> Bool
     is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep (idType v))
                              && isDllName this_pkg (idName v)
     is_dll_arg _             = False
+
+    this_pkg = thisPackage dflags
 
 isAddrRep :: PrimRep -> Bool
 -- True of machine adddresses; these are the things that don't
@@ -139,10 +142,6 @@ isAddrRep :: PrimRep -> Bool
 isAddrRep AddrRep = True
 isAddrRep PtrRep  = True
 isAddrRep _       = False
-
-#else
-isDllConApp _ _ _ = False
-#endif
 
 stgArgType :: StgArg -> Type
 	-- Very half baked becase we have lost the type arguments
