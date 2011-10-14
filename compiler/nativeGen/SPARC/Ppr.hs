@@ -108,15 +108,11 @@ pprGloblDecl platform lbl
   | otherwise = ptext (sLit ".global ") <> pprCLabel_asm platform lbl
 
 pprTypeAndSizeDecl :: Platform -> CLabel -> Doc
-#if linux_TARGET_OS
 pprTypeAndSizeDecl platform lbl
-  | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".type ") <>
-                pprCLabel_asm platform lbl <> ptext (sLit ", @object")
-#else
-pprTypeAndSizeDecl _ _
-  = empty
-#endif
+ | platformOS platform == OSLinux && externallyVisibleCLabel lbl
+    = ptext (sLit ".type ") <>
+      pprCLabel_asm platform lbl <> ptext (sLit ", @object")
+ | otherwise = empty
 
 pprLabel :: Platform -> CLabel -> Doc
 pprLabel platform lbl = pprGloblDecl platform lbl
