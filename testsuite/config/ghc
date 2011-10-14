@@ -33,9 +33,8 @@ if (ghc_with_native_codegen == 1):
 
 if (ghc_with_profiling == 1):
     config.have_profiling = True
-    if (ghc_with_native_codegen == 1):
-        config.compile_ways.append('profasm')
-        config.run_ways.append('profasm')
+    config.compile_ways.append('profasm')
+    config.run_ways.append('profasm')
 
 if (ghc_with_interpreter == 1):
     config.have_interp = True
