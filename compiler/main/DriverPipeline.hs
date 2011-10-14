@@ -1428,8 +1428,9 @@ mkExtraCObj dflags xs
                      ([Option        "-c",
                        FileOption "" cFile,
                        Option        "-o",
-                       FileOption "" oFile] ++
-                      map (FileOption "-I") (includeDirs rtsDetails))
+                       FileOption "" oFile]
+                      ++ map SysTools.Option (getOpts dflags opt_c) -- see #5528
+                      ++ map (FileOption "-I") (includeDirs rtsDetails))
       return oFile
 
 mkExtraObjToLinkIntoBinary :: DynFlags -> [PackageId] -> IO FilePath

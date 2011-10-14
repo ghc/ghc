@@ -172,15 +172,15 @@ rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HOSTPLATFORM)" "i386-unknown-mingw32"
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend $$(rts_ffi_objs_stamp)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
+	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_ffi_objs) $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend $$(rts_ffi_objs_stamp)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) \
+	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_ffi_objs) $$(rts_$1_OBJS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
 ifeq "$$(darwin_HOST_OS)" "1"
 	# Ensure library's install name is correct before anyone links with it.
@@ -188,15 +188,21 @@ ifeq "$$(darwin_HOST_OS)" "1"
 endif
 endif
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_ffi_objs_stamp)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+	echo $$(rts_ffi_objs) $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
 		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 endif
 
 endif
 
 endef
+
+rts_ffi_objs_stamp = rts/dist/ffi/stamp
+rts_ffi_objs       = rts/dist/ffi/*.o
+$(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) | $$(dir $$@)/.
+	cd rts/dist/ffi && $(AR) x ../../../$(libffi_STATIC_LIB)
+	touch $@
 
 # And expand the above for each way:
 $(foreach way,$(rts_WAYS),$(eval $(call build-rts-way,$(way))))
@@ -455,15 +461,7 @@ endif
 
 $(eval $(call dependencies,rts,dist,1))
 
-$(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h $(DTRACEPROBES_H)
-
-#-----------------------------------------------------------------------------
-# libffi stuff
-
-rts_CC_OPTS     += -Ilibffi/dist-install/build
-rts_HC_OPTS     += -Ilibffi/dist-install/build
-rts_HSC2HS_OPTS += -Ilibffi/dist-install/build
-rts_LD_OPTS     += -Llibffi/dist-install/build
+$(rts_dist_depfile_c_asm) : $(ffi_HEADER) $(DTRACEPROBES_H)
 
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported
