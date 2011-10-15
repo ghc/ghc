@@ -22,6 +22,7 @@ import FastString
 import ForeignCall
 import Outputable hiding ( panic, pprPanic )
 import qualified Outputable
+import Platform
 import UniqSupply
 import Unique
 import Util
@@ -143,11 +144,10 @@ genCall :: LlvmEnv -> CmmCallTarget -> [HintedCmmFormal] -> [HintedCmmActual]
 
 -- Write barrier needs to be handled specially as it is implemented as an LLVM
 -- intrinsic function.
-#if i386_TARGET_ARCH || x86_64_TARGET_ARCH || sparc_TARGET_ARCH
-genCall env (CmmPrim MO_WriteBarrier) _ _ _ = return (env, nilOL, [])
-
-#else
-genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
+genCall env (CmmPrim MO_WriteBarrier) _ _ _
+ | platformArch (getLlvmPlatform env) `elem` [ArchX86, ArchX86_64, ArchSPARC]
+    = return (env, nilOL, [])
+ | otherwise = do
     let fname = fsLit "llvm.memory.barrier"
     let funSig = LlvmFunctionDecl fname ExternallyVisible CC_Ccc LMVoid
                     FixedArgs (tysToParams [i1, i1, i1, i1, i1]) llvmFunAlign
@@ -167,7 +167,6 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
     where
         lmTrue :: LlvmVar
         lmTrue  = mkIntLit i1 (-1)
-#endif
 
 -- Handle popcnt function specifically since GHC only really has i32 and i64
 -- types and things like Word8 are backed by an i32 and just present a logical
@@ -235,11 +234,10 @@ genCall env target res args ret = do
 
     -- translate to LLVM call convention
     let lmconv = case cconv of
-#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-            StdCallConv  -> CC_X86_Stdcc
-#else
-            StdCallConv  -> CC_Ccc
-#endif
+            StdCallConv  -> case platformArch (getLlvmPlatform env) of
+                            ArchX86    -> CC_X86_Stdcc
+                            ArchX86_64 -> CC_X86_Stdcc
+                            _          -> CC_Ccc
             CCallConv    -> CC_Ccc
             PrimCallConv -> CC_Ccc
             CmmCallConv  -> panic "CmmCallConv not supported here!"
