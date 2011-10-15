@@ -4,7 +4,7 @@
 module Main where
 
 
-a1 :: Num a => a -> a
+a1 :: (Num a, Eq a) => a -> a
 
 a1 x | x==0 = x
 a1 x = 1 + k8 (x-1)
@@ -16,7 +16,7 @@ a5 x = 1 + a4 x
 a6 x = 1 + a5 x
 a7 x = 1 + a6 x
 a8 x = 1 + a7 x
-	   
+
 b1 x = 1 + a8 x
 b2 x = 1 + b1 x
 b3 x = 1 + b2 x
@@ -25,7 +25,7 @@ b5 x = 1 + b4 x
 b6 x = 1 + b5 x
 b7 x = 1 + b6 x
 b8 x = 1 + b7 x
-	   
+
 c1 x = 1 + b8 x
 c2 x = 1 + c1 x
 c3 x = 1 + c2 x

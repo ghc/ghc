@@ -17,7 +17,7 @@ main = do let d = 1e20 :: Double
           test "tanf" tanf tan f
           putStrLn "Done"
 
-test :: (RealFloat a, Floating a, RealFloat b, Floating b)
+test :: (RealFloat a, Floating a, RealFloat b, Floating b, Show b)
      => String -> (a -> a) -> (b -> b) -> b -> IO ()
 test s f g x = do let y = realToFrac (f (realToFrac x))
                       z = g x
