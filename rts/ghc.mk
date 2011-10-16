@@ -21,7 +21,7 @@ rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 rts_dist_WAYS = $(rts_WAYS)
 
 ALL_RTS_LIBS = rts/dist/build/libHSrtsmain.a \
-	       $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
+             $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
 all_rts : $(ALL_RTS_LIBS)
 
 # -----------------------------------------------------------------------------
@@ -119,6 +119,18 @@ rts/dist/build/win32/libHSffi.dll.a : rts/dist/build/win32/libHSffi.def
 endif
 endif
 
+ifneq "$(BINDIST)" "YES"
+rts_ffi_objs_stamp = rts/dist/ffi/stamp
+rts_ffi_objs       = rts/dist/ffi/*.o
+$(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) | $$(dir $$@)/.
+	cd rts/dist/ffi && $(AR) x ../../../$(libffi_STATIC_LIB)
+	touch $@
+
+# This is a little hacky. We don't know the SO version, so we only
+# depend on libffi.so, but copy libffi.so*
+rts/dist/build/libffi$(soext): libffi/build/inst/lib/libffi$(soext)
+	cp libffi/build/inst/lib/libffi$(soext)* rts/dist/build
+endif
 
 #-----------------------------------------------------------------------------
 # Building one way
@@ -177,14 +189,14 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend $$(rts_ffi_objs_stamp)
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend rts/dist/build/libffi$$(soext)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_ffi_objs) $$(rts_$1_OBJS) \
+	  -no-auto-link-packages -Lrts/dist/build -lffi `cat rts/libs.depend` $$(rts_$1_OBJS) \
 	  $$(rts_$1_DTRACE_OBJS) -o $$@
 ifeq "$$(darwin_HOST_OS)" "1"
 	# Ensure library's install name is correct before anyone links with it.
-	install_name_tool -id $(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
+	install_name_tool -id $$(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
 endif
 endif
 else
@@ -197,12 +209,6 @@ endif
 endif
 
 endef
-
-rts_ffi_objs_stamp = rts/dist/ffi/stamp
-rts_ffi_objs       = rts/dist/ffi/*.o
-$(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) | $$(dir $$@)/.
-	cd rts/dist/ffi && $(AR) x ../../../$(libffi_STATIC_LIB)
-	touch $@
 
 # And expand the above for each way:
 $(foreach way,$(rts_WAYS),$(eval $(call build-rts-way,$(way))))
@@ -519,6 +525,7 @@ endif
 # installing
 
 INSTALL_LIBS += $(ALL_RTS_LIBS)
+INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
 
 # -----------------------------------------------------------------------------
 # cleaning

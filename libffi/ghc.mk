@@ -11,15 +11,37 @@
 # -----------------------------------------------------------------------------
 
 
-libffi_STAMP_CONFIGURE = libffi/stamp.ffi.configure
-libffi_STAMP_BUILD     = libffi/stamp.ffi.build
-libffi_STAMP_INSTALL   = libffi/stamp.ffi.install
+libffi_STAMP_STATIC_CONFIGURE = libffi/stamp.ffi.static.configure
+libffi_STAMP_STATIC_BUILD     = libffi/stamp.ffi.static.build
+libffi_STAMP_STATIC_INSTALL   = libffi/stamp.ffi.static.install
+
+libffi_STAMP_STATIC_SHARED_CONFIGURE = libffi/stamp.ffi.static-shared.configure
+libffi_STAMP_STATIC_SHARED_BUILD     = libffi/stamp.ffi.static-shared.build
+libffi_STAMP_STATIC_SHARED_INSTALL   = libffi/stamp.ffi.static-shared.install
+
+ifeq "$(BuildSharedLibs)" "YES"
+libffi_STAMP_CONFIGURE = $(libffi_STAMP_STATIC_SHARED_CONFIGURE)
+libffi_STAMP_BUILD     = $(libffi_STAMP_STATIC_SHARED_BUILD)
+libffi_STAMP_INSTALL   = $(libffi_STAMP_STATIC_SHARED_INSTALL)
+libffi_EnableShared    = yes
+else
+libffi_STAMP_CONFIGURE = $(libffi_STAMP_STATIC_CONFIGURE)
+libffi_STAMP_BUILD     = $(libffi_STAMP_STATIC_BUILD)
+libffi_STAMP_INSTALL   = $(libffi_STAMP_STATIC_INSTALL)
+libffi_EnableShared    = no
+endif
 
 libffi_STATIC_LIB  = libffi/build/inst/lib/libffi.a
 ffi_HEADER         = rts/dist/build/ffi.h
 
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE):
+	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_CONFIGURE)
+	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_BUILD)
+	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_INSTALL)
+	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_SHARED_CONFIGURE)
+	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_SHARED_BUILD)
+	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_SHARED_INSTALL)
 	"$(RM)" $(RM_OPTS_REC) $(LIBFFI_DIR) libffi/build
 	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
@@ -43,9 +65,8 @@ $(libffi_STAMP_CONFIGURE):
         LDFLAGS="$(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE1) -w" \
         "$(SHELL)" configure \
 	          --prefix=$(TOP)/libffi/build/inst \
-	          --with-pic \
 	          --enable-static=yes \
-	          --enable-shared=no \
+	          --enable-shared=$(libffi_EnableShared) \
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 
 	# wc on OS X has spaces in its output, which libffi's Makefile
