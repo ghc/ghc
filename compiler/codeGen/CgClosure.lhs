@@ -44,7 +44,6 @@ import Util
 import BasicTypes
 import StaticFlags
 import DynFlags
-import Constants
 import Outputable
 import FastString
 
