@@ -15,7 +15,7 @@ module CmdLineParser (
         Flag(..),
         errorsToGhcException,
 
-        EwM, addErr, addWarn, getArg, liftEwM, deprecate
+        EwM, addErr, addWarn, getArg, getCurLoc, liftEwM, deprecate
   ) where
 
 #include "HsVersions.h"
@@ -90,6 +90,9 @@ deprecate s
 
 getArg :: Monad m => EwM m String
 getArg = EwM (\(L _ arg) es ws -> return (es, ws, arg))
+
+getCurLoc :: Monad m => EwM m SrcSpan
+getCurLoc = EwM (\(L loc _) es ws -> return (es, ws, loc))
 
 liftEwM :: Monad m => m a -> EwM m a
 liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })

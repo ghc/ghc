@@ -547,6 +547,11 @@ data DynFlags = DynFlags {
   language              :: Maybe Language,
   -- | Safe Haskell mode
   safeHaskell           :: SafeHaskellMode,
+  -- We store the location of where template haskell and newtype deriving were
+  -- turned on so we can produce accurate error messages when Safe Haskell turns
+  -- them off.
+  thOnLoc               :: SrcSpan,
+  newDerivOnLoc         :: SrcSpan,
   -- Don't change this without updating extensionFlags:
   extensions            :: [OnOff ExtensionFlag],
   -- extensionFlags should always be equal to
@@ -869,6 +874,8 @@ defaultDynFlags mySettings =
         warningFlags = standardWarnings,
         language = Nothing,
         safeHaskell = Sf_None,
+        thOnLoc = noSrcSpan,
+        newDerivOnLoc = noSrcSpan,
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
         log_action = defaultLogAction
@@ -1267,16 +1274,18 @@ parseDynamicFlags dflags0 args cmdline = do
 shFlagsDisallowed :: DynFlags -> (DynFlags, [Located String])
 shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
     where
-        check_method (df, warns) (test,str,fix)
-            | test df   = (fix df, warns ++ safeFailure str)
+        check_method (df, warns) (str,loc,test,fix)
+            | test df   = (fix df, warns ++ safeFailure loc str)
             | otherwise = (df, warns)
 
-        bad_flags = [(xopt Opt_GeneralizedNewtypeDeriving, "-XGeneralizedNewtypeDeriving",
-                     flip xopt_unset Opt_GeneralizedNewtypeDeriving),
-                     (xopt Opt_TemplateHaskell, "-XTemplateHaskell",
-                     flip xopt_unset Opt_TemplateHaskell)]
+        bad_flags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc dflags,
+                         xopt Opt_GeneralizedNewtypeDeriving,
+                         flip xopt_unset Opt_GeneralizedNewtypeDeriving),
+                     ("-XTemplateHaskell", thOnLoc dflags,
+                         xopt Opt_TemplateHaskell,
+                         flip xopt_unset Opt_TemplateHaskell)]
 
-        safeFailure str = [L noSrcSpan $ "Warning: " ++ str ++ " is not allowed in"
+        safeFailure loc str = [L loc $ "Warning: " ++ str ++ " is not allowed in"
                                       ++ " Safe Haskell; ignoring " ++ str]
 
 
@@ -1895,7 +1904,7 @@ xFlags = [
   ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods, nop ),
   ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses, nop ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies, nop ),
-  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, nop ),
+  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving, setGenDeriving ),
   ( "OverlappingInstances",             Opt_OverlappingInstances, nop ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
@@ -2085,13 +2094,17 @@ rtsIsProfiled :: Bool
 rtsIsProfiled = unsafePerformIO rtsIsProfiledIO /= 0
 #endif
 
+setGenDeriving :: Bool -> DynP ()
+setGenDeriving True  = getCurLoc >>= \l -> upd (\d -> d { newDerivOnLoc = l })
+setGenDeriving False = return ()
+
 checkTemplateHaskellOk :: Bool -> DynP ()
 #ifdef GHCI
 checkTemplateHaskellOk turn_on
   | turn_on && rtsIsProfiled
   = addErr "You can't use Template Haskell with a profiled compiler"
   | otherwise
-  = return ()
+  = getCurLoc >>= \l -> upd (\d -> d { thOnLoc = l })
 #else
 -- In stage 1 we don't know that the RTS has rts_isProfiled,
 -- so we simply say "ok".  It doesn't matter because TH isn't
