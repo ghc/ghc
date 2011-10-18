@@ -381,7 +381,7 @@ onException io what = io `catchException` \e -> do _ <- what
 -- with exceptions masked, you can be sure that the library call will not be
 -- able to unmask exceptions again.  If you are writing library code and need
 -- to use asynchronous exceptions, the only way is to create a new thread;
--- see 'Control.Concurrent.forkIOUnmasked'.
+-- see 'Control.Concurrent.forkIOWithUnmask'.
 --
 -- Asynchronous exceptions may still be received while in the masked
 -- state if the masked thread /blocks/ in certain ways; see
