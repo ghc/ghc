@@ -72,8 +72,8 @@ test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', extra_clean(['Cgrun067A.hi', 'Cgrun067A.o']),
      compile_and_run, [''])
 test('cgrun068', reqlib('random'), compile_and_run, [''])
-test('cgrun069', omit_ways(['ghci']), multisrc_compile_and_run,
-                 ['cgrun069', ['cgrun069_cmm.cmm'], ''])
+test('cgrun069', omit_ways(['ghci']), multi_compile_and_run,
+                 ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
 test('cgrun071', normal, compile_and_run, [''])
 
@@ -85,6 +85,6 @@ test('3207', normal, compile_and_run, [''])
 test('3561', normal, compile_and_run, [''])
 test('3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('4441', normal, compile_and_run, [''])
-test('5149', omit_ways(['ghci']), multisrc_compile_and_run,
-                 ['5149', ['5149_cmm.cmm'], ''])
+test('5149', omit_ways(['ghci']), multi_compile_and_run,
+                 ['5149', [('5149_cmm.cmm', '')], ''])
 test('5129', normal, compile_and_run, [''])

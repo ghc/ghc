@@ -342,7 +342,7 @@ test('mc18', normal, compile, [''])
 test('tc249', normal, compile, [''])
 test('tc250', normal, compile, [''])
 test('tc251', extra_clean(['Tc251_Help.hi', 'Tc251_Help.o']),
-              multisrc_compile, ['tc251', ['Tc251_Help.hs'], '-v0'])
+              multi_compile, ['tc251', [('Tc251_Help.hs', '')], '-v0'])
 test('tc252', normal, compile, [''])
 test('tc253', normal, compile, [''])
 test('tc254', normal, compile, [''])

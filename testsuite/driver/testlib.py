@@ -540,7 +540,7 @@ def test_common_work (name, opts, func, args):
         # All the ways we might run this test
         if func == compile or func == multimod_compile:
             all_ways = config.compile_ways
-        elif func == compile_and_run or func == multimod_compile_and_run or func == multisrc_compile_and_run:
+        elif func == compile_and_run or func == multimod_compile_and_run:
             all_ways = config.run_ways
         elif func == ghci_script:
             if 'ghci' in config.run_ways:
@@ -594,8 +594,7 @@ def test_common_work (name, opts, func, args):
                        '_stub.h', '_stub.c', '_stub.o',
                        '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
 
-            if func == multisrc_compile or func == multisrc_compile_fail \
-                or func == multi_compile or func == multi_compile_fail:
+            if func == multi_compile or func == multi_compile_fail:
                     extra_mods = args[1]
                     clean(map (lambda (f,x): replace_suffix(f, 'o'), extra_mods))
                     clean(map (lambda (f,x): replace_suffix(f, 'hi'), extra_mods))
@@ -826,14 +825,6 @@ def multimod_compile( name, way, top_mod, extra_hc_opts ):
 def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, 1, top_mod, [], extra_hc_opts )
 
-def multisrc_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
-    extra_mods = map ((lambda y : (y, '')), extra_mods)
-    return do_compile( name, way, 0, top_mod, extra_mods, extra_hc_opts)
-
-def multisrc_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
-    extra_mods = map ((lambda y : (y, '')), extra_mods)
-    return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
-
 def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
     return do_compile( name, way, 0, top_mod, extra_mods, extra_hc_opts)
 
@@ -913,10 +904,6 @@ def compile_and_run( name, way, extra_hc_opts ):
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     return compile_and_run__( name, way, top_mod, [], extra_hc_opts)
-
-def multisrc_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
-    extra_mods = map ((lambda y : (y, '')), extra_mods)
-    return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
 
 def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
     return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
