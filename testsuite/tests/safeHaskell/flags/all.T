@@ -1,3 +1,8 @@
+# flags tests are about checking that various ghc option flags
+# and some language extension flags still work. This used to
+# test that safe compilation was working but now safe compilation
+# has been dropped.
+
 # Just do the normal way, SafeHaskell is all in the frontend
 def f( opts ):
   opts.only_ways = ['normal']

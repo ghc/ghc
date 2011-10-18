@@ -1,3 +1,6 @@
+# check tests are about checking that the transitive safety
+# check of safe haskell is working properly.
+
 # Just do the normal way, SafeHaskell is all in the frontend
 def f( opts ):
   opts.only_ways = ['normal']

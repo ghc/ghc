@@ -1,7 +1,7 @@
 local.db:
     safePkg01-1.0
 
-trusted: True
+trusted: False
 
 M_SafePkg
 package dependencies: base* ghc-prim integer-gmp
@@ -24,4 +24,6 @@ trusted: safe
 require own pkg trusted: True
 
 Testing setting trust
+trusted: True
+trusted: False
 trusted: False

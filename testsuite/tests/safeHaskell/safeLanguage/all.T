@@ -1,3 +1,8 @@
+# safeLanguage tests are all about making sure the correct
+# unsafe language extensions are disabled or restricted
+# in the -XSafe language. Basically testing that -XSafe
+# works correctly (incluidng testing safe imports a little).
+
 # Just do the normal way, SafeHaskell is all in the frontend
 def f( opts ):
   opts.only_ways = ['normal']
