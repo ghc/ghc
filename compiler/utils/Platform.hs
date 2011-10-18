@@ -17,8 +17,6 @@ module Platform (
 
 where
 
-import Panic
-
 #include "HsVersions.h"
 
 
