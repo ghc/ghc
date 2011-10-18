@@ -104,12 +104,16 @@ ignoreIOExceptions io = io `catch` ((\_ -> return ()) :: IOException -> IO ())
 
 #else
 run secs cmd =
+    let escape '\\' = "\\\\"
+        escape '"'  = "\\\""
+        escape c    = [c]
+        cmd' = "sh -c \"" ++ concatMap escape cmd ++ "\"" in
     alloca $ \p_startupinfo ->
     alloca $ \p_pi ->
-    withTString ("sh -c \"" ++ cmd ++ "\"") $ \cmd' ->
+    withTString cmd' $ \cmd'' ->
     do job <- createJobObjectW nullPtr nullPtr
        let creationflags = 0
-       b <- createProcessW nullPtr cmd' nullPtr nullPtr True
+       b <- createProcessW nullPtr cmd'' nullPtr nullPtr True
                            creationflags
                            nullPtr nullPtr p_startupinfo p_pi
        unless b $ errorWin "createProcessW"

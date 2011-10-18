@@ -351,3 +351,8 @@ test('T706',
       extra_clean(['T706.hs'])],
      run_command,
      ['$MAKE -s --no-print-directory T706'])
+test('spacesInArgs',
+     extra_run_opts('"a   b"   "c   d"   \'e   f\'   \'g   h\''),
+     compile_and_run,
+     [''])
+
