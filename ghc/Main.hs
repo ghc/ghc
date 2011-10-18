@@ -182,13 +182,13 @@ main' postLoadMode dflags0 args flagWarnings = do
   hsc_env <- GHC.getSession
 
   let
-     -- To simplify the handling of filepaths, we normalise all filepaths right 
+     -- To simplify the handling of filepaths, we normalise all filepaths right
      -- away - e.g., for win32 platforms, backslashes are converted
      -- into forward slashes.
     normal_fileish_paths = map (normalise . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
-  -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 
+  -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on
   --       the command-line.
   liftIO $ mapM_ (consIORef v_Ld_inputs) (reverse objs)
 
@@ -236,7 +236,7 @@ partition_args ("-x":suff:args) srcs objs
   | StopLn <- phase	= partition_args args srcs (slurp ++ objs)
   | otherwise		= partition_args rest (these_srcs ++ srcs) objs
 	where phase = startPhase suff
-	      (slurp,rest) = break (== "-x") args 
+	      (slurp,rest) = break (== "-x") args
 	      these_srcs = zip slurp (repeat (Just phase))
 partition_args (arg:args) srcs objs
   | looks_like_an_input arg = partition_args args ((arg,Nothing):srcs) objs
@@ -248,7 +248,7 @@ partition_args (arg:args) srcs objs
 
       The following things should be considered compilation manager inputs:
 
-       - haskell source files (strings ending in .hs, .lhs or other 
+       - haskell source files (strings ending in .hs, .lhs or other
          haskellish extension),
 
        - module names (not forgetting hierarchical module names),
@@ -260,7 +260,7 @@ partition_args (arg:args) srcs objs
       straight through to the linker.
     -}
 looks_like_an_input :: String -> Bool
-looks_like_an_input m =  isSourceFilename m 
+looks_like_an_input m =  isSourceFilename m
 		      || looksLikeModuleName m
 		      || '.' `notElem` m
 
@@ -284,10 +284,10 @@ checkOptions mode dflags srcs objs = do
 	-- -prof and --interactive are not a good combination
    when (notNull (filter (not . isRTSWay) (wayNames dflags))
          && isInterpretiveMode mode) $
-      do ghcError (UsageError 
+      do ghcError (UsageError
                    "--interactive can't be used with -prof or -unreg.")
 	-- -ohi sanity check
-   if (isJust (outputHi dflags) && 
+   if (isJust (outputHi dflags) &&
       (isCompManagerMode mode || srcs `lengthExceeds` 1))
 	then ghcError (UsageError "-ohi can only be used when compiling a single source file")
 	else do
@@ -316,12 +316,12 @@ checkOptions mode dflags srcs objs = do
 -- Compiler output options
 
 -- called to verify that the output files & directories
--- point somewhere valid. 
+-- point somewhere valid.
 --
 -- The assumption is that the directory portion of these output
 -- options will have to exist by the time 'verifyOutputFiles'
 -- is invoked.
--- 
+--
 verifyOutputFiles :: DynFlags -> IO ()
 verifyOutputFiles dflags = do
   -- not -odir: we create the directory for -odir if it doesn't exist (#2278).
@@ -336,9 +336,9 @@ verifyOutputFiles dflags = do
      flg <- doesDirNameExist hi
      when (not flg) (nonExistentDir "-ohi" hi)
  where
-   nonExistentDir flg dir = 
-     ghcError (CmdLineError ("error: directory portion of " ++ 
-                             show dir ++ " does not exist (used with " ++ 
+   nonExistentDir flg dir =
+     ghcError (CmdLineError ("error: directory portion of " ++
+                             show dir ++ " does not exist (used with " ++
 			     show flg ++ " option.)"))
 
 -----------------------------------------------------------------------------
@@ -478,7 +478,7 @@ parseModeFlags :: [Located String]
                       [Located String])
 parseModeFlags args = do
   let ((leftover, errs1, warns), (mModeFlag, errs2, flags')) =
-          runCmdLine (processArgs mode_flags args CmdLineOnly True)
+          runCmdLine (processArgs mode_flags args)
                      (Nothing, [], [])
       mode = case mModeFlag of
              Nothing     -> doMakeMode
@@ -494,16 +494,16 @@ type ModeM = CmdLineP (Maybe (Mode, String), [String], [Located String])
 mode_flags :: [Flag ModeM]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-    flagC "?"                     (PassFlag (setMode showGhcUsageMode))
-  , flagC "-help"                 (PassFlag (setMode showGhcUsageMode))
-  , flagC "V"                     (PassFlag (setMode showVersionMode))
-  , flagC "-version"              (PassFlag (setMode showVersionMode))
-  , flagC "-numeric-version"      (PassFlag (setMode showNumVersionMode))
-  , flagC "-info"                 (PassFlag (setMode showInfoMode))
-  , flagC "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
-  , flagC "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
+    Flag "?"                     (PassFlag (setMode showGhcUsageMode))
+  , Flag "-help"                 (PassFlag (setMode showGhcUsageMode))
+  , Flag "V"                     (PassFlag (setMode showVersionMode))
+  , Flag "-version"              (PassFlag (setMode showVersionMode))
+  , Flag "-numeric-version"      (PassFlag (setMode showNumVersionMode))
+  , Flag "-info"                 (PassFlag (setMode showInfoMode))
+  , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
+  , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
   ] ++
-  [ flagC k'                      (PassFlag (setMode (printSetting k)))
+  [ Flag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
           "Booter version",
           "Stage",
@@ -529,21 +529,21 @@ mode_flags =
         replaceSpace c   = c
   ] ++
       ------- interfaces ----------------------------------------------------
-  [ flagC "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
+  [ Flag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
                                                "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  , flagC "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
-                                             addFlag "-no-link" f))
-  , flagC "M"            (PassFlag (setMode doMkDependHSMode))
-  , flagC "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , flagC "C"            (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
-                                             addFlag "-fvia-C" f))
-  , flagC "S"            (PassFlag (setMode (stopBeforeMode As)))
-  , flagC "-make"        (PassFlag (setMode doMakeMode))
-  , flagC "-interactive" (PassFlag (setMode doInteractiveMode))
-  , flagC "-abi-hash"    (PassFlag (setMode doAbiHashMode))
-  , flagC "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
+  , Flag "c"            (PassFlag (\f -> do setMode (stopBeforeMode StopLn) f
+                                            addFlag "-no-link" f))
+  , Flag "M"            (PassFlag (setMode doMkDependHSMode))
+  , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
+  , Flag "C"            (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
+                                            addFlag "-fvia-C" f))
+  , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
+  , Flag "-make"        (PassFlag (setMode doMakeMode))
+  , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
+  , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
+  , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   ]
 
 setMode :: Mode -> String -> EwM ModeM ()
@@ -603,9 +603,9 @@ doMake :: [(String,Maybe Phase)] -> Ghc ()
 doMake srcs  = do
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
-	haskellish (f,Nothing) = 
+	haskellish (f,Nothing) =
 	  looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
-	haskellish (_,Just phase) = 
+	haskellish (_,Just phase) =
 	  phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
 
     hsc_env <- GHC.getSession
@@ -690,7 +690,7 @@ showUsage ghci dflags = do
      dump (c:s)       = putChar c >> dump s
 
 dumpFinalStats :: DynFlags -> IO ()
-dumpFinalStats dflags = 
+dumpFinalStats dflags =
   when (dopt Opt_D_faststring_stats dflags) $ dumpFastStringStats dflags
 
 dumpFastStringStats :: DynFlags -> IO ()
@@ -715,7 +715,7 @@ dumpFastStringStats dflags = do
 
 countFS :: Int -> Int -> Int -> Int -> [[FastString]] -> (Int, Int, Int, Int)
 countFS entries longest is_z has_z [] = (entries, longest, is_z, has_z)
-countFS entries longest is_z has_z (b:bs) = 
+countFS entries longest is_z has_z (b:bs) =
   let
 	len = length b
 	longest' = max len longest

@@ -229,20 +229,46 @@ freeStorage (rtsBool free_heap)
 
    The entry code for every CAF does the following:
      
-      - builds a BLACKHOLE in the heap
-      - pushes an update frame pointing to the BLACKHOLE
-      - calls newCaf, below
-      - updates the CAF with a static indirection to the BLACKHOLE
-      
+      - builds a CAF_BLACKHOLE in the heap
+
+      - calls newCaf, which atomically updates the CAF with
+        IND_STATIC pointing to the CAF_BLACKHOLE
+
+      - if newCaf returns zero, it re-enters the CAF (see Note [atomic
+        CAF entry])
+
+      - pushes an update frame pointing to the CAF_BLACKHOLE
+
    Why do we build an BLACKHOLE in the heap rather than just updating
    the thunk directly?  It's so that we only need one kind of update
-   frame - otherwise we'd need a static version of the update frame too.
+   frame - otherwise we'd need a static version of the update frame
+   too, and various other parts of the RTS that deal with update
+   frames would also need special cases for static update frames.
 
    newCaf() does the following:
        
+      - it updates the CAF with an IND_STATIC pointing to the
+        CAF_BLACKHOLE, atomically.
+
       - it puts the CAF on the oldest generation's mutable list.
         This is so that we treat the CAF as a root when collecting
 	younger generations.
+
+   ------------------
+   Note [atomic CAF entry]
+
+   With THREADED_RTS, newCaf() is required to be atomic (see
+   #5558). This is because if two threads happened to enter the same
+   CAF simultaneously, they would create two distinct CAF_BLACKHOLEs,
+   and so the normal threadPaused() machinery for detecting duplicate
+   evaluation will not detect this.  Hence in lockCAF() below, we
+   atomically lock the CAF with WHITEHOLE before updating it with
+   IND_STATIC, and return zero if another thread locked the CAF first.
+   In the event that we lost the race, CAF entry code will re-enter
+   the CAF and block on the other thread's CAF_BLACKHOLE.
+
+   ------------------
+   Note [GHCi CAFs]
 
    For GHCI, we have additional requirements when dealing with CAFs:
 
@@ -264,36 +290,76 @@ freeStorage (rtsBool free_heap)
 
    -------------------------------------------------------------------------- */
 
-void
-newCAF(StgRegTable *reg, StgClosure* caf)
+STATIC_INLINE StgWord lockCAF (StgClosure *caf, StgClosure *bh)
 {
-  if(keepCAFs)
-  {
-    // HACK:
-    // If we are in GHCi _and_ we are using dynamic libraries,
-    // then we can't redirect newCAF calls to newDynCAF (see below),
-    // so we make newCAF behave almost like newDynCAF.
-    // The dynamic libraries might be used by both the interpreted
-    // program and GHCi itself, so they must not be reverted.
-    // This also means that in GHCi with dynamic libraries, CAFs are not
-    // garbage collected. If this turns out to be a problem, we could
-    // do another hack here and do an address range test on caf to figure
-    // out whether it is from a dynamic library.
-    ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
+    const StgInfoTable *orig_info;
 
-    ACQUIRE_SM_LOCK; // caf_list is global, locked by sm_mutex
-    ((StgIndStatic *)caf)->static_link = caf_list;
-    caf_list = caf;
-    RELEASE_SM_LOCK;
-  }
-  else
-  {
-    // Put this CAF on the mutable list for the old generation.
-    ((StgIndStatic *)caf)->saved_info = NULL;
-    if (oldest_gen->no != 0) {
-        recordMutableCap(caf, regTableToCapability(reg), oldest_gen->no);
+    orig_info = caf->header.info;
+
+#ifdef THREADED_RTS
+    const StgInfoTable *cur_info;
+
+    if (orig_info == &stg_IND_STATIC_info ||
+        orig_info == &stg_WHITEHOLE_info) {
+        // already claimed by another thread; re-enter the CAF
+        return 0;
     }
-  }
+
+    cur_info = (const StgInfoTable *)
+        cas((StgVolatilePtr)&caf->header.info,
+            (StgWord)orig_info,
+            (StgWord)&stg_WHITEHOLE_info);
+
+    if (cur_info != orig_info) {
+        // already claimed by another thread; re-enter the CAF
+        return 0;
+    }
+
+    // successfully claimed by us; overwrite with IND_STATIC
+#endif
+
+    // For the benefit of revertCAFs(), save the original info pointer
+    ((StgIndStatic *)caf)->saved_info  = orig_info;
+
+    ((StgIndStatic*)caf)->indirectee = bh;
+    write_barrier();
+    SET_INFO(caf,&stg_IND_STATIC_info);
+
+    return 1;
+}
+
+StgWord
+newCAF(StgRegTable *reg, StgClosure *caf, StgClosure *bh)
+{
+    if (lockCAF(caf,bh) == 0) return 0;
+
+    if(keepCAFs)
+    {
+        // HACK:
+        // If we are in GHCi _and_ we are using dynamic libraries,
+        // then we can't redirect newCAF calls to newDynCAF (see below),
+        // so we make newCAF behave almost like newDynCAF.
+        // The dynamic libraries might be used by both the interpreted
+        // program and GHCi itself, so they must not be reverted.
+        // This also means that in GHCi with dynamic libraries, CAFs are not
+        // garbage collected. If this turns out to be a problem, we could
+        // do another hack here and do an address range test on caf to figure
+        // out whether it is from a dynamic library.
+
+        ACQUIRE_SM_LOCK; // caf_list is global, locked by sm_mutex
+        ((StgIndStatic *)caf)->static_link = caf_list;
+        caf_list = caf;
+        RELEASE_SM_LOCK;
+    }
+    else
+    {
+        // Put this CAF on the mutable list for the old generation.
+        ((StgIndStatic *)caf)->saved_info = NULL;
+        if (oldest_gen->no != 0) {
+            recordMutableCap(caf, regTableToCapability(reg), oldest_gen->no);
+        }
+    }
+    return 1;
 }
 
 // External API for setting the keepCAFs flag. see #3900.
@@ -312,16 +378,19 @@ setKeepCAFs (void)
 //
 // The linker hackily arranges that references to newCaf from dynamic
 // code end up pointing to newDynCAF.
-void
-newDynCAF (StgRegTable *reg STG_UNUSED, StgClosure *caf)
+StgWord
+newDynCAF (StgRegTable *reg STG_UNUSED, StgClosure *caf, StgClosure *bh)
 {
+    if (lockCAF(caf,bh) == 0) return 0;
+
     ACQUIRE_SM_LOCK;
 
-    ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
     ((StgIndStatic *)caf)->static_link = revertible_caf_list;
     revertible_caf_list = caf;
 
     RELEASE_SM_LOCK;
+
+    return 1;
 }
 
 /* -----------------------------------------------------------------------------

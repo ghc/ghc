@@ -890,7 +890,7 @@ checkSafeImports dflags hsc_env tcg_env
     = do
         imps <- mapM condense imports'
         pkgs <- mapM checkSafe imps
-        checkPkgTrust pkg_reqs
+        when (packageTrustOn dflags) $ checkPkgTrust pkg_reqs
 
         -- add in trusted package requirements for this module
         let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
@@ -936,7 +936,9 @@ checkSafeImports dflags hsc_env tcg_env
         -- modules in the home package are trusted but otherwise
         -- we check the package trust flag.
         packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
-        packageTrusted Sf_Safe False _ = True
+        packageTrusted _ _ _
+            | not (packageTrustOn dflags) = True
+        packageTrusted Sf_Safe False _    = True
         packageTrusted _ _ m
             | isHomePkg m = True
             | otherwise   = trusted $ getPackageDetails (pkgState dflags)

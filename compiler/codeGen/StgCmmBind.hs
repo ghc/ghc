@@ -644,25 +644,24 @@ link_caf _is_upd = do
 	-- so that the garbage collector can find them
 	-- This must be done *before* the info table pointer is overwritten,
 	-- because the old info table ptr is needed for reversion
-  ; emitRtsCallWithVols rtsPackageId (fsLit "newCAF")
+  ; ret <- newTemp bWord
+  ; emitRtsCallGen [(ret,NoHint)] rtsPackageId (fsLit "newCAF")
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
-        (CmmReg nodeReg, AddrHint) ]
-      [node] False
-	-- node is live, so save it.
+        (CmmReg nodeReg, AddrHint),
+        (CmmReg (CmmLocal hp_rel), AddrHint) ]
+      (Just [node]) False
+        -- node is live, so save it.
 
-	-- Overwrite the closure with a (static) indirection
-	-- to the newly-allocated black hole
-  ; emit (mkStore (cmmRegOffW nodeReg off_indirectee) (CmmReg (CmmLocal hp_rel)) <*>
-	  mkStore (CmmReg nodeReg) ind_static_info)
+  -- see Note [atomic CAF entry] in rts/sm/Storage.c
+  ; emit $ mkCmmIfThen
+      (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), CmmLit zeroCLit]) $
+        -- re-enter R1.  Doing this directly is slightly dodgy; we're
+        -- assuming lots of things, like the stack pointer hasn't
+        -- moved since we entered the CAF.
+        let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
+        mkJump target [] 0
 
   ; return hp_rel }
-  where
-    ind_static_info :: CmmExpr
-    ind_static_info = mkLblExpr mkIndStaticInfoLabel
-
-    off_indirectee :: WordOff
-    off_indirectee = fixedHdrSize + oFFSET_StgInd_indirectee*wORD_SIZE
-
 
 ------------------------------------------------------------------------
 --		Profiling

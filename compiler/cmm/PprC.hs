@@ -958,7 +958,7 @@ cLoad platform expr rep =
         struct = ptext (sLit "struct") <+> braces (decl)
         packed_attr = ptext (sLit "__attribute__((packed))")
         cast = parens (struct <+> packed_attr <> char '*')
-    in parens (cast <+> pprExpr1 expr) <> ptext (sLit "->x")
+    in parens (cast <+> pprExpr1 platform expr) <> ptext (sLit "->x")
 #else
 cLoad platform expr rep = char '*' <> parens (cCast platform (machRepPtrCType rep) expr)
 #endif

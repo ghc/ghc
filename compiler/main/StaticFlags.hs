@@ -24,7 +24,7 @@ module StaticFlags (
 	opt_PprCols,
 	opt_PprCaseAsLet,
 	opt_PprStyle_Debug, opt_TraceLevel,
-        opt_NoDebugOutput, 
+        opt_NoDebugOutput,
 
 	-- Suppressing boring aspects of core dumps
 	opt_SuppressAll,
@@ -85,7 +85,7 @@ module StaticFlags (
 
     -- For the parser
     addOpt, removeOpt, addWay, getWayFlags, v_opt_C_ready,
-    
+
     -- Saving/restoring globals
     saveStaticFlagGlobals, restoreStaticFlagGlobals
   ) where
@@ -119,7 +119,7 @@ addWay = consIORef v_Ways . lkupWay
 removeOpt :: String -> IO ()
 removeOpt f = do
   fs <- readIORef v_opt_C
-  writeIORef v_opt_C $! filter (/= f) fs    
+  writeIORef v_opt_C $! filter (/= f) fs
 
 lookUp	       	 :: FastString -> Bool
 lookup_def_int   :: String -> Int -> Int
@@ -147,14 +147,14 @@ packed_static_opts :: [FastString]
 packed_static_opts   = map mkFastString staticFlags
 
 lookUp     sw = sw `elem` packed_static_opts
-	
--- (lookup_str "foo") looks for the flag -foo=X or -fooX, 
+
+-- (lookup_str "foo") looks for the flag -foo=X or -fooX,
 -- and returns the string X
-lookup_str sw 
+lookup_str sw
    = case firstJusts (map (stripPrefix sw) staticFlags) of
 	Just ('=' : str) -> Just str
 	Just str         -> Just str
-	Nothing		 -> Nothing	
+	Nothing		 -> Nothing
 
 lookup_all_str sw = map f $ catMaybes (map (stripPrefix sw) staticFlags) where
    f ('=' : str) = str
@@ -198,7 +198,7 @@ unpacked_opts =
 
 opt_IgnoreDotGhci :: Bool
 opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
- 
+
 opt_GhciScripts :: [String]
 opt_GhciScripts = lookup_all_str "-ghci-script"
 
@@ -207,13 +207,13 @@ opt_GhciScripts = lookup_all_str "-ghci-script"
 --   Except for uniques, as some simplifier phases introduce new varibles that
 --   have otherwise identical names.
 opt_SuppressAll :: Bool
-opt_SuppressAll	
+opt_SuppressAll
 	= lookUp  (fsLit "-dsuppress-all")
 
 -- | Suppress all coercions, them replacing with '...'
 opt_SuppressCoercions :: Bool
 opt_SuppressCoercions
-	=  lookUp  (fsLit "-dsuppress-all") 
+	=  lookUp  (fsLit "-dsuppress-all")
 	|| lookUp  (fsLit "-dsuppress-coercions")
 
 -- | Suppress module id prefixes on variables.
@@ -230,7 +230,7 @@ opt_SuppressTypeApplications
 
 -- | Suppress info such as arity and unfoldings on identifiers.
 opt_SuppressIdInfo :: Bool
-opt_SuppressIdInfo 
+opt_SuppressIdInfo
 	=  lookUp  (fsLit "-dsuppress-all")
 	|| lookUp  (fsLit "-dsuppress-idinfo")
 
@@ -254,10 +254,10 @@ opt_PprCaseAsLet	= lookUp   (fsLit "-dppr-case-as-let")
 -- | Set the maximum width of the dumps
 --   If GHC's command line options are bad then the options parser uses the
 --   pretty printer display the error message. In this case the staticFlags
---   won't be initialized yet, so we must check for this case explicitly 
+--   won't be initialized yet, so we must check for this case explicitly
 --   and return the default value.
 opt_PprCols :: Int
-opt_PprCols 
+opt_PprCols
  = unsafePerformIO
  $ do	ready <- readIORef v_opt_C_ready
 	if (not ready)
@@ -287,7 +287,7 @@ opt_SccProfilingOn		= lookUp  (fsLit "-fscc-profiling")
 
 -- Hpc opts
 opt_Hpc :: Bool
-opt_Hpc				= lookUp (fsLit "-fhpc")  
+opt_Hpc				= lookUp (fsLit "-fhpc")
 
 -- language opts
 opt_DictsStrict :: Bool
@@ -369,7 +369,7 @@ opt_Unregisterised		= lookUp  (fsLit "-funregisterised")
 
 -- Derived, not a real option.  Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
--- indirection to the entry code.  See TABLES_NEXT_TO_CODE in 
+-- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
 -- includes/rts/storage/InfoTables.h.
 tablesNextToCode :: Bool
 tablesNextToCode 		= not opt_Unregisterised
@@ -417,7 +417,7 @@ data WayName
 GLOBAL_VAR(v_Ways, [] ,[Way])
 
 allowed_combination :: [WayName] -> Bool
-allowed_combination way = and [ x `allowedWith` y 
+allowed_combination way = and [ x `allowedWith` y
 			      | x <- way, y <- way, x < y ]
   where
 	-- Note ordering in these tests: the left argument is
@@ -448,7 +448,7 @@ getWayFlags = do
   if not (allowed_combination (map wayName ways))
       then ghcError (CmdLineError $
       		    "combination not supported: "  ++
-      		    foldr1 (\a b -> a ++ '/':b) 
+      		    foldr1 (\a b -> a ++ '/':b)
       		    (map wayDesc ways))
       else
       	   return (concatMap wayOpts ways)
@@ -457,13 +457,13 @@ mkBuildTag :: [Way] -> String
 mkBuildTag ways = concat (intersperse "_" (map wayTag ways))
 
 lkupWay :: WayName -> Way
-lkupWay w = 
+lkupWay w =
    case listToMaybe (filter ((==) w . wayName) way_details) of
 	Nothing -> error "findBuildTag"
 	Just details -> details
 
 isRTSWay :: WayName -> Bool
-isRTSWay = wayRTSOnly . lkupWay 
+isRTSWay = wayRTSOnly . lkupWay
 
 data Way = Way {
   wayName    :: WayName,
@@ -496,10 +496,10 @@ way_details =
 
     Way WayDyn "dyn" False "Dynamic"
 	[ "-DDYNAMIC"
-	, "-optc-DDYNAMIC" 
+	, "-optc-DDYNAMIC"
 #if defined(mingw32_TARGET_OS)
 	-- On Windows, code that is to be linked into a dynamic library must be compiled
-	--	with -fPIC. Labels not in the current package are assumed to be in a DLL 
+	--	with -fPIC. Labels not in the current package are assumed to be in a DLL
 	--	different from the current one.
 	, "-fPIC"
 #elif defined(openbsd_TARGET_OS)
@@ -518,7 +518,7 @@ way_details =
 	[ "-DTRACING"
 	, "-optc-DTRACING" ],
 
-    Way WayPar "mp" False "Parallel" 
+    Way WayPar "mp" False "Parallel"
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
@@ -529,7 +529,7 @@ way_details =
         , "-optl-lgpvm3" ],
 
     -- at the moment we only change the RTS and could share compiler and libs!
-    Way WayPar "mt" False "Parallel ticky profiling" 
+    Way WayPar "mt" False "Parallel ticky profiling"
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-optc-DPAR"
@@ -540,7 +540,7 @@ way_details =
         , "-optl-lpvm3"
         , "-optl-lgpvm3" ],
 
-    Way WayPar "md" False "Distributed" 
+    Way WayPar "md" False "Distributed"
 	[ "-fparallel"
 	, "-D__PARALLEL_HASKELL__"
 	, "-D__DISTRIBUTED_HASKELL__"
@@ -580,3 +580,4 @@ restoreStaticFlagGlobals (c_ready, c, ways) = do
     writeIORef v_opt_C_ready c_ready
     writeIORef v_opt_C c
     writeIORef v_Ways ways
+

@@ -50,7 +50,7 @@ parseStaticFlags args = do
   ready <- readIORef v_opt_C_ready
   when ready $ ghcError (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
-  (leftover, errs, warns1) <- processArgs static_flags args CmdLineOnly True
+  (leftover, errs, warns1) <- processArgs static_flags args
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
     -- deal with the way flags: the way (eg. prof) gives rise to
@@ -60,10 +60,10 @@ parseStaticFlags args = do
 
     -- if we're unregisterised, add some more flags
   let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
-		  | otherwise = []
+                  | otherwise = []
 
   (more_leftover, errs, warns2) <-
-      processArgs static_flags (unreg_flags ++ way_flags') CmdLineOnly True
+      processArgs static_flags (unreg_flags ++ way_flags')
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -77,7 +77,7 @@ parseStaticFlags args = do
                | otherwise        = []
 
     -- HACK: -fexcess-precision is both a static and a dynamic flag.  If
-    -- the static flag parser has slurped it, we must return it as a 
+    -- the static flag parser has slurped it, we must return it as a
     -- leftover too.  ToDo: make -fexcess-precision dynamic only.
   let excess_prec
        | opt_SimplExcessPrecision = map (mkGeneralLocated "in excess_prec")
@@ -96,7 +96,7 @@ static_flags :: [Flag IO]
 --
 -- The common (PassFlag addOpt) action puts the static flag into the bunch of
 -- things that are searched up by the top-level definitions like
---	opt_foo = lookUp (fsLit "-dfoo")
+--      opt_foo = lookUp (fsLit "-dfoo")
 
 -- Note that ordering is important in the following list: any flag which
 -- is a prefix flag (i.e. HasArg, Prefix, OptPrefix, AnySuffix) will override
@@ -104,65 +104,65 @@ static_flags :: [Flag IO]
 
 static_flags = [
         ------- GHCi -------------------------------------------------------
-    flagC "ignore-dot-ghci" (PassFlag addOpt) 
-  , flagC "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
+    Flag "ignore-dot-ghci" (PassFlag addOpt)
+  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
 
         ------- ways --------------------------------------------------------
-  , flagC "prof"           (NoArg (addWay WayProf)) 
-  , flagC "eventlog"       (NoArg (addWay WayEventLog))
-  , flagC "parallel"       (NoArg (addWay WayPar))
-  , flagC "gransim"        (NoArg (addWay WayGran))
-  , flagC "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
-  , flagC "debug"          (NoArg (addWay WayDebug))
-  , flagC "ndp"            (NoArg (addWay WayNDP))
-  , flagC "threaded"       (NoArg (addWay WayThreaded))
+  , Flag "prof"           (NoArg (addWay WayProf))
+  , Flag "eventlog"       (NoArg (addWay WayEventLog))
+  , Flag "parallel"       (NoArg (addWay WayPar))
+  , Flag "gransim"        (NoArg (addWay WayGran))
+  , Flag "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
+  , Flag "debug"          (NoArg (addWay WayDebug))
+  , Flag "ndp"            (NoArg (addWay WayNDP))
+  , Flag "threaded"       (NoArg (addWay WayThreaded))
 
-  , flagC "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug))
+  , Flag "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug))
     -- -ticky enables ticky-ticky code generation, and also implies -debug which
     -- is required to get the RTS ticky support.
 
         ------ Debugging ----------------------------------------------------
-  , flagC "dppr-debug"                  (PassFlag addOpt)
-  , flagC "dppr-cols"                   (AnySuffix addOpt)
-  , flagC "dppr-user-length"            (AnySuffix addOpt)
-  , flagC "dppr-case-as-let"            (PassFlag addOpt)
-  , flagC "dsuppress-all"               (PassFlag addOpt)
-  , flagC "dsuppress-uniques"           (PassFlag addOpt)
-  , flagC "dsuppress-coercions"         (PassFlag addOpt)
-  , flagC "dsuppress-module-prefixes"   (PassFlag addOpt)
-  , flagC "dsuppress-type-applications" (PassFlag addOpt)
-  , flagC "dsuppress-idinfo"            (PassFlag addOpt)
-  , flagC "dsuppress-type-signatures"   (PassFlag addOpt)
-  , flagC "dopt-fuel"                   (AnySuffix addOpt)
-  , flagC "dtrace-level"                (AnySuffix addOpt)
-  , flagC "dno-debug-output"            (PassFlag addOpt)
-  , flagC "dstub-dead-values"           (PassFlag addOpt)
+  , Flag "dppr-debug"                  (PassFlag addOpt)
+  , Flag "dppr-cols"                   (AnySuffix addOpt)
+  , Flag "dppr-user-length"            (AnySuffix addOpt)
+  , Flag "dppr-case-as-let"            (PassFlag addOpt)
+  , Flag "dsuppress-all"               (PassFlag addOpt)
+  , Flag "dsuppress-uniques"           (PassFlag addOpt)
+  , Flag "dsuppress-coercions"         (PassFlag addOpt)
+  , Flag "dsuppress-module-prefixes"   (PassFlag addOpt)
+  , Flag "dsuppress-type-applications" (PassFlag addOpt)
+  , Flag "dsuppress-idinfo"            (PassFlag addOpt)
+  , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
+  , Flag "dopt-fuel"                   (AnySuffix addOpt)
+  , Flag "dtrace-level"                (AnySuffix addOpt)
+  , Flag "dno-debug-output"            (PassFlag addOpt)
+  , Flag "dstub-dead-values"           (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 
         ----- Linker --------------------------------------------------------
-  , flagC "static"         (PassFlag addOpt)
-  , flagC "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn))
+  , Flag "static"         (PassFlag addOpt)
+  , Flag "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn))
     -- ignored for compat w/ gcc:
-  , flagC "rdynamic"       (NoArg (return ()))
+  , Flag "rdynamic"       (NoArg (return ()))
 
         ----- RTS opts ------------------------------------------------------
-  , flagC "H"              (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
-        
-  , flagC "Rghc-timing"    (NoArg (liftEwM enableTimingStats))
+  , Flag "H"              (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
+
+  , Flag "Rghc-timing"    (NoArg (liftEwM enableTimingStats))
 
         ------ Compiler flags -----------------------------------------------
 
         -- -fPIC requires extra checking: only the NCG supports it.
         -- See also DynFlags.parseDynamicFlags.
-  , flagC "fPIC" (PassFlag setPIC)
+  , Flag "fPIC" (PassFlag setPIC)
 
         -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
-  , flagC "fno-"
+  , Flag "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
-        
+
 
         -- Pass all remaining "-f<blah>" options to hsc
-  , flagC "f" (AnySuffixPred isStaticFlag addOpt)
+  , Flag "f" (AnySuffixPred isStaticFlag addOpt)
   ]
 
 setPIC :: String -> StaticP ()

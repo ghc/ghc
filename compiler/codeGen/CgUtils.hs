@@ -13,6 +13,7 @@ module CgUtils (
         emitRODataLits, mkRODataLits,
         emitIf, emitIfThenElse,
         emitRtsCall, emitRtsCallWithVols, emitRtsCallWithResult,
+        emitRtsCallGen,
         assignTemp, assignTemp_, newTemp,
         emitSimultaneously,
         emitSwitch, emitLitSwitch,
@@ -235,22 +236,23 @@ emitRtsCall
    -> Bool                      -- ^ whether this is a safe call
    -> Code                      -- ^ cmm code
 
-emitRtsCall pkg fun args safe = emitRtsCall' [] pkg fun args Nothing safe
+emitRtsCall pkg fun args safe = emitRtsCallGen [] pkg fun args Nothing safe
    -- The 'Nothing' says "save all global registers"
 
 emitRtsCallWithVols :: PackageId -> FastString -> [CmmHinted CmmExpr] -> [GlobalReg] -> Bool -> Code
 emitRtsCallWithVols pkg fun args vols safe
-   = emitRtsCall' [] pkg fun args (Just vols) safe
+   = emitRtsCallGen [] pkg fun args (Just vols) safe
 
 emitRtsCallWithResult
    :: LocalReg -> ForeignHint
    -> PackageId -> FastString
    -> [CmmHinted CmmExpr] -> Bool -> Code
+
 emitRtsCallWithResult res hint pkg fun args safe
-   = emitRtsCall' [CmmHinted res hint] pkg fun args Nothing safe
+   = emitRtsCallGen [CmmHinted res hint] pkg fun args Nothing safe
 
 -- Make a call to an RTS C procedure
-emitRtsCall'
+emitRtsCallGen
    :: [CmmHinted LocalReg]
    -> PackageId
    -> FastString
@@ -258,7 +260,7 @@ emitRtsCall'
    -> Maybe [GlobalReg]
    -> Bool -- True <=> CmmSafe call
    -> Code
-emitRtsCall' res pkg fun args vols safe = do
+emitRtsCallGen res pkg fun args vols safe = do
   safety <- if safe
             then getSRTInfo >>= (return . CmmSafe)
             else return CmmUnsafe
