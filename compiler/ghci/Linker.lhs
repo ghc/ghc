@@ -440,10 +440,10 @@ dieWith :: SrcSpan -> Message -> IO a
 dieWith span msg = ghcError (ProgramError (showSDoc (mkLocMessage span msg)))
 
 
-checkNonStdWay :: DynFlags -> SrcSpan -> IO (Maybe String)
+checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool
 checkNonStdWay dflags srcspan = do
   let tag = buildTag dflags
-  if null tag {-  || tag == "dyn" -} then return Nothing else do
+  if null tag {-  || tag == "dyn" -} then return False else do
     -- see #3604: object files compiled for way "dyn" need to link to the
     -- dynamic packages, so we can't load them into a statically-linked GHCi.
     -- we have to treat "dyn" in the same way as "prof".
@@ -453,12 +453,14 @@ checkNonStdWay dflags srcspan = do
     -- .o files or -dynamic .o files into GHCi (currently that's not possible
     -- because the dynamic objects contain refs to e.g. __stginit_base_Prelude_dyn
     -- whereas we have __stginit_base_Prelude_.
-  let default_osuf = phaseInputExt StopLn
-  if objectSuf dflags == default_osuf
-	then failNonStd srcspan
-	else return (Just default_osuf)
+  if (objectSuf dflags == normalObjectSuffix)
+     then failNonStd srcspan
+     else return True
 
-failNonStd :: SrcSpan -> IO (Maybe String)
+normalObjectSuffix :: String
+normalObjectSuffix = phaseInputExt StopLn
+
+failNonStd :: SrcSpan -> IO Bool
 failNonStd srcspan = dieWith srcspan $
   ptext (sLit "Dynamic linking required, but this is a non-standard build (eg. prof).") $$
   ptext (sLit "You need to build the program twice: once the normal way, and then") $$
@@ -467,13 +469,13 @@ failNonStd srcspan = dieWith srcspan $
 
 getLinkDeps :: HscEnv -> HomePackageTable
             -> PersistentLinkerState
-	    -> Maybe String			-- the "normal" object suffix
+            -> Bool                             -- replace object suffices?
 	    -> SrcSpan				-- for error messages
 	    -> [Module]				-- If you need these
 	    -> IO ([Linkable], [PackageId])	-- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
+getLinkDeps hsc_env hpt pls replace_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
 	-- 1.  Find the dependent home-pkg-modules/packages from each iface
@@ -494,7 +496,8 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 	-- 3.  For each dependent module, find its linkable
 	--     This will either be in the HPT or (in the case of one-shot
 	--     compilation) we may need to use maybe_getFileLinkable
-	lnks_needed <- mapM (get_linkable maybe_normal_osuf) mods_needed ;
+        let { osuf = objectSuf dflags } ;
+        lnks_needed <- mapM (get_linkable osuf replace_osuf) mods_needed ;
 
 	return (lnks_needed, pkgs_needed) }
   where
@@ -559,7 +562,7 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 
 	-- This one is a build-system bug
 
-    get_linkable maybe_normal_osuf mod_name	-- A home-package module
+    get_linkable osuf replace_osuf mod_name      -- A home-package module
 	| Just mod_info <- lookupUFM hpt mod_name 
 	= adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
 	| otherwise	
@@ -578,22 +581,24 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 		  Just lnk -> adjust_linkable lnk
 	      }}
 
-	    adjust_linkable lnk
-		| Just osuf <- maybe_normal_osuf = do
-			new_uls <- mapM (adjust_ul osuf) (linkableUnlinked lnk)
-        		return lnk{ linkableUnlinked=new_uls }
-		| otherwise =
-			return lnk
+            adjust_linkable lnk
+                | replace_osuf = do
+                        new_uls <- mapM adjust_ul (linkableUnlinked lnk)
+         		return lnk{ linkableUnlinked=new_uls }
+                | otherwise =
+                        return lnk
 
-	    adjust_ul osuf (DotO file) = do
-		let new_file = replaceExtension file osuf
-		ok <- doesFileExist new_file
+            adjust_ul (DotO file) = do
+                MASSERT (osuf `isSuffixOf` file)
+                let new_file = reverse (drop (length osuf + 1) (reverse file))
+                                 <.> normalObjectSuffix
+                ok <- doesFileExist new_file
 		if (not ok)
 		   then dieWith span $
 			  ptext (sLit "cannot find normal object file ")
 				<> quotes (text new_file) $$ while_linking_expr
 		   else return (DotO new_file)
-	    adjust_ul _ _ = panic "adjust_ul"
+            adjust_ul _ = panic "adjust_ul"
 \end{code}
 
 

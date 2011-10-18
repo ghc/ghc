@@ -51,7 +51,6 @@ import Name             hiding ( varName )
 import NameSet
 import Avail
 import RdrName
-import PrelNames (pRELUDE)
 import VarSet
 import VarEnv
 import ByteCodeInstr
@@ -814,7 +813,7 @@ setContext imports
 findGlobalRdrEnv :: HscEnv -> [InteractiveImport] -> IO GlobalRdrEnv
 -- Compute the GlobalRdrEnv for the interactive context
 findGlobalRdrEnv hsc_env imports
-  = do { idecls_env <- hscRnImportDecls hsc_env this_mod idecls
+  = do { idecls_env <- hscRnImportDecls hsc_env idecls
        	 	    -- This call also loads any orphan modules
        ; imods_env  <- mapM (mkTopLevEnv (hsc_HPT hsc_env)) imods
        ; return (foldr plusGlobalRdrEnv idecls_env imods_env) }
@@ -824,10 +823,6 @@ findGlobalRdrEnv hsc_env imports
 
     imods :: [Module]
     imods = [m | IIModule m <- imports]
-
-    this_mod = case imods of 
-                 []    -> pRELUDE
-                 (m:_) -> m
 
 availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
 availsToGlobalRdrEnv mod_name avails
