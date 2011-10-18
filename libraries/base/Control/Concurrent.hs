@@ -559,7 +559,8 @@ foreign import ccall safe "fdReady"
       threads doing I\/O operations don't block the whole runtime,
       whereas on Unix systems all the currently blocked I\/O requests
       are managed by a single thread (the /IO manager thread/) using
-      @select@.
+      a mechanism such as @epoll@ or @kqueue@, depending on what is
+      provided by the host operating system.
 
       The runtime will run a Haskell thread using any of the available
       worker OS threads.  If you need control over which particular OS
