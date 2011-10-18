@@ -43,14 +43,14 @@ test('TH_NestedSplices',
 
 # Testing profiling with TH is a bit tricky; we've already disabled
 # the prof way above, and also we want to add options specifically for
-# profiling (-osuf p_o) because this is necessary when mixing
+# profiling (-osuf p.o) because this is necessary when mixing
 # profiling w/ TH.  Furthermore we must have built the program the
 # normal way first, which is why the work is done by a Makefile rule.
 test('TH_spliceE5_prof',
      [req_profiling,
       omit_ways(['ghci']),
-      extra_clean(['TH_spliceE5_prof_Lib.p_o', 'TH_spliceE5_prof_Lib.hi',
-                   'TH_spliceE5_prof_Lib.o','TH_spliceE5_prof.p_o'])],
+      extra_clean(['TH_spliceE5_prof_Lib.p.o', 'TH_spliceE5_prof_Lib.hi',
+                   'TH_spliceE5_prof_Lib.o','TH_spliceE5_prof.p.o'])],
      run_command,
      ['$MAKE -s --no-print-directory TH_spliceE5_prof'])
 

@@ -420,7 +420,15 @@ def cmd_prefix( prefix ):
     return lambda opts, p=prefix: _cmd_prefix(opts, prefix)
 
 def _cmd_prefix( opts, prefix ):
-    opts.cmd_prefix = prefix
+    opts.cmd_wrapper = lambda cmd, p=prefix: p + ' ' + cmd;
+
+# ----
+
+def cmd_wrapper( fun ):
+    return lambda opts, f=fun: _cmd_wrapper(opts, fun)
+
+def _cmd_wrapper( opts, fun ):
+    opts.cmd_wrapper = fun
 
 # ----
 
@@ -804,9 +812,6 @@ def ghci_script( name, way, script ):
           ' --interactive -v0 -ignore-dot-ghci ' + \
           join(flags,' ')
 
-    if getTestOpts().cmd_prefix != '':
-        cmd = getTestOpts().cmd_prefix + ' ' + cmd;
-
     getTestOpts().stdin = script
     return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
@@ -893,8 +898,6 @@ def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
             return result
 
         cmd = './' + name;
-        if getTestOpts().cmd_prefix != '':
-            cmd = getTestOpts().cmd_prefix + ' ' + cmd;
 
         # we don't check the compiler's stderr for a compile-and-run test
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
@@ -1067,12 +1070,16 @@ def simple_run( name, way, prog, args ):
         stdin_comes_from = ''
     else:
         stdin_comes_from = ' <' + use_stdin
-    cmd = 'cd ' + getTestOpts().testdir + ' && ' \
-       + prog + ' ' + args + ' '  \
+    cmd = prog + ' ' + args + ' '  \
         + my_rts_flags + ' '       \
         + stdin_comes_from         \
         + ' >' + run_stdout        \
         + ' 2>' + run_stderr
+
+    if getTestOpts().cmd_wrapper != None:
+        cmd = getTestOpts().cmd_wrapper(cmd);
+
+    cmd = 'cd ' + getTestOpts().testdir + ' && ' + cmd
 
     # run the command
     result = runCmdFor(name, cmd)
@@ -1124,11 +1131,6 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail(errname)
     rm_no_fail(name)
 
-    if getTestOpts().cmd_prefix == '':
-        cmd_prefix = ''
-    else:
-        cmd_prefix = getTestOpts().cmd_prefix + ' '
-
     if (top_mod == ''):
         srcname = add_hs_lhs_suffix(name)
     else:
@@ -1169,14 +1171,18 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     script.close()
 
-    cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
-          + config.compiler + "' " \
+    cmd = "'" + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
           + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts + ' ' \
           + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
+
+    if getTestOpts().cmd_wrapper != None:
+        cmd = getTestOpts().cmd_wrapper(cmd);
+
+    cmd = 'cd ' + getTestOpts().testdir + " && " + cmd
 
     result = runCmdFor(name, cmd)
 

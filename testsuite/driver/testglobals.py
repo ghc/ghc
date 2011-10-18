@@ -216,8 +216,8 @@ class TestOptions:
        # Command to run for extra cleaning
        self.clean_cmd = None
 
-       # Prefix to put on the command before running it
-       self.cmd_prefix = ''
+       # Command wrapper: a function to apply to the command before running it
+       self.cmd_wrapper = None
 
        # Prefix to put on the command before compiling it
        self.compile_cmd_prefix = ''
