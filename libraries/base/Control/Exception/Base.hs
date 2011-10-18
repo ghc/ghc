@@ -358,8 +358,8 @@ blocked  = return False
 --
 -- Note that we have to give a type signature to @e@, or the program
 -- will not typecheck as the type is ambiguous. While it is possible
--- to catch exceptions of any type, see the previous section \"Catching all
--- exceptions\" for an explanation of the problems with doing so.
+-- to catch exceptions of any type, see the section \"Catching all
+-- exceptions\" (in "Control.Exception") for an explanation of the problems with doing so.
 --
 -- For catching exceptions in pure (non-'IO') expressions, see the
 -- function 'evaluate'.
