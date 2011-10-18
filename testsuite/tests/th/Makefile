@@ -12,8 +12,8 @@ T2386:
 HC_OPTS = -XTemplateHaskell -package template-haskell
 
 TH_spliceE5_prof::
-	$(RM) TH_spliceE5_prof*.o TH_spliceE5_prof*.hi TH_spliceE5_prof*.p_o 
+	$(RM) TH_spliceE5_prof*.o TH_spliceE5_prof*.hi TH_spliceE5_prof*.p.o 
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -c
-	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -prof -auto-all -osuf p_o -o $@
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -prof -auto-all -osuf p.o -o $@
 	./$@
 
