@@ -36,8 +36,7 @@ data Platform
 --      about what instruction set extensions an architecture might support.
 --
 data Arch
-        = ArchUnknown
-        | ArchX86
+        = ArchX86
         | ArchX86_64
         | ArchPPC
         | ArchPPC_64
@@ -48,11 +47,9 @@ data Arch
         deriving (Show, Eq)
 
 
--- | Operating systems that the native code generator knows about.
---      Having OSUnknown should produce a sensible default, but no promises.
+-- | Operating systems that we know about.
 data OS
-        = OSUnknown
-        | OSLinux
+        = OSLinux
         | OSDarwin
         | OSSolaris2
         | OSMinGW32
@@ -79,7 +76,6 @@ data ArmISAExt
 
 target32Bit :: Platform -> Bool
 target32Bit p = case platformArch p of
-                ArchUnknown -> panic "Don't know if ArchUnknown is 32bit"
                 ArchX86     -> True
                 ArchX86_64  -> False
                 ArchPPC     -> True
@@ -96,7 +92,6 @@ osElfTarget OSOpenBSD  = True
 osElfTarget OSSolaris2 = True
 osElfTarget OSDarwin   = False
 osElfTarget OSMinGW32  = False
-osElfTarget OSUnknown  = panic "Don't know if OSUnknown is elf"
 
 
 -- | This is the target platform as far as the #ifdefs are concerned.
@@ -121,7 +116,7 @@ defaultTargetArch       = ArchSPARC
 #elif arm_TARGET_ARCH
 defaultTargetArch       = ArchARM defaultTargetArmISA defaultTargetArmISAExt
 #else
-defaultTargetArch       = ArchUnknown
+#error Unknown Arch
 #endif
 
 
@@ -142,7 +137,7 @@ defaultTargetOS = OSFreeBSD
 #elif openbsd_TARGET_OS
 defaultTargetOS = OSOpenBSD
 #else
-defaultTargetOS = OSUnknown
+#error Unknown OS
 #endif
 
 #if arm_TARGET_ARCH
