@@ -83,21 +83,20 @@ rts/libs.depend : $(GHC_PKG_INPLACE)
 # 	These are made from rts/win32/libHS*.def which contain lists of
 # 	all the symbols in those libraries used by the RTS.
 #
-ifneq "$$(findstring dyn, $1)" ""
 ifeq  "$(HOSTPLATFORM)" "i386-unknown-mingw32" 
 
 ALL_RTS_DEF_LIBNAMES 	= base ghc-prim
 ALL_RTS_DEF_LIBS	= \
 	rts/dist/build/win32/libHSbase.dll.a \
 	rts/dist/build/win32/libHSghc-prim.dll.a \
-	rts/dist/build/win32/libHSffi.dll.a 
+	libffi/build/inst/lib/libffi.dll.a
 
 # -- import libs for the regular Haskell libraries
 define make-importlib-def # args $1 = lib name
 rts/dist/build/win32/libHS$1.def : rts/win32/libHS$1.def
 	cat rts/win32/libHS$1.def \
 		| sed "s/@LibVersion@/$$(libraries/$1_dist-install_VERSION)/" \
-		| sed "s/@ProjectVersion@/$(ProjectVersion)/" \
+		| sed "s/@ProjectVersion@/$$(ProjectVersion)/" \
 		> rts/dist/build/win32/libHS$1.def
 
 rts/dist/build/win32/libHS$1.dll.a : rts/dist/build/win32/libHS$1.def
@@ -105,18 +104,6 @@ rts/dist/build/win32/libHS$1.dll.a : rts/dist/build/win32/libHS$1.def
 			-l rts/dist/build/win32/libHS$1.dll.a
 endef
 $(foreach lib,$(ALL_RTS_DEF_LIBNAMES),$(eval $(call make-importlib-def,$(lib))))
-
-
-# -- import libs for libffi
-rts/dist/build/win32/libHSffi.def : rts/win32/libHSffi.def
-	cat rts/win32/libHSffi.def \
-		| sed "s/@ProjectVersion@/$(ProjectVersion)/" \
-		> rts/dist/build/win32/libHSffi.def
-
-rts/dist/build/win32/libHSffi.dll.a : rts/dist/build/win32/libHSffi.def
-	"$(DLLTOOL)" 	-d rts/dist/build/win32/libHSffi.def \
-			-l rts/dist/build/win32/libHSffi.dll.a
-endif
 endif
 
 ifneq "$(BINDIST)" "YES"
@@ -130,6 +117,9 @@ $(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) | $$(dir $$@)/.
 # depend on libffi.so, but copy libffi.so*
 rts/dist/build/libffi$(soext): libffi/build/inst/lib/libffi$(soext)
 	cp libffi/build/inst/lib/libffi$(soext)* rts/dist/build
+
+rts/dist/build/libffi-5.dll: libffi/build/inst/bin/libffi-5.dll
+	cp $< $@
 endif
 
 #-----------------------------------------------------------------------------
@@ -184,10 +174,10 @@ rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
 ifeq "$$(HOSTPLATFORM)" "i386-unknown-mingw32"
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend rts/dist/build/libffi-5.dll
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
+	  -no-auto-link-packages -Lrts/dist/build -lffi-5 `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend rts/dist/build/libffi$$(soext)
 	"$$(RM)" $$(RM_OPTS) $$@
@@ -526,6 +516,7 @@ endif
 
 INSTALL_LIBS += $(ALL_RTS_LIBS)
 INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
+INSTALL_LIBS += $(wildcard rts/dist/build/libffi-5.dll)
 
 # -----------------------------------------------------------------------------
 # cleaning
