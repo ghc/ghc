@@ -300,18 +300,17 @@ hscGetModuleInterface hsc_env mod
 -- | Rename some import declarations
 hscRnImportDecls
         :: HscEnv
-        -> Module
         -> [LImportDecl RdrName]
         -> IO GlobalRdrEnv
 
 -- It is important that we use tcRnImports instead of calling rnImports directly
 -- because tcRnImports will force-load any orphan modules necessary, making extra
 -- instances/family instances visible (GHC #4832)
-hscRnImportDecls hsc_env this_mod import_decls
+hscRnImportDecls hsc_env import_decls
   = runHsc hsc_env $ ioMsgMaybe $ 
-    initTc hsc_env HsSrcFile False this_mod $
+    initTc hsc_env HsSrcFile False iNTERACTIVE $ -- iNTERACTIVE, see #5545
     fmap tcg_rdr_env $ 
-    tcRnImports hsc_env this_mod import_decls
+    tcRnImports hsc_env iNTERACTIVE import_decls
 #endif
 
 -- -----------------------------------------------------------------------------
