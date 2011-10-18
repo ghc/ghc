@@ -311,14 +311,7 @@ test('dynHelloWorld',
      compile_and_run,
      [''])
 
-# simple test that we can load and use the GHC package in all ways
-# (in #5313 it was failing the dyn way)
-p = subprocess.Popen([config.compiler, "--print-libdir"], stdout=subprocess.PIPE)
-libdir = chop(p.stdout.read())
-p.stdout.close
-
-test('5313', extra_run_opts('\'' + libdir + '\''), compile_and_run, ['-package ghc'])
-# extra_run_opts: be careful about quoting on Windows!
+test('5313', extra_run_opts('"' + config.libdir + '"'), compile_and_run, ['-package ghc'])
 
 test('2464', normal, compile, [''])
 test('3674',
