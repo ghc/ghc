@@ -15,7 +15,8 @@
 #define RTS_STABLE_H
 
 EXTERN_INLINE StgPtr deRefStablePtr (StgStablePtr stable_ptr);
-StgStablePtr getStablePtr  (StgPtr p);
+StgStablePtr getStablePtr (StgPtr p);
+void freeStablePtr (StgStablePtr sp);
 
 /* -----------------------------------------------------------------------------
    PRIVATE from here.
