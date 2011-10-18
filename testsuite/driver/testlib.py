@@ -531,100 +531,103 @@ def get_package_cache_timestamp():
 
 
 def test_common_work (name, opts, func, args):
-    t.total_tests = t.total_tests+1
-    setLocalTestOpts(opts)
+    try:
+        t.total_tests = t.total_tests+1
+        setLocalTestOpts(opts)
 
-    package_conf_cache_file_start_timestamp = get_package_cache_timestamp()
+        package_conf_cache_file_start_timestamp = get_package_cache_timestamp()
 
-    # All the ways we might run this test
-    if func == compile or func == multimod_compile:
-        all_ways = config.compile_ways
-    elif func == compile_and_run or func == multimod_compile_and_run or func == multisrc_compile_and_run:
-        all_ways = config.run_ways
-    elif func == ghci_script:
-        if 'ghci' in config.run_ways:
-            all_ways = ['ghci']
+        # All the ways we might run this test
+        if func == compile or func == multimod_compile:
+            all_ways = config.compile_ways
+        elif func == compile_and_run or func == multimod_compile_and_run or func == multisrc_compile_and_run:
+            all_ways = config.run_ways
+        elif func == ghci_script:
+            if 'ghci' in config.run_ways:
+                all_ways = ['ghci']
+            else:
+                all_ways = []
         else:
-            all_ways = []
-    else:
-        all_ways = ['normal']
+            all_ways = ['normal']
 
-    # A test itself can request extra ways by setting opts.extra_ways
-    all_ways = all_ways + filter(lambda way: way not in all_ways,
-                                 opts.extra_ways)
+        # A test itself can request extra ways by setting opts.extra_ways
+        all_ways = all_ways + filter(lambda way: way not in all_ways,
+                                     opts.extra_ways)
 
-    t.total_test_cases = t.total_test_cases + len(all_ways)
+        t.total_test_cases = t.total_test_cases + len(all_ways)
 
-    ok_way = lambda way: \
-        not getTestOpts().skip \
-        and (config.only == [] or name in config.only) \
-        and (getTestOpts().only_ways == [] or way in getTestOpts().only_ways) \
-        and (config.cmdline_ways == [] or way in config.cmdline_ways) \
-        and way not in getTestOpts().omit_ways
+        ok_way = lambda way: \
+            not getTestOpts().skip \
+            and (config.only == [] or name in config.only) \
+            and (getTestOpts().only_ways == [] or way in getTestOpts().only_ways) \
+            and (config.cmdline_ways == [] or way in config.cmdline_ways) \
+            and way not in getTestOpts().omit_ways
 
-    # Which ways we are asked to skip
-    do_ways = filter (ok_way,all_ways)
+        # Which ways we are asked to skip
+        do_ways = filter (ok_way,all_ways)
 
-    # In fast mode, we skip all but one way
-    if config.fast and len(do_ways) > 0:
-        do_ways = [do_ways[0]]
+        # In fast mode, we skip all but one way
+        if config.fast and len(do_ways) > 0:
+            do_ways = [do_ways[0]]
 
-    if not config.clean_only:
-        # Run the required tests...
-        for way in do_ways:
-            do_test (name, way, func, args)
+        if not config.clean_only:
+            # Run the required tests...
+            for way in do_ways:
+                do_test (name, way, func, args)
 
-        for way in all_ways:
-            if way not in do_ways:
-                skiptest (name,way)
+            for way in all_ways:
+                if way not in do_ways:
+                    skiptest (name,way)
 
-    if getTestOpts().cleanup != '' and (config.clean_only or do_ways != []):
-        clean(map (lambda suff: name + suff,
-                  ['', '.exe', '.exe.manifest', '.genscript',
-                   '.stderr.normalised',        '.stdout.normalised',
-                   '.run.stderr',               '.run.stdout',
-                   '.run.stderr.normalised',    '.run.stdout.normalised',
-                   '.comp.stderr',              '.comp.stdout',
-                   '.comp.stderr.normalised',   '.comp.stdout.normalised',
-                   '.interp.stderr',            '.interp.stdout',
-                   '.interp.stderr.normalised', '.interp.stdout.normalised',
-                   '.stats', '.comp.stats',
-                   '.hi', '.o', '.prof', '.exe.prof', '.hc',
-                   '_stub.h', '_stub.c', '_stub.o',
-                   '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
+        if getTestOpts().cleanup != '' and (config.clean_only or do_ways != []):
+            clean(map (lambda suff: name + suff,
+                      ['', '.exe', '.exe.manifest', '.genscript',
+                       '.stderr.normalised',        '.stdout.normalised',
+                       '.run.stderr',               '.run.stdout',
+                       '.run.stderr.normalised',    '.run.stdout.normalised',
+                       '.comp.stderr',              '.comp.stdout',
+                       '.comp.stderr.normalised',   '.comp.stdout.normalised',
+                       '.interp.stderr',            '.interp.stdout',
+                       '.interp.stderr.normalised', '.interp.stdout.normalised',
+                       '.stats', '.comp.stats',
+                       '.hi', '.o', '.prof', '.exe.prof', '.hc',
+                       '_stub.h', '_stub.c', '_stub.o',
+                       '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
 
-        if func == multisrc_compile or func == multisrc_compile_fail \
-            or func == multi_compile or func == multi_compile_fail:
-                extra_mods = args[1]
-                clean(map (lambda (f,x): replace_suffix(f, 'o'), extra_mods))
-                clean(map (lambda (f,x): replace_suffix(f, 'hi'), extra_mods))
+            if func == multisrc_compile or func == multisrc_compile_fail \
+                or func == multi_compile or func == multi_compile_fail:
+                    extra_mods = args[1]
+                    clean(map (lambda (f,x): replace_suffix(f, 'o'), extra_mods))
+                    clean(map (lambda (f,x): replace_suffix(f, 'hi'), extra_mods))
 
-        clean(getTestOpts().clean_files)
+            clean(getTestOpts().clean_files)
+
+            try:
+                cleanCmd = getTestOpts().clean_cmd
+                if cleanCmd != None:
+                    result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
+                    if result != 0:
+                        framework_fail(name, 'cleaning', 'clean-command failed: ' + str(result))
+            except e:
+                framework_fail(name, 'cleaning', 'clean-command exception')
+
+        package_conf_cache_file_end_timestamp = get_package_cache_timestamp();
+
+        if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
+            framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
 
         try:
-            cleanCmd = getTestOpts().clean_cmd
-            if cleanCmd != None:
-                result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
-                if result != 0:
-                    framework_fail(name, 'cleaning', 'clean-command failed: ' + str(result))
-        except e:
-            framework_fail(name, 'cleaning', 'clean-command exception')
-
-    package_conf_cache_file_end_timestamp = get_package_cache_timestamp();
-
-    if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
-        framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
-
-    try:
-        for f in files_written[name]:
-            if os.path.exists(f):
-                try:
-                    if not f in files_written_not_removed[name]:
-                        files_written_not_removed[name].append(f)
-                except:
-                    files_written_not_removed[name] = [f]
-    except:
-        pass
+            for f in files_written[name]:
+                if os.path.exists(f):
+                    try:
+                        if not f in files_written_not_removed[name]:
+                            files_written_not_removed[name].append(f)
+                    except:
+                        files_written_not_removed[name] = [f]
+        except:
+            pass
+    except Exception, e:
+        framework_fail(name, 'runTest', 'Unhandled exception: ' + str(e))
 
 def clean(strs):
     for str in strs:
