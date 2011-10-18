@@ -19,6 +19,8 @@
 
 #include "BeginPrivate.h"
 
+void    freeStablePtr         ( StgStablePtr sp );
+
 void    initStablePtrTable    ( void );
 void    exitStablePtrTable    ( void );
 StgWord lookupStableName      ( StgPtr p );
