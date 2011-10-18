@@ -59,6 +59,12 @@ test('4811', normal, compile_and_run, [''])
 
 test('allowinterrupt001', normal, compile_and_run, [''])
 
+# try hard to provoke the error by running the test 100 times
+test('5558',
+     [ only_ways(['threaded2']),
+       cmd_wrapper(lambda c: 'for i in `seq 1 100`; do ' + c + '; done') ],
+     compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
@@ -199,4 +205,3 @@ test('conc067', ignore_output, compile_and_run, [''])
 # omit threaded2, the behaviour of this test is non-deterministic with more
 # than one CPU.
 test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
-
