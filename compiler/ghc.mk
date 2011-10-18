@@ -105,6 +105,8 @@ endif
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
 	@echo 'cRAWCPP_FLAGS         :: String'                             >> $@
 	@echo 'cRAWCPP_FLAGS         = "$(RAWCPP_FLAGS)"'                   >> $@
+	@echo 'cLdHasNoCompactUnwind :: String'                             >> $@
+	@echo 'cLdHasNoCompactUnwind = "$(LdHasNoCompactUnwind)"'           >> $@
 	@echo 'cLdIsGNULd            :: String'                             >> $@
 	@echo 'cLdIsGNULd            = "$(LdIsGNULd)"'                      >> $@
 	@echo 'cLdHasBuildId         :: String'                             >> $@

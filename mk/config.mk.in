@@ -693,6 +693,10 @@ LdIsGNULd		= @LdIsGNULd@
 # disable it with --build-id=none.
 LdHasBuildId	        = @LdHasBuildId@
 
+# Set to YES if ld has the --no_compact_unwind flag. See #5019
+# and compiler/main/DriverPipeline.hs.
+LdHasNoCompactUnwind	= @LdHasNoCompactUnwind@
+
 # On MSYS, building with SplitObjs=YES fails with 
 #   ar: Bad file number
 # see #3201.  We need to specify a smaller max command-line size
