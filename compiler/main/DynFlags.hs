@@ -41,6 +41,7 @@ module DynFlags (
         SafeHaskellMode(..),
         safeHaskellOn, safeLanguageOn,
         safeDirectImpsReq, safeImplicitImpsReq,
+        packageTrustOn,
 
         -- ** System tool settings and locations
         Settings(..),
@@ -295,6 +296,9 @@ data DynFlag
    | Opt_KeepTmpFiles
    | Opt_KeepRawTokenStream
    | Opt_KeepLlvmFiles
+
+   -- safe haskell flags
+   | Opt_PackageTrust
 
    deriving (Eq, Show)
 
@@ -1012,6 +1016,10 @@ setLanguage l = upd f
 dynFlagDependencies :: DynFlags -> [ModuleName]
 dynFlagDependencies = pluginModNames
 
+-- | Is the -fpackage-trust mode on
+packageTrustOn :: DynFlags -> Bool
+packageTrustOn = dopt Opt_PackageTrust
+
 -- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool
 safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
@@ -1601,6 +1609,9 @@ dynamic_flags = [
   , Flag "fobject-code"     (NoArg (setTarget defaultHscTarget))
   , Flag "fglasgow-exts"    (NoArg (enableGlasgowExts >> deprecate "Use individual extensions instead"))
   , Flag "fno-glasgow-exts" (NoArg (disableGlasgowExts >> deprecate "Use individual extensions instead"))
+
+        ------ Safe Haskell flags -------------------------------------------
+  , Flag "fpackage-trust"   (NoArg (setDynFlag Opt_PackageTrust))
  ]
  ++ map (mkFlag turnOn  "f"    setDynFlag  ) fFlags
  ++ map (mkFlag turnOff "fno-" unSetDynFlag) fFlags
