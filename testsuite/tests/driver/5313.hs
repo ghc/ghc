@@ -2,9 +2,7 @@ import qualified GHC
 import System.Environment
 
 main = do
-  (libdir0:_) <- getArgs
-  let libdir = filter (/= '\'') libdir0 -- sigh, remove superfluous quotes.
-                                        -- necessary to get the ghci way working
+  (libdir:_) <- getArgs
   GHC.runGhcT (Just libdir) $ do
       -- begin initialize
       df0 <- GHC.getSessionDynFlags
