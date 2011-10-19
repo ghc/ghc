@@ -59,6 +59,7 @@ normalRegColors platform
                   ArchPPC_64  -> panic "X86 normalRegColors ArchPPC_64"
                   ArchSPARC   -> panic "X86 normalRegColors ArchSPARC"
                   ArchARM _ _ -> panic "X86 normalRegColors ArchARM"
+                  ArchUnknown -> panic "X86 normalRegColors ArchUnknown"
 
 fpRegColors :: [(Reg,String)]
 fpRegColors =

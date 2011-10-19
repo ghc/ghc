@@ -36,7 +36,8 @@ data Platform
 --      about what instruction set extensions an architecture might support.
 --
 data Arch
-        = ArchX86
+        = ArchUnknown
+        | ArchX86
         | ArchX86_64
         | ArchPPC
         | ArchPPC_64
@@ -76,6 +77,7 @@ data ArmISAExt
 
 target32Bit :: Platform -> Bool
 target32Bit p = case platformArch p of
+                ArchUnknown -> panic "Don't know if ArchUnknown is 32bit"
                 ArchX86     -> True
                 ArchX86_64  -> False
                 ArchPPC     -> True
@@ -116,7 +118,7 @@ defaultTargetArch       = ArchSPARC
 #elif arm_TARGET_ARCH
 defaultTargetArch       = ArchARM defaultTargetArmISA defaultTargetArmISAExt
 #else
-#error Unknown Arch
+defaultTargetArch       = ArchUnknown
 #endif
 
 
