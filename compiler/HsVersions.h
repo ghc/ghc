@@ -16,11 +16,6 @@ you will screw up the layout where they are used in case expressions!
 /* Pull in all the platform defines for this build (foo_TARGET_ARCH etc.) */
 #include "ghc_boot_platform.h"
 
-/* This macro indicates that the target OS supports ELF-like shared libraries */
-#if linux_TARGET_OS || freebsd_TARGET_OS || openbsd_TARGET_OS || solaris2_TARGET_OS
-#define elf_OBJ_FORMAT 1
-#endif
-
 /* Pull in the autoconf defines (HAVE_FOO), but don't include
  * ghcconfig.h, because that will include ghcplatform.h which has the
  * wrong platform settings for the compiler (it has the platform
