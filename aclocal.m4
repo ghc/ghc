@@ -225,6 +225,20 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         esac
     }
 
+    dnl ** check for Apple-style dead-stripping support
+    dnl    (.subsections-via-symbols assembler directive)
+
+    AC_MSG_CHECKING(for .subsections_via_symbols)
+    AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
+        [AC_MSG_RESULT(yes)
+         HaskellHaveSubsectionsViaSymbols=True
+         AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
+                   [Define to 1 if Apple-style dead-stripping is supported.])
+        ],
+        [HaskellHaveSubsectionsViaSymbols=False
+         AC_MSG_RESULT(no)])
+
     checkArch "$BuildArch" ""
     checkVendor "$BuildVendor"
     checkOS "$BuildOS" ""
@@ -239,6 +253,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     AC_SUBST(HaskellTargetArch)
     AC_SUBST(HaskellTargetOs)
+    AC_SUBST(HaskellHaveSubsectionsViaSymbols)
 ])
 
 

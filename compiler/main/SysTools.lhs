@@ -191,6 +191,7 @@ initSysTools mbMinusB
                                 Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
         ; targetArch <- readSetting "target arch"
         ; targetOS <- readSetting "target os"
+        ; targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
         ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
         -- On Windows, mingw is distributed with GHC,
         -- so we look in TopDir/../mingw/bin
@@ -252,7 +253,8 @@ initSysTools mbMinusB
         ; return $ Settings {
                         sTargetPlatform = Platform {
                                               platformArch = targetArch,
-                                              platformOS   = targetOS
+                                              platformOS   = targetOS,
+                                              platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
                                           },
                         sTmpDir = normalise tmpdir,
                         sGhcUsagePath = ghc_usage_msg_path,

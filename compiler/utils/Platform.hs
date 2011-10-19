@@ -19,9 +19,11 @@ import Panic
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
 data Platform
-        = Platform
-        { platformArch  :: Arch
-        , platformOS    :: OS }
+        = Platform {
+              platformArch                     :: Arch,
+              platformOS                       :: OS,
+              platformHasSubsectionsViaSymbols :: Bool
+          }
         deriving (Read, Show, Eq)
 
 

@@ -9,6 +9,7 @@
  ("windres command", "@SettingsWindresCommand@"),
  ("perl command", "@SettingsPerlCommand@"),
  ("target os", "@HaskellTargetOs@"),
- ("target arch", "@HaskellTargetArch@")
+ ("target arch", "@HaskellTargetArch@"),
+ ("target has subsections via symbols", "@HaskellHaveSubsectionsViaSymbols@")
  ]
 

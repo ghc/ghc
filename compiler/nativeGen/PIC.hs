@@ -510,7 +510,7 @@ pprGotDeclaration _ _
 -- the splitter in driver/split/ghc-split.lprl recognizes the new output
 
 pprImportedSymbol :: Platform -> CLabel -> Doc
-pprImportedSymbol platform@(Platform ArchPPC OSDarwin) importedLbl
+pprImportedSymbol platform@(Platform { platformArch = ArchPPC, platformOS = OSDarwin }) importedLbl
 	| Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
 	= case opt_PIC of
            False ->
@@ -564,7 +564,7 @@ pprImportedSymbol platform@(Platform ArchPPC OSDarwin) importedLbl
 	= empty
 
 		
-pprImportedSymbol platform@(Platform ArchX86 OSDarwin) importedLbl
+pprImportedSymbol platform@(Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl
 	| Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
 	= case opt_PIC of
            False ->
@@ -617,7 +617,7 @@ pprImportedSymbol platform@(Platform ArchX86 OSDarwin) importedLbl
 	= empty
 
 
-pprImportedSymbol (Platform _ OSDarwin) _
+pprImportedSymbol (Platform { platformOS = OSDarwin }) _
 	= empty
 	
 
@@ -650,12 +650,12 @@ pprImportedSymbol (Platform _ OSDarwin) _
 -- the NCG will keep track of all DynamicLinkerLabels it uses
 -- and output each of them using pprImportedSymbol.
 
-pprImportedSymbol (Platform ArchPPC_64 os) _
-	| osElfTarget os
+pprImportedSymbol platform@(Platform { platformArch = ArchPPC_64 }) _
+	| osElfTarget (platformOS platform)
 	= empty
 
-pprImportedSymbol platform@(Platform _ os) importedLbl
-	| osElfTarget os
+pprImportedSymbol platform importedLbl
+	| osElfTarget (platformOS platform)
 	= case dynamicLinkerLabelInfo importedLbl of
 	    Just (SymbolPtr, lbl)
 	      -> let symbolSize = case wordWidth of

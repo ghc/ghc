@@ -1103,37 +1103,38 @@ asmTempLabelPrefix platform =
 
 pprDynamicLinkerAsmLabel :: Platform -> DynamicLinkerLabelInfo -> CLabel -> SDoc
 pprDynamicLinkerAsmLabel platform dllInfo lbl
- = if platform == Platform ArchX86_64 OSDarwin
-   then case dllInfo of
-        CodeStub        -> char 'L' <> pprCLabel platform lbl <> text "$stub"
-        SymbolPtr       -> char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr"
-        GotSymbolPtr    -> pprCLabel platform lbl <> text "@GOTPCREL"
-        GotSymbolOffset -> pprCLabel platform lbl
-   else if platformOS platform == OSDarwin
-   then case dllInfo of
-        CodeStub  -> char 'L' <> pprCLabel platform lbl <> text "$stub"
-        SymbolPtr -> char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr"
-        _         -> panic "pprDynamicLinkerAsmLabel"
-   else if platformArch platform == ArchPPC && osElfTarget (platformOS platform)
-   then case dllInfo of
-        CodeStub  -> pprCLabel platform lbl <> text "@plt"
-        SymbolPtr -> text ".LC_" <> pprCLabel platform lbl
-        _         -> panic "pprDynamicLinkerAsmLabel"
-   else if platformArch platform == ArchX86_64 && osElfTarget (platformOS platform)
-   then case dllInfo of
-        CodeStub        -> pprCLabel platform lbl <> text "@plt"
-        GotSymbolPtr    -> pprCLabel platform lbl <> text "@gotpcrel"
-        GotSymbolOffset -> pprCLabel platform lbl
-        SymbolPtr       -> text ".LC_" <> pprCLabel platform lbl
+ = if platformOS platform == OSDarwin
+   then if platformArch platform == ArchX86_64
+        then case dllInfo of
+             CodeStub        -> char 'L' <> pprCLabel platform lbl <> text "$stub"
+             SymbolPtr       -> char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr"
+             GotSymbolPtr    -> pprCLabel platform lbl <> text "@GOTPCREL"
+             GotSymbolOffset -> pprCLabel platform lbl
+        else case dllInfo of
+             CodeStub  -> char 'L' <> pprCLabel platform lbl <> text "$stub"
+             SymbolPtr -> char 'L' <> pprCLabel platform lbl <> text "$non_lazy_ptr"
+             _         -> panic "pprDynamicLinkerAsmLabel"
+
    else if osElfTarget (platformOS platform)
-   then case dllInfo of
-        CodeStub        -> pprCLabel platform lbl <> text "@plt"
-        SymbolPtr       -> text ".LC_" <> pprCLabel platform lbl
-        GotSymbolPtr    -> pprCLabel platform lbl <> text "@got"
-        GotSymbolOffset -> pprCLabel platform lbl <> text "@gotoff"
+        then if platformArch platform == ArchPPC
+             then case dllInfo of
+                  CodeStub  -> pprCLabel platform lbl <> text "@plt"
+                  SymbolPtr -> text ".LC_" <> pprCLabel platform lbl
+                  _         -> panic "pprDynamicLinkerAsmLabel"
+             else if platformArch platform == ArchX86_64
+                  then case dllInfo of
+                       CodeStub        -> pprCLabel platform lbl <> text "@plt"
+                       GotSymbolPtr    -> pprCLabel platform lbl <> text "@gotpcrel"
+                       GotSymbolOffset -> pprCLabel platform lbl
+                       SymbolPtr       -> text ".LC_" <> pprCLabel platform lbl
+        else case dllInfo of
+             CodeStub        -> pprCLabel platform lbl <> text "@plt"
+             SymbolPtr       -> text ".LC_" <> pprCLabel platform lbl
+             GotSymbolPtr    -> pprCLabel platform lbl <> text "@got"
+             GotSymbolOffset -> pprCLabel platform lbl <> text "@gotoff"
    else if platformOS platform == OSMinGW32
-   then case dllInfo of
-        SymbolPtr -> text "__imp_" <> pprCLabel platform lbl
-        _         -> panic "pprDynamicLinkerAsmLabel"
+        then case dllInfo of
+             SymbolPtr -> text "__imp_" <> pprCLabel platform lbl
+             _         -> panic "pprDynamicLinkerAsmLabel"
    else panic "pprDynamicLinkerAsmLabel"
 
