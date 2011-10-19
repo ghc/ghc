@@ -203,6 +203,12 @@ nativeCodeGen dflags h us cmms
                      panic "nativeCodeGen: No NCG for ARM"
                  ArchPPC_64 ->
                      panic "nativeCodeGen: No NCG for PPC 64"
+                 ArchAlpha ->
+                     panic "nativeCodeGen: No NCG for Alpha"
+                 ArchMipseb ->
+                     panic "nativeCodeGen: No NCG for mipseb"
+                 ArchMipsel ->
+                     panic "nativeCodeGen: No NCG for mipsel"
                  ArchUnknown ->
                      panic "nativeCodeGen: No NCG for unknown arch"
 

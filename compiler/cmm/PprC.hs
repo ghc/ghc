@@ -59,10 +59,6 @@ import Data.Array.ST
 
 import Control.Monad.ST
 
-#if defined(alpha_TARGET_ARCH) || defined(mips_TARGET_ARCH) || defined(mipsel_TARGET_ARCH) || defined(arm_TARGET_ARCH)
-#define BEWARE_LOAD_STORE_ALIGNMENT
-#endif
-
 -- --------------------------------------------------------------------------
 -- Top level
 
@@ -952,16 +948,21 @@ cCast :: Platform -> SDoc -> CmmExpr -> SDoc
 cCast platform ty expr = parens ty <> pprExpr1 platform expr
 
 cLoad :: Platform -> CmmExpr -> CmmType -> SDoc
-#ifdef BEWARE_LOAD_STORE_ALIGNMENT
-cLoad platform expr rep =
-    let decl = machRepCType rep <+> ptext (sLit "x") <> semi
-        struct = ptext (sLit "struct") <+> braces (decl)
-        packed_attr = ptext (sLit "__attribute__((packed))")
-        cast = parens (struct <+> packed_attr <> char '*')
-    in parens (cast <+> pprExpr1 platform expr) <> ptext (sLit "->x")
-#else
-cLoad platform expr rep = char '*' <> parens (cCast platform (machRepPtrCType rep) expr)
-#endif
+cLoad platform expr rep
+ | bewareLoadStoreAlignment (platformArch platform)
+   = let decl = machRepCType rep <+> ptext (sLit "x") <> semi
+         struct = ptext (sLit "struct") <+> braces (decl)
+         packed_attr = ptext (sLit "__attribute__((packed))")
+         cast = parens (struct <+> packed_attr <> char '*')
+     in parens (cast <+> pprExpr1 platform expr) <> ptext (sLit "->x")
+ | otherwise
+    = char '*' <> parens (cCast platform (machRepPtrCType rep) expr)
+    where -- On these platforms, unaligned loads are known to cause problems
+          bewareLoadStoreAlignment ArchAlpha    = True
+          bewareLoadStoreAlignment ArchMipseb   = True
+          bewareLoadStoreAlignment ArchMipsel   = True
+          bewareLoadStoreAlignment (ArchARM {}) = True
+          bewareLoadStoreAlignment _            = False
 
 isCmmWordType :: CmmType -> Bool
 -- True of GcPtrReg/NonGcReg of native word size

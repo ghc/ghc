@@ -42,6 +42,9 @@ data Arch
         | ArchARM
           { armISA    :: ArmISA
           , armISAExt :: [ArmISAExt] }
+        | ArchAlpha
+        | ArchMipseb
+        | ArchMipsel
         deriving (Read, Show, Eq)
 
 
@@ -83,6 +86,9 @@ target32Bit p = case platformArch p of
                 ArchPPC_64  -> False
                 ArchSPARC   -> True
                 ArchARM _ _ -> True
+                ArchMipseb  -> True
+                ArchMipsel  -> True
+                ArchAlpha   -> False
 
 
 -- | This predicates tells us whether the OS supports ELF-like shared libraries.
