@@ -853,6 +853,7 @@ genCCall target dest_regs argsAndHints
           OSMinGW32  -> panic "PPC.CodeGen.genCCall: not defined for this os"
           OSFreeBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
           OSOpenBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSUnknown  -> panic "PPC.CodeGen.genCCall: not defined for this os"
 
 data GenCCallPlatform = GCPLinux | GCPDarwin
 

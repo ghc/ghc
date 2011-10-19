@@ -48,9 +48,11 @@ data Arch
         deriving (Show, Eq)
 
 
--- | Operating systems that we know about.
+-- | Operating systems that the native code generator knows about.
+--      Having OSUnknown should produce a sensible default, but no promises.
 data OS
-        = OSLinux
+        = OSUnknown
+        | OSLinux
         | OSDarwin
         | OSSolaris2
         | OSMinGW32
@@ -94,6 +96,7 @@ osElfTarget OSOpenBSD  = True
 osElfTarget OSSolaris2 = True
 osElfTarget OSDarwin   = False
 osElfTarget OSMinGW32  = False
+osElfTarget OSUnknown  = panic "Don't know if OSUnknown is elf"
 
 
 -- | This is the target platform as far as the #ifdefs are concerned.
@@ -139,7 +142,7 @@ defaultTargetOS = OSFreeBSD
 #elif openbsd_TARGET_OS
 defaultTargetOS = OSOpenBSD
 #else
-#error Unknown OS
+defaultTargetOS = OSUnknown
 #endif
 
 #if arm_TARGET_ARCH
