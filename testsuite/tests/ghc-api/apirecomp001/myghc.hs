@@ -47,7 +47,6 @@ main = do
     r <- runStmt "main" RunToCompletion
     case r of
       RunOk _        -> prn "ok"
-      RunFailed      -> prn "compilation failed"
       RunException _ -> prn "exception"
       RunBreak _ _ _ -> prn "breakpoint"
     liftIO $ hFlush stdout
