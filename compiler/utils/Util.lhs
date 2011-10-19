@@ -69,7 +69,7 @@ module Util (
         readRational,
 
         -- * read helpers
-        maybeReadFuzzy,
+        maybeRead, maybeReadFuzzy,
 
         -- * IO-ish utilities
         createDirectoryHierarchy,
@@ -988,6 +988,11 @@ readRational top_s
 
 -----------------------------------------------------------------------------
 -- read helpers
+
+maybeRead :: Read a => String -> Maybe a
+maybeRead str = case reads str of
+                [(x, "")] -> Just x
+                _         -> Nothing
 
 maybeReadFuzzy :: Read a => String -> Maybe a
 maybeReadFuzzy str = case reads str of

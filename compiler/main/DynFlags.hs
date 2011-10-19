@@ -45,6 +45,7 @@ module DynFlags (
 
         -- ** System tool settings and locations
         Settings(..),
+        targetPlatform,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
@@ -456,7 +457,6 @@ data DynFlags = DynFlags {
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
 
-  targetPlatform        :: Platform.Platform, -- ^ The platform we're compiling for. Used by the NCG.
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
   mainModIs             :: Module,
@@ -569,6 +569,7 @@ data DynFlags = DynFlags {
  }
 
 data Settings = Settings {
+  sTargetPlatform        :: Platform,    -- Filled in by SysTools
   sGhcUsagePath          :: FilePath,    -- Filled in by SysTools
   sGhciUsagePath         :: FilePath,    -- ditto
   sTopDir                :: FilePath,
@@ -604,6 +605,9 @@ data Settings = Settings {
   sOpt_lc                :: [String]  -- LLVM: llc static compiler
 
  }
+
+targetPlatform :: DynFlags -> Platform
+targetPlatform dflags = sTargetPlatform (settings dflags)
 
 ghcUsagePath          :: DynFlags -> FilePath
 ghcUsagePath dflags = sGhcUsagePath (settings dflags)
@@ -818,7 +822,6 @@ defaultDynFlags mySettings =
         floatLamArgs            = Just 0, -- Default: float only if no fvs
         strictnessBefore        = [],
 
-        targetPlatform          = defaultTargetPlatform,
         cmdlineHcIncludes       = [],
         importPaths             = ["."],
         mainModIs               = mAIN,

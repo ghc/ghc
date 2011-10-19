@@ -47,6 +47,7 @@ import Config
 import Outputable
 import ErrUtils
 import Panic
+import Platform
 import Util
 import DynFlags
 import StaticFlags
@@ -182,6 +183,14 @@ initSysTools mbMinusB
                                             _ ->
                                                 xs
                                Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+              readSetting key = case lookup key mySettings of
+                                Just xs ->
+                                    case maybeRead xs of
+                                    Just v -> return v
+                                    Nothing -> pgmError ("Failed to read " ++ show key ++ " value " ++ show xs)
+                                Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+        ; targetArch <- readSetting "target arch"
+        ; targetOS <- readSetting "target os"
         ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
         -- On Windows, mingw is distributed with GHC,
         -- so we look in TopDir/../mingw/bin
@@ -241,6 +250,10 @@ initSysTools mbMinusB
               lo_prog = "opt"
 
         ; return $ Settings {
+                        sTargetPlatform = Platform {
+                                              platformArch = targetArch,
+                                              platformOS   = targetOS
+                                          },
                         sTmpDir = normalise tmpdir,
                         sGhcUsagePath = ghc_usage_msg_path,
                         sGhciUsagePath = ghci_usage_msg_path,

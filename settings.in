@@ -7,5 +7,8 @@
  ("touch command", "@SettingsTouchCommand@"),
  ("dllwrap command", "@SettingsDllWrapCommand@"),
  ("windres command", "@SettingsWindresCommand@"),
- ("perl command", "@SettingsPerlCommand@")]
+ ("perl command", "@SettingsPerlCommand@"),
+ ("target os", "@HaskellTargetOs@"),
+ ("target arch", "@HaskellTargetArch@")
+ ]
 

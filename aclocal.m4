@@ -101,9 +101,81 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         ;;
     esac
 
+    BuildPlatform="$BuildArch-$BuildVendor-$BuildOS"
+    BuildPlatform_CPP=`echo "$BuildPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+    BuildArch_CPP=`    echo "$BuildArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+    BuildVendor_CPP=`  echo "$BuildVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+    BuildOS_CPP=`      echo "$BuildOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
+
+    HostPlatform="$HostArch-$HostVendor-$HostOS"
+    HostPlatform_CPP=`echo "$HostPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+    HostArch_CPP=`    echo "$HostArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+    HostVendor_CPP=`  echo "$HostVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+    HostOS_CPP=`      echo "$HostOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
+
+    TargetPlatform="$TargetArch-$TargetVendor-$TargetOS"
+    TargetPlatform_CPP=`echo "$TargetPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
+    TargetArch_CPP=`    echo "$TargetArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
+    TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
+    TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
+
+    echo "GHC build  : $BuildPlatform"
+    echo "GHC host   : $HostPlatform"
+    echo "GHC target : $TargetPlatform"
+
+    AC_SUBST(BuildPlatform)
+    AC_SUBST(HostPlatform)
+    AC_SUBST(TargetPlatform)
+    AC_SUBST(HostPlatform_CPP)
+    AC_SUBST(BuildPlatform_CPP)
+    AC_SUBST(TargetPlatform_CPP)
+
+    AC_SUBST(HostArch_CPP)
+    AC_SUBST(BuildArch_CPP)
+    AC_SUBST(TargetArch_CPP)
+
+    AC_SUBST(HostOS_CPP)
+    AC_SUBST(BuildOS_CPP)
+    AC_SUBST(TargetOS_CPP)
+
+    AC_SUBST(HostVendor_CPP)
+    AC_SUBST(BuildVendor_CPP)
+    AC_SUBST(TargetVendor_CPP)
+
+    AC_SUBST(exeext)
+    AC_SUBST(soext)
+])
+
+
+# FPTOOLS_SET_HASKELL_PLATFORM_VARS
+# ----------------------------------
+# Set the Haskell platform variables
+AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
+[
     checkArch() {
         case [$]1 in
-        alpha|arm|hppa|hppa1_1|i386|ia64|m68k|mips|mipseb|mipsel|powerpc|powerpc64|rs6000|s390|s390x|sparc|sparc64|vax|x86_64)
+        i386)
+            test -z "[$]2" || eval "[$]2=ArchX86"
+            ;;
+        x86_64)
+            GET_ARM_ISA()
+            test -z "[$]2" || eval "[$]2=ArchX86_64"
+            ;;
+        powerpc)
+            test -z "[$]2" || eval "[$]2=ArchPPC"
+            ;;
+        powerpc64)
+            test -z "[$]2" || eval "[$]2=ArchPPC_64"
+            ;;
+        sparc)
+            test -z "[$]2" || eval "[$]2=ArchSPARC"
+            ;;
+        arm)
+            GET_ARM_ISA()
+            test -z "[$]2" || eval "[$]2=\"ArchARM \$ARM_ISA \$ARM_ISA_EXT\""
+            ;;
+        alpha|hppa|hppa1_1|ia64|m68k|mips|mipseb|mipsel|rs6000|s390|s390x|sparc64|vax)
+            test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         *)
             echo "Unknown arch [$]1"
@@ -125,71 +197,107 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
 
     checkOS() {
         case [$]1 in
-        linux|freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+        linux)
+            test -z "[$]2" || eval "[$]2=OSLinux"
+            ;;
+        darwin)
+            test -z "[$]2" || eval "[$]2=OSDarwin"
+            ;;
+        solaris2)
+            test -z "[$]2" || eval "[$]2=OSSolaris2"
+            ;;
+        mingw32)
+            test -z "[$]2" || eval "[$]2=OSMinGW32"
+            ;;
+        freebsd)
+            test -z "[$]2" || eval "[$]2=OSFreeBSD"
+            ;;
+        openbsd)
+            test -z "[$]2" || eval "[$]2=OSOpenBSD"
+            ;;
+        netbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+            test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         *)
             echo "Unknown OS '[$]1'"
             exit 1
             ;;
         esac
-}
+    }
 
-BuildPlatform="$BuildArch-$BuildVendor-$BuildOS"
-BuildPlatform_CPP=`echo "$BuildPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-BuildArch_CPP=`    echo "$BuildArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-BuildVendor_CPP=`  echo "$BuildVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-BuildOS_CPP=`      echo "$BuildOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
+    checkArch "$BuildArch" ""
+    checkVendor "$BuildVendor"
+    checkOS "$BuildOS" ""
 
-checkArch "$BuildArch"
-checkVendor "$BuildVendor"
-checkOS "$BuildOS"
+    checkArch "$HostArch" ""
+    checkVendor "$HostVendor"
+    checkOS "$HostOS" ""
 
-HostPlatform="$HostArch-$HostVendor-$HostOS"
-HostPlatform_CPP=`echo "$HostPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-HostArch_CPP=`    echo "$HostArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-HostVendor_CPP=`  echo "$HostVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-HostOS_CPP=`      echo "$HostOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
+    checkArch "$TargetArch" "HaskellTargetArch"
+    checkVendor "$TargetVendor"
+    checkOS "$TargetOS" "HaskellTargetOs"
 
-checkArch "$HostArch"
-checkVendor "$HostVendor"
-checkOS "$HostOS"
+    AC_SUBST(HaskellTargetArch)
+    AC_SUBST(HaskellTargetOs)
+])
 
-TargetPlatform="$TargetArch-$TargetVendor-$TargetOS"
-TargetPlatform_CPP=`echo "$TargetPlatform" | sed -e 's/\./_/g' -e 's/-/_/g'`
-TargetArch_CPP=`    echo "$TargetArch"     | sed -e 's/\./_/g' -e 's/-/_/g'`
-TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
-TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
-checkArch "$TargetArch"
-checkVendor "$TargetVendor"
-checkOS "$TargetOS"
-
-echo "GHC build  : $BuildPlatform"
-echo "GHC host   : $HostPlatform"
-echo "GHC target : $TargetPlatform"
-
-AC_SUBST(BuildPlatform)
-AC_SUBST(HostPlatform)
-AC_SUBST(TargetPlatform)
-AC_SUBST(HostPlatform_CPP)
-AC_SUBST(BuildPlatform_CPP)
-AC_SUBST(TargetPlatform_CPP)
-
-AC_SUBST(HostArch_CPP)
-AC_SUBST(BuildArch_CPP)
-AC_SUBST(TargetArch_CPP)
-
-AC_SUBST(HostOS_CPP)
-AC_SUBST(BuildOS_CPP)
-AC_SUBST(TargetOS_CPP)
-
-AC_SUBST(HostVendor_CPP)
-AC_SUBST(BuildVendor_CPP)
-AC_SUBST(TargetVendor_CPP)
-
-AC_SUBST(exeext)
-AC_SUBST(soext)
-
+# GET_ARM_ISA
+# ----------------------------------
+# Get info about the ISA on the Arm arch
+AC_DEFUN([GET_ARM_ISA],
+[
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM(
+            [],
+            [#if defined(__ARM_ARCH_2__)  || \
+                 defined(__ARM_ARCH_3__)  || \
+                 defined(__ARM_ARCH_3M__) || \
+                 defined(__ARM_ARCH_4__)  || \
+                 defined(__ARM_ARCH_4T__) || \
+                 defined(__ARM_ARCH_5__)  || \
+                 defined(__ARM_ARCH_5T__) || \
+                 defined(__ARM_ARCH_5E__) || \
+                 defined(__ARM_ARCH_5TE__)
+                 return 0;
+             #else
+                 not pre arm v6
+             #endif]
+        )],
+        [AC_DEFINE(arm_HOST_ARCH_PRE_ARMv6, 1, [ARM pre v6])
+         AC_DEFINE(arm_HOST_ARCH_PRE_ARMv7, 1, [ARM pre v7])
+         changequote(, )dnl
+         ARM_ISA=ARMv5
+         ARM_ISA_EXT="[]"
+         changequote([, ])dnl
+        ],
+        [
+            AC_COMPILE_IFELSE([
+                AC_LANG_PROGRAM(
+                    [],
+                    [#if defined(__ARM_ARCH_6__)   || \
+                         defined(__ARM_ARCH_6J__)  || \
+                         defined(__ARM_ARCH_6T2__) || \
+                         defined(__ARM_ARCH_6Z__)  || \
+                         defined(__ARM_ARCH_6ZK__) || \
+                         defined(__ARM_ARCH_6M__)
+                         return 0;
+                     #else
+                         not pre arm v7
+                     #endif]
+                )],
+                [AC_DEFINE(arm_HOST_ARCH_PRE_ARMv7, 1, [ARM pre v7])
+                 changequote(, )dnl
+                 ARM_ISA=ARMv6
+                 ARM_ISA_EXT="[]"
+                 changequote([, ])dnl
+                ],
+                [changequote(, )dnl
+                 ARM_ISA=ARMv7
+                 ARM_ISA_EXT="[VFPv3, NEON]"
+                 changequote([, ])dnl
+                ])
+        ])
 ])
 
 

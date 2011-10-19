@@ -444,6 +444,11 @@ AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
 
+dnl ** Set up the variables for the platform in the settings file.
+dnl May need to use gcc to find platform details.
+dnl --------------------------------------------------------------
+FPTOOLS_SET_HASKELL_PLATFORM_VARS
+
 FP_SETTINGS
 
 dnl ** figure out how to do context diffs

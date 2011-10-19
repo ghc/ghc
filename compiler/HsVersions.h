@@ -15,7 +15,6 @@ you will screw up the layout where they are used in case expressions!
 
 /* Pull in all the platform defines for this build (foo_TARGET_ARCH etc.) */
 #include "ghc_boot_platform.h"
-#include "../includes/stg/ArchSpecific.h"
 
 /* This macro indicates that the target OS supports ELF-like shared libraries */
 #if linux_TARGET_OS || freebsd_TARGET_OS || openbsd_TARGET_OS || solaris2_TARGET_OS
