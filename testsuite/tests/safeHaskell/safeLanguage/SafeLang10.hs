@@ -1,4 +1,4 @@
-{-# LANGUAGE SafeImports #-}
+{-# LANGUAGE Trustworthy #-}
 module Main where
 
 import safe SafeLang10_A -- trusted lib
@@ -8,5 +8,4 @@ main = do
     let r = res [(1::Int)]
     putStrLn $ "Result: " ++ show r 
     putStrLn $ "Result: " ++ show function
-
 

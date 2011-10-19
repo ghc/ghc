@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 module Dep10 where
 
 import GHC.ST

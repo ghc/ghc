@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 module Dep05 where
 

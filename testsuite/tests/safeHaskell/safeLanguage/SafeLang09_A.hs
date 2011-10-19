@@ -12,4 +12,3 @@ class Pos a where
 instance Pos [a] where
     res _ = True
 
-

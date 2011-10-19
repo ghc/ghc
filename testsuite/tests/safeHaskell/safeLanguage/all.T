@@ -9,11 +9,11 @@ def f( opts ):
 
 setTestOpts(f)
 
-test('SafeLang01', normal, compile, ['-trust base'])
-test('SafeLang02', normal, compile, ['-trust base'])
-test('SafeLang03', normal, compile, ['-trust base'])
+test('SafeLang01', normal, compile, [''])
+test('SafeLang02', normal, compile, [''])
+test('SafeLang03', normal, compile, [''])
 test('SafeLang04', normal, compile_and_run, [''])
-test('SafeLang05', normal, compile_and_run, ['-trust base'])
+test('SafeLang05', normal, compile_and_run, [''])
 test('SafeLang06',
      extra_clean(['SafeLang06_A.o', 'SafeLang06_A.hi']),
      compile_and_run,
@@ -30,25 +30,26 @@ test('SafeLang10',
      extra_clean(['SafeLang10_A.o', 'SafeLang10_A.hi',
                   'SafeLang10_B.o', 'SafeLang10_B.hi']),
      multimod_compile_fail,
-     ['SafeLang10', '-trust base'])
+     ['SafeLang10', ''])
 test('SafeLang11',
      [req_interp,
       extra_clean(['SafeLang11_A.o', 'SafeLang11_A.hi',
                    'SafeLang11_B.o', 'SafeLang11_B.hi'])],
      multimod_compile_and_run,
-     ['SafeLang11', '-trust base'])
-test('SafeLang12', normal, multimod_compile_fail, ['SafeLang12', '-trust base'])
+     ['SafeLang11', ''])
+test('SafeLang12', normal, multimod_compile_fail, ['SafeLang12', ''])
 test('SafeLang13',
      extra_clean(['SafeLang13_A.o', 'SafeLang13_A.hi']),
      multimod_compile_and_run,
-     ['SafeLang13', '-trust base'])
+     ['SafeLang13', ''])
 test('SafeLang14',
      extra_clean(['SafeLang14_A.o', 'SafeLang14_A.hi']),
      multimod_compile_fail,
-     ['SafeLang14', '-trust base -XSafe'])
+     ['SafeLang14', '-XSafe'])
 test('SafeLang15',
      [exit_code(1),
       extra_clean(['SafeLang15_A.o', 'SafeLang15_A.hi'])],
      multimod_compile_and_run,
-     ['SafeLang15', '-trust base -XSafe'])
+     ['SafeLang15', '-XSafe'])
 test('SafeLang16', normal, compile, [''])
+

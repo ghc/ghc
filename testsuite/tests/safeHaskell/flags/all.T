@@ -9,25 +9,36 @@ def f( opts ):
 
 setTestOpts(f)
 
-test('SafeFlags01', normal, compile, ['-trust base'])
+test('SafeFlags01', normal, compile, [''])
 test('SafeFlags02', normal, compile, [''])
-test('SafeFlags03', normal, compile, [''])
+# no longer support a SafeImport flag, so expect fail for them.
+test('SafeFlags03', normal, compile_fail, [''])
 
 # no longer support a SafeLanguage flag, so expect fail for them.
-test('SafeFlags04', normal, compile_fail, ['-trust base'])
+test('SafeFlags04', normal, compile_fail, [''])
 
-test('SafeFlags05', normal, compile, ['-trust base'])
-test('SafeFlags06', normal, compile, [''])
-
-# no longer support a SafeLanguage flag, so expect fail for them.
-test('SafeFlags07', normal, compile_fail, ['-trust base'])
+test('SafeFlags05', normal, compile_fail, [''])
+test('SafeFlags06', normal, compile_fail, [''])
 
 # no longer support a SafeLanguage flag, so expect fail for them.
-test('SafeFlags08', normal, compile_fail, ['-trust base'])
+test('SafeFlags07', normal, compile_fail, [''])
+
+# no longer support a SafeLanguage flag, so expect fail for them.
+test('SafeFlags08', normal, compile_fail, [''])
 test('SafeFlags09', normal, compile_fail, [''])
 
 test('SafeFlags10', normal, compile_fail, [''])
-test('SafeFlags11', normal, compile, ['-trust base'])
+test('SafeFlags11', normal, compile, [''])
+
+test('SafeFlags12', normal, compile, [''])
+test('SafeFlags13', normal, compile_fail, [''])
+test('SafeFlags14', normal, compile_fail, [''])
+
+test('SafeFlags15', normal, compile, [''])
+test('SafeFlags16', normal, compile, [''])
+test('SafeFlags17', normal, compile, [''])
+test('SafeFlags18', normal, compile, [''])
+test('SafeFlags19', normal, compile_fail, [''])
 
 test('Flags01', normal, compile, [''])
 test('Flags02', normal, compile, [''])

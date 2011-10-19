@@ -15,4 +15,3 @@ mkSimpleClass name = do
 	return [InstanceD [] (AppT (ConT cname) (ConT dname)) [FunD mname
             [Clause [] (NormalB (ConE conname)) []]]]
 
-

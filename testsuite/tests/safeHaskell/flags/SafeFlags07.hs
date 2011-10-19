@@ -1,4 +1,4 @@
-{-# LANGUAGE SafeLanguage, SafeImports #-}
+{-# LANGUAGE SafeLanguage, Unsafe #-}
 
 -- | Basic test to see if Safe flags compiles
 module SafeFlags07 where

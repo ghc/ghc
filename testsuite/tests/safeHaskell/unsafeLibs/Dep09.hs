@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 module Dep09 where
 
 import GHC.Ptr

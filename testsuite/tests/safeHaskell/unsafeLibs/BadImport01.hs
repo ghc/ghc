@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+-- | Import unsafe module System.IO.Unsafe to make sure it fails
 module Main where
 
 import System.IO.Unsafe

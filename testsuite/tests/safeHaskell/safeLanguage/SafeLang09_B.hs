@@ -16,4 +16,3 @@ instance Pos [Int] where
 function :: Int
 function = 3
 
-

@@ -1,4 +1,4 @@
-{-# LANGUAGE SafeImports #-}
+{-# LANGUAGE Unsafe #-}
 module Check02 ( main' ) where
 
 import safe Check02_B

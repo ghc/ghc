@@ -1,4 +1,4 @@
-{-# LANGUAGE Trustworthy, SafeImports #-}
+{-# LANGUAGE Trustworthy, Unsafe #-}
 
 -- | Basic test to see if Safe flags compiles
 module SafeFlags06 where
