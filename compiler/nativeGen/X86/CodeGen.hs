@@ -1842,15 +1842,17 @@ genCCall64 target dest_regs args =
             tot_arg_size = arg_size * length stack_args
 
             -- On entry to the called function, %rsp should be aligned
-            -- on a 16-byte boundary +8 (i.e. the first stack arg after
-            -- the return address is 16-byte aligned).  In STG land
-            -- %rsp is kept 16-byte aligned (see StgCRun.c), so we just
-            -- need to make sure we push a multiple of 16-bytes of args,
-            -- plus the return address, to get the correct alignment.
+            -- on a 16-byte boundary +8 (i.e. the first stack arg
+            -- above the return address is 16-byte aligned).  In STG
+            -- land %rsp is kept 8-byte aligned (see StgCRun.c), so we
+            -- just need to make sure we pad by eight bytes after
+            -- pushing a multiple of 16-bytes of args to get the
+            -- correct alignment. If we push an odd number of eight byte
+            -- arguments then no padding is needed.
             -- Urg, this is hard.  We need to feed the delta back into
             -- the arg pushing code.
         (real_size, adjust_rsp) <-
-            if tot_arg_size `rem` 16 == 0
+            if (tot_arg_size + 8) `rem` 16 == 0
                 then return (tot_arg_size, nilOL)
                 else do -- we need to adjust...
                     delta <- getDeltaNat
@@ -1865,7 +1867,7 @@ genCCall64 target dest_regs args =
         delta <- getDeltaNat
 
         -- deal with static vs dynamic call targets
-        (callinsns,cconv) <-
+        (callinsns,_cconv) <-
           case target of
             CmmCallee (CmmLit (CmmLabel lbl)) conv
                -> -- ToDo: stdcall arg sizes
