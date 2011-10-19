@@ -500,13 +500,13 @@ x86fp_kludge (CmmProc info lbl (ListGraph code)) =
 makeImportsDoc :: DynFlags -> [CLabel] -> Pretty.Doc
 makeImportsDoc dflags imports
  = dyld_stubs imports
-
-#if HAVE_SUBSECTIONS_VIA_SYMBOLS
-                -- On recent versions of Darwin, the linker supports
-                -- dead-stripping of code and data on a per-symbol basis.
-                -- There's a hack to make this work in PprMach.pprNatCmmDecl.
-            Pretty.$$ Pretty.text ".subsections_via_symbols"
-#endif
+            Pretty.$$
+            -- On recent versions of Darwin, the linker supports
+            -- dead-stripping of code and data on a per-symbol basis.
+            -- There's a hack to make this work in PprMach.pprNatCmmDecl.
+            (if platformHasSubsectionsViaSymbols (targetPlatform dflags)
+             then Pretty.text ".subsections_via_symbols"
+             else Pretty.empty)
 #if HAVE_GNU_NONEXEC_STACK
                 -- On recent GNU ELF systems one can mark an object file
                 -- as not requiring an executable stack. If all objects
