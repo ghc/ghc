@@ -1269,12 +1269,12 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 mkPlan :: LStmt Name -> TcM PlanResult
 mkPlan (L loc (ExprStmt expr _ _ _))	-- An expression typed at the prompt 
   = do	{ uniq <- newUnique		-- is treated very specially
-	; let fresh_it  = itName uniq
+        ; let fresh_it  = itName uniq loc
 	      the_bind  = L loc $ mkTopFunBind (L loc fresh_it) matches
 	      matches   = [mkMatch [] expr emptyLocalBinds]
 	      let_stmt  = L loc $ LetStmt $ HsValBinds $
                           ValBindsOut [(NonRecursive,unitBag the_bind)] []
-	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
+              bind_stmt = L loc $ BindStmt (L loc (VarPat fresh_it)) expr
 					   (HsVar bindIOName) noSyntaxExpr 
 	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
 			          	   (HsVar thenIOName) noSyntaxExpr placeHolderType
@@ -1390,7 +1390,7 @@ tcRnExpr hsc_env ictxt rdr_expr
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
-    let { fresh_it  = itName uniq } ;
+    let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
     ((_tc_expr, res_ty), lie)	<- captureConstraints (tcInferRho rn_expr) ;
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $ 
                                       simplifyInfer True {- Free vars are closed -}
