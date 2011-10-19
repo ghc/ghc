@@ -29,12 +29,11 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
-import Var        (isTyVar, varType, isId)
-import Id         (idType, mkLocalId, mkVanillaGlobal, isDeadBinder, idOccInfo, setIdOccInfo, zapIdOccInfo)
+import Var        (isTyVar, isId)
+import Id         (idType, mkLocalId, isDeadBinder, idOccInfo, setIdOccInfo, zapIdOccInfo, zapFragileIdInfo)
 import Type       (isUnLiftedType, mkTyVarTy)
 import Coercion   (isCoVar, mkCoVarCo)
 import Name       (Name, mkSystemVarName)
-import PrelNames  (undefinedName)
 import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
 import qualified State as State
@@ -51,8 +50,6 @@ import qualified Data.Map as M
 import Data.Monoid
 import Data.Ord
 import qualified Data.Set as S
-
-import System.IO.Unsafe (unsafePerformIO)
 
 import Prelude hiding (Monad(..))
 
@@ -190,7 +187,7 @@ gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredV
             -- NB: It's important that type variables become live after inlining a binding, or we won't
             -- necessarily lambda-abstract over all the free type variables of a h-function
             consider_inlining x' hb (h_pending_kvs, h_output, live)
-              | x' `elemVarSet` live = (h_pending_kvs,            M.insert x' hb h_output, live `unionVarSet` heapBindingFreeVars hb `unionVarSet` tyVarsOfType (varType x')) -- FIXME: idFreeVars?
+              | x' `elemVarSet` live = (h_pending_kvs,            M.insert x' hb h_output, live `unionVarSet` heapBindingFreeVars hb `unionVarSet` varBndrFreeVars x')
               | otherwise            = ((x', hb) : h_pending_kvs, h_output,                live)
     
     pruneLiveStack :: Deeds -> Stack -> FreeVars -> (Deeds, Stack)
@@ -325,15 +322,21 @@ applyAbsVars e (x:xs)
   | isCoVar x
   = applyAbsVars (e `coApp` mkCoVarCo x) xs
 
-   -- FIXME: sort of a hack! Lie about the type of undefined.
+   -- A pretty cute hack here, though potentially quite confusing!
+   -- If you want to put "undefined" here instead then watch out: this counts
+   -- as an extra free variable, so it might trigger the assertion in Process.hs
+   -- that checks that the output term has no more FVs than the input.
   | isDeadBinder x, not (isUnLiftedType ty)
-  = applyAbsVars (e `app` mkVanillaGlobal undefinedName (idType x)) xs
+  = applyAbsVars (letRec [(x_zapped, var x_zapped)] $ e `app` x_zapped) xs
 
-   -- NB: Lint will choke on occurrences of dead Ids, so make sure we zap the deadness flag
   | otherwise
-  = applyAbsVars (e `app` zapIdOccInfo x) xs
+  = applyAbsVars (e `app` x_zapped) xs
 
   where ty = idType x
+        x_zapped = zapFragileIdInfo (zapIdOccInfo x)
+        -- NB: Lint will choke on occurrences of dead Ids, so make sure we zap the deadness flag
+        -- Make sure we zap the "fragile" info too because the FVs of the unfolding are
+        -- not necessarily in scope.
 
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
@@ -494,7 +497,7 @@ promise p opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted p)
       --
       -- TODO: we can generate the wrappers in a smarter way now that we can always see all possible fulfilments?
       let optimised_fvs_incomplete = fvedTermFreeVars optimised_e
-          optimised_fvs = optimised_fvs_incomplete `unionVarSet` tyVarsOfTypes (map idType (varSetElems optimised_fvs_incomplete))
+          optimised_fvs = optimised_fvs_incomplete `unionVarSet` unionVarSets (map varBndrFreeVars (varSetElems optimised_fvs_incomplete))
           abstracted'
             | not rEFINE_FULFILMENT_FVS = abstracted p
             | otherwise = [if x `elemVarSet` optimised_fvs

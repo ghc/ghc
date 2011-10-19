@@ -3,7 +3,7 @@
 module Supercompile.Core.FreeVars (
     module Supercompile.Core.FreeVars,
     module VarSet,
-    tyVarsOfType, tyVarsOfTypes, tyCoVarsOfCo
+    idFreeVars, tyVarsOfType, tyVarsOfTypes, tyCoVarsOfCo
   ) where
 
 import Supercompile.Core.Syntax
@@ -13,12 +13,17 @@ import Supercompile.Utilities
 import CoreFVs
 import VarSet
 import Coercion (tyCoVarsOfCo)
-import Var      (isTyVar)
+import Id       (isId)
 import Type     (tyVarsOfType, tyVarsOfTypes)
 
 
 type FreeVars = VarSet
 type BoundVars = VarSet
+
+
+varBndrFreeVars :: Var -> FreeVars
+varBndrFreeVars x | isId x    = idFreeVars x
+                  | otherwise = emptyVarSet
 
 
 (varFreeVars',                termFreeVars,                termFreeVars',                altsFreeVars,                valueFreeVars,                valueFreeVars')                = mkFreeVars (\f (I e) -> f e)
@@ -65,8 +70,7 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     typ = tyVarsOfType
 
 nonRecBinderFreeVars :: Var -> FreeVars -> FreeVars
-nonRecBinderFreeVars x fvs | isTyVar x = fvs `delVarSet` x
-                           | otherwise = (fvs `delVarSet` x) `unionVarSet` idFreeVars x
+nonRecBinderFreeVars x fvs = (fvs `delVarSet` x) `unionVarSet` varBndrFreeVars x
 
 nonRecBindersFreeVars :: [Var] -> FreeVars -> FreeVars
 nonRecBindersFreeVars xs = flip (foldr nonRecBinderFreeVars) xs

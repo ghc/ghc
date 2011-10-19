@@ -18,7 +18,6 @@ import Supercompile.Termination.Generaliser (Generaliser(..))
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
-import Var       (varType)
 import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo)
 import PrelNames (undefinedName)
 import Type      (splitTyConApp_maybe)
@@ -817,7 +816,7 @@ transitiveInline init_h_inlineable _state@(deeds, Heap h ids, k, in_e)
         -- necessarily lambda-abstract over all the free type variables of a h-function
         consider_inlining x' hb (deeds, h_output, live, live_in_let)
           = (deeds', M.insert x' inline_hb h_output, live `unionVarSet` fvs, if howBound inline_hb == LetBound then live_in_let `unionVarSet` fvs else live_in_let)
-          where fvs = heapBindingFreeVars inline_hb `unionVarSet` tyVarsOfType (varType x') -- FIXME: idFreeVars?
+          where fvs = heapBindingFreeVars inline_hb `unionVarSet` varBndrFreeVars x'
                 (deeds', inline_hb) = case claimDeeds deeds (heapBindingSize hb) of -- Do we have enough deeds to inline an unmodified version?
                   Just deeds' ->                                                       (deeds', hb)
                   Nothing     -> trace (showSDoc $ text "inline-deeds:" <+> pPrint x') (deeds,  makeFreeForDeeds hb)
