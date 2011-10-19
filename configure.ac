@@ -703,24 +703,6 @@ FP_PROG_LD_X
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID
 
-dnl *** check for GNU non-executable stack note support (ELF only)
-dnl     (.section .note.GNU-stack,"",@progbits)
-
-dnl This test doesn't work with "gcc -g" in gcc 4.4 (GHC trac #3889:
-dnl     Error: can't resolve `.note.GNU-stack' {.note.GNU-stack section} - `.Ltext0' {.text section}
-dnl so we empty CFLAGS while running this test
-CFLAGS2="$CFLAGS"
-CFLAGS=
-AC_MSG_CHECKING(for GNU non-executable stack support)
-AC_COMPILE_IFELSE(
-    [AC_LANG_PROGRAM([__asm__ (".section .note.GNU-stack,\"\",@progbits");], [0])],
-    [AC_MSG_RESULT(yes)
-     AC_DEFINE([HAVE_GNU_NONEXEC_STACK],[1],
-               [Define to 1 if GNU non-executable stack notes are supported.])
-    ],
-    [AC_MSG_RESULT(no)])
-CFLAGS="$CFLAGS2"
-
 FP_VISIBILITY_HIDDEN
 
 dnl ** check for librt

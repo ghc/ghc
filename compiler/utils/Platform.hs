@@ -22,6 +22,7 @@ data Platform
         = Platform {
               platformArch                     :: Arch,
               platformOS                       :: OS,
+              platformHasGnuNonexecStack       :: Bool,
               platformHasSubsectionsViaSymbols :: Bool
           }
         deriving (Read, Show, Eq)

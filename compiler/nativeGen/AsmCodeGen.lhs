@@ -507,17 +507,18 @@ makeImportsDoc dflags imports
             (if platformHasSubsectionsViaSymbols (targetPlatform dflags)
              then Pretty.text ".subsections_via_symbols"
              else Pretty.empty)
-#if HAVE_GNU_NONEXEC_STACK
+            Pretty.$$ 
                 -- On recent GNU ELF systems one can mark an object file
                 -- as not requiring an executable stack. If all objects
                 -- linked into a program have this note then the program
                 -- will not use an executable stack, which is good for
                 -- security. GHC generated code does not need an executable
                 -- stack so add the note in:
-            Pretty.$$ Pretty.text ".section .note.GNU-stack,\"\",@progbits"
-#endif
+            (if platformHasGnuNonexecStack (targetPlatform dflags)
+             then Pretty.text ".section .note.GNU-stack,\"\",@progbits"
+             else Pretty.empty)
                 -- And just because every other compiler does, lets stick in
-		-- an identifier directive: .ident "GHC x.y.z"
+                -- an identifier directive: .ident "GHC x.y.z"
             Pretty.$$ let compilerIdent = Pretty.text "GHC" Pretty.<+>
 	                                  Pretty.text cProjectVersion
                        in Pretty.text ".ident" Pretty.<+>

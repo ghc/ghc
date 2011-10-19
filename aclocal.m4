@@ -239,6 +239,23 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         [HaskellHaveSubsectionsViaSymbols=False
          AC_MSG_RESULT(no)])
 
+    dnl *** check for GNU non-executable stack note support (ELF only)
+    dnl     (.section .note.GNU-stack,"",@progbits)
+
+    dnl This test doesn't work with "gcc -g" in gcc 4.4 (GHC trac #3889:
+    dnl     Error: can't resolve `.note.GNU-stack' {.note.GNU-stack section} - `.Ltext0' {.text section}
+    dnl so we empty CFLAGS while running this test
+    CFLAGS2="$CFLAGS"
+    CFLAGS=
+    AC_MSG_CHECKING(for GNU non-executable stack support)
+    AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM([__asm__ (".section .note.GNU-stack,\"\",@progbits");], [0])],
+        [AC_MSG_RESULT(yes)
+         HaskellHaveGnuNonexecStack=True],
+        [AC_MSG_RESULT(no)
+         HaskellHaveGnuNonexecStack=False])
+    CFLAGS="$CFLAGS2"
+
     checkArch "$BuildArch" ""
     checkVendor "$BuildVendor"
     checkOS "$BuildOS" ""
@@ -254,6 +271,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     AC_SUBST(HaskellTargetArch)
     AC_SUBST(HaskellTargetOs)
     AC_SUBST(HaskellHaveSubsectionsViaSymbols)
+    AC_SUBST(HaskellHaveGnuNonexecStack)
 ])
 
 
