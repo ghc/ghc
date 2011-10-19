@@ -76,6 +76,11 @@ These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).
 It can take a long time.  To customise the build, see the file HACKING.
 
+Once you have a build you need to keep it going.  You need to keep all
+repos in sync with the sync-all script [7].  To get the latest changes:
+
+    $ ./sync-all pull
+    $ ./sync-all get
 
 
 References
@@ -87,6 +92,7 @@ References
  [4] http://www.haskell.org/happy/                      Happy
  [5] http://www.haskell.org/alex/                       Alex
  [6] http://www.haskell.org/haddock/                    Haddock
+ [7] http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll
 
 
 Contributors
