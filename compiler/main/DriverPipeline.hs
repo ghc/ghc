@@ -1015,7 +1015,8 @@ runPhase Cmm input_fn dflags
 runPhase cc_phase input_fn dflags
    | any (cc_phase `eqPhase`) [Cc, Ccpp, HCc, Cobjc, Cobjcpp]
    = do
-        let cc_opts = getOpts dflags opt_c
+        let platform = targetPlatform dflags
+            cc_opts = getOpts dflags opt_c
             hcc = cc_phase `eqPhase` HCc
 
         let cmdline_include_paths = includePaths dflags
@@ -1043,12 +1044,15 @@ runPhase cc_phase input_fn dflags
              then return []
              else getPackageExtraCcOpts dflags pkgs
 
-#ifdef darwin_TARGET_OS
-        pkg_framework_paths <- io $ getPackageFrameworkPath dflags pkgs
-        let cmdline_framework_paths = frameworkPaths dflags
-        let framework_paths = map ("-F"++)
-                        (cmdline_framework_paths ++ pkg_framework_paths)
-#endif
+        framework_paths <-
+            case platformOS platform of
+            OSDarwin ->
+                do pkgFrameworkPaths <- io $ getPackageFrameworkPath dflags pkgs
+                   let cmdlineFrameworkPaths = frameworkPaths dflags
+                   return $ map ("-F"++)
+                                (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
+            _ ->
+                return []
 
         let split_objs = dopt Opt_SplitObjs dflags
             split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
@@ -1068,7 +1072,7 @@ runPhase cc_phase input_fn dflags
                 -- than a double, which leads to unpredictable results.
                 -- By default, we turn this off with -ffloat-store unless
                 -- the user specified -fexcess-precision.
-                (if platformArch (targetPlatform dflags) == ArchX86 &&
+                (if platformArch platform == ArchX86 &&
                     not (dopt Opt_ExcessPrecision dflags)
                         then [ "-ffloat-store" ]
                         else []) ++
@@ -1101,7 +1105,7 @@ runPhase cc_phase input_fn dflags
                 -- These symbols are imported into the stub.c file via RtsAPI.h, and the
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
-                       ++ (if platformOS (targetPlatform dflags) == OSMinGW32 &&
+                       ++ (if platformOS platform == OSMinGW32 &&
                               thisPackage dflags == basePackageId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
@@ -1112,7 +1116,7 @@ runPhase cc_phase input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                       ++ (if platformArch platform == ArchSPARC
                            then ["-mcpu=v9"]
                            else [])
 
@@ -1122,9 +1126,7 @@ runPhase cc_phase input_fn dflags
                        ++ verbFlags
                        ++ [ "-S", "-Wimplicit", cc_opt ]
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
-#ifdef darwin_TARGET_OS
                        ++ framework_paths
-#endif
                        ++ cc_opts
                        ++ split_opt
                        ++ include_paths
@@ -1483,15 +1485,13 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
 getLinkInfo :: DynFlags -> [PackageId] -> IO String
 getLinkInfo dflags dep_packages = do
    package_link_opts <- getPackageLinkOpts dflags dep_packages
-#ifdef darwin_TARGET_OS
-   pkg_frameworks <- getPackageFrameworks dflags dep_packages
-#endif
+   pkg_frameworks <- case platformOS (targetPlatform dflags) of
+                     OSDarwin -> getPackageFrameworks dflags dep_packages
+                     _        -> return []
    extra_ld_inputs <- readIORef v_Ld_inputs
    let
       link_info = (package_link_opts,
-#ifdef darwin_TARGET_OS
                    pkg_frameworks,
-#endif
                    rtsOpts dflags,
                    rtsOptsEnabled dflags,
                    dopt Opt_NoHsMain dflags,
@@ -1585,7 +1585,8 @@ getHCFilePackages filename =
 
 linkBinary :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
 linkBinary dflags o_files dep_packages = do
-    let verbFlags = getVerbFlags dflags
+    let platform = targetPlatform dflags
+        verbFlags = getVerbFlags dflags
         output_fn = exeFileName dflags
 
     -- get the full list of packages to link with, by combining the
@@ -1595,7 +1596,7 @@ linkBinary dflags o_files dep_packages = do
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
         get_pkg_lib_path_opts l
-         | osElfTarget (platformOS (targetPlatform dflags)) &&
+         | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
            not opt_Static
             = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
@@ -1615,20 +1616,40 @@ linkBinary dflags o_files dep_packages = do
 
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
-#ifdef darwin_TARGET_OS
-    pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
-    let pkg_framework_path_opts = map ("-F"++) pkg_framework_paths
+    pkg_framework_path_opts <-
+        case platformOS platform of
+        OSDarwin ->
+            do pkg_framework_paths <- getPackageFrameworkPath dflags dep_packages
+               return $ map ("-F" ++) pkg_framework_paths
+        _ ->
+            return []
 
-    let framework_paths = frameworkPaths dflags
-        framework_path_opts = map ("-F"++) framework_paths
+    framework_path_opts <-
+        case platformOS platform of
+        OSDarwin ->
+            do let framework_paths = frameworkPaths dflags
+               return $ map ("-F" ++) framework_paths
+        _ ->
+            return []
 
-    pkg_frameworks <- getPackageFrameworks dflags dep_packages
-    let pkg_framework_opts = concat [ ["-framework", fw] | fw <- pkg_frameworks ]
+    pkg_framework_opts <-
+        case platformOS platform of
+        OSDarwin ->
+            do pkg_frameworks <- getPackageFrameworks dflags dep_packages
+               return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
+        _ ->
+            return []
 
-    let frameworks = cmdlineFrameworks dflags
-        framework_opts = concat [ ["-framework", fw] | fw <- reverse frameworks ]
-         -- reverse because they're added in reverse order from the cmd line
-#endif
+    framework_opts <-
+        case platformOS platform of
+        OSDarwin ->
+            do let frameworks = cmdlineFrameworks dflags
+               -- reverse because they're added in reverse order from
+               -- the cmd line:
+               return $ concat [ ["-framework", fw] | fw <- reverse frameworks ]
+        _ ->
+            return []
+
         -- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
@@ -1671,7 +1692,7 @@ linkBinary dflags o_files dep_packages = do
 
                       -- Permit the linker to auto link _symbol to _imp_symbol.
                       -- This lets us link against DLLs without needing an "import library".
-                      ++ (if platformOS (targetPlatform dflags) == OSMinGW32
+                      ++ (if platformOS platform == OSMinGW32
                           then ["-Wl,--enable-auto-import"]
                           else [])
 
@@ -1683,9 +1704,9 @@ linkBinary dflags o_files dep_packages = do
                       -- like
                       --     ld: warning: could not create compact unwind for .LFB3: non-standard register 5 being saved in prolog
                       -- on x86.
-                      ++ (if cLdHasNoCompactUnwind == "YES" &&
-                             platformOS   (targetPlatform dflags) == OSDarwin   &&
-                             platformArch (targetPlatform dflags) `elem` [ArchX86, ArchX86_64]
+                      ++ (if cLdHasNoCompactUnwind == "YES"    &&
+                             platformOS   platform == OSDarwin &&
+                             platformArch platform `elem` [ArchX86, ArchX86_64]
                           then ["-Wl,-no_compact_unwind"]
                           else [])
 
@@ -1695,8 +1716,8 @@ linkBinary dflags o_files dep_packages = do
                       -- when linking any program. We're not sure
                       -- whether this is something we ought to fix, but
                       -- for now this flags silences them.
-                      ++ (if platformOS   (targetPlatform dflags) == OSDarwin   &&
-                             platformArch (targetPlatform dflags) == ArchX86
+                      ++ (if platformOS   platform == OSDarwin &&
+                             platformArch platform == ArchX86
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
@@ -1705,18 +1726,14 @@ linkBinary dflags o_files dep_packages = do
                       ++ lib_path_opts
                       ++ extra_ld_opts
                       ++ rc_objs
-#ifdef darwin_TARGET_OS
                       ++ framework_path_opts
                       ++ framework_opts
-#endif
                       ++ pkg_lib_path_opts
                       ++ main_lib
                       ++ [extraLinkObj]
                       ++ pkg_link_opts
-#ifdef darwin_TARGET_OS
                       ++ pkg_framework_path_opts
                       ++ pkg_framework_opts
-#endif
                       ++ debug_opts
                       ++ thread_opts
                     ))
