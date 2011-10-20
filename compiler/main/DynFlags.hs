@@ -39,7 +39,7 @@ module DynFlags (
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
-        safeHaskellOn, safeLanguageOn,
+        safeImportsOn, safeLanguageOn,
         safeDirectImpsReq, safeImplicitImpsReq,
         packageTrustOn,
 
@@ -343,16 +343,18 @@ data Language = Haskell98 | Haskell2010
 -- | The various Safe Haskell modes
 data SafeHaskellMode
    = Sf_None
-   | Sf_SafeImports
+   | Sf_Unsafe
    | Sf_Trustworthy
    | Sf_Safe
+   | Sf_SafeInfered
    deriving (Eq)
 
 instance Outputable SafeHaskellMode where
-    ppr Sf_None = ptext $ sLit "None"
-    ppr Sf_SafeImports = ptext $ sLit "SafeImports"
+    ppr Sf_None        = ptext $ sLit "None"
+    ppr Sf_Unsafe      = ptext $ sLit "Unsafe"
     ppr Sf_Trustworthy = ptext $ sLit "Trustworthy"
-    ppr Sf_Safe = ptext $ sLit "Safe"
+    ppr Sf_Safe        = ptext $ sLit "Safe"
+    ppr Sf_SafeInfered = ptext $ sLit "Safe-Infered"
 
 data ExtensionFlag
    = Opt_Cpp
@@ -880,7 +882,7 @@ defaultDynFlags mySettings =
         flags = defaultFlags,
         warningFlags = standardWarnings,
         language = Nothing,
-        safeHaskell = Sf_None,
+        safeHaskell = Sf_SafeInfered,
         thOnLoc = noSrcSpan,
         newDerivOnLoc = noSrcSpan,
         extensions = [],
@@ -1027,9 +1029,11 @@ packageTrustOn = dopt Opt_PackageTrust
 safeLanguageOn :: DynFlags -> Bool
 safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 
--- | Test if Safe Haskell is on in some form
-safeHaskellOn :: DynFlags -> Bool
-safeHaskellOn dflags = safeHaskell dflags /= Sf_None
+-- | Test if Safe Imports are on in some form
+safeImportsOn :: DynFlags -> Bool
+safeImportsOn dflags = safeHaskell dflags == Sf_Unsafe ||
+                       safeHaskell dflags == Sf_Trustworthy ||
+                       safeHaskell dflags == Sf_Safe
 
 -- | Set a 'Safe Haskell' flag
 setSafeHaskell :: SafeHaskellMode -> DynP ()
@@ -1059,11 +1063,8 @@ combineSafeFlags a b =
         (Sf_None, sf) -> return sf
         (sf, Sf_None) -> return sf
 
-        (Sf_SafeImports, sf) -> return sf
-        (sf, Sf_SafeImports) -> return sf
-
-        (Sf_Trustworthy, Sf_Safe) -> err
-        (Sf_Safe, Sf_Trustworthy) -> err
+        (Sf_SafeInfered, sf) -> return sf
+        (sf, Sf_SafeInfered) -> return sf
 
         (a,b) | a == b -> return a
               | otherwise -> err
@@ -1829,9 +1830,8 @@ languageFlags = [
 -- They are used to place hard requirements on what GHC Haskell language
 -- features can be used.
 safeHaskellFlags :: [FlagSpec SafeHaskellMode]
-safeHaskellFlags = [mkF Sf_SafeImports, mkF Sf_Trustworthy, mkF' Sf_Safe]
+safeHaskellFlags = [mkF Sf_Unsafe, mkF Sf_Trustworthy, mkF Sf_Safe]
     where mkF  flag = (showPpr flag, flag, nop)
-          mkF' flag = (showPpr flag, flag, nop)
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]

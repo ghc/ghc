@@ -1990,23 +1990,26 @@ noIfaceTrustInfo = setSafeMode Sf_None
 trustInfoToNum :: IfaceTrustInfo -> Word8
 trustInfoToNum it
   = case getSafeMode it of
-            Sf_None -> 0
-            Sf_SafeImports -> 1
+            Sf_None        -> 0
+            Sf_Unsafe      -> 1
             Sf_Trustworthy -> 2
-            Sf_Safe -> 3
+            Sf_Safe        -> 3
+            Sf_SafeInfered -> 4
 
 numToTrustInfo :: Word8 -> IfaceTrustInfo
 numToTrustInfo 0 = setSafeMode Sf_None
-numToTrustInfo 1 = setSafeMode Sf_SafeImports
+numToTrustInfo 1 = setSafeMode Sf_Unsafe
 numToTrustInfo 2 = setSafeMode Sf_Trustworthy
 numToTrustInfo 3 = setSafeMode Sf_Safe
+numToTrustInfo 4 = setSafeMode Sf_SafeInfered
 numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
 
 instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_None)         = ptext $ sLit "none"
-    ppr (TrustInfo Sf_SafeImports)  = ptext $ sLit "safe-imports"
+    ppr (TrustInfo Sf_Unsafe)       = ptext $ sLit "unsafe"
     ppr (TrustInfo Sf_Trustworthy)  = ptext $ sLit "trustworthy"
     ppr (TrustInfo Sf_Safe)         = ptext $ sLit "safe"
+    ppr (TrustInfo Sf_SafeInfered)  = ptext $ sLit "safe-infered"
 \end{code}
 
 %************************************************************************
