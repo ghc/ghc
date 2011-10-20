@@ -1,0 +1,4 @@
+
+GoodImport03.hs:25:1:
+    Warning: Module `Control.OldException' is deprecated:
+               Future versions of base will not support the old exceptions style. Please switch to extensible exceptions.

@@ -1,4 +1,4 @@
-{-# LANGUAGE SafeImports #-}
+{-# LANGUAGE SafeImport #-}
 
 -- | Basic test to see if Safe flags compiles
 module SafeFlags03 where

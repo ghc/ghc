@@ -945,9 +945,9 @@ def checkStats(stats_file, num_fields):
 def extras_build( way, extra_mods, extra_hc_opts ):
     for modopts in extra_mods:
         mod, opts = modopts
-        result = simple_build( mod, way, opts + extra_hc_opts, 0, '', 0, 0, 0)
-        if not (mod.endswith(".hs") or mod.endswith(".lhs")):
-            extra_hc_opts += " " + replace_suffix(mod, 'o')
+        result = simple_build( mod, way, opts + ' ' + extra_hc_opts, 0, '', 0, 0, 0)
+        if not (mod.endswith('.hs') or mod.endswith('.lhs')):
+            extra_hc_opts += ' ' + replace_suffix(mod, 'o')
         if badResult(result):
             return result
 

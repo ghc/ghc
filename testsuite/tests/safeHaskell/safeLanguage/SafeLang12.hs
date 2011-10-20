@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import SafeLang12_A

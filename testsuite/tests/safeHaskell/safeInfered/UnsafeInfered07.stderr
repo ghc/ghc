@@ -1,0 +1,5 @@
+[1 of 2] Compiling UnsafeInfered07_A ( UnsafeInfered07_A.hs, UnsafeInfered07_A.o )
+[2 of 2] Compiling UnsafeInfered07  ( UnsafeInfered07.hs, UnsafeInfered07.o )
+
+UnsafeInfered07.hs:4:1:
+    main:UnsafeInfered07_A can't be safely imported! The module itself isn't safe.

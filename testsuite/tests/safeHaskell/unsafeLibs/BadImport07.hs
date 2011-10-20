@@ -5,7 +5,7 @@ module Main where
 import Unsafe.Coerce
 
 f :: Int
-f = trace "What kind of swallow?" 2
+f = 2
 
 main :: IO ()
 main = putStrLn $ "X is: " ++ show f

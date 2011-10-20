@@ -6,5 +6,5 @@ import Data.Typeable
 data G = G Int
 
 instance Typeable G where
-    typeof _ = typeof (undefined::Int)
+    typeOf _ = typeOf (undefined::Int)
 
