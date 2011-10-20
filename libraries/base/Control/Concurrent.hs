@@ -124,7 +124,7 @@ import GHC.Base
 
 import System.Posix.Types ( Fd )
 import Foreign.StablePtr
-import Foreign.C.Types  ( CInt )
+import Foreign.C.Types
 import Control.Monad    ( when )
 
 #ifdef mingw32_HOST_OS

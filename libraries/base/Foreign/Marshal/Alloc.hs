@@ -62,7 +62,7 @@ module Foreign.Marshal.Alloc (
 ) where
 
 import Data.Maybe
-import Foreign.C.Types          ( CSize )
+import Foreign.C.Types          ( CSize(..) )
 import Foreign.Storable         ( Storable(sizeOf,alignment) )
 
 #ifndef __GLASGOW_HASKELL__

@@ -6,7 +6,7 @@ module GHC.Event.Clock (getCurrentTime) where
 
 import Foreign (Ptr, Storable(..), nullPtr, with)
 import Foreign.C.Error (throwErrnoIfMinus1_)
-import Foreign.C.Types (CInt, CLong, CTime, CSUSeconds)
+import Foreign.C.Types
 import GHC.Base
 import GHC.Err
 import GHC.Num
