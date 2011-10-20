@@ -108,7 +108,7 @@ import SrcLoc
 import FastString
 import Outputable
 #ifdef GHCI
-import Foreign.C        ( CInt )
+import Foreign.C        ( CInt(..) )
 #endif
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
