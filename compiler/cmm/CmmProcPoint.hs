@@ -282,19 +282,8 @@ addProcPointProtocols callPPs procPoints g =
               let block = mapLookup id (toBlockMap g) `orElse`
                                     panic "branch out of graph"
               in case blockToNodeList block of
--- MS: There is an ugly bug in ghc-6.10, which rejects following valid code.
--- After trying several tricks, the NOINLINE on getItOut worked. Uffff.
-#if __GLASGOW_HASKELL__ >= 612
                    (_, [], JustC (CmmBranch pee)) | setMember pee procPoints -> Just pee
                    _                                                         -> Nothing
-#else
-                   (_, [], exit) | CmmBranch pee <- getItOut exit
-                                 , setMember pee procPoints      -> Just pee
-                   _                                             -> Nothing
-              where {-# NOINLINE getItOut #-}
-                    getItOut :: MaybeC C a -> a
-                    getItOut (JustC a) = a
-#endif
 
 -- | For now, following a suggestion by Ben Lippmeier, we pass all
 -- live variables as arguments, hoping that a clever register
