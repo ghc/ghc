@@ -1894,8 +1894,9 @@ genCCall64 target dest_regs args =
         let call = callinsns `appOL`
                    toOL (
                             -- Deallocate parameters after call for ccall;
-                            -- but not for stdcall (callee does it)
-                      (if cconv == StdCallConv || real_size==0 then [] else
+                            -- stdcall has callee do it, but is not supported on
+                            -- x86_64 target (see #3336)
+                      (if real_size==0 then [] else
                        [ADD (intSize wordWidth) (OpImm (ImmInt real_size)) (OpReg esp)])
                       ++
                       [DELTA (delta + real_size)]
