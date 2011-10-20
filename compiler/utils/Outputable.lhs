@@ -84,6 +84,8 @@ import Panic
 import Data.Char
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Word
 import System.IO	( Handle, stderr, stdout, hFlush )
 import System.FilePath
@@ -643,6 +645,9 @@ instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
 instance (PlatformOutputable a) => PlatformOutputable [a] where
     pprPlatform platform xs = brackets (fsep (punctuate comma (map (pprPlatform platform) xs)))
+
+instance (Outputable a) => Outputable (Set a) where
+    ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])

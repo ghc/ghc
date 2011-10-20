@@ -26,6 +26,7 @@ import TcRnMonad
 import TcHsType
 import TcExpr
 import TcEnv
+import RnEnv
 
 import FamInst
 import FamInstEnv
@@ -47,7 +48,6 @@ import Platform
 import SrcLoc
 import Bag
 import FastString
-import Util
 
 import Control.Monad
 \end{code}
@@ -99,13 +99,29 @@ normaliseFfiType' env ty0 = go [] ty0
           else do newtypeOK <- do env <- getGblEnv
                                   case tyConSingleDataCon_maybe tc of
                                       Just dataCon ->
-                                          return $ notNull $ lookupGRE_Name (tcg_rdr_env env) $ dataConName dataCon
+                                          case lookupGRE_Name (tcg_rdr_env env) $ dataConName dataCon of
+                                              [gre] ->
+                                                  do -- If we look through a newtype constructor, then we need it to be in scope.
+                                                     -- But if this is the only use if that import then we'll get an unused import
+                                                     -- warning, so we need to mark a valid RdrName for it as used.
+                                                     case gre_prov gre of
+                                                         Imported (is : _) ->
+                                                             do let modName = is_as (is_decl is)
+                                                                    occName = nameOccName (dataConName dataCon)
+                                                                    rdrName = mkRdrQual modName occName
+                                                                addUsedRdrNames [rdrName]
+                                                         Imported [] ->
+                                                             panic "normaliseFfiType': Imported []"
+                                                         LocalDef ->
+                                                             return ()
+                                                     return True
+                                              [] ->
+                                                  return False
+                                              _ ->
+                                                  panic "normaliseFfiType': Got more GREs than expected"
                                       _ ->
                                           return False
-                  let newtypeForeign = nameModule_maybe (tyConName tc) `elem`
-                                       [Just (mkBaseModule (fsLit "Foreign.C.Types")),
-                                        Just (mkBaseModule (fsLit "System.Posix.Types"))]
-                  if newtypeOK || newtypeForeign
+                  if newtypeOK
                       then do let nt_co = mkAxInstCo (newTyConCo tc) tys
                               add_co nt_co rec_nts' nt_rhs
                       else children_only
