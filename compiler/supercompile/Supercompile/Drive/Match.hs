@@ -406,7 +406,7 @@ matchPureHeap rn2 init_free_eqs h_l h_r
       where go extra_free_eqs used_l' used_r' = do
                 -- Don't forget to match types/unfoldings of binders as well:
                 bndr_free_eqs <- matchBndrExtras rn2 x_l x_r
-                matchLoop ((x_l, x_r) : bndr_free_eqs ++ known) (extra_free_eqs ++ free_eqs) used_l' used_r'
+                matchLoop ((x_l, x_r) : known) (bndr_free_eqs ++ extra_free_eqs ++ free_eqs) used_l' used_r'
 
 app3 :: [a] -> [a] -> [a] -> [a]
 app3 x y z = x ++ y ++ z

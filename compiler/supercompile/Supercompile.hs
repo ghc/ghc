@@ -218,7 +218,7 @@ termToCoreExpr = term
 -- NB: assumes no-shadowing at the top level. I don't want to have to rename stuff to
 -- commute CoreBinds...
 partitionBinds :: (Id -> Bool) -> [CoreBind] -> ([CoreBind], [CoreBind], S.FreeVars)
-partitionBinds should_sc initial_binds = go initial_inside [(b, unionVarSets (map exprFreeVars (rhssOfBind b))) | b <- initial_undecided]
+partitionBinds should_sc initial_binds = go initial_inside [(b, unionVarSets (map S.idFreeVars (bindersOf b) ++ map exprFreeVars (rhssOfBind b))) | b <- initial_undecided]
   where
     (initial_inside, initial_undecided) = partition (any should_sc . bindersOf) initial_binds
     
