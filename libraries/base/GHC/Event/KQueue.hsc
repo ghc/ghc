@@ -31,7 +31,7 @@ import Control.Monad (when, unless)
 import Data.Bits (Bits(..))
 import Data.Word (Word16, Word32)
 import Foreign.C.Error (throwErrnoIfMinus1)
-import Foreign.C.Types (CInt, CLong, CTime)
+import Foreign.C.Types
 import Foreign.Marshal.Alloc (alloca)
 import Foreign.Ptr (Ptr, nullPtr)
 import Foreign.Storable (Storable(..))
@@ -49,9 +49,6 @@ import qualified GHC.Event.Array as A
 #if defined(HAVE_KEVENT64)
 import Data.Int (Int64)
 import Data.Word (Word64)
-import Foreign.C.Types (CUInt)
-#else
-import Foreign.C.Types (CIntPtr, CUIntPtr)
 #endif
 
 #include <sys/types.h>
