@@ -92,3 +92,4 @@ test('T5385',
      multimod_compile_fail,
      ['T5385','-v0'])
 test('T5513', normal, compile_fail, [''])
+test('Misplaced', normal, compile_fail, [''])
