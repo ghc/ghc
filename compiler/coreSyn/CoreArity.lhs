@@ -283,6 +283,23 @@ should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
 do so; it improves some programs significantly, and increasing convergence
 isn't a bad thing.  Hence the ABot/ATop in ArityType.
 
+However, this really isn't always the Right Thing, and we have several
+tickets reporting unexpected bahaviour resulting from this
+transformation.  So we try to limit it as much as possible:
+
+ * Do NOT move a lambda outside a known-bottom case expression
+      case undefined of { (a,b) -> \y -> e }
+   This showed up in Trac #5557
+
+ * Do NOT move a lambda outside a case if all the branches of 
+   the case are known to return bottom.
+      case x of { (a,b) -> \y -> error "urk" }
+   This case is less important, but the idea is that if the fn is 
+   going to diverge eventually anyway then getting the best arity 
+   isn't an issue, so we might as well play safe
+
+Of course both these are readily defeated by disguising the bottoms.
+
 4. Note [Newtype arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Non-recursive newtypes are transparent, and should not get in the way.
@@ -575,9 +592,20 @@ arityType cheap_fn (App fun arg )
 	--  ===>
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
-arityType cheap_fn (Case scrut bndr _ alts)
-  = floatIn (cheap_fn scrut (Just (idType bndr)))
-	    (foldr1 andArityType [arityType cheap_fn rhs | (_,_,rhs) <- alts])
+	--
+arityType cheap_fn (Case scrut _ _ alts)
+  | exprIsBottom scrut 
+  = ABot 0     -- Do not eta expand
+               -- See Note [Dealing with bottom]
+  | otherwise
+  = case alts_type of
+     ABot n  | n>0       -> ATop []    -- Don't eta expand 
+     	     | otherwise -> ABot 0     -- if RHS is bottomming
+    			               -- See Note [Dealing with bottom]
+     ATop as | exprIsTrivial scrut -> ATop as
+             | otherwise           -> ATop (takeWhile id as)	    
+  where
+    alts_type = foldr1 andArityType [arityType cheap_fn rhs | (_,_,rhs) <- alts]
 
 arityType cheap_fn (Let b e) 
   = floatIn (cheap_bind b) (arityType cheap_fn e)
