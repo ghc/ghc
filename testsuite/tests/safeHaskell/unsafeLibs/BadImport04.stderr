@@ -1,0 +1,3 @@
+
+BadImport04.hs:5:1:
+    base:Foreign can't be safely imported! The module itself isn't safe.

@@ -26,4 +26,5 @@ test('UnsafeInfered09', normal, multimod_compile_fail, ['UnsafeInfered09', ''])
 # Mixed tests
 test('Mixed01', normal, compile_fail, [''])
 test('Mixed02', normal, compile_fail, [''])
+test('Mixed03', normal, compile_fail, [''])
 

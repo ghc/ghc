@@ -1,0 +1,3 @@
+
+BadImport08.hs:5:1:
+    base:Control.Monad.ST can't be safely imported! The module itself isn't safe.

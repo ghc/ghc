@@ -1,0 +1,3 @@
+
+Dep10.hs:4:1:
+    base:GHC.ST can't be safely imported! The module itself isn't safe.
