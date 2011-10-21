@@ -478,12 +478,15 @@ simplifyExpr dflags expr
 
         ; us <-  mkSplitUniqSupply 's'
 
-        ; let sz = exprSize expr
-              (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
-                                 simplExprGently (simplEnvForGHCi dflags) expr
+	; let sz = exprSize expr
+              (expr', counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
+				 simplExprGently (simplEnvForGHCi dflags) expr
 
-        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
-                        (pprCoreExpr expr')
+	; Err.dumpIfSet (dopt Opt_D_dump_simpl_stats dflags)
+		  "Simplifier statistics" (pprSimplCount counts)
+
+	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+			(pprCoreExpr expr')
 
         ; return expr'
         }
