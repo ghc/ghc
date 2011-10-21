@@ -803,12 +803,12 @@ fromListBL bound l = BL (length l) bound l []
 setContext :: GhcMonad m => [InteractiveImport] -> m ()
 setContext imports
   = do { hsc_env <- getSession
-       ; let old_ic = hsc_IC hsc_env
        ; all_env <- liftIO $ findGlobalRdrEnv hsc_env imports
-       ; let final_rdr_env = ic_tythings old_ic `icPlusGblRdrEnv` all_env
+       ; let old_ic        = hsc_IC hsc_env
+             final_rdr_env = ic_tythings old_ic `icPlusGblRdrEnv` all_env
        ; modifySession $ \_ ->
-         hsc_env{ hsc_IC = old_ic { ic_imports      = imports
-                                  , ic_rn_gbl_env   = final_rdr_env }}}
+         hsc_env{ hsc_IC = old_ic { ic_imports    = imports
+                                  , ic_rn_gbl_env = final_rdr_env }}}
 
 findGlobalRdrEnv :: HscEnv -> [InteractiveImport] -> IO GlobalRdrEnv
 -- Compute the GlobalRdrEnv for the interactive context

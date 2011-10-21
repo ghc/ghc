@@ -8,11 +8,11 @@
 module TcRnDriver (
 #ifdef GHCI
 	tcRnStmt, tcRnExpr, tcRnType,
+	tcRnImportDecls,
 	tcRnLookupRdrName,
 	getModuleInterface,
 	tcRnDeclsi,
 #endif
-	tcRnImports,
 	tcRnLookupName,
 	tcRnGetInfo,
 	tcRnModule, 
@@ -1402,6 +1402,15 @@ tcRnExpr hsc_env ictxt rdr_expr
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
     zonkTcType all_expr_ty
     }
+
+--------------------------
+tcRnImportDecls :: HscEnv
+	 	-> [LImportDecl RdrName]
+	 	-> IO (Messages, Maybe GlobalRdrEnv)
+tcRnImportDecls hsc_env import_decls
+ =  initTcPrintErrors hsc_env iNTERACTIVE $ 
+    do { gbl_env <- tcRnImports hsc_env iNTERACTIVE import_decls
+       ; return (tcg_rdr_env gbl_env) }
 \end{code}
 
 tcRnType just finds the kind of a type
