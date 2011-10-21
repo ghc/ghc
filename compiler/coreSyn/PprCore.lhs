@@ -14,6 +14,7 @@ module PprCore (
 
 import CoreSyn
 import CostCentre
+import Literal( pprLiteral )
 import Var
 import Id
 import IdInfo
@@ -94,8 +95,8 @@ ppr_binding (val_bdr, expr)
 \end{code}
 
 \begin{code}
-pprParendExpr   expr = ppr_expr parens expr
-pprCoreExpr expr = ppr_expr noParens expr
+pprParendExpr expr = ppr_expr parens expr
+pprCoreExpr   expr = ppr_expr noParens expr
 
 noParens :: SDoc -> SDoc
 noParens pp = pp
@@ -106,12 +107,10 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
 	-- The function adds parens in context that need
 	-- an atomic value (e.g. function args)
 
-ppr_expr add_par (Type ty) = add_par (ptext (sLit "TYPE") <+> ppr ty)	-- Wierd
-
+ppr_expr _       (Var name)    = ppr name
+ppr_expr add_par (Type ty)     = add_par (ptext (sLit "TYPE") <+> ppr ty)	-- Wierd
 ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO") <+> ppr co)
-	           
-ppr_expr _       (Var name) = ppr name
-ppr_expr _       (Lit lit)  = ppr lit
+ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
 
 ppr_expr add_par (Cast expr co) 
   = add_par $

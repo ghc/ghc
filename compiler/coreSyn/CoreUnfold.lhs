@@ -491,7 +491,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr
-litSize (MachStr str) = 10 + 10 * ((lengthFS str + 3) `div` 4)
+litSize (LitInteger {}) = 100	-- Note [Size of literal integers]
+litSize (MachStr str)   = 10 + 10 * ((lengthFS str + 3) `div` 4)
 	-- If size could be 0 then @f "x"@ might be too small
 	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
 	--  duplication of little strings]
@@ -555,6 +556,17 @@ conSize dc n_val_args
      -- REALLY like unfolding constructors that get scrutinised.
      -- [SDM, 25/5/11]
 \end{code}
+
+Note [Literal integer size]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Literal integers *can* be big (mkInteger [...coefficients...]), but
+need not be (S# n).  We just use an aribitrary big-ish constant here
+so that, in particular, we don't inline top-level defns like
+   n = S# 5
+There's no point in doing so -- any optimsations will see the S#
+through n's unfolding.  Nor will a big size inhibit unfoldings functions
+that mention a literal Integer, because the float-out pass will float
+all those constants to top level.
 
 Note [Constructor size]
 ~~~~~~~~~~~~~~~~~~~~~~~
