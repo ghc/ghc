@@ -4,4 +4,6 @@
     Declared at: <interactive>:3:32
                  <interactive>:3:68
 
+<interactive>:3:68: `f' is not a (visible) method of class `Foo'
+
 <interactive>:3:108: `f' is not a (visible) method of class `Foo'
