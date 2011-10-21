@@ -11,7 +11,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 \begin{code}
 module RnBinds (
    -- Renaming top-level bindings
-   rnTopBinds, rnTopBindsLHS, rnTopBindsRHS, 
+   rnTopBindsLHS, rnTopBindsRHS, rnValBindsRHS,
 
    -- Renaming local bindings
    rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
@@ -20,7 +20,7 @@ module RnBinds (
    rnMethodBinds, renameSigs, mkSigTvFn,
    rnMatchGroup, rnGRHSs,
    makeMiniFixityEnv, MiniFixityEnv,
-   misplacedSigErr
+   HsSigCtxt(..)
    ) where
 
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
@@ -169,28 +169,14 @@ rnTopBindsRHS binds
   = do { is_boot <- tcIsHsBoot
        ; if is_boot 
          then rnTopBindsBoot binds
-         else rnValBindsRHS Nothing   -- Allow SPEC prags for imports
-                            binds }
-
--- Wrapper if we don't need to do anything in between the left and right,
--- or anything else in the scope of the left
---
--- Never used when there are fixity declarations
-rnTopBinds :: HsValBinds RdrName 
-           -> RnM (HsValBinds Name, DefUses)
-rnTopBinds b
-  = do { nl <- rnTopBindsLHS emptyFsEnv b
-       ; let bound_names = collectHsValBinders nl
-       ; bindLocalNames bound_names $ 
-         rnValBindsRHS (Just (mkNameSet bound_names)) nl }
-       
+         else rnValBindsRHS TopSigCtxt binds }
 
 rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
 -- A hs-boot file has no bindings. 
 -- Return a single HsBindGroup with empty binds and renamed signatures
 rnTopBindsBoot (ValBindsIn mbinds sigs)
   = do	{ checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
-	; sigs' <- renameSigs Nothing okHsBootSig sigs
+	; sigs' <- renameSigs HsBootCtxt sigs
 	; return (ValBindsOut [] sigs', usesOnly (hsSigsFVs sigs')) }
 rnTopBindsBoot b = pprPanic "rnTopBindsBoot" (ppr b)
 \end{code}
@@ -292,13 +278,12 @@ rnValBindsLHS _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
 -- Assumes the LHS vars are in scope
 --
 -- Does not bind the local fixity declarations
-rnValBindsRHS :: Maybe NameSet	-- Names bound by the LHSes
-	       	  		-- Nothing if expect sigs for imports
-               -> HsValBindsLR Name RdrName
-               -> RnM (HsValBinds Name, DefUses)
+rnValBindsRHS :: HsSigCtxt 
+              -> HsValBindsLR Name RdrName
+              -> RnM (HsValBinds Name, DefUses)
 
-rnValBindsRHS mb_bound_names (ValBindsIn mbinds sigs)
-  = do { sigs' <- renameSigs mb_bound_names okBindSig sigs
+rnValBindsRHS ctxt (ValBindsIn mbinds sigs)
+  = do { sigs' <- renameSigs ctxt sigs
        ; binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs')) mbinds
        ; case depAnalBinds binds_w_dus of
            (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
@@ -322,7 +307,7 @@ rnLocalValBindsRHS :: NameSet  -- names bound by the LHSes
                    -> HsValBindsLR Name RdrName
                    -> RnM (HsValBinds Name, DefUses)
 rnLocalValBindsRHS bound_names binds
-  = rnValBindsRHS (Just bound_names) binds
+  = rnValBindsRHS (LocalBindCtxt bound_names) binds
 
 -- for local binds
 -- wrapper that does both the left- and right-hand sides 
@@ -654,12 +639,11 @@ At the moment we don't gather free-var info from the types in
 signatures.  We'd only need this if we wanted to report unused tyvars.
 
 \begin{code}
-renameSigs :: Maybe NameSet		-- If (Just ns) complain if the sig isn't for one of ns
-	   -> (Sig Name -> Bool) 	-- Complain about the wrong kind of signature if this is False
+renameSigs :: HsSigCtxt 
 	   -> [LSig RdrName]
 	   -> RnM [LSig Name]
 -- Renames the signatures and performs error checks
-renameSigs mb_names ok_sig sigs 
+renameSigs ctxt sigs 
   = do	{ mapM_ dupSigDeclErr (findDupsEq eqHsSig sigs)  -- Duplicate
 	  	-- Check for duplicates on RdrName version, 
 		-- because renamed version has unboundName for
@@ -670,9 +654,9 @@ renameSigs mb_names ok_sig sigs
 		--	       op :: a -> a
  		--             default op :: Eq a => a -> a
 		
-	; sigs' <- mapM (wrapLocM (renameSig mb_names)) sigs
+	; sigs' <- mapM (wrapLocM (renameSig ctxt)) sigs
 
-	; let (good_sigs, bad_sigs) = partition (ok_sig . unLoc) sigs'
+	; let (good_sigs, bad_sigs) = partition (okHsSig ctxt) sigs'
 	; mapM_ misplacedSigErr bad_sigs		 -- Misplaced
 
 	; return good_sigs } 
@@ -687,19 +671,20 @@ renameSigs mb_names ok_sig sigs
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
 
-renameSig :: Maybe NameSet -> Sig RdrName -> RnM (Sig Name)
+renameSig :: HsSigCtxt -> Sig RdrName -> RnM (Sig Name)
 -- FixitySig is renamed elsewhere.
 renameSig _ (IdSig x)
   = return (IdSig x)	  -- Actually this never occurs
-renameSig mb_names sig@(TypeSig vs ty)
-  = do	{ new_vs <- mapM (lookupSigOccRn mb_names sig) vs
+
+renameSig ctxt sig@(TypeSig vs ty)
+  = do	{ new_vs <- mapM (lookupSigOccRn ctxt sig) vs
 	; new_ty <- rnHsSigType (ppr_sig_bndrs vs) ty
 	; return (TypeSig new_vs new_ty) }
 
-renameSig mb_names sig@(GenericSig vs ty)
+renameSig ctxt sig@(GenericSig vs ty)
   = do	{ defaultSigs_on <- xoptM Opt_DefaultSignatures
         ; unless defaultSigs_on (addErr (defaultSigErr sig))
-        ; new_v <- mapM (lookupSigOccRn mb_names sig) vs
+        ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
 	; new_ty <- rnHsSigType (ppr_sig_bndrs vs) ty
 	; return (GenericSig new_v new_ty) }
 
@@ -711,23 +696,49 @@ renameSig _ (SpecInstSig ty)
 -- so, in the top-level case (when mb_names is Nothing)
 -- we use lookupOccRn.  If there's both an imported and a local 'f'
 -- then the SPECIALISE pragma is ambiguous, unlike all other signatures
-renameSig mb_names sig@(SpecSig v ty inl)
-  = do	{ new_v <- case mb_names of
-                     Just {} -> lookupSigOccRn mb_names sig v
-                     Nothing -> lookupLocatedOccRn v
+renameSig ctxt sig@(SpecSig v ty inl)
+  = do	{ new_v <- case ctxt of 
+                     TopSigCtxt -> lookupLocatedOccRn v
+                     _          -> lookupSigOccRn ctxt sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (SpecSig new_v new_ty inl) }
 
-renameSig mb_names sig@(InlineSig v s)
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
+renameSig ctxt sig@(InlineSig v s)
+  = do	{ new_v <- lookupSigOccRn ctxt sig v
 	; return (InlineSig new_v s) }
 
-renameSig mb_names sig@(FixSig (FixitySig v f))
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
+renameSig ctxt sig@(FixSig (FixitySig v f))
+  = do	{ new_v <- lookupSigOccRn ctxt sig v
 	; return (FixSig (FixitySig new_v f)) }
 
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
+
+okHsSig :: HsSigCtxt -> LSig a -> Bool
+okHsSig ctxt (L _ sig) 
+  = case (sig, ctxt) of
+     (GenericSig {}, ClsDeclCtxt {}) -> True
+     (GenericSig {}, _)              -> False
+
+     (TypeSig {}, InstDeclCtxt {}) -> False
+     (TypeSig {}, _)               -> True
+
+     (FixSig {}, InstDeclCtxt {}) -> False
+     (FixSig {}, _)               -> True
+
+     (IdSig {}, TopSigCtxt) -> True
+     (IdSig {}, _)          -> False
+
+     (InlineSig {}, HsBootCtxt) -> False
+     (InlineSig {}, _)          -> True
+
+     (SpecSig {}, TopSigCtxt)       -> True
+     (SpecSig {}, LocalBindCtxt {}) -> True
+     (SpecSig {}, InstDeclCtxt {})  -> True
+     (SpecSig {}, _)                -> False
+
+     (SpecInstSig {}, InstDeclCtxt {}) -> True
+     (SpecInstSig {}, _)               -> False
 \end{code}
 
 

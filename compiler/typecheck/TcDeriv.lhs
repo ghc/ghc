@@ -382,8 +382,9 @@ renameDeriv is_boot inst_infos bagBinds
 	; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
 	; let aux_val_binds = ValBindsIn aux_binds (bagToList aux_sigs)
 	; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
-	; bindLocalNames (collectHsValBinders rn_aux_lhs) $
-    do	{ (rn_aux, dus_aux) <- rnTopBindsRHS rn_aux_lhs
+        ; let bndrs = collectHsValBinders rn_aux_lhs
+	; bindLocalNames bndrs $ 
+    do	{ (rn_aux, dus_aux) <- rnValBindsRHS (LocalBindCtxt (mkNameSet bndrs)) rn_aux_lhs
 	; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
 	; return (listToBag rn_inst_infos, rn_aux,
                   dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }

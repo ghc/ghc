@@ -449,9 +449,8 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	--
 	-- But the (unqualified) method names are in scope
        ; let binders = collectHsBindsBinders mbinds'
-	     bndr_set = mkNameSet binders
        ; uprags' <- bindLocalNames binders $
-	            renameSigs (Just bndr_set) okInstDclSig uprags
+	            renameSigs (InstDeclCtxt cls) uprags
 
        ; return (InstDecl inst_ty' mbinds' uprags' ats',
 	         meth_fvs `plusFV` at_fvs
@@ -798,7 +797,7 @@ rnTyClDecl _ (ClassDecl {tcdCtxt = context, tcdLName = lcls,
 	     ; fds'  <- rnFds cls_doc fds
              ; let rn_at = rnTyClDecl (Just cls')
              ; (ats', fv_ats) <- mapAndUnzipM (wrapLocFstM rn_at) ats
-	     ; sigs' <- renameSigs Nothing okClsDclSig sigs
+	     ; sigs' <- renameSigs (ClsDeclCtxt cls') sigs
              ; (at_defs', fv_at_defs) <- mapAndUnzipM (wrapLocFstM rn_at) at_defs
 	     ; let fvs = extractHsCtxtTyNames context'	`plusFV`
 	                 hsSigsFVs sigs'                `plusFV`

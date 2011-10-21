@@ -9,7 +9,9 @@ module RnEnv (
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
 	lookupLocatedOccRn, lookupOccRn, lookupLocalOccRn_maybe,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
-	lookupLocalDataTcNames, lookupSigOccRn,
+
+	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
+
 	lookupFixityRn, lookupTyFixityRn, 
 	lookupInstDeclBndr, lookupSubBndr, 
         lookupSubBndrGREs, lookupConstructorFields,
@@ -427,14 +429,16 @@ lookupLocalOccRn_maybe rdr_name
        ; return (lookupLocalRdrEnv local_env rdr_name) }
 
 -- lookupOccRn looks up an occurrence of a RdrName
+lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
+lookupOccRn_maybe rdr_name
+  = do { local_env <- getLocalRdrEnv
+       ; case lookupLocalRdrEnv local_env rdr_name of 
+          Just name -> return (Just name)
+          Nothing   -> lookupGlobalOccRn_maybe rdr_name }
+
 lookupOccRn :: RdrName -> RnM Name
 lookupOccRn rdr_name
-  = do { local_env <- getLocalRdrEnv
-       ; case lookupLocalRdrEnv local_env rdr_name of {
-          Just name -> return name ;
-          Nothing   -> do
-
-       { mb_name <- lookupGlobalOccRn_maybe rdr_name
+  = do { mb_name <- lookupOccRn_maybe rdr_name
        ; case mb_name of {
 		Just n  -> return n ;
 		Nothing -> do
@@ -449,7 +453,7 @@ lookupOccRn rdr_name
        ; if isQual rdr_name && allow_qual && is_ghci
          then lookupQualifiedName rdr_name
          else do { traceRn (text "lookupOccRn" <+> ppr rdr_name)
-                 ; unboundName WL_Any rdr_name } } } } } }
+                 ; unboundName WL_Any rdr_name } } } }
 
 
 lookupGlobalOccRn :: RdrName -> RnM Name
@@ -588,67 +592,88 @@ return the imported 'f', so that later on the reanamer will
 correctly report "misplaced type sig".
 
 \begin{code}
-lookupSigOccRn :: Maybe NameSet	   -- Just ns => these are the binders
-				   -- 	 	 in the same group
-				   -- Nothing => signatures without 
-				   -- 		 binders are expected
-				   --		 (a) top-level (SPECIALISE prags)
-				   -- 		 (b) class decls
-				   --		 (c) hs-boot files
+data HsSigCtxt 
+  = HsBootCtxt		     -- Top level of a hs-boot file
+  | TopSigCtxt		     -- At top level
+  | LocalBindCtxt NameSet    -- In a local binding, binding these names
+  | ClsDeclCtxt   Name	     -- Class decl for this class
+  | InstDeclCtxt  Name	     -- Intsance decl for this class
+
+lookupSigOccRn :: HsSigCtxt
 	       -> Sig RdrName
 	       -> Located RdrName -> RnM (Located Name)
-lookupSigOccRn mb_bound_names sig
+lookupSigOccRn ctxt sig
   = wrapLocM $ \ rdr_name -> 
-    do { mb_name <- lookupBindGroupOcc mb_bound_names (hsSigDoc sig) rdr_name
+    do { mb_name <- lookupBindGroupOcc ctxt (hsSigDoc sig) rdr_name
        ; case mb_name of
 	   Left err   -> do { addErr err; return (mkUnboundName rdr_name) }
 	   Right name -> return name }
 
-lookupBindGroupOcc :: Maybe NameSet  -- See notes on the (Maybe NameSet)
-	           -> SDoc           --  in lookupSigOccRn
+lookupBindGroupOcc :: HsSigCtxt
+	           -> SDoc     
 	           -> RdrName -> RnM (Either Message Name)
 -- Looks up the RdrName, expecting it to resolve to one of the 
 -- bound names passed in.  If not, return an appropriate error message
 --
 -- See Note [Looking up signature names]
-lookupBindGroupOcc mb_bound_names what rdr_name
+lookupBindGroupOcc ctxt what rdr_name
   | Just n <- isExact_maybe rdr_name
   = do { n' <- lookupExactOcc n
-       ; check_local_name n' }
+       ; return (Right n') }  -- Maybe we should check the side conditions
+       	 	      	      -- but it's a pain, and Exact things only show
+			      -- up when you know what you are doing
   | otherwise
-  = do  { local_env <- getLocalRdrEnv
-        ; case lookupLocalRdrEnv local_env rdr_name of {
-            Just n  -> check_local_name n;
-            Nothing -> do       -- Not defined in a nested scope
-
-        { env <- getGlobalRdrEnv 
-        ; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-        ; case (filter isLocalGRE gres) of
-            (gre:_) -> check_local_name (gre_name gre)
+  = case ctxt of 
+      HsBootCtxt       -> lookup_top		    
+      TopSigCtxt       -> lookup_top
+      LocalBindCtxt ns -> lookup_group ns
+      ClsDeclCtxt  cls -> lookup_cls_op cls
+      InstDeclCtxt cls -> lookup_cls_op cls
+  where
+    lookup_cls_op cls
+      = do { env <- getGlobalRdrEnv 
+           ; let gres = lookupSubBndrGREs env (ParentIs cls) rdr_name
+           ; case gres of
+               []      -> return (Left (unknownSubordinateErr doc rdr_name))
+               (gre:_) -> return (Right (gre_name gre)) }
                         -- If there is more than one local GRE for the 
                         -- same OccName 'f', that will be reported separately
                         -- as a duplicate top-level binding for 'f'
-            [] | null gres -> bale_out_with empty
-               | otherwise -> bale_out_with import_msg
-        }}}
-  where
-      check_local_name name 	-- The name is in scope, and not imported
-  	  = case mb_bound_names of
-  		  Just bound_names | not (name `elemNameSet` bound_names)
-				   -> bale_out_with local_msg
-	 	  _other -> return (Right name)
+      where
+        doc = ptext (sLit "method of class") <+> quotes (ppr cls)
 
-      bale_out_with msg 
+    lookup_top
+      = do { env <- getGlobalRdrEnv 
+           ; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+           ; case filter isLocalGRE gres of
+               [] | null gres -> bale_out_with empty
+                  | otherwise -> bale_out_with (bad_msg (ptext (sLit "an imported value")))
+               (gre:_) 
+                  | ParentIs {} <- gre_par gre
+		  -> bale_out_with (bad_msg (ptext (sLit "a record selector or class method")))
+		  | otherwise
+                  -> return (Right (gre_name gre)) }
+
+    lookup_group bound_names
+      = do { mb_name <- lookupOccRn_maybe rdr_name
+           ; case mb_name of
+               Just n  
+                 | n `elemNameSet` bound_names -> return (Right n)
+                 | otherwise                   -> bale_out_with local_msg
+               Nothing                         -> bale_out_with empty }
+
+    bale_out_with msg 
   	= return (Left (sep [ ptext (sLit "The") <+> what
   				<+> ptext (sLit "for") <+> quotes (ppr rdr_name)
   			   , nest 2 $ ptext (sLit "lacks an accompanying binding")]
   		       $$ nest 2 msg))
 
-      local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
+    local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
   			   <+> quotes (ppr rdr_name) <+> ptext (sLit "is declared")
 
-      import_msg = parens $ ptext (sLit "You cannot give a") <+> what
-    			  <+> ptext (sLit "for an imported value")
+    bad_msg thing = parens $ ptext (sLit "You cannot give a") <+> what
+    			  <+> ptext (sLit "for") <+> thing
+
 
 ---------------
 lookupLocalDataTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
@@ -660,7 +685,7 @@ lookupLocalDataTcNames bndr_set what rdr_name
 	-- Special case for (:), which doesn't get into the GlobalRdrEnv
   = do { n' <- lookupExactOcc n; return [n'] }	-- For this we don't need to try the tycon too
   | otherwise
-  = do	{ mb_gres <- mapM (lookupBindGroupOcc (Just bndr_set) what)
+  = do	{ mb_gres <- mapM (lookupBindGroupOcc (LocalBindCtxt bndr_set) what)
 			  (dataTcOccs rdr_name)
 	; let (errs, names) = splitEithers mb_gres
 	; when (null names) (addErr (head errs))	-- Bleat about one only

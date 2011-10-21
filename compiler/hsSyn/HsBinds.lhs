@@ -727,25 +727,6 @@ isDefaultMethod (SpecPrags {})  = False
 \end{code}
 
 \begin{code}
-okBindSig :: Sig a -> Bool
-okBindSig _ = True
-
-okHsBootSig :: Sig a -> Bool
-okHsBootSig (TypeSig  _ _)    = True
-okHsBootSig (GenericSig  _ _) = False
-okHsBootSig (FixSig _) 	      = True
-okHsBootSig _                 = False
-
-okClsDclSig :: Sig a -> Bool
-okClsDclSig (SpecInstSig _) = False
-okClsDclSig _               = True        -- All others OK
-
-okInstDclSig :: Sig a -> Bool
-okInstDclSig (TypeSig _ _)    = False
-okInstDclSig (GenericSig _ _) = False
-okInstDclSig (FixSig _)       = False
-okInstDclSig _ 	              = True
-
 isFixityLSig :: LSig name -> Bool
 isFixityLSig (L _ (FixSig {})) = True
 isFixityLSig _	               = False
