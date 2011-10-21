@@ -150,3 +150,17 @@ test('T5205',
      compile_and_run,
      ['-O'])
 
+test('T5549',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 5000000000,
+                                             8000000000)),
+                           # expected value: 47088 (x86/Darwin)
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 5000000000,
+                                             8000000000)),
+                           # expected value: 6,725,846,120 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+
