@@ -19,6 +19,7 @@ module TcTyDecls(
 import TypeRep
 import HsSyn
 import RnHsSyn
+import Class
 import Type
 import HscTypes
 import TyCon
@@ -30,6 +31,7 @@ import Avail
 import Digraph
 import BasicTypes
 import SrcLoc
+import UniqSet
 import Maybes( mapCatMaybes )
 import Util ( isSingleton )
 import Data.List
@@ -117,17 +119,62 @@ calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
 --
 -- It is OK for superclasses to be type synonyms for other classes, so look for cycles
 -- through there too.
-calcClassCycles :: [LTyClDecl Name] -> [LTyClDecl Name] -> [[LTyClDecl Name]]
-calcClassCycles syn_decls alg_decls
-  = [decls | CyclicSCC decls <- stronglyConnCompFromEdgedVertices (mkSynEdges syn_decls ++ cls_edges)]
+calcClassCycles :: Class -> [[TyCon]]
+calcClassCycles cls = nubBy eqAsCycle $ expandTheta (unitUniqSet cls) [classTyCon cls] (classSCTheta cls) []
   where
-    cls_edges = [ (ldecl, unLoc (tcdLName decl),
-                          mk_cls_edges (unLoc (tcdCtxt decl)))
-                | ldecl@(L _ decl) <- alg_decls, isClassDecl decl ]
+    -- The last TyCon in the cycle is always the same as the first
+    eqAsCycle xs ys = any (xs ==) (cycles (tail ys))
+    cycles xs = take n . map (take n) . tails . cycle $ xs
+      where n = length xs
 
-    mk_cls_edges :: HsContext Name -> [Name]
-    mk_cls_edges ctxt = [ tc | tc <- nameSetToList (extractHsTyNames_s ctxt)
-                             , not (isTyVarName tc) ]
+    -- No more superclasses to expand ==> no problems with cycles
+    expandTheta :: UniqSet Class -- Path of Classes to here in set form
+                -> [TyCon]       -- Path to here
+                -> ThetaType     -- Superclass work list
+                -> [[TyCon]]     -- Input error paths
+                -> [[TyCon]]     -- Final error paths
+    expandTheta _    _    []           = id
+    expandTheta seen path (pred:theta) = expandType seen path pred . expandTheta seen path theta
+
+    {-
+    expandTree seen path (ClassPred cls tys)
+      | cls `elemUniqSet` seen = 
+      | otherwise              = expandTheta (addOneToUniqSet cls seen) (classTyCon cls:path) (substTysWith (classTyVars cls) tys (classSCTheta cls))
+    expandTree seen path (TuplePred ts)      = flip (foldr (expandTree seen path)) ts
+    expandTree _    _    (EqPred _ _)        = id
+    expandTree _    _    (IPPred _ _)        = id
+    expandTree seen path (IrredPred pred)    = expandType seen path pred
+    -}
+
+    expandType seen path (TyConApp tc tys)
+      -- Expand unsaturated classes to their superclass theta if they are yet unseen.
+      -- If they have already been seen then we have detected an error!
+      | Just cls <- tyConClass_maybe tc
+      , let (env, remainder) = papp (classTyVars cls) tys
+            rest_tys = either (const []) id remainder
+      = if cls `elementOfUniqSet` seen
+         then (reverse (classTyCon cls:path):) . flip (foldr (expandType seen path)) tys
+         else expandTheta (addOneToUniqSet seen cls) (tc:path) (substTys (mkTopTvSubst env) (classSCTheta cls)) . flip (foldr (expandType seen path)) rest_tys
+      -- For synonyms, try to expand them: some arguments might be phantoms, after all. We can expand
+      -- with impunity because at this point the type synonym cycle check has already happened.
+      | isSynTyCon tc
+      , SynonymTyCon rhs <- synTyConRhs tc
+      , let (env, remainder) = papp (tyConTyVars tc) tys
+            rest_tys = either (const []) id remainder
+      = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs) . flip (foldr (expandType seen path)) rest_tys
+      -- For non-class, non-synonyms, just check the arguments
+      | otherwise
+      = flip (foldr (expandType seen path)) tys
+    expandType _    _    (TyVarTy _)      = id
+    expandType seen path (AppTy t1 t2)    = expandType seen path t1 . expandType seen path t2
+    expandType seen path (FunTy t1 t2)    = expandType seen path t1 . expandType seen path t2
+    expandType seen path (ForAllTy _tv t) = expandType seen path t
+
+    papp :: [TyVar] -> [Type] -> ([(TyVar, Type)], Either [TyVar] [Type])
+    papp []       tys      = ([], Right tys)
+    papp tvs      []       = ([], Left tvs)
+    papp (tv:tvs) (ty:tys) = ((tv, ty):env, remainder)
+      where (env, remainder) = papp tvs tys
 \end{code}
 
 
