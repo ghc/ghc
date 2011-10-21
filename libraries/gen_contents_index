@@ -36,6 +36,7 @@ case $* in
 esac
 
 # Now create the combined contents and index pages
+echo $HADDOCK_ARGS
 $HADDOCK --gen-index --gen-contents -o . \
          -t "Haskell Hierarchical Libraries" \
          -p "prologue.txt" \
