@@ -339,9 +339,9 @@ mk_tuple sort arity = (tycon, tuple_con)
 	  ConstraintTuple -> constraintKind
 
 	tyvars = take arity $ case sort of
-	  BoxedTuple   -> alphaTyVars
-	  UnboxedTuple -> openAlphaTyVars
-	  ConstraintTuple    -> tyVarList constraintKind
+	  BoxedTuple      -> alphaTyVars
+	  UnboxedTuple    -> argAlphaTyVars	-- No nested unboxed tuples
+	  ConstraintTuple -> tyVarList constraintKind
 
 	tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
 	tyvar_tys = mkTyVarTys tyvars

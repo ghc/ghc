@@ -254,8 +254,6 @@ structures or passed to polymorphic functions.
 <para>
 No variable can have an unboxed tuple type, nor may a constructor or function
 argument have an unboxed tuple type.  The following are all illegal:
-
-
 <programlisting>
   data Foo = Foo (# Int, Int #)
 
@@ -266,6 +264,14 @@ argument have an unboxed tuple type.  The following are all illegal:
   g (# a,b #) = a
 
   h x = let y = (# x,x #) in ...
+</programlisting>
+</para>
+</listitem>
+<listitem>
+<para>
+Unboxed tuples may not be nested. So this is illegal:
+<programlisting>
+f :: (# Int, (# Int, Int #), Bool #)
 </programlisting>
 </para>
 </listitem>

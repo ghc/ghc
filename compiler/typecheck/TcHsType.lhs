@@ -270,6 +270,11 @@ kcTypeType :: LHsType Name -> TcM (LHsType Name)
 -- unlifted or an unboxed tuple.
 kcTypeType ty = kc_check_lhs_type ty ekOpen
 
+kcArgs :: SDoc -> [LHsType Name] -> Kind -> TcM [LHsType Name]
+kcArgs what tys kind 
+  = sequence [ kc_check_lhs_type ty (EK kind (EkArg what n)) 
+             | (ty,n) <- tys `zip` [1..] ]
+
 ---------------------------
 kcCheckLHsType :: LHsType Name -> ExpKind -> TcM (LHsType Name)
 kcCheckLHsType ty kind = addKcTypeCtxt ty $ kc_check_lhs_type ty kind
@@ -373,23 +378,22 @@ kc_hs_type (HsKindSig ty k) = do
     ty' <- kc_check_lhs_type ty (EK k EkKindSig)
     return (HsKindSig ty' k, k)
 
-kc_hs_type (HsTupleTy (HsBoxyTuple _) tys) = do
-    fact_tup_ok <- xoptM Opt_ConstraintKinds
-    if not fact_tup_ok
-     then do tys' <- mapM kcLiftedType tys
-             return (HsTupleTy (HsBoxyTuple liftedTypeKind) tys', liftedTypeKind)
-     else do -- In some contexts users really "mean" to write
+kc_hs_type (HsTupleTy (HsBoxyTuple _) tys)
+  = do { fact_tup_ok <- xoptM Opt_ConstraintKinds
+       ; k <- if fact_tup_ok
+              then newKindVar
+              else return liftedTypeKind
+       ; tys' <- kcArgs (ptext (sLit "a tuple")) tys k
+       ; return (HsTupleTy (HsBoxyTuple k) tys', k) }
+             -- In some contexts users really "mean" to write
              -- tuples with Constraint components, rather than * components.
              --
-             -- This special case of kind-checking does this rewriting when we can detect
-             -- that we need it.
-             k <- newKindVar
-             tys' <- mapM (\ty -> kc_check_lhs_type ty (EK k EkUnk)) tys
-             return (HsTupleTy (HsBoxyTuple k) tys', k)
+             -- This special case of kind-checking does this rewriting 
+             -- when we can detect that we need it.
 
-kc_hs_type (HsTupleTy HsUnboxedTuple tys) = do
-    tys' <- mapM kcTypeType tys
-    return (HsTupleTy HsUnboxedTuple tys', ubxTupleKind)
+kc_hs_type (HsTupleTy HsUnboxedTuple tys)
+  = do { tys' <- kcArgs (ptext (sLit "an unboxed tuple")) tys argTypeKind
+       ; return (HsTupleTy HsUnboxedTuple tys', ubxTupleKind) }
 
 kc_hs_type (HsFunTy ty1 ty2) = do
     ty1' <- kc_check_lhs_type ty1 (EK argTypeKind EkUnk)
@@ -488,7 +492,7 @@ splitFunKind the_fun arg_no fk (arg:args)
        ; case mb_fk of
             Nothing       -> failWithTc too_many_args 
             Just (ak,fk') -> do { (aks, rk) <- splitFunKind the_fun (arg_no+1) fk' args
-                                ; return ((arg, EK ak (EkArg the_fun arg_no)):aks, rk) } }
+                                ; return ((arg, EK ak (EkArg (quotes the_fun) arg_no)):aks, rk) } }
   where
     too_many_args = quotes the_fun <+>
 		    ptext (sLit "is applied to too many type arguments")
@@ -974,7 +978,7 @@ checkExpectedKind ty act_kind (EK exp_kind ek_ctxt) = do
                expected_herald EkFamInst = ptext (sLit "The family instance required")
                expected_herald (EkArg fun arg_no)
 	         = ptext (sLit "The") <+> speakNth arg_no <+> ptext (sLit "argument of")
-		   <+> quotes fun <+> ptext (sLit ("should have"))
+		   <+> fun <+> ptext (sLit ("should have"))
 
            failWithTcM (env2, err $$ more_info)
 \end{code}
