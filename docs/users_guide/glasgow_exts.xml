@@ -5183,7 +5183,7 @@ class (F a ~ b) => C a b where
 </para>
 
 <para>
-	With the <option>-XConstraintKind</option> flag, GHC becomes more liberal in
+	With the <option>-XConstraintKinds</option> flag, GHC becomes more liberal in
 	what it accepts as constraints in your program. To be precise, with this flag any
 	<emphasis>type</emphasis> of the new kind <literal>Constraint</literal> can be used as a constraint.
 	The following things have kind <literal>Constraint</literal>:
