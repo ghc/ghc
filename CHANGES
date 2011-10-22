@@ -1,3 +1,9 @@
+Changes in version 2.9.4
+
+  * Require GHC >= 7.2
+
+  * Support Alex 3.x
+
 Changes in version 2.9.3
 
   [This is the version that comes with GHC 7.2.1 although it claims it's 2.9.2!]
