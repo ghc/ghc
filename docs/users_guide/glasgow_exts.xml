@@ -3562,6 +3562,22 @@ Here, <literal>C</literal> is a superclass of <literal>D</literal>, but it's OK 
 class operation <literal>op</literal> of <literal>C</literal> to mention <literal>D</literal>.  (It
 would not be OK for <literal>D</literal> to be a superclass of <literal>C</literal>.)
 </para>
+<para>
+With the extension that adds a <link linkend="constraint-kind">kind of constraints</link>,
+you can write more exotic superclass definitions. The superclass cycle check is even more
+liberal in these case. For example, this is OK:
+
+<programlisting>
+  class A cls c where
+    meth :: cls c => c -> c
+  
+  class A B c => B c where
+</programlisting>
+
+A superclass context for a class <literal>C</literal> is allowed if, after expanding
+type synonyms to their right-hand-sides, and uses of classes (other than <literal>C</literal>)
+to their superclasses, <literal>C</literal> does not occur syntactically in the context.
+</para>
 </sect3>
 
 
