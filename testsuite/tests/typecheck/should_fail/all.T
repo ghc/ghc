@@ -244,6 +244,8 @@ test('tcfail212', normal, compile_fail, [''])
 test('tcfail213', normal, compile_fail, [''])
 test('tcfail214', normal, compile_fail, [''])
 test('tcfail215', normal, compile_fail, [''])
+test('tcfail216', normal, compile_fail, [''])
+test('tcfail217', normal, compile_fail, [''])
 
 test('FailDueToGivenOverlapping', normal, compile_fail, [''])
 test('LongWayOverlapping', normal, compile_fail, [''])
