@@ -1,0 +1,15 @@
+
+T5573a.hs:11:16:
+    Kind incompatibility when matching types:
+      t0 :: ??
+      (# Bool, Bool #) :: (#)
+    In the expression: (# True, False #)
+    In the expression: (# x, (# True, False #) #)
+    In an equation for `foo2': foo2 x = (# x, (# True, False #) #)
+
+T5573a.hs:14:6:
+    Kind incompatibility when matching types:
+      t0 :: ??
+      (# t1, t2 #) :: (#)
+    In the pattern: (# x, y #)
+    In an equation for `foo3': foo3 (# x, y #) = x

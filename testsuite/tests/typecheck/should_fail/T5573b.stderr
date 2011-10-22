@@ -1,0 +1,7 @@
+
+T5573b.hs:6:22:
+    Kind mis-match
+    The first argument of an unboxed tuple should have kind `??',
+    but `(# Double#, Double# #)' has kind `(#)'
+    In the type signature for `foo':
+      foo :: Double# -> (# (# Double#, Double# #), Double# #)
