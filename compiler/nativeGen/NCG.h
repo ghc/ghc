@@ -13,22 +13,8 @@
 
 #define COMMA ,
 
--- - - - - - - - - - - - - - - - - - - - - - 
 #if i386_TARGET_ARCH
 # define IF_ARCH_i386(x,y) x
 #else
 # define IF_ARCH_i386(x,y) y
-#endif
--- - - - - - - - - - - - - - - - - - - - - - 
-#if linux_TARGET_OS
-# define IF_OS_linux(x,y) x
-#else
-# define IF_OS_linux(x,y) y
-#endif
--- - - - - - - - - - - - - - - - - - - - - - 
-#if darwin_TARGET_OS
-# define IF_OS_darwin(x,y) x
-#else
-# define IF_OS_darwin(x,y) y
-#endif
 #endif

@@ -318,10 +318,10 @@ pprInstr :: Platform -> Instr -> Doc
 
 pprInstr _ (COMMENT _) = empty -- nuke 'em
 {-
-pprInstr _ (COMMENT s)
-     IF_OS_linux(
-        ((<>) (ptext (sLit "# ")) (ftext s)),
-        ((<>) (ptext (sLit "; ")) (ftext s)))
+pprInstr platform (COMMENT s) =
+     if platformOS platform == OSLinux
+     then ptext (sLit "# ") <> ftext s
+     else ptext (sLit "; ") <> ftext s
 -}
 pprInstr platform (DELTA d)
    = pprInstr platform (COMMENT (mkFastString ("\tdelta = " ++ show d)))
