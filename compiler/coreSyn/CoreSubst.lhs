@@ -1227,16 +1227,14 @@ dealWithCoercion co stuff@(dc, _dc_univ_args, dc_args)
           -- Cast the value arguments (which include dictionaries)
         new_val_args = zipWith cast_arg arg_tys val_args
         cast_arg arg_ty arg = mkCoerce (theta_subst arg_ty) arg
-    in
-#ifdef DEBUG
-    let dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
+
+        dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
                          ppr ex_args, ppr val_args]
     in
     ASSERT2( eqType _from_ty (mkTyConApp to_tc _dc_univ_args), dump_doc )
     ASSERT2( all isTypeArg ex_args, dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
-#endif
     Just (dc, to_tc_arg_tys, ex_args ++ new_val_args)
 
   | otherwise
