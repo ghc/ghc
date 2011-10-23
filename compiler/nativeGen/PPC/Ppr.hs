@@ -19,9 +19,6 @@ module PPC.Ppr (
 
 where
 
-#include "nativeGen/NCG.h"
-#include "HsVersions.h"
-
 import PPC.Regs
 import PPC.Instr
 import PPC.Cond
@@ -52,7 +49,7 @@ import Data.Bits
 
 pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> Doc
 pprNatCmmDecl platform (CmmData section dats) =
-  pprSectionHeader section $$ pprDatas platform dats
+  pprSectionHeader platform section $$ pprDatas platform dats
 
  -- special case for split markers:
 pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph []))
@@ -60,12 +57,12 @@ pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph []))
 
  -- special case for code without an info table:
 pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph blocks)) =
-  pprSectionHeader Text $$
+  pprSectionHeader platform Text $$
   pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map (pprBasicBlock platform) blocks)
 
 pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
-  pprSectionHeader Text $$
+  pprSectionHeader platform Text $$
   (
        (if platformHasSubsectionsViaSymbols platform
         then pprCLabel_asm platform (mkDeadStripPreventer info_lbl) <> char ':'
@@ -239,33 +236,20 @@ pprImm platform (ImmConstantSum a b) = pprImm platform a <> char '+' <> pprImm p
 pprImm platform (ImmConstantDiff a b) = pprImm platform a <> char '-'
                             <> lparen <> pprImm platform b <> rparen
 
-#if darwin_TARGET_OS
 pprImm platform (LO i)
-  = hcat [ pp_lo, pprImm platform i, rparen ]
-  where
-    pp_lo = text "lo16("
+  = if platformOS platform == OSDarwin
+    then hcat [ text "lo16(", pprImm platform i, rparen ]
+    else pprImm platform i <> text "@l"
 
 pprImm platform (HI i)
-  = hcat [ pp_hi, pprImm platform i, rparen ]
-  where
-    pp_hi = text "hi16("
+  = if platformOS platform == OSDarwin
+    then hcat [ text "hi16(", pprImm platform i, rparen ]
+    else pprImm platform i <> text "@h"
 
 pprImm platform (HA i)
-  = hcat [ pp_ha, pprImm platform i, rparen ]
-  where
-    pp_ha = text "ha16("
-    
-#else
-pprImm platform (LO i)
-  = pprImm platform i <> text "@l"
-
-pprImm platform (HI i)
-  = pprImm platform i <> text "@h"
-
-pprImm platform (HA i)
-  = pprImm platform i <> text "@ha"
-#endif
-
+  = if platformOS platform == OSDarwin
+    then hcat [ text "ha16(", pprImm platform i, rparen ]
+    else pprImm platform i <> text "@ha"
 
 
 pprAddr :: Platform -> AddrMode -> Doc
@@ -277,30 +261,26 @@ pprAddr platform (AddrRegImm r1 (ImmInteger i)) = hcat [ integer i, char '(', pp
 pprAddr platform (AddrRegImm r1 imm) = hcat [ pprImm platform imm, char '(', pprReg platform r1, char ')' ]
 
 
-pprSectionHeader :: Section -> Doc
-#if darwin_TARGET_OS 
-pprSectionHeader seg
+pprSectionHeader :: Platform -> Section -> Doc
+pprSectionHeader platform seg
  = case seg of
- 	Text			-> ptext (sLit ".text\n.align 2")
-	Data			-> ptext (sLit ".data\n.align 2")
-	ReadOnlyData		-> ptext (sLit ".const\n.align 2")
-	RelocatableReadOnlyData	-> ptext (sLit ".const_data\n.align 2")
-	UninitialisedData	-> ptext (sLit ".const_data\n.align 2")
-	ReadOnlyData16		-> ptext (sLit ".const\n.align 4")
-	OtherSection _		-> panic "PprMach.pprSectionHeader: unknown section"
-
-#else
-pprSectionHeader seg
- = case seg of
- 	Text			-> ptext (sLit ".text\n.align 2")
-	Data			-> ptext (sLit ".data\n.align 2")
-	ReadOnlyData		-> ptext (sLit ".section .rodata\n\t.align 2")
-	RelocatableReadOnlyData	-> ptext (sLit ".data\n\t.align 2")
-	UninitialisedData	-> ptext (sLit ".section .bss\n\t.align 2")
-	ReadOnlyData16		-> ptext (sLit ".section .rodata\n\t.align 4")
-	OtherSection _		-> panic "PprMach.pprSectionHeader: unknown section"
-
-#endif
+        Text                    -> ptext (sLit ".text\n.align 2")
+        Data                    -> ptext (sLit ".data\n.align 2")
+        ReadOnlyData
+         | osDarwin             -> ptext (sLit ".const\n.align 2")
+         | otherwise            -> ptext (sLit ".section .rodata\n\t.align 2")
+        RelocatableReadOnlyData
+         | osDarwin             -> ptext (sLit ".const_data\n.align 2")
+         | otherwise            -> ptext (sLit ".data\n\t.align 2")
+        UninitialisedData
+         | osDarwin             -> ptext (sLit ".const_data\n.align 2")
+         | otherwise            -> ptext (sLit ".section .bss\n\t.align 2")
+        ReadOnlyData16
+         | osDarwin             -> ptext (sLit ".const\n.align 4")
+         | otherwise            -> ptext (sLit ".section .rodata\n\t.align 4")
+        OtherSection _          ->
+            panic "PprMach.pprSectionHeader: unknown section"
+    where osDarwin = platformOS platform == OSDarwin
 
 
 pprDataItem :: Platform -> CmmLit -> Doc
