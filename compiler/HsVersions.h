@@ -46,8 +46,6 @@ name :: IORef (ty);                 \
 name = Util.globalM (value);
 #endif
 
-#define COMMA ,
-
 #ifdef DEBUG
 #define ASSERT(e)      if (not (e)) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
