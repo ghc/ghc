@@ -1,17 +1,17 @@
-import System.Cmd
-import System.Environment
-import System.FilePath
-import System.Exit
-import System.Directory
-import System.Process
-import Data.List
 import Control.Monad
+import Data.List
+import Data.Maybe
+import Distribution.Simple.Program
+import Distribution.Simple.Utils
+import Distribution.Verbosity
+import System.Cmd
+import System.Directory
+import System.Environment
+import System.Exit
+import System.FilePath
+import System.Process
 import Text.Printf
 import Text.Regex
-import Distribution.Simple.Utils
-import Distribution.Simple.Program
-import Distribution.Verbosity
-import Data.Maybe
 
 
 packageRoot   = "."
