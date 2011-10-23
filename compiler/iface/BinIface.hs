@@ -42,6 +42,7 @@ import Config
 import FastMutInt
 import Unique
 import Outputable
+import Platform
 import FastString
 import Constants
 
@@ -96,9 +97,9 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
         -- (This magic number does not change when we change
         --  GHC interface file format)
   magic <- get bh
-  wantedGot "Magic" binaryInterfaceMagic magic
+  wantedGot "Magic" (binaryInterfaceMagic dflags) magic
   errorOnMismatch "magic number mismatch: old/corrupt interface file?"
-      binaryInterfaceMagic magic
+      (binaryInterfaceMagic dflags) magic
 
         -- Note [dummy iface field]
         -- read a dummy 32/64 bit value.  This field used to hold the
@@ -155,7 +156,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
 writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeBinIface dflags hi_path mod_iface = do
   bh <- openBinMem initBinMemSize
-  put_ bh binaryInterfaceMagic
+  put_ bh (binaryInterfaceMagic dflags)
 
        -- dummy 32/64-bit field before the version/way for
        -- compatibility with older interface file formats.
@@ -229,16 +230,11 @@ writeBinIface dflags hi_path mod_iface = do
 initBinMemSize :: Int
 initBinMemSize = 1024 * 1024
 
--- The *host* architecture version:
-#include "../includes/MachDeps.h"
+binaryInterfaceMagic :: DynFlags -> Word32
+binaryInterfaceMagic dflags
+ | target32Bit (targetPlatform dflags) = 0x1face
+ | otherwise                           = 0x1face64
 
-binaryInterfaceMagic :: Word32
-#if   WORD_SIZE_IN_BITS == 32
-binaryInterfaceMagic = 0x1face
-#elif WORD_SIZE_IN_BITS == 64
-binaryInterfaceMagic = 0x1face64
-#endif
-  
 -- -----------------------------------------------------------------------------
 -- The symbol table
 
