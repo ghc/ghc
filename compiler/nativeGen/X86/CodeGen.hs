@@ -161,7 +161,7 @@ stmtToInstrs stmt = do
               size = cmmTypeSize ty
 
     CmmCall target result_regs args _ _
-       -> genCCall target result_regs args
+       -> genCCall is32Bit target result_regs args
 
     CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
@@ -418,8 +418,8 @@ getRegister' is32Bit (CmmReg reg)
             -- on x86_64, we have %rip for PicBaseReg, but it's not
             -- a full-featured register, it can only be used for
             -- rip-relative addressing.
-            do reg' <- getPicBaseNat archWordSize
-               return (Fixed archWordSize reg' nilOL)
+            do reg' <- getPicBaseNat (archWordSize is32Bit)
+               return (Fixed (archWordSize is32Bit) reg' nilOL)
         _ ->
             do use_sse2 <- sse2Enabled
                let
@@ -636,15 +636,15 @@ getRegister' is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
                  return (swizzleRegisterRep e_code new_size)
 
 
-getRegister' _ (CmmMachOp mop [x, y]) = do -- dyadic MachOps
+getRegister' is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse2 <- sse2Enabled
   case mop of
-      MO_F_Eq _ -> condFltReg EQQ x y
-      MO_F_Ne _ -> condFltReg NE  x y
-      MO_F_Gt _ -> condFltReg GTT x y
-      MO_F_Ge _ -> condFltReg GE  x y
-      MO_F_Lt _ -> condFltReg LTT x y
-      MO_F_Le _ -> condFltReg LE  x y
+      MO_F_Eq _ -> condFltReg is32Bit EQQ x y
+      MO_F_Ne _ -> condFltReg is32Bit NE  x y
+      MO_F_Gt _ -> condFltReg is32Bit GTT x y
+      MO_F_Ge _ -> condFltReg is32Bit GE  x y
+      MO_F_Lt _ -> condFltReg is32Bit LTT x y
+      MO_F_Le _ -> condFltReg is32Bit LE  x y
 
       MO_Eq _   -> condIntReg EQQ x y
       MO_Ne _   -> condIntReg NE  x y
@@ -1052,6 +1052,7 @@ getNonClobberedOperand (CmmLit lit) = do
     else getNonClobberedOperand_generic (CmmLit lit)
 
 getNonClobberedOperand (CmmLoad mem pk) = do
+  is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
   if (not (isFloatType pk) || use_sse2)
       && IF_ARCH_i386(not (isWord64 pk), True)
@@ -1060,9 +1061,9 @@ getNonClobberedOperand (CmmLoad mem pk) = do
       (src',save_code) <-
         if (amodeCouldBeClobbered src)
                 then do
-                   tmp <- getNewRegNat archWordSize
+                   tmp <- getNewRegNat (archWordSize is32Bit)
                    return (AddrBaseIndex (EABaseReg tmp) EAIndexNone (ImmInt 0),
-                           unitOL (LEA archWordSize (OpAddr src) (OpReg tmp)))
+                           unitOL (LEA (archWordSize is32Bit) (OpAddr src) (OpReg tmp)))
                 else
                    return (src, nilOL)
       return (OpAddr src', mem_code `appOL` save_code)
@@ -1502,7 +1503,8 @@ genCondJump id bool = do
 -- register allocator.
 
 genCCall
-    :: CmmCallTarget            -- function to call
+    :: Bool                     -- 32 bit platform?
+    -> CmmCallTarget            -- function to call
     -> [HintedCmmFormal]        -- where to put the result
     -> [HintedCmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
@@ -1512,9 +1514,10 @@ genCCall
 -- Unroll memcpy calls if the source and destination pointers are at
 -- least DWORD aligned and the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall (CmmPrim MO_Memcpy) _ [CmmHinted dst _, CmmHinted src _,
-                                CmmHinted (CmmLit (CmmInt n _)) _,
-                                CmmHinted (CmmLit (CmmInt align _)) _]
+genCCall is32Bit (CmmPrim MO_Memcpy) _
+         [CmmHinted dst _, CmmHinted src _,
+          CmmHinted (CmmLit (CmmInt n _)) _,
+          CmmHinted (CmmLit (CmmInt align _)) _]
     | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
@@ -1524,7 +1527,7 @@ genCCall (CmmPrim MO_Memcpy) _ [CmmHinted dst _, CmmHinted src _,
         return $ code_dst dst_r `appOL` code_src src_r `appOL`
             go dst_r src_r tmp_r n
   where
-    size = if align .&. 4 /= 0 then II32 else archWordSize
+    size = if align .&. 4 /= 0 then II32 else (archWordSize is32Bit)
 
     sizeBytes = fromIntegral (sizeInBytes size)
 
@@ -1554,10 +1557,11 @@ genCCall (CmmPrim MO_Memcpy) _ [CmmHinted dst _, CmmHinted src _,
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall (CmmPrim MO_Memset) _ [CmmHinted dst _,
-                                CmmHinted (CmmLit (CmmInt c _)) _,
-                                CmmHinted (CmmLit (CmmInt n _)) _,
-                                CmmHinted (CmmLit (CmmInt align _)) _]
+genCCall _ (CmmPrim MO_Memset) _
+         [CmmHinted dst _,
+          CmmHinted (CmmLit (CmmInt c _)) _,
+          CmmHinted (CmmLit (CmmInt n _)) _,
+          CmmHinted (CmmLit (CmmInt align _)) _]
     | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
@@ -1592,11 +1596,11 @@ genCCall (CmmPrim MO_Memset) _ [CmmHinted dst _,
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
+genCCall _ (CmmPrim MO_WriteBarrier) _ _ = return nilOL
         -- write barrier compiles to no code on x86/x86-64;
         -- we keep it this long in order to prevent earlier optimisations.
 
-genCCall (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
+genCCall is32Bit (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
          args@[CmmHinted src _] = do
     sse4_2 <- sse4_2Enabled
     if sse4_2
@@ -1616,16 +1620,14 @@ genCCall (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
             targetExpr <- cmmMakeDynamicReference dflags addImportNat
                           CallReference lbl
             let target = CmmCallee targetExpr CCallConv
-            genCCall target dest_regs args
+            genCCall is32Bit target dest_regs args
   where
     size = intSize width
     lbl = mkCmmCodeLabel primPackageId (fsLit (popCntLabel width))
 
-genCCall target dest_regs args =
-    do is32Bit <- is32BitPlatform
-       if is32Bit
-           then genCCall32 target dest_regs args
-           else genCCall64 target dest_regs args
+genCCall is32Bit target dest_regs args
+ | is32Bit   = genCCall32 target dest_regs args
+ | otherwise = genCCall64 target dest_regs args
 
 genCCall32 :: CmmCallTarget            -- function to call
            -> [HintedCmmFormal]        -- where to put the result
@@ -2144,8 +2146,8 @@ condIntReg cond x y = do
 
 
 
-condFltReg :: Cond -> CmmExpr -> CmmExpr -> NatM Register
-condFltReg cond x y = if_sse2 condFltReg_sse2 condFltReg_x87
+condFltReg :: Bool -> Cond -> CmmExpr -> CmmExpr -> NatM Register
+condFltReg is32Bit cond x y = if_sse2 condFltReg_sse2 condFltReg_x87
  where
   condFltReg_x87 = do
     CondCode _ cond cond_code <- condFltCode cond x y
@@ -2160,8 +2162,8 @@ condFltReg cond x y = if_sse2 condFltReg_sse2 condFltReg_x87
 
   condFltReg_sse2 = do
     CondCode _ cond cond_code <- condFltCode cond x y
-    tmp1 <- getNewRegNat archWordSize
-    tmp2 <- getNewRegNat archWordSize
+    tmp1 <- getNewRegNat (archWordSize is32Bit)
+    tmp2 <- getNewRegNat (archWordSize is32Bit)
     let
         -- We have to worry about unordered operands (eg. comparisons
         -- against NaN).  If the operands are unordered, the comparison

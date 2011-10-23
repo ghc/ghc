@@ -345,7 +345,7 @@ pprAddr platform (AddrBaseIndex base index displacement)
   = let
         pp_disp  = ppr_disp displacement
         pp_off p = pp_disp <> char '(' <> p <> char ')'
-        pp_reg r = pprReg platform archWordSize r
+        pp_reg r = pprReg platform (archWordSize (target32Bit platform)) r
     in
     case (base, index) of
       (EABaseNone,  EAIndexNone) -> pp_disp
@@ -513,7 +513,7 @@ pprInstr platform (MOVZxL sizes src dst) = pprSizeOpOpCoerce platform (sLit "mov
         -- the remaining zero-extension to 64 bits is automatic, and the 32-bit
         -- instruction is shorter.
 
-pprInstr platform (MOVSxL sizes src dst) = pprSizeOpOpCoerce platform (sLit "movs") sizes archWordSize src dst
+pprInstr platform (MOVSxL sizes src dst) = pprSizeOpOpCoerce platform (sLit "movs") sizes (archWordSize (target32Bit platform)) src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
@@ -598,10 +598,10 @@ pprInstr platform (JXX cond blockid)
 pprInstr platform (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm platform imm)
 
 pprInstr platform (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm platform imm)
-pprInstr platform (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand platform archWordSize op)
+pprInstr platform (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand platform (archWordSize (target32Bit platform)) op)
 pprInstr platform (JMP_TBL op _ _ _)  = pprInstr platform (JMP op)
 pprInstr platform (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm platform imm)
-pprInstr platform (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg platform archWordSize reg)
+pprInstr platform (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg platform (archWordSize (target32Bit platform)) reg)
 
 pprInstr platform (IDIV sz op)   = pprSizeOp platform (sLit "idiv") sz op
 pprInstr platform (DIV sz op)    = pprSizeOp platform (sLit "div")  sz op
@@ -1053,9 +1053,9 @@ pprRegReg :: Platform -> LitString -> Reg -> Reg -> Doc
 pprRegReg platform name reg1 reg2
   = hcat [
         pprMnemonic_ name,
-        pprReg platform archWordSize reg1,
+        pprReg platform (archWordSize (target32Bit platform)) reg1,
         comma,
-        pprReg platform archWordSize reg2
+        pprReg platform (archWordSize (target32Bit platform)) reg2
     ]
 
 
@@ -1065,7 +1065,7 @@ pprSizeOpReg platform name size op1 reg2
         pprMnemonic name size,
         pprOperand platform size op1,
         comma,
-        pprReg platform archWordSize reg2
+        pprReg platform (archWordSize (target32Bit platform)) reg2
     ]
 
 pprCondRegReg :: Platform -> LitString -> Size -> Cond -> Reg -> Reg -> Doc

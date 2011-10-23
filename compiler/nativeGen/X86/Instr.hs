@@ -35,14 +35,10 @@ import Unique
 
 -- Size of an x86/x86_64 memory address, in bytes.
 --
-archWordSize :: Size
-#if i386_TARGET_ARCH
-archWordSize    = II32
-#elif x86_64_TARGET_ARCH
-archWordSize    = II64
-#else
-archWordSize    = panic "X86.Instr.archWordSize: not defined"
-#endif
+archWordSize :: Bool -> Size
+archWordSize is32Bit
+ | is32Bit   = II32
+ | otherwise = II64
 
 -- | Instruction instance for x86 instruction set.
 instance Instruction Instr where
