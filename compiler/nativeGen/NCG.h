@@ -11,8 +11,4 @@
 
 #include "ghc_boot_platform.h"
 
-#if i386_TARGET_ARCH
-# define IF_ARCH_i386(x,y) x
-#else
-# define IF_ARCH_i386(x,y) y
 #endif

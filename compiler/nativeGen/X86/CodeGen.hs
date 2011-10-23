@@ -846,12 +846,15 @@ getRegister' is32Bit (CmmLoad mem pk)
     return (Any size code)
   where size = intSize $ typeWidth pk
 
-getRegister' _ (CmmLit (CmmInt 0 width))
+getRegister' is32Bit (CmmLit (CmmInt 0 width))
   = let
         size = intSize width
 
         -- x86_64: 32-bit xor is one byte shorter, and zero-extends to 64 bits
-        size1 = IF_ARCH_i386( size, case size of II64 -> II32; _ -> size )
+        size1 = if is32Bit then size
+                           else case size of
+                                II64 -> II32
+                                _ -> size
         code dst
            = unitOL (XOR size1 (OpReg dst) (OpReg dst))
     in
@@ -1055,7 +1058,7 @@ getNonClobberedOperand (CmmLoad mem pk) = do
   is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
   if (not (isFloatType pk) || use_sse2)
-      && IF_ARCH_i386(not (isWord64 pk), True)
+      && (if is32Bit then not (isWord64 pk) else True)
     then do
       Amode src mem_code <- getAmode mem
       (src',save_code) <-
@@ -1103,8 +1106,9 @@ getOperand (CmmLit lit) = do
     else getOperand_generic (CmmLit lit)
 
 getOperand (CmmLoad mem pk) = do
+  is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
-  if (not (isFloatType pk) || use_sse2) && IF_ARCH_i386(not (isWord64 pk), True)
+  if (not (isFloatType pk) || use_sse2) && (if is32Bit then not (isWord64 pk) else True)
      then do
        Amode src mem_code <- getAmode mem
        return (OpAddr src, mem_code)
@@ -1164,8 +1168,9 @@ isSuitableFloatingPointLit _ = False
 
 getRegOrMem :: CmmExpr -> NatM (Operand, InstrBlock)
 getRegOrMem e@(CmmLoad mem pk) = do
+  is32Bit <- is32BitPlatform
   use_sse2 <- sse2Enabled
-  if (not (isFloatType pk) || use_sse2) && IF_ARCH_i386(not (isWord64 pk), True)
+  if (not (isFloatType pk) || use_sse2) && (if is32Bit then not (isWord64 pk) else True)
      then do
        Amode src mem_code <- getAmode mem
        return (OpAddr src, mem_code)

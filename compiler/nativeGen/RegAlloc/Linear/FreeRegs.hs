@@ -61,8 +61,8 @@ instance FR SPARC.FreeRegs where
 maxSpillSlots :: Platform -> Int
 maxSpillSlots platform
               = case platformArch platform of
-                ArchX86     -> X86.Instr.maxSpillSlots
-                ArchX86_64  -> X86.Instr.maxSpillSlots
+                ArchX86     -> X86.Instr.maxSpillSlots True  -- 32bit
+                ArchX86_64  -> X86.Instr.maxSpillSlots False -- not 32bit
                 ArchPPC     -> PPC.Instr.maxSpillSlots
                 ArchSPARC   -> SPARC.Instr.maxSpillSlots
                 ArchARM _ _ -> panic "maxSpillSlots ArchARM"
