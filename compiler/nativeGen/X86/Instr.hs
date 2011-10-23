@@ -617,7 +617,7 @@ x86_mkSpillInstr platform reg delta slot
     in
     let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
     in case targetClassOfReg platform reg of
-           RcInteger   -> MOV IF_ARCH_i386(II32,II64)
+           RcInteger   -> MOV (archWordSize (target32Bit platform))
                               (OpReg reg) (OpAddr (spRel platform off_w))
            RcDouble    -> GST FF80 reg (spRel platform off_w) {- RcFloat/RcDouble -}
            RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off_w))
@@ -637,7 +637,7 @@ x86_mkLoadInstr platform reg delta slot
     in
         let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
         in case targetClassOfReg platform reg of
-              RcInteger -> MOV IF_ARCH_i386(II32,II64)
+              RcInteger -> MOV (archWordSize (target32Bit platform))
                                (OpAddr (spRel platform off_w)) (OpReg reg)
               RcDouble  -> GLD FF80 (spRel platform off_w) reg {- RcFloat/RcDouble -}
               RcDoubleSSE -> MOV FF64 (OpAddr (spRel platform off_w)) (OpReg reg)
