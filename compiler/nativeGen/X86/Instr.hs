@@ -33,7 +33,7 @@ import CLabel
 import UniqSet
 import Unique
 
--- Size of a PPC memory address, in bytes.
+-- Size of an x86/x86_64 memory address, in bytes.
 --
 archWordSize :: Size
 #if i386_TARGET_ARCH
