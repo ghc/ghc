@@ -531,17 +531,16 @@ zonkQuantifiedTyVar tv
 	-- It might be a skolem type variable, 
 	-- for example from a user type signature
 
-      MetaTv _ _ref -> 
-#ifdef DEBUG               
-			-- [Sept 04] Check for non-empty.  
-		 	-- See note [Silly Type Synonym]
-                      (readMutVar _ref >>= \cts -> 
-                       case cts of 
-                             Flexi -> return ()
-                             Indirect ty -> WARN( True, ppr tv $$ ppr ty )
-                                            return ()) >>
-#endif
-                      skolemiseUnboundMetaTyVar tv vanillaSkolemTv
+      MetaTv _ ref ->
+          do when debugIsOn $ do
+                 -- [Sept 04] Check for non-empty.
+                 -- See note [Silly Type Synonym]
+                 cts <- readMutVar ref
+                 case cts of
+                     Flexi -> return ()
+                     Indirect ty -> WARN( True, ppr tv $$ ppr ty )
+                                    return ()
+             skolemiseUnboundMetaTyVar tv vanillaSkolemTv
       _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
 
 skolemiseUnboundMetaTyVar :: TcTyVar -> TcTyVarDetails -> TcM TyVar
