@@ -345,7 +345,7 @@ test('T706',
      run_command,
      ['$MAKE -s --no-print-directory T706'])
 test('spacesInArgs',
-     extra_run_opts('"a   b"   "c   d"   \'e   f\'   \'g   h\''),
+     extra_run_opts('"a   b"   "c   d"'),
      compile_and_run,
      [''])
 
