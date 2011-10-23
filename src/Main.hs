@@ -407,11 +407,7 @@ getInTreeLibDir = do
   m <- getExecDir
   case m of
     Nothing -> error "No GhcLibDir found"
-#ifdef NEW_GHC_LAYOUT
     Just d -> return (d </> ".." </> "lib")
-#else
-    Just d -> return (d </> "..")
-#endif
 
 
 getExecDir :: IO (Maybe String)
