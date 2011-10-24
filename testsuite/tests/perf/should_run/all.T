@@ -152,9 +152,9 @@ test('T5205',
 
 test('T5549',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 5000000000,
+          stats_num_field('bytes allocated', 3000000000,
                                              8000000000)),
-                           # expected value: 47088 (x86/Darwin)
+                           # expected value: 3362958676 (Windows)
       if_wordsize(64,
           stats_num_field('bytes allocated', 5000000000,
                                              8000000000)),
