@@ -112,15 +112,70 @@ mkSynEdges syn_decls = [ (ldecl, unLoc (tcdLName decl),
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
+\end{code}
 
--- We can't allow cycles via superclasses because it would result in the
--- type checker looping when it canonicalises a class constraint (superclasses
--- are added during canonicalisation)
---
--- It is OK for superclasses to be type synonyms for other classes, so look for cycles
--- through there too.
+Note [Superclass cycle check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can't allow cycles via superclasses because it would result in the
+type checker looping when it canonicalises a class constraint (superclasses
+are added during canonicalisation).  More precisely, given a constraint
+    C ty1 .. tyn
+we want to instantiate all of C's superclasses, transitively, and
+that set must be finite.  So if
+     class (D b, E b a) => C a b
+then when we encounter the constraint
+     C ty1 ty2
+we'll instantiate the superclasses
+     (D ty2, E ty2 ty1)
+and then *their* superclasses, and so on.  This set must be finite!
+
+It is OK for superclasses to be type synonyms for other classes, so
+must "look through" type synonyms. Eg
+     type X a = C [a]
+     class X a => C a	-- No!  Recursive superclass!
+
+We want definitions such as:
+
+  class C cls a where cls a => a -> a
+  class C D a => D a where
+
+to be accepted, even though a naive acyclicity check would reject the
+program as having a cycle between D and its superclass.  Why? Because
+when we instantiate 
+     D ty1
+we get the superclas
+     C D ty1
+and C has no superclasses, so we have terminated with a finite set.
+
+More precisely, the rule is this: the superclasses sup_C of a class C
+are rejected iff:
+
+  C \elem expand(sup_C)
+
+Where expand is defined as follows:
+
+(1)  expand(a ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
+
+(2)  expand(D ty1 ... tyN) = {D} 
+                             \union sup_D[ty1/x1, ..., tyP/xP] 
+                             \union expand(ty(P+1)) ... \union expand(tyN)
+           where (D x1 ... xM) is a class, P = min(M,N)
+
+(3)  expand(T ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
+        where T is not a class
+
+Eqn (1) is conservative; when there's a type variable at the head,
+look in all the argument types.  Eqn (2) expands superclasses; the
+third component of the union is like Eqn (1).  Eqn (3) happens mainly
+when the context is a (constraint) tuple, such as (Eq a, Show a).
+
+Furthermore, expand always looks through type synonyms.
+
+\begin{code}
 calcClassCycles :: Class -> [[TyCon]]
-calcClassCycles cls = nubBy eqAsCycle $ expandTheta (unitUniqSet cls) [classTyCon cls] (classSCTheta cls) []
+calcClassCycles cls 
+  = nubBy eqAsCycle $ 
+    expandTheta (unitUniqSet cls) [classTyCon cls] (classSCTheta cls) []
   where
     -- The last TyCon in the cycle is always the same as the first
     eqAsCycle xs ys = any (xs ==) (cycles (tail ys))
@@ -128,6 +183,7 @@ calcClassCycles cls = nubBy eqAsCycle $ expandTheta (unitUniqSet cls) [classTyCo
       where n = length xs
 
     -- No more superclasses to expand ==> no problems with cycles
+    -- See Note [Superclass cycle check]
     expandTheta :: UniqSet Class -- Path of Classes to here in set form
                 -> [TyCon]       -- Path to here
                 -> ThetaType     -- Superclass work list
@@ -139,7 +195,8 @@ calcClassCycles cls = nubBy eqAsCycle $ expandTheta (unitUniqSet cls) [classTyCo
     {-
     expandTree seen path (ClassPred cls tys)
       | cls `elemUniqSet` seen = 
-      | otherwise              = expandTheta (addOneToUniqSet cls seen) (classTyCon cls:path) (substTysWith (classTyVars cls) tys (classSCTheta cls))
+      | otherwise              = expandTheta (addOneToUniqSet cls seen) (classTyCon cls:path) 
+                                             (substTysWith (classTyVars cls) tys (classSCTheta cls))
     expandTree seen path (TuplePred ts)      = flip (foldr (expandTree seen path)) ts
     expandTree _    _    (EqPred _ _)        = id
     expandTree _    _    (IPPred _ _)        = id
@@ -153,18 +210,26 @@ calcClassCycles cls = nubBy eqAsCycle $ expandTheta (unitUniqSet cls) [classTyCo
       , let (env, remainder) = papp (classTyVars cls) tys
             rest_tys = either (const []) id remainder
       = if cls `elementOfUniqSet` seen
-         then (reverse (classTyCon cls:path):) . flip (foldr (expandType seen path)) tys
-         else expandTheta (addOneToUniqSet seen cls) (tc:path) (substTys (mkTopTvSubst env) (classSCTheta cls)) . flip (foldr (expandType seen path)) rest_tys
-      -- For synonyms, try to expand them: some arguments might be phantoms, after all. We can expand
-      -- with impunity because at this point the type synonym cycle check has already happened.
+         then (reverse (classTyCon cls:path):) 
+              . flip (foldr (expandType seen path)) tys
+         else expandTheta (addOneToUniqSet seen cls) (tc:path) 
+                          (substTys (mkTopTvSubst env) (classSCTheta cls))
+              . flip (foldr (expandType seen path)) rest_tys
+
+      -- For synonyms, try to expand them: some arguments might be
+      -- phantoms, after all. We can expand with impunity because at
+      -- this point the type synonym cycle check has already happened.
       | isSynTyCon tc
       , SynonymTyCon rhs <- synTyConRhs tc
       , let (env, remainder) = papp (tyConTyVars tc) tys
             rest_tys = either (const []) id remainder
-      = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs) . flip (foldr (expandType seen path)) rest_tys
+      = expandType seen (tc:path) (substTy (mkTopTvSubst env) rhs) 
+        . flip (foldr (expandType seen path)) rest_tys
+
       -- For non-class, non-synonyms, just check the arguments
       | otherwise
       = flip (foldr (expandType seen path)) tys
+
     expandType _    _    (TyVarTy _)      = id
     expandType seen path (AppTy t1 t2)    = expandType seen path t1 . expandType seen path t2
     expandType seen path (FunTy t1 t2)    = expandType seen path t1 . expandType seen path t2

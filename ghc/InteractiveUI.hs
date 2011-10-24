@@ -412,7 +412,7 @@ runGHCi paths maybe_exprs = do
            -- This would be a good place for runFileInputT.
            Right hdl ->
                do runInputTWithPrefs defaultPrefs defaultSettings $
-                            runCommands False $ fileLoop hdl
+                            runCommands $ fileLoop hdl
                   liftIO (hClose hdl `catchIO` \_ -> return ())
      where
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
@@ -447,11 +447,14 @@ runGHCi paths maybe_exprs = do
   dflags <- getDynFlags
   let show_prompt = verbosity dflags > 0 || is_tty
 
+  -- reset line number
+  getGHCiState >>= \st -> setGHCiState st{line_number=1}
+
   case maybe_exprs of
         Nothing ->
           do
             -- enter the interactive loop
-            runGHCiInput $ runCommands False $ nextInputLine show_prompt is_tty
+            runGHCiInput $ runCommands $ nextInputLine show_prompt is_tty
         Just exprs -> do
             -- just evaluate the expression we were given
             enqueueCommands exprs
@@ -465,7 +468,7 @@ runGHCi paths maybe_exprs = do
                                    -- this used to be topHandlerFastExit, see #2228
                                      $ topHandler e
             runInputTWithPrefs defaultPrefs defaultSettings $ do
-                runCommands' handle False (return Nothing)
+                runCommands' handle (return Nothing)
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -485,7 +488,9 @@ nextInputLine :: Bool -> Bool -> InputT GHCi (Maybe String)
 nextInputLine show_prompt is_tty
   | is_tty = do
     prompt <- if show_prompt then lift mkPrompt else return ""
-    getInputLine prompt
+    r <- getInputLine prompt
+    incrementLineNo
+    return r
   | otherwise = do
     when show_prompt $ lift mkPrompt >>= liftIO . putStr
     fileLoop stdin
@@ -521,8 +526,8 @@ checkPerms name =
             else return True
 #endif
 
-incrementLines :: InputT GHCi ()
-incrementLines = do
+incrementLineNo :: InputT GHCi ()
+incrementLineNo = do
    st <- lift $ getGHCiState
    let ln = 1+(line_number st)
    lift $ setGHCiState st{line_number=ln}
@@ -540,7 +545,7 @@ fileLoop hdl = do
                 -- perhaps did getContents which closes stdin at
                 -- EOF.
         Right l -> do
-           incrementLines
+           incrementLineNo
            return (Just l)
 
 mkPrompt :: GHCi String
@@ -593,15 +598,12 @@ queryQueue = do
     c:cs -> do setGHCiState st{ cmdqueue = cs }
                return (Just c)
 
-runCommands :: Bool -> InputT GHCi (Maybe String) -> InputT GHCi ()
+runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands = runCommands' handler
 
 runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
-             -> Bool
              -> InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands' eh resetLineTo1 getCmd = do
-    when resetLineTo1 $ lift $ do st <- getGHCiState
-                                  setGHCiState $ st { line_number = 0 }
+runCommands' eh getCmd = do
     b <- ghandle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
@@ -613,7 +615,7 @@ runCommands' eh resetLineTo1 getCmd = do
             (runOneCommand eh getCmd)
     case b of
       Nothing -> return ()
-      Just _  -> runCommands' eh resetLineTo1 getCmd
+      Just _  -> runCommands' eh getCmd
 
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)

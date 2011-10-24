@@ -120,8 +120,8 @@ import FastString
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName :: Unique -> Name
-itName uniq = mkInternalName uniq (mkOccNameFS varName (fsLit "it")) noSrcSpan
+itName :: Unique -> SrcSpan -> Name
+itName uniq loc = mkInternalName uniq (mkOccNameFS varName (fsLit "it")) loc
 \end{code}
 
 \begin{code}

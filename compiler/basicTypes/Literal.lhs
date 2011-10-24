@@ -376,12 +376,12 @@ literalType (MachWord64  _) = word64PrimTy
 literalType (MachFloat _)   = floatPrimTy
 literalType (MachDouble _)  = doublePrimTy
 literalType (MachLabel _ _ _) = addrPrimTy
-literalType (LitInteger _ mkIntegerId)
+literalType (LitInteger _ mk_integer_id)
       -- We really mean idType, rather than varType, but importing Id
       -- causes a module import loop
-    = case varType mkIntegerId of
-      FunTy _ (FunTy _ integerTy) -> integerTy
-      _ -> panic "literalType: mkIntegerId has the wrong type"
+    = case varType mk_integer_id of
+        FunTy _ (FunTy _ integerTy) -> integerTy
+        _ -> panic "literalType: mkIntegerId has the wrong type"
 
 absentLiteralOf :: TyCon -> Maybe Literal
 -- Return a literal of the appropriate primtive
