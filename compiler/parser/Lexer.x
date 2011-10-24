@@ -584,9 +584,7 @@ data Token
   | ITlineComment     String     -- comment starting by "--"
   | ITblockComment    String     -- comment in {- -}
 
-#ifdef DEBUG
-  deriving Show -- debugging
-#endif
+  deriving Show
 
 -- the bitmap provided as the third component indicates whether the
 -- corresponding extension keyword is valid under the extension options

@@ -169,9 +169,7 @@ data CmmToken
   | CmmT_Int	   Integer
   | CmmT_Float     Rational
   | CmmT_EOF
-#ifdef DEBUG
   deriving (Show)
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Lexer actions

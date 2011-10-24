@@ -98,10 +98,7 @@ data RealSrcLoc
   = SrcLoc	FastString	-- A precise location (file name)
 		{-# UNPACK #-} !Int		-- line number, begins at 1
 		{-# UNPACK #-} !Int		-- column number, begins at 1
-
-#ifdef DEBUG
-  deriving Show -- debugging
-#endif
+  deriving Show
 
 data SrcLoc
   = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
@@ -254,24 +251,16 @@ data RealSrcSpan
 	  srcSpanLine	  :: {-# UNPACK #-} !Int,
 	  srcSpanCol      :: {-# UNPACK #-} !Int
 	}
-#ifdef DEBUG
   deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, becuase we
                                 -- derive Show for Token
-#else
-  deriving (Eq, Typeable)
-#endif
 
 data SrcSpan =
     RealSrcSpan !RealSrcSpan
   | UnhelpfulSpan !FastString	-- Just a general indication
 				-- also used to indicate an empty span
 
-#ifdef DEBUG
   deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, becuase we
                                 -- derive Show for Token
-#else
-  deriving (Eq, Typeable)
-#endif
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, wiredInSrcSpan :: SrcSpan
