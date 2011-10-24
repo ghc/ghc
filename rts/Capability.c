@@ -636,7 +636,15 @@ yieldCapability (Capability** pCap, Task *task)
 		continue;
 	    }
 
-	    if (task->incall->tso == NULL) {
+            if (task->cap != cap) {
+                // see Note [migrated bound threads]
+                debugTrace(DEBUG_sched,
+                           "task has been migrated to cap %d", task->cap->no);
+		RELEASE_LOCK(&cap->lock);
+		continue;
+	    }
+
+            if (task->incall->tso == NULL) {
 		ASSERT(cap->spare_workers != NULL);
 		// if we're not at the front of the queue, release it
 		// again.  This is unlikely to happen.
@@ -663,6 +671,23 @@ yieldCapability (Capability** pCap, Task *task)
 
     return;
 }
+
+// Note [migrated bound threads]
+//
+// There's a tricky case where:
+//    - cap A is running an unbound thread T1
+//    - there is a bound thread T2 at the head of the run queue on cap A
+//    - T1 makes a safe foreign call, the task bound to T2 is woken up on cap A
+//    - T1 returns quickly grabbing A again (T2 is still waking up on A)
+//    - T1 blocks, the scheduler migrates T2 to cap B
+//    - the task bound to T2 wakes up on cap B
+//
+// We take advantage of the following invariant:
+//
+//  - A bound thread can only be migrated by the holder of the
+//    Capability on which the bound thread currently lives.  So, if we
+//    hold Capabilty C, and task->cap == C, then task cannot be
+//    migrated under our feet.
 
 /* ----------------------------------------------------------------------------
  * prodCapability
