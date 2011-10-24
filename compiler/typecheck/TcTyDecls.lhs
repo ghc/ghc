@@ -166,8 +166,8 @@ Where expand is defined as follows:
 
 Eqn (1) is conservative; when there's a type variable at the head,
 look in all the argument types.  Eqn (2) expands superclasses; the
-third component of the union is like Eqn (1).  Eqn (3) really never
-happens.
+third component of the union is like Eqn (1).  Eqn (3) happens mainly
+when the context is a (constraint) tuple, such as (Eq a, Show a).
 
 Furthermore, expand always looks through type synonyms.
 
