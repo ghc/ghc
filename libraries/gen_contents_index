@@ -7,19 +7,30 @@ HADDOCK_ARGS=
 case $* in
 --inplace)
     HADDOCK=../inplace/bin/haddock
-    for LIB in `grep '^libraries/[^ ]*  *- ' ../packages | sed -e 's#libraries/##' -e 's/ .*//'`
+    for REPO in `grep '^libraries/[^ ]*  *- ' ../packages | sed -e 's#libraries/##' -e 's/ .*//'`
     do
-        HADDOCK_FILE="$LIB/dist-install/doc/html/$LIB/$LIB.haddock"
-        if [ -f "$HADDOCK_FILE" ]
+        if [ -f "$REPO/ghc-packages" ]
         then
-            LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
-            NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
-            # It's easier to portably remove tabs with tr than to try to get
-            # sed to do what we want
-            VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://' | tr -d ' \t'`
-            HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
-            HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
+            LIBS="`cat $REPO/ghc-packages`"
+            LIBROOT="$REPO"
+        else
+            LIBS="$REPO"
+            LIBROOT="."
         fi
+        for LIB in $LIBS
+        do
+            HADDOCK_FILE="$LIBROOT/$LIB/dist-install/doc/html/$LIB/$LIB.haddock"
+            if [ -f "$HADDOCK_FILE" ]
+            then
+                LIBPATH=`echo "$HADDOCK_FILE" | sed 's#/dist-install.*##'`
+                NAME=`echo "$HADDOCK_FILE" | sed 's#.*/##' | sed 's#\.haddock$##'`
+                # It's easier to portably remove tabs with tr than to try to get
+                # sed to do what we want
+                VERSION=`grep -i '^version:' $LIBPATH/$NAME.cabal | sed 's/.*://' | tr -d ' \t'`
+                HADDOCK_ARG="--read-interface=${NAME}-${VERSION},$HADDOCK_FILE"
+                HADDOCK_ARGS="$HADDOCK_ARGS $HADDOCK_ARG"
+            fi
+        done
     done
     ;;
 *)

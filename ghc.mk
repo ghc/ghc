@@ -332,7 +332,7 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/cabal hpc extensible-exceptions binary bin-package-db hoopl
+PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc extensible-exceptions binary bin-package-db hoopl
 
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
@@ -413,7 +413,7 @@ $(eval $(call addPackage,haskell2010))
 $(eval $(call addPackage,hpc))
 $(eval $(call addPackage,pretty))
 $(eval $(call addPackage,template-haskell))
-$(eval $(call addPackage,Cabal/cabal))
+$(eval $(call addPackage,Cabal/Cabal))
 $(eval $(call addPackage,binary))
 $(eval $(call addPackage,bin-package-db))
 $(eval $(call addPackage,hoopl))

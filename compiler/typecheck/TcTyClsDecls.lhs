@@ -226,9 +226,6 @@ kcTyClDecls1 decls
 
         { (kc_syn_decls, tcl_env) <- kcSynDecls (calcSynCycles syn_decls)
 
-          -- Now check for cyclic classes
-        ; checkClassCycleErrs syn_decls alg_decls
-
         ; setLclEnv tcl_env $  do
         { kc_alg_decls <- mapM (wrapLocM kcTyClDecl) alg_decls
                 
@@ -988,16 +985,10 @@ Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 
 \begin{code}
-checkClassCycleErrs :: [LTyClDecl Name] -> [LTyClDecl Name] -> TcM ()
-checkClassCycleErrs syn_decls alg_decls
-  | null cls_cycles
-  = return ()
-  | otherwise
-  = do { mapM_ recClsErr cls_cycles
-       ; failM }       -- Give up now, because later checkValidTyCl
-                       -- will loop if the synonym is recursive
-  where
-    cls_cycles = calcClassCycles syn_decls alg_decls
+checkClassCycleErrs :: Class -> TcM ()
+checkClassCycleErrs cls
+  = unless (null cls_cycles) $ mapM_ recClsErr cls_cycles
+  where cls_cycles = calcClassCycles cls
 
 checkValidTyCl :: TyClDecl Name -> TcM ()
 -- We do the validity check over declarations, rather than TyThings
@@ -1165,6 +1156,9 @@ checkValidClass cls
 
    	-- Check the super-classes
 	; checkValidTheta (ClassSCCtxt (className cls)) theta
+
+          -- Now check for cyclic superclasses
+        ; checkClassCycleErrs cls
 
 	-- Check the class operations
 	; mapM_ (check_op constrained_class_methods) op_stuff
@@ -1504,14 +1498,10 @@ recSynErr syn_decls
     sorted_decls = sortLocated syn_decls
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
 
-recClsErr :: [Located (TyClDecl Name)] -> TcRn ()
-recClsErr cls_decls
-  = setSrcSpan (getLoc (head sorted_decls)) $
-    addErr (sep [ptext (sLit "Cycle in class declarations (via superclasses):"),
-                nest 2 (vcat (map ppr_decl sorted_decls))])
-  where
-    sorted_decls = sortLocated cls_decls
-    ppr_decl (L loc decl) = ppr loc <> colon <+> ppr (decl { tcdSigs = [] })
+recClsErr :: [TyCon] -> TcRn ()
+recClsErr cycles
+  = addErr (sep [ptext (sLit "Cycle in class declaration (via superclasses):"),
+                 nest 2 (hsep (intersperse (text "->") (map ppr cycles)))])
 
 sortLocated :: [Located a] -> [Located a]
 sortLocated things = sortLe le things

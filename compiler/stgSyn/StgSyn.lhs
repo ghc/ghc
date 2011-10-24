@@ -39,9 +39,7 @@ module StgSyn (
 
 	pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs
 
-#ifdef DEBUG
 	, pprStgLVs
-#endif
     ) where
 
 #include "HsVersions.h"
@@ -804,7 +802,6 @@ instance Outputable AltType where
 \end{code}
 
 \begin{code}
-#ifdef DEBUG
 pprStgLVs :: Outputable occ => GenStgLiveVars occ -> SDoc
 pprStgLVs lvs
   = getPprStyle $ \ sty ->
@@ -812,7 +809,6 @@ pprStgLVs lvs
 	empty
     else
 	hcat [text "{-lvs:", interpp'SP (uniqSetToList lvs), text "-}"]
-#endif
 \end{code}
 
 \begin{code}

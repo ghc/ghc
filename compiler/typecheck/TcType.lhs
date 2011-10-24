@@ -1027,14 +1027,13 @@ evVarPred_maybe v = if isPredTy ty then Just ty else Nothing
   where ty = varType v
 
 evVarPred :: EvVar -> PredType
-#ifdef DEBUG
 evVarPred var
+ | debugIsOn
   = case evVarPred_maybe var of
       Just pred -> pred
       Nothing   -> pprPanic "tcEvVarPred" (ppr var <+> ppr (varType var))
-#else
-evVarPred = varType
-#endif
+ | otherwise
+  = varType var
 \end{code}
 
 Superclasses

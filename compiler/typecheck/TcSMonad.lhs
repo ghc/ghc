@@ -107,18 +107,16 @@ import MonadUtils
 import VarSet
 import Pair
 import FastString
+import StaticFlags
+import Util
 
 import HsBinds               -- for TcEvBinds stuff 
 import Id 
 import TcRnTypes
+
+import Control.Monad
 import Data.IORef
-
 import qualified Data.Map as Map
-
-#ifdef DEBUG
-import StaticFlags( opt_PprStyle_Debug )
-import Control.Monad( when )
-#endif
 \end{code}
 
 
@@ -585,12 +583,12 @@ runTcS context untouch tcs
        ; ty_binds <- TcM.readTcRef ty_binds_var
        ; mapM_ do_unification (varEnvElts ty_binds)
 
-#ifdef DEBUG
-       ; count <- TcM.readTcRef step_count
-       ; when (opt_PprStyle_Debug && count > 0) $
-         TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") 
-                            <+> int count <+> ppr context)
-#endif
+       ; when debugIsOn $ do {
+             count <- TcM.readTcRef step_count
+           ; when (opt_PprStyle_Debug && count > 0) $
+             TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") 
+                                <+> int count <+> ppr context)
+         }
              -- And return
        ; ev_binds      <- TcM.readTcRef evb_ref
        ; return (res, evBindMapBinds ev_binds) }
@@ -727,12 +725,11 @@ setWantedTyBind tv ty
   = do { ref <- getTcSTyBinds
        ; wrapTcS $ 
          do { ty_binds <- TcM.readTcRef ref
-#ifdef DEBUG
-            ; TcM.checkErr (not (tv `elemVarEnv` ty_binds)) $
-              vcat [ text "TERRIBLE ERROR: double set of meta type variable"
-                   , ppr tv <+> text ":=" <+> ppr ty
-                   , text "Old value =" <+> ppr (lookupVarEnv_NF ty_binds tv)]
-#endif
+            ; when debugIsOn $
+                  TcM.checkErr (not (tv `elemVarEnv` ty_binds)) $
+                  vcat [ text "TERRIBLE ERROR: double set of meta type variable"
+                       , ppr tv <+> text ":=" <+> ppr ty
+                       , text "Old value =" <+> ppr (lookupVarEnv_NF ty_binds tv)]
             ; TcM.writeTcRef ref (extendVarEnv ty_binds tv (tv,ty)) } }
 
 setIPBind :: EvVar -> EvTerm -> TcS () 

@@ -9,7 +9,10 @@
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-module X86.Instr
+module X86.Instr (Instr(..), Operand(..),
+                  getJumpDestBlockId, canShortcut, shortcutStatics,
+                  shortcutJump, i386_insert_ffrees,
+                  maxSpillSlots, archWordSize)
 where
 
 import X86.Cond
@@ -33,16 +36,12 @@ import CLabel
 import UniqSet
 import Unique
 
--- Size of a PPC memory address, in bytes.
+-- Size of an x86/x86_64 memory address, in bytes.
 --
-archWordSize :: Size
-#if i386_TARGET_ARCH
-archWordSize    = II32
-#elif x86_64_TARGET_ARCH
-archWordSize    = II64
-#else
-archWordSize    = panic "X86.Instr.archWordSize: not defined"
-#endif
+archWordSize :: Bool -> Size
+archWordSize is32Bit
+ | is32Bit   = II32
+ | otherwise = II64
 
 -- | Instruction instance for x86 instruction set.
 instance Instruction Instr where
@@ -617,16 +616,16 @@ x86_mkSpillInstr
     -> Instr
 
 x86_mkSpillInstr platform reg delta slot
-  = let off     = spillSlotToOffset slot
+  = let off     = spillSlotToOffset is32Bit slot
     in
-    let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
+    let off_w = (off - delta) `div` (if is32Bit then 4 else 8)
     in case targetClassOfReg platform reg of
-           RcInteger   -> MOV IF_ARCH_i386(II32,II64)
+           RcInteger   -> MOV (archWordSize is32Bit)
                               (OpReg reg) (OpAddr (spRel platform off_w))
            RcDouble    -> GST FF80 reg (spRel platform off_w) {- RcFloat/RcDouble -}
            RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off_w))
            _         -> panic "X86.mkSpillInstr: no match"
-
+    where is32Bit = target32Bit platform
 
 -- | Make a spill reload instruction.
 x86_mkLoadInstr
@@ -637,33 +636,35 @@ x86_mkLoadInstr
     -> Instr
 
 x86_mkLoadInstr platform reg delta slot
-  = let off     = spillSlotToOffset slot
+  = let off     = spillSlotToOffset is32Bit slot
     in
-        let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
+        let off_w = (off-delta) `div` (if is32Bit then 4 else 8)
         in case targetClassOfReg platform reg of
-              RcInteger -> MOV IF_ARCH_i386(II32,II64)
+              RcInteger -> MOV (archWordSize is32Bit)
                                (OpAddr (spRel platform off_w)) (OpReg reg)
               RcDouble  -> GLD FF80 (spRel platform off_w) reg {- RcFloat/RcDouble -}
               RcDoubleSSE -> MOV FF64 (OpAddr (spRel platform off_w)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
+    where is32Bit = target32Bit platform
 
-spillSlotSize :: Int
-spillSlotSize = IF_ARCH_i386(12, 8)
+spillSlotSize :: Bool -> Int
+spillSlotSize is32Bit = if is32Bit then 12 else 8
 
-maxSpillSlots :: Int
-maxSpillSlots = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize) - 1
+maxSpillSlots :: Bool -> Int
+maxSpillSlots is32Bit
+    = ((rESERVED_C_STACK_BYTES - 64) `div` spillSlotSize is32Bit) - 1
 
 -- convert a spill slot number to a *byte* offset, with no sign:
 -- decide on a per arch basis whether you are spilling above or below
 -- the C stack pointer.
-spillSlotToOffset :: Int -> Int
-spillSlotToOffset slot
-   | slot >= 0 && slot < maxSpillSlots
-   = 64 + spillSlotSize * slot
+spillSlotToOffset :: Bool -> Int -> Int
+spillSlotToOffset is32Bit slot
+   | slot >= 0 && slot < maxSpillSlots is32Bit
+   = 64 + spillSlotSize is32Bit * slot
    | otherwise
    = pprPanic "spillSlotToOffset:"
               (   text "invalid spill location: " <> int slot
-              $$  text "maxSpillSlots:          " <> int maxSpillSlots)
+              $$  text "maxSpillSlots:          " <> int (maxSpillSlots is32Bit))
 
 --------------------------------------------------------------------------------
 

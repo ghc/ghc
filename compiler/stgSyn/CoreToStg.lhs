@@ -791,9 +791,7 @@ mkStgRhs rhs_fvs srt binder_info rhs
                     then (if isNotTop toplev
                             then SingleEntry    -- HA!  Paydirt for "dem"
                             else
-#ifdef DEBUG
-                     trace "WARNING: SE CAFs unsupported, forcing UPD instead" $
-#endif
+                     (if debugIsOn then trace "WARNING: SE CAFs unsupported, forcing UPD instead" else id) $
                      Updatable)
                 else Updatable
         -- For now we forbid SingleEntry CAFs; they tickle the

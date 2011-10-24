@@ -150,7 +150,8 @@ data NcgImpl statics instr jumpDest = NcgImpl {
 --------------------
 nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 nativeCodeGen dflags h us cmms
- = let nCG' :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
+ = let platform = targetPlatform dflags
+       nCG' :: (PlatformOutputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
        x86NcgImpl = NcgImpl {
                          cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
@@ -160,13 +161,13 @@ nativeCodeGen dflags h us cmms
                         ,shortcutStatics           = X86.Instr.shortcutStatics
                         ,shortcutJump              = X86.Instr.shortcutJump
                         ,pprNatCmmDecl              = X86.Ppr.pprNatCmmDecl
-                        ,maxSpillSlots             = X86.Instr.maxSpillSlots
+                        ,maxSpillSlots             = X86.Instr.maxSpillSlots (target32Bit platform)
                         ,allocatableRegs           = X86.Regs.allocatableRegs
                         ,ncg_x86fp_kludge          = id
                         ,ncgExpandTop              = id
                         ,ncgMakeFarBranches        = id
                     }
-   in case platformArch $ targetPlatform dflags of
+   in case platformArch platform of
                  ArchX86    -> nCG' (x86NcgImpl { ncg_x86fp_kludge = map x86fp_kludge })
                  ArchX86_64 -> nCG' x86NcgImpl
                  ArchPPC ->
