@@ -1910,8 +1910,6 @@ data VectInfo
     { vectInfoVar          :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
     , vectInfoTyCon        :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
     , vectInfoDataCon      :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
-    , vectInfoPADFun       :: NameEnv (TyCon  , Var)      -- ^ @(T_v, paT)@ keyed on @T_v@
-    , vectInfoIso          :: NameEnv (TyCon  , Var)      -- ^ @(T, isoT)@ keyed on @T@
     , vectInfoScalarVars   :: VarSet                      -- ^ set of purely scalar variables
     , vectInfoScalarTyCons :: NameSet                     -- ^ set of scalar type constructors
     }
@@ -1937,16 +1935,13 @@ data IfaceVectInfo
 
 noVectInfo :: VectInfo
 noVectInfo 
-  = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyVarSet
-             emptyNameSet
+  = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyVarSet emptyNameSet
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 = 
   VectInfo (vectInfoVar          vi1 `plusVarEnv`    vectInfoVar          vi2)
            (vectInfoTyCon        vi1 `plusNameEnv`   vectInfoTyCon        vi2)
            (vectInfoDataCon      vi1 `plusNameEnv`   vectInfoDataCon      vi2)
-           (vectInfoPADFun       vi1 `plusNameEnv`   vectInfoPADFun       vi2)
-           (vectInfoIso          vi1 `plusNameEnv`   vectInfoIso          vi2)
            (vectInfoScalarVars   vi1 `unionVarSet`   vectInfoScalarVars   vi2)
            (vectInfoScalarTyCons vi1 `unionNameSets` vectInfoScalarTyCons vi2)
 
@@ -1961,8 +1956,6 @@ instance Outputable VectInfo where
              [ ptext (sLit "variables     :") <+> ppr (vectInfoVar          info)
              , ptext (sLit "tycons        :") <+> ppr (vectInfoTyCon        info)
              , ptext (sLit "datacons      :") <+> ppr (vectInfoDataCon      info)
-             , ptext (sLit "PA dfuns      :") <+> ppr (vectInfoPADFun       info)
-             , ptext (sLit "iso           :") <+> ppr (vectInfoIso          info)
              , ptext (sLit "scalar vars   :") <+> ppr (vectInfoScalarVars   info)
              , ptext (sLit "scalar tycons :") <+> ppr (vectInfoScalarTyCons info)
              ]

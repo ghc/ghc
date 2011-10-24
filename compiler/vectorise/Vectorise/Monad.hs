@@ -1,4 +1,3 @@
-
 module Vectorise.Monad (
   module Vectorise.Monad.Base,
   module Vectorise.Monad.Naming,
@@ -17,10 +16,6 @@ module Vectorise.Monad (
   maybeCantVectoriseVarM,
   dumpVar,
   addGlobalScalar, 
-    
-  -- * Primitives
-  lookupPrimPArray,
-  lookupPrimMethod
 ) where
 
 import Vectorise.Monad.Base
@@ -31,21 +26,24 @@ import Vectorise.Monad.InstEnv
 import Vectorise.Builtins
 import Vectorise.Env
 
+import CoreSyn
+import DsMonad
 import HscTypes hiding ( MonadThings(..) )
 import DynFlags
 import MonadUtils (liftIO)
-import TyCon
+import InstEnv
+import Class
 import VarSet
 import VarEnv
 import Var
 import Id
-import DsMonad
+import Name
 import ErrUtils
 import Outputable
-import FastString
 
 import Control.Monad
 import System.IO
+
 
 -- |Run a vectorisation computation.
 --
@@ -56,8 +54,7 @@ initV :: HscEnv
       -> IO (Maybe (VectInfo, a))
 initV hsc_env guts info thing_inside
   = do {
-         let type_env = typeEnvFromEntities [] (mg_tcs guts) (mg_clss guts) (mg_fam_insts guts)
-                        -- XXX should we try to get the Ids here?
+         let type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_clss guts) (mg_fam_insts guts)
        ; (_, Just res) <- initDs hsc_env (mg_module guts)
                                          (mg_rdr_env guts) type_env go
 
@@ -72,16 +69,15 @@ initV hsc_env guts info thing_inside
        }
   where
     dumpIfVtTrace = dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_vt_trace
+    
+    bindsToIds (NonRec v _)   = [v]
+    bindsToIds (Rec    binds) = map fst binds
+    
+    ids = concatMap bindsToIds (mg_binds guts)
 
     go 
-      = do {   -- pick a DPH backend
-           ; dflags <- getDOptsDs
-           ; case dphPackageMaybe dflags of
-               Nothing  -> failWithDs $ ptext selectBackendErr
-               Just pkg -> do {
-
-               -- set up tables of builtin entities
-           ; builtins        <- initBuiltins pkg
+      = do {   -- set up tables of builtin entities
+           ; builtins        <- initBuiltins
            ; builtin_vars    <- initBuiltinVars builtins
            ; builtin_tycons  <- initBuiltinTyCons builtins
 
@@ -89,14 +85,14 @@ initV hsc_env guts info thing_inside
            ; eps <- liftIO $ hscEPS hsc_env
            ; let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
                  instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
-           ; builtin_prs <- initBuiltinPRs builtins instEnvs
-           ; builtin_pas <- initBuiltinPAs builtins instEnvs
+                 builtin_pas = initClassDicts instEnvs (paClass builtins) -- grab all available 'PA' and..
+                 builtin_prs = initClassDicts instEnvs (prClass builtins) -- ..'PR' class instances
 
                -- construct the initial global environment
            ; let thing_inside' = traceVt "VectDecls" (ppr (mg_vect_decls guts)) >> thing_inside
            ; let genv = extendImportedVarsEnv builtin_vars
                         . extendTyConsEnv     builtin_tycons
-                        . extendPAFunsEnv     builtin_pas
+                        . setPAFunsEnv        builtin_pas
                         . setPRFunsEnv        builtin_prs
                         $ initGlobalEnv info (mg_vect_decls guts) instEnvs famInstEnvs
  
@@ -110,24 +106,37 @@ initV hsc_env guts info thing_inside
                                         mkDumpDoc "Warning: vectorisation failure:" reason
                                   ; return Nothing
                                   }
-           } }
+           }
 
-    new_info genv = modVectInfo genv (mg_tcs guts) (mg_vect_decls guts) info
+    new_info genv = modVectInfo genv ids (mg_tcs guts) (mg_vect_decls guts) info
 
-    selectBackendErr = sLit "To use -fvectorise select a DPH backend with -fdph-par or -fdph-seq"
+    -- For a given DPH class, produce a mapping from type constructor (in head position) to the instance
+    -- dfun for that type constructor and class.  (DPH class instances cannot overlap in head
+    -- constructors.)
+    --
+    initClassDicts :: (InstEnv, InstEnv) -> Class -> [(Name, Var)]
+    initClassDicts insts cls = map find $ classInstances insts cls
+      where
+        find i | [Just tc] <- instanceRoughTcs i = (tc, instanceDFunId i)
+               | otherwise                       = pprPanic invalidInstance (ppr i)
+
+    invalidInstance = "Invalid DPH instance (overlapping in head constructor)"
+
 
 -- Builtins -------------------------------------------------------------------
--- | Lift a desugaring computation using the `Builtins` into the vectorisation monad.
+
+-- |Lift a desugaring computation using the `Builtins` into the vectorisation monad.
+--
 liftBuiltinDs :: (Builtins -> DsM a) -> VM a
 liftBuiltinDs p = VM $ \bi genv lenv -> do { x <- p bi; return (Yes genv lenv x)}
 
-
--- | Project something from the set of builtins.
+-- |Project something from the set of builtins.
+--
 builtin :: (Builtins -> a) -> VM a
 builtin f = VM $ \bi genv lenv -> return (Yes genv lenv (f bi))
 
-
--- | Lift a function using the `Builtins` into the vectorisation monad.
+-- |Lift a function using the `Builtins` into the vectorisation monad.
+--
 builtins :: (a -> Builtins -> b) -> VM (a -> b)
 builtins f = VM $ \bi genv lenv -> return (Yes genv lenv (`f` bi))
 
@@ -174,13 +183,3 @@ addGlobalScalar var
   = do { traceVt "addGlobalScalar" (ppr var)
        ; updGEnv $ \env -> env{global_scalar_vars = extendVarSet (global_scalar_vars env) var}
        }
-
-
--- Primitives -----------------------------------------------------------------
-
-lookupPrimPArray :: TyCon -> VM (Maybe TyCon)
-lookupPrimPArray = liftBuiltinDs . primPArray
-
-lookupPrimMethod :: TyCon -> String -> VM (Maybe Var)
-lookupPrimMethod tycon = liftBuiltinDs . primMethod tycon
-

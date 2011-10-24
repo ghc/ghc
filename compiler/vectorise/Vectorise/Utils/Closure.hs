@@ -1,13 +1,14 @@
+-- |Utils concerning closure construction and application.
 
--- | Utils concerning closure construction and application.
 module Vectorise.Utils.Closure (
-	mkClosure,
-	mkClosureApp,
-	buildClosure,
-	buildClosures,
-	buildEnv
+  mkClosure,
+  mkClosureApp,
+  buildClosure,
+  buildClosures,
+  buildEnv
 )
 where
+
 import Vectorise.Builtins
 import Vectorise.Vect
 import Vectorise.Monad
@@ -29,12 +30,12 @@ import FastString
 
 -- | Make a closure.
 mkClosure
-	:: Type		-- ^ Type of the argument.
-	-> Type		-- ^ Type of the result.
-	-> Type		-- ^ Type of the environment.
-	-> VExpr	-- ^ The function to apply.
-	-> VExpr	-- ^ The environment to use.
-	-> VM VExpr
+  :: Type   -- ^ Type of the argument.
+  -> Type   -- ^ Type of the result.
+  -> Type   -- ^ Type of the environment.
+  -> VExpr  -- ^ The function to apply.
+  -> VExpr  -- ^ The environment to use.
+  -> VM VExpr
 
 mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
  = do dict <- paDictOfType env_ty
@@ -46,11 +47,11 @@ mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
 
 -- | Make a closure application.
 mkClosureApp 
-	:: Type		-- ^ Type of the argument.
-	-> Type		-- ^ Type of the result.
-	-> VExpr	-- ^ Closure to apply.
-	-> VExpr	-- ^ Argument to use.
-	-> VM VExpr
+  :: Type   -- ^ Type of the argument.
+  -> Type   -- ^ Type of the result.
+  -> VExpr  -- ^ Closure to apply.
+  -> VExpr  -- ^ Argument to use.
+  -> VM VExpr
 
 mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
  = do vapply <- builtin applyVar
@@ -60,14 +61,13 @@ mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
               Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [Var lc, lclo, larg])
 
 
-
 buildClosures 
-	:: [TyVar]
-	-> [VVar]
-	-> [Type]	-- ^ Type of the arguments.
-	-> Type		-- ^ Type of result.
-	-> VM VExpr
-	-> VM VExpr
+  :: [TyVar]
+  -> [VVar]
+  -> [Type] -- ^ Type of the arguments.
+  -> Type   -- ^ Type of result.
+  -> VM VExpr
+  -> VM VExpr
 
 buildClosures _   _    [] _ mk_body
  = mk_body

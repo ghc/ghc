@@ -1,27 +1,26 @@
-
 module Vectorise.Utils.Base (
-	voidType,
-	newLocalVVar,
+  voidType,
+  newLocalVVar,
 
-	mkDataConTagLit,
-	mkDataConTag, dataConTagZ,
-	mkBuiltinTyConApp,
-	mkBuiltinTyConApps,
-	mkWrapType,
-	mkClosureTypes,
-	mkPReprType,
-	mkPArrayType, splitPrimTyCon,
-	mkPArray,
-	mkPDataType,
-	mkBuiltinCo,
-	mkVScrut,
+  mkDataConTagLit,
+  mkDataConTag, dataConTagZ,
+  mkBuiltinTyConApp,
+  mkBuiltinTyConApps,
+  mkWrapType,
+  mkClosureTypes,
+  mkPReprType,
+  mkPArrayType, splitPrimTyCon,
+  mkPArray,
+  mkPDataType,
+  mkBuiltinCo,
+  mkVScrut,
 
-        preprSynTyCon,
-	pdataReprTyCon,
-	pdataReprDataCon,
-        prDFunOfTyCon
-)
-where
+  preprSynTyCon,
+  pdataReprTyCon,
+  pdataReprDataCon,
+  prDFunOfTyCon
+) where
+
 import Vectorise.Monad
 import Vectorise.Vect
 import Vectorise.Builtins
@@ -96,24 +95,23 @@ mkPReprType :: Type -> VM Type
 mkPReprType ty = mkBuiltinTyConApp preprTyCon [ty]
 
 
------
+-- |Wrap a type into 'PArray', treating unboxed types specially.
+--
 mkPArrayType :: Type -> VM Type
 mkPArrayType ty
   | Just tycon <- splitPrimTyCon ty
-  = do
-      r <- lookupPrimPArray tycon
-      case r of
-        Just arr -> return $ mkTyConApp arr []
-        Nothing  -> cantVectorise "Primitive tycon not vectorised" (ppr tycon)
-
+  = do { arr <- builtin (parray_PrimTyCon tycon)
+       ; return $ mkTyConApp arr []
+       }
 mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
+-- |Checks if a type constructor is defined in 'GHC.Prim' (e.g., 'Int#'); if so, returns it.
+--
 splitPrimTyCon :: Type -> Maybe TyCon
 splitPrimTyCon ty
   | Just (tycon, []) <- splitTyConApp_maybe ty
   , isPrimTyCon tycon
   = Just tycon
-
   | otherwise = Nothing
 
 

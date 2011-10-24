@@ -494,13 +494,9 @@ tidyInstances tidy_dfun ispecs
 \begin{code}
 tidyVectInfo :: TidyEnv -> VectInfo -> VectInfo
 tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
-                                         , vectInfoPADFun       = pas
-                                         , vectInfoIso          = isos
                                          , vectInfoScalarVars   = scalarVars
                                          })
   = info { vectInfoVar          = tidy_vars
-         , vectInfoPADFun       = tidy_pas
-         , vectInfoIso          = tidy_isos 
          , vectInfoScalarVars   = tidy_scalarVars
          }
   where
@@ -511,11 +507,6 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                                tidy_var_v = lookup_var var_v
                          , isExportedId tidy_var_v
                          ]
-
-    tidy_pas  = mapNameEnv tidy_snd_var pas
-    tidy_isos = mapNameEnv tidy_snd_var isos
-
-    tidy_snd_var (x, var) = (x, lookup_var var)
 
     tidy_scalarVars = mkVarSet [ lookup_var var 
                                | var <- varSetElems scalarVars

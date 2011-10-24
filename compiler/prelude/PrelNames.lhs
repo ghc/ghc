@@ -399,6 +399,9 @@ rANDOM          = mkBaseModule (fsLit "System.Random")
 gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 
+dATA_ARRAY_PARALLEL_PRIM :: PackageId -> Module
+dATA_ARRAY_PARALLEL_PRIM pkg = mkModule pkg (mkModuleNameFS (fsLit "Data.Array.Parallel.Prim"))
+
 gHC_PARR :: PackageId -> Module
 gHC_PARR pkg = mkModule pkg (mkModuleNameFS (fsLit "Data.Array.Parallel"))
 

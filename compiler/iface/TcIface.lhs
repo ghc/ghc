@@ -64,7 +64,6 @@ import Util
 import FastString
 
 import Control.Monad
-import Data.List
 \end{code}
 
 This module takes
@@ -724,13 +723,11 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
        ; vVars     <- mapM vectVarMapping                          vars
        ; tyConRes1 <- mapM vectTyConMapping                        tycons
        ; tyConRes2 <- mapM (vectTyConReuseMapping scalarTyConsSet) tyconsReuse
-       ; let (vTyCons, vDataCons, vPAs, vIsos) = unzip4 (tyConRes1 ++ tyConRes2)
+       ; let (vTyCons, vDataCons) = unzip (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
                   { vectInfoVar          = mkVarEnv  vVars
                   , vectInfoTyCon        = mkNameEnv vTyCons
                   , vectInfoDataCon      = mkNameEnv (concat vDataCons)
-                  , vectInfoPADFun       = mkNameEnv (catMaybes vPAs)
-                  , vectInfoIso          = mkNameEnv (catMaybes vIsos)
                   , vectInfoScalarVars   = mkVarSet  (map lookupVar scalarVars)
                   , vectInfoScalarTyCons = scalarTyConsSet
                   }
@@ -748,44 +745,31 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
            }
     vectTyConMapping name 
       = do { vName   <- lookupOrig mod (mkLocalisedOccName mod mkVectTyConOcc name)
-           ; paName  <- lookupOrig mod (mkLocalisedOccName mod mkPADFunOcc    name)
-           ; isoName <- lookupOrig mod (mkLocalisedOccName mod mkVectIsoOcc   name)
            -- FIXME: we will need to use tcIfaceTyCon/tcIfaceExtId on some of these (but depends
            --   on how we exactly define the 'VECTORISE type' pragma to work)
            ; let { tycon    = lookupTyCon name
                  ; vTycon   = lookupTyCon vName
-                 ; paTycon  = lookupVar paName
-                 ; isoTycon = lookupVar isoName
                  }
            ; vDataCons <- mapM vectDataConMapping (tyConDataCons tycon)
            ; return ( (name, (tycon, vTycon))          -- (T, T_v)
                     , vDataCons                        -- list of (Ci, Ci_v)
-                    , Just (vName, (vTycon, paTycon))  -- (T_v, paT)
-                    , Just (name, (tycon, isoTycon))   -- (T, isoT)
                     )
            }
     vectTyConReuseMapping scalarNames name 
-      = do { paName  <- lookupOrig mod (mkLocalisedOccName mod mkPADFunOcc  name)
-           ; isoName <- lookupOrig mod (mkLocalisedOccName mod mkVectIsoOcc name)
-           ; tycon <- forkM (text ("vect reuse tycon") <+> ppr name) $
+      = do { tycon <- forkM (text ("vect reuse tycon") <+> ppr name) $
                       tcIfaceTyCon (IfaceTc name) -- somewhat naughty for wired in tycons, but ok
            ; if name `elemNameSet` scalarNames
              then do
-           { return ( (name, (tycon, tycon))      -- scalar type constructors expose no data...
-                    , []                          -- ...constructors and have no PA and ISO vars...
-                    , Nothing                     -- ...see "Note [Pragmas to vectorise tycons]" in..
-                    , Nothing                     -- ...'Vectorise.Type.Env'
-                    )
+           { return ( (name, (tycon, tycon))      -- scalar type constructors expose no data..
+                    , []                          -- ..constructors see..
+                    )                             -- .."Note [Pragmas to vectorise tycons]"..
+                                                  -- ..in 'Vectorise.Type.Env'
            } else do 
-           { let { paTycon    = lookupVar paName
-                 ; isoTycon   = lookupVar isoName
-                 ; vDataCons  = [ (dataConName dc, (dc, dc)) 
+           { let { vDataCons  = [ (dataConName dc, (dc, dc)) 
                                 | dc <- tyConDataCons tycon]
                  }
            ; return ( (name, (tycon, tycon))          -- (T, T)
                     , vDataCons                       -- list of (Ci, Ci)
-                    , Just (name, (tycon, paTycon))   -- (T, paT)
-                    , Just (name, (tycon, isoTycon))  -- (T, isoT)
                     )
            }}
     vectDataConMapping datacon
