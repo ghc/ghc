@@ -4916,6 +4916,7 @@ class IsBoolMap v where
 instance IsBoolMap [(Int, Bool)] where
   lookupKey = lookup
 </programlisting>
+A default declaration is not permitted for an associated <emphasis>data</emphasis> type.
       </para>
 	</sect3>
 
