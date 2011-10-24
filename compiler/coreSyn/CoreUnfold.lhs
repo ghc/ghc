@@ -33,7 +33,7 @@ module CoreUnfold (
 
         -- Reexport from CoreSubst (it only live there so it can be used
         -- by the Very Simple Optimiser)
-        exprIsConApp_maybe
+        exprIsConApp_maybe, exprIsLiteral_maybe
     ) where
 
 #include "HsVersions.h"

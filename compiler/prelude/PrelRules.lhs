@@ -22,6 +22,7 @@ import CoreSyn
 import MkCore
 import Id
 import Literal
+import CoreSubst   ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
@@ -731,24 +732,28 @@ match_Integer_convert :: Num a
                       -> IdUnfoldingFun
                       -> [Expr CoreBndr]
                       -> Maybe (Expr CoreBndr)
-match_Integer_convert convert _ [Lit (LitInteger x _)]
-    = Just (convert (fromIntegral x))
+match_Integer_convert convert id_unf [xl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  = Just (convert (fromIntegral x))
 match_Integer_convert _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer)
                    -> IdUnfoldingFun
                    -> [Expr CoreBndr]
                    -> Maybe (Expr CoreBndr)
-match_Integer_unop unop _ [Lit (LitInteger x i)]
-    = Just (Lit (LitInteger (unop x) i))
+match_Integer_unop unop id_unf [xl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  = Just (Lit (LitInteger (unop x) i))
 match_Integer_unop _ _ _ = Nothing
 
 match_Integer_binop :: (Integer -> Integer -> Integer)
                     -> IdUnfoldingFun
                     -> [Expr CoreBndr]
                     -> Maybe (Expr CoreBndr)
-match_Integer_binop binop _ [Lit (LitInteger x i), Lit (LitInteger y _)]
-    = Just (Lit (LitInteger (x `binop` y) i))
+match_Integer_binop binop id_unf [xl,yl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
+  = Just (Lit (LitInteger (x `binop` y) i))
 match_Integer_binop _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
@@ -756,18 +761,19 @@ match_Integer_divop :: (Integer -> Integer -> (Integer, Integer))
                     -> IdUnfoldingFun
                     -> [Expr CoreBndr]
                     -> Maybe (Expr CoreBndr)
-match_Integer_divop divop _ [Lit (LitInteger x i), Lit (LitInteger y _)]
- | y /= 0
-    = case x `divop` y of
-      (r, s) ->
-          case idType i of
-          FunTy _ (FunTy _ integerTy) ->
+match_Integer_divop divop id_unf [xl,yl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
+  , y /= 0
+  , (r,s) <- x `divop` y
+  = case idType i of
+      FunTy _ (FunTy _ integerTy) ->
               Just $ mkConApp (tupleCon UnboxedTuple 2)
                               [Type integerTy,
                                Type integerTy,
                                Lit (LitInteger r i),
                                Lit (LitInteger s i)]
-          _ -> panic "match_Integer_divop: mkIntegerId has the wrong type"
+      _ -> panic "match_Integer_divop: mkIntegerId has the wrong type"
 
 match_Integer_divop _ _ _ = Nothing
 
@@ -775,24 +781,30 @@ match_Integer_Int_binop :: (Integer -> Int -> Integer)
                         -> IdUnfoldingFun
                         -> [Expr CoreBndr]
                         -> Maybe (Expr CoreBndr)
-match_Integer_Int_binop binop _ [Lit (LitInteger x i), Lit (MachInt y)]
-    = Just (Lit (LitInteger (x `binop` fromIntegral y) i))
+match_Integer_Int_binop binop id_unf [xl,yl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
+  = Just (Lit (LitInteger (x `binop` fromIntegral y) i))
 match_Integer_Int_binop _ _ _ = Nothing
 
 match_Integer_binop_Bool :: (Integer -> Integer -> Bool)
                          -> IdUnfoldingFun
                          -> [Expr CoreBndr]
                          -> Maybe (Expr CoreBndr)
-match_Integer_binop_Bool binop _ [Lit (LitInteger x _), Lit (LitInteger y _)]
-    = Just (if x `binop` y then trueVal else falseVal)
+match_Integer_binop_Bool binop id_unf [xl, yl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
+  = Just (if x `binop` y then trueVal else falseVal)
 match_Integer_binop_Bool _ _ _ = Nothing
 
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering)
                              -> IdUnfoldingFun
                              -> [Expr CoreBndr]
                              -> Maybe (Expr CoreBndr)
-match_Integer_binop_Ordering binop _ [Lit (LitInteger x _), Lit (LitInteger y _)]
-    = Just $ case x `binop` y of
+match_Integer_binop_Ordering binop id_unf [xl, yl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
+  = Just $ case x `binop` y of
              LT -> ltVal
              EQ -> eqVal
              GT -> gtVal

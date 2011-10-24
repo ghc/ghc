@@ -32,7 +32,7 @@ module CoreSubst (
 
 	-- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
-        exprIsConApp_maybe
+        exprIsConApp_maybe, exprIsLiteral_maybe
     ) where
 
 #include "HsVersions.h"
@@ -40,6 +40,7 @@ module CoreSubst (
 import CoreSyn
 import CoreFVs
 import CoreUtils
+import Literal  ( Literal )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 
 import qualified Type
@@ -1263,3 +1264,18 @@ Note [DFun arity check]
 Here we check that the total number of supplied arguments (inclding 
 type args) matches what the dfun is expecting.  This may be *less*
 than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
+
+\begin{code}
+exprIsLiteral_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe Literal
+-- Same deal as exprIsConApp_maybe, but much simpler
+-- Nevertheless we do need to look through unfoldings for
+-- Integer literals, which are vigorously hoisted to top level
+-- and not subsequently inlined
+exprIsLiteral_maybe id_unf e
+  = case e of
+      Lit l     -> Just l
+      Note _ e' -> exprIsLiteral_maybe id_unf e'
+      Var v     | Just rhs <- expandUnfolding_maybe (id_unf v)
+                -> exprIsLiteral_maybe id_unf rhs
+      _         -> Nothing
+\end{code}       
