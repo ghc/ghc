@@ -119,6 +119,31 @@ calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges
 --
 -- It is OK for superclasses to be type synonyms for other classes, so look for cycles
 -- through there too.
+--
+-- Note [Superclass cycle check]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We want definitions such as:
+--
+--   class C cls a where cls a => a -> a
+--   class C D a => D a where
+--
+-- To be accepted, even though a naive acyclicity check would reject the program as having
+-- a cycle between D and its superclass.
+--
+-- The superclasses sup_C of a class C are rejected iff:
+--
+--   C \elem expand(sup_C)
+--
+-- Where expand is defined as follows:
+--
+--   expand(a ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
+--   expand(D ty1 ... tyN) = {D} \union sup_D[ty1/x1, ..., tyP/xP] \union expand(ty(P+1)) ... \union expand(tyN)
+--     where (D x1 ... xM) is a class, P = min(M,N)
+--   expand(T ty1 ... tyN) = expand(ty1) \union ... \union expand(tyN)
+--     where T is not a class
+--
+-- Furthermore, expand always looks through type synonyms.
 calcClassCycles :: Class -> [[TyCon]]
 calcClassCycles cls = nubBy eqAsCycle $ expandTheta (unitUniqSet cls) [classTyCon cls] (classSCTheta cls) []
   where
@@ -128,6 +153,7 @@ calcClassCycles cls = nubBy eqAsCycle $ expandTheta (unitUniqSet cls) [classTyCo
       where n = length xs
 
     -- No more superclasses to expand ==> no problems with cycles
+    -- See Note [Superclass cycle check]
     expandTheta :: UniqSet Class -- Path of Classes to here in set form
                 -> [TyCon]       -- Path to here
                 -> ThetaType     -- Superclass work list
