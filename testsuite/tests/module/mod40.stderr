@@ -1,5 +1,8 @@
 
 mod40.hs:3:1:
-    Cycle in class declarations (via superclasses):
-      mod40.hs:3:1-31: class C2 a => C1 a
-      mod40.hs:4:1-31: class C1 a => C2 a
+    Cycle in class declaration (via superclasses): C1 -> C2 -> C1
+    In the class declaration for `C1'
+
+mod40.hs:4:1:
+    Cycle in class declaration (via superclasses): C2 -> C1 -> C2
+    In the class declaration for `C2'
