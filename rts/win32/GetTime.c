@@ -92,6 +92,46 @@ getThreadCPUTime(void)
     return fileTimeToTicks(userTime);
 }
 
+void
+getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
+{
+    /* Windows has a bunch of time APIs but none that directly give
+       us unix epoch time, so we have to do a little dance. */
+
+    SYSTEMTIME systime;
+    FILETIME filetime;
+    ULARGE_INTEGER unixtime;
+
+    /* Windows SYSTEMTIME is a big struct with fields for
+       year, month, day, hour, minute, second, millisecond. */
+    GetSystemTime(&systime);
+    /* Windows FILETIME timestamps use an epoch-based time,
+       using a 64bit unsigned word. The time is measured in
+       units of 100 nanoseconds since an epoch of 1601. */
+    SystemTimeToFileTime(&systime, &filetime);
+
+    /* FILETIME isn't directly a 64bit word, but a struct with
+       a pair of 32bit words, so we have to convert via a
+       ULARGE_INTEGER struct which is a handy union type */
+    unixtime.LowPart  = filetime.dwLowDateTime;
+    unixtime.HighPart = filetime.dwHighDateTime;
+    
+    /* We have to do an epoch conversion, since FILETIME uses 1601
+       while we want unix epoch of 1970. In case you were wondering,
+       there were 11,644,473,600 seconds between 1601 and 1970, then
+       multiply by 10^7 for units of 100 nanoseconds. */
+    unixtime.QuadPart = unixtime.QuadPart - 116444736000000000ull;
+    
+    /* For the seconds part we use integer division by 10^7 */
+    *sec  = unixtime.QuadPart / 10000000ull;
+    
+    /* The remainder from integer division by 10^7 gives us
+       the sub-second component in units of 100 nanoseconds.
+       So for nanoseconds we just multiply by 100.
+       Note that nanoseconds always fits in a 32bit word */
+    *nsec = ((unsigned long)(unixtime.QuadPart % 10000000ull)) * 100ul;
+}
+
 nat
 getPageFaults(void)
 {

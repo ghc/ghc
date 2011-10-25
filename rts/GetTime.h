@@ -22,6 +22,11 @@ Ticks getThreadCPUTime      (void);
 Ticks getProcessElapsedTime (void);
 void  getProcessTimes       (Ticks *user, Ticks *elapsed);
 
+/* Get the current date and time.
+   Uses seconds since the Unix epoch, plus nanoseconds
+ */
+void  getUnixEpochTime      (StgWord64 *sec, StgWord32 *nsec);
+
 // Not strictly timing, but related
 nat   getPageFaults         (void);
 
