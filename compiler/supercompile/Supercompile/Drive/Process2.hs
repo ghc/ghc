@@ -61,6 +61,10 @@ import qualified Data.Traversable as Traversable
 
 data Stream a = a :< Stream a
 
+listToStream :: [a] -> Stream a
+listToStream []     = error "listToStream"
+listToStream (x:xs) = x :< listToStream xs
+
 
 data DelayStructure sh a where
     Leaf :: a -> DelayStructure () a
@@ -130,13 +134,13 @@ breadthFirst = id
 
 type ScpM = DelayM State (Deeds, FVedTerm)
 
-traceRenderScpM :: Outputable a => String -> a -> ScpM ()
-traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth
+traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
+traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
 
 runScpM :: (Applicative m, Monad m)
         => (State -> m (ScpM (Deeds, FVedTerm)))
-        -> ScpM a -> m a
-runScpM sc = runDelayM eval_strat sc
+        -> m (ScpM a) -> m a
+runScpM sc mx = mx >>= runDelayM eval_strat sc
   where
     --eval_strat = depthFirst
     eval_strat = breadthFirst
@@ -163,11 +167,16 @@ data Promise = P {
   }
 
 data MemoState = MS {
-    promises :: [Promise], -- TODO: fulfilments
+    promises :: [Promise], -- FIXME: fulfilments
     hNames   :: Stream Name
   }
 
 type MemoM = State.State MemoState
+
+runMemoM :: MemoM a -> a
+runMemoM = flip evalState $ MS { promises = [], hNames = h_names }
+  where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
+                                         [1..] (uniqsFromSupply hFunctionsUniqSupply)
 
 {-
 newtype MemoM a = MemoM { unMemoM :: MemoState -> (MemoState, a) }
@@ -223,13 +232,13 @@ memo opt state = State.state $ \ms ->
 
 type RollbackScpM = () -- Generaliser -> ScpBM (Deeds, Out FVedTerm)
 
-sc' :: History (State, RollbackScpM) -> State -> ScpM (Deeds, Out FVedTerm)
-sc' hist state = error "FIXME"
+sc' :: State -> HistoryT st ScpM (Deeds, Out FVedTerm)
+sc' state = error "FIXME"
 
-sc :: History (State, RollbackScpM) -> State -> MemoM (ScpM (Deeds, Out FVedTerm))
-sc hist = memo (sc' hist) . gc -- Garbage collection necessary because normalisation might have made some stuff dead
+sc :: State -> HistoryT st MemoM (ScpM (Deeds, Out FVedTerm))
+sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runScpM sc $ sc (mkHistory (cofmap fst wQO)) state
+supercompile unfoldings e = fVedTermToTerm $ snd $ runMemoM $ runHistoryT $ runScpM sc $ sc state
   where state = prepareTerm unfoldings e
