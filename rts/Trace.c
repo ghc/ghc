@@ -293,9 +293,9 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag)
     }
 }
 
-void traceCapsetModify_ (EventTypeNum tag,
-                         CapsetID capset,
-                         StgWord32 other)
+void traceCapsetEvent_ (EventTypeNum tag,
+                        CapsetID capset,
+                        StgWord info)
 {
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
@@ -304,18 +304,18 @@ void traceCapsetModify_ (EventTypeNum tag,
         tracePreface();
         switch (tag) {
         case EVENT_CAPSET_CREATE:   // (capset, capset_type)
-            debugBelch("created capset %lu of type %d\n", (lnat)capset, (int)other);
+            debugBelch("created capset %lu of type %d\n", (lnat)capset, (int)info);
             break;
         case EVENT_CAPSET_DELETE:   // (capset)
             debugBelch("deleted capset %lu\n", (lnat)capset);
             break;
         case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
             debugBelch("assigned cap %lu to capset %lu\n",
-                       (lnat)other, (lnat)capset);
+                       (lnat)info, (lnat)capset);
             break;
         case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
             debugBelch("removed cap %lu from capset %lu\n",
-                       (lnat)other, (lnat)capset);
+                       (lnat)info, (lnat)capset);
             break;
         }
         RELEASE_LOCK(&trace_utx);
@@ -323,25 +323,25 @@ void traceCapsetModify_ (EventTypeNum tag,
 #endif
     {
         if (eventlog_enabled) {
-            postCapsetModifyEvent(tag, capset, other);
+            postCapsetEvent(tag, capset, info);
         }
     }
 }
 
 void traceOSProcessInfo_(void) {
     if (eventlog_enabled) {
-        postCapsetModifyEvent(EVENT_OSPROCESS_PID,
-                              CAPSET_OSPROCESS_DEFAULT,
-                              getpid());
+        postCapsetEvent(EVENT_OSPROCESS_PID,
+                        CAPSET_OSPROCESS_DEFAULT,
+                        getpid());
 
 #if !defined(cygwin32_HOST_OS) && !defined (mingw32_HOST_OS)
 /* Windows has no strong concept of process heirarchy, so no getppid().
  * In any case, this trace event is mainly useful for tracing programs
  * that use 'forkProcess' which Windows doesn't support anyway.
  */
-        postCapsetModifyEvent(EVENT_OSPROCESS_PPID,
-                              CAPSET_OSPROCESS_DEFAULT,
-                              getppid());
+        postCapsetEvent(EVENT_OSPROCESS_PPID,
+                        CAPSET_OSPROCESS_DEFAULT,
+                        getppid());
 #endif
         {
             char buf[256];

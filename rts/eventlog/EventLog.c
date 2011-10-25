@@ -559,9 +559,9 @@ postSparkCountersEvent (Capability *cap,
     postWord64(eb,remaining);
 }
 
-void postCapsetModifyEvent (EventTypeNum tag,
-                            EventCapsetID capset,
-                            StgWord32 other)
+void postCapsetEvent (EventTypeNum tag,
+                      EventCapsetID capset,
+                      StgWord info)
 {
     ACQUIRE_LOCK(&eventBufMutex);
 
@@ -576,7 +576,7 @@ void postCapsetModifyEvent (EventTypeNum tag,
     switch (tag) {
     case EVENT_CAPSET_CREATE:   // (capset, capset_type)
     {
-        postCapsetType(&eventBuf, other /* capset_type */);
+        postCapsetType(&eventBuf, info /* capset_type */);
         break;
     }
 
@@ -588,17 +588,17 @@ void postCapsetModifyEvent (EventTypeNum tag,
     case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
     case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
     {
-        postCapNo(&eventBuf, other /* capno */);
+        postCapNo(&eventBuf, info /* capno */);
         break;
     }
     case EVENT_OSPROCESS_PID:   // (capset, pid)
     case EVENT_OSPROCESS_PPID:  // (capset, parent_pid)
     {
-        postWord32(&eventBuf, other);
+        postWord32(&eventBuf, info);
         break;
     }
     default:
-        barf("postCapsetModifyEvent: unknown event tag %d", tag);
+        barf("postCapsetEvent: unknown event tag %d", tag);
     }
 
     RELEASE_LOCK(&eventBufMutex);
