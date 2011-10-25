@@ -1029,6 +1029,10 @@ packageTrustOn = dopt Opt_PackageTrust
 safeLanguageOn :: DynFlags -> Bool
 safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 
+-- | Is the Safe Haskell safe inference mode active
+safeInferOn :: DynFlags -> Bool
+safeInferOn dflags = safeHaskell dflags == Sf_SafeInfered
+
 -- | Test if Safe Imports are on in some form
 safeImportsOn :: DynFlags -> Bool
 safeImportsOn dflags = safeHaskell dflags == Sf_Unsafe ||

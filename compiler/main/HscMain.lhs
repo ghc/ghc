@@ -886,6 +886,20 @@ checkSafeImports dflags hsc_env tcg_env
     = do
         imps <- mapM condense imports'
         pkgs <- mapM checkSafe imps
+
+        -- grab any safe haskell specific errors and restore old warnings
+        errs <- getWarnings
+        clearWarnings
+        logWarnings oldErrs
+
+        -- See the Note [ Safe Haskell Inference]
+        when (not $ isEmptyBag errs) (
+            -- did we fail safe inference or fail -XSafe?
+            case safeInferOn dflags of
+                True  -> setDynFlags (dflags { safeHaskell = Sf_None } )
+                False -> liftIO . throwIO . mkSrcErr $ errs
+            )
+
         when (packageTrustOn dflags) $ checkPkgTrust pkg_reqs
 
         -- add in trusted package requirements for this module
