@@ -1633,8 +1633,21 @@ fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys                = concat (map fvType tys)
 
--- Size of a type: the number of variables and constructors
+-------------------
+sizePred :: PredType -> Int
+-- Size of a predicate: the number of variables and constructors
+-- See Note [Paterson conditions on PredTypes]
+sizePred ty = go (predTypePredTree ty)
+  where
+    go (ClassPred _ tys') = sizeTypes tys'
+    go (IPPred {})        = 0
+    go (EqPred {})        = 0
+    go (TuplePred ts)     = maximum (0:map go ts)
+    go (IrredPred ty)     = sizeType ty
+
+-------------------
 sizeType :: Type -> Int
+-- Size of a type: the number of variables and constructors
 sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
 sizeType (TyVarTy _)       = 1
 sizeType (TyConApp _ tys)  = sizeTypes tys + 1
@@ -1644,42 +1657,31 @@ sizeType (ForAllTy _ ty)   = sizeType ty
 
 sizeTypes :: [Type] -> Int
 sizeTypes xs               = sum (map sizeType xs)
-
--- Size of a predicate: the number of variables and constructors
---
--- Note [Paterson conditions on PredTypes]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- We are considering whether *class* constraints terminate
--- (see Note [Paterson conditions]). Precisely, the Paterson conditions
--- would have us check that "the constraint has fewer constructors and variables
--- (taken together and counting repetitions) than the head.".
---
--- However, we can be a bit more refined by looking at which kind of constraint
--- this actually is. There are two main tricks:
---
---  1. It seems like it should be OK not to count the tuple type constructor
---     for a PredType like (Show a, Eq a) :: Constraint, since we don't
---     count the "implicit" tuple in the ThetaType itself.
---
---     In fact, the Paterson test just checks *each component* of the top level
---     ThetaType against the size bound, one at a time. By analogy, it should be
---     OK to return the size of the *largest* tuple component as the size of the
---     whole tuple.
---
---  2. Once we get into an implicit parameter or equality we
---     can't get back to a class constraint, so it's safe
---     to say "size 0".  See Trac #4200.
---
--- NB: we don't want to detect PredTypes in sizeType (and then call 
--- sizePred on them), or we might get an infinite loop if that PredType
--- is irreducible. See Trac #5581.
-sizePred :: PredType -> Int
-sizePred ty = go (predTypePredTree ty)
-  where
-    go (ClassPred _ tys') = sizeTypes tys'
-    go (IPPred {})        = 0
-    go (EqPred {})        = 0
-    go (TuplePred ts)     = maximum (0:map go ts)
-    go (IrredPred ty)     = sizeType ty
 \end{code}
+
+Note [Paterson conditions on PredTypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are considering whether *class* constraints terminate
+(see Note [Paterson conditions]). Precisely, the Paterson conditions
+would have us check that "the constraint has fewer constructors and variables
+(taken together and counting repetitions) than the head.".
+
+However, we can be a bit more refined by looking at which kind of constraint
+this actually is. There are two main tricks:
+
+ 1. It seems like it should be OK not to count the tuple type constructor
+    for a PredType like (Show a, Eq a) :: Constraint, since we don't
+    count the "implicit" tuple in the ThetaType itself.
+
+    In fact, the Paterson test just checks *each component* of the top level
+    ThetaType against the size bound, one at a time. By analogy, it should be
+    OK to return the size of the *largest* tuple component as the size of the
+    whole tuple.
+
+ 2. Once we get into an implicit parameter or equality we
+    can't get back to a class constraint, so it's safe
+    to say "size 0".  See Trac #4200.
+
+NB: we don't want to detect PredTypes in sizeType (and then call 
+sizePred on them), or we might get an infinite loop if that PredType
+is irreducible. See Trac #5581.
