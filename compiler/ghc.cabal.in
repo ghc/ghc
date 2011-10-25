@@ -56,6 +56,7 @@ Library
                    containers >= 0.1 && < 0.6,
                    array      >= 0.1 && < 0.5,
                    filepath   >= 1   && < 1.4,
+                   xhtml,
                    Cabal,
                    hpc
 
@@ -452,6 +453,8 @@ Library
         Supercompile.Core.Tag
         Supercompile.Drive.Match
         Supercompile.Drive.Process
+        Supercompile.Drive.Process1
+        Supercompile.Drive.Process2
         Supercompile.Drive.Split
         Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate

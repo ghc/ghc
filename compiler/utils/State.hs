@@ -32,6 +32,9 @@ put s' = State $ \_ -> (# (), s' #)
 modify :: (s -> s) -> State s ()
 modify f = State $ \s -> (# (), f s #)
 
+state :: (s -> (a, s)) -> State s a
+state f = State $ \s -> case f s of (x, s') -> (# x, s' #)
+
 
 evalState :: State s a -> s -> a
 evalState s i = case runState' s i of
