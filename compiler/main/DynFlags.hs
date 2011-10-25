@@ -39,9 +39,9 @@ module DynFlags (
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
-        safeImportsOn, safeLanguageOn,
-        safeDirectImpsReq, safeImplicitImpsReq,
+        safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
         packageTrustOn,
+        safeDirectImpsReq, safeImplicitImpsReq,
 
         -- ** System tool settings and locations
         Settings(..),
@@ -1025,6 +1025,10 @@ dynFlagDependencies = pluginModNames
 packageTrustOn :: DynFlags -> Bool
 packageTrustOn = dopt Opt_PackageTrust
 
+-- | Is Safe Haskell on in some way (including inference mode)
+safeHaskellOn :: DynFlags -> Bool
+safeHaskellOn dflags = safeHaskell dflags /= Sf_None
+
 -- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool
 safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
@@ -1032,6 +1036,12 @@ safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 -- | Is the Safe Haskell safe inference mode active
 safeInferOn :: DynFlags -> Bool
 safeInferOn dflags = safeHaskell dflags == Sf_SafeInfered
+
+-- | Turn off Safe Haskell inference mode (set module to unsafe)
+setSafeInferOff :: DynFlags -> DynFlags
+setSafeInferOff dflags
+  | safeHaskell dflags == Sf_SafeInfered = dflags { safeHaskell = Sf_None }
+  | otherwise                            = dflags
 
 -- | Test if Safe Imports are on in some form
 safeImportsOn :: DynFlags -> Bool
@@ -1050,33 +1060,24 @@ setSafeHaskell s = updM f
 -- | Are all direct imports required to be safe for this Safe Haskell mode?
 -- Direct imports are when the code explicitly imports a module
 safeDirectImpsReq :: DynFlags -> Bool
-safeDirectImpsReq = safeLanguageOn
+safeDirectImpsReq d = safeLanguageOn d || safeInferOn d
 
 -- | Are all implicit imports required to be safe for this Safe Haskell mode?
 -- Implicit imports are things in the prelude. e.g System.IO when print is used.
 safeImplicitImpsReq :: DynFlags -> Bool
-safeImplicitImpsReq = safeLanguageOn
+safeImplicitImpsReq d = safeLanguageOn d || safeInferOn d
 
 -- | Combine two Safe Haskell modes correctly. Used for dealing with multiple flags.
 -- This makes Safe Haskell very much a monoid but for now I prefer this as I don't
 -- want to export this functionality from the module but do want to export the
 -- type constructors.
 combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
-combineSafeFlags a b =
-    case (a,b) of
-        (Sf_None, sf) -> return sf
-        (sf, Sf_None) -> return sf
-
-        (Sf_SafeInfered, sf) -> return sf
-        (sf, Sf_SafeInfered) -> return sf
-
-        (a,b) | a == b -> return a
-              | otherwise -> err
-
-    where err = do
-              let s = "Incompatible Safe Haskell flags! (" ++ showPpr a ++ ", " ++ showPpr b ++ ")"
-              addErr s
-              return $ panic s -- Just for saftey instead of returning say, a
+combineSafeFlags a b | a `elem` [Sf_None, Sf_SafeInfered] = return b
+                     | b `elem` [Sf_None, Sf_SafeInfered] = return a
+                     | a == b                             = return a
+                     | otherwise = addErr errm >> return (panic errm)
+    where errm = "Incompatible Safe Haskell flags! ("
+                    ++ showPpr a ++ ", " ++ showPpr b ++ ")"
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -1279,20 +1280,40 @@ parseDynamicFlags dflags0 args cmdline = do
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
   -- check for disabled flags in safe haskell
-  let (dflags2, sh_warns) = if (safeLanguageOn dflags1)
-                                then shFlagsDisallowed dflags1
-                                else (dflags1, [])
-
+  let (dflags2, sh_warns) = safeFlagCheck dflags1
+  
   return (dflags2, leftover, sh_warns ++ warns)
 
--- | Extensions that can't be enabled at all when compiling in Safe mode
--- checkSafeHaskellFlags :: MonadIO m => DynFlags -> m ()
-shFlagsDisallowed :: DynFlags -> (DynFlags, [Located String])
-shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
+-- | Check (and potentially disable) any extensions that aren't allowed
+-- in safe mode.
+safeFlagCheck :: DynFlags -> (DynFlags, [Located String])
+safeFlagCheck dflags | not (safeLanguageOn dflags || safeInferOn dflags)
+                     = (dflags, [])
+safeFlagCheck dflags =
+    case safeLanguageOn dflags of
+        True -> (dflags', warns)
+
+        False | null warns && safeInfOk
+              -> (dflags', [])
+
+              | otherwise
+              -> (dflags' { safeHaskell = Sf_None }, [])
+                -- Have we infered Unsafe?
+                -- See Note [HscMain . Safe Haskell Inference]
     where
+        -- TODO: Can we do better than this for inference?
+        safeInfOk = not $ xopt Opt_OverlappingInstances dflags
+
+        (dflags', warns) = foldl check_method (dflags, []) bad_flags
+
         check_method (df, warns) (str,loc,test,fix)
-            | test df   = (fix df, warns ++ safeFailure loc str)
+            | test df   = (apFix fix df, warns ++ safeFailure loc str)
             | otherwise = (df, warns)
+
+        apFix f = if safeInferOn dflags then id else f
+
+        safeFailure loc str = [L loc $ "Warning: " ++ str ++ " is not allowed in"
+                                      ++ " Safe Haskell; ignoring " ++ str]
 
         bad_flags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc dflags,
                          xopt Opt_GeneralizedNewtypeDeriving,
@@ -1300,9 +1321,6 @@ shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
                      ("-XTemplateHaskell", thOnLoc dflags,
                          xopt Opt_TemplateHaskell,
                          flip xopt_unset Opt_TemplateHaskell)]
-
-        safeFailure loc str = [L loc $ "Warning: " ++ str ++ " is not allowed in"
-                                      ++ " Safe Haskell; ignoring " ++ str]
 
 
 {- **********************************************************************
@@ -1835,7 +1853,7 @@ languageFlags = [
 -- features can be used.
 safeHaskellFlags :: [FlagSpec SafeHaskellMode]
 safeHaskellFlags = [mkF Sf_Unsafe, mkF Sf_Trustworthy, mkF Sf_Safe]
-    where mkF  flag = (showPpr flag, flag, nop)
+    where mkF flag = (showPpr flag, flag, nop)
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]
