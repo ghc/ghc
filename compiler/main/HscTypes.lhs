@@ -4,6 +4,7 @@
 \section[HscTypes]{Types for the per-module compiler}
 
 \begin{code}
+
 -- | Types for the per-module compiler
 module HscTypes ( 
         -- * compilation state
@@ -35,7 +36,6 @@ module HscTypes (
         lookupIfaceByModule, emptyModIface,
         
         PackageInstEnv, PackageRuleBase,
-
 
         -- * Annotations
         prepareAnnotations,
@@ -1560,6 +1560,7 @@ noDependencies = Deps [] [] [] []
 
 -- | Records modules that we depend on by making a direct import from
 data Usage
+  -- | Module from another package
   = UsagePackageModule {
         usg_mod      :: Module,
            -- ^ External package module depended on
@@ -1567,7 +1568,8 @@ data Usage
             -- ^ Cached module fingerprint
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
-    }                                           -- ^ Module from another package
+    }
+  -- | Module from the current package
   | UsageHomeModule {
         usg_mod_name :: ModuleName,
             -- ^ Name of the module
@@ -1582,7 +1584,7 @@ data Usage
             -- if we depend on the export list
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
-    }                                           -- ^ Module from the current package
+    }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
         --      i.e. we imported the module directly, whether or not we
@@ -1771,14 +1773,14 @@ ms_imps ms = ms_textual_imps ms ++ map mk_additional_import (dynFlagDependencies
     -- import that did not occur in the program text, such as those induced by the use of
     -- plugins (the -plgFoo flag)
     mk_additional_import mod_nm = noLoc $ ImportDecl {
-      ideclName = noLoc mod_nm,
-      ideclPkgQual = Nothing,
-      ideclSource = False,
-      ideclImplicit = True,     -- Maybe implicit because not "in the program text"
+      ideclName      = noLoc mod_nm,
+      ideclPkgQual   = Nothing,
+      ideclSource    = False,
+      ideclImplicit  = True,	-- Maybe implicit because not "in the program text"
       ideclQualified = False,
-      ideclAs = Nothing,
-      ideclHiding = Nothing,
-      ideclSafe = False
+      ideclAs        = Nothing,
+      ideclHiding    = Nothing,
+      ideclSafe      = False
     }
 
 -- The ModLocation contains both the original source filename and the
