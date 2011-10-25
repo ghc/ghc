@@ -1438,7 +1438,8 @@ tcRnType hsc_env ictxt normalise rdr_type
     failIfErrsM ;
 
 	-- Now kind-check the type
-    ty <- tcHsSigType GenSigCtxt rn_type ;
+	-- It can have any rank or kind
+    ty <- tcHsSigType GhciCtxt rn_type ;
 
     ty' <- if normalise 
            then do { fam_envs <- tcGetFamInstEnvs 

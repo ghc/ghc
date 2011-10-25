@@ -835,6 +835,7 @@ checkValidType ctxt ty = do
 		 ForSigCtxt _	-> gen_rank 1
 		 SpecInstCtxt   -> gen_rank 1
                  ThBrackCtxt    -> gen_rank 1
+		 GhciCtxt       -> ArbitraryRank
                  GenSigCtxt     -> panic "checkValidType"
                                      -- Can't happen; GenSigCtxt not used for *user* sigs
 
@@ -842,18 +843,22 @@ checkValidType ctxt ty = do
 
 	kind_ok = case ctxt of
 			TySynCtxt _  -> True -- Any kind will do
-			ThBrackCtxt  -> True -- Any kind will do
+			ThBrackCtxt  -> True -- ditto
+                        GhciCtxt     -> True -- ditto
 			ResSigCtxt   -> isSubOpenTypeKind actual_kind
 			ExprSigCtxt  -> isSubOpenTypeKind actual_kind
 			GenPatCtxt   -> isLiftedTypeKind actual_kind
 			ForSigCtxt _ -> isLiftedTypeKind actual_kind
 			_            -> isSubArgTypeKind actual_kind
 	
-	ubx_tup = case ctxt of
-	              TySynCtxt _ | unboxed -> UT_Ok
-	              ExprSigCtxt | unboxed -> UT_Ok
-	              ThBrackCtxt | unboxed -> UT_Ok
-	              _                     -> UT_NotOk
+	ubx_tup 
+         | not unboxed = UT_NotOk
+         | otherwise   = case ctxt of
+	              	   TySynCtxt _ -> UT_Ok
+	              	   ExprSigCtxt -> UT_Ok
+	              	   ThBrackCtxt -> UT_Ok
+		      	   GhciCtxt    -> UT_Ok
+	              	   _           -> UT_NotOk
 
 	-- Check the internal validity of the type itself
     check_type rank ubx_tup ty

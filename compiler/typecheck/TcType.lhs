@@ -351,10 +351,10 @@ data UserTypeCtxt
   | DefaultDeclCtxt	-- Types in a default declaration
   | SpecInstCtxt	-- SPECIALISE instance pragma
   | ThBrackCtxt		-- Template Haskell type brackets [t| ... |]
-
   | GenSigCtxt          -- Higher-rank or impredicative situations
                         -- e.g. (f e) where f has a higher-rank type
                         -- We might want to elaborate this
+  | GhciCtxt            -- GHCi command :kind <type>
 
 -- Notes re TySynCtxt
 -- We allow type synonyms that aren't types; e.g.  type List = []
@@ -410,20 +410,21 @@ pprTcTyVarDetails (MetaTv TcsTv _) = ptext (sLit "tcs")
 pprTcTyVarDetails (MetaTv SigTv _) = ptext (sLit "sig")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
-pprUserTypeCtxt (InfSigCtxt n)   = ptext (sLit "the inferred type for") <+> quotes (ppr n)
-pprUserTypeCtxt (FunSigCtxt n)   = ptext (sLit "the type signature for") <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt      = ptext (sLit "an expression type signature")
-pprUserTypeCtxt (ConArgCtxt c)   = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)    = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
-pprUserTypeCtxt GenPatCtxt       = ptext (sLit "the type pattern of a generic definition")
-pprUserTypeCtxt ThBrackCtxt      = ptext (sLit "a Template Haskell quotation [t|...|]")
-pprUserTypeCtxt LamPatSigCtxt    = ptext (sLit "a pattern type signature")
-pprUserTypeCtxt BindPatSigCtxt   = ptext (sLit "a pattern type signature")
-pprUserTypeCtxt ResSigCtxt       = ptext (sLit "a result type signature")
-pprUserTypeCtxt (ForSigCtxt n)   = ptext (sLit "the foreign declaration for") <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt  = ptext (sLit "a type in a `default' declaration")
-pprUserTypeCtxt SpecInstCtxt     = ptext (sLit "a SPECIALISE instance pragma")
-pprUserTypeCtxt GenSigCtxt       = ptext (sLit "a type expected by the context")
+pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
+pprUserTypeCtxt (FunSigCtxt n)    = ptext (sLit "the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
+pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
+pprUserTypeCtxt GenPatCtxt        = ptext (sLit "the type pattern of a generic definition")
+pprUserTypeCtxt ThBrackCtxt       = ptext (sLit "a Template Haskell quotation [t|...|]")
+pprUserTypeCtxt LamPatSigCtxt     = ptext (sLit "a pattern type signature")
+pprUserTypeCtxt BindPatSigCtxt    = ptext (sLit "a pattern type signature")
+pprUserTypeCtxt ResSigCtxt        = ptext (sLit "a result type signature")
+pprUserTypeCtxt (ForSigCtxt n)    = ptext (sLit "the foreign declaration for") <+> quotes (ppr n)
+pprUserTypeCtxt DefaultDeclCtxt   = ptext (sLit "a type in a `default' declaration")
+pprUserTypeCtxt SpecInstCtxt      = ptext (sLit "a SPECIALISE instance pragma")
+pprUserTypeCtxt GenSigCtxt        = ptext (sLit "a type expected by the context")
+pprUserTypeCtxt GhciCtxt          = ptext (sLit "a type in a GHCi command")
 \end{code}
 
 
