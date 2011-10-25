@@ -62,7 +62,7 @@ test('allowinterrupt001', normal, compile_and_run, [''])
 # try hard to provoke the error by running the test 100 times
 test('5558',
      [ only_ways(['threaded2']),
-       cmd_wrapper(lambda c: 'for i in `seq 1 100`; do ' + c + '; done') ],
+       cmd_wrapper(lambda c: 'for i in `seq 1 100`; do ' + c + ' || break; done') ],
      compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
