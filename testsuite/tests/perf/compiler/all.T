@@ -79,9 +79,9 @@ test('T3294',
 test('T4801',
      [ # expect_broken(5224),
        # temporarily unbroken (#5227)
-      # expected value: 11 (x86/OSX):
       if_wordsize(32,
-          compiler_stats_num_field('peak_megabytes_allocated', 30, 40)),
+      #                                expected value x86/OSX: 27
+          compiler_stats_num_field('peak_megabytes_allocated', 25, 29)),
       # expected value: 48-49 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 47, 50)),
@@ -100,10 +100,10 @@ test('T4801',
       if_platform('x86_64-apple-darwin',
           compiler_stats_num_field('bytes allocated', 490000000,
                                                       530000000)),
-      # expected value: 14181360 (x86/Linux)
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 10000000,
-                                                     14000000)),
+      #                    expected value: x86/OS X:  9651948
+          compiler_stats_num_field('max_bytes_used',  9000000,
+                                                     10000000)),
       # expected value: 18188272 (amd64/Linux)
       #                 10290952 (windows)
       if_wordsize(64,
