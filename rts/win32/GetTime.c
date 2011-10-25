@@ -27,26 +27,6 @@ fileTimeToTicks(FILETIME ft)
     return t;
 }    
 
-static int is_win9x = -1;
-
-static INLINE_ME rtsBool
-isWin9x(void)
-{
-    if (is_win9x < 0) {
-	/* figure out whether we're on a Win9x box or not. */
-	OSVERSIONINFO oi;
-	BOOL b;
-	
-	/* Need to init the size field first.*/
-	oi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	b = GetVersionEx(&oi);
-      
-	is_win9x = ( (b && (oi.dwPlatformId & VER_PLATFORM_WIN32_WINDOWS)) ? 1 : 0);
-    }
-    return is_win9x;
-}
-
-
 void
 getProcessTimes(Ticks *user, Ticks *elapsed)
 {
@@ -58,8 +38,6 @@ Ticks
 getProcessCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
-
-    if (isWin9x()) return getProcessElapsedTime();
 
     if (!GetProcessTimes(GetCurrentProcess(), &creationTime,
 			 &exitTime, &kernelTime, &userTime)) {
@@ -105,8 +83,6 @@ Ticks
 getThreadCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
-
-    if (isWin9x()) return getProcessCPUTime();
 
     if (!GetThreadTimes(GetCurrentThread(), &creationTime,
 			&exitTime, &kernelTime, &userTime)) {
