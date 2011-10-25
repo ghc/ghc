@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 

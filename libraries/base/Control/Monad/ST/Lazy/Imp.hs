@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples, Rank2Types #-}
 {-# OPTIONS_HADDOCK hide #-}
 

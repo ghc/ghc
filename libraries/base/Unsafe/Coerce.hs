@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
 
 -----------------------------------------------------------------------------

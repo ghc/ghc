@@ -62,6 +62,7 @@ GHC.Float       Classes: Floating, RealFloat
 Other Prelude modules are much easier with fewer complex dependencies.
 
 \begin{code}
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , BangPatterns

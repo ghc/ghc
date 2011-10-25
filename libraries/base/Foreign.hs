@@ -1,5 +1,7 @@
 #if sh_SAFE_DEFAULT
 {-# LANGUAGE Trustworthy #-}
+#else
+{-# LANGUAGE Unsafe #-}
 #endif
 {-# LANGUAGE NoImplicitPrelude #-}
 

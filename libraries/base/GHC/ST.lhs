@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, Rank2Types #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------

@@ -1,6 +1,8 @@
-{-# LANGUAGE SafeImports, CPP, NoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
 #if sh_SAFE_DEFAULT
 {-# LANGUAGE Trustworthy #-}
+#else
+{-# LANGUAGE Unsafe #-}
 #endif
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -28,7 +30,7 @@ module Foreign.ForeignPtr (
 #endif
     ) where
 
-import safe Foreign.ForeignPtr.Safe
+import Foreign.ForeignPtr.Safe
 
 #if !sh_SAFE_DEFAULT
 import Foreign.Ptr ( Ptr )

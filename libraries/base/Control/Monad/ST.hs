@@ -1,6 +1,8 @@
-{-# LANGUAGE CPP, SafeImports #-}
+{-# LANGUAGE CPP #-}
 #if sh_SAFE_DEFAULT
 {-# LANGUAGE Safe #-}
+#else
+{-# LANGUAGE Unsafe #-}
 #endif
 
 -----------------------------------------------------------------------------
@@ -29,7 +31,7 @@ module Control.Monad.ST (
 #endif
     ) where
 
-import safe Control.Monad.ST.Safe
+import Control.Monad.ST.Safe
 
 #if !sh_SAFE_DEFAULT
 import qualified Control.Monad.ST.Unsafe as U

@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Data.Typeable (Typeable, mkTyConApp, cast) where

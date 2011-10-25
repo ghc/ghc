@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, ForeignFunctionInterface,
              DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}

@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module GHC.Fingerprint (
         fingerprintString,

@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 #if sh_SAFE_DEFAULT
 {-# LANGUAGE Safe #-}
+#else
+{-# LANGUAGE Unsafe #-}
 #endif
 -----------------------------------------------------------------------------
 -- |

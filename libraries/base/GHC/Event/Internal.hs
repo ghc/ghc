@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE ExistentialQuantification, NoImplicitPrelude #-}
 
 module GHC.Event.Internal

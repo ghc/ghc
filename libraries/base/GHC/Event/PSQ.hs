@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
 
 -- Copyright (c) 2008, Ralf Hinze
