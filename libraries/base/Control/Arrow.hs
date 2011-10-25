@@ -274,6 +274,9 @@ class Arrow a => ArrowLoop a where
 instance ArrowLoop (->) where
     loop f b = let (c,d) = f (b,d) in c
 
+-- | Beware that for many monads (those for which the '>>=' operation
+-- is strict) this instance will /not/ satisfy the right-tightening law
+-- required by the 'ArrowLoop' class.
 instance MonadFix m => ArrowLoop (Kleisli m) where
     loop (Kleisli f) = Kleisli (liftM fst . mfix . f')
       where f' x y = f (x, snd y)
