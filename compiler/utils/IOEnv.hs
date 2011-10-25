@@ -3,6 +3,10 @@
 --
 -- The IO Monad with an environment
 --
+-- The environment is passed around as a Reader monad but
+-- as its in the IO monad, mutable references can be used
+-- for updating state.
+--
 {-# LANGUAGE UndecidableInstances #-}
 
 module IOEnv (
