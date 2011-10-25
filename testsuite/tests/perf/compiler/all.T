@@ -85,9 +85,9 @@ test('T4801',
       # expected value: 48-49 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 47, 50)),
-      # expected value: 64 (amd64/OS X):
+      # expected value: 58 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
-          compiler_stats_num_field('peak_megabytes_allocated', 62, 66)),
+          compiler_stats_num_field('peak_megabytes_allocated', 56, 60)),
       # expected value: 228286660 (x86/OS X)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 200000000,
@@ -109,10 +109,10 @@ test('T4801',
       if_wordsize(64,
           compiler_stats_num_field('max_bytes_used', 15000000,
                                                      20000000)),
-      # expected value: 23097936 (amd64/OS X):
+      # expected value: 20486256 (amd64/OS X):
       if_platform('x86_64-apple-darwin',
-          compiler_stats_num_field('max_bytes_used', 21000000,
-                                                     25000000)),
+          compiler_stats_num_field('max_bytes_used', 20000000,
+                                                     23000000)),
        only_ways(['normal'])
       ],
      compile,
