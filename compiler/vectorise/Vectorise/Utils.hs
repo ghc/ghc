@@ -72,44 +72,44 @@ isAnnTypeArg _              = False
 -- |An empty array of the given type.
 --
 emptyPD :: Type -> VM CoreExpr
-emptyPD = paMethod emptyPDVar "emptyPD"
+emptyPD = paMethod emptyPDVar emptyPD_PrimVar
 
 -- |Produce an array containing copies of a given element.
 --
-replicatePD :: CoreExpr -- ^ Number of copies in the resulting array.
-            -> CoreExpr -- ^ Value to replicate.
+replicatePD :: CoreExpr     -- ^ Number of copies in the resulting array.
+            -> CoreExpr     -- ^ Value to replicate.
             -> VM CoreExpr
 replicatePD len x 
   = liftM (`mkApps` [len,x])
-        $ paMethod replicatePDVar "replicatePD" (exprType x)
+        $ paMethod replicatePDVar replicatePD_PrimVar (exprType x)
 
--- | Select some elements from an array that correspond to a particular tag value
----  and pack them into a new array.
---   eg  packByTagPD Int# [:23, 42, 95, 50, 27, 49:]  3 [:1, 2, 1, 2, 3, 2:] 2 
---          ==> [:42, 50, 49:]
+-- |Select some elements from an array that correspond to a particular tag value and pack them into a new
+-- array.
 --
-packByTagPD :: Type   -- ^ Element type.
-            -> CoreExpr -- ^ Source array.
-            -> CoreExpr -- ^ Length of resulting array.
-            -> CoreExpr -- ^ Tag values of elements in source array.
-            -> CoreExpr -- ^ The tag value for the elements to select.
+-- > packByTagPD Int# [:23, 42, 95, 50, 27, 49:]  3 [:1, 2, 1, 2, 3, 2:] 2 
+-- >   ==> [:42, 50, 49:]
+--
+packByTagPD :: Type       -- ^ Element type.
+            -> CoreExpr   -- ^ Source array.
+            -> CoreExpr   -- ^ Length of resulting array.
+            -> CoreExpr   -- ^ Tag values of elements in source array.
+            -> CoreExpr   -- ^ The tag value for the elements to select.
             -> VM CoreExpr
 packByTagPD ty xs len tags t
   = liftM (`mkApps` [xs, len, tags, t])
-          (paMethod packByTagPDVar "packByTagPD" ty)
+          (paMethod packByTagPDVar packByTagPD_PrimVar ty)
 
--- | Combine some arrays based on a selector.
---     The selector says which source array to choose for each element of the
---     resulting array.
+-- |Combine some arrays based on a selector.  The selector says which source array to choose for each
+-- element of the resulting array.
 --
-combinePD :: Type   -- ^ Element type
-          -> CoreExpr -- ^ Length of resulting array
-          -> CoreExpr -- ^ Selector.
-          -> [CoreExpr] -- ^ Arrays to combine.
+combinePD :: Type         -- ^ Element type
+          -> CoreExpr     -- ^ Length of resulting array
+          -> CoreExpr     -- ^ Selector.
+          -> [CoreExpr]   -- ^ Arrays to combine.
           -> VM CoreExpr
 combinePD ty len sel xs
   = liftM (`mkApps` (len : sel : xs))
-          (paMethod (combinePDVar n) ("combine" ++ show n ++ "PD") ty)
+          (paMethod (combinePDVar n) (combinePD_PrimVar n) ty)
   where
     n = length xs
 
