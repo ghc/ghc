@@ -37,6 +37,7 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
                   CapsetTypeOsProcess = CAPSET_TYPE_OSPROCESS,
                   CapsetTypeClockdomain = CAPSET_TYPE_CLOCKDOMAIN };
 #define CAPSET_OSPROCESS_DEFAULT 0
+#define CAPSET_CLOCKDOMAIN_DEFAULT 1
 
 // -----------------------------------------------------------------------------
 // Message classes
@@ -199,6 +200,8 @@ void traceCapsetEvent_ (EventTypeNum tag,
                         CapsetID capset,
                         StgWord info);
 
+void traceWallClockTime_(void);
+
 void traceOSProcessInfo_ (void);
 
 void traceSparkCounters_ (Capability *cap,
@@ -219,6 +222,7 @@ void traceSparkCounters_ (Capability *cap,
 #define traceThreadStatus(class, tso) /* nothing */
 INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #define traceCapsetEvent_(tag, capset, info) /* nothing */
+#define traceWallClockTime_() /* nothing */
 #define traceOSProcessInfo_() /* nothing */
 #define traceSparkCounters_(cap, counters, remaining) /* nothing */
 
@@ -490,6 +494,12 @@ INLINE_HEADER void traceCapsetRemoveCap(CapsetID capset STG_UNUSED,
 {
     traceCapsetEvent_(EVENT_CAPSET_REMOVE_CAP, capset, capno);
     dtraceCapsetRemoveCap(capset, capno);
+}
+
+INLINE_HEADER void traceWallClockTime(void)
+{
+    traceWallClockTime_();
+    /* Note: no DTrace equivalent because it is available to DTrace directly */
 }
 
 INLINE_HEADER void traceOSProcessInfo(void)

@@ -69,6 +69,8 @@ void postCapsetVecEvent (EventTypeNum tag,
                          int argc,
                          char *msg[]);
 
+void postWallClockTime (EventCapsetID capset);
+
 /* 
  * Post a `par` spark event
  */

@@ -328,6 +328,12 @@ void traceCapsetEvent_ (EventTypeNum tag,
     }
 }
 
+void traceWallClockTime_(void) {
+    if (eventlog_enabled) {
+        postWallClockTime(CAPSET_CLOCKDOMAIN_DEFAULT);
+    }
+}
+
 void traceOSProcessInfo_(void) {
     if (eventlog_enabled) {
         postCapsetEvent(EVENT_OSPROCESS_PID,

@@ -83,6 +83,7 @@ char *EventDesc[] = {
   [EVENT_PROGRAM_ENV]         = "Program environment variables",
   [EVENT_OSPROCESS_PID]       = "Process ID",
   [EVENT_OSPROCESS_PPID]      = "Parent process ID",
+  [EVENT_WALL_CLOCK_TIME]     = "Wall clock time",
   [EVENT_SPARK_COUNTERS]      = "Spark counters",
   [EVENT_SPARK_CREATE]        = "Spark create",
   [EVENT_SPARK_DUD]           = "Spark dud",
@@ -297,6 +298,11 @@ initEventLogging(void)
         case EVENT_OSPROCESS_PPID:
             eventTypes[t].size =
                 sizeof(EventCapsetID) + sizeof(StgWord32);
+            break;
+
+        case EVENT_WALL_CLOCK_TIME: // (capset, unix_epoch_seconds, nanoseconds)
+            eventTypes[t].size =
+                sizeof(EventCapsetID) + sizeof(StgWord64) + sizeof(StgWord32);
             break;
 
         case EVENT_SPARK_STEAL:     // (cap, victim_cap)
@@ -664,6 +670,52 @@ void postCapsetVecEvent (EventTypeNum tag,
         // again, 1 + to account for \0
         postBuf(&eventBuf, (StgWord8*) argv[i], 1 + strlen(argv[i]));
     }
+
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postWallClockTime (EventCapsetID capset)
+{
+    StgWord64 ts;
+    StgWord64 sec;
+    StgWord32 nsec;
+
+    ACQUIRE_LOCK(&eventBufMutex);
+    
+    /* The EVENT_WALL_CLOCK_TIME event is intended to allow programs
+       reading the eventlog to match up the event timestamps with wall
+       clock time. The normal event timestamps measure time since the
+       start of the program. To align eventlogs from concurrent
+       processes we need to be able to match up the timestamps. One way
+       to do this is if we know how the timestamps and wall clock time
+       match up (and of course if both processes have sufficiently
+       synchronised clocks).
+
+       So we want to make sure that the timestamp that we generate for
+       this event matches up very closely with the wall clock time.
+       Unfortunately we currently have to use two different APIs to get
+       the elapsed time vs the wall clock time. So to minimise the
+       difference we just call them very close together.
+     */
+    
+    getUnixEpochTime(&sec, &nsec);  /* Get the wall clock time */
+    ts = time_ns();                 /* Get the eventlog timestamp */
+
+    if (!hasRoomForEvent(&eventBuf, EVENT_WALL_CLOCK_TIME)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(&eventBuf);
+    }
+
+    /* Normally we'd call postEventHeader(), but that generates its own
+       timestamp, so we go one level lower so we can write out the
+       timestamp we already generated above. */
+    postEventTypeNum(&eventBuf, EVENT_WALL_CLOCK_TIME);
+    postWord64(&eventBuf, ts);
+    
+    /* EVENT_WALL_CLOCK_TIME (capset, unix_epoch_seconds, nanoseconds) */
+    postCapsetID(&eventBuf, capset);
+    postWord64(&eventBuf, sec);
+    postWord32(&eventBuf, nsec);
 
     RELEASE_LOCK(&eventBufMutex);
 }
