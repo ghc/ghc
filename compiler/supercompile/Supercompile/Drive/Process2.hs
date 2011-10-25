@@ -146,19 +146,19 @@ runScpM sc mx = mx >>= runDelayM eval_strat sc
     eval_strat = breadthFirst
 
 
-newtype HistoryT m a = HT { unHT :: History (State, RollbackScpM) -> m a }
+{--}
+type HistoryM = (->) (History (State, RollbackScpM))
 
-instance Functor m => Functor (HistoryT m) where
-    fmap f mx = HT $ \hist -> fmap f (unHT mx hist)
+runHistoryM :: HistoryM a -> a
+runHistoryM = flip ($) (mkHistory (cofmap fst wQO))
+{--}
 
-instance Applicative m => Applicative (HistoryT m) where
-    pure x = HT $ \_ -> pure x
-    mf <*> mx = HT $ \hist -> unHT mf hist <*> unHT mx hist
+{-
+type HistoryM = State.State (History (State, RollbackScpM))
 
-instance Monad m => Monad (HistoryT m) where
-    return x = HT $ \_ -> return x
-    mx >>= fxmy = HT $ \hist -> unHT mx hist >>= \x -> unHT (fxmy x) hist
-
+runHistoryM :: HistoryM a -> a
+runHistoryM = flip State.evalState (mkHistory (cofmap fst wQO))
+-}
 
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
@@ -171,31 +171,24 @@ data MemoState = MS {
     hNames   :: Stream Name
   }
 
-type MemoM = State.State MemoState
+newtype MemoT m a = MT { unMT :: MemoState -> m (a, MemoState) }
 
-runMemoM :: MemoM a -> a
-runMemoM = flip evalState $ MS { promises = [], hNames = h_names }
-  where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
-                                         [1..] (uniqsFromSupply hFunctionsUniqSupply)
+instance Functor m => Functor (MemoT m) where
+    fmap f mx = MT $ \s -> fmap (first f) (unMT mx s)
 
-{-
-newtype MemoM a = MemoM { unMemoM :: MemoState -> (MemoState, a) }
-
-instance Functor MemoM where
-    fmap = liftM
-
-instance Applicative MemoM where
+instance (Functor m, Monad m) => Applicative (MemoT m) where
     pure = return
     (<*>) = ap
 
-instance Monad MemoM where
-    return x = MemoM $ \s -> (s, x)
-    MemoM xf >>= fxmy = MemoM $ \s -> case xf s of (s', x) -> unMemoM (fxmy x) s'
+instance Monad m => Monad (MemoT m) where
+    return x = MT $ \s -> return (x, s)
+    mx >>= fxmy = MT $ \s -> unMT mx s >>= \(x, s) -> unMT (fxmy x) s
 
-modify :: (MemoState -> (MemoState, a))
-       -> MemoM a
-modify = MemoM
--}
+runMemoT :: Functor m => MemoT m a -> m a
+runMemoT mx = fmap fst $ unMT mx MS { promises = [], hNames = h_names }
+  where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
+                                         [1..] (uniqsFromSupply hFunctionsUniqSupply)
+
 
 promise :: State -> MemoState -> (Promise, MemoState)
 promise state ms = (p, ms)
@@ -212,33 +205,34 @@ promise state ms = (p, ms)
             hNames   = h_names'
           }
 
-memo :: (State -> ScpM (Deeds, Out FVedTerm))
-     -> State -> MemoM (ScpM (Deeds, Out FVedTerm))
-memo opt state = State.state $ \ms ->
+memo :: (State -> HistoryM (ScpM (Deeds, Out FVedTerm)))
+     -> State -> MemoT HistoryM (ScpM (Deeds, Out FVedTerm))
+memo opt state = MT $ \ms ->
      -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
     case [ (p, (releaseStateDeed state, var (fun p) `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
          | p <- promises ms
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                           match (meaning p) state]
-         ] of (p, res):_ -> (do { traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state), res)
-                                ; pure res }, ms)
-              _          -> (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
-                                ; res <- opt state
-                                ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
-                                ; pure res }, ms')
+         ] of (p, res):_ -> pure $ (do { traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state), res)
+                                       ; pure res }, ms)
+              _          -> opt state >>= \mres -> return
+                                   (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
+                                       ; res <- mres
+                                       ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
+                                       ; pure res }, ms')
                 where (p, ms') = promise state ms
 
 
 type RollbackScpM = () -- Generaliser -> ScpBM (Deeds, Out FVedTerm)
 
-sc' :: State -> HistoryT st ScpM (Deeds, Out FVedTerm)
+sc' :: State -> HistoryM (ScpM (Deeds, Out FVedTerm))
 sc' state = error "FIXME"
 
-sc :: State -> HistoryT st MemoM (ScpM (Deeds, Out FVedTerm))
+sc :: State -> MemoT HistoryM (ScpM (Deeds, Out FVedTerm))
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ snd $ runMemoM $ runHistoryT $ runScpM sc $ sc state
+supercompile unfoldings e = fVedTermToTerm $ snd $ runHistoryM $ runMemoT $ runScpM sc $ sc state
   where state = prepareTerm unfoldings e
