@@ -89,7 +89,9 @@ Ticks stat_getElapsedTime(void)
 double
 mut_user_time_until( Ticks t )
 {
-    return TICK_TO_DBL(t - GC_tot_cpu - PROF_VAL(RP_tot_time));
+    return TICK_TO_DBL(t - GC_tot_cpu);
+    // heapCensus() time is included in GC_tot_cpu, so we don't need
+    // to subtract it here.
 }
 
 double
@@ -108,13 +110,13 @@ mut_user_time( void )
 double
 mut_user_time_during_RP( void )
 {
-  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time);
+    return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time);
 }
 
 double
 mut_user_time_during_heap_census( void )
 {
-  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time);
+    return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time);
 }
 #endif /* PROFILING */
 
@@ -559,6 +561,12 @@ stat_exit(int alloc)
             gc_cpu     += GC_coll_cpu[i];
             gc_elapsed += GC_coll_elapsed[i];
         }
+
+        // heapCensus() is called by the GC, so RP and HC time are
+        // included in the GC stats.  We therefore subtract them to
+        // obtain the actual GC cpu time.  XXX: we aren't doing this
+        // for elapsed time.
+        gc_cpu -= 0 + PROF_VAL(RP_tot_time + HC_tot_time);
 
         init_cpu     = get_init_cpu();
         init_elapsed = get_init_elapsed();
