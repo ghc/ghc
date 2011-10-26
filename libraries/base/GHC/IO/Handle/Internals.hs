@@ -912,3 +912,4 @@ decodeByteBuf h_@Handle__{..} cbuf = do
 
   writeIORef haByteBuffer bbuf2
   return cbuf'
+

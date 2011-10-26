@@ -16,6 +16,7 @@
 -- The IORef type
 --
 -----------------------------------------------------------------------------
+
 module GHC.IORef (
         IORef(..),
         newIORef, readIORef, writeIORef, atomicModifyIORef

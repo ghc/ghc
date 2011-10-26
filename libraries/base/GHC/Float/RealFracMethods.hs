@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples, ForeignFunctionInterface,
     NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Float.RealFracMethods
@@ -340,3 +341,4 @@ foreign import ccall unsafe "rintDouble"
 
 foreign import ccall unsafe "rintFloat"
     c_rintFloat :: Float -> Float
+

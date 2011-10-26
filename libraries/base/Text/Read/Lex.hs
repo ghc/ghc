@@ -451,3 +451,4 @@ readOctP, readDecP, readHexP :: (Eq a, Num a) => ReadP a
 readOctP = readIntP' 8
 readDecP = readIntP' 10
 readHexP = readIntP' 16
+

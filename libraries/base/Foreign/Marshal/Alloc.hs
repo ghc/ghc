@@ -245,3 +245,4 @@ foreign import ccall unsafe "stdlib.h free"    _free    :: Ptr a -> IO ()
 -- used as a finalizer (cf 'Foreign.ForeignPtr.ForeignPtr') for storage
 -- allocated with 'malloc', 'mallocBytes', 'realloc' or 'reallocBytes'.
 foreign import ccall unsafe "stdlib.h &free" finalizerFree :: FinalizerPtr a
+

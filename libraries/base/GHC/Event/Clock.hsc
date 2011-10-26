@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface #-}
 
 module GHC.Event.Clock (getCurrentTime) where
@@ -47,3 +47,4 @@ instance Storable CTimeval where
 
 foreign import ccall unsafe "sys/time.h gettimeofday" gettimeofday
     :: Ptr CTimeval -> Ptr () -> IO CInt
+

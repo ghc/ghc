@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, CPP, ForeignFunctionInterface, NoImplicitPrelude #-}
 
 module GHC.Event.Array
@@ -312,3 +312,4 @@ foreign import ccall unsafe "string.h memcpy"
 
 foreign import ccall unsafe "string.h memmove"
     memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
+

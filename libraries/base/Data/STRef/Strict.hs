@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.STRef.Strict
@@ -18,3 +19,4 @@ module Data.STRef.Strict (
   ) where
 
 import Data.STRef
+

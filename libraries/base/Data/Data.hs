@@ -23,7 +23,6 @@
 -- For more information, please visit the new
 -- SYB wiki: <http://www.cs.uu.nl/wiki/bin/view/GenericProgramming/SYB>.
 --
---
 -----------------------------------------------------------------------------
 
 module Data.Data (

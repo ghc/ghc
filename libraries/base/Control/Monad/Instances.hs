@@ -2,6 +2,7 @@
 {-# OPTIONS_NHC98 --prelude #-}
 -- This module deliberately declares orphan instances:
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Instances
@@ -37,3 +38,4 @@ instance Monad (Either e) where
         return = Right
         Left  l >>= _ = Left l
         Right r >>= k = k r
+

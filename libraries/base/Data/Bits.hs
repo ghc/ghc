@@ -380,5 +380,4 @@ own to enable constant folding; for example 'shift':
            10000000 -> ww_sOb
          }
 -} 
-     
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Function
@@ -10,6 +11,8 @@
 -- Portability :  portable
 --
 -- Simple combinators working solely on and with functions.
+--
+-----------------------------------------------------------------------------
 
 module Data.Function
   ( -- * "Prelude" re-exports
@@ -82,3 +85,4 @@ fix f = let x = f x in x
 
 on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 (.*.) `on` f = \x y -> f x .*. f y
+

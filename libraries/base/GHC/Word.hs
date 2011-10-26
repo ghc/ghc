@@ -838,3 +838,4 @@ instance Ix Word64 where
 
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
+

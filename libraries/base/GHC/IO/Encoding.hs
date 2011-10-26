@@ -200,3 +200,4 @@ latin1_encode input output = fmap (\(_why,input',output') -> (input',output')) $
 latin1_decode :: Buffer Word8 -> CharBuffer -> IO (Buffer Word8, CharBuffer)
 latin1_decode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_decode input output
 --latin1_decode = unsafePerformIO $ do mkTextDecoder Iconv.latin1 >>= return.encode
+

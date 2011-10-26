@@ -475,3 +475,4 @@ catchIOError = New.catch
 catch :: IO a -> (IOError -> IO a) -> IO a
 catch = New.catch
 #endif /* !__HUGS__ */
+

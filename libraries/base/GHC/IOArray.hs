@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IOArray

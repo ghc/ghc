@@ -7,6 +7,7 @@
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO
@@ -471,3 +472,4 @@ a `finally` sequel =
 --
 evaluate :: a -> IO a
 evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
+

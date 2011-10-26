@@ -2,6 +2,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, BangPatterns, MagicHash #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Enum

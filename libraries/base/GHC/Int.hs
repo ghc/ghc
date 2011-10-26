@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash,
              StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Int

@@ -578,3 +578,4 @@ foreign import ccall unsafe "__hscore_bufsiz"   dEFAULT_BUFFER_SIZE :: Int
 foreign import ccall unsafe "__hscore_seek_cur" sEEK_CUR :: CInt
 foreign import ccall unsafe "__hscore_seek_set" sEEK_SET :: CInt
 foreign import ccall unsafe "__hscore_seek_end" sEEK_END :: CInt
+

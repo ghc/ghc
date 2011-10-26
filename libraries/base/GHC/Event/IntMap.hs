@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, MagicHash, NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -39,6 +39,7 @@
 -- This means that the operation can become linear in the number of
 -- elements with a maximum of /W/ -- the number of bits in an 'Int'
 -- (32 or 64).
+--
 -----------------------------------------------------------------------------
 
 module GHC.Event.IntMap
@@ -374,3 +375,4 @@ highestBitMask x0
         x4 -> case (x4 .|. shiftRL x4 16) of
          x5 -> case (x5 .|. shiftRL x5 32) of   -- for 64 bit platforms
           x6 -> (x6 `xor` (shiftRL x6 1))
+

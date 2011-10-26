@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , ForeignFunctionInterface
            , GeneralizedNewtypeDeriving

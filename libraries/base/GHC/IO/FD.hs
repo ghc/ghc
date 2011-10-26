@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , BangPatterns
@@ -664,3 +664,4 @@ foreign import ccall unsafe "lockFile"
 foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
 #endif
+

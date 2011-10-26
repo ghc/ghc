@@ -22,3 +22,4 @@ module Data.Eq (
 #if __GLASGOW_HASKELL__
 import GHC.Base
 #endif
+

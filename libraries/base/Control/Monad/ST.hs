@@ -1,9 +1,4 @@
-{-# LANGUAGE CPP #-}
-#if sh_SAFE_DEFAULT
-{-# LANGUAGE Safe #-}
-#else
 {-# LANGUAGE Unsafe #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,18 +17,22 @@
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST (
-          module Control.Monad.ST.Safe
-#if !sh_SAFE_DEFAULT
+        -- * The 'ST' Monad
+        ST,             -- abstract, instance of Functor, Monad, Typeable.
+        runST,          -- :: (forall s. ST s a) -> a
+        fixST,          -- :: (a -> ST s a) -> ST s a
+
+        -- * Converting 'ST' to 'IO'
+        RealWorld,              -- abstract
+        stToIO,                 -- :: ST RealWorld a -> IO a
+
         -- * Unsafe Functions
-        , unsafeInterleaveST
-        , unsafeIOToST
-        , unsafeSTToIO
-#endif
+        unsafeInterleaveST,
+        unsafeIOToST,
+        unsafeSTToIO
     ) where
 
 import Control.Monad.ST.Safe
-
-#if !sh_SAFE_DEFAULT
 import qualified Control.Monad.ST.Unsafe as U
 
 {-# DEPRECATED unsafeInterleaveST, unsafeIOToST, unsafeSTToIO
@@ -51,5 +50,4 @@ unsafeIOToST = U.unsafeIOToST
 {-# INLINE unsafeSTToIO #-}
 unsafeSTToIO :: ST s a -> IO a
 unsafeSTToIO = U.unsafeSTToIO
-#endif
 

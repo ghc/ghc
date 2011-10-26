@@ -277,3 +277,4 @@ advancePtr  = doAdvance undefined
   where
     doAdvance             :: Storable a' => a' -> Ptr a' -> Int -> Ptr a'
     doAdvance dummy ptr i  = ptr `plusPtr` (i * sizeOf dummy)
+

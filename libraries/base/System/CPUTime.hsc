@@ -185,3 +185,4 @@ clockTicks =
 foreign import ccall unsafe sysconf :: CInt -> IO CLong
 #endif
 #endif /* __GLASGOW_HASKELL__ */
+

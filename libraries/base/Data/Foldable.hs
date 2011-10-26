@@ -18,6 +18,8 @@
 -- functor.  To avoid ambiguity, either import those modules hiding
 -- these names or qualify uses of these function names with an alias
 -- for this module.
+--
+-----------------------------------------------------------------------------
 
 module Data.Foldable (
     -- * Folds
@@ -320,3 +322,4 @@ notElem x = not . elem x
 -- 'Nothing' if there is no such element.
 find :: Foldable t => (a -> Bool) -> t a -> Maybe a
 find p = listToMaybe . concatMap (\ x -> if p x then [x] else [])
+

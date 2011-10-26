@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , ForeignFunctionInterface
            , GeneralizedNewtypeDeriving
@@ -299,3 +299,4 @@ foreign import ccall safe "kevent"
 #endif
 
 #endif /* defined(HAVE_KQUEUE) */
+

@@ -27,3 +27,4 @@ import GHC.Base
 -- NB: This definition *must* be kept in sync with `TysWiredIn.parrTyCon'!
 --
 data [::] e = PArr !Int (Array# e)
+

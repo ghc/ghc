@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Zip
@@ -51,3 +52,4 @@ instance MonadZip [] where
     mzip     = zip
     mzipWith = zipWith
     munzip   = unzip
+

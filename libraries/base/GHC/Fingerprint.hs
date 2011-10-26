@@ -1,9 +1,10 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude
            , BangPatterns
            , ForeignFunctionInterface
            , EmptyDataDecls
   #-}
+
 -- ----------------------------------------------------------------------------
 -- 
 --  (c) The University of Glasgow 2006
@@ -74,3 +75,4 @@ foreign import ccall unsafe "MD5Update"
    c_MD5Update :: Ptr MD5Context -> Ptr Word8 -> CInt -> IO ()
 foreign import ccall unsafe "MD5Final"
    c_MD5Final  :: Ptr Word8 -> Ptr MD5Context -> IO ()
+

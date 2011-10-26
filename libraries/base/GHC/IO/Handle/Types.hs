@@ -428,3 +428,4 @@ instance Show Handle where
 
 showHandle :: FilePath -> String -> String
 showHandle file = showString "{handle: " . showString file . showString "}"
+

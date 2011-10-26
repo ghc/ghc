@@ -71,3 +71,4 @@ Like 'trace', but uses 'show' on the argument to convert it to a 'String'.
 -}
 traceShow :: (Show a) => a -> b -> b
 traceShow = trace . show
+

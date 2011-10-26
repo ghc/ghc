@@ -541,3 +541,4 @@ castCharToCWchar :: Char -> CWchar
 castCharToCWchar ch = fromIntegral (ord ch)
 
 #endif /* !mingw32_HOST_OS */
+

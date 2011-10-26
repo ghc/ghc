@@ -178,3 +178,4 @@ moveBytes dest src size  = do _ <- memmove dest src (fromIntegral size)
 --
 foreign import ccall unsafe "string.h" memcpy  :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
 foreign import ccall unsafe "string.h" memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
+

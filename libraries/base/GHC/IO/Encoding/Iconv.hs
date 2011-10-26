@@ -190,3 +190,4 @@ iconvRecode iconv_t
               throwErrno "iconvRecoder"
 
 #endif /* !mingw32_HOST_OS */
+

@@ -1,6 +1,5 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
-
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE ForeignFunctionInterface #-}
 #endif
@@ -37,3 +36,4 @@ foreign import ccall {-safe-} "performMajorGC" performGC :: IO ()
 #ifdef __NHC__
 import NHC.IOExtras (performGC)
 #endif
+

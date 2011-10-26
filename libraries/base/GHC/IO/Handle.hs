@@ -741,3 +741,4 @@ showHandle' filepath is_duplex h =
       where
        def :: Int 
        def = bufSize buf
+

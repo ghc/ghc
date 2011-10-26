@@ -1,5 +1,6 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+
 module Data.Typeable.Internal (
     Typeable(typeOf),
     TypeRep,

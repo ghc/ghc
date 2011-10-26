@@ -284,3 +284,4 @@ pokeFingerprint p0 (Fingerprint high low) = do
       pokeW64 (castPtr p0) 8 high
       pokeW64 (castPtr p0 `plusPtr` 8) 8 low
 #endif
+

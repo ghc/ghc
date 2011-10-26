@@ -336,3 +336,4 @@ divvy str =
     (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
     (name,_:value) -> (name,value)
 #endif  /* __GLASGOW_HASKELL__ */
+

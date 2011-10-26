@@ -255,3 +255,4 @@ tryFillBufferAndCall encoder null_terminate from0 to_p to_sz_bytes act = do
               InputUnderflow  -> recover encoder from' to' >>= go (iteration + 1) -- These conditions are equally bad
               InvalidSequence -> recover encoder from' to' >>= go (iteration + 1) -- since the input was truncated/invalid
               OutputUnderflow -> return Nothing -- Oops, out of buffer during decoding: ask the caller for more
+

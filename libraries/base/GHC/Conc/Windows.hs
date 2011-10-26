@@ -1,4 +1,4 @@
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, ForeignFunctionInterface,
              DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
@@ -324,3 +324,4 @@ foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
 
 foreign import stdcall "WaitForSingleObject"
    c_WaitForSingleObject :: HANDLE -> DWORD -> IO DWORD
+

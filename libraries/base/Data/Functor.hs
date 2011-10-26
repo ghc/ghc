@@ -33,3 +33,4 @@ infixl 4 <$>
 -- | An infix synonym for 'fmap'.
 (<$>) :: Functor f => (a -> b) -> f a -> f b
 (<$>) = fmap
+

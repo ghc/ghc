@@ -209,3 +209,4 @@ isSeparator c = case generalCategory c of
 toTitle :: Char -> Char
 toTitle = toUpper
 #endif
+

@@ -124,3 +124,4 @@ instance Eq (StableName a) where
 
 #include "Typeable.h"
 INSTANCE_TYPEABLE1(StableName,stableNameTc,"StableName")
+

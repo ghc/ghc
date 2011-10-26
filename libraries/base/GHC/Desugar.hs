@@ -41,3 +41,4 @@ data AnnotationWrapper = forall a. (Data a) => AnnotationWrapper a
 
 toAnnotationWrapper :: (Data a) => a -> AnnotationWrapper
 toAnnotationWrapper what = AnnotationWrapper what
+

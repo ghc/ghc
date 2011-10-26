@@ -331,3 +331,4 @@ INSTANCE_BITS(CIntMax)
 INSTANCE_BITS(CUIntMax)
 
 #endif
+

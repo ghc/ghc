@@ -16,7 +16,6 @@
 --
 -----------------------------------------------------------------------------
 
-
 module GHC.IOBase {-# DEPRECATED "use GHC.IO instead" #-} (
     IO(..), unIO, failIO, liftIO, bindIO, thenIO, returnIO,
     unsafePerformIO, unsafeInterleaveIO,
@@ -91,3 +90,4 @@ instance Show BlockedIndefinitely where
 
 blockedIndefinitely :: SomeException -- for the RTS
 blockedIndefinitely = toException BlockedIndefinitely
+

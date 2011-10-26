@@ -1,9 +1,3 @@
-{-# LANGUAGE CPP #-}
-#if sh_SAFE_DEFAULT
-{-# LANGUAGE Safe #-}
-#else
-{-# LANGUAGE Unsafe #-}
-#endif
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.ST.Strict
@@ -22,9 +16,5 @@ module Control.Monad.ST.Strict (
         module Control.Monad.ST
   ) where
 
-#if sh_SAFE_DEFAULT
-import safe Control.Monad.ST
-#else
 import Control.Monad.ST
-#endif
 

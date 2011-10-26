@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, DeriveDataTypeable, MagicHash #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Exception
@@ -339,3 +340,4 @@ untangle coded message
           _         -> (loc, "")
         }
     not_bar c = c /= '|'
+

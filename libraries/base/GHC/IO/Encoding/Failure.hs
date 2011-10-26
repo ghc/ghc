@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, PatternGuards #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Encoding.Failure
@@ -212,3 +213,4 @@ ioe_encodingError :: IO a
 ioe_encodingError = ioException
     (IOError Nothing InvalidArgument "recoverEncode"
         "invalid character" Nothing Nothing)
+

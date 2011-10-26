@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Handle
@@ -15,7 +16,6 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-
 module GHC.Handle {-# DEPRECATED "use GHC.IO.Handle instead" #-} (
   withHandle, withHandle', withHandle_,
   wantWritableHandle, wantReadableHandle, wantSeekableHandle,

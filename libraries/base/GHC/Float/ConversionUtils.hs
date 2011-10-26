@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -O2 #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Float.ConversionUtils
@@ -95,3 +96,4 @@ zeroCountArr =
                                 (# _, ba #) -> ba
     in case mkArr realWorld# of
         b -> BA b
+

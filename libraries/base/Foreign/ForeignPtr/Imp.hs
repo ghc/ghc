@@ -179,3 +179,4 @@ mallocForeignPtrArray  = doMalloc undefined
 -- the block of memory was allocated by 'Foreign.Marshal.Alloc.malloc'.
 mallocForeignPtrArray0      :: Storable a => Int -> IO (ForeignPtr a)
 mallocForeignPtrArray0 size  = mallocForeignPtrArray (size + 1)
+

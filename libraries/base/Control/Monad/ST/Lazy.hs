@@ -1,9 +1,4 @@
-{-# LANGUAGE CPP #-}
-#if sh_SAFE_DEFAULT
-{-# LANGUAGE Safe #-}
-#else
 {-# LANGUAGE Unsafe #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,16 +17,24 @@
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST.Lazy (
-          module Control.Monad.ST.Lazy.Safe
-#if !sh_SAFE_DEFAULT
+        -- * The 'ST' monad
+        ST,
+        runST,
+        fixST,
+
+        -- * Converting between strict and lazy 'ST'
+        strictToLazyST, lazyToStrictST,
+
+        -- * Converting 'ST' To 'IO'
+        RealWorld,
+        stToIO,
+
         -- * Unsafe Functions
-        , unsafeInterleaveST
-        , unsafeIOToST
-#endif
+        unsafeInterleaveST,
+        unsafeIOToST
     ) where
 
 import Control.Monad.ST.Lazy.Safe
-#if !sh_SAFE_DEFAULT
 import qualified Control.Monad.ST.Lazy.Unsafe as U
 
 {-# DEPRECATED unsafeInterleaveST, unsafeIOToST
@@ -45,5 +48,4 @@ unsafeInterleaveST = U.unsafeInterleaveST
 {-# INLINE unsafeIOToST #-}
 unsafeIOToST :: IO a -> ST s a
 unsafeIOToST = U.unsafeIOToST
-#endif
 

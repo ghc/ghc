@@ -1010,3 +1010,4 @@ illegalBufferSize handle fn sz =
                             InvalidArgument  fn
                             ("illegal buffer size " ++ showsPrec 9 sz [])
                             Nothing Nothing)
+

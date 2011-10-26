@@ -131,3 +131,4 @@ data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains in
                                       -- to output at least one encoded ASCII character, but the input contains
                                       -- an invalid or unrepresentable sequence
                     deriving (Eq, Show)
+

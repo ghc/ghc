@@ -209,3 +209,4 @@ pooledNewArray0 pool marker vals = do
    ptr <- pooledMallocArray0 pool (length vals)
    pokeArray0 marker ptr vals
    return ptr
+

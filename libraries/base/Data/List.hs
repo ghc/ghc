@@ -1105,3 +1105,4 @@ errorEmptyList fun =
   error ("Prelude." ++ fun ++ ": empty list")
 
 #endif /* !__GLASGOW_HASKELL__ */
+
