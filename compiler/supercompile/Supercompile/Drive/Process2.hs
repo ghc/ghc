@@ -145,31 +145,36 @@ breadthFirst :: DelayM m r -> DelayM m r
 breadthFirst = id
 
 
-type ScpM = DelayM (MemoT HistoryM)
+type ScpM = DelayM (MemoT HistoryThreadM)
 
 traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
 traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
 
-runScpM :: MemoT HistoryM (ScpM a) -> MemoT HistoryM a
+runScpM :: MemoT HistoryThreadM (ScpM a) -> MemoT HistoryThreadM a
 runScpM mx = mx >>= runDelayM eval_strat
   where
     --eval_strat = depthFirst
     eval_strat = breadthFirst
 
 
-{--}
-type HistoryM = (->) (History (State, RollbackScpM))
+type ProcessHistory = History (State, RollbackScpM)
 
-runHistoryM :: HistoryM a -> a
-runHistoryM = flip ($) (mkHistory (cofmap fst wQO))
-{--}
+pROCESS_HISTORY :: ProcessHistory
+pROCESS_HISTORY = mkHistory (cofmap fst wQO)
 
-{-
-type HistoryM = State.State (History (State, RollbackScpM))
+type HistoryEnvM = (->) ProcessHistory
 
-runHistoryM :: HistoryM a -> a
-runHistoryM = flip State.evalState (mkHistory (cofmap fst wQO))
--}
+runHistoryEnvM :: HistoryEnvM a -> a
+runHistoryEnvM = flip ($) pROCESS_HISTORY
+
+type HistoryThreadM = State.State ProcessHistory
+
+withHistory :: (ProcessHistory -> (ProcessHistory, a)) -> HistoryThreadM a
+withHistory f = State.state (swap . f)
+  where swap = uncurry (flip (,))
+
+runHistoryThreadM :: HistoryThreadM a -> a
+runHistoryThreadM = flip State.evalState pROCESS_HISTORY
 
 
 newtype StateT s m a = ST { unST :: s -> m (a, s) }
@@ -288,15 +293,15 @@ memo opt state = ST $ \ms ->
 
 type RollbackScpM = () -- Generaliser -> ScpBM (Deeds, Out FVedTerm)
 
-sc' :: State -> HistoryM (FulfilmentT ScpM (Deeds, Out FVedTerm))
-sc' state = \hist -> case terminate hist (state, ()) of
-                       Continue hist'             -> split (snd $ reduce state) (delayStateT . sc) -- FIXME: use hist'
-                       Stop (shallower_state, ()) -> maybe (split state) id (generalise (mK_GENERALISER shallower_state state) state) (delayStateT . sc)
+sc' :: State -> HistoryThreadM (FulfilmentT ScpM (Deeds, Out FVedTerm))
+sc' state = withHistory $ \hist -> case terminate hist (state, ()) of
+              Continue hist'             -> (hist', split (snd $ reduce state) (delayStateT . sc))
+              Stop (shallower_state, ()) -> (hist,  maybe (split state) id (generalise (mK_GENERALISER shallower_state state) state) (delayStateT . sc))
 
-sc :: State -> MemoT HistoryM (FulfilmentT ScpM (Deeds, Out FVedTerm))
+sc :: State -> MemoT HistoryThreadM (FulfilmentT ScpM (Deeds, Out FVedTerm))
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runHistoryM $ runMemoT $ runScpM $ liftM (runFulfilmentT . fmap snd) $ sc state
+supercompile unfoldings e = fVedTermToTerm $ runHistoryThreadM $ runMemoT $ runScpM $ liftM (runFulfilmentT . fmap snd) $ sc state
   where state = prepareTerm unfoldings e
