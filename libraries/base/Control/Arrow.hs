@@ -6,17 +6,16 @@
 -- License     :  BSD-style (see the LICENSE file in the distribution)
 --
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  experimental
+-- Stability   :  provisional
 -- Portability :  portable
 --
 -- Basic arrow definitions, based on
---      /Generalising Monads to Arrows/, by John Hughes,
---      /Science of Computer Programming/ 37, pp67-111, May 2000.
+--  * /Generalising Monads to Arrows/, by John Hughes,
+--    /Science of Computer Programming/ 37, pp67-111, May 2000.
 -- plus a couple of definitions ('returnA' and 'loop') from
---      /A New Notation for Arrows/, by Ross Paterson, in /ICFP 2001/,
---      Firenze, Italy, pp229-240.
--- See these papers for the equations these combinators are expected to
--- satisfy.  These papers and more information on arrows can be found at
+--  * /A New Notation for Arrows/, by Ross Paterson, in /ICFP 2001/,
+--    Firenze, Italy, pp229-240.
+-- These papers and more information on arrows can be found at
 -- <http://www.haskell.org/arrows/>.
 
 module Control.Arrow (
@@ -54,10 +53,28 @@ infixr 1 ^<<, <<^
 
 -- | The basic arrow class.
 --
---   Minimal complete definition: 'arr' and 'first'.
+-- Minimal complete definition: 'arr' and 'first', satisfying the laws
 --
---   The other combinators have sensible default definitions,
---   which may be overridden for efficiency.
+--  * @'arr' id = 'id'@
+--
+--  * @'arr' (f >>> g) = 'arr' f >>> 'arr' g@
+--
+--  * @'first' ('arr' f) = 'arr' ('first' f)@
+--
+--  * @'first' (f >>> g) = 'first' f >>> 'first' g@
+--
+--  * @'first' f >>> 'arr' 'fst' = 'arr' 'fst' >>> f@
+--
+--  * @'first' f >>> 'arr' ('id' *** g) = 'arr' ('id' *** g) >>> 'first' f@
+--
+--  * @'first' ('first' f) >>> 'arr' 'assoc' = 'arr' 'assoc' >>> 'first' f@
+--
+-- where
+--
+-- > assoc ((a,b),c) = (a,(b,c))
+--
+-- The other combinators have sensible default definitions,
+-- which may be overridden for efficiency.
 
 class Category a => Arrow a where
 
@@ -122,7 +139,6 @@ instance Arrow (->) where
     (***) f g ~(x,y) = (f x, g y)
 
 -- | Kleisli arrows of a monad.
-
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
 
 instance Monad m => Category (Kleisli m) where
@@ -135,7 +151,6 @@ instance Monad m => Arrow (Kleisli m) where
     second (Kleisli f) = Kleisli (\ ~(d,b) -> f b >>= \c -> return (d,c))
 
 -- | The identity arrow, which plays the role of 'return' in arrow notation.
-
 returnA :: Arrow a => a b b
 returnA = arr id
 
@@ -161,16 +176,36 @@ class Arrow a => ArrowZero a where
 instance MonadPlus m => ArrowZero (Kleisli m) where
     zeroArrow = Kleisli (\_ -> mzero)
 
+-- | A monoid on arrows.
 class ArrowZero a => ArrowPlus a where
+    -- | An associative operation with identity 'zeroArrow'.
     (<+>) :: a b c -> a b c -> a b c
 
 instance MonadPlus m => ArrowPlus (Kleisli m) where
     Kleisli f <+> Kleisli g = Kleisli (\x -> f x `mplus` g x)
 
 -- | Choice, for arrows that support it.  This class underlies the
---   @if@ and @case@ constructs in arrow notation.
---   Any instance must define 'left'.  The other combinators have sensible
---   default definitions, which may be overridden for efficiency.
+-- @if@ and @case@ constructs in arrow notation.
+-- Minimal complete definition: 'left', satisfying the laws
+--
+--  * @'left' ('arr' f) = 'arr' ('left' f)@
+--
+--  * @'left' (f >>> g) = 'left' f >>> 'left' g@
+--
+--  * @'left' f >>> 'arr' 'Left' = 'arr' 'Left' >>> f@
+--
+--  * @'left' f >>> 'arr' ('id' +++ g) = 'arr' ('id' +++ g) >>> 'left' f@
+--
+--  * @'left' ('left' f) >>> 'arr' 'assocsum' = 'arr' 'assocsum' >>> 'left' f@
+--
+-- where
+--
+-- > assocsum (Left (Left x)) = Left x
+-- > assocsum (Left (Right y)) = Right (Left y)
+-- > assocsum (Right z) = Right (Right z)
+--
+-- The other combinators have sensible default definitions, which may
+-- be overridden for efficiency.
 
 class Arrow a => ArrowChoice a where
 
@@ -237,6 +272,15 @@ instance Monad m => ArrowChoice (Kleisli m) where
     Kleisli f ||| Kleisli g = Kleisli (either f g)
 
 -- | Some arrows allow application of arrow inputs to other inputs.
+-- Instances should satisfy the following laws:
+--
+--  * @'first' ('arr' (\\x -> 'arr' (\\y -> (x,y)))) >>> 'app' = 'id'@
+--
+--  * @'first' ('arr' (g >>>)) >>> 'app' = 'second' g >>> 'app'@
+--
+--  * @'first' ('arr' (>>> h)) >>> 'app' = 'app' >>> h@
+--
+-- Such arrows are equivalent to monads (see 'ArrowMonad').
 
 class Arrow a => ArrowApply a where
     app :: a (a b c, b) c
@@ -264,10 +308,34 @@ leftApp :: ArrowApply a => a b c -> a (Either b d) (Either c d)
 leftApp f = arr ((\b -> (arr (\() -> b) >>> f >>> arr Left, ())) |||
              (\d -> (arr (\() -> d) >>> arr Right, ()))) >>> app
 
--- | The 'loop' operator expresses computations in which an output value is
---   fed back as input, even though the computation occurs only once.
---   It underlies the @rec@ value recursion construct in arrow notation.
-
+-- | The 'loop' operator expresses computations in which an output value
+-- is fed back as input, although the computation occurs only once.
+-- It underlies the @rec@ value recursion construct in arrow notation.
+-- 'loop' should satisfy the following laws:
+--
+-- [/extension/]
+--      @'loop' ('arr' f) = 'arr' (\\ b -> 'fst' ('fix' (\\ (c,d) -> f (b,d))))@
+--
+-- [/left tightening/]
+--      @'loop' ('first' h >>> f) = h >>> 'loop' f@
+--
+-- [/right tightening/]
+--      @'loop' (f >>> 'first' h) = 'loop' f >>> h@
+--
+-- [/sliding/]
+--      @'loop' (f >>> 'arr' ('id' *** k)) = 'loop' ('arr' ('id' *** k) >>> f)@
+--
+-- [/vanishing/]
+--      @'loop' ('loop' f) = 'loop' ('arr' unassoc >>> f >>> 'arr' assoc)@
+--
+-- [/superposing/]
+--      @'second' ('loop' f) = 'loop' ('arr' assoc >>> 'second' f >>> 'arr' unassoc)@
+--
+-- where
+--
+-- > assoc ((a,b),c) = (a,(b,c))
+-- > unassoc (a,(b,c)) = ((a,b),c)
+--
 class Arrow a => ArrowLoop a where
     loop :: a (b,d) (c,d) -> a b c
 
