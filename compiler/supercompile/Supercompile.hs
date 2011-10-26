@@ -9,7 +9,7 @@ import Supercompile.Utilities
 import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S
 import qualified Supercompile.Evaluator.Syntax as S
-import qualified Supercompile.Drive.Process1 as S
+import qualified Supercompile.Drive.Process1 as S ()
 import qualified Supercompile.Drive.Process2 as S
 
 import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
@@ -330,7 +330,9 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
     bv_uniques = uniqsFromSupply anfUniqSupply'
 
 supercompile :: CoreExpr -> IO CoreExpr
-supercompile e = liftM (termToCoreExpr . snd) (S.supercompile (M.fromList unfs) e')
+supercompile e = -- liftM (termToCoreExpr . snd) $
+                 return $ termToCoreExpr $
+                 S.supercompile (M.fromList unfs) e'
   where unfs = termUnfoldings e'
         e' = runParseM (coreExprToTerm e)
 
