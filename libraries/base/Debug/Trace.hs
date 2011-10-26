@@ -11,17 +11,23 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- The 'trace' function.
+-- Functions for tracing and monitoring execution.
+--
+-- These can be useful for investigating bugs or performance problems.
+-- They should /not/ be used in production code.
 --
 -----------------------------------------------------------------------------
 
 module Debug.Trace (
         -- * Tracing
-        putTraceMsg,      -- :: String -> IO ()
+        -- $tracing
         trace,            -- :: String -> a -> a
         traceShow,
+        traceIO,          -- :: String -> IO ()
+        putTraceMsg,
 
         -- * Eventlog tracing
+        -- $eventlog_tracing
         traceEvent,
         traceEventIO,
   ) where
@@ -36,12 +42,22 @@ import qualified GHC.Exts as GHC
 import System.IO (hPutStrLn,stderr)
 #endif
 
--- | 'putTraceMsg' function outputs the trace message from IO monad.
--- Usually the output stream is 'System.IO.stderr' but if the function is called
--- from Windows GUI application then the output will be directed to the Windows
--- debug console.
-putTraceMsg :: String -> IO ()
-putTraceMsg msg = do
+-- $tracing
+--
+-- The 'trace', 'traceShow' and 'traceIO' functions print messages to an output
+-- stream. They are intended for \"prinf debugging\", that is: tracing the flow
+-- of execution and printing interesting values.
+
+-- The usual output stream is 'System.IO.stderr'. For Windows GUI applications
+-- (that have no stderr) the output is directed to the Windows debug console.
+-- Some implementations of these functions may decorate the string that\'s
+-- output to indicate that you\'re tracing.
+
+-- | The 'traceIO' function outputs the trace message from the IO monad.
+-- This sequences the output with respect to other IO actions.
+--
+traceIO :: String -> IO ()
+traceIO msg = do
 #ifndef __GLASGOW_HASKELL__
     hPutStrLn stderr msg
 #else
@@ -55,28 +71,60 @@ foreign import ccall unsafe "HsBase.h debugBelch2"
    debugBelch :: CString -> CString -> IO ()
 #endif
 
+
+-- | Deprecated. Use 'traceIO'.
+putTraceMsg :: String -> IO ()
+putTraceMsg = traceIO
+{-# DEPRECATED putTraceMsg "Use Debug.Trace.traceIO" #-}
+
+
 {-# NOINLINE trace #-}
 {-|
-When called, 'trace' outputs the string in its first argument, before 
-returning the second argument as its result. The 'trace' function is not 
-referentially transparent, and should only be used for debugging, or for 
-monitoring execution. Some implementations of 'trace' may decorate the string 
-that\'s output to indicate that you\'re tracing. The function is implemented on
-top of 'putTraceMsg'.
+The 'trace' function outputs the trace message given as its first argument,
+before returning the second argument as its result.
+
+For example, this returns the value of @f x@ but first outputs the message.
+
+> trace ("calling f with x = " ++ show x) (f x)
+
+The 'trace' function should /only/ be used for debugging, or for monitoring
+execution. The function is not referentially transparent: its type indicates
+that it is a pure function but it has the side effect of outputting the
+trace message.
 -}
 trace :: String -> a -> a
 trace string expr = unsafePerformIO $ do
-    putTraceMsg string
+    traceIO string
     return expr
 
 {-|
 Like 'trace', but uses 'show' on the argument to convert it to a 'String'.
 
-> traceShow = trace . show
+This makes it convenient for printing the values of interesting variables or
+expressions inside a function. For example here we print the value of the
+variables @x@ and @z@:
+
+> f x y =
+>     traceShow (x, z) $ result
+>   where
+>     z = ...
+>     ...
 -}
 traceShow :: (Show a) => a -> b -> b
 traceShow = trace . show
 
+
+-- $eventlog_tracing
+--
+-- Eventlog tracing is a performance profiling system. These functions emit
+-- extra events into the eventlog. In combination with eventlog profiling
+-- tools these functions can be used for monitoring execution and
+-- investigating performance problems.
+--
+-- Currently only GHC provides eventlog profiling, see the GHC user guide for
+-- details on how to use it. These function exists for other Haskell
+-- implementations but no events are emitted. Note that the string message is
+-- always evaluated, whether or not profiling is available or enabled.
 
 {-# NOINLINE traceEvent #-}
 -- | The 'traceEvent' function behaves like 'trace' with the difference that
