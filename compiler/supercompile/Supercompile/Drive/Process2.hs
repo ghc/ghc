@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, ScopedTypeVariables #-}
 module Supercompile.Drive.Process2 () where
 
 import Supercompile.Drive.Match
@@ -171,6 +171,51 @@ runHistoryM :: HistoryM a -> a
 runHistoryM = flip State.evalState (mkHistory (cofmap fst wQO))
 -}
 
+
+newtype StateT s m a = ST { unST :: s -> m (a, s) }
+
+instance Functor m => Functor (StateT s m) where
+    fmap f mx = ST $ \s -> fmap (first f) (unST mx s)
+
+instance (Functor m, Monad m) => Applicative (StateT s m) where
+    pure = return
+    (<*>) = ap
+
+instance Monad m => Monad (StateT s m) where
+    return x = ST $ \s -> return (x, s)
+    mx >>= fxmy = ST $ \s -> unST mx s >>= \(x, s) -> unST (fxmy x) s
+
+liftStateT :: Functor m => m a -> StateT s m a
+liftStateT mx = ST $ \s -> fmap (flip (,) s) mx
+
+delayStateT :: Functor m => m (StateT s (DelayM m) a) -> StateT s (DelayM m) a
+delayStateT mx = ST $ \s -> delay (fmap (($ s) . unST) mx)
+
+{-
+-- NB: you can't implement this for all monad transformers
+-- (in particular the continuation monad transformer).
+-- But if you can, we can derive a delayStateT equivalent from it:
+fiddle :: (forall b. m b -> n b)
+       -> StateT s m a -> StateT s n a
+fiddle f mx = ST $ \s -> f (unST mx s)
+
+
+lifty :: Monad m => m a -> DelayM m a
+lifty = delay . liftM return
+
+mx                                  :: m (StateT s (DelayM m) a)
+liftStateT mx                       :: StateT s m (StateT s (DelayM m) a)
+fiddle lifty                        :: forall a. Monad m => StateT s m a -> StateT s (DelayM m) a
+fiddle lifty (liftStateT mx)        :: Monad m => StateT s (DelayM m) (StateT s (DelayM m) a)
+join (fiddle lifty (liftStateT mx)) :: Monad m => StateT s (DelayM m) a
+
+Therefore:
+
+delayStateT :: Monad m => m (StateT s (DelayM m) a) -> StateT s (DelayM m) a
+delayStateT = join . fiddle lifty . liftStateT
+-}
+
+
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
     abstracted :: [AbsVar], -- Abstracted over these variables
@@ -178,27 +223,29 @@ data Promise = P {
   }
 
 data MemoState = MS {
-    promises :: [Promise], -- FIXME: fulfilments
+    promises :: [Promise],
     hNames   :: Stream Name
   }
 
-newtype MemoT m a = MT { unMT :: MemoState -> m (a, MemoState) }
-
-instance Functor m => Functor (MemoT m) where
-    fmap f mx = MT $ \s -> fmap (first f) (unMT mx s)
-
-instance (Functor m, Monad m) => Applicative (MemoT m) where
-    pure = return
-    (<*>) = ap
-
-instance Monad m => Monad (MemoT m) where
-    return x = MT $ \s -> return (x, s)
-    mx >>= fxmy = MT $ \s -> unMT mx s >>= \(x, s) -> unMT (fxmy x) s
+type MemoT = StateT MemoState
 
 runMemoT :: Functor m => MemoT m a -> m a
-runMemoT mx = fmap fst $ unMT mx MS { promises = [], hNames = h_names }
+runMemoT mx = fmap fst $ unST mx MS { promises = [], hNames = h_names }
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
+
+
+newtype FulfilmentState = FS {
+    fulfilments :: [(Var, FVedTerm)]
+  }
+
+type FulfilmentT = StateT FulfilmentState
+
+fulfill :: Monad m => Promise -> (Deeds, FVedTerm) -> FulfilmentT m (Deeds, FVedTerm)
+fulfill p (deeds, e_body) = ST $ \fs -> return ((deeds, e_body), FS { fulfilments = (fun p, tyVarIdLambdas (abstracted p) e_body) : fulfilments fs })
+
+runFulfilmentT :: Monad m => FulfilmentT m FVedTerm -> m FVedTerm
+runFulfilmentT mx = liftM (\(e, fs) -> letRec (fulfilments fs) e) $ unST mx (FS { fulfilments = [] })
 
 
 promise :: State -> MemoState -> (Promise, MemoState)
@@ -216,13 +263,13 @@ promise state ms = (p, ms)
             hNames   = h_names'
           }
 
-instance MonadStatics (DelayM (MemoT HistoryM)) where
+instance MonadStatics (FulfilmentT ScpM) where
     -- FIXME
 
 memo :: (Applicative t, Monad m)
-     => (State -> t (m (Deeds, Out FVedTerm)))
-     -> State -> MemoT t (m (Deeds, Out FVedTerm))
-memo opt state = MT $ \ms ->
+     => (State -> t (FulfilmentT m (Deeds, Out FVedTerm)))
+     -> State -> MemoT t (FulfilmentT m (Deeds, Out FVedTerm))
+memo opt state = ST $ \ms ->
      -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
     case [ (p, (releaseStateDeed state, var (fun p) `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
@@ -235,21 +282,21 @@ memo opt state = MT $ \ms ->
                                    (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
                                        ; res <- mres
                                        ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
-                                       ; return res }, ms')
+                                       ; fulfill p res }, ms')
                 where (p, ms') = promise state ms
 
 
 type RollbackScpM = () -- Generaliser -> ScpBM (Deeds, Out FVedTerm)
 
-sc' :: State -> HistoryM (ScpM (Deeds, Out FVedTerm))
+sc' :: State -> HistoryM (FulfilmentT ScpM (Deeds, Out FVedTerm))
 sc' state = \hist -> case terminate hist (state, ()) of
-                       Continue hist'             -> split (snd $ reduce state) (delay . sc) -- FIXME: use hist'
-                       Stop (shallower_state, ()) -> maybe (split state) id (generalise (mK_GENERALISER shallower_state state) state) (delay . sc)
+                       Continue hist'             -> split (snd $ reduce state) (delayStateT . sc) -- FIXME: use hist'
+                       Stop (shallower_state, ()) -> maybe (split state) id (generalise (mK_GENERALISER shallower_state state) state) (delayStateT . sc)
 
-sc :: State -> MemoT HistoryM (ScpM (Deeds, Out FVedTerm))
+sc :: State -> MemoT HistoryM (FulfilmentT ScpM (Deeds, Out FVedTerm))
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ snd $ runHistoryM $ runMemoT $ runScpM $ sc state
+supercompile unfoldings e = fVedTermToTerm $ runHistoryM $ runMemoT $ runScpM $ liftM (runFulfilmentT . fmap snd) $ sc state
   where state = prepareTerm unfoldings e
