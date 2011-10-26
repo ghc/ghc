@@ -219,8 +219,9 @@ promise state ms = (p, ms)
 instance MonadStatics (DelayM (MemoT HistoryM)) where
     -- FIXME
 
-memo :: (State -> HistoryM (ScpM (Deeds, Out FVedTerm)))
-     -> State -> MemoT HistoryM (ScpM (Deeds, Out FVedTerm))
+memo :: (Applicative t, Monad m)
+     => (State -> t (m (Deeds, Out FVedTerm)))
+     -> State -> MemoT t (m (Deeds, Out FVedTerm))
 memo opt state = MT $ \ms ->
      -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
@@ -229,12 +230,12 @@ memo opt state = MT $ \ms ->
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                           match (meaning p) state]
          ] of (p, res):_ -> pure $ (do { traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state), res)
-                                       ; pure res }, ms)
-              _          -> opt state >>= \mres -> return
+                                       ; return res }, ms)
+              _          -> flip fmap (opt state) $ \mres ->
                                    (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
                                        ; res <- mres
                                        ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
-                                       ; pure res }, ms')
+                                       ; return res }, ms')
                 where (p, ms') = promise state ms
 
 
