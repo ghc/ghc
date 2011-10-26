@@ -14,7 +14,7 @@ module Packages (
 	PackageState(..),
 	initPackages,
 	getPackageDetails,
-        lookupModuleInAllPackages, lookupModuleWithSuggestions,
+	lookupModuleInAllPackages, lookupModuleWithSuggestions,
 
 	-- * Inspecting the set of packages in scope
 	getPackageIncludePath,
