@@ -269,7 +269,9 @@ promise state ms = (p, ms)
           }
 
 instance MonadStatics (FulfilmentT ScpM) where
-    -- FIXME
+    bindCapturedFloats fvs mx | isEmptyVarSet fvs = liftM ((,) []) mx
+                              | otherwise         = pprPanic "bindCapturedFloats: does not support statics" (ppr fvs)
+    monitorFVs = liftM ((,) emptyVarSet)
 
 memo :: (Applicative t, Monad m)
      => (State -> t (FulfilmentT m (Deeds, Out FVedTerm)))
