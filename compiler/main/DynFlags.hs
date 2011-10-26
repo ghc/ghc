@@ -1,14 +1,16 @@
--- |
--- Dynamic flags
+-------------------------------------------------------------------------------
 --
+-- | Dynamic flags
+--
+-- Most flags are dynamic flags, which means they can change from compilation
+-- to compilation using @OPTIONS_GHC@ pragmas, and in a multi-session GHC each
+-- session can be using different dynamic flags. Dynamic flags can also be set
+-- at the prompt in GHCi.
 --
 -- (c) The University of Glasgow 2005
 --
+-------------------------------------------------------------------------------
 
--- Most flags are dynamic flags, which means they can change from
--- compilation to compilation using @OPTIONS_GHC@ pragmas, and in a
--- multi-session GHC each session can be using different dynamic
--- flags.  Dynamic flags can also be set at the prompt in GHCi.
 module DynFlags (
         -- * Dynamic flags and associated configuration types
         DynFlag(..),
@@ -85,7 +87,7 @@ module DynFlags (
 #ifdef GHCI
 -- Only in stage 2 can we be sure that the RTS
 -- exposes the appropriate runtime boolean
-        , rtsIsProfiled
+      , rtsIsProfiled
 #endif
   ) where
 
