@@ -266,6 +266,7 @@ initCapability( Capability *cap, nat i )
     cap->pinned_object_block = NULL;
 
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
+    traceCapsetAssignCap(CAPSET_CLOCKDOMAIN_DEFAULT, i);
 #if defined(THREADED_RTS)
     traceSparkCounters(cap);
 #endif
@@ -282,9 +283,10 @@ initCapability( Capability *cap, nat i )
 void
 initCapabilities( void )
 {
-    /* Declare a single capability set representing the process. 
-       Each capability will get added to this capset. */ 
+    /* Declare a couple capability sets representing the process and
+       clock domain. Each capability will get added to these capsets. */
     traceCapsetCreate(CAPSET_OSPROCESS_DEFAULT, CapsetTypeOsProcess);
+    traceCapsetCreate(CAPSET_CLOCKDOMAIN_DEFAULT, CapsetTypeClockdomain);
 
 #if defined(THREADED_RTS)
     nat i;
@@ -867,6 +869,7 @@ shutdownCapability (Capability *cap,
 #endif /* THREADED_RTS */
 
     traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);
+    traceCapsetRemoveCap(CAPSET_CLOCKDOMAIN_DEFAULT, cap->no);
 }
 
 void
@@ -878,6 +881,7 @@ shutdownCapabilities(Task *task, rtsBool safe)
         shutdownCapability(&capabilities[i], task, safe);
     }
     traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
+    traceCapsetDelete(CAPSET_CLOCKDOMAIN_DEFAULT);
 
 #if defined(THREADED_RTS)
     ASSERT(checkSparkCountInvariant());
