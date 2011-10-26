@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, RankNTypes, RebindableSyntax #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-module Supercompile.Drive.Process1 (SCStats(..), supercompile) where
+module Supercompile.Drive.Process1 (supercompile) where
 
 #include "HsVersions.h"
 
