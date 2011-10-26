@@ -53,8 +53,8 @@ module HsDecls (
     ) where
 
 -- friends:
-import {-# SOURCE #-}	HsExpr( LHsExpr, HsExpr, pprExpr )
-	-- Because Expr imports Decls via HsBracket
+import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, pprExpr )
+        -- Because Expr imports Decls via HsBracket
 
 import HsBinds
 import HsPat
@@ -70,7 +70,7 @@ import ForeignCall
 
 -- others:
 import Class
-import Outputable	
+import Outputable       
 import Util
 import SrcLoc
 import FastString
@@ -82,9 +82,9 @@ import Data.Maybe       ( isJust )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[HsDecl]{Declarations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -92,20 +92,20 @@ type LHsDecl id = Located (HsDecl id)
 
 -- | A Haskell Declaration
 data HsDecl id
-  = TyClD	(TyClDecl id)     -- ^ A type or class declaration.
-  | InstD	(InstDecl  id)    -- ^ An instance declaration.
+  = TyClD       (TyClDecl id)     -- ^ A type or class declaration.
+  | InstD       (InstDecl  id)    -- ^ An instance declaration.
   | DerivD      (DerivDecl id)
-  | ValD	(HsBind id)
-  | SigD	(Sig id)
-  | DefD	(DefaultDecl id)
+  | ValD        (HsBind id)
+  | SigD        (Sig id)
+  | DefD        (DefaultDecl id)
   | ForD        (ForeignDecl id)
-  | WarningD	(WarnDecl id)
-  | AnnD	(AnnDecl id)
-  | RuleD	(RuleDecl id)
-  | VectD	(VectDecl id)
-  | SpliceD	(SpliceDecl id)
-  | DocD	(DocDecl)
-  | QuasiQuoteD	(HsQuasiQuote id)
+  | WarningD    (WarnDecl id)
+  | AnnD        (AnnDecl id)
+  | RuleD       (RuleDecl id)
+  | VectD       (VectDecl id)
+  | SpliceD     (SpliceDecl id)
+  | DocD        (DocDecl)
+  | QuasiQuoteD (HsQuasiQuote id)
   deriving (Data, Typeable)
 
 
@@ -114,11 +114,11 @@ data HsDecl id
 -- OR     in the ClassDecls in TyClDs
 --
 -- The former covers
--- 	a) data constructors
--- 	b) class methods (but they can be also done in the
--- 		signatures of class decls)
---	c) imported functions (that have an IfacSig)
---	d) top level decls
+--      a) data constructors
+--      b) class methods (but they can be also done in the
+--              signatures of class decls)
+--      c) imported functions (that have an IfacSig)
+--      d) top level decls
 --
 -- The latter is for class methods only
 
@@ -126,19 +126,19 @@ data HsDecl id
 -- fed to the renamer.
 data HsGroup id
   = HsGroup {
-	hs_valds  :: HsValBinds id,
+        hs_valds  :: HsValBinds id,
 
-	hs_tyclds :: [[LTyClDecl id]],	
-		-- A list of mutually-recursive groups
-		-- Parser generates a singleton list;
-		-- renamer does dependency analysis
+        hs_tyclds :: [[LTyClDecl id]],  
+                -- A list of mutually-recursive groups
+                -- Parser generates a singleton list;
+                -- renamer does dependency analysis
 
-	hs_instds :: [LInstDecl id],
+        hs_instds :: [LInstDecl id],
         hs_derivds :: [LDerivDecl id],
 
-	hs_fixds  :: [LFixitySig id],
-		-- Snaffled out of both top-level fixity signatures,
-		-- and those in class declarations
+        hs_fixds  :: [LFixitySig id],
+                -- Snaffled out of both top-level fixity signatures,
+                -- and those in class declarations
 
         hs_defds  :: [LDefaultDecl id],
         hs_fords  :: [LForeignDecl id],
@@ -155,9 +155,9 @@ emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], hs_derivds = [],
-		       hs_fixds = [], hs_defds = [], hs_annds = [],
-		       hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
-		       hs_valds = error "emptyGroup hs_valds: Can't happen",
+                       hs_fixds = [], hs_defds = [], hs_annds = [],
+                       hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
+                       hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_docs = [] }
 
 appendGroups :: HsGroup a -> HsGroup a -> HsGroup a
@@ -223,44 +223,44 @@ instance OutputableBndr name => Outputable (HsDecl name) where
 
 instance OutputableBndr name => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,
-		   hs_tyclds = tycl_decls,
-		   hs_instds = inst_decls,
+                   hs_tyclds = tycl_decls,
+                   hs_instds = inst_decls,
                    hs_derivds = deriv_decls,
-		   hs_fixds  = fix_decls,
-		   hs_warnds = deprec_decls,
-		   hs_annds  = ann_decls,
-		   hs_fords  = foreign_decls,
-		   hs_defds  = default_decls,
-		   hs_ruleds = rule_decls,
-		   hs_vects  = vect_decls })
-	= vcat_mb empty 
+                   hs_fixds  = fix_decls,
+                   hs_warnds = deprec_decls,
+                   hs_annds  = ann_decls,
+                   hs_fords  = foreign_decls,
+                   hs_defds  = default_decls,
+                   hs_ruleds = rule_decls,
+                   hs_vects  = vect_decls })
+        = vcat_mb empty 
             [ppr_ds fix_decls, ppr_ds default_decls, 
-	     ppr_ds deprec_decls, ppr_ds ann_decls,
-	     ppr_ds rule_decls,
-	     ppr_ds vect_decls,
-	     if isEmptyValBinds val_decls 
+             ppr_ds deprec_decls, ppr_ds ann_decls,
+             ppr_ds rule_decls,
+             ppr_ds vect_decls,
+             if isEmptyValBinds val_decls 
                 then Nothing 
                 else Just (ppr val_decls),
-	     ppr_ds (concat tycl_decls), 
+             ppr_ds (concat tycl_decls), 
              ppr_ds inst_decls,
              ppr_ds deriv_decls,
-	     ppr_ds foreign_decls]
-	where
+             ppr_ds foreign_decls]
+        where
           ppr_ds :: Outputable a => [a] -> Maybe SDoc
-	  ppr_ds [] = Nothing
-	  ppr_ds ds = Just (vcat (map ppr ds))
+          ppr_ds [] = Nothing
+          ppr_ds ds = Just (vcat (map ppr ds))
 
           vcat_mb :: SDoc -> [Maybe SDoc] -> SDoc
-	  -- Concatenate vertically with white-space between non-blanks
+          -- Concatenate vertically with white-space between non-blanks
           vcat_mb _    []             = empty
           vcat_mb gap (Nothing : ds) = vcat_mb gap ds
           vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
 
 data SpliceDecl id 
-  = SpliceDecl			-- Top level splice
+  = SpliceDecl                  -- Top level splice
         (Located (HsExpr id))
-        HsExplicitFlag		-- Explicit <=> $(f x y)
-				-- Implicit <=> f x y,  i.e. a naked top level expression
+        HsExplicitFlag          -- Explicit <=> $(f x y)
+                                -- Implicit <=> f x y,  i.e. a naked top level expression
     deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
@@ -269,14 +269,14 @@ instance OutputableBndr name => Outputable (SpliceDecl name) where
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[TyDecl]{@data@, @newtype@ or @type@ (synonym) type declaration}
-%*									*
+%*                                                                      *
 %************************************************************************
 
-		--------------------------------
-			THE NAMING STORY
-		--------------------------------
+                --------------------------------
+                        THE NAMING STORY
+                --------------------------------
 
 Here is the story about the implicit names that go with type, class,
 and instance decls.  It's a bit tricky, so pay attention!
@@ -284,13 +284,13 @@ and instance decls.  It's a bit tricky, so pay attention!
 "Implicit" (or "system") binders
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Each data type decl defines 
-	a worker name for each constructor
-	to-T and from-T convertors
+        a worker name for each constructor
+        to-T and from-T convertors
   Each class decl defines
-	a tycon for the class
-	a data constructor for that tycon
-	the worker for that constructor
-	a selector for each superclass
+        a tycon for the class
+        a data constructor for that tycon
+        the worker for that constructor
+        a selector for each superclass
 
 All have occurrence names that are derived uniquely from their parent
 declaration.
@@ -335,10 +335,10 @@ In *source-code* class declarations:
 
  - During typechecking, we generate a binding for each $dm for 
    which there's a programmer-supplied default method:
-	class Foo a where
-	  op1 :: <type>
-	  op2 :: <type>
-	  op1 = ...
+        class Foo a where
+          op1 :: <type>
+          op2 :: <type>
+          op1 = ...
    We generate a binding for $dmop1 but not for $dmop2.
    The Class for Foo has a NoDefMeth for op2 and a DefMeth for op1.
    The Name for $dmop2 is simply discarded.
@@ -346,9 +346,9 @@ In *source-code* class declarations:
 In *interface-file* class declarations:
   - When parsing, we see if there's an explicit programmer-supplied default method
     because there's an '=' sign to indicate it:
-	class Foo a where
-	  op1 = :: <type>	-- NB the '='
-  	  op2   :: <type>
+        class Foo a where
+          op1 = :: <type>       -- NB the '='
+          op2   :: <type>
     We use this info to generate a DefMeth with a suitable RdrName for op1,
     and a NoDefMeth for op2
   - The interface file has a separate definition for $dmop1, with unfolding etc.
@@ -369,8 +369,8 @@ dictionary functions in advance (we don't know how many we need).
 On the other hand for interface-file instance declarations, the decl
 specifies the name of the dictionary function, and it has a binding elsewhere
 in the interface file:
-	instance {Eq Int} = dEqInt
-	dEqInt :: {Eq Int} <pragma info>
+        instance {Eq Int} = dEqInt
+        dEqInt :: {Eq Int} <pragma info>
 
 So again we treat source code and interface file code slightly differently.
 
@@ -385,8 +385,8 @@ Source code:
   - The occurrence name it chooses is derived from the instance decl (just for 
     documentation really) --- e.g. dNumInt.  Two dict funs may share a common
     occurrence name, but will have different uniques.  E.g.
-	instance Foo [Int]  where ...
-	instance Foo [Bool] where ...
+        instance Foo [Int]  where ...
+        instance Foo [Bool] where ...
     These might both be dFooList
 
   - The CoreTidy phase externalises the name, and ensures the occurrence name is
@@ -434,88 +434,88 @@ type LTyClDecl name = Located (TyClDecl name)
 -- | A type or class declaration.
 data TyClDecl name
   = ForeignType { 
-		tcdLName    :: Located name,
-		tcdExtName  :: Maybe FastString
+                tcdLName    :: Located name,
+                tcdExtName  :: Maybe FastString
     }
 
 
   | -- | @type/data family T :: *->*@
-    TyFamily {  tcdFlavour:: FamilyFlavour,	        -- type or data
-		tcdLName  :: Located name,	        -- type constructor
-		tcdTyVars :: [LHsTyVarBndr name],	-- type variables
-		tcdKind   :: Maybe Kind			-- result kind
+    TyFamily {  tcdFlavour:: FamilyFlavour,             -- type or data
+                tcdLName  :: Located name,              -- type constructor
+                tcdTyVars :: [LHsTyVarBndr name],       -- type variables
+                tcdKind   :: Maybe Kind                 -- result kind
     }
 
 
   | -- | Declares a data type or newtype, giving its construcors
     -- @
-    -- 	data/newtype T a = <constrs>
-    --	data/newtype instance T [a] = <constrs>
+    --  data/newtype T a = <constrs>
+    --  data/newtype instance T [a] = <constrs>
     -- @
-    TyData {	tcdND     :: NewOrData,
-		tcdCtxt   :: LHsContext name,	 	-- ^ Context
-		tcdLName  :: Located name,	 	-- ^ Type constructor
+    TyData {    tcdND     :: NewOrData,
+                tcdCtxt   :: LHsContext name,           -- ^ Context
+                tcdLName  :: Located name,              -- ^ Type constructor
 
-		tcdTyVars :: [LHsTyVarBndr name], 	-- ^ Type variables
-		tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns.
+                tcdTyVars :: [LHsTyVarBndr name],       -- ^ Type variables
+                tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns.
                   -- See Note [tcdTyVars and tcdTyPats] 
 
-		tcdKindSig:: Maybe Kind,
+                tcdKindSig:: Maybe Kind,
                         -- ^ Optional kind signature.
                         --
-			-- @(Just k)@ for a GADT-style @data@, or @data
-			-- instance@ decl with explicit kind sig
+                        -- @(Just k)@ for a GADT-style @data@, or @data
+                        -- instance@ decl with explicit kind sig
 
-		tcdCons	  :: [LConDecl name],
+                tcdCons   :: [LConDecl name],
                         -- ^ Data constructors
                         --
-			-- For @data T a = T1 | T2 a@
+                        -- For @data T a = T1 | T2 a@
                         --   the 'LConDecl's all have 'ResTyH98'.
-			-- For @data T a where { T1 :: T a }@
+                        -- For @data T a where { T1 :: T a }@
                         --   the 'LConDecls' all have 'ResTyGADT'.
 
-		tcdDerivs :: Maybe [LHsType name]
-			-- ^ Derivings; @Nothing@ => not specified,
-			-- 	        @Just []@ => derive exactly what is asked
+                tcdDerivs :: Maybe [LHsType name]
+                        -- ^ Derivings; @Nothing@ => not specified,
+                        --              @Just []@ => derive exactly what is asked
                         --
-			-- These "types" must be of form
+                        -- These "types" must be of form
                         -- @
-			--	forall ab. C ty1 ty2
+                        --      forall ab. C ty1 ty2
                         -- @
-			-- Typically the foralls and ty args are empty, but they
-			-- are non-empty for the newtype-deriving case
+                        -- Typically the foralls and ty args are empty, but they
+                        -- are non-empty for the newtype-deriving case
     }
 
-  | TySynonym {	tcdLName  :: Located name,	        -- ^ type constructor
-		tcdTyVars :: [LHsTyVarBndr name],	-- ^ type variables
-		tcdTyPats :: Maybe [LHsType name],	-- ^ Type patterns
+  | TySynonym { tcdLName  :: Located name,              -- ^ type constructor
+                tcdTyVars :: [LHsTyVarBndr name],       -- ^ type variables
+                tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns
                   -- See Note [tcdTyVars and tcdTyPats] 
 
-		tcdSynRhs :: LHsType name	        -- ^ synonym expansion
+                tcdSynRhs :: LHsType name               -- ^ synonym expansion
     }
 
-  | ClassDecl {	tcdCtxt    :: LHsContext name, 	 	-- ^ Context...
-		tcdLName   :: Located name,	    	-- ^ Name of the class
-		tcdTyVars  :: [LHsTyVarBndr name],	-- ^ Class type variables
-		tcdFDs     :: [Located (FunDep name)],	-- ^ Functional deps
-		tcdSigs    :: [LSig name],		-- ^ Methods' signatures
-		tcdMeths   :: LHsBinds name,		-- ^ Default methods
-		tcdATs	   :: [LTyClDecl name],		-- ^ Associated types; ie
-							--   only 'TyFamily'
+  | ClassDecl { tcdCtxt    :: LHsContext name,          -- ^ Context...
+                tcdLName   :: Located name,             -- ^ Name of the class
+                tcdTyVars  :: [LHsTyVarBndr name],      -- ^ Class type variables
+                tcdFDs     :: [Located (FunDep name)],  -- ^ Functional deps
+                tcdSigs    :: [LSig name],              -- ^ Methods' signatures
+                tcdMeths   :: LHsBinds name,            -- ^ Default methods
+                tcdATs     :: [LTyClDecl name],         -- ^ Associated types; ie
+                                                        --   only 'TyFamily'
                 tcdATDefs  :: [LTyClDecl name],         -- ^ Associated type defaults; ie
                                                         --   only 'TySynonym'
-		tcdDocs    :: [LDocDecl]		-- ^ Haddock docs
+                tcdDocs    :: [LDocDecl]                -- ^ Haddock docs
     }
   deriving (Data, Typeable)
 
 data NewOrData
-  = NewType			-- ^ @newtype Blah ...@
-  | DataType			-- ^ @data Blah ...@
-  deriving( Eq, Data, Typeable )		-- Needed because Demand derives Eq
+  = NewType                     -- ^ @newtype Blah ...@
+  | DataType                    -- ^ @data Blah ...@
+  deriving( Eq, Data, Typeable )                -- Needed because Demand derives Eq
 
 data FamilyFlavour
-  = TypeFamily			-- ^ @type family ...@
-  | DataFamily	                -- ^ @data family ...@
+  = TypeFamily                  -- ^ @type family ...@
+  | DataFamily                  -- ^ @data family ...@
   deriving (Data, Typeable)
 \end{code}
 
@@ -556,12 +556,12 @@ isDataDecl _other      = False
 -- | type or type instance declaration
 isTypeDecl :: TyClDecl name -> Bool
 isTypeDecl (TySynonym {}) = True
-isTypeDecl _other	  = False
+isTypeDecl _other         = False
 
 -- | vanilla Haskell type synonym (ie, not a type instance)
 isSynDecl :: TyClDecl name -> Bool
 isSynDecl (TySynonym {tcdTyPats = Nothing}) = True
-isSynDecl _other	                    = False
+isSynDecl _other                            = False
 
 -- | type class
 isClassDecl :: TyClDecl name -> Bool
@@ -578,7 +578,7 @@ isFamInstDecl :: TyClDecl name -> Bool
 isFamInstDecl tydecl
    | isTypeDecl tydecl
      || isDataDecl tydecl = isJust (tcdTyPats tydecl)
-   | otherwise	          = False
+   | otherwise            = False
 \end{code}
 
 Dealing with names
@@ -592,12 +592,12 @@ tyClDeclTyVars (TyFamily    {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TySynonym   {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TyData      {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (ClassDecl   {tcdTyVars = tvs}) = tvs
-tyClDeclTyVars (ForeignType {})		       = []
+tyClDeclTyVars (ForeignType {})                = []
 \end{code}
 
 \begin{code}
 countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int, Int)
-	-- class, synonym decls, data, newtype, family decls, family instances
+        -- class, synonym decls, data, newtype, family decls, family instances
 countTyClDecls decls 
  = (count isClassDecl    decls,
     count isSynDecl      decls,  -- excluding...
@@ -615,61 +615,61 @@ countTyClDecls decls
 
 \begin{code}
 instance OutputableBndr name
-	      => Outputable (TyClDecl name) where
+              => Outputable (TyClDecl name) where
 
     ppr (ForeignType {tcdLName = ltycon})
-	= hsep [ptext (sLit "foreign import type dotnet"), ppr ltycon]
+        = hsep [ptext (sLit "foreign import type dotnet"), ppr ltycon]
 
     ppr (TyFamily {tcdFlavour = flavour, tcdLName = ltycon, 
-		   tcdTyVars = tyvars, tcdKind = mb_kind})
+                   tcdTyVars = tyvars, tcdKind = mb_kind})
       = pp_flavour <+> pp_decl_head [] ltycon tyvars Nothing <+> pp_kind
         where
-	  pp_flavour = case flavour of
-		         TypeFamily -> ptext (sLit "type family")
-			 DataFamily -> ptext (sLit "data family")
+          pp_flavour = case flavour of
+                         TypeFamily -> ptext (sLit "type family")
+                         DataFamily -> ptext (sLit "data family")
 
           pp_kind = case mb_kind of
-		      Nothing   -> empty
-		      Just kind -> dcolon <+> pprKind kind
+                      Nothing   -> empty
+                      Just kind -> dcolon <+> pprKind kind
 
     ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdTyPats = typats,
-		    tcdSynRhs = mono_ty})
+                    tcdSynRhs = mono_ty})
       = hang (ptext (sLit "type") <+> 
-	      (if isJust typats then ptext (sLit "instance") else empty) <+>
-	      pp_decl_head [] ltycon tyvars typats <+> 
-	      equals)
-	     4 (ppr mono_ty)
+              (if isJust typats then ptext (sLit "instance") else empty) <+>
+              pp_decl_head [] ltycon tyvars typats <+> 
+              equals)
+             4 (ppr mono_ty)
 
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = ltycon,
-		 tcdTyVars = tyvars, tcdTyPats = typats, tcdKindSig = mb_sig, 
-		 tcdCons = condecls, tcdDerivs = derivings})
+                 tcdTyVars = tyvars, tcdTyPats = typats, tcdKindSig = mb_sig, 
+                 tcdCons = condecls, tcdDerivs = derivings})
       = pp_tydecl (null condecls && isJust mb_sig) 
                   (ppr new_or_data <+> 
-		   (if isJust typats then ptext (sLit "instance") else empty) <+>
-		   pp_decl_head (unLoc context) ltycon tyvars typats <+> 
-		   ppr_sigx mb_sig)
-		  (pp_condecls condecls)
-		  derivings
+                   (if isJust typats then ptext (sLit "instance") else empty) <+>
+                   pp_decl_head (unLoc context) ltycon tyvars typats <+> 
+                   ppr_sigx mb_sig)
+                  (pp_condecls condecls)
+                  derivings
       where
-	ppr_sigx Nothing     = empty
-	ppr_sigx (Just kind) = dcolon <+> pprKind kind
+        ppr_sigx Nothing     = empty
+        ppr_sigx (Just kind) = dcolon <+> pprKind kind
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, 
-		    tcdFDs  = fds,
+                    tcdFDs  = fds,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs})
       | null sigs && isEmptyBag methods && null ats && null at_defs -- No "where" part
       = top_matter
 
-      | otherwise	-- Laid out
+      | otherwise       -- Laid out
       = vcat [ top_matter <+> ptext (sLit "where")
-	     , nest 2 $ pprDeclList (map ppr ats ++
+             , nest 2 $ pprDeclList (map ppr ats ++
                                      map ppr at_defs ++
-			             pprLHsBindsForUser methods sigs) ]
+                                     pprLHsBindsForUser methods sigs) ]
       where
         top_matter = ptext (sLit "class") 
-		     <+> pp_decl_head (unLoc context) lclas tyvars Nothing
-		     <+> pprFundeps (map unLoc fds)
+                     <+> pp_decl_head (unLoc context) lclas tyvars Nothing
+                     <+> pprFundeps (map unLoc fds)
 
 pp_decl_head :: OutputableBndr name
    => HsContext name
@@ -677,16 +677,16 @@ pp_decl_head :: OutputableBndr name
    -> [LHsTyVarBndr name]
    -> Maybe [LHsType name]
    -> SDoc
-pp_decl_head context thing tyvars Nothing	-- no explicit type patterns
+pp_decl_head context thing tyvars Nothing       -- no explicit type patterns
   = hsep [pprHsContext context, ppr thing, interppSP tyvars]
 pp_decl_head context thing _      (Just typats) -- explicit type patterns
   = hsep [ pprHsContext context, ppr thing
-	 , hsep (map (pprParendHsType.unLoc) typats)]
+         , hsep (map (pprParendHsType.unLoc) typats)]
 
 pp_condecls :: OutputableBndr name => [LConDecl name] -> SDoc
 pp_condecls cs@(L _ ConDecl{ con_res = ResTyGADT _ } : _) -- In GADT syntax
   = hang (ptext (sLit "where")) 2 (vcat (map ppr cs))
-pp_condecls cs 			  -- In H98 syntax
+pp_condecls cs                    -- In H98 syntax
   = equals <+> sep (punctuate (ptext (sLit " |")) (map ppr cs))
 
 pp_tydecl :: OutputableBndr name => Bool -> SDoc -> SDoc -> Maybe [LHsType name] -> SDoc
@@ -697,7 +697,7 @@ pp_tydecl False pp_head pp_decl_rhs derivings
       pp_decl_rhs,
       case derivings of
         Nothing -> empty
-	Just ds -> hsep [ptext (sLit "deriving"), parens (interpp'SP ds)]
+        Just ds -> hsep [ptext (sLit "deriving"), parens (interpp'SP ds)]
     ])
 
 instance Outputable NewOrData where
@@ -707,9 +707,9 @@ instance Outputable NewOrData where
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[ConDecl]{A data-constructor declaration}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -719,13 +719,13 @@ type LConDecl name = Located (ConDecl name)
 --   MkT :: forall b a. Eq a => MkT a b
 
 -- data T b where
---	MkT1 :: Int -> T Int
+--      MkT1 :: Int -> T Int
 
 -- data T = Int `MkT` Int
---	  | MkT2
+--        | MkT2
 
 -- data T a where
---	Int `MkT` Int :: T Int
+--      Int `MkT` Int :: T Int
 
 data ConDecl name
   = ConDecl
@@ -738,17 +738,17 @@ data ConDecl name
 
     , con_qvars     :: [LHsTyVarBndr name]
         -- ^ Type variables.  Depending on 'con_res' this describes the
-	-- following entities
+        -- following entities
         --
         --  - ResTyH98:  the constructor's *existential* type variables
         --  - ResTyGADT: *all* the constructor's quantified type variables
-	--
-	-- If con_explicit is Implicit, then con_qvars is irrelevant
-	-- until after renaming.  
+        --
+        -- If con_explicit is Implicit, then con_qvars is irrelevant
+        -- until after renaming.  
 
     , con_cxt       :: LHsContext name
         -- ^ The context.  This /does not/ include the \"stupid theta\" which
-	-- lives only in the 'TyData' decl.
+        -- lives only in the 'TyData' decl.
 
     , con_details   :: HsConDeclDetails name
         -- ^ The main payload
@@ -761,9 +761,9 @@ data ConDecl name
 
     , con_old_rec :: Bool   
         -- ^ TEMPORARY field; True <=> user has employed now-deprecated syntax for
-	--   	       	               GADT-style record decl   C { blah } :: T a b
-	-- Remove this when we no longer parse this stuff, and hence do not
-	-- need to report decprecated use
+        --                             GADT-style record decl   C { blah } :: T a b
+        -- Remove this when we no longer parse this stuff, and hence do not
+        -- need to report decprecated use
     } deriving (Data, Typeable)
 
 type HsConDeclDetails name = HsConDetails (LBangType name) [ConDeclField name]
@@ -774,13 +774,13 @@ hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map cd_fld_type flds
 
 data ResType name
-   = ResTyH98		-- Constructor was declared using Haskell 98 syntax
-   | ResTyGADT (LHsType name)	-- Constructor was declared using GADT-style syntax,
-				--	and here is its result type
+   = ResTyH98           -- Constructor was declared using Haskell 98 syntax
+   | ResTyGADT (LHsType name)   -- Constructor was declared using GADT-style syntax,
+                                --      and here is its result type
    deriving (Data, Typeable)
 
 instance OutputableBndr name => Outputable (ResType name) where
-	 -- Debugging only
+         -- Debugging only
    ppr ResTyH98 = ptext (sLit "ResTyH98")
    ppr (ResTyGADT ty) = ptext (sLit "ResTyGADT") <+> pprParendHsType (unLoc ty)
 \end{code}
@@ -815,26 +815,26 @@ pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
 
 pprConDecl (ConDecl {con_name = con, con_details = InfixCon {}, con_res = ResTyGADT {} })
   = pprPanic "pprConDecl" (ppr con)
-	-- In GADT syntax we don't allow infix constructors
+        -- In GADT syntax we don't allow infix constructors
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[InstDecl]{An instance declaration}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 type LInstDecl name = Located (InstDecl name)
 
 data InstDecl name
-  = InstDecl	(LHsType name)	-- Context => Class Instance-type
-				-- Using a polytype means that the renamer conveniently
-				-- figures out the quantified type variables for us.
-		(LHsBinds name)
-		[LSig name]	-- User-supplied pragmatic info
-		[LTyClDecl name]-- Associated types (ie, 'TyData' and
-				-- 'TySynonym' only)
+  = InstDecl    (LHsType name)  -- Context => Class Instance-type
+                                -- Using a polytype means that the renamer conveniently
+                                -- figures out the quantified type variables for us.
+                (LHsBinds name)
+                [LSig name]     -- User-supplied pragmatic info
+                [LTyClDecl name]-- Associated types (ie, 'TyData' and
+                                -- 'TySynonym' only)
   deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
@@ -842,10 +842,10 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
       | null sigs && null ats && isEmptyBag binds  -- No "where" part
       = top_matter
 
-      | otherwise	-- Laid out
+      | otherwise       -- Laid out
       = vcat [ top_matter <+> ptext (sLit "where")
              , nest 2 $ pprDeclList (map ppr ats ++
-	                             pprLHsBindsForUser binds sigs) ]
+                                     pprLHsBindsForUser binds sigs) ]
       where
         top_matter = ptext (sLit "instance") <+> ppr inst_ty
 
@@ -856,9 +856,9 @@ instDeclATs inst_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[DerivDecl]{A stand-alone instance deriving declaration}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -873,9 +873,9 @@ instance (OutputableBndr name) => Outputable (DerivDecl name) where
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[DefaultDecl]{A @default@ declaration}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 There can only be one default declaration per module, but it is hard
@@ -886,20 +886,20 @@ syntax, and that restriction must be checked in the front end.
 type LDefaultDecl name = Located (DefaultDecl name)
 
 data DefaultDecl name
-  = DefaultDecl	[LHsType name]
+  = DefaultDecl [LHsType name]
   deriving (Data, Typeable)
 
 instance (OutputableBndr name)
-	      => Outputable (DefaultDecl name) where
+              => Outputable (DefaultDecl name) where
 
     ppr (DefaultDecl tys)
       = ptext (sLit "default") <+> parens (interpp'SP tys)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Foreign function interface declaration}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -943,31 +943,31 @@ noForeignExportCoercionYet
 -- convention 
 --
 data ForeignImport = -- import of a C entity
-		     --
+                     --
                      --  * the two strings specifying a header file or library
                      --   may be empty, which indicates the absence of a
                      --   header or object specification (both are not used
                      --   in the case of `CWrapper' and when `CFunction'
                      --   has a dynamic target)
-		     --
-		     --  * the calling convention is irrelevant for code
-		     --   generation in the case of `CLabel', but is needed
-		     --   for pretty printing 
-		     --
-		     --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
-		     --
-		     CImport  CCallConv	      -- ccall or stdcall
-			      Safety	      -- interruptible, safe or unsafe
-			      FastString      -- name of C header
-			      CImportSpec     -- details of the C entity
+                     --
+                     --  * the calling convention is irrelevant for code
+                     --   generation in the case of `CLabel', but is needed
+                     --   for pretty printing 
+                     --
+                     --  * `Safety' is irrelevant for `CLabel' and `CWrapper'
+                     --
+                     CImport  CCallConv       -- ccall or stdcall
+                              Safety          -- interruptible, safe or unsafe
+                              FastString      -- name of C header
+                              CImportSpec     -- details of the C entity
   deriving (Data, Typeable)
 
 -- details of an external C entity
 --
 data CImportSpec = CLabel    CLabelString     -- import address of a C label
-		 | CFunction CCallTarget      -- static or dynamic function
-		 | CWrapper		      -- wrapper to expose closures
-					      -- (former f.e.d.)
+                 | CFunction CCallTarget      -- static or dynamic function
+                 | CWrapper                   -- wrapper to expose closures
+                                              -- (former f.e.d.)
   deriving (Data, Typeable)
 
 -- specification of an externally exported entity in dependence on the calling
@@ -1009,22 +1009,22 @@ instance Outputable ForeignExport where
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Transformation rules}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 type LRuleDecl name = Located (RuleDecl name)
 
 data RuleDecl name
-  = HsRule			-- Source rule
-	RuleName		-- Rule name
-	Activation
-	[RuleBndr name]		-- Forall'd vars; after typechecking this includes tyvars
-	(Located (HsExpr name))	-- LHS
+  = HsRule                      -- Source rule
+        RuleName                -- Rule name
+        Activation
+        [RuleBndr name]         -- Forall'd vars; after typechecking this includes tyvars
+        (Located (HsExpr name)) -- LHS
         NameSet                 -- Free-vars from the LHS
-	(Located (HsExpr name))	-- RHS
+        (Located (HsExpr name)) -- RHS
         NameSet                 -- Free-vars from the RHS
   deriving (Data, Typeable)
 
@@ -1038,12 +1038,12 @@ collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 instance OutputableBndr name => Outputable (RuleDecl name) where
   ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
-	= sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
-	       nest 4 (pp_forall <+> pprExpr (unLoc lhs)), 
-	       nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
-	where
-	  pp_forall | null ns   = empty
-		    | otherwise	= text "forall" <+> fsep (map ppr ns) <> dot
+        = sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
+               nest 4 (pp_forall <+> pprExpr (unLoc lhs)), 
+               nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
+        where
+          pp_forall | null ns   = empty
+                    | otherwise = text "forall" <+> fsep (map ppr ns) <> dot
 
 instance OutputableBndr name => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
@@ -1119,9 +1119,9 @@ instance OutputableBndr name => Outputable (VectDecl name) where
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[DocDecl]{Document comments}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -1148,9 +1148,9 @@ docDeclDoc (DocGroup _ d) = d
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[DeprecDecl]{Deprecations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 We use exported entities for things to deprecate.
@@ -1167,9 +1167,9 @@ instance OutputableBndr name => Outputable (WarnDecl name) where
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[AnnDecl]{Annotations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
