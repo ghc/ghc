@@ -904,7 +904,7 @@ checkSafeImports dflags hsc_env tcg_env
         -- See the Note [ Safe Haskell Inference]
         when (not $ isEmptyBag errs) (
             -- did we fail safe inference or fail -XSafe?
-            case safeInferOn dflags of
+            case safeHaskell dflags == Sf_SafeInfered of
                 True  -> setDynFlags (dflags { safeHaskell = Sf_None } )
                 False -> liftIO . throwIO . mkSrcErr $ errs
             )

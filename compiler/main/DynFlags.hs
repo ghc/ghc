@@ -1037,6 +1037,12 @@ safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 safeInferOn :: DynFlags -> Bool
 safeInferOn dflags = safeHaskell dflags == Sf_SafeInfered
 
+-- | Turn off Safe Haskell inference mode (set module to unsafe)
+setSafeInferOff :: DynFlags -> DynFlags
+setSafeInferOff dflags
+  | safeHaskell dflags == Sf_SafeInfered = dflags { safeHaskell = Sf_None }
+  | otherwise                            = dflags
+
 -- | Test if Safe Imports are on in some form
 safeImportsOn :: DynFlags -> Bool
 safeImportsOn dflags = safeHaskell dflags == Sf_Unsafe ||
