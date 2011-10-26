@@ -51,7 +51,7 @@ import qualified Data.Set as S
 
 
 
-import Control.Applicative (Applicative(..), (<$>))
+import Control.Applicative (Applicative(..), (<$>), liftA2)
 import Control.Monad (liftM2)
 
 import Data.Foldable (Foldable(..))
@@ -66,72 +66,73 @@ listToStream []     = error "listToStream"
 listToStream (x:xs) = x :< listToStream xs
 
 
-data DelayStructure sh a where
-    Leaf :: a -> DelayStructure () a
-    Branch :: DelayStructure sh1 a -> DelayStructure sh2 a -> DelayStructure (sh1, sh2) a
+data LeafTy a
+data Q
+data A
 
-instance Show a => Show (DelayStructure sh a) where
-    show (Leaf x) = "Leaf (" ++ show x ++ ")"
-    show (Branch t1 t2) = "Branch (" ++ show t1 ++ ") (" ++ show t2 ++ ")"
-
-instance Functor (DelayStructure sh) where
-    fmap = Traversable.fmapDefault
-
-instance Foldable (DelayStructure sh) where
-    foldMap = Traversable.foldMapDefault
-
-instance Traversable (DelayStructure sh) where
-    traverse f (Leaf x) = Leaf <$> f x
-    traverse f (Branch t1 t2) = Branch <$> traverse f t1 <*> traverse f t2
-
+data DelayStructure sh m qa where
+    LeafQ :: m (DelayM m a) -> DelayStructure (LeafTy a) m Q
+    LeafA :: a              -> DelayStructure (LeafTy a) m A
+    Branch :: DelayStructure sh1 m qa -> DelayStructure sh2 m qa -> DelayStructure (sh1, sh2) m qa
 
 -- If you don't want DelayM to have Monad structure, you can nuke the nested use of DelayM,
 -- and make some of the consumers simpler. I actually want this generalisation, though.
-data DelayM m a r = Done r
-                  | forall sh. Delayed (DelayStructure sh (m (DelayM m a a))) (DelayStructure sh a -> DelayM m a r)
+data DelayM m r = Done r
+                | forall sh. Delayed (DelayStructure sh m Q) (DelayStructure sh m A -> DelayM m r)
 
-instance Functor (DelayM m a) where
+instance Functor (DelayM m) where
     fmap f x = pure f <*> x
 
-instance Applicative (DelayM m a) where
+instance Applicative (DelayM m) where
     pure = return
     Done f         <*> Done x         = Done (f x)
     Delayed qs k   <*> Done x         = Delayed qs (\as -> k as <*> Done x)
     Done f         <*> Delayed qs k   = Delayed qs (\as -> Done f <*> k as)
     Delayed qs1 k1 <*> Delayed qs2 k2 = Delayed (Branch qs1 qs2) (\(Branch as1 as2) -> k1 as1 <*> k2 as2)
 
-instance Monad (DelayM m a) where
+instance Monad (DelayM m) where
     return = Done
     Done x       >>= fxmy = fxmy x
     Delayed qs k >>= fxmy = Delayed qs (\as -> k as >>= fxmy)
 
-delay :: m (DelayM m a a) -> DelayM m a a
-delay q = Delayed (Leaf q) (\(Leaf a) -> pure a)
+delay :: m (DelayM m a) -> DelayM m a
+delay q = Delayed (LeafQ q) (\(LeafA a) -> pure a)
 
 runDelayM :: (Applicative m, Monad m)
-          => (DelayM m a r -> DelayM m a r) -- ^ Chooses the evaluation strategy
-          -> DelayM m a r -> m r
+          => (DelayM m r -> DelayM m r) -- ^ Chooses the evaluation strategy
+          -> DelayM m r -> m r
 runDelayM choose_some = go
   where
     go = go' . choose_some
     
     go' (Done x)       = pure x
-    go' (Delayed qs k) = sequenceA qs >>= \fs -> go (sequenceA fs >>= k)
+    go' (Delayed qs k) = mungeDS qs >>= \mx -> go (mx >>= k)
+
+mungeDS :: Applicative n
+        => DelayStructure sh n Q
+        -> n (DelayM n (DelayStructure sh m A))
+mungeDS (LeafQ mx)       = fmap (fmap LeafA) mx
+mungeDS (Branch qs1 qs2) = liftA2 (liftA2 Branch) (mungeDS qs1) (mungeDS qs2)
+
+delayDS :: DelayStructure sh n Q
+        -> DelayM n (DelayStructure sh m A)
+delayDS (LeafQ mx)       = fmap LeafA (delay mx)
+delayDS (Branch qs1 qs2) = liftA2 Branch (delayDS qs1) (delayDS qs2)
 
 
-depthFirst :: DelayM m a r -> DelayM m a r
+depthFirst :: DelayM m r -> DelayM m r
 depthFirst (Done x)       = Done x
 depthFirst (Delayed qs k) = delayTail qs >>= k
   where
-    delayTail :: DelayStructure sh (m (DelayM m a a)) -> DelayM m a (DelayStructure sh a)
-    delayTail (Leaf q)         = fmap Leaf (delay q)
-    delayTail (Branch qs1 qs2) = liftM2 Branch (delayTail qs1) (traverse delay qs2)
+    delayTail :: DelayStructure sh m Q -> DelayM m (DelayStructure sh m A)
+    delayTail (LeafQ q)        = fmap LeafA (delay q)
+    delayTail (Branch qs1 qs2) = liftM2 Branch (delayTail qs1) (delayDS qs2)
 
-breadthFirst :: DelayM m a r -> DelayM m a r
+breadthFirst :: DelayM m r -> DelayM m r
 breadthFirst = id
 
 
-type ScpM = DelayM (MemoT HistoryM) (Deeds, FVedTerm)
+type ScpM = DelayM (MemoT HistoryM)
 
 traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
 traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
