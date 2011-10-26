@@ -87,60 +87,57 @@ instance Traversable (DelayStructure sh) where
 
 -- If you don't want DelayM to have Monad structure, you can nuke the nested use of DelayM,
 -- and make some of the consumers simpler. I actually want this generalisation, though.
-data DelayM q a r = Done r
-                  | forall sh. Delayed (DelayStructure sh q) (DelayStructure sh a -> DelayM q a r)
+data DelayM m a r = Done r
+                  | forall sh. Delayed (DelayStructure sh (m (DelayM m a a))) (DelayStructure sh a -> DelayM m a r)
 
-instance Functor (DelayM q a) where
+instance Functor (DelayM m a) where
     fmap f x = pure f <*> x
 
-instance Applicative (DelayM q a) where
+instance Applicative (DelayM m a) where
     pure = return
     Done f         <*> Done x         = Done (f x)
     Delayed qs k   <*> Done x         = Delayed qs (\as -> k as <*> Done x)
     Done f         <*> Delayed qs k   = Delayed qs (\as -> Done f <*> k as)
     Delayed qs1 k1 <*> Delayed qs2 k2 = Delayed (Branch qs1 qs2) (\(Branch as1 as2) -> k1 as1 <*> k2 as2)
 
-instance Monad (DelayM q a) where
+instance Monad (DelayM m a) where
     return = Done
     Done x       >>= fxmy = fxmy x
     Delayed qs k >>= fxmy = Delayed qs (\as -> k as >>= fxmy)
 
-delay :: q -> DelayM q a a
+delay :: m (DelayM m a a) -> DelayM m a a
 delay q = Delayed (Leaf q) (\(Leaf a) -> pure a)
 
-runDelayM :: (Applicative memom, Monad memom)
-          => (DelayM q a r -> DelayM q a r) -- ^ Chooses the evaluation strategy
-          -> (q -> memom (DelayM q a a))    -- ^ How to answer questions in the monad (possibly generating new requests in the process)
-          -> DelayM q a r -> memom r
-runDelayM choose_some sc = go
+runDelayM :: (Applicative m, Monad m)
+          => (DelayM m a r -> DelayM m a r) -- ^ Chooses the evaluation strategy
+          -> DelayM m a r -> m r
+runDelayM choose_some = go
   where
     go = go' . choose_some
     
     go' (Done x)       = pure x
-    go' (Delayed qs k) = traverse sc qs >>= \fs -> go (sequenceA fs >>= k)
+    go' (Delayed qs k) = sequenceA qs >>= \fs -> go (sequenceA fs >>= k)
 
 
-depthFirst :: DelayM q a r -> DelayM q a r
+depthFirst :: DelayM m a r -> DelayM m a r
 depthFirst (Done x)       = Done x
 depthFirst (Delayed qs k) = delayTail qs >>= k
   where
-    delayTail :: DelayStructure sh q -> DelayM q a (DelayStructure sh a)
+    delayTail :: DelayStructure sh (m (DelayM m a a)) -> DelayM m a (DelayStructure sh a)
     delayTail (Leaf q)         = fmap Leaf (delay q)
     delayTail (Branch qs1 qs2) = liftM2 Branch (delayTail qs1) (traverse delay qs2)
 
-breadthFirst :: DelayM q a r -> DelayM q a r
+breadthFirst :: DelayM m a r -> DelayM m a r
 breadthFirst = id
 
 
-type ScpM = DelayM State (Deeds, FVedTerm)
+type ScpM = DelayM (MemoT HistoryM) (Deeds, FVedTerm)
 
 traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
 traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
 
-runScpM :: (Applicative m, Monad m)
-        => (State -> m (ScpM (Deeds, FVedTerm)))
-        -> m (ScpM a) -> m a
-runScpM sc mx = mx >>= runDelayM eval_strat sc
+runScpM :: MemoT HistoryM (ScpM a) -> MemoT HistoryM a
+runScpM mx = mx >>= runDelayM eval_strat
   where
     --eval_strat = depthFirst
     eval_strat = breadthFirst
@@ -234,5 +231,5 @@ sc = memo sc' . gc -- Garbage collection necessary because normalisation might h
 
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ snd $ runHistoryM $ runMemoT $ runScpM sc $ sc state
+supercompile unfoldings e = fVedTermToTerm $ snd $ runHistoryM $ runMemoT $ runScpM $ sc state
   where state = prepareTerm unfoldings e
