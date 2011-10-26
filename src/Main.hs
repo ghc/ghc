@@ -50,7 +50,7 @@ import Data.Int
 #ifdef IN_GHC_TREE
 import System.FilePath
 #else
-import GHC.Paths
+import qualified GHC.Paths as GhcPaths
 import Paths_haddock
 #endif
 
@@ -153,7 +153,7 @@ main = handleTopExceptions $ do
 readPackagesAndProcessModules :: [Flag] -> [String]
                               -> IO ([(DocPaths, InterfaceFile)], [Interface], LinkEnv)
 readPackagesAndProcessModules flags files = do
-  libDir <- getGhcLibDir flags
+  libDir <- fmap snd (getGhcDirs flags)
 
   -- Catches all GHC source errors, then prints and re-throws them.
   let handleSrcErrors action' = flip handleSourceError action' $ \err -> do
@@ -327,23 +327,23 @@ getHaddockLibDir flags =
   case [str | Flag_Lib str <- flags] of
     [] ->
 #ifdef IN_GHC_TREE
-      getInTreeLibDir
+      fmap snd getInTreeDirs
 #else
       getDataDir -- provided by Cabal
 #endif
     fs -> return (last fs)
 
 
-getGhcLibDir :: [Flag] -> IO String
-getGhcLibDir flags =
+getGhcDirs :: [Flag] -> IO (String, String)
+getGhcDirs flags =
   case [ dir | Flag_GhcLibDir dir <- flags ] of
     [] ->
 #ifdef IN_GHC_TREE
-      getInTreeLibDir
+      getInTreeDirs
 #else
-      return libdir -- from GHC.Paths
+      return (GhcPaths.ghc, GhcPaths.libdir) -- from GHC.Paths
 #endif
-    xs -> return $ last xs
+    xs -> return (GhcPaths.ghc, last xs)
 
 
 shortcutFlags :: [Flag] -> IO ()
@@ -354,8 +354,12 @@ shortcutFlags flags = do
   when (Flag_Version        `elem` flags) byeVersion
   when (Flag_GhcVersion     `elem` flags) byeGhcVersion
 
+  when (Flag_PrintGhcPath `elem` flags) $ do
+    dir <- fmap fst (getGhcDirs flags)
+    bye $ dir ++ "\n"
+
   when (Flag_PrintGhcLibDir `elem` flags) $ do
-    dir <- getGhcLibDir flags
+    dir <- fmap snd (getGhcDirs flags)
     bye $ dir ++ "\n"
 
   when (Flag_UseUnicode `elem` flags && Flag_Html `notElem` flags) $
@@ -402,12 +406,12 @@ getPrologue flags =
 
 #ifdef IN_GHC_TREE
 
-getInTreeLibDir :: IO String
-getInTreeLibDir = do
+getInTreeDirs :: IO (String, String)
+getInTreeDirs = do
   m <- getExecDir
   case m of
-    Nothing -> error "No GhcLibDir found"
-    Just d -> return (d </> ".." </> "lib")
+    Nothing -> error "No GhcDir found"
+    Just d -> let p = d </> ".." in return (p </> "bin" </> "ghc", p </> "lib")
 
 
 getExecDir :: IO (Maybe String)
