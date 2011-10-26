@@ -48,11 +48,11 @@ void postCapMsg(Capability *cap, char *msg, va_list ap);
 void postEventStartup(EventCapNo n_caps);
 
 /*
- * Post a capability set modification event
+ * Post an event that is associated with a capability set
  */
-void postCapsetModifyEvent (EventTypeNum tag,
-                            EventCapsetID capset,
-                            StgWord32 other);
+void postCapsetEvent (EventTypeNum tag,
+                      EventCapsetID capset,
+                      StgWord info);
 
 /*
  * Post a capability set event with a string payload
@@ -68,6 +68,8 @@ void postCapsetVecEvent (EventTypeNum tag,
                          EventCapsetID capset,
                          int argc,
                          char *msg[]);
+
+void postWallClockTime (EventCapsetID capset);
 
 /* 
  * Post a `par` spark event
