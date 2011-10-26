@@ -1,6 +1,11 @@
 import Control.Monad
 import Data.List
 import Data.Maybe
+import Distribution.InstalledPackageInfo
+import Distribution.Package
+import Distribution.Simple.Compiler
+import Distribution.Simple.GHC
+import Distribution.Simple.PackageIndex
 import Distribution.Simple.Program
 import Distribution.Simple.Utils
 import Distribution.Verbosity
@@ -51,17 +56,23 @@ test = do
   waitForProcess h2
   putStrLn ""
 
-  -- TODO: use Distribution.* to get the packages instead
-  libdir <- rawSystemStdout normal haddockPath ["--print-ghc-libdir"]
-  let librariesPath = ".."</>".."</>"share"</>"doc"</>"ghc"</>"html"</>"libraries"
+  -- TODO: maybe do something more clever here using haddock.cabal
+  ghcPath <- fmap init $ rawSystemStdout normal haddockPath ["--print-ghc-path"]
+  (_, conf) <- configure normal (Just ghcPath) Nothing emptyProgramConfiguration
+  pkgIndex <- getInstalledPackages normal [GlobalPackageDB] conf
+  let safeHead xs = case xs of x : _ -> Just x; [] -> Nothing
+  let mkDep pkgName =
+        maybe (error "Couldn't find test dependencies") id $ do
+          let pkgs = lookupPackageName pkgIndex (PackageName pkgName)
+          (_, pkgs') <- safeHead pkgs
+          pkg <- safeHead pkgs'
+          ifacePath <- safeHead (haddockInterfaces pkg)
+          htmlPath <- safeHead (haddockHTMLs pkg)
+          return ("-i " ++ htmlPath ++ "," ++ ifacePath)
 
-  let mkDep name version =
-        let path = init libdir </> librariesPath </> name ++ "-" ++ version
-        in  "-i " ++ path ++ "," ++ path </> name ++ ".haddock"
-
-  let base    = mkDep "base" "4.3.1.0"
-      process = mkDep "process" "1.0.1.5"
-      ghcprim = mkDep "ghc-prim" "0.2.0.0"
+  let base    = mkDep "base"
+      process = mkDep "process"
+      ghcprim = mkDep "ghc-prim"
 
   putStrLn "Running tests..."
   handle <- runProcess haddockPath
