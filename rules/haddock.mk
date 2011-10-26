@@ -66,7 +66,7 @@ endif
 # uses the Template Haskell or Annotations extensions, for example.
 
 # Make the haddocking depend on the library .a file, to ensure
-# that we wait until the library is fully build before we haddock it
+# that we wait until the library is fully built before we haddock it
 $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) : $$($1_$2_v_LIB)
 endif
 
