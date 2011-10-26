@@ -216,6 +216,9 @@ promise state ms = (p, ms)
             hNames   = h_names'
           }
 
+instance MonadStatics (DelayM (MemoT HistoryM)) where
+    -- FIXME
+
 memo :: (State -> HistoryM (ScpM (Deeds, Out FVedTerm)))
      -> State -> MemoT HistoryM (ScpM (Deeds, Out FVedTerm))
 memo opt state = MT $ \ms ->
@@ -238,7 +241,9 @@ memo opt state = MT $ \ms ->
 type RollbackScpM = () -- Generaliser -> ScpBM (Deeds, Out FVedTerm)
 
 sc' :: State -> HistoryM (ScpM (Deeds, Out FVedTerm))
-sc' state = error "FIXME"
+sc' state = \hist -> case terminate hist (state, ()) of
+                       Continue hist'             -> split (snd $ reduce state) (delay . sc) -- FIXME: use hist'
+                       Stop (shallower_state, ()) -> maybe (split state) id (generalise (mK_GENERALISER shallower_state state) state) (delay . sc)
 
 sc :: State -> MemoT HistoryM (ScpM (Deeds, Out FVedTerm))
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
