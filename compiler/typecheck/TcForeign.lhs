@@ -236,7 +236,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
           check (isFFIDynArgumentTy arg1_ty)
                 (illegalForeignTyErr argument arg1_ty)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
-          let safe_on = safeLanguageOn dflags || safeInferOn dflags
+          let safe_on = safeLanguageOn dflags
               ioOK    = if safe_on then mustBeIO else nonIOok
           checkForeignRes ioOK safe_on (isFFIImportResultTy dflags) res_ty
           return idecl
@@ -250,17 +250,17 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
             (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
       checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
       -- prim import result is more liberal, allows (#,,#)
-      let safe_on = safeLanguageOn dflags || safeInferOn dflags
+      let safe_on = safeLanguageOn dflags
           ioOK    = if safe_on then mustBeIO else nonIOok
       checkForeignRes ioOK safe_on (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
-      checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
+      checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
       checkCConv cconv
       checkCTarget target
       dflags <- getDOpts
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
-      let safe_on = safeLanguageOn dflags || safeInferOn dflags
+      let safe_on = safeLanguageOn dflags
           ioOK    = if safe_on then mustBeIO else nonIOok
       checkForeignRes ioOK safe_on (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
@@ -377,14 +377,9 @@ checkForeignRes non_io_result_ok safehs_check pred_res_ty ty
     Just (_, res_ty)
      | pred_res_ty res_ty ->
         return ()
-
-    _ -> do
-        dflags <- getDOpts
-        case safeInferOn dflags && safehs_check of
-            True | pred_res_ty ty -> recordUnsafeInfer
-
-            _ -> check (non_io_result_ok && pred_res_ty ty)
-                     (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
+    _ ->
+        check (non_io_result_ok && pred_res_ty ty)
+              (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
 \end{code}
 
 \begin{code}

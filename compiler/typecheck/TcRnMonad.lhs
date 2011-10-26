@@ -2,8 +2,6 @@
 % (c) The University of Glasgow 2006
 %
 
-Functions for working with the typechecker environment (setters, getters...).
-
 \begin{code}
 module TcRnMonad(
         module TcRnMonad,
@@ -63,7 +61,6 @@ import Control.Monad
 
 \begin{code}
 
--- | Setup the initial typechecking environment
 initTc :: HscEnv
        -> HscSource
        -> Bool          -- True <=> retain renamed syntax trees
@@ -81,7 +78,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         used_rdr_var <- newIORef Set.empty ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
-        infer_var    <- newIORef True ;
         lie_var      <- newIORef emptyWC ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
@@ -94,46 +90,45 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 | otherwise      = Nothing ;
 
              gbl_env = TcGblEnv {
-                tcg_mod            = mod,
-                tcg_src            = hsc_src,
-                tcg_rdr_env        = emptyGlobalRdrEnv,
-                tcg_fix_env        = emptyNameEnv,
-                tcg_field_env      = RecFields emptyNameEnv emptyNameSet,
-                tcg_default        = Nothing,
-                tcg_type_env       = emptyNameEnv,
-                tcg_type_env_var   = type_env_var,
-                tcg_inst_env       = emptyInstEnv,
-                tcg_fam_inst_env   = emptyFamInstEnv,
-                tcg_th_used        = th_var,
-                tcg_th_splice_used = th_splice_var,
-                tcg_exports        = [],
-                tcg_imports        = emptyImportAvails,
-                tcg_used_rdrnames  = used_rdr_var,
-                tcg_dus            = emptyDUs,
+                tcg_mod       = mod,
+                tcg_src       = hsc_src,
+                tcg_rdr_env   = emptyGlobalRdrEnv,
+                tcg_fix_env   = emptyNameEnv,
+                tcg_field_env = RecFields emptyNameEnv emptyNameSet,
+                tcg_default   = Nothing,
+                tcg_type_env  = emptyNameEnv,
+                tcg_type_env_var = type_env_var,
+                tcg_inst_env  = emptyInstEnv,
+                tcg_fam_inst_env  = emptyFamInstEnv,
+                tcg_th_used   = th_var,
+                tcg_th_splice_used   = th_splice_var,
+                tcg_exports  = [],
+                tcg_imports  = emptyImportAvails,
+                tcg_used_rdrnames = used_rdr_var,
+                tcg_dus      = emptyDUs,
 
-                tcg_rn_imports     = [],
-                tcg_rn_exports     = maybe_rn_syntax [],
-                tcg_rn_decls       = maybe_rn_syntax emptyRnGroup,
+                tcg_rn_imports = [],
+                tcg_rn_exports = maybe_rn_syntax [],
+                tcg_rn_decls   = maybe_rn_syntax emptyRnGroup,
 
-                tcg_binds          = emptyLHsBinds,
-                tcg_imp_specs      = [],
-                tcg_sigs           = emptyNameSet,
-                tcg_ev_binds       = emptyBag,
-                tcg_warns          = NoWarnings,
-                tcg_anns           = [],
-                tcg_tcs            = [],
-                tcg_clss           = [],
-                tcg_insts          = [],
-                tcg_fam_insts      = [],
-                tcg_rules          = [],
-                tcg_fords          = [],
-                tcg_vects          = [],
-                tcg_dfun_n         = dfun_n_var,
-                tcg_keep           = keep_var,
-                tcg_doc_hdr        = Nothing,
-                tcg_hpc            = False,
-                tcg_main           = Nothing,
-                tcg_safeInfer      = infer_var
+                tcg_binds     = emptyLHsBinds,
+                tcg_imp_specs = [],
+                tcg_sigs      = emptyNameSet,
+                tcg_ev_binds  = emptyBag,
+                tcg_warns     = NoWarnings,
+                tcg_anns      = [],
+                tcg_tcs       = [],
+                tcg_clss      = [],
+                tcg_insts     = [],
+                tcg_fam_insts = [],
+                tcg_rules     = [],
+                tcg_fords     = [],
+                tcg_vects     = [],
+                tcg_dfun_n    = dfun_n_var,
+                tcg_keep      = keep_var,
+                tcg_doc_hdr   = Nothing,
+                tcg_hpc       = False,
+                tcg_main      = Nothing
              } ;
              lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
@@ -276,15 +271,15 @@ unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 
 -- | Do it flag is true
 ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifDOptM flag thing_inside = do { b <- doptM flag ;
+ifDOptM flag thing_inside = do { b <- doptM flag;
                                 if b then thing_inside else return () }
 
 ifWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifWOptM flag thing_inside = do { b <- woptM flag ;
+ifWOptM flag thing_inside = do { b <- woptM flag;
                                 if b then thing_inside else return () }
 
 ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
-ifXOptM flag thing_inside = do { b <- xoptM flag ;
+ifXOptM flag thing_inside = do { b <- xoptM flag;
                                 if b then thing_inside else return () }
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
@@ -559,7 +554,7 @@ setErrsVar :: TcRef Messages -> TcRn a -> TcRn a
 setErrsVar v = updLclEnv (\ env -> env { tcl_errs =  v })
 
 addErr :: Message -> TcRn ()    -- Ignores the context stack
-addErr msg = do { loc <- getSrcSpanM; addErrAt loc msg }
+addErr msg = do { loc <- getSrcSpanM ; addErrAt loc msg }
 
 failWith :: Message -> TcRn a
 failWith msg = addErr msg >> failM
@@ -1077,18 +1072,6 @@ getStage = do { env <- getLclEnv; return (tcl_th_ctxt env) }
 
 setStage :: ThStage -> TcM a -> TcM a
 setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
-             Safe Haskell context
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-recordUnsafeInfer :: TcM ()
-recordUnsafeInfer = getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) False
 \end{code}
 
 

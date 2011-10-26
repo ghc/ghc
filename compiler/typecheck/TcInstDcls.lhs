@@ -407,19 +407,15 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        -- performed. Derived instances are OK.
        ; dflags <- getDOpts
        ; when (safeLanguageOn dflags) $
-             mapM_ (\x -> when (typInstCheck x)
+             mapM_ (\x -> when (is_cls (iSpec x) `elem` typeableClassNames)
                                (addErrAt (getSrcSpan $ iSpec x) typInstErr))
                    local_info
-       -- As above but for Safe Inference mode.
-       ; when (safeInferOn dflags) $
-             mapM_ (\x -> when (typInstCheck x) recordUnsafeInfer) local_info
 
        ; return ( gbl_env
                 , (bagToList deriv_inst_info) ++ local_info
                 , aux_binds `plusHsValBinds` deriv_binds)
     }}}
   where
-    typInstCheck ty = is_cls (iSpec ty) `elem` typeableClassNames
     typInstErr = ptext $ sLit $ "Can't create hand written instances of Typeable in Safe"
                               ++ " Haskell! Can only derive them"
 

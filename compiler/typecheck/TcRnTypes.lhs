@@ -2,19 +2,6 @@
 % (c) The University of Glasgow 2006
 % (c) The GRASP Project, Glasgow University, 1992-2002
 %
-
-Various types used during typechecking, please see TcRnMonad as well for
-operations on these types. You probably want to import it, instead of this
-module.
-
-All the monads exported here are built on top of the same IOEnv monad. The
-monad functions like a Reader monad in the way it passes the environment
-around. This is done to allow the environment to be manipulated in a stack
-like fashion when entering expressions... ect.
-
-For state that is global and should be returned at the end (e.g not part
-of the stack mechanism), you should use an TcRef (= IORef) to store them.
-
 \begin{code}
 module TcRnTypes(
 	TcRnIf, TcRn, TcM, RnM,	IfM, IfL, IfG, -- The monad is opaque outside this module
@@ -148,34 +135,29 @@ instance Outputable TcTyVarBind where
 
 
 %************************************************************************
-%*                                                                      *
-                The main environment types
-%*                                                                      *
+%*									*
+		The main environment types
+%*									*
 %************************************************************************
 
 \begin{code}
--- We 'stack' these envs through the Reader like monad infastructure
--- as we move into an expression (although the change is focused in
--- the lcl type).
-data Env gbl lcl
+data Env gbl lcl	-- Changes as we move into an expression
   = Env {
-        env_top  :: HscEnv,  -- Top-level stuff that never changes
-                             -- Includes all info about imported things
+	env_top	 :: HscEnv,	-- Top-level stuff that never changes
+				-- Includes all info about imported things
 
-        env_us   :: {-# UNPACK #-} !(IORef UniqSupply),
-                             -- Unique supply for local varibles
+	env_us   :: {-# UNPACK #-} !(IORef UniqSupply),	
+				-- Unique supply for local varibles
 
-        env_gbl  :: gbl,     -- Info about things defined at the top level
-                             -- of the module being compiled
+	env_gbl  :: gbl,	-- Info about things defined at the top level
+				-- of the module being compiled
 
-        env_lcl  :: lcl      -- Nested stuff; changes as we go into 
+	env_lcl  :: lcl	 	-- Nested stuff; changes as we go into 
     }
 
 -- TcGblEnv describes the top-level of the module at the 
 -- point at which the typechecker is finished work.
 -- It is this structure that is handed on to the desugarer
--- For state that needs to be updated during the typechecking
--- phase and returned at end, use a TcRef (= IORef).
 
 data TcGblEnv
   = TcGblEnv {
@@ -216,8 +198,7 @@ data TcGblEnv
 	tcg_exports :: [AvailInfo],	-- ^ What is exported
 	tcg_imports :: ImportAvails,
           -- ^ Information about what was imported from where, including
-	  -- things bound in this module. Also store Safe Haskell info
-          -- here about transative trusted packaage requirements.
+	  -- things bound in this module.
 
 	tcg_dus :: DefUses,
           -- ^ What is defined in this module and what is used.
@@ -299,11 +280,9 @@ data TcGblEnv
         tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
                                              --  prog uses hpc instrumentation.
 
-        tcg_main      :: Maybe Name,         -- ^ The Name of the main
+        tcg_main      :: Maybe Name          -- ^ The Name of the main
                                              -- function, if this module is
                                              -- the main module.
-        tcg_safeInfer :: TcRef Bool          -- Has the typechecker infered this
-                                             -- module as -XSafe (Safe Haskell)
     }
 
 data RecFieldEnv 

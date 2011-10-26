@@ -110,7 +110,6 @@ import Control.Monad
 
 
 \begin{code}
--- | Top level entry point for typechecker and renamer
 tcRnModule :: HscEnv 
 	   -> HscSource
 	   -> Bool 		-- True <=> save renamed syntax
