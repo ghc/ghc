@@ -1,5 +1,5 @@
-{-# LANGUAGE GADTs, ScopedTypeVariables #-}
-module Supercompile.Drive.Process2 () where
+{-# LANGUAGE GADTs #-}
+module Supercompile.Drive.Process2 (supercompile) where
 
 import Supercompile.Drive.Match
 import Supercompile.Drive.Split
@@ -7,56 +7,24 @@ import Supercompile.Drive.Process
 
 import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
---import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 import Supercompile.Core.Tag
 
 import Supercompile.Evaluator.Deeds
-import Supercompile.Evaluator.Evaluate
-import Supercompile.Evaluator.FreeVars
 import Supercompile.Evaluator.Residualise
 import Supercompile.Evaluator.Syntax
 
 import Supercompile.Termination.Combinators
---import Supercompile.Termination.Extras
---import Supercompile.Termination.TagSet
-import Supercompile.Termination.TagBag
---import Supercompile.Termination.TagGraph
-import Supercompile.Termination.Generaliser
 
-import Supercompile.StaticFlags
-import Supercompile.Utilities hiding (Monad(..))
+import Supercompile.Utilities
 
-import Var        (isTyVar, isId)
-import Id         (idType, mkLocalId, isDeadBinder, idOccInfo, setIdOccInfo, zapIdOccInfo, zapFragileIdInfo)
-import Type       (isUnLiftedType, mkTyVarTy)
-import Coercion   (isCoVar, mkCoVarCo)
+import Id         (mkLocalId)
 import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
 import qualified State as State
-import State hiding (State, mapAccumLM)
-import BasicTypes (OccInfo(..))
 
-import Text.XHtml hiding (text)
-
-import qualified Control.Monad as Monad
-import Control.Exception (handleJust, AsyncException(UserInterrupt))
-import qualified Data.Foldable as Foldable
-import qualified Data.Traversable as Traversable
 import qualified Data.Map as M
-import Data.Monoid
-import Data.Ord
-import qualified Data.Set as S
-
-
-
-import Control.Applicative (Applicative(..), (<$>), liftA2)
-import Control.Monad (liftM2)
-
-import Data.Foldable (Foldable(..))
-import Data.Traversable (Traversable(..))
-import qualified Data.Traversable as Traversable
 
 
 data Stream a = a :< Stream a
@@ -153,8 +121,9 @@ traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include d
 runScpM :: MemoT HistoryThreadM (ScpM a) -> MemoT HistoryThreadM a
 runScpM mx = mx >>= runDelayM eval_strat
   where
-    --eval_strat = depthFirst
-    eval_strat = breadthFirst
+    -- Doing things this way prevents GHC bleating about depthFirst being unused
+    eval_strat | False     = depthFirst
+               | otherwise = breadthFirst
 
 
 type ProcessHistory = History (State, RollbackScpM)
@@ -190,8 +159,10 @@ instance Monad m => Monad (StateT s m) where
     return x = ST $ \s -> return (x, s)
     mx >>= fxmy = ST $ \s -> unST mx s >>= \(x, s) -> unST (fxmy x) s
 
+{-
 liftStateT :: Functor m => m a -> StateT s m a
 liftStateT mx = ST $ \s -> fmap (flip (,) s) mx
+-}
 
 delayStateT :: Functor m => m (StateT s (DelayM m) a) -> StateT s (DelayM m) a
 delayStateT mx = ST $ \s -> delay (fmap (($ s) . unST) mx)
@@ -254,7 +225,7 @@ runFulfilmentT mx = liftM (\(e, fs) -> letRec (fulfilments fs) e) $ unST mx (FS 
 
 
 promise :: State -> MemoState -> (Promise, MemoState)
-promise state ms = (p, ms)
+promise state ms = (p, ms')
   where vs_list = stateAbsVars state
         h_name :< h_names' = hNames ms
         x = mkLocalId h_name (vs_list `mkPiTypes` stateType state)
