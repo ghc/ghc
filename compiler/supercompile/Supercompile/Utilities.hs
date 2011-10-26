@@ -25,7 +25,7 @@ import Outputable
 import State hiding (mapAccumLM)
 
 import Control.Arrow (first, second, (***), (&&&))
-import Control.Applicative (Applicative(..), (<$>))
+import Control.Applicative (Applicative(..), (<$>), liftA2)
 import Control.Exception (bracket)
 import Control.Monad hiding (join)
 
@@ -229,6 +229,10 @@ instance (Functor f, Outputable1 f, Outputable1 g, Outputable a) => Outputable (
 
 instance (Functor f, Functor g) => Functor (O f g) where
     fmap f (Comp x) = Comp (fmap (fmap f) x)
+
+instance (Applicative f, Applicative g) => Applicative (O f g) where
+    pure = Comp . pure . pure
+    mf <*> mx = Comp $ liftA2 (<*>) (unComp mf) (unComp mx)
 
 instance (Foldable f, Foldable g) => Foldable (O f g) where
     foldMap f = foldMap (foldMap f) . unComp

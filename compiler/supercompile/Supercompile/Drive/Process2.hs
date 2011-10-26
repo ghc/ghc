@@ -67,18 +67,19 @@ listToStream (x:xs) = x :< listToStream xs
 
 
 data LeafTy a
-data Q
-data A
 
-data DelayStructure sh m qa where
-    LeafQ :: m (DelayM m a) -> DelayStructure (LeafTy a) m Q
-    LeafA :: a              -> DelayStructure (LeafTy a) m A
-    Branch :: DelayStructure sh1 m qa -> DelayStructure sh2 m qa -> DelayStructure (sh1, sh2) m qa
+data DelayStructure sh f where
+    Leaf   :: f a -> DelayStructure (LeafTy a) f
+    Branch :: DelayStructure sh1 f -> DelayStructure sh2 f -> DelayStructure (sh1, sh2) f
+
+
+--newtype I a = I { unI :: a }
+newtype QM m a = QM { unQM :: m (DelayM m a) }
 
 -- If you don't want DelayM to have Monad structure, you can nuke the nested use of DelayM,
 -- and make some of the consumers simpler. I actually want this generalisation, though.
 data DelayM m r = Done r
-                | forall sh. Delayed (DelayStructure sh m Q) (DelayStructure sh m A -> DelayM m r)
+                | forall sh. Delayed (DelayStructure sh (QM m)) (DelayStructure sh Identity -> DelayM m r)
 
 instance Functor (DelayM m) where
     fmap f x = pure f <*> x
@@ -96,7 +97,7 @@ instance Monad (DelayM m) where
     Delayed qs k >>= fxmy = Delayed qs (\as -> k as >>= fxmy)
 
 delay :: m (DelayM m a) -> DelayM m a
-delay q = Delayed (LeafQ q) (\(LeafA a) -> pure a)
+delay q = Delayed (Leaf (QM q)) (\(Leaf (I a)) -> pure a)
 
 runDelayM :: (Applicative m, Monad m)
           => (DelayM m r -> DelayM m r) -- ^ Chooses the evaluation strategy
@@ -108,24 +109,36 @@ runDelayM choose_some = go
     go' (Done x)       = pure x
     go' (Delayed qs k) = mungeDS qs >>= \mx -> go (mx >>= k)
 
+fmapNT :: Applicative m
+       => (forall a. f a -> m (g a))
+       -> DelayStructure sh f
+       -> m (DelayStructure sh g)
+fmapNT f (Leaf x)         = fmap Leaf (f x)
+fmapNT f (Branch qs1 qs2) = liftA2 Branch (fmapNT f qs1) (fmapNT f qs2)
+
 mungeDS :: Applicative n
-        => DelayStructure sh n Q
-        -> n (DelayM n (DelayStructure sh m A))
-mungeDS (LeafQ mx)       = fmap (fmap LeafA) mx
+        => DelayStructure sh (QM n)
+        -> n (DelayM n (DelayStructure sh Identity))
+mungeDS = unComp . fmapNT (Comp . fmap (fmap I) . unQM)
+{-
+mungeDS (Leaf (QM mx))   = fmap (fmap (Leaf . I)) mx
 mungeDS (Branch qs1 qs2) = liftA2 (liftA2 Branch) (mungeDS qs1) (mungeDS qs2)
+-}
 
-delayDS :: DelayStructure sh n Q
-        -> DelayM n (DelayStructure sh m A)
-delayDS (LeafQ mx)       = fmap LeafA (delay mx)
+delayDS :: DelayStructure sh (QM n)
+        -> DelayM n (DelayStructure sh Identity)
+delayDS = fmapNT (fmap I . delay . unQM)
+{-
+delayDS (Leaf (QM mx))   = fmap (Leaf . I) (delay mx)
 delayDS (Branch qs1 qs2) = liftA2 Branch (delayDS qs1) (delayDS qs2)
-
+-}
 
 depthFirst :: DelayM m r -> DelayM m r
 depthFirst (Done x)       = Done x
 depthFirst (Delayed qs k) = delayTail qs >>= k
   where
-    delayTail :: DelayStructure sh m Q -> DelayM m (DelayStructure sh m A)
-    delayTail (LeafQ q)        = fmap LeafA (delay q)
+    delayTail :: DelayStructure sh (QM m) -> DelayM m (DelayStructure sh Identity)
+    delayTail (Leaf (QM q))    = fmap (Leaf . I) (delay q)
     delayTail (Branch qs1 qs2) = liftM2 Branch (delayTail qs1) (delayDS qs2)
 
 breadthFirst :: DelayM m r -> DelayM m r
