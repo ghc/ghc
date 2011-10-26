@@ -47,6 +47,7 @@ module GHC.Exts
         Down(..), groupWith, sortWith, the,
 
         -- * Event logging
+        traceEventIO,
         traceEvent,
 
         -- * SpecConstr annotations
@@ -62,9 +63,10 @@ import GHC.Magic
 import GHC.Word
 import GHC.Int
 import GHC.Ptr
+import GHC.Foreign
+import GHC.IO.Encoding
 import Data.String
 import Data.List
-import Foreign.C
 import Data.Data
 
 -- XXX This should really be in Data.Tuple, where the definitions are
@@ -112,11 +114,14 @@ groupByFB c n eq xs0 = groupByFBCore xs0
 -- -----------------------------------------------------------------------------
 -- tracing
 
-traceEvent :: String -> IO ()
-traceEvent msg = do
-  withCString msg $ \(Ptr p) -> IO $ \s ->
+traceEventIO :: String -> IO ()
+traceEventIO msg = do
+  withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
     case traceEvent# p s of s' -> (# s', () #)
 
+traceEvent :: String -> IO ()
+traceEvent = traceEventIO
+{-# DEPRECATED traceEvent "Use Debug.Trace.traceEvent or Debug.Trace.traceEventIO" #-}
 
 
 {- **********************************************************************

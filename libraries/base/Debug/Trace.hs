@@ -19,7 +19,11 @@ module Debug.Trace (
         -- * Tracing
         putTraceMsg,      -- :: String -> IO ()
         trace,            -- :: String -> a -> a
-        traceShow
+        traceShow,
+
+        -- * Eventlog tracing
+        traceEvent,
+        traceEventIO,
   ) where
 
 import Prelude
@@ -27,6 +31,7 @@ import System.IO.Unsafe
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign.C.String
+import qualified GHC.Exts as GHC
 #else
 import System.IO (hPutStrLn,stderr)
 #endif
@@ -72,3 +77,33 @@ Like 'trace', but uses 'show' on the argument to convert it to a 'String'.
 traceShow :: (Show a) => a -> b -> b
 traceShow = trace . show
 
+
+{-# NOINLINE traceEvent #-}
+-- | The 'traceEvent' function behaves like 'trace' with the difference that
+-- the message is emitted to the eventlog, if eventlog profiling is available
+-- and enabled at runtime.
+--
+-- It is suitable for use in pure code. In an IO context use 'traceEventIO'
+-- instead.
+--
+-- Note that when using GHC's SMP runtime, it is possible (but rare) to get
+-- duplicate events emitted if two CPUs simultaneously evaluate the same thunk
+-- that uses 'traceEvent'.
+--
+traceEvent :: String -> a -> a
+traceEvent msg expr = unsafeDupablePerformIO $ do
+    traceEventIO msg
+    return expr
+
+-- | The 'traceEventIO' function emits a message to the eventlog, if eventlog
+-- profiling is available and enabled at runtime.
+--
+-- Compared to 'traceEvent', 'traceEventIO' sequences the event with respect to
+-- other IO actions.
+--
+traceEventIO :: String -> IO ()
+#ifdef __GLASGOW_HASKELL__
+traceEventIO = GHC.traceEventIO
+#else
+traceEventIO msg = (return $! length msg) >> return ()
+#endif
