@@ -405,6 +405,10 @@ sub scmall {
             scm ($localpath, $scm, "repack", @args)
                 if $scm eq "git"
         }
+        elsif ($command =~ /^format-patch$/) {
+            scm ($localpath, $scm, "format-patch", @args)
+                if $scm eq "git"
+        }
         else {
             die "Unknown command: $command";
         }
@@ -484,6 +488,7 @@ any extra arguments to git:
   commit
   config
   fetch
+  format-patch
   grep
   log
   new
