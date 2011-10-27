@@ -15,8 +15,7 @@ import CoreMonad	( FloatOutSwitches(..) )
 
 import DynFlags		( DynFlags, DynFlag(..) )
 import ErrUtils		( dumpIfSet_dyn )
-import CostCentre	( dupifyCC, CostCentre )
-import DataCon		( DataCon )
+import DataCon          ( DataCon )
 import Id		( Id, idArity, isBottomingId )
 import Var		( Var )
 import SetLevels
@@ -195,7 +194,6 @@ installUnderLambdas floats e
   | otherwise         = go e
   where
     go (Lam b e)                 = Lam b (go e)
-    go (Note n e) | notSccNote n = Note n (go e)
     go e                         = install floats e
 
 ---------------
@@ -278,18 +276,19 @@ floatExpr lam@(Lam (TB _ lam_spec) _)
     case (floatBody bndr_lvl body) of { (fs, floats, body') ->
     (add_to_stats fs floats, floats, mkLams bndrs body') }
 
-floatExpr (Note note@(SCC cc) expr)
+floatExpr (Tick tickish expr)
+  | tickishScoped tickish
   = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
     let
 	-- Annotate bindings floated outwards past an scc expression
 	-- with the cc.  We mark that cc as "duplicated", though.
-	annotated_defns = wrapCostCentre (dupifyCC cc) floating_defns
+        annotated_defns = wrapTick (mkNoTick tickish) floating_defns
     in
-    (fs, annotated_defns, Note note expr') }
+    (fs, annotated_defns, Tick tickish expr') }
 
-floatExpr (Note note expr)	-- Other than SCCs
+  | otherwise  -- not scoped, can just float
   = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
-    (fs, floating_defns, Note note expr') }
+    (fs, floating_defns, Tick tickish expr') }
 
 floatExpr (Cast expr co)
   = case (floatExpr expr) of { (fs, floating_defns, expr') ->
@@ -555,15 +554,15 @@ partitionByLevel (Level major minor) (FB tops defns)
                                             Just min_defns -> M.splitLookup minor min_defns
     here_min = mb_here_min `orElse` emptyBag
 
-wrapCostCentre :: CostCentre -> FloatBinds -> FloatBinds
-wrapCostCentre cc (FB tops defns)
+wrapTick :: Tickish Id -> FloatBinds -> FloatBinds
+wrapTick t (FB tops defns)
   = FB (mapBag wrap_bind tops) (M.map (M.map wrap_defns) defns)
   where
     wrap_defns = mapBag wrap_one 
 
-    wrap_bind (NonRec binder rhs) = NonRec binder (mkSCC cc rhs)
-    wrap_bind (Rec pairs)         = Rec (mapSnd (mkSCC cc) pairs)
+    wrap_bind (NonRec binder rhs) = NonRec binder (mkTick t rhs)
+    wrap_bind (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
 
     wrap_one (FloatLet bind)      = FloatLet (wrap_bind bind)
-    wrap_one (FloatCase e b c bs) = FloatCase (mkSCC cc e) b c bs
+    wrap_one (FloatCase e b c bs) = FloatCase (mkTick t e) b c bs
 \end{code}

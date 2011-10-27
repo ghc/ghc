@@ -1668,32 +1668,45 @@ phase <replaceable>n</replaceable></entry>
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-auto</option></entry>
-	      <entry>Auto-add <literal>_scc_</literal>s to all
-	      exported functions not marked INLINE</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-no-auto</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-auto-all</option></entry>
-	      <entry>Auto-add <literal>_scc_</literal>s to all
-	      top-level functions not marked INLINE</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-no-auto-all</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-caf-all</option></entry>
-	      <entry>Auto-add <literal>_scc_</literal>s to all CAFs</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-no-caf-all</option></entry>
-	    </row>
-	    <row>
 	      <entry><option>-prof</option></entry>
 	      <entry>Turn on profiling</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
+              <entry><option>-fprof-auto</option></entry>
+              <entry>Auto-add <literal>SCC</literal>s to all bindings
+              not marked INLINE</entry>
+	      <entry>dynamic</entry>
+              <entry><option>-fno-prof-auto</option></entry>
+	    </row>
+	    <row>
+              <entry><option>-fprof-auto-top</option></entry>
+              <entry>Auto-add <literal>SCC</literal>s to all top-level
+              bindings not marked INLINE</entry>
+              <entry>dynamic</entry>
+              <entry><option>-fno-prof-auto</option></entry>
+	    </row>
+	    <row>
+              <entry><option>-fprof-auto-exported</option></entry>
+              <entry>Auto-add <literal>SCC</literal>s to all exported
+              bindings not marked INLINE</entry>
+              <entry>dynamic</entry>
+              <entry><option>-fno-prof-auto</option></entry>
+	    </row>
+	    <row>
+              <entry><option>-fprof-cafs</option></entry>
+              <entry>Auto-add <literal>SCC</literal>s to all CAFs</entry>
+	      <entry>dynamic</entry>
+              <entry><option>-fno-prof-cafs</option></entry>
+	    </row>
+	    <row>
+              <entry><option>-fno-prof-count-entries</option></entry>
+              <entry>Do not collect entry counts</entry>
+	      <entry>dynamic</entry>
+              <entry><option>-fprof-count-entries</option></entry>
+	    </row>
+            <row>
 	      <entry><option>-ticky</option></entry>
 	      <entry><link linkend="ticky-ticky">Turn on ticky-ticky profiling</link></entry>
 	      <entry>static</entry>

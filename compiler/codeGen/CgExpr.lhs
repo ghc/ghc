@@ -258,7 +258,7 @@ SCC expressions are treated specially. They set the current cost
 centre.
 
 \begin{code}
-cgExpr (StgSCC cc expr) = do emitSetCCC cc; cgExpr expr
+cgExpr (StgSCC cc tick push expr) = do emitSetCCC cc tick push; cgExpr expr
 \end{code}
 
 %********************************************************

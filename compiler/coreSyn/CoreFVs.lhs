@@ -185,7 +185,7 @@ expr_fvs (Type ty) 	 = someVars (tyVarsOfType ty)
 expr_fvs (Coercion co)   = someVars (tyCoVarsOfCo co)
 expr_fvs (Var var) 	 = oneVar var
 expr_fvs (Lit _)         = noVars
-expr_fvs (Note _ expr)   = expr_fvs expr
+expr_fvs (Tick t expr) = tickish_fvs t `union` expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
 expr_fvs (Cast expr co)  = expr_fvs expr `union` someVars (tyCoVarsOfCo co)
@@ -212,6 +212,10 @@ rhs_fvs (bndr, rhs) = expr_fvs rhs `union`
 ---------
 exprs_fvs :: [CoreExpr] -> FV
 exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
+
+tickish_fvs :: Tickish Id -> FV
+tickish_fvs (Breakpoint _ ids) = someVars (mkVarSet ids)
+tickish_fvs _ = noVars
 \end{code}
 
 
@@ -255,7 +259,7 @@ exprOrphNames e
     go (Coercion co)        = orphNamesOfCo co
     go (App e1 e2) 	    = go e1 `unionNameSets` go e2
     go (Lam v e)   	    = go e `delFromNameSet` idName v
-    go (Note _ e)           = go e
+    go (Tick _ e)         = go e
     go (Cast e co)          = go e `unionNameSets` orphNamesOfCo co
     go (Let (NonRec _ r) e) = go e `unionNameSets` go r
     go (Let (Rec prs) e)    = exprsOrphNames (map snd prs) `unionNameSets` go e
@@ -536,10 +540,12 @@ freeVars (Cast expr co)
     expr2 = freeVars expr
     cfvs  = tyCoVarsOfCo co
 
-freeVars (Note other_note expr)
-  = (freeVarsOf expr2, AnnNote other_note expr2)
+freeVars (Tick tickish expr)
+  = (tickishFVs tickish `unionFVs` freeVarsOf expr2, AnnTick tickish expr2)
   where
     expr2 = freeVars expr
+    tickishFVs (Breakpoint _ ids) = mkVarSet ids
+    tickishFVs _                  = emptyVarSet
 
 freeVars (Type ty) = (tyVarsOfType ty, AnnType ty)
 

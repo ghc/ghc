@@ -13,7 +13,6 @@ module PprCore (
     ) where
 
 import CoreSyn
-import CostCentre
 import Literal( pprLiteral )
 import Var
 import Id
@@ -225,13 +224,8 @@ ppr_expr add_par (Let bind expr)
 		Rec _      -> (sLit "letrec {")
 		NonRec _ _ -> (sLit "let {")
 
-ppr_expr add_par (Note (SCC cc) expr)
-  = add_par (sep [pprCostCentreCore cc, pprCoreExpr expr])
-
-ppr_expr add_par (Note (CoreNote s) expr)
-  = add_par $ 
-    sep [sep [ptext (sLit "__core_note"), pprHsString (mkFastString s)],
-         pprParendExpr expr]
+ppr_expr add_par (Tick tickish expr)
+  = add_par (sep [ppr tickish, pprCoreExpr expr])
 
 pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
 pprCoreAlt (con, args, rhs) 
@@ -464,6 +458,31 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
                nest 2 (ptext (sLit "=") <+> pprCoreExpr rhs)
             ])
+\end{code}
+
+-----------------------------------------------------
+--      Tickish
+-----------------------------------------------------
+
+\begin{code}
+instance Outputable id => Outputable (Tickish id) where
+  ppr (HpcTick modl ix) =
+      hcat [ptext (sLit "tick<"),
+            ppr modl, comma,
+            ppr ix,
+            ptext (sLit ">")]
+  ppr (Breakpoint ix vars) =
+      hcat [ptext (sLit "break<"),
+            ppr ix,
+            ptext (sLit ">"),
+            parens (hcat (punctuate comma (map ppr vars)))]
+  ppr (ProfNote { profNoteCC = cc,
+                  profNoteCount = tick,
+                  profNoteScope = scope }) =
+      case (tick,scope) of
+         (True,True)  -> hcat [ptext (sLit "scctick<"), ppr cc, char '>']
+         (True,False) -> hcat [ptext (sLit "tick<"),    ppr cc, char '>']
+         _            -> hcat [ptext (sLit "scc<"),     ppr cc, char '>']
 \end{code}
 
 -----------------------------------------------------

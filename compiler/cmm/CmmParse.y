@@ -798,7 +798,6 @@ stmtMacros :: UniqFM ([CmmExpr] -> Code)
 stmtMacros = listToUFM [
   ( fsLit "CCS_ALLOC",		   \[words,ccs]  -> profAlloc words ccs ),
   ( fsLit "CLOSE_NURSERY",	   \[]  -> emitCloseNursery ),
-  ( fsLit "ENTER_CCS_PAP_CL",     \[e] -> enterCostCentrePAP e ),
   ( fsLit "ENTER_CCS_THUNK",      \[e] -> enterCostCentreThunk e ),
   ( fsLit "HP_CHK_GEN",           \[words,liveness,reentry] -> 
                                       hpChkGen words liveness reentry ),

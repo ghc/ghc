@@ -55,7 +55,6 @@ import UniqSupply
 import BreakArray
 import Data.Maybe
 import Module
-import IdInfo
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -65,19 +64,20 @@ import qualified FiniteMap as Map
 -- Generating byte code for a complete module
 
 byteCodeGen :: DynFlags
+            -> Module
             -> CoreProgram
             -> [TyCon]
             -> ModBreaks
             -> IO CompiledByteCode
-byteCodeGen dflags binds tycs modBreaks
+byteCodeGen dflags this_mod binds tycs modBreaks
    = do showPass dflags "ByteCodeGen"
 
         let flatBinds = [ (bndr, freeVars rhs)
                         | (bndr, rhs) <- flattenBinds binds]
 
         us <- mkSplitUniqSupply 'y'
-        (BcM_State _us _final_ctr mallocd _, proto_bcos)
-           <- runBc us modBreaks (mapM schemeTopBind flatBinds)
+        (BcM_State _us _this_mod _final_ctr mallocd _, proto_bcos)
+           <- runBc us this_mod modBreaks (mapM schemeTopBind flatBinds)
 
         when (notNull mallocd)
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
@@ -93,9 +93,10 @@ byteCodeGen dflags binds tycs modBreaks
 -- Returns: (the root BCO for this expression,
 --           a list of auxilary BCOs resulting from compiling closures)
 coreExprToBCOs :: DynFlags
+               -> Module
                -> CoreExpr
                -> IO UnlinkedBCO
-coreExprToBCOs dflags expr
+coreExprToBCOs dflags this_mod expr
  = do showPass dflags "ByteCodeGen"
 
       -- create a totally bogus name for the top-level BCO; this
@@ -106,8 +107,9 @@ coreExprToBCOs dflags expr
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
       us <- mkSplitUniqSupply 'y'
-      (BcM_State _us _final_ctr mallocd _ , proto_bco)
-         <- runBc us emptyModBreaks (schemeTopBind (invented_id, freeVars expr))
+      (BcM_State _us _this_mod _final_ctr mallocd _ , proto_bco)
+         <- runBc us this_mod emptyModBreaks $
+              schemeTopBind (invented_id, freeVars expr)
 
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
@@ -291,25 +293,25 @@ schemeR_wrk fvs nm original_body (args, body)
 -- introduce break instructions for ticked expressions
 schemeER_wrk :: Word16 -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
 schemeER_wrk d p rhs
-   | Just (tickInfo, (_annot, newRhs)) <- isTickedExp' rhs = do
-        code <- schemeE d 0 p newRhs
+  | AnnTick (Breakpoint tick_no fvs) (_annot, newRhs) <- rhs
+  = do  code <- schemeE d 0 p newRhs
         arr <- getBreakArray
-        let idOffSets = getVarOffSets d p tickInfo
-        let tickNumber = tickInfo_number tickInfo
+        this_mod <- getCurrentModule
+        let idOffSets = getVarOffSets d p fvs
         let breakInfo = BreakInfo
-                        { breakInfo_module = tickInfo_module tickInfo
-                        , breakInfo_number = tickNumber
+                        { breakInfo_module = this_mod
+                        , breakInfo_number = tick_no
                         , breakInfo_vars = idOffSets
                         , breakInfo_resty = exprType (deAnnotate' newRhs)
                         }
         let breakInstr = case arr of
                          BA arr# ->
-                             BRK_FUN arr# (fromIntegral tickNumber) breakInfo
+                             BRK_FUN arr# (fromIntegral tick_no) breakInfo
         return $ breakInstr `consOL` code
    | otherwise = schemeE d 0 p rhs
 
-getVarOffSets :: Word16 -> BCEnv -> TickInfo -> [(Id, Word16)]
-getVarOffSets d p = catMaybes . map (getOffSet d p) . tickInfo_locals
+getVarOffSets :: Word16 -> BCEnv -> [Id] -> [(Id, Word16)]
+getVarOffSets d p = catMaybes . map (getOffSet d p)
 
 getOffSet :: Word16 -> BCEnv -> Id -> Maybe (Id, Word16)
 getOffSet d env id
@@ -333,19 +335,7 @@ fvsToEnv p fvs = [v | v <- varSetElems fvs,
 -- -----------------------------------------------------------------------------
 -- schemeE
 
-data TickInfo
-   = TickInfo
-     { tickInfo_number :: Int     -- the (module) unique number of the tick
-     , tickInfo_module :: Module  -- the origin of the ticked expression
-     , tickInfo_locals :: [Id]    -- the local vars in scope at the ticked expression
-     }
-
-instance Outputable TickInfo where
-   ppr info = text "TickInfo" <+>
-              parens (int (tickInfo_number info) <+> ppr (tickInfo_module info) <+>
-                      ppr (tickInfo_locals info))
-
-returnUnboxedAtom :: Word16 -> Sequel -> BCEnv 
+returnUnboxedAtom :: Word16 -> Sequel -> BCEnv
                  -> AnnExpr' Id VarSet -> CgRep
                  -> BcM BCInstrList
 -- Returning an unlifted value.
@@ -451,12 +441,11 @@ schemeE d s p (AnnLet binds (_,body))
 -- call exprFreeVars on a deAnnotated expression, this may not be the
 -- best way to calculate the free vars but it seemed like the least
 -- intrusive thing to do
-schemeE d s p exp@(AnnCase {})
-   | Just (_tickInfo, _rhs) <- isTickedExp' exp
+schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
    = if isUnLiftedType ty
         then do
           -- If the result type is unlifted, then we must generate
-          --   let f = \s . case tick# of _ -> e
+          --   let f = \s . tick<n> e
           --   in  f realWorld#
           -- When we stop at the breakpoint, _result will have an unlifted
           -- type and hence won't be bound in the environment, but the
@@ -475,6 +464,9 @@ schemeE d s p exp@(AnnCase {})
    where exp' = deAnnotate' exp
          fvs  = exprFreeVars exp'
          ty   = exprType exp'
+
+-- ignore other kinds of tick
+schemeE d s p (AnnTick _ (_, rhs)) = schemeE d s p rhs
 
 schemeE d s p (AnnCase scrut _ _ [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind1)
@@ -514,49 +506,11 @@ schemeE _ _ _ expr
    Ticked Expressions
    ------------------
 
-   A ticked expression looks like this:
-
-      case tick<n> var1 ... varN of DEFAULT -> e
-
-   (*) <n> is the number of the tick, which is unique within a module
-   (*) var1 ... varN are the local variables in scope at the tick site
-
-   If we find a ticked expression we return:
-
-      Just ((n, [var1 ... varN]), e)
-
-  otherwise we return Nothing.
-
-  The idea is that the "case tick<n> ..." is really just an annotation on
+  The idea is that the "breakpoint<n,fvs> E" is really just an annotation on
   the code. When we find such a thing, we pull out the useful information,
-  and then compile the code as if it was just the expression "e".
+  and then compile the code as if it was just the expression E.
 
 -}
-
-isTickedExp' :: AnnExpr' Id a -> Maybe (TickInfo, AnnExpr Id a)
-isTickedExp' (AnnCase scrut _bndr _type alts)
-   | Just tickInfo <- isTickedScrut scrut,
-     [(DEFAULT, _bndr, rhs)] <- alts
-     = Just (tickInfo, rhs)
-   where
-   isTickedScrut :: (AnnExpr Id a) -> Maybe TickInfo
-   isTickedScrut expr
-      | Var id <- f,
-        Just (TickBox modName tickNumber) <- isTickBoxOp_maybe id
-           = Just $ TickInfo { tickInfo_number = tickNumber
-                             , tickInfo_module = modName
-                             , tickInfo_locals = idsOfArgs args
-                             }
-      | otherwise = Nothing
-      where
-      (f, args) = collectArgs $ deAnnotate expr
-      idsOfArgs :: [Expr Id] -> [Id]
-      idsOfArgs = catMaybes . map exprId
-      exprId :: Expr Id -> Maybe Id
-      exprId (Var id) = Just id
-      exprId _        = Nothing
-
-isTickedExp' _ = Nothing
 
 -- Compile code to do a tail call.  Specifically, push the fn,
 -- slide the on-stack app back down to the sequel depth,
@@ -1452,13 +1406,14 @@ bcView :: AnnExpr' Var ann -> Maybe (AnnExpr' Var ann)
 --  a) type abstractions
 --  b) type applications
 --  c) casts
---  d) notes
+--  d) ticks (but not breakpoints)
 -- Type lambdas *can* occur in random expressions,
 -- whereas value lambdas cannot; that is why they are nuked here
-bcView (AnnNote _ (_,e)) 	     = Just e
-bcView (AnnCast (_,e) _) 	     = Just e
+bcView (AnnCast (_,e) _)             = Just e
 bcView (AnnLam v (_,e)) | isTyVar v  = Just e
 bcView (AnnApp (_,e) (_, AnnType _)) = Just e
+bcView (AnnTick Breakpoint{} _)      = Nothing
+bcView (AnnTick _other_tick (_,e))   = Just e
 bcView _                             = Nothing
 
 isVoidArgAtom :: AnnExpr' Var ann -> Bool
@@ -1493,12 +1448,13 @@ mkStackOffsets original_depth szsw
 type BcPtr = Either ItblPtr (Ptr ())
 
 data BcM_State
-   = BcM_State {
-        uniqSupply :: UniqSupply,       -- for generating fresh variable names
-        nextlabel :: Word16,            -- for generating local labels
-        malloced  :: [BcPtr],           -- thunks malloced for current BCO
-                                        -- Should be free()d when it is GCd
-        breakArray :: BreakArray        -- array of breakpoint flags
+   = BcM_State
+        { uniqSupply :: UniqSupply       -- for generating fresh variable names
+        , thisModule :: Module           -- current module (for breakpoints)
+        , nextlabel :: Word16            -- for generating local labels
+        , malloced  :: [BcPtr]           -- thunks malloced for current BCO
+                                         -- Should be free()d when it is GCd
+        , breakArray :: BreakArray       -- array of breakpoint flags
         }
 
 newtype BcM r = BcM (BcM_State -> IO (BcM_State, r))
@@ -1508,9 +1464,9 @@ ioToBc io = BcM $ \st -> do
   x <- io
   return (st, x)
 
-runBc :: UniqSupply -> ModBreaks -> BcM r -> IO (BcM_State, r)
-runBc us modBreaks (BcM m)
-   = m (BcM_State us 0 [] breakArray)
+runBc :: UniqSupply -> Module -> ModBreaks -> BcM r -> IO (BcM_State, r)
+runBc us this_mod modBreaks (BcM m)
+   = m (BcM_State us this_mod 0 [] breakArray)
    where
    breakArray = modBreaks_flags modBreaks
 
@@ -1567,6 +1523,9 @@ newUnique = BcM $
    \st -> case takeUniqFromSupply (uniqSupply st) of
              (uniq, us) -> let newState = st { uniqSupply = us }
                            in  return (newState, uniq)
+
+getCurrentModule :: BcM Module
+getCurrentModule = BcM $ \st -> return (st, thisModule st)
 
 newId :: Type -> BcM Id
 newId ty = do

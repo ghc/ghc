@@ -124,7 +124,11 @@ data SimplCont
         CallCtxt        -- Whether *this* argument position is interesting
 	SimplCont		
 
-data ArgInfo 
+  | TickIt
+        (Tickish Id)    -- Tick tickish []
+        SimplCont
+
+data ArgInfo
   = ArgInfo {
         ai_fun   :: Id,		-- The function
 	ai_args  :: [OutExpr],	-- ...applied to these args (which are in *reverse* order)
@@ -154,6 +158,7 @@ instance Outputable SimplCont where
   ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
+  ppr (TickIt t cont)                = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
 
 data DupFlag = NoDup       -- Unsimplified, might be big
              | Simplified  -- Simplified
@@ -227,6 +232,7 @@ contResultType env ty cont
     go (StrictArg ai _ cont)          _  = go cont (funResultTy (argInfoResultTy ai))
     go (Select _ _ alts se cont)      _  = go cont (subst_ty se (coreAltsType alts))
     go (ApplyTo _ arg se cont)        ty = go cont (apply_to_arg ty arg se)
+    go (TickIt _ cont)                ty = go cont ty
 
     apply_to_arg ty (Type ty_arg)     se = applyTy ty (subst_ty se ty_arg)
     apply_to_arg ty (Coercion co_arg) se = applyCo ty (subst_co se co_arg)
@@ -331,6 +337,7 @@ interestingCallContext cont
     interesting (StrictArg _ cci _) = cci
     interesting (StrictBind {})	    = BoringCtxt
     interesting (Stop cci)   	    = cci
+    interesting (TickIt _ cci)      = interesting cci
     interesting (CoerceIt _ cont)   = interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
@@ -453,6 +460,7 @@ interestingArgContext rules call_cont
     go (StrictBind {})	   = False	-- ??
     go (CoerceIt _ c)	   = go c
     go (Stop cci)          = interesting cci
+    go (TickIt _ c)        = go c
 
     interesting (ArgCtxt rules) = rules
     interesting _               = False
@@ -829,7 +837,7 @@ preInlineUnconditionally env top_lvl bndr rhs
 	-- E.g. let f = \ab.BIG in \y. map f xs
 	-- 	Don't want to substitute for f, because then we allocate
 	--	its closure every time the \y is called
-	-- But: let f = \ab.BIG in \y. map (f y) xs
+        -- But: let f = \ab.BIG in \y. map (f y) xs
 	--	Now we do want to substitute for f, even though it's not 
 	--	saturated, because we're going to allocate a closure for 
 	--	(f y) every time round the loop anyhow.
@@ -839,8 +847,9 @@ preInlineUnconditionally env top_lvl bndr rhs
 	-- Sadly, not quite the same as exprIsHNF.
     canInlineInLam (Lit _)		= True
     canInlineInLam (Lam b e)		= isRuntimeVar b || canInlineInLam e
-    canInlineInLam (Note _ e)		= canInlineInLam e
-    canInlineInLam _			= False
+    canInlineInLam _                    = False
+      -- not ticks.  Counting ticks cannot be duplicated, and non-counting
+      -- ticks around a Lam will disappear anyway.
 
     early_phase = case sm_phase mode of
                     Phase 0 -> False
@@ -1356,7 +1365,7 @@ abstractFloats main_tvs body_env body
 	; return (float_binds, CoreSubst.substExpr (text "abstract_floats1") subst body) }
   where
     main_tv_set = mkVarSet main_tvs
-    body_floats = getFloats body_env
+    body_floats = getFloatBinds body_env
     empty_subst = CoreSubst.mkEmptySubst (seInScope body_env)
 
     abstract :: CoreSubst.Subst -> OutBind -> SimplM (CoreSubst.Subst, OutBind)

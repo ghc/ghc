@@ -889,7 +889,8 @@ tcRhs (TcPatBind _ pat' grhss pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
                     tcGRHSsPat grhss pat_ty
         ; return (PatBind { pat_lhs = pat', pat_rhs = grhss', pat_rhs_ty = pat_ty 
-                          , bind_fvs = placeHolderNames }) }
+                          , bind_fvs = placeHolderNames
+                          , pat_ticks = (Nothing,[]) }) }
 
 
 ---------------------

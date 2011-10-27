@@ -230,8 +230,10 @@ genMkPAP regstatus macro jump ticker disamb
 
 		else empty, 
             if is_fun_case then mb_tag_node arity else empty,
-	     text "jump " <> text jump <> semi
-	    ]) $$
+            if overflow_regs
+                then text "jump_SAVE_CCCS" <> parens (text jump) <> semi
+                else text "jump " <> text jump <> semi
+            ]) $$
  	   text "}"
 
 	where
@@ -280,17 +282,36 @@ genMkPAP regstatus macro jump ticker disamb
 	     	   loadSpWordOff "W_" 0 <> text " = " <>
 		                mkApplyInfoName rest_args <> semi
 
-	     shuffle_extra_args
-		= vcat (map shuffle_down
-		         [sp_stk_args .. sp_stk_args+stack_args_size-1]) $$
-	     	  loadSpWordOff "W_" (sp_stk_args+stack_args_size-1)
-			<> text " = "
-	                <> mkApplyInfoName rest_args <> semi $$
-	          text "Sp_adj(" <> int (sp_stk_args -  1) <> text ");"
+             shuffle_extra_args
+                = vcat [text "#ifdef PROFILING",
+                        shuffle True,
+                        text "#else",
+                        shuffle False,
+                        text "#endif"]
+               where
+                -- Sadly here we have to insert an stg_restore_cccs frame
+                -- just underneath the stg_ap_*_info frame if we're
+                -- profiling; see Note [jump_SAVE_CCCS]
+                shuffle prof =
+                  let offset = if prof then 2 else 0 in
+                  vcat (map (shuffle_down (offset+1))
+                         [sp_stk_args .. sp_stk_args+stack_args_size-1]) $$
+                  (if prof
+                    then
+                      loadSpWordOff "W_" (sp_stk_args+stack_args_size-3)
+                        <> text " = stg_restore_cccs_info;" $$
+                      loadSpWordOff "W_" (sp_stk_args+stack_args_size-2)
+                        <> text " = W_[CCCS];"
+                    else empty) $$
+                  loadSpWordOff "W_" (sp_stk_args+stack_args_size-1)
+                        <> text " = "
+                        <> mkApplyInfoName rest_args <> semi $$
+                  text "Sp_adj(" <> int (sp_stk_args -  1 - offset) <> text ");"
 
-	     shuffle_down i = 
-		  loadSpWordOff "W_" (i-1) <> text " = " <>
+             shuffle_down j i =
+                  loadSpWordOff "W_" (i-j) <> text " = " <>
 		  loadSpWordOff "W_" i <> semi
+
 
 -- The EXACT ARITY case
 --
@@ -356,6 +377,21 @@ genMkPAP regstatus macro jump ticker disamb
 	  (reg_locs, leftovers, sp_offset) 
 		= assignRegs regstatus stk_args_slow_offset args
 		-- BUILD_PAP assumes args start at offset 1
+
+-- Note [jump_SAVE_CCCS]
+
+-- when profiling, if we have some extra arguments to apply that we
+-- save to the stack, we must also save the current cost centre stack
+-- and restore it when applying the extra arguments.  This is all
+-- handled by the macro jump_SAVE_CCCS(target), defined in
+-- rts/AutoApply.h.
+--
+-- At the jump, the stack will look like this:
+--
+--      ... extra args ...
+--      stg_ap_pp_info
+--      CCCS
+--      stg_restore_cccs_info
 
 -- --------------------------------------
 -- Examine tag bits of function pointer and enter it
@@ -579,8 +615,9 @@ genApply regstatus args =
 	  -- overwritten by an indirection, so we must enter the original
 	  -- info pointer we read, don't read it again, because it might
 	  -- not be enterable any more.
-	  text "jump %ENTRY_CODE(info);",
-	  text ""
+          text "jump_SAVE_CCCS(%ENTRY_CODE(info));",
+            -- see Note [jump_SAVE_CCCS]
+          text ""
 	 ]),
 	text "}",
 

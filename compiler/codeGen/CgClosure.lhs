@@ -108,7 +108,7 @@ cgStdRhsClosure
 	-> [StgArg]		-- payload
 	-> FCode (Id, CgIdInfo)
 
-cgStdRhsClosure bndr cc _bndr_info _fvs args body lf_info payload 
+cgStdRhsClosure bndr _cc _bndr_info _fvs _args _body lf_info payload
   = do	-- AHA!  A STANDARD-FORM THUNK
   {	-- LAY OUT THE OBJECT
     amodes <- getArgAmodes payload
@@ -122,10 +122,10 @@ cgStdRhsClosure bndr cc _bndr_info _fvs args body lf_info payload
 				     NoC_SRT	-- No SRT for a std-form closure
 				     descr
 		
-  ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
+--  ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
 
 	-- BUILD THE OBJECT
-  ; heap_offset <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
+  ; heap_offset <- allocDynClosure closure_info curCCS curCCS amodes_w_offsets
 
 	-- RETURN
   ; returnFC (bndr, heapIdInfo bndr heap_offset lf_info) }
@@ -197,9 +197,9 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
   ; let
 	to_amode (info, offset) = do { amode <- idInfoToAmode info
 				     ; return (amode, offset) }
-  ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
+--  ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
   ; amodes_w_offsets <- mapFCs to_amode bind_details
-  ; heap_offset <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
+  ; heap_offset <- allocDynClosure closure_info curCCS curCCS amodes_w_offsets
 
 	-- RETURN
   ; returnFC (bndr, heapIdInfo bndr heap_offset lf_info) }
@@ -239,16 +239,15 @@ So it should set up an update frame (if it is shared).
 NB: Thunks cannot have a primitive type!
 
 \begin{code}
-closureCodeBody _binder_info cl_info cc [{- No args i.e. thunk -}] body = do
+closureCodeBody _binder_info cl_info _cc [{- No args i.e. thunk -}] body = do
   { body_absC <- getCgStmts $ do
 	{ tickyEnterThunk cl_info
 	; ldvEnterClosure cl_info  -- NB: Node always points when profiling
 	; thunkWrapper cl_info $ do
 		-- We only enter cc after setting up update so
 		-- that cc of enclosing scope will be recorded
-		-- in update frame CAF/DICT functions will be
-		-- subsumed by this enclosing cc
-	    { enterCostCentre cl_info cc body
+                -- in the update frame
+            { enterCostCentreThunk (CmmReg nodeReg)
 	    ; cgExpr body }
 	}
     
@@ -307,16 +306,14 @@ mkFunEntryCode cl_info cc reg_args stk_args sp_top reg_save_code body = do
   ; bindArgsToStack stk_args
   ; setRealAndVirtualSp sp_top
 
-	-- Enter the cost-centre, if required
-	-- ToDo: It's not clear why this is outside the funWrapper,
-	--	 but the tickyEnterFun is inside. Perhaps we can put
-	--	 them together?
-  ; enterCostCentre cl_info cc body
-
-	-- Do the business
+        -- Do the business
   ; funWrapper cl_info reg_args reg_save_code $ do
 	{ tickyEnterFun cl_info
-	; cgExpr body }
+        ; enterCostCentreFun cc $
+              CmmMachOp mo_wordSub [ CmmReg nodeReg
+                                   , CmmLit (mkIntCLit (funTag cl_info)) ]
+
+        ; cgExpr body }
   }
 \end{code}
 

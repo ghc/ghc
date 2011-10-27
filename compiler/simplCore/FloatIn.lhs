@@ -210,12 +210,13 @@ We don't float lets inwards past an SCC.
 	cc, change current cc to the new one and float binds into expr.
 
 \begin{code}
-fiExpr to_drop (_, AnnNote note@(SCC _) expr)
-  = 	-- Wimp out for now
-    mkCoLets' to_drop (Note note (fiExpr [] expr))
+fiExpr to_drop (_, AnnTick tickish expr)
+  | tickishScoped tickish
+  =     -- Wimp out for now - we could push values in
+    mkCoLets' to_drop (Tick tickish (fiExpr [] expr))
 
-fiExpr to_drop (_, AnnNote note@(CoreNote _) expr)
-  = Note note (fiExpr to_drop expr)
+  | otherwise
+  = Tick tickish (fiExpr to_drop expr)
 \end{code}
 
 For @Lets@, the possible ``drop points'' for the \tr{to_drop}

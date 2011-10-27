@@ -33,7 +33,7 @@ data Exp
   | Let Vdefg Exp
   | Case Exp Vbind Ty [Alt] {- non-empty list -}
   | Cast Exp Ty
-  | Note String Exp
+  | Tick String Exp {- XXX probably wrong -}
   | External String String Ty {- target name, convention, and type -} 
   | DynExternal String Ty {- convention and type (incl. Addr# of target as first arg) -} 
   | Label String

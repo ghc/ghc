@@ -89,7 +89,6 @@ deSugar hsc_env
 
 	-- Desugar the program
         ; let export_set = availsToNameSet exports
-	; let auto_scc = mkAutoScc dflags mod export_set
         ; let target = hscTarget dflags
         ; let hpcInfo = emptyHpcInfo other_hpc_info
 	; (msgs, mb_res)
@@ -98,15 +97,23 @@ deSugar hsc_env
                        return (emptyMessages,
                                Just ([], nilOL, [], [], NoStubs, hpcInfo, emptyModBreaks))
                    _        -> do
+
+                     let want_ticks = opt_Hpc
+                                   || target == HscInterpreted
+                                   || (opt_SccProfilingOn
+                                       && case profAuto dflags of
+                                            NoProfAuto -> False
+                                            _          -> True)
+
                      (binds_cvr,ds_hpc_info, modBreaks)
-			 <- if (opt_Hpc
-				  || target == HscInterpreted)
-			       && (not (isHsBoot hsc_src))
-                              then addCoverageTicksToBinds dflags mod mod_loc tcs binds 
+                         <- if want_ticks && not (isHsBoot hsc_src)
+                              then addTicksToBinds dflags mod mod_loc export_set
+                                          (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, emptyModBreaks)
+
                      initDs hsc_env mod rdr_env type_env $ do
                        do { ds_ev_binds <- dsEvBinds ev_binds
-                          ; core_prs <- dsTopLHsBinds auto_scc binds_cvr
+                          ; core_prs <- dsTopLHsBinds binds_cvr
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
@@ -215,22 +222,6 @@ and Rec the rest.
 
 
 \begin{code}
-mkAutoScc :: DynFlags -> Module -> NameSet -> AutoScc
-mkAutoScc dflags mod exports
-  | not opt_SccProfilingOn 	-- No profiling
-  = NoSccs		
-    -- Add auto-scc on all top-level things
-  | dopt Opt_AutoSccsOnAllToplevs dflags
-  = AddSccs mod (\id -> not $ isDerivedOccName $ getOccName id)
-    -- See #1641.  This is pretty yucky, but I can't see a better way
-    -- to identify compiler-generated Ids, and at least this should
-    -- catch them all.
-    -- Only on exported things
-  | dopt Opt_AutoSccsOnExportedToplevs dflags
-  = AddSccs mod (\id -> idName id `elemNameSet` exports)
-  | otherwise
-  = NoSccs
-
 deSugarExpr :: HscEnv
 	    -> Module -> GlobalRdrEnv -> TypeEnv 
  	    -> LHsExpr Id

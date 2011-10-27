@@ -21,7 +21,6 @@ import Name
 import Type
 import TypeRep
 import Var
-import CostCentre
 import UniqFM
 import Unique( Unique )
 
@@ -239,7 +238,7 @@ data CoreMap a
        , cm_co   :: CoercionMap a
        , cm_type :: TypeMap a
        , cm_cast :: CoreMap (CoercionMap a)
-       , cm_scc  :: CoreMap (CostCentreMap a)
+       , cm_source :: CoreMap (TickishMap a)
        , cm_app  :: CoreMap (CoreMap a)
        , cm_lam  :: CoreMap (TypeMap a)
        , cm_letn :: CoreMap (CoreMap (BndrMap a))
@@ -255,7 +254,7 @@ wrapEmptyCM = CM { cm_var = emptyTM, cm_lit = emptyLiteralMap
  		 , cm_cast = emptyTM, cm_app = emptyTM 
  		 , cm_lam = emptyTM, cm_letn = emptyTM 
  		 , cm_letr = emptyTM, cm_case = emptyTM
-                 , cm_scc = emptyTM } 
+                 , cm_source = emptyTM }
 
 instance TrieMap CoreMap where
    type Key CoreMap = CoreExpr
@@ -289,7 +288,7 @@ fdE k m
   . foldTM k (cm_co m)
   . foldTM k (cm_type m)
   . foldTM (foldTM k) (cm_cast m)
-  . foldTM (foldTM k) (cm_scc m)
+  . foldTM (foldTM k) (cm_source m)
   . foldTM (foldTM k) (cm_app m)
   . foldTM (foldTM k) (cm_lam m)
   . foldTM (foldTM (foldTM k)) (cm_letn m)
@@ -307,8 +306,7 @@ lkE env expr cm
     go (Type t) 	    = cm_type >.> lkT env t
     go (Coercion c)         = cm_co   >.> lkC env c
     go (Cast e c)           = cm_cast >.> lkE env e >=> lkC env c
-    go (Note (SCC cc) e)    = cm_scc  >.> lkE env e >=> lkCC cc
-    go (Note _        e)    = lkE env e
+    go (Tick tickish e)   = cm_source >.> lkE env e >=> lkTickish tickish
     go (App e1 e2)          = cm_app >.> lkE env e2 >=> lkE env e1
     go (Lam v e)            = cm_lam >.> lkE (extendCME env v) e >=> lkBndr env v
     go (Let (NonRec b r) e) = cm_letn >.> lkE env r 
@@ -329,8 +327,7 @@ xtE env (Coercion c)         f m = m { cm_co   = cm_co m   |> xtC env c f }
 xtE _   (Lit l)              f m = m { cm_lit  = cm_lit m  |> xtLit l f }
 xtE env (Cast e c)           f m = m { cm_cast = cm_cast m |> xtE env e |>>
                                                  xtC env c f }
-xtE env (Note (SCC cc) e)    f m = m { cm_scc = cm_scc m |> xtE env e |>> xtCC cc f }
-xtE env (Note _        e)    f m = xtE env e f m
+xtE env (Tick t e)         f m = m { cm_source = cm_source m |> xtE env e |>> xtTickish t f }
 xtE env (App e1 e2)          f m = m { cm_app = cm_app m |> xtE env e2 |>> xtE env e1 f }
 xtE env (Lam v e)            f m = m { cm_lam = cm_lam m |> xtE (extendCME env v) e
                                                  |>> xtBndr env v f }
@@ -347,12 +344,12 @@ xtE env (Case e b _ as)      f m = m { cm_case = cm_case m |> xtE env e
                                                  |>> let env1 = extendCME env b
                                                      in xtList (xtA env1) as f }
 
-type CostCentreMap a = Map.Map CostCentre a
-lkCC :: CostCentre -> CostCentreMap a -> Maybe a
-lkCC = lookupTM
+type TickishMap a = Map.Map (Tickish Id) a
+lkTickish :: Tickish Id -> TickishMap a -> Maybe a
+lkTickish = lookupTM
 
-xtCC :: CostCentre -> XT a -> CostCentreMap a -> CostCentreMap a
-xtCC = alterTM
+xtTickish :: Tickish Id -> XT a -> TickishMap a -> TickishMap a
+xtTickish = alterTM
 
 ------------------------
 data AltMap a	-- A single alternative

@@ -65,11 +65,13 @@ initProfTimer( void )
     startHeapProfTimer();
 }
 
+nat total_ticks = 0;
 
 void
 handleProfTick(void)
 {
 #ifdef PROFILING
+    total_ticks++;
     if (do_prof_ticks) {
 	CCCS->time_ticks++;
     }

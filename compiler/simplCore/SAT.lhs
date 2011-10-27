@@ -227,9 +227,9 @@ satExpr (Let bind body) interesting_ids = do
     (bind', sat_info_bind) <- satBind bind interesting_ids
     return (Let bind' body', mergeIdSATInfo sat_info_body sat_info_bind, body_app)
 
-satExpr (Note note expr) interesting_ids = do
+satExpr (Tick tickish expr) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids
-    return (Note note expr', sat_info_expr, expr_app)
+    return (Tick tickish expr', sat_info_expr, expr_app)
 
 satExpr ty@(Type _) _ = do
     return (ty, emptyIdSATInfo, Nothing)

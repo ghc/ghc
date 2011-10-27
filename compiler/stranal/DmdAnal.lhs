@@ -166,8 +166,8 @@ dmdAnal env dmd (Cast e co)
 	-- inside recursive products -- we might not reach
 	-- a fixpoint.  So revert to a vanilla Eval demand
 
-dmdAnal env dmd (Note n e)
-  = (dmd_ty, Note n e')
+dmdAnal env dmd (Tick t e)
+  = (dmd_ty, Tick t e')
   where
     (dmd_ty, e') = dmdAnal env dmd e
 

@@ -475,10 +475,18 @@ mkWWcpr body_ty _other		-- No CPR info
 --	\ x -> case (_scc_ "foo" E) of I# x -> x)
 --
 -- This transform doesn't move work or allocation
--- from one cost centre to another
+-- from one cost centre to another.
+--
+-- Later [SDM]: presumably this is because we want the simplifier to
+-- eliminate the case, and the scc would get in the way?  I'm ok with
+-- including the case itself in the cost centre, since it is morally
+-- part of the function (post transformation) anyway.
+
 workerCase :: Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
-workerCase bndr (Note (SCC cc) e) args con body = Note (SCC cc) (mkUnpackCase bndr e args con body)
-workerCase bndr e args con body = mkUnpackCase bndr e args con body
+workerCase bndr (Tick tickish e) args con body
+   = Tick tickish (mkUnpackCase bndr e args con body)
+workerCase bndr e args con body
+   = mkUnpackCase bndr e args con body
 \end{code}
 
 

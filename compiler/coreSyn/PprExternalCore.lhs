@@ -161,7 +161,7 @@ pexp (Case e vb ty alts) = sep [text "%case" <+> paty ty <+> paexp e,
 			     text "%of" <+> pvbind vb]
 			$$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
 pexp (Cast e co) = (text "%cast" <+> parens (pexp e)) $$ paty co
-pexp (Note s e) = (text "%note" <+> pstring s) $$ pexp e
+pexp (Tick s e) = (text "%source" <+> pstring s) $$ pexp e
 pexp (External n cc t) = (text "%external" <+> text cc <+> pstring n) $$ paty t
 pexp (DynExternal cc t) = (text "%dynexternal" <+> text cc) $$ paty t
 pexp (Label n) = (text "%label" <+> pstring n)

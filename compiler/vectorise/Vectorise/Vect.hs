@@ -12,7 +12,7 @@ module Vectorise.Vect (
 	vRec,
 	vVar,
 	vType,
-	vNote,
+        vTick,
 	vLet,
 	vLams,
 	vLamsWithoutLC,
@@ -66,8 +66,8 @@ vType ty = (Type ty, Type ty)
 
 
 -- | Make a vectorised note.
-vNote :: Note -> VExpr -> VExpr
-vNote = mapVect . Note
+vTick :: Tickish Id -> VExpr -> VExpr
+vTick = mapVect . Tick
 
 
 -- | Make a vectorised non-recursive binding.

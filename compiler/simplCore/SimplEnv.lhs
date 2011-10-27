@@ -12,9 +12,7 @@ module SimplEnv (
 	-- The simplifier mode
 	setMode, getMode, updMode,
 
-        setEnclosingCC, getEnclosingCC,
-
-	-- Environments
+        -- Environments
 	SimplEnv(..), StaticEnv, pprSimplEnv,	-- Temp not abstract
         mkSimplEnv, extendIdSubst, SimplEnv.extendTvSubst, SimplEnv.extendCvSubst,
 	zapSubstEnv, setSubstEnv, 
@@ -32,7 +30,7 @@ module SimplEnv (
 	-- Floats
   	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
 	wrapFloats, floatBinds, setFloats, zapFloats, addRecFloats,
-	doFloatFromRhs, getFloats
+        doFloatFromRhs, getFloatBinds, getFloats, mapFloatRhss
     ) where
 
 #include "HsVersions.h"
@@ -42,7 +40,6 @@ import CoreMonad	( SimplifierMode(..) )
 import IdInfo
 import CoreSyn
 import CoreUtils
-import CostCentre
 import Var
 import VarEnv
 import VarSet
@@ -59,6 +56,7 @@ import BasicTypes
 import MonadUtils
 import Outputable
 import FastString
+import Util
 
 import Data.List
 \end{code}
@@ -107,7 +105,6 @@ data SimplEnv
      -- wrt the original expression
 
 	seMode 	    :: SimplifierMode,
-        seCC        :: CostCentreStack, -- The enclosing CCS (when profiling)
 
 	-- The current substitution
 	seTvSubst   :: TvSubstEnv,	-- InTyVar |--> OutType
@@ -227,8 +224,7 @@ seIdSubst:
 \begin{code}
 mkSimplEnv :: SimplifierMode -> SimplEnv
 mkSimplEnv mode
-  = SimplEnv { seCC = subsumedCCS
-             , seMode = mode
+  = SimplEnv { seMode = mode
              , seInScope = init_in_scope
              , seFloats = emptyFloats
              , seTvSubst = emptyVarEnv
@@ -268,13 +264,6 @@ setMode mode env = env { seMode = mode }
 
 updMode :: (SimplifierMode -> SimplifierMode) -> SimplEnv -> SimplEnv
 updMode upd env = env { seMode = upd (seMode env) }
-
----------------------
-getEnclosingCC :: SimplEnv -> CostCentreStack
-getEnclosingCC env = seCC env
-
-setEnclosingCC :: SimplEnv -> CostCentreStack -> SimplEnv
-setEnclosingCC env cc = env {seCC = cc}
 
 ---------------------
 extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
@@ -432,6 +421,13 @@ addNonRec env id rhs
     env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
 	  seInScope = extendInScopeSet (seInScope env) id }
 
+mapFloatRhss :: SimplEnv -> (CoreExpr -> CoreExpr) -> SimplEnv
+mapFloatRhss env@SimplEnv { seFloats = Floats fs ff } fun
+   = env { seFloats = Floats (mapOL app fs) ff }
+   where
+     app (NonRec b e) = NonRec b (fun e)
+     app (Rec bs)     = Rec (mapSnd fun bs)
+
 extendFloats :: SimplEnv -> OutBind -> SimplEnv
 -- Add these bindings to the floats, and extend the in-scope env too
 extendFloats env bind
@@ -474,8 +470,11 @@ wrapFlts (Floats bs _) body = foldrOL wrap body bs
     wrap (Rec prs)    body = Let (Rec prs) body
     wrap (NonRec b r) body = bindNonRec b r body
 
-getFloats :: SimplEnv -> [CoreBind]
-getFloats (SimplEnv {seFloats = Floats bs _}) = fromOL bs
+getFloatBinds :: SimplEnv -> [CoreBind]
+getFloatBinds env = floatBinds (seFloats env)
+
+getFloats :: SimplEnv -> Floats
+getFloats env = seFloats env
 
 isEmptyFloats :: SimplEnv -> Bool
 isEmptyFloats env = isEmptyFlts (seFloats env)

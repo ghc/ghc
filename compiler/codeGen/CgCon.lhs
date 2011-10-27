@@ -223,9 +223,9 @@ buildDynCon' _ binder ccs con args
   where
     lf_info = mkConLFInfo con
 
-    use_cc      -- cost-centre to stick in the object
-      | currentOrSubsumedCCS ccs = curCCS
-      | otherwise                = CmmLit (mkCCostCentreStack ccs)
+    use_cc  -- cost-centre to stick in the object
+      | isCurrentCCS ccs = curCCS
+      | otherwise        = panic "buildDynCon: non-current CCS not implemented"
 
     blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
 \end{code}

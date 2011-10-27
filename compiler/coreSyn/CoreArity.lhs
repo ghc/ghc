@@ -67,7 +67,7 @@ manifestArity :: CoreExpr -> Arity
 -- ^ manifestArity sees how many leading value lambdas there are
 manifestArity (Lam v e) | isId v    	= 1 + manifestArity e
 			| otherwise 	= manifestArity e
-manifestArity (Note n e) | notSccNote n	= manifestArity e
+manifestArity (Tick t e) | not (tickishIsCode t) =  manifestArity e
 manifestArity (Cast e _)            	= manifestArity e
 manifestArity _                     	= 0
 
@@ -79,7 +79,7 @@ exprArity e = go e
     go (Var v) 	       	           = idArity v
     go (Lam x e) | isId x    	   = go e + 1
     		 | otherwise 	   = go e
-    go (Note n e) | notSccNote n   = go e
+    go (Tick t e) | not (tickishIsCode t) = go e
     go (Cast e co)                 = go e `min` length (typeArity (pSnd (coercionKind co)))
                                         -- Note [exprArity invariant]
     go (App e (Type _))            = go e
@@ -454,7 +454,7 @@ type OneShot = Bool    -- False <=> Know nothing
 vanillaArityType :: ArityType
 vanillaArityType = ATop []	-- Totally uninformative
 
--- ^ The Arity returned is the number of value args the [_$_]
+-- ^ The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
 exprEtaExpandArity :: CheapFun -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
@@ -467,7 +467,7 @@ exprEtaExpandArity cheap_fun e
       ATop []             -> 0
       ABot n              -> n
   where
-    has_lam (Note _ e) = has_lam e
+    has_lam (Tick _ e) = has_lam e
     has_lam (Lam b e)  = isId b || has_lam e
     has_lam _          = False
 
@@ -552,9 +552,8 @@ type CheapFun = CoreExpr -> Maybe Type -> Bool
 	-- of the expression; Nothing means "don't know"
 
 arityType :: CheapFun -> CoreExpr -> ArityType
-arityType cheap_fn (Note n e) 
-  | notSccNote n              = arityType cheap_fn e
-arityType cheap_fn (Cast e co) 
+
+arityType cheap_fn (Cast e co)
   = arityType cheap_fn e
     `andArityType` ATop (typeArity (pSnd (coercionKind co)))
     -- See Note [exprArity invariant]; must be true of
@@ -613,6 +612,9 @@ arityType cheap_fn (Let b e)
     cheap_bind (NonRec b e) = is_cheap (b,e)
     cheap_bind (Rec prs)    = all is_cheap prs
     is_cheap (b,e) = cheap_fn e (Just (idType b))
+
+arityType cheap_fn (Tick t e)
+  | not (tickishIsCode t)     = arityType cheap_fn e
 
 arityType _           _       = vanillaArityType
 \end{code}
@@ -762,8 +764,8 @@ etaInfoApp subst (Let b e) eis
   where
     (subst', b') = subst_bind subst b
 
-etaInfoApp subst (Note note e) eis
-  = Note note (etaInfoApp subst e eis)
+etaInfoApp subst (Tick t e) eis
+  = Tick (substTickish subst t) (etaInfoApp subst e eis)
 
 etaInfoApp subst e eis
   = go (subst_expr subst e) eis

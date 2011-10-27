@@ -148,7 +148,7 @@ dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_
   = do { (args, rhs) <- matchWrapper (FunRhs (idName fun ) inf) matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
-       ; rhs' <- mkOptTickBox tick rhs
+       ; let rhs' = mkOptTickBox tick rhs
        ; return (bindNonRec fun rhs' body) }
 
 dsStrictBind (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) body
@@ -317,10 +317,11 @@ dsExpr (ExplicitTuple tup_args boxity)
 
 dsExpr (HsSCC cc expr) = do
     mod_name <- getModuleDs
-    Note (SCC (mkUserCC cc mod_name)) <$> dsLExpr expr
+    count <- doptDs Opt_ProfCountEntries
+    Tick (ProfNote (mkUserCC cc mod_name) count True) <$> dsLExpr expr
 
-dsExpr (HsCoreAnn fs expr)
-  = Note (CoreNote $ unpackFS fs) <$> dsLExpr expr
+dsExpr (HsCoreAnn _ expr)
+  = dsLExpr expr
 
 dsExpr (HsCase discrim matches@(MatchGroup _ rhs_ty)) 
   | isEmptyMatchGroup matches	-- A Core 'case' is always non-empty
@@ -586,9 +587,9 @@ dsExpr (HsProc pat cmd) = dsProcExpr pat cmd
 Hpc Support 
 
 \begin{code}
-dsExpr (HsTick ix vars e) = do
+dsExpr (HsTick tickish e) = do
   e' <- dsLExpr e
-  mkTickBox ix vars e'
+  return (Tick tickish e')
 
 -- There is a problem here. The then and else branches
 -- have no free variables, so they are open to lifting.

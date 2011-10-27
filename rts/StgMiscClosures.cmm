@@ -36,6 +36,19 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME, P_ unused)
 }
 
 /* ----------------------------------------------------------------------------
+   Restore a saved cost centre
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ cccs)
+{
+#if defined(PROFILING)
+    W_[CCCS] = Sp(1);
+#endif
+    Sp_adj(2);
+    jump %ENTRY_CODE(Sp(0));
+}
+
+/* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */
 
@@ -225,9 +238,6 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
 #endif
 
     LDV_ENTER(R1);
-
-    /* Enter PAP cost centre */
-    ENTER_CCS_PAP_CL(R1);
 
     /* For ticky-ticky, change the perm_ind to a normal ind on first
      * entry, so the number of ent_perm_inds is the number of *thunks*

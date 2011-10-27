@@ -340,17 +340,16 @@ coreToStgExpr expr@(Lam _ _)
 
     return (result_expr, fvs, escs)
 
-coreToStgExpr (Note (SCC cc) expr) = do
-    (expr2, fvs, escs) <- coreToStgExpr expr
-    return (StgSCC cc expr2, fvs, escs)
+coreToStgExpr (Tick (HpcTick m n) expr)
+  = do (expr2, fvs, escs) <- coreToStgExpr expr
+       return (StgTick m n expr2, fvs, escs)
 
-coreToStgExpr (Case (Var id) _bndr _ty [(DEFAULT,[],expr)])
-  | Just (TickBox m n) <- isTickBoxOp_maybe id = do
-    (expr2, fvs, escs) <- coreToStgExpr expr
-    return (StgTick m n expr2, fvs, escs)
+coreToStgExpr (Tick (ProfNote cc tick push) expr)
+  = do (expr2, fvs, escs) <- coreToStgExpr expr
+       return (StgSCC cc tick push expr2, fvs, escs)
 
-coreToStgExpr (Note _ expr)
-  = coreToStgExpr expr
+coreToStgExpr (Tick Breakpoint{} _expr)
+  = panic "coreToStgExpr: breakpoint should not happen"
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
@@ -1108,15 +1107,16 @@ filterStgBinders bndrs = filter isId bndrs
 
 
 \begin{code}
-        -- Ignore all notes except SCC
 myCollectBinders :: Expr Var -> ([Var], Expr Var)
 myCollectBinders expr
   = go [] expr
   where
     go bs (Lam b e)          = go (b:bs) e
-    go bs e@(Note (SCC _) _) = (reverse bs, e)
+    go bs e@(Tick t e')
+        | tickishIsCode t    = (reverse bs, e)
+        | otherwise          = go bs e'
+        -- Ignore only non-code source annotations
     go bs (Cast e _)         = go bs e
-    go bs (Note _ e)         = go bs e
     go bs e                  = (reverse bs, e)
 
 myCollectArgs :: CoreExpr -> (Id, [CoreArg])
@@ -1127,9 +1127,8 @@ myCollectArgs expr
   where
     go (Var v)          as = (v, as)
     go (App f a) as        = go f (a:as)
-    go (Note (SCC _) _) _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
+    go (Tick _ _)     _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
     go (Cast e _)       as = go e as
-    go (Note _ e)       as = go e as
     go (Lam b e)        as
        | isTyVar b         = go e as  -- Note [Collect args]
     go _                _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)

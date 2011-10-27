@@ -9,11 +9,11 @@ module IfaceSyn (
 
         IfaceDecl(..), IfaceClassOp(..), IfaceAT(..), IfaceATDefault(..),
         IfaceConDecl(..), IfaceConDecls(..),
-        IfaceExpr(..), IfaceAlt, IfaceNote(..), IfaceLetBndr(..),
+        IfaceExpr(..), IfaceAlt, IfaceLetBndr(..),
         IfaceBinding(..), IfaceConAlt(..),
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
-        IfaceInst(..), IfaceFamInst(..),
+        IfaceInst(..), IfaceFamInst(..), IfaceTickish(..),
 
         -- Misc
         ifaceDeclSubBndrs, visibleIfConDecls,
@@ -243,14 +243,15 @@ data IfaceExpr
   | IfaceApp 	IfaceExpr IfaceExpr
   | IfaceCase	IfaceExpr IfLclName [IfaceAlt]
   | IfaceLet	IfaceBinding  IfaceExpr
-  | IfaceNote	IfaceNote IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
   | IfaceFCall  ForeignCall IfaceType
-  | IfaceTick   Module Int
+  | IfaceTick   IfaceTickish IfaceExpr    -- from Tick tickish E
 
-data IfaceNote = IfaceSCC CostCentre
-               | IfaceCoreNote String
+data IfaceTickish
+  = IfaceHpcTick Module Int                -- from HpcTick x
+  | IfaceSCC     CostCentre Bool Bool      -- from ProfNote
+  -- no breakpoints: we never export these into interface files
 
 type IfaceAlt = (IfaceConAlt, [IfLclName], IfaceExpr)
         -- Note: IfLclName, not IfaceBndr (and same with the case binder)
@@ -573,7 +574,6 @@ pprIfaceExpr _       (IfaceLcl v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
 pprIfaceExpr _       (IfaceLit l)       = ppr l
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
-pprIfaceExpr _       (IfaceTick m ix)   = braces (text "tick" <+> ppr m <+> ppr ix)
 pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
 pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceType co
 
@@ -617,8 +617,8 @@ pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
                   ptext (sLit "} in"),
                   pprIfaceExpr noParens body])
 
-pprIfaceExpr add_par (IfaceNote note body) = add_par $ ppr note
-                                                <+> pprParendIfaceExpr body
+pprIfaceExpr add_par (IfaceTick tickish e)
+  = add_par (pprIfaceTickish tickish <+> pprIfaceExpr noParens e)
 
 ppr_alt :: (IfaceConAlt, [IfLclName], IfaceExpr) -> SDoc
 ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs,
@@ -633,18 +633,19 @@ ppr_bind (IfLetBndr b ty info, rhs)
          equals <+> pprIfaceExpr noParens rhs]
 
 ------------------
+pprIfaceTickish :: IfaceTickish -> SDoc
+pprIfaceTickish (IfaceHpcTick m ix)
+  = braces (text "tick" <+> ppr m <+> ppr ix)
+pprIfaceTickish (IfaceSCC cc tick scope)
+  = braces (pprCostCentreCore cc <+> ppr tick <+> ppr scope)
+
+------------------
 pprIfaceApp :: IfaceExpr -> [SDoc] -> SDoc
 pprIfaceApp (IfaceApp fun arg) args = pprIfaceApp fun $
                                           nest 2 (pprParendIfaceExpr arg) : args
 pprIfaceApp fun                args = sep (pprParendIfaceExpr fun : args)
 
 ------------------
-instance Outputable IfaceNote where
-    ppr (IfaceSCC cc)     = pprCostCentreCore cc
-    ppr (IfaceCoreNote s) = ptext (sLit "__core_note")
-                            <+> pprHsString (mkFastString s)
-
-
 instance Outputable IfaceConAlt where
     ppr IfaceDefault      = text "DEFAULT"
     ppr (IfaceLitAlt l)   = ppr l
@@ -818,7 +819,7 @@ freeNamesIfExpr (IfaceTuple _ as) = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam b body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)    = freeNamesIfExpr f &&& freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfType co
-freeNamesIfExpr (IfaceNote _n r)  = freeNamesIfExpr r
+freeNamesIfExpr (IfaceTick _ e)   = freeNamesIfExpr e
 
 freeNamesIfExpr (IfaceCase s _ alts)
   = freeNamesIfExpr s 

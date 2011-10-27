@@ -1629,12 +1629,13 @@ toIfaceExpr (App f a)       = toIfaceApp f [a]
 toIfaceExpr (Case s x _ as) = IfaceCase (toIfaceExpr s) (getFS x) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (coToIfaceType co)
-toIfaceExpr (Note n e)      = IfaceNote (toIfaceNote n) (toIfaceExpr e)
+toIfaceExpr (Tick t e)    = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
 
 ---------------------
-toIfaceNote :: Note -> IfaceNote
-toIfaceNote (SCC cc)      = IfaceSCC cc
-toIfaceNote (CoreNote s)  = IfaceCoreNote s
+toIfaceTickish :: Tickish Id -> IfaceTickish
+toIfaceTickish (ProfNote cc tick push) = IfaceSCC cc tick push
+toIfaceTickish (HpcTick modl ix)       = IfaceHpcTick modl ix
+toIfaceTickish _ = panic "toIfaceTickish"
 
 ---------------------
 toIfaceBind :: Bind Id -> IfaceBinding
@@ -1679,7 +1680,6 @@ toIfaceVar v
     | Just fcall <- isFCallId_maybe v            = IfaceFCall fcall (toIfaceType (idType v))
        -- Foreign calls have special syntax
     | isExternalName name		         = IfaceExt name
-    | Just (TickBox m ix) <- isTickBoxOp_maybe v = IfaceTick m ix
-    | otherwise		                         = IfaceLcl (getFS name)
+    | otherwise                                  = IfaceLcl (getFS name)
   where name = idName v
 \end{code}

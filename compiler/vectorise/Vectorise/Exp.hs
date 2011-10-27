@@ -43,14 +43,15 @@ import Data.List
 
 -- | Vectorise a polymorphic expression.
 --
-vectPolyExpr :: Bool            -- ^ When vectorising the RHS of a binding, whether that
-                                --   binding is a loop breaker.
+vectPolyExpr :: Bool            -- ^ When vectorising the RHS of a
+                                -- binding, whether that binding is a
+                                -- loop breaker.
              -> [Var]                     
              -> CoreExprWithFVs
              -> VM (Inline, Bool, VExpr)
-vectPolyExpr loop_breaker recFns (_, AnnNote note expr)
+vectPolyExpr loop_breaker recFns (_, AnnTick tickish expr)
  = do (inline, isScalarFn, expr') <- vectPolyExpr loop_breaker recFns expr
-      return (inline, isScalarFn, vNote note expr')
+      return (inline, isScalarFn, vTick tickish expr')
 vectPolyExpr loop_breaker recFns expr
  = do
       arity <- polyArity tvs
@@ -75,8 +76,8 @@ vectExpr (_, AnnVar v)
 vectExpr (_, AnnLit lit) 
   = vectLiteral lit
 
-vectExpr (_, AnnNote note expr)
-  = liftM (vNote note) (vectExpr expr)
+vectExpr (_, AnnTick tickish expr)
+  = liftM (vTick tickish) (vectExpr expr)
 
 -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
 --   its only purpose is to abort the program, but we need to adjust the type to keep CoreLint
@@ -247,7 +248,7 @@ vectScalarFun forceScalar recFns expr
       where
         scalars' = scalars `extendVarSet` var
     is_scalar scalars  isScalarTC  (Cast e _coe)   = is_scalar scalars isScalarTC e
-    is_scalar scalars  isScalarTC  (Note _ e   )   = is_scalar scalars isScalarTC e
+    is_scalar scalars  isScalarTC  (Tick _ e   )   = is_scalar scalars isScalarTC e
     is_scalar _scalars _isScalarTC (Type {})       = True
     is_scalar _scalars _isScalarTC (Coercion {})   = True
 

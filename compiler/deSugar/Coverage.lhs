@@ -2,11 +2,10 @@
 % (c) Galois, 2006
 % (c) University of Glasgow, 2007
 %
-\section[Coverage]{@coverage@: the main function}
-
 \begin{code}
-module Coverage (addCoverageTicksToBinds, hpcInitCode) where
+module Coverage (addTicksToBinds, hpcInitCode) where
 
+import Type
 import HsSyn
 import Module
 import Outputable
@@ -14,8 +13,11 @@ import DynFlags
 import Control.Monad
 import SrcLoc
 import ErrUtils
+import NameSet hiding (FreeVars)
 import Name
 import Bag
+import CostCentre
+import CoreSyn
 import Id
 import VarSet
 import Data.List
@@ -24,6 +26,7 @@ import HscTypes
 import Platform
 import StaticFlags
 import TyCon
+import BasicTypes
 import MonadUtils
 import Maybes
 import CLabel
@@ -44,174 +47,306 @@ import qualified Data.Map as Map
 
 %************************************************************************
 %*									*
-%* 		The main function: addCoverageTicksToBinds
+%*              The main function: addTicksToBinds
 %*									*
 %************************************************************************
 
 \begin{code}
-addCoverageTicksToBinds
+addTicksToBinds
         :: DynFlags
         -> Module
-        -> ModLocation          -- of the current module
-        -> [TyCon]		-- type constructor in this module
+        -> ModLocation          -- ... off the current module
+        -> NameSet              -- Exported Ids.  When we call addTicksToBinds,
+                                -- isExportedId doesn't work yet (the desugarer
+                                -- hasn't set it), so we have to work from this set.
+        -> [TyCon]              -- Type constructor in this module
         -> LHsBinds Id
         -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
-addCoverageTicksToBinds dflags mod mod_loc tyCons binds = 
+addTicksToBinds dflags mod mod_loc exports tyCons binds =
+
  case ml_hs_file mod_loc of
- Nothing -> return (binds, emptyHpcInfo False, emptyModBreaks)
- Just orig_file -> do
+   Nothing        -> return (binds, emptyHpcInfo False, emptyModBreaks)
+   Just orig_file -> do
 
-  if "boot" `isSuffixOf` orig_file then return (binds, emptyHpcInfo False, emptyModBreaks) else do
+     if "boot" `isSuffixOf` orig_file
+         then return (binds, emptyHpcInfo False, emptyModBreaks)
+         else do
+   
+     let  orig_file2 = guessSourceFile binds orig_file
 
-  -- Now, we try look for a file generated from a .hsc file to a .hs file, by peeking ahead.
-
-  let top_pos = catMaybes $ foldrBag (\ (L pos _) rest -> srcSpanFileName_maybe pos : rest) [] binds
-  let orig_file2 = case top_pos of
-		     (file_name:_) 
-		       | ".hsc" `isSuffixOf` unpackFS file_name -> unpackFS file_name
-		     _ -> orig_file
-
-  let mod_name = moduleNameString (moduleName mod)
-
-  let (binds1,_,st)
+          (binds1,_,st)
 		 = unTM (addTickLHsBinds binds) 
 		   (TTE
-		       { fileName    = mkFastString orig_file2
+                      { fileName     = mkFastString orig_file2
 		      , declPath     = []
+                      , dflags       = dflags
+                      , exports      = exports
                       , inScope      = emptyVarSet
-		      , blackList    = Map.fromList [ (getSrcSpan (tyConName tyCon),()) 
-		                                    | tyCon <- tyCons ]
-		       })
+                      , blackList    = Map.fromList
+                                          [ (getSrcSpan (tyConName tyCon),())
+                                          | tyCon <- tyCons ]
+                      , density      = mkDensity dflags
+                      , this_mod     = mod
+                       })
 		   (TT 
 		      { tickBoxCount = 0
 		      , mixEntries   = []
 		      })
 
-  let entries = reverse $ mixEntries st
+     let entries = reverse $ mixEntries st
 
-  -- write the mix entries for this module
-  hashNo <- if opt_Hpc then do
-     let hpc_dir = hpcDir dflags
+     let count = tickBoxCount st
+     hashNo <- writeMixEntries dflags mod count entries orig_file2
+     modBreaks <- mkModBreaks count entries
 
-     let hpc_mod_dir = if modulePackageId mod == mainPackageId 
-		       then hpc_dir
-		       else hpc_dir ++ "/" ++ packageIdString (modulePackageId mod)
+     doIfSet_dyn dflags Opt_D_dump_ticked $ printDump (pprLHsBinds binds1)
+   
+     return (binds1, HpcInfo count hashNo, modBreaks)
 
-     let tabStop = 1 -- <tab> counts as a normal char in GHC's location ranges.
-     createDirectoryIfMissing True hpc_mod_dir
-     modTime <- getModificationTime orig_file2
-     let entries' = [ (hpcPos, box) 
-                    | (span,_,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
-     when (length entries' /= tickBoxCount st) $ do
-       panic "the number of .mix entries are inconsistent"
-     let hashNo = mixHash orig_file2 modTime tabStop entries'
-     mixCreate hpc_mod_dir mod_name 
-     	       $ Mix orig_file2 modTime (toHash hashNo) tabStop entries'
-     return $ hashNo 
-   else do
-     return $ 0
 
-  -- Todo: use proper src span type
+guessSourceFile :: LHsBinds Id -> FilePath -> FilePath
+guessSourceFile binds orig_file =
+     -- Try look for a file generated from a .hsc file to a
+     -- .hs file, by peeking ahead.
+     let top_pos = catMaybes $ foldrBag (\ (L pos _) rest ->
+                                 srcSpanFileName_maybe pos : rest) [] binds
+     in
+     case top_pos of
+        (file_name:_) | ".hsc" `isSuffixOf` unpackFS file_name
+                      -> unpackFS file_name
+        _ -> orig_file
+
+
+mkModBreaks :: Int -> [MixEntry_] -> IO ModBreaks
+mkModBreaks count entries = do
   breakArray <- newBreakArray $ length entries
-
-  let locsTicks = listArray (0,tickBoxCount st-1) 
-                     [ span | (span,_,_,_) <- entries ]
-      varsTicks = listArray (0,tickBoxCount st-1) 
-                     [ vars | (_,_,vars,_) <- entries ]
-      declsTicks= listArray (0,tickBoxCount st-1) 
-                     [ decls | (_,decls,_,_) <- entries ]
-      modBreaks = emptyModBreaks 
-                  { modBreaks_flags = breakArray 
-                  , modBreaks_locs  = locsTicks 
-                  , modBreaks_vars  = varsTicks
-                  , modBreaks_decls = declsTicks
-                  } 
-
-  doIfSet_dyn dflags  Opt_D_dump_hpc $ do
-	  printDump (pprLHsBinds binds1)
-
-  return (binds1, HpcInfo (tickBoxCount st) hashNo, modBreaks)
-\end{code}
+  let
+         locsTicks = listArray (0,count-1) [ span  | (span,_,_,_)  <- entries ]
+         varsTicks = listArray (0,count-1) [ vars  | (_,_,vars,_)  <- entries ]
+         declsTicks= listArray (0,count-1) [ decls | (_,decls,_,_) <- entries ]
+         modBreaks = emptyModBreaks 
+                     { modBreaks_flags = breakArray 
+                     , modBreaks_locs  = locsTicks 
+                     , modBreaks_vars  = varsTicks
+                     , modBreaks_decls = declsTicks
+                     } 
+  --
+  return modBreaks
 
 
-\begin{code}
-liftL :: (Monad m) => (a -> m a) -> Located a -> m (Located a)
-liftL f (L loc a) = do
-  a' <- f a
-  return $ L loc a'
+writeMixEntries :: DynFlags -> Module -> Int -> [MixEntry_] -> FilePath -> IO Int
+writeMixEntries dflags mod count entries filename
+  | not opt_Hpc = return 0
+  | otherwise   = do
+        let
+            hpc_dir = hpcDir dflags
+            mod_name = moduleNameString (moduleName mod)
+
+            hpc_mod_dir
+              | modulePackageId mod == mainPackageId  = hpc_dir
+              | otherwise = hpc_dir ++ "/" ++ packageIdString (modulePackageId mod)
+   
+            tabStop = 8 -- <tab> counts as a normal char in GHC's location ranges.
+
+        createDirectoryIfMissing True hpc_mod_dir
+        modTime <- getModificationTime filename
+        let entries' = [ (hpcPos, box) 
+                       | (span,_,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
+        when (length entries' /= count) $ do
+          panic "the number of .mix entries are inconsistent"
+        let hashNo = mixHash filename modTime tabStop entries'
+        mixCreate hpc_mod_dir mod_name 
+                       $ Mix filename modTime (toHash hashNo) tabStop entries'
+        return hashNo
+
+
+-- -----------------------------------------------------------------------------
+-- TickDensity: where to insert ticks
+
+data TickDensity
+  = TickForCoverage       -- for Hpc
+  | TickForBreakPoints    -- for GHCi
+  | TickAllFunctions      -- for -prof-auto-all
+  | TickTopFunctions      -- for -prof-auto-top
+  | TickExportedFunctions -- for -prof-auto-exported
+  -- maybe also:
+  --  | TickCallSites        -- for stack tracing
+  deriving Eq
+
+mkDensity :: DynFlags -> TickDensity
+mkDensity dflags
+  | opt_Hpc                              = TickForCoverage
+  | HscInterpreted  <- hscTarget dflags  = TickForBreakPoints
+  | ProfAutoAll     <- profAuto dflags   = TickAllFunctions
+  | ProfAutoTop     <- profAuto dflags   = TickTopFunctions
+  | ProfAutoExports <- profAuto dflags   = TickExportedFunctions
+  | otherwise = panic "desnity"
+
+
+-- | Decide whether to add a tick to a binding or not.
+shouldTickBind  :: TickDensity
+                -> Bool         -- top level?
+                -> Bool         -- exported?
+                -> Bool         -- simple pat bind?
+                -> Bool         -- INLINE pragma?
+                -> Bool
+
+shouldTickBind density top_lev exported simple_pat inline
+ = case density of
+      TickForBreakPoints    -> not simple_pat
+        -- we never add breakpoints to simple pattern bindings
+        -- (there's always a tick on the rhs anyway).
+      TickAllFunctions      -> not inline
+      TickTopFunctions      -> top_lev && not inline
+      TickExportedFunctions -> exported && not inline
+      TickForCoverage       -> True
+
+shouldTickPatBind :: TickDensity -> Bool -> Bool
+shouldTickPatBind density top_lev
+  = case density of
+      TickForBreakPoints    -> False
+      TickAllFunctions      -> True
+      TickTopFunctions      -> top_lev
+      TickExportedFunctions -> False
+      TickForCoverage       -> False
+
+-- -----------------------------------------------------------------------------
+-- Adding ticks to bindings
 
 addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
 addTickLHsBinds binds = mapBagM addTickLHsBind binds
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
-addTickLHsBind (L pos bind@(AbsBinds { abs_binds = binds })) = do
+addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
+                                       abs_exports = abs_exports })) = do
+  withEnv add_exports $ do
   binds' <- addTickLHsBinds binds
   return $ L pos $ bind { abs_binds = binds' }
-addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do 
+ where
+   -- in AbsBinds, the Id on each binding is not the actual top-level
+   -- Id that we are defining, they are related by the abs_exports
+   -- field of AbsBinds.  So if we're doing TickExportedFunctions we need
+   -- to add the local Ids to the set of exported Names so that we know to
+   -- tick the right bindings.
+   add_exports env =
+     env{ exports = exports env `addListToNameSet`
+                      [ idName mid
+                      | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
+                      , idName pid `elemNameSet` (exports env) ] }
+
+addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
 
   (fvs, (MatchGroup matches' ty)) <- 
         getFreeVars $
         addPathEntry name $
-        addTickMatchGroup (fun_matches funBind)
+        addTickMatchGroup False (fun_matches funBind)
 
   blackListed <- isBlackListed pos
+  density <- getDensity
+  exported_names <- liftM exports getEnv
 
-  -- Todo: we don't want redundant ticks on simple pattern bindings
   -- We don't want to generate code for blacklisted positions
-  if blackListed || (not opt_Hpc && isSimplePatBind funBind)
-     then 
-        return $ L pos $ funBind { fun_matches = MatchGroup matches' ty 
-                                 , fun_tick = Nothing 
-                                 }
-     else do
-        tick_no <- allocATickBox (if null decl_path
-                                     then TopLevelBox [name]
-                                     else LocalBox (decl_path ++ [name])) 
-                                pos fvs
+  -- We don't want redundant ticks on simple pattern bindings
+  -- We don't want to tick non-exported bindings in TickExportedFunctions
+  let simple = isSimplePatBind funBind
+      toplev = null decl_path
+      exported = idName id `elemNameSet` exported_names
+      inline   = pprTrace "inline" (ppr id <+> ppr (idInlinePragma id)) $ isAnyInlinePragma (idInlinePragma id)
 
-        return $ L pos $ funBind { fun_matches = MatchGroup matches' ty 
-                                 , fun_tick = tick_no
-                                 }
+  tick <- if not blackListed &&
+               shouldTickBind density toplev exported simple inline
+             then
+                bindTick density name pos fvs
+             else
+                return Nothing
+
+  return $ L pos $ funBind { fun_matches = MatchGroup matches' ty
+                           , fun_tick = tick }
+
    where
    -- a binding is a simple pattern binding if it is a funbind with zero patterns
    isSimplePatBind :: HsBind a -> Bool
    isSimplePatBind funBind = matchGroupArity (fun_matches funBind) == 0
 
 -- TODO: Revisit this
-addTickLHsBind (L pos (pat@(PatBind { pat_rhs = rhs }))) = do
+addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs, pat_rhs = rhs }))) = do
   let name = "(...)"
-  rhs' <- addPathEntry name $ addTickGRHSs False rhs
-{-
+  (fvs, rhs') <- getFreeVars $ addPathEntry name $ addTickGRHSs False False rhs
+
+  density <- getDensity
   decl_path <- getPathEntry
-  tick_me <- allocTickBox (if null decl_path
-			   then TopLevelBox [name]
-			   else LocalBox (name : decl_path))
--}			   
-  return $ L pos $ pat { pat_rhs = rhs' }
+  let top_lev = null decl_path
+  let add_ticks = shouldTickPatBind density top_lev
+
+  tickish <- if add_ticks
+                then bindTick density name pos fvs
+                else return Nothing
+
+  let patvars = map getOccString (collectPatBinders lhs)
+  patvar_ticks <- if add_ticks
+                     then mapM (\v -> bindTick density v pos fvs) patvars
+                     else return []
+
+  return $ L pos $ pat { pat_rhs = rhs',
+                         pat_ticks = (tickish, patvar_ticks)}
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
+
+
+bindTick :: TickDensity -> String -> SrcSpan -> FreeVars -> TM (Maybe (Tickish Id))
+bindTick density name pos fvs = do
+  decl_path <- getPathEntry
+  let
+      toplev        = null decl_path
+      count_entries = toplev || density == TickAllFunctions
+      top_only      = density /= TickAllFunctions
+      box_label     = if toplev then TopLevelBox [name]
+                                else LocalBox (decl_path ++ [name])
+  --
+  allocATickBox box_label count_entries top_only pos fvs
+
+
+-- -----------------------------------------------------------------------------
+-- Decorate an LHsExpr with ticks
+
+-- selectively add ticks to interesting expressions
+addTickLHsExpr :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExpr (L pos e0) = do
+  d <- getDensity
+  case d of
+    TickForCoverage    -> tick_it
+    TickForBreakPoints -> if isGoodBreakExpr e0 then tick_it else dont_tick_it
+    _other             -> dont_tick_it
+ where
+   tick_it      = allocTickBox (ExpBox False) False False pos $ addTickHsExpr e0
+   dont_tick_it = do e1 <- addTickHsExpr e0; return $ L pos e1
 
 -- Add a tick to the expression no matter what it is.  There is one exception:
 -- for the debugger, if the expression is a 'let', then we don't want to add
 -- a tick here because there will definititely be a tick on the body anyway.
 addTickLHsExprAlways :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprAlways (L pos e0)
-  | not opt_Hpc, HsLet _ _ <- e0 = addTickLHsExprNever (L pos e0)
-  | otherwise = allocTickBox (ExpBox False) pos $ addTickHsExpr e0
+addTickLHsExprAlways (L pos e0) = do
+  d <- getDensity
+  case d of
+     TickForBreakPoints | HsLet _ _ <- e0 -> dont_tick_it
+                        | otherwise       -> tick_it
+     TickForCoverage -> tick_it
+     _other          -> dont_tick_it
+ where
+   tick_it      = allocTickBox (ExpBox False) False False pos $ addTickHsExpr e0
+   dont_tick_it = do e1 <- addTickHsExpr e0; return $ L pos e1
 
-addTickLHsExprNeverOrAlways :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprNeverOrAlways e
-    | opt_Hpc   = addTickLHsExprNever e
-    | otherwise = addTickLHsExprAlways e
-
-addTickLHsExprNeverOrMaybe :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprNeverOrMaybe e
-    | opt_Hpc   = addTickLHsExprNever e
-    | otherwise = addTickLHsExpr e
+-- | A let body is ticked only if we're doing breakpoints.  For coverage, the
+-- whole let is ticked, so there's no need to tick the body.
+addTickLHsExprLetBody :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExprLetBody e
+   = ifDensity TickForBreakPoints
+         (addTickLHsExprAlways e)
+         (addTickLHsExprNever e)
 
 -- version of addTick that does not actually add a tick,
 -- because the scope of this tick is completely subsumed by 
@@ -220,16 +355,6 @@ addTickLHsExprNever :: LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprNever (L pos e0) = do
     e1 <- addTickHsExpr e0
     return $ L pos e1
-
--- selectively add ticks to interesting expressions
-addTickLHsExpr :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExpr (L pos e0) = do
-    if opt_Hpc || isGoodBreakExpr e0
-       then do
-          allocTickBox (ExpBox False) pos $ addTickHsExpr e0
-       else do
-          e1 <- addTickHsExpr e0
-          return $ L pos e1 
 
 -- general heuristic: expressions which do not denote values are good break points
 isGoodBreakExpr :: HsExpr Id -> Bool
@@ -246,15 +371,19 @@ isGoodBreakExpr _other         = False
 
 addTickLHsExprOptAlt :: Bool -> LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprOptAlt oneOfMany (L pos e0)
-  | not opt_Hpc = addTickLHsExpr (L pos e0)
-  | otherwise =
-    allocTickBox (ExpBox oneOfMany) pos $ 
-        addTickHsExpr e0
+  = ifDensity TickForCoverage
+        (allocTickBox (ExpBox oneOfMany) False False pos $ addTickHsExpr e0)
+        (addTickLHsExpr (L pos e0))
 
 addBinTickLHsExpr :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
-addBinTickLHsExpr boxLabel (L pos e0) =
-    allocBinTickBox boxLabel pos $
-        addTickHsExpr e0
+addBinTickLHsExpr boxLabel (L pos e0)
+  = ifDensity TickForCoverage
+        (allocBinTickBox boxLabel pos $ addTickHsExpr e0)
+        (addTickLHsExpr (L pos e0))
+
+
+-- -----------------------------------------------------------------------------
+-- Decoarate an HsExpr with ticks
 
 addTickHsExpr :: HsExpr Id -> TM (HsExpr Id)
 addTickHsExpr e@(HsVar id) = do freeVar id; return e
@@ -262,20 +391,23 @@ addTickHsExpr e@(HsIPVar _) = return e
 addTickHsExpr e@(HsOverLit _) = return e
 addTickHsExpr e@(HsLit _) = return e
 addTickHsExpr (HsLam matchgroup) =
-        liftM HsLam (addTickMatchGroup matchgroup)
-addTickHsExpr (HsApp e1 e2) = 
+        liftM HsLam (addTickMatchGroup True matchgroup)
+addTickHsExpr (HsApp e1 e2) =
 	liftM2 HsApp (addTickLHsExprNever e1) (addTickLHsExpr e2)
 addTickHsExpr (OpApp e1 e2 fix e3) = 
 	liftM4 OpApp 
 		(addTickLHsExpr e1) 
 		(addTickLHsExprNever e2)
 		(return fix)
-		(addTickLHsExpr e3)
+                (addTickLHsExpr e3)
 addTickHsExpr (NegApp e neg) =
 	liftM2 NegApp
 		(addTickLHsExpr e) 
 		(addTickSyntaxExpr hpcSrcSpan neg)
-addTickHsExpr (HsPar e) = liftM HsPar (addTickLHsExprNeverOrMaybe e)
+addTickHsExpr (HsPar e) =
+        liftM HsPar $
+           ifDensity TickForCoverage (addTickLHsExprNever e)
+                                     (addTickLHsExpr e)
 addTickHsExpr (SectionL e1 e2) = 
 	liftM2 SectionL
 		(addTickLHsExpr e1)
@@ -291,7 +423,7 @@ addTickHsExpr (ExplicitTuple es boxity) =
 addTickHsExpr (HsCase e mgs) = 
 	liftM2 HsCase
 		(addTickLHsExpr e) 
-		(addTickMatchGroup mgs)
+                (addTickMatchGroup False mgs)
 addTickHsExpr (HsIf cnd e1 e2 e3) = 
 	liftM3 (HsIf cnd)
 		(addBinTickLHsExpr (BinBox CondBinBox) e1)
@@ -301,7 +433,7 @@ addTickHsExpr (HsLet binds e) =
 	bindLocals (collectLocalBinders binds) $
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
-                (addTickLHsExprNeverOrAlways e)
+                (addTickLHsExprLetBody e)
 addTickHsExpr (HsDo cxt stmts srcloc) 
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
        ; return (HsDo cxt stmts' srcloc) }
@@ -338,7 +470,7 @@ addTickHsExpr (ArithSeq	 ty arith_seq) =
 		(return ty)
 		(addTickArithSeqInfo arith_seq)
 addTickHsExpr (HsTickPragma _ (L pos e0)) = do
-    e2 <- allocTickBox (ExpBox False) pos $
+    e2 <- allocTickBox (ExpBox False) False False pos $
                 addTickHsExpr e0
     return $ unLoc e2
 addTickHsExpr (PArrSeq	 ty arith_seq) =
@@ -374,33 +506,47 @@ addTickTupArg :: HsTupArg Id -> TM (HsTupArg Id)
 addTickTupArg (Present e)  = do { e' <- addTickLHsExpr e; return (Present e') }
 addTickTupArg (Missing ty) = return (Missing ty)
 
-addTickMatchGroup :: MatchGroup Id -> TM (MatchGroup Id)
-addTickMatchGroup (MatchGroup matches ty) = do
+addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup Id -> TM (MatchGroup Id)
+addTickMatchGroup is_lam (MatchGroup matches ty) = do
   let isOneOfMany = matchesOneOfMany matches
-  matches' <- mapM (liftL (addTickMatch isOneOfMany)) matches
+  matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
   return $ MatchGroup matches' ty
 
-addTickMatch :: Bool -> Match Id -> TM (Match Id)
-addTickMatch isOneOfMany (Match pats opSig gRHSs) =
+addTickMatch :: Bool -> Bool -> Match Id -> TM (Match Id)
+addTickMatch isOneOfMany isLambda (Match pats opSig gRHSs) =
   bindLocals (collectPatsBinders pats) $ do
-    gRHSs' <- addTickGRHSs isOneOfMany gRHSs
+    gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ Match pats opSig gRHSs'
 
-addTickGRHSs :: Bool -> GRHSs Id -> TM (GRHSs Id)
-addTickGRHSs isOneOfMany (GRHSs guarded local_binds) = do
+addTickGRHSs :: Bool -> Bool -> GRHSs Id -> TM (GRHSs Id)
+addTickGRHSs isOneOfMany isLambda (GRHSs guarded local_binds) = do
   bindLocals binders $ do
     local_binds' <- addTickHsLocalBinds local_binds
-    guarded' <- mapM (liftL (addTickGRHS isOneOfMany)) guarded
+    guarded' <- mapM (liftL (addTickGRHS isOneOfMany isLambda)) guarded
     return $ GRHSs guarded' local_binds'
   where
     binders = collectLocalBinders local_binds
 
-addTickGRHS :: Bool -> GRHS Id -> TM (GRHS Id)
-addTickGRHS isOneOfMany (GRHS stmts expr) = do
+addTickGRHS :: Bool -> Bool -> GRHS Id -> TM (GRHS Id)
+addTickGRHS isOneOfMany isLambda (GRHS stmts expr) = do
   (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
-                        (if opt_Hpc then addTickLHsExprOptAlt isOneOfMany expr
-                                    else addTickLHsExprAlways expr)
+                        (addTickGRHSBody isOneOfMany isLambda expr)
   return $ GRHS stmts' expr'
+
+addTickGRHSBody :: Bool -> Bool -> LHsExpr Id -> TM (LHsExpr Id)
+addTickGRHSBody isOneOfMany isLambda expr@(L pos e0) = do
+  d <- getDensity
+  case d of
+    TickForCoverage  -> addTickLHsExprOptAlt isOneOfMany expr
+    TickAllFunctions | isLambda ->
+       addPathEntry "\\" $
+         allocTickBox (ExpBox False) True{-count-} False{-not top-} pos $
+           addTickHsExpr e0
+    TickTopFunctions ->
+       allocTickBox (ExpBox False) False{-no count-} True{-top-} pos $
+         addTickHsExpr e0
+    _otherwise ->
+       addTickLHsExprAlways expr
 
 addTickLStmts :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM [LStmt Id]
 addTickLStmts isGuard stmts = do
@@ -673,6 +819,11 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
 		(addTickLHsExpr e1)
 		(addTickLHsExpr e2)
 		(addTickLHsExpr e3)
+
+liftL :: (Monad m) => (a -> m a) -> Located a -> m (Located a)
+liftL f (L loc a) = do
+  a' <- f a
+  return $ L loc a'
 \end{code}
 
 \begin{code}
@@ -680,11 +831,15 @@ data TickTransState = TT { tickBoxCount:: Int
                          , mixEntries  :: [MixEntry_]
                          }                        
 
-data TickTransEnv = TTE { fileName      :: FastString
-			, declPath     :: [String]
+data TickTransEnv = TTE { fileName     :: FastString
+                        , density      :: TickDensity
+                        , dflags       :: DynFlags
+                        , exports      :: NameSet
+                        , declPath     :: [String]
                         , inScope      :: VarSet
-			, blackList   :: Map SrcSpan ()
-			}
+                        , blackList    :: Map SrcSpan ()
+                        , this_mod     :: Module
+                        }
 
 --	deriving Show
 
@@ -731,6 +886,12 @@ withEnv f (TM m) = TM $ \ env st ->
 		                 case m (f env) st of
                                    (a, fvs, st') -> (a, fvs, st')
 
+getDensity :: TM TickDensity
+getDensity = TM $ \env st -> (density env, noFVs, st)
+
+ifDensity :: TickDensity -> TM a -> TM a -> TM a
+ifDensity d th el = do d0 <- getDensity; if d == d0 then th else el
+
 getFreeVars :: TM a -> TM (FreeVars, a)
 getFreeVars (TM m) 
   = TM $ \ env st -> case m env st of (a, fv, st') -> ((fv,a), fv, st')
@@ -773,46 +934,73 @@ isBlackListed pos = TM $ \ env st ->
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
-allocTickBox :: BoxLabel -> SrcSpan -> TM (HsExpr Id) -> TM (LHsExpr Id)
-allocTickBox boxLabel pos m | isGoodSrcSpan' pos = 
-  sameFileName pos 
-    (do e <- m; return (L pos e)) $ do
-  (fvs, e) <- getFreeVars m
-  TM $ \ env st ->
-    let c = tickBoxCount st
-        ids = occEnvElts fvs
-        mes = mixEntries st
-        me = (pos, declPath env, map (nameOccName.idName) ids, boxLabel)
-    in
-    ( L pos (HsTick c ids (L pos e))
-    , fvs
-    , st {tickBoxCount=c+1,mixEntries=me:mes}
-    )
-allocTickBox _boxLabel pos m = do e <- m; return (L pos e)
+allocTickBox :: BoxLabel -> Bool -> Bool -> SrcSpan -> TM (HsExpr Id)
+             -> TM (LHsExpr Id)
+allocTickBox boxLabel countEntries topOnly pos m | isGoodSrcSpan' pos =
+  sameFileName pos (do e <- m; return (L pos e)) $ do
+    (fvs, e) <- getFreeVars m
+    env <- getEnv
+    tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
+    return (L pos (HsTick tickish (L pos e)))
+allocTickBox _boxLabel _countEntries _topOnly pos m = do
+  e <- m
+  return (L pos e)
+
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
-allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
-allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = 
-  sameFileName pos 
-    (return Nothing) $ TM $ \ env st ->
-  let mydecl_path
-        | null (declPath env), TopLevelBox x <- boxLabel = x
-        | otherwise = declPath env
-      me = (pos, mydecl_path, map (nameOccName.idName) ids, boxLabel)
-      c = tickBoxCount st
-      mes = mixEntries st
-      ids = occEnvElts fvs
-  in ( Just (c, ids)
-     , noFVs
-     , st {tickBoxCount=c+1, mixEntries=me:mes}
-     )
-allocATickBox _boxLabel _pos _fvs = return Nothing
+allocATickBox :: BoxLabel -> Bool -> Bool -> SrcSpan -> FreeVars
+              -> TM (Maybe (Tickish Id))
+allocATickBox boxLabel countEntries topOnly  pos fvs | isGoodSrcSpan' pos =
+  sameFileName pos (return Nothing) $ do
+    let
+      mydecl_path = case boxLabel of
+                      TopLevelBox x -> x
+                      LocalBox xs  -> xs
+                      _ -> panic "allocATickBox"
+    tickish <- mkTickish boxLabel countEntries topOnly pos fvs mydecl_path
+    return (Just tickish)
+allocATickBox _boxLabel _countEntries _topOnly _pos _fvs =
+  return Nothing
+
+
+mkTickish :: BoxLabel -> Bool -> Bool -> SrcSpan -> OccEnv Id -> [String]
+          -> TM (Tickish Id)
+mkTickish boxLabel countEntries topOnly pos fvs decl_path =
+  TM $ \ env st ->
+    let c = tickBoxCount st
+        ids = filter (not . isUnLiftedType . idType) $ occEnvElts fvs
+            -- unlifted types cause two problems here:
+            --   * we can't bind them  at the GHCi prompt
+            --     (bindLocalsAtBreakpoint already fliters them out),
+            --   * the simplifier might try to substitute a literal for
+            --     the Id, and we can't handle that.
+
+        mes = mixEntries st
+        me = (pos, decl_path, map (nameOccName.idName) ids, boxLabel)
+
+        cc_name | topOnly   = head decl_path
+                | otherwise = concat (intersperse "." decl_path)
+
+        cc = mkUserCC (mkFastString cc_name) (this_mod env)
+
+        count = countEntries && dopt Opt_ProfCountEntries (dflags env)
+
+        tickish
+          | opt_Hpc            = HpcTick (this_mod env) c
+          | opt_SccProfilingOn = ProfNote cc count True{-scopes-}
+          | otherwise          = Breakpoint c ids
+    in
+    ( tickish
+    , fvs
+    , st {tickBoxCount=c+1,mixEntries=me:mes}
+    )
+
 
 allocBinTickBox :: (Bool -> BoxLabel) -> SrcSpan -> TM (HsExpr Id)
                 -> TM (LHsExpr Id)
 allocBinTickBox boxLabel pos m
- | not opt_Hpc = allocTickBox (ExpBox False) pos m
+ | not opt_Hpc = allocTickBox (ExpBox False) False False pos m
  | isGoodSrcSpan' pos =
  do
  e <- m
@@ -823,7 +1011,7 @@ allocBinTickBox boxLabel pos m
       c = tickBoxCount st
       mes = mixEntries st
   in 
-             ( L pos $ HsTick c [] $ L pos $ HsBinTick (c+1) (c+2) (L pos e)
+             ( L pos $ HsTick (HpcTick (this_mod env) c) $ L pos $ HsBinTick (c+1) (c+2) (L pos e)
            -- notice that F and T are reversed,
            -- because we are building the list in
            -- reverse...

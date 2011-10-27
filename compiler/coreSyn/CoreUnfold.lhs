@@ -204,7 +204,7 @@ inlineBoringOk e
     go credit (App f (Type {}))            = go credit f
     go credit (App f a) | credit > 0  
                         , exprIsTrivial a  = go (credit-1) f
-    go credit (Note _ e) 		   = go credit e     
+    go credit (Tick _ e)                 = go credit e -- dubious
     go credit (Cast e _) 		   = go credit e
     go _      (Var {})         		   = boringCxtOk
     go _      _                		   = boringCxtNotOk
@@ -348,7 +348,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
     size_up (Cast e _) = size_up e
-    size_up (Note _ e) = size_up e
+    size_up (Tick _ e) = size_up e
     size_up (Type _)   = sizeZero           -- Types cost nothing
     size_up (Coercion _) = sizeZero
     size_up (Lit lit)  = sizeN (litSize lit)
@@ -1187,7 +1187,7 @@ interestingArg e = go e 0
     go (App fn (Type _)) n = go fn n
     go (App fn (Coercion _)) n = go fn n
     go (App fn _)        n = go fn (n+1)
-    go (Note _ a) 	 n = go a n
+    go (Tick _ a)      n = go a n
     go (Cast e _) 	 n = go e n
     go (Lam v e)  	 n 
        | isTyVar v	   = go e n

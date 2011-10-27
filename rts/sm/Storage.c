@@ -607,6 +607,9 @@ allocate (Capability *cap, lnat n)
     bdescr *bd;
     StgPtr p;
 
+    TICK_ALLOC_HEAP_NOCTR(n);
+    CCS_ALLOC(CCCS,n);
+    
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
 	lnat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
 
@@ -638,9 +641,6 @@ allocate (Capability *cap, lnat n)
 
     /* small allocation (<LARGE_OBJECT_THRESHOLD) */
 
-    TICK_ALLOC_HEAP_NOCTR(n);
-    CCS_ALLOC(CCCS,n);
-    
     bd = cap->r.rCurrentAlloc;
     if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
         

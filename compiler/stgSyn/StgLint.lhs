@@ -191,7 +191,7 @@ lintStgExpr (StgLetNoEscape _ _ binds body) = do
       addInScopeVars binders $
         lintStgExpr body
 
-lintStgExpr (StgSCC _ expr) = lintStgExpr expr
+lintStgExpr (StgSCC _ _ _ expr) = lintStgExpr expr
 
 lintStgExpr (StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
     _ <- MaybeT $ lintStgExpr scrut

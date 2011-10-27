@@ -41,7 +41,7 @@ INFO_TABLE_RET( stg_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
     W_ updatee;
     
     updatee = StgUpdateFrame_updatee(Sp);
-    
+
     /* remove the update frame from the stack */
     Sp = Sp + SIZEOF_StgUpdateFrame;
     

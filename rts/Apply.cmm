@@ -85,8 +85,9 @@ stg_PAP_apply
   // profiling
   TICK_ENT_PAP();
   LDV_ENTER(pap);
-  // Enter PAP cost centre 
-  ENTER_CCS_PAP_CL(pap);
+#ifdef PROFILING
+  foreign "C" enterFunCCS(StgHeader_ccs(pap));
+#endif
 
   // Reload the stack 
   W_ i;
@@ -175,11 +176,9 @@ INFO_TABLE(stg_AP,/*special layout*/0,0,AP,"AP","AP")
 
   TICK_ENT_AP();
   LDV_ENTER(ap);
+  ENTER_CCS_THUNK(ap);
 
-  // Enter PAP cost centre
-  ENTER_CCS_PAP_CL(ap);   // ToDo: ENTER_CC_AP_CL 
-
-  // Reload the stack 
+  // Reload the stack
   W_ i;
   W_ p;
   p = ap + SIZEOF_StgHeader + OFFSET_StgAP_payload;
@@ -245,11 +244,9 @@ INFO_TABLE(stg_AP_NOUPD,/*special layout*/0,0,AP,"AP_NOUPD","AP_NOUPD")
 
   TICK_ENT_AP();
   LDV_ENTER(ap);
+  ENTER_CCS_THUNK(ap);
 
-  // Enter PAP cost centre
-  ENTER_CCS_PAP_CL(ap);   // ToDo: ENTER_CC_AP_CL 
-
-  // Reload the stack 
+  // Reload the stack
   W_ i;
   W_ p;
   p = ap + SIZEOF_StgHeader + OFFSET_StgAP_payload;
@@ -326,9 +323,7 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
 
   TICK_ENT_AP();
   LDV_ENTER(ap);
-
-  // Enter PAP cost centre
-  ENTER_CCS_PAP_CL(ap);   // ToDo: ENTER_CC_AP_CL 
+  ENTER_CCS_THUNK(ap);
 
   // Reload the stack
   W_ i;
@@ -379,9 +374,7 @@ INFO_TABLE(stg_AP_STACK_NOUPD,/*special layout*/0,0,AP_STACK,
 
   TICK_ENT_AP();
   LDV_ENTER(ap);
-
-  // Enter PAP cost centre
-  ENTER_CCS_PAP_CL(ap);   // ToDo: ENTER_CC_AP_CL 
+  ENTER_CCS_THUNK(ap);
 
   // Reload the stack
   W_ i;

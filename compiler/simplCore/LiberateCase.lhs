@@ -201,7 +201,7 @@ libCase _   (Lit lit)           = Lit lit
 libCase _   (Type ty)           = Type ty
 libCase _   (Coercion co)       = Coercion co
 libCase env (App fun arg)       = App (libCase env fun) (libCase env arg)
-libCase env (Note note body)    = Note note (libCase env body)
+libCase env (Tick tickish body) = Tick tickish (libCase env body)
 libCase env (Cast e co)         = Cast (libCase env e) co
 
 libCase env (Lam binder body)

@@ -33,7 +33,6 @@ import qualified CoreSubst
 import CoreArity
 import Rules            ( lookupRule, getRules )
 import BasicTypes       ( isMarkedStrict, Arity )
-import CostCentre       ( currentCCS, pushCCisNop )
 import TysPrim          ( realWorldStatePrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils	( foldlM, mapAccumLM )
@@ -648,7 +647,9 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
       	-- Simplify the unfolding
       ; new_unfolding <- simplUnfolding env top_lvl old_bndr final_rhs old_unf
 
-      ; if postInlineUnconditionally env top_lvl new_bndr occ_info final_rhs new_unfolding
+      ; if postInlineUnconditionally env top_lvl new_bndr occ_info
+                                     final_rhs new_unfolding
+
 	                -- Inline and discard the binding
 	then do  { tick (PostInlineUnconditionally old_bndr)
 	         ; return (extendIdSubst env old_bndr (DoneEx final_rhs)) }
@@ -902,7 +903,7 @@ simplExprF1 :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplEnv, OutExpr)
 simplExprF1 env (Var v)        cont = simplIdF env v cont
 simplExprF1 env (Lit lit)      cont = rebuild env (Lit lit) cont
-simplExprF1 env (Note n expr)  cont = simplNote env n expr cont
+simplExprF1 env (Tick t expr)  cont = simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = simplCast env body co cont
 simplExprF1 env (Coercion co)  cont = simplCoercionF env co cont
 simplExprF1 env (Type ty)      cont = ASSERT( contIsRhsOrArg cont )
@@ -989,6 +990,77 @@ simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
   = let opt_co = optCoercion (getCvSubst env) co
     in opt_co `seq` return opt_co
+
+-----------------------------------
+-- | Push a TickIt context outwards past applications and cases, as
+-- long as this is a non-scoping tick, to let case and application
+-- optimisations apply.
+
+simplTick :: SimplEnv -> Tickish Id -> InExpr -> SimplCont
+          -> SimplM (SimplEnv, OutExpr)
+simplTick env tickish expr cont
+  -- A scoped tick turns into a continuation, so that we can spot
+  -- (scc t (\x . e)) in simplLam and eliminate the scc.  If we didn't do
+  -- it this way, then it would take two passes of the simplifier to
+  -- reduce ((scc t (\x . e)) e').
+  -- NB, don't do this with counting ticks, because if the expr is
+  -- bottom, then rebuildCall will discard the continuation.
+
+-- XXX: we cannot do this, because the simplifier assumes that
+-- the context can be pushed into a case with a single branch. e.g.
+--    scc<f>  case expensive of p -> e
+-- becomes
+--    case expensive of p -> scc<f> e
+--
+-- So I'm disabling this for now.  It just means we will do more
+-- simplifier iterations that necessary in some cases.
+
+--  | tickishScoped tickish && not (tickishCounts tickish)
+--  = simplExprF env expr (TickIt tickish cont)
+
+  -- For non-scoped ticks, we push the continuation inside the
+  -- tick.  This has the effect of moving the tick to the outside of a
+  -- case or application context, allowing the normal case and
+  -- application optimisations to fire.
+  | not (tickishScoped tickish)
+  = do { (env', expr') <- simplExprF env expr cont
+       ; return (env', mkTick tickish expr')
+       }
+
+  -- the last case handles scoped/counting ticks, where all we
+  -- can do is simplify the inner expression and then rebuild.
+  --
+  -- NB. float handling here is tricky.  We have some floats already
+  -- in the env, and there may be floats arising from the inner
+  -- expression.  We must be careful to wrap any floats arising from
+  -- the inner expression with a non-counting tick, but not those from
+  -- the env passed in.
+  --
+
+  -- For breakpoints, we cannot do any floating of bindings around the
+  -- tick.  So
+  | Breakpoint{} <- tickish
+  = do { (env', expr') <- simplExprF (zapFloats env) expr mkBoringStop
+       ; let tickish' = simplTickish env tickish
+       ; (env'', expr'') <- rebuild (zapFloats env') (wrapFloats env' expr') (TickIt tickish' cont)
+       ; return (env'', wrapFloats env expr'')
+       }
+
+  | otherwise
+  = do { (env', expr') <- simplExprF (zapFloats env) expr mkBoringStop
+       ; let tickish' = simplTickish env tickish
+       ; let env'' = addFloats env (mapFloatRhss env' (mkTick (mkNoTick tickish')))
+       ; rebuild env'' expr' (TickIt tickish' cont)
+       }
+ where
+  simplTickish env tickish
+    | Breakpoint n ids <- tickish
+          = Breakpoint n (map (getDoneId . substId env) ids)
+    | otherwise = tickish
+
+  getDoneId (DoneId id) = id
+  getDoneId (DoneEx e)  = getIdFromTrivialExpr e -- Note [substTickish] in CoreSubst
+  getDoneId other = pprPanic "getDoneId" (ppr other)
 \end{code}
 
 
@@ -1014,6 +1086,7 @@ rebuild env expr cont
         | isSimplified dup_flag    -> rebuild env (App expr arg) cont
         | otherwise                -> do { arg' <- simplExpr (se `setInScope` env) arg
                                          ; rebuild env (App expr arg') cont }
+      TickIt t cont                -> rebuild env (mkTick t expr) cont
 \end{code}
 
 
@@ -1127,6 +1200,14 @@ simplLam env (bndr:bndrs) body (ApplyTo _ arg arg_se cont)
       = setIdUnfolding bndr NoUnfolding
       | otherwise = bndr
 
+      -- discard a non-counting tick on a lambda.  This may change the
+      -- cost attribution slightly (moving the allocation of the
+      -- lambda elsewhere), but we don't care: optimisation changes
+      -- cost attribution all the time.
+simplLam env bndrs body (TickIt tickish cont)
+  | not (tickishCounts tickish)
+  = simplLam env bndrs body cont
+
         -- Not enough args, so there are real lambdas left to put in the result
 simplLam env bndrs body cont
   = do  { (env', bndrs') <- simplLamBndrs env bndrs
@@ -1168,7 +1249,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
         ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
           simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
 
-  | isStrictId bndr		  -- Includes coercions
+  | isStrictId bndr              -- Includes coercions
   = do  { simplExprF (rhs_se `setFloats` env) rhs
                      (StrictBind bndr bndrs body env cont) }
 
@@ -1179,31 +1260,6 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
         ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
         ; simplLam env3 bndrs body cont }
 \end{code}
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{Notes}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
--- Hack alert: we only distinguish subsumed cost centre stacks for the
--- purposes of inlining.  All other CCCSs are mapped to currentCCS.
-simplNote :: SimplEnv -> Note -> CoreExpr -> SimplCont
-          -> SimplM (SimplEnv, OutExpr)
-simplNote env (SCC cc) e cont
-  | pushCCisNop cc (getEnclosingCC env)  -- scc "f" (...(scc "f" e)...) 
-  = simplExprF env e cont	         -- ==>  scc "f" (...e...)
-  | otherwise
-  = do  { e' <- simplExpr (setEnclosingCC env currentCCS) e
-        ; rebuild env (mkSCC cc e') cont }
-
-simplNote env (CoreNote s) e cont
-  = do { e' <- simplExpr env e
-       ; rebuild env (Note (CoreNote s) e') cont }
-\end{code}
-
 
 %************************************************************************
 %*                                                                      *
@@ -1643,9 +1699,7 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
     strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
 
     scrut_is_var (Cast s _) = scrut_is_var s
-    scrut_is_var (Var v)    = not (isTickBoxOp v)
-                                    -- ugly hack; covering this case is what
-                                    -- exprOkForSpeculation was intended for.
+    scrut_is_var (Var _)    = True
     scrut_is_var _          = False
 
 
@@ -2081,6 +2135,10 @@ mkDupableCont _   (Stop {}) = panic "mkDupableCont"     -- Handled by previous e
 mkDupableCont env (CoerceIt ty cont)
   = do  { (env', dup, nodup) <- mkDupableCont env cont
         ; return (env', CoerceIt ty dup, nodup) }
+
+-- Duplicating ticks for now, not sure if this is good or not
+mkDupableCont env cont@(TickIt{})
+  = return (env, mkBoringStop, cont)
 
 mkDupableCont env cont@(StrictBind {})
   =  return (env, mkBoringStop, cont)

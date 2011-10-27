@@ -249,7 +249,13 @@ lintCoreExpr (Cast expr co)
        ; checkTys from_ty expr_ty (mkCastErr from_ty expr_ty)
        ; return to_ty }
 
-lintCoreExpr (Note _ expr)
+lintCoreExpr (Tick (Breakpoint _ ids) expr)
+  = do forM_ ids $ \id -> do
+         checkDeadIdOcc id
+         lookupIdInScope id
+       lintCoreExpr expr
+
+lintCoreExpr (Tick _other_tickish expr)
   = lintCoreExpr expr
 
 lintCoreExpr (Let (NonRec tv (Type ty)) body)

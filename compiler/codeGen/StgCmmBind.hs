@@ -151,8 +151,8 @@ cgRhs :: Id -> StgRhs -> FCode (CgIdInfo, CmmAGraph)
    -- The returned values are the binding for the environment
    -- and the Initialization Code that witnesses the binding
 
-cgRhs name (StgRhsCon maybe_cc con args)
-  = buildDynCon name maybe_cc con args
+cgRhs name (StgRhsCon cc con args)
+  = buildDynCon name cc con args
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
   = mkRhsClosure name cc bi (nonVoidIds fvs) upd_flag srt args body
@@ -300,12 +300,13 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
                                 (length args) body fv_details
 
 	-- BUILD THE OBJECT
-	; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
+--      ; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
+        ; let use_cc = curCCS; blame_cc = curCCS
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
         ; let info_tbl = mkCmmInfo closure_info
         ; (tmp, init) <- allocDynClosure info_tbl lf_info use_cc blame_cc
-				         (map toVarArg fv_details)
+                                         (map toVarArg fv_details)
 
 	-- RETURN
 	; regIdInfo bndr lf_info tmp init }
@@ -324,7 +325,7 @@ cgStdThunk
 	-> [StgArg]			-- payload
 	-> FCode (CgIdInfo, CmmAGraph)
 
-cgStdThunk bndr cc _bndr_info body lf_info payload
+cgStdThunk bndr _cc _bndr_info _body lf_info payload
   = do	-- AHA!  A STANDARD-FORM THUNK
   {	-- LAY OUT THE OBJECT
     mod_name <- getModuleName
@@ -337,7 +338,8 @@ cgStdThunk bndr cc _bndr_info body lf_info payload
 				     NoC_SRT	-- No SRT for a std-form closure
 				     descr
 
-  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
+--  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
+  ; let use_cc = curCCS; blame_cc = curCCS
 
 	-- BUILD THE OBJECT
   ; let info_tbl = mkCmmInfo closure_info
@@ -394,7 +396,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
      lf_info  = closureLFInfo cl_info
      info_tbl = mkCmmInfo cl_info
 
-closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
+closureCodeBody top_lvl bndr cl_info _cc args arity body fv_details
   = ASSERT( length args > 0 )
     do  { -- Allocate the global ticky counter,
           -- and establish the ticky-counter
@@ -424,8 +426,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
 
                 -- Main payload
                 ; entryHeapCheck cl_info offset node' arity arg_regs $ do
-                { enterCostCentre cl_info cc body
-                ; fv_bindings <- mapM bind_fv fv_details
+                { fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
                 ; if node_points then load_fvs node lf_info fv_bindings
@@ -473,7 +474,7 @@ mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
 -----------------------------------------
 thunkCode :: ClosureInfo -> [(NonVoid Id, VirtualHpOffset)] -> CostCentreStack
           -> LocalReg -> Int -> StgExpr -> FCode ()
-thunkCode cl_info fv_details cc node arity body
+thunkCode cl_info fv_details _cc node arity body
   = do { let node_points = nodeMustPointToIt (closureLFInfo cl_info)
              node'       = if node_points then Just node else Nothing
         ; tickyEnterThunk cl_info
@@ -493,7 +494,7 @@ thunkCode cl_info fv_details cc node arity body
             -- that cc of enclosing scope will be recorded
             -- in update frame CAF/DICT functions will be
             -- subsumed by this enclosing cc
-            do { enterCostCentre cl_info cc body
+            do { enterCostCentreThunk (CmmReg nodeReg)
                ; let lf_info = closureLFInfo cl_info
                ; fv_bindings <- mapM bind_fv fv_details
                ; load_fvs node lf_info fv_bindings

@@ -28,6 +28,7 @@ module CgCallConv (
     ) where
 
 import CgMonad
+import CgProf
 import SMRep
 
 import OldCmm
@@ -160,10 +161,16 @@ constructSlowCall amodes
 -- fewer arguments than we currently have.
 slowArgs :: [(CgRep,CmmExpr)] -> [(CgRep,CmmExpr)]
 slowArgs [] = []
-slowArgs amodes = (NonPtrArg, mkLblExpr stg_ap_pat) : args ++ slowArgs rest
-  where	(arg_pat, args, rest) = matchSlowPattern amodes
-	stg_ap_pat 	= mkCmmRetInfoLabel rtsPackageId arg_pat
-  
+slowArgs amodes
+  | opt_SccProfilingOn = save_cccs ++ this_pat ++ slowArgs rest
+  | otherwise          =              this_pat ++ slowArgs rest
+  where
+    (arg_pat, args, rest) = matchSlowPattern amodes
+    stg_ap_pat = mkCmmRetInfoLabel rtsPackageId arg_pat
+    this_pat   = (NonPtrArg, mkLblExpr stg_ap_pat) : args
+    save_cccs  = [(NonPtrArg, mkLblExpr save_cccs_lbl), (NonPtrArg, curCCS)]
+    save_cccs_lbl = mkCmmRetInfoLabel rtsPackageId (fsLit "stg_restore_cccs")
+
 matchSlowPattern :: [(CgRep,CmmExpr)] 
 		 -> (FastString, [(CgRep,CmmExpr)], [(CgRep,CmmExpr)])
 matchSlowPattern amodes = (arg_pat, these, rest)

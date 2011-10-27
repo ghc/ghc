@@ -309,9 +309,9 @@ lvlExpr ctxt_lvl env expr@(_, AnnApp _ _) = do
          fun'  <- lvlExpr ctxt_lvl env fun
          return (foldl App fun' args')
 
-lvlExpr ctxt_lvl env (_, AnnNote note expr) = do
+lvlExpr ctxt_lvl env (_, AnnTick tickish expr) = do
     expr' <- lvlExpr ctxt_lvl env expr
-    return (Note note expr')
+    return (Tick tickish expr')
 
 lvlExpr ctxt_lvl env (_, AnnCast expr (_, co)) = do
     expr' <- lvlExpr ctxt_lvl env expr
@@ -446,9 +446,9 @@ lvlMFE _ _ env (_, AnnType ty)
 -- If we do we'll transform  lvl = e |> co 
 --			 to  lvl' = e; lvl = lvl' |> co
 -- and then inline lvl.  Better just to float out the payload.
-lvlMFE strict_ctxt ctxt_lvl env (_, AnnNote n e)
+lvlMFE strict_ctxt ctxt_lvl env (_, AnnTick t e)
   = do { e' <- lvlMFE strict_ctxt ctxt_lvl env e
-       ; return (Note n e') }
+       ; return (Tick t e') }
 
 lvlMFE strict_ctxt ctxt_lvl env (_, AnnCast e (_, co))
   = do	{ e' <- lvlMFE strict_ctxt ctxt_lvl env e
@@ -838,7 +838,7 @@ isFunction :: CoreExprWithFVs -> Bool
 -- constructors.  So the simple thing is just to look for lambdas
 isFunction (_, AnnLam b e) | isId b    = True
                            | otherwise = isFunction e
-isFunction (_, AnnNote _ e)            = isFunction e
+-- isFunction (_, AnnTick _ e)          = isFunction e  -- dubious
 isFunction _                           = False
 
 countFreeIds :: VarSet -> Int

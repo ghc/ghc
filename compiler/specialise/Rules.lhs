@@ -626,10 +626,6 @@ match :: RuleEnv
 
 -- The Var case follows closely what happens in Unify.match
 match renv subst (Var v1)    e2 = match_var renv subst v1 e2
-match renv subst (Note _ e1) e2 = match renv subst e1 e2
-match renv subst e1 (Note _ e2) = match renv subst e1 e2
-      -- Ignore notes in both template and thing to be matched
-      -- See Note [Notes in RULE matching]
 
 match renv subst e1 (Var v2)      -- Note [Expanding variables]
   | not (inRnEnvR rn_env v2) -- Note [Do not expand locally-bound variables]
@@ -885,13 +881,12 @@ the entire match.
 Hence, (a) the guard (not (isLocallyBoundR v2))
        (b) when we expand we nuke the renaming envt (nukeRnEnvR).
 
-Note [Notes in RULE matching]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Look through Notes in both template and expression being matched.  In
-particular, we don't want to be confused by InlineMe notes.  Maybe we
-should be more careful about profiling notes, but for now I'm just
-riding roughshod over them.  cf Note [Notes in call patterns] in
-SpecConstr
+Note [Tick annotations in RULE matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to look through Notes in both template and expression being
+matched.  This would be incorrect for ticks, which we cannot discard,
+so we do not look through Ticks at all.  cf Note [Notes in call
+patterns] in SpecConstr
 
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~
@@ -1051,7 +1046,7 @@ ruleCheck _   (Lit _) 	    = emptyBag
 ruleCheck _   (Type _)      = emptyBag
 ruleCheck _   (Coercion _)  = emptyBag
 ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
-ruleCheck env (Note _ e)    = ruleCheck env e
+ruleCheck env (Tick _ e)  = ruleCheck env e
 ruleCheck env (Cast e _)    = ruleCheck env e
 ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
 ruleCheck env (Lam _ e)     = ruleCheck env e

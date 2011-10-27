@@ -478,12 +478,17 @@ cpeRhsE env (Let bind expr)
        ; (floats, body) <- cpeRhsE env' expr
        ; return (new_binds `appendFloats` floats, body) }
 
-cpeRhsE env (Note note expr)
-  | ignoreNote note
+cpeRhsE env (Tick tickish expr)
+  | ignoreTickish tickish
   = cpeRhsE env expr
-  | otherwise	      -- Just SCCs actually
+  | otherwise         -- Just SCCs actually
   = do { body <- cpeBodyNF env expr
-       ; return (emptyFloats, Note note body) }
+       ; return (emptyFloats, Tick tickish' body) }
+  where
+    tickish' | Breakpoint n fvs <- tickish
+             = Breakpoint n (map (lookupCorePrepEnv env) fvs)
+             | otherwise
+             = tickish
 
 cpeRhsE env (Cast expr co)
    = do { (floats, expr') <- cpeRhsE env expr
@@ -494,11 +499,6 @@ cpeRhsE env expr@(Lam {})
         ; (env', bndrs') <- cpCloneBndrs env bndrs
 	; body' <- cpeBodyNF env' body
 	; return (emptyFloats, mkLams bndrs' body') }
-
-cpeRhsE env (Case (Var id) bndr ty [(DEFAULT,[],expr)])
-  | Just (TickBox {}) <- isTickBoxOp_maybe id
-  = do { body <- cpeBodyNF env expr
-       ; return (emptyFloats, Case (Var id) bndr ty [(DEFAULT,[],body)]) }
 
 cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
@@ -561,13 +561,14 @@ rhsToBodyNF rhs = do { (floats,body) <- rhsToBody rhs
 rhsToBody :: CpeRhs -> UniqSM (Floats, CpeBody)
 -- Remove top level lambdas by let-binding
 
-rhsToBody (Note n expr)
-        -- You can get things like
-        --      case e of { p -> coerce t (\s -> ...) }
+rhsToBody (Tick t expr)
+  | not (tickishScoped t)  -- we can only float out of non-scoped annotations
   = do { (floats, expr') <- rhsToBody expr
-       ; return (floats, Note n expr') }
+       ; return (floats, Tick t expr') }
 
 rhsToBody (Cast e co)
+        -- You can get things like
+        --      case e of { p -> coerce t (\s -> ...) }
   = do { (floats, e') <- rhsToBody e
        ; return (floats, Cast e' co) }
 
@@ -662,8 +663,8 @@ cpeApp env expr
            ; (fun', hd, _, floats, ss) <- collect_args fun depth
            ; return (Cast fun' co, hd, ty2, floats, ss) }
           
-    collect_args (Note note fun) depth
-      | ignoreNote note         -- Drop these notes altogether
+    collect_args (Tick tickish fun) depth
+      | ignoreTickish tickish   -- Drop these notes altogether
       = collect_args fun depth  -- They aren't used by the code generator
 
 	-- N-variable fun, better let-bind it
@@ -759,9 +760,9 @@ saturateDataToTag sat_expr
              ; return (Case arg arg_id1 (exprType app)
                             [(DEFAULT, [], fun `App` Var arg_id1)]) }
 
-    eval_data2tag_arg (Note note app)	-- Scc notes can appear
+    eval_data2tag_arg (Tick t app)    -- Scc notes can appear
         = do { app' <- eval_data2tag_arg app
-             ; return (Note note app') }
+             ; return (Tick t app') }
 
     eval_data2tag_arg other	-- Should not happen
 	= pprPanic "eval_data2tag" (ppr other)
@@ -784,18 +785,9 @@ of the scope of a `seq`, or dropped the `seq` altogether.
 %************************************************************************
 
 \begin{code}
-	-- We don't ignore SCCs, since they require some code generation
-ignoreNote :: Note -> Bool
--- Tells which notes to drop altogether; they are ignored by code generation
--- Do not ignore SCCs!
--- It's important that we do drop InlineMe notes; for example
---    unzip = __inline_me__ (/\ab. foldr (..) (..))
--- Here unzip gets arity 1 so we'll eta-expand it. But we don't
--- want to get this:
---     unzip = /\ab \xs. (__inline_me__ ...) a b xs
-ignoreNote (CoreNote _) = True 
-ignoreNote _other       = False
-
+-- we don't ignore any Tickishes at the moment.
+ignoreTickish :: Tickish Id -> Bool
+ignoreTickish _ = False
 
 cpe_ExprIsTrivial :: CoreExpr -> Bool
 -- Version that doesn't consider an scc annotation to be trivial.
@@ -804,7 +796,7 @@ cpe_ExprIsTrivial (Type _)                 = True
 cpe_ExprIsTrivial (Coercion _)             = True
 cpe_ExprIsTrivial (Lit _)                  = True
 cpe_ExprIsTrivial (App e arg)              = isTypeArg arg && cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Note n e)               = notSccNote n  && cpe_ExprIsTrivial e
+cpe_ExprIsTrivial (Tick t e)             = not (tickishIsCode t) && cpe_ExprIsTrivial e
 cpe_ExprIsTrivial (Cast e _)               = cpe_ExprIsTrivial e
 cpe_ExprIsTrivial (Lam b body) | isTyVar b = cpe_ExprIsTrivial body
 cpe_ExprIsTrivial _                        = False
@@ -1056,8 +1048,8 @@ dropDeadCode (Case scrut bndr t alts)
 dropDeadCode (Cast e c)
   = (Cast e' c, fvs)
   where !(e', fvs) = dropDeadCode e
-dropDeadCode (Note n e)
-  = (Note n e', fvs)
+dropDeadCode (Tick t e)
+  = (Tick t e', fvs)
   where !(e', fvs) = dropDeadCode e
 dropDeadCode e = (e, emptyVarSet)  -- Lit, Type, Coercion
 

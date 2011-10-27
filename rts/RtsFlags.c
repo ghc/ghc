@@ -258,14 +258,12 @@ usage_text[] = {
 "  -B       Sound the bell at the start of each garbage collection",
 #if defined(PROFILING)
 "",
-"  -px      Time/allocation profile (XML)  (output file <program>.prof)",
 "  -p       Time/allocation profile        (output file <program>.prof)",
 "  -P       More detailed Time/Allocation profile",
 "  -Pa      Give information about *all* cost centres",
 
 # if defined(PROFILING)
 "",
-"  -hx            Heap residency profile (XML)   (output file <program>.prof)",
 "  -h<break-down> Heap residency profile (hp2ps) (output file <program>.hp)",
 "     break-down: c = cost centre stack (default)",
 "                 m = module",
@@ -936,10 +934,7 @@ error = rtsTrue;
 		OPTION_SAFE;
 		PROFILING_BUILD_ONLY(
 		switch (rts_argv[arg][2]) {
-		  case 'x':
-		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_XML;
-		    break;
-		  case 'a':
+                  case 'a':
 		    RtsFlags.CcFlags.doCostCentres = COST_CENTRES_ALL;
 		    break;
 		  default:

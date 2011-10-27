@@ -575,13 +575,7 @@ allocDynClosure cl_info use_cc _blame_cc amodes_with_offsets
 
 	-- SAY WHAT WE ARE ABOUT TO DO
 	; profDynAlloc cl_info use_cc	
-		-- ToDo: This is almost certainly wrong
-		-- We're ignoring blame_cc. But until we've
-		-- fixed the boxing hack in chooseDynCostCentres etc,
-		-- we're worried about making things worse by "fixing"
-		-- this part to use blame_cc!
-
-	; tickyDynAlloc cl_info
+        ; tickyDynAlloc cl_info
 
 	-- ALLOCATE THE OBJECT
 	; base <- getHpRelOffset info_offset

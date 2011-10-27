@@ -76,5 +76,16 @@
      Sp_adj(n+1);						\
      jump %ENTRY_CODE(Sp(0));
 
+// Jump to target, saving CCCS and restoring it on return
+#if defined(PROFILING)
+#define jump_SAVE_CCCS(target) \
+    Sp(-1) = W_[CCCS]; \
+    Sp(-2) = stg_restore_cccs_info; \
+    Sp_adj(-2); \
+    jump (target)
+#else
+#define jump_SAVE_CCCS(target) jump (target)
+#endif
+
 #endif /* APPLY_H */
 

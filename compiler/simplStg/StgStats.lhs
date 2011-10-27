@@ -159,7 +159,7 @@ statExpr (StgApp _ _)	  = countOne Applications
 statExpr (StgLit _)	  = countOne Literals
 statExpr (StgConApp _ _)  = countOne ConstructorApps
 statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
-statExpr (StgSCC _ e)     = statExpr e
+statExpr (StgSCC _ _ _ e) = statExpr e
 statExpr (StgTick _ _ e)  = statExpr e
 
 statExpr (StgLetNoEscape _ _ binds body)

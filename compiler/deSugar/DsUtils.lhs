@@ -35,7 +35,7 @@ module DsUtils (
         dsSyntaxTable, lookupEvidence,
 
 	selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
-	mkTickBox, mkOptTickBox, mkBinaryTickBox
+        mkOptTickBox, mkBinaryTickBox
     ) where
 
 #include "HsVersions.h"
@@ -70,7 +70,8 @@ import SrcLoc
 import Util
 import ListSetOps
 import FastString
-import StaticFlags
+
+import Control.Monad    ( zipWithM )
 \end{code}
 
 
@@ -568,14 +569,17 @@ cases like
      (p,q) = e
 
 \begin{code}
-mkSelectorBinds :: LPat Id	-- The pattern
+mkSelectorBinds :: [Maybe (Tickish Id)]  -- ticks to add, possibly
+                -> LPat Id      -- The pattern
 		-> CoreExpr	-- Expression to which the pattern is bound
 		-> DsM [(Id,CoreExpr)]
 
-mkSelectorBinds (L _ (VarPat v)) val_expr
-  = return [(v, val_expr)]
+mkSelectorBinds ticks (L _ (VarPat v)) val_expr
+  = return [(v, case ticks of
+                  [t] -> mkOptTickBox t val_expr
+                  _   -> val_expr)]
 
-mkSelectorBinds pat val_expr
+mkSelectorBinds ticks pat val_expr
   | null binders 
   = return []
 
@@ -599,7 +603,7 @@ mkSelectorBinds pat val_expr
         -- But we need it at different types... so we use coerce for that
        ; err_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID  unitTy (ppr pat)
        ; err_var <- newSysLocalDs unitTy
-       ; binds <- mapM (mk_bind val_var err_var) binders
+       ; binds <- zipWithM (mk_bind val_var err_var) ticks' binders
        ; return ( (val_var, val_expr) : 
                   (err_var, err_expr) :
                   binds ) }
@@ -608,22 +612,26 @@ mkSelectorBinds pat val_expr
   = do { error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID   tuple_ty (ppr pat)
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat local_tuple error_expr
        ; tuple_var <- newSysLocalDs tuple_ty
-       ; let mk_tup_bind binder
-              = (binder, mkTupleSelector local_binders binder tuple_var (Var tuple_var))
-       ; return ( (tuple_var, tuple_expr) : map mk_tup_bind binders ) }
+       ; let mk_tup_bind tick binder
+              = (binder, mkOptTickBox tick $
+                            mkTupleSelector local_binders binder
+                                            tuple_var (Var tuple_var))
+       ; return ( (tuple_var, tuple_expr) : zipWith mk_tup_bind ticks' binders ) }
   where
     binders       = collectPatBinders pat
-    local_binders = map localiseId binders	-- See Note [Localise pattern binders]
+    ticks'        = ticks ++ repeat Nothing
+
+    local_binders = map localiseId binders      -- See Note [Localise pattern binders]
     local_tuple   = mkBigCoreVarTup binders
     tuple_ty      = exprType local_tuple
 
-    mk_bind scrut_var err_var bndr_var = do
+    mk_bind scrut_var err_var tick bndr_var = do
     -- (mk_bind sv err_var) generates
     --          bv = case sv of { pat -> bv; other -> coerce (type-of-bv) err_var }
     -- Remember, pat binds bv
         rhs_expr <- matchSimply (Var scrut_var) PatBindRhs pat
                                 (Var bndr_var) error_expr
-        return (bndr_var, rhs_expr)
+        return (bndr_var, mkOptTickBox tick rhs_expr)
       where
         error_expr = mkCoerce co (Var err_var)
         co         = mkUnsafeCo (exprType (Var err_var)) (idType bndr_var)
@@ -767,38 +775,19 @@ CPR-friendly.  This matters a lot: if you don't get it right, you lose
 the tail call property.  For example, see Trac #3403.
 
 \begin{code}
-mkOptTickBox :: Maybe (Int,[Id]) -> CoreExpr -> DsM CoreExpr
-mkOptTickBox Nothing e   = return e
-mkOptTickBox (Just (ix,ids)) e = mkTickBox ix ids e
-
-mkTickBox :: Int -> [Id] -> CoreExpr -> DsM CoreExpr
-mkTickBox ix vars e = do
-       uq <- newUnique 	
-       mod <- getModuleDs
-       let tick | opt_Hpc   = mkTickBoxOpId uq mod ix
-                | otherwise = mkBreakPointOpId uq mod ix
-       uq2 <- newUnique 	
-       let occName = mkVarOcc "tick"
-       let name = mkInternalName uq2 occName noSrcSpan   -- use mkSysLocal?
-       let var  = Id.mkLocalId name realWorldStatePrimTy
-       scrut <- 
-          if opt_Hpc 
-            then return (Var tick)
-            else do
-              let tickVar = Var tick
-              let tickType = mkFunTys (map idType vars) realWorldStatePrimTy 
-              let scrutApTy = App tickVar (Type tickType)
-              return (mkApps scrutApTy (map Var vars) :: Expr Id)
-       return $ Case scrut var ty [(DEFAULT,[],e)]
-  where
-     ty = exprType e
+mkOptTickBox :: Maybe (Tickish Id) -> CoreExpr -> CoreExpr
+mkOptTickBox Nothing e        = e
+mkOptTickBox (Just tickish) e = Tick tickish e
 
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique 	
-       let bndr1 = mkSysLocal (fsLit "t1") uq boolTy 
-       falseBox <- mkTickBox ixF [] $ Var falseDataConId
-       trueBox  <- mkTickBox ixT [] $ Var trueDataConId
+       this_mod <- getModuleDs
+       let bndr1 = mkSysLocal (fsLit "t1") uq boolTy
+       let
+           falseBox = Tick (HpcTick this_mod ixF) (Var falseDataConId)
+           trueBox  = Tick (HpcTick this_mod ixT) (Var trueDataConId)
+       --
        return $ Case e bndr1 boolTy
                        [ (DataAlt falseDataCon, [], falseBox)
                        , (DataAlt trueDataCon,  [], trueBox)

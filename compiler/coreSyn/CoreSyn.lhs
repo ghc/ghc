@@ -9,9 +9,9 @@
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
 	-- * Main data types
-	Expr(..), Alt, Bind(..), AltCon(..), Arg, Note(..),
-	CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
-	TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..),
+        Expr(..), Alt, Bind(..), AltCon(..), Arg, Tickish(..),
+        CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
+        TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..),
 
         -- ** 'Expr' construction
 	mkLets, mkLams,
@@ -35,9 +35,11 @@ module CoreSyn (
 
         isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
-        notSccNote,
 
-	-- * Unfolding data types
+        tickishCounts, tickishScoped, tickishIsCode, mkNoTick, mkNoScope,
+        tickishCanSplit,
+
+        -- * Unfolding data types
         Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
 
 	-- ** Constructing 'Unfolding's
@@ -87,6 +89,7 @@ import Coercion
 import Name
 import Literal
 import DataCon
+import Module
 import TyCon
 import BasicTypes
 import FastString
@@ -253,7 +256,7 @@ data Expr b
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]	-- See #case_invariant#
   | Cast  (Expr b) Coercion
-  | Note  Note (Expr b)
+  | Tick  (Tickish Id) (Expr b)
   | Type  Type
   | Coercion Coercion
   deriving (Data, Typeable)
@@ -312,12 +315,85 @@ Note [Type let]
 See #type_let#
 
 \begin{code}
+-- | Allows attaching extra information to points in expressions
+data Tickish id =
+    -- | An @{-# SCC #-}@ profiling annotation, either automatically
+    -- added by the desugarer as a result of -auto-all, or added by
+    -- the user.
+    ProfNote {
+      profNoteCC    :: CostCentre, -- ^ the cost centre
+      profNoteCount :: !Bool,      -- ^ bump the entry count?
+      profNoteScope :: !Bool       -- ^ scopes over the enclosed expression
+                                   -- (i.e. not just a tick)
+    }
 
--- | Allows attaching extra information to points in expressions rather than e.g. identifiers.
-data Note
-  = SCC CostCentre      -- ^ A cost centre annotation for profiling
-  | CoreNote String     -- ^ A generic core annotation, propagated but not used by GHC
-  deriving (Data, Typeable)
+  -- | A "tick" used by HPC to track the execution of each
+  -- subexpression in the original source code.
+  | HpcTick {
+      tickModule :: Module,
+      tickId     :: !Int
+    }
+
+  -- | A breakpoint for the GHCi debugger.  This behaves like an HPC
+  -- tick, but has a list of free variables which will be available
+  -- for inspection in GHCi when the program stops at the breakpoint.
+  --
+  -- NB. we must take account of these Ids when (a) counting free variables,
+  -- and (b) substituting (don't substitute for them)
+  | Breakpoint
+    { breakpointId     :: !Int
+    , breakpointFVs    :: [id]  -- ^ the order of this list is important:
+                                -- it matches the order of the lists in the
+                                -- appropriate entry in HscTypes.ModBreaks.
+                                --
+                                -- Careful about substitution!  See
+                                -- Note [substTickish] in CoreSubst.
+    }
+
+  deriving (Eq, Ord, Data, Typeable)
+
+
+-- | A "tick" note is one that counts evaluations in some way.  We
+-- cannot discard a tick, and the compiler should preserve the number
+-- of ticks as far as possible.
+--
+-- Hwever, we stil allow the simplifier to increase or decrease
+-- sharing, so in practice the actual number of ticks may vary, except
+-- that we never change the value from zero to non-zero or vice versa.
+--
+tickishCounts :: Tickish id -> Bool
+tickishCounts n@ProfNote{} = profNoteCount n
+tickishCounts HpcTick{}    = True
+tickishCounts Breakpoint{} = True
+
+tickishScoped :: Tickish id -> Bool
+tickishScoped n@ProfNote{} = profNoteScope n
+tickishScoped HpcTick{}    = False
+tickishScoped Breakpoint{} = True
+   -- Breakpoints are scoped: eventually we're going to do call
+   -- stacks, but also this helps prevent the simplifier from moving
+   -- breakpoints around and changing their result type (see #1531).
+
+mkNoTick :: Tickish id -> Tickish id
+mkNoTick n@ProfNote{} = n {profNoteCount = False}
+mkNoTick Breakpoint{} = panic "mkNoTick: Breakpoint" -- cannot split a BP
+mkNoTick t = t
+
+mkNoScope :: Tickish id -> Tickish id
+mkNoScope n@ProfNote{} = n {profNoteScope = False}
+mkNoScope Breakpoint{} = panic "mkNoScope: Breakpoint" -- cannot split a BP
+mkNoScope t = t
+
+-- | Return True if this source annotation compiles to some code, or will
+-- disappear before the backend.
+tickishIsCode :: Tickish id -> Bool
+tickishIsCode _tickish = True  -- all of them for now
+
+-- | Return True if this Tick can be split into (tick,scope) parts with
+-- 'mkNoScope' and 'mkNoTick' respectively.
+tickishCanSplit :: Tickish Id -> Bool
+tickishCanSplit Breakpoint{} = False
+tickishCanSplit _ = True
 \end{code}
 
 
@@ -1085,10 +1161,8 @@ collectArgs expr
 -- | Gets the cost centre enclosing an expression, if any.
 -- It looks inside lambdas because @(scc \"foo\" \\x.e) = \\x. scc \"foo\" e@
 coreExprCc :: Expr b -> CostCentre
-coreExprCc (Note (SCC cc) _)   = cc
-coreExprCc (Note _ e)          = coreExprCc e
-coreExprCc (Lam _ e)           = coreExprCc e
-coreExprCc _                   = noCostCentre
+coreExprCc (Tick (ProfNote { profNoteCC = cc}) _)   = cc
+coreExprCc _ = noCostCentre
 \end{code}
 
 %************************************************************************
@@ -1136,10 +1210,6 @@ valBndrCount = count isId
 -- | The number of argument expressions that are values rather than types at their top level
 valArgCount :: [Arg b] -> Int
 valArgCount = count isValArg
-
-notSccNote :: Note -> Bool
-notSccNote (SCC {}) = False
-notSccNote _        = True
 \end{code}
 
 
@@ -1158,7 +1228,7 @@ seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
 seqExpr (Cast e co)     = seqExpr e `seq` seqCo co
-seqExpr (Note n e)      = seqNote n `seq` seqExpr e
+seqExpr (Tick n e)    = seqTickish n `seq` seqExpr e
 seqExpr (Type t)       = seqType t
 seqExpr (Coercion co)   = seqCo co
 
@@ -1166,9 +1236,10 @@ seqExprs :: [CoreExpr] -> ()
 seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
 
-seqNote :: Note -> ()
-seqNote (CoreNote s)   = s `seq` ()
-seqNote _              = ()
+seqTickish :: Tickish Id -> ()
+seqTickish ProfNote{ profNoteCC = cc } = cc `seq` ()
+seqTickish HpcTick{} = ()
+seqTickish Breakpoint{ breakpointFVs = ids } = seqBndrs ids
 
 seqBndr :: CoreBndr -> ()
 seqBndr b = b `seq` ()
@@ -1216,7 +1287,7 @@ data AnnExpr' bndr annot
   | AnnLet	(AnnBind bndr annot) (AnnExpr bndr annot)
   | AnnCast     (AnnExpr bndr annot) (annot, Coercion)
     		   -- Put an annotation on the (root of) the coercion
-  | AnnNote	Note (AnnExpr bndr annot)
+  | AnnTick     (Tickish Id) (AnnExpr bndr annot)
   | AnnType	Type
   | AnnCoercion Coercion
 
@@ -1245,14 +1316,14 @@ deAnnotate :: AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
 deAnnotate' :: AnnExpr' bndr annot -> Expr bndr
-deAnnotate' (AnnType t)          = Type t
+deAnnotate' (AnnType t)           = Type t
 deAnnotate' (AnnCoercion co)      = Coercion co
 deAnnotate' (AnnVar  v)           = Var v
 deAnnotate' (AnnLit  lit)         = Lit lit
 deAnnotate' (AnnLam  binder body) = Lam binder (deAnnotate body)
 deAnnotate' (AnnApp  fun arg)     = App (deAnnotate fun) (deAnnotate arg)
 deAnnotate' (AnnCast e (_,co))    = Cast (deAnnotate e) co
-deAnnotate' (AnnNote note body)   = Note note (deAnnotate body)
+deAnnotate' (AnnTick tick body)   = Tick tick (deAnnotate body)
 
 deAnnotate' (AnnLet bind body)
   = Let (deAnnBind bind) (deAnnotate body)

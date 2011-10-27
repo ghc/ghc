@@ -97,11 +97,6 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
         ; let rep = cit_rep info_tbl
         ; tickyDynAlloc rep lf_info
         ; profDynAlloc rep use_cc
-                -- ToDo: This is almost certainly wrong
-                -- We're ignoring blame_cc. But until we've
-                -- fixed the boxing hack in chooseDynCostCentres etc,
-                -- we're worried about making things worse by "fixing"
-                -- this part to use blame_cc!
 
         -- FIND THE OFFSET OF THE INFO-PTR WORD
         ; let   info_offset = virt_hp + 1

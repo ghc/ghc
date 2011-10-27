@@ -59,7 +59,7 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args)  = cgConApp con args
-cgExpr (StgSCC cc expr)   = do { emitSetCCC cc; cgExpr expr }
+cgExpr (StgSCC cc tick push expr) = do { emitSetCCC cc tick push; cgExpr expr }
 cgExpr (StgTick m n expr) = do { emit (mkTickBox m n); cgExpr expr }
 cgExpr (StgLit lit)       = do cmm_lit <- cgLit lit
                                emitReturn [CmmLit cmm_lit]

@@ -140,12 +140,17 @@ isTrueLHsExpr (L _ (HsVar v)) |  v `hasKey` otherwiseIdKey
                               || v `hasKey` getUnique trueDataConId
                                       = Just return
 	-- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (L _ (HsTick    ix frees e))
-    | Just ticks <- isTrueLHsExpr e   = Just (\x -> ticks x >>= mkTickBox ix frees)
+isTrueLHsExpr (L _ (HsTick tickish e))
+    | Just ticks <- isTrueLHsExpr e
+    = Just (\x -> ticks x >>= return .  (Tick tickish))
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
 isTrueLHsExpr (L _ (HsBinTick ixT _ e))
-    | Just ticks <- isTrueLHsExpr e   = Just (\x -> ticks x >>= mkTickBox ixT [])
+    | Just ticks <- isTrueLHsExpr e
+    = Just (\x -> do e <- ticks x
+                     this_mod <- getModuleDs
+                     return (Tick (HpcTick this_mod ixT) e))
+
 isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e
 isTrueLHsExpr _                       = Nothing
 \end{code}

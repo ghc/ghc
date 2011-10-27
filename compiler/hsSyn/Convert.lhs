@@ -130,7 +130,8 @@ cvtDec (TH.ValD pat body ds)
 	; ds' <- cvtLocalDecs (ptext (sLit "a where clause")) ds
 	; returnL $ Hs.ValD $
           PatBind { pat_lhs = pat', pat_rhs = GRHSs body' ds' 
-		  , pat_rhs_ty = void, bind_fvs = placeHolderNames } }
+                  , pat_rhs_ty = void, bind_fvs = placeHolderNames
+                  , pat_ticks = (Nothing,[]) } }
 
 cvtDec (TH.FunD nm cls)   
   | null cls

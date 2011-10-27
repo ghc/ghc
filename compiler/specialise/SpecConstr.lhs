@@ -970,8 +970,8 @@ combineOccs xs ys = zipWithEqual "combineOccs" combineOcc xs ys
 setScrutOcc :: ScEnv -> ScUsage -> OutExpr -> ArgOcc -> ScUsage
 -- _Overwrite_ the occurrence info for the scrutinee, if the scrutinee
 -- is a variable, and an interesting variable
-setScrutOcc env usg (Cast e _) occ = setScrutOcc env usg e occ
-setScrutOcc env usg (Note _ e) occ = setScrutOcc env usg e occ
+setScrutOcc env usg (Cast e _) occ   = setScrutOcc env usg e occ
+setScrutOcc env usg (Tick _ e) occ = setScrutOcc env usg e occ
 setScrutOcc env usg (Var v)    occ
   | Just RecArg <- lookupHowBound env v = usg { scu_occs = extendVarEnv (scu_occs usg) v occ }
   | otherwise				= usg
@@ -1003,8 +1003,8 @@ scExpr' env (Var v)     = case scSubstId env v of
 scExpr' env (Type t)    = return (nullUsage, Type (scSubstTy env t))
 scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
 scExpr' _   e@(Lit {})  = return (nullUsage, e)
-scExpr' env (Note n e)  = do (usg,e') <- scExpr env e
-                             return (usg, Note n e')
+scExpr' env (Tick t e)  = do (usg,e') <- scExpr env e
+                             return (usg, Tick t e')
 scExpr' env (Cast e co) = do (usg, e') <- scExpr env e
                              return (usg, Cast e' (scSubstCo env co))
 scExpr' env e@(App _ _) = scApp env (collectArgs e)
@@ -1583,7 +1583,7 @@ argToPat _env _in_scope _val_env arg@(Type {}) _arg_occ
 argToPat _env _in_scope _val_env arg@(Coercion {}) _arg_occ
   = return (False, arg)
 
-argToPat env in_scope val_env (Note _ arg) arg_occ
+argToPat env in_scope val_env (Tick _ arg) arg_occ
   = argToPat env in_scope val_env arg arg_occ
 	-- Note [Notes in call patterns]
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1765,9 +1765,9 @@ samePat (vs1, as1) (vs2, as2)
 
     same (Type {}) (Type {}) = True	-- Note [Ignore type differences]
     same (Coercion {}) (Coercion {}) = True
-    same (Note _ e1) e2	= same e1 e2	-- Ignore casts and notes
+    same (Tick _ e1) e2 = same e1 e2  -- Ignore casts and notes
     same (Cast e1 _) e2	= same e1 e2
-    same e1 (Note _ e2) = same e1 e2
+    same e1 (Tick _ e2) = same e1 e2
     same e1 (Cast e2 _) = same e1 e2
 
     same e1 e2 = WARN( bad e1 || bad e2, ppr e1 $$ ppr e2) 

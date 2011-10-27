@@ -1,3 +1,4 @@
+
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
@@ -11,6 +12,7 @@ The occurrence analyser re-typechecks a core expression, returning a new
 core expression with (hopefully) improved usage information.
 
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 module OccurAnal (
         occurAnalysePgm, occurAnalyseExpr
     ) where
@@ -827,7 +829,7 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
     is_con_app (Var v)    = isConLikeId v
     is_con_app (App f _)  = is_con_app f
     is_con_app (Lam _ e)  = is_con_app e
-    is_con_app (Note _ e) = is_con_app e
+    is_con_app (Tick _ e) = is_con_app e
     is_con_app _          = False
 \end{code}
 
@@ -1072,18 +1074,19 @@ We need to gather info about what coercion variables appear, so that
 we can sort them into the right place when doing dependency analysis.
 
 \begin{code}
-\end{code}
+occAnal env (Tick tickish body)
+  | Breakpoint _ ids <- tickish
+  = (mapVarEnv markInsideSCC usage
+         +++ mkVarEnv (zip ids (repeat NoOccInfo)), Tick tickish body')
+    -- never substitute for any of the Ids in a Breakpoint
 
-\begin{code}
-occAnal env (Note note@(SCC _) body)
-  = case occAnal env body of { (usage, body') ->
-    (mapVarEnv markInsideSCC usage, Note note body')
-    }
+  | tickishScoped tickish
+  = (mapVarEnv markInsideSCC usage, Tick tickish body')
 
-occAnal env (Note note body)
-  = case occAnal env body of { (usage, body') ->
-    (usage, Note note body')
-    }
+  | otherwise
+  = (usage, Tick tickish body')
+  where
+    !(usage,body') = occAnal env body
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
@@ -1896,7 +1899,8 @@ markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
 
 markMany _  = NoOccInfo
 
-markInsideSCC occ = markMany occ
+markInsideSCC occ = markInsideLam occ
+  -- inside an SCC, we can inline lambdas only.
 
 markInsideLam (OneOcc _ one_br int_cxt) = OneOcc True one_br int_cxt
 markInsideLam occ                       = occ

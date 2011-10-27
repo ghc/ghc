@@ -874,9 +874,6 @@ tcIfaceExpr (IfaceCast expr co)
 tcIfaceExpr (IfaceLcl name)
   = Var <$> tcIfaceLclId name
 
-tcIfaceExpr (IfaceTick modName tickNo)
-  = Var <$> tcIfaceTick modName tickNo
-
 tcIfaceExpr (IfaceExt gbl)
   = Var <$> tcIfaceExtId gbl
 
@@ -950,11 +947,15 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
                                 (idName id) (idType id) info
           ; return (setIdInfo id id_info, rhs') }
 
-tcIfaceExpr (IfaceNote note expr) = do
+tcIfaceExpr (IfaceTick tickish expr) = do
     expr' <- tcIfaceExpr expr
-    case note of
-        IfaceSCC cc       -> return (Note (SCC cc)   expr')
-        IfaceCoreNote n   -> return (Note (CoreNote n) expr')
+    tickish' <- tcIfaceTickish tickish
+    return (Tick tickish' expr')
+
+-------------------------
+tcIfaceTickish :: IfaceTickish -> IfM lcl (Tickish Id)
+tcIfaceTickish (IfaceHpcTick modl ix)   = return (HpcTick modl ix)
+tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 
 -------------------------
 tcIfaceLit :: Literal -> IfL Literal

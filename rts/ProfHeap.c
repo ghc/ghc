@@ -919,12 +919,12 @@ heapCensusChain( Census *census, bdescr *bd )
     for (; bd != NULL; bd = bd->link) {
 
         // HACK: pretend a pinned block is just one big ARR_WORDS
-        // owned by CCS_SYSTEM.  These blocks can be full of holes due
+        // owned by CCS_PINNED.  These blocks can be full of holes due
         // to alignment constraints so we can't traverse the memory
         // and do a proper census.
         if (bd->flags & BF_PINNED) {
             StgClosure arr;
-            SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_SYSTEM);
+            SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_PINNED);
             heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, rtsTrue);
             continue;
         }

@@ -30,13 +30,12 @@ extern FILE *hp_file;
 
 #ifdef PROFILING
 
-void gen_XML_logfile    ( void );
 void reportCCSProfiling ( void );
 
 void PrintNewStackDecls ( void );
 
 void fprintCCS( FILE *f, CostCentreStack *ccs );
-void fprintCCS_stderr( CostCentreStack *ccs );
+void fprintCCS_stderr (CostCentreStack *ccs, StgTSO *tso);
 
 #ifdef DEBUG
 void debugCCS( CostCentreStack *ccs );

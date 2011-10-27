@@ -374,7 +374,9 @@ Finally for @scc@ expressions we introduce a new STG construct.
 \begin{code}
   | StgSCC
 	CostCentre		-- label of SCC expression
-	(GenStgExpr bndr occ)	-- scc expression
+        !Bool                   -- bump the entry count?
+        !Bool                   -- push the cost centre?
+        (GenStgExpr bndr occ)   -- scc expression
 \end{code}
 
 %************************************************************************
@@ -761,9 +763,12 @@ pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
 			     char ']']))))
 		2 (ppr expr)]
 
-pprStgExpr (StgSCC cc expr)
-  = sep [ hsep [ptext (sLit "_scc_"), ppr cc],
-	  pprStgExpr expr ]
+pprStgExpr (StgSCC cc tick push expr)
+  = sep [ hsep [scc, ppr cc], pprStgExpr expr ]
+  where
+    scc | tick && push = ptext (sLit "_scc_")
+        | tick         = ptext (sLit "_tick_")
+        | otherwise    = ptext (sLit "_push_")
 
 pprStgExpr (StgTick m n expr)
   = sep [ hsep [ptext (sLit "_tick_"),  pprModule m,text (show n)],
