@@ -131,6 +131,7 @@ struct TRACE_FLAGS {
     rtsBool gc;             /* trace GC events */
     rtsBool sparks_sampled; /* trace spark events by a sampled method */
     rtsBool sparks_full;    /* trace spark events 100% accurately */
+    rtsBool user;           /* trace user events (emitted from Haskell code) */
 };
 
 struct CONCURRENT_FLAGS {

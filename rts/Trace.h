@@ -66,6 +66,7 @@ extern int TRACE_sched;
 extern int TRACE_gc;
 extern int TRACE_spark_sampled;
 extern int TRACE_spark_full;
+/* extern int TRACE_user; */  // only used in Trace.c
 
 // -----------------------------------------------------------------------------
 // Posting events

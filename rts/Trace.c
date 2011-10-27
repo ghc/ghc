@@ -50,6 +50,7 @@ int TRACE_sched;
 int TRACE_gc;
 int TRACE_spark_sampled;
 int TRACE_spark_full;
+int TRACE_user;
 
 #ifdef THREADED_RTS
 static Mutex trace_utx;
@@ -106,9 +107,12 @@ void initTracing (void)
         RtsFlags.TraceFlags.sparks_full ||
         RtsFlags.DebugFlags.sparks;
 
+    TRACE_user =
+        RtsFlags.TraceFlags.user;
+
     eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG;
 
-    /* Note: we can have TRACE_sched or TRACE_spark turned on even when
+    /* Note: we can have any of the TRACE_* flags turned on even when
        eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
      */
 
@@ -521,13 +525,17 @@ static void traceFormatUserMsg(Capability *cap, char *msg, ...)
     va_list ap;
     va_start(ap,msg);
 
+    /* Note: normally we don't check the TRACE_* flags here as they're checked
+       by the wrappers in Trace.h. But traceUserMsg is special since it has no
+       wrapper (it's called from cmm code), so we check TRACE_user here
+     */
 #ifdef DEBUG
-    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR && TRACE_user) {
         traceCap_stderr(cap, msg, ap);
     } else
 #endif
     {
-        if (eventlog_enabled) {
+        if (eventlog_enabled && TRACE_user) {
             postUserMsg(cap, msg, ap);
         }
     }

@@ -166,6 +166,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.gc            = rtsFalse;
     RtsFlags.TraceFlags.sparks_sampled= rtsFalse;
     RtsFlags.TraceFlags.sparks_full   = rtsFalse;
+    RtsFlags.TraceFlags.user          = rtsFalse;
 #endif
 
     RtsFlags.MiscFlags.tickInterval	= 20;  /* In milliseconds */
@@ -295,12 +296,13 @@ usage_text[] = {
 "                g    GC events",
 "                p    par spark events (sampled)",
 "                f    par spark events (full detail)",
+"                u    user events (emitted from Haskell code)",
+"                a    all event classes above",
 #  ifdef DEBUG
 "                t    add time stamps (only useful with -v)",
 #  endif
-"                a    all event classes above",
 "               -x    disable an event class, for any flag above",
-"             the initial enabled event classes are 'sgp'",
+"             the initial enabled event classes are 'sgpu'",
 #endif
 
 #if !defined(PROFILING)
@@ -1466,6 +1468,7 @@ static void read_trace_flags(char *arg)
     RtsFlags.TraceFlags.scheduler      = rtsTrue;
     RtsFlags.TraceFlags.gc             = rtsTrue;
     RtsFlags.TraceFlags.sparks_sampled = rtsTrue;
+    RtsFlags.TraceFlags.user           = rtsTrue;
 
     for (c  = arg; *c != '\0'; c++) {
         switch(*c) {
@@ -1479,6 +1482,7 @@ static void read_trace_flags(char *arg)
             RtsFlags.TraceFlags.gc             = enabled;
             RtsFlags.TraceFlags.sparks_sampled = enabled;
             RtsFlags.TraceFlags.sparks_full    = enabled;
+            RtsFlags.TraceFlags.user           = enabled;
             enabled = rtsTrue;
             break;
 
@@ -1500,6 +1504,10 @@ static void read_trace_flags(char *arg)
             break;
         case 'g':
             RtsFlags.TraceFlags.gc        = enabled;
+            enabled = rtsTrue;
+            break;
+        case 'u':
+            RtsFlags.TraceFlags.user      = enabled;
             enabled = rtsTrue;
             break;
         default:
