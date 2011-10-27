@@ -1074,18 +1074,19 @@ error = rtsTrue;
                     RtsFlags.ParFlags.nNodes = getNumberOfProcessors();
 #endif
 		} else {
-		    RtsFlags.ParFlags.nNodes
-		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
-		    if (RtsFlags.ParFlags.nNodes <= 0) {
+		    int nNodes;
+		    nNodes = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+		    if (nNodes <= 0) {
 		      errorBelch("bad value for -N");
 		      error = rtsTrue;
 		    }
 #if defined(PROFILING)
-                    if (RtsFlags.ParFlags.nNodes > 1) {
+                    if (nNodes > 1) {
                         errorBelch("bad option %s: only -N1 is supported with profiling", rts_argv[arg]);
 		      error = rtsTrue;
                     }
 #endif
+                    RtsFlags.ParFlags.nNodes = (nat)nNodes;
 		}
 		) break;
 
