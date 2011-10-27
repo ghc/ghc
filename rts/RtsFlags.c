@@ -893,28 +893,31 @@ error = rtsTrue;
 		break;
 
               case 'T':
-        	  OPTION_UNSAFE;
+        	  OPTION_SAFE;
                   RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
                   break; /* Don't initialize statistics file. */
 
 	      case 'S':
-		  OPTION_UNSAFE;
+		  OPTION_SAFE; /* but see below */
 		  RtsFlags.GcFlags.giveStats = VERBOSE_GC_STATS;
 		  goto stats;
 
 	      case 's':
-        	  OPTION_UNSAFE;
+        	  OPTION_SAFE; /* but see below */
 		  RtsFlags.GcFlags.giveStats = SUMMARY_GC_STATS;
 		  goto stats;
 
 	      case 't':
-        	  OPTION_UNSAFE;
+        	  OPTION_SAFE; /* but see below */
 		  RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
 		  goto stats;
 
 	    stats:
 		{ 
 		    int r;
+		    if (rts_argv[arg][2] != '\0') {
+		      OPTION_UNSAFE;
+		    }
                     r = openStatsFile(rts_argv[arg]+2, NULL,
                                       &RtsFlags.GcFlags.statsFile);
 		    if (r == -1) { error = rtsTrue; }
@@ -1241,6 +1244,9 @@ error = rtsTrue;
 
 		{ 
 		    int r;
+		    if (rts_argv[arg][2] != '\0') {
+		      OPTION_UNSAFE;
+		    }
                     r = openStatsFile(rts_argv[arg]+2,
                                       TICKY_FILENAME_FMT,
                                       &RtsFlags.TickyFlags.tickyFile);
