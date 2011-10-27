@@ -332,7 +332,6 @@ usage_text[] = {
 "  -DS  DEBUG: sanity",
 "  -Dt  DEBUG: stable",
 "  -Dp  DEBUG: prof",
-"  -De  DEBUG: event logging",
 "  -Da  DEBUG: apply",
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
