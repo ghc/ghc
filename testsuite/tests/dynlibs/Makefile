@@ -36,8 +36,8 @@ T5373:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373B -rtsopts
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373C -rtsopts=some
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373D -rtsopts=none
-	-./T5373A +RTS -\? 2>&1 | grep disabled
-	-./T5373B +RTS -\? 2>&1 | grep disabled
-	-./T5373C +RTS -\? 2>&1 | grep disabled
-	-./T5373D +RTS -\? 2>&1 | grep disabled
+	-./T5373A +RTS -c 2>&1 | grep disabled
+	-./T5373B +RTS -c 2>&1 | grep disabled
+	-./T5373C +RTS -c 2>&1 | grep disabled
+	-./T5373D +RTS -c 2>&1 | grep disabled
 
