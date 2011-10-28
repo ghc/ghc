@@ -398,13 +398,23 @@ doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> OutExpr -> SimplEnv -> Bool
 doFloatFromRhs lvl rec str rhs (SimplEnv {seFloats = Floats fs ff})
   =  not (isNilOL fs) && want_to_float && can_float
   where
-     want_to_float = isTopLevel lvl || exprIsExpandable rhs
+     want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs 
+     		     -- See Note [Float when cheap or expandable]
      can_float = case ff of
                    FltLifted  -> True
                    FltOkSpec  -> isNotTopLevel lvl && isNonRec rec
                    FltCareful -> isNotTopLevel lvl && isNonRec rec && str
 \end{code}
 
+Note [Float when cheap or expandable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to float a let from a let if the residual RHS is
+   a) cheap, such as (\x. blah)
+   b) expandable, such as (f b) if f is CONLIKE
+But there are 
+  - cheap things that are not expandable (eg \x. expensive)
+  - expandable things that are not cheap (eg (f b) where b is CONLIKE)
+so we must take the 'or' of the two.
 
 \begin{code}
 emptyFloats :: Floats
