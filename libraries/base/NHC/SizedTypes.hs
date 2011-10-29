@@ -34,6 +34,9 @@ module NHC.SizedTypes
     ; shiftR     = nhc_prim/**/T/**/Rsh	\
     ; bitSize  _ = BS			\
     ; isSigned _ = S			\
+    ; bit        = bitDefault           \
+    ; testBit    = testBitDefault       \
+    ; popCount   = popCountDefault      \
     }
 
 SIZED_TYPE(Int8,8,True)
