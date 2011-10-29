@@ -753,7 +753,7 @@ restrictedDamerauLevenshteinDistanceWithLengths m n str1 str2
     else restrictedDamerauLevenshteinDistance' (undefined :: Integer) n m str2 str1
 
 restrictedDamerauLevenshteinDistance'
-  :: (Bits bv) => bv -> Int -> Int -> String -> String -> Int
+  :: (Bits bv, Num bv) => bv -> Int -> Int -> String -> String -> Int
 restrictedDamerauLevenshteinDistance' _bv_dummy m n str1 str2
   | [] <- str1 = n
   | otherwise  = extractAnswer $
@@ -766,7 +766,7 @@ restrictedDamerauLevenshteinDistance' _bv_dummy m n str1 str2
     extractAnswer (_, _, _, _, distance) = distance
 
 restrictedDamerauLevenshteinDistanceWorker
-      :: (Bits bv) => IM.IntMap bv -> bv -> bv
+      :: (Bits bv, Num bv) => IM.IntMap bv -> bv -> bv
       -> (bv, bv, bv, bv, Int) -> Char -> (bv, bv, bv, bv, Int)
 restrictedDamerauLevenshteinDistanceWorker str1_mvs top_bit_mask vector_mask
                                            (pm, d0, vp, vn, distance) char2
@@ -795,7 +795,7 @@ restrictedDamerauLevenshteinDistanceWorker str1_mvs top_bit_mask vector_mask
 sizedComplement :: Bits bv => bv -> bv -> bv
 sizedComplement vector_mask vect = vector_mask `xor` vect
 
-matchVectors :: Bits bv => String -> IM.IntMap bv
+matchVectors :: (Bits bv, Num bv) => String -> IM.IntMap bv
 matchVectors = snd . foldl' go (0 :: Int, IM.empty)
   where
     go (ix, im) char = let ix' = ix + 1
