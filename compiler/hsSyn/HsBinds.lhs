@@ -7,19 +7,13 @@
 Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module HsBinds where
 
 import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
-			       MatchGroup, pprFunBind,
-			       GRHSs, pprPatBind )
+                               MatchGroup, pprFunBind,
+                               GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
 import HsTypes
@@ -45,9 +39,9 @@ import Data.List ( intersect )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Bindings: @BindGroup@}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Global bindings (where clauses)
@@ -61,8 +55,8 @@ Global bindings (where clauses)
 
 type HsLocalBinds id = HsLocalBindsLR id id
 
-data HsLocalBindsLR idL idR	-- Bindings in a 'let' expression
-			       -- or a 'where' clause
+data HsLocalBindsLR idL idR    -- Bindings in a 'let' expression
+                               -- or a 'where' clause
   = HsValBinds (HsValBindsLR idL idR)
   | HsIPBinds  (HsIPBinds idR)
   | EmptyLocalBinds
@@ -72,14 +66,14 @@ type HsValBinds id = HsValBindsLR id id
 
 data HsValBindsLR idL idR  -- Value bindings (not implicit parameters)
   = ValBindsIn             -- Before renaming RHS; idR is always RdrName
-	(LHsBindsLR idL idR) [LSig idR]	-- Not dependency analysed
-					-- Recursive by default
+        (LHsBindsLR idL idR) [LSig idR] -- Not dependency analysed
+                                        -- Recursive by default
 
-  | ValBindsOut		   -- After renaming RHS; idR can be Name or Id
-	[(RecFlag, LHsBinds idL)]	-- Dependency analysed, later bindings 
+  | ValBindsOut            -- After renaming RHS; idR can be Name or Id
+        [(RecFlag, LHsBinds idL)]       -- Dependency analysed, later bindings
                                         -- in the list may depend on earlier
                                         -- ones.
-	[LSig Name]
+        [LSig Name]
   deriving (Data, Typeable)
 
 type LHsBind  id = LHsBindLR  id id
@@ -103,78 +97,78 @@ data HsBindLR idL idR
     --                                        @(f :: a -> a) = ... @
     FunBind {
 
-	fun_id :: Located idL,
+        fun_id :: Located idL,
 
-	fun_infix :: Bool,	-- ^ True => infix declaration
+        fun_infix :: Bool,      -- ^ True => infix declaration
 
-	fun_matches :: MatchGroup idR,	-- ^ The payload
+        fun_matches :: MatchGroup idR,  -- ^ The payload
 
-	fun_co_fn :: HsWrapper,	-- ^ Coercion from the type of the MatchGroup to the type of
-				-- the Id.  Example:
+        fun_co_fn :: HsWrapper, -- ^ Coercion from the type of the MatchGroup to the type of
+                                -- the Id.  Example:
                                 -- @
-				--	f :: Int -> forall a. a -> a
-				--	f x y = y
+                                --      f :: Int -> forall a. a -> a
+                                --      f x y = y
                                 -- @
-				-- Then the MatchGroup will have type (Int -> a' -> a')
-				-- (with a free type variable a').  The coercion will take
-				-- a CoreExpr of this type and convert it to a CoreExpr of
-				-- type 	Int -> forall a'. a' -> a'
-				-- Notice that the coercion captures the free a'.
+                                -- Then the MatchGroup will have type (Int -> a' -> a')
+                                -- (with a free type variable a').  The coercion will take
+                                -- a CoreExpr of this type and convert it to a CoreExpr of
+                                -- type         Int -> forall a'. a' -> a'
+                                -- Notice that the coercion captures the free a'.
 
-	bind_fvs :: NameSet,	-- ^ After the renamer, this contains the locally-bound
-		    		-- free variables of this defn.
-				-- See Note [Bind free vars]
+        bind_fvs :: NameSet,    -- ^ After the renamer, this contains the locally-bound
+                                -- free variables of this defn.
+                                -- See Note [Bind free vars]
 
 
         fun_tick :: Maybe (Int,[Id])   -- ^ This is the (optional) module-local tick number.
     }
 
-  | PatBind {	-- The pattern is never a simple variable;
-		-- That case is done by FunBind
-	pat_lhs    :: LPat idL,
-	pat_rhs    :: GRHSs idR,
-	pat_rhs_ty :: PostTcType,	-- Type of the GRHSs
-	bind_fvs   :: NameSet		-- See Note [Bind free vars]
+  | PatBind {   -- The pattern is never a simple variable;
+                -- That case is done by FunBind
+        pat_lhs    :: LPat idL,
+        pat_rhs    :: GRHSs idR,
+        pat_rhs_ty :: PostTcType,       -- Type of the GRHSs
+        bind_fvs   :: NameSet           -- See Note [Bind free vars]
     }
 
-  | VarBind {	-- Dictionary binding and suchlike 
-	var_id     :: idL,	     -- All VarBinds are introduced by the type checker
-	var_rhs    :: LHsExpr idR,   -- Located only for consistency
-	var_inline :: Bool           -- True <=> inline this binding regardless
-				     --	(used for implication constraints only)
+  | VarBind {   -- Dictionary binding and suchlike
+        var_id     :: idL,           -- All VarBinds are introduced by the type checker
+        var_rhs    :: LHsExpr idR,   -- Located only for consistency
+        var_inline :: Bool           -- True <=> inline this binding regardless
+                                     -- (used for implication constraints only)
     }
 
-  | AbsBinds {				-- Binds abstraction; TRANSLATION
-        abs_tvs     :: [TyVar],  
-	abs_ev_vars :: [EvVar],	 -- Includes equality constraints
+  | AbsBinds {                          -- Binds abstraction; TRANSLATION
+        abs_tvs     :: [TyVar],
+        abs_ev_vars :: [EvVar],  -- Includes equality constraints
 
        -- AbsBinds only gets used when idL = idR after renaming,
-       -- but these need to be idL's for the collect... code in HsUtil 
+       -- but these need to be idL's for the collect... code in HsUtil
        -- to have the right type
-	abs_exports :: [ABExport idL],
+        abs_exports :: [ABExport idL],
 
         abs_ev_binds :: TcEvBinds,     -- Evidence bindings
-	abs_binds    :: LHsBinds idL   -- Typechecked user bindings
+        abs_binds    :: LHsBinds idL   -- Typechecked user bindings
     }
 
   deriving (Data, Typeable)
-	-- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
-	-- 
-	-- Creates bindings for (polymorphic, overloaded) poly_f
-	-- in terms of monomorphic, non-overloaded mono_f
-	--
-	-- Invariants: 
-	--	1. 'binds' binds mono_f
-	--	2. ftvs is a subset of tvs
-	--	3. ftvs includes all tyvars free in ds
-	--
-	-- See section 9 of static semantics paper for more details.
-	-- (You can get a PhD for explaining the True Meaning
-	--  of this last construct.)
+        -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
+        --
+        -- Creates bindings for (polymorphic, overloaded) poly_f
+        -- in terms of monomorphic, non-overloaded mono_f
+        --
+        -- Invariants:
+        --      1. 'binds' binds mono_f
+        --      2. ftvs is a subset of tvs
+        --      3. ftvs includes all tyvars free in ds
+        --
+        -- See section 9 of static semantics paper for more details.
+        -- (You can get a PhD for explaining the True Meaning
+        --  of this last construct.)
 
-data ABExport id 
-  = ABE { abe_poly  :: id 
-        , abe_mono  :: id 
+data ABExport id
+  = ABE { abe_poly  :: id
+        , abe_mono  :: id
         , abe_wrap  :: HsWrapper  -- See Note [AbsBinds wrappers]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
         , abe_prags :: TcSpecPrags }
@@ -193,7 +187,7 @@ This ultimately desugars to something like this:
    tup :: forall a b. (a->a, b->b)
    tup = /\a b. (\x:a.x, \y:b.y)
    f :: forall a. a -> a
-   f = /\a. case tup a Any of 
+   f = /\a. case tup a Any of
                (fm::a->a,gm:Any->Any) -> fm
    ...similarly for g...
 
@@ -213,7 +207,7 @@ a) Dependency analysis prior to type checking
 b) Deciding whether we can do generalisation of the binding
     (see TcBinds.decideGeneralisationPlan)
 
-Specifically, 
+Specifically,
 
   * bind_fvs includes all free vars that are defined in this module
     (including top-level things and lexically scoped type variables)
@@ -233,27 +227,27 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR id
   ppr (ValBindsIn binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
-  ppr (ValBindsOut sccs sigs) 
+  ppr (ValBindsOut sccs sigs)
     = getPprStyle $ \ sty ->
-      if debugStyle sty then	-- Print with sccs showing
-	vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
+      if debugStyle sty then    -- Print with sccs showing
+        vcat (map ppr sigs) $$ vcat (map ppr_scc sccs)
      else
-	pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
+        pprDeclList (pprLHsBindsForUser (unionManyBags (map snd sccs)) sigs)
    where
      ppr_scc (rec_flag, binds) = pp_rec rec_flag <+> pprLHsBinds binds
      pp_rec Recursive    = ptext (sLit "rec")
      pp_rec NonRecursive = ptext (sLit "nonrec")
 
 pprLHsBinds :: (OutputableBndr idL, OutputableBndr idR) => LHsBindsLR idL idR -> SDoc
-pprLHsBinds binds 
+pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
 
 pprLHsBindsForUser :: (OutputableBndr idL, OutputableBndr idR, OutputableBndr id2)
-		   => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
---  pprLHsBindsForUser is different to pprLHsBinds because 
+                   => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
+--  pprLHsBindsForUser is different to pprLHsBinds because
 --  a) No braces: 'let' and 'where' include a list of HsBindGroups
---     and we don't want several groups of bindings each 
+--     and we don't want several groups of bindings each
 --     with braces around
 --  b) Sort by location before printing
 --  c) Include signatures
@@ -263,7 +257,7 @@ pprLHsBindsForUser binds sigs
 
     decls :: [(SrcSpan, SDoc)]
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
-    	    [(loc, ppr bind) | L loc bind <- bagToList binds]
+            [(loc, ppr bind) | L loc bind <- bagToList binds]
 
     sort_by_loc decls = sortLe (\(l1,_) (l2,_) -> l1 <= l2) decls
 
@@ -272,7 +266,7 @@ pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
 -- One could choose  { d1; d2; ... }, using 'sep'
 -- or      d1
 --         d2
---	   ..
+--         ..
 --    using vcat
 -- At the moment we chose the latter
 -- Also we do the 'pprDeeperList' thing.
@@ -307,38 +301,40 @@ plusHsValBinds (ValBindsIn ds1 sigs1) (ValBindsIn ds2 sigs2)
   = ValBindsIn (ds1 `unionBags` ds2) (sigs1 ++ sigs2)
 plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
   = ValBindsOut (ds1 ++ ds2) (sigs1 ++ sigs2)
+plusHsValBinds _ _
+  = panic "HsBinds.plusHsValBinds"
 
 getTypeSigNames :: HsValBinds a -> NameSet
 -- Get the names that have a user type sig
-getTypeSigNames (ValBindsIn {}) 
-  = panic "getTypeSigNames"
-getTypeSigNames (ValBindsOut _ sigs) 
+getTypeSigNames (ValBindsOut _ sigs)
   = mkNameSet [unLoc n | L _ (TypeSig names _) <- sigs, n <- names]
+getTypeSigNames _
+  = panic "HsBinds.getTypeSigNames"
 \end{code}
 
 What AbsBinds means
 ~~~~~~~~~~~~~~~~~~~
-	 AbsBinds tvs
-		  [d1,d2]
-		  [(tvs1, f1p, f1m), 
-		   (tvs2, f2p, f2m)]
-		  BIND
+         AbsBinds tvs
+                  [d1,d2]
+                  [(tvs1, f1p, f1m),
+                   (tvs2, f2p, f2m)]
+                  BIND
 means
 
-	f1p = /\ tvs -> \ [d1,d2] -> letrec DBINDS and BIND 
-				      in fm
+        f1p = /\ tvs -> \ [d1,d2] -> letrec DBINDS and BIND
+                                     in fm
 
-	gp = ...same again, with gm instead of fm
+        gp = ...same again, with gm instead of fm
 
 This is a pretty bad translation, because it duplicates all the bindings.
 So the desugarer tries to do a better job:
 
-	fp = /\ [a,b] -> \ [d1,d2] -> case tp [a,b] [d1,d2] of
-					(fm,gm) -> fm
-	..ditto for gp..
+        fp = /\ [a,b] -> \ [d1,d2] -> case tp [a,b] [d1,d2] of
+                                        (fm,gm) -> fm
+        ..ditto for gp..
 
-	tp = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND 
-				       in (fm,gm)
+        tp = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND
+                                      in (fm,gm)
 
 \begin{code}
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsBindLR idL idR) where
@@ -348,15 +344,15 @@ ppr_monobind :: (OutputableBndr idL, OutputableBndr idR) => HsBindLR idL idR -> 
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = pprPatBind pat grhss
-ppr_monobind (VarBind { var_id = var, var_rhs = rhs })    
+ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CaseBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
 ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
-	     	        fun_co_fn = wrap, 
-			fun_matches = matches,
-		        fun_tick = tick })
-  = pprTicks empty (case tick of 
-			Nothing -> empty
-			Just t  -> text "-- tick id = " <> ppr t)
+                        fun_co_fn = wrap,
+                        fun_matches = matches,
+                        fun_tick = tick })
+  = pprTicks empty (case tick of
+                        Nothing -> empty
+                        Just t  -> text "-- tick id = " <> ppr t)
     $$  ifPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind (unLoc fun) inf matches
     $$  ifPprDebug (ppr wrap)
@@ -365,20 +361,20 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
   = sep [ptext (sLit "AbsBinds"),
-  	 brackets (interpp'SP tyvars),
-  	 brackets (interpp'SP dictvars),
-  	 brackets (sep (punctuate comma (map ppr exports)))]
+         brackets (interpp'SP tyvars),
+         brackets (interpp'SP dictvars),
+         brackets (sep (punctuate comma (map ppr exports)))]
     $$
     nest 2 ( vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
-  			-- Print type signatures
-  	     $$ pprLHsBinds val_binds )
+                        -- Print type signatures
+             $$ pprLHsBinds val_binds )
     $$
     ifPprDebug (ppr ev_binds)
 
 instance (OutputableBndr id) => Outputable (ABExport id) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> ptext (sLit "<=") <+> ppr lcl
-	   , nest 2 (pprTcSpecPrags prags)
+           , nest 2 (pprTcSpecPrags prags)
            , nest 2 (ppr wrap)]
 \end{code}
 
@@ -388,22 +384,22 @@ pprTicks :: SDoc -> SDoc -> SDoc
 -- Print stuff about ticks only when -dppr-debug is on, to avoid
 -- them appearing in error messages (from the desugarer); see Trac # 3263
 pprTicks pp_no_debug pp_when_debug
-  = getPprStyle (\ sty -> if debugStyle sty then pp_when_debug 
+  = getPprStyle (\ sty -> if debugStyle sty then pp_when_debug
                                             else pp_no_debug)
 \end{code}
 
 %************************************************************************
-%*									*
-		Implicit parameter bindings
-%*									*
+%*                                                                      *
+                Implicit parameter bindings
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 data HsIPBinds id
-  = IPBinds 
-	[LIPBind id] 
-	TcEvBinds	-- Only in typechecker output; binds 
-			-- uses of the implicit parameters
+  = IPBinds
+        [LIPBind id]
+        TcEvBinds       -- Only in typechecker output; binds
+                        -- uses of the implicit parameters
   deriving (Data, Typeable)
 
 isEmptyIPBinds :: HsIPBinds id -> Bool
@@ -414,12 +410,12 @@ type LIPBind id = Located (IPBind id)
 -- | Implicit parameter bindings.
 data IPBind id
   = IPBind
-	(IPName id)
-	(LHsExpr id)
+        (IPName id)
+        (LHsExpr id)
   deriving (Data, Typeable)
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
-  ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs) 
+  ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
                         $$ ifPprDebug (ppr ds)
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
@@ -428,45 +424,45 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Coercion functions}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 data HsWrapper
-  = WpHole			-- The identity coercion
+  = WpHole                      -- The identity coercion
 
-  | WpCompose HsWrapper HsWrapper	
+  | WpCompose HsWrapper HsWrapper
        -- (wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]
-       -- 
+       --
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
   | WpCast LCoercion          -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
 
-	-- Evidence abstraction and application
+        -- Evidence abstraction and application
         -- (both dictionaries and coercions)
-  | WpEvLam EvVar 		-- \d. []	the 'd' is an evidence variable
-  | WpEvApp EvTerm		-- [] d		the 'd' is evidence for a constraint
+  | WpEvLam EvVar               -- \d. []       the 'd' is an evidence variable
+  | WpEvApp EvTerm              -- [] d         the 'd' is evidence for a constraint
 
-	-- Type abstraction and application
-  | WpTyLam TyVar 		-- \a. []	the 'a' is a type variable (not coercion var)
-  | WpTyApp Type		-- [] t		the 't' is a type (not coercion)
+        -- Type abstraction and application
+  | WpTyLam TyVar               -- \a. []       the 'a' is a type variable (not coercion var)
+  | WpTyApp Type                -- [] t         the 't' is a type (not coercion)
 
 
-  | WpLet TcEvBinds      	-- Non-empty (or possibly non-empty) evidence bindings,
+  | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
   deriving (Data, Typeable)
 
 
-data TcEvBinds 
-  = TcEvBinds		-- Mutable evidence bindings
-       EvBindsVar	-- Mutable because they are updated "later"
-     	       	       	--    when an implication constraint is solved
+data TcEvBinds
+  = TcEvBinds           -- Mutable evidence bindings
+       EvBindsVar       -- Mutable because they are updated "later"
+                        --    when an implication constraint is solved
 
-  | EvBinds 		-- Immutable after zonking
+  | EvBinds             -- Immutable after zonking
        (Bag EvBind)
 
   deriving( Typeable )
@@ -500,7 +496,7 @@ instance Data TcEvBinds where
 data EvBind = EvBind EvVar EvTerm
 
 data EvTerm
-  = EvId EvId                  -- Term-level variable-to-variable bindings 
+  = EvId EvId                  -- Term-level variable-to-variable bindings
                                -- (no coercion variables! they come via EvCoercionBox)
 
   | EvCoercionBox LCoercion    -- (Boxed) coercion bindings
@@ -516,27 +512,27 @@ data EvTerm
 
   | EvSuperClass DictId Int    -- n'th superclass. Used for both equalities and
                                -- dictionaries, even though the former have no
-			       -- selector Id.  We count up from _0_ 
-			       
+                               -- selector Id.  We count up from _0_
+
   deriving( Data, Typeable)
 \end{code}
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~
-How evidence is created and updated. Bindings for dictionaries, 
+How evidence is created and updated. Bindings for dictionaries,
 and coercions and implicit parameters are carried around in TcEvBinds
 which during constraint generation and simplification is always of the
-form (TcEvBinds ref). After constraint simplification is finished it 
-will be transformed to t an (EvBinds ev_bag). 
+form (TcEvBinds ref). After constraint simplification is finished it
+will be transformed to t an (EvBinds ev_bag).
 
-Evidence for coercions *SHOULD* be filled in using the TcEvBinds 
-However, all EvVars that correspond to *wanted* coercion terms in 
-an EvBind must be mutable variables so that they can be readily 
+Evidence for coercions *SHOULD* be filled in using the TcEvBinds
+However, all EvVars that correspond to *wanted* coercion terms in
+an EvBind must be mutable variables so that they can be readily
 inlined (by zonking) after constraint simplification is finished.
 
-Conclusion: a new wanted coercion variable should be made mutable. 
-[Notice though that evidence variables that bind coercion terms 
- from super classes will be "given" and hence rigid] 
+Conclusion: a new wanted coercion variable should be made mutable.
+[Notice though that evidence variables that bind coercion terms
+ from super classes will be "given" and hence rigid]
 
 
 \begin{code}
@@ -546,7 +542,7 @@ emptyTcEvBinds = EvBinds emptyBag
 isEmptyTcEvBinds :: TcEvBinds -> Bool
 isEmptyTcEvBinds (EvBinds b)    = isEmptyBag b
 isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
- 
+
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
 WpHole <.> c = c
 c <.> WpHole = c
@@ -591,7 +587,7 @@ isIdHsWrapper _      = False
 Pretty printing
 
 \begin{code}
-instance Outputable HsWrapper where 
+instance Outputable HsWrapper where
   ppr co_fn = pprHsWrapper (ptext (sLit "<>")) co_fn
 
 pprHsWrapper :: SDoc -> HsWrapper -> SDoc
@@ -605,7 +601,7 @@ pprHsWrapper doc wrap
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>") 
+    help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>")
                                               <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
     help it (WpTyApp ty)  = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
@@ -632,7 +628,7 @@ instance Outputable EvBind where
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
-  ppr (EvId v)        	 = ppr v
+  ppr (EvId v)           = ppr v
   ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendCo co
   ppr (EvCoercionBox co) = ptext (sLit "CO") <+> ppr co
   ppr (EvTupleSel v n)   = ptext (sLit "tupsel") <> parens (ppr (v,n))
@@ -642,9 +638,9 @@ instance Outputable EvTerm where
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{@Sig@: type signatures and value-modifying user pragmas}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 It is convenient to lump ``value-modifying'' user-pragmas (e.g.,
@@ -655,64 +651,64 @@ serves for both.
 \begin{code}
 type LSig name = Located (Sig name)
 
-data Sig name	-- Signatures and pragmas
-  = 	-- An ordinary type signature
-	-- f :: Num a => a -> a
+data Sig name   -- Signatures and pragmas
+  =     -- An ordinary type signature
+        -- f :: Num a => a -> a
     TypeSig [Located name] (LHsType name)
 
         -- A type signature for a default method inside a class
         -- default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
   | GenericSig [Located name] (LHsType name)
 
-	-- A type signature in generated code, notably the code
-	-- generated for record selectors.  We simply record
-	-- the desired Id itself, replete with its name, type
-	-- and IdDetails.  Otherwise it's just like a type 
-	-- signature: there should be an accompanying binding
+        -- A type signature in generated code, notably the code
+        -- generated for record selectors.  We simply record
+        -- the desired Id itself, replete with its name, type
+        -- and IdDetails.  Otherwise it's just like a type
+        -- signature: there should be an accompanying binding
   | IdSig Id
 
-	-- An ordinary fixity declaration
-	--	infixl *** 8
+        -- An ordinary fixity declaration
+        --      infixl *** 8
   | FixSig (FixitySig name)
 
-	-- An inline pragma
-	-- {#- INLINE f #-}
-  | InlineSig	(Located name)	-- Function name
-		InlinePragma	-- Never defaultInlinePragma
+        -- An inline pragma
+        -- {#- INLINE f #-}
+  | InlineSig   (Located name)  -- Function name
+                InlinePragma    -- Never defaultInlinePragma
 
-	-- A specialisation pragma
-	-- {-# SPECIALISE f :: Int -> Int #-}
-  | SpecSig 	(Located name)	-- Specialise a function or datatype ...
-		(LHsType name)	-- ... to these types
-		InlinePragma    -- The pragma on SPECIALISE_INLINE form
-				-- If it's just defaultInlinePragma, then we said
-				--    SPECIALISE, not SPECIALISE_INLINE
+        -- A specialisation pragma
+        -- {-# SPECIALISE f :: Int -> Int #-}
+  | SpecSig     (Located name)  -- Specialise a function or datatype ...
+                (LHsType name)  -- ... to these types
+                InlinePragma    -- The pragma on SPECIALISE_INLINE form
+                                -- If it's just defaultInlinePragma, then we said
+                                --    SPECIALISE, not SPECIALISE_INLINE
 
         -- A specialisation pragma for instance declarations only
         -- {-# SPECIALISE instance Eq [Int] #-}
-  | SpecInstSig (LHsType name)  -- (Class tys); should be a specialisation of the 
+  | SpecInstSig (LHsType name)  -- (Class tys); should be a specialisation of the
                                 -- current instance decl
   deriving (Data, Typeable)
 
 
 type LFixitySig name = Located (FixitySig name)
-data FixitySig name = FixitySig (Located name) Fixity 
+data FixitySig name = FixitySig (Located name) Fixity
   deriving (Data, Typeable)
 
 -- TsSpecPrags conveys pragmas from the type checker to the desugarer
-data TcSpecPrags 
-  = IsDefaultMethod	-- Super-specialised: a default method should 
-    			-- be macro-expanded at every call site
+data TcSpecPrags
+  = IsDefaultMethod     -- Super-specialised: a default method should
+                        -- be macro-expanded at every call site
   | SpecPrags [LTcSpecPrag]
   deriving (Data, Typeable)
 
 type LTcSpecPrag = Located TcSpecPrag
 
-data TcSpecPrag 
-  = SpecPrag   
-        Id		-- The Id to be specialised
-	HsWrapper	-- An wrapper, that specialises the polymorphic function
-	InlinePragma 	-- Inlining spec for the specialised function
+data TcSpecPrag
+  = SpecPrag
+        Id              -- The Id to be specialised
+        HsWrapper       -- An wrapper, that specialises the polymorphic function
+        InlinePragma    -- Inlining spec for the specialised function
   deriving (Data, Typeable)
 
 noSpecPrags :: TcSpecPrags
@@ -731,15 +727,15 @@ isDefaultMethod (SpecPrags {})  = False
 \begin{code}
 isFixityLSig :: LSig name -> Bool
 isFixityLSig (L _ (FixSig {})) = True
-isFixityLSig _	               = False
+isFixityLSig _                 = False
 
-isVanillaLSig :: LSig name -> Bool	 -- User type signatures
+isVanillaLSig :: LSig name -> Bool       -- User type signatures
 -- A badly-named function, but it's part of the GHCi (used
 -- by Haddock) so I don't want to change it gratuitously.
 isVanillaLSig (L _(TypeSig {})) = True
 isVanillaLSig _                 = False
 
-isTypeLSig :: LSig name -> Bool	 -- Type signatures
+isTypeLSig :: LSig name -> Bool  -- Type signatures
 isTypeLSig (L _(TypeSig {}))    = True
 isTypeLSig (L _(GenericSig {})) = True
 isTypeLSig (L _(IdSig {}))      = True
@@ -754,24 +750,24 @@ isSpecInstLSig (L _ (SpecInstSig {})) = True
 isSpecInstLSig _                      = False
 
 isPragLSig :: LSig name -> Bool
-	-- Identifies pragmas 
+-- Identifies pragmas
 isPragLSig (L _ (SpecSig {}))   = True
 isPragLSig (L _ (InlineSig {})) = True
 isPragLSig _                    = False
 
 isInlineLSig :: LSig name -> Bool
-	-- Identifies inline pragmas 
+-- Identifies inline pragmas
 isInlineLSig (L _ (InlineSig {})) = True
 isInlineLSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
-hsSigDoc (TypeSig {}) 		= ptext (sLit "type signature")
-hsSigDoc (GenericSig {})	= ptext (sLit "default type signature")
-hsSigDoc (IdSig {}) 		= ptext (sLit "id signature")
-hsSigDoc (SpecSig {})	 	= ptext (sLit "SPECIALISE pragma")
+hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
+hsSigDoc (GenericSig {})        = ptext (sLit "default type signature")
+hsSigDoc (IdSig {})             = ptext (sLit "id signature")
+hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
 hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
-hsSigDoc (SpecInstSig {})	= ptext (sLit "SPECIALISE instance pragma")
-hsSigDoc (FixSig {}) 		= ptext (sLit "fixity declaration")
+hsSigDoc (SpecInstSig {})       = ptext (sLit "SPECIALISE instance pragma")
+hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
 \end{code}
 
 Check if signatures overlap; this is used when checking for duplicate
@@ -799,19 +795,19 @@ instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
-ppr_sig (TypeSig vars ty)	  = pprVarSig (map unLoc vars) (ppr ty)
-ppr_sig (GenericSig vars ty)	  = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
-ppr_sig (IdSig id)	          = pprVarSig [id] (ppr (varType id))
-ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
-ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var (ppr ty) inl)
+ppr_sig (TypeSig vars ty)         = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (GenericSig vars ty)      = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (IdSig id)                = pprVarSig [id] (ppr (varType id))
+ppr_sig (FixSig fix_sig)          = ppr fix_sig
+ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec var (ppr ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
-ppr_sig (SpecInstSig ty) 	  = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
+ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 
 instance Outputable name => Outputable (FixitySig name) where
   ppr (FixitySig name fixity) = sep [ppr fixity, ppr name]
 
 pragBrackets :: SDoc -> SDoc
-pragBrackets doc = ptext (sLit "{-#") <+> doc <+> ptext (sLit "#-}") 
+pragBrackets doc = ptext (sLit "{-#") <+> doc <+> ptext (sLit "#-}")
 
 pprVarSig :: (Outputable id) => [id] -> SDoc -> SDoc
 pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
@@ -831,4 +827,3 @@ pprTcSpecPrags (SpecPrags ps)  = vcat (map (ppr . unLoc) ps)
 instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl) = pprSpec var (ptext (sLit "<type>")) inl
 \end{code}
-
