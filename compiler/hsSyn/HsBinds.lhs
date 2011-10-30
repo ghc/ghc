@@ -40,6 +40,8 @@ import FastString
 
 import Data.IORef( IORef )
 import Data.Data hiding ( Fixity )
+
+import Data.List ( intersect )
 \end{code}
 
 %************************************************************************
@@ -772,19 +774,24 @@ hsSigDoc (SpecInstSig {})	= ptext (sLit "SPECIALISE instance pragma")
 hsSigDoc (FixSig {}) 		= ptext (sLit "fixity declaration")
 \end{code}
 
-Signature equality is used when checking for duplicate signatures
+Check if signatures overlap; this is used when checking for duplicate
+signatures. Since some of the signatures contain a list of names, testing for
+equality is not enough -- we have to check if they overlap.
 
 \begin{code}
-eqHsSig :: Eq a => LSig a -> LSig a -> Bool
-eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
-eqHsSig (L _ (IdSig n1))         	(L _ (IdSig n2))                = n1 == n2
-eqHsSig (L _ (TypeSig ns1 _))         	(L _ (TypeSig ns2 _))           = map unLoc ns1 == map unLoc ns2
-eqHsSig (L _ (GenericSig ns1 _))        (L _ (GenericSig ns2 _))        = map unLoc ns1 == map unLoc ns2
-eqHsSig (L _ (InlineSig n1 _))          (L _ (InlineSig n2 _))          = unLoc n1 == unLoc n2
- 	-- For specialisations, we don't have equality over
-	-- HsType, so it's not convenient to spot duplicate 
-	-- specialisations here.  Check for this later, when we're in Type land
-eqHsSig _other1 _other2 = False
+overlapHsSig :: Eq a => LSig a -> LSig a -> Bool
+overlapHsSig sig1 sig2 = case (unLoc sig1, unLoc sig2) of
+  (FixSig (FixitySig n1 _), FixSig (FixitySig n2 _)) -> unLoc n1 == unLoc n2
+  (IdSig n1,                IdSig n2)                -> n1 == n2
+  (TypeSig ns1 _,           TypeSig ns2 _)           -> not . null $ overlap ns1 ns2
+  (GenericSig ns1 _,        GenericSig ns2 _)        -> not . null $ overlap ns1 ns2
+  (InlineSig n1 _,          InlineSig n2 _)          -> unLoc n1 == unLoc n2
+  -- For specialisations, we don't have equality over HsType, so it's not
+  -- convenient to spot duplicate specialisations here.  Check for this later,
+  -- when we're in Type land
+  (_other1,                 _other2)                 -> False
+  where
+    overlap ns1 ns2 = intersect (map unLoc ns1) (map unLoc ns2)
 \end{code}
 
 \begin{code}

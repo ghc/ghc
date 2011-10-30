@@ -644,7 +644,7 @@ renameSigs :: HsSigCtxt
 	   -> RnM [LSig Name]
 -- Renames the signatures and performs error checks
 renameSigs ctxt sigs 
-  = do	{ mapM_ dupSigDeclErr (findDupsEq eqHsSig sigs)  -- Duplicate
+  = do	{ mapM_ dupSigDeclErr (findDupsEq overlapHsSig sigs)  -- Duplicate
 	  	-- Check for duplicates on RdrName version, 
 		-- because renamed version has unboundName for
 		-- not-in-scope binders, which gives bogus dup-sig errors
