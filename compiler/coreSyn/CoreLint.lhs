@@ -644,8 +644,8 @@ lintTyBndrKind tv = lintKind (tyVarKind tv)
 lintCoercion :: OutCoercion -> LintM (OutType, OutType)
 -- Check the kind of a coercion term, returning the kind
 lintCoercion (Refl ty)
-  = do { ty' <- lintInTy ty
-       ; return (ty', ty') }
+  = do { _k <- lintType ty
+       ; return (ty, ty) }
 
 lintCoercion co@(TyConAppCo tc cos)
   = do { (ss,ts) <- mapAndUnzipM lintCoercion cos
@@ -680,9 +680,9 @@ lintCoercion (AxiomInstCo (CoAxiom { co_ax_tvs = tvs
                  substTyWith tvs tys2 rhs) }
 
 lintCoercion (UnsafeCo ty1 ty2)
-  = do { ty1' <- lintInTy ty1
-       ; ty2' <- lintInTy ty2
-       ; return (ty1', ty2') }
+  = do { _k1 <- lintType ty1
+       ; _k2 <- lintType ty2
+       ; return (ty1, ty2) }
 
 lintCoercion (SymCo co) 
   = do { (ty1, ty2) <- lintCoercion co
