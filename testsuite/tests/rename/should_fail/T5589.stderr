@@ -1,0 +1,5 @@
+
+T5589.hs:4:1:
+    Duplicate type signature:
+      T5589.hs:4:1-10: aaa :: Int
+      T5589.hs:3:1-15: bbb, aaa :: Int

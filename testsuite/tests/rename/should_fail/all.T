@@ -93,4 +93,5 @@ test('T5385',
      ['T5385','-v0'])
 test('T5513', normal, compile_fail, [''])
 test('T5533', normal, compile_fail, [''])
+test('T5589', normal, compile_fail, [''])
 test('Misplaced', normal, compile_fail, [''])
