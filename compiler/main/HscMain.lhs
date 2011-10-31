@@ -161,12 +161,13 @@ import Data.IORef
 \begin{code}
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-  { eps_var <- newIORef initExternalPackageState
-  ; us      <- mkSplitUniqSupply 'r'
-  ; nc_var  <- newIORef (initNameCache us knownKeyNames)
-  ; fc_var  <- newIORef emptyUFM
-  ; mlc_var <- newIORef emptyModuleEnv
-  ; optFuel <- initOptFuelState
+  { eps_var  <- newIORef initExternalPackageState
+  ; us       <- mkSplitUniqSupply 'r'
+  ; nc_var   <- newIORef (initNameCache us knownKeyNames)
+  ; fc_var   <- newIORef emptyUFM
+  ; mlc_var  <- newIORef emptyModuleEnv
+  ; optFuel  <- initOptFuelState
+  ; safe_var <- newIORef True
   ; return (HscEnv { hsc_dflags       = dflags,
   		     hsc_targets      = [],
   		     hsc_mod_graph    = [],
@@ -177,7 +178,8 @@ newHscEnv dflags = do
   		     hsc_FC           = fc_var,
   		     hsc_MLC          = mlc_var,
   		     hsc_OptFuel      = optFuel,
-                     hsc_type_env_var = Nothing } ) }
+                     hsc_type_env_var = Nothing,
+                     hsc_safeInf      = safe_var } ) }
 
 
 knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
@@ -191,40 +193,37 @@ knownKeyNames =              -- where templateHaskellNames are defined
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an enviornment and warning state
 
-newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages, HscEnv))
+newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
 
 instance Monad Hsc where
-  return a    = Hsc $ \e w -> return (a, w, e)
-  Hsc m >>= k = Hsc $ \e w -> do (a, w1, e1) <- m e w
+  return a    = Hsc $ \_ w -> return (a, w)
+  Hsc m >>= k = Hsc $ \e w -> do (a, w1) <- m e w
                                  case k a of
-                                   Hsc k' -> k' e1 w1
+                                   Hsc k' -> k' e w1
 
 instance MonadIO Hsc where
-  liftIO io = Hsc $ \e w -> do a <- io; return (a, w, e)
+  liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
-  (a, w, e) <- hsc hsc_env emptyBag
-  printOrThrowWarnings (hsc_dflags e) w
+  (a, w) <- hsc hsc_env emptyBag
+  printOrThrowWarnings (hsc_dflags hsc_env) w
   return a
 
 getWarnings :: Hsc WarningMessages
-getWarnings = Hsc $ \e w -> return (w, w, e)
+getWarnings = Hsc $ \_ w -> return (w, w)
 
 clearWarnings :: Hsc ()
-clearWarnings = Hsc $ \e _w -> return ((), emptyBag, e)
+clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 
 logWarnings :: WarningMessages -> Hsc ()
-logWarnings w = Hsc $ \e w0 -> return ((), w0 `unionBags` w, e)
+logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 
 getHscEnv :: Hsc HscEnv
-getHscEnv = Hsc $ \e w -> return (e, w, e)
+getHscEnv = Hsc $ \e w -> return (e, w)
 
 getDynFlags :: Hsc DynFlags
-getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w, e)
-
-setDynFlags :: DynFlags -> Hsc ()
-setDynFlags dflags = Hsc $ \e w -> return ((), w, e { hsc_dflags = dflags })
+getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do
@@ -607,7 +606,7 @@ hscOneShotCompiler =
 
   , hscRecompile = genericHscRecompile hscOneShotCompiler
 
-  , hscBackend = \ tc_result mod_summary mb_old_hash -> do
+  , hscBackend = \tc_result mod_summary mb_old_hash -> do
        dflags <- getDynFlags
        case hscTarget dflags of
          HscNothing -> return (HscRecomp Nothing ())
@@ -902,18 +901,21 @@ checkSafeImports dflags hsc_env tcg_env
         logWarnings oldErrs
 
         -- See the Note [ Safe Haskell Inference]
-        when (not $ isEmptyBag errs) (
-            -- did we fail safe inference or fail -XSafe?
-            case safeInferOn dflags of
-                True  -> setDynFlags (dflags { safeHaskell = Sf_None } )
-                False -> liftIO . throwIO . mkSrcErr $ errs
-            )
+        case (not $ isEmptyBag errs) of
 
-        when (packageTrustOn dflags) $ checkPkgTrust pkg_reqs
-
-        -- add in trusted package requirements for this module
-        let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
-        return tcg_env { tcg_imports = imp_info `plusImportAvails` new_trust }
+            -- We have errors!
+            True ->
+                -- did we fail safe inference or fail -XSafe?
+                case safeInferOn dflags of
+                    True  -> wipeTrust tcg_env
+                    False -> liftIO . throwIO . mkSrcErr $ errs
+            
+            -- All good matey!
+            False -> do
+                when (packageTrustOn dflags) $ checkPkgTrust pkg_reqs
+                -- add in trusted package requirements for this module
+                let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
+                return tcg_env { tcg_imports = imp_info `plusImportAvails` new_trust }
 
     where
         imp_info = tcg_imports tcg_env     -- ImportAvails
@@ -1029,8 +1031,8 @@ checkSafeImports dflags hsc_env tcg_env
 -- | Set module to unsafe and wipe trust information.
 wipeTrust :: TcGblEnv -> Hsc TcGblEnv
 wipeTrust tcg_env = do
-    dflags <- getDynFlags
-    setDynFlags (dflags { safeHaskell = Sf_None })
+    env <- getHscEnv
+    liftIO $ hscSetSafeInf env False
     let imps = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
     return $ tcg_env { tcg_imports = imps }
 
