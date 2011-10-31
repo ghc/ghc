@@ -169,5 +169,3 @@ defTyConPAs ps = updGEnv $ \env ->
 
 lookupTyConPR :: TyCon -> VM (Maybe Var)
 lookupTyConPR tc = readGEnv $ \env -> lookupNameEnv (global_pr_funs env) (tyConName tc)
-
-

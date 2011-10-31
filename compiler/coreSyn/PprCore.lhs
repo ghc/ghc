@@ -482,4 +482,7 @@ instance Outputable CoreVect where
                                        ppr tc
   ppr (VectType True var (Just tc))  = ptext (sLit "VECTORISE SCALAR type") <+> ppr var <+>
                                        char '=' <+> ppr tc
+  ppr (VectClass tc)                 = ptext (sLit "VECTORISE class") <+> ppr tc
+  ppr (VectInst False var)           = ptext (sLit "VECTORISE instance") <+> ppr var
+  ppr (VectInst True var)            = ptext (sLit "VECTORISE SCALAR instance") <+> ppr var
 \end{code}

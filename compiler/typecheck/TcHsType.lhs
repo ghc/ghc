@@ -6,7 +6,7 @@
 
 \begin{code}
 module TcHsType (
-	tcHsSigType, tcHsSigTypeNC, tcHsDeriv, 
+	tcHsSigType, tcHsSigTypeNC, tcHsDeriv, tcHsVectInst, 
 	tcHsInstHead, tcHsQuantifiedType,
 	UserTypeCtxt(..), 
 
@@ -219,6 +219,20 @@ tc_hs_deriv tv_names ty
 
   | otherwise
   = failWithTc (ptext (sLit "Illegal deriving item") <+> ppr ty)
+
+-- Used for 'VECTORISE [SCALAR] instance' declarations
+--
+tcHsVectInst :: LHsType Name -> TcM (Class, [Type])
+tcHsVectInst ty
+  | Just (L _ cls_name, tys) <- splitLHsClassTy_maybe ty
+  = do { cls_kind <- kcClass cls_name
+       ; (tys, _res_kind) <- kcApps cls_name cls_kind tys
+       ; arg_tys <- dsHsTypes tys
+       ; cls <- tcLookupClass cls_name
+       ; return (cls, arg_tys)
+       }
+  | otherwise
+  = failWithTc $ ptext (sLit "Malformed instance type")
 \end{code}
 
 	These functions are used during knot-tying in

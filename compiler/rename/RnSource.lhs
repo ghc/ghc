@@ -664,6 +664,18 @@ rnHsVectDecl (HsVectTypeIn isScalar tycon (Just rhs_tycon))
        }
 rnHsVectDecl (HsVectTypeOut _ _ _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectTypeOut'"
+rnHsVectDecl (HsVectClassIn cls)
+  = do { cls' <- lookupLocatedOccRn cls
+       ; return (HsVectClassIn cls', unitFV (unLoc cls'))
+       }
+rnHsVectDecl (HsVectClassOut _)
+  = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectClassOut'"
+rnHsVectDecl (HsVectInstIn isScalar instTy)
+  = do { instTy' <- rnLHsInstType (text "In a VECTORISE pragma") instTy
+       ; return (HsVectInstIn isScalar instTy', emptyFVs)
+       }
+rnHsVectDecl (HsVectInstOut _ _)
+  = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectInstOut'"
 \end{code}
 
 %*********************************************************

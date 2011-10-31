@@ -365,7 +365,7 @@ data OverlapFlag
   -- instantiating 'b' would change which instance 
   -- was chosen
   | Incoherent { isSafeOverlap :: Bool }
-  deriving( Eq )
+  deriving (Eq, Data, Typeable)
 
 instance Outputable OverlapFlag where
    ppr (NoOverlap  b) = empty <+> pprSafeOverlap b

@@ -14,7 +14,7 @@ module InstEnv (
         instanceDFunId, setInstanceDFunId, instanceRoughTcs,
 
         InstEnv, emptyInstEnv, extendInstEnv, overwriteInstEnv, 
-        extendInstEnvList, lookupInstEnv', lookupInstEnv, instEnvElts,
+        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv', lookupInstEnv, instEnvElts,
         classInstances, instanceBindFun,
         instanceCantMatch, roughMatchTcs
     ) where
@@ -29,11 +29,13 @@ import TcType
 import TyCon
 import Unify
 import Outputable
+import ErrUtils
 import BasicTypes
 import UniqFM
 import Id
 import FastString
 
+import Data.Data        hiding (TyCon, mkTyConApp)
 import Data.Maybe       ( isJust, isNothing )
 \end{code}
 
@@ -62,6 +64,7 @@ data Instance
              , is_flag :: OverlapFlag   -- See detailed comments with
                                         -- the decl of BasicTypes.OverlapFlag
     }
+  deriving (Data, Typeable)
 \end{code}
 
 Note [Rough-match field]
@@ -435,21 +438,41 @@ Note [InstTypes: instantiating types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A successful match is an Instance, together with the types at which
         the dfun_id in the Instance should be instantiated
-The instantiating types are (Mabye Type)s because the dfun
+The instantiating types are (Either TyVar Type)s because the dfun
 might have some tyvars that *only* appear in arguments
         dfun :: forall a b. C a b, Ord b => D [a]
 When we match this against D [ty], we return the instantiating types
         [Right ty, Left b]
-where the Nothing indicates that 'b' can be freely instantiated.  
+where the 'Left b' indicates that 'b' can be freely instantiated.  
 (The caller instantiates it to a flexi type variable, which will 
  presumably later become fixed via functional dependencies.)
 
 \begin{code}
+-- |Look up an instance in the given instance environment. The given class application must match exactly
+-- one instance and the match may not contain any flexi type variables.  If the lookup is unsuccessful,
+-- yield 'Left errorMessage'.
+--
+lookupUniqueInstEnv :: (InstEnv, InstEnv) 
+                    -> Class -> [Type]
+                    -> Either Message (Instance, [Type])
+lookupUniqueInstEnv instEnv cls tys
+  = case lookupInstEnv instEnv cls tys of
+      ([(inst, inst_tys)], _, _) 
+             | noFlexiVar -> Right (inst, inst_tys')
+             | otherwise  -> Left $ ptext (sLit "flexible type variable:") <+>
+                                    (ppr $ mkTyConApp (classTyCon cls) tys)
+             where
+               inst_tys'  = [ty | Right ty <- inst_tys]
+               noFlexiVar = all isRight inst_tys
+      _other -> Left $ ptext (sLit "instance not found") <+> (ppr $ mkTyConApp (classTyCon cls) tys)
+  where
+    isRight (Left  _) = False
+    isRight (Right _) = True
 
-lookupInstEnv' :: InstEnv    -- InstEnv to look in
-                    -> Class -> [Type]  -- What we are looking for
-                    -> ([InstMatch],    -- Successful matches
-                        [Instance])     -- These don't match but do unify
+lookupInstEnv' :: InstEnv          -- InstEnv to look in
+               -> Class -> [Type]  -- What we are looking for
+               -> ([InstMatch],    -- Successful matches
+                   [Instance])     -- These don't match but do unify
 -- The second component of the result pair happens when we look up
 --      Foo [a]
 -- in an InstEnv that has entries for

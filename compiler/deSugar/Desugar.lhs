@@ -16,6 +16,8 @@ import TcRnTypes
 import MkIface
 import Id
 import Name
+import InstEnv
+import Class
 import Avail
 import CoreSyn
 import CoreSubst
@@ -412,4 +414,12 @@ dsVect (L _loc (HsVectTypeOut isScalar tycon rhs_tycon))
   = return $ VectType isScalar tycon rhs_tycon
 dsVect vd@(L _ (HsVectTypeIn _ _ _))
   = pprPanic "Desugar.dsVect: unexpected 'HsVectTypeIn'" (ppr vd)
+dsVect (L _loc (HsVectClassOut cls))
+  = return $ VectClass (classTyCon cls)
+dsVect vc@(L _ (HsVectClassIn _))
+  = pprPanic "Desugar.dsVect: unexpected 'HsVectClassIn'" (ppr vc)
+dsVect (L _loc (HsVectInstOut isScalar inst))
+  = return $ VectInst isScalar (instanceDFunId inst)
+dsVect vi@(L _ (HsVectInstIn _ _))
+  = pprPanic "Desugar.dsVect: unexpected 'HsVectInstIn'" (ppr vi)
 \end{code}

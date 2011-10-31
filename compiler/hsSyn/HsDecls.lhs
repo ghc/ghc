@@ -28,7 +28,7 @@ module HsDecls (
   collectRuleBndrSigTys,
   -- ** @VECTORISE@ declarations
   VectDecl(..), LVectDecl,
-  lvectDeclName,
+  lvectDeclName, lvectInstDecl,
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
   -- ** Top-level template haskell splice
@@ -69,6 +69,7 @@ import Coercion
 import ForeignCall
 
 -- others:
+import InstEnv
 import Class
 import Outputable       
 import Util
@@ -1083,13 +1084,34 @@ data VectDecl name
       Bool                      -- 'TRUE' => SCALAR declaration
       TyCon
       (Maybe TyCon)             -- 'Nothing' => no right-hand side
+  | HsVectClassIn               -- pre type-checking
+      (Located name)
+  | HsVectClassOut              -- post type-checking
+      Class
+  | HsVectInstIn                -- pre type-checking
+      Bool                      -- 'TRUE' => SCALAR declaration
+      (LHsType name)
+  | HsVectInstOut               -- post type-checking
+      Bool                      -- 'TRUE' => SCALAR declaration
+      Instance
   deriving (Data, Typeable)
 
 lvectDeclName :: NamedThing name => LVectDecl name -> Name
-lvectDeclName (L _ (HsVect        (L _ name) _))   = getName name
-lvectDeclName (L _ (HsNoVect      (L _ name)))     = getName name
-lvectDeclName (L _ (HsVectTypeIn  _ (L _ name) _)) = getName name
-lvectDeclName (L _ (HsVectTypeOut _ tycon _))      = getName tycon
+lvectDeclName (L _ (HsVect         (L _ name) _))   = getName name
+lvectDeclName (L _ (HsNoVect       (L _ name)))     = getName name
+lvectDeclName (L _ (HsVectTypeIn   _ (L _ name) _)) = getName name
+lvectDeclName (L _ (HsVectTypeOut  _ tycon _))      = getName tycon
+lvectDeclName (L _ (HsVectClassIn  (L _ name)))     = getName name
+lvectDeclName (L _ (HsVectClassOut cls))            = getName cls
+lvectDeclName (L _ (HsVectInstIn   _ _))            = panic "HsDecls.lvectDeclName: HsVectInstIn"
+lvectDeclName (L _ (HsVectInstOut  _ _))            = panic "HsDecls.lvectDeclName: HsVectInstOut"
+-- lvectDeclName (L _ (HsVectInstIn   _ (L _ name)))   = getName name
+-- lvectDeclName (L _ (HsVectInstOut  _ inst))         = getName inst
+
+lvectInstDecl :: LVectDecl name -> Bool
+lvectInstDecl (L _ (HsVectInstIn _ _))  = True
+lvectInstDecl (L _ (HsVectInstOut _ _)) = True
+lvectInstDecl _                         = False
 
 instance OutputableBndr name => Outputable (VectDecl name) where
   ppr (HsVect v Nothing)
@@ -1116,6 +1138,18 @@ instance OutputableBndr name => Outputable (VectDecl name) where
     = sep [text "{-# VECTORISE SCALAR type" <+> ppr t <+> text "#-}" ]
   ppr (HsVectTypeOut True t (Just t'))
     = sep [text "{-# VECTORISE SCALAR type" <+> ppr t, text "=", ppr t', text "#-}" ]
+  ppr (HsVectClassIn c)
+    = sep [text "{-# VECTORISE class" <+> ppr c <+> text "#-}" ]
+  ppr (HsVectClassOut c)
+    = sep [text "{-# VECTORISE class" <+> ppr c <+> text "#-}" ]
+  ppr (HsVectInstIn False ty)
+    = sep [text "{-# VECTORISE instance" <+> ppr ty <+> text "#-}" ]
+  ppr (HsVectInstIn True ty)
+    = sep [text "{-# VECTORISE SCALAR instance" <+> ppr ty <+> text "#-}" ]
+  ppr (HsVectInstOut False i)
+    = sep [text "{-# VECTORISE instance" <+> ppr i <+> text "#-}" ]
+  ppr (HsVectInstOut True i)
+    = sep [text "{-# VECTORISE SCALAR instance" <+> ppr i <+> text "#-}" ]
 \end{code}
 
 %************************************************************************

@@ -1034,6 +1034,12 @@ zonkVect env (HsNoVect v)
 zonkVect _env (HsVectTypeOut s t rt)
   = return $ HsVectTypeOut s t rt
 zonkVect _ (HsVectTypeIn _ _ _) = panic "TcHsSyn.zonkVect: HsVectTypeIn"
+zonkVect _env (HsVectClassOut c)
+  = return $ HsVectClassOut c
+zonkVect _ (HsVectClassIn _) = panic "TcHsSyn.zonkVect: HsVectClassIn"
+zonkVect _env (HsVectInstOut s i)
+  = return $ HsVectInstOut s i
+zonkVect _ (HsVectInstIn _ _) = panic "TcHsSyn.zonkVect: HsVectInstIn"
 \end{code}
 
 %************************************************************************

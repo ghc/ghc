@@ -26,7 +26,7 @@ module TcType (
   UserTypeCtxt(..), pprUserTypeCtxt,
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..), 
-  isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy,
+  isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isAmbiguousTyVar, metaTvRef, 
   isFlexi, isIndirect, isRuntimeUnkSkol,

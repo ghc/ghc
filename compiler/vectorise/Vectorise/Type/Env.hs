@@ -90,6 +90,11 @@ import Data.List
 --     by the vectoriser).
 --
 --     Type constructors declared with {-# VECTORISE type T = T' #-} are treated in this manner.
+--
+-- In addition, we have also got a single pragma form for type classes: {-# VECTORISE class C #-}.  It
+-- implies that the class type constructor may be used in vectorised code together with its data
+-- constructor.  We generally produce a vectorised version of the data type and data constructor.
+-- We do not generate 'PData' and 'PRepr' instances for class type constructors.
 
 -- |Vectorise a type environment.
 --
@@ -193,11 +198,9 @@ vectTypeEnv tycons vectTypeDecls
               ; return (dfuns, binds)
               }
 
-           -- We return: (1) the vectorised type constructors, (2)
-           -- their 'PRepr' & 'PData' instance constructors two.
-       ; let new_tycons = tycons ++ new_tcs ++ inst_tcs
-
-       ; return (new_tycons, fam_insts, binds)
+           -- Return the vectorised variants of type constructors as well as the generated instance type
+           -- constructors, family instances, and dfun bindings.
+       ; return (new_tcs ++ inst_tcs, fam_insts, binds)
        }
 
 

@@ -9,7 +9,6 @@ module Vectorise.Env (
   GlobalEnv(..),
   initGlobalEnv,
   extendImportedVarsEnv,
-  setFamEnv,
   extendFamEnv,
   extendTyConsEnv,
   setPAFunsEnv,
@@ -158,13 +157,6 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
 extendImportedVarsEnv :: [(Var, Var)] -> GlobalEnv -> GlobalEnv
 extendImportedVarsEnv ps genv
   = genv { global_vars = extendVarEnvList (global_vars genv) ps }
-
--- |Set the list of type family instances in an environment.
---
-setFamEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv
-setFamEnv l_fam_inst genv
-  = genv { global_fam_inst_env = (g_fam_inst, l_fam_inst) }
-  where (g_fam_inst, _) = global_fam_inst_env genv
 
 -- |Extend the list of type family instances.
 --

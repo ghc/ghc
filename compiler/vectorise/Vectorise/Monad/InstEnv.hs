@@ -19,16 +19,9 @@ import Outputable
 #include "HsVersions.h"
 
 
-getInstEnv :: VM (InstEnv, InstEnv)
-getInstEnv = readGEnv global_inst_env
-
-getFamInstEnv :: VM FamInstEnvs
-getFamInstEnv = readGEnv global_fam_inst_env
-
-
 -- Look up the dfun of a class instance.
 --
--- The match must be unique - ie, match exactly one instance - but the 
+-- The match must be unique —i.e., match exactly one instance— but the 
 -- type arguments used for matching may be more specific than those of 
 -- the class instance declaration.  The found class instances must not have
 -- any type variables in the instance context that do not appear in the
@@ -37,21 +30,11 @@ getFamInstEnv = readGEnv global_fam_inst_env
 --
 lookupInst :: Class -> [Type] -> VM (DFunId, [Type])
 lookupInst cls tys
-  = do { instEnv <- getInstEnv
-       ; case lookupInstEnv instEnv cls tys of
-           ([(inst, inst_tys)], _, _) 
-             | noFlexiVar -> return (instanceDFunId inst, inst_tys')
-             | otherwise  -> cantVectorise "VectMonad.lookupInst: flexi var: " 
-                                           (ppr $ mkTyConApp (classTyCon cls) tys)
-             where
-               inst_tys'  = [ty | Right ty <- inst_tys]
-               noFlexiVar = all isRight inst_tys
-           _other         ->
-             cantVectorise "VectMonad.lookupInst: not found " (ppr cls <+> ppr tys)
+  = do { instEnv <- readGEnv global_inst_env
+       ; case lookupUniqueInstEnv instEnv cls tys of
+           Right (inst, inst_tys) -> return (instanceDFunId inst, inst_tys)
+           Left  err              -> cantVectorise "Vectorise.Monad.InstEnv.lookupInst:" err
        }
-  where
-    isRight (Left  _) = False
-    isRight (Right _) = True
 
 -- Look up the representation tycon of a family instance.
 --
@@ -72,7 +55,7 @@ lookupInst cls tys
 lookupFamInst :: TyCon -> [Type] -> VM (TyCon, [Type])
 lookupFamInst tycon tys
   = ASSERT( isFamilyTyCon tycon )
-    do { instEnv <- getFamInstEnv
+    do { instEnv <- readGEnv global_fam_inst_env
        ; case lookupFamInstEnv instEnv tycon tys of
            [(fam_inst, rep_tys)] -> return (famInstTyCon fam_inst, rep_tys)
            _other                -> 

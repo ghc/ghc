@@ -589,6 +589,11 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | '{-# VECTORISE' 'type' gtycon '=' gtycon '#-}'     
                                                 { unitOL $ LL $ 
                                                     VectD (HsVectTypeIn False $3 (Just $5)) }
+        | '{-# VECTORISE' 'class' gtycon '#-}'  { unitOL $ LL $ VectD (HsVectClassIn $3) }
+        | '{-# VECTORISE' 'instance' type '#-}'     
+                                                { unitOL $ LL $ VectD (HsVectInstIn False $3) }
+        | '{-# VECTORISE_SCALAR' 'instance' type '#-}'     
+                                                { unitOL $ LL $ VectD (HsVectInstIn True $3) }
         | annotation { unitOL $1 }
         | decl                                  { unLoc $1 }
 

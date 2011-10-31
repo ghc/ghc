@@ -15,7 +15,7 @@ module Vectorise.Utils.Base (
   mkBuiltinCo,
   mkVScrut,
 
-  preprSynTyCon,
+  -- preprSynTyCon,
   pdataReprTyCon,
   pdataReprDataCon,
   prDFunOfTyCon
@@ -122,17 +122,14 @@ mkPArray ty len dat = do
                         let [dc] = tyConDataCons tc
                         return $ mkConApp dc [Type ty, len, dat]
 
-
 mkPDataType :: Type -> VM Type
 mkPDataType ty = mkBuiltinTyConApp pdataTyCon [ty]
-
 
 mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
 mkBuiltinCo get_tc
   = do
       tc <- builtin get_tc
       return $ mkTyConAppCo tc []
-
 
 mkVScrut :: VExpr -> VM (CoreExpr, CoreExpr, TyCon, [Type])
 mkVScrut (ve, le)
@@ -142,12 +139,11 @@ mkVScrut (ve, le)
   where
     ty = exprType ve
 
-preprSynTyCon :: Type -> VM (TyCon, [Type])
-preprSynTyCon ty = builtin preprTyCon >>= (`lookupFamInst` [ty])
+-- preprSynTyCon :: Type -> VM (TyCon, [Type])
+-- preprSynTyCon ty = builtin preprTyCon >>= (`lookupFamInst` [ty])
 
 pdataReprTyCon :: Type -> VM (TyCon, [Type])
 pdataReprTyCon ty = builtin pdataTyCon >>= (`lookupFamInst` [ty])
-
 
 pdataReprDataCon :: Type -> VM (DataCon, [Type])
 pdataReprDataCon ty

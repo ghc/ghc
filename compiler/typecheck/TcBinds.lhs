@@ -691,9 +691,9 @@ tcVect (HsNoVect name)
     do { var <- wrapLocM tcLookupId name
        ; return $ HsNoVect var
        }
-tcVect (HsVectTypeIn isScalar lname@(L _ name) rhs_name)
+tcVect (HsVectTypeIn isScalar lname rhs_name)
   = addErrCtxt (vectCtxt lname) $
-    do { tycon <- tcLookupTyCon name
+    do { tycon <- tcLookupLocatedTyCon lname
        ; checkTc (not isScalar || tyConArity tycon == 0) scalarTyConMustBeNullary
 
        ; rhs_tycon <- fmapMaybeM (tcLookupTyCon . unLoc) rhs_name
@@ -701,9 +701,24 @@ tcVect (HsVectTypeIn isScalar lname@(L _ name) rhs_name)
        }
 tcVect (HsVectTypeOut _ _ _)
   = panic "TcBinds.tcVect: Unexpected 'HsVectTypeOut'"
+tcVect (HsVectClassIn lname)
+  = addErrCtxt (vectCtxt lname) $
+    do { cls <- tcLookupLocatedClass lname
+       ; return $ HsVectClassOut cls
+       }
+tcVect (HsVectClassOut _)
+  = panic "TcBinds.tcVect: Unexpected 'HsVectClassOut'"
+tcVect (HsVectInstIn isScalar linstTy)
+  = addErrCtxt (vectCtxt linstTy) $
+    do { (cls, tys) <- tcHsVectInst linstTy
+       ; inst       <- tcLookupInstance cls tys
+       ; return $ HsVectInstOut isScalar inst
+       }
+tcVect (HsVectInstOut _ _)
+  = panic "TcBinds.tcVect: Unexpected 'HsVectInstOut'"
 
-vectCtxt :: Located Name -> SDoc
-vectCtxt name = ptext (sLit "When checking the vectorisation declaration for") <+> ppr name
+vectCtxt :: Outputable thing => thing -> SDoc
+vectCtxt thing = ptext (sLit "When checking the vectorisation declaration for") <+> ppr thing
 
 scalarTyConMustBeNullary :: Message
 scalarTyConMustBeNullary = ptext (sLit "VECTORISE SCALAR type constructor must be nullary")

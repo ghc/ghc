@@ -17,7 +17,7 @@ module TcEnv(
         tcLookupLocatedGlobal,  tcLookupGlobal, 
         tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
-        tcLookupLocatedClass, 
+        tcLookupLocatedClass, tcLookupInstance,
         
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvTvs,
@@ -78,6 +78,7 @@ import BasicTypes
 import Outputable
 import Unique
 import FastString
+import ListSetOps
 \end{code}
 
 
@@ -171,6 +172,30 @@ tcLookupLocatedClass = addLocM tcLookupClass
 
 tcLookupLocatedTyCon :: Located Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocM tcLookupTyCon
+
+-- Find the instance that exactly matches a type class application.  The class arguments must be precisely
+-- the same as in the instance declaration (modulo renaming).
+--
+tcLookupInstance :: Class -> [Type] -> TcM Instance
+tcLookupInstance cls tys
+  = do { instEnv <- tcGetInstEnvs
+       ; case lookupUniqueInstEnv instEnv cls tys of
+           Left err             -> failWithTc $ ptext (sLit "Couldn't match instance:") <+> err 
+           Right (inst, tys) 
+             | uniqueTyVars tys -> return inst
+             | otherwise        -> failWithTc errNotExact
+       }
+  where
+    errNotExact = ptext (sLit "Not an exact match (i.e., some variables get instantiated)")
+    
+    uniqueTyVars tys = all isTyVarTy tys && hasNoDups (map extractTyVar tys)
+      where
+        extractTyVar (TyVarTy tv) = tv
+        extractTyVar _            = panic "TcEnv.tcLookupInstance: extractTyVar"
+    
+    tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
+                       ; return (eps_inst_env eps, tcg_inst_env env) 
+                       }
 \end{code}
 
 \begin{code}
