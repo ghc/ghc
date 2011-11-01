@@ -181,3 +181,8 @@ test('T5306',
                    'T5306b.hi', 'T5306b.o'])],
      multimod_compile,
      ['T5306', '-v0'])
+test('T5592',
+     [only_compiler_types(['ghc']),
+      extra_clean(['T5592a.hi',      'T5592a.o'])],
+     multimod_compile_and_run,
+     ['T5592', '-v0'])
