@@ -779,15 +779,15 @@ overlapHsSig :: Eq a => LSig a -> LSig a -> Bool
 overlapHsSig sig1 sig2 = case (unLoc sig1, unLoc sig2) of
   (FixSig (FixitySig n1 _), FixSig (FixitySig n2 _)) -> unLoc n1 == unLoc n2
   (IdSig n1,                IdSig n2)                -> n1 == n2
-  (TypeSig ns1 _,           TypeSig ns2 _)           -> not . null $ overlap ns1 ns2
-  (GenericSig ns1 _,        GenericSig ns2 _)        -> not . null $ overlap ns1 ns2
+  (TypeSig ns1 _,           TypeSig ns2 _)           -> ns1 `overlaps_with` ns2
+  (GenericSig ns1 _,        GenericSig ns2 _)        -> ns1 `overlaps_with` ns2
   (InlineSig n1 _,          InlineSig n2 _)          -> unLoc n1 == unLoc n2
   -- For specialisations, we don't have equality over HsType, so it's not
   -- convenient to spot duplicate specialisations here.  Check for this later,
   -- when we're in Type land
   (_other1,                 _other2)                 -> False
   where
-    overlap ns1 ns2 = intersect (map unLoc ns1) (map unLoc ns2)
+    ns1 `overlaps_with` ns2 = not (null (intersect (map unLoc ns1) (map unLoc ns2)))
 \end{code}
 
 \begin{code}
