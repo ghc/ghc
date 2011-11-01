@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, RankNTypes #-}
 module Supercompile.Drive.Process2 (supercompile) where
 
 import Supercompile.Drive.Match
@@ -25,6 +25,7 @@ import CoreUtils  (mkPiTypes)
 import qualified State as State
 
 import qualified Data.Map as M
+import Data.Monoid (mempty)
 
 
 data Stream a = a :< Stream a
@@ -113,12 +114,14 @@ breadthFirst :: DelayM m r -> DelayM m r
 breadthFirst = id
 
 
-type ScpM = DelayM (MemoT HistoryThreadM)
+-- NB: monads *within* the ContT are persistent over a rollback. Ones outside get reset.
+type ProcessM = SpecT (ContT (Out FVedTerm) HistoryThreadM)
+type ScpM = DelayM (MemoT ProcessM)
 
 traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
 traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
 
-runScpM :: MemoT HistoryThreadM (ScpM a) -> MemoT HistoryThreadM a
+runScpM :: (Applicative m, Monad m) => m (DelayM m a) -> m a
 runScpM mx = mx >>= runDelayM eval_strat
   where
     -- Doing things this way prevents GHC bleating about depthFirst being unused
@@ -146,6 +149,10 @@ runHistoryThreadM :: HistoryThreadM a -> a
 runHistoryThreadM = flip State.evalState pROCESS_HISTORY
 
 
+class MonadTrans t where
+    lift :: Monad m => m a -> t m a
+
+
 newtype StateT s m a = ST { unST :: s -> m (a, s) }
 
 instance Functor m => Functor (StateT s m) where
@@ -159,10 +166,8 @@ instance Monad m => Monad (StateT s m) where
     return x = ST $ \s -> return (x, s)
     mx >>= fxmy = ST $ \s -> unST mx s >>= \(x, s) -> unST (fxmy x) s
 
-{-
-liftStateT :: Functor m => m a -> StateT s m a
-liftStateT mx = ST $ \s -> fmap (flip (,) s) mx
--}
+instance MonadTrans (StateT s) where
+    lift mx = ST $ \s -> liftM (flip (,) s) mx
 
 delayStateT :: Functor m => m (StateT s (DelayM m) a) -> StateT s (DelayM m) a
 delayStateT mx = ST $ \s -> delay (fmap (($ s) . unST) mx)
@@ -190,6 +195,53 @@ Therefore:
 delayStateT :: Monad m => m (StateT s (DelayM m) a) -> StateT s (DelayM m) a
 delayStateT = join . fiddle lifty . liftStateT
 -}
+
+
+newtype ContT r m a = ContT { unContT :: (a -> m r) -> m r }
+
+instance Functor (ContT r m) where
+    fmap f mx = ContT $ \k -> unContT mx (k . f)
+
+instance Applicative (ContT r m) where
+    pure = return
+    (<*>) = ap
+
+instance Monad (ContT r m) where
+    return x = ContT $ \k -> k x
+    mx >>= fxmy = ContT $ \k -> unContT mx $ \x -> unContT (fxmy x) k
+
+instance MonadTrans (ContT r) where
+    lift mx = ContT $ \k -> mx >>= k
+
+runContT :: Monad m => ContT r m r -> m r
+runContT mx = unContT mx return
+
+callCC :: ((forall b. a -> ContT r m b) -> ContT r m a) -> ContT r m a
+callCC f = ContT $ \k -> unContT (f (\a -> ContT $ \_k -> k a)) k
+
+
+newtype ReaderT r m a = ReaderT { unReaderT :: r -> m a }
+
+instance Functor m => Functor (ReaderT r m) where
+    fmap f mx = ReaderT $ \r -> fmap f (unReaderT mx r)
+
+instance Applicative m => Applicative (ReaderT r m) where
+    pure x = ReaderT $ \_ -> pure x
+    mf <*> mx = ReaderT $ \r -> unReaderT mf r <*> unReaderT mx r
+
+instance Monad m => Monad (ReaderT r m) where
+    return x = ReaderT $ \_ -> return x
+    mx >>= fxmy = ReaderT $ \r -> unReaderT mx r >>= \x -> unReaderT (fxmy x) r
+
+instance MonadTrans (ReaderT r) where
+    lift mx = ReaderT $ \_ -> mx
+
+runReaderT :: r -> ReaderT r m a -> m a
+runReaderT = flip unReaderT
+
+liftCallCCReaderT :: (((forall b. a -> m b)           -> m a)           -> m a)
+                  ->  ((forall b. a -> ReaderT r m b) -> ReaderT r m a) -> ReaderT r m a
+liftCallCCReaderT call_cc f = ReaderT $ \r -> call_cc $ \c -> runReaderT r (f (ReaderT . const . c))
 
 
 data Promise = P {
@@ -265,17 +317,34 @@ memo opt state = ST $ \ms ->
                 where (p, ms') = promise state ms
 
 
-type RollbackScpM = () -- Generaliser -> ScpBM (Deeds, Out FVedTerm)
+-- FIXME: I'm not convinced this is being extended correctly!!
+type SpecT = ReaderT AlreadySpeculated
 
-sc' :: State -> HistoryThreadM (FulfilmentT ScpM (Deeds, Out FVedTerm))
-sc' state = withHistory $ \hist -> case terminate hist (state, ()) of
-              Continue hist'             -> (hist', split (snd $ reduce state) (delayStateT . sc))
-              Stop (shallower_state, ()) -> (hist,  maybe (split state) id (generalise (mK_GENERALISER shallower_state state) state) (delayStateT . sc))
+runSpecT :: SpecT m a -> m a
+runSpecT = runReaderT nothingSpeculated
 
-sc :: State -> MemoT HistoryThreadM (FulfilmentT ScpM (Deeds, Out FVedTerm))
+speculated :: State -> (State -> SpecT m a) -> SpecT m a
+speculated s k = ReaderT $ \already -> case speculate already (mempty, s) of (already, (_stats, s')) -> unReaderT (k s') already
+
+
+newtype RollbackScpM = RB { doRB :: forall c. FulfilmentT ScpM (Deeds, Out FVedTerm) -> ProcessM c }
+
+withHistory' :: (ProcessHistory -> ProcessM (ProcessHistory, a)) -> ProcessM a
+withHistory' act = (lift . lift) State.get >>= \hist -> act hist >>= \(hist', x) -> (lift . lift) (State.put hist') >> return x
+
+
+sc' :: State -> ProcessM (FulfilmentT ScpM (Deeds, Out FVedTerm))
+sc' state = liftCallCCReaderT callCC (\k -> try (RB k))
+  where
+    trce shallow_state = pprTraceSC "sc-stop" (pPrintFullState True shallow_state $$ pPrintFullState True state)
+    try rb = withHistory' $ \hist -> case terminate hist (state, rb) of
+               Continue hist'                   -> speculated state $ \state' -> return          (hist', split (reduce state') (delayStateT . sc))
+               Stop (shallow_state, shallow_rb) -> trce shallow_state $          doRB shallow_rb (maybe (split shallow_state) id (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT . sc))
+
+sc :: State -> MemoT ProcessM (FulfilmentT ScpM (Deeds, Out FVedTerm))
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runHistoryThreadM $ runMemoT $ runScpM $ liftM (runFulfilmentT . fmap snd) $ sc state
+supercompile unfoldings e = fVedTermToTerm $ runHistoryThreadM $ runContT $ runSpecT $ runMemoT $ runScpM $ liftM (runFulfilmentT . fmap snd) $ sc state
   where state = prepareTerm unfoldings e

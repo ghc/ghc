@@ -8,8 +8,9 @@ module Supercompile.Drive.Process (
 
     SCStats(..), seqSCStats,
 
-    reduce, gc,
-    AlreadySpeculated, speculate,
+    reduce, reduce', gc,
+    AlreadySpeculated, nothingSpeculated,
+    speculate,
 
     AbsVar, renameAbsVar, applyAbsVars, stateAbsVars
   ) where
@@ -188,6 +189,9 @@ gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredV
 
 type AlreadySpeculated = S.Set Var
 
+nothingSpeculated :: AlreadySpeculated
+nothingSpeculated = S.empty
+
 -- Note [Order of speculation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -253,7 +257,7 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
         try_speculation in_e rb = Monad.join (modifySpecState go)
           where go no_change@(stats, deeds, h_speculated_ok, h_speculated_failure, ids) = case terminate hist (state, rb) of
                     Stop (_old_state, rb) -> (no_change, rb)
-                    Continue hist -> case reduce state of
+                    Continue hist -> case reduce' state of
                         (extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
                           | Just a <- traverse qaToAnswer qa
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
@@ -281,8 +285,11 @@ runSpecM spec state = unSpecM spec state (\state () -> state)
 catchSpecM :: ((forall b. SpecM b) -> SpecM ()) -> SpecM () -> SpecM ()
 catchSpecM mx mcatch = SpecM $ \s k -> unSpecM (mx (SpecM $ \_s _k -> unSpecM mcatch s k)) s k
 
-reduce :: State -> (SCStats, State)
-reduce orig_state = go (mkHistory rEDUCE_WQO) orig_state
+reduce :: State -> State
+reduce = snd . reduce'
+
+reduce' :: State -> (SCStats, State)
+reduce' orig_state = go (mkHistory rEDUCE_WQO) orig_state
   where
     -- NB: it is important that we ensure that reduce is idempotent if we have rollback on. I use this property to improve memoisation.
     go hist state = -- traceRender ("reduce:step", pPrintFullState state) $
