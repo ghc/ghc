@@ -10,14 +10,14 @@ Utility functions on @Core@ syntax
 module CoreUtils (
         -- * Constructing expressions
         mkTick, mkTickNoHNF, mkCoerce,
-	bindNonRec, needsCaseBinding,
-	mkAltExpr, mkPiType, mkPiTypes,
+        bindNonRec, needsCaseBinding,
+        mkAltExpr, mkPiType, mkPiTypes,
 
         -- * Taking expressions apart
         findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
 
         -- * Properties of expressions
-	exprType, coreAltType, coreAltsType,
+        exprType, coreAltType, coreAltsType,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
         exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprIsBig, exprIsConLike,
