@@ -1246,24 +1246,35 @@ mkMultiBranch :: Maybe Int      -- # datacons in tycon, if alg alt
                                 -- Nothing is always safe
               -> [(Discr, BCInstrList)]
               -> BcM BCInstrList
-mkMultiBranch maybe_ncons raw_ways
-   = let d_way     = filter (isNoDiscr.fst) raw_ways
-         notd_ways = sortLe
-                        (\w1 w2 -> leAlt (fst w1) (fst w2))
-                        (filter (not.isNoDiscr.fst) raw_ways)
+mkMultiBranch maybe_ncons raw_ways = do
+     lbl_default <- getLabelBc
 
+     let
          mkTree :: [(Discr, BCInstrList)] -> Discr -> Discr -> BcM BCInstrList
-         mkTree [] _range_lo _range_hi = return the_default
+         mkTree [] _range_lo _range_hi = return (unitOL (JMP lbl_default))
+             -- shouldn't happen?
 
          mkTree [val] range_lo range_hi
             | range_lo `eqAlt` range_hi
             = return (snd val)
+            | null defaults -- Note [CASEFAIL]
+            = do lbl <- getLabelBc
+                 return (testEQ (fst val) lbl
+                            `consOL` (snd val
+                            `appOL`  (LABEL lbl `consOL` unitOL CASEFAIL)))
             | otherwise
-            = do label_neq <- getLabelBc
-                 return (testEQ (fst val) label_neq
-                         `consOL` (snd val
-                         `appOL`   unitOL (LABEL label_neq)
-                         `appOL`   the_default))
+            = return (testEQ (fst val) lbl_default `consOL` snd val)
+
+            -- Note [CASEFAIL] It may be that this case has no default
+            -- branch, but the alternatives are not exhaustive - this
+            -- happens for GADT cases for example, where the types
+            -- prove that certain branches are impossible.  We could
+            -- just assume that the other cases won't occur, but if
+            -- this assumption was wrong (because of a bug in GHC)
+            -- then the result would be a segfault.  So instead we
+            -- emit an explicit test and a CASEFAIL instruction that
+            -- causes the interpreter to barf() if it is ever
+            -- executed.
 
          mkTree vals range_lo range_hi
             = let n = length vals `div` 2
@@ -1280,9 +1291,18 @@ mkMultiBranch maybe_ncons raw_ways
                       `appOL`   code_hi))
 
          the_default
-            = case d_way of [] -> unitOL CASEFAIL
-                            [(_, def)] -> def
-                            _ -> panic "mkMultiBranch/the_default"
+            = case defaults of
+                []         -> nilOL
+                [(_, def)] -> LABEL lbl_default `consOL` def
+                _          -> panic "mkMultiBranch/the_default"
+     -- in
+     instrs <- mkTree notd_ways init_lo init_hi
+     return (instrs `appOL` the_default)
+  where
+         (defaults, not_defaults) = partition (isNoDiscr.fst) raw_ways
+         notd_ways = sortLe
+                        (\w1 w2 -> leAlt (fst w1) (fst w2))
+                        not_defaults
 
          testLT (DiscrI i) fail_label = TESTLT_I i fail_label
          testLT (DiscrW i) fail_label = TESTLT_W i fail_label
@@ -1349,8 +1369,6 @@ mkMultiBranch maybe_ncons raw_ways
          maxF =  1.0e37
          minD = -1.0e308
          maxD =  1.0e308
-     in
-         mkTree notd_ways init_lo init_hi
 
 
 -- -----------------------------------------------------------------------------
