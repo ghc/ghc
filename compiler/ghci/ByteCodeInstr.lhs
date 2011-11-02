@@ -15,12 +15,13 @@ module ByteCodeInstr (
 
 import ByteCodeItbls	( ItblPtr )
 
+import PprCore
 import Type
 import Outputable
+import FastString
 import Name
 import Id
 import CoreSyn
-import PprCore
 import Literal
 import DataCon
 import VarSet
@@ -166,11 +167,37 @@ instance Outputable a => Outputable (ProtoBCO a) where
    ppr (ProtoBCO name instrs bitmap bsize arity origin malloced)
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity 
 		<+> text (show malloced) <> colon)
-	$$ nest 6 (text "bitmap: " <+> text (show bsize) <+> text (show bitmap))
-        $$ nest 6 (vcat (map ppr instrs))
-        $$ case origin of
-              Left alts -> vcat (map (pprCoreAlt.deAnnAlt) alts)
-              Right rhs -> pprCoreExpr (deAnnotate rhs)
+        $$ nest 3 (case origin of
+                      Left alts -> vcat (zipWith (<+>) (char '{' : repeat (char ';'))
+                                                       (map (pprCoreAltShort.deAnnAlt) alts)) <+> char '}'
+                      Right rhs -> pprCoreExprShort (deAnnotate rhs))
+        $$ nest 3 (text "bitmap: " <+> text (show bsize) <+> text (show bitmap))
+        $$ nest 3 (vcat (map ppr instrs))
+
+-- Print enough of the Core expression to enable the reader to find
+-- the expression in the -ddump-prep output.  That is, we need to
+-- include at least a binder.
+
+pprCoreExprShort :: CoreExpr -> SDoc
+pprCoreExprShort expr@(Lam _ _)
+  = let
+        (bndrs, _) = collectBinders expr
+    in
+    char '\\' <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow <+> ptext (sLit "...")
+
+pprCoreExprShort (Case _expr var _ty _alts)
+ = ptext (sLit "case of") <+> ppr var
+
+pprCoreExprShort (Let (NonRec x _) _) = ptext (sLit "let") <+> ppr x <+> ptext (sLit ("= ... in ..."))
+pprCoreExprShort (Let (Rec bs) _) = ptext (sLit "let {") <+> ppr (fst (head bs)) <+> ptext (sLit ("= ...; ... } in ..."))
+
+pprCoreExprShort (Tick t e) = ppr t <+> pprCoreExprShort e
+pprCoreExprShort (Cast e _) = pprCoreExprShort e <+> ptext (sLit "`cast` T")
+
+pprCoreExprShort e = pprCoreExpr e
+
+pprCoreAltShort :: CoreAlt -> SDoc
+pprCoreAltShort (con, args, expr) = ppr con <+> sep (map ppr args) <+> ptext (sLit "->") <+> pprCoreExprShort expr
 
 instance Outputable BCInstr where
    ppr (STKCHECK n)          = text "STKCHECK" <+> ppr n
@@ -180,9 +207,9 @@ instance Outputable BCInstr where
    ppr (PUSH_G nm)  	     = text "PUSH_G  " <+> ppr nm
    ppr (PUSH_PRIMOP op)      = text "PUSH_G  " <+> text "GHC.PrimopWrappers." 
                                                <> ppr op
-   ppr (PUSH_BCO bco)        = text "PUSH_BCO" <+> nest 3 (ppr bco)
-   ppr (PUSH_ALTS bco)       = text "PUSH_ALTS " <+> ppr bco
-   ppr (PUSH_ALTS_UNLIFTED bco pk) = text "PUSH_ALTS_UNLIFTED " <+> ppr pk <+> ppr bco
+   ppr (PUSH_BCO bco)        = hang (text "PUSH_BCO") 2 (ppr bco)
+   ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
+   ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
 
    ppr (PUSH_UBX (Left lit) nw) = text "PUSH_UBX" <+> parens (ppr nw) <+> ppr lit
    ppr (PUSH_UBX (Right aa) nw) = text "PUSH_UBX" <+> parens (ppr nw) <+> text (show aa)
