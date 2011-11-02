@@ -292,7 +292,6 @@ basicKnownKeyNames
         -- Monad comprehensions
         , guardMName
         , liftMName
-        , groupMName
         , mzipName
     ]
 
@@ -328,7 +327,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
-    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_GROUP, mONAD_ZIP,
+    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE :: Module
 
@@ -375,7 +374,6 @@ gHC_INT         = mkBaseModule (fsLit "GHC.Int")
 gHC_WORD        = mkBaseModule (fsLit "GHC.Word")
 mONAD           = mkBaseModule (fsLit "Control.Monad")
 mONAD_FIX       = mkBaseModule (fsLit "Control.Monad.Fix")
-mONAD_GROUP     = mkBaseModule (fsLit "Control.Monad.Group")
 mONAD_ZIP       = mkBaseModule (fsLit "Control.Monad.Zip")
 aRROW           = mkBaseModule (fsLit "Control.Arrow")
 cONTROL_APPLICATIVE = mkBaseModule (fsLit "Control.Applicative")
@@ -1007,10 +1005,9 @@ choiceAName        = varQual aRROW (fsLit "|||")          choiceAIdKey
 loopAName          = varQual aRROW (fsLit "loop")  loopAIdKey
 
 -- Monad comprehensions
-guardMName, liftMName, groupMName, mzipName :: Name
+guardMName, liftMName, mzipName :: Name
 guardMName         = varQual mONAD (fsLit "guard") guardMIdKey
 liftMName          = varQual mONAD (fsLit "liftM") liftMIdKey
-groupMName         = varQual mONAD_GROUP (fsLit "mgroupWith") groupMIdKey
 mzipName           = varQual mONAD_ZIP (fsLit "mzip") mzipIdKey
 
 
@@ -1578,11 +1575,10 @@ toIntegerClassOpKey  = mkPreludeMiscIdUnique 192
 toRationalClassOpKey = mkPreludeMiscIdUnique 193
 
 -- Monad comprehensions
-guardMIdKey, liftMIdKey, groupMIdKey, mzipIdKey :: Unique
+guardMIdKey, liftMIdKey, mzipIdKey :: Unique
 guardMIdKey     = mkPreludeMiscIdUnique 194
 liftMIdKey      = mkPreludeMiscIdUnique 195
-groupMIdKey     = mkPreludeMiscIdUnique 196
-mzipIdKey       = mkPreludeMiscIdUnique 197
+mzipIdKey       = mkPreludeMiscIdUnique 196
 
 
 ---------------- Template Haskell -------------------

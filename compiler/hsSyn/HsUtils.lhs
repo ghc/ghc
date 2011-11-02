@@ -51,7 +51,7 @@ module HsUtils(
 
   -- Stmts
   mkTransformStmt, mkTransformByStmt, mkExprStmt, mkBindStmt, mkLastStmt,
-  emptyTransStmt, mkGroupUsingStmt, mkGroupByStmt, mkGroupByUsingStmt, 
+  emptyTransStmt, mkGroupUsingStmt, mkGroupByUsingStmt, 
   emptyRecStmt, mkRecStmt, 
 
   -- Template Haskell
@@ -243,10 +243,9 @@ mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
 mkNPat lit neg     = NPat lit neg noSyntaxExpr
 mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
 
-mkTransformStmt   :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
-mkTransformByStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
+mkTransformStmt    :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
+mkTransformByStmt  :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 mkGroupUsingStmt   :: [LStmt idL]                -> LHsExpr idR -> StmtLR idL idR
-mkGroupByStmt      :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
 mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 
 emptyTransStmt :: StmtLR idL idR
@@ -254,12 +253,10 @@ emptyTransStmt = TransStmt { trS_form = undefined, trS_stmts = [], trS_bndrs = [
                            , trS_by = Nothing, trS_using = noLoc noSyntaxExpr
                            , trS_ret = noSyntaxExpr, trS_bind = noSyntaxExpr
                            , trS_fmap = noSyntaxExpr }
-mkTransformStmt   ss u    = emptyTransStmt { trS_form = ThenForm, trS_stmts = ss, trS_using = u }
-mkTransformByStmt ss u b  = emptyTransStmt { trS_form = ThenForm, trS_stmts = ss, trS_using = u, trS_by = Just b }
-mkGroupByStmt      ss b   = emptyTransStmt { trS_form = GroupFormB, trS_stmts = ss, trS_by = Just b }
-mkGroupUsingStmt   ss u   = emptyTransStmt { trS_form = GroupFormU, trS_stmts = ss, trS_using = u }
-mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupFormU, trS_stmts = ss
-                                           , trS_by = Just b, trS_using = u }
+mkTransformStmt    ss u   = emptyTransStmt { trS_form = ThenForm,  trS_stmts = ss, trS_using = u }
+mkTransformByStmt  ss u b = emptyTransStmt { trS_form = ThenForm,  trS_stmts = ss, trS_using = u, trS_by = Just b }
+mkGroupUsingStmt   ss u   = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u }
+mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = ss, trS_using = u, trS_by = Just b }
 
 mkLastStmt expr	    = LastStmt expr noSyntaxExpr
 mkExprStmt expr	    = ExprStmt expr noSyntaxExpr noSyntaxExpr placeHolderType

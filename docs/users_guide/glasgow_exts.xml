@@ -1087,7 +1087,7 @@ employees = [ ("Simon", "MS", 80)
 
 output = [ (the dept, sum salary)
 | (name, dept, salary) &lt;- employees
-, then group by dept
+, then group by dept using groupWith
 , then sortWith by (sum salary)
 , then take 5 ]
 </programlisting>
@@ -1099,8 +1099,8 @@ In this example, the list <literal>output</literal> would take on
 </programlisting>
 </para>
 <para>There are three new keywords: <literal>group</literal>, <literal>by</literal>, and <literal>using</literal>.
-(The function <literal>sortWith</literal> is not a keyword; it is an ordinary
-function that is exported by <literal>GHC.Exts</literal>.)</para>
+(The functions <literal>sortWith</literal> and <literal>groupWith</literal> are not keywords; they are ordinary
+functions that are exported by <literal>GHC.Exts</literal>.)</para>
 
 <para>There are five new forms of comprehension qualifier,
 all introduced by the (existing) keyword <literal>then</literal>:
@@ -1175,21 +1175,6 @@ output = [ (the x, y)
     unchanged from the list form introduced by the grouping.</para>
 
     </listitem>
-
-    <listitem>
-
-<programlisting>
-then group by e
-</programlisting>
-
-    <para>This form of grouping is essentially the same as the one described above. However,
-    since no function to use for the grouping has been supplied it will fall back on the
-    <literal>groupWith</literal> function defined in
-    <ulink url="&libraryBaseLocation;/GHC-Exts.html"><literal>GHC.Exts</literal></ulink>. This
-    is the form of the group statement that we made use of in the opening example.</para>
-
-    </listitem>
-
 
     <listitem>
 
@@ -1305,33 +1290,9 @@ do (x,y) &lt;- take 2 (do x &lt;- [1..10]
             </para>
 
 <programlisting>
-[ x | x &lt;- [1,1,2,2,3], then group by x ]
 [ x | x &lt;- [1,1,2,2,3], then group by x using GHC.Exts.groupWith ]
 [ x | x &lt;- [1,1,2,2,3], then group using myGroup ]
 </programlisting>
-
-            <para>
-                The basic <literal>then group by e</literal> statement is
-                translated using the <literal>mgroupWith</literal> function, which
-                requires a <literal>MonadGroup</literal> instance, defined in
-                <ulink url="&libraryBaseLocation;/Control-Monad-Group.html"><literal>Control.Monad.Group</literal></ulink>:
-            </para>
-
-<programlisting>
-do x &lt;- mgroupWith (do x &lt;- [1,1,2,2,3]
-                       return x)
-   return x
-</programlisting>
-
-            <para>
-                Note that the type of <literal>x</literal> is changed by the
-                grouping statement.
-            </para>
-
-            <para>
-                The grouping function can also be defined with the
-                <literal>using</literal> keyword.
-            </para>
 
         </listitem>
         <listitem>
@@ -1390,7 +1351,7 @@ Lists of qualifiers: Q,R,S
 
 -- Basic forms
 D[ e | ]               = return e
-D[ e | p &lt;- e, Q ]     = e &gt;&gt;= \p -&gt; D[ e | Q ]
+D[ e | p &lt;- e, Q ]  = e &gt;&gt;= \p -&gt; D[ e | Q ]
 D[ e | e, Q ]          = guard e &gt;&gt; \p -&gt; D[ e | Q ]
 D[ e | let d, Q ]      = let d in D[ e | Q ]
 
@@ -1406,8 +1367,6 @@ D[ e | Q then group using f, R ]      = f D[ Qv | Q ] &gt;&gt;= \ys -&gt;
                                         case (fmap selQv1 ys, ..., fmap selQvn ys) of
                                  	     Qv -&gt; D[ e | R ]
 
-D[ e | Q then group by b, R ]         = D[ e | Q then group by b using mgroupWith, R ]
-
 D[ e | Q then group by b using f, R ] = f (\Qv -&gt; b) D[ Qv | Q ] &gt;&gt;= \ys -&gt;
                                         case (fmap selQv1 ys, ..., fmap selQvn ys) of
                                            Qv -&gt; D[ e | R ]
@@ -1422,7 +1381,6 @@ return       GHC.Base               t1 -&gt; m t2
 (&gt;&gt;)         GHC.Base               m1 t1 -&gt; m2 t2         -&gt; m3 t3
 guard        Control.Monad          t1 -&gt; m t2
 fmap         GHC.Base               forall a b. (a-&gt;b) -&gt; n a -&gt; n b
-mgroupWith   Control.Monad.Group    forall a. (a -&gt; t) -&gt; m1 a -&gt; m2 (n a)
 mzip         Control.Monad.Zip      forall a b. m a -&gt; m b -&gt; m (a,b)
 </programlisting>
 The comprehension should typecheck when its desugaring would typecheck.

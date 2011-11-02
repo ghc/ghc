@@ -943,12 +943,8 @@ data StmtLR idL idR
   deriving (Data, Typeable)
 
 data TransForm	 -- The 'f' below is the 'using' function, 'e' is the by function
-  = ThenForm	 -- then f          or    then f by e        (depending on trS_by)
-  | GroupFormU	 -- group using f   or    group using f by e (depending on trS_by)
-  | GroupFormB   -- group by e  
-      -- In the GroupByFormB, trS_using is filled in with
-      --    'groupWith' (list comprehensions) or 
-      --    'groupM' (monad comprehensions)
+  = ThenForm     -- then f               or    then f by e             (depending on trS_by)
+  | GroupForm	   -- then group using f   or    then group by e using f (depending on trS_by)
   deriving (Data, Typeable)
 \end{code}
 
@@ -1078,12 +1074,7 @@ expressions:
    =>
   guard exp >> [ body | stmts ]
 
-Grouping/parallel statements require the 'Control.Monad.Group.groupM' and
-'Control.Monad.Zip.mzip' functions:
-
-  [ body | stmts, then group by e, rest]
-   =>
-  groupM [ body | stmts ] >>= \bndrs -> [ body | rest ]
+Parallel statements require the 'Control.Monad.Zip.mzip' function:
 
   [ body | stmts1 | stmts2 | .. ]
    =>
@@ -1126,9 +1117,7 @@ pprTransStmt :: OutputableBndr id => Maybe (LHsExpr id)
 				  -> SDoc
 pprTransStmt by using ThenForm
   = sep [ ptext (sLit "then"), nest 2 (ppr using), nest 2 (pprBy by)]
-pprTransStmt by _ GroupFormB
-  = sep [ ptext (sLit "then group"), nest 2 (pprBy by) ]
-pprTransStmt by using GroupFormU
+pprTransStmt by using GroupForm
   = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 (ptext (sLit "using") <+> ppr using)]
 
 pprBy :: OutputableBndr id => Maybe (LHsExpr id) -> SDoc

@@ -1584,21 +1584,15 @@ squals :: { Located [LStmt RdrName] }   -- In reverse order, because the last
 
 transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
                         -- Function is applied to a list of stmts *in order*
-    : 'then' exp                { LL $ \leftStmts -> (mkTransformStmt leftStmts $2) }
-    -- >>>
-    | 'then' exp 'by' exp       { LL $ \leftStmts -> (mkTransformByStmt leftStmts $2 $4) }
-    | 'then' 'group' 'by' exp   { LL $ \leftStmts -> (mkGroupByStmt leftStmts $4) }
-    -- <<<
-    -- These two productions deliberately have a shift-reduce conflict. I have made 'group' into a special_id,
-    -- which means you can enable TransformListComp while still using Data.List.group. However, this makes the two
-    -- productions ambiguous. I've set things up so that Happy chooses to resolve the conflict in that case by
-    -- choosing the "group by" variant, which is what we want.
-    --
-    -- This is rather dubious: the user might be confused as to how to parse this statement. However, it is a good
-    -- practical choice. NB: Data.List.group :: [a] -> [[a]], so using the first production would not even type check
-    -- if /that/ is the group function we conflict with.
-    | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt leftStmts $4) }
+    : 'then' exp                           { LL $ \leftStmts -> (mkTransformStmt    leftStmts $2)    }
+    | 'then' exp 'by' exp                  { LL $ \leftStmts -> (mkTransformByStmt  leftStmts $2 $4) }
+    | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt   leftStmts $4)    }
     | 'then' 'group' 'by' exp 'using' exp  { LL $ \leftStmts -> (mkGroupByUsingStmt leftStmts $4 $6) }
+
+-- Note that 'group' is a special_id, which means that you can enable
+-- TransformListComp while still using Data.List.group. However, this
+-- introduces a shift/reduce conflict. Happy chooses to resolve the conflict
+-- in by choosing the "group by" variant, which is what we want.
 
 -----------------------------------------------------------------------------
 -- Parallel array expressions

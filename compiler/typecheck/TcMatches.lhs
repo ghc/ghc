@@ -540,8 +540,6 @@ tcMcStmt _ (ExprStmt rhs then_op guard_op _) res_ty thing_inside
 
 -- Grouping statements
 --
---   [ body | stmts, then group by e ]
---     ->  e :: t
 --   [ body | stmts, then group by e using f ]
 --     ->  e :: t
 --         f :: forall a. (a -> t) -> m a -> m (m a)

@@ -779,13 +779,10 @@ rnStmt ctxt (L loc (ParStmt segs _ _ _)) thing_inside
 rnStmt ctxt (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = form
                               , trS_using = using })) thing_inside
   = do { -- Rename the 'using' expression in the context before the transform is begun
-         (using', fvs1) <- case form of
-                             GroupFormB -> do { (e,fvs) <- lookupStmtName ctxt groupMName
-                                              ; return (noLoc e, fvs) }
-			     _          -> rnLExpr using
+         (using', fvs1) <- rnLExpr using
 
          -- Rename the stmts and the 'by' expression
-	 -- Keep track of the variables mentioned in the 'by' expression
+         -- Keep track of the variables mentioned in the 'by' expression
        ; ((stmts', (by', used_bndrs, thing)), fvs2) 
              <- rnStmts (TransStmtCtxt ctxt) stmts $ \ bndrs ->
                 do { (by',   fvs_by) <- mapMaybeFvRn rnLExpr by
