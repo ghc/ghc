@@ -66,21 +66,28 @@ initSmpl dflags rules fam_envs us size m
   = case unSM m env us (zeroSimplCount dflags) of 
 	(result, _, count) -> (result, count)
   where
-    -- Compute the max simplifier ticks as
-    --     pgm-size * magic-multiplier * tick-factor/100
-    -- where magic-multiplier is a constant that gives reasonable results
-    max_ticks = fromInteger ((toInteger size * toInteger (simplTickFactor dflags 
-                                                          * magic_multiplier)) 
-                             `div` 100)
+    env = STE { st_flags = dflags, st_rules = rules
+    	      , st_max_ticks = computeMaxTicks dflags size
+              , st_fams = fam_envs }
+
+computeMaxTicks :: DynFlags -> Int -> Int
+-- Compute the max simplifier ticks as
+--     (base-size + pgm-size) * magic-multiplier * tick-factor/100
+-- where 
+--    magic-multiplier is a constant that gives reasonable results
+--    base-size is a constant to deal with size-zero programs
+computeMaxTicks dflags size
+  = fromInteger ((toInteger (size + base_size)
+                  * toInteger (tick_factor * magic_multiplier))
+          `div` 100)
+  where
+    tick_factor      = simplTickFactor dflags 
+    base_size        = 100
     magic_multiplier = 40
 	-- MAGIC NUMBER, multiplies the simplTickFactor
 	-- We can afford to be generous; this is really
 	-- just checking for loops, and shouldn't usually fire
 	-- A figure of 20 was too small: see Trac #553
-
-    env = STE { st_flags = dflags, st_rules = rules
-    	      , st_max_ticks = max_ticks
-              , st_fams = fam_envs }
 
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
