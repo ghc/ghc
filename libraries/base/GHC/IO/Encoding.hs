@@ -176,7 +176,7 @@ char8 = Latin1.latin1
 --
 mkTextEncoding :: String -> IO TextEncoding
 mkTextEncoding e = case mb_coding_failure_mode of
-    Nothing -> unknown_encoding
+    Nothing -> unknownEncodingErr e
     Just cfm -> mkTextEncoding' cfm enc
   where
     -- The only problem with actually documenting //IGNORE and //TRANSLIT as
@@ -188,9 +188,6 @@ mkTextEncoding e = case mb_coding_failure_mode of
         "//TRANSLIT"  -> Just TransliterateCodingFailure
         "//ROUNDTRIP" -> Just RoundtripFailure
         _             -> Nothing
-    
-    unknown_encoding = ioException (IOError Nothing NoSuchThing "mkTextEncoding"
-                                            ("unknown encoding:" ++ e)  Nothing Nothing)
 
 mkTextEncoding' :: CodingFailureMode -> String -> IO TextEncoding
 mkTextEncoding' cfm enc = case [toUpper c | c <- enc, c /= '-'] of
@@ -203,7 +200,7 @@ mkTextEncoding' cfm enc = case [toUpper c | c <- enc, c /= '-'] of
     "UTF32BE" -> return $ UTF32.mkUTF32be cfm
 #if defined(mingw32_HOST_OS)
     'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
-    _ -> unknown_encoding
+    _ -> unknownEncodingErr (enc ++ codingFailureModeSuffix cfm)
 #else
     _ -> Iconv.mkIconvEncoding cfm enc
 #endif
@@ -216,3 +213,6 @@ latin1_decode :: Buffer Word8 -> CharBuffer -> IO (Buffer Word8, CharBuffer)
 latin1_decode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_decode input output
 --latin1_decode = unsafePerformIO $ do mkTextDecoder Iconv.latin1 >>= return.encode
 
+unknownEncodingErr :: String -> IO a    
+unknownEncodingErr e = ioException (IOError Nothing NoSuchThing "mkTextEncoding"
+                                            ("unknown encoding:" ++ e)  Nothing Nothing)
