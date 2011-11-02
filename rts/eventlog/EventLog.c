@@ -62,6 +62,7 @@ char *EventDesc[] = {
   [EVENT_MIGRATE_THREAD]      = "Migrate thread",
   [EVENT_SHUTDOWN]            = "Shutdown",
   [EVENT_THREAD_WAKEUP]       = "Wakeup thread",
+  [EVENT_THREAD_LABEL]        = "Thread label",
   [EVENT_GC_START]            = "Starting GC",
   [EVENT_GC_END]              = "Finished GC",
   [EVENT_REQUEST_SEQ_GC]      = "Request sequential GC",
@@ -332,6 +333,7 @@ initEventLogging(void)
         case EVENT_RTS_IDENTIFIER:   // (capset, str)
         case EVENT_PROGRAM_ARGS:     // (capset, strvec)
         case EVENT_PROGRAM_ENV:      // (capset, strvec)
+        case EVENT_THREAD_LABEL:     // (thread, str)
             eventTypes[t].size = 0xffff;
             break;
 
@@ -789,6 +791,31 @@ void postEventStartup(EventCapNo n_caps)
     postCapNo(&eventBuf, n_caps);
 
     RELEASE_LOCK(&eventBufMutex);
+}
+
+void postThreadLabel(Capability    *cap,
+                     EventThreadID  id,
+                     char          *label)
+{
+    EventsBuf *eb;
+    int strsize = strlen(label);
+    int size = strsize + sizeof(EventCapsetID);
+
+    eb = &capEventBuf[cap->no];
+
+    if (!hasRoomForVariableEvent(eb, size)){
+        printAndClearEventBuf(eb);
+
+        if (!hasRoomForVariableEvent(eb, size)){
+            // Event size exceeds buffer size, bail out:
+            return;
+        }
+    }
+
+    postEventHeader(eb, EVENT_THREAD_LABEL);
+    postPayloadSize(eb, size);
+    postThreadID(eb, id);
+    postBuf(eb, (StgWord8*) label, strsize);
 }
 
 void closeBlockMarker (EventsBuf *ebuf)

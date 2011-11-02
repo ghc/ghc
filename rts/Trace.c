@@ -547,6 +547,24 @@ void traceUserMsg(Capability *cap, char *msg)
     traceFormatUserMsg(cap, "%s", msg);
 }
 
+void traceThreadLabel_(Capability *cap,
+                       StgTSO     *tso,
+                       char       *label)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        ACQUIRE_LOCK(&trace_utx);
+        tracePreface();
+        debugBelch("cap %d: thread %lu has label %s\n",
+                   cap->no, (lnat)tso->id, label);
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        postThreadLabel(cap, tso->id, label);
+    }
+}
+
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
 {
 #ifdef DEBUG
