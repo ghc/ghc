@@ -45,6 +45,7 @@ import qualified GHC.IO.Encoding.UTF8   as UTF8
 import qualified GHC.IO.Encoding.UTF16  as UTF16
 import qualified GHC.IO.Encoding.UTF32  as UTF32
 
+import Data.Char (toUpper)
 import Data.List
 import Data.Maybe
 
@@ -192,14 +193,14 @@ mkTextEncoding e = case mb_coding_failure_mode of
                                             ("unknown encoding:" ++ e)  Nothing Nothing)
 
 mkTextEncoding' :: CodingFailureMode -> String -> IO TextEncoding
-mkTextEncoding' cfm enc = case enc of
-    "UTF-8"    -> return $ UTF8.mkUTF8 cfm
-    "UTF-16"   -> return $ UTF16.mkUTF16 cfm
-    "UTF-16LE" -> return $ UTF16.mkUTF16le cfm
-    "UTF-16BE" -> return $ UTF16.mkUTF16be cfm
-    "UTF-32"   -> return $ UTF32.mkUTF32 cfm
-    "UTF-32LE" -> return $ UTF32.mkUTF32le cfm
-    "UTF-32BE" -> return $ UTF32.mkUTF32be cfm
+mkTextEncoding' cfm enc = case [toUpper c | c <- enc, c /= '-'] of
+    "UTF8"    -> return $ UTF8.mkUTF8 cfm
+    "UTF16"   -> return $ UTF16.mkUTF16 cfm
+    "UTF16LE" -> return $ UTF16.mkUTF16le cfm
+    "UTF16BE" -> return $ UTF16.mkUTF16be cfm
+    "UTF32"   -> return $ UTF32.mkUTF32 cfm
+    "UTF32LE" -> return $ UTF32.mkUTF32le cfm
+    "UTF32BE" -> return $ UTF32.mkUTF32be cfm
 #if defined(mingw32_HOST_OS)
     'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
     _ -> unknown_encoding
