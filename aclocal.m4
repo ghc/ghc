@@ -172,7 +172,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             ;;
         arm)
             GET_ARM_ISA()
-            test -z "[$]2" || eval "[$]2=\"ArchARM \$ARM_ISA \$ARM_ISA_EXT\""
+            test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT}\""
             ;;
         alpha)
             test -z "[$]2" || eval "[$]2=ArchAlpha"
@@ -336,7 +336,7 @@ AC_DEFUN([GET_ARM_ISA],
                 ],
                 [changequote(, )dnl
                  ARM_ISA=ARMv7
-                 ARM_ISA_EXT="[VFPv3, NEON]"
+                 ARM_ISA_EXT="[VFPv3,NEON]"
                  changequote([, ])dnl
                 ])
         ])
