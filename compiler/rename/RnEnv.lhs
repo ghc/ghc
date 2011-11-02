@@ -13,7 +13,7 @@ module RnEnv (
 	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
 
 	lookupFixityRn, lookupTyFixityRn, 
-	lookupInstDeclBndr, lookupSubBndr, 
+	lookupInstDeclBndr, lookupSubBndr, greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
@@ -323,18 +323,26 @@ lookupSubBndr parent doc rdr_name
     -- Note [Usage for sub-bndrs]
     used_rdr_name gre
       | isQual rdr_name = rdr_name
-      | otherwise       = case gre_prov gre of
-                            LocalDef    -> rdr_name
-			    Imported is -> used_rdr_name_from_is is
+      | otherwise       = greRdrName gre
+
+greRdrName :: GlobalRdrElt -> RdrName
+greRdrName gre
+  = case gre_prov gre of
+      LocalDef    -> unqual_rdr
+      Imported is -> used_rdr_name_from_is is
+
+  where 
+    occ = nameOccName (gre_name gre)
+    unqual_rdr = mkRdrUnqual occ
 
     used_rdr_name_from_is imp_specs	-- rdr_name is unqualified
       | not (all (is_qual . is_decl) imp_specs) 
-      = rdr_name    -- An unqualified import is available
+      = unqual_rdr  -- An unqualified import is available
       | otherwise
       = 	    -- Only qualified imports available, so make up 
 		    -- a suitable qualifed name from the first imp_spec
         ASSERT( not (null imp_specs) )
-        mkRdrQual (is_as (is_decl (head imp_specs))) (rdrNameOcc rdr_name)
+        mkRdrQual (is_as (is_decl (head imp_specs))) occ
 
 lookupSubBndrGREs :: GlobalRdrEnv -> Parent -> RdrName -> [GlobalRdrElt]
 -- If Parent = NoParent, just do a normal lookup

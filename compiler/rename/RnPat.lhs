@@ -509,31 +509,37 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
            ; let present_flds = getFieldIds flds
                  parent_tc = find_tycon rdr_env con
 
-                   -- Only fill in fields whose selectors are in scope (somehow)
-	         fld_in_scope fld = not (null (lookupGRE_Name rdr_env fld))
-
-                   -- For constructor uses, the arg should be in scope (unqualified)
+                   -- For constructor uses (but not patterns)
+                   -- the arg should be in scope (unqualified)
 		   -- ignoring the record field itself
 		   -- Eg.  data R = R { x,y :: Int }
                    --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
-		 arg_in_scope rdr = rdr `elemLocalRdrEnv` lcl_env
-                                 || notNull [ gre | gre <- lookupGRE_RdrName rdr rdr_env
-                                                  , case gre_par gre of
-                                                      ParentIs p -> p /= parent_tc
-                                                      _          -> True ]
+		 arg_in_scope fld 
+                   = rdr `elemLocalRdrEnv` lcl_env
+                   || notNull [ gre | gre <- lookupGRE_RdrName rdr rdr_env
+                                    , case gre_par gre of
+                                        ParentIs p -> p /= parent_tc
+                                        _          -> True ]
+                   where
+                     rdr = mkRdrUnqual (nameOccName fld)
 
+                 dot_dot_gres = [ gre 
+                                | fld <- con_fields
+                                , not (fld `elem` present_flds)
+                                , let gres@(gre:_) = lookupGRE_Name rdr_env fld
+                                , not (null gres)
+                                , case ctxt of
+                                    HsRecFieldCon {} -> arg_in_scope fld
+                                    _other           -> True ] 
+
+           ; addUsedRdrNames (map greRdrName dot_dot_gres)
            ; return [ HsRecField
-                              { hsRecFieldId = loc_f
-                              , hsRecFieldArg = L loc (mk_arg arg_rdr)
-                              , hsRecPun = False }
-                    | f <- con_fields
-		    , let loc_f = L loc f 
-		          arg_rdr = mkRdrUnqual (nameOccName f)
-		    , not (f `elem` present_flds)
-		    , fld_in_scope f
-                    , case ctxt of
-                        HsRecFieldCon {} -> arg_in_scope arg_rdr
-                        _other           -> True ] }
+                        { hsRecFieldId  = L loc fld
+                        , hsRecFieldArg = L loc (mk_arg arg_rdr)
+                        , hsRecPun      = False }
+                    | gre <- dot_dot_gres
+		    , let fld     = gre_name gre
+		          arg_rdr = mkRdrUnqual (nameOccName fld) ] }
 
     check_disambiguation :: Bool -> Maybe Name -> RnM Parent
     -- When disambiguation is on, 
