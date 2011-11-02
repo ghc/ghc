@@ -67,7 +67,7 @@
 #else
 #error Cannot cope with WORD_SIZE_IN_BITS being nether 32 nor 64
 #endif
-#define BCO_GET_LARGE_ARG ((bci & bci_FLAG_LARGE_ARGS) ? BCO_NEXT_WORD : BCO_NEXT)
+#define BCO_GET_LARGE_ARG ((bci & bci_FLAG_LARGE_ARGS) ? BCO_READ_NEXT_WORD : BCO_NEXT)
 
 #define BCO_PTR(n)    (W_)ptrs[n]
 #define BCO_LIT(n)    literals[n]
@@ -804,7 +804,7 @@ run_BCO:
 		 //printStack(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
 		 //debugBelch("-- END stack\n\n");
 		 //}
-		 debugBelch("Sp = %p   pc = %d      ", Sp, bciPtr);
+                 debugBelch("Sp = %p   pc = %-4d ", Sp, bciPtr);
 		 disInstr(bco,bciPtr);
 		 if (0) { int i;
 		 debugBelch("\n");
