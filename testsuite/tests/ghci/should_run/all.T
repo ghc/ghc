@@ -16,3 +16,5 @@ test('3171',
       req_interp],
      run_command,
      ['$MAKE -s --no-print-directory 3171'])
+
+test('ghcirun004', just_ghci, compile_and_run, [''])
