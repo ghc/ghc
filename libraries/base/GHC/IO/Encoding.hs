@@ -35,6 +35,7 @@ import GHC.IO.Encoding.Types
 import GHC.Word
 #if !defined(mingw32_HOST_OS)
 import qualified GHC.IO.Encoding.Iconv  as Iconv
+import System.IO.Unsafe (unsafePerformIO)
 #else
 import qualified GHC.IO.Encoding.CodePage as CodePage
 import Text.Read (reads)
@@ -117,13 +118,23 @@ fileSystemEncoding :: TextEncoding
 foreignEncoding :: TextEncoding
 
 #if !defined(mingw32_HOST_OS)
-localeEncoding = Iconv.localeEncoding
-fileSystemEncoding = Iconv.mkLocaleEncoding RoundtripFailure
-foreignEncoding = Iconv.mkLocaleEncoding IgnoreCodingFailure
+-- It is rather important that we don't just call Iconv.mkIconvEncoding here
+-- because some iconvs (in particular GNU iconv) will brokenly UTF-8 encode
+-- lone surrogates without complaint.
+--
+-- By going through our Haskell implementations of those encodings, we are
+-- guaranteed to catch such errors.
+--
+-- FIXME: this is not a complete solution because if the locale encoding is one
+-- which we don't have a Haskell-side decoder for, iconv might still ignore the
+-- lone surrogate in the input.
+localeEncoding     = unsafePerformIO $ mkTextEncoding' ErrorOnCodingFailure Iconv.localeEncodingName
+fileSystemEncoding = unsafePerformIO $ mkTextEncoding' RoundtripFailure     Iconv.localeEncodingName
+foreignEncoding    = unsafePerformIO $ mkTextEncoding' IgnoreCodingFailure  Iconv.localeEncodingName
 #else
-localeEncoding = CodePage.localeEncoding
+localeEncoding     = CodePage.localeEncoding
 fileSystemEncoding = CodePage.mkLocaleEncoding RoundtripFailure
-foreignEncoding = CodePage.mkLocaleEncoding IgnoreCodingFailure
+foreignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
 #endif
 
 -- | An encoding in which Unicode code points are translated to bytes
@@ -164,21 +175,8 @@ char8 = Latin1.latin1
 --
 mkTextEncoding :: String -> IO TextEncoding
 mkTextEncoding e = case mb_coding_failure_mode of
-  Nothing -> unknown_encoding
-  Just cfm -> case enc of
-    "UTF-8"    -> return $ UTF8.mkUTF8 cfm
-    "UTF-16"   -> return $ UTF16.mkUTF16 cfm
-    "UTF-16LE" -> return $ UTF16.mkUTF16le cfm
-    "UTF-16BE" -> return $ UTF16.mkUTF16be cfm
-    "UTF-32"   -> return $ UTF32.mkUTF32 cfm
-    "UTF-32LE" -> return $ UTF32.mkUTF32le cfm
-    "UTF-32BE" -> return $ UTF32.mkUTF32be cfm
-#if defined(mingw32_HOST_OS)
-    'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
-    _ -> unknown_encoding
-#else
-    _ -> Iconv.mkIconvEncoding cfm enc
-#endif
+    Nothing -> unknown_encoding
+    Just cfm -> mkTextEncoding' cfm enc
   where
     -- The only problem with actually documenting //IGNORE and //TRANSLIT as
     -- supported suffixes is that they are not necessarily supported with non-GNU iconv
@@ -192,6 +190,22 @@ mkTextEncoding e = case mb_coding_failure_mode of
     
     unknown_encoding = ioException (IOError Nothing NoSuchThing "mkTextEncoding"
                                             ("unknown encoding:" ++ e)  Nothing Nothing)
+
+mkTextEncoding' :: CodingFailureMode -> String -> IO TextEncoding
+mkTextEncoding' cfm enc = case enc of
+    "UTF-8"    -> return $ UTF8.mkUTF8 cfm
+    "UTF-16"   -> return $ UTF16.mkUTF16 cfm
+    "UTF-16LE" -> return $ UTF16.mkUTF16le cfm
+    "UTF-16BE" -> return $ UTF16.mkUTF16be cfm
+    "UTF-32"   -> return $ UTF32.mkUTF32 cfm
+    "UTF-32LE" -> return $ UTF32.mkUTF32le cfm
+    "UTF-32BE" -> return $ UTF32.mkUTF32be cfm
+#if defined(mingw32_HOST_OS)
+    'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
+    _ -> unknown_encoding
+#else
+    _ -> Iconv.mkIconvEncoding cfm enc
+#endif
 
 latin1_encode :: CharBuffer -> Buffer Word8 -> IO (CharBuffer, Buffer Word8)
 latin1_encode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_encode input output -- unchecked, used for char8

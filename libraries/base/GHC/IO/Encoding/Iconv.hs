@@ -23,7 +23,7 @@
 module GHC.IO.Encoding.Iconv (
 #if !defined(mingw32_HOST_OS)
    iconvEncoding, mkIconvEncoding,
-   localeEncoding, mkLocaleEncoding
+   localeEncodingName
 #endif
  ) where
 
@@ -64,12 +64,6 @@ localeEncodingName = unsafePerformIO $ do
    -- if we have either of them.
    cstr <- c_localeEncoding
    peekCAString cstr -- Assume charset names are ASCII
-
-localeEncoding :: TextEncoding
-localeEncoding = mkLocaleEncoding ErrorOnCodingFailure
-
-mkLocaleEncoding :: CodingFailureMode -> TextEncoding
-mkLocaleEncoding cfm = unsafePerformIO $ mkIconvEncoding cfm localeEncodingName
 
 -- We hope iconv_t is a storable type.  It should be, since it has at least the
 -- value -1, which is a possible return value from iconv_open.
