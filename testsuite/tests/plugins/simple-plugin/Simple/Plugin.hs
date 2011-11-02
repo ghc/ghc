@@ -75,7 +75,7 @@ changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in ca
         Let bind e -> liftM2 Let (changeBind anns mb_replacement bind) (go e)
         Case e b ty alts -> liftM4 Case (go e) (return b) (return ty) (mapM (changeAlt anns mb_replacement) alts)
         Cast e coerce -> liftM2 Cast (go e) (return coerce)
-        Note note e -> liftM (Note note) (go e)
+        Tick t e -> liftM (Tick t) (go e)
         _ -> return e
 
 changeAlt :: UniqFM [ReplaceWith] -> Maybe String -> CoreAlt -> CoreM CoreAlt
