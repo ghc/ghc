@@ -1038,25 +1038,35 @@ simplTick env tickish expr cont
   --
 
   -- For breakpoints, we cannot do any floating of bindings around the
-  -- tick.  So
+  -- tick, because breakpoints cannot be split into tick/scope pairs.
   | Breakpoint{} <- tickish
-  = do { (env', expr') <- simplExprF (zapFloats env) expr mkBoringStop
+  = do { let (inc,outc) = splitCont cont
+       ; (env', expr') <- simplExprF (zapFloats env) expr inc
        ; let tickish' = simplTickish env tickish
-       ; (env'', expr'') <- rebuild (zapFloats env') (wrapFloats env' expr') (TickIt tickish' cont)
+       ; (env'', expr'') <- rebuild (zapFloats env') (wrapFloats env' expr') (TickIt tickish' outc)
        ; return (env'', wrapFloats env expr'')
        }
 
   | otherwise
-  = do { (env', expr') <- simplExprF (zapFloats env) expr mkBoringStop
+  = do { let (inc,outc) = splitCont cont
+       ; (env', expr') <- simplExprF (zapFloats env) expr inc
        ; let tickish' = simplTickish env tickish
        ; let env'' = addFloats env (mapFloatRhss env' (mkTick (mkNoTick tickish')))
-       ; rebuild env'' expr' (TickIt tickish' cont)
+       ; rebuild env'' expr' (TickIt tickish' outc)
        }
  where
   simplTickish env tickish
     | Breakpoint n ids <- tickish
           = Breakpoint n (map (getDoneId . substId env) ids)
     | otherwise = tickish
+
+  -- push type application and coercion inside a tick
+  splitCont :: SimplCont -> (SimplCont, SimplCont)
+  splitCont (ApplyTo f (Type t) env c) = (ApplyTo f (Type t) env inc, outc)
+    where (inc,outc) = splitCont c
+  splitCont (CoerceIt co c) = (CoerceIt co inc, outc)
+    where (inc,outc) = splitCont c
+  splitCont other = (mkBoringStop, other)
 
   getDoneId (DoneId id) = id
   getDoneId (DoneEx e)  = getIdFromTrivialExpr e -- Note [substTickish] in CoreSubst
