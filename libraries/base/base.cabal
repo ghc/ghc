@@ -131,7 +131,6 @@ Library {
         Control.Monad.ST.Lazy.Safe,
         Control.Monad.ST.Lazy.Unsafe,
         Control.Monad.ST.Strict,
-        Control.Monad.Group
         Control.Monad.Zip
         Data.Bits,
         Data.Bool,
