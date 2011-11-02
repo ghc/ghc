@@ -143,11 +143,13 @@ fixTables ss = fixed
     have been pushed, so sub 4). GHC though since it always uses jumps keeps
     the stack 16 byte aligned on both function calls and function entry.
 
-    We correct the alignment here.
+    We correct the alignment here for Mac OS X i386. The x86_64 target already
+    has the correct alignment since we keep the stack 16+8 aligned throughout
+    STG land for 64-bit targets.
 -}
 fixupStack :: B.ByteString -> B.ByteString -> B.ByteString
 
-#if !darwin_TARGET_OS
+#if !darwin_TARGET_OS || x86_64_TARGET_ARCH
 fixupStack = const
 
 #else

@@ -267,29 +267,36 @@ StgRunIsImplementedInAssembler(void)
 	"addq %0, %%rsp\n\t"
 	"retq"
 
-	: : "i"(RESERVED_C_STACK_BYTES+48+8 /*stack frame size*/));
+	: : "i"(RESERVED_C_STACK_BYTES+48 /*stack frame size*/));
     /* 
-       HACK alert!
-
-       The x86_64 ABI specifies that on a procedure call, %rsp is
+       The x86_64 ABI specifies that on entry to a procedure, %rsp is
        aligned on a 16-byte boundary + 8.  That is, the first
        argument on the stack after the return address will be
-       16-byte aligned.  
-       
-       Which should be fine: RESERVED_C_STACK_BYTES+48 is a multiple
-       of 16 bytes.  
-       
-       BUT... when we do a C-call from STG land, gcc likes to put the
-       stack alignment adjustment in the prolog.  eg. if we're calling
-       a function with arguments in regs, gcc will insert 'subq $8,%rsp'
-       in the prolog, to keep %rsp aligned (the return address is 8
-       bytes, remember).  The mangler throws away the prolog, so we
-       lose the stack alignment.
+       16-byte aligned.
 
-       The hack is to add this extra 8 bytes to our %rsp adjustment
-       here, so that throughout STG code, %rsp is 16-byte aligned,
-       ready for a C-call.  
+       We maintain the 16+8 stack alignment throughout the STG code.
 
+       When we call STG_RUN the stack will be aligned to 16+8. We used
+       to subtract an extra 8 bytes so that %rsp would be 16 byte
+       aligned at all times in STG land. This worked fine for the
+       native code generator which knew that the stack was already
+       aligned on 16 bytes when it generated calls to C functions.
+
+       This arrangemnt caused problems for the LLVM backend. The LLVM
+       code generator would assume that on entry to each function the
+       stack is aligned to 16+8 as required by the ABI. However, since
+       we only enter STG functions by jumping to them with tail calls,
+       the stack was actually aligned to a 16-byte boundary. The LLVM
+       backend had its own mangler that would post-process the
+       assembly code to fixup the stack manipulation code to mainain
+       the correct alignment (see #4211).
+
+       Therefore, we now now keep the stack aligned to 16+8 while in
+       STG land so that LLVM generates correct code without any
+       mangling. The native code generator can handle this alignment
+       just fine by making sure the stack is aligned to a 16-byte
+       boundary before it makes a C-call.
+       
        A quick way to see if this is wrong is to compile this code:
 
           main = System.Exit.exitWith ExitSuccess
@@ -300,7 +307,6 @@ StgRunIsImplementedInAssembler(void)
        stack isn't aligned, and calling exitWith from Haskell invokes
        shutdownHaskellAndExit using a C call.
 
-       Future gcc releases will almost certainly break this hack...
     */
 }
 
