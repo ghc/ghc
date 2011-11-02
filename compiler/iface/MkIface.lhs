@@ -234,7 +234,8 @@ mkIface_ hsc_env maybe_old_fingerprint
 --	put exactly the info into the TypeEnv that we want
 --	to expose in the interface
 
-  = do	{ usages <- mkUsageInfo hsc_env this_mod dir_imp_mods used_names
+  = do	{ usages  <- mkUsageInfo hsc_env this_mod dir_imp_mods used_names
+        ; safeInf <- hscGetSafeInf hsc_env
 
 	; let	{ entities = typeEnvElts type_env ;
                   decls  = [ tyThingToIfaceDecl entity
@@ -253,7 +254,10 @@ mkIface_ hsc_env maybe_old_fingerprint
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
                 ; iface_vect_info = flattenVectInfo vect_info
-                ; trust_info  = (setSafeMode . safeHaskell) dflags
+                ; safeMode    = if safeInferOn dflags  && not safeInf
+                                    then Sf_None
+                                    else safeHaskell dflags
+                ; trust_info  = setSafeMode safeMode
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
