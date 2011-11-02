@@ -136,13 +136,29 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
           | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
          label_env = mkLabelEnv Map.empty lableInitialOffset instrs
 
+         n_instrs = length instrs :: Int
+         max_w16s = fromIntegral n_instrs * maxInstr16s :: Word
+
+         -- Jump instructions are variable-sized, there are long and
+         -- short variants depending on the magnitude of the offset.
+         -- However, we can't tell what size instructions we will need
+         -- until we have calculated the offsets of the labels, which
+         -- depends on the size of the instructions...  We could
+         -- repeat the calculation and hope to reach a fixpoint, but
+         -- instead we just calculate the worst-case size and use that
+         -- to decide whether *all* the jumps in this BCO will be long
+         -- or short.
+
+         -- True => all our jumps will be long
+         large_bco = if isLarge max_w16s then pprTrace "assembleBCO" (text "LARGE!") True else False
+
          mkLabelEnv :: Map Word16 Word -> Word -> [BCInstr]
                     -> Map Word16 Word
          mkLabelEnv env _ [] = env
          mkLabelEnv env i_offset (i:is)
             = let new_env
                      = case i of LABEL n -> Map.insert n i_offset env ; _ -> env
-              in  mkLabelEnv new_env (i_offset + instrSize16s i) is
+              in  mkLabelEnv new_env (i_offset + instrSize16s i large_bco) is
 
          findLabel :: Word16 -> Word
          findLabel lab
@@ -156,7 +172,7 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
          ptrs  <- return emptySS :: IO (SizedSeq BCOPtr)
          let init_asm_state = (insns,lits,ptrs)
          (final_insns, final_lits, final_ptrs)
-            <- mkBits dflags findLabel init_asm_state instrs
+            <- mkBits dflags large_bco findLabel init_asm_state instrs
 
          let asm_insns = ssElts final_insns
              n_insns   = sizeSS final_insns
@@ -231,20 +247,28 @@ largeArg w
               fromIntegral w]
  | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
 
+largeArg16s :: Word
+largeArg16s | wORD_SIZE_IN_BITS == 64  = 4
+            | otherwise                = 2
+
 -- This is where all the action is (pass 2 of the assembler)
 mkBits :: DynFlags
+       -> Bool                          -- jumps are long
        -> (Word16 -> Word)              -- label finder
        -> AsmState
        -> [BCInstr]                     -- instructions (in)
        -> IO AsmState
 
-mkBits dflags findLabel st proto_insns
+mkBits dflags long_jumps findLabel st proto_insns
   = foldM doInstr st proto_insns
     where
        doInstr :: AsmState -> BCInstr -> IO AsmState
        doInstr st i
           = case i of
-               STKCHECK  n -> instr1Large st bci_STKCHECK n
+               STKCHECK  n
+                  | isLarge n  -> instrn st (largeArgInstr bci_STKCHECK : largeArg n)
+                  | otherwise  -> instr2 st bci_STKCHECK (fromIntegral n)
+
                PUSH_L    o1       -> instr2 st bci_PUSH_L o1
                PUSH_LL   o1 o2    -> instr3 st bci_PUSH_LL o1 o2
                PUSH_LLL  o1 o2 o3 -> instr4 st bci_PUSH_LLL o1 o2 o3
@@ -292,26 +316,26 @@ mkBits dflags findLabel st proto_insns
                                         instr3 st2 bci_PACK itbl_no sz
                LABEL     _        -> return st
                TESTLT_I  i l      -> do (np, st2) <- int st i
-                                        instr2Large st2 bci_TESTLT_I np (findLabel l)
+                                        jumpInstr2 st2 bci_TESTLT_I np (findLabel l)
                TESTEQ_I  i l      -> do (np, st2) <- int st i
-                                        instr2Large st2 bci_TESTEQ_I np (findLabel l)
+                                        jumpInstr2 st2 bci_TESTEQ_I np (findLabel l)
                TESTLT_W  w l      -> do (np, st2) <- word st w
-                                        instr2Large st2 bci_TESTLT_W np (findLabel l)
+                                        jumpInstr2 st2 bci_TESTLT_W np (findLabel l)
                TESTEQ_W  w l      -> do (np, st2) <- word st w
-                                        instr2Large st2 bci_TESTEQ_W np (findLabel l)
+                                        jumpInstr2 st2 bci_TESTEQ_W np (findLabel l)
                TESTLT_F  f l      -> do (np, st2) <- float st f
-                                        instr2Large st2 bci_TESTLT_F np (findLabel l)
+                                        jumpInstr2 st2 bci_TESTLT_F np (findLabel l)
                TESTEQ_F  f l      -> do (np, st2) <- float st f
-                                        instr2Large st2 bci_TESTEQ_F np (findLabel l)
+                                        jumpInstr2 st2 bci_TESTEQ_F np (findLabel l)
                TESTLT_D  d l      -> do (np, st2) <- double st d
-                                        instr2Large st2 bci_TESTLT_D np (findLabel l)
+                                        jumpInstr2 st2 bci_TESTLT_D np (findLabel l)
                TESTEQ_D  d l      -> do (np, st2) <- double st d
-                                        instr2Large st2 bci_TESTEQ_D np (findLabel l)
-               TESTLT_P  i l      -> instr2Large st bci_TESTLT_P i (findLabel l)
-               TESTEQ_P  i l      -> instr2Large st bci_TESTEQ_P i (findLabel l)
+                                        jumpInstr2 st2 bci_TESTEQ_D np (findLabel l)
+               TESTLT_P  i l      -> jumpInstr2 st bci_TESTLT_P i (findLabel l)
+               TESTEQ_P  i l      -> jumpInstr2 st bci_TESTEQ_P i (findLabel l)
                CASEFAIL           -> instr1 st bci_CASEFAIL
                SWIZZLE   stkoff n -> instr3 st bci_SWIZZLE stkoff n
-               JMP       l        -> instr1Large st bci_JMP (findLabel l)
+               JMP       l        -> jumpInstr1 st bci_JMP (findLabel l)
                ENTER              -> instr1 st bci_ENTER
                RETURN             -> instr1 st bci_RETURN
                RETURN_UBX rep     -> instr1 st (return_ubx rep)
@@ -328,13 +352,13 @@ mkBits dflags findLabel st proto_insns
           = do st_i' <- addToSS st_i i
                instrn (st_i', st_l, st_p) is
 
-       instr1Large st i1 large
-        | large > 65535 = instrn st (largeArgInstr i1 : largeArg large)
-        | otherwise = instr2 st i1 (fromIntegral large)
+       jumpInstr1 st i1 i2
+            | long_jumps = instrn st (largeArgInstr i1 : largeArg i2)
+            | otherwise  = instr2 st i1 (fromIntegral i2)
 
-       instr2Large st i1 i2 large
-        | large > 65535 = instrn st (largeArgInstr i1 : i2 : largeArg large)
-        | otherwise = instr3 st i1 i2 (fromIntegral large)
+       jumpInstr2 st i1 i2 i3
+           | long_jumps = instrn st (largeArgInstr i1 : i2 : largeArg i3)
+           | otherwise  = instr3 st i1 i2 (fromIntegral i3)
 
        instr1 (st_i0,st_l0,st_p0) i1
           = do st_i1 <- addToSS st_i0 i1
@@ -416,6 +440,8 @@ mkBits dflags findLabel st proto_insns
        literal st (MachWord64 ii)  = int64 st (fromIntegral ii)
        literal _  other            = pprPanic "ByteCodeAsm.literal" (ppr other)
 
+isLarge :: Word -> Bool
+isLarge n = n > 65535
 
 push_alts :: CgRep -> Word16
 push_alts NonPtrArg = bci_PUSH_ALTS_N
@@ -435,10 +461,10 @@ return_ubx PtrArg    = bci_RETURN_P
 
 
 -- The size in 16-bit entities of an instruction.
-instrSize16s :: BCInstr -> Word
-instrSize16s instr
+instrSize16s :: BCInstr -> Bool -> Word
+instrSize16s instr long_jumps
    = case instr of
-        STKCHECK{}              -> 2
+        STKCHECK n              -> if isLarge n then 1 + largeArg16s else 2
         PUSH_L{}                -> 2
         PUSH_LL{}               -> 3
         PUSH_LLL{}              -> 4
@@ -468,17 +494,17 @@ instrSize16s instr
         UNPACK{}                -> 2
         PACK{}                  -> 3
         LABEL{}                 -> 0    -- !!
-        TESTLT_I{}              -> 3
-        TESTEQ_I{}              -> 3
-        TESTLT_W{}              -> 3
-        TESTEQ_W{}              -> 3
-        TESTLT_F{}              -> 3
-        TESTEQ_F{}              -> 3
-        TESTLT_D{}              -> 3
-        TESTEQ_D{}              -> 3
-        TESTLT_P{}              -> 3
-        TESTEQ_P{}              -> 3
-        JMP{}                   -> 2
+        TESTLT_I{}              -> 2 + jump
+        TESTEQ_I{}              -> 2 + jump
+        TESTLT_W{}              -> 2 + jump
+        TESTEQ_W{}              -> 2 + jump
+        TESTLT_F{}              -> 2 + jump
+        TESTEQ_F{}              -> 2 + jump
+        TESTLT_D{}              -> 2 + jump
+        TESTEQ_D{}              -> 2 + jump
+        TESTLT_P{}              -> 2 + jump
+        TESTEQ_P{}              -> 2 + jump
+        JMP{}                   -> 1 + jump
         CASEFAIL{}              -> 1
         ENTER{}                 -> 1
         RETURN{}                -> 1
@@ -486,6 +512,13 @@ instrSize16s instr
         CCALL{}                 -> 4
         SWIZZLE{}               -> 3
         BRK_FUN{}               -> 4
+  where
+    jump | long_jumps = largeArg16s
+         | otherwise  = 1
+
+-- The biggest instruction in Word16s
+maxInstr16s :: Word
+maxInstr16s = 2 + largeArg16s -- LARGE TESTLT_I = 2 + largeArg16s
 
 -- Make lists of host-sized words for literals, so that when the
 -- words are placed in memory at increasing addresses, the
