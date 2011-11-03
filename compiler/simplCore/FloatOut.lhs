@@ -440,7 +440,9 @@ partitionByMajorLevel.
 \begin{code}
 data FloatBind 
   = FloatLet FloatLet  
-  | FloatCase CoreExpr Id DataCon [Var]       -- case e of y { C ys -> ... }
+  | FloatCase CoreExpr Id DataCon [Var]
+      -- case e of y { C ys -> ... }
+      -- See Note [Floating cases] in SetLevels
 
 type FloatLet = CoreBind	-- INVARIANT: a FloatLet is always lifted
 type MajorEnv = M.IntMap MinorEnv	  -- Keyed by major level

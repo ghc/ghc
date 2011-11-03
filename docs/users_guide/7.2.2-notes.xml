@@ -11,6 +11,14 @@
   <itemizedlist>
     <listitem>
       <para>
+        An optimiser bug
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5453">#5453</ulink>)
+        which can cause segfaults has been fixed.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
         A native code generator bug
         (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5393">#5393</ulink>)
         which can cause segfaults on x86 and
