@@ -254,7 +254,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   let simple = isSimplePatBind funBind
       toplev = null decl_path
       exported = idName id `elemNameSet` exported_names
-      inline   = pprTrace "inline" (ppr id <+> ppr (idInlinePragma id)) $ isAnyInlinePragma (idInlinePragma id)
+      inline   = {- pprTrace "inline" (ppr id <+> ppr (idInlinePragma id)) $ -}
+                 isAnyInlinePragma (idInlinePragma id)
 
   tick <- if not blackListed &&
                shouldTickBind density toplev exported simple inline
