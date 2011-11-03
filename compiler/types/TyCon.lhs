@@ -97,7 +97,7 @@ import FastString
 import Constants
 import Util
 import qualified Data.Data as Data
-import Data.Typeable hiding (TyCon)
+import Data.Typeable (Typeable)
 \end{code}
 
 -----------------------------------------------
