@@ -136,9 +136,6 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
           | otherwise = error "wORD_SIZE_IN_BITS not 32 or 64?"
          label_env = mkLabelEnv Map.empty lableInitialOffset instrs
 
-         n_instrs = length instrs :: Int
-         max_w16s = fromIntegral n_instrs * maxInstr16s :: Word
-
          -- Jump instructions are variable-sized, there are long and
          -- short variants depending on the magnitude of the offset.
          -- However, we can't tell what size instructions we will need
@@ -150,7 +147,8 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced)
          -- or short.
 
          -- True => all our jumps will be long
-         large_bco = if isLarge max_w16s then pprTrace "assembleBCO" (text "LARGE!") True else False
+         large_bco = isLarge max_w16s
+            where max_w16s = fromIntegral (length instrs) * maxInstr16s :: Word
 
          mkLabelEnv :: Map Word16 Word -> Word -> [BCInstr]
                     -> Map Word16 Word
