@@ -604,6 +604,12 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
 
       MO_V_Insert {}  -> needLlvm
       MO_V_Extract {} -> needLlvm
+      MO_V_Add {}     -> needLlvm
+      MO_V_Sub {}     -> needLlvm
+      MO_V_Mul {}     -> needLlvm
+      MO_VS_Quot {}   -> needLlvm
+      MO_VS_Rem {}    -> needLlvm
+      MO_VS_Neg {}    -> needLlvm
       MO_VF_Add {}    -> needLlvm
       MO_VF_Sub {}    -> needLlvm
       MO_VF_Mul {}    -> needLlvm
@@ -704,6 +710,12 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
       MO_V_Insert {}  -> needLlvm
       MO_V_Extract {} -> needLlvm
+      MO_V_Add {}     -> needLlvm
+      MO_V_Sub {}     -> needLlvm
+      MO_V_Mul {}     -> needLlvm
+      MO_VS_Quot {}   -> needLlvm
+      MO_VS_Rem {}    -> needLlvm
+      MO_VS_Neg {}    -> needLlvm
       MO_VF_Add {}    -> needLlvm
       MO_VF_Sub {}    -> needLlvm
       MO_VF_Mul {}    -> needLlvm
@@ -2712,6 +2724,12 @@ sse2NegCode w x = do
 isVecExpr :: CmmExpr -> Bool
 isVecExpr (CmmMachOp (MO_V_Insert {}) _)  = True
 isVecExpr (CmmMachOp (MO_V_Extract {}) _) = True
+isVecExpr (CmmMachOp (MO_V_Add {}) _)     = True
+isVecExpr (CmmMachOp (MO_V_Sub {}) _)     = True
+isVecExpr (CmmMachOp (MO_V_Mul {}) _)     = True
+isVecExpr (CmmMachOp (MO_VS_Quot {}) _)   = True
+isVecExpr (CmmMachOp (MO_VS_Rem {}) _)    = True
+isVecExpr (CmmMachOp (MO_VS_Neg {}) _)    = True
 isVecExpr (CmmMachOp (MO_VF_Add {}) _)    = True
 isVecExpr (CmmMachOp (MO_VF_Sub {}) _)    = True
 isVecExpr (CmmMachOp (MO_VF_Mul {}) _)    = True

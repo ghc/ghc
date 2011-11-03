@@ -2297,6 +2297,104 @@ primop  WriteOffAddrOp_FloatAsFloatX4 "writeFloatOffAddrAsFloatX4#" GenPrimOp
         can_fail = True
 
 ------------------------------------------------------------------------
+section "Int32 SIMD Vectors" 
+	{Operations on SIMD vectors of 4 32-bit signed integers.}
+------------------------------------------------------------------------
+
+primtype Int32X4#
+
+primop Int32ToInt32X4Op "int32ToInt32X4#" GenPrimOp     
+   INT32 -> Int32X4#
+
+primop Int32X4InsertOp "insertInt32X4#" GenPrimOp     
+   Int32X4# -> INT32 -> Int# -> Int32X4#
+   with can_fail = True
+
+primop Int32X4PackOp "packInt32X4#" GenPrimOp         
+   INT32 -> INT32 -> INT32 -> INT32 -> Int32X4#
+
+primop Int32X4UnpackOp "unpackInt32X4#" GenPrimOp         
+   Int32X4# -> (# INT32, INT32, INT32, INT32 #)
+
+primop Int32X4AddOp "plusInt32X4#" Dyadic            
+   Int32X4# -> Int32X4# -> Int32X4#
+   with commutable = True
+
+primop Int32X4SubOp "minusInt32X4#" Dyadic
+  Int32X4# -> Int32X4# -> Int32X4#
+
+primop Int32X4MulOp "timesInt32X4#" Dyadic    
+   Int32X4# -> Int32X4# -> Int32X4#
+   with commutable = True
+
+primop Int32X4QuotOp "quotInt32X4#" Dyadic  
+   Int32X4# -> Int32X4# -> Int32X4#
+   with can_fail = True
+   
+primop Int32X4RemOp "remInt32X4#" Dyadic  
+   Int32X4# -> Int32X4# -> Int32X4#
+   with can_fail = True
+
+primop Int32X4NegOp "negateInt32X4#" Monadic
+   Int32X4# -> Int32X4#
+
+primop IndexByteArrayOp_Int32X4 "indexInt32X4Array#" GenPrimOp
+   ByteArray# -> Int# -> Int32X4#
+   with can_fail = True
+
+primop ReadByteArrayOp_Int32X4 "readInt32X4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_Int32X4 "writeInt32X4Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_Int32X4 "indexInt32X4OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int32X4#
+   with can_fail = True
+
+primop ReadOffAddrOp_Int32X4 "readInt32X4OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteOffAddrOp_Int32X4 "writeInt32X4OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexByteArrayOp_Int32AsInt32X4 "indexInt32ArrayAsInt32X4#" GenPrimOp
+   ByteArray# -> Int# -> Int32X4#
+   with can_fail = True
+
+primop ReadByteArrayOp_Int32AsInt32X4 "readInt32ArrayAsInt32X4#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_Int32AsInt32X4 "writeInt32ArrayAsInt32X4#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_Int32AsInt32X4 "indexInt32OffAddrAsInt32X4#" GenPrimOp
+   Addr# -> Int# -> Int32X4#
+   with can_fail = True
+
+primop ReadOffAddrOp_Int32AsInt32X4 "readInt32OffAddrAsInt32X4#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int32X4# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteOffAddrOp_Int32AsInt32X4 "writeInt32OffAddrAsInt32X4#" GenPrimOp
+   Addr# -> Int# -> Int32X4# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+   
+------------------------------------------------------------------------
 ---                                                                  ---
 ------------------------------------------------------------------------
 

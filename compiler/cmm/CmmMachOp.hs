@@ -107,6 +107,16 @@ data MachOp
   -- Vector element insertion and extraction operations
   | MO_V_Insert  Length Width   -- Insert scalar into vector
   | MO_V_Extract Length Width   -- Extract scalar from vector
+  
+  -- Integer vector operations
+  | MO_V_Add Length Width  
+  | MO_V_Sub Length Width  
+  | MO_V_Mul Length Width
+
+  -- Signed vector multiply/divide
+  | MO_VS_Quot Length Width
+  | MO_VS_Rem  Length Width
+  | MO_VS_Neg  Length Width
 
   -- Floating point vector operations
   | MO_VF_Add  Length Width  
@@ -352,6 +362,14 @@ machOpResultType dflags mop tys =
 
     MO_V_Insert {}      -> ty1
     MO_V_Extract {}     -> vecElemType ty1
+    
+    MO_V_Add {}         -> ty1
+    MO_V_Sub {}         -> ty1
+    MO_V_Mul {}         -> ty1
+
+    MO_VS_Quot {}       -> ty1
+    MO_VS_Rem {}        -> ty1
+    MO_VS_Neg {}        -> ty1
 
     MO_VF_Add {}        -> ty1
     MO_VF_Sub {}        -> ty1
@@ -427,6 +445,14 @@ machOpArgReps dflags op =
 
     MO_V_Insert  l r    -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
     MO_V_Extract l r    -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
+
+    MO_V_Add _ r        -> [r,r]
+    MO_V_Sub _ r        -> [r,r]
+    MO_V_Mul _ r        -> [r,r]
+
+    MO_VS_Quot _ r      -> [r,r]
+    MO_VS_Rem  _ r      -> [r,r]
+    MO_VS_Neg  _ r      -> [r]
 
     MO_VF_Add  _ r      -> [r,r]
     MO_VF_Sub  _ r      -> [r,r]

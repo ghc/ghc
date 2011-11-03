@@ -879,6 +879,13 @@ genMachOp env _ op [x] = case op of
     MO_FF_Conv from to
         -> sameConv from (widthToLlvmFloat to) LM_Fptrunc LM_Fpext
 
+    MO_VS_Neg len w ->
+        let ty    = widthToLlvmInt w
+            vecty = LMVector len ty
+            all0  = LMIntLit (-0) ty
+            all0s = LMLitVar $ LMVectorLit (replicate len all0)
+        in negate vecty all0s LM_MO_Sub
+
     MO_VF_Neg len w ->
         let ty    = widthToLlvmFloat w
             vecty = LMVector len ty
@@ -929,6 +936,13 @@ genMachOp env _ op [x] = case op of
  
     MO_V_Insert   _ _ -> panicOp
     MO_V_Extract  _ _ -> panicOp
+  
+    MO_V_Add      _ _ -> panicOp
+    MO_V_Sub      _ _ -> panicOp
+    MO_V_Mul      _ _ -> panicOp
+
+    MO_VS_Quot    _ _ -> panicOp
+    MO_VS_Rem     _ _ -> panicOp
 
     MO_VF_Add     _ _ -> panicOp
     MO_VF_Sub     _ _ -> panicOp
@@ -1065,6 +1079,13 @@ genMachOp_slow env opt op [x, y] = case op of
     MO_Shl _   -> genBinMach LM_MO_Shl
     MO_U_Shr _ -> genBinMach LM_MO_LShr
     MO_S_Shr _ -> genBinMach LM_MO_AShr
+
+    MO_V_Add _ _   -> genBinMach LM_MO_Add
+    MO_V_Sub _ _   -> genBinMach LM_MO_Sub
+    MO_V_Mul _ _   -> genBinMach LM_MO_Mul
+
+    MO_VS_Quot _ _ -> genBinMach LM_MO_SDiv
+    MO_VS_Rem _ _  -> genBinMach LM_MO_SRem
  
     MO_VF_Add _ _  -> genBinMach LM_MO_FAdd
     MO_VF_Sub _ _  -> genBinMach LM_MO_FSub
@@ -1083,6 +1104,8 @@ genMachOp_slow env opt op [x, y] = case op of
 
     MO_V_Insert  {} -> panicOp
     MO_V_Extract {} -> panicOp
+
+    MO_VS_Neg {} -> panicOp
 
     MO_VF_Neg {} -> panicOp
 
