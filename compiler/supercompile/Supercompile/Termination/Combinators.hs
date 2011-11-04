@@ -219,9 +219,9 @@ instance History GraphicalHistory where
 mkGraphicalHistory :: forall a. TTest a -> GraphicalHistory (NodeKey, a)
 mkGraphicalHistory (WQO (prepare :: a -> b) embed) = go_init emptyTopologicalOrder [] 0
   where
-    go_init topo abs key' = GH {
-        unGH = \(key, a) -> let Just topo' = insertTopologicalOrder topo (key, key') in go topo' [] abs key key' a (prepare a),
-        generatedKey = key'
+    go_init topo abs generated_key = GH {
+        unGH = \(key, a) -> let Just topo' = insertTopologicalOrder topo (key, generated_key + 1) in go topo' [] abs key (generated_key + 1) a (prepare a),
+        generatedKey = generated_key
       }
 
     go topo new_abs []                  key key' new_a new_b = Continue $ go_init topo (reverse ((key, new_a, new_b):new_abs)) (key' + 1)

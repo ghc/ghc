@@ -114,53 +114,6 @@ breadthFirst :: DelayM m r -> DelayM m r
 breadthFirst = id
 
 
-type LevelM = FulfilmentT (SpecT ScpM)
-
-
--- NB: monads *within* the ContT are persistent over a rollback. Ones outside get reset.
-type ProcessM = ContT (Out FVedTerm) HistoryThreadM
-type ScpM = DelayM (MemoT ProcessM)
-
-traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
-traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
-
-runScpM :: (Applicative m, Monad m) => m (DelayM m a) -> m a
-runScpM mx = mx >>= runDelayM eval_strat
-  where
-    -- Doing things this way prevents GHC bleating about depthFirst being unused
-    eval_strat | False     = depthFirst
-               | otherwise = breadthFirst
-
-
-type ProcessHistory = LinearHistory (State, RollbackScpM) -- TODO: GraphicalHistory
-
-pROCESS_HISTORY :: ProcessHistory
-pROCESS_HISTORY = mkLinearHistory (cofmap fst wQO)
-
-type HistoryEnvM = (->) ProcessHistory
-
-runHistoryEnvM :: HistoryEnvM a -> a
-runHistoryEnvM = flip ($) pROCESS_HISTORY
-
-type HistoryThreadM = State.State ProcessHistory
-
-withHistory :: (ProcessHistory -> (ProcessHistory, a)) -> HistoryThreadM a
-withHistory f = State.state (swap . f)
-  where swap = uncurry (flip (,))
-
-runHistoryThreadM :: HistoryThreadM a -> a
-runHistoryThreadM = flip State.evalState pROCESS_HISTORY
-
-
-terminateM :: State -> RollbackScpM -> a -> (State -> RollbackScpM -> ProcessM (ProcessHistory, a)) -> ProcessM a
-terminateM state rb k_continue k_stop = withHistory' $ \hist -> case terminate hist (state, rb) of
-    Continue hist'                   -> return (hist', k_continue)
-    Stop (shallow_state, shallow_rb) -> k_stop shallow_state shallow_rb
-  where
-    withHistory' :: (ProcessHistory -> ProcessM (ProcessHistory, a)) -> ProcessM a
-    withHistory' act = lift State.get >>= \hist -> act hist >>= \(hist', x) -> lift (State.put hist') >> return x
-
-
 class MonadTrans t where
     lift :: Monad m => m a -> t m a
 
@@ -263,6 +216,38 @@ liftCallCCReaderT :: (((forall b. a -> m b)           -> m a)           -> m a)
 liftCallCCReaderT call_cc f = ReaderT $ \r -> call_cc $ \c -> runReaderT r (f (ReaderT . const . c))
 
 
+newtype RollbackScpM = RB { doRB :: forall c. LevelM (Deeds, Out FVedTerm) -> ProcessM c }
+
+
+type ProcessHistory = LinearHistory (State, RollbackScpM) -- TODO: GraphicalHistory
+
+pROCESS_HISTORY :: ProcessHistory
+pROCESS_HISTORY = mkLinearHistory (cofmap fst wQO)
+
+type HistoryEnvM = (->) ProcessHistory
+
+runHistoryEnvM :: HistoryEnvM a -> a
+runHistoryEnvM = flip ($) pROCESS_HISTORY
+
+type HistoryThreadM = State.State ProcessHistory
+
+withHistory :: (ProcessHistory -> (ProcessHistory, a)) -> HistoryThreadM a
+withHistory f = State.state (swap . f)
+  where swap = uncurry (flip (,))
+
+runHistoryThreadM :: HistoryThreadM a -> a
+runHistoryThreadM = flip State.evalState pROCESS_HISTORY
+
+
+terminateM :: State -> RollbackScpM -> a -> (State -> RollbackScpM -> ProcessM (ProcessHistory, a)) -> ProcessM a
+terminateM state rb k_continue k_stop = withHistory' $ \hist -> case terminate hist (state, rb) of
+    Continue hist'                   -> return (hist', k_continue)
+    Stop (shallow_state, shallow_rb) -> k_stop shallow_state shallow_rb
+  where
+    withHistory' :: (ProcessHistory -> ProcessM (ProcessHistory, a)) -> ProcessM a
+    withHistory' act = lift State.get >>= \hist -> act hist >>= \(hist', x) -> lift (State.put hist') >> return x
+
+
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
     abstracted :: [AbsVar], -- Abstracted over these variables
@@ -336,7 +321,6 @@ memo opt state = StateT $ \ms ->
                 where (p, ms') = promise state ms
 
 
--- FIXME: I'm not convinced this is being extended correctly!!
 type SpecT = ReaderT AlreadySpeculated
 
 runSpecT :: SpecT m a -> m a
@@ -350,7 +334,22 @@ liftSpeculatedStateT :: (forall a. State -> (State -> m a)        -> m a)
 liftSpeculatedStateT speculated state k = StateT $ \s -> speculated state (\state' -> unStateT (k state') s)
 
 
-newtype RollbackScpM = RB { doRB :: forall c. LevelM (Deeds, Out FVedTerm) -> ProcessM c }
+type LevelM = FulfilmentT (SpecT ScpM)
+
+-- NB: monads *within* the ContT are persistent over a rollback. Ones outside get reset.
+type ProcessM = ContT (Out FVedTerm) HistoryThreadM
+type ScpM = DelayM (MemoT ProcessM)
+
+traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
+traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
+
+runScpM :: (Applicative m, Monad m) => m (DelayM m a) -> m a
+runScpM mx = mx >>= runDelayM eval_strat
+  where
+    -- Doing things this way prevents GHC bleating about depthFirst being unused
+    eval_strat | False     = depthFirst
+               | otherwise = breadthFirst
+
 
 sc' :: State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc' state = callCC (\k -> try (RB k))
