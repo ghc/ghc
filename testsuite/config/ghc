@@ -7,7 +7,7 @@ import re
 #
 config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
-config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint', '-dno-debug-output', '-no-user-package-conf', '-rtsopts', '-fno-ghci-history']
+config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint', '-dno-debug-output', '-no-user-package-conf', '-rtsopts']
 
 config.hp2ps                 = 'hp2ps'
 config.hpc                   = 'hpc'
@@ -141,6 +141,11 @@ def get_compiler_info():
     config.compiler_version = v[0]
     config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])
     config.compiler_tags = v[1:]
+
+    # -fno-ghci-history was added in 7.3
+    if version_ge(config.compiler_version, '7.3'):
+       config.compiler_always_flags = \
+          config.compiler_always_flags + ['-fno-ghci-history']
 
     if re.match(".*_p(_.*|$)", rtsInfoDict["RTS way"]):
         config.compiler_profiled = True
