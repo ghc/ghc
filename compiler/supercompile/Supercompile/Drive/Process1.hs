@@ -56,7 +56,7 @@ ifThenElse False _ y = y
 
 
 supercompile :: M.Map Var Term -> Term -> IO (SCStats, Term)
-supercompile unfoldings e = liftM (second fVedTermToTerm) $ runScpM $ fmap snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
+supercompile unfoldings e = liftM (second fVedTermToTerm) $ runScpM $ fmap snd $ sc (mkLinearHistory (cofmap fst wQO)) S.empty state
   where state = prepareTerm unfoldings e
 
 --
@@ -439,12 +439,13 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
 
 
 type RollbackScpM = Generaliser -> ScpBM (Deeds, Out FVedTerm)
+type ProcessHistory = LinearHistory (State, RollbackScpM)
 
 lift :: ScpPM a -> ScpBM a
 lift act = ScpM $ \e s k -> unScpM act e (s { pTreeHole = () }) (\x s' -> k x (s' { pTreeHole = pTreeHole s' : pTreeHole s }))
 
-sc  :: History (State, RollbackScpM) -> AlreadySpeculated -> State -> ScpPM (Deeds, Out FVedTerm)
-sc' :: History (State, RollbackScpM) -> AlreadySpeculated -> State -> ScpBM (Deeds, Out FVedTerm)
+sc  :: ProcessHistory -> AlreadySpeculated -> State -> ScpPM (Deeds, Out FVedTerm)
+sc' :: ProcessHistory -> AlreadySpeculated -> State -> ScpBM (Deeds, Out FVedTerm)
 sc  hist = rollbackBig (memo (sc' hist))
 sc' hist speculated state = handlePrint $ (\raise -> check raise) `catchScpM` \gen -> stop gen state hist -- TODO: I want to use the original history here, but I think doing so leads to non-term as it contains rollbacks from "below us" (try DigitsOfE2)
   where

@@ -241,12 +241,12 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
     (h_values, h_non_values) = M.partition (maybe False (termIsValue . snd) . heapBindingTerm) h
     (h_non_values_unspeculated, h_non_values_speculated) = (h_non_values `exclude` speculated, h_non_values `restrict` speculated)
 
-    (stats', deeds', h_speculated_ok, h_speculated_failure, ids') = runSpecM (speculateManyMap (mkHistory (cofmap fst wQO)) h_non_values_unspeculated) (stats, deeds, h_values, M.empty, ids)
+    (stats', deeds', h_speculated_ok, h_speculated_failure, ids') = runSpecM (speculateManyMap (mkLinearHistory (cofmap fst wQO)) h_non_values_unspeculated) (stats, deeds, h_values, M.empty, ids)
     
     speculateManyMap hist = speculateMany hist . concatMap M.toList . topologicalSort heapBindingFreeVars
     speculateMany hist = mapM_ (speculateOne hist)
     
-    speculateOne :: History (State, SpecM ()) -> (Out Var, HeapBinding) -> SpecM ()
+    speculateOne :: LinearHistory (State, SpecM ()) -> (Out Var, HeapBinding) -> SpecM ()
     speculateOne hist (x', hb)
       | HB InternallyBound (Right in_e) <- hb
       = (\rb -> try_speculation in_e rb) `catchSpecM` speculation_failure
@@ -289,7 +289,7 @@ reduce :: State -> State
 reduce = snd . reduce'
 
 reduce' :: State -> (SCStats, State)
-reduce' orig_state = go (mkHistory rEDUCE_WQO) orig_state
+reduce' orig_state = go (mkLinearHistory rEDUCE_WQO) orig_state
   where
     -- NB: it is important that we ensure that reduce is idempotent if we have rollback on. I use this property to improve memoisation.
     go hist state = -- traceRender ("reduce:step", pPrintFullState state) $
