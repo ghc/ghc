@@ -152,6 +152,15 @@ runHistoryThreadM :: HistoryThreadM a -> a
 runHistoryThreadM = flip State.evalState pROCESS_HISTORY
 
 
+terminateM :: State -> RollbackScpM -> a -> (State -> RollbackScpM -> ProcessM (ProcessHistory, a)) -> ProcessM a
+terminateM state rb k_continue k_stop = withHistory' $ \hist -> case terminate hist (state, rb) of
+    Continue hist'                   -> return (hist', k_continue)
+    Stop (shallow_state, shallow_rb) -> k_stop shallow_state shallow_rb
+  where
+    withHistory' :: (ProcessHistory -> ProcessM (ProcessHistory, a)) -> ProcessM a
+    withHistory' act = lift State.get >>= \hist -> act hist >>= \(hist', x) -> lift (State.put hist') >> return x
+
+
 class MonadTrans t where
     lift :: Monad m => m a -> t m a
 
@@ -343,18 +352,14 @@ liftSpeculatedStateT speculated state k = StateT $ \s -> speculated state (\stat
 
 newtype RollbackScpM = RB { doRB :: forall c. LevelM (Deeds, Out FVedTerm) -> ProcessM c }
 
-withHistory' :: (ProcessHistory -> ProcessM (ProcessHistory, a)) -> ProcessM a
-withHistory' act = lift State.get >>= \hist -> act hist >>= \(hist', x) -> lift (State.put hist') >> return x
-
-
 sc' :: State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc' state = callCC (\k -> try (RB k))
   where
     trce shallow_state = pprTraceSC "sc-stop" (pPrintFullState True shallow_state $$ pPrintFullState True state)
     try :: RollbackScpM -> ProcessM (LevelM (Deeds, Out FVedTerm))
-    try rb = withHistory' $ \hist -> case terminate hist (state, rb) of
-               Continue hist'                   ->                      return          (hist', liftSpeculatedStateT speculated state $ \state' -> split (reduce state') (delayStateT (delayReaderT delay) . sc))
-               Stop (shallow_state, shallow_rb) -> trce shallow_state $ doRB shallow_rb (maybe (split shallow_state) id (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT (delayReaderT delay) . sc))
+    try rb = terminateM state rb
+               (liftSpeculatedStateT speculated state $ \state' -> split (reduce state') (delayStateT (delayReaderT delay) . sc))
+               (\shallow_state shallow_rb -> trce shallow_state $ doRB shallow_rb (maybe (split shallow_state) id (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT (delayReaderT delay) . sc)))
 
 sc :: State -> MemoT ProcessM (LevelM (Deeds, Out FVedTerm))
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
