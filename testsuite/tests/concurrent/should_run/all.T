@@ -65,6 +65,8 @@ test('5558',
        cmd_wrapper(lambda c: 'for i in `seq 1 100`; do ' + c + ' || break; done') ],
      compile_and_run, [''])
 
+test('5421', normal, compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
@@ -205,3 +207,4 @@ test('conc067', ignore_output, compile_and_run, [''])
 # omit threaded2, the behaviour of this test is non-deterministic with more
 # than one CPU.
 test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
+
