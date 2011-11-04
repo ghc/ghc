@@ -206,7 +206,7 @@ initBuiltinTyCons bi
 -- Lookup a variable given its name and the module that contains it.
 --
 externalVar :: FastString -> DsM Var
-externalVar fs = lookupDAPPRdrEnv (mkVarOccFS fs) >>= dsImportId
+externalVar fs = lookupDAPPRdrEnv (mkVarOccFS fs) >>= dsLookupGlobalId
 
 -- Like `externalVar` but wrap the `Var` in a `CoreExpr`.
 --
@@ -216,7 +216,7 @@ externalFun fs = liftM Var $ externalVar fs
 -- Lookup a 'TyCon' in 'Data.Array.Parallel.Prim', given its name.
 --
 externalTyCon :: FastString -> DsM TyCon
-externalTyCon fs = lookupDAPPRdrEnv (mkTcOccFS fs) >>= dsImportTyCon
+externalTyCon fs = lookupDAPPRdrEnv (mkTcOccFS fs) >>= dsLookupTyCon
 
 -- Lookup some `Type` given its name and the module that contains it.
 --
@@ -229,7 +229,7 @@ externalType fs
 --
 externalClass :: FastString -> DsM Class
 externalClass fs 
-  = do { tycon <- lookupDAPPRdrEnv (mkClsOccFS fs) >>= dsImportTyCon
+  = do { tycon <- lookupDAPPRdrEnv (mkClsOccFS fs) >>= dsLookupTyCon
        ; case tyConClass_maybe tycon of
            Nothing  -> pprPanic "Vectorise.Builtins.Initialise" $ 
                          ptext (sLit "Data.Array.Parallel.Prim.") <> 

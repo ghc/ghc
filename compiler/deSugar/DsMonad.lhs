@@ -23,7 +23,7 @@ module DsMonad (
         getDOptsDs, getGhcModeDs, doptDs, woptDs,
         dsLookupGlobal, dsLookupGlobalId, dsLookupDPHId, dsLookupTyCon, dsLookupDataCon,
         
-        assertDAPPLoaded, lookupDAPPRdrEnv, dsImportDecl, dsImportId, dsImportTyCon,
+        assertDAPPLoaded, lookupDAPPRdrEnv,
 
         DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -386,7 +386,7 @@ assertDAPPLoaded :: DsM ()
 assertDAPPLoaded 
   = do { env <- ds_dph_env <$> getGblEnv
        ; when (null $ occEnvElts env) $
-           panic "'Data.Array.Parallel.Prim' not available; probably missing dependencies in DPH package"
+           panic "'Data.Array.Parallel.Prim' not available; maybe missing dependency in DPH package"
        }
 
 -- Look up a name exported by 'Data.Array.Parallel.Prim'.
@@ -400,26 +400,6 @@ lookupDAPPRdrEnv occ
            [gre] -> return $ gre_name gre
            _     -> pprPanic "Multiple definitions in 'Data.Array.Parallel.Prim':" (ppr occ)
        }
-
--- Find the thing referred to by an imported name.
---
-dsImportDecl :: Name -> DsM TyThing
-dsImportDecl name
-  = do { env <- getGblEnv
-       ; setEnvs (ds_if_env env) $ do
-       { mb_thing <- importDecl name
-       ; case mb_thing of
-           Failed err      -> failIfM err
-           Succeeded thing -> return thing
-       } }
-
-dsImportId :: Name -> DsM Id
-dsImportId name
-  = tyThingId <$> dsImportDecl name
-
-dsImportTyCon :: Name -> DsM TyCon
-dsImportTyCon name
-  = tyThingTyCon <$> dsImportDecl name
 \end{code}
 
 \begin{code}
