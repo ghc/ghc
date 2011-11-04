@@ -401,7 +401,7 @@ lookupDAPPRdrEnv occ
            _     -> pprPanic "Multiple definitions in 'Data.Array.Parallel.Prim':" (ppr occ)
        }
 
--- Find the thing repferred to by an imported name.
+-- Find the thing referred to by an imported name.
 --
 dsImportDecl :: Name -> DsM TyThing
 dsImportDecl name

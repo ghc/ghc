@@ -339,6 +339,8 @@ vectsFreeVars = foldr (unionVarSet . vectFreeVars) emptyVarSet
     vectFreeVars (Vect   _ (Just rhs)) = expr_fvs rhs isLocalId emptyVarSet
     vectFreeVars (NoVect _)            = noFVs
     vectFreeVars (VectType _ _ _)      = noFVs
+    vectFreeVars (VectClass _)         = noFVs
+    vectFreeVars (VectInst _ _)        = noFVs
       -- this function is only concerned with values, not types
 \end{code}
 

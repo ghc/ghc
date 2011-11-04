@@ -198,7 +198,8 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     }
   where
     vectIds        = [id    | Vect     id    _   <- vectDecls]
-    vectTypeTyCons = [tycon | VectType _ tycon _ <- vectDecls]
+    vectTypeTyCons = [tycon | VectType _ tycon _ <- vectDecls] ++
+                     [tycon | VectClass tycon    <- vectDecls]
     vectDataCons   = concatMap tyConDataCons vectTypeTyCons
     ids            = mg_ids ++ vectIds
     tyCons         = mg_tyCons ++ vectTypeTyCons

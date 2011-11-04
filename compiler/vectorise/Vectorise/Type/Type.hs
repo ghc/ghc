@@ -78,7 +78,6 @@ vectType ty@(ForAllTy _ _)
       dictsPA     <- liftM catMaybes $ mapM paDictArgType tyvars
 
       -- pack it all back together.
-      traceVt "vect ForAllTy: " $ ppr (abstractType tyvars (dictsPA ++ dictsVect) tyBody'')
       return $ abstractType tyvars (dictsPA ++ dictsVect) tyBody''
 
 -- |Add quantified vars and dictionary parameters to the front of a type.

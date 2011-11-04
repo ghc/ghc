@@ -597,14 +597,14 @@ mkDataCOcc = mk_simple_deriv varName  "$c"
 -- Vectorisation
 mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc, mkPADFunOcc, mkPReprTyConOcc,
   mkPDataTyConOcc, mkPDataDataConOcc :: Maybe String -> OccName -> OccName
-mkVectOcc         = mk_simple_deriv_with varName  "$v_"
-mkVectTyConOcc    = mk_simple_deriv_with tcName   ":V_"
-mkVectDataConOcc  = mk_simple_deriv_with dataName ":VD_"
-mkVectIsoOcc      = mk_simple_deriv_with varName  "$VI_"
-mkPADFunOcc       = mk_simple_deriv_with varName  "$PA_"
-mkPReprTyConOcc   = mk_simple_deriv_with tcName   ":VR_"
-mkPDataTyConOcc   = mk_simple_deriv_with tcName   ":VP_"
-mkPDataDataConOcc = mk_simple_deriv_with dataName ":VPD_"
+mkVectOcc         = mk_simple_deriv_with varName  "$v"
+mkVectTyConOcc    = mk_simple_deriv_with tcName   "V:"
+mkVectDataConOcc  = mk_simple_deriv_with dataName "VD:"
+mkVectIsoOcc      = mk_simple_deriv_with varName  "$vi"
+mkPADFunOcc       = mk_simple_deriv_with varName  "$pa"
+mkPReprTyConOcc   = mk_simple_deriv_with tcName   "VR:"
+mkPDataTyConOcc   = mk_simple_deriv_with tcName   "VP:"
+mkPDataDataConOcc = mk_simple_deriv_with dataName "VPD:"
 
 mk_simple_deriv :: NameSpace -> String -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)

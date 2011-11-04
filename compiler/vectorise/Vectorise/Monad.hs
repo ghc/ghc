@@ -85,8 +85,8 @@ initV hsc_env guts info thing_inside
            ; eps <- liftIO $ hscEPS hsc_env
            ; let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
                  instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
-                 builtin_pas = initClassDicts instEnvs (paClass builtins) -- grab all available 'PA' and..
-                 builtin_prs = initClassDicts instEnvs (prClass builtins) -- ..'PR' class instances
+                 builtin_pas = initClassDicts instEnvs (paClass builtins)  -- grab all 'PA' and..
+                 builtin_prs = initClassDicts instEnvs (prClass builtins)  -- ..'PR' class instances
 
                -- construct the initial global environment
            ; let thing_inside' = traceVt "VectDecls" (ppr (mg_vect_decls guts)) >> thing_inside
@@ -110,9 +110,9 @@ initV hsc_env guts info thing_inside
 
     new_info genv = modVectInfo genv ids (mg_tcs guts) (mg_vect_decls guts) info
 
-    -- For a given DPH class, produce a mapping from type constructor (in head position) to the instance
-    -- dfun for that type constructor and class.  (DPH class instances cannot overlap in head
-    -- constructors.)
+    -- For a given DPH class, produce a mapping from type constructor (in head position) to the
+    -- instance dfun for that type constructor and class.  (DPH class instances cannot overlap in
+    -- head constructors.)
     --
     initClassDicts :: (InstEnv, InstEnv) -> Class -> [(Name, Var)]
     initClassDicts insts cls = map find $ classInstances insts cls

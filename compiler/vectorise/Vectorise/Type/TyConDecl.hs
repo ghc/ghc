@@ -21,81 +21,92 @@ import Control.Monad
 --
 vectTyConDecls :: [TyCon] -> VM [TyCon]
 vectTyConDecls tcs = fixV $ \tcs' ->
-  do
-    mapM_ (uncurry defTyCon) (zipLazy tcs tcs')
-    mapM vectTyConDecl tcs
+  do { mapM_ (uncurry defTyCon) (zipLazy tcs tcs')
+     ; mapM vectTyConDecl tcs
+     }
 
 -- |Vectorise a single type constructor.
 --
 vectTyConDecl :: TyCon -> VM TyCon
 vectTyConDecl tycon
-  -- a type class constructor.
-  -- TODO: check for no stupid theta, fds, assoc types. 
-  | isClassTyCon tycon
-  , Just cls		<- tyConClass_maybe tycon
 
-  = do  -- make the name of the vectorised class tycon.
-        name'       <- mkLocalisedName mkVectTyConOcc (tyConName tycon)
+      -- Type constructor representing a type class
+  | Just cls <- tyConClass_maybe tycon
+  = do { unless (null $ classATs cls) $
+           cantVectorise "Associated types are not yet supported" (ppr cls)
 
-        -- vectorise right of definition.
-        rhs'        <- vectAlgTyConRhs tycon (algTyConRhs tycon)
+           -- make the name of the vectorised class tycon: "Class" --> "V:Class"
+       ; name' <- mkLocalisedName mkVectTyConOcc (tyConName tycon)
+       
+           -- vectorise superclass constraint (types)
+       ; theta' <- mapM vectType (classSCTheta cls)
 
-        -- vectorise method selectors.
-        -- This also adds a mapping between the original and vectorised method selector
-        -- to the state.
-        methods'    <- mapM vectMethod
-                    $  [(id, defMethSpecOfDefMeth meth) 
-                            | (id, meth)    <- classOpItems cls]
+           -- vectorise method selectors and add them to the vectorisation map
+       ; methods' <- sequence [ vectMethod id meth | (id, meth) <- classOpItems cls]
 
-        -- keep the original recursiveness flag.
-        let rec_flag = boolToRecFlag (isRecursiveTyCon tycon)
-  
-        -- Calling buildclass here attaches new quantifiers and dictionaries to the method types.
-        cls'     <- liftDs 
-                $  buildClass
-                         False               -- include unfoldings on dictionary selectors.
-                         name'               -- new name  V_T:Class
-                         (tyConTyVars tycon) -- keep original type vars
-                         []                  -- no stupid theta
-                         []                  -- no functional dependencies
-                         []                  -- no associated types
-                         methods'            -- method info
-                         rec_flag            -- whether recursive
+           -- keep the original recursiveness flag
+       ; let rec_flag = boolToRecFlag (isRecursiveTyCon tycon)
 
-        let tycon'  = mkClassTyCon name'
-                         (tyConKind tycon)
-                         (tyConTyVars tycon)
-                         rhs'
-                         cls'
-                         rec_flag
+           -- construct the vectorised class (this also creates the class type constructors and its
+           -- data constructor)
+           --
+           -- NB: 'buildClass' attaches new quantifiers and dictionaries to the method types
+       ; cls' <- liftDs $
+                   buildClass
+                     False                      -- include unfoldings on dictionary selectors
+                     name'                      -- new name: "V:Class"
+                     (tyConTyVars tycon)        -- keep original type vars
+                     theta'                     -- superclasses
+                     (snd . classTvsFds $ cls)  -- keep the original functional dependencies
+                     []                         -- no associated types (for the moment)
+                     methods'                   -- method info
+                     rec_flag                   -- whether recursive
 
-        return $ tycon'
+           -- the original dictionary constructor must map to the vectorised one
+       ; let tycon'        = classTyCon cls'
+             Just datacon  = tyConSingleDataCon_maybe tycon
+             Just datacon' = tyConSingleDataCon_maybe tycon'
+       ; defDataCon datacon datacon'
+
+           -- return the type constructor of the vectorised class
+       ; return tycon'
+       }
                       
-  -- a regular algebraic type constructor.
-  -- TODO: check for stupid theta, generaics, GADTS etc
+       -- Regular algebraic type constructor — for now, Haskell 2011-style only
   | isAlgTyCon tycon
-  = do  name'       <- mkLocalisedName mkVectTyConOcc (tyConName tycon)
-        rhs'        <- vectAlgTyConRhs tycon (algTyConRhs tycon)
-        let rec_flag =  boolToRecFlag (isRecursiveTyCon tycon)
+  = do { unless (all isVanillaDataCon (tyConDataCons tycon)) $
+           cantVectorise "Currently only Haskell 2011 datatypes are supported" (ppr tycon)
+  
+           -- make the name of the vectorised class tycon
+       ; name' <- mkLocalisedName mkVectTyConOcc (tyConName tycon)
 
-        liftDs $ buildAlgTyCon 
-                        name'               -- new name
-                        (tyConTyVars tycon) -- keep original type vars.
-                        []                  -- no stupid theta.
-                        rhs'                -- new constructor defs.
-                        rec_flag            -- FIXME: is this ok?
-                        False               -- not GADT syntax
-                        NoParentTyCon
-                        Nothing             -- not a family instance
+           -- vectorise the data constructor of the class tycon
+       ; rhs' <- vectAlgTyConRhs tycon (algTyConRhs tycon)
 
-    -- some other crazy thing that we don't handle.
-    | otherwise
-    = cantVectorise "Can't vectorise type constructor: " (ppr tycon)
+           -- keep the original recursiveness and GADT flags
+       ; let rec_flag  = boolToRecFlag (isRecursiveTyCon tycon)
+             gadt_flag = isGadtSyntaxTyCon tycon
 
+           -- build the vectorised type constructor
+       ; liftDs $ buildAlgTyCon 
+                    name'                   -- new name
+                    (tyConTyVars tycon)     -- keep original type vars
+                    []                      -- no stupid theta
+                    rhs'                    -- new constructor defs
+                    rec_flag                -- whether recursive
+                    gadt_flag               -- whether in GADT syntax
+                    NoParentTyCon           
+                    Nothing                 -- not a family instance
+       }
 
--- | Vectorise a class method.
-vectMethod :: (Id, DefMethSpec) -> VM (Name, DefMethSpec, Type)
-vectMethod (id, defMeth)
+  -- some other crazy thing that we don't handle
+  | otherwise
+  = cantVectorise "Can't vectorise exotic type constructor" (ppr tycon)
+
+-- |Vectorise a class method.
+--
+vectMethod :: Id -> DefMeth -> VM (Name, DefMethSpec, Type)
+vectMethod id defMeth
  = do {   -- Vectorise the method type.
       ; typ' <- vectType (varType id)
 
@@ -110,56 +121,62 @@ vectMethod (id, defMeth)
       ; let (_tyvars, tyBody) = splitForAllTys typ'
       ; let (_dict,   tyRest) = splitFunTy tyBody
 
-      ; return  (Var.varName id', defMeth, tyRest)
+      ; return  (Var.varName id', defMethSpecOfDefMeth defMeth, tyRest)
       }
 
 -- |Vectorise the RHS of an algebraic type.
 --
 vectAlgTyConRhs :: TyCon -> AlgTyConRhs -> VM AlgTyConRhs
-vectAlgTyConRhs _ (DataTyCon { data_cons = data_cons
-                             , is_enum   = is_enum
-                             })
-  = do
-      data_cons' <- mapM vectDataCon data_cons
-      zipWithM_ defDataCon data_cons data_cons'
-      return $ DataTyCon { data_cons = data_cons'
-                         , is_enum   = is_enum
-                         }
-vectAlgTyConRhs tc _ 
-        = cantVectorise "Can't vectorise type definition:" (ppr tc)
+vectAlgTyConRhs tc (AbstractTyCon {})
+  = cantVectorise "Can't vectorise imported abstract type" (ppr tc)
+vectAlgTyConRhs _tc DataFamilyTyCon
+  = return DataFamilyTyCon
+vectAlgTyConRhs _tc (DataTyCon { data_cons = data_cons
+                               , is_enum   = is_enum
+                               })
+  = do { data_cons' <- mapM vectDataCon data_cons
+       ; zipWithM_ defDataCon data_cons data_cons'
+       ; return $ DataTyCon { data_cons = data_cons'
+                            , is_enum   = is_enum
+                            }
+       }
+vectAlgTyConRhs tc (NewTyCon {})
+  = cantVectorise noNewtypeErr (ppr tc)
+  where
+    noNewtypeErr = "Vectorisation of newtypes not supported yet; please use a 'data' declaration"
 
--- |Vectorise a data constructor.
---
--- Vectorises its argument and return types.
+-- |Vectorise a data constructor by vectorising its argument and return types..
 --
 vectDataCon :: DataCon -> VM DataCon
 vectDataCon dc
-  | not . null $ dataConExTyVars dc
-  = cantVectorise "Can't vectorise constructor (existentials):" (ppr dc)
-
-  | not . null $ dataConEqSpec   dc
-  = cantVectorise "Can't vectorise constructor (eq spec):" (ppr dc)
-
+  | not . null $ ex_tvs
+  = cantVectorise "Can't vectorise constructor with existential type variables yet" (ppr dc)
+  | not . null $ eq_spec
+  = cantVectorise "Can't vectorise constructor with equality context yet" (ppr dc)
+  | not . null $ dataConFieldLabels dc
+  = cantVectorise "Can't vectorise constructor with labelled fields yet" (ppr dc)
+  | not . null $ theta
+  = cantVectorise "Can't vectorise constructor with constraint context yet" (ppr dc)
   | otherwise
-  = do
-      name'    <- mkLocalisedName mkVectDataConOcc name
-      tycon'   <- vectTyCon tycon
-      arg_tys  <- mapM vectType rep_arg_tys
-
-      liftDs $ buildDataCon 
-                name'
-                False                          -- not infix
-                (map (const HsNoBang) arg_tys) -- strictness annots on args.
-                []                             -- no labelled fields
-                univ_tvs                       -- universally quantified vars
-                []                             -- no existential tvs for now
-                []                             -- no eq spec for now
-                []                             -- no context
-                arg_tys                        -- argument types
-                (mkFamilyTyConApp tycon' (mkTyVarTys univ_tvs)) -- return type
-                tycon'                         -- representation tycon
+  = do { name'   <- mkLocalisedName mkVectDataConOcc name
+       ; tycon'  <- vectTyCon tycon
+       ; arg_tys <- mapM vectType rep_arg_tys
+       ; let ret_ty = mkFamilyTyConApp tycon' (mkTyVarTys univ_tvs)
+       ; liftDs $ buildDataCon
+                    name'
+                    (dataConIsInfix dc)            -- infix if the original is
+                    (dataConStrictMarks dc)        -- strictness as original constructor
+                    []                             -- no labelled fields for now
+                    univ_tvs                       -- universally quantified vars
+                    []                             -- no existential tvs for now
+                    []                             -- no equalities for now
+                    []                             -- no context for now
+                    arg_tys                        -- argument types
+                    ret_ty                         -- return type
+                    tycon'                         -- representation tycon
+       }
   where
     name        = dataConName dc
-    univ_tvs    = dataConUnivTyVars dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
+    (univ_tvs, ex_tvs, eq_spec, theta, _arg_tys, _res_ty) = dataConFullSig dc

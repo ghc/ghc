@@ -26,7 +26,7 @@ import Type
 import Digraph
 
 
--- |From a list of type constructors, extract those thatcan be vectorised, returning them in two
+-- |From a list of type constructors, extract those that can be vectorised, returning them in two
 -- sets, where the first result list /must be/ vectorised and the second result list /need not be/
 -- vectroised.
 
@@ -55,7 +55,11 @@ classifyTyCons convStatus tcs = classify [] [] convStatus (tyConGroups tcs)
         can_convert  = isNullUFM (refs `minusUFM` cs) && all convertable tcs
         must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
 
-        convertable tc = isDataTyCon tc && all isVanillaDataCon (tyConDataCons tc)
+        -- We currently admit Haskell 2011-style data and newtype declarations as well as type
+        -- constructors representing classes.
+        convertable tc 
+          = (isDataTyCon tc || isNewTyCon tc) && all isVanillaDataCon (tyConDataCons tc)
+            || isClassTyCon tc
 
 -- Used to group type constructors into mutually dependent groups.
 --
