@@ -602,7 +602,7 @@ MAIN            MAIN                    102           0    0.0    0.0   100.0  1
            other than making the PS file generation work, rather than
            falling over.  The result seems to be broken PS on the page
            with the image. -->
-      <imagedata fileref="prof_scc.png" contentwidth="645px"
+      <imagedata fileref="prof_scc" contentwidth="645px"
       contentdepth="428px"/>
 
     <para>You might also want to take a look
