@@ -48,3 +48,4 @@ test('T5315', normal, compile_and_run, [''])
 test('T5453', normal, compile_and_run, [''])
 test('T5441', extra_clean(['T5441a.o','T5441a.hi']), 
               multimod_compile_and_run, ['T5441',''])
+test('T5603', expect_broken(5603), compile_and_run, [''])
