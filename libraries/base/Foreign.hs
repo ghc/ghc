@@ -45,11 +45,11 @@ import Foreign.Storable
 import Foreign.Marshal
 
 import GHC.IO (IO)
-import qualified System.IO.Unsafe (unsafePerformIO)
+import qualified GHC.IO (unsafePerformIO)
 
 {-# DEPRECATED unsafePerformIO "Use System.IO.Unsafe.unsafePerformIO instead; This function will be removed in the next release" #-}
 
 {-# INLINE unsafePerformIO #-}
 unsafePerformIO :: IO a -> a
-unsafePerformIO = System.IO.Unsafe.unsafePerformIO
+unsafePerformIO = GHC.IO.unsafePerformIO
 
