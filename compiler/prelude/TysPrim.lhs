@@ -6,6 +6,13 @@
 \section[TysPrim]{Wired-in knowledge about primitive types}
 
 \begin{code}
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 -- | This module defines TyCons that can't be expressed in Haskell. 
 --   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn
 module TysPrim(

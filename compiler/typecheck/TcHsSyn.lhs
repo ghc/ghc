@@ -9,6 +9,13 @@ This module is an extension of @HsSyn@ syntax, for use in the type
 checker.
 
 \begin{code}
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 module TcHsSyn (
 	mkHsConApp, mkHsDictLet, mkHsApp,
 	hsLitType, hsLPatType, hsPatType, 

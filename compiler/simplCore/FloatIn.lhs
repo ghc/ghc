@@ -12,6 +12,13 @@ case, so that we don't allocate things, save them on the stack, and
 then discover that they aren't needed in the chosen branch.
 
 \begin{code}
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 module FloatIn ( floatInwards ) where
 
 #include "HsVersions.h"

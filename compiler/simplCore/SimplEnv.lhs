@@ -4,6 +4,13 @@ o% (c) The AQUA Project, Glasgow University, 1993-1998
 \section[SimplMonad]{The simplifier Monad}
 
 \begin{code}
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 module SimplEnv (
 	InId, InBind, InExpr, InAlt, InArg, InType, InBndr, InVar,
 	OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr, OutVar,

@@ -4,6 +4,13 @@
 \section[TysWiredIn]{Wired-in knowledge about {\em non-primitive} types}
 
 \begin{code}
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module TysPrim
 module TysWiredIn (

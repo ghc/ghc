@@ -22,6 +22,14 @@
 -- * 'Id.Id': see "Id#name_types"
 --
 -- * 'Var.Var': see "Var#name_types"
+
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 module RdrName (
         -- * The main type
 	RdrName(..),	-- Constructors exported only to BinIface

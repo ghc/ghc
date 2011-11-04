@@ -8,6 +8,13 @@
    -- When the earliest compiler we want to boostrap with is
    -- GHC 7.2, we can make RealSrcLoc properly abstract
 
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
