@@ -211,6 +211,15 @@ mkCoerce co expr
 -- annotation if possible.
 mkTick :: Tickish Id -> CoreExpr -> CoreExpr
 
+mkTick t (Var x)
+  | isFunTy (idType x) = Tick t (Var x)
+  | otherwise
+  = if tickishCounts t
+       then if tickishScoped t && tickishCanSplit t
+               then Tick (mkNoScope t) (Var x)
+               else Tick t (Var x)
+       else Var x
+
 mkTick t (Cast e co)
   = Cast (mkTick t e) co -- Move tick inside cast
 
