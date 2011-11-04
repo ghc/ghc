@@ -47,20 +47,19 @@ Generic representation:
     GenDerivOutput.S1_1_0List
     GenDerivOutput.S1_1_1List
   
-  Representation types: GenDerivOutput.Rep_List
-  
-  Meta-information instances:
-    instance GHC.Generics.Datatype GenDerivOutput.D1List where
-      GHC.Generics.datatypeName _ = "List"
-      GHC.Generics.moduleName _ = "GenDerivOutput"
-    instance GHC.Generics.Constructor GenDerivOutput.C1_0List where
-      GHC.Generics.conName _ = "Nil"
-    instance GHC.Generics.Constructor GenDerivOutput.C1_1List where
-      GHC.Generics.conName _ = "Cons"
-      GHC.Generics.conIsRecord _ = GHC.Types.True
-    instance GHC.Generics.Selector GenDerivOutput.S1_1_0List where
-      GHC.Generics.selName _ = "element"
-    instance GHC.Generics.Selector GenDerivOutput.S1_1_1List where
-      GHC.Generics.selName _ = "rest"
+  Representation types:
+    GenDerivOutput.Rep_List = GHC.Generics.D1
+                                GenDerivOutput.D1List
+                                (GHC.Generics.C1 GenDerivOutput.C1_0List GHC.Generics.U1
+                                 GHC.Generics.:+: GHC.Generics.C1
+                                                    GenDerivOutput.C1_1List
+                                                    (GHC.Generics.S1
+                                                       GenDerivOutput.S1_1_0List
+                                                       (GHC.Generics.Par0 a)
+                                                     GHC.Generics.:*: GHC.Generics.S1
+                                                                        GenDerivOutput.S1_1_1List
+                                                                        (GHC.Generics.Rec0
+                                                                           (GenDerivOutput.List
+                                                                              a))))
 
 
