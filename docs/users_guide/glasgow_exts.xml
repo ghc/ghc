@@ -7332,9 +7332,9 @@ The basic idea is that a command defines an arrow from environments to values.
 These environments assign values to the free local variables of the command.
 Thus combinators that produce arrows from arrows
 may also be used to build commands from commands.
-For example, the <literal>ArrowChoice</literal> class includes a combinator
+For example, the <literal>ArrowPlus</literal> class includes a combinator
 <programlisting>
-ArrowChoice a => (&lt;+>) :: a e c -> a e c -> a e c
+ArrowPlus a => (&lt;+>) :: a e c -> a e c -> a e c
 </programlisting>
 so we can use it to build commands:
 <programlisting>
