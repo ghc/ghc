@@ -162,9 +162,11 @@ emitCostCentreDecl
    :: CostCentre
    -> Code
 emitCostCentreDecl cc = do 
-  { label <- newStringCLit (costCentreUserName cc)
-  ; modl  <- newStringCLit (Module.moduleNameString 
-                                (Module.moduleName (cc_mod cc)))
+                        -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
+  { label <- newByteStringCLit (bytesFS $ costCentreUserNameFS cc)
+  ; modl  <- newByteStringCLit (bytesFS $ Module.moduleNameFS
+                                        $ Module.moduleName
+                                        $ cc_mod cc)
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.
                 -- Hence don't emit the package name in the module here.
