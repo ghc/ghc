@@ -631,8 +631,8 @@ stg_labelThreadzh
   /* args: 
 	R1 = ThreadId#
 	R2 = Addr# */
-#ifdef DEBUG
-  foreign "C" labelThread(R1 "ptr", R2 "ptr") [];
+#if defined(DEBUG) || defined(TRACING) || defined(DTRACE)
+  foreign "C" labelThread(MyCapability() "ptr", R1 "ptr", R2 "ptr") [];
 #endif
   jump %ENTRY_CODE(Sp(0));
 }

@@ -13,12 +13,13 @@
 #include "ThreadLabels.h"
 #include "RtsUtils.h"
 #include "Hash.h"
+#include "Trace.h"
 
 #include <stdlib.h>
 #include <string.h>
 
 #if defined(DEBUG)
-/* to the end */
+
 static HashTable * threadLabels = NULL;
 
 void
@@ -61,9 +62,14 @@ removeThreadLabel(StgWord key)
   }  
 }
 
+#endif /* DEBUG */
+
 void
-labelThread(StgPtr tso, char *label)
+labelThread(Capability *cap   STG_UNUSED,
+            StgTSO     *tso   STG_UNUSED,
+            char       *label STG_UNUSED)
 {
+#if defined(DEBUG)
   int len;
   void *buf;
 
@@ -72,7 +78,8 @@ labelThread(StgPtr tso, char *label)
   buf = stgMallocBytes(len * sizeof(char), "Schedule.c:labelThread()");
   strncpy(buf,label,len);
   /* Update will free the old memory for us */
-  updateThreadLabel(((StgTSO *)tso)->id,buf);
+  updateThreadLabel(tso->id,buf);
+#endif
+  traceThreadLabel(cap, tso, label);
 }
 
-#endif /* DEBUG */

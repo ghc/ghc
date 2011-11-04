@@ -50,6 +50,7 @@ provider HaskellEvent {
   probe request__seq__gc (EventCapNo);
   probe request__par__gc (EventCapNo);
   probe create__spark__thread (EventCapNo, EventThreadID);
+  probe thread__label (EventCapNo, EventThreadID, char *);
 
   /* other events */
 /* This one doesn't seem to be used at all at the moment: */

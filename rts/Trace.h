@@ -152,8 +152,17 @@ void trace_(char *msg, ...);
 
 /* 
  * A message or event emitted by the program
+ * Used by Debug.Trace.{traceEvent, traceEventIO}
  */
 void traceUserMsg(Capability *cap, char *msg);
+
+/*
+ * An event to record a Haskell thread's label/name
+ * Used by GHC.Conc.labelThread
+ */
+void traceThreadLabel_(Capability *cap,
+                       StgTSO     *tso,
+                       char       *label);
 
 /* 
  * Emit a debug message (only when DEBUG is defined)
@@ -221,6 +230,7 @@ void traceSparkCounters_ (Capability *cap,
 #define debugTrace(class, str, ...) /* nothing */
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
+#define traceThreadLabel_(cap, tso, label) /* nothing */
 INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #define traceCapsetEvent_(tag, capset, info) /* nothing */
 #define traceWallClockTime_() /* nothing */
@@ -268,6 +278,8 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
     HASKELLEVENT_REQUEST_PAR_GC(cap)
 #define dtraceCreateSparkThread(cap, spark_tid)         \
     HASKELLEVENT_CREATE_SPARK_THREAD(cap, spark_tid)
+#define dtraceThreadLabel(cap, tso, label)              \
+    HASKELLEVENT_THREAD_LABEL(cap, tso, label)
 INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_STARTUP(num_caps);
 }
@@ -318,6 +330,7 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
 #define dtraceRequestSeqGc(cap)                         /* nothing */
 #define dtraceRequestParGc(cap)                         /* nothing */
 #define dtraceCreateSparkThread(cap, spark_tid)         /* nothing */
+#define dtraceThreadLabel(cap, tso, label)              /* nothing */
 INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceUserMsg(cap, msg)                         /* nothing */
 #define dtraceGcIdle(cap)                               /* nothing */
@@ -412,6 +425,16 @@ INLINE_HEADER void traceEventThreadWakeup(Capability *cap       STG_UNUSED,
     traceSchedEvent(cap, EVENT_THREAD_WAKEUP, tso, other_cap);
     dtraceThreadWakeup((EventCapNo)cap->no, (EventThreadID)tso->id,
                        (EventCapNo)other_cap);
+}
+
+INLINE_HEADER void traceThreadLabel(Capability *cap   STG_UNUSED,
+                                    StgTSO     *tso   STG_UNUSED,
+                                    char       *label STG_UNUSED)
+{
+    if (RTS_UNLIKELY(TRACE_sched)) {
+        traceThreadLabel_(cap, tso, label);
+    }
+    dtraceThreadLabel((EventCapNo)cap->no, (EventThreadID)tso->id, label);
 }
 
 INLINE_HEADER void traceEventGcStart(Capability *cap STG_UNUSED)

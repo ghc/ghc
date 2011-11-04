@@ -34,7 +34,7 @@ import Util
 import Outputable
 import FastString
 
-import Data.Typeable hiding (TyCon)
+import Data.Typeable (Typeable)
 import qualified Data.Data as Data
 \end{code}
 

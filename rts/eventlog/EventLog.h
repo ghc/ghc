@@ -83,6 +83,13 @@ void postSparkCountersEvent (Capability *cap,
                              SparkCounters counters,
                              StgWord remaining);
 
+/*
+ * Post an event to annotate a thread with a label
+ */
+void postThreadLabel(Capability    *cap,
+                     EventThreadID  id,
+                     char          *label);
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
@@ -105,6 +112,12 @@ INLINE_HEADER void postCapMsg (Capability *cap STG_UNUSED,
                                va_list ap STG_UNUSED)
 { /* nothing */ }
 
+
+INLINE_HEADER void postThreadLabel(Capability    *cap   STG_UNUSED,
+                                   EventThreadID  id    STG_UNUSED,
+                                   char          *label STG_UNUSED)
+{ /* nothing */ }
+                                   
 #endif
 
 #include "EndPrivate.h"
