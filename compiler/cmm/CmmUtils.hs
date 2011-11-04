@@ -62,7 +62,7 @@ module CmmUtils(
 
 #include "HsVersions.h"
 
-import TyCon    ( PrimRep(..) )
+import TyCon    ( PrimRep(..), PrimElemRep(..) )
 import Type     ( UnaryType, typePrimRep )
 
 import SMRep
@@ -87,15 +87,28 @@ import Hoopl
 ---------------------------------------------------
 
 primRepCmmType :: DynFlags -> PrimRep -> CmmType
-primRepCmmType _      VoidRep    = panic "primRepCmmType:VoidRep"
-primRepCmmType dflags PtrRep     = gcWord dflags
-primRepCmmType dflags IntRep     = bWord dflags
-primRepCmmType dflags WordRep    = bWord dflags
-primRepCmmType _      Int64Rep   = b64
-primRepCmmType _      Word64Rep  = b64
-primRepCmmType dflags AddrRep    = bWord dflags
-primRepCmmType _      FloatRep   = f32
-primRepCmmType _      DoubleRep  = f64
+primRepCmmType _      VoidRep          = panic "primRepCmmType:VoidRep"
+primRepCmmType dflags PtrRep           = gcWord dflags
+primRepCmmType dflags IntRep           = bWord dflags
+primRepCmmType dflags WordRep          = bWord dflags
+primRepCmmType _      Int64Rep         = b64
+primRepCmmType _      Word64Rep        = b64
+primRepCmmType dflags AddrRep          = bWord dflags
+primRepCmmType _      FloatRep         = f32
+primRepCmmType _      DoubleRep        = f64
+primRepCmmType _      (VecRep len rep) = vec len (primElemRepCmmType rep)
+
+primElemRepCmmType :: PrimElemRep -> CmmType
+primElemRepCmmType Int8ElemRep   = b8
+primElemRepCmmType Int16ElemRep  = b16
+primElemRepCmmType Int32ElemRep  = b32
+primElemRepCmmType Int64ElemRep  = b64
+primElemRepCmmType Word8ElemRep  = b8
+primElemRepCmmType Word16ElemRep = b16
+primElemRepCmmType Word32ElemRep = b32
+primElemRepCmmType Word64ElemRep = b64
+primElemRepCmmType FloatElemRep  = f32
+primElemRepCmmType DoubleElemRep = f64
 
 typeCmmType :: DynFlags -> UnaryType -> CmmType
 typeCmmType dflags ty = primRepCmmType dflags (typePrimRep ty)
@@ -110,6 +123,7 @@ primRepForeignHint Word64Rep    = NoHint
 primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
 primRepForeignHint FloatRep     = NoHint
 primRepForeignHint DoubleRep    = NoHint
+primRepForeignHint (VecRep {})  = NoHint
 
 typeForeignHint :: UnaryType -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep

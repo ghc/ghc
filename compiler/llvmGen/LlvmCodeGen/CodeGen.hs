@@ -1260,6 +1260,17 @@ genLit opt env (CmmInt i w)
 genLit _ env (CmmFloat r w)
   = return (env, LMLitVar $ LMFloatLit (fromRational r) (widthToLlvmFloat w),
               nilOL, [])
+ 
+genLit opt env (CmmVec ls)
+  = do llvmLits <- mapM toLlvmLit ls
+       return (env, LMLitVar $ LMVectorLit llvmLits, nilOL, [])
+  where
+    toLlvmLit :: CmmLit -> UniqSM LlvmLit
+    toLlvmLit lit = do
+        (_, llvmLitVar, _, _) <- genLit opt env lit
+        case llvmLitVar of
+          LMLitVar llvmLit -> return llvmLit
+          _ -> panic "genLit"
 
 genLit _ env cmm@(CmmLabel l)
   = let dflags = getDflags env
