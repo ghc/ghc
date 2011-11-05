@@ -34,6 +34,8 @@ import Name
 import Bag
 import RdrName (GlobalRdrEnv)
 
+-- From GHC API:
+import Outputable(ppr, runSDoc, initSDocContext)
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
@@ -263,10 +265,29 @@ declsFromClass class_ = docs ++ defs ++ sigs ++ ats
 
 declNames :: HsDecl a -> [a]
 declNames (TyClD d) = [tcdName d]
-declNames (ForD (ForeignImport n _ _ _)) = [unLoc n]
+declNames (ForD (ForeignImport n _ _)) = [unLoc n]
 -- we have normal sigs only (since they are taken from ValBindsOut)
 declNames (SigD sig) = sigNameNoLoc sig
-declNames _ = error "unexpected argument to declNames"
+declNames (DocD _) = []
+declNames x = error$ "unexpected argument to declNames: " ++ showHsDecl x
+
+showHsDecl x = 
+   case x of 
+     TyClD _ -> "TyClD" --  (TyClDecl id)	
+     InstD _ -> "InstD" --  (InstDecl id)	
+     DerivD _ -> "DerivD" --  (DerivDecl id)	 
+     ValD _ -> "ValD" --  (HsBind id)	 
+     SigD _ -> "SigD" --  (Sig id)	 
+     DefD _ -> "DefD" -- (DefaultDecl id)	 
+     ForD _ -> "ForD" --  (ForeignDecl id)	 
+     WarningD _ -> "WarningD" --  (WarnDecl id)	 
+     AnnD _ -> "AnnD" --  (AnnDecl id)	 
+     RuleD _ -> "RuleD" --  (RuleDecl id)	 
+     VectD _ -> "VectD" --  (VectDecl id)	 
+     SpliceD _ -> "SpliceD" --  (SpliceDecl id)	 
+     DocD _ -> "DocD" -- DocDecl
+     QuasiQuoteD _ -> "QuasiQuoteD" --  (HsQuasiQuote id)	 
+
 
 
 -- | The top-level declarations of a module that we care about,
@@ -770,7 +791,7 @@ extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
   _ -> L pos (TypeSig lname (noLoc (mkImplicitHsForAllTy (lctxt []) ltype)))
   where
     lctxt = noLoc . ctxt
-    ctxt preds = nlHsTyConApp c (map toTypeNoLoc tvs0) : preds
+    ctxt preds = noLoc (HsClassP c (map toTypeNoLoc tvs0)) : preds
 extractClassDecl _ _ _ = error "extractClassDecl: unexpected decl"
 
 
