@@ -7,13 +7,6 @@ TcSplice: Template Haskell splices
 
 
 \begin{code}
-{-# OPTIONS -fno-warn-unused-imports -fno-warn-unused-binds #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcSplice( kcSpliceType, tcSpliceExpr, tcSpliceDecls, tcBracket,
                  lookupThName_maybe,
                  runQuasiQuoteExpr, runQuasiQuotePat,
@@ -64,7 +57,6 @@ import TyCon
 import DataCon
 import Id
 import IdInfo
-import TysWiredIn
 import DsMeta
 import DsExpr
 import DsMonad hiding (Splice)
@@ -80,7 +72,6 @@ import Data.Maybe
 import BasicTypes
 import Panic
 import FastString
-import Exception
 import Control.Monad    ( when )
 
 import qualified Language.Haskell.TH as TH
@@ -92,8 +83,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 import GHC.Desugar      ( AnnotationWrapper(..) )
 #endif
 
-import GHC.Exts         ( unsafeCoerce#, Int#, Int(..) )
-import System.IO.Error
+import GHC.Exts         ( unsafeCoerce# )
 \end{code}
 
 Note [How top-level splices are handled]
@@ -1273,7 +1263,7 @@ reifyClassInstance i
        ; let head_ty = foldl TH.AppT (TH.ConT (reifyName cls)) thtypes
        ; return $ (TH.InstanceD cxt head_ty []) }
   where
-     (tvs, theta, cls, types) = instanceHead i
+     (_tvs, theta, cls, types) = instanceHead i
 
 ------------------------------
 reifyFamilyInstance :: FamInst -> TcM TH.Dec
