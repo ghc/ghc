@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 -- |
@@ -30,6 +31,7 @@ import Data.Map (Map)
 
 import GHC hiding (NoLink)
 import Binary
+import BinIface (getSymtabName, getDictFastString)
 import Name
 import UniqSupply
 import UniqFM
@@ -104,10 +106,10 @@ writeInterfaceFile filename iface = do
   let bin_dict = BinDictionary {
                       bin_dict_next = dict_next_ref,
                       bin_dict_map  = dict_map_ref }
-  ud <- newWriteState (putName bin_symtab) (putFastString bin_dict)
 
   -- put the main thing
-  bh <- return $ setUserData bh0 ud
+  bh <- return $ setUserData bh0 $ newWriteState (putName bin_symtab)
+                                                 (putFastString bin_dict)
   put_ bh iface
 
   -- write the symtab pointer at the front of the file
@@ -166,9 +168,11 @@ freshNameCache = ( create_fresh_nc , \_ -> return () )
 -- monad being used.  The exact monad is whichever monad the first
 -- argument, the getter and setter of the name cache, requires.
 --
-readInterfaceFile :: MonadIO m =>
-                     NameCacheAccessor m
-                  -> FilePath -> m (Either String InterfaceFile)
+readInterfaceFile :: forall m.
+                     MonadIO m
+                  => NameCacheAccessor m
+                  -> FilePath
+                  -> m (Either String InterfaceFile)
 readInterfaceFile (get_name_cache, set_name_cache) filename = do
   bh0 <- liftIO $ readBinMem filename
 
@@ -180,23 +184,38 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
       "Magic number mismatch: couldn't load interface file: " ++ filename
       | version /= binaryInterfaceVersion -> return . Left $
       "Interface file is of wrong version: " ++ filename
-      | otherwise -> do
+      | otherwise -> with_name_cache $ \update_nc -> do
 
       dict  <- get_dictionary bh0
-      bh1   <- init_handle_user_data bh0 dict
-
-      theNC <- get_name_cache
-      (nc', symtab) <- get_symbol_table bh1 theNC
-      set_name_cache nc'
-
-      -- set the symbol table
-      let ud' = getUserData bh1
-      bh2 <- return $! setUserData bh1 ud'{ud_symtab = symtab}
+  
+      -- read the symbol table so we are capable of reading the actual data
+      bh1 <- do
+          let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
+                                                   (getDictFastString dict)
+          symtab <- update_nc (get_symbol_table bh1)
+          return $ setUserData bh1 $ newReadState (getSymtabName (NCU (\f -> update_nc (return . f))) dict symtab)
+                                                  (getDictFastString dict)
 
       -- load the actual data
-      iface <- liftIO $ get bh2
+      iface <- liftIO $ get bh1
       return (Right iface)
  where
+   with_name_cache :: forall a.
+                      ((forall n b. MonadIO n
+                                => (NameCache -> n (NameCache, b))
+                                -> n b)
+                       -> m a)
+                   -> m a
+   with_name_cache act = do
+      nc_var <-  get_name_cache >>= (liftIO . newIORef)
+      x <- act $ \f -> do
+              nc <- liftIO $ readIORef nc_var
+              (nc', x) <- f nc
+              liftIO $ writeIORef nc_var nc'
+              return x
+      liftIO (readIORef nc_var) >>= set_name_cache
+      return x
+
    get_dictionary bin_handle = liftIO $ do
       dict_p <- get bin_handle
       data_p <- tellBin bin_handle
@@ -204,10 +223,6 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
       dict <- getDictionary bin_handle
       seekBin bin_handle data_p
       return dict
-
-   init_handle_user_data bin_handle dict = liftIO $ do
-      ud <- newReadState dict
-      return (setUserData bin_handle ud)
 
    get_symbol_table bh1 theNC = liftIO $ do
       symtab_p <- get bh1

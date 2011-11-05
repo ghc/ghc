@@ -263,7 +263,7 @@ declsFromClass class_ = docs ++ defs ++ sigs ++ ats
 
 declNames :: HsDecl a -> [a]
 declNames (TyClD d) = [tcdName d]
-declNames (ForD (ForeignImport n _ _)) = [unLoc n]
+declNames (ForD (ForeignImport n _ _ _)) = [unLoc n]
 -- we have normal sigs only (since they are taken from ValBindsOut)
 declNames (SigD sig) = sigNameNoLoc sig
 declNames _ = error "unexpected argument to declNames"
@@ -770,7 +770,7 @@ extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
   _ -> L pos (TypeSig lname (noLoc (mkImplicitHsForAllTy (lctxt []) ltype)))
   where
     lctxt = noLoc . ctxt
-    ctxt preds = noLoc (HsClassP c (map toTypeNoLoc tvs0)) : preds
+    ctxt preds = nlHsTyConApp c (map toTypeNoLoc tvs0) : preds
 extractClassDecl _ _ _ = error "extractClassDecl: unexpected decl"
 
 

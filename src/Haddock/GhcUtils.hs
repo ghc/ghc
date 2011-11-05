@@ -96,8 +96,8 @@ getMainDeclBinder (ValD d) =
 #endif
 
 getMainDeclBinder (SigD d) = sigNameNoLoc d
-getMainDeclBinder (ForD (ForeignImport name _ _)) = [unLoc name]
-getMainDeclBinder (ForD (ForeignExport _ _ _)) = []
+getMainDeclBinder (ForD (ForeignImport name _ _ _)) = [unLoc name]
+getMainDeclBinder (ForD (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
 -- Useful when there is a signature with multiple names, e.g.

@@ -20,14 +20,16 @@ module Haddock.Convert where
 import HsSyn
 import TcType ( tcSplitTyConApp_maybe, tcSplitSigmaTy )
 import TypeRep
+import Kind ( liftedTypeKind, constraintKind )
 import Coercion ( splitKindFunTys, synTyConResKind )
 import Name
 import Var
 import Class
 import TyCon
 import DataCon
+import BasicTypes ( TupleSort(..) )
 import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName )
+import TysWiredIn ( listTyConName, eqTyCon )
 import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc, unLoc )
 
@@ -47,7 +49,24 @@ tyThingToLHsDecl t = noLoc $ case t of
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
-  ATyCon tc -> TyClD (synifyTyCon tc)
+  ATyCon tc
+    | Just cl <- tyConClass_maybe tc -- classes are just a little tedious
+    -> TyClD $ ClassDecl
+         (synifyCtx (classSCTheta cl))
+         (synifyName cl)
+         (synifyTyVars (classTyVars cl))
+         (map (\ (l,r) -> noLoc
+                    (map getName l, map getName r) ) $
+            snd $ classTvsFds cl)
+         (map (noLoc . synifyIdSig DeleteTopLevelQuantification)
+              (classMethods cl))
+         emptyBag --ignore default method definitions, they don't affect signature
+         -- class associated-types are a subset of TyCon:
+         [noLoc (synifyTyCon at_tc) | (at_tc, _) <- classATItems cl]
+         [] --ignore associated type defaults
+         [] --we don't have any docs at this point
+    | otherwise
+    -> TyClD (synifyTyCon tc)
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
@@ -56,26 +75,10 @@ tyThingToLHsDecl t = noLoc $ case t of
   -- a data-constructor alone just gets rendered as a function:
   ADataCon dc -> SigD (TypeSig [synifyName dc]
     (synifyType ImplicitizeForAll (dataConUserType dc)))
-  -- classes are just a little tedious
-  AClass cl ->
-    TyClD $ ClassDecl
-      (synifyCtx (classSCTheta cl))
-      (synifyName cl)
-      (synifyTyVars (classTyVars cl))
-      (map (\ (l,r) -> noLoc
-                 (map getName l, map getName r) ) $
-         snd $ classTvsFds cl)
-      (map (noLoc . synifyIdSig DeleteTopLevelQuantification)
-           (classMethods cl))
-      emptyBag --ignore default method definitions, they don't affect signature
-      (map synifyClassAT (classATs cl))
-      [] --we don't have any docs at this point
 
-
--- class associated-types are a subset of TyCon
--- (mainly only type/data-families)
-synifyClassAT :: TyCon -> LTyClDecl Name
-synifyClassAT = noLoc . synifyTyCon
+synifyATDefault :: TyCon -> LTyClDecl Name
+synifyATDefault tc = noLoc (synifyAxiom ax)
+  where Just ax = tyConFamilyCoercion_maybe tc
 
 synifyAxiom :: CoAxiom -> TyClDecl Name
 synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
@@ -224,25 +227,7 @@ synifyIdSig s i = TypeSig [synifyName i] (synifyType s (varType i))
 
 
 synifyCtx :: [PredType] -> LHsContext Name
-synifyCtx = noLoc . map synifyPred
-
-
-synifyPred :: PredType -> LHsPred Name
-synifyPred (ClassP cls tys) =
-    let sTys = map (synifyType WithinType) tys
-    in noLoc $
-        HsClassP (getName cls) sTys
-synifyPred (IParam ip ty) =
-    let sTy = synifyType WithinType ty
-    -- IPName should be in class NamedThing...
-    in noLoc $
-      HsIParam ip sTy
-synifyPred (EqPred ty1 ty2) =
-    let
-     s1 = synifyType WithinType ty1
-     s2 = synifyType WithinType ty2
-    in noLoc $
-      HsEqualP s1 s2
+synifyCtx = noLoc . map (synifyType WithinType)
 
 
 synifyTyVars :: [TyVar] -> [LHsTyVarBndr Name]
@@ -273,16 +258,26 @@ data SynifyTypeState
 
 
 synifyType :: SynifyTypeState -> Type -> LHsType Name
-synifyType _ (PredTy{}) = --should never happen.
-  error "synifyType: PredTys are not, in themselves, source-level types."
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | isTupleTyCon tc, tyConArity tc == length tys =
-     noLoc $ HsTupleTy (tupleTyConBoxity tc) (map (synifyType WithinType) tys)
+     noLoc $ HsTupleTy (case tupleTyConSort tc of
+                          BoxedTuple      -> HsBoxyTuple liftedTypeKind
+                          ConstraintTuple -> HsBoxyTuple constraintKind
+                          UnboxedTuple    -> HsUnboxedTuple)
+                       (map (synifyType WithinType) tys)
   -- ditto for lists
   | getName tc == listTyConName, [ty] <- tys =
      noLoc $ HsListTy (synifyType WithinType ty)
+  -- ditto for implicit parameter tycons
+  | Just ip <- tyConIP_maybe tc
+  , [ty] <- tys
+  = noLoc $ HsIParamTy ip (synifyType WithinType ty)
+  -- and equalities
+  | tc == eqTyCon
+  , [ty1, ty2] <- tys
+  = noLoc $ HsEqTy (synifyType WithinType ty1) (synifyType WithinType ty2)
   -- Most TyCons:
   | otherwise =
     foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
@@ -313,9 +308,9 @@ synifyType s forallty@(ForAllTy _tv _ty) =
 
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
-                  ([HsPred Name], Name, [HsType Name])
+                  ([HsType Name], Name, [HsType Name])
 synifyInstHead (_, preds, cls, ts) =
-  ( map (unLoc . synifyPred) preds
+  ( map (unLoc . synifyType WithinType) preds
   , getName cls
   , map (unLoc . synifyType WithinType) ts
   )

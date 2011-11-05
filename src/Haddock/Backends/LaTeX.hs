@@ -24,7 +24,7 @@ import GHC
 import OccName
 import Name                 ( isTyConName, nameOccName )
 import RdrName              ( rdrNameOcc, isRdrTc )
-import BasicTypes           ( IPName(..), Boxity(..) )
+import BasicTypes           ( ipNameName )
 import Outputable           ( Outputable, ppr, showSDoc )
 import FastString           ( unpackFS, unpackLitString )
 
@@ -450,7 +450,7 @@ rDoc = maybeDoc . fmap latexStripTrailingWhitespace
 -------------------------------------------------------------------------------
 
 
-ppClassHdr :: Bool -> Located [LHsPred DocName] -> DocName
+ppClassHdr :: Bool -> Located [LHsType DocName] -> DocName
            -> [Located (HsTyVarBndr DocName)] -> [Located ([DocName], [DocName])]
            -> Bool -> LaTeX
 ppClassHdr summ lctxt n tvs fds unicode =
@@ -473,7 +473,7 @@ ppClassDecl :: [DocInstance DocName] -> SrcSpan
             -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> LaTeX
 ppClassDecl instances loc mbDoc subdocs
-  (ClassDecl lctxt lname ltyvars lfds lsigs _ ats _) unicode
+  (ClassDecl lctxt lname ltyvars lfds lsigs _ ats at_defs _) unicode
   = declWithDoc classheader (if null body then Nothing else Just (vcat body)) $$
     instancesBit
   where
@@ -486,8 +486,8 @@ ppClassDecl instances loc mbDoc subdocs
     body = catMaybes [fmap docToLaTeX mbDoc, body_]
 
     body_
-      | null lsigs, null ats = Nothing
-      | null ats  = Just methodTable
+      | null lsigs, null ats, null at_defs = Nothing
+      | null ats, null at_defs = Just methodTable
 ---     | otherwise = atTable $$ methodTable
       | otherwise = error "LaTeX.ppClassDecl"
 
@@ -771,7 +771,7 @@ ppContextNoArrow []  _ = empty
 ppContextNoArrow cxt unicode = pp_hs_context (map unLoc cxt) unicode
 
 
-ppContextNoLocs :: [HsPred DocName] -> Bool -> LaTeX
+ppContextNoLocs :: [HsType DocName] -> Bool -> LaTeX
 ppContextNoLocs []  _ = empty
 ppContextNoLocs cxt unicode = pp_hs_context cxt unicode <+> darrow unicode
 
@@ -780,17 +780,10 @@ ppContext :: HsContext DocName -> Bool -> LaTeX
 ppContext cxt unicode = ppContextNoLocs (map unLoc cxt) unicode
 
 
-pp_hs_context :: [HsPred DocName] -> Bool -> LaTeX
+pp_hs_context :: [HsType DocName] -> Bool -> LaTeX
 pp_hs_context []  _       = empty
-pp_hs_context [p] unicode = ppPred unicode p
-pp_hs_context cxt unicode = parenList (map (ppPred unicode) cxt)
-
-
-ppPred :: Bool -> HsPred DocName -> LaTeX
-ppPred unicode (HsClassP n ts) = ppAppNameTypes n (map unLoc ts) unicode
-ppPred unicode (HsEqualP t1 t2) = ppLType unicode t1 <> text "~" <> ppLType unicode t2
-ppPred unicode (HsIParam (IPName n) t)
-  = char '?' <> ppDocName n <> dcolon unicode <> ppLType unicode t
+pp_hs_context [p] unicode = ppType unicode p
+pp_hs_context cxt unicode = parenList (map (ppType unicode) cxt)
 
 
 -------------------------------------------------------------------------------
@@ -807,9 +800,9 @@ ppBang HsNoBang = empty
 ppBang _        = char '!' -- Unpacked args is an implementation detail,
 
 
-tupleParens :: Boxity -> [LaTeX] -> LaTeX
-tupleParens Boxed   = parenList
-tupleParens Unboxed = ubxParenList
+tupleParens :: HsTupleSort -> [LaTeX] -> LaTeX
+tupleParens (HsBoxyTuple _) = parenList
+tupleParens HsUnboxedTuple  = ubxParenList
 
 
 -------------------------------------------------------------------------------
@@ -878,11 +871,15 @@ ppr_mono_ty _         (HsTupleTy con tys) u = tupleParens con (map (ppLType u) t
 ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppKind kind)
 ppr_mono_ty _         (HsListTy ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)
-ppr_mono_ty _         (HsPredTy p)        u = parens (ppPred u p)
+ppr_mono_ty _         (HsIParamTy n ty)   u = brackets (ppDocName (ipNameName n) <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ = error "ppr_mono_ty HsQuasiQuoteTy"
 ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
 ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
+
+ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode
+  = maybeParen ctxt_prec pREC_OP $
+    ppr_mono_lty pREC_OP ty1 unicode <+> char '~' <+> ppr_mono_lty pREC_OP ty2 unicode
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode
   = maybeParen ctxt_prec pREC_CON $

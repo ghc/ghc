@@ -24,7 +24,7 @@ import GHC
 
 getDeclFnArgDocs :: HsDecl Name -> Map Int HsDocString
 getDeclFnArgDocs (SigD (TypeSig _ ty)) = getTypeFnArgDocs ty
-getDeclFnArgDocs (ForD (ForeignImport _ ty _)) = getTypeFnArgDocs ty
+getDeclFnArgDocs (ForD (ForeignImport _ ty _ _)) = getTypeFnArgDocs ty
 getDeclFnArgDocs (TyClD (TySynonym {tcdSynRhs = ty})) = getTypeFnArgDocs ty
 getDeclFnArgDocs _ = Map.empty
 

@@ -17,8 +17,8 @@ import Haddock.GhcUtils
 
 import GHC hiding (NoLink)
 import Name
-import BasicTypes
 import Bag (emptyBag)
+import BasicTypes ( IPName(..), ipNameName )
 
 import Data.List
 import qualified Data.Map as Map hiding ( Map )
@@ -208,25 +208,6 @@ renameFnArgsDoc :: FnArgsDoc Name -> RnM (FnArgsDoc DocName)
 renameFnArgsDoc = mapM renameDoc
 
 
-renameLPred :: LHsPred Name -> RnM (LHsPred DocName)
-renameLPred = mapM renamePred
-
-
-renamePred :: HsPred Name -> RnM (HsPred DocName)
-renamePred (HsClassP name types) = do
-  name'  <- rename name
-  types' <- mapM renameLType types
-  return (HsClassP name' types')
-renamePred (HsEqualP type1 type2) = do
-  type1' <- renameLType type1
-  type2' <- renameLType type2
-  return (HsEqualP type1' type2')
-renamePred (HsIParam (IPName name) t) = do
-  name' <- rename name
-  t'    <- renameLType t
-  return (HsIParam (IPName name') t')
-
-
 renameLType :: LHsType Name -> RnM (LHsType DocName)
 renameLType = mapM renameType
 
@@ -254,6 +235,8 @@ renameType t = case t of
 
   HsListTy ty -> return . HsListTy =<< renameLType ty
   HsPArrTy ty -> return . HsPArrTy =<< renameLType ty
+  HsIParamTy n ty -> liftM2 HsIParamTy (liftM IPName (rename (ipNameName n))) (renameLType ty)
+  HsEqTy ty1 ty2 -> liftM2 HsEqTy (renameLType ty1) (renameLType ty2)
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
 
@@ -264,8 +247,6 @@ renameType t = case t of
     return (HsOpTy a' (L loc op') b')
 
   HsParTy ty -> return . HsParTy =<< renameLType ty
-
-  HsPredTy p -> return . HsPredTy =<< renamePred p
 
   HsKindSig ty k -> do
     ty' <- renameLType ty
@@ -285,15 +266,15 @@ renameLTyVarBndr (L loc tv) = do
   return $ L loc (replaceTyVarName tv name')
 
 
-renameLContext :: Located [LHsPred Name] -> RnM (Located [LHsPred DocName])
+renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
-  context' <- mapM renameLPred context
+  context' <- mapM renameLType context
   return (L loc context')
 
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
 renameInstHead (preds, className, types) = do
-  preds' <- mapM renamePred preds
+  preds' <- mapM renameType preds
   className' <- rename className
   types' <- mapM renameType types
   return (preds', className', types')
@@ -351,15 +332,16 @@ renameTyClD d = case d of
     typats'  <- mapM (mapM renameLType) typats
     return (TySynonym lname' ltyvars' typats' ltype')
 
-  ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats _ -> do
+  ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats at_defs _ -> do
     lcontext' <- renameLContext lcontext
     lname'    <- renameL lname
     ltyvars'  <- mapM renameLTyVarBndr ltyvars
     lfundeps' <- mapM renameLFunDep lfundeps
     lsigs'    <- mapM renameLSig lsigs
     ats'      <- mapM renameLTyClD ats
+    at_defs'  <- mapM renameLTyClD at_defs
     -- we don't need the default methods or the already collected doc entities
-    return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag ats' [])
+    return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag ats' at_defs' [])
 
   where
     renameLCon (L loc con) = return . L loc =<< renameCon con
@@ -410,14 +392,14 @@ renameSig sig = case sig of
 
 
 renameForD :: ForeignDecl Name -> RnM (ForeignDecl DocName)
-renameForD (ForeignImport lname ltype x) = do
+renameForD (ForeignImport lname ltype co x) = do
   lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignImport lname' ltype' x)
-renameForD (ForeignExport lname ltype x) = do
+  return (ForeignImport lname' ltype' co x)
+renameForD (ForeignExport lname ltype co x) = do
   lname' <- renameL lname
   ltype' <- renameLType ltype
-  return (ForeignExport lname' ltype' x)
+  return (ForeignExport lname' ltype' co x)
 
 
 renameInstD :: InstDecl Name -> RnM (InstDecl DocName)
