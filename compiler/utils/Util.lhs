@@ -14,7 +14,8 @@
 -- | Highly random utility functions
 module Util (
         -- * Flags dependent on the compiler build
-        ghciSupported, debugIsOn, ghciTablesNextToCode, isDynamicGhcLib,
+        ghciSupported, debugIsOn, ncgDebugIsOn,
+        ghciTablesNextToCode, isDynamicGhcLib,
         isWindowsHost, isWindowsTarget, isDarwinTarget,
 
         -- * General list processing
@@ -158,6 +159,13 @@ debugIsOn :: Bool
 debugIsOn = True
 #else
 debugIsOn = False
+#endif
+
+ncgDebugIsOn :: Bool
+#ifdef NCG_DEBUG
+ncgDebugIsOn = True
+#else
+ncgDebugIsOn = False
 #endif
 
 ghciTablesNextToCode :: Bool

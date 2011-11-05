@@ -828,7 +828,8 @@ Ideas for other things we could do (put these in Hoopl please!):
 cmmToCmm :: DynFlags -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline (cmmEliminateDeadBlocks blocks))
+  let platform = targetPlatform dflags
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline platform (cmmEliminateDeadBlocks blocks))
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
