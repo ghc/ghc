@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Cmm optimisation
@@ -27,7 +20,6 @@ import OldCmm
 import OldPprCmm
 import CmmNode (wrapRecExp)
 import CmmUtils
-import CLabel
 import StaticFlags
 
 import UniqFM
@@ -39,12 +31,8 @@ import Platform
 import BlockId
 
 import Data.Bits
-import Data.Word
-import Data.Int
 import Data.Maybe
 import Data.List
-
-import Compiler.Hoopl hiding (Unique)
 
 -- -----------------------------------------------------------------------------
 -- Eliminates dead blocks
@@ -111,11 +99,11 @@ works as follows:
 
   - count uses of each temporary
   - for each temporary:
-	- attempt to push it forward to the statement that uses it
+        - attempt to push it forward to the statement that uses it
         - only push forward past assignments to other temporaries
-	  (assumes that temporaries are single-assignment)
-	- if we reach the statement that uses it, inline the rhs
-	  and delete the original assignment.
+          (assumes that temporaries are single-assignment)
+        - if we reach the statement that uses it, inline the rhs
+          and delete the original assignment.
 
 [N.B. In the Quick C-- compiler, this optimization is achieved by a
  combination of two dataflow passes: forward substitution (peephole
@@ -164,7 +152,7 @@ cmmMiniInline platform blocks = map do_inline blocks
           = BasicBlock id (cmmMiniInlineStmts platform (countUses blocks) stmts)
 
 cmmMiniInlineStmts :: Platform -> UniqFM Int -> [CmmStmt] -> [CmmStmt]
-cmmMiniInlineStmts _ uses [] = []
+cmmMiniInlineStmts _        _    [] = []
 cmmMiniInlineStmts platform uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
         -- not used: just discard this assignment
   | Nothing <- lookupUFM uses u
@@ -228,12 +216,15 @@ lookForInlineLit u expr stmts@(stmt : rest)
     -- We skip over assignments to registers, unless the register
     -- being assigned to is the one we're inlining.
     ok_to_skip = case stmt of
-        CmmAssign (CmmLocal r@(LocalReg u' _)) _ | u' == u -> False
+        CmmAssign (CmmLocal (LocalReg u' _)) _ | u' == u -> False
         _other -> True
 
+lookForInline :: Unique -> CmmExpr -> [CmmStmt] -> Maybe [CmmStmt]
 lookForInline u expr stmts = lookForInline' u expr regset stmts
     where regset = foldRegsUsed extendRegSet emptyRegSet expr
 
+lookForInline' :: Unique -> CmmExpr -> RegSet -> [CmmStmt] -> Maybe [CmmStmt]
+lookForInline' _ _    _      [] = panic "lookForInline' []"
 lookForInline' u expr regset (stmt : rest)
   | Just 1 <- lookupUFM (countUses stmt) u, ok_to_inline
   = Just (inlineStmt u expr stmt : rest)
@@ -247,14 +238,14 @@ lookForInline' u expr regset (stmt : rest)
   = Nothing
 
   where
-	-- we don't inline into CmmCall if the expression refers to global
-	-- registers.  This is a HACK to avoid global registers clashing with
-	-- C argument-passing registers, really the back-end ought to be able
-	-- to handle it properly, but currently neither PprC nor the NCG can
-	-- do it.  See also CgForeignCall:load_args_into_temps.
+        -- we don't inline into CmmCall if the expression refers to global
+        -- registers.  This is a HACK to avoid global registers clashing with
+        -- C argument-passing registers, really the back-end ought to be able
+        -- to handle it properly, but currently neither PprC nor the NCG can
+        -- do it.  See also CgForeignCall:load_args_into_temps.
     ok_to_inline = case stmt of
-		     CmmCall{} -> hasNoGlobalRegs expr
-		     _ -> True
+                     CmmCall{} -> hasNoGlobalRegs expr
+                     _ -> True
 
    -- Expressions aren't side-effecting.  Temporaries may or may not
    -- be single-assignment depending on the source (the old code
@@ -267,8 +258,8 @@ lookForInline' u expr regset (stmt : rest)
     ok_to_skip = case stmt of
                  CmmNop -> True
                  CmmComment{} -> True
-                 CmmAssign (CmmLocal r@(LocalReg u' _)) rhs | u' /= u && not (r `elemRegSet` regset) -> True
-                 CmmAssign g@(CmmGlobal _) rhs -> not (g `regUsedIn` expr)
+                 CmmAssign (CmmLocal r@(LocalReg u' _)) _rhs | u' /= u && not (r `elemRegSet` regset) -> True
+                 CmmAssign g@(CmmGlobal _) _rhs -> not (g `regUsedIn` expr)
                  _other -> False
 
 
@@ -278,12 +269,12 @@ inlineStmt u a (CmmStore e1 e2) = CmmStore (inlineExpr u a e1) (inlineExpr u a e
 inlineStmt u a (CmmCall target regs es srt ret)
    = CmmCall (infn target) regs es' srt ret
    where infn (CmmCallee fn cconv) = CmmCallee (inlineExpr u a fn) cconv
-	 infn (CmmPrim p) = CmmPrim p
-	 es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
+         infn (CmmPrim p) = CmmPrim p
+         es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
 inlineStmt u a (CmmCondBranch e d) = CmmCondBranch (inlineExpr u a e) d
 inlineStmt u a (CmmSwitch e d) = CmmSwitch (inlineExpr u a e) d
 inlineStmt u a (CmmJump e d) = CmmJump (inlineExpr u a e) d
-inlineStmt u a other_stmt = other_stmt
+inlineStmt _ _ other_stmt = other_stmt
 
 inlineExpr :: Unique -> CmmExpr -> CmmExpr -> CmmExpr
 inlineExpr u a e@(CmmReg (CmmLocal (LocalReg u' _)))
@@ -296,7 +287,7 @@ inlineExpr u a e@(CmmRegOff (CmmLocal (LocalReg u' rep)) off)
     width = typeWidth rep
 inlineExpr u a (CmmLoad e rep) = CmmLoad (inlineExpr u a e) rep
 inlineExpr u a (CmmMachOp op es) = CmmMachOp op (map (inlineExpr u a) es)
-inlineExpr u a other_expr = other_expr
+inlineExpr _ _ other_expr = other_expr
 
 -- -----------------------------------------------------------------------------
 -- MachOp constant folder
@@ -320,18 +311,18 @@ cmmMachOpFoldM
     -> [CmmExpr]
     -> Maybe CmmExpr
 
-cmmMachOpFoldM _ op arg@[CmmLit (CmmInt x rep)]
+cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
   = Just $ case op of
-      MO_S_Neg r -> CmmLit (CmmInt (-x) rep)
-      MO_Not r   -> CmmLit (CmmInt (complement x) rep)
+      MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)
+      MO_Not _   -> CmmLit (CmmInt (complement x) rep)
 
         -- these are interesting: we must first narrow to the 
         -- "from" type, in order to truncate to the correct size.
         -- The final narrow/widen to the destination type
         -- is implicit in the CmmLit.
-      MO_SF_Conv from to -> CmmLit (CmmFloat (fromInteger x) to)
-      MO_SS_Conv from to -> CmmLit (CmmInt (narrowS from x) to)
-      MO_UU_Conv from to -> CmmLit (CmmInt (narrowU from x) to)
+      MO_SF_Conv _from to -> CmmLit (CmmFloat (fromInteger x) to)
+      MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
+      MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
 
       _ -> panic "cmmMachOpFoldM: unknown unary op"
 
@@ -341,7 +332,7 @@ cmmMachOpFoldM _ (MO_SS_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
 cmmMachOpFoldM _ (MO_UU_Conv rep1 rep2) [x] | rep1 == rep2 = Just x
 
 -- Eliminate nested conversions where possible
-cmmMachOpFoldM platform conv_outer args@[CmmMachOp conv_inner [x]]
+cmmMachOpFoldM platform conv_outer [CmmMachOp conv_inner [x]]
   | Just (rep1,rep2,signed1) <- isIntConversion conv_inner,
     Just (_,   rep3,signed2) <- isIntConversion conv_outer
   = case () of
@@ -374,22 +365,22 @@ cmmMachOpFoldM platform conv_outer args@[CmmMachOp conv_inner [x]]
 -- but what if the architecture only supports word-sized loads, should
 -- we do the transformation anyway?
 
-cmmMachOpFoldM _ mop args@[CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
+cmmMachOpFoldM _ mop [CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
   = case mop of
         -- for comparisons: don't forget to narrow the arguments before
         -- comparing, since they might be out of range.
-        MO_Eq r   -> Just $ CmmLit (CmmInt (if x_u == y_u then 1 else 0) wordWidth)
-        MO_Ne r   -> Just $ CmmLit (CmmInt (if x_u /= y_u then 1 else 0) wordWidth)
+        MO_Eq _   -> Just $ CmmLit (CmmInt (if x_u == y_u then 1 else 0) wordWidth)
+        MO_Ne _   -> Just $ CmmLit (CmmInt (if x_u /= y_u then 1 else 0) wordWidth)
 
-        MO_U_Gt r -> Just $ CmmLit (CmmInt (if x_u >  y_u then 1 else 0) wordWidth)
-        MO_U_Ge r -> Just $ CmmLit (CmmInt (if x_u >= y_u then 1 else 0) wordWidth)
-        MO_U_Lt r -> Just $ CmmLit (CmmInt (if x_u <  y_u then 1 else 0) wordWidth)
-        MO_U_Le r -> Just $ CmmLit (CmmInt (if x_u <= y_u then 1 else 0) wordWidth)
+        MO_U_Gt _ -> Just $ CmmLit (CmmInt (if x_u >  y_u then 1 else 0) wordWidth)
+        MO_U_Ge _ -> Just $ CmmLit (CmmInt (if x_u >= y_u then 1 else 0) wordWidth)
+        MO_U_Lt _ -> Just $ CmmLit (CmmInt (if x_u <  y_u then 1 else 0) wordWidth)
+        MO_U_Le _ -> Just $ CmmLit (CmmInt (if x_u <= y_u then 1 else 0) wordWidth)
 
-        MO_S_Gt r -> Just $ CmmLit (CmmInt (if x_s >  y_s then 1 else 0) wordWidth)
-        MO_S_Ge r -> Just $ CmmLit (CmmInt (if x_s >= y_s then 1 else 0) wordWidth)
-        MO_S_Lt r -> Just $ CmmLit (CmmInt (if x_s <  y_s then 1 else 0) wordWidth)
-        MO_S_Le r -> Just $ CmmLit (CmmInt (if x_s <= y_s then 1 else 0) wordWidth)
+        MO_S_Gt _ -> Just $ CmmLit (CmmInt (if x_s >  y_s then 1 else 0) wordWidth)
+        MO_S_Ge _ -> Just $ CmmLit (CmmInt (if x_s >= y_s then 1 else 0) wordWidth)
+        MO_S_Lt _ -> Just $ CmmLit (CmmInt (if x_s <  y_s then 1 else 0) wordWidth)
+        MO_S_Le _ -> Just $ CmmLit (CmmInt (if x_s <= y_s then 1 else 0) wordWidth)
 
         MO_Add r -> Just $ CmmLit (CmmInt (x + y) r)
         MO_Sub r -> Just $ CmmLit (CmmInt (x - y) r)
@@ -407,7 +398,7 @@ cmmMachOpFoldM _ mop args@[CmmLit (CmmInt x xrep), CmmLit (CmmInt y _)]
         MO_U_Shr r -> Just $ CmmLit (CmmInt (x_u `shiftR` fromIntegral y) r)
         MO_S_Shr r -> Just $ CmmLit (CmmInt (x `shiftR` fromIntegral y) r)
 
-        other      -> Nothing
+        _          -> Nothing
 
    where
         x_u = narrowU xrep x
@@ -525,51 +516,51 @@ cmmMachOpFoldM platform cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
 
 -- We can often do something with constants of 0 and 1 ...
 
-cmmMachOpFoldM _ mop args@[x, y@(CmmLit (CmmInt 0 _))]
+cmmMachOpFoldM _ mop [x, y@(CmmLit (CmmInt 0 _))]
   = case mop of
-        MO_Add   r -> Just x
-        MO_Sub   r -> Just x
-        MO_Mul   r -> Just y
-        MO_And   r -> Just y
-        MO_Or    r -> Just x
-        MO_Xor   r -> Just x
-        MO_Shl   r -> Just x
-        MO_S_Shr r -> Just x
-        MO_U_Shr r -> Just x
-        MO_Ne    r | isComparisonExpr x -> Just x
-        MO_Eq    r | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_U_Gt  r | isComparisonExpr x -> Just x
-        MO_S_Gt  r | isComparisonExpr x -> Just x
-        MO_U_Lt  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_S_Lt  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_U_Ge  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
-        MO_S_Ge  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
-        MO_U_Le  r | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_S_Le  r | Just x' <- maybeInvertCmmExpr x -> Just x'
-        other    -> Nothing
+        MO_Add   _ -> Just x
+        MO_Sub   _ -> Just x
+        MO_Mul   _ -> Just y
+        MO_And   _ -> Just y
+        MO_Or    _ -> Just x
+        MO_Xor   _ -> Just x
+        MO_Shl   _ -> Just x
+        MO_S_Shr _ -> Just x
+        MO_U_Shr _ -> Just x
+        MO_Ne    _ | isComparisonExpr x -> Just x
+        MO_Eq    _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+        MO_U_Gt  _ | isComparisonExpr x -> Just x
+        MO_S_Gt  _ | isComparisonExpr x -> Just x
+        MO_U_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
+        MO_S_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
+        MO_U_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
+        MO_S_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
+        MO_U_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+        MO_S_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+        _ -> Nothing
 
-cmmMachOpFoldM _ mop args@[x, y@(CmmLit (CmmInt 1 rep))]
+cmmMachOpFoldM _ mop [x, (CmmLit (CmmInt 1 rep))]
   = case mop of
-        MO_Mul    r -> Just x
-        MO_S_Quot r -> Just x
-        MO_U_Quot r -> Just x
-        MO_S_Rem  r -> Just $ CmmLit (CmmInt 0 rep)
-        MO_U_Rem  r -> Just $ CmmLit (CmmInt 0 rep)
-        MO_Ne    r | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_Eq    r | isComparisonExpr x -> Just x
-        MO_U_Lt  r | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_S_Lt  r | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_U_Gt  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_S_Gt  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
-        MO_U_Le  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
-        MO_S_Le  r | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
-        MO_U_Ge  r | isComparisonExpr x -> Just x
-        MO_S_Ge  r | isComparisonExpr x -> Just x
-        other       -> Nothing
+        MO_Mul    _ -> Just x
+        MO_S_Quot _ -> Just x
+        MO_U_Quot _ -> Just x
+        MO_S_Rem  _ -> Just $ CmmLit (CmmInt 0 rep)
+        MO_U_Rem  _ -> Just $ CmmLit (CmmInt 0 rep)
+        MO_Ne    _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+        MO_Eq    _ | isComparisonExpr x -> Just x
+        MO_U_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+        MO_S_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+        MO_U_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
+        MO_S_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 wordWidth)
+        MO_U_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
+        MO_S_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 wordWidth)
+        MO_U_Ge  _ | isComparisonExpr x -> Just x
+        MO_S_Ge  _ | isComparisonExpr x -> Just x
+        _ -> Nothing
 
 -- Now look for multiplication/division by powers of 2 (integers).
 
-cmmMachOpFoldM platform mop args@[x, y@(CmmLit (CmmInt n _))]
+cmmMachOpFoldM platform mop [x, (CmmLit (CmmInt n _))]
   = case mop of
         MO_Mul rep
            | Just p <- exactLog2 n ->
@@ -587,7 +578,7 @@ cmmMachOpFoldM platform mop args@[x, y@(CmmLit (CmmInt n _))]
                 -- dividend if it is a negative number.
                 --
                 -- to avoid a test/jump, we use the following sequence:
-                -- 	x1 = x >> word_size-1  (all 1s if -ve, all 0s if +ve)
+                --      x1 = x >> word_size-1  (all 1s if -ve, all 0s if +ve)
                 --      x2 = y & (divisor-1)
                 --      result = (x+x2) >>= log2(divisor)
                 -- this could be done a bit more simply using conditional moves,
@@ -605,8 +596,7 @@ cmmMachOpFoldM platform mop args@[x, y@(CmmLit (CmmInt n _))]
                     x3 = CmmMachOp (MO_Add rep) [x, x2]
                 in
                 Just (cmmMachOpFold platform (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)])
-        other
-           -> Nothing
+        _ -> Nothing
 
 -- Anything else is just too hard.
 
@@ -635,9 +625,9 @@ exactLog2 x_
     else
        case iUnbox (fromInteger x_) of { x ->
        if (x `bitAndFastInt` negateFastInt x) /=# x then
-	  Nothing
+          Nothing
        else
-	  Just (toInteger (iBox (pow2 x)))
+          Just (toInteger (iBox (pow2 x)))
        }
   where
     pow2 x | x ==# _ILIT(1) = _ILIT(0)
@@ -672,32 +662,34 @@ exactLog2 x_
 
 cmmLoopifyForC :: RawCmmDecl -> RawCmmDecl
 cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
-cmmLoopifyForC p@(CmmProc (Just info@(Statics info_lbl _)) entry_lbl
+cmmLoopifyForC (CmmProc (Just info@(Statics info_lbl _)) entry_lbl
                  (ListGraph blocks@(BasicBlock top_id _ : _))) =
 --  pprTrace "jump_lbl" (ppr jump_lbl <+> ppr entry_lbl) $
   CmmProc (Just info) entry_lbl (ListGraph blocks')
   where blocks' = [ BasicBlock id (map do_stmt stmts)
-		  | BasicBlock id stmts <- blocks ]
+                  | BasicBlock id stmts <- blocks ]
 
         do_stmt (CmmJump (CmmLit (CmmLabel lbl)) _) | lbl == jump_lbl
-		= CmmBranch top_id
-	do_stmt stmt = stmt
+                = CmmBranch top_id
+        do_stmt stmt = stmt
 
-	jump_lbl | tablesNextToCode = info_lbl
-		 | otherwise        = entry_lbl
+        jump_lbl | tablesNextToCode = info_lbl
+                 | otherwise        = entry_lbl
 
 cmmLoopifyForC top = top
 
 -- -----------------------------------------------------------------------------
 -- Utils
 
+isLit :: CmmExpr -> Bool
 isLit (CmmLit _) = True
 isLit _          = False
 
 isComparisonExpr :: CmmExpr -> Bool
 isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
-isComparisonExpr _other 	    = False
+isComparisonExpr _                  = False
 
+isPicReg :: CmmExpr -> Bool
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True
 isPicReg _ = False
 
