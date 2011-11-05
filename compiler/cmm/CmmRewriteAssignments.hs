@@ -22,6 +22,7 @@ import OptimizationFuel
 import StgCmmUtils
 
 import Control.Monad
+import Platform
 import UniqFM
 import Unique
 import BlockId
@@ -33,8 +34,8 @@ import Prelude hiding (succ, zip)
 ----------------------------------------------------------------
 --- Main function
 
-rewriteAssignments :: CmmGraph -> FuelUniqSM CmmGraph
-rewriteAssignments g = do
+rewriteAssignments :: Platform -> CmmGraph -> FuelUniqSM CmmGraph
+rewriteAssignments platform g = do
   -- Because we need to act on forwards and backwards information, we
   -- first perform usage analysis and bake this information into the
   -- graph (backwards transform), and then do a forwards transform
@@ -43,7 +44,7 @@ rewriteAssignments g = do
   g'' <- liftM fst $ dataflowPassFwd g' [(g_entry g, fact_bot assignmentLattice)] $
                                      analRewFwd assignmentLattice
                                                 assignmentTransfer
-                                                (assignmentRewrite `thenFwdRw` machOpFoldRewrite)
+                                                (assignmentRewrite `thenFwdRw` machOpFoldRewrite platform)
   return (modifyGraph eraseRegUsage g'')
 
 ----------------------------------------------------------------
@@ -611,8 +612,8 @@ assignmentRewrite = mkFRewrite3 first middle last
 -- in literals, which we can inline more aggressively, and inlining
 -- gives us opportunities for more folding.  However, we don't need any
 -- facts to do MachOp folding.
-machOpFoldRewrite :: FwdRewrite FuelUniqSM (WithRegUsage CmmNode) a
-machOpFoldRewrite = mkFRewrite3 first middle last
+machOpFoldRewrite :: Platform -> FwdRewrite FuelUniqSM (WithRegUsage CmmNode) a
+machOpFoldRewrite platform = mkFRewrite3 first middle last
   where first _ _ = return Nothing
         middle :: WithRegUsage CmmNode O O -> a -> GenCmmReplGraph (WithRegUsage CmmNode) O O
         middle (Plain m) _ = return (fmap (mkMiddle . Plain) (foldNode m))
@@ -622,7 +623,7 @@ machOpFoldRewrite = mkFRewrite3 first middle last
         last (Plain l) _ = return (fmap (mkLast . Plain) (foldNode l))
         foldNode :: CmmNode e x -> Maybe (CmmNode e x)
         foldNode n = mapExpDeepM foldExp n
-        foldExp (CmmMachOp op args) = cmmMachOpFoldM op args
+        foldExp (CmmMachOp op args) = cmmMachOpFoldM platform op args
         foldExp _ = Nothing
 
 -- ToDo: Outputable instance for UsageMap and AssignmentMap

@@ -114,7 +114,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        dumpPlatform platform Opt_D_dump_cmmz_spills "Post spills and reloads" g
 
        ----------- Sink and inline assignments -------------------
-       g <- runOptimization $ rewriteAssignments g
+       g <- runOptimization $ rewriteAssignments platform g
        dumpPlatform platform Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
 
        ----------- Eliminate dead assignments -------------------
