@@ -335,15 +335,16 @@ getHaddockLibDir flags =
 
 
 getGhcDirs :: [Flag] -> IO (String, String)
-getGhcDirs flags =
-  case [ dir | Flag_GhcLibDir dir <- flags ] of
-    [] ->
+getGhcDirs flags = do
+  (ghcPath, libDir) <-
 #ifdef IN_GHC_TREE
-      getInTreeDirs
+    getInTreeDirs
 #else
-      return (GhcPaths.ghc, GhcPaths.libdir) -- from GHC.Paths
+    return (GhcPaths.ghc, GhcPaths.libdir)
 #endif
-    xs -> return (GhcPaths.ghc, last xs)
+  case [ dir | Flag_GhcLibDir dir <- flags ] of
+    [] -> return (ghcPath, libDir)
+    xs -> return (ghcPath, last xs)
 
 
 shortcutFlags :: [Flag] -> IO ()
