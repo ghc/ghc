@@ -34,8 +34,6 @@ import Name
 import Bag
 import RdrName (GlobalRdrEnv)
 
--- From GHC API:
-import Outputable(ppr, runSDoc, initSDocContext)
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
@@ -180,7 +178,7 @@ mkDeclMap :: [DeclInfo] -> Map Name DeclInfo
 mkDeclMap decls = Map.fromList . concat $
   [ decls_ ++ subDecls
   | (parent@(L _ d), doc, subs) <- decls
-  , let decls_ = [ (name, (parent, doc, subs)) | name <- declNames d ]
+  , let decls_ = [ (name, (parent, doc, subs)) | name <- getMainDeclBinder d ]
         subDecls = [ (n, (parent, doc', [])) | (n, doc') <- subs ]
   , not (isDocD d), not (isInstD d) ]
 
@@ -232,7 +230,7 @@ classDataSubs decl
   where
     classSubs = [ (name, doc, fnArgsDoc)
                 | (L _ d, doc) <- classDecls decl
-                , name <- declNames d
+                , name <- getMainDeclBinder d
                 , let fnArgsDoc = getDeclFnArgDocs d ]
     dataSubs  = constrs ++ fields
       where
@@ -261,33 +259,6 @@ declsFromClass class_ = docs ++ defs ++ sigs ++ ats
     defs = mkDecls (bagToList . tcdMeths) ValD class_
     sigs = mkDecls tcdSigs SigD class_
     ats  = mkDecls tcdATs TyClD class_
-
-
-declNames :: HsDecl a -> [a]
-declNames (TyClD d) = [tcdName d]
-declNames (ForD (ForeignImport n _ _)) = [unLoc n]
--- we have normal sigs only (since they are taken from ValBindsOut)
-declNames (SigD sig) = sigNameNoLoc sig
-declNames (DocD _) = []
-declNames x = error$ "unexpected argument to declNames: " ++ showHsDecl x
-
-showHsDecl x = 
-   case x of 
-     TyClD _ -> "TyClD" --  (TyClDecl id)	
-     InstD _ -> "InstD" --  (InstDecl id)	
-     DerivD _ -> "DerivD" --  (DerivDecl id)	 
-     ValD _ -> "ValD" --  (HsBind id)	 
-     SigD _ -> "SigD" --  (Sig id)	 
-     DefD _ -> "DefD" -- (DefaultDecl id)	 
-     ForD _ -> "ForD" --  (ForeignDecl id)	 
-     WarningD _ -> "WarningD" --  (WarnDecl id)	 
-     AnnD _ -> "AnnD" --  (AnnDecl id)	 
-     RuleD _ -> "RuleD" --  (RuleDecl id)	 
-     VectD _ -> "VectD" --  (VectDecl id)	 
-     SpliceD _ -> "SpliceD" --  (SpliceDecl id)	 
-     DocD _ -> "DocD" -- DocDecl
-     QuasiQuoteD _ -> "QuasiQuoteD" --  (HsQuasiQuote id)	 
-
 
 
 -- | The top-level declarations of a module that we care about,
@@ -516,7 +487,7 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
     declWith t =
       case findDecl t of
         Just (decl, doc, subs) ->
-          let declNames_ = getMainDeclBinder (unL decl)
+          let declNames = getMainDeclBinder (unL decl)
           in case () of
             _
               -- temp hack: we filter out separately exported ATs, since we haven't decided how
@@ -526,7 +497,7 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
 
               -- We should not show a subordinate by itself if any of its
               -- parents is also exported. See note [1].
-              | not $ t `elem` declNames_,
+              | not $ t `elem` declNames,
                 Just p <- find isExported (parents t $ unL decl) ->
                 do liftErrMsg $ tell [
                      "Warning: " ++ moduleString thisMod ++ ": " ++

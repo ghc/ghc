@@ -85,20 +85,14 @@ isVarSym = isLexVarSym . occNameFS
 getMainDeclBinder :: HsDecl name -> [name]
 getMainDeclBinder (TyClD d) = [tcdName d]
 getMainDeclBinder (ValD d) =
-#if __GLASGOW_HASKELL__ == 612
-  case collectAcc d [] of
-    []       -> []
-    (name:_) -> [unLoc name]
-#else
   case collectHsBindBinders d of
     []       -> []
     (name:_) -> [name]
-#endif
-
 getMainDeclBinder (SigD d) = sigNameNoLoc d
 getMainDeclBinder (ForD (ForeignImport name _ _ _)) = [unLoc name]
 getMainDeclBinder (ForD (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
+
 
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..
