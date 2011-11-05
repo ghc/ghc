@@ -1470,11 +1470,6 @@ def compare_outputs( kind, normaliser, extra_normaliser,
         r = os.system( 'diff -uw ' + expected_file_for_diff + \
                                ' ' + actual_file )
 
-        print "\ndiff between normalised outputs:\n"
-
-        r = os.system( 'diff -uw ' + expected_normalised_file + \
-                               ' ' + actual_normalised_file )
-
         # If for some reason there were no non-whitespace differences,
         # then do a full diff
         if r == 0:
