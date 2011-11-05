@@ -6,8 +6,9 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
 
+-- ToDo: remove -fno-warn-warnings-deprecations
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
--- ToDo: remove
+-- ToDo: remove -fno-warn-incomplete-patterns
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 -- Module for building CmmAGraphs.

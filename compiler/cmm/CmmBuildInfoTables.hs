@@ -7,10 +7,10 @@
 -- for details
 
 -- Norman likes local bindings
--- If this module lives on I'd like to get rid of this flag in due course
+-- If this module lives on I'd like to get rid of the -XNoMonoLocalBinds
+-- flag in due course
 
--- Todo: remove
-
+-- Todo: remove -fno-warn-warnings-deprecations
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module CmmBuildInfoTables
     ( CAFSet, CAFEnv, cafAnal, localCAFInfo, mkTopCAFInfo

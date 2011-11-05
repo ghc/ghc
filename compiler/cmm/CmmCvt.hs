@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
--- ToDo: remove
+-- ToDo: remove -fno-warn-incomplete-patterns
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 module CmmCvt
