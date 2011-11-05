@@ -569,10 +569,12 @@ Here is where we desugar the Template Haskell brackets and escapes
 \begin{code}
 -- Template Haskell stuff
 
-#ifdef GHCI     /* Only if bootstrapping */
+#ifdef GHCI
 dsExpr (HsBracketOut x ps) = dsBracket x ps
-dsExpr (HsSpliceE s)       = pprPanic "dsExpr:splice" (ppr s)
+#else
+dsExpr (HsBracketOut _ _) = panic "dsExpr HsBracketOut"
 #endif
+dsExpr (HsSpliceE s)       = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
 dsExpr (HsProc pat cmd) = dsProcExpr pat cmd
