@@ -6,20 +6,6 @@
 Matching guarded right-hand-sides (GRHSs)
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
 #include "HsVersions.h"
@@ -45,10 +31,10 @@ import Outputable
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
 It desugars:
 \begin{verbatim}
-	| g1 -> e1
-	...
-	| gn -> en
-	where binds
+        | g1 -> e1
+        ...
+        | gn -> en
+        where binds
 \end{verbatim}
 producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the @ei@.
@@ -65,18 +51,18 @@ dsGuarded grhss rhs_ty = do
 In contrast, @dsGRHSs@ produces a @MatchResult@.
 
 \begin{code}
-dsGRHSs :: HsMatchContext Name -> [Pat Id]	-- These are to build a MatchContext from
-	-> GRHSs Id				-- Guarded RHSs
-	-> Type					-- Type of RHS
-	-> DsM MatchResult
+dsGRHSs :: HsMatchContext Name -> [Pat Id]      -- These are to build a MatchContext from
+        -> GRHSs Id                             -- Guarded RHSs
+        -> Type                                 -- Type of RHS
+        -> DsM MatchResult
 dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty = do
     match_results <- mapM (dsGRHS hs_ctx pats rhs_ty) grhss
-    let 
-	match_result1 = foldr1 combineMatchResults match_results
-	match_result2 = adjustMatchResultDs 
-                                 (\e -> dsLocalBinds binds e) 
+    let
+        match_result1 = foldr1 combineMatchResults match_results
+        match_result2 = adjustMatchResultDs
+                                 (\e -> dsLocalBinds binds e)
                                  match_result1
-		-- NB: nested dsLet inside matchResult
+                -- NB: nested dsLet inside matchResult
     --
     return match_result2
 
@@ -87,32 +73,32 @@ dsGRHS hs_ctx _ rhs_ty (L _ (GRHS guards rhs))
 
 
 %************************************************************************
-%*									*
-%*  matchGuard : make a MatchResult from a guarded RHS			*
-%*									*
+%*                                                                      *
+%*  matchGuard : make a MatchResult from a guarded RHS                  *
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-matchGuards :: [Stmt Id] 		-- Guard
-            -> HsStmtContext Name	-- Context
-	    -> LHsExpr Id		-- RHS
-	    -> Type			-- Type of RHS of guard
-	    -> DsM MatchResult
+matchGuards :: [Stmt Id]                -- Guard
+            -> HsStmtContext Name       -- Context
+            -> LHsExpr Id               -- RHS
+            -> Type                     -- Type of RHS of guard
+            -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what an ExprStmt means
--- Here we must be in a guard context (not do-expression, nor list-comp)	
+-- Here we must be in a guard context (not do-expression, nor list-comp)
 
 matchGuards [] _ rhs _
-  = do	{ core_rhs <- dsLExpr rhs
-	; return (cantFailMatchResult core_rhs) }
+  = do  { core_rhs <- dsLExpr rhs
+        ; return (cantFailMatchResult core_rhs) }
 
-	-- ExprStmts must be guards
-	-- Turn an "otherwise" guard is a no-op.  This ensures that 
-	-- you don't get a "non-exhaustive eqns" message when the guards 
-	-- finish in "otherwise".
-	-- NB:	The success of this clause depends on the typechecker not
-	-- 	wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
-	--	If it does, you'll get bogus overlap warnings
+        -- ExprStmts must be guards
+        -- Turn an "otherwise" guard is a no-op.  This ensures that
+        -- you don't get a "non-exhaustive eqns" message when the guards
+        -- finish in "otherwise".
+        -- NB:  The success of this clause depends on the typechecker not
+        --      wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
+        --      If it does, you'll get bogus overlap warnings
 matchGuards (ExprStmt e _ _ _ : stmts) ctx rhs rhs_ty
   | Just addTicks <- isTrueLHsExpr e = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
@@ -125,28 +111,33 @@ matchGuards (ExprStmt expr _ _ _ : stmts) ctx rhs rhs_ty = do
 matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     return (adjustMatchResultDs (dsLocalBinds binds) match_result)
-	-- NB the dsLet occurs inside the match_result
-	-- Reason: dsLet takes the body expression as its argument
-	--	   so we can't desugar the bindings without the
-	--	   body expression in hand
+        -- NB the dsLet occurs inside the match_result
+        -- Reason: dsLet takes the body expression as its argument
+        --         so we can't desugar the bindings without the
+        --         body expression in hand
 
 matchGuards (BindStmt pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
     matchSinglePat core_rhs (StmtCtxt ctx) pat rhs_ty match_result
 
+matchGuards (LastStmt  {} : _) _ _ _ = panic "matchGuards LastStmt"
+matchGuards (ParStmt   {} : _) _ _ _ = panic "matchGuards ParStmt"
+matchGuards (TransStmt {} : _) _ _ _ = panic "matchGuards TransStmt"
+matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
+
 isTrueLHsExpr :: LHsExpr Id -> Maybe (CoreExpr -> DsM CoreExpr)
 
 -- Returns Just {..} if we're sure that the expression is True
 -- I.e.   * 'True' datacon
---	  * 'otherwise' Id
---	  * Trivial wappings of these
+--        * 'otherwise' Id
+--        * Trivial wappings of these
 -- The arguments to Just are any HsTicks that we have found,
 -- because we still want to tick then, even it they are aways evaluted.
 isTrueLHsExpr (L _ (HsVar v)) |  v `hasKey` otherwiseIdKey
                               || v `hasKey` getUnique trueDataConId
                                       = Just return
-	-- trueDataConId doesn't have the same unique as trueDataCon
+        -- trueDataConId doesn't have the same unique as trueDataCon
 isTrueLHsExpr (L _ (HsTick tickish e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> ticks x >>= return .  (Tick tickish))
@@ -165,5 +156,5 @@ isTrueLHsExpr _                       = Nothing
 Should {\em fail} if @e@ returns @D@
 \begin{verbatim}
 f x | p <- e', let C y# = e, f y# = r1
-    | otherwise 	 = r2 
+    | otherwise          = r2
 \end{verbatim}
