@@ -5,6 +5,13 @@
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 
 \begin{code}
+{-# OPTIONS -fno-warn-tabs #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and
+-- detab the module (please do the detabbing in a separate patch). See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
+-- for details
+
 -- |
 -- #name_types#
 -- GHC uses several kinds of name internally:
@@ -30,13 +37,6 @@
 --
 --  * Internal, if they name things in the module being compiled. Some internal
 --    Names are system names, if they are names manufactured by the compiler
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module Name (
 	-- * The main types
