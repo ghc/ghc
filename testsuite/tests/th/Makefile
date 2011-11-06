@@ -17,3 +17,22 @@ TH_spliceE5_prof::
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -prof -auto-all -osuf p.o -o $@
 	./$@
 
+.PHONY: TH_Depends
+TH_Depends:
+	$(RM) TH_Depends_external.txt
+	$(RM) TH_Depends TH_Depends.exe
+	$(RM) TH_Depends.o TH_Depends.hi
+	$(RM) TH_Depends_External.o TH_Depends_External.hi
+	echo "first run" > TH_Depends_external.txt
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 TH_Depends
+	./TH_Depends
+# Remove the executable, as GHC won't relink if the timestamps seem to
+# be the same
+	$(RM) TH_Depends TH_Depends.exe
+	echo "second run" > TH_Depends_external.txt
+# Give TH_Depends_external.txt a future date in case it gets the same
+# timestamp again
+	touch --date="now + 3 seconds" TH_Depends_external.txt
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 TH_Depends
+	./TH_Depends
+
