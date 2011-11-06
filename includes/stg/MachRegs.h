@@ -778,7 +778,11 @@
  */
 
 #ifndef MAX_REAL_VANILLA_REG
-#  if   defined(REG_R8)
+#  if   defined(REG_R10)
+#  define MAX_REAL_VANILLA_REG 10
+#  elif   defined(REG_R9)
+#  define MAX_REAL_VANILLA_REG 9
+#  elif   defined(REG_R8)
 #  define MAX_REAL_VANILLA_REG 8
 #  elif defined(REG_R7)
 #  define MAX_REAL_VANILLA_REG 7

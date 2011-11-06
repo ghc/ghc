@@ -350,6 +350,12 @@ callerSaves (VanillaReg 7 _)    = True
 #ifdef CALLER_SAVES_R8
 callerSaves (VanillaReg 8 _)    = True
 #endif
+#ifdef CALLER_SAVES_R9
+callerSaves (VanillaReg 9 _)    = True
+#endif
+#ifdef CALLER_SAVES_R10
+callerSaves (VanillaReg 10 _)   = True
+#endif
 #ifdef CALLER_SAVES_F1
 callerSaves (FloatReg 1)        = True
 #endif
@@ -920,6 +926,12 @@ activeStgRegs = [
 #endif
 #ifdef REG_R8
     ,VanillaReg 8 VGcPtr
+#endif
+#ifdef REG_R9
+    ,VanillaReg 9 VGcPtr
+#endif
+#ifdef REG_R10
+    ,VanillaReg 10 VGcPtr
 #endif
 #ifdef REG_SpLim
     ,SpLim

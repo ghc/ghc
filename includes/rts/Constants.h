@@ -80,7 +80,7 @@
    *real* machine registers, and not just offsets in the Register Table.
    -------------------------------------------------------------------------- */
 
-#define MAX_VANILLA_REG 8
+#define MAX_VANILLA_REG 10
 #define MAX_FLOAT_REG   4
 #define MAX_DOUBLE_REG  2
 #define MAX_LONG_REG    1

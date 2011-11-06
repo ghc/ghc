@@ -472,6 +472,12 @@ freeReg REG_R7   = fastBool False
 #ifdef REG_R8  
 freeReg REG_R8   = fastBool False
 #endif
+#ifdef REG_R9
+freeReg REG_R9   = fastBool False
+#endif
+#ifdef REG_R10
+freeReg REG_R10  = fastBool False
+#endif
 #ifdef REG_F1
 freeReg REG_F1 = fastBool False
 #endif
