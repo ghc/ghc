@@ -7,13 +7,6 @@ each let-binding.  At the same time, we figure out which top-level
 bindings have no CAF references, and record the fact in their IdInfo.
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SRT( computeSRTs ) where
 
 #include "HsVersions.h"
@@ -89,6 +82,8 @@ srtTopRhs _ rhs@(StgRhsClosure _ _ _ _  (SRTEntries cafs) _ _)
   where
         elems = varSetElems cafs
         table = mkVarEnv (zip elems [0..])
+srtTopRhs _ (StgRhsClosure _ _ _ _  NoSRT _ _) = panic "srtTopRhs NoSRT"
+srtTopRhs _ (StgRhsClosure _ _ _ _  (SRT _ _ _) _ _) = panic "srtTopRhs SRT"
 
 -- ---- Binds:
 
@@ -158,6 +153,8 @@ constructSRT table (SRTEntries entries)
     bitmap_entries = map (subtract offset) sorted_ints
     len = last bitmap_entries + 1
     bitmap = intsToBitmap len bitmap_entries
+constructSRT _ NoSRT = panic "constructSRT NoSRT"
+constructSRT _ (SRT {}) = panic "constructSRT SRT"
 
 -- ---------------------------------------------------------------------------
 -- Misc stuff
