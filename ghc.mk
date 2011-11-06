@@ -2,7 +2,6 @@
 utils/haddock_USES_CABAL = YES
 utils/haddock_PACKAGE = haddock
 utils/haddock_CONFIGURE_OPTS = --flag in-ghc-tree
-utils/haddock_HC_OPTS += -DNEW_GHC_LAYOUT
 utils/haddock_dist_SHELL_WRAPPER = YES
 utils/haddock_dist_INSTALL_SHELL_WRAPPER = YES
 utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME = haddock-ghc-$(ProjectVersion)
