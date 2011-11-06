@@ -119,3 +119,8 @@ test('5250', [ config_5250,
                omit_ways(['ghci']) ],
              compile_and_run, ['spalign.c'])
 
+test('T5423',
+     extra_clean(['T5423_cmm.o']),
+     run_command,
+     ['$MAKE -s --no-print-directory T5423'])
+

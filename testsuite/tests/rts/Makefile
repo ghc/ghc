@@ -36,3 +36,12 @@ exec_signals-prep:
 	$(RM) 4850.o 4850.hi 4850$(exeext)
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -rtsopts -debug -threaded --make 4850
 	./4850 +RTS -s 2>&1 | grep Task | wc -l | tr -d ' '
+
+.PHONY: T5423
+T5423:
+	$(RM) T5423_cmm.o T5423.o T5423.hi T5423$(exeext)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -c T5423_cmm.cmm
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -c T5423.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T5423.o T5423_cmm.o -o T5423$(exeext)
+	./T5423
+
