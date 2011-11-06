@@ -5,13 +5,6 @@
 % Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Check ( check , ExhaustivePat ) where
 
 #include "HsVersions.h"
@@ -152,6 +145,17 @@ untidy b (L loc p) = L loc (untidy' b p)
     untidy' _ (TuplePat pats box ty) = TuplePat (map untidy_no_pars pats) box ty
     untidy' _ (PArrPat _ _)          = panic "Check.untidy: Shouldn't get a parallel array here!"
     untidy' _ (SigPatIn _ _)         = panic "Check.untidy: SigPat"
+    untidy' _ (LazyPat {})           = panic "Check.untidy: LazyPat"
+    untidy' _ (AsPat {})             = panic "Check.untidy: AsPat"
+    untidy' _ (ParPat {})            = panic "Check.untidy: ParPat"
+    untidy' _ (BangPat {})           = panic "Check.untidy: BangPat"
+    untidy' _ (ConPatOut {})         = panic "Check.untidy: ConPatOut"
+    untidy' _ (ViewPat {})           = panic "Check.untidy: ViewPat"
+    untidy' _ (QuasiQuotePat {})     = panic "Check.untidy: QuasiQuotePat"
+    untidy' _ (NPat {})              = panic "Check.untidy: NPat"
+    untidy' _ (NPlusKPat {})         = panic "Check.untidy: NPlusKPat"
+    untidy' _ (SigPatOut {})         = panic "Check.untidy: SigPatOut"
+    untidy' _ (CoPat {})             = panic "Check.untidy: CoPat"
 
 untidy_con :: HsConPatDetails Name -> HsConPatDetails Name
 untidy_con (PrefixCon pats) = PrefixCon (map untidy_pars pats)
@@ -383,6 +387,7 @@ remove_first_column (ConPatOut{ pat_con = L _ con, pat_args = PrefixCon con_pats
      shift_var eqn@(EqnInfo { eqn_pats = WildPat _ : ps })
         = eqn { eqn_pats = new_wilds ++ ps }
      shift_var _ = panic "Check.Shift_var:No done"
+remove_first_column _ _ = panic "Check.remove_first_column: Not ConPatOut"
 
 make_row_vars :: [HsLit] -> (EqnNo, EquationInfo) -> ExhaustivePat
 make_row_vars used_lits (_, EqnInfo { eqn_pats = pats})
@@ -401,6 +406,7 @@ make_row_vars_for_constructor (_, EqnInfo { eqn_pats = pats})
 
 compare_cons :: Pat Id -> Pat Id -> Bool
 compare_cons (ConPatOut{ pat_con = L _ id1 }) (ConPatOut { pat_con = L _ id2 }) = id1 == id2
+compare_cons _ _ = panic "Check.compare_cons: Not ConPatOut"
 
 remove_dups :: [Pat Id] -> [Pat Id]
 remove_dups []     = []
@@ -585,6 +591,8 @@ make_con (ConPatOut{ pat_con = L _ id, pat_args = PrefixCon pats, pat_ty = ty })
         (pats_con, rest_pats) = splitAtList pats ps
         tc                    = dataConTyCon id
 
+make_con _ _ = panic "Check.make_con: Not ConPatOut"
+
 -- reconstruct parallel array pattern
 --
 --  * don't check for the type only; we need to make sure that we are really
@@ -697,6 +705,10 @@ tidy_pat (TuplePat ps boxity ty)
 
 tidy_pat (NPat lit mb_neg eq) = tidyNPat tidy_lit_pat lit mb_neg eq
 tidy_pat (LitPat lit)         = tidy_lit_pat lit
+
+tidy_pat (ConPatIn {})        = panic "Check.tidy_pat: ConPatIn"
+tidy_pat (QuasiQuotePat {})   = panic "Check.tidy_pat: QuasiQuotePat"
+tidy_pat (SigPatIn {})        = panic "Check.tidy_pat: SigPatIn"
 
 tidy_lit_pat :: HsLit -> Pat Id
 -- Unpack string patterns fully, so we can see when they
