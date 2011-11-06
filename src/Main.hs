@@ -329,7 +329,7 @@ getHaddockLibDir flags =
   case [str | Flag_Lib str <- flags] of
     [] ->
 #ifdef IN_GHC_TREE
-      fmap snd getInTreeDirs
+      getInTreeDir
 #else
       getDataDir -- provided by Cabal
 #endif
@@ -338,15 +338,21 @@ getHaddockLibDir flags =
 
 getGhcDirs :: [Flag] -> IO (String, String)
 getGhcDirs flags = do
-  (ghcPath, libDir) <-
-#ifdef IN_GHC_TREE
-    getInTreeDirs
-#else
-    return (GhcPaths.ghc, GhcPaths.libdir)
-#endif
   case [ dir | Flag_GhcLibDir dir <- flags ] of
-    [] -> return (ghcPath, libDir)
+    [] -> do
+#ifdef IN_GHC_TREE
+      libDir <- getInTreeDir
+      return (ghcPath, libDir)
+#else
+      return (ghcPath, GhcPaths.libdir)
+#endif
     xs -> return (ghcPath, last xs)
+  where
+#ifdef IN_GHC_TREE
+    ghcPath = "not available"
+#else
+    ghcPath = GhcPaths.ghc
+#endif
 
 
 shortcutFlags :: [Flag] -> IO ()
@@ -409,12 +415,12 @@ getPrologue flags =
 
 #ifdef IN_GHC_TREE
 
-getInTreeDirs :: IO (String, String)
-getInTreeDirs = do
+getInTreeDir :: IO String
+getInTreeDir = do
   m <- getExecDir
   case m of
     Nothing -> error "No GhcDir found"
-    Just d -> let p = d </> ".." in return (p </> "bin" </> "ghc", p </> "lib")
+    Just d -> return (d </> ".." </> "lib")
 
 
 getExecDir :: IO (Maybe String)
