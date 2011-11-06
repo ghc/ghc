@@ -80,6 +80,7 @@ deSugar hsc_env
                             tcg_anns         = anns,
                             tcg_binds        = binds,
                             tcg_imp_specs    = imp_specs,
+                            tcg_dependent_files = dependent_files,
                             tcg_ev_binds     = ev_binds,
                             tcg_fords        = fords,
                             tcg_rules        = rules,
@@ -168,6 +169,7 @@ deSugar hsc_env
         ; deps <- mkDependencies tcg_env
 
         ; used_th <- readIORef tc_splice_used
+        ; dep_files <- readIORef dependent_files
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
@@ -194,7 +196,8 @@ deSugar hsc_env
                 mg_modBreaks    = modBreaks,
                 mg_vect_decls   = ds_vects,
                 mg_vect_info    = noVectInfo,
-                mg_trust_pkg    = imp_trust_own_pkg imports
+                mg_trust_pkg    = imp_trust_own_pkg imports,
+                mg_dependent_files = dep_files
               }
         ; return (msgs, Just mod_guts)
 	}}}

@@ -929,6 +929,11 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
                           }
 
   qRunIO io = liftIO io
+
+  qAddDependentFile fp = do
+    ref <- fmap tcg_dependent_files getGblEnv
+    dep_files <- readTcRef ref
+    writeTcRef ref (fp:dep_files)
 \end{code}
 
 

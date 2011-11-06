@@ -792,16 +792,11 @@ data ModGuts
         mg_fam_inst_env :: FamInstEnv,
         -- ^ Type-family instance enviroment for /home-package/ modules
         -- (including this one); c.f. 'tcg_fam_inst_env'
-        mg_trust_pkg :: Bool
+        mg_trust_pkg :: Bool,
         -- ^ Do we need to trust our own package for Safe Haskell?
         -- See Note [RnNames . Trust Own Package]
+        mg_dependent_files :: [FilePath] -- ^ dependencies from addDependentFile
     }
-
--- The ModGuts takes on several slightly different forms:
---
--- After simplification, the following fields change slightly:
---      mg_rules        Orphan rules only (local ones now attached to binds)
---      mg_binds        With rules attached
 
 -- The ModGuts takes on several slightly different forms:
 --
@@ -1598,7 +1593,12 @@ data Usage
             -- if we depend on the export list
         usg_safe :: IsSafeImport
             -- ^ Was this module imported as a safe import
-    }
+    }                                           -- ^ Module from the current package
+  | UsageFile {
+        usg_file_path  :: FilePath,
+        usg_mtime      :: ClockTime
+        -- ^ External file dependency. From a CPP #include or TH addDependentFile. Should be absolute.
+  }
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
         --      i.e. we imported the module directly, whether or not we

@@ -87,6 +87,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         type_env_var <- case hsc_type_env_var hsc_env of {
                            Just (_mod, te_var) -> return te_var ;
                            Nothing             -> newIORef emptyNameEnv } ;
+
+        dependent_files_var <- newIORef [] ;
         let {
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
@@ -133,7 +135,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcg_doc_hdr        = Nothing,
                 tcg_hpc            = False,
                 tcg_main           = Nothing,
-                tcg_safeInfer      = infer_var
+                tcg_safeInfer      = infer_var,
+                tcg_dependent_files = dependent_files_var
              } ;
              lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
