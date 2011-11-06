@@ -7,12 +7,6 @@ Desugaring list comprehensions, monad comprehensions and array comprehensions
 
 \begin{code}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module DsListComp ( dsListComp, dsPArrComp, dsMonadComp ) where
 
@@ -139,6 +133,8 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
     -- which hold lists rather than single values
     let pat = mkBigLHsVarPatTup to_bndrs
     return (bound_unzipped_inner_list_expr, pat)
+
+dsTransStmt _ = panic "dsTransStmt: Not given a TransStmt"
 \end{code}
 
 %************************************************************************
@@ -251,6 +247,8 @@ deListComp (ParStmt stmtss_w_bndrs _ _ _ : quals) list
         -- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
         pat  = mkBigLHsPatTup pats
         pats = map mkBigLHsVarPatTup bndrs_s
+
+deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
 \end{code}
 
 
@@ -343,6 +341,9 @@ dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) = do
 
     -- Do the rest of the work in the generic binding builder
     dfBindComp c_id n_id (pat, core_list1) quals
+
+dfListComp _ _ (ParStmt {} : _) = panic "dfListComp ParStmt"
+dfListComp _ _ (RecStmt {} : _) = panic "dfListComp RecStmt"
 
 dfBindComp :: Id -> Id          -- 'c' and 'n'
        -> (LPat Id, CoreExpr)
@@ -589,7 +590,9 @@ dePArrComp (LetStmt ds : qs) pa cea = do
 -- So, encountering one here is a bug.
 --
 dePArrComp (ParStmt _ _ _ _ : _) _ _ =
-  panic "DsListComp.dePArrComp: malformed comprehension AST"
+  panic "DsListComp.dePArrComp: malformed comprehension AST: ParStmt"
+dePArrComp (TransStmt {} : _) _ _ = panic "DsListComp.dePArrComp: TransStmt"
+dePArrComp (RecStmt   {} : _) _ _ = panic "DsListComp.dePArrComp: RecStmt"
 
 --  <<[:e' | qs | qss:]>> pa ea =
 --    <<[:e' | qss:]>> (pa, (x_1, ..., x_n))
