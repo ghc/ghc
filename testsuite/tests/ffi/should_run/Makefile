@@ -16,3 +16,7 @@ ffi002_setup :
 
 5402_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c 5402.hs
+
+5594_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c 5594.hs
+

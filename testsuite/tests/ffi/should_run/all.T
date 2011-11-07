@@ -180,3 +180,10 @@ test('5402', [ omit_ways(['ghci']),
                compile_cmd_prefix('$MAKE --no-print-directory 5402_setup && ') ],
              compile_and_run, ["-no-hs-main 5402_main.c"])
 
+test('5594', [ omit_ways(['ghci']),
+               extra_clean(['5594_c.o']),
+               compile_cmd_prefix('$MAKE --no-print-directory 5594_setup && ') ],
+               # The 5594_setup hack is to ensure that we generate
+               # 5594_stub.h before compiling 5594_c.c, which
+               # needs it.
+               compile_and_run, ['5594_c.c -no-hs-main'])
