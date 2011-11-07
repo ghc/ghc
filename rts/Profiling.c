@@ -684,6 +684,19 @@ insertCCInSortedList( CostCentre *new_cc )
     *prev = new_cc;
 }
 
+static nat
+strlen_utf8 (char *s)
+{
+    nat n = 0;
+    unsigned char c;
+
+    for (; *s != '\0'; s++) {
+        c = *s;
+        if (c < 0x80 || c > 0xBF) n++;
+    }
+    return n;
+}
+
 static void
 reportPerCCCosts( void )
 {
@@ -703,8 +716,8 @@ reportPerCCCosts( void )
             || RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL) {
             insertCCInSortedList(cc);
 
-            max_label_len = stg_max(strlen(cc->label), max_label_len);
-            max_module_len = stg_max(strlen(cc->module), max_module_len);
+            max_label_len = stg_max(strlen_utf8(cc->label), max_label_len);
+            max_module_len = stg_max(strlen_utf8(cc->module), max_module_len);
         }
     }
 
@@ -719,7 +732,12 @@ reportPerCCCosts( void )
         if (ignoreCC(cc)) {
             continue;
         }
-        fprintf(prof_file, "%-*s %-*s", max_label_len, cc->label, max_module_len, cc->module);
+        fprintf(prof_file, "%s%*s %s%*s",
+                cc->label,
+                max_label_len - strlen_utf8(cc->label), "",
+                cc->module,
+                max_module_len - strlen_utf8(cc->module), "");
+
         fprintf(prof_file, "%6.1f %6.1f",
                 total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) total_prof_ticks * 100),
                 total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat)
@@ -808,8 +826,8 @@ findCCSMaxLens(CostCentreStack *ccs, nat indent, nat *max_label_len, nat *max_mo
 
     cc = ccs->cc;
 
-    *max_label_len = stg_max(*max_label_len, indent + strlen(cc->label));
-    *max_module_len = stg_max(*max_module_len, strlen(cc->module));
+    *max_label_len = stg_max(*max_label_len, indent + strlen_utf8(cc->label));
+    *max_module_len = stg_max(*max_module_len, strlen_utf8(cc->module));
 
     for (i = ccs->indexTable; i != 0; i = i->next) {
         if (!i->back_edge) {
@@ -832,8 +850,12 @@ logCCS(CostCentreStack *ccs, nat indent, nat max_label_len, nat max_module_len)
         /* force printing of *all* cost centres if -Pa */
     {
 
-        fprintf(prof_file, "%-*s%-*s %-*s",
-                indent, "", max_label_len-indent, cc->label, max_module_len, cc->module);
+        fprintf(prof_file, "%-*s%s%*s %s%*s",
+                indent, "",
+                cc->label,
+                max_label_len-indent - strlen_utf8(cc->label), "",
+                cc->module,
+                max_module_len - strlen_utf8(cc->module), "");
 
         fprintf(prof_file, "%6ld %11" FMT_Word64 "  %5.1f  %5.1f   %5.1f  %5.1f",
             ccs->ccsID, ccs->scc_count,
