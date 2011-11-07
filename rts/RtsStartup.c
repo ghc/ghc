@@ -69,6 +69,8 @@ void exitLinker( void );	// there is no Linker.h file to include
 // Count of how many outstanding hs_init()s there have been.
 static int hs_init_count = 0;
 
+static void flushStdHandles(void);
+
 /* -----------------------------------------------------------------------------
    Initialise floating point unit on x86 (currently disabled; See Note
    [x86 Floating point precision] in compiler/nativeGen/X86/Instr.hs)
@@ -296,6 +298,8 @@ hs_exit_(rtsBool wait_foreign)
     
     OnExitHook();
 
+    flushStdHandles();
+
     // sanity check
 #if defined(DEBUG)
     checkFPUStack();
@@ -405,6 +409,17 @@ hs_exit_(rtsBool wait_foreign)
 
     // Free the various argvs
     freeRtsArgs();
+}
+
+// Flush stdout and stderr.  We do this during shutdown so that it
+// happens even when the RTS is being used as a library, without a
+// main (#5594)
+static void flushStdHandles(void)
+{
+    Capability *cap;
+    cap = rts_lock();
+    rts_evalIO(cap, &base_GHCziTopHandler_flushStdHandles_closure, NULL);
+    rts_unlock(cap);
 }
 
 // The real hs_exit():

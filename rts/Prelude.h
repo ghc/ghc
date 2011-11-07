@@ -47,6 +47,8 @@ PRELUDE_CLOSURE(base_GHCziConcziSync_runSparks_closure);
 PRELUDE_CLOSURE(base_GHCziConcziIO_ensureIOManagerIsRunning_closure);
 PRELUDE_CLOSURE(base_GHCziConcziSignal_runHandlers_closure);
 
+PRELUDE_CLOSURE(base_GHCziTopHandler_flushStdHandles_closure);
+
 PRELUDE_INFO(ghczmprim_GHCziTypes_Czh_static_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Izh_static_info);
 PRELUDE_INFO(ghczmprim_GHCziTypes_Fzh_static_info);
