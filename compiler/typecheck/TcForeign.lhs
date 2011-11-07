@@ -216,8 +216,8 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ CWrapper) = do
     checkCConv cconv
     case arg_tys of
         [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
-                        checkForeignRes nonIOok  False isFFIExportResultTy res1_ty
-                        checkForeignRes mustBeIO False isFFIDynResultTy    res_ty
+                        checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
+                        checkForeignRes mustBeIO checkSafe isFFIDynResultTy    res_ty
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr empty sig_ty)
@@ -236,9 +236,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
           check (isFFIDynArgumentTy arg1_ty)
                 (illegalForeignTyErr argument arg1_ty)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
-          let safe_on = safeLanguageOn dflags || safeInferOn dflags
-              ioOK    = if safe_on then mustBeIO else nonIOok
-          checkForeignRes ioOK safe_on (isFFIImportResultTy dflags) res_ty
+          checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
           return idecl
   | cconv == PrimCallConv = do
       dflags <- getDOpts
@@ -250,9 +248,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
             (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
       checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
       -- prim import result is more liberal, allows (#,,#)
-      let safe_on = safeLanguageOn dflags || safeInferOn dflags
-          ioOK    = if safe_on then mustBeIO else nonIOok
-      checkForeignRes ioOK safe_on (isFFIPrimResultTy dflags) res_ty
+      checkForeignRes nonIOok checkSafe (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
       checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
@@ -260,9 +256,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
       checkCTarget target
       dflags <- getDOpts
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
-      let safe_on = safeLanguageOn dflags || safeInferOn dflags
-          ioOK    = if safe_on then mustBeIO else nonIOok
-      checkForeignRes ioOK safe_on (isFFIImportResultTy dflags) res_ty
+      checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
       return idecl
 
@@ -336,7 +330,7 @@ tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
     check (isCLabelString str) (badCName str)
     checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
-    checkForeignRes nonIOok False isFFIExportResultTy res_ty
+    checkForeignRes nonIOok noCheckSafe isFFIExportResultTy res_ty
   where
       -- Drop the foralls before inspecting n
       -- the structure of the foreign type.
@@ -355,37 +349,56 @@ tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
 \begin{code}
 ------------ Checking argument types for foreign import ----------------------
 checkForeignArgs :: (Type -> Bool) -> [Type] -> TcM ()
-checkForeignArgs pred tys
-  = mapM_ go tys
-  where
-    go ty = check (pred ty) (illegalForeignTyErr argument ty)
+checkForeignArgs pred tys = mapM_ go tys
+  where go ty = check (pred ty) (illegalForeignTyErr argument ty)
 
 ------------ Checking result types for foreign calls ----------------------
--- Check that the type has the form
+-- | Check that the type has the form
 --    (IO t) or (t) , and that t satisfies the given predicate.
+-- When calling this function, any newtype wrappers (should) have been
+-- already dealt with by normaliseFfiType.
+-- 
+-- We also check that the Safe Haskell condition of FFI imports having
+-- results in the IO monad holds.
 --
 checkForeignRes :: Bool -> Bool -> (Type -> Bool) -> Type -> TcM ()
+checkForeignRes non_io_result_ok check_safe pred_res_ty ty
+  = case tcSplitIOType_maybe ty of
+        -- Got an IO result type, that's always fine!
+        Just (_, res_ty) | pred_res_ty res_ty -> return ()
+
+        -- Case for non-IO result type with FFI Import
+        _ -> do
+            dflags <- getDOpts
+            case (pred_res_ty ty && non_io_result_ok) of
+                -- handle normal typecheck fail, we want to handle this first and
+                -- only report safe haskell errors if the normal type check is OK.
+                False -> addErrTc $ illegalForeignTyErr result ty
+
+                -- handle safe infer fail
+                _ | check_safe && safeInferOn dflags
+                    -> recordUnsafeInfer
+
+                -- handle safe language typecheck fail
+                _ | check_safe && safeLanguageOn dflags
+                    -> addErrTc $ illegalForeignTyErr result ty $+$ safeHsErr
+
+                -- sucess! non-IO return is fine
+                _ -> return ()
+
+  where 
+    safeHsErr = ptext $ sLit "Safe Haskell is on, all FFI imports must be in the IO monad"
 
 nonIOok, mustBeIO :: Bool
 nonIOok  = True
 mustBeIO = False
 
-checkForeignRes non_io_result_ok safehs_check pred_res_ty ty
-    -- We need an (IO t) result. Any newtype wrappers of type functions
-    -- have already been dealt with by normaliseFfiType.
-  = case tcSplitIOType_maybe ty of
-    Just (_, res_ty)
-     | pred_res_ty res_ty ->
-        return ()
-
-    _ -> do
-        dflags <- getDOpts
-        case safeInferOn dflags && safehs_check of
-            True | pred_res_ty ty -> recordUnsafeInfer
-
-            _ -> check (non_io_result_ok && pred_res_ty ty)
-                     (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
+checkSafe, noCheckSafe :: Bool
+checkSafe   = True
+noCheckSafe = False
 \end{code}
+
+Checking a supported backend is in use
 
 \begin{code}
 checkCOrAsmOrLlvm :: HscTarget -> Maybe SDoc
@@ -449,10 +462,6 @@ illegalForeignTyErr arg_or_res ty
   = hang (hsep [ptext (sLit "Unacceptable"), arg_or_res,
                 ptext (sLit "type in foreign declaration:")])
        2 (hsep [ppr ty])
-
-safeHsErr :: Bool -> SDoc
-safeHsErr False = empty
-safeHsErr True  = ptext $ sLit "Safe Haskell is on, all FFI imports must be in the IO monad"
 
 -- Used for 'arg_or_res' argument to illegalForeignTyErr
 argument, result :: SDoc
