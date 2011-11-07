@@ -4832,7 +4832,7 @@ type instance F t1 .. tn = t
 
 
 <sect2 id="assoc-decl">
-<title>Associated type families</title>
+<title>Associated data and type families</title>
 <para>
 A data or type synonym family can be declared as part of a type class, thus:
 <programlisting>
@@ -4909,9 +4909,13 @@ instance GMapKey Flob where
         the free indexed parameter is of a kind with a finite number of alternatives
         (unlike <literal>*</literal>).
       </para>
+    </sect3>
+
+    <sect3 id="assoc-decl-defs">
+    <title>Associated type synonym defaults</title>
       <para>
-      	It is possible for the class defining the associated type to specify a default for
-      	associated type instances. So for example, this is OK:
+        It is possible for the class defining the associated type to specify a 
+        default for associated type instances. So for example, this is OK:
 <programlisting>
 class IsBoolMap v where
   type Key v
@@ -4922,9 +4926,20 @@ class IsBoolMap v where
 instance IsBoolMap [(Int, Bool)] where
   lookupKey = lookup
 </programlisting>
-A default declaration is not permitted for an associated <emphasis>data</emphasis> type.
+
+There can also be multiple defaults for a single type, as long as they do not
+overlap:
+<programlisting>
+class C a where
+  type F a b
+  type F a Int  = Bool
+  type F a Bool = Int
+</programlisting>
+
+A default declaration is not permitted for an associated
+<emphasis>data</emphasis> type.
       </para>
-	</sect3>
+    </sect3>
 
     <sect3 id="scoping-class-params">
       <title>Scoping of class parameters</title>
