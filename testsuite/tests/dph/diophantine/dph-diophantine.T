@@ -15,6 +15,7 @@ test    ('dph-diophantine-fast'
           , reqlib('dph-prim-par')
           , extra_clean(['DiophantineVect.hi', 'DiophantineVect.o',
                          'Main.hi', 'Main.o'])
+          , expect_broken(5613)
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
