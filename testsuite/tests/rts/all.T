@@ -115,6 +115,8 @@ def config_5250(opts):
         opts.skip = 1;
 
 test('5250', [ config_5250,
+               # stack ptr is not 16-byte aligned on 32-bit Windows
+               if_os('mingw32', expect_fail),
                extra_clean(['spalign.o']),
                omit_ways(['ghci']) ],
              compile_and_run, ['spalign.c'])
