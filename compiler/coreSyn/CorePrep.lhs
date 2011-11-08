@@ -1056,8 +1056,10 @@ dropDeadCode (Cast e c)
   = (Cast e' c, fvs)
   where !(e', fvs) = dropDeadCode e
 dropDeadCode (Tick t e)
-  = (Tick t e', fvs)
+  = (Tick t e', fvs')
   where !(e', fvs) = dropDeadCode e
+        fvs' | Breakpoint _ xs <- t =  fvs `unionVarSet` mkVarSet xs
+             | otherwise            =  fvs
 dropDeadCode e = (e, emptyVarSet)  -- Lit, Type, Coercion
 
 dropDeadCodeAlts :: [CoreAlt] -> ([CoreAlt], VarSet)
