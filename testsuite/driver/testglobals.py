@@ -225,6 +225,9 @@ class TestOptions:
        # Extra output normalisation
        self.extra_normaliser = lambda x: x
 
+       # Extra normalisation for compiler error messages
+       self.extra_errmsg_normaliser = lambda x: x
+
        # The directory the test is in
        self.testdir = '.'
 

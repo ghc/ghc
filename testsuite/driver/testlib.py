@@ -449,6 +449,15 @@ def normalise_fun( fun ):
 def _normalise_fun( opts, f ):
     opts.extra_normaliser = f
 
+def normalise_errmsg_fun( fun ):
+    return lambda opts, f=fun: _normalise_errmsg_fun(opts, f)
+
+def _normalise_errmsg_fun( opts, f ):
+    opts.extra_errmsg_normaliser = f
+
+def two_normalisers(f, g):
+    return lambda x, f=f, g=g: f(g(x))
+
 # ----
 # Function for composing two opt-fns together
 
@@ -865,7 +874,8 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
     (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
-    if not compare_outputs('stderr', normalise_errmsg, normalise_whitespace, \
+    if not compare_outputs('stderr', \
+                           two_normalisers(two_normalisers(getTestOpts().extra_errmsg_normaliser, normalise_errmsg), normalise_whitespace), \
                            expected_stderr_file, actual_stderr_file):
         return failBecause('stderr mismatch')
 
@@ -1338,7 +1348,8 @@ def check_stdout_ok( name ):
       else:
          return normalise_output(str)
 
-   return compare_outputs('stdout', norm, getTestOpts().extra_normaliser, \
+   return compare_outputs('stdout', \
+                          two_normalisers(norm, getTestOpts().extra_normaliser), \
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
@@ -1360,7 +1371,8 @@ def check_stderr_ok( name ):
       else:
          return normalise_output(str)
 
-   return compare_outputs('stderr', norm, getTestOpts().extra_normaliser, \
+   return compare_outputs('stderr', \
+                          two_normalisers(norm, getTestOpts().extra_normaliser), \
                           expected_stderr_file, actual_stderr_file)
 
 def dump_stderr( name ):
@@ -1427,25 +1439,25 @@ def check_prof_ok(name):
     if not os.path.exists(expected_prof_file):
         return True
     else:
-        return compare_outputs('prof', normalise_prof, normalise_whitespace, \
-                                  expected_prof_file, prof_file)
+        return compare_outputs('prof', \
+                               two_normalisers(normalise_whitespace,normalise_prof), \
+                               expected_prof_file, prof_file)
 
 # Compare expected output to actual output, and optionally accept the
 # new output. Returns true if output matched or was accepted, false
 # otherwise.
-def compare_outputs( kind, normaliser, extra_normaliser,
-                     expected_file, actual_file ):
+def compare_outputs( kind, normaliser, expected_file, actual_file ):
     if os.path.exists(expected_file):
         expected_raw = read_no_crs(expected_file)
         # print "norm:", normaliser(expected_raw)
-        expected_str = extra_normaliser(normaliser(expected_raw))
+        expected_str = normaliser(expected_raw)
         expected_file_for_diff = expected_file
     else:
         expected_str = ''
         expected_file_for_diff = '/dev/null'
 
     actual_raw = read_no_crs(actual_file)
-    actual_str = extra_normaliser(normaliser(actual_raw))
+    actual_str = normaliser(actual_raw)
 
     if expected_str != actual_str:
         print 'Actual ' + kind + ' output differs from expected:'
@@ -1511,7 +1523,9 @@ def normalise_errmsg( str ):
 # only the shape of the profile and the number of entries.
 def normalise_prof (str):
     # strip everything up to the line beginning "COST CENTRE"
+    print "before: ", str
     str = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',str)
+    print "after: ", str
 
     # strip results for CAFs, these tend to change unpredictably
     str = re.sub('[ \t]*CAF.*\n','',str)
