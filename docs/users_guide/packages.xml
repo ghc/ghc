@@ -882,28 +882,6 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
     <variablelist>
       <varlistentry>
         <term>
-          <option>&ndash;&ndash;auto-ghci-libs</option><indexterm><primary><option>&ndash;&ndash;auto-ghci-libs</option></primary>
-          </indexterm>
-        </term>
-        <listitem>
-          <para>Automatically generate the GHCi
-            <filename>.o</filename> version of each
-            <filename>.a</filename> Haskell library, using GNU ld (if
-            that is available).  Without this option,
-            <literal>ghc-pkg</literal> will warn if GHCi versions of
-            any Haskell libraries in the package don't exist.</para>
-
-            <para>GHCi <literal>.o</literal> libraries don't
-            necessarily have to live in the same directory as the
-            corresponding <literal>.a</literal> library.  However,
-            this option will cause the GHCi library to be created in
-            the same directory as the <literal>.a</literal>
-            library.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
           <option>-f</option> <replaceable>file</replaceable>
           <indexterm><primary><option>-f</option></primary>
           </indexterm>
@@ -1054,15 +1032,31 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
             so check the documentation if you run into difficulties.</para>
       </listitem>
       <listitem>
-        <para>Versions of the Haskell libraries for use with GHCi may also
-          be included: GHCi cannot load <literal>.a</literal> files
-          directly, instead it will look for an object file
-          called <filename>HSfoo.o</filename> and load that.  On some
-          systems, the <literal>ghc-pkg</literal> tool can automatically
-          build the GHCi version of each library, see
-          <xref linkend="package-management"/>.  To build these libraries
-          by hand from the <literal>.a</literal> archive, it is possible
-          to use GNU <command>ld</command> as follows:</para>
+        <para>To load a package <literal>foo</literal>, GHCi can load
+          its <literal>libHSfoo.a</literal> library directly, but it
+          can also load a package in the form of a
+          single <literal>HSfoo.o</literal> file that has been
+          pre-linked.  Loading the <literal>.o</literal> file is
+          slightly quicker, but at the expense of having another copy
+          of the compiled package.  The rule of thumb is that if the
+          modules of the package were compiled
+          with <option>-split-objs</option> then building
+          the <literal>HSfoo.o</literal> is worthwhile because it
+          saves time when loading the package into GHCi.
+          Without <option>-split-objs</option>, there is not much
+          difference in load time between the <literal>.o</literal>
+          and <literal>.a</literal> libraries, so it is better to save
+          the disk space and only keep the <literal>.a</literal>
+          around.  In a GHC distribution we
+          provide <literal>.o</literal> files for most packages except
+          the GHC package itself.
+        </para>
+
+        <para>The <literal>HSfoo.o</literal> file is built by Cabal
+          automatically;
+          use <option>--disable-library-for-ghci</option> to disable
+          it.  To build one manually, the following
+          GNU <command>ld</command> command can be used:</para>
 
 <screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
 
