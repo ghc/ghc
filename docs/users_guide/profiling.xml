@@ -30,7 +30,7 @@
       <para>If you are using external packages with
       <literal>cabal</literal>, you may need to reinstall these
       packages with profiling support; typically this is done with
-      <literal>cabal install -p <replaceble>package</replaceble>
+      <literal>cabal install -p <replaceable>package</replaceable>
       --reinstall</literal>.</para>
     </listitem>
 
