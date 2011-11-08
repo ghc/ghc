@@ -86,9 +86,16 @@
         (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5436">#5436</ulink>).
       </para>
     </listitem>
+
     <listitem>
       <para>
         The base package is now version 4.4.1.0 (was 4.4.0.0).
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Haddock is now version 2.9.4.
       </para>
     </listitem>
   </itemizedlist>
