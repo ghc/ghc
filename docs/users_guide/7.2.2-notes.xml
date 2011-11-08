@@ -11,6 +11,14 @@
   <itemizedlist>
     <listitem>
       <para>
+        All packages are now trusted by default. If you wish to make use
+        of Safe Haskell, you will need to manually untrust packages that
+        you do not wish to trust.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
         An optimiser bug
         (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5453">#5453</ulink>)
         which can cause segfaults has been fixed.
