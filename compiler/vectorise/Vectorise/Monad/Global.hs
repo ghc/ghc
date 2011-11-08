@@ -137,7 +137,6 @@ lookupDataCon :: DataCon -> VM (Maybe DataCon)
 lookupDataCon dc
   | isTupleTyCon (dataConTyCon dc) 
   = return (Just dc)
-
   | otherwise 
   = readGEnv $ \env -> lookupNameEnv (global_datacons env) (dataConName dc)
 

@@ -108,16 +108,16 @@ import Data.List
 --
 -- It desugars to
 --
---   data Num a = Num { (+) :: a -> a -> a }
+--   data Num a = D:Num { (+) :: a -> a -> a }
 --
 -- which we vectorise to
 --
---  data $vNum a = $vNum { ($v+) :: PArray a :-> PArray a :-> PArray a }
+--  data V:Num a = D:V:Num { ($v+) :: PArray a :-> PArray a :-> PArray a }
 --
 -- while adding the following entries to the vectorisation map:
 --
---   tycon  : Num --> $vNum
---   datacon: Num --> $vNum
+--   tycon  : Num   --> V:Num
+--   datacon: D:Num --> D:V:Num
 --   var    : (+) --> ($v+)
 
 -- |Vectorise type constructor including class type constructors.
