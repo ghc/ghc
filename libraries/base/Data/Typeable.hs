@@ -51,6 +51,9 @@ module Data.Typeable
 
         TyCon,          -- abstract, instance of: Eq, Show, Typeable
         tyConString,    -- :: TyCon   -> String
+        tyConPackage,   -- :: TyCon   -> String
+        tyConModule,    -- :: TyCon   -> String
+        tyConName,      -- :: TyCon   -> String
 
         -- * Construction of type representations
         mkTyCon,        -- :: String  -> TyCon
