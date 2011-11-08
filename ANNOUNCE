@@ -1,27 +1,50 @@
 
    =============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 7.2.1
+    The (Interactive) Glasgow Haskell Compiler -- version 7.2.2
    =============================================================
 
-The GHC Team is pleased to announce a new major release of GHC, 7.2.1.
+The GHC Team is pleased to announce a new bugfix release of GHC, 7.2.2.
 
 The 7.2 branch is intended to be more of a "technology preview" than
 normal GHC stable branches; in particular, it supports a significantly
 improved version of DPH, as well as new features such as compiler
 plugins and "safe Haskell". The design of these new features may evolve
-as we get more experience with them. See the release notes for more
-details of what's new and what's changed.
+as we get more experience with them.
 
-We are also using this branch as an opportunity to work out the best
-workflows to use with git.
+The changes in this release, relative to 7.2.1, are:
 
-We expect the 7.2 branch to be short-lived, with 7.4.1 coming out
-shortly after ICFP as normal.
+* All packages are now trusted by default. If you wish to make use
+  of Safe Haskell, you will need to manually untrust packages that
+  you do not wish to trust.
 
+* An optimiser bug which can cause segfaults has been fixed.
 
-Full release notes are here:
+* A native code generator bug which can cause segfaults on x86 and
+  amd64 has been fixed.
 
-  http://www.haskell.org/ghc/docs/7.2.1/html/users_guide/release-7-2-1.html
+* A race condition in the runtime system that can cause segfaults
+  has been fixed.
+
+* Exception handlers are now run in the mask state, rather than the
+  maskUninterruptible state. Fixes a bug that could cause the GHCi
+  debugger to hang amongst other things.
+
+* The shutdownHaskellAndExit function now immediately exits, even
+  if hs_init has been called multiple times.
+
+* A bug arising when using type signature declarations in Template
+  Haskell splices has been fixed.
+
+* A bug arising when using class instances in Template Haskell
+  splices has been fixed.
+
+* Incorrectly encoded text at the end of a file is now handled
+  correctly.
+
+* The base package is now version 4.4.1.0 (was 4.4.0.0).
+
+* Haddock is now version 2.9.4.
+
 
 How to get it
 ~~~~~~~~~~~~~
