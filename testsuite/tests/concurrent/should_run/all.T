@@ -66,6 +66,7 @@ test('5558',
      compile_and_run, [''])
 
 test('5421', normal, compile_and_run, [''])
+test('5611', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
