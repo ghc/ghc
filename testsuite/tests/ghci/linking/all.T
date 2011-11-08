@@ -32,6 +32,10 @@ test('ghcilink005',
      ['$MAKE -s --no-print-directory ghcilink005'])
 
 test('ghcilink006',
-     extra_clean(['dir006/*','dir006']),
+     [
+       if_os('mingw32', expect_broken(5289)), # still cannot load libstdc++
+                                              # on Windows.  See also #4468.
+       extra_clean(['dir006/*','dir006'])
+     ],
      run_command,
      ['$MAKE -s --no-print-directory ghcilink006'])
