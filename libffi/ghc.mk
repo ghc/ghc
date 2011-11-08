@@ -34,6 +34,10 @@ endif
 libffi_STATIC_LIB  = libffi/build/inst/lib/libffi.a
 ffi_HEADER         = rts/dist/build/ffi.h
 
+ifeq "$(OSTYPE)" "cygwin"
+LIBFFI_PATH_MANGLE = PATH=$$(cygpath "$(TOP)")/libffi:$$PATH; export PATH;
+endif
+
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE):
 	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_CONFIGURE)
@@ -54,8 +58,7 @@ $(libffi_STAMP_CONFIGURE):
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
 	cd libffi && \
-	    PATH=$(TOP)/libffi:$$PATH; \
-	    export PATH; \
+	    $(LIBFFI_PATH_MANGLE) \
 	    cd build && \
 	    CC=$(CC_STAGE1) \
 	    LD=$(LD) \
