@@ -801,7 +801,10 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
                | p <- packages db_to_operate_on,
                  sourcePackageId p == sourcePackageId pkg ]
   --
-  changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on
+  -- In 7.2, we always trust packages when they're installed
+  let pkg' = pkg { trusted = True }
+
+  changeDB verbosity (removes ++ [AddPackage pkg']) db_to_operate_on
 
 parsePackageInfo
         :: String
