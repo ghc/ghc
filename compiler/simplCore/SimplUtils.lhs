@@ -1181,7 +1181,7 @@ findArity dicts_cheap bndr rhs old_arity
 
     init_cheap_app :: CheapAppFun
     init_cheap_app fn n_val_args
-      | fn == bndr = True
+      | fn == bndr = True   -- On the first pass, this binder gets infinite arity
       | otherwise  = isCheapApp fn n_val_args
  
 mk_cheap_fn :: Bool -> CheapAppFun -> CheapFun

@@ -139,18 +139,18 @@ Note [exprArity invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprArity has the following invariant:
 
-  * If typeArity (exprType e) = n,
-    then manifestArity (etaExpand e n) = n
+  (1) If typeArity (exprType e) = n,
+      then manifestArity (etaExpand e n) = n
  
-    That is, etaExpand can always expand as much as typeArity says
-    So the case analysis in etaExpand and in typeArity must match
+      That is, etaExpand can always expand as much as typeArity says
+      So the case analysis in etaExpand and in typeArity must match
  
-  * exprArity e <= typeArity (exprType e)      
+  (2) exprArity e <= typeArity (exprType e)      
 
-  * Hence if (exprArity e) = n, then manifestArity (etaExpand e n) = n
+  (3) Hence if (exprArity e) = n, then manifestArity (etaExpand e n) = n
 
-    That is, if exprArity says "the arity is n" then etaExpand really 
-    can get "n" manifest lambdas to the top.
+      That is, if exprArity says "the arity is n" then etaExpand really 
+      can get "n" manifest lambdas to the top.
 
 Why is this important?  Because 
   - In TidyPgm we use exprArity to fix the *final arity* of 
@@ -561,12 +561,17 @@ type CheapFun = CoreExpr -> Maybe Type -> Bool
 arityType :: CheapFun -> CoreExpr -> ArityType
 
 arityType cheap_fn (Cast e co)
-  = arityType cheap_fn e
-    `andArityType` ATop (typeArity (pSnd (coercionKind co)))
-    -- See Note [exprArity invariant]; must be true of
+  = case arityType cheap_fn e of
+      ATop os -> ATop (take co_arity os)
+      ABot n  -> ABot (n `min` co_arity)
+  where
+    co_arity = length (typeArity (pSnd (coercionKind co)))
+    -- See Note [exprArity invariant] (2); must be true of
     -- arityType too, since that is how we compute the arity
     -- of variables, and they in turn affect result of exprArity
     -- Trac #5441 is a nice demo
+    -- However, do make sure that ATop -> ATop and ABot -> ABot!
+    --   Casts don't affect that part. Getting this wrong provoked #5475
 
 arityType _ (Var v)
   | Just strict_sig <- idStrictness_maybe v
