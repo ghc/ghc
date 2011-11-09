@@ -77,6 +77,11 @@ test('prof-doc-last',
      compile_and_run,
      [''])
 
+test('T5559', # unicode in cost centre names
+     [ req_profiling, extra_ways(['prof']), only_ways(['prof'] + prof_ways) ],
+     compile_and_run,
+     [''])
+
 # Note [consistent stacks]
 #  Certain optimisations can change the stacks we get out of the
 #  profiler.  These flags are necessary (but perhaps not sufficient)
