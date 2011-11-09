@@ -1353,7 +1353,7 @@ def check_stdout_ok( name ):
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
-   print "Stdout:"
+   print 'Stdout:'
    print read_no_crs(qualify(name, 'run.stdout'))
 
 def check_stderr_ok( name ):
@@ -1459,7 +1459,9 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
     actual_raw = read_no_crs(actual_file)
     actual_str = normaliser(actual_raw)
 
-    if expected_str != actual_str:
+    if expected_str == actual_str:
+        return 1
+    else:
         print 'Actual ' + kind + ' output differs from expected:'
 
         if expected_file_for_diff == '/dev/null':
@@ -1491,8 +1493,10 @@ def compare_outputs( kind, normaliser, expected_file, actual_file ):
         if config.accept:
             print 'Accepting new output.'
             write_file(expected_file, actual_raw)
-        return 0
-    return 1
+            return 1
+        else:
+            return 0
+
 
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
