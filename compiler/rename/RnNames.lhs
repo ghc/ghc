@@ -214,6 +214,10 @@ rnImportDecl this_mod
     dflags <- getDOpts
     warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
+    when (mod_safe && not (safeImportsOn dflags)) $
+        addErrAt loc (ptext (sLit "safe import can't be used as Safe Haskell isn't on!")
+                  $+$ ptext (sLit $ "please enable Safe Haskell through either"
+                                 ++ "-XSafe, -XTruswrothy or -XUnsafe"))
 
     let
         imp_mod    = mi_module iface
