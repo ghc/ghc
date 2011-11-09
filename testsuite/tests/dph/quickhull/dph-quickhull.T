@@ -12,7 +12,7 @@ test    ('dph-quickhull-opt'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -funfolding-use-threshold30 -fdph-par'])
+          , '-Odph -funfolding-use-threshold30 -fdph-par -package dph-prim-par'])
 
 test    ('dph-quickhull-fast' 
         , [ extra_clean(['Main.hi', 'Main.o',
@@ -25,6 +25,6 @@ test    ('dph-quickhull-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -fdph-par'])
+          , '-O -fno-enable-rewrite-rules -fdph-par -package dph-prim-par'])
 
 
