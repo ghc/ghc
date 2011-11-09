@@ -60,6 +60,19 @@ varSetToDataMap v = M.fromList . map (flip (,) v) . uniqSetToList
 restrictDataMapVarSet :: (Ord k, Uniquable k) => M.Map k v -> UniqSet k -> M.Map k v
 restrictDataMapVarSet m s = M.filterWithKey (\k _v -> k `elementOfUniqSet` s) m
 
+-- FIXME:
+--
+--   let f = \x -> e
+--   in <f>
+--
+-- Splits to:
+--
+--    let f = \x -> e
+--    in <\x -> e>
+--
+-- For some reason that (\x -> e) actualy has the same tag as <f> (see Accumulator without rollback),
+-- and disaster ensues...
+
 --
 -- == Gathering entry information for the splitter ==
 --

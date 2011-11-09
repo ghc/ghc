@@ -14,6 +14,7 @@ import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.Residualise
 import Supercompile.Evaluator.Syntax
 
+import Supercompile.Termination.TagBag (stateTags)
 import Supercompile.Termination.Combinators
 
 import Supercompile.Utilities
@@ -220,10 +221,10 @@ liftCallCCReaderT call_cc f = ReaderT $ \r -> call_cc $ \c -> runReaderT r (f (R
 newtype RollbackScpM = RB { doRB :: forall c. LevelM (Deeds, Out FVedTerm) -> ProcessM c }
 
 
-type ProcessHistory = LinearHistory (Parent, State, RollbackScpM) -- TODO: GraphicalHistory
+type ProcessHistory = GraphicalHistory (NodeKey, (State, RollbackScpM)) -- TODO: GraphicalHistory
 
 pROCESS_HISTORY :: ProcessHistory
-pROCESS_HISTORY = mkLinearHistory (cofmap sndOf3 wQO)
+pROCESS_HISTORY = mkGraphicalHistory (cofmap fst wQO)
 
 type HistoryEnvM = (->) ProcessHistory
 
@@ -240,12 +241,12 @@ runHistoryThreadM :: HistoryThreadM a -> a
 runHistoryThreadM = flip State.evalState pROCESS_HISTORY
 
 
-type Parent = ()
+type Parent = NodeKey
 
-terminateM :: Parent -> State -> RollbackScpM -> (Parent -> a) -> (Parent -> State -> RollbackScpM -> ProcessM (ProcessHistory, a)) -> ProcessM a
-terminateM parent state rb k_continue k_stop = withHistory' $ \hist -> case terminate hist (parent, state, rb) of
-    Continue hist'                                   -> return (hist', k_continue parent)
-    Stop (shallow_parent, shallow_state, shallow_rb) -> k_stop shallow_parent shallow_state shallow_rb
+terminateM :: Parent -> State -> RollbackScpM -> (Parent -> a) -> (Parent -> State -> RollbackScpM -> ProcessM a) -> ProcessM a
+terminateM parent state rb k_continue k_stop = withHistory' $ \hist -> trace (show hist) $ case terminate hist (parent, (state, rb)) of
+    Continue hist'                                     -> return (hist', k_continue (generatedKey hist'))
+    Stop (shallow_parent, (shallow_state, shallow_rb)) -> liftM ((,) hist) $ k_stop shallow_parent shallow_state shallow_rb
   where
     withHistory' :: (ProcessHistory -> ProcessM (ProcessHistory, a)) -> ProcessM a
     withHistory' act = lift State.get >>= \hist -> act hist >>= \(hist', x) -> lift (State.put hist') >> return x
@@ -357,16 +358,18 @@ runScpM mx = mx >>= runDelayM eval_strat
 sc' :: Parent -> State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc' parent state = callCC (\k -> try (RB k))
   where
-    trce shallow_state = pprTraceSC "sc-stop" (pPrintFullState True shallow_state $$ pPrintFullState True state)
+    trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") (ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$
+                                                                    pPrintFullState True shallow_state $$ pPrintFullState True state)
     try :: RollbackScpM -> ProcessM (LevelM (Deeds, Out FVedTerm))
     try rb = terminateM parent state rb
                (\parent -> liftSpeculatedStateT speculated state $ \state' -> split (reduce state') (delayStateT (delayReaderT delay) . sc parent))
-               (\shallow_parent shallow_state shallow_rb -> trce shallow_state $ doRB shallow_rb (maybe (split shallow_state) id (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT (delayReaderT delay) . sc shallow_parent)))
+               -- (\_ shallow_state _ -> return $ maybe (trce "split" shallow_state $ split state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) state) (delayStateT (delayReaderT delay) . sc parent))
+               (\shallow_parent shallow_state shallow_rb -> doRB shallow_rb (maybe (trce "split" shallow_state $ split shallow_state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT (delayReaderT delay) . sc shallow_parent)))
 
 sc :: Parent -> State -> MemoT ProcessM (LevelM (Deeds, Out FVedTerm))
 sc parent = memo (sc' parent) . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runHistoryThreadM $ runContT $ runMemoT $ runScpM $ liftM (runSpecT . runFulfilmentT . fmap snd) $ sc () state
+supercompile unfoldings e = fVedTermToTerm $ runHistoryThreadM $ runContT $ runMemoT $ runScpM $ liftM (runSpecT . runFulfilmentT . fmap snd) $ sc 0 state
   where state = prepareTerm unfoldings e

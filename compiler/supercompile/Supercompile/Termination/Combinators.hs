@@ -210,29 +210,40 @@ mkLinearHistory (WQO (prepare :: a -> b) embed) = go_init []
         (_, False) -> go ((a, b):new_abs) abs new_a new_b
 
 
-data GraphicalHistory a = GH { unGH :: a -> TermRes GraphicalHistory a, generatedKey :: NodeKey }
+data GraphicalHistory a = GH { terminateGH :: a -> TermRes GraphicalHistory a, generatedKey :: NodeKey, showGH :: String }
+
+instance Show (GraphicalHistory a) where
+    show = showGH
 
 instance History GraphicalHistory where
-    terminate = unGH
+    terminate = terminateGH
 
 {-# INLINE mkGraphicalHistory #-}
 mkGraphicalHistory :: forall a. TTest a -> GraphicalHistory (NodeKey, a)
 mkGraphicalHistory (WQO (prepare :: a -> b) embed) = go_init emptyTopologicalOrder [] 0
   where
     go_init topo abs generated_key = GH {
-        unGH = \(key, a) -> let Just topo' = insertTopologicalOrder topo (key, generated_key + 1) in go topo' [] abs key (generated_key + 1) a (prepare a),
-        generatedKey = generated_key
+        terminateGH = \(key, a) -> let new_abkey = generated_key + 1
+                                       Just topo' = insertTopologicalOrder topo (key, new_abkey)
+                                   in go topo' [] abs new_abkey a (prepare a),
+        generatedKey = generated_key,
+        showGH = show ([abkey | (abkey, _a, _b) <- abs], topo)
       }
 
-    go topo new_abs []                  key key' new_a new_b = Continue $ go_init topo (reverse ((key, new_a, new_b):new_abs)) (key' + 1)
-    go topo new_abs ((abkey, a, b):abs) key key' new_a new_b = case b `embed` new_b of
+    go topo new_abs []                  new_abkey new_a new_b = Continue $ go_init topo (reverse ((new_abkey, new_a, new_b):new_abs)) new_abkey
+    go topo new_abs ((abkey, a, b):abs) new_abkey new_a new_b = case b `embed` new_b of
+       -- Doesn't embed, but embeds the other way: continue, don't include in history (transitivity)
+      (False, True)  -> go topo new_abs                 abs new_abkey new_a new_b
+       -- Doesn't embed either way: continue, but include in history for later checking
+      (False, False) -> go topo ((abkey, a, b):new_abs) abs new_abkey new_a new_b
+       -- Embeds! Potential termination :-(
       (True, emb) | not emb
-                  , Just topo' <- insertTopologicalOrder topo (key, key')
-                  -> go topo' ((key, a, b):new_abs) abs key key' new_a new_b
+                  , Just topo' <- insertTopologicalOrder topo (new_abkey, abkey)
+                  -- We can continue because we added a "dependency edge" without creating a cycle
+                  -> go topo' ((abkey, a, b):new_abs) abs new_abkey new_a new_b
+                  -- Embeds the other way as well, or creates a cycle: stop
                   | otherwise
                   -> Stop (abkey, a)
-      (False, True)  -> go topo new_abs          abs key key' new_a new_b
-      (False, False) -> go topo ((key, a, b):new_abs) abs key key' new_a new_b
 
 
 type NodeKey = Int
@@ -240,11 +251,11 @@ type NodeKey = Int
 data TopologicalOrder = TO {
     ord      :: IM.IntMap Int, -- ^ Maps NodeKey to node position in the topological order.
                                -- If there exists an edge (x, y) then IM.lookup x ord < IM.lookup y ord
-    maxPos   :: Int,
     minPos   :: Int,
-    outEdges :: IM.IntMap IS.IntSet, -- ^ Maps "from" NodeKey to all "to" nodes
-    inEdges  :: IM.IntMap IS.IntSet  -- ^ Maps "to"   NodeKey to all "from" nodes
-  }
+    maxPos   :: Int,
+    inEdges  :: IM.IntMap IS.IntSet, -- ^ Maps "to"   NodeKey to all "from" nodes
+    outEdges :: IM.IntMap IS.IntSet  -- ^ Maps "from" NodeKey to all "to" nodes
+  } deriving (Show)
 
 emptyTopologicalOrder :: TopologicalOrder
 emptyTopologicalOrder = TO { ord = IM.empty, maxPos = -1, minPos = 0, outEdges = IM.empty, inEdges = IM.empty }
