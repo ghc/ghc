@@ -79,7 +79,7 @@ mapCatMaybes f (x:xs) = case f x of
 \end{code}
 
 \begin{code}
-
+-- | flipped version of @fromMaybe@.
 orElse :: Maybe a -> a -> a
 (Just x) `orElse` _ = x
 Nothing  `orElse` y = y

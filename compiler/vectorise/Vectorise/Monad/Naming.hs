@@ -9,15 +9,18 @@ module Vectorise.Monad.Naming
   , newLocalVars
   , newDummyVar
   , newTyVar
-  ) where
+  )
+where
 
 import Vectorise.Monad.Base
 
 import DsMonad
+import TcType
 import Type
 import Var
 import Name
 import SrcLoc
+import MkId
 import Id
 import FastString
 
@@ -43,7 +46,8 @@ mkLocalisedName mk_occ name =
      ; return new_name
      }
 
--- |Produce the vectorised variant of an `Id` with the given type.
+-- |Produce the vectorised variant of an `Id` with the given type, while taking care that vectorised
+-- dfun ids must be dfuns again.
 --
 -- Force the new name to be a system name and, if the original was an external name, disambiguate
 -- the new name with the module name of the original.
@@ -51,10 +55,17 @@ mkLocalisedName mk_occ name =
 mkVectId :: Id -> Type -> VM Id
 mkVectId id ty
   = do { name <- mkLocalisedName mkVectOcc (getName id)
-       ; let id' | isExportedId id = Id.mkExportedLocalId name ty
+       ; let id' | isDFunId id     = MkId.mkDictFunId name tvs theta cls tys
+                 | isExportedId id = Id.mkExportedLocalId name ty
                  | otherwise       = Id.mkLocalId         name ty
        ; return id'
        }
+  where
+    -- Decompose a dictionary function signature: \forall tvs. theta -> cls tys
+    -- NB: We do *not* use closures '(:->)' for vectorised predicate abstraction as dictionary
+    --     functions are always fully applied.
+    (tvs, theta, pty) = tcSplitSigmaTy  ty
+    (cls, tys)        = tcSplitDFunHead pty
 
 -- |Make a fresh instance of this var, with a new unique.
 --

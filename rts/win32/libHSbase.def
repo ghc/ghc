@@ -30,6 +30,8 @@ EXPORTS
 	base_GHCziConcziIO_ensureIOManagerIsRunning_closure
 	base_GHCziConcziSync_runSparks_closure
 
+	base_GHCziTopHandler_flushStdHandles_closure
+
 	base_GHCziWeak_runFinalizzerBatch_closure
 	base_GHCziPack_unpackCString_closure
 	base_GHCziIOziException_blockedIndefinitelyOnMVar_closure

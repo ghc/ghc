@@ -6,8 +6,7 @@ module Vectorise.Utils.Closure (
   buildClosure,
   buildClosures,
   buildEnv
-)
-where
+) where
 
 import Vectorise.Builtins
 import Vectorise.Vect
@@ -28,15 +27,14 @@ import BasicTypes( TupleSort(..) )
 import FastString
 
 
--- | Make a closure.
-mkClosure
-  :: Type   -- ^ Type of the argument.
-  -> Type   -- ^ Type of the result.
-  -> Type   -- ^ Type of the environment.
-  -> VExpr  -- ^ The function to apply.
-  -> VExpr  -- ^ The environment to use.
-  -> VM VExpr
-
+-- |Make a closure.
+--
+mkClosure :: Type       -- ^ Type of the argument.
+          -> Type       -- ^ Type of the result.
+          -> Type       -- ^ Type of the environment.
+          -> VExpr      -- ^ The function to apply.
+          -> VExpr      -- ^ The environment to use.
+          -> VM VExpr
 mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
  = do dict <- paDictOfType env_ty
       mkv  <- builtin closureVar
@@ -44,15 +42,13 @@ mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
       return (Var mkv `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, venv],
               Var mkl `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, lenv])
 
-
--- | Make a closure application.
-mkClosureApp 
-  :: Type   -- ^ Type of the argument.
-  -> Type   -- ^ Type of the result.
-  -> VExpr  -- ^ Closure to apply.
-  -> VExpr  -- ^ Argument to use.
-  -> VM VExpr
-
+-- |Make a closure application.
+--
+mkClosureApp :: Type      -- ^ Type of the argument.
+             -> Type      -- ^ Type of the result.
+             -> VExpr     -- ^ Closure to apply.
+             -> VExpr     -- ^ Argument to use.
+             -> VM VExpr
 mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
  = do vapply <- builtin applyVar
       lapply <- builtin liftedApplyVar
@@ -60,21 +56,16 @@ mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
       return (Var vapply `mkTyApps` [arg_ty, res_ty] `mkApps` [vclo, varg],
               Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [Var lc, lclo, larg])
 
-
-buildClosures 
-  :: [TyVar]
-  -> [VVar]
-  -> [Type] -- ^ Type of the arguments.
-  -> Type   -- ^ Type of result.
-  -> VM VExpr
-  -> VM VExpr
-
+buildClosures :: [TyVar]
+              -> [VVar]
+              -> [Type]   -- ^ Type of the arguments.
+              -> Type     -- ^ Type of result.
+              -> VM VExpr
+              -> VM VExpr
 buildClosures _   _    [] _ mk_body
  = mk_body
-
 buildClosures tvs vars [arg_ty] res_ty mk_body
  =  buildClosure tvs vars arg_ty res_ty mk_body
-
 buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
  = do res_ty' <- mkClosureTypes arg_tys res_ty
       arg     <- newLocalVVar (fsLit "x") arg_ty
@@ -84,7 +75,6 @@ buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
             lc     <- builtin liftingContext
             clo    <- buildClosures tvs (vars ++ [arg]) arg_tys res_ty mk_body
             return $ vLams lc (vars ++ [arg]) clo
-
 
 -- (clo <x1,...,xn> <f,f^>, aclo (Arr lc xs1 ... xsn) <f,f^>)
 --   where
@@ -110,6 +100,7 @@ buildClosure tvs vars arg_ty res_ty mk_body
 
 
 -- Environments ---------------------------------------------------------------
+
 buildEnv :: [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VExpr)
 buildEnv [] 
  = do
@@ -117,10 +108,9 @@ buildEnv []
       void  <- builtin voidVar
       pvoid <- builtin pvoidVar
       return (ty, vVar (void, pvoid), \_ body -> body)
-
-buildEnv [v] = return (vVarType v, vVar v,
-                    \env body -> vLet (vNonRec v env) body)
-
+buildEnv [v] 
+ = return (vVarType v, vVar v,
+           \env body -> vLet (vNonRec v env) body)
 buildEnv vs
  = do (lenv_tc, lenv_tyargs) <- pdataReprTyCon ty
 

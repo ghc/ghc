@@ -1066,12 +1066,12 @@ setSafeHaskell s = updM f
 -- | Are all direct imports required to be safe for this Safe Haskell mode?
 -- Direct imports are when the code explicitly imports a module
 safeDirectImpsReq :: DynFlags -> Bool
-safeDirectImpsReq d = safeLanguageOn d || safeInferOn d
+safeDirectImpsReq d = safeLanguageOn d
 
 -- | Are all implicit imports required to be safe for this Safe Haskell mode?
 -- Implicit imports are things in the prelude. e.g System.IO when print is used.
 safeImplicitImpsReq :: DynFlags -> Bool
-safeImplicitImpsReq d = safeLanguageOn d || safeInferOn d
+safeImplicitImpsReq d = safeLanguageOn d
 
 -- | Combine two Safe Haskell modes correctly. Used for dealing with multiple flags.
 -- This makes Safe Haskell very much a monoid but for now I prefer this as I don't
@@ -1337,7 +1337,7 @@ safeFlagCheck dflags =
 
 allFlags :: [String]
 allFlags = map ('-':) $
-           [ flagName flag | flag <- dynamic_flags, ok (flagOptKind flag) ] ++
+           [ flagName flag | flag <- dynamic_flags ++ package_flags, ok (flagOptKind flag) ] ++
            map ("fno-"++) fflags ++
            map ("f"++) fflags ++
            map ("X"++) supportedExtensions

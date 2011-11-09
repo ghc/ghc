@@ -920,7 +920,10 @@ checkSafeImports dflags hsc_env tcg_env
     condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
     condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
     condense (m, x:xs) = do (_,_,l,s) <- foldlM cond' x xs
-                            return (m, l, s)
+                            -- we turn all imports into safe ones when
+                            -- inference mode is on.
+                            let s' = if safeInferOn dflags then True else s
+                            return (m, l, s')
         
     -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal

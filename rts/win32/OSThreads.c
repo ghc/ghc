@@ -93,20 +93,30 @@ yieldThread()
 void
 shutdownThread()
 {
-  _endthreadex(0);
-  barf("_endthreadex returned"); // avoid gcc warning
+    ExitThread(0);
+    barf("ExitThread() returned"); // avoid gcc warning
 }
 
 int
 createOSThread (OSThreadId* pId, OSThreadProc *startProc, void *param)
 {
-  
-  return (_beginthreadex ( NULL,  /* default security attributes */
-			   0,
-			   (unsigned (__stdcall *)(void *)) startProc,
-			   param,
-			   0,
-			   (unsigned*)pId) == 0);
+    HANDLE h;
+    h = CreateThread ( NULL,  /* default security attributes */
+                       0,
+                       (LPTHREAD_START_ROUTINE)startProc,
+                       param,
+                       0,
+                       pId);
+
+    if (h == 0) {
+        return 1;
+    } else {
+        // This handle leaks if we don't close it here.  Perhaps we
+        // should try to keep it around to avoid needing OpenThread()
+        // later.
+        CloseHandle(h);
+        return 0;
+    }
 }
 
 OSThreadId
@@ -128,6 +138,7 @@ osThreadIsAlive(OSThreadId id)
         sysErrorBelch("osThreadIsAlive: GetExitCodeThread");
         stg_exit(EXIT_FAILURE);
     }
+    CloseHandle(hdl);
     return (exit_code == STILL_ACTIVE);
 }
 
@@ -286,6 +297,7 @@ interruptOSThread (OSThreadId id)
     } else {
         // Nothing to do, unfortunately
     }
+    CloseHandle(hdl);
 }
 
 #else /* !defined(THREADED_RTS) */

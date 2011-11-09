@@ -1,30 +1,33 @@
+-- |Vectorisation of expressions.
 
--- | Vectorisation of expressions.
-module Vectorise.Exp (
-
-  -- Vectorise a polymorphic expression
-  vectPolyExpr, 
-  
-  -- Vectorise a scalar expression of functional type
-  vectScalarFun
-) where
+module Vectorise.Exp
+  (   -- * Vectorise polymorphic expressions with special cases for right-hand sides of particular 
+      --   variable bindings
+    vectPolyExpr
+  , vectScalarFun
+  , vectScalarDFun
+  ) 
+where
 
 #include "HsVersions.h"
 
 import Vectorise.Type.Type
 import Vectorise.Var
+import Vectorise.Convert
 import Vectorise.Vect
 import Vectorise.Env
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Utils
 
-import CoreSyn
 import CoreUtils
 import MkCore
+import CoreSyn
 import CoreFVs
+import Class
 import DataCon
 import TyCon
+import TcType
 import Type
 import NameSet
 import Var
@@ -38,6 +41,7 @@ import TysPrim
 import Outputable
 import FastString
 import Control.Monad
+import Control.Applicative
 import Data.List
 
 
@@ -82,6 +86,7 @@ vectExpr (_, AnnTick tickish expr)
 -- SPECIAL CASE: Vectorise/lift 'patError @ ty err' by only vectorising/lifting the type 'ty';
 --   its only purpose is to abort the program, but we need to adjust the type to keep CoreLint
 --   happy.
+-- FIXME: can't be do this with a VECTORISE pragma on 'pAT_ERROR_ID' now?
 vectExpr (_, AnnApp (_, AnnApp (_, AnnVar v) (_, AnnType ty)) err)
   | v == pAT_ERROR_ID
   = do { (vty, lty) <- vectAndLiftType ty
@@ -168,7 +173,7 @@ onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
 
 vectExpr e = cantVectorise "Can't vectorise expression (vectExpr)" (ppr $ deAnnotate e)
 
--- | Vectorise an expression with an outer lambda abstraction.
+-- |Vectorise an expression with an outer lambda abstraction.
 --
 vectFnExpr :: Bool             -- ^ If we process the RHS of a binding, whether that binding should
                                --   be inlined
@@ -201,7 +206,7 @@ vectScalarFun forceScalar recFns expr
       ; let scalarVars = gscalarVars `extendVarSetList` recFns
             (arg_tys, res_ty) = splitFunTys (exprType expr)
       ; MASSERT( not $ null arg_tys )
-      ; onlyIfV empty
+      ; onlyIfV (ptext (sLit "not a scalar function"))
                 (forceScalar                              -- user asserts the functions is scalar
                  ||
                  all (is_scalar_ty scalarTyCons) arg_tys  -- check whether the function is scalar
@@ -299,6 +304,109 @@ mkScalarFun arg_tys res_ty expr
        ; lclo    <- liftPD (Var clo_var)
        ; return (Var clo_var, lclo)
        }
+
+-- |Vectorise a dictionary function that has a 'VECTORISE SCALAR instance' pragma.
+-- 
+-- In other words, all methods in that dictionary are scalar functions — to be vectorised with
+-- 'vectScalarFun'.  The dictionary "function" itself may be a constant, though.
+--
+-- NB: You may think that we could implement this function guided by the struture of the Core
+--     expression of the right-hand side of the dictionary function.  We cannot proceed like this as
+--     'vectScalarDFun' must also work for *imported* dfuns, where we don't necessarily have access
+--     to the Core code of the unvectorised dfun.
+--
+-- Here an example — assume,
+--
+-- > class Eq a where { (==) :: a -> a -> Bool }
+-- > instance (Eq a, Eq b) => Eq (a, b) where { (==) = ... }
+-- > {-# VECTORISE SCALAR instance Eq (a, b) }
+--
+-- The unvectorised dfun for the above instance has the following signature:
+--
+-- > $dEqPair :: forall a b. Eq a -> Eq b -> Eq (a, b)
+--
+-- We generate the following (scalar) vectorised dfun (liberally using TH notation):
+--
+-- > $v$dEqPair :: forall a b. V:Eq a -> V:Eq b -> V:Eq (a, b)
+-- > $v$dEqPair = /\a b -> \dEqa :: V:Eq a -> \dEqb :: V:Eq b ->
+-- >                D:V:Eq $(vectScalarFun True recFns 
+-- >                         [| (==) @(a, b) ($dEqPair @a @b $(unVect dEqa) $(unVect dEqb)) |])
+--
+-- NB:
+-- * '(,)' vectorises to '(,)' — hence, the type constructor in the result type remains the same.
+-- * We share the '$(unVect di)' sub-expressions between the different selectors, but duplicate
+--   the application of the unvectorised dfun, to enable the dictionary selection rules to fire.
+--
+vectScalarDFun :: Var        -- ^ Original dfun
+               -> [Var]      -- ^ Functions names in same recursive binding group
+               -> VM CoreExpr
+vectScalarDFun var recFns
+  = do {   -- bring the type variables into scope
+       ; mapM_ defLocalTyVar tvs
+
+           -- vectorise dictionary argument types and generate variables for them
+       ; vTheta     <- mapM vectType theta
+       ; vThetaBndr <- mapM (newLocalVar (fsLit "vd")) vTheta
+       ; let vThetaVars = varsToCoreExprs vThetaBndr
+       
+           -- vectorise superclass dictionaries and methods as scalar expressions
+       ; thetaVars  <- mapM (newLocalVar (fsLit "d")) theta
+       ; thetaExprs <- zipWithM unVectDict theta vThetaVars
+       ; let thetaDictBinds = zipWith NonRec thetaVars thetaExprs
+             dict           = Var var `mkTyApps` (mkTyVarTys tvs) `mkVarApps` thetaVars
+             scsOps         = map (\selId -> varToCoreExpr selId `mkTyApps` tys `mkApps` [dict])
+                                  selIds
+       ; vScsOps <- mapM (\e -> vectorised <$> vectScalarFun True recFns e) scsOps
+
+           -- vectorised applications of the class-dictionary data constructor
+       ; Just vDataCon <- lookupDataCon dataCon
+       ; vTys          <- mapM vectType tys
+       ; let vBody = thetaDictBinds `mkLets` mkCoreConApps vDataCon (map Type vTys ++ vScsOps)
+
+       ; return $ mkLams (tvs ++ vThetaBndr) vBody
+       }
+  where
+    ty                = varType var
+    (tvs, theta, pty) = tcSplitSigmaTy  ty        -- 'theta' is the instance context
+    (cls, tys)        = tcSplitDFunHead pty       -- 'pty' is the instance head
+    selIds            = classAllSelIds cls
+    dataCon           = classDataCon cls
+
+-- Build a value of the dictionary before vectorisation from original, unvectorised type and an
+-- expression computing the vectorised dictionary.
+--
+-- Given the vectorised version of a dictionary 'vd :: V:C vt1..vtn', generate code that computes
+-- the unvectorised version, thus:
+--
+-- > D:C op1 .. opm
+-- > where
+-- >   opi = $(fromVect opTyi [| vSeli @vt1..vtk vd |])
+--
+-- where 'opTyi' is the type of the i-th superclass or op of the unvectorised dictionary.
+--
+unVectDict :: Type -> CoreExpr -> VM CoreExpr
+unVectDict ty e 
+  = do { vTys <- mapM vectType tys
+       ; let meths = map (\sel -> Var sel `mkTyApps` vTys `mkApps` [e]) selIds
+       ; scOps <- zipWithM fromVect methTys meths
+       ; return $ mkCoreConApps dataCon (map Type tys ++ scOps)
+       }
+  where
+    (tycon, tys, dataCon, methTys) = splitProductType "unVectDict: original type" ty
+    cls                            = case tyConClass_maybe tycon of
+                                       Just cls -> cls
+                                       Nothing  -> panic "Vectorise.Exp.unVectDict: no class"
+    selIds                         = classAllSelIds cls
+
+{-
+!!!How about 'isClassOpId_maybe'?  Do we need to treat them specially to get the class ops for
+!!!the vectorised instances or do they just work out?? (We may want to make sure that the
+!!!vectorised Ids at least get the right IdDetails...)
+!!!NB: For *locally defined* instances, the selector functions are part of the vectorised bindings,
+!!!    but not so for *imported* instances, where we need to generate the vectorised versions from
+!!!    scratch.
+!!!Also need to take care of the builtin rules for selectors (see mkDictSelId).
+ -}
 
 -- | Vectorise a lambda abstraction.
 --

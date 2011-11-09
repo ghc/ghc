@@ -1932,7 +1932,12 @@ f "2"    = 2
 	    <para>This option is a bit of a sledgehammer: it might
 	    sometimes make things worse.  Selectively unboxing fields
 	    by using <literal>UNPACK</literal> pragmas might be
-	    better.</para>
+	    better. An alternative is to use
+        <option>-funbox-strict-fields</option> to turn on
+        unboxing by default but disable it for certain constructor
+        fields using the <literal>NOUNPACK</literal> pragma
+        (see <xref linkend="nounpack-pragma"/>).
+        </para>
 	  </listitem>
 	</varlistentry>
 
