@@ -143,7 +143,9 @@ easier to write RULEs for them.
    in TcIface.
 
  * When looking for CAF-hood (in TidyPgm), we must take account of the
-   CAF-hood of the mk_integer field in LitInteger; see TidyPgm.cafRefsL
+   CAF-hood of the mk_integer field in LitInteger; see TidyPgm.cafRefsL.
+   Indeed this is the only reason we put the mk_integer field in the 
+   literal -- otherwise we could just look it up in CorePrep.
 
 
 Binary instance
