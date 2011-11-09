@@ -19,8 +19,8 @@ import TestData
 runQuickhull :: PArray QH.Point -> [(Double, Double)]
 runQuickhull pts 
  = let result = quickhull pts
-       resxs  = P.toUArrPA (QH.xsOf result)
-       resys  = P.toUArrPA (QH.ysOf result)
+       resxs  = P.toUArray (QH.xsOf result)
+       resys  = P.toUArray (QH.ysOf result)
    in  resxs U.!: 0 `seq` (zip (U.toList resxs) (U.toList resys))
 
 

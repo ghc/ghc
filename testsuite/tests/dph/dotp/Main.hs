@@ -28,7 +28,7 @@ generateVector :: Int -> IO (PArray Double)
 generateVector n 
   = do
       vec <- generateVectorU n
-      return $ P.fromUArrPA' vec
+      return $ P.fromUArray vec
 
 generateVectors :: Int -> IO (PArray Double, PArray Double)
 generateVectors n =

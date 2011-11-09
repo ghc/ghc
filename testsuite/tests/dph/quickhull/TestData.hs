@@ -86,7 +86,7 @@ toPArrayPoints ps
 
 -- | Force points to be evaluated
 force pts 
-	= P.toUArrPA (QH.xsOf pts) U.!: 0 D.+ 
-          P.toUArrPA (QH.ysOf pts) U.!: 0
+	= P.toUArray (QH.xsOf pts) U.!: 0 D.+ 
+          P.toUArray (QH.ysOf pts) U.!: 0
 
    
