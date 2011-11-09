@@ -1,4 +1,0 @@
- - No test for infer safe when overlapping used
- - Should just the enabling of RULES make a module unsafe or only if there are actual rules defined?
- - As above but with newtype deriving
-

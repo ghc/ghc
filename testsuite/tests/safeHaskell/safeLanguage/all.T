@@ -53,3 +53,9 @@ test('SafeLang15',
      ['SafeLang15', '-XSafe'])
 test('SafeLang16', normal, compile, [''])
 
+# Test building a package, that trust values are set correctly
+# and can be changed correctly
+#test('SafeRecomp01',
+#		clean_cmd('$MAKE -s --no-print-directory cleanSafeRecomp01'),
+#      run_command, ['$MAKE -s --no-print-directory safeRecomp01'])
+
