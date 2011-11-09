@@ -1337,7 +1337,7 @@ safeFlagCheck dflags =
 
 allFlags :: [String]
 allFlags = map ('-':) $
-           [ flagName flag | flag <- dynamic_flags, ok (flagOptKind flag) ] ++
+           [ flagName flag | flag <- dynamic_flags ++ package_flags, ok (flagOptKind flag) ] ++
            map ("fno-"++) fflags ++
            map ("f"++) fflags ++
            map ("X"++) supportedExtensions
