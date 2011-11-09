@@ -4,13 +4,6 @@
 \section[RnNames]{Extracting imported and top-level names in scope}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module RnNames (
         rnImports, getLocalNonValBinders,
         rnExports, extendGlobalRdrEnvRn,
@@ -42,14 +35,14 @@ import ErrUtils
 import Util
 import FastString
 import ListSetOps
-import Data.List        ( partition, (\\), find )
-import qualified Data.Set as Set
-import System.IO
+
 import Control.Monad
 import Data.Map         ( Map )
 import qualified Data.Map as Map
+import Data.List        ( partition, (\\), find )
+import qualified Data.Set as Set
+import System.IO
 \end{code}
-
 
 
 %************************************************************************
@@ -137,39 +130,35 @@ with yes we have gone with no for now.
 
 
 \begin{code}
+-- | Process Import Decls
+-- Do the non SOURCE ones first, so that we get a helpful warning for SOURCE
+-- ones that are unnecessary
 rnImports :: [LImportDecl RdrName]
           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+rnImports imports = do
+    this_mod <- getModule
+    let (source, ordinary) = partition is_source_import imports
+        is_source_import d = ideclSource (unLoc d)
+    stuff1 <- mapM (rnImportDecl this_mod) ordinary
+    stuff2 <- mapM (rnImportDecl this_mod) source
+    -- Safe Haskell: See Note [Tracking Trust Transitively]
+    let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2)
+    return (decls, rdr_env, imp_avails, hpc_usage)
 
-rnImports imports
-         -- PROCESS IMPORT DECLS
-         -- Do the non {- SOURCE -} ones first, so that we get a helpful
-         -- warning for {- SOURCE -} ones that are unnecessary
-    = do this_mod <- getModule
-         let (source, ordinary) = partition is_source_import imports
-             is_source_import d = ideclSource (unLoc d)
-         stuff1 <- mapM (rnImportDecl this_mod) ordinary
-         stuff2 <- mapM (rnImportDecl this_mod) source
-         -- Safe Haskell: See Note [Tracking Trust Transitively]
-         let (decls, rdr_env, imp_avails, hpc_usage) = 
-                        combine (stuff1 ++ stuff2)
-         return (decls, rdr_env, imp_avails, hpc_usage)
+  where
+    combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
+            -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+    combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails, False)
+    
+    plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
+         (decls, gbl_env2, imp_avails2,hpc_usage2)
+      = ( decl:decls,
+          gbl_env1 `plusGlobalRdrEnv` gbl_env2,
+          imp_avails1 `plusImportAvails` imp_avails2,
+          hpc_usage1 || hpc_usage2 )
 
-    where
-      combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
-              -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
-      combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails, False)
-        where
-          plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
-               (decls, gbl_env2, imp_avails2,hpc_usage2)
-            = ( decl:decls,
-                gbl_env1 `plusGlobalRdrEnv` gbl_env2,
-                imp_avails1 `plusImportAvails` imp_avails2,
-                hpc_usage1 || hpc_usage2 )
-
-rnImportDecl  :: Module
-              -> LImportDecl RdrName
+rnImportDecl  :: Module -> LImportDecl RdrName
               -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
-
 rnImportDecl this_mod 
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
@@ -181,15 +170,13 @@ rnImportDecl this_mod
         pkg_imports <- xoptM Opt_PackageImports
         when (not pkg_imports) $ addErr packageImportErr
 
-        -- If there's an error in loadInterface, (e.g. interface
-        -- file not found) we get lots of spurious errors from 'filterImports'
-    let
-        imp_mod_name = unLoc loc_imp_mod_name
+    -- If there's an error in loadInterface, (e.g. interface
+    -- file not found) we get lots of spurious errors from 'filterImports'
+    let imp_mod_name = unLoc loc_imp_mod_name
         doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
-        -- Check for a missing import list
-        -- (Opt_WarnMissingImportList also checks for T(..) items
-        --  but that is done in checkDodgyImport below)
+    -- Check for a missing import list (Opt_WarnMissingImportList also
+    -- checks for T(..) items but that is done in checkDodgyImport below)
     case imp_details of
         Just (False, _) -> return () -- Explicit import list
         _  | implicit   -> return () -- Do not bleat for implicit imports
@@ -199,18 +186,18 @@ rnImportDecl this_mod
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
 
-        -- Compiler sanity check: if the import didn't say
-        -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) (do
+    -- Compiler sanity check: if the import didn't say
+    -- {-# SOURCE #-} we should not get a hi-boot file
+    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) do
 
-        -- Issue a user warning for a redundant {- SOURCE -} import
-        -- NB that we arrange to read all the ordinary imports before
-        -- any of the {- SOURCE -} imports.
-        --
-        -- in --make and GHCi, the compilation manager checks for this,
-        -- and indeed we shouldn't do it here because the existence of
-        -- the non-boot module depends on the compilation order, which
-        -- is not deterministic.  The hs-boot test can show this up.
+    -- Issue a user warning for a redundant {- SOURCE -} import
+    -- NB that we arrange to read all the ordinary imports before
+    -- any of the {- SOURCE -} imports.
+    --
+    -- in --make and GHCi, the compilation manager checks for this,
+    -- and indeed we shouldn't do it here because the existence of
+    -- the non-boot module depends on the compilation order, which
+    -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDOpts
     warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
@@ -219,8 +206,7 @@ rnImportDecl this_mod
                   $+$ ptext (sLit $ "please enable Safe Haskell through either"
                                  ++ "-XSafe, -XTruswrothy or -XUnsafe"))
 
-    let
-        imp_mod    = mi_module iface
+    let imp_mod    = mi_module iface
         warns      = mi_warns iface
         orph_iface = mi_orphan iface
         has_finsts = mi_finsts iface
@@ -228,9 +214,7 @@ rnImportDecl this_mod
         trust      = getSafeMode $ mi_trust iface
         trust_pkg  = mi_trust_pkg iface
 
-        qual_mod_name = case as_mod of
-                          Nothing           -> imp_mod_name
-                          Just another_name -> another_name
+        qual_mod_name = as_mod `orElse` imp_mod_name
         imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
                                   is_dloc = loc, is_as = qual_mod_name }
 
@@ -319,18 +303,18 @@ rnImportDecl this_mod
                         -- module as a safe import.
                         -- See Note [Tracking Trust Transitively]
                         -- and Note [Trust Transitive Property]
-                        imp_trust_pkgs = if mod_safe' 
-                                            then map fst $ filter snd dependent_pkgs
-                                            else [],
+                        imp_trust_pkgs = if mod_safe'
+                                             then map fst $ filter snd dependent_pkgs
+                                             else [],
                         -- Do we require our own pkg to be trusted?
                         -- See Note [Trust Own Package]
                         imp_trust_own_pkg = pkg_trust_req
                    }
 
     -- Complain if we import a deprecated module
-    ifWOptM Opt_WarnWarningsDeprecations        (
+    ifWOptM Opt_WarnWarningsDeprecations (
        case warns of
-          WarnAll txt -> addWarn (moduleWarn imp_mod_name txt)
+          WarnAll txt -> addWarn $ moduleWarn imp_mod_name txt
           _           -> return ()
      )
 
@@ -338,7 +322,6 @@ rnImportDecl this_mod
                                    , ideclHiding = new_imp_details })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
-    )
 
 warnRedundantSourceImport :: ModuleName -> SDoc
 warnRedundantSourceImport mod_name
