@@ -27,7 +27,7 @@ getModule (PackageData rs@(root:rest)) file =
     where
         testPackage pkg =
             do
-                bHi <- doesFileExist ""
+                bHi <- doesFileExist "/does/not/exist"
                 return [("","") | bHi]
 
 main = getModule (PackageData ["7"]) "13"
