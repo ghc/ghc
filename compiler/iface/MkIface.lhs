@@ -268,43 +268,43 @@ mkIface_ hsc_env maybe_old_fingerprint
                 ; trust_info  = setSafeMode safeMode
 
 	        ; intermediate_iface = ModIface { 
-			mi_module   = this_mod,
-			mi_boot     = is_boot,
-			mi_deps     = deps,
-			mi_usages   = usages,
-			mi_exports  = mkIfaceExports exports,
+			mi_module      = this_mod,
+			mi_boot        = is_boot,
+			mi_deps        = deps,
+			mi_usages      = usages,
+			mi_exports     = mkIfaceExports exports,
 	
 			-- Sort these lexicographically, so that
 			-- the result is stable across compilations
-			mi_insts    = sortLe le_inst iface_insts,
-			mi_fam_insts= sortLe le_fam_inst iface_fam_insts,
-			mi_rules    = sortLe le_rule iface_rules,
+			mi_insts       = sortLe le_inst iface_insts,
+			mi_fam_insts   = sortLe le_fam_inst iface_fam_insts,
+			mi_rules       = sortLe le_rule iface_rules,
 
-                        mi_vect_info = iface_vect_info,
+                        mi_vect_info   = iface_vect_info,
 
-			mi_fixities = fixities,
-			mi_warns  = warns,
-			mi_anns     = mkIfaceAnnotations anns,
-			mi_globals  = Just rdr_env,
+			mi_fixities    = fixities,
+			mi_warns       = warns,
+			mi_anns        = mkIfaceAnnotations anns,
+			mi_globals     = Just rdr_env,
 
 			-- Left out deliberately: filled in by addVersionInfo
-			mi_iface_hash = fingerprint0,
-			mi_mod_hash  = fingerprint0,
- 			mi_exp_hash  = fingerprint0,
-                        mi_used_th   = used_th,
+			mi_iface_hash  = fingerprint0,
+			mi_mod_hash    = fingerprint0,
+ 			mi_exp_hash    = fingerprint0,
+                        mi_used_th     = used_th,
                         mi_orphan_hash = fingerprint0,
-			mi_orphan    = False,	-- Always set by addVersionInfo, but
+			mi_orphan      = False,	-- Always set by addVersionInfo, but
 						-- it's a strict field, so we can't omit it.
-                        mi_finsts    = False,   -- Ditto
-			mi_decls     = deliberatelyOmitted "decls",
-			mi_hash_fn   = deliberatelyOmitted "hash_fn",
-			mi_hpc       = isHpcUsed hpc_info,
-			mi_trust     = trust_info,
-			mi_trust_pkg = pkg_trust_req,
+                        mi_finsts      = False, -- Ditto
+			mi_decls       = deliberatelyOmitted "decls",
+			mi_hash_fn     = deliberatelyOmitted "hash_fn",
+			mi_hpc         = isHpcUsed hpc_info,
+			mi_trust       = trust_info,
+			mi_trust_pkg   = pkg_trust_req,
 
 			-- And build the cached values
-			mi_warn_fn = mkIfaceWarnCache warns,
-			mi_fix_fn = mkIfaceFixCache fixities }
+			mi_warn_fn     = mkIfaceWarnCache warns,
+			mi_fix_fn      = mkIfaceFixCache fixities }
 		}
 
         ; (new_iface, no_change_at_all) 
