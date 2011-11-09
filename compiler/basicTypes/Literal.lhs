@@ -33,7 +33,7 @@ module Literal
         , pprLiteral
 
         -- ** Predicates on Literals and their contents
-        , litIsDupable, litIsTrivial
+        , litIsDupable, litIsTrivial, litIsLifted
         , inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
         , isZeroLit
         , litFitsInChar
@@ -368,6 +368,10 @@ litFitsInChar (MachInt i)
                          = fromInteger i <= ord minBound
                         && fromInteger i >= ord maxBound
 litFitsInChar _         = False
+
+litIsLifted :: Literal -> Bool
+litIsLifted (LitInteger {}) = True
+litIsLifted _               = False
 \end{code}
 
         Types

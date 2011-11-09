@@ -278,17 +278,37 @@ type Arg b = Expr b
 type Alt b = (AltCon, [b], Expr b)
 
 -- | A case alternative constructor (i.e. pattern match)
-data AltCon = DataAlt DataCon	-- ^ A plain data constructor: @case e of { Foo x -> ... }@.
-                                -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
-	    | LitAlt  Literal   -- ^ A literal: @case e of { 1 -> ... }@
-	    | DEFAULT           -- ^ Trivial alternative: @case e of { _ -> ... }@
-	 deriving (Eq, Ord, Data, Typeable)
+data AltCon 
+  = DataAlt DataCon   --  ^ A plain data constructor: @case e of { Foo x -> ... }@.
+                      -- Invariant: the 'DataCon' is always from a @data@ type, and never from a @newtype@
+
+  | LitAlt  Literal   -- ^ A literal: @case e of { 1 -> ... }@
+                      -- Invariant: always an *unlifted* literal
+		      -- See Note [Literal alternatives]
+	      	      
+  | DEFAULT           -- ^ Trivial alternative: @case e of { _ -> ... }@
+   deriving (Eq, Ord, Data, Typeable)
 
 -- | Binding, used for top level bindings in a module and local bindings in a @let@.
 data Bind b = NonRec b (Expr b)
 	    | Rec [(b, (Expr b))]
   deriving (Data, Typeable)
 \end{code}
+
+Note [Literal alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Literal alternatives (LitAlt lit) are always for *un-lifted* literals.
+We have one literal, a literal Integer, that is lifted, and we don't
+allow in a LitAlt, because LitAlt cases don't do any evaluation. Also
+(see Trac #5603) if you say
+    case 3 of
+      S# x -> ...
+      J# _ _ -> ...
+(where S#, J# are the constructors for Integer) we don't want the
+simplifier calling findAlt with argument (LitAlt 3).  No no.  Integer
+literals are an opaque encoding of an algebraic data type, not of
+an unlifted literal, like all the others.
+
 
 -------------------------- CoreSyn INVARIANTS ---------------------------
 

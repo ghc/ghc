@@ -31,6 +31,7 @@ import CoreUtils
 import CoreUnfold	( couldBeSmallEnoughToInline )
 import CoreFVs 		( exprsFreeVars )
 import CoreMonad
+import Literal		( litIsLifted )
 import HscTypes         ( ModGuts(..) )
 import WwLib		( mkWorkerArgs )
 import DataCon
@@ -1714,7 +1715,8 @@ argsToPats env in_scope val_env args occs
 \begin{code}
 isValue :: ValueEnv -> CoreExpr -> Maybe Value
 isValue _env (Lit lit)
-  = Just (ConVal (LitAlt lit) [])
+  | litIsLifted lit = Nothing
+  | otherwise       = Just (ConVal (LitAlt lit) [])
 
 isValue env (Var v)
   | Just stuff <- lookupVarEnv env v

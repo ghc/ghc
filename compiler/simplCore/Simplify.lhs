@@ -21,6 +21,7 @@ import Type hiding      ( substTy, extendTvSubst, substTyVar )
 import SimplEnv
 import SimplUtils
 import FamInstEnv	( FamInstEnv )
+import Literal		( litIsLifted )
 import Id
 import MkId		( seqId, realWorldPrimId )
 import MkCore		( mkImpossibleExpr )
@@ -1713,6 +1714,7 @@ rebuildCase, reallyRebuildCase
 rebuildCase env scrut case_bndr alts cont
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
+  , not (litIsLifted lit)
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (LitAlt lit) alts of
 	    Nothing           -> missingAlt env case_bndr alts cont

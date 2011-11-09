@@ -41,7 +41,6 @@ import Kind
 import Type
 import TypeRep
 import TyCon
-import TcType
 import BasicTypes
 import StaticFlags
 import ListSetOps
@@ -526,12 +525,12 @@ lintCoreAlt _ alt_ty (DEFAULT, args, rhs) =
      ; checkAltExpr rhs alt_ty }
 
 lintCoreAlt scrut_ty alt_ty (LitAlt lit, args, rhs)
-  | isIntegerTy scrut_ty
-    = failWithL integerScrutinisedMsg
+  | litIsLifted lit
+  = failWithL integerScrutinisedMsg
   | otherwise
-    = do { checkL (null args) (mkDefaultArgsMsg args)
-         ; checkTys lit_ty scrut_ty (mkBadPatMsg lit_ty scrut_ty)
-         ; checkAltExpr rhs alt_ty }
+  = do { checkL (null args) (mkDefaultArgsMsg args)
+       ; checkTys lit_ty scrut_ty (mkBadPatMsg lit_ty scrut_ty)
+       ; checkAltExpr rhs alt_ty }
   where
     lit_ty = literalType lit
 
@@ -1089,7 +1088,7 @@ mkBadPatMsg con_result_ty scrut_ty
 
 integerScrutinisedMsg :: Message
 integerScrutinisedMsg
-  = text "In a case alternative, scrutinee type is Integer"
+  = text "In a LitAlt, the literal is lifted (probably Integer)"
 
 mkBadAltMsg :: Type -> CoreAlt -> Message
 mkBadAltMsg scrut_ty alt
