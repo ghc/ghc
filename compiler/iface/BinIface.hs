@@ -1,14 +1,20 @@
+--
+--  (c) The University of Glasgow 2002-2006
+--
+
 {-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
---
---  (c) The University of Glasgow 2002-2006
---
--- Binary interface file support.
-
-module BinIface ( writeBinIface, readBinIface, getSymtabName, getDictFastString,
-                  CheckHiWay(..), TraceBinIFaceReading(..) ) where
+-- | Binary interface file support.
+module BinIface (
+        writeBinIface,
+        readBinIface,
+        getSymtabName,
+        getDictFastString,
+        CheckHiWay(..),
+        TraceBinIFaceReading(..)
+    ) where
 
 #include "HsVersions.h"
 
@@ -55,179 +61,182 @@ import Data.IORef
 import Control.Monad
 import System.Time ( ClockTime(..) )
 
+
+-- ---------------------------------------------------------------------------
+-- Reading and writing binary interface files
+--
+
 data CheckHiWay = CheckHiWay | IgnoreHiWay
     deriving Eq
 
 data TraceBinIFaceReading = TraceBinIFaceReading | QuietBinIFaceReading
     deriving Eq
 
--- ---------------------------------------------------------------------------
--- Reading and writing binary interface files
-
+-- | Read an interface file
 readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
-  ncu <- mkNameCacheUpdater
-  dflags <- getDOpts
-  liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
+    ncu <- mkNameCacheUpdater
+    dflags <- getDOpts
+    liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
 
 readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
               -> NameCacheUpdater
               -> IO ModIface
 readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
-  let printer :: SDoc -> IO ()
-      printer = case traceBinIFaceReading of
-                TraceBinIFaceReading -> \sd -> printSDoc sd defaultDumpStyle
-                QuietBinIFaceReading -> \_ -> return ()
-      wantedGot :: Outputable a => String -> a -> a -> IO ()
-      wantedGot what wanted got
-          = printer (text what <> text ": " <>
+    let printer :: SDoc -> IO ()
+        printer = case traceBinIFaceReading of
+                      TraceBinIFaceReading -> \sd -> printSDoc sd defaultDumpStyle
+                      QuietBinIFaceReading -> \_ -> return ()
+        wantedGot :: Outputable a => String -> a -> a -> IO ()
+        wantedGot what wanted got =
+            printer (text what <> text ": " <>
                      vcat [text "Wanted " <> ppr wanted <> text ",",
                            text "got    " <> ppr got])
 
-      errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
-      errorOnMismatch what wanted got
+        errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
+        errorOnMismatch what wanted got =
             -- This will be caught by readIface which will emit an error
             -- msg containing the iface module name.
-          = when (wanted /= got) $ ghcError $ ProgramError
-                        (what ++ " (wanted " ++ show wanted
-                              ++ ", got "    ++ show got ++ ")")
-  bh <- Binary.readBinMem hi_path
+            when (wanted /= got) $ ghcError $ ProgramError
+                         (what ++ " (wanted " ++ show wanted
+                               ++ ", got "    ++ show got ++ ")")
+    bh <- Binary.readBinMem hi_path
 
-        -- Read the magic number to check that this really is a GHC .hi file
-        -- (This magic number does not change when we change
-        --  GHC interface file format)
-  magic <- get bh
-  wantedGot "Magic" (binaryInterfaceMagic dflags) magic
-  errorOnMismatch "magic number mismatch: old/corrupt interface file?"
-      (binaryInterfaceMagic dflags) magic
+    -- Read the magic number to check that this really is a GHC .hi file
+    -- (This magic number does not change when we change
+    --  GHC interface file format)
+    magic <- get bh
+    wantedGot "Magic" (binaryInterfaceMagic dflags) magic
+    errorOnMismatch "magic number mismatch: old/corrupt interface file?"
+        (binaryInterfaceMagic dflags) magic
 
-        -- Note [dummy iface field]
-        -- read a dummy 32/64 bit value.  This field used to hold the
-        -- dictionary pointer in old interface file formats, but now
-        -- the dictionary pointer is after the version (where it
-        -- should be).  Also, the serialisation of value of type "Bin
-        -- a" used to depend on the word size of the machine, now they
-        -- are always 32 bits.
-        --
-  if wORD_SIZE == 4
-     then do _ <- Binary.get bh :: IO Word32; return ()
-     else do _ <- Binary.get bh :: IO Word64; return ()
+    -- Note [dummy iface field]
+    -- read a dummy 32/64 bit value.  This field used to hold the
+    -- dictionary pointer in old interface file formats, but now
+    -- the dictionary pointer is after the version (where it
+    -- should be).  Also, the serialisation of value of type "Bin
+    -- a" used to depend on the word size of the machine, now they
+    -- are always 32 bits.
+    if wORD_SIZE == 4
+        then do _ <- Binary.get bh :: IO Word32; return ()
+        else do _ <- Binary.get bh :: IO Word64; return ()
 
-        -- Check the interface file version and ways.
-  check_ver  <- get bh
-  let our_ver = show opt_HiVersion
-  wantedGot "Version" our_ver check_ver
-  errorOnMismatch "mismatched interface file versions" our_ver check_ver
+    -- Check the interface file version and ways.
+    check_ver  <- get bh
+    let our_ver = show opt_HiVersion
+    wantedGot "Version" our_ver check_ver
+    errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
-  check_way <- get bh
-  let way_descr = getWayDescr dflags
-  wantedGot "Way" way_descr check_way
-  when (checkHiWay == CheckHiWay) $
-       errorOnMismatch "mismatched interface file ways" way_descr check_way
+    check_way <- get bh
+    let way_descr = getWayDescr dflags
+    wantedGot "Way" way_descr check_way
+    when (checkHiWay == CheckHiWay) $
+        errorOnMismatch "mismatched interface file ways" way_descr check_way
 
-        -- Read the dictionary
-        -- The next word in the file is a pointer to where the dictionary is
-        -- (probably at the end of the file)
-  dict_p <- Binary.get bh
-  data_p <- tellBin bh          -- Remember where we are now
-  seekBin bh dict_p
-  dict <- getDictionary bh
-  seekBin bh data_p             -- Back to where we were before
-
-        -- Initialise the user-data field of bh
-  bh <- do
-    bh <- return $ setUserData bh $ newReadState (error "getSymtabName")
-                                                 (getDictFastString dict)
-
-    symtab_p <- Binary.get bh     -- Get the symtab ptr
+    -- Read the dictionary
+    -- The next word in the file is a pointer to where the dictionary is
+    -- (probably at the end of the file)
+    dict_p <- Binary.get bh
     data_p <- tellBin bh          -- Remember where we are now
-    seekBin bh symtab_p
-    symtab <- getSymbolTable bh ncu
+    seekBin bh dict_p
+    dict   <- getDictionary bh
     seekBin bh data_p             -- Back to where we were before
+
+    -- Initialise the user-data field of bh
+    bh <- do
+        bh <- return $ setUserData bh $ newReadState (error "getSymtabName")
+                                                     (getDictFastString dict)
+        symtab_p <- Binary.get bh     -- Get the symtab ptr
+        data_p <- tellBin bh          -- Remember where we are now
+        seekBin bh symtab_p
+        symtab <- getSymbolTable bh ncu
+        seekBin bh data_p             -- Back to where we were before
     
-    -- It is only now that we know how to get a Name
-    return $ setUserData bh $ newReadState (getSymtabName ncu dict symtab)
-                                           (getDictFastString dict)
+        -- It is only now that we know how to get a Name
+        return $ setUserData bh $ newReadState (getSymtabName ncu dict symtab)
+                                               (getDictFastString dict)
 
-        -- Read the interface file
-  get bh
+    -- Read the interface file
+    get bh
 
-
+-- | Write an interface file
 writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeBinIface dflags hi_path mod_iface = do
-  bh <- openBinMem initBinMemSize
-  put_ bh (binaryInterfaceMagic dflags)
+    bh <- openBinMem initBinMemSize
+    put_ bh (binaryInterfaceMagic dflags)
 
-       -- dummy 32/64-bit field before the version/way for
-       -- compatibility with older interface file formats.
-       -- See Note [dummy iface field] above.
-  if wORD_SIZE == 4
-     then Binary.put_ bh (0 :: Word32)
-     else Binary.put_ bh (0 :: Word64)
+   -- dummy 32/64-bit field before the version/way for
+   -- compatibility with older interface file formats.
+   -- See Note [dummy iface field] above.
+    if wORD_SIZE == 4
+        then Binary.put_ bh (0 :: Word32)
+        else Binary.put_ bh (0 :: Word64)
 
-        -- The version and way descriptor go next
-  put_ bh (show opt_HiVersion)
-  let way_descr = getWayDescr dflags
-  put_  bh way_descr
+    -- The version and way descriptor go next
+    put_ bh (show opt_HiVersion)
+    let way_descr = getWayDescr dflags
+    put_  bh way_descr
 
-        -- Remember where the dictionary pointer will go
-  dict_p_p <- tellBin bh
-  put_ bh dict_p_p      -- Placeholder for ptr to dictionary
+    -- Remember where the dictionary pointer will go
+    dict_p_p <- tellBin bh
+    -- Placeholder for ptr to dictionary
+    put_ bh dict_p_p
 
-        -- Remember where the symbol table pointer will go
-  symtab_p_p <- tellBin bh
-  put_ bh symtab_p_p
+    -- Remember where the symbol table pointer will go
+    symtab_p_p <- tellBin bh
+    put_ bh symtab_p_p
 
-        -- Make some intial state
-  symtab_next <- newFastMutInt
-  writeFastMutInt symtab_next 0
-  symtab_map <- newIORef emptyUFM
-  let bin_symtab = BinSymbolTable {
-                      bin_symtab_next = symtab_next,
-                      bin_symtab_map  = symtab_map }
-  dict_next_ref <- newFastMutInt
-  writeFastMutInt dict_next_ref 0
-  dict_map_ref <- newIORef emptyUFM
-  let bin_dict = BinDictionary {
-                      bin_dict_next = dict_next_ref,
-                      bin_dict_map  = dict_map_ref }
+    -- Make some intial state
+    symtab_next <- newFastMutInt
+    writeFastMutInt symtab_next 0
+    symtab_map <- newIORef emptyUFM
+    let bin_symtab = BinSymbolTable {
+                         bin_symtab_next = symtab_next,
+                         bin_symtab_map  = symtab_map }
+    dict_next_ref <- newFastMutInt
+    writeFastMutInt dict_next_ref 0
+    dict_map_ref <- newIORef emptyUFM
+    let bin_dict = BinDictionary {
+                       bin_dict_next = dict_next_ref,
+                       bin_dict_map  = dict_map_ref }
   
-        -- Put the main thing, 
-  bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
-                                                (putFastString bin_dict)
-  put_ bh mod_iface
+    -- Put the main thing, 
+    bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
+                                                  (putFastString bin_dict)
+    put_ bh mod_iface
 
-        -- Write the symtab pointer at the fornt of the file
-  symtab_p <- tellBin bh                -- This is where the symtab will start
-  putAt bh symtab_p_p symtab_p  -- Fill in the placeholder
-  seekBin bh symtab_p           -- Seek back to the end of the file
+    -- Write the symtab pointer at the fornt of the file
+    symtab_p <- tellBin bh        -- This is where the symtab will start
+    putAt bh symtab_p_p symtab_p  -- Fill in the placeholder
+    seekBin bh symtab_p           -- Seek back to the end of the file
 
-        -- Write the symbol table itself
-  symtab_next <- readFastMutInt symtab_next
-  symtab_map  <- readIORef symtab_map
-  putSymbolTable bh symtab_next symtab_map
-  debugTraceMsg dflags 3 (text "writeBinIface:" <+> int symtab_next 
+    -- Write the symbol table itself
+    symtab_next <- readFastMutInt symtab_next
+    symtab_map  <- readIORef symtab_map
+    putSymbolTable bh symtab_next symtab_map
+    debugTraceMsg dflags 3 (text "writeBinIface:" <+> int symtab_next 
                                 <+> text "Names")
 
-        -- NB. write the dictionary after the symbol table, because
-        -- writing the symbol table may create more dictionary entries.
+    -- NB. write the dictionary after the symbol table, because
+    -- writing the symbol table may create more dictionary entries.
 
-        -- Write the dictionary pointer at the fornt of the file
-  dict_p <- tellBin bh          -- This is where the dictionary will start
-  putAt bh dict_p_p dict_p      -- Fill in the placeholder
-  seekBin bh dict_p             -- Seek back to the end of the file
+    -- Write the dictionary pointer at the fornt of the file
+    dict_p <- tellBin bh          -- This is where the dictionary will start
+    putAt bh dict_p_p dict_p      -- Fill in the placeholder
+    seekBin bh dict_p             -- Seek back to the end of the file
 
-        -- Write the dictionary itself
-  dict_next <- readFastMutInt dict_next_ref
-  dict_map  <- readIORef dict_map_ref
-  putDictionary bh dict_next dict_map
-  debugTraceMsg dflags 3 (text "writeBinIface:" <+> int dict_next
-                                 <+> text "dict entries")
+    -- Write the dictionary itself
+    dict_next <- readFastMutInt dict_next_ref
+    dict_map  <- readIORef dict_map_ref
+    putDictionary bh dict_next dict_map
+    debugTraceMsg dflags 3 (text "writeBinIface:" <+> int dict_next
+                                <+> text "dict entries")
 
-        -- And send the result to the file
-  writeBinMem bh hi_path
+    -- And send the result to the file
+    writeBinMem bh hi_path
 
+-- | Initial ram buffer to allocate for writing interface files
 initBinMemSize :: Int
 initBinMemSize = 1024 * 1024
 
@@ -236,54 +245,45 @@ binaryInterfaceMagic dflags
  | target32Bit (targetPlatform dflags) = 0x1face
  | otherwise                           = 0x1face64
 
+
 -- -----------------------------------------------------------------------------
 -- The symbol table
+--
 
 putSymbolTable :: BinHandle -> Int -> UniqFM (Int,Name) -> IO ()
 putSymbolTable bh next_off symtab = do
-  put_ bh next_off
-  let names = elems (array (0,next_off-1) (eltsUFM symtab))
-  mapM_ (\n -> serialiseName bh n symtab) names
+    put_ bh next_off
+    let names = elems (array (0,next_off-1) (eltsUFM symtab))
+    mapM_ (\n -> serialiseName bh n symtab) names
 
-getSymbolTable :: BinHandle -> NameCacheUpdater
-               -> IO SymbolTable
+getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
 getSymbolTable bh ncu = do
-  sz <- get bh
-  od_names <- sequence (replicate sz (get bh))
-  updateNameCache ncu $ \namecache ->
-    let
-        arr = listArray (0,sz-1) names
-        (namecache', names) =    
+    sz <- get bh
+    od_names <- sequence (replicate sz (get bh))
+    updateNameCache ncu $ \namecache ->
+        let arr = listArray (0,sz-1) names
+            (namecache', names) =    
                 mapAccumR (fromOnDiskName arr) namecache od_names
-    in (namecache', arr)
+        in (namecache', arr)
 
 type OnDiskName = (PackageId, ModuleName, OccName)
 
-fromOnDiskName
-   :: Array Int Name
-   -> NameCache
-   -> OnDiskName
-   -> (NameCache, Name)
+fromOnDiskName :: Array Int Name -> NameCache -> OnDiskName -> (NameCache, Name)
 fromOnDiskName _ nc (pid, mod_name, occ) =
-  let
-        mod   = mkModule pid mod_name
+    let mod   = mkModule pid mod_name
         cache = nsNames nc
-  in
-  case lookupOrigNameCache cache  mod occ of
-     Just name -> (nc, name)
-     Nothing   ->
-        case takeUniqFromSupply (nsUniqs nc) of
-        (uniq, us) ->
-            let
-                name      = mkExternalName uniq mod occ noSrcSpan
-                new_cache = extendNameCache cache mod occ name
-            in
-            ( nc{ nsUniqs = us, nsNames = new_cache }, name )
+    in case lookupOrigNameCache cache  mod occ of
+           Just name -> (nc, name)
+           Nothing   ->
+               let (uniq, us) = takeUniqFromSupply (nsUniqs nc)
+                   name       = mkExternalName uniq mod occ noSrcSpan
+                   new_cache  = extendNameCache cache mod occ name
+               in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
 
 serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
 serialiseName bh name _ = do
-  let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-  put_ bh (modulePackageId mod, moduleName mod, nameOccName name)
+    let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    put_ bh (modulePackageId mod, moduleName mod, nameOccName name)
 
 
 -- Note [Symbol table representation of names]
@@ -311,8 +311,7 @@ knownKeyNamesMap :: UniqFM Name
 knownKeyNamesMap = listToUFM_Directly [(nameUnique n, n) | n <- knownKeyNames]
   where
     knownKeyNames :: [Name]
-    knownKeyNames = map getName wiredInThings
-                    ++ basicKnownKeyNames
+    knownKeyNames = map getName wiredInThings ++ basicKnownKeyNames
 
 
 -- See Note [Symbol table representation of names]
@@ -520,58 +519,58 @@ instance Binary ModIface where
         put_ bh trust_pkg
 
    get bh = do
-        mod_name  <- get bh
-        is_boot   <- get bh
-        iface_hash <- get bh
-        mod_hash  <- get bh
-        orphan    <- get bh
+        mod_name    <- get bh
+        is_boot     <- get bh
+        iface_hash  <- get bh
+        mod_hash    <- get bh
+        orphan      <- get bh
         hasFamInsts <- get bh
-        deps      <- lazyGet bh
-        usages    <- {-# SCC "bin_usages" #-} lazyGet bh
-        exports   <- {-# SCC "bin_exports" #-} get bh
-        exp_hash  <- get bh
-        used_th   <- get bh
-        fixities  <- {-# SCC "bin_fixities" #-} get bh
-        warns     <- {-# SCC "bin_warns" #-} lazyGet bh
-        anns      <- {-# SCC "bin_anns" #-} lazyGet bh
-        decls     <- {-# SCC "bin_tycldecls" #-} get bh
-        insts     <- {-# SCC "bin_insts" #-} get bh
-        fam_insts <- {-# SCC "bin_fam_insts" #-} get bh
-        rules     <- {-# SCC "bin_rules" #-} lazyGet bh
+        deps        <- lazyGet bh
+        usages      <- {-# SCC "bin_usages" #-} lazyGet bh
+        exports     <- {-# SCC "bin_exports" #-} get bh
+        exp_hash    <- get bh
+        used_th     <- get bh
+        fixities    <- {-# SCC "bin_fixities" #-} get bh
+        warns       <- {-# SCC "bin_warns" #-} lazyGet bh
+        anns        <- {-# SCC "bin_anns" #-} lazyGet bh
+        decls       <- {-# SCC "bin_tycldecls" #-} get bh
+        insts       <- {-# SCC "bin_insts" #-} get bh
+        fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
+        rules       <- {-# SCC "bin_rules" #-} lazyGet bh
         orphan_hash <- get bh
-        vect_info <- get bh
-        hpc_info  <- get bh
-        trust     <- get bh
-        trust_pkg <- get bh
+        vect_info   <- get bh
+        hpc_info    <- get bh
+        trust       <- get bh
+        trust_pkg   <- get bh
         return (ModIface {
-                 mi_module    = mod_name,
-                 mi_boot      = is_boot,
-                 mi_iface_hash = iface_hash,
-                 mi_mod_hash  = mod_hash,
-                 mi_orphan    = orphan,
-                 mi_finsts    = hasFamInsts,
-                 mi_deps      = deps,
-                 mi_usages    = usages,
-                 mi_exports   = exports,
-                 mi_exp_hash  = exp_hash,
-                 mi_used_th   = used_th,
-                 mi_anns      = anns,
-                 mi_fixities  = fixities,
-                 mi_warns     = warns,
-                 mi_decls     = decls,
-                 mi_globals   = Nothing,
-                 mi_insts     = insts,
-                 mi_fam_insts = fam_insts,
-                 mi_rules     = rules,
+                 mi_module      = mod_name,
+                 mi_boot        = is_boot,
+                 mi_iface_hash  = iface_hash,
+                 mi_mod_hash    = mod_hash,
+                 mi_orphan      = orphan,
+                 mi_finsts      = hasFamInsts,
+                 mi_deps        = deps,
+                 mi_usages      = usages,
+                 mi_exports     = exports,
+                 mi_exp_hash    = exp_hash,
+                 mi_used_th     = used_th,
+                 mi_anns        = anns,
+                 mi_fixities    = fixities,
+                 mi_warns       = warns,
+                 mi_decls       = decls,
+                 mi_globals     = Nothing,
+                 mi_insts       = insts,
+                 mi_fam_insts   = fam_insts,
+                 mi_rules       = rules,
                  mi_orphan_hash = orphan_hash,
-                 mi_vect_info = vect_info,
-                 mi_hpc       = hpc_info,
-                 mi_trust     = trust,
-                 mi_trust_pkg = trust_pkg,
+                 mi_vect_info   = vect_info,
+                 mi_hpc         = hpc_info,
+                 mi_trust       = trust,
+                 mi_trust_pkg   = trust_pkg,
                         -- And build the cached values
-                 mi_warn_fn   = mkIfaceWarnCache warns,
-                 mi_fix_fn    = mkIfaceFixCache fixities,
-                 mi_hash_fn   = mkIfaceHashCache decls })
+                 mi_warn_fn     = mkIfaceWarnCache warns,
+                 mi_fix_fn      = mkIfaceFixCache fixities,
+                 mi_hash_fn     = mkIfaceHashCache decls })
 
 getWayDescr :: DynFlags -> String
 getWayDescr dflags
@@ -1066,183 +1065,150 @@ instance Binary IfaceCoCon where
 
 instance Binary IfaceExpr where
     put_ bh (IfaceLcl aa) = do
-            putByte bh 0
-            put_ bh aa
+        putByte bh 0
+        put_ bh aa
     put_ bh (IfaceType ab) = do
-            putByte bh 1
-            put_ bh ab
+        putByte bh 1
+        put_ bh ab
     put_ bh (IfaceCo ab) = do
-            putByte bh 2
-            put_ bh ab
+        putByte bh 2
+        put_ bh ab
     put_ bh (IfaceTuple ac ad) = do
-            putByte bh 3
-            put_ bh ac
-            put_ bh ad
+        putByte bh 3
+        put_ bh ac
+        put_ bh ad
     put_ bh (IfaceLam ae af) = do
-            putByte bh 4
-            put_ bh ae
-            put_ bh af
+        putByte bh 4
+        put_ bh ae
+        put_ bh af
     put_ bh (IfaceApp ag ah) = do
-            putByte bh 5
-            put_ bh ag
-            put_ bh ah
+        putByte bh 5
+        put_ bh ag
+        put_ bh ah
     put_ bh (IfaceCase ai aj ak) = do
-            putByte bh 6
-            put_ bh ai
-            put_ bh aj
-            put_ bh ak
+        putByte bh 6
+        put_ bh ai
+        put_ bh aj
+        put_ bh ak
     put_ bh (IfaceLet al am) = do
-            putByte bh 7
-            put_ bh al
-            put_ bh am
+        putByte bh 7
+        put_ bh al
+        put_ bh am
     put_ bh (IfaceTick an ao) = do
-            putByte bh 8
-            put_ bh an
-            put_ bh ao
+        putByte bh 8
+        put_ bh an
+        put_ bh ao
     put_ bh (IfaceLit ap) = do
-            putByte bh 9
-            put_ bh ap
+        putByte bh 9
+        put_ bh ap
     put_ bh (IfaceFCall as at) = do
-            putByte bh 10
-            put_ bh as
-            put_ bh at
+        putByte bh 10
+        put_ bh as
+        put_ bh at
     put_ bh (IfaceExt aa) = do
-            putByte bh 11
-            put_ bh aa
+        putByte bh 11
+        put_ bh aa
     put_ bh (IfaceCast ie ico) = do
-            putByte bh 12
-            put_ bh ie
-            put_ bh ico
+        putByte bh 12
+        put_ bh ie
+        put_ bh ico
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do aa <- get bh
-                      return (IfaceLcl aa)
-              1 -> do ab <- get bh
-                      return (IfaceType ab)
-              2 -> do ab <- get bh
-                      return (IfaceCo ab)
-              3 -> do ac <- get bh
-                      ad <- get bh
-                      return (IfaceTuple ac ad)
-              4 -> do ae <- get bh
-                      af <- get bh
-                      return (IfaceLam ae af)
-              5 -> do ag <- get bh
-                      ah <- get bh
-                      return (IfaceApp ag ah)
-              6 -> do ai <- get bh
-                      aj <- get bh
-                      ak <- get bh
-                      return (IfaceCase ai aj ak)
-              7 -> do al <- get bh
-                      am <- get bh
-                      return (IfaceLet al am)
-              8 -> do an <- get bh
-                      ao <- get bh
-                      return (IfaceTick an ao)
-              9 -> do ap <- get bh
-                      return (IfaceLit ap)
-              10 -> do as <- get bh
-                       at <- get bh
-                       return (IfaceFCall as at)
-              11 -> do aa <- get bh
-                       return (IfaceExt aa)
-              12 -> do ie <- get bh
-                       ico <- get bh
-                       return (IfaceCast ie ico)
-              _ -> panic ("get IfaceExpr " ++ show h)
+        h <- getByte bh
+        case h of
+            0 -> do aa <- get bh
+                    return (IfaceLcl aa)
+            1 -> do ab <- get bh
+                    return (IfaceType ab)
+            2 -> do ab <- get bh
+                    return (IfaceCo ab)
+            3 -> do ac <- get bh
+                    ad <- get bh
+                    return (IfaceTuple ac ad)
+            4 -> do ae <- get bh
+                    af <- get bh
+                    return (IfaceLam ae af)
+            5 -> do ag <- get bh
+                    ah <- get bh
+                    return (IfaceApp ag ah)
+            6 -> do ai <- get bh
+                    aj <- get bh
+                    ak <- get bh
+                    return (IfaceCase ai aj ak)
+            7 -> do al <- get bh
+                    am <- get bh
+                    return (IfaceLet al am)
+            8 -> do an <- get bh
+                    ao <- get bh
+                    return (IfaceTick an ao)
+            9 -> do ap <- get bh
+                    return (IfaceLit ap)
+            10 -> do as <- get bh
+                     at <- get bh
+                     return (IfaceFCall as at)
+            11 -> do aa <- get bh
+                     return (IfaceExt aa)
+            12 -> do ie <- get bh
+                     ico <- get bh
+                     return (IfaceCast ie ico)
+            _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceConAlt where
-    put_ bh IfaceDefault = do
-            putByte bh 0
-    put_ bh (IfaceDataAlt aa) = do
-            putByte bh 1
-            put_ bh aa
-    put_ bh (IfaceLitAlt ac) = do
-            putByte bh 2
-            put_ bh ac
+    put_ bh IfaceDefault      = putByte bh 0
+    put_ bh (IfaceDataAlt aa) = putByte bh 1 >> put_ bh aa
+    put_ bh (IfaceLitAlt ac)  = putByte bh 2 >> put_ bh ac
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do return IfaceDefault
-              1 -> do aa <- get bh
-                      return (IfaceDataAlt aa)
-              _ -> do ac <- get bh
-                      return (IfaceLitAlt ac)
+        h <- getByte bh
+        case h of
+            0 -> return IfaceDefault
+            1 -> get bh >>= (return . IfaceDataAlt)
+            _ -> get bh >>= (return . IfaceLitAlt)
 
 instance Binary IfaceBinding where
-    put_ bh (IfaceNonRec aa ab) = do
-            putByte bh 0
-            put_ bh aa
-            put_ bh ab
-    put_ bh (IfaceRec ac) = do
-            putByte bh 1
-            put_ bh ac
+    put_ bh (IfaceNonRec aa ab) = putByte bh 0 >> put_ bh aa >> put_ bh ab
+    put_ bh (IfaceRec ac)       = putByte bh 1 >> put_ bh ac
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do aa <- get bh
-                      ab <- get bh
-                      return (IfaceNonRec aa ab)
-              _ -> do ac <- get bh
-                      return (IfaceRec ac)
+        h <- getByte bh
+        case h of
+            0 -> do { aa <- get bh; ab <- get bh; return (IfaceNonRec aa ab) }
+            _ -> do { ac <- get bh; return (IfaceRec ac) }
 
 instance Binary IfaceIdDetails where
     put_ bh IfVanillaId      = putByte bh 0
-    put_ bh (IfRecSelId a b) = do { putByte bh 1; put_ bh a; put_ bh b }
+    put_ bh (IfRecSelId a b) = putByte bh 1 >> put_ bh a >> put_ bh b
     put_ bh IfDFunId         = putByte bh 2
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return IfVanillaId
-              1 -> do a <- get bh
-                      b <- get bh
-                      return (IfRecSelId a b)
-              _ -> return IfDFunId
+        h <- getByte bh
+        case h of
+            0 -> return IfVanillaId
+            1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
+            _ -> return IfDFunId
 
 instance Binary IfaceIdInfo where
-    put_ bh NoInfo = putByte bh 0
-    put_ bh (HasInfo i) = do
-            putByte bh 1
-            lazyPut bh i                        -- NB lazyPut
+    put_ bh NoInfo      = putByte bh 0
+    put_ bh (HasInfo i) = putByte bh 1 >> lazyPut bh i -- NB lazyPut
 
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return NoInfo
-              _ -> do info <- lazyGet bh        -- NB lazyGet
-                      return (HasInfo info)
+        h <- getByte bh
+        case h of
+            0 -> return NoInfo
+            _ -> lazyGet bh >>= (return . HasInfo)     -- NB lazyGet
 
 instance Binary IfaceInfoItem where
-    put_ bh (HsArity aa) = do
-            putByte bh 0
-            put_ bh aa
-    put_ bh (HsStrictness ab) = do
-            putByte bh 1
-            put_ bh ab
-    put_ bh (HsUnfold lb ad) = do
-            putByte bh 2
-            put_ bh lb
-            put_ bh ad
-    put_ bh (HsInline ad) = do
-            putByte bh 3
-            put_ bh ad
-    put_ bh HsNoCafRefs = do
-            putByte bh 4
+    put_ bh (HsArity aa)      = putByte bh 0 >> put_ bh aa
+    put_ bh (HsStrictness ab) = putByte bh 1 >> put_ bh ab
+    put_ bh (HsUnfold lb ad)  = putByte bh 2 >> put_ bh lb >> put_ bh ad
+    put_ bh (HsInline ad)     = putByte bh 3 >> put_ bh ad
+    put_ bh HsNoCafRefs       = putByte bh 4
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do aa <- get bh
-                      return (HsArity aa)
-              1 -> do ab <- get bh
-                      return (HsStrictness ab)
-              2 -> do lb <- get bh
-                      ad <- get bh
-                      return (HsUnfold lb ad)
-              3 -> do ad <- get bh
-                      return (HsInline ad)
-              _ -> do return HsNoCafRefs
+        h <- getByte bh
+        case h of
+            0 -> get bh >>= (return . HsArity)
+            1 -> get bh >>= (return . HsStrictness)
+            2 -> do lb <- get bh
+                    ad <- get bh
+                    return (HsUnfold lb ad)
+            3 -> get bh >>= (return . HsInline)
+            _ -> return HsNoCafRefs
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s e) = do
@@ -1272,47 +1238,47 @@ instance Binary IfaceUnfolding where
     get bh = do
         h <- getByte bh
         case h of
-          0 -> do s <- get bh
-                  e <- get bh
-                  return (IfCoreUnfold s e)
-          1 -> do a <- get bh
-                  b <- get bh
-                  c <- get bh
-                  d <- get bh
-                  return (IfInlineRule a b c d)
-          2 -> do a <- get bh
-                  n <- get bh
-                  return (IfLclWrapper a n)
-          3 -> do a <- get bh
-                  n <- get bh
-                  return (IfExtWrapper a n)
-          4 -> do as <- get bh
-                  return (IfDFunUnfold as)
-          _ -> do e <- get bh
-                  return (IfCompulsory e)
+            0 -> do s <- get bh
+                    e <- get bh
+                    return (IfCoreUnfold s e)
+            1 -> do a <- get bh
+                    b <- get bh
+                    c <- get bh
+                    d <- get bh
+                    return (IfInlineRule a b c d)
+            2 -> do a <- get bh
+                    n <- get bh
+                    return (IfLclWrapper a n)
+            3 -> do a <- get bh
+                    n <- get bh
+                    return (IfExtWrapper a n)
+            4 -> do as <- get bh
+                    return (IfDFunUnfold as)
+            _ -> do e <- get bh
+                    return (IfCompulsory e)
 
 instance Binary IfaceTickish where
     put_ bh (IfaceHpcTick m ix) = do
-      putByte bh 0
-      put_ bh m
-      put_ bh ix
+        putByte bh 0
+        put_ bh m
+        put_ bh ix
     put_ bh (IfaceSCC cc tick push) = do
-      putByte bh 1
-      put_ bh cc
-      put_ bh tick
-      put_ bh push
+        putByte bh 1
+        put_ bh cc
+        put_ bh tick
+        put_ bh push
 
     get bh = do
-      h <- getByte bh
-      case h of
-        0 -> do m <- get bh
-                ix <- get bh
-                return (IfaceHpcTick m ix)
-        1 -> do cc <- get bh
-                tick <- get bh
-                push <- get bh
-                return (IfaceSCC cc tick push)
-        _ -> panic ("get IfaceTickish " ++ show h)
+        h <- getByte bh
+        case h of
+            0 -> do m <- get bh
+                    ix <- get bh
+                    return (IfaceHpcTick m ix)
+            1 -> do cc <- get bh
+                    tick <- get bh
+                    push <- get bh
+                    return (IfaceSCC cc tick push)
+            _ -> panic ("get IfaceTickish " ++ show h)
 
 -------------------------------------------------------------------------
 --              IfaceDecl and friends
@@ -1326,50 +1292,54 @@ instance Binary IfaceTickish where
 
 instance Binary IfaceDecl where
     put_ bh (IfaceId name ty details idinfo) = do
-            putByte bh 0
-            put_ bh (occNameFS name)
-            put_ bh ty
-            put_ bh details
-            put_ bh idinfo
+        putByte bh 0
+        put_ bh (occNameFS name)
+        put_ bh ty
+        put_ bh details
+        put_ bh idinfo
+
     put_ _ (IfaceForeign _ _) = 
         error "Binary.put_(IfaceDecl): IfaceForeign"
+
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7) = do
-            putByte bh 2
-            put_ bh (occNameFS a1)
-            put_ bh a2
-            put_ bh a3
-            put_ bh a4
-            put_ bh a5
-            put_ bh a6
-            put_ bh a7
+        putByte bh 2
+        put_ bh (occNameFS a1)
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+        put_ bh a6
+        put_ bh a7
+
     put_ bh (IfaceSyn a1 a2 a3 a4 a5) = do
-            putByte bh 3
-            put_ bh (occNameFS a1)
-            put_ bh a2
-            put_ bh a3
-            put_ bh a4
-            put_ bh a5
+        putByte bh 3
+        put_ bh (occNameFS a1)
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+
     put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7) = do
-            putByte bh 4
-            put_ bh a1
-            put_ bh (occNameFS a2)
-            put_ bh a3
-            put_ bh a4
-            put_ bh a5
-            put_ bh a6
-            put_ bh a7
+        putByte bh 4
+        put_ bh a1
+        put_ bh (occNameFS a2)
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+        put_ bh a6
+        put_ bh a7
+
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do name    <- get bh
-                      ty      <- get bh
-                      details <- get bh
-                      idinfo  <- get bh
-                      occ <- return $! mkOccNameFS varName name
-                      return (IfaceId occ ty details idinfo)
-              1 -> error "Binary.get(TyClDecl): ForeignType"
-              2 -> do
-                    a1 <- get bh
+        h <- getByte bh
+        case h of
+            0 -> do name    <- get bh
+                    ty      <- get bh
+                    details <- get bh
+                    idinfo  <- get bh
+                    occ <- return $! mkOccNameFS varName name
+                    return (IfaceId occ ty details idinfo)
+            1 -> error "Binary.get(TyClDecl): ForeignType"
+            2 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
@@ -1378,16 +1348,14 @@ instance Binary IfaceDecl where
                     a7 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
                     return (IfaceData occ a2 a3 a4 a5 a6 a7)
-              3 -> do
-                    a1 <- get bh
+            3 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
                     a5 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
                     return (IfaceSyn occ a2 a3 a4 a5)
-              _ -> do
-                    a1 <- get bh
+            _ -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
@@ -1399,88 +1367,89 @@ instance Binary IfaceDecl where
 
 instance Binary IfaceInst where
     put_ bh (IfaceInst cls tys dfun flag orph) = do
-            put_ bh cls
-            put_ bh tys
-            put_ bh dfun
-            put_ bh flag
-            put_ bh orph
-    get bh = do cls  <- get bh
-                tys  <- get bh
-                dfun <- get bh
-                flag <- get bh
-                orph <- get bh
-                return (IfaceInst cls tys dfun flag orph)
+        put_ bh cls
+        put_ bh tys
+        put_ bh dfun
+        put_ bh flag
+        put_ bh orph
+    get bh = do
+        cls  <- get bh
+        tys  <- get bh
+        dfun <- get bh
+        flag <- get bh
+        orph <- get bh
+        return (IfaceInst cls tys dfun flag orph)
 
 instance Binary IfaceFamInst where
     put_ bh (IfaceFamInst fam tys tycon) = do
-            put_ bh fam
-            put_ bh tys
-            put_ bh tycon
-    get bh = do fam   <- get bh
-                tys   <- get bh
-                tycon <- get bh
-                return (IfaceFamInst fam tys tycon)
+        put_ bh fam
+        put_ bh tys
+        put_ bh tycon
+    get bh = do
+        fam   <- get bh
+        tys   <- get bh
+        tycon <- get bh
+        return (IfaceFamInst fam tys tycon)
 
 instance Binary OverlapFlag where
     put_ bh (NoOverlap  b) = putByte bh 0 >> put_ bh b
     put_ bh (OverlapOk  b) = putByte bh 1 >> put_ bh b
     put_ bh (Incoherent b) = putByte bh 2 >> put_ bh b
-    get bh = do h <- getByte bh
-                b <- get bh
-                case h of
-                  0 -> return $ NoOverlap b
-                  1 -> return $ OverlapOk b
-                  2 -> return $ Incoherent b
-                  _ -> panic ("get OverlapFlag " ++ show h)
+    get bh = do
+        h <- getByte bh
+        b <- get bh
+        case h of
+            0 -> return $ NoOverlap b
+            1 -> return $ OverlapOk b
+            2 -> return $ Incoherent b
+            _ -> panic ("get OverlapFlag " ++ show h)
 
 instance Binary IfaceConDecls where
-    put_ bh (IfAbstractTyCon d) = do { putByte bh 0; put_ bh d }
-    put_ bh IfOpenDataTyCon = putByte bh 1
-    put_ bh (IfDataTyCon cs) = do { putByte bh 2
-                                  ; put_ bh cs }
-    put_ bh (IfNewTyCon c)  = do { putByte bh 3
-                                  ; put_ bh c }
+    put_ bh (IfAbstractTyCon d) = putByte bh 0 >> put_ bh d
+    put_ bh IfOpenDataTyCon     = putByte bh 1
+    put_ bh (IfDataTyCon cs)    = putByte bh 2 >> put_ bh cs
+    put_ bh (IfNewTyCon c)      = putByte bh 3 >> put_ bh c
     get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do { d <- get bh; return (IfAbstractTyCon d) }
-              1 -> return IfOpenDataTyCon
-              2 -> do cs <- get bh
-                      return (IfDataTyCon cs)
-              _ -> do aa <- get bh
-                      return (IfNewTyCon aa)
+        h <- getByte bh
+        case h of
+            0 -> get bh >>= (return . IfAbstractTyCon)
+            1 -> return IfOpenDataTyCon
+            2 -> get bh >>= (return . IfDataTyCon)
+            _ -> get bh >>= (return . IfNewTyCon)
 
 instance Binary IfaceConDecl where
     put_ bh (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10) = do
-            put_ bh a1
-            put_ bh a2
-            put_ bh a3
-            put_ bh a4
-            put_ bh a5
-            put_ bh a6
-            put_ bh a7
-            put_ bh a8
-            put_ bh a9
-            put_ bh a10
-    get bh = do a1 <- get bh
-                a2 <- get bh
-                a3 <- get bh          
-                a4 <- get bh
-                a5 <- get bh
-                a6 <- get bh
-                a7 <- get bh
-                a8 <- get bh
-                a9 <- get bh
-                a10 <- get bh
-                return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
+        put_ bh a1
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+        put_ bh a6
+        put_ bh a7
+        put_ bh a8
+        put_ bh a9
+        put_ bh a10
+    get bh = do
+        a1 <- get bh
+        a2 <- get bh
+        a3 <- get bh          
+        a4 <- get bh
+        a5 <- get bh
+        a6 <- get bh
+        a7 <- get bh
+        a8 <- get bh
+        a9 <- get bh
+        a10 <- get bh
+        return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
 
 instance Binary IfaceAT where
     put_ bh (IfaceAT dec defs) = do
-            put_ bh dec
-            put_ bh defs
-    get bh = do dec <- get bh
-                defs <- get bh
-                return (IfaceAT dec defs)
+        put_ bh dec
+        put_ bh defs
+    get bh = do
+        dec  <- get bh
+        defs <- get bh
+        return (IfaceAT dec defs)
 
 instance Binary IfaceATDefault where
     put_ bh (IfaceATD tvs pat_tys ty) = do
@@ -1490,37 +1459,37 @@ instance Binary IfaceATDefault where
     get bh = liftM3 IfaceATD (get bh) (get bh) (get bh)
 
 instance Binary IfaceClassOp where
-   put_ bh (IfaceClassOp n def ty) = do 
+    put_ bh (IfaceClassOp n def ty) = do 
         put_ bh (occNameFS n)
         put_ bh def     
         put_ bh ty
-   get bh = do
-        n <- get bh
+    get bh = do
+        n   <- get bh
         def <- get bh
-        ty <- get bh
+        ty  <- get bh
         occ <- return $! mkOccNameFS varName n
         return (IfaceClassOp occ def ty)
 
 instance Binary IfaceRule where
     put_ bh (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8) = do
-            put_ bh a1
-            put_ bh a2
-            put_ bh a3
-            put_ bh a4
-            put_ bh a5
-            put_ bh a6
-            put_ bh a7
-            put_ bh a8
+        put_ bh a1
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
+        put_ bh a6
+        put_ bh a7
+        put_ bh a8
     get bh = do
-            a1 <- get bh
-            a2 <- get bh
-            a3 <- get bh
-            a4 <- get bh
-            a5 <- get bh
-            a6 <- get bh
-            a7 <- get bh
-            a8 <- get bh
-            return (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8)
+        a1 <- get bh
+        a2 <- get bh
+        a3 <- get bh
+        a4 <- get bh
+        a5 <- get bh
+        a6 <- get bh
+        a7 <- get bh
+        a8 <- get bh
+        return (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8)
 
 instance Binary IfaceAnnotation where
     put_ bh (IfaceAnnotation a1 a2) = do
@@ -1541,25 +1510,23 @@ instance Binary name => Binary (AnnTarget name) where
     get bh = do
         h <- getByte bh
         case h of
-          0 -> do a <- get bh
-                  return (NamedTarget a)
-          _ -> do a <- get bh
-                  return (ModuleTarget a)
+            0 -> get bh >>= (return . NamedTarget)
+            _ -> get bh >>= (return . ModuleTarget)
 
 instance Binary IfaceVectInfo where
     put_ bh (IfaceVectInfo a1 a2 a3 a4 a5) = do
-            put_ bh a1
-            put_ bh a2
-            put_ bh a3
-            put_ bh a4
-            put_ bh a5
+        put_ bh a1
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
+        put_ bh a5
     get bh = do
-            a1 <- get bh
-            a2 <- get bh
-            a3 <- get bh
-            a4 <- get bh
-            a5 <- get bh
-            return (IfaceVectInfo a1 a2 a3 a4 a5)
+        a1 <- get bh
+        a2 <- get bh
+        a3 <- get bh
+        a4 <- get bh
+        a5 <- get bh
+        return (IfaceVectInfo a1 a2 a3 a4 a5)
 
 instance Binary IfaceTrustInfo where
     put_ bh iftrust = putByte bh $ trustInfoToNum iftrust
