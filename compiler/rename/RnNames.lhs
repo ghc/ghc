@@ -508,25 +508,25 @@ getLocalNonValBinders fixity_env
           -- Process all type/class decls *except* family instances
         ; tc_avails <- mapM new_tc tycl_decls_noinsts
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
-	; setEnvs envs $ do {
-	    -- Bring these things into scope first
+        ; setEnvs envs $ do {
+            -- Bring these things into scope first
             -- See Note [Looking up family names in family instances]
 
           -- Process all family instances
-	  -- to bring new data constructors into scope
+          -- to bring new data constructors into scope
         ; ti_avails  <- mapM (new_ti Nothing) tyinst_decls
         ; nti_avails <- concatMapM new_assoc inst_decls
 
           -- Finish off with value binders:
-	  --    foreign decls for an ordinary module
-	  --    type sigs in case of a hs-boot file only
+          --    foreign decls for an ordinary module
+          --    type sigs in case of a hs-boot file only
         ; is_boot <- tcIsHsBoot 
         ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
                         | otherwise = for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
-	; let avails    = ti_avails ++ nti_avails ++ val_avails
-	      new_bndrs = availsToNameSet avails `unionNameSets` 
+        ; let avails    = ti_avails ++ nti_avails ++ val_avails
+              new_bndrs = availsToNameSet avails `unionNameSets` 
                           availsToNameSet tc_avails
         ; envs <- extendGlobalRdrEnvRn avails fixity_env 
         ; return (envs, new_bndrs) } }
@@ -569,14 +569,14 @@ lookupTcdName :: Maybe Name -> TyClDecl RdrName -> RnM (Located Name)
 -- Used for TyData and TySynonym only
 -- See Note [Family instance binders]
 lookupTcdName mb_cls tc_decl
-  | not (isFamInstDecl tc_decl)	  -- The normal case
-  = ASSERT2( isNothing mb_cls, ppr tc_rdr )	-- Parser prevents this
+  | not (isFamInstDecl tc_decl)   -- The normal case
+  = ASSERT2( isNothing mb_cls, ppr tc_rdr )     -- Parser prevents this
     lookupLocatedTopBndrRn tc_rdr
 
-  | Just cls <- mb_cls	    -- Associated type; c.f RnBinds.rnMethodBind
+  | Just cls <- mb_cls      -- Associated type; c.f RnBinds.rnMethodBind
   = wrapLocM (lookupInstDeclBndr cls (ptext (sLit "associated type"))) tc_rdr
 
-  | otherwise		    -- Family instance; tc_rdr is an *occurrence*
+  | otherwise               -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRn tc_rdr 
   where
     tc_rdr = tcdLName tc_decl
@@ -918,7 +918,7 @@ it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 Note [Exports of data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose you see (Trac #5306)
-	module M where
+        module M where
           import X( F )
           data instance F Int = FInt
 What does M export?  AvailTC F [FInt] 
@@ -1046,8 +1046,8 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
              ; warnDodgyExports <- woptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
                                 || (moduleName this_mod == mod)
-		   ; gres = filter (isModuleExported implicit_prelude mod)
-		     	           (globalRdrEnvElts rdr_env)
+                   ; gres = filter (isModuleExported implicit_prelude mod)
+                                   (globalRdrEnvElts rdr_env)
                    ; new_exports = map greExportAvail gres
                    ; names       = map gre_name gres }
 
@@ -1423,9 +1423,9 @@ warnUnusedImportDecls gbl_env
     explicit_import (L _ decl) = unLoc (ideclName decl) /= pRELUDE_NAME
         -- Filter out the implicit Prelude import
         -- which we do not want to bleat about
-	-- This also filters out an *explicit* Prelude import
-	-- but solving that problem involves more plumbing, and
-	-- it just doesn't seem worth it
+        -- This also filters out an *explicit* Prelude import
+        -- but solving that problem involves more plumbing, and
+        -- it just doesn't seem worth it
 \end{code}
 
 \begin{code}
@@ -1652,7 +1652,7 @@ badImportItemErrDataCon dataType iface decl_spec ie
     datacon = parenSymOcc datacon_occ (ppr datacon_occ) 
     source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
                   | otherwise     = empty
-    parens_sp d = parens (space <> d <> space)	-- T( f,g )
+    parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
 badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> [AvailInfo] -> SDoc
 badImportItemErr iface decl_spec ie avails
