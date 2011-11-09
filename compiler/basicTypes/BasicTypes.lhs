@@ -588,6 +588,7 @@ data HsBang = HsNoBang
 	    | HsUnpackFailed   -- An UNPACK pragma that we could not make 
 	      		       -- use of, because the type isn't unboxable; 
                                -- equivalant to HsStrict except for checkValidDataCon
+            | HsNoUnpack       -- {-# NOUNPACK #-} ! (GHC extension, meaning "strict but not unboxed")
   deriving (Eq, Data, Typeable)
 
 instance Outputable HsBang where
@@ -595,6 +596,7 @@ instance Outputable HsBang where
     ppr HsStrict       = char '!'
     ppr HsUnpack       = ptext (sLit "{-# UNPACK #-} !")
     ppr HsUnpackFailed = ptext (sLit "{-# UNPACK (failed) #-} !")
+    ppr HsNoUnpack     = ptext (sLit "{-# NOUNPACK #-} !")
 
 isBanged :: HsBang -> Bool
 isBanged HsNoBang = False

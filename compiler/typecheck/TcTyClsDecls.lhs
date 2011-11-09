@@ -926,6 +926,7 @@ chooseBoxingStrategy arg_ty bang
 	HsStrict -> do { unbox_strict <- doptM Opt_UnboxStrictFields
                        ; if unbox_strict then return (can_unbox HsStrict arg_ty)
                                          else return HsStrict }
+	HsNoUnpack -> return HsStrict
 	HsUnpack -> do { omit_prags <- doptM Opt_OmitInterfacePragmas
             -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
 	    -- See Trac #5252: unpacking means we must not conceal the

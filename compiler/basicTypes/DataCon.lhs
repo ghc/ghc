@@ -952,6 +952,7 @@ computeRep stricts tys
   where
     unbox HsNoBang       ty = [(NotMarkedStrict, ty)]
     unbox HsStrict       ty = [(MarkedStrict,    ty)]
+    unbox HsNoUnpack     ty = [(MarkedStrict,    ty)]
     unbox HsUnpackFailed ty = [(MarkedStrict,    ty)]
     unbox HsUnpack ty = zipEqual "computeRep" (dataConRepStrictness arg_dc) arg_tys
                       where

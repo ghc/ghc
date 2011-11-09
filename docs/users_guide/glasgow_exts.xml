@@ -8575,6 +8575,26 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
       constructor field.</para>
     </sect2>
 
+    <sect2 id="nounpack-pragma">
+      <title>NOUNPACK pragma</title>
+
+      <indexterm><primary>NOUNPACK</primary></indexterm>
+
+      <para>The <literal>NOUNPACK</literal> pragma indicates to the compiler
+      that it should not unpack the contents of a constructor field.
+      Example:
+      </para>
+<programlisting>
+data T = T {-# NOUNPACK #-} !(Int,Int)
+</programlisting>
+      <para>
+        Even with the flags
+        <option>-funbox-strict-fields</option> and <option>-O</option>,
+        the field of the constructor <function>T</function> is not
+        unpacked.
+      </para>
+    </sect2>
+
     <sect2 id="source-pragma">
       <title>SOURCE pragma</title>
 

@@ -773,13 +773,15 @@ instance Binary HsBang where
     put_ bh HsStrict        = putByte bh 1
     put_ bh HsUnpack        = putByte bh 2
     put_ bh HsUnpackFailed  = putByte bh 3
+    put_ bh HsNoUnpack      = putByte bh 4
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> do return HsNoBang
 	      1 -> do return HsStrict
 	      2 -> do return HsUnpack
-	      _ -> do return HsUnpackFailed
+	      3 -> do return HsUnpackFailed
+              _ -> do return HsNoUnpack
 
 instance Binary TupleSort where
     put_ bh BoxedTuple      = putByte bh 0

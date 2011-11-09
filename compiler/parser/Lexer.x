@@ -477,6 +477,7 @@ data Token
   | ITgenerated_prag
   | ITcore_prag                 -- hdaume: core annotations
   | ITunpack_prag
+  | ITnounpack_prag
   | ITann_prag
   | ITclose_prag
   | IToptions_prag String
@@ -2267,6 +2268,7 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("generated", token ITgenerated_prag),
                            ("core", token ITcore_prag),
                            ("unpack", token ITunpack_prag),
+                           ("nounpack", token ITnounpack_prag),
                            ("ann", token ITann_prag),
                            ("vectorize", token ITvect_prag),
                            ("novectorize", token ITnovect_prag)])
