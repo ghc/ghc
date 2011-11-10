@@ -340,6 +340,7 @@ data WarningFlag =
    deriving (Eq, Show)
 
 data Language = Haskell98 | Haskell2010
+   deriving Enum
 
 -- | The various Safe Haskell modes
 data SafeHaskellMode
@@ -435,7 +436,7 @@ data ExtensionFlag
    | Opt_NondecreasingIndentation
    | Opt_RelaxedLayout
    | Opt_TraditionalRecordSyntax
-   deriving (Eq, Show)
+   deriving (Eq, Enum, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session

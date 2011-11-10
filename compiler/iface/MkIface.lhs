@@ -1189,8 +1189,7 @@ checkVersions hsc_env mod_summary iface
     mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
--- | Check the safe haskell flags haven't changed
---   (e.g different flag on command line now)
+-- | Check the flags haven't changed
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkFlagHash hsc_env iface = do
     let old_hash = mi_flag_hash iface

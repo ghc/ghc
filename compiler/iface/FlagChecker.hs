@@ -1,4 +1,4 @@
--- {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- -----------------------------------------------------------------------------
 -- | This module manages storing the various GHC option flags in a modules
@@ -15,7 +15,7 @@ import HscTypes
 import Name
 import Fingerprint
 
--- import Data.List (sort)
+import Data.List (sort)
 
 {-
 Note [DynFlags Hash]
@@ -36,22 +36,34 @@ recompilation manager and its not sure how beneficial it is.
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
 -- the finger print on important fields in @DynFlags@ so that
 -- the recompilation checker can use this fingerprint.
-fingerprintDynFlags :: DynFlags -> (BinHandle -> Name -> IO ()) -> IO Fingerprint
-fingerprintDynFlags dflags nameio =
+fingerprintDynFlags :: DynFlags -> (BinHandle -> Name -> IO ())
+                    -> IO Fingerprint
+
+fingerprintDynFlags DynFlags{..} nameio =
     let -- DriverPipeline.getLinkInfo handles this info I believe
         -- rtsopts = (rtsOptsEnabled dflags, rtsOpts dflags)
 
         -- Probably not a good idea
         -- optlvl  = optLevel dflags
 
-        mainis   = (mainModIs dflags, mainFunIs dflags)
+        mainis   = (mainModIs, mainFunIs)
         -- pkgopts  = (thisPackage dflags, sort $ packageFlags dflags)
-        safeHs   = setSafeMode $ safeHaskell dflags
+        safeHs   = setSafeMode safeHaskell
         -- oflags   = sort $ filter filterOFlags $ flags dflags
-        -- eflags   = sort $ filter filterEFlags $ extensionFlags dflags
 
-        flagOpts = (mainis, safeHs)
-    in computeFingerprint nameio flagOpts
+        -- *all* the extension flags and the language
+        lang = (fmap fromEnum language,
+                sort $ map fromEnum $ extensionFlags)
+
+        -- -I, -D and -U flags affect CPP
+        cpp = (includePaths, sOpt_P settings)
+
+        -- -i, -osuf, -hcsuf, -hisuf, -odir, -hidir, -stubdir, -o, -ohi
+        paths = (importPaths,
+                   [ objectSuf, hcSuf, hiSuf ],
+                   [ objectDir, hiDir, stubDir, outputFile, outputHi ])
+
+    in computeFingerprint nameio (mainis, safeHs, lang, cpp, paths)
 
 {-
 -- | Should the @DynFlag@ be included in the fingerprint?
@@ -67,16 +79,6 @@ filterOFlags Opt_SSE2                   = True
 filterOFlags Opt_SSE4_2                 = True
 filterOFlags Opt_PackageTrust           = True
 filterOFlags _                          = False
-
--- | Should the @ExtensionFlag@ be included in the fingerprint?
-filterEFlags :: ExtensionFlag -> Bool
-filterEFlags Opt_ExtendedDefaultRules = True
-filterEFlags Opt_InterruptibleFFI     = True
-filterEFlags Opt_ImplicitParams       = True
-filterEFlags Opt_ImplicitPrelude      = True
-filterEFlags Opt_OverloadedStrings    = True
-filterEFlags Opt_RebindableSyntax     = True
-filterEFlags _                        = False
 -}
 
 -- -----------------------------------------------------------------------------
