@@ -39,6 +39,7 @@ import TcHsType
 import TcPat
 import TcMType
 import TcType
+import DsMonad hiding (Splice)
 import Id
 import DataCon
 import Name
@@ -52,7 +53,6 @@ import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
-import Module
 import DynFlags
 import SrcLoc
 import Util
@@ -749,8 +749,9 @@ tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
   = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
+	; enumFromToP <- initDsTc $ dsDPHBuiltin enumFromToPVar
 	; enum_from_to <- newMethodFromName (PArrSeqOrigin seq) 
-				 (enumFromToPName basePackageId) elt_ty    -- !!!FIXME: chak
+				 (idName enumFromToP) elt_ty
 	; return $ mkHsWrapCo coi 
                      (PArrSeq enum_from_to (FromTo expr1' expr2')) }
 
@@ -759,13 +760,14 @@ tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; expr3' <- tcPolyExpr expr3 elt_ty
+	; enumFromThenToP <- initDsTc $ dsDPHBuiltin enumFromThenToPVar
 	; eft <- newMethodFromName (PArrSeqOrigin seq)
-		      (enumFromThenToPName basePackageId) elt_ty        -- !!!FIXME: chak
+		      (idName enumFromThenToP) elt_ty        -- !!!FIXME: chak
 	; return $ mkHsWrapCo coi 
                      (PArrSeq eft (FromThenTo expr1' expr2' expr3')) }
 
 tcExpr (PArrSeq _ _) _ 
-  = panic "TcExpr.tcMonoExpr: Infinite parallel array!"
+  = panic "TcExpr.tcExpr: Infinite parallel array!"
     -- the parser shouldn't have generated it and the renamer shouldn't have
     -- let it through
 \end{code}

@@ -301,6 +301,7 @@ Library
         LoadIface
         MkIface
         TcIface
+        FlagChecker
         Annotations
         BreakArray
         CmdLineParser

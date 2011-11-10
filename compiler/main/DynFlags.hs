@@ -37,7 +37,6 @@ module DynFlags (
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fWarningFlags, fLangFlags, xFlags,
-        DPHBackend(..), dphPackageMaybe,
         wayNames, dynFlagDependencies,
 
         -- ** Safe Haskell
@@ -341,6 +340,7 @@ data WarningFlag =
    deriving (Eq, Show)
 
 data Language = Haskell98 | Haskell2010
+   deriving Enum
 
 -- | The various Safe Haskell modes
 data SafeHaskellMode
@@ -436,7 +436,7 @@ data ExtensionFlag
    | Opt_NondecreasingIndentation
    | Opt_RelaxedLayout
    | Opt_TraditionalRecordSyntax
-   deriving (Eq, Show)
+   deriving (Eq, Enum, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
 -- information relating to the compilation of a single file or GHC session
@@ -466,8 +466,6 @@ data DynFlags = DynFlags {
   mainModIs             :: Module,
   mainFunIs             :: Maybe String,
   ctxtStkDepth          :: Int,         -- ^ Typechecker context stack depth
-
-  dphBackend            :: DPHBackend,
 
   thisPackage           :: PackageId,   -- ^ name of package currently being compiled
 
@@ -840,8 +838,6 @@ defaultDynFlags mySettings =
         mainModIs               = mAIN,
         mainFunIs               = Nothing,
         ctxtStkDepth            = mAX_CONTEXT_REDUCTION_DEPTH,
-
-        dphBackend              = DPHNone,
 
         thisPackage             = mainPackageId,
 
@@ -1622,13 +1618,6 @@ dynamic_flags = [
   , Flag "fprof-auto-exported"    (noArg (\d -> d { profAuto = ProfAutoExports } ))
   , Flag "fno-prof-auto"          (noArg (\d -> d { profAuto = NoProfAuto } ))
 
-        ------ DPH flags ----------------------------------------------------
-
-  , Flag "fdph-seq"         (NoArg (setDPHBackend DPHSeq))
-  , Flag "fdph-par"         (NoArg (setDPHBackend DPHPar))
-  , Flag "fdph-this"        (NoArg (setDPHBackend DPHThis))
-  , Flag "fdph-none"        (NoArg (setDPHBackend DPHNone))
-
         ------ Compiler flags -----------------------------------------------
 
   , Flag "fasm"             (NoArg (setObjTarget HscAsm))
@@ -2357,29 +2346,6 @@ setDPHOpt :: DynFlags -> DynP DynFlags
 setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                                          , simplPhases         = 3
                                          })
-
--- Determines the package used by the vectoriser for the symbols of the vectorised code.
--- 'DPHNone' indicates that no data-parallel backend library is available; hence, the
--- vectoriser cannot be used.
---
-data DPHBackend = DPHPar    -- "dph-par"
-                | DPHSeq    -- "dph-seq"
-                | DPHThis   -- the currently compiled package
-                | DPHNone   -- no DPH library available
-        deriving(Eq, Ord, Enum, Show)
-
-setDPHBackend :: DPHBackend -> DynP ()
-setDPHBackend backend = upd $ \dflags -> dflags { dphBackend = backend }
-
--- Query the DPH backend package to be used by the vectoriser and desugaring of DPH syntax.
---
-dphPackageMaybe :: DynFlags -> Maybe PackageId
-dphPackageMaybe dflags
-  = case dphBackend dflags of
-      DPHPar  -> Just dphParPackageId
-      DPHSeq  -> Just dphSeqPackageId
-      DPHThis -> Just (thisPackage dflags)
-      DPHNone -> Nothing
 
 setMainIs :: String -> DynP ()
 setMainIs arg

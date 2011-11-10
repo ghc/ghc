@@ -365,11 +365,11 @@ dsExpr (ExplicitList elt_ty xs)
 --   singletonP x1 +:+ ... +:+ singletonP xn
 --
 dsExpr (ExplicitPArr ty []) = do
-    emptyP <- dsLookupDPHId emptyPName
+    emptyP <- dsDPHBuiltin emptyPVar
     return (Var emptyP `App` Type ty)
 dsExpr (ExplicitPArr ty xs) = do
-    singletonP <- dsLookupDPHId singletonPName
-    appP       <- dsLookupDPHId appPName
+    singletonP <- dsDPHBuiltin singletonPVar
+    appP       <- dsDPHBuiltin appPVar
     xs'        <- mapM dsLExpr xs
     return . foldr1 (binary appP) $ map (unary singletonP) xs'
   where

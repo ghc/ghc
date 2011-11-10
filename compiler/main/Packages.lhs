@@ -724,13 +724,7 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 -}
 
   let
-      flags = reverse (packageFlags dflags) ++ dphPackage
-      -- expose the appropriate DPH backend library
-      dphPackage = case dphBackend dflags of
-                     DPHPar  -> [ExposePackage "dph-prim-par", ExposePackage "dph-par"]
-                     DPHSeq  -> [ExposePackage "dph-prim-seq", ExposePackage "dph-seq"]
-                     DPHThis -> []
-                     DPHNone -> []
+      flags = reverse (packageFlags dflags)
 
       -- pkgs0 with duplicate packages filtered out.  This is
       -- important: it is possible for a package in the global package

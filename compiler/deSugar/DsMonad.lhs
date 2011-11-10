@@ -21,9 +21,9 @@ module DsMonad (
         newUnique, 
         UniqSupply, newUniqueSupply,
         getDOptsDs, getGhcModeDs, doptDs, woptDs,
-        dsLookupGlobal, dsLookupGlobalId, dsLookupDPHId, dsLookupTyCon, dsLookupDataCon,
+        dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
         
-        assertDAPPLoaded, lookupDAPPRdrEnv,
+        PArrBuiltin(..), dsLookupDPHRdrEnv, dsInitPArrBuiltin,
 
         DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -41,6 +41,7 @@ import CoreSyn
 import HsSyn
 import TcIface
 import LoadIface
+import Finder
 import PrelNames
 import Avail
 import RdrName
@@ -60,7 +61,6 @@ import DynFlags
 import ErrUtils
 import FastString
 import Maybes
-import Control.Monad
 
 import Data.IORef
 \end{code}
@@ -131,16 +131,38 @@ type DsWarning = (SrcSpan, SDoc)
         -- and we'll do the print_unqual stuff later on to turn it
         -- into a Doc.
 
-data DsGblEnv = DsGblEnv {
-        ds_mod     :: Module,                   -- For SCC profiling
-        ds_unqual  :: PrintUnqualified,
-        ds_msgs    :: IORef Messages,           -- Warning messages
-        ds_if_env  :: (IfGblEnv, IfLclEnv),     -- Used for looking up global, 
+-- If '-XParallelArrays' is given, the desugarer populates this table with the corresponding
+-- variables found in 'Data.Array.Parallel'.
+--
+data PArrBuiltin
+        = PArrBuiltin
+        { lengthPVar         :: Var     -- ^ lengthP
+        , replicatePVar      :: Var     -- ^ replicateP
+        , singletonPVar      :: Var     -- ^ singletonP
+        , mapPVar            :: Var     -- ^ mapP
+        , filterPVar         :: Var     -- ^ filterP
+        , zipPVar            :: Var     -- ^ zipP
+        , crossMapPVar       :: Var     -- ^ crossMapP
+        , indexPVar          :: Var     -- ^ (!:)
+        , emptyPVar          :: Var     -- ^ emptyP
+        , appPVar            :: Var     -- ^ (+:+)
+        , enumFromToPVar     :: Var     -- ^ enumFromToP
+        , enumFromThenToPVar :: Var     -- ^ enumFromThenToP
+        }
+
+data DsGblEnv 
+        = DsGblEnv
+        { ds_mod     :: Module                  -- For SCC profiling
+        , ds_unqual  :: PrintUnqualified
+        , ds_msgs    :: IORef Messages          -- Warning messages
+        , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global, 
                                                 -- possibly-imported things
-        ds_dph_env :: GlobalRdrEnv              -- exported entities of 'Data.Array.Parallel.Prim' iff
-                                                -- '-fdph-*' flag was given (i.e., 'DynFlags.DPHBackend /=
-                                                -- DPHNone'); otherwise, empty
-    }
+        , ds_dph_env :: GlobalRdrEnv            -- exported entities of 'Data.Array.Parallel.Prim'
+                                                -- iff '-fvectorise' flag was given as well as
+                                                -- exported entities of 'Data.Array.Parallel' iff
+                                                -- '-XParallelArrays' was given; otherwise, empty
+        , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
+        }
 
 data DsLclEnv = DsLclEnv {
         ds_meta    :: DsMetaEnv,        -- Template Haskell bindings
@@ -171,8 +193,9 @@ initDs hsc_env mod rdr_env type_env thing_inside
               (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env msg_var
 
         ; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
-                          loadDAPP dflags $
-                            tryM thing_inside       -- Catch exceptions (= errors during desugaring)
+                          loadDAP dflags $
+                            initDPHBuiltins $
+                              tryM thing_inside     -- Catch exceptions (= errors during desugaring)
 
         -- Display any errors and warnings 
         -- Note: if -Werror is used, we don't signal an error here.
@@ -190,22 +213,50 @@ initDs hsc_env mod rdr_env type_env thing_inside
         }
   where
     -- Extend the global environment with a 'GlobalRdrEnv' containing the exported entities of
-    -- 'Data.Array.Parallel.Prim' if '-fdph-*' specified.
-    loadDAPP dflags thing_inside
-      | Just pkg <- dphPackageMaybe dflags
-      = do { rdr_env <- loadModule sdoc (dATA_ARRAY_PARALLEL_PRIM pkg)
-           ; updGblEnv (\env -> env {ds_dph_env = rdr_env}) thing_inside
+    --   * 'Data.Array.Parallel'      iff '-XParallalArrays' specified (see also 'checkLoadDAP').
+    --   * 'Data.Array.Parallel.Prim' iff '-fvectorise' specified.
+    loadDAP dflags thing_inside
+      = do { dapEnv  <- loadOneModule dATA_ARRAY_PARALLEL_NAME      checkLoadDAP          paErr
+           ; dappEnv <- loadOneModule dATA_ARRAY_PARALLEL_PRIM_NAME (doptM Opt_Vectorise) veErr
+           ; updGblEnv (\env -> env {ds_dph_env = dapEnv `plusOccEnv` dappEnv }) thing_inside
            }
-      | otherwise
-      = do { ifXOptM Opt_ParallelArrays (liftIO $ fatalErrorMsg dflags $ ptext selectBackendErrPA)
-           ; ifDOptM Opt_Vectorise      (liftIO $ fatalErrorMsg dflags $ ptext selectBackendErrVect)
-           ; thing_inside
+      where
+        loadOneModule :: ModuleName           -- the module to load
+                      -> DsM Bool             -- under which condition
+                      -> Message              -- error message if module not found
+                      -> DsM GlobalRdrEnv     -- empty if condition 'False'
+        loadOneModule modname check err
+          = do { doLoad <- check
+               ; if not doLoad 
+                 then return emptyGlobalRdrEnv
+                 else do {
+               ; result <- liftIO $ findImportedModule hsc_env modname Nothing
+               ; case result of
+                   Found _ mod -> loadModule err mod
+                   _           -> do { liftIO $ fatalErrorMsg dflags err
+                                     ; panic "DsMonad.initDs: failed to load module"
+                                     }
+               } }
+
+        paErr = ptext $ sLit "To use -XParallelArrays, you must specify a DPH backend package"
+        veErr = ptext $ sLit "To use -fvectorise, you must specify a DPH backend package"
+
+    initDPHBuiltins thing_inside
+      = do {   -- If '-XParallelArrays' given, we populate the builtin table for desugaring those
+           ; doInitBuiltins <- checkLoadDAP
+           ; if doInitBuiltins
+             then dsInitPArrBuiltin thing_inside
+             else thing_inside
            }
 
-    sdoc = ptext (sLit "Internal Data Parallel Haskell interface 'Data.Array.Parallel.Prim'")
-
-    selectBackendErrVect = sLit "To use -fvectorise select a DPH backend with -fdph-par or -fdph-seq"
-    selectBackendErrPA   = sLit "To use -XParallelArrays select a DPH backend with -fdph-par or -fdph-seq"
+    checkLoadDAP = do { paEnabled <- xoptM Opt_ParallelArrays
+                      ; return $ paEnabled &&
+                                 mod /= gHC_PARR' && 
+                                 moduleName mod /= dATA_ARRAY_PARALLEL_NAME
+                      }
+                      -- do not load 'Data.Array.Parallel' iff compiling 'base:GHC.PArr' or a
+                      -- module called 'dATA_ARRAY_PARALLEL_NAME'; see also the comments at the top
+                      -- of 'base:GHC.PArr' and 'Data.Array.Parallel' in the DPH libraries
 
 initDsTc :: DsM a -> TcM a
 initDsTc thing_inside
@@ -228,23 +279,26 @@ mkDsEnvs dflags mod rdr_env type_env msg_var
                            , ds_unqual  = mkPrintUnqualified dflags rdr_env
                            , ds_msgs    = msg_var
                            , ds_dph_env = emptyGlobalRdrEnv
+                           , ds_parr_bi = panic "DsMonad: uninitialised ds_parr_bi"
                            }
         lcl_env = DsLclEnv { ds_meta = emptyNameEnv
                            , ds_loc  = noSrcSpan
                            }
     in (gbl_env, lcl_env)
 
--- Attempt to load the given module and return its exported entities if successful; otherwise, return an
--- empty environment.  See "Note [Loading Data.Array.Parallel.Prim]".
+-- Attempt to load the given module and return its exported entities if successful.
 --
 loadModule :: SDoc -> Module -> DsM GlobalRdrEnv
 loadModule doc mod
-  = do { env <- getGblEnv
+  = do { env    <- getGblEnv
+       ; dflags <- getDOpts
        ; setEnvs (ds_if_env env) $ do
        { iface <- loadInterface doc mod ImportBySystem
-       ;   case iface of
-             Failed _err     -> return $ mkGlobalRdrEnv []
-             Succeeded iface -> return $ mkGlobalRdrEnv . gresFromAvails prov . mi_exports $ iface
+       ; case iface of
+           Failed err      -> do { liftIO $ fatalErrorMsg dflags (err $$ doc)
+                                 ; panic "DsMonad.loadModule: failed to load"
+                                 }
+           Succeeded iface -> return $ mkGlobalRdrEnv . gresFromAvails prov . mi_exports $ iface
        } }
   where
     prov     = Imported [ImpSpec { is_decl = imp_spec, is_item = ImpAll }]
@@ -252,15 +306,6 @@ loadModule doc mod
                              is_dloc = wiredInSrcSpan, is_as = name }
     name = moduleName mod
 \end{code}
-
-Note [Loading Data.Array.Parallel.Prim]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We generally attempt to load the interface of 'Data.Array.Parallel.Prim' when a DPH backend is selected.
-However, while compiling packages containing a DPH backend, we will start out compiling the modules
-'Data.Array.Parallel.Prim' depends on — i.e., when compiling these modules, the interface won't exist yet.
-This is fine, as these modules do not use the vectoriser, but we need to ensure that GHC doesn't barf when
-the interface is missing.  Instead of an error message, we just put an empty 'GlobalRdrEnv' into the
-'DsM' state.
 
 
 %************************************************************************
@@ -355,18 +400,11 @@ dsLookupGlobalId :: Name -> DsM Id
 dsLookupGlobalId name 
   = tyThingId <$> dsLookupGlobal name
 
--- Looking up a global DPH 'Id' is like 'dsLookupGlobalId', but the package, in which the looked
--- up name is located, varies with the active DPH backend.
+-- |Get a name from "Data.Array.Parallel" for the desugarer, from the 'ds_parr_bi' component of the
+-- global desugerar environment.
 --
-dsLookupDPHId :: (PackageId -> Name) -> DsM Id
-dsLookupDPHId nameInPkg
-  = do { dflags <- getDOpts
-       ; case dphPackageMaybe dflags of
-           Just pkg -> tyThingId <$> dsLookupGlobal (nameInPkg pkg)
-           Nothing  -> failWithDs $ ptext err
-       }
-  where
-    err = sLit "To use -XParallelArrays select a DPH backend with -fdph-par or -fdph-seq"
+dsDPHBuiltin :: (PArrBuiltin -> a) -> DsM a
+dsDPHBuiltin sel = (sel . ds_parr_bi) <$> getGblEnv
 
 dsLookupTyCon :: Name -> DsM TyCon
 dsLookupTyCon name
@@ -378,28 +416,61 @@ dsLookupDataCon name
 \end{code}
 
 \begin{code}
--- Complain if 'Data.Array.Parallel.Prim' wasn't loaded (and we are about to use it).
+-- Look up a name exported by 'Data.Array.Parallel.Prim' or 'Data.Array.Parallel.Prim'.
 --
--- See "Note [Loading Data.Array.Parallel.Prim]".
---
-assertDAPPLoaded :: DsM ()
-assertDAPPLoaded 
-  = do { env <- ds_dph_env <$> getGblEnv
-       ; when (null $ occEnvElts env) $
-           panic "'Data.Array.Parallel.Prim' not available; maybe missing dependency in DPH package"
-       }
-
--- Look up a name exported by 'Data.Array.Parallel.Prim'.
---
-lookupDAPPRdrEnv :: OccName -> DsM Name
-lookupDAPPRdrEnv occ
+dsLookupDPHRdrEnv :: OccName -> DsM Name
+dsLookupDPHRdrEnv occ
   = do { env <- ds_dph_env <$> getGblEnv
        ; let gres = lookupGlobalRdrEnv env occ
        ; case gres of
-           []    -> pprPanic "Name not found in 'Data.Array.Parallel.Prim':" (ppr occ)
+           []    -> pprPanic nameNotFound (ppr occ)
            [gre] -> return $ gre_name gre
-           _     -> pprPanic "Multiple definitions in 'Data.Array.Parallel.Prim':" (ppr occ)
+           _     -> pprPanic multipleNames (ppr occ)
        }
+  where
+    nameNotFound  = "Name not found in 'Data.Array.Parallel' or 'Data.Array.Parallel.Prim':"
+    multipleNames = "Multiple definitions in 'Data.Array.Parallel' and 'Data.Array.Parallel.Prim':"
+
+-- Populate 'ds_parr_bi' from 'ds_dph_env'.
+--
+dsInitPArrBuiltin :: DsM a -> DsM a
+dsInitPArrBuiltin thing_inside
+  = do { lengthPVar         <- externalVar (fsLit "lengthP")
+       ; replicatePVar      <- externalVar (fsLit "replicateP")
+       ; singletonPVar      <- externalVar (fsLit "singletonP")
+       ; mapPVar            <- externalVar (fsLit "mapP")
+       ; filterPVar         <- externalVar (fsLit "filterP")
+       ; zipPVar            <- externalVar (fsLit "zipP")
+       ; crossMapPVar       <- externalVar (fsLit "crossMapP")
+       ; indexPVar          <- externalVar (fsLit "!:")
+       ; emptyPVar          <- externalVar (fsLit "emptyP")
+       ; appPVar            <- externalVar (fsLit "+:+")
+       -- ; enumFromToPVar     <- externalVar (fsLit "enumFromToP")
+       -- ; enumFromThenToPVar <- externalVar (fsLit "enumFromThenToP")
+       ; enumFromToPVar     <- return arithErr
+       ; enumFromThenToPVar <- return arithErr
+
+       ; updGblEnv (\env -> env {ds_parr_bi = PArrBuiltin
+                                              { lengthPVar         = lengthPVar
+                                              , replicatePVar      = replicatePVar
+                                              , singletonPVar      = singletonPVar
+                                              , mapPVar            = mapPVar
+                                              , filterPVar         = filterPVar
+                                              , zipPVar            = zipPVar
+                                              , crossMapPVar       = crossMapPVar
+                                              , indexPVar          = indexPVar
+                                              , emptyPVar          = emptyPVar
+                                              , appPVar            = appPVar
+                                              , enumFromToPVar     = enumFromToPVar
+                                              , enumFromThenToPVar = enumFromThenToPVar
+                                              } })
+                   thing_inside
+       }
+  where
+    externalVar :: FastString -> DsM Var
+    externalVar fs = dsLookupDPHRdrEnv (mkVarOccFS fs) >>= dsLookupGlobalId
+    
+    arithErr = panic "Arithmetic sequences have to wait until we support type classes"
 \end{code}
 
 \begin{code}
