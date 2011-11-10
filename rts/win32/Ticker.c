@@ -153,7 +153,8 @@ exitTicker (rtsBool wait)
 	    if (!GetExitCodeThread(tickThread, &exitCode)) {
 		return;
 	    }
-	    if (exitCode != STILL_ACTIVE) {
+            CloseHandle(tickThread);
+            if (exitCode != STILL_ACTIVE) {
 		tickThread = INVALID_HANDLE_VALUE;
 		if ( hStopEvent != INVALID_HANDLE_VALUE ) {
 		    CloseHandle(hStopEvent);
