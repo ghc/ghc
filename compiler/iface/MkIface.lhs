@@ -500,32 +500,46 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                    decl = abiDecl abi
                -- pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
                hash <- computeFingerprint hash_fn abi
-               return (extend_hash_env (hash,decl) local_env,
-                       (hash,decl) : decls_w_hashes)
+               env' <- extend_hash_env local_env (hash,decl)
+               return (env', (hash,decl) : decls_w_hashes)
 
        fingerprint_group (local_env, decls_w_hashes) (CyclicSCC abis)
           = do let decls = map abiDecl abis
-                   local_env' = foldr extend_hash_env local_env 
+               local_env1 <- foldM extend_hash_env local_env
                                    (zip (repeat fingerprint0) decls)
-                   hash_fn = mk_put_name local_env'
+               let hash_fn = mk_put_name local_env1
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                let stable_abis = sortBy cmp_abiNames abis
                 -- put the cycle in a canonical order
                hash <- computeFingerprint hash_fn stable_abis
                let pairs = zip (repeat hash) decls
-               return (foldr extend_hash_env local_env pairs,
-                       pairs ++ decls_w_hashes)
+               local_env2 <- foldM extend_hash_env local_env pairs
+               return (local_env2, pairs ++ decls_w_hashes)
 
-       extend_hash_env :: (Fingerprint,IfaceDecl)
-                       -> OccEnv (OccName,Fingerprint)
-                       -> OccEnv (OccName,Fingerprint)
-       extend_hash_env (hash,d) env0 = foldr add_imp env1 (ifaceDeclSubBndrs d)
+       -- we have fingerprinted the whole declaration, but we now need
+       -- to assign fingerprints to all the OccNames that it binds, to
+       -- use when referencing those OccNames in later declarations.
+       --
+       -- We better give each name bound by the declaration a
+       -- different fingerprint!  So we calculate the fingerprint of
+       -- each binder by combining the fingerprint of the whole
+       -- declaration with the name of the binder. (#5614)
+       extend_hash_env :: OccEnv (OccName,Fingerprint)
+                       -> (Fingerprint,IfaceDecl)
+                       -> IO (OccEnv (OccName,Fingerprint))
+       extend_hash_env env0 (hash,d) = do
+          let
+            sub_bndrs = ifaceDeclSubBndrs d
+            fp_sub_bndr occ = computeFingerprint putNameLiterally (hash,occ)
+          --
+          sub_fps <- mapM fp_sub_bndr sub_bndrs
+          return (foldr (\(b,fp) env -> extendOccEnv env b (b,fp)) env1
+                        (zip sub_bndrs sub_fps))
         where
           decl_name = ifName d
           item = (decl_name, hash)
           env1 = extendOccEnv env0 decl_name item
-          add_imp bndr env = extendOccEnv env bndr item
-            
+
    --
    (local_env, decls_w_hashes) <- 
        foldM fingerprint_group (emptyOccEnv, []) groups
