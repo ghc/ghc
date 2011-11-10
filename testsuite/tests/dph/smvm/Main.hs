@@ -12,19 +12,19 @@ import Data.Array.Parallel.PArray as P
 
 
 -- Load sparse matrix from a file
-loadSM 	:: String 
-	-> IO (PArray (PArray (Int, Double)), PArray Double)
+loadSM  :: String
+        -> IO (PArray (PArray (Int, Double)), PArray Double)
 
-loadSM s 
+loadSM s
   = do
       (segd, m, v) <- loadSM' s
       return $ (nestUSegdPA' segd (fromUArrPA_2' m), fromUArrPA' v)
 
 
-loadSM' :: String 
-	-> IO	( U.Segd
-		, U.Array (Int, Double)
-		, U.Array Double)
+loadSM' :: String
+        -> IO   ( U.Segd
+                , U.Array (Int, Double)
+                , U.Array Double)
 loadSM' fname =
   do
     h <- openBinaryFile fname ReadMode
@@ -40,26 +40,21 @@ loadSM' fname =
     evaluate dv
     return (segd, m, dv)
 
-main 
- = do	[inFile, outFile]	<- getArgs
-	(m, v)			<- loadSM inFile
-	let result		= smvm m v
+main
+ = do   [inFile, outFile]   <- getArgs
+        (m, v)              <- loadSM inFile
+        let result          = smvm m v
 
-	-- ignore wibbles in low-order bits
-	let output
-		=  (unlines
-			$ map (take 12)
-			$ map show
-			$ P.toList result)
-		++ ("SUM = "
-			++ (take 12 $ show $ sum $ P.toList result)
-			++ "\n")
+        -- ignore wibbles in low-order bits
+        let output
+                =  (unlines
+                        $ map (take 12)
+                        $ map show
+                        $ P.toList result)
+                ++ ("SUM = "
+                        ++ (take 12 $ show $ sum $ P.toList result)
+                        ++ "\n")
 
-	-- check our result against the provided outFile
-	outputCheck <- readFile outFile
-	print $	output == outputCheck
-
-
-	
-
-
+        -- check our result against the provided outFile
+        outputCheck <- readFile outFile
+        print $ output == outputCheck
