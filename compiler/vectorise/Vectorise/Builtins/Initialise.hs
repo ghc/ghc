@@ -30,9 +30,7 @@ import Data.Array
 --
 initBuiltins :: DsM Builtins
 initBuiltins
- = do { assertDAPPLoaded      -- complain if 'Data.Array.Parallel.Prim' is not available
-
-          -- 'PArray': desugared array type
+ = do {   -- 'PArray': desugared array type
       ; parrayTyCon <- externalTyCon (fsLit "PArray")
       ; parray_tcs  <- mapM externalTyCon (suffixed "PArray" aLL_DPH_PRIM_TYCONS)
       ; let parray_PrimTyCons = mkNameEnv (zip aLL_DPH_PRIM_TYCONS parray_tcs)
@@ -206,19 +204,19 @@ initBuiltinTyCons bi
 -- Lookup a variable given its name and the module that contains it.
 --
 externalVar :: FastString -> DsM Var
-externalVar fs = lookupDAPPRdrEnv (mkVarOccFS fs) >>= dsLookupGlobalId
+externalVar fs = dsLookupDPHRdrEnv (mkVarOccFS fs) >>= dsLookupGlobalId
 
 -- Like `externalVar` but wrap the `Var` in a `CoreExpr`.
 --
 externalFun :: FastString -> DsM CoreExpr
-externalFun fs = liftM Var $ externalVar fs
+externalFun fs = Var <$> externalVar fs
 
 -- Lookup a 'TyCon' in 'Data.Array.Parallel.Prim', given its name.
 --
 externalTyCon :: FastString -> DsM TyCon
-externalTyCon fs = lookupDAPPRdrEnv (mkTcOccFS fs) >>= dsLookupTyCon
+externalTyCon fs = dsLookupDPHRdrEnv (mkTcOccFS fs) >>= dsLookupTyCon
 
--- Lookup some `Type` given its name and the module that contains it.
+-- Lookup some `Type` in 'Data.Array.Parallel.Prim', given its name.
 --
 externalType :: FastString -> DsM Type
 externalType fs
@@ -229,7 +227,7 @@ externalType fs
 --
 externalClass :: FastString -> DsM Class
 externalClass fs 
-  = do { tycon <- lookupDAPPRdrEnv (mkClsOccFS fs) >>= dsLookupTyCon
+  = do { tycon <- dsLookupDPHRdrEnv (mkClsOccFS fs) >>= dsLookupTyCon
        ; case tyConClass_maybe tycon of
            Nothing  -> pprPanic "Vectorise.Builtins.Initialise" $ 
                          ptext (sLit "Data.Array.Parallel.Prim.") <> 

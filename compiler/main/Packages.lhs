@@ -727,8 +727,8 @@ mkPackageState dflags pkgs0 preload0 this_package = do
       flags = reverse (packageFlags dflags) ++ dphPackage
       -- expose the appropriate DPH backend library
       dphPackage = case dphBackend dflags of
-                     DPHPar  -> [ExposePackage "dph-prim-par", ExposePackage "dph-par"]
-                     DPHSeq  -> [ExposePackage "dph-prim-seq", ExposePackage "dph-seq"]
+                     DPHPar  -> [ExposePackage "dph-par"]
+                     DPHSeq  -> [ExposePackage "dph-seq"]
                      DPHThis -> []
                      DPHNone -> []
 

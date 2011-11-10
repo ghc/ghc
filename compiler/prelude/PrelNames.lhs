@@ -156,7 +156,6 @@ basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
  ++ typeableClassNames
- ++ dphKnownKeyNames dphSeqPackageId ++ dphKnownKeyNames dphParPackageId
  ++ [   -- Type constructors (synonyms especially)
         ioTyConName, ioDataConName,
         runMainIOName,
@@ -306,20 +305,6 @@ genericTyConNames = [
     d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
     repTyConName, rep1TyConName
   ]
-
--- Know names from the DPH package which vary depending on the selected DPH backend.
---
-dphKnownKeyNames :: PackageId -> [Name]
-dphKnownKeyNames dphPkg
-  = map ($ dphPkg)
-    [
-        -- Parallel array operations
-          nullPName, lengthPName, replicatePName,       singletonPName, mapPName,
-          filterPName, zipPName, crossMapPName, indexPName,
-          toPName, emptyPName, appPName,
-        enumFromToPName, enumFromThenToPName
-
-    ]
 \end{code}
 
 
@@ -399,12 +384,6 @@ rANDOM          = mkBaseModule (fsLit "System.Random")
 gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
 
-dATA_ARRAY_PARALLEL_PRIM :: PackageId -> Module
-dATA_ARRAY_PARALLEL_PRIM pkg = mkModule pkg (mkModuleNameFS (fsLit "Data.Array.Parallel.Prim"))
-
-gHC_PARR :: PackageId -> Module
-gHC_PARR pkg = mkModule pkg (mkModuleNameFS (fsLit "Data.Array.Parallel"))
-
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
 
@@ -422,6 +401,10 @@ iNTERACTIVE    = mkMainModule (fsLit ":Interactive")
 pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")
 mAIN_NAME      = mkModuleNameFS (fsLit "Main")
+
+dATA_ARRAY_PARALLEL_NAME, dATA_ARRAY_PARALLEL_PRIM_NAME :: ModuleName
+dATA_ARRAY_PARALLEL_NAME      = mkModuleNameFS (fsLit "Data.Array.Parallel")
+dATA_ARRAY_PARALLEL_PRIM_NAME = mkModuleNameFS (fsLit "Data.Array.Parallel.Prim")
 
 mkPrimModule :: FastString -> Module
 mkPrimModule m = mkModule primPackageId (mkModuleNameFS m)
@@ -963,26 +946,6 @@ gen1ClassName = clsQual gHC_GENERICS (fsLit "Generic1") gen1ClassKey
 datatypeClassName = clsQual gHC_GENERICS (fsLit "Datatype") datatypeClassKey
 constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
 selectorClassName = clsQual gHC_GENERICS (fsLit "Selector") selectorClassKey
-
--- parallel array types and functions
-enumFromToPName, enumFromThenToPName, nullPName, lengthPName,
-    singletonPName, replicatePName, mapPName, filterPName,
-    zipPName, crossMapPName, indexPName, toPName,
-    emptyPName, appPName :: PackageId -> Name
-enumFromToPName     pkg = varQual (gHC_PARR pkg) (fsLit "enumFromToP")     enumFromToPIdKey
-enumFromThenToPName pkg = varQual (gHC_PARR pkg) (fsLit "enumFromThenToP") enumFromThenToPIdKey
-nullPName           pkg = varQual (gHC_PARR pkg) (fsLit "nullP")           nullPIdKey
-lengthPName         pkg = varQual (gHC_PARR pkg) (fsLit "lengthP")         lengthPIdKey
-singletonPName      pkg = varQual (gHC_PARR pkg) (fsLit "singletonP")      singletonPIdKey
-replicatePName      pkg = varQual (gHC_PARR pkg) (fsLit "replicateP")      replicatePIdKey
-mapPName            pkg = varQual (gHC_PARR pkg) (fsLit "mapP")            mapPIdKey
-filterPName         pkg = varQual (gHC_PARR pkg) (fsLit "filterP")         filterPIdKey
-zipPName            pkg = varQual (gHC_PARR pkg) (fsLit "zipP")            zipPIdKey
-crossMapPName       pkg = varQual (gHC_PARR pkg) (fsLit "crossMapP")       crossMapPIdKey
-indexPName          pkg = varQual (gHC_PARR pkg) (fsLit "!:")              indexPIdKey
-toPName             pkg = varQual (gHC_PARR pkg) (fsLit "toP")             toPIdKey
-emptyPName          pkg = varQual (gHC_PARR pkg) (fsLit "emptyP")          emptyPIdKey
-appPName            pkg = varQual (gHC_PARR pkg) (fsLit "+:+")             appPIdKey
 
 -- IO things
 ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
@@ -1538,25 +1501,6 @@ dollarIdKey           = mkPreludeMiscIdUnique 123
 
 coercionTokenIdKey :: Unique
 coercionTokenIdKey    = mkPreludeMiscIdUnique 124
-
--- Parallel array functions
-singletonPIdKey, nullPIdKey, lengthPIdKey, replicatePIdKey, mapPIdKey,
-    filterPIdKey, zipPIdKey, crossMapPIdKey, indexPIdKey, toPIdKey,
-    enumFromToPIdKey, enumFromThenToPIdKey, emptyPIdKey, appPIdKey :: Unique
-singletonPIdKey               = mkPreludeMiscIdUnique 130
-nullPIdKey                    = mkPreludeMiscIdUnique 131
-lengthPIdKey                  = mkPreludeMiscIdUnique 132
-replicatePIdKey               = mkPreludeMiscIdUnique 133
-mapPIdKey                     = mkPreludeMiscIdUnique 134
-filterPIdKey                  = mkPreludeMiscIdUnique 135
-zipPIdKey                     = mkPreludeMiscIdUnique 136
-crossMapPIdKey                = mkPreludeMiscIdUnique 137
-indexPIdKey                   = mkPreludeMiscIdUnique 138
-toPIdKey                      = mkPreludeMiscIdUnique 139
-enumFromToPIdKey              = mkPreludeMiscIdUnique 140
-enumFromThenToPIdKey          = mkPreludeMiscIdUnique 141
-emptyPIdKey                   = mkPreludeMiscIdUnique 142
-appPIdKey                     = mkPreludeMiscIdUnique 143
 
 -- dotnet interop
 unmarshalObjectIdKey, marshalObjectIdKey, marshalStringIdKey,
