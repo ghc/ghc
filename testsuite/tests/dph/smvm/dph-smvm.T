@@ -15,15 +15,15 @@ elif config.platform.startswith('sparc-'):
 
 
 if testFile != 'nothing':
- test   ('dph-smvm' 
+ test   ('dph-smvm'
         , [ alone
           , skip_if_fast
           , reqlib('dph-par')
           , reqlib('dph-prim-par')
-          , only_ways(['normal', 'threaded1', 'threaded2']) 
+          , only_ways(['normal', 'threaded1', 'threaded2'])
           , extra_run_opts(testFile + " " + outFile)
-          ] 
-        , multimod_compile_and_run 
+          ]
+        , multimod_compile_and_run
         , [ 'Main'
           , '-Odph -package dph-par'])
 
