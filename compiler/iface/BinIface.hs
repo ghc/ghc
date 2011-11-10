@@ -475,6 +475,7 @@ instance Binary ModIface where
                  mi_boot      = is_boot,
                  mi_iface_hash= iface_hash,
                  mi_mod_hash  = mod_hash,
+                 mi_flag_hash = flag_hash,
                  mi_orphan    = orphan,
                  mi_finsts    = hasFamInsts,
                  mi_deps      = deps,
@@ -498,6 +499,7 @@ instance Binary ModIface where
         put_ bh is_boot
         put_ bh iface_hash
         put_ bh mod_hash
+        put_ bh flag_hash
         put_ bh orphan
         put_ bh hasFamInsts
         lazyPut bh deps
@@ -523,6 +525,7 @@ instance Binary ModIface where
         is_boot     <- get bh
         iface_hash  <- get bh
         mod_hash    <- get bh
+        flag_hash   <- get bh
         orphan      <- get bh
         hasFamInsts <- get bh
         deps        <- lazyGet bh
@@ -547,6 +550,7 @@ instance Binary ModIface where
                  mi_boot        = is_boot,
                  mi_iface_hash  = iface_hash,
                  mi_mod_hash    = mod_hash,
+                 mi_flag_hash   = flag_hash,
                  mi_orphan      = orphan,
                  mi_finsts      = hasFamInsts,
                  mi_deps        = deps,

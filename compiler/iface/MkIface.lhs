@@ -57,6 +57,8 @@ Basic idea:
 
 import IfaceSyn
 import LoadIface
+import FlagChecker
+
 import Id
 import IdInfo
 import Demand
@@ -285,13 +287,14 @@ mkIface_ hsc_env maybe_old_fingerprint
                         mi_anns        = mkIfaceAnnotations anns,
                         mi_globals     = Just rdr_env,
 
-                        -- Left out deliberately: filled in by addVersionInfo
+                        -- Left out deliberately: filled in by addFingerprints
                         mi_iface_hash  = fingerprint0,
                         mi_mod_hash    = fingerprint0,
+                        mi_flag_hash   = fingerprint0,
                         mi_exp_hash    = fingerprint0,
                         mi_used_th     = used_th,
                         mi_orphan_hash = fingerprint0,
-                        mi_orphan      = False, -- Always set by addVersionInfo, but
+                        mi_orphan      = False, -- Always set by addFingerprints, but
                                                 -- it's a strict field, so we can't omit it.
                         mi_finsts      = False, -- Ditto
                         mi_decls       = deliberatelyOmitted "decls",
@@ -337,7 +340,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 
                 -- bug #1617: on reload we weren't updating the PrintUnqualified
                 -- correctly.  This stems from the fact that the interface had
-                -- not changed, so addVersionInfo returns the old ModIface
+                -- not changed, so addFingerprints returns the old ModIface
                 -- with the old GlobalRdrEnv (mi_globals).
         ; let final_iface = new_iface{ mi_globals = Just rdr_env }
 
@@ -560,6 +563,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- put the declarations in a canonical order, sorted by OccName
    let sorted_decls = Map.elems $ Map.fromList $
                           [(ifName d, e) | e@(_, d) <- decls_w_hashes]
+   
+   -- the flag hash depends on:
+   --   - (some of) dflags
+   -- it returns two hashes, one that shouldn't change
+   -- the abi hash and one that should
+   flag_hash <- fingerprintDynFlags dflags putNameLiterally
 
    -- the ABI hash depends on:
    --   - decls
@@ -567,6 +576,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - orphans
    --   - deprecations
    --   - vect info
+   --   - flag abi hash
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,
@@ -575,10 +585,10 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                        mi_vect_info iface0)
 
    -- The interface hash depends on:
-   --    - the ABI hash, plus
-   --    - usages
-   --    - deps
-   --    - hpc
+   --   - the ABI hash, plus
+   --   - usages
+   --   - deps
+   --   - hpc
    iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash, 
                        mi_usages iface0,
@@ -593,6 +603,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_iface_hash  = iface_hash,
                 mi_exp_hash    = export_hash,
                 mi_orphan_hash = orphan_hash,
+                mi_flag_hash   = flag_hash,
                 mi_orphan      = not (null orph_rules && null orph_insts
                                       && null (ifaceVectInfoVar (mi_vect_info iface0))),
                 mi_finsts      = not . null $ mi_fam_insts iface0,
@@ -1043,12 +1054,18 @@ Trac #5362 for an example.  Such Names are always
 %************************************************************************
 %*                                                                      *
         Load the old interface file for this module (unless
-        we have it aleady), and check whether it is up to date
+        we have it already), and check whether it is up to date
         
 %*                                                                      *
 %************************************************************************
 
 \begin{code}
+-- | Top level function to check if the version of an old interface file
+-- is equivalent to the current source file the user asked us to compile.
+-- If the same, we can avoid recompilation. We return a tuple where the
+-- first element is a bool saying if we should recompile the object file
+-- and the second is maybe the interface file, where Nothng means to
+-- rebuild the interface file not use the exisitng one.
 checkOldIface :: HscEnv
               -> ModSummary
               -> SourceModified
@@ -1066,69 +1083,76 @@ check_old_iface :: HscEnv -> ModSummary -> SourceModified -> Maybe ModIface
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
         getIface =
-             case maybe_iface of
-                 Just _  -> do
-                     traceIf (text "We already have the old interface for" <+> ppr (ms_mod mod_summary))
-                     return maybe_iface
-                 Nothing -> do
-                     let iface_path = msHiFilePath mod_summary
-                     read_result <- readIface (ms_mod mod_summary) iface_path False
-                     case read_result of
-                         Failed err -> do
-                             traceIf (text "FYI: cannont read old interface file:" $$ nest 4 err)
-                             return Nothing
-                         Succeeded iface -> do
-                             traceIf (text "Read the interface file" <+> text iface_path)
-                             return $ Just iface
+            case maybe_iface of
+                Just _  -> do
+                    traceIf (text "We already have the old interface for" <+> ppr (ms_mod mod_summary))
+                    return maybe_iface
+                Nothing -> loadIface
 
+        loadIface = do
+             let iface_path = msHiFilePath mod_summary
+             read_result <- readIface (ms_mod mod_summary) iface_path False
+             case read_result of
+                 Failed err -> do
+                     traceIf (text "FYI: cannont read old interface file:" $$ nest 4 err)
+                     return Nothing
+                 Succeeded iface -> do
+                     traceIf (text "Read the interface file" <+> text iface_path)
+                     return $ Just iface
+
+        src_changed
+            | dopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
+            | SourceModified <- src_modified = True
+            | otherwise = False
     in do
-         let src_changed
-              | dopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
-              | SourceModified <- src_modified = True
-              | otherwise = False
+        when src_changed $
+            traceHiDiffs (nest 4 $ text "Source file changed or recompilation check turned off")
 
-         when src_changed
-             (traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
+        case src_changed of
+            -- If the source has changed and we're in interactive mode,
+            -- avoid reading an interface; just return the one we might
+            -- have been supplied with.
+            True | not (isObjectTarget $ hscTarget dflags) ->
+                return (outOfDate, maybe_iface)
 
-         -- If the source has changed and we're in interactive mode,
-         -- avoid reading an interface; just return the one we might
-         -- have been supplied with.
-         if not (isObjectTarget $ hscTarget dflags) && src_changed
-            then return (outOfDate, maybe_iface)
-            else do
-                -- Try and read the old interface for the current module
-                -- from the .hi file left from the last time we compiled it
+            -- Try and read the old interface for the current module
+            -- from the .hi file left from the last time we compiled it
+            True -> do
                 maybe_iface' <- getIface
-                if src_changed
-                   then return (outOfDate, maybe_iface')
-                   else do
+                return (outOfDate, maybe_iface')
+
+            False -> do
+                maybe_iface' <- getIface
                 case maybe_iface' of
-                    Nothing -> return (outOfDate, maybe_iface')
-                    Just iface ->
-                      -- We have got the old iface; check its versions
-                      -- even in the SourceUnmodifiedAndStable case we
-                      -- should check versions because some packages
-                      -- might have changed or gone away.
-                      checkVersions hsc_env mod_summary iface
-\end{code}
+                    -- We can't retrieve the iface
+                    Nothing    -> return (outOfDate, Nothing)
 
-@recompileRequired@ is called from the HscMain.   It checks whether
-a recompilation is required.  It needs access to the persistent state,
-finder, etc, because it may have to load lots of interface files to
-check their versions.
+                    -- We have got the old iface; check its versions
+                    -- even in the SourceUnmodifiedAndStable case we
+                    -- should check versions because some packages
+                    -- might have changed or gone away.
+                    Just iface -> checkVersions hsc_env mod_summary iface
 
-\begin{code}
+-- | @recompileRequired@ is called from the HscMain.   It checks whether
+-- a recompilation is required.  It needs access to the persistent state,
+-- finder, etc, because it may have to load lots of interface files to
+-- check their versions.
 type RecompileRequired = Bool
 upToDate, outOfDate :: Bool
-upToDate  = False       -- Recompile not required
-outOfDate = True        -- Recompile required
+upToDate  = False  -- Recompile not required
+outOfDate = True   -- Recompile required
 
--- | Check the safe haskell flags haven't changed
---   (e.g different flag on command line now)
-safeHsChanged :: HscEnv -> ModIface -> Bool
-safeHsChanged hsc_env iface
-  = (getSafeMode $ mi_trust iface) /= (safeHaskell $ hsc_dflags hsc_env)
-
+-- | Check if a module is still the same 'version'.
+--
+-- This function is called in the recompilation checker after we have
+-- determined that the module M being checked hasn't had any changes
+-- to its source file since we last compiled M. So at this point in general
+-- two things may have changed that mean we should recompile M:
+--   * The interface export by a dependency of M has changed.
+--   * The compiler flags specified this time for M have changed
+--     in a manner that is significant for recompilaiton.
+-- We return not just if we should recompile the object file but also
+-- if we should rebuild the interface file.
 checkVersions :: HscEnv
               -> ModSummary
               -> ModIface       -- Old interface
@@ -1137,9 +1161,10 @@ checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
+       ; recomp <- checkFlagHash hsc_env iface
+       ; if recomp then return (outOfDate, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
        ; if recomp then return (outOfDate, Just iface) else do {
-       ; if trust_dif then return (outOfDate, Nothing) else do {
 
        -- Source code unchanged and no errors yet... carry on
        --
@@ -1159,12 +1184,21 @@ checkVersions hsc_env mod_summary iface
        ; return (recomp, Just iface)
     }}}
   where
-    this_pkg  = thisPackage (hsc_dflags hsc_env)
-    trust_dif = safeHsChanged hsc_env iface
+    this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
+-- | Check the safe haskell flags haven't changed
+--   (e.g different flag on command line now)
+checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
+checkFlagHash hsc_env iface = do
+    let old_hash = mi_flag_hash iface
+    new_hash <- liftIO $ fingerprintDynFlags (hsc_dflags hsc_env) putNameLiterally
+    case old_hash == new_hash of
+        True  -> up_to_date (ptext $ sLit "Module flags unchanged")
+        False -> out_of_date_hash (ptext $ sLit "  Module flags have changed")
+                     old_hash new_hash
 
 -- If the direct imports of this module are resolved to targets that
 -- are not among the dependencies of the previous interface file,
@@ -1233,11 +1267,10 @@ needInterface mod continue
       Succeeded iface -> continue iface
 
 
-checkModUsage :: PackageId ->Usage -> IfG RecompileRequired
--- Given the usage information extracted from the old
+-- | Given the usage information extracted from the old
 -- M.hi file for the module being compiled, figure out
 -- whether M needs to be recompiled.
-
+checkModUsage :: PackageId -> Usage -> IfG RecompileRequired
 checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash }
@@ -1283,9 +1316,8 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file, usg_mtime = old_mtime }
   return $ old_mtime /= new_mtime
 
 
-
 ------------------------
-checkModuleFingerprint :: Fingerprint -> Fingerprint -> IfG Bool
+checkModuleFingerprint :: Fingerprint -> Fingerprint -> IfG RecompileRequired
 checkModuleFingerprint old_mod_hash new_mod_hash
   | new_mod_hash == old_mod_hash
   = up_to_date (ptext (sLit "Module fingerprint unchanged"))
@@ -1306,7 +1338,7 @@ checkMaybeHash maybe_old_hash new_hash doc continue
 ------------------------
 checkEntityUsage :: (OccName -> Maybe (OccName, Fingerprint))
                  -> (OccName, Fingerprint)
-                 -> IfG Bool
+                 -> IfG RecompileRequired
 checkEntityUsage new_hash (name,old_hash)
   = case new_hash name of
 
@@ -1319,11 +1351,11 @@ checkEntityUsage new_hash (name,old_hash)
           | otherwise            -> out_of_date_hash (ptext (sLit "  Out of date:") <+> ppr name)
                                                      old_hash new_hash
 
-up_to_date, out_of_date :: SDoc -> IfG Bool
+up_to_date, out_of_date :: SDoc -> IfG RecompileRequired
 up_to_date  msg = traceHiDiffs msg >> return upToDate
 out_of_date msg = traceHiDiffs msg >> return outOfDate
 
-out_of_date_hash :: SDoc -> Fingerprint -> Fingerprint -> IfG Bool
+out_of_date_hash :: SDoc -> Fingerprint -> Fingerprint -> IfG RecompileRequired
 out_of_date_hash msg old_hash new_hash 
   = out_of_date (hsep [msg, ppr old_hash, ptext (sLit "->"), ppr new_hash])
 

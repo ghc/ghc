@@ -622,6 +622,8 @@ data ModIface
         mi_module     :: !Module,             -- ^ Name of the module we are for
         mi_iface_hash :: !Fingerprint,        -- ^ Hash of the whole interface
         mi_mod_hash   :: !Fingerprint,        -- ^ Hash of the ABI only
+        mi_flag_hash  :: !Fingerprint,        -- ^ Hash of the important flags
+                                              -- used when compiling this module
 
         mi_orphan     :: !WhetherHasOrphans,  -- ^ Whether this module has orphans
         mi_finsts     :: !WhetherHasFamInst,  -- ^ Whether this module has family instances
@@ -732,6 +734,7 @@ emptyModIface mod
   = ModIface { mi_module      = mod,
                mi_iface_hash  = fingerprint0,
                mi_mod_hash    = fingerprint0,
+               mi_flag_hash   = fingerprint0,
                mi_orphan      = False,
                mi_finsts      = False,
                mi_boot        = False,
@@ -1568,7 +1571,7 @@ data Dependencies
                         -- instances are from the home or an external package)
          }
   deriving( Eq )
-        -- Equality used only for old/new comparison in MkIface.addVersionInfo
+        -- Equality used only for old/new comparison in MkIface.addFingerprints
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
 noDependencies :: Dependencies

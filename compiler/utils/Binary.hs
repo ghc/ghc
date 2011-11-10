@@ -447,20 +447,30 @@ instance (Binary a, Binary b, Binary c) => Binary (a,b,c) where
 
 instance (Binary a, Binary b, Binary c, Binary d) => Binary (a,b,c,d) where
     put_ bh (a,b,c,d) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d
-    get bh          = do a <- get bh
-                         b <- get bh
-                         c <- get bh
-                         d <- get bh
-                         return (a,b,c,d)
+    get bh            = do a <- get bh
+                           b <- get bh
+                           c <- get bh
+                           d <- get bh
+                           return (a,b,c,d)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a,b,c,d, e) where
     put_ bh (a,b,c,d, e) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e;
-    get bh          = do a <- get bh
-                         b <- get bh
-                         c <- get bh
-                         d <- get bh
-                         e <- get bh
-                         return (a,b,c,d,e)
+    get bh               = do a <- get bh
+                              b <- get bh
+                              c <- get bh
+                              d <- get bh
+                              e <- get bh
+                              return (a,b,c,d,e)
+
+instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary (a,b,c,d, e, f) where
+    put_ bh (a,b,c,d, e, f) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e; put_ bh f;
+    get bh                  = do a <- get bh
+                                 b <- get bh
+                                 c <- get bh
+                                 d <- get bh
+                                 e <- get bh
+                                 f <- get bh
+                                 return (a,b,c,d,e,f)
 
 instance Binary a => Binary (Maybe a) where
     put_ bh Nothing  = putByte bh 0
