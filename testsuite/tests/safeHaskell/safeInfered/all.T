@@ -8,20 +8,45 @@ def f( opts ):
 setTestOpts(f)
 
 # Tests that should compile fine as they should be infered safe
-test('SafeInfered01', normal, multimod_compile, ['SafeInfered01', ''])
-test('SafeInfered02', normal, multimod_compile, ['SafeInfered02', ''])
-test('SafeInfered03', normal, multimod_compile, ['SafeInfered03', ''])
-test('SafeInfered04', normal, multimod_compile, ['SafeInfered04', ''])
+test('SafeInfered01',
+     [ extra_clean(['SafeInfered01_A.hi', 'SafeInfered01_A.o']) ],
+     multimod_compile, ['SafeInfered01', ''])
+test('SafeInfered02',
+     [ extra_clean(['SafeInfered02_A.hi', 'SafeInfered02_A.o']) ],
+     multimod_compile, ['SafeInfered02', ''])
+test('SafeInfered03',
+     [ extra_clean(['SafeInfered03_A.hi', 'SafeInfered03_A.o']) ],
+      multimod_compile, ['SafeInfered03', ''])
+test('SafeInfered04',
+     [ extra_clean(['SafeInfered04_A.hi', 'SafeInfered04_A.o']) ],
+     multimod_compile, ['SafeInfered04', ''])
 
 # Tests that should fail to compile as they should be infered unsafe
-test('UnsafeInfered01', normal, multimod_compile_fail, ['UnsafeInfered01', ''])
-test('UnsafeInfered02', normal, multimod_compile_fail, ['UnsafeInfered02', ''])
-test('UnsafeInfered03', normal, multimod_compile_fail, ['UnsafeInfered03', ''])
-test('UnsafeInfered05', normal, multimod_compile_fail, ['UnsafeInfered05', ''])
-test('UnsafeInfered06', normal, multimod_compile_fail, ['UnsafeInfered06', ''])
-test('UnsafeInfered07', normal, multimod_compile_fail, ['UnsafeInfered07', ''])
-test('UnsafeInfered08', normal, multimod_compile_fail, ['UnsafeInfered08', ''])
-test('UnsafeInfered09', normal, multimod_compile_fail, ['UnsafeInfered09', ''])
+test('UnsafeInfered01',
+     [ extra_clean(['UnsafeInfered01_A.hi', 'UnsafeInfered01_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered01', ''])
+test('UnsafeInfered02',
+     [ extra_clean(['UnsafeInfered02_A.hi', 'UnsafeInfered02_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered02', ''])
+test('UnsafeInfered03',
+     [ extra_clean(['UnsafeInfered03_A.hi', 'UnsafeInfered03_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered03', ''])
+test('UnsafeInfered05',
+     [ extra_clean(['UnsafeInfered05_A.hi', 'UnsafeInfered05_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered05', ''])
+test('UnsafeInfered06',
+     [ extra_clean(['UnsafeInfered06_A.hi', 'UnsafeInfered06_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered06', ''])
+test('UnsafeInfered07',
+     [ extra_clean(['UnsafeInfered07_A.hi', 'UnsafeInfered07_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered07', ''])
+test('UnsafeInfered08',
+     [ extra_clean(['UnsafeInfered08_A.hi', 'UnsafeInfered08_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered08', ''])
+test('UnsafeInfered09',
+     [ extra_clean(['UnsafeInfered09_A.hi', 'UnsafeInfered09_A.o',
+                    'UnsafeInfered09_B.hi', 'UnsafeInfered09_B.o']) ],
+     multimod_compile_fail, ['UnsafeInfered09', ''])
 
 # Mixed tests
 test('Mixed01', normal, compile_fail, [''])
