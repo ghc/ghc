@@ -8,7 +8,7 @@ test    ('dph-dotp-opt'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -fdph-par -package dph-prim-par'])
+          , '-Odph -package dph-par -package dph-prim-par'])
 
 test    ('dph-dotp-fast' 
         , [ extra_clean(['Main.o', 'Main.hi', 'DotPVect.hi', 'DotPVect.o'])
@@ -17,6 +17,5 @@ test    ('dph-dotp-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -fdph-par -package dph-prim-par'])
-
+          , '-O -fno-enable-rewrite-rules -package dph-par -package dph-prim-par'])
 

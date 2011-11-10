@@ -8,7 +8,7 @@ test    ('dph-words-opt'
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -fdph-par -package dph-prim-par -fno-liberate-case'])
+          , '-Odph -package dph-par -package dph-prim-par -fno-liberate-case'])
 
 
 test    ('dph-words-fast' 
@@ -18,6 +18,5 @@ test    ('dph-words-fast'
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -fdph-par -package dph-prim-par'])
-
+          , '-O -fno-enable-rewrite-rules -package dph-par -package dph-prim-par'])
 

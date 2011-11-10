@@ -7,6 +7,5 @@ test    ('dph-sumnats'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -fdph-par'])
-
+          , '-Odph -package dph-par'])
 

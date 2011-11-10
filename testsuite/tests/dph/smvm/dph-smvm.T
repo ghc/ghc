@@ -25,6 +25,5 @@ if testFile != 'nothing':
           ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -fdph-par'])
-
+          , '-Odph -package dph-par'])
 

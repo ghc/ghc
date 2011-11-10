@@ -8,7 +8,7 @@ test    ('dph-diophantine-opt'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -fdph-par'])
+          , '-Odph -package dph-par'])
 
 test    ('dph-diophantine-fast' 
         , [ reqlib('dph-par')
@@ -19,5 +19,5 @@ test    ('dph-diophantine-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -fdph-par'])
+          , '-O -fno-enable-rewrite-rules -package dph-par'])
 
