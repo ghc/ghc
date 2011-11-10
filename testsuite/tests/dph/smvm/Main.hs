@@ -18,7 +18,7 @@ loadSM  :: String
 loadSM s
   = do
       (segd, m, v) <- loadSM' s
-      return $ (nestUSegdPA' segd (fromUArrPA_2' m), fromUArrPA' v)
+      return $ (nestUSegd segd (fromUArray2 m), fromUArray v)
 
 
 loadSM' :: String
