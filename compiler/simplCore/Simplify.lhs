@@ -1062,7 +1062,11 @@ simplTick env tickish expr cont
   = do { let (inc,outc) = splitCont cont
        ; (env', expr') <- simplExprF (zapFloats env) expr inc
        ; let tickish' = simplTickish env tickish
-       ; let env'' = addFloats env (mapFloatRhss env' (mkTick (mkNoTick tickish')))
+       ; let wrap_float (b,rhs) = (zapIdStrictness (setIdArity b 0),
+                                   mkTick (mkNoTick tickish') rhs)
+              -- when wrapping a float with mkTick, we better zap the Id's
+              -- strictness info and arity, because it might be wrong now.
+       ; let env'' = addFloats env (mapFloats env' wrap_float)
        ; rebuild env'' expr' (TickIt tickish' outc)
        }
  where

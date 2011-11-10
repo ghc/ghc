@@ -37,7 +37,7 @@ module SimplEnv (
 	-- Floats
   	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
 	wrapFloats, floatBinds, setFloats, zapFloats, addRecFloats,
-        doFloatFromRhs, getFloatBinds, getFloats, mapFloatRhss
+        doFloatFromRhs, getFloatBinds, getFloats, mapFloats
     ) where
 
 #include "HsVersions.h"
@@ -63,7 +63,6 @@ import BasicTypes
 import MonadUtils
 import Outputable
 import FastString
-import Util
 
 import Data.List
 \end{code}
@@ -428,12 +427,12 @@ addNonRec env id rhs
     env { seFloats = seFloats env `addFlts` unitFloat (NonRec id rhs),
 	  seInScope = extendInScopeSet (seInScope env) id }
 
-mapFloatRhss :: SimplEnv -> (CoreExpr -> CoreExpr) -> SimplEnv
-mapFloatRhss env@SimplEnv { seFloats = Floats fs ff } fun
+mapFloats :: SimplEnv -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> SimplEnv
+mapFloats env@SimplEnv { seFloats = Floats fs ff } fun
    = env { seFloats = Floats (mapOL app fs) ff }
    where
-     app (NonRec b e) = NonRec b (fun e)
-     app (Rec bs)     = Rec (mapSnd fun bs)
+     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
+     app (Rec bs)     = Rec (map fun bs)
 
 extendFloats :: SimplEnv -> OutBind -> SimplEnv
 -- Add these bindings to the floats, and extend the in-scope env too
