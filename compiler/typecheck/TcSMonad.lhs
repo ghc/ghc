@@ -214,9 +214,11 @@ isSubKindTcS k1 k2 = wrapTcS (TcM.isSubKindTcM k1 k2)
 
 unifyKindTcS :: Type -> Type     -- Context
              -> Kind -> Kind     -- Corresponding kinds
-             -> TcS ()
+             -> TcS Bool
 unifyKindTcS ty1 ty2 ki1 ki2
-  = wrapTcS (TcM.addErrCtxtM ctxt (TcM.unifyKindEq ki1 ki2))
+  = wrapTcS $ TcM.addErrCtxtM ctxt $ do
+      (_errs, mb_r) <- TcM.tryTc (TcM.unifyKindEq ki1 ki2)
+      return (maybe False (const True) mb_r)
   where ctxt = TcM.mkKindErrorCtxt ty1 ki1 ty2 ki2
 
 deCanonicalise :: CanonicalCt -> FlavoredEvVar
