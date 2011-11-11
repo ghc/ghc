@@ -12,8 +12,10 @@ import DynFlags
 import HscTypes
 import Name
 import Fingerprint
+-- import Outputable
 
 import Data.List (sort)
+import System.FilePath (normalise)
 
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
 -- the finger print on important fields in @DynFlags@ so that
@@ -32,12 +34,14 @@ fingerprintDynFlags DynFlags{..} nameio =
                 sort $ map fromEnum $ extensionFlags)
 
         -- -I, -D and -U flags affect CPP
-        cpp = (includePaths, sOpt_P settings)
+        cpp = (map normalise includePaths, sOpt_P settings)
+            -- normalise: eliminate spurious differences due to "./foo" vs "foo"
 
         -- -i, -osuf, -hcsuf, -hisuf, -odir, -hidir, -stubdir, -o, -ohi
-        paths = (importPaths,
+        paths = (map normalise importPaths,
                    [ objectSuf, hcSuf, hiSuf ],
                    [ objectDir, hiDir, stubDir, outputFile, outputHi ])
 
-    in computeFingerprint nameio (mainis, safeHs, lang, cpp, paths)
+    in -- pprTrace "flags" (ppr (mainis, safeHs, lang, cpp, paths)) $
+       computeFingerprint nameio (mainis, safeHs, lang, cpp, paths)
 
