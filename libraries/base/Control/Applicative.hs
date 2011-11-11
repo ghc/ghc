@@ -48,7 +48,7 @@ module Control.Applicative (
 import Prelude hiding (id,(.))
 
 import Control.Category
-import Control.Arrow (Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
+import Control.Arrow
 import Control.Monad (liftM, ap, MonadPlus(..))
 #ifndef __NHC__
 import Control.Monad.ST.Safe (ST)
@@ -56,6 +56,16 @@ import qualified Control.Monad.ST.Lazy.Safe as Lazy (ST)
 #endif
 import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))
+
+import Text.ParserCombinators.ReadP
+#ifndef __NHC__
+  (ReadP)
+#else
+  (ReadPN)
+#define ReadP (ReadPN b)
+#endif
+
+import Text.ParserCombinators.ReadPrec (ReadPrec)
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Conc (STM, retry, orElse)
@@ -203,6 +213,30 @@ instance Applicative (Either e) where
     pure          = Right
     Left  e <*> _ = Left e
     Right f <*> r = fmap f r
+
+instance Applicative ReadP where
+    pure = return
+    (<*>) = ap
+
+instance Alternative ReadP where
+    empty = mzero
+    (<|>) = mplus
+
+instance Applicative ReadPrec where
+    pure = return
+    (<*>) = ap
+
+instance Alternative ReadPrec where
+    empty = mzero
+    (<|>) = mplus
+
+instance Arrow a => Applicative (ArrowMonad a) where
+   pure x = ArrowMonad (arr (const x))
+   ArrowMonad f <*> ArrowMonad x = ArrowMonad (f &&& x >>> arr (uncurry id))
+
+instance ArrowPlus a => Alternative (ArrowMonad a) where
+   empty = ArrowMonad zeroArrow
+   ArrowMonad x <|> ArrowMonad y = ArrowMonad (x <+> y)
 
 -- new instances
 
