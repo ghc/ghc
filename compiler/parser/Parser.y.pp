@@ -32,7 +32,7 @@ import RdrHsSyn
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
 import Lexer
 import RdrName
-import TysPrim          ( eqPrimTyCon )
+import TysPrim          ( liftedTypeKindTyConName, eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
                           unboxedSingletonTyCon, unboxedSingletonDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
@@ -45,8 +45,7 @@ import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
 import StaticFlags      ( opt_SccProfilingOn, opt_Hpc )
-import Type             ( Kind, liftedTypeKind, unliftedTypeKind )
-import Coercion         ( mkArrowKind )
+import Kind             ( Kind, liftedTypeKind, unliftedTypeKind, mkArrowKind )
 import Class            ( FunDep )
 import BasicTypes
 import DynFlags
@@ -310,6 +309,7 @@ incorrect.
  ';'            { L _ ITsemi }
  ','            { L _ ITcomma }
  '`'            { L _ ITbackquote }
+ SIMPLEQUOTE    { L _ ITsimpleQuote      }     -- 'x
 
  VARID          { L _ (ITvarid    _) }          -- identifiers
  CONID          { L _ (ITconid    _) }
@@ -349,7 +349,6 @@ incorrect.
 '|]'            { L _ ITcloseQuote    }
 TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
 '$('            { L _ ITparenEscape   }     -- $( exp )
-TH_VAR_QUOTE    { L _ ITvarQuote      }     -- 'x
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 
@@ -718,9 +717,9 @@ data_or_newtype :: { Located NewOrData }
         : 'data'        { L1 DataType }
         | 'newtype'     { L1 NewType }
 
-opt_kind_sig :: { Located (Maybe Kind) }
+opt_kind_sig :: { Located (Maybe (LHsKind RdrName)) }
         :                               { noLoc Nothing }
-        | '::' kind                     { LL (Just (unLoc $2)) }
+        | '::' kind                     { LL (Just $2) }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
@@ -968,8 +967,8 @@ sigtypes1 :: { [LHsType RdrName] }      -- Always HsForAllTys
 -- Types
 
 infixtype :: { LHsType RdrName }
-        : btype qtyconop type         { LL $ HsOpTy $1 $2 $3 }
-        | btype tyvarop  type    { LL $ HsOpTy $1 $2 $3 }
+        : btype qtyconop type         { LL $ mkHsOpTy $1 $2 $3 }
+        | btype tyvarop  type    { LL $ mkHsOpTy $1 $2 $3 }
 
 strict_mark :: { Located HsBang }
         : '!'                           { L1 HsStrict }
@@ -1020,18 +1019,21 @@ context :: { LHsContext RdrName }
 
 type :: { LHsType RdrName }
         : btype                         { $1 }
-        | btype qtyconop type           { LL $ HsOpTy $1 $2 $3 }
-        | btype tyvarop  type           { LL $ HsOpTy $1 $2 $3 }
+        | btype qtyconop type           { LL $ mkHsOpTy $1 $2 $3 }
+        | btype tyvarop  type           { LL $ mkHsOpTy $1 $2 $3 }
         | btype '->'     ctype          { LL $ HsFunTy $1 $3 }
         | btype '~'      btype          { LL $ HsEqTy $1 $3 }
+                                        -- see Note [Promotion]
+        | btype SIMPLEQUOTE qconop type     { LL $ mkHsOpTy $1 $3 $4 }
+        | btype SIMPLEQUOTE varop  type     { LL $ mkHsOpTy $1 $3 $4 }
 
 typedoc :: { LHsType RdrName }
         : btype                          { $1 }
         | btype docprev                  { LL $ HsDocTy $1 $2 }
-        | btype qtyconop type            { LL $ HsOpTy $1 $2 $3 }
-        | btype qtyconop type docprev    { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
-        | btype tyvarop  type            { LL $ HsOpTy $1 $2 $3 }
-        | btype tyvarop  type docprev    { LL $ HsDocTy (L (comb3 $1 $2 $3) (HsOpTy $1 $2 $3)) $4 }
+        | btype qtyconop type            { LL $ mkHsOpTy $1 $2 $3 }
+        | btype qtyconop type docprev    { LL $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
+        | btype tyvarop  type            { LL $ mkHsOpTy $1 $2 $3 }
+        | btype tyvarop  type docprev    { LL $ HsDocTy (L (comb3 $1 $2 $3) (mkHsOpTy $1 $2 $3)) $4 }
         | btype '->'     ctypedoc        { LL $ HsFunTy $1 $3 }
         | btype docprev '->' ctypedoc    { LL $ HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2)) $4 }
         | btype '~'      btype           { LL $ HsEqTy $1 $3 }
@@ -1050,11 +1052,17 @@ atype :: { LHsType RdrName }
         | '[' ctype ']'                 { LL $ HsListTy  $2 }
         | '[:' ctype ':]'               { LL $ HsPArrTy  $2 }
         | '(' ctype ')'                 { LL $ HsParTy   $2 }
-        | '(' ctype '::' kind ')'       { LL $ HsKindSig $2 (unLoc $4) }
+        | '(' ctype '::' kind ')'       { LL $ HsKindSig $2 $4 }
         | quasiquote                    { L1 (HsQuasiQuoteTy (unLoc $1)) }
         | '$(' exp ')'                  { LL $ mkHsSpliceTy $2 }
-        | TH_ID_SPLICE                  { LL $ mkHsSpliceTy $ L1 $ HsVar $ 
+        | TH_ID_SPLICE                  { LL $ mkHsSpliceTy $ L1 $ HsVar $
                                           mkUnqual varName (getTH_ID_SPLICE $1) }
+                                                      -- see Note [Promotion] for the followings
+        | SIMPLEQUOTE qconid                          { LL $ HsTyVar $ unLoc $2 }
+        | SIMPLEQUOTE  '(' ')'                        { LL $ HsTyVar $ getRdrName unitDataCon }
+        | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')' { LL $ HsExplicitTupleTy [] ($3 : $5) }
+        | SIMPLEQUOTE  '[' comma_types0 ']'           { LL $ HsExplicitListTy placeHolderKind $3 }
+        | '[' ctype ',' comma_types1 ']'              { LL $ HsExplicitListTy placeHolderKind ($2 : $4) }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -1081,8 +1089,7 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
         : tyvar                         { L1 (UserTyVar (unLoc $1) placeHolderKind) }
-        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) 
-                                                          (unLoc $4)) }
+        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) $4 placeHolderKind) }
 
 fds :: { Located [Located (FunDep RdrName)] }
         : {- empty -}                   { noLoc [] }
@@ -1103,15 +1110,55 @@ varids0 :: { Located [RdrName] }
 -----------------------------------------------------------------------------
 -- Kinds
 
-kind    :: { Located Kind }
-        : akind                 { $1 }
-        | akind '->' kind       { LL (mkArrowKind (unLoc $1) (unLoc $3)) }
+kind :: { LHsKind RdrName }
+        : bkind                  { $1 }
+        | bkind '->' kind        { LL $ HsFunTy $1 $3 }
 
-akind   :: { Located Kind }
-        : '*'                   { L1 liftedTypeKind }
-        | '!'                   { L1 unliftedTypeKind }
-        | CONID                 {% checkKindName (L1 (getCONID $1)) }
-        | '(' kind ')'          { LL (unLoc $2) }
+bkind :: { LHsKind RdrName }
+        : akind                  { $1 }
+        | bkind akind            { LL $ HsAppTy $1 $2 }
+
+akind :: { LHsKind RdrName }
+        : '*'                    { L1 $ HsTyVar (nameRdrName liftedTypeKindTyConName) }
+        | '(' kind ')'           { LL $ HsParTy $2 }
+        | pkind                  { $1 }
+
+pkind :: { LHsKind RdrName }  -- promoted type, see Note [Promotion]
+        : qtycon                          { L1 $ HsTyVar $ unLoc $1 }
+        | '(' ')'                         { LL $ HsTyVar $ getRdrName unitTyCon }
+        | '(' kind ',' comma_kinds1 ')'   { LL $ HsTupleTy (HsBoxyTuple placeHolderKind) ($2 : $4) }
+        | '[' kind ']'                    { LL $ HsListTy $2 }
+
+comma_kinds1 :: { [LHsKind RdrName] }
+        : kind                          { [$1] }
+        | kind  ',' comma_kinds1        { $1 : $3 }
+
+{- Note [Promotion]
+   ~~~~~~~~~~~~~~~~
+
+- Syntax of promoted qualified names
+We write 'Nat.Zero instead of Nat.'Zero when dealing with qualified
+names. Moreover ticks are only allowed in types, not in kinds, for a
+few reasons:
+  1. we don't need quotes since we cannot define names in kinds
+  2. if one day we merge types and kinds, tick would mean look in DataName
+  3. we don't have a kind namespace anyway
+
+- Syntax of explicit kind polymorphism  (IA0_TODO: not yet implemented)
+Kind abstraction is implicit. We write
+> data SList (s :: k -> *) (as :: [k]) where ...
+because it looks like what we do in terms
+> id (x :: a) = x
+
+- Name resolution
+When the user write Zero instead of 'Zero in types, we parse it a
+HsTyVar ("Zero", TcClsName) instead of HsTyVar ("Zero", DataName). We
+deal with this in the renamer. If a HsTyVar ("Zero", TcClsName) is not
+bounded in the type level, then we look for it in the term level (we
+change its namespace to DataName, see Note [Demotion] in OccName). And
+both become a HsTyVar ("Zero", DataName) after the renamer.
+
+-}
 
 
 -----------------------------------------------------------------------------
@@ -1411,10 +1458,10 @@ aexp2   :: { LHsExpr RdrName }
         | '$(' exp ')'          { LL $ HsSpliceE (mkHsSplice $2) }               
 
 
-        | TH_VAR_QUOTE qvar     { LL $ HsBracket (VarBr (unLoc $2)) }
-        | TH_VAR_QUOTE qcon     { LL $ HsBracket (VarBr (unLoc $2)) }
-        | TH_TY_QUOTE tyvar     { LL $ HsBracket (VarBr (unLoc $2)) }
-        | TH_TY_QUOTE gtycon    { LL $ HsBracket (VarBr (unLoc $2)) }
+        | SIMPLEQUOTE  qvar     { LL $ HsBracket (VarBr True  (unLoc $2)) }
+        | SIMPLEQUOTE  qcon     { LL $ HsBracket (VarBr True  (unLoc $2)) }
+        | TH_TY_QUOTE tyvar     { LL $ HsBracket (VarBr False (unLoc $2)) }
+        | TH_TY_QUOTE gtycon    { LL $ HsBracket (VarBr False (unLoc $2)) }
         | '[|' exp '|]'         { LL $ HsBracket (ExpBr $2) }                       
         | '[t|' ctype '|]'      { LL $ HsBracket (TypBr $2) }                       
         | '[p|' infixexp '|]'   {% checkPattern $2 >>= \p ->

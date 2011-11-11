@@ -1383,7 +1383,7 @@ abstractFloats main_tvs body_env body
 	   ; return (subst', (NonRec poly_id poly_rhs)) }
       where
 	rhs' = CoreSubst.substExpr (text "abstract_floats2") subst rhs
-	tvs_here = varSetElems (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
+	tvs_here = varSetElemsKvsFirst (main_tv_set `intersectVarSet` exprSomeFreeVars isTyVar rhs')
 	
 		-- Abstract only over the type variables free in the rhs
 		-- wrt which the new binding is abstracted.  But the naive
@@ -1422,7 +1422,7 @@ abstractFloats main_tvs body_env body
 		-- If you ever want to be more selective, remember this bizarre case too:
 		--	x::a = x
 		-- Here, we must abstract 'x' over 'a'.
-	 tvs_here = main_tvs
+	 tvs_here = sortQuantVars main_tvs
 
     mk_poly tvs_here var
       = do { uniq <- getUniqueM
@@ -1745,18 +1745,21 @@ mkCase dflags scrut bndr alts = mkCase1 dflags scrut bndr alts
 mkCase1 _dflags scrut case_bndr alts	-- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
-       ; return (re_cast scrut) }
+       ; return (re_cast scrut rhs1) }
   where
-    identity_alt (con, args, rhs) = check_eq con args (de_cast rhs)
+    identity_alt (con, args, rhs) = check_eq con args rhs
 
-    check_eq DEFAULT       _    (Var v)   = v == case_bndr
-    check_eq (LitAlt lit') _    (Lit lit) = lit == lit'
-    check_eq (DataAlt con) args rhs       = rhs `cheapEqExpr` mkConApp con (arg_tys ++ varsToCoreExprs args)
-					 || rhs `cheapEqExpr` Var case_bndr
-    check_eq _ _ _ = False
+    check_eq con           args (Cast e co) | not (any (`elemVarSet` tyCoVarsOfCo co) args)
+        {- See Note [RHS casts] -}          = check_eq con args e
+    check_eq _             _    (Var v)     = v == case_bndr
+    check_eq (LitAlt lit') _    (Lit lit)   = lit == lit'
+    check_eq (DataAlt con) args rhs         = rhs `cheapEqExpr` mkConApp con (arg_tys ++ varsToCoreExprs args)
+    check_eq _             _    _           = False
 
     arg_tys = map Type (tyConAppArgs (idType case_bndr))
 
+        -- Note [RHS casts]
+        -- ~~~~~~~~~~~~~~~~
 	-- We've seen this:
 	--	case e of x { _ -> x `cast` c }
 	-- And we definitely want to eliminate this case, to give
@@ -1766,12 +1769,11 @@ mkCase1 _dflags scrut case_bndr alts	-- Identity case
 	-- if (all identity_alt alts) holds.
 	-- 
 	-- Don't worry about nested casts, because the simplifier combines them
-    de_cast (Cast e _) = e
-    de_cast e	       = e
 
-    re_cast scrut = case head alts of
-			(_,_,Cast _ co) -> Cast scrut co
-			_    	        -> scrut
+    ((_,_,rhs1):_) = alts
+
+    re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
+    re_cast scrut _             = scrut
 
 --------------------------------------------------
 --	3. Merge Identical Alternatives

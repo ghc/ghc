@@ -45,6 +45,7 @@ import DataCon
 import Name
 import TyCon
 import Type
+import Kind( splitKiTyVars )
 import Coercion
 import Var
 import VarSet
@@ -290,8 +291,8 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
 
        -- Make sure that the argument and result types have kind '*'
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
-       ; unifyKind (typeKind arg2_ty) liftedTypeKind
-       ; unifyKind (typeKind res_ty)  liftedTypeKind
+       ; _ <- unifyKind (typeKind arg2_ty) liftedTypeKind
+       ; _ <- unifyKind (typeKind res_ty)  liftedTypeKind
 
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
        ; co_res <- unifyType op_res_ty res_ty
@@ -646,16 +647,24 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 	-- 
 	; let fixed_tvs = getFixedTyVars con1_tvs relevant_cons
 	      is_fixed_tv tv = tv `elemVarSet` fixed_tvs
-	      mk_inst_ty tv result_inst_ty 
+	      mk_inst_ty subst tv result_inst_ty 
 	        | is_fixed_tv tv = return result_inst_ty	    -- Same as result type
-	        | otherwise      = newFlexiTyVarTy (tyVarKind tv)  -- Fresh type, of correct kind
+	        | otherwise      = newFlexiTyVarTy (subst (tyVarKind tv))  -- Fresh type, of correct kind
 
 	; (_, result_inst_tys, result_inst_env) <- tcInstTyVars con1_tvs
-	; scrut_inst_tys <- zipWithM mk_inst_ty con1_tvs result_inst_tys
 
-	; let rec_res_ty    = TcType.substTy result_inst_env con1_res_ty
+        ; let (con1_r_kvs, con1_r_tvs) = splitKiTyVars con1_tvs
+              n_kinds = length con1_r_kvs
+              (result_inst_r_kis, result_inst_r_tys) = splitAt n_kinds result_inst_tys
+	; scrut_inst_r_kis <- zipWithM (mk_inst_ty (TcType.substTy (zipTopTvSubst [] []))) con1_r_kvs result_inst_r_kis
+          -- IA0_NOTE: we have to build the kind substitution
+        ; let kind_subst = TcType.substTy (zipTopTvSubst con1_r_kvs scrut_inst_r_kis)
+	; scrut_inst_r_tys <- zipWithM (mk_inst_ty kind_subst) con1_r_tvs result_inst_r_tys
+
+	; let scrut_inst_tys = scrut_inst_r_kis ++ scrut_inst_r_tys
+              rec_res_ty    = TcType.substTy result_inst_env con1_res_ty
 	      con1_arg_tys' = map (TcType.substTy result_inst_env) con1_arg_tys
-	      scrut_subst   = zipTopTvSubst con1_tvs scrut_inst_tys
+              scrut_subst   = zipTopTvSubst con1_tvs scrut_inst_tys
 	      scrut_ty      = TcType.substTy scrut_subst con1_res_ty
 
         ; co_res <- unifyType rec_res_ty res_ty

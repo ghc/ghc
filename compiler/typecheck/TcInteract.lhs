@@ -622,7 +622,8 @@ trySpontaneousEqOneWay eqv gw tv xi
   | not (isSigTyVar tv) || isTyVarTy xi 
   = do { let kxi = typeKind xi -- NB: 'xi' is fully rewritten according to the inerts 
                                -- so we have its more specific kind in our hands
-       ; if kxi `isSubKind` tyVarKind tv then
+       ; is_sub_kind <- kxi `isSubKindTcS` tyVarKind tv
+       ; if is_sub_kind then
              solveWithIdentity eqv gw tv xi
          else return SPCantSolve
 {-
@@ -642,18 +643,32 @@ trySpontaneousEqOneWay eqv gw tv xi
 trySpontaneousEqTwoWay :: EqVar -> CtFlavor -> TcTyVar -> TcTyVar -> TcS SPSolveResult
 -- Both tyvars are *touchable* MetaTyvars so there is only a chance for kind error here
 trySpontaneousEqTwoWay eqv gw tv1 tv2
-  | k1 `isSubKind` k2
-  , nicer_to_update_tv2 = solveWithIdentity eqv gw tv2 (mkTyVarTy tv1)
-  | k2 `isSubKind` k1 
-  = solveWithIdentity eqv gw tv1 (mkTyVarTy tv2)
-  | otherwise -- None is a subkind of the other, but they are both touchable! 
-  = return SPCantSolve
-    -- do { addErrorTcS KindError gw (mkTyVarTy tv1) (mkTyVarTy tv2)
-    --   ; return SPError }
+  = do { k1_sub_k2 <- k1 `isSubKindTcS` k2
+       ; if k1_sub_k2 && nicer_to_update_tv2
+         then solveWithIdentity eqv gw tv2 (mkTyVarTy tv1)
+         else do
+       { k2_sub_k1 <- k2 `isSubKindTcS` k1
+       ; MASSERT( k2_sub_k1 )  -- they were unified in TcCanonical
+       ; solveWithIdentity eqv gw tv1 (mkTyVarTy tv2) } }
   where
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
     nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
+{-
+-- Previous code below (before kind polymorphism and unification):
+  -- | k1 `isSubKind` k2
+  -- , nicer_to_update_tv2 = solveWithIdentity eqv gw tv2 (mkTyVarTy tv1)
+  -- | k2 `isSubKind` k1 
+  -- = solveWithIdentity eqv gw tv1 (mkTyVarTy tv2)
+  -- | otherwise -- None is a subkind of the other, but they are both touchable! 
+  -- = return SPCantSolve
+  --   -- do { addErrorTcS KindError gw (mkTyVarTy tv1) (mkTyVarTy tv2)
+  --   --   ; return SPError }
+  -- where
+  --   k1 = tyVarKind tv1
+  --   k2 = tyVarKind tv2
+  --   nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
+-}
 \end{code}
 
 Note [Kind errors] 

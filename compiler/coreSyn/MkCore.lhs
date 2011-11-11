@@ -288,8 +288,10 @@ mkIPUnbox ipx = Var x `Cast` mkAxInstCo (ipCoAxiom ip) [ty]
 \begin{code}
 
 mkEqBox :: Coercion -> CoreExpr
-mkEqBox co = Var (dataConWorkId eqBoxDataCon) `mkTyApps` [ty1, ty2] `App` Coercion co
+mkEqBox co = ASSERT( typeKind ty2 `eqKind` k )
+             Var (dataConWorkId eqBoxDataCon) `mkTyApps` [k, ty1, ty2] `App` Coercion co
   where Pair ty1 ty2 = coercionKind co
+        k = typeKind ty1
 
 \end{code}
 

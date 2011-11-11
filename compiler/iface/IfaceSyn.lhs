@@ -500,6 +500,7 @@ pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
                                                             (map (pprIfaceConDecl tc) cs))
 
 mkIfaceEqPred :: IfaceType -> IfaceType -> IfacePredType
+-- IA0_NOTE: This is wrong, but only used for pretty-printing.
 mkIfaceEqPred ty1 ty2 = IfaceTyConApp (IfaceTc eqTyConName) [ty1, ty2]
 
 pprIfaceConDecl :: OccName -> IfaceConDecl -> SDoc
@@ -718,7 +719,9 @@ freeNamesIfDecl d@IfaceData{} =
 freeNamesIfDecl d@IfaceSyn{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfSynRhs (ifSynRhs d) &&&
-  freeNamesIfTcFam (ifFamInst d)
+  freeNamesIfTcFam (ifFamInst d) &&&
+  freeNamesIfKind (ifSynKind d) -- IA0_NOTE: because of promotion, we
+                                -- return names in the kind signature
 freeNamesIfDecl d@IfaceClass{} =
   freeNamesIfTvBndrs (ifTyVars d) &&&
   freeNamesIfContext (ifCtxt d) &&&
@@ -769,6 +772,9 @@ freeNamesIfConDecl c =
   fnList freeNamesIfType (ifConArgTys c) &&&
   fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints
 
+freeNamesIfKind :: IfaceType -> NameSet
+freeNamesIfKind = freeNamesIfType
+
 freeNamesIfType :: IfaceType -> NameSet
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
@@ -795,8 +801,8 @@ freeNamesIfLetBndr (IfLetBndr _name ty info) = freeNamesIfType ty
                                              &&& freeNamesIfIdInfo info
 
 freeNamesIfTvBndr :: IfaceTvBndr -> NameSet
-freeNamesIfTvBndr (_fs,k) = freeNamesIfType k
-    -- kinds can have Names inside, when the Kind is an equality predicate
+freeNamesIfTvBndr (_fs,k) = freeNamesIfKind k
+    -- kinds can have Names inside, because of promotion
 
 freeNamesIfIdBndr :: IfaceIdBndr -> NameSet
 freeNamesIfIdBndr = freeNamesIfTvBndr

@@ -15,6 +15,7 @@ module BuildTyCl (
 	buildSynTyCon, 
         buildAlgTyCon, 
         buildDataCon,
+        buildPromotedDataTyCon,
         TcMethInfo, buildClass,
 	distinctAbstractTyConRhs, totallyAbstractTyConRhs,
 	mkNewTyConRhs, mkDataTyConRhs, 
@@ -34,11 +35,13 @@ import MkId
 import Class
 import TyCon
 import Type
+import Kind             ( promoteType, isPromotableType )
 import Coercion
 
 import TcRnMonad
 import Util		( isSingleton )
 import Outputable
+import Unique           ( getUnique )
 \end{code}
 	
 
@@ -59,11 +62,10 @@ buildSynTyCon tc_name tvs rhs rhs_kind parent mb_family
 
   | otherwise
   = return (mkSynTyCon tc_name kind tvs rhs parent)
-  where
-    kind = mkArrowKinds (map tyVarKind tvs) rhs_kind
+  where kind = mkForAllArrowKinds tvs rhs_kind
 
 ------------------------------------------------------
-buildAlgTyCon :: Name -> [TyVar] 
+buildAlgTyCon :: Name -> [TyVar]        -- ^ Kind variables adn type variables
 	      -> ThetaType		-- ^ Stupid theta
 	      -> AlgTyConRhs
 	      -> RecFlag
@@ -72,22 +74,21 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs stupid_theta rhs is_rec gadt_syn
+buildAlgTyCon tc_name ktvs stupid_theta rhs is_rec gadt_syn
 	      parent mb_family
   | Just fam_inst_info <- mb_family
   = -- We need to tie a knot as the coercion of a data instance depends
      -- on the instance representation tycon and vice versa.
     ASSERT( isNoParent parent )
     fixM $ \ tycon_rec -> do 
-    { fam_parent <- mkFamInstParentInfo tc_name tvs fam_inst_info tycon_rec
-    ; return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
+    { fam_parent <- mkFamInstParentInfo tc_name ktvs fam_inst_info tycon_rec
+    ; return (mkAlgTyCon tc_name kind ktvs stupid_theta rhs
 		         fam_parent is_rec gadt_syn) }
 
   | otherwise
-  = return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
+  = return (mkAlgTyCon tc_name kind ktvs stupid_theta rhs
 	               parent is_rec gadt_syn)
-  where
-    kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
+  where kind = mkForAllArrowKinds ktvs liftedTypeKind
 
 -- | If a family tycon with instance types is given, the current tycon is an
 -- instance of that family and we need to
@@ -224,6 +225,11 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
     arg_tyvars      = tyVarsOfTypes arg_tys
     in_arg_tys pred = not $ isEmptyVarSet $ 
 		      tyVarsOfType pred `intersectVarSet` arg_tyvars
+
+buildPromotedDataTyCon :: DataCon -> TyCon
+buildPromotedDataTyCon dc = ASSERT ( isPromotableType ty )
+  mkPromotedDataTyCon dc (getName dc) (getUnique dc) (promoteType ty)
+  where ty = dataConUserType dc
 \end{code}
 
 
@@ -301,7 +307,7 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
 		 then mkNewTyConRhs tycon_name rec_tycon dict_con
 		 else return (mkDataTyConRhs [dict_con])
 
-	; let {	clas_kind = mkArrowKinds (map tyVarKind tvs) constraintKind
+	; let {	clas_kind = mkForAllArrowKinds tvs constraintKind
 
  	      ; tycon = mkClassTyCon tycon_name clas_kind tvs
  	                             rhs rec_clas tc_isrec

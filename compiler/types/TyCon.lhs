@@ -36,7 +36,8 @@ module TyCon(
 	mkSynTyCon,
         mkSuperKindTyCon,
         mkForeignTyCon,
-        mkAnyTyCon,
+	mkPromotedDataTyCon,
+	mkPromotedTypeTyCon,
 
         -- ** Predicates on TyCons
         isAlgTyCon,
@@ -46,7 +47,8 @@ module TyCon(
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, 
         isSynTyCon, isClosedSynTyCon,
         isSuperKindTyCon, isDecomposableTyCon,
-        isForeignTyCon, isAnyTyCon, tyConHasKind,
+        isForeignTyCon, tyConHasKind,
+        isPromotedDataTyCon, isPromotedTypeTyCon,
 
 	isInjectiveTyCon,
 	isDataTyCon, isProductTyCon, isEnumerationTyCon, 
@@ -90,7 +92,7 @@ module TyCon(
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
-import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
+import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon, dataConName )
 import {-# SOURCE #-} IParam  ( ipTyConName )
 
 import Var
@@ -341,7 +343,7 @@ data TyCon
 	tc_kind     :: Kind,
 	tyConArity  :: Arity,
 
-	tyConTyVars :: [TyVar],	  -- ^ The type variables used in the type constructor.
+	tyConTyVars :: [TyVar],	  -- ^ The kind and type variables used in the type constructor.
                                   -- Invariant: length tyvars = arity
 	                          -- Precisely, this list scopes over:
 	                          --
@@ -427,19 +429,6 @@ data TyCon
                                            --   holds the name of the imported thing
     }
 
-  -- | Any types.  Like tuples, this is a potentially-infinite family of TyCons
-  --   one for each distinct Kind. They have no values at all.
-  --   Because there are infinitely many of them (like tuples) they are 
-  --   defined in GHC.Prim and have names like "Any(*->*)".  
-  --   Their Unique is derived from the OccName.
-  -- See Note [Any types] in TysPrim
-  | AnyTyCon {
-	tyConUnique  :: Unique,
-	tyConName    :: Name,
-	tc_kind      :: Kind	-- Never = *; that is done via PrimTyCon
-		     		-- See Note [Any types] in TysPrim
-    }
-
   -- | Super-kinds. These are "kinds-of-kinds" and are never seen in
   -- Haskell source programs.  There are only two super-kinds: TY (aka
   -- "box"), which is the super-kind of kinds that construct types
@@ -451,6 +440,23 @@ data TyCon
         tyConUnique :: Unique,
         tyConName   :: Name
     }
+
+  -- | Represents promoted data constructor.
+  | PromotedDataTyCon {	   	-- See Note [Promoted data constructors]
+	tyConUnique :: Unique, -- ^ Same Unique as the data constructor
+	tyConName   :: Name,   -- ^ Same Name as the data constructor
+	tc_kind     :: Kind,   -- ^ Translated type of the data constructor
+        dataCon     :: DataCon -- ^ Corresponding data constructor
+    }
+
+  -- | Represents promoted type constructor.
+  | PromotedTypeTyCon {
+	tyConUnique :: Unique, -- ^ Same Unique as the type constructor
+	tyConName   :: Name,   -- ^ Same Name as the type constructor
+	tyConArity  :: Arity,  -- ^ n if ty_con :: * -> ... -> *  n times
+        ty_con      :: TyCon   -- ^ Corresponding type constructor
+    }
+
   deriving Typeable
 
 -- | Names of the fields in an algebraic record type
@@ -551,6 +557,7 @@ data TyConParent
     NoParentTyCon
 
   -- | Type constructors representing a class dictionary.
+  -- See Note [ATyCon for classes] in TypeRep
   | ClassTyCon
 	Class		-- INVARIANT: the classTyCon of this Class is the current tycon
 
@@ -618,6 +625,34 @@ data SynTyConRhs
    -- | A type synonym family  e.g. @type family F x y :: * -> *@
    | SynFamilyTyCon
 \end{code}
+
+Note [Promoted data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A data constructor can be promoted to become a type constructor,
+via the PromotedDataTyCon alternative in TyCon.
+
+* Only "vanilla" data constructors are promoted; ones with no GADT
+  stuff, no existentials, etc.  We might generalise this later.
+
+* The TyCon promoted from a DataCon has the *same* Name and Unique as
+  the DataCon.  Eg. If the data constructor Data.Maybe.Just(unique 78,
+  say) is promoted to a TyCon whose name is Data.Maybe.Just(unique 78)
+
+* The *kind* of a promoted DataCon may be polymorphic.  Example:
+    type of DataCon           Just :: forall (a:*). a -> Maybe a
+    kind of (promoted) tycon  Just :: forall (a:box). a -> Maybe a
+  The kind is not identical to the type, because of the */box 
+  kind signature on the forall'd variable; so the tc_kind field of
+  PromotedDataTyCon is not identical to the dataConUserType of the 
+  DataCon.  But it's the same modulo changing the variable kinds,
+  done by Kind.promoteType. 
+
+* Small note: We promote the *user* type of the DataCon.  Eg
+     data T = MkT {-# UNPACK #-} !(Bool, Bool)
+  The promoted kind is
+     MkT :: (Bool,Bool) -> T
+  *not* 
+     MkT :: Bool -> Bool -> T
 
 Note [Enumeration types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -933,12 +968,6 @@ mkSynTyCon name kind tyvars rhs parent
         synTcParent = parent
     }
 
-mkAnyTyCon :: Name -> Kind -> TyCon
-mkAnyTyCon name kind 
-  = AnyTyCon {  tyConName = name,
-		tc_kind = kind,
-        	tyConUnique = nameUnique name }
-
 -- | Create a super-kind 'TyCon'
 mkSuperKindTyCon :: Name -> TyCon -- Super kinds always have arity zero
 mkSuperKindTyCon name
@@ -946,6 +975,27 @@ mkSuperKindTyCon name
         tyConName = name,
         tyConUnique = nameUnique name
   }
+
+-- | Create a promoted data constructor 'TyCon'
+mkPromotedDataTyCon :: DataCon -> Name -> Unique -> Kind -> TyCon
+mkPromotedDataTyCon con name unique kind
+  = PromotedDataTyCon {
+        tyConName = name,
+        tyConUnique = unique,
+        tc_kind = kind,
+        dataCon = con
+  }
+
+-- | Create a promoted type constructor 'TyCon'
+mkPromotedTypeTyCon :: TyCon -> TyCon
+mkPromotedTypeTyCon con
+  = PromotedTypeTyCon {
+        tyConName = getName con,
+        tyConUnique = getUnique con,
+        tyConArity = tyConArity con,
+        ty_con = con
+  }
+
 \end{code}
 
 \begin{code}
@@ -1016,6 +1066,7 @@ isDistinctTyCon (AlgTyCon {algTcRhs = rhs}) = isDistinctAlgRhs rhs
 isDistinctTyCon (FunTyCon {})               = True
 isDistinctTyCon (TupleTyCon {})             = True
 isDistinctTyCon (PrimTyCon {})              = True
+isDistinctTyCon (PromotedDataTyCon {})      = True
 isDistinctTyCon _                           = False
 
 isDistinctAlgRhs :: AlgTyConRhs -> Bool
@@ -1178,10 +1229,15 @@ isSuperKindTyCon :: TyCon -> Bool
 isSuperKindTyCon (SuperKindTyCon {}) = True
 isSuperKindTyCon _                   = False
 
--- | Is this an AnyTyCon?
-isAnyTyCon :: TyCon -> Bool
-isAnyTyCon (AnyTyCon {}) = True
-isAnyTyCon _              = False
+-- | Is this a PromotedDataTyCon?
+isPromotedDataTyCon :: TyCon -> Bool
+isPromotedDataTyCon (PromotedDataTyCon {}) = True
+isPromotedDataTyCon _                      = False
+
+-- | Is this a PromotedTypeTyCon?
+isPromotedTypeTyCon :: TyCon -> Bool
+isPromotedTypeTyCon (PromotedTypeTyCon {}) = True
+isPromotedTypeTyCon _                      = False
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
@@ -1249,12 +1305,12 @@ expand tvs rhs tys
 \begin{code}
 
 tyConKind :: TyCon -> Kind
-tyConKind (FunTyCon   { tc_kind = k }) = k
-tyConKind (AlgTyCon   { tc_kind = k }) = k
-tyConKind (TupleTyCon { tc_kind = k }) = k
-tyConKind (SynTyCon   { tc_kind = k }) = k
-tyConKind (PrimTyCon  { tc_kind = k }) = k
-tyConKind (AnyTyCon   { tc_kind = k }) = k
+tyConKind (FunTyCon          { tc_kind = k }) = k
+tyConKind (AlgTyCon          { tc_kind = k }) = k
+tyConKind (TupleTyCon        { tc_kind = k }) = k
+tyConKind (SynTyCon          { tc_kind = k }) = k
+tyConKind (PrimTyCon         { tc_kind = k }) = k
+tyConKind (PromotedDataTyCon { tc_kind = k }) = k
 tyConKind tc = pprPanic "tyConKind" (ppr tc)	-- SuperKindTyCon and CoTyCon
 
 tyConHasKind :: TyCon -> Bool
@@ -1458,7 +1514,8 @@ instance Uniquable TyCon where
     getUnique tc = tyConUnique tc
 
 instance Outputable TyCon where
-    ppr tc  = ppr (getName tc) 
+    ppr (PromotedDataTyCon {dataCon = dc}) = quote (ppr (dataConName dc))
+    ppr tc = ppr (getName tc)
 
 instance NamedThing TyCon where
     getName = tyConName

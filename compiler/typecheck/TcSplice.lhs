@@ -364,7 +364,7 @@ tcBracket brack res_ty
        ; return (noLoc (HsBracketOut brack pendings)) }
 
 tc_bracket :: ThStage -> HsBracket Name -> TcM TcType
-tc_bracket outer_stage (VarBr name)     -- Note [Quoting names]
+tc_bracket outer_stage br@(VarBr _ name)     -- Note [Quoting names]
   = do  { thing <- tcLookup name
         ; case thing of
             AGlobal _ -> return ()
@@ -373,7 +373,7 @@ tc_bracket outer_stage (VarBr name)     -- Note [Quoting names]
                 -> keepAliveTc id
                 | otherwise
                 -> do { checkTc (thLevel outer_stage + 1 == bind_lvl)
-                                (quotedNameStageErr name) }
+                                (quotedNameStageErr br) }
             _ -> pprPanic "th_bracket" (ppr name)
 
         ; tcMetaTy nameTyConName        -- Result type is Var (not Q-monadic)
@@ -410,9 +410,9 @@ tc_bracket _ (PatBr pat)
 tc_bracket _ (DecBrL _)
   = panic "tc_bracket: Unexpected DecBrL"
 
-quotedNameStageErr :: Name -> SDoc
-quotedNameStageErr v
-  = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr (VarBr v)
+quotedNameStageErr :: HsBracket Name -> SDoc
+quotedNameStageErr br
+  = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr br
         , ptext (sLit "must be used at the same stage at which is is bound")]
 \end{code}
 
@@ -536,8 +536,8 @@ kcSpliceType splice@(HsSplice name hs_expr) fvs
     -- Here (h 4) :: Q Type
     -- but $(h 4) :: a  i.e. any type, of any kind
 
-    ; kind <- newKindVar
-    ; return (HsSpliceTy splice fvs kind, kind)
+    ; kind <- newMetaKindVar
+    ; return (HsSpliceTy splice fvs kind, kind) 
     }}}
 
 kcTopSpliceType :: LHsExpr Name -> TcM (HsType Name, TcKind)
@@ -551,11 +551,11 @@ kcTopSpliceType expr
         -- Run the expression
         ; hs_ty2 <- runMetaT zonked_q_expr
         ; showSplice "type" expr (ppr hs_ty2)
-
+  
         -- Rename it, but bale out if there are errors
         -- otherwise the type checker just gives more spurious errors
-        ; addErrCtxt (spliceResultDoc expr) $ do
-        { let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
+        ; addErrCtxt (spliceResultDoc expr) $ do 
+        { let doc = SpliceTypeCtx hs_ty2
         ; hs_ty3 <- checkNoErrs (rnLHsType doc hs_ty2)
         ; (ty4, kind) <- kcLHsType hs_ty3
         ; return (unLoc ty4, kind) }}
@@ -990,7 +990,7 @@ reifyInstances th_nm th_tys
             _ -> bale_out (ppr_th th_nm <+> ptext (sLit "is not a class or type constructor"))
         }
   where
-    doc = ptext (sLit "TcSplice.reifyInstances")
+    doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
 
     tc_types :: TyCon -> [TH.Type] -> TcM [Type]
@@ -1159,6 +1159,7 @@ reifyThing (ATyVar tv ty)
         ; return (TH.TyVarI (reifyName tv) ty2) }
 
 reifyThing (AThing {}) = panic "reifyThing AThing"
+reifyThing ANothing = panic "reifyThing ANothing"
 
 ------------------------------
 reifyAxiom :: CoAxiom -> TcM TH.Info

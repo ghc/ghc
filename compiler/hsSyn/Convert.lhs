@@ -27,7 +27,6 @@ import qualified OccName
 import OccName
 import SrcLoc
 import Type
-import Coercion
 import TysWiredIn
 import BasicTypes as Hs
 import ForeignCall
@@ -204,7 +203,7 @@ cvtDec (ForeignD ford)
 
 cvtDec (FamilyD flav tc tvs kind)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
-       ; let kind' = fmap cvtKind kind
+       ; kind' <- cvtMaybeKind kind
        ; returnL $ TyClD (TyFamily (cvtFamFlavour flav) tc' tvs' kind') }
   where
     cvtFamFlavour TypeFam = TypeFamily
@@ -785,7 +784,8 @@ cvt_tv (TH.PlainTV nm)
        }
 cvt_tv (TH.KindedTV nm ki) 
   = do { nm' <- tName nm
-       ; returnL $ KindedTyVar nm' (cvtKind ki)
+       ; ki' <- cvtKind ki
+       ; returnL $ KindedTyVar nm' ki' placeHolderKind
        }
 
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
@@ -842,7 +842,8 @@ cvtType ty
 
            SigT ty ki
              -> do { ty' <- cvtType ty
-                   ; mk_apps (HsKindSig ty' (cvtKind ki)) tys'
+                   ; ki' <- cvtKind ki
+                   ; mk_apps (HsKindSig ty' ki') tys'
                    }
 
            _ -> failWith (ptext (sLit "Malformed type") <+> text (show ty))
@@ -859,9 +860,16 @@ split_ty_app ty = go ty []
     go (AppT f a) as' = do { a' <- cvtType a; go f (a':as') }
     go f as 	      = return (f,as)
 
-cvtKind :: TH.Kind -> Type.Kind
-cvtKind StarK          = liftedTypeKind
-cvtKind (ArrowK k1 k2) = mkArrowKind (cvtKind k1) (cvtKind k2)
+cvtKind :: TH.Kind -> CvtM (LHsKind RdrName)
+cvtKind StarK          = returnL (HsTyVar (getRdrName liftedTypeKindTyCon))
+cvtKind (ArrowK k1 k2) = do
+  k1' <- cvtKind k1
+  k2' <- cvtKind k2
+  returnL (HsFunTy k1' k2')
+
+cvtMaybeKind :: Maybe TH.Kind -> CvtM (Maybe (LHsKind RdrName))
+cvtMaybeKind Nothing = return Nothing
+cvtMaybeKind (Just ki) = cvtKind ki >>= return . Just
 
 -----------------------------------------------------------
 

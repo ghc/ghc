@@ -287,9 +287,14 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		-- Check that it has the right shape:
 		-- 	((w,s1) .. sn)
 		-- where the si do not mention w
-	   ; checkTc (corner_ty `eqType` mkTyVarTy w_tv && 
-		      not (w_tv `elemVarSet` tyVarsOfTypes arg_tys))
+           ; _bogus <- unifyType corner_ty (mkTyVarTy w_tv)
+	   ; checkTc (not (w_tv `elemVarSet` tyVarsOfTypes arg_tys))
 		     (badFormFun i tup_ty')
+     -- JPM: WARNING: this test is utterly bogus; see #5609
+     -- We are not using the coercion returned by the unify;
+     -- and (even more seriously) the w not in arg_tys test is totally
+     -- bogus if there are suspended equality constraints. This code
+     -- needs to be re-architected.
 
 	   ; tcCmdTop (env { cmd_arr = b }) cmd arg_tys s }
 

@@ -393,7 +393,8 @@ data ExtensionFlag
    | Opt_DoAndIfThenElse
    | Opt_RebindableSyntax
    | Opt_ConstraintKinds
-
+   | Opt_PolyKinds                -- Kind polymorphism
+   
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
    | Opt_DeriveFunctor
@@ -1904,7 +1905,8 @@ xFlags = [
   ( "DoAndIfThenElse",                  Opt_DoAndIfThenElse, nop ),
   ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
   ( "ConstraintKinds",                  Opt_ConstraintKinds, nop ),
-  ( "MonoPatBinds",                     Opt_MonoPatBinds,
+  ( "PolyKinds",                        Opt_PolyKinds, nop ),
+  ( "MonoPatBinds",                     Opt_MonoPatBinds, 
     \ turn_on -> when turn_on $ deprecate "Experimental feature now removed; has no effect" ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),
@@ -1988,7 +1990,9 @@ impliedFlags
     , (Opt_TypeFamilies,     turnOn, Opt_MonoLocalBinds)
 
     , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
-                                                     -- all over the place
+                                                          -- all over the place
+
+    , (Opt_PolyKinds,        turnOn, Opt_KindSignatures)
 
     , (Opt_ImpredicativeTypes,  turnOn, Opt_RankNTypes)
 

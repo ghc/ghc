@@ -14,7 +14,7 @@
 module RnEnv ( 
 	newTopSrcBinder, 
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
-	lookupLocatedOccRn, lookupOccRn, lookupLocalOccRn_maybe,
+	lookupLocatedOccRn, lookupOccRn, lookupLocalOccRn_maybe, lookupPromotedOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 
 	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
@@ -32,14 +32,16 @@ module RnEnv (
 	addLocalFixities,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
-	bindTyVarsRn, bindTyVarsFV, extendTyVarEnvFVRn,
+	extendTyVarEnvFVRn,
 
 	checkDupRdrNames, checkDupAndShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, 
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches,
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr, kindSigErr, perhapsForallMsg
+	dataTcOccs, unknownNameErr, kindSigErr, polyKindsErr, perhapsForallMsg,
+
+        HsDocContext(..), docOfHsDocContext
     ) where
 
 #include "HsVersions.h"
@@ -444,31 +446,61 @@ lookupLocalOccRn_maybe rdr_name
        ; return (lookupLocalRdrEnv local_env rdr_name) }
 
 -- lookupOccRn looks up an occurrence of a RdrName
+lookupOccRn :: RdrName -> RnM Name
+lookupOccRn rdr_name = do
+  opt_name <- lookupOccRn_maybe rdr_name
+  maybe (unboundName WL_Any rdr_name) return opt_name
+
+-- lookupPromotedOccRn looks up an optionally promoted RdrName.
+lookupPromotedOccRn :: RdrName -> RnM Name
+-- see Note [Demotion] in OccName
+lookupPromotedOccRn rdr_name = do {
+    -- 1. lookup the name
+    opt_name <- lookupOccRn_maybe rdr_name 
+  ; case opt_name of
+      -- 1.a. we found it!
+      Just name -> return name
+      -- 1.b. we did not find it -> 2
+      Nothing -> do {
+  ; -- 2. maybe it was implicitly promoted
+    case demoteRdrName rdr_name of
+      -- 2.a it was not in a promoted namespace
+      Nothing -> err
+      -- 2.b let's try every thing again -> 3
+      Just demoted_rdr_name -> do {
+  ; poly_kinds <- xoptM Opt_PolyKinds
+    -- 3. lookup again
+  ; opt_demoted_name <- lookupOccRn_maybe demoted_rdr_name ;
+  ; case opt_demoted_name of
+      -- 3.a. it was implicitly promoted, but confirm that we can promote
+      -- JPM: We could try to suggest turning on PolyKinds here
+      Just demoted_name -> if poly_kinds then return demoted_name else err
+      -- 3.b. use rdr_name to have a correct error message
+      Nothing -> err } } }
+  where err = unboundName WL_Any rdr_name
+
+-- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupOccRn_maybe rdr_name
   = do { local_env <- getLocalRdrEnv
-       ; case lookupLocalRdrEnv local_env rdr_name of 
-          Just name -> return (Just name)
-          Nothing   -> lookupGlobalOccRn_maybe rdr_name }
-
-lookupOccRn :: RdrName -> RnM Name
-lookupOccRn rdr_name
-  = do { mb_name <- lookupOccRn_maybe rdr_name
+       ; case lookupLocalRdrEnv local_env rdr_name of {
+          Just name -> return (Just name) ;
+          Nothing   -> do
+       { mb_name <- lookupGlobalOccRn_maybe rdr_name
        ; case mb_name of {
-		Just n  -> return n ;
-		Nothing -> do
-
-       { -- We allow qualified names on the command line to refer to 
-	 --  *any* name exported by any module in scope, just as if there
-	 -- was an "import qualified M" declaration for every module.
-	 allow_qual <- doptM Opt_ImplicitImportQualified
+                Just name  -> return (Just name) ;
+                Nothing -> do
+       { -- We allow qualified names on the command line to refer to
+         --  *any* name exported by any module in scope, just as if there
+         -- was an "import qualified M" declaration for every module.
+         allow_qual <- doptM Opt_ImplicitImportQualified
        ; is_ghci <- getIsGHCi
                -- This test is not expensive,
                -- and only happens for failed lookups
        ; if isQual rdr_name && allow_qual && is_ghci
          then lookupQualifiedName rdr_name
          else do { traceRn (text "lookupOccRn" <+> ppr rdr_name)
-                 ; unboundName WL_Any rdr_name } } } }
+                 ; return Nothing } } } } } }
 
 
 lookupGlobalOccRn :: RdrName -> RnM Name
@@ -564,7 +596,7 @@ addUsedRdrNames rdrs
 
 -- A qualified name on the command line can refer to any module at all: we
 -- try to load the interface if we don't already have it.
-lookupQualifiedName :: RdrName -> RnM Name
+lookupQualifiedName :: RdrName -> RnM (Maybe Name)
 lookupQualifiedName rdr_name
   | Just (mod,occ) <- isQual_maybe rdr_name
    -- Note: we want to behave as we would for a source file import here,
@@ -575,9 +607,9 @@ lookupQualifiedName rdr_name
 	 | avail <- mi_exports iface,
     	   name  <- availNames avail,
     	   nameOccName name == occ ] of
-      (n:ns) -> ASSERT (null ns) return n
+      (n:ns) -> ASSERT (null ns) return (Just n)
       _ -> do { traceRn (text "lookupQualified" <+> ppr rdr_name)
-              ; unboundName WL_Any rdr_name }
+              ; return Nothing }
 
   | otherwise
   = pprPanic "RnEnv.lookupQualifiedName" (ppr rdr_name)
@@ -962,28 +994,6 @@ bindLocatedLocalsFV rdr_names enclosed_scope
     return (thing, delFVs names fvs)
 
 -------------------------------------
-bindTyVarsFV ::  [LHsTyVarBndr RdrName]
-	      -> ([LHsTyVarBndr Name] -> RnM (a, FreeVars))
-	      -> RnM (a, FreeVars)
-bindTyVarsFV tyvars thing_inside
-  = bindTyVarsRn tyvars $ \ tyvars' ->
-    do { (res, fvs) <- thing_inside tyvars'
-       ; return (res, delFVs (map hsLTyVarName tyvars') fvs) }
-
-bindTyVarsRn ::  [LHsTyVarBndr RdrName]
-	      -> ([LHsTyVarBndr Name] -> RnM a)
-	      -> RnM a
--- Haskell-98 binding of type variables; e.g. within a data type decl
-bindTyVarsRn tyvar_names enclosed_scope
-  = bindLocatedLocalsRn located_tyvars	$ \ names ->
-    do { kind_sigs_ok <- xoptM Opt_KindSignatures
-       ; unless (null kinded_tyvars || kind_sigs_ok) 
-       	 	(mapM_ (addErr . kindSigErr) kinded_tyvars)
-       ; enclosed_scope (zipWith replaceLTyVarName tyvar_names names) }
-  where 
-    located_tyvars = hsLTyVarLocNames tyvar_names
-    kinded_tyvars  = [n | L _ (KindedTyVar n _) <- tyvar_names]
-
 bindPatSigTyVars :: [LHsType RdrName] -> ([Name] -> RnM a) -> RnM a
   -- Find the type variables in the pattern type 
   -- signatures that must be brought into scope
@@ -1402,6 +1412,11 @@ kindSigErr thing
   = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
        2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
 
+polyKindsErr :: Outputable a => a -> SDoc
+polyKindsErr thing
+  = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr thing))
+       2 (ptext (sLit "Perhaps you intended to use -XPolyKinds"))
+
 
 badQualBndrErr :: RdrName -> SDoc
 badQualBndrErr rdr_name
@@ -1411,4 +1426,57 @@ opDeclErr :: RdrName -> SDoc
 opDeclErr n 
   = hang (ptext (sLit "Illegal declaration of a type or class operator") <+> quotes (ppr n))
        2 (ptext (sLit "Use -XTypeOperators to declare operators in type and declarations"))
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Contexts for renaming errors}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+data HsDocContext
+  = TypeSigCtx SDoc
+  | PatCtx
+  | SpecInstSigCtx
+  | DefaultDeclCtx
+  | ForeignDeclCtx (Located RdrName)
+  | DerivDeclCtx
+  | RuleCtx FastString
+  | TyDataCtx (Located RdrName)
+  | TySynCtx (Located RdrName)
+  | TyFamilyCtx (Located RdrName)
+  | ConDeclCtx (Located RdrName)
+  | ClassDeclCtx (Located RdrName)
+  | ExprWithTySigCtx
+  | TypBrCtx
+  | HsTypeCtx
+  | GHCiCtx
+  | SpliceTypeCtx (LHsType RdrName)
+  | ClassInstanceCtx
+  | VectDeclCtx (Located RdrName)
+
+docOfHsDocContext :: HsDocContext -> SDoc
+docOfHsDocContext (TypeSigCtx doc) = text "In the type signature for" <+> doc
+docOfHsDocContext PatCtx = text "In a pattern type-signature"
+docOfHsDocContext SpecInstSigCtx = text "In a SPECIALISE instance pragma"
+docOfHsDocContext DefaultDeclCtx = text "In a `default' declaration"
+docOfHsDocContext (ForeignDeclCtx name) = ptext (sLit "In the foreign declaration for") <+> ppr name
+docOfHsDocContext DerivDeclCtx = text "In a deriving declaration"
+docOfHsDocContext (RuleCtx name) = text "In the transformation rule" <+> ftext name
+docOfHsDocContext (TyDataCtx tycon) = text "In the data type declaration for" <+> quotes (ppr tycon)
+docOfHsDocContext (TySynCtx name) = text "In the declaration for type synonym" <+> quotes (ppr name)
+docOfHsDocContext (TyFamilyCtx name) = text "In the declaration for type family" <+> quotes (ppr name)
+docOfHsDocContext (ConDeclCtx name) = text "In the definition of data constructor" <+> quotes (ppr name)
+docOfHsDocContext (ClassDeclCtx name) = text "In the declaration for class" 	<+> ppr name
+docOfHsDocContext ExprWithTySigCtx = text "In an expression type signature"
+docOfHsDocContext TypBrCtx = ptext (sLit "In a Template-Haskell quoted type")
+docOfHsDocContext HsTypeCtx = text "In a type argument"
+docOfHsDocContext GHCiCtx = ptext (sLit "In GHCi input")
+docOfHsDocContext (SpliceTypeCtx hs_ty) = ptext (sLit "In the spliced type") <+> ppr hs_ty
+docOfHsDocContext ClassInstanceCtx = ptext (sLit "TcSplice.reifyInstances")
+docOfHsDocContext (VectDeclCtx tycon) = ptext (sLit "In the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
+
 \end{code}

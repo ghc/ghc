@@ -41,8 +41,6 @@ import ErrUtils
 import Util
 import Maybes
 import FastString
-
-import Control.Monad (guard)
 \end{code}
 
 
@@ -175,7 +173,7 @@ match menv subst (TyVarTy tv1) ty2
   | tv1' `elemVarSet` me_tmpls menv
   = if any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
     then Nothing	-- Occurs check
-    else do { subst1 <- match_kind menv subst tv1 ty2
+    else do { subst1 <- match_kind menv subst (tyVarKind tv1) (typeKind ty2)
 			-- Note [Matching kinds]
 	    ; return (extendVarEnv subst1 tv1' ty2) }
 
@@ -188,7 +186,8 @@ match menv subst (TyVarTy tv1) ty2
     tv1' = rnOccL rn_env tv1
 
 match menv subst (ForAllTy tv1 ty1) (ForAllTy tv2 ty2) 
-  = match menv' subst ty1 ty2
+  = do { subst' <- match_kind menv subst (tyVarKind tv1) (tyVarKind tv2)
+       ; match menv' subst' ty1 ty2 }
   where		-- Use the magic of rnBndr2 to go under the binders
     menv' = menv { me_env = rnBndr2 (me_env menv) tv1 tv2 }
 
@@ -207,11 +206,15 @@ match _ _ _ _
   = Nothing
 
 --------------
-match_kind :: MatchEnv -> TvSubstEnv -> TyVar -> Type -> Maybe TvSubstEnv
+match_kind :: MatchEnv -> TvSubstEnv -> Kind -> Kind -> Maybe TvSubstEnv
 -- Match the kind of the template tyvar with the kind of Type
 -- Note [Matching kinds]
-match_kind _ subst tv ty
-  = guard (typeKind ty `isSubKind` tyVarKind tv) >> return subst
+match_kind menv subst k1 k2
+  | k2 `isSubKind` k1
+  = return subst
+
+  | otherwise
+  = match menv subst k1 k2
 
 -- Note [Matching kinds]
 -- ~~~~~~~~~~~~~~~~~~~~~
@@ -509,25 +512,29 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
   | Just ty' <- lookupVarEnv subst tv2
   = uUnrefined subst tv1 ty' ty'
 
+  | otherwise
   -- So both are unrefined; next, see if the kinds force the direction
-  | eqKind k1 k2	-- Can update either; so check the bind-flags
-  = do	{ b1 <- tvBindFlag tv1
-	; b2 <- tvBindFlag tv2
-	; case (b1,b2) of
-	    (BindMe, _) 	 -> bind tv1 ty2
-	    (Skolem, Skolem)	 -> failWith (misMatch ty1 ty2)
-	    (Skolem, _)		 -> bind tv2 ty1
-	}
-
-  | k1 `isSubKind` k2 = bindTv subst tv2 ty1  -- Must update tv2
-  | k2 `isSubKind` k1 = bindTv subst tv1 ty2  -- Must update tv1
-
-  | otherwise = failWith (kindMisMatch tv1 ty2)
-  where
-    ty1 = TyVarTy tv1
-    k1 = tyVarKind tv1
-    k2 = tyVarKind tv2
-    bind tv ty = return $ extendVarEnv subst tv ty
+  = case (k1_sub_k2, k2_sub_k1) of
+        (True,  True)  -> choose subst
+        (True,  False) -> bindTv subst tv2 ty1
+        (False, True)  -> bindTv subst tv1 ty2
+        (False, False) -> do
+            { subst' <- unify subst k1 k2
+            ; choose subst' }
+  where subst_kind = mkTvSubst (mkInScopeSet (tyVarsOfTypes [k1,k2])) subst
+        k1 = substTy subst_kind (tyVarKind tv1)
+        k2 = substTy subst_kind (tyVarKind tv2)
+        k1_sub_k2 = k1 `isSubKind` k2
+        k2_sub_k1 = k2 `isSubKind` k1
+        ty1 = TyVarTy tv1
+        bind subst tv ty = return $ extendVarEnv subst tv ty
+        choose subst = do
+             { b1 <- tvBindFlag tv1
+             ; b2 <- tvBindFlag tv2
+             ; case (b1, b2) of
+                 (BindMe, _)         -> bind subst tv1 ty2
+                 (Skolem, Skolem)    -> failWith (misMatch ty1 ty2)
+                 (Skolem, _)         -> bind subst tv2 ty1 }
 
 uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
   | tv1 `elemVarSet` niSubstTvSet subst (tyVarsOfType ty2')

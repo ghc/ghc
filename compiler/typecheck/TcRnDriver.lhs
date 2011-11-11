@@ -333,7 +333,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	-- any mutually recursive types are done right
 	-- Just discard the auxiliary bindings; they are generated 
 	-- only for Haskell source code, and should already be in Core
-   (tcg_env, _aux_binds) <- tcTyAndClassDecls emptyModDetails rn_decls ;
+   tcg_env <- tcTyAndClassDecls emptyModDetails rn_decls ;
    dep_files <- liftIO $ readIORef (tcg_dependent_files tcg_env) ;
 
    setGblEnv tcg_env $ do {
@@ -357,7 +357,6 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
                                 mg_deps      = noDependencies,	-- ??
                                 mg_exports   = my_exports,
                                 mg_tcs       = tcg_tcs tcg_env,
-                                mg_clss      = tcg_clss tcg_env,
                                 mg_insts     = tcg_insts tcg_env,
                                 mg_fam_insts = tcg_fam_insts tcg_env,
                                 mg_inst_env  = tcg_inst_env tcg_env,
@@ -538,8 +537,8 @@ tcRnHsBootDecls decls
 
 		-- Typecheck type/class decls
 	; traceTc "Tc2" empty
-	; (tcg_env, aux_binds) 
-               <- tcTyAndClassDecls emptyModDetails tycl_decls
+	; tcg_env <- tcTyAndClassDecls emptyModDetails tycl_decls
+        ; let aux_binds = mkRecSelBinds [tc | ATyCon tc <- nameEnvElts (tcg_type_env tcg_env)]
 	; setGblEnv tcg_env    $ do {
 
 		-- Typecheck instance decls
@@ -746,7 +745,8 @@ checkBootTyCon tc1 tc2
          = checkBootTyCon tc1 tc2 &&
            eqListBy eqATDef def_ats1 def_ats2
 
-       eqATDef (ATD tvs1 ty_pats1 ty1) (ATD tvs2 ty_pats2 ty2)
+       -- Ignore the location of the defaults
+       eqATDef (ATD tvs1 ty_pats1 ty1 _loc1) (ATD tvs2 ty_pats2 ty2 _loc2)
          = eqListBy same_kind tvs1 tvs2 &&
            eqListBy (eqTypeX env) ty_pats1 ty_pats2 &&
            eqTypeX env ty1 ty2
@@ -887,9 +887,10 @@ tcTopSrcDecls boot_details
 		-- The latter come in via tycl_decls
         traceTc "Tc2" empty ;
 
-	(tcg_env, aux_binds) <- tcTyAndClassDecls boot_details tycl_decls ;
+	tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
+	let { aux_binds = mkRecSelBinds [tc | tc <- tcg_tcs tcg_env] } ;
 		-- If there are any errors, tcTyAndClassDecls fails here
-	
+
 	setGblEnv tcg_env	$ do {
 
 		-- Source-language instances, including derivings,
@@ -963,6 +964,7 @@ tcTopSrcDecls boot_details
                                  , tcg_vects = tcg_vects tcg_env ++ vects
                                  , tcg_anns  = tcg_anns tcg_env ++ annotations
                                  , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
+
         return (tcg_env', tcl_env)
     }}}}}}
 \end{code}
@@ -1446,7 +1448,7 @@ tcRnType hsc_env ictxt normalise rdr_type
   = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext hsc_env ictxt $ do {
 
-    rn_type <- rnLHsType doc rdr_type ;
+    rn_type <- rnLHsType GHCiCtx rdr_type ;
     failIfErrsM ;
 
 	-- Now kind-check the type
@@ -1462,8 +1464,6 @@ tcRnType hsc_env ictxt normalise rdr_type
             
     return (ty', typeKind ty)
     }
-  where
-    doc = ptext (sLit "In GHCi input")
 
 \end{code}
 
@@ -1727,10 +1727,8 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
 
 pprModGuts :: ModGuts -> SDoc
 pprModGuts (ModGuts { mg_tcs = tcs
-                    , mg_clss = clss
                     , mg_rules = rules })
-  = vcat [ ppr_types [] (mkTypeEnv (map ATyCon tcs
-                                    ++ map (ATyCon . classTyCon) clss)),
+  = vcat [ ppr_types [] (mkTypeEnv (map ATyCon tcs)),
 	   ppr_rules rules ]
 
 ppr_types :: [Instance] -> TypeEnv -> SDoc

@@ -18,7 +18,7 @@
 module TypeRep (
 	TyThing(..),
 	Type(..),
-        Kind, SuperKind,
+        KindOrType, Kind, SuperKind,
         PredType, ThetaType,      -- Synonyms
 
         -- Functions over types
@@ -117,7 +117,7 @@ to cut all loops.  The other members of the loop may be marked 'non-recursive'.
 \begin{code}
 -- | The key representation of types within the compiler
 data Type
-  = TyVarTy TyVar	-- ^ Vanilla type variable (*never* a coercion variable)
+  = TyVarTy Var	-- ^ Vanilla type or kind variable (*never* a coercion variable)
 
   | AppTy
 	Type
@@ -130,7 +130,7 @@ data Type
 
   | TyConApp
 	TyCon
-	[Type]		-- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
+	[KindOrType]	-- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
 	                -- Invariant: saturated appliations of 'FunTyCon' must
 	                -- use 'FunTy' and saturated synonyms must use their own
                         -- constructors. However, /unsaturated/ 'FunTyCon's
@@ -151,10 +151,12 @@ data Type
 			-- See Note [Equality-constrained types]
 
   | ForAllTy
-	TyVar         -- Type variable
+	Var         -- Type or kind variable
 	Type	        -- ^ A polymorphic type
 
   deriving (Data.Data, Data.Typeable)
+
+type KindOrType = Type -- See Note [Arguments to type constructors]
 
 -- | The key type representing kinds in the compiler.
 -- Invariant: a kind is always in one of these forms:
@@ -171,6 +173,30 @@ type Kind = Type
 -- > TyConApp SuperKindTyCon ...
 type SuperKind = Type
 \end{code}
+
+
+Note [Arguments to type constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Because of kind polymorphism, in addition to type application we now
+have kind instantiation. We reuse the same notations to do so.
+
+For example:
+
+  Just (* -> *) Maybe
+  Right * Nat Zero
+
+are represented by:
+
+  TyConApp (PromotedDataCon Just) [* -> *, Maybe]
+  TyConApp (PromotedDataCon Right) [*, Nat, (PromotedDataCon Zero)]
+
+Important note: Nat is used as a *kind* and not as a type. This can be
+confusing, since type-level Nat and kind-level Nat are identical. We
+use the kind of (PromotedDataCon Right) to know if its arguments are
+kinds or types.
+
+This kind instantiation only happens in TyConApp currently.
+
 
 Note [Equality-constrained types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -266,9 +292,12 @@ isLiftedTypeKind _                = False
 %*									*
 %************************************************************************
 
-\begin{code}
+\begin{code}  
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
+-- tyVarsOfType returns only the free *type* variables of a type
+-- For example, tyVarsOfType (a::k) returns {a}, not including the
+-- kind variable {k}
 tyVarsOfType (TyVarTy v)         = unitVarSet v
 tyVarsOfType (TyConApp _ tys)    = tyVarsOfTypes tys
 tyVarsOfType (FunTy arg res)     = tyVarsOfType arg `unionVarSet` tyVarsOfType res
@@ -289,13 +318,22 @@ Despite the fact that DataCon has to be imported via a hi-boot route,
 this module seems the right place for TyThing, because it's needed for
 funTyCon and all the types in TysPrim.
 
+Note [ATyCon for classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Both classes and type constructors are represented in the type environment
+as ATyCon.  You can tell the difference, and get to the class, with
+   isClassTyCon :: TyCon -> Bool
+   tyConClass_maybe :: TyCon -> Maybe Class
+The Class and its associated TyCon have the same Name.
+
 \begin{code}
 -- | A typecheckable-thing, essentially anything that has a name
-data TyThing = AnId     Id
-	     | ADataCon DataCon
-	     | ATyCon   TyCon
-             | ACoAxiom CoAxiom
-        deriving (Eq, Ord)
+data TyThing 
+  = AnId     Id
+  | ADataCon DataCon
+  | ATyCon   TyCon       -- TyCons and classes; see Note [ATyCon for classes]
+  | ACoAxiom CoAxiom
+  deriving (Eq, Ord)
 
 instance Outputable TyThing where 
   ppr = pprTyThing
@@ -343,12 +381,13 @@ instance NamedThing TyThing where	-- Can't put this with the type
 -- 3. The substition is only applied ONCE! This is because
 -- in general such application will not reached a fixed point.
 data TvSubst 		
-  = TvSubst InScopeSet 	-- The in-scope type variables
-	    TvSubstEnv	-- Substitution of types
+  = TvSubst InScopeSet 	-- The in-scope type and kind variables
+	    TvSubstEnv  -- Substitutes both type and kind variables
 	-- See Note [Apply Once]
 	-- and Note [Extending the TvSubstEnv]
 
 -- | A substitition of 'Type's for 'TyVar's
+--                 and 'Kind's for 'KindVar's
 type TvSubstEnv = TyVarEnv Type
 	-- A TvSubstEnv is used both inside a TvSubst (with the apply-once
 	-- invariant discussed in Note [Apply Once]), and also independently
@@ -592,7 +631,7 @@ pprTcApp p pp tc tys
   = tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
   | tc `hasKey` eqTyConKey -- We need to special case the type equality TyCon because
                            -- its not a SymOcc so won't get printed infix
-  , [ty1,ty2] <- tys
+  , [_, ty1,ty2] <- tys
   = pprInfixApp p pp (getName tc) ty1 ty2
   | otherwise
   = pprTypeNameApp p pp (getName tc) tys

@@ -21,7 +21,7 @@ module Type (
 	-- $type_classification
 	
         -- $representation_types
-        TyThing(..), Type, PredType, ThetaType,
+        TyThing(..), Type, KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, 
 
         -- ** Constructing and deconstructing types
@@ -34,11 +34,12 @@ module Type (
 	splitFunTys, splitFunTysN,
 	funResultTy, funArgTy, zipFunTys, 
 
-	mkTyConApp, mkTyConTy, 
+	mkTyConApp, mkTyConTy,
 	tyConAppTyCon_maybe, tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs, 
 	splitTyConApp_maybe, splitTyConApp, 
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
+        mkForAllArrowKinds,
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
 	
 	-- (Newtypes)
@@ -62,7 +63,7 @@ module Type (
         funTyCon,
 
         -- ** Predicates on types
-        isTyVarTy, isFunTy, isDictTy, isPredTy,
+        isTyVarTy, isFunTy, isDictTy, isPredTy, isKindTy,
 
 	-- (Lifting and boxity)
 	isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
@@ -70,24 +71,25 @@ module Type (
 
 	-- * Main data types representing Kinds
 	-- $kind_subtyping
-        Kind, SimpleKind, KindVar,
+        Kind, SimpleKind, MetaKindVar,
 
         -- ** Finding the kind of a type
         typeKind,
         
         -- ** Common Kinds and SuperKinds
-        liftedTypeKind, unliftedTypeKind, openTypeKind,
+        anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind, constraintKind,
         tySuperKind, 
 
         -- ** Common Kind type constructors
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
         argTypeKindTyCon, ubxTupleKindTyCon, constraintKindTyCon,
+        anyKindTyCon,
 
 	-- * Type free variables
 	tyVarsOfType, tyVarsOfTypes,
 	expandTypeSynonyms, 
-	typeSize,
+	typeSize, varSetElemsKvsFirst, sortQuantVars,
 
 	-- * Type comparison
         eqType, eqTypeX, eqTypes, cmpType, cmpTypes, 
@@ -121,17 +123,16 @@ module Type (
         isInScope, composeTvSubst, zipTyEnv,
         isEmptyTvSubst, unionTvSubst,
 
-	-- ** Performing substitution on types
+	-- ** Performing substitution on types and kinds
 	substTy, substTys, substTyWith, substTysWith, substTheta, 
         substTyVar, substTyVars, substTyVarBndr,
-        cloneTyVarBndr, deShadowTy, lookupTyVar, 
+        cloneTyVarBndr, deShadowTy, lookupTyVar,
+        substKiWith, substKisWith,
 
 	-- * Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
 	pprEqPred, pprTheta, pprThetaArrowTy, pprClassPred, 
-        pprKind, pprParendKind,
-	
-	pprSourceTyCon
+        pprKind, pprParendKind, pprSourceTyCon,
     ) where
 
 #include "HsVersions.h"
@@ -139,7 +140,7 @@ module Type (
 -- We import the representation and primitive functions from TypeRep.
 -- Many things are reexported, but not the representation!
 
-import Kind    ( kindAppResult, kindFunResult, isTySuperKind, isSubOpenTypeKind )
+import Kind
 import TypeRep
 
 -- friends:
@@ -151,7 +152,7 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( eqTyCon, mkBoxedTupleTy )
-import PrelNames	         ( eqTyConKey, eqPrimTyConKey )
+import PrelNames	         ( eqTyConKey )
 
 -- others
 import {-# SOURCE #-} IParam ( ipTyCon )
@@ -674,6 +675,13 @@ mkForAllTy tyvar ty
 mkForAllTys :: [TyVar] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
+mkForAllArrowKinds :: [TyVar] -> Kind -> Kind
+-- mkForAllArrowKinds [k1, k2, (a:k1 -> *)] k2
+-- returns forall k1 k2. (k1 -> *) -> k2
+mkForAllArrowKinds ktvs res =
+  mkForAllTys kvs $ mkArrowKinds (map tyVarKind tvs) res
+  where (kvs, tvs) = splitKiTyVars ktvs
+
 isForAllTy :: Type -> Bool
 isForAllTy (ForAllTy _ _) = True
 isForAllTy _              = False
@@ -715,12 +723,12 @@ applyTy, applyTys
 --
 -- We use @applyTys type-of-f [t1,t2]@ to compute the type of the expression.
 -- Panics if no application is possible.
-applyTy :: Type -> Type -> Type
+applyTy :: Type -> KindOrType -> Type
 applyTy ty arg | Just ty' <- coreView ty = applyTy ty' arg
 applyTy (ForAllTy tv ty) arg = substTyWith [tv] [arg] ty
 applyTy _                _   = panic "applyTy"
 
-applyTys :: Type -> [Type] -> Type
+applyTys :: Type -> [KindOrType] -> Type
 -- ^ This function is interesting because:
 --
 --	1. The function may have more for-alls than there are args
@@ -731,12 +739,12 @@ applyTys :: Type -> [Type] -> Type
 --
 -- > applyTys (forall a.a) [forall b.b, Int]
 --
--- This really can happen, via dressing up polymorphic types with newtype
--- clothing.  Here's an example:
---
--- > newtype R = R (forall a. a->a)
--- > foo = case undefined :: R of
--- >            R f -> f ()
+-- This really can happen, but only (I think) in situations involving
+-- undefined.  For example:
+--       undefined :: forall a. a
+-- Term: undefined @(forall b. b->b) @Int 
+-- This term should have type (Int -> Int), but notice that
+-- there are more type args than foralls in 'undefined's type.
 
 applyTys ty args = applyTysD empty ty args
 
@@ -776,7 +784,12 @@ noParenPred :: PredType -> Bool
 noParenPred p = isClassPred p || isEqPred p
 
 isPredTy :: Type -> Bool
-isPredTy ty = typeKind ty `eqKind` constraintKind
+isPredTy ty
+  | isSuperKind ty = False
+  | otherwise = typeKind ty `eqKind` constraintKind
+
+isKindTy :: Type -> Bool
+isKindTy = isSuperKind . typeKind
 
 isClassPred, isEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
@@ -796,10 +809,16 @@ Make PredTypes
 \begin{code}
 -- | Creates a type equality predicate
 mkEqPred :: (Type, Type) -> PredType
-mkEqPred (ty1, ty2) = TyConApp eqTyCon [ty1, ty2]
+mkEqPred (ty1, ty2)
+  -- IA0_TODO: The caller should give the kind.
+  = TyConApp eqTyCon [k, ty1, ty2]
+  where k = defaultKind (typeKind ty1)
 
 mkPrimEqType :: (Type, Type) -> Type
-mkPrimEqType (ty1, ty2) = TyConApp eqPrimTyCon [ty1, ty2]
+mkPrimEqType (ty1, ty2)
+  -- IA0_TODO: The caller should give the kind.
+  = TyConApp eqPrimTyCon [k, ty1, ty2]
+  where k = defaultKind (typeKind ty1)
 \end{code}
 
 --------------------- Implicit parameters ---------------------------------
@@ -877,7 +896,7 @@ predTypePredTree ev_ty = case splitTyConApp_maybe ev_ty of
     Just (tc, tys) | Just clas <- tyConClass_maybe tc
                    -> ClassPred clas tys
     Just (tc, tys) | tc `hasKey` eqTyConKey
-                   , let [ty1, ty2] = tys
+                   , let [_, ty1, ty2] = tys
                    -> EqPred ty1 ty2
     Just (tc, tys) | Just ip <- tyConIP_maybe tc
                    , let [ty] = tys
@@ -905,7 +924,7 @@ getEqPredTys ty = case getEqPredTys_maybe ty of
 
 getEqPredTys_maybe :: PredType -> Maybe (Type, Type)
 getEqPredTys_maybe ty = case splitTyConApp_maybe ty of 
-        Just (tc, [ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
+        Just (tc, [_, ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
         _ -> Nothing
 
 getIPPredTy_maybe :: PredType -> Maybe (IPName Name, Type)
@@ -927,6 +946,26 @@ typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (ForAllTy _ t)  = 1 + typeSize t
 typeSize (TyConApp _ ts) = 1 + sum (map typeSize ts)
+
+varSetElemsKvsFirst :: VarSet -> [TyVar]
+-- {k1,a,k2,b} --> [k1,k2,a,b]
+varSetElemsKvsFirst set = uncurry (++) $ partitionKiTyVars (varSetElems set)
+
+sortQuantVars :: [Var] -> [Var]
+-- Sort the variables so the true kind then type variables come first
+sortQuantVars = sortLe le
+  where
+    v1 `le` v2 = case (is_tv v1, is_tv v2) of
+                   (True, False)  -> True
+                   (False, True)  -> False
+                   (True, True)   ->
+                     case (is_kv v1, is_kv v2) of
+                       (True, False) -> True
+                       (False, True) -> False
+                       _             -> v1 <= v2  -- Same family
+                   (False, False) -> v1 <= v2
+    is_tv v = isTyVar v
+    is_kv v = isSuperKind (tyVarKind v)
 \end{code}
 
 
@@ -1158,6 +1197,29 @@ cmpTypesX _   []        _         = LT
 cmpTypesX _   _         []        = GT
 \end{code}
 
+Note [cmpTypeX]
+~~~~~~~~~~~~~~~
+
+When we compare foralls, we should look at the kinds. But if we do so,
+we get a corelint error like the following (in
+libraries/ghc-prim/GHC/PrimopWrappers.hs):
+
+    Binder's type: forall (o_abY :: *).
+                   o_abY
+                   -> GHC.Prim.State# GHC.Prim.RealWorld
+                   -> GHC.Prim.State# GHC.Prim.RealWorld
+    Rhs type: forall (a_12 :: ?).
+              a_12
+              -> GHC.Prim.State# GHC.Prim.RealWorld
+              -> GHC.Prim.State# GHC.Prim.RealWorld
+
+This is why we don't look at the kind. Maybe we should look if the
+kinds are compatible.
+
+-- cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)
+--   = cmpTypeX env (tyVarKind tv1) (tyVarKind tv2) `thenCmp`
+--     cmpTypeX (rnBndr2 env tv1 tv2) t1 t2
+
 %************************************************************************
 %*									*
 		Type substitutions
@@ -1308,7 +1370,7 @@ instance Outputable TvSubst where
 
 %************************************************************************
 %*									*
-		Performing type substitutions
+		Performing type or kind substitutions
 %*									*
 %************************************************************************
 
@@ -1319,11 +1381,17 @@ substTyWith :: [TyVar] -> [Type] -> Type -> Type
 substTyWith tvs tys = ASSERT( length tvs == length tys )
 		      substTy (zipOpenTvSubst tvs tys)
 
+substKiWith :: [KindVar] -> [Kind] -> Kind -> Kind
+substKiWith = substTyWith
+
 -- | Type substitution making use of an 'TvSubst' that
 -- is assumed to be open, see 'zipOpenTvSubst'
 substTysWith :: [TyVar] -> [Type] -> [Type] -> [Type]
 substTysWith tvs tys = ASSERT( length tvs == length tys )
 		       substTys (zipOpenTvSubst tvs tys)
+
+substKisWith :: [KindVar] -> [Kind] -> [Kind] -> [Kind]
+substKisWith = substTysWith
 
 -- | Substitute within a 'Type'
 substTy :: TvSubst -> Type  -> Type
@@ -1397,7 +1465,9 @@ substTyVarBndr subst@(TvSubst in_scope tenv) old_var
     _no_capture = not (new_var `elemVarSet` tyVarsOfTypes (varEnvElts tenv))
     -- Assertion check that we are not capturing something in the substitution
 
-    no_change = new_var == old_var
+    old_ki = tyVarKind old_var
+    no_kind_change = isEmptyVarSet (tyVarsOfType old_ki) -- verify that kind is closed
+    no_change = no_kind_change && (new_var == old_var)
 	-- no_change means that the new_var is identical in
 	-- all respects to the old_var (same unique, same kind)
 	-- See Note [Extending the TvSubst]
@@ -1408,7 +1478,8 @@ substTyVarBndr subst@(TvSubst in_scope tenv) old_var
 	--	(\x.e) with id_subst = [x |-> e']
 	-- Here we must simply zap the substitution for x
 
-    new_var = uniqAway in_scope old_var
+    new_var | no_kind_change = uniqAway in_scope old_var
+            | otherwise = uniqAway in_scope $ updateTyVarKind (substTy subst) old_var
 	-- The uniqAway part makes sure the new variable is not already in scope
 
 cloneTyVarBndr :: TvSubst -> TyVar -> Unique -> (TvSubst, TyVar)
@@ -1454,9 +1525,9 @@ Kinds
 --
 -- Where in the last example @t :: ??@ (i.e. is not an unboxed tuple)
 
-type KindVar = TyVar  -- invariant: KindVar will always be a 
-                      -- TcTyVar with details MetaTv TauTv ...
--- kind var constructors and functions are in TcType
+type MetaKindVar = TyVar  -- invariant: MetaKindVar will always be a
+                          -- TcTyVar with details MetaTv TauTv ...
+-- meta kind var constructors and functions are in TcType
 
 type SimpleKind = Kind
 \end{code}
@@ -1469,13 +1540,13 @@ type SimpleKind = Kind
 
 \begin{code}
 typeKind :: Type -> Kind
-typeKind ty@(TyConApp tc tys) 
-  = ASSERT2( not (tc `hasKey` eqPrimTyConKey) || length tys == 2, ppr ty )
-             -- Assertion checks for unsaturated application of ~#
-             -- See Note [The ~# TyCon] in TysPrim
-    kindAppResult (tyConKind tc) tys
+typeKind (TyConApp tc tys)
+  | isPromotedTypeTyCon tc
+  = ASSERT( tyConArity tc == length tys ) tySuperKind
+  | otherwise
+  = kindAppResult (tyConKind tc) tys
 
-typeKind (AppTy fun _)        = kindFunResult (typeKind fun)
+typeKind (AppTy fun arg)      = kindAppResult (typeKind fun) [arg]
 typeKind (ForAllTy _ ty)      = typeKind ty
 typeKind (TyVarTy tyvar)      = tyVarKind tyvar
 typeKind (FunTy _arg res)
@@ -1484,8 +1555,8 @@ typeKind (FunTy _arg res)
     -- The only things that can be after a function arrow are
     --   (a) types (of kind openTypeKind or its sub-kinds)
     --   (b) kinds (of super-kind TY) (e.g. * -> (* -> *))
-    | isTySuperKind k         = k
-    | otherwise               = ASSERT( isSubOpenTypeKind k) liftedTypeKind 
+    | isSuperKind k         = k
+    | otherwise             = ASSERT( isSubOpenTypeKind k ) liftedTypeKind
     where
       k = typeKind res
 

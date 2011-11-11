@@ -83,7 +83,6 @@ import DsMeta           ( templateHaskellNames )
 import VarSet
 import VarEnv           ( emptyTidyEnv )
 import Panic
-import Class
 import Data.List
 #endif
 
@@ -1384,8 +1383,7 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     hsc_env <- getHscEnv
     liftIO $ linkDecls hsc_env src_span cbc
 
-    let tcs  = filter (not . isImplicitTyCon) $ mg_tcs simpl_mg
-        clss = mg_clss simpl_mg
+    let tcs         = filter (not . isImplicitTyCon) $ (mg_tcs simpl_mg)
 
         ext_vars = filter (isExternalName . idName) $
                       bindersOfBinds core_binds
@@ -1400,7 +1398,6 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
 
         tythings =  map AnId user_vars
                  ++ map ATyCon tcs
-                 ++ map (ATyCon . classTyCon) clss
 
     let ictxt1 = extendInteractiveContext icontext tythings
         ictxt  = ictxt1 { ic_sys_vars  = sys_vars ++ ic_sys_vars ictxt1,
@@ -1506,7 +1503,6 @@ mkModGuts mod binds =
         mg_rdr_env      = emptyGlobalRdrEnv,
         mg_fix_env      = emptyFixityEnv,
         mg_tcs          = [],
-        mg_clss         = [],
         mg_insts        = [],
         mg_fam_insts    = [],
         mg_rules        = [],

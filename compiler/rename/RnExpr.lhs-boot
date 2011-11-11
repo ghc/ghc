@@ -17,7 +17,7 @@ rnLExpr :: LHsExpr RdrName
 	-> RnM (LHsExpr Name, FreeVars)
 
 rnStmts :: --forall thing.
-	   HsStmtContext Name -> [LStmt RdrName] 
+	   HsStmtContext Name -> [LStmt RdrName]
         -> ([Name] -> RnM (thing, FreeVars))
 	-> RnM (([LStmt Name], thing), FreeVars)
 \end{code}

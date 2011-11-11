@@ -673,6 +673,8 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
 
 	; checkExistentials ex_tvs penv 
         ; ex_tvs' <- tcInstSuperSkolTyVars ex_tvs
+-- JPM: call the X version, with initial subt (univ_tvs -> ctxt_res_tys)
+-- return tenv
                      -- Get location from monad, not from ex_tvs
 
         ; let pat_ty' = mkTyConApp tycon ctxt_res_tys

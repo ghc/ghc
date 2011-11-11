@@ -54,7 +54,7 @@ initV :: HscEnv
       -> IO (Maybe (VectInfo, a))
 initV hsc_env guts info thing_inside
   = do {
-         let type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_clss guts) (mg_fam_insts guts)
+         let type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
        ; (_, Just res) <- initDs hsc_env (mg_module guts)
                                          (mg_rdr_env guts) type_env go
 

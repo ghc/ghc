@@ -21,20 +21,21 @@ module TysPrim(
         tyVarList, alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 	alphaTy, betaTy, gammaTy, deltaTy,
 	openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar, openAlphaTyVars,
-        argAlphaTyVars, argAlphaTyVar, argAlphaTy, argBetaTy, argBetaTyVar,
+        argAlphaTy, argAlphaTyVar, argAlphaTyVars, argBetaTy, argBetaTyVar,
+        kKiVar,
 
         -- Kind constructors...
-        tySuperKindTyCon, tySuperKind,
+        tySuperKindTyCon, tySuperKind, anyKindTyCon,
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
         argTypeKindTyCon, ubxTupleKindTyCon, constraintKindTyCon,
 
-        tySuperKindTyConName, liftedTypeKindTyConName,
+        tySuperKindTyConName, anyKindTyConName, liftedTypeKindTyConName,
         openTypeKindTyConName, unliftedTypeKindTyConName,
         ubxTupleKindTyConName, argTypeKindTyConName,
         constraintKindTyConName,
 
         -- Kinds
-	liftedTypeKind, unliftedTypeKind, openTypeKind,
+	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind, constraintKind,
         mkArrowKind, mkArrowKinds,
 
@@ -74,21 +75,20 @@ module TysPrim(
         eqPrimTyCon,            -- ty1 ~# ty2
 
 	-- * Any
-	anyTy, anyTyCon, anyTyConOfKind, anyTypeOfKind
+	anyTy, anyTyCon, anyTypeOfKind
   ) where
 
 #include "HsVersions.h"
 
-import Var		( TyVar, mkTyVar )
+import Var		( TyVar, KindVar, mkTyVar )
 import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
-import OccName          ( mkTcOcc,mkTyVarOccFS, mkTcOccFS )
+import OccName          ( mkTyVarOccFS, mkTcOccFS )
 import TyCon
 import TypeRep
 import SrcLoc
 import Unique		( mkAlphaTyVarUnique )
 import PrelNames
 import FastString
-import Outputable
 
 import Data.Char
 \end{code}
@@ -127,6 +127,7 @@ primTyCons
     , word32PrimTyCon
     , word64PrimTyCon
     , anyTyCon
+    , anyKindTyCon
     , eqPrimTyCon
 
     , liftedTypeKindTyCon
@@ -223,6 +224,10 @@ argAlphaTyVars@(argAlphaTyVar : argBetaTyVar : _) = tyVarList argTypeKind
 argAlphaTy, argBetaTy :: Type
 argAlphaTy = mkTyVarTy argAlphaTyVar
 argBetaTy  = mkTyVarTy argBetaTyVar
+
+kKiVar :: KindVar
+kKiVar = (tyVarList tySuperKind) !! 10
+
 \end{code}
 
 
@@ -237,15 +242,20 @@ funTyConName :: Name
 funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
 funTyCon :: TyCon
-funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind)
-        -- You might think that (->) should have type (?? -> ? -> *), and you'd be right
-	-- But if we do that we get kind errors when saying
-	--	instance Control.Arrow (->)
-	-- becuase the expected kind is (*->*->*).  The trouble is that the
-	-- expected/actual stuff in the unifier does not go contra-variant, whereas
-	-- the kind sub-typing does.  Sigh.  It really only matters if you use (->) in
-	-- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
-        -- because they are never in scope in the source
+funTyCon = mkFunTyCon funTyConName (mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind)
+-- One step to remove subkinding.
+-- (->) :: * -> * -> *
+-- but we should have (and want) the following typing rule for fully applied arrows
+--      Gamma |- tau   :: k1    k1 in {*, #}
+--      Gamma |- sigma :: k2    k2 in {*, #, (#)}
+--      -----------------------------------------
+--      Gamma |- tau -> sigma :: *
+-- Currently we have the following rule which achieves more or less the same effect
+--      Gamma |- tau   :: ??
+--      Gamma |- sigma :: ?
+--      --------------------------
+--      Gamma |- tau -> sigma :: *
+-- In the end we don't want subkinding at all.
 \end{code}
 
 
@@ -257,18 +267,19 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] lif
 
 \begin{code}
 -- | See "Type#kind_subtyping" for details of the distinction between the 'Kind' 'TyCon's
-tySuperKindTyCon, liftedTypeKindTyCon,
+tySuperKindTyCon, anyKindTyCon, liftedTypeKindTyCon,
       openTypeKindTyCon, unliftedTypeKindTyCon,
       ubxTupleKindTyCon, argTypeKindTyCon,
       constraintKindTyCon
    :: TyCon
-tySuperKindTyConName, liftedTypeKindTyConName,
+tySuperKindTyConName, anyKindTyConName, liftedTypeKindTyConName,
       openTypeKindTyConName, unliftedTypeKindTyConName,
       ubxTupleKindTyConName, argTypeKindTyConName,
       constraintKindTyConName
    :: Name
 
 tySuperKindTyCon      = mkSuperKindTyCon tySuperKindTyConName
+anyKindTyCon          = mkKindTyCon anyKindTyConName          tySuperKind
 liftedTypeKindTyCon   = mkKindTyCon liftedTypeKindTyConName   tySuperKind
 openTypeKindTyCon     = mkKindTyCon openTypeKindTyConName     tySuperKind
 unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName tySuperKind
@@ -280,6 +291,7 @@ constraintKindTyCon   = mkKindTyCon constraintKindTyConName   tySuperKind
 -- ... and now their names
 
 tySuperKindTyConName      = mkPrimTyConName (fsLit "BOX") tySuperKindTyConKey tySuperKindTyCon
+anyKindTyConName      = mkPrimTyConName (fsLit "AnyK") anyKindTyConKey anyKindTyCon
 liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*") liftedTypeKindTyConKey liftedTypeKindTyCon
 openTypeKindTyConName     = mkPrimTyConName (fsLit "?") openTypeKindTyConKey openTypeKindTyCon
 unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
@@ -302,13 +314,15 @@ kindTyConType :: TyCon -> Type
 kindTyConType kind = TyConApp kind []
 
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
-liftedTypeKind, unliftedTypeKind, openTypeKind, argTypeKind, ubxTupleKind, constraintKind :: Kind
+anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind, argTypeKind, ubxTupleKind, constraintKind :: Kind
 
+-- See Note [Any kinds]
+anyKind          = kindTyConType anyKindTyCon
 liftedTypeKind   = kindTyConType liftedTypeKindTyCon
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
 openTypeKind     = kindTyConType openTypeKindTyCon
 argTypeKind      = kindTyConType argTypeKindTyCon
-ubxTupleKind	 = kindTyConType ubxTupleKindTyCon
+ubxTupleKind     = kindTyConType ubxTupleKindTyCon
 constraintKind   = kindTyConType constraintKindTyCon
 
 -- | Given two kinds @k1@ and @k2@, creates the 'Kind' @k1 -> k2@
@@ -406,15 +420,13 @@ Note [The ~# TyCon)
 ~~~~~~~~~~~~~~~~~~~~
 There is a perfectly ordinary type constructor ~# that represents the type
 of coercions (which, remember, are values).  For example
-   Refl Int :: ~# Int Int
+   Refl Int :: ~# * Int Int
 
-Atcually it is not quite "perfectly ordinary" because it is kind-polymorphic:
-   Refl Maybe :: ~# Maybe Maybe
+It is a kind-polymorphic type constructor like Any:
+   Refl Maybe :: ~# (* -> *) Maybe Maybe
 
-So the true kind of ~# :: forall k. k -> k -> #.  But we don't have
-polymorphic kinds (yet). However, (~) really only appears saturated in
-which case there is no problem in finding the kind of (ty1 ~# ty2). So
-we check that in CoreLint (and, in an assertion, in Kind.typeKind).
+(~) only appears saturated. So we check that in CoreLint (and, in an
+assertion, in Kind.typeKind).
 
 Note [The State# TyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -436,7 +448,10 @@ statePrimTyCon	 = pcPrimTyCon statePrimTyConName 1 VoidRep
 
 eqPrimTyCon :: TyCon  -- The representation type for equality predicates
 		      -- See Note [The ~# TyCon]
-eqPrimTyCon  = pcPrimTyCon eqPrimTyConName 2 VoidRep
+eqPrimTyCon  = mkPrimTyCon eqPrimTyConName kind 3 VoidRep
+  where kind = ForAllTy kv $ mkArrowKinds [k, k] unliftedTypeKind
+        kv = kKiVar
+        k = mkTyVarTy kv
 \end{code}
 
 RealWorld is deeply magical.  It is *primitive*, but it is not
@@ -606,7 +621,7 @@ threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName PtrRep
 
 Note [Any types]
 ~~~~~~~~~~~~~~~~
-The type constructor Any::* has these properties
+The type constructor Any of kind forall k. k -> k has these properties:
 
   * It is defined in module GHC.Prim, and exported so that it is 
     available to users.  For this reason it's treated like any other 
@@ -629,31 +644,18 @@ The type constructor Any::* has these properties
     For example   	length Any []
     See Note [Strangely-kinded void TyCons]
 
-In addition, we have a potentially-infinite family of types, one for
-each kind /other than/ *, needed to instantiate otherwise
-un-constrained type variables of kinds other than *.  This is a bit
-like tuples; there is a potentially-infinite family.  They have slightly
-different characteristics to Any::*:
-  
-  * They are built with TyCon.AnyTyCon
-  * They have non-user-writable names like "Any(*->*)" 
-  * They are not exported by GHC.Prim
-  * They are uninhabited (of course; not kind *)
-  * They have a unique derived from their OccName (see Note [Uniques of Any])
-  * Their Names do not live in the global name cache
+Note [Any kinds]
+~~~~~~~~~~~~~~~~
 
-Note [Uniques of Any]
-~~~~~~~~~~~~~~~~~~~~~
-Although Any(*->*), say, doesn't have a binding site, it still needs
-to have a Unique.  Unlike tuples (which are also an infinite family)
-there is no convenient way to index them, so we use the Unique from
-their OccName instead.  That should be unique, 
-  - both wrt each other, because their strings differ
+The type constructor AnyK (of sort BOX) is used internally only to zonk kind
+variables with no constraints on them. It appears in similar circumstances to
+Any, but at the kind level. For example:
 
-  - and wrt any other Name, because Names get uniques with 
-    various 'char' tags, but the OccName of Any will 
-    get a Unique built with mkTcOccUnique, which has a particular 'char' 
-    tag; see Unique.mkTcOccUnique!
+  type family Length (l :: [k]) :: Nat
+  type instance Length [] = Zero
+
+Length is kind-polymorphic, and when applied to the empty (promoted) list it
+will be supplied the kind AnyL: Length AnyK [].
 
 Note [Strangely-kinded void TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -683,25 +685,9 @@ anyTy :: Type
 anyTy = mkTyConTy anyTyCon
 
 anyTyCon :: TyCon
-anyTyCon = mkLiftedPrimTyCon anyTyConName liftedTypeKind 0 PtrRep
+anyTyCon = mkLiftedPrimTyCon anyTyConName kind 1 PtrRep
+  where kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
 
 anyTypeOfKind :: Kind -> Type
-anyTypeOfKind kind = mkTyConApp (anyTyConOfKind kind) []
-
-anyTyConOfKind :: Kind -> TyCon
--- Map all superkinds of liftedTypeKind to liftedTypeKind
-anyTyConOfKind kind 
-  | isLiftedTypeKind kind = anyTyCon
-  | otherwise             = tycon
-  where
-	  -- Derive the name from the kind, thus:
-	  --     Any(*->*), Any(*->*->*)
-	  -- These are names that can't be written by the user,
-	  -- and are not allocated in the global name cache
-    str = "Any" ++ showSDoc (pprParendKind kind)
-
-    occ   = mkTcOcc str
-    uniq  = getUnique occ  -- See Note [Uniques of Any]
-    name  = mkWiredInName gHC_PRIM occ uniq (ATyCon tycon) UserSyntax
-    tycon = mkAnyTyCon name kind 
+anyTypeOfKind kind = mkTyConApp anyTyCon [kind]
 \end{code}

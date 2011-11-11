@@ -53,6 +53,7 @@ import NameEnv
 import TcType
 import TyCon
 import TysWiredIn
+import TysPrim ( liftedTypeKindTyConName )
 import CoreSyn
 import MkCore
 import CoreUtils
@@ -81,7 +82,7 @@ dsBracket brack splices
   where
     new_bit = mkNameEnv [(n, Splice (unLoc e)) | (n,e) <- splices]
 
-    do_brack (VarBr n)   = do { MkC e1  <- lookupOcc n ; return e1 }
+    do_brack (VarBr _ n) = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr e)   = do { MkC e1  <- repLE e     ; return e1 }
     do_brack (PatBr p)   = do { MkC p1  <- repTopP p   ; return p1 }
     do_brack (TypBr t)   = do { MkC t1  <- repLTy t    ; return t1 }
@@ -598,7 +599,7 @@ repTyVarBndrWithKind :: LHsTyVarBndr Name
                      -> Core TH.Name -> DsM (Core TH.TyVarBndr)
 repTyVarBndrWithKind (L _ (UserTyVar {})) nm
   = repPlainTV nm
-repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) nm
+repTyVarBndrWithKind (L _ (KindedTyVar _ ki _)) nm
   = repKind ki >>= repKindedTV nm
 
 -- represent a type context
@@ -684,7 +685,7 @@ repTy (HsTupleTy HsUnboxedTuple tys) = do
 			        tys1 <- repLTys tys
 			        tcon <- repUnboxedTupleTyCon (length tys)
 			        repTapps tcon tys1
-repTy (HsOpTy ty1 n ty2)    = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1) 
+repTy (HsOpTy ty1 (_, n) ty2) = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
 			    	   `nlHsAppTy` ty2)
 repTy (HsParTy t)  	    = repLTy t
 repTy (HsKindSig t k)       = do
@@ -696,17 +697,16 @@ repTy ty		      = notHandled "Exotic form of type" (ppr ty)
 
 -- represent a kind
 --
-repKind :: Kind -> DsM (Core TH.Kind)
+repKind :: LHsKind Name -> DsM (Core TH.Kind)
 repKind ki
-  = do { let (kis, ki') = splitKindFunTys ki
+  = do { let (kis, ki') = splitHsFunType ki
        ; kis_rep <- mapM repKind kis
        ; ki'_rep <- repNonArrowKind ki'
        ; foldrM repArrowK ki'_rep kis_rep
        }
   where
-    repNonArrowKind k | isLiftedTypeKind k = repStarK
-                      | otherwise          = notHandled "Exotic form of kind" 
-                                                        (ppr k)
+    repNonArrowKind (L _ (HsTyVar name)) | name == liftedTypeKindTyConName = repStarK
+    repNonArrowKind k = notHandled "Exotic form of kind" (ppr k)
 
 -----------------------------------------------------------------------------
 -- 		Splices

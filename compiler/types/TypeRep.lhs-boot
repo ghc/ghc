@@ -8,6 +8,7 @@ data TyThing
 
 type PredType = Type
 type Kind = Type
+type SuperKind = Type
 
 instance Outputable Type
 \end{code}

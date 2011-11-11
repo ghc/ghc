@@ -420,16 +420,25 @@ mkIPName ip tycon_u datacon_u dc_wrk_u co_ax_u = name_ip
 \begin{code}
 eqTyCon :: TyCon
 eqTyCon = mkAlgTyCon eqTyConName
-            (mkArrowKinds [openTypeKind, openTypeKind] constraintKind)
-            [alphaTyVar, betaTyVar]
+            (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
+            [kv, a, b]
             []      -- No stupid theta
             (DataTyCon [eqBoxDataCon] False)
             NoParentTyCon
             NonRecursive
             False
-    
+  where
+    kv = kKiVar
+    k = mkTyVarTy kv
+    a:b:_ = tyVarList k
+
 eqBoxDataCon :: DataCon
-eqBoxDataCon = pcDataCon eqBoxDataConName [alphaTyVar, betaTyVar] [TyConApp eqPrimTyCon [mkTyVarTy alphaTyVar, mkTyVarTy betaTyVar]] eqTyCon
+eqBoxDataCon = pcDataCon eqBoxDataConName args [TyConApp eqPrimTyCon (map mkTyVarTy args)] eqTyCon
+  where
+    kv = kKiVar
+    k = mkTyVarTy kv
+    a:b:_ = tyVarList k
+    args = [kv, a, b]
 \end{code}
 
 \begin{code}
