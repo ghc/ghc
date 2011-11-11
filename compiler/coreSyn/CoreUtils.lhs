@@ -715,6 +715,7 @@ it's applied only to dictionaries.
 %************************************************************************
 
 \begin{code}
+-----------------------------
 -- | 'exprOkForSpeculation' returns True of an expression that is:
 --
 --  * Safe to evaluate even if normal order eval might not
@@ -755,12 +756,8 @@ exprOkForSpeculation :: Expr b -> Bool
 exprOkForSpeculation (Lit _)      = True
 exprOkForSpeculation (Type _)     = True
 exprOkForSpeculation (Coercion _) = True
-
-exprOkForSpeculation (Var v)
-      =  isUnLiftedType (idType v)          -- c.f. the Var case of exprIsHNF
-      || isDataConWorkId v                  -- Nullary constructors
-      || idArity v > 0                      -- Functions
-      || isEvaldUnfolding (idUnfolding v)   -- Let-bound values
+exprOkForSpeculation (Var v)      = appOkForSpeculation v []
+exprOkForSpeculation (Cast e _)   = exprOkForSpeculation e
 
 -- Tick annotations that *tick* cannot be speculated, because these
 -- are meant to identify whether or not (and how often) the particular
@@ -769,8 +766,6 @@ exprOkForSpeculation (Tick tickish e)
    | tickishCounts tickish = False
    | otherwise             = exprOkForSpeculation e
 
-exprOkForSpeculation (Cast e _)  = exprOkForSpeculation e
-
 exprOkForSpeculation (Case e _ _ alts)
   =  exprOkForSpeculation e  -- Note [exprOkForSpeculation: case expressions]
   && all (\(_,_,rhs) -> exprOkForSpeculation rhs) alts
@@ -778,37 +773,46 @@ exprOkForSpeculation (Case e _ _ alts)
 
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
-        (Var f, args) -> spec_ok (idDetails f) args
+        (Var f, args) -> appOkForSpeculation f args
         _             -> False
 
-  where
-    spec_ok (DataConWorkId _) _
-      = True    -- The strictness of the constructor has already
+-----------------------------
+appOkForSpeculation :: Id -> [Expr b] -> Bool
+appOkForSpeculation fun args
+  = case idDetails fun of
+      DFunId new_type ->  not new_type
+         -- DFuns terminate, unless the dict is implemented 
+         -- with a newtype in which case they may not
+
+      DataConWorkId {} -> True
+                -- The strictness of the constructor has already
                 -- been expressed by its "wrapper", so we don't need
                 -- to take the arguments into account
 
-    spec_ok (PrimOpId op) args
-      | isDivOp op,             -- Special case for dividing operations that fail
-        [arg1, Lit lit] <- args -- only if the divisor is zero
-      = not (isZeroLit lit) && exprOkForSpeculation arg1
-                -- Often there is a literal divisor, and this
-                -- can get rid of a thunk in an inner looop
+      PrimOpId op
+        | isDivOp op              -- Special case for dividing operations that fail
+        , [arg1, Lit lit] <- args -- only if the divisor is zero
+        -> not (isZeroLit lit) && exprOkForSpeculation arg1
+                  -- Often there is a literal divisor, and this
+                  -- can get rid of a thunk in an inner looop
 
-      | DataToTagOp <- op      -- See Note [dataToTag speculation]
-      = True
+        | DataToTagOp <- op      -- See Note [dataToTag speculation]
+        -> True
 
-      | otherwise
-      = primOpOkForSpeculation op &&
-        all exprOkForSpeculation args
-                                -- A bit conservative: we don't really need
-                                -- to care about lazy arguments, but this is easy
+        | otherwise
+        -> primOpOkForSpeculation op &&
+           all exprOkForSpeculation args
+                                  -- A bit conservative: we don't really need
+                                  -- to care about lazy arguments, but this is easy
 
-    spec_ok (DFunId new_type) _ = not new_type
-         -- DFuns terminate, unless the dict is implemented with a newtype
-         -- in which case they may not
+      _other -> isUnLiftedType (idType fun)          -- c.f. the Var case of exprIsHNF
+             || idArity fun > n_val_args             -- Partial apps
+             || (n_val_args ==0 && 
+                 isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
+             where
+               n_val_args = valArgCount args
 
-    spec_ok _ _ = False
-
+-----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
 -- True  <=> the case alterantives are definiely exhaustive
 -- False <=> they may or may not be
@@ -977,19 +981,19 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
         -- we could get an infinite loop
 
     is_hnf_like (Lit _)          = True
-    is_hnf_like (Type _)        = True       -- Types are honorary Values;
+    is_hnf_like (Type _)         = True       -- Types are honorary Values;
                                               -- we don't mind copying them
     is_hnf_like (Coercion _)     = True       -- Same for coercions
     is_hnf_like (Lam b e)        = isRuntimeVar b || is_hnf_like e
     is_hnf_like (Tick tickish e) = not (tickishCounts tickish)
                                       && is_hnf_like e
                                       -- See Note [exprIsHNF Tick]
-    is_hnf_like (Cast e _)       = is_hnf_like e
-    is_hnf_like (App e (Type _))    = is_hnf_like e
+    is_hnf_like (Cast e _)           = is_hnf_like e
+    is_hnf_like (App e (Type _))     = is_hnf_like e
     is_hnf_like (App e (Coercion _)) = is_hnf_like e
-    is_hnf_like (App e a)        = app_is_value e [a]
-    is_hnf_like (Let _ e)        = is_hnf_like e  -- Lazy let(rec)s don't affect us
-    is_hnf_like _                = False
+    is_hnf_like (App e a)            = app_is_value e [a]
+    is_hnf_like (Let _ e)            = is_hnf_like e  -- Lazy let(rec)s don't affect us
+    is_hnf_like _                    = False
 
     -- There is at least one value argument
     app_is_value :: CoreExpr -> [CoreArg] -> Bool
