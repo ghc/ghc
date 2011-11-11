@@ -475,14 +475,13 @@ canEq fl eqv ty1 (TyConApp fn tys)
   = do { untch <- getUntouchables 
        ; canEqLeaf untch fl eqv (classify ty1) (FunCls fn tys) }
 
-canEq fl eqv ty1@(TyConApp tc1 tys1) ty2@(TyConApp tc2 tys2)
+canEq fl eqv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
   | isDecomposableTyCon tc1 && isDecomposableTyCon tc2
   , tc1 == tc2
   , length tys1 == length tys2
   = -- Generate equalities for each of the corresponding arguments
-    do { let (kis1, tys1') = span isKind tys1
-             (kis2, tys2') = span isKind tys2
-       ; zipWithM_ (unifyKindTcS ty1 ty2) kis1 kis2
+    do { let (kis1,  tys1') = span isKind tys1
+             (_kis2, tys2') = span isKind tys2
        ; let kicos = map mkReflCo kis1
        ; argeqvs
              <- if isWanted fl then
@@ -780,8 +779,14 @@ canEqLeafOriented :: CtFlavor -> EqVar
 canEqLeafOriented fl eqv cls1@(FunCls fn tys1) s2         -- cv : F tys1
   = ASSERT2( isSynFamilyTyCon fn, ppr (unClassify cls1) )
     do { are_compat <- compatKindTcS k1 k2  -- make sure that the kind are compatible
-       ; unless are_compat (unifyKindTcS (unClassify cls1) s2 k1 k2)
-       ; (xis1,cos1,ccs1) <- flattenMany fl tys1 -- Flatten type function arguments
+       ; can_unify <- if not are_compat 
+                      then unifyKindTcS (unClassify cls1) s2 k1 k2
+                      else return False
+         -- If the kinds cannot be unified or are not compatible, don't fail
+         -- right away; instead, emit a frozen error
+       ; if (not are_compat && not can_unify) then canEqFailure fl eqv else
+    do {
+         (xis1,cos1,ccs1) <- flattenMany fl tys1 -- Flatten type function arguments
                                                  -- cos1 :: xis1 ~ tys1
        ; (xi2, co2, ccs2) <- flatten fl s2       -- Flatten entire RHS
                                                  -- co2  :: xi2 ~ s2
@@ -810,7 +815,7 @@ canEqLeafOriented fl eqv cls1@(FunCls fn tys1) s2         -- cv : F tys1
                                   , cc_fun    = fn
                                   , cc_tyargs = xis1 
                                   , cc_rhs    = xi2 }
-       ; return $ ccs `extendCCans` final_cc }
+       ; return $ ccs `extendCCans` final_cc } }
   where
     k1 = typeKind (unClassify cls1)
     k2 = typeKind s2
@@ -828,8 +833,14 @@ canEqLeafTyVarLeft :: CtFlavor -> EqVar -> TcTyVar -> TcType -> TcS CanonicalCts
 -- Establish invariants of CTyEqCans 
 canEqLeafTyVarLeft fl eqv tv s2       -- cv : tv ~ s2
   = do { are_compat <- compatKindTcS k1 k2
-       ; unless are_compat (unifyKindTcS (mkTyVarTy tv) s2 k1 k2)
-       ; (xi2, co, ccs2) <- flatten fl s2  -- Flatten RHS   co : xi2 ~ s2
+       ; can_unify <- if not are_compat
+                      then unifyKindTcS (mkTyVarTy tv) s2 k1 k2
+                      else return False
+         -- If the kinds cannot be unified or are not compatible, don't fail
+         -- right away; instead, emit a frozen error
+       ; if (not are_compat && not can_unify) then canEqFailure fl eqv else
+    do {
+         (xi2, co, ccs2) <- flatten fl s2  -- Flatten RHS   co : xi2 ~ s2
        ; mxi2' <- canOccursCheck fl tv xi2 -- Do an occurs check, and return a possibly
                                            -- unfolded version of the RHS, if we had to 
                                            -- unfold any type synonyms to get rid of tv.
@@ -849,7 +860,7 @@ canEqLeafTyVarLeft fl eqv tv s2       -- cv : tv ~ s2
        ; return $ ccs2 `extendCCans` CTyEqCan { cc_id     = eqv_new
                                               , cc_flavor = fl
                                               , cc_tyvar  = tv
-                                              , cc_rhs    = xi2' } } } }
+                                              , cc_rhs    = xi2' } } } } }
   where
     k1 = tyVarKind tv
     k2 = typeKind s2
