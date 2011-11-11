@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 
 import qualified Data.Set as S
+import GHC.Prim ( Constraint )
 
 class RMonad m where
     type RMonadCtxt m a :: Constraint

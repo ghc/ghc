@@ -1,5 +1,7 @@
 {-# LANGUAGE GADTs, TypeFamilies, ConstraintKinds #-}
 
+import GHC.Prim ( Constraint )
+
 type Showish = Show
 
 f :: (Showish a) => a -> String
