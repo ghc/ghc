@@ -1,7 +1,7 @@
 
 tcfail136.hs:9:35:
     `SymDict' is not applied to enough type arguments
-    Expected kind `?', but `SymDict' has kind `* -> *'
+    Expected kind `??', but `SymDict' has kind `* -> *'
     In the type `SymDict'
     In the definition of data constructor `SymTable'
     In the data type declaration for `SymTable'

@@ -1,7 +1,7 @@
 
 SimpleFail14.hs:5:15:
     Predicate `a ~ a' used as a type
-    Expected kind `?', but `a ~ a' has kind `Constraint'
+    Expected kind `??', but `a ~ a' has kind `Constraint'
     In the type `a ~ a'
     In the definition of data constructor `T'
     In the data type declaration for `T'

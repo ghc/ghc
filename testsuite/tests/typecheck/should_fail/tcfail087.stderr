@@ -1,5 +1,7 @@
 
-tcfail087.hs:6:11:
-    Illegal unboxed tuple type as function argument: (# Int, Int #)
+tcfail087.hs:6:14:
+    Kind mis-match
+    Expected kind `??', but `(# Int, Int #)' has kind `(#)'
+    In the type `(# Int, Int #)'
     In the definition of data constructor `Ex'
     In the data type declaration for `Ex'

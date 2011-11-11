@@ -1,19 +1,20 @@
 
-rw.hs:14:47:
+rw.hs:14:42:
     Couldn't match type `a' with `Int'
       `a' is a rigid type variable bound by
           the type signature for writeInt :: T a -> IORef a -> IO ()
           at rw.hs:13:1
-    In the second argument of `writeIORef', namely `(1 :: Int)'
+    Expected type: IORef Int
+      Actual type: IORef a
+    In the first argument of `writeIORef', namely `ref'
     In the expression: writeIORef ref (1 :: Int)
-    In a case alternative: ~(Li x) -> writeIORef ref (1 :: Int)
 
-rw.hs:19:51:
+rw.hs:19:34:
     Couldn't match type `a' with `Bool'
       `a' is a rigid type variable bound by
           the type signature for readBool :: T a -> IORef a -> IO ()
           at rw.hs:17:1
-    Expected type: a -> Bool
-      Actual type: Bool -> Bool
-    In the second argument of `(.)', namely `not'
-    In the second argument of `(>>=)', namely `(print . not)'
+    Expected type: IORef Bool
+      Actual type: IORef a
+    In the first argument of `readIORef', namely `ref'
+    In the first argument of `(>>=)', namely `readIORef ref'

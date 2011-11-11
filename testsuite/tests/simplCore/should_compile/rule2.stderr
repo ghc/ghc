@@ -13,21 +13,18 @@
 Total ticks:     11
 
 2 PreInlineUnconditionally
-    1 f
-    1 lvl
-1 UnfoldingDone
-    1 Roman.bar
-1 RuleFired
-    1 foo/bar
+  1 f
+  1 lvl
+1 UnfoldingDone 1 Roman.bar
+1 RuleFired 1 foo/bar
 7 BetaReduction
-    1 f
-    1 m
-    1 a
-    1 m
-    1 a
-    1 m
-    1 b
-8 SimplifierDone
-    8
+  1 f
+  1 m
+  1 a
+  1 m
+  1 a
+  1 b
+  1 m
+8 SimplifierDone 8
 
 

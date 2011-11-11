@@ -6,7 +6,7 @@ TH_foreignInterruptible.hs:1:1: Splicing declarations
             Interruptible
             "&"
             (mkName "foo")
-            (AppT (ConT 'Ptr) (ConT '())))]
+            (AppT (ConT ''Ptr) (ConT ''())))]
   ======>
     TH_foreignInterruptible.hs:8:3-100
     foreign import ccall interruptible "static &foo" foo

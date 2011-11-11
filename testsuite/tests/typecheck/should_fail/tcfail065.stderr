@@ -1,11 +1,12 @@
 
-tcfail065.hs:29:20:
-    Couldn't match type `x1' with `x'
+tcfail065.hs:29:18:
+    Couldn't match type `x' with `x1'
+      `x' is a rigid type variable bound by
+          the instance declaration at tcfail065.hs:28:18
       `x1' is a rigid type variable bound by
            the type signature for setX :: x1 -> X x -> X x
            at tcfail065.hs:29:3
-      `x' is a rigid type variable bound by
-          the instance declaration at tcfail065.hs:28:18
-    In the first argument of `X', namely `x'
+    Expected type: X x1
+      Actual type: X x
+    In the return type of a call of `X'
     In the expression: X x
-    In an equation for `setX': setX x (X _) = X x

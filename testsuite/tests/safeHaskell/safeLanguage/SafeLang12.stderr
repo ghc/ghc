@@ -6,5 +6,6 @@ SafeLang12_B.hs:2:14:
     Warning: -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
 [1 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
 
-SafeLang12_B.hs:14:68:
-    lexical error in string/character literal at character '\''
+SafeLang12_B.hs:14:67:
+    Syntax error on ''Class
+    Perhaps you intended to use -XTemplateHaskell

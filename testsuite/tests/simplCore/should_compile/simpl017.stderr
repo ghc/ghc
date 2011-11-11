@@ -1,7 +1,7 @@
 
 simpl017.hs:44:12:
     Couldn't match expected type `forall v. [E m i] -> E' v m a'
-                with actual type `[E m i] -> E' v0 m a'
+                with actual type `[E m i] -> E' v0 m0 e0'
     In the first argument of `return', namely `f'
     In a stmt of a 'do' block: return f
     In the first argument of `E', namely

@@ -1,5 +1,6 @@
 
 tcfail090.hs:8:9:
+    Couldn't match kind `*' against `#'
     Kind incompatibility when matching types:
       a0 :: *
       ByteArray# :: #

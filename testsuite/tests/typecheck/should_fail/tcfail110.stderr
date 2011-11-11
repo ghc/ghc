@@ -1,6 +1,6 @@
 
-tcfail110.hs:8:30:
+tcfail110.hs:8:19:
     `Foo a' is not applied to enough type arguments
-    Expected kind `*', but `Foo a' has kind `* -> *'
+    Expected kind `??', but `Foo a' has kind `* -> *'
     In the type signature for `bar':
       bar :: String -> (forall a. Foo a) -> IO ()

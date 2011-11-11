@@ -15,9 +15,9 @@ tcfail174.hs:13:14:
     In the expression: Capture g
 
 tcfail174.hs:16:14:
-    Couldn't match expected type `forall x. x -> b'
+    Couldn't match expected type `forall x. x -> a0'
                 with actual type `forall a. a -> a'
-    Expected type: Capture (forall x. x -> b)
+    Expected type: Capture (forall x. x -> a0)
       Actual type: Capture (forall a. a -> a)
     In the first argument of `Capture', namely `g'
     In the expression: Capture g

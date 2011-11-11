@@ -1,7 +1,7 @@
 
 tcfail148.hs:5:28:
     `List' is not applied to enough type arguments
-    Expected kind `?', but `List' has kind `* -> *'
+    Expected kind `??', but `List' has kind `* -> *'
     In the type `List'
     In the definition of data constructor `Cons'
     In the data type declaration for `List'

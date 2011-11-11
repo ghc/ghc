@@ -38,7 +38,8 @@ expectedGhcOnlyExtensions = ["ParallelArrays",
                              "AlternativeLayoutRule",
                              "AlternativeLayoutRuleTransitional",
                              "MonadComprehensions",
-                             "TraditionalRecordSyntax"]
+                             "TraditionalRecordSyntax",
+                             "PolyKinds"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",

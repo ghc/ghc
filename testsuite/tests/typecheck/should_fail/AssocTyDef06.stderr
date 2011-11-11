@@ -1,6 +1,5 @@
 
 AssocTyDef06.hs:6:5:
-    Kind mis-match
-    Expected kind `k0 -> k1 -> k2', but `Typ' has kind `k0 -> *'
+    Number of parameters must match family declaration; expected 1
     In the type synonym instance default declaration for `Typ'
     In the class declaration for `Cls'

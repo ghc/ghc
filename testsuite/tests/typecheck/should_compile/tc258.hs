@@ -2,6 +2,8 @@
 
 module AltPrelude where
 
+import GHC.Prim (Constraint)
+
 class MyFunctor f where
        type FunctorCtxt f a :: Constraint
        type FunctorCtxt f a = ()

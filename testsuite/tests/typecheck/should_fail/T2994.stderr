@@ -5,10 +5,10 @@ T2994.hs:11:10:
     but `MonadReader Int' has kind `* -> Constraint'
     In the instance declaration for `MonadReader Int'
 
-T2994.hs:13:10:
-    `MonadReader (Reader' r)' is not applied to enough type arguments
-    Expected kind `Constraint',
-    but `MonadReader (Reader' r)' has kind `* -> Constraint'
+T2994.hs:13:23:
+    `Reader' r' is not applied to enough type arguments
+    The first argument of `MonadReader' should have kind `*',
+    but `Reader' r' has kind `* -> *'
     In the instance declaration for `MonadReader (Reader' r)'
 
 T2994.hs:15:10:

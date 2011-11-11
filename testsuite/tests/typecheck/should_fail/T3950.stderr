@@ -1,7 +1,7 @@
 
 T3950.hs:15:13:
-    Couldn't match expected type `Id p' with actual type `Id p x0'
+    Couldn't match expected type `Id p' with actual type `Id p0 x0'
     Expected type: w (Id p)
-      Actual type: Sealed (Id p x0)
+      Actual type: Sealed (Id p0 x0)
     In the first argument of `Just', namely rp'
     In the expression: Just rp'

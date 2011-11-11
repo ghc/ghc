@@ -1,5 +1,5 @@
 TH_genEx.hs:1:1: Splicing declarations
-    genAny (reify 'MyInterface)
+    genAny (reify ''MyInterface)
   ======>
     TH_genEx.hs:13:3-30
     data AnyMyInterface1111

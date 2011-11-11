@@ -1,5 +1,5 @@
 
-tcfail213.hs:6:1:
+tcfail213.hs:8:1:
     Illegal irreducible constraint F a
     in superclass/instance head context (Use -XUndecidableInstances to permit this)
     In the context: (F a)

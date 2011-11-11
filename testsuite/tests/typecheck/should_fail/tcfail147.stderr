@@ -1,7 +1,7 @@
 
 tcfail147.hs:7:19:
     `XClass' is not applied to enough type arguments
-    Expected kind `?', but `XClass' has kind `k0 -> Constraint'
+    Expected kind `??', but `XClass' has kind `k0 -> Constraint'
     In the type `XClass'
     In the definition of data constructor `XCon'
     In the data type declaration for `XData'

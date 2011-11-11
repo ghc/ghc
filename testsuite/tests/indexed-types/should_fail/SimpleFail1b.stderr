@@ -1,5 +1,4 @@
 
 SimpleFail1b.hs:4:1:
-    Kind mis-match
-    Expected kind `* -> * -> k0 -> k1', but `T1' has kind `* -> * -> *'
+    Number of parameters must match family declaration; expected 2
     In the data type instance declaration for `T1'

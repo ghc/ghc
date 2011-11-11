@@ -1,11 +1,11 @@
 
 tcfail115.hs:9:24:
+    Couldn't match kind `??' against `(#)'
     Kind incompatibility when matching types:
       t0 :: ??
       (# Int, Int #) :: (#)
     In the expression: (r :: (# Int, Int #))
     In a case alternative: r -> (r :: (# Int, Int #))
-    In the expression: case t of { r -> (r :: (# Int, Int #)) }
 
 tcfail115.hs:12:25:
     The variable `r' cannot have an unboxed tuple type: (# Int, Int #)

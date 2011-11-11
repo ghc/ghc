@@ -1,6 +1,8 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds, UndecidableInstances #-}
 module Ctx where
 
+import GHC.Prim( Constraint )
+
 type family Indirect :: * -> Constraint
 type instance Indirect = Show
 
