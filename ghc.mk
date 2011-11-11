@@ -313,9 +313,11 @@ endif
 # Packages that are built but not installed
 PKGS_THAT_ARE_INTREE_ONLY := haskeline mtl terminfo utf8-string xhtml
 
-PKGS_THAT_ARE_DPH := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
-                dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
-                vector primitive random
+PKGS_THAT_ARE_DPH := \
+    dph/dph-base \
+    dph/dph-prim-interface dph/dph-prim-seq dph/dph-prim-par \
+    dph/dph-lifted-boxed dph/dph-lifted-copy dph/dph-lifted-vseg \
+    vector primitive random
 
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
@@ -539,8 +541,6 @@ endif
 # these cases, so we just skip checking them.
 # NB. these must come before we include the ghc.mk files below, because
 # they disable the relevant rules.
-CHECKED_libraries/dph/dph-seq = YES
-CHECKED_libraries/dph/dph-par = YES
 # In compiler's case, include-dirs points outside of the source tree
 CHECKED_compiler = YES
 
