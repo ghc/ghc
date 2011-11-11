@@ -554,6 +554,7 @@ gen_wrappers (Info _ entries)
         llvmOnlyTyCon "FloatX4#"  = True
         llvmOnlyTyCon "DoubleX2#" = True
         llvmOnlyTyCon "Int32X4#"  = True
+        llvmOnlyTyCon "Int64X2#"  = True
         llvmOnlyTyCon _           = False
 
 gen_primop_list :: Info -> String
@@ -676,6 +677,7 @@ ppType (TyApp "Double#"     []) = "doublePrimTy"
 ppType (TyApp "FloatX4#"    []) = "floatX4PrimTy"
 ppType (TyApp "DoubleX2#"   []) = "doubleX2PrimTy"
 ppType (TyApp "Int32X4#"    []) = "int32X4PrimTy"
+ppType (TyApp "Int64X2#"    []) = "int64X2PrimTy"
 ppType (TyApp "ByteArray#"  []) = "byteArrayPrimTy"
 ppType (TyApp "RealWorld"   []) = "realWorldTy"
 ppType (TyApp "ThreadId#"   []) = "threadIdPrimTy"

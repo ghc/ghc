@@ -2488,6 +2488,103 @@ primop  WriteOffAddrOp_Int32AsInt32X4 "writeInt32OffAddrAsInt32X4#" GenPrimOp
    Addr# -> Int# -> Int32X4# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
+
+------------------------------------------------------------------------
+section "Int64 SIMD Vectors" 
+	{Operations on SIMD vectors of 2 64-bit signed integers.}
+------------------------------------------------------------------------
+
+primtype Int64X2#
+
+primop Int64ToInt64X2Op "int64ToInt64X2#" GenPrimOp     
+   INT64 -> Int64X2#
+
+primop Int64X2InsertOp "insertInt64X2#" GenPrimOp     
+   Int64X2# -> INT64 -> Int# -> Int64X2#
+   with can_fail = True
+
+primop Int64X2PackOp "packInt64X2#" GenPrimOp         
+   INT64 -> INT64 -> Int64X2#
+
+primop Int64X2UnpackOp "unpackInt64X2#" GenPrimOp         
+   Int64X2# -> (# INT64, INT64 #)
+
+primop Int64X2AddOp "plusInt64X2#" Dyadic            
+   Int64X2# -> Int64X2# -> Int64X2#
+   with commutable = True
+
+primop Int64X2SubOp "minusInt64X2#" Dyadic
+  Int64X2# -> Int64X2# -> Int64X2#
+
+primop Int64X2MulOp "timesInt64X2#" Dyadic    
+   Int64X2# -> Int64X2# -> Int64X2#
+   with commutable = True
+
+primop Int64X2QuotOp "quotInt64X2#" Dyadic  
+   Int64X2# -> Int64X2# -> Int64X2#
+   with can_fail = True
+   
+primop Int64X2RemOp "remInt64X2#" Dyadic  
+   Int64X2# -> Int64X2# -> Int64X2#
+   with can_fail = True
+
+primop Int64X2NegOp "negateInt64X2#" Monadic
+   Int64X2# -> Int64X2#
+
+primop IndexByteArrayOp_Int64X2 "indexInt64X2Array#" GenPrimOp
+   ByteArray# -> Int# -> Int64X2#
+   with can_fail = True
+
+primop ReadByteArrayOp_Int64X2 "readInt64X2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_Int64X2 "writeInt64X2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_Int64X2 "indexInt64X2OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int64X2#
+   with can_fail = True
+
+primop ReadOffAddrOp_Int64X2 "readInt64X2OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+
+primop  WriteOffAddrOp_Int64X2 "writeInt64X2OffAddr#" GenPrimOp
+   Addr# -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexByteArrayOp_Int64AsInt64X2 "indexInt64ArrayAsInt64X2#" GenPrimOp
+   ByteArray# -> Int# -> Int64X2#
+   with can_fail = True
+
+primop ReadByteArrayOp_Int64AsInt64X2 "readInt64ArrayAsInt64X2#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_Int64AsInt64X2 "writeInt64ArrayAsInt64X2#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_Int64AsInt64X2 "indexInt64OffAddrAsInt64X2#" GenPrimOp
+   Addr# -> Int# -> Int64X2#
+   with can_fail = True
+
+primop ReadOffAddrOp_Int64AsInt64X2 "readInt64OffAddrAsInt64X2#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, Int64X2# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteOffAddrOp_Int64AsInt64X2 "writeInt64OffAddrAsInt64X2#" GenPrimOp
+   Addr# -> Int# -> Int64X2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
    
 ------------------------------------------------------------------------
 ---                                                                  ---
