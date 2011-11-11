@@ -128,7 +128,7 @@ exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
 -- and gives them a suitable strictness signatures.  It's used during
 -- float-out
 exprBotStrictness_maybe e
-  = case getBotArity (arityType is_cheap e) of
+  = case getBotArity (arityType [] is_cheap e) of
 	Nothing -> Nothing
 	Just ar -> Just (ar, mkStrictSig (mkTopDmdType (replicate ar topDmd) BotRes))
   where
@@ -251,34 +251,32 @@ Or, to put it another way, in any context C
 
 It's all a bit more subtle than it looks:
 
-Note [Arity of case expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We treat the arity of 
-	case x of p -> \s -> ...
-as 1 (or more) because for I/O ish things we really want to get that
-\s to the top.  We are prepared to evaluate x each time round the loop
-in order to get that.
-
-This isn't really right in the presence of seq.  Consider
-	f = \x -> case x of
-			True  -> \y -> x+y
-			False -> \y -> x-y
-Can we eta-expand here?  At first the answer looks like "yes of course", but
-consider
-	(f bot) `seq` 1
-This should diverge!  But if we eta-expand, it won't.   Again, we ignore this
-"problem", because being scrupulous would lose an important transformation for
-many programs.
-
-1.  Note [One-shot lambdas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [One-shot lambdas]
+~~~~~~~~~~~~~~~~~~~~~~~
 Consider one-shot lambdas
 		let x = expensive in \y z -> E
 We want this to have arity 1 if the \y-abstraction is a 1-shot lambda.
 
-3.  Note [Dealing with bottom]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
+Note [Dealing with bottom]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+A Big Deal with computing arities is expressions like
+
+   f = \x -> case x of
+               True  -> \s -> e1
+               False -> \s -> e2
+
+This happens all the time when f :: Bool -> IO ()
+In this case we do eta-expand, in order to get that \s to the
+top, and give f arity 2.
+
+This isn't really right in the presence of seq.  Consider
+	(f bot) `seq` 1
+
+This should diverge!  But if we eta-expand, it won't.  We ignore this
+"problem", because being scrupulous would lose an important
+transformation for many programs.
+
+Consider also
 	f = \x -> error "foo"
 Here, arity 1 is fine.  But if it is
 	f = \x -> case x of 
@@ -290,22 +288,31 @@ should diverge, but it'll converge if we eta-expand f.  Nevertheless, we
 do so; it improves some programs significantly, and increasing convergence
 isn't a bad thing.  Hence the ABot/ATop in ArityType.
 
-However, this really isn't always the Right Thing, and we have several
-tickets reporting unexpected bahaviour resulting from this
-transformation.  So we try to limit it as much as possible:
+So these two transformations aren't always the Right Thing, and we
+have several tickets reporting unexpected bahaviour resulting from
+this transformation.  So we try to limit it as much as possible:
 
- * Do NOT move a lambda outside a known-bottom case expression
-      case undefined of { (a,b) -> \y -> e }
-   This showed up in Trac #5557
+ (1) Do NOT move a lambda outside a known-bottom case expression
+       case undefined of { (a,b) -> \y -> e }
+     This showed up in Trac #5557
 
- * Do NOT move a lambda outside a case if all the branches of 
-   the case are known to return bottom.
-      case x of { (a,b) -> \y -> error "urk" }
-   This case is less important, but the idea is that if the fn is 
-   going to diverge eventually anyway then getting the best arity 
-   isn't an issue, so we might as well play safe
+ (2) Do NOT move a lambda outside a case if all the branches of 
+     the case are known to return bottom.
+        case x of { (a,b) -> \y -> error "urk" }
+     This case is less important, but the idea is that if the fn is 
+     going to diverge eventually anyway then getting the best arity 
+     isn't an issue, so we might as well play safe
 
-Of course both these are readily defeated by disguising the bottoms.
+ (3) Do NOT move a lambda outside a case unless 
+     (a) The scrutinee is ok-for-speculation, or
+     (b) There is an enclosing value \x, and the scrutinee is x
+         E.g.  let x = case y of ( DEFAULT -> \v -> blah }
+     We don't move the \y out.  This is pretty arbitrary; but it
+     catches the common case of doing `seq` on y.
+     This is the reason for the under_lam argument to arityType.
+     See Trac #5625
+
+Of course both (1) and (2) are readily defeated by disguising the bottoms.
 
 4. Note [Newtype arity]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -467,7 +474,7 @@ exprEtaExpandArity :: CheapFun -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
 -- 	e  ==>  \xy -> e x y
 exprEtaExpandArity cheap_fun e
-  = case (arityType cheap_fun e) of
+  = case (arityType [] cheap_fun e) of
       ATop (os:oss) 
         | os || has_lam e -> 1 + length oss	-- Note [Eta expanding thunks]
         | otherwise       -> 0
@@ -558,10 +565,13 @@ type CheapFun = CoreExpr -> Maybe Type -> Bool
 	-- If the Maybe is Just, the type is the type
 	-- of the expression; Nothing means "don't know"
 
-arityType :: CheapFun -> CoreExpr -> ArityType
+arityType :: [Id] 	 -- Enclosing value-lambda Ids
+                         -- See Note [Dealing with bottom (3)]
+          -> CheapFun
+          -> CoreExpr -> ArityType
 
-arityType cheap_fn (Cast e co)
-  = case arityType cheap_fn e of
+arityType under_lam cheap_fn (Cast e co)
+  = case arityType under_lam cheap_fn e of
       ATop os -> ATop (take co_arity os)
       ABot n  -> ABot (n `min` co_arity)
   where
@@ -573,7 +583,7 @@ arityType cheap_fn (Cast e co)
     -- However, do make sure that ATop -> ATop and ABot -> ABot!
     --   Casts don't affect that part. Getting this wrong provoked #5475
 
-arityType _ (Var v)
+arityType _ _ (Var v)
   | Just strict_sig <- idStrictness_maybe v
   , (ds, res) <- splitStrictSig strict_sig
   , let arity = length ds
@@ -586,15 +596,17 @@ arityType _ (Var v)
     one_shots = typeArity (idType v)
 
 	-- Lambdas; increase arity
-arityType cheap_fn (Lam x e)
-  | isId x    = arityLam x (arityType cheap_fn e)
-  | otherwise = arityType cheap_fn e
+arityType under_lam cheap_fn (Lam x e)
+  | isId x    = arityLam x (arityType (x:under_lam) cheap_fn e)
+  | otherwise = arityType under_lam cheap_fn e
 
 	-- Applications; decrease arity, except for types
-arityType cheap_fn (App fun (Type _))
-   = arityType cheap_fn fun
-arityType cheap_fn (App fun arg )
-   = arityApp (arityType cheap_fn fun) (cheap_fn arg Nothing) 
+arityType under_lam cheap_fn (App fun (Type _))
+   = arityType under_lam cheap_fn fun
+arityType under_lam cheap_fn (App fun arg )
+   = arityApp (arityType under_lam' cheap_fn fun) (cheap_fn arg Nothing) 
+   where
+     under_lam' = case under_lam of { [] -> []; (_:xs) -> xs }
 
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
@@ -604,31 +616,39 @@ arityType cheap_fn (App fun arg )
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
 	--
-arityType cheap_fn (Case scrut _ _ alts)
+arityType under_lam cheap_fn (Case scrut _ _ alts)
   | exprIsBottom scrut 
   = ABot 0     -- Do not eta expand
-               -- See Note [Dealing with bottom]
+               -- See Note [Dealing with bottom (1)]
   | otherwise
   = case alts_type of
      ABot n  | n>0       -> ATop []    -- Don't eta expand 
      	     | otherwise -> ABot 0     -- if RHS is bottomming
-    			               -- See Note [Dealing with bottom]
-     ATop as | exprIsTrivial scrut -> ATop as
-             | otherwise           -> ATop (takeWhile id as)	    
-  where
-    alts_type = foldr1 andArityType [arityType cheap_fn rhs | (_,_,rhs) <- alts]
+    			               -- See Note [Dealing with bottom (2)]
 
-arityType cheap_fn (Let b e) 
-  = floatIn (cheap_bind b) (arityType cheap_fn e)
+     ATop as | is_under scrut             -> ATop as
+             | exprOkForSpeculation scrut -> ATop as
+             | otherwise                  -> ATop (takeWhile id as)	    
+  where
+    -- is_under implements Note [Dealing with bottom (3)]
+    is_under (Var f)           = f `elem` under_lam
+    is_under (App f (Type {})) = is_under f
+    is_under (Cast f _)        = is_under f
+    is_under _                 = False
+
+    alts_type = foldr1 andArityType [arityType under_lam cheap_fn rhs | (_,_,rhs) <- alts]
+
+arityType under_lam cheap_fn (Let b e) 
+  = floatIn (cheap_bind b) (arityType under_lam cheap_fn e)
   where
     cheap_bind (NonRec b e) = is_cheap (b,e)
     cheap_bind (Rec prs)    = all is_cheap prs
     is_cheap (b,e) = cheap_fn e (Just (idType b))
 
-arityType cheap_fn (Tick t e)
-  | not (tickishIsCode t)     = arityType cheap_fn e
+arityType under_lam cheap_fn (Tick t e)
+  | not (tickishIsCode t)     = arityType under_lam cheap_fn e
 
-arityType _           _       = vanillaArityType
+arityType _ _ _ = vanillaArityType
 \end{code}
   
   
