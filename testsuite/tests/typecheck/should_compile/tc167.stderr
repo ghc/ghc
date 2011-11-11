@@ -1,0 +1,6 @@
+
+tc167.hs:8:11:
+    Expecting a lifted type, but `Int#' is unlifted
+    The first argument of `(->)' should have kind `*',
+    but `Int#' has kind `#'
+    In the type signature for `f': f :: (->) Int# Int#
