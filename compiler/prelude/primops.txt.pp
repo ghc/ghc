@@ -2297,6 +2297,101 @@ primop  WriteOffAddrOp_FloatAsFloatX4 "writeFloatOffAddrAsFloatX4#" GenPrimOp
         can_fail = True
 
 ------------------------------------------------------------------------
+section "Double SIMD Vectors" 
+	{Operations on SIMD vectors of 2 double-precision (64-bit)
+         floating-point numbers.}
+------------------------------------------------------------------------
+
+primtype DoubleX2#
+
+primop DoubleToDoubleX2Op "doubleToDoubleX2#" GenPrimOp     
+   Double# -> DoubleX2#
+
+primop DoubleX2InsertOp "insertDoubleX2#" GenPrimOp     
+   DoubleX2# -> Double# -> Int# -> DoubleX2#
+   with can_fail = True
+
+primop DoubleX2PackOp "packDoubleX2#" GenPrimOp         
+   Double# -> Double# -> DoubleX2#
+
+primop DoubleX2UnpackOp "unpackDoubleX2#" GenPrimOp         
+   DoubleX2# -> (# Double#, Double# #)
+
+primop DoubleX2AddOp "plusDoubleX2#" Dyadic            
+   DoubleX2# -> DoubleX2# -> DoubleX2#
+   with commutable = True
+
+primop DoubleX2SubOp "minusDoubleX2#" Dyadic
+  DoubleX2# -> DoubleX2# -> DoubleX2#
+
+primop DoubleX2MulOp "timesDoubleX2#" Dyadic    
+   DoubleX2# -> DoubleX2# -> DoubleX2#
+   with commutable = True
+
+primop DoubleX2DivOp "divideDoubleX2#" Dyadic  
+   DoubleX2# -> DoubleX2# -> DoubleX2#
+   with can_fail = True
+
+primop DoubleX2NegOp "negateDoubleX2#" Monadic
+   DoubleX2# -> DoubleX2#
+
+primop IndexByteArrayOp_DoubleX2 "indexDoubleX2Array#" GenPrimOp
+   ByteArray# -> Int# -> DoubleX2#
+   with can_fail = True
+
+primop ReadByteArrayOp_DoubleX2 "readDoubleX2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_DoubleX2 "writeDoubleX2Array#" GenPrimOp
+   MutableByteArray# s -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_DoubleX2 "indexDoubleX2OffAddr#" GenPrimOp
+   Addr# -> Int# -> DoubleX2#
+   with can_fail = True
+
+primop ReadOffAddrOp_DoubleX2 "readDoubleX2OffAddr#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteOffAddrOp_DoubleX2 "writeDoubleX2OffAddr#" GenPrimOp
+   Addr# -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexByteArrayOp_DoubleAsDoubleX2 "indexDoubleArrayAsDoubleX2#" GenPrimOp
+   ByteArray# -> Int# -> DoubleX2#
+   with can_fail = True
+
+primop ReadByteArrayOp_DoubleAsDoubleX2 "readDoubleArrayAsDoubleX2#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop WriteByteArrayOp_DoubleAsDoubleX2 "writeDoubleArrayAsDoubleX2#" GenPrimOp
+   MutableByteArray# s -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop IndexOffAddrOp_DoubleAsDoubleX2 "indexDoubleOffAddrAsDoubleX2#" GenPrimOp
+   Addr# -> Int# -> DoubleX2#
+   with can_fail = True
+
+primop ReadOffAddrOp_DoubleAsDoubleX2 "readDoubleOffAddrAsDoubleX2#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, DoubleX2# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteOffAddrOp_DoubleAsDoubleX2 "writeDoubleOffAddrAsDoubleX2#" GenPrimOp
+   Addr# -> Int# -> DoubleX2# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+------------------------------------------------------------------------
 section "Int32 SIMD Vectors" 
 	{Operations on SIMD vectors of 4 32-bit signed integers.}
 ------------------------------------------------------------------------
