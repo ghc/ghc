@@ -17,7 +17,7 @@ module Haddock.Backends.LaTeX (
 import Haddock.Types
 import Haddock.Utils
 import Haddock.GhcUtils
-import Pretty hiding (Doc)
+import Pretty hiding (Doc, quote)
 import qualified Pretty
 
 import GHC
@@ -25,7 +25,6 @@ import OccName
 import Name                 ( isTyConName, nameOccName )
 import RdrName              ( rdrNameOcc, isRdrTc )
 import BasicTypes           ( ipNameName )
-import Outputable           ( Outputable, ppr, showSDoc )
 import FastString           ( unpackFS, unpackLitString )
 
 import qualified Data.Map as Map
@@ -791,10 +790,6 @@ pp_hs_context cxt unicode = parenList (map (ppType unicode) cxt)
 -------------------------------------------------------------------------------
 
 
-ppKind :: Outputable a => a -> LaTeX
-ppKind k = text (showSDoc (ppr k))
-
-
 ppBang :: HsBang -> LaTeX
 ppBang HsNoBang = empty
 ppBang _        = char '!' -- Unpacked args is an implementation detail,
@@ -840,6 +835,12 @@ ppType       unicode ty = ppr_mono_ty pREC_TOP ty unicode
 ppParendType unicode ty = ppr_mono_ty pREC_CON ty unicode
 ppFunLhType  unicode ty = ppr_mono_ty pREC_FUN ty unicode
 
+ppLKind :: Bool -> LHsKind DocName -> LaTeX
+ppLKind unicode y = ppKind unicode (unLoc y)
+
+ppKind :: Bool -> HsKind DocName -> LaTeX
+ppKind unicode ki = ppr_mono_ty pREC_TOP ki unicode
+
 
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
@@ -868,7 +869,7 @@ ppr_mono_ty _         (HsBangTy b ty)     u = ppBang b <> ppLParendType u ty
 ppr_mono_ty _         (HsTyVar name)      _ = ppDocName name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
 ppr_mono_ty _         (HsTupleTy con tys) u = tupleParens con (map (ppLType u) tys)
-ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppKind kind)
+ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppLKind u kind)
 ppr_mono_ty _         (HsListTy ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsIParamTy n ty)   u = brackets (ppDocName (ipNameName n) <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u)
@@ -876,6 +877,9 @@ ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ = error "ppr_mono_ty HsQuasiQuoteTy"
 ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"
 ppr_mono_ty _         (HsCoreTy {})       _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty _         (HsExplicitListTy _ tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
+ppr_mono_ty _         (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLType u) tys
+ppr_mono_ty _         (HsWrapTy {})       _ = error "ppr_mono_ty HsWrapTy"
 
 ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2) unicode
   = maybeParen ctxt_prec pREC_OP $
@@ -885,7 +889,7 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode
   = maybeParen ctxt_prec pREC_CON $
     hsep [ppr_mono_lty pREC_FUN fun_ty unicode, ppr_mono_lty pREC_CON arg_ty unicode]
 
-ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2) unicode
+ppr_mono_ty ctxt_prec (HsOpTy ty1 (_, op) ty2) unicode
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode
   where

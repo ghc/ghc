@@ -558,10 +558,10 @@ miniSynopsis mdl iface unicode qual =
 
 processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocName
                        -> [Html]
-processForMiniSynopsis mdl unicode _ (ExportDecl (L _loc decl0) _doc _ _insts) =
+processForMiniSynopsis mdl unicode qual (ExportDecl (L _loc decl0) _doc _ _insts) =
   ((divTopDecl <<).(declElem <<)) `fmap` case decl0 of
     TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
-        (TyFamily{}) -> [ppTyFamHeader True False d unicode]
+        (TyFamily{}) -> [ppTyFamHeader True False d unicode qual]
         (TyData{tcdTyPats = ps})
           | Nothing <- ps -> [keyword "data" <+> b]
           | Just _ <- ps  -> [keyword "data" <+> keyword "instance" <+> b]

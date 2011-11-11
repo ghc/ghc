@@ -20,8 +20,7 @@ module Haddock.Convert where
 import HsSyn
 import TcType ( tcSplitTyConApp_maybe, tcSplitSigmaTy )
 import TypeRep
-import Kind ( liftedTypeKind, constraintKind )
-import Coercion ( splitKindFunTys, synTyConResKind )
+import Kind ( liftedTypeKind, constraintKind, splitKindFunTys, synTyConResKind )
 import Name
 import Var
 import Class
@@ -103,14 +102,14 @@ synifyTyCon tc
       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
       (zipWith
          (\fakeTyVar realKind -> noLoc $
-             KindedTyVar (getName fakeTyVar) realKind)
+             KindedTyVar (getName fakeTyVar) (synifyKind realKind) placeHolderKind)
          alphaTyVars --a, b, c... which are unfortunately all kind *
          (fst . splitKindFunTys $ tyConKind tc)
       )
       -- assume primitive types aren't members of data/newtype families:
       Nothing
       -- we have their kind accurately:
-      (Just (tyConKind tc))
+      (Just (synifyKind (tyConKind tc)))
       -- no algebraic constructors:
       []
       -- "deriving" needn't be specified:
@@ -119,13 +118,14 @@ synifyTyCon tc
       case synTyConRhs tc of
         SynFamilyTyCon ->
           TyFamily TypeFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
-               (Just (synTyConResKind tc))
+               (Just (synifyKind (synTyConResKind tc))) -- placeHolderKind
         _ -> error "synifyTyCon: impossible open type synonym?"
   | isDataFamilyTyCon tc = --(why no "isOpenAlgTyCon"?)
       case algTyConRhs tc of
         DataFamilyTyCon ->
           TyFamily DataFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
                Nothing --always kind '*'
+               -- placeHolderKind
         _ -> error "synifyTyCon: impossible open data type?"
   | otherwise =
   -- (closed) type, newtype, and data
@@ -164,7 +164,7 @@ synifyTyCon tc
   syn_type = synifyType WithinType (synTyConType tc)
  in if isSynTyCon tc
   then TySynonym name tyvars typats syn_type
-  else TyData alg_nd alg_ctx name tyvars typats alg_kindSig alg_cons alg_deriv
+  else TyData alg_nd alg_ctx name tyvars typats (fmap synifyKind alg_kindSig) alg_cons alg_deriv
 
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
@@ -238,7 +238,7 @@ synifyTyVars = map synifyTyVar
       name = getName tv
      in if isLiftedTypeKind kind
         then UserTyVar name placeHolderKind
-        else KindedTyVar name kind
+        else KindedTyVar name (synifyKind kind) placeHolderKind
 
 
 --states of what to do with foralls:
@@ -306,6 +306,8 @@ synifyType s forallty@(ForAllTy _tv _ty) =
      in noLoc $
            HsForAllTy forallPlicitness sTvs sCtx sTau
 
+synifyKind :: Kind -> LHsKind Name
+synifyKind = synifyType (error "synifyKind")
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
                   ([HsType Name], Name, [HsType Name])
