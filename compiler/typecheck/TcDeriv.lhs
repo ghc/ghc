@@ -34,7 +34,7 @@ import TcMType
 import TcSimplify
 
 import RnBinds
-import RnEnv
+import RnEnv  
 import RnSource   ( addTcgDUs )
 import HscTypes
 
@@ -474,13 +474,12 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; (tvs, theta, cls, inst_tys) <- tcHsInstHead deriv_ty
+       ; (tvs, theta, cls, inst_tys) <- tcHsInstHead TcType.InstDeclCtxt deriv_ty
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs:" <+> ppr tvs
               , text "theta:" <+> ppr theta
               , text "cls:" <+> ppr cls
               , text "tys:" <+> ppr inst_tys ]
-       ; checkValidInstance deriv_ty tvs theta cls inst_tys
 		-- C.f. TcInstDcls.tcLocalInstDecl1
 
        ; let cls_tys = take (length inst_tys - 1) inst_tys
@@ -494,6 +493,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
 
 ------------------------------------------------------------------
 deriveTyData :: (LHsType Name, LTyClDecl Name) -> TcM EarlyDerivSpec
+-- The deriving clause of a data or newtype declaration
 deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 					           tcdTyVars = tv_names,
 				    	           tcdTyPats = ty_pats }))
@@ -541,7 +541,7 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 	; checkTc (not (isFamilyTyCon tc) || n_args_to_drop == 0)
 		  (typeFamilyPapErr tc cls cls_tys inst_ty)
 
-	; mkEqnHelp DerivOrigin (varSetElems univ_tvs) cls cls_tys inst_ty Nothing } }
+	; mkEqnHelp DerivOrigin (varSetElemsKvsFirst univ_tvs) cls cls_tys inst_ty Nothing } }
   where
 	-- Tiresomely we must figure out the "lhs", which is awkward for type families
 	-- E.g.   data T a b = .. deriving( Eq )
@@ -553,6 +553,7 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
     get_lhs Nothing     = do { tc <- tcLookupTyCon tycon_name
 			     ; let tvs = tyConTyVars tc
 			     ; return (tvs, tc, mkTyVarTys tvs) }
+    -- JPM: to fix
     get_lhs (Just pats) = do { let hs_app = nlHsTyConApp tycon_name pats
 			     ; (tvs, tc_app) <- tcHsQuantifiedType tv_names hs_app
 			     ; let (tc, tc_args) = tcSplitTyConApp tc_app
@@ -1111,7 +1112,7 @@ mkNewTypeEqn orig dflags tvs
 	; dfun_name <- new_dfun_name cls tycon
   	; loc <- getSrcSpanM
 	; let spec = DS { ds_loc = loc, ds_orig = orig
-			, ds_name = dfun_name, ds_tvs = varSetElems dfun_tvs
+			, ds_name = dfun_name, ds_tvs = varSetElemsKvsFirst dfun_tvs
 			, ds_cls = cls, ds_tys = inst_tys
 			, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
 			, ds_theta =  mtheta `orElse` all_preds

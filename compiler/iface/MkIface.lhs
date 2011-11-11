@@ -1490,7 +1490,7 @@ classToIfaceDecl clas
       = IfaceAT (tyThingToIfaceDecl (ATyCon tc))
                 (map to_if_at_def defs)
       where
-        to_if_at_def (ATD tvs pat_tys ty)
+        to_if_at_def (ATD tvs pat_tys ty _loc)
           = IfaceATD (toIfaceTvBndrs tvs) (map toIfaceType pat_tys) (toIfaceType ty)
 
     toIfaceClassOp (sel_id, def_meth)

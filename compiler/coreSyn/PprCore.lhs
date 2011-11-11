@@ -28,6 +28,7 @@ import Demand
 import DataCon
 import TyCon
 import Type
+import Kind
 import Coercion
 import StaticFlags
 import BasicTypes

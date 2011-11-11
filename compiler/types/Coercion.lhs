@@ -19,19 +19,7 @@ module Coercion (
         Coercion(..), Var, CoVar,
         LCoercion,
 
-        -- ** Deconstructing Kinds 
-        kindFunResult, kindAppResult, synTyConResKind,
-        splitKindFunTys, splitKindFunTysN, splitKindFunTy_maybe,
-
-        -- ** Predicates on Kinds
-        isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
-        isUbxTupleKind, isArgTypeKind, isKind, isTySuperKind, 
-        isSuperKind, 
-	mkArrowKind, mkArrowKinds,
-
-        isSubArgTypeKind, isSubOpenTypeKind, isSubKind, defaultKind, eqKind,
-        isSubKindCon,
-
+        -- ** Functions over coercions
         coVarKind, coVarKind_maybe,
         coercionType, coercionKind, coercionKinds, isReflCo,
         mkCoercionType,
@@ -90,7 +78,6 @@ import Unify	( MatchEnv(..), matchList )
 import TypeRep
 import qualified Type
 import Type hiding( substTy, substTyVarBndr, extendTvSubst )
-import Kind
 import TyCon
 import Var
 import VarEnv
@@ -161,21 +148,22 @@ data Coercion
   deriving (Data.Data, Data.Typeable)
 \end{code}
 
+Note [LCoercions]
+~~~~~~~~~~~~~~~~~
+| LCoercions are a hack used by the typechecker. Normally,
+Coercions have free variables of type (a ~# b): we call these
+CoVars. However, the type checker passes around equality evidence
+(boxed up) at type (a ~ b).
+
+An LCoercion is simply a Coercion whose free variables have the
+boxed type (a ~ b). After we are done with typechecking the
+desugarer finds the free variables, unboxes them, and creates a
+resulting real Coercion with kosher free variables.
+
+We can use most of the Coercion "smart constructors" to build LCoercions. However,
+mkCoVarCo will not work! The equivalent is mkEqVarLCo.
+
 \begin{code}
--- Note [LCoercions]
--- ~~~~~~~~~~~~~~~~~
--- | LCoercions are a hack used by the typechecker. Normally,
--- Coercions have free variables of type (a ~# b): we call these
--- CoVars. However, the type checker passes around equality evidence
--- (boxed up) at type (a ~ b).
---
--- An LCoercion is simply a Coercion whose free variables have the
--- boxed type (a ~ b). After we are done with typechecking the
--- desugarer finds the free variables, unboxes them, and creates a
--- resulting real Coercion with kosher free variables.
---
--- We can use most of the Coercion "smart constructors" to build LCoercions. However,
--- mkCoVarCo will not work! The equivalent is mkEqVarLCo.
 type LCoercion = Coercion
 \end{code}
 
@@ -280,6 +268,30 @@ in Coercion.  This is important because we need Nth to work on
 predicates too:
     Nth 1 ((~) [c] g) = g
 See Simplify.simplCoercionF, which generates such selections.
+
+Note [Kind coercions]
+~~~~~~~~~~~~~~~~~~~~~
+Suppose T :: * -> *, and g :: A ~ B
+Then the coercion
+   TyConAppCo T [g]      T g : T A ~ T B
+
+Now suppose S :: forall k. k -> *, and g :: A ~ B
+Then the coercion
+   TyConAppCo S [Refl *, g]   T <*> g : T * A ~ T * B
+
+Notice that the arguments to TyConAppCo are coercions, but the first
+represents a *kind* coercion. Now, we don't allow any non-trivial kind
+coercions, so it's an invariant that any such kind coercions are Refl.
+Lint checks this. 
+
+However it's inconvenient to insist that these kind coercions are always
+*structurally* (Refl k), because the key function exprIsConApp_maybe
+pushes coercions into constructor arguments, so 
+       C k ty e |> g
+may turn into
+       C (Nth 0 g) ....
+Now (Nth 0 g) will optimise to Refl, but perhaps not instantly.
+
 
 %************************************************************************
 %*									*
@@ -446,6 +458,7 @@ pprCoAxiom ax
 -- > decomposeCo 3 c = [nth 0 c, nth 1 c, nth 2 c]
 decomposeCo :: Arity -> Coercion -> [Coercion]
 decomposeCo arity co = [mkNthCo n co | n <- [0..(arity-1)] ]
+                       -- Remember, Nth is zero-indexed
 
 -- | Attempts to obtain the type variable underlying a 'Coercion'
 getCoVar_maybe :: Coercion -> Maybe CoVar
@@ -488,7 +501,7 @@ coVarKind cv = case coVarKind_maybe cv of
 
 coVarKind_maybe :: CoVar -> Maybe (Type,Type) 
 coVarKind_maybe cv = case splitTyConApp_maybe (varType cv) of
-  Just (tc, [ty1, ty2]) | tc `hasKey` eqPrimTyConKey -> Just (ty1, ty2)
+  Just (tc, [_, ty1, ty2]) | tc `hasKey` eqPrimTyConKey -> Just (ty1, ty2)
   _ -> Nothing
 
 -- | Makes a coercion type from two types: the types whose equality 
@@ -923,6 +936,9 @@ ty_co_subst subst ty
 			     -- won't be in the substitution
     go (AppTy ty1 ty2)   = mkAppCo (go ty1) (go ty2)
     go (TyConApp tc tys) = mkTyConAppCo tc (map go tys)
+                           -- IA0_NOTE: Do we need to do anything
+                           -- about kind instantiations? I don't think
+                           -- so.  see Note [Kind coercions]
     go (FunTy ty1 ty2)   = mkFunCo (go ty1) (go ty2)
     go (ForAllTy v ty)   = mkForAllCo v' $! (ty_co_subst subst' ty)
                          where
@@ -1083,6 +1099,7 @@ coercionKinds :: [Coercion] -> Pair [Type]
 coercionKinds tys = sequenceA $ map coercionKind tys
 
 getNth :: Int -> Type -> Type
+-- Executing Nth
 getNth n ty | Just tys <- tyConAppArgs_maybe ty
             = ASSERT2( n < length tys, ppr n <+> ppr tys ) tys !! n
 getNth n ty = pprPanic "getNth" (ppr n <+> ppr ty)
@@ -1095,3 +1112,9 @@ applyCo ty co | Just ty' <- coreView ty = applyCo ty' co
 applyCo (FunTy _ ty) _ = ty
 applyCo _            _ = panic "applyCo"
 \end{code}
+
+Note [Kind coercions]
+~~~~~~~~~~~~~~~~~~~~~
+Kind coercions are only of the form: Refl kind. They are only used to
+instantiate kind polymorphic type constructors in TyConAppCo. Remember
+that kind instantiation only happens with TyConApp, not AppTy.

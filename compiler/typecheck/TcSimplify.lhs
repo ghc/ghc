@@ -28,7 +28,6 @@ import VarSet
 import VarEnv 
 import Coercion
 import TypeRep
-
 import Name
 import NameEnv	( emptyNameEnv )
 import Bag
@@ -210,6 +209,18 @@ Allow constraints which consist only of type variables, with no repeats.
 *                                                                                 *
 ***********************************************************************************
 
+Note [Which variables to quantify]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose the inferred type of a function is
+   T kappa (alpha:kappa) -> Int
+where alpha is a type unification variable and 
+      kappa is a kind unification variable
+Then we want to quantify over *both* alpha and kappa.  But notice that
+kappa appears "at top level" of the type, as well as inside the kind
+of alpha.  So it should be fine to just look for the "top level"
+kind/type variables of the type, without looking transitively into the
+kinds of those type variables.
+
 \begin{code}
 simplifyInfer :: Bool
               -> Bool                  -- Apply monomorphism restriction
@@ -226,8 +237,10 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs     <- tcGetGlobalTyVars            -- Already zonked
        ; zonked_taus <- zonkTcTypes (map snd name_taus)
-       ; let tvs_to_quantify = get_tau_tvs zonked_taus `minusVarSet` gbl_tvs
-       ; qtvs <- zonkQuantifiedTyVars (varSetElems tvs_to_quantify)
+       ; let tvs_to_quantify = tyVarsOfTypes zonked_taus `minusVarSet` gbl_tvs
+       	     		       -- tvs_to_quantify can contain both kind and type vars
+       	                       -- See Note [Which variables to quantify]
+       ; qtvs <- zonkQuantifiedTyVars tvs_to_quantify
        ; return (qtvs, [], False, emptyTcEvBinds) }
 
   | otherwise
@@ -249,7 +262,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 	     -- Then split the constraints on the baisis of those tyvars
 	     -- to avoid unnecessarily simplifying a class constraint
 	     -- See Note [Avoid unecessary constraint simplification]
-       ; let zonked_tau_tvs = get_tau_tvs zonked_taus
+       ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
              proto_qtvs = growWanteds gbl_tvs zonked_wanteds $
                           zonked_tau_tvs `minusVarSet` gbl_tvs
              (perhaps_bound, surely_free)
@@ -311,8 +324,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                         -- they are also bound in ic_skols and we want them to be
                         -- tidied uniformly
 
-       ; gloc <- getCtLoc skol_info
-       ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
+       ; qtvs_to_return <- zonkQuantifiedTyVars qtvs
 
             -- Step 5
             -- Minimize `bound' and emit an implication
@@ -320,6 +332,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
        ; ev_binds_var <- newTcEvBinds
        ; mapBagM_ (\(EvBind evar etrm) -> addTcEvBind ev_binds_var evar etrm) tc_binds0
        ; lcl_env <- getLclTypeEnv
+       ; gloc <- getCtLoc skol_info
        ; let implic = Implic { ic_untch    = NoUntouchables
                              , ic_env      = lcl_env
                              , ic_skols    = mkVarSet qtvs_to_return
@@ -340,13 +353,6 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
        ; return ( qtvs_to_return, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } }
-  where
-    get_tau_tvs = tyVarsOfTypes	-- I think this stuff is out of date
-{-
-    get_tau_tvs | isTopLevel top_lvl = tyVarsOfTypes
-                | otherwise          = exactTyVarsOfTypes
-     -- See Note [Silly type synonym] in TcType
--}
 \end{code}
 
 

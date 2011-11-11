@@ -42,7 +42,6 @@ module RdrHsSyn (
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSig,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkDoAndIfThenElse,
-        checkKindName,
         checkRecordSyntax,
         parseError,
         parseErrorSDoc,
@@ -50,16 +49,13 @@ module RdrHsSyn (
 
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
-import TypeRep          ( Kind )
-import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc,
+import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
                           isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
-import OccName          ( occNameFS )
-import Name             ( Name, nameOccName )
+import Name             ( Name )
 import BasicTypes       ( maxPrecedence, Activation(..), RuleMatchInfo,
                           InlinePragma(..), InlineSpec(..) )
 import Lexer
 import TysWiredIn       ( unitTyCon )
-import TysPrim          ( constraintKindTyConName, constraintKind )
 import ForeignCall
 import OccName          ( srcDataName, varName, isDataOcc, isTcOcc,
                           occNameString )
@@ -110,6 +106,8 @@ extract_lctxt ctxt acc = foldr extract_lty acc (unLoc ctxt)
 extract_ltys :: [LHsType RdrName] -> [Located RdrName] -> [Located RdrName]
 extract_ltys tys acc = foldr extract_lty acc tys
 
+-- IA0_NOTE: Should this function also return kind variables?
+-- (explicit kind poly)
 extract_lty :: LHsType RdrName -> [Located RdrName] -> [Located RdrName]
 extract_lty (L loc ty) acc
   = case ty of
@@ -123,7 +121,7 @@ extract_lty (L loc ty) acc
       HsFunTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
       HsIParamTy _ ty           -> extract_lty ty acc
       HsEqTy ty1 ty2            -> extract_lty ty1 (extract_lty ty2 acc)
-      HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
+      HsOpTy ty1 (_, (L loc tv)) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty                -> extract_lty ty acc
       HsCoreTy {}               -> acc  -- The type is closed
       HsQuasiQuoteTy {}         -> acc  -- Quasi quotes mention no type variables
@@ -135,6 +133,9 @@ extract_lty (L loc ty) acc
                                 where
                                    locals = hsLTyVarNames tvs
       HsDocTy ty _              -> extract_lty ty acc
+      HsExplicitListTy _ tys    -> extract_ltys tys acc
+      HsExplicitTupleTy _ tys   -> extract_ltys tys acc
+      HsWrapTy _ _              -> panic "extract_lty"
 
 extract_tv :: SrcSpan -> RdrName -> [Located RdrName] -> [Located RdrName]
 extract_tv loc tv acc | isRdrTyVar tv = L loc tv : acc
@@ -191,7 +192,7 @@ mkTyData :: SrcSpan
          -> NewOrData
          -> Bool                -- True <=> data family instance
          -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
-         -> Maybe Kind
+         -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LTyClDecl RdrName)
@@ -219,7 +220,7 @@ mkTySynonym loc is_family lhs rhs
 mkTyFamily :: SrcSpan
            -> FamilyFlavour
            -> LHsType RdrName   -- LHS
-           -> Maybe Kind        -- Optional kind signature
+           -> Maybe (LHsKind RdrName) -- Optional kind signature
            -> P (LTyClDecl RdrName)
 mkTyFamily loc flavour lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
@@ -493,7 +494,7 @@ checkTyVars tycl_hdr tparms = mapM chk tparms
   where
         -- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar tv k))
+        | isRdrTyVar tv    = return (L l (KindedTyVar tv k placeHolderKind))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
     chk t@(L l _)
@@ -532,10 +533,10 @@ checkTyClHdr ty
   where
     goL (L l ty) acc = go l ty acc
 
-    go l (HsTyVar tc) acc
+    go l (HsTyVar tc) acc 
         | isRdrTc tc         = return (L l tc, acc)
-
-    go _ (HsOpTy t1 ltc@(L _ tc) t2) acc
+                                     
+    go _ (HsOpTy t1 (_, ltc@(L _ tc)) t2) acc
         | isRdrTc tc         = return (ltc, t1:t2:acc)
     go _ (HsParTy ty)    acc = goL ty acc
     go _ (HsAppTy t1 t2) acc = goL t1 (t2:acc)
@@ -776,17 +777,6 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
           expr = text "if"   <+> ppr guardExpr <> pprOptSemi semiThen <+>
                  text "then" <+> ppr thenExpr  <> pprOptSemi semiElse <+>
                  text "else" <+> ppr elseExpr
-
-checkKindName :: Located FastString -> P (Located Kind)
-checkKindName (L l fs) = do
-    pState <- getPState
-    let ext_enabled = xopt Opt_ConstraintKinds (dflags pState)
-        is_kosher = fs == occNameFS (nameOccName constraintKindTyConName)
-    if not ext_enabled || not is_kosher
-     then parseErrorSDoc l (text "Unexpected named kind:"
-                         $$ nest 4 (ppr fs)
-                         $$ if (not ext_enabled && is_kosher) then text "Perhaps you meant to use -XConstraintKinds?" else empty)
-     else return (L l constraintKind)
 \end{code}
 
 

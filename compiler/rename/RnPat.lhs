@@ -314,12 +314,11 @@ rnPatAndThen mk (SigPatIn pat ty)
   = do { patsigs <- liftCps (xoptM Opt_ScopedTypeVariables)
        ; if patsigs
          then do { pat' <- rnLPatAndThen mk pat
-                 ; ty' <- liftCpsFV (rnHsTypeFVs tvdoc ty)
+                 ; ty' <- liftCpsFV (rnHsTypeFVs PatCtx ty)
 		 ; return (SigPatIn pat' ty') }
          else do { liftCps (addErr (patSigErr ty))
                  ; rnPatAndThen mk (unLoc pat) } }
-  where
-    tvdoc = text "In a pattern type-signature"
+
        
 rnPatAndThen mk (LitPat lit)
   | HsString s <- lit

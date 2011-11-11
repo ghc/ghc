@@ -14,13 +14,13 @@ module TcEnv(
         -- Global environment
         tcExtendGlobalEnv, tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
         tcExtendGlobalValEnv,
-        tcLookupLocatedGlobal,  tcLookupGlobal, 
+        tcLookupLocatedGlobal, tcLookupGlobal, 
         tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupInstance,
         
         -- Local environment
-        tcExtendKindEnv, tcExtendKindEnvTvs,
+        tcExtendKindEnv, tcExtendKindEnvTvs, tcExtendTcTyThingEnv,
         tcExtendTyVarEnv, tcExtendTyVarEnv2, 
         tcExtendGhciEnv, tcExtendLetEnv,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
@@ -32,13 +32,13 @@ module TcEnv(
         tcExtendRecEnv,         -- For knot-tying
 
         -- Rules
-        tcExtendRules,
+         tcExtendRules,
 
         -- Defaults
         tcGetDefaultTys,
 
         -- Global type variables
-        tcGetGlobalTyVars,
+        tcGetGlobalTyVars, zapLclTypeEnv,
 
         -- Template Haskell stuff
         checkWellStaged, tcMetaTy, thLevel, 
@@ -221,36 +221,31 @@ setGlobalTypeEnv tcg_env new_type_env
          ; return (tcg_env { tcg_type_env = new_type_env }) }
 
 
-tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
-  -- Given a mixture of Ids, TyCons, Classes, all defined in the
-  -- module being compiled, extend the global environment
-tcExtendGlobalEnv things thing_inside
-  = do { env <- getGblEnv
-       ; let env' = env { tcg_tcs  = [ tc | ATyCon tc <- things,
-                                            not (isClassTyCon tc)]
-                                      ++ tcg_tcs env
-                        , tcg_clss = [ cl | ATyCon tc <- things,
-                                            Just cl <- [tyConClass_maybe tc]]
-                                      ++ tcg_clss env }
-       ; setGblEnv env' $
-            tcExtendGlobalEnvImplicit things thing_inside
-       }
-
 tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
   -- Extend the global environment with some TyThings that can be obtained
   -- via implicitTyThings from other entities in the environment.  Examples
   -- are dfuns, famInstTyCons, data cons, etc.
-  -- These TyThings are not added to tcg_tcs or tcg_clss.
+  -- These TyThings are not added to tcg_tcs.
 tcExtendGlobalEnvImplicit things thing_inside
    = do { tcg_env <- getGblEnv
         ; let ge'  = extendTypeEnvList (tcg_type_env tcg_env) things
         ; tcg_env' <- setGlobalTypeEnv tcg_env ge'
         ; setGblEnv tcg_env' thing_inside }
 
+tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
+  -- Given a mixture of Ids, TyCons, Classes, all defined in the
+  -- module being compiled, extend the global environment
+tcExtendGlobalEnv things thing_inside
+  = do { env <- getGblEnv
+       ; let env' = env { tcg_tcs = [tc | ATyCon tc <- things] ++ tcg_tcs env }
+       ; setGblEnv env' $
+            tcExtendGlobalEnvImplicit things thing_inside
+       }
+
 tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
   -- Same deal as tcExtendGlobalEnv, but for Ids
 tcExtendGlobalValEnv ids thing_inside 
-  = tcExtendGlobalEnv [AnId id | id <- ids] thing_inside
+  = tcExtendGlobalEnvImplicit [AnId id | id <- ids] thing_inside
 
 tcExtendRecEnv :: [(Name,TyThing)] -> TcM r -> TcM r
 -- Extend the global environments for the type/class knot tying game
@@ -319,6 +314,13 @@ getInLocalScope = do { lcl_env <- getLclTypeEnv
 \end{code}
 
 \begin{code}
+tcExtendTcTyThingEnv :: [(Name, TcTyThing)] -> TcM r -> TcM r
+tcExtendTcTyThingEnv things thing_inside
+  = updLclEnv upd thing_inside
+  where
+    upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
+    extend env  = extendNameEnvList env things
+
 tcExtendKindEnv :: [(Name, TcKind)] -> TcM r -> TcM r
 tcExtendKindEnv things thing_inside
   = updLclEnv upd thing_inside
@@ -442,6 +444,14 @@ tcExtendGlobalTyVars :: IORef VarSet -> VarSet -> TcM (IORef VarSet)
 tcExtendGlobalTyVars gtv_var extra_global_tvs
   = do { global_tvs <- readMutVar gtv_var
        ; newMutVar (global_tvs `unionVarSet` extra_global_tvs) }
+
+zapLclTypeEnv :: TcM a -> TcM a
+zapLclTypeEnv thing_inside
+  = do { tvs_var <- newTcRef emptyVarSet 
+       ; let upd env = env { tcl_env = emptyNameEnv
+                           , tcl_rdr = emptyLocalRdrEnv
+                           , tcl_tyvars = tvs_var }
+       ; updLclEnv upd thing_inside }
 \end{code}
 
 
@@ -724,11 +734,15 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 
 notFound :: Name -> TcM TyThing
 notFound name 
-  = do { (gbl,lcl) <- getEnvs
+  = do { (_gbl,lcl) <- getEnvs
        ; failWithTc (vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),
-                     ptext (sLit "tcg_type_env of environment:") <+> ppr (tcg_type_env gbl),
                      ptext (sLit "tcl_env of environment:") <+> ppr (tcl_env lcl)]
+                       -- Take case: printing the whole gbl env can
+                       -- cause an infnite loop, in the case where we
+                       -- are in the middle of a recursive TyCon/Class group;
+                       -- so let's just not print it!  Getting a loop here is
+                       -- very unhelpful, because it hides one compiler bug with another
                     ) }
 
 wrongThingErr :: String -> TcTyThing -> Name -> TcM a

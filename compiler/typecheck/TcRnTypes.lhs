@@ -296,8 +296,7 @@ data TcGblEnv
         tcg_imp_specs :: [LTcSpecPrag],     -- ...SPECIALISE prags for imported Ids
 	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
 	tcg_anns      :: [Annotation],      -- ...Annotations
-        tcg_tcs       :: [TyCon],           -- ...TyCons
-        tcg_clss      :: [Class],           -- ...Classes
+        tcg_tcs       :: [TyCon],           -- ...TyCons and Classes
 	tcg_insts     :: [Instance],	    -- ...Instances
         tcg_fam_insts :: [FamInst],         -- ...Family instances
         tcg_rules     :: [LRuleDecl Id],    -- ...Rules
@@ -559,8 +558,32 @@ data TcTyThing
 				-- for error-message purposes; it is the corresponding
 				-- Name in the domain of the envt
 
-  | AThing  TcKind 		-- Used temporarily, during kind checking, for the
-				--	tycons and clases in this recursive group
+  | AThing  TcKind   -- Used temporarily, during kind checking, for the
+		     --	tycons and clases in this recursive group
+                     -- Can be a mono-kind or a poly-kind; in TcTyClsDcls see
+                     -- Note [Type checking recursive type and class declarations]
+
+  | ANothing                    -- see Note [ANothing]
+
+{-
+Note [ANothing]
+~~~~~~~~~~~~~~~
+
+We don't want to allow promotion in a strongly connected component
+when kind checking.
+
+Consider:
+  data T f = K (f (K Any))
+
+When kind checking the `data T' declaration the local env contains the
+mappings:
+  T -> AThing <some initial kind>
+  K -> ANothing
+
+ANothing is only used for DataCons, and only used during type checking
+in tcTyClGroup.
+-}
+
 
 instance Outputable TcTyThing where	-- Debugging only
    ppr (AGlobal g)      = pprTyThing g
@@ -571,12 +594,14 @@ instance Outputable TcTyThing where	-- Debugging only
 				 <+> ppr (tct_level elt))
    ppr (ATyVar tv _)    = text "Type variable" <+> quotes (ppr tv)
    ppr (AThing k)       = text "AThing" <+> ppr k
+   ppr ANothing         = text "ANothing"
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
 pprTcTyThingCategory (ATyVar {})     = ptext (sLit "Type variable")
 pprTcTyThingCategory (ATcId {})      = ptext (sLit "Local identifier")
 pprTcTyThingCategory (AThing {})     = ptext (sLit "Kinded thing")
+pprTcTyThingCategory ANothing        = ptext (sLit "Opaque thing")
 \end{code}
 
 Note [Bindings with closed types]
@@ -587,7 +612,7 @@ Consider
         in ...
 
 Can we generalise 'g' under the OutsideIn algorithm?  Yes, 
-becuase all g's free variables are top-level; that is they themselves
+because all g's free variables are top-level; that is they themselves
 have no free type variables, and it is the type variables in the
 environment that makes things tricky for OutsideIn generalisation.
 

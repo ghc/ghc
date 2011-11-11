@@ -41,7 +41,7 @@ import TyCon
 import DataCon
 import PrelNames
 import TysWiredIn
-import TysPrim          ( anyTyConOfKind )
+import TysPrim          ( tySuperKindTyCon )
 import BasicTypes       ( Arity, strongLoopBreaker )
 import Literal
 import qualified Var
@@ -502,7 +502,9 @@ tc_iface_decl _parent ignore_prags
        return tc
 
    tc_iface_at_def (IfaceATD tvs pat_tys ty) =
-       bindIfaceTyVars_AT tvs $ \tvs' -> liftM2 (ATD tvs') (mapM tcIfaceType pat_tys) (tcIfaceType ty)
+       bindIfaceTyVars_AT tvs $
+         \tvs' -> liftM2 (\pats tys -> ATD tvs' pats tys noSrcSpan)
+                           (mapM tcIfaceType pat_tys) (tcIfaceType ty)
 
    mk_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
 
@@ -1235,9 +1237,15 @@ tcIfaceGlobal name
 -- emasculated form (e.g. lacking data constructors).
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon (IfaceAnyTc kind)  = do { tc_kind <- tcIfaceType kind
-                                     ; tcWiredInTyCon (anyTyConOfKind tc_kind) }
-tcIfaceTyCon (IfaceTc name)     = do { thing <- tcIfaceGlobal name 
+tcIfaceTyCon IfaceIntTc         = tcWiredInTyCon intTyCon
+tcIfaceTyCon IfaceBoolTc        = tcWiredInTyCon boolTyCon
+tcIfaceTyCon IfaceCharTc        = tcWiredInTyCon charTyCon
+tcIfaceTyCon IfaceListTc        = tcWiredInTyCon listTyCon
+tcIfaceTyCon IfacePArrTc        = tcWiredInTyCon parrTyCon
+tcIfaceTyCon (IfaceTupTc bx ar) = tcWiredInTyCon (tupleTyCon bx ar)
+tcIfaceTyCon (IfaceIPTc n)      = do { n' <- newIPName n
+                                     ; tcWiredInTyCon (ipTyCon n') }
+tcIfaceTyCon (IfaceTc name)     = do { thing <- tcIfaceGlobal name
                                      ; return (check_tc (tyThingTyCon thing)) }
   where
     check_tc tc
@@ -1245,6 +1253,14 @@ tcIfaceTyCon (IfaceTc name)     = do { thing <- tcIfaceGlobal name
                    IfaceTc _ -> tc
                    _         -> pprTrace "check_tc" (ppr tc) tc
      | otherwise = tc
+-- we should be okay just returning Kind constructors without extra loading
+tcIfaceTyCon IfaceLiftedTypeKindTc   = return liftedTypeKindTyCon
+tcIfaceTyCon IfaceOpenTypeKindTc     = return openTypeKindTyCon
+tcIfaceTyCon IfaceUnliftedTypeKindTc = return unliftedTypeKindTyCon
+tcIfaceTyCon IfaceArgTypeKindTc      = return argTypeKindTyCon
+tcIfaceTyCon IfaceUbxTupleKindTc     = return ubxTupleKindTyCon
+tcIfaceTyCon IfaceConstraintKindTc   = return constraintKindTyCon
+tcIfaceTyCon IfaceSuperKindTc        = return tySuperKindTyCon
 
 -- Even though we are in an interface file, we want to make
 -- sure the instances and RULES of this tycon are loaded 
@@ -1310,11 +1326,21 @@ bindIfaceTyVar (occ,kind) thing_inside
 
 bindIfaceTyVars :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
 bindIfaceTyVars bndrs thing_inside
-  = do  { names <- newIfaceNames (map mkTyVarOccFS occs)
-        ; tyvars <- zipWithM mk_iface_tyvar names kinds
-        ; extendIfaceTyVarEnv tyvars (thing_inside tyvars) }
+  = do { names <- newIfaceNames (map mkTyVarOccFS occs)
+        ; let (kis_kind, tys_kind) = span isSuperIfaceKind kinds
+              (kis_name, tys_name) = splitAt (length kis_kind) names
+          -- We need to bring the kind variables in scope since type
+          -- variables may mention them.
+        ; kvs <- zipWithM mk_iface_tyvar kis_name kis_kind
+        ; extendIfaceTyVarEnv kvs $ do
+        { tvs <- zipWithM mk_iface_tyvar tys_name tys_kind
+        ; extendIfaceTyVarEnv tvs (thing_inside (kvs ++ tvs)) } }
   where
     (occs,kinds) = unzip bndrs
+
+isSuperIfaceKind :: IfaceKind -> Bool
+isSuperIfaceKind (IfaceTyConApp IfaceSuperKindTc []) = True
+isSuperIfaceKind _ = False
 
 mk_iface_tyvar :: Name -> IfaceKind -> IfL TyVar
 mk_iface_tyvar name ifKind
@@ -1328,12 +1354,14 @@ bindIfaceTyVars_AT :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
 -- Here 'a' is in scope when we look at the 'data T'
 bindIfaceTyVars_AT [] thing_inside
   = thing_inside []
-bindIfaceTyVars_AT (b@(tv_occ,_) : bs) thing_inside 
-  = bindIfaceTyVars_AT bs $ \ bs' ->
-    do { mb_tv <- lookupIfaceTyVar tv_occ
-       ; case mb_tv of
-           Just b' -> thing_inside (b':bs')
-           Nothing -> bindIfaceTyVar b $ \ b' -> 
-                      thing_inside (b':bs') }
-\end{code} 
+bindIfaceTyVars_AT (b@(tv_occ,_) : bs) thing_inside
+  = do { mb_tv <- lookupIfaceTyVar tv_occ
+       ; let bind_b :: (TyVar -> IfL a) -> IfL a
+             bind_b = case mb_tv of
+                        Just b' -> \k -> k b'
+                        Nothing -> bindIfaceTyVar b
+       ; bind_b $ \b' ->
+         bindIfaceTyVars_AT bs $ \bs' ->
+         thing_inside (b':bs') }
+\end{code}
 

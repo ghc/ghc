@@ -169,8 +169,13 @@ rnExpr (NegApp e _)
 -- Don't ifdef-GHCI them because we want to fail gracefully
 -- (not with an rnExpr crash) in a stage-1 compiler.
 rnExpr e@(HsBracket br_body)
-  = checkTH e "bracket"		`thenM_`
-    rnBracket br_body		`thenM` \ (body', fvs_e) ->
+  = do
+    thEnabled <- xoptM Opt_TemplateHaskell
+    unless thEnabled $
+      failWith ( vcat [ ptext (sLit "Syntax error on") <+> ppr e
+                      , ptext (sLit "Perhaps you intended to use -XTemplateHaskell") ] )
+    checkTH e "bracket"
+    (body', fvs_e) <- rnBracket br_body
     return (HsBracket body', fvs_e)
 
 rnExpr (HsSpliceE splice)
@@ -265,12 +270,10 @@ rnExpr (RecordUpd expr rbinds _ _ _)
 		  fvExpr `plusFV` fvRbinds) }
 
 rnExpr (ExprWithTySig expr pty)
-  = do	{ (pty', fvTy) <- rnHsTypeFVs doc pty
+  = do	{ (pty', fvTy) <- rnHsTypeFVs ExprWithTySigCtx pty
 	; (expr', fvExpr) <- bindSigTyVarsFV (hsExplicitTvs pty') $
 		  	     rnLExpr expr
 	; return (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy) }
-  where 
-    doc = text "In an expression type signature"
 
 rnExpr (HsIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -280,10 +283,8 @@ rnExpr (HsIf _ p b1 b2)
        ; return (HsIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
 rnExpr (HsType a)
-  = rnHsTypeFVs doc a	`thenM` \ (t, fvT) -> 
+  = rnHsTypeFVs HsTypeCtx a	`thenM` \ (t, fvT) -> 
     return (HsType t, fvT)
-  where 
-    doc = text "In a type argument"
 
 rnExpr (ArithSeq _ seq)
   = rnArithSeq seq	 `thenM` \ (new_seq, fvs) ->
@@ -590,14 +591,14 @@ rnArithSeq (FromThenTo expr1 expr2 expr3)
 
 \begin{code}
 rnBracket :: HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
-rnBracket (VarBr n) 
+rnBracket (VarBr flg n) 
   = do { name <- lookupOccRn n
        ; this_mod <- getModule
        ; unless (nameIsLocalOrFrom this_mod name) $  -- Reason: deprecation checking assumes
          do { _ <- loadInterfaceForName msg name     -- the home interface is loaded, and
             ; return () }			     -- this is the only way that is going
 	      	     				     -- to happen
-       ; return (VarBr name, unitFV name) }
+       ; return (VarBr flg name, unitFV name) }
   where
     msg = ptext (sLit "Need interface for Template Haskell quoted Name")
 
@@ -606,10 +607,8 @@ rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
 
 rnBracket (PatBr p) = rnPat ThPatQuote p $ \ p' -> return (PatBr p', emptyFVs)
 
-rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
+rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs TypBrCtx t
 			 ; return (TypBr t', fvs) }
-		    where
-		      doc = ptext (sLit "In a Template-Haskell quoted type")
 
 rnBracket (DecBrL decls) 
   = do { (group, mb_splice) <- findSplice decls

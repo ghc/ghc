@@ -86,7 +86,6 @@ deSugar hsc_env
                             tcg_rules        = rules,
                             tcg_vects        = vects,
                             tcg_tcs          = tcs,
-                            tcg_clss         = clss,
                             tcg_insts        = insts,
                             tcg_fam_insts    = fam_insts,
                             tcg_hpc          = other_hpc_info })
@@ -184,7 +183,6 @@ deSugar hsc_env
                 mg_warns        = warns,
                 mg_anns         = anns,
                 mg_tcs          = tcs,
-                mg_clss         = clss,
                 mg_insts        = insts,
                 mg_fam_insts    = fam_insts,
                 mg_inst_env     = inst_env,

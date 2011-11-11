@@ -7,12 +7,16 @@
 -- for details
 
 module TcUnify where
-import TcType	( TcTauType )
-import TcRnTypes( TcM )
-import Coercion (LCoercion)
+import TcType     ( TcTauType, TcKind, Type, Kind )
+import VarEnv     ( TidyEnv )
+import TcRnTypes  ( TcM )
+import Coercion   ( LCoercion )
+import Outputable ( SDoc )
 
 -- This boot file exists only to tie the knot between
---		TcUnify and Inst
+--              TcUnify and Inst
 
 unifyType :: TcTauType -> TcTauType -> TcM LCoercion
+unifyKindEq :: TcKind -> TcKind -> TcM ()
+mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
 \end{code}

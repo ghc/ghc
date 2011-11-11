@@ -14,7 +14,7 @@ module HsDecls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl,
   -- ** Class or type declarations
-  TyClDecl(..), LTyClDecl,
+  TyClDecl(..), LTyClDecl, TyClGroup,
   isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
   isFamInstDecl, tcdName, tyClDeclTyVars,
   countTyClDecls,
@@ -63,7 +63,6 @@ import HsDoc
 import TyCon
 import NameSet
 import Name
-import {- Kind parts of -} Type
 import BasicTypes
 import Coercion
 import ForeignCall
@@ -431,6 +430,8 @@ Interface file code:
 -- In both cases, 'tcdVars' collects all variables we need to quantify over.
 
 type LTyClDecl name = Located (TyClDecl name)
+type TyClGroup name = [LTyClDecl name]  -- this is used in TcTyClsDecls to represent
+                                        -- strongly connected components of decls
 
 -- | A type or class declaration.
 data TyClDecl name
@@ -444,7 +445,7 @@ data TyClDecl name
     TyFamily {  tcdFlavour:: FamilyFlavour,             -- type or data
                 tcdLName  :: Located name,              -- type constructor
                 tcdTyVars :: [LHsTyVarBndr name],       -- type variables
-                tcdKind   :: Maybe Kind                 -- result kind
+                tcdKind   :: Maybe (LHsKind name)       -- result kind
     }
 
 
@@ -461,7 +462,7 @@ data TyClDecl name
                 tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns.
                   -- See Note [tcdTyVars and tcdTyPats] 
 
-                tcdKindSig:: Maybe Kind,
+                tcdKindSig:: Maybe (LHsKind name),
                         -- ^ Optional kind signature.
                         --
                         -- @(Just k)@ for a GADT-style @data@, or @data
@@ -535,14 +536,18 @@ tcdTyPats = Just tys
    This is a data/type family instance declaration
    tcdTyVars are fv(tys)
 
-   Eg   class C a b where
-          type F a x :: *
-        instance D p s => C (p,q) [r] where
-          type F (p,q) x = p -> x
-   The tcdTyVars of the F instance decl are {p,q,x},
-   i.e. not including s, nor r 
-        (and indeed neither s nor should be mentioned
-         on the RHS of the F instance decl; Trac #5515)
+   Eg   class C s t where
+          type F t p :: *
+        instance C w (a,b) where
+          type F (a,b) x = x->a
+   The tcdTyVars of the F decl are {a,b,x}, even though the F decl
+   is nested inside the 'instance' decl. 
+
+   However after the renamer, the uniques will match up:
+        instance C w7 (a8,b9) where
+          type F (a8,b9) x10 = x10->a8
+   so that we can compare the type patter in the 'instance' decl and
+   in the associated 'type' decl
 
 ------------------------------
 Simple classifiers
@@ -631,7 +636,7 @@ instance OutputableBndr name
 
           pp_kind = case mb_kind of
                       Nothing   -> empty
-                      Just kind -> dcolon <+> pprKind kind
+                      Just kind -> dcolon <+> ppr kind
 
     ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdTyPats = typats,
                     tcdSynRhs = mono_ty})
@@ -653,7 +658,7 @@ instance OutputableBndr name
                   derivings
       where
         ppr_sigx Nothing     = empty
-        ppr_sigx (Just kind) = dcolon <+> pprKind kind
+        ppr_sigx (Just kind) = dcolon <+> ppr kind
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, 
                     tcdFDs  = fds,

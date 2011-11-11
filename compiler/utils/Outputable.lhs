@@ -30,7 +30,7 @@ module Outputable (
 	char,
 	text, ftext, ptext,
 	int, integer, float, double, rational,
-	parens, cparen, brackets, braces, quotes, doubleQuotes, angleBrackets,
+	parens, cparen, brackets, braces, quotes, quote, doubleQuotes, angleBrackets,
 	semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
 	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
 	blankLine,
@@ -449,11 +449,12 @@ float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
 
-parens, braces, brackets, quotes, doubleQuotes, angleBrackets :: SDoc -> SDoc
+parens, braces, brackets, quotes, quote, doubleQuotes, angleBrackets :: SDoc -> SDoc
 
 parens d       = SDoc $ Pretty.parens . runSDoc d
 braces d       = SDoc $ Pretty.braces . runSDoc d
 brackets d     = SDoc $ Pretty.brackets . runSDoc d
+quote d        = SDoc $ Pretty.quote . runSDoc d
 doubleQuotes d = SDoc $ Pretty.doubleQuotes . runSDoc d
 angleBrackets d = char '<' <> d <> char '>'
 

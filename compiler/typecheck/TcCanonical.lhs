@@ -21,6 +21,7 @@ import FunDeps
 import qualified TcMType as TcM
 import TcType
 import Type
+import Kind
 import Coercion
 import Class
 import TyCon
@@ -474,28 +475,32 @@ canEq fl eqv ty1 (TyConApp fn tys)
   = do { untch <- getUntouchables 
        ; canEqLeaf untch fl eqv (classify ty1) (FunCls fn tys) }
 
-canEq fl eqv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+canEq fl eqv ty1@(TyConApp tc1 tys1) ty2@(TyConApp tc2 tys2)
   | isDecomposableTyCon tc1 && isDecomposableTyCon tc2
   , tc1 == tc2
   , length tys1 == length tys2
   = -- Generate equalities for each of the corresponding arguments
-    do { argeqvs 
+    do { let (kis1, tys1') = span isKind tys1
+             (kis2, tys2') = span isKind tys2
+       ; zipWithM_ (unifyKindTcS ty1 ty2) kis1 kis2
+       ; let kicos = map mkReflCo kis1
+       ; argeqvs
              <- if isWanted fl then
-                    do { argeqvs <- zipWithM newEqVar tys1 tys2
+                    do { argeqvs <- zipWithM newEqVar tys1' tys2'
                        ; setEqBind eqv
-                         (mkTyConAppCo tc1 (map mkEqVarLCo argeqvs))
+                         (mkTyConAppCo tc1 (kicos ++ (map mkEqVarLCo argeqvs)))
                        ; return argeqvs }
                 else if isGivenOrSolved fl then
                     let go_one ty1 ty2 n = do
                           argeqv <- newEqVar ty1 ty2
                           setEqBind argeqv (mkNthCo n (mkEqVarLCo eqv))
                           return argeqv
-                    in zipWith3M go_one tys1 tys2 [0..]
+                    in zipWith3M go_one tys1' tys2' [(length kicos)..]
 
                 else -- Derived 
-                    zipWithM (\t1 t2 -> newDerivedId (mkEqPred (t1, t2))) tys1 tys2
+                    zipWithM (\t1 t2 -> newDerivedId (mkEqPred (t1, t2))) tys1' tys2'
 
-       ; andCCans <$> zipWith3M (canEq fl) argeqvs tys1 tys2 }
+       ; andCCans <$> zipWith3M (canEq fl) argeqvs tys1' tys2' }
 
 -- See Note [Equality between type applications]
 --     Note [Care with type applications] in TcUnify
@@ -504,7 +509,8 @@ canEq fl eqv ty1 ty2
   , Nothing <- tcView ty2  -- See Note [Naked given applications]
   , Just (s1,t1) <- tcSplitAppTy_maybe ty1
   , Just (s2,t2) <- tcSplitAppTy_maybe ty2
-    = if isWanted fl 
+    = ASSERT( not (isKind t1) && not (isKind t2) )
+      if isWanted fl 
       then do { eqv1 <- newEqVar s1 s2 
               ; eqv2 <- newEqVar t1 t2 
               ; setEqBind eqv
@@ -772,15 +778,10 @@ canEqLeafOriented :: CtFlavor -> EqVar
                   -> TypeClassifier -> TcType -> TcS CanonicalCts 
 -- First argument is not OtherCls
 canEqLeafOriented fl eqv cls1@(FunCls fn tys1) s2         -- cv : F tys1
-  | let k1 = kindAppResult (tyConKind fn) tys1,
-    let k2 = typeKind s2, 
-    not (k1 `compatKind` k2) -- Establish the kind invariant for CFunEqCan
-  = canEqFailure fl eqv
-    -- Eagerly fails, see Note [Kind errors] in TcInteract
-
-  | otherwise 
   = ASSERT2( isSynFamilyTyCon fn, ppr (unClassify cls1) )
-    do { (xis1,cos1,ccs1) <- flattenMany fl tys1 -- Flatten type function arguments
+    do { are_compat <- compatKindTcS k1 k2  -- make sure that the kind are compatible
+       ; unless are_compat (unifyKindTcS (unClassify cls1) s2 k1 k2)
+       ; (xis1,cos1,ccs1) <- flattenMany fl tys1 -- Flatten type function arguments
                                                  -- cos1 :: xis1 ~ tys1
        ; (xi2, co2, ccs2) <- flatten fl s2       -- Flatten entire RHS
                                                  -- co2  :: xi2 ~ s2
@@ -810,6 +811,10 @@ canEqLeafOriented fl eqv cls1@(FunCls fn tys1) s2         -- cv : F tys1
                                   , cc_tyargs = xis1 
                                   , cc_rhs    = xi2 }
        ; return $ ccs `extendCCans` final_cc }
+  where
+    k1 = typeKind (unClassify cls1)
+    k2 = typeKind s2
+
 
 -- Otherwise, we have a variable on the left, so call canEqLeafTyVarLeft
 canEqLeafOriented fl eqv (FskCls tv) s2 
@@ -822,11 +827,9 @@ canEqLeafOriented _ eqv (OtherCls ty1) ty2
 canEqLeafTyVarLeft :: CtFlavor -> EqVar -> TcTyVar -> TcType -> TcS CanonicalCts
 -- Establish invariants of CTyEqCans 
 canEqLeafTyVarLeft fl eqv tv s2       -- cv : tv ~ s2
-  | not (k1 `compatKind` k2) -- Establish the kind invariant for CTyEqCan
-  = canEqFailure fl eqv
-       -- Eagerly fails, see Note [Kind errors] in TcInteract
-  | otherwise
-  = do { (xi2, co, ccs2) <- flatten fl s2  -- Flatten RHS   co : xi2 ~ s2
+  = do { are_compat <- compatKindTcS k1 k2
+       ; unless are_compat (unifyKindTcS (mkTyVarTy tv) s2 k1 k2)
+       ; (xi2, co, ccs2) <- flatten fl s2  -- Flatten RHS   co : xi2 ~ s2
        ; mxi2' <- canOccursCheck fl tv xi2 -- Do an occurs check, and return a possibly
                                            -- unfolded version of the RHS, if we had to 
                                            -- unfold any type synonyms to get rid of tv.
@@ -1041,7 +1044,7 @@ instFunDepEqn :: WantedLoc -> Equation -> TcS [(Int,(EvVar,WantedLoc))]
 instFunDepEqn wl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
                         , fd_pred1 = d1, fd_pred2 = d2 })
   = do { let tvs = varSetElems qtvs
-       ; tvs' <- mapM instFlexiTcS tvs
+       ; tvs' <- mapM instFlexiTcS tvs  -- IA0_TODO: we might need to do kind substitution
        ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs')
        ; foldM (do_one subst) [] eqs }
   where 

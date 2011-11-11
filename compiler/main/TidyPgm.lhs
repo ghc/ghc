@@ -129,7 +129,6 @@ mkBootModDetailsTc hsc_env
         TcGblEnv{ tcg_exports   = exports,
                   tcg_type_env  = type_env, -- just for the Ids
                   tcg_tcs       = tcs,
-                  tcg_clss      = clss,
                   tcg_insts     = insts,
                   tcg_fam_insts = fam_insts
                 }
@@ -139,7 +138,7 @@ mkBootModDetailsTc hsc_env
 	; let { insts'     = tidyInstances globaliseAndTidyId insts
 	      ; dfun_ids   = map instanceDFunId insts'
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
-                                (typeEnvIds type_env) tcs clss fam_insts
+                                (typeEnvIds type_env) tcs fam_insts
 	      ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
 	      }
 	; return (ModDetails { md_types     = type_env'
@@ -153,10 +152,10 @@ mkBootModDetailsTc hsc_env
 	}
   where
 
-mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [Class] -> [FamInst] -> TypeEnv
-mkBootTypeEnv exports ids tcs clss fam_insts
+mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [FamInst] -> TypeEnv
+mkBootTypeEnv exports ids tcs fam_insts
   = tidyTypeEnv True False exports $
-       typeEnvFromEntities final_ids tcs clss fam_insts
+       typeEnvFromEntities final_ids tcs fam_insts
   where
         -- Find the LocalIds in the type env that are exported
 	-- Make them into GlobalIds, and tidy their types
@@ -294,7 +293,6 @@ tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_exports   = exports
                               , mg_tcs       = tcs
-                              , mg_clss      = clss
                               , mg_insts     = insts
                               , mg_fam_insts = fam_insts
                               , mg_binds     = binds
@@ -314,7 +312,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               }
         ; showPass dflags CoreTidy
 
-        ; let { type_env = typeEnvFromEntities [] tcs clss fam_insts
+        ; let { type_env = typeEnvFromEntities [] tcs fam_insts
 
               ; implicit_binds
                   = concatMap getClassImplicitBinds (typeEnvClasses type_env) ++

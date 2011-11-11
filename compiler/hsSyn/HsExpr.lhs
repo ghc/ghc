@@ -1197,7 +1197,8 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | DecBrL [LHsDecl id]	 -- [d| decls |]; result of parser
                   | DecBrG (HsGroup id)  -- [d| decls |]; result of renamer
                   | TypBr (LHsType id)   -- [t| type  |]
-                  | VarBr id             -- 'x, ''T
+                  | VarBr Bool id        -- True: 'x, False: ''T
+                                         -- (The Bool flag is used only in pprHsBracket)
   deriving (Data, Typeable)
 
 instance OutputableBndr id => Outputable (HsBracket id) where
@@ -1210,11 +1211,8 @@ pprHsBracket (PatBr p) 	 = thBrackets (char 'p') (ppr p)
 pprHsBracket (DecBrG gp) = thBrackets (char 'd') (ppr gp)
 pprHsBracket (DecBrL ds) = thBrackets (char 'd') (vcat (map ppr ds))
 pprHsBracket (TypBr t) 	 = thBrackets (char 't') (ppr t)
-pprHsBracket (VarBr n) 	 = char '\'' <> ppr n
--- Infelicity: can't show ' vs '', because
--- we can't ask n what its OccName is, because the
--- pretty-printer for HsExpr doesn't ask for NamedThings
--- But the pretty-printer for names will show the OccName class
+pprHsBracket (VarBr True n)  = char '\''         <> ppr n
+pprHsBracket (VarBr False n) = ptext (sLit "''") <> ppr n
 
 thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+>

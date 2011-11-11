@@ -1762,13 +1762,13 @@ primtype BCO#
    {Primitive bytecode type.}
 
 primop   AddrToAnyOp "addrToAny#" GenPrimOp
-   Addr# -> (# Any #)
+   Addr# -> (# a #)
    {Convert an {\tt Addr\#} to a followable Any type.}
    with
    code_size = 0
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
-   BCO# -> (# Any #)
+   BCO# -> (# a #)
    with
    out_of_line = True
 
@@ -1849,7 +1849,7 @@ pseudoop   "lazy"
 
 	Like {\tt seq}, the argument of {\tt lazy} can have an unboxed type. }
 
-primtype Any
+primtype Any a
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
 	lifted type, and back. 
 
@@ -1879,6 +1879,9 @@ primtype Any
 	and make others up on the fly.  If any of these others end up being exported
 	into interface files, we'll get a crash; at least until we add interface-file
 	syntax to support them. }
+
+primtype AnyK
+	{ JPM Todo }
 
 pseudoop   "unsafeCoerce#"
    a -> b

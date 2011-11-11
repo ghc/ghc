@@ -40,7 +40,7 @@ module RdrName (
 	nameRdrName, getRdrName, 
 
 	-- ** Destruction
-	rdrNameOcc, rdrNameSpace, setRdrNameSpace,
+	rdrNameOcc, rdrNameSpace, setRdrNameSpace, demoteRdrName,
 	isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual, 
 	isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
@@ -159,6 +159,14 @@ setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
 setRdrNameSpace (Exact n)    ns = ASSERT( isExternalName n ) 
 		       	          Orig (nameModule n)
 				       (setOccNameSpace ns (nameOccName n))
+
+-- demoteRdrName lowers the NameSpace of RdrName.
+-- see Note [Demotion] in OccName
+demoteRdrName :: RdrName -> Maybe RdrName
+demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
+demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
+demoteRdrName (Orig _ _) = panic "demoteRdrName"
+demoteRdrName (Exact _) = panic "demoteRdrName"
 \end{code}
 
 \begin{code}

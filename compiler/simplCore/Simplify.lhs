@@ -988,8 +988,13 @@ simplCoercionF env co cont
     simpl_co co (CoerceIt g cont)
        = simpl_co new_co cont
      where
-       new_co = mkSymCo g0 `mkTransCo` co `mkTransCo` g1
-       [g0, g1] = decomposeCo 2 g
+       -- g :: (s1 ~# s2) ~# (t1 ~#  t2)
+       -- g1 :: s1 ~# t1
+       -- g2 :: s2 ~# t2
+       new_co = mkSymCo g1 `mkTransCo` co `mkTransCo` g2
+       [_reflk, g1, g2] = decomposeCo 3 g
+            -- Remember, (~#) :: forall k. k -> k -> *
+            -- so it takes *three* arguments, not two
 
     simpl_co co cont
        = seqCo co `seq` rebuild env (Coercion co) cont

@@ -813,7 +813,7 @@ data ModGuts
         mg_fix_env   :: !FixityEnv,      -- ^ Fixities declared in this module
                                          -- ToDo: I'm unconvinced this is actually used anywhere
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
-        mg_clss      :: ![Class],        -- ^ Classes declared in this module
+                                         -- (includes TyCons for classes)
         mg_insts     :: ![Instance],     -- ^ Class instances declared in this module
         mg_fam_insts :: ![FamInst],      -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains 
@@ -1317,14 +1317,14 @@ mkTypeEnvWithImplicits things =
     `plusNameEnv`
   mkTypeEnv (concatMap implicitTyThings things)
 
-typeEnvFromEntities :: [Id] -> [TyCon] -> [Class] -> [FamInst] -> TypeEnv
-typeEnvFromEntities ids tcs clss faminsts =
+typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst] -> TypeEnv
+typeEnvFromEntities ids tcs faminsts =
   mkTypeEnv (   map AnId ids
              ++ map ATyCon all_tcs
              ++ concatMap implicitTyConThings all_tcs
             )
  where
-  all_tcs = tcs ++ map classTyCon clss ++ map famInstTyCon faminsts
+  all_tcs = tcs ++ map famInstTyCon faminsts
 
 lookupTypeEnv = lookupNameEnv
 

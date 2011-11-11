@@ -255,6 +255,7 @@ addLocalFamInst home_fie famInst = do
     -- If there are any conflicts, we should probably error
     -- But, if we're allowed to overwrite and the conflict is in the home FIE,
     -- then overwrite instead of error.
+    traceTc "checkForConflicts" (ppr conflicts $$ ppr famInst $$ ppr inst_envs)
     isGHCi <- getIsGHCi
     case conflicts of
         dup : _ ->  case (isGHCi, home_conflicts) of

@@ -454,16 +454,15 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
         ; checkTc (not is_boot || (isEmptyLHsBinds binds && null uprags))
                   badBootDeclErr
 
-        ; (tyvars, theta, clas, inst_tys) <- tcHsInstHead poly_ty
-        ; checkValidInstance poly_ty tyvars theta clas inst_tys
+        ; (tyvars, theta, clas, inst_tys) <- tcHsInstHead InstDeclCtxt poly_ty
         ; let mini_env = mkVarEnv (classTyVars clas `zip` inst_tys)
 
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
         ; idx_tycons0 <- tcExtendTyVarEnv tyvars $
-                        mapAndRecoverM (tcAssocDecl clas mini_env) ats
+                         mapAndRecoverM (tcAssocDecl clas mini_env) ats
 
-        -- Check for misssing associated types and build them
+        -- Check for missing associated types and build them
         -- from their defaults (if available)
         ; let defined_ats = mkNameSet $ map (tcdName . unLoc) ats
               check_at_instance (fam_tc, defs)
@@ -473,7 +472,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
                 | null defs                                  = return (Just (tyConName fam_tc), [])
                  -- No user instance, have defaults ==> instatiate them
                 | otherwise = do
-                    defs' <- forM defs $ \(ATD tvs pat_tys rhs) -> do
+                    defs' <- forM defs $ \(ATD tvs pat_tys rhs _loc) -> do
                       let mini_env_subst = mkTvSubst (mkInScopeSet (mkVarSet tvs)) mini_env
                           tvs' = varSetElems (tyVarsOfType rhs')
                           pat_tys' = substTys mini_env_subst pat_tys
@@ -526,6 +525,7 @@ tcFamInstDecl :: TopLevelFlag -> TyClDecl Name -> TcM TyCon
 tcFamInstDecl top_lvl decl
   = do { -- type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
+       ; traceTc "tcFamInstDecl" (ppr decl)
        ; let fam_tc_lname = tcdLName decl
        ; type_families <- xoptM Opt_TypeFamilies
        ; is_boot <- tcIsHsBoot   -- Are we compiling an hs-boot file?
@@ -551,13 +551,8 @@ tcFamInstDecl1 :: TyCon -> TyClDecl Name -> TcM TyCon
 
   -- "type instance"
 tcFamInstDecl1 fam_tc (decl@TySynonym {})
-  = kcFamTyPats decl $ \k_tvs k_typats resKind ->
-    do { -- kind check the right-hand side of the type equation
-       ; k_rhs <- kcCheckLHsType (tcdSynRhs decl) (EK resKind EkUnk)
-                  -- ToDo: the ExpKind could be better
-
-         -- (1) do the work of verifying the synonym
-       ; (t_tvs, t_typats, t_rhs) <- tcSynFamInstDecl fam_tc (decl { tcdTyVars = k_tvs, tcdTyPats = Just k_typats, tcdSynRhs = k_rhs })
+  = do { -- (1) do the work of verifying the synonym
+       ; (t_tvs, t_typats, t_rhs) <- tcSynFamInstDecl fam_tc decl
 
          -- (2) check the well-formedness of the instance
        ; checkValidFamInst t_typats t_rhs
@@ -571,59 +566,50 @@ tcFamInstDecl1 fam_tc (decl@TySynonym {})
        }
 
   -- "newtype instance" and "data instance"
-tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data
-                                   , tcdCons = cons})
-  = kcFamTyPats decl $ \k_tvs k_typats resKind ->
-    do { -- check that the family declaration is for the right kind
+tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data, tcdCtxt = ctxt
+                                   , tcdTyVars = tvs, tcdTyPats = Just pats
+                                  , tcdCons = cons})
+  = do { -- Check that the family declaration is for the right kind
          checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
-       ; -- (1) kind check the data declaration as usual
-       ; k_decl <- kcDataDecl decl k_tvs
-       ; let k_ctxt = tcdCtxt k_decl
-             k_cons = tcdCons k_decl
+         -- Kind check type patterns
+       ; tcFamTyPats fam_tc tvs pats (\_always_star -> kcDataDecl decl) $ 
+           \tvs' pats' resultKind -> do
 
-         -- result kind must be '*' (otherwise, we have too few patterns)
-       ; resKind' <- zonkTcKindToKind resKind -- Remember: kcFamTyPats supplies unzonked kind!
-       ; checkTc (isLiftedTypeKind resKind') $ tooFewParmsErr (tyConArity fam_tc)
+         -- Check that left-hand side contains no type family applications
+         -- (vanilla synonyms are fine, though, and we checked for
+         -- foralls earlier)
+       { mapM_ checkTyFamFreeness pats'
+         
+         -- Result kind must be '*' (otherwise, we have too few patterns)
+       ; checkTc (isLiftedTypeKind resultKind) $ tooFewParmsErr (tyConArity fam_tc)
 
-         -- (2) type check indexed data type declaration
-       ; tcTyVarBndrs k_tvs $ \t_tvs -> do   -- turn kinded into proper tyvars
+       ; stupid_theta <- tcHsKindedContext =<< kcHsContext ctxt
+       ; dataDeclChecks (tcdName decl) new_or_data stupid_theta cons
 
-         -- kind check the type indexes and the context
-       { t_typats     <- mapM tcHsKindedType k_typats
-       ; stupid_theta <- tcHsKindedContext k_ctxt
-
-         -- (3) Check that
-         --     (a) left-hand side contains no type family applications
-         --         (vanilla synonyms are fine, though, and we checked for
-         --         foralls earlier)
-       ; mapM_ checkTyFamFreeness t_typats
-
-       ; dataDeclChecks (tcdName decl) new_or_data stupid_theta k_cons
-
-         -- (4) construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName (tcdLName decl) t_typats
+         -- Construct representation tycon
+       ; rep_tc_name <- newFamInstTyConName (tcdLName decl) pats'
        ; let ex_ok = True       -- Existentials ok for type families!
        ; fixM (\ rep_tycon -> do
-             { let orig_res_ty = mkTyConApp fam_tc t_typats
-             ; data_cons <- tcConDecls ex_ok rep_tycon
-                                       (t_tvs, orig_res_ty) k_cons
+             { let orig_res_ty = mkTyConApp fam_tc pats'
+             ; data_cons <- tcConDecls new_or_data ex_ok rep_tycon
+                                       (tvs', orig_res_ty) cons
              ; tc_rhs <-
                  case new_or_data of
                    DataType -> return (mkDataTyConRhs data_cons)
                    NewType  -> ASSERT( not (null data_cons) )
                                mkNewTyConRhs rep_tc_name rep_tycon (head data_cons)
-             ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
-                             h98_syntax NoParentTyCon (Just (fam_tc, t_typats))
+             ; buildAlgTyCon rep_tc_name tvs' stupid_theta tc_rhs Recursive
+                             h98_syntax NoParentTyCon (Just (fam_tc, pats'))
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
                  -- dependency.  (2) They are always valid loop breakers as
                  -- they involve a coercion.
              })
-       }}
-       where
+       } }
+    where
          h98_syntax = case cons of      -- All constructors have same shape
                         L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
                         _ -> True
@@ -644,9 +630,9 @@ tcAssocDecl clas mini_env (L loc decl)
   
        -- Check that the associated type comes from this class
        ; checkTc (Just clas == tyConAssoc_maybe fam_tc)
-                 (badATErr clas (tyConName at_tc))
+                 (badATErr (className clas) (tyConName at_tc))
 
-       -- See Note [Checking consistent instantiation]
+       -- See Note [Checking consistent instantiation] in TcTyClsDecls
        ; zipWithM_ check_arg (tyConTyVars fam_tc) at_tys
 
        ; return at_tc }
@@ -914,7 +900,7 @@ tcSpecInst :: Id -> Sig Name -> TcM TcSpecPrag
 tcSpecInst dfun_id prag@(SpecInstSig hs_ty)
   = addErrCtxt (spec_ctxt prag) $
     do  { let name = idName dfun_id
-        ; (tyvars, theta, clas, tys) <- tcHsInstHead hs_ty
+        ; (tyvars, theta, clas, tys) <- tcHsInstHead SpecInstCtxt hs_ty
         ; let spec_dfun_ty = mkDictFunTy tyvars theta clas tys
 
         ; co_fn <- tcSubType (SpecPragOrigin name) SpecInstCtxt

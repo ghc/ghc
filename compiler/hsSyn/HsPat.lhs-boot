@@ -1,10 +1,13 @@
 \begin{code}
+{-# LANGUAGE KindSignatures #-}
+
 module HsPat where
 import SrcLoc( Located )
 
 import Data.Data
 
-data Pat i
+-- IA0_NOTE: We need kind annotation because of kind polymorphism.
+data Pat (i :: *)
 type LPat i = Located (Pat i)
 
 instance Typeable1 Pat

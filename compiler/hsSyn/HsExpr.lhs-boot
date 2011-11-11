@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE KindSignatures #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
@@ -13,11 +14,12 @@ import Outputable ( SDoc, OutputableBndr )
 import {-# SOURCE #-} HsPat  ( LPat )
 
 import Data.Data
-	
-data HsExpr i
-data HsSplice i
-data MatchGroup a
-data GRHSs a
+
+-- IA0_NOTE: We need kind annotations because of kind polymorphism
+data HsExpr (i :: *)
+data HsSplice (i :: *)
+data MatchGroup (a :: *)
+data GRHSs (a :: *)
 
 instance Typeable1 HsSplice
 instance Data i => Data (HsSplice i)

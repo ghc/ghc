@@ -309,58 +309,6 @@ lookupFamInstEnv
    where
      match _ tpl_tvs tpl_tys tys = tcMatchTys tpl_tvs tpl_tys tys
 
-lookupFamInstEnvConflicts'
-    :: FamInstEnv
-    -> FamInst		-- Putative new instance
-    -> [TyVar]		-- Unique tyvars, matching arity of FamInst
-    -> [FamInstMatch] 	-- Conflicting matches
--- E.g. when we are about to add
---    f : type instance F [a] = a->a
--- we do (lookupFamInstConflicts f [b])
--- to find conflicting matches
--- The skolem tyvars are needed because we don't have a 
--- unique supply to hand
---
--- Precondition: the tycon is saturated (or over-saturated)
-
-lookupFamInstEnvConflicts' env fam_inst skol_tvs
-  = lookup_fam_inst_env' my_unify False env fam tys'
-  where
-    inst_tycon = famInstTyCon fam_inst
-    (fam, tys) = expectJust "FamInstEnv.lookuFamInstEnvConflicts"
-    	       	            (tyConFamInst_maybe inst_tycon)
-    skol_tys = mkTyVarTys skol_tvs
-    tys'     = substTys (zipTopTvSubst (tyConTyVars inst_tycon) skol_tys) tys
-        -- In example above,   fam tys' = F [b]   
-
-    my_unify old_fam_inst tpl_tvs tpl_tys match_tys
-       = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
-		  (ppr fam <+> ppr tys) $$
-		  (ppr tpl_tvs <+> ppr tpl_tys) )
-		-- Unification will break badly if the variables overlap
-		-- They shouldn't because we allocate separate uniques for them
-         case tcUnifyTys instanceBindFun tpl_tys match_tys of
-	      Just subst | conflicting old_fam_inst subst -> Just subst
-	      _other	   	              	          -> Nothing
-
-      -- - In the case of data family instances, any overlap is fundamentally a
-      --   conflict (as these instances imply injective type mappings).
-      -- - In the case of type family instances, overlap is admitted as long as
-      --   the right-hand sides of the overlapping rules coincide under the
-      --   overlap substitution.  We require that they are syntactically equal;
-      --   anything else would be difficult to test for at this stage.
-    conflicting old_fam_inst subst 
-      | isAlgTyCon fam = True
-      | otherwise      = not (old_rhs `eqType` new_rhs)
-      where
-        old_tycon = famInstTyCon old_fam_inst
-        old_tvs   = tyConTyVars old_tycon
-        old_rhs   = mkTyConApp old_tycon  (substTyVars subst old_tvs)
-        new_rhs   = mkTyConApp inst_tycon (substTyVars subst skol_tvs)
-
-
-
-
 lookupFamInstEnvConflicts
     :: FamInstEnvs
     -> FamInst		-- Putative new instance
@@ -376,18 +324,18 @@ lookupFamInstEnvConflicts
 -- Precondition: the tycon is saturated (or over-saturated)
 
 lookupFamInstEnvConflicts envs fam_inst skol_tvs
-  = lookup_fam_inst_env my_unify False envs fam tys'
+  = lookup_fam_inst_env my_unify False envs fam tys1
   where
     inst_tycon = famInstTyCon fam_inst
     (fam, tys) = expectJust "FamInstEnv.lookuFamInstEnvConflicts"
     	       	            (tyConFamInst_maybe inst_tycon)
     skol_tys = mkTyVarTys skol_tvs
-    tys'     = substTys (zipTopTvSubst (tyConTyVars inst_tycon) skol_tys) tys
+    tys1     = substTys (zipTopTvSubst (tyConTyVars inst_tycon) skol_tys) tys
         -- In example above,   fam tys' = F [b]   
 
     my_unify old_fam_inst tpl_tvs tpl_tys match_tys
-       = ASSERT2( tyVarsOfTypes tys `disjointVarSet` tpl_tvs,
-		  (ppr fam <+> ppr tys) $$
+       = ASSERT2( tyVarsOfTypes tys1 `disjointVarSet` tpl_tvs,
+		  (ppr fam <+> ppr tys1) $$
 		  (ppr tpl_tvs <+> ppr tpl_tys) )
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
@@ -395,12 +343,7 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
 	      Just subst | conflicting old_fam_inst subst -> Just subst
 	      _other	   	              	          -> Nothing
 
-      -- - In the case of data family instances, any overlap is fundamentally a
-      --   conflict (as these instances imply injective type mappings).
-      -- - In the case of type family instances, overlap is admitted as long as
-      --   the right-hand sides of the overlapping rules coincide under the
-      --   overlap substitution.  We require that they are syntactically equal;
-      --   anything else would be difficult to test for at this stage.
+      -- Note [Family instance overlap conflicts]
     conflicting old_fam_inst subst 
       | isAlgTyCon fam = True
       | otherwise      = not (old_rhs `eqType` new_rhs)
@@ -409,7 +352,28 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
         old_tvs   = tyConTyVars old_tycon
         old_rhs   = mkTyConApp old_tycon  (substTyVars subst old_tvs)
         new_rhs   = mkTyConApp inst_tycon (substTyVars subst skol_tvs)
+
+-- This variant is called when we want to check if the conflict is only in the
+-- home environment (see FamInst.addLocalFamInst)
+lookupFamInstEnvConflicts' :: FamInstEnv -> FamInst -> [TyVar] -> [FamInstMatch]
+lookupFamInstEnvConflicts' env fam_inst skol_tvs
+  = lookupFamInstEnvConflicts (emptyFamInstEnv, env) fam_inst skol_tvs
 \end{code}
+
+Note [Family instance overlap conflicts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- In the case of data family instances, any overlap is fundamentally a
+  conflict (as these instances imply injective type mappings).
+
+- In the case of type family instances, overlap is admitted as long as
+  the right-hand sides of the overlapping rules coincide under the
+  overlap substitution.  eg
+       type instance F a Int = a
+       type instance F Int b = b
+  These two overlap on (F Int Int) but then both RHSs are Int, 
+  so all is well. We require that they are syntactically equal;
+  anything else would be difficult to test for at this stage.
+
 
 While @lookupFamInstEnv@ uses a one-way match, the next function
 @lookupFamInstEnvConflicts@ uses two-way matching (ie, unification).  This is

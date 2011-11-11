@@ -23,6 +23,7 @@ import TyCon
 -- import Class
 import TypeRep
 import Type
+import Kind
 import PprExternalCore () -- Instances
 import DataCon
 import Coercion

@@ -45,6 +45,7 @@ import Var
 import TcRnMonad
 import TcType
 import TcMType
+import TcHsSyn ( mkZonkTcTyVar )
 import TcUnify
 import TcEnv
 
@@ -1130,7 +1131,7 @@ zonkTerm = foldTermM (TermFoldM
 zonkRttiType :: TcType -> TcM Type
 -- Zonk the type, replacing any unbound Meta tyvars
 -- by skolems, safely out of Meta-tyvar-land
-zonkRttiType = zonkType (mkZonkTcTyVar zonk_unbound_meta) 
+zonkRttiType = zonkType (mkZonkTcTyVar zonk_unbound_meta mkTyVarTy)
   where
     zonk_unbound_meta tv 
       = ASSERT( isTcTyVar tv )

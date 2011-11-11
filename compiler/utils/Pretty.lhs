@@ -106,7 +106,7 @@ Relative to John's original paper, there are the following new features:
         These new ones do the obvious things:
                 char, semi, comma, colon, space,
                 parens, brackets, braces,
-                quotes, doubleQuotes
+                quotes, quote, doubleQuotes
 
 4.      The "above" combinator, $$, now overlaps its two arguments if the
         last line of the top argument stops before the first line of the second begins.
@@ -165,7 +165,7 @@ module Pretty (
 
         char, text, ftext, ptext, zeroWidthText,
         int, integer, float, double, rational,
-        parens, brackets, braces, quotes, doubleQuotes,
+        parens, brackets, braces, quotes, quote, doubleQuotes,
         semi, comma, colon, space, equals,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, cparen,
 
@@ -233,8 +233,8 @@ char                      :: Char -> Doc
 semi, comma, colon, space, equals              :: Doc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace :: Doc
 
-parens, brackets, braces  :: Doc -> Doc
-quotes, doubleQuotes      :: Doc -> Doc
+parens, brackets, braces    :: Doc -> Doc
+quotes, quote, doubleQuotes :: Doc -> Doc
 
 int      :: Int -> Doc
 integer  :: Integer -> Doc
@@ -409,6 +409,7 @@ rational n = text (show (fromRat n :: Double))
 --rational n = text (show (fromRationalX n)) -- _showRational 30 n)
 
 quotes p        = char '`' <> p <> char '\''
+quote p         = char '\'' <> p
 doubleQuotes p  = char '"' <> p <> char '"'
 parens p        = char '(' <> p <> char ')'
 brackets p      = char '[' <> p <> char ']'
