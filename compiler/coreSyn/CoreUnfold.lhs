@@ -278,9 +278,10 @@ Notice that 'x' counts 0, while (f x) counts 2.  That's deliberate: there's
 a function call to account for.  Notice also that constructor applications 
 are very cheap, because exposing them to a caller is so valuable.
 
-[25/5/11] All sizes are now multiplied by 10, except for primops.
-This makes primops look cheap, and seems to be almost unversally
-beneficial.  Done partly as a result of #4978.
+[25/5/11] All sizes are now multiplied by 10, except for primops
+(which have sizes like 1 or 4.  This makes primops look fantastically
+cheap, and seems to be almost unversally beneficial.  Done partly as a
+result of #4978.
 
 Note [Do not inline top-level bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -337,7 +338,8 @@ uncondInline :: Arity -> Int -> Bool
 -- Size of call is arity (+1 for the function)
 -- See Note [INLINE for small functions]
 uncondInline arity size 
-  | arity == 0 = size == 0
+  | arity == 0 = False	-- Never unconditionally inline non-lambda
+    	       	 	-- PostInlineUnconditionally will do that
   | otherwise  = size <= 10 * (arity + 1)
 \end{code}
 
@@ -747,16 +749,27 @@ smallEnoughToInline _
 ----------------
 certainlyWillInline :: Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
-certainlyWillInline (CoreUnfolding { uf_is_cheap = is_cheap, uf_arity = n_vals, uf_guidance = guidance })
+certainlyWillInline (CoreUnfolding { uf_arity = n_vals, uf_guidance = guidance })
   = case guidance of
       UnfNever      -> False
       UnfWhen {}    -> True
       UnfIfGoodArgs { ug_size = size} 
-                    -> is_cheap && size - (10 * (n_vals +1)) <= opt_UF_UseThreshold
+                    -> n_vals > 0     -- See Note [certainlyWillInline: be caseful of thunks]
+                    && size - (10 * (n_vals +1)) <= opt_UF_UseThreshold
 
 certainlyWillInline _
   = False
 \end{code}
+
+Note [certainlyWillInline: be caseful of thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Don't claim that thunks will certainly inline, because that risks work
+duplication.  Even if the work duplication is not great (eg is_cheap
+holds), it can make a big difference in an inner loop In Trac #5623 we
+found that the WorkWrap phase thought that
+       y = case x of F# v -> F# (v +# v)
+was certainlyWillInline, so the addition got duplicated.  
+
 
 %************************************************************************
 %*									*
@@ -1084,7 +1097,8 @@ to be cheap, and that's good because exprIsConApp_maybe doesn't
 think that expression is a constructor application.
 
 I used to test is_value rather than is_cheap, which was utterly
-wrong, because the above expression responds True to exprIsHNF.
+wrong, because the above expression responds True to exprIsHNF, 
+which is what sets is_value.
 
 This kind of thing can occur if you have
 
