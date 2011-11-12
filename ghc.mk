@@ -316,6 +316,7 @@ PKGS_THAT_ARE_INTREE_ONLY := haskeline mtl terminfo utf8-string xhtml
 PKGS_THAT_ARE_DPH := \
     dph/dph-base \
     dph/dph-prim-interface dph/dph-prim-seq dph/dph-prim-par \
+    dph/dph-lifted-base \
     dph/dph-lifted-boxed dph/dph-lifted-copy dph/dph-lifted-vseg \
     vector primitive random
 
