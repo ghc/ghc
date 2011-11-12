@@ -18,12 +18,12 @@ if testFile != 'nothing':
  test   ('dph-smvm'
         , [ alone
           , skip_if_fast
-          , reqlib('dph-par')
+          , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2'])
           , extra_run_opts(testFile + " " + outFile)
           ]
         , multimod_compile_and_run
         , [ 'Main'
-          , '-Odph -package dph-par -package dph-prim-par'])
+          , '-Odph -package dph-lifted-copy -package dph-prim-par'])
 
