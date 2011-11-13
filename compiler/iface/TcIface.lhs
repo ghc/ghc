@@ -273,7 +273,7 @@ typecheckIface iface
         ; anns      <- tcIfaceAnnotations (mi_anns iface)
 
                 -- Vectorisation information
-        ; vect_info <- tcIfaceVectInfo (mi_module iface) (mi_vect_info iface)
+        ; vect_info <- tcIfaceVectInfo (mi_module iface) type_env (mi_vect_info iface)
 
                 -- Exports
         ; exports <- ifaceExportNames (mi_exports iface)
@@ -712,14 +712,21 @@ tcIfaceAnnTarget (ModuleTarget mod) = do
 %************************************************************************
 
 \begin{code}
-tcIfaceVectInfo :: Module -> IfaceVectInfo -> IfL VectInfo
-tcIfaceVectInfo mod (IfaceVectInfo 
-                     { ifaceVectInfoVar          = vars
-                     , ifaceVectInfoTyCon        = tycons
-                     , ifaceVectInfoTyConReuse   = tyconsReuse
-                     , ifaceVectInfoScalarVars   = scalarVars
-                     , ifaceVectInfoScalarTyCons = scalarTyCons
-                     })
+-- We need access to the type environment as we need to look up information about type constructors
+-- (i.e., their data constructors and whether they are class type constructors) and about classes
+-- (i.e., their selector ids).  If a vectorised type constructor or class is defined in the same
+-- module as where it is vectorised, we cannot look that information up from the type constructor
+-- that we obtained via a 'forkM'ed 'tcIfaceTyCon' without recursively loading the interface that
+-- we are already type checking again and again and again...
+--
+tcIfaceVectInfo :: Module -> TypeEnv -> IfaceVectInfo -> IfL VectInfo
+tcIfaceVectInfo mod typeEnv (IfaceVectInfo 
+                             { ifaceVectInfoVar          = vars
+                             , ifaceVectInfoTyCon        = tycons
+                             , ifaceVectInfoTyConReuse   = tyconsReuse
+                             , ifaceVectInfoScalarVars   = scalarVars
+                             , ifaceVectInfoScalarTyCons = scalarTyCons
+                             })
   = do { let scalarTyConsSet = mkNameSet scalarTyCons
        ; vVars       <- mapM vectVarMapping                          vars
        ; tyConRes1   <- mapM vectTyConMapping                        tycons
@@ -752,8 +759,18 @@ tcIfaceVectInfo mod (IfaceVectInfo
 
     vectTyConMapping name 
       = do { vName  <- lookupOrig mod (mkLocalisedOccName mod mkVectTyConOcc name)
-           ; tycon  <- forkM (text ("vect tycon") <+> ppr name) $
-                         tcIfaceTyCon (IfaceTc name)
+
+               -- we need a fully defined version of the type constructor to be able to extract
+               -- its data constructors etc.
+           ; tycon  <- do { let mb_tycon = lookupTypeEnv typeEnv name
+                          ; case mb_tycon of
+                                -- tycon is local
+                              Just (ATyCon tycon) -> return tycon
+                                -- name is not a tycon => internal inconsistency
+                              Just _              -> notATyConErr
+                                -- tycon is external
+                              Nothing             -> tcIfaceTyCon (IfaceTc name)
+                          }
            ; vTycon <- forkM (text ("vect vTycon") <+> ppr vName) $
                          tcIfaceTyCon (IfaceTc vName)
 
@@ -766,6 +783,8 @@ tcIfaceVectInfo mod (IfaceVectInfo
                     , vDataCons                        -- list of (Ci, Ci_v)
                     )
            }
+      where
+        notATyConErr = pprPanic "TcIface.tcIfaceVectInfo: not a tycon" (ppr name)
 
     vectTyConReuseMapping scalarNames name 
       = do { tycon <- forkM (text ("vect reuse tycon") <+> ppr name) $
