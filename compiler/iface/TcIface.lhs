@@ -713,11 +713,11 @@ tcIfaceAnnTarget (ModuleTarget mod) = do
 
 \begin{code}
 -- We need access to the type environment as we need to look up information about type constructors
--- (i.e., their data constructors and whether they are class type constructors) and about classes
--- (i.e., their selector ids).  If a vectorised type constructor or class is defined in the same
--- module as where it is vectorised, we cannot look that information up from the type constructor
--- that we obtained via a 'forkM'ed 'tcIfaceTyCon' without recursively loading the interface that
--- we are already type checking again and again and again...
+-- (i.e., their data constructors and whether they are class type constructors).  If a vectorised
+-- type constructor or class is defined in the same module as where it is vectorised, we cannot
+-- look that information up from the type constructor that we obtained via a 'forkM'ed
+-- 'tcIfaceTyCon' without recursively loading the interface that we are already type checking again
+-- and again and again...
 --
 tcIfaceVectInfo :: Module -> TypeEnv -> IfaceVectInfo -> IfL VectInfo
 tcIfaceVectInfo mod typeEnv (IfaceVectInfo 

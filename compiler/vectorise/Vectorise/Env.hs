@@ -21,6 +21,7 @@ import InstEnv
 import FamInstEnv
 import CoreSyn
 import Type
+import Class
 import TyCon
 import DataCon
 import VarEnv
@@ -31,15 +32,20 @@ import Name
 import NameEnv
 import FastString
 
+import Data.Maybe
 
--- | Indicates what scope something (a variable) is in.
+
+-- |Indicates what scope something (a variable) is in.
+--
 data Scope a b 
         = Global a 
         | Local  b
 
 
 -- LocalEnv -------------------------------------------------------------------
--- | The local environment.
+
+-- |The local environment.
+--
 data LocalEnv
   = LocalEnv {
         -- Mapping from local variables to their vectorised and lifted versions.
@@ -55,8 +61,8 @@ data LocalEnv
         , local_bind_name :: FastString
         }
 
-
--- | Create an empty local environment.
+-- |Create an empty local environment.
+--
 emptyLocalEnv :: LocalEnv
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
@@ -188,6 +194,8 @@ setPRFunsEnv ps genv = genv { global_pr_funs = mkNameEnv ps }
 -- data constructors referenced in VECTORISE pragmas, even if they are defined in an imported
 -- module.
 --
+-- The variables explicitly include class selectors.
+--
 modVectInfo :: GlobalEnv -> [Id] -> [TyCon] -> [CoreVect]-> VectInfo -> VectInfo
 modVectInfo env mg_ids mg_tyCons vectDecls info
   = info 
@@ -198,13 +206,16 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     , vectInfoScalarTyCons = global_scalar_tycons env `minusNameSet` vectInfoScalarTyCons info
     }
   where
-    vectIds        = [id    | Vect     id    _   <- vectDecls]
-    vectTypeTyCons = [tycon | VectType _ tycon _ <- vectDecls] ++
-                     [tycon | VectClass tycon    <- vectDecls]
-    vectDataCons   = concatMap tyConDataCons vectTypeTyCons
-    ids            = mg_ids ++ vectIds
-    tyCons         = mg_tyCons ++ vectTypeTyCons
-    dataCons       = concatMap tyConDataCons mg_tyCons ++ vectDataCons
+    vectIds         = [id    | Vect     id    _   <- vectDecls]
+    vectTypeTyCons  = [tycon | VectType _ tycon _ <- vectDecls] ++
+                      [tycon | VectClass tycon    <- vectDecls]
+    vectDataCons    = concatMap tyConDataCons vectTypeTyCons
+    ids             = mg_ids ++ vectIds ++ selIds
+    tyCons          = mg_tyCons ++ vectTypeTyCons
+    dataCons        = concatMap tyConDataCons mg_tyCons ++ vectDataCons
+    selIds          = concat [ classAllSelIds cls 
+                             | tycon <- tyCons
+                             , cls <- maybeToList . tyConClass_maybe $ tycon]
     
     -- Produce an entry for every declaration that is mentioned in the domain of the 'inspectedEnv'
     mk_env decls inspectedEnv
