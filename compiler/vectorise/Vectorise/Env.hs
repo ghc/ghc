@@ -194,7 +194,7 @@ setPRFunsEnv ps genv = genv { global_pr_funs = mkNameEnv ps }
 -- data constructors referenced in VECTORISE pragmas, even if they are defined in an imported
 -- module.
 --
--- The variables explicitly include class selectors.
+-- The variables explicitly include class selectors and dfuns.
 --
 modVectInfo :: GlobalEnv -> [Id] -> [TyCon] -> [CoreVect]-> VectInfo -> VectInfo
 modVectInfo env mg_ids mg_tyCons vectDecls info
@@ -206,7 +206,8 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     , vectInfoScalarTyCons = global_scalar_tycons env `minusNameSet` vectInfoScalarTyCons info
     }
   where
-    vectIds         = [id    | Vect     id    _   <- vectDecls]
+    vectIds         = [id    | Vect     id    _   <- vectDecls] ++
+                      [id    | VectInst _ id      <- vectDecls]
     vectTypeTyCons  = [tycon | VectType _ tycon _ <- vectDecls] ++
                       [tycon | VectClass tycon    <- vectDecls]
     vectDataCons    = concatMap tyConDataCons vectTypeTyCons

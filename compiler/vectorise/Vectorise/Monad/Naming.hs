@@ -46,8 +46,8 @@ mkLocalisedName mk_occ name =
      ; return new_name
      }
 
--- |Produce the vectorised variant of an `Id` with the given type, while taking care that vectorised
--- dfun ids must be dfuns again.
+-- |Produce the vectorised variant of an `Id` with the given vectorised type, while taking care that
+-- vectorised dfun ids must be dfuns again.
 --
 -- Force the new name to be a system name and, if the original was an external name, disambiguate
 -- the new name with the module name of the original.

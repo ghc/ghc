@@ -49,7 +49,11 @@ vectTyConDecl tycon
        ; theta' <- mapM vectType (classSCTheta cls)
 
            -- vectorise method selectors
-       ; methods' <- sequence [ vectMethod id meth | (id, meth) <- classOpItems cls]
+       ; let opItems      = classOpItems cls
+             Just datacon = tyConSingleDataCon_maybe tycon
+             argTys       = dataConRepArgTys datacon                      -- all selector types
+             opTys        = drop (length argTys - length opItems) argTys  -- only method types
+       ; methods' <- sequence [ vectMethod id meth ty | ((id, meth), ty) <- zip opItems opTys]
 
            -- keep the original recursiveness flag
        ; let rec_flag = boolToRecFlag (isRecursiveTyCon tycon)
@@ -115,24 +119,17 @@ vectTyConDecl tycon
   | otherwise
   = cantVectorise "Can't vectorise exotic type constructor" (ppr tycon)
 
--- |Vectorise a class method.  (Don't enter into the vectorisation map yet.)
+-- |Vectorise a class method.  (Don't enter it into the vectorisation map yet.)
 --
-vectMethod :: Id -> DefMeth -> VM (Name, DefMethSpec, Type)
-vectMethod id defMeth
+vectMethod :: Id -> DefMeth -> Type -> VM (Name, DefMethSpec, Type)
+vectMethod id defMeth ty
  = do {   -- Vectorise the method type.
-      ; typ' <- vectType (varType id)
+      ; ty' <- vectType ty
 
           -- Create a name for the vectorised method.
-      ; id' <- mkVectId id typ'
+      ; id' <- mkVectId id ty'
 
-          -- When we call buildClass in vectTyConDecl, it adds foralls and dictionaries
-          -- to the types of each method. However, the types we get back from vectType
-          -- above already already have these, so we need to chop them off here otherwise
-          -- we'll get two copies in the final version.
-      ; let (_tyvars, tyBody) = splitForAllTys typ'
-      ; let (_dict,   tyRest) = splitFunTy tyBody
-
-      ; return  (Var.varName id', defMethSpecOfDefMeth defMeth, tyRest)
+      ; return  (Var.varName id', defMethSpecOfDefMeth defMeth, ty')
       }
 
 -- |Vectorise the RHS of an algebraic type.
