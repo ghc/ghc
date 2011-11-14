@@ -1759,7 +1759,11 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
  , if isUnLiftedType (idType case_bndr)
    then ok_for_spec         -- Satisfy the let-binding invariant
    else elim_lifted
-  = do  { tick (CaseElim case_bndr)
+  = do  { -- pprTrace "case elim" (vcat [ppr case_bndr, ppr (exprIsHNF scrut),
+          --                            ppr strict_case_bndr, ppr (scrut_is_var scrut),
+          --                            ppr ok_for_spec,
+          --                            ppr scrut]) $
+          tick (CaseElim case_bndr)
         ; env' <- simplNonRecX env case_bndr scrut
           -- If case_bndr is deads, simplNonRecX will discard
         ; simplExprF env' rhs cont }
