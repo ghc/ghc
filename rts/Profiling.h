@@ -35,7 +35,7 @@ void reportCCSProfiling ( void );
 void PrintNewStackDecls ( void );
 
 void fprintCCS( FILE *f, CostCentreStack *ccs );
-void fprintCCS_stderr (CostCentreStack *ccs, StgTSO *tso);
+void fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso);
 
 #ifdef DEBUG
 void debugCCS( CostCentreStack *ccs );

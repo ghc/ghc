@@ -17,6 +17,7 @@
 #include "ProfHeap.h"
 #include "Arena.h"
 #include "RetainerProfile.h"
+#include "Printer.h"
 
 #include <string.h>
 
@@ -1001,7 +1002,7 @@ static rtsBool fprintCallStack (CostCentreStack *ccs)
 
 /* For calling from .cmm code, where we can't reliably refer to stderr */
 void
-fprintCCS_stderr (CostCentreStack *ccs, StgTSO *tso)
+fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
 {
     rtsBool is_caf;
     StgPtr frame;
@@ -1010,7 +1011,26 @@ fprintCCS_stderr (CostCentreStack *ccs, StgTSO *tso)
     nat depth = 0;
     const nat MAX_DEPTH = 10; // don't print gigantic chains of stacks
 
-    fprintf(stderr, "*** Exception raised (reporting due to +RTS -xc), stack trace:\n  ");
+    {
+        char *desc;
+        StgInfoTable *info;
+        info = get_itbl(exception);
+        switch (info->type) {
+        case CONSTR:
+        case CONSTR_1_0:
+        case CONSTR_0_1:
+        case CONSTR_2_0:
+        case CONSTR_1_1:
+        case CONSTR_0_2:
+        case CONSTR_STATIC:
+        case CONSTR_NOCAF_STATIC:
+            desc = GET_CON_DESC(itbl_to_con_itbl(info));
+        default:
+            desc = closure_type_names[info->type];
+        }
+        fprintf(stderr, "*** Exception (reporting due to +RTS -xc): (%s), stack trace: \n  ", desc);
+    }
+
     is_caf = fprintCallStack(ccs);
 
     // traverse the stack down to the enclosing update frame to
