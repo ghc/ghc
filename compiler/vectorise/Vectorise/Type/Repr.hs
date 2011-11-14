@@ -1,5 +1,11 @@
 
 -- | Compute the generic representation type for data types.
+--
+--   During vectorisation, we generate a PRepr and PA instance for each user defined
+--   data type. The PA dictionary contains methods to convert the user type to and
+--   from our generic representation. This module computes a description of what
+--   that generic representation is.
+--
 module Vectorise.Type.Repr ( 
   CompRepr (..), ProdRepr (..), ConRepr (..), SumRepr (..),
   tyConRepr, sumReprType, conReprType, prodReprType, compReprType, compOrigType
@@ -18,6 +24,8 @@ import Outputable
 
 
 -- | Describes the generic representation of a data type.
+--   If the data type has multiple constructors then we bundle them
+--   together into a generic sum type.
 data SumRepr 
         =  -- | Data type has no data constructors.
            EmptySum
@@ -26,59 +34,83 @@ data SumRepr
         | UnarySum ConRepr
 
         -- | Data type has multiple constructors.
-        | Sum  { -- | Representation type for the sum (eg Sum2)
+        | Sum  { -- | Representation tycon for the sum (eg Sum2)
                  repr_sum_tc    :: TyCon
 
-               -- | PData version of the sum TyCon    (eg PDataSum2)
+               -- | PData version of the sum tycon     (eg PDataSum2)
                --   This TyCon doesn't appear explicitly in the source program.
                --   See Note [PData TyCons].
                , repr_psum_tc   :: TyCon
 
-               -- | PDatas version of the sum TyCon   (eg PDatasSum2)
+               -- | PDatas version of the sum tycon    (eg PDatasSum2)
                --   Not all lifted backends use `PDatas`.
                , repr_psums_tc  :: Maybe TyCon
 
-               -- | Type of selector (eg Sel2)
+               -- | Type of the selector (eg Sel2)
                , repr_sel_ty    :: Type
 
                -- | Type of each data constructor.
                , repr_con_tys   :: [Type]
 
-               -- | Representation types of each data constructor.
+               -- | Generic representation types of each data constructor.
                , repr_cons      :: [ConRepr]
                }
 
+
+-- | Describes the representation type of a data constructor.
 data ConRepr  
         = ConRepr 
                 { repr_dc       :: DataCon
                 , repr_prod     :: ProdRepr 
                 }
 
+-- | Describes the representation type of the fields \/ components of a constructor.
+--   If the data constructor has multiple fields then we bundle them 
+--   together into a generic product type.
 data ProdRepr 
-        = EmptyProd
+        = -- | Data constructor has no fields.
+          EmptyProd
+
+        -- | Data constructor has a single field.
         | UnaryProd CompRepr
-        | Prod { repr_tup_tc   :: TyCon         -- representation tuple tycon
-               , repr_ptup_tc  :: TyCon         -- PData representation tycon
-               , repr_comp_tys :: [Type]        -- representation types of
-               , repr_comps    :: [CompRepr]    --      components
+
+        -- | Data constructor has several fields.
+        | Prod { -- | Representation tycon for the product (eg Tuple2)
+                 repr_tup_tc   :: TyCon
+
+                 -- | PData  version of the product tycon  (eg PDataTuple2)
+               , repr_ptup_tc  :: TyCon
+
+                 -- | PDatas version of the product tycon  (eg PDatasTuple2s)
+                 --   Not all lifted backends use `PDatas`.
+               , repr_ptups_tc :: Maybe TyCon
+
+                 -- | Types of each field.
+               , repr_comp_tys :: [Type]
+
+                 -- | Generic representation types for each field.
+               , repr_comps    :: [CompRepr]
                }
 
+
+-- | Describes the representation type of a data constructor field.
 data CompRepr
         = Keep Type
                CoreExpr     -- PR dictionary for the type
         | Wrap Type
 
 
--- | Determine the representation type of a data type constructor.
---
+-------------------------------------------------------------------------------
+
+-- | Determine the generic representation of a data type, given its tycon.
+--   The `TyCon` contains a description of the whole data type.
 tyConRepr :: TyCon -> VM SumRepr
 tyConRepr tc 
-  = do  result  <- sum_repr (tyConDataCons tc)
-        {-pprTrace "tyConRepr" (ppr result)-} 
-        return result
-
+  = sum_repr (tyConDataCons tc)
   where
     -- Build the representation type for a data type with the given constructors.
+    -- The representation types for each individual constructor are bundled
+    -- together into a generic sum type.
     sum_repr :: [DataCon] -> VM SumRepr
     sum_repr []    = return EmptySum
     sum_repr [con] = liftM UnarySum (con_repr con)
@@ -86,6 +118,8 @@ tyConRepr tc
      = do  let arity    = length cons
            rs           <- mapM con_repr cons
            tys          <- mapM conReprType rs
+
+           -- Get the 'Sum' tycon of this arity (eg Sum2).
            sum_tc       <- builtin (sumTyCon arity)
            
            -- Get the 'PData' and 'PDatas' tycons for the sum.
@@ -103,28 +137,42 @@ tyConRepr tc
                   , repr_cons     = rs
                   }
 
+    -- Build the representation type for a single data constructor.
     con_repr con   = liftM (ConRepr con) (prod_repr (dataConRepArgTys con))
 
+    -- Build the representation type for the fields of a data constructor.
+    -- The representation types for each individual field are bundled
+    -- together into a generic product type.
     prod_repr :: [Type] -> VM ProdRepr
     prod_repr []   = return EmptyProd
     prod_repr [ty] = liftM UnaryProd (comp_repr ty)
     prod_repr tys  
      = do  let arity    = length tys
            rs           <- mapM comp_repr tys
-           tup_tc       <- builtin (prodTyCon arity)
            tys'         <- mapM compReprType rs
-           (ptup_tc, _) <- pdataReprTyCon (mkTyConApp tup_tc tys')
+
+           -- Get the Prod \/ Tuple tycon of this arity (eg Tuple2)
+           tup_tc       <- builtin (prodTyCon arity)
+
+           -- Get the 'PData' and 'PDatas' tycons for the product.
+           let prodapp  = mkTyConApp tup_tc tys'
+           ptup_tc      <- liftM fst         $ pdataReprTyCon prodapp
+           ptups_tc     <- liftM (liftM fst) $ pdatasReprTyCon_maybe prodapp
+           
            return $ Prod 
                   { repr_tup_tc   = tup_tc
                   , repr_ptup_tc  = ptup_tc
+                  , repr_ptups_tc = ptups_tc
                   , repr_comp_tys = tys'
                   , repr_comps    = rs
                   }
     
+    -- Build the representation type for a single data constructor field.
     comp_repr ty = liftM (Keep ty) (prDictOfReprType ty)
                    `orElseV` return (Wrap ty)
 
 
+-- | Yield the type of this sum representation.
 sumReprType :: SumRepr -> VM Type
 sumReprType EmptySum     = voidType
 sumReprType (UnarySum r) = conReprType r
@@ -132,10 +180,12 @@ sumReprType (Sum { repr_sum_tc  = sum_tc, repr_con_tys = tys })
   = return $ mkTyConApp sum_tc tys
 
 
+-- | Yield the type of this constructor representation.
 conReprType :: ConRepr -> VM Type
 conReprType (ConRepr _ r) = prodReprType r
 
 
+-- | Yield the type of of this product representation.
 prodReprType :: ProdRepr -> VM Type
 prodReprType EmptyProd     = voidType
 prodReprType (UnaryProd r) = compReprType r
@@ -143,6 +193,7 @@ prodReprType (Prod { repr_tup_tc = tup_tc, repr_comp_tys = tys })
   = return $ mkTyConApp tup_tc tys
 
 
+-- | Yield the type of this data constructor field \/ component representation.
 compReprType :: CompRepr -> VM Type
 compReprType (Keep ty _) = return ty
 compReprType (Wrap ty)
@@ -150,6 +201,7 @@ compReprType (Wrap ty)
         return $ mkTyConApp wrap_tc [ty]
        
 
+-- Yield the original component type of a data constructor component representation.
 compOrigType :: CompRepr -> Type
 compOrigType (Keep ty _) = ty
 compOrigType (Wrap ty)   = ty
@@ -191,8 +243,8 @@ instance Outputable ProdRepr where
         UnaryProd cr
          -> sep [text "UnaryProd", ppr cr]
          
-        Prod tuptcs ptuptcs comptys comps
-         -> sep [text "Prod", ppr tuptcs, ppr ptuptcs, ppr comptys, ppr comps]
+        Prod tuptcs ptuptcs ptupstcs comptys comps
+         -> sep [text "Prod", ppr tuptcs, ppr ptuptcs, ppr ptupstcs, ppr comptys, ppr comps]
 
 
 instance Outputable CompRepr where

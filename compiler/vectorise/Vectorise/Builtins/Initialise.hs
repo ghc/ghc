@@ -38,7 +38,7 @@ initBuiltins
           -- 'PData': type family mapping array element types to array representation types
           -- Not all backends use `PDatas`.
       ; pdataTyCon  <- externalTyCon (fsLit "PData")
-      ; pdatasTyCon@(Just _) <- externalTyCon_maybe (fsLit "PDatas")
+      ; pdatasTyCon <- externalTyCon_maybe (fsLit "PDatas")
 
           -- 'PR': class of basic array operators operating on 'PData' types
       ; prClass     <- externalClass (fsLit "PR")
