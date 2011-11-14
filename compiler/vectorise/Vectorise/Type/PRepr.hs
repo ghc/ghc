@@ -1,11 +1,3 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Vectorise.Type.PRepr
   ( buildPReprTyCon
   , buildPAScAndMethods 
@@ -17,7 +9,7 @@ import Vectorise.Builtins
 import Vectorise.Type.Repr
 import CoreSyn
 import CoreUtils
-import MkCore		 ( mkWildCase )
+import MkCore            ( mkWildCase )
 import TyCon
 import Type
 import BuildTyCl
@@ -62,10 +54,10 @@ buildPAScAndMethods :: [(String, TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreEx
 --      fromArrPRepr :: PData (PRepr a) -> PData a
 
 buildPAScAndMethods = [("PR",           buildPRDict),
-             	       ("toPRepr",      buildToPRepr),
-             	       ("fromPRepr",    buildFromPRepr),
-             	       ("toArrPRepr",   buildToArrPRepr),
-             	       ("fromArrPRepr", buildFromArrPRepr)]
+                       ("toPRepr",      buildToPRepr),
+                       ("fromPRepr",    buildFromPRepr),
+                       ("toArrPRepr",   buildToArrPRepr),
+                       ("fromArrPRepr", buildFromArrPRepr)]
 
 buildPRDict :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
 buildPRDict vect_tc prepr_tc _ _
