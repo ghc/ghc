@@ -21,21 +21,11 @@ import Var
 import Name
 
 
--- debug                = False
--- dtrace s x   = if debug then pprTrace "Vectoris.Type.PADict" s x else x
-
 -- |Build the PA dictionary function for some type and hoist it to top level.
 --
--- The PA dictionary holds fns that convert values to and from their vectorised representations.
+--  The PA dictionary holds fns that convert values to and from their vectorised representations.
 --
-buildPADict
-  :: TyCon  -- ^ tycon of the type being vectorised.
-  -> TyCon  -- ^ tycon of the type used for the vectorised representation.
-  -> TyCon  -- ^ PRepr instance tycon
-  -> SumRepr  -- ^ representation used for the type being vectorised.
-  -> VM Var -- ^ name of the top-level dictionary function.
-
--- Recall the definition:
+-- @Recall the definition:
 --    class class PR (PRepr a) => PA a where
 --      toPRepr      :: a -> PRepr a
 --      fromPRepr    :: PRepr a -> a
@@ -50,8 +40,17 @@ buildPADict
 --    $toRepr :: forall a. PA a -> T a -> PRepr (T a)
 --    $toPRepr = ...
 -- The "..." stuff is filled in by buildPAScAndMethods
+-- @
+--
+buildPADict
+        :: TyCon        -- ^ tycon of the type being vectorised.
+        -> TyCon        -- ^ tycon of the type used for the vectorised representation.
+        -> TyCon        -- ^ PData  instance tycon
+        -> TyCon        -- ^ PDatas instance tycon
+        -> SumRepr      -- ^ representation used for the type being vectorised.
+        -> VM Var       -- ^ name of the top-level dictionary function.
 
-buildPADict vect_tc prepr_tc arr_tc repr
+buildPADict vect_tc prepr_tc pdata_tc pdatas_tc repr
  = polyAbstract tvs $ \args ->    -- The args are the dictionaries we lambda
                                   -- abstract over; and they are put in the
                                   -- envt, so when we need a (PA a) we can 
@@ -88,23 +87,21 @@ buildPADict vect_tc prepr_tc arr_tc repr
       ; return dfun
       }
   where
-    tvs       = tyConTyVars vect_tc
-    arg_tys   = mkTyVarTys tvs
-    inst_ty   = mkTyConApp vect_tc arg_tys
-
+    tvs          = tyConTyVars vect_tc
+    arg_tys      = mkTyVarTys tvs
+    inst_ty      = mkTyConApp vect_tc arg_tys
     vect_tc_name = getName vect_tc
 
     method args dfun_name (name, build)
-      = localV
-      $ do
-          expr     <- build vect_tc prepr_tc arr_tc repr
-          let body = mkLams (tvs ++ args) expr
-          raw_var  <- newExportedVar (method_name dfun_name name) (exprType body)
-          let var  = raw_var
+     = localV
+     $ do  expr     <- build vect_tc prepr_tc pdata_tc pdatas_tc repr
+           let body = mkLams (tvs ++ args) expr
+           raw_var  <- newExportedVar (method_name dfun_name name) (exprType body)
+           let var  = raw_var
                       `setIdUnfolding` mkInlineUnfolding (Just (length args)) body
                       `setInlinePragma` alwaysInlinePragma
-          hoistBinding var body
-          return var
+           hoistBinding var body
+           return var
 
     method_call args id        = mkApps (Var id) (map Type arg_tys ++ map Var args)
     method_name dfun_name name = mkVarOcc $ occNameString dfun_name ++ ('$' : name)

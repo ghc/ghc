@@ -64,7 +64,16 @@ mk_fam_inst fam_tc arg_tc
 --  Not all lifted backends use the 'toArrPReprs' and 'fromArrPReprs' methods, 
 --  so we only generate these if the 'PDatas' type family is defined.
 --
-buildPAScAndMethods :: VM [( String, TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr)]
+type PAInstanceBuilder
+        =  TyCon        -- ^ Vectorised TyCon 
+        -> TyCon        -- ^ Representation TyCon
+        -> TyCon        -- ^ 'PData'  TyCon
+        -> TyCon        -- ^ 'PDatas' TyCon
+        -> SumRepr      -- ^ Description of generic representation.
+        -> VM CoreExpr  -- ^ Instance function.
+
+
+buildPAScAndMethods :: VM [(String, PAInstanceBuilder)]
 buildPAScAndMethods
  = do   hasPDatas <- liftM isJust $ builtin pdatasTyCon
         return 
@@ -76,12 +85,11 @@ buildPAScAndMethods
          ++ (if hasPDatas then
               [ ("toArrPReprs",   buildToArrPReprs)
               , ("fromArrPReprs", buildFromArrPReprs)]
-              else [])
-             
+              else [])             
 
 
-buildPRDict :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
-buildPRDict vect_tc prepr_tc _ _
+buildPRDict :: PAInstanceBuilder
+buildPRDict vect_tc prepr_tc _ _ _
   = prDictOfPReprInstTyCon inst_ty prepr_tc arg_tys
   where
     arg_tys = mkTyVarTys (tyConTyVars vect_tc)
@@ -90,8 +98,8 @@ buildPRDict vect_tc prepr_tc _ _
 
 -- buildToPRepr ---------------------------------------------------------------
 -- | Build the 'toRepr' method of the PA class.
-buildToPRepr :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
-buildToPRepr vect_tc repr_tc _ repr
+buildToPRepr :: PAInstanceBuilder
+buildToPRepr vect_tc repr_tc _ _ repr
  = do let arg_ty = mkTyConApp vect_tc ty_args
 
       -- Get the representation type of the argument.
@@ -164,8 +172,8 @@ buildToPRepr vect_tc repr_tc _ repr
 
 -- buildFromPRepr -------------------------------------------------------------
 -- | Build the 'fromPRepr' method of the PA class.
-buildFromPRepr :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
-buildFromPRepr vect_tc repr_tc _ repr
+buildFromPRepr :: PAInstanceBuilder
+buildFromPRepr vect_tc repr_tc _ _ repr
   = do
       arg_ty <- mkPReprType res_ty
       arg <- newLocalVar (fsLit "x") arg_ty
@@ -218,8 +226,8 @@ buildFromPRepr vect_tc repr_tc _ repr
 
 -- buildToArrRepr -------------------------------------------------------------
 -- | Build the 'toArrRepr' method of the PA class.
-buildToArrPRepr :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
-buildToArrPRepr vect_tc prepr_tc pdata_tc r
+buildToArrPRepr :: PAInstanceBuilder
+buildToArrPRepr vect_tc prepr_tc pdata_tc _ r
  = do arg_ty <- mkPDataType el_ty
       res_ty <- mkPDataType =<< mkPReprType el_ty
       arg    <- newLocalVar (fsLit "xs") arg_ty
@@ -301,8 +309,8 @@ buildToArrPRepr vect_tc prepr_tc pdata_tc r
 
 -- buildFromArrPRepr ----------------------------------------------------------
 -- | Build the 'fromArrPRepr' method for the PA class.
-buildFromArrPRepr :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
-buildFromArrPRepr vect_tc prepr_tc pdata_tc r
+buildFromArrPRepr :: PAInstanceBuilder
+buildFromArrPRepr vect_tc prepr_tc pdata_tc _ r
  = do arg_ty <- mkPDataType =<< mkPReprType el_ty
       res_ty <- mkPDataType el_ty
       arg    <- newLocalVar (fsLit "xs") arg_ty
@@ -378,8 +386,54 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc r
          = do (res', args') <- f res_ty res expr r
               return (res', args' ++ args)
 
--- buildToArrPReprs -----------------------------------------------------------
-buildToArrPReprs        = error "buildToArrPReprs not done yet"
 
+-- buildToArrPReprs -----------------------------------------------------------
+-- | Build the 'toArrPReprs' instance for the PA class.
+--   This converts a PData of elements into the generic representation.
+buildToArrPReprs :: PAInstanceBuilder
+buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
+ = do
+        -- The element type of the argument.
+        --  eg: 'Tree a b'.
+        let ty_args = mkTyVarTys $ tyConTyVars vect_tc
+        let el_ty   = mkTyConApp vect_tc ty_args
+
+        -- The argument type of the instance.
+        --  eg: 'PDatas (Tree a b)'
+        Just arg_ty      <- mkPDatasType el_ty
+
+        -- The result type. 
+        --  eg: 'PDatas (PRepr (Tree a b))'
+        Just res_ty      <- mkPDatasType =<< mkPReprType el_ty
+        
+        -- Variable to bind the argument to the instance
+        -- eg: (xss :: PDatas (Tree a b))
+        varg         <- newLocalVar (fsLit "xss") arg_ty
+        
+        return  $ Lam varg (Var varg)
+
+        
 -- buildFromArrPReprs ---------------------------------------------------------
-buildFromArrPReprs      = error "buildFromArrPReprs not done yet"
+buildFromArrPReprs :: PAInstanceBuilder
+buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
+ = do   
+        -- The element type of the argument.
+        --  eg: 'Tree a b'.
+        let ty_args = mkTyVarTys $ tyConTyVars vect_tc
+        let el_ty   = mkTyConApp vect_tc ty_args
+
+        -- The argument type of the instance.
+        --  eg: 'PDatas (PRepr (Tree a b))'
+        Just arg_ty      <- mkPDatasType =<< mkPReprType el_ty
+
+        -- The result type. 
+        --  eg: 'PDatas (Tree a b)'
+        Just res_ty      <- mkPDatasType el_ty
+        
+        -- Variable to bind the argument to the instance
+        -- eg: (xss :: PDatas (PRepr (Tree a b)))
+        varg         <- newLocalVar (fsLit "xss") arg_ty
+        
+        return  $ Lam varg (Var varg)
+
+

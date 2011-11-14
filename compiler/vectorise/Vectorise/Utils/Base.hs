@@ -11,7 +11,7 @@ module Vectorise.Utils.Base (
   mkPReprType,
   mkPArrayType, splitPrimTyCon,
   mkPArray,
-  mkPDataType,
+  mkPDataType,  mkPDatasType,
   mkBuiltinCo,
   mkVScrut,
 
@@ -37,7 +37,7 @@ import Outputable
 import FastString
 
 import Control.Monad (liftM)
-
+import Data.Maybe
 
 -- Simple Types ---------------------------------------------------------------
 voidType :: VM Type
@@ -67,36 +67,38 @@ dataConTagZ :: DataCon -> Int
 dataConTagZ con = dataConTag con - fIRST_TAG
 
 
+-- Type Construction ----------------------------------------------------------
+-- | Make an application of a builtin type constructor to some arguments.
 mkBuiltinTyConApp :: (Builtins -> TyCon) -> [Type] -> VM Type
 mkBuiltinTyConApp get_tc tys
-  = do
-      tc <- builtin get_tc
+ = do tc     <- builtin get_tc
       return $ mkTyConApp tc tys
 
 
 mkBuiltinTyConApps :: (Builtins -> TyCon) -> [Type] -> Type -> VM Type
 mkBuiltinTyConApps get_tc tys ty
-  = do
-      tc <- builtin get_tc
+ = do tc     <- builtin get_tc
       return $ foldr (mk tc) ty tys
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
 
+-- | Make an application of the 'Wrap' type constructor.
 mkWrapType :: Type -> VM Type
-mkWrapType ty = mkBuiltinTyConApp wrapTyCon [ty]
+mkWrapType ty  = mkBuiltinTyConApp wrapTyCon [ty]
 
 
+-- | Make an application of the closure type constructor.
 mkClosureTypes :: [Type] -> Type -> VM Type
 mkClosureTypes = mkBuiltinTyConApps closureTyCon
 
 
+-- | Make an application of the 'PRepr' type constructor.
 mkPReprType :: Type -> VM Type
 mkPReprType ty = mkBuiltinTyConApp preprTyCon [ty]
 
 
--- |Wrap a type into 'PArray', treating unboxed types specially.
---
+-- | Wrap a type into 'PArray', treating unboxed types specially.
 mkPArrayType :: Type -> VM Type
 mkPArrayType ty
   | Just tycon <- splitPrimTyCon ty
@@ -105,8 +107,23 @@ mkPArrayType ty
        }
 mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
+
+-- | Make an appliction of the 'PData' tycon to some argument.
+mkPDataType :: Type -> VM Type
+mkPDataType ty
+        = mkBuiltinTyConApp pdataTyCon [ty]
+
+
+-- | Make an application of the 'PDatas' tycon to some argument.
+mkPDatasType :: Type -> VM (Maybe Type)
+mkPDatasType ty
+ = do   mtc      <- builtin pdatasTyCon
+        case mtc of
+         Nothing        -> return Nothing
+         Just tc'       -> return $ Just $ mkTyConApp tc' [ty]
+
+
 -- |Checks if a type constructor is defined in 'GHC.Prim' (e.g., 'Int#'); if so, returns it.
---
 splitPrimTyCon :: Type -> Maybe TyCon
 splitPrimTyCon ty
   | Just (tycon, []) <- splitTyConApp_maybe ty
@@ -115,22 +132,30 @@ splitPrimTyCon ty
   | otherwise = Nothing
 
 
-------
-mkPArray :: Type -> CoreExpr -> CoreExpr -> VM CoreExpr
-mkPArray ty len dat = do
-                        tc <- builtin parrayTyCon
-                        let [dc] = tyConDataCons tc
-                        return $ mkConApp dc [Type ty, len, dat]
 
-mkPDataType :: Type -> VM Type
-mkPDataType ty = mkBuiltinTyConApp pdataTyCon [ty]
+-- CoreExpr Construction ------------------------------------------------------
+-- | Make an application of the 'PArray' data constructor.
+mkPArray 
+        :: Type         -- ^ Element type
+        -> CoreExpr     -- ^ 'Int'   for the array length.
+        -> CoreExpr     -- ^ 'PData' for the array data.
+        -> VM CoreExpr
 
+mkPArray ty len dat 
+ = do   tc <- builtin parrayTyCon
+        let [dc] = tyConDataCons tc
+        return $ mkConApp dc [Type ty, len, dat]
+
+
+-- Coercion Construction -----------------------------------------------------
+-- | Make a coersion to some builtin type.
 mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
 mkBuiltinCo get_tc
-  = do
-      tc <- builtin get_tc
+ = do tc     <- builtin get_tc
       return $ mkTyConAppCo tc []
 
+
+-------------------------------------------------------------------------------
 mkVScrut :: VExpr -> VM (CoreExpr, CoreExpr, TyCon, [Type])
 mkVScrut (ve, le)
   = do

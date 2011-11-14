@@ -204,9 +204,10 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
 
            -- Build 'PRepr' and 'PData' instance type constructors and family instances for all
            -- type constructors with vectorised representations.
-       ; reprs     <- mapM tyConRepr vect_tcs
-       ; repr_tcs  <- zipWith3M buildPReprTyCon orig_tcs vect_tcs reprs
-       ; pdata_tcs <- zipWith3M buildPDataTyCon orig_tcs vect_tcs reprs
+       ; reprs      <- mapM tyConRepr vect_tcs
+       ; repr_tcs   <- zipWith3M buildPReprTyCon  orig_tcs vect_tcs reprs
+       ; pdata_tcs  <- zipWith3M buildPDataTyCon  orig_tcs vect_tcs reprs
+       ; pdatas_tcs <- zipWith3M buildPDatasTyCon orig_tcs vect_tcs reprs
        ; let inst_tcs  = repr_tcs ++ pdata_tcs
              fam_insts = map mkLocalFamInst inst_tcs
        ; updGEnv $ extendFamEnv fam_insts
@@ -217,11 +218,12 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        ; (_, binds) <- fixV $ \ ~(dfuns, _) ->
            do { defTyConPAs (zipLazy vect_tcs dfuns)
               ; dfuns <- sequence 
-                      $  zipWith4 buildTyConBindings
+                      $  zipWith5 buildTyConBindings
                                   orig_tcs
                                   vect_tcs
                                   repr_tcs
                                   pdata_tcs
+                                  pdatas_tcs
 
               ; binds <- takeHoisted
               ; return (dfuns, binds)
@@ -233,14 +235,13 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        }
 
 
--- Helpers -------------------
-
-buildTyConBindings :: TyCon -> TyCon -> TyCon -> TyCon -> VM Var
-buildTyConBindings orig_tc vect_tc prepr_tc pdata_tc
- = do { vectDataConWorkers orig_tc vect_tc pdata_tc
-      ; repr <- tyConRepr vect_tc
-      ; buildPADict vect_tc prepr_tc pdata_tc repr
-      }
+-- Helpers --------------------------------------------------------------------
+buildTyConBindings :: TyCon -> TyCon -> TyCon -> TyCon -> TyCon -> VM Var
+buildTyConBindings orig_tc vect_tc prepr_tc pdata_tc pdatas_tc
+ = do   vectDataConWorkers orig_tc vect_tc pdata_tc
+        repr <- tyConRepr vect_tc
+        buildPADict vect_tc prepr_tc pdata_tc pdatas_tc repr
+      
 
 vectDataConWorkers :: TyCon -> TyCon -> TyCon -> VM ()
 vectDataConWorkers orig_tc vect_tc arr_tc

@@ -1,7 +1,7 @@
 
 module Vectorise.Type.PData
   ( buildPDataTyCon
-  ) 
+  , buildPDatasTyCon ) 
 where
 
 import Vectorise.Monad
@@ -20,10 +20,13 @@ import MonadUtils
 import Control.Monad
 
 
+buildPDatasTyCon :: TyCon -> TyCon -> SumRepr -> VM TyCon
+buildPDatasTyCon = buildPDataTyCon -- error "buildPDatasTyCon: not finished"
+
 buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM TyCon
-buildPDataTyCon orig_tc vect_tc repr = fixV $ \repr_tc ->
-  do
-    name' <- mkLocalisedName mkPDataTyConOcc orig_name
+buildPDataTyCon orig_tc vect_tc repr 
+ = fixV $ \repr_tc ->
+ do name' <- mkLocalisedName mkPDataTyConOcc orig_name
     rhs   <- buildPDataTyConRhs orig_name vect_tc repr_tc repr
     pdata <- builtin pdataTyCon
 
@@ -35,22 +38,20 @@ buildPDataTyCon orig_tc vect_tc repr = fixV $ \repr_tc ->
                            False       -- not GADT syntax
                            NoParentTyCon
                            (Just $ mk_fam_inst pdata vect_tc)
-  where
+ where
     orig_name = tyConName orig_tc
-    tyvars = tyConTyVars vect_tc
-    rec_flag = boolToRecFlag (isRecursiveTyCon vect_tc)
+    tyvars    = tyConTyVars vect_tc
+    rec_flag  = boolToRecFlag (isRecursiveTyCon vect_tc)
 
 
 buildPDataTyConRhs :: Name -> TyCon -> TyCon -> SumRepr -> VM AlgTyConRhs
 buildPDataTyConRhs orig_name vect_tc repr_tc repr
-  = do
-      data_con <- buildPDataDataCon orig_name vect_tc repr_tc repr
+ = do data_con <- buildPDataDataCon orig_name vect_tc repr_tc repr
       return $ DataTyCon { data_cons = [data_con], is_enum = False }
 
 buildPDataDataCon :: Name -> TyCon -> TyCon -> SumRepr -> VM DataCon
 buildPDataDataCon orig_name vect_tc repr_tc repr
-  = do
-      dc_name  <- mkLocalisedName mkPDataDataConOcc orig_name
+ = do dc_name  <- mkLocalisedName mkPDataDataConOcc orig_name
       comp_tys <- sum_tys repr
 
       liftDs $ buildDataCon dc_name
@@ -64,10 +65,10 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
                             comp_tys
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
-  where
+ where
     tvs   = tyConTyVars vect_tc
 
-    sum_tys EmptySum = return []
+    sum_tys EmptySum     = return []
     sum_tys (UnarySum r) = con_tys r
     sum_tys (Sum { repr_sel_ty = sel_ty
                  , repr_cons   = cons })
@@ -75,7 +76,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
 
     con_tys (ConRepr _ r) = prod_tys r
 
-    prod_tys EmptyProd = return []
+    prod_tys EmptyProd     = return []
     prod_tys (UnaryProd r) = liftM singleton (comp_ty r)
     prod_tys (Prod { repr_comps = comps }) = mapM comp_ty comps
 
