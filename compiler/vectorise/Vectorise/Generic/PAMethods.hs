@@ -1,4 +1,4 @@
-module Vectorise.Type.PRepr
+module Vectorise.Generic.PAMethods
   ( buildPReprTyCon
   , buildPAScAndMethods 
   ) where
@@ -6,7 +6,7 @@ module Vectorise.Type.PRepr
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
-import Vectorise.Type.Repr
+import Vectorise.Generic.Description
 import CoreSyn
 import CoreUtils
 import MkCore            ( mkWildCase )

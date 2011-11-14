@@ -15,10 +15,10 @@ import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.TyConDecl
 import Vectorise.Type.Classify
-import Vectorise.Type.PADict
 import Vectorise.Type.PData
-import Vectorise.Type.PRepr
-import Vectorise.Type.Repr
+import Vectorise.Generic.PADict
+import Vectorise.Generic.PAMethods
+import Vectorise.Generic.Description
 import Vectorise.Utils
 
 import CoreSyn

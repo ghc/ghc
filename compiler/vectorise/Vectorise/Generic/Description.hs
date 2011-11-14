@@ -1,12 +1,13 @@
 
--- | Compute the generic representation type for data types.
+-- | Compute a description of the generic representation that we use for 
+--   a user defined data type.
 --
 --   During vectorisation, we generate a PRepr and PA instance for each user defined
 --   data type. The PA dictionary contains methods to convert the user type to and
 --   from our generic representation. This module computes a description of what
 --   that generic representation is.
 --
-module Vectorise.Type.Repr ( 
+module Vectorise.Generic.Description ( 
   CompRepr (..), ProdRepr (..), ConRepr (..), SumRepr (..),
   tyConRepr, sumReprType, conReprType, prodReprType, compReprType, compOrigType
 ) where

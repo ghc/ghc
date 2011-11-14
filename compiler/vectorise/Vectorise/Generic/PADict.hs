@@ -1,12 +1,12 @@
 
-module Vectorise.Type.PADict
+module Vectorise.Generic.PADict
   ( buildPADict
   ) where
 
 import Vectorise.Monad
 import Vectorise.Builtins
-import Vectorise.Type.Repr
-import Vectorise.Type.PRepr ( buildPAScAndMethods )
+import Vectorise.Generic.Description
+import Vectorise.Generic.PAMethods ( buildPAScAndMethods )
 import Vectorise.Utils
 
 import BasicTypes

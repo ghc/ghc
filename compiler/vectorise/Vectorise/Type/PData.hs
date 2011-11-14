@@ -6,7 +6,7 @@ where
 
 import Vectorise.Monad
 import Vectorise.Builtins
-import Vectorise.Type.Repr
+import Vectorise.Generic.Description
 import Vectorise.Utils
 
 import BasicTypes
