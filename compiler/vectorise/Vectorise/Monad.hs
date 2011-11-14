@@ -89,7 +89,6 @@ initV hsc_env guts info thing_inside
                  builtin_prs = initClassDicts instEnvs (prClass builtins)  -- ..'PR' class instances
 
                -- construct the initial global environment
-           ; let thing_inside' = traceVt "VectDecls" (ppr (mg_vect_decls guts)) >> thing_inside
            ; let genv = extendImportedVarsEnv builtin_vars
                         . extendTyConsEnv     builtin_tycons
                         . setPAFunsEnv        builtin_pas
@@ -97,7 +96,7 @@ initV hsc_env guts info thing_inside
                         $ initGlobalEnv info (mg_vect_decls guts) instEnvs famInstEnvs
  
                -- perform vectorisation
-           ; r <- runVM thing_inside' builtins genv emptyLocalEnv
+           ; r <- runVM thing_inside builtins genv emptyLocalEnv
            ; case r of
                Yes genv _ x -> return $ Just (new_info genv, x)
                No reason    -> do { unqual <- mkPrintUnqualifiedDs

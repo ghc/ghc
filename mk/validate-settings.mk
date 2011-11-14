@@ -99,8 +99,7 @@ libraries/dph/dph-base_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-interface_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-prim-par_dist-install_EXTRA_HC_OPTS += -Wwarn
-libraries/dph/dph-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
-libraries/dph/dph-par_dist-install_EXTRA_HC_OPTS += -Wwarn
+libraries/dph/dph-lifted-common-install_EXTRA_HC_OPTS += -Wwarn
 
 # We need to turn of deprecated warnings for SafeHaskell transition
 libraries/array_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations

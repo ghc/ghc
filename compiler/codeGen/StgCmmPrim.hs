@@ -877,7 +877,7 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
         (CmmLit $ mkIntCLit 0)
 
     let arr = CmmReg (CmmLocal arr_r)
-    emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCSAddr
+    emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCS
     emit $ mkStore (cmmOffsetB arr (fixedHdrSize * wORD_SIZE +
                                     oFFSET_StgMutArrPtrs_ptrs)) n
     emit $ mkStore (cmmOffsetB arr (fixedHdrSize * wORD_SIZE +

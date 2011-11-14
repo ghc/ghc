@@ -137,7 +137,3 @@ ruleCtxt :: FastString -> SDoc
 ruleCtxt name = ptext (sLit "When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)
 \end{code}
-
-
-
-

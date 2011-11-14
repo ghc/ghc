@@ -162,9 +162,10 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            -- appear in vectorised code.  (We also drop the local type constructors appearing in a
            -- VECTORISE SCALAR pragma or a VECTORISE pragma with an explicit right-hand side, as
            -- these are being handled separately.)
-       ; let maybeVectoriseTyCons   = filter notLocalScalarTyCon tycons ++ impVectTyCons
-             (conv_tcs, keep_tcs)   = classifyTyCons vectTyConFlavour maybeVectoriseTyCons
-             orig_tcs               = keep_tcs ++ conv_tcs
+           -- Furthermore, 'drop_tcs' are those type constructors that we cannot vectorise.
+       ; let maybeVectoriseTyCons           = filter notLocalScalarTyCon tycons ++ impVectTyCons
+             (conv_tcs, keep_tcs, drop_tcs) = classifyTyCons vectTyConFlavour maybeVectoriseTyCons
+             orig_tcs                       = keep_tcs ++ conv_tcs
              
        ; traceVt " VECT SCALAR    : " $ ppr localScalarTyCons
        ; traceVt " VECT [class]   : " $ ppr impVectTyCons
@@ -172,6 +173,13 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        ; traceVt " -- after classification (local and VECT [class] tycons) --" empty
        ; traceVt " reuse          : " $ ppr keep_tcs
        ; traceVt " convert        : " $ ppr conv_tcs
+       
+           -- warn the user about unvectorised type constructors
+       ; let explanation = ptext (sLit "(They use unsupported language extensions") $$
+                           ptext (sLit "or depend on type constructors that are not vectorised)")
+       ; unless (null drop_tcs) $
+           emitVt "Warning: cannot vectorise these type constructors:" $ 
+             pprQuotedList drop_tcs $$ explanation
 
        ; let defTyConDataCons origTyCon vectTyCon
                = do { defTyCon origTyCon vectTyCon

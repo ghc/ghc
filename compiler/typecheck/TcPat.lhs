@@ -672,17 +672,14 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
 	; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
 	; checkExistentials ex_tvs penv 
-        ; ex_tvs' <- tcInstSuperSkolTyVars ex_tvs
--- JPM: call the X version, with initial subt (univ_tvs -> ctxt_res_tys)
--- return tenv
+        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX
+                               (zipTopTvSubst univ_tvs ctxt_res_tys) ex_tvs
                      -- Get location from monad, not from ex_tvs
 
         ; let pat_ty' = mkTyConApp tycon ctxt_res_tys
 	      -- pat_ty' is type of the actual constructor application
               -- pat_ty' /= pat_ty iff coi /= IdCo
               
-	      tenv     = zipTopTvSubst (univ_tvs     ++ ex_tvs)
-				       (ctxt_res_tys ++ mkTyVarTys ex_tvs')
 	      arg_tys' = substTys tenv arg_tys
 
 	; if null ex_tvs && null eq_spec && null theta

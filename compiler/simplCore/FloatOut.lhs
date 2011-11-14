@@ -567,9 +567,17 @@ wrapTick t (FB tops defns)
   where
     wrap_defns = mapBag wrap_one 
 
-    wrap_bind (NonRec binder rhs) = NonRec binder (mkTick t rhs)
-    wrap_bind (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
+    wrap_bind (NonRec binder rhs) = NonRec binder (maybe_tick rhs)
+    wrap_bind (Rec pairs)         = Rec (mapSnd maybe_tick pairs)
 
     wrap_one (FloatLet bind)      = FloatLet (wrap_bind bind)
-    wrap_one (FloatCase e b c bs) = FloatCase (mkTick t e) b c bs
+    wrap_one (FloatCase e b c bs) = FloatCase (maybe_tick e) b c bs
+
+    maybe_tick e | exprIsHNF e = e
+                 | otherwise   = mkTick t e
+      -- we don't need to wrap a tick around an HNF when we float it
+      -- outside a tick: that is an invariant of the tick semantics
+      -- Conversely, inlining of HNFs inside an SCC is allowed, and
+      -- indeed the HNF we're floating here might well be inlined back
+      -- again, and we don't want to end up with duplicate ticks.
 \end{code}

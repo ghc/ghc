@@ -398,16 +398,6 @@ unVectDict ty e
                                        Nothing  -> panic "Vectorise.Exp.unVectDict: no class"
     selIds                         = classAllSelIds cls
 
-{-
-!!!How about 'isClassOpId_maybe'?  Do we need to treat them specially to get the class ops for
-!!!the vectorised instances or do they just work out?? (We may want to make sure that the
-!!!vectorised Ids at least get the right IdDetails...)
-!!!NB: For *locally defined* instances, the selector functions are part of the vectorised bindings,
-!!!    but not so for *imported* instances, where we need to generate the vectorised versions from
-!!!    scratch.
-!!!Also need to take care of the builtin rules for selectors (see mkDictSelId).
- -}
-
 -- | Vectorise a lambda abstraction.
 --
 vectLam :: Bool             -- ^ When the RHS of a binding, whether that binding should be inlined.

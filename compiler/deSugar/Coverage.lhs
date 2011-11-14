@@ -550,9 +550,6 @@ addTickGRHSBody isOneOfMany isLambda expr@(L pos e0) = do
        addPathEntry "\\" $
          allocTickBox (ExpBox False) True{-count-} False{-not top-} pos $
            addTickHsExpr e0
-    TickTopFunctions ->
-       allocTickBox (ExpBox False) False{-no count-} True{-top-} pos $
-         addTickHsExpr e0
     _otherwise ->
        addTickLHsExprAlways expr
 
