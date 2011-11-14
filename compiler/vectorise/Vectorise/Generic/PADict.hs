@@ -20,6 +20,7 @@ import Id
 import Var
 import Name
 
+
 -- debug                = False
 -- dtrace s x   = if debug then pprTrace "Vectoris.Type.PADict" s x else x
 
@@ -59,7 +60,8 @@ buildPADict vect_tc prepr_tc arr_tc repr
       ; let dfun_name = mkLocalisedOccName mod mkPADFunOcc vect_tc_name
       
           -- Get ids for each of the methods in the dictionary, including superclass
-      ; method_ids <- mapM (method args dfun_name) buildPAScAndMethods
+      ; paMethodBuilders <- buildPAScAndMethods
+      ; method_ids       <- mapM (method args dfun_name) paMethodBuilders
 
           -- Expression to build the dictionary.
       ; pa_dc  <- builtin paDataCon
