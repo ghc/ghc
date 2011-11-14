@@ -305,10 +305,10 @@ instance MonadStatics LevelM where
     bindCapturedFloats _fvs mx = liftM ((,) []) mx -- FIXME: do something other than hope for the best
     monitorFVs = liftM ((,) emptyVarSet)
 
-memo :: (Applicative t, Monad m)
+memo :: (Applicative t, Functor m, Monad m)
      => (State -> t (FulfilmentT m (Deeds, Out FVedTerm)))
      -> State -> MemoT t (FulfilmentT m (Deeds, Out FVedTerm))
-memo opt state = StateT $ \ms ->
+memo opt state = StateT $ \ms -> traceRenderScpM "memo" state *>
      -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
     case [ (p, (releaseStateDeed state, var (fun p) `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
@@ -344,8 +344,8 @@ type LevelM = FulfilmentT (SpecT ScpM)
 type ProcessM = ContT (Out FVedTerm) HistoryThreadM
 type ScpM = DelayM (MemoT ProcessM)
 
-traceRenderScpM :: (Outputable a, Monad m) => String -> a -> m ()
-traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ return () -- TODO: include depth, refine to ScpM monad only
+traceRenderScpM :: (Outputable a, Applicative t) => String -> a -> t ()
+traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ pure () -- TODO: include depth, refine to ScpM monad only
 
 runScpM :: (Applicative m, Monad m) => m (DelayM m a) -> m a
 runScpM mx = mx >>= runDelayM eval_strat
@@ -359,12 +359,12 @@ sc' :: Parent -> State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc' parent state = callCC (\k -> try (RB k))
   where
     trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") (ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$
-                                                                    pPrintFullState True shallow_state $$ pPrintFullState True state)
+                                                                    ppr shallow_state $$ pPrintFullState True shallow_state $$ ppr state $$ pPrintFullState True state)
     try :: RollbackScpM -> ProcessM (LevelM (Deeds, Out FVedTerm))
     try rb = terminateM parent state rb
                (\parent -> liftSpeculatedStateT speculated state $ \state' -> split (reduce state') (delayStateT (delayReaderT delay) . sc parent))
                -- (\_ shallow_state _ -> return $ maybe (trce "split" shallow_state $ split state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) state) (delayStateT (delayReaderT delay) . sc parent))
-               (\shallow_parent shallow_state shallow_rb -> doRB shallow_rb (maybe (trce "split" shallow_state $ split shallow_state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT (delayReaderT delay) . sc shallow_parent)))
+               (\shallow_parent shallow_state shallow_rb -> trace "rb" $ doRB shallow_rb (maybe (trce "split" shallow_state $ split shallow_state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT (delayReaderT delay) . sc shallow_parent)))
 
 sc :: Parent -> State -> MemoT ProcessM (LevelM (Deeds, Out FVedTerm))
 sc parent = memo (sc' parent) . gc -- Garbage collection necessary because normalisation might have made some stuff dead
