@@ -1039,44 +1039,22 @@ simplTick env tickish expr cont
        ; return (env', mkTick tickish expr')
        }
 
-  -- the last case handles scoped/counting ticks, where all we
-  -- can do is simplify the inner expression and then rebuild.
-  --
-  -- NB. float handling here is tricky.  We have some floats already
-  -- in the env, and there may be floats arising from the inner
-  -- expression.  We must be careful to wrap any floats arising from
-  -- the inner expression with a non-counting tick, but not those from
-  -- the env passed in.
-  --
-
   -- For breakpoints, we cannot do any floating of bindings around the
   -- tick, because breakpoints cannot be split into tick/scope pairs.
-  | Breakpoint{} <- tickish
-  = do { let (inc,outc) = splitCont cont
-       ; (env', expr') <- simplExprF (zapFloats env) expr inc
-       ; let tickish' = simplTickish env tickish
-       ; (env'', expr'') <- rebuild (zapFloats env') (wrapFloats env' expr') (TickIt tickish' outc)
-       ; return (env'', wrapFloats env expr'')
-       }
+  | not (tickishCanSplit tickish)
+  = no_floating_past_tick
 
   | Just expr' <- want_to_push_tick_inside
     -- see Note [case-of-scc-of-case]
   = simplExprF env expr' cont
 
   | otherwise
-  = do { let (inc,outc) = splitCont cont
-       ; (env', expr') <- simplExprF (zapFloats env) expr inc
-       ; let tickish' = simplTickish env tickish
-       ; let wrap_float (b,rhs) = (zapIdStrictness (setIdArity b 0),
-                                   mkTick (mkNoTick tickish') rhs)
-              -- when wrapping a float with mkTick, we better zap the Id's
-              -- strictness info and arity, because it might be wrong now.
-       ; let env'' = addFloats env (mapFloats env' wrap_float)
-       ; rebuild env'' expr' (TickIt tickish' outc)
-       }
+  = no_floating_past_tick -- was: wrap_floats, see below
+
  where
   want_to_push_tick_inside
      | not interesting_cont = Nothing
+     | not (tickishCanSplit tickish) = Nothing
      | otherwise
        = case expr of
            Case scrut bndr ty alts
@@ -1084,10 +1062,39 @@ simplTick env tickish expr cont
              where t_scope = mkNoTick tickish -- drop the tick on the dup'd ones
                    alts'   = [ (c,bs, mkTick t_scope e) | (c,bs,e) <- alts]
            _other -> Nothing
+    where
+      interesting_cont = case cont of
+                            Select _ _ _ _ _ -> True
+                            _ -> False
 
-  interesting_cont = case cont of
-                          Select _ _ _ _ _ -> True
-                          _ -> False
+  no_floating_past_tick =
+    do { let (inc,outc) = splitCont cont
+       ; (env', expr') <- simplExprF (zapFloats env) expr inc
+       ; let tickish' = simplTickish env tickish
+       ; (env'', expr'') <- rebuild (zapFloats env')
+                                    (wrapFloats env' expr')
+                                    (TickIt tickish' outc)
+       ; return (addFloats env env'', expr'')
+       }
+
+-- Alternative version that wraps outgoing floats with the tick.  This
+-- results in ticks being duplicated, as we don't make any attempt to
+-- eliminate the tick if we re-inline the binding (because the tick
+-- semantics allows unrestricted inlining of HNFs), so I'm not doing
+-- this any more.  FloatOut will catch any real opportunities for
+-- floating.
+--
+--  wrap_floats =
+--    do { let (inc,outc) = splitCont cont
+--       ; (env', expr') <- simplExprF (zapFloats env) expr inc
+--       ; let tickish' = simplTickish env tickish
+--       ; let wrap_float (b,rhs) = (zapIdStrictness (setIdArity b 0),
+--                                   mkTick (mkNoTick tickish') rhs)
+--              -- when wrapping a float with mkTick, we better zap the Id's
+--              -- strictness info and arity, because it might be wrong now.
+--       ; let env'' = addFloats env (mapFloats env' wrap_float)
+--       ; rebuild env'' expr' (TickIt tickish' outc)
+--       }
 
 
   simplTickish env tickish
