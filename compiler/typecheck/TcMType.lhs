@@ -42,7 +42,9 @@ module TcMType (
   -- Instantiation
   tcInstTyVars, tcInstSigTyVars,
   tcInstType, 
-  tcInstSkolTyVars, tcInstSuperSkolTyVars, tcInstSkolTyVar, tcInstSkolType,
+  tcInstSkolTyVars, tcInstSuperSkolTyVars,
+  tcInstSkolTyVarsX, tcInstSuperSkolTyVarsX,
+  tcInstSkolTyVar, tcInstSkolType,
   tcSkolDFunType, tcSuperSkolTyVars,
 
   --------------------------------
@@ -102,7 +104,7 @@ import Unique( Unique )
 import Bag
 
 import Control.Monad
-import Data.List        ( (\\), partition )
+import Data.List        ( (\\), partition, mapAccumL )
 \end{code}
 
 
@@ -210,51 +212,47 @@ tcSuperSkolTyVars :: [TyVar] -> [TcTyVar]
 -- Make skolem constants, but do *not* give them new names, as above
 -- Moreover, make them "super skolems"; see comments with superSkolemTv
 -- see Note [Kind substitution when instantiating]
-tcSuperSkolTyVars tyvars  -- IA0_NOTE: should be ordered (kind vars first)
-  = kvs' ++ tvs'
-  where
-    (kvs, tvs) = splitKiTyVars tyvars
-    kvs' = [ mkTcTyVar (tyVarName kv) (tyVarKind kv) superSkolemTv
-           | kv <- kvs ]
-    tvs' = [ mkTcTyVar (tyVarName tv) (substTy subst (tyVarKind tv)) superSkolemTv
-           | tv <- tvs ]
-    subst = zipTopTvSubst kvs (map mkTyVarTy kvs')
+-- Precondition: tyvars should be ordered (kind vars first)
+tcSuperSkolTyVars = snd . mapAccumL tcSuperSkolTyVar (mkTopTvSubst [])
 
-tcInstSkolTyVar :: Bool -> TvSubst -> TyVar -> TcM TcTyVar
+tcSuperSkolTyVar :: TvSubst -> TyVar -> (TvSubst, TcTyVar)
+tcSuperSkolTyVar subst tv
+  = (extendTvSubst subst tv (mkTyVarTy new_tv), new_tv)
+  where
+    kind   = substTy subst (tyVarKind tv)
+    new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
+
+tcInstSkolTyVar :: Bool -> TvSubst -> TyVar -> TcM (TvSubst, TcTyVar)
 -- Instantiate the tyvar, using 
---	* the occ-name and kind of the supplied tyvar, 
---	* the unique from the monad,
---	* the location either from the tyvar (skol_info = SigSkol)
+--      * the occ-name and kind of the supplied tyvar, 
+--      * the unique from the monad,
+--      * the location either from the tyvar (skol_info = SigSkol)
 --                     or from the monad (otherwise)
 tcInstSkolTyVar overlappable subst tyvar
-  = do	{ uniq <- newUnique
-        ; loc <-  getSrcSpanM
-	; let new_name = mkInternalName uniq occ loc
-        ; return (mkTcTyVar new_name kind (SkolemTv overlappable)) }
+  = do  { uniq <- newUnique
+        ; loc  <- getSrcSpanM
+        ; let new_name = mkInternalName uniq occ loc
+              new_tv   = mkTcTyVar new_name kind (SkolemTv overlappable)
+        ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
   where
     old_name = tyVarName tyvar
     occ      = nameOccName old_name
     kind     = substTy subst (tyVarKind tyvar)
 
-tcInstSkolTyVars :: [TyVar] -> TcM [TcTyVar]
+tcInstSkolTyVars' :: Bool -> TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
 -- Precondition: tyvars should be ordered (kind vars first)
 -- see Note [Kind substitution when instantiating]
-tcInstSkolTyVars tyvars
-  = do { kvs' <- mapM (tcInstSkolTyVar False (mkTopTvSubst [])) kvs
-       ; tvs' <- mapM (tcInstSkolTyVar False (zipTopTvSubst kvs (map mkTyVarTy kvs'))) tvs
-       ; return (kvs' ++ tvs') }
-  where (kvs, tvs) = splitKiTyVars tyvars
+tcInstSkolTyVars' isSuperSkol = mapAccumLM (tcInstSkolTyVar isSuperSkol)
 
-tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
--- Precondition: tyvars should be ordered (kind vars first)
--- see Note [Kind substitution when instantiating]
+-- Wrappers
+tcInstSkolTyVars, tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
+tcInstSkolTyVars      = fmap snd . tcInstSkolTyVars' False (mkTopTvSubst [])
+tcInstSuperSkolTyVars = fmap snd . tcInstSkolTyVars' True  (mkTopTvSubst [])
 
--- JPM: do this with mapAccumLM
-tcInstSuperSkolTyVars tyvars
-  = do { kvs' <- mapM (tcInstSkolTyVar True (mkTopTvSubst [])) kvs
-       ; tvs' <- mapM (tcInstSkolTyVar True (zipTopTvSubst kvs (map mkTyVarTy kvs'))) tvs
-       ; return (kvs' ++ tvs') }
-  where (kvs, tvs) = splitKiTyVars tyvars
+tcInstSkolTyVarsX, tcInstSuperSkolTyVarsX
+  :: TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
+tcInstSkolTyVarsX      subst = tcInstSkolTyVars' False subst
+tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True  subst
 
 tcInstSkolType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants
@@ -266,21 +264,18 @@ tcInstSigTyVars :: [TyVar] -> TcM [TcTyVar]
 -- We use SigTvs for them, so that they can't unify with arbitrary types
 -- Precondition: tyvars should be ordered (kind vars first)
 -- see Note [Kind substitution when instantiating]
-tcInstSigTyVars tyvars
-  = do { kvs' <- mapM (tcInstSigTyVar (mkTopTvSubst [])) kvs
-       ; tvs' <- mapM (tcInstSigTyVar (zipTopTvSubst kvs (map mkTyVarTy kvs'))) tvs
-       ; return (kvs' ++ tvs') }
-  where (kvs, tvs) = splitKiTyVars tyvars
+tcInstSigTyVars = fmap snd . mapAccumLM tcInstSigTyVar (mkTopTvSubst [])
 
-tcInstSigTyVar :: TvSubst -> TyVar -> TcM TcTyVar
-tcInstSigTyVar subst tyvar
+tcInstSigTyVar :: TvSubst -> TyVar -> TcM (TvSubst, TcTyVar)
+tcInstSigTyVar subst tv
   = do { uniq <- newMetaUnique
        ; ref <- newMutVar Flexi
-       ; let name = setNameUnique (tyVarName tyvar) uniq
-                    -- Use the same OccName so that the tidy-er
-                    -- doesn't rename 'a' to 'a0' etc
-             kind = substTy subst (tyVarKind tyvar)
-       ; return (mkTcTyVar name kind (MetaTv SigTv ref)) }
+       ; let name   = setNameUnique (tyVarName tv) uniq
+                      -- Use the same OccName so that the tidy-er
+                      -- doesn't rename 'a' to 'a0' etc
+             kind   = substTy subst (tyVarKind tv)
+             new_tv = mkTcTyVar name kind (MetaTv SigTv ref)
+       ; return (extendTvSubst subst tv (mkTyVarTy new_tv), new_tv) }
 \end{code}
 
 Note [Kind substitution when instantiating]
