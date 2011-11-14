@@ -476,8 +476,8 @@ Library
         Vectorise.Generic.Description
         Vectorise.Generic.PAMethods
         Vectorise.Generic.PADict
+        Vectorise.Generic.PData
         Vectorise.Type.Env
-        Vectorise.Type.PData
         Vectorise.Type.Type
         Vectorise.Type.TyConDecl
         Vectorise.Type.Classify

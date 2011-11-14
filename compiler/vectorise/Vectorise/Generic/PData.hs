@@ -3,7 +3,7 @@
 --
 --   TODO: the PData and PDatas cases are very similar.
 --   We should be able to factor out the common parts.
-module Vectorise.Type.PData
+module Vectorise.Generic.PData
   ( buildPDataTyCon
   , buildPDatasTyCon ) 
 where

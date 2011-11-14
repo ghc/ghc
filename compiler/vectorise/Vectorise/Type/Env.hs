@@ -15,9 +15,9 @@ import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.TyConDecl
 import Vectorise.Type.Classify
-import Vectorise.Type.PData
 import Vectorise.Generic.PADict
 import Vectorise.Generic.PAMethods
+import Vectorise.Generic.PData
 import Vectorise.Generic.Description
 import Vectorise.Utils
 
