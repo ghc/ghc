@@ -48,7 +48,7 @@ vectTyConDecl tycon
            -- vectorise superclass constraint (types)
        ; theta' <- mapM vectType (classSCTheta cls)
 
-           -- vectorise method selectors and add them to the vectorisation map
+           -- vectorise method selectors
        ; methods' <- sequence [ vectMethod id meth | (id, meth) <- classOpItems cls]
 
            -- keep the original recursiveness flag
@@ -74,6 +74,11 @@ vectTyConDecl tycon
              Just datacon  = tyConSingleDataCon_maybe tycon
              Just datacon' = tyConSingleDataCon_maybe tycon'
        ; defDataCon datacon datacon'
+
+           -- the original superclass and methods selectors must map to the vectorised ones
+       ; let selIds  = classAllSelIds cls
+             selIds' = classAllSelIds cls'
+       ; zipWithM_ defGlobalVar selIds selIds'
 
            -- return the type constructor of the vectorised class
        ; return tycon'
@@ -110,7 +115,7 @@ vectTyConDecl tycon
   | otherwise
   = cantVectorise "Can't vectorise exotic type constructor" (ppr tycon)
 
--- |Vectorise a class method.
+-- |Vectorise a class method.  (Don't enter into the vectorisation map yet.)
 --
 vectMethod :: Id -> DefMeth -> VM (Name, DefMethSpec, Type)
 vectMethod id defMeth
@@ -119,7 +124,6 @@ vectMethod id defMeth
 
           -- Create a name for the vectorised method.
       ; id' <- mkVectId id typ'
-      ; defGlobalVar id id'
 
           -- When we call buildClass in vectTyConDecl, it adds foralls and dictionaries
           -- to the types of each method. However, the types we get back from vectType
