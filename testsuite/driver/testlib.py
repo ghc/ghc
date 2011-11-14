@@ -1529,9 +1529,7 @@ def normalise_errmsg( str ):
 # only the shape of the profile and the number of entries.
 def normalise_prof (str):
     # strip everything up to the line beginning "COST CENTRE"
-    print "before: ", str
     str = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',str)
-    print "after: ", str
 
     # strip results for CAFs, these tend to change unpredictably
     str = re.sub('[ \t]*CAF.*\n','',str)
