@@ -1,24 +1,17 @@
-
 \begin{code}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.Base
         (
-        module GHC.Base,
         module GHC.Classes,
-        module GHC.Types,
         module GHC.Prim,
-  )
-        where
+        Num(..)
+  ) where
 
-import GHC.Types
 import GHC.Classes
 import GHC.Prim
-import GHC.Tuple ()
-import GHC.Integer ()
 
-default ()
-
-type String = [Char]
+class Num a  where
+    signum    :: a -> a
 \end{code}
 
