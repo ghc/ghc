@@ -193,7 +193,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
               (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env msg_var
 
         ; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
-                          loadDAP dflags $
+                          loadDAP $
                             initDPHBuiltins $
                               tryM thing_inside     -- Catch exceptions (= errors during desugaring)
 
@@ -215,7 +215,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
     -- Extend the global environment with a 'GlobalRdrEnv' containing the exported entities of
     --   * 'Data.Array.Parallel'      iff '-XParallalArrays' specified (see also 'checkLoadDAP').
     --   * 'Data.Array.Parallel.Prim' iff '-fvectorise' specified.
-    loadDAP dflags thing_inside
+    loadDAP thing_inside
       = do { dapEnv  <- loadOneModule dATA_ARRAY_PARALLEL_NAME      checkLoadDAP          paErr
            ; dappEnv <- loadOneModule dATA_ARRAY_PARALLEL_PRIM_NAME (doptM Opt_Vectorise) veErr
            ; updGblEnv (\env -> env {ds_dph_env = dapEnv `plusOccEnv` dappEnv }) thing_inside
@@ -233,13 +233,14 @@ initDs hsc_env mod rdr_env type_env thing_inside
                ; result <- liftIO $ findImportedModule hsc_env modname Nothing
                ; case result of
                    Found _ mod -> loadModule err mod
-                   _           -> do { liftIO $ fatalErrorMsg dflags err
-                                     ; panic "DsMonad.initDs: failed to load module"
-                                     }
+                   _           -> pprPgmError "Unable to use Data Parallel Haskell (DPH):" err
                } }
 
-        paErr = ptext $ sLit "To use -XParallelArrays, you must specify a DPH backend package"
-        veErr = ptext $ sLit "To use -fvectorise, you must specify a DPH backend package"
+        paErr       = ptext (sLit "To use -XParallelArrays,") <+> specBackend $$ hint1 $$ hint2
+        veErr       = ptext (sLit "To use -fvectorise,") <+> specBackend $$ hint1 $$ hint2
+        specBackend = ptext (sLit "you must specify a DPH backend package")
+        hint1       = ptext (sLit "Look for packages named 'dph-lifted-*' with 'ghc-pkg'")
+        hint2       = ptext (sLit "You may need to install them with 'cabal install dph-examples'")
 
     initDPHBuiltins thing_inside
       = do {   -- If '-XParallelArrays' given, we populate the builtin table for desugaring those
@@ -291,13 +292,10 @@ mkDsEnvs dflags mod rdr_env type_env msg_var
 loadModule :: SDoc -> Module -> DsM GlobalRdrEnv
 loadModule doc mod
   = do { env    <- getGblEnv
-       ; dflags <- getDOpts
        ; setEnvs (ds_if_env env) $ do
        { iface <- loadInterface doc mod ImportBySystem
        ; case iface of
-           Failed err      -> do { liftIO $ fatalErrorMsg dflags (err $$ doc)
-                                 ; panic "DsMonad.loadModule: failed to load"
-                                 }
+           Failed err      -> pprPanic "DsMonad.loadModule: failed to load" (err $$ doc)
            Succeeded iface -> return $ mkGlobalRdrEnv . gresFromAvails prov . mi_exports $ iface
        } }
   where
