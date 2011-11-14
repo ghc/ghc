@@ -50,7 +50,7 @@ import SrcLoc
 import DynFlags
 import HscTypes		( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq )
-import Digraph		( SCC, flattenSCCs, stronglyConnCompFromEdgedVertices )
+import Digraph		( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 
 import Control.Monad
 import Maybes( orElse )
@@ -76,20 +76,20 @@ Checks the @(..)@ etc constraints in the export list.
 \begin{code}
 -- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
-rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
+rnSrcDecls :: [Name] -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a HsGroup; used for normal source files *and* hs-boot files
-rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
-                            hs_tyclds  = tycl_decls,
-                            hs_instds  = inst_decls,
-                            hs_derivds = deriv_decls,
-                            hs_fixds   = fix_decls,
-                            hs_warnds  = warn_decls,
-                            hs_annds   = ann_decls,
-                            hs_fords   = foreign_decls,
-                            hs_defds   = default_decls,
-                            hs_ruleds  = rule_decls,
-                            hs_vects   = vect_decls,
-                            hs_docs    = docs })
+rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
+                                       hs_tyclds  = tycl_decls,
+                                       hs_instds  = inst_decls,
+                                       hs_derivds = deriv_decls,
+                                       hs_fixds   = fix_decls,
+                                       hs_warnds  = warn_decls,
+                                       hs_annds   = ann_decls,
+                                       hs_fords   = foreign_decls,
+                                       hs_defds   = default_decls,
+                                       hs_ruleds  = rule_decls,
+                                       hs_vects   = vect_decls,
+                                       hs_docs    = docs })
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
    --     FastStrings to FixItems.
@@ -137,7 +137,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn (text "Start rnTyClDecls") ;
-   (rn_tycl_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
+   (rn_tycl_decls, src_fvs1) <- rnTyClDecls extra_deps tycl_decls ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn (text "Start rnmono") ;
@@ -700,24 +700,65 @@ in order to get the set of tyvars used by it, make an assoc list,
 and then go over it again to rename the tyvars!
 However, we can also do some scoping checks at the same time.
 
+
+Note [Extra dependencies from .hs-boot files]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following case:
+
+  module A where
+    import B
+    data A1 = A1 B1
+  
+  module B where
+    import {-# SOURCE #-} A
+    type DisguisedA1 = A1
+    data B1 = B1 DisguisedA1
+
+We do not follow type synonyms when building the dependencies for each datatype,
+so we will not find out that B1 really depends on A1 (which means it depends on
+itself). To handle this problem, at the moment we add dependencies to everything
+that comes from an .hs-boot file. But we don't add those dependencies to
+everything. Imagine module B above had another datatype declaration:
+
+  data B2 = B2 Int
+
+Even though B2 has a dependency (on Int), all its dependencies are from things
+that live on other packages. Since we don't have mutual dependencies across
+packages, it is safe not to add the dependencies on the .hs-boot stuff to B2.
+
+See also Note [Grouping of type and class declarations] in TcTyClsDecls.
+
 \begin{code}
-rnTyClDecls :: [[LTyClDecl RdrName]] -> RnM ([[LTyClDecl Name]], FreeVars)
--- Renamed the declarations and do depedency analysis on them
-rnTyClDecls tycl_ds
+isInPackage :: PackageId -> Name -> Bool
+isInPackage pkgId nm = case nameModule_maybe nm of
+                         Nothing -> False
+                         Just m  -> pkgId == modulePackageId m
+-- We use nameModule_maybe because we might be in a TH splice, in which case
+-- there is no module name. In that case we cannot have mutual dependencies,
+-- so it's fine to return False here.
+
+rnTyClDecls :: [Name] -> [[LTyClDecl RdrName]]
+            -> RnM ([[LTyClDecl Name]], FreeVars)
+-- Rename the declarations and do depedency analysis on them
+rnTyClDecls extra_deps tycl_ds
   = do { ds_w_fvs <- mapM (wrapLocFstM (rnTyClDecl Nothing)) (concat tycl_ds)
+       ; thisPkg  <- fmap thisPackage getDOpts
+       ; let add_boot_deps :: FreeVars -> FreeVars
+             -- See Note [Extra dependencies from .hs-boot files]
+             add_boot_deps fvs | any (isInPackage thisPkg) (nameSetToList fvs)
+                               = fvs `plusFV` mkFVs extra_deps
+                               | otherwise
+                               = fvs
 
-       ; let sccs :: [SCC (LTyClDecl Name)]
-             sccs = depAnalTyClDecls ds_w_fvs
+             ds_w_fvs' = map (\(ds, fvs) -> (ds, add_boot_deps fvs)) ds_w_fvs
 
-             all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs
+             sccs :: [SCC (LTyClDecl Name)]
+             sccs = depAnalTyClDecls ds_w_fvs'
 
-       ; return ([flattenSCCs sccs], all_fvs) }
--- JPM: This is wrong. We are calculating the SCCs but then ignore them and
--- merge into a single, big group. This is a quick fix to allow
--- mutually-recursive types across modules to work, given the new way of kind
--- checking and type checking declarations in groups (see
--- Note [Grouping of type and class declarations] in TcTyClsDecls). This "fix"
--- fully breaks promotion; we will fix that later.
+             all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs'
+
+       ; return (map flattenSCC sccs, all_fvs) }
+
 
 rnTyClDecl :: Maybe Name  -- Just cls => this TyClDecl is nested 
 	      	    	  --             inside an *instance decl* for cls
