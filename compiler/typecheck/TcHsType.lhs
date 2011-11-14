@@ -171,12 +171,15 @@ tcHsSigType ctxt hs_ty
     tcHsSigTypeNC ctxt hs_ty
 
 tcHsSigTypeNC ctxt hs_ty
-  = do	{ (kinded_ty, _kind) <- kc_lhs_type hs_ty
-    	  -- The kind is checked by checkValidType, and isn't necessarily
-	  -- of kind * in a Template Haskell quote eg [t| Maybe |]
-	; ty <- tcHsKindedType kinded_ty
-	; checkValidType ctxt ty
-	; return ty }
+  = do  { -- (kinded_ty, _kind) <- kc_lhs_type hs_ty
+          kinded_ty <- case expectedKindInCtxt ctxt of
+                         Nothing -> fmap fst (kc_lhs_type hs_ty)
+                         Just k  -> kc_check_lhs_type hs_ty (EK k EkUnk) -- JPM fix this
+          -- The kind is checked by checkValidType, and isn't necessarily
+          -- of kind * in a Template Haskell quote eg [t| Maybe |]
+        ; ty <- tcHsKindedType kinded_ty
+        ; checkValidType ctxt ty
+        ; return ty }
 
 -- Like tcHsType, but takes an expected kind
 tcCheckHsType :: LHsType Name -> Kind -> TcM Type
@@ -1351,9 +1354,9 @@ sc_ds_var_app name arg_kis
 
 -- General case
 sc_ds_var_app name arg_kis = do
-  thing <- tcLookup name
-  case thing of
-    AGlobal (ATyCon tc)
+  (_errs, mb_thing) <- tryTc (tcLookup name)
+  case mb_thing of
+    Just (AGlobal (ATyCon tc))
       | isAlgTyCon tc || isTupleTyCon tc -> do
       poly_kinds <- xoptM Opt_PolyKinds
       unless poly_kinds $ addErr (polyKindsErr name)
@@ -1363,8 +1366,13 @@ sc_ds_var_app name arg_kis = do
           return (mkTyConApp (mkPromotedTypeTyCon tc) arg_kis)
         Just _  -> err tc_kind "is not fully applied"
         Nothing -> err tc_kind "is not promotable"
-
-    _ -> wrongThingErr "promoted type" thing name
+    -- It is in scope, but not what we expected
+    Just thing -> wrongThingErr "promoted type" thing name
+    -- It is not in scope, but it passed the renamer: staging error
+    Nothing    -> ASSERT2 ( isTyConName name, ppr name )
+                  failWithTc (ptext (sLit "Promoted kind") <+> 
+                              quotes (ppr name) <+>
+                              ptext (sLit "used in a mutually recursive group"))
 
   where err k m = failWithTc (    quotes (ppr name) <+> ptext (sLit "of kind")
                               <+> quotes (ppr k)    <+> ptext (sLit m))

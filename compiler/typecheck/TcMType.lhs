@@ -50,6 +50,7 @@ module TcMType (
   --------------------------------
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
+  expectedKindInCtxt, 
   checkValidTheta, 
   checkValidInstHead, checkValidInstance, validDerivPred,
   checkInstTermination, checkValidFamInst, checkTyFamFreeness, 
@@ -892,6 +893,17 @@ This might not necessarily show up in kind checking.
 
 	
 \begin{code}
+-- Depending on the context, we might accept any kind (for instance, in a TH
+-- splice), or only certain kinds (like in type signatures).
+expectedKindInCtxt :: UserTypeCtxt -> Maybe Kind
+expectedKindInCtxt (TySynCtxt _)  = Nothing -- Any kind will do
+expectedKindInCtxt ThBrackCtxt    = Nothing
+expectedKindInCtxt GhciCtxt       = Nothing
+expectedKindInCtxt ResSigCtxt     = Just openTypeKind
+expectedKindInCtxt ExprSigCtxt    = Just openTypeKind
+expectedKindInCtxt (ForSigCtxt _) = Just liftedTypeKind
+expectedKindInCtxt _              = Just argTypeKind
+
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty = do
@@ -929,14 +941,9 @@ checkValidType ctxt ty = do
 
 	actual_kind = typeKind ty
 
-	kind_ok = case ctxt of
-			TySynCtxt _  -> True -- Any kind will do
-			ThBrackCtxt  -> True -- ditto
-                        GhciCtxt     -> True -- ditto
-			ResSigCtxt   -> tcIsSubOpenTypeKind actual_kind
-			ExprSigCtxt  -> tcIsSubOpenTypeKind actual_kind
-			ForSigCtxt _ -> isLiftedTypeKind actual_kind
-			_            -> tcIsSubArgTypeKind actual_kind
+        kind_ok = case expectedKindInCtxt ctxt of
+                    Nothing -> True
+                    Just k  -> tcIsSubKind actual_kind k
 	
 	ubx_tup 
          | not unboxed = UT_NotOk

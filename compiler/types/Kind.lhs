@@ -42,7 +42,7 @@ module Kind (
 
         isSubArgTypeKind, tcIsSubArgTypeKind, 
         isSubOpenTypeKind, tcIsSubOpenTypeKind,
-        isSubKind, defaultKind,
+        isSubKind, tcIsSubKind, defaultKind,
         isSubKindCon, tcIsSubKindCon, isSubOpenTypeKindCon,
 
         -- ** Functions on variables
@@ -229,13 +229,18 @@ isSuperKind _                   = False
 isKind :: Kind -> Bool
 isKind k = isSuperKind (typeKind k)
 
-isSubKind :: Kind -> Kind -> Bool
+isSubKind, tcIsSubKind :: Kind -> Kind -> Bool
+isSubKind   = isSubKind' False
+tcIsSubKind = isSubKind' True
+
+-- The first argument denotes whether we are in the type-checking phase or not
+isSubKind' :: Bool -> Kind -> Kind -> Bool
 -- ^ @k1 \`isSubKind\` k2@ checks that @k1@ <: @k2@
 
-isSubKind (FunTy a1 r1) (FunTy a2 r2)
-  = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
+isSubKind' duringTc (FunTy a1 r1) (FunTy a2 r2)
+  = (isSubKind' duringTc a2 a1) && (isSubKind' duringTc r1 r2)
 
-isSubKind k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
+isSubKind' duringTc k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
   | isPromotedTypeTyCon kc1 || isPromotedTypeTyCon kc2
     -- handles promoted kinds (List *, Nat, etc.)
     = eqKind k1 k2
@@ -247,10 +252,10 @@ isSubKind k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
 
   | otherwise = -- handles usual kinds (*, #, (#), etc.)
                 ASSERT2( null k1s && null k2s, ppr k1 <+> ppr k2 )
-                kc1 `isSubKindCon` kc2
+                if duringTc then kc1 `tcIsSubKindCon` kc2
+                else kc1 `isSubKindCon` kc2
 
-
-isSubKind k1 k2 = eqKind k1 k2
+isSubKind' _duringTc k1 k2 = eqKind k1 k2
 
 isSubKindCon :: TyCon -> TyCon -> Bool
 -- ^ @kc1 \`isSubKindCon\` kc2@ checks that @kc1@ <: @kc2@
