@@ -15,8 +15,8 @@ module Vectorise.Utils.Base (
   mkBuiltinCo,
   mkVScrut,
 
-  -- preprSynTyCon,
   pdataReprTyCon,
+  pdatasReprTyCon_maybe,
   pdataReprDataCon,
   prDFunOfTyCon
 ) where
@@ -139,11 +139,27 @@ mkVScrut (ve, le)
   where
     ty = exprType ve
 
--- preprSynTyCon :: Type -> VM (TyCon, [Type])
--- preprSynTyCon ty = builtin preprTyCon >>= (`lookupFamInst` [ty])
 
+-- | Get the PData tycon that represents this type.
+--   This tycon does not appear explicitly in the source program.
+--   See Note [PData TyCons] in Vectorise.PRepr
+--
+--   @pdataReprTyCon {Sum2} = {PDataSum2}@
+--
 pdataReprTyCon :: Type -> VM (TyCon, [Type])
-pdataReprTyCon ty = builtin pdataTyCon >>= (`lookupFamInst` [ty])
+pdataReprTyCon ty
+        = builtin pdataTyCon >>= (`lookupFamInst` [ty])
+
+
+-- | Get the PDatas tycon that represents this type, if there is one.
+--   Not all backends use 'PDatas', so there might not be one.
+pdatasReprTyCon_maybe :: Type -> VM (Maybe (TyCon, [Type]))
+pdatasReprTyCon_maybe ty
+ = do   mtc     <- builtin pdatasTyCon
+        case mtc of
+         Nothing        -> return Nothing
+         Just tc        -> liftM Just $ lookupFamInst tc [ty]
+
 
 pdataReprDataCon :: Type -> VM (DataCon, [Type])
 pdataReprDataCon ty

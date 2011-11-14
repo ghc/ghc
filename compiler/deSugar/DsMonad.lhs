@@ -23,7 +23,9 @@ module DsMonad (
         getDOptsDs, getGhcModeDs, doptDs, woptDs,
         dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
         
-        PArrBuiltin(..), dsLookupDPHRdrEnv, dsInitPArrBuiltin,
+        PArrBuiltin(..), 
+        dsLookupDPHRdrEnv, dsLookupDPHRdrEnv_maybe,
+        dsInitPArrBuiltin,
 
         DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -63,6 +65,7 @@ import FastString
 import Maybes
 
 import Data.IORef
+import Control.Monad
 \end{code}
 
 %************************************************************************
@@ -416,20 +419,29 @@ dsLookupDataCon name
 \end{code}
 
 \begin{code}
--- Look up a name exported by 'Data.Array.Parallel.Prim' or 'Data.Array.Parallel.Prim'.
---
+
+
+-- |Lookup a name exported by 'Data.Array.Parallel.Prim' or 'Data.Array.Parallel.Prim'.
+--  Panic if there isn't one, or if it is defined multiple times.
 dsLookupDPHRdrEnv :: OccName -> DsM Name
 dsLookupDPHRdrEnv occ
+  = liftM (fromMaybe (pprPanic nameNotFound (ppr occ)))
+  $ dsLookupDPHRdrEnv_maybe occ
+  where nameNotFound  = "Name not found in 'Data.Array.Parallel' or 'Data.Array.Parallel.Prim':"
+
+-- |Lookup a name exported by 'Data.Array.Parallel.Prim' or 'Data.Array.Parallel.Prim',
+--  returning `Nothing` if it's not defined. Panic if it's defined multiple times.
+dsLookupDPHRdrEnv_maybe :: OccName -> DsM (Maybe Name)
+dsLookupDPHRdrEnv_maybe occ
   = do { env <- ds_dph_env <$> getGblEnv
        ; let gres = lookupGlobalRdrEnv env occ
        ; case gres of
-           []    -> pprPanic nameNotFound (ppr occ)
-           [gre] -> return $ gre_name gre
+           []    -> return $ Nothing
+           [gre] -> return $ Just $ gre_name gre
            _     -> pprPanic multipleNames (ppr occ)
        }
-  where
-    nameNotFound  = "Name not found in 'Data.Array.Parallel' or 'Data.Array.Parallel.Prim':"
-    multipleNames = "Multiple definitions in 'Data.Array.Parallel' and 'Data.Array.Parallel.Prim':"
+  where multipleNames = "Multiple definitions in 'Data.Array.Parallel' and 'Data.Array.Parallel.Prim':"
+
 
 -- Populate 'ds_parr_bi' from 'ds_dph_env'.
 --

@@ -73,6 +73,10 @@ data Builtins
         { parrayTyCon          :: TyCon                     -- ^ PArray
         , parray_PrimTyCons    :: NameEnv TyCon             -- ^ PArray_Int# etc.
         , pdataTyCon           :: TyCon                     -- ^ PData
+
+        , pdatasTyCon          :: Maybe TyCon    
+        -- ^ PDatas. Not all lifted backends use 'PDatas', so it might not be defined.
+
         , prClass              :: Class                     -- ^ PR
         , prTyCon              :: TyCon                     -- ^ PR
         , preprTyCon           :: TyCon                     -- ^ PRepr
@@ -118,19 +122,19 @@ parray_PrimTyCon :: TyCon -> Builtins -> TyCon
 parray_PrimTyCon tc bi = lookupEnvBuiltin "parray_PrimTyCon" (parray_PrimTyCons bi) (tyConName tc)
 
 selTy :: Int -> Builtins -> Type
-selTy = indexBuiltin "selTy" selTys
+selTy           = indexBuiltin "selTy" selTys
 
 selReplicate :: Int -> Builtins -> CoreExpr
-selReplicate = indexBuiltin "selReplicate" selReplicates 
+selReplicate    = indexBuiltin "selReplicate" selReplicates 
 
 selTags :: Int -> Builtins -> CoreExpr
-selTags   = indexBuiltin "selTags" selTagss
+selTags         = indexBuiltin "selTags" selTagss
 
 selElements :: Int -> Int -> Builtins -> CoreExpr
 selElements i j = indexBuiltin "selElements" selElementss (i, j)
 
 sumTyCon :: Int -> Builtins -> TyCon
-sumTyCon = indexBuiltin "sumTyCon" sumTyCons
+sumTyCon        = indexBuiltin "sumTyCon" sumTyCons
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n _
@@ -171,8 +175,8 @@ scalarZip = indexBuiltin "scalarZip" scalarZips
 closureCtrFun :: Int -> Builtins -> Var
 closureCtrFun = indexBuiltin "closureCtrFun" closureCtrFuns
 
--- Get an element from one of the arrays of `Builtins`. Panic if the indexed thing is not in the array.
---
+-- | Get an element from one of the arrays of `Builtins`.
+--   Panic if the indexed thing is not in the array.
 indexBuiltin :: (Ix i, Outputable i) 
              => String                   -- ^ Name of the selector we've used, for panic messages.
              -> (Builtins -> Array i a)  -- ^ Field selector for the `Builtins`.
@@ -192,8 +196,8 @@ indexBuiltin fn f i bi
     , text "and ask what you can do to help (it might involve some GHC hacking)."])
   where xs = f bi
 
--- Get an entry from one of a 'NameEnv' of `Builtins`. Panic if the named item is not in the array.
---
+
+-- | Get an entry from one of a 'NameEnv' of `Builtins`. Panic if the named item is not in the array.
 lookupEnvBuiltin :: String                    -- Function name for error messages
                  -> NameEnv a                 -- Name environment
                  -> Name                      -- Index into the name environment

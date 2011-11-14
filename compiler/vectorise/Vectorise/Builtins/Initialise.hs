@@ -36,17 +36,19 @@ initBuiltins
       ; let parray_PrimTyCons = mkNameEnv (zip aLL_DPH_PRIM_TYCONS parray_tcs)
 
           -- 'PData': type family mapping array element types to array representation types
-      ; pdataTyCon <- externalTyCon (fsLit "PData")
+          -- Not all backends use `PDatas`.
+      ; pdataTyCon  <- externalTyCon (fsLit "PData")
+      ; pdatasTyCon@(Just _) <- externalTyCon_maybe (fsLit "PDatas")
 
           -- 'PR': class of basic array operators operating on 'PData' types
-      ; prClass <- externalClass (fsLit "PR")
+      ; prClass     <- externalClass (fsLit "PR")
       ; let prTyCon     = classTyCon prClass
 
           -- 'PRepr': type family mapping element types to representation types
       ; preprTyCon  <- externalTyCon (fsLit "PRepr")
 
           -- 'PA': class of basic operations on arrays (parametrised by the element type)
-      ; paClass <- externalClass (fsLit "PA")
+      ; paClass     <- externalClass (fsLit "PA")
       ; let paTyCon     = classTyCon paClass
             [paDataCon] = tyConDataCons paTyCon
             paPRSel     = classSCSelId paClass 0
@@ -75,34 +77,34 @@ initBuiltins
       ; scalarClass <- externalClass (fsLit "Scalar")
 
           -- N-ary maps ('zipWith' family)
-      ; scalar_map  <- externalVar (fsLit "scalar_map")
-      ; scalar_zip2 <- externalVar (fsLit "scalar_zipWith")
-      ; scalar_zips <- mapM externalVar (numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
-      ; let scalarZips = listArray (1, mAX_DPH_SCALAR_ARGS) (scalar_map : scalar_zip2 : scalar_zips)
+      ; scalar_map       <- externalVar (fsLit "scalar_map")
+      ; scalar_zip2      <- externalVar (fsLit "scalar_zipWith")
+      ; scalar_zips      <- mapM externalVar (numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
+      ; let scalarZips   = listArray (1, mAX_DPH_SCALAR_ARGS) (scalar_map : scalar_zip2 : scalar_zips)
 
           -- Types and functions for generic type representations
-      ; voidTyCon   <- externalTyCon (fsLit "Void")
-      ; voidVar     <- externalVar (fsLit "void")
-      ; fromVoidVar <- externalVar (fsLit "fromVoid")
-      ; sum_tcs     <- mapM externalTyCon (numbered "Sum" 2 mAX_DPH_SUM)
-      ; let sumTyCons = listArray (2, mAX_DPH_SUM) sum_tcs
-      ; wrapTyCon   <- externalTyCon (fsLit "Wrap")
-      ; pvoidVar    <- externalVar (fsLit "pvoid")
+      ; voidTyCon        <- externalTyCon (fsLit "Void")
+      ; voidVar          <- externalVar   (fsLit "void")
+      ; fromVoidVar      <- externalVar   (fsLit "fromVoid")
+      ; sum_tcs          <- mapM externalTyCon (numbered "Sum" 2 mAX_DPH_SUM)
+      ; let sumTyCons    = listArray (2, mAX_DPH_SUM) sum_tcs
+      ; wrapTyCon        <- externalTyCon (fsLit "Wrap")
+      ; pvoidVar         <- externalVar   (fsLit "pvoid")
 
           -- Types and functions for closure conversion
       ; closureTyCon     <- externalTyCon (fsLit ":->")
-      ; closureVar       <- externalVar (fsLit "closure")
-      ; liftedClosureVar <- externalVar (fsLit "liftedClosure")
-      ; applyVar         <- externalVar (fsLit "$:")
-      ; liftedApplyVar   <- externalVar (fsLit "liftedApply")
+      ; closureVar       <- externalVar   (fsLit "closure")
+      ; liftedClosureVar <- externalVar   (fsLit "liftedClosure")
+      ; applyVar         <- externalVar   (fsLit "$:")
+      ; liftedApplyVar   <- externalVar   (fsLit "liftedApply")
       ; closures         <- mapM externalVar (numbered "closure" 1 mAX_DPH_SCALAR_ARGS)
       ; let closureCtrFuns = listArray (1, mAX_DPH_COMBINE) closures
 
           -- Types and functions for selectors
-      ; sel_tys        <- mapM externalType (numbered "Sel" 2 mAX_DPH_SUM)
-      ; sel_replicates <- mapM externalFun (numbered_hash "replicateSel" 2 mAX_DPH_SUM)
-      ; sel_tags       <- mapM externalFun (numbered "tagsSel" 2 mAX_DPH_SUM)
-      ; sel_elements   <- mapM mk_elements [(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
+      ; sel_tys          <- mapM externalType (numbered "Sel" 2 mAX_DPH_SUM)
+      ; sel_replicates   <- mapM externalFun  (numbered_hash "replicateSel" 2 mAX_DPH_SUM)
+      ; sel_tags         <- mapM externalFun  (numbered "tagsSel" 2 mAX_DPH_SUM)
+      ; sel_elements     <- mapM mk_elements [(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
       ; let selTys        = listArray (2, mAX_DPH_SUM) sel_tys
             selReplicates = listArray (2, mAX_DPH_SUM) sel_replicates
             selTagss      = listArray (2, mAX_DPH_SUM) sel_tags
@@ -115,6 +117,7 @@ initBuiltins
                { parrayTyCon          = parrayTyCon
                , parray_PrimTyCons    = parray_PrimTyCons
                , pdataTyCon           = pdataTyCon
+               , pdatasTyCon          = pdatasTyCon
                , preprTyCon           = preprTyCon
                , prClass              = prClass
                , prTyCon              = prTyCon
@@ -199,32 +202,42 @@ initBuiltinTyCons bi
              : []
 
 
--- Auxilliary look up functions ----------------
+-- Auxilliary look up functions -----------------------------------------------
 
--- Lookup a variable given its name and the module that contains it.
---
+-- |Lookup a variable given its name and the module that contains it.
 externalVar :: FastString -> DsM Var
 externalVar fs = dsLookupDPHRdrEnv (mkVarOccFS fs) >>= dsLookupGlobalId
 
--- Like `externalVar` but wrap the `Var` in a `CoreExpr`.
---
+
+-- |Like `externalVar` but wrap the `Var` in a `CoreExpr`.
 externalFun :: FastString -> DsM CoreExpr
 externalFun fs = Var <$> externalVar fs
 
--- Lookup a 'TyCon' in 'Data.Array.Parallel.Prim', given its name.
---
+
+-- |Lookup a 'TyCon' in 'Data.Array.Parallel.Prim', given its name.
+--  Panic if there isn't one.
 externalTyCon :: FastString -> DsM TyCon
 externalTyCon fs = dsLookupDPHRdrEnv (mkTcOccFS fs) >>= dsLookupTyCon
 
--- Lookup some `Type` in 'Data.Array.Parallel.Prim', given its name.
---
+
+-- |Lookup a 'TyCon' in 'Data.Array.Parallel.Prim', given its name.
+--  Return 'Nothing' if there isn't one.
+externalTyCon_maybe :: FastString -> DsM (Maybe TyCon)
+externalTyCon_maybe fs
+ = do   mName   <- dsLookupDPHRdrEnv_maybe (mkTcOccFS fs)
+        case mName of
+         Nothing        -> return Nothing
+         Just name      -> liftM Just $ dsLookupTyCon name
+
+
+-- |Lookup some `Type` in 'Data.Array.Parallel.Prim', given its name.
 externalType :: FastString -> DsM Type
 externalType fs
  = do  tycon <- externalTyCon fs
        return $ mkTyConApp tycon []
 
--- Lookup a 'Class' in 'Data.Array.Parallel.Prim', given its name.
---
+
+-- |Lookup a 'Class' in 'Data.Array.Parallel.Prim', given its name.
 externalClass :: FastString -> DsM Class
 externalClass fs 
   = do { tycon <- dsLookupDPHRdrEnv (mkClsOccFS fs) >>= dsLookupTyCon
