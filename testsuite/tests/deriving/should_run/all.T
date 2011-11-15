@@ -32,3 +32,5 @@ test('drvrun-foldable1', normal, compile_and_run, [''])
 test('T4136', normal, compile_and_run, [''])
 test('T4528a', normal, compile_and_run, [''])
 test('T5041', normal, compile_and_run, [''])
+test('T5628', exit_code(1), compile_and_run, [''])
+
