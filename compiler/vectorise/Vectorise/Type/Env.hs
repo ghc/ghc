@@ -209,7 +209,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        ; pdata_tcs  <- zipWith3M buildPDataTyCon  orig_tcs vect_tcs reprs
        ; pdatas_tcs <- zipWith3M buildPDatasTyCon orig_tcs vect_tcs reprs
 
-       ; let inst_tcs  = repr_tcs ++ pdata_tcs
+       ; let inst_tcs  = repr_tcs ++ pdata_tcs ++ pdatas_tcs
              fam_insts = map mkLocalFamInst inst_tcs
        ; updGEnv $ extendFamEnv fam_insts
 
