@@ -177,27 +177,32 @@ gen_Eq_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Eq_binds loc tycon
   = (method_binds, aux_binds)
   where
-    (nullary_cons, nonnullary_cons)
+    (nullary_cons, non_nullary_cons)
        | isNewTyCon tycon = ([], tyConDataCons tycon)
        | otherwise        = partition isNullarySrcDataCon (tyConDataCons tycon)
 
     no_nullary_cons = null nullary_cons
 
-    rest | no_nullary_cons
-	 = case tyConSingleDataCon_maybe tycon of
-	    	  Just _ -> []
-	    	  Nothing -> -- if cons don't match, then False
-	    	     [([nlWildPat, nlWildPat], false_Expr)]
-	 | otherwise -- calc. and compare the tags
-	 = [([a_Pat, b_Pat],
-    	    untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
-    	               (genOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
+    fall_through_eqn
+      | no_nullary_cons   -- All constructors have arguments
+      = case non_nullary_cons of
+          []  -> []   -- No constructors; no fall-though case
+          [c] -> []   -- One constructor; no fall-though case
+          _   ->      -- Two or more constructors; add fall-through of
+	   	      --       (==) _ _ = False
+	    	 [([nlWildPat, nlWildPat], false_Expr)]
+
+      | otherwise -- One or more nullary cons; add fall-through of
+                  -- extract tags compare for equality
+      = [([a_Pat, b_Pat],
+    	 untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
+    	            (genOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
     aux_binds | no_nullary_cons = emptyBag
 	      | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
     method_binds = listToBag [eq_bind, ne_bind]
-    eq_bind = mk_FunBind loc eq_RDR (map pats_etc nonnullary_cons ++ rest)
+    eq_bind = mk_FunBind loc eq_RDR (map pats_etc non_nullary_cons ++ fall_through_eqn)
     ne_bind = mk_easy_FunBind loc ne_RDR [a_Pat, b_Pat] (
 			nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
 
