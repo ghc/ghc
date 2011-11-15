@@ -650,7 +650,7 @@ The type constructor Any of kind forall k. k -> k has these properties:
     the code generator, because the code gen may *enter* a data value
     but never enters a function value. 
 
-  * It is used to instantiate otherwise un-constrained type variables of kind *
+  * It is used to instantiate otherwise un-constrained type variables
     For example   	length Any []
     See Note [Strangely-kinded void TyCons]
 
@@ -665,7 +665,7 @@ Any, but at the kind level. For example:
   type instance Length [] = Zero
 
 Length is kind-polymorphic, and when applied to the empty (promoted) list it
-will be supplied the kind AnyL: Length AnyK [].
+will have the kind Length AnyK [].
 
 Note [Strangely-kinded void TyCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

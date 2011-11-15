@@ -1849,7 +1849,7 @@ pseudoop   "lazy"
 
 	Like {\tt seq}, the argument of {\tt lazy} can have an unboxed type. }
 
-primtype Any a
+primtype Any k
 	{ The type constructor {\tt Any} is type to which you can unsafely coerce any
 	lifted type, and back. 
 
@@ -1872,16 +1872,25 @@ primtype Any a
 	application is required, but there is no constraint on the
 	choice.  In this situation GHC uses {\tt Any}:
 
-	{\tt length Any ([] Any)}
+	{\tt length (Any *) ([] (Any *))}
 
-	Annoyingly, we sometimes need {\tt Any}s of other kinds, such as {\tt (* -> *)} etc.
-	This is a bit like tuples.   We define a couple of useful ones here,
-	and make others up on the fly.  If any of these others end up being exported
-	into interface files, we'll get a crash; at least until we add interface-file
-	syntax to support them. }
+        Note that {\tt Any} is kind polymorphic, and takes a kind {\tt k} as its
+        first argument. The kind of {\tt Any} is thus {\tt forall k. k -> k}.}
 
 primtype AnyK
-	{ JPM Todo }
+        { The kind {\tt AnyK} is the kind level counterpart to {\tt Any}. In a
+        kind polymorphic setting, a similar example to the length of the empty
+        list can be given at the type level:
+
+        {\tt type family Length (l :: [k]) :: Nat}
+        {\tt type instance Length [] = Zero}
+
+        When {\tt Length} is applied to the empty (promoted) list it will have
+        the kind {\tt Length AnyK []}.
+
+        {\tt AnyK} is currently not exported and cannot be used directly, but
+        you might see it in debug output from the compiler.
+        }
 
 pseudoop   "unsafeCoerce#"
    a -> b
