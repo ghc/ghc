@@ -15,9 +15,8 @@ module Vectorise.Utils.Base (
   mkBuiltinCo,
   mkVScrut,
 
-  pdataReprTyCon,
-  pdatasReprTyCon_maybe,
-  pdataReprDataCon,
+  pdataReprTyCon,   pdatasReprTyCon,
+  pdataReprDataCon, pdatasReprDataCon,
   prDFunOfTyCon
 ) where
 
@@ -37,7 +36,7 @@ import Outputable
 import FastString
 
 import Control.Monad (liftM)
-import Data.Maybe
+
 
 -- Simple Types ---------------------------------------------------------------
 voidType :: VM Type
@@ -110,17 +109,12 @@ mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
 -- | Make an appliction of the 'PData' tycon to some argument.
 mkPDataType :: Type -> VM Type
-mkPDataType ty
-        = mkBuiltinTyConApp pdataTyCon [ty]
+mkPDataType ty  = mkBuiltinTyConApp pdataTyCon [ty]
 
 
 -- | Make an application of the 'PDatas' tycon to some argument.
-mkPDatasType :: Type -> VM (Maybe Type)
-mkPDatasType ty
- = do   mtc      <- builtin pdatasTyCon
-        case mtc of
-         Nothing        -> return Nothing
-         Just tc'       -> return $ Just $ mkTyConApp tc' [ty]
+mkPDatasType :: Type -> VM Type
+mkPDatasType ty = mkBuiltinTyConApp pdatasTyCon [ty]
 
 
 -- |Checks if a type constructor is defined in 'GHC.Prim' (e.g., 'Int#'); if so, returns it.
@@ -175,23 +169,22 @@ pdataReprTyCon :: Type -> VM (TyCon, [Type])
 pdataReprTyCon ty
         = builtin pdataTyCon >>= (`lookupFamInst` [ty])
 
-
--- | Get the PDatas tycon that represents this type, if there is one.
---   Not all backends use 'PDatas', so there might not be one.
-pdatasReprTyCon_maybe :: Type -> VM (Maybe (TyCon, [Type]))
-pdatasReprTyCon_maybe ty
- = do   mtc     <- builtin pdatasTyCon
-        case mtc of
-         Nothing        -> return Nothing
-         Just tc        -> liftM Just $ lookupFamInst tc [ty]
-
-
 pdataReprDataCon :: Type -> VM (DataCon, [Type])
 pdataReprDataCon ty
-  = do
-      (tc, arg_tys) <- pdataReprTyCon ty
-      let [dc] = tyConDataCons tc
-      return (dc, arg_tys)
+ = do   (tc, arg_tys) <- pdataReprTyCon ty
+        let [dc] = tyConDataCons tc
+        return (dc, arg_tys)
+
+pdatasReprTyCon :: Type -> VM (TyCon, [Type])
+pdatasReprTyCon ty
+        = builtin pdatasTyCon >>= (`lookupFamInst` [ty])
+
+pdatasReprDataCon :: Type -> VM (DataCon, [Type])
+pdatasReprDataCon ty
+ = do   (tc, arg_tys) <- pdatasReprTyCon ty
+        let [dc] = tyConDataCons tc
+        return (dc, arg_tys)
+
 
 prDFunOfTyCon :: TyCon -> VM CoreExpr
 prDFunOfTyCon tycon

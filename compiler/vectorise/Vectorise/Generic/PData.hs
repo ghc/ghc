@@ -79,7 +79,7 @@ buildPDatasTyCon orig_tc vect_tc repr
  = fixV $ \repr_tc ->
  do name'       <- mkLocalisedName mkPDatasTyConOcc orig_name
     rhs         <- buildPDatasTyConRhs orig_name vect_tc repr_tc repr
-    Just pdatas <- builtin pdatasTyCon
+    pdatas      <- builtin pdatasTyCon
 
     liftDs $ buildAlgTyCon name'
                            tyvars
@@ -106,10 +106,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
  = do let tvs   = tyConTyVars vect_tc
       dc_name        <- mkLocalisedName mkPDatasDataConOcc orig_name
 
-      let mkPDatasType' t
-           = mkPDatasType t >>= (\(Just t') -> return t')
-
-      comp_tys  <- mkSumTys mkPDatasType' repr
+      comp_tys  <- mkSumTys mkPDatasType repr
 
       liftDs $ buildDataCon dc_name
                             False                  -- not infix

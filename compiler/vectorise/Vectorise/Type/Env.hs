@@ -39,7 +39,7 @@ import FastString
 import MonadUtils
 import Control.Monad
 import Data.List
-
+import Data.Maybe
 
 -- Note [Pragmas to vectorise tycons]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -208,6 +208,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        ; repr_tcs   <- zipWith3M buildPReprTyCon  orig_tcs vect_tcs reprs
        ; pdata_tcs  <- zipWith3M buildPDataTyCon  orig_tcs vect_tcs reprs
        ; pdatas_tcs <- zipWith3M buildPDatasTyCon orig_tcs vect_tcs reprs
+
        ; let inst_tcs  = repr_tcs ++ pdata_tcs
              fam_insts = map mkLocalFamInst inst_tcs
        ; updGEnv $ extendFamEnv fam_insts

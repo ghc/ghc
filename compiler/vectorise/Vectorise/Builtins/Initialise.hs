@@ -38,7 +38,7 @@ initBuiltins
           -- 'PData': type family mapping array element types to array representation types
           -- Not all backends use `PDatas`.
       ; pdataTyCon  <- externalTyCon (fsLit "PData")
-      ; pdatasTyCon <- externalTyCon_maybe (fsLit "PDatas")
+      ; pdatasTyCon <- externalTyCon (fsLit "PDatas")
 
           -- 'PR': class of basic array operators operating on 'PData' types
       ; prClass     <- externalClass (fsLit "PR")
@@ -90,6 +90,7 @@ initBuiltins
       ; let sumTyCons    = listArray (2, mAX_DPH_SUM) sum_tcs
       ; wrapTyCon        <- externalTyCon (fsLit "Wrap")
       ; pvoidVar         <- externalVar   (fsLit "pvoid")
+      ; pvoidsVar        <- externalVar   (fsLit "pvoids")
 
           -- Types and functions for closure conversion
       ; closureTyCon     <- externalTyCon (fsLit ":->")
@@ -141,6 +142,7 @@ initBuiltins
                , sumTyCons            = sumTyCons
                , wrapTyCon            = wrapTyCon
                , pvoidVar             = pvoidVar
+               , pvoidsVar            = pvoidsVar
                , closureTyCon         = closureTyCon
                , closureVar           = closureVar
                , liftedClosureVar     = liftedClosureVar
@@ -218,16 +220,6 @@ externalFun fs = Var <$> externalVar fs
 --  Panic if there isn't one.
 externalTyCon :: FastString -> DsM TyCon
 externalTyCon fs = dsLookupDPHRdrEnv (mkTcOccFS fs) >>= dsLookupTyCon
-
-
--- |Lookup a 'TyCon' in 'Data.Array.Parallel.Prim', given its name.
---  Return 'Nothing' if there isn't one.
-externalTyCon_maybe :: FastString -> DsM (Maybe TyCon)
-externalTyCon_maybe fs
- = do   mName   <- dsLookupDPHRdrEnv_maybe (mkTcOccFS fs)
-        case mName of
-         Nothing        -> return Nothing
-         Just name      -> liftM Just $ dsLookupTyCon name
 
 
 -- |Lookup some `Type` in 'Data.Array.Parallel.Prim', given its name.

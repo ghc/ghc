@@ -1,3 +1,9 @@
+
+-- | Generate methods for the PA class.
+--
+--   TODO: there is a large amount of redundancy here between the 
+--   a, PData a, and PDatas a forms. See if we can factor some of this out.
+--
 module Vectorise.Generic.PAMethods
   ( buildPReprTyCon
   , buildPAScAndMethods 
@@ -20,7 +26,6 @@ import MkId
 import FastString
 import MonadUtils
 import Control.Monad
-import Data.Maybe
 
 
 buildPReprTyCon :: TyCon -> TyCon -> SumRepr -> VM TyCon
@@ -57,12 +62,9 @@ mk_fam_inst fam_tc arg_tc
 --      toArrPRepr    :: PData a          -> PData (PRepr a)
 --      fromArrPRepr  :: PData (PRepr a)  -> PData a
 --
---      toArrPReprs   :: PDatas a         -> PDatas (PRepr a)    (optional)
---      fromArrPReprs :: PDatas (PRepr a) -> PDatas a            (optional)
+--      toArrPReprs   :: PDatas a         -> PDatas (PRepr a)
+--      fromArrPReprs :: PDatas (PRepr a) -> PDatas a
 --   @
---
---  Not all lifted backends use the 'toArrPReprs' and 'fromArrPReprs' methods, 
---  so we only generate these if the 'PDatas' type family is defined.
 --
 type PAInstanceBuilder
         =  TyCon        -- ^ Vectorised TyCon 
@@ -75,17 +77,13 @@ type PAInstanceBuilder
 
 buildPAScAndMethods :: VM [(String, PAInstanceBuilder)]
 buildPAScAndMethods
- = do   hasPDatas <- liftM isJust $ builtin pdatasTyCon
-        return 
-         $    [ ("PR",            buildPRDict)
-              , ("toPRepr",       buildToPRepr)
-              , ("fromPRepr",     buildFromPRepr)
-              , ("toArrPRepr",    buildToArrPRepr)
-              , ("fromArrPRepr",  buildFromArrPRepr)]
-         ++ (if hasPDatas then
-              [ ("toArrPReprs",   buildToArrPReprs)
-              , ("fromArrPReprs", buildFromArrPReprs)]
-              else [])             
+ = return [ ("PR",            buildPRDict)
+          , ("toPRepr",       buildToPRepr)
+          , ("fromPRepr",     buildFromPRepr)
+          , ("toArrPRepr",    buildToArrPRepr)
+          , ("fromArrPRepr",  buildFromArrPRepr)
+          , ("toArrPReprs",   buildToArrPReprs)
+          , ("fromArrPReprs", buildFromArrPReprs)]
 
 
 buildPRDict :: PAInstanceBuilder
@@ -246,60 +244,46 @@ buildToArrPRepr vect_tc prepr_tc pdata_tc _ r
              $ mkWildCase scrut (mkTyConApp pdata_tc ty_args) res_ty
                [(DataAlt pdata_dc, vars, mkCoerce co result)]
   where
-    ty_args = mkTyVarTys $ tyConTyVars vect_tc
-    el_ty   = mkTyConApp vect_tc ty_args
-
+    ty_args    = mkTyVarTys $ tyConTyVars vect_tc
+    el_ty      = mkTyConApp vect_tc ty_args
     [pdata_dc] = tyConDataCons pdata_tc
 
+    to_sum ss
+     = case ss of
+        EmptySum    -> builtin pvoidVar >>= \pvoid -> return ([], Var pvoid) 
+        UnarySum r  -> to_con r
+        Sum{}
+         -> do  let psum_tc     =  repr_psum_tc ss
+                let [psum_con]  =  tyConDataCons psum_tc
+                (vars, exprs)   <- mapAndUnzipM to_con (repr_cons ss)
+                sel             <- newLocalVar (fsLit "sel") (repr_sel_ty ss)
+                return ( sel : concat vars
+                       , wrapFamInstBody psum_tc (repr_con_tys ss)
+                         $ mkConApp psum_con 
+                         $ map Type (repr_con_tys ss) ++ (Var sel : exprs))
 
-    to_sum EmptySum 
-     = do pvoid <- builtin pvoidVar
-          return ([], Var pvoid)
+    to_prod ss
+     = case ss of
+        EmptyProd    -> builtin pvoidVar >>= \pvoid -> return ([], Var pvoid)
+        UnaryProd r
+         -> do  pty  <- mkPDataType (compOrigType r)
+                var  <- newLocalVar (fsLit "x") pty
+                expr <- to_comp (Var var) r
+                return ([var], expr)
+        Prod{}
+         -> do  let [ptup_con]  = tyConDataCons (repr_ptup_tc ss)
+                ptys   <- mapM (mkPDataType . compOrigType) (repr_comps ss)
+                vars   <- newLocalVars (fsLit "x") ptys
+                exprs  <- zipWithM to_comp (map Var vars) (repr_comps ss)
+                return ( vars
+                       , wrapFamInstBody (repr_ptup_tc ss) (repr_comp_tys ss)
+                         $ mkConApp ptup_con
+                         $ map Type (repr_comp_tys ss) ++ exprs)
 
-    to_sum (UnarySum r) = to_con r
-
-    to_sum (Sum { repr_psum_tc = psum_tc
-                , repr_sel_ty  = sel_ty
-                , repr_con_tys = tys
-                , repr_cons    = cons
-                })
-     = do (vars, exprs) <- mapAndUnzipM to_con cons
-          sel <- newLocalVar (fsLit "sel") sel_ty
-          return (sel : concat vars, mk_result (Var sel) exprs)
-      where
-        [psum_con] = tyConDataCons psum_tc
-        mk_result sel exprs = wrapFamInstBody psum_tc tys
-                            $ mkConApp psum_con
-                            $ map Type tys ++ (sel : exprs)
-
-    to_con (ConRepr _ r) = to_prod r
-
-    to_prod EmptyProd
-     = do pvoid <- builtin pvoidVar
-          return ([], Var pvoid)
-
-    to_prod (UnaryProd r)
-     = do pty  <- mkPDataType (compOrigType r)
-          var  <- newLocalVar (fsLit "x") pty
-          expr <- to_comp (Var var) r
-          return ([var], expr)
-
-    to_prod (Prod { repr_ptup_tc  = ptup_tc
-                  , repr_comp_tys = tys
-                  , repr_comps    = comps })
-     = do ptys <- mapM (mkPDataType . compOrigType) comps
-          vars <- newLocalVars (fsLit "x") ptys
-          es   <- zipWithM to_comp (map Var vars) comps
-          return (vars, mk_result es)
-      where
-        [ptup_con] = tyConDataCons ptup_tc
-        mk_result exprs = wrapFamInstBody ptup_tc tys
-                        $ mkConApp ptup_con
-                        $ map Type tys ++ exprs
-
-    to_comp expr (Keep _ _) = return expr
+    to_con (ConRepr _ r)    = to_prod r
 
     -- FIXME: this is bound to be wrong!
+    to_comp expr (Keep _ _) = return expr
     to_comp expr (Wrap ty)
       = do
           wrap_tc  <- builtin wrapTyCon
@@ -317,61 +301,57 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc _ r
 
       pdata_co <- mkBuiltinCo pdataTyCon
       let Just repr_co = tyConFamilyCoercion_maybe prepr_tc
-          co           = mkAppCo pdata_co
+      let co           = mkAppCo pdata_co
                        $ mkAxInstCo repr_co var_tys
 
-          scrut  = mkCoerce co (Var arg)
+      let scrut        = mkCoerce co (Var arg)
 
-          mk_result args = wrapFamInstBody pdata_tc var_tys
-                         $ mkConApp pdata_con
-                         $ map Type var_tys ++ args
+      let mk_result args
+            = wrapFamInstBody pdata_tc var_tys
+            $ mkConApp pdata_con
+            $ map Type var_tys ++ args
 
       (expr, _) <- fixV $ \ ~(_, args) ->
                      from_sum res_ty (mk_result args) scrut r
 
       return $ Lam arg expr
  where
-    var_tys = mkTyVarTys $ tyConTyVars vect_tc
-    el_ty   = mkTyConApp vect_tc var_tys
-
+    var_tys     = mkTyVarTys $ tyConTyVars vect_tc
+    el_ty       = mkTyConApp vect_tc var_tys
     [pdata_con] = tyConDataCons pdata_tc
 
-    from_sum _ res _ EmptySum = return (res, [])
-    from_sum res_ty res expr (UnarySum r) = from_con res_ty res expr r
-    from_sum res_ty res expr (Sum { repr_psum_tc = psum_tc
-                                  , repr_sel_ty  = sel_ty
-                                  , repr_con_tys = tys
-                                  , repr_cons    = cons })
-     = do sel  <- newLocalVar (fsLit "sel") sel_ty
-          ptys <- mapM mkPDataType tys
-          vars <- newLocalVars (fsLit "xs") ptys
-          (res', args) <- fold from_con res_ty res (map Var vars) cons
-          let scrut = unwrapFamInstScrut psum_tc tys expr
-              body  = mkWildCase scrut (exprType scrut) res_ty
-                      [(DataAlt psum_con, sel : vars, res')]
-          return (body, Var sel : args)
-      where
-        [psum_con] = tyConDataCons psum_tc
+    from_sum res_ty res expr ss
+     = case ss of
+        EmptySum    -> return (res, [])
+        UnarySum r  -> from_con res_ty res expr r
+        Sum {}
+         -> do  let psum_tc    =  repr_psum_tc ss
+                let [psum_con] =  tyConDataCons psum_tc
+                sel            <- newLocalVar (fsLit "sel") (repr_sel_ty ss)
+                ptys           <- mapM mkPDataType (repr_con_tys ss)
+                vars           <- newLocalVars (fsLit "xs") ptys
+                (res', args)   <- fold from_con res_ty res (map Var vars) (repr_cons ss)
+                let scrut      =  unwrapFamInstScrut psum_tc (repr_con_tys ss) expr
+                let body       =  mkWildCase scrut (exprType scrut) res_ty
+                                    [(DataAlt psum_con, sel : vars, res')]
+                return (body, Var sel : args)
 
+    from_prod res_ty res expr ss
+     = case ss of
+        EmptyProd   -> return (res, [])
+        UnaryProd r -> from_comp res_ty res expr r
+        Prod {}
+         -> do  let ptup_tc    =  repr_ptup_tc ss
+                let [ptup_con] =  tyConDataCons ptup_tc
+                ptys           <- mapM mkPDataType (repr_comp_tys ss)
+                vars           <- newLocalVars (fsLit "ys") ptys
+                (res', args)   <- fold from_comp res_ty res (map Var vars) (repr_comps ss)
+                let scrut      =  unwrapFamInstScrut ptup_tc (repr_comp_tys ss) expr
+                let body       =  mkWildCase scrut (exprType scrut) res_ty
+                                    [(DataAlt ptup_con, vars, res')]
+                return (body, args)      
 
     from_con res_ty res expr (ConRepr _ r) = from_prod res_ty res expr r
-
-    from_prod _ res _ EmptyProd
-      = return (res, [])
-    from_prod res_ty res expr (UnaryProd r)
-      = from_comp res_ty res expr r
-    from_prod res_ty res expr (Prod { repr_ptup_tc  = ptup_tc
-                                    , repr_comp_tys = tys
-                                    , repr_comps    = comps })
-     = do ptys <- mapM mkPDataType tys
-          vars <- newLocalVars (fsLit "ys") ptys
-          (res', args) <- fold from_comp res_ty res (map Var vars) comps
-          let scrut = unwrapFamInstScrut ptup_tc tys expr
-              body  = mkWildCase scrut (exprType scrut) res_ty
-                      [(DataAlt ptup_con, vars, res')]
-          return (body, args)
-      where
-        [ptup_con] = tyConDataCons ptup_tc
 
     from_comp _ res expr (Keep _ _) = return (res, [expr])
     from_comp _ res expr (Wrap ty)
@@ -380,7 +360,8 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc _ r
           return (res, [unwrapNewTypeBody pwrap_tc [ty]
                         $ unwrapFamInstScrut pwrap_tc [ty] expr])
 
-    fold f res_ty res exprs rs = foldrM f' (res, []) (zip exprs rs)
+    fold f res_ty res exprs rs
+      = foldrM f' (res, []) (zip exprs rs)
       where
         f' (expr, r) (res, args) 
          = do (res', args') <- f res_ty res expr r
@@ -393,47 +374,171 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc _ r
 buildToArrPReprs :: PAInstanceBuilder
 buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
  = do
-        -- The element type of the argument.
-        --  eg: 'Tree a b'.
-        let ty_args = mkTyVarTys $ tyConTyVars vect_tc
-        let el_ty   = mkTyConApp vect_tc ty_args
+    -- The argument type of the instance.
+    --  eg: 'PDatas (Tree a b)'
+    arg_ty    <- mkPDatasType el_ty
 
-        -- The argument type of the instance.
-        --  eg: 'PDatas (Tree a b)'
-        Just arg_ty      <- mkPDatasType el_ty
+    -- The result type. 
+    --  eg: 'PDatas (PRepr (Tree a b))'
+    res_ty    <- mkPDatasType =<< mkPReprType el_ty
 
-        -- The result type. 
-        --  eg: 'PDatas (PRepr (Tree a b))'
-        Just res_ty      <- mkPDatasType =<< mkPReprType el_ty
-        
-        -- Variable to bind the argument to the instance
-        -- eg: (xss :: PDatas (Tree a b))
-        varg         <- newLocalVar (fsLit "xss") arg_ty
-        
-        return  $ Lam varg (Var varg)
+    -- Variable to bind the argument to the instance
+    -- eg: (xss :: PDatas (Tree a b))
+    varg      <- newLocalVar (fsLit "xss") arg_ty
 
+    -- Coersion to case between the (PRepr a) type and its instance.
+    pdatas_co <- mkBuiltinCo pdatasTyCon
+    let Just repr_co = tyConFamilyCoercion_maybe prepr_tc
+    let co           = mkAppCo pdatas_co
+                     . mkSymCo
+                     $ mkAxInstCo repr_co ty_args
+
+    let scrut        = unwrapFamInstScrut pdatas_tc ty_args (Var varg)
+    (vars, result)  <- to_sum r
+
+    return  $ Lam varg
+            $ mkWildCase scrut (mkTyConApp pdatas_tc ty_args) res_ty
+                    [(DataAlt pdatas_dc, vars, mkCoerce co result)]        
+
+ where
+    -- The element type of the argument.
+    --  eg: 'Tree a b'.
+    ty_args = mkTyVarTys $ tyConTyVars vect_tc
+    el_ty   = mkTyConApp vect_tc ty_args
         
+    -- PDatas data constructor
+    [pdatas_dc] = tyConDataCons pdatas_tc
+         
+    to_sum ss
+     = case ss of       -- BROKEN: should be
+        EmptySum    -> builtin pvoidVar >>= \pvoid -> return ([], Var pvoid) 
+        UnarySum r  -> to_con r
+        Sum{}
+          -> do let psums_tc     = repr_psums_tc ss
+                let [psums_con]  = tyConDataCons psums_tc
+                (vars, exprs)   <- mapAndUnzipM to_con (repr_cons ss)
+                sel             <- newLocalVar (fsLit "sel") (repr_sel_ty ss) -- BROKEN: should be vector
+                return ( sel : concat vars
+                       , wrapFamInstBody psums_tc (repr_con_tys ss)
+                         $ mkConApp psums_con 
+                         $ map Type (repr_con_tys ss) ++ (Var sel : exprs))        
+
+    to_prod ss
+     = case ss of       -- BROKEN: should be pvoids
+        EmptyProd    -> builtin pvoidVar >>= \pvoid -> return ([], Var pvoid)
+        UnaryProd r
+         -> do  pty  <- mkPDatasType (compOrigType r)
+                var  <- newLocalVar (fsLit "x") pty
+                expr <- to_comp (Var var) r
+                return ([var], expr)
+        Prod{}
+         -> do  let [ptups_con]  = tyConDataCons (repr_ptups_tc ss)
+                ptys   <- mapM (mkPDatasType . compOrigType) (repr_comps ss)
+                vars   <- newLocalVars (fsLit "x") ptys
+                exprs  <- zipWithM to_comp (map Var vars) (repr_comps ss)
+                return ( vars
+                       , wrapFamInstBody (repr_ptups_tc ss) (repr_comp_tys ss)
+                         $ mkConApp ptups_con
+                         $ map Type (repr_comp_tys ss) ++ exprs)
+
+    to_con (ConRepr _ r)    = to_prod r
+
+    -- FIXME: this is bound to be wrong!
+    to_comp expr (Keep _ _) = return expr
+    to_comp expr (Wrap ty)
+     = do wrap_tc       <- builtin wrapTyCon
+          (pwrap_tc, _) <- pdatasReprTyCon (mkTyConApp wrap_tc [ty])
+          return $ wrapNewTypeBody pwrap_tc [ty] expr
+
+
 -- buildFromArrPReprs ---------------------------------------------------------
 buildFromArrPReprs :: PAInstanceBuilder
 buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
  = do   
-        -- The element type of the argument.
-        --  eg: 'Tree a b'.
-        let ty_args = mkTyVarTys $ tyConTyVars vect_tc
-        let el_ty   = mkTyConApp vect_tc ty_args
+    -- The element type of the argument.
+    --  eg: 'Tree a b'.
+    let ty_args = mkTyVarTys $ tyConTyVars vect_tc
+    let el_ty   = mkTyConApp vect_tc ty_args
 
-        -- The argument type of the instance.
-        --  eg: 'PDatas (PRepr (Tree a b))'
-        Just arg_ty      <- mkPDatasType =<< mkPReprType el_ty
+    -- The argument type of the instance.
+    --  eg: 'PDatas (PRepr (Tree a b))'
+    arg_ty      <- mkPDatasType =<< mkPReprType el_ty
 
-        -- The result type. 
-        --  eg: 'PDatas (Tree a b)'
-        Just res_ty      <- mkPDatasType el_ty
+    -- The result type. 
+    --  eg: 'PDatas (Tree a b)'
+    res_ty      <- mkPDatasType el_ty
         
-        -- Variable to bind the argument to the instance
-        -- eg: (xss :: PDatas (PRepr (Tree a b)))
-        varg         <- newLocalVar (fsLit "xss") arg_ty
+    -- Variable to bind the argument to the instance
+    -- eg: (xss :: PDatas (PRepr (Tree a b)))
+    varg        <- newLocalVar (fsLit "xss") arg_ty
         
-        return  $ Lam varg (Var varg)
+    -- Build the coersion between PRepr and the instance type
+    pdatas_co <- mkBuiltinCo pdatasTyCon
+    let Just repr_co = tyConFamilyCoercion_maybe prepr_tc
+    let co           = mkAppCo pdatas_co
+                     $ mkAxInstCo repr_co var_tys
 
+    let scrut        = mkCoerce co (Var varg)
+
+    let mk_result args
+            = wrapFamInstBody pdatas_tc var_tys
+            $ mkConApp pdatas_con
+            $ map Type var_tys ++ args
+
+    (expr, _) <- fixV $ \ ~(_, args) ->
+                     from_sum res_ty (mk_result args) scrut r
+
+    return $ Lam varg expr
+ where
+    var_tys      = mkTyVarTys $ tyConTyVars vect_tc
+    el_ty        = mkTyConApp vect_tc var_tys
+    [pdatas_con] = tyConDataCons pdatas_tc
+
+    from_sum res_ty res expr ss
+     = case ss of
+        EmptySum    -> return (res, [])
+        UnarySum r  -> from_con res_ty res expr r
+        Sum {}
+         -> do  let psums_tc    =  repr_psums_tc ss
+                let [psums_con] =  tyConDataCons psums_tc
+                sel             <- newLocalVar (fsLit "sel") (repr_sel_ty ss)
+                ptys            <- mapM mkPDatasType (repr_con_tys ss)
+                vars            <- newLocalVars (fsLit "xs") ptys
+                (res', args)    <- fold from_con res_ty res (map Var vars) (repr_cons ss)
+                let scrut       =  unwrapFamInstScrut psums_tc (repr_con_tys ss) expr
+                let body        =  mkWildCase scrut (exprType scrut) res_ty
+                                    [(DataAlt psums_con, sel : vars, res')]
+                return (body, Var sel : args)
+
+    from_prod res_ty res expr ss
+     = case ss of
+        EmptyProd   -> return (res, [])
+        UnaryProd r -> from_comp res_ty res expr r
+        Prod {}
+         -> do  let ptups_tc    =  repr_ptups_tc ss
+                let [ptups_con] =  tyConDataCons ptups_tc
+                ptys            <- mapM mkPDatasType (repr_comp_tys ss)
+                vars            <- newLocalVars (fsLit "ys") ptys
+                (res', args)    <- fold from_comp res_ty res (map Var vars) (repr_comps ss)
+                let scrut       =  unwrapFamInstScrut ptups_tc (repr_comp_tys ss) expr
+                let body        =  mkWildCase scrut (exprType scrut) res_ty
+                                    [(DataAlt ptups_con, vars, res')]
+                return (body, args)      
+
+    from_con res_ty res expr (ConRepr _ r)
+        = from_prod res_ty res expr r
+
+    from_comp _ res expr (Keep _ _) = return (res, [expr])
+    from_comp _ res expr (Wrap ty)
+     = do wrap_tc        <- builtin wrapTyCon
+          (pwraps_tc, _) <- pdatasReprTyCon (mkTyConApp wrap_tc [ty])
+          return (res, [unwrapNewTypeBody pwraps_tc [ty]
+                        $ unwrapFamInstScrut pwraps_tc [ty] expr])
+
+    fold f res_ty res exprs rs
+      = foldrM f' (res, []) (zip exprs rs)
+      where
+        f' (expr, r) (res, args) 
+         = do (res', args') <- f res_ty res expr r
+              return (res', args' ++ args)
 

@@ -44,8 +44,7 @@ data SumRepr
                , repr_psum_tc   :: TyCon
 
                -- | PDatas version of the sum tycon    (eg PDatasSum2)
-               --   Not all lifted backends use `PDatas`.
-               , repr_psums_tc  :: Maybe TyCon
+               , repr_psums_tc  :: TyCon
 
                -- | Type of the selector (eg Sel2)
                , repr_sel_ty    :: Type
@@ -84,7 +83,7 @@ data ProdRepr
 
                  -- | PDatas version of the product tycon  (eg PDatasTuple2s)
                  --   Not all lifted backends use `PDatas`.
-               , repr_ptups_tc :: Maybe TyCon
+               , repr_ptups_tc :: TyCon
 
                  -- | Types of each field.
                , repr_comp_tys :: [Type]
@@ -125,8 +124,8 @@ tyConRepr tc
            
            -- Get the 'PData' and 'PDatas' tycons for the sum.
            let sumapp   = mkTyConApp sum_tc tys
-           psum_tc      <- liftM fst         $ pdataReprTyCon sumapp
-           psums_tc     <- liftM (liftM fst) $ pdatasReprTyCon_maybe sumapp
+           psum_tc      <- liftM fst $ pdataReprTyCon  sumapp
+           psums_tc     <- liftM fst $ pdatasReprTyCon sumapp
            
            sel_ty       <- builtin (selTy arity)
            return $ Sum 
@@ -157,8 +156,8 @@ tyConRepr tc
 
            -- Get the 'PData' and 'PDatas' tycons for the product.
            let prodapp  = mkTyConApp tup_tc tys'
-           ptup_tc      <- liftM fst         $ pdataReprTyCon prodapp
-           ptups_tc     <- liftM (liftM fst) $ pdatasReprTyCon_maybe prodapp
+           ptup_tc      <- liftM fst $ pdataReprTyCon  prodapp
+           ptups_tc     <- liftM fst $ pdatasReprTyCon prodapp
            
            return $ Prod 
                   { repr_tup_tc   = tup_tc

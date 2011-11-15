@@ -73,10 +73,7 @@ data Builtins
         { parrayTyCon          :: TyCon                     -- ^ PArray
         , parray_PrimTyCons    :: NameEnv TyCon             -- ^ PArray_Int# etc.
         , pdataTyCon           :: TyCon                     -- ^ PData
-
-        , pdatasTyCon          :: Maybe TyCon    
-        -- ^ PDatas. Not all lifted backends use 'PDatas', so it might not be defined.
-
+        , pdatasTyCon          :: TyCon                     -- ^ PDatas
         , prClass              :: Class                     -- ^ PR
         , prTyCon              :: TyCon                     -- ^ PR
         , preprTyCon           :: TyCon                     -- ^ PRepr
@@ -99,7 +96,9 @@ data Builtins
         , fromVoidVar          :: Var                       -- ^ fromVoid
         , sumTyCons            :: Array Int TyCon           -- ^ Sum2 .. Sum3
         , wrapTyCon            :: TyCon                     -- ^ Wrap
+        , wrapsTyCon           :: TyCon                     -- ^ Wraps
         , pvoidVar             :: Var                       -- ^ pvoid
+        , pvoidsVar            :: Var                       -- ^ pvoids
         , closureTyCon         :: TyCon                     -- ^ :->
         , closureVar           :: Var                       -- ^ closure
         , liftedClosureVar     :: Var                       -- ^ liftedClosure
