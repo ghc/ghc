@@ -71,6 +71,11 @@ static int hs_init_count = 0;
 
 static void flushStdHandles(void);
 
+const RtsConfig defaultRtsConfig  = {
+    .rts_opts_enabled = RtsOptsSafeOnly,
+    .rts_opts = NULL
+};
+
 /* -----------------------------------------------------------------------------
    Initialise floating point unit on x86 (currently disabled; See Note
    [x86 Floating point precision] in compiler/nativeGen/X86/Instr.hs)
@@ -106,6 +111,12 @@ x86_init_fpu ( void )
 void
 hs_init(int *argc, char **argv[])
 {
+    hs_init_ghc(argc, argv, defaultRtsConfig);
+}
+
+void
+hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
+{
     hs_init_count++;
     if (hs_init_count > 1) {
 	// second and subsequent inits are ignored
@@ -132,7 +143,8 @@ hs_init(int *argc, char **argv[])
     /* Parse the flags, separating the RTS flags from the programs args */
     if (argc != NULL && argv != NULL) {
 	setFullProgArgv(*argc,*argv);
-        setupRtsFlags(argc, *argv);
+        setupRtsFlags(argc, *argv,
+                      rts_config.rts_opts_enabled, rts_config.rts_opts);
     }
 
     /* Initialise the stats department, phase 1 */

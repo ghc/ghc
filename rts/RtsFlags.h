@@ -15,7 +15,9 @@
 /* Routines that operate-on/to-do-with RTS flags: */
 
 void initRtsFlagsDefaults (void);
-void setupRtsFlags        (int *argc, char *argv[]);
+void setupRtsFlags        (int *argc, char *argv[],
+                           RtsOptsEnabledEnum rtsOptsEnabled,
+                           const char *ghc_rts_opts);
 void setProgName          (char *argv[]);
 void freeRtsArgs          (void);
 

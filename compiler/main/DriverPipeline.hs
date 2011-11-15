@@ -1437,25 +1437,39 @@ mkExtraCObj dflags xs
                       ++ map (FileOption "-I") (includeDirs rtsDetails))
       return oFile
 
+-- When linking a binary, we need to create a C main() function that
+-- starts everything off.  This used to be compiled statically as part
+-- of the RTS, but that made it hard to change the -rtsopts setting,
+-- so now we generate and compile a main() stub as part of every
+-- binary and pass the -rtsopts setting directly to the RTS (#5373)
+--
 mkExtraObjToLinkIntoBinary :: DynFlags -> [PackageId] -> IO FilePath
 mkExtraObjToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
-   mkExtraCObj dflags (showSDoc (vcat [rts_opts_enabled,
-                                       extra_rts_opts,
+
+   mkExtraCObj dflags (showSDoc (vcat [main,
                                        link_opts link_info]
                                    <> char '\n')) -- final newline, to
                                                   -- keep gcc happy
 
   where
-    rts_opts_enabled
-         = vcat [text "#include \"Rts.h\"",
-                 text "#include \"RtsOpts.h\"",
-                 text "const RtsOptsEnabledEnum rtsOptsEnabled = " <>
-                       text (show (rtsOptsEnabled dflags)) <> semi ]
-
-    extra_rts_opts = case rtsOpts dflags of
-          Nothing   -> empty
-          Just opts -> text "char *ghc_rts_opts = " <> text (show opts) <> semi
+    main
+      | dopt Opt_NoHsMain dflags = empty
+      | otherwise = vcat [
+             ptext (sLit "#include \"Rts.h\""),
+             ptext (sLit "extern StgClosure ZCMain_main_closure;"),
+             ptext (sLit "int main(int argc, char *argv[])"),
+             char '{',
+             ptext (sLit "    RtsConfig __conf = defaultRtsConfig;"),
+             ptext (sLit "    __conf.rts_opts_enabled = ")
+                 <> text (show (rtsOptsEnabled dflags)) <> semi,
+             case rtsOpts dflags of
+                Nothing   -> empty
+                Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
+                               text (show opts) <> semi,
+             ptext (sLit "    return hs_main(argc, argv, &ZCMain_main_closure,__conf);"),
+             char '}'
+           ]
 
     link_opts info
      | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
@@ -1607,13 +1621,6 @@ linkBinary dflags o_files dep_packages = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    -- The C "main" function is not in the rts but in a separate static
-    -- library libHSrtsmain.a that sits next to the rts lib files. Assuming
-    -- we're using a Haskell main function then we need to link it in.
-    let no_hs_main = dopt Opt_NoHsMain dflags
-    let main_lib | no_hs_main = []
-                 | otherwise  = [ "-lHSrtsmain" ]
-
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags dep_packages
 
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
@@ -1731,7 +1738,6 @@ linkBinary dflags o_files dep_packages = do
                       ++ framework_path_opts
                       ++ framework_opts
                       ++ pkg_lib_path_opts
-                      ++ main_lib
                       ++ [extraLinkObj]
                       ++ pkg_link_opts
                       ++ pkg_framework_path_opts
@@ -1852,8 +1858,6 @@ linkDynLib dflags o_files dep_packages = do
 
     let extra_ld_opts = getOpts dflags opt_l
 
-    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags dep_packages
-
 #if defined(mingw32_HOST_OS)
     -----------------------------------------------------------------------------
     -- Making a DLL
@@ -1880,7 +1884,6 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
-         ++ [extraLinkObj]
          ++ pkg_link_opts
         ))
 #elif defined(darwin_TARGET_OS)
@@ -1936,7 +1939,6 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
-         ++ [extraLinkObj]
          ++ pkg_link_opts
         ))
 #else
@@ -1970,7 +1972,6 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
-         ++ [extraLinkObj]
          ++ pkg_link_opts
         ))
 #endif

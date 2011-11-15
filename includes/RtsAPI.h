@@ -38,25 +38,63 @@ typedef struct StgClosure_ *HaskellObj;
 typedef struct Capability_ Capability;
 
 /* ----------------------------------------------------------------------------
+   RTS configuration settings, for passing to hs_init_ghc()
+   ------------------------------------------------------------------------- */
+
+typedef enum {
+    RtsOptsNone,         // +RTS causes an error
+    RtsOptsSafeOnly,     // safe RTS options allowed; others cause an error
+    RtsOptsAll           // all RTS options allowed
+  } RtsOptsEnabledEnum;
+
+// The RtsConfig struct is passed (by value) to hs_init_ghc().  The
+// reason for using a struct is extensibility: we can add more
+// fields to this later without breaking existing client code.
+typedef struct {
+    RtsOptsEnabledEnum rts_opts_enabled;
+    const char *rts_opts;
+} RtsConfig;
+
+// Clients should start with defaultRtsConfig and then customise it.
+// Bah, I really wanted this to be a const struct value, but it seems
+// you can't do that in C (it generates code).
+extern const RtsConfig defaultRtsConfig;
+
+/* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.
    ------------------------------------------------------------------------- */
-extern void startupHaskell         ( int argc, char *argv[], 
+
+/* DEPRECATED, use hs_init() or hs_init_ghc() instead  */
+extern void startupHaskell         ( int argc, char *argv[],
 				     void (*init_root)(void) );
+
+/* DEPRECATED, use hs_exit() instead  */
 extern void shutdownHaskell        ( void );
+
+/*
+ * GHC-specific version of hs_init() that allows specifying whether
+ * +RTS ... -RTS options are allowed or not (default: only "safe"
+ * options are allowed), and allows passing an option string that is
+ * to be interpreted by the RTS only, not passed to the program.
+ */
+extern void hs_init_ghc (int *argc, char **argv[],   // program arguments
+                         RtsConfig rts_config);      // RTS configuration
+
 extern void shutdownHaskellAndExit ( int exitCode )
 #if __GNUC__ >= 3
     __attribute__((__noreturn__))
 #endif
     ;
+
+#ifndef mingw32_HOST_OS
+extern void shutdownHaskellAndSignal (int sig);
+#endif
+
 extern void getProgArgv            ( int *argc, char **argv[] );
 extern void setProgArgv            ( int argc, char *argv[] );
 extern void getFullProgArgv        ( int *argc, char **argv[] );
 extern void setFullProgArgv        ( int argc, char *argv[] );
 extern void freeFullProgArgv       ( void ) ;
-
-#ifndef mingw32_HOST_OS
-extern void shutdownHaskellAndSignal (int sig);
-#endif
 
 /* exit() override */
 extern void (*exitFn)(int);

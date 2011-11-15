@@ -20,8 +20,7 @@ rts_dist_HC = $(GHC_STAGE1)
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
 rts_dist_WAYS = $(rts_WAYS)
 
-ALL_RTS_LIBS = rts/dist/build/libHSrtsmain.a \
-             $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
+ALL_RTS_LIBS = $(foreach way,$(rts_WAYS),rts/dist/build/libHSrts$($(way)_libsuf))
 all_rts : $(ALL_RTS_LIBS)
 
 # -----------------------------------------------------------------------------
@@ -36,7 +35,6 @@ ALL_DIRS += posix
 endif
 
 EXCLUDED_SRCS :=
-EXCLUDED_SRCS += rts/Main.c
 EXCLUDED_SRCS += rts/parallel/SysMan.c
 EXCLUDED_SRCS += $(wildcard rts/Vis*.c)
 
@@ -482,15 +480,6 @@ endif
 DTRACEPROBES_SRC = rts/RtsProbes.d
 $(DTRACEPROBES_H): $(DTRACEPROBES_SRC) includes/ghcplatform.h | $$(dir $$@)/.
 	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C $(DTRACE_FLAGS) -h -o $@ -s $<
-endif
-
-# -----------------------------------------------------------------------------
-# build the static lib containing the C main symbol
-
-ifneq "$(BINDIST)" "YES"
-rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
-	"$(RM)" $(RM_OPTS) $@
-	"$(AR_STAGE1)" $(AR_OPTS_STAGE1) $(EXTRA_AR_ARGS_STAGE1) $@ $<
 endif
 
 # -----------------------------------------------------------------------------

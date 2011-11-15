@@ -10,7 +10,6 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
-#include "RtsOpts.h"
 #include "RtsUtils.h"
 #include "Profiling.h"
 #include "RtsFlags.h"
@@ -396,9 +395,10 @@ strequal(const char *a, const char * b)
     return(strcmp(a, b) == 0);
 }
 
-static void splitRtsFlags(char *s)
+static void splitRtsFlags(const char *s)
 {
-    char *c1, *c2;
+    const char *c1, *c2;
+    char *t;
 
     c1 = s;
     do {
@@ -408,10 +408,10 @@ static void splitRtsFlags(char *s)
 	
 	if (c1 == c2) { break; }
 	
-        s = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
-        strncpy(s, c1, c2-c1);
-        s[c2-c1] = '\0';
-        rts_argv[rts_argc++] = s;
+        t = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
+        strncpy(t, c1, c2-c1);
+        t[c2-c1] = '\0';
+        rts_argv[rts_argc++] = t;
 
 	c1 = c2;
     } while (*c1 != '\0');
@@ -434,7 +434,9 @@ static void splitRtsFlags(char *s)
 
   -------------------------------------------------------------------------- */
 
-void setupRtsFlags (int *argc, char *argv[])
+void setupRtsFlags (int *argc, char *argv[],
+                    RtsOptsEnabledEnum rtsOptsEnabled,
+                    const char *ghc_rts_opts)
 {
     nat mode;
     nat total_arg;
@@ -554,14 +556,14 @@ static void checkUnsafe(RtsOptsEnabledEnum enabled)
     }
 }
 
-static void procRtsOpts (int rts_argc0, RtsOptsEnabledEnum enabled)
+static void procRtsOpts (int rts_argc0, RtsOptsEnabledEnum rtsOptsEnabled)
 {
     rtsBool error = rtsFalse;
     int arg;
 
     if (!(rts_argc0 < rts_argc)) return;
 
-    if (enabled == RtsOptsNone) {
+    if (rtsOptsEnabled == RtsOptsNone) {
         errorBelch("RTS options are disabled. Link with -rtsopts to enable them.");
         stg_exit(EXIT_FAILURE);
     }
@@ -578,7 +580,7 @@ static void procRtsOpts (int rts_argc0, RtsOptsEnabledEnum enabled)
         rtsBool option_checked = rtsFalse;
 
 #define OPTION_SAFE option_checked = rtsTrue;
-#define OPTION_UNSAFE checkUnsafe(enabled); option_checked = rtsTrue;
+#define OPTION_UNSAFE checkUnsafe(rtsOptsEnabled); option_checked = rtsTrue;
 
         if (rts_argv[arg][0] != '-') {
 	    fflush(stdout);
@@ -1142,7 +1144,7 @@ error = rtsTrue;
 		      errorBelch("bad value for -N");
 		      error = rtsTrue;
 		    }
-                    if (enabled == RtsOptsSafeOnly &&
+                    if (rtsOptsEnabled == RtsOptsSafeOnly &&
                 	nNodes > (int)getNumberOfProcessors()) {
                       errorBelch("Using large values for -N is not allowed by default. Link with -rtsopts to allow full control.");
                       stg_exit(EXIT_FAILURE);
