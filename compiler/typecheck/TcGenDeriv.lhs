@@ -187,7 +187,7 @@ gen_Eq_binds loc tycon
       | no_nullary_cons   -- All constructors have arguments
       = case non_nullary_cons of
           []  -> []   -- No constructors; no fall-though case
-          [c] -> []   -- One constructor; no fall-though case
+          [_] -> []   -- One constructor; no fall-though case
           _   ->      -- Two or more constructors; add fall-through of
 	   	      --       (==) _ _ = False
 	    	 [([nlWildPat, nlWildPat], false_Expr)]
