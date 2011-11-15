@@ -224,7 +224,8 @@ mkTick t (Var x)
 mkTick t (Cast e co)
   = Cast (mkTick t e) co -- Move tick inside cast
 
-mkTick _ (Lit l) = Lit l
+mkTick t (Lit l)
+  | not (tickishCounts t) = Lit l
 
 mkTick t expr@(App f arg)
   | not (isRuntimeArg arg) = App (mkTick t f) arg

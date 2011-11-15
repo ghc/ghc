@@ -28,14 +28,58 @@
 
 struct stack_gap { StgWord gap_size; struct stack_gap *next_gap; };
 
+static struct stack_gap *
+updateAdjacentFrames (Capability *cap, StgTSO *tso,
+                      StgUpdateFrame *upd, nat count, struct stack_gap *next)
+{
+    StgClosure *updatee;
+    struct stack_gap *gap;
+    nat i;
+
+    // The first one (highest address) is the frame we take the
+    // "master" updatee from; all the others will be made indirections
+    // to this one.  It is essential that we do it this way around: we
+    // used to make the lowest-addressed frame the "master" frame and
+    // shuffle it down, but a bad case cropped up (#5505) where this
+    // happened repeatedly, generating a chain of indirections which
+    // the GC repeatedly traversed (indirection chains longer than one
+    // are not supposed to happen).  So now after identifying a block
+    // of adjacent update frames we walk downwards again updating them
+    // all to point to the highest one, before squeezing out all but
+    // the highest one.
+    updatee = upd->updatee;
+    count--;
+
+    upd--;
+    gap = (struct stack_gap*)upd;
+
+    for (i = count; i > 0; i--, upd--) {
+        /*
+         * Check two things: that the two update frames
+         * don't point to the same object, and that the
+         * updatee_bypass isn't already an indirection.
+         * Both of these cases only happen when we're in a
+         * block hole-style loop (and there are multiple
+         * update frames on the stack pointing to the same
+         * closure), but they can both screw us up if we
+         * don't check.
+         */
+        if (upd->updatee != updatee && !closure_IND(upd->updatee)) {
+            updateThunk(cap, tso, upd->updatee, updatee);
+        }
+    }
+
+    gap->gap_size = count * sizeofW(StgUpdateFrame);
+    gap->next_gap = next;
+
+    return gap;
+}
+
 static void
 stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
 {
     StgPtr frame;
-    rtsBool prev_was_update_frame;
-    StgClosure *updatee = NULL;
-    StgRetInfoTable *info;
-    StgWord current_gap_size;
+    nat adjacent_update_frames;
     struct stack_gap *gap;
 
     // Stage 1: 
@@ -48,75 +92,43 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
 
     ASSERT(frame < bottom);
     
-    prev_was_update_frame = rtsFalse;
-    current_gap_size = 0;
+    adjacent_update_frames = 0;
     gap = (struct stack_gap *) (frame - sizeofW(StgUpdateFrame));
 
-    while (frame <= bottom) {
-	
-	info = get_ret_itbl((StgClosure *)frame);
-	switch (info->i.type) {
+    while (frame <= bottom)
+    {
+        switch (get_ret_itbl((StgClosure *)frame)->i.type) {
 
-	case UPDATE_FRAME:
+        case UPDATE_FRAME:
 	{ 
-	    StgUpdateFrame *upd = (StgUpdateFrame *)frame;
+            if (adjacent_update_frames > 0) {
+                TICK_UPD_SQUEEZED();
+            }
+            adjacent_update_frames++;
 
-	    if (prev_was_update_frame) {
-
-		TICK_UPD_SQUEEZED();
-		/* wasn't there something about update squeezing and ticky to be
-		 * sorted out?  oh yes: we aren't counting each enter properly
-		 * in this case.  See the log somewhere.  KSW 1999-04-21
-		 *
-		 * Check two things: that the two update frames don't point to
-		 * the same object, and that the updatee_bypass isn't already an
-		 * indirection.  Both of these cases only happen when we're in a
-		 * block hole-style loop (and there are multiple update frames
-		 * on the stack pointing to the same closure), but they can both
-		 * screw us up if we don't check.
-		 */
-		if (upd->updatee != updatee && !closure_IND(upd->updatee)) {
-                    updateThunk(cap, tso, upd->updatee, updatee);
-		}
-
-		// now mark this update frame as a stack gap.  The gap
-		// marker resides in the bottom-most update frame of
-		// the series of adjacent frames, and covers all the
-		// frames in this series.
-		current_gap_size += sizeofW(StgUpdateFrame);
-		((struct stack_gap *)frame)->gap_size = current_gap_size;
-		((struct stack_gap *)frame)->next_gap = gap;
-
-		frame += sizeofW(StgUpdateFrame);
-		continue;
-	    } 
-
-	    // single update frame, or the topmost update frame in a series
-	    else {
-		prev_was_update_frame = rtsTrue;
-		updatee = upd->updatee;
-		frame += sizeofW(StgUpdateFrame);
-		continue;
-	    }
-	}
+            frame += sizeofW(StgUpdateFrame);
+            continue;
+        }
 	    
 	default:
-	    prev_was_update_frame = rtsFalse;
-
-	    // we're not in a gap... check whether this is the end of a gap
+            // we're not in a gap... check whether this is the end of a gap
 	    // (an update frame can't be the end of a gap).
-	    if (current_gap_size != 0) {
-		gap = (struct stack_gap *) (frame - sizeofW(StgUpdateFrame));
-	    }
-	    current_gap_size = 0;
+            if (adjacent_update_frames > 1) {
+                gap = updateAdjacentFrames(cap, tso,
+                                           (StgUpdateFrame*)(frame - sizeofW(StgUpdateFrame)),
+                                           adjacent_update_frames, gap);
+            }
+            adjacent_update_frames = 0;
 
 	    frame += stack_frame_sizeW((StgClosure *)frame);
 	    continue;
 	}
     }
 
-    if (current_gap_size != 0) {
-	gap = (struct stack_gap *) (frame - sizeofW(StgUpdateFrame));
+    if (adjacent_update_frames > 1) {
+        gap = updateAdjacentFrames(cap, tso,
+                                   (StgUpdateFrame*)(frame - sizeofW(StgUpdateFrame)),
+                                   adjacent_update_frames, gap);
     }
 
     // Now we have a stack with gaps in it, and we have to walk down
@@ -349,7 +361,7 @@ end:
     debugTrace(DEBUG_squeeze, 
 	       "words_to_squeeze: %d, weight: %d, squeeze: %s", 
 	       words_to_squeeze, weight, 
-	       weight < words_to_squeeze ? "YES" : "NO");
+               ((weight <= 8 && words_to_squeeze > 0) || weight < words_to_squeeze) ? "YES" : "NO");
 
     // Should we squeeze or not?  Arbitrary heuristic: we squeeze if
     // the number of words we have to shift down is less than the
