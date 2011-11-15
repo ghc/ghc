@@ -19,11 +19,14 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
 import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo)
+import Var       (varUnique)
 import PrelNames (undefinedName)
 import Type      (splitTyConApp_maybe)
 import Util      (zipWithEqual, zipWith3Equal, zipWith4Equal)
 import Unique    (Uniquable)
+import Digraph
 import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
+import UniqFM    (delListFromUFM_Directly)
 import VarEnv
 
 import Data.Traversable (fmapDefault, foldMapDefault)
@@ -645,11 +648,44 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
           where ((deeds', entered'), b') = mapAccumT (\(deeds, entered) s -> case f deeds s of (deeds, entered', s) -> ((deeds, plusVarEnv_C plusEntered entered entered'), s)) (deeds, emptyVarEnv) b
 
         -- Like inlineHeapT, but removes from the EnteredEnv any mention of the actual binder being analysed, so we push more stuff down
-        -- NB: this would be subsumed if we found a way to push an Update frame for such a thing into its Bracketed, since then it wouldn't even be a FV
+        -- NB: this would be (partially?) subsumed if we found a way to push an Update frame for such a thing into its Bracketed, since then it wouldn't even be a FV
+        --
+        -- This is required to prevent self-recursive heap bindings from being unconditionally residualised:
+        --  let xs = x : xs
+        --      z = head xs
+        --  in Just z
+        -- ==>
+        --  let z = let xs = x : xs
+        --          in head xs
+        --  in Just z
+        --
+        -- Without this hack, xs is Once from both z and xs, so it is Many overall and can't be inlined.
+        --
+        -- More generally, we might have mutual recursion:
+        --  let xs = x : ys
+        --      ys = y : xs
+        --      z = head xs + head ys
+        --  in Just z
+        -- ==>
+        --  let z = let xs = x : xs
+        --              ys = y : ys
+        --          in head xs + head ys
+        --  in Just z
+        --
+        -- To deal with the more general case, we have to identify strongly-connected-components in the
+        -- graph of heap Bracketed things. This is well-motivated because SCCs must be either pushed
+        -- or residualised as a group.
         inlineHeapWithKey :: (Deeds -> a                 -> (Deeds, EnteredEnv, b))
                           ->  Deeds -> M.Map (Out Var) a -> (Deeds, EnteredEnv, M.Map (Out Var) b)
-        inlineHeapWithKey f deeds b = (deeds', entered', b')
-          where ((deeds', entered'), b') = M.mapAccumWithKey (\(deeds, entered) x' brack -> case f deeds brack of (deeds, entered', brack) -> ((deeds, plusVarEnv_C plusEntered entered (entered' `delVarEnv` x')), brack)) (deeds, emptyVarEnv) b
+        inlineHeapWithKey f deeds b = (deeds', overall_entered', b')
+          where
+            ((deeds', heap_entered'), b') = M.mapAccumWithKey (\(deeds, heap_entered) x' brack -> case f deeds brack of (deeds, entered', brack) -> ((deeds, M.insert x' entered' heap_entered), brack)) (deeds, M.empty) b
+
+            overall_entered' = foldr go emptyVarEnv $ stronglyConnCompG $ graphFromEdgedVertices [(entered', varUnique x', varEnvKeys entered') | (x', entered') <- M.toList heap_entered']
+
+            go (AcyclicSCC (entered', _, _)) overall_entered = plusVarEnv_C plusEntered entered' overall_entered
+            go (CyclicSCC  nodes)            overall_entered = foldr (\entered' overall_entered' -> plusVarEnv_C plusEntered (entered' `delListFromUFM_Directly` xs') overall_entered') overall_entered entereds'
+              where (entereds', xs', _) = unzip3 nodes
 
         -- Inline what we can of the heap, and compute the Entered information for the resulting thing.
         -- See Note [transitiveInline and entered information] for the story about Entered information.

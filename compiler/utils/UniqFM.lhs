@@ -50,6 +50,7 @@ module UniqFM (
 	delFromUFM,
 	delFromUFM_Directly,
 	delListFromUFM,
+        delListFromUFM_Directly,
 	plusUFM,
 	plusUFM_C,
 	minusUFM,
@@ -134,6 +135,7 @@ adjustUFM_Directly :: (elt -> elt) -> UniqFM elt -> Unique -> UniqFM elt
 delFromUFM	:: Uniquable key => UniqFM elt -> key	 -> UniqFM elt
 delListFromUFM	:: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
 delFromUFM_Directly :: UniqFM elt -> Unique -> UniqFM elt
+delListFromUFM_Directly :: UniqFM elt -> [Unique] -> UniqFM elt
 
 -- Bindings in right argument shadow those in the left
 plusUFM		:: UniqFM elt -> UniqFM elt -> UniqFM elt
@@ -225,6 +227,7 @@ adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
 delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
 delListFromUFM = foldl delFromUFM
 delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)
+delListFromUFM_Directly = foldl delFromUFM_Directly
 
 -- M.union is left-biased, plusUFM should be right-biased.
 plusUFM (UFM x) (UFM y) = UFM (M.union y x)
