@@ -33,7 +33,6 @@ updateAdjacentFrames (Capability *cap, StgTSO *tso,
                       StgUpdateFrame *upd, nat count, struct stack_gap *next)
 {
     StgClosure *updatee;
-    StgUpdateFrame *frame;
     struct stack_gap *gap;
     nat i;
 
@@ -51,10 +50,10 @@ updateAdjacentFrames (Capability *cap, StgTSO *tso,
     updatee = upd->updatee;
     count--;
 
-    frame = upd - 1;
-    gap = (struct stack_gap*)frame;
+    upd--;
+    gap = (struct stack_gap*)upd;
 
-    for (i = count; i > 0; i--, frame--) {
+    for (i = count; i > 0; i--, upd--) {
         /*
          * Check two things: that the two update frames
          * don't point to the same object, and that the
