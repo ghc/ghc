@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, RankNTypes #-}
+{-# LANGUAGE GADTs, RankNTypes, GeneralizedNewtypeDeriving #-}
 module Supercompile.Drive.Process2 (supercompile) where
 
 import Supercompile.Drive.Match
@@ -188,6 +188,9 @@ runContT mx = unContT mx return
 callCC :: ((forall b. a -> ContT r m b) -> ContT r m a) -> ContT r m a
 callCC f = ContT $ \k -> unContT (f (\a -> ContT $ \_k -> k a)) k
 
+callCCish :: (Applicative n, Applicative m) => ((b -> a -> ContT (n r) m b) -> ContT (n r) m a) -> ContT (n r) m a
+callCCish f = ContT $ \k -> unContT (f (\b a -> ContT $ \k' -> liftA2 (*>) (k' b) (k a))) k
+
 
 newtype ReaderT r m a = ReaderT { unReaderT :: r -> m a }
 
@@ -218,7 +221,7 @@ liftCallCCReaderT :: (((forall b. a -> m b)           -> m a)           -> m a)
 liftCallCCReaderT call_cc f = ReaderT $ \r -> call_cc $ \c -> runReaderT r (f (ReaderT . const . c))
 
 
-newtype RollbackScpM = RB { doRB :: forall c. LevelM (Deeds, Out FVedTerm) -> ProcessM c }
+newtype RollbackScpM = RB { doRB :: LevelM (Deeds, Out FVedTerm) -> LevelM (Deeds, Out FVedTerm) -> ProcessM (LevelM (Deeds, Out FVedTerm)) }
 
 
 type ProcessHistory = GraphicalHistory (NodeKey, (State, RollbackScpM)) -- TODO: GraphicalHistory
@@ -249,7 +252,7 @@ terminateM parent state rb k_continue k_stop = withHistory' $ \hist -> trace (sh
     Stop (shallow_parent, (shallow_state, shallow_rb)) -> liftM ((,) hist) $ k_stop shallow_parent shallow_state shallow_rb
   where
     withHistory' :: (ProcessHistory -> ProcessM (ProcessHistory, a)) -> ProcessM a
-    withHistory' act = lift State.get >>= \hist -> act hist >>= \(hist', x) -> lift (State.put hist') >> return x
+    withHistory' act = lift (lift State.get) >>= \hist -> act hist >>= \(hist', x) -> lift (lift (State.put hist')) >> return x
 
 
 data Promise = P {
@@ -272,16 +275,19 @@ runMemoT mx = fmap fst $ unStateT mx MS { promises = [], hNames = h_names }
 
 
 newtype FulfilmentState = FS {
-    fulfilments :: [(Var, FVedTerm)]
+    fulfilments :: M.Map Var FVedTerm
   }
 
 type FulfilmentT = StateT FulfilmentState
 
 fulfill :: Monad m => Promise -> (Deeds, FVedTerm) -> FulfilmentT m (Deeds, FVedTerm)
-fulfill p (deeds, e_body) = StateT $ \fs -> return ((deeds, e_body), FS { fulfilments = (fun p, tyVarIdLambdas (abstracted p) e_body) : fulfilments fs })
+fulfill p (deeds, e_body) = StateT $ \fs ->
+  let fs' | fun p `M.member` fulfilments fs = fs
+          | otherwise                       = FS { fulfilments = M.insert (fun p) (tyVarIdLambdas (abstracted p) e_body) (fulfilments fs) }
+  in return ((deeds, var (fun p) `applyAbsVars` abstracted p), fs')
 
 runFulfilmentT :: Monad m => FulfilmentT m FVedTerm -> m FVedTerm
-runFulfilmentT mx = liftM (\(e, fs) -> letRec (fulfilments fs) e) $ unStateT mx (FS { fulfilments = [] })
+runFulfilmentT mx = liftM (\(e, fs) -> letRec (M.toList (fulfilments fs)) e) $ unStateT mx (FS { fulfilments = M.empty })
 
 
 promise :: State -> MemoState -> (Promise, MemoState)
@@ -305,25 +311,28 @@ instance MonadStatics LevelM where
     bindCapturedFloats _fvs mx = liftM ((,) []) mx -- FIXME: do something other than hope for the best
     monitorFVs = liftM ((,) emptyVarSet)
 
-memo :: (Applicative t, Functor m, Monad m)
-     => (State -> t (FulfilmentT m (Deeds, Out FVedTerm)))
-     -> State -> MemoT t (FulfilmentT m (Deeds, Out FVedTerm))
-memo opt state = StateT $ \ms -> traceRenderScpM "memo" state *>
-     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
+memo :: (MonadTrans t1, Monad (t1 (MemoT t2)), Applicative t2, Monad t2)
+     => (State -> t1 (MemoT t2) (LevelM (Deeds, Out FVedTerm)))
+     ->  State -> t1 (MemoT t2) (LevelM (Deeds, Out FVedTerm))
+memo opt state = do
+  mb_res <- lift $ StateT $ \ms ->
+    -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
     case [ (p, (releaseStateDeed state, var (fun p) `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
          | p <- promises ms
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                           match (meaning p) state]
-         ] of (p, res):_ -> pure $ (do { traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state), res)
-                                       ; return res }, ms)
-              _          -> flip fmap (opt state) $ \mres ->
-                                   (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
-                                       ; res <- mres
-                                       ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
-                                       ; fulfill p res }, ms')
+         ] of (p, res):_ -> pure (Right (do { traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state), res)
+                                            ; return res }), ms)
+              _          -> pure (Left p, ms')
                 where (p, ms') = promise state ms
-
+  case mb_res of
+    Right res -> return res
+    Left p  -> flip liftM (opt state) $ \mres ->
+                   (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
+                       ; res <- mres
+                       ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
+                       ; fulfill p res })
 
 type SpecT = ReaderT AlreadySpeculated
 
@@ -341,8 +350,8 @@ liftSpeculatedStateT speculated state k = StateT $ \s -> speculated state (\stat
 type LevelM = FulfilmentT (SpecT ScpM)
 
 -- NB: monads *within* the ContT are persistent over a rollback. Ones outside get reset.
-type ProcessM = ContT (Out FVedTerm) HistoryThreadM
-type ScpM = DelayM (MemoT ProcessM)
+type ProcessM = ContT (FulfilmentT Identity (Out FVedTerm)) (MemoT HistoryThreadM)
+type ScpM = DelayM ProcessM
 
 traceRenderScpM :: (Outputable a, Applicative t) => String -> a -> t ()
 traceRenderScpM msg x = pprTraceSC msg (pPrint x) $ pure () -- TODO: include depth, refine to ScpM monad only
@@ -355,21 +364,32 @@ runScpM mx = mx >>= runDelayM eval_strat
                | otherwise = breadthFirst
 
 
+-- callCC :: ((forall b. a -> ContT r m b) -> ContT r m a) -> ContT r m a
+-- callCC f = ContT $ \k -> unContT (f (\a -> ContT $ \_k -> k a)) k
+-- newtype ContT r m a = ContT { unContT :: (a -> m r) -> m r }
+
+
 sc' :: Parent -> State -> ProcessM (LevelM (Deeds, Out FVedTerm))
-sc' parent state = callCC (\k -> try (RB k))
+sc' parent state = callCCish (\k -> try (RB k))
   where
     trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") (ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$
                                                                     ppr shallow_state $$ pPrintFullState True shallow_state $$ ppr state $$ pPrintFullState True state)
     try :: RollbackScpM -> ProcessM (LevelM (Deeds, Out FVedTerm))
     try rb = terminateM parent state rb
-               (\parent -> liftSpeculatedStateT speculated state $ \state' -> split (reduce state') (delayStateT (delayReaderT delay) . sc parent))
+               (\parent -> liftSpeculatedStateT speculated state $ \state' -> split (reduce state') (sc'' parent))
                -- (\_ shallow_state _ -> return $ maybe (trce "split" shallow_state $ split state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) state) (delayStateT (delayReaderT delay) . sc parent))
-               (\shallow_parent shallow_state shallow_rb -> trace "rb" $ doRB shallow_rb (maybe (trce "split" shallow_state $ split shallow_state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) shallow_state) (delayStateT (delayReaderT delay) . sc shallow_parent)))
+               (\shallow_parent shallow_state shallow_rb -> trace "rb" $ doRB shallow_rb (split state (sc'' parent))
+                                                                                         (maybe (trce "split" shallow_state $ split shallow_state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) shallow_state) (sc'' shallow_parent)))
+    
+    sc'' :: Parent -> State -> LevelM (Deeds, Out FVedTerm)
+    sc'' parent = delayStateT (delayReaderT delay) . sc parent
 
-sc :: Parent -> State -> MemoT ProcessM (LevelM (Deeds, Out FVedTerm))
+sc :: Parent -> State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc parent = memo (sc' parent) . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
+foo :: LevelM (Out FVedTerm) -> ScpM (FulfilmentT Identity (Out FVedTerm))
+foo = undefined
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runHistoryThreadM $ runContT $ runMemoT $ runScpM $ liftM (runSpecT . runFulfilmentT . fmap snd) $ sc 0 state
+supercompile unfoldings e = fVedTermToTerm $ unI $ runFulfilmentT $ runHistoryThreadM $ runMemoT $ runContT $ runScpM $ liftM (foo . fmap snd) $ sc 0 state
   where state = prepareTerm unfoldings e
