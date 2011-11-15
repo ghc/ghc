@@ -96,7 +96,6 @@ data Builtins
         , fromVoidVar          :: Var                       -- ^ fromVoid
         , sumTyCons            :: Array Int TyCon           -- ^ Sum2 .. Sum3
         , wrapTyCon            :: TyCon                     -- ^ Wrap
-        , wrapsTyCon           :: TyCon                     -- ^ Wraps
         , pvoidVar             :: Var                       -- ^ pvoid
         , pvoidsVar            :: Var                       -- ^ pvoids
         , closureTyCon         :: TyCon                     -- ^ :->
