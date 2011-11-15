@@ -56,6 +56,7 @@ if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
     config.run_ways.append('profthreaded')
 
 if (ghc_with_llvm == 1):
+    config.compile_ways.append('optllvm')
     config.run_ways.append('optllvm')
 
 config.in_tree_compiler = in_tree_compiler
@@ -157,3 +158,4 @@ def get_compiler_info():
         config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
     except:
         config.package_conf_cache_file = ''
+

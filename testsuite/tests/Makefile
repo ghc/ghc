@@ -10,9 +10,9 @@ ifeq "$(findstring base,$(LIBRARIES))" ""
 $(error base library does not seem to be installed)
 endif
 
-# XXX Do this better?
 # Now find the "tests" directories of those libraries, where they exist
 LIBRARY_TEST_PATHS := $(wildcard $(patsubst %, $(TOP)/../libraries/%/tests, $(LIBRARIES)))
 
 # Add tests from packages
 RUNTEST_OPTS += $(patsubst %, --rootdir=%, $(LIBRARY_TEST_PATHS))
+

@@ -1,4 +1,3 @@
-
 TOP = .
 
 # If we're cleaning then we don't want to do all the GHC detection hardwork,

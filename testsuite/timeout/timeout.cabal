@@ -1,14 +1,11 @@
 Name: timeout
--- XXX Version number:
 Version: 1
-Copyright: XXX
+Copyright: GHC Team
 License: BSD3
--- XXX License-File: LICENSE
-Author: XXX
-Maintainer: XXX
-Synopsis: XXX
-Description:
-	XXX
+Author: GHC Team <cvs-ghc@haskell.org>
+Maintainer: GHC Team <cvs-ghc@haskell.org>
+Synopsis: timout utility
+Description: timeout utility
 Category: Development
 build-type: Simple
 cabal-version: >=1.2

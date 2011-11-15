@@ -2,10 +2,6 @@
 # (c) Simon Marlow 2002
 #
 
-# ToDo:
-#   GHCi tests
-#   expect failure for some ways only
-
 import sys
 import os
 import string

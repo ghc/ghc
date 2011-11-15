@@ -1,15 +1,16 @@
 {-# OPTIONS -cpp #-}
+module Main where
 
 import Prelude hiding (catch)
 
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (putMVar, takeMVar, newEmptyMVar)
+import Control.Monad
 import Control.Exception
 import Data.Maybe (isNothing)
 import System.Environment (getArgs)
 import System.Exit
 import System.IO (hPutStrLn, stderr)
-import Control.Monad
 
 #if !defined(mingw32_HOST_OS)
 import System.Posix hiding (killProcess)

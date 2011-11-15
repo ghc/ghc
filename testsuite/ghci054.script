@@ -1,4 +1,0 @@
---Testing type synonyms
-type Foo = String
-let foo = "foo" :: Foo
-:t foo
