@@ -1,0 +1,6 @@
+
+PolyKinds07.hs:10:11:
+    Opaque thing `A1' used as a type
+    In the type `B A1'
+    In the definition of data constructor `B1'
+    In the data type declaration for `B'
