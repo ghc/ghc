@@ -680,7 +680,7 @@ lintKind (FunTy k1 k2)
   = lintKind k1 >> lintKind k2
 
 lintKind kind@(TyConApp tc kis)
-  = do { unless (tyConArity tc == length kis || isSuperKindTyCon tc)
+  = do { unless (isSuperKindTyCon tc || tyConArity tc == length kis)
            (addErrL malformed_kind)
        ; mapM_ lintKind kis }
   where
@@ -863,8 +863,8 @@ lintType (TyVarTy tv)
   = do { checkTyCoVarInScope tv
        ; let kind = tyVarKind tv
        ; lintKind kind
-       ; if (isSuperKind kind) then failWithL msg
-         else return kind }
+       ; WARN( isSuperKind kind, msg )
+         return kind }
   where msg = hang (ptext (sLit "Expecting a type, but got a kind"))
                  2 (ptext (sLit "Offending kind:") <+> ppr tv)
 
