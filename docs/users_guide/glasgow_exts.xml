@@ -8346,8 +8346,8 @@ happen.
       <para>A <literal>SPECIALIZE</literal> pragma for a function can
       be put anywhere its type signature could be put.  Moreover, you 
       can also <literal>SPECIALIZE</literal> an <emphasis>imported</emphasis>
-      provided it was given an <literal>INLINABLE</literal> pragma at its definition site
-      (<xref linkend="inlinable-pragma"/>)</para>
+		function provided it was given an <literal>INLINABLE</literal> pragma at
+		its definition site (<xref linkend="inlinable-pragma"/>).</para>
 
       <para>A <literal>SPECIALIZE</literal> has the effect of generating
       (a) a specialised version of the function and (b) a rewrite rule
