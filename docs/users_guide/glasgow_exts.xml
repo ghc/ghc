@@ -8344,12 +8344,21 @@ happen.
 </programlisting>
 
       <para>A <literal>SPECIALIZE</literal> pragma for a function can
-      be put anywhere its type signature could be put.</para>
+      be put anywhere its type signature could be put.  Moreover, you 
+      can also <literal>SPECIALIZE</literal> an <emphasis>imported</emphasis>
+      provided it was given an <literal>INLINABLE</literal> pragma at its definition site
+      (<xref linkend="inlinable-pragma".>)</para>
 
       <para>A <literal>SPECIALIZE</literal> has the effect of generating
       (a) a specialised version of the function and (b) a rewrite rule
-      (see <xref linkend="rewrite-rules"/>) that rewrites a call to the
-      un-specialised function into a call to the specialised one.</para>
+      (see <xref linkend="rewrite-rules"/>) that rewrites a call to
+      the un-specialised function into a call to the specialised one.
+      Moreover, given a <literal>SPECIALIZE</literal> pragma for a
+      function <literal>f</literal>, GHC will automatically create
+      specialisations for any type-class-overloaded functions called
+      by <literal>f</literal>, if they are in the same module as
+      the <literal>SPECIALIZE</literal> pragma, or if they are
+      <literal>INLINABLE</literal>; and so on, transitively.</para>
 
       <para>The type in a SPECIALIZE pragma can be any type that is less
 	polymorphic than the type of the original function.  In concrete terms,
