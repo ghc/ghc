@@ -1446,6 +1446,15 @@ mkExtraObjToLinkIntoBinary :: DynFlags -> [PackageId] -> IO FilePath
 mkExtraObjToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
 
+   let have_rts_opts_flags =
+         isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
+                                        RtsOptsSafeOnly -> False
+                                        _ -> True
+
+   when (dopt Opt_NoHsMain dflags && have_rts_opts_flags) $ do
+      hPutStrLn stderr $ "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main.\n" ++
+                         "    Call hs_init_ghc() from your main() function to set these options."
+
    mkExtraCObj dflags (showSDoc (vcat [main,
                                        link_opts link_info]
                                    <> char '\n')) -- final newline, to
