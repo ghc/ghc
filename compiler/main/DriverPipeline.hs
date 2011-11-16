@@ -172,8 +172,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
        handleBatch (HscRecomp hasStub _)
            | isHsBoot src_flavour
                = do when (isObjectTarget hsc_lang) $ -- interpreted reaches here too
-                       liftIO $ SysTools.touch dflags' "Touching object file"
-                                   object_filename
+                       liftIO $ touchObjectFile dflags' object_filename
                     return maybe_old_linkable
 
            | otherwise
@@ -956,7 +955,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
 
         case result of
           HscNoRecomp
-              -> do io $ SysTools.touch dflags' "Touching object file" o_file
+              -> do io $ touchObjectFile dflags' o_file
                     -- The .o file must have a later modification date
                     -- than the source file (else we wouldn't be in HscNoRecomp)
                     -- but we touch it anyway, to keep 'make' happy (we think).
@@ -970,7 +969,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
                     -- In the case of hs-boot files, generate a dummy .o-boot
                     -- stamp file for the benefit of Make
                     when (isHsBoot src_flavour) $
-                      io $ SysTools.touch dflags' "Touching object file" o_file
+                      io $ touchObjectFile dflags' o_file
                     return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
@@ -2083,4 +2082,9 @@ hscNextPhase dflags _ hsc_lang =
         HscLlvm        -> LlvmOpt
         HscNothing     -> StopLn
         HscInterpreted -> StopLn
+
+touchObjectFile :: DynFlags -> FilePath -> IO ()
+touchObjectFile dflags path = do
+  createDirectoryHierarchy $ takeDirectory path
+  SysTools.touch dflags "Touching object file" path
 
