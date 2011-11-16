@@ -1,11 +1,11 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, OverlappingInstances, UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, OverlappingInstances, UndecidableInstances, KindSignatures #-}
 
 -- Trac #1470
 
 module Foo where
 
 class Sat a
-class Data ctx a
+class Data (ctx :: * -> *) a
 instance  Sat (ctx Char)             => Data ctx Char
 instance (Sat (ctx [a]), Data ctx a) => Data ctx [a]
 

@@ -8,7 +8,7 @@ module T3018 where
 import Control.Monad
 
 -- minimal Data/Rep classes
-data Rep ctx a
+data Rep (ctx :: * -> *) a
 
 class Data (ctx :: * -> *) a where rep :: Rep ctx a 
 
