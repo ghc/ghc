@@ -1,1 +1,1 @@
-                  Eta.bof `cast` ((->) (Sym (Eta.NTCo:Foo)) (Refl Eta.T)) -}
+                   ((->) (Sym (Eta.NTCo:Foo)) (Refl Eta.T))) -}

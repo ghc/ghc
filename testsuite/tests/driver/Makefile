@@ -485,3 +485,9 @@ T706:
 	cp T706b.hs T706.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T706.hs
 	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS) --interactive -ignore-dot-ghci -v0 T706
+
+.PHONY: T5584
+T5584:
+	$(RM) -rf T5584_out
+	mkdir T5584_out
+	"$(TEST_HC)" -odir T5584_out -c T5584/A.hs-boot

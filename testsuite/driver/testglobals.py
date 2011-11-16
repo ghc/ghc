@@ -142,16 +142,16 @@ class TestOptions:
 
        # if not None then we look for namebase.stderr etc rather than
        # using the test name
-       self.with_namebase = None;
+       self.with_namebase = None
 
        # skip this test?
-       self.skip = 0;
+       self.skip = 0
 
        # skip these ways
        self.omit_ways = []
 
-       # skip all ways except these ([] == do all ways)
-       self.only_ways = []
+       # skip all ways except these (None == do all ways)
+       self.only_ways = None
 
        # add these ways to the default set
        self.extra_ways = []
