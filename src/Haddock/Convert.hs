@@ -263,8 +263,8 @@ synifyType _ (TyConApp tc tys)
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | isTupleTyCon tc, tyConArity tc == length tys =
      noLoc $ HsTupleTy (case tupleTyConSort tc of
-                          BoxedTuple      -> HsBoxyTuple liftedTypeKind
-                          ConstraintTuple -> HsBoxyTuple constraintKind
+                          BoxedTuple      -> HsBoxedTuple
+                          ConstraintTuple -> HsConstraintTuple
                           UnboxedTuple    -> HsUnboxedTuple)
                        (map (synifyType WithinType) tys)
   -- ditto for lists

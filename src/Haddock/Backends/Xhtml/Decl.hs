@@ -641,8 +641,8 @@ ppBang _        = toHtml "!" -- Unpacked args is an implementation detail,
 
 
 tupleParens :: HsTupleSort -> [Html] -> Html
-tupleParens (HsBoxyTuple _) = parenList
-tupleParens HsUnboxedTuple  = ubxParenList
+tupleParens HsUnboxedTuple = ubxParenList
+tupleParens _              = parenList
 
 
 --------------------------------------------------------------------------------

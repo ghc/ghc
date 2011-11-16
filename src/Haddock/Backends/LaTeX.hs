@@ -796,8 +796,8 @@ ppBang _        = char '!' -- Unpacked args is an implementation detail,
 
 
 tupleParens :: HsTupleSort -> [LaTeX] -> LaTeX
-tupleParens (HsBoxyTuple _) = parenList
-tupleParens HsUnboxedTuple  = ubxParenList
+tupleParens HsUnboxedTuple = ubxParenList
+tupleParens _              = parenList
 
 
 -------------------------------------------------------------------------------
