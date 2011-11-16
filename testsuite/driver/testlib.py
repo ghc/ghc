@@ -117,6 +117,10 @@ def req_profiling( opts ):
     if not config.have_profiling:
         opts.expect = 'fail'
 
+def req_shared_libs( opts ):
+    if not config.have_shared_libs:
+        opts.expect = 'fail'
+
 def req_interp( opts ):
     if not config.have_interp:
         opts.expect = 'fail'
