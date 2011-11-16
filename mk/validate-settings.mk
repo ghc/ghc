@@ -27,7 +27,11 @@ GhcStage2HcOpts += -O -fwarn-tabs -dcore-lint
 # running of the tests, and faster building of the utils to be installed
 
 GhcLibHcOpts    += -O -dcore-lint
+ifeq "$(ValidateSpeed)" "FAST"
+GhcLibWays     := v
+else
 GhcLibWays     := $(filter v dyn,$(GhcLibWays))
+endif
 SplitObjs       = NO
 NoFibWays       =
 STRIP_CMD       = :
@@ -47,7 +51,7 @@ BUILD_DOCBOOK_PDF = NO
 ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif
-ifeq "$(ValidateSlow)" "YES"
+ifeq "$(ValidateSpeed)" "SLOW"
 GhcStage2HcOpts += -DDEBUG
 endif
 

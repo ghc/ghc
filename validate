@@ -9,7 +9,8 @@
 #                     compiler the test suite covers.
 #                     2008-07-01: 63% slower than the default.
 #                     HTML generated here: testsuite/hpc_output/hpc_index.html
-#   --fast:           Default. Opposite to --slow.
+#   --normal:         Default settings
+#   --fast:           Omit dyn way, omit binary distribution
 #   --slow:           Build stage2 with -DDEBUG.
 #                     2008-07-01: 14% slower than the default.
 
@@ -18,7 +19,7 @@ set -e
 no_clean=0
 testsuite_only=0
 hpc=NO
-slow=NO
+speed=NORMAL
 
 while [ $# -gt 0 ]
 do
@@ -33,10 +34,13 @@ do
         hpc=YES
         ;;
     --slow)
-        slow=YES
+        speed=SLOW
         ;;
     --fast)
-        slow=NO
+        speed=FAST
+        ;;
+    --normal)
+        speed=NORMAL
         ;;
     *)
         echo "Bad argument: $1" >&2
@@ -88,31 +92,40 @@ thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 
 echo "Validating=YES" > mk/are-validating.mk
 
-$make -j$threads ValidateHpc=$hpc ValidateSlow=$slow
+$make -j$threads ValidateHpc=$hpc ValidateSpeed=$speed
 # For a "debug make", add "--debug=b --debug=m"
 
-$make binary-dist-prep
-$make test_bindist TEST_PREP=YES
+# -----------------------------------------------------------------------------
+# Build and test a binary distribution (not --fast)
 
-#
-# Install the mtl package into the bindist, because it is used by some
-# tests.  It isn't essential that we do this (the failing tests will
-# be treated as expected failures), but we get a bit more test
-# coverage, and also verify that we can install a package into the
-# bindist with Cabal.
-#
-bindistdir="bindisttest/install dir"
-cd libraries/mtl
-"$thisdir/$bindistdir/bin/ghc" --make Setup
-./Setup configure --with-ghc="$thisdir/$bindistdir/bin/ghc" --with-haddock="$thisdir/$bindistdir/bin/haddock" --global --builddir=dist-bindist --prefix="$thisdir/$bindistdir"
-./Setup build   --builddir=dist-bindist
-./Setup haddock --builddir=dist-bindist
-./Setup install --builddir=dist-bindist
-./Setup clean   --builddir=dist-bindist
-rm -f Setup Setup.exe Setup.hi Setup.o
-cd $thisdir
+if [ $speed != "FAST" ]; then
+
+    $make binary-dist-prep
+    $make test_bindist TEST_PREP=YES
+
+    #
+    # Install the mtl package into the bindist, because it is used by some
+    # tests.  It isn't essential that we do this (the failing tests will
+    # be treated as expected failures), but we get a bit more test
+    # coverage, and also verify that we can install a package into the
+    # bindist with Cabal.
+    #
+    bindistdir="bindisttest/install dir"
+    cd libraries/mtl
+    "$thisdir/$bindistdir/bin/ghc" --make Setup
+    ./Setup configure --with-ghc="$thisdir/$bindistdir/bin/ghc" --with-haddock="$thisdir/$bindistdir/bin/haddock" --global --builddir=dist-bindist --prefix="$thisdir/$bindistdir"
+    ./Setup build   --builddir=dist-bindist
+    ./Setup haddock --builddir=dist-bindist
+    ./Setup install --builddir=dist-bindist
+    ./Setup clean   --builddir=dist-bindist
+    rm -f Setup Setup.exe Setup.hi Setup.o
+    cd $thisdir
+fi
 
 fi # testsuite-only
+
+# -----------------------------------------------------------------------------
+# Run the testsuite
 
 if [ "$hpc" = YES ]
 then
@@ -124,14 +137,22 @@ then
     rm -f $HPCTIXFILE
 fi
 
-if [ "$slow" = YES ]
-then
-MAKE_TEST_TARGET=fulltest
-else
-MAKE_TEST_TARGET=test
-fi
+case "$speed" in
+SLOW)
+        MAKE_TEST_TARGET=fulltest
+        BINDIST="BINDIST=YES"
+        ;;
+NORMAL)
+        MAKE_TEST_TARGET=test
+        BINDIST="BINDIST=YES"
+        ;;
+FAST)
+        MAKE_TEST_TARGET=test
+        BINDIST="BINDIST=NO"
+        ;;
+esac
 
-$make $MAKE_TEST_TARGET stage=2 BINDIST=YES THREADS=$threads 2>&1 | tee testlog
+$make $MAKE_TEST_TARGET stage=2 $BINDIST THREADS=$threads 2>&1 | tee testlog
 
 if [ "$hpc" = YES ]
 then
