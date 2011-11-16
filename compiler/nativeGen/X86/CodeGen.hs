@@ -1678,9 +1678,9 @@ genCCall32 target dest_regs args =
     _ -> do
         let
             sizes               = map (arg_size . cmmExprType . hintlessCmm) (reverse args)
-            raw_arg_size        = sum sizes
-            tot_arg_size        = roundTo 16 raw_arg_size
-            arg_pad_size        = tot_arg_size - raw_arg_size
+            raw_arg_size        = sum sizes + 4
+            arg_pad_size        = (roundTo 16 $ raw_arg_size) - raw_arg_size
+            tot_arg_size        = raw_arg_size + arg_pad_size - 4
         delta0 <- getDeltaNat
         setDeltaNat (delta0 - arg_pad_size)
 
