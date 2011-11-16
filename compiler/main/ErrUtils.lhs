@@ -12,7 +12,7 @@
 -- for details
 
 module ErrUtils (
-	Message, mkLocMessage, printError, pprMessageBag,
+	Message, mkLocMessage, printError, pprMessageBag, pprErrMsgBag,
 	Severity(..),
 
 	ErrMsg, WarnMsg,
@@ -149,23 +149,31 @@ printBagOfWarnings :: DynFlags -> Bag WarnMsg -> IO ()
 printBagOfWarnings dflags bag_of_warns = 
   printMsgBag dflags bag_of_warns SevWarning
 
+pprErrMsgBag :: Bag ErrMsg -> [SDoc]
+pprErrMsgBag bag
+  = [ let style = mkErrStyle unqual
+      in withPprStyle style (d $$ e)
+    | ErrMsg { errMsgShortDoc  = d,
+               errMsgExtraInfo = e,
+               errMsgContext   = unqual } <- sortMsgBag bag ]
+
 printMsgBag :: DynFlags -> Bag ErrMsg -> Severity -> IO ()
 printMsgBag dflags bag sev
-  = sequence_   [ let style = mkErrStyle unqual
-		  in log_action dflags sev s style (d $$ e)
-		| ErrMsg { errMsgSpans = s:_,
-			   errMsgShortDoc = d,
-			   errMsgExtraInfo = e,
-			   errMsgContext = unqual } <- sorted_errs ]
-    where
-      bag_ls	  = bagToList bag
-      sorted_errs = sortLe occ'ed_before bag_ls
+  = sequence_ [ let style = mkErrStyle unqual
+                in log_action dflags sev s style (d $$ e)
+              | ErrMsg { errMsgSpans     = s:_,
+                         errMsgShortDoc  = d,
+                         errMsgExtraInfo = e,
+                         errMsgContext   = unqual } <- sortMsgBag bag ]
 
-      occ'ed_before err1 err2 = 
-         case compare (head (errMsgSpans err1)) (head (errMsgSpans err2)) of
-		LT -> True
-		EQ -> True
-		GT -> False
+sortMsgBag :: Bag ErrMsg -> [ErrMsg]
+sortMsgBag bag = sortLe srcOrder $ bagToList bag
+  where
+    srcOrder err1 err2 = 
+        case compare (head (errMsgSpans err1)) (head (errMsgSpans err2)) of
+            LT -> True
+            EQ -> True
+            GT -> False
 
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val

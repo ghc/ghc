@@ -262,7 +262,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                 ; iface_vect_info = flattenVectInfo vect_info
                 -- Check if we are in Safe Inference mode but we failed to pass
                 -- the muster
-                ; safeMode    = if safeInferOn dflags  && not safeInf
+                ; safeMode    = if safeInferOn dflags && not safeInf
                                     then Sf_None
                                     else safeHaskell dflags
                 ; trust_info  = setSafeMode safeMode

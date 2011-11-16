@@ -338,6 +338,8 @@ data WarningFlag =
    | Opt_WarnUnusedDoBind
    | Opt_WarnWrongDoBind
    | Opt_WarnAlternativeLayoutRuleTransitional
+   | Opt_WarnUnsafe
+   | Opt_WarnSafe
    deriving (Eq, Show)
 
 data Language = Haskell98 | Haskell2010
@@ -560,6 +562,8 @@ data DynFlags = DynFlags {
   -- them off.
   thOnLoc               :: SrcSpan,
   newDerivOnLoc         :: SrcSpan,
+  warnSafeOnLoc         :: SrcSpan,
+  warnUnsafeOnLoc       :: SrcSpan,
   -- Don't change this without updating extensionFlags:
   extensions            :: [OnOff ExtensionFlag],
   -- extensionFlags should always be equal to
@@ -894,6 +898,8 @@ defaultDynFlags mySettings =
         safeHaskell = Sf_SafeInfered,
         thOnLoc = noSrcSpan,
         newDerivOnLoc = noSrcSpan,
+        warnSafeOnLoc = noSrcSpan,
+        warnUnsafeOnLoc = noSrcSpan,
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
         log_action = defaultLogAction,
@@ -1076,10 +1082,12 @@ safeImplicitImpsReq d = safeLanguageOn d
 -- want to export this functionality from the module but do want to export the
 -- type constructors.
 combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
-combineSafeFlags a b | a `elem` [Sf_None, Sf_SafeInfered] = return b
-                     | b `elem` [Sf_None, Sf_SafeInfered] = return a
-                     | a == b                             = return a
-                     | otherwise = addErr errm >> return (panic errm)
+combineSafeFlags a b | a == Sf_SafeInfered = return b
+                     | b == Sf_SafeInfered = return a
+                     | a == Sf_None        = return b
+                     | b == Sf_None        = return a
+                     | a == b              = return a
+                     | otherwise           = addErr errm >> return (panic errm)
     where errm = "Incompatible Safe Haskell flags! ("
                     ++ showPpr a ++ ", " ++ showPpr b ++ ")"
 
@@ -1638,6 +1646,7 @@ dynamic_flags = [
 
         ------ Safe Haskell flags -------------------------------------------
   , Flag "fpackage-trust"   (NoArg (setDynFlag Opt_PackageTrust))
+  , Flag "fno-safe-infer"   (NoArg (setSafeHaskell Sf_None))
  ]
  ++ map (mkFlag turnOn  "f"    setDynFlag  ) fFlags
  ++ map (mkFlag turnOff "fno-" unSetDynFlag) fFlags
@@ -1737,10 +1746,12 @@ fWarningFlags = [
   ( "warn-auto-orphans",                Opt_WarnAutoOrphans, nop ),
   ( "warn-tabs",                        Opt_WarnTabs, nop ),
   ( "warn-unrecognised-pragmas",        Opt_WarnUnrecognisedPragmas, nop ),
-  ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings, nop),
+  ( "warn-lazy-unlifted-bindings",      Opt_WarnLazyUnliftedBindings, nop ),
   ( "warn-unused-do-bind",              Opt_WarnUnusedDoBind, nop ),
   ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, nop ),
-  ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop )]
+  ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop ),
+  ( "warn-unsafe",                      Opt_WarnUnsafe, setWarnUnsafe ),
+  ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ) ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec DynFlag]
@@ -2136,6 +2147,14 @@ foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
 rtsIsProfiled :: Bool
 rtsIsProfiled = unsafePerformIO rtsIsProfiledIO /= 0
 #endif
+
+setWarnSafe :: Bool -> DynP ()
+setWarnSafe True  = getCurLoc >>= \l -> upd (\d -> d { warnSafeOnLoc = l })
+setWarnSafe False = return ()
+
+setWarnUnsafe :: Bool -> DynP ()
+setWarnUnsafe True  = getCurLoc >>= \l -> upd (\d -> d { warnUnsafeOnLoc = l })
+setWarnUnsafe False = return ()
 
 setGenDeriving :: Bool -> DynP ()
 setGenDeriving True  = getCurLoc >>= \l -> upd (\d -> d { newDerivOnLoc = l })

@@ -167,7 +167,7 @@ newHscEnv dflags = do
     mlc_var <- newIORef emptyModuleEnv
     optFuel <- initOptFuelState
     safe_var <- newIORef True
-    return HscEnv { hsc_dflags       = dflags,
+    return HscEnv {  hsc_dflags       = dflags,
                      hsc_targets      = [],
                      hsc_mod_graph    = [],
                      hsc_IC           = emptyInteractiveContext,
@@ -790,10 +790,25 @@ hscFileFrontEnd mod_summary = do
         ioMsgMaybe $
             tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
     tcSafeOK <- liftIO $ readIORef (tcg_safeInfer tcg_env)
-    -- if safe haskell off or safe infer failed, wipe trust
+
+    -- end of the Safe Haskell line, how to respond to user?
     if not (safeHaskellOn dflags) || (safeInferOn dflags && not tcSafeOK)
-        then wipeTrust tcg_env
-        else hscCheckSafeImports tcg_env
+
+        -- if safe haskell off or safe infer failed, wipe trust
+        then wipeTrust tcg_env emptyBag
+
+        -- module safe, throw warning if needed
+        else do
+            tcg_env' <- hscCheckSafeImports tcg_env
+            safe <- liftIO $ hscGetSafeInf hsc_env
+            when (safe && wopt Opt_WarnSafe dflags)
+                 (logWarnings $ unitBag $
+                     mkPlainWarnMsg (warnSafeOnLoc dflags) $ errSafe tcg_env')
+            return tcg_env'
+  where
+    pprMod t  = ppr $ moduleName $ tcg_mod t
+    errSafe t = text "Warning:" <+> quotes (pprMod t)
+                   <+> text "has been infered as safe!"
 
 --------------------------------------------------------------
 -- Safe Haskell
@@ -850,9 +865,9 @@ hscCheckSafeImports tcg_env = do
               -- user defined RULES, so not safe or already unsafe
             | safeInferOn dflags && not (null $ tcg_rules tcg_env') ||
               safeHaskell dflags == Sf_None
-            -> wipeTrust tcg_env'
+            -> wipeTrust tcg_env' $ warns (tcg_rules tcg_env')
 
-              -- trustworthy
+              -- trustworthy OR safe infered with no RULES
             | otherwise
             -> return tcg_env'
 
@@ -900,7 +915,7 @@ checkSafeImports dflags hsc_env tcg_env
             True ->
                 -- did we fail safe inference or fail -XSafe?
                 case safeInferOn dflags of
-                    True  -> wipeTrust tcg_env
+                    True  -> wipeTrust tcg_env errs
                     False -> liftIO . throwIO . mkSrcErr $ errs
             
             -- All good matey!
@@ -1025,12 +1040,29 @@ checkSafeImports dflags hsc_env tcg_env
                            | otherwise   = Just (modulePackageId m)
 
 -- | Set module to unsafe and wipe trust information.
-wipeTrust :: TcGblEnv -> Hsc TcGblEnv
-wipeTrust tcg_env = do
-    env <- getHscEnv
+--
+-- Make sure to call this method to set a module to infered unsafe,
+-- it should be a central and single failure method.
+wipeTrust :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
+wipeTrust tcg_env whyUnsafe = do
+    env    <- getHscEnv
+    dflags <- getDynFlags
+
+    when (wopt Opt_WarnUnsafe dflags)
+         (logWarnings $ unitBag $
+             mkPlainWarnMsg (warnUnsafeOnLoc dflags) whyUnsafe')
+
     liftIO $ hscSetSafeInf env False
-    let imps = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
-    return $ tcg_env { tcg_imports = imps }
+    return $ tcg_env { tcg_imports = wiped_trust }
+
+  where
+    wiped_trust = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
+    pprMod      = ppr $ moduleName $ tcg_mod tcg_env
+    whyUnsafe'  = vcat [ text "Warning:" <+> quotes pprMod
+                             <+> text "has been infered as unsafe!"
+                       , text "Reason:"
+                       , nest 4 (vcat $ pprErrMsgBag whyUnsafe) ]
+
 
 --------------------------------------------------------------
 -- Simplifiers
