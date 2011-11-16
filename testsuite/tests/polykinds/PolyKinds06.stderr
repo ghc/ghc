@@ -1,0 +1,4 @@
+
+PolyKinds06.hs:9:11:
+    Promoted kind `A' used in a mutually recursive group
+    In the kind `A -> *'

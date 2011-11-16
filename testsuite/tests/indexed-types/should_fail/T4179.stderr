@@ -19,31 +19,8 @@ T4179.hs:26:16:
     In an equation for `fCon': fCon = foldDoC op
 
 T4179.hs:26:16:
-    Could not deduce (A2 (x (A2 (FCon x) -> A3 (FCon x)))
-                        ~
-                      A2 (FCon x))
-    from the context (Functor x, DoC (FCon x))
-      bound by the type signature for
-                 fCon :: (Functor x, DoC (FCon x)) =>
-                         Con x -> A2 (FCon x) -> A3 (FCon x)
-      at T4179.hs:26:1-17
-    NB: `A2' is a type function, and may not be injective
-    Expected type: A2 (FCon x) -> A3 (FCon x)
-      Actual type: A2 (x (A2 (FCon x) -> A3 (FCon x)))
-                   -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
-    Expected type: x (A2 (FCon x) -> A3 (FCon x))
-                   -> A2 (FCon x)
-                   -> A3 (FCon x)
-      Actual type: x (A2 (FCon x) -> A3 (FCon x))
-                   -> A2 (x (A2 (FCon x) -> A3 (FCon x)))
-                   -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
-    In the first argument of `foldDoC', namely `op'
-    In the expression: foldDoC op
-
-T4179.hs:26:16:
     Could not deduce (A3 (x (A2 (FCon x) -> A3 (FCon x)))
-                        ~
-                      A3 (FCon x))
+                      ~ A3 (FCon x))
     from the context (Functor x, DoC (FCon x))
       bound by the type signature for
                  fCon :: (Functor x, DoC (FCon x)) =>
@@ -54,8 +31,27 @@ T4179.hs:26:16:
       Actual type: A2 (x (A2 (FCon x) -> A3 (FCon x)))
                    -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
     Expected type: x (A2 (FCon x) -> A3 (FCon x))
-                   -> A2 (FCon x)
-                   -> A3 (FCon x)
+                   -> A2 (FCon x) -> A3 (FCon x)
+      Actual type: x (A2 (FCon x) -> A3 (FCon x))
+                   -> A2 (x (A2 (FCon x) -> A3 (FCon x)))
+                   -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
+    In the first argument of `foldDoC', namely `op'
+    In the expression: foldDoC op
+
+T4179.hs:26:16:
+    Could not deduce (A2 (x (A2 (FCon x) -> A3 (FCon x)))
+                      ~ A2 (FCon x))
+    from the context (Functor x, DoC (FCon x))
+      bound by the type signature for
+                 fCon :: (Functor x, DoC (FCon x)) =>
+                         Con x -> A2 (FCon x) -> A3 (FCon x)
+      at T4179.hs:26:1-17
+    NB: `A2' is a type function, and may not be injective
+    Expected type: A2 (FCon x) -> A3 (FCon x)
+      Actual type: A2 (x (A2 (FCon x) -> A3 (FCon x)))
+                   -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
+    Expected type: x (A2 (FCon x) -> A3 (FCon x))
+                   -> A2 (FCon x) -> A3 (FCon x)
       Actual type: x (A2 (FCon x) -> A3 (FCon x))
                    -> A2 (x (A2 (FCon x) -> A3 (FCon x)))
                    -> A3 (x (A2 (FCon x) -> A3 (FCon x)))

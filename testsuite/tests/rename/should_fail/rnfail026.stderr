@@ -1,5 +1,5 @@
 
-rnfail026.hs:16:17:
+rnfail026.hs:16:35:
     Kind mis-match
     The first argument of `Monad' should have kind `* -> *',
     but `Set a' has kind `*'

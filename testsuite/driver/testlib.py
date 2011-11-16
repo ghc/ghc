@@ -117,6 +117,10 @@ def req_profiling( opts ):
     if not config.have_profiling:
         opts.expect = 'fail'
 
+def req_shared_libs( opts ):
+    if not config.have_shared_libs:
+        opts.expect = 'fail'
+
 def req_interp( opts ):
     if not config.have_interp:
         opts.expect = 'fail'
@@ -576,7 +580,7 @@ def test_common_work (name, opts, func, args):
         ok_way = lambda way: \
             not getTestOpts().skip \
             and (config.only == [] or name in config.only) \
-            and (getTestOpts().only_ways == [] or way in getTestOpts().only_ways) \
+            and (getTestOpts().only_ways == None or way in getTestOpts().only_ways) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
             and way not in getTestOpts().omit_ways
 
@@ -999,6 +1003,12 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     stats_file = name + '.comp.stats'
     if len(opts.compiler_stats_num_fields) > 0:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+
+    # Required by GHC 7.3+, harmless for earlier versions:
+    if (getTestOpts().c_src or
+        getTestOpts().objc_src or
+        getTestOpts().objcpp_src):
+        extra_hc_opts += ' -no-hs-main '
 
     if getTestOpts().compile_cmd_prefix == '':
         cmd_prefix = ''

@@ -55,7 +55,7 @@ Roman.$wgo =
       Data.Maybe.Nothing ->
         Roman.foo3
         `cast` (UnsafeCo GHC.Types.Int GHC.Prim.Int#
-                :: GHC.Types.Int ~ GHC.Prim.Int#);
+                :: GHC.Types.Int ~# GHC.Prim.Int#);
       Data.Maybe.Just x ->
         case x of _ { GHC.Types.I# ipv ->
         let {

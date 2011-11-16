@@ -1,0 +1,8 @@
+
+PolyKinds04.hs:5:16:
+    `Maybe' is not applied to enough type arguments
+    The first argument of `A' should have kind `*',
+    but `Maybe' has kind `* -> *'
+    In the type `A Maybe'
+    In the definition of data constructor `B1'
+    In the data type declaration for `B'

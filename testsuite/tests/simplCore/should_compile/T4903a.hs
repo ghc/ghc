@@ -14,7 +14,7 @@ class El phi ix where
 class Fam phi where
   from :: phi ix -> ix -> PF phi I0 ix
 
-type family PF phi :: (* -> *) -> * -> *
+type family PF (phi :: * -> *) :: (* -> *) -> * -> *
 
 data I0 a = I0 a
 
