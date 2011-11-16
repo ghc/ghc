@@ -8,6 +8,9 @@ import Foreign.Storable
 import Foreign.Ptr
 import Foreign.Marshal.Utils
 
+main :: IO ()
+main = print $ arst (zeroMatrix 10 10) (Constant 9)
+
 data ComputeElement
     = Constant !Double
     | Value !Double
@@ -23,14 +26,6 @@ fromComputeElement (Value    v) = v
 
 sizeofDouble = sizeOf (undefined :: Double)
 sizeofInt64  = sizeOf (undefined :: Int64)
-
-{-
-typedef struct
-{
-     double v;
-     int64_t c;
-} ComputeElement;
--}
 
 instance Storable ComputeElement where
     sizeOf    _ = sizeofDouble + sizeofInt64
@@ -57,6 +52,4 @@ arst mat v = runST $ do
     return (x > 0)
 
 zeroMatrix m n = buildMatrix m n (const (Value 0))
-
-main = print $ arst (zeroMatrix 10 10) (Constant 9)
 

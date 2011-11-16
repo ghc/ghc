@@ -6,16 +6,19 @@ import Data.Packed
 import Data.Packed.ST
 import Control.Applicative
 import Control.Monad
---import qualified Control.Monad.Parallel as Parallel
 import Control.Monad.ST
 import Foreign.Storable
 import Foreign.Ptr
 import Foreign.Marshal.Utils
 
 import Control.Parallel.Strategies
---import Data.Vector.Strategies
 
 import Graphics.Plot
+
+
+main :: IO ()
+main = let whee = jacobiST zeroRho (0, 1) (constLeftBorder 100 128)
+       in writeFile "Something.pgm" $ matrixToPGM (computeElementMatrixToDouble whee)
 
 inParallel = parMap rwhnf id
 
@@ -38,19 +41,10 @@ isConstant (Constant _) = True
 isConstant _            = False
 
 fromComputeElement (Constant v) = v
-fromComputeElement (Value v) = v
+fromComputeElement (Value    v) = v
 
 sizeofDouble = sizeOf (undefined :: Double)
-sizeofInt64 = sizeOf (undefined :: Int64)
-
-
-{-
-typedef struct
-{
-    double v;
-    int64_t c;
-} ComputeElement;
--}
+sizeofInt64  = sizeOf (undefined :: Int64)
 
 instance Storable ComputeElement where
   sizeOf _ = sizeofDouble + sizeofInt64
@@ -67,26 +61,19 @@ instance Storable ComputeElement where
                 poke (castPtr p) (fromComputeElement v)
                 poke (castPtr p `plusPtr` sizeofDouble) c
 
-
-
 jacobi :: Element a => Int -> Matrix a -> Matrix a
 jacobi n mat = undefined
   where
     core = subMatrix (1, 1) (rows mat - 1, cols mat - 1) mat
 
-
 applyComputeElement _ v@(Constant _) = v
-applyComputeElement f (Value v) = Value (f v)
+applyComputeElement f   (Value    v) = Value (f v)
 
 
 writeMatrix' = uncurry . writeMatrix
-readMatrix' = uncurry . readMatrix
-
+readMatrix'  = uncurry . readMatrix
 
 zeroRho _ _ = 0
-
---jacobiST :: Storable t => Matrix t -> Matrix ComputeElement
--- rho :: Double -> Double -> Double
 
 type STComputeMatrix s = STMatrix s ComputeElement
 
@@ -95,9 +82,6 @@ type RelaxationFunction s =  STComputeMatrix s    -- initial matrix
                           -> Int               -- i
                           -> Int               -- j
                           -> ST s Double       -- new element
-
-
-
 
 applyMethod :: RelaxationFunction s -> STComputeMatrix s -> STComputeMatrix s -> Int -> Int -> ST s ()
 applyMethod f mat mat' i j = do
@@ -164,20 +148,10 @@ jacobiST rho (rangeX, rangeY) origMat = runST $ do
 
   freezeMatrix mat'
 
-
-
-
 constLeftBorder v n = fromColumns (border:replicate (n - 1) rest)
   where border = buildVector n (const (Constant v))
         rest = buildVector n (const (Value 0))
 
-
 computeElementMatrixToDouble :: Matrix ComputeElement -> Matrix Double
 computeElementMatrixToDouble = liftMatrix (mapVector fromComputeElement)
-
-
-herp = let whee = jacobiST zeroRho (0, 1) (constLeftBorder 100 128)
-       in writeFile "Something.pgm" $ matrixToPGM (computeElementMatrixToDouble whee)
-
-main = herp
 
