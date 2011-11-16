@@ -811,7 +811,7 @@ cvtType ty
              | length tys' == n 	-- Saturated
              -> if n==1 then return (head tys')	-- Singleton tuples treated 
                                                 -- like nothing (ie just parens)
-                        else returnL (HsTupleTy (HsBoxyTuple liftedTypeKind) tys')
+                        else returnL (HsTupleTy HsBoxedTuple tys')
              | n == 1    
              -> failWith (ptext (sLit "Illegal 1-tuple type constructor"))
              | otherwise 

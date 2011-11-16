@@ -231,10 +231,34 @@ E.g.    h :: (Int,Bool)                 HsTupleTy; f is a pair
                                            a type-level pair of booleans 
         kind of S :: (Bool,Bool) -> *   This kind uses HsExplicitTupleTy
 
+Note [Distinguishing tuple kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Apart from promotion, tuples can have one of three different kinds:
+
+        x :: (Int, Bool)                -- Regular boxed tuples
+        f :: Int# -> (# Int#, Int# #)   -- Unboxed tuples
+        g :: (Eq a, Ord a) => a         -- Constraint tuples
+
+For convenience, internally we use a single constructor for all of these,
+namely HsTupleTy, but keep track of the tuple kind (in the first argument to
+HsTupleTy, a HsTupleSort). We can tell if a tuple is unboxed while parsing,
+because of the #. However, with -XConstraintKinds we can only distinguish
+between constraint and boxed tuples during type checking, in general. Hence the
+four constructors of HsTupleSort:
+        
+        HsUnboxedTuple                  -> Produced by the parser
+        HsBoxedTuple                    -> Certainly a boxed tuple
+        HsConstraintTuple               -> Certainly a constraint tuple
+        HsBoxedOrConstraintTuple        -> Could be a boxed or a constraint 
+                                        tuple. Produced by the parser only,
+                                        disappears after type checking
 
 \begin{code}
 data HsTupleSort = HsUnboxedTuple
-                 | HsBoxyTuple PostTcKind -- Either a Constraint or normal tuple: resolved during type checking
+                 | HsBoxedTuple
+                 | HsConstraintTuple
+                 | HsBoxedOrConstraintTuple
                  deriving (Data, Typeable)
 
 data HsExplicitFlag = Explicit | Implicit deriving (Data, Typeable)
@@ -520,7 +544,7 @@ ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2
 ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (interpp'SP tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
-                    HsBoxyTuple _  -> BoxedTuple
+                    _              -> BoxedTuple
 ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> ppr kind)
 ppr_mono_ty _    (HsListTy ty)	     = brackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPArrTy ty)	     = pabrackets (ppr_mono_lty pREC_TOP ty)

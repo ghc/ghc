@@ -32,7 +32,6 @@ import RnEnv
 import RnNames
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
-import Kind             ( liftedTypeKind )
 
 import ForeignCall	( CCallTarget(..) )
 import Module
@@ -1082,7 +1081,7 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
                        , con_details = new_details', con_res = new_res_ty, con_doc = mb_doc' }) }}
  where
     doc = ConDeclCtx name
-    get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy (HsBoxyTuple liftedTypeKind) tys))
+    get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy HsBoxedTuple tys))
 
 rnConResult :: HsDocContext
             -> HsConDetails (LHsType Name) [ConDeclField Name]

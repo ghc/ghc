@@ -676,15 +676,15 @@ repTy (HsPArrTy t)          = do
 			        t1   <- repLTy t
 			        tcon <- repTy (HsTyVar (tyConName parrTyCon))
 			        repTapp tcon t1
-repTy (HsTupleTy (HsBoxyTuple kind) tys)
-  | kind `eqKind` liftedTypeKind = do
-			        tys1 <- repLTys tys 
-			        tcon <- repTupleTyCon (length tys)
-			        repTapps tcon tys1
+repTy (HsTupleTy HsBoxedTuple tys) = do
+                                        tys1 <- repLTys tys 
+                                        tcon <- repTupleTyCon (length tys)
+                                        repTapps tcon tys1
 repTy (HsTupleTy HsUnboxedTuple tys) = do
 			        tys1 <- repLTys tys
 			        tcon <- repUnboxedTupleTyCon (length tys)
 			        repTapps tcon tys1
+repTy (HsTupleTy _ _) = panic "repTy HsTupleTy"
 repTy (HsOpTy ty1 (_, n) ty2) = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
 			    	   `nlHsAppTy` ty2)
 repTy (HsParTy t)  	    = repLTy t

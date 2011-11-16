@@ -1047,7 +1047,7 @@ atype :: { LHsType RdrName }
         | tyvar                         { L1 (HsTyVar (unLoc $1)) }
         | strict_mark atype             { LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
         | '{' fielddecls '}'            {% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
-        | '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy (HsBoxyTuple placeHolderKind)  ($2:$4) }
+        | '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy HsBoxedOrConstraintTuple  ($2:$4) }
         | '(#' comma_types1 '#)'        { LL $ HsTupleTy HsUnboxedTuple $2     }
         | '[' ctype ']'                 { LL $ HsListTy  $2 }
         | '[:' ctype ':]'               { LL $ HsPArrTy  $2 }
@@ -1126,7 +1126,7 @@ akind :: { LHsKind RdrName }
 pkind :: { LHsKind RdrName }  -- promoted type, see Note [Promotion]
         : qtycon                          { L1 $ HsTyVar $ unLoc $1 }
         | '(' ')'                         { LL $ HsTyVar $ getRdrName unitTyCon }
-        | '(' kind ',' comma_kinds1 ')'   { LL $ HsTupleTy (HsBoxyTuple placeHolderKind) ($2 : $4) }
+        | '(' kind ',' comma_kinds1 ')'   { LL $ HsTupleTy HsBoxedTuple ($2 : $4) }
         | '[' kind ']'                    { LL $ HsListTy $2 }
 
 comma_kinds1 :: { [LHsKind RdrName] }

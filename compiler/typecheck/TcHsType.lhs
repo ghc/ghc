@@ -171,10 +171,9 @@ tcHsSigType ctxt hs_ty
     tcHsSigTypeNC ctxt hs_ty
 
 tcHsSigTypeNC ctxt hs_ty
-  = do  { -- (kinded_ty, _kind) <- kc_lhs_type hs_ty
-          kinded_ty <- case expectedKindInCtxt ctxt of
-                         Nothing -> fmap fst (kc_lhs_type hs_ty)
-                         Just k  -> kc_check_lhs_type hs_ty (EK k EkUnk) -- JPM fix this
+  = do  { kinded_ty <- case expectedKindInCtxt ctxt of
+                         Nothing -> fmap fst (kc_lhs_type_fresh hs_ty)
+                         Just k  -> kc_lhs_type hs_ty (EK k EkUnk) -- JPM fix this
           -- The kind is checked by checkValidType, and isn't necessarily
           -- of kind * in a Template Haskell quote eg [t| Maybe |]
         ; ty <- tcHsKindedType kinded_ty
@@ -192,7 +191,7 @@ tcHsType :: LHsType Name -> TcM Type
 -- kind check and desugar
 -- no validity checking because of knot-tying
 tcHsType hs_ty
-  = do { (kinded_ty, _) <- kc_lhs_type hs_ty
+  = do { (kinded_ty, _) <- kc_lhs_type_fresh hs_ty
        ; ty <- tcHsKindedType kinded_ty
        ; return ty }
 
@@ -202,7 +201,7 @@ tcHsInstHead :: UserTypeCtxt -> LHsType Name -> TcM ([TyVar], ThetaType, Class, 
 tcHsInstHead ctxt lhs_ty@(L loc hs_ty)
   = setSrcSpan loc   $	-- No need for an "In the type..." context
                         -- because that comes from the caller
-    do { kinded_ty <- kc_check_hs_type hs_ty ekConstraint
+    do { kinded_ty <- kc_hs_type hs_ty ekConstraint
        ; ty <- ds_type kinded_ty
        ; let (tvs, theta, tau) = tcSplitSigmaTy ty
        ; case getClassPredTys_maybe tau of
@@ -302,182 +301,142 @@ tcHsKindedContext hs_theta = addLocM (mapM dsHsType) hs_theta
 ---------------------------
 kcLiftedType :: LHsType Name -> TcM (LHsType Name)
 -- The type ty must be a *lifted* *type*
-kcLiftedType ty = kc_check_lhs_type ty ekLifted
+kcLiftedType ty = kc_lhs_type ty ekLifted
     
----------------------------
-kcTypeType :: LHsType Name -> TcM (LHsType Name)
--- The type ty must be a *type*, but it can be lifted or
--- unlifted or an unboxed tuple.
-kcTypeType ty = kc_check_lhs_type ty ekOpen
-
 kcArgs :: SDoc -> [LHsType Name] -> Kind -> TcM [LHsType Name]
 kcArgs what tys kind 
-  = sequence [ kc_check_lhs_type ty (EK kind (EkArg what n)) 
+  = sequence [ kc_lhs_type ty (EK kind (EkArg what n))
              | (ty,n) <- tys `zip` [1..] ]
 
 ---------------------------
 kcArgType :: LHsType Name -> TcM (LHsType Name)
 -- The type ty must be an *arg* *type* (lifted or unlifted)
-kcArgType ty = kc_check_lhs_type ty ekArg
+kcArgType ty = kc_lhs_type ty ekArg
 
 ---------------------------
 kcCheckLHsType :: LHsType Name -> ExpKind -> TcM (LHsType Name)
-kcCheckLHsType ty kind = addKcTypeCtxt ty $ kc_check_lhs_type ty kind
-
-
-kc_check_lhs_type :: LHsType Name -> ExpKind -> TcM (LHsType Name)
--- Check that the type has the specified kind
--- Be sure to use checkExpectedKind, rather than simply unifying 
--- with OpenTypeKind, because it gives better error messages
-kc_check_lhs_type (L span ty) exp_kind 
-  = setSrcSpan span $
-    do { ty' <- kc_check_hs_type ty exp_kind
-       ; return (L span ty') }
-
-kc_check_lhs_types :: [(LHsType Name, ExpKind)] -> TcM [LHsType Name]
-kc_check_lhs_types tys_w_kinds
-  = mapM kc_arg tys_w_kinds
-  where
-    kc_arg (arg, arg_kind) = kc_check_lhs_type arg arg_kind
-
-
----------------------------
-kc_check_hs_type :: HsType Name -> ExpKind -> TcM (HsType Name)
-
--- First some special cases for better error messages 
--- when we know the expected kind
-kc_check_hs_type (HsParTy ty) exp_kind
-  = do { ty' <- kc_check_lhs_type ty exp_kind; return (HsParTy ty') }
-
-kc_check_hs_type ty@(HsAppTy ty1 ty2) exp_kind
-  = do { let (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
-       ; (fun_ty', fun_kind) <- kc_lhs_type fun_ty
-       ; arg_tys' <- kcCheckApps fun_ty fun_kind arg_tys ty exp_kind
-       ; return (mkHsAppTys fun_ty' arg_tys') }
-
--- This is the general case: infer the kind and compare
-kc_check_hs_type ty exp_kind
-  = do	{ traceTc "kc_check_hs_type" (ppr ty)
-        ; (ty', act_kind) <- kc_hs_type ty
-		-- Add the context round the inner check only
-		-- because checkExpectedKind already mentions
-		-- 'ty' by name in any error message
-
-	; checkExpectedKind (strip ty) act_kind exp_kind
-	; return ty' }
-  where
-	-- We infer the kind of the type, and then complain if it's
-	-- not right.  But we don't want to complain about
-	--	(ty) or !(ty) or forall a. ty
-	-- when the real difficulty is with the 'ty' part.
-    strip (HsParTy (L _ ty))          = strip ty
-    strip (HsBangTy _ (L _ ty))       = strip ty
-    strip (HsForAllTy _ _ _ (L _ ty)) = strip ty
-    strip ty			      = ty
+kcCheckLHsType ty kind = addKcTypeCtxt ty $ kc_lhs_type ty kind
 \end{code}
 
-	Here comes the main function
+Like tcExpr, kc_hs_type takes an expected kind which it unifies with
+the kind it figures out. When we don't know what kind to expect, we use
+kc_lhs_type_fresh, to first create a new meta kind variable and use that as
+the expected kind.
 
 \begin{code}
 kcLHsType :: LHsType Name -> TcM (LHsType Name, TcKind)
 -- Called from outside: set the context
-kcLHsType ty = addKcTypeCtxt ty (kc_lhs_type ty)
+kcLHsType ty = addKcTypeCtxt ty (kc_lhs_type_fresh ty)
 
-kc_lhs_type :: LHsType Name -> TcM (LHsType Name, TcKind)
-kc_lhs_type (L span ty)
+kc_lhs_type_fresh :: LHsType Name -> TcM (LHsType Name, TcKind)
+kc_lhs_type_fresh ty =  do
+  kv <- newMetaKindVar
+  r <- kc_lhs_type ty (EK kv EkUnk)
+  return (r, kv)
+
+kc_lhs_types :: [(LHsType Name, ExpKind)] -> TcM [LHsType Name]
+kc_lhs_types tys_w_kinds = mapM (uncurry kc_lhs_type) tys_w_kinds
+
+kc_lhs_type :: LHsType Name -> ExpKind -> TcM (LHsType Name)
+kc_lhs_type (L span ty) exp_kind
   = setSrcSpan span $
-    do { traceTc "kc_lhs_type" (ppr ty)
-       ; (ty', kind) <- kc_hs_type ty
-       ; return (L span ty', kind) }
+    do { traceTc "kc_lhs_type" (ppr ty <+> ppr exp_kind)
+       ; ty' <- kc_hs_type ty exp_kind
+       ; return (L span ty') }
 
--- kc_hs_type *returns* the kind of the type, rather than taking an expected
--- kind as argument as tcExpr does.  
--- Reasons: 
---	(a) the kind of (->) is
---		forall bx1 bx2. Type bx1 -> Type bx2 -> Type Boxed
---  	    so we'd need to generate huge numbers of bx variables.
---	(b) kinds are so simple that the error messages are fine
---
--- The translated type has explicitly-kinded type-variable binders
+kc_hs_type :: HsType Name -> ExpKind -> TcM (HsType Name)
+kc_hs_type (HsParTy ty) exp_kind = do
+   ty' <- kc_lhs_type ty exp_kind
+   return (HsParTy ty')
 
-kc_hs_type :: HsType Name -> TcM (HsType Name, TcKind)
-kc_hs_type (HsParTy ty) = do
-   (ty', kind) <- kc_lhs_type ty
-   return (HsParTy ty', kind)
-
-kc_hs_type (HsTyVar name)
+kc_hs_type (HsTyVar name) exp_kind
   -- Special case for the unit tycon so it benefits from kind overloading
   | name == tyConName unitTyCon
-  = kc_hs_type (HsTupleTy (HsBoxyTuple placeHolderKind) [])
-  | otherwise = kcTyVar name
+  = kc_hs_type (HsTupleTy HsBoxedOrConstraintTuple []) exp_kind
+  | otherwise = do 
+      (ty, k) <- kcTyVar name
+      checkExpectedKind ty k exp_kind
+      return ty
 
-kc_hs_type (HsListTy ty) = do
+kc_hs_type (HsListTy ty) exp_kind = do
     ty' <- kcLiftedType ty
-    return (HsListTy ty', liftedTypeKind)
+    checkExpectedKind ty liftedTypeKind exp_kind
+    return (HsListTy ty')
 
-kc_hs_type (HsPArrTy ty) = do
+kc_hs_type (HsPArrTy ty) exp_kind = do
     ty' <- kcLiftedType ty
-    return (HsPArrTy ty', liftedTypeKind)
+    checkExpectedKind ty liftedTypeKind exp_kind
+    return (HsPArrTy ty')
 
-kc_hs_type (HsKindSig ty k) = do
-    k' <- scDsLHsKind k
-    ty' <- kc_check_lhs_type ty (EK k' EkKindSig)
-    return (HsKindSig ty' k, k')
+kc_hs_type (HsKindSig ty sig_k) exp_kind = do
+    sig_k' <- scDsLHsKind sig_k
+    ty' <- kc_lhs_type ty (EK sig_k' EkKindSig)
+    checkExpectedKind ty sig_k' exp_kind
+    return (HsKindSig ty' sig_k)
 
-kc_hs_type (HsTupleTy (HsBoxyTuple _) tys)
+-- See Note [Distinguishing tuple kinds] in HsTypes
+kc_hs_type (HsTupleTy HsBoxedOrConstraintTuple tys) exp_kind@(EK exp_k _ctxt)
   = do { fact_tup_ok <- xoptM Opt_ConstraintKinds
-       ; k <- if fact_tup_ok
-              then newMetaKindVar
-              else return liftedTypeKind
-       ; tys' <- kcArgs (ptext (sLit "a tuple")) tys k
-       ; return (HsTupleTy (HsBoxyTuple k) tys', k) }
-             -- In some contexts users really "mean" to write
-             -- tuples with Constraint components, rather than * components.
-             --
-             -- This special case of kind-checking does this rewriting 
-             -- when we can detect that we need it.
+       ; let (k, tupleType) = if fact_tup_ok && isConstraintKind exp_k
+                              then (constraintKind, HsConstraintTuple)
+                              -- If it's not a constraint, then it has to be *
+                              -- Unboxed tuples are a separate case
+                              else (liftedTypeKind, HsBoxedTuple)
+       ; kc_hs_tuple_type tys tupleType k exp_kind }
 
-kc_hs_type (HsTupleTy HsUnboxedTuple tys)
+kc_hs_type (HsTupleTy HsBoxedTuple tys) exp_kind
+  = kc_hs_tuple_type tys HsBoxedTuple liftedTypeKind exp_kind
+
+kc_hs_type (HsTupleTy HsConstraintTuple tys) exp_kind
+  = kc_hs_tuple_type tys HsConstraintTuple constraintKind exp_kind
+
+-- JPM merge with kc_hs_tuple_type ?
+kc_hs_type ty@(HsTupleTy HsUnboxedTuple tys) exp_kind
   = do { tys' <- kcArgs (ptext (sLit "an unboxed tuple")) tys argTypeKind
-       ; return (HsTupleTy HsUnboxedTuple tys', ubxTupleKind) }
+       ; checkExpectedKindS ty ubxTupleKind exp_kind
+       ; return (HsTupleTy HsUnboxedTuple tys') }
 
-kc_hs_type (HsFunTy ty1 ty2) = do
-    ty1' <- kc_check_lhs_type ty1 (EK argTypeKind EkUnk)
-    ty2' <- kcTypeType ty2
-    return (HsFunTy ty1' ty2', liftedTypeKind)
+kc_hs_type ty@(HsFunTy ty1 ty2) exp_kind@(EK _ ctxt) = do
+    ty1' <- kc_lhs_type ty1 (EK argTypeKind  ctxt)
+    ty2' <- kc_lhs_type ty2 (EK openTypeKind ctxt)
+    checkExpectedKindS ty liftedTypeKind exp_kind
+    return (HsFunTy ty1' ty2')
 
-kc_hs_type (HsOpTy ty1 (_, l_op@(L loc op)) ty2) = do
+kc_hs_type ty@(HsOpTy ty1 (_, l_op@(L loc op)) ty2) exp_kind = do
     (wop, op_kind) <- kcTyVar op
-    ([ty1',ty2'], res_kind) <- kcApps l_op op_kind [ty1,ty2]
+    [ty1',ty2'] <- kcCheckApps l_op op_kind [ty1,ty2] ty exp_kind
     let op' = case wop of
                 HsTyVar name -> (WpKiApps [], L loc name)
                 HsWrapTy wrap (HsTyVar name) -> (wrap, L loc name)
                 _ -> panic "kc_hs_type HsOpTy"
-    return (HsOpTy ty1' op' ty2', res_kind)
+    return (HsOpTy ty1' op' ty2')
 
-kc_hs_type (HsAppTy ty1 ty2) = do
+kc_hs_type ty@(HsAppTy ty1 ty2) exp_kind = do
     let (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
-    (fun_ty', fun_kind) <- kc_lhs_type fun_ty
-    (arg_tys', res_kind) <- kcApps fun_ty fun_kind arg_tys
-    return (mkHsAppTys fun_ty' arg_tys', res_kind)
+    (fun_ty', fun_kind) <- kc_lhs_type_fresh fun_ty
+    arg_tys' <- kcCheckApps fun_ty fun_kind arg_tys ty exp_kind
+    return (mkHsAppTys fun_ty' arg_tys')
 
-kc_hs_type (HsIParamTy n ty) = do
-    ty' <- kc_check_lhs_type ty (EK liftedTypeKind EkIParam)
-    return (HsIParamTy n ty', constraintKind)
+kc_hs_type ipTy@(HsIParamTy n ty) exp_kind = do
+    ty' <- kc_lhs_type ty (EK liftedTypeKind EkIParam)
+    checkExpectedKindS ipTy constraintKind exp_kind
+    return (HsIParamTy n ty')
 
-kc_hs_type (HsEqTy ty1 ty2) = do
-    (ty1', kind1) <- kc_lhs_type ty1
-    (ty2', kind2) <- kc_lhs_type ty2
+kc_hs_type ty@(HsEqTy ty1 ty2) exp_kind = do
+    (ty1', kind1) <- kc_lhs_type_fresh ty1
+    (ty2', kind2) <- kc_lhs_type_fresh ty2
     checkExpectedKind ty2 kind2 (EK kind1 EkEqPred)
-    return (HsEqTy ty1' ty2', constraintKind)
+    checkExpectedKindS ty constraintKind exp_kind
+    return (HsEqTy ty1' ty2')
 
-kc_hs_type (HsCoreTy ty)
-  = return (HsCoreTy ty, typeKind ty)
+kc_hs_type (HsCoreTy ty) exp_kind = do
+    checkExpectedKind ty (typeKind ty) exp_kind
+    return (HsCoreTy ty)
 
-kc_hs_type (HsForAllTy exp tv_names context ty)
+kc_hs_type (HsForAllTy exp tv_names context ty) exp_kind
   = kcHsTyVars tv_names         $ \ tv_names' ->
     do	{ ctxt' <- kcHsContext context
-	; (ty', k)  <- kc_lhs_type ty
+	; ty'   <- kc_lhs_type ty exp_kind
 	     -- The body of a forall is usually a type, but in principle
 	     -- there's no reason to prohibit *unlifted* types.
 	     -- In fact, GHC can itself construct a function with an
@@ -491,43 +450,59 @@ kc_hs_type (HsForAllTy exp tv_names context ty)
              -- {*, Constraint, #}, but I'm not doing that yet
              -- Example that should be rejected:  
              --          f :: (forall (a:*->*). a) Int
+  	; return (HsForAllTy exp tv_names' ctxt' ty') }
 
-  	; return (HsForAllTy exp tv_names' ctxt' ty', k) }
+kc_hs_type (HsBangTy b ty) exp_kind
+  = do { ty' <- kc_lhs_type ty exp_kind
+       ; return (HsBangTy b ty') }
 
-kc_hs_type (HsBangTy b ty)
-  = do { (ty', kind) <- kc_lhs_type ty
-       ; return (HsBangTy b ty', kind) }
-
-kc_hs_type ty@(HsRecTy _)
+kc_hs_type ty@(HsRecTy _) _exp_kind
   = failWithTc (ptext (sLit "Unexpected record type") <+> ppr ty)
       -- Record types (which only show up temporarily in constructor signatures) 
       -- should have been removed by now
 
 #ifdef GHCI	/* Only if bootstrapped */
-kc_hs_type (HsSpliceTy sp fvs _) = kcSpliceType sp fvs
+kc_hs_type (HsSpliceTy sp fvs _) exp_kind = do
+    (ty, k) <- kcSpliceType sp fvs
+    checkExpectedKindS ty k exp_kind
+    return ty
 #else
-kc_hs_type ty@(HsSpliceTy {}) = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
+kc_hs_type ty@(HsSpliceTy {}) _exp_kind =
+    failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
 #endif
 
-kc_hs_type (HsQuasiQuoteTy {}) = panic "kc_hs_type"	-- Eliminated by renamer
+kc_hs_type (HsQuasiQuoteTy {}) _exp_kind =
+    panic "kc_hs_type"  -- Eliminated by renamer
 
--- remove the doc nodes here, no need to worry about the location since
--- its the same for a doc node and it's child type node
-kc_hs_type (HsDocTy ty _)
-  = kc_hs_type (unLoc ty) 
+-- Remove the doc nodes here, no need to worry about the location since
+-- it's the same for a doc node and its child type node
+kc_hs_type (HsDocTy ty _) exp_kind
+  = kc_hs_type (unLoc ty) exp_kind
 
-kc_hs_type (HsExplicitListTy _ tys) 
-  = do { ty_k_s <- mapM kc_lhs_type tys
+kc_hs_type ty@(HsExplicitListTy _k tys) exp_kind
+  = do { ty_k_s <- mapM kc_lhs_type_fresh tys
        ; kind <- unifyKinds (ptext (sLit "In a promoted list")) ty_k_s
-       ; return (HsExplicitListTy kind (map fst ty_k_s), mkListTy kind) }
-kc_hs_type (HsExplicitTupleTy _ tys) = do
-  ty_k_s <- mapM kc_lhs_type tys
-  return ( HsExplicitTupleTy (map snd ty_k_s) (map fst ty_k_s)
-         , mkTyConApp (tupleTyCon BoxedTuple (length tys)) (map snd ty_k_s))
+       ; checkExpectedKindS ty (mkListTy kind) exp_kind
+       ; return (HsExplicitListTy kind (map fst ty_k_s)) }
 
-kc_hs_type (HsWrapTy {}) = panic "kc_hs_type HsWrapTy"  -- it means we kind checked something twice
+kc_hs_type ty@(HsExplicitTupleTy _ tys) exp_kind = do
+  ty_k_s <- mapM kc_lhs_type_fresh tys
+  let tupleKi = mkTyConApp (tupleTyCon BoxedTuple (length tys)) (map snd ty_k_s)
+  checkExpectedKindS ty tupleKi exp_kind
+  return (HsExplicitTupleTy (map snd ty_k_s) (map fst ty_k_s))
+
+kc_hs_type (HsWrapTy {}) _exp_kind =
+    panic "kc_hs_type HsWrapTy"  -- We kind checked something twice
 
 ---------------------------
+kc_hs_tuple_type :: [LHsType Name] -> HsTupleSort -> Kind -> ExpKind
+                 -> TcM (HsType Name)
+kc_hs_tuple_type tys tuple_type kind exp_kind
+  = do { tys' <- kcArgs (ptext (sLit "a tuple")) tys kind
+       ; let hsTupleTy = HsTupleTy tuple_type tys'
+       ; checkExpectedKindS hsTupleTy kind exp_kind
+       ; return hsTupleTy }
+
 kcApps :: Outputable a
        => a 
        -> TcKind			-- Function kind
@@ -535,19 +510,18 @@ kcApps :: Outputable a
        -> TcM ([LHsType Name], TcKind)	-- Kind-checked args
 kcApps the_fun fun_kind args
   = do { (args_w_kinds, res_kind) <- splitFunKind (ppr the_fun) 1 fun_kind args
-       ; args' <- kc_check_lhs_types args_w_kinds
+       ; args' <- kc_lhs_types args_w_kinds
        ; return (args', res_kind) }
 
 kcCheckApps :: Outputable a => a -> TcKind -> [LHsType Name]
 	    -> HsType Name     -- The type being checked (for err messages only)
 	    -> ExpKind 	       -- Expected kind
-	    -> TcM [LHsType Name]
+	    -> TcM ([LHsType Name])
 kcCheckApps the_fun fun_kind args ty exp_kind
   = do { (args_w_kinds, res_kind) <- splitFunKind (ppr the_fun) 1 fun_kind args
-       ; checkExpectedKind ty res_kind exp_kind
-       	     -- Check the result kind *before* checking argument kinds
-	     -- This improves error message; Trac #2994
-       ; kc_check_lhs_types args_w_kinds }
+       ; args_w_kinds' <- kc_lhs_types args_w_kinds
+       ; checkExpectedKindS ty res_kind exp_kind
+       ; return args_w_kinds' }
 
 
 ---------------------------
@@ -568,7 +542,7 @@ kcHsContext :: LHsContext Name -> TcM (LHsContext Name)
 kcHsContext ctxt = wrapLocM (mapM kcHsLPredType) ctxt
 
 kcHsLPredType :: LHsType Name -> TcM (LHsType Name)
-kcHsLPredType pred = kc_check_lhs_type pred ekConstraint
+kcHsLPredType pred = kc_lhs_type pred ekConstraint
 
 ---------------------------
 kcTyVar :: Name -> TcM (HsType Name, TcKind)
@@ -697,17 +671,11 @@ ds_type (HsPArrTy ty) = do
 
 ds_type (HsTupleTy hs_con tys) = do
     con <- case hs_con of
-        HsUnboxedTuple -> return UnboxedTuple
-        HsBoxyTuple kind -> do
-          -- Here we use zonkTcKind instead of zonkTcKindToKind because pairs
-          -- are a special case: we use them both for types (eg. (Int, Bool))
-          -- and for constraints (eg. (Show a, Eq a))
-          kind' <- zonkTcKind kind
-          case () of
-            _ | kind' `eqKind` constraintKind -> return ConstraintTuple
-            _ | kind' `eqKind` liftedTypeKind -> return BoxedTuple
-            _ | otherwise
-              -> failWithTc (ptext (sLit "Unexpected tuple component kind:") <+> ppr kind')
+        HsUnboxedTuple    -> return UnboxedTuple
+        HsBoxedTuple      -> return BoxedTuple
+        HsConstraintTuple -> return ConstraintTuple
+        _ -> panic "ds_type HsTupleTy"
+        -- failWithTc (ptext (sLit "Unexpected tuple component kind:") <+> ppr kind')
     let tycon = tupleTyCon con (length tys)
     tau_tys <- dsHsTypes tys
     checkWiredInTyCon tycon
@@ -1200,9 +1168,8 @@ data EkCtxt  = EkUnk		-- Unknown context
 instance Outputable ExpKind where
   ppr (EK k _) = ptext (sLit "Expected kind:") <+> ppr k
 
-ekLifted, ekOpen, ekArg, ekConstraint :: ExpKind
+ekLifted, ekArg, ekConstraint :: ExpKind
 ekLifted     = EK liftedTypeKind EkUnk
-ekOpen       = EK openTypeKind   EkUnk
 ekArg        = EK argTypeKind    EkUnk
 ekConstraint = EK constraintKind EkUnk
 
@@ -1278,6 +1245,18 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
 		   <+> fun <+> ptext (sLit ("should have"))
 
            failWithTcM (env2, err $$ more_info)
+
+-- We infer the kind of the type, and then complain if it's not right.
+-- But we don't want to complain about
+--      (ty) or !(ty) or forall a. ty
+-- when the real difficulty is with the 'ty' part.
+checkExpectedKindS :: HsType Name -> TcKind -> ExpKind -> TcM ()
+checkExpectedKindS ty = checkExpectedKind (strip ty)
+  where
+    strip (HsParTy (L _ ty))          = strip ty
+    strip (HsBangTy _ (L _ ty))       = strip ty
+    strip (HsForAllTy _ _ _ (L _ ty)) = strip ty
+    strip ty                          = ty
 \end{code}
 
 %************************************************************************
