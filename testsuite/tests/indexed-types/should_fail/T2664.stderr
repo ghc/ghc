@@ -1,6 +1,6 @@
 
 T2664.hs:31:17:
-    Could not deduce (b ~ a)
+    Could not deduce (a ~ b)
     from the context (Connect a, Connect b)
       bound by the instance declaration at T2664.hs:22:10-52
     or from ((a :*: b) ~ Dual c, c ~ Dual (a :*: b))
@@ -8,10 +8,10 @@ T2664.hs:31:17:
                  newPChan :: ((a :*: b) ~ Dual c, c ~ Dual (a :*: b)) =>
                              IO (PChan (a :*: b), PChan c)
       at T2664.hs:(23,5)-(31,87)
-      `b' is a rigid type variable bound by
-          the instance declaration at T2664.hs:22:30
       `a' is a rigid type variable bound by
           the instance declaration at T2664.hs:22:19
+      `b' is a rigid type variable bound by
+          the instance declaration at T2664.hs:22:30
     Expected type: PChan (a :*: b)
       Actual type: PChan (b :*: a)
     In the expression: O $ takeMVar v

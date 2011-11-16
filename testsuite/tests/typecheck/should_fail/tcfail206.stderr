@@ -38,10 +38,11 @@ tcfail206.hs:17:5:
     In the expression: (# 1, #)
     In an equation for `e': e = (# 1, #)
 
-tcfail206.hs:20:7:
+tcfail206.hs:20:5:
     Couldn't match type `a' with `Bool'
       `a' is a rigid type variable bound by
           the type signature for f :: a -> (# a, Bool #) at tcfail206.hs:20:1
-    In the expression: True || False
+    Expected type: a -> (# a, Bool #)
+      Actual type: a -> (# a, a #)
     In the expression: (# True || False, #)
     In an equation for `f': f = (# True || False, #)

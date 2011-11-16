@@ -14,7 +14,7 @@ TYPE CONSTRUCTORS
       FamilyInstance: none
 COERCION AXIOMS
   axiom Foo.TFCo:R:ElemListColl [a]
-    :: Elem (ListColl a) ~ Foo.R:ElemListColl a
+    :: Elem (ListColl a) ~# Foo.R:ElemListColl a
 INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11
 FAMILY INSTANCES
