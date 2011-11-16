@@ -43,7 +43,7 @@ import StaticFlags
 import CoreSyn
 import qualified CoreSubst
 import PprCore
-import DataCon	( dataConCannotMatch )
+import DataCon	( dataConCannotMatch, dataConWorkId )
 import CoreFVs
 import CoreUtils
 import CoreArity
@@ -1747,14 +1747,15 @@ mkCase1 _dflags scrut case_bndr alts	-- Identity case
   = do { tick (CaseIdentity case_bndr)
        ; return (re_cast scrut rhs1) }
   where
-    identity_alt (con, args, rhs) = check_eq con args rhs
+    identity_alt (con, args, rhs) = check_eq rhs con args
 
-    check_eq con           args (Cast e co) | not (any (`elemVarSet` tyCoVarsOfCo co) args)
-        {- See Note [RHS casts] -}          = check_eq con args e
-    check_eq _             _    (Var v)     = v == case_bndr
-    check_eq (LitAlt lit') _    (Lit lit)   = lit == lit'
-    check_eq (DataAlt con) args rhs         = rhs `cheapEqExpr` mkConApp con (arg_tys ++ varsToCoreExprs args)
-    check_eq _             _    _           = False
+    check_eq (Cast rhs co) con args         = not (any (`elemVarSet` tyCoVarsOfCo co) args)
+        {- See Note [RHS casts] -}            && check_eq rhs con args
+    check_eq (Lit lit) (LitAlt lit') _      = lit == lit'
+    check_eq (Var v)   _ _ | v == case_bndr = True
+    check_eq (Var v)   (DataAlt con) []     = v == dataConWorkId con   -- Optimisation only
+    check_eq rhs       (DataAlt con) args   = rhs `cheapEqExpr` mkConApp con (arg_tys ++ varsToCoreExprs args)
+    check_eq _ _ _ = False
 
     arg_tys = map Type (tyConAppArgs (idType case_bndr))
 
