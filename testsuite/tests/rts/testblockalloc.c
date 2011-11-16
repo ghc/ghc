@@ -21,7 +21,15 @@ int main (int argc, char *argv[])
 
     srand(SEED);
 
+#if __GLASGOW_HASKELL__ >= 703
+    {
+        RtsConfig conf = defaultRtsConfig;
+        conf.rts_opts_enabled = RtsOptsAll;
+        hs_init_ghc(&argc, &argv, conf);
+    }
+#else
     hs_init(&argc, &argv);
+#endif
 
    // repeatedly sweep though the array, allocating new random-sized
    // objects and deallocating the old ones.
