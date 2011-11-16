@@ -1,5 +1,5 @@
 
-T3540.hs:4:11:
+T3540.hs:4:12:
     Predicate `a ~ Int' used as a type
     Expected kind `??', but `a ~ Int' has kind `Constraint'
     In the type signature for `thing': thing :: a ~ Int
