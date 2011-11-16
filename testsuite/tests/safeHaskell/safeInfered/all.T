@@ -48,6 +48,14 @@ test('UnsafeInfered09',
                     'UnsafeInfered09_B.hi', 'UnsafeInfered09_B.o']) ],
      multimod_compile_fail, ['UnsafeInfered09', ''])
 
+# Test that should fail as we disable safe inference
+test('UnsafeInfered10',
+     [ extra_clean(['UnsafeInfered10_A.hi', 'UnsafeInfered10_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered10', ''])
+test('UnsafeInfered11',
+     [ extra_clean(['UnsafeInfered11_A.hi', 'UnsafeInfered11_A.o']) ],
+     multimod_compile_fail, ['UnsafeInfered11', ''])
+
 # Mixed tests
 test('Mixed01', normal, compile_fail, [''])
 test('Mixed02', normal, compile_fail, [''])

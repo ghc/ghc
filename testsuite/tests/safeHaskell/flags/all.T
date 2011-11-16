@@ -41,6 +41,20 @@ test('SafeFlags18', normal, compile, ['-trust base'])
 test('SafeFlags19', normal, compile_fail, [''])
 test('SafeFlags20', normal, compile, ['-trust base'])
 
-test('Flags01', normal, compile, [''])
-test('Flags02', normal, compile, [''])
+# test -Wunsafe flag
+test('SafeFlags21', normal, compile, [''])
+test('SafeFlags22', normal, compile, [''])
+test('SafeFlags23', normal, compile_fail, [''])
+
+# test -Wsafe flag
+test('SafeFlags24', normal, compile, [''])
+test('SafeFlags25', normal, compile, [''])
+test('SafeFlags26', normal, compile_fail, [''])
+
+# test -fno-safe-infer
+test('SafeFlags27', normal, compile, [''])
+
+# test certain flags are still allowed under -XSafe
+test('Flags01', normal, compile, ['-XSafe'])
+test('Flags02', normal, compile, ['-XSafe'])
 
