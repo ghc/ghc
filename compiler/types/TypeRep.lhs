@@ -1,4 +1,4 @@
-%
+ | %
 % (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1998
 %
@@ -477,16 +477,15 @@ pprParendKind = pprParendType
 
 ------------------
 pprEqPred :: Pair Type -> SDoc
-pprEqPred = ppr_eq_pred ppr_type
-
-ppr_eq_pred :: (Prec -> a -> SDoc) -> Pair a -> SDoc
-ppr_eq_pred pp (Pair ty1 ty2) = sep [ pp FunPrec ty1
-                                    , nest 2 (ptext (sLit "~"))
-                                    , pp FunPrec ty2]
-			       -- Precedence looks like (->) so that we get
-			       --    Maybe a ~ Bool
-			       --    (a->a) ~ Bool
-			       -- Note parens on the latter!
+-- NB: Maybe move to Coercion? It's only called after coercionKind anyway. 
+pprEqPred (Pair ty1 ty2) 
+  = sep [ ppr_type FunPrec ty1
+        , nest 2 (ptext (sLit "~#"))
+        , ppr_type FunPrec ty2]
+    -- Precedence looks like (->) so that we get
+    --    Maybe a ~ Bool
+    --    (a->a) ~ Bool
+    -- Note parens on the latter!
 
 ------------
 pprClassPred :: Class -> [Type] -> SDoc

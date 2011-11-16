@@ -186,10 +186,14 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 --------------------------------------
 dsTcEvBinds :: TcEvBinds -> DsM [CoreBind]
 dsTcEvBinds (TcEvBinds {}) = panic "dsEvBinds"	-- Zonker has got rid of this
-dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
+dsTcEvBinds (EvBinds bs)   = -- pprTrace "EvBinds bs = "  (ppr bs) $ 
+                             dsEvBinds bs
 
 dsEvBinds :: Bag EvBind -> DsM [CoreBind]
-dsEvBinds bs = return (map dsEvGroup sccs)
+dsEvBinds bs = do { let core_binds = map dsEvSCC sccs 
+--                   ; pprTrace "dsEvBinds, result = " (vcat (map ppr core_binds)) $ 
+                  ; return core_binds }
+--                   ; return (map dsEvGroup sccs)
   where
     sccs :: [SCC EvBind]
     sccs = stronglyConnCompFromEdgedVertices edges
@@ -202,19 +206,19 @@ dsEvBinds bs = return (map dsEvGroup sccs)
 
     free_vars_of :: EvTerm -> [EvVar]
     free_vars_of (EvId v)           = [v]
-    free_vars_of (EvCast v co)      = v : varSetElems (tyCoVarsOfCo co)
-    free_vars_of (EvCoercionBox co) = varSetElems (tyCoVarsOfCo co)
+    free_vars_of (EvCast v co)      = v : varSetElems (coVarsOfCo co)
+    free_vars_of (EvCoercionBox co) = varSetElems (coVarsOfCo co)
     free_vars_of (EvDFunApp _ _ vs) = vs
     free_vars_of (EvTupleSel v _)   = [v]
     free_vars_of (EvTupleMk vs)     = vs
     free_vars_of (EvSuperClass d _) = [d]
 
-dsEvGroup :: SCC EvBind -> CoreBind
+dsEvSCC :: SCC EvBind -> CoreBind
 
-dsEvGroup (AcyclicSCC (EvBind v r))
+dsEvSCC (AcyclicSCC (EvBind v r))
   = NonRec v (dsEvTerm r)
 
-dsEvGroup (CyclicSCC bs)
+dsEvSCC (CyclicSCC bs)
   = Rec (map ds_pair bs)
   where
     ds_pair (EvBind v r) = (v, dsEvTerm r)
@@ -251,8 +255,12 @@ dsLCoercion co k
 
 ---------------------------------------
 dsEvTerm :: EvTerm -> CoreExpr
-dsEvTerm (EvId v)                = Var v
-dsEvTerm (EvCast v co)           = dsLCoercion co $ Cast (Var v)
+dsEvTerm (EvId v) = Var v
+
+dsEvTerm (EvCast v co) 
+  = dsLCoercion co $ mkCast (Var v) -- 'v' is always a lifted evidence variable so it is
+                                    -- unnecessary to call varToCoreExpr v here.
+
 dsEvTerm (EvDFunApp df tys vars) = Var df `mkTyApps` tys `mkVarApps` vars
 dsEvTerm (EvCoercionBox co)      = dsLCoercion co mkEqBox
 dsEvTerm (EvTupleSel v n)
@@ -686,12 +694,13 @@ dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
 dsHsWrapper WpHole 	      = return (\e -> e)
 dsHsWrapper (WpTyApp ty)      = return (\e -> App e (Type ty))
 dsHsWrapper (WpLet ev_binds)  = do { ds_ev_binds <- dsTcEvBinds ev_binds
+--                                   ; pprTrace "Desugared core bindings = " (vcat (map ppr ds_ev_binds)) $ 
                                    ; return (mkCoreLets ds_ev_binds) }
 dsHsWrapper (WpCompose c1 c2) = do { k1 <- dsHsWrapper c1 
                                    ; k2 <- dsHsWrapper c2
                                    ; return (k1 . k2) }
 dsHsWrapper (WpCast co)
-  = return (\e -> dsLCoercion co (Cast e)) 
+  = return (\e -> dsLCoercion co (mkCast e)) 
 dsHsWrapper (WpEvLam ev)      = return (\e -> Lam ev e) 
 dsHsWrapper (WpTyLam tv)      = return (\e -> Lam tv e) 
 dsHsWrapper (WpEvApp evtrm)

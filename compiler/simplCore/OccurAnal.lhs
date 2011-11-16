@@ -28,7 +28,7 @@ module OccurAnal (
 
 import CoreSyn
 import CoreFVs
-import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp, mkCoerce )
+import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp, mkCast )
 import Id
 import Name( localiseName )
 import BasicTypes
@@ -1345,7 +1345,7 @@ wrapProxy (bndr, rhs_var, co) (body_usg, body)
   where
     (body_usg', tagged_bndr) = tagBinder body_usg bndr
     rhs_usg = unitVarEnv rhs_var NoOccInfo	-- We don't need exact info
-    rhs = mkCoerce co (Var (zapIdOccInfo rhs_var)) -- See Note [Zap case binders in proxy bindings]
+    rhs = mkCast (Var (zapIdOccInfo rhs_var)) co -- See Note [Zap case binders in proxy bindings]
 \end{code}
 
 

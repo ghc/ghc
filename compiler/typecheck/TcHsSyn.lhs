@@ -206,6 +206,10 @@ data ZonkEnv
 	-- Only *type* abstraction is done by side effect
 	-- Is only consulted lazily; hence knot-tying
 
+instance Outputable ZonkEnv where 
+  ppr (ZonkEnv _ _ty_env var_env) = vcat (map ppr (varEnvElts var_env))
+
+
 emptyZonkEnv :: ZonkEnv
 emptyZonkEnv = ZonkEnv zonkTypeZapping emptyVarEnv emptyVarEnv
 
@@ -1078,7 +1082,7 @@ zonkEvTerm env (EvCoercionBox co) = do { co' <- zonkTcLCoToLCo env co
                                        ; return (EvCoercionBox co') }
 zonkEvTerm env (EvCast v co)      = ASSERT( isId v) 
                                     do { co' <- zonkTcLCoToLCo env co
-                                       ; return (EvCast (zonkIdOcc env v) co') }
+                                       ; return (mkEvCast (zonkIdOcc env v) co') }
 zonkEvTerm env (EvTupleSel v n)   = return (EvTupleSel (zonkIdOcc env v) n)
 zonkEvTerm env (EvTupleMk vs)     = return (EvTupleMk (map (zonkIdOcc env) vs))
 zonkEvTerm env (EvSuperClass d n) = return (EvSuperClass (zonkIdOcc env d) n)
@@ -1225,10 +1229,14 @@ zonkTypeZapping tv
 
 
 zonkTcLCoToLCo :: ZonkEnv -> LCoercion -> TcM LCoercion
+-- NB: zonking often reveals that the coercion is an identity
+--     in which case the Refl-ness can propagate up to the top
+--     which in turn gives more efficient desugaring.  So it's
+--     worth using the 'mk' smart constructors on the RHS
 zonkTcLCoToLCo env co
   = go co
   where
-    go (CoVarCo cv)         = return (CoVarCo (zonkEvVarOcc env cv))
+    go (CoVarCo cv)         = return (mkEqVarLCo (zonkEvVarOcc env cv))
     go (Refl ty)            = do { ty' <- zonkTcTypeToType env ty
                                  ; return (Refl ty') }
     go (TyConAppCo tc cos)  = do { cos' <- mapM go cos; return (mkTyConAppCo tc cos') }

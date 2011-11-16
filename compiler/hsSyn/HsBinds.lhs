@@ -486,19 +486,21 @@ data EvBindsVar = EvBindsVar (IORef EvBindMap) Unique
      -- The Unique is only for debug printing
 
 -----------------
-type EvBindMap = VarEnv EvBind
+newtype EvBindMap = EvBindMap { ev_bind_varenv :: VarEnv EvBind } -- Map from evidence variables to evidence terms
 
 emptyEvBindMap :: EvBindMap
-emptyEvBindMap = emptyVarEnv
+emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyVarEnv }
 
 extendEvBinds :: EvBindMap -> EvVar -> EvTerm -> EvBindMap
-extendEvBinds bs v t = extendVarEnv bs v (EvBind v t)
+extendEvBinds bs v t 
+  = EvBindMap { ev_bind_varenv = extendVarEnv (ev_bind_varenv bs) v (EvBind v t) }
 
 lookupEvBind :: EvBindMap -> EvVar -> Maybe EvBind
-lookupEvBind = lookupVarEnv
+lookupEvBind bs = lookupVarEnv (ev_bind_varenv bs)
 
 evBindMapBinds :: EvBindMap -> Bag EvBind
-evBindMapBinds = foldVarEnv consBag emptyBag
+evBindMapBinds bs 
+  = foldVarEnv consBag emptyBag (ev_bind_varenv bs)
 
 -----------------
 instance Data TcEvBinds where
@@ -551,6 +553,11 @@ Conclusion: a new wanted coercion variable should be made mutable.
 
 
 \begin{code}
+mkEvCast :: EvVar -> LCoercion -> EvTerm
+mkEvCast ev lco
+  | isReflCo lco = EvId ev
+  | otherwise    = EvCast ev lco
+
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
 

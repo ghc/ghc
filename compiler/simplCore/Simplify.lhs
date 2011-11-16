@@ -983,26 +983,12 @@ simplCoercionF :: SimplEnv -> InCoercion -> SimplCont
 --  =  Coercion (syn (nth 0 g) ; co ; nth 1 g) 
 simplCoercionF env co cont 
   = do { co' <- simplCoercion env co
-       ; simpl_co co' cont }
-  where
-    simpl_co co (CoerceIt g cont)
-       = simpl_co new_co cont
-     where
-       -- g :: (s1 ~# s2) ~# (t1 ~#  t2)
-       -- g1 :: s1 ~# t1
-       -- g2 :: s2 ~# t2
-       new_co = mkSymCo g1 `mkTransCo` co `mkTransCo` g2
-       [_reflk, g1, g2] = decomposeCo 3 g
-            -- Remember, (~#) :: forall k. k -> k -> *
-            -- so it takes *three* arguments, not two
-
-    simpl_co co cont
-       = seqCo co `seq` rebuild env (Coercion co) cont
+       ; rebuild env (Coercion co') cont }
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
   = let opt_co = optCoercion (getCvSubst env) co
-    in opt_co `seq` return opt_co
+    in seqCo opt_co `seq` return opt_co
 
 -----------------------------------
 -- | Push a TickIt context outwards past applications and cases, as
@@ -1162,7 +1148,8 @@ rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplEnv, OutExpr)
 rebuild env expr cont
   = case cont of
       Stop {}                      -> return (env, expr)
-      CoerceIt co cont             -> rebuild env (Cast expr co) cont
+      CoerceIt co cont             -> rebuild env (mkCast expr co) cont 
+                                         -- NB: mkCast implements the (Coercion co |> g) optimisation
       Select _ bndr alts se cont   -> rebuildCase (se `setFloats` env) expr bndr alts cont
       StrictArg info _ cont        -> rebuildCall env (info `addArgTo` expr) cont
       StrictBind b bs body se cont -> do { env' <- simplNonRecX (se `setFloats` env) b expr
@@ -1242,7 +1229,7 @@ simplCast env body co0 cont0
            -- t2 ~ s2 with left and right on the curried form:
            --    (->) t1 t2 ~ (->) s1 s2
            [co1, co2] = decomposeCo 2 co
-           new_arg    = mkCoerce (mkSymCo co1) arg'
+           new_arg    = mkCast arg' (mkSymCo co1)
            arg'       = substExpr (text "move-cast") arg_se' arg
            arg_se'    = arg_se `setInScope` env
 
@@ -1447,7 +1434,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
     cont_ty = contResultType env res_ty cont
     co      = mkUnsafeCo res_ty cont_ty
     mk_coerce expr | cont_ty `eqType` res_ty = expr
-                   | otherwise = mkCoerce co expr
+                   | otherwise = mkCast expr co
 
 rebuildCall env info (ApplyTo dup_flag (Type arg_ty) se cont)
   = do { arg_ty' <- if isSimplified dup_flag then return arg_ty

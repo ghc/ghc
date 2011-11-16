@@ -63,8 +63,10 @@ module TcMType (
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
-  zonkTcKind, defaultKindVarToStar,
-  zonkImplication, zonkEvVar, zonkWantedEvVar, zonkFlavoredEvVar,
+
+  zonkTcKind, defaultKindVarToStar, zonkCt, zonkCts,
+  zonkImplication, zonkEvVar, zonkWantedEvVar,
+
   zonkWC, zonkWantedEvVars,
   zonkTcTypeAndSubst,
   tcGetGlobalTyVars, 
@@ -164,7 +166,7 @@ newDict cls tys
        ; return (mkLocalId name (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
-predTypeOccName ty = case predTypePredTree ty of
+predTypeOccName ty = case classifyPredType ty of
     ClassPred cls _ -> mkDictOcc (getOccName cls)
     IPPred ip _     -> mkVarOccFS (ipFastString ip)
     EqPred _ _      -> mkVarOccFS (fsLit "cobox")
@@ -670,18 +672,25 @@ zonkEvVar :: EvVar -> TcM EvVar
 zonkEvVar var = do { ty' <- zonkTcType (varType var)
                    ; return (setVarType var ty') }
 
-zonkFlavoredEvVar :: FlavoredEvVar -> TcM FlavoredEvVar
-zonkFlavoredEvVar (EvVarX ev fl)
-  = do { ev' <- zonkEvVar ev
-       ; fl' <- zonkFlavor fl
-       ; return (EvVarX ev' fl') }
 
 zonkWC :: WantedConstraints -> TcM WantedConstraints
 zonkWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
-  = do { flat'   <- zonkWantedEvVars flat
+  = do { flat'   <- mapBagM zonkCt flat 
        ; implic' <- mapBagM zonkImplication implic
-       ; insol'  <- mapBagM zonkFlavoredEvVar insol
+       ; insol'  <- mapBagM zonkCt insol
        ; return (WC { wc_flat = flat', wc_impl = implic', wc_insol = insol' }) }
+
+zonkCt :: Ct -> TcM Ct 
+-- Zonking a Ct conservatively gives back a CNonCanonical
+zonkCt ct 
+  = do { v'  <- zonkEvVar (cc_id ct)
+       ; fl' <- zonkFlavor (cc_flavor ct)
+       ; return $ 
+         CNonCanonical { cc_id = v'
+                       , cc_flavor = fl'
+                       , cc_depth = cc_depth ct } }
+zonkCts :: Cts -> TcM Cts
+zonkCts = mapBagM zonkCt
 
 zonkWantedEvVars :: Bag WantedEvVar -> TcM (Bag WantedEvVar)
 zonkWantedEvVars = mapBagM zonkWantedEvVar
@@ -1217,7 +1226,7 @@ check_pred_ty' _ _ctxt (IPPred _ ty) = checkValidMonoType ty
 check_pred_ty' dflags ctxt t@(TuplePred ts)
   = do { checkTc (xopt Opt_ConstraintKinds dflags)
                  (predTupleErr (predTreePredType t))
-       ; mapM_ (check_pred_ty' dflags ctxt) ts }
+       ; mapM_ (check_pred_ty dflags ctxt) ts }
     -- This case will not normally be executed because without -XConstraintKinds
     -- tuple types are only kind-checked as *
 
@@ -1386,7 +1395,7 @@ growPredTyVars :: TcPredType
                -> TyVarSet	-- The set to extend
 	       -> TyVarSet	-- TyVars of the predicate if it intersects
 	       	  		-- the set, or is implicit parameter
-growPredTyVars pred tvs = go (predTypePredTree pred)
+growPredTyVars pred tvs = go (classifyPredType pred)
   where
     grow pred_tvs | pred_tvs `intersectsVarSet` tvs = pred_tvs
                   | otherwise                       = emptyVarSet
@@ -1394,7 +1403,7 @@ growPredTyVars pred tvs = go (predTypePredTree pred)
     go (IPPred _ ty)     = tyVarsOfType ty -- See Note [Implicit parameters and ambiguity]
     go (ClassPred _ tys) = grow (tyVarsOfTypes tys)
     go (EqPred ty1 ty2)  = grow (tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2)
-    go (TuplePred ts)    = unionVarSets (map go ts)
+    go (TuplePred ts)    = unionVarSets (map (go . classifyPredType) ts)
     go (IrredPred ty)    = grow (tyVarsOfType ty)
 \end{code}
     
@@ -1727,7 +1736,6 @@ fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys                = concat (map fvType tys)
 
--------------------
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors
 sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
@@ -1749,12 +1757,12 @@ sizeTypes xs = sum (map sizeType tys)
 -- can't get back to a class constraint, so it's safe
 -- to say "size 0".  See Trac #4200.
 sizePred :: PredType -> Int
-sizePred ty = go (predTypePredTree ty)
+sizePred ty = go (classifyPredType ty)
   where
     go (ClassPred _ tys') = sizeTypes tys'
     go (IPPred {})        = 0
     go (EqPred {})        = 0
-    go (TuplePred ts)     = sum (map go ts)
+    go (TuplePred ts)     = sum (map (go . classifyPredType) ts)
     go (IrredPred ty)     = sizeType ty
 \end{code}
 

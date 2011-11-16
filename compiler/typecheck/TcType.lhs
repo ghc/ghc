@@ -1013,7 +1013,7 @@ tcInstHeadTyAppAllTyVars ty
 Deconstructors and tests on predicate types
 
 \begin{code}
--- | Like 'predTypePredTree' but doesn't look through type synonyms.
+-- | Like 'classifyPredType' but doesn't look through type synonyms.
 -- Used to check that programs only use "simple" contexts without any
 -- synonyms in them.
 shallowPredTypePredTree :: PredType -> PredTree
@@ -1029,7 +1029,7 @@ shallowPredTypePredTree ev_ty
          , let [ty] = tys
          -> IPPred ip ty
       () | isTupleTyCon tc
-         -> TuplePred (map shallowPredTypePredTree tys)
+         -> TuplePred tys
       _ -> IrredPred ev_ty
   | otherwise
   = IrredPred ev_ty
@@ -1061,31 +1061,32 @@ mkMinimalBySCs :: [PredType] -> [PredType]
 mkMinimalBySCs ptys = [ ploc |  ploc <- ptys
                              ,  ploc `not_in_preds` rec_scs ]
  where
-   rec_scs = concatMap (trans_super_classes . predTypePredTree) ptys
+   rec_scs = concatMap trans_super_classes ptys
    not_in_preds p ps = null (filter (eqPred p) ps)
-   trans_super_classes (ClassPred cls tys) = transSuperClasses cls tys
-   trans_super_classes (TuplePred ts)      = concatMap trans_super_classes ts
-   trans_super_classes _other_pty          = []
+
+   trans_super_classes pred   -- Superclasses of pred, excluding pred itself
+     = case classifyPredType pred of
+         ClassPred cls tys -> transSuperClasses cls tys
+         TuplePred ts      -> concatMap trans_super_classes ts
+         _                 -> []
 
 transSuperClasses :: Class -> [Type] -> [PredType]
-transSuperClasses cls tys
-  = foldl (\pts p -> trans_sc p ++ pts) [] $
-    immSuperClasses cls tys
-  where trans_sc :: PredType -> [PredType]
-        trans_sc = trans_sc' . predTypePredTree
-
-        trans_sc' :: PredTree -> [PredType]
-        trans_sc' ptree@(ClassPred cls tys)
-          = foldl (\pts p -> trans_sc p ++ pts) [predTreePredType ptree] $
-            immSuperClasses cls tys
-        trans_sc' ptree@(TuplePred ts)
-          = foldl (\pts t -> trans_sc' t ++ pts) [predTreePredType ptree] ts
-        trans_sc' ptree = [predTreePredType ptree]
+transSuperClasses cls tys    -- Superclasses of (cls tys),
+                             -- excluding (cls tys) itself
+  = concatMap trans_sc (immSuperClasses cls tys)
+  where 
+    trans_sc :: PredType -> [PredType]
+    -- (trans_sc p) returns (p : p's superclasses)
+    trans_sc p = case classifyPredType p of
+                   ClassPred cls tys -> p : transSuperClasses cls tys
+                   TuplePred ps      -> concatMap trans_sc ps
+                   _                 -> [p]
 
 immSuperClasses :: Class -> [Type] -> [PredType]
 immSuperClasses cls tys
   = substTheta (zipTopTvSubst tyvars tys) sc_theta
-  where (tyvars,sc_theta,_,_) = classBigSig cls
+  where 
+    (tyvars,sc_theta,_,_) = classBigSig cls
 \end{code}
 
 

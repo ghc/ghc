@@ -140,11 +140,11 @@ oclose preds fixed_tvs
 	      ]
      
     classesOfPredTy :: PredType -> [(Class, [Type])]
-    classesOfPredTy = go . predTypePredTree
-      where
-       go (ClassPred cls tys) = [(cls, tys)]
-       go (TuplePred ts)      = concatMap go ts
-       go _                   = []
+    classesOfPredTy pred
+       = case classifyPredType pred of
+            ClassPred cls tys -> [(cls, tys)]
+            TuplePred ts      -> concatMap classesOfPredTy ts
+            _                 -> []
 \end{code}
 
     

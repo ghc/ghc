@@ -949,7 +949,8 @@ simple_opt_expr' subst expr
       = case altcon of
           DEFAULT -> go rhs
           _       -> mkLets (catMaybes mb_binds) $ simple_opt_expr subst' rhs
-            where (subst', mb_binds) = mapAccumL simple_opt_out_bind subst (zipEqual "simpleOptExpr" bs es)
+            where (subst', mb_binds) = mapAccumL simple_opt_out_bind subst 
+                                                 (zipEqual "simpleOptExpr" bs es)
 
       | otherwise
       = Case e' b' (substTy subst ty)
@@ -1016,9 +1017,11 @@ simple_opt_bind' subst (NonRec b r)
 
 ----------------------
 simple_opt_out_bind :: Subst -> (InVar, OutExpr) -> (Subst, Maybe CoreBind)
-simple_opt_out_bind subst (b, r') = case maybe_substitute subst b r' of
-      Just ext_subst -> (ext_subst, Nothing)
-      Nothing        -> (subst', Just (NonRec b2 r'))
+simple_opt_out_bind subst (b, r') 
+  | Just ext_subst <- maybe_substitute subst b r'
+  = (ext_subst, Nothing)
+  | otherwise
+  = (subst', Just (NonRec b2 r'))
   where
     (subst', b') = subst_opt_bndr subst b
     b2 = add_info subst' b b'
@@ -1038,6 +1041,8 @@ maybe_substitute subst b r
     Just (extendCvSubst subst b co)
 
   | isId b              -- let x = e in <body>
+  , not (isCoVar b)	-- See Note [Do not inline CoVars unconditionally]
+    		 	-- in SimplUtils
   , safe_to_inline (idOccInfo b) 
   , isAlwaysActive (idInlineActivation b)	-- Note [Inline prag in simplOpt]
   , not (isStableUnfolding (idUnfolding b))
@@ -1257,7 +1262,7 @@ dealWithCoercion co stuff@(dc, _dc_univ_args, dc_args)
 
           -- Cast the value arguments (which include dictionaries)
         new_val_args = zipWith cast_arg arg_tys val_args
-        cast_arg arg_ty arg = mkCoerce (theta_subst arg_ty) arg
+        cast_arg arg_ty arg = mkCast arg (theta_subst arg_ty)
 
         dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,

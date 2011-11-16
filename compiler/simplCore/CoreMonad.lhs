@@ -251,8 +251,9 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
-  | CoreDesugar	 -- Not strictly a core-to-core pass, but produces
-                 -- Core output, and hence useful to pass to endPass
+  | CoreDesugar    -- Right after desugaring, no simple optimisation yet!
+  | CoreDesugarOpt -- CoreDesugarXXX: Not strictly a core-to-core pass, but produces
+                       --                 Core output, and hence useful to pass to endPass
 
   | CoreTidy
   | CorePrep
@@ -274,6 +275,7 @@ coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse 
 coreDumpFlag CoreDoVectorisation      = Just Opt_D_dump_vect
 coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds 
+coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds 
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 
@@ -295,7 +297,8 @@ instance Outputable CoreToDo where
   ppr CoreDoSpecConstr         = ptext (sLit "SpecConstr")
   ppr CoreCSE                  = ptext (sLit "Common sub-expression")
   ppr CoreDoVectorisation      = ptext (sLit "Vectorisation")
-  ppr CoreDesugar              = ptext (sLit "Desugar")
+  ppr CoreDesugar              = ptext (sLit "Desugar (before optimization)")
+  ppr CoreDesugarOpt           = ptext (sLit "Desugar (after optimization)")
   ppr CoreTidy                 = ptext (sLit "Tidy Core")
   ppr CorePrep 		       = ptext (sLit "CorePrep")
   ppr CoreDoPrintCore          = ptext (sLit "Print core")

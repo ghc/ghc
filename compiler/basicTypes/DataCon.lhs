@@ -858,16 +858,17 @@ dataConCannotMatch tys con
   | all isTyVarTy tys = False	-- Also common
   | otherwise
   = typesCantMatch [(Type.substTy subst ty1, Type.substTy subst ty2)
-                   | (ty1, ty2) <- concatMap (predEqs . predTypePredTree) theta ]
+                   | (ty1, ty2) <- concatMap predEqs theta ]
   where
     dc_tvs  = dataConUnivTyVars con
     theta   = dataConTheta con
     subst   = zipTopTvSubst dc_tvs tys
 
     -- TODO: could gather equalities from superclasses too
-    predEqs (EqPred ty1 ty2) = [(ty1, ty2)]
-    predEqs (TuplePred ts)   = concatMap predEqs ts
-    predEqs _                = []
+    predEqs pred = case classifyPredType pred of
+                     EqPred ty1 ty2 -> [(ty1, ty2)]
+                     TuplePred ts   -> concatMap predEqs ts
+                     _              -> []
 \end{code}
 
 %************************************************************************

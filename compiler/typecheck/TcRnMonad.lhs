@@ -998,6 +998,15 @@ emitFlats ct
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`addFlats` ct) }
 
+emitWantedCts :: Cts -> TcM () 
+-- Precondition: all wanted
+emitWantedCts = mapBagM_ emit_wanted_ct
+  where emit_wanted_ct ct 
+          | v <- cc_id ct 
+          , Wanted loc <- cc_flavor ct 
+          = emitFlat (EvVarX v loc)
+          | otherwise = panic "emitWantecCts: can't emit non-wanted!"
+
 emitImplication :: Implication -> TcM ()
 emitImplication ct
   = do { lie_var <- getConstraintVar ;

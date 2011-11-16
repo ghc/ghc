@@ -122,7 +122,7 @@ prDictOfPReprInstTyCon ty prepr_tc prepr_args
       let co = mkAppCo pr_co
              $ mkSymCo
              $ mkAxInstCo arg_co prepr_args
-      return $ mkCoerce co dict
+      return $ mkCast dict co
 
   | otherwise = cantVectorise "Invalid PRepr type instance" (ppr ty)
 

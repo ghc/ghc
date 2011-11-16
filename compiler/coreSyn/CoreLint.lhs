@@ -297,6 +297,21 @@ lintCoreExpr (Let (Rec pairs) body)
     (_, dups) = removeDups compare bndrs
 
 lintCoreExpr e@(App _ _)
+{- DV: This grievous hack (from ghc-constraint-solver should not be needed: 
+    | Var x <- fun -- Greivous hack for Eq# construction: Eq# may have type arguments
+                   -- of kind (* -> *) but its type insists on *. When we have polymorphic kinds,
+                   -- we should do this properly
+    , Just dc <- isDataConWorkId_maybe x
+    , dc == eqBoxDataCon
+    , [Type arg_ty1, Type arg_ty2, co_e] <- args
+    = do arg_ty1' <- lintInTy arg_ty1
+         arg_ty2' <- lintInTy arg_ty2
+         unless (typeKind arg_ty1' `eqKind` typeKind arg_ty2')
+                (addErrL (mkEqBoxKindErrMsg arg_ty1 arg_ty2))
+         
+         lintCoreArg (mkCoercionType arg_ty1' arg_ty2' `mkFunTy` mkEqPred (arg_ty1', arg_ty2')) co_e
+    | otherwise
+-}
     = do { fun_ty <- lintCoreExpr fun
          ; addLoc (AnExpr e) $ foldM lintCoreArg fun_ty args }
   where
@@ -460,13 +475,10 @@ checkTyKind tyvar arg_ty
 checkTyCoKind :: TyVar -> OutCoercion -> LintM (OutType, OutType)
 checkTyCoKind tv co
   = do { (t1,t2) <- lintCoercion co
-       ; k1      <- lintType t1
-       ; k2      <- lintType t2
-       ; unless ((k1 `isSubKind` tyvar_kind) && (k2 `isSubKind` tyvar_kind))
+            -- t1,t2 have the same kind
+       ; unless (typeKind t1 `isSubKind` tyVarKind tv)
                 (addErrL (mkTyCoAppErrMsg tv co))
        ; return (t1,t2) }
-  where 
-    tyvar_kind = tyVarKind tv
 
 checkTyCoKinds :: [TyVar] -> [OutCoercion] -> LintM [(OutType, OutType)]
 checkTyCoKinds = zipWithM checkTyCoKind
@@ -688,6 +700,29 @@ lintTyBndrKind tv =
   else lintKind ki  -- type forall
 
 -------------------
+{-
+lint_prim_eq_co :: TyCon -> OutCoercion -> [OutCoercion] -> LintM (OutType,OutType)
+lint_prim_eq_co tc co arg_cos = case arg_cos of 
+  [co1,co2] -> do { (t1,s1) <- lintCoercion co1
+                  ; (t2,s2) <- lintCoercion co2
+                  ; checkL (typeKind t1 `eqKind` typeKind t2) $ 
+                    ptext (sLit "Mismatched arg kinds in coercion application:") <+> ppr co
+                  ; return (mkTyConApp tc [t1,t2], mkTyConApp tc [s1,s2]) }
+  _ -> failWithL (ptext (sLit "Unsaturated or oversaturated ~# coercion") <+> ppr co)
+
+lint_eq_co :: TyCon -> OutCoercion -> [OutCoercion] -> LintM (OutType,OutType) 
+lint_eq_co tc co arg_cos = case arg_cos of 
+  [co1,co2] -> do { (t1,s1) <- lintCoercion co1
+                  ; (t2,s2) <- lintCoercion co2
+                  ; checkL (typeKind t1 `eqKind` typeKind t2) $
+                    ptext (sLit "Mismatched arg kinds in coercion application:") <+> ppr co
+                  ; return (mkTyConApp tc [t1,t2], mkTyConApp tc [s1,s2]) }
+  [co1] -> do { (t1,s1) <- lintCoercion co1
+              ; return (mkTyConApp tc [t1], mkTyConApp tc [s1]) }
+  [] -> return (mkTyConApp tc [], mkTyConApp tc [])
+  _ -> failWithL (ptext (sLit "Oversaturated ~ coercion") <+> ppr co) 
+-}
+
 lintKindCoercion :: OutCoercion -> LintM OutKind
 -- Kind coercions are only reflexivity because they mean kind
 -- instantiation.  See Note [Kind coercions] in Coercion
@@ -700,11 +735,28 @@ lintKindCoercion co
 
 lintCoercion :: OutCoercion -> LintM (OutType, OutType)
 -- Check the kind of a coercion term, returning the kind
+-- Post-condition: the returned OutTypes are lint-free
+--                 and have the same kind as each other
 lintCoercion (Refl ty)
-  = do { _k <- lintType ty
+  = do { _ <- lintType ty
        ; return (ty, ty) }
 
 lintCoercion co@(TyConAppCo tc cos)
+{- DV: This grievous hack (from ghc-constraint-solver) should not be needed any more:
+  | tc `hasKey` eqPrimTyConKey      -- Just as in lintType, treat applications of (~) and (~#)
+  = lint_prim_eq_co tc co cos       -- specially to allow for polymorphism. This hack will 
+                                    -- hopefully go away when we merge in kind polymorphism.
+  | tc `hasKey` eqTyConKey
+  = lint_eq_co tc co cos
+
+  | otherwise
+  = do { (ss,ts) <- mapAndUnzipM lintCoercion cos
+       ; let kind_to_check = if (tc `hasKey` funTyConKey) && (length cos == 2)
+                             then mkArrowKinds [argTypeKind,openTypeKind] liftedTypeKind
+                             else tyConKind tc -- TODO: Fix this when kind polymorphism is in! 
+       ; check_co_app co kind_to_check ss
+       ; return (mkTyConApp tc ss, mkTyConApp tc ts) }
+-}
   = do   -- We use the kind of the type constructor to know how many
          -- kind coercions we have (one kind coercion for one kind
          -- instantiation).
@@ -720,6 +772,7 @@ lintCoercion co@(TyConAppCo tc cos)
        ; (ss,ts) <- mapAndUnzipM lintCoercion cotys
        ; check_co_app co ki (kis ++ ss)
        ; return (mkTyConApp tc (kis ++ ss), mkTyConApp tc (kis ++ ts)) }
+
 
 lintCoercion co@(AppCo co1 co2)
   = do { (s1,t1) <- lintCoercion co1
@@ -740,7 +793,8 @@ lintCoercion (CoVarCo cv)
                   2 (ptext (sLit "With offending type:") <+> ppr (varType cv)))
   | otherwise
   = do { checkTyCoVarInScope cv
-       ; return (coVarKind cv) }
+       ; cv' <- lookupIdInScope cv 
+       ; return (coVarKind cv') }
 
 lintCoercion (AxiomInstCo (CoAxiom { co_ax_tvs = ktvs
                                    , co_ax_lhs = lhs
@@ -759,8 +813,8 @@ lintCoercion (AxiomInstCo (CoAxiom { co_ax_tvs = ktvs
     (kcos, tcos) = splitAt (length kvs) cos
 
 lintCoercion (UnsafeCo ty1 ty2)
-  = do { _k1 <- lintType ty1
-       ; _k2 <- lintType ty2
+  = do { _ <- lintType ty1
+       ; _ <- lintType ty2
        ; return (ty1, ty2) }
 
 lintCoercion (SymCo co) 
@@ -794,7 +848,7 @@ lintCoercion (InstCo co arg_ty)
 	  Nothing -> failWithL (ptext (sLit "Bad argument of inst")) }
 
 ----------
-checkTcApp :: Coercion -> Int -> Type -> LintM Type
+checkTcApp :: OutCoercion -> Int -> Type -> LintM OutType
 checkTcApp co n ty
   | Just tys <- tyConAppArgs_maybe ty
   , n < length tys
@@ -988,10 +1042,10 @@ updateTvSubst subst' m =
 getTvSubst :: LintM TvSubst
 getTvSubst = LintM (\ _ subst errs -> (Just subst, errs))
 
-applySubstTy :: Type -> LintM Type
+applySubstTy :: InType -> LintM OutType
 applySubstTy ty = do { subst <- getTvSubst; return (Type.substTy subst ty) }
 
-applySubstCo :: Coercion -> LintM Coercion
+applySubstCo :: InCoercion -> LintM OutCoercion
 applySubstCo co = do { subst <- getTvSubst; return (substCo (tvCvSubst subst) co) }
 
 extendSubstL :: TyVar -> Type -> LintM a -> LintM a

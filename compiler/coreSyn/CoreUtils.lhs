@@ -9,7 +9,8 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
         -- * Constructing expressions
-        mkTick, mkTickNoHNF, mkCoerce,
+        mkCast,
+        mkTick, mkTickNoHNF,
         bindNonRec, needsCaseBinding,
         mkAltExpr, mkPiType, mkPiTypes,
 
@@ -190,15 +191,27 @@ panic_msg e op_ty = pprCoreExpr e $$ ppr op_ty
 \begin{code}
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
-mkCoerce :: Coercion -> CoreExpr -> CoreExpr
-mkCoerce co e | isReflCo co = e
-mkCoerce co (Cast expr co2)
+mkCast :: CoreExpr -> Coercion -> CoreExpr
+mkCast e co | isReflCo co = e
+
+mkCast (Coercion e_co) co 
+  = Coercion new_co
+  where
+       -- g :: (s1 ~# s2) ~# (t1 ~#  t2)
+       -- g1 :: s1 ~# t1
+       -- g2 :: s2 ~# t2
+       new_co = mkSymCo g1 `mkTransCo` e_co `mkTransCo` g2
+       [_reflk, g1, g2] = decomposeCo 3 co
+            -- Remember, (~#) :: forall k. k -> k -> *
+            -- so it takes *three* arguments, not two
+
+mkCast (Cast expr co2) co
   = ASSERT(let { Pair  from_ty  _to_ty  = coercionKind co;
                  Pair _from_ty2  to_ty2 = coercionKind co2} in
            from_ty `eqType` to_ty2 )
-    mkCoerce (mkTransCo co2 co) expr
+    mkCast expr (mkTransCo co2 co)
 
-mkCoerce co expr
+mkCast expr co
   = let Pair from_ty _to_ty = coercionKind co in
 --    if to_ty `eqType` from_ty
 --    then expr
@@ -1504,7 +1517,7 @@ tryEtaReduce bndrs body
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
     go [] fun co
-      | ok_fun fun = Just (mkCoerce co fun)
+      | ok_fun fun = Just (mkCast fun co)
 
     go (b : bs) (App fun arg) co
       | Just co' <- ok_arg b arg co
