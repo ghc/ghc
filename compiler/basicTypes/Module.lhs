@@ -9,14 +9,8 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
-module Module 
+module Module
     (
         -- * The ModuleName type
         ModuleName,
@@ -34,47 +28,47 @@ module Module
         packageIdFS,
         stringToPackageId,
         packageIdString,
-	stablePackageIdCmp,
+        stablePackageIdCmp,
 
-	-- * Wired-in PackageIds
-	-- $wired_in_packages
-	primPackageId,
-	integerPackageId,
-	basePackageId,
-	rtsPackageId,
-	thPackageId,
+        -- * Wired-in PackageIds
+        -- $wired_in_packages
+        primPackageId,
+        integerPackageId,
+        basePackageId,
+        rtsPackageId,
+        thPackageId,
         dphSeqPackageId,
         dphParPackageId,
-	mainPackageId,
+        mainPackageId,
         thisGhcPackageId,
-        
-	-- * The Module type
-	Module,
-	modulePackageId, moduleName,
-	pprModule,
-	mkModule,
+
+        -- * The Module type
+        Module,
+        modulePackageId, moduleName,
+        pprModule,
+        mkModule,
         stableModuleCmp,
 
-	-- * The ModuleLocation type
-	ModLocation(..),
-	addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn,
+        -- * The ModuleLocation type
+        ModLocation(..),
+        addBootSuffix, addBootSuffix_maybe, addBootSuffixLocn,
 
-	-- * Module mappings
-    	ModuleEnv,
-	elemModuleEnv, extendModuleEnv, extendModuleEnvList, 
-	extendModuleEnvList_C, plusModuleEnv_C,
-	delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv,
-	lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv,
-	moduleEnvKeys, moduleEnvElts, moduleEnvToList,
+        -- * Module mappings
+        ModuleEnv,
+        elemModuleEnv, extendModuleEnv, extendModuleEnvList,
+        extendModuleEnvList_C, plusModuleEnv_C,
+        delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv,
+        lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv,
+        moduleEnvKeys, moduleEnvElts, moduleEnvToList,
         unitModuleEnv, isEmptyModuleEnv,
         foldModuleEnv, extendModuleEnvWith, filterModuleEnv,
 
-	-- * ModuleName mappings
-	ModuleNameEnv,
+        -- * ModuleName mappings
+        ModuleNameEnv,
 
-	-- * Sets of Modules
-	ModuleSet, 
-	emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
+        -- * Sets of Modules
+        ModuleSet,
+        emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
     ) where
 
 #include "Typeable.h"
@@ -95,9 +89,9 @@ import System.FilePath
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Module locations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -106,19 +100,19 @@ import System.FilePath
 data ModLocation
    = ModLocation {
         ml_hs_file   :: Maybe FilePath,
-		-- The source file, if we have one.  Package modules
-		-- probably don't have source files.
+                -- The source file, if we have one.  Package modules
+                -- probably don't have source files.
 
         ml_hi_file   :: FilePath,
-		-- Where the .hi file is, whether or not it exists
-		-- yet.  Always of form foo.hi, even if there is an
-		-- hi-boot file (we add the -boot suffix later)
+                -- Where the .hi file is, whether or not it exists
+                -- yet.  Always of form foo.hi, even if there is an
+                -- hi-boot file (we add the -boot suffix later)
 
         ml_obj_file  :: FilePath
-		-- Where the .o file is, whether or not it exists yet.
-		-- (might not exist either because the module hasn't
-		-- been compiled yet, or because it is part of a
-		-- package with a .a file)
+                -- Where the .o file is, whether or not it exists yet.
+                -- (might not exist either because the module hasn't
+                -- been compiled yet, or because it is part of a
+                -- package with a .a file)
   } deriving Show
 
 instance Outputable ModLocation where
@@ -126,7 +120,7 @@ instance Outputable ModLocation where
 \end{code}
 
 For a module in another package, the hs_file and obj_file
-components of ModLocation are undefined.  
+components of ModLocation are undefined.
 
 The locations specified by a ModLocation may or may not
 correspond to actual files yet: for example, even if the object
@@ -148,15 +142,15 @@ addBootSuffixLocn :: ModLocation -> ModLocation
 -- ^ Add the @-boot@ suffix to all file paths associated with the module
 addBootSuffixLocn locn
   = locn { ml_hs_file  = fmap addBootSuffix (ml_hs_file locn)
-	 , ml_hi_file  = addBootSuffix (ml_hi_file locn)
-	 , ml_obj_file = addBootSuffix (ml_obj_file locn) }
+         , ml_hi_file  = addBootSuffix (ml_hi_file locn)
+         , ml_obj_file = addBootSuffix (ml_obj_file locn) }
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The name of a module}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -194,11 +188,11 @@ stableModuleNameCmp :: ModuleName -> ModuleName -> Ordering
 stableModuleNameCmp n1 n2 = moduleNameFS n1 `compare` moduleNameFS n2
 
 pprModuleName :: ModuleName -> SDoc
-pprModuleName (ModuleName nm) = 
+pprModuleName (ModuleName nm) =
     getPprStyle $ \ sty ->
-    if codeStyle sty 
-	then ftext (zEncodeFS nm)
-	else ftext nm
+    if codeStyle sty
+        then ftext (zEncodeFS nm)
+        else ftext nm
 
 moduleNameFS :: ModuleName -> FastString
 moduleNameFS (ModuleName mod) = mod
@@ -226,9 +220,9 @@ moduleNameColons = dots_to_colons . moduleNameString
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{A fully qualified module}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -259,7 +253,7 @@ instance Data Module where
 -- gives an ordering based on the 'Unique's of the components, which may
 -- not be stable from run to run of the compiler.
 stableModuleCmp :: Module -> Module -> Ordering
-stableModuleCmp (Module p1 n1) (Module p2 n2) 
+stableModuleCmp (Module p1 n1) (Module p2 n2)
    = (p1 `stablePackageIdCmp`  p2) `thenCmp`
      (n1 `stableModuleNameCmp` n2)
 
@@ -274,8 +268,8 @@ pprPackagePrefix :: PackageId -> Module -> SDoc
 pprPackagePrefix p mod = getPprStyle doc
  where
    doc sty
-       | codeStyle sty = 
-          if p == mainPackageId 
+       | codeStyle sty =
+          if p == mainPackageId
                 then empty -- never qualify the main package in code
                 else ftext (zEncodeFS (packageIdFS p)) <> char '_'
        | qualModule sty mod = ftext (packageIdFS (modulePackageId mod)) <> char ':'
@@ -336,7 +330,7 @@ packageIdString = unpackFS . packageIdFS
 -- -----------------------------------------------------------------------------
 -- $wired_in_packages
 -- Certain packages are known to the compiler, in that we know about certain
--- entities that reside in these packages, and the compiler needs to 
+-- entities that reside in these packages, and the compiler needs to
 -- declare static Modules and Names that refer to these packages.  Hence
 -- the wired-in packages can't include version numbers, since we don't want
 -- to bake the version numbers of these packages into GHC.
@@ -370,7 +364,7 @@ thisGhcPackageId   = fsToPackageId (fsLit ("ghc-" ++ cProjectVersion))
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
 -- to symbol names, since there can be only one main package per program.
-mainPackageId	   = fsToPackageId (fsLit "main")
+mainPackageId      = fsToPackageId (fsLit "main")
 \end{code}
 
 %************************************************************************
@@ -452,7 +446,7 @@ foldModuleEnv f x (ModuleEnv e) = Map.foldRightWithKey (\_ v -> f v) x e
 -- | A set of 'Module's
 type ModuleSet = Map Module ()
 
-mkModuleSet	:: [Module] -> ModuleSet
+mkModuleSet     :: [Module] -> ModuleSet
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
 emptyModuleSet  :: ModuleSet
 moduleSetElts   :: ModuleSet -> [Module]
@@ -472,3 +466,4 @@ UniqFM.
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 type ModuleNameEnv elt = UniqFM elt
 \end{code}
+

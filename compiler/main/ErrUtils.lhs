@@ -4,49 +4,43 @@
 \section[ErrsUtils]{Utilities for error reporting}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module ErrUtils (
-	Message, mkLocMessage, printError, pprMessageBag, pprErrMsgBag,
-	Severity(..),
+        Message, mkLocMessage, printError, pprMessageBag, pprErrMsgBag,
+        Severity(..),
 
-	ErrMsg, WarnMsg,
+        ErrMsg, WarnMsg,
         ErrorMessages, WarningMessages,
         errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
-	Messages, errorsFound, emptyMessages,
-	mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
-	printBagOfErrors, printBagOfWarnings,
-	warnIsErrorMsg, mkLongWarnMsg,
+        Messages, errorsFound, emptyMessages,
+        mkErrMsg, mkPlainErrMsg, mkLongErrMsg, mkWarnMsg, mkPlainWarnMsg,
+        printBagOfErrors, printBagOfWarnings,
+        warnIsErrorMsg, mkLongWarnMsg,
 
-	ghcExit,
-	doIfSet, doIfSet_dyn, 
-	dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_or,
+        ghcExit,
+        doIfSet, doIfSet_dyn,
+        dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_or,
         mkDumpDoc, dumpSDoc,
 
-	--  * Messages during compilation
+        --  * Messages during compilation
         putMsg, putMsgWith,
-	errorMsg,
-	fatalErrorMsg, fatalErrorMsg',
-	compilationProgressMsg,
-	showPass,
-	debugTraceMsg,	
+        errorMsg,
+        fatalErrorMsg, fatalErrorMsg',
+        compilationProgressMsg,
+        showPass,
+        debugTraceMsg,
     ) where
 
 #include "HsVersions.h"
 
-import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
-import Util		( sortLe )
+import Bag              ( Bag, bagToList, isEmptyBag, emptyBag )
+import Util             ( sortLe )
 import Outputable
 import SrcLoc
 import DynFlags
-import StaticFlags	( opt_ErrorSpans )
+import StaticFlags      ( opt_ErrorSpans )
 
-import System.Exit	( ExitCode(..), exitWith )
+import System.Exit      ( ExitCode(..), exitWith )
 import Data.List
 import qualified Data.Set as Set
 import Data.IORef
@@ -84,13 +78,13 @@ printError span msg =
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
 
-data ErrMsg = ErrMsg { 
-	errMsgSpans     :: [SrcSpan],
-	errMsgContext   :: PrintUnqualified,
-	errMsgShortDoc  :: Message,
-	errMsgExtraInfo :: Message
-	}
-	-- The SrcSpan is used for sorting errors into line-number order
+data ErrMsg = ErrMsg {
+        errMsgSpans     :: [SrcSpan],
+        errMsgContext   :: PrintUnqualified,
+        errMsgShortDoc  :: Message,
+        errMsgExtraInfo :: Message
+        }
+        -- The SrcSpan is used for sorting errors into line-number order
 
 instance Show ErrMsg where
     show em = showSDoc (errMsgShortDoc em)
@@ -113,7 +107,7 @@ mkPlainErrMsg locn msg
 -- A long (multi-line) error message, with context to tell us whether
 -- to qualify names in the message or not.
 mkLongErrMsg :: SrcSpan -> PrintUnqualified -> Message -> Message -> ErrMsg
-mkLongErrMsg locn print_unqual msg extra 
+mkLongErrMsg locn print_unqual msg extra
  = ErrMsg { errMsgSpans = [locn], errMsgContext = print_unqual
           , errMsgShortDoc = msg, errMsgExtraInfo = extra }
 
@@ -142,11 +136,11 @@ errorsFound :: DynFlags -> Messages -> Bool
 errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
 
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
-printBagOfErrors dflags bag_of_errors = 
+printBagOfErrors dflags bag_of_errors =
   printMsgBag dflags bag_of_errors SevError
 
 printBagOfWarnings :: DynFlags -> Bag WarnMsg -> IO ()
-printBagOfWarnings dflags bag_of_warns = 
+printBagOfWarnings dflags bag_of_warns =
   printMsgBag dflags bag_of_warns SevWarning
 
 pprErrMsgBag :: Bag ErrMsg -> [SDoc]
@@ -169,7 +163,7 @@ printMsgBag dflags bag sev
 sortMsgBag :: Bag ErrMsg -> [ErrMsg]
 sortMsgBag bag = sortLe srcOrder $ bagToList bag
   where
-    srcOrder err1 err2 = 
+    srcOrder err1 err2 =
         case compare (head (errMsgSpans err1)) (head (errMsgSpans err2)) of
             LT -> True
             EQ -> True
@@ -179,15 +173,15 @@ ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val
   | val == 0  = exitWith ExitSuccess
   | otherwise = do errorMsg dflags (text "\nCompilation had errors\n\n")
-	           exitWith (ExitFailure val)
+                   exitWith (ExitFailure val)
 
 doIfSet :: Bool -> IO () -> IO ()
 doIfSet flag action | flag      = action
-		    | otherwise = return ()
+                    | otherwise = return ()
 
 doIfSet_dyn :: DynFlags -> DynFlag -> IO () -> IO()
 doIfSet_dyn dflags flag action | dopt flag dflags = action
-		               | otherwise        = return ()
+                               | otherwise        = return ()
 
 -- -----------------------------------------------------------------------------
 -- Dumping
@@ -199,7 +193,7 @@ dumpIfSet flag hdr doc
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | dopt flag dflags || verbosity dflags >= 4 
+  | dopt flag dflags || verbosity dflags >= 4
   = dumpSDoc dflags flag hdr doc
   | otherwise
   = return ()
@@ -212,18 +206,18 @@ dumpIfSet_dyn_or dflags (flag : flags) hdr doc
       else dumpIfSet_dyn_or dflags flags hdr doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
-mkDumpDoc hdr doc 
+mkDumpDoc hdr doc
    = vcat [blankLine,
-	   line <+> text hdr <+> line,
-	   doc,
-	   blankLine]
-     where 
+           line <+> text hdr <+> line,
+           doc,
+           blankLine]
+     where
         line = text (replicate 20 '=')
 
 
 -- | Write out a dump.
---	If --dump-to-file is set then this goes to a file.
---	otherwise emit to stdout.
+--      If --dump-to-file is set then this goes to a file.
+--      otherwise emit to stdout.
 dumpSDoc :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpSDoc dflags dflag hdr doc
  = do let mFile = chooseDumpFile dflags dflag
@@ -253,36 +247,31 @@ dumpSDoc dflags dflag hdr doc
 chooseDumpFile :: DynFlags -> DynFlag -> Maybe String
 chooseDumpFile dflags dflag
 
-	-- dump file location is being forced
-	--	by the --ddump-file-prefix flag.
- 	| dumpToFile
-	, Just prefix	<- dumpPrefixForce dflags
-	= Just $ prefix ++ (beautifyDumpName dflag)
+        -- dump file location is being forced
+        --      by the --ddump-file-prefix flag.
+        | dumpToFile
+        , Just prefix   <- dumpPrefixForce dflags
+        = Just $ prefix ++ (beautifyDumpName dflag)
 
-	-- dump file location chosen by DriverPipeline.runPipeline
-	| dumpToFile
-	, Just prefix	<- dumpPrefix dflags
-	= Just $ prefix ++ (beautifyDumpName dflag)
+        -- dump file location chosen by DriverPipeline.runPipeline
+        | dumpToFile
+        , Just prefix   <- dumpPrefix dflags
+        = Just $ prefix ++ (beautifyDumpName dflag)
 
-	-- we haven't got a place to put a dump file.
-	| otherwise
-	= Nothing
+        -- we haven't got a place to put a dump file.
+        | otherwise
+        = Nothing
 
-	where	dumpToFile = dopt Opt_DumpToFile dflags
+        where dumpToFile = dopt Opt_DumpToFile dflags
 
 
 -- | Build a nice file name from name of a DynFlag constructor
 beautifyDumpName :: DynFlag -> String
 beautifyDumpName dflag
- = let	str	= show dflag
- 	cut	= if isPrefixOf "Opt_D_" str
-			 then drop 6 str
-			 else str
-	dash	= map	(\c -> case c of
-				'_'	-> '-'
-				_	-> c)
-			cut
-   in	dash
+ = let str  = show dflag
+       cut  = if isPrefixOf "Opt_D_" str then drop 6 str else str
+       dash = map (\c -> if c == '_' then '-' else c) cut
+   in dash
 
 
 -- -----------------------------------------------------------------------------
@@ -321,10 +310,11 @@ compilationProgressMsg dflags msg
   = ifVerbose dflags 1 (log_action dflags SevOutput noSrcSpan defaultUserStyle (text msg))
 
 showPass :: DynFlags -> String -> IO ()
-showPass dflags what 
+showPass dflags what
   = ifVerbose dflags 2 (log_action dflags SevInfo noSrcSpan defaultUserStyle (text "***" <+> text what <> colon))
 
 debugTraceMsg :: DynFlags -> Int -> Message -> IO ()
 debugTraceMsg dflags val msg
   = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
 \end{code}
+

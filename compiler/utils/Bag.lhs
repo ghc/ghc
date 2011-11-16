@@ -16,7 +16,7 @@ module Bag (
         concatBag, foldBag, foldrBag, foldlBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag,
         listToBag, bagToList,
-        foldrBagM, foldlBagM, mapBagM, mapBagM_, 
+        foldrBagM, foldlBagM, mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM
     ) where
@@ -120,13 +120,13 @@ partitionBag pred (ListBag vs) = (listToBag sats, listToBag fails)
   where (sats, fails) = partition pred vs
 
 
-partitionBagWith :: (a -> Either b c) -> Bag a 
+partitionBagWith :: (a -> Either b c) -> Bag a
                     -> (Bag b {- Left  -},
                         Bag c {- Right -})
 partitionBagWith _    EmptyBag = (EmptyBag, EmptyBag)
 partitionBagWith pred (UnitBag val)
     = case pred val of
-         Left a  -> (UnitBag a, EmptyBag) 
+         Left a  -> (UnitBag a, EmptyBag)
          Right b -> (EmptyBag, UnitBag b)
 partitionBagWith pred (TwoBags b1 b2)
     = (sat1 `unionBags` sat2, fail1 `unionBags` fail2)
@@ -269,3 +269,4 @@ instance Data a => Data (Bag a) where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Bag"
 \end{code}
+

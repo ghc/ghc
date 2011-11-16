@@ -27,7 +27,7 @@
 -------------------------------------------------------------------------------
 
 module HscMain
-    ( 
+    (
     -- * Making an HscEnv
       newHscEnv
 
@@ -183,7 +183,7 @@ newHscEnv dflags = do
 
 knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
 knownKeyNames =              -- where templateHaskellNames are defined
-    map getName wiredInThings 
+    map getName wiredInThings
         ++ basicKnownKeyNames
 #ifdef GHCI
         ++ templateHaskellNames
@@ -279,12 +279,12 @@ ioMsgMaybe' ioA = do
 
 #ifdef GHCI
 hscTcRnLookupRdrName :: HscEnv -> RdrName -> IO [Name]
-hscTcRnLookupRdrName hsc_env rdr_name = 
+hscTcRnLookupRdrName hsc_env rdr_name =
     runHsc hsc_env $ ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name
 #endif
 
 hscTcRcLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
-hscTcRcLookupName hsc_env name = 
+hscTcRcLookupName hsc_env name =
     runHsc hsc_env $ ioMsgMaybe' $ tcRnLookupName hsc_env name
       -- ignore errors: the only error we're likely to get is
       -- "name not found", and the Maybe in the return type
@@ -348,7 +348,7 @@ hscParse' mod_summary = do
 -- XXX: should this really be a Maybe X?  Check under which circumstances this
 -- can become a Nothing and decide whether this should instead throw an
 -- exception/signal an error.
-type RenamedStuff = 
+type RenamedStuff =
         (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
                 Maybe LHsDocString))
 
@@ -357,7 +357,7 @@ hscTypecheckRename :: HscEnv -> ModSummary -> Located (HsModule RdrName)
                    -> IO (TcGblEnv, RenamedStuff)
 hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
     tc_result <- {-# SCC "Typecheck-Rename" #-}
-                 ioMsgMaybe $ 
+                 ioMsgMaybe $
                      tcRnModule hsc_env (ms_hsc_src mod_summary)
                                 True rdr_module
 
@@ -393,7 +393,7 @@ hscDesugar' mod_summary tc_result = do
 makeSimpleIface :: HscEnv -> Maybe ModIface -> TcGblEnv -> ModDetails
                 -> IO (ModIface,Bool)
 makeSimpleIface hsc_env maybe_old_iface tc_result details =
-    runHsc hsc_env $ ioMsgMaybe $ 
+    runHsc hsc_env $ ioMsgMaybe $
         mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) details tc_result
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
@@ -509,7 +509,7 @@ genericHscCompile compiler hscMessage hsc_env
   = do
     (recomp_reqd, mb_checked_iface)
         <- {-# SCC "checkOldIface" #-}
-           checkOldIface hsc_env mod_summary 
+           checkOldIface hsc_env mod_summary
                          source_modified mb_old_iface0
     -- save the interface that comes back from checkOldIface.
     -- In one-shot mode we don't have the old iface until this
@@ -559,7 +559,7 @@ hscCheckRecompBackend compiler tc_result hsc_env mod_summary
     let mb_old_hash = fmap mi_iface_hash mb_checked_iface
     case mb_checked_iface of
         Just iface | not recomp_reqd
-            -> runHsc hsc_env $ 
+            -> runHsc hsc_env $
                    hscNoRecomp compiler
                        iface{ mi_globals = Just (tcg_rdr_env tc_result) }
         _otherwise
@@ -917,7 +917,7 @@ checkSafeImports dflags hsc_env tcg_env
                 case safeInferOn dflags of
                     True  -> wipeTrust tcg_env errs
                     False -> liftIO . throwIO . mkSrcErr $ errs
-            
+
             -- All good matey!
             False -> do
                 when (packageTrustOn dflags) $ checkPkgTrust pkg_reqs
@@ -938,7 +938,7 @@ checkSafeImports dflags hsc_env tcg_env
                             -- inference mode is on.
                             let s' = if safeInferOn dflags then True else s
                             return (m, l, s')
-        
+
     -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
     cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
     cond' v1@(m1,_,l1,s1) (_,_,_,s2)
@@ -1084,12 +1084,12 @@ hscSimplify' ds_result = do
 hscSimpleIface :: TcGblEnv
                -> Maybe Fingerprint
                -> Hsc (ModIface, Bool, ModDetails)
-hscSimpleIface tc_result mb_old_iface = do 
+hscSimpleIface tc_result mb_old_iface = do
     hsc_env <- getHscEnv
     details <- liftIO $ mkBootModDetailsTc hsc_env tc_result
     (new_iface, no_change)
         <- {-# SCC "MkFinalIface" #-}
-           ioMsgMaybe $ 
+           ioMsgMaybe $
                mkIfaceTc hsc_env mb_old_iface details tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
@@ -1098,7 +1098,7 @@ hscSimpleIface tc_result mb_old_iface = do
 hscNormalIface :: ModGuts
                -> Maybe Fingerprint
                -> Hsc (ModIface, Bool, ModDetails, CgGuts)
-hscNormalIface simpl_result mb_old_iface = do 
+hscNormalIface simpl_result mb_old_iface = do
     hsc_env <- getHscEnv
     (cg_guts, details) <- {-# SCC "CoreTidy" #-}
                           liftIO $ tidyProgram hsc_env simpl_result
@@ -1110,7 +1110,7 @@ hscNormalIface simpl_result mb_old_iface = do
     -- until after code output
     (new_iface, no_change)
         <- {-# SCC "MkFinalIface" #-}
-           ioMsgMaybe $ 
+           ioMsgMaybe $
                mkIface hsc_env mb_old_iface details simpl_result
 
     -- Emit external core
@@ -1162,13 +1162,13 @@ hscGenHardCode cgguts mod_summary = do
         -----------------  Convert to STG ------------------
         (stg_binds, cost_centre_info)
             <- {-# SCC "CoreToStg" #-}
-               myCoreToStg dflags this_mod prepd_binds 
+               myCoreToStg dflags this_mod prepd_binds
 
         let prof_init = profilingInitCode platform this_mod cost_centre_info
             foreign_stubs = foreign_stubs0 `appendStubC` prof_init
 
         ------------------  Code generation ------------------
-         
+
         cmms <- if dopt Opt_TryNewCodeGen dflags
                     then tryNewCodeGen hsc_env this_mod data_tycons
                              cost_centre_info
@@ -1182,7 +1182,7 @@ hscGenHardCode cgguts mod_summary = do
         rawcmms <- cmmToRawCmm platform cmms
         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (pprPlatform platform rawcmms)
         (_stub_h_exists, stub_c_exists)
-            <- codeOutput dflags this_mod location foreign_stubs 
+            <- codeOutput dflags this_mod location foreign_stubs
                dependencies rawcmms
         return stub_c_exists
 
@@ -1214,7 +1214,7 @@ hscInteractive (iface, details, cgguts) mod_summary = do
     comp_bc <- liftIO $ byteCodeGen dflags this_mod prepd_binds
                                     data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff ---
-    (_istub_h_exists, istub_c_exists) 
+    (_istub_h_exists, istub_c_exists)
         <- liftIO $ outputForeignStubs dflags this_mod
                                         location foreign_stubs
     return (HscRecomp istub_c_exists (Just (comp_bc, mod_breaks))
@@ -1252,7 +1252,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
         platform = targetPlatform dflags
     prog <- StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds hpc_info
-    dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
+    dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen"
                   (pprCmms platform prog)
 
     -- We are building a single SRT for the entire module, so
@@ -1268,7 +1268,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
 myCoreToStg :: DynFlags -> Module -> CoreProgram
             -> IO ( [(StgBinding,[(Id,[Id])])] -- output program
                   , CollectedCCs) -- cost centre info (declared and used)
-myCoreToStg dflags this_mod prepd_binds = do 
+myCoreToStg dflags this_mod prepd_binds = do
     stg_binds
         <- {-# SCC "Core2Stg" #-}
            coreToStg dflags prepd_binds
@@ -1289,7 +1289,7 @@ myCoreToStg dflags this_mod prepd_binds = do
 {-
 When the UnlinkedBCOExpr is linked you get an HValue of type
         IO [HValue]
-When you run it you get a list of HValues that should be 
+When you run it you get a list of HValues that should be
 the same length as the list of names; add them to the ClosureEnv.
 
 A naked expression returns a singleton Name [it].
@@ -1304,13 +1304,13 @@ A naked expression returns a singleton Name [it].
 
         expr (of IO type)       ==>     expr >>= \ v -> return [v]
           [NB: result not printed]      bindings: [it]
-          
 
-        expr (of non-IO type, 
+
+        expr (of non-IO type,
           result showable)      ==>     let v = expr in print v >> return [v]
                                         bindings: [it]
 
-        expr (of non-IO type, 
+        expr (of non-IO type,
           result not showable)  ==>     error
 -}
 
@@ -1333,7 +1333,7 @@ hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
     maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
     case maybe_stmt of
         Nothing -> return Nothing
-        
+
         -- The real stuff
         Just parsed_stmt -> do
              -- Rename and typecheck it
@@ -1366,16 +1366,16 @@ hscDeclsWithLocation :: HscEnv
                      -> String -- ^ The source
                      -> Int    -- ^ Starting line
                      -> IO ([TyThing], InteractiveContext)
-hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do 
+hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     L _ (HsModule{ hsmodDecls = decls }) <-
         hscParseThingWithLocation source linenumber parseModule str
-    
+
     {- Rename and typecheck it -}
     let icontext = hsc_IC hsc_env
     tc_gblenv <- ioMsgMaybe $ tcRnDeclsi hsc_env icontext decls
 
     {- Grab the new instances -}
-    -- We grab the whole environment because of the overlapping that may have 
+    -- We grab the whole environment because of the overlapping that may have
     -- been done. See the notes at the definition of InteractiveContext
     -- (ic_instances) for more details.
     let finsts = famInstEnvElts $ tcg_fam_inst_env tc_gblenv
@@ -1434,12 +1434,12 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     let ictxt1 = extendInteractiveContext icontext tythings
         ictxt  = ictxt1 { ic_sys_vars  = sys_vars ++ ic_sys_vars ictxt1,
                           ic_instances = (insts, finsts) }
-    
+
     return (tythings, ictxt)
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
 hscImport hsc_env str = runHsc hsc_env $ do
-    (L _ (HsModule{hsmodImports=is})) <- 
+    (L _ (HsModule{hsmodImports=is})) <-
        hscParseThing parseModule str
     case is of
         [i] -> return (unLoc i)
@@ -1475,7 +1475,7 @@ hscParseStmt = hscParseThing parseStmt
 
 hscParseStmtWithLocation :: String -> Int -> String
                          -> Hsc (Maybe (LStmt RdrName))
-hscParseStmtWithLocation source linenumber stmt = 
+hscParseStmtWithLocation source linenumber stmt =
     hscParseThingWithLocation source linenumber parseStmt stmt
 
 hscParseType :: String -> Hsc (LHsType RdrName)
@@ -1489,7 +1489,7 @@ hscParseIdentifier hsc_env str =
 hscParseThing :: (Outputable thing) => Lexer.P thing -> String -> Hsc thing
 hscParseThing = hscParseThingWithLocation "<interactive>" 1
 
-hscParseThingWithLocation :: (Outputable thing) => String -> Int 
+hscParseThingWithLocation :: (Outputable thing) => String -> Int
                           -> Lexer.P thing -> String -> Hsc thing
 hscParseThingWithLocation source linenumber parser str
   = {-# SCC "Parser" #-} do

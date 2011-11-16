@@ -397,7 +397,7 @@ data ExtensionFlag
    | Opt_RebindableSyntax
    | Opt_ConstraintKinds
    | Opt_PolyKinds                -- Kind polymorphism
-   
+
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
    | Opt_DeriveFunctor
@@ -1293,7 +1293,7 @@ parseDynamicFlags dflags0 args cmdline = do
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck dflags1
-  
+
   return (dflags2, leftover, sh_warns ++ warns)
 
 -- | Check (and potentially disable) any extensions that aren't allowed
@@ -1919,7 +1919,7 @@ xFlags = [
   ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
   ( "ConstraintKinds",                  Opt_ConstraintKinds, nop ),
   ( "PolyKinds",                        Opt_PolyKinds, nop ),
-  ( "MonoPatBinds",                     Opt_MonoPatBinds, 
+  ( "MonoPatBinds",                     Opt_MonoPatBinds,
     \ turn_on -> when turn_on $ deprecate "Experimental feature now removed; has no effect" ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),

@@ -6,7 +6,7 @@
 \begin{code}
 
 -- | Types for the per-module compiler
-module HscTypes ( 
+module HscTypes (
         -- * compilation state
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), ModLocationCache,
@@ -24,7 +24,7 @@ module HscTypes (
 
         -- * Information about the module being compiled
         HscSource(..), isHsBoot, hscSourceString,       -- Re-exported from DriverPhases
-        
+
         -- * State relating to modules in this package
         HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
         hptInstances, hptRules, hptVectInfo,
@@ -34,17 +34,17 @@ module HscTypes (
         ExternalPackageState(..), EpsStats(..), addEpsInStats,
         PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
         lookupIfaceByModule, emptyModIface,
-        
+
         PackageInstEnv, PackageRuleBase,
 
         -- * Annotations
         prepareAnnotations,
 
         -- * Interactive context
-        InteractiveContext(..), emptyInteractiveContext, 
+        InteractiveContext(..), emptyInteractiveContext,
         icPrintUnqual, icInScopeTTs, icPlusGblRdrEnv,
         extendInteractiveContext, substInteractiveContext,
-        InteractiveImport(..), 
+        InteractiveImport(..),
         mkPrintUnqualified, pprModulePrefix,
 
         -- * Interfaces
@@ -60,7 +60,7 @@ module HscTypes (
         tyThingId, tyThingCoAxiom, tyThingParent_maybe, tyThingsTyVars,
         implicitTyThings, implicitTyConThings, implicitClassThings,
         isImplicitTyThing,
-        
+
         TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
         typeEnvFromEntities, mkTypeEnvWithImplicits,
         extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
@@ -71,7 +71,7 @@ module HscTypes (
         MonadThings(..),
 
         -- * Information on imports and exports
-        WhetherHasOrphans, IsBootInterface, Usage(..), 
+        WhetherHasOrphans, IsBootInterface, Usage(..),
         Dependencies(..), noDependencies,
         NameCache(..), OrigNameCache, OrigIParamCache,
         IfaceExport,
@@ -83,7 +83,7 @@ module HscTypes (
         Linkable(..), isObjectLinkable, linkableObjs,
         Unlinked(..), CompiledByteCode,
         isObject, nameOfObject, isInterpretable, byteCodeOfObject,
-        
+
         -- * Program coverage
         HpcInfo(..), emptyHpcInfo, isHpcUsed, AnyHpcUsage,
 
@@ -91,7 +91,7 @@ module HscTypes (
         ModBreaks (..), BreakIndex, emptyModBreaks,
 
         -- * Vectorisation information
-        VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo, 
+        VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo,
         noIfaceVectInfo,
 
         -- * Safe Haskell information
@@ -122,13 +122,13 @@ import Rules            ( RuleBase )
 import CoreSyn          ( CoreProgram )
 import Name
 import NameEnv
-import NameSet  
+import NameSet
 import VarEnv
 import VarSet
 import Var
 import Id
 import IdInfo           ( IdDetails(..) )
-import Type             
+import Type
 
 import Annotations
 import Class
@@ -242,7 +242,7 @@ handleFlagWarnings dflags warns
  = when (wopt Opt_WarnDeprecatedFlags dflags) $ do
         -- It would be nicer if warns :: [Located Message], but that
         -- has circular import problems.
-      let bag = listToBag [ mkPlainWarnMsg loc (text warn) 
+      let bag = listToBag [ mkPlainWarnMsg loc (text warn)
                           | L loc warn <- warns ]
 
       printOrThrowWarnings dflags bag
@@ -266,8 +266,8 @@ handleFlagWarnings dflags warns
 -- module, the driver would invoke hsc on the source code... so nowadays
 -- we think of hsc as the layer of the compiler that deals with compiling
 -- a single module.
-data HscEnv 
-  = HscEnv { 
+data HscEnv
+  = HscEnv {
         hsc_dflags :: DynFlags,
                 -- ^ The dynamic flag settings
 
@@ -282,7 +282,7 @@ data HscEnv
 
         hsc_HPT    :: HomePackageTable,
                 -- ^ The home package table describes already-compiled
-                -- home-package modules, /excluding/ the module we 
+                -- home-package modules, /excluding/ the module we
                 -- are compiling right now.
                 -- (In one-shot mode the current module is the only
                 -- home-package module, so hsc_HPT is empty.  All other
@@ -290,21 +290,21 @@ data HscEnv
                 -- However, even in GHCi mode, hi-boot interfaces are
                 -- demand-loaded into the external-package table.)
                 --
-                -- 'hsc_HPT' is not mutable because we only demand-load 
-                -- external packages; the home package is eagerly 
+                -- 'hsc_HPT' is not mutable because we only demand-load
+                -- external packages; the home package is eagerly
                 -- loaded, module by module, by the compilation manager.
-                --      
+                --
                 -- The HPT may contain modules compiled earlier by @--make@
                 -- but not actually below the current module in the dependency
                 -- graph.
-                --      
+                --
                 -- (This changes a previous invariant: changed Jan 05.)
-        
+
         hsc_EPS :: {-# UNPACK #-} !(IORef ExternalPackageState),
                 -- ^ Information about the currently loaded external packages.
                 -- This is mutable because packages will be demand-loaded during
                 -- a compilation run as required.
-        
+
         hsc_NC  :: {-# UNPACK #-} !(IORef NameCache),
                 -- ^ As with 'hsc_EPS', this is side-effected by compiling to
                 -- reflect sucking in interface files.  They cache the state of
@@ -313,7 +313,7 @@ data HscEnv
         hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
                 -- ^ The cached result of performing finding in the file system
         hsc_MLC  :: {-# UNPACK #-} !(IORef ModLocationCache),
-                -- ^ This caches the location of modules, so we don't have to 
+                -- ^ This caches the location of modules, so we don't have to
                 -- search the filesystem multiple times. See also 'hsc_FC'.
 
         hsc_OptFuel :: OptFuelState,
@@ -323,7 +323,7 @@ data HscEnv
 
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv),
                 -- ^ Used for one-shot compilation only, to initialise
-                -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for 
+                -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for
                 -- 'TcRunTypes.TcGblEnv'
 
         hsc_safeInf :: {-# UNPACK #-} !(IORef Bool)
@@ -368,7 +368,7 @@ data TargetId
   deriving Eq
 
 pprTarget :: Target -> SDoc
-pprTarget (Target id obj _) = 
+pprTarget (Target id obj _) =
     (if obj then char '*' else empty) <> pprTargetId id
 
 instance Outputable Target where
@@ -407,7 +407,7 @@ emptyPackageIfaceTable :: PackageIfaceTable
 emptyPackageIfaceTable = emptyModuleEnv
 
 -- | Information about modules in the package being compiled
-data HomeModInfo 
+data HomeModInfo
   = HomeModInfo {
       hm_iface    :: !ModIface,
         -- ^ The basic loaded interface file: every loaded module has one of
@@ -447,10 +447,10 @@ lookupIfaceByModule dflags hpt pit mod
         -- The module comes from the home package, so look first
         -- in the HPT.  If it's not from the home package it's wrong to look
         -- in the HPT, because the HPT is indexed by *ModuleName* not Module
-  = fmap hm_iface (lookupUFM hpt (moduleName mod)) 
+  = fmap hm_iface (lookupUFM hpt (moduleName mod))
     `mplus` lookupModuleEnv pit mod
 
-  | otherwise = lookupModuleEnv pit mod         -- Look in PIT only 
+  | otherwise = lookupModuleEnv pit mod         -- Look in PIT only
 
 -- If the module does come from the home package, why do we look in the PIT as well?
 -- (a) In OneShot mode, even home-package modules accumulate in the PIT
@@ -474,7 +474,7 @@ hptInstances hsc_env want_this_module
 
 -- | Get the combined VectInfo of all modules in the home package table. In
 -- contrast to instances and rules, we don't care whether the modules are
--- "below" us in the dependency sense. The VectInfo of those modules not "below" 
+-- "below" us in the dependency sense. The VectInfo of those modules not "below"
 -- us does not affect the compilation of the current module.
 hptVectInfo :: HscEnv -> VectInfo
 hptVectInfo = concatVectInfo . hptAllThings ((: []) . md_vect_info . hm_details)
@@ -515,7 +515,7 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
         -- Look it up in the HPT
     , let things = case lookupUFM hpt mod of
                     Just info -> extract info
-                    Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg [] 
+                    Nothing -> pprTrace "WARNING in hptSomeThingsBelowUs" msg []
           msg = vcat [ptext (sLit "missing module") <+> ppr mod,
                       ptext (sLit "Probable cause: out-of-date interface files")]
                         -- This really shouldn't happen, but see Trac #962
@@ -534,7 +534,7 @@ hptObjs hpt = concat (map (maybe [] linkableObjs . hm_linkable) (eltsUFM hpt))
 %************************************************************************
 
 \begin{code}
--- | Deal with gathering annotations in from all possible places 
+-- | Deal with gathering annotations in from all possible places
 --   and combining them into a single 'AnnEnv'
 prepareAnnotations :: HscEnv -> Maybe ModGuts -> IO AnnEnv
 prepareAnnotations hsc_env mb_guts = do
@@ -546,8 +546,8 @@ prepareAnnotations hsc_env mb_guts = do
         -- entries regardless of dependency ordering.
         home_pkg_anns  = (mkAnnEnv . hptAnns hsc_env) $ fmap (dep_mods . mg_deps) mb_guts
         other_pkg_anns = eps_ann_env eps
-        ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns, 
-                                                         Just home_pkg_anns, 
+        ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns,
+                                                         Just home_pkg_anns,
                                                          Just other_pkg_anns]
     return ann_env
 \end{code}
@@ -577,7 +577,7 @@ data FindResult
         -- ^ The requested package was not found
   | FoundMultiple [PackageId]
         -- ^ _Error_: both in multiple packages
-        
+
         -- | Not found
   | NotFound
       { fr_paths       :: [FilePath]       -- Places where I looked
@@ -608,16 +608,16 @@ type ModLocationCache = ModuleEnv ModLocation
 %************************************************************************
 
 \begin{code}
--- | A 'ModIface' plus a 'ModDetails' summarises everything we know 
+-- | A 'ModIface' plus a 'ModDetails' summarises everything we know
 -- about a compiled module.  The 'ModIface' is the stuff *before* linking,
--- and can be written out to an interface file. The 'ModDetails is after 
+-- and can be written out to an interface file. The 'ModDetails is after
 -- linking and can be completely recovered from just the 'ModIface'.
--- 
+--
 -- When we read an interface file, we also construct a 'ModIface' from it,
 -- except that we explicitly make the 'mi_decls' and a few other fields empty;
 -- as when reading we consolidate the declarations etc. into a number of indexed
 -- maps and environments in the 'ExternalPackageState'.
-data ModIface 
+data ModIface
   = ModIface {
         mi_module     :: !Module,             -- ^ Name of the module we are for
         mi_iface_hash :: !Fingerprint,        -- ^ Hash of the whole interface
@@ -646,7 +646,7 @@ data ModIface
                 -- Kept sorted by (mod,occ), to make version comparisons easier
                 -- Records the modules that are the declaration points for things
                 -- exported by this module, and the 'OccName's of those things
-        
+
         mi_exp_hash :: !Fingerprint,
                 -- ^ Hash of export list
 
@@ -671,7 +671,7 @@ data ModIface
                 -- ^ Type, class and variable declarations
                 -- The hash of an Id changes if its fixity or deprecations change
                 --      (as well as its type of course)
-                -- Ditto data constructors, class operations, except that 
+                -- Ditto data constructors, class operations, except that
                 -- the hash of the parent class/tycon changes
 
         mi_globals  :: !(Maybe GlobalRdrEnv),
@@ -758,7 +758,7 @@ emptyModIface mod
                mi_hash_fn     = emptyIfaceHashCache,
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
-               mi_trust_pkg   = False }           
+               mi_trust_pkg   = False }
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
 -- for home modules only. Information relating to packages will be loaded into
@@ -771,7 +771,7 @@ data ModDetails
         md_insts     :: ![Instance],    -- ^ 'DFunId's for the instances in this module
         md_fam_insts :: ![FamInst],
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
-        md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently 
+        md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
                                         -- they only annotate things also declared in this module
         md_vect_info :: !VectInfo       -- ^ Module vectorisation information
      }
@@ -785,7 +785,7 @@ emptyModDetails
                  md_rules     = [],
                  md_fam_insts = [],
                  md_anns      = [],
-                 md_vect_info = noVectInfo } 
+                 md_vect_info = noVectInfo }
 
 -- | Records the modules directly imported by a module for extracting e.g. usage information
 type ImportedMods = ModuleEnv [ImportedModsVal]
@@ -793,7 +793,7 @@ type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
 
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
--- being compiled right now.  Once it is compiled, a 'ModIface' and 
+-- being compiled right now.  Once it is compiled, a 'ModIface' and
 -- 'ModDetails' are extracted and the ModGuts is discarded.
 data ModGuts
   = ModGuts {
@@ -816,7 +816,7 @@ data ModGuts
                                          -- (includes TyCons for classes)
         mg_insts     :: ![Instance],     -- ^ Class instances declared in this module
         mg_fam_insts :: ![FamInst],      -- ^ Family instances declared in this module
-        mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains 
+        mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
         mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
@@ -830,7 +830,7 @@ data ModGuts
 
         -- The next two fields are unusual, because they give instance
         -- environments for *all* modules in the home package, including
-        -- this module, rather than for *just* this module.  
+        -- this module, rather than for *just* this module.
         -- Reason: when looking up an instance we don't want to have to
         --        look at each module in the home package in turn
         mg_inst_env     :: InstEnv,
@@ -853,13 +853,13 @@ data ModGuts
 
 
 ---------------------------------------------------------
--- The Tidy pass forks the information about this module: 
+-- The Tidy pass forks the information about this module:
 --      * one lot goes to interface file generation (ModIface)
 --        and later compilations (ModDetails)
 --      * the other lot goes to code generation (CgGuts)
 
 -- | A restricted form of 'ModGuts' for code generation purposes
-data CgGuts 
+data CgGuts
   = CgGuts {
         cg_module    :: !Module,
                 -- ^ Module being compiled
@@ -878,7 +878,7 @@ data CgGuts
                 -- as part of the code-gen of tycons
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
-        cg_dep_pkgs  :: ![PackageId],    -- ^ Dependent packages, used to 
+        cg_dep_pkgs  :: ![PackageId],    -- ^ Dependent packages, used to
                                          -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,        -- ^ Program coverage tick box information
         cg_modBreaks :: !ModBreaks       -- ^ Module breakpoints
@@ -912,8 +912,8 @@ appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 \begin{code}
 -- | Interactive context, recording information about the state of the
 -- context in which statements are executed in a GHC session.
-data InteractiveContext 
-  = InteractiveContext { 
+data InteractiveContext
+  = InteractiveContext {
          ic_imports    :: [InteractiveImport],
              -- ^ The GHCi context is extended with these imports
              --
@@ -992,13 +992,13 @@ icInScopeTTs = ic_tythings
 
 -- | Get the PrintUnqualified function based on the flags and this InteractiveContext
 icPrintUnqual :: DynFlags -> InteractiveContext -> PrintUnqualified
-icPrintUnqual dflags InteractiveContext{ ic_rn_gbl_env = grenv } = 
+icPrintUnqual dflags InteractiveContext{ ic_rn_gbl_env = grenv } =
     mkPrintUnqualified dflags grenv
 
--- | This function is called with new TyThings recently defined to update the 
+-- | This function is called with new TyThings recently defined to update the
 -- InteractiveContext to include them.  Ids are easily removed when shadowed,
--- but Classes and TyCons are not.  Some work could be done to determine 
--- whether they are entirely shadowed, but as you could still have references 
+-- but Classes and TyCons are not.  Some work could be done to determine
+-- whether they are entirely shadowed, but as you could still have references
 -- to them (e.g. instances for classes or values of the type for TyCons), it's
 -- not clear whether removing them is even the appropriate behavior.
 extendInteractiveContext :: InteractiveContext -> [TyThing] -> InteractiveContext
@@ -1027,7 +1027,7 @@ substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
 substInteractiveContext ictxt subst
     | isEmptyTvSubst subst = ictxt
 
-substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst 
+substInteractiveContext ictxt@InteractiveContext{ ic_tythings = tts } subst
     = ictxt { ic_tythings = map subst_ty tts }
   where subst_ty (AnId id) = AnId $ id `setIdType` substTy subst (idType id)
         subst_ty tt        = tt
@@ -1050,7 +1050,7 @@ instance Outputable InteractiveImport where
 
 %************************************************************************
 %*                                                                      *
-        Building a PrintUnqualified             
+        Building a PrintUnqualified
 %*                                                                      *
 %************************************************************************
 
@@ -1066,7 +1066,7 @@ scope.  However, the name might not be in scope at all, and that's
 where it gets tricky.  Here are the cases:
 
  1. T uniquely maps to  P:M.T      --->  "T"      NameUnqual
- 2. There is an X for which X.T 
+ 2. There is an X for which X.T
        uniquely maps to  P:M.T     --->  "X.T"    NameQual X
  3. There is no binding for "M.T"  --->  "M.T"    NameNotInScope1
  4. Otherwise                      --->  "P:M.T"  NameNotInScope2
@@ -1097,7 +1097,7 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 
         | [gre] <- qual_gres = NameQual (get_qual_mod (gre_prov gre))
 
-        | null qual_gres = 
+        | null qual_gres =
               if null (lookupGRE_RdrName (mkRdrQual (moduleName mod) occ) env)
                    then NameNotInScope1
                    else NameNotInScope2
@@ -1127,7 +1127,7 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
   qual_mod mod
      | modulePackageId mod == thisPackage dflags = False
 
-     | [pkgconfig] <- [pkg | (pkg,exposed_module) <- lookup, 
+     | [pkgconfig] <- [pkg | (pkg,exposed_module) <- lookup,
                              exposed pkg && exposed_module],
        packageConfigId pkgconfig == modulePackageId mod
         -- this says: we are given a module P:M, is there just one exposed package
@@ -1182,12 +1182,12 @@ implicitTyThings (ACoAxiom _cc) = []
 implicitTyThings (ATyCon tc)    = implicitTyConThings tc
 implicitTyThings (ADataCon dc)  = map AnId (dataConImplicitIds dc)
     -- For data cons add the worker and (possibly) wrapper
-    
+
 implicitClassThings :: Class -> [TyThing]
-implicitClassThings cl 
+implicitClassThings cl
   = -- Does not include default methods, because those Ids may have
     --    their own pragmas, unfoldings etc, not derived from the Class object
-    -- associated types 
+    -- associated types
     --    No extras_plus (recursive call) for the classATs, because they
     --    are only the family decls; they have no implicit things
     map ATyCon (classATs cl) ++
@@ -1195,7 +1195,7 @@ implicitClassThings cl
     map AnId (classAllSelIds cl)
 
 implicitTyConThings :: TyCon -> [TyThing]
-implicitTyConThings tc 
+implicitTyConThings tc
   = class_stuff ++
       -- fields (names of selectors)
       -- (possibly) implicit coercion and family coercion
@@ -1218,11 +1218,11 @@ extras_plus thing = thing : implicitTyThings thing
 -- For newtypes and indexed data types (and both),
 -- add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]
-implicitCoTyCon tc 
+implicitCoTyCon tc
   = map ACoAxiom . catMaybes $ [-- Just if newtype, Nothing if not
                               newTyConCo_maybe tc,
                               -- Just if family instance, Nothing if not
-                              tyConFamilyCoercion_maybe tc] 
+                              tyConFamilyCoercion_maybe tc]
 
 -- | Returns @True@ if there should be no interface-file declaration
 -- for this thing on its own: either it is built-in, or it is part
@@ -1301,18 +1301,18 @@ lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
 
 emptyTypeEnv        = emptyNameEnv
 typeEnvElts     env = nameEnvElts env
-typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env] 
-typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env] 
-typeEnvIds      env = [id | AnId id     <- typeEnvElts env] 
-typeEnvDataCons env = [dc | ADataCon dc <- typeEnvElts env] 
+typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env]
+typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env]
+typeEnvIds      env = [id | AnId id     <- typeEnvElts env]
+typeEnvDataCons env = [dc | ADataCon dc <- typeEnvElts env]
 typeEnvClasses  env = [cl | tc <- typeEnvTyCons env,
                             Just cl <- [tyConClass_maybe tc]]
 
 mkTypeEnv :: [TyThing] -> TypeEnv
 mkTypeEnv things = extendTypeEnvList emptyTypeEnv things
-                
+
 mkTypeEnvWithImplicits :: [TyThing] -> TypeEnv
-mkTypeEnvWithImplicits things = 
+mkTypeEnvWithImplicits things =
   mkTypeEnv things
     `plusNameEnv`
   mkTypeEnv (concatMap implicitTyThings things)
@@ -1330,7 +1330,7 @@ lookupTypeEnv = lookupNameEnv
 
 -- Extend the type environment
 extendTypeEnv :: TypeEnv -> TyThing -> TypeEnv
-extendTypeEnv env thing = extendNameEnv env (getName thing) thing 
+extendTypeEnv env thing = extendNameEnv env (getName thing) thing
 
 extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
 extendTypeEnvList env things = foldl extendTypeEnv env things
@@ -1355,7 +1355,7 @@ lookupType :: DynFlags
 
 lookupType dflags hpt pte name
   -- in one-shot, we don't use the HPT
-  | not (isOneShot (ghcMode dflags)) && modulePackageId mod == this_pkg 
+  | not (isOneShot (ghcMode dflags)) && modulePackageId mod == this_pkg
   = do hm <- lookupUFM hpt (moduleName mod) -- Maybe monad
        lookupNameEnv (md_types (hm_details hm)) name
   | otherwise
@@ -1369,7 +1369,7 @@ lookupTypeHscEnv :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupTypeHscEnv hsc_env name = do
     eps <- readIORef (hsc_EPS hsc_env)
     return $! lookupType dflags hpt (eps_PTE eps) name
-  where 
+  where
     dflags = hsc_dflags hsc_env
     hpt = hsc_HPT hsc_env
 \end{code}
@@ -1425,7 +1425,7 @@ class Monad m => MonadThings m where
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
                  -> (OccName -> Maybe (OccName, Fingerprint))
-mkIfaceHashCache pairs 
+mkIfaceHashCache pairs
   = \occ -> lookupOccEnv env occ
   where
     env = foldr add_decl emptyOccEnv pairs
@@ -1498,7 +1498,7 @@ plusWarns (WarnSome v1) (WarnSome v2) = WarnSome (v1 ++ v2)
 \begin{code}
 -- | Creates cached lookup for the 'mi_fix_fn' field of 'ModIface'
 mkIfaceFixCache :: [(OccName, Fixity)] -> OccName -> Fixity
-mkIfaceFixCache pairs 
+mkIfaceFixCache pairs
   = \n -> lookupOccEnv env n `orElse` defaultFixity
   where
    env = mkOccEnv pairs
@@ -1509,7 +1509,7 @@ emptyIfaceFixCache _ = defaultFixity
 -- | Fixity environment mapping names to their fixities
 type FixityEnv = NameEnv FixItem
 
--- | Fixity information for an 'Name'. We keep the OccName in the range 
+-- | Fixity information for an 'Name'. We keep the OccName in the range
 -- so that we can generate an interface from it
 data FixItem = FixItem OccName Fixity
 
@@ -1596,7 +1596,7 @@ data Usage
             -- ^ Cached module fingerprint
         usg_entities :: [(OccName,Fingerprint)],
             -- ^ Entities we depend on, sorted by occurrence name and fingerprinted.
-            -- NB: usages are for parent names only, e.g. type constructors 
+            -- NB: usages are for parent names only, e.g. type constructors
             -- but not the associated data constructors.
         usg_exports  :: Maybe Fingerprint,
             -- ^ Fingerprint for the export list we used to depend on this module,
@@ -1612,9 +1612,9 @@ data Usage
     deriving( Eq )
         -- The export list field is (Just v) if we depend on the export list:
         --      i.e. we imported the module directly, whether or not we
-        --           enumerated the things we imported, or just imported 
+        --           enumerated the things we imported, or just imported
         --           everything
-        -- We need to recompile if M's exports change, because 
+        -- We need to recompile if M's exports change, because
         -- if the import was    import M,       we might now have a name clash
         --                                      in the importing module.
         -- if the import was    import M(x)     M might no longer export x
@@ -1661,7 +1661,7 @@ data ExternalPackageState
                 -- whose interfaces we have opened.
                 -- The declarations in these interface files are held in the
                 -- 'eps_decls', 'eps_inst_env', 'eps_fam_inst_env' and 'eps_rules'
-                -- fields of this record, not in the 'mi_decls' fields of the 
+                -- fields of this record, not in the 'mi_decls' fields of the
                 -- interface we have sucked in.
                 --
                 -- What /is/ in the PIT is:
@@ -1676,11 +1676,11 @@ data ExternalPackageState
                 --
                 -- * Deprecations and warnings
 
-        eps_PTE :: !PackageTypeEnv,        
+        eps_PTE :: !PackageTypeEnv,
                 -- ^ Result of typechecking all the external package
                 -- interface files we have sucked in. The domain of
                 -- the mapping is external-package modules
-                
+
         eps_inst_env     :: !PackageInstEnv,   -- ^ The total 'InstEnv' accumulated
                                                -- from all the external-package modules
         eps_fam_inst_env :: !PackageFamInstEnv,-- ^ The total 'FamInstEnv' accumulated
@@ -1702,7 +1702,7 @@ data ExternalPackageState
 -- \"In\" means stuff that is just /read/ from interface files,
 -- \"Out\" means actually sucked in and type-checked
 data EpsStats = EpsStats { n_ifaces_in
-                         , n_decls_in, n_decls_out 
+                         , n_decls_in, n_decls_out
                          , n_rules_in, n_rules_out
                          , n_insts_in, n_insts_out :: !Int }
 
@@ -1715,7 +1715,7 @@ addEpsInStats stats n_decls n_insts n_rules
           , n_rules_in  = n_rules_in stats + n_rules }
 \end{code}
 
-Names in a NameCache are always stored as a Global, and have the SrcLoc 
+Names in a NameCache are always stored as a Global, and have the SrcLoc
 of their binding locations.
 
 Actually that's not quite right.  When we first encounter the original
@@ -1810,7 +1810,7 @@ ms_imps ms = ms_textual_imps ms ++ map mk_additional_import (dynFlagDependencies
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
 -- done.  The point is that the summariser will have to cpp/unlit/whatever
--- all files anyway, and there's no point in doing this twice -- just 
+-- all files anyway, and there's no point in doing this twice -- just
 -- park the result in a temp file, put the name of it in the location,
 -- and let @compile@ read from that file on the way back up.
 
@@ -1830,7 +1830,7 @@ instance Outputable ModSummary where
    ppr ms
       = sep [text "ModSummary {",
              nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
-                          text "ms_mod =" <+> ppr (ms_mod ms) 
+                          text "ms_mod =" <+> ppr (ms_mod ms)
                                 <> text (hscSourceString (ms_hsc_src ms)) <> comma,
                           text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
@@ -1843,12 +1843,12 @@ showModMsg target recomp mod_summary
         hsep [text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' '),
               char '(', text (normalise $ msHsFilePath mod_summary) <> comma,
               case target of
-                  HscInterpreted | recomp 
+                  HscInterpreted | recomp
                              -> text "interpreted"
                   HscNothing -> text "nothing"
                   _          -> text (normalise $ msObjFilePath mod_summary),
               char ')']
- where 
+ where
     mod     = moduleName (ms_mod mod_summary)
     mod_str = showSDoc (ppr mod) ++ hscSourceString (ms_hsc_src mod_summary)
 \end{code}
@@ -1887,11 +1887,11 @@ data SourceModified
 \begin{code}
 -- | Information about a modules use of Haskell Program Coverage
 data HpcInfo
-  = HpcInfo 
+  = HpcInfo
      { hpcInfoTickCount :: Int
      , hpcInfoHash      :: Int
      }
-  | NoHpcInfo 
+  | NoHpcInfo
      { hpcUsed          :: AnyHpcUsage  -- ^ Is hpc used anywhere on the module \*tree\*?
      }
 
@@ -1900,7 +1900,7 @@ data HpcInfo
 type AnyHpcUsage = Bool
 
 emptyHpcInfo :: AnyHpcUsage -> HpcInfo
-emptyHpcInfo = NoHpcInfo 
+emptyHpcInfo = NoHpcInfo
 
 -- | Find out if HPC is used by this module or any of the modules
 -- it depends upon
@@ -1931,7 +1931,7 @@ on just the OccName easily in a Core pass.
 -- NB: The following tables may also include 'Var's, 'TyCon's and 'DataCon's from imported modules,
 --     which have been subsequently vectorised in the current module.
 --
-data VectInfo      
+data VectInfo
   = VectInfo
     { vectInfoVar          :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
     , vectInfoTyCon        :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
@@ -1940,16 +1940,16 @@ data VectInfo
     , vectInfoScalarTyCons :: NameSet                     -- ^ set of scalar type constructors
     }
 
--- |Vectorisation information for 'ModIface'; i.e, the vectorisation information propagated 
+-- |Vectorisation information for 'ModIface'; i.e, the vectorisation information propagated
 -- across module boundaries.
 --
-data IfaceVectInfo 
-  = IfaceVectInfo 
+data IfaceVectInfo
+  = IfaceVectInfo
     { ifaceVectInfoVar          :: [Name]  -- ^ All variables in here have a vectorised variant
     , ifaceVectInfoTyCon        :: [Name]  -- ^ All 'TyCon's in here have a vectorised variant;
                                            -- the name of the vectorised variant and those of its
                                            -- data constructors are determined by
-                                           -- 'OccName.mkVectTyConOcc' and 
+                                           -- 'OccName.mkVectTyConOcc' and
                                            -- 'OccName.mkVectDataConOcc'; the names of the
                                            -- isomorphisms are determined by 'OccName.mkVectIsoOcc'
     , ifaceVectInfoTyConReuse   :: [Name]  -- ^ The vectorised form of all the 'TyCon's in here
@@ -1960,11 +1960,11 @@ data IfaceVectInfo
     }
 
 noVectInfo :: VectInfo
-noVectInfo 
+noVectInfo
   = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyVarSet emptyNameSet
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
-plusVectInfo vi1 vi2 = 
+plusVectInfo vi1 vi2 =
   VectInfo (vectInfoVar          vi1 `plusVarEnv`    vectInfoVar          vi2)
            (vectInfoTyCon        vi1 `plusNameEnv`   vectInfoTyCon        vi2)
            (vectInfoDataCon      vi1 `plusNameEnv`   vectInfoDataCon      vi2)
@@ -2143,7 +2143,7 @@ type BreakIndex = Int
 data ModBreaks
    = ModBreaks
    { modBreaks_flags :: BreakArray
-        -- ^ The array of flags, one per breakpoint, 
+        -- ^ The array of flags, one per breakpoint,
         -- indicating which breakpoints are enabled.
    , modBreaks_locs :: !(Array BreakIndex SrcSpan)
         -- ^ An array giving the source span of each breakpoint.
@@ -2157,9 +2157,10 @@ data ModBreaks
 emptyModBreaks :: ModBreaks
 emptyModBreaks = ModBreaks
    { modBreaks_flags = error "ModBreaks.modBreaks_array not initialised"
-         -- ToDo: can we avoid this? 
+         -- ToDo: can we avoid this?
    , modBreaks_locs  = array (0,-1) []
    , modBreaks_vars  = array (0,-1) []
    , modBreaks_decls = array (0,-1) []
    }
 \end{code}
+
