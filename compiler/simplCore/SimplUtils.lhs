@@ -1139,8 +1139,7 @@ tryEtaExpand env bndr rhs
       = return (exprArity rhs, rhs)
 
       | sm_eta_expand (getMode env)      -- Provided eta-expansion is on
-      , let dicts_cheap = dopt Opt_DictsCheap dflags
-            new_arity   = findArity dicts_cheap bndr rhs old_arity
+      , let new_arity = findArity dflags bndr rhs old_arity
       , new_arity > manifest_arity  	-- And the curent manifest arity isn't enough
       		    			-- See Note [Eta expansion to manifes arity]
       = do { tick (EtaExpansion bndr)
@@ -1152,16 +1151,21 @@ tryEtaExpand env bndr rhs
     old_arity  = idArity bndr
     _dmd_arity = length $ fst $ splitStrictSig $ idStrictness bndr
 
-findArity :: Bool -> Id -> CoreExpr -> Arity -> Arity
+findArity :: DynFlags -> Id -> CoreExpr -> Arity -> Arity
 -- This implements the fixpoint loop for arity analysis
 -- See Note [Arity analysis]
-findArity dicts_cheap bndr rhs old_arity
-  = go (exprEtaExpandArity (mk_cheap_fn dicts_cheap init_cheap_app) rhs)
+findArity dflags bndr rhs old_arity
+  = go (exprEtaExpandArity dflags init_cheap_app rhs)
        -- We always call exprEtaExpandArity once, but usually 
        -- that produces a result equal to old_arity, and then
        -- we stop right away (since arities should not decrease)
        -- Result: the common case is that there is just one iteration
   where
+    init_cheap_app :: CheapAppFun
+    init_cheap_app fn n_val_args
+      | fn == bndr = True   -- On the first pass, this binder gets infinite arity
+      | otherwise  = isCheapApp fn n_val_args
+
     go :: Arity -> Arity
     go cur_arity
       | cur_arity <= old_arity = cur_arity	
@@ -1172,46 +1176,12 @@ findArity dicts_cheap bndr rhs old_arity
                              , ppr rhs])
                     go new_arity
       where
-        new_arity = exprEtaExpandArity (mk_cheap_fn dicts_cheap cheap_app) rhs
-      
+        new_arity = exprEtaExpandArity dflags cheap_app rhs
+
         cheap_app :: CheapAppFun
         cheap_app fn n_val_args
           | fn == bndr = n_val_args < cur_arity
           | otherwise  = isCheapApp fn n_val_args
-
-    init_cheap_app :: CheapAppFun
-    init_cheap_app fn n_val_args
-      | fn == bndr = True   -- On the first pass, this binder gets infinite arity
-      | otherwise  = isCheapApp fn n_val_args
- 
-mk_cheap_fn :: Bool -> CheapAppFun -> CheapFun
-mk_cheap_fn dicts_cheap cheap_app
-  | not dicts_cheap
-  = \e _     -> exprIsCheap' cheap_app e
-  | otherwise
-  = \e mb_ty -> exprIsCheap' cheap_app e
-             || case mb_ty of
-                  Nothing -> False
-                  Just ty -> isDictLikeTy ty
-	-- If the experimental -fdicts-cheap flag is on, we eta-expand through
-	-- dictionary bindings.  This improves arities. Thereby, it also
-	-- means that full laziness is less prone to floating out the
-	-- application of a function to its dictionary arguments, which
-	-- can thereby lose opportunities for fusion.  Example:
-	-- 	foo :: Ord a => a -> ...
-	--	foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
-	--		-- So foo has arity 1
-	--
-	--	f = \x. foo dInt $ bar x
-	--
-	-- The (foo DInt) is floated out, and makes ineffective a RULE 
-	--	foo (bar x) = ...
-	--
-	-- One could go further and make exprIsCheap reply True to any
-	-- dictionary-typed expression, but that's more work.
-	-- 
-	-- See Note [Dictionary-like types] in TcType.lhs for why we use
-  	-- isDictLikeTy here rather than isDictTy
 \end{code}
 
 Note [Eta-expanding at let bindings]

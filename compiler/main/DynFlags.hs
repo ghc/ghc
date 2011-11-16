@@ -244,6 +244,7 @@ data DynFlag
    | Opt_Vectorise
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
+   | Opt_PedanticBottoms                -- Be picky about how we treat bottom
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -1753,6 +1754,7 @@ fFlags = [
   ( "liberate-case",                    Opt_LiberateCase, nop ),
   ( "spec-constr",                      Opt_SpecConstr, nop ),
   ( "cse",                              Opt_CSE, nop ),
+  ( "pedantic-bottoms",                 Opt_PedanticBottoms, nop ),
   ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas, nop ),
   ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas, nop ),
   ( "expose-all-unfoldings",            Opt_ExposeAllUnfoldings, nop ),

@@ -1856,6 +1856,20 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
+            <option>-fpedantic-bottoms</option>
+            <indexterm><primary><option>-fpedantic-bottoms</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Make GHC be more precise about its treatment of bottom (but see also
+                     <option>-fno-state-hack</option>). In particular, stop GHC 
+                     eta-expanding through a case expression, which is good for
+		     performance, but bad if you are using <literal>seq</literal> on
+                     partial applications.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
             <option>-fomit-interface-pragmas</option>
 	    <indexterm><primary><option>-fomit-interface-pragmas</option></primary></indexterm>
           </term>

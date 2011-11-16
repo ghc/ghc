@@ -1538,6 +1538,15 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fpedantic-bottoms</option></entry>
+	      <entry>Make GHC be more precise about its treatment of bottom (but see also
+                     <option>-fno-state-hack</option>). In particular, GHC will not
+                     eta-expand through a case expression.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-pedantic-bottoms</option></entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fomit-interface-pragmas</option></entry>
 	      <entry>Don't generate interface pragmas</entry>
 	      <entry>dynamic</entry>
