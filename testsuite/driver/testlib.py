@@ -576,7 +576,7 @@ def test_common_work (name, opts, func, args):
         ok_way = lambda way: \
             not getTestOpts().skip \
             and (config.only == [] or name in config.only) \
-            and (getTestOpts().only_ways == [] or way in getTestOpts().only_ways) \
+            and (getTestOpts().only_ways == None or way in getTestOpts().only_ways) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
             and way not in getTestOpts().omit_ways
 
