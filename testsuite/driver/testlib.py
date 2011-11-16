@@ -1000,6 +1000,12 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     if len(opts.compiler_stats_num_fields) > 0:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
+    # Required by GHC 7.3+, harmless for earlier versions:
+    if (getTestOpts().c_src or
+        getTestOpts().objc_src or
+        getTestOpts().objcpp_src):
+        extra_hc_opts += ' -no-hs-main '
+
     if getTestOpts().compile_cmd_prefix == '':
         cmd_prefix = ''
     else:
