@@ -25,7 +25,7 @@ import VarSet
 import VarEnv
 import CoreSyn
 import Rules
-import CoreUtils	( exprIsTrivial, applyTypeToArgs, mkPiTypes )
+import CoreUtils	( exprIsTrivial, applyTypeToArgs )
 import CoreFVs		( exprFreeVars, exprsFreeVars, idFreeVars )
 import UniqSupply	( UniqSM, initUs_, MonadUnique(..) )
 import Name

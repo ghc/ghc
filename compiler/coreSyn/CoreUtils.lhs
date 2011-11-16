@@ -12,7 +12,7 @@ module CoreUtils (
         mkCast,
         mkTick, mkTickNoHNF,
         bindNonRec, needsCaseBinding,
-        mkAltExpr, mkPiType, mkPiTypes,
+        mkAltExpr,
 
         -- * Taking expressions apart
         findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
@@ -136,20 +136,6 @@ Various possibilities suggest themselves:
 
  - Expand synonyms on the fly, when the problem arises. That is what
    we are doing here.  It's not too expensive, I think.
-
-\begin{code}
-mkPiType  :: Var -> Type -> Type
--- ^ Makes a @(->)@ type or a forall type, depending
--- on whether it is given a type variable or a term variable.
-mkPiTypes :: [Var] -> Type -> Type
--- ^ 'mkPiType' for multiple type or value arguments
-
-mkPiType v ty
-   | isId v    = mkFunTy (idType v) ty
-   | otherwise = mkForAllTy v ty
-
-mkPiTypes vs ty = foldr mkPiType ty vs
-\end{code}
 
 \begin{code}
 applyTypeToArg :: Type -> CoreExpr -> Type

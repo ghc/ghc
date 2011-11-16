@@ -44,7 +44,6 @@ import Var
 import VarEnv
 import VarSet     ( mkVarSet, varSetElems )
 import Pair
-import CoreUtils  ( mkPiTypes )
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var), CoreExpr, varToCoreExpr )
 import PrelNames  ( typeableClassNames )

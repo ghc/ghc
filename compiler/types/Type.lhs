@@ -39,7 +39,7 @@ module Type (
 	splitTyConApp_maybe, splitTyConApp, 
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
-        mkForAllArrowKinds,
+        mkPiKinds, mkPiType, mkPiTypes,
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
 	
 	-- (Newtypes)
@@ -675,12 +675,25 @@ mkForAllTy tyvar ty
 mkForAllTys :: [TyVar] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
-mkForAllArrowKinds :: [TyVar] -> Kind -> Kind
--- mkForAllArrowKinds [k1, k2, (a:k1 -> *)] k2
+mkPiKinds :: [TyVar] -> Kind -> Kind
+-- mkPiKinds [k1, k2, (a:k1 -> *)] k2
 -- returns forall k1 k2. (k1 -> *) -> k2
-mkForAllArrowKinds ktvs res =
-  mkForAllTys kvs $ mkArrowKinds (map tyVarKind tvs) res
-  where (kvs, tvs) = splitKiTyVars ktvs
+mkPiKinds [] res = res
+mkPiKinds (tv:tvs) res 
+  | isKiVar tv = ForAllTy tv          (mkPiKinds tvs res)
+  | otherwise  = FunTy (tyVarKind tv) (mkPiKinds tvs res)
+
+mkPiType  :: Var -> Type -> Type
+-- ^ Makes a @(->)@ type or a forall type, depending
+-- on whether it is given a type variable or a term variable.
+mkPiTypes :: [Var] -> Type -> Type
+-- ^ 'mkPiType' for multiple type or value arguments
+
+mkPiType v ty
+   | isId v    = mkFunTy (varType v) ty
+   | otherwise = mkForAllTy v ty
+
+mkPiTypes vs ty = foldr mkPiType ty vs
 
 isForAllTy :: Type -> Bool
 isForAllTy (ForAllTy _ _) = True

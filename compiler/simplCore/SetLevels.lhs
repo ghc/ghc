@@ -63,7 +63,7 @@ module SetLevels (
 
 import CoreSyn
 import CoreMonad	( FloatOutSwitches(..) )
-import CoreUtils	( exprType, exprOkForSpeculation, mkPiTypes )
+import CoreUtils	( exprType, exprOkForSpeculation )
 import CoreArity	( exprBotStrictness_maybe )
 import CoreFVs		-- all of it
 import Coercion         ( isCoVar )
@@ -78,7 +78,7 @@ import Literal		( litIsTrivial )
 import Demand		( StrictSig, increaseStrictSigArity )
 import Name		( getOccName, mkSystemVarName )
 import OccName		( occNameString )
-import Type		( isUnLiftedType, Type, sortQuantVars )
+import Type		( isUnLiftedType, Type, sortQuantVars, mkPiTypes )
 import Kind		( kiVarsOfKinds )
 import BasicTypes	( Arity )
 import UniqSupply

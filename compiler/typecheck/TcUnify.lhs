@@ -43,7 +43,6 @@ module TcUnify (
 
 import HsSyn
 import TypeRep
-import CoreUtils( mkPiTypes )
 import TcErrors	( unifyCtxt )
 import TcMType
 import TcIface

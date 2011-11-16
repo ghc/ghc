@@ -89,7 +89,6 @@ import Data.IORef ( readIORef )
 
 #ifdef GHCI
 import TcType   ( isUnitTy, isTauTy )
-import CoreUtils( mkPiTypes )
 import TcHsType
 import TcMatches
 import RnTypes
