@@ -1,6 +1,7 @@
 
-T3540.hs:4:1:
-    Expecting an ordinary type, but found a type of kind Constraint
+T3540.hs:4:11:
+    Predicate `a ~ Int' used as a type
+    Expected kind `??', but `a ~ Int' has kind `Constraint'
     In the type signature for `thing': thing :: a ~ Int
 
 T3540.hs:7:20:
