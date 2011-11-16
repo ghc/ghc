@@ -891,6 +891,18 @@ $ cat foo.hspp</screen>
           <literal>Main</literal> module present (normally the
           compiler will not attempt linking when there is no
           <literal>Main</literal>).</para>
+
+          <para>The flags <option>-rtsopts</option>
+            and <option>-with-rtsopts</option> have no effect when
+            used with <option>-no-hs-main</option>, because they are
+            implemented by changing the definition
+            of <literal>main</literal> that GHC generates.  See
+            <xref linkend="using-own-main" /> for how to get the
+            effect of <option>-rtsopts</option>
+            and <option>-with-rtsopts</option> when using your
+            own <literal>main</literal>.
+          </para>
+
         </listitem>
       </varlistentry>
 
@@ -1024,6 +1036,12 @@ $ cat foo.hspp</screen>
             security problem.  For this reason, GHC 7.0.1 and later
             default to <option>-rtsops=some</option>.
           </para>
+
+          <para>
+            Note that <option>-rtsopts</option> has no effect when
+            used with <option>-no-hs-main</option>; see
+            <xref linkend="using-own-main" /> for details.
+          </para>
         </listitem>
       </varlistentry>
 
@@ -1041,6 +1059,12 @@ $ cat foo.hspp</screen>
             not have the ability to change RTS options at run-time, in which case
             <option>-with-rtsopts</option> would be the <emphasis>only</emphasis> way to set
             them.)
+          </para>
+
+          <para>
+            Note that <option>-with-rtsopts</option> has no effect when
+            used with <option>-no-hs-main</option>; see
+            <xref linkend="using-own-main" /> for details.
           </para>
         </listitem>
       </varlistentry>

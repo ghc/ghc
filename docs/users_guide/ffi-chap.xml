@@ -278,40 +278,7 @@ int main(int argc, char *argv[])
 	(i.e. those arguments between
 	<literal>+RTS...-RTS</literal>).</para>
 
-      <informaltable>
-	<tgroup cols="2" align="left" colsep="1" rowsep="1">
-	  <thead>
-	    <row>
-	      <entry>Character</entry>
-	      <entry>Replacement</entry>
-	    </row>
-	  </thead>
-	  <tbody>
-	    <row>
-	      <entry><literal>.</literal></entry>
-	      <entry><literal>zd</literal></entry>
-	    </row>
-	    <row>
-	      <entry><literal>_</literal></entry>
-	      <entry><literal>zu</literal></entry>
-	    </row>
-	    <row>
-	      <entry><literal>`</literal></entry>
-	      <entry><literal>zq</literal></entry>
-	    </row>
-	    <row>
-	      <entry><literal>Z</literal></entry>
-	      <entry><literal>ZZ</literal></entry>
-	    </row>
-	    <row>
-	      <entry><literal>z</literal></entry>
-	      <entry><literal>zz</literal></entry>
-	    </row>
-          </tbody>
-        </tgroup>
-      </informaltable>
-
-	<para>After we've finished invoking our Haskell functions, we
+        <para>After we've finished invoking our Haskell functions, we
 	can call <literal>hs_exit()</literal>, which terminates the
 	RTS.</para>
 
@@ -331,6 +298,85 @@ int main(int argc, char *argv[])
 	<option>-no-hs-main</option><indexterm><primary><option>-no-hs-main</option></primary>
 	  </indexterm>, otherwise GHC will try to link
 	to the <literal>Main</literal> Haskell module.</para>
+
+        <para>To use <literal>+RTS</literal> flags
+          with <literal>hs_init()</literal>, we have to modify the
+          example slightly.  By default, GHC's RTS will only accept
+          "safe"
+          <literal>+RTS</literal> flags (see
+          <xref linkend="options-linker" />), and
+          the <option>-rtsopts</option><indexterm><primary><option>-rtsopts</option></primary></indexterm> link-time flag overrides this.
+          However, <option>-rtsopts</option> has no effect
+          when <option>-no-hs-main</option> is in use (and the same
+          goes for <option>-with-rtsopts</option>).  To set these
+          options we have to call a GHC-specific API instead
+          of <option>hs_init()</option>:</para>
+
+<programlisting>
+#include &lt;stdio.h&gt;
+#include "HsFFI.h"
+
+#ifdef __GLASGOW_HASKELL__
+#include "foo_stub.h"
+#include "Rts.h"
+#endif
+
+int main(int argc, char *argv[])
+{
+  int i;
+
+#if __GLASGOW_HASKELL__ >= 703
+  {
+      RtsConfig conf = defaultRtsConfig;
+      conf.rts_opts_enabled = RtsOptsAll;
+      hs_init_ghc(&amp;argc, &amp;argv, conf);
+  }
+#else
+  hs_init(&amp;argc, &amp;argv);
+#endif
+
+  for (i = 0; i &lt; 5; i++) {
+    printf("%d\n", foo(2500));
+  }
+
+  hs_exit();
+  return 0;
+}</programlisting>
+
+      <para>Note two changes: we included <literal>Rts.h</literal>,
+        which defines the GHC-specific external RTS interface, and we
+        called <literal>hs_init_ghc()</literal> instead
+        of <literal>hs_init()</literal>, passing an argument of
+        type <literal>RtsConfig</literal>.
+        <literal>RtsConfig</literal> is a struct with various fields
+        that affect the behaviour of the runtime system.  Its
+        definition is:</para>
+
+<programlisting>
+typedef struct {
+    RtsOptsEnabledEnum rts_opts_enabled;
+    const char *rts_opts;
+} RtsConfig;
+
+extern const RtsConfig defaultRtsConfig;
+
+typedef enum {
+    RtsOptsNone,         // +RTS causes an error
+    RtsOptsSafeOnly,     // safe RTS options allowed; others cause an error
+    RtsOptsAll           // all RTS options allowed
+  } RtsOptsEnabledEnum;
+</programlisting>
+
+      <para>There is a default
+        value <literal>defaultRtsConfig</literal> that should be used
+        to initialise variables of type <literal>RtsConfig</literal>.
+        More fields will undoubtedly be added
+        to <literal>RtsConfig</literal> in the future, so in order to
+        keep your code forwards-compatible it is best to initialise
+        with <literal>defaultRtsConfig</literal> and then modify the
+        required fields, as in the code sample above.</para>
+
+
       </sect3>
 
       <sect3 id="ffi-library">
