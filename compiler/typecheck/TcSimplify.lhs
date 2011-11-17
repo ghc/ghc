@@ -372,6 +372,7 @@ to check the original wanted.
 \begin{code}
 
 simplifyWithApprox :: WantedConstraints -> TcS WantedConstraints
+-- Post: returns only wanteds (no deriveds)
 simplifyWithApprox wanted
  = do { traceTcS "simplifyApproxLoop" (ppr wanted)
 
@@ -384,24 +385,11 @@ simplifyWithApprox wanted
       -- Solve extra stuff for real: notice that all the extra unsolved constraints will 
       -- be in the inerts of the monad, so we are OK
       ; traceTcS "simplifyApproxLoop" $ text "Calling solve_wanteds!"
-      ; solve_wanteds (WC { wc_flat  = floats -- They are floated so they are not in the evvar cache
-                          , wc_impl  = residual_implics
-                          , wc_insol = emptyBag })
-      }
-
-
-{- OLD:
-      ; results <- solve_wanteds wanted  
-      ; let (residual_implics, floats) = approximateImplications (wc_impl results)
-
-        -- If no new work was produced then we are done with simplifyApproxLoop
-      ; if insolubleWC results || isEmptyBag floats
-        then return results
-        else solve_wanteds 
-                (WC { wc_flat = floats `unionBags` wc_flat results
-                    , wc_impl = residual_implics
-                    , wc_insol = emptyBag }) }
--}
+      ; wants_or_ders <- solve_wanteds (WC { wc_flat  = floats -- They are floated so they are not in the evvar cache
+                                           , wc_impl  = residual_implics
+                                           , wc_insol = emptyBag })
+      ; return $ 
+        wants_or_ders { wc_flat = keepWanted (wc_flat wants_or_ders) } }
 
 
 approximateImplications :: Bag Implication -> (Bag Implication, Cts)
