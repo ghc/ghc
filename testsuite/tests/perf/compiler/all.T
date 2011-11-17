@@ -159,8 +159,8 @@ test('T5030',
                                                       550000000)),
       # expected value: 1255998208 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 90000000,
-                                                     110000000)),
+          compiler_stats_num_field('bytes allocated', 900000000,
+                                                     1100000000)),
        only_ways(['normal'])
       ],
      compile,
