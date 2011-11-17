@@ -9,8 +9,8 @@ T3807:
 	$(RM) T3807-export.o T3807-load.o
 	$(RM) T3807test.so
 	$(RM) T3807-load
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version` -rtsopts
-	'$(TEST_HC)' $(TEST_HC_OPTS) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -lHSrts-ghc`'$(TEST_HC)' $(TEST_HC_OPTS) --numeric-version` -rtsopts
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
 	./T3807-load
 
 .PHONY: T4464
@@ -32,10 +32,10 @@ T4464:
 
 .PHONY: T5373
 T5373:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373A
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373B -rtsopts
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373C -rtsopts=some
-	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -dynamic --make T5373D -rtsopts=none
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic --make T5373A
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic --make T5373B -rtsopts
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic --make T5373C -rtsopts=some
+	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic --make T5373D -rtsopts=none
 	-./T5373A +RTS -c 2>&1 | grep disabled
 	-./T5373B +RTS -c 2>&1 | grep disabled
 	-./T5373C +RTS -c 2>&1 | grep disabled

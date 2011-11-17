@@ -443,11 +443,11 @@ shared001:
 .PHONY: rtsopts001
 rtsopts001:
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make rtsOpts -rtsopts
+	"$(TEST_HC)" $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make rtsOpts -rtsopts
 	echo "Normal"
 	-./rtsOpts +RTS -C0 2>&1
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make rtsOpts
+	"$(TEST_HC)" $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make rtsOpts
 	echo "No RTS opts"
 	-./rtsOpts +RTS -C0 2>&1
 
