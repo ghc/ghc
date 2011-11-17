@@ -1,23 +1,16 @@
-
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-module Vectorise.Utils.Hoisting (
-	Inline(..),
-	addInlineArity,
-	inlineMe,
-	
-	hoistBinding,
-	hoistExpr,
-	hoistVExpr,
-	hoistPolyVExpr,
-	takeHoisted
-)
+module Vectorise.Utils.Hoisting
+  ( Inline(..)
+  , addInlineArity
+  , inlineMe
+  
+  , hoistBinding
+  , hoistExpr
+  , hoistVExpr
+  , hoistPolyVExpr
+  , takeHoisted
+  )
 where
+
 import Vectorise.Monad
 import Vectorise.Env
 import Vectorise.Vect
@@ -28,32 +21,37 @@ import CoreUtils
 import CoreUnfold
 import Type
 import Id
-import BasicTypes( Arity )
+import BasicTypes  (Arity)
 import FastString
 import Control.Monad
+import Control.Applicative
 
 
 -- Inline ---------------------------------------------------------------------
--- | Records whether we should inline a particular binding.
+
+-- |Records whether we should inline a particular binding.
+--
 data Inline 
         = Inline Arity
         | DontInline
 
--- | Add to the arity contained within an `Inline`, if any.
+-- |Add to the arity contained within an `Inline`, if any.
+--
 addInlineArity :: Inline -> Int -> Inline
 addInlineArity (Inline m) n = Inline (m+n)
 addInlineArity DontInline _ = DontInline
 
--- | Says to always inline a binding.
+-- |Says to always inline a binding.
+--
 inlineMe :: Inline
 inlineMe = Inline 0
 
 
--- Hoising --------------------------------------------------------------------
+-- Hoisting --------------------------------------------------------------------
+
 hoistBinding :: Var -> CoreExpr -> VM ()
 hoistBinding v e = updGEnv $ \env ->
   env { global_bindings = (v,e) : global_bindings env }
-
 
 hoistExpr :: FastString -> CoreExpr -> Inline -> VM Var
 hoistExpr fs expr inl
@@ -67,7 +65,6 @@ hoistExpr fs expr inl
                                       mkInlineUnfolding (Just arity) expr
                       DontInline   -> var
 
-
 hoistVExpr :: VExpr -> Inline -> VM VVar
 hoistVExpr (ve, le) inl
   = do
@@ -76,16 +73,22 @@ hoistVExpr (ve, le) inl
       lv <- hoistExpr ('l' `consFS` fs) le (addInlineArity inl 1)
       return (vv, lv)
 
-
-hoistPolyVExpr :: [TyVar] -> Inline -> VM VExpr -> VM VExpr
-hoistPolyVExpr tvs inline p
-  = do
-      inline' <- liftM (addInlineArity inline) (polyArity tvs)
-      expr <- closedV . polyAbstract tvs $ \args ->
-              liftM (mapVect (mkLams $ tvs ++ args)) p
-      fn   <- hoistVExpr expr inline'
-      polyVApply (vVar fn) (mkTyVarTys tvs)
-
+-- |Hoist a polymorphic vectorised expression into a new top-level binding (representing a closure
+-- function).
+--
+-- The hoisted expression is parameterised by (1) a set of type variables and (2) a set of value
+-- variables that are passed as conventional type and value arguments.  The latter is implicitly
+-- extended by the set of 'PA' dictionaries required for the type variables.
+--
+hoistPolyVExpr :: [TyVar] -> [Var] -> Inline -> VM VExpr -> VM VExpr
+hoistPolyVExpr tvs vars inline p
+  = do { inline' <- addInlineArity inline . (+ length vars) <$> polyArity tvs
+       ; expr <- closedV . polyAbstract tvs $ \args ->
+                   mapVect (mkLams $ tvs ++ args ++ vars) <$> p
+       ; fn   <- hoistVExpr expr inline'
+       ; let varArgs = varsToCoreExprs vars
+       ; mapVect (\e -> e `mkApps` varArgs) <$> polyVApply (vVar fn) (mkTyVarTys tvs)
+       }
 
 takeHoisted :: VM [(Var, CoreExpr)]
 takeHoisted

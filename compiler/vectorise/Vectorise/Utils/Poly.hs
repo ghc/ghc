@@ -1,18 +1,12 @@
 -- |Auxiliary functions to vectorise type abstractions.
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-module Vectorise.Utils.Poly (
-  polyAbstract, 
-  polyApply,
-  polyVApply,
-  polyArity
-) where
+module Vectorise.Utils.Poly
+  ( polyAbstract
+  , polyApply
+  , polyVApply
+  , polyArity
+  ) 
+where
 
 import Vectorise.Vect
 import Vectorise.Monad
@@ -60,7 +54,7 @@ polyArity tvs
        ; return $ length [() | Just _ <- tys]
        }
 
--- |Apply a variable to its type arguments as well as 'PA' dictionaries for these type arguments.
+-- |Apply a expression to its type arguments as well as 'PA' dictionaries for these type arguments.
 --
 polyApply :: CoreExpr -> [Type] -> VM CoreExpr
 polyApply expr tys

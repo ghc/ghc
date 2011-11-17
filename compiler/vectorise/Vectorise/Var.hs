@@ -1,22 +1,17 @@
+{-# LANGUAGE TupleSections #-}
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
+-- |Vectorise variables and literals.
 
--- | Vectorise variables and literals.
-module Vectorise.Var (
-	vectBndr,
-	vectBndrNew,
-	vectBndrIn,
-	vectBndrNewIn,
-	vectBndrsIn,
-	vectVar,
-	vectPolyVar,
-	vectLiteral
-) where
+module Vectorise.Var 
+  ( vectBndr
+  , vectBndrNew
+  , vectBndrIn
+  , vectBndrNewIn
+  , vectBndrsIn
+  , vectVar
+  , vectConst
+  )
+where
 
 import Vectorise.Utils
 import Vectorise.Monad
@@ -26,15 +21,15 @@ import Vectorise.Type.Type
 import CoreSyn
 import Type
 import VarEnv
-import Literal
 import Id
 import FastString
-import Control.Monad
+import Control.Applicative
 
 
 -- Binders ----------------------------------------------------------------------------------------
 
--- | Vectorise a binder variable, along with its attached type.
+-- |Vectorise a binder variable, along with its attached type.
+--
 vectBndr :: Var -> VM VVar
 vectBndr v
  = do (vty, lty) <- vectAndLiftType (idType v)
@@ -47,8 +42,8 @@ vectBndr v
   where
     mapTo vv lv env = env { local_vars = extendVarEnv (local_vars env) v (vv, lv) }
 
--- | Vectorise a binder variable, along with its attached type, 
---   but give the result a new name.
+-- |Vectorise a binder variable, along with its attached type, but give the result a new name.
+--
 vectBndrNew :: Var -> FastString -> VM VVar
 vectBndrNew v fs
  = do vty <- vectType (idType v)
@@ -58,7 +53,8 @@ vectBndrNew v fs
   where
     upd vv env = env { local_vars = extendVarEnv (local_vars env) v vv }
 
--- | Vectorise a binder then run a computation with that binder in scope.
+-- |Vectorise a binder then run a computation with that binder in scope.
+--
 vectBndrIn :: Var -> VM a -> VM (VVar, a)
 vectBndrIn v p
  = localV
@@ -66,7 +62,8 @@ vectBndrIn v p
       x <- p
       return (vv, x)
 
--- | Vectorise a binder, give it a new name, then run a computation with that binder in scope.
+-- |Vectorise a binder, give it a new name, then run a computation with that binder in scope.
+--
 vectBndrNewIn :: Var -> FastString -> VM a -> VM (VVar, a)
 vectBndrNewIn v fs p
  = localV
@@ -74,60 +71,33 @@ vectBndrNewIn v fs p
       x  <- p
       return (vv, x)
 
--- | Vectorise some binders, then run a computation with them in scope.
+-- |Vectorise some binders, then run a computation with them in scope.
+--
 vectBndrsIn :: [Var] -> VM a -> VM ([VVar], a)
 vectBndrsIn vs p
  = localV
  $ do vvs <- mapM vectBndr vs
-      x	  <- p
+      x   <- p
       return (vvs, x)
 
 
 -- Variables --------------------------------------------------------------------------------------
 
--- | Vectorise a variable, producing the vectorised and lifted versions.
+-- |Vectorise a variable, producing the vectorised and lifted versions.
+--
 vectVar :: Var -> VM VExpr
-vectVar v
- = do 
-      -- lookup the variable from the environment.
-      r	<- lookupVar v
-
-      case r of
-        -- If it's been locally bound then we'll already have both versions available.
-        Local (vv,lv) 
-         -> return (Var vv, Var lv)
-
-        -- To create the lifted version of a global variable we replicate it
-	-- using the integer context in the VM state for the number of elements.
-        Global vv     
-         -> do let vexpr = Var vv
-               lexpr <- liftPD vexpr
-               return (vexpr, lexpr)
-
--- | Like `vectVar` but also add type applications to the variables.
--- FIXME: 'vectVar' is really just a special case, which 'vectPolyVar' should handle fine as well —
---        MERGE the two functions!
-vectPolyVar :: Var -> [Type] -> VM VExpr
-vectPolyVar v tys
- = do vtys	<- mapM vectType tys
-      r		<- lookupVar v
-      case r of
-        Local (vv, lv) 
-         -> liftM2 (,) (polyApply (Var vv) vtys)
-                       (polyApply (Var lv) vtys)
-
-        Global poly    
-         -> do vexpr <- polyApply (Var poly) vtys
-               lexpr <- liftPD vexpr
-               return (vexpr, lexpr)
+vectVar var
+  = do { vVar <- lookupVar var
+       ; case vVar of
+           Local (vv, lv) -> return (Var vv, Var lv) -- local variables have a vect & lifted version
+           Global vv      -> vectConst (Var vv)      -- global variables get replicated
+       }
 
 
--- Literals ---------------------------------------------------------------------------------------
+-- Constants --------------------------------------------------------------------------------------
 
--- | Lifted literals are created by replicating them
---   We use the the integer context in the `VM` state for the number
---   of elements in the output array.
-vectLiteral :: Literal -> VM VExpr
-vectLiteral lit
- = do lexpr <- liftPD (Lit lit)
-      return (Lit lit, lexpr)
+-- |Constants are lifted by replication along the integer context in the `VM` state for the number
+-- of elements in the result array.
+--
+vectConst :: CoreExpr -> VM VExpr
+vectConst c = (c,) <$> liftPD c

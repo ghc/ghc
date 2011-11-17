@@ -1,12 +1,11 @@
 -- |Utils concerning closure construction and application.
 
-module Vectorise.Utils.Closure (
-  mkClosure,
-  mkClosureApp,
-  buildClosure,
-  buildClosures,
-  buildEnv
-) where
+module Vectorise.Utils.Closure
+  ( mkClosure
+  , mkClosureApp
+  , buildClosures
+  )
+where
 
 import Vectorise.Builtins
 import Vectorise.Vect
@@ -56,51 +55,72 @@ mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
       return (Var vapply `mkTyApps` [arg_ty, res_ty] `mkApps` [vclo, varg],
               Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [Var lc, lclo, larg])
 
-buildClosures :: [TyVar]
-              -> [VVar]
-              -> [Type]   -- ^ Type of the arguments.
-              -> Type     -- ^ Type of result.
+-- |Build a set of 'n' closures corresponding to an 'n'-ary vectorised function.  The length of
+-- the list of types of arguments determines the arity.
+--
+-- In addition to a set of type variables, a set of value variables is passed during closure
+-- /construction/.  In contrast, the closure environment and the arguments are passed during closure
+-- application.
+--
+buildClosures :: [TyVar]    -- ^ Type variables passed during closure construction.
+              -> [Var]      -- ^ Variables passed during closure construction.
+              -> [VVar]     -- ^ Variables in the environment.
+              -> [Type]     -- ^ Type of the arguments.
+              -> Type       -- ^ Type of result.
               -> VM VExpr
               -> VM VExpr
-buildClosures _   _    [] _ mk_body
+buildClosures _tvs _vars _env [] _res_ty mk_body
  = mk_body
-buildClosures tvs vars [arg_ty] res_ty mk_body
- =  buildClosure tvs vars arg_ty res_ty mk_body
-buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
- = do res_ty' <- mkClosureTypes arg_tys res_ty
-      arg     <- newLocalVVar (fsLit "x") arg_ty
-      buildClosure tvs vars arg_ty res_ty'
-        . hoistPolyVExpr tvs (Inline (length vars + 1))
-        $ do
-            lc     <- builtin liftingContext
-            clo    <- buildClosures tvs (vars ++ [arg]) arg_tys res_ty mk_body
-            return $ vLams lc (vars ++ [arg]) clo
+buildClosures tvs vars env [arg_ty] res_ty mk_body
+ =  buildClosure tvs vars env arg_ty res_ty mk_body
+buildClosures tvs vars env (arg_ty : arg_tys) res_ty mk_body
+ = do { res_ty' <- mkClosureTypes arg_tys res_ty
+      ; arg     <- newLocalVVar (fsLit "x") arg_ty
+      ; buildClosure tvs vars env arg_ty res_ty'
+          . hoistPolyVExpr tvs vars (Inline (length env + 1))
+          $ do { lc     <- builtin liftingContext
+               ; clo    <- buildClosures tvs vars (env ++ [arg]) arg_tys res_ty mk_body
+               ; return $ vLams lc (env ++ [arg]) clo
+               }
+      }
 
+-- Build a closure taking one extra argument during closure application.
+--
 -- (clo <x1,...,xn> <f,f^>, aclo (Arr lc xs1 ... xsn) <f,f^>)
 --   where
 --     f  = \env v -> case env of <x1,...,xn> -> e x1 ... xn v
 --     f^ = \env v -> case env of Arr l xs1 ... xsn -> e^ l x1 ... xn v
 --
-buildClosure :: [TyVar] -> [VVar] -> Type -> Type -> VM VExpr -> VM VExpr
-buildClosure tvs vars arg_ty res_ty mk_body
-  = do
-      (env_ty, env, bind) <- buildEnv vars
-      env_bndr <- newLocalVVar (fsLit "env") env_ty
-      arg_bndr <- newLocalVVar (fsLit "arg") arg_ty
+-- In addition to a set of type variables, a set of value variables is passed during closure
+-- /construction/.  In contrast, the closure environment and the closure argument are passed during
+-- closure application.
+--
+buildClosure :: [TyVar]         -- ^Type variables passed during closure construction.
+             -> [Var]           -- ^Variables passed during closure construction.
+             -> [VVar]          -- ^Variables in the environment.
+             -> Type            -- ^Type of the closure argument.
+             -> Type            -- ^Type of the result.
+             -> VM VExpr 
+             -> VM VExpr
+buildClosure tvs vars vvars arg_ty res_ty mk_body
+  = do { (env_ty, env, bind) <- buildEnv vvars
+       ; env_bndr <- newLocalVVar (fsLit "env") env_ty
+       ; arg_bndr <- newLocalVVar (fsLit "arg") arg_ty
 
-      fn <- hoistPolyVExpr tvs (Inline 2)
-          $ do
-              lc     <- builtin liftingContext
-              body   <- mk_body
-              return .  vLams lc [env_bndr, arg_bndr]
-                     $  bind (vVar env_bndr)
-                             (vVarApps lc body (vars ++ [arg_bndr]))
+           -- generate the closure function as a hoisted binding
+       ; fn <- hoistPolyVExpr tvs vars (Inline 2) $
+                 do { lc     <- builtin liftingContext
+                    ; body   <- mk_body
+                    ; return . vLams lc [env_bndr, arg_bndr]
+                             $ bind (vVar env_bndr)
+                                    (vVarApps lc body (vvars ++ [arg_bndr]))
+                    }
 
-      mkClosure arg_ty res_ty env_ty fn env
+       ; mkClosure arg_ty res_ty env_ty fn env
+       }
 
-
--- Environments ---------------------------------------------------------------
-
+-- Build the environment for a single closure.
+--
 buildEnv :: [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VExpr)
 buildEnv [] 
  = do

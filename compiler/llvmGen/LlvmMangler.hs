@@ -88,7 +88,7 @@ readSections r w = go B.empty [] []
             | infoSec `B.isInfixOf` hdr =
                 cts `seq` return $ (hdr, cts):ss
             | otherwise =
-                writeSection w (hdr, fixupStack cts B.empty) >> return ss
+                writeSection w (hdr, cts) >> return ss
 
       case e_l of
         Right l | l == syntaxUnified 
@@ -110,7 +110,7 @@ writeSection w (hdr, cts) = do
 -- | Reorder and convert sections so info tables end up next to the
 -- code. Also does stack fixups.
 fixTables :: [Section] -> [Section]
-fixTables ss = fixed
+fixTables ss = map strip sorted
   where
     -- Resort sections: We only assign a non-zero number to all
     -- sections having the "STRIP ME" marker. As sortBy is stable,
@@ -120,7 +120,9 @@ fixTables ss = fixed
       | B.null a  = 0
       | otherwise = 1 + readInt (B.takeWhile isDigit $ B.drop infoLen a)
       where (_,a) = B.breakSubstring infoSec hdr
+
     indexed = zip (map (extractIx . fst) ss) ss
+
     sorted = map snd $ sortBy (compare `on` fst) indexed
 
     -- Turn all the "STRIP ME" sections into normal text sections, as
@@ -128,11 +130,6 @@ fixTables ss = fixed
     strip (hdr, cts)
       | infoSec `B.isInfixOf` hdr = (textStmt, cts)
       | otherwise                 = (hdr, cts)
-    stripped = map strip sorted
-
-    -- Do stack fixup
-    fix (hdr, cts) = (hdr, fixupStack cts B.empty)
-    fixed = map fix stripped
  
 {-|
     Mac OS X requires that the stack be 16 byte aligned when making a function
@@ -147,41 +144,6 @@ fixTables ss = fixed
     has the correct alignment since we keep the stack 16+8 aligned throughout
     STG land for 64-bit targets.
 -}
-fixupStack :: B.ByteString -> B.ByteString -> B.ByteString
-
-#if !darwin_TARGET_OS || x86_64_TARGET_ARCH
-fixupStack = const
-
-#else
-fixupStack f f' | B.null f' =
-    let -- fixup sub op
-        (a, c) = B.breakSubstring spInst f
-        (b, n) = B.breakEnd dollarPred a
-        num    = B.pack $ show $ readInt n + spFix
-    in if B.null c
-          then f' `B.append` f
-          else fixupStack c $ f' `B.append` b `B.append` num
-
-fixupStack f f' =
-    let -- fixup add ops
-        (a, c)  = B.breakSubstring jmpInst f
-        -- we matched on a '\n' so go past it
-        (l', b) = B.break eolPred $ B.tail c
-        l       = (B.head c) `B.cons` l'
-        (a', n) = B.breakEnd dollarPred a
-        (n', x) = B.break commaPred n
-        num     = B.pack $ show $ readInt n' + spFix
-        -- We need to avoid processing jumps to labels, they are of the form:
-        -- jmp\tL..., jmp\t_f..., jmpl\t_f..., jmpl\t*%eax..., jmpl *L...
-        targ = B.dropWhile ((==)'*') $ B.drop 1 $ B.dropWhile ((/=)'\t') $
-                B.drop labelStart c
-    in if B.null c
-          then f' `B.append` f
-          else if B.head targ == 'L'
-                then fixupStack b $ f' `B.append` a `B.append` l
-                else fixupStack b $ f' `B.append` a' `B.append` num `B.append`
-                                    x `B.append` l
-#endif
 
 -- | Read an int or error
 readInt :: B.ByteString -> Int

@@ -60,6 +60,10 @@ instance Monad VM where
                                          Yes genv' lenv' x -> runVM (f x) bi genv' lenv'
                                          No reason         -> return $ No reason
 
+instance Applicative VM where
+  pure  = return
+  (<*>) = ap
+  
 instance Functor VM where
   fmap = liftM
   

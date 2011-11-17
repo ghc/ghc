@@ -308,7 +308,7 @@ vectDataConWorkers orig_tc vect_tc arr_tc
                 . inBind orig_worker
                 . polyAbstract tyvars $ \args ->
                   liftM (mkLams (tyvars ++ args) . vectorised)
-                $ buildClosures tyvars [] arg_tys res_ty mk_body
+                $ buildClosures tyvars [] [] arg_tys res_ty mk_body
 
           raw_worker <- mkVectId orig_worker (exprType body)
           let vect_worker = raw_worker `setIdUnfolding`

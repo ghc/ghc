@@ -186,7 +186,7 @@ StgRunIsImplementedInAssembler(void)
         "addl %0, %%esp\n\t"
         "ret"
 
-      : : "i" (RESERVED_C_STACK_BYTES + 16 + 12)
+      : : "i" (RESERVED_C_STACK_BYTES + 16)
         // + 16 to make room for the 4 registers we have to save
         // + 12 because we need to align %esp to a 16-byte boundary (#5250)
     );
