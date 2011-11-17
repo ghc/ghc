@@ -57,7 +57,7 @@ buildPDataDataCon :: Name -> TyCon -> TyCon -> SumRepr -> VM DataCon
 buildPDataDataCon orig_name vect_tc repr_tc repr
  = do let tvs   = tyConTyVars vect_tc
       dc_name   <- mkLocalisedName mkPDataDataConOcc orig_name
-      comp_tys  <- mkSumTys mkPDataType repr
+      comp_tys  <- mkSumTys repr_sel_ty mkPDataType repr
 
       liftDs $ buildDataCon dc_name
                             False                  -- not infix
@@ -106,7 +106,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
  = do let tvs   = tyConTyVars vect_tc
       dc_name        <- mkLocalisedName mkPDatasDataConOcc orig_name
 
-      comp_tys  <- mkSumTys mkPDatasType repr
+      comp_tys  <- mkSumTys repr_sels_ty mkPDatasType repr
 
       liftDs $ buildDataCon dc_name
                             False                  -- not infix
@@ -124,18 +124,18 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
 -- Utils ----------------------------------------------------------------------
 -- | Flatten a SumRepr into a list of data constructor types.
 mkSumTys 
-        :: (Type -> VM Type)
+        :: (SumRepr -> Type)
+        -> (Type -> VM Type)
         -> SumRepr
         -> VM [Type]
 
-mkSumTys mkTc repr
+mkSumTys repr_selX_ty mkTc repr
  = sum_tys repr
  where
     sum_tys EmptySum      = return []
     sum_tys (UnarySum r)  = con_tys r
-    sum_tys (Sum { repr_sel_ty = sel_ty
-                 , repr_cons   = cons })
-      = liftM (sel_ty :) (concatMapM con_tys cons)
+    sum_tys d@(Sum { repr_cons   = cons })
+      = liftM (repr_selX_ty d :) (concatMapM con_tys cons)
 
     con_tys (ConRepr _ r)  = prod_tys r
 
