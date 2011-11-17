@@ -242,7 +242,7 @@ buildToArrPRepr vect_tc prepr_tc pdata_tc _ r
 
       return . Lam arg
              $ mkWildCase scrut (mkTyConApp pdata_tc ty_args) res_ty
-               [(DataAlt pdata_dc, vars, mkCoerce co result)]
+               [(DataAlt pdata_dc, vars, mkCast co result)]
   where
     ty_args    = mkTyVarTys $ tyConTyVars vect_tc
     el_ty      = mkTyConApp vect_tc ty_args
@@ -304,7 +304,7 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc _ r
       let co           = mkAppCo pdata_co
                        $ mkAxInstCo repr_co var_tys
 
-      let scrut        = mkCoerce co (Var arg)
+      let scrut        = mkCast co (Var arg)
 
       let mk_result args
             = wrapFamInstBody pdata_tc var_tys
@@ -398,7 +398,7 @@ buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
 
     return  $ Lam varg
             $ mkWildCase scrut (mkTyConApp pdatas_tc ty_args) res_ty
-                    [(DataAlt pdatas_dc, vars, mkCoerce co result)]        
+                    [(DataAlt pdatas_dc, vars, mkCast co result)]        
 
  where
     -- The element type of the argument.
@@ -478,7 +478,7 @@ buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
     let co           = mkAppCo pdatas_co
                      $ mkAxInstCo repr_co var_tys
 
-    let scrut        = mkCoerce co (Var varg)
+    let scrut        = mkCast co (Var varg)
 
     let mk_result args
             = wrapFamInstBody pdatas_tc var_tys
