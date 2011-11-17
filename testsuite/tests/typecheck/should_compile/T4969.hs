@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -w #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
              FlexibleContexts, FlexibleInstances,
-             OverlappingInstances, UndecidableInstances #-}
+             OverlappingInstances, UndecidableInstances,
+             KindSignatures #-}
 
 -- Cut down from a larger core-lint error
 
@@ -26,7 +27,7 @@ data FreshThings = Fresh
 
 newtype NewName a = NewName a
 newtype LetDef = LetDef NiceDeclaration  
-newtype TCMT m a = TCM ()
+newtype TCMT (m :: * -> *) a = TCM ()
 
 localToAbstract :: ToAbstract c a => c -> (a -> TCMT IO b) -> TCMT IO b  
 localToAbstract = undefined

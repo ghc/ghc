@@ -4,7 +4,7 @@ module T5303( showContextSeries ) where
 import Control.Monad.State.Strict( StateT )  
 import Control.Monad.Trans ( lift )
 
-data Tree m = Tree {}
+data Tree (m :: * -> *) = Tree {}
 
 data FL (a :: * -> * -> *) x z where
     (:>:) :: a x y -> FL a y z -> FL a x z
