@@ -1101,21 +1101,26 @@ coercion_kind :: (CoVar -> (Type,Type)) -> Coercion -> Pair Type
 -- Works for Coercions and LCoercions but you have to pass in what to do 
 -- at the (unlifted or lifted) coercion variable. 
 coercion_kind f co = go co 
-  where go (Refl ty)            = Pair ty ty
-        go (TyConAppCo tc cos)  = mkTyConApp tc <$> (sequenceA $ map go cos)
-        go (AppCo co1 co2)      = mkAppTy <$> go co1 <*> go co2
-        go (ForAllCo tv co)     = mkForAllTy tv <$> go co
-        go (CoVarCo cv)         = toPair $ f cv
-        go (AxiomInstCo ax cos) = let Pair tys1 tys2 = (sequenceA $ map go cos) 
-                                  in  Pair (substTyWith (co_ax_tvs ax) tys1 (co_ax_lhs ax)) 
-                                           (substTyWith (co_ax_tvs ax) tys2 (co_ax_rhs ax))
-        go (UnsafeCo ty1 ty2)   = Pair ty1 ty2
-        go (SymCo co)           = swap $ go co
-        go (TransCo co1 co2)    = Pair (pFst $ go co1) (pSnd $ go co2)
-        go (NthCo d co)         = getNth d <$> go co
-        go co@(InstCo aco ty)    | Just ks <- splitForAllTy_maybe `traverse` go aco
-                                          = (\(tv, body) -> substTyWith [tv] [ty] body) <$> ks
-        				  | otherwise = pprPanic "coercionKind" (ppr co)
+  where 
+    go (Refl ty)            = Pair ty ty
+    go (TyConAppCo tc cos)  = mkTyConApp tc <$> (sequenceA $ map go cos)
+    go (AppCo co1 co2)      = mkAppTy <$> go co1 <*> go co2
+    go (ForAllCo tv co)     = mkForAllTy tv <$> go co
+    go (CoVarCo cv)         = toPair $ f cv
+    go (AxiomInstCo ax cos) = let Pair tys1 tys2 = sequenceA $ map go cos 
+                              in  Pair (substTyWith (co_ax_tvs ax) tys1 (co_ax_lhs ax)) 
+                                       (substTyWith (co_ax_tvs ax) tys2 (co_ax_rhs ax))
+    go (UnsafeCo ty1 ty2)   = Pair ty1 ty2
+    go (SymCo co)           = swap $ go co
+    go (TransCo co1 co2)    = Pair (pFst $ go co1) (pSnd $ go co2)
+    go (NthCo d co)         = getNth d <$> go co
+    go (InstCo aco ty)      = go_app aco [ty]
+
+    go_app :: Coercion -> [Type] -> Pair Type
+    -- Collect up all the arguments and apply all at once
+    -- See Note [Nested InstCos]
+    go_app (InstCo co ty) tys = go_app co (ty:tys)
+    go_app co             tys = (`applyTys` tys) <$> go co
 
 -- | Apply 'coercionKind' to multiple 'Coercion's
 coercionKinds :: [Coercion] -> Pair [Type]
@@ -1127,6 +1132,22 @@ getNth n ty | Just tys <- tyConAppArgs_maybe ty
             = ASSERT2( n < length tys, ppr n <+> ppr tys ) tys !! n
 getNth n ty = pprPanic "getNth" (ppr n <+> ppr ty)
 \end{code}
+
+Note [Nested InstCos]
+~~~~~~~~~~~~~~~~~~~~~
+In Trac #5631 we found that 70% of the entire compilation time was
+being spent in coercionKind!  The reason was that we had
+   (g @ ty1 @ ty2 .. @ ty100)    -- The "@s" are InstCos
+where 
+   g :: forall a1 a2 .. a100. phi
+If we deal with the InstCos one at a time, we'll do this:
+   1.  Find the kind of (g @ ty1 .. @ ty99) : forall a100. phi'
+   2.  Substitute phi'[ ty100/a100 ], a single tyvar->type subst
+But this is a *quadratic* algorithm, and the blew up Trac #5631.
+So it's very important to do the substitution simultaneously.
+
+cf Type.applyTys (which in fact we call here)
+
 
 \begin{code}
 applyCo :: Type -> Coercion -> Type
