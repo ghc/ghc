@@ -4,7 +4,7 @@
 
 module Main where
 
-import GHC.Exts(sortWith, the)
+import GHC.Exts(sortWith, the, groupWith)
 
 employees = [ ("Simon", "MS", 80)
             , ("Erik", "MS", 100)
@@ -16,7 +16,7 @@ main = putStrLn (show can_still_use_group_function) >> putStrLn (show output)
   where
     output = [ (the dept, map sum salary, (show x) ++ " and " ++ (show y)) 
              | (name, dept, salary) <- employees
-             , then group by dept
+             , then group by dept using groupWith
              , x <- [1, 2, 3]
              , y <- [4, 5, 6]
              , then sortWith by sum salary
