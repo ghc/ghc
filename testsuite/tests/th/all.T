@@ -213,3 +213,5 @@ test('TH_Depends',
                    'TH_Depends_external.txt'])],
      run_command,
      ['$MAKE -s --no-print-directory TH_Depends'])
+test('T5597', extra_clean(['T5597a.hi','T5597a.o']), 
+              multimod_compile, ['T5597','-v0'])
