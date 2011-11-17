@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import Control.Exception
-import Control.Concurrent.STM
+import GHC.Conc
 
 main = do
   ms1 ← getMaskingState
