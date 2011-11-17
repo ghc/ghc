@@ -53,11 +53,11 @@ T4957:
 .PHONY: simpl021
 simpl021:
 	$(RM) -f Simpl021A.hi Simpl021A.o Simpl021B.hi Simpl021B.o
-	'$(TEST_HC)' -c Simpl021A.hs -O
-	'$(TEST_HC)' -c Simpl021B.hs -O
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c Simpl021A.hs -O
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c Simpl021B.hs -O
 
 .PHONY: T5327
 T5327:
 	$(RM) -f T5327.hi T5327.o
-	'$(TEST_HC)' -c T5327.hs -O -ddump-simpl | grep -c "GHC.Prim.># 34 "
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5327.hs -O -ddump-simpl | grep -c "GHC.Prim.># 34 "
 
