@@ -14,7 +14,7 @@ module Vectorise.Builtins.Base (
   
   -- * Projections
   parray_PrimTyCon,
-  selTy,
+  selTy, selsTy,
   selReplicate,
   selTags,
   selElements,
@@ -105,6 +105,7 @@ data Builtins
         , liftedApplyVar       :: Var                       -- ^ liftedApply
         , closureCtrFuns       :: Array Int Var             -- ^ closure1 .. closure3
         , selTys               :: Array Int Type            -- ^ Sel2
+        , selsTys              :: Array Int Type            -- ^ Sel2s
         , selReplicates        :: Array Int CoreExpr        -- ^ replicate2
         , selTagss             :: Array Int CoreExpr        -- ^ tagsSel2
         , selElementss         :: Array (Int, Int) CoreExpr -- ^ elementsSel2_0 .. elementsSel_2_1
@@ -121,6 +122,9 @@ parray_PrimTyCon tc bi = lookupEnvBuiltin "parray_PrimTyCon" (parray_PrimTyCons 
 
 selTy :: Int -> Builtins -> Type
 selTy           = indexBuiltin "selTy" selTys
+
+selsTy :: Int -> Builtins -> Type
+selsTy          = indexBuiltin "selsTy" selsTys
 
 selReplicate :: Int -> Builtins -> CoreExpr
 selReplicate    = indexBuiltin "selReplicate" selReplicates 

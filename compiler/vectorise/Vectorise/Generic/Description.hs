@@ -46,8 +46,11 @@ data SumRepr
                -- | PDatas version of the sum tycon    (eg PDatasSum2)
                , repr_psums_tc  :: TyCon
 
-               -- | Type of the selector (eg Sel2)
+               -- | Type of the selector               (eg Sel2)
                , repr_sel_ty    :: Type
+
+               -- | Type of multi-selector             (eg Sel2s)
+               , repr_sels_ty   :: Type
 
                -- | Type of each data constructor.
                , repr_con_tys   :: [Type]
@@ -128,11 +131,13 @@ tyConRepr tc
            psums_tc     <- liftM fst $ pdatasReprTyCon sumapp
            
            sel_ty       <- builtin (selTy arity)
+           sels_ty      <- builtin (selsTy arity)
            return $ Sum 
                   { repr_sum_tc   = sum_tc
                   , repr_psum_tc  = psum_tc
                   , repr_psums_tc = psums_tc
                   , repr_sel_ty   = sel_ty
+                  , repr_sels_ty  = sels_ty
                   , repr_con_tys  = tys
                   , repr_cons     = rs
                   }
@@ -217,12 +222,13 @@ instance Outputable SumRepr where
         UnarySum con
          -> sep [text "UnarySum", ppr con]
 
-        Sum sumtc psumtc psumstc selty contys cons
+        Sum sumtc psumtc psumstc selty selsty contys cons
          -> text "Sum" $+$ braces (nest 4 
                 $ sep   [ text "repr_sum_tc   = " <> ppr sumtc
                         , text "repr_psum_tc  = " <> ppr psumtc
                         , text "repr_psums_tc = " <> ppr psumstc
                         , text "repr_sel_ty   = " <> ppr selty
+                        , text "repr_sels_ty  = " <> ppr selsty
                         , text "repr_con_tys  = " <> ppr contys
                         , text "repr_cons     = " <> ppr cons])
 

@@ -102,11 +102,13 @@ initBuiltins
       ; let closureCtrFuns = listArray (1, mAX_DPH_COMBINE) closures
 
           -- Types and functions for selectors
-      ; sel_tys          <- mapM externalType (numbered "Sel" 2 mAX_DPH_SUM)
+      ; sel_tys          <- mapM externalType (numbered "Sel"  2 mAX_DPH_SUM)
+      ; sels_tys         <- mapM externalType (numbered "Sels" 2 mAX_DPH_SUM)
       ; sel_replicates   <- mapM externalFun  (numbered_hash "replicateSel" 2 mAX_DPH_SUM)
       ; sel_tags         <- mapM externalFun  (numbered "tagsSel" 2 mAX_DPH_SUM)
       ; sel_elements     <- mapM mk_elements [(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
       ; let selTys        = listArray (2, mAX_DPH_SUM) sel_tys
+            selsTys       = listArray (2, mAX_DPH_SUM) sels_tys
             selReplicates = listArray (2, mAX_DPH_SUM) sel_replicates
             selTagss      = listArray (2, mAX_DPH_SUM) sel_tags
             selElementss  = array     ((2, 0), (mAX_DPH_SUM, mAX_DPH_SUM)) sel_elements
@@ -150,6 +152,7 @@ initBuiltins
                , liftedApplyVar       = liftedApplyVar
                , closureCtrFuns       = closureCtrFuns
                , selTys               = selTys
+               , selsTys              = selsTys
                , selReplicates        = selReplicates
                , selTagss             = selTagss
                , selElementss         = selElementss

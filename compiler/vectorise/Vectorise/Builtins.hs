@@ -9,7 +9,7 @@ module Vectorise.Builtins (
   
   -- * Wrapped selectors
   parray_PrimTyCon,
-  selTy,
+  selTy, selsTy,
   selReplicate,
   selTags,
   selElements,

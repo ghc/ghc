@@ -410,22 +410,22 @@ buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
     [pdatas_dc] = tyConDataCons pdatas_tc
          
     to_sum ss
-     = case ss of       -- BROKEN: should be
-        EmptySum    -> builtin pvoidVar >>= \pvoid -> return ([], Var pvoid) 
+     = case ss of
+        EmptySum    -> builtin pvoidsVar >>= \pvoids -> return ([], Var pvoids) 
         UnarySum r  -> to_con r
         Sum{}
           -> do let psums_tc     = repr_psums_tc ss
                 let [psums_con]  = tyConDataCons psums_tc
                 (vars, exprs)   <- mapAndUnzipM to_con (repr_cons ss)
-                sel             <- newLocalVar (fsLit "sel") (repr_sel_ty ss) -- BROKEN: should be vector
+                sel             <- newLocalVar (fsLit "sels") (repr_sels_ty ss)
                 return ( sel : concat vars
                        , wrapFamInstBody psums_tc (repr_con_tys ss)
                          $ mkConApp psums_con 
                          $ map Type (repr_con_tys ss) ++ (Var sel : exprs))        
 
     to_prod ss
-     = case ss of       -- BROKEN: should be pvoids
-        EmptyProd    -> builtin pvoidVar >>= \pvoid -> return ([], Var pvoid)
+     = case ss of
+        EmptyProd    -> builtin pvoidsVar >>= \pvoids -> return ([], Var pvoids)
         UnaryProd r
          -> do  pty  <- mkPDatasType (compOrigType r)
                 var  <- newLocalVar (fsLit "x") pty
@@ -501,7 +501,7 @@ buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
         Sum {}
          -> do  let psums_tc    =  repr_psums_tc ss
                 let [psums_con] =  tyConDataCons psums_tc
-                sel             <- newLocalVar (fsLit "sel") (repr_sel_ty ss)
+                sel             <- newLocalVar (fsLit "sels") (repr_sels_ty ss)
                 ptys            <- mapM mkPDatasType (repr_con_tys ss)
                 vars            <- newLocalVars (fsLit "xs") ptys
                 (res', args)    <- fold from_con res_ty res (map Var vars) (repr_cons ss)
