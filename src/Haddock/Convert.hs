@@ -20,7 +20,7 @@ module Haddock.Convert where
 import HsSyn
 import TcType ( tcSplitTyConApp_maybe, tcSplitSigmaTy )
 import TypeRep
-import Kind ( liftedTypeKind, constraintKind, splitKindFunTys, synTyConResKind )
+import Kind ( splitKindFunTys, synTyConResKind )
 import Name
 import Var
 import Class
