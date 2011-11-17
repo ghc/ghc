@@ -120,6 +120,43 @@ StgFunPtr StgReturn(void)
 #define STG_GLOBAL ".global "
 #endif
 
+/*
+ * Note [Stack Alignment on X86]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * On X86 (both 32bit and 64bit) we keep the stack aligned on function calls at
+ * a 16-byte boundary. This is done because on a number of architectures the
+ * ABI requires this (x64, Mac OSX 32bit/64bit) as well as interfacing with
+ * other libraries through the FFI.
+ *
+ * As part of this arrangment we must maitain the stack at a 16-byte boundary
+ * - word_size-bytes (so 16n - 4 for i386 and 16n - 8 for x64) on entry to a
+ * procedure since both GCC and LLVM expect this. This is because the stack
+ * should have been 16-byte boundary aligned and then a call made which pushes
+ * a return address onto the stack (so word_size more space used). In STG code
+ * we only jump to other STG procedures, so we maintain the 16n - word_size
+ * alignment for these jumps.
+ *
+ * This gives us binary compatability with LLVM and GCC as well as dealing
+ * with the FFI. Previously we just maintianed a 16n byte alignment for
+ * procedure entry and calls, which led to bugs (see #4211 and #5250).
+ *
+ * To change this convention you need to change the code here, and in
+ * compiler/nativeGen/X86/CodeGen.hs::GenCCall, and maybe the adjustor
+ * code for thunks in rts/AdjustorAsm.s, rts/Adjustor.c.
+ *
+ * A quick way to see if this is wrong is to compile this code:
+ *
+ *    main = System.Exit.exitWith ExitSuccess
+ *
+ * And run it with +RTS -sstderr.  The stats code in the RTS, in
+ * particular statsPrintf(), relies on the stack alignment because
+ * it saves the %xmm regs on the stack, so it'll fall over if the
+ * stack isn't aligned, and calling exitWith from Haskell invokes
+ * shutdownHaskellAndExit using a C call.
+ *
+ */
+
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
@@ -180,7 +217,7 @@ StgRunIsImplementedInAssembler(void)
 
       : : "i" (RESERVED_C_STACK_BYTES + 16)
         // + 16 to make room for the 4 registers we have to save
-        // + 12 because we need to align %esp to a 16-byte boundary (#5250)
+        // See Note [Stack Alignment on X86]
     );
 }
 
@@ -260,46 +297,9 @@ StgRunIsImplementedInAssembler(void)
         "retq"
 
         : : "i"(RESERVED_C_STACK_BYTES + 48 /*stack frame size*/));
-    /* 
-       The x86_64 ABI specifies that on entry to a procedure, %rsp is
-       aligned on a 16-byte boundary + 8.  That is, the first
-       argument on the stack after the return address will be
-       16-byte aligned.
-
-       We maintain the 16+8 stack alignment throughout the STG code.
-
-       When we call STG_RUN the stack will be aligned to 16+8. We used
-       to subtract an extra 8 bytes so that %rsp would be 16 byte
-       aligned at all times in STG land. This worked fine for the
-       native code generator which knew that the stack was already
-       aligned on 16 bytes when it generated calls to C functions.
-
-       This arrangemnt caused problems for the LLVM backend. The LLVM
-       code generator would assume that on entry to each function the
-       stack is aligned to 16+8 as required by the ABI. However, since
-       we only enter STG functions by jumping to them with tail calls,
-       the stack was actually aligned to a 16-byte boundary. The LLVM
-       backend had its own mangler that would post-process the
-       assembly code to fixup the stack manipulation code to mainain
-       the correct alignment (see #4211).
-
-       Therefore, we now now keep the stack aligned to 16+8 while in
-       STG land so that LLVM generates correct code without any
-       mangling. The native code generator can handle this alignment
-       just fine by making sure the stack is aligned to a 16-byte
-       boundary before it makes a C-call.
-       
-       A quick way to see if this is wrong is to compile this code:
-
-          main = System.Exit.exitWith ExitSuccess
-
-       And run it with +RTS -sstderr.  The stats code in the RTS, in
-       particular statsPrintf(), relies on the stack alignment because
-       it saves the %xmm regs on the stack, so it'll fall over if the
-       stack isn't aligned, and calling exitWith from Haskell invokes
-       shutdownHaskellAndExit using a C call.
-
-    */
+        /*
+         * See Note [Stack Alignment on X86]
+         */
 }
 
 #endif /* x86-64 */

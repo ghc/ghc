@@ -1677,10 +1677,13 @@ genCCall32 target dest_regs args =
                       ++ show (length args) ++ ")"
     _ -> do
         let
+            -- Align stack to 16n for calls, assuming a starting stack
+            -- alignment of 16n - word_size on procedure entry. Which we
+            -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
             sizes               = map (arg_size . cmmExprType . hintlessCmm) (reverse args)
-            raw_arg_size        = sum sizes + 4
+            raw_arg_size        = sum sizes + wORD_SIZE
             arg_pad_size        = (roundTo 16 $ raw_arg_size) - raw_arg_size
-            tot_arg_size        = raw_arg_size + arg_pad_size - 4
+            tot_arg_size        = raw_arg_size + arg_pad_size - wORD_SIZE
         delta0 <- getDeltaNat
         setDeltaNat (delta0 - arg_pad_size)
 
@@ -1820,14 +1823,17 @@ genCCall64 :: CmmCallTarget            -- function to call
            -> NatM InstrBlock
 genCCall64 target dest_regs args =
     case (target, dest_regs) of
+
     (CmmPrim op, []) ->
         -- void return type prim op
         outOfLineCmmOp op Nothing args
+
     (CmmPrim op, [res]) ->
         -- we only cope with a single result for foreign calls
         outOfLineCmmOp op (Just res) args
+
     _ -> do
-            -- load up the register arguments
+        -- load up the register arguments
         (stack_args, aregs, fregs, load_args_code)
              <- load_args args allArgRegs allFPArgRegs nilOL
 
@@ -1836,33 +1842,24 @@ genCCall64 target dest_regs args =
             int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
             arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
                     -- for annotating the call instruction with
-
             sse_regs = length fp_regs_used
-
             tot_arg_size = arg_size * length stack_args
 
-            -- On entry to the called function, %rsp should be aligned
-            -- on a 16-byte boundary +8 (i.e. the first stack arg
-            -- above the return address is 16-byte aligned).  In STG
-            -- land %rsp is kept 8-byte aligned (see StgCRun.c), so we
-            -- just need to make sure we pad by eight bytes after
-            -- pushing a multiple of 16-bytes of args to get the
-            -- correct alignment. If we push an odd number of eight byte
-            -- arguments then no padding is needed.
-            -- Urg, this is hard.  We need to feed the delta back into
-            -- the arg pushing code.
+
+        -- Align stack to 16n for calls, assuming a starting stack
+        -- alignment of 16n - word_size on procedure entry. Which we
+        -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
         (real_size, adjust_rsp) <-
-            if (tot_arg_size + 8) `rem` 16 == 0
+            if (tot_arg_size + wORD_SIZE) `rem` 16 == 0
                 then return (tot_arg_size, nilOL)
                 else do -- we need to adjust...
                     delta <- getDeltaNat
-                    setDeltaNat (delta-8)
-                    return (tot_arg_size+8, toOL [
-                                    SUB II64 (OpImm (ImmInt 8)) (OpReg rsp),
-                                    DELTA (delta-8)
-                            ])
+                    setDeltaNat (delta - wORD_SIZE)
+                    return (tot_arg_size + wORD_SIZE, toOL [
+                                    SUB II64 (OpImm (ImmInt wORD_SIZE)) (OpReg rsp),
+                                    DELTA (delta - wORD_SIZE) ])
 
-            -- push the stack args, right to left
+        -- push the stack args, right to left
         push_code <- push_args (reverse stack_args) nilOL
         delta <- getDeltaNat
 
@@ -1893,9 +1890,9 @@ genCCall64 target dest_regs args =
 
         let call = callinsns `appOL`
                    toOL (
-                            -- Deallocate parameters after call for ccall;
-                            -- stdcall has callee do it, but is not supported on
-                            -- x86_64 target (see #3336)
+                        -- Deallocate parameters after call for ccall;
+                        -- stdcall has callee do it, but is not supported on
+                        -- x86_64 target (see #3336)
                       (if real_size==0 then [] else
                        [ADD (intSize wordWidth) (OpImm (ImmInt real_size)) (OpReg esp)])
                       ++
