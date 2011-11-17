@@ -6,29 +6,26 @@
  *
  * To run an STG function from C land, call
  *
- *		rv = StgRun(f,BaseReg);
+ *              rv = StgRun(f,BaseReg);
  *
  * where "f" is the STG function to call, and BaseReg is the address of the
  * RegTable for this run (we might have separate RegTables if we're running
  * multiple threads on an SMP machine).
  *
- * In the end, "f" must JMP to StgReturn (defined below),
- * passing the return-value "rv" in R1,
- * to return to the caller of StgRun returning "rv" in
+ * In the end, "f" must JMP to StgReturn (defined below), passing the
+ * return-value "rv" in R1, to return to the caller of StgRun returning "rv" in
  * the whatever way C returns a value.
  *
- * NOTE: StgRun/StgReturn do *NOT* load or store Hp or any
- * other registers (other than saving the C callee-saves
- * registers).  Instead, the called function "f" must do that
- * in STG land.
+ * NOTE: StgRun/StgReturn do *NOT* load or store Hp or any other registers
+ * (other than saving the C callee-saves registers). Instead, the called
+ * function "f" must do that in STG land.
  *
- * GCC will have assumed that pushing/popping of C-stack frames is
- * going on when it generated its code, and used stack space
- * accordingly.  However, we actually {\em post-process away} all
- * such stack-framery (see \tr{ghc/driver/ghc-asm.lprl}). Things will
- * be OK however, if we initially make sure there are
- * @RESERVED_C_STACK_BYTES@ on the C-stack to begin with, for local
- * variables.
+ * GCC will have assumed that pushing/popping of C-stack frames is going on
+ * when it generated its code, and used stack space accordingly. However, we
+ * actually {\em post-process away} all such stack-framery (see
+ * \tr{ghc/driver/ghc-asm.lprl}). Things will be OK however, if we initially
+ * make sure there are @RESERVED_C_STACK_BYTES@ on the C-stack to begin with,
+ * for local variables.
  *
  * -------------------------------------------------------------------------- */
 
@@ -39,13 +36,13 @@
  * some reason gcc generates sub-optimal code for StgRun() on the Alpha
  * (unnecessarily saving extra registers on the stack) if we don't.
  *
- * Why do it at the top of this file, rather than near StgRun() below?  Because
+ * Why do it at the top of this file, rather than near StgRun() below? Because
  * gcc doesn't let us define global register variables after any function
- * definition has been read.  Any point after #include "Stg.h" would be too
+ * definition has been read. Any point after #include "Stg.h" would be too
  * late.
  *
  * We define alpha_EXTRA_CAREFUL here to save $s6, $f8 and $f9 -- registers
- * that we don't use but which are callee-save registers.  The __divq() routine
+ * that we don't use but which are callee-save registers. The __divq() routine
  * in libc.a clobbers $s6.
  */
 #include "ghcconfig.h"
@@ -65,7 +62,6 @@ register double fake_f9 __asm__("$f9");
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
-// yeuch
 #define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
@@ -87,12 +83,12 @@ register double fake_f9 __asm__("$f9");
 StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
     while (f) {
-	IF_DEBUG(interpreter,
-	    debugBelch("Jumping to ");
-	    printPtr((P_)f); fflush(stdout);
-	    debugBelch("\n");
-	    );
-	f = (StgFunPtr) (f)();
+        IF_DEBUG(interpreter,
+                 debugBelch("Jumping to ");
+                 printPtr((P_)f); fflush(stdout);
+                 debugBelch("\n");
+                 );
+        f = (StgFunPtr) (f)();
     }
     return (StgRegTable *)R1.p;
 }
@@ -106,13 +102,9 @@ StgFunPtr StgReturn(void)
 
 #ifdef LEADING_UNDERSCORE
 #define STG_RUN "_StgRun"
-#else
-#define STG_RUN "StgRun"
-#endif
-
-#ifdef LEADING_UNDERSCORE
 #define STG_RETURN "_StgReturn"
 #else
+#define STG_RUN "StgRun"
 #define STG_RETURN "StgReturn"
 #endif
 
@@ -133,9 +125,9 @@ StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
         STG_GLOBAL STG_RUN "\n"
-	STG_RUN ":\n\t"
+        STG_RUN ":\n\t"
 
-	/*
+        /*
          * move %esp down to reserve an area for temporary storage
          * during the execution of STG code.
          *
@@ -143,42 +135,42 @@ StgRunIsImplementedInAssembler(void)
          * bytes from here - this is a requirement of the C ABI, so
          * that C code can assign SSE2 registers directly to/from
          * stack locations.
-	 */
+         */
         "subl %0, %%esp\n\t"
 
-	/*
-	 * save callee-saves registers on behalf of the STG code.
-	 */
+        /*
+         * save callee-saves registers on behalf of the STG code.
+         */
         "movl %%esp, %%eax\n\t"
         "addl %0-16, %%eax\n\t"
         "movl %%ebx,0(%%eax)\n\t"
         "movl %%esi,4(%%eax)\n\t"
         "movl %%edi,8(%%eax)\n\t"
         "movl %%ebp,12(%%eax)\n\t"
-	/*
-	 * Set BaseReg
-	 */
+        /*
+         * Set BaseReg
+         */
         "movl 24(%%eax),%%ebx\n\t"
-	/*
-	 * grab the function argument from the stack
-	 */
+        /*
+         * grab the function argument from the stack
+         */
         "movl 20(%%eax),%%eax\n\t"
         /*
-	 * jump to it
-	 */
+         * jump to it
+         */
         "jmp *%%eax\n\t"
 
         STG_GLOBAL STG_RETURN "\n"
-       	STG_RETURN ":\n\t"
+        STG_RETURN ":\n\t"
 
-	"movl %%esi, %%eax\n\t"   /* Return value in R1  */
+        "movl %%esi, %%eax\n\t"   /* Return value in R1  */
 
-	/*
-	 * restore callee-saves registers.  (Don't stomp on %%eax!)
-	 */
-	"movl %%esp, %%edx\n\t"
+        /*
+         * restore callee-saves registers.  (Don't stomp on %%eax!)
+         */
+        "movl %%esp, %%edx\n\t"
         "addl %0-16, %%edx\n\t"
-        "movl 0(%%edx),%%ebx\n\t"	/* restore the registers saved above */
+        "movl 0(%%edx),%%ebx\n\t"       /* restore the registers saved above */
         "movl 4(%%edx),%%esi\n\t"
         "movl 8(%%edx),%%edi\n\t"
         "movl 12(%%edx),%%ebp\n\t"
@@ -224,50 +216,50 @@ static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile (
-	/*
-	 * save callee-saves registers on behalf of the STG code.
-	 */
-	".globl " STG_RUN "\n"
-	STG_RUN ":\n\t"
-	"subq %0, %%rsp\n\t"
-	"movq %%rsp, %%rax\n\t"
-	"addq %0-48, %%rax\n\t"
+        /*
+         * save callee-saves registers on behalf of the STG code.
+         */
+        ".globl " STG_RUN "\n"
+        STG_RUN ":\n\t"
+        "subq %0, %%rsp\n\t"
+        "movq %%rsp, %%rax\n\t"
+        "addq %0-48, %%rax\n\t"
         "movq %%rbx,0(%%rax)\n\t"
         "movq %%rbp,8(%%rax)\n\t"
         "movq %%r12,16(%%rax)\n\t"
         "movq %%r13,24(%%rax)\n\t"
         "movq %%r14,32(%%rax)\n\t"
         "movq %%r15,40(%%rax)\n\t"
-	/*
-	 * Set BaseReg
-	 */
-	"movq %%rsi,%%r13\n\t"
-	/*
-	 * grab the function argument from the stack, and jump to it.
-	 */
+        /*
+         * Set BaseReg
+         */
+        "movq %%rsi,%%r13\n\t"
+        /*
+         * grab the function argument from the stack, and jump to it.
+         */
         "movq %%rdi,%%rax\n\t"
         "jmp *%%rax\n\t"
 
-	".globl " STG_RETURN "\n"
-       	STG_RETURN ":\n\t"
+        ".globl " STG_RETURN "\n"
+         STG_RETURN ":\n\t"
 
-	"movq %%rbx, %%rax\n\t"   /* Return value in R1  */
+        "movq %%rbx, %%rax\n\t"   /* Return value in R1  */
 
-	/*
-	 * restore callee-saves registers.  (Don't stomp on %%rax!)
-	 */
-	"movq %%rsp, %%rdx\n\t"
-	"addq %0-48, %%rdx\n\t"
-        "movq 0(%%rdx),%%rbx\n\t"	/* restore the registers saved above */
+        /*
+         * restore callee-saves registers.  (Don't stomp on %%rax!)
+         */
+        "movq %%rsp, %%rdx\n\t"
+        "addq %0-48, %%rdx\n\t"
+        "movq 0(%%rdx),%%rbx\n\t"       /* restore the registers saved above */
         "movq 8(%%rdx),%%rbp\n\t"
         "movq 16(%%rdx),%%r12\n\t"
         "movq 24(%%rdx),%%r13\n\t"
         "movq 32(%%rdx),%%r14\n\t"
         "movq 40(%%rdx),%%r15\n\t"
-	"addq %0, %%rsp\n\t"
-	"retq"
+        "addq %0, %%rsp\n\t"
+        "retq"
 
-	: : "i"(RESERVED_C_STACK_BYTES+48 /*stack frame size*/));
+        : : "i"(RESERVED_C_STACK_BYTES + 48 /*stack frame size*/));
     /* 
        The x86_64 ABI specifies that on entry to a procedure, %rsp is
        aligned on a 16-byte boundary + 8.  That is, the first
@@ -355,10 +347,10 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #endif
     f();
     __asm__ volatile (
-	    ".align 4\n"
-            ".global " STG_RETURN "\n"
-       	    STG_RETURN ":"
-	    : : "p" (space) : "l0","l1","l2","l3","l4","l5","l6","l7");
+                 ".align 4\n"
+                 ".global " STG_RETURN "\n"
+                 STG_RETURN ":"
+                 : : "p" (space) : "l0","l1","l2","l3","l4","l5","l6","l7");
     /* we tell the C compiler that l0-l7 are clobbered on return to
      * StgReturn, otherwise it tries to use these to save eg. the
      * address of space[100] across the call.  The correct thing
@@ -379,7 +371,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
      * dereferencing a bogus pointer in StgReturn.
      */
     __asm__ volatile ("ld %1,%0"
-		      : "=r" (i7) : "m" (((void **)(space))[100]));
+                                : "=r" (i7) : "m" (((void **)(space))[100]));
 #endif
     return (StgRegTable *)R1.i;
 }
@@ -473,13 +465,13 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
 
     real_pv = f;
 
-    __asm__ volatile(	"lda $30,-%0($30)"	"\n"
-		"\t"	"jmp ($27)"		"\n"
-		"\t"	".align 3"		"\n"
-		".globl " STG_RETURN		"\n"
-		STG_RETURN ":"			"\n"
-		"\t"	"lda $30,%0($30)"	"\n"
-		: : "K" (RESERVED_C_STACK_BYTES));
+    __asm__ volatile(   "lda $30,-%0($30)"      "\n"
+                "\t"    "jmp ($27)"             "\n"
+                "\t"    ".align 3"              "\n"
+                ".globl " STG_RETURN            "\n"
+                STG_RETURN ":"                  "\n"
+                "\t"    "lda $30,%0($30)"       "\n"
+                : : "K" (RESERVED_C_STACK_BYTES));
 
     ret = real_s5;
 
@@ -525,14 +517,14 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
     StgRegTable * ret;
 
     __asm__ volatile ("ldo %0(%%r30),%%r19\n"
-		      "\tstw %%r3, 0(0,%%r19)\n"
+                      "\tstw %%r3, 0(0,%%r19)\n"
                       "\tstw %%r4, 4(0,%%r19)\n"
                       "\tstw %%r5, 8(0,%%r19)\n"
                       "\tstw %%r6,12(0,%%r19)\n"
                       "\tstw %%r7,16(0,%%r19)\n"
                       "\tstw %%r8,20(0,%%r19)\n"
                       "\tstw %%r9,24(0,%%r19)\n"
-		      "\tstw %%r10,28(0,%%r19)\n"
+                      "\tstw %%r10,28(0,%%r19)\n"
                       "\tstw %%r11,32(0,%%r19)\n"
                       "\tstw %%r12,36(0,%%r19)\n"
                       "\tstw %%r13,40(0,%%r19)\n"
@@ -541,39 +533,39 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
                       "\tstw %%r16,52(0,%%r19)\n"
                       "\tstw %%r17,56(0,%%r19)\n"
                       "\tstw %%r18,60(0,%%r19)\n"
-		      "\tldo 80(%%r19),%%r19\n"
-		      "\tfstds %%fr12,-16(0,%%r19)\n"
-		      "\tfstds %%fr13, -8(0,%%r19)\n"
-		      "\tfstds %%fr14,  0(0,%%r19)\n"
-		      "\tfstds %%fr15,  8(0,%%r19)\n"
-		      "\tldo 32(%%r19),%%r19\n"
-		      "\tfstds %%fr16,-16(0,%%r19)\n"
-		      "\tfstds %%fr17, -8(0,%%r19)\n"
-		      "\tfstds %%fr18,  0(0,%%r19)\n"
-		      "\tfstds %%fr19,  8(0,%%r19)\n"
-		      "\tldo 32(%%r19),%%r19\n"
-		      "\tfstds %%fr20,-16(0,%%r19)\n"
-		      "\tfstds %%fr21, -8(0,%%r19)\n" : :
+                      "\tldo 80(%%r19),%%r19\n"
+                      "\tfstds %%fr12,-16(0,%%r19)\n"
+                      "\tfstds %%fr13, -8(0,%%r19)\n"
+                      "\tfstds %%fr14,  0(0,%%r19)\n"
+                      "\tfstds %%fr15,  8(0,%%r19)\n"
+                      "\tldo 32(%%r19),%%r19\n"
+                      "\tfstds %%fr16,-16(0,%%r19)\n"
+                      "\tfstds %%fr17, -8(0,%%r19)\n"
+                      "\tfstds %%fr18,  0(0,%%r19)\n"
+                      "\tfstds %%fr19,  8(0,%%r19)\n"
+                      "\tldo 32(%%r19),%%r19\n"
+                      "\tfstds %%fr20,-16(0,%%r19)\n"
+                      "\tfstds %%fr21, -8(0,%%r19)\n" : :
                       "n" (-(116 * sizeof(long) + 10 * sizeof(double))) : "%r19"
-		      );
+                     );
 
     f();
 
     __asm__ volatile (".align 4\n"
-               	      "\t.EXPORT " STG_RETURN ",CODE\n"
-		      "\t.EXPORT " STG_RETURN ",ENTRY,PRIV_LEV=3\n"
+                      "\t.EXPORT " STG_RETURN ",CODE\n"
+                      "\t.EXPORT " STG_RETURN ",ENTRY,PRIV_LEV=3\n"
                       STG_RETURN "\n"
                       /* "\tldo %0(%%r3),%%r19\n" */
                       "\tldo %1(%%r30),%%r19\n"
                       "\tcopy %%r11, %0\n"  /* save R1 */
-		      "\tldw  0(0,%%r19),%%r3\n"
+                      "\tldw  0(0,%%r19),%%r3\n"
                       "\tldw  4(0,%%r19),%%r4\n"
                       "\tldw  8(0,%%r19),%%r5\n"
                       "\tldw 12(0,%%r19),%%r6\n"
                       "\tldw 16(0,%%r19),%%r7\n"
                       "\tldw 20(0,%%r19),%%r8\n"
                       "\tldw 24(0,%%r19),%%r9\n"
-		      "\tldw 28(0,%%r19),%%r10\n"
+                      "\tldw 28(0,%%r19),%%r10\n"
                       "\tldw 32(0,%%r19),%%r11\n"
                       "\tldw 36(0,%%r19),%%r12\n"
                       "\tldw 40(0,%%r19),%%r13\n"
@@ -582,23 +574,23 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
                       "\tldw 52(0,%%r19),%%r16\n"
                       "\tldw 56(0,%%r19),%%r17\n"
                       "\tldw 60(0,%%r19),%%r18\n"
-		      "\tldo 80(%%r19),%%r19\n"
-		      "\tfldds -16(0,%%r19),%%fr12\n"
-		      "\tfldds  -8(0,%%r19),%%fr13\n"
-		      "\tfldds   0(0,%%r19),%%fr14\n"
-		      "\tfldds   8(0,%%r19),%%fr15\n"
-		      "\tldo 32(%%r19),%%r19\n"
-		      "\tfldds -16(0,%%r19),%%fr16\n"
-		      "\tfldds  -8(0,%%r19),%%fr17\n"
-		      "\tfldds   0(0,%%r19),%%fr18\n"
-		      "\tfldds   8(0,%%r19),%%fr19\n"
-		      "\tldo 32(%%r19),%%r19\n"
-		      "\tfldds -16(0,%%r19),%%fr20\n"
-		      "\tfldds  -8(0,%%r19),%%fr21\n"
-		         : "=r" (ret)
-		         : "n" (-(116 * sizeof(long) + 10 * sizeof(double)))
-		         : "%r19"
-		      );
+                      "\tldo 80(%%r19),%%r19\n"
+                      "\tfldds -16(0,%%r19),%%fr12\n"
+                      "\tfldds  -8(0,%%r19),%%fr13\n"
+                      "\tfldds   0(0,%%r19),%%fr14\n"
+                      "\tfldds   8(0,%%r19),%%fr15\n"
+                      "\tldo 32(%%r19),%%r19\n"
+                      "\tfldds -16(0,%%r19),%%fr16\n"
+                      "\tfldds  -8(0,%%r19),%%fr17\n"
+                      "\tfldds   0(0,%%r19),%%fr18\n"
+                      "\tfldds   8(0,%%r19),%%fr19\n"
+                      "\tldo 32(%%r19),%%r19\n"
+                      "\tfldds -16(0,%%r19),%%fr20\n"
+                      "\tfldds  -8(0,%%r19),%%fr21\n"
+                      : "=r" (ret)
+                      : "n" (-(116 * sizeof(long) + 10 * sizeof(double)))
+                      : "%r19"
+                     );
 
     return ret;
 }
@@ -624,24 +616,24 @@ void StgRunIsImplementedInAssembler(void)
             // prevent it here (it tends to get confused here).
         __asm__ volatile (".no_dead_strip _StgRunIsImplementedInAssembler");
 #endif
-	__asm__ volatile (
-		"\n.globl _StgRun\n"
-		"_StgRun:\n"
-		"\tmflr r0\n"
-		"\tbl saveFP # f14\n"
-		"\tstmw r13,-220(r1)\n"
-		"\tstwu r1,-%0(r1)\n"
+        __asm__ volatile (
+                "\n.globl _StgRun\n"
+                "_StgRun:\n"
+                "\tmflr r0\n"
+                "\tbl saveFP # f14\n"
+                "\tstmw r13,-220(r1)\n"
+                "\tstwu r1,-%0(r1)\n"
                 "\tmr r27,r4\n" // BaseReg == r27
-		"\tmtctr r3\n"
-		"\tmr r12,r3\n"
-		"\tbctr\n"
-		".globl _StgReturn\n"
-		"_StgReturn:\n"
-		"\tmr r3,r14\n"
-		"\tla r1,%0(r1)\n"
-		"\tlmw r13,-220(r1)\n"
-		"\tb restFP # f14\n"
-	: : "i"(RESERVED_C_STACK_BYTES+224 /*stack frame size*/));
+                "\tmtctr r3\n"
+                "\tmr r12,r3\n"
+                "\tbctr\n"
+                ".globl _StgReturn\n"
+                "_StgReturn:\n"
+                "\tmr r3,r14\n"
+                "\tla r1,%0(r1)\n"
+                "\tlmw r13,-220(r1)\n"
+                "\tb restFP # f14\n"
+        : : "i"(RESERVED_C_STACK_BYTES+224 /*stack frame size*/));
 }
 #else
 
@@ -658,66 +650,66 @@ void StgRunIsImplementedInAssembler(void)
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
-	__asm__ volatile (
-		"\t.globl StgRun\n"
-		"\t.type StgRun,@function\n"
-		"StgRun:\n"
-		"\tmflr 0\n"
-		"\tstw 0,4(1)\n"
-		"\tmr 5,1\n"
-		"\tstwu 1,-%0(1)\n"
-		"\tstmw 13,-220(5)\n"
-		"\tstfd 14,-144(5)\n"
-		"\tstfd 15,-136(5)\n"
-		"\tstfd 16,-128(5)\n"
-		"\tstfd 17,-120(5)\n"
-		"\tstfd 18,-112(5)\n"
-		"\tstfd 19,-104(5)\n"
-		"\tstfd 20,-96(5)\n"
-		"\tstfd 21,-88(5)\n"
-		"\tstfd 22,-80(5)\n"
-		"\tstfd 23,-72(5)\n"
-		"\tstfd 24,-64(5)\n"
-		"\tstfd 25,-56(5)\n"
-		"\tstfd 26,-48(5)\n"
-		"\tstfd 27,-40(5)\n"
-		"\tstfd 28,-32(5)\n"
-		"\tstfd 29,-24(5)\n"
-		"\tstfd 30,-16(5)\n"
-		"\tstfd 31,-8(5)\n"
-		"\tmr 27,4\n"  // BaseReg == r27
-		"\tmtctr 3\n"
-		"\tmr 12,3\n"
-		"\tbctr\n"
-		".globl StgReturn\n"
-		"\t.type StgReturn,@function\n"
-		"StgReturn:\n"
-		"\tmr 3,14\n"
-		"\tla 5,%0(1)\n"
-		"\tlmw 13,-220(5)\n"
-		"\tlfd 14,-144(5)\n"
-		"\tlfd 15,-136(5)\n"
-		"\tlfd 16,-128(5)\n"
-		"\tlfd 17,-120(5)\n"
-		"\tlfd 18,-112(5)\n"
-		"\tlfd 19,-104(5)\n"
-		"\tlfd 20,-96(5)\n"
-		"\tlfd 21,-88(5)\n"
-		"\tlfd 22,-80(5)\n"
-		"\tlfd 23,-72(5)\n"
-		"\tlfd 24,-64(5)\n"
-		"\tlfd 25,-56(5)\n"
-		"\tlfd 26,-48(5)\n"
-		"\tlfd 27,-40(5)\n"
-		"\tlfd 28,-32(5)\n"
-		"\tlfd 29,-24(5)\n"
-		"\tlfd 30,-16(5)\n"
-		"\tlfd 31,-8(5)\n"
-		"\tmr 1,5\n"
-		"\tlwz 0,4(1)\n"
-		"\tmtlr 0\n"
-		"\tblr\n"
-	: : "i"(RESERVED_C_STACK_BYTES+224 /*stack frame size*/));
+        __asm__ volatile (
+                "\t.globl StgRun\n"
+                "\t.type StgRun,@function\n"
+                "StgRun:\n"
+                "\tmflr 0\n"
+                "\tstw 0,4(1)\n"
+                "\tmr 5,1\n"
+                "\tstwu 1,-%0(1)\n"
+                "\tstmw 13,-220(5)\n"
+                "\tstfd 14,-144(5)\n"
+                "\tstfd 15,-136(5)\n"
+                "\tstfd 16,-128(5)\n"
+                "\tstfd 17,-120(5)\n"
+                "\tstfd 18,-112(5)\n"
+                "\tstfd 19,-104(5)\n"
+                "\tstfd 20,-96(5)\n"
+                "\tstfd 21,-88(5)\n"
+                "\tstfd 22,-80(5)\n"
+                "\tstfd 23,-72(5)\n"
+                "\tstfd 24,-64(5)\n"
+                "\tstfd 25,-56(5)\n"
+                "\tstfd 26,-48(5)\n"
+                "\tstfd 27,-40(5)\n"
+                "\tstfd 28,-32(5)\n"
+                "\tstfd 29,-24(5)\n"
+                "\tstfd 30,-16(5)\n"
+                "\tstfd 31,-8(5)\n"
+                "\tmr 27,4\n"  // BaseReg == r27
+                "\tmtctr 3\n"
+                "\tmr 12,3\n"
+                "\tbctr\n"
+                ".globl StgReturn\n"
+                "\t.type StgReturn,@function\n"
+                "StgReturn:\n"
+                "\tmr 3,14\n"
+                "\tla 5,%0(1)\n"
+                "\tlmw 13,-220(5)\n"
+                "\tlfd 14,-144(5)\n"
+                "\tlfd 15,-136(5)\n"
+                "\tlfd 16,-128(5)\n"
+                "\tlfd 17,-120(5)\n"
+                "\tlfd 18,-112(5)\n"
+                "\tlfd 19,-104(5)\n"
+                "\tlfd 20,-96(5)\n"
+                "\tlfd 21,-88(5)\n"
+                "\tlfd 22,-80(5)\n"
+                "\tlfd 23,-72(5)\n"
+                "\tlfd 24,-64(5)\n"
+                "\tlfd 25,-56(5)\n"
+                "\tlfd 26,-48(5)\n"
+                "\tlfd 27,-40(5)\n"
+                "\tlfd 28,-32(5)\n"
+                "\tlfd 29,-24(5)\n"
+                "\tlfd 30,-16(5)\n"
+                "\tlfd 31,-8(5)\n"
+                "\tmr 1,5\n"
+                "\tlwz 0,4(1)\n"
+                "\tmtlr 0\n"
+                "\tblr\n"
+        : : "i"(RESERVED_C_STACK_BYTES+224 /*stack frame size*/));
 }
 #endif
 
@@ -739,120 +731,120 @@ static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
         // r0 volatile
-	// r1 stack pointer
-	// r2 toc - needs to be saved
-	// r3-r10 argument passing, volatile
-	// r11, r12 very volatile (not saved across cross-module calls)
-	// r13 thread local state (never modified, don't need to save)
-	// r14-r31 callee-save
-	__asm__ volatile (
-		".section \".opd\",\"aw\"\n"
-		".align 3\n"
-		".globl StgRun\n"
-		"StgRun:\n"
-			"\t.quad\t.StgRun,.TOC.@tocbase,0\n"
-			"\t.size StgRun,24\n"
-		".globl StgReturn\n"
-		"StgReturn:\n"
-			"\t.quad\t.StgReturn,.TOC.@tocbase,0\n"
-			"\t.size StgReturn,24\n"
-		".previous\n"
-		".globl .StgRun\n"
-		".type .StgRun,@function\n"
-		".StgRun:\n"
-			"\tmflr 0\n"
-			"\tmr 5, 1\n"
-			"\tstd 0, 16(1)\n"
-			"\tstdu 1, -%0(1)\n"
-			"\tstd 2, -296(5)\n"
-			"\tstd 14, -288(5)\n"
-			"\tstd 15, -280(5)\n"
-			"\tstd 16, -272(5)\n"
-			"\tstd 17, -264(5)\n"
-			"\tstd 18, -256(5)\n"
-			"\tstd 19, -248(5)\n"
-			"\tstd 20, -240(5)\n"
-			"\tstd 21, -232(5)\n"
-			"\tstd 22, -224(5)\n"
-			"\tstd 23, -216(5)\n"
-			"\tstd 24, -208(5)\n"
-			"\tstd 25, -200(5)\n"
-			"\tstd 26, -192(5)\n"
-			"\tstd 27, -184(5)\n"
-			"\tstd 28, -176(5)\n"
-			"\tstd 29, -168(5)\n"
-			"\tstd 30, -160(5)\n"
-			"\tstd 31, -152(5)\n"
-			"\tstfd 14, -144(5)\n"
-			"\tstfd 15, -136(5)\n"
-			"\tstfd 16, -128(5)\n"
-			"\tstfd 17, -120(5)\n"
-			"\tstfd 18, -112(5)\n"
-			"\tstfd 19, -104(5)\n"
-			"\tstfd 20, -96(5)\n"
-			"\tstfd 21, -88(5)\n"
-			"\tstfd 22, -80(5)\n"
-			"\tstfd 23, -72(5)\n"
-			"\tstfd 24, -64(5)\n"
-			"\tstfd 25, -56(5)\n"
-			"\tstfd 26, -48(5)\n"
-			"\tstfd 27, -40(5)\n"
-			"\tstfd 28, -32(5)\n"
-			"\tstfd 29, -24(5)\n"
-			"\tstfd 30, -16(5)\n"
-			"\tstfd 31, -8(5)\n"
-			"\tmr 27, 4\n"  // BaseReg == r27
-			"\tld 2, 8(3)\n"
-			"\tld 3, 0(3)\n"
-			"\tmtctr 3\n"
-			"\tbctr\n"
-		".globl .StgReturn\n"
-		".type .StgReturn,@function\n"
-		".StgReturn:\n"
-			"\tmr 3,14\n"
-			"\tla 5, %0(1)\n" // load address == addi r5, r1, %0
-			"\tld 2, -296(5)\n"
-			"\tld 14, -288(5)\n"
-			"\tld 15, -280(5)\n"
-			"\tld 16, -272(5)\n"
-			"\tld 17, -264(5)\n"
-			"\tld 18, -256(5)\n"
-			"\tld 19, -248(5)\n"
-			"\tld 20, -240(5)\n"
-			"\tld 21, -232(5)\n"
-			"\tld 22, -224(5)\n"
-			"\tld 23, -216(5)\n"
-			"\tld 24, -208(5)\n"
-			"\tld 25, -200(5)\n"
-			"\tld 26, -192(5)\n"
-			"\tld 27, -184(5)\n"
-			"\tld 28, -176(5)\n"
-			"\tld 29, -168(5)\n"
-			"\tld 30, -160(5)\n"
-			"\tld 31, -152(5)\n"
-			"\tlfd 14, -144(5)\n"
-			"\tlfd 15, -136(5)\n"
-			"\tlfd 16, -128(5)\n"
-			"\tlfd 17, -120(5)\n"
-			"\tlfd 18, -112(5)\n"
-			"\tlfd 19, -104(5)\n"
-			"\tlfd 20, -96(5)\n"
-			"\tlfd 21, -88(5)\n"
-			"\tlfd 22, -80(5)\n"
-			"\tlfd 23, -72(5)\n"
-			"\tlfd 24, -64(5)\n"
-			"\tlfd 25, -56(5)\n"
-			"\tlfd 26, -48(5)\n"
-			"\tlfd 27, -40(5)\n"
-			"\tlfd 28, -32(5)\n"
-			"\tlfd 29, -24(5)\n"
-			"\tlfd 30, -16(5)\n"
-			"\tlfd 31, -8(5)\n"
-			"\tmr 1, 5\n"
-			"\tld 0, 16(1)\n"
-			"\tmtlr 0\n"
-			"\tblr\n"
-	: : "i"(RESERVED_C_STACK_BYTES+304 /*stack frame size*/));
+        // r1 stack pointer
+        // r2 toc - needs to be saved
+        // r3-r10 argument passing, volatile
+        // r11, r12 very volatile (not saved across cross-module calls)
+        // r13 thread local state (never modified, don't need to save)
+        // r14-r31 callee-save
+        __asm__ volatile (
+                ".section \".opd\",\"aw\"\n"
+                ".align 3\n"
+                ".globl StgRun\n"
+                "StgRun:\n"
+                "\t.quad\t.StgRun,.TOC.@tocbase,0\n"
+                "\t.size StgRun,24\n"
+                ".globl StgReturn\n"
+                "StgReturn:\n"
+                "\t.quad\t.StgReturn,.TOC.@tocbase,0\n"
+                "\t.size StgReturn,24\n"
+                ".previous\n"
+                ".globl .StgRun\n"
+                ".type .StgRun,@function\n"
+                ".StgRun:\n"
+                "\tmflr 0\n"
+                "\tmr 5, 1\n"
+                "\tstd 0, 16(1)\n"
+                "\tstdu 1, -%0(1)\n"
+                "\tstd 2, -296(5)\n"
+                "\tstd 14, -288(5)\n"
+                "\tstd 15, -280(5)\n"
+                "\tstd 16, -272(5)\n"
+                "\tstd 17, -264(5)\n"
+                "\tstd 18, -256(5)\n"
+                "\tstd 19, -248(5)\n"
+                "\tstd 20, -240(5)\n"
+                "\tstd 21, -232(5)\n"
+                "\tstd 22, -224(5)\n"
+                "\tstd 23, -216(5)\n"
+                "\tstd 24, -208(5)\n"
+                "\tstd 25, -200(5)\n"
+                "\tstd 26, -192(5)\n"
+                "\tstd 27, -184(5)\n"
+                "\tstd 28, -176(5)\n"
+                "\tstd 29, -168(5)\n"
+                "\tstd 30, -160(5)\n"
+                "\tstd 31, -152(5)\n"
+                "\tstfd 14, -144(5)\n"
+                "\tstfd 15, -136(5)\n"
+                "\tstfd 16, -128(5)\n"
+                "\tstfd 17, -120(5)\n"
+                "\tstfd 18, -112(5)\n"
+                "\tstfd 19, -104(5)\n"
+                "\tstfd 20, -96(5)\n"
+                "\tstfd 21, -88(5)\n"
+                "\tstfd 22, -80(5)\n"
+                "\tstfd 23, -72(5)\n"
+                "\tstfd 24, -64(5)\n"
+                "\tstfd 25, -56(5)\n"
+                "\tstfd 26, -48(5)\n"
+                "\tstfd 27, -40(5)\n"
+                "\tstfd 28, -32(5)\n"
+                "\tstfd 29, -24(5)\n"
+                "\tstfd 30, -16(5)\n"
+                "\tstfd 31, -8(5)\n"
+                "\tmr 27, 4\n"  // BaseReg == r27
+                "\tld 2, 8(3)\n"
+                "\tld 3, 0(3)\n"
+                "\tmtctr 3\n"
+                "\tbctr\n"
+                ".globl .StgReturn\n"
+                ".type .StgReturn,@function\n"
+                ".StgReturn:\n"
+                "\tmr 3,14\n"
+                "\tla 5, %0(1)\n" // load address == addi r5, r1, %0
+                "\tld 2, -296(5)\n"
+                "\tld 14, -288(5)\n"
+                "\tld 15, -280(5)\n"
+                "\tld 16, -272(5)\n"
+                "\tld 17, -264(5)\n"
+                "\tld 18, -256(5)\n"
+                "\tld 19, -248(5)\n"
+                "\tld 20, -240(5)\n"
+                "\tld 21, -232(5)\n"
+                "\tld 22, -224(5)\n"
+                "\tld 23, -216(5)\n"
+                "\tld 24, -208(5)\n"
+                "\tld 25, -200(5)\n"
+                "\tld 26, -192(5)\n"
+                "\tld 27, -184(5)\n"
+                "\tld 28, -176(5)\n"
+                "\tld 29, -168(5)\n"
+                "\tld 30, -160(5)\n"
+                "\tld 31, -152(5)\n"
+                "\tlfd 14, -144(5)\n"
+                "\tlfd 15, -136(5)\n"
+                "\tlfd 16, -128(5)\n"
+                "\tlfd 17, -120(5)\n"
+                "\tlfd 18, -112(5)\n"
+                "\tlfd 19, -104(5)\n"
+                "\tlfd 20, -96(5)\n"
+                "\tlfd 21, -88(5)\n"
+                "\tlfd 22, -80(5)\n"
+                "\tlfd 23, -72(5)\n"
+                "\tlfd 24, -64(5)\n"
+                "\tlfd 25, -56(5)\n"
+                "\tlfd 26, -48(5)\n"
+                "\tlfd 27, -40(5)\n"
+                "\tlfd 28, -32(5)\n"
+                "\tlfd 29, -24(5)\n"
+                "\tlfd 30, -16(5)\n"
+                "\tlfd 31, -8(5)\n"
+                "\tmr 1, 5\n"
+                "\tld 0, 16(1)\n"
+                "\tmtlr 0\n"
+                "\tblr\n"
+        : : "i"(RESERVED_C_STACK_BYTES+304 /*stack frame size*/));
 }
 #else // linux_HOST_OS
 #error Only linux support for power64 right now.
@@ -895,55 +887,55 @@ static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
     __asm__ volatile(
-		".global StgRun\n"
-		"StgRun:\n"
-		"\talloc loc29 = ar.pfs, 0, %1, 8, 0\n"	/* setup register frame */
-		"\tld8 r18 = [r32],8\n"			/* get procedure address */
-		"\tadds sp = -%0, sp ;;\n"		/* setup stack */
-		"\tld8 gp = [r32]\n"			/* get procedure GP */
-		"\tadds r16 = %0-(%2*16), sp\n"
-		"\tadds r17 = %0-((%2-1)*16), sp ;;\n"
-		"\tstf.spill [r16] = f16,32\n"		/* spill callee-saved fp regs */
-		"\tstf.spill [r17] = f17,32\n"
-		"\tmov b6 = r18 ;;\n"			/* set target address */
-		"\tstf.spill [r16] = f18,32\n"
-		"\tstf.spill [r17] = f19,32\n"
-		"\tmov loc30 = b0 ;;\n"			/* save return address */
-		"\tstf.spill [r16] = f20,32\n"
-		"\tstf.spill [r17] = f21,32 ;;\n"
-		"\tstf.spill [r16] = f22,32\n"
-		"\tstf.spill [r17] = f23,32\n"
-                "\tmov loc32 = ar.lc ;;\n"		/* save loop counter */
-		"\tstf.spill [r16] = f2,32\n"
-		"\tstf.spill [r17] = f3,32\n"
-                "\tmov loc33 = pr ;;\n"			/* save predicate registers */
-		"\tstf.spill [r16] = f4,32\n"
-		"\tstf.spill [r17] = f5,32\n"
-		"\tbr.few b6 ;;\n"			/* branch to function */
-		".global StgReturn\n"
-		"StgReturn:\n"
-		"\tmov r8 = loc16\n"		/* return value in r8 */
-		"\tadds r16 = %0-(%2*16), sp\n"
-	    	"\tadds r17 = %0-((%2-1)*16), sp ;;\n"
-		"\tldf.fill f16 = [r16],32\n"	/* start restoring fp regs */
-		"\tldf.fill f17 = [r17],32\n"
-		"\tmov ar.pfs = loc29 ;;\n"	/* restore register frame */
-		"\tldf.fill f18 = [r16],32\n"
-		"\tldf.fill f19 = [r17],32\n"
-		"\tmov b0 = loc30 ;;\n"		/* restore return address */
-		"\tldf.fill f20 = [r16],32\n"
-		"\tldf.fill f21 = [r17],32\n"
-                "\tmov ar.lc = loc32 ;;\n"	/* restore loop counter */
-		"\tldf.fill f22 = [r16],32\n"
-		"\tldf.fill f23 = [r17],32\n"
-		"\tmov pr = loc33 ;;\n"		/* restore predicate registers */
-		"\tldf.fill f2 = [r16],32\n"
-		"\tldf.fill f3 = [r17],32\n"
-		"\tadds sp = %0, sp ;;\n"	/* restore stack */
-		"\tldf.fill f4 = [r16],32\n"
-		"\tldf.fill f5 = [r17],32\n"
-		"\tbr.ret.sptk.many b0 ;;\n"	/* return */
-	: : "i"(RESERVED_C_STACK_BYTES + PRESERVED_FP_REGISTERS*16),
+                ".global StgRun\n"
+                "StgRun:\n"
+                "\talloc loc29 = ar.pfs, 0, %1, 8, 0\n" /* setup register frame */
+                "\tld8 r18 = [r32],8\n"                 /* get procedure address */
+                "\tadds sp = -%0, sp ;;\n"              /* setup stack */
+                "\tld8 gp = [r32]\n"                    /* get procedure GP */
+                "\tadds r16 = %0-(%2*16), sp\n"
+                "\tadds r17 = %0-((%2-1)*16), sp ;;\n"
+                "\tstf.spill [r16] = f16,32\n"          /* spill callee-saved fp regs */
+                "\tstf.spill [r17] = f17,32\n"
+                "\tmov b6 = r18 ;;\n"                   /* set target address */
+                "\tstf.spill [r16] = f18,32\n"
+                "\tstf.spill [r17] = f19,32\n"
+                "\tmov loc30 = b0 ;;\n"                 /* save return address */
+                "\tstf.spill [r16] = f20,32\n"
+                "\tstf.spill [r17] = f21,32 ;;\n"
+                "\tstf.spill [r16] = f22,32\n"
+                "\tstf.spill [r17] = f23,32\n"
+                "\tmov loc32 = ar.lc ;;\n"              /* save loop counter */
+                "\tstf.spill [r16] = f2,32\n"
+                "\tstf.spill [r17] = f3,32\n"
+                "\tmov loc33 = pr ;;\n"                 /* save predicate registers */
+                "\tstf.spill [r16] = f4,32\n"
+                "\tstf.spill [r17] = f5,32\n"
+                "\tbr.few b6 ;;\n"                      /* branch to function */
+                ".global StgReturn\n"
+                "StgReturn:\n"
+                "\tmov r8 = loc16\n"            /* return value in r8 */
+                "\tadds r16 = %0-(%2*16), sp\n"
+                "\tadds r17 = %0-((%2-1)*16), sp ;;\n"
+                "\tldf.fill f16 = [r16],32\n"   /* start restoring fp regs */
+                "\tldf.fill f17 = [r17],32\n"
+                "\tmov ar.pfs = loc29 ;;\n"     /* restore register frame */
+                "\tldf.fill f18 = [r16],32\n"
+                "\tldf.fill f19 = [r17],32\n"
+                "\tmov b0 = loc30 ;;\n"         /* restore return address */
+                "\tldf.fill f20 = [r16],32\n"
+                "\tldf.fill f21 = [r17],32\n"
+                "\tmov ar.lc = loc32 ;;\n"      /* restore loop counter */
+                "\tldf.fill f22 = [r16],32\n"
+                "\tldf.fill f23 = [r17],32\n"
+                "\tmov pr = loc33 ;;\n"         /* restore predicate registers */
+                "\tldf.fill f2 = [r16],32\n"
+                "\tldf.fill f3 = [r17],32\n"
+                "\tadds sp = %0, sp ;;\n"       /* restore stack */
+                "\tldf.fill f4 = [r16],32\n"
+                "\tldf.fill f5 = [r17],32\n"
+                "\tbr.ret.sptk.many b0 ;;\n"    /* return */
+        : : "i"(RESERVED_C_STACK_BYTES + PRESERVED_FP_REGISTERS*16),
             "i"(LOCALS),
             "i"(PRESERVED_FP_REGISTERS));
 }
@@ -962,21 +954,21 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
     register StgThreadReturnCode __v0 __asm__("$2");
 
     __asm__ __volatile__(
-	"	la	$25, %1			\n"
-	"	move	$30, %2			\n"
-	"	jr	%1			\n"
-	"	.align 3			\n"
-	"	.globl " STG_RETURN "		\n"
-	"	.aent " STG_RETURN "		\n"
-	STG_RETURN ":				\n"
-	"	move	%0, $16			\n"
-	"	move	$3, $17			\n"
-	: "=r" (__v0),
-	: "r" (f), "r" (basereg)
-	"$16", "$17", "$18", "$19", "$20", "$21", "$22", "$23",
-	"$25", "$28", "$30",
-	"$f20", "$f22", "$f24", "$f26", "$f28", "$f30",
-	"memory");
+        "       la      $25, %1                 \n"
+        "       move    $30, %2                 \n"
+        "       jr      %1                      \n"
+        "       .align 3                        \n"
+        "       .globl " STG_RETURN "           \n"
+        "       .aent " STG_RETURN "            \n"
+        STG_RETURN ":                           \n"
+        "       move    %0, $16                 \n"
+        "       move    $3, $17                 \n"
+        : "=r" (__v0),
+        : "r" (f), "r" (basereg)
+        "$16", "$17", "$18", "$19", "$20", "$21", "$22", "$23",
+        "$25", "$28", "$30",
+        "$f20", "$f22", "$f24", "$f26", "$f28", "$f30",
+        "memory");
 
     return __v0;
 }
@@ -999,10 +991,10 @@ StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg) {
     StgRegTable * r;
     __asm__ volatile (
-	/*
-	 * save callee-saves registers on behalf of the STG code.
-	 */
-	"stmfd sp!, {r4-r10, fp, ip, lr}\n\t"
+        /*
+         * save callee-saves registers on behalf of the STG code.
+         */
+        "stmfd sp!, {r4-r10, fp, ip, lr}\n\t"
 #if !defined(arm_HOST_ARCH_PRE_ARMv6)
         "vstmdb sp!, {d8-d11}\n\t"
 #endif
@@ -1012,19 +1004,19 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
          * the assembler can't assemble it.
          */
         "sub sp, sp, %3\n\t"
-	/*
-	 * Set BaseReg
-	 */
+        /*
+         * Set BaseReg
+         */
         "mov r4, %2\n\t"
         /*
          * Jump to function argument.
          */
         "bx %1\n\t"
 
-	".global " STG_RETURN "\n\t"
+        ".global " STG_RETURN "\n\t"
         THUMB_FUNC
         ".type " STG_RETURN ", %%function\n"
-       	STG_RETURN ":\n\t"
+        STG_RETURN ":\n\t"
         /*
          * Free the space we allocated
          */
@@ -1033,13 +1025,13 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
          * Return the new register table, taking it from Stg's R1 (ARM's R7).
          */
         "mov %0, r7\n\t"
-	/*
-	 * restore callee-saves registers.
-	 */
+        /*
+         * restore callee-saves registers.
+         */
 #if !defined(arm_HOST_ARCH_PRE_ARMv6)
         "vldmia sp!, {d8-d11}\n\t"
 #endif
-	"ldmfd sp!, {r4-r10, fp, ip, lr}\n\t"
+        "ldmfd sp!, {r4-r10, fp, ip, lr}\n\t"
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
       : 
