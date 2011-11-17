@@ -7,6 +7,7 @@ module Vectorise.Utils (
 
   -- * Annotated Exprs
   collectAnnTypeArgs,
+  collectAnnDictArgs,
   collectAnnTypeBinders,
   collectAnnValBinders,
   isAnnTypeArg,
@@ -31,6 +32,7 @@ import Vectorise.Monad
 import Vectorise.Builtins
 import CoreSyn
 import CoreUtils
+import Id
 import Type
 import Control.Monad
 
@@ -43,17 +45,28 @@ collectAnnTypeArgs expr = go expr []
     go (_, AnnApp f (_, AnnType ty)) tys = go f (ty : tys)
     go e                             tys = (e, tys)
 
+collectAnnDictArgs :: AnnExpr Var ann -> (AnnExpr Var ann, [AnnExpr Var ann])
+collectAnnDictArgs expr = go expr []
+  where
+    go e@(_, AnnApp f arg) dicts 
+      | isPredTy . exprType . deAnnotate $ arg = go f (arg : dicts)
+      | otherwise                              = (e, dicts)
+    go e                        dicts          = (e, dicts)
+
 collectAnnTypeBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)
 collectAnnTypeBinders expr = go [] expr
   where
-    go bs (_, AnnLam b e) | isTyVar b = go (b:bs) e
+    go bs (_, AnnLam b e) | isTyVar b = go (b : bs) e
     go bs e                           = (reverse bs, e)
 
+-- |Collect all consecutive value binders that are not dictionaries.
+--
 collectAnnValBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)
 collectAnnValBinders expr = go [] expr
   where
-    go bs (_, AnnLam b e) | isId b = go (b:bs) e
-    go bs e                        = (reverse bs, e)
+    go bs (_, AnnLam b e) | isId b 
+                          && (not . isPredTy . idType $ b) = go (b : bs) e
+    go bs e                                                = (reverse bs, e)
 
 isAnnTypeArg :: AnnExpr b ann -> Bool
 isAnnTypeArg (_, AnnType _) = True

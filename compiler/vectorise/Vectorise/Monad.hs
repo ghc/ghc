@@ -13,8 +13,7 @@ module Vectorise.Monad (
   
   -- * Variables
   lookupVar,
-  maybeCantVectoriseVarM,
-  dumpVar,
+  lookupVar_maybe,
   addGlobalScalar, 
 ) where
 
@@ -41,7 +40,6 @@ import Name
 import ErrUtils
 import Outputable
 
-import Control.Monad
 import System.IO
 
 
@@ -142,32 +140,31 @@ builtins f = VM $ \bi genv lenv -> return (Yes genv lenv (`f` bi))
 
 -- Var ------------------------------------------------------------------------
 
--- |Lookup the vectorised, and if local, also the lifted versions of a variable.
+-- |Lookup the vectorised, and if local, also the lifted version of a variable.
 --
 -- * If it's in the global environment we get the vectorised version.
 -- * If it's in the local environment we get both the vectorised and lifted version.
 --
 lookupVar :: Var -> VM (Scope Var (Var, Var))
 lookupVar v
- = do r <- readLEnv $ \env -> lookupVarEnv (local_vars env) v
-      case r of
-        Just e  -> return (Local e)
-        Nothing -> liftM Global
-                . maybeCantVectoriseVarM v
-                . readGEnv $ \env -> lookupVarEnv (global_vars env) v
+  = do { mb_res <- lookupVar_maybe v
+       ; case mb_res of
+           Just x  -> return x
+           Nothing -> dumpVar v
+       }
 
-maybeCantVectoriseVarM :: Monad m => Var -> m (Maybe Var) -> m Var
-maybeCantVectoriseVarM v p
- = do r <- p
-      case r of
-        Just x  -> return x
-        Nothing -> dumpVar v
+lookupVar_maybe :: Var -> VM (Maybe (Scope Var (Var, Var)))
+lookupVar_maybe v
+ = do { r <- readLEnv $ \env -> lookupVarEnv (local_vars env) v
+      ; case r of
+          Just e  -> return $ Just (Local e)
+          Nothing -> fmap Global <$> (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
+      }
 
 dumpVar :: Var -> a
 dumpVar var
   | Just _    <- isClassOpId_maybe var
   = cantVectorise "ClassOpId not vectorised:" (ppr var)
-
   | otherwise
   = cantVectorise "Variable not vectorised:" (ppr var)
 
