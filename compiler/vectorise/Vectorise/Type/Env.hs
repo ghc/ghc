@@ -39,7 +39,6 @@ import FastString
 import MonadUtils
 import Control.Monad
 import Data.List
-import Data.Maybe
 
 -- Note [Pragmas to vectorise tycons]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
