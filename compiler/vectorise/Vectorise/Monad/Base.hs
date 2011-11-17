@@ -37,7 +37,6 @@ import DynFlags
 import StaticFlags
 
 import Control.Monad
-import Control.Applicative
 import System.IO (stderr)
 
 
