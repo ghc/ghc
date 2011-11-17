@@ -56,3 +56,8 @@ simpl021:
 	'$(TEST_HC)' -c Simpl021A.hs -O
 	'$(TEST_HC)' -c Simpl021B.hs -O
 
+.PHONY: T5327
+T5327:
+	$(RM) -f T5327.hi T5327.o
+	'$(TEST_HC)' -c T5327.hs -O -ddump-simpl | grep -c "GHC.Prim.># 34 "
+

@@ -133,3 +133,4 @@ test('simpl021',
                   'Simpl021B.hi', 'Simpl021B.o']),
      run_command,
      ['$MAKE -s --no-print-directory simpl021'])
+test('T5327', normal, run_command, ['$MAKE -s --no-print-directory T5327'])
