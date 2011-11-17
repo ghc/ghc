@@ -378,7 +378,9 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModSummary -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_summary tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe $ deSugar hsc_env (ms_location mod_summary) tc_result
+    r <- ioMsgMaybe $
+      {-# SCC "deSugar" #-}
+      deSugar hsc_env (ms_location mod_summary) tc_result
 
     -- always check -Werror after desugaring, this is the last opportunity for
     -- warnings to arise before the backend.
@@ -1131,6 +1133,7 @@ hscWriteIface :: ModIface -> Bool -> ModSummary -> Hsc ()
 hscWriteIface iface no_change mod_summary = do
     dflags <- getDynFlags
     unless no_change $
+        {-# SCC "writeIface" #-}
         liftIO $ writeIfaceFile dflags (ms_location mod_summary) iface
 
 -- | Compile to hard-code.
@@ -1170,7 +1173,8 @@ hscGenHardCode cgguts mod_summary = do
         ------------------  Code generation ------------------
 
         cmms <- if dopt Opt_TryNewCodeGen dflags
-                    then tryNewCodeGen hsc_env this_mod data_tycons
+                    then {-# SCC "NewCodeGen" #-}
+                         tryNewCodeGen hsc_env this_mod data_tycons
                              cost_centre_info
                              stg_binds hpc_info
                     else {-# SCC "CodeGen" #-}
@@ -1179,10 +1183,12 @@ hscGenHardCode cgguts mod_summary = do
                              stg_binds hpc_info
 
         ------------------  Code output -----------------------
-        rawcmms <- cmmToRawCmm platform cmms
+        rawcmms <- {-# SCC "cmmToRawCmm" #-}
+                   cmmToRawCmm platform cmms
         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (pprPlatform platform rawcmms)
         (_stub_h_exists, stub_c_exists)
-            <- codeOutput dflags this_mod location foreign_stubs
+            <- {-# SCC "codeOutput" #-}
+               codeOutput dflags this_mod location foreign_stubs
                dependencies rawcmms
         return stub_c_exists
 
