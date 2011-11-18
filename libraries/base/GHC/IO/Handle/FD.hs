@@ -52,7 +52,8 @@ stdin :: Handle
 stdin = unsafePerformIO $ do
    -- ToDo: acquire lock
    setBinaryMode FD.stdin
-   mkHandle FD.stdin "<stdin>" ReadHandle True (Just localeEncoding)
+   enc <- getLocaleEncoding
+   mkHandle FD.stdin "<stdin>" ReadHandle True (Just enc)
                 nativeNewlineMode{-translate newlines-}
                 (Just stdHandleFinalizer) Nothing
 
@@ -62,7 +63,8 @@ stdout :: Handle
 stdout = unsafePerformIO $ do
    -- ToDo: acquire lock
    setBinaryMode FD.stdout
-   mkHandle FD.stdout "<stdout>" WriteHandle True (Just localeEncoding)
+   enc <- getLocaleEncoding
+   mkHandle FD.stdout "<stdout>" WriteHandle True (Just enc)
                 nativeNewlineMode{-translate newlines-}
                 (Just stdHandleFinalizer) Nothing
 
@@ -72,8 +74,9 @@ stderr :: Handle
 stderr = unsafePerformIO $ do
     -- ToDo: acquire lock
    setBinaryMode FD.stderr
+   enc <- getLocaleEncoding
    mkHandle FD.stderr "<stderr>" WriteHandle False{-stderr is unbuffered-} 
-                (Just localeEncoding)
+                (Just enc)
                 nativeNewlineMode{-translate newlines-}
                 (Just stdHandleFinalizer) Nothing
 
@@ -179,7 +182,7 @@ openFile' filepath iomode binary non_blocking = do
   -- first open the file to get an FD
   (fd, fd_type) <- FD.openFile filepath iomode non_blocking
 
-  let mb_codec = if binary then Nothing else Just localeEncoding
+  mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
 
   -- then use it to make a Handle
   mkHandleFromFD fd fd_type filepath iomode
@@ -253,8 +256,8 @@ fdToHandle' fdint mb_type is_socket filepath iomode binary = do
   (fd,fd_type) <- FD.mkFD fdint iomode mb_stat
                        is_socket
                        is_socket
-  mkHandleFromFD fd fd_type filepath iomode is_socket
-                       (if binary then Nothing else Just localeEncoding)
+  enc <- if binary then return Nothing else fmap Just getLocaleEncoding
+  mkHandleFromFD fd fd_type filepath iomode is_socket enc
 
 
 -- | Turn an existing file descriptor into a Handle.  This is used by

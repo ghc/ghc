@@ -45,7 +45,8 @@ getFullArgs =
    getFullProgArgv p_argc p_argv
    p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
-   peekArray (p - 1) (advancePtr argv 1) >>= mapM (GHC.peekCString fileSystemEncoding)
+   enc <- getFileSystemEncoding
+   peekArray (p - 1) (advancePtr argv 1) >>= mapM (GHC.peekCString enc)
 
 foreign import ccall unsafe "getFullProgArgv"
     getFullProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()

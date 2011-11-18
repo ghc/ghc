@@ -413,6 +413,13 @@ readIO s        =  case (do { (x,t) <- reads s ;
                         [x]    -> return x
                         []     -> ioError (userError "Prelude.readIO: no parse")
                         _      -> ioError (userError "Prelude.readIO: ambiguous parse")
+
+-- | The Unicode encoding of the current locale
+--
+-- This is the initial locale encoding: if it has been subsequently changed by
+-- 'GHC.IO.Encoding.setLocaleEncoding' this value will not reflect that change.
+localeEncoding :: TextEncoding
+localeEncoding = initLocaleEncoding
 #endif  /* __GLASGOW_HASKELL__ */
 
 #ifndef __NHC__
@@ -584,8 +591,8 @@ openTempFile' loc tmp_dir template binary mode = do
                               False{-is_socket-} 
                               True{-is_nonblock-}
 
-         h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-}
-                           (Just localeEncoding)
+         enc <- getLocaleEncoding
+         h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
 
          return (filepath, h)
 #else

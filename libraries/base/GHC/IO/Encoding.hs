@@ -22,7 +22,9 @@ module GHC.IO.Encoding (
         utf8, utf8_bom,
         utf16, utf16le, utf16be,
         utf32, utf32le, utf32be, 
-        localeEncoding, fileSystemEncoding, foreignEncoding,
+        initLocaleEncoding,
+        getLocaleEncoding, getFileSystemEncoding, getForeignEncoding,
+        setLocaleEncoding, setFileSystemEncoding, setForeignEncoding,
         char8,
         mkTextEncoding,
     ) where
@@ -45,6 +47,7 @@ import qualified GHC.IO.Encoding.UTF8   as UTF8
 import qualified GHC.IO.Encoding.UTF16  as UTF16
 import qualified GHC.IO.Encoding.UTF32  as UTF32
 
+import Data.IORef
 import Data.Char (toUpper)
 import Data.List
 import Data.Maybe
@@ -100,7 +103,7 @@ utf32be  :: TextEncoding
 utf32be = UTF32.utf32be
 
 -- | The Unicode encoding of the current locale
-localeEncoding :: TextEncoding
+getLocaleEncoding :: IO TextEncoding
 
 -- | The Unicode encoding of the current locale, but allowing arbitrary
 -- undecodable bytes to be round-tripped through it.
@@ -111,12 +114,24 @@ localeEncoding :: TextEncoding
 -- On Windows, this encoding *should not* be used if possible because
 -- the use of code pages is deprecated: Strings should be retrieved
 -- via the "wide" W-family of UTF-16 APIs instead
-fileSystemEncoding :: TextEncoding
+getFileSystemEncoding :: IO TextEncoding
 
 -- | The Unicode encoding of the current locale, but where undecodable
 -- bytes are replaced with their closest visual match. Used for
 -- the 'CString' marshalling functions in "Foreign.C.String"
-foreignEncoding :: TextEncoding
+getForeignEncoding :: IO TextEncoding
+
+setLocaleEncoding, setFileSystemEncoding, setForeignEncoding :: TextEncoding -> IO ()
+(getLocaleEncoding, setLocaleEncoding)         = mkGlobal initLocaleEncoding
+(getFileSystemEncoding, setFileSystemEncoding) = mkGlobal initFileSystemEncoding
+(getForeignEncoding, setForeignEncoding)       = mkGlobal initForeignEncoding
+
+mkGlobal :: a -> (IO a, a -> IO ())
+mkGlobal x = unsafePerformIO $ do
+    x_ref <- newIORef x
+    return (readIORef x_ref, writeIORef x_ref)
+
+initLocaleEncoding, initFileSystemEncoding, initForeignEncoding :: TextEncoding
 
 #if !defined(mingw32_HOST_OS)
 -- It is rather important that we don't just call Iconv.mkIconvEncoding here
@@ -129,13 +144,13 @@ foreignEncoding :: TextEncoding
 -- FIXME: this is not a complete solution because if the locale encoding is one
 -- which we don't have a Haskell-side decoder for, iconv might still ignore the
 -- lone surrogate in the input.
-localeEncoding     = unsafePerformIO $ mkTextEncoding' ErrorOnCodingFailure Iconv.localeEncodingName
-fileSystemEncoding = unsafePerformIO $ mkTextEncoding' RoundtripFailure     Iconv.localeEncodingName
-foreignEncoding    = unsafePerformIO $ mkTextEncoding' IgnoreCodingFailure  Iconv.localeEncodingName
+initLocaleEncoding     = unsafePerformIO $ mkTextEncoding' ErrorOnCodingFailure Iconv.localeEncodingName
+initFileSystemEncoding = unsafePerformIO $ mkTextEncoding' RoundtripFailure     Iconv.localeEncodingName
+initForeignEncoding    = unsafePerformIO $ mkTextEncoding' IgnoreCodingFailure  Iconv.localeEncodingName
 #else
-localeEncoding     = CodePage.localeEncoding
-fileSystemEncoding = CodePage.mkLocaleEncoding RoundtripFailure
-foreignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
+initLocaleEncoding     = CodePage.localeEncoding
+initFileSystemEncoding = CodePage.mkLocaleEncoding RoundtripFailure
+initForeignEncoding    = CodePage.mkLocaleEncoding IgnoreCodingFailure
 #endif
 
 -- | An encoding in which Unicode code points are translated to bytes

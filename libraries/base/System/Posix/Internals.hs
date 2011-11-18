@@ -53,7 +53,7 @@ import GHC.IO.IOMode
 import GHC.IO.Exception
 import GHC.IO.Device
 #ifndef mingw32_HOST_OS
-import {-# SOURCE #-} GHC.IO.Encoding (fileSystemEncoding)
+import {-# SOURCE #-} GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 #endif
 #elif __HUGS__
@@ -199,9 +199,9 @@ peekFilePath :: CString -> IO FilePath
 peekFilePathLen :: CStringLen -> IO FilePath
 
 #if __GLASGOW_HASKELL__
-withFilePath = GHC.withCString fileSystemEncoding
-peekFilePath = GHC.peekCString fileSystemEncoding
-peekFilePathLen = GHC.peekCStringLen fileSystemEncoding
+withFilePath fp f = getFileSystemEncoding >>= \enc -> GHC.withCString enc fp f
+peekFilePath fp = getFileSystemEncoding >>= \enc -> GHC.peekCString enc fp
+peekFilePathLen fp = getFileSystemEncoding >>= \enc -> GHC.peekCStringLen enc fp
 #else
 withFilePath = withCString
 peekFilePath = peekCString
