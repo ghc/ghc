@@ -590,7 +590,8 @@ class TypecheckedMod m => DesugaredMod m where
 -- | The result of successful parsing.
 data ParsedModule =
   ParsedModule { pm_mod_summary   :: ModSummary
-               , pm_parsed_source :: ParsedSource }
+               , pm_parsed_source :: ParsedSource
+               , pm_extra_src_files :: [FilePath] }
 
 instance ParsedMod ParsedModule where
   modSummary m    = pm_mod_summary m
@@ -676,8 +677,8 @@ parseModule :: GhcMonad m => ModSummary -> m ParsedModule
 parseModule ms = do
    hsc_env <- getSession
    let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
-   rdr_module <- liftIO $ hscParse hsc_env_tmp ms
-   return (ParsedModule ms rdr_module)
+   hpm <- liftIO $ hscParse hsc_env_tmp ms
+   return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm))
 
 -- | Typecheck and rename a parsed module.
 --
@@ -688,7 +689,9 @@ typecheckModule pmod = do
  hsc_env <- getSession
  let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
  (tc_gbl_env, rn_info)
-       <- liftIO $ hscTypecheckRename hsc_env_tmp ms (parsedSource pmod)
+       <- liftIO $ hscTypecheckRename hsc_env_tmp ms $
+                      HsParsedModule { hpm_module = parsedSource pmod,
+                                       hpm_src_files = pm_extra_src_files pmod }
  details <- liftIO $ makeSimpleDetails hsc_env_tmp tc_gbl_env
  return $
      TypecheckedModule {

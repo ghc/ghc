@@ -709,7 +709,8 @@ pprUsage usage@UsageHomeModule{}
         vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
         )
 pprUsage usage@UsageFile{}
-  = hsep [ptext (sLit "addDependentFile"), ppr (usg_file_path usage)]
+  = hsep [ptext (sLit "addDependentFile"),
+          doubleQuotes (text (usg_file_path usage))]
 
 pprUsageImport :: Outputable a => Usage -> (Usage -> a) -> SDoc
 pprUsageImport usage usg_mod'

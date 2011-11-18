@@ -329,8 +329,8 @@ link' dflags batch_attempt_linking hpt
                    return Succeeded
            else do
 
-        debugTraceMsg dflags 1 (ptext (sLit "Linking") <+> text exe_file
-                                 <+> text "...")
+        compilationProgressMsg dflags $ showSDoc $
+            (ptext (sLit "Linking") <+> text exe_file <+> text "...")
 
         -- Don't showPass in Batch mode; doLink will do that for us.
         let link = case ghcLink dflags of
