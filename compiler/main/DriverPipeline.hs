@@ -148,7 +148,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
    -- Figure out what lang we're generating
    let hsc_lang = hscTarget dflags
    -- ... and what the next phase should be
-   let next_phase = hscNextPhase dflags src_flavour hsc_lang
+   let next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
    -- ... and what file to generate the output into
    output_fn <- getOutputFilename next_phase
                         Temporary basename dflags next_phase (Just location)
@@ -921,7 +921,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
                                   else return SourceModified
 
   -- get the DynFlags
-        let next_phase = hscNextPhase dflags src_flavour hsc_lang
+        let next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
         output_fn  <- phaseOutputFilename next_phase
 
         let dflags' = dflags { hscTarget = hsc_lang,
@@ -987,7 +987,7 @@ runPhase Cmm input_fn dflags
         PipeEnv{src_basename} <- getPipeEnv
         let hsc_lang = hscTarget dflags
 
-        let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
+        let next_phase = hscPostBackendPhase dflags HsSrcFile hsc_lang
 
         output_fn <- phaseOutputFilename next_phase
 
@@ -1141,7 +1141,7 @@ runPhase cc_phase input_fn dflags
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-runPhase SplitMangle input_fn dflags
+runPhase Splitter input_fn dflags
   = do  -- tmp_pfx is the prefix used for the split .s files
 
         split_s_prefix <- io $ SysTools.newTempName dflags "split"
@@ -1164,12 +1164,13 @@ runPhase SplitMangle input_fn dflags
         io $ addFilesToClean dflags' [ split_s_prefix ++ "__" ++ show n ++ ".s"
                                      | n <- [1..n_files]]
 
-        return (SplitAs, "**splitmangle**")
-          -- we don't use the filename
+        return (SplitAs,
+                "**splitter**") -- we don't use the filename in SplitAs
 
 -----------------------------------------------------------------------------
--- As phase
+-- As, SpitAs phase : Assembler
 
+-- This is for calling the assembler on a regular assembly file (not split).
 runPhase As input_fn dflags
   = do
         -- LLVM from version 3.0 onwards doesn't support the OS X system
@@ -1220,6 +1221,8 @@ runPhase As input_fn dflags
         return (next_phase, output_fn)
 
 
+-- This is for calling the assembler on a split assembly file (so a collection
+-- of assembly files)
 runPhase SplitAs _input_fn dflags
   = do
         -- we'll handle the stub_o file in this phase, so don't MergeStub,
@@ -1360,9 +1363,8 @@ runPhase LlvmLlc input_fn dflags
                    then ["-O1", "-O2", "-O2"]
                    else ["-O1", "-O2", "-O3"]
         -- On ARMv7 using LLVM, LLVM fails to allocate floating point registers
-        -- while compiling GHC source code. It's probably due to fact
-        -- that it does not enable VFP by default. Let's do this manually
-        -- here
+        -- while compiling GHC source code. It's probably due to fact that it
+        -- does not enable VFP by default. Let's do this manually here
         fpOpts = case platformArch (targetPlatform dflags) of 
                    ArchARM ARMv7 ext -> if (elem VFPv3 ext)
                                       then ["-mattr=+v7,+vfp3"]
@@ -2100,13 +2102,14 @@ joinObjectFiles dflags o_files output_fn = do
 -- -----------------------------------------------------------------------------
 -- Misc.
 
-hscNextPhase :: DynFlags -> HscSource -> HscTarget -> Phase
-hscNextPhase _ HsBootFile _        =  StopLn
-hscNextPhase dflags _ hsc_lang =
+-- | What phase to run after one of the backend code generators has run
+hscPostBackendPhase :: DynFlags -> HscSource -> HscTarget -> Phase
+hscPostBackendPhase _ HsBootFile _    =  StopLn
+hscPostBackendPhase dflags _ hsc_lang =
   case hsc_lang of
         HscC -> HCc
-        HscAsm | dopt Opt_SplitObjs dflags -> SplitMangle
-               | otherwise -> As
+        HscAsm | dopt Opt_SplitObjs dflags -> Splitter
+               | otherwise                 -> As
         HscLlvm        -> LlvmOpt
         HscNothing     -> StopLn
         HscInterpreted -> StopLn
