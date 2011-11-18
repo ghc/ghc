@@ -491,3 +491,11 @@ T5584:
 	$(RM) -rf T5584_out
 	mkdir T5584_out
 	"$(TEST_HC)" -odir T5584_out -c T5584/A.hs-boot
+
+.PHONY: T5198
+T5198:
+	$(RM) -rf T5198dump
+	[ ! -d T5198dump ]
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c T5198.hs -dumpdir T5198dump -ddump-to-file -ddump-simpl
+	[ -f T5198dump/T5198.dump-simpl ]
+
