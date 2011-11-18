@@ -7,19 +7,12 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module DriverPhases (
    HscSource(..), isHsBoot, hscSourceString,
    Phase(..),
    happensBefore, eqPhase, anyHsc, isStopLn,
-   startPhase,          -- :: String -> Phase
-   phaseInputExt,       -- :: Phase -> String
+   startPhase,
+   phaseInputExt,
 
    isHaskellishSuffix,
    isHaskellSrcSuffix,
@@ -37,7 +30,7 @@ module DriverPhases (
    isExtCoreFilename,
    isDynLibFilename,
    isHaskellUserSrcFilename,
-   isSourceFilename         -- :: FilePath -> Bool
+   isSourceFilename
  ) where
 
 #include "HsVersions.h"
@@ -125,8 +118,8 @@ eqPhase HCc         HCc        = True
 eqPhase Splitter    Splitter   = True
 eqPhase SplitAs     SplitAs    = True
 eqPhase As          As         = True
-eqPhase LlvmOpt	    LlvmOpt    = True
-eqPhase LlvmLlc	    LlvmLlc    = True
+eqPhase LlvmOpt     LlvmOpt    = True
+eqPhase LlvmLlc     LlvmLlc    = True
 eqPhase LlvmMangle  LlvmMangle = True
 eqPhase CmmCpp      CmmCpp     = True
 eqPhase Cmm         Cmm        = True
@@ -280,5 +273,4 @@ isObjectFilename         f = isObjectSuffix         (drop 1 $ takeExtension f)
 isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (drop 1 $ takeExtension f)
 isDynLibFilename         f = isDynLibSuffix         (drop 1 $ takeExtension f)
 isSourceFilename         f = isSourceSuffix         (drop 1 $ takeExtension f)
-
 

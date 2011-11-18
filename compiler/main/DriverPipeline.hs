@@ -1000,11 +1000,6 @@ runPhase Cmm input_fn dflags
 
         io $ hscCompileCmmFile hsc_env input_fn
 
-        -- XXX: catch errors above and convert them into ghcError?  Original
-        -- code was:
-        --
-        --when (not ok) $ ghcError (PhaseFailed "cmm" (ExitFailure 1))
-
         return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
@@ -1063,7 +1058,6 @@ runPhase cc_phase input_fn dflags
                    | otherwise            = "-O"
 
         -- Decide next phase
-
         let next_phase = As
         output_fn <- phaseOutputFilename next_phase
 
@@ -1135,8 +1129,6 @@ runPhase cc_phase input_fn dflags
                        ))
 
         return (next_phase, output_fn)
-
-        -- ToDo: postprocess the output from gcc
 
 -----------------------------------------------------------------------------
 -- Splitting phase
