@@ -34,7 +34,7 @@ module ErrUtils (
 #include "HsVersions.h"
 
 import Bag              ( Bag, bagToList, isEmptyBag, emptyBag )
-import Util             ( sortLe )
+import Util
 import Outputable
 import SrcLoc
 import DynFlags
@@ -234,6 +234,7 @@ dumpSDoc dflags dflag hdr doc
                             mode = if append then AppendMode else WriteMode
                         when (not append) $
                             writeIORef gdref (Set.insert fileName gd)
+                        createDirectoryHierarchy (takeDirectory fileName)
                         handle <- openFile fileName mode
                         hPrintDump handle doc
                         hClose handle
