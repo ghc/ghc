@@ -2,6 +2,10 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# -fforce-recomp makes lots of driver tests trivially pass, so we
+# filter it out from $(TEST_HC_OPTS).
+TEST_HC_OPTS_NO_RECOMP = $(filter-out -fforce-recomp,$(TEST_HC_OPTS))
+
 LOCAL_PKGCONF=local.package.conf
 
 clean:
@@ -30,7 +34,7 @@ prep:
 	cd p1 && ./setup build -v0
 
 prep.%:
-	cd $* && "$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -o setup Setup.hs
+	cd $* && "$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -v0 --make -o setup Setup.hs
 	cd $* && ./setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
 	cd $* && ./setup build -v0
 	cd $* && ./setup register -v0 --inplace
