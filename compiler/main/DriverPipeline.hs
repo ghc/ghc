@@ -1376,11 +1376,12 @@ runPhase LlvmLlc input_fn dflags
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
 
-runPhase LlvmMangle input_fn _dflags
+runPhase LlvmMangle input_fn dflags
   = do
-      output_fn <- phaseOutputFilename As
+      let next_phase = if dopt Opt_SplitObjs dflags then Splitter else As
+      output_fn <- phaseOutputFilename next_phase
       io $ llvmFixupAsm input_fn output_fn
-      return (As, output_fn)
+      return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
 -- merge in stub objects
