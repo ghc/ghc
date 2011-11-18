@@ -83,7 +83,6 @@ import DsMeta           ( templateHaskellNames )
 import VarSet
 import VarEnv           ( emptyTidyEnv )
 import Panic
-import Data.List
 #endif
 
 import Id
@@ -145,9 +144,11 @@ import UniqSupply       ( initUs_ )
 import Bag
 import Exception
 
+import Data.List
 import Control.Monad
 import Data.Maybe
 import Data.IORef
+import System.FilePath as FilePath
 
 #include "HsVersions.h"
 
@@ -309,11 +310,11 @@ hscRnImportDecls hsc_env import_decls =
 -- -----------------------------------------------------------------------------
 -- | parse a file, returning the abstract syntax
 
-hscParse :: HscEnv -> ModSummary -> IO (Located (HsModule RdrName))
+hscParse :: HscEnv -> ModSummary -> IO HsParsedModule
 hscParse hsc_env mod_summary = runHsc hsc_env $ hscParse' mod_summary
 
 -- internal version, that doesn't fail due to -Werror
-hscParse' :: ModSummary -> Hsc (Located (HsModule RdrName))
+hscParse' :: ModSummary -> Hsc HsParsedModule
 hscParse' mod_summary = do
     dflags <- getDynFlags
     let src_filename  = ms_hspp_file mod_summary
@@ -342,8 +343,32 @@ hscParse' mod_summary = do
                                    ppr rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics" $
                                    ppSourceStats False rdr_module
-            return rdr_module
-                -- ToDo: free the string buffer later.
+
+            -- To get the list of extra source files, we take the list
+            -- that the parser gave us,
+            --   - eliminate files beginning with '<'.  gcc likes to use
+            --     pseudo-filenames like "<built-in>" and "<command-line>"
+            --   - normalise them (elimiante differences between ./f and f)
+            --   - filter out the preprocessed source file
+            --   - filter out anything beginning with tmpdir
+            --   - remove duplicates
+            --   - filter out the .hs/.lhs source filename if we have one
+            --
+            let n_hspp  = FilePath.normalise src_filename
+                srcs0 = nub $ filter (not . (tmpDir dflags `isPrefixOf`))
+                            $ filter (not . (== n_hspp))
+                            $ map FilePath.normalise
+                            $ filter (not . (== '<') . head)
+                            $ map unpackFS
+                            $ srcfiles pst
+                srcs1 = case ml_hs_file (ms_location mod_summary) of
+                          Just f  -> filter (/= FilePath.normalise f) srcs0
+                          Nothing -> srcs0
+
+            return HsParsedModule {
+                      hpm_module    = rdr_module,
+                      hpm_src_files = srcs1
+                   }
 
 -- XXX: should this really be a Maybe X?  Check under which circumstances this
 -- can become a Nothing and decide whether this should instead throw an
@@ -353,7 +378,7 @@ type RenamedStuff =
                 Maybe LHsDocString))
 
 -- | Rename and typecheck a module, additionally returning the renamed syntax
-hscTypecheckRename :: HscEnv -> ModSummary -> Located (HsModule RdrName)
+hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
                    -> IO (TcGblEnv, RenamedStuff)
 hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
     tc_result <- {-# SCC "Typecheck-Rename" #-}
@@ -784,13 +809,13 @@ batchMsg hsc_env mb_mod_index recomp mod_summary =
 
 hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
 hscFileFrontEnd mod_summary = do
-    rdr_module <- hscParse' mod_summary
+    hpm <- hscParse' mod_summary
     hsc_env <- getHscEnv
     dflags  <- getDynFlags
     tcg_env <-
         {-# SCC "Typecheck-Rename" #-}
         ioMsgMaybe $
-            tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+            tcRnModule hsc_env (ms_hsc_src mod_summary) False hpm
     tcSafeOK <- liftIO $ readIORef (tcg_safeInfer tcg_env)
 
     -- end of the Safe Haskell line, how to respond to user?

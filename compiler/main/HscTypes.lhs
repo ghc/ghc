@@ -99,6 +99,9 @@ module HscTypes (
         IfaceTrustInfo, getSafeMode, setSafeMode, noIfaceTrustInfo,
         trustInfoToNum, numToTrustInfo, IsSafeImport,
 
+        -- * result of the parser
+        HsParsedModule(..),
+
         -- * Compilation errors and warnings
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
         throwOneError, handleSourceError,
@@ -2039,6 +2042,24 @@ instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_Trustworthy)  = ptext $ sLit "trustworthy"
     ppr (TrustInfo Sf_Safe)         = ptext $ sLit "safe"
     ppr (TrustInfo Sf_SafeInfered)  = ptext $ sLit "safe-infered"
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Parser result}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+data HsParsedModule = HsParsedModule {
+    hpm_module    :: Located (HsModule RdrName),
+    hpm_src_files :: [FilePath]
+       -- ^ extra source files (e.g. from #includes).  The lexer collects
+       -- these from '# <file> <line>' pragmas, which the C preprocessor
+       -- leaves behind.  These files and their timestamps are stored in
+       -- the .hi file, so that we can force recompilation if any of
+       -- them change (#3589)
+  }
 \end{code}
 
 %************************************************************************

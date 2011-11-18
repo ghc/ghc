@@ -121,13 +121,18 @@ import Control.Monad
 tcRnModule :: HscEnv 
 	   -> HscSource
 	   -> Bool 		-- True <=> save renamed syntax
-	   -> Located (HsModule RdrName)
+           -> HsParsedModule
 	   -> IO (Messages, Maybe TcGblEnv)
 
 tcRnModule hsc_env hsc_src save_rn_syntax
-	 (L loc (HsModule maybe_mod export_ies 
+   HsParsedModule {
+      hpm_module =
+         (L loc (HsModule maybe_mod export_ies
 			  import_decls local_decls mod_deprec
-			  maybe_doc_hdr))
+                          maybe_doc_hdr)),
+      hpm_src_files =
+         src_files
+   }
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
    let { this_pkg = thisPackage (hsc_dflags hsc_env) ;
@@ -207,7 +212,10 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- Report unused names
  	reportUnusedNames export_ies tcg_env ;
 
-		-- Dump output and return
+                -- add extra source files to tcg_dependent_files
+        addDependentFiles src_files ;
+
+                -- Dump output and return
 	tcDump tcg_env ;
 	return tcg_env
     }}}}

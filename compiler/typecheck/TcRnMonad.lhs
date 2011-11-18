@@ -513,6 +513,12 @@ getRecFieldEnv = do { env <- getGblEnv; return (tcg_field_env env) }
 
 getDeclaredDefaultTys :: TcRn (Maybe [Type])
 getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }
+
+addDependentFiles :: [FilePath] -> TcRn ()
+addDependentFiles fs = do
+  ref <- fmap tcg_dependent_files getGblEnv
+  dep_files <- readTcRef ref
+  writeTcRef ref (fs ++ dep_files)
 \end{code}
 
 %************************************************************************

@@ -1129,6 +1129,7 @@ setFile code span buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
   setAlrLastLoc $ alrInitialLoc file
   setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
+  addSrcFile file
   _ <- popLexState
   pushLexState code
   lexToken
@@ -1482,6 +1483,7 @@ data PState = PState {
                                    -- extensions
         context    :: [LayoutContext],
         lex_state  :: [Int],
+        srcfiles   :: [FastString],
         -- Used in the alternative layout rule:
         -- These tokens are the next ones to be sent out. They are
         -- just blindly emitted, without the rule looking at them again:
@@ -1568,6 +1570,9 @@ setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
 
 getSrcLoc :: P RealSrcLoc
 getSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
+
+addSrcFile :: FastString -> P ()
+addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
 
 setLastToken :: RealSrcSpan -> Int -> P ()
 setLastToken loc len = P $ \s -> POk s {
@@ -1851,6 +1856,7 @@ mkPState flags buf loc =
       extsBitmap    = fromIntegral bitmap,
       context       = [],
       lex_state     = [bol, 0],
+      srcfiles      = [],
       alr_pending_implicit_tokens = [],
       alr_next_token = Nothing,
       alr_last_loc = alrInitialLoc (fsLit "<no file>"),
