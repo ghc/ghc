@@ -522,7 +522,8 @@ unVectDict ty e
 -- |Vectorise an 'n'-ary lambda abstraction by building a set of 'n' explicit closures.
 --
 -- All non-dictionary free variables go into the closure's environment, whereas the dictionary
--- variables are passed explicit (as conventional arguments) into the body during closure construction.
+-- variables are passed explicit (as conventional arguments) into the body during closure
+-- construction.
 --
 vectLam :: Bool             -- ^ When the RHS of a binding, whether that binding should be inlined.
         -> Bool             -- ^ Whether the binding is a loop breaker.

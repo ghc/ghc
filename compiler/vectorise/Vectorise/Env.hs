@@ -211,9 +211,10 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     vectTypeTyCons  = [tycon | VectType _ tycon _ <- vectDecls] ++
                       [tycon | VectClass tycon    <- vectDecls]
     vectDataCons    = concatMap tyConDataCons vectTypeTyCons
-    ids             = mg_ids ++ vectIds ++ selIds
+    ids             = mg_ids ++ vectIds ++ dataConIds ++ selIds
     tyCons          = mg_tyCons ++ vectTypeTyCons
     dataCons        = concatMap tyConDataCons mg_tyCons ++ vectDataCons
+    dataConIds      = map dataConWorkId dataCons
     selIds          = concat [ classAllSelIds cls 
                              | tycon <- tyCons
                              , cls <- maybeToList . tyConClass_maybe $ tycon]

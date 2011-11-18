@@ -276,8 +276,8 @@ buildToArrPRepr vect_tc prepr_tc pdata_tc r
     to_comp expr (Wrap ty)
       = do
           wrap_tc  <- builtin wrapTyCon
-          (pwrap_tc, _) <- pdataReprTyCon (mkTyConApp wrap_tc [ty])
-          return $ wrapNewTypeBody pwrap_tc [ty] expr
+          pwrap_tc <- pdataReprTyConExact (mkTyConApp wrap_tc [ty])
+        return $ wrapNewTypeBody pwrap_tc [ty] expr
 
 
 buildFromArrPRepr :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
@@ -358,7 +358,7 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc r
     from_comp _ res expr (Wrap ty)
       = do
           wrap_tc  <- builtin wrapTyCon
-          (pwrap_tc, _) <- pdataReprTyCon (mkTyConApp wrap_tc [ty])
+          pwrap_tc <- pdataReprTyConExact (mkTyConApp wrap_tc [ty])
           return (res, [unwrapNewTypeBody pwrap_tc [ty]
                         $ unwrapFamInstScrut pwrap_tc [ty] expr])
 

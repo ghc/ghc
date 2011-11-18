@@ -15,7 +15,7 @@ module Vectorise.Utils.Base (
   mkBuiltinCo,
   mkVScrut,
 
-  pdataReprTyCon,   pdatasReprTyCon,
+  pdataReprTyCon, pdataReprTyConExact, pdatasReprTyCon,
   pdataReprDataCon, pdatasReprDataCon,
   prDFunOfTyCon
 ) where
@@ -28,12 +28,14 @@ import CoreSyn
 import CoreUtils
 import Coercion
 import Type
+import TypeRep
 import TyCon
 import DataCon
 import MkId
 import Literal
 import Outputable
 import FastString
+import ListSetOps
 
 import Control.Monad (liftM)
 
@@ -150,6 +152,7 @@ mkBuiltinCo get_tc
 
 
 -------------------------------------------------------------------------------
+
 mkVScrut :: VExpr -> VM (CoreExpr, CoreExpr, TyCon, [Type])
 mkVScrut (ve, le)
   = do
@@ -158,37 +161,57 @@ mkVScrut (ve, le)
   where
     ty = exprType ve
 
-
--- | Get the PData tycon that represents this type.
---   This tycon does not appear explicitly in the source program.
---   See Note [PData TyCons] in Vectorise.PRepr
+-- |Get the representation tycon of the 'PData' data family for a given type.
+--
+-- This tycon does not appear explicitly in the source program — see Note [PData TyCons] in
+-- 'Vectorise.Generic.Description':
 --
 --   @pdataReprTyCon {Sum2} = {PDataSum2}@
 --
+-- The type for which we look up a 'PData' instance may be more specific than the type in the
+-- instance declaration.  In that case the second component of the result will be more specific than
+-- a set of distinct type variables.
+-- 
 pdataReprTyCon :: Type -> VM (TyCon, [Type])
-pdataReprTyCon ty
-        = builtin pdataTyCon >>= (`lookupFamInst` [ty])
+pdataReprTyCon ty = builtin pdataTyCon >>= (`lookupFamInst` [ty])
+
+-- |Get the representation tycon of the 'PData' data family for a given type which must match the
+-- type index in the looked up 'PData' instance exactly.
+--
+pdataReprTyConExact :: Type -> VM TyCon
+pdataReprTyConExact ty
+  = do { (tycon, tys) <- pdataReprTyCon ty
+       ; if uniqueTyVars tys
+         then
+           return tycon
+         else
+           cantVectorise "No exact 'PData' family instance for" (ppr ty)
+       } 
+  where
+    uniqueTyVars tys = all isTyVarTy tys && hasNoDups (map extractTyVar tys)
+      where
+        extractTyVar (TyVarTy tv) = tv
+        extractTyVar _            = panic "Vectorise.Utils.Base: extractTyVar"
 
 pdataReprDataCon :: Type -> VM (DataCon, [Type])
 pdataReprDataCon ty
- = do   (tc, arg_tys) <- pdataReprTyCon ty
-        let [dc] = tyConDataCons tc
-        return (dc, arg_tys)
+  = do { (tc, arg_tys) <- pdataReprTyCon ty
+       ; let [dc] = tyConDataCons tc
+       ; return (dc, arg_tys)
+       }
 
 pdatasReprTyCon :: Type -> VM (TyCon, [Type])
-pdatasReprTyCon ty
-        = builtin pdatasTyCon >>= (`lookupFamInst` [ty])
+pdatasReprTyCon ty = builtin pdatasTyCon >>= (`lookupFamInst` [ty])
 
 pdatasReprDataCon :: Type -> VM (DataCon, [Type])
 pdatasReprDataCon ty
- = do   (tc, arg_tys) <- pdatasReprTyCon ty
-        let [dc] = tyConDataCons tc
-        return (dc, arg_tys)
-
+  = do { (tc, arg_tys) <- pdatasReprTyCon ty
+       ; let [dc] = tyConDataCons tc
+       ; return (dc, arg_tys)
+       }
 
 prDFunOfTyCon :: TyCon -> VM CoreExpr
 prDFunOfTyCon tycon
   = liftM Var
   . maybeCantVectoriseM "No PR dictionary for tycon" (ppr tycon)
   $ lookupTyConPR tycon
-

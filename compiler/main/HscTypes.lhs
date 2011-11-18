@@ -1943,6 +1943,9 @@ data VectInfo
 -- |Vectorisation information for 'ModIface'; i.e, the vectorisation information propagated
 -- across module boundaries.
 --
+-- NB: The field 'ifaceVectInfoVar' explicitly contains the workers of data constructors as well as
+--     class selectors — i.e., their mappings are /not/ implicitly generated from the data types.
+--
 data IfaceVectInfo
   = IfaceVectInfo
     { ifaceVectInfoVar          :: [Name]  -- ^ All variables in here have a vectorised variant
