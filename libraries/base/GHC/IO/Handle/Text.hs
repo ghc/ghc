@@ -39,7 +39,6 @@ import GHC.IO.FD
 import GHC.IO.Buffer
 import qualified GHC.IO.BufferedIO as Buffered
 import GHC.IO.Exception
-import GHC.IO.Encoding.Failure (surrogatifyRoundtripCharacter, desurrogatifyRoundtripCharacter)
 import GHC.Exception
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
@@ -275,8 +274,7 @@ unpack !buf !r !w acc0
          | otherwise = do
               -- Here, we are rather careful to only put an *evaluated* character
               -- in the output string. Due to pointer tagging, this allows the consumer
-              -- to avoid ping-ponging between the actual consumer code and the
-              -- code of desurrogatifyRoundtripCharacter
+              -- to avoid ping-ponging between the actual consumer code and the thunk code
 #ifdef CHARBUF_UTF16
               -- reverse-order decoding of UTF-16
               c2 <- peekElemOff pbuf i
@@ -289,8 +287,7 @@ unpack !buf !r !w acc0
                            { C# c# -> unpackRB (C# c# : acc) (i-2) }
 #else
               c <- peekElemOff pbuf i
-              case desurrogatifyRoundtripCharacter c of { C# c# ->
-              unpackRB (C# c# : acc) (i-1) } -- Note [#5536]
+              unpackRB (c : acc) (i-1)
 #endif
      in
      unpackRB acc0 (w-1)
@@ -313,8 +310,7 @@ unpack_nl !buf !r !w acc0
                             then unpackRB ('\n':acc) (i-2)
                             else unpackRB ('\n':acc) (i-1)
                  else do
-                         case desurrogatifyRoundtripCharacter c of { C# c# ->
-                         unpackRB (C# c# : acc) (i-1) } -- Note [#5536]
+                         unpackRB (c : acc) (i-1)
      in do
      c <- peekElemOff pbuf (w-1)
      if (c == '\r')
@@ -612,7 +608,7 @@ writeBlocks hdl line_buffered add_nl nl
            else do
                shoveString n' cs rest
      | otherwise = do
-        n' <- writeCharBuf raw n (surrogatifyRoundtripCharacter c)
+        n' <- writeCharBuf raw n c
         shoveString n' cs rest
   in
   shoveString 0 s (if add_nl then "\n" else "")

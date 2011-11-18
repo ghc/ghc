@@ -18,7 +18,6 @@
 module GHC.IO.Encoding.Failure (
     CodingFailureMode(..), codingFailureModeSuffix,
     isSurrogate,
-    surrogatifyRoundtripCharacter, desurrogatifyRoundtripCharacter,
     recoverDecode, recoverEncode
   ) where
 
@@ -61,26 +60,35 @@ data CodingFailureMode
 -- Note [Roundtripping]
 -- ~~~~~~~~~~~~~~~~~~~~
 --
--- Roundtripping is based on the ideas of PEP383. However, unlike
--- PEP383 we do not wish to use lone surrogate codepoints to escape
--- undecodable bytes, because that may confuse Unicode processing
--- software written in Haskell. Instead, we use the range of
--- private-use characters from 0xEF80 to 0xEFFF designated for
--- "encoding hacks" by the ConScript Unicode Registery.
+-- Roundtripping is based on the ideas of PEP383.
 --
--- This introduces a technical problem when it comes to encoding back
--- to bytes using iconv. The iconv code will not fail when it tries to
--- encode a private-use character (as it would if trying to encode a
--- surrogate), which means that we won't get a chance to replace it
+-- We used to use the range of private-use characters from 0xEF80 to
+-- 0xEFFF designated for "encoding hacks" by the ConScript Unicode Registery
+-- to encode these characters.
+--
+-- However, people didn't like this because it means we don't get
+-- guaranteed roundtripping for byte sequences that look like a UTF-8
+-- encoded codepoint 0xEFxx.
+--
+-- So now like PEP383 we use lone surrogate codepoints 0xDCxx to escape
+-- undecodable bytes, even though that may confuse Unicode processing
+-- software written in Haskell. This guarantees roundtripping because
+-- unicode input that includes lone surrogate codepoints is invalid by
+-- definition.
+--
+-- When we used private-use characters there was a technical problem when it
+-- came to encoding back to bytes using iconv. The iconv code will not fail when
+-- it tries to encode a private-use character (as it would if trying to encode
+-- a surrogate), which means that we won't get a chance to replace it
 -- with the byte we originally escaped.
 --
 -- To work around this, when filling the buffer to be encoded (in
--- writeBlocks/withEncodedCString/newEncodedCString), we replace the
+-- writeBlocks/withEncodedCString/newEncodedCString), we replaced the
 -- private-use characters with lone surrogates again! Likewise, when
 -- reading from a buffer (unpack/unpack_nl/peekEncodedCString) we have
 -- to do the inverse process.
 --
--- The user of String should never see these lone surrogates, but it
+-- The user of String would never see these lone surrogates, but it
 -- ensures that iconv will throw an error when encountering them.  We
 -- use lone surrogates in the range 0xDC00 to 0xDCFF for this purpose.
 
@@ -116,26 +124,6 @@ unrepresentableChar = '\xFFFD'
 isSurrogate :: Char -> Bool
 isSurrogate c = (0xD800 <= x && x <= 0xDBFF)
              || (0xDC00 <= x && x <= 0xDFFF)
-  where x = ord c
-
--- | Private use characters (in Strings) --> lone surrogates (in
--- Buffer CharBufElem) (We use some private-use characters for
--- roundtripping unknown bytes through a String)
-{-# INLINE surrogatifyRoundtripCharacter #-}
-surrogatifyRoundtripCharacter :: Char -> Char
-surrogatifyRoundtripCharacter c
-  | 0xEF00 <= x && x < 0xF000 = chr (x - (0xEF00 - 0xDC00))
-  | otherwise                 = c
-  where x = ord c
-
--- | Lone surrogates (in Buffer CharBufElem) --> private use
--- characters (in Strings) (We use some surrogate characters for
--- roundtripping unknown bytes through a String)
-{-# INLINE desurrogatifyRoundtripCharacter #-}
-desurrogatifyRoundtripCharacter :: Char -> Char
-desurrogatifyRoundtripCharacter c
-  | 0xDC00 <= x && x < 0xDD00 = chr (x - (0xDC00 - 0xEF00))
-  | otherwise                 = c
   where x = ord c
 
 -- Bytes (in Buffer Word8) --> lone surrogates (in Buffer CharBufElem)
