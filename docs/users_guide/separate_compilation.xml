@@ -374,6 +374,19 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 	  </listitem>
 	</varlistentry>
 
+	<varlistentry>
+	  <term>
+            <option>-dumpdir</option>  <replaceable>dir</replaceable>
+            <indexterm><primary><option>-dumpdir</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Redirects all dump files into
+	    <replaceable>dir</replaceable>.  Dump files are generated when
+	    <literal>-ddump-to-file</literal> is used with other
+	    <literal>-ddump-*</literal> flags.</para>
+	  </listitem>
+	</varlistentry>
+
         <varlistentry>
           <term>
             <option>-outputdir</option> <replaceable>dir</replaceable>
@@ -383,7 +396,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
             <para>The <option>-outputdir</option> option is shorthand for
               the combination
               of <option>-odir</option>, <option>-hidir</option>,
-              and <option>-stubdir</option>.
+              <option>-stubdir</option> and <option>-dumpdir</option>.
             </para>
           </listitem>
         </varlistentry>

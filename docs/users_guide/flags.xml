@@ -266,7 +266,13 @@
 	    </row>
 	    <row>
 	      <entry><option>-stubdir</option> <replaceable>dir</replaceable></entry>
-	      <entry>redirect FFi stub files</entry>
+	      <entry>redirect FFI stub files</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dumpdir</option> <replaceable>dir</replaceable></entry>
+	      <entry>redirect dump files</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>

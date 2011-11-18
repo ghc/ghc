@@ -41,6 +41,7 @@ import DynFlags
 import StaticFlags      ( opt_ErrorSpans )
 
 import System.Exit      ( ExitCode(..), exitWith )
+import System.FilePath
 import Data.List
 import qualified Data.Set as Set
 import Data.IORef
@@ -247,23 +248,27 @@ dumpSDoc dflags dflag hdr doc
 chooseDumpFile :: DynFlags -> DynFlag -> Maybe String
 chooseDumpFile dflags dflag
 
-        -- dump file location is being forced
-        --      by the --ddump-file-prefix flag.
-        | dumpToFile
-        , Just prefix   <- dumpPrefixForce dflags
-        = Just $ prefix ++ (beautifyDumpName dflag)
+        | dopt Opt_DumpToFile dflags
+        , Just prefix <- getPrefix
+        = Just $ setDir (prefix ++ (beautifyDumpName dflag))
 
-        -- dump file location chosen by DriverPipeline.runPipeline
-        | dumpToFile
-        , Just prefix   <- dumpPrefix dflags
-        = Just $ prefix ++ (beautifyDumpName dflag)
-
-        -- we haven't got a place to put a dump file.
         | otherwise
         = Nothing
 
-        where dumpToFile = dopt Opt_DumpToFile dflags
-
+        where getPrefix
+                 -- dump file location is being forced
+                 --      by the --ddump-file-prefix flag.
+               | Just prefix <- dumpPrefixForce dflags
+                  = Just prefix
+                 -- dump file location chosen by DriverPipeline.runPipeline
+               | Just prefix <- dumpPrefix dflags
+                  = Just prefix
+                 -- we haven't got a place to put a dump file.
+               | otherwise
+                  = Nothing
+              setDir f = case dumpDir dflags of
+                         Just d  -> d </> f
+                         Nothing ->       f
 
 -- | Build a nice file name from name of a DynFlag constructor
 beautifyDumpName :: DynFlag -> String

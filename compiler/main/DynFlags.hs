@@ -486,6 +486,7 @@ data DynFlags = DynFlags {
   dylibInstallName      :: Maybe String,
   hiDir                 :: Maybe String,
   stubDir               :: Maybe String,
+  dumpDir               :: Maybe String,
 
   objectSuf             :: String,
   hcSuf                 :: String,
@@ -851,6 +852,7 @@ defaultDynFlags mySettings =
         dylibInstallName        = Nothing,
         hiDir                   = Nothing,
         stubDir                 = Nothing,
+        dumpDir                 = Nothing,
 
         objectSuf               = phaseInputExt StopLn,
         hcSuf                   = phaseInputExt HCc,
@@ -1105,7 +1107,8 @@ getVerbFlags dflags
   | verbosity dflags >= 4 = ["-v"]
   | otherwise             = []
 
-setObjectDir, setHiDir, setStubDir, setOutputDir, setDylibInstallName,
+setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
+         setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, addOptl, addOptP,
          addCmdlineFramework, addHaddockOpts
@@ -1119,7 +1122,8 @@ setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling via C (i.e. unregisterised
   -- builds).
-setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
+setDumpDir    f d = d{ dumpDir    = Just f}
+setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f . setDumpDir f
 setDylibInstallName  f d = d{ dylibInstallName = Just f}
 
 setObjectSuf  f d = d{ objectSuf  = f}
@@ -1435,6 +1439,7 @@ dynamic_flags = [
   , Flag "hidir"             (hasArg setHiDir)
   , Flag "tmpdir"            (hasArg setTmpDir)
   , Flag "stubdir"           (hasArg setStubDir)
+  , Flag "dumpdir"           (hasArg setDumpDir)
   , Flag "outputdir"         (hasArg setOutputDir)
   , Flag "ddump-file-prefix" (hasArg (setDumpPrefixForce . Just))
 
