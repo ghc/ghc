@@ -149,6 +149,7 @@ import Control.Monad
 import Data.Maybe
 import Data.IORef
 import System.FilePath as FilePath
+import System.Directory
 
 #include "HsVersions.h"
 
@@ -365,9 +366,14 @@ hscParse' mod_summary = do
                           Just f  -> filter (/= FilePath.normalise f) srcs0
                           Nothing -> srcs0
 
+            -- sometimes we see source files from earlier
+            -- preprocessing stages that cannot be found, so just
+            -- filter them out:
+            srcs2 <- liftIO $ filterM doesFileExist srcs1
+
             return HsParsedModule {
                       hpm_module    = rdr_module,
-                      hpm_src_files = srcs1
+                      hpm_src_files = srcs2
                    }
 
 -- XXX: should this really be a Maybe X?  Check under which circumstances this
