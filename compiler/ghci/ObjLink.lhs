@@ -36,7 +36,11 @@ import Control.Monad    ( when )
 import Foreign.C
 import Foreign		( nullPtr )
 import GHC.Exts         ( Ptr(..) )
-import GHC.IO.Encoding  ( fileSystemEncoding )
+#if __GLASGOW_HASKELL__ >= 703
+import GHC.IO.Encoding (getFileSystemEncoding)
+#else
+import GHC.IO.Encoding (TextEncoding, fileSystemEncoding)
+#endif
 import qualified GHC.Foreign as GHC
 import System.FilePath  ( dropExtension )
 
@@ -45,9 +49,16 @@ import System.FilePath  ( dropExtension )
 -- RTS Linker Interface
 -- ---------------------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ < 703
+getFileSystemEncoding :: IO TextEncoding
+getFileSystemEncoding = return fileSystemEncoding
+#endif
+
 -- UNICODE FIXME: Unicode object/archive/DLL file names on Windows will only work in the right code page
 withFileCString :: FilePath -> (CString -> IO a) -> IO a
-withFileCString = GHC.withCString fileSystemEncoding
+withFileCString fp f = do
+    enc <- getFileSystemEncoding
+    GHC.withCString enc fp f
 
 insertSymbol :: String -> String -> Ptr a -> IO ()
 insertSymbol obj_name key symbol
