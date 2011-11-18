@@ -24,7 +24,7 @@ TEST_HC_OPTS_NO_RECOMP = $(filter-out -fforce-recomp,$(TEST_HC_OPTS))
 test011:
 	$(RM) A011.hi
 	$(RM) A011$(OBJSUFFIX)
-	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) $(TEST_HC_OPTS_NO_RECOMP) -c A011.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS_NO_RECOMP) -c A011.hs
 	test -f A011.hi
 	test -f A011$(OBJSUFFIX)
 
