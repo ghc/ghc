@@ -12,11 +12,11 @@ ifneq "$(BINDIST)" "YES"
 $(INPLACE_BIN)/$(utils/haddock_dist_PROG): $(INPLACE_LIB)/html $(INPLACE_LIB)/latex
 
 $(INPLACE_LIB)/html:
-	"$(RM)" $(RM_OPTS_REC) $@
+	$(call removeTrees,$@)
 	"$(CP)" -R utils/haddock/html $@
 
 $(INPLACE_LIB)/latex:
-	"$(RM)" $(RM_OPTS_REC) $@
+	$(call removeTrees,$@)
 	"$(CP)" -R utils/haddock/latex $@
 
 endif
@@ -45,7 +45,7 @@ install_utils/haddock_data:
 
 .PHONY: install_utils/haddock_link
 install_utils/haddock_link:
-	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/haddock"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/haddock")
 	$(LN_S) $(utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME) "$(DESTDIR)$(bindir)/haddock"
 
 BINDIST_EXTRAS += $(addprefix utils/haddock/,$(utils/haddock_dist_DATA_FILES))
