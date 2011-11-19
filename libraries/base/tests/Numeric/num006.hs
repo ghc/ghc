@@ -10,13 +10,13 @@ showDec = showInt
 
 {-
 --showBinary :: Integral a => a -> ShowS
-showBinary n r = 
+showBinary n r =
  showString "0b" $
  showIntAtBase 2 (toChr) n r
  where toChr d = chr (ord '0' + fromIntegral d)
 -}
 
-main = 
+main =
  do
   print (map (\ x -> showOct x []) [1..32])
   print (map (\ x -> showDec x []) [1..32])

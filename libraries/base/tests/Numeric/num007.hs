@@ -4,7 +4,7 @@ module Main(main) where
 
 import Numeric
 
-main = 
+main =
  do
   putStrLn (show (readOct "00000111"))
   putStrLn (show (readDec "00000111"))

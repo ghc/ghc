@@ -7,7 +7,7 @@ import Numeric
 showSignedInt :: Integral a => a -> String
 showSignedInt x = showSigned (showInt) 0 x ""
 
-main = 
+main =
   do
    putStrLn (showInt (343023920121::Integer) [])
    putStrLn (showInt (3430239::Int) [])

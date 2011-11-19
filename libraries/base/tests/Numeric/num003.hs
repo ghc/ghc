@@ -5,9 +5,9 @@ module Main(main) where
 import Numeric
 import Data.Char
 
-main = 
-  let 
-   rd :: ReadS Integer 
+main =
+  let
+   rd :: ReadS Integer
    rd = readSigned (readInt 10 (isDigit) (digitToInt))
   in
   do

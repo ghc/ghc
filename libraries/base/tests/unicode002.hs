@@ -41,4 +41,4 @@ main = do
     putStrLn header
     mapM (putStrLn . charCode) [ (chr 0) .. (chr 6553) ]
 
-  
+

@@ -4,14 +4,14 @@ module Main(main) where
 
 import Numeric
 
-main = 
-  let 
+main =
+  let
    ls = ["3489348394032498320438240938403","0","-1","1","34323","2L","012","0x23","3243ab"]
    present str f ls =
-    sequence (map (\ v -> putStr ('\n':str ++ 
-                                  ' ': v   ++ 
-				  " = "    ++ 
-				  (show (f v)))) ls)
+    sequence (map (\ v -> putStr ('\n':str ++
+                                  ' ': v   ++
+                                  " = "    ++
+                                  (show (f v)))) ls)
   in
   do
    present "(readDec::ReadS Integer)" (readDec::ReadS Integer) ls
