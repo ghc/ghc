@@ -17,4 +17,5 @@ test('unicode002',
      compile_and_run,
      [''])
 test('data-fixed-show-read', normal, compile_and_run, [''])
+test('showDouble', normal, compile_and_run, [''])
 
