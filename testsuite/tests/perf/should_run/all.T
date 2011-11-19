@@ -166,9 +166,9 @@ test('T5549',
 
 test('T4474a',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 3500000000,
-                                             3900000000)),
-                           # expected value: ?????????? ()
+          stats_num_field('bytes allocated', 1600000000,
+                                             2000000000)),
+                           # expected value: 1879095912 (i386/OSX)
       if_wordsize(64,
           stats_num_field('bytes allocated', 3500000000,
                                              3900000000)),
@@ -179,9 +179,9 @@ test('T4474a',
      ['-O'])
 test('T4474b',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 3500000000,
-                                             3900000000)),
-                           # expected value: ?????????? ()
+          stats_num_field('bytes allocated', 1600000000,
+                                             2000000000)),
+                           # expected value: 1879095912 (i386/OSX)
       if_wordsize(64,
           stats_num_field('bytes allocated', 3500000000,
                                              3900000000)),
@@ -192,9 +192,9 @@ test('T4474b',
      ['-O'])
 test('T4474c',
      [if_wordsize(32,
-          stats_num_field('bytes allocated', 3500000000,
-                                             3900000000)),
-                           # expected value: ?????????? ()
+          stats_num_field('bytes allocated', 1600000000,
+                                             2000000000)),
+                           # expected value: 1879095912 (i386/OSX)
       if_wordsize(64,
           stats_num_field('bytes allocated', 3500000000,
                                              3900000000)),
