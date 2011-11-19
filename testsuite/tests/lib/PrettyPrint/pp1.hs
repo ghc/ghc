@@ -1,6 +1,6 @@
 -- This code used to print an infinite string, by calling 'spaces'
 -- with a negative argument.  There's a patch in the library now,
--- which makes 'spaces' do somehthing sensible when called with a negative
+-- which makes 'spaces' do something sensible when called with a negative
 -- argument, but it really should not happen at all.
 
 
