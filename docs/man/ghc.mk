@@ -30,7 +30,7 @@ docs/man/flags.xsl: docs/man/gen_flags.xsl.sh
 # Re-use the flags documentation from the user's guide by injecting some
 # entities after the XML declaration to make it a stand-alone document.
 docs/man/flags.xml: docs/users_guide/flags.xml
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	head -n 1 $< >> $@
 	echo "<!DOCTYPE sect1 [<!ENTITY ndash  \"-\"> \
 	                       <!ENTITY ldquo  \"\`\"> \

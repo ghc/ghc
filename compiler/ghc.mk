@@ -44,7 +44,7 @@ compiler/stage3/package-data.mk : compiler/stage3/build/Config.hs
 endif
 
 compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	@echo 'Creating $@ ... '
 	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
 	@echo 'module Config where'                                         >> $@
@@ -157,7 +157,7 @@ $(eval $(call clean-target,compiler,config_hs,compiler/main/Config.hs))
 PLATFORM_H = ghc_boot_platform.h
 
 compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	@echo "Creating $@..."
 	@echo "#ifndef __PLATFORM_H__"                           >> $@
 	@echo "#define __PLATFORM_H__"                           >> $@
@@ -203,7 +203,7 @@ endif
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same
 # (stage1 is the cross-compiler, not stage2).
 compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	@echo "Creating $@..."
 	@echo "#ifndef __PLATFORM_H__"                            >> $@
 	@echo "#define __PLATFORM_H__"                            >> $@

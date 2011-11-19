@@ -36,7 +36,7 @@ all_$1_$2 : $$(INPLACE_BIN)/$$($1_$2_PROG)
 
 $$(INPLACE_BIN)/$$($1_$2_PROG): WRAPPER=$$@
 $$(INPLACE_BIN)/$$($1_$2_PROG): $$($1_$2_INPLACE) $$($1_$2_SHELL_WRAPPER_NAME)
-	"$$(RM)" $$(RM_OPTS)                              $$@
+	$$(call removeFiles,                             $$@)
 	echo '#!$$(SHELL)'                             >> $$@
 	echo 'executablename="$$(TOP)/$$<"'            >> $$@
 	echo 'datadir="$$(TOP)/$$(INPLACE_LIB)"'       >> $$@
@@ -65,7 +65,7 @@ install: install_$1_$2_wrapper
 install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
 install_$1_$2_wrapper:
 	$$(call INSTALL_DIR,"$$(DESTDIR)$$(bindir)")
-	"$$(RM)" $$(RM_OPTS)                                        "$$(WRAPPER)"
+	$$(call removeFiles,                                        "$$(WRAPPER)")
 	$$(CREATE_SCRIPT)                                           "$$(WRAPPER)"
 	echo '#!$$(SHELL)'                                       >> "$$(WRAPPER)"
 	echo 'exedir="$$(ghclibexecdir)"'                        >> "$$(WRAPPER)"

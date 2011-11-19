@@ -41,7 +41,7 @@ $1/package.conf.install:
 distclean : clean_$1_package.conf
 .PHONY: clean_$1_package.conf
 clean_$1_package.conf :
-	"$$(RM)" $$(RM_OPTS) $1/package.conf.install $1/package.conf.inplace
+	$$(call removeFiles,$1/package.conf.install $1/package.conf.inplace)
 
 $(call profEnd, manual-package-config($1))
 endef

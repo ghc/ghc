@@ -74,7 +74,7 @@ $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk
 endif
 
 $(includes_H_PLATFORM) : includes/Makefile
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCPLATFORM_H__"  >$@
 	@echo "#define __GHCPLATFORM_H__" >>$@

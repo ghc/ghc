@@ -672,8 +672,11 @@ ifeq "$(phase)" "final"
 $(eval $(call all-target,library_doc_index,libraries/index.html))
 endif
 INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
-CLEAN_FILES += libraries/doc-index* libraries/haddock*.css \
-	       libraries/haddock*.js libraries/index*.html libraries/*.gif
+CLEAN_FILES += $(wildcard libraries/doc-index*   \
+                          libraries/haddock*.css \
+                          libraries/haddock*.js  \
+                          libraries/index*.html  \
+                          libraries/*.gif)
 endif
 
 # -----------------------------------------------------------------------------
@@ -882,7 +885,7 @@ INSTALL_DISTDIR_compiler = stage2
 install_packages: install_libexecs
 install_packages: rts/package.conf.install
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
-	"$(RM)" $(RM_OPTS_REC) "$(INSTALLED_PACKAGE_CONF)"
+	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
 	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
@@ -962,7 +965,7 @@ endif
 BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 
 unix-binary-dist-prep:
-	"$(RM)" $(RM_OPTS_REC) bindistprep/
+	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
 	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
@@ -973,13 +976,13 @@ unix-binary-dist-prep:
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
 	echo "GHC_CABAL_INPLACE  = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal" >> $(BIN_DIST_MK)
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
-	"$(RM)" $(RM_OPTS) $(BIN_DIST_PREP_TAR)
+	$(call removeFiles,$(BIN_DIST_PREP_TAR))
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
 # tree then we want to include the real file, not a symlink to it
 	cd bindistprep && "$(TAR_CMD)" hcf - -T ../$(BIN_DIST_LIST) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
 windows-binary-dist-prep:
-	"$(RM)" $(RM_OPTS_REC) bindistprep/
+	$(call removeTrees,bindistprep/)
 	$(MAKE) prefix=$(TOP)/$(BIN_DIST_PREP_DIR) install
 	cd bindistprep && "$(TAR_CMD)" cf - $(BIN_DIST_NAME) | bzip2 -c > ../$(BIN_DIST_PREP_TAR_BZ2)
 
@@ -1074,8 +1077,8 @@ endef
 
 .PHONY: sdist-prep
 sdist-prep :
-	"$(RM)" $(RM_OPTS_REC) $(SRC_DIST_DIR)
-	"$(RM)" $(RM_OPTS) $(SRC_DIST_TARBALL)
+	$(call removeTrees,$(SRC_DIST_DIR))
+	$(call removeFiles,$(SRC_DIST_TARBALL))
 	mkdir $(SRC_DIST_DIR)
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done
@@ -1092,7 +1095,7 @@ sdist-prep :
 	$(call sdist_file,utils/genprimopcode,dist,,,Parser,y)
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Lex,x)
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Parse,y)
-	cd $(SRC_DIST_DIR) && "$(RM)" $(RM_OPTS_REC) compiler/stage[123] mk/build.mk
+	cd $(SRC_DIST_DIR) && $(call removeTrees,compiler/stage[123] mk/build.mk)
 	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
 
 .PHONY: sdist
@@ -1142,15 +1145,15 @@ clean : clean_files clean_libraries
 
 .PHONY: clean_files
 clean_files :
-	"$(RM)" $(RM_OPTS) $(CLEAN_FILES)
+	$(call removeFiles,$(CLEAN_FILES))
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
 clean_libraries: $(patsubst %,clean_libraries/%_dist-boot,$(PACKAGES_STAGE0))
 
 clean_libraries:
-	"$(RM)" $(RM_OPTS_REC) $(patsubst %, libraries/%/dist, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/*.buildinfo, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
+	$(call removeTrees,$(patsubst %, libraries/%/dist, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(patsubst %, $(wildcard libraries/%/*.buildinfo), $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 
 # We have to define a clean target for each library manually, because the
 # libraries/*/ghc.mk files are not included when we're cleaning.
@@ -1164,42 +1167,42 @@ endif
 clean : clean_bindistprep
 .PHONY: clean_bindistprep
 clean_bindistprep:
-	"$(RM)" $(RM_OPTS_REC) bindistprep/
+	$(call removeTrees,bindistprep/)
 
 distclean : clean
-	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
-	"$(RM)" $(RM_OPTS) mk/config.mk mk/are-validating.mk mk/project.mk
-	"$(RM)" $(RM_OPTS) mk/config.mk.old mk/project.mk.old
-	"$(RM)" $(RM_OPTS) settings docs/users_guide/ug-book.xml
-	"$(RM)" $(RM_OPTS) compiler/ghc.cabal compiler/ghc.cabal.old
-	"$(RM)" $(RM_OPTS) ghc/ghc-bin.cabal
-	"$(RM)" $(RM_OPTS) libraries/base/include/HsBaseConfig.h
-	"$(RM)" $(RM_OPTS) libraries/directory/include/HsDirectoryConfig.h
-	"$(RM)" $(RM_OPTS) libraries/process/include/HsProcessConfig.h
-	"$(RM)" $(RM_OPTS) libraries/unix/include/HsUnixConfig.h
-	"$(RM)" $(RM_OPTS) libraries/old-time/include/HsTimeConfig.h
-	"$(RM)" $(RM_OPTS_REC) utils/ghc-pwd/dist
-	"$(RM)" $(RM_OPTS_REC) inplace
+	$(call removeFiles,config.cache config.status config.log mk/config.h mk/stamp-h)
+	$(call removeFiles,mk/config.mk mk/are-validating.mk mk/project.mk)
+	$(call removeFiles,mk/config.mk.old mk/project.mk.old)
+	$(call removeFiles,settings docs/users_guide/ug-book.xml)
+	$(call removeFiles,compiler/ghc.cabal compiler/ghc.cabal.old)
+	$(call removeFiles,ghc/ghc-bin.cabal)
+	$(call removeFiles,libraries/base/include/HsBaseConfig.h)
+	$(call removeFiles,libraries/directory/include/HsDirectoryConfig.h)
+	$(call removeFiles,libraries/process/include/HsProcessConfig.h)
+	$(call removeFiles,libraries/unix/include/HsUnixConfig.h)
+	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h)
+	$(call removeTrees,utils/ghc-pwd/dist)
+	$(call removeTrees,inplace)
 
-	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.log, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.status, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/include/Hs*Config.h, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS_REC) $(patsubst %, libraries/%/autom4te.cache, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
+	$(call removeFiles,$(patsubst %, libraries/%/config.log, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(patsubst %, libraries/%/config.status, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(patsubst %, $(wildcard,libraries/%/include/Hs*Config.h), $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeTrees,$(patsubst %, libraries/%/autom4te.cache, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 
 maintainer-clean : distclean
-	"$(RM)" $(RM_OPTS) configure mk/config.h.in
-	"$(RM)" $(RM_OPTS_REC) autom4te.cache libraries/*/autom4te.cache
-	"$(RM)" $(RM_OPTS) ghc.spec
-	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/GNUmakefile, \
-	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/configure, \
-	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
-	"$(RM)" $(RM_OPTS) libraries/base/include/HsBaseConfig.h.in
-	"$(RM)" $(RM_OPTS) libraries/directory/include/HsDirectoryConfig.h.in
-	"$(RM)" $(RM_OPTS) libraries/process/include/HsProcessConfig.h.in
-	"$(RM)" $(RM_OPTS) libraries/unix/include/HsUnixConfig.h.in
-	"$(RM)" $(RM_OPTS) libraries/old-time/include/HsTimeConfig.h.in
+	$(call removeFiles,configure mk/config.h.in)
+	$(call removeTrees,autom4te.cache $(wildcard libraries/*/autom4te.cache))
+	$(call removeFiles,ghc.spec)
+	$(call removeFiles,$(patsubst %, libraries/%/GNUmakefile, \
+	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(patsubst %, libraries/%/configure, \
+	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,libraries/base/include/HsBaseConfig.h.in)
+	$(call removeFiles,libraries/directory/include/HsDirectoryConfig.h.in)
+	$(call removeFiles,libraries/process/include/HsProcessConfig.h.in)
+	$(call removeFiles,libraries/unix/include/HsUnixConfig.h.in)
+	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h.in)
 
 .PHONY: all_libraries
 

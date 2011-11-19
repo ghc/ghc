@@ -37,7 +37,7 @@ html_$1 : $1/$2/index.html
 
 ifneq "$$(BINDIST)" "YES"
 $1/$2/index.html: $$($1_DOCBOOK_SOURCES)
-	"$$(RM)" $$(RM_OPTS_REC) $$(dir $$@)
+	$$(call removeTrees,$$(dir $$@))
 	"$$(XSLTPROC)" --stringparam base.dir $$(dir $$@) \
 	               --stringparam use.id.as.filename 1 \
 	               --stringparam html.stylesheet fptools.css \

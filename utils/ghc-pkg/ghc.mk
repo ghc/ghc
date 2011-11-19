@@ -21,7 +21,7 @@ inplace/bin/ghc-pkg : utils/ghc-pkg/dist-install/build/tmp/$(utils/ghc-pkg_dist_
 ifeq "$(Windows)" "YES"
 	cp $< $@
 else
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	echo "#!/bin/sh" >>$@
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
 	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
@@ -31,11 +31,11 @@ endif
 else
 
 $(GHC_PKG_INPLACE) : utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext) | $$(dir $$@)/. $(INPLACE_PACKAGE_CONF)/.
-	"$(RM)" $(RM_OPTS) $(INPLACE_PACKAGE_CONF)/*
+	$(call removeFiles,$(wildcard $(INPLACE_PACKAGE_CONF)/*))
 ifeq "$(Windows)" "YES"
 	cp $< $@
 else
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	echo "#!/bin/sh" >>$@
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
 	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
@@ -70,7 +70,7 @@ utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main
 
 
 utils/ghc-pkg/Version.hs: mk/project.mk
-	"$(RM)" $(RM_OPTS) $@
+	$(call removeFiles,$@)
 	echo "module Version where"                    >> $@
 	echo "version, targetOS, targetARCH :: String" >> $@
 	echo "version    = \"$(ProjectVersion)\""      >> $@
@@ -105,7 +105,7 @@ install: install_utils/ghc-pkg_link
 .PNONY: install_utils/ghc-pkg_link
 install_utils/ghc-pkg_link: 
 	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
-	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/ghc-pkg"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc-pkg")
 	$(LN_S) ghc-pkg-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghc-pkg"
 endif
 

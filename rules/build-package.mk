@@ -47,8 +47,8 @@ maintainer-clean : distclean
 
 .PHONY: clean_$1_$2_config
 clean_$1_$2_config:
-	"$$(RM)" $$(RM_OPTS) $1/config.log $1/config.status $1/include/Hs*Config.h
-	"$$(RM)" $$(RM_OPTS_REC) $1/autom4te.cache
+	$$(call removeFiles,$1/config.log $1/config.status $(wildcard $1/include/Hs*Config.h))
+	$$(call removeTrees,$1/autom4te.cache)
 
 ifneq "$$($1_$2_NOT_NEEDED)" "YES"
 $$(eval $$(call build-package-helper,$1,$2,$3))

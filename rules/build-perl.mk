@@ -44,7 +44,7 @@ $1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$(UNLIT) | $$$$(dir $$$$@)/.
 endif
 
 $1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
-	"$$(RM)" $$(RM_OPTS) $$@
+	$$(call removeFiles,$$@)
 	echo '#!$$(PERL)'                                  >> $$@
 	echo '$$$$TARGETPLATFORM  = "$$(TARGETPLATFORM)";' >> $$@
 	echo '$$$$TABLES_NEXT_TO_CODE  = "$(GhcEnableTablesNextToCode)";' >> $$@

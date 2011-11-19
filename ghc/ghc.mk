@@ -143,7 +143,7 @@ ifeq "$(Windows)" "NO"
 install: install_ghc_link
 .PNONY: install_ghc_link
 install_ghc_link: 
-	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/ghc"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc")
 	$(LN_S) ghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghc"
 else
 # On Windows we install the main binary as $(bindir)/ghc.exe
@@ -151,7 +151,7 @@ else
 install: install_ghc_post
 .PHONY: install_ghc_post
 install_ghc_post: install_bins
-	"$(RM)" $(RM_OPTS) $(DESTDIR)$(bindir)/ghc.exe
+	$(call removeFiles,$(DESTDIR)$(bindir)/ghc.exe)
 	"$(MV)" -f $(DESTDIR)$(bindir)/ghc-stage$(INSTALL_GHC_STAGE).exe $(DESTDIR)$(bindir)/ghc.exe
 endif
 

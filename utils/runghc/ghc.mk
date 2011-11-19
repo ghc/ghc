@@ -33,7 +33,7 @@ install_runhaskell: install_bins
 	"$(CP)" $(DESTDIR)$(bindir)/runghc$(exeext) $(DESTDIR)$(bindir)/runhaskell$(exeext)
 else
 install_runhaskell:
-	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/runhaskell"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/runhaskell")
 	$(LN_S) runghc "$(DESTDIR)$(bindir)/runhaskell"
 endif
 

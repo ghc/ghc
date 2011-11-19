@@ -18,12 +18,12 @@ install: install_driver_ghci
 install_driver_ghci: WRAPPER=$(DESTDIR)$(bindir)/ghci-$(ProjectVersion)
 install_driver_ghci:
 	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
-	"$(RM)" $(RM_OPTS)                                 "$(WRAPPER)"
+	$(call removeFiles,                                "$(WRAPPER)")
 	$(CREATE_SCRIPT)                                   "$(WRAPPER)"
 	echo '#!$(SHELL)'                               >> "$(WRAPPER)"
 	echo 'exec "$(bindir)/ghc-$(ProjectVersion)" --interactive $${1+"$$@"}' >> "$(WRAPPER)"
 	$(EXECUTABLE_FILE)                                 "$(WRAPPER)"
-	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/ghci"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/ghci")
 	$(LN_S) ghci-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghci"
 
 else # Windows...
@@ -53,7 +53,7 @@ install_driver_ghcii: GHCII_SCRIPT=$(DESTDIR)$(bindir)/ghcii.sh
 install_driver_ghcii: GHCII_SCRIPT_VERSIONED = $(DESTDIR)$(bindir)/ghcii-$(ProjectVersion).sh
 install_driver_ghcii:
 	$(call INSTALL_DIR,$(DESTDIR)$(bindir))
-	"$(RM)" $(RM_OPTS) $(GHCII_SCRIPT)
+	$(call removeFiles,$(GHCII_SCRIPT))
 	echo "#!$(SHELL)"                                  >> $(GHCII_SCRIPT)
 	echo 'exec "$$0"/../ghc --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
 	$(EXECUTABLE_FILE) $(GHCII_SCRIPT)

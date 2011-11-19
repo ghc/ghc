@@ -74,3 +74,24 @@ RM_OPTS = -f
 RM_OPTS_REC = -rf
 endif
 
+# If $1 is empty then we don't do anything (as "rm -rf" fails on
+# Solaris; trac #4916).
+# If $1 contains a * then we fail; globbing needs to be done at the call
+# site using $(wildcard ...). This makes it a little safer, as it's
+# harder to accidentally delete something you didn't mean to.
+# Similarly, we fail if any argument contains ".." or starts with a "/".
+
+removeFiles = $(call removeHelper,removeFiles,"$(RM)",$(RM_OPTS),$1)
+removeTrees = $(call removeHelper,removeTrees,"$(RM)",$(RM_OPTS_REC),$1)
+
+removeHelper = $(if $(strip $4),\
+                   $(if $(findstring *,$4),\
+                       $(error $1: Got a star: $4),\
+                   $(if $(findstring ..,$4),\
+                       $(error $1: Got dot-dot: $4),\
+                   $(if $(filter /%,$4),\
+                       $(error $1: Got leading slash: $4),\
+                       $2 $3 $4\
+                    )))\
+                )
+

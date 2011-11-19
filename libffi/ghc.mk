@@ -40,13 +40,13 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 $(libffi_STAMP_CONFIGURE):
-	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_CONFIGURE)
-	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_BUILD)
-	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_INSTALL)
-	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_SHARED_CONFIGURE)
-	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_SHARED_BUILD)
-	"$(RM)" $(RM_OPTS) $(libffi_STAMP_STATIC_SHARED_INSTALL)
-	"$(RM)" $(RM_OPTS_REC) $(LIBFFI_DIR) libffi/build
+	$(call removeFiles,$(libffi_STAMP_STATIC_CONFIGURE))
+	$(call removeFiles,$(libffi_STAMP_STATIC_BUILD))
+	$(call removeFiles,$(libffi_STAMP_STATIC_INSTALL))
+	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_CONFIGURE))
+	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_BUILD))
+	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_INSTALL))
+	$(call removeTrees,$(LIBFFI_DIR) libffi/build)
 	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
 
@@ -95,7 +95,7 @@ $(ffi_HEADER): $(libffi_STAMP_INSTALL) | $$(dir $$@)/.
 	cp libffi/build/inst/lib/libffi-*/include/ffi.h $@
 
 $(eval $(call clean-target,libffi,, \
-    libffi/build libffi/stamp.ffi.* libffi/dist-install))
+    libffi/build $(wildcard libffi/stamp.ffi.*) libffi/dist-install))
 
 endif
 
