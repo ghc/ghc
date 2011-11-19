@@ -164,3 +164,43 @@ test('T5549',
      compile_and_run,
      ['-O'])
 
+test('T4474a',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: ?????????? ()
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: 3766493912 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+test('T4474b',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: ?????????? ()
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: 3766493912 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+test('T4474c',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: ?????????? ()
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: 3766493912 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+
