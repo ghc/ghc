@@ -16,4 +16,5 @@ test('unicode002',
      if_platform('i386-unknown-openbsd', expect_fail),
      compile_and_run,
      [''])
+test('data-fixed-show-read', normal, compile_and_run, [''])
 
