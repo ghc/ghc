@@ -397,6 +397,10 @@ sub scmall {
             scm ($localpath, $scm, "reset", @args)
                 unless $scm eq "darcs";
         }
+        elsif ($command =~ /^branch$/) {
+            scm ($localpath, $scm, "branch", @args)
+                unless $scm eq "darcs";
+        }
         elsif ($command =~ /^config$/) {
             scm ($localpath, $scm, "config", @args)
                 unless $scm eq "darcs";
@@ -483,6 +487,7 @@ remote set-url [--push] <remote-name>
 These commands just run the equivalent git command on each repository, passing
 any extra arguments to git:
 
+  branch
   checkout
   clean
   commit
