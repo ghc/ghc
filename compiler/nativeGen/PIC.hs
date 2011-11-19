@@ -31,11 +31,6 @@
       the PIC base register when needed.
     - MachCodeGen calls cmmMakeDynamicReference whenever it uses a CLabel
       that wasn't in the original Cmm code (e.g. floating point literals).
-  + The Mangler
-    - The mangler converts absolure refs to relative refs in info tables
-    - Symbol pointers, stub code and PIC calculations that are generated
-      by GCC are left intact by the mangler (so far only on ppc-darwin
-      and ppc-linux).
 -}
 
 {-# OPTIONS -fno-warn-tabs #-}

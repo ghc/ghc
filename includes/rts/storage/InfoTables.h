@@ -23,11 +23,6 @@
    have values in the lower 2Gb of the address space, so offsets all
    fit in 32 bits.  Hence we can use 32-bit offset fields.
 
-   When going via-C, the mangler arranges that we only generate
-   relative relocations between symbols in the same segment (the text
-   segment).  The NCG, however, puts things in the right sections and
-   uses 32-bit relative offsets instead.
-
    Somewhere between binutils-2.16.1 and binutils-2.16.91.0.6,
    support for 64-bit PC-relative relocations was added, so maybe this
    hackery can go away sometime.

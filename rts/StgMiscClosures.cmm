@@ -601,8 +601,6 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
  * on the fact that static closures live in the data section.
  */
 
-/* end the name with _closure, to convince the mangler this is a closure */
-
 #if !(defined(__PIC__) && defined(mingw32_HOST_OS))
 section "data" {
  stg_CHARLIKE_closure:
