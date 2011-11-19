@@ -29,8 +29,8 @@ $(eval $(call clean-target,gmp,,\
 clean : clean_gmp
 .PHONY: clean_gmp
 clean_gmp:
-	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/objs
-	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/gmpbuild
+	$(call removeTrees,libraries/integer-gmp/gmp/objs)
+	$(call removeTrees,libraries/integer-gmp/gmp/gmpbuild)
 endif
 
 ifeq "$(phase)" "final"
