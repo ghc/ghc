@@ -54,7 +54,7 @@ INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ cccs)
 
 /* 9 bits of return code for constructors created by the interpreter. */
 stg_interp_constr_entry
-{ 
+{
     /* R1 points at the constructor */
     jump %ENTRY_CODE(Sp(0));
 }
@@ -70,7 +70,7 @@ stg_interp_constr_entry
 
       ptr to BCO holding return continuation
       ptr to one of these info tables.
- 
+
    The info table code, both direct and vectored, must:
       * push R1/F1/D1 on the stack, and its tag if necessary
       * push the BCO (so it's now on the stack twice)
@@ -102,7 +102,7 @@ INFO_TABLE_RET( stg_ctoi_R1p, RET_BCO)
 }
 
 /*
- * When the returned value is a pointer, but unlifted, in R1 ... 
+ * When the returned value is a pointer, but unlifted, in R1 ...
  */
 INFO_TABLE_RET( stg_ctoi_R1unpt, RET_BCO )
 {
@@ -202,7 +202,7 @@ INFO_TABLE_FUN( stg_BCO, 4, 0, BCO, "BCO", "BCO", ARG_BCO )
 
 INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 {
-    TICK_ENT_DYN_IND();	/* tick */
+    TICK_ENT_DYN_IND(); /* tick */
     R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1);
@@ -210,7 +210,7 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 
 INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
 {
-    TICK_ENT_DYN_IND();	/* tick */
+    TICK_ENT_DYN_IND(); /* tick */
     R1 = StgInd_indirectee(R1);
     TICK_ENT_VIA_NODE();
     jump %ENTRY_CODE(Sp(0));
@@ -218,7 +218,7 @@ INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
 
 INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
 {
-    TICK_ENT_STATIC_IND();	/* tick */
+    TICK_ENT_STATIC_IND(); /* tick */
     R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1);
@@ -260,7 +260,7 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
 #endif
 
     jump %GET_ENTRY(R1);
-}  
+}
 
 /* ----------------------------------------------------------------------------
    Black holes.
@@ -275,7 +275,7 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 {
     W_ r, p, info, bq, msg, owner, bd;
 
-    TICK_ENT_DYN_IND();	/* tick */
+    TICK_ENT_DYN_IND(); /* tick */
 
 retry:
     p = StgInd_indirectee(R1);
@@ -296,13 +296,13 @@ retry:
         info == stg_BLOCKING_QUEUE_CLEAN_info ||
         info == stg_BLOCKING_QUEUE_DIRTY_info)
     {
-        ("ptr" msg) = foreign "C" allocate(MyCapability() "ptr", 
+        ("ptr" msg) = foreign "C" allocate(MyCapability() "ptr",
                                            BYTES_TO_WDS(SIZEOF_MessageBlackHole)) [R1];
-        
+
         SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = R1;
-               
+
         (r) = foreign "C" messageBlackHole(MyCapability() "ptr", msg "ptr") [R1];
 
         if (r == 0) {
@@ -338,18 +338,18 @@ INFO_TABLE(stg_CAF_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 
 INFO_TABLE(stg_BLOCKING_QUEUE_CLEAN,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
 { foreign "C" barf("BLOCKING_QUEUE_CLEAN object entered!") never returns; }
-    
+
 
 INFO_TABLE(stg_BLOCKING_QUEUE_DIRTY,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
 { foreign "C" barf("BLOCKING_QUEUE_DIRTY object entered!") never returns; }
-    
+
 
 /* ----------------------------------------------------------------------------
    Whiteholes are used for the "locked" state of a closure (see lockClosure())
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_WHITEHOLE, 0,0, WHITEHOLE, "WHITEHOLE", "WHITEHOLE")
-{ 
+{
 #if defined(THREADED_RTS)
     W_ info, i;
 
@@ -514,10 +514,10 @@ CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
    These come in two basic flavours: arrays of data (StgArrWords) and arrays of
    pointers (StgArrPtrs).  They all have a similar layout:
 
-	___________________________
-	| Info | No. of | data....
+   ___________________________
+   | Info | No. of | data....
         |  Ptr | Words  |
-	---------------------------
+   ---------------------------
 
    These are *unpointed* objects: i.e. they cannot be entered.
 
@@ -549,7 +549,7 @@ INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIR
 
 /* ----------------------------------------------------------------------------
    Dummy return closure
- 
+
    Entering this closure will just return to the address on the top of the
    stack.  Useful for getting a thread in a canonical form where we can
    just enter the top stack word to start the thread.  (see deleteThread)
@@ -569,7 +569,7 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
 { foreign "C" barf("MVAR_TSO_QUEUE object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
-   CHARLIKE and INTLIKE closures.  
+   CHARLIKE and INTLIKE closures.
 
    These are static representations of Chars and small Ints, so that
    we can remove dynamic Chars and Ints during garbage collection and
@@ -581,9 +581,9 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
  * When sticking the RTS in a Windows DLL, we delay populating the
  * Charlike and Intlike tables until load-time, which is only
  * when we've got the real addresses to the C# and I# closures.
- *	
- *	-- this is currently broken BL 2009/11/14.
- *	   we don't rewrite to static closures at all with Windows DLLs.
+ *
+ * -- this is currently broken BL 2009/11/14.
+ *    we don't rewrite to static closures at all with Windows DLLs.
  */
 // #warning Is this correct? _imp is a pointer!
 #define Char_hash_static_info _imp__ghczmprim_GHCziTypes_Czh_static_info
@@ -864,7 +864,7 @@ section "data" {
 
 section "data" {
  stg_INTLIKE_closure:
-    INTLIKE_HDR(-16)	/* MIN_INTLIKE == -16 */
+    INTLIKE_HDR(-16) /* MIN_INTLIKE == -16 */
     INTLIKE_HDR(-15)
     INTLIKE_HDR(-14)
     INTLIKE_HDR(-13)
@@ -896,7 +896,7 @@ section "data" {
     INTLIKE_HDR(13)
     INTLIKE_HDR(14)
     INTLIKE_HDR(15)
-    INTLIKE_HDR(16)	/* MAX_INTLIKE == 16 */
+    INTLIKE_HDR(16)  /* MAX_INTLIKE == 16 */
 }
 
 #endif // !(defined(__PIC__) && defined(mingw32_HOST_OS))
