@@ -37,8 +37,6 @@ module Data.Ix
     --  (Ix a, Ix b) => Ix (a, b)
     --  ...
 
-    -- Implementation checked wrt. Haskell 98 lib report, 1/99.
-
     -- * Deriving Instances of 'Ix'
     -- | Derived instance declarations for the class 'Ix' are only possible
     -- for enumerations (i.e. datatypes having only nullary constructors)

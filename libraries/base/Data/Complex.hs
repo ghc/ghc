@@ -42,8 +42,6 @@ module Data.Complex
         --  (RealFloat a) => Num        (Complex a)
         --  (RealFloat a) => Fractional (Complex a)
         --  (RealFloat a) => Floating   (Complex a)
-        -- 
-        -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 
         )  where
 
