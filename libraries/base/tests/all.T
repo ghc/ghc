@@ -18,4 +18,5 @@ test('unicode002',
      [''])
 test('data-fixed-show-read', normal, compile_and_run, [''])
 test('showDouble', normal, compile_and_run, [''])
+test('hash001', normal, compile_and_run, [''])
 
