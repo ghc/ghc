@@ -1,19 +1,13 @@
---!! Basic pipe usage
-module Main(main) where
+-- !! Basic pipe usage
+module Main (main) where
 
-import Posix
+import System.Posix
 
 main = do
-  str <- getEffectiveUserName
-  putStrLn str
   (rd, wd) <- createPipe
-  n <- forkProcess
-  case n of
-    Nothing  -> do
-       (str,_) <- fdRead rd 32
-       -- avoid them zombies
-       putStrLn str
-    Just pid -> do
-       fdWrite wd "Hi, there - forked child calling" 
---       getProcessStatus False True pid
-       return ()
+  pid <- forkProcess $ do (str, _) <- fdRead rd 32
+                          putStrLn str
+  fdWrite wd "Hi, there - forked child calling"
+  getProcessStatus True False pid
+  return ()
+
