@@ -1194,7 +1194,7 @@ initLinker( void )
         barf("Compiling re_invalid failed");
     }
     compileResult = regcomp(&re_realso,
-           "(GROUP|INPUT) *\\( *(([^ )])+)",
+           "(GROUP|INPUT) *\\( *([^ )]+)",
            REG_EXTENDED);
     if (compileResult != 0) {
         barf("Compiling re_realso failed");
@@ -1361,7 +1361,7 @@ addDLL( char *dll_name )
       if ((fp = fopen(line, "r")) == NULL) {
          return errmsg; // return original error if open fails
       }
-      // try to find a GROUP ( ... ) command
+      // try to find a GROUP or INPUT ( ... ) command
       while (fgets(line, MAXLINE, fp) != NULL) {
          IF_DEBUG(linker, debugBelch("input line = %s", line));
          if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
@@ -1371,8 +1371,9 @@ addDLL( char *dll_name )
             errmsg = internal_dlopen(line+match[2].rm_so);
             break;
          }
-         // if control reaches here, no GROUP ( ... ) directive was found
-         // and the original error message is returned to the caller
+         // if control reaches here, no GROUP or INPUT ( ... ) directive
+         // was found and the original error message is returned to the
+         // caller
       }
       fclose(fp);
    }
