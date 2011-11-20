@@ -1,4 +1,0 @@
-USER       PID %CPU %MEM  SIZE   RSS TTY STAT START   TIME COMMAND
-sof      30160  0.0  0.2  1244   648  p0 S   15:09   0:00 /bin/sh -c ./posix001
-USER       PID %CPU %MEM  SIZE   RSS TTY STAT START   TIME COMMAND
-sof      30161  0.0  0.1   892   336  p0 R   15:09   0:00 ps ux30161 
