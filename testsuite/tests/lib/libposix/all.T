@@ -1,3 +1,4 @@
 test('posix002', reqlib('unix'), compile_and_run, [''])
 test('posix003', normal,         compile_and_run, [''])
 test('posix004', reqlib('unix'), compile_and_run, [''])
+test('posix005', [reqlib('unix'), expect_broken(5648)], compile_and_run, [''])
