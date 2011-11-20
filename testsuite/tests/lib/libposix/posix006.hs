@@ -1,14 +1,16 @@
-import Posix
 
-main = 
-    epochTime >>= \ start ->
-    sleep 5 >>
-    let timeleft = 0 in
-    epochTime >>= \ finish ->
-    putStr "Started: " >>
-    print start >>
-    putStr "\nSlept: " >>
-    print (5 - timeleft) >>
-    putStr "\nFinished: " >>
-    print finish >>
-    putChar '\n'
+import System.Posix.Time
+import System.Posix.Unistd
+
+main = do start <- epochTime
+          sleep 5
+          finish <- epochTime
+          let slept = finish - start
+          if slept >= 5 && slept <= 6
+              then putStrLn "OK"
+              else do putStr "Started: "
+                      print start
+                      putStr "Finished: "
+                      print finish
+                      putStr "Slept: "
+                      print slept
