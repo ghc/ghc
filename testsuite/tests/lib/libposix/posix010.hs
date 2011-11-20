@@ -1,24 +1,16 @@
-import Posix
+import System.Posix
 
-main =
-    getUserEntryForName "sof"     >>= \ sof ->
-    getUserEntryForName "partain" >>= \ partain ->
-    putStr (ue2String sof) >>
-    putChar '\n' >>    
-    putStr (ue2String partain) >>
-    putChar '\n' >>    
-    getUserEntryForID (userID sof) >>= \ muid ->
-    getUserEntryForID (userID partain) >>= \ puid ->
-    putStr (ue2String muid) >>
-    putChar '\n' >>    
-    putStr (ue2String puid) >>
-    putChar '\n'
+main = do
+    root <- getUserEntryForName "root"
+    putStrLn (ue2String root)
+    root' <- getUserEntryForID (userID root)
+    putStrLn (ue2String root')
+    if homeDirectory root == homeDirectory root' &&
+       userShell     root == userShell     root'
+        then putStrLn "OK"
+        else putStrLn "Mismatch"
 
-ue2String ue =
-    name ++ (':' : (show uid) ++ (':' : (show gid) ++ (':' : home ++ (':' : shell))))
-  where
-    name = userName ue
-    uid = userID ue
-    gid = userGroupID ue
-    home = homeDirectory ue
-    shell = userShell ue
+ue2String ue = concat [name, ":", show uid, ":", show gid]
+    where name = userName ue
+          uid = userID ue
+          gid = userGroupID ue
