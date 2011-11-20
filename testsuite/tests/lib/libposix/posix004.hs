@@ -1,58 +1,44 @@
-import Posix
-import System(ExitCode(..), exitWith)
 
-main = 
-    forkProcess >>= \ maybe_pid ->
-    case maybe_pid of
-	Nothing -> raiseSignal floatingPointException
-	_ -> doParent
+import System.Exit (ExitCode(..), exitWith)
+import System.Posix.Process
+import System.Posix.Signals
 
-doParent =
-    getAnyProcessStatus True False >>= \ (Just (pid, tc)) ->
-    case tc of
-	Terminated sig | sig == floatingPointException -> forkChild2
-	_ -> fail (userError "unexpected termination cause")
+main = do test1
+          test2
+          test3
+          test4
+          putStrLn "I'm happy."
 
-forkChild2 =
-    forkProcess >>= \ maybe_pid ->
-    case maybe_pid of
-	Nothing -> exitImmediately (ExitFailure 42)
-	_ -> doParent2
-    
-doParent2 =
-    getAnyProcessStatus True False >>= \ (Just (pid, tc)) ->
+test1 = do
+    forkProcess $ raiseSignal floatingPointException
+    Just (pid, tc) <- getAnyProcessStatus True False
     case tc of
-	Exited (ExitFailure 42) -> forkChild3
-	_ -> fail (userError "unexpected termination cause (2)")
-	    
-forkChild3 =
-    forkProcess >>= \ maybe_pid ->
-    case maybe_pid of
-	Nothing -> exitImmediately (ExitSuccess)
-	_ -> doParent3
-    
-doParent3 =
-    getAnyProcessStatus True False >>= \ (Just (pid, tc)) ->
+        Terminated sig | sig == floatingPointException -> return ()
+        _ -> error "unexpected termination cause"
+
+test2 = do
+    forkProcess $ exitImmediately (ExitFailure 42)
+    Just (pid, tc) <- getAnyProcessStatus True False
     case tc of
-	Exited ExitSuccess -> forkChild4
-	_ -> fail (userError "unexpected termination cause (3)")
-	    
-forkChild4 =
-    forkProcess >>= \ maybe_pid ->
-    case maybe_pid of
-	Nothing -> raiseSignal softwareStop
-	_ -> doParent4
-    
-doParent4 =
-    getAnyProcessStatus True True >>= \ (Just (pid, tc)) ->
+        Exited (ExitFailure 42) -> return ()
+        _ -> error "unexpected termination cause (2)"
+
+test3 = do
+    forkProcess $ exitImmediately ExitSuccess
+    Just (pid, tc) <- getAnyProcessStatus True False
     case tc of
-	Stopped sig | sig == softwareStop -> enoughAlready pid
-	_ -> fail (userError "unexpected termination cause (4)")
-	    
-enoughAlready pid =
-    signalProcess killProcess pid >>
-    getAnyProcessStatus True True >>= \ (Just (pid, tc)) ->
+        Exited ExitSuccess -> return ()
+        _ -> error "unexpected termination cause (3)"
+
+test4 = do
+    forkProcess $ raiseSignal softwareStop
+    Just (pid, tc) <- getAnyProcessStatus True True
     case tc of
-	Terminated sig | sig == killProcess -> putStr "I'm happy.\n"
-	_ -> fail (userError "unexpected termination cause (5)")
-    
+        Stopped sig | sig == softwareStop -> do
+            signalProcess killProcess pid
+            Just (pid, tc) <- getAnyProcessStatus True True
+            case tc of
+                Terminated sig | sig == killProcess -> return ()
+                _ -> error "unexpected termination cause (5)"
+        _ -> error "unexpected termination cause (4)"
+
