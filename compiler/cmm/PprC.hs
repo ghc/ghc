@@ -25,39 +25,38 @@ module PprC (
 
 -- Cmm stuff
 import BlockId
-import OldCmm
-import OldPprCmm ()
 import CLabel
 import ForeignCall
+import OldCmm
+import OldPprCmm ()
 
 -- Utils
+import Constants
+import CPrim
 import DynFlags
-import Unique
-import UniqSet
 import FastString
 import Outputable
 import Platform
-import Constants
+import UniqSet
+import Unique
 import Util
 
 -- The rest
-import Data.List
+import Control.Monad.ST
 import Data.Bits
 import Data.Char
-import System.IO
+import Data.List
 import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Word
+import System.IO
+import qualified Data.Map as Map
 
--- castSTUArray has moved to Data.Array.Unsafe
 #if __GLASGOW_HASKELL__ >= 703
-import Data.Array.Unsafe( castSTUArray )
-import Data.Array.ST hiding( castSTUArray )
+import Data.Array.Unsafe ( castSTUArray )
+import Data.Array.ST hiding ( castSTUArray )
 #else
 import Data.Array.ST
 #endif
-
-import Control.Monad.ST
 
 -- --------------------------------------------------------------------------
 -- Top level
@@ -626,36 +625,36 @@ pprCallishMachOp_for_C :: CallishMachOp -> SDoc
 
 pprCallishMachOp_for_C mop
     = case mop of
-        MO_F64_Pwr  -> ptext (sLit "pow")
-        MO_F64_Sin  -> ptext (sLit "sin")
-        MO_F64_Cos  -> ptext (sLit "cos")
-        MO_F64_Tan  -> ptext (sLit "tan")
-        MO_F64_Sinh -> ptext (sLit "sinh")
-        MO_F64_Cosh -> ptext (sLit "cosh")
-        MO_F64_Tanh -> ptext (sLit "tanh")
-        MO_F64_Asin -> ptext (sLit "asin")
-        MO_F64_Acos -> ptext (sLit "acos")
-        MO_F64_Atan -> ptext (sLit "atan")
-        MO_F64_Log  -> ptext (sLit "log")
-        MO_F64_Exp  -> ptext (sLit "exp")
-        MO_F64_Sqrt -> ptext (sLit "sqrt")
-        MO_F32_Pwr  -> ptext (sLit "powf")
-        MO_F32_Sin  -> ptext (sLit "sinf")
-        MO_F32_Cos  -> ptext (sLit "cosf")
-        MO_F32_Tan  -> ptext (sLit "tanf")
-        MO_F32_Sinh -> ptext (sLit "sinhf")
-        MO_F32_Cosh -> ptext (sLit "coshf")
-        MO_F32_Tanh -> ptext (sLit "tanhf")
-        MO_F32_Asin -> ptext (sLit "asinf")
-        MO_F32_Acos -> ptext (sLit "acosf")
-        MO_F32_Atan -> ptext (sLit "atanf")
-        MO_F32_Log  -> ptext (sLit "logf")
-        MO_F32_Exp  -> ptext (sLit "expf")
-        MO_F32_Sqrt -> ptext (sLit "sqrtf")
+        MO_F64_Pwr      -> ptext (sLit "pow")
+        MO_F64_Sin      -> ptext (sLit "sin")
+        MO_F64_Cos      -> ptext (sLit "cos")
+        MO_F64_Tan      -> ptext (sLit "tan")
+        MO_F64_Sinh     -> ptext (sLit "sinh")
+        MO_F64_Cosh     -> ptext (sLit "cosh")
+        MO_F64_Tanh     -> ptext (sLit "tanh")
+        MO_F64_Asin     -> ptext (sLit "asin")
+        MO_F64_Acos     -> ptext (sLit "acos")
+        MO_F64_Atan     -> ptext (sLit "atan")
+        MO_F64_Log      -> ptext (sLit "log")
+        MO_F64_Exp      -> ptext (sLit "exp")
+        MO_F64_Sqrt     -> ptext (sLit "sqrt")
+        MO_F32_Pwr      -> ptext (sLit "powf")
+        MO_F32_Sin      -> ptext (sLit "sinf")
+        MO_F32_Cos      -> ptext (sLit "cosf")
+        MO_F32_Tan      -> ptext (sLit "tanf")
+        MO_F32_Sinh     -> ptext (sLit "sinhf")
+        MO_F32_Cosh     -> ptext (sLit "coshf")
+        MO_F32_Tanh     -> ptext (sLit "tanhf")
+        MO_F32_Asin     -> ptext (sLit "asinf")
+        MO_F32_Acos     -> ptext (sLit "acosf")
+        MO_F32_Atan     -> ptext (sLit "atanf")
+        MO_F32_Log      -> ptext (sLit "logf")
+        MO_F32_Exp      -> ptext (sLit "expf")
+        MO_F32_Sqrt     -> ptext (sLit "sqrtf")
         MO_WriteBarrier -> ptext (sLit "write_barrier")
-        MO_Memcpy   -> ptext (sLit "memcpy")
-        MO_Memset   -> ptext (sLit "memset")
-        MO_Memmove  -> ptext (sLit "memmove")
+        MO_Memcpy       -> ptext (sLit "memcpy")
+        MO_Memset       -> ptext (sLit "memset")
+        MO_Memmove      -> ptext (sLit "memmove")
         a -> panic $ "pprCallishMachOp_for_C: Unknown callish op! ("
                       ++ show a ++ ")"
 
