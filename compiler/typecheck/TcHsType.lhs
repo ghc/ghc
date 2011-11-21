@@ -31,8 +31,7 @@ module TcHsType (
 	tcTyVarBndrs, tcTyVarBndrsKindGen, dsHsType,
 	tcDataKindSig, tcTyClTyVars,
 
-        ExpKind(..), EkCtxt(..), ekConstraint,
-        checkExpectedKind,
+        ExpKind(..), ekConstraint, expArgKind, checkExpectedKind,
 
 		-- Pattern type signatures
 	tcHsPatSigType, tcPatSig
@@ -173,7 +172,7 @@ tcHsSigType ctxt hs_ty
 tcHsSigTypeNC ctxt hs_ty
   = do  { kinded_ty <- case expectedKindInCtxt ctxt of
                          Nothing -> fmap fst (kc_lhs_type_fresh hs_ty)
-                         Just k  -> kc_lhs_type hs_ty (EK k EkUnk) -- JPM fix this
+                         Just k  -> kc_lhs_type hs_ty (EK k (ptext (sLit "Expected")))
           -- The kind is checked by checkValidType, and isn't necessarily
           -- of kind * in a Template Haskell quote eg [t| Maybe |]
         ; ty <- tcHsKindedType kinded_ty
@@ -183,7 +182,7 @@ tcHsSigTypeNC ctxt hs_ty
 -- Like tcHsType, but takes an expected kind
 tcCheckHsType :: LHsType Name -> Kind -> TcM Type
 tcCheckHsType hs_ty exp_kind
-  = do { kinded_ty <- kcCheckLHsType hs_ty (EK exp_kind EkUnk) -- JPM add context
+  = do { kinded_ty <- kcCheckLHsType hs_ty (EK exp_kind (ptext (sLit "Expected")))
        ; ty <- tcHsKindedType kinded_ty
        ; return ty }
 
@@ -305,7 +304,7 @@ kcLiftedType ty = kc_lhs_type ty ekLifted
     
 kcArgs :: SDoc -> [LHsType Name] -> Kind -> TcM [LHsType Name]
 kcArgs what tys kind 
-  = sequence [ kc_lhs_type ty (EK kind (EkArg what n))
+  = sequence [ kc_lhs_type ty (expArgKind what kind n)
              | (ty,n) <- tys `zip` [1..] ]
 
 ---------------------------
@@ -331,7 +330,7 @@ kcLHsType ty = addKcTypeCtxt ty (kc_lhs_type_fresh ty)
 kc_lhs_type_fresh :: LHsType Name -> TcM (LHsType Name, TcKind)
 kc_lhs_type_fresh ty =  do
   kv <- newMetaKindVar
-  r <- kc_lhs_type ty (EK kv EkUnk)
+  r <- kc_lhs_type ty (EK kv (ptext (sLit "Expected")))
   return (r, kv)
 
 kc_lhs_types :: [(LHsType Name, ExpKind)] -> TcM [LHsType Name]
@@ -370,7 +369,8 @@ kc_hs_type (HsPArrTy ty) exp_kind = do
 
 kc_hs_type (HsKindSig ty sig_k) exp_kind = do
     sig_k' <- scDsLHsKind sig_k
-    ty' <- kc_lhs_type ty (EK sig_k' EkKindSig)
+    ty' <- kc_lhs_type ty
+             (EK sig_k' (ptext (sLit "An enclosing kind signature specified")))
     checkExpectedKind ty sig_k' exp_kind
     return (HsKindSig ty' sig_k)
 
@@ -418,14 +418,17 @@ kc_hs_type ty@(HsAppTy ty1 ty2) exp_kind = do
     return (mkHsAppTys fun_ty' arg_tys')
 
 kc_hs_type ipTy@(HsIParamTy n ty) exp_kind = do
-    ty' <- kc_lhs_type ty (EK liftedTypeKind EkIParam)
+    ty' <- kc_lhs_type ty 
+             (EK liftedTypeKind 
+               (ptext (sLit "The type argument of the implicit parameter had")))
     checkExpectedKindS ipTy constraintKind exp_kind
     return (HsIParamTy n ty')
 
 kc_hs_type ty@(HsEqTy ty1 ty2) exp_kind = do
     (ty1', kind1) <- kc_lhs_type_fresh ty1
     (ty2', kind2) <- kc_lhs_type_fresh ty2
-    checkExpectedKind ty2 kind2 (EK kind1 EkEqPred)
+    checkExpectedKind ty2 kind2
+      (EK kind1 (ptext (sLit "The left argument of the equality predicate had")))
     checkExpectedKindS ty constraintKind exp_kind
     return (HsEqTy ty1' ty2')
 
@@ -532,7 +535,9 @@ splitFunKind the_fun arg_no fk (arg:args)
        ; case mb_fk of
             Nothing       -> failWithTc too_many_args 
             Just (ak,fk') -> do { (aks, rk) <- splitFunKind the_fun (arg_no+1) fk' args
-                                ; return ((arg, EK ak (EkArg (quotes the_fun) arg_no)):aks, rk) } }
+                                ; return ((arg
+                                          ,expArgKind (quotes the_fun) ak arg_no)
+                                         :aks ,rk) } }
   where
     too_many_args = quotes the_fun <+>
 		    ptext (sLit "is applied to too many type arguments")
@@ -1157,27 +1162,28 @@ We would like to get a decent error message from
 -- The ExpKind datatype means "expected kind" and contains 
 -- some info about just why that kind is expected, to improve
 -- the error message on a mis-match
-data ExpKind = EK TcKind EkCtxt
-data EkCtxt  = EkUnk		-- Unknown context
-      	     | EkEqPred		-- Second argument of an equality predicate
-      	     | EkKindSig	-- Kind signature
-     	     | EkArg SDoc Int   -- Function, arg posn, expected kind
-             | EkIParam         -- Implicit parameter type
-             | EkFamInst        -- Family instance
+data ExpKind = EK TcKind SDoc
 
 instance Outputable ExpKind where
   ppr (EK k _) = ptext (sLit "Expected kind:") <+> ppr k
 
 ekLifted, ekArg, ekConstraint :: ExpKind
-ekLifted     = EK liftedTypeKind EkUnk
-ekArg        = EK argTypeKind    EkUnk
-ekConstraint = EK constraintKind EkUnk
+ekLifted     = EK liftedTypeKind (ptext (sLit "Expected"))
+ekArg        = EK argTypeKind    (ptext (sLit "Expected"))
+ekConstraint = EK constraintKind (ptext (sLit "Expected"))
+
+-- Build an ExpKind for arguments
+expArgKind :: SDoc -> TcKind -> Int -> ExpKind
+expArgKind exp kind arg_no = EK kind (ptext (sLit "The") <+> speakNth arg_no 
+                                  <+> ptext (sLit "argument of") <+> exp
+                                  <+> ptext (sLit "should have"))
 
 unifyKinds :: SDoc -> [(LHsType Name, TcKind)] -> TcM TcKind
 unifyKinds fun act_kinds = do
   kind <- newMetaKindVar
-  let exp_kind arg_no = EK kind (EkArg fun arg_no)
-  mapM_ (\(arg_no, (ty, act_kind)) -> checkExpectedKind ty act_kind (exp_kind arg_no)) (zip [1..] act_kinds)
+  let checkArgs (arg_no, (ty, act_kind)) = 
+        checkExpectedKind ty act_kind (expArgKind (quotes fun) kind arg_no)
+  mapM_ checkArgs (zip [1..] act_kinds)
   return kind
 
 checkExpectedKind :: Outputable a => a -> TcKind -> ExpKind -> TcM ()
@@ -1230,19 +1236,10 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
                    | otherwise               -- E.g. Monad [Int]
                    = ptext (sLit "Kind mis-match")
 
-               more_info = sep [ expected_herald ek_ctxt <+> ptext (sLit "kind") 
+               more_info = sep [ ek_ctxt <+> ptext (sLit "kind") 
                                     <+> quotes (pprKind tidy_exp_kind) <> comma,
                                  ptext (sLit "but") <+> quotes (ppr ty) <+>
                                      ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
-
-               expected_herald EkUnk     = ptext (sLit "Expected")
-               expected_herald EkKindSig = ptext (sLit "An enclosing kind signature specified")
-               expected_herald EkEqPred  = ptext (sLit "The left argument of the equality predicate had")
-               expected_herald EkIParam  = ptext (sLit "The type argument of the implicit parameter had")
-               expected_herald EkFamInst = ptext (sLit "The family instance required")
-               expected_herald (EkArg fun arg_no)
-	         = ptext (sLit "The") <+> speakNth arg_no <+> ptext (sLit "argument of")
-		   <+> fun <+> ptext (sLit ("should have"))
 
            failWithTcM (env2, err $$ more_info)
 

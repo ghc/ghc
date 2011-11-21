@@ -736,7 +736,7 @@ tcSynFamInstDecl fam_tc (TySynonym { tcdTyVars = tvs, tcdTyPats = Just pats
                                    , tcdSynRhs = rhs })
   = do { checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
-       ; let kc_rhs rhs kind = kcCheckLHsType rhs (EK kind EkUnk) 
+       ; let kc_rhs rhs kind = kcCheckLHsType rhs (EK kind (ptext (sLit "Expected")))
 
        ; tcFamTyPats fam_tc tvs pats (kc_rhs rhs)
                 $ \tvs' pats' res_kind -> do
@@ -791,7 +791,7 @@ tcFamTyPats fam_tc tyvars pats kind_checker thing_inside
        ; let body' = substKiWith fam_kvs fam_arg_kinds body
              (kinds, resKind) = splitKindFunTysN fam_arity body'
        ; typats <- zipWithM kcCheckLHsType pats
-                            [ EK kind (EkArg (ppr fam_tc) n)
+                            [ expArgKind (quotes (ppr fam_tc)) kind n
                             | (kind,n) <- kinds `zip` [1..]]
 
         -- Kind check the "thing inside"; this just works by 
