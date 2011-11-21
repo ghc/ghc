@@ -30,13 +30,6 @@ import qualified Data.Map as M
 import Data.Monoid (mempty)
 
 
-data Stream a = a :< Stream a
-
-listToStream :: [a] -> Stream a
-listToStream []     = error "listToStream"
-listToStream (x:xs) = x :< listToStream xs
-
-
 data LeafTy a
 
 data DelayStructure sh f where
@@ -116,26 +109,6 @@ breadthFirst :: DelayM m r -> DelayM m r
 breadthFirst = id
 
 
-class MonadTrans t where
-    lift :: Monad m => m a -> t m a
-
-
-newtype StateT s m a = StateT { unStateT :: s -> m (a, s) }
-
-instance Functor m => Functor (StateT s m) where
-    fmap f mx = StateT $ \s -> fmap (first f) (unStateT mx s)
-
-instance (Functor m, Monad m) => Applicative (StateT s m) where
-    pure = return
-    (<*>) = ap
-
-instance Monad m => Monad (StateT s m) where
-    return x = StateT $ \s -> return (x, s)
-    mx >>= fxmy = StateT $ \s -> unStateT mx s >>= \(x, s) -> unStateT (fxmy x) s
-
-instance MonadTrans (StateT s) where
-    lift mx = StateT $ \s -> liftM (flip (,) s) mx
-
 delayStateT :: Functor m
             => (forall a. m (n a) -> n a)
             -> m (StateT s n a) -> StateT s n a
@@ -166,55 +139,19 @@ delayStateT = join . fiddle lifty . liftStateT
 -}
 
 
-newtype ContT r m a = ContT { unContT :: (a -> m r) -> m r }
-
-instance Functor (ContT r m) where
-    fmap f mx = ContT $ \k -> unContT mx (k . f)
-
-instance Applicative (ContT r m) where
-    pure = return
-    (<*>) = ap
-
-instance Monad (ContT r m) where
-    return x = ContT $ \k -> k x
-    mx >>= fxmy = ContT $ \k -> unContT mx $ \x -> unContT (fxmy x) k
-
-instance MonadTrans (ContT r) where
-    lift mx = ContT $ \k -> mx >>= k
-
-runContT :: Monad m => ContT r m r -> m r
-runContT mx = unContT mx return
-
-callCC :: ((forall b. a -> ContT r m b) -> ContT r m a) -> ContT r m a
-callCC f = ContT $ \k -> unContT (f (\a -> ContT $ \_k -> k a)) k
+delayContT :: Functor m
+           => (forall a. m (n a) -> n a)
+           -> m (ContT r n b) -> ContT r n b
+delayContT delay mx = ContT $ \k -> delay (fmap (flip unContT k) mx)
 
 callCCish :: (Applicative n, Applicative m) => ((b -> a -> ContT (n r) m b) -> ContT (n r) m a) -> ContT (n r) m a
 callCCish f = ContT $ \k -> unContT (f (\b a -> ContT $ \k' -> liftA2 (*>) (k' b) (k a))) k
 
 
-newtype ReaderT r m a = ReaderT { unReaderT :: r -> m a }
-
-instance Functor m => Functor (ReaderT r m) where
-    fmap f mx = ReaderT $ \r -> fmap f (unReaderT mx r)
-
-instance Applicative m => Applicative (ReaderT r m) where
-    pure x = ReaderT $ \_ -> pure x
-    mf <*> mx = ReaderT $ \r -> unReaderT mf r <*> unReaderT mx r
-
-instance Monad m => Monad (ReaderT r m) where
-    return x = ReaderT $ \_ -> return x
-    mx >>= fxmy = ReaderT $ \r -> unReaderT mx r >>= \x -> unReaderT (fxmy x) r
-
-instance MonadTrans (ReaderT r) where
-    lift mx = ReaderT $ \_ -> mx
-
 delayReaderT :: Functor m
              => (forall a. m (n a) -> n a)
             -> m (ReaderT r n a) -> ReaderT r n a
 delayReaderT delay mx = ReaderT $ \r -> delay (fmap (($ r) . unReaderT) mx)
-
-runReaderT :: r -> ReaderT r m a -> m a
-runReaderT = flip unReaderT
 
 liftCallCCReaderT :: (((forall b. a -> m b)           -> m a)           -> m a)
                   ->  ((forall b. a -> ReaderT r m b) -> ReaderT r m a) -> ReaderT r m a

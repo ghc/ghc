@@ -12,9 +12,8 @@ import Supercompile.Utilities hiding (guard)
 
 import qualified CoreSyn as Core
 
-import BasicTypes (RecFlag(..))
 import Coercion
-import Var        (varType, TyVar, isTyVar, isId, tyVarKind)
+import Var        (TyVar, isTyVar, isId, tyVarKind)
 import Id         (Id, idType, realIdUnfolding, idSpecialisation)
 import IdInfo     (SpecInfo(..))
 import VarEnv
@@ -175,7 +174,7 @@ matchBndrExtras rn2 v_l v_r
   | otherwise                = fail "matchBndrExtras"
 
 matchTyVarBndrExtras :: RnEnv2 -> TyVar -> TyVar -> Match [(Var, Var)]
-matchTyVarBndrExtras rn2 a_l a_r = matchKind (tyVarKind a_l) (tyVarKind a_r)
+matchTyVarBndrExtras _ a_l a_r = matchKind (tyVarKind a_l) (tyVarKind a_r)
 
 matchIdCoVarBndrExtras :: RnEnv2 -> Id -> Id -> Match [(Var, Var)]
 matchIdCoVarBndrExtras rn2 x_l x_r = liftM3 app3 (matchUnfolding rn2 (realIdUnfolding x_l) (realIdUnfolding x_r)) (matchSpecInfo rn2 (idSpecialisation x_l) (idSpecialisation x_r)) (matchType rn2 (idType x_l) (idType x_r))
@@ -184,7 +183,7 @@ matchSpecInfo :: RnEnv2 -> SpecInfo -> SpecInfo -> Match [(Var, Var)]
 matchSpecInfo rn2 (SpecInfo rules_l _) (SpecInfo rules_r _) = matchList (matchRule rn2) rules_l rules_r
 
 matchRule :: RnEnv2 -> Core.CoreRule -> Core.CoreRule -> Match [(Var, Var)]
-matchRule rn2 (Core.BuiltinRule { Core.ru_name = name1 }) (Core.BuiltinRule { Core.ru_name = name2 }) = guard "matchRule: BuiltinRule" (name1 == name2) >> return [] -- NB: assume builtin rules generate RHSes without any free vars!
+matchRule _   (Core.BuiltinRule { Core.ru_name = name1 }) (Core.BuiltinRule { Core.ru_name = name2 }) = guard "matchRule: BuiltinRule" (name1 == name2) >> return [] -- NB: assume builtin rules generate RHSes without any free vars!
 matchRule rn2 (Core.Rule { Core.ru_bndrs = vs_l, Core.ru_args = args_l, Core.ru_rhs = rhs_l }) (Core.Rule { Core.ru_bndrs = vs_r, Core.ru_args = args_r, Core.ru_rhs = rhs_r }) = matchMany matchVarBndr rn2 vs_l vs_r $ \rn2 -> liftM2 (++) (matchList (matchCore rn2) args_l args_r) (matchCore rn2 rhs_l rhs_r)
 matchRule _ _ _ = fail "matchRule"
 

@@ -441,8 +441,8 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
 type RollbackScpM = Generaliser -> ScpBM (Deeds, Out FVedTerm)
 type ProcessHistory = LinearHistory (State, RollbackScpM)
 
-lift :: ScpPM a -> ScpBM a
-lift act = ScpM $ \e s k -> unScpM act e (s { pTreeHole = () }) (\x s' -> k x (s' { pTreeHole = pTreeHole s' : pTreeHole s }))
+liftPB :: ScpPM a -> ScpBM a
+liftPB act = ScpM $ \e s k -> unScpM act e (s { pTreeHole = () }) (\x s' -> k x (s' { pTreeHole = pTreeHole s' : pTreeHole s }))
 
 sc  :: ProcessHistory -> AlreadySpeculated -> State -> ScpPM (Deeds, Out FVedTerm)
 sc' :: ProcessHistory -> AlreadySpeculated -> State -> ScpBM (Deeds, Out FVedTerm)
@@ -454,10 +454,10 @@ sc' hist speculated state = handlePrint $ (\raise -> check raise) `catchScpM` \g
                       Stop (shallower_state, rb) -> recordStopped shallower_state $maybe (stop gen state hist) ($ gen) $ guard sC_ROLLBACK Monad.>> Just rb
                         where gen = mK_GENERALISER shallower_state state
     stop gen state hist = do addStats $ mempty { stat_sc_stops = 1 }
-                             maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (lift . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
+                             maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (liftPB . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
     continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState False state'))
                        addStats stats
-                       split state' (lift . sc hist speculated')
+                       split state' (liftPB . sc hist speculated')
       where (speculated', (stats, state')) = (if sPECULATION then speculate speculated else ((,) speculated)) $ reduce' state -- TODO: experiment with doing admissability-generalisation on reduced terms. My suspicion is that it won't help, though (such terms are already stuck or non-stuck but loopy: throwing stuff away does not necessarily remove loopiness).
 
 memo :: (AlreadySpeculated -> State -> ScpBM (Deeds, Out FVedTerm))

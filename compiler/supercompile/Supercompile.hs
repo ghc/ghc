@@ -10,7 +10,8 @@ import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S
 import qualified Supercompile.Evaluator.Syntax as S
 import qualified Supercompile.Drive.Process1 as S ()
-import qualified Supercompile.Drive.Process2 as S
+import qualified Supercompile.Drive.Process2 as S ()
+import qualified Supercompile.Drive.Process3 as S
 
 import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
 import CoreSyn

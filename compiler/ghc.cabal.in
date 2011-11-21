@@ -455,6 +455,7 @@ Library
         Supercompile.Drive.Process
         Supercompile.Drive.Process1
         Supercompile.Drive.Process2
+        Supercompile.Drive.Process3
         Supercompile.Drive.Split
         Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate
