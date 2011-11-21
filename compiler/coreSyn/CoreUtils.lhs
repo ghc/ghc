@@ -223,6 +223,8 @@ mkTick t (Var x)
 mkTick t (Cast e co)
   = Cast (mkTick t e) co -- Move tick inside cast
 
+mkTick t (Coercion co) = Coercion co
+
 mkTick t (Lit l)
   | not (tickishCounts t) = Lit l
 
