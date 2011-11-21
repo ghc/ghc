@@ -1450,8 +1450,10 @@ dynamic_flags = [
   , Flag "keep-s-files"     (NoArg (setDynFlag Opt_KeepSFiles))
   , Flag "keep-raw-s-file"  (NoArg (addWarn "The -keep-raw-s-file flag does nothing; it will be removed in a future GHC release"))
   , Flag "keep-raw-s-files" (NoArg (addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
-  , Flag "keep-llvm-file"   (NoArg (setDynFlag Opt_KeepLlvmFiles))
-  , Flag "keep-llvm-files"  (NoArg (setDynFlag Opt_KeepLlvmFiles))
+  , Flag "keep-llvm-file"   (NoArg (do setObjTarget HscLlvm
+                                       setDynFlag Opt_KeepLlvmFiles))
+  , Flag "keep-llvm-files"  (NoArg (do setObjTarget HscLlvm
+                                       setDynFlag Opt_KeepLlvmFiles))
      -- This only makes sense as plural
   , Flag "keep-tmp-files"   (NoArg (setDynFlag Opt_KeepTmpFiles))
 
