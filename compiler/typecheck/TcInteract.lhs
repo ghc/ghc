@@ -486,7 +486,7 @@ Note [Kind errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the wanted problem: 
       alpha ~ (# Int, Int #) 
-where alpha :: ?? and (# Int, Int #) :: (#). We can't spontaneously solve this constraint, 
+where alpha :: ArgKind and (# Int, Int #) :: (#). We can't spontaneously solve this constraint, 
 but we should rather reject the program that give rise to it. If 'trySpontaneousEqTwoWay' 
 simply returns @CantSolve@ then that wanted constraint is going to propagate all the way and 
 get quantified over in inference mode. That's bad because we do know at this point that the 

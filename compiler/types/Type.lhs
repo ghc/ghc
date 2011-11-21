@@ -1510,34 +1510,10 @@ cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq
 Kinds
 ~~~~~
 
-\begin{code}
--- $kind_subtyping
--- #kind_subtyping#
--- There's a little subtyping at the kind level:
---
--- @
---               ?
---              \/ &#92;
---             \/   &#92;
---            ??   (\#)
---           \/  &#92;
---          \*    \#
--- .
--- Where:        \*    [LiftedTypeKind]   means boxed type
---              \#    [UnliftedTypeKind] means unboxed type
---              (\#)  [UbxTupleKind]     means unboxed tuple
---              ??   [ArgTypeKind]      is the lub of {\*, \#}
---              ?    [OpenTypeKind]	means any type at all
--- @
---
--- In particular:
---
--- > error :: forall a:?. String -> a
--- > (->)  :: ?? -> ? -> \*
--- > (\\(x::t) -> ...)
---
--- Where in the last example @t :: ??@ (i.e. is not an unboxed tuple)
+For the description of subkinding in GHC, see
+  http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeType#Kinds
 
+\begin{code}
 type MetaKindVar = TyVar  -- invariant: MetaKindVar will always be a
                           -- TcTyVar with details MetaTv TauTv ...
 -- meta kind var constructors and functions are in TcType

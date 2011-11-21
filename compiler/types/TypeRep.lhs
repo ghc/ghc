@@ -620,9 +620,9 @@ pprTcApp _ pp tc [ty]
   | tc `hasKey` parrTyConKey = ptext (sLit "[:") <> pp TopPrec ty <> ptext (sLit ":]")
   | tc `hasKey` liftedTypeKindTyConKey   = ptext (sLit "*")
   | tc `hasKey` unliftedTypeKindTyConKey = ptext (sLit "#")
-  | tc `hasKey` openTypeKindTyConKey     = ptext (sLit "(?)")
+  | tc `hasKey` openTypeKindTyConKey     = ptext (sLit "OpenKind")
   | tc `hasKey` ubxTupleKindTyConKey     = ptext (sLit "(#)")
-  | tc `hasKey` argTypeKindTyConKey      = ptext (sLit "??")
+  | tc `hasKey` argTypeKindTyConKey      = ptext (sLit "ArgKind")
   | Just n <- tyConIP_maybe tc           = ppr n <> ptext (sLit "::") <> pp TopPrec ty
 
 pprTcApp p pp tc tys
