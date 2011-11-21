@@ -7,6 +7,7 @@ test('PolyKinds01', normal, compile, [''])
 test('PolyKinds03', normal, compile, [''])
 test('PolyKinds05', normal, compile, [''])
 test('PolyKinds08', normal, compile, [''])
+test('PolyKinds11', normal, compile, [''])
 
 test('PolyKinds02', normal, compile_fail, [''])
 test('PolyKinds04', normal, compile_fail, [''])
