@@ -286,7 +286,8 @@
                 <indexterm><primary><option>-ddump-asm</option></primary></indexterm>
 	      </term>
 	      <listitem>
-		<para>assembly language from the native-code generator</para>
+            <para>assembly language from the
+              <link linkend="native-code-gen">native code generator</link></para>
 	      </listitem>
 	    </varlistentry>
 
@@ -296,7 +297,8 @@
                 <indexterm><primary><option>-ddump-llvm</option></primary></indexterm>
 	      </term>
 	      <listitem>
-		<para>LLVM code from the LLVM code generator</para>
+	        <para>LLVM code from the <link linkend="llvm-code-gen">LLVM code
+	          generator</link></para>
 	      </listitem>
 	    </varlistentry>
 
@@ -785,28 +787,6 @@ Main.skip2{-r1L6-} =
     <para>(&ldquo;It's just a simple functional language&rdquo; is an
     unregisterised trademark of Peyton Jones Enterprises, plc.)</para>
 
-  </sect2>
-
-  <sect2 id="unreg">
-    <title>Unregisterised compilation</title>
-    <indexterm><primary>unregisterised compilation</primary></indexterm>
-
-    <para>The term "unregisterised" really means "compile via vanilla
-    C", disabling some of the platform-specific tricks that GHC
-    normally uses to make programs go faster.  When compiling
-    unregisterised, GHC simply generates a C file which is compiled
-    via gcc.</para>
-
-    <para>Unregisterised compilation can be useful when porting GHC to
-    a new machine, since it reduces the prerequisite tools to
-    <command>gcc</command>, <command>as</command>, and
-    <command>ld</command> and nothing more, and furthermore the amount
-    of platform-specific code that needs to be written in order to get
-    unregisterised compilation going is usually fairly small.</para>
-
-   <para>Unregisterised compilation cannot be selected at
-   compile-time; you have to build GHC with the appropriate options
-   set.  Consult the GHC Building Guide for details.</para>
   </sect2>
 
 </sect1>

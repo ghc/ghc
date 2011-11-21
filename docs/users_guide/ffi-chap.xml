@@ -434,7 +434,8 @@ typedef enum {
 
       <para>GHC no longer includes external header files when
         compiling via C, so this checking is not performed.  The
-        change was made for compatibility with the native code backend
+        change was made for compatibility with the
+        <ulink linkend="native-code-gen">native code generator</ulink>
         (<literal>-fasm</literal>) and to comply strictly with the FFI
         specification, which requires that FFI calls are not subject
         to macro expansion and other CPP conversions that may be

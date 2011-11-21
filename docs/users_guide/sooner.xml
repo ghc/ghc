@@ -152,17 +152,17 @@ should go here!</para>
       </varlistentry>
 
       <varlistentry>
-	<term>Compile via LVM:</term>
+	<term>Compile via LLVM:</term>
 	<listitem>
-		<para>The LLVM code generator can sometimes do a far better job
-			    at producing fast code then either the native code generator
-					or the C code generator. This is not universal and depends
-					on the code. Numeric heavy code seems to show the best
-					improvement when compiled via LLVM. You can also experiment
-					with passing specific flags to LLVM with the
-					<option>-optlo</option> and <option>-optlc</option> flags.
-				   Be careful though as setting these flags stops GHC from setting
-				   its usual flags for the LLVM optimiser and compiler.</para>
+		<para>The <link linkend="llvm-code-gen">LLVM code generator</link> can
+			sometimes do a far better job at producing fast code than the <link
+				linkend="native-code-gen">native code generator</link>. This is not
+			universal and depends on the code. Numeric heavy code seems to show
+			the best improvement when compiled via LLVM. You can also experiment
+			with passing specific flags to LLVM with the <option>-optlo</option>
+			and <option>-optlc</option> flags.  Be careful though as setting these
+			flags stops GHC from setting its usual flags for the LLVM optimiser
+			and compiler.</para>
 	</listitem>
       </varlistentry>
 

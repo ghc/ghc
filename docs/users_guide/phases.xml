@@ -531,8 +531,8 @@ $ cat foo.hspp</screen>
           <indexterm><primary><option>-fasm</option></primary></indexterm>
         </term>
         <listitem>
-          <para>Use GHC's native code generator rather than
-          compiling via LLVM.
+          <para>Use GHC's <link linkend="native-code-gen">native code generator
+            </link>rather than compiling via LLVM.
           <option>-fasm</option> is the default.</para>
         </listitem>
       </varlistentry>
@@ -543,12 +543,12 @@ $ cat foo.hspp</screen>
           <indexterm><primary><option>-fllvm</option></primary></indexterm>
         </term>
         <listitem>
-          <para>Compile via LLVM instead of using the native code
-          generator. This will generally take slightly longer than the
-          native code generator to compile.
-          Produced code is generally the same speed or faster
-          than the other two code generators. Compiling via LLVM
-          requires LLVM version 2.8 or later to be on the path.</para>
+          <para>Compile via <link linkend="llvm-code-gen">LLVM</link>instead
+          of using the native code generator. This will generally take slightly
+          longer than the native code generator to compile. Produced code is
+          generally the same speed or faster than the other two code
+          generators. Compiling via LLVM requires LLVM to be on the
+          path.</para>
         </listitem>
       </varlistentry>
 
@@ -597,10 +597,9 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Generate position-independent code (code that can be put into
-          shared libraries). This currently works on Linux x86 and x86-64 when
-          using the native code generator (-fasm).
-          On Windows, position-independent code is never used
-          so the flag is a no-op on that platform.</para>
+          shared libraries). This currently works on Linux x86 and x86-64. On
+          Windows, position-independent code is never used so the flag is a
+          no-op on that platform.</para>
         </listitem>
       </varlistentry>
 

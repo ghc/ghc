@@ -1357,7 +1357,7 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
 
   </sect2>
 
-  <sect2>
+  <sect2 id="ghc-info">
     <title>Getting information about the RTS</title>
 
     <indexterm><primary>RTS</primary></indexterm>
@@ -1477,7 +1477,8 @@ $ ./a.out +RTS --info
       <varlistentry>
         <term><literal>Compiler unregistered</literal></term>
         <listitem>
-          <para>Was this program compiled with an &ldquo;unregistered&rdquo;
+          <para>Was this program compiled with an
+          <link linkend="unreg">&ldquo;unregistered&rdquo;</link>
           version of GHC? (I.e., a version of GHC that has no platform-specific
           optimisations compiled in, usually because this is a currently
           unsupported platform.) This value will usually be no, unless you're

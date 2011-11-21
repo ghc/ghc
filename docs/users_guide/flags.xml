@@ -1859,13 +1859,15 @@ phase <replaceable>n</replaceable></entry>
 	  <tbody>
 	    <row>
 	      <entry><option>-fasm</option></entry>
-	      <entry>Use the native code generator</entry>
+        <entry>Use the <link linkend="native-code-gen">native code
+            generator</link></entry>
 	      <entry>dynamic</entry>
 	      <entry>-fllvm</entry>
 	    </row>
 	    <row>
 	      <entry><option>-fllvm</option></entry>
-	      <entry>Compile via LLVM</entry>
+        <entry>Compile using the <link linkend="llvm-code-gen">LLVM code
+            generator</link></entry>
 	      <entry>dynamic</entry>
 	      <entry>-fasm</entry>
 	    </row>
@@ -2771,7 +2773,7 @@ phase <replaceable>n</replaceable></entry>
 	    </row>
 	    <row>
 	      <entry><option>-funregisterised</option></entry>
-	      <entry>Unregisterised compilation (use <option>-unreg</option> instead)</entry>
+        <entry><link linkend="unreg">Unregisterised</link> compilation (use <option>-unreg</option> instead)</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
