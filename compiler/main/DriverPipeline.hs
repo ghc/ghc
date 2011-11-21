@@ -2070,13 +2070,18 @@ joinObjectFiles dflags o_files output_fn = do
                                 else [])
                          ++ [
                             SysTools.Option ld_build_id,
-                            SysTools.Option ld_x_flag,
+                            -- SysTools.Option ld_x_flag,
                             SysTools.Option "-o",
                             SysTools.FileOption "" output_fn ]
                          ++ args)
 
-      ld_x_flag | null cLD_X = ""
-                | otherwise  = "-Wl,-x"
+      -- Do *not* add the -x flag to ld, because we want to keep those
+      -- local symbols around for the benefit of external tools. e.g.
+      -- the 'perf report' output is much less useful if all the local
+      -- symbols have been stripped out.
+      --
+      -- ld_x_flag | null cLD_X = ""
+      --           | otherwise  = "-Wl,-x"
 
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a
