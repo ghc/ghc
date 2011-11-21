@@ -20,44 +20,14 @@
  * (other than saving the C callee-saves registers). Instead, the called
  * function "f" must do that in STG land.
  *
- * GCC will have assumed that pushing/popping of C-stack frames is going on
- * when it generated its code, and used stack space accordingly. However, we
- * actually {\em post-process away} all such stack-framery (see
- * \tr{ghc/driver/ghc-asm.lprl}). Things will be OK however, if we initially
- * make sure there are @RESERVED_C_STACK_BYTES@ on the C-stack to begin with,
- * for local variables.
+ * We also initially make sure that there are @RESERVED_C_STACK_BYTES@ on the
+ * C-stack. This is done to reserve some space for the allocation of
+ * temporaries in STG code.
  *
  * -------------------------------------------------------------------------- */
 
 #include "PosixSource.h"
-
-/*
- * We define the following (unused) global register variables, because for
- * some reason gcc generates sub-optimal code for StgRun() on the Alpha
- * (unnecessarily saving extra registers on the stack) if we don't.
- *
- * Why do it at the top of this file, rather than near StgRun() below? Because
- * gcc doesn't let us define global register variables after any function
- * definition has been read. Any point after #include "Stg.h" would be too
- * late.
- *
- * We define alpha_EXTRA_CAREFUL here to save $s6, $f8 and $f9 -- registers
- * that we don't use but which are callee-save registers. The __divq() routine
- * in libc.a clobbers $s6.
- */
 #include "ghcconfig.h"
-#ifndef USE_MINIINTERPRETER
-#ifdef alpha_HOST_ARCH
-#define alpha_EXTRA_CAREFUL
-register long   fake_ra __asm__("$26");
-register long   fake_gp __asm__("$29");
-#ifdef alpha_EXTRA_CAREFUL
-register long   fake_s6 __asm__("$15");
-register double fake_f8 __asm__("$f8");
-register double fake_f9 __asm__("$f9");
-#endif
-#endif
-#endif
 
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
@@ -242,7 +212,6 @@ StgWord8 *win32AllocStack(void)
    get gcc to generate the correct subtraction from %rsp by using
    the local array variable trick.  It didn't seem to reserve
    enough space.  Oh well, it's not much harder this way.
-
    ------------------------------------------------------------------------- */
 
 #ifdef x86_64_HOST_ARCH
@@ -379,229 +348,9 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #endif
 
 /* -----------------------------------------------------------------------------
-   alpha architecture
-
-   "The stack pointer (SP) must at all times denote an address that has octaword
-    alignment. (This restriction has the side effect that the in-memory portion
-    of the argument list, if any, will start on an octaword boundary.) Note that
-    the stack grows toward lower addresses. During a procedure invocation, SP
-    can never be set to a value that is higher than the value of SP at entry to
-    that procedure invocation.
-
-   "The contents of the stack, located above the portion of the argument list
-    (if any) that is passed in memory, belong to the calling procedure. Because
-    they are part of the calling procedure, they should not be read or written
-    by the called procedure, except as specified by indirect arguments or
-    language-controlled up-level references.
-
-   "The SP value might be used by the hardware when raising exceptions and
-    asynchronous interrupts. It must be assumed that the contents of the stack
-    below the current SP value and within the stack for the current thread are
-    continually and unpredictably modified, as specified in the _Alpha
-    Architecture Reference Manual_, and as a result of asynchronous software
-    actions."
-
-   -- Compaq Computer Corporation, Houston. Tru64 UNIX Calling Standard for
-      Alpha Systems, 5.1 edition, August 2000, section 3.2.1.  http://www.
-      tru64unix.compaq.com/docs/base_doc/DOCUMENTATION/V51_PDF/ARH9MBTE.PDF
-   -------------------------------------------------------------------------- */
-
-#ifdef alpha_HOST_ARCH
-
-StgRegTable *
-StgRun(StgFunPtr f, StgRegTable *basereg)
-{
-    register long   real_ra __asm__("$26"); volatile long   save_ra;
-    register long   real_gp __asm__("$29"); volatile long   save_gp;
-
-    register long   real_s0 __asm__("$9" ); volatile long   save_s0;
-    register long   real_s1 __asm__("$10"); volatile long   save_s1;
-    register long   real_s2 __asm__("$11"); volatile long   save_s2;
-    register long   real_s3 __asm__("$12"); volatile long   save_s3;
-    register long   real_s4 __asm__("$13"); volatile long   save_s4;
-    register long   real_s5 __asm__("$14"); volatile long   save_s5;
-#ifdef alpha_EXTRA_CAREFUL
-    register long   real_s6 __asm__("$15"); volatile long   save_s6;
-#endif
-
-    register double real_f2 __asm__("$f2"); volatile double save_f2;
-    register double real_f3 __asm__("$f3"); volatile double save_f3;
-    register double real_f4 __asm__("$f4"); volatile double save_f4;
-    register double real_f5 __asm__("$f5"); volatile double save_f5;
-    register double real_f6 __asm__("$f6"); volatile double save_f6;
-    register double real_f7 __asm__("$f7"); volatile double save_f7;
-#ifdef alpha_EXTRA_CAREFUL
-    register double real_f8 __asm__("$f8"); volatile double save_f8;
-    register double real_f9 __asm__("$f9"); volatile double save_f9;
-#endif
-
-    register StgFunPtr real_pv __asm__("$27");
-
-    StgRegTable * ret;
-
-    save_ra = real_ra;
-    save_gp = real_gp;
-
-    save_s0 = real_s0;
-    save_s1 = real_s1;
-    save_s2 = real_s2;
-    save_s3 = real_s3;
-    save_s4 = real_s4;
-    save_s5 = real_s5;
-#ifdef alpha_EXTRA_CAREFUL
-    save_s6 = real_s6;
-#endif
-
-    save_f2 = real_f2;
-    save_f3 = real_f3;
-    save_f4 = real_f4;
-    save_f5 = real_f5;
-    save_f6 = real_f6;
-    save_f7 = real_f7;
-#ifdef alpha_EXTRA_CAREFUL
-    save_f8 = real_f8;
-    save_f9 = real_f9;
-#endif
-
-    real_pv = f;
-
-    __asm__ volatile(   "lda $30,-%0($30)"      "\n"
-                "\t"    "jmp ($27)"             "\n"
-                "\t"    ".align 3"              "\n"
-                ".globl " STG_RETURN            "\n"
-                STG_RETURN ":"                  "\n"
-                "\t"    "lda $30,%0($30)"       "\n"
-                : : "K" (RESERVED_C_STACK_BYTES));
-
-    ret = real_s5;
-
-    real_s0 = save_s0;
-    real_s1 = save_s1;
-    real_s2 = save_s2;
-    real_s3 = save_s3;
-    real_s4 = save_s4;
-    real_s5 = save_s5;
-#ifdef alpha_EXTRA_CAREFUL
-    real_s6 = save_s6;
-#endif
-
-    real_f2 = save_f2;
-    real_f3 = save_f3;
-    real_f4 = save_f4;
-    real_f5 = save_f5;
-    real_f6 = save_f6;
-    real_f7 = save_f7;
-#ifdef alpha_EXTRA_CAREFUL
-    real_f8 = save_f8;
-    real_f9 = save_f9;
-#endif
-
-    real_ra = save_ra;
-    real_gp = save_gp;
-
-    return ret;
-}
-
-#endif /* alpha_HOST_ARCH */
-
-/* -----------------------------------------------------------------------------
-   HP-PA architecture
-   -------------------------------------------------------------------------- */
-
-#ifdef hppa1_1_HOST_ARCH
-
-StgRegTable *
-StgRun(StgFunPtr f, StgRegTable *basereg)
-{
-    StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];
-    StgRegTable * ret;
-
-    __asm__ volatile ("ldo %0(%%r30),%%r19\n"
-                      "\tstw %%r3, 0(0,%%r19)\n"
-                      "\tstw %%r4, 4(0,%%r19)\n"
-                      "\tstw %%r5, 8(0,%%r19)\n"
-                      "\tstw %%r6,12(0,%%r19)\n"
-                      "\tstw %%r7,16(0,%%r19)\n"
-                      "\tstw %%r8,20(0,%%r19)\n"
-                      "\tstw %%r9,24(0,%%r19)\n"
-                      "\tstw %%r10,28(0,%%r19)\n"
-                      "\tstw %%r11,32(0,%%r19)\n"
-                      "\tstw %%r12,36(0,%%r19)\n"
-                      "\tstw %%r13,40(0,%%r19)\n"
-                      "\tstw %%r14,44(0,%%r19)\n"
-                      "\tstw %%r15,48(0,%%r19)\n"
-                      "\tstw %%r16,52(0,%%r19)\n"
-                      "\tstw %%r17,56(0,%%r19)\n"
-                      "\tstw %%r18,60(0,%%r19)\n"
-                      "\tldo 80(%%r19),%%r19\n"
-                      "\tfstds %%fr12,-16(0,%%r19)\n"
-                      "\tfstds %%fr13, -8(0,%%r19)\n"
-                      "\tfstds %%fr14,  0(0,%%r19)\n"
-                      "\tfstds %%fr15,  8(0,%%r19)\n"
-                      "\tldo 32(%%r19),%%r19\n"
-                      "\tfstds %%fr16,-16(0,%%r19)\n"
-                      "\tfstds %%fr17, -8(0,%%r19)\n"
-                      "\tfstds %%fr18,  0(0,%%r19)\n"
-                      "\tfstds %%fr19,  8(0,%%r19)\n"
-                      "\tldo 32(%%r19),%%r19\n"
-                      "\tfstds %%fr20,-16(0,%%r19)\n"
-                      "\tfstds %%fr21, -8(0,%%r19)\n" : :
-                      "n" (-(116 * sizeof(long) + 10 * sizeof(double))) : "%r19"
-                     );
-
-    f();
-
-    __asm__ volatile (".align 4\n"
-                      "\t.EXPORT " STG_RETURN ",CODE\n"
-                      "\t.EXPORT " STG_RETURN ",ENTRY,PRIV_LEV=3\n"
-                      STG_RETURN "\n"
-                      /* "\tldo %0(%%r3),%%r19\n" */
-                      "\tldo %1(%%r30),%%r19\n"
-                      "\tcopy %%r11, %0\n"  /* save R1 */
-                      "\tldw  0(0,%%r19),%%r3\n"
-                      "\tldw  4(0,%%r19),%%r4\n"
-                      "\tldw  8(0,%%r19),%%r5\n"
-                      "\tldw 12(0,%%r19),%%r6\n"
-                      "\tldw 16(0,%%r19),%%r7\n"
-                      "\tldw 20(0,%%r19),%%r8\n"
-                      "\tldw 24(0,%%r19),%%r9\n"
-                      "\tldw 28(0,%%r19),%%r10\n"
-                      "\tldw 32(0,%%r19),%%r11\n"
-                      "\tldw 36(0,%%r19),%%r12\n"
-                      "\tldw 40(0,%%r19),%%r13\n"
-                      "\tldw 44(0,%%r19),%%r14\n"
-                      "\tldw 48(0,%%r19),%%r15\n"
-                      "\tldw 52(0,%%r19),%%r16\n"
-                      "\tldw 56(0,%%r19),%%r17\n"
-                      "\tldw 60(0,%%r19),%%r18\n"
-                      "\tldo 80(%%r19),%%r19\n"
-                      "\tfldds -16(0,%%r19),%%fr12\n"
-                      "\tfldds  -8(0,%%r19),%%fr13\n"
-                      "\tfldds   0(0,%%r19),%%fr14\n"
-                      "\tfldds   8(0,%%r19),%%fr15\n"
-                      "\tldo 32(%%r19),%%r19\n"
-                      "\tfldds -16(0,%%r19),%%fr16\n"
-                      "\tfldds  -8(0,%%r19),%%fr17\n"
-                      "\tfldds   0(0,%%r19),%%fr18\n"
-                      "\tfldds   8(0,%%r19),%%fr19\n"
-                      "\tldo 32(%%r19),%%r19\n"
-                      "\tfldds -16(0,%%r19),%%fr20\n"
-                      "\tfldds  -8(0,%%r19),%%fr21\n"
-                      : "=r" (ret)
-                      : "n" (-(116 * sizeof(long) + 10 * sizeof(double)))
-                      : "%r19"
-                     );
-
-    return ret;
-}
-
-#endif /* hppa1_1_HOST_ARCH */
-
-/* -----------------------------------------------------------------------------
    PowerPC architecture
 
    Everything is in assembler, so we don't have to deal with GCC...
-   
    -------------------------------------------------------------------------- */
 
 #ifdef powerpc_HOST_ARCH
@@ -719,7 +468,6 @@ StgRunIsImplementedInAssembler(void)
    PowerPC 64 architecture
 
    Everything is in assembler, so we don't have to deal with GCC...
-   
    -------------------------------------------------------------------------- */
 
 #ifdef powerpc64_HOST_ARCH
@@ -846,134 +594,12 @@ StgRunIsImplementedInAssembler(void)
                 "\tblr\n"
         : : "i"(RESERVED_C_STACK_BYTES+304 /*stack frame size*/));
 }
+
 #else // linux_HOST_OS
 #error Only linux support for power64 right now.
 #endif
 
 #endif
-
-/* -----------------------------------------------------------------------------
-   IA64 architecture
-
-   Again, in assembler - so we can fiddle with the register stack, and because
-   gcc doesn't handle asm-clobbered callee-saves correctly.
-
-   loc0  - loc15: preserved locals
-   loc16 - loc28: STG registers
-           loc29: saved ar.pfs
-           loc30: saved b0
-           loc31: saved gp (gcc 3.3 uses this slot)
-           loc32: saved ar.lc
-           loc33: saved pr
-       f2  -  f5: preserved floating-point registers
-       f16 - f23: preserved floating-point registers
-   -------------------------------------------------------------------------- */
-
-#ifdef ia64_HOST_ARCH
-
-/* the memory stack is rarely used, so 16K is excessive */
-#undef RESERVED_C_STACK_BYTES
-#define RESERVED_C_STACK_BYTES 1024
-
-/* We don't spill all the callee-save FP registers, only the ones that
- * gcc has been observed to use */
-#define PRESERVED_FP_REGISTERS 12
-
-/* We always allocate 34 local and 8 output registers.  As long as gcc used
- * fewer than 32 locals, the mangler will adjust the stack frame accordingly. */
-#define LOCALS 34
-
-static void GNUC3_ATTRIBUTE(used)
-StgRunIsImplementedInAssembler(void)
-{
-    __asm__ volatile(
-                ".global StgRun\n"
-                "StgRun:\n"
-                "\talloc loc29 = ar.pfs, 0, %1, 8, 0\n" /* setup register frame */
-                "\tld8 r18 = [r32],8\n"                 /* get procedure address */
-                "\tadds sp = -%0, sp ;;\n"              /* setup stack */
-                "\tld8 gp = [r32]\n"                    /* get procedure GP */
-                "\tadds r16 = %0-(%2*16), sp\n"
-                "\tadds r17 = %0-((%2-1)*16), sp ;;\n"
-                "\tstf.spill [r16] = f16,32\n"          /* spill callee-saved fp regs */
-                "\tstf.spill [r17] = f17,32\n"
-                "\tmov b6 = r18 ;;\n"                   /* set target address */
-                "\tstf.spill [r16] = f18,32\n"
-                "\tstf.spill [r17] = f19,32\n"
-                "\tmov loc30 = b0 ;;\n"                 /* save return address */
-                "\tstf.spill [r16] = f20,32\n"
-                "\tstf.spill [r17] = f21,32 ;;\n"
-                "\tstf.spill [r16] = f22,32\n"
-                "\tstf.spill [r17] = f23,32\n"
-                "\tmov loc32 = ar.lc ;;\n"              /* save loop counter */
-                "\tstf.spill [r16] = f2,32\n"
-                "\tstf.spill [r17] = f3,32\n"
-                "\tmov loc33 = pr ;;\n"                 /* save predicate registers */
-                "\tstf.spill [r16] = f4,32\n"
-                "\tstf.spill [r17] = f5,32\n"
-                "\tbr.few b6 ;;\n"                      /* branch to function */
-                ".global StgReturn\n"
-                "StgReturn:\n"
-                "\tmov r8 = loc16\n"            /* return value in r8 */
-                "\tadds r16 = %0-(%2*16), sp\n"
-                "\tadds r17 = %0-((%2-1)*16), sp ;;\n"
-                "\tldf.fill f16 = [r16],32\n"   /* start restoring fp regs */
-                "\tldf.fill f17 = [r17],32\n"
-                "\tmov ar.pfs = loc29 ;;\n"     /* restore register frame */
-                "\tldf.fill f18 = [r16],32\n"
-                "\tldf.fill f19 = [r17],32\n"
-                "\tmov b0 = loc30 ;;\n"         /* restore return address */
-                "\tldf.fill f20 = [r16],32\n"
-                "\tldf.fill f21 = [r17],32\n"
-                "\tmov ar.lc = loc32 ;;\n"      /* restore loop counter */
-                "\tldf.fill f22 = [r16],32\n"
-                "\tldf.fill f23 = [r17],32\n"
-                "\tmov pr = loc33 ;;\n"         /* restore predicate registers */
-                "\tldf.fill f2 = [r16],32\n"
-                "\tldf.fill f3 = [r17],32\n"
-                "\tadds sp = %0, sp ;;\n"       /* restore stack */
-                "\tldf.fill f4 = [r16],32\n"
-                "\tldf.fill f5 = [r17],32\n"
-                "\tbr.ret.sptk.many b0 ;;\n"    /* return */
-        : : "i"(RESERVED_C_STACK_BYTES + PRESERVED_FP_REGISTERS*16),
-            "i"(LOCALS),
-            "i"(PRESERVED_FP_REGISTERS));
-}
-
-#endif
-
-/* -----------------------------------------------------------------------------
-   MIPS architecture
-   -------------------------------------------------------------------------- */
-
-#ifdef mips_HOST_ARCH
-
-StgThreadReturnCode
-StgRun(StgFunPtr f, StgRegTable *basereg)
-{
-    register StgThreadReturnCode __v0 __asm__("$2");
-
-    __asm__ __volatile__(
-        "       la      $25, %1                 \n"
-        "       move    $30, %2                 \n"
-        "       jr      %1                      \n"
-        "       .align 3                        \n"
-        "       .globl " STG_RETURN "           \n"
-        "       .aent " STG_RETURN "            \n"
-        STG_RETURN ":                           \n"
-        "       move    %0, $16                 \n"
-        "       move    $3, $17                 \n"
-        : "=r" (__v0),
-        : "r" (f), "r" (basereg)
-        "$16", "$17", "$18", "$19", "$20", "$21", "$22", "$23",
-        "$25", "$28", "$30",
-        "$f20", "$f22", "$f24", "$f26", "$f28", "$f30",
-        "memory");
-
-    return __v0;
-}
-
-#endif /* mips_HOST_ARCH */
 
 /* -----------------------------------------------------------------------------
    ARM architecture

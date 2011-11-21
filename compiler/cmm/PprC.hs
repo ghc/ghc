@@ -958,9 +958,6 @@ cLoad platform expr rep
  | otherwise
     = char '*' <> parens (cCast platform (machRepPtrCType rep) expr)
     where -- On these platforms, unaligned loads are known to cause problems
-          bewareLoadStoreAlignment ArchAlpha    = True
-          bewareLoadStoreAlignment ArchMipseb   = True
-          bewareLoadStoreAlignment ArchMipsel   = True
           bewareLoadStoreAlignment (ArchARM {}) = True
           bewareLoadStoreAlignment _            = False
 
