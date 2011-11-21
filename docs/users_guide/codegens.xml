@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="code-generators">
+  <title>GHC Backends</title>
+  <sect2 id="replacing-phases">
+  
+     <para>GHC supports multiple backend code-generators. This is the part
+        of the compiler responsible for taking the the last intermediate
+        representation that GHC uses and compiling it to executable code.
+        The supported backends are described below.
+     </para>
+
+     <sect3 id="native-code-gen">
+        <title>Native Code Generator (<option>-fasm</option>)</title>
+        This is the default backend used by GHC. It is a native code generator,
+        compiling all the way to assembly code. It is the fastest backend and
+        generally produces good performance code.  Select it with the
+        <option>-fasm</option> flag.
+     </sect3>
+
+     <sect3 id="llvm-code-gen">
+        <title>LLVM Code Generator (<option>-fllvm</option>)</title>
+        <para>This is an alternative backend that uses the
+           <ulink url="http://llvm.org">LLVM</ulink> compiler to produce
+           executable code.  It generally produces code as with performance as
+           good as the native code generator but for some cases can produce
+           much faster code. This is especially true for numeric, array heavy
+           code using packages like vector.
+        </para>
+          
+        <para>You must install and have LLVM available on your PATH for the
+           LLVM code generator to work. Specifically it needs to be able to
+           call the <literal>opt</literal>and <literal>llc</literal> tools.
+           Secondly, if you are running Mac OS X with LLVM 3.0 or greater then
+           you also need the
+           <ulink url="http://clang.llvm.org">Clang c compiler</ulink> compiler
+           available on your PATH. Clang and LLVM are both included with OS X
+           by default from 10.6 onwards.
+        </para>
+         
+     </sect3>
+
+     <sect3 id="c-code-gen">
+        <title>C Code Generator (<option>-fvia-C</option>)</title>
+
+     </sect3>
+
+  </sect2>
+
+</sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->

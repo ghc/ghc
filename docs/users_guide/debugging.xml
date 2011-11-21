@@ -292,6 +292,16 @@
 
 	    <varlistentry>
 	      <term>
+	        <option>-ddump-llvm</option>:
+                <indexterm><primary><option>-ddump-llvm</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>LLVM code from the LLVM code generator</para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
 	        <option>-ddump-bcos</option>:
                 <indexterm><primary><option>-ddump-bcos</option></primary></indexterm>
 	      </term>

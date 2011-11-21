@@ -2003,6 +2003,8 @@ f "2"    = 2
 
   </sect1>
 
+  &code-gens;
+
   &phases;
 
   &shared_libs;

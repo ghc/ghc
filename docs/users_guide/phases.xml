@@ -548,7 +548,7 @@ $ cat foo.hspp</screen>
           native code generator to compile.
           Produced code is generally the same speed or faster
           than the other two code generators. Compiling via LLVM
-          requires LLVM version 2.7 or later to be on the path.</para>
+          requires LLVM version 2.8 or later to be on the path.</para>
         </listitem>
       </varlistentry>
 
