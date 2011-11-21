@@ -173,11 +173,12 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        ; traceVt " convert        : " $ ppr conv_tcs
        
            -- warn the user about unvectorised type constructors
-       ; let explanation = ptext (sLit "(They use unsupported language extensions") $$
-                           ptext (sLit "or depend on type constructors that are not vectorised)")
-       ; unless (null drop_tcs) $
+       ; let explanation    = ptext (sLit "(They use unsupported language extensions") $$
+                              ptext (sLit "or depend on type constructors that are not vectorised)")
+             drop_tcs_nosyn = filter (not . isSynTyCon) drop_tcs
+       ; unless (null drop_tcs_nosyn) $
            emitVt "Warning: cannot vectorise these type constructors:" $ 
-             pprQuotedList drop_tcs $$ explanation
+             pprQuotedList drop_tcs_nosyn $$ explanation
 
        ; let defTyConDataCons origTyCon vectTyCon
                = do { defTyCon origTyCon vectTyCon
