@@ -1,12 +1,14 @@
 
 import System.Posix.Time
 import System.Posix.Unistd
+import System.Posix.Signals
 
 main = do start <- epochTime
-          sleep 5
+          blockSignals reservedSignals -- see #4504
+          sleep 1
           finish <- epochTime
           let slept = finish - start
-          if slept >= 5 && slept <= 6
+          if slept >= 1 && slept <= 2
               then putStrLn "OK"
               else do putStr "Started: "
                       print start
