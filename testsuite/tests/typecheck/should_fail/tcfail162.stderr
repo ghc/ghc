@@ -1,7 +1,7 @@
 
 tcfail162.hs:10:33:
     `ForeignPtr' is not applied to enough type arguments
-    Expected kind `??', but `ForeignPtr' has kind `* -> *'
+    Expected kind `ArgKind', but `ForeignPtr' has kind `* -> *'
     In the type `{-# UNPACK #-} !ForeignPtr'
     In the definition of data constructor `Foo'
     In the data type declaration for `Foo'
