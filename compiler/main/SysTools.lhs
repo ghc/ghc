@@ -21,6 +21,7 @@ module SysTools (
         runWindres,
         runLlvmOpt,
         runLlvmLlc,
+        runClang,
         figureLlvmVersion,
         readElfSection,
 
@@ -473,6 +474,22 @@ runLlvmLlc dflags args = do
   let (p,args0) = pgm_lc dflags
   runSomething dflags "LLVM Compiler" p (args0++args)
 
+-- | Run the clang compiler (used as an assembler for the LLVM
+-- backend on OS X as LLVM doesn't support the OS X system
+-- assembler)
+runClang :: DynFlags -> [Option] -> IO ()
+runClang dflags args = do
+  -- we simply assume its available on the PATH
+  let clang = "clang"
+  Exception.catch (do
+        runSomething dflags "Clang (Assembler)" clang args
+    )
+    (\(err :: SomeException) -> do
+        putMsg dflags $ text $ "Error running clang! you need clang installed"
+                            ++ " to use the LLVM backend"
+        throw err
+    )
+
 -- | Figure out which version of LLVM we are running this session
 figureLlvmVersion :: DynFlags -> IO (Maybe Int)
 figureLlvmVersion dflags = do
@@ -504,9 +521,13 @@ figureLlvmVersion dflags = do
              return $ Just v
             )
             (\err -> do
-                putMsg dflags $ text $ "Error (" ++ show err ++ ")"
-                putMsg dflags $ text "Warning: Couldn't figure out LLVM version!"
-                putMsg dflags $ text "Make sure you have installed LLVM"
+                debugTraceMsg dflags 2
+                    (text "Error (figuring out LLVM version):" <+>
+                     text (show err))
+                putMsg dflags $ vcat
+                    [ text "Warning:", nest 9 $
+                          text "Couldn't figure out LLVM version!" $$
+                          text "Make sure you have installed LLVM"]
                 return Nothing)
   return ver
   

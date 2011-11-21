@@ -448,6 +448,7 @@ data DynFlags = DynFlags {
   ghcMode               :: GhcMode,
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
+  settings              :: Settings,
   hscOutName            :: String,      -- ^ Name of the output file
   extCoreName           :: String,      -- ^ Name of the .hcr output file
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
@@ -517,8 +518,6 @@ data DynFlags = DynFlags {
   -- Plugins
   pluginModNames        :: [ModuleName],
   pluginModNameOpts     :: [(ModuleName,String)],
-
-  settings              :: Settings,
 
   --  For ghc -M
   depMakefile           :: FilePath,

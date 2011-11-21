@@ -1172,7 +1172,21 @@ runPhase SplitMangle input_fn dflags
 
 runPhase As input_fn dflags
   = do
-        let as_opts =  getOpts dflags opt_a
+        -- LLVM from version 3.0 onwards doesn't support the OS X system
+        -- assembler, so we use clang as the assembler instead. (#5636)
+        let whichAsProg | hscTarget dflags == HscLlvm &&
+                          platformOS (targetPlatform dflags) == OSDarwin
+                        = do
+                            llvmVer <- io $ figureLlvmVersion dflags
+                            return $ case llvmVer of
+                                Just n | n >= 30 -> SysTools.runClang
+                                _                -> SysTools.runAs
+
+                        | otherwise
+                        = return SysTools.runAs
+
+        as_prog <- whichAsProg
+        let as_opts = getOpts dflags opt_a
         let cmdline_include_paths = includePaths dflags
 
         next_phase <- maybeMergeStub
@@ -1182,7 +1196,7 @@ runPhase As input_fn dflags
         -- might be a hierarchical module.
         io $ createDirectoryHierarchy (takeDirectory output_fn)
 
-        io $ SysTools.runAs dflags
+        io $ as_prog dflags
                        (map SysTools.Option as_opts
                        ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
 
