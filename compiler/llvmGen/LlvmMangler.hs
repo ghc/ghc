@@ -14,6 +14,8 @@ module LlvmMangler ( llvmFixupAsm ) where
 
 #include "HsVersions.h"
 
+import DynFlags ( DynFlags )
+import ErrUtils ( showPass )
 import LlvmCodeGen.Ppr ( infoSection )
 
 import Control.Exception
@@ -54,8 +56,9 @@ dollarPred = ((==) '$')
 commaPred  = ((==) ',')
 
 -- | Read in assembly file and process
-llvmFixupAsm :: FilePath -> FilePath -> IO ()
-llvmFixupAsm f1 f2 = do
+llvmFixupAsm :: DynFlags -> FilePath -> FilePath -> IO ()
+llvmFixupAsm dflags f1 f2 = do
+    showPass dflags "LlVM Mangler"
     r <- openBinaryFile f1 ReadMode
     w <- openBinaryFile f2 WriteMode
     ss <- readSections r w

@@ -45,6 +45,7 @@ llvmCodeGen dflags h us cmms
                 env' = funInsert lbl llvmFunTy e
             in (d,env')
     in do
+        showPass dflags "LlVM CodeGen"
         bufh <- newBufHandle h
         Prt.bufLeftRender bufh $ pprLlvmHeader
         ver  <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags

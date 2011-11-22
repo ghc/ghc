@@ -1372,7 +1372,7 @@ runPhase LlvmMangle input_fn dflags
   = do
       let next_phase = if dopt Opt_SplitObjs dflags then Splitter else As
       output_fn <- phaseOutputFilename next_phase
-      io $ llvmFixupAsm input_fn output_fn
+      io $ llvmFixupAsm dflags input_fn output_fn
       return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
