@@ -681,7 +681,8 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
           where
             ((deeds', heap_entered'), b') = M.mapAccumWithKey (\(deeds, heap_entered) x' brack -> case f deeds brack of (deeds, entered', brack) -> ((deeds, M.insert x' entered' heap_entered), brack)) (deeds, M.empty) b
 
-            overall_entered' = foldr go emptyVarEnv $ stronglyConnCompG $ graphFromEdgedVertices [(entered', varUnique x', varEnvKeys entered') | (x', entered') <- M.toList heap_entered']
+            overall_entered' = -- pprTrace "overall_entered'" (ppr (M.toList heap_entered')) $
+                               foldr go emptyVarEnv $ stronglyConnCompG $ graphFromEdgedVertices [(entered', varUnique x', varEnvKeys entered') | (x', entered') <- M.toList heap_entered']
 
             go (AcyclicSCC (entered', _, _)) overall_entered = plusVarEnv_C plusEntered entered' overall_entered
             go (CyclicSCC  nodes)            overall_entered = foldr (\entered' overall_entered' -> plusVarEnv_C plusEntered (entered' `delListFromUFM_Directly` xs') overall_entered') overall_entered entereds'
@@ -697,7 +698,8 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         inlineBracketHeap :: Deeds -> Bracketed (Entered, UnnormalisedState) -> (Deeds, EnteredEnv, RBracketed State)
         inlineBracketHeap init_deeds = third3 rigidizeBracketed . inlineHeapT inline_one init_deeds
           where
-            inline_one deeds (ent, state) = (deeds', mkEnteredEnv ent $ stateFreeVars state', (0, heap', k', in_e'))
+            inline_one deeds (ent, state) = -- pprTrace "inline_one" (ppr (ent, stateFreeVars state', state)) $
+                                            (deeds', mkEnteredEnv ent $ stateFreeVars state', (0, heap', k', in_e'))
               where
                 -- The elements of the Bracketed may contain proposed heap bindings gathered from Case frames.
                 -- However, we haven't yet claimed deeds for them :-(.
@@ -730,7 +732,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         --     into a context where it is still evaluated Once, anything it refers to is still evaluated Once. So the existing Entered information
         --     does not appear to be invalidated when we decide not to residualise an additional binding.
         entered    = plusVarEnv_C plusEntered entered_focus entered_heap
-        safe_not_resid_xs' = -- traceRender ("candidates", onces, must_resid_xs, not_resid_xs, candidates S.\\ not_resid_xs) $
+        safe_not_resid_xs' = -- pprTrace "candidates" (ppr (safe_not_resid_xs, entered, onces, must_resid_xs)) $
                              safe_not_resid_xs `unionVarSet` (onces `minusVarSet` must_resid_xs)
           where onces = filterVarSet (\x' -> maybe True isOnce (lookupVarEnv entered x')) bound_xs
         --   c) We should *start* residualising those bindings we thought were safe to inline but we actually couldn't inline because

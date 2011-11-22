@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Supercompile.Drive.Process2 (supercompile) where
+module Supercompile.Drive.Process3 (supercompile) where
 
 import Supercompile.Drive.Match
 import Supercompile.Drive.Split
@@ -14,7 +14,8 @@ import Supercompile.Evaluator.Residualise
 import Supercompile.Evaluator.Syntax
 
 import Supercompile.Termination.TagBag (stateTags)
-import Supercompile.Termination.Combinators
+import Supercompile.Termination.Combinators hiding (generatedKey)
+import qualified Supercompile.Termination.Combinators as Combinators
 
 import Supercompile.Utilities
 
@@ -26,13 +27,27 @@ import CoreUtils  (mkPiTypes)
 import Control.Monad (join)
 
 import qualified Data.Map as M
+import Data.Monoid (mempty)
 
 
+{--}
 type ProcessHistory = GraphicalHistory (NodeKey, State)
 
 pROCESS_HISTORY :: ProcessHistory
 pROCESS_HISTORY = mkGraphicalHistory wQO
 
+generatedKey :: ProcessHistory -> NodeKey
+generatedKey = Combinators.generatedKey
+{--}
+{-
+type ProcessHistory = LinearHistory (NodeKey, State)
+
+pROCESS_HISTORY :: ProcessHistory
+pROCESS_HISTORY = mkLinearHistory (cofmap snd wQO)
+
+generatedKey :: ProcessHistory -> NodeKey
+generatedKey _ = 0
+-}
 
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
@@ -71,7 +86,7 @@ fulfill p (deeds, e_body) fs = ((deeds, var (fun p) `applyAbsVars` abstracted p)
 
 
 newtype ScpM a = ScpM { unScpM :: StateT (MemoState, ProcessHistory, FulfilmentState)
-                                         (ReaderT NodeKey Identity) a }
+                                         (ReaderT (NodeKey, AlreadySpeculated) Identity) a }
                deriving (Functor, Applicative, Monad)
 
 instance MonadStatics ScpM where
@@ -86,7 +101,7 @@ runScpM me = letRec (fulfilments fs') e
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, (_ms', _hist', fs')) = unI $ unReaderT (unStateT (unScpM me) (ms, hist, fs)) parent
+        (e, (_ms', _hist', fs')) = unI $ unReaderT (unStateT (unScpM me) (ms, hist, fs)) (parent, nothingSpeculated)
 
 
 traceRenderM :: Outputable a => String -> a -> ScpM ()
@@ -96,14 +111,17 @@ fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \(ms, hist, fs) -> case fulfill p res fs of (res', fs') -> return (res', (ms, hist, fs'))
 
 terminateM :: State -> ScpM a -> (State -> ScpM a) -> ScpM a
-terminateM state mcont mstop = join $ ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \parent -> case terminate hist (parent, state) of
+terminateM state mcont mstop = join $ ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(parent, already) -> case terminate hist (parent, state) of
         Stop (_, shallow_state) -> pure (mstop shallow_state, (ms, hist, fs)) -- FIXME: prevent rollback?
-        Continue hist'          -> pure (ScpM $ StateT $ \s -> ReaderT $ \_ -> unReaderT (unStateT (unScpM mcont) s) (generatedKey hist'), (ms, hist', fs))
+        Continue hist'          -> pure (ScpM $ StateT $ \s -> ReaderT $ \_ -> unReaderT (unStateT (unScpM mcont) s) (generatedKey hist', already), (ms, hist', fs))
+
+speculateM :: State -> (State -> ScpM a) -> ScpM a
+speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (parent, already')
 
 
 sc, sc' :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
-sc' state = terminateM state (split (reduce state) sc)
+sc' state = terminateM state (speculateM (reduce state) $ \state -> split state sc)
                              (\shallow_state -> maybe (trce "split" shallow_state $ split state)
                                                       (trce "gen" shallow_state)
                                                       (generalise (mK_GENERALISER shallow_state state) state)

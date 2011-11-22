@@ -289,12 +289,12 @@ insertTopologicalOrder (TO { ord = ord, maxPos = maxPos, minPos = minPos, outEdg
             GT                      -> dfs_f visited ns
             _ | IM.member n visited -> dfs_f visited ns
             EQ -> Nothing -- Cycle detected!
-            LT -> dfs_f (IM.insert n n_ord visited) (IS.foldr (:) ns (IM.findWithDefault IS.empty n outEdges))
+            LT -> dfs_f (IM.insert n n_ord visited) (IS.fold (:) ns (IM.findWithDefault IS.empty n outEdges))
           where n_ord = IM.findWithDefault (error "dfs_f: unknown node") n ord
         
         dfs_b visited []     = visited
         dfs_b visited (n:ns) = case lb `compare` n_ord of
-            LT | not (IM.member n visited) -> dfs_b (IM.insert n n_ord visited) (IS.foldr (:) ns (IM.findWithDefault IS.empty n inEdges))
+            LT | not (IM.member n visited) -> dfs_b (IM.insert n n_ord visited) (IS.fold (:) ns (IM.findWithDefault IS.empty n inEdges))
             _                              -> dfs_b visited ns
           where n_ord = IM.findWithDefault (error "dfs_b: unknown node") n ord
         
