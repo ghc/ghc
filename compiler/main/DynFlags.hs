@@ -265,7 +265,6 @@ data DynFlag
    | Opt_SplitObjs
    | Opt_StgStats
    | Opt_HideAllPackages
-   | Opt_DistrustAllPackages
    | Opt_PrintBindResult
    | Opt_Haddock
    | Opt_HaddockOptions
@@ -301,6 +300,7 @@ data DynFlag
    | Opt_KeepLlvmFiles
 
    -- safe haskell flags
+   | Opt_DistrustAllPackages
    | Opt_PackageTrust
 
    deriving (Eq, Show)
