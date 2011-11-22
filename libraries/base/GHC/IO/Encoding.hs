@@ -34,10 +34,8 @@ import GHC.IO.Exception
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
-import GHC.Word
 #if !defined(mingw32_HOST_OS)
-import qualified GHC.IO.Encoding.Iconv  as Iconv
-import System.IO.Unsafe (unsafePerformIO)
+import qualified GHC.IO.Encoding.Iconv as Iconv
 #else
 import qualified GHC.IO.Encoding.CodePage as CodePage
 import Text.Read (reads)
@@ -46,11 +44,13 @@ import qualified GHC.IO.Encoding.Latin1 as Latin1
 import qualified GHC.IO.Encoding.UTF8   as UTF8
 import qualified GHC.IO.Encoding.UTF16  as UTF16
 import qualified GHC.IO.Encoding.UTF32  as UTF32
+import GHC.Word
 
 import Data.IORef
 import Data.Char (toUpper)
 import Data.List
 import Data.Maybe
+import System.IO.Unsafe (unsafePerformIO)
 
 -- -----------------------------------------------------------------------------
 
