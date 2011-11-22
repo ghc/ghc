@@ -105,7 +105,8 @@ $ ghc-pkg list
       status. A package can be either trusted or not trusted (distrusted).
       By default packages are distrusted. This property of a package only
       plays a role when compiling code using GHC's Safe Haskell feature
-      (see <xref linkend="safe-haskell"/>).
+      (see <xref linkend="safe-haskell"/>) with the
+      <option>-fpackage-trust</option> flag enabled.
     </para>
 
     <para>To see which modules are provided by a package use the

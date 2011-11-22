@@ -1096,14 +1096,14 @@
 	      <entry><option>-</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XSafeLanguage</option></entry>
-        <entry>Enable the <link linkend="safe-haskell">Safe Haskell</link> Safe Language.</entry>
+	      <entry><option>-XUnsafe</option></entry>
+         <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> Unsafe mode.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XSafeImports</option></entry>
-        <entry>Enable <link linkend="safe-imports-ext">Safe Imports</link>.</entry>
+	      <entry><option>-fpackage-trust</option></entry>
+         <entry>Enable <link linkend="safe-haskell">Safe Haskell</link> trusted package requirement for trustworty modules.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-</option></entry>
 	    </row>
@@ -1350,6 +1350,24 @@
 	    <entry>warn about do bindings that appear to throw away monadic values that you should have bound instead</entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-fno-warn-wrong-do-bind</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-unsafe</option></entry>
+       <entry>warn if the module being compiled is regarded to be unsafe.
+         Should be used to check the safety status of modules when using safe
+         inference.</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-unsafe</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-safe</option></entry>
+       <entry>warn if the module being compiled is regarded to be safe.
+         Should be used to check the safety status of modules when using safe
+         inference.</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-safe</option></entry>
 	  </row>
 
 	  </tbody>

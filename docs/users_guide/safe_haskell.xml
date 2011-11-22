@@ -1,16 +1,30 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
 <sect1 id="safe-haskell">
   <title>Safe Haskell</title>
+  <indexterm><primary>safe haskell</primary></indexterm>
 
   <para>
   Safe Haskell is an extension to the Haskell language that is implemented in
   GHC as of version 7.2. It allows for unsafe code to be securely included in a
   trusted code base by restricting the features of GHC Haskell the code is
-  allowed to use. Put simply, it makes the types of programs trustable.  Safe
-  Haskell itself is aimed to be as minimal as possible while still providing
-  strong enough guarantees about compiled Haskell code for more advance secure
-  systems to be built on top of it. These include techniques such as
-  information flow control security or encrypted computations.
+  allowed to use. Put simply, it makes the types of programs trustable. Safe
+  Haskell is aimed to be as minimal as possible while still providing strong
+  enough guarantees about compiled Haskell code for more advance secure systems
+  to be built on top of it. These include techniques such as information flow
+  control security or encrypted computations.
+  </para>
+
+  <para>
+  While this is the use case that Safe Haskell was motivated by it is important
+  to understand that what Safe Haskell is tracking and enforcing is a stricter
+  form of type safety than is usually guaranteed in Haskell. As part of this,
+  Safe Haskell is run during every compilation of GHC, tracking safety and
+  inferring it even for modules that don't explicitly use Safe Haskell. Please
+  refer to section <xref linkend="safe-inference"/> for more details of this.
+  This also means that there are some design choices that from a security point
+  of view may seem strange but when thought of from the angle of tracking type
+  safety are logical. Feedback on the current design and this tension between
+  the security and type safety view points is welcome.
   </para>
 
   The design of Safe Haskell covers the following aspects:
@@ -31,6 +45,7 @@
 
   <sect2 id="safe-use-cases">
     <title>Uses of Safe Haskell</title>
+    <indexterm><primary>safe haskell uses</primary></indexterm>
 
     Safe Haskell has been designed with two use cases in mind:
 
@@ -51,13 +66,14 @@
       Haskell code easier to analyze and reason about. It also codifies an
       existing culture in the Haskell community of trying to avoid using such
       unsafe functions unless absolutely necessary. As such using the safe
-      language (through the <option>-XSafe</option> flag) can be thought of as a
-      way of enforcing good style, similar to the function of
+      language (through the <option>-XSafe</option> flag) can be thought of as
+      a way of enforcing good style, similar to the function of
       <option>-Wall</option>.
     </sect3>
 
     <sect3>
       <title>Building secure systems (restricted IO Monads)</title>
+      <indexterm><primary>secure haskell</primary></indexterm>
 
       <para>
       Safe Haskell is designed to give users enough guarantees about the safety
@@ -161,7 +177,7 @@
       FFI functions, Generalized Newtype Deriving, RULES and restricting the
       operation of Overlapping Instances. The <option>-XSafe</option> flag also
       restricts the modules can be imported by Danger to only those that are
-      considered trusted.  Trusted modules are those compiled with
+      considered trusted. Trusted modules are those compiled with
       <option>-XSafe</option>, where GHC provides a mechanical guarantee that
       the code is safe. Or those modules compiled with
       <option>-XTrustworthy</option>, where the module author claims that the
@@ -174,10 +190,14 @@
       The <option>-XTrustworthy</option> flag doesn't place any restrictions on
       the module like <option>-XSafe</option> does. Instead the module author
       claims that while code may use unsafe features internally, it only
-      exposes an API that can used in a safe manner. There is an issue here as
-      <option>-XTrustworthy</option> may be used by an arbitrary module and
-      module author. Because of this for trustworthy modules to be considered
-      trusted, and so allowed to be used in <option>-XSafe</option> compiled
+      exposes an API that can used in a safe manner. The use of
+      <option>-XTrustworthy</option> by itself marks the module as trusted.
+      There is an issue here as <option>-XTrustworthy</option> may be used by
+      an arbitrary module and module author. To control the use of trustworthy
+      modules it is recommended to use the <option>-fpackage-trust</option>
+      flag. This flag adds an extra requirement to the trust check for
+      trustworthy modules, such that for trustworthy modules to be considered
+      trusted, and allowed to be used in <option>-XSafe</option> compiled
       code, the client C compiling the code must tell GHC that they trust the
       package the trustworthy module resides in. This is essentially a way of
       for C to say, while this package contains trustworthy modules that can be
@@ -185,7 +205,7 @@
       the author(s) of this package and trust the modules only expose a safe
       API. The trust of a package can be changed at any time, so if a
       vulnerability found in a package, C can declare that package untrusted so
-      that any future compilation against that package would fail.  For a more
+      that any future compilation against that package would fail. For a more
       detailed overview of this mechanism see <xref linkend="safe-trust"/>.
       </para>
 
@@ -293,17 +313,18 @@
         compilation error will occur. A simple way to think of this is a
         <emphasis>same origin policy</emphasis> for overlapping instances
         defined in Safe compiled modules.</listitem>
-	  <listitem><emphasis>Data.Typeable</emphasis> &mdash; We restrict Typeable
-		  instances to only derived ones (offered by GHC through the 
-		  <link linkend="deriving-typeable"><option>-XDeriveDataTypeable</option>
-		  </link> extension). Hand crafted instances of the Typeable type class
-		  are not allowed in Safe Haskell as this can easily be abused to 
-		  unsafely coerce between types.</listitem>
+     <listitem><emphasis>Data.Typeable</emphasis> &mdash; We restrict Typeable
+        instances to only derived ones (offered by GHC through the 
+        <link linkend="deriving-typeable"><option>-XDeriveDataTypeable</option>
+        </link> extension). Hand crafted instances of the Typeable type class
+        are not allowed in Safe Haskell as this can easily be abused to 
+        unsafely coerce between types.</listitem>
     </itemizedlist>
   </sect2>
 
   <sect2 id="safe-imports">
     <title>Safe Imports</title>
+    <indexterm><primary>safe imports</primary></indexterm>
 
     Safe Haskell enables a small extension to the usual import syntax of
     Haskell, adding a <emphasis>safe</emphasis> keyword:
@@ -314,7 +335,7 @@
     When used, the module being imported with the safe keyword must be a
     trusted module, otherwise a compilation error will occur. The safe import
     extension is enabled by either of the <option>-XSafe</option>,
-    <option>-XTrustworthy</option>, or <option>-XSafeImports</option>
+    <option>-XTrustworthy</option>, or <option>-XUnsafe</option>
     flags and corresponding PRAGMA's. When the <option>-XSafe</option> flag
     is used, the safe keyword is allowed but meaningless, every import
     is required to be safe regardless.
@@ -322,8 +343,10 @@
 
   <sect2 id="safe-trust">
     <title>Trust</title>
+    <indexterm><primary>safe haskell trust</primary></indexterm>
+    <indexterm><primary>trust</primary></indexterm>
 
-    The Safe Haskell extension introduces the following two new language flags:
+    The Safe Haskell extension introduces the following three new language flags:
 
     <itemizedlist>
       <listitem><emphasis>-XSafe</emphasis> &mdash; Enables the safe language
@@ -331,55 +354,130 @@
         requires that all imports be trusted or a compilation error will
         occur.</listitem>
       <listitem><emphasis>-XTrustworthy</emphasis> &mdash; Means that while
-        this module may invoke unsafe functions internally, the module's
-        author claims that it exports an API that can't be used in an unsafe
-        way.  This doesn't enable the safe language or place any restrictions
-        on the allowed Haskell code.  The trust guarantee is provided by the
-        module author, not GHC. An import statement with the safe keyword
-        results in a compilation error if the imported module is not trusted.
-        An import statement without the keyword behaves as usual and can
-        import any module whether trusted or not.</listitem>
+        this module may invoke unsafe functions internally, the module's author
+        claims that it exports an API that can't be used in an unsafe way. This
+        doesn't enable the safe language or place any restrictions on the
+        allowed Haskell code. The trust guarantee is provided by the module
+        author, not GHC. An import statement with the safe keyword results in a
+        compilation error if the imported module is not trusted.  An import
+        statement without the keyword behaves as usual and can import any
+        module whether trusted or not.</listitem>
+      <listitem><emphasis>-XUnsafe</emphasis> &mdash; Marks the module being
+        compiled as unsafe so that modules compiled using
+        <option>-XSafe</option> can't import it.
+      </listitem>
     </itemizedlist>
 
     <para>
-    Whether or not a module is trusted depends on a notion of trust for
-    packages, which is determined by the client C invoking GHC (i.e. you). A
-    package <emphasis>P</emphasis> is trusted when either C's package database
-    records that <emphasis>P</emphasis> is trusted (and no command-line
-    arguments override this), or C's command-line flags say to trust it
-    regardless of what is recorded in the package database. In either case, C
-    is the only authority on package trust. It is up to the client to decide
-    which <link linkend="safe-package-trust">packages they trust</link>.
+    The procedure to check if a module is trusted or not depends on if the
+    <option>-fpackage-trust</option> flag is present. The checks are very
+    similar with the presence of the <option>-fpackage-trust</option> flag
+    simply enabling an extra requirement for trustworthy modules to be
+    regarded as trusted.
     </para>
 
-    So a <emphasis>module M in a package P is trusted by a client C</emphasis>
-    if and only if:
+    <sect3>
+      <title>Trust check (<option>-fpackage-trust</option> disabled)</title>
+      <indexterm><primary>trust check</primary></indexterm>
 
-    <itemizedlist>
-      <listitem>Both of these hold:
-        <itemizedlist>
-          <listitem> The module was compiled with <option>-XSafe</option>
-            </listitem>
-          <listitem> All of M's direct imports are trusted by C</listitem>
-        </itemizedlist>
-      </listitem>
-      <listitem><emphasis>OR</emphasis> all of these hold:
-        <itemizedlist>
-          <listitem>The module was compiled with <option>-XTrustworthy</option>
-            </listitem>
-          <listitem>All of M's direct safe imports are trusted by C</listitem>
-          <listitem>Package P is trusted by C</listitem>
-        </itemizedlist>
-      </listitem>
-    </itemizedlist>
+      A <emphasis>module M in a package P is trusted by a client C</emphasis>
+      if and only if:
 
-    For the first trust definition the trust guarantee is provided by GHC
-    through the restrictions imposed by the safe language. For the second
-    definition of trust, the guarantee is provided initially by the
-    module author. The client C then establishes that they trust the
-    module author by indicating they trust the package the module resides
-    in. This trust chain is required as GHC provides no guarantee for
-    <literal>-XTrustworthy</literal> compiled modules.
+      <itemizedlist>
+        <listitem>Both of these hold:
+          <itemizedlist>
+            <listitem> The module was compiled with <option>-XSafe</option>
+              </listitem>
+            <listitem> All of M's direct imports are trusted by C</listitem>
+          </itemizedlist>
+        </listitem>
+        <listitem><emphasis>OR</emphasis> all of these hold:
+          <itemizedlist>
+            <listitem>The module was compiled with <option>-XTrustworthy</option>
+              </listitem>
+            <listitem>All of M's direct safe imports are trusted by C</listitem>
+          </itemizedlist>
+        </listitem>
+      </itemizedlist>
+
+      The above definition of trust has an issue though. Any module can be
+      compiled with -XTrustworthy and it will be trusted regardless of what it
+      does. To control this there is an additional definition of package trust
+      (enabled with the <option>-fpackage-trust</option> flag). The point of
+      package trusts is to require that the client C explicitly say which
+      packages are allowed to contain trustworthy modules. That is, C
+      establishes that it trusts a package P and its author and so trust the
+      modules in P that use -XTrustworthy. When package trust is enabled, any
+      modules that are considered trustworthy but reside in a package that
+      isn't trusted are not considered trusted. A more formal definition is
+      given in the next section.
+    </sect3>
+
+    <sect3>
+      <title>Trust check (<option>-fpackage-trust</option> enabled)</title>
+      <indexterm><primary>-fpackage-trust</primary></indexterm>
+
+      When the <option>-fpackage-trust</option> flag is enabled, whether or not
+      a module is trusted depends on a notion of trust for packages, which is
+      determined by the client C invoking GHC (i.e. you). A package <emphasis>P
+      is trusted</emphasis> when one of these hold:
+      <itemizedlist>
+        <listitem>C's package database records that P is trusted (and no
+          command-line arguments override this)</listitem>
+        <listitem>C's command-line flags say to trust P regardless of what is
+          recorded in the package database.</listitem>
+      </itemizedlist>
+
+      In either case, C is the only authority on package trust. It is up to the
+      client to decide which <link linkend="safe-package-trust">packages they
+      trust</link>.
+
+      When the <option>-fpackage-trust</option> flag is used a <emphasis>module M from
+      package P is trusted by a client C</emphasis> if and only if:
+
+      <itemizedlist>
+        <listitem>Both of these hold:
+          <itemizedlist>
+            <listitem> The module was compiled with <option>-XSafe</option>
+              </listitem>
+            <listitem> All of M's direct imports are trusted by C</listitem>
+          </itemizedlist>
+        </listitem>
+        <listitem><emphasis>OR</emphasis> all of these hold:
+          <itemizedlist>
+            <listitem>The module was compiled with <option>-XTrustworthy</option>
+              </listitem>
+            <listitem>All of M's direct safe imports are trusted by C</listitem>
+            <listitem>Package P is trusted by C</listitem>
+          </itemizedlist>
+        </listitem>
+      </itemizedlist>
+
+      For the first trust definition the trust guarantee is provided by GHC
+      through the restrictions imposed by the safe language. For the second
+      definition of trust, the guarantee is provided initially by the
+      module author. The client C then establishes that they trust the
+      module author by indicating they trust the package the module resides
+      in. This trust chain is required as GHC provides no guarantee for
+      <literal>-XTrustworthy</literal> compiled modules.
+
+      The reason there are two modes of checking trust is that the extra
+      requirement enabled by <option>-fpackage-trust</option> causes the design
+      of Safe Haskell to be invasive. Packages using Safe Haskell when the flag
+      is enabled may or may not compile depending on the state of trusted
+      packages on a users machine. A maintainer of a package foo that uses Safe
+      Haskell so that security conscious Haskellers can use foo now may have
+      other users of foo who don't know or care about Safe Haskell complaining
+      about compilation problems they are having with foo because a package bar
+      isn't trusted that foo requires. In this sense, the
+      <option>-fpackage-trust</option> flag can be thought of as a flag to
+      properly turn on Safe Haskell while without it, it's operating in a
+      covert fashion.
+
+      Having the <option>-fpackage-trust</option> flag also nicely unifies the
+      semantics of how Safe Haskell works when used explicitly and how modules
+      are <ulink linkend="safe-inference">inferred as safe</ulink>.
+    </sect3>
 
     <sect3 id="safe-trust-example">
       <title>Example</title>
@@ -424,6 +522,7 @@
 
     <sect3 id="safe-package-trust">
       <title>Package Trust</title>
+      <indexterm><primary>package trust</primary></indexterm>
 
       Safe Haskell gives packages a new Boolean property, that of trust.
       Several new options are available at the GHC command-line to specify the
@@ -445,35 +544,52 @@
       <xref linkend="packages"/>.
     </sect3>
 
-    <sect3 id="safe-no-trust">
-      <title>Safe Imports without Trust</title>
-
-      If you are writing a module and want to import a module from an untrusted
-      author, then you would use the following syntax:
-
-      <programlisting>
-        import safe Untrusted.Module
-      </programlisting>
-
-      As the safe import keyword is a feature of Safe Haskell and not Haskell98
-      this would fail though unless you enabled Safe imports through on the of
-      the Safe Haskell language flags. Three flags enable safe imports,
-      <option>-XSafe, -XTrustworthy</option> and
-      <option>-XSafeImports</option>. However <option>-XSafe</option> and
-      <option>-XTrustworthy</option> do more then just enable the keyword which
-      may be undesirable. Using the <option>-XSafeImports</option> language
-      flag allows you to enable safe imports and nothing more.
-    </sect3>
   </sect2>
+
+  <sec2 id="safe-inference">
+    <title>Safe Haskell Inference</title>
+    <indexterm><primary>safe inference</primary></indexterm>
+
+    In the case where a module is compiled without one of
+    <option>-XSafe</option>, <option>-XTrustworthy</option> or
+    <option>-XUnsafe</option> being used, GHC will try to figure out itself if
+    the module can be considered safe or not. This safety inference will never
+    mark a module as trustworthy, only as either unsafe or as safe. GHC uses a
+    simply method to determine this for a module M: If M would compile without
+    error under the <option>-XSafe</option> flag, then the module is marked as
+    safe. If M would fail to compile under the <option>-XSafe</option> flag,
+    then the module is marked as unsafe. 
+
+    When should you use Safe Haskell inference and when should you use an
+    explicit <option>-XSafe</option> flag? The later case should be used when
+    you have a hard requirement that the module be safe. That is, the
+    <ulink linkend="safe-use-cases">use cases</ulink> outlined and the purpose
+    for which Safe Haskell is intended: compiling untrusted code. Safe
+    inference is meant to be used by ordinary Haskell programmers. Users who
+    probably don't care about Safe Haskell. 
+
+    Say you are writing a Haskell library. Then you probably just want to use
+    Safe inference. Assuming you avoid any unsafe features of the language then
+    your modules will be marked safe. This is a benefit as now a user of your
+    library who may want to use it as part of an API exposed to untrusted code
+    can use the library without any changes. If there wasn't safety inference
+    then either the writer of the library would have to explicitly use Safe
+    Haskell, which is an unreasonable expectation of the whole Haskell
+    community. Or the user of the library would have to wrap it in a shim that
+    simply re-exported your API through a trustworthy module, an annoying
+    practice.
+  </sec2>
 
   <sect2 id="safe-flag-summary">
     <title>Safe Haskell Flag Summary</title>
+    <indexterm><primary>safe haskell flags</primary></indexterm>
 
     In summary, Safe Haskell consists of the following language flags:
 
     <variablelist>
       <varlistentry>
         <term>-XSafe</term>
+        <indexterm><primary>-XSafe</primary></indexterm>
         <listitem>To be trusted, all of the module's direct imports must be
           trusted, but the module itself need not reside in a trusted
           package, because the compiler vouches for its trustworthiness. The
@@ -491,6 +607,7 @@
 
       <varlistentry>
         <term>-XTrustworthy</term>
+        <indexterm><primary>-XTrustworthy</primary></indexterm>
         <listitem>This establishes that the module is trusted, but the
           guarantee is provided by the module's author. A client of this
           module then specifies that they trust the module author by
@@ -499,8 +616,10 @@
           of Haskell programs or their semantics, except that they allow the
           safe import keyword.
           <itemizedlist>
-            <listitem><emphasis>Module Trusted</emphasis> &mdash; Yes but only if the
-              package the module resides in is also trusted.</listitem>
+            <listitem><emphasis>Module Trusted</emphasis> &mdash; Yes.</listitem>
+            <listitem><emphasis>Module Trusted (<option>-fpackage-trust</option>
+              enabled)</emphasis> &mdash; Yes but only if the package the module
+              resides in is also trusted.</listitem>
             <listitem><emphasis>Haskell Language</emphasis> &mdash; Unrestricted
             </listitem>
             <listitem><emphasis>Imported Modules</emphasis> &mdash; Under control of
@@ -510,10 +629,11 @@
       </varlistentry>
 
       <varlistentry>
-        <term>-XSafeImport</term>
-        <listitem>Enable the Safe Import extension so that a module can
-          require a dependency to be trusted without asserting any trust
-          about itself.
+        <term>-XUnsafe</term>
+        <indexterm><primary>-XUnsafe</primary></indexterm>
+        <listitem>Mark a module as unsafe so that it can't be imported by code
+          compiled with <option>-XSafe</option>. Also enable the Safe Import
+          extension so that a module can require a dependency to be trusted.
           <itemizedlist>
             <listitem><emphasis>Module Trusted</emphasis> &mdash; No</listitem>
             <listitem><emphasis>Haskell Language</emphasis> &mdash;
@@ -526,6 +646,39 @@
 
     </variablelist>
 
+    And one general flag:
+
+    <variablelist>
+      <varlistentry>
+        <term>-fpackage-trust</term>
+        <indexterm><primary>-fpackage-trust</primary></indexterm>
+        <listitem>When enabled turn on an extra check for a trustworthy module
+          M, requiring that the package M resides in is considered trusted for
+          the M to be considered trusted.
+        </listitem>
+      </varlistentry>
+    </variablelist>
+
+    And two warning flags:
+
+    <variablelist>
+      <varlistentry>
+        <term>-fwarn-unsafe</term>
+        <indexterm><primary>-fwarn-unsafe</primary></indexterm>
+        <listitem>Issue a warning if the module being compiled is regarded
+          to be unsafe. Should be used to check the safety status of modules
+          when using safe inference.
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>-fwarn-safe</term>
+        <indexterm><primary>-fwarn-safe</primary></indexterm>
+        <listitem>Issue a warning if the module being compiled is regarded
+          to be safe. Should be used to check the safety status of modules
+          when using safe inference.
+        </listitem>
+      </varlistentry>
+    </variablelist>
   </sect2>
 
 </sect1>
