@@ -1338,7 +1338,13 @@ runPhase LlvmLlc input_fn dflags
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
 
-    output_fn <- phaseOutputFilename LlvmMangle
+    -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
+    let next_phase = case dopt Opt_NoLlvmMangler dflags of
+                         False                            -> LlvmMangle
+                         True | dopt Opt_SplitObjs dflags -> Splitter
+                         True                             -> As
+                        
+    output_fn <- phaseOutputFilename next_phase
 
     io $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
@@ -1348,7 +1354,7 @@ runPhase LlvmLlc input_fn dflags
                 ++ map SysTools.Option lc_opts
                 ++ map SysTools.Option fpOpts)
 
-    return (LlvmMangle, output_fn)
+    return (next_phase, output_fn)
   where
         -- Bug in LLVM at O3 on OSX.
         llvmOpts = if platformOS (targetPlatform dflags) == OSDarwin
