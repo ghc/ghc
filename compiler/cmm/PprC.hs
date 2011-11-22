@@ -601,26 +601,26 @@ pprMachOp_for_C mop = case mop of
                                       ++ " should have been handled earlier!")
 
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
-signedOp (MO_S_Quot _)   = True
-signedOp (MO_S_Rem  _)   = True
-signedOp (MO_S_Neg  _)   = True
-signedOp (MO_S_Ge   _)   = True
-signedOp (MO_S_Le   _)   = True
-signedOp (MO_S_Gt   _)   = True
-signedOp (MO_S_Lt   _)   = True
-signedOp (MO_S_Shr  _)   = True
+signedOp (MO_S_Quot _)    = True
+signedOp (MO_S_Rem  _)    = True
+signedOp (MO_S_Neg  _)    = True
+signedOp (MO_S_Ge   _)    = True
+signedOp (MO_S_Le   _)    = True
+signedOp (MO_S_Gt   _)    = True
+signedOp (MO_S_Lt   _)    = True
+signedOp (MO_S_Shr  _)    = True
 signedOp (MO_SS_Conv _ _) = True
 signedOp (MO_SF_Conv _ _) = True
-signedOp _ = False
+signedOp _                = False
 
 floatComparison :: MachOp -> Bool  -- comparison between float args
-floatComparison (MO_F_Eq   _)    = True
-floatComparison (MO_F_Ne   _)    = True
-floatComparison (MO_F_Ge   _)    = True
-floatComparison (MO_F_Le   _)    = True
-floatComparison (MO_F_Gt   _)    = True
-floatComparison (MO_F_Lt   _)    = True
-floatComparison _ = False
+floatComparison (MO_F_Eq   _) = True
+floatComparison (MO_F_Ne   _) = True
+floatComparison (MO_F_Ge   _) = True
+floatComparison (MO_F_Le   _) = True
+floatComparison (MO_F_Gt   _) = True
+floatComparison (MO_F_Lt   _) = True
+floatComparison _             = False
 
 -- ---------------------------------------------------------------------
 -- tend to be implemented by foreign calls
