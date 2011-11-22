@@ -14,7 +14,7 @@ module TcSMonad (
     WorkList(..), isEmptyWorkList, emptyWorkList,
     workListFromEq, workListFromNonEq, workListFromCt, 
     extendWorkListEq, extendWorkListNonEq, extendWorkListCt, 
-    appendWorkListCt, appendWorkListEqs, unionWorkList,
+    appendWorkListCt, appendWorkListEqs, unionWorkList, selectWorkItem,
 
     getTcSWorkList, updWorkListTcS, updWorkListTcS_return, keepWanted,
 
@@ -207,17 +207,22 @@ better rewrite it as much as possible before reporting it as an error to the use
 \begin{code}
 
 -- See Note [WorkList]
-data WorkList = WorkList { wl_eqs  :: [Ct], wl_rest :: [Ct] }
+data WorkList = WorkList { wl_eqs  :: [Ct], wl_funeqs :: [Ct], wl_rest :: [Ct] }
 
 
 unionWorkList :: WorkList -> WorkList -> WorkList
 unionWorkList new_wl orig_wl = 
-   WorkList { wl_eqs = wl_eqs new_wl ++ wl_eqs orig_wl
-            , wl_rest = wl_rest new_wl ++ wl_rest orig_wl }
+   WorkList { wl_eqs    = wl_eqs new_wl ++ wl_eqs orig_wl
+            , wl_funeqs = wl_funeqs new_wl ++ wl_funeqs orig_wl
+            , wl_rest   = wl_rest new_wl ++ wl_rest orig_wl }
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
 -- Extension by equality
-extendWorkListEq ct wl = wl { wl_eqs = ct : wl_eqs wl }
+extendWorkListEq ct wl 
+  | Just {} <- isCFunEqCan_Maybe ct
+  = wl { wl_funeqs = ct : wl_funeqs wl }
+  | otherwise
+  = wl { wl_eqs = ct : wl_eqs wl }
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
@@ -238,25 +243,36 @@ appendWorkListEqs :: [Ct] -> WorkList -> WorkList
 appendWorkListEqs cts wl = foldr extendWorkListEq wl cts
 
 isEmptyWorkList :: WorkList -> Bool
-isEmptyWorkList wl = null (wl_eqs wl) &&  null (wl_rest wl)
+isEmptyWorkList wl 
+  = null (wl_eqs wl) &&  null (wl_rest wl) && null (wl_funeqs wl)
 
 emptyWorkList :: WorkList
-emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [] }
+emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [], wl_funeqs = []}
 
 workListFromEq :: Ct -> WorkList
-workListFromEq ct = WorkList { wl_eqs = [ct], wl_rest = [] }
+workListFromEq ct = extendWorkListEq ct emptyWorkList
 
 workListFromNonEq :: Ct -> WorkList
-workListFromNonEq ct = WorkList { wl_eqs = [], wl_rest = [ct] }
+workListFromNonEq ct = extendWorkListNonEq ct emptyWorkList
 
 workListFromCt :: Ct -> WorkList
 -- Agnostic 
 workListFromCt ct | isLCoVar (cc_id ct) = workListFromEq ct 
                   | otherwise           = workListFromNonEq ct
 
+
+selectWorkItem :: WorkList -> (Maybe Ct, WorkList)
+selectWorkItem wl@(WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
+  = case (eqs,feqs,rest) of
+      (ct:cts,_,_)     -> (Just ct, wl { wl_eqs    = cts })
+      (_,(ct:cts),_)   -> (Just ct, wl { wl_funeqs = cts })
+      (_,_,(ct:cts))   -> (Just ct, wl { wl_rest   = cts })
+      (_,_,_)          -> (Nothing,wl)
+
 -- Pretty printing 
 instance Outputable WorkList where 
   ppr wl = vcat [ text "WorkList (eqs)   = " <+> ppr (wl_eqs wl)
+                , text "WorkList (funeqs)= " <+> ppr (wl_funeqs wl)
                 , text "WorkList (rest)  = " <+> ppr (wl_rest wl)
                 ]
 
@@ -482,14 +498,6 @@ updInertSet is item
                                           (item, mkEqVarLCo (cc_id item))
         inscope' = extendInScopeSetSet (inert_eq_tvs is) (tyVarsOfCt item)
     in is { inert_eqs = eqs', inert_eq_tvs = inscope' }
-
-{-
-       -- /Solved/ non-equalities go to the solved map
-  | Just GivenSolved <- isGiven_maybe (cc_flavor item)
-  = let pty = mkPredKeyForTypeMap item
-        solved_orig = inert_solved is
-    in is { inert_solved = alterTM pty (\_ -> Just item) solved_orig }
--}
 
   | Just x  <- isCIPCan_Maybe item      -- IP 
   = is { inert_ips   = updCCanMap (x,item) (inert_ips is) }  
@@ -1267,7 +1275,15 @@ newEvVar :: CtFlavor -> TcPredType -> TcS EvVarCreated
 --     the call sites for this invariant to be quickly restored.
 newEvVar fl pty
   | isGivenOrSolved fl    -- Create new variable and update the cache
-  = do { new <- forceNewEvVar fl pty
+  = do { eref <- getTcSEvVarCache
+       ; ecache <- wrapTcS (TcM.readTcRef eref)
+       ; case lookupTM pty (evc_cache ecache) of
+           Just (_,cached_fl) 
+               | cached_fl `canSolve` fl 
+               -> pprTrace "Interesting: given newEvVar, missed caching opportunity!" empty $
+                  return ()
+           _ -> return ()
+       ; new <- forceNewEvVar fl pty
        ; return (EvVarCreated True new) }
 
   | otherwise             -- Otherwise lookup first
@@ -1442,14 +1458,24 @@ rewriteFromInertEqs (subst,inscope) fl v
        ; if isReflCo co then return (v,True)
          else do { traceTcS "rewriteFromInertEqs" $
                    text "Original item =" <+> ppr v <+> dcolon <+> ppr (evVarPred v)
-                 ; v' <- forceNewEvVar fl (pSnd (liftedCoercionKind co))
-                 ; case fl of 
-                     Wanted {}  -> setEvBind v (EvCast v' (mkSymCo co)) 
-                     Given {}   -> setEvBind v' (EvCast v co) 
-                     Derived {} -> return ()
-                 ; traceTcS "rewriteFromInertEqs" $
-                   text "Rewritten item =" <+> ppr v' <+> dcolon <+> ppr (evVarPred v')
-                 ; return (v',False) } }
+                 ; delCachedEvVar v
+                 ; evc <- newEvVar fl (pSnd (liftedCoercionKind co))
+                 ; let v' = evc_the_evvar evc
+                 ; if isNewEvVar evc then 
+                       do { case fl of 
+                              Wanted {}  -> setEvBind v (EvCast v' (mkSymCo co)) 
+                              Given {}   -> setEvBind v' (EvCast v co) 
+                              Derived {} -> return () 
+                          ; traceTcS "rewriteFromInertEqs" $
+                            text "Rewritten item =" <+> ppr v' <+>
+                                          dcolon <+> ppr (evVarPred v')
+                          ; return (v',False) } 
+                   else -- Maybe given, but when wanted set bind
+                       do { case fl of 
+                              Wanted {} -> setEvBind v (EvCast v' (mkSymCo co))
+                              _ -> return ()
+                          ; return (v',True) } -- As if rewriting never happened?
+                 } } 
 
 
 -- See Note [LiftInertEqs]

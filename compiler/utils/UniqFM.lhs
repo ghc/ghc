@@ -20,7 +20,7 @@ and ``addToUFM\_C'' and ``Data.IntMap.insertWith'' differ in the order
 of arguments of combining function.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# OPTIONS -fno-warn-tabs -XGeneralizedNewtypeDeriving #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -74,6 +74,7 @@ import Compiler.Hoopl   hiding (Unique)
 import Data.Function (on)
 import qualified Data.IntMap as M
 import qualified Data.Foldable as Foldable
+import qualified Data.Traversable as Traversable
 import Data.Typeable
 import Data.Data
 \end{code}
@@ -179,10 +180,18 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 
 \begin{code}
 newtype UniqFM ele = UFM { unUFM :: M.IntMap ele }
-  deriving (Typeable,Data)
+  deriving (Typeable,Data, Traversable.Traversable, Functor)
 
 instance Eq ele => Eq (UniqFM ele) where
     (==) = (==) `on` unUFM
+
+{-
+instance Functor UniqFM where
+   fmap f = fmap f . unUFM
+
+instance Traversable.Traversable UniqFM where 
+    traverse f = Traversable.traverse f . unUFM
+-}
 
 instance Foldable.Foldable UniqFM where
     foldMap f = Foldable.foldMap f . unUFM

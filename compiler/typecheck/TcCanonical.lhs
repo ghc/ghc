@@ -658,8 +658,9 @@ getCachedFlatEq tc xi_args fl feq_origin
        ; flat_cache <- getTcSEvVarFlatCache
        ; inerts <- getTcSInerts
        ; case lookupFunEq pty fl (inert_funeqs inerts) of
-           Nothing -> lookup_in_flat_cache pty flat_cache
-           res     -> return res }
+           Nothing 
+               -> lookup_in_flat_cache pty flat_cache
+           res -> return res }
   where lookup_in_flat_cache pty flat_cache 
           = case lookupTM pty flat_cache of
               Just (co',(xi',fl',when_generated)) -- ev' :: (TyConApp tc xi_args) ~ xi'
@@ -667,6 +668,9 @@ getCachedFlatEq tc xi_args fl feq_origin
                , feq_origin `origin_matches` when_generated
                -> do { traceTcS "getCachedFlatEq" $ text "success!"
                      ; (xi'',co) <- flatten 0 fl' xi' -- co :: xi'' ~ xi'
+                                    -- The only purpose of this flattening is to apply the
+                                    -- inert substitution (since everything in the flat cache
+                                    -- by construction will have a family-free RHS.
                      ; return $ Just (xi'', co' `mkTransCo` (mkSymCo co)) }
               _ -> do { traceTcS "getCachedFlatEq" $ text "failure!" <+> pprEvVarCache flat_cache
                       ; return Nothing }

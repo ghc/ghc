@@ -1435,6 +1435,7 @@ tcRnExpr hsc_env ictxt rdr_expr
     let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
     ((_tc_expr, res_ty), lie)	<- captureConstraints (tcInferRho rn_expr) ;
     ((qtvs, dicts, _, _), lie_top) <- captureConstraints $ 
+                                      {-# SCC "simplifyInfer" #-}
                                       simplifyInfer True {- Free vars are closed -}
                                                     False {- No MR for now -}
                                                     [(fresh_it, res_ty)]

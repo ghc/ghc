@@ -1011,7 +1011,7 @@ emitWantedCts = mapBagM_ emit_wanted_ct
           | v <- cc_id ct 
           , Wanted loc <- cc_flavor ct 
           = emitFlat (EvVarX v loc)
-          | otherwise = panic "emitWantecCts: can't emit non-wanted!"
+          | otherwise = panic "emitWantedCts: can't emit non-wanted!"
 
 emitImplication :: Implication -> TcM ()
 emitImplication ct

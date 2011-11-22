@@ -47,6 +47,9 @@ import Bag
 import Control.Monad ( foldM )
 import TrieMap
 
+import VarEnv
+import qualified Data.Traversable as Traversable
+
 import Control.Monad( when )
 import UniqFM
 import FastString ( sLit ) 
@@ -164,22 +167,14 @@ selectNextWorkItem max_depth
   = updWorkListTcS_return pick_next
   where 
     pick_next :: WorkList -> (SelectWorkItem, WorkList)
-    -- A simple priorititization of equalities (for now)
-    -- --------------------------------------------------------
-    pick_next wl@(WorkList { wl_eqs = eqs, wl_rest = rest })
-      = case (eqs,rest) of
-          ([],[])                        -- No more work
-              -> (NoWorkRemaining,wl)
-          ((ct:cts),_)
-            | cc_depth ct > max_depth  -- Depth exceeded
-            -> (MaxDepthExceeded ct,wl)
-            | otherwise                -- Equality work 
-            -> (NextWorkItem ct, wl { wl_eqs = cts })
-          ([],(ct:cts))
-            | cc_depth ct > max_depth  -- Depth exceeded
-            -> (MaxDepthExceeded ct,wl)
-            | otherwise                -- Non-equality work
-           -> (NextWorkItem ct, wl {wl_rest = cts})
+    pick_next wl = case selectWorkItem wl of
+                     (Nothing,_) 
+                         -> (NoWorkRemaining,wl)           -- No more work
+                     (Just ct, new_wl) 
+                         | cc_depth ct > max_depth         -- Depth exceeded
+                         -> (MaxDepthExceeded ct,new_wl)
+                     (Just ct, new_wl) 
+                         -> (NextWorkItem ct, new_wl)      -- New workitem and worklist
 
 runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline 
                   -> WorkItem                   -- The work item 
@@ -315,24 +310,23 @@ kickOutRewritableInerts :: Ct -> TcS ()
 -- Pre:  ct is a CTyEqCan 
 -- Post: the TcS monad is left with the thinner non-rewritable inerts; the 
 --       rewritable end up in the worklist
-kickOutRewritableInerts ct 
-  = do { wl <- modifyInertTcS (kick_out_rewritable ct)
+kickOutRewritableInerts ct
+  = do { (wl,ieqs,solved_out) <- modifyInertTcS (kick_out_rewritable ct)
 
-         -- Rewrite the rewritable solved on the spot and stick them back in the inerts
+       -- Rewrite the inert_eqs on the spot! 
+       ; let ct_subst = unitVarEnv (cc_tyvar ct) (ct, mkEqVarLCo (cc_id ct))
+             inscope  = mkInScopeSet $ tyVarsOfCt ct
 
-{- DV: I am commenting out the solved story altogether because I did not see any performance
-       improvement compared to just kicking out the solved ones any way. In fact there were
-       situations where performance got worse.
+       ; new_ieqs <- rewriteInertEqsFromInertEq (ct_subst,inscope) ieqs
+       ; modifyInertTcS (\is -> ((), is { inert_eqs = new_ieqs }))
 
-       ; let subst = unitVarEnv (cc_tyvar ct) (ct, mkEqVarLCo (cc_id ct))
-             inscope = mkInScopeSet $ tyVarsOfCt ct
-       ; solved_rewritten <- mapBagM (rewrite_solved (subst,inscope)) solved_out
-       ; _unused <- modifyInertTcS (add_new_solveds solved_rewritten)
-      
--}
+
+       -- Rewrite the rewritable solved on the spot and stick them back in the inerts
+       ; _unused <- mapBagM (rewrite_solved (ct_subst,inscope)) solved_out
+
        ; traceTcS "Kick out" (ppr ct $$ ppr wl)
        ; updWorkListTcS (unionWorkList wl) }
-{- 
+
   where rewrite_solved inert_eqs solved_ct 
           = do { (new_ev,_) <- rewriteFromInertEqs inert_eqs fl ev
                ; mk_canonical new_ev }
@@ -344,19 +338,24 @@ kickOutRewritableInerts ct
                   = do { let new_pty = evVarPred new_ev
                        ; r <- canEvVar new_ev (classifyPredType new_pty) d fl
                        ; case r of
-                           Stop -> pprPanic "kickOutRewritableInerts" $ 
-                                   vcat [ text "Should never Stop, solved constraint IS canonical!"
-                                        , text "Orig (solved)     =" <+> ppr solved_ct
-                                        , text "Rewritten (solved)=" <+> ppr new_pty ]
-                           ContinueWith ct -> return ct }
-        add_new_solveds cts is = ((), is { inert_solved = new_solved })
-           where orig_solveds     = inert_solved is
-                 do_one slvmap ct = let ct_key = mkPredKeyForTypeMap ct
-                                    in alterTM ct_key (\_ -> Just ct) slvmap
-                 new_solved       = foldlBag do_one orig_solveds cts
--}
+                           Stop -> return ()
+                           ContinueWith ct -> updInertSetTcS ct }
 
-kick_out_rewritable :: Ct -> InertSet -> (WorkList,InertSet)
+
+rewriteInertEqsFromInertEq :: (TyVarEnv (Ct,Coercion), InScopeSet) -- A new substitution
+                           -> TyVarEnv (Ct,Coercion)               -- The inert equalities
+                           -> TcS (TyVarEnv (Ct,Coercion))         -- The new inert equalities
+rewriteInertEqsFromInertEq the_subst ieqs = Traversable.mapM do_one ieqs
+ where do_one (ct,co)
+        | ev <- cc_id ct, fl <- cc_flavor ct
+        = do { (new_ev,not_rewritten) <- rewriteFromInertEqs the_subst fl ev
+             ; let EqPred _ xi = classifyPredType (evVarPred new_ev)
+             ; if not_rewritten then 
+                   return (ct,co) -- return the same
+               else
+                   return (ct { cc_id = new_ev, cc_rhs = xi }, mkEqVarLCo new_ev) }
+
+kick_out_rewritable :: Ct -> InertSet -> ((WorkList,TyVarEnv (Ct,Coercion),Cts), InertSet)
 kick_out_rewritable ct (IS { inert_eqs    = eqmap
                            , inert_eq_tvs = inscope
                            , inert_dicts  = dictmap
@@ -365,12 +364,13 @@ kick_out_rewritable ct (IS { inert_eqs    = eqmap
                            , inert_irreds = irreds
                            , inert_frozen = frozen
                            } )
-  = (kicked_out, remaining)
+  = ((kicked_out, eqs_in, feqs_out_solved `andCts` dicts_out_solved), remaining)
   where
 
-    kicked_out = WorkList { wl_eqs  = eqs_out ++ bagToList feqs_out
-                          , wl_rest = bagToList (fro_out `andCts` dicts_out 
-                                        `andCts` ips_out `andCts` irs_out) }
+    kicked_out = WorkList { wl_eqs    = eqs_out
+                          , wl_funeqs = bagToList feqs_out
+                          , wl_rest   = bagToList (fro_out `andCts` dicts_out 
+                                          `andCts` ips_out `andCts` irs_out) }
   
     remaining = IS { inert_eqs = eqs_in
                    , inert_eq_tvs = inscope -- keep the same, safe and cheap
@@ -383,18 +383,37 @@ kick_out_rewritable ct (IS { inert_eqs    = eqmap
 
     fl = cc_flavor ct
     tv = cc_tyvar ct
+          
+    (eqs_out,   eqs_in)   = partitionEqMap
+                               (\inert_ct -> rewritable inert_ct && 
+                                             not (cc_flavor inert_ct `canRewrite` fl)) eqmap
+                               -- Delicate: 
+                               -- We want to throw out only the rewritables which cannot
+                               -- themselves rewrite the workitem. Because, what will remain
+                               -- in eqs_in, even if rewritable, can be readily substituted
+                               -- in-place from the new item, without dangers for occurs
+                               -- loops or further need for canonicalization.
 
-    (eqs_out,   eqs_in)   = partitionEqMap rewritable eqmap
-    (ips_out,   ips_in)   = partitionCCanMap rewritable ipmap 
+    (ips_out,   ips_in)         = partitionCCanMap rewritable ipmap
 
-    (feqs_out,  feqs_in)  = partitionCtTypeMap rewritable funeqmap
-    (dicts_out, dicts_in) = partitionCCanMap rewritable dictmap
+    (feqs_out_all,  feqs_in)    = partitionCtTypeMap rewritable funeqmap
+    (feqs_out_solved, feqs_out) = partitionBag is_solved feqs_out_all
+
+    (dicts_out_all, dicts_in) = partitionCCanMap rewritable dictmap
+    (dicts_out_solved, dicts_out) = partitionBag is_solved dicts_out_all
 
     (irs_out,   irs_in)   = partitionBag rewritable irreds
     (fro_out,   fro_in)   = partitionBag rewritable frozen
-    rewritable ct = (fl `canRewrite` cc_flavor ct) && 
+
+    rewritable ct = (fl `canRewrite` cc_flavor ct)  &&
                     (tv `elemVarSet` tyVarsOfCt ct)
 
+    is_solved ct
+      | Just GivenSolved <- isGiven_maybe (cc_flavor ct)
+      = True
+      | otherwise = False
+
+      
 
                              
 data SPSolveResult = SPCantSolve
@@ -1387,8 +1406,8 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = eqv, cc_flavor = fl
 
                                        ; return $ 
                                          SomeTopInt { tir_rule = "Fun/Top (solved, more work)"
-                                                    , tir_new_item = ContinueWith solved } } 
-                       -- Cache in inerts the Solved item
+                                                    , tir_new_item = ContinueWith solved } }
+                                                     -- Cache in inerts the Solved item
 
                        Given {} -> do { eqv' <- newGivenEqVar fl xi rhs_ty $ 
                                                 mkSymCo (mkEqVarLCo eqv) `mkTransCo` coe
