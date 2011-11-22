@@ -458,8 +458,10 @@ cmmPrimOpFunctions env mop
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
 
-    MO_WriteBarrier -> panic $ "cmmPrimOpFunctions: MO_WriteBarrier not supported here"
-    MO_Touch -> panic $ "cmmPrimOpFunctions: MO_Touch not supported here"
+    MO_WriteBarrier ->
+        panic $ "cmmPrimOpFunctions: MO_WriteBarrier not supported here"
+    MO_Touch ->
+        panic $ "cmmPrimOpFunctions: MO_Touch not supported here"
 
     where
         intrinTy1 = (if getLlvmVer env >= 28
