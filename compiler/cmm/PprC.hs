@@ -580,43 +580,47 @@ pprMachOp_for_C mop = case mop of
 
 -- noop casts
         MO_UU_Conv from to | from == to -> empty
-        MO_UU_Conv _from to  -> parens (machRep_U_CType to)
+        MO_UU_Conv _from to -> parens (machRep_U_CType to)
 
         MO_SS_Conv from to | from == to -> empty
-        MO_SS_Conv _from to  -> parens (machRep_S_CType to)
+        MO_SS_Conv _from to -> parens (machRep_S_CType to)
 
-        -- TEMPORARY: the old code didn't check this case, so let's leave it out
-        -- to facilitate comparisons against the old output code.
-        --MO_FF_Conv from to | from == to -> empty
-        MO_FF_Conv _from to  -> parens (machRep_F_CType to)
+        MO_FF_Conv from to | from == to -> empty
+        MO_FF_Conv _from to -> parens (machRep_F_CType to)
 
-        MO_SF_Conv _from to  -> parens (machRep_F_CType to)
-        MO_FS_Conv _from to  -> parens (machRep_S_CType to)
-
-        _ -> pprTrace "offending mop" (ptext $ sLit $ show mop) $
-             panic "PprC.pprMachOp_for_C: unknown machop"
+        MO_SF_Conv _from to -> parens (machRep_F_CType to)
+        MO_FS_Conv _from to -> parens (machRep_S_CType to)
+        
+        MO_S_MulMayOflo _ -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_S_MulMayOflo")
+                                (panic $ "PprC.pprMachOp_for_C: MO_S_MulMayOflo"
+                                      ++ " should have been handled earlier!")
+        MO_U_MulMayOflo _ -> pprTrace "offending mop:"
+                                (ptext $ sLit "MO_U_MulMayOflo")
+                                (panic $ "PprC.pprMachOp_for_C: MO_U_MulMayOflo"
+                                      ++ " should have been handled earlier!")
 
 signedOp :: MachOp -> Bool      -- Argument type(s) are signed ints
-signedOp (MO_S_Quot _)   = True
-signedOp (MO_S_Rem  _)   = True
-signedOp (MO_S_Neg  _)   = True
-signedOp (MO_S_Ge   _)   = True
-signedOp (MO_S_Le   _)   = True
-signedOp (MO_S_Gt   _)   = True
-signedOp (MO_S_Lt   _)   = True
-signedOp (MO_S_Shr  _)   = True
+signedOp (MO_S_Quot _)    = True
+signedOp (MO_S_Rem  _)    = True
+signedOp (MO_S_Neg  _)    = True
+signedOp (MO_S_Ge   _)    = True
+signedOp (MO_S_Le   _)    = True
+signedOp (MO_S_Gt   _)    = True
+signedOp (MO_S_Lt   _)    = True
+signedOp (MO_S_Shr  _)    = True
 signedOp (MO_SS_Conv _ _) = True
 signedOp (MO_SF_Conv _ _) = True
-signedOp _ = False
+signedOp _                = False
 
 floatComparison :: MachOp -> Bool  -- comparison between float args
-floatComparison (MO_F_Eq   _)    = True
-floatComparison (MO_F_Ne   _)    = True
-floatComparison (MO_F_Ge   _)    = True
-floatComparison (MO_F_Le   _)    = True
-floatComparison (MO_F_Gt   _)    = True
-floatComparison (MO_F_Lt   _)    = True
-floatComparison _ = False
+floatComparison (MO_F_Eq   _) = True
+floatComparison (MO_F_Ne   _) = True
+floatComparison (MO_F_Ge   _) = True
+floatComparison (MO_F_Le   _) = True
+floatComparison (MO_F_Gt   _) = True
+floatComparison (MO_F_Lt   _) = True
+floatComparison _             = False
 
 -- ---------------------------------------------------------------------
 -- tend to be implemented by foreign calls
