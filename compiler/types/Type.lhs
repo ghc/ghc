@@ -824,14 +824,18 @@ Make PredTypes
 mkEqPred :: (Type, Type) -> PredType
 mkEqPred (ty1, ty2)
   -- IA0_TODO: The caller should give the kind.
-  = TyConApp eqTyCon [k, ty1, ty2]
+  = WARN ( not (k `eqKind` defaultKind k), ppr (k, ty1, ty2) )
+    TyConApp eqTyCon [k, ty1, ty2]
   where k = defaultKind (typeKind ty1)
+--  where k = typeKind ty1
 
 mkPrimEqType :: (Type, Type) -> Type
 mkPrimEqType (ty1, ty2)
   -- IA0_TODO: The caller should give the kind.
-  = TyConApp eqPrimTyCon [k, ty1, ty2]
+  = WARN ( not (k `eqKind` defaultKind k), ppr (k, ty1, ty2) )
+    TyConApp eqPrimTyCon [k, ty1, ty2]
   where k = defaultKind (typeKind ty1)
+--  where k = typeKind ty1
 \end{code}
 
 --------------------- Implicit parameters ---------------------------------

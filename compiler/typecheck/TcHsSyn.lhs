@@ -1206,9 +1206,7 @@ zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- Works on both types and kinds
 zonkTvCollecting unbound_tv_set tv
   = do { poly_kinds <- xoptM Opt_PolyKinds
-       ; if isKiVar tv && not poly_kinds then
-            do { defaultKindVarToStar tv
-               ; return liftedTypeKind }
+       ; if isKiVar tv && not poly_kinds then defaultKindVarToStar tv
          else do
        { tv' <- zonkQuantifiedTyVar tv
        ; tv_set <- readMutVar unbound_tv_set
