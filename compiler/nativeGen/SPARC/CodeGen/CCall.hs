@@ -342,5 +342,8 @@ outOfLineMachOp_table mop
 
         MO_PopCnt w  -> fsLit $ popCntLabel w
 
-	_ -> pprPanic "outOfLineMachOp(sparc): Unknown callish mach op "
-              		(pprCallishMachOp mop)
+        MO_WriteBarrier ->
+            panic $ "outOfLineCmmOp: MO_WriteBarrier not supported here"
+        MO_Touch ->
+            panic $ "outOfLineCmmOp: MO_Touch not supported here"
+

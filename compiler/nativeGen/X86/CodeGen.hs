@@ -2048,8 +2048,10 @@ outOfLineCmmOp mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
 
-              other -> panic $ "outOfLineCmmOp: unmatched op! (" ++ show other ++ ")"
-
+              MO_WriteBarrier ->
+                  panic $ "outOfLineCmmOp: MO_WriteBarrier not supported here"
+              MO_Touch ->
+                  panic $ "outOfLineCmmOp: MO_Touch not supported here"
 
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
