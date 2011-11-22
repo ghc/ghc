@@ -143,3 +143,6 @@ OSTYPE=@OSTYPE@
 # In case of Solaris OS, does it provide broken shared libs
 # linker or not?
 SOLARIS_BROKEN_SHLD=@SOLARIS_BROKEN_SHLD@
+
+# Do we have a C compiler using an LLVM back end?
+CC_LLVM_BACKEND = @CC_LLVM_BACKEND@
