@@ -14,7 +14,7 @@ import Name
 import Fingerprint
 -- import Outputable
 
-import Data.List (sort)
+import qualified Data.IntSet as IntSet
 import System.FilePath (normalise)
 
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
@@ -31,7 +31,7 @@ fingerprintDynFlags DynFlags{..} nameio =
 
         -- *all* the extension flags and the language
         lang = (fmap fromEnum language,
-                sort $ map fromEnum $ extensionFlags)
+                IntSet.toList $ extensionFlags)
 
         -- -I, -D and -U flags affect CPP
         cpp = (map normalise includePaths, sOpt_P settings)
