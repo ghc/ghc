@@ -2238,10 +2238,29 @@ f "2"    = 2
 				This gives a substantial performance improvement for floating
 				point, but the resulting compiled code
 				will only run on processors that support SSE2 (Intel Pentium 4 and
-				later, or AMD Athlon 64 and later).
+				later, or AMD Athlon 64 and later). The
+				<link linkend="llvm-code-gen">LLVM backend</link> will also use SSE2
+				if your processor supports it but detects this automatically so no
+				flag is required.
           </para>
           <para>
             SSE2 is unconditionally used on x86-64 platforms.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-msse4.2</option>:</term>
+	<listitem>
+          <para>
+				(x86 only, added in GHC 7.2.1) Use the SSE4.2 instruction set to
+				implement some floating point and bit operations when using the
+				<link linkend="native-code-gen">native code generator</link>. The
+				resulting compiled code will only run on processors that
+				support SSE4.2 (Intel Core i7 and later). The
+				<link linkend="llvm-code-gen">LLVM backend</link> will also use
+				SSE4.2 if your processor supports it but detects this automatically
+				so no flag is required.
           </para>
         </listitem>
       </varlistentry>
