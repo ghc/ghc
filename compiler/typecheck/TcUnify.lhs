@@ -59,6 +59,7 @@ import Var
 import VarSet
 import VarEnv
 import ErrUtils
+import DynFlags
 import BasicTypes
 import Maybes ( allMaybes )
 import Util
@@ -542,10 +543,14 @@ uType_defer (item : origin) ty1 ty2
        ; emitFlat (mkEvVarX eqv loc)
 
        -- Error trace only
-       ; ctxt <- getErrCtxt
-       ; doc <- mkErrInfo emptyTidyEnv ctxt
-       ; traceTc "utype_defer" (vcat [ppr eqv, ppr ty1, ppr ty2, ppr origin, doc])
-
+       -- NB. do *not* call mkErrInfo unless tracing is on, because
+       -- it is hugely expensive (#5631)
+       ; ifDOptM Opt_D_dump_tc_trace $ do
+            { ctxt <- getErrCtxt
+            ; doc <- mkErrInfo emptyTidyEnv ctxt
+            ; traceTc "utype_defer" (vcat [ppr eqv, ppr ty1,
+                                           ppr ty2, ppr origin, doc])
+            }
        ; return (mkEqVarLCo eqv) }
 uType_defer [] _ _
   = panic "uType_defer"
