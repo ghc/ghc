@@ -13,6 +13,7 @@ module Vectorise.Builtins (
   selReplicate,
   selTags,
   selElements,
+  selsLength,
   sumTyCon,
   prodTyCon,
   prodDataCon,

@@ -26,6 +26,7 @@ import MkId
 import FastString
 import MonadUtils
 import Control.Monad
+import Outputable
 
 
 buildPReprTyCon :: TyCon -> TyCon -> SumRepr -> VM TyCon
@@ -408,29 +409,41 @@ buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
         
     -- PDatas data constructor
     [pdatas_dc] = tyConDataCons pdatas_tc
-         
+                  
     to_sum ss
      = case ss of
-        EmptySum    -> builtin pvoidsVar >>= \pvoids -> return ([], Var pvoids) 
-        UnarySum r  -> to_con r
+        -- We can't convert data types with no data.
+        -- See Note: [Empty PDatas].
+        EmptySum        -> return ([], errorEmptyPDatas el_ty)
+        UnarySum r      -> to_con (errorEmptyPDatas el_ty) r
+
         Sum{}
-          -> do let psums_tc     = repr_psums_tc ss
+         -> do  let psums_tc     = repr_psums_tc ss
                 let [psums_con]  = tyConDataCons psums_tc
-                (vars, exprs)   <- mapAndUnzipM to_con (repr_cons ss)
-                sel             <- newLocalVar (fsLit "sels") (repr_sels_ty ss)
-                return ( sel : concat vars
+                sels             <- newLocalVar (fsLit "sels") (repr_sels_ty ss)
+
+                -- Take the number of selectors to serve as the length of 
+                -- and PDatas Void arrays in the product. See Note [Empty PDatas].
+                let xSums        =  App (repr_selsLength_v ss) (Var sels)
+
+                (vars, exprs)    <- mapAndUnzipM (to_con xSums) (repr_cons ss)
+                return ( sels : concat vars
                        , wrapFamInstBody psums_tc (repr_con_tys ss)
                          $ mkConApp psums_con 
-                         $ map Type (repr_con_tys ss) ++ (Var sel : exprs))        
+                         $ map Type (repr_con_tys ss) ++ (Var sels : exprs))        
 
-    to_prod ss
+    to_prod xSums ss
      = case ss of
-        EmptyProd    -> builtin pvoidsVar >>= \pvoids -> return ([], Var pvoids)
+        EmptyProd    
+         -> do  pvoids  <- builtin pvoidsVar
+                return ([], App (Var pvoids) xSums )
+
         UnaryProd r
          -> do  pty  <- mkPDatasType (compOrigType r)
                 var  <- newLocalVar (fsLit "x") pty
                 expr <- to_comp (Var var) r
                 return ([var], expr)
+
         Prod{}
          -> do  let [ptups_con]  = tyConDataCons (repr_ptups_tc ss)
                 ptys   <- mapM (mkPDatasType . compOrigType) (repr_comps ss)
@@ -441,7 +454,8 @@ buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
                          $ mkConApp ptups_con
                          $ map Type (repr_comp_tys ss) ++ exprs)
 
-    to_con (ConRepr _ r)    = to_prod r
+    to_con xSums (ConRepr _ r)
+        = to_prod xSums r
 
     -- FIXME: this is bound to be wrong!
     to_comp expr (Keep _ _) = return expr
@@ -455,11 +469,6 @@ buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
 buildFromArrPReprs :: PAInstanceBuilder
 buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
  = do   
-    -- The element type of the argument.
-    --  eg: 'Tree a b'.
-    let ty_args = mkTyVarTys $ tyConTyVars vect_tc
-    let el_ty   = mkTyConApp vect_tc ty_args
-
     -- The argument type of the instance.
     --  eg: 'PDatas (PRepr (Tree a b))'
     arg_ty      <- mkPDatasType =<< mkPReprType el_ty
@@ -490,13 +499,21 @@ buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
 
     return $ Lam varg expr
  where
+    -- The element type of the argument.
+    --  eg: 'Tree a b'.
+    ty_args      = mkTyVarTys $ tyConTyVars vect_tc
+    el_ty        = mkTyConApp vect_tc ty_args
+
     var_tys      = mkTyVarTys $ tyConTyVars vect_tc
     [pdatas_con] = tyConDataCons pdatas_tc
 
     from_sum res_ty res expr ss
      = case ss of
-        EmptySum    -> return (res, [])
-        UnarySum r  -> from_con res_ty res expr r
+        -- We can't convert data types with no data.
+        -- See Note: [Empty PDatas].
+        EmptySum        -> return (res, errorEmptyPDatas el_ty)
+        UnarySum r      -> from_con res_ty res expr r
+
         Sum {}
          -> do  let psums_tc    =  repr_psums_tc ss
                 let [psums_con] =  tyConDataCons psums_tc
@@ -541,3 +558,50 @@ buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
          = do (res', args') <- f res_ty res expr r
               return (res', args' ++ args)
 
+
+-- Notes ----------------------------------------------------------------------
+{-
+Note [Empty PDatas]
+~~~~~~~~~~~~~~~~~~~
+We don't support "empty" data types like the following:
+
+  data Empty0
+  data Empty1 = MkEmpty1
+  data Empty2 = MkEmpty2 Empty0
+  ...
+
+There is no parallel data associcated with these types, so there is no where
+to store the length of the PDatas array with our standard representation.
+
+Enumerations like the following are ok:
+  data Bool = True | False
+
+The native and generic representations are:
+  type instance (PDatas Bool)        = VPDs:Bool Sels2
+  type instance (PDatas (Repr Bool)) = PSum2s Sels2 (PDatas Void) (PDatas Void)
+
+To take the length of a (PDatas Bool) we take the length of the contained Sels2.
+When converting a (PDatas Bool) to a (PDatas (Repr Bool)) we use this length to
+initialise the two (PDatas Void) arrays.
+
+However, with this:
+  data Empty1 = MkEmpty1
+ 
+The native and generic representations would be:
+  type instance (PDatas Empty1)        = VPDs:Empty1
+  type instance (PDatas (Repr Empty1)) = PVoids Int
+ 
+The 'Int' argument of PVoids is supposed to store the length of the PDatas 
+array. When converting the (PDatas Empty1) to a (PDatas (Repr Empty1)) we
+need to come up with a value for it, but there isn't one.
+
+To fix this we'd need to add an Int field to VPDs:Empty1 as well, but that's
+too much hassle and there's no point running a parallel computation on no
+data anyway.
+-}
+errorEmptyPDatas :: Type -> a
+errorEmptyPDatas tc
+    = cantVectorise "Vectorise.PAMethods"
+    $ vcat  [ text "Cannot vectorise data type with no parallel data " <> quotes (ppr tc)
+            , text "Data types to be vectorised must contain at least one constructor"
+            , text "with at least one field." ]

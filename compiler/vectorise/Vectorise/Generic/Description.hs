@@ -52,6 +52,9 @@ data SumRepr
                -- | Type of multi-selector             (eg Sel2s)
                , repr_sels_ty   :: Type
 
+               -- | Function to get the length of a Sels of this type.
+               , repr_selsLength_v :: CoreExpr 
+
                -- | Type of each data constructor.
                , repr_con_tys   :: [Type]
 
@@ -130,16 +133,18 @@ tyConRepr tc
            psum_tc      <- liftM fst $ pdataReprTyCon  sumapp
            psums_tc     <- liftM fst $ pdatasReprTyCon sumapp
            
-           sel_ty       <- builtin (selTy arity)
-           sels_ty      <- builtin (selsTy arity)
+           sel_ty       <- builtin (selTy      arity)
+           sels_ty      <- builtin (selsTy     arity)
+           selsLength_v <- builtin (selsLength arity)
            return $ Sum 
-                  { repr_sum_tc   = sum_tc
-                  , repr_psum_tc  = psum_tc
-                  , repr_psums_tc = psums_tc
-                  , repr_sel_ty   = sel_ty
-                  , repr_sels_ty  = sels_ty
-                  , repr_con_tys  = tys
-                  , repr_cons     = rs
+                  { repr_sum_tc         = sum_tc
+                  , repr_psum_tc        = psum_tc
+                  , repr_psums_tc       = psums_tc
+                  , repr_sel_ty         = sel_ty
+                  , repr_sels_ty        = sels_ty
+                  , repr_selsLength_v   = selsLength_v
+                  , repr_con_tys        = tys
+                  , repr_cons           = rs
                   }
 
     -- Build the representation type for a single data constructor.
@@ -222,15 +227,16 @@ instance Outputable SumRepr where
         UnarySum con
          -> sep [text "UnarySum", ppr con]
 
-        Sum sumtc psumtc psumstc selty selsty contys cons
+        Sum sumtc psumtc psumstc selty selsty selsLength contys cons
          -> text "Sum" $+$ braces (nest 4 
-                $ sep   [ text "repr_sum_tc   = " <> ppr sumtc
-                        , text "repr_psum_tc  = " <> ppr psumtc
-                        , text "repr_psums_tc = " <> ppr psumstc
-                        , text "repr_sel_ty   = " <> ppr selty
-                        , text "repr_sels_ty  = " <> ppr selsty
-                        , text "repr_con_tys  = " <> ppr contys
-                        , text "repr_cons     = " <> ppr cons])
+                $ sep   [ text "repr_sum_tc       = " <> ppr sumtc
+                        , text "repr_psum_tc      = " <> ppr psumtc
+                        , text "repr_psums_tc     = " <> ppr psumstc
+                        , text "repr_sel_ty       = " <> ppr selty
+                        , text "repr_sels_ty      = " <> ppr selsty
+                        , text "repr_selsLength_v = " <> ppr selsLength
+                        , text "repr_con_tys      = " <> ppr contys
+                        , text "repr_cons         = " <> ppr cons])
 
 
 instance Outputable ConRepr where
