@@ -18,6 +18,7 @@ module Vectorise.Builtins.Base (
   selReplicate,
   selTags,
   selElements,
+  selsLength,
   sumTyCon,
   prodTyCon,
   prodDataCon,
@@ -105,7 +106,8 @@ data Builtins
         , liftedApplyVar       :: Var                       -- ^ liftedApply
         , closureCtrFuns       :: Array Int Var             -- ^ closure1 .. closure3
         , selTys               :: Array Int Type            -- ^ Sel2
-        , selsTys              :: Array Int Type            -- ^ Sel2s
+        , selsTys              :: Array Int Type            -- ^ Sels2
+        , selsLengths          :: Array Int CoreExpr        -- ^ lengthSels2
         , selReplicates        :: Array Int CoreExpr        -- ^ replicate2
         , selTagss             :: Array Int CoreExpr        -- ^ tagsSel2
         , selElementss         :: Array (Int, Int) CoreExpr -- ^ elementsSel2_0 .. elementsSel_2_1
@@ -125,6 +127,9 @@ selTy           = indexBuiltin "selTy" selTys
 
 selsTy :: Int -> Builtins -> Type
 selsTy          = indexBuiltin "selsTy" selsTys
+
+selsLength :: Int -> Builtins -> CoreExpr
+selsLength      = indexBuiltin "selLength" selsLengths
 
 selReplicate :: Int -> Builtins -> CoreExpr
 selReplicate    = indexBuiltin "selReplicate" selReplicates 
