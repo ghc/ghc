@@ -579,48 +579,49 @@ flatten d fl (TyConApp tc tys)
 		 -- in which case the remaining arguments should
 		 -- be dealt with by AppTys
                fam_ty = mkTyConApp tc xi_args
-         ; (ret_co, rhs_var, ct) <-
+         ; (ret_co, rhs_xi, ct) <-
              do { is_cached <- getCachedFlatEq tc xi_args fl Any
                 ; case is_cached of
-                    Just (rhs_var,ret_eq) -> 
+                    Just (rhs_xi,ret_eq) -> 
                         do { traceTcS "is_cached!" $ ppr ret_eq
-                           ; return (ret_eq, rhs_var, []) }
+                           ; return (ret_eq, rhs_xi, []) }
                     Nothing
                         | isGivenOrSolved fl ->
-                            do { rhs_var <- newFlattenSkolemTy fam_ty
-                               ; eqv <- newGivenEqVar fl fam_ty rhs_var (mkReflCo fam_ty)
+                            do { rhs_xi_var <- newFlattenSkolemTy fam_ty
+                               ; eqv <- newGivenEqVar fl fam_ty rhs_xi_var (mkReflCo fam_ty)
                                ; let ct  = CFunEqCan { cc_id     = eqv
                                                      , cc_flavor = fl -- Given
                                                      , cc_fun    = tc 
                                                      , cc_tyargs = xi_args 
-                                                     , cc_rhs    = rhs_var 
+                                                     , cc_rhs    = rhs_xi_var 
                                                      , cc_depth  = d }
                                            -- Update the flat cache: just an optimisation!
-                               ; updateFlatCache eqv fl tc xi_args rhs_var WhileFlattening
+                               ; updateFlatCache eqv fl tc xi_args rhs_xi_var WhileFlattening
 
-                               ; return (mkEqVarLCo eqv, rhs_var, [ct]) }
+                               ; return (mkEqVarLCo eqv, rhs_xi_var, [ct]) }
                         | otherwise ->
                     -- Derived or Wanted: make a new /unification/ flatten variable
-                            do { rhs_var <- newFlexiTcSTy (typeKind fam_ty)
+                            do { rhs_xi_var <- newFlexiTcSTy (typeKind fam_ty)
                                ; let wanted_flavor = mkWantedFlavor fl
-                               ; evc <- newEqVar wanted_flavor fam_ty rhs_var
+                               ; evc <- newEqVar wanted_flavor fam_ty rhs_xi_var
                                ; let eqv = evc_the_evvar evc -- Not going to be cached
                                      ct = CFunEqCan { cc_id = eqv
                                                     , cc_flavor = wanted_flavor
                                                     -- Always Wanted, not Derived
                                                     , cc_fun = tc
                                                     , cc_tyargs = xi_args
-                                                    , cc_rhs    = rhs_var 
+                                                    , cc_rhs    = rhs_xi_var 
                                                     , cc_depth  = d }
                                           -- Update the flat cache: just an optimisation!
-                               ; updateFlatCache eqv fl tc xi_args rhs_var WhileFlattening
-                               ; return (mkEqVarLCo eqv, rhs_var, [ct]) } }
+                               ; updateFlatCache eqv fl tc xi_args rhs_xi_var WhileFlattening
+                               ; return (mkEqVarLCo eqv, rhs_xi_var, [ct]) } }
 
            -- Emit the flat constraints
          ; updWorkListTcS $ appendWorkListEqs ct
 
          ; let (cos_args, cos_rest) = splitAt (tyConArity tc) cos
-         ; return ( foldl AppTy rhs_var xi_rest
+         ; return ( mkAppTys rhs_xi xi_rest    -- NB mkAppTys: rhs_xi might not be a type variable
+	   	    	     	    	       --    cf Trac #5655
                   , foldl AppCo (mkSymCo ret_co `mkTransCo` mkTyConAppCo tc cos_args)
                                 cos_rest) }
 
