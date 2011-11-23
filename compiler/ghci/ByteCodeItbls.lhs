@@ -198,6 +198,13 @@ mkJumpToAddr a
      in
          insnBytes
 
+byte0, byte1, byte2, byte3
+   :: (Integral w, Bits w) => w -> Word8
+byte0 w = fromIntegral w
+byte1 w = fromIntegral (w `shiftR` 8)
+byte2 w = fromIntegral (w `shiftR` 16)
+byte3 w = fromIntegral (w `shiftR` 24)
+
 #elif x86_64_TARGET_ARCH
 -- Generates:
 --      jmpq *.L1(%rip)
@@ -220,6 +227,17 @@ mkJumpToAddr a
      in
          insnBytes
 
+byte0, byte1, byte2, byte3, byte4, byte5, byte6, byte7
+   :: (Integral w, Bits w) => w -> Word8
+byte0 w = fromIntegral w
+byte1 w = fromIntegral (w `shiftR` 8)
+byte2 w = fromIntegral (w `shiftR` 16)
+byte3 w = fromIntegral (w `shiftR` 24)
+byte4 w = fromIntegral (w `shiftR` 32)
+byte5 w = fromIntegral (w `shiftR` 40)
+byte6 w = fromIntegral (w `shiftR` 48)
+byte7 w = fromIntegral (w `shiftR` 56)
+
 #elif alpha_TARGET_ARCH
 type ItblCode = Word32
 mkJumpToAddr a
@@ -236,19 +254,6 @@ type ItblCode = Word32
 mkJumpToAddr a
     = undefined
 #endif
-
-
-byte0, byte1, byte2, byte3, byte4, byte5, byte6, byte7
-   :: (Integral w, Bits w) => w -> Word8
-byte0 w = fromIntegral w
-byte1 w = fromIntegral (w `shiftR` 8)
-byte2 w = fromIntegral (w `shiftR` 16)
-byte3 w = fromIntegral (w `shiftR` 24)
-byte4 w = fromIntegral (w `shiftR` 32)
-byte5 w = fromIntegral (w `shiftR` 40)
-byte6 w = fromIntegral (w `shiftR` 48)
-byte7 w = fromIntegral (w `shiftR` 56)
-
 
 #ifndef __HADDOCK__
 -- entry point for direct returns for created constr itbls
