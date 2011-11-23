@@ -625,9 +625,8 @@ vectAlgCase _tycon _ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
           . vectBndrsIn bndrs
           $ vectExpr body
       let (vect_bndrs, lift_bndrs) = unzip vbndrs
-      (vscrut, lscrut, pdata_tc, _arg_tys) <- mkVScrut (vVar vbndr)
+      (vscrut, lscrut, pdata_dc) <- pdataUnwrapScrut (vVar vbndr)
       vect_dc <- maybeV dataConErr (lookupDataCon dc)
-      let [pdata_dc] = tyConDataCons pdata_tc
 
       let vcase = mk_wild_case vscrut vty vect_dc  vect_bndrs vect_body
           lcase = mk_wild_case lscrut lty pdata_dc lift_bndrs lift_body
@@ -657,8 +656,7 @@ vectAlgCase tycon _ty_args scrut bndr ty alts
       let (vect_dcs, vect_bndrss, lift_bndrss, vbodies) = unzip4 valts
 
       vexpr <- vectExpr scrut
-      (vect_scrut, lift_scrut, pdata_tc, _arg_tys) <- mkVScrut (vVar vbndr)
-      let [pdata_dc] = tyConDataCons pdata_tc
+      (vect_scrut, lift_scrut, pdata_dc) <- pdataUnwrapScrut (vVar vbndr)
 
       let (vect_bodies, lift_bodies) = unzip vbodies
 

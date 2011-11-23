@@ -227,22 +227,18 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
        ; (_, binds) <- fixV $ \ ~(dfuns, _) ->
            do { defTyConPAs (zipLazy vect_tcs dfuns)
 
-                  -- query the 'PData' instance type constructors for type constructors that have a
+                  -- Query the 'PData' instance type constructors for type constructors that have a
                   -- VECTORISE pragma with an explicit right-hand side (this is Item (3) of
-                  -- "Note [Pragmas to vectorise tycons]" above)
-              ; pdata_withRHS_tcs <- mapM pdataReprTyConExact
-                                          [ mkTyConApp tycon tys
-                                          | (tycon, _) <- vectTyConsWithRHS
-                                          , let tys = mkTyVarTys (tyConTyVars tycon)
-                                          ]
+                  -- "Note [Pragmas to vectorise tycons]" above).
+              ; pdata_withRHS_tcs <- mapM pdataReprTyConExact (map fst vectTyConsWithRHS)
 
-                  -- build workers for all vectorised data constructors (except scalar ones)
+                  -- Build workers for all vectorised data constructors (except scalar ones)
               ; sequence_ $
                   zipWith3 vectDataConWorkers (orig_tcs  ++ map fst vectTyConsWithRHS)
                                               (vect_tcs  ++ map snd vectTyConsWithRHS)
                                               (pdata_tcs ++ pdata_withRHS_tcs)
 
-                  -- build a 'PA' dictionary for all type constructors (except scalar ones and those
+                  -- Build a 'PA' dictionary for all type constructors (except scalar ones and those
                   -- defined with an explicit right-hand side where the dictionary is user-supplied)
               ; dfuns <- sequence $
                            zipWith4 buildTyConPADict

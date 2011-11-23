@@ -164,13 +164,13 @@ buildToPRepr vect_tc repr_tc _ _ repr
     -- CoreExp to convert a data constructor component to the generic representation.
     to_comp :: CoreExpr -> CompRepr -> VM CoreExpr
     to_comp expr (Keep _ _) = return expr
-    to_comp expr (Wrap ty)  
-     = do wrap_tc <- builtin wrapTyCon
-          return $ wrapNewTypeBody wrap_tc [ty] expr
+    to_comp expr (Wrap ty)  = wrapNewTypeBodyOfWrap expr ty
 
 
 -- buildFromPRepr -------------------------------------------------------------
--- | Build the 'fromPRepr' method of the PA class.
+
+-- |Build the 'fromPRepr' method of the PA class.
+--
 buildFromPRepr :: PAInstanceBuilder
 buildFromPRepr vect_tc repr_tc _ _ repr
   = do
@@ -217,14 +217,13 @@ buildFromPRepr vect_tc repr_tc _ _ repr
                    [(DataAlt tup_con, vars, con `mkApps` es)]
 
     from_comp expr (Keep _ _) = return expr
-    from_comp expr (Wrap ty)
-      = do
-          wrap <- builtin wrapTyCon
-          return $ unwrapNewTypeBody wrap [ty] expr
+    from_comp expr (Wrap ty)  = unwrapNewTypeBodyOfWrap expr ty
 
 
 -- buildToArrRepr -------------------------------------------------------------
--- | Build the 'toArrRepr' method of the PA class.
+
+-- |Build the 'toArrRepr' method of the PA class.
+--
 buildToArrPRepr :: PAInstanceBuilder
 buildToArrPRepr vect_tc prepr_tc pdata_tc _ r
  = do arg_ty <- mkPDataType el_ty
@@ -283,17 +282,14 @@ buildToArrPRepr vect_tc prepr_tc pdata_tc _ r
 
     to_con (ConRepr _ r)    = to_prod r
 
-    -- FIXME: this is bound to be wrong!
     to_comp expr (Keep _ _) = return expr
-    to_comp expr (Wrap ty)
-      = do
-          wrap_tc  <- builtin wrapTyCon
-          pwrap_tc <- pdataReprTyConExact (mkTyConApp wrap_tc [ty])
-          return $ wrapNewTypeBody pwrap_tc [ty] expr
+    to_comp expr (Wrap ty)  = wrapNewTypeBodyOfPDataWrap expr ty
 
 
 -- buildFromArrPRepr ----------------------------------------------------------
--- | Build the 'fromArrPRepr' method for the PA class.
+
+-- |Build the 'fromArrPRepr' method for the PA class.
+--
 buildFromArrPRepr :: PAInstanceBuilder
 buildFromArrPRepr vect_tc prepr_tc pdata_tc _ r
  = do arg_ty <- mkPDataType =<< mkPReprType el_ty
@@ -355,11 +351,9 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc _ r
     from_con res_ty res expr (ConRepr _ r) = from_prod res_ty res expr r
 
     from_comp _ res expr (Keep _ _) = return (res, [expr])
-    from_comp _ res expr (Wrap ty)
-     = do wrap_tc  <- builtin wrapTyCon
-          pwrap_tc <- pdataReprTyConExact (mkTyConApp wrap_tc [ty])
-          return (res, [unwrapNewTypeBody pwrap_tc [ty]
-                        $ unwrapFamInstScrut pwrap_tc [ty] expr])
+    from_comp _ res expr (Wrap ty)  = do { expr' <- unwrapNewTypeBodyOfPDataWrap expr ty
+                                         ; return (res, [expr'])
+                                         }
 
     fold f res_ty res exprs rs
       = foldrM f' (res, []) (zip exprs rs)
@@ -457,12 +451,8 @@ buildToArrPReprs vect_tc prepr_tc _ pdatas_tc r
     to_con xSums (ConRepr _ r)
         = to_prod xSums r
 
-    -- FIXME: this is bound to be wrong!
     to_comp expr (Keep _ _) = return expr
-    to_comp expr (Wrap ty)
-     = do wrap_tc       <- builtin wrapTyCon
-          (pwrap_tc, _) <- pdatasReprTyCon (mkTyConApp wrap_tc [ty])
-          return $ wrapNewTypeBody pwrap_tc [ty] expr
+    to_comp expr (Wrap ty)  = wrapNewTypeBodyOfPDatasWrap expr ty
 
 
 -- buildFromArrPReprs ---------------------------------------------------------
@@ -545,11 +535,9 @@ buildFromArrPReprs vect_tc prepr_tc _ pdatas_tc r
         = from_prod res_ty res expr r
 
     from_comp _ res expr (Keep _ _) = return (res, [expr])
-    from_comp _ res expr (Wrap ty)
-     = do wrap_tc        <- builtin wrapTyCon
-          (pwraps_tc, _) <- pdatasReprTyCon (mkTyConApp wrap_tc [ty])
-          return (res, [unwrapNewTypeBody pwraps_tc [ty]
-                        $ unwrapFamInstScrut pwraps_tc [ty] expr])
+    from_comp _ res expr (Wrap ty)  = do { expr' <- unwrapNewTypeBodyOfPDatasWrap expr ty
+                                         ; return (res, [expr'])
+                                         }
 
     fold f res_ty res exprs rs
       = foldrM f' (res, []) (zip exprs rs)
