@@ -85,8 +85,10 @@ fulfill :: Promise -> (Deeds, FVedTerm) -> FulfilmentState -> ((Deeds, FVedTerm)
 fulfill p (deeds, e_body) fs = ((deeds, var (fun p) `applyAbsVars` abstracted p), FS { fulfilments = (fun p, tyVarIdLambdas (abstracted p) e_body) : fulfilments fs })
 
 
+type StopCount = Int
+
 newtype ScpM a = ScpM { unScpM :: StateT (MemoState, ProcessHistory, FulfilmentState)
-                                         (ReaderT (NodeKey, AlreadySpeculated) Identity) a }
+                                         (ReaderT (StopCount, NodeKey, AlreadySpeculated) Identity) a }
                deriving (Functor, Applicative, Monad)
 
 instance MonadStatics ScpM where
@@ -101,7 +103,7 @@ runScpM me = letRec (fulfilments fs') e
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, (_ms', _hist', fs')) = unI $ unReaderT (unStateT (unScpM me) (ms, hist, fs)) (parent, nothingSpeculated)
+        (e, (_ms', _hist', fs')) = unI $ unReaderT (unStateT (unScpM me) (ms, hist, fs)) (0, parent, nothingSpeculated)
 
 
 traceRenderM :: Outputable a => String -> a -> ScpM ()
@@ -111,12 +113,13 @@ fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \(ms, hist, fs) -> case fulfill p res fs of (res', fs') -> return (res', (ms, hist, fs'))
 
 terminateM :: State -> ScpM a -> (State -> ScpM a) -> ScpM a
-terminateM state mcont mstop = join $ ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(parent, already) -> case terminate hist (parent, state) of
-        Stop (_, shallow_state) -> pure (mstop shallow_state, (ms, hist, fs)) -- FIXME: prevent rollback?
-        Continue hist'          -> pure (ScpM $ StateT $ \s -> ReaderT $ \_ -> unReaderT (unStateT (unScpM mcont) s) (generatedKey hist', already), (ms, hist', fs))
+terminateM state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(stops, parent, already) -> case terminate hist (parent, state) of
+        Stop (_, shallow_state) -> trace ("stops: " ++ show stops) $
+                                   unReaderT (unStateT (unScpM (mstop shallow_state)) (ms, hist,  fs)) (stops + 1, parent,             already) -- FIXME: prevent rollback?
+        Continue hist'          -> unReaderT (unStateT (unScpM mcont)                 (ms, hist', fs)) (stops,     generatedKey hist', already)
 
 speculateM :: State -> (State -> ScpM a) -> ScpM a
-speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (parent, already')
+speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(stops, parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (stops, parent, already')
 
 
 sc, sc' :: State -> ScpM (Deeds, FVedTerm)
