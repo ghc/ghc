@@ -287,7 +287,12 @@ MAIN        MAIN                    102           0    0.0    0.0   100.0  100.0
       <literal>&lt;expression&gt;</literal> is any Haskell
       expression.  An <literal>SCC</literal> annotation extends as
       far to the right as possible when parsing. (SCC stands for "Set
-      Cost Centre").</para>
+      Cost Centre").  The double quotes can be omitted
+      if <literal>name</literal> is a Haskell identifier, for example:</para>
+
+<programlisting>
+     {-# SCC my_function #-} &lt;expression&gt;
+</programlisting>
 
       <para>Here is an example of a program with a couple of SCCs:</para>
 
@@ -295,10 +300,10 @@ MAIN        MAIN                    102           0    0.0    0.0   100.0  100.0
 main :: IO ()
 main = do let xs = [1..1000000]
           let ys = [1..2000000]
-          print $ {-# SCC "last_xs" #-} last xs
-          print $ {-# SCC "last_init_xs" #-} last $ init xs
-          print $ {-# SCC "last_ys" #-} last ys
-          print $ {-# SCC "last_init_ys" #-}last $ init ys
+          print $ {-# SCC last_xs #-} last xs
+          print $ {-# SCC last_init_xs #-} last $ init xs
+          print $ {-# SCC last_ys #-} last ys
+          print $ {-# SCC last_init_ys #-}last $ init ys
 </programlisting>
 
       <para>which gives this profile when run:</para>
