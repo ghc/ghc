@@ -37,6 +37,12 @@ test('scc003', [req_profiling,
      compile_and_run,
      ['-fno-state-hack']) # Note [consistent stacks]
 
+test('scc004', [req_profiling,
+                extra_ways(['prof']), only_ways(['prof'] + prof_ways),
+                expect_broken(5654)],
+     compile_and_run,
+     [''])
+
 test('5314',
      [ only_ways(prof_ways + extra_prof_ways),
        extra_ways(extra_prof_ways),
