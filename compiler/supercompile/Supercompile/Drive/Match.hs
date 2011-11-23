@@ -26,6 +26,14 @@ import Data.Function (on)
 import qualified Data.Map as M
 
 
+pprTraceSC :: String -> SDoc -> a -> a
+pprTraceSC = pprTrace
+--pprTraceSC msg doc a = traceSC (msg ++ ": " ++ showSDoc doc) a
+
+traceSC :: String -> a -> a
+traceSC = trace
+
+
 --newtype Match a = Match { unMatch :: Either String a }
 newtype Match a = Match { unMatch :: Maybe a }
 
@@ -67,9 +75,9 @@ match s_l@(_deeds_l, Heap h_l _, k_l, qa_l) s_r@(_deeds_r, Heap h_r _, k_r, qa_r
   runMatch $ do
     let init_rn2 = matchRnEnv2 stateFreeVars s_l s_r
     (rn2, mfree_eqs2) <- mfix $ \(~(rn2, _)) -> matchEC init_rn2 rn2 k_l k_r
-    free_eqs1 <- pprTrace "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
-    free_eqs2 <- pprTrace "match1" empty $ mfree_eqs2
-    pprTrace "match2" (ppr free_eqs1) $ matchPureHeap rn2 (free_eqs1 ++ free_eqs2) h_l h_r >>= safeMkMatchResult
+    free_eqs1 <- pprTraceSC "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
+    free_eqs2 <- pprTraceSC "match1" empty $ mfree_eqs2
+    pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap rn2 (free_eqs1 ++ free_eqs2) h_l h_r >>= safeMkMatchResult
 
 matchAnned :: (a -> a -> b)
            -> Anned a -> Anned a -> b
@@ -160,12 +168,12 @@ matchTyVarBndr rn2 a_l a_r k = liftM2 (++) (matchKind (tyVarKind a_l) (tyVarKind
 
 matchIdCoVarBndr :: RnEnv2 -> Id -> Id -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
 matchIdCoVarBndr rn2 x_l x_r k = liftM2 (++) match_x (k rn2')
-  where (rn2', match_x) = matchIdCoVarBndr' rn2 x_l x_r
+  where (rn2', match_x) = matchIdCoVarBndr' rn2 rn2' x_l x_r
 
 -- We have to be careful to match the "fragile" IdInfo for binders as well as the obvious type information
 -- (idSpecialisation :: Id -> SpecInfo, realIdUnfolding :: Id -> Unfolding)
-matchIdCoVarBndr' :: RnEnv2 -> Id -> Id -> (RnEnv2, Match [(Var, Var)])
-matchIdCoVarBndr' rn2 x_l x_r = (rnBndr2 rn2 x_l x_r, matchIdCoVarBndrExtras rn2 x_l x_r)
+matchIdCoVarBndr' :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Id -> Id -> (RnEnv2, Match [(Var, Var)])
+matchIdCoVarBndr' init_rn2 rn2 x_l x_r = (rnBndr2 init_rn2 x_l x_r, matchIdCoVarBndrExtras rn2 x_l x_r)
 
 matchBndrExtras :: RnEnv2 -> Var -> Var -> Match [(Var, Var)]
 matchBndrExtras rn2 v_l v_r
@@ -265,10 +273,10 @@ matchIn :: (InScopeSet -> Renaming -> a -> a)
 matchIn rnm mtch rn2 (rn_l, x_l) (rn_r, x_r) = mtch rn2 (rnm iss rn_l x_l) (rnm iss rn_r x_r)
   where iss = rnInScopeSet rn2 -- NB: this line is the only thing that relies on the RnEnv2 InScopeSet being correct
 
-matchEC :: RnEnv2 -> RnEnv2 -> Stack -> Stack -> Match (RnEnv2, Match [(Var, Var)])
+matchEC :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Stack -> Stack -> Match (RnEnv2, Match [(Var, Var)])
 matchEC init_rn2 rn2 k_l k_r = foldZipEqualM (\(init_rn2', meqs) kf_l kf_r -> fmap (second (liftM2 (++) meqs)) $ matchECFrame init_rn2' rn2 kf_l kf_r) (init_rn2, return []) k_l k_r
 
-matchECFrame :: RnEnv2 -> RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> Match (RnEnv2, Match [(Var, Var)])
+matchECFrame :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Tagged StackFrame -> Tagged StackFrame -> Match (RnEnv2, Match [(Var, Var)])
 matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
   where
     go :: StackFrame -> StackFrame -> Match (RnEnv2, Match [(Var, Var)])
@@ -278,7 +286,7 @@ matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
     go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, guard "matchECFrame: primop" (pop_l == pop_r) >> liftM3 (\x y z -> x ++ y ++ z) (matchList (matchType rn2) tys_l' tys_r') (matchList (matchAnned (matchAnswer rn2)) as_l as_r) (matchList (matchIn renameAnnedTerm matchTerm rn2) in_es_l in_es_r))
     go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2, matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r)
     go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2, matchCoercion rn2 co_l' co_r')
-    go (Update x_l')                         (Update x_r')                         = return (matchIdCoVarBndr' rn2 x_l' x_r')
+    go (Update x_l')                         (Update x_r')                         = return (matchIdCoVarBndr' init_rn2 rn2 x_l' x_r')
     go _ _ = fail "matchECFrame"
 
 --- Returns a renaming from the list only if the list maps a "left" variable to a unique "right" variable
@@ -333,7 +341,7 @@ matchPureHeap rn2 init_free_eqs h_l h_r
     matchLoop known ((x_l, x_r):free_eqs) used_l used_r
        -- Perhaps we have already assumed this equality is true?
       | (x_l, x_r) `elem` known = matchLoop known free_eqs used_l used_r
-      | otherwise = case (M.lookup x_l h_l, M.lookup x_r h_r) of
+      | otherwise = {- traceSC "matchLoop" $ -} case (M.lookup x_l h_l, M.lookup x_r h_r) of
            -- If matching an internal let, it is possible that variables occur free. Insist that free-ness matches:
           (Nothing, Nothing) -> go [] used_l used_r
           (Just _, Nothing) -> fail "matchLoop: matching binding on left not present in the right"
@@ -354,7 +362,7 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                --
                -- TODO: give let-bound nothings tags and generalise to get the same effect?
               ((LambdaBound, Nothing), (_how_r, mb_in_e_r)) -> case mb_in_e_r of
-                  Nothing -> (if _how_r == LetBound then pprTrace "Downgrading" (ppr x_l <+> ppr x_r) else id) $
+                  Nothing -> (if _how_r == LetBound then pprTraceSC "Downgrading" (ppr x_l <+> ppr x_r) else id) $
                              go [] used_l used_r
                   Just _ -> fail "matchLoop: cannot match termless LambdaBound on left against an actual term"
                -- If the template has an unfolding, we must do lookthrough
