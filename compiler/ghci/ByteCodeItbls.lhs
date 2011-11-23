@@ -372,7 +372,7 @@ instance Storable StgInfoTable where
            return 
               StgInfoTable { 
 #ifndef GHCI_TABLES_NEXT_TO_CODE
-                 entry  = entry,
+                 entry  = entry',
 #endif
                  ptrs   = ptrs',
                  nptrs  = nptrs',
