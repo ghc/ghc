@@ -4,9 +4,8 @@ tcfail209.hs:5:1:
     (Use -XConstraintKinds to permit this)
     In the type signature for `f': f :: Showish a => a -> a
 
-tcfail209.hs:8:8:
-    Predicate `Show a' used as a type
-    The first argument of a tuple should have kind `*',
-    but `Show a' has kind `Constraint'
+tcfail209.hs:8:1:
+    Illegal tuple constraint (Show a, Num a)
+    (Use -XConstraintKinds to permit this)
     In the type signature for `g':
       g :: ((Show a, Num a), Eq a) => a -> a
