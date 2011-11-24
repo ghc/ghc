@@ -13,7 +13,7 @@ module Hash (
   Hash(..),
  ) where
 
-import Array
+import Data.Array
 import Prelude hiding (lookup)
 
 -- | A hash table with keys of type @key@ and values of type @val@.
