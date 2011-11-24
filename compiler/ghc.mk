@@ -129,12 +129,6 @@ endif
 	@echo 'cGHC_SYSMAN_DIR       = "$(GHC_SYSMAN_DIR)"'                 >> $@
 	@echo 'cDEFAULT_TMPDIR       :: String'                             >> $@
 	@echo 'cDEFAULT_TMPDIR       = "$(DEFAULT_TMPDIR)"'                 >> $@
-	@echo 'cRelocatableBuild     :: Bool'                               >> $@
-ifeq "$(RelocatableBuild)" "YES"
-	@echo 'cRelocatableBuild     = True'                                >> $@
-else
-	@echo 'cRelocatableBuild     = False'                               >> $@
-endif
 	@echo 'cLibFFI               :: Bool'                               >> $@
 ifeq "$(UseLibFFIForAdjustors)" "YES"
 	@echo 'cLibFFI               = True'                                >> $@

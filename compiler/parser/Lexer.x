@@ -1126,7 +1126,19 @@ setLine code span buf len = do
 
 setFile :: Int -> Action
 setFile code span buf len = do
-  let file = lexemeToFastString (stepOn buf) (len-2)
+  let file = mkFastString (go (lexemeToString (stepOn buf) (len-2)))
+        where go ('\\':c:cs) = c : go cs
+              go (c:cs)      = c : go cs
+              go []          = []
+              -- decode escapes in the filename.  e.g. on Windows
+              -- when our filenames have backslashes in, gcc seems to
+              -- escape the backslashes.  One symptom of not doing this
+              -- is that filenames in error messages look a bit strange:
+              --   C:\\foo\bar.hs
+              -- only the first backslash is doubled, because we apply
+              -- System.FilePath.normalise before printing out
+              -- filenames and it does not remove duplicate
+              -- backslashes after the drive letter (should it?).
   setAlrLastLoc $ alrInitialLoc file
   setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
   addSrcFile file
