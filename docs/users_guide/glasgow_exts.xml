@@ -8414,7 +8414,7 @@ unrolling of the indexing function.</para>
 <para>You can add explicit phase control (<xref linkend="phase-control"/>) 
 to <literal>SPECIALISE INLINE</literal> pragma,
 just like on an <literal>INLINE</literal> pragma; if you do so, the same phase 
-is used for the rewrite rule and the INLINE control of the specialised function.
+is used for the rewrite rule and the INLINE control of the specialised function.</para>
 
 <para>Warning: you can make GHC diverge by using <literal>SPECIALISE INLINE</literal>
 on an ordinarily-recursive function.</para>
