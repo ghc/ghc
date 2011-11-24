@@ -16,7 +16,6 @@ import System.Exit
 import System.FilePath
 import System.Process
 import Text.Printf
-import Text.Regex
 
 
 packageRoot   = "."
@@ -58,7 +57,7 @@ test = do
 
   -- TODO: maybe do something more clever here using haddock.cabal
   ghcPath <- fmap init $ rawSystemStdout normal haddockPath ["--print-ghc-path"]
-  (_, conf) <- configure normal (Just ghcPath) Nothing emptyProgramConfiguration
+  (_, conf) <- configure normal (Just ghcPath) Nothing defaultProgramConfiguration
   pkgIndex <- getInstalledPackages normal [GlobalPackageDB] conf
   let safeHead xs = case xs of x : _ -> Just x; [] -> Nothing
   let mkDep pkgName =
@@ -118,9 +117,14 @@ check modules strict = do
 
 haddockEq file1 file2 = stripLinks file1 == stripLinks file2
 
-
-stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
-
+stripLinks str =
+  let prefix = "<a href=\"" in
+  case stripPrefix prefix str of
+    Just str' -> prefix ++ stripLinks (dropWhile (/= '"') str')
+    Nothing ->
+      case str of
+        [] -> []
+        x : xs -> x : stripLinks xs
 
 programOnPath p = do
   result <- findProgramLocation silent p

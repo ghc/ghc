@@ -210,7 +210,7 @@ test-suite html-tests
   default-language: Haskell2010
   main-is:          runtests.hs
   hs-source-dirs:   tests/html-tests
-  build-depends:    base, directory, process, filepath, Cabal, regex-compat
+  build-depends:    base, directory, process, filepath, Cabal
 
 source-repository head
   type:     git
