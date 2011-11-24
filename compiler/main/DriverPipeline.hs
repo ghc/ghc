@@ -745,9 +745,7 @@ runPhase (Unlit sf) input_fn dflags
                    [ -- The -h option passes the file name for unlit to
                      -- put in a #line directive
                      SysTools.Option     "-h"
-                     -- cpp interprets \b etc as escape sequences,
-                     -- so we use / for filenames in pragmas
-                   , SysTools.Option $ reslash Forwards $ normalise input_fn
+                   , SysTools.Option $ escape $ normalise input_fn
                    , SysTools.FileOption "" input_fn
                    , SysTools.FileOption "" output_fn
                    ]
@@ -755,6 +753,19 @@ runPhase (Unlit sf) input_fn dflags
        io $ SysTools.runUnlit dflags flags
 
        return (Cpp sf, output_fn)
+  where
+       -- escape the characters \, ", and ', but don't try to escape
+       -- Unicode or anything else (so we don't use Util.charToC
+       -- here).  If we get this wrong, then in
+       -- Coverage.addTicksToBinds where we check that the filename in
+       -- a SrcLoc is the same as the source filenaame, the two will
+       -- look bogusly different. See test:
+       -- libraries/hpc/tests/function/subdir/tough2.lhs
+       escape ('\\':cs) = '\\':'\\': escape cs
+       escape ('\"':cs) = '\\':'\"': escape cs
+       escape ('\'':cs) = '\\':'\'': escape cs
+       escape (c:cs)    = c : escape cs
+       escape []        = []
 
 -------------------------------------------------------------------------------
 -- Cpp phase : (a) gets OPTIONS out of file
