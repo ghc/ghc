@@ -1320,14 +1320,15 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                                 { LL $ toOL [ LL $ SigD (TypeSig ($1 : unLoc $3) $5) ] }
         | infix prec ops        { LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
                                              | n <- unLoc $3 ] }
-        | '{-# INLINE'   activation qvar '#-}'        
+        | '{-# INLINE' activation qvar '#-}'        
                 { LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma (getINLINE $1) $2))) }
-        | '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
-                { LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlinePragma) 
-                                            | t <- $4] }
+        | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
+                { let inl_prag = mkInlinePragma (EmptyInlineSpec, FunLike) $2
+                  in LL $ toOL [ LL $ SigD (SpecSig $3 t inl_prag) 
+                               | t <- $5] }
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
                 { LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlinePragma (getSPEC_INLINE $1) $2))
-                                            | t <- $5] }
+                            | t <- $5] }
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 { LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
 

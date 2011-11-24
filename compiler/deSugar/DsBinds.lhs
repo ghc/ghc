@@ -512,17 +512,31 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; let spec_id  = mkLocalId spec_name spec_ty 
          	            `setInlinePragma` inl_prag
          	 	    `setIdUnfolding`  spec_unf
+             id_inl = idInlinePragma poly_id
+
+	     -- See Note [Activation pragmas for SPECIALISE]
              inl_prag | not (isDefaultInlinePragma spec_inl)    = spec_inl
          	      | not is_local_id  -- See Note [Specialising imported functions]
 		      	    		 -- in OccurAnal
                       , isStrongLoopBreaker (idOccInfo poly_id) = neverInlinePragma
-		      | otherwise                               = idInlinePragma poly_id
+		      | otherwise                               = id_inl
        	      -- Get the INLINE pragma from SPECIALISE declaration, or,
               -- failing that, from the original Id
 
+             spec_prag_act = inlinePragmaActivation spec_inl
+
+	     -- See Note [Activation pragmas for SPECIALISE]
+	     -- no_act_spec is True if the user didn't write an explicit
+	     -- phase specification in the SPECIALISE pragma
+             no_act_spec = case inlinePragmaSpec spec_inl of
+                             NoInline -> isNeverActive  spec_prag_act
+                             _        -> isAlwaysActive spec_prag_act
+	     rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
+                      | otherwise   = spec_prag_act                   -- Specified by user
+
              rule =  mkRule False {- Not auto -} is_local_id
                         (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
-       			AlwaysActive poly_name
+       			rule_act poly_name
        		        final_bndrs args
        			(mkVarApps (Var spec_id) bndrs)
 
@@ -556,6 +570,48 @@ specUnfolding wrap_fn spec_ty (DFunUnfolding _ _ ops)
 specUnfolding _ _ _
   = return (noUnfolding, nilOL)
 \end{code}
+
+
+Note [Activation pragmas for SPECIALISE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+From a user SPECIALISE pragma for f, we generate
+  a) A top-level binding    spec_fn = rhs
+  b) A RULE                 f dOrd = spec_fn
+
+We need two pragma-like things:
+
+* spec_fn's inline pragma: inherited from f's inline pragma (ignoring 
+                           activation on SPEC), unless overriden by SPEC INLINE
+
+* Activation of RULE: from SPECIALISE pragma (if activation given)
+                      otherwise from f's inline pragma
+
+This is not obvious (see Trac #5237)!
+
+Examples      Rule activation   Inline prag on spec'd fn
+---------------------------------------------------------------------
+SPEC [n] f :: ty            [n]   Always, or NOINLINE [n]
+                                  copy f's prag
+
+NOINLINE f
+SPEC [n] f :: ty            [n]   NOINLINE
+                                  copy f's prag
+
+NOINLINE [k] f
+SPEC [n] f :: ty            [n]   NOINLINE [k]
+                                  copy f's prag
+
+INLINE [k] f
+SPEC [n] f :: ty            [n]   INLINE [k] 
+                                  copy f's prag
+
+SPEC INLINE [n] f :: ty     [n]   INLINE [n]
+                                  (ignore INLINE prag on f,
+                                  same activation for rule and spec'd fn)
+
+NOINLINE [k] f
+SPEC f :: ty                [n]   INLINE [k]
+
 
 %************************************************************************
 %*									*
