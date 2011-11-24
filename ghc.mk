@@ -1047,7 +1047,7 @@ publish-docs:
 # Directory in which we're going to build the src dist
 #
 SRC_DIST_NAME=ghc-$(ProjectVersion)
-SRC_DIST_DIR=$(TOP)/$(SRC_DIST_NAME)
+SRC_DIST_DIR=$(SRC_DIST_NAME)
 
 #
 # Files to include in source distributions
