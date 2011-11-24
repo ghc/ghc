@@ -1083,8 +1083,8 @@ sdist-prep :
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done
 	cd $(SRC_DIST_DIR) && $(MAKE) distclean
-	rm -rf $(SRC_DIST_DIR)/libraries/tarballs/
-	rm -rf $(SRC_DIST_DIR)/libraries/stamp/
+	$(call removeTrees,$(SRC_DIST_DIR)/libraries/tarballs/)
+	$(call removeTrees,$(SRC_DIST_DIR)/libraries/stamp/)
 	$(call sdist_file,compiler,stage2,cmm,,CmmLex,x)
 	$(call sdist_file,compiler,stage2,cmm,,CmmParse,y)
 	$(call sdist_file,compiler,stage2,parser,,Lexer,x)
