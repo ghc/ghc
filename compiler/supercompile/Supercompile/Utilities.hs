@@ -22,7 +22,7 @@ import UniqSupply
 import Unique (Unique, getKey)
 import UniqFM (UniqFM, eltsUFM)
 import Maybes (expectJust)
-import Outputable
+import Outputable hiding (Depth)
 import State hiding (mapAccumLM)
 
 import Control.Arrow (first, second, (***), (&&&))

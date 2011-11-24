@@ -85,10 +85,11 @@ fulfill :: Promise -> (Deeds, FVedTerm) -> FulfilmentState -> ((Deeds, FVedTerm)
 fulfill p (deeds, e_body) fs = ((deeds, var (fun p) `applyAbsVars` abstracted p), FS { fulfilments = (fun p, tyVarIdLambdas (abstracted p) e_body) : fulfilments fs })
 
 
+type Depth = Int
 type StopCount = Int
 
 newtype ScpM a = ScpM { unScpM :: StateT (MemoState, ProcessHistory, FulfilmentState)
-                                         (ReaderT (StopCount, NodeKey, AlreadySpeculated) Identity) a }
+                                         (ReaderT (Depth, StopCount, NodeKey, AlreadySpeculated) Identity) a }
                deriving (Functor, Applicative, Monad)
 
 instance MonadStatics ScpM where
@@ -103,23 +104,23 @@ runScpM me = letRec (fulfilments fs') e
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, (_ms', _hist', fs')) = unI $ unReaderT (unStateT (unScpM me) (ms, hist, fs)) (0, parent, nothingSpeculated)
+        (e, (_ms', _hist', fs')) = unI $ unReaderT (unStateT (unScpM me) (ms, hist, fs)) (0, 0, parent, nothingSpeculated)
 
 
 traceRenderM :: Outputable a => String -> a -> ScpM ()
-traceRenderM msg x = pprTraceSC msg (pPrint x) $ pure () -- TODO: include depth, refine to ScpM monad only
+traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \(depth, _, _, _) -> pprTraceSC (replicate depth ' ' ++ msg) (pPrint x) $ pure ((), s) -- TODO: include depth, refine to ScpM monad only
 
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \(ms, hist, fs) -> case fulfill p res fs of (res', fs') -> return (res', (ms, hist, fs'))
 
 terminateM :: State -> ScpM a -> (State -> ScpM a) -> ScpM a
-terminateM state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(stops, parent, already) -> case terminate hist (parent, state) of
+terminateM state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(depth, stops, parent, already) -> trace ("depth: " ++ show depth) case terminate hist (parent, state) of
         Stop (_, shallow_state) -> trace ("stops: " ++ show stops) $
-                                   unReaderT (unStateT (unScpM (mstop shallow_state)) (ms, hist,  fs)) (stops + 1, parent,             already) -- FIXME: prevent rollback?
-        Continue hist'          -> unReaderT (unStateT (unScpM mcont)                 (ms, hist', fs)) (stops,     generatedKey hist', already)
+                                   unReaderT (unStateT (unScpM (mstop shallow_state)) (ms, hist,  fs)) (depth + 1, stops + 1, parent,             already) -- FIXME: prevent rollback?
+        Continue hist'          -> unReaderT (unStateT (unScpM mcont)                 (ms, hist', fs)) (depth + 1, stops,     generatedKey hist', already)
 
 speculateM :: State -> (State -> ScpM a) -> ScpM a
-speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(stops, parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (stops, parent, already')
+speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(depth, stops, parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (depth, stops, parent, already')
 
 
 sc, sc' :: State -> ScpM (Deeds, FVedTerm)
@@ -130,8 +131,8 @@ sc' state = terminateM state (speculateM (reduce state) $ \state -> split state 
                                                       (generalise (mK_GENERALISER shallow_state state) state)
                                                       sc)
   where
-    trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") (ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$
-                                                                    ppr shallow_state $$ pPrintFullState True shallow_state $$ ppr state $$ pPrintFullState True state)
+    trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
+                                                                    {- ppr shallow_state $$ -} pPrintFullState {-True-}False shallow_state $$ {- ppr state $$ -} pPrintFullState {-True-}False state)
 
 -- Note [Prevent rollback loops by only rolling back when generalising]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -167,11 +168,11 @@ memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
     case [ (p, (releaseStateDeed state, var (fun p) `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
          | p <- promises ms
-         , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
+         , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
                           match (meaning p) state]
-         ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState True state), res)
+         ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state), res)
                                      ; return res }, (ms, hist, fs))
-              _          -> pure (do { traceRenderM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
+              _          -> pure (do { traceRenderM ">sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state))
                                      ; res <- opt state
                                      ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
                                      ; fulfillM p res }, (ms', hist, fs))

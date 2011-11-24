@@ -27,11 +27,13 @@ import qualified Data.Map as M
 
 
 pprTraceSC :: String -> SDoc -> a -> a
-pprTraceSC = pprTrace
+pprTraceSC _ _ = id
+--pprTraceSC = pprTrace
 --pprTraceSC msg doc a = traceSC (msg ++ ": " ++ showSDoc doc) a
 
 traceSC :: String -> a -> a
-traceSC = trace
+traceSC _ = id
+--traceSC = trace
 
 
 --newtype Match a = Match { unMatch :: Either String a }
