@@ -1046,7 +1046,11 @@ solveCTyFunEqs cts
       ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
   where
     solve_one (cv,tv,ty) = do { setWantedTyBind tv ty
-                              ; setEqBind cv (mkReflCo ty) }
+                              ; _ <- setEqBind cv (mkReflCo ty) $
+                                       (Wanted $ panic "Met an already solved function equality!")
+                              ; return () -- Don't care about flavors etc this is
+                                          -- the last thing happening
+                              }
 
 ------------
 type FunEqBinds = (TvSubstEnv, [(CoVar, TcTyVar, TcType)])

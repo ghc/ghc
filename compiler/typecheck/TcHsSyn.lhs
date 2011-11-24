@@ -280,7 +280,10 @@ zonkEvBndr :: ZonkEnv -> EvVar -> TcM EvVar
 -- Works for dictionaries and coercions
 -- Does not extend the ZonkEnv
 zonkEvBndr env var 
-  = do { ty <- zonkTcTypeToType env (varType var)
+  = do { let var_ty = varType var
+       ; ty <- 
+           {-# SCC "zonkEvBndr_zonkTcTypeToType" #-}
+           zonkTcTypeToType env var_ty
        ; return (setVarType var ty) }
 
 zonkEvVarOcc :: ZonkEnv -> EvVar -> EvVar
@@ -1103,7 +1106,8 @@ zonkEvBindsVar env (EvBindsVar ref _) = do { bs <- readMutVar ref
 
 zonkEvBinds :: ZonkEnv -> Bag EvBind -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBinds env binds
-  = fixM (\ ~( _, new_binds) -> do
+  = {-# SCC "zonkEvBinds" #-}
+    fixM (\ ~( _, new_binds) -> do
 	 { let env1 = extendIdZonkEnv env (collect_ev_bndrs new_binds)
          ; binds' <- mapBagM (zonkEvBind env1) binds
          ; return (env1, binds') })
@@ -1113,10 +1117,31 @@ zonkEvBinds env binds
     add (EvBind var _) vars = var : vars
 
 zonkEvBind :: ZonkEnv -> EvBind -> TcM EvBind
+
+
 zonkEvBind env (EvBind var term)
-  = do { var' <- zonkEvBndr env var
-       ; term' <- zonkEvTerm env term
-       ; return (EvBind var' term') }
+  = case term of 
+      -- Fast path for reflexivity coercions:
+      EvCoercionBox co 
+        | Just ty <- isReflCo_maybe co
+        ->
+          do { zty  <- zonkTcTypeToType env ty
+             ; let var' = setVarType var (mkEqPred (zty,zty))
+             ; return (EvBind var' (EvCoercionBox (mkReflCo zty))) }
+
+      -- Fast path for variable-variable bindings 
+      -- NB: could be optimized further! (e.g. SymCo cv)
+        | Just {} <- getCoVar_maybe co 
+        -> do { term'@(EvCoercionBox (CoVarCo cv')) <- zonkEvTerm env term
+              ; let var' = setVarType var (varType cv')
+              ; return (EvBind var' term') }
+
+      -- Ugly safe and slow path
+      _ -> do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
+              ; term' <- zonkEvTerm env term 
+              ; return (EvBind var' term')
+              }
+
 \end{code}
 
 %************************************************************************
@@ -1186,9 +1211,14 @@ mkZonkTcTyVar unbound_mvar_fn unbound_ivar_fn
          FlatSkol ty    -> zonkType zonk_tv ty
          MetaTv _ ref   -> do { cts <- readMutVar ref
            		      ; case cts of    
-           		           Flexi -> do { kind <- zonkType zonk_tv (tyVarKind tv)
+           		           Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
+                                                         zonkType zonk_tv (tyVarKind tv)
                                                ; unbound_mvar_fn (setTyVarKind tv kind) }
-           		           Indirect ty -> zonkType zonk_tv ty }
+           		           Indirect ty -> do { zty <- zonkType zonk_tv ty 
+                                                     -- Small optimisation: shortern-out indirect steps
+                                                     -- so that the old type may be more easily collected.
+                                                     ; writeMutVar ref (Indirect zty)
+                                                     ; return zty } }
 
 zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type
 zonkTcTypeToType (ZonkEnv zonk_unbound_tyvar tv_env _id_env)
