@@ -933,7 +933,7 @@ rec { b &lt;- f a c     ===>    (b,c) &lt;- mfix (\~(b,c) -> do { b &lt;- f a c
     ; c &lt;- f b a }                                        ; c &lt;- f b a
                                                           ; return (b,c) })
 </programlisting>
-In general, the statment <literal>rec <replaceable>ss</replaceable></literal>
+In general, the statement <literal>rec <replaceable>ss</replaceable></literal>
 is desugared to the statement
 <programlisting>
 <replaceable>vs</replaceable> &lt;- mfix (\~<replaceable>vs</replaceable> -&gt; do { <replaceable>ss</replaceable>; return <replaceable>vs</replaceable> })
@@ -1028,7 +1028,7 @@ This name is not supported by GHC.
    [ (x, y) | x &lt;- xs | y &lt;- ys ]
 </programlisting>
 
-    <para>The behavior of parallel list comprehensions follows that of
+    <para>The behaviour of parallel list comprehensions follows that of
     zip, in that the resulting list will have the same length as the
     shortest branch.</para>
 
@@ -1790,7 +1790,7 @@ the same as the omitted field names.
 
 <listitem><para>
 The "<literal>..</literal>" expands to the missing
-<emphasis>in-scope</emphasis> record fields.  
+<emphasis>in-scope</emphasis> record fields.
 Specifically the expansion of "<literal>C {..}</literal>" includes
 <literal>f</literal> if and only if:
 <itemizedlist>
@@ -1801,8 +1801,8 @@ Specifically the expansion of "<literal>C {..}</literal>" includes
 The record field <literal>f</literal> is in scope somehow (either qualified or unqualified).
 </para></listitem>
 <listitem><para>
-In the case of expressions (but not patterns), 
-the variable <literal>f</literal> is in scope unqualified, 
+In the case of expressions (but not patterns),
+the variable <literal>f</literal> is in scope unqualified,
 apart from the binding of the record selector itself.
 </para></listitem>
 </itemizedlist>
@@ -1817,7 +1817,7 @@ module X where
 The <literal>R{..}</literal> expands to <literal>R{M.a=a}</literal>,
 omitting <literal>b</literal> since the record field is not in scope,
 and omitting <literal>c</literal> since the variable <literal>c</literal>
-is not in scope (apart from the binding of the 
+is not in scope (apart from the binding of the
 record selector <literal>c</literal>, of course).
 </para></listitem>
 </itemizedlist>
@@ -2060,7 +2060,7 @@ The following syntax is stolen:
 <sect2 id="nullary-types">
 <title>Data types with no constructors</title>
 
-<para>With the <option>-XEmptyDataDecls</option> flag (or equivalent LANGUAGE pragma), 
+<para>With the <option>-XEmptyDataDecls</option> flag (or equivalent LANGUAGE pragma),
 GHC lets you declare a data type with no constructors.  For example:</para>
 
 <programlisting>
@@ -3535,7 +3535,7 @@ liberal in these case. For example, this is OK:
 <programlisting>
   class A cls c where
     meth :: cls c => c -> c
-  
+
   class A B c => B c where
 </programlisting>
 
@@ -4260,7 +4260,7 @@ of the instance declaration, thus:
 </para>
 <para>
 Warning: overlapping instances must be used with care.  They
-can give rise to incoherence (ie different instance choices are made
+can give rise to incoherence (i.e. different instance choices are made
 in different parts of the program) even without <option>-XIncoherentInstances</option>. Consider:
 <programlisting>
 {-# LANGUAGE OverlappingInstances #-}
@@ -4839,7 +4839,7 @@ instance (Eq (Elem [e])) => Collects ([e]) where
         type indexes corresponding to class parameters must be identical to
         the type given in the instance head; here this is the first argument
         of <literal>GMap</literal>, namely <literal>Either a b</literal>,
-        which coincides with the only class parameter.  
+        which coincides with the only class parameter.
       </para>
       <para>
 	Instances for an associated family can only appear as part of
@@ -4873,7 +4873,7 @@ instance GMapKey Flob where
     <sect3 id="assoc-decl-defs">
     <title>Associated type synonym defaults</title>
       <para>
-        It is possible for the class defining the associated type to specify a 
+        It is possible for the class defining the associated type to specify a
         default for associated type instances. So for example, this is OK:
 <programlisting>
 class IsBoolMap v where
@@ -4905,7 +4905,7 @@ A default declaration is not permitted for an associated
       <para>
 	The visibility of class
 	parameters in the right-hand side of associated family instances
-	depends <emphasis>solely</emphasis> on the parameters of the 
+	depends <emphasis>solely</emphasis> on the parameters of the
 	family.  As an example, consider the simple class declaration
 <programlisting>
 class C a b where
@@ -4929,19 +4929,19 @@ instance C [c] d where
     <title>Import and export</title>
 
     <para>
-The rules for export lists 
-(Haskell Report 
+The rules for export lists
+(Haskell Report
    <ulink url="http://www.haskell.org/onlinereport/modules.html#sect5.2">Section 5.2</ulink>)
 needs adjustment for type families:
 <itemizedlist>
 <listitem><para>
   The form <literal>T(..)</literal>, where <literal>T</literal>
-  is a data family, names the family <literal>T</literal> and all the in-scope 
-  constructors (whether in scope qualified or unqualified) that are data 
+  is a data family, names the family <literal>T</literal> and all the in-scope
+  constructors (whether in scope qualified or unqualified) that are data
   instances of <literal>T</literal>.
   </para></listitem>
 <listitem><para>
-  The form <literal>T(.., ci, .., fj, ..)</literal>, where <literal>T</literal> is 
+  The form <literal>T(.., ci, .., fj, ..)</literal>, where <literal>T</literal> is
   a data family, names <literal>T</literal> and the specified constructors <literal>ci</literal>
   and fields <literal>fj</literal> as usual. The constructors and field names must
   belong to some data instance of <literal>T</literal>, but are not required to belong
@@ -4974,7 +4974,7 @@ class GMapKey k where
 
 instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
   data GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
-  ...method declartions...
+  ...method declarations...
 </programlisting>
 Here are some export lists and their meaning:
 	<itemizedlist>
@@ -4991,21 +4991,21 @@ Here are some export lists and their meaning:
               (in this case <literal>GMapEither</literal>) are not exported.</para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap( GMapKey( type GMap, empty, lookup, insert ) )</literal>: 
-              Same as the pevious item. Note the "<literal>type</literal>" keyword.</para>
+	    <para><literal>module GMap( GMapKey( type GMap, empty, lookup, insert ) )</literal>:
+              Same as the previous item. Note the "<literal>type</literal>" keyword.</para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap( GMapKey(..), GMap(..) )</literal>: 
+	    <para><literal>module GMap( GMapKey(..), GMap(..) )</literal>:
               Same as previous item, but also exports all the data
 	      constructors for <literal>GMap</literal>, namely <literal>GMapEither</literal>.
 	      </para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap ( GMapKey( empty, lookup, insert), GMap(..) )</literal>:  
+	    <para><literal>module GMap ( GMapKey( empty, lookup, insert), GMap(..) )</literal>:
               Same as previous item.</para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap ( GMapKey, empty, lookup, insert, GMap(..) )</literal>: 
+	    <para><literal>module GMap ( GMapKey, empty, lookup, insert, GMap(..) )</literal>:
               Same as previous item.</para>
 	  </listitem>
 	</itemizedlist>
@@ -5022,16 +5022,16 @@ Two things to watch out for:
       <listitem><para>
   Consider this example:
 <programlisting>
-  module X where 
+  module X where
     data family D
 
   module Y where
     import X
     data instance D Int = D1 | D2
 </programlisting>
-    Module Y exports all the entities defined in Y, namely the data constructrs <literal>D1</literal>
+    Module Y exports all the entities defined in Y, namely the data constructors <literal>D1</literal>
     and <literal>D2</literal>, <emphasis>but not the data family <literal>D</literal></emphasis>.
-    That (annoyingly) means that you cannot selectively import Y selectively, 
+    That (annoyingly) means that you cannot selectively import Y selectively,
     thus "<literal>import Y( D(D1,D2) )</literal>", because Y does not export <literal>D</literal>.
     Instead you should list the exports explicitly, thus:
 <programlisting>
@@ -5040,7 +5040,7 @@ or   module Y( module Y, D ) where ...
 </programlisting>
       </para></listitem>
   </itemizedlist>
-</para> 
+</para>
 </sect3>
 
     <sect3 id="data-family-impexp-instances">
@@ -5081,7 +5081,7 @@ The situation is especially bad because the type instance for <literal>F Bool</l
 might be in another module, or even in a module that is not yet written.
 </para>
 <para>
-However, type class instances of instances of data families can be defined 
+However, type class instances of instances of data families can be defined
 much like any other data type. For example, we can say
 <programlisting>
 data instance T Int = T1 Int | T2 Bool
@@ -5228,7 +5228,7 @@ foo x = (show x, read)
 </para>
 
 <programlisting>
-type family Clsish u a 
+type family Clsish u a
 type instance Clsish () a = Cls a
 class Clsish () a => Cls a where
 </programlisting>
@@ -5236,7 +5236,7 @@ class Clsish () a => Cls a where
 <programlisting>
 class OkCls a where
 
-type family OkClsish u a 
+type family OkClsish u a
 type instance OkClsish () a = OkCls a
 instance OkClsish () a => OkCls a where
 </programlisting>
@@ -6879,10 +6879,10 @@ The quoted <replaceable>string</replaceable>
 finishes at the first occurrence of the two-character sequence <literal>"|]"</literal>.
 Absolutely no escaping is performed.  If you want to embed that character
 sequence in the string, you must invent your own escape convention (such
-as, say, using the string <literal>"|~]"</literal> instead), and make your 
+as, say, using the string <literal>"|~]"</literal> instead), and make your
 quoter function interpret <literal>"|~]"</literal> as <literal>"|]"</literal>.
 One way to implement this is to compose your quoter with a pre-processing pass to
-perform your escape conversion.  See the 
+perform your escape conversion.  See the
 <ulink url="http://hackage.haskell.org/trac/ghc/ticket/5348">
 discussion in Trac</ulink> for details.
 </para></listitem>
@@ -8305,7 +8305,7 @@ happen.
 <itemizedlist>
 <listitem>
       <para>A <literal>SPECIALIZE</literal> pragma for a function can
-      be put anywhere its type signature could be put.  Moreover, you 
+      be put anywhere its type signature could be put.  Moreover, you
       can also <literal>SPECIALIZE</literal> an <emphasis>imported</emphasis>
 		function provided it was given an <literal>INLINABLE</literal> pragma at
 		its definition site (<xref linkend="inlinable-pragma"/>).</para>
@@ -8325,9 +8325,9 @@ happen.
 </listitem>
 
 <listitem>
-   <para>You can add phase control (<xref linkend="phase-control"/>) 
+   <para>You can add phase control (<xref linkend="phase-control"/>)
    to the RULE generated by a <literal>SPECIALIZE</literal> pragma,
-   just as you can if you writ a RULE directly. For exxample:
+   just as you can if you write a RULE directly. For example:
 <programlisting>
   {-# SPECIALIZE [0] hammeredLookup :: [(Widget, value)] -> Widget -> value #-}
 </programlisting>
@@ -8342,12 +8342,12 @@ happen.
   {-# SPECIALIZE foo :: Int -> Int #-}
 </programlisting>
   The <literal>NOINLINE</literal> pragma tells GHC not to inline <literal>foo</literal>
-  until Phase 0; and this property is inherited by the specialiation RULE, which will
+  until Phase 0; and this property is inherited by the specialisation RULE, which will
   therefore only fire in Phase 0.</para>
-  <para>The main reason for using phase control on specialisations is so that you can 
-  write optimisation RULES that fire early in the compilation pipeline, and only 
+  <para>The main reason for using phase control on specialisations is so that you can
+  write optimisation RULES that fire early in the compilation pipeline, and only
    <emphasis>then</emphasis> specialise the calls to the function. If specialisation is
-   done too early, the optimsation rules might fail to fire.
+   done too early, the optimisation rules might fail to fire.
   </para>
 </listitem>
 
@@ -8411,9 +8411,9 @@ the specialised function will be inlined.  It has two calls to
 both at type <literal>Int</literal>.  Both these calls fire the first
 specialisation, whose body is also inlined.  The result is a type-based
 unrolling of the indexing function.</para>
-<para>You can add explicit phase control (<xref linkend="phase-control"/>) 
+<para>You can add explicit phase control (<xref linkend="phase-control"/>)
 to <literal>SPECIALISE INLINE</literal> pragma,
-just like on an <literal>INLINE</literal> pragma; if you do so, the same phase 
+just like on an <literal>INLINE</literal> pragma; if you do so, the same phase
 is used for the rewrite rule and the INLINE control of the specialised function.</para>
 
 <para>Warning: you can make GHC diverge by using <literal>SPECIALISE INLINE</literal>
