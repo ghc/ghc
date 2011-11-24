@@ -238,17 +238,21 @@ mkJumpToAddr a
 #endif
 
 
-byte0, byte1, byte2, byte3, byte4, byte5, byte6, byte7
-   :: (Integral w, Bits w) => w -> Word8
+#if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
+byte0, byte1, byte2, byte3 :: (Integral w, Bits w) => w -> Word8
 byte0 w = fromIntegral w
 byte1 w = fromIntegral (w `shiftR` 8)
 byte2 w = fromIntegral (w `shiftR` 16)
 byte3 w = fromIntegral (w `shiftR` 24)
+#endif
+
+#if defined(x86_64_TARGET_ARCH)
+byte4, byte5, byte6, byte7 :: (Integral w, Bits w) => w -> Word8
 byte4 w = fromIntegral (w `shiftR` 32)
 byte5 w = fromIntegral (w `shiftR` 40)
 byte6 w = fromIntegral (w `shiftR` 48)
 byte7 w = fromIntegral (w `shiftR` 56)
-
+#endif
 
 #ifndef __HADDOCK__
 -- entry point for direct returns for created constr itbls
