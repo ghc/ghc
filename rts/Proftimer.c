@@ -50,7 +50,7 @@ void
 startHeapProfTimer( void )
 {
     if (RtsFlags.ProfFlags.doHeapProfile && 
-	RtsFlags.ProfFlags.profileIntervalTicks > 0) {
+        RtsFlags.ProfFlags.heapProfileIntervalTicks > 0) {
 	do_heap_prof_ticks = rtsTrue;
     }
 }
@@ -60,7 +60,7 @@ initProfTimer( void )
 {
     performHeapProfile = rtsFalse;
 
-    ticks_to_heap_profile = RtsFlags.ProfFlags.profileIntervalTicks;
+    ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 
     startHeapProfTimer();
 }
@@ -80,7 +80,7 @@ handleProfTick(void)
     if (do_heap_prof_ticks) {
 	ticks_to_heap_profile--;
 	if (ticks_to_heap_profile <= 0) {
-	    ticks_to_heap_profile = RtsFlags.ProfFlags.profileIntervalTicks;
+            ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 	    performHeapProfile = rtsTrue;
 	}
     }

@@ -15,26 +15,26 @@
 # include <time.h>
 #endif
 
-#define HNS_PER_SEC 10000000LL /* FILETIMES are in units of 100ns */
 /* Convert FILETIMEs into secs */
 
-static INLINE_ME Ticks
-fileTimeToTicks(FILETIME ft)
+static INLINE_ME Time
+fileTimeToRtsTime(FILETIME ft)
 {
-    Ticks t;
-    t = ((Ticks)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-    t = (t * TICKS_PER_SECOND) / HNS_PER_SEC;
+    Time t;
+    t = ((Time)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    t = NSToTime(t * 100);
+    /* FILETIMES are in units of 100ns */
     return t;
 }    
 
 void
-getProcessTimes(Ticks *user, Ticks *elapsed)
+getProcessTimes(Time *user, Time *elapsed)
 {
     *user    = getProcessCPUTime();
     *elapsed = getProcessElapsedTime();
 }
 
-Ticks
+Time
 getProcessCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
@@ -44,14 +44,14 @@ getProcessCPUTime(void)
 	return 0;
     }
 
-    return fileTimeToTicks(userTime);
+    return fileTimeToRtsTime(userTime);
 }
 
 // getProcessElapsedTime relies on QueryPerformanceFrequency 
 // which should be available on any Windows computer thay you
 // would want to run Haskell on. Satnam Singh, 5 July 2010.
 
-Ticks
+Time
 getProcessElapsedTime(void)
 {
     // frequency represents the number of ticks per second
@@ -73,13 +73,14 @@ getProcessElapsedTime(void)
     // Get the tick count.
     QueryPerformanceCounter(&system_time) ;
 
-    // Return the tick count as a millisecond value. 
+    // Return the tick count as a Time value.
     // Using double to compute the intermediate value, because a 64-bit
-    // int would overflow when multiplied by TICKS_PER_SECOND in about 81 days.
-    return (Ticks)((TICKS_PER_SECOND * (double)system_time.QuadPart) / (double)frequency.QuadPart) ;
+    // int would overflow when multiplied by TICK_RESOLUTION in about 81 days.
+    return fsecondsToTime((double)system_time.QuadPart /
+                          (double)frequency.QuadPart) ;
 }
 
-Ticks
+Time
 getThreadCPUTime(void)
 {
     FILETIME creationTime, exitTime, userTime, kernelTime = {0,0};
@@ -89,7 +90,7 @@ getThreadCPUTime(void)
 	return 0;
     }
 
-    return fileTimeToTicks(userTime);
+    return fileTimeToRtsTime(userTime);
 }
 
 void

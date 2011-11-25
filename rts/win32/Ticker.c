@@ -2,166 +2,80 @@
  * RTS periodic timers.
  * 
  */
+#define _WIN32_WINNT 0x0500
+
 #include "Rts.h"
 #include "Ticker.h"
 #include <windows.h>
 #include <stdio.h>
 #include <process.h>
 
-/*
- * Provide a timer service for the RTS, periodically
- * notifying it that a number of 'ticks' has passed.
- *
- */
+static TickProc tick_proc = NULL;
+static HANDLE timer_queue = NULL;
+static HANDLE timer       = NULL;
+static Time tick_interval = 0;
 
-/* To signal pause or shutdown of the timer service, we use a local
- * event which the timer thread listens to.
- */
-static HANDLE hStopEvent = INVALID_HANDLE_VALUE;
-static HANDLE tickThread = INVALID_HANDLE_VALUE;
-
-static TickProc tickProc = NULL;
-
-static enum { TickerGo, TickerPause, TickerExit } ticker_state;
-
-/*
- * Ticking is done by a separate thread which periodically
- * wakes up to handle a tick.
- *
- * This is the portable way of providing a timer service under
- * Win32; features like waitable timers or timer queues are only
- * supported by a subset of the Win32 platforms (notably not
- * under Win9x.)
- *
- */
-static
-unsigned
-WINAPI
-TimerProc(PVOID param)
+static VOID CALLBACK tick_callback(
+  PVOID lpParameter STG_UNUSED,
+  BOOLEAN TimerOrWaitFired STG_UNUSED
+  )
 {
-  int ms = (int)param;
-  DWORD waitRes = 0;
-  
-  /* interpret a < 0 timeout period as 'instantaneous' */ 
-  if (ms < 0) ms = 0;
-
-  while (1) {
-      switch (ticker_state) {
-      case TickerGo:
-          waitRes = WaitForSingleObject(hStopEvent, ms);
-          break;
-      case TickerPause:
-          waitRes = WaitForSingleObject(hStopEvent, INFINITE);
-          break;
-      case TickerExit:
-          /* event has become signalled */
-          tickProc = NULL;
-          CloseHandle(hStopEvent);
-          hStopEvent = INVALID_HANDLE_VALUE;
-          return 0;
-      }
-      
-      switch (waitRes) {
-      case WAIT_OBJECT_0:
-          /* event has become signalled */
-          ResetEvent(hStopEvent);
-          continue;
-      case WAIT_TIMEOUT:
-          /* tick */
-          tickProc(0);
-          break;
-      case WAIT_FAILED:
-          sysErrorBelch("TimerProc: WaitForSingleObject failed");
-          break; 
-      default:
-          errorBelch("TimerProc: unexpected result %lu\n", waitRes);
-          break;
-      }
-  }
-  return 0;
+    tick_proc(0);
 }
 
+// We use the CreateTimerQueue() API which has been around since
+// Windows 2000.  Apparently it gives bad results before Windows 7,
+// though: http://www.virtualdub.org/blog/pivot/entry.php?id=272
+//
+// Even with the improvements in Windows 7, this timer isn't going to
+// be very useful for profiling with a max usable resolution of
+// 15ms. Unfortunately we don't have anything better.
 
 void
-initTicker (nat ms, TickProc handle_tick)
+initTicker (Time interval, TickProc handle_tick)
 {
-  unsigned threadId;
-  /* 'hStopEvent' is a manual-reset event that's signalled upon
-   * shutdown of timer service (=> timer thread.)
-   */
-  hStopEvent = CreateEvent ( NULL,
-			     TRUE,
-			     FALSE,
-			     NULL);
-  if (hStopEvent == INVALID_HANDLE_VALUE) {
-      sysErrorBelch("CreateEvent");
-      stg_exit(EXIT_FAILURE);
-  }
-  tickProc = handle_tick;
-  ticker_state = TickerPause;
-  tickThread = (HANDLE)(long)_beginthreadex( NULL,
-			       0,
-			       TimerProc,
-			       (LPVOID)ms,
-			       0,
-			       &threadId);
+    tick_interval = interval;
+    tick_proc = handle_tick;
 
-  if (tickThread == 0) {
-      sysErrorBelch("_beginthreadex");
-      stg_exit(EXIT_FAILURE);
-  }
+    timer_queue = CreateTimerQueue();
+    if (timer_queue == NULL) {
+        sysErrorBelch("CreateTimerQueue");
+        stg_exit(EXIT_FAILURE);
+    }
 }
 
 void
 startTicker(void)
 {
-    ticker_state = TickerGo;
-    SetEvent(hStopEvent);
+    BOOL r;
+
+    r = CreateTimerQueueTimer(&timer,
+                              timer_queue,
+                              tick_callback,
+                              0,
+                              0,
+                              TimeToUS(tick_interval) / 1000, // ms
+                              WT_EXECUTEINTIMERTHREAD);
+    if (r == 0) {
+        sysErrorBelch("CreateTimerQueueTimer");
+        stg_exit(EXIT_FAILURE);
+    }
 }
 
 void
 stopTicker(void)
 {
-    ticker_state = TickerPause;
-    SetEvent(hStopEvent);
+    if (timer_queue != NULL && timer != NULL) {
+        DeleteTimerQueueTimer(timer_queue, timer, NULL);
+        timer = NULL;
+    }
 }
 
 void
 exitTicker (rtsBool wait)
 {
-    // We must wait for the ticker thread to terminate, since if we
-    // are in a DLL that is about to be unloaded, the ticker thread
-    // cannot be allowed to return to a missing DLL.
-
-    if (hStopEvent != INVALID_HANDLE_VALUE && 
-	tickThread != INVALID_HANDLE_VALUE) {
-	DWORD exitCode;
-        ticker_state = TickerExit;
-	SetEvent(hStopEvent);
-	while (wait) {
-            // See #3748:
-            //
-            // when the RTS is compiled into a DLL (wait==rtsTrue),
-            // the ticker thread must stop before we exit, or chaos
-            // will ensue.  We can't kill it, because it may be
-            // holding a lock.
-            //
-            // When not compiled into a DLL, we wait for
-            // the thread out of courtesy, but give up after 200ms if
-            // it still hasn't stopped.
-	    WaitForSingleObject(tickThread, 200);
-	    if (!GetExitCodeThread(tickThread, &exitCode)) {
-		return;
-	    }
-            CloseHandle(tickThread);
-            if (exitCode != STILL_ACTIVE) {
-		tickThread = INVALID_HANDLE_VALUE;
-		if ( hStopEvent != INVALID_HANDLE_VALUE ) {
-		    CloseHandle(hStopEvent);
-		    hStopEvent = INVALID_HANDLE_VALUE;
-		}
-		return;
-	    }
-	}
+    if (timer_queue != NULL) {
+        DeleteTimerQueueEx(timer_queue, wait ? INVALID_HANDLE_VALUE : NULL);
+        timer_queue = NULL;
     }
 }

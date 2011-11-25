@@ -13,7 +13,7 @@
 
 typedef void (*TickProc)(int);
 
-void initTicker  (nat ms, TickProc handle_tick);
+void initTicker  (Time interval, TickProc handle_tick);
 void startTicker (void);
 void stopTicker  (void);
 void exitTicker  (rtsBool wait);

@@ -23,7 +23,11 @@ defaultsHook (void)
 
     // See #3408: the default idle GC time of 0.3s is too short on
     // Windows where we receive console events once per second or so.
+#if __GLASGOW_HASKELL__ >= 703
+    RtsFlags.GcFlags.idleGCDelayTime = SecondsToTime(5);
+#else
     RtsFlags.GcFlags.idleGCDelayTime = 5*1000;
+#endif
 }
 
 void

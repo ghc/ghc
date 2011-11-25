@@ -701,20 +701,22 @@ void
 printThreadBlockage(StgTSO *tso)
 {
   switch (tso->why_blocked) {
+#if defined(mingw32_HOST_OS)
+    case BlockedOnDoProc:
+    debugBelch("is blocked on proc (request: %u)", tso->block_info.async_result->reqID);
+    break;
+#endif
+#if !defined(THREADED_RTS)
   case BlockedOnRead:
     debugBelch("is blocked on read from fd %d", (int)(tso->block_info.fd));
     break;
   case BlockedOnWrite:
     debugBelch("is blocked on write to fd %d", (int)(tso->block_info.fd));
     break;
-#if defined(mingw32_HOST_OS)
-    case BlockedOnDoProc:
-    debugBelch("is blocked on proc (request: %u)", tso->block_info.async_result->reqID);
-    break;
-#endif
   case BlockedOnDelay:
     debugBelch("is blocked until %ld", (long)(tso->block_info.target));
     break;
+#endif
   case BlockedOnMVar:
     debugBelch("is blocked on an MVar @ %p", tso->block_info.closure);
     break;
