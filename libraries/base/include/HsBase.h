@@ -207,11 +207,6 @@ __hscore_utime( const char *file, const struct utimbuf *timep )
 { return utime(file,timep); }
 #endif
 
-// This is used by dph:Data.Array.Parallel.Arr.BUArr, and shouldn't be
-INLINE void *
-__hscore_memcpy_dst_off( char *dst, int dst_off, char *src, size_t sz )
-{ return memcpy(dst+dst_off, src, sz); }
-
 INLINE void *
 __hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
 { return memcpy(dst, src+src_off, sz); }
@@ -632,27 +627,8 @@ INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
 // gettimeofday()-related
 
 #if !defined(__MINGW32__)
-
 INLINE int __hsbase_gettimeofday(struct timeval *tv, struct timezone *tz) {
         return gettimeofday(tv, tz);
-}
-
-INLINE HsInt sizeofTimeVal(void) { return sizeof(struct timeval); }
-
-INLINE HsWord64 getUSecOfDay(void)
-{
-    struct timeval tv;
-    gettimeofday(&tv, (struct timezone *) NULL);
-    // Don't forget to cast *before* doing the arithmetic, otherwise
-    // the arithmetic happens at the type of tv_sec, which is probably
-    // only 'int'.
-    return ((HsWord64)tv.tv_sec * 1000000 + (HsWord64)tv.tv_usec);
-}
-
-INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
-{
-    p->tv_sec  = usecs / 1000000;
-    p->tv_usec = usecs % 1000000;
 }
 #endif /* !defined(__MINGW32__) */
 
