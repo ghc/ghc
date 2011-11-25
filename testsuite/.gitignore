@@ -125,3 +125,5 @@ timeout/dist/
 /tests/safeHaskell/check/pkg01/install/
 /tests/safeHaskell/check/pkg01/local.db/
 /tests/safeHaskell/check/pkg01/setup
+tests/dph/classes/dph-classes-fast
+tests/dph/dotp/dph-dotp-opt
