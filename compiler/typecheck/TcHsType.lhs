@@ -1229,14 +1229,18 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
            env0 <- tcInitTidyEnv
            let (exp_as, _) = splitKindFunTys exp_kind
                (act_as, _) = splitKindFunTys act_kind
-               n_exp_as = length exp_as
-               n_act_as = length act_as
+               n_exp_as  = length exp_as
+               n_act_as  = length act_as
+               n_diff_as = n_act_as - n_exp_as
 
                (env1, tidy_exp_kind) = tidyOpenKind env0 exp_kind
                (env2, tidy_act_kind) = tidyOpenKind env1 act_kind
 
                err | n_exp_as < n_act_as     -- E.g. [Maybe]
-                   = quotes (ppr ty) <+> ptext (sLit "is not applied to enough type arguments")
+                   = ptext (sLit "Expecting") <+>
+                     speakN n_diff_as <+> ptext (sLit "more argument") <>
+                     (if n_diff_as > 1 then char 's' else empty) <+>
+                     ptext (sLit "to") <+> quotes (ppr ty)
 
                      -- Now n_exp_as >= n_act_as. In the next two cases,
                      -- n_exp_as == 0, and hence so is n_act_as
@@ -1244,7 +1248,7 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
                    = text "Predicate" <+> quotes (ppr ty) <+> text "used as a type"
                    
                    | isConstraintKind tidy_exp_kind
-                   = text "Type of kind " <+> ppr tidy_act_kind <+> text "used as a constraint"
+                   = text "Type of kind" <+> ppr tidy_act_kind <+> text "used as a constraint"
                    
                    | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
                    = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
@@ -1255,14 +1259,14 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
                        <+> ptext (sLit "is lifted")
 
                    | otherwise               -- E.g. Monad [Int]
-                   = ptext (sLit "Kind mis-match")
+                   = ptext (sLit "Kind mis-match") $$ more_info
 
                more_info = sep [ ek_ctxt <+> ptext (sLit "kind") 
                                     <+> quotes (pprKind tidy_exp_kind) <> comma,
                                  ptext (sLit "but") <+> quotes (ppr ty) <+>
                                      ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
 
-           failWithTcM (env2, err $$ more_info)
+           failWithTcM (env2, err)
 \end{code}
 
 %************************************************************************
