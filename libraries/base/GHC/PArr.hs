@@ -34,4 +34,4 @@ import GHC.Base
 --
 data [::] e = PArr !Int (Array# e)
 
-type PArr e = [::] e   -- this synonym is to get access to '[::]' without using the special syntax
+type PArr = [::]   -- this synonym is to get access to '[::]' without using the special syntax
