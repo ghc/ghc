@@ -204,3 +204,16 @@ test('T4474c',
      compile_and_run,
      ['-O'])
 
+test('T5237',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated',  70000,
+                                              90000)),
+                           # expected value: 78328 (i386/Linux)
+      if_wordsize(64,
+          stats_num_field('bytes allocated',  90000,
+                                             130000)),
+                           # expected value: 110888 (amd64/Linux)
+     only_ways(['normal'])
+     ],
+    compile_and_run,
+    ['-O ' + sse2_opts])
