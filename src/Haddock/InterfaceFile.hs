@@ -37,9 +37,7 @@ import UniqSupply
 import UniqFM
 import IfaceEnv
 import HscTypes
-#if MIN_VERSION_ghc(7,1,0)
 import GhcMonad (withSession)
-#endif
 import FastMutInt
 import FastString
 import Unique

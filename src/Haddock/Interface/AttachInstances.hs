@@ -25,11 +25,7 @@ import GHC
 import Name
 import InstEnv
 import Class
-#if MIN_VERSION_ghc(7,1,0)
 import GhcMonad (withSession)
-#else
-import HscTypes (withSession)
-#endif
 import TysPrim( funTyCon )
 import MonadUtils (liftIO)
 import TcRnDriver (tcRnGetInfo)

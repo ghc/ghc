@@ -222,11 +222,7 @@ ident pos str sc cont dflags =
 
 strToHsQNames :: DynFlags -> RealSrcLoc -> String -> Maybe [RdrName]
 strToHsQNames dflags loc str0 = 
-#if MIN_VERSION_ghc(7,1,0)
   let buffer = stringToStringBuffer str0
-#else
-  let buffer = unsafePerformIO (stringToStringBuffer str0)
-#endif
       pstate = mkPState dflags buffer loc
       result = unP parseIdentifier pstate 
   in case result of 

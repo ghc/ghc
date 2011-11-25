@@ -275,11 +275,7 @@ filterOutInstances = filter (\(L _ d, _, _) -> not (isInstD d))
 -- bindings from an 'HsGroup'.
 declsFromGroup :: HsGroup Name -> [Decl]
 declsFromGroup group_ =
-#if MIN_VERSION_ghc(7,0,2)
   mkDecls (concat . hs_tyclds)  TyClD  group_ ++
-#else
-  mkDecls hs_tyclds             TyClD  group_ ++
-#endif
   mkDecls hs_derivds            DerivD group_ ++
   mkDecls hs_defds              DefD   group_ ++
   mkDecls hs_fords              ForD   group_ ++

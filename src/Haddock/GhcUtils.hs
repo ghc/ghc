@@ -30,9 +30,7 @@ import Name
 import Packages
 import Module
 import RdrName (GlobalRdrEnv)
-#if MIN_VERSION_ghc(7,1,0)
 import GhcMonad (withSession)
-#endif
 import HscTypes
 import UniqFM
 import GHC
