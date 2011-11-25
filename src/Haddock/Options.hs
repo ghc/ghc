@@ -62,6 +62,7 @@ data Flag
   | Flag_Help
   | Flag_Verbosity String
   | Flag_Version
+  | Flag_InterfaceVersion
   | Flag_UseContents String
   | Flag_GenContents
   | Flag_UseIndex String
@@ -130,6 +131,8 @@ options backwardsCompat =
       "display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
       "output version information and exit",
+    Option []  ["interface-version"]  (NoArg Flag_InterfaceVersion)
+      "output interface file version and exit",
     Option ['v']  ["verbosity"]  (ReqArg Flag_Verbosity "VERBOSITY")
       "set verbosity level",
     Option [] ["use-contents"] (ReqArg Flag_UseContents "URL")

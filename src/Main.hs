@@ -359,9 +359,10 @@ shortcutFlags :: [Flag] -> IO ()
 shortcutFlags flags = do
   usage <- getUsage
 
-  when (Flag_Help           `elem` flags) (bye usage)
-  when (Flag_Version        `elem` flags) byeVersion
-  when (Flag_GhcVersion     `elem` flags) byeGhcVersion
+  when (Flag_Help             `elem` flags) (bye usage)
+  when (Flag_Version          `elem` flags) byeVersion
+  when (Flag_InterfaceVersion `elem` flags) (bye (show binaryInterfaceVersion ++ "\n"))
+  when (Flag_GhcVersion       `elem` flags) (bye (cProjectVersion ++ "\n"))
 
   when (Flag_PrintGhcPath `elem` flags) $ do
     dir <- fmap fst (getGhcDirs flags)
@@ -389,8 +390,6 @@ shortcutFlags flags = do
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
       ++ "Ported to use the GHC API by David Waern 2006-2008\n"
-
-    byeGhcVersion = bye (cProjectVersion ++ "\n")
 
 
 updateHTMLXRefs :: [(DocPaths, InterfaceFile)] -> IO ()
