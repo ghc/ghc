@@ -667,5 +667,13 @@ INLINE int fcntl_lock(int fd, int cmd, struct flock *lock) {
 
 #endif
 
+#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
+#if defined(HAVE_GETRUSAGE) && ! irix_HOST_OS && ! solaris2_HOST_OS
+INLINE int __hsbase_getrusage(int who, struct rusage *rusage) {
+   return getrusage(who, rusage);
+}
+#endif
+#endif
+
 #endif /* __HSBASE_H__ */
 
