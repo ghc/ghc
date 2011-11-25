@@ -3,7 +3,7 @@ import System.Posix.Unistd
 
 main = do
     putStrLn "Blocking real time alarms."
-    blockSignals (addSignal realTimeAlarm emptySignalSet)
+    blockSignals (addSignal realTimeAlarm reservedSignals)
     putStrLn "Scheduling an alarm in 2 seconds..."
     scheduleAlarm 2
     putStrLn "Sleeping 5 seconds."
