@@ -32,7 +32,7 @@ main = do
 
 test = do
   x <- doesFileExist haddockPath
-  when (not x) $ die "you need to run 'cabal build' successfully first"
+  unless x $ die "you need to run 'cabal build' successfully first"
 
   contents <- getDirectoryContents testDir
   args <- getArgs

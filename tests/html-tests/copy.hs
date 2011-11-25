@@ -5,7 +5,6 @@ import System.Exit
 import System.Directory
 import Data.List
 import Control.Monad
-import Text.Regex
 
 
 main = do
@@ -27,4 +26,11 @@ copy file = do
   writeFile new (stripLinks contents)
 
 
-stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
+stripLinks str =
+  let prefix = "<a href=\"" in
+  case stripPrefix prefix str of
+    Just str' -> prefix ++ stripLinks (dropWhile (/= '"') str')
+    Nothing ->
+      case str of
+        [] -> []
+        x : xs -> x : stripLinks xs
