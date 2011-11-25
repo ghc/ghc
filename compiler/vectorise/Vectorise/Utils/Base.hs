@@ -156,7 +156,7 @@ wrapNewTypeBodyOfPDataWrap :: CoreExpr -> Type -> VM CoreExpr
 wrapNewTypeBodyOfPDataWrap e ty
   = do { wrap_tc  <- builtin wrapTyCon
        ; pwrap_tc <- pdataReprTyConExact wrap_tc
-       ; return $ wrapFamInstBody pwrap_tc [ty] (wrapNewTypeBody pwrap_tc [ty] e)
+       ; return $ wrapNewTypeBody pwrap_tc [ty] e
        }
 
 -- |Strip the constructor wrapper of the 'PData' /newtype/ instance of 'Wrap'.
@@ -174,7 +174,7 @@ wrapNewTypeBodyOfPDatasWrap :: CoreExpr -> Type -> VM CoreExpr
 wrapNewTypeBodyOfPDatasWrap e ty
   = do { wrap_tc  <- builtin wrapTyCon
        ; pwrap_tc <- pdatasReprTyConExact wrap_tc
-       ; return $ wrapFamInstBody pwrap_tc [ty] (wrapNewTypeBody pwrap_tc [ty] e)
+       ; return $ wrapNewTypeBody pwrap_tc [ty] e
        }
 
 -- |Strip the constructor wrapper of the 'PDatas' /newtype/ instance of 'Wrap'.

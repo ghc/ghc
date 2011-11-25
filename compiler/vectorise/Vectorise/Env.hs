@@ -129,6 +129,10 @@ data GlobalEnv
 
 -- |Create an initial global environment.
 --
+-- We add scalar variables and type constructors identified by vectorisation pragmas already here
+-- to the global table, so that we can query scalarness during vectorisation, and especially, when
+-- vectorising the scalar entities' definitions themselves.
+--
 initGlobalEnv :: VectInfo -> [CoreVect] -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
 initGlobalEnv info vectDecls instEnvs famInstEnvs
   = GlobalEnv 
@@ -151,10 +155,16 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
                                         -- FIXME: we currently only allow RHSes consisting of a
                                         --   single variable to be able to obtain the type without
                                         --   inference — see also 'TcBinds.tcVect'
-    scalar_vars   = [var              | Vect     var   Nothing                  <- vectDecls] ++
-                    [var              | VectInst True var                       <- vectDecls]
-    novects       = [var              | NoVect   var                            <- vectDecls]
-    scalar_tycons = [tyConName tycon  | VectType True tycon _                   <- vectDecls]
+    scalar_vars   = [var              | Vect     var   Nothing                   <- vectDecls] ++
+                    [var              | VectInst var                             <- vectDecls]
+    novects       = [var              | NoVect   var                             <- vectDecls]
+    scalar_tycons = [tyConName tycon  | VectType True tycon Nothing              <- vectDecls] ++
+                    [tyConName tycon  | VectType _    tycon (Just tycon')        <- vectDecls
+                                      , tycon == tycon']
+                      -- - for 'VectType True tycon Nothing', we checked that the type does not
+                      --   contain arrays (or type variables that could be instatiated to arrays)
+                      -- - for 'VectType _ tycon (Just tycon')', where the two tycons are the same,
+                      --   we also know that there can be no embedded arrays
 
 
 -- Operators on Global Environments -------------------------------------------
@@ -207,7 +217,7 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     }
   where
     vectIds         = [id    | Vect     id    _   <- vectDecls] ++
-                      [id    | VectInst _ id      <- vectDecls]
+                      [id    | VectInst id        <- vectDecls]
     vectTypeTyCons  = [tycon | VectType _ tycon _ <- vectDecls] ++
                       [tycon | VectClass tycon    <- vectDecls]
     vectDataCons    = concatMap tyConDataCons vectTypeTyCons

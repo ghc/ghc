@@ -754,7 +754,7 @@ substVect subst  (Vect   v (Just rhs)) = Vect v (Just (simpleOptExprWith subst r
 substVect _subst vd@(NoVect _)         = vd
 substVect _subst vd@(VectType _ _ _)   = vd
 substVect _subst vd@(VectClass _)      = vd
-substVect _subst vd@(VectInst _ _)     = vd
+substVect _subst vd@(VectInst _)       = vd
 
 ------------------
 substVarSet :: Subst -> VarSet -> VarSet

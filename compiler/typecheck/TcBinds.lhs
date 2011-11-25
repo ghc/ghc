@@ -694,7 +694,11 @@ tcVect (HsNoVect name)
 tcVect (HsVectTypeIn isScalar lname rhs_name)
   = addErrCtxt (vectCtxt lname) $
     do { tycon <- tcLookupLocatedTyCon lname
-       ; checkTc (not isScalar || tyConArity tycon == 0) scalarTyConMustBeNullary
+       ; checkTc (   not isScalar             -- either    we have a non-SCALAR declaration
+                 || isJust rhs_name           -- or        we explicitly provide a vectorised type
+                 || tyConArity tycon == 0     -- otherwise the type constructor must be nullary
+                 )
+                 scalarTyConMustBeNullary
 
        ; rhs_tycon <- fmapMaybeM (tcLookupTyCon . unLoc) rhs_name
        ; return $ HsVectTypeOut isScalar tycon rhs_tycon
@@ -708,13 +712,13 @@ tcVect (HsVectClassIn lname)
        }
 tcVect (HsVectClassOut _)
   = panic "TcBinds.tcVect: Unexpected 'HsVectClassOut'"
-tcVect (HsVectInstIn isScalar linstTy)
+tcVect (HsVectInstIn linstTy)
   = addErrCtxt (vectCtxt linstTy) $
     do { (cls, tys) <- tcHsVectInst linstTy
        ; inst       <- tcLookupInstance cls tys
-       ; return $ HsVectInstOut isScalar inst
+       ; return $ HsVectInstOut inst
        }
-tcVect (HsVectInstOut _ _)
+tcVect (HsVectInstOut _)
   = panic "TcBinds.tcVect: Unexpected 'HsVectInstOut'"
 
 vectCtxt :: Outputable thing => thing -> SDoc

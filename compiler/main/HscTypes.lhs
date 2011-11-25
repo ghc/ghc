@@ -1948,6 +1948,9 @@ data VectInfo
 --
 -- NB: The field 'ifaceVectInfoVar' explicitly contains the workers of data constructors as well as
 --     class selectors — i.e., their mappings are /not/ implicitly generated from the data types.
+--     Moreover, whether the worker of a data constructor is in 'ifaceVectInfoVar' determines
+--     whether that data constructor was vectorised (or is part of an abstractly vectorised type
+--     constructor).
 --
 data IfaceVectInfo
   = IfaceVectInfo

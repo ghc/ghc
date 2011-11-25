@@ -672,11 +672,11 @@ rnHsVectDecl (HsVectClassIn cls)
        }
 rnHsVectDecl (HsVectClassOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectClassOut'"
-rnHsVectDecl (HsVectInstIn isScalar instTy)
+rnHsVectDecl (HsVectInstIn instTy)
   = do { instTy' <- rnLHsInstType (text "In a VECTORISE pragma") instTy
-       ; return (HsVectInstIn isScalar instTy', emptyFVs)
+       ; return (HsVectInstIn instTy', emptyFVs)
        }
-rnHsVectDecl (HsVectInstOut _ _)
+rnHsVectDecl (HsVectInstOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectInstOut'"
 \end{code}
 
