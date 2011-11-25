@@ -149,12 +149,12 @@ typedef struct Task_ {
     // really want separate stats for each call in a nested chain of
     // foreign->haskell->foreign->haskell calls, but we'll get a
     // separate Task for each of the haskell calls.
-    Ticks       elapsedtimestart;
-    Ticks       muttimestart;
-    Ticks       mut_time;
-    Ticks       mut_etime;
-    Ticks       gc_time;
-    Ticks       gc_etime;
+    Time       elapsedtimestart;
+    Time       muttimestart;
+    Time       mut_time;
+    Time       mut_etime;
+    Time       gc_time;
+    Time       gc_etime;
 
     // Links tasks on the returning_tasks queue of a Capability, and
     // on spare_workers.
@@ -208,7 +208,7 @@ void workerTaskStop (Task *task);
 void taskTimeStamp (Task *task);
 
 // The current Task has finished a GC, record the amount of time spent.
-void taskDoneGC (Task *task, Ticks cpu_time, Ticks elapsed_time);
+void taskDoneGC (Task *task, Time cpu_time, Time elapsed_time);
 
 // Put the task back on the free list, mark it stopped.  Used by
 // forkProcess().

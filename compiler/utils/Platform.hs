@@ -55,6 +55,7 @@ data OS
         | OSMinGW32
         | OSFreeBSD
         | OSOpenBSD
+        | OSNetBSD
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture and Extensions
@@ -90,6 +91,7 @@ osElfTarget :: OS -> Bool
 osElfTarget OSLinux    = True
 osElfTarget OSFreeBSD  = True
 osElfTarget OSOpenBSD  = True
+osElfTarget OSNetBSD   = True
 osElfTarget OSSolaris2 = True
 osElfTarget OSDarwin   = False
 osElfTarget OSMinGW32  = False

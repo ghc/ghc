@@ -54,7 +54,13 @@ typedef union {
 #if defined(mingw32_HOST_OS)
   StgAsyncIOResult *async_result;
 #endif
+#if !defined(THREADED_RTS)
   StgWord target;
+    // Only for the non-threaded RTS: the target time for a thread
+    // blocked in threadDelay, in units of 10ms.  This is a
+    // compromise: we don't want to take up much space in the TSO.  If
+    // you want better resolution for threadDelay, use -threaded.
+#endif
 } StgTSOBlockInfo;
 
 

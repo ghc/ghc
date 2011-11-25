@@ -49,7 +49,7 @@ void      stat_workerStop(void);
 void      initStats0(void);
 void      initStats1(void);
 
-double    mut_user_time_until(Ticks t);
+double    mut_user_time_until(Time t);
 double    mut_user_time(void);
 
 #ifdef PROFILING
@@ -59,8 +59,8 @@ double    mut_user_time_during_heap_census(void);
 
 void      statDescribeGens( void );
 
-Ticks stat_getElapsedGCTime(void);
-Ticks stat_getElapsedTime(void);
+Time stat_getElapsedGCTime(void);
+Time stat_getElapsedTime(void);
 
 /* Only exported for Papi.c */
 void statsPrintf( char *s, ... ) 

@@ -576,11 +576,12 @@ zonkTcPredType = zonkTcType
 		     are used at the end of type checking
 
 \begin{code}
-defaultKindVarToStar :: TcTyVar -> TcM ()
+defaultKindVarToStar :: TcTyVar -> TcM Kind
 -- We have a meta-kind: unify it with '*'
 defaultKindVarToStar kv 
-  = ASSERT ( isKiVar kv && isMetaTyVar kv )
-    writeMetaTyVar kv liftedTypeKind
+  = do { ASSERT ( isKiVar kv && isMetaTyVar kv )
+         writeMetaTyVar kv liftedTypeKind
+       ; return liftedTypeKind }
 
 zonkQuantifiedTyVars :: TcTyVarSet -> TcM [TcTyVar]
 -- Precondition: a kind variable occurs before a type
@@ -907,11 +908,12 @@ expectedKindInCtxt _              = Just argTypeKind
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty = do
-    traceTc "checkValidType" (ppr ty)
-    unboxed  <- xoptM Opt_UnboxedTuples
-    rank2    <- xoptM Opt_Rank2Types
-    rankn    <- xoptM Opt_RankNTypes
-    polycomp <- xoptM Opt_PolymorphicComponents
+    traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
+    unboxed         <- xoptM Opt_UnboxedTuples
+    rank2           <- xoptM Opt_Rank2Types
+    rankn           <- xoptM Opt_RankNTypes
+    polycomp        <- xoptM Opt_PolymorphicComponents
+    constraintKinds <- xoptM Opt_ConstraintKinds
     let 
 	gen_rank n | rankn     = ArbitraryRank
 	           | rank2     = Rank 2
@@ -960,10 +962,12 @@ checkValidType ctxt ty = do
 	-- Check that the thing has kind Type, and is lifted if necessary
 	-- Do this second, because we can't usefully take the kind of an 
 	-- ill-formed type such as (a~Int)
-    traceTc "checkValidType kind_ok ctxt" (ppr kind_ok $$ pprUserTypeCtxt ctxt)
     checkTc kind_ok (kindErr actual_kind)
 
-    traceTc "checkValidType done" (ppr ty)
+        -- Check that the thing does not have kind Constraint,
+        -- if -XConstraintKinds isn't enabled
+    unless constraintKinds
+      $ checkTc (not (isConstraintKind actual_kind)) (predTupleErr ty)
 
 checkValidMonoType :: Type -> TcM ()
 checkValidMonoType ty = check_mono_type MustBeMonoType ty

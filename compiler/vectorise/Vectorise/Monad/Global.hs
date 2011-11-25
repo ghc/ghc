@@ -12,7 +12,7 @@ module Vectorise.Monad.Global (
   lookupVectDecl, noVectDecl, 
   
   -- * Scalars
-  globalScalarVars, isGlobalScalar, globalScalarTyCons,
+  globalScalarVars, isGlobalScalarVar, globalScalarTyCons,
   
   -- * TyCons
   lookupTyCon,
@@ -96,8 +96,8 @@ globalScalarVars = readGEnv global_scalar_vars
 
 -- |Check whether a given variable is in the set of global scalar variables.
 --
-isGlobalScalar :: Var -> VM Bool
-isGlobalScalar var = readGEnv $ \env -> var `elemVarSet` global_scalar_vars env
+isGlobalScalarVar :: Var -> VM Bool
+isGlobalScalarVar var = readGEnv $ \env -> var `elemVarSet` global_scalar_vars env
 
 -- |Get the set of global scalar type constructors including both those scalar type constructors
 -- declared in an imported module and those declared in the current module.

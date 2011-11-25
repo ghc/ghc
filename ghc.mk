@@ -1047,7 +1047,7 @@ publish-docs:
 # Directory in which we're going to build the src dist
 #
 SRC_DIST_NAME=ghc-$(ProjectVersion)
-SRC_DIST_DIR=$(TOP)/$(SRC_DIST_NAME)
+SRC_DIST_DIR=$(SRC_DIST_NAME)
 
 #
 # Files to include in source distributions
@@ -1083,8 +1083,8 @@ sdist-prep :
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
 	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done
 	cd $(SRC_DIST_DIR) && $(MAKE) distclean
-	rm -rf $(SRC_DIST_DIR)/libraries/tarballs/
-	rm -rf $(SRC_DIST_DIR)/libraries/stamp/
+	$(call removeTrees,$(SRC_DIST_DIR)/libraries/tarballs/)
+	$(call removeTrees,$(SRC_DIST_DIR)/libraries/stamp/)
 	$(call sdist_file,compiler,stage2,cmm,,CmmLex,x)
 	$(call sdist_file,compiler,stage2,cmm,,CmmParse,y)
 	$(call sdist_file,compiler,stage2,parser,,Lexer,x)
@@ -1096,7 +1096,7 @@ sdist-prep :
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Lex,x)
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Parse,y)
 	cd $(SRC_DIST_DIR) && $(call removeTrees,compiler/stage[123] mk/build.mk)
-	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" -o -name "*-darcs-backup*" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
+	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name .git -o -name "autom4te*" -o -name "*~" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
 
 .PHONY: sdist
 sdist : sdist-prep

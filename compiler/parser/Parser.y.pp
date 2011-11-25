@@ -589,11 +589,12 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | '{-# VECTORISE' 'type' gtycon '=' gtycon '#-}'     
                                                 { unitOL $ LL $ 
                                                     VectD (HsVectTypeIn False $3 (Just $5)) }
+        | '{-# VECTORISE_SCALAR' 'type' gtycon '=' gtycon '#-}'     
+                                                { unitOL $ LL $ 
+                                                    VectD (HsVectTypeIn True $3 (Just $5)) }
         | '{-# VECTORISE' 'class' gtycon '#-}'  { unitOL $ LL $ VectD (HsVectClassIn $3) }
-        | '{-# VECTORISE' 'instance' type '#-}'     
-                                                { unitOL $ LL $ VectD (HsVectInstIn False $3) }
         | '{-# VECTORISE_SCALAR' 'instance' type '#-}'     
-                                                { unitOL $ LL $ VectD (HsVectInstIn True $3) }
+                                                { unitOL $ LL $ VectD (HsVectInstIn $3) }
         | annotation { unitOL $1 }
         | decl                                  { unLoc $1 }
 
@@ -1320,14 +1321,15 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                                 { LL $ toOL [ LL $ SigD (TypeSig ($1 : unLoc $3) $5) ] }
         | infix prec ops        { LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
                                              | n <- unLoc $3 ] }
-        | '{-# INLINE'   activation qvar '#-}'        
+        | '{-# INLINE' activation qvar '#-}'        
                 { LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma (getINLINE $1) $2))) }
-        | '{-# SPECIALISE' qvar '::' sigtypes1 '#-}'
-                { LL $ toOL [ LL $ SigD (SpecSig $2 t defaultInlinePragma) 
-                                            | t <- $4] }
+        | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
+                { let inl_prag = mkInlinePragma (EmptyInlineSpec, FunLike) $2
+                  in LL $ toOL [ LL $ SigD (SpecSig $3 t inl_prag) 
+                               | t <- $5] }
         | '{-# SPECIALISE_INLINE' activation qvar '::' sigtypes1 '#-}'
                 { LL $ toOL [ LL $ SigD (SpecSig $3 t (mkInlinePragma (getSPEC_INLINE $1) $2))
-                                            | t <- $5] }
+                            | t <- $5] }
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 { LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
 

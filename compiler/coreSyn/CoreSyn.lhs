@@ -538,7 +538,7 @@ data CoreVect = Vect      Id   (Maybe CoreExpr)
               | NoVect    Id
               | VectType  Bool TyCon (Maybe TyCon)
               | VectClass TyCon                     -- class tycon
-              | VectInst  Bool Id                   -- (1) whether SCALAR & (2) instance dfun
+              | VectInst  Id                        -- instance dfun (always SCALAR)
 \end{code}
 
 

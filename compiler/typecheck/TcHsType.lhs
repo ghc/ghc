@@ -67,7 +67,7 @@ import NameSet
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag( Opt_ConstraintKinds, Opt_PolyKinds ) )
+import DynFlags ( ExtensionFlag( Opt_PolyKinds ) )
 import Util
 import UniqSupply
 import Outputable
@@ -375,31 +375,60 @@ kc_hs_type (HsKindSig ty sig_k) exp_kind = do
     return (HsKindSig ty' sig_k)
 
 -- See Note [Distinguishing tuple kinds] in HsTypes
-kc_hs_type (HsTupleTy HsBoxedOrConstraintTuple tys) exp_kind@(EK exp_k _ctxt)
-  = do { fact_tup_ok <- xoptM Opt_ConstraintKinds
-       ; let (k, tupleType) = if fact_tup_ok && isConstraintKind exp_k
-                              then (constraintKind, HsConstraintTuple)
-                              -- If it's not a constraint, then it has to be *
-                              -- Unboxed tuples are a separate case
-                              else (liftedTypeKind, HsBoxedTuple)
-       ; kc_hs_tuple_type tys tupleType k exp_kind }
+kc_hs_type ty@(HsTupleTy HsBoxedOrConstraintTuple tys) exp_kind@(EK exp_k _ctxt)
+  | isConstraintOrLiftedKind exp_k -- (NB: not zonking, to avoid left-right bias)
+  = do { tys' <- kcArgs (ptext (sLit "a tuple")) tys exp_k
+       ; return $ if isConstraintKind exp_k
+                    then HsTupleTy HsConstraintTuple tys'
+                    else HsTupleTy HsBoxedTuple      tys' }
+  | otherwise
+  -- It is not clear from the context if it's * or Constraint, 
+  -- so we infer the kind from the arguments
+  = do { k <- newMetaKindVar
+       ; tys' <- kcArgs (ptext (sLit "a tuple")) tys k 
+       ; k' <- zonkTcKind k
+       ; if isConstraintKind k'
+         then do { checkExpectedKind ty k' exp_kind
+                 ; return (HsTupleTy HsConstraintTuple tys') }
+         -- If it's not clear from the arguments that it's Constraint, then
+         -- it must be *. Check the arguments again to give good error messages
+         -- in eg. `(Maybe, Maybe)`
+         else do { tys'' <- kcArgs (ptext (sLit "a tuple")) tys liftedTypeKind
+                 ; checkExpectedKind ty liftedTypeKind exp_kind
+                 ; return (HsTupleTy HsBoxedTuple tys'') } }
+{-
+Note that we will still fail to infer the correct kind in this case:
 
-kc_hs_type (HsTupleTy HsBoxedTuple tys) exp_kind
-  = kc_hs_tuple_type tys HsBoxedTuple liftedTypeKind exp_kind
+  type T a = ((a,a), D a)
+  type family D :: Constraint -> Constraint
 
-kc_hs_type (HsTupleTy HsConstraintTuple tys) exp_kind
-  = kc_hs_tuple_type tys HsConstraintTuple constraintKind exp_kind
+While kind checking T, we do not yet know the kind of D, so we will default the
+kind of T to * -> *. It works if we annotate `a` with kind `Constraint`.
+-}
 
--- JPM merge with kc_hs_tuple_type ?
-kc_hs_type ty@(HsTupleTy HsUnboxedTuple tys) exp_kind
-  = do { tys' <- kcArgs (ptext (sLit "an unboxed tuple")) tys argTypeKind
-       ; checkExpectedKindS ty ubxTupleKind exp_kind
-       ; return (HsTupleTy HsUnboxedTuple tys') }
+kc_hs_type ty@(HsTupleTy tup_sort tys) exp_kind
+  = do { tys' <- kcArgs cxt_doc tys arg_kind
+       ; checkExpectedKind ty out_kind exp_kind
+       ; return (HsTupleTy tup_sort tys') }
+  where
+    arg_kind = case tup_sort of
+                 HsBoxedTuple      -> liftedTypeKind
+                 HsUnboxedTuple    -> argTypeKind
+                 HsConstraintTuple -> constraintKind
+                 _                 -> panic "kc_hs_type arg_kind"
+    out_kind = case tup_sort of
+                 HsUnboxedTuple    -> ubxTupleKind
+                 _                 -> arg_kind
+    cxt_doc = case tup_sort of
+                 HsBoxedTuple      -> ptext (sLit "a tuple")
+                 HsUnboxedTuple    -> ptext (sLit "an unboxed tuple")
+                 HsConstraintTuple -> ptext (sLit "a constraint tuple")
+                 _                 -> panic "kc_hs_type tup_sort"
 
 kc_hs_type ty@(HsFunTy ty1 ty2) exp_kind@(EK _ ctxt) = do
     ty1' <- kc_lhs_type ty1 (EK argTypeKind  ctxt)
     ty2' <- kc_lhs_type ty2 (EK openTypeKind ctxt)
-    checkExpectedKindS ty liftedTypeKind exp_kind
+    checkExpectedKind ty liftedTypeKind exp_kind
     return (HsFunTy ty1' ty2')
 
 kc_hs_type ty@(HsOpTy ty1 (_, l_op@(L loc op)) ty2) exp_kind = do
@@ -421,7 +450,7 @@ kc_hs_type ipTy@(HsIParamTy n ty) exp_kind = do
     ty' <- kc_lhs_type ty 
              (EK liftedTypeKind 
                (ptext (sLit "The type argument of the implicit parameter had")))
-    checkExpectedKindS ipTy constraintKind exp_kind
+    checkExpectedKind ipTy constraintKind exp_kind
     return (HsIParamTy n ty')
 
 kc_hs_type ty@(HsEqTy ty1 ty2) exp_kind = do
@@ -429,7 +458,7 @@ kc_hs_type ty@(HsEqTy ty1 ty2) exp_kind = do
     (ty2', kind2) <- kc_lhs_type_fresh ty2
     checkExpectedKind ty2 kind2
       (EK kind1 (ptext (sLit "The left argument of the equality predicate had")))
-    checkExpectedKindS ty constraintKind exp_kind
+    checkExpectedKind ty constraintKind exp_kind
     return (HsEqTy ty1' ty2')
 
 kc_hs_type (HsCoreTy ty) exp_kind = do
@@ -467,7 +496,7 @@ kc_hs_type ty@(HsRecTy _) _exp_kind
 #ifdef GHCI	/* Only if bootstrapped */
 kc_hs_type (HsSpliceTy sp fvs _) exp_kind = do
     (ty, k) <- kcSpliceType sp fvs
-    checkExpectedKindS ty k exp_kind
+    checkExpectedKind ty k exp_kind
     return ty
 #else
 kc_hs_type ty@(HsSpliceTy {}) _exp_kind =
@@ -485,27 +514,19 @@ kc_hs_type (HsDocTy ty _) exp_kind
 kc_hs_type ty@(HsExplicitListTy _k tys) exp_kind
   = do { ty_k_s <- mapM kc_lhs_type_fresh tys
        ; kind <- unifyKinds (ptext (sLit "In a promoted list")) ty_k_s
-       ; checkExpectedKindS ty (mkListTy kind) exp_kind
+       ; checkExpectedKind ty (mkListTy kind) exp_kind
        ; return (HsExplicitListTy kind (map fst ty_k_s)) }
 
 kc_hs_type ty@(HsExplicitTupleTy _ tys) exp_kind = do
   ty_k_s <- mapM kc_lhs_type_fresh tys
   let tupleKi = mkTyConApp (tupleTyCon BoxedTuple (length tys)) (map snd ty_k_s)
-  checkExpectedKindS ty tupleKi exp_kind
+  checkExpectedKind ty tupleKi exp_kind
   return (HsExplicitTupleTy (map snd ty_k_s) (map fst ty_k_s))
 
 kc_hs_type (HsWrapTy {}) _exp_kind =
     panic "kc_hs_type HsWrapTy"  -- We kind checked something twice
 
 ---------------------------
-kc_hs_tuple_type :: [LHsType Name] -> HsTupleSort -> Kind -> ExpKind
-                 -> TcM (HsType Name)
-kc_hs_tuple_type tys tuple_type kind exp_kind
-  = do { tys' <- kcArgs (ptext (sLit "a tuple")) tys kind
-       ; let hsTupleTy = HsTupleTy tuple_type tys'
-       ; checkExpectedKindS hsTupleTy kind exp_kind
-       ; return hsTupleTy }
-
 kcApps :: Outputable a
        => a 
        -> TcKind			-- Function kind
@@ -523,7 +544,7 @@ kcCheckApps :: Outputable a => a -> TcKind -> [LHsType Name]
 kcCheckApps the_fun fun_kind args ty exp_kind
   = do { (args_w_kinds, res_kind) <- splitFunKind (ppr the_fun) 1 fun_kind args
        ; args_w_kinds' <- kc_lhs_types args_w_kinds
-       ; checkExpectedKindS ty res_kind exp_kind
+       ; checkExpectedKind ty res_kind exp_kind
        ; return args_w_kinds' }
 
 
@@ -1208,14 +1229,18 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
            env0 <- tcInitTidyEnv
            let (exp_as, _) = splitKindFunTys exp_kind
                (act_as, _) = splitKindFunTys act_kind
-               n_exp_as = length exp_as
-               n_act_as = length act_as
+               n_exp_as  = length exp_as
+               n_act_as  = length act_as
+               n_diff_as = n_act_as - n_exp_as
 
                (env1, tidy_exp_kind) = tidyOpenKind env0 exp_kind
                (env2, tidy_act_kind) = tidyOpenKind env1 act_kind
 
                err | n_exp_as < n_act_as     -- E.g. [Maybe]
-                   = quotes (ppr ty) <+> ptext (sLit "is not applied to enough type arguments")
+                   = ptext (sLit "Expecting") <+>
+                     speakN n_diff_as <+> ptext (sLit "more argument") <>
+                     (if n_diff_as > 1 then char 's' else empty) <+>
+                     ptext (sLit "to") <+> quotes (ppr ty)
 
                      -- Now n_exp_as >= n_act_as. In the next two cases,
                      -- n_exp_as == 0, and hence so is n_act_as
@@ -1223,7 +1248,7 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
                    = text "Predicate" <+> quotes (ppr ty) <+> text "used as a type"
                    
                    | isConstraintKind tidy_exp_kind
-                   = text "Type of kind " <+> ppr tidy_act_kind <+> text "used as a constraint"
+                   = text "Type of kind" <+> ppr tidy_act_kind <+> text "used as a constraint"
                    
                    | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
                    = ptext (sLit "Expecting a lifted type, but") <+> quotes (ppr ty)
@@ -1234,26 +1259,14 @@ checkExpectedKind ty act_kind ek@(EK exp_kind ek_ctxt) = do
                        <+> ptext (sLit "is lifted")
 
                    | otherwise               -- E.g. Monad [Int]
-                   = ptext (sLit "Kind mis-match")
+                   = ptext (sLit "Kind mis-match") $$ more_info
 
                more_info = sep [ ek_ctxt <+> ptext (sLit "kind") 
                                     <+> quotes (pprKind tidy_exp_kind) <> comma,
                                  ptext (sLit "but") <+> quotes (ppr ty) <+>
                                      ptext (sLit "has kind") <+> quotes (pprKind tidy_act_kind)]
 
-           failWithTcM (env2, err $$ more_info)
-
--- We infer the kind of the type, and then complain if it's not right.
--- But we don't want to complain about
---      (ty) or !(ty) or forall a. ty
--- when the real difficulty is with the 'ty' part.
-checkExpectedKindS :: HsType Name -> TcKind -> ExpKind -> TcM ()
-checkExpectedKindS ty = checkExpectedKind (strip ty)
-  where
-    strip (HsParTy (L _ ty))          = strip ty
-    strip (HsBangTy _ (L _ ty))       = strip ty
-    strip (HsForAllTy _ _ _ (L _ ty)) = strip ty
-    strip ty                          = ty
+           failWithTcM (env2, err)
 \end{code}
 
 %************************************************************************

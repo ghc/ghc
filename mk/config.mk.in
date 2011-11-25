@@ -118,6 +118,7 @@ SharedLibsPlatformList =                        \
     i386-unknown-linux   x86_64-unknown-linux   \
     i386-unknown-freebsd x86_64-unknown-freebsd \
     i386-unknown-openbsd x86_64-unknown-openbsd \
+    i386-unknown-netbsd  x86_64-unknown-netbsd  \
     i386-unknown-mingw32                        \
     i386-apple-darwin    x86_64-apple-darwin    powerpc-apple-darwin
 

@@ -87,8 +87,8 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
 
           -- Vectorise all the top level bindings and VECTORISE declarations on imported identifiers
           -- NB: Need to vectorise the imported bindings first (local bindings may depend on them).
-      ; let impBinds = [imp_id | Vect          imp_id _ <- vect_decls, isGlobalId imp_id] ++
-                       [imp_id | VectInst True imp_id   <- vect_decls, isGlobalId imp_id]
+      ; let impBinds = [imp_id | Vect     imp_id _ <- vect_decls, isGlobalId imp_id] ++
+                       [imp_id | VectInst imp_id   <- vect_decls, isGlobalId imp_id]
       ; binds_imp <- mapM vectImpBind impBinds
       ; binds_top <- mapM vectTopBind binds
 
@@ -150,7 +150,7 @@ vectTopBind b@(NonRec var expr)
          ; (inline, isScalar, expr') <- vectTopRhs [] var expr
          ; var' <- vectTopBinder var inline expr'
          ; when isScalar $ 
-             addGlobalScalar var
+             addGlobalScalarVar var
  
              -- We replace the original top-level binding by a value projected from the vectorised
              -- closure and add any newly created hoisted top-level bindings.
@@ -182,7 +182,7 @@ vectTopBind b@(Rec bs)
                   ; if and areScalars
                     then      -- (1) Entire recursive group is scalar
                               --      => add all variables to the global set of scalars
-                         do { mapM_ addGlobalScalar vars
+                         do { mapM_ addGlobalScalarVar vars
                             ; return (vars', inlines, exprs', hs)
                             }
                     else      -- (2) At least one binding is not scalar
@@ -226,7 +226,7 @@ vectImpBind var
        ; (inline, isScalar, expr') <- vectTopRhs [] var (Var var)
        ; var' <- vectTopBinder var inline expr'
        ; when isScalar $ 
-           addGlobalScalar var
+           addGlobalScalarVar var
 
            -- We add any newly created hoisted top-level bindings.
        ; hs <- takeHoisted
@@ -340,7 +340,7 @@ vectTopRhs :: [Var]           -- ^ Names of all functions in the rec block
                  , CoreExpr)  -- (3) the vectorised right-hand side
 vectTopRhs recFs var expr
   = closedV
-  $ do { globalScalar <- isGlobalScalar var
+  $ do { globalScalar <- isGlobalScalarVar var
        ; vectDecl     <- lookupVectDecl var
        ; let isDFun = isDFunId var
 
@@ -385,7 +385,7 @@ tryConvert :: Var       -- ^ Name of the original binding (eg @foo@)
            -> CoreExpr  -- ^ The original body of the binding.
            -> VM CoreExpr
 tryConvert var vect_var rhs
-  = do { globalScalar <- isGlobalScalar var
+  = do { globalScalar <- isGlobalScalarVar var
        ; if globalScalar
          then
            return rhs

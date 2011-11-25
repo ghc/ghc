@@ -801,11 +801,11 @@ reportCCSProfiling( void )
 	fprintf(prof_file, " %s", prog_argv[count]);
     fprintf(prof_file, "\n\n");
 
-    fprintf(prof_file, "\ttotal time  = %11.2f secs   (%lu ticks @ %d ms)\n",
-	    (double) total_prof_ticks *
-        (double) RtsFlags.MiscFlags.tickInterval / 1000,
+    fprintf(prof_file, "\ttotal time  = %11.2f secs   (%lu ticks @ %d us)\n",
+            ((double) total_prof_ticks *
+             (double) RtsFlags.MiscFlags.tickInterval) / TIME_RESOLUTION,
 	    (unsigned long) total_prof_ticks,
-        (int) RtsFlags.MiscFlags.tickInterval);
+            (int) TimeToUS(RtsFlags.MiscFlags.tickInterval));
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
 	    showStgWord64(total_alloc * sizeof(W_),

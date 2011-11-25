@@ -545,7 +545,7 @@
       </para>
     </sect3>
 
-    <sec3 id="trustworthy-guarantees">
+    <sect3 id="trustworthy-guarantees">
       <title>Trustworthy Requirements</title>
       <indexterm><primary>trustworthy</primary></indexterm>
 
@@ -554,7 +554,7 @@
       exposed by its export list) can't be used in an unsafe manner.  This mean
       that symbols exported should respect type safety and referential
       transparency.
-    </sec3>
+    </sect3>
 
     <sect3 id="safe-package-trust">
       <title>Package Trust</title>
@@ -582,7 +582,7 @@
 
   </sect2>
 
-  <sec2 id="safe-inference">
+  <sect2 id="safe-inference">
     <title>Safe Haskell Inference</title>
     <indexterm><primary>safe inference</primary></indexterm>
 
@@ -619,7 +619,7 @@
     user of the library would have to wrap it in a shim that simply re-exported
     your API through a trustworthy module, an annoying practice.
     </para>
-  </sec2>
+  </sect2>
 
   <sect2 id="safe-flag-summary">
     <title>Safe Haskell Flag Summary</title>

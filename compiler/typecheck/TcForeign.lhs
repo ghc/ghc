@@ -121,17 +121,29 @@ normaliseFfiType' env ty0 = go [] ty0
                                                   panic "normaliseFfiType': Got more GREs than expected"
                                       _ ->
                                           return False
-                  if newtypeOK
-                      then do let nt_co = mkAxInstCo (newTyConCo tc) tys
-                              add_co nt_co rec_nts' nt_rhs
-                      else children_only
+                  when (not newtypeOK) $
+                     -- later: stop_here
+                    addWarnTc (ptext (sLit "newtype") <+> quotes (ppr tc) <+>
+                               ptext (sLit "is used in an FFI declaration,") $$
+                               ptext (sLit "but its constructor is not in scope.") $$
+                               ptext (sLit "This will become an error in GHC 7.6.1."))
+
+                  let nt_co = mkAxInstCo (newTyConCo tc) tys
+                  add_co nt_co rec_nts' nt_rhs
+
         | isFamilyTyCon tc              -- Expand open tycons
         , (co, ty) <- normaliseTcApp env tc tys
         , not (isReflCo co)
         = add_co co rec_nts ty
+
         | otherwise
-        = children_only
+        = return (mkReflCo ty, ty)
+            -- If we have reached an ordinary (non-newtype) type constructor,
+            -- we are done.  Note that we don't need to normalise the arguments,
+            -- because whether an FFI type is legal or not depends only on
+            -- the top-level type constructor (e.g. "Ptr a" is valid for all a).
         where
+
           children_only = do xs <- mapM (go rec_nts) tys
                              let (cos, tys') = unzip xs
                              return (mkTyConAppCo tc cos, mkTyConApp tc tys')

@@ -1063,9 +1063,9 @@ zonkVect _ (HsVectTypeIn _ _ _) = panic "TcHsSyn.zonkVect: HsVectTypeIn"
 zonkVect _env (HsVectClassOut c)
   = return $ HsVectClassOut c
 zonkVect _ (HsVectClassIn _) = panic "TcHsSyn.zonkVect: HsVectClassIn"
-zonkVect _env (HsVectInstOut s i)
-  = return $ HsVectInstOut s i
-zonkVect _ (HsVectInstIn _ _) = panic "TcHsSyn.zonkVect: HsVectInstIn"
+zonkVect _env (HsVectInstOut i)
+  = return $ HsVectInstOut i
+zonkVect _ (HsVectInstIn _) = panic "TcHsSyn.zonkVect: HsVectInstIn"
 \end{code}
 
 %************************************************************************
@@ -1206,9 +1206,7 @@ zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- Works on both types and kinds
 zonkTvCollecting unbound_tv_set tv
   = do { poly_kinds <- xoptM Opt_PolyKinds
-       ; if isKiVar tv && not poly_kinds then
-            do { defaultKindVarToStar tv
-               ; return liftedTypeKind }
+       ; if isKiVar tv && not poly_kinds then defaultKindVarToStar tv
          else do
        { tv' <- zonkQuantifiedTyVar tv
        ; tv_set <- readMutVar unbound_tv_set

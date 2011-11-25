@@ -199,7 +199,8 @@ initBuiltinVars (Builtins { })
 -- |Get a list of names to `TyCon`s in the mock prelude.
 --
 initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
--- FIXME: must be replaced by VECTORISE pragmas!!!
+-- FIXME: * must be replaced by VECTORISE pragmas!!!
+--        * then we can remove 'parrayTyCon' from the Builtins as well
 initBuiltinTyCons bi
   = do
       return $ (tyConName funTyCon, closureTyCon bi)

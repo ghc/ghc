@@ -9,6 +9,4 @@
 #ifndef ITIMER_H
 #define ITIMER_H
 
-RTS_PRIVATE lnat getourtimeofday ( void );
-
 #endif /* ITIMER_H */

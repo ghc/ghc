@@ -14,7 +14,8 @@ module Vectorise.Monad (
   -- * Variables
   lookupVar,
   lookupVar_maybe,
-  addGlobalScalar, 
+  addGlobalScalarVar, 
+  addGlobalScalarTyCon, 
 ) where
 
 import Vectorise.Monad.Base
@@ -32,6 +33,8 @@ import DynFlags
 import MonadUtils (liftIO)
 import InstEnv
 import Class
+import TyCon
+import NameSet
 import VarSet
 import VarEnv
 import Var
@@ -174,8 +177,17 @@ dumpVar var
 -- |Mark the given variable as scalar — i.e., executing the associated code does not involve any
 -- parallel array computations.
 --
-addGlobalScalar :: Var -> VM ()
-addGlobalScalar var
-  = do { traceVt "addGlobalScalar" (ppr var)
+addGlobalScalarVar :: Var -> VM ()
+addGlobalScalarVar var
+  = do { traceVt "addGlobalScalarVar" (ppr var)
        ; updGEnv $ \env -> env{global_scalar_vars = extendVarSet (global_scalar_vars env) var}
+       }
+
+-- |Mark the given type constructor as scalar — i.e., its values cannot embed parallel arrays.
+--
+addGlobalScalarTyCon :: TyCon -> VM ()
+addGlobalScalarTyCon tycon
+  = do { traceVt "addGlobalScalarTyCon" (ppr tycon)
+       ; updGEnv $ \env -> 
+           env{global_scalar_tycons = addOneToNameSet (global_scalar_tycons env) (tyConName tycon)}
        }

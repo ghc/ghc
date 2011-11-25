@@ -728,10 +728,11 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                              , ifaceVectInfoScalarTyCons = scalarTyCons
                              })
   = do { let scalarTyConsSet = mkNameSet scalarTyCons
-       ; vVars       <- mapM vectVarMapping                          vars
-       ; tyConRes1   <- mapM vectTyConMapping                        tycons
-       ; tyConRes2   <- mapM (vectTyConReuseMapping scalarTyConsSet) tyconsReuse
-       ; vScalarVars <- mapM vectVar                                 scalarVars
+       ; vVars       <- mapM vectVarMapping                  vars
+       ; let varsSet = mkVarSet (map fst vVars)
+       ; tyConRes1   <- mapM (vectTyConVectMapping varsSet)  tycons
+       ; tyConRes2   <- mapM (vectTyConReuseMapping varsSet) tyconsReuse
+       ; vScalarVars <- mapM vectVar                         scalarVars
        ; let (vTyCons, vDataCons) = unzip (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
                   { vectInfoVar          = mkVarEnv  vVars
@@ -757,69 +758,51 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
       = forkM (ptext (sLit "vect scalar var")  <+> ppr name)  $
           tcIfaceExtId name
 
-    vectTyConMapping name 
+    vectTyConVectMapping vars name
       = do { vName  <- lookupOrig mod (mkLocalisedOccName mod mkVectTyConOcc name)
+           ; vectTyConMapping vars name vName
+           }
 
-               -- we need a fully defined version of the type constructor to be able to extract
-               -- its data constructors etc.
-           ; tycon  <- do { let mb_tycon = lookupTypeEnv typeEnv name
-                          ; case mb_tycon of
-                                -- tycon is local
-                              Just (ATyCon tycon) -> return tycon
-                                -- name is not a tycon => internal inconsistency
-                              Just _              -> notATyConErr
-                                -- tycon is external
-                              Nothing             -> tcIfaceTyCon (IfaceTc name)
-                          }
-           ; vTycon <- forkM (text ("vect vTycon") <+> ppr vName) $
-                         tcIfaceTyCon (IfaceTc vName)
+    vectTyConReuseMapping vars name
+      = vectTyConMapping vars name name
 
-               -- we need to handle class type constructors differently due to the manner in which
-               -- the name for the dictionary data constructor is computed
-           ; vDataCons <- if isClassTyCon tycon
-                          then vectClassDataConMapping vName (tyConSingleDataCon_maybe tycon)
-                          else mapM vectDataConMapping (tyConDataCons tycon)
+    vectTyConMapping vars name vName
+      = do { tycon  <- lookupLocalOrExternal name
+           ; vTycon <- lookupLocalOrExternal vName
+
+               -- map the data constructors of the original type constructor to those of the
+               -- vectorised type constructor /unless/ the type constructor was vectorised
+               -- abstractly; if it was vectorised abstractly, the workers of its data constructors
+               -- do not appear in the set of vectorised variables
+           ; let isAbstract | isClassTyCon tycon = False
+                            | datacon:_ <- tyConDataCons tycon 
+                                                 = not $ dataConWrapId datacon `elemVarSet` vars
+                            | otherwise          = True
+                 vDataCons  | isAbstract = []
+                            | otherwise  = [ (dataConName datacon, (datacon, vDatacon))
+                                           | (datacon, vDatacon) <- zip (tyConDataCons tycon)
+                                                                        (tyConDataCons vTycon)
+                                           ]
+
            ; return ( (name, (tycon, vTycon))          -- (T, T_v)
                     , vDataCons                        -- list of (Ci, Ci_v)
                     )
            }
       where
+          -- we need a fully defined version of the type constructor to be able to extract
+          -- its data constructors etc.
+        lookupLocalOrExternal name
+          = do { let mb_tycon = lookupTypeEnv typeEnv name
+               ; case mb_tycon of
+                     -- tycon is local
+                   Just (ATyCon tycon) -> return tycon
+                     -- name is not a tycon => internal inconsistency
+                   Just _              -> notATyConErr
+                     -- tycon is external
+                   Nothing             -> tcIfaceTyCon (IfaceTc name)
+               }
+
         notATyConErr = pprPanic "TcIface.tcIfaceVectInfo: not a tycon" (ppr name)
-
-    vectTyConReuseMapping scalarNames name 
-      = do { tycon <- forkM (text ("vect reuse tycon") <+> ppr name) $
-                        tcIfaceTyCon (IfaceTc name) -- somewhat naughty for wired in tycons, but ok
-           ; if name `elemNameSet` scalarNames
-             then do
-           { return ( (name, (tycon, tycon))      -- scalar type constructors expose no data..
-                    , []                          -- ..constructors see..
-                    )                             -- .."Note [Pragmas to vectorise tycons]"..
-                                                  -- ..in 'Vectorise.Type.Env'
-           } else do 
-           { let { vDataCons  = [ (dataConName dc, (dc, dc)) 
-                                | dc <- tyConDataCons tycon]
-                 }
-           ; return ( (name, (tycon, tycon))          -- (T, T)
-                    , vDataCons                       -- list of (Ci, Ci)
-                    )
-           }}
-
-    vectClassDataConMapping _vTyconName Nothing = panic "tcIfaceVectInfo: vectClassDataConMapping"
-    vectClassDataConMapping vTyconName  (Just datacon)
-      = do { let name = dataConName datacon
-           ; vName <- lookupOrig mod (mkClassDataConOcc . nameOccName $ vTyconName)
-           ; vDataCon <- forkM (text ("vect class datacon") <+> ppr name) $
-                           tcIfaceDataCon vName
-           ; return [(name, (datacon, vDataCon))]
-           }
-
-    vectDataConMapping datacon
-      = do { let name = dataConName datacon
-           ; vName <- lookupOrig mod (mkLocalisedOccName mod mkVectDataConOcc name)
-           ; vDataCon <- forkM (text ("vect datacon") <+> ppr name) $
-                           tcIfaceDataCon vName
-           ; return (name, (datacon, vDataCon))
-           }
 \end{code}
 
 %************************************************************************

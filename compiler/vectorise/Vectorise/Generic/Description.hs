@@ -1,16 +1,20 @@
-
--- | Compute a description of the generic representation that we use for 
---   a user defined data type.
+-- |Compute a description of the generic representation that we use for a user defined data type.
 --
---   During vectorisation, we generate a PRepr and PA instance for each user defined
---   data type. The PA dictionary contains methods to convert the user type to and
---   from our generic representation. This module computes a description of what
---   that generic representation is.
+-- During vectorisation, we generate a PRepr and PA instance for each user defined
+-- data type. The PA dictionary contains methods to convert the user type to and
+-- from our generic representation. This module computes a description of what
+-- that generic representation is.
 --
-module Vectorise.Generic.Description ( 
-  CompRepr (..), ProdRepr (..), ConRepr (..), SumRepr (..),
-  tyConRepr, sumReprType, conReprType, prodReprType, compReprType, compOrigType
-) where
+module Vectorise.Generic.Description 
+  ( CompRepr(..)
+  , ProdRepr(..)
+  , ConRepr(..)
+  , SumRepr(..)
+  , tyConRepr
+  , sumReprType
+  , compOrigType
+  ) 
+where
 
 import Vectorise.Utils
 import Vectorise.Monad
@@ -108,8 +112,8 @@ data CompRepr
 
 -------------------------------------------------------------------------------
 
--- | Determine the generic representation of a data type, given its tycon.
---   The `TyCon` contains a description of the whole data type.
+-- |Determine the generic representation of a data type, given its tycon.
+--
 tyConRepr :: TyCon -> VM SumRepr
 tyConRepr tc 
   = sum_repr (tyConDataCons tc)
@@ -129,9 +133,8 @@ tyConRepr tc
            sum_tc       <- builtin (sumTyCon arity)
            
            -- Get the 'PData' and 'PDatas' tycons for the sum.
-           let sumapp   = mkTyConApp sum_tc tys
-           psum_tc      <- liftM fst $ pdataReprTyCon  sumapp
-           psums_tc     <- liftM fst $ pdatasReprTyCon sumapp
+           psum_tc      <- pdataReprTyConExact  sum_tc
+           psums_tc     <- pdatasReprTyConExact sum_tc
            
            sel_ty       <- builtin (selTy      arity)
            sels_ty      <- builtin (selsTy     arity)
@@ -165,9 +168,8 @@ tyConRepr tc
            tup_tc       <- builtin (prodTyCon arity)
 
            -- Get the 'PData' and 'PDatas' tycons for the product.
-           let prodapp  = mkTyConApp tup_tc tys'
-           ptup_tc      <- liftM fst $ pdataReprTyCon  prodapp
-           ptups_tc     <- liftM fst $ pdatasReprTyCon prodapp
+           ptup_tc      <- pdataReprTyConExact  tup_tc
+           ptups_tc     <- pdatasReprTyConExact tup_tc
            
            return $ Prod 
                   { repr_tup_tc   = tup_tc
@@ -181,37 +183,35 @@ tyConRepr tc
     comp_repr ty = liftM (Keep ty) (prDictOfReprType ty)
                    `orElseV` return (Wrap ty)
 
-
--- | Yield the type of this sum representation.
+-- |Yield the type of this sum representation.
+--
 sumReprType :: SumRepr -> VM Type
 sumReprType EmptySum     = voidType
 sumReprType (UnarySum r) = conReprType r
 sumReprType (Sum { repr_sum_tc  = sum_tc, repr_con_tys = tys })
   = return $ mkTyConApp sum_tc tys
 
-
--- | Yield the type of this constructor representation.
+-- Yield the type of this constructor representation.
+--
 conReprType :: ConRepr -> VM Type
 conReprType (ConRepr _ r) = prodReprType r
 
-
--- | Yield the type of of this product representation.
+-- Yield the type of of this product representation.
+--
 prodReprType :: ProdRepr -> VM Type
 prodReprType EmptyProd     = voidType
 prodReprType (UnaryProd r) = compReprType r
 prodReprType (Prod { repr_tup_tc = tup_tc, repr_comp_tys = tys })
   = return $ mkTyConApp tup_tc tys
 
-
--- | Yield the type of this data constructor field \/ component representation.
+-- Yield the type of this data constructor field \/ component representation.
+--
 compReprType :: CompRepr -> VM Type
 compReprType (Keep ty _) = return ty
-compReprType (Wrap ty)
-  = do  wrap_tc <- builtin wrapTyCon
-        return $ mkTyConApp wrap_tc [ty]
-       
+compReprType (Wrap ty)   = mkWrapType ty
 
--- Yield the original component type of a data constructor component representation.
+-- |Yield the original component type of a data constructor component representation.
+--
 compOrigType :: CompRepr -> Type
 compOrigType (Keep ty _) = ty
 compOrigType (Wrap ty)   = ty

@@ -224,7 +224,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         openbsd)
             test -z "[$]2" || eval "[$]2=OSOpenBSD"
             ;;
-        netbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+        netbsd)
+            test -z "[$]2" || eval "[$]2=OSNetBSD"
+            ;;
+        dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         *)

@@ -1070,8 +1070,7 @@ heapCensusChain( Census *census, bdescr *bd )
     }
 }
 
-void
-heapCensus( Ticks t )
+void heapCensus (Time t)
 {
   nat g, n;
   Census *census;
