@@ -112,8 +112,7 @@ getCPUTime = do
 
 type CRUsage = ()
 foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
-#else
-# if defined(HAVE_TIMES)
+#elif defined(HAVE_TIMES)
     allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
     _ <- times p_tms
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
@@ -123,12 +122,11 @@ foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
 
 type CTms = ()
 foreign import ccall unsafe times :: Ptr CTms -> IO CClock
-# else
+#else
     ioException (IOError Nothing UnsupportedOperation 
                          "getCPUTime"
                          "can't get CPU time"
                          Nothing)
-# endif
 #endif
 
 #else /* win32 */
