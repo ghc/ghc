@@ -498,6 +498,7 @@ any extra arguments to git:
   config
   fetch
   format-patch
+  gc
   grep
   log
   new
