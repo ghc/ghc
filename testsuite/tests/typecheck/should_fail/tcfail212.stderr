@@ -1,12 +1,8 @@
 
 tcfail212.hs:10:7:
-    `Maybe' is not applied to enough type arguments
-    The first argument of a tuple should have kind `*',
-    but `Maybe' has kind `* -> *'
+    Expecting one more argument to `Maybe'
     In the type signature for `f': f :: (Maybe, Either Int)
 
 tcfail212.hs:13:7:
     Expecting a lifted type, but `Int#' is unlifted
-    The first argument of a tuple should have kind `*',
-    but `Int#' has kind `#'
     In the type signature for `g': g :: (Int#, Int#)
