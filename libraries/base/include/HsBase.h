@@ -633,6 +633,10 @@ INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
 
 #if !defined(__MINGW32__)
 
+INLINE int __hsbase_gettimeofday(struct timeval *tv, struct timezone *tz) {
+        return gettimeofday(tv, tz);
+}
+
 INLINE HsInt sizeofTimeVal(void) { return sizeof(struct timeval); }
 
 INLINE HsWord64 getUSecOfDay(void)
