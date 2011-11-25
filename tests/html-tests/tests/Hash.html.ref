@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>Hash</p
 	></div
       ><div id="table-of-contents"
@@ -36,13 +46,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	>Contents</p
 	><ul
 	><li
-	  ><A HREF="">The <code
+	  ><a href=""
+	    >The <code
 	      >HashTable</code
 	      > type
 </a
 	    ><ul
 	    ><li
-	      ><A HREF="">Operations on <code
+	      ><a href=""
+		>Operations on <code
 		  >HashTable</code
 		  >s
 </a
@@ -50,7 +62,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	      ></ul
 	    ></li
 	  ><li
-	  ><A HREF="">The <code
+	  ><a href=""
+	    >The <code
 	      >Hash</code
 	      > class
 </a
@@ -74,39 +87,58 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">HashTable</a
+	    >  <a href=""
+	    >HashTable</a
 	    > key val</li
 	  ><li class="src short"
-	  ><A HREF="">new</a
-	    > :: (<A HREF="">Eq</a
-	    > key, <A HREF="">Hash</a
-	    > key) =&gt; <A HREF="">Int</a
-	    > -&gt; <A HREF="">IO</a
-	    > (<A HREF="">HashTable</a
+	  ><a href=""
+	    >new</a
+	    > :: (<a href=""
+	    >Eq</a
+	    > key, <a href=""
+	    >Hash</a
+	    > key) =&gt; <a href=""
+	    >Int</a
+	    > -&gt; <a href=""
+	    >IO</a
+	    > (<a href=""
+	    >HashTable</a
 	    > key val)</li
 	  ><li class="src short"
-	  ><A HREF="">insert</a
-	    > :: (<A HREF="">Eq</a
-	    > key, <A HREF="">Hash</a
-	    > key) =&gt; key -&gt; val -&gt; <A HREF="">IO</a
-	    > <A HREF="">()</a
+	  ><a href=""
+	    >insert</a
+	    > :: (<a href=""
+	    >Eq</a
+	    > key, <a href=""
+	    >Hash</a
+	    > key) =&gt; key -&gt; val -&gt; <a href=""
+	    >IO</a
+	    > <a href=""
+	    >()</a
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">lookup</a
-	    > :: <A HREF="">Hash</a
-	    > key =&gt; key -&gt; <A HREF="">IO</a
-	    > (<A HREF="">Maybe</a
+	  ><a href=""
+	    >lookup</a
+	    > :: <a href=""
+	    >Hash</a
+	    > key =&gt; key -&gt; <a href=""
+	    >IO</a
+	    > (<a href=""
+	    >Maybe</a
 	    > val)</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    >  <A HREF="">Hash</a
+	    >  <a href=""
+	    >Hash</a
 	    > a  <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
-	      ><A HREF="">hash</a
-		> :: a -&gt; <A HREF="">Int</a
+	      ><a href=""
+		>hash</a
+		> :: a -&gt; <a href=""
+		>Int</a
 		></li
 	      ></ul
 	    ></li
@@ -135,7 +167,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
  The type <code
 	      >key</code
 	      > should be an instance of <code
-	      ><A HREF="">Eq</a
+	      ><a href=""
+		>Eq</a
 		></code
 	      >.
 </p
@@ -150,11 +183,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	><p class="src"
 	  ><a name="v:new" class="def"
 	    >new</a
-	    > :: (<A HREF="">Eq</a
-	    > key, <A HREF="">Hash</a
-	    > key) =&gt; <A HREF="">Int</a
-	    > -&gt; <A HREF="">IO</a
-	    > (<A HREF="">HashTable</a
+	    > :: (<a href=""
+	    >Eq</a
+	    > key, <a href=""
+	    >Hash</a
+	    > key) =&gt; <a href=""
+	    >Int</a
+	    > -&gt; <a href=""
+	    >IO</a
+	    > (<a href=""
+	    >HashTable</a
 	    > key val)</p
 	  ><div class="doc"
 	  ><p
@@ -166,10 +204,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	><p class="src"
 	  ><a name="v:insert" class="def"
 	    >insert</a
-	    > :: (<A HREF="">Eq</a
-	    > key, <A HREF="">Hash</a
-	    > key) =&gt; key -&gt; val -&gt; <A HREF="">IO</a
-	    > <A HREF="">()</a
+	    > :: (<a href=""
+	    >Eq</a
+	    > key, <a href=""
+	    >Hash</a
+	    > key) =&gt; key -&gt; val -&gt; <a href=""
+	    >IO</a
+	    > <a href=""
+	    >()</a
 	    ></p
 	  ><div class="doc"
 	  ><p
@@ -181,20 +223,25 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	><p class="src"
 	  ><a name="v:lookup" class="def"
 	    >lookup</a
-	    > :: <A HREF="">Hash</a
-	    > key =&gt; key -&gt; <A HREF="">IO</a
-	    > (<A HREF="">Maybe</a
+	    > :: <a href=""
+	    >Hash</a
+	    > key =&gt; key -&gt; <a href=""
+	    >IO</a
+	    > (<a href=""
+	    >Maybe</a
 	    > val)</p
 	  ><div class="doc"
 	  ><p
 	    >Looks up a key in the hash table, returns <code
 	      ><code
-		><A HREF="">Just</a
+		><a href=""
+		  >Just</a
 		  ></code
 		> val</code
 	      > if the key
  was found, or <code
-	      ><A HREF="">Nothing</a
+	      ><a href=""
+		>Nothing</a
 		></code
 	      > otherwise.
 </p
@@ -225,14 +272,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	    ><p class="src"
 	    ><a name="v:hash" class="def"
 	      >hash</a
-	      > :: a -&gt; <A HREF="">Int</a
+	      > :: a -&gt; <a href=""
+	      >Int</a
 	      ></p
 	    ><div class="doc"
 	    ><p
 	      >hashes the value of type <code
 		>a</code
 		> into an <code
-		><A HREF="">Int</a
+		><a href=""
+		  >Int</a
 		  ></code
 		>
 </p
@@ -245,25 +294,32 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">Hash</a
-		    > <A HREF="">Float</a
+		  ><a href=""
+		    >Hash</a
+		    > <a href=""
+		    >Float</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  ><A HREF="">Hash</a
-		    > <A HREF="">Int</a
+		  ><a href=""
+		    >Hash</a
+		    > <a href=""
+		    >Int</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  >(<A HREF="">Hash</a
-		    > a, <A HREF="">Hash</a
-		    > b) =&gt; <A HREF="">Hash</a
+		  >(<a href=""
+		    >Hash</a
+		    > a, <a href=""
+		    >Hash</a
+		    > b) =&gt; <a href=""
+		    >Hash</a
 		    > (a, b)</td
 		  ><td class="doc empty"
 		  >&nbsp;</td
@@ -276,8 +332,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_Hash.html");};
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

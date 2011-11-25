@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>Bug6</p
 	></div
       ><div id="description"
@@ -47,52 +57,72 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
 	><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">A</a
-	    >  = <A HREF="">A</a
-	    > <A HREF="">Int</a
+	    >  <a href=""
+	    >A</a
+	    >  = <a href=""
+	    >A</a
+	    > <a href=""
+	    >Int</a
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">B</a
-	    >  = <A HREF="">B</a
+	    >  <a href=""
+	    >B</a
+	    >  = <a href=""
+	    >B</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">b</a
-		> :: <A HREF="">Int</a
+	      ><a href=""
+		>b</a
+		> :: <a href=""
+		>Int</a
 		></li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">C</a
-	    >  = <A HREF="">C</a
+	    >  <a href=""
+	    >C</a
+	    >  = <a href=""
+	    >C</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">c1</a
-		> :: <A HREF="">Int</a
+	      ><a href=""
+		>c1</a
+		> :: <a href=""
+		>Int</a
 		></li
 	      ><li
-	      ><A HREF="">c2</a
-		> :: <A HREF="">Int</a
+	      ><a href=""
+		>c2</a
+		> :: <a href=""
+		>Int</a
 		></li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">D</a
-	    >  = <A HREF="">D</a
-	    > <A HREF="">Int</a
-	    > <A HREF="">Int</a
+	    >  <a href=""
+	    >D</a
+	    >  = <a href=""
+	    >D</a
+	    > <a href=""
+	    >Int</a
+	    > <a href=""
+	    >Int</a
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">E</a
-	    >  = <A HREF="">E</a
-	    > <A HREF="">Int</a
+	    >  <a href=""
+	    >E</a
+	    >  = <a href=""
+	    >E</a
+	    > <a href=""
+	    >Int</a
 	    ></li
 	  ></ul
 	></div
@@ -119,7 +149,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
 	      ><td class="src"
 		><a name="v:A" class="def"
 		  >A</a
-		  > <A HREF="">Int</a
+		  > <a href=""
+		  >Int</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -161,7 +192,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
 		    ><dt class="src"
 		      ><a name="v:b" class="def"
 			>b</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc empty"
 		      >&nbsp;</dd
@@ -207,14 +239,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
 		    ><dt class="src"
 		      ><a name="v:c1" class="def"
 			>c1</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc empty"
 		      >&nbsp;</dd
 		      ><dt class="src"
 		      ><a name="v:c2" class="def"
 			>c2</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc empty"
 		      >&nbsp;</dd
@@ -248,8 +282,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
 	      ><td class="src"
 		><a name="v:D" class="def"
 		  >D</a
-		  > <A HREF="">Int</a
-		  > <A HREF="">Int</a
+		  > <a href=""
+		  >Int</a
+		  > <a href=""
+		  >Int</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -277,7 +313,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
 	      ><td class="src"
 		><a name="v:E" class="def"
 		  >E</a
-		  > <A HREF="">Int</a
+		  > <a href=""
+		  >Int</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -289,8 +326,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug6.html");};
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

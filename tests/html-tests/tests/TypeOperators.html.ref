@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>TypeOperators</p
 	></div
       ><div id="table-of-contents"
@@ -36,7 +46,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
 	>Contents</p
 	><ul
 	><li
-	  ><A HREF="">stuff
+	  ><a href=""
+	    >stuff
 </a
 	    ></li
 	  ></ul
@@ -48,41 +59,52 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
 	><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  a <A HREF="">:-:</a
+	    >  a <a href=""
+	    >:-:</a
 	    > b</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  (a <A HREF="">:+:</a
+	    >  (a <a href=""
+	    >:+:</a
 	    > b) c</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">Op</a
+	    >  <a href=""
+	    >Op</a
 	    > a b</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">O</a
-	    > g f a = <A HREF="">O</a
+	    >  <a href=""
+	    >O</a
+	    > g f a = <a href=""
+	    >O</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">unO</a
+	      ><a href=""
+		>unO</a
 		> :: g (f a)</li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
-	  ><A HREF="">biO</a
-	    > ::  (g `<A HREF="">O</a
+	  ><a href=""
+	    >biO</a
+	    > ::  (g `<a href=""
+	    >O</a
 	    >` f) a</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">Flip</a
-	    > (~&gt;) b a = <A HREF="">Flip</a
+	    >  <a href=""
+	    >Flip</a
+	    > (~&gt;) b a = <a href=""
+	    >Flip</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">unFlip</a
+	      ><a href=""
+		>unFlip</a
 		> :: a ~&gt; b</li
 	      ></ul
 	    >}</li
@@ -160,7 +182,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
 	><p class="src"
 	  ><a name="v:biO" class="def"
 	    >biO</a
-	    > ::  (g `<A HREF="">O</a
+	    > ::  (g `<a href=""
+	    >O</a
 	    >` f) a</p
 	  ></div
 	><div class="top"
@@ -207,8 +230,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeOperators.html");}
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

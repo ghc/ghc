@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug7.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug7.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>Bug7</p
 	></div
       ><div id="description"
@@ -48,13 +58,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug7.html");};
 	><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">Foo</a
-	    >  = <A HREF="">Foo</a
+	    >  <a href=""
+	    >Foo</a
+	    >  = <a href=""
+	    >Foo</a
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    >  <A HREF="">Bar</a
+	    >  <a href=""
+	    >Bar</a
 	    > x y </li
 	  ></ul
 	></div
@@ -94,9 +107,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug7.html");};
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">Bar</a
-		    > <A HREF="">Foo</a
-		    > <A HREF="">Foo</a
+		  ><a href=""
+		    >Bar</a
+		    > <a href=""
+		    >Foo</a
+		    > <a href=""
+		    >Foo</a
 		    ></td
 		  ><td class="doc"
 		  ><p
@@ -127,9 +143,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug7.html");};
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">Bar</a
-		    > <A HREF="">Foo</a
-		    > <A HREF="">Foo</a
+		  ><a href=""
+		    >Bar</a
+		    > <a href=""
+		    >Foo</a
+		    > <a href=""
+		    >Foo</a
 		    ></td
 		  ><td class="doc"
 		  ><p
@@ -145,8 +164,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug7.html");};
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

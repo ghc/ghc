@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>GADTRecords</p
 	></div
       ><div id="synopsis"
@@ -38,40 +48,56 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
 	><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">H1</a
+	    >  <a href=""
+	    >H1</a
 	    > a b <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
-	      ><A HREF="">C1</a
-		> ::  <A HREF="">H1</a
+	      ><a href=""
+		>C1</a
+		> ::  <a href=""
+		>H1</a
 		> a b  </li
 	      ><li
-	      ><A HREF="">C2</a
-		> :: <A HREF="">Ord</a
-		> a =&gt; [a] -&gt; <A HREF="">H1</a
+	      ><a href=""
+		>C2</a
+		> :: <a href=""
+		>Ord</a
+		> a =&gt; [a] -&gt; <a href=""
+		>H1</a
 		> a a  </li
 	      ><li
-	      ><A HREF="">C3</a
+	      ><a href=""
+		>C3</a
 		> ::  { <ul class="subs"
 		><li
-		  ><A HREF="">field</a
-		    > :: <A HREF="">Int</a
+		  ><a href=""
+		    >field</a
+		    > :: <a href=""
+		    >Int</a
 		    ></li
 		  ></ul
-		> } -&gt; <A HREF="">H1</a
-		> <A HREF="">Int</a
-		> <A HREF="">Int</a
+		> } -&gt; <a href=""
+		>H1</a
+		> <a href=""
+		>Int</a
+		> <a href=""
+		>Int</a
 		></li
 	      ><li
-	      ><A HREF="">C4</a
+	      ><a href=""
+		>C4</a
 		> ::  { <ul class="subs"
 		><li
-		  ><A HREF="">field2</a
+		  ><a href=""
+		    >field2</a
 		    > :: a</li
 		  ></ul
-		> } -&gt; <A HREF="">H1</a
-		> <A HREF="">Int</a
+		> } -&gt; <a href=""
+		>H1</a
+		> <a href=""
+		>Int</a
 		> a</li
 	      ></ul
 	    ></li
@@ -102,7 +128,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
 	      ><td class="src"
 		><a name="v:C1" class="def"
 		  >C1</a
-		  > ::  <A HREF="">H1</a
+		  > ::  <a href=""
+		  >H1</a
 		  > a b</td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -111,8 +138,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
 	      ><td class="src"
 		><a name="v:C2" class="def"
 		  >C2</a
-		  > :: <A HREF="">Ord</a
-		  > a =&gt; [a] -&gt; <A HREF="">H1</a
+		  > :: <a href=""
+		  >Ord</a
+		  > a =&gt; [a] -&gt; <a href=""
+		  >H1</a
 		  > a a</td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -121,10 +150,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
 	      ><td class="src"
 		><a name="v:C3" class="def"
 		  >C3</a
-		  > ::  <A HREF="">Int</a
-		  > -&gt; <A HREF="">H1</a
-		  > <A HREF="">Int</a
-		  > <A HREF="">Int</a
+		  > ::  <a href=""
+		  >Int</a
+		  > -&gt; <a href=""
+		  >H1</a
+		  > <a href=""
+		  >Int</a
+		  > <a href=""
+		  >Int</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -138,7 +171,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
 		    ><dt class="src"
 		      ><a name="v:field" class="def"
 			>field</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc"
 		      ><p
@@ -155,8 +189,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
 	      ><td class="src"
 		><a name="v:C4" class="def"
 		  >C4</a
-		  > ::  a -&gt; <A HREF="">H1</a
-		  > <A HREF="">Int</a
+		  > ::  a -&gt; <a href=""
+		  >H1</a
+		  > <a href=""
+		  >Int</a
 		  > a</td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -189,8 +225,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_GADTRecords.html");};
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

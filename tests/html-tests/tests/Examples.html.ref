@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Examples.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Examples.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>Examples</p
 	></div
       ><div id="synopsis"
@@ -36,9 +46,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Examples.html");};
 	>Synopsis</p
 	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
 	><li class="src short"
-	  ><A HREF="">fib</a
-	    > :: <A HREF="">Integer</a
-	    > -&gt; <A HREF="">Integer</a
+	  ><a href=""
+	    >fib</a
+	    > :: <a href=""
+	    >Integer</a
+	    > -&gt; <a href=""
+	    >Integer</a
 	    ></li
 	  ></ul
 	></div
@@ -49,13 +62,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Examples.html");};
 	><p class="src"
 	  ><a name="v:fib" class="def"
 	    >fib</a
-	    > :: <A HREF="">Integer</a
-	    > -&gt; <A HREF="">Integer</a
+	    > :: <a href=""
+	    >Integer</a
+	    > -&gt; <a href=""
+	    >Integer</a
 	    ></p
 	  ><div class="doc"
 	  ><p
 	    >Fibonacci number of given <code
-	      ><A HREF="">Integer</a
+	      ><a href=""
+		>Integer</a
 		></code
 	      >.
 </p
@@ -154,8 +170,9 @@ bar
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug3.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug3.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>Bug3</p
 	></div
       ><div id="synopsis"
@@ -36,8 +46,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug3.html");};
 	>Synopsis</p
 	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
 	><li class="src short"
-	  ><A HREF="">foo</a
-	    > :: <A HREF="">Int</a
+	  ><a href=""
+	    >foo</a
+	    > :: <a href=""
+	    >Int</a
 	    ></li
 	  ></ul
 	></div
@@ -48,7 +60,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug3.html");};
 	><p class="src"
 	  ><a name="v:foo" class="def"
 	    >foo</a
-	    > :: <A HREF="">Int</a
+	    > :: <a href=""
+	    >Int</a
 	    ></p
 	  ><div class="doc"
 	  ><p
@@ -61,8 +74,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug3.html");};
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

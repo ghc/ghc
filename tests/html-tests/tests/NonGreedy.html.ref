@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_NonGreedy.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_NonGreedy.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>NonGreedy</p
 	></div
       ><div id="synopsis"
@@ -36,7 +46,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_NonGreedy.html");};
 	>Synopsis</p
 	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
 	><li class="src short"
-	  ><A HREF="">f</a
+	  ><a href=""
+	    >f</a
 	    > ::  a</li
 	  ></ul
 	></div
@@ -50,8 +61,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_NonGreedy.html");};
 	    > ::  a</p
 	  ><div class="doc"
 	  ><p
-	    ><A HREF="">url1</a
-	      > <A HREF="">url2</a
+	    ><a href=""
+	      >url1</a
+	      > <a href=""
+	      >url2</a
 	      >
 </p
 	    ></div
@@ -60,8 +73,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_NonGreedy.html");};
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

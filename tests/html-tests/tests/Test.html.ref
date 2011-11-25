@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -47,6 +49,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	    ><td
 	    >libraries@haskell.org</td
 	    ></tr
+	  ><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
 	  ></table
 	><p class="caption"
 	>Test</p
@@ -56,53 +64,65 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	>Contents</p
 	><ul
 	><li
-	  ><A HREF="">Type declarations
+	  ><a href=""
+	    >Type declarations
 </a
 	    ><ul
 	    ><li
-	      ><A HREF="">Data types
+	      ><a href=""
+		>Data types
 </a
 		></li
 	      ><li
-	      ><A HREF="">Records
+	      ><a href=""
+		>Records
 </a
 		></li
 	      ></ul
 	    ></li
 	  ><li
-	  ><A HREF="">Class declarations
+	  ><a href=""
+	    >Class declarations
 </a
 	    ></li
 	  ><li
-	  ><A HREF="">Function types
+	  ><a href=""
+	    >Function types
 </a
 	    ></li
 	  ><li
-	  ><A HREF="">Auxiliary stuff
+	  ><a href=""
+	    >Auxiliary stuff
 </a
 	    ></li
 	  ><li
-	  ><A HREF="">A hidden module
+	  ><a href=""
+	    >A hidden module
 </a
 	    ></li
 	  ><li
-	  ><A HREF="">A visible module
+	  ><a href=""
+	    >A visible module
 </a
 	    ></li
 	  ><li
-	  ><A HREF="">Existential / Universal types
+	  ><a href=""
+	    >Existential / Universal types
 </a
 	    ></li
 	  ><li
-	  ><A HREF="">Type signatures with argument docs
+	  ><a href=""
+	    >Type signatures with argument docs
 </a
 	    ></li
 	  ><li
-	  ><A HREF="">A section
+	  ><a href=""
+	    >A section
 </a
 	    ><ul
 	    ><li
-	      ><A HREF="">A subsection 
+	      ><a href=""
+		>A subsection 
 </a
 		></li
 	      ></ul
@@ -116,16 +136,20 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	><p
 	  >This module illustrates &amp; tests most of the features of Haddock.
  Testing references from the description: <code
-	    ><A HREF="">T</a
+	    ><a href=""
+	      >T</a
 	      ></code
 	    >, <code
-	    ><A HREF="">f</a
+	    ><a href=""
+	      >f</a
 	      ></code
 	    >, <code
-	    ><A HREF="">g</a
+	    ><a href=""
+	      >g</a
 	      ></code
 	    >, <code
-	    ><A HREF="">visible</a
+	    ><a href=""
+	      >visible</a
 	      ></code
 	    >.
 </p
@@ -138,201 +162,270 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">T</a
+	    >  <a href=""
+	    >T</a
 	    > a b<ul class="subs"
 	    ><li
-	      >= <A HREF="">A</a
-		> <A HREF="">Int</a
-		> (<A HREF="">Maybe</a
-		> <A HREF="">Float</a
+	      >= <a href=""
+		>A</a
+		> <a href=""
+		>Int</a
+		> (<a href=""
+		>Maybe</a
+		> <a href=""
+		>Float</a
 		>)  </li
 	      ><li
-	      >| <A HREF="">B</a
-		> (<A HREF="">T</a
-		> a b, <A HREF="">T</a
-		> <A HREF="">Int</a
-		> <A HREF="">Float</a
+	      >| <a href=""
+		>B</a
+		> (<a href=""
+		>T</a
+		> a b, <a href=""
+		>T</a
+		> <a href=""
+		>Int</a
+		> <a href=""
+		>Float</a
 		>)  </li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">T2</a
+	    >  <a href=""
+	    >T2</a
 	    > a b</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">T3</a
+	    >  <a href=""
+	    >T3</a
 	    > a b<ul class="subs"
 	    ><li
-	      >= <A HREF="">A1</a
+	      >= <a href=""
+		>A1</a
 		> a  </li
 	      ><li
-	      >| <A HREF="">B1</a
+	      >| <a href=""
+		>B1</a
 		> b  </li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">T4</a
+	    >  <a href=""
+	    >T4</a
 	    > a b<ul class="subs"
 	    ><li
-	      >= <A HREF="">A2</a
+	      >= <a href=""
+		>A2</a
 		> a  </li
 	      ><li
-	      >| <A HREF="">B2</a
+	      >| <a href=""
+		>B2</a
 		> b  </li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">T5</a
+	    >  <a href=""
+	    >T5</a
 	    > a b<ul class="subs"
 	    ><li
-	      >= <A HREF="">A3</a
+	      >= <a href=""
+		>A3</a
 		> a  </li
 	      ><li
-	      >| <A HREF="">B3</a
+	      >| <a href=""
+		>B3</a
 		> b  </li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">T6</a
+	    >  <a href=""
+	    >T6</a
 	    > <ul class="subs"
 	    ><li
-	      >= <A HREF="">A4</a
+	      >= <a href=""
+		>A4</a
 		>  </li
 	      ><li
-	      >| <A HREF="">B4</a
+	      >| <a href=""
+		>B4</a
 		>  </li
 	      ><li
-	      >| <A HREF="">C4</a
+	      >| <a href=""
+		>C4</a
 		>  </li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">N1</a
-	    > a = <A HREF="">N1</a
+	    >  <a href=""
+	    >N1</a
+	    > a = <a href=""
+	    >N1</a
 	    > a</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">N2</a
-	    > a b = <A HREF="">N2</a
+	    >  <a href=""
+	    >N2</a
+	    > a b = <a href=""
+	    >N2</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">n</a
+	      ><a href=""
+		>n</a
 		> :: a b</li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">N3</a
-	    > a b = <A HREF="">N3</a
+	    >  <a href=""
+	    >N3</a
+	    > a b = <a href=""
+	    >N3</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">n3</a
+	      ><a href=""
+		>n3</a
 		> :: a b</li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">N4</a
+	    >  <a href=""
+	    >N4</a
 	    > a b</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">N5</a
-	    > a b = <A HREF="">N5</a
+	    >  <a href=""
+	    >N5</a
+	    > a b = <a href=""
+	    >N5</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">n5</a
+	      ><a href=""
+		>n5</a
 		> :: a b</li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">N6</a
-	    > a b = <A HREF="">N6</a
+	    >  <a href=""
+	    >N6</a
+	    > a b = <a href=""
+	    >N6</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">n6</a
+	      ><a href=""
+		>n6</a
 		> :: a b</li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >newtype</span
-	    >  <A HREF="">N7</a
-	    > a b = <A HREF="">N7</a
+	    >  <a href=""
+	    >N7</a
+	    > a b = <a href=""
+	    >N7</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">n7</a
+	      ><a href=""
+		>n7</a
 		> :: a b</li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">R</a
+	    >  <a href=""
+	    >R</a
 	    > <ul class="subs"
 	    ><li
-	      >= <A HREF="">C1</a
+	      >= <a href=""
+		>C1</a
 		> { <ul class="subs"
 		><li
-		  ><A HREF="">p</a
-		    > :: <A HREF="">Int</a
+		  ><a href=""
+		    >p</a
+		    > :: <a href=""
+		    >Int</a
 		    ></li
 		  ><li
-		  ><A HREF="">q</a
+		  ><a href=""
+		    >q</a
 		    > :: <span class="keyword"
 		    >forall</span
 		    > a.  a -&gt; a</li
 		  ><li
-		  ><A HREF="">r</a
-		    > :: <A HREF="">Int</a
+		  ><a href=""
+		    >r</a
+		    > :: <a href=""
+		    >Int</a
 		    ></li
 		  ><li
-		  ><A HREF="">s</a
-		    > :: <A HREF="">Int</a
+		  ><a href=""
+		    >s</a
+		    > :: <a href=""
+		    >Int</a
 		    ></li
 		  ></ul
 		> }</li
 	      ><li
-	      >| <A HREF="">C2</a
+	      >| <a href=""
+		>C2</a
 		> { <ul class="subs"
 		><li
-		  ><A HREF="">t</a
-		    > :: T1 -&gt; <A HREF="">T2</a
-		    > <A HREF="">Int</a
-		    > <A HREF="">Int</a
-		    > -&gt; <A HREF="">T3</a
-		    > <A HREF="">Bool</a
-		    > <A HREF="">Bool</a
-		    > -&gt; <A HREF="">T4</a
-		    > <A HREF="">Float</a
-		    > <A HREF="">Float</a
-		    > -&gt; <A HREF="">T5</a
-		    > <A HREF="">()</a
-		    > <A HREF="">()</a
+		  ><a href=""
+		    >t</a
+		    > :: T1 -&gt; <a href=""
+		    >T2</a
+		    > <a href=""
+		    >Int</a
+		    > <a href=""
+		    >Int</a
+		    > -&gt; <a href=""
+		    >T3</a
+		    > <a href=""
+		    >Bool</a
+		    > <a href=""
+		    >Bool</a
+		    > -&gt; <a href=""
+		    >T4</a
+		    > <a href=""
+		    >Float</a
+		    > <a href=""
+		    >Float</a
+		    > -&gt; <a href=""
+		    >T5</a
+		    > <a href=""
+		    >()</a
+		    > <a href=""
+		    >()</a
 		    ></li
 		  ><li
-		  ><A HREF="">u</a
-		    > :: <A HREF="">Int</a
+		  ><a href=""
+		    >u</a
+		    > :: <a href=""
+		    >Int</a
 		    ></li
 		  ><li
-		  ><A HREF="">v</a
-		    > :: <A HREF="">Int</a
+		  ><a href=""
+		    >v</a
+		    > :: <a href=""
+		    >Int</a
 		    ></li
 		  ></ul
 		> }</li
@@ -341,164 +434,236 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">R1</a
-	    >  = <A HREF="">C3</a
+	    >  <a href=""
+	    >R1</a
+	    >  = <a href=""
+	    >C3</a
 	    > {<ul class="subs"
 	    ><li
-	      ><A HREF="">s1</a
-		> :: <A HREF="">Int</a
+	      ><a href=""
+		>s1</a
+		> :: <a href=""
+		>Int</a
 		></li
 	      ><li
-	      ><A HREF="">s2</a
-		> :: <A HREF="">Int</a
+	      ><a href=""
+		>s2</a
+		> :: <a href=""
+		>Int</a
 		></li
 	      ><li
-	      ><A HREF="">s3</a
-		> :: <A HREF="">Int</a
+	      ><a href=""
+		>s3</a
+		> :: <a href=""
+		>Int</a
 		></li
 	      ></ul
 	    >}</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    > <A HREF="">D</a
-	    > a =&gt; <A HREF="">C</a
+	    > <a href=""
+	    >D</a
+	    > a =&gt; <a href=""
+	    >C</a
 	    > a  <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
-	      ><A HREF="">a</a
-		> :: <A HREF="">IO</a
+	      ><a href=""
+		>a</a
+		> :: <a href=""
+		>IO</a
 		> a</li
 	      ><li
-	      ><A HREF="">b</a
+	      ><a href=""
+		>b</a
 		> :: [a]</li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    >  <A HREF="">D</a
+	    >  <a href=""
+	    >D</a
 	    > a  <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
-	      ><A HREF="">d</a
-		> ::  <A HREF="">T</a
+	      ><a href=""
+		>d</a
+		> ::  <a href=""
+		>T</a
 		> a b</li
 	      ><li
-	      ><A HREF="">e</a
+	      ><a href=""
+		>e</a
 		> :: (a, a)</li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    >  <A HREF="">E</a
+	    >  <a href=""
+	    >E</a
 	    > a </li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    >  <A HREF="">F</a
+	    >  <a href=""
+	    >F</a
 	    > a  <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
-	      ><A HREF="">ff</a
+	      ><a href=""
+		>ff</a
 		> :: a</li
 	      ></ul
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">f</a
-	    > :: <A HREF="">C</a
-	    > a =&gt; a -&gt; <A HREF="">Int</a
+	  ><a href=""
+	    >f</a
+	    > :: <a href=""
+	    >C</a
+	    > a =&gt; a -&gt; <a href=""
+	    >Int</a
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">g</a
-	    > :: <A HREF="">Int</a
-	    > -&gt; <A HREF="">IO</a
+	  ><a href=""
+	    >g</a
+	    > :: <a href=""
+	    >Int</a
+	    > -&gt; <a href=""
+	    >IO</a
 	    > CInt</li
 	  ><li class="src short"
-	  ><A HREF="">hidden</a
-	    > :: <A HREF="">Int</a
-	    > -&gt; <A HREF="">Int</a
+	  ><a href=""
+	    >hidden</a
+	    > :: <a href=""
+	    >Int</a
+	    > -&gt; <a href=""
+	    >Int</a
 	    ></li
 	  ><li class="src short"
-	  >module <A HREF="">Visible</a
+	  >module <a href=""
+	    >Visible</a
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    >  <A HREF="">Ex</a
+	    >  <a href=""
+	    >Ex</a
 	    > a<ul class="subs"
 	    ><li
 	      >= <span class="keyword"
 		>forall</span
-		> b . <A HREF="">C</a
-		> b =&gt; <A HREF="">Ex1</a
+		> b . <a href=""
+		>C</a
+		> b =&gt; <a href=""
+		>Ex1</a
 		> b  </li
 	      ><li
 	      >| <span class="keyword"
 		>forall</span
-		> b . <A HREF="">Ex2</a
+		> b . <a href=""
+		>Ex2</a
 		> b  </li
 	      ><li
 	      >| <span class="keyword"
 		>forall</span
-		> b . <A HREF="">C</a
-		> a =&gt; <A HREF="">Ex3</a
+		> b . <a href=""
+		>C</a
+		> a =&gt; <a href=""
+		>Ex3</a
 		> b  </li
 	      ><li
-	      >| <A HREF="">Ex4</a
+	      >| <a href=""
+		>Ex4</a
 		> (<span class="keyword"
 		>forall</span
 		> a.  a -&gt; a)  </li
 	      ></ul
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">k</a
-	    > :: <A HREF="">T</a
-	    > <A HREF="">()</a
-	    > <A HREF="">()</a
-	    > -&gt; <A HREF="">T2</a
-	    > <A HREF="">Int</a
-	    > <A HREF="">Int</a
-	    > -&gt; (<A HREF="">T3</a
-	    > <A HREF="">Bool</a
-	    > <A HREF="">Bool</a
-	    > -&gt; <A HREF="">T4</a
-	    > <A HREF="">Float</a
-	    > <A HREF="">Float</a
-	    >) -&gt; <A HREF="">T5</a
-	    > <A HREF="">()</a
-	    > <A HREF="">()</a
-	    > -&gt; <A HREF="">IO</a
-	    > <A HREF="">()</a
+	  ><a href=""
+	    >k</a
+	    > :: <a href=""
+	    >T</a
+	    > <a href=""
+	    >()</a
+	    > <a href=""
+	    >()</a
+	    > -&gt; <a href=""
+	    >T2</a
+	    > <a href=""
+	    >Int</a
+	    > <a href=""
+	    >Int</a
+	    > -&gt; (<a href=""
+	    >T3</a
+	    > <a href=""
+	    >Bool</a
+	    > <a href=""
+	    >Bool</a
+	    > -&gt; <a href=""
+	    >T4</a
+	    > <a href=""
+	    >Float</a
+	    > <a href=""
+	    >Float</a
+	    >) -&gt; <a href=""
+	    >T5</a
+	    > <a href=""
+	    >()</a
+	    > <a href=""
+	    >()</a
+	    > -&gt; <a href=""
+	    >IO</a
+	    > <a href=""
+	    >()</a
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">l</a
-	    > :: (<A HREF="">Int</a
-	    >, <A HREF="">Int</a
-	    >, <A HREF="">Float</a
-	    >) -&gt; <A HREF="">Int</a
+	  ><a href=""
+	    >l</a
+	    > :: (<a href=""
+	    >Int</a
+	    >, <a href=""
+	    >Int</a
+	    >, <a href=""
+	    >Float</a
+	    >) -&gt; <a href=""
+	    >Int</a
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">m</a
-	    > :: <A HREF="">R</a
-	    > -&gt; <A HREF="">N1</a
-	    > <A HREF="">()</a
-	    > -&gt; <A HREF="">IO</a
-	    > <A HREF="">Int</a
+	  ><a href=""
+	    >m</a
+	    > :: <a href=""
+	    >R</a
+	    > -&gt; <a href=""
+	    >N1</a
+	    > <a href=""
+	    >()</a
+	    > -&gt; <a href=""
+	    >IO</a
+	    > <a href=""
+	    >Int</a
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">o</a
-	    > :: <A HREF="">Float</a
-	    > -&gt; <A HREF="">IO</a
-	    > <A HREF="">Float</a
+	  ><a href=""
+	    >o</a
+	    > :: <a href=""
+	    >Float</a
+	    > -&gt; <a href=""
+	    >IO</a
+	    > <a href=""
+	    >Float</a
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">f'</a
-	    > :: <A HREF="">Int</a
+	  ><a href=""
+	    >f'</a
+	    > :: <a href=""
+	    >Int</a
 	    ></li
 	  ></ul
 	></div
@@ -532,14 +697,18 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	      ><td class="src"
 		><a name="v:A" class="def"
 		  >A</a
-		  > <A HREF="">Int</a
-		  > (<A HREF="">Maybe</a
-		  > <A HREF="">Float</a
+		  > <a href=""
+		  >Int</a
+		  > (<a href=""
+		  >Maybe</a
+		  > <a href=""
+		  >Float</a
 		  >)</td
 		><td class="doc"
 		><p
 		  >This comment describes the <code
-		    ><A HREF="">A</a
+		    ><a href=""
+		      >A</a
 		      ></code
 		    > constructor
 </p
@@ -549,15 +718,20 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	      ><td class="src"
 		><a name="v:B" class="def"
 		  >B</a
-		  > (<A HREF="">T</a
-		  > a b, <A HREF="">T</a
-		  > <A HREF="">Int</a
-		  > <A HREF="">Float</a
+		  > (<a href=""
+		  >T</a
+		  > a b, <a href=""
+		  >T</a
+		  > <a href=""
+		  >Int</a
+		  > <a href=""
+		  >Float</a
 		  >)</td
 		><td class="doc"
 		><p
 		  >This comment describes the <code
-		    ><A HREF="">B</a
+		    ><a href=""
+		      >B</a
 		      ></code
 		    > constructor
 </p
@@ -663,7 +837,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >documents <code
-		    ><A HREF="">A3</a
+		    ><a href=""
+		      >A3</a
 		      ></code
 		    >
 </p
@@ -677,7 +852,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >documents <code
-		    ><A HREF="">B3</a
+		    ><a href=""
+		      >B3</a
 		      ></code
 		    >
 </p
@@ -710,7 +886,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >This is the doc for <code
-		    ><A HREF="">A4</a
+		    ><a href=""
+		      >A4</a
 		      ></code
 		    >
 </p
@@ -724,7 +901,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >This is the doc for <code
-		    ><A HREF="">B4</a
+		    ><a href=""
+		      >B4</a
 		      ></code
 		    >
 </p
@@ -738,7 +916,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >This is the doc for <code
-		    ><A HREF="">C4</a
+		    ><a href=""
+		      >C4</a
 		      ></code
 		    >
 </p
@@ -856,7 +1035,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		      ><dd class="doc"
 		      ><p
 			>this is the <code
-			  ><A HREF="">n3</a
+			  ><a href=""
+			    >n3</a
 			    ></code
 			  > field 
 </p
@@ -994,7 +1174,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >The <code
-		    ><A HREF="">N7</a
+		    ><a href=""
+		      >N7</a
 		      ></code
 		    > constructor
 </p
@@ -1034,20 +1215,25 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	  ><div class="doc"
 	  ><p
 	    >This is the documentation for the <code
-	      ><A HREF="">R</a
+	      ><a href=""
+		>R</a
 		></code
 	      > record, which has four fields,
  <code
-	      ><A HREF="">p</a
+	      ><a href=""
+		>p</a
 		></code
 	      >, <code
-	      ><A HREF="">q</a
+	      ><a href=""
+		>q</a
 		></code
 	      >, <code
-	      ><A HREF="">r</a
+	      ><a href=""
+		>r</a
 		></code
 	      >, and <code
-	      ><A HREF="">s</a
+	      ><a href=""
+		>s</a
 		></code
 	      >.
 </p
@@ -1064,7 +1250,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >This is the <code
-		    ><A HREF="">C1</a
+		    ><a href=""
+		      >C1</a
 		      ></code
 		    > record constructor, with the following fields:
 </p
@@ -1079,12 +1266,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		    ><dt class="src"
 		      ><a name="v:p" class="def"
 			>p</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc"
 		      ><p
 			>This comment applies to the <code
-			  ><A HREF="">p</a
+			  ><a href=""
+			    >p</a
 			    ></code
 			  > field
 </p
@@ -1098,7 +1287,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		      ><dd class="doc"
 		      ><p
 			>This comment applies to the <code
-			  ><A HREF="">q</a
+			  ><a href=""
+			    >q</a
 			    ></code
 			  > field
 </p
@@ -1106,15 +1296,18 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		      ><dt class="src"
 		      ><a name="v:r" class="def"
 			>r</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc"
 		      ><p
 			>This comment applies to both <code
-			  ><A HREF="">r</a
+			  ><a href=""
+			    >r</a
 			    ></code
 			  > and <code
-			  ><A HREF="">s</a
+			  ><a href=""
+			    >s</a
 			    ></code
 			  >
 </p
@@ -1122,15 +1315,18 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		      ><dt class="src"
 		      ><a name="v:s" class="def"
 			>s</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc"
 		      ><p
 			>This comment applies to both <code
-			  ><A HREF="">r</a
+			  ><a href=""
+			    >r</a
 			    ></code
 			  > and <code
-			  ><A HREF="">s</a
+			  ><a href=""
+			    >s</a
 			    ></code
 			  >
 </p
@@ -1149,7 +1345,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >This is the <code
-		    ><A HREF="">C2</a
+		    ><a href=""
+		      >C2</a
 		      ></code
 		    > record constructor, also with some fields:
 </p
@@ -1164,32 +1361,46 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		    ><dt class="src"
 		      ><a name="v:t" class="def"
 			>t</a
-			> :: T1 -&gt; <A HREF="">T2</a
-			> <A HREF="">Int</a
-			> <A HREF="">Int</a
-			> -&gt; <A HREF="">T3</a
-			> <A HREF="">Bool</a
-			> <A HREF="">Bool</a
-			> -&gt; <A HREF="">T4</a
-			> <A HREF="">Float</a
-			> <A HREF="">Float</a
-			> -&gt; <A HREF="">T5</a
-			> <A HREF="">()</a
-			> <A HREF="">()</a
+			> :: T1 -&gt; <a href=""
+			>T2</a
+			> <a href=""
+			>Int</a
+			> <a href=""
+			>Int</a
+			> -&gt; <a href=""
+			>T3</a
+			> <a href=""
+			>Bool</a
+			> <a href=""
+			>Bool</a
+			> -&gt; <a href=""
+			>T4</a
+			> <a href=""
+			>Float</a
+			> <a href=""
+			>Float</a
+			> -&gt; <a href=""
+			>T5</a
+			> <a href=""
+			>()</a
+			> <a href=""
+			>()</a
 			></dt
 		      ><dd class="doc empty"
 		      >&nbsp;</dd
 		      ><dt class="src"
 		      ><a name="v:u" class="def"
 			>u</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc empty"
 		      >&nbsp;</dd
 		      ><dt class="src"
 		      ><a name="v:v" class="def"
 			>v</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc empty"
 		      >&nbsp;</dd
@@ -1226,7 +1437,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		><td class="doc"
 		><p
 		  >This is the <code
-		    ><A HREF="">C3</a
+		    ><a href=""
+		      >C3</a
 		      ></code
 		    > record constructor
 </p
@@ -1241,12 +1453,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		    ><dt class="src"
 		      ><a name="v:s1" class="def"
 			>s1</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc"
 		      ><p
 			>The <code
-			  ><A HREF="">s1</a
+			  ><a href=""
+			    >s1</a
 			    ></code
 			  > record selector
 </p
@@ -1254,12 +1468,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		      ><dt class="src"
 		      ><a name="v:s2" class="def"
 			>s2</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc"
 		      ><p
 			>The <code
-			  ><A HREF="">s2</a
+			  ><a href=""
+			    >s2</a
 			    ></code
 			  > record selector
 </p
@@ -1267,12 +1483,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 		      ><dt class="src"
 		      ><a name="v:s3" class="def"
 			>s3</a
-			> :: <A HREF="">Int</a
+			> :: <a href=""
+			>Int</a
 			></dt
 		      ><dd class="doc"
 		      ><p
 			>The <code
-			  ><A HREF="">s3</a
+			  ><a href=""
+			    >s3</a
 			    ></code
 			  > record selector
 </p
@@ -1298,7 +1516,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	><p class="src"
 	  ><span class="keyword"
 	    >class</span
-	    > <A HREF="">D</a
+	    > <a href=""
+	    >D</a
 	    > a =&gt; <a name="t:C" class="def"
 	    >C</a
 	    > a  <span class="keyword"
@@ -1309,7 +1528,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	    >This comment applies to the <em
 	      >previous</em
 	      > declaration (the <code
-	      ><A HREF="">C</a
+	      ><a href=""
+		>C</a
 		></code
 	      > class)
 </p
@@ -1320,12 +1540,14 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	    ><p class="src"
 	    ><a name="v:a" class="def"
 	      >a</a
-	      > :: <A HREF="">IO</a
+	      > :: <a href=""
+	      >IO</a
 	      > a</p
 	    ><div class="doc"
 	    ><p
 	      >this is a description of the <code
-		><A HREF="">a</a
+		><a href=""
+		  >a</a
 		  ></code
 		> method
 </p
@@ -1337,7 +1559,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	    ><div class="doc"
 	    ><p
 	      >this is a description of the <code
-		><A HREF="">b</a
+		><a href=""
+		  >b</a
 		  ></code
 		> method
 </p
@@ -1364,7 +1587,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	    ><p class="src"
 	    ><a name="v:d" class="def"
 	      >d</a
-	      > ::  <A HREF="">T</a
+	      > ::  <a href=""
+	      >T</a
 	      > a b</p
 	    ><p class="src"
 	    ><a name="v:e" class="def"
@@ -1378,16 +1602,20 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">D</a
-		    > <A HREF="">Float</a
+		  ><a href=""
+		    >D</a
+		    > <a href=""
+		    >Float</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  ><A HREF="">D</a
-		    > <A HREF="">Int</a
+		  ><a href=""
+		    >D</a
+		    > <a href=""
+		    >Int</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
@@ -1439,17 +1667,21 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	><p class="src"
 	  ><a name="v:f" class="def"
 	    >f</a
-	    > :: <A HREF="">C</a
-	    > a =&gt; a -&gt; <A HREF="">Int</a
+	    > :: <a href=""
+	    >C</a
+	    > a =&gt; a -&gt; <a href=""
+	    >Int</a
 	    ></p
 	  ><div class="doc"
 	  ><p
 	    >In a comment string we can refer to identifiers in scope with
 single quotes like this: <code
-	      ><A HREF="">T</a
+	      ><a href=""
+		>T</a
 		></code
 	      >, and we can refer to modules by
-using double quotes: <A HREF="">Foo</a
+using double quotes: <a href=""
+	      >Foo</a
 	      >.  We can add emphasis <em
 	      >like this</em
 	      >.
@@ -1485,7 +1717,8 @@ using double quotes: <A HREF="">Foo</a
 	    ><pre
 	    >
      This is a block of code, which can include other markup: <code
-	      ><A HREF="">R</a
+	      ><a href=""
+		>R</a
 		></code
 	      >
      formatting
@@ -1496,7 +1729,8 @@ using double quotes: <A HREF="">Foo</a
 	    > this is another block of code
 </pre
 	    ><p
-	    >We can also include URLs in documentation: <A HREF="">http://www.haskell.org/</a
+	    >We can also include URLs in documentation: <a href=""
+	      >http://www.haskell.org/</a
 	      >.
 </p
 	    ></div
@@ -1505,8 +1739,10 @@ using double quotes: <A HREF="">Foo</a
 	><p class="src"
 	  ><a name="v:g" class="def"
 	    >g</a
-	    > :: <A HREF="">Int</a
-	    > -&gt; <A HREF="">IO</a
+	    > :: <a href=""
+	    >Int</a
+	    > -&gt; <a href=""
+	    >IO</a
 	    > CInt</p
 	  ><div class="doc"
 	  ><p
@@ -1633,8 +1869,10 @@ test2
 	><p class="src"
 	  ><a name="v:hidden" class="def"
 	    >hidden</a
-	    > :: <A HREF="">Int</a
-	    > -&gt; <A HREF="">Int</a
+	    > :: <a href=""
+	    >Int</a
+	    > -&gt; <a href=""
+	    >Int</a
 	    ></p
 	  ></div
 	><h1 id="g:8"
@@ -1642,7 +1880,8 @@ test2
 </h1
 	><div class="top"
 	><p class="src"
-	  >module <A HREF="">Visible</a
+	  >module <a href=""
+	    >Visible</a
 	    ></p
 	  ></div
 	><div class="doc"
@@ -1673,7 +1912,8 @@ test2
 	      ><td class="src"
 		><span class="keyword"
 		  >forall</span
-		  > b . <A HREF="">C</a
+		  > b . <a href=""
+		  >C</a
 		  > b =&gt; <a name="v:Ex1" class="def"
 		  >Ex1</a
 		  > b</td
@@ -1694,7 +1934,8 @@ test2
 	      ><td class="src"
 		><span class="keyword"
 		  >forall</span
-		  > b . <A HREF="">C</a
+		  > b . <a href=""
+		  >C</a
 		  > a =&gt; <a name="v:Ex3" class="def"
 		  >Ex3</a
 		  > b</td
@@ -1728,14 +1969,18 @@ test2
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: <A HREF="">T</a
-		  > <A HREF="">()</a
-		  > <A HREF="">()</a
+		>:: <a href=""
+		  >T</a
+		  > <a href=""
+		  >()</a
+		  > <a href=""
+		  >()</a
 		  ></td
 		><td class="doc"
 		><p
 		  >This argument has type <code
-		    ><A HREF="">T</a
+		    ><a href=""
+		      >T</a
 		      ></code
 		    >
 </p
@@ -1743,9 +1988,12 @@ test2
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">T2</a
-		  > <A HREF="">Int</a
-		  > <A HREF="">Int</a
+		>-&gt; <a href=""
+		  >T2</a
+		  > <a href=""
+		  >Int</a
+		  > <a href=""
+		  >Int</a
 		  ></td
 		><td class="doc"
 		><p
@@ -1755,12 +2003,18 @@ test2
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; (<A HREF="">T3</a
-		  > <A HREF="">Bool</a
-		  > <A HREF="">Bool</a
-		  > -&gt; <A HREF="">T4</a
-		  > <A HREF="">Float</a
-		  > <A HREF="">Float</a
+		>-&gt; (<a href=""
+		  >T3</a
+		  > <a href=""
+		  >Bool</a
+		  > <a href=""
+		  >Bool</a
+		  > -&gt; <a href=""
+		  >T4</a
+		  > <a href=""
+		  >Float</a
+		  > <a href=""
+		  >Float</a
 		  >)</td
 		><td class="doc"
 		><p
@@ -1772,9 +2026,12 @@ test2
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">T5</a
-		  > <A HREF="">()</a
-		  > <A HREF="">()</a
+		>-&gt; <a href=""
+		  >T5</a
+		  > <a href=""
+		  >()</a
+		  > <a href=""
+		  >()</a
 		  ></td
 		><td class="doc"
 		><p
@@ -1786,8 +2043,10 @@ test2
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">IO</a
-		  > <A HREF="">()</a
+		>-&gt; <a href=""
+		  >IO</a
+		  > <a href=""
+		  >()</a
 		  ></td
 		><td class="doc"
 		><p
@@ -1814,9 +2073,12 @@ test2
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: (<A HREF="">Int</a
-		  >, <A HREF="">Int</a
-		  >, <A HREF="">Float</a
+		>:: (<a href=""
+		  >Int</a
+		  >, <a href=""
+		  >Int</a
+		  >, <a href=""
+		  >Float</a
 		  >)</td
 		><td class="doc"
 		><p
@@ -1826,12 +2088,14 @@ test2
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">Int</a
+		>-&gt; <a href=""
+		  >Int</a
 		  ></td
 		><td class="doc"
 		><p
 		  >returns an <code
-		    ><A HREF="">Int</a
+		    ><a href=""
+		      >Int</a
 		      ></code
 		    >
 </p
@@ -1851,15 +2115,18 @@ test2
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: <A HREF="">R</a
+		>:: <a href=""
+		  >R</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">N1</a
-		  > <A HREF="">()</a
+		>-&gt; <a href=""
+		  >N1</a
+		  > <a href=""
+		  >()</a
 		  ></td
 		><td class="doc"
 		><p
@@ -1869,8 +2136,10 @@ test2
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">IO</a
-		  > <A HREF="">Int</a
+		>-&gt; <a href=""
+		  >IO</a
+		  > <a href=""
+		  >Int</a
 		  ></td
 		><td class="doc"
 		><p
@@ -1897,7 +2166,8 @@ test2
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: <A HREF="">Float</a
+		>:: <a href=""
+		  >Float</a
 		  ></td
 		><td class="doc"
 		><p
@@ -1907,8 +2177,10 @@ test2
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">IO</a
-		  > <A HREF="">Float</a
+		>-&gt; <a href=""
+		  >IO</a
+		  > <a href=""
+		  >Float</a
 		  ></td
 		><td class="doc"
 		><p
@@ -1944,12 +2216,14 @@ test2
 	><p class="src"
 	  ><a name="v:f-39-" class="def"
 	    >f'</a
-	    > :: <A HREF="">Int</a
+	    > :: <a href=""
+	    >Int</a
 	    ></p
 	  ><div class="doc"
 	  ><p
 	    >a function with a prime can be referred to as <code
-	      ><A HREF="">f'</a
+	      ><a href=""
+		>f'</a
 		></code
 	      > 
  but f' doesn't get link'd 'f\''
@@ -1960,8 +2234,9 @@ test2
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

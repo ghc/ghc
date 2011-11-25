@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html"
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html"
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>CrossPackageDocs</p
 	></div
       ><div id="synopsis"
@@ -36,44 +46,64 @@ window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html"
 	>Synopsis</p
 	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
 	><li class="src short"
-	  ><A HREF="">map</a
+	  ><a href=""
+	    >map</a
 	    > ::  (a -&gt; b) -&gt; [a] -&gt; [b]</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    >  <A HREF="">Monad</a
+	    >  <a href=""
+	    >Monad</a
 	    > m  <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
-	      ><A HREF="">(&gt;&gt;=)</a
+	      ><a href=""
+		>(&gt;&gt;=)</a
 		> ::  m a -&gt; (a -&gt; m b) -&gt; m b</li
 	      ><li
-	      ><A HREF="">(&gt;&gt;)</a
+	      ><a href=""
+		>(&gt;&gt;)</a
 		> ::  m a -&gt; m b -&gt; m b</li
 	      ><li
-	      ><A HREF="">return</a
+	      ><a href=""
+		>return</a
 		> ::  a -&gt; m a</li
 	      ><li
-	      ><A HREF="">fail</a
-		> ::  <A HREF="">String</a
+	      ><a href=""
+		>fail</a
+		> ::  <a href=""
+		>String</a
 		> -&gt; m a</li
 	      ></ul
 	    ></li
 	  ><li class="src short"
-	  ><A HREF="">runInteractiveProcess</a
-	    > :: <A HREF="">FilePath</a
-	    > -&gt; [<A HREF="">String</a
-	    >] -&gt; <A HREF="">Maybe</a
-	    > <A HREF="">FilePath</a
-	    > -&gt; <A HREF="">Maybe</a
-	    > [(<A HREF="">String</a
-	    >, <A HREF="">String</a
-	    >)] -&gt; <A HREF="">IO</a
-	    > (<A HREF="">Handle</a
-	    >, <A HREF="">Handle</a
-	    >, <A HREF="">Handle</a
-	    >, <A HREF="">ProcessHandle</a
+	  ><a href=""
+	    >runInteractiveProcess</a
+	    > :: <a href=""
+	    >FilePath</a
+	    > -&gt; [<a href=""
+	    >String</a
+	    >] -&gt; <a href=""
+	    >Maybe</a
+	    > <a href=""
+	    >FilePath</a
+	    > -&gt; <a href=""
+	    >Maybe</a
+	    > [(<a href=""
+	    >String</a
+	    >, <a href=""
+	    >String</a
+	    >)] -&gt; <a href=""
+	    >IO</a
+	    > (<a href=""
+	    >Handle</a
+	    >, <a href=""
+	    >Handle</a
+	    >, <a href=""
+	    >Handle</a
+	    >, <a href=""
+	    >ProcessHandle</a
 	    >)</li
 	  ></ul
 	></div
@@ -88,7 +118,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html"
 	  ><div class="doc"
 	  ><p
 	    ><code
-	      ><A HREF="">map</a
+	      ><a href=""
+		>map</a
 		></code
 	      > <code
 	      >f xs</code
@@ -117,7 +148,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_CrossPackageDocs.html"
 	  ><div class="doc"
 	  ><p
 	    >The <code
-	      ><A HREF="">Monad</a
+	      ><a href=""
+		>Monad</a
 		></code
 	      > class defines the basic operations over a <em
 	      >monad</em
@@ -136,16 +168,19 @@ monadic expressions.
 </p
 	    ><p
 	    >Minimal complete definition: <code
-	      ><A HREF="">&gt;&gt;=</a
+	      ><a href=""
+		>&gt;&gt;=</a
 		></code
 	      > and <code
-	      ><A HREF="">return</a
+	      ><a href=""
+		>return</a
 		></code
 	      >.
 </p
 	    ><p
 	    >Instances of <code
-	      ><A HREF="">Monad</a
+	      ><a href=""
+		>Monad</a
 		></code
 	      > should satisfy the following laws:
 </p
@@ -156,10 +191,12 @@ monadic expressions.
 </pre
 	    ><p
 	    >Instances of both <code
-	      ><A HREF="">Monad</a
+	      ><a href=""
+		>Monad</a
 		></code
 	      > and <code
-	      ><A HREF="">Functor</a
+	      ><a href=""
+		>Functor</a
 		></code
 	      > should additionally satisfy the law:
 </p
@@ -168,14 +205,16 @@ monadic expressions.
 </pre
 	    ><p
 	    >The instances of <code
-	      ><A HREF="">Monad</a
+	      ><a href=""
+		>Monad</a
 		></code
 	      > for lists, <code
 	      >Data.Maybe.Maybe</code
 	      > and <code
 	      >System.IO.IO</code
 	      >
-defined in the <A HREF="">Prelude</a
+defined in the <a href=""
+	      >Prelude</a
 	      > satisfy these laws.
 </p
 	    ></div
@@ -215,7 +254,8 @@ defined in the <A HREF="">Prelude</a
 	    ><p class="src"
 	    ><a name="v:fail" class="def"
 	      >fail</a
-	      > ::  <A HREF="">String</a
+	      > ::  <a href=""
+	      >String</a
 	      > -&gt; m a</p
 	    ><div class="doc"
 	    ><p
@@ -234,45 +274,62 @@ defined in the <A HREF="">Prelude</a
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">Monad</a
+		  ><a href=""
+		    >Monad</a
 		    > []</td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  ><A HREF="">Monad</a
-		    > <A HREF="">IO</a
+		  ><a href=""
+		    >Monad</a
+		    > <a href=""
+		    >IO</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  ><A HREF="">Monad</a
+		  ><a href=""
+		    >Monad</a
 		    > Q</td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  ><A HREF="">Monad</a
-		    > <A HREF="">Maybe</a
+		  ><a href=""
+		    >Monad</a
+		    > <a href=""
+		    >Maybe</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  ><A HREF="">Monad</a
+		  ><a href=""
+		    >Monad</a
+		    > PprM</td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td class="src"
+		  ><a href=""
+		    >Monad</a
 		    > ((-&gt;) r)</td
 		  ><td class="doc empty"
 		  >&nbsp;</td
 		  ></tr
 		><tr
 		><td class="src"
-		  ><A HREF="">Monad</a
-		    > (<A HREF="">Either</a
+		  ><a href=""
+		    >Monad</a
+		    > (<a href=""
+		    >Either</a
 		    > e)</td
 		  ><td class="doc empty"
 		  >&nbsp;</td
@@ -292,7 +349,8 @@ defined in the <A HREF="">Prelude</a
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: <A HREF="">FilePath</a
+		>:: <a href=""
+		  >FilePath</a
 		  ></td
 		><td class="doc"
 		><p
@@ -302,7 +360,8 @@ defined in the <A HREF="">Prelude</a
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; [<A HREF="">String</a
+		>-&gt; [<a href=""
+		  >String</a
 		  >]</td
 		><td class="doc"
 		><p
@@ -312,8 +371,10 @@ defined in the <A HREF="">Prelude</a
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">Maybe</a
-		  > <A HREF="">FilePath</a
+		>-&gt; <a href=""
+		  >Maybe</a
+		  > <a href=""
+		  >FilePath</a
 		  ></td
 		><td class="doc"
 		><p
@@ -323,9 +384,12 @@ defined in the <A HREF="">Prelude</a
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">Maybe</a
-		  > [(<A HREF="">String</a
-		  >, <A HREF="">String</a
+		>-&gt; <a href=""
+		  >Maybe</a
+		  > [(<a href=""
+		  >String</a
+		  >, <a href=""
+		  >String</a
 		  >)]</td
 		><td class="doc"
 		><p
@@ -335,11 +399,16 @@ defined in the <A HREF="">Prelude</a
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; <A HREF="">IO</a
-		  > (<A HREF="">Handle</a
-		  >, <A HREF="">Handle</a
-		  >, <A HREF="">Handle</a
-		  >, <A HREF="">ProcessHandle</a
+		>-&gt; <a href=""
+		  >IO</a
+		  > (<a href=""
+		  >Handle</a
+		  >, <a href=""
+		  >Handle</a
+		  >, <a href=""
+		  >Handle</a
+		  >, <a href=""
+		  >ProcessHandle</a
 		  >)</td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -349,7 +418,8 @@ defined in the <A HREF="">Prelude</a
 	  ><div class="doc"
 	  ><p
 	    >Runs a raw command, and returns <code
-	      ><A HREF="">Handle</a
+	      ><a href=""
+		>Handle</a
 		></code
 	      >s that may be used to communicate
      with the process via its <code
@@ -369,11 +439,13 @@ defined in the <A HREF="">Prelude</a
 </pre
 	    ><p
 	    >The <code
-	      ><A HREF="">Handle</a
+	      ><a href=""
+		>Handle</a
 		></code
 	      >s are initially in binary mode; if you need them to be
     in text mode then use <code
-	      ><A HREF="">hSetBinaryMode</a
+	      ><a href=""
+		>hSetBinaryMode</a
 		></code
 	      >.
 </p
@@ -383,8 +455,9 @@ defined in the <A HREF="">Prelude</a
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

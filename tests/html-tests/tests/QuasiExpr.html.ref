@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>QuasiExpr</p
 	></div
       ><div id="interface"
@@ -49,7 +59,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	      ><td class="src"
 		><a name="v:IntExpr" class="def"
 		  >IntExpr</a
-		  > <A HREF="">Integer</a
+		  > <a href=""
+		  >Integer</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -58,7 +69,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	      ><td class="src"
 		><a name="v:AntiIntExpr" class="def"
 		  >AntiIntExpr</a
-		  > <A HREF="">String</a
+		  > <a href=""
+		  >String</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -67,9 +79,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	      ><td class="src"
 		><a name="v:BinopExpr" class="def"
 		  >BinopExpr</a
-		  > <A HREF="">BinOp</a
-		  > <A HREF="">Expr</a
-		  > <A HREF="">Expr</a
+		  > <a href=""
+		  >BinOp</a
+		  > <a href=""
+		  >Expr</a
+		  > <a href=""
+		  >Expr</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -78,7 +93,8 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	      ><td class="src"
 		><a name="v:AntiExpr" class="def"
 		  >AntiExpr</a
-		  > <A HREF="">String</a
+		  > <a href=""
+		  >String</a
 		  ></td
 		><td class="doc empty"
 		>&nbsp;</td
@@ -92,8 +108,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">Show</a
-		    > <A HREF="">Expr</a
+		  ><a href=""
+		    >Show</a
+		    > <a href=""
+		    >Expr</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
@@ -154,8 +172,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">Show</a
-		    > <A HREF="">BinOp</a
+		  ><a href=""
+		    >Show</a
+		    > <a href=""
+		    >BinOp</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
@@ -168,23 +188,27 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	><p class="src"
 	  ><a name="v:eval" class="def"
 	    >eval</a
-	    > :: <A HREF="">Expr</a
-	    > -&gt; <A HREF="">Integer</a
+	    > :: <a href=""
+	    >Expr</a
+	    > -&gt; <a href=""
+	    >Integer</a
 	    ></p
 	  ></div
 	><div class="top"
 	><p class="src"
 	  ><a name="v:parseExprExp" class="def"
 	    >parseExprExp</a
-	    > :: <A HREF="">String</a
+	    > :: <a href=""
+	    >String</a
 	    > -&gt; Q Exp</p
 	  ></div
 	></div
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html

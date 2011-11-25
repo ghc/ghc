@@ -17,10 +17,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
   ><div id="package-header"
     ><ul class="links" id="page-menu"
       ><li
-	><A HREF="">Contents</a
+	><a href=""
+	  >Contents</a
 	  ></li
 	><li
-	><A HREF="">Index</a
+	><a href=""
+	  >Index</a
 	  ></li
 	></ul
       ><p class="caption" class="empty"
@@ -28,7 +30,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
       ></div
     ><div id="content"
     ><div id="module-header"
-      ><p class="caption"
+      ><table class="info"
+	><tr
+	  ><th
+	    >Safe Haskell</th
+	    ><td
+	    >None</td
+	    ></tr
+	  ></table
+	><p class="caption"
 	>TypeFamilies</p
 	></div
       ><div id="synopsis"
@@ -38,31 +48,38 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	><li class="src short"
 	  ><span class="keyword"
 	    >type family</span
-	    > <A HREF="">G</a
+	    > <a href=""
+	    >G</a
 	    > a :: *</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >class</span
-	    >  <A HREF="">A</a
+	    >  <a href=""
+	    >A</a
 	    > a  <span class="keyword"
 	    >where</span
 	    ><ul class="subs"
 	    ><li
 	      ><span class="keyword"
 		>data</span
-		> <A HREF="">B</a
+		> <a href=""
+		>B</a
 		> a :: * -&gt; *</li
 	      ><li
-	      ><A HREF="">f</a
-		> :: <A HREF="">B</a
-		> a <A HREF="">Int</a
+	      ><a href=""
+		>f</a
+		> :: <a href=""
+		>B</a
+		> a <a href=""
+		>Int</a
 		></li
 	      ></ul
 	    ></li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >type family</span
-	    > <A HREF="">F</a
+	    > <a href=""
+	    >F</a
 	    > a </li
 	  ></ul
 	></div
@@ -117,8 +134,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	    ><p class="src"
 	    ><a name="v:f" class="def"
 	      >f</a
-	      > :: <A HREF="">B</a
-	      > a <A HREF="">Int</a
+	      > :: <a href=""
+	      >B</a
+	      > a <a href=""
+	      >Int</a
 	      ></p
 	    ><div class="doc"
 	    ><p
@@ -133,8 +152,10 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	    ><table
 	      ><tr
 		><td class="src"
-		  ><A HREF="">A</a
-		    > <A HREF="">Int</a
+		  ><a href=""
+		    >A</a
+		    > <a href=""
+		    >Int</a
 		    ></td
 		  ><td class="doc empty"
 		  >&nbsp;</td
@@ -160,8 +181,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
       ></div
     ><div id="footer"
     ><p
-      >Produced by <A HREF="">Haddock</a
-	> version 2.9.2</p
+      >Produced by <a href=""
+	>Haddock</a
+	> version 2.9.4</p
       ></div
     ></body
   ></html
