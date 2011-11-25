@@ -431,7 +431,7 @@ odd             =  not . even
 
 -------------------------------------------------------
 -- | raise a number to a non-negative integral power
-{-# SPECIALISE (^) ::
+{-# SPECIALISE [1] (^) ::
         Integer -> Integer -> Integer,
         Integer -> Int -> Integer,
         Int -> Int -> Int #-}
@@ -464,6 +464,44 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
    Currently the fromInteger calls are not floated because we get
              \d1 d2 x y -> blah
    after the gentle round of simplification. -}
+
+{- Rules for powers with known small exponent
+    see #5237
+    For small exponents, (^) is inefficient compared to manually
+    expanding the multiplication tree.
+    Here, rules for the most common exponent types are given.
+    The range of exponents for which rules are given is quite
+    arbitrary and kept small to not unduly increase the number of rules.
+    0 and 1 are excluded based on the assumption that nobody would
+    write x^0 or x^1 in code and the cases where an exponent could
+    be statically resolved to 0 or 1 are rare.
+
+    It might be desirable to have corresponding rules also for
+    exponents of other types, in particular Word, but we can't
+    have those rules here (importing GHC.Word or GHC.Int would
+    create a cyclic module dependency), and it's doubtful they
+    would fire, since the exponents of other types tend to get
+    floated out before the rule has a chance to fire.
+
+    Also desirable would be rules for (^^), but I haven't managed
+    to get those to fire.
+
+    Note: Trying to save multiplications by sharing the square for
+    exponents 4 and 5 does not save time, indeed, for Double, it is
+    up to twice slower, so the rules contain flat sequences of
+    multiplications.
+-}
+
+{-# RULES
+"^2/Int"        forall x. x ^ (2 :: Int) = let u = x in u*u
+"^3/Int"        forall x. x ^ (3 :: Int) = let u = x in u*u*u
+"^4/Int"        forall x. x ^ (4 :: Int) = let u = x in u*u*u*u
+"^5/Int"        forall x. x ^ (5 :: Int) = let u = x in u*u*u*u*u
+"^2/Integer"    forall x. x ^ (2 :: Integer) = let u = x in u*u
+"^3/Integer"    forall x. x ^ (3 :: Integer) = let u = x in u*u*u
+"^4/Integer"    forall x. x ^ (4 :: Integer) = let u = x in u*u*u*u
+"^5/Integer"    forall x. x ^ (5 :: Integer) = let u = x in u*u*u*u*u
+  #-}
 
 -------------------------------------------------------
 -- Special power functions for Rational
