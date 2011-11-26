@@ -378,6 +378,7 @@ data ExtensionFlag
    | Opt_ForeignFunctionInterface
    | Opt_UnliftedFFITypes
    | Opt_InterruptibleFFI
+   | Opt_CApiFFI
    | Opt_GHCForeignImportPrim
    | Opt_ParallelArrays           -- Syntactic support for parallel arrays
    | Opt_Arrows                   -- Arrow-notation syntax
@@ -1898,6 +1899,7 @@ xFlags = [
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
   ( "InterruptibleFFI",                 Opt_InterruptibleFFI, nop ),
+  ( "CApiFFI",                          Opt_CApiFFI, nop ),
   ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
   ( "LiberalTypeSynonyms",              Opt_LiberalTypeSynonyms, nop ),
   ( "Rank2Types",                       Opt_Rank2Types, nop ),

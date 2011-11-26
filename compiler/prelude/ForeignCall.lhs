@@ -151,13 +151,15 @@ platforms.
 See: http://www.programmersheaven.com/2/Calling-conventions
 
 \begin{code}
-data CCallConv = CCallConv | StdCallConv | CmmCallConv | PrimCallConv
+data CCallConv = CCallConv | CApiConv | StdCallConv
+               | CmmCallConv | PrimCallConv
   deriving (Eq, Data, Typeable)
   {-! derive: Binary !-}
 
 instance Outputable CCallConv where
   ppr StdCallConv = ptext (sLit "stdcall")
   ppr CCallConv   = ptext (sLit "ccall")
+  ppr CApiConv    = ptext (sLit "capi")
   ppr CmmCallConv = ptext (sLit "C--")
   ppr PrimCallConv = ptext (sLit "prim")
 
@@ -167,6 +169,7 @@ defaultCCallConv = CCallConv
 ccallConvToInt :: CCallConv -> Int
 ccallConvToInt StdCallConv = 0
 ccallConvToInt CCallConv   = 1
+ccallConvToInt CApiConv    = panic "ccallConvToInt CApiConv"
 ccallConvToInt (CmmCallConv {})  = panic "ccallConvToInt CmmCallConv"
 ccallConvToInt (PrimCallConv {}) = panic "ccallConvToInt PrimCallConv"
 \end{code}
@@ -178,6 +181,7 @@ calling convention (used by PprAbsC):
 ccallConvAttribute :: CCallConv -> SDoc
 ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv         = empty
+ccallConvAttribute CApiConv          = empty
 ccallConvAttribute (CmmCallConv {})  = panic "ccallConvAttribute CmmCallConv"
 ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
 \end{code}
@@ -294,11 +298,14 @@ instance Binary CCallConv where
             putByte bh 2
     put_ bh CmmCallConv = do
             putByte bh 3
+    put_ bh CApiConv = do
+            putByte bh 4
     get bh = do
             h <- getByte bh
             case h of
               0 -> do return CCallConv
               1 -> do return StdCallConv
               2 -> do return PrimCallConv
-              _ -> do return CmmCallConv
+              3 -> do return CmmCallConv
+              _ -> do return CApiConv
 \end{code}

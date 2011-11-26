@@ -239,6 +239,7 @@ genCall env target res args ret = do
                             ArchX86_64 -> CC_X86_Stdcc
                             _          -> CC_Ccc
             CCallConv    -> CC_Ccc
+            CApiConv     -> CC_Ccc
             PrimCallConv -> CC_Ccc
             CmmCallConv  -> panic "CmmCallConv not supported here!"
 

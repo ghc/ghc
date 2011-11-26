@@ -457,6 +457,7 @@ data Token
   | ITunsafe
   | ITstdcallconv
   | ITccallconv
+  | ITcapiconv
   | ITprimcallconv
   | ITmdo
   | ITfamily
@@ -642,6 +643,7 @@ reservedWordsFM = listToUFM $
          ( "unsafe",         ITunsafe,        bit ffiBit),
          ( "stdcall",        ITstdcallconv,   bit ffiBit),
          ( "ccall",          ITccallconv,     bit ffiBit),
+         ( "capi",           ITcapiconv,      bit cApiFfiBit),
          ( "prim",           ITprimcallconv,  bit ffiBit),
 
          ( "rec",            ITrec,           bit recBit),
@@ -1754,6 +1756,8 @@ ffiBit :: Int
 ffiBit= 0
 interruptibleFfiBit :: Int
 interruptibleFfiBit = 1
+cApiFfiBit :: Int
+cApiFfiBit = 2
 parrBit :: Int
 parrBit = 3
 arrowsBit :: Int
@@ -1879,6 +1883,7 @@ mkPState flags buf loc =
     where
       bitmap =     ffiBit                      `setBitIf` xopt Opt_ForeignFunctionInterface flags
                .|. interruptibleFfiBit         `setBitIf` xopt Opt_InterruptibleFFI         flags
+               .|. cApiFfiBit                  `setBitIf` xopt Opt_CApiFFI                  flags
                .|. parrBit                     `setBitIf` xopt Opt_ParallelArrays           flags
                .|. arrowsBit                   `setBitIf` xopt Opt_Arrows                   flags
                .|. thBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
