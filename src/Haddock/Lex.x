@@ -121,7 +121,7 @@ data Token
   | TokDefStart
   | TokDefEnd
   | TokSpecial Char
-  | TokIdent [RdrName]
+  | TokIdent RdrName
   | TokString String
   | TokURL String
   | TokPic String
@@ -209,7 +209,7 @@ begin sc = \_ _ _ cont _ -> cont sc
 
 ident :: Action
 ident pos str sc cont dflags = 
-  case strToHsQNames dflags loc id of
+  case parseIdent dflags loc id of
 	Just names -> (TokIdent names, pos) : cont sc
 	Nothing -> (TokString str, pos) : cont sc
  where id = init (tail str)
@@ -220,12 +220,12 @@ ident pos str sc cont dflags =
              AlexPn _ line col ->
                  mkRealSrcLoc filename line col
 
-strToHsQNames :: DynFlags -> RealSrcLoc -> String -> Maybe [RdrName]
-strToHsQNames dflags loc str0 = 
+parseIdent :: DynFlags -> RealSrcLoc -> String -> Maybe RdrName
+parseIdent dflags loc str0 = 
   let buffer = stringToStringBuffer str0
       pstate = mkPState dflags buffer loc
       result = unP parseIdentifier pstate 
   in case result of 
-       POk _ name -> Just [unLoc name] 
+       POk _ name -> Just (unLoc name)
        _ -> Nothing
 }

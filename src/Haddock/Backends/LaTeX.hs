@@ -22,8 +22,8 @@ import qualified Pretty
 
 import GHC
 import OccName
-import Name                 ( isTyConName, nameOccName )
-import RdrName              ( rdrNameOcc, isRdrTc )
+import Name                 ( nameOccName )
+import RdrName              ( rdrNameOcc )
 import BasicTypes           ( ipNameName )
 import FastString           ( unpackFS, unpackLitString )
 
@@ -997,9 +997,8 @@ latexMonoMunge c   s = latexMunge c s
 -------------------------------------------------------------------------------
 
 
-parLatexMarkup :: (a -> LaTeX) -> (a -> Bool)
-               -> DocMarkup a (StringContext -> LaTeX)
-parLatexMarkup ppId isTyCon = Markup {
+parLatexMarkup :: (a -> LaTeX) -> DocMarkup a (StringContext -> LaTeX)
+parLatexMarkup ppId = Markup {
   markupParagraph     = \p v -> p v <> text "\\par" $$ text "",
   markupEmpty         = \_ -> empty,
   markupString        = \s v -> text (fixString v s),
@@ -1027,26 +1026,15 @@ parLatexMarkup ppId isTyCon = Markup {
         Verb  -> theid
         Mono  -> theid
         Plain -> text "\\haddockid" <> braces theid
-      where theid = ppId (choose id)
-
-    -- If an id can refer to multiple things, we give precedence to type
-    -- constructors.  This should ideally be done during renaming from RdrName
-    -- to Name, but since we will move this process from GHC into Haddock in
-    -- the future, we fix it here in the meantime.
-    -- TODO: mention this rule in the documentation.
-    choose [] = error "empty identifier list in HsDoc"
-    choose [x] = x
-    choose (x:y:_)
-      | isTyCon x = x
-      | otherwise = y
+      where theid = ppId id
 
 
 latexMarkup :: DocMarkup DocName (StringContext -> LaTeX)
-latexMarkup = parLatexMarkup ppVerbDocName (isTyConName . getName)
+latexMarkup = parLatexMarkup ppVerbDocName
 
 
 rdrLatexMarkup :: DocMarkup RdrName (StringContext -> LaTeX)
-rdrLatexMarkup = parLatexMarkup ppVerbRdrName isRdrTc
+rdrLatexMarkup = parLatexMarkup ppVerbRdrName
 
 
 docToLaTeX :: Doc DocName -> LaTeX

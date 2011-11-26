@@ -28,17 +28,15 @@ import Haddock.Utils
 import Text.XHtml hiding ( name, title, p, quote )
 
 import GHC
-import Name
-import RdrName
 
 
-parHtmlMarkup :: (a -> Html) -> (a -> Bool) -> DocMarkup a Html
-parHtmlMarkup ppId isTyCon = Markup {
+parHtmlMarkup :: (a -> Html) -> DocMarkup a Html
+parHtmlMarkup ppId = Markup {
   markupEmpty         = noHtml,
   markupString        = toHtml,
   markupParagraph     = paragraph,
   markupAppend        = (+++),
-  markupIdentifier    = thecode . ppId . choose,
+  markupIdentifier    = thecode . ppId,
   markupModule        = \m -> let (mdl,ref) = break (=='#') m
                               in ppModuleRef (mkModuleNoPackage mdl) ref,
   markupEmphasis      = emphasize,
@@ -53,17 +51,6 @@ parHtmlMarkup ppId isTyCon = Markup {
   markupExample       = examplesToHtml
   }
   where
-    -- If an id can refer to multiple things, we give precedence to type
-    -- constructors.  This should ideally be done during renaming from RdrName
-    -- to Name, but since we will move this process from GHC into Haddock in
-    -- the future, we fix it here in the meantime.
-    -- TODO: mention this rule in the documentation.
-    choose [] = error "empty identifier list in HsDoc"
-    choose [x] = x
-    choose (x:y:_)
-      | isTyCon x = x
-      | otherwise = y
-
     examplesToHtml l = pre (concatHtml $ map exampleToHtml l) ! [theclass "screen"]
 
     exampleToHtml (Example expression result) = htmlExample
@@ -77,17 +64,17 @@ parHtmlMarkup ppId isTyCon = Markup {
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml :: Qualification -> Doc DocName -> Html
 docToHtml qual = markup fmt . cleanup
-  where fmt = parHtmlMarkup (ppDocName qual) (isTyConName . getName)
+  where fmt = parHtmlMarkup (ppDocName qual)
 
 
 origDocToHtml :: Doc Name -> Html
 origDocToHtml = markup fmt . cleanup
-  where fmt = parHtmlMarkup ppName isTyConName
+  where fmt = parHtmlMarkup ppName
 
 
 rdrDocToHtml :: Doc RdrName -> Html
 rdrDocToHtml = markup fmt . cleanup
-  where fmt = parHtmlMarkup ppRdrName isRdrTc
+  where fmt = parHtmlMarkup ppRdrName
 
 
 docElement :: (Html -> Html) -> Html -> Html

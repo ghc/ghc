@@ -58,7 +58,7 @@ renameInterface renamingEnv warnings iface =
 
       -- combine the missing names and filter out the built-ins, which would
       -- otherwise allways be missing.
-      missingNames = nub $ filter isExternalName
+      missingNames = nub $ filter isExternalName  -- XXX: isExternalName filters out too much
                     (missingNames1 ++ missingNames2 ++ missingNames3)
 
       -- filter out certain built in type constructors using their string
@@ -171,11 +171,9 @@ renameDoc d = case d of
   DocParagraph doc -> do
     doc' <- renameDoc doc
     return (DocParagraph doc')
-  DocIdentifier ids -> do
-    lkp <- getLookupRn
-    case [ n | (True, n) <- map lkp ids ] of
-      ids'@(_:_) -> return (DocIdentifier ids')
-      [] -> return (DocIdentifier (map Undocumented ids))
+  DocIdentifier x -> do
+    x' <- rename x
+    return (DocIdentifier x')
   DocModule str -> return (DocModule str)
   DocEmphasis doc -> do
     doc' <- renameDoc doc

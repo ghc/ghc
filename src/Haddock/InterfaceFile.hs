@@ -65,9 +65,9 @@ binaryInterfaceMagic = 0xD0Cface
 -- we version our interface files accordingly.
 binaryInterfaceVersion :: Word16
 #if __GLASGOW_HASKELL__ == 702
-binaryInterfaceVersion = 17
+binaryInterfaceVersion = 18
 #elif __GLASGOW_HASKELL__ == 703
-binaryInterfaceVersion = 17
+binaryInterfaceVersion = 18
 #else
 #error Unknown GHC version
 #endif

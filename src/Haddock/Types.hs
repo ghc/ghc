@@ -275,7 +275,8 @@ data Doc id
   | DocAppend (Doc id) (Doc id)
   | DocString String
   | DocParagraph (Doc id)
-  | DocIdentifier [id]
+  | DocIdentifier id
+--  | DocIdentifierOutOfScope [RdrName]
   | DocModule String
   | DocEmphasis (Doc id)
   | DocMonospaced (Doc id)
@@ -310,7 +311,7 @@ data DocMarkup id a = Markup
   , markupString        :: String -> a
   , markupParagraph     :: a -> a
   , markupAppend        :: a -> a -> a
-  , markupIdentifier    :: [id] -> a
+  , markupIdentifier    :: id -> a
   , markupModule        :: String -> a
   , markupEmphasis      :: a -> a
   , markupMonospaced    :: a -> a

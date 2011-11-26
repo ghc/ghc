@@ -5,17 +5,13 @@ import Haddock.Types
 import RnEnv       ( dataTcOccs )
 
 import RdrName     ( RdrName, gre_name, GlobalRdrEnv, lookupGRE_RdrName )
-import Name        ( Name )
+import Name        ( Name, isTyConName )
 import Outputable  ( ppr, showSDoc )
 
 rnHaddockModInfo :: GlobalRdrEnv -> HaddockModInfo RdrName -> HaddockModInfo Name
 rnHaddockModInfo gre hmod =
   let desc = hmi_description hmod
   in hmod { hmi_description = fmap (rnDoc gre) desc }
-
-ids2string :: [RdrName] -> String
-ids2string []    = []
-ids2string (x:_) = showSDoc $ ppr x
 
 data Id x = Id {unId::x}
 instance Monad Id where (Id v)>>=f = f v; return = Id
@@ -38,13 +34,16 @@ rnDoc gre = unId . do_rn
     doc' <- do_rn doc
     return (DocParagraph doc')
 
-  DocIdentifier ids -> do
-    let choices = concatMap dataTcOccs ids
+  DocIdentifier x -> do
+    let choices = dataTcOccs x
     let gres = concatMap (\rdrName ->
                  map gre_name (lookupGRE_RdrName rdrName gre)) choices
-    case gres of
-      []   -> return (DocMonospaced (DocString (ids2string ids)))
-      ids' -> return (DocIdentifier ids')
+    return $ case gres of
+      []   -> DocMonospaced (DocString (showSDoc $ ppr x))  -- TODO: DocIdentifierRdrName
+      [a]  -> DocIdentifier a
+      a:b:_ | isTyConName a -> DocIdentifier a | otherwise -> DocIdentifier b
+        -- If an id can refer to multiple things, we give precedence to type
+        -- constructors.
 
   DocModule str -> return (DocModule str)
 
