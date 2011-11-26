@@ -9328,12 +9328,6 @@ will fuse with one but not the other)
  <function>msum</function>
 </para>
 </listitem>
-<listitem>
-
-<para>
- <function>sortBy</function>
-</para>
-</listitem>
 
 </itemizedlist>
 
