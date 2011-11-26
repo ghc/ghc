@@ -8,7 +8,6 @@ module Vectorise.Builtins (
   Builtins(..),
   
   -- * Wrapped selectors
-  parray_PrimTyCon,
   selTy, selsTy,
   selReplicate,
   selTags,
@@ -26,7 +25,7 @@ module Vectorise.Builtins (
   closureCtrFun,
 
   -- * Initialisation
-  initBuiltins, initBuiltinVars, initBuiltinTyCons
+  initBuiltins, initBuiltinVars,
 ) where
 
 import Vectorise.Builtins.Base
