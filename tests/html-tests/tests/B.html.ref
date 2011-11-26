@@ -41,6 +41,22 @@ window.onload = function () {pageLoad();setSynopsis("mini_B.html");};
 	><p class="caption"
 	>B</p
 	></div
+      ><div id="synopsis"
+      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
+	>Synopsis</p
+	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
+	><li class="src short"
+	  >module <a href=""
+	    >A</a
+	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >test</a
+	    > :: <a href=""
+	    >Int</a
+	    ></li
+	  ></ul
+	></div
       ><div id="interface"
       ><h1
 	>Documentation</h1
@@ -49,6 +65,42 @@ window.onload = function () {pageLoad();setSynopsis("mini_B.html");};
 	  >module <a href=""
 	    >A</a
 	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:test" class="def"
+	    >test</a
+	    > :: <a href=""
+	    >Int</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >This link shouldn't work: <code
+	      >other</code
+	      >.
+   These links should work: <code
+	      ><a href=""
+		>other</a
+		></code
+	      >, <code
+	      ><a href=""
+		>sortBy</a
+		></code
+	      >, <code
+	      ><a href=""
+		>test2</a
+		></code
+	      >, <code
+	      ><a href=""
+		>test2</a
+		></code
+	      >, <code
+	      ><a href=""
+		>fromMaybe</a
+		></code
+	      >.
+</p
+	    ></div
 	  ></div
 	></div
       ></div

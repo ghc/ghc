@@ -66,6 +66,22 @@ window.onload = function () {pageLoad();setSynopsis("mini_A.html");};
 	      ></table
 	    ></div
 	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:other" class="def"
+	    >other</a
+	    > :: <a href=""
+	    >Int</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:test2" class="def"
+	    >test2</a
+	    > :: <a href=""
+	    >Bool</a
+	    ></p
+	  ></div
 	></div
       ></div
     ><div id="footer"

@@ -209,9 +209,13 @@ monadic expressions.
 		>Monad</a
 		></code
 	      > for lists, <code
-	      >Data.Maybe.Maybe</code
+	      ><a href=""
+		>Maybe</a
+		></code
 	      > and <code
-	      >System.IO.IO</code
+	      ><a href=""
+		>IO</a
+		></code
 	      >
 defined in the <a href=""
 	      >Prelude</a
