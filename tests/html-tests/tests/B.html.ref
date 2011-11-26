@@ -99,6 +99,9 @@ window.onload = function () {pageLoad();setSynopsis("mini_B.html");};
 		>fromMaybe</a
 		></code
 	      >.
+   Module link: <a href=""
+	      >Prelude</a
+	      >.
 </p
 	    ></div
 	  ></div

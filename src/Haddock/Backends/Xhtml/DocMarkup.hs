@@ -21,7 +21,6 @@ module Haddock.Backends.Xhtml.DocMarkup (
 
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils
-import Haddock.GhcUtils
 import Haddock.Types
 import Haddock.Utils
 
@@ -39,7 +38,7 @@ parHtmlMarkup qual ppId = Markup {
   markupIdentifier           = thecode . ppId,
   markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
   markupModule               = \m -> let (mdl,ref) = break (=='#') m
-                                     in ppModuleRef (mkModuleNoPackage mdl) ref,
+                                     in ppModuleRef (mkModuleName mdl) ref,
   markupEmphasis             = emphasize,
   markupMonospaced           = thecode,
   markupUnorderedList        = unordList,

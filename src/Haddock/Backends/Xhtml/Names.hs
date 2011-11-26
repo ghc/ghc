@@ -127,9 +127,9 @@ ppModule mdl = anchor ! [href (moduleUrl mdl)]
                << toHtml (moduleString mdl)
 
 
-ppModuleRef :: Module -> String -> Html
-ppModuleRef mdl ref = anchor ! [href (moduleUrl mdl ++ ref)]
-                      << toHtml (moduleString mdl)
+ppModuleRef :: ModuleName -> String -> Html
+ppModuleRef mdl ref = anchor ! [href (moduleHtmlFile' mdl ++ ref)]
+                      << toHtml (moduleNameString mdl)
     -- NB: The ref parameter already includes the '#'.
     -- This function is only called from markupModule expanding a
     -- DocModule, which doesn't seem to be ever be used.

@@ -3,5 +3,6 @@ import A ( A(..), test2 )
 
 -- | This link shouldn't work: 'other'.
 --   These links should work: 'A.other', 'Data.List.sortBy', 'test2', 'A.test2', 'Data.Maybe.fromMaybe'.
+--   Module link: "Prelude".
 test :: Int
 test = 1

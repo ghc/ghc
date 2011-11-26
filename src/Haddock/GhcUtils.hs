@@ -61,10 +61,6 @@ unpackPackageId p
   where str = packageIdString p
 
 
-mkModuleNoPackage :: String -> Module
-mkModuleNoPackage str = mkModule (stringToPackageId "") (mkModuleName str)
-
-
 lookupLoadedHomeModuleGRE  :: GhcMonad m => ModuleName -> m (Maybe GlobalRdrEnv)
 lookupLoadedHomeModuleGRE mod_name = withSession $ \hsc_env ->
   case lookupUFM (hsc_HPT hsc_env) mod_name of
