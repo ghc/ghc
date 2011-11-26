@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface, CApiFFI #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -480,10 +480,10 @@ foreign import ccall unsafe "HsBase.h mkfifo"
 foreign import ccall unsafe "HsBase.h pipe"
    c_pipe :: Ptr CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_sigemptyset"
+foreign import capi unsafe "HsBase.h sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
+foreign import capi unsafe "HsBase.h sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h sigprocmask"
@@ -495,7 +495,7 @@ foreign import ccall unsafe "HsBase.h tcgetattr"
 foreign import ccall unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_utime"
+foreign import capi unsafe "HsBase.h utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
 foreign import ccall unsafe "HsBase.h waitpid"
