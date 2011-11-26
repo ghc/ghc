@@ -299,13 +299,11 @@ dsFExport fn_id co ext_name cconv isDyn = do
        -- Look at the result type of the exported function, orig_res_ty
        -- If it's IO t, return         (t, True)
        -- If it's plain t, return      (t, False)
-    (res_ty,             -- t
-     is_IO_res_ty) <-    -- Bool
-        case tcSplitIOType_maybe orig_res_ty of
-           Just (_ioTyCon, res_ty) -> return (res_ty, True)
-                   -- The function already returns IO t
-           Nothing                    -> return (orig_res_ty, False)
-                   -- The function returns t
+       (res_ty, is_IO_res_ty) = case tcSplitIOType_maybe orig_res_ty of
+                                -- The function already returns IO t
+                                Just (_ioTyCon, res_ty) -> (res_ty, True)
+                                -- The function returns t
+                                Nothing                 -> (orig_res_ty, False)
 
     dflags <- getDOpts
     return $
