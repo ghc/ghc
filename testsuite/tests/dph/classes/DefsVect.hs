@@ -14,7 +14,6 @@ import Data.Array.Parallel.Prelude.Int  (Int)
 -- {-# VECTORISE class Ord #-}
 -- {-# VECTORISE SCALAR instance Ord Int #-}
 
--- {-# VECTORISE type Bool = Bool #-}
 -- {-# VECTORISE type Ordering #-}
 
 data MyBool = MyTrue | MyFalse

@@ -1,6 +1,6 @@
 
 import WordsVect
-import Data.Array.Parallel.Prelude
+import Data.Array.Parallel
 import qualified Data.Array.Parallel.Prelude.Word8	as W
 import qualified Data.Array.Parallel.PArray 		as P
 import qualified Data.Array.Parallel.Unlifted		as U
