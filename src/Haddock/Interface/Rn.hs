@@ -4,7 +4,7 @@ import Haddock.Types
 
 import RnEnv       ( dataTcOccs )
 
-import RdrName     ( RdrName, gre_name, GlobalRdrEnv, lookupGRE_RdrName )
+import RdrName
 import Name        ( Name, isTyConName )
 import Outputable  ( ppr, showSDoc )
 
@@ -36,14 +36,20 @@ rnDoc gre = unId . do_rn
 
   DocIdentifier x -> do
     let choices = dataTcOccs x
-    let gres = concatMap (\rdrName ->
-                 map gre_name (lookupGRE_RdrName rdrName gre)) choices
-    return $ case gres of
-      []   -> DocMonospaced (DocString (showSDoc $ ppr x))  -- TODO: DocIdentifierRdrName
-      [a]  -> DocIdentifier a
-      a:b:_ | isTyConName a -> DocIdentifier a | otherwise -> DocIdentifier b
-        -- If an id can refer to multiple things, we give precedence to type
-        -- constructors.
+    let names = concatMap (\c -> map gre_name (lookupGRE_RdrName c gre)) choices
+    return $
+      case names of
+        [] ->
+          case choices of
+            [] -> DocMonospaced (DocString (showSDoc $ ppr x))
+            [a] -> outOfScope a
+            a:b:_ | isRdrTc a -> outOfScope a | otherwise -> outOfScope b
+        [a] -> DocIdentifier a
+        a:b:_ | isTyConName a -> DocIdentifier a | otherwise -> DocIdentifier b
+            -- If an id can refer to multiple things, we give precedence to type
+            -- constructors.
+
+  DocIdentifierUnchecked x -> return (DocIdentifierUnchecked x)
 
   DocModule str -> return (DocModule str)
 
@@ -81,3 +87,14 @@ rnDoc gre = unId . do_rn
   DocAName str -> return (DocAName str)
 
   DocExamples e -> return (DocExamples e)
+
+
+outOfScope :: RdrName -> Doc a
+outOfScope x =
+  case x of
+    Unqual occ -> monospaced occ
+    Qual mdl occ -> DocIdentifierUnchecked (mdl, occ)
+    Orig _ occ -> monospaced occ
+    Exact name -> monospaced name  -- Shouldn't happen since x is out of scope
+  where
+    monospaced a = DocMonospaced (DocString (showSDoc $ ppr a))

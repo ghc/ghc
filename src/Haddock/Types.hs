@@ -26,6 +26,7 @@ import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC hiding (NoLink)
+import OccName
 
 
 -----------------------------------------------------------------------------
@@ -276,7 +277,7 @@ data Doc id
   | DocString String
   | DocParagraph (Doc id)
   | DocIdentifier id
---  | DocIdentifierOutOfScope [RdrName]
+  | DocIdentifierUnchecked (ModuleName, OccName)
   | DocModule String
   | DocEmphasis (Doc id)
   | DocMonospaced (Doc id)
@@ -288,7 +289,7 @@ data Doc id
   | DocPic String
   | DocAName String
   | DocExamples [Example]
-  deriving (Eq, Show, Functor)
+  deriving (Eq, Functor)
 
 
 unrenameDoc :: Doc DocName -> Doc Name
@@ -307,22 +308,23 @@ exampleToString (Example expression result) =
 
 
 data DocMarkup id a = Markup
-  { markupEmpty         :: a
-  , markupString        :: String -> a
-  , markupParagraph     :: a -> a
-  , markupAppend        :: a -> a -> a
-  , markupIdentifier    :: id -> a
-  , markupModule        :: String -> a
-  , markupEmphasis      :: a -> a
-  , markupMonospaced    :: a -> a
-  , markupUnorderedList :: [a] -> a
-  , markupOrderedList   :: [a] -> a
-  , markupDefList       :: [(a,a)] -> a
-  , markupCodeBlock     :: a -> a
-  , markupURL           :: String -> a
-  , markupAName         :: String -> a
-  , markupPic           :: String -> a
-  , markupExample       :: [Example] -> a
+  { markupEmpty                :: a
+  , markupString               :: String -> a
+  , markupParagraph            :: a -> a
+  , markupAppend               :: a -> a -> a
+  , markupIdentifier           :: id -> a
+  , markupIdentifierUnchecked  :: (ModuleName, OccName) -> a
+  , markupModule               :: String -> a
+  , markupEmphasis             :: a -> a
+  , markupMonospaced           :: a -> a
+  , markupUnorderedList        :: [a] -> a
+  , markupOrderedList          :: [a] -> a
+  , markupDefList              :: [(a,a)] -> a
+  , markupCodeBlock            :: a -> a
+  , markupURL                  :: String -> a
+  , markupAName                :: String -> a
+  , markupPic                  :: String -> a
+  , markupExample              :: [Example] -> a
   }
 
 

@@ -30,25 +30,26 @@ import Text.XHtml hiding ( name, title, p, quote )
 import GHC
 
 
-parHtmlMarkup :: (a -> Html) -> DocMarkup a Html
-parHtmlMarkup ppId = Markup {
-  markupEmpty         = noHtml,
-  markupString        = toHtml,
-  markupParagraph     = paragraph,
-  markupAppend        = (+++),
-  markupIdentifier    = thecode . ppId,
-  markupModule        = \m -> let (mdl,ref) = break (=='#') m
-                              in ppModuleRef (mkModuleNoPackage mdl) ref,
-  markupEmphasis      = emphasize,
-  markupMonospaced    = thecode,
-  markupUnorderedList = unordList,
-  markupOrderedList   = ordList,
-  markupDefList       = defList,
-  markupCodeBlock     = pre,
-  markupURL           = \url -> anchor ! [href url] << url,
-  markupAName         = \aname -> namedAnchor aname << "",
-  markupPic           = \path -> image ! [src path],
-  markupExample       = examplesToHtml
+parHtmlMarkup :: Qualification -> (a -> Html) -> DocMarkup a Html
+parHtmlMarkup qual ppId = Markup {
+  markupEmpty                = noHtml,
+  markupString               = toHtml,
+  markupParagraph            = paragraph,
+  markupAppend               = (+++),
+  markupIdentifier           = thecode . ppId,
+  markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
+  markupModule               = \m -> let (mdl,ref) = break (=='#') m
+                                     in ppModuleRef (mkModuleNoPackage mdl) ref,
+  markupEmphasis             = emphasize,
+  markupMonospaced           = thecode,
+  markupUnorderedList        = unordList,
+  markupOrderedList          = ordList,
+  markupDefList              = defList,
+  markupCodeBlock            = pre,
+  markupURL                  = \url -> anchor ! [href url] << url,
+  markupAName                = \aname -> namedAnchor aname << "",
+  markupPic                  = \path -> image ! [src path],
+  markupExample              = examplesToHtml
   }
   where
     examplesToHtml l = pre (concatHtml $ map exampleToHtml l) ! [theclass "screen"]
@@ -64,17 +65,17 @@ parHtmlMarkup ppId = Markup {
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
 docToHtml :: Qualification -> Doc DocName -> Html
 docToHtml qual = markup fmt . cleanup
-  where fmt = parHtmlMarkup (ppDocName qual)
+  where fmt = parHtmlMarkup qual (ppDocName qual)
 
 
-origDocToHtml :: Doc Name -> Html
-origDocToHtml = markup fmt . cleanup
-  where fmt = parHtmlMarkup ppName
+origDocToHtml :: Qualification -> Doc Name -> Html
+origDocToHtml qual = markup fmt . cleanup
+  where fmt = parHtmlMarkup qual ppName
 
 
-rdrDocToHtml :: Doc RdrName -> Html
-rdrDocToHtml = markup fmt . cleanup
-  where fmt = parHtmlMarkup ppRdrName
+rdrDocToHtml :: Qualification -> Doc RdrName -> Html
+rdrDocToHtml qual = markup fmt . cleanup
+  where fmt = parHtmlMarkup qual ppRdrName
 
 
 docElement :: (Html -> Html) -> Html -> Html

@@ -228,7 +228,7 @@ render flags ifaces installedIfaces srcMap = do
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title pkgStr
                    themes opt_index_url sourceUrls' opt_wiki_urls
-                   allVisibleIfaces True prologue pretty
+                   allVisibleIfaces True prologue pretty opt_qualification
     copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
@@ -393,10 +393,13 @@ shortcutFlags flags = do
 
 
 updateHTMLXRefs :: [(DocPaths, InterfaceFile)] -> IO ()
-updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
+updateHTMLXRefs packages = do
+  writeIORef html_xrefs_ref (Map.fromList mapping)
+  writeIORef html_xrefs_ref' (Map.fromList mapping')
   where
     mapping = [ (instMod iface, html) | ((html, _), ifaces) <- packages
               , iface <- ifInstalledIfaces ifaces ]
+    mapping' = [ (moduleName m, html) | (m, html) <- mapping ]
 
 
 getPrologue :: [Flag] -> IO (Maybe (Doc RdrName))

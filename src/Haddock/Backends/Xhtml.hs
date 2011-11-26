@@ -83,8 +83,7 @@ ppHtml doctitle maybe_package ifaces odir prologue
         themes maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
-        prologue
-        debug
+        prologue debug qual
 
   when (isNothing maybe_index_url) $
     ppHtmlIndex odir doctitle maybe_package
@@ -224,10 +223,11 @@ ppHtmlContents
    -> WikiURLs
    -> [InstalledInterface] -> Bool -> Maybe (Doc GHC.RdrName)
    -> Bool
+   -> Qualification  -- ^ How to qualify names
    -> IO ()
 ppHtmlContents odir doctitle _maybe_package
   themes maybe_index_url
-  maybe_source_url maybe_wiki_url ifaces showPkgs prologue debug = do
+  maybe_source_url maybe_wiki_url ifaces showPkgs prologue debug qual = do
   let tree = mkModuleTree showPkgs
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
       html =
@@ -235,8 +235,8 @@ ppHtmlContents odir doctitle _maybe_package
         bodyHtml doctitle Nothing
           maybe_source_url maybe_wiki_url
           Nothing maybe_index_url << [
-            ppPrologue doctitle prologue,
-            ppModuleTree tree
+            ppPrologue qual doctitle prologue,
+            ppModuleTree qual tree
           ]
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
@@ -245,27 +245,27 @@ ppHtmlContents odir doctitle _maybe_package
   ppHtmlContentsFrame odir doctitle themes ifaces debug
 
 
-ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
-ppPrologue _ Nothing = noHtml
-ppPrologue title (Just doc) =
-  divDescription << (h1 << title +++ docElement thediv (rdrDocToHtml doc))
+ppPrologue :: Qualification -> String -> Maybe (Doc GHC.RdrName) -> Html
+ppPrologue _ _ Nothing = noHtml
+ppPrologue qual title (Just doc) =
+  divDescription << (h1 << title +++ docElement thediv (rdrDocToHtml qual doc))
 
 
-ppModuleTree :: [ModuleTree] -> Html
-ppModuleTree ts =
-  divModuleList << (sectionName << "Modules" +++ mkNodeList [] "n" ts)
+ppModuleTree :: Qualification -> [ModuleTree] -> Html
+ppModuleTree qual ts =
+  divModuleList << (sectionName << "Modules" +++ mkNodeList qual [] "n" ts)
 
 
-mkNodeList :: [String] -> String -> [ModuleTree] -> Html
-mkNodeList ss p ts = case ts of
+mkNodeList :: Qualification -> [String] -> String -> [ModuleTree] -> Html
+mkNodeList qual ss p ts = case ts of
   [] -> noHtml
-  _ -> unordList (zipWith (mkNode ss) ps ts)
+  _ -> unordList (zipWith (mkNode qual ss) ps ts)
   where
     ps = [ p ++ '.' : show i | i <- [(1::Int)..]]
 
 
-mkNode :: [String] -> String -> ModuleTree -> Html
-mkNode ss p (Node s leaf pkg short ts) =
+mkNode :: Qualification -> [String] -> String -> ModuleTree -> Html
+mkNode qual ss p (Node s leaf pkg short ts) =
   htmlModule +++ shortDescr +++ htmlPkg +++ subtree
   where
     modAttrs = case (ts, leaf) of
@@ -288,10 +288,10 @@ mkNode ss p (Node s leaf pkg short ts) =
 
     mdl = intercalate "." (reverse (s:ss))
 
-    shortDescr = maybe noHtml origDocToHtml short
+    shortDescr = maybe noHtml (origDocToHtml qual) short
     htmlPkg = maybe noHtml (thespan ! [theclass "package"] <<) pkg
 
-    subtree = mkNodeList (s:ss) p ts ! collapseSection p True ""
+    subtree = mkNodeList qual (s:ss) p ts ! collapseSection p True ""
 
 
 -- | Turn a module tree into a flat list of full module names.  E.g.,

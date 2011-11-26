@@ -11,7 +11,7 @@
 -- Portability :  portable
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Names (
-  ppName, ppDocName, ppLDocName, ppRdrName,
+  ppName, ppDocName, ppLDocName, ppRdrName, ppUncheckedLink,
   ppBinder, ppBinder',
   ppModule, ppModuleRef,
   linkId
@@ -37,6 +37,10 @@ ppOccName = toHtml . occNameString
 
 ppRdrName :: RdrName -> Html
 ppRdrName = ppOccName . rdrNameOcc
+
+
+ppUncheckedLink :: Qualification -> (ModuleName, OccName) -> Html
+ppUncheckedLink _ (mdl, occ) = linkIdOcc' mdl (Just occ) << ppOccName occ -- TODO: apply ppQualifyName
 
 
 ppLDocName :: Qualification -> Located DocName -> Html
@@ -108,6 +112,14 @@ linkIdOcc mdl mbName = anchor ! [href url]
     url = case mbName of
       Nothing   -> moduleUrl mdl
       Just name -> moduleNameUrl mdl name
+
+
+linkIdOcc' :: ModuleName -> Maybe OccName -> Html -> Html
+linkIdOcc' mdl mbName = anchor ! [href url]
+  where
+    url = case mbName of
+      Nothing   -> moduleHtmlFile' mdl
+      Just name -> moduleNameUrl' mdl name
 
 
 ppModule :: Module -> Html

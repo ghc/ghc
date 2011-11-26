@@ -999,34 +999,35 @@ latexMonoMunge c   s = latexMunge c s
 
 parLatexMarkup :: (a -> LaTeX) -> DocMarkup a (StringContext -> LaTeX)
 parLatexMarkup ppId = Markup {
-  markupParagraph     = \p v -> p v <> text "\\par" $$ text "",
-  markupEmpty         = \_ -> empty,
-  markupString        = \s v -> text (fixString v s),
-  markupAppend        = \l r v -> l v <> r v,
-  markupIdentifier    = markupId,
-  markupModule        = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
-  markupEmphasis      = \p v -> emph (p v),
-  markupMonospaced    = \p _ -> tt (p Mono),
-  markupUnorderedList = \p v -> itemizedList (map ($v) p) $$ text "",
-  markupPic           = \path _ -> parens (text "image: " <> text path),
-  markupOrderedList   = \p v -> enumeratedList (map ($v) p) $$ text "",
-  markupDefList       = \l v -> descriptionList (map (\(a,b) -> (a v, b v)) l),
-  markupCodeBlock     = \p _ -> quote (verb (p Verb)) $$ text "",
-  markupURL           = \u _ -> text "\\url" <> braces (text u),
-  markupAName         = \_ _ -> empty,
-  markupExample       = \e _ -> quote $ verb $ text $ unlines $ map exampleToString e
+  markupParagraph            = \p v -> p v <> text "\\par" $$ text "",
+  markupEmpty                = \_ -> empty,
+  markupString               = \s v -> text (fixString v s),
+  markupAppend               = \l r v -> l v <> r v,
+  markupIdentifier           = markupId ppId,
+  markupIdentifierUnchecked  = markupId (ppVerbOccName . snd),
+  markupModule               = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
+  markupEmphasis             = \p v -> emph (p v),
+  markupMonospaced           = \p _ -> tt (p Mono),
+  markupUnorderedList        = \p v -> itemizedList (map ($v) p) $$ text "",
+  markupPic                  = \path _ -> parens (text "image: " <> text path),
+  markupOrderedList          = \p v -> enumeratedList (map ($v) p) $$ text "",
+  markupDefList              = \l v -> descriptionList (map (\(a,b) -> (a v, b v)) l),
+  markupCodeBlock            = \p _ -> quote (verb (p Verb)) $$ text "",
+  markupURL                  = \u _ -> text "\\url" <> braces (text u),
+  markupAName                = \_ _ -> empty,
+  markupExample              = \e _ -> quote $ verb $ text $ unlines $ map exampleToString e
   }
   where
     fixString Plain s = latexFilter s
     fixString Verb  s = s
     fixString Mono  s = latexMonoFilter s
 
-    markupId id v =
+    markupId ppId_ id v =
       case v of
         Verb  -> theid
         Mono  -> theid
         Plain -> text "\\haddockid" <> braces theid
-      where theid = ppId id
+      where theid = ppId_ id
 
 
 latexMarkup :: DocMarkup DocName (StringContext -> LaTeX)

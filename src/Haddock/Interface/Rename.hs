@@ -174,6 +174,7 @@ renameDoc d = case d of
   DocIdentifier x -> do
     x' <- rename x
     return (DocIdentifier x')
+  DocIdentifierUnchecked x -> return (DocIdentifierUnchecked x)
   DocModule str -> return (DocModule str)
   DocEmphasis doc -> do
     doc' <- renameDoc doc

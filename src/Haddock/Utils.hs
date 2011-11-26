@@ -17,7 +17,7 @@ module Haddock.Utils (
   toDescription, toInstalledDescription,
 
   -- * Filename utilities
-  moduleHtmlFile,
+  moduleHtmlFile, moduleHtmlFile',
   contentsHtmlFile, indexHtmlFile,
   frameIndexHtmlFile,
   moduleIndexFrameName, mainFrameName, synopsisFrameName,
@@ -25,7 +25,7 @@ module Haddock.Utils (
   jsFile, framesFile,
 
   -- * Anchor and URL utilities
-  moduleNameUrl, moduleUrl,
+  moduleNameUrl, moduleNameUrl', moduleUrl,
   nameAnchorId,
   makeAnchorId,
 
@@ -33,7 +33,7 @@ module Haddock.Utils (
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
 
   -- * HTML cross reference mapping
-  html_xrefs_ref,
+  html_xrefs_ref, html_xrefs_ref',
 
   -- * Doc markup 
   markup,
@@ -172,15 +172,24 @@ restrictATs names ats = [ at | at <- ats , tcdName (unL at) `elem` names ]
 --------------------------------------------------------------------------------
 
 
+baseName :: ModuleName -> FilePath
+baseName = map (\c -> if c == '.' then '-' else c) . moduleNameString
+
+
 moduleHtmlFile :: Module -> FilePath
 moduleHtmlFile mdl =
   case Map.lookup mdl html_xrefs of
-    Nothing  -> mdl' ++ ".html"
-    Just fp0 -> HtmlPath.joinPath [fp0, mdl' ++ ".html"]
+    Nothing  -> baseName mdl' ++ ".html"
+    Just fp0 -> HtmlPath.joinPath [fp0, baseName mdl' ++ ".html"]
   where
-   mdl' = map (\c -> if c == '.' then '-' else c)
-              (moduleNameString (moduleName mdl))
+   mdl' = moduleName mdl
 
+
+moduleHtmlFile' :: ModuleName -> FilePath
+moduleHtmlFile' mdl =
+  case Map.lookup mdl html_xrefs' of
+    Nothing  -> baseName mdl ++ ".html"
+    Just fp0 -> HtmlPath.joinPath [fp0, baseName mdl ++ ".html"]
 
 
 contentsHtmlFile, indexHtmlFile :: String
@@ -227,6 +236,10 @@ moduleUrl = moduleHtmlFile
 
 moduleNameUrl :: Module -> OccName -> String
 moduleNameUrl mdl n = moduleUrl mdl ++ '#' : nameAnchorId n
+
+
+moduleNameUrl' :: ModuleName -> OccName -> String
+moduleNameUrl' mdl n = moduleHtmlFile' mdl ++ '#' : nameAnchorId n
 
 
 nameAnchorId :: OccName -> String
@@ -353,9 +366,19 @@ html_xrefs_ref :: IORef (Map Module FilePath)
 html_xrefs_ref = unsafePerformIO (newIORef (error "module_map"))
 
 
+{-# NOINLINE html_xrefs_ref' #-}
+html_xrefs_ref' :: IORef (Map ModuleName FilePath)
+html_xrefs_ref' = unsafePerformIO (newIORef (error "module_map"))
+
+
 {-# NOINLINE html_xrefs #-}
 html_xrefs :: Map Module FilePath
 html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
+
+
+{-# NOINLINE html_xrefs' #-}
+html_xrefs' :: Map ModuleName FilePath
+html_xrefs' = unsafePerformIO (readIORef html_xrefs_ref')
 
 
 -----------------------------------------------------------------------------
@@ -380,22 +403,23 @@ spanWith p xs@(a:as)
 
 
 markup :: DocMarkup id a -> Doc id -> a
-markup m DocEmpty              = markupEmpty m
-markup m (DocAppend d1 d2)     = markupAppend m (markup m d1) (markup m d2)
-markup m (DocString s)         = markupString m s
-markup m (DocParagraph d)      = markupParagraph m (markup m d)
-markup m (DocIdentifier x)     = markupIdentifier m x
-markup m (DocModule mod0)      = markupModule m mod0
-markup m (DocEmphasis d)       = markupEmphasis m (markup m d)
-markup m (DocMonospaced d)     = markupMonospaced m (markup m d)
-markup m (DocUnorderedList ds) = markupUnorderedList m (map (markup m) ds)
-markup m (DocOrderedList ds)   = markupOrderedList m (map (markup m) ds)
-markup m (DocDefList ds)       = markupDefList m (map (markupPair m) ds)
-markup m (DocCodeBlock d)      = markupCodeBlock m (markup m d)
-markup m (DocURL url)          = markupURL m url
-markup m (DocAName ref)        = markupAName m ref
-markup m (DocPic img)          = markupPic m img
-markup m (DocExamples e)       = markupExample m e
+markup m DocEmpty                    = markupEmpty m
+markup m (DocAppend d1 d2)           = markupAppend m (markup m d1) (markup m d2)
+markup m (DocString s)               = markupString m s
+markup m (DocParagraph d)            = markupParagraph m (markup m d)
+markup m (DocIdentifier x)           = markupIdentifier m x
+markup m (DocIdentifierUnchecked x)  = markupIdentifierUnchecked m x
+markup m (DocModule mod0)            = markupModule m mod0
+markup m (DocEmphasis d)             = markupEmphasis m (markup m d)
+markup m (DocMonospaced d)           = markupMonospaced m (markup m d)
+markup m (DocUnorderedList ds)       = markupUnorderedList m (map (markup m) ds)
+markup m (DocOrderedList ds)         = markupOrderedList m (map (markup m) ds)
+markup m (DocDefList ds)             = markupDefList m (map (markupPair m) ds)
+markup m (DocCodeBlock d)            = markupCodeBlock m (markup m d)
+markup m (DocURL url)                = markupURL m url
+markup m (DocAName ref)              = markupAName m ref
+markup m (DocPic img)                = markupPic m img
+markup m (DocExamples e)             = markupExample m e
 
 
 markupPair :: DocMarkup id a -> (Doc id, Doc id) -> (a, a)
@@ -405,22 +429,23 @@ markupPair m (a,b) = (markup m a, markup m b)
 -- | The identity markup
 idMarkup :: DocMarkup a (Doc a)
 idMarkup = Markup {
-  markupEmpty         = DocEmpty,
-  markupString        = DocString,
-  markupParagraph     = DocParagraph,
-  markupAppend        = DocAppend,
-  markupIdentifier    = DocIdentifier,
-  markupModule        = DocModule,
-  markupEmphasis      = DocEmphasis,
-  markupMonospaced    = DocMonospaced,
-  markupUnorderedList = DocUnorderedList,
-  markupOrderedList   = DocOrderedList,
-  markupDefList       = DocDefList,
-  markupCodeBlock     = DocCodeBlock,
-  markupURL           = DocURL,
-  markupAName         = DocAName,
-  markupPic           = DocPic,
-  markupExample       = DocExamples
+  markupEmpty                = DocEmpty,
+  markupString               = DocString,
+  markupParagraph            = DocParagraph,
+  markupAppend               = DocAppend,
+  markupIdentifier           = DocIdentifier,
+  markupIdentifierUnchecked  = DocIdentifierUnchecked,
+  markupModule               = DocModule,
+  markupEmphasis             = DocEmphasis,
+  markupMonospaced           = DocMonospaced,
+  markupUnorderedList        = DocUnorderedList,
+  markupOrderedList          = DocOrderedList,
+  markupDefList              = DocDefList,
+  markupCodeBlock            = DocCodeBlock,
+  markupURL                  = DocURL,
+  markupAName                = DocAName,
+  markupPic                  = DocPic,
+  markupExample              = DocExamples
   }
 
 

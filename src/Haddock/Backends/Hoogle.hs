@@ -228,22 +228,23 @@ str a = [Str a]
 
 markupTag :: Outputable o => DocMarkup o [Tag]
 markupTag = Markup {
-  markupParagraph     = box TagP,
-  markupEmpty         = str "",
-  markupString        = str,
-  markupAppend        = (++),
-  markupIdentifier    = box (TagInline "a") . str . out,
-  markupModule        = box (TagInline "a") . str,
-  markupEmphasis      = box (TagInline "i"),
-  markupMonospaced    = box (TagInline "tt"),
-  markupPic           = const $ str " ",
-  markupUnorderedList = box (TagL 'u'),
-  markupOrderedList   = box (TagL 'o'),
-  markupDefList       = box (TagL 'u') . map (\(a,b) -> TagInline "i" a : Str " " : b),
-  markupCodeBlock     = box TagPre,
-  markupURL           = box (TagInline "a") . str,
-  markupAName         = const $ str "",
-  markupExample       = box TagPre . str . unlines . map exampleToString
+  markupParagraph            = box TagP,
+  markupEmpty                = str "",
+  markupString               = str,
+  markupAppend               = (++),
+  markupIdentifier           = box (TagInline "a") . str . out,
+  markupIdentifierUnchecked  = box (TagInline "a") . str . out . snd,
+  markupModule               = box (TagInline "a") . str,
+  markupEmphasis             = box (TagInline "i"),
+  markupMonospaced           = box (TagInline "tt"),
+  markupPic                  = const $ str " ",
+  markupUnorderedList        = box (TagL 'u'),
+  markupOrderedList          = box (TagL 'o'),
+  markupDefList              = box (TagL 'u') . map (\(a,b) -> TagInline "i" a : Str " " : b),
+  markupCodeBlock            = box TagPre,
+  markupURL                  = box (TagInline "a") . str,
+  markupAName                = const $ str "",
+  markupExample              = box TagPre . str . unlines . map exampleToString
   }
 
 

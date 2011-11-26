@@ -460,6 +460,9 @@ instance (Binary id) => Binary (Doc id) where
     put_ bh (DocExamples ao) = do
             putByte bh 15
             put_ bh ao
+    put_ bh (DocIdentifierUnchecked x) = do
+            putByte bh 16
+            put_ bh x
     get bh = do
             h <- getByte bh
             case h of
@@ -511,6 +514,9 @@ instance (Binary id) => Binary (Doc id) where
               15 -> do
                     ao <- get bh
                     return (DocExamples ao)
+              16 -> do
+                    x <- get bh
+                    return (DocIdentifierUnchecked x)
               _ -> fail "invalid binary data found"
 
 
