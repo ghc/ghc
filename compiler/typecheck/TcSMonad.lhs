@@ -489,8 +489,11 @@ updInertSet :: InertSet -> AtomicInert -> InertSet
 -- Add a new inert element to the inert set. 
 updInertSet is item 
   | isCTyEqCan item                     
-  = let upd_err a b = pprPanic "updInertSet" $ 
-                      vcat [text "Multiple inert equalities:", ppr a, ppr b]
+  = let upd_err a b = pprPanic "updInertSet" $
+                      vcat [ text "Multiple inert equalities:"
+                           , text "Old (already inert):" <+> ppr a
+                           , text "Trying to insert   :" <+> ppr b
+                           ]
                            
         -- If evidence is cached, pick it up from the flavor!
         coercion 
@@ -1084,6 +1087,7 @@ setWantedTyBind tv ty
 
 setEvBind :: EvVar -> EvTerm -> CtFlavor -> TcS CtFlavor
 -- If the flavor is Solved, we cache the new evidence term inside the returned flavor
+-- see Note [Optimizing Spontaneously Solved Coercions]
 setEvBind ev t fl
   = do { tc_evbinds <- getTcEvBinds
        ; wrapTcS $ TcM.addTcEvBind tc_evbinds ev t
@@ -1124,6 +1128,51 @@ setEvBind ev t fl
         evterm_evs (EvTupleMk evs)     = evs
 #endif
 
+\end{code}
+Note [Optimizing Spontaneously Solved Coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
+Spontaneously solved coercions such as alpha := tau used to be bound as everything else
+in the evidence binds. Subsequently they were used for rewriting other wanted or solved
+goals. For instance: 
+
+WorkItem = [S] g1 : a ~ tau
+Inerts   = [S] g2 : b ~ [a]
+           [S] g3 : c ~ [(a,a)]
+
+Would result, eventually, after the workitem rewrites the inerts, in the
+following evidence bindings:
+
+        g1 = ReflCo tau
+        g2 = ReflCo [a]
+        g3 = ReflCo [(a,a)]
+        g2' = g2 ; [g1] 
+        g3' = g3 ; [(g1,g1)]
+
+This ia annoying because it puts way too much stress to the zonker and
+desugarer, since we /know/ at the generation time (spontaneously
+solving) that the evidence for a particular evidence variable is the
+identity.
+
+For this reason, our solution is to cache inside the GivenSolved
+flavor of a constraint the term which is actually solving this
+constraint. Whenever we perform a setEvBind, a new flavor is returned
+so that if it was a GivenSolved to start with, it remains a
+GivenSolved with a new evidence term inside. Then, when we use solved
+goals to rewrite other constraints we simply use whatever is in the
+GivenSolved flavor and not the constraint cc_id.
+
+In our particular case we'd get the following evidence bindings, eventually: 
+
+       g1 = ReflCo tau
+       g2 = ReflCo [a]
+       g3 = ReflCo [(a,a)]
+       g2'= ReflCo [a]
+       g3'= ReflCo [(a,a)]
+
+Since we use smart constructors to get rid of g;ReflCo t ~~> g etc.
+
+\begin{code}
 
 
 warnTcS :: CtLoc orig -> Bool -> SDoc -> TcS ()
@@ -1458,37 +1507,6 @@ getInertEqs :: TcS (TyVarEnv (Ct,Coercion), InScopeSet)
 getInertEqs = do { inert <- getTcSInerts
                  ; return (inert_eqs inert, inert_eq_tvs inert) }
 
-{-- UNSAFE in the prsence of Solved flavors! Don't use! 
-rewriteFromInertEqs :: (TyVarEnv (Ct,Coercion), InScopeSet)
-                    -- Precondition: Ct are CTyEqCans only!
-                    -> CtFlavor 
-                    -> EvVar 
-                    -> TcS (EvVar,Bool)
--- Boolean flag returned: True <-> no rewriting happened
-rewriteFromInertEqs (subst,inscope) fl v 
-  = do { let co = liftInertEqsTy (subst,inscope) fl (evVarPred v)
-       ; if isReflCo co then return (v,True)
-         else do { traceTcS "rewriteFromInertEqs" $
-                   text "Original item =" <+> ppr v <+> dcolon <+> ppr (evVarPred v)
-                 ; delCachedEvVar v fl
-                 ; evc <- newEvVar fl (pSnd (liftedCoercionKind co))
-                 ; let v' = evc_the_evvar evc
-                 ; if isNewEvVar evc then 
-                       do { case fl of 
-                              Wanted {}  -> setEvBind v (EvCast v' (mkSymCo co)) 
-                              Given {}   -> setEvBind v' (EvCast v co) 
-                              Derived {} -> return () 
-                          ; traceTcS "rewriteFromInertEqs" $
-                            text "Rewritten item =" <+> ppr v' <+>
-                                          dcolon <+> ppr (evVarPred v')
-                          ; return (v',False) } 
-                   else -- Maybe given, but when wanted set bind
-                       do { case fl of 
-                              Wanted {} -> setEvBind v (EvCast v' (mkSymCo co))
-                              _ -> return ()
-                          ; return (v',True) } -- As if rewriting never happened?
-                 } } 
---}
 
 -- See Note [LiftInertEqs]
 liftInertEqsTy :: (TyVarEnv (Ct,Coercion),InScopeSet)
@@ -1544,7 +1562,7 @@ ty_cts_subst subst inscope fl ty
                 unused_evvar = panic "ty_cts_subst: This var is just an alpha-renaming!"
 \end{code}
 
-Note [LiftInertEqsPred]
+Note [LiftInertEqsTy]
 ~~~~~~~~~~~~~~~~~~~~~~~ 
 The function liftInertEqPred behaves almost like liftCoSubst (in
 Coercion), but accepts a map TyVarEnv (Ct,Coercion) instead of a

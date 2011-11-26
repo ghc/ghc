@@ -339,72 +339,57 @@ rewriteInertEqsFromInertEq :: (TcTyVar,Coercion, CtFlavor) -- A new substitution
                            -> TyVarEnv (Ct,Coercion)       -- All inert equalities
                            -> TcS (TyVarEnv (Ct,Coercion)) -- The new inert equalities
 rewriteInertEqsFromInertEq (subst_tv,subst_co, subst_fl) ieqs
--- The goal: traverse the inert equalities:
---    1) If current inert element cannot itself rewrite subst_fl then:
---           a) if it is rewritable by subst fl throw him out
---           b) if it is not rewritable by subst keep him in as is
---    2) otherwise
---           a) if it is rewritable by subst fl rewrite him on the spot
---           b) if it is not rewritable by subst fl then keep him as is
-
- = do { mieqs <- Traversable.mapM do_one ieqs -- mieqs :: TyVarEnv (Maybe (Ct,Coercion))
-      ; case Traversable.sequence mieqs of 
-          Nothing         -> return emptyVarEnv
-          Just final_ieqs -> return final_ieqs }
+-- The goal: traverse the inert equalities and rewrite some of them, dropping some others
+-- back to the worklist. This is delicate, see Note [Delicate equality kick-out]
+ = do { mieqs <- Traversable.mapM do_one ieqs 
+      ; traceTcS "Original inert equalities:" (ppr ieqs)
+      ; let flatten_justs elem venv
+              | Just (act,aco) <- elem = extendVarEnv venv (cc_tyvar act) (act,aco)
+              | otherwise = venv                                     
+            final_ieqs = foldVarEnv flatten_justs emptyVarEnv mieqs
+      ; traceTcS "Remaining inert equalities:" (ppr final_ieqs)
+      ; return final_ieqs }
 
  where do_one (ct,inert_co)
-        | (not (subst_fl `canRewrite` fl)) || isReflCo co
-        -- If the inert is not rewritable we just keep it
-        = return (Just (ct,inert_co))
-        -- Inert is definitely rewritable
-        | not (fl `canRewrite` subst_fl)  -- But the inert cannot itself rewrite the subst item
-                                          -- so there is need for recanonicalization.
-        = do { updWorkListTcS (extendWorkListEq ct) 
-             ; return Nothing }
-        | otherwise -- Or the inert can rewrite subst as well, so it's safe to rewrite on-the-spot
-        = do { let rhs' = pSnd (liftedCoercionKind co)
-             ; delCachedEvVar ev fl
-             ; evc <- newEqVar fl (mkTyVarTy tv) rhs'
-             ; let ev' = evc_the_evvar evc
-             ; let evco' = mkEqVarLCo ev' 
-             ; fl' <- if isNewEvVar evc then
-                   do { case fl of 
-                          Wanted  {} -> setEqBind ev  
-                                            (evco' `mkTransCo` mkSymCo co) fl
-                          Given   {} -> setEqBind ev' 
-                                            (mkEqVarLCo ev `mkTransCo` co) fl
-                          Derived {} -> return fl }
-               else
-                   if (isWanted fl) then 
-                       setEqBind ev (evco' `mkTransCo` mkSymCo co) fl
-                   else
-                       return fl
-
-             ; let ct' = ct { cc_id = ev', cc_flavor = fl', cc_rhs = rhs' }
-             ; return (Just (ct',evco')) }
-        where ev  = cc_id ct
-              fl  = cc_flavor ct
-              tv  = cc_tyvar ct
-              rhs = cc_rhs ct
-              co  = liftCoSubstWith [subst_tv] [subst_co] rhs
-
-
-
---     (eqs_out,   eqs_in)   = partitionEqMap
---                                (\inert_ct -> (not (cc_flavor inert_ct `canRewrite` fl)) && 
---                                              rewritable inert_ct) eqmap
---          -- Why not just (rewritable_inert ct)? Check out Note [Delicate equality kick-out]
-
-
-
--- {- 
---                   traceTcS "rewriteInertEqsFromInertEq" $ 
---                         vcat [ text "rewriting equality: " <+> ppr ct
---                              , text "from: " <+> ppr subst_co <+> text "of flavor: " <+> ppr subst_fl 
---                              , text "can rewrite? " <+> ppr (subst_fl `canRewrite` fl) ]
---            -}
-
-
+         | subst_fl `canRewrite` fl && (subst_tv `elemVarSet` tyVarsOfCt ct) 
+                                      -- Annoyingly inefficient, but we can't simply check 
+                                      -- that isReflCo co because of cached solved ReflCo evidence.
+         = if fl `canRewrite` subst_fl then 
+               -- If also the inert can rewrite the subst it's totally safe 
+               -- to rewrite on the spot
+               do { (ct',inert_co') <- rewrite_on_the_spot (ct,inert_co)
+                  ; return $ Just (ct',inert_co') }
+           else -- We have to throw inert back to worklist for occurs checks 
+              do { updWorkListTcS (extendWorkListEq ct)
+                 ; return Nothing }
+         | otherwise -- Just keep it there
+         = return $ Just (ct,inert_co)
+         where 
+           rewrite_on_the_spot (ct,_inert_co)
+             = do { let rhs' = pSnd (liftedCoercionKind co)
+                  ; delCachedEvVar ev fl
+                  ; evc <- newEqVar fl (mkTyVarTy tv) rhs'
+                  ; let ev' = evc_the_evvar evc
+                  ; let evco' = mkEqVarLCo ev' 
+                  ; fl' <- if isNewEvVar evc then
+                               do { case fl of 
+                                      Wanted {} 
+                                        -> setEqBind ev (evco' `mkTransCo` mkSymCo co) fl
+                                      Given {} 
+                                        -> setEqBind ev' (mkEqVarLCo ev `mkTransCo` co) fl
+                                      Derived {}
+                                        -> return fl }
+                           else
+                               if isWanted fl then 
+                                   setEqBind ev (evco' `mkTransCo` mkSymCo co) fl
+                               else return fl
+                  ; let ct' = ct { cc_id = ev', cc_flavor = fl', cc_rhs = rhs' }
+                  ; return (ct',evco') }
+           ev  = cc_id ct
+           fl  = cc_flavor ct
+           tv  = cc_tyvar ct
+           rhs = cc_rhs ct
+           co  = liftCoSubstWith [subst_tv] [subst_co] rhs
 
 kick_out_rewritable :: Ct -> InertSet -> ((WorkList,TyVarEnv (Ct,Coercion)), InertSet)
 -- Returns ALL equalities, to be dealt with later
