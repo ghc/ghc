@@ -1117,9 +1117,9 @@ zonkEvBinds env binds
     add (EvBind var _) vars = var : vars
 
 zonkEvBind :: ZonkEnv -> EvBind -> TcM EvBind
-
-
 zonkEvBind env (EvBind var term)
+  -- This function has some special cases for avoiding re-zonking the
+  -- same types many types. See Note [Optimized Evidence Binding Zonking]
   = case term of 
       -- Fast path for reflexivity coercions:
       EvCoercionBox co 
@@ -1131,17 +1131,16 @@ zonkEvBind env (EvBind var term)
 
       -- Fast path for variable-variable bindings 
       -- NB: could be optimized further! (e.g. SymCo cv)
-        | Just {} <- getCoVar_maybe co 
-        -> do { term'@(EvCoercionBox (CoVarCo cv')) <- zonkEvTerm env term
-              ; let var' = setVarType var (varType cv')
+        | Just cv <- getCoVar_maybe co 
+        -> do { let cv' = zonkIdOcc env cv -- Just lazily look up
+                    term' = EvCoercionBox (CoVarCo cv')
+                    var'  = setVarType var (varType cv')
               ; return (EvBind var' term') }
-
       -- Ugly safe and slow path
       _ -> do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
               ; term' <- zonkEvTerm env term 
               ; return (EvBind var' term')
               }
-
 \end{code}
 
 %************************************************************************
@@ -1195,6 +1194,33 @@ The type of Phantom is (forall (k : BOX). forall (a : k). Int). Both `a` and
 (forall (k : AnyK). forall (a : Any AnyK). Int). For that we have to check if
 we have a type or a kind variable; for kind variables we just return AnyK (and
 not the ill-kinded Any BOX).
+
+Note [Optimized Evidence Binding Zonking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When optimising evidence binds we may come accross situations where 
+a coercion is just reflexivity: 
+      cv = ReflCo ty
+In such a case it is a waste of time to zonk both ty and the type 
+of the coercion, especially if the types involved are huge. For this
+reason this case is optimized to only zonk 'ty' and set the type of 
+the variable to be that zonked type.
+
+Another case that hurts a lot are simple coercion bindings of the form:
+      cv1 = cv2
+      cv3 = cv1
+      cv4 = cv2 
+etc. In all such cases it is very easy to just get the zonked type of 
+cv2 and use it to set the type of the LHS coercion variable without zonking
+twice. Though this case is funny, it can happen due the way that evidence 
+from spontaneously solved goals is now used.
+See Note [Optimizing Spontaneously Solved Goals] about this.
+
+NB: That these optimizations are independently useful, regardless of the 
+constraint solver strategy.
+
+DV, TODO: followup on this note mentioning new examples I will add to perf/
+
 
 \begin{code}
 mkZonkTcTyVar :: (TcTyVar -> TcM Type)	-- What to do for an *mutable Flexi* var

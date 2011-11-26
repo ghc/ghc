@@ -1214,7 +1214,7 @@ data GivenKind
                 -- Is given as result of being solved, maybe provisionally on
                 -- some other wanted constraints. We cache the evidence term 
                 -- sometimes here as well /as well as/ in the EvBinds, 
-                -- see note [Optimizing Spontaneously Solved Coercions]
+                -- see Note [Optimizing Spontaneously Solved Coercions]
 
 instance Outputable CtFlavor where
   ppr (Given _ GivenOrig)        = ptext (sLit "[G]")
