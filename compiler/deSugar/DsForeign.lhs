@@ -509,10 +509,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                int64TyConKey, word64TyConKey]
 
   -- Now we can cook up the prototype for the exported function.
-  pprCconv = case cc of
-                CCallConv   -> empty
-                StdCallConv -> text (ccallConvAttribute cc)
-                _           -> panic ("mkFExportCBits/pprCconv " ++ showPpr cc)
+  pprCconv = ccallConvAttribute cc
 
   header_bits = ptext (sLit "extern") <+> fun_proto <> semi
 

@@ -254,7 +254,7 @@ pprStmt platform stmt = case stmt of
 pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
   = res_type ress <+>
-    parens (text (ccallConvAttribute cconv) <>  ppr_fn) <>
+    parens (ccallConvAttribute cconv <> ppr_fn) <>
     parens (commafy (map arg_type args))
   where
         res_type [] = ptext (sLit "void")

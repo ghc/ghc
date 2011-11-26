@@ -175,9 +175,9 @@ Generate the gcc attribute corresponding to the given
 calling convention (used by PprAbsC):
 
 \begin{code}
-ccallConvAttribute :: CCallConv -> String
-ccallConvAttribute StdCallConv = "__attribute__((__stdcall__))"
-ccallConvAttribute CCallConv   = ""
+ccallConvAttribute :: CCallConv -> SDoc
+ccallConvAttribute StdCallConv       = text "__attribute__((__stdcall__))"
+ccallConvAttribute CCallConv         = empty
 ccallConvAttribute (CmmCallConv {})  = panic "ccallConvAttribute CmmCallConv"
 ccallConvAttribute (PrimCallConv {}) = panic "ccallConvAttribute PrimCallConv"
 \end{code}
