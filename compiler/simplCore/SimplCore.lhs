@@ -885,6 +885,7 @@ hasShortableIdInfo :: Id -> Bool
 hasShortableIdInfo id
   =  isEmptySpecInfo (specInfo info)
   && isDefaultInlinePragma (inlinePragInfo info)
+  && not (isStableUnfolding (unfoldingInfo info))
   where
      info = idInfo id
 
