@@ -296,8 +296,8 @@ checkSize :: Id -> CoreExpr
 checkSize fn_id rhs thing_inside
   | isStableUnfolding (realIdUnfolding fn_id)
   = return [ (fn_id, rhs) ]
-      -- See Note [Don't w/w INLINABLE things]
-      -- and Note [Don't w/w INLINABLABLE things]
+      -- See Note [Don't w/w INLINE things]
+      -- and Note [Don't w/w INLINABLE things]
       -- NB: use realIdUnfolding because we want to see the unfolding
       --     even if it's a loop breaker!
 
