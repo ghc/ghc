@@ -354,14 +354,14 @@ AC_DEFUN([FP_SETTINGS],
     if test "$windows" = YES
     then
         SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
-        SettingsCCompilerFlags=''
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
         SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
         SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
-        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
         SettingsPerlCommand="$PerlCmd"
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
@@ -424,6 +424,11 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     then
         $2="$$2 -fno-stack-protector"
     fi
+
+    # Reduce memory usage when linking. See trac #5240.
+    $3="$$3 -Wl,--hash-size=31 -Wl,--reduce-memory-overheads"
+    $4="$$4     --hash-size=31     --reduce-memory-overheads"
+
     rm -f conftest.c conftest.o
     AC_MSG_RESULT([done])
 ])
