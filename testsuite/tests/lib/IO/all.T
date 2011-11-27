@@ -119,7 +119,8 @@ test('concio002', reqlib('process'), compile_and_run, [''])
 
 test('2122', extra_clean(['2122-test']), compile_and_run, [''])
 test('3307',
-     [extra_clean(['chinese-file-小说', 'chinese-name'])],
+     [if_msys(expect_fail), # See trac #5599
+      extra_clean(['chinese-file-小说', 'chinese-name'])],
      run_command,
      ['$MAKE -s --no-print-directory 3307-test'])
 test('4855', normal, compile_and_run, [''])
@@ -142,7 +143,11 @@ test('encoding001',
 
 test('encoding002', normal, compile_and_run, [''])
 
-test('environment001', extra_clean(['environment001']), run_command, ['$MAKE -s --no-print-directory environment001-test'])
+test('environment001',
+     [if_msys(expect_fail), # See trac #5599
+      extra_clean(['environment001'])],
+     run_command,
+     ['$MAKE -s --no-print-directory environment001-test'])
 
 test('newline001', extra_clean(['newline001.out']), compile_and_run, [''])
 
