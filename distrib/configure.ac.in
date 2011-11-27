@@ -56,6 +56,9 @@ FIND_GCC()
 FP_GCC_VERSION
 AC_PROG_CPP
 
+FP_PROG_LD_HashSize31
+FP_PROG_LD_ReduceMemoryOverheads
+
 #
 dnl ** Check gcc version and flags we need to pass it **
 #
