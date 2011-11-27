@@ -6,7 +6,7 @@
 -- Module      :  System.Environment
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -180,7 +180,8 @@ basename f = go f f
 
 
 -- | Computation 'getEnv' @var@ returns the value
--- of the environment variable @var@.  
+-- of the environment variable @var@. For the inverse, POSIX users
+-- can use 'System.Posix.Env.putEnv'.
 --
 -- This computation may fail with:
 --
@@ -280,7 +281,7 @@ setProgArgv argv = do
   c_setProgArgv (genericLength argv) vs
   return vs
 
-foreign import ccall unsafe "setProgArgv" 
+foreign import ccall unsafe "setProgArgv"
   c_setProgArgv  :: CInt -> Ptr CString -> IO ()
 
 -- |'getEnvironment' retrieves the entire environment as a
@@ -307,7 +308,7 @@ getEnvironment = bracket c_GetEnvironmentStrings c_FreeEnvironmentStrings $ \pBl
           -- getting the actual String:
           str <- peekCWString pBlock
           fmap (divvy str :) $ go pBlock'
-    
+
     -- Returns pointer to the byte *after* the next null
     seekNull pBlock done = do
         let pBlock' = pBlock `plusPtr` sizeOf (undefined :: CWchar)
@@ -330,7 +331,7 @@ getEnvironment = do
       stuff <- peekArray0 nullPtr pBlock >>= mapM (GHC.peekCString enc)
       return (map divvy stuff)
 
-foreign import ccall unsafe "__hscore_environ" 
+foreign import ccall unsafe "__hscore_environ"
   getEnvBlock :: IO (Ptr CString)
 #endif
 
@@ -340,4 +341,3 @@ divvy str =
     (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
     (name,_:value) -> (name,value)
 #endif  /* __GLASGOW_HASKELL__ */
-
