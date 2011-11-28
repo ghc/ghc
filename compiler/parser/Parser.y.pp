@@ -1394,6 +1394,7 @@ scc_annot :: { Located FastString }
         : '_scc_' STRING                        {% (addWarning Opt_WarnWarningsDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->
                                    ( do scc <- getSCC $2; return $ LL scc ) }
         | '{-# SCC' STRING '#-}'                {% do scc <- getSCC $2; return $ LL scc }
+        | '{-# SCC' VARID  '#-}'                { LL (getVARID $2) }
 
 hpc_annot :: { Located (FastString,(Int,Int),(Int,Int)) }
         : '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
