@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface #-}
+{-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface, CApiFFI #-}
 
 module GHC.Event.Clock (getCurrentTime) where
 

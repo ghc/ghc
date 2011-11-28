@@ -459,13 +459,13 @@ foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
 
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-foreign import ccall unsafe "HsBase.h fcntl_read"
+foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h fcntl_write"
+foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_write :: CInt -> CInt -> CLong -> IO CInt
 
-foreign import ccall unsafe "HsBase.h fcntl_lock"
+foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
 
 foreign import ccall unsafe "HsBase.h fork"

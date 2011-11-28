@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NondecreasingIndentation, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP, NondecreasingIndentation, ForeignFunctionInterface, CApiFFI #-}
 
 -----------------------------------------------------------------------------
 -- |
