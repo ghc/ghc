@@ -1,5 +1,5 @@
 
-T2664.hs:31:17:
+T2664.hs:31:78:
     Could not deduce (a ~ b)
     from the context (Connect a, Connect b)
       bound by the instance declaration at T2664.hs:22:10-52
@@ -12,9 +12,9 @@ T2664.hs:31:17:
           the instance declaration at T2664.hs:22:19
       `b' is a rigid type variable bound by
           the instance declaration at T2664.hs:22:30
-    Expected type: PChan (a :*: b)
-      Actual type: PChan (b :*: a)
-    In the expression: O $ takeMVar v
-    In the first argument of `return', namely
-      `(O $ takeMVar v, 
-        E (pchoose Right v newPChan) (pchoose Left v newPChan))'
+    Expected type: Dual (Dual b)
+      Actual type: a
+    In the third argument of `pchoose', namely `newPChan'
+    In the second argument of `E', namely `(pchoose Left v newPChan)'
+    In the expression:
+      E (pchoose Right v newPChan) (pchoose Left v newPChan)
