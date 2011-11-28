@@ -91,7 +91,7 @@ ofZgraph g = Old.ListGraph $ mapMaybe convert_block $ postorderDfs g
                               Old.CmmCall (cmm_target target)
                                           (add_hints (get_conv target) Results   ress)
                                           (add_hints (get_conv target) Arguments args)
-                                          Old.CmmUnsafe Old.CmmMayReturn
+                                          Old.CmmMayReturn
 
                   last :: CmmNode O C -> () -> [Old.CmmStmt]
                   last node _ = stmts

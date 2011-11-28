@@ -59,7 +59,7 @@ cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
                 stmt m (CmmComment _) = m
                 stmt m (CmmAssign _ e) = expr m e
                 stmt m (CmmStore e1 e2) = expr (expr m e1) e2
-                stmt m (CmmCall c _ as _ _) = f (actuals m as) c
+                stmt m (CmmCall c _ as _) = f (actuals m as) c
                     where f m (CmmCallee e _) = expr m e
                           f m (CmmPrim _) = m
                 stmt m (CmmBranch b) = b:m
@@ -266,8 +266,8 @@ lookForInline' u expr regset (stmt : rest)
 inlineStmt :: Unique -> CmmExpr -> CmmStmt -> CmmStmt
 inlineStmt u a (CmmAssign r e) = CmmAssign r (inlineExpr u a e)
 inlineStmt u a (CmmStore e1 e2) = CmmStore (inlineExpr u a e1) (inlineExpr u a e2)
-inlineStmt u a (CmmCall target regs es srt ret)
-   = CmmCall (infn target) regs es' srt ret
+inlineStmt u a (CmmCall target regs es ret)
+   = CmmCall (infn target) regs es' ret
    where infn (CmmCallee fn cconv) = CmmCallee (inlineExpr u a fn) cconv
          infn (CmmPrim p) = CmmPrim p
          es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]

@@ -154,7 +154,6 @@ data CmmStmt	-- Old-style
      CmmCallTarget
      [HintedCmmFormal]		 -- zero or more results
      [HintedCmmActual]		 -- zero or more arguments
-     CmmSafety			 -- whether to build a continuation
      CmmReturnInfo
   -- Some care is necessary when handling the arguments of these, see
   -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
@@ -192,7 +191,7 @@ instance UserOfLocalRegs CmmStmt where
       stmt (CmmComment {})           = id
       stmt (CmmAssign _ e)           = gen e
       stmt (CmmStore e1 e2)          = gen e1 . gen e2
-      stmt (CmmCall target _ es _ _) = gen target . gen es
+      stmt (CmmCall target _ es _)   = gen target . gen es
       stmt (CmmBranch _)             = id
       stmt (CmmCondBranch e _)       = gen e
       stmt (CmmSwitch e _)           = gen e

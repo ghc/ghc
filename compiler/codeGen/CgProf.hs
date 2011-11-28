@@ -142,7 +142,7 @@ enterCostCentreFun ccs closure =
   ifProfiling $ do
     if isCurrentCCS ccs
        then emitRtsCall rtsPackageId (fsLit "enterFunCCS")
-               [CmmHinted (costCentreFrom closure) AddrHint] False
+               [CmmHinted (costCentreFrom closure) AddrHint]
        else return () -- top-level function, nothing to do
 
 ifProfiling :: Code -> Code
@@ -234,7 +234,6 @@ pushCostCentre result ccs cc
 	rtsPackageId 
         (fsLit "pushCostCentre") [CmmHinted ccs AddrHint,
                                   CmmHinted (CmmLit (mkCCostCentre cc)) AddrHint]
-        False
 
 bumpSccCount :: CmmExpr -> CmmStmt
 bumpSccCount ccs

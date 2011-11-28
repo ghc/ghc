@@ -127,7 +127,7 @@ emitForeignCall' safety results target args vols _srt ret
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     let caller_load' = if ret == CmmNeverReturns then [] else caller_load
     stmtsC caller_save
-    stmtC (CmmCall target results temp_args CmmUnsafe ret)
+    stmtC (CmmCall target results temp_args ret)
     stmtsC caller_load'
 
   | otherwise = do
@@ -149,12 +149,12 @@ emitForeignCall' safety results target args vols _srt ret
                         [ CmmHinted id AddrHint ]
                         [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint
                         , CmmHinted (CmmLit (CmmInt (fromIntegral (fromEnum (playInterruptible safety))) wordWidth)) NoHint]
-                        CmmUnsafe ret)
-    stmtC (CmmCall temp_target results temp_args CmmUnsafe ret)
+                        ret)
+    stmtC (CmmCall temp_target results temp_args ret)
     stmtC (CmmCall (CmmCallee resumeThread CCallConv)
                         [ CmmHinted new_base AddrHint ]
                         [ CmmHinted (CmmReg (CmmLocal id)) AddrHint ]
-                        CmmUnsafe ret)
+                        ret)
     -- Assign the result to BaseReg: we
     -- might now have a different Capability!
     stmtC (CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)))

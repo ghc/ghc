@@ -122,11 +122,10 @@ pprStmt platform stmt = case stmt of
 
     -- call "ccall" foo(x, y)[r1, r2];
     -- ToDo ppr volatile
-    CmmCall (CmmCallee fn cconv) results args safety ret ->
+    CmmCall (CmmCallee fn cconv) results args ret ->
         sep  [ pp_lhs <+> pp_conv
              , nest 2 (pprExpr9 platform fn <>
                        parens (commafy (map ppr_ar args)))
-               <> brackets (pprPlatform platform safety)
              , case ret of CmmMayReturn -> empty
                            CmmNeverReturns -> ptext $ sLit (" never returns")
              ] <> semi
@@ -142,9 +141,9 @@ pprStmt platform stmt = case stmt of
                       _           -> ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
 
     -- Call a CallishMachOp, like sin or cos that might be implemented as a library call.
-    CmmCall (CmmPrim op) results args safety ret ->
+    CmmCall (CmmPrim op) results args ret ->
         pprStmt platform (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
-                                  results args safety ret)
+                                  results args ret)
         where
           -- HACK: A CallishMachOp doesn't really correspond to a ForeignLabel, but we
           --       use one to get the label printed.
