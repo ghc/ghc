@@ -13,3 +13,5 @@ test('PolyKinds02', normal, compile_fail, [''])
 test('PolyKinds04', normal, compile_fail, [''])
 test('PolyKinds06', normal, compile_fail, [''])
 test('PolyKinds07', normal, compile_fail, [''])
+
+test('PolyKinds12', expect_fail, compile, [''])
