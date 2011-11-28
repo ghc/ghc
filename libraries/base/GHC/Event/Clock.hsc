@@ -45,6 +45,6 @@ instance Storable CTimeval where
         #{poke struct timeval, tv_sec} ptr (sec tv)
         #{poke struct timeval, tv_usec} ptr (usec tv)
 
-foreign import ccall unsafe "__hsbase_gettimeofday" gettimeofday
+foreign import capi unsafe "HsBase.h gettimeofday" gettimeofday
     :: Ptr CTimeval -> Ptr () -> IO CInt
 

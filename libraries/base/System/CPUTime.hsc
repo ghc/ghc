@@ -111,7 +111,7 @@ getCPUTime = do
                 * 1000000)
 
 type CRUsage = ()
-foreign import ccall unsafe "__hsbase_getrusage" getrusage :: CInt -> Ptr CRUsage -> IO CInt
+foreign import capi unsafe "HsBase.h getrusage" getrusage :: CInt -> Ptr CRUsage -> IO CInt
 #elif defined(HAVE_TIMES)
     allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
     _ <- times p_tms

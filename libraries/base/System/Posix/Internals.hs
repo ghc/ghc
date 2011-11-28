@@ -486,7 +486,7 @@ foreign import capi unsafe "HsBase.h sigemptyset"
 foreign import capi unsafe "HsBase.h sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h sigprocmask"
+foreign import capi unsafe "HsBase.h sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 
 foreign import ccall unsafe "HsBase.h tcgetattr"

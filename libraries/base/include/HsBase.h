@@ -598,14 +598,6 @@ INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
 	return (select(nfds,readfds,writefds,exceptfds,timeout));
 }
 
-// gettimeofday()-related
-
-#if !defined(__MINGW32__)
-INLINE int __hsbase_gettimeofday(struct timeval *tv, struct timezone *tz) {
-        return gettimeofday(tv, tz);
-}
-#endif /* !defined(__MINGW32__) */
-
 #if darwin_HOST_OS
 // You should not access _environ directly on Darwin in a bundle/shared library.
 // See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html
@@ -639,14 +631,6 @@ INLINE int fcntl_lock(int fd, int cmd, struct flock *lock) {
     return fcntl(fd, cmd, lock);
 }
 
-#endif
-
-#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
-#if defined(HAVE_GETRUSAGE) && ! irix_HOST_OS && ! solaris2_HOST_OS
-INLINE int __hsbase_getrusage(int who, struct rusage *rusage) {
-   return getrusage(who, rusage);
-}
-#endif
 #endif
 
 #endif /* __HSBASE_H__ */
