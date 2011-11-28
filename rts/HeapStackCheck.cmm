@@ -169,8 +169,8 @@ __stg_gc_enter_1
 
 INFO_TABLE_RET( stg_enter_checkbh, RET_SMALL, P_ unused)
 {
-    R1 = Sp(1);
-    Sp_adj(2);
+    R1 = StgUpdateFrame_updatee(Sp);
+    Sp = Sp + SIZEOF_StgUpdateFrame;
     foreign "C" checkBlockingQueues(MyCapability() "ptr",
                                     CurrentTSO) [R1];
     ENTER();
