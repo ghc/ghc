@@ -316,9 +316,10 @@ mkFunEntryCode cl_info cc reg_args stk_args sp_top reg_save_code body = do
         -- Do the business
   ; funWrapper cl_info reg_args reg_save_code $ do
 	{ tickyEnterFun cl_info
-        ; enterCostCentreFun cc $
-              CmmMachOp mo_wordSub [ CmmReg nodeReg
-                                   , CmmLit (mkIntCLit (funTag cl_info)) ]
+        ; enterCostCentreFun cc
+              (CmmMachOp mo_wordSub [ CmmReg nodeReg
+                                    , CmmLit (mkIntCLit (funTag cl_info)) ])
+              (node : map snd reg_args) -- live regs
 
         ; cgExpr body }
   }

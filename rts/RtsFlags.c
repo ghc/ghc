@@ -1147,12 +1147,6 @@ error = rtsTrue;
                       errorBelch("Using large values for -N is not allowed by default. Link with -rtsopts to allow full control.");
                       stg_exit(EXIT_FAILURE);
                     }
-#if defined(PROFILING)
-                    if (nNodes > 1) {
-                        errorBelch("bad option %s: only -N1 is supported with profiling", rts_argv[arg]);
-		      error = rtsTrue;
-                    }
-#endif
                     RtsFlags.ParFlags.nNodes = (nat)nNodes;
 		}
 		) break;

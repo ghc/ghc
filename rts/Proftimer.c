@@ -11,6 +11,7 @@
 
 #include "Profiling.h"
 #include "Proftimer.h"
+#include "Capability.h"
 
 #ifdef PROFILING
 static rtsBool do_prof_ticks = rtsFalse;       // enable profiling ticks
@@ -73,7 +74,10 @@ handleProfTick(void)
 #ifdef PROFILING
     total_ticks++;
     if (do_prof_ticks) {
-	CCCS->time_ticks++;
+        nat n;
+        for (n=0; n < n_capabilities; n++) {
+            capabilities[n].r.rCCCS->time_ticks++;
+        }
     }
 #endif
 

@@ -372,7 +372,7 @@
    CCCS_ALLOC(bytes);
 
 /* CCS_ALLOC wants the size in words, because ccs->mem_alloc is in words */
-#define CCCS_ALLOC(__alloc) CCS_ALLOC(BYTES_TO_WDS(__alloc), W_[CCCS])
+#define CCCS_ALLOC(__alloc) CCS_ALLOC(BYTES_TO_WDS(__alloc), CCCS)
 
 #define HP_CHK_GEN_TICKY(alloc,liveness,reentry)	\
    HP_CHK_GEN(alloc,liveness,reentry);			\

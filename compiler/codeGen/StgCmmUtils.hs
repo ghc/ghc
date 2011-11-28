@@ -253,7 +253,7 @@ callerSaveVolatileRegs = (caller_save, caller_load)
     caller_save = catAGraphs (map callerSaveGlobalReg    regs_to_save)
     caller_load = catAGraphs (map callerRestoreGlobalReg regs_to_save)
 
-    system_regs = [ Sp,SpLim,Hp,HpLim,CurrentTSO,CurrentNursery
+    system_regs = [ Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery
 		    {- ,SparkHd,SparkTl,SparkBase,SparkLim -}
 		  , BaseReg ]
 
@@ -366,6 +366,9 @@ callerSaves Hp			= True
 #ifdef CALLER_SAVES_HpLim
 callerSaves HpLim		= True
 #endif
+#ifdef CALLER_SAVES_CCCS
+callerSaves CCCS                = True
+#endif
 #ifdef CALLER_SAVES_CurrentTSO
 callerSaves CurrentTSO		= True
 #endif
@@ -385,7 +388,8 @@ baseRegOffset SpLim		  = oFFSET_StgRegTable_rSpLim
 baseRegOffset (LongReg 1)         = oFFSET_StgRegTable_rL1
 baseRegOffset Hp		  = oFFSET_StgRegTable_rHp
 baseRegOffset HpLim		  = oFFSET_StgRegTable_rHpLim
-baseRegOffset CurrentTSO	  = oFFSET_StgRegTable_rCurrentTSO
+baseRegOffset CCCS                = oFFSET_StgRegTable_rCCCS
+baseRegOffset CurrentTSO          = oFFSET_StgRegTable_rCurrentTSO
 baseRegOffset CurrentNursery	  = oFFSET_StgRegTable_rCurrentNursery
 baseRegOffset HpAlloc		  = oFFSET_StgRegTable_rHpAlloc
 baseRegOffset GCEnter1		  = oFFSET_stgGCEnter1

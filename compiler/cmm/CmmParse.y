@@ -775,8 +775,9 @@ isPtrGlobalReg Sp		     = True
 isPtrGlobalReg SpLim		     = True
 isPtrGlobalReg Hp		     = True
 isPtrGlobalReg HpLim		     = True
-isPtrGlobalReg CurrentTSO	     = True
-isPtrGlobalReg CurrentNursery	     = True
+isPtrGlobalReg CCCS                  = True
+isPtrGlobalReg CurrentTSO            = True
+isPtrGlobalReg CurrentNursery        = True
 isPtrGlobalReg (VanillaReg _ VGcPtr) = True
 isPtrGlobalReg _		     = False
 

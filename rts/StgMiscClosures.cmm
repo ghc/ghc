@@ -42,7 +42,7 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME, P_ unused)
 INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ cccs)
 {
 #if defined(PROFILING)
-    W_[CCCS] = Sp(1);
+    CCCS = Sp(1);
 #endif
     Sp_adj(2);
     jump %ENTRY_CODE(Sp(0));

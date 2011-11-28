@@ -286,7 +286,7 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
     caller_save = foldr ($!) [] (map callerSaveGlobalReg    regs_to_save)
     caller_load = foldr ($!) [] (map callerRestoreGlobalReg regs_to_save)
 
-    system_regs = [Sp,SpLim,Hp,HpLim,CurrentTSO,CurrentNursery,
+    system_regs = [Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery,
                    {-SparkHd,SparkTl,SparkBase,SparkLim,-}BaseReg ]
 
     regs_to_save = system_regs ++ vol_list
@@ -384,6 +384,9 @@ callerSaves Hp                  = True
 #ifdef CALLER_SAVES_HpLim
 callerSaves HpLim               = True
 #endif
+#ifdef CALLER_SAVES_CCCS
+callerSaves CCCS                = True
+#endif
 #ifdef CALLER_SAVES_CurrentTSO
 callerSaves CurrentTSO          = True
 #endif
@@ -423,6 +426,7 @@ baseRegOffset (LongReg 1)         = oFFSET_StgRegTable_rL1
 baseRegOffset (LongReg n)         = panic ("Registers above L1 are not supported (tried to use L" ++ show n ++ ")")
 baseRegOffset Hp                  = oFFSET_StgRegTable_rHp
 baseRegOffset HpLim               = oFFSET_StgRegTable_rHpLim
+baseRegOffset CCCS                = oFFSET_StgRegTable_rCCCS
 baseRegOffset CurrentTSO          = oFFSET_StgRegTable_rCurrentTSO
 baseRegOffset CurrentNursery      = oFFSET_StgRegTable_rCurrentNursery
 baseRegOffset HpAlloc             = oFFSET_StgRegTable_rHpAlloc

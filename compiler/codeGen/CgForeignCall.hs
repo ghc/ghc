@@ -240,8 +240,8 @@ emitLoadThreadState = do
   emitOpenNursery
   -- and load the current cost centre stack from the TSO when profiling:
   when opt_SccProfilingOn $
-        stmtC (CmmStore curCCSAddr
-                (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord))
+        stmtC $ storeCurCCS $
+                  CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord
 
 emitOpenNursery :: Code
 emitOpenNursery = stmtsC [
