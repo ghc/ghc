@@ -853,7 +853,7 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
            (EQ, MetaTv i1 ref1, MetaTv i2 ref2)
                 | nicer_to_update_tv1 i1 i2 -> updateMeta tv1 ref1 ty2
                 | otherwise                 -> updateMeta tv2 ref2 ty1
-           (EQ, MetaTv _ ref1, _)  -> updateMeta tv1 ref1 ty2
+           (EQ, MetaTv _ ref1, _) -> updateMeta tv1 ref1 ty2
            (EQ, _, MetaTv _ ref2) -> updateMeta tv2 ref2 ty1
 
 	   -- Can't do it in-place, so defer
