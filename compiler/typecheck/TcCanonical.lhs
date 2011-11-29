@@ -558,18 +558,57 @@ flatten d ctxt ty
   = do { (xi, co) <- flatten d ctxt ty'
        ; return (xi,co) }
 	
-       -- The following is tedious to do:
+       -- DV: The following is tedious to do but maybe we should return to this
        -- Preserve type synonyms if possible
        -- ; if no_flattening
        --   then return (xi, mkReflCo xi,no_flattening) -- Importantly, not xi!
        --   else return (xi,co,no_flattening) 
        -- }
 
-flatten _d ctxt v@(TyVarTy _)
+flatten d ctxt v@(TyVarTy _)
   = do { ieqs <- getInertEqs
-       ; let co = liftInertEqsTy ieqs ctxt v             -- co :: v ~ xi
-             new_ty = pSnd (liftedCoercionKind co)
-       ; return (new_ty, mkSymCo co) }                   -- return xi ~ v
+       ; let co = liftInertEqsTy ieqs ctxt v           -- co : v ~ ty
+             ty = pSnd (liftedCoercionKind co)
+       ; if v `eqType` ty then
+             return (ty,mkReflCo ty)
+         else -- NB recursive call. Why? See Note [Non-idempotent inert substitution]
+              -- Actually I believe that applying the substition only *twice* will suffice
+         
+             do { (ty_final,co') <- flatten d ctxt ty  -- co' : ty_final ~ ty
+                ; return (ty_final,co' `mkTransCo` mkSymCo co) } }
+
+\end{code}
+
+Note [Non-idempotent inert substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The inert substitution is not idempotent in the broad sense. It is only idempotent in 
+that it cannot rewrite the RHS of other inert equalities any further. An example of such 
+an inert substitution is:
+
+ [Ś] g1 : ta8 ~ ta4
+ [W] g2 : ta4 ~ a5Fj
+
+Observe that the wanted cannot rewrite the solved goal, despite the fact that ta4 appears on
+an RHS of an equality. Now, imagine a constraint:
+
+ [W] g3: ta8 ~ Int 
+
+coming in. If we simply apply once the inert substitution we will get: 
+
+ [W] g3_1: ta4 ~ Int 
+
+and because potentially ta4 is untouchable we will try to insert g3_1 in the inert set, 
+getting a panic since the inert only allows ONE equation per LHS type variable (as it 
+should).
+
+For this reason, when we reach to flatten a type variable, we flatten it recursively, 
+so that we can make sure that the inert substitution /is/ fully applied.
+
+This insufficient rewriting was the reason for #5668.
+
+\begin{code}
+
 
 flatten d ctxt (AppTy ty1 ty2)
   = do { (xi1,co1) <- flatten d ctxt ty1
