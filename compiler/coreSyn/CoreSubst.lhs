@@ -1202,8 +1202,8 @@ exprIsConApp_maybe id_unf expr
 	-- and that is the business of callSiteInline.
 	-- In practice, without this test, most of the "hits" were
 	-- CPR'd workers getting inlined back into their wrappers,
-        | unfoldingArity unfolding == 0 
-        , Just rhs <- expandUnfolding_maybe unfolding
+        | Just rhs <- expandUnfolding_maybe unfolding
+        , unfoldingArity unfolding == 0 
         , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
         = go (Left in_scope') rhs cont
         where
