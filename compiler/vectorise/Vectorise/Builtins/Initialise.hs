@@ -2,7 +2,7 @@
 
 module Vectorise.Builtins.Initialise (
   -- * Initialisation
-  initBuiltins, initBuiltinVars, initBuiltinTyCons
+  initBuiltins, initBuiltinVars
 ) where
 
 import Vectorise.Builtins.Base
@@ -30,12 +30,7 @@ import Data.Array
 --
 initBuiltins :: DsM Builtins
 initBuiltins
- = do {   -- 'PArray': desugared array type
-      ; parrayTyCon <- externalTyCon (fsLit "PArray")
-      ; parray_tcs  <- mapM externalTyCon (suffixed "PArray" aLL_DPH_PRIM_TYCONS)
-      ; let parray_PrimTyCons = mkNameEnv (zip aLL_DPH_PRIM_TYCONS parray_tcs)
-
-          -- 'PData': type family mapping array element types to array representation types
+ = do {   -- 'PData': type family mapping array element types to array representation types
           -- Not all backends use `PDatas`.
       ; pdataTyCon  <- externalTyCon (fsLit "PData")
       ; pdatasTyCon <- externalTyCon (fsLit "PDatas")
@@ -80,7 +75,8 @@ initBuiltins
       ; scalar_map       <- externalVar (fsLit "scalar_map")
       ; scalar_zip2      <- externalVar (fsLit "scalar_zipWith")
       ; scalar_zips      <- mapM externalVar (numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
-      ; let scalarZips   = listArray (1, mAX_DPH_SCALAR_ARGS) (scalar_map : scalar_zip2 : scalar_zips)
+      ; let scalarZips   = listArray (1, mAX_DPH_SCALAR_ARGS) 
+                                     (scalar_map : scalar_zip2 : scalar_zips)
 
           -- Types and functions for generic type representations
       ; voidTyCon        <- externalTyCon (fsLit "Void")
@@ -119,9 +115,7 @@ initBuiltins
       ; liftingContext  <- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy) newUnique
 
       ; return $ Builtins 
-               { parrayTyCon          = parrayTyCon
-               , parray_PrimTyCons    = parray_PrimTyCons
-               , pdataTyCon           = pdataTyCon
+               { pdataTyCon           = pdataTyCon
                , pdatasTyCon          = pdatasTyCon
                , preprTyCon           = preprTyCon
                , prClass              = prClass
@@ -195,20 +189,6 @@ initBuiltinVars (Builtins { })
       = [mk_tup n (mkFastString $ "tup" ++ show n) | n <- [2..5]]
       where
         mk_tup n name = (tupleCon BoxedTuple n, name)
-
--- |Get a list of names to `TyCon`s in the mock prelude.
---
-initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
--- FIXME: * must be replaced by VECTORISE pragmas!!!
---        * then we can remove 'parrayTyCon' from the Builtins as well
-initBuiltinTyCons bi
-  = do
-      return $ (tyConName funTyCon, closureTyCon bi)
-             : (parrTyConName,      parrayTyCon bi)
-
-             -- FIXME: temporary
-             : (tyConName $ parrayTyCon bi, parrayTyCon bi)
-             : []
 
 
 -- Auxilliary look up functions -----------------------------------------------

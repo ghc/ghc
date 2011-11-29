@@ -39,8 +39,11 @@ import TyCon
 import DataCon
 import NameEnv
 import NameSet
+import Name
 import VarEnv
 import VarSet
+import Var as Var
+import FastString
 import Outputable
 
 
@@ -70,8 +73,22 @@ defGlobalVar :: Var -> Var -> VM ()
 defGlobalVar v v'
   = do { traceVt "add global var mapping:" (ppr v <+> text "-->" <+> ppr v') 
 
-       ; updGEnv $ \env -> env { global_vars = extendVarEnv (global_vars env) v v' }
+           -- check for duplicate vectorisation
+       ; currentDef <- readGEnv $ \env -> lookupVarEnv (global_vars env) v
+       ; case currentDef of
+           Just old_v' -> cantVectorise "Variable is already vectorised:" $
+                            ppr v <+> moduleOf v old_v'
+           Nothing     -> return ()
+
+       ; updGEnv  $ \env -> env { global_vars = extendVarEnv (global_vars env) v v' }
        }
+  where
+    moduleOf var var' | var == var'
+                      = ptext (sLit "vectorises to itself")
+                      | Just mod <- nameModule_maybe (Var.varName var') 
+                      = ptext (sLit "in module") <+> ppr mod
+                      | otherwise
+                      = ptext (sLit "in the current module")
 
 
 -- Vectorisation declarations -------------------------------------------------
@@ -120,8 +137,26 @@ lookupTyCon tc
 -- |Add a mapping between plain and vectorised `TyCon`s to the global environment.
 --
 defTyCon :: TyCon -> TyCon -> VM ()
-defTyCon tc tc' = updGEnv $ \env ->
-  env { global_tycons = extendNameEnv (global_tycons env) (tyConName tc) tc' }
+defTyCon tc tc'
+  = do { traceVt "add global tycon mapping:" (ppr tc <+> text "-->" <+> ppr tc') 
+
+           -- check for duplicate vectorisation
+       ; currentDef <- readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
+       ; case currentDef of
+           Just old_tc' -> cantVectorise "Type constructor or class is already vectorised:" $
+                            ppr tc <+> moduleOf tc old_tc'
+           Nothing     -> return ()
+
+       ; updGEnv $ \env -> 
+           env { global_tycons = extendNameEnv (global_tycons env) (tyConName tc) tc' }
+       }
+  where
+    moduleOf tc tc' | tc == tc'
+                    = ptext (sLit "vectorises to itself")
+                    | Just mod <- nameModule_maybe (tyConName tc') 
+                    = ptext (sLit "in module") <+> ppr mod
+                    | otherwise
+                    = ptext (sLit "in the current module")
 
 -- |Get the set of all vectorised type constructors.
 --

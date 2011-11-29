@@ -988,10 +988,10 @@
 	      <entry><option>-XNoRecursiveDo</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XPArr</option></entry>
+	      <entry><option>-XParallelArrays</option></entry>
 	      <entry>Enable parallel arrays.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-XNoPArr</option></entry>
+	      <entry><option>-XNoParallelArrays</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XRecordWildCards</option></entry>

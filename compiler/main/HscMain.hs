@@ -404,14 +404,14 @@ hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
 -- | Convert a typechecked module to Core
 hscDesugar :: HscEnv -> ModSummary -> TcGblEnv -> IO ModGuts
 hscDesugar hsc_env mod_summary tc_result =
-    runHsc hsc_env $ hscDesugar' mod_summary tc_result
+    runHsc hsc_env $ hscDesugar' (ms_location mod_summary) tc_result
 
-hscDesugar' :: ModSummary -> TcGblEnv -> Hsc ModGuts
-hscDesugar' mod_summary tc_result = do
+hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
+hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
     r <- ioMsgMaybe $
       {-# SCC "deSugar" #-}
-      deSugar hsc_env (ms_location mod_summary) tc_result
+      deSugar hsc_env mod_location tc_result
 
     -- always check -Werror after desugaring, this is the last opportunity for
     -- warnings to arise before the backend.
@@ -616,7 +616,7 @@ genericHscBackend compiler tc_result mod_summary mb_old_hash
     | HsBootFile <- ms_hsc_src mod_summary =
         hscGenBootOutput compiler tc_result mod_summary mb_old_hash
     | otherwise = do
-        guts <- hscDesugar' mod_summary tc_result
+        guts <- hscDesugar' (ms_location mod_summary) tc_result
         hscGenOutput compiler guts mod_summary mb_old_hash
 
 compilerBackend :: HsCompiler a -> TcGblEnv -> Compiler a
@@ -1423,8 +1423,7 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
                                       ml_hi_file   = undefined,
                                       ml_obj_file  = undefined}
-    ds_result <- ioMsgMaybe $ deSugar hsc_env iNTERACTIVELoc tc_gblenv
-    handleWarnings
+    ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}
     simpl_mg <- liftIO $ hscSimplify hsc_env ds_result

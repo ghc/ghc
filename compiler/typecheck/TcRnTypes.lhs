@@ -71,7 +71,7 @@ module TcRnTypes(
 	SkolemInfo(..),
 
         CtFlavor(..), pprFlavorArising, isWanted, 
-        isGivenOrSolved, isGiven_maybe,
+        isGivenOrSolved, isGiven_maybe, isSolved,
         isDerived,
 
 	-- Pretty printing
@@ -1210,14 +1210,17 @@ data CtFlavor
 
 data GivenKind
   = GivenOrig   -- Originates in some given, such as signature or pattern match
-  | GivenSolved -- Is given as result of being solved, maybe provisionally on
-                -- some other wanted constraints. 
+  | GivenSolved (Maybe EvTerm) 
+                -- Is given as result of being solved, maybe provisionally on
+                -- some other wanted constraints. We cache the evidence term 
+                -- sometimes here as well /as well as/ in the EvBinds, 
+                -- see Note [Optimizing Spontaneously Solved Coercions]
 
 instance Outputable CtFlavor where
-  ppr (Given _ GivenOrig)   = ptext (sLit "[G]")
-  ppr (Given _ GivenSolved) = ptext (sLit "[S]") -- Print [S] for Given/Solved's
-  ppr (Wanted {})           = ptext (sLit "[W]")
-  ppr (Derived {})          = ptext (sLit "[D]") 
+  ppr (Given _ GivenOrig)        = ptext (sLit "[G]")
+  ppr (Given _ (GivenSolved {})) = ptext (sLit "[S]") -- Print [S] for Given/Solved's
+  ppr (Wanted {})                = ptext (sLit "[W]")
+  ppr (Derived {})               = ptext (sLit "[D]")
 
 pprFlavorArising :: CtFlavor -> SDoc
 pprFlavorArising (Derived wl)   = pprArisingAt wl
@@ -1231,6 +1234,10 @@ isWanted _           = False
 isGivenOrSolved :: CtFlavor -> Bool
 isGivenOrSolved (Given {}) = True
 isGivenOrSolved _ = False
+
+isSolved :: CtFlavor -> Bool
+isSolved (Given _ (GivenSolved {})) = True
+isSolved _ = False
 
 isGiven_maybe :: CtFlavor -> Maybe GivenKind 
 isGiven_maybe (Given _ gk) = Just gk

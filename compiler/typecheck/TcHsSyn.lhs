@@ -280,7 +280,10 @@ zonkEvBndr :: ZonkEnv -> EvVar -> TcM EvVar
 -- Works for dictionaries and coercions
 -- Does not extend the ZonkEnv
 zonkEvBndr env var 
-  = do { ty <- zonkTcTypeToType env (varType var)
+  = do { let var_ty = varType var
+       ; ty <- 
+           {-# SCC "zonkEvBndr_zonkTcTypeToType" #-}
+           zonkTcTypeToType env var_ty
        ; return (setVarType var ty) }
 
 zonkEvVarOcc :: ZonkEnv -> EvVar -> EvVar
@@ -1103,7 +1106,8 @@ zonkEvBindsVar env (EvBindsVar ref _) = do { bs <- readMutVar ref
 
 zonkEvBinds :: ZonkEnv -> Bag EvBind -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBinds env binds
-  = fixM (\ ~( _, new_binds) -> do
+  = {-# SCC "zonkEvBinds" #-}
+    fixM (\ ~( _, new_binds) -> do
 	 { let env1 = extendIdZonkEnv env (collect_ev_bndrs new_binds)
          ; binds' <- mapBagM (zonkEvBind env1) binds
          ; return (env1, binds') })
@@ -1114,9 +1118,29 @@ zonkEvBinds env binds
 
 zonkEvBind :: ZonkEnv -> EvBind -> TcM EvBind
 zonkEvBind env (EvBind var term)
-  = do { var' <- zonkEvBndr env var
-       ; term' <- zonkEvTerm env term
-       ; return (EvBind var' term') }
+  -- This function has some special cases for avoiding re-zonking the
+  -- same types many types. See Note [Optimized Evidence Binding Zonking]
+  = case term of 
+      -- Fast path for reflexivity coercions:
+      EvCoercionBox co 
+        | Just ty <- isReflCo_maybe co
+        ->
+          do { zty  <- zonkTcTypeToType env ty
+             ; let var' = setVarType var (mkEqPred (zty,zty))
+             ; return (EvBind var' (EvCoercionBox (mkReflCo zty))) }
+
+      -- Fast path for variable-variable bindings 
+      -- NB: could be optimized further! (e.g. SymCo cv)
+        | Just cv <- getCoVar_maybe co 
+        -> do { let cv' = zonkIdOcc env cv -- Just lazily look up
+                    term' = EvCoercionBox (CoVarCo cv')
+                    var'  = setVarType var (varType cv')
+              ; return (EvBind var' term') }
+      -- Ugly safe and slow path
+      _ -> do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
+              ; term' <- zonkEvTerm env term 
+              ; return (EvBind var' term')
+              }
 \end{code}
 
 %************************************************************************
@@ -1171,6 +1195,33 @@ The type of Phantom is (forall (k : BOX). forall (a : k). Int). Both `a` and
 we have a type or a kind variable; for kind variables we just return AnyK (and
 not the ill-kinded Any BOX).
 
+Note [Optimized Evidence Binding Zonking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When optimising evidence binds we may come accross situations where 
+a coercion is just reflexivity: 
+      cv = ReflCo ty
+In such a case it is a waste of time to zonk both ty and the type 
+of the coercion, especially if the types involved are huge. For this
+reason this case is optimized to only zonk 'ty' and set the type of 
+the variable to be that zonked type.
+
+Another case that hurts a lot are simple coercion bindings of the form:
+      cv1 = cv2
+      cv3 = cv1
+      cv4 = cv2 
+etc. In all such cases it is very easy to just get the zonked type of 
+cv2 and use it to set the type of the LHS coercion variable without zonking
+twice. Though this case is funny, it can happen due the way that evidence 
+from spontaneously solved goals is now used.
+See Note [Optimizing Spontaneously Solved Goals] about this.
+
+NB: That these optimizations are independently useful, regardless of the 
+constraint solver strategy.
+
+DV, TODO: followup on this note mentioning new examples I will add to perf/
+
+
 \begin{code}
 mkZonkTcTyVar :: (TcTyVar -> TcM Type)	-- What to do for an *mutable Flexi* var
 	      -> (TcTyVar -> Type)	-- What to do for an immutable var
@@ -1186,9 +1237,14 @@ mkZonkTcTyVar unbound_mvar_fn unbound_ivar_fn
          FlatSkol ty    -> zonkType zonk_tv ty
          MetaTv _ ref   -> do { cts <- readMutVar ref
            		      ; case cts of    
-           		           Flexi -> do { kind <- zonkType zonk_tv (tyVarKind tv)
+           		           Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
+                                                         zonkType zonk_tv (tyVarKind tv)
                                                ; unbound_mvar_fn (setTyVarKind tv kind) }
-           		           Indirect ty -> zonkType zonk_tv ty }
+           		           Indirect ty -> do { zty <- zonkType zonk_tv ty 
+                                                     -- Small optimisation: shortern-out indirect steps
+                                                     -- so that the old type may be more easily collected.
+                                                     ; writeMutVar ref (Indirect zty)
+                                                     ; return zty } }
 
 zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type
 zonkTcTypeToType (ZonkEnv zonk_unbound_tyvar tv_env _id_env)

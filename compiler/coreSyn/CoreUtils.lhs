@@ -1282,6 +1282,13 @@ altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
 \begin{code}
 data CoreStats = CS { cs_tm, cs_ty, cs_co :: Int }
 
+
+instance Outputable CoreStats where 
+ ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3 }) = 
+    text "size of" <+> vcat [ text "terms     =" <+> int i1
+                            , text "types     =" <+> int i2
+                            , text "coercions =" <+> int i3 ]
+
 plusCS :: CoreStats -> CoreStats -> CoreStats
 plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1 })
        (CS { cs_tm = p2, cs_ty = q2, cs_co = r2 })

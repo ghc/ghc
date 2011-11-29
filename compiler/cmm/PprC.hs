@@ -254,7 +254,7 @@ pprStmt platform stmt = case stmt of
 pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args
   = res_type ress <+>
-    parens (text (ccallConvAttribute cconv) <>  ppr_fn) <>
+    parens (ccallConvAttribute cconv <> ppr_fn) <>
     parens (commafy (map arg_type args))
   where
         res_type [] = ptext (sLit "void")
@@ -845,6 +845,7 @@ pprCall platform ppr_fn cconv results args _
 -- change in the future...
 is_cishCC :: CCallConv -> Bool
 is_cishCC CCallConv    = True
+is_cishCC CApiConv     = True
 is_cishCC StdCallConv  = True
 is_cishCC CmmCallConv  = False
 is_cishCC PrimCallConv = False

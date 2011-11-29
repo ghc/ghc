@@ -453,6 +453,7 @@ Calling conventions
 \begin{code}
 checkCConv :: CCallConv -> TcM ()
 checkCConv CCallConv    = return ()
+checkCConv CApiConv     = return ()
 checkCConv StdCallConv  = do dflags <- getDOpts
                              let platform = targetPlatform dflags
                              unless (platformArch platform == ArchX86) $

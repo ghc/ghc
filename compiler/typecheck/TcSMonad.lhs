@@ -14,7 +14,7 @@ module TcSMonad (
     WorkList(..), isEmptyWorkList, emptyWorkList,
     workListFromEq, workListFromNonEq, workListFromCt, 
     extendWorkListEq, extendWorkListNonEq, extendWorkListCt, 
-    appendWorkListCt, appendWorkListEqs, unionWorkList,
+    appendWorkListCt, appendWorkListEqs, unionWorkList, selectWorkItem,
 
     getTcSWorkList, updWorkListTcS, updWorkListTcS_return, keepWanted,
 
@@ -47,8 +47,6 @@ module TcSMonad (
 
        -- Setting evidence variables 
     setEqBind,
-    setIPBind,
-    setDictBind,
     setEvBind,
 
     setWantedTyBind,
@@ -62,7 +60,7 @@ module TcSMonad (
 
         -- Inerts 
     InertSet(..), 
-    getInertEqs, rewriteFromInertEqs, liftInertEqsTy,
+    getInertEqs, liftInertEqsTy,
     emptyInert, getTcSInerts, updInertSet, extractUnsolved,
     extractUnsolvedTcS, modifyInertTcS,
     updInertSetTcS, partitionCCanMap, partitionEqMap,
@@ -125,7 +123,7 @@ import Bag
 import MonadUtils
 import VarSet
 
-import Pair ( pSnd )
+-- import Pair ( pSnd )
 import FastString
 import Util
 
@@ -207,17 +205,22 @@ better rewrite it as much as possible before reporting it as an error to the use
 \begin{code}
 
 -- See Note [WorkList]
-data WorkList = WorkList { wl_eqs  :: [Ct], wl_rest :: [Ct] }
+data WorkList = WorkList { wl_eqs  :: [Ct], wl_funeqs :: [Ct], wl_rest :: [Ct] }
 
 
 unionWorkList :: WorkList -> WorkList -> WorkList
 unionWorkList new_wl orig_wl = 
-   WorkList { wl_eqs = wl_eqs new_wl ++ wl_eqs orig_wl
-            , wl_rest = wl_rest new_wl ++ wl_rest orig_wl }
+   WorkList { wl_eqs    = wl_eqs new_wl ++ wl_eqs orig_wl
+            , wl_funeqs = wl_funeqs new_wl ++ wl_funeqs orig_wl
+            , wl_rest   = wl_rest new_wl ++ wl_rest orig_wl }
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
 -- Extension by equality
-extendWorkListEq ct wl = wl { wl_eqs = ct : wl_eqs wl }
+extendWorkListEq ct wl 
+  | Just {} <- isCFunEqCan_Maybe ct
+  = wl { wl_funeqs = ct : wl_funeqs wl }
+  | otherwise
+  = wl { wl_eqs = ct : wl_eqs wl }
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
@@ -238,25 +241,36 @@ appendWorkListEqs :: [Ct] -> WorkList -> WorkList
 appendWorkListEqs cts wl = foldr extendWorkListEq wl cts
 
 isEmptyWorkList :: WorkList -> Bool
-isEmptyWorkList wl = null (wl_eqs wl) &&  null (wl_rest wl)
+isEmptyWorkList wl 
+  = null (wl_eqs wl) &&  null (wl_rest wl) && null (wl_funeqs wl)
 
 emptyWorkList :: WorkList
-emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [] }
+emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [], wl_funeqs = []}
 
 workListFromEq :: Ct -> WorkList
-workListFromEq ct = WorkList { wl_eqs = [ct], wl_rest = [] }
+workListFromEq ct = extendWorkListEq ct emptyWorkList
 
 workListFromNonEq :: Ct -> WorkList
-workListFromNonEq ct = WorkList { wl_eqs = [], wl_rest = [ct] }
+workListFromNonEq ct = extendWorkListNonEq ct emptyWorkList
 
 workListFromCt :: Ct -> WorkList
 -- Agnostic 
 workListFromCt ct | isLCoVar (cc_id ct) = workListFromEq ct 
                   | otherwise           = workListFromNonEq ct
 
+
+selectWorkItem :: WorkList -> (Maybe Ct, WorkList)
+selectWorkItem wl@(WorkList { wl_eqs = eqs, wl_funeqs = feqs, wl_rest = rest })
+  = case (eqs,feqs,rest) of
+      (ct:cts,_,_)     -> (Just ct, wl { wl_eqs    = cts })
+      (_,(ct:cts),_)   -> (Just ct, wl { wl_funeqs = cts })
+      (_,_,(ct:cts))   -> (Just ct, wl { wl_rest   = cts })
+      (_,_,_)          -> (Nothing,wl)
+
 -- Pretty printing 
 instance Outputable WorkList where 
   ppr wl = vcat [ text "WorkList (eqs)   = " <+> ppr (wl_eqs wl)
+                , text "WorkList (funeqs)= " <+> ppr (wl_funeqs wl)
                 , text "WorkList (rest)  = " <+> ppr (wl_rest wl)
                 ]
 
@@ -475,21 +489,24 @@ updInertSet :: InertSet -> AtomicInert -> InertSet
 -- Add a new inert element to the inert set. 
 updInertSet is item 
   | isCTyEqCan item                     
-  = let upd_err a b = pprPanic "updInertSet" $ 
-                      vcat [text "Multiple inert equalities:", ppr a, ppr b]
+  = let upd_err a b = pprPanic "updInertSet" $
+                      vcat [ text "Multiple inert equalities:"
+                           , text "Old (already inert):" <+> ppr a
+                           , text "Trying to insert   :" <+> ppr b
+                           ]
+                           
+        -- If evidence is cached, pick it up from the flavor!
+        coercion 
+          | Just (GivenSolved (Just (EvCoercionBox co))) <- isGiven_maybe (cc_flavor item)
+          = co
+          | otherwise 
+          = mkEqVarLCo (cc_id item)
+
         eqs'     = extendVarEnv_C upd_err (inert_eqs is)
                                           (cc_tyvar item)
-                                          (item, mkEqVarLCo (cc_id item))
+                                          (item, coercion)
         inscope' = extendInScopeSetSet (inert_eq_tvs is) (tyVarsOfCt item)
     in is { inert_eqs = eqs', inert_eq_tvs = inscope' }
-
-{-
-       -- /Solved/ non-equalities go to the solved map
-  | Just GivenSolved <- isGiven_maybe (cc_flavor item)
-  = let pty = mkPredKeyForTypeMap item
-        solved_orig = inert_solved is
-    in is { inert_solved = alterTM pty (\_ -> Just item) solved_orig }
--}
 
   | Just x  <- isCIPCan_Maybe item      -- IP 
   = is { inert_ips   = updCCanMap (x,item) (inert_ips is) }  
@@ -660,11 +677,11 @@ combineCtLoc (Derived loc ) _  = loc
 combineCtLoc _ (Derived loc )  = loc
 combineCtLoc _ _ = panic "combineCtLoc: both given"
 
-mkSolvedFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
+mkSolvedFlavor :: CtFlavor -> SkolemInfo -> EvTerm -> CtFlavor
 -- To be called when we actually solve a wanted/derived (perhaps leaving residual goals)
-mkSolvedFlavor (Wanted  loc) sk  = Given (setCtLocOrigin loc sk) GivenSolved
-mkSolvedFlavor (Derived loc) sk  = Given (setCtLocOrigin loc sk) GivenSolved
-mkSolvedFlavor fl@(Given {}) _sk = pprPanic "Solving a given constraint!" $ ppr fl
+mkSolvedFlavor (Wanted  loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
+mkSolvedFlavor (Derived loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
+mkSolvedFlavor fl@(Given {}) _sk _evterm = pprPanic "Solving a given constraint!" $ ppr fl
 
 mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
 mkGivenFlavor (Wanted  loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
@@ -1050,8 +1067,8 @@ getTcEvBindsMap
        ; wrapTcS $ TcM.readTcRef ev_ref }
 
 
-setEqBind :: EqVar -> LCoercion -> TcS () 
-setEqBind eqv co = setEvBind eqv (EvCoercionBox co)
+setEqBind :: EqVar -> LCoercion -> CtFlavor -> TcS CtFlavor
+setEqBind eqv co fl = setEvBind eqv (EvCoercionBox co) fl
 
 setWantedTyBind :: TcTyVar -> TcType -> TcS () 
 -- Add a type binding
@@ -1067,15 +1084,11 @@ setWantedTyBind tv ty
                        , text "Old value =" <+> ppr (lookupVarEnv_NF ty_binds tv)]
             ; TcM.writeTcRef ref (extendVarEnv ty_binds tv (tv,ty)) } }
 
-setIPBind :: EvVar -> EvTerm -> TcS () 
-setIPBind = setEvBind 
 
-setDictBind :: EvVar -> EvTerm -> TcS () 
-setDictBind = setEvBind 
-
-setEvBind :: EvVar -> EvTerm -> TcS () 
--- Internal
-setEvBind ev t
+setEvBind :: EvVar -> EvTerm -> CtFlavor -> TcS CtFlavor
+-- If the flavor is Solved, we cache the new evidence term inside the returned flavor
+-- see Note [Optimizing Spontaneously Solved Coercions]
+setEvBind ev t fl
   = do { tc_evbinds <- getTcEvBinds
        ; wrapTcS $ TcM.addTcEvBind tc_evbinds ev t
 
@@ -1084,6 +1097,11 @@ setEvBind ev t
        ; let cycle = any (reaches binds) (evterm_evs t)
        ; when cycle (fail_if_co_loop binds)
 #endif
+       ; return $ 
+         case fl of 
+           Given gl (GivenSolved _) 
+               -> Given gl (GivenSolved (Just t))
+           _   -> fl
        }
 
 #ifdef DEBUG
@@ -1110,6 +1128,51 @@ setEvBind ev t
         evterm_evs (EvTupleMk evs)     = evs
 #endif
 
+\end{code}
+Note [Optimizing Spontaneously Solved Coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
+Spontaneously solved coercions such as alpha := tau used to be bound as everything else
+in the evidence binds. Subsequently they were used for rewriting other wanted or solved
+goals. For instance: 
+
+WorkItem = [S] g1 : a ~ tau
+Inerts   = [S] g2 : b ~ [a]
+           [S] g3 : c ~ [(a,a)]
+
+Would result, eventually, after the workitem rewrites the inerts, in the
+following evidence bindings:
+
+        g1 = ReflCo tau
+        g2 = ReflCo [a]
+        g3 = ReflCo [(a,a)]
+        g2' = g2 ; [g1] 
+        g3' = g3 ; [(g1,g1)]
+
+This ia annoying because it puts way too much stress to the zonker and
+desugarer, since we /know/ at the generation time (spontaneously
+solving) that the evidence for a particular evidence variable is the
+identity.
+
+For this reason, our solution is to cache inside the GivenSolved
+flavor of a constraint the term which is actually solving this
+constraint. Whenever we perform a setEvBind, a new flavor is returned
+so that if it was a GivenSolved to start with, it remains a
+GivenSolved with a new evidence term inside. Then, when we use solved
+goals to rewrite other constraints we simply use whatever is in the
+GivenSolved flavor and not the constraint cc_id.
+
+In our particular case we'd get the following evidence bindings, eventually: 
+
+       g1 = ReflCo tau
+       g2 = ReflCo [a]
+       g3 = ReflCo [(a,a)]
+       g2'= ReflCo [a]
+       g3'= ReflCo [(a,a)]
+
+Since we use smart constructors to get rid of g;ReflCo t ~~> g etc.
+
+\begin{code}
 
 
 warnTcS :: CtLoc orig -> Bool -> SDoc -> TcS ()
@@ -1267,11 +1330,23 @@ newEvVar :: CtFlavor -> TcPredType -> TcS EvVarCreated
 --     the call sites for this invariant to be quickly restored.
 newEvVar fl pty
   | isGivenOrSolved fl    -- Create new variable and update the cache
-  = do { new <- forceNewEvVar fl pty
+  = do { 
+{- We lose a lot of time if we enable this check:
+         eref <- getTcSEvVarCache
+       ; ecache <- wrapTcS (TcM.readTcRef eref)
+       ; case lookupTM pty (evc_cache ecache) of
+           Just (_,cached_fl) 
+               | cached_fl `canSolve` fl 
+               -> pprTrace "Interesting: given newEvVar, missed caching opportunity!" empty $
+                  return ()
+           _ -> return ()
+-}
+         new <- forceNewEvVar fl pty
        ; return (EvVarCreated True new) }
 
   | otherwise             -- Otherwise lookup first
-  = do { eref <- getTcSEvVarCache
+  = {-# SCC "newEvVarWanted" #-}
+    do { eref <- getTcSEvVarCache
        ; ecache <- wrapTcS (TcM.readTcRef eref)
        ; case lookupTM pty (evc_cache ecache) of
            Just (cached_evvar, cached_flavor)
@@ -1322,9 +1397,10 @@ updateCache ecache (ev,fl,pty)
         ecache'    = alterTM pty (\_ -> Just (ev,fl)) $
                      evc_cache ecache
 
-delCachedEvVar :: EvVar -> TcS ()
-delCachedEvVar ev
-  = do { eref   <- getTcSEvVarCache
+delCachedEvVar :: EvVar -> CtFlavor -> TcS ()
+delCachedEvVar ev _fl
+  = {-# SCC "delCachedEvVarOther" #-}
+    do { eref   <- getTcSEvVarCache
        ; ecache <- wrapTcS (TcM.readTcRef eref)
        ; wrapTcS $ TcM.writeTcRef eref (delFromCache ecache ev) }
 
@@ -1361,13 +1437,13 @@ pprEvVarCache tm = ppr (foldTM mk_pair tm [])
  where mk_pair (co,_) cos = (co, liftedCoercionKind co) : cos
 
 
-newGivenEqVar :: CtFlavor -> TcType -> TcType -> Coercion -> TcS EvVar
+newGivenEqVar :: CtFlavor -> TcType -> TcType -> Coercion -> TcS (CtFlavor,EvVar)
 -- Pre: fl is Given
 newGivenEqVar fl ty1 ty2 co 
   = do { ecv <- newEqVar fl ty1 ty2
        ; let v = evc_the_evvar ecv -- Will be a new EvVar by post of newEvVar
-       ; setEvBind v (EvCoercionBox co)
-       ; return v }
+       ; fl' <- setEvBind v (EvCoercionBox co) fl
+       ; return (fl',v) }
 
 newEqVar :: CtFlavor -> TcType -> TcType -> TcS EvVarCreated
 newEqVar fl ty1 ty2 
@@ -1431,26 +1507,6 @@ getInertEqs :: TcS (TyVarEnv (Ct,Coercion), InScopeSet)
 getInertEqs = do { inert <- getTcSInerts
                  ; return (inert_eqs inert, inert_eq_tvs inert) }
 
-rewriteFromInertEqs :: (TyVarEnv (Ct,Coercion), InScopeSet)
-                    -- Precondition: Ct are CTyEqCans only!
-                    -> CtFlavor 
-                    -> EvVar 
-                    -> TcS (EvVar,Bool)
--- Boolean flag returned: True <-> no rewriting happened
-rewriteFromInertEqs (subst,inscope) fl v 
-  = do { let co = liftInertEqsTy (subst,inscope) fl (evVarPred v)
-       ; if isReflCo co then return (v,True)
-         else do { traceTcS "rewriteFromInertEqs" $
-                   text "Original item =" <+> ppr v <+> dcolon <+> ppr (evVarPred v)
-                 ; v' <- forceNewEvVar fl (pSnd (liftedCoercionKind co))
-                 ; case fl of 
-                     Wanted {}  -> setEvBind v (EvCast v' (mkSymCo co)) 
-                     Given {}   -> setEvBind v' (EvCast v co) 
-                     Derived {} -> return ()
-                 ; traceTcS "rewriteFromInertEqs" $
-                   text "Rewritten item =" <+> ppr v' <+> dcolon <+> ppr (evVarPred v')
-                 ; return (v',False) } }
-
 
 -- See Note [LiftInertEqs]
 liftInertEqsTy :: (TyVarEnv (Ct,Coercion),InScopeSet)
@@ -1506,7 +1562,7 @@ ty_cts_subst subst inscope fl ty
                 unused_evvar = panic "ty_cts_subst: This var is just an alpha-renaming!"
 \end{code}
 
-Note [LiftInertEqsPred]
+Note [LiftInertEqsTy]
 ~~~~~~~~~~~~~~~~~~~~~~~ 
 The function liftInertEqPred behaves almost like liftCoSubst (in
 Coercion), but accepts a map TyVarEnv (Ct,Coercion) instead of a

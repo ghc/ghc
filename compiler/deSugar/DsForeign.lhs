@@ -125,8 +125,8 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id co (CImport cconv safety _ spec) = do
-    (ids, h, c) <- dsCImport id co spec cconv safety
+dsFImport id co (CImport cconv safety header spec) = do
+    (ids, h, c) <- dsCImport id co spec cconv safety header
     return (ids, h, c)
 
 dsCImport :: Id
@@ -134,8 +134,9 @@ dsCImport :: Id
           -> CImportSpec
           -> CCallConv
           -> Safety
+          -> FastString -- header
           -> DsM ([Binding], SDoc, SDoc)
-dsCImport id co (CLabel cid) cconv _ = do
+dsCImport id co (CLabel cid) cconv _ _ = do
    let ty = pFst $ coercionKind co
        fod = case tyConAppTyCon_maybe ty of
              Just tycon
@@ -151,11 +152,11 @@ dsCImport id co (CLabel cid) cconv _ = do
     in
     return ([(id, rhs')], empty, empty)
 
-dsCImport id co (CFunction target) cconv@PrimCallConv safety
+dsCImport id co (CFunction target) cconv@PrimCallConv safety _
   = dsPrimCall id co (CCall (CCallSpec target cconv safety))
-dsCImport id co (CFunction target) cconv safety
-  = dsFCall id co (CCall (CCallSpec target cconv safety))
-dsCImport id co CWrapper cconv _
+dsCImport id co (CFunction target) cconv safety header
+  = dsFCall id co (CCall (CCallSpec target cconv safety)) header
+dsCImport id co CWrapper cconv _ _
   = dsFExportDynamic id co cconv
 
 -- For stdcall labels, if the type was a FunPtr or newtype thereof,
@@ -181,8 +182,9 @@ fun_type_arg_stdcall_info _other_conv _
 %************************************************************************
 
 \begin{code}
-dsFCall :: Id -> Coercion -> ForeignCall -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsFCall fn_id co fcall = do
+dsFCall :: Id -> Coercion -> ForeignCall -> FastString
+        -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
+dsFCall fn_id co fcall headerFilename = do
     let
         ty                   = pFst $ coercionKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
@@ -200,10 +202,48 @@ dsFCall fn_id co fcall = do
 
     ccall_uniq <- newUnique
     work_uniq  <- newUnique
+
+    (fcall', cDoc) <-
+              case fcall of
+              CCall (CCallSpec (StaticTarget cName mPackageId) CApiConv safety) ->
+               do fcall_uniq <- newUnique
+                  let wrapperName = mkFastString "ghc_wrapper_" `appendFS`
+                                    mkFastString (showSDoc (ppr fcall_uniq)) `appendFS`
+                                    mkFastString "_" `appendFS`
+                                    cName
+                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId) CApiConv safety)
+                      c = include
+                       $$ fun_proto <+> braces (cRet <> semi)
+                      include
+                       | nullFS headerFilename = empty
+                       | otherwise = text "#include <" <> ftext headerFilename <> text ">"
+                      fun_proto = cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
+                      cRet
+                       | isVoidRes =                   cCall
+                       | otherwise = text "return" <+> cCall
+                      cCall = ppr cName <> parens argVals
+                      raw_res_ty = case tcSplitIOType_maybe io_res_ty of
+                                   Just (_ioTyCon, res_ty) -> res_ty
+                                   Nothing                 -> io_res_ty
+                      isVoidRes = raw_res_ty `eqType` unitTy
+                      cResType | isVoidRes = text "void"
+                               | otherwise = showStgType raw_res_ty
+                      pprCconv = ccallConvAttribute CApiConv
+                      argTypes
+                       | null arg_tys = text "void"
+                       | otherwise = hsep $ punctuate comma
+                                         [ showStgType t <+> char 'a' <> int n
+                                         | (t, n) <- zip arg_tys [1..] ]
+                      argVals = hsep $ punctuate comma
+                                    [ char 'a' <> int n
+                                    | (_, n) <- zip arg_tys [1..] ]
+                  return (fcall', c)
+              _ ->
+                  return (fcall, empty)
     let
         -- Build the worker
         worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
-        the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
+        the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
         work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
 
@@ -214,7 +254,7 @@ dsFCall fn_id co fcall = do
         wrap_rhs'    = Cast wrap_rhs co
         fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfolding (Just (length args)) wrap_rhs'
 
-    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], empty, empty)
+    return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], empty, cDoc)
 \end{code}
 
 
@@ -299,13 +339,11 @@ dsFExport fn_id co ext_name cconv isDyn = do
        -- Look at the result type of the exported function, orig_res_ty
        -- If it's IO t, return         (t, True)
        -- If it's plain t, return      (t, False)
-    (res_ty,             -- t
-     is_IO_res_ty) <-    -- Bool
-        case tcSplitIOType_maybe orig_res_ty of
-           Just (_ioTyCon, res_ty) -> return (res_ty, True)
-                   -- The function already returns IO t
-           Nothing                    -> return (orig_res_ty, False)
-                   -- The function returns t
+       (res_ty, is_IO_res_ty) = case tcSplitIOType_maybe orig_res_ty of
+                                -- The function already returns IO t
+                                Just (_ioTyCon, res_ty) -> (res_ty, True)
+                                -- The function returns t
+                                Nothing                 -> (orig_res_ty, False)
 
     dflags <- getDOpts
     return $
@@ -511,10 +549,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                int64TyConKey, word64TyConKey]
 
   -- Now we can cook up the prototype for the exported function.
-  pprCconv = case cc of
-                CCallConv   -> empty
-                StdCallConv -> text (ccallConvAttribute cc)
-                _           -> panic ("mkFExportCBits/pprCconv " ++ showPpr cc)
+  pprCconv = ccallConvAttribute cc
 
   header_bits = ptext (sLit "extern") <+> fun_proto <> semi
 

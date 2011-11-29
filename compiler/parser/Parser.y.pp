@@ -244,6 +244,7 @@ incorrect.
  'family'       { L _ ITfamily }
  'stdcall'      { L _ ITstdcallconv }
  'ccall'        { L _ ITccallconv }
+ 'capi'         { L _ ITcapiconv }
  'prim'         { L _ ITprimcallconv }
  'proc'         { L _ ITproc }          -- for arrow notation extension
  'rec'          { L _ ITrec }           -- for arrow notation extension
@@ -922,6 +923,7 @@ fdecl : 'import' callconv safety fspec
 callconv :: { CCallConv }
           : 'stdcall'                   { StdCallConv }
           | 'ccall'                     { CCallConv   }
+          | 'capi'                      { CApiConv    }
           | 'prim'                      { PrimCallConv}
 
 safety :: { Safety }
@@ -1394,6 +1396,7 @@ scc_annot :: { Located FastString }
         : '_scc_' STRING                        {% (addWarning Opt_WarnWarningsDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->
                                    ( do scc <- getSCC $2; return $ LL scc ) }
         | '{-# SCC' STRING '#-}'                {% do scc <- getSCC $2; return $ LL scc }
+        | '{-# SCC' VARID  '#-}'                { LL (getVARID $2) }
 
 hpc_annot :: { Located (FastString,(Int,Int),(Int,Int)) }
         : '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
@@ -1944,6 +1947,7 @@ special_id
         | 'dynamic'             { L1 (fsLit "dynamic") }
         | 'stdcall'             { L1 (fsLit "stdcall") }
         | 'ccall'               { L1 (fsLit "ccall") }
+        | 'capi'                { L1 (fsLit "capi") }
         | 'prim'                { L1 (fsLit "prim") }
         | 'group'               { L1 (fsLit "group") }
 

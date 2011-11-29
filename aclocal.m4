@@ -354,14 +354,14 @@ AC_DEFUN([FP_SETTINGS],
     if test "$windows" = YES
     then
         SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
-        SettingsCCompilerFlags=''
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
         SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
         SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
-        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
         SettingsPerlCommand="$PerlCmd"
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
@@ -424,6 +424,19 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     then
         $2="$$2 -fno-stack-protector"
     fi
+
+    # Reduce memory usage when linking. See trac #5240.
+    if test -n "$LdHashSize31"
+    then
+        $3="$$3 -Wl,$LdHashSize31"
+        $4="$$4     $LdHashSize31"
+    fi
+    if test -n "$LdReduceMemoryOverheads"
+    then
+        $3="$$3 -Wl,$LdReduceMemoryOverheads"
+        $4="$$4     $LdReduceMemoryOverheads"
+    fi
+
     rm -f conftest.c conftest.o
     AC_MSG_RESULT([done])
 ])
@@ -769,28 +782,55 @@ AC_SUBST(Alex3)
 ])
 
 
-# FP_PROG_LD_X
-# ------------
-# Sets the output variable LdXFlag to -x if ld supports this flag, otherwise the
-# variable's value is empty.
-AC_DEFUN([FP_PROG_LD_X],
+# FP_PROG_LD_FLAG
+# ---------------
+# Sets the output variable $2 to $1 if ld supports the $1 flag.
+# Otherwise the variable's value is empty.
+AC_DEFUN([FP_PROG_LD_FLAG],
 [
-AC_CACHE_CHECK([whether ld understands -x], [fp_cv_ld_x],
+AC_CACHE_CHECK([whether ld understands $1], [fp_cv_$2],
 [echo 'foo() {}' > conftest.c
 ${CC-cc} -c conftest.c
-if ${LdCmd} -r -x -o conftest2.o conftest.o > /dev/null 2>&1; then
-   fp_cv_ld_x=yes
+if ${LdCmd} -r $1 -o conftest2.o conftest.o > /dev/null 2>&1; then
+   fp_cv_$2=$1
 else
-   fp_cv_ld_x=no
+   fp_cv_$2=
 fi
 rm -rf conftest*])
-if test "$fp_cv_ld_x" = yes; then
-  LdXFlag=-x
-else
-  LdXFlag=
-fi
+$2=$fp_cv_$2
+])# FP_PROG_LD_FLAG
+
+
+# FP_PROG_LD_X
+# ------------
+# Sets the output variable LdXFlag to -x if ld supports this flag.
+# Otherwise the variable's value is empty.
+AC_DEFUN([FP_PROG_LD_X],
+[
+FP_PROG_LD_FLAG([-x],[LdXFlag])
 AC_SUBST([LdXFlag])
 ])# FP_PROG_LD_X
+
+
+# FP_PROG_LD_HashSize31
+# ------------
+# Sets the output variable LdHashSize31 to --hash-size=31 if ld supports
+# this flag. Otherwise the variable's value is empty.
+AC_DEFUN([FP_PROG_LD_HashSize31],
+[
+FP_PROG_LD_FLAG([--hash-size=31],[LdHashSize31])
+])# FP_PROG_LD_HashSize31
+
+
+# FP_PROG_LD_ReduceMemoryOverheads
+# ------------
+# Sets the output variable LdReduceMemoryOverheads to
+# --reduce-memory-overheads if ld supports this flag.
+# Otherwise the variable's value is empty.
+AC_DEFUN([FP_PROG_LD_ReduceMemoryOverheads],
+[
+FP_PROG_LD_FLAG([--reduce-memory-overheads],[LdReduceMemoryOverheads])
+])# FP_PROG_LD_ReduceMemoryOverheads
 
 
 # FP_PROG_LD_BUILD_ID
