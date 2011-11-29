@@ -67,14 +67,16 @@ stgAllocForGMP (size_t size_in_bytes)
 {
   StgArrWords* arr;
   nat data_size_in_words, total_size_in_words;
+  Capability *cap;
 
   /* round up to a whole number of words */
   data_size_in_words  = ROUNDUP_BYTES_TO_WDS(size_in_bytes);
   total_size_in_words = sizeofW(StgArrWords) + data_size_in_words;
 
   /* allocate and fill it in. */
-  arr = (StgArrWords *)allocate(rts_unsafeGetMyCapability(), total_size_in_words);
-  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, CCCS, size_in_bytes);
+  cap = rts_unsafeGetMyCapability();
+  arr = (StgArrWords *)allocate(cap, total_size_in_words);
+  SET_ARR_HDR(arr, &stg_ARR_WORDS_info, ((CapabilityPublic*)cap)->r.rCCCS, size_in_bytes);
 
   /* and return a ptr to the goods inside the array */
   return arr->payload;
