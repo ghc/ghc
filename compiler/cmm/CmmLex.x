@@ -106,8 +106,9 @@ $white_no_nl+		;
   SpLim			{ global_reg SpLim }
   Hp			{ global_reg Hp }
   HpLim			{ global_reg HpLim }
-  CurrentTSO		{ global_reg CurrentTSO }
-  CurrentNursery	{ global_reg CurrentNursery }
+  CCCS                  { global_reg CCCS }
+  CurrentTSO            { global_reg CurrentTSO }
+  CurrentNursery        { global_reg CurrentNursery }
   HpAlloc		{ global_reg HpAlloc }
   BaseReg		{ global_reg BaseReg }
   

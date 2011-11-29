@@ -222,6 +222,7 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rSpLim);
     field_offset(StgRegTable, rHp);
     field_offset(StgRegTable, rHpLim);
+    field_offset(StgRegTable, rCCCS);
     field_offset(StgRegTable, rCurrentTSO);
     field_offset(StgRegTable, rCurrentNursery);
     field_offset(StgRegTable, rHpAlloc);

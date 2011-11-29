@@ -37,6 +37,15 @@ typedef struct StgClosure_ *HaskellObj;
  */
 typedef struct Capability_ Capability;
 
+/*
+ * The public view of a Capability: we can be sure it starts with
+ * these two components (but it may have more private fields).
+ */
+typedef struct CapabilityPublic_ {
+    StgFunTable f;
+    StgRegTable r;
+} CapabilityPublic;
+
 /* ----------------------------------------------------------------------------
    RTS configuration settings, for passing to hs_init_ghc()
    ------------------------------------------------------------------------- */

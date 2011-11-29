@@ -86,7 +86,7 @@ stg_PAP_apply
   TICK_ENT_PAP();
   LDV_ENTER(pap);
 #ifdef PROFILING
-  foreign "C" enterFunCCS(StgHeader_ccs(pap));
+  foreign "C" enterFunCCS(BaseReg "ptr", StgHeader_ccs(pap) "ptr");
 #endif
 
   // Reload the stack 

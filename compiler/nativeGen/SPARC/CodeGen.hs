@@ -135,7 +135,7 @@ stmtToInstrs stmt = case stmt of
 	where ty = cmmExprType src
 	      size = cmmTypeSize ty
 
-    CmmCall target result_regs args _ _
+    CmmCall target result_regs args _
        -> genCCall target result_regs args
 
     CmmBranch	id		-> genBranch id

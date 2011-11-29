@@ -21,6 +21,9 @@ void endRetainerProfiling  ( void );
 void retainerProfile       ( void );
 void resetStaticObjectForRetainerProfiling( StgClosure *static_objects );
 
+// flip is either 1 or 0, changed at the beginning of retainerProfile()
+// It is used to tell whether a retainer set has been touched so far
+// during this pass.
 extern StgWord flip;
 
 // extract the retainer set field from c

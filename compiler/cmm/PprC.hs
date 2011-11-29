@@ -193,7 +193,7 @@ pprStmt platform stmt = case stmt of
         where
           rep = cmmExprType src
 
-    CmmCall (CmmCallee fn cconv) results args safety ret ->
+    CmmCall (CmmCallee fn cconv) results args ret ->
         maybe_proto $$
         fnCall
         where
@@ -215,7 +215,7 @@ pprStmt platform stmt = case stmt of
             case fn of
               CmmLit (CmmLabel lbl)
                 | StdCallConv <- cconv ->
-                    let myCall = pprCall platform (pprCLabel platform lbl) cconv results args safety
+                    let myCall = pprCall platform (pprCLabel platform lbl) cconv results args
                     in (real_fun_proto lbl, myCall)
                         -- stdcall functions must be declared with
                         -- a function type, otherwise the C compiler
@@ -223,22 +223,22 @@ pprStmt platform stmt = case stmt of
                         -- can't add the @n suffix ourselves, because
                         -- it isn't valid C.
                 | CmmNeverReturns <- ret ->
-                    let myCall = pprCall platform (pprCLabel platform lbl) cconv results args safety
+                    let myCall = pprCall platform (pprCLabel platform lbl) cconv results args
                     in (real_fun_proto lbl, myCall)
                 | not (isMathFun lbl) ->
                     let myCall = braces (
                                      pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
                                   $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
-                                  $$ pprCall platform (text "ghcFunPtr") cconv results args safety <> semi
+                                  $$ pprCall platform (text "ghcFunPtr") cconv results args <> semi
                                  )
                     in (fun_proto lbl, myCall)
               _ ->
                    (empty {- no proto -},
-                    pprCall platform cast_fn cconv results args safety <> semi)
+                    pprCall platform cast_fn cconv results args <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
-    CmmCall (CmmPrim op) results args safety _ret ->
-        pprCall platform ppr_fn CCallConv results args' safety
+    CmmCall (CmmPrim op) results args _ret ->
+        pprCall platform ppr_fn CCallConv results args'
         where
         ppr_fn = pprCallishMachOp_for_C op
         -- The mem primops carry an extra alignment arg, must drop it.
@@ -812,10 +812,10 @@ pprLocalReg (LocalReg uniq _) = char '_' <> ppr uniq
 -- Foreign Calls
 
 pprCall :: Platform -> SDoc -> CCallConv
-        -> [HintedCmmFormal] -> [HintedCmmActual] -> CmmSafety
+        -> [HintedCmmFormal] -> [HintedCmmActual]
         -> SDoc
 
-pprCall platform ppr_fn cconv results args _
+pprCall platform ppr_fn cconv results args
   | not (is_cishCC cconv)
   = panic $ "pprCall: unknown calling convention"
 
@@ -926,7 +926,7 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)         = te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)          = te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es _ _)   = mapM_ (te_temp.hintlessCmm) rs >>
+te_Stmt (CmmCall _ rs es _)     = mapM_ (te_temp.hintlessCmm) rs >>
                                   mapM_ (te_Expr.hintlessCmm) es
 te_Stmt (CmmCondBranch e _)     = te_Expr e
 te_Stmt (CmmSwitch e _)         = te_Expr e

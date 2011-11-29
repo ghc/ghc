@@ -501,7 +501,7 @@ run_thread:
     // Costs for the scheduler are assigned to CCS_SYSTEM
     stopHeapProfTimer();
 #if defined(PROFILING)
-    CCCS = CCS_SYSTEM;
+    cap->r.rCCCS = CCS_SYSTEM;
 #endif
     
     schedulePostRunThread(cap,t);
@@ -2262,7 +2262,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
 	    if (raise_closure == NULL) {
 		raise_closure = 
 		    (StgThunk *)allocate(cap,sizeofW(StgThunk)+1);
-		SET_HDR(raise_closure, &stg_raise_info, CCCS);
+                SET_HDR(raise_closure, &stg_raise_info, cap->r.rCCCS);
 		raise_closure->payload[0] = exception;
 	    }
             updateThunk(cap, tso, ((StgUpdateFrame *)p)->updatee,

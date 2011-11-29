@@ -488,7 +488,6 @@ extern StgWord RTS_VAR(stable_ptr_table);
 
 // Profiling.c
 extern unsigned int RTS_VAR(era);
-extern StgWord      RTS_VAR(CCCS);	        /* current CCS */
 extern unsigned int RTS_VAR(entering_PAP);
 extern StgWord      RTS_VAR(CC_LIST);               /* registered CC list */
 extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */

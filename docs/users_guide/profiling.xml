@@ -9,12 +9,6 @@
   can answer questions like "why is my program so slow?", or "why is
   my program using so much memory?".</para>
 
-  <para>Note that multi-processor execution (e.g. <literal>+RTS
-  -N2</literal>) is not currently supported with GHC's time and space
-  profiling.  However, there is a separate tool specifically for
-  profiling concurrent and parallel programs: <ulink
-  url="http://www.haskell.org/haskellwiki/ThreadScope">ThreadScope</ulink>.</para>
-
   <para>Profiling a program is a three-step process:</para>
 
   <orderedlist>
@@ -1357,6 +1351,44 @@ to re-read its input file:
 </screen>
 </para>
 </sect2>
+  </sect1>
+
+  <sect1 id="prof-threaded">
+    <title>Profiling Parallel and Concurrent Programs</title>
+
+    <para>Combining <option>-threaded</option>
+      and <option>-prof</option> is perfectly fine, and indeed it is
+      possible to profile a program running on multiple processors
+      with the <option>+RTS -N</option> option.<footnote>This feature
+      was added in GHC 7.4.1.</footnote>
+    </para>
+
+    <para>
+      Some caveats apply, however.  In the current implementation, a
+      profiled program is likely to scale much less well than the
+      unprofiled program, because the profiling implementation uses
+      some shared data structures which require locking in the runtime
+      system.  Furthermore, the memory allocation statistics collected
+      by the profiled program are stored in shared memory
+      but <emphasis>not</emphasis> locked (for speed), which means
+      that these figures might be inaccurate for parallel programs.
+    </para>
+
+    <para>
+      We strongly recommend that you
+      use <option>-fno-prof-count-entries</option> when compiling a
+      program to be profiled on multiple cores, because the entry
+      counts are also stored in shared memory, and continuously
+      updating them on multiple cores is extremely slow.
+    </para>
+
+    <para>
+      We also recommend
+      using <ulink url="http://www.haskell.org/haskellwiki/ThreadScope">ThreadScope</ulink>
+      for profiling parallel programs; it offers a GUI for visualising
+      parallel execution, and is complementary to the time and space
+      profiling features provided with GHC.
+    </para>
   </sect1>
 
   <sect1 id="hpc">

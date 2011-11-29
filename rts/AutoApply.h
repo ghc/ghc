@@ -22,7 +22,7 @@
     TICK_ALLOC_HEAP_NOCTR(BYTES_TO_WDS(size));		\
     TICK_ALLOC_PAP(n+1 /* +1 for the FUN */, 0);	\
     pap = Hp + WDS(1) - size;				\
-    SET_HDR(pap, stg_PAP_info, W_[CCCS]);		\
+    SET_HDR(pap, stg_PAP_info, CCCS);                   \
     StgPAP_arity(pap) = HALF_W_(arity - m);		\
     StgPAP_fun(pap)   = R1;				\
     StgPAP_n_args(pap) = HALF_W_(n);			\
@@ -52,7 +52,7 @@
      TICK_ALLOC_HEAP_NOCTR(BYTES_TO_WDS(size));			\
      TICK_ALLOC_PAP(n+1 /* +1 for the FUN */, 0);		\
      new_pap = Hp + WDS(1) - size;				\
-     SET_HDR(new_pap, stg_PAP_info, W_[CCCS]);			\
+     SET_HDR(new_pap, stg_PAP_info, CCCS);                      \
      StgPAP_arity(new_pap) = HALF_W_(arity - m);		\
      W_ n_args;							\
      n_args = TO_W_(StgPAP_n_args(pap));			\
@@ -78,10 +78,10 @@
 
 // Jump to target, saving CCCS and restoring it on return
 #if defined(PROFILING)
-#define jump_SAVE_CCCS(target) \
-    Sp(-1) = W_[CCCS]; \
-    Sp(-2) = stg_restore_cccs_info; \
-    Sp_adj(-2); \
+#define jump_SAVE_CCCS(target)                  \
+    Sp(-1) = CCCS;                              \
+    Sp(-2) = stg_restore_cccs_info;             \
+    Sp_adj(-2);                                 \
     jump (target)
 #else
 #define jump_SAVE_CCCS(target) jump (target)

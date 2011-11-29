@@ -210,8 +210,8 @@ loadThreadState tso stack = do
         openNursery,
         -- and load the current cost centre stack from the TSO when profiling:
         if opt_SccProfilingOn then
-          mkStore curCCSAddr
-                  (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) ccsType)
+          storeCurCCS
+            (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) ccsType)
         else mkNop]
 emitLoadThreadState :: LocalReg -> LocalReg -> FCode ()
 emitLoadThreadState tso stack = emit $ loadThreadState tso stack

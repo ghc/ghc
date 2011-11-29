@@ -775,8 +775,9 @@ isPtrGlobalReg Sp		     = True
 isPtrGlobalReg SpLim		     = True
 isPtrGlobalReg Hp		     = True
 isPtrGlobalReg HpLim		     = True
-isPtrGlobalReg CurrentTSO	     = True
-isPtrGlobalReg CurrentNursery	     = True
+isPtrGlobalReg CCCS                  = True
+isPtrGlobalReg CurrentTSO            = True
+isPtrGlobalReg CurrentNursery        = True
 isPtrGlobalReg (VanillaReg _ VGcPtr) = True
 isPtrGlobalReg _		     = False
 
@@ -867,10 +868,9 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
 	  results <- sequence results_code
 	  expr <- expr_code
 	  args <- sequence args_code
-	  --code (stmtC (CmmCall (CmmCallee expr convention) results args safety))
           case convention of
             -- Temporary hack so at least some functions are CmmSafe
-            CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args safety ret))
+            CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args ret))
             _ ->
               let expr' = adjCallTarget convention expr args in
               case safety of

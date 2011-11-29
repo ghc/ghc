@@ -614,7 +614,7 @@ do_apply:
 		// build a new PAP and return it.
 		StgPAP *new_pap;
 		new_pap = (StgPAP *)allocate(cap, PAP_sizeW(pap->n_args + m));
-		SET_HDR(new_pap,&stg_PAP_info,CCCS);
+                SET_HDR(new_pap,&stg_PAP_info,cap->r.rCCCS);
 		new_pap->arity = pap->arity - n;
 		new_pap->n_args = pap->n_args + m;
 		new_pap->fun = pap->fun;
@@ -659,7 +659,7 @@ do_apply:
 		StgPAP *pap;
 		nat i;
 		pap = (StgPAP *)allocate(cap, PAP_sizeW(m));
-		SET_HDR(pap, &stg_PAP_info,CCCS);
+                SET_HDR(pap, &stg_PAP_info,cap->r.rCCCS);
 		pap->arity = arity - n;
 		pap->fun = obj;
 		pap->n_args = m;

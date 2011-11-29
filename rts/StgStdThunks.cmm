@@ -30,8 +30,8 @@
 #define NOUPD_FRAME_SIZE    (SIZEOF_StgHeader)
 
 #ifdef PROFILING
-#define SAVE_CCCS(fs)  	StgHeader_ccs(Sp-fs) = W_[CCCS]
-#define GET_SAVED_CCCS  W_[CCCS] = StgHeader_ccs(Sp)
+#define SAVE_CCCS(fs)   StgHeader_ccs(Sp-fs) = CCCS
+#define GET_SAVED_CCCS  CCCS = StgHeader_ccs(Sp)
 #define RET_PARAMS      W_ unused1, W_ unused2
 #else
 #define SAVE_CCCS(fs)   /* empty */

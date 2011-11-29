@@ -233,23 +233,22 @@ emitRtsCall
    :: PackageId                 -- ^ package the function is in
    -> FastString                -- ^ name of function
    -> [CmmHinted CmmExpr]       -- ^ function args
-   -> Bool                      -- ^ whether this is a safe call
    -> Code                      -- ^ cmm code
 
-emitRtsCall pkg fun args safe = emitRtsCallGen [] pkg fun args Nothing safe
+emitRtsCall pkg fun args = emitRtsCallGen [] pkg fun args Nothing
    -- The 'Nothing' says "save all global registers"
 
-emitRtsCallWithVols :: PackageId -> FastString -> [CmmHinted CmmExpr] -> [GlobalReg] -> Bool -> Code
-emitRtsCallWithVols pkg fun args vols safe
-   = emitRtsCallGen [] pkg fun args (Just vols) safe
+emitRtsCallWithVols :: PackageId -> FastString -> [CmmHinted CmmExpr] -> [GlobalReg] -> Code
+emitRtsCallWithVols pkg fun args vols
+   = emitRtsCallGen [] pkg fun args (Just vols)
 
 emitRtsCallWithResult
    :: LocalReg -> ForeignHint
    -> PackageId -> FastString
-   -> [CmmHinted CmmExpr] -> Bool -> Code
+   -> [CmmHinted CmmExpr] -> Code
 
-emitRtsCallWithResult res hint pkg fun args safe
-   = emitRtsCallGen [CmmHinted res hint] pkg fun args Nothing safe
+emitRtsCallWithResult res hint pkg fun args
+   = emitRtsCallGen [CmmHinted res hint] pkg fun args Nothing
 
 -- Make a call to an RTS C procedure
 emitRtsCallGen
@@ -258,14 +257,10 @@ emitRtsCallGen
    -> FastString
    -> [CmmHinted CmmExpr]
    -> Maybe [GlobalReg]
-   -> Bool -- True <=> CmmSafe call
    -> Code
-emitRtsCallGen res pkg fun args vols safe = do
-  safety <- if safe
-            then getSRTInfo >>= (return . CmmSafe)
-            else return CmmUnsafe
+emitRtsCallGen res pkg fun args vols = do
   stmtsC caller_save
-  stmtC (CmmCall target res args safety CmmMayReturn)
+  stmtC (CmmCall target res args CmmMayReturn)
   stmtsC caller_load
   where
     (caller_save, caller_load) = callerSaveVolatileRegs vols
@@ -291,7 +286,7 @@ callerSaveVolatileRegs vols = (caller_save, caller_load)
     caller_save = foldr ($!) [] (map callerSaveGlobalReg    regs_to_save)
     caller_load = foldr ($!) [] (map callerRestoreGlobalReg regs_to_save)
 
-    system_regs = [Sp,SpLim,Hp,HpLim,CurrentTSO,CurrentNursery,
+    system_regs = [Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery,
                    {-SparkHd,SparkTl,SparkBase,SparkLim,-}BaseReg ]
 
     regs_to_save = system_regs ++ vol_list
@@ -389,6 +384,9 @@ callerSaves Hp                  = True
 #ifdef CALLER_SAVES_HpLim
 callerSaves HpLim               = True
 #endif
+#ifdef CALLER_SAVES_CCCS
+callerSaves CCCS                = True
+#endif
 #ifdef CALLER_SAVES_CurrentTSO
 callerSaves CurrentTSO          = True
 #endif
@@ -428,6 +426,7 @@ baseRegOffset (LongReg 1)         = oFFSET_StgRegTable_rL1
 baseRegOffset (LongReg n)         = panic ("Registers above L1 are not supported (tried to use L" ++ show n ++ ")")
 baseRegOffset Hp                  = oFFSET_StgRegTable_rHp
 baseRegOffset HpLim               = oFFSET_StgRegTable_rHpLim
+baseRegOffset CCCS                = oFFSET_StgRegTable_rCCCS
 baseRegOffset CurrentTSO          = oFFSET_StgRegTable_rCurrentTSO
 baseRegOffset CurrentNursery      = oFFSET_StgRegTable_rCurrentNursery
 baseRegOffset HpAlloc             = oFFSET_StgRegTable_rHpAlloc
@@ -1009,13 +1008,13 @@ fixStgRegStmt stmt
 
         CmmStore addr src -> CmmStore (fixStgRegExpr addr) (fixStgRegExpr src)
 
-        CmmCall target regs args srt returns ->
+        CmmCall target regs args returns ->
             let target' = case target of
                     CmmCallee e conv -> CmmCallee (fixStgRegExpr e) conv
                     other            -> other
                 args' = map (\(CmmHinted arg hint) ->
                                 (CmmHinted (fixStgRegExpr arg) hint)) args
-            in CmmCall target' regs args' srt returns
+            in CmmCall target' regs args' returns
 
         CmmCondBranch test dest -> CmmCondBranch (fixStgRegExpr test) dest
 

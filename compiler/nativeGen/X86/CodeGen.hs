@@ -160,7 +160,7 @@ stmtToInstrs stmt = do
         where ty = cmmExprType src
               size = cmmTypeSize ty
 
-    CmmCall target result_regs args _ _
+    CmmCall target result_regs args _
        -> genCCall is32Bit target result_regs args
 
     CmmBranch id          -> genBranch id
@@ -1996,7 +1996,7 @@ outOfLineCmmOp mop res args
       targetExpr <- cmmMakeDynamicReference dflags addImportNat CallReference lbl
       let target = CmmCallee targetExpr CCallConv
 
-      stmtToInstrs (CmmCall target (catMaybes [res]) args' CmmUnsafe CmmMayReturn)
+      stmtToInstrs (CmmCall target (catMaybes [res]) args' CmmMayReturn)
   where
         -- Assume we can call these functions directly, and that they're not in a dynamic library.
         -- TODO: Why is this ok? Under linux this code will be in libm.so

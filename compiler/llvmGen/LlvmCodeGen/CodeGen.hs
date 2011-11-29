@@ -125,7 +125,7 @@ stmtToInstrs env stmt = case stmt of
     CmmSwitch arg ids    -> genSwitch env arg ids
 
     -- Foreign Call
-    CmmCall target res args _ ret
+    CmmCall target res args ret
         -> genCall env target res args ret
 
     -- Tail call

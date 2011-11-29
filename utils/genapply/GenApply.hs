@@ -301,7 +301,7 @@ genMkPAP regstatus macro jump ticker disamb
                       loadSpWordOff "W_" (sp_stk_args+stack_args_size-3)
                         <> text " = stg_restore_cccs_info;" $$
                       loadSpWordOff "W_" (sp_stk_args+stack_args_size-2)
-                        <> text " = W_[CCCS];"
+                        <> text " = CCCS;"
                     else empty) $$
                   loadSpWordOff "W_" (sp_stk_args+stack_args_size-1)
                         <> text " = "
