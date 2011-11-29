@@ -51,7 +51,10 @@ module GHC.Exts
         traceEvent,
 
         -- * SpecConstr annotations
-        SpecConstrAnnotation(..)
+        SpecConstrAnnotation(..),
+
+        -- * The call stack
+        currentCallStack
 
        ) where
 
@@ -65,6 +68,7 @@ import GHC.Int
 import GHC.Ptr
 import GHC.Foreign
 import GHC.IO.Encoding
+import GHC.Stack
 import Data.String
 import Data.List
 import Data.Data

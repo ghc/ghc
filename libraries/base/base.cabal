@@ -92,6 +92,7 @@ Library {
             GHC.Read,
             GHC.Real,
             GHC.ST,
+            GHC.Stack,
             GHC.Stats,
             GHC.Show,
             GHC.Stable,
