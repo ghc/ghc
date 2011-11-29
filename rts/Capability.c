@@ -267,6 +267,8 @@ initCapability( Capability *cap, nat i )
 
 #ifdef PROFILING
     cap->r.rCCCS = CCS_SYSTEM;
+#else
+    cap->r.rCCCS = NULL;
 #endif
 
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
@@ -614,6 +616,7 @@ waitForReturnCapability (Capability **pCap, Task *task)
 #ifdef PROFILING
     cap->r.rCCCS = CCS_SYSTEM;
 #endif
+
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
