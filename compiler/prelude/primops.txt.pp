@@ -634,13 +634,15 @@ primop  ReadArrayOp "readArray#" GenPrimOp
    {Read from specified index of mutable array. Result is not yet evaluated.}
    with
    has_side_effects = True
+   can_fail         = True
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
    MutableArray# s a -> Int# -> a -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
    has_side_effects = True
-   code_size = 2 -- card update too
+   can_fail         = True
+   code_size        = 2 -- card update too
 
 primop  SizeofArrayOp "sizeofArray#" GenPrimOp
    Array# a -> Int#
@@ -654,6 +656,8 @@ primop  IndexArrayOp "indexArray#" GenPrimOp
    Array# a -> Int# -> (# a #)
    {Read from specified index of immutable array. Result is packaged into
     an unboxed singleton; the result itself is not yet evaluated.}
+   with
+   can_fail         = True
 
 primop  UnsafeFreezeArrayOp "unsafeFreezeArray#" GenPrimOp
    MutableArray# s a -> State# s -> (# State# s, Array# a #)
@@ -675,6 +679,7 @@ primop  CopyArrayOp "copyArray#" GenPrimOp
    The two arrays must not be the same array in different states, but this is not checked either.}
   with
   has_side_effects = True
+  can_fail         = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
@@ -683,6 +688,7 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
    Both arrays must fully contain the specified ranges, but this is not checked.}
   with
   has_side_effects = True
+  can_fail         = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  CloneArrayOp "cloneArray#" GenPrimOp
@@ -779,184 +785,232 @@ primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
    ByteArray# -> Int# -> Char#
    {Read 8-bit character; offset in bytes.}
+   with can_fail = True
 
 primop IndexByteArrayOp_WideChar "indexWideCharArray#" GenPrimOp
    ByteArray# -> Int# -> Char#
    {Read 31-bit character; offset in 4-byte words.}
+   with can_fail = True
 
 primop IndexByteArrayOp_Int "indexIntArray#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   with can_fail = True
 
 primop IndexByteArrayOp_Word "indexWordArray#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   with can_fail = True
 
 primop IndexByteArrayOp_Addr "indexAddrArray#" GenPrimOp
    ByteArray# -> Int# -> Addr#
+   with can_fail = True
 
 primop IndexByteArrayOp_Float "indexFloatArray#" GenPrimOp
    ByteArray# -> Int# -> Float#
+   with can_fail = True
 
 primop IndexByteArrayOp_Double "indexDoubleArray#" GenPrimOp
    ByteArray# -> Int# -> Double#
+   with can_fail = True
 
 primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
    ByteArray# -> Int# -> StablePtr# a
+   with can_fail = True
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   with can_fail = True
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
+   with can_fail = True
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
    ByteArray# -> Int# -> INT32
+   with can_fail = True
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
    ByteArray# -> Int# -> INT64
+   with can_fail = True
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   with can_fail = True
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
+   with can_fail = True
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
    ByteArray# -> Int# -> WORD32
+   with can_fail = True
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
    ByteArray# -> Int# -> WORD64
+   with can_fail = True
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 8-bit character; offset in bytes.}
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 31-bit character; offset in 4-byte words.}
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Addr "readAddrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Float "readFloatArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Double "readDoubleArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_StablePtr "readStablePtrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Int8 "readInt8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Word8 "readWord8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
    with has_side_effects = True
+        can_fail = True
 
 primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
    {Write 8-bit character; offset in bytes.}
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_WideChar "writeWideCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
    {Write 31-bit character; offset in 4-byte words.}
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Int "writeIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Word "writeWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Addr "writeAddrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Addr# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Float "writeFloatArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Float# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Double "writeDoubleArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Double# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_StablePtr "writeStablePtrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Int8 "writeInt8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
-   with has_side_effects = True
+   with can_fail = True
+        has_side_effects = True
 
 primop  WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
    with has_side_effects = True
+        can_fail = True
 
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
@@ -966,6 +1020,7 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall }
+  can_fail = True
 
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
@@ -974,6 +1029,7 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall }
+  can_fail = True
 
 ------------------------------------------------------------------------
 section "Addr#"
@@ -1012,183 +1068,230 @@ primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Bool
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
    {Reads 8-bit character; offset in bytes.}
+   with can_fail = True
 
 primop IndexOffAddrOp_WideChar "indexWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
    {Reads 31-bit character; offset in 4-byte words.}
+   with can_fail = True
 
 primop IndexOffAddrOp_Int "indexIntOffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
+   with can_fail = True
 
 primop IndexOffAddrOp_Word "indexWordOffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
+   with can_fail = True
 
 primop IndexOffAddrOp_Addr "indexAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> Addr#
+   with can_fail = True
 
 primop IndexOffAddrOp_Float "indexFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> Float#
+   with can_fail = True
 
 primop IndexOffAddrOp_Double "indexDoubleOffAddr#" GenPrimOp
    Addr# -> Int# -> Double#
+   with can_fail = True
 
 primop IndexOffAddrOp_StablePtr "indexStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> StablePtr# a
+   with can_fail = True
 
 primop IndexOffAddrOp_Int8 "indexInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
+   with can_fail = True
 
 primop IndexOffAddrOp_Int16 "indexInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
+   with can_fail = True
 
 primop IndexOffAddrOp_Int32 "indexInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> INT32
+   with can_fail = True
 
 primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> INT64
+   with can_fail = True
 
 primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
+   with can_fail = True
 
 primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
+   with can_fail = True
 
 primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD32
+   with can_fail = True
 
 primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD64
+   with can_fail = True
 
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
    {Reads 8-bit character; offset in bytes.}
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_WideChar "readWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
    {Reads 31-bit character; offset in 4-byte words.}
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Int "readIntOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Word "readWordOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Addr "readAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Addr# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Float "readFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Float# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Double "readDoubleOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Double# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_StablePtr "readStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, StablePtr# a #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Int8 "readInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, INT32 #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, INT64 #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, WORD32 #)
    with has_side_effects = True
+        can_fail         = True
 
 primop ReadOffAddrOp_Word64 "readWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, WORD64 #)
    with has_side_effects = True
-
+        can_fail         = True
 
 primop  WriteOffAddrOp_Char "writeCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_WideChar "writeWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Int "writeIntOffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Word "writeWordOffAddr#" GenPrimOp
    Addr# -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Addr "writeAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> Addr# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Float "writeFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> Float# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Double "writeDoubleOffAddr#" GenPrimOp
    Addr# -> Int# -> Double# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_StablePtr "writeStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> StablePtr# a -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Int8 "writeInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Int16 "writeInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Int32 "writeInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> INT32 -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> INT64 -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Word8 "writeWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD32 -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD64 -> State# s -> State# s
    with has_side_effects = True
+        can_fail         = True
 
 ------------------------------------------------------------------------
 section "Mutable variables"
@@ -1210,6 +1313,7 @@ primop  ReadMutVarOp "readMutVar#" GenPrimOp
    {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
    with
    has_side_effects = True
+   can_fail         = True
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a -> a -> State# s -> State# s
@@ -1217,6 +1321,7 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    with
    has_side_effects = True
    code_size = { primOpCodeSizeForeignCall } -- for the write barrier
+   can_fail         = True
 
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
    MutVar# s a -> MutVar# s a -> Bool
@@ -1231,6 +1336,7 @@ primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
    with
    out_of_line = True
    has_side_effects = True
+   can_fail         = True
 
 primop  CasMutVarOp "casMutVar#" GenPrimOp
   MutVar# s a -> a -> a -> State# s -> (# State# s, Int#, a #)
