@@ -33,6 +33,8 @@ import Foreign.C
 import GHC.IO
 import GHC.Base
 import GHC.Ptr
+import GHC.Foreign as GHC
+import GHC.IO.Encoding
 
 #define PROFILING
 #include "Rts.h"
@@ -71,8 +73,8 @@ currentCallStack = do
      | ccs == nullPtr = return acc
      | otherwise = do
         cc  <- ccsCC ccs
-        lbl <- peekCAString =<< ccLabel cc
-        mdl <- peekCString =<< ccModule cc
+        lbl <- GHC.peekCString utf8 =<< ccLabel cc
+        mdl <- GHC.peekCString utf8 =<< ccModule cc
         parent <- ccsParent ccs
         go parent ((mdl ++ '.':lbl) : acc)
   --
