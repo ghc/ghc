@@ -611,10 +611,15 @@ discardWarnings :: TcRn a -> TcRn a
 -- Ignore warnings inside the thing inside;
 -- used to ignore-unused-variable warnings inside derived code
 discardWarnings thing_inside
-  = do  { errs_var <- newTcRef emptyMessages
-        ; result <- setErrsVar errs_var thing_inside
-        ; (_warns, errs) <- readTcRef errs_var
-        ; addMessages (emptyBag, errs)
+  = do  { errs_var <- getErrsVar
+        ; (old_warns, _) <- readTcRef errs_var ;
+
+        ; result <- thing_inside
+
+        -- Revert warnings to old_warns
+        ; (_new_warns, new_errs) <- readTcRef errs_var
+        ; writeTcRef errs_var (old_warns, new_errs) 
+
         ; return result }
 \end{code}
 
@@ -627,7 +632,7 @@ discardWarnings thing_inside
 
 \begin{code}
 addReport :: Message -> Message -> TcRn ()
-addReport msg extra_info = do loc <- getSrcSpanM; addReportAt loc msg extra_info
+addReport msg extra_info = do { traceTc "addr" msg; loc <- getSrcSpanM; addReportAt loc msg extra_info }
 
 addReportAt :: SrcSpan -> Message -> Message -> TcRn ()
 addReportAt loc msg extra_info

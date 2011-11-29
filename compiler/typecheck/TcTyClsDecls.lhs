@@ -14,7 +14,7 @@ TcTyClsDecls: Typecheck type and class declarations
 -- for details
 
 module TcTyClsDecls (
-	tcTyAndClassDecls, mkRecSelBinds,
+	tcTyAndClassDecls, tcAddImplicits,
 
 	-- Functions used by TcInstDcls to check 
 	-- data/type family instance declarations
@@ -31,12 +31,13 @@ import BuildTyCl
 import TcUnify
 import TcRnMonad
 import TcEnv
+import TcBinds( tcRecSelBinds )
 import TcTyDecls
 import TcClassDcl
 import TcHsType
 import TcMType
 import TcType
-import TysWiredIn	( unitTy )
+import TysWiredIn( unitTy )
 import Type
 import Kind
 import Class
@@ -96,9 +97,9 @@ instantiate k to *.
 \begin{code}
 
 tcTyAndClassDecls :: ModDetails
-                   -> [TyClGroup Name]       -- Mutually-recursive groups in dependency order
-                   -> TcM (TcGblEnv)         -- Input env extended by types and classes
-                                             -- and their implicit Ids,DataCons
+                  -> [TyClGroup Name]   -- Mutually-recursive groups in dependency order
+                  -> TcM TcGblEnv       -- Input env extended by types and classes
+                                        -- and their implicit Ids,DataCons
 -- Fails if there are any errors
 tcTyAndClassDecls boot_details decls_s
   = checkNoErrs $ do    -- The code recovers internally, but if anything gave rise to
@@ -111,8 +112,8 @@ tcTyAndClassDecls boot_details decls_s
     fold_env :: [TyClGroup Name] -> TcM TcGblEnv
     fold_env [] = getGblEnv
     fold_env (tyclds:tyclds_s)
-      = do { env <- tcTyClGroup boot_details tyclds
-           ; setGblEnv env $ fold_env tyclds_s }
+      = do { tcg_env <- tcTyClGroup boot_details tyclds
+           ; setGblEnv tcg_env $ fold_env tyclds_s }
              -- remaining groups are typecheck in the extended global env
 
 tcTyClGroup :: ModDetails -> TyClGroup Name -> TcM TcGblEnv
@@ -154,11 +155,16 @@ tcTyClGroup boot_details tyclds
            -- Step 4: Add the implicit things;
            -- we want them in the environment because
            -- they may be mentioned in interface files
-       ; let implicit_things = concatMap implicitTyThings tyclss
-             dm_ids          = mkDefaultMethodIds tyclss
-       ; tcExtendGlobalEnvImplicit implicit_things $ 
-         tcExtendGlobalValEnv dm_ids $ 
-         getGblEnv } }
+       ; tcExtendGlobalValEnv (mkDefaultMethodIds tyclss) $
+         tcAddImplicits tyclss } }
+
+tcAddImplicits :: [TyThing] -> TcM TcGblEnv
+tcAddImplicits tyclss
+ = tcExtendGlobalEnvImplicit implicit_things $ 
+   tcRecSelBinds rec_sel_binds
+ where
+   implicit_things = concatMap implicitTyThings tyclss
+   rec_sel_binds   = mkRecSelBinds tyclss
 
 zipRecTyClss :: TyClGroup Name
              -> [TyThing]           -- Knot-tied
@@ -1472,7 +1478,7 @@ must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
 
 \begin{code}
-mkRecSelBinds :: [TyCon] -> HsValBinds Name
+mkRecSelBinds :: [TyThing] -> HsValBinds Name
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
@@ -1481,7 +1487,7 @@ mkRecSelBinds tycons
   where
     (sigs, binds) = unzip rec_sels
     rec_sels = map mkRecSelBind [ (tc,fld) 
-       	 	     	        | tc <- tycons
+       	 	     	        | ATyCon tc <- tycons
 				, fld <- tyConFields tc ]
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
