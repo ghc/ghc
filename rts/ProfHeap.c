@@ -51,11 +51,11 @@ typedef struct _counter {
     union {
 	nat resid;
 	struct {
-	    int prim;     // total size of 'inherently used' closures
-	    int not_used; // total size of 'never used' closures
-	    int used;     // total size of 'used at least once' closures
-	    int void_total;  // current total size of 'destroyed without being used' closures
-	    int drag_total;  // current total size of 'used at least once and waiting to die'
+	    long prim;     // total size of 'inherently used' closures
+	    long not_used; // total size of 'never used' closures
+	    long used;     // total size of 'used at least once' closures
+	    long void_total;  // current total size of 'destroyed without being used' closures
+	    long drag_total;  // current total size of 'used at least once and waiting to die'
 	} ldv;
     } c;
     struct _counter *next;
@@ -78,11 +78,11 @@ typedef struct {
     Arena     * arena;
 
     // for LDV profiling, when just displaying by LDV
-    int       prim;
-    int       not_used;
-    int       used;
-    int       void_total;
-    int       drag_total;
+    long       prim;
+    long       not_used;
+    long       used;
+    long       void_total;
+    long       drag_total;
 } Census;
 
 static Census *censuses = NULL;
@@ -192,14 +192,14 @@ LDV_recordDead( StgClosure *c, nat size )
 	    t = (LDVW((c)) & LDV_CREATE_MASK) >> LDV_SHIFT;
 	    if (t < era) {
 		if (RtsFlags.ProfFlags.bioSelector == NULL) {
-		    censuses[t].void_total   += (int)size;
-		    censuses[era].void_total -= (int)size;
+                    censuses[t].void_total   += (long)size;
+                    censuses[era].void_total -= (long)size;
 		    ASSERT(censuses[t].void_total < censuses[t].not_used);
 		} else {
 		    id = closureIdentity(c);
 		    ctr = lookupHashTable(censuses[t].hash, (StgWord)id);
 		    ASSERT( ctr != NULL );
-		    ctr->c.ldv.void_total += (int)size;
+                    ctr->c.ldv.void_total += (long)size;
 		    ctr = lookupHashTable(censuses[era].hash, (StgWord)id);
 		    if (ctr == NULL) {
 			ctr = arenaAlloc(censuses[era].arena, sizeof(counter));
@@ -209,7 +209,7 @@ LDV_recordDead( StgClosure *c, nat size )
 			ctr->next = censuses[era].ctrs;
 			censuses[era].ctrs = ctr;
 		    }
-		    ctr->c.ldv.void_total -= (int)size;
+                    ctr->c.ldv.void_total -= (long)size;
 		}
 	    }
 	} else {
@@ -223,7 +223,7 @@ LDV_recordDead( StgClosure *c, nat size )
 		    id = closureIdentity(c);
 		    ctr = lookupHashTable(censuses[t+1].hash, (StgWord)id);
 		    ASSERT( ctr != NULL );
-		    ctr->c.ldv.drag_total += (int)size;
+                    ctr->c.ldv.drag_total += (long)size;
 		    ctr = lookupHashTable(censuses[era].hash, (StgWord)id);
 		    if (ctr == NULL) {
 			ctr = arenaAlloc(censuses[era].arena, sizeof(counter));
@@ -233,7 +233,7 @@ LDV_recordDead( StgClosure *c, nat size )
 			ctr->next = censuses[era].ctrs;
 			censuses[era].ctrs = ctr;
 		    }
-		    ctr->c.ldv.drag_total -= (int)size;
+                    ctr->c.ldv.drag_total -= (long)size;
 		}
 	    }
 	}
@@ -632,7 +632,7 @@ aggregateCensusInfo( void )
 
     // Aggregate the LDV counters when displaying by biography.
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
-	int void_total, drag_total;
+        long void_total, drag_total;
 
 	// Now we compute void_total and drag_total for each census
 	// After the program has finished, the void_total field of
@@ -732,7 +732,7 @@ static void
 dumpCensus( Census *census )
 {
     counter *ctr;
-    int count;
+    long count;
 
     printSample(rtsTrue, census->time);
 
