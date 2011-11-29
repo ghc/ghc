@@ -100,3 +100,6 @@ test('T5559', # unicode in cost centre names
 #       -fno-state-hack
 #       -fno-full-laziness
 
+test('callstack001', [ extra_ways(['prof']), only_ways(prof_ways) ],
+                     compile_and_run, [''])
+
