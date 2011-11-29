@@ -120,7 +120,7 @@ simplifyDeriv orig pred tvs theta
              get_good :: Ct -> Either PredType Ct
              get_good ct | validDerivPred skol_set p = Left p
                          | otherwise                 = Right ct
-                         where p = evVarPred (cc_id ct)
+                         where p = ctPred ct
 
        ; reportUnsolved (residual_wanted { wc_flat = bad })
 
@@ -319,7 +319,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
             -- Step 4, zonk quantified variables 
        { let minimal_flat_preds = mkMinimalBySCs $ 
-                                  map (evVarPred . cc_id) $ bagToList bound
+                                  map ctPred $ bagToList bound
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
                                    | (name, ty) <- name_taus ]
                         -- Don't add the quantified variables here, because
@@ -432,13 +432,13 @@ growWanteds gbl_tvs wc = fixVarSet (growWC gbl_tvs wc)
 growWantedEVs :: TyVarSet -> Cts -> TyVarSet -> TyVarSet
 growWantedEVs gbl_tvs ws tvs
   | isEmptyBag ws = tvs
-  | otherwise     = fixVarSet (growPreds gbl_tvs (evVarPred . cc_id) ws) tvs
+  | otherwise     = fixVarSet (growPreds gbl_tvs ctPred ws) tvs
 
 --------  Helper functions, do not do fixpoint ------------------------
 growWC :: TyVarSet -> WantedConstraints -> TyVarSet -> TyVarSet
 growWC gbl_tvs wc = growImplics gbl_tvs             (wc_impl wc) .
-                    growPreds   gbl_tvs (evVarPred . cc_id) (wc_flat wc) .
-                    growPreds   gbl_tvs (evVarPred . cc_id) (wc_insol wc)
+                    growPreds   gbl_tvs ctPred (wc_flat wc) .
+                    growPreds   gbl_tvs ctPred (wc_insol wc)
 
 growImplics :: TyVarSet -> Bag Implication -> TyVarSet -> TyVarSet
 growImplics gbl_tvs implics tvs
@@ -466,7 +466,7 @@ quantifyMe qtvs ct
   | isIPPred pred = True  -- Note [Inheriting implicit parameters]
   | otherwise	  = tyVarsOfType pred `intersectsVarSet` qtvs
   where
-    pred = evVarPred (cc_id ct)
+    pred = ctPred ct
 \end{code}
 
 Note [Avoid unecessary constraint simplification]
@@ -601,7 +601,7 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
 
 
        -- Don't quantify over equalities (judgement call here)
-       ; let (eqs, dicts) = partitionBag (isEqPred . evVarPred . cc_id)
+       ; let (eqs, dicts) = partitionBag (isEqPred . ctPred)
                                          (wc_flat lhs_results)
              lhs_dicts    = map cc_id (bagToList dicts)
                                  -- Dicts and implicit parameters
@@ -822,7 +822,7 @@ solveNestedImplications implics
         pushable_wanted :: Ct -> Bool 
         pushable_wanted cc 
          | isWantedCt cc 
-         = isEqPred (evVarPred (cc_id cc)) -- see Note [Preparing inert set for implications]
+         = isEqPred (ctPred cc) -- see Note [Preparing inert set for implications]
          | otherwise = False 
 
 solveImplication :: TcTyVarSet     -- Untouchable TcS unification variables
@@ -885,7 +885,7 @@ floatEqualities skols can_given wantders
   
   where is_floatable :: Ct -> Bool
         is_floatable ct
-          | ct_predty <- evVarPred (cc_id ct)
+          | ct_predty <- ctPred ct
           , isEqPred ct_predty
           = skols `disjointVarSet` tvs_under_fsks ct_predty
         is_floatable _ct = False

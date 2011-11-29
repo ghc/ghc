@@ -60,7 +60,7 @@ module TcSMonad (
 
         -- Inerts 
     InertSet(..), 
-    getInertEqs, liftInertEqsTy,
+    getInertEqs, liftInertEqsTy, getCtCoercion,
     emptyInert, getTcSInerts, updInertSet, extractUnsolved,
     extractUnsolvedTcS, modifyInertTcS,
     updInertSetTcS, partitionCCanMap, partitionEqMap,
@@ -142,6 +142,7 @@ import Data.IORef
 import TrieMap
 
 \end{code}
+
 
 \begin{code}
 compatKind :: Kind -> Kind -> Bool
@@ -496,11 +497,7 @@ updInertSet is item
                            ]
                            
         -- If evidence is cached, pick it up from the flavor!
-        coercion 
-          | Just (GivenSolved (Just (EvCoercionBox co))) <- isGiven_maybe (cc_flavor item)
-          = co
-          | otherwise 
-          = mkEqVarLCo (cc_id item)
+        coercion = getCtCoercion item
 
         eqs'     = extendVarEnv_C upd_err (inert_eqs is)
                                           (cc_tyvar item)
@@ -1507,6 +1504,17 @@ getInertEqs :: TcS (TyVarEnv (Ct,Coercion), InScopeSet)
 getInertEqs = do { inert <- getTcSInerts
                  ; return (inert_eqs inert, inert_eq_tvs inert) }
 
+getCtCoercion :: Ct -> Coercion
+-- Precondition: A CTyEqCan.
+getCtCoercion ct 
+  | Just (GivenSolved (Just (EvCoercionBox co))) <- maybe_given
+  = co
+  | otherwise
+  = mkEqVarLCo (setVarType (cc_id ct) (ctPred ct))
+                -- NB: The variable could be rewritten by a spontaneously
+                -- solved, so it is not safe to simply do a mkEqVarLCo (cc_id ct)
+                -- Instead we use the most accurate type, given by ctPred c
+  where maybe_given = isGiven_maybe (cc_flavor ct)
 
 -- See Note [LiftInertEqs]
 liftInertEqsTy :: (TyVarEnv (Ct,Coercion),InScopeSet)

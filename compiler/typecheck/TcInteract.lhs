@@ -114,7 +114,7 @@ solveInteractCts cts
           = return (ct:acc_cts, alterTM pty (\_ -> Just (ev,fl)) acc_cache)
           where fl = cc_flavor ct
                 ev = cc_id ct
-                pty = evVarPred ev
+                pty = ctPred ct
 
 
 solveInteractGiven :: GivenLoc -> [EvVar] -> TcS () 
@@ -319,11 +319,8 @@ kickOutRewritableInerts ct
 
        -- Step 1: Rewrite as many of the inert_eqs on the spot! 
        -- NB: if it is a solved constraint just use the cached evidence
-       ; let ct_coercion 
-               | Just (GivenSolved (Just (EvCoercionBox co))) <- isGiven_maybe (cc_flavor ct)
-               = co 
-               | otherwise 
-               = mkEqVarLCo (cc_id ct)
+       
+       ; let ct_coercion = getCtCoercion ct 
 
        ; new_ieqs <- {-# SCC "rewriteInertEqsFromInertEq" #-}
                      rewriteInertEqsFromInertEq (cc_tyvar ct,ct_coercion, cc_flavor ct) ieqs

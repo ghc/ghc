@@ -55,7 +55,7 @@ module TcRnTypes(
         singleCt, extendCts, isEmptyCts, isCTyEqCan, 
         isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe,
         isCIrredEvCan, isCNonCanonical,
-        SubGoalDepth,
+        SubGoalDepth, ctPred,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, addFlats, addImplics, mkFlatWC,
@@ -898,10 +898,28 @@ data Ct
       cc_depth  :: SubGoalDepth
     }
 
+\end{code}
 
+\begin{code}
+
+ctPred :: Ct -> PredType 
+ctPred (CNonCanonical { cc_id = v }) = evVarPred v
+ctPred (CDictCan { cc_class = cls, cc_tyargs = xis }) 
+  = mkClassPred cls xis
+ctPred (CTyEqCan { cc_tyvar = tv, cc_rhs = xi }) 
+  = mkEqPred (mkTyVarTy tv, xi)
+ctPred (CFunEqCan { cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 }) 
+  = mkEqPred(mkTyConApp fn xis1, xi2)
+ctPred (CIPCan { cc_ip_nm = nm, cc_ip_ty = xi }) 
+  = mkIPPred nm xi
+ctPred (CIrredEvCan { cc_ty = xi }) = xi
+\end{code}
+
+
+\begin{code}
 instance Outputable Ct where
   ppr ct = ppr (cc_flavor ct) <> braces (ppr (cc_depth ct))
-                  <+> ppr ev_var <+> dcolon <+> ppr (varType ev_var) 
+                  <+> ppr ev_var <+> dcolon <+> ppr (ctPred ct)
                   <+> parens (text ct_sort)
          where ev_var  = cc_id ct
                ct_sort = case ct of 
