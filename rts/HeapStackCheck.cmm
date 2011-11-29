@@ -167,7 +167,14 @@ __stg_gc_enter_1
    be an orphaned BLOCKING_QUEUE now.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_enter_checkbh, RET_SMALL, P_ unused)
+/* The stg_enter_checkbh frame has the same shape as an update frame: */
+#if defined(PROFILING)
+#define UPD_FRAME_PARAMS W_ unused1, W_ unused2, P_ unused3
+#else
+#define UPD_FRAME_PARAMS P_ unused1
+#endif
+
+INFO_TABLE_RET( stg_enter_checkbh, RET_SMALL, UPD_FRAME_PARAMS)
 {
     R1 = StgUpdateFrame_updatee(Sp);
     Sp = Sp + SIZEOF_StgUpdateFrame;
