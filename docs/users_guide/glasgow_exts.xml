@@ -1970,7 +1970,7 @@ The following syntax is stolen:
           <indexterm><primary><literal>mdo</literal></primary></indexterm>
 	</term>
 	<listitem><para>
-	Stolen by: <option>-XRecursiveDo</option>,
+	Stolen by: <option>-XRecursiveDo</option>
 	  </para></listitem>
       </varlistentry>
 
@@ -1980,7 +1980,7 @@ The following syntax is stolen:
           <indexterm><primary><literal>foreign</literal></primary></indexterm>
 	</term>
 	<listitem><para>
-	Stolen by: <option>-XForeignFunctionInterface</option>,
+	Stolen by: <option>-XForeignFunctionInterface</option>
 	  </para></listitem>
       </varlistentry>
 
@@ -1994,7 +1994,7 @@ The following syntax is stolen:
           <indexterm><primary><literal>proc</literal></primary></indexterm>
 	</term>
 	<listitem><para>
-	Stolen by: <option>-XArrows</option>,
+	Stolen by: <option>-XArrows</option>
 	  </para></listitem>
       </varlistentry>
 
@@ -2005,7 +2005,7 @@ The following syntax is stolen:
           <indexterm><primary>implicit parameters</primary></indexterm>
 	</term>
 	<listitem><para>
-	Stolen by: <option>-XImplicitParams</option>,
+	Stolen by: <option>-XImplicitParams</option>
 	  </para></listitem>
       </varlistentry>
 
@@ -2019,7 +2019,17 @@ The following syntax is stolen:
           <indexterm><primary>Template Haskell</primary></indexterm>
 	</term>
 	<listitem><para>
-	Stolen by: <option>-XTemplateHaskell</option>,
+	Stolen by: <option>-XTemplateHaskell</option>
+	  </para></listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+	  <literal>'<replaceable>varid</replaceable></literal>
+	</term>
+	<listitem><para>
+	Stolen by: <option>-XTemplateHaskell</option>and 
+                   <option>-XPolyKinds</option>
 	  </para></listitem>
       </varlistentry>
 
@@ -2029,7 +2039,7 @@ The following syntax is stolen:
           <indexterm><primary>quasi-quotation</primary></indexterm>
 	</term>
 	<listitem><para>
-	Stolen by: <option>-XQuasiQuotes</option>,
+	Stolen by: <option>-XQuasiQuotes</option>
 	  </para></listitem>
       </varlistentry>
 
@@ -2041,10 +2051,10 @@ The following syntax is stolen:
 	      <replaceable>integer</replaceable><literal>&num;</literal>,
 	      <replaceable>float</replaceable><literal>&num;</literal>,
 	      <replaceable>float</replaceable><literal>&num;&num;</literal>,
-	      <literal>(&num;</literal>, <literal>&num;)</literal>,
+	      <literal>(&num;</literal>, <literal>&num;)</literal>
 	</term>
 	<listitem><para>
-	Stolen by: <option>-XMagicHash</option>,
+	Stolen by: <option>-XMagicHash</option>
 	  </para></listitem>
       </varlistentry>
     </variablelist>
@@ -5111,6 +5121,223 @@ instance Show v => Show (GMap () v) where ...
 </programlisting>
       </para>
 
+</sect2>
+
+</sect1>
+
+<sect1 id="kind-polymorphism-and-promotion">
+<title>Kind polymorphism and promotion</title>
+
+<para>
+Standard Haskell has a rich type language. Types classify terms and serve to
+avoid many common programming mistakes. The kind language, however, is
+relatively simple, distinguishing only lifted types (kind <literal>*</literal>),
+type constructors (eg. kind <literal>* -> * -> *</literal>), and unlifted
+types (<xref linkend="glasgow-unboxed"/>). In particular when using advanced
+type system features, such as type families (<xref linkend="type-families"/>)
+or GADTs (<xref linkend="gadt"/>), this simple kind system is insufficient,
+and fails to prevent simple errors. Consider the example of type-level natural
+numbers, and length-indexed vectors:
+<programlisting>
+data Ze
+data Su n
+
+data Vec :: * -> * -> * where
+  Nil  :: Vec a Ze
+  Cons :: a -> Vec a n -> Vec a (Su n)
+</programlisting>
+The kind of <literal>Vec</literal> is <literal>* -> * -> *</literal>. This means
+that eg. <literal>Vec Int Char</literal> is a well-kinded type, even though this
+is not what we intend when defining length-indexed vectors.
+</para>
+
+<para>
+With the <option>-XPolyKinds</option> flag, users can specify better kinds for
+their programs. This flag enables two orthogonal but related features: kind
+polymorphism and user defined kinds through datatype promotion. With
+<option>-XPolyKinds</option>, the example above can then be rewritten to:
+<programlisting>
+data Nat = Ze | Su Nat
+
+data Vec :: * -> Nat -> * where
+  Nil  :: Vec a Ze
+  Cons :: a -> Vec a n -> Vec a (Su n)
+</programlisting>
+With the improved kind of <literal>Vec</literal>, things like
+<literal>Vec Int Char</literal> are now ill-kinded, and GHC will report an
+error.
+</para>
+
+<para>
+In this section we show a few examples of how to make use of the new kind
+system. This extension is described in more detail in the paper
+<ulink url="http://dreixel.net/research/pdf/ghp.pdf">Giving Haskell a
+Promotion</ulink>, which appeared at TLDI 2012.
+</para>
+
+<sect2 id="kind-polymorphism">
+<title>Kind polymorphism</title>
+<para>
+Currently there is a lot of code duplication in the way Typeable is implemented
+(<xref linkend="deriving-typeable"/>):
+<programlisting>
+class Typeable (t :: *) where
+  typeOf :: t -> TypeRep
+
+class Typeable1 (t :: * -> *) where
+  typeOf1 :: t a -> TypeRep
+
+class Typeable2 (t :: * -> * -> *) where
+  typeOf2 :: t a b -> TypeRep
+</programlisting>
+</para>
+
+<para>
+Kind polymorphism allows us to merge all these classes into one:
+<programlisting>
+data Proxy t = Proxy
+
+class Typeable t where
+  typeOf :: Proxy t -> TypeRep
+
+instance Typeable Int  where typeOf _ = TypeRep
+instance Typeable []   where typeOf _ = TypeRep
+</programlisting>
+Note that the datatype <literal>Proxy</literal> has kind
+<literal>forall k. k -> *</literal> (inferred by GHC), and the new
+<literal>Typeable</literal> class has kind
+<literal>forall k. k -> Constraint</literal>.
+</para>
+
+<para>
+There are some restrictions in the current implementation:
+<itemizedlist>
+ <listitem><para>You cannot explicitly abstract over kinds, or mention kind
+ variables. So the following are all rejected:
+<programlisting>
+data D1 (t :: k)
+
+data D2 :: k -> *
+
+data D3 (k :: BOX)
+</programlisting></para>
+ </listitem>
+ <listitem><para>The return kind of a type family is always defaulted to
+ <literal>*</literal>. So the following is rejected:
+<programlisting>
+type family F a
+type instance F Int = Maybe
+</programlisting></para>
+ </listitem>
+</itemizedlist>
+</para>
+
+</sect2>
+
+<sect2 id="promotion">
+<title>Datatype promotion</title>
+<para>
+Along with kind polymorphism comes the ability to define custom named kinds.
+With <option>-XPolyKinds</option>, GHC automatically promotes every suitable
+datatype to be a kind, and its (value) constructors to be type constructors.
+The following types
+<programlisting>
+data Nat = Ze | Su Nat
+
+data List a = Nil | Cons a (List a)
+
+data Pair a b = Pair a b
+ 
+data Sum a b = L a | R b
+</programlisting>
+give rise to the following kinds and type constructors:
+<programlisting>
+Nat :: BOX
+Ze :: Nat
+Su :: Nat -> Nat
+
+List k :: BOX
+Nil  :: List k
+Cons :: k -> List k -> List k
+
+Pair k1 k2 :: BOX
+Pair :: k1 -> k2 -> Pair k1 k2
+
+Sum k1 k2 :: BOX
+L :: k1 -> Sum k1 k2
+R :: k2 -> Sum k1 k2
+</programlisting>
+Note that <literal>List</literal>, for instance, does not get kind
+<literal>BOX -> BOX</literal>, because we do not further classify kinds; all
+kinds have sort <literal>BOX</literal>.
+</para>
+
+<para>
+The following restrictions apply to promotion:
+<itemizedlist>
+ <listitem><para>We only promote datatypes whose kinds are of the form
+ <literal>* -> ... -> * -> *</literal>. In particular, we do not promote
+ higher-kinded datatypes such as <literal>data Fix f = In (f (Fix f))</literal>,
+ or datatypes whose kinds involve promoted types such as
+ <literal>Vec :: * -> Nat -> *</literal>.</para></listitem>
+ <listitem><para>We do not promote datatypes whose constructors are kind
+ polymorphic, involve constraints, or use existential quantification.
+ </para></listitem>
+</itemizedlist>
+</para>
+
+<sect3 id="promotion-syntax">
+<title>Distinguishing between types and constructors</title>
+<para>
+Since constructors and types share the same namespace, with promotion you can
+get ambiguous type names:
+<programlisting>
+data P          -- 1
+
+data Prom = P   -- 2
+
+type T = P      -- 1 or promoted 2?
+</programlisting>
+In these cases, if you want to refer to the promoted constructor, you should
+prefix its name with a quote:
+<programlisting>
+type T1 = P     -- 1
+
+type T2 = 'P    -- promoted 2
+</programlisting>
+Note that promoted datatypes give rise to named kinds. Since these can never be
+ambiguous, we do not allow quotes in kind names.
+</para>
+</sect3>
+
+<sect3 id="promoted-lists-and-tuples">
+<title>Promoted lists and tuples types</title>
+<para>
+Haskell's list and tuple types are natively promoted to kinds, and enjoy the
+same convenient syntax at the type level, albeit prefixed with a quote:
+<programlisting>
+data HList :: [*] -> * where
+  HNil  :: HList '[]
+  HCons :: a -> HList t -> HList (a ': t)
+
+data Tuple :: (*,*) -> * where
+  Tuple :: a -> b -> Tuple '(a,b)
+</programlisting>
+Note that this requires <option>-XTypeOperators</option>.
+</para>
+</sect3>
+
+</sect2>
+
+<sect2 id="kind-polymorphism-limitations">
+<title>Shortcomings of the current implementation</title>
+<para>
+For the release on GHC 7.4 we focused on getting the new kind-polymorphic core
+to work with all existing programs (which do not make use of kind polymorphism).
+Many things already work properly with <option>-XPolyKinds</option>, but we
+expect that some things will not work. If you run into trouble, please
+<link linkend="bug-reporting">report a bug</link>!
+</para>
 </sect2>
 
 </sect1>
@@ -9099,12 +9326,6 @@ will fuse with one but not the other)
 
 <para>
  <function>msum</function>
-</para>
-</listitem>
-<listitem>
-
-<para>
- <function>sortBy</function>
 </para>
 </listitem>
 

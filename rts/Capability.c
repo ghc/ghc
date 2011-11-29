@@ -46,7 +46,7 @@ volatile StgWord waiting_for_gc = 0;
 /* Let foreign code get the current Capability -- assuming there is one!
  * This is useful for unsafe foreign calls because they are called with
  * the current Capability held, but they are not passed it. For example,
- * see see the integer-gmp package which calls allocateLocal() in its
+ * see see the integer-gmp package which calls allocate() in its
  * stgAllocForGMP() function (which gets called by gmp functions).
  * */
 Capability * rts_unsafeGetMyCapability (void)
@@ -265,6 +265,12 @@ initCapability( Capability *cap, nat i )
     cap->context_switch = 0;
     cap->pinned_object_block = NULL;
 
+#ifdef PROFILING
+    cap->r.rCCCS = CCS_SYSTEM;
+#else
+    cap->r.rCCCS = NULL;
+#endif
+
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
     traceCapsetAssignCap(CAPSET_CLOCKDOMAIN_DEFAULT, i);
 #if defined(THREADED_RTS)
@@ -453,6 +459,9 @@ releaseCapability_ (Capability* cap,
 	}
     }
 
+#ifdef PROFILING
+    cap->r.rCCCS = CCS_IDLE;
+#endif
     last_free_capability = cap;
     debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
@@ -604,6 +613,10 @@ waitForReturnCapability (Capability **pCap, Task *task)
 
     }
 
+#ifdef PROFILING
+    cap->r.rCCCS = CCS_SYSTEM;
+#endif
+
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
@@ -676,13 +689,18 @@ yieldCapability (Capability** pCap, Task *task)
 		task->next = NULL;
                 cap->n_spare_workers--;
             }
-	    cap->running_task = task;
+
+            cap->running_task = task;
 	    RELEASE_LOCK(&cap->lock);
 	    break;
 	}
 
-	debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
+        debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
 	ASSERT(cap->running_task == task);
+
+#ifdef PROFILING
+        cap->r.rCCCS = CCS_SYSTEM;
+#endif
 
     *pCap = cap;
 

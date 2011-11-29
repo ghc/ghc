@@ -155,6 +155,8 @@ emitPrimOp [res] SparkOp [arg] live = do
   where
 	newspark = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark")))
 
+emitPrimOp [res] GetCCCSOp [] _live
+   = stmtC (CmmAssign (CmmLocal res) curCCS)
 
 emitPrimOp [res] ReadMutVarOp [mutv] _
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))

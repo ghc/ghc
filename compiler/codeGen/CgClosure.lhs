@@ -316,9 +316,10 @@ mkFunEntryCode cl_info cc reg_args stk_args sp_top reg_save_code body = do
         -- Do the business
   ; funWrapper cl_info reg_args reg_save_code $ do
 	{ tickyEnterFun cl_info
-        ; enterCostCentreFun cc $
-              CmmMachOp mo_wordSub [ CmmReg nodeReg
-                                   , CmmLit (mkIntCLit (funTag cl_info)) ]
+        ; enterCostCentreFun cc
+              (CmmMachOp mo_wordSub [ CmmReg nodeReg
+                                    , CmmLit (mkIntCLit (funTag cl_info)) ])
+              (node : map snd reg_args) -- live regs
 
         ; cgExpr body }
   }
@@ -482,7 +483,7 @@ emitBlackHoleCode is_single_entry = do
     stmtsC [
        CmmStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
                 (CmmReg (CmmGlobal CurrentTSO)),
-       CmmCall (CmmPrim MO_WriteBarrier) [] [] CmmUnsafe CmmMayReturn,
+       CmmCall (CmmPrim MO_WriteBarrier) [] [] CmmMayReturn,
        CmmStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
      ]
 \end{code}
@@ -580,7 +581,7 @@ link_caf cl_info _is_upd = do
       [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
         CmmHinted (CmmReg nodeReg) AddrHint,
         CmmHinted hp_rel AddrHint ]
-      (Just [node]) False
+      (Just [node])
 	-- node is live, so save it.
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c

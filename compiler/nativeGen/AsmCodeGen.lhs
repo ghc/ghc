@@ -879,7 +879,7 @@ cmmStmtConFold stmt
            -> do addr' <- cmmExprConFold JumpReference addr
                  return $ CmmJump addr' regs
 
-	CmmCall target regs args srt returns
+        CmmCall target regs args returns
 	   -> do target' <- case target of
 			      CmmCallee e conv -> do
 			        e' <- cmmExprConFold CallReference e
@@ -888,7 +888,7 @@ cmmStmtConFold stmt
                  args' <- mapM (\(CmmHinted arg hint) -> do
                                   arg' <- cmmExprConFold DataReference arg
                                   return (CmmHinted arg' hint)) args
-	         return $ CmmCall target' regs args' srt returns
+                 return $ CmmCall target' regs args' returns
 
         CmmCondBranch test dest
            -> do test' <- cmmExprConFold DataReference test

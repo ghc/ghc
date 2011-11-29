@@ -149,7 +149,7 @@ static inline void postBuf(EventsBuf *eb, StgWord8 *buf, nat size)
 }
 
 static inline StgWord64 time_ns(void)
-{ return stat_getElapsedTime() * (1000000000LL/TICKS_PER_SECOND); }
+{ return TimeToNS(stat_getElapsedTime()); }
 
 static inline void postEventTypeNum(EventsBuf *eb, EventTypeNum etNum)
 { postWord16(eb, etNum); }

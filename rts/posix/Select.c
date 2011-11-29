@@ -16,6 +16,7 @@
 #include "Capability.h"
 #include "Select.h"
 #include "AwaitEvent.h"
+#include "Stats.h"
 
 # ifdef HAVE_SYS_SELECT_H
 #  include <sys/select.h>
@@ -37,12 +38,23 @@
 #endif
 
 #if !defined(THREADED_RTS)
-/* last timestamp */
-lnat timestamp = 0;
 
 /* 
  * The threaded RTS uses an IO-manager thread in Haskell instead (see GHC.Conc) 
  */
+
+#define LowResTimeToTime(t) (USToTime((t) * 10000))
+
+/*
+ * Return the time since the program started, in LowResTime,
+ * rounded down.
+ *
+ * This is only used by posix/Select.c.  It should probably go away.
+ */
+LowResTime getourtimeofday(void)
+{
+  return TimeToUS(stat_getElapsedTime()) / 10000;
+}
 
 /* There's a clever trick here to avoid problems when the time wraps
  * around.  Since our maximum delay is smaller than 31 bits of ticks
@@ -55,15 +67,14 @@ lnat timestamp = 0;
  * if this is true, then our time has expired.
  * (idea due to Andy Gill).
  */
-static rtsBool
-wakeUpSleepingThreads(lnat ticks)
+static rtsBool wakeUpSleepingThreads (LowResTime now)
 {
     StgTSO *tso;
     rtsBool flag = rtsFalse;
 
     while (sleeping_queue != END_TSO_QUEUE) {
 	tso = sleeping_queue;
-        if (((long)ticks - (long)tso->block_info.target) < 0) {
+        if (((long)now - (long)tso->block_info.target) < 0) {
             break;
         }
 	sleeping_queue = tso->_link;
@@ -108,7 +119,8 @@ awaitEvent(rtsBool wait)
     rtsBool select_succeeded = rtsTrue;
     rtsBool unblock_all = rtsFalse;
     struct timeval tv;
-    lnat min, ticks;
+    Time min;
+    LowResTime now;
 
     tv.tv_sec  = 0;
     tv.tv_usec = 0;
@@ -128,18 +140,17 @@ awaitEvent(rtsBool wait)
      */
     do {
 
-      ticks = timestamp = getourtimeofday();
-      if (wakeUpSleepingThreads(ticks)) { 
+      now = getourtimeofday();
+      if (wakeUpSleepingThreads(now)) {
 	  return;
       }
 
       if (!wait) {
 	  min = 0;
       } else if (sleeping_queue != END_TSO_QUEUE) {
-	  min = (sleeping_queue->block_info.target - ticks) 
-	      * RtsFlags.MiscFlags.tickInterval * 1000;
+          min = LowResTimeToTime(sleeping_queue->block_info.target - now);
       } else {
-	  min = 0x7ffffff;
+          min = (Time)-1;
       }
 
       /* 
@@ -185,8 +196,8 @@ awaitEvent(rtsBool wait)
 
       /* Check for any interesting events */
       
-      tv.tv_sec  = min / 1000000;
-      tv.tv_usec = min % 1000000;
+      tv.tv_sec  = TimeToSeconds(min);
+      tv.tv_usec = TimeToUS(min) % 1000000;
 
       while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
 	  if (errno != EINTR) {
@@ -236,7 +247,7 @@ awaitEvent(rtsBool wait)
 	  
 	  /* check for threads that need waking up 
 	   */
-	  wakeUpSleepingThreads(getourtimeofday());
+          wakeUpSleepingThreads(getourtimeofday());
 	  
 	  /* If new runnable threads have arrived, stop waiting for
 	   * I/O and run them.

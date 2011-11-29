@@ -369,7 +369,7 @@ stg_catchzh
   
     /* Set up the catch frame */
     Sp = Sp - SIZEOF_StgCatchFrame;
-    SET_HDR(Sp,stg_catch_frame_info,W_[CCCS]);
+    SET_HDR(Sp,stg_catch_frame_info,CCCS);
     
     StgCatchFrame_handler(Sp) = R2;
     StgCatchFrame_exceptions_blocked(Sp) = 
@@ -427,7 +427,7 @@ stg_raisezh
      */
     if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags) != 0::I32) {
         SAVE_THREAD_STATE();
-        foreign "C" fprintCCS_stderr(W_[CCCS] "ptr",
+        foreign "C" fprintCCS_stderr(CCCS "ptr",
                                      exception "ptr",
                                      CurrentTSO "ptr") [];
         LOAD_THREAD_STATE();

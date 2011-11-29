@@ -41,6 +41,7 @@ module StaticFlags (
 	opt_SuppressTypeApplications,
 	opt_SuppressIdInfo,
 	opt_SuppressTypeSignatures,
+        opt_SuppressVarKinds,
 
 	-- profiling opts
 	opt_SccProfilingOn,
@@ -222,6 +223,11 @@ opt_SuppressCoercions :: Bool
 opt_SuppressCoercions
 	=  lookUp  (fsLit "-dsuppress-all")
 	|| lookUp  (fsLit "-dsuppress-coercions")
+
+opt_SuppressVarKinds :: Bool
+opt_SuppressVarKinds
+	=  lookUp  (fsLit "-dsuppress-all")
+	|| lookUp  (fsLit "-dsuppress-var-kinds")
 
 -- | Suppress module id prefixes on variables.
 opt_SuppressModulePrefixes :: Bool

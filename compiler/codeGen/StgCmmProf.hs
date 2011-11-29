@@ -21,7 +21,7 @@ module StgCmmProf (
 	dynProfHdr, profDynAlloc, profAlloc, staticProfHdr, initUpdFrameProf,
         enterCostCentreThunk,
         costCentreFrom,
-	curCCS, curCCSAddr,
+        curCCS, storeCurCCS,
         emitSetCCC,
 
 	saveCurrentCostCentre, restoreCurrentCostCentre,
@@ -73,11 +73,10 @@ ccType :: CmmType 	-- Type of a cost centre
 ccType = bWord
 
 curCCS :: CmmExpr
-curCCS = CmmLoad curCCSAddr ccsType
+curCCS = CmmReg (CmmGlobal CCCS)
 
--- Address of current CCS variable, for storing into
-curCCSAddr :: CmmExpr
-curCCSAddr = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CCCS")))
+storeCurCCS :: CmmExpr -> CmmAGraph
+storeCurCCS e = mkAssign (CmmGlobal CCCS) e
 
 mkCCostCentre :: CostCentre -> CmmLit
 mkCCostCentre cc = CmmLabel (mkCCLabel cc)
@@ -150,7 +149,7 @@ restoreCurrentCostCentre :: Maybe LocalReg -> FCode ()
 restoreCurrentCostCentre Nothing 
   = return ()
 restoreCurrentCostCentre (Just local_cc)
-  = emit (mkStore curCCSAddr (CmmReg (CmmLocal local_cc)))
+  = emit (storeCurCCS (CmmReg (CmmLocal local_cc)))
 
 
 -------------------------------------------------------------------------------
@@ -186,7 +185,7 @@ profAlloc words ccs
 enterCostCentreThunk :: CmmExpr -> FCode ()
 enterCostCentreThunk closure = 
   ifProfiling $ do 
-    emit $ mkStore curCCSAddr (costCentreFrom closure)
+    emit $ storeCurCCS (costCentreFrom closure)
 
 ifProfiling :: FCode () -> FCode ()
 ifProfiling code
@@ -269,7 +268,7 @@ emitSetCCC cc tick push
     tmp <- newTemp ccsType -- TODO FIXME NOW
     pushCostCentre tmp curCCS cc
     when tick $ emit (bumpSccCount (CmmReg (CmmLocal tmp)))
-    when push $ emit (mkStore curCCSAddr (CmmReg (CmmLocal tmp)))
+    when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
 pushCostCentre result ccs cc

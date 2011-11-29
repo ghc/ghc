@@ -114,8 +114,6 @@ typedef struct _IndexTable {
    Pre-defined cost centres and cost centre stacks
    -------------------------------------------------------------------------- */
 
-extern CostCentreStack * RTS_VAR(CCCS);	        /* current CCS */
- 
 #if IN_STG_CODE
 
 extern StgWord CC_MAIN[];	
@@ -153,6 +151,9 @@ extern CostCentreStack CCS_DONT_CARE[];  // shouldn't ever get set
 extern CostCentre      CC_PINNED[];
 extern CostCentreStack CCS_PINNED[];     // pinned memory
 
+extern CostCentre      CC_IDLE[];
+extern CostCentreStack CCS_IDLE[];       // capability is idle
+
 #endif /* IN_STG_CODE */
 
 extern unsigned int RTS_VAR(CC_ID);     // global ids
@@ -165,7 +166,7 @@ extern unsigned int RTS_VAR(era);
  * ---------------------------------------------------------------------------*/
 
 CostCentreStack * pushCostCentre (CostCentreStack *, CostCentre *);
-void              enterFunCCS    (CostCentreStack *);
+void              enterFunCCS    (StgRegTable *reg, CostCentreStack *);
 
 /* -----------------------------------------------------------------------------
    Registering CCs and CCSs

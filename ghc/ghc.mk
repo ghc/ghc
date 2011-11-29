@@ -26,8 +26,11 @@ ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
 ghc_stage2_MORE_HC_OPTS = $(GhcStage2HcOpts)
 ghc_stage3_MORE_HC_OPTS = $(GhcStage3HcOpts)
 
-ghc_stage2_CC_OPTS = -Iincludes
-ghc_stage3_CC_OPTS = -Iincludes
+# We need __GLASGOW_HASKELL__ in hschooks.c, so we have to build C
+# sources with GHC:
+ghc_stage1_UseGhcForCC = YES
+ghc_stage2_UseGhcForCC = YES
+ghc_stage3_UseGhcForCC = YES
 
 ghc_stage1_C_FILES_NODEPS = ghc/hschooks.c
 

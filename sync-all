@@ -413,6 +413,10 @@ sub scmall {
             scm ($localpath, $scm, "format-patch", @args)
                 if $scm eq "git"
         }
+        elsif ($command =~ /^gc$/) {
+            scm ($localpath, $scm, "gc", @args)
+                unless $scm eq "darcs";
+        }
         else {
             die "Unknown command: $command";
         }
@@ -494,6 +498,7 @@ any extra arguments to git:
   config
   fetch
   format-patch
+  gc
   grep
   log
   new

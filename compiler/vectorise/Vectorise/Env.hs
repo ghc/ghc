@@ -10,7 +10,6 @@ module Vectorise.Env (
   initGlobalEnv,
   extendImportedVarsEnv,
   extendFamEnv,
-  extendTyConsEnv,
   setPAFunsEnv,
   setPRFunsEnv,
   modVectInfo
@@ -181,12 +180,6 @@ extendFamEnv :: [FamInst] -> GlobalEnv -> GlobalEnv
 extendFamEnv new genv
   = genv { global_fam_inst_env = (g_fam_inst, extendFamInstEnvList l_fam_inst new) }
   where (g_fam_inst, l_fam_inst) = global_fam_inst_env genv
-
--- |Extend the list of type constructors in an environment.
---
-extendTyConsEnv :: [(Name, TyCon)] -> GlobalEnv -> GlobalEnv
-extendTyConsEnv ps genv
-  = genv { global_tycons = extendNameEnvList (global_tycons genv) ps }
 
 -- |Set the list of PA functions in an environment.
 --

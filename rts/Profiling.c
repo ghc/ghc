@@ -18,6 +18,7 @@
 #include "Arena.h"
 #include "RetainerProfile.h"
 #include "Printer.h"
+#include "Capability.h"
 
 #include <string.h>
 
@@ -51,15 +52,15 @@ FILE *prof_file;
 static char *hp_filename;	/* heap profile (hp2ps style) log file */
 FILE *hp_file;
 
-/* The Current Cost Centre Stack (for attributing costs)
- */
-CostCentreStack *CCCS;
-
 /* Linked lists to keep track of CCs and CCSs that haven't
  * been declared in the log file yet
  */
 CostCentre      *CC_LIST  = NULL;
 CostCentreStack *CCS_LIST = NULL;
+
+#ifdef THREADED_RTS
+Mutex ccs_mutex;
+#endif
 
 /*
  * Built-in cost centres and cost-centre stacks:
@@ -92,6 +93,7 @@ CC_DECLARE(CC_GC,        "GC",          "GC",        CC_NOT_CAF, );
 CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", CC_NOT_CAF, );
 CC_DECLARE(CC_DONT_CARE, "DONT_CARE",   "MAIN",      CC_NOT_CAF, );
 CC_DECLARE(CC_PINNED,    "PINNED",      "SYSTEM",    CC_NOT_CAF, );
+CC_DECLARE(CC_IDLE,      "IDLE",        "IDLE",      CC_NOT_CAF, );
 
 CCS_DECLARE(CCS_MAIN, 	    CC_MAIN,       );
 CCS_DECLARE(CCS_SYSTEM,	    CC_SYSTEM,     );
@@ -99,6 +101,7 @@ CCS_DECLARE(CCS_GC,         CC_GC,         );
 CCS_DECLARE(CCS_OVERHEAD,   CC_OVERHEAD,   );
 CCS_DECLARE(CCS_DONT_CARE,  CC_DONT_CARE,  );
 CCS_DECLARE(CCS_PINNED,     CC_PINNED,     );
+CCS_DECLARE(CCS_IDLE,       CC_IDLE,       );
 
 /*
  * Static Functions
@@ -143,7 +146,12 @@ initProfiling1 (void)
     prof_arena = newArena();
 
     /* for the benefit of allocate()... */
-    CCCS = CCS_SYSTEM;
+    {
+        nat n;
+        for (n=0; n < n_capabilities; n++) {
+            capabilities[n].r.rCCCS = CCS_SYSTEM;
+        }
+    }
 }
 
 void
@@ -156,8 +164,6 @@ void
 initProfiling2 (void)
 {
     CostCentreStack *ccs, *next;
-
-    CCCS = CCS_SYSTEM;
 
     /* Set up the log file, and dump the header and cost centre
      * information into it.
@@ -173,12 +179,14 @@ initProfiling2 (void)
     REGISTER_CC(CC_OVERHEAD);
     REGISTER_CC(CC_DONT_CARE);
     REGISTER_CC(CC_PINNED);
+    REGISTER_CC(CC_IDLE);
 
     REGISTER_CCS(CCS_SYSTEM);
     REGISTER_CCS(CCS_GC);
     REGISTER_CCS(CCS_OVERHEAD);
     REGISTER_CCS(CCS_DONT_CARE);
     REGISTER_CCS(CCS_PINNED);
+    REGISTER_CCS(CCS_IDLE);
     REGISTER_CCS(CCS_MAIN);
 
     /* find all the registered cost centre stacks, and make them
@@ -310,12 +318,17 @@ endProfiling ( void )
 
 // implements  c1 ++> c2,  where c1 and c2 are equal depth
 //
-static void enterFunEqualStacks (CostCentreStack *ccs, CostCentreStack *ccsfn)
+static CostCentreStack *
+enterFunEqualStacks (CostCentreStack *ccs0,
+                     CostCentreStack *ccsapp,
+                     CostCentreStack *ccsfn)
 {
-    ASSERT(ccs->depth == ccsfn->depth);
-    if (ccs == ccsfn) return;
-    enterFunEqualStacks(ccs->prevStack, ccsfn->prevStack);
-    CCCS = pushCostCentre(CCCS, ccsfn->cc);
+    ASSERT(ccsapp->depth == ccsfn->depth);
+    if (ccsapp == ccsfn) return ccs0;
+    return pushCostCentre(enterFunEqualStacks(ccs0,
+                                              ccsapp->prevStack,
+                                              ccsfn->prevStack),
+                          ccsfn->cc);
 }
 
 // implements  c1 ++> c2,  where c2 is deeper than c1.
@@ -323,21 +336,25 @@ static void enterFunEqualStacks (CostCentreStack *ccs, CostCentreStack *ccsfn)
 // enterFunEqualStacks(), and then push on the elements that we
 // dropped in reverse order.
 //
-static void enterFunCurShorter (CostCentreStack *ccsfn, StgWord n)
+static CostCentreStack *
+enterFunCurShorter (CostCentreStack *ccsapp, CostCentreStack *ccsfn, StgWord n)
 {
     if (n == 0) {
-        ASSERT(ccsfn->depth == CCCS->depth);
-        enterFunEqualStacks(CCCS,ccsfn);
-        return;
+        ASSERT(ccsfn->depth == ccsapp->depth);
+        return enterFunEqualStacks(ccsapp,ccsapp,ccsfn);;
+    } else {
+        ASSERT(ccsfn->depth > ccsapp->depth);
+        return pushCostCentre(enterFunCurShorter(ccsapp, ccsfn->prevStack, n-1),
+                              ccsfn->cc);
     }
-    enterFunCurShorter(ccsfn->prevStack, n-1);
-    CCCS = pushCostCentre(CCCS, ccsfn->cc);
 }
 
-void enterFunCCS ( CostCentreStack *ccsfn )
+void enterFunCCS (StgRegTable *reg, CostCentreStack *ccsfn)
 {
+    CostCentreStack *ccsapp;
+
     // common case 1: both stacks are the same
-    if (ccsfn == CCCS) {
+    if (ccsfn == reg->rCCCS) {
         return;
     }
 
@@ -346,34 +363,38 @@ void enterFunCCS ( CostCentreStack *ccsfn )
         return;
     }
 
+    ccsapp = reg->rCCCS;
+    reg->rCCCS = CCS_OVERHEAD;
+
     // common case 3: the stacks are completely different (e.g. one is a
     // descendent of MAIN and the other of a CAF): we append the whole
     // of the function stack to the current CCS.
-    if (ccsfn->root != CCCS->root) {
-        CCCS = appendCCS(CCCS,ccsfn);
+    if (ccsfn->root != ccsapp->root) {
+        reg->rCCCS = appendCCS(ccsapp,ccsfn);
         return;
     }
 
-    // uncommon case 4: CCCS is deeper than ccsfn
-    if (CCCS->depth > ccsfn->depth) {
+    // uncommon case 4: ccsapp is deeper than ccsfn
+    if (ccsapp->depth > ccsfn->depth) {
         nat i, n;
-        CostCentreStack *tmp = CCCS;
-        n = CCCS->depth - ccsfn->depth;
+        CostCentreStack *tmp = ccsapp;
+        n = ccsapp->depth - ccsfn->depth;
         for (i = 0; i < n; i++) {
             tmp = tmp->prevStack;
         }
-        enterFunEqualStacks(tmp,ccsfn);
+        reg->rCCCS = enterFunEqualStacks(ccsapp,tmp,ccsfn);
         return;
     }
 
     // uncommon case 5: ccsfn is deeper than CCCS
-    if (ccsfn->depth > CCCS->depth) {
-        enterFunCurShorter(ccsfn, ccsfn->depth - CCCS->depth);
+    if (ccsfn->depth > ccsapp->depth) {
+        reg->rCCCS = enterFunCurShorter(ccsapp, ccsfn,
+                                        ccsfn->depth - ccsapp->depth);
         return;
     }
 
     // uncommon case 6: stacks are equal depth, but different
-    enterFunEqualStacks(CCCS,ccsfn);
+    reg->rCCCS = enterFunEqualStacks(ccsapp,ccsapp,ccsfn);
 }
 
 /* -----------------------------------------------------------------------------
@@ -477,20 +498,41 @@ appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 CostCentreStack *
 pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
 {
-    CostCentreStack *temp_ccs;
-  
-    if (ccs == EMPTY_STACK)
-        return actualPush(ccs,cc);
-    else {
-        if (ccs->cc == cc)
+    CostCentreStack *temp_ccs, *ret;
+    IndexTable *ixtable;
+
+    if (ccs == EMPTY_STACK) {
+        ACQUIRE_LOCK(&ccs_mutex);
+        ret = actualPush(ccs,cc);
+    }
+    else
+    {
+        if (ccs->cc == cc) {
             return ccs;
-        else {
+        } else {
             // check if we've already memoized this stack
-            temp_ccs = isInIndexTable(ccs->indexTable,cc);
+            ixtable = ccs->indexTable;
+            temp_ccs = isInIndexTable(ixtable,cc);
       
-            if (temp_ccs != EMPTY_STACK)
+            if (temp_ccs != EMPTY_STACK) {
                 return temp_ccs;
-            else {
+            } else {
+
+                // not in the IndexTable, now we take the lock:
+                ACQUIRE_LOCK(&ccs_mutex);
+
+                if (ccs->indexTable != ixtable)
+                {
+                    // someone modified ccs->indexTable while
+                    // we did not hold the lock, so we must
+                    // check it again:
+                    temp_ccs = isInIndexTable(ixtable,cc);
+                    if (temp_ccs != EMPTY_STACK)
+                    {
+                        RELEASE_LOCK(&ccs_mutex);
+                        return temp_ccs;
+                    }
+                }
                 temp_ccs = checkLoop(ccs,cc);
                 if (temp_ccs != NULL) {
                     // This CC is already in the stack somewhere.
@@ -510,13 +552,16 @@ pushCostCentre (CostCentreStack *ccs, CostCentre *cc)
 #endif
                     ccs->indexTable = addToIndexTable (ccs->indexTable,
                                                        new_ccs, cc, 1);
-                    return new_ccs;
+                    ret = new_ccs;
                 } else {
-                    return actualPush (ccs,cc);
+                    ret = actualPush (ccs,cc);
                 }
             }
         }
     }
+
+    RELEASE_LOCK(&ccs_mutex);
+    return ret;
 }
 
 static CostCentreStack *
@@ -801,11 +846,12 @@ reportCCSProfiling( void )
 	fprintf(prof_file, " %s", prog_argv[count]);
     fprintf(prof_file, "\n\n");
 
-    fprintf(prof_file, "\ttotal time  = %11.2f secs   (%lu ticks @ %d ms)\n",
-	    (double) total_prof_ticks *
-        (double) RtsFlags.MiscFlags.tickInterval / 1000,
+    fprintf(prof_file, "\ttotal time  = %11.2f secs   (%lu ticks @ %d us, %d processor%s)\n",
+            ((double) total_prof_ticks *
+             (double) RtsFlags.MiscFlags.tickInterval) / (TIME_RESOLUTION * n_capabilities),
 	    (unsigned long) total_prof_ticks,
-        (int) RtsFlags.MiscFlags.tickInterval);
+            (int) TimeToUS(RtsFlags.MiscFlags.tickInterval),
+            n_capabilities, n_capabilities > 1 ? "s" : "");
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
 	    showStgWord64(total_alloc * sizeof(W_),

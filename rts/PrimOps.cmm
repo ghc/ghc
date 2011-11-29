@@ -63,7 +63,7 @@ stg_newByteArrayzh
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
     ("ptr" p) = foreign "C" allocate(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
-    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrWords_bytes(p) = n;
     RET_P(p);
 }
@@ -96,7 +96,7 @@ stg_newPinnedByteArrayzh
        to BA_ALIGN bytes: */
     p = p + ((-p - SIZEOF_StgArrWords) & BA_MASK);
 
-    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrWords_bytes(p) = n;
     RET_P(p);
 }
@@ -136,7 +136,7 @@ stg_newAlignedPinnedByteArrayzh
        <alignment> is a power of 2, which is technically not guaranteed */
     p = p + ((-p - SIZEOF_StgArrWords) & (alignment - 1));
 
-    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrWords_bytes(p) = n;
     RET_P(p);
 }
@@ -157,7 +157,7 @@ stg_newArrayzh
     ("ptr" arr) = foreign "C" allocate(MyCapability() "ptr",words) [R2];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
-    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
+    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
@@ -225,7 +225,7 @@ stg_newMutVarzh
     ALLOC_PRIM( SIZEOF_StgMutVar, R1_PTR, stg_newMutVarzh);
 
     mv = Hp - SIZEOF_StgMutVar + WDS(1);
-    SET_HDR(mv,stg_MUT_VAR_DIRTY_info,W_[CCCS]);
+    SET_HDR(mv,stg_MUT_VAR_DIRTY_info,CCCS);
     StgMutVar_var(mv) = R1;
     
     RET_P(mv);
@@ -297,21 +297,21 @@ stg_atomicModifyMutVarzh
    TICK_ALLOC_THUNK_2();
    CCCS_ALLOC(THUNK_2_SIZE);
    z = Hp - THUNK_2_SIZE + WDS(1);
-   SET_HDR(z, stg_ap_2_upd_info, W_[CCCS]);
+   SET_HDR(z, stg_ap_2_upd_info, CCCS);
    LDV_RECORD_CREATE(z);
    StgThunk_payload(z,0) = f;
 
    TICK_ALLOC_THUNK_1();
    CCCS_ALLOC(THUNK_1_SIZE);
    y = z - THUNK_1_SIZE;
-   SET_HDR(y, stg_sel_0_upd_info, W_[CCCS]);
+   SET_HDR(y, stg_sel_0_upd_info, CCCS);
    LDV_RECORD_CREATE(y);
    StgThunk_payload(y,0) = z;
 
    TICK_ALLOC_THUNK_1();
    CCCS_ALLOC(THUNK_1_SIZE);
    r = y - THUNK_1_SIZE;
-   SET_HDR(r, stg_sel_1_upd_info, W_[CCCS]);
+   SET_HDR(r, stg_sel_1_upd_info, CCCS);
    LDV_RECORD_CREATE(r);
    StgThunk_payload(r,0) = z;
 
@@ -353,7 +353,7 @@ stg_mkWeakzh
   ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, stg_mkWeakzh );
 
   w = Hp - SIZEOF_StgWeak + WDS(1);
-  SET_HDR(w, stg_WEAK_info, W_[CCCS]);
+  SET_HDR(w, stg_WEAK_info, CCCS);
 
   // We don't care about cfinalizer here.
   // Should StgWeak_cfinalizer(w) be stg_NO_FINALIZER_closure or
@@ -397,14 +397,14 @@ stg_mkWeakForeignEnvzh
   ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR, stg_mkWeakForeignEnvzh );
 
   w = Hp - SIZEOF_StgWeak + WDS(1);
-  SET_HDR(w, stg_WEAK_info, W_[CCCS]);
+  SET_HDR(w, stg_WEAK_info, CCCS);
 
   payload_words = 4;
   words         = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
   ("ptr" p)     = foreign "C" allocate(MyCapability() "ptr", words) [];
 
   TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
-  SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+  SET_HDR(p, stg_ARR_WORDS_info, CCCS);
 
   StgArrWords_bytes(p)     = WDS(payload_words);
   StgArrWords_payload(p,0) = fptr;
@@ -877,7 +877,7 @@ stg_atomicallyzh
   Sp = Sp - SIZEOF_StgAtomicallyFrame;
   frame = Sp;
 
-  SET_HDR(frame,stg_atomically_frame_info, W_[CCCS]);
+  SET_HDR(frame,stg_atomically_frame_info, CCCS);
   StgAtomicallyFrame_code(frame) = R1;
   StgAtomicallyFrame_result(frame) = NO_TREC;
   StgAtomicallyFrame_next_invariant_to_check(frame) = END_INVARIANT_CHECK_QUEUE;
@@ -903,7 +903,7 @@ stg_catchSTMzh
   Sp = Sp - SIZEOF_StgCatchSTMFrame;
   frame = Sp;
 
-  SET_HDR(frame, stg_catch_stm_frame_info, W_[CCCS]);
+  SET_HDR(frame, stg_catch_stm_frame_info, CCCS);
   StgCatchSTMFrame_handler(frame) = R2;
   StgCatchSTMFrame_code(frame) = R1;
 
@@ -941,7 +941,7 @@ stg_catchRetryzh
   Sp = Sp - SIZEOF_StgCatchRetryFrame;
   frame = Sp;
   
-  SET_HDR(frame, stg_catch_retry_frame_info, W_[CCCS]);
+  SET_HDR(frame, stg_catch_retry_frame_info, CCCS);
   StgCatchRetryFrame_running_alt_code(frame) = 0 :: CInt; // false;
   StgCatchRetryFrame_first_code(frame) = R1;
   StgCatchRetryFrame_alt_code(frame) = R2;
@@ -1153,7 +1153,7 @@ stg_newMVarzh
     ALLOC_PRIM ( SIZEOF_StgMVar, NO_PTRS, stg_newMVarzh );
   
     mvar = Hp - SIZEOF_StgMVar + WDS(1);
-    SET_HDR(mvar,stg_MVAR_DIRTY_info,W_[CCCS]);
+    SET_HDR(mvar,stg_MVAR_DIRTY_info,CCCS);
         // MVARs start dirty: generation 0 has no mutable list
     StgMVar_head(mvar)  = stg_END_TSO_QUEUE_closure;
     StgMVar_tail(mvar)  = stg_END_TSO_QUEUE_closure;
@@ -1527,7 +1527,7 @@ stg_makeStableNamezh
      */
     if ( snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) == NULL ) {
 	sn_obj = Hp - SIZEOF_StgStableName + WDS(1);
-	SET_HDR(sn_obj, stg_STABLE_NAME_info, W_[CCCS]);
+	SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
 	StgStableName_sn(sn_obj) = index;
 	snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) = sn_obj;
     } else {
@@ -1578,7 +1578,7 @@ stg_newBCOzh
     ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R5_PTR, stg_newBCOzh );
 
     bco = Hp - bytes + WDS(1);
-    SET_HDR(bco, stg_BCO_info, W_[CCCS]);
+    SET_HDR(bco, stg_BCO_info, CCCS);
     
     StgBCO_instrs(bco)     = R1;
     StgBCO_literals(bco)   = R2;
@@ -1617,7 +1617,7 @@ stg_mkApUpd0zh
     CCCS_ALLOC(SIZEOF_StgAP);
 
     ap = Hp - SIZEOF_StgAP + WDS(1);
-    SET_HDR(ap, stg_AP_info, W_[CCCS]);
+    SET_HDR(ap, stg_AP_info, CCCS);
     
     StgAP_n_args(ap) = HALF_W_(0);
     StgAP_fun(ap) = R1;
@@ -1668,7 +1668,7 @@ out:
     ptrs_arr  = Hp - nptrs_arr_sz - ptrs_arr_sz + WDS(1);
     nptrs_arr = Hp - nptrs_arr_sz + WDS(1);
 
-    SET_HDR(ptrs_arr, stg_MUT_ARR_PTRS_FROZEN_info, W_[CCCS]);
+    SET_HDR(ptrs_arr, stg_MUT_ARR_PTRS_FROZEN_info, CCCS);
     StgMutArrPtrs_ptrs(ptrs_arr) = ptrs;
     StgMutArrPtrs_size(ptrs_arr) = ptrs + ptrs_arr_cards;
 
@@ -1683,7 +1683,7 @@ for:
        allocated in the nursery.  The GC will fill it in if/when the array
        is promoted. */
     
-    SET_HDR(nptrs_arr, stg_ARR_WORDS_info, W_[CCCS]);
+    SET_HDR(nptrs_arr, stg_ARR_WORDS_info, CCCS);
     StgArrWords_bytes(nptrs_arr) = WDS(nptrs);
     p = 0;
 for2:
@@ -1785,16 +1785,13 @@ stg_delayzh
 
 #else
 
+
     W_ time;
-    W_ divisor;
     (time) = foreign "C" getourtimeofday() [R1];
-    divisor = TO_W_(RtsFlags_MiscFlags_tickInterval(RtsFlags));
-    if (divisor == 0) {
-        divisor = 50;
-    }
-    divisor = divisor * 1000;
-    target = ((R1 + divisor - 1) / divisor) /* divide rounding up */
-           + time + 1; /* Add 1 as getourtimeofday rounds down */
+    // getourtimeofday() returns a value in units of 10ms
+    // R1 is in microseconds, we need to (/ 10000), rounding up
+    target = time + 1 + (R1 + 10000-1) / 10000;
+
     StgTSO_block_info(CurrentTSO) = target;
 
     /* Insert the new thread in the sleeping queue. */

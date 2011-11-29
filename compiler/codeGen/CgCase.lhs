@@ -670,6 +670,6 @@ restoreCurrentCostCentre Nothing     _freeit = nopC
 restoreCurrentCostCentre (Just slot) freeit
  = do 	{ sp_rel <- getSpRelOffset slot
 	; whenC freeit (freeStackSlots [slot])
-	; stmtC (CmmStore curCCSAddr (CmmLoad sp_rel bWord)) }
+        ; stmtC (storeCurCCS (CmmLoad sp_rel bWord)) }
 \end{code}
 

@@ -809,6 +809,13 @@
 	      <entry><option>-XNoConstraintKinds</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XPolyKinds</option></entry>
+	      <entry>Enable <link linkend="kind-polymorphism">kind polymorphism</link>.
+                     Implies <option>-XKindSignatures</option>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoPolyKinds</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XScopedTypeVariables</option></entry>
 	      <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
 	      Implied by <option>-fglasgow-exts</option>.</entry>
@@ -981,10 +988,10 @@
 	      <entry><option>-XNoRecursiveDo</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XPArr</option></entry>
+	      <entry><option>-XParallelArrays</option></entry>
 	      <entry>Enable parallel arrays.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-XNoPArr</option></entry>
+	      <entry><option>-XNoParallelArrays</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XRecordWildCards</option></entry>

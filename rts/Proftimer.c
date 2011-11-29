@@ -11,6 +11,7 @@
 
 #include "Profiling.h"
 #include "Proftimer.h"
+#include "Capability.h"
 
 #ifdef PROFILING
 static rtsBool do_prof_ticks = rtsFalse;       // enable profiling ticks
@@ -50,7 +51,7 @@ void
 startHeapProfTimer( void )
 {
     if (RtsFlags.ProfFlags.doHeapProfile && 
-	RtsFlags.ProfFlags.profileIntervalTicks > 0) {
+        RtsFlags.ProfFlags.heapProfileIntervalTicks > 0) {
 	do_heap_prof_ticks = rtsTrue;
     }
 }
@@ -60,7 +61,7 @@ initProfTimer( void )
 {
     performHeapProfile = rtsFalse;
 
-    ticks_to_heap_profile = RtsFlags.ProfFlags.profileIntervalTicks;
+    ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 
     startHeapProfTimer();
 }
@@ -73,14 +74,17 @@ handleProfTick(void)
 #ifdef PROFILING
     total_ticks++;
     if (do_prof_ticks) {
-	CCCS->time_ticks++;
+        nat n;
+        for (n=0; n < n_capabilities; n++) {
+            capabilities[n].r.rCCCS->time_ticks++;
+        }
     }
 #endif
 
     if (do_heap_prof_ticks) {
 	ticks_to_heap_profile--;
 	if (ticks_to_heap_profile <= 0) {
-	    ticks_to_heap_profile = RtsFlags.ProfFlags.profileIntervalTicks;
+            ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 	    performHeapProfile = rtsTrue;
 	}
     }

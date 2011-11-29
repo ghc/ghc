@@ -608,7 +608,7 @@ allocate (Capability *cap, lnat n)
     StgPtr p;
 
     TICK_ALLOC_HEAP_NOCTR(n);
-    CCS_ALLOC(CCCS,n);
+    CCS_ALLOC(cap->r.rCCCS,n);
     
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
 	lnat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
@@ -719,7 +719,7 @@ allocatePinned (Capability *cap, lnat n)
     }
 
     TICK_ALLOC_HEAP_NOCTR(n);
-    CCS_ALLOC(CCCS,n);
+    CCS_ALLOC(cap->r.rCCCS,n);
 
     bd = cap->pinned_object_block;
     

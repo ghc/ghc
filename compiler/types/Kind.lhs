@@ -35,7 +35,8 @@ module Kind (
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
-        isUbxTupleKind, isArgTypeKind, isConstraintKind, isKind,
+        isUbxTupleKind, isArgTypeKind, isConstraintKind,
+        isConstraintOrLiftedKind, isKind,
         isSuperKind, noHashInKind,
         isLiftedTypeKindCon, isConstraintKindCon,
         isAnyKind, isAnyKindCon,
@@ -138,7 +139,7 @@ synTyConResKind tycon = kindAppResult (tyConKind tycon) (map mkTyVarTy (tyConTyV
 
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
 isUbxTupleKind, isOpenTypeKind, isArgTypeKind, isUnliftedTypeKind,
-  isConstraintKind, isAnyKind :: Kind -> Bool
+  isConstraintKind, isAnyKind, isConstraintOrLiftedKind :: Kind -> Bool
 
 isOpenTypeKindCon, isUbxTupleKindCon, isArgTypeKindCon,
   isUnliftedTypeKindCon, isSubArgTypeKindCon, tcIsSubArgTypeKindCon,
@@ -175,6 +176,9 @@ isConstraintKindCon tc = tyConUnique tc == constraintKindTyConKey
 isConstraintKind (TyConApp tc _) = isConstraintKindCon tc
 isConstraintKind _               = False
 
+isConstraintOrLiftedKind (TyConApp tc _)
+  = isConstraintKindCon tc || isLiftedTypeKindCon tc
+isConstraintOrLiftedKind _ = False
 
 -- Subkinding
 -- The tc variants are used during type-checking, where we don't want the
@@ -288,8 +292,8 @@ defaultKind :: Kind -> Kind
 -- and the calling conventions differ.
 -- This defaulting is done in TcMType.zonkTcTyVarBndr.
 defaultKind k
-  | isSubOpenTypeKind k = liftedTypeKind
-  | otherwise           = k
+  | tcIsSubOpenTypeKind k = liftedTypeKind
+  | otherwise             = k
 
 splitKiTyVars :: [TyVar] -> ([KindVar], [TyVar])
 -- Precondition: kind variables should precede type variables

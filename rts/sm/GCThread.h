@@ -181,9 +181,9 @@ typedef struct gc_thread_ {
     lnat no_work;
     lnat scav_find_work;
 
-    Ticks gc_start_cpu;   // process CPU time
-    Ticks gc_start_elapsed;  // process elapsed time
-    Ticks gc_start_thread_cpu; // thread CPU time
+    Time gc_start_cpu;   // process CPU time
+    Time gc_start_elapsed;  // process elapsed time
+    Time gc_start_thread_cpu; // thread CPU time
     lnat gc_start_faults;
 
     // -------------------

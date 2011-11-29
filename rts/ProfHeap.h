@@ -9,11 +9,9 @@
 #ifndef PROFHEAP_H
 #define PROFHEAP_H
 
-#include "GetTime.h" // for Ticks
-
 #include "BeginPrivate.h"
 
-void    heapCensus         (Ticks t);
+void    heapCensus         (Time t);
 nat     initHeapProfiling  (void);
 void    endHeapProfiling   (void);
 rtsBool strMatchesSelector (char* str, char* sel);

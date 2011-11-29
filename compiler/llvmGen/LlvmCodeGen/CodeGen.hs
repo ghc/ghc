@@ -125,7 +125,7 @@ stmtToInstrs env stmt = case stmt of
     CmmSwitch arg ids    -> genSwitch env arg ids
 
     -- Foreign Call
-    CmmCall target res args _ ret
+    CmmCall target res args ret
         -> genCall env target res args ret
 
     -- Tail call
@@ -239,6 +239,7 @@ genCall env target res args ret = do
                             ArchX86_64 -> CC_X86_Stdcc
                             _          -> CC_Ccc
             CCallConv    -> CC_Ccc
+            CApiConv     -> CC_Ccc
             PrimCallConv -> CC_Ccc
             CmmCallConv  -> panic "CmmCallConv not supported here!"
 

@@ -133,7 +133,7 @@ lintCmmStmt platform labels = lint
             _ <- lintCmmExpr platform l
             _ <- lintCmmExpr platform r
             return ()
-          lint (CmmCall target _res args _ _) =
+          lint (CmmCall target _res args _) =
               lintTarget platform target >> mapM_ (lintCmmExpr platform . hintlessCmm) args
           lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr platform e >> checkCond platform e
           lint (CmmSwitch e branches) = do

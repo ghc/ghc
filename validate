@@ -90,9 +90,11 @@ fi
 
 thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 
-echo "Validating=YES" > mk/are-validating.mk
+echo "Validating=YES"       >  mk/are-validating.mk
+echo "ValidateSpeed=$speed" >> mk/are-validating.mk
+echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 
-$make -j$threads ValidateHpc=$hpc ValidateSpeed=$speed
+$make -j$threads
 # For a "debug make", add "--debug=b --debug=m"
 
 # -----------------------------------------------------------------------------

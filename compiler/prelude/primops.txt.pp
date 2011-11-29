@@ -1799,6 +1799,9 @@ primop  TraceCcsOp "traceCcs#" GenPrimOp
    has_side_effects = True
    out_of_line = True
 
+primop  GetCCCSOp "getCCCS#" GenPrimOp
+   State# s -> (# State# s, Addr# #)
+
 ------------------------------------------------------------------------
 section "Etc" 
 	{Miscellaneous built-ins}

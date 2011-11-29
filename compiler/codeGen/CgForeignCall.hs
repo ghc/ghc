@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module CgForeignCall (
   cgForeignCall,
   emitForeignCall,
@@ -50,32 +43,32 @@ import Control.Monad
 -- Code generation for Foreign Calls
 
 cgForeignCall
-	:: [HintedCmmFormal]	-- where to put the results
-	-> ForeignCall		-- the op
-	-> [StgArg]		-- arguments
-	-> StgLiveVars	-- live vars, in case we need to save them
-	-> Code
+        :: [HintedCmmFormal]    -- where to put the results
+        -> ForeignCall          -- the op
+        -> [StgArg]             -- arguments
+        -> StgLiveVars  -- live vars, in case we need to save them
+        -> Code
 cgForeignCall results fcall stg_args live
-  = do 
+  = do
   reps_n_amodes <- getArgAmodes stg_args
   let
-	-- Get the *non-void* args, and jiggle them with shimForeignCall
-	arg_exprs = [ shimForeignCallArg stg_arg expr 
-	  	    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
-	               nonVoidArg rep]
+        -- Get the *non-void* args, and jiggle them with shimForeignCall
+        arg_exprs = [ shimForeignCallArg stg_arg expr
+                    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes,
+                       nonVoidArg rep]
 
-	arg_hints = zipWith CmmHinted
+        arg_hints = zipWith CmmHinted
                       arg_exprs (map (typeForeignHint.stgArgType) stg_args)
   -- in
   emitForeignCall results fcall arg_hints live
 
 
 emitForeignCall
-	:: [HintedCmmFormal]	-- where to put the results
-	-> ForeignCall		-- the op
-	-> [CmmHinted CmmExpr] -- arguments
-	-> StgLiveVars	-- live vars, in case we need to save them
-	-> Code
+        :: [HintedCmmFormal]    -- where to put the results
+        -> ForeignCall          -- the op
+        -> [CmmHinted CmmExpr] -- arguments
+        -> StgLiveVars  -- live vars, in case we need to save them
+        -> Code
 
 emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   = do vols <- getVolatileRegs live
@@ -84,34 +77,34 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
          (CmmCallee cmm_target cconv) call_args (Just vols) srt CmmMayReturn
   where
       (call_args, cmm_target)
-	= case target of
-	   -- If the packageId is Nothing then the label is taken to be in the
-	   --	package currently being compiled.
-	   StaticTarget lbl mPkgId
-	    -> let labelSource 
-	    		= case mPkgId of
-				Nothing		-> ForeignLabelInThisPackage
-				Just pkgId	-> ForeignLabelInPackage pkgId
-	       in ( args
-	          , CmmLit (CmmLabel 
-			   	(mkForeignLabel lbl call_size labelSource IsFunction)))
+        = case target of
+           -- If the packageId is Nothing then the label is taken to be in the
+           --   package currently being compiled.
+           StaticTarget lbl mPkgId
+            -> let labelSource
+                        = case mPkgId of
+                                Nothing         -> ForeignLabelInThisPackage
+                                Just pkgId      -> ForeignLabelInPackage pkgId
+               in ( args
+                  , CmmLit (CmmLabel
+                                (mkForeignLabel lbl call_size labelSource IsFunction)))
 
-	   -- A label imported with "foreign import ccall "dynamic" ..."
-	   --	Note: "dynamic" here doesn't mean "dynamic library".
-	   --	Read the FFI spec for details.
-	   DynamicTarget    ->  case args of
-	                        (CmmHinted fn _):rest -> (rest, fn)
-	                        [] -> panic "emitForeignCall: DynamicTarget []"
+           -- A label imported with "foreign import ccall "dynamic" ..."
+           --   Note: "dynamic" here doesn't mean "dynamic library".
+           --   Read the FFI spec for details.
+           DynamicTarget    ->  case args of
+                                (CmmHinted fn _):rest -> (rest, fn)
+                                [] -> panic "emitForeignCall: DynamicTarget []"
 
-	-- in the stdcall calling convention, the symbol needs @size appended
-	-- to it, where size is the total number of bytes of arguments.  We
-	-- attach this info to the CLabel here, and the CLabel pretty printer
-	-- will generate the suffix when the label is printed.
+        -- in the stdcall calling convention, the symbol needs @size appended
+        -- to it, where size is the total number of bytes of arguments.  We
+        -- attach this info to the CLabel here, and the CLabel pretty printer
+        -- will generate the suffix when the label is printed.
       call_size
-	| StdCallConv <- cconv = Just (sum (map (arg_size.cmmExprType.hintlessCmm) args))
-	| otherwise            = Nothing
+        | StdCallConv <- cconv = Just (sum (map (arg_size.cmmExprType.hintlessCmm) args))
+        | otherwise            = Nothing
 
-	-- ToDo: this might not be correct for 64-bit API
+        -- ToDo: this might not be correct for 64-bit API
       arg_size rep = max (widthInBytes (typeWidth rep)) wORD_SIZE
 
 
@@ -120,21 +113,21 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 -- which should be used instead of this (the equivalent emitForeignCall
 -- is not presently exported.)
 emitForeignCall'
-	:: Safety
-	-> [HintedCmmFormal]	-- where to put the results
-	-> CmmCallTarget	-- the op
-	-> [CmmHinted CmmExpr] -- arguments
-	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
+        :: Safety
+        -> [HintedCmmFormal]    -- where to put the results
+        -> CmmCallTarget        -- the op
+        -> [CmmHinted CmmExpr] -- arguments
+        -> Maybe [GlobalReg]    -- live vars, in case we need to save them
         -> C_SRT                -- the SRT of the calls continuation
         -> CmmReturnInfo
-	-> Code
+        -> Code
 emitForeignCall' safety results target args vols _srt ret
   | not (playSafe safety) = do
     temp_args <- load_args_into_temps args
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     let caller_load' = if ret == CmmNeverReturns then [] else caller_load
     stmtsC caller_save
-    stmtC (CmmCall target results temp_args CmmUnsafe ret)
+    stmtC (CmmCall target results temp_args ret)
     stmtsC caller_load'
 
   | otherwise = do
@@ -152,16 +145,16 @@ emitForeignCall' safety results target args vols _srt ret
     -- Once that happens, this function will just emit a (CmmSafe srt) call,
     -- and the CPS will be the one to convert that
     -- to this sequence of three CmmUnsafe calls.
-    stmtC (CmmCall (CmmCallee suspendThread CCallConv) 
-			[ CmmHinted id AddrHint ]
-			[ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint
-			, CmmHinted (CmmLit (CmmInt (fromIntegral (fromEnum (playInterruptible safety))) wordWidth)) NoHint]
-			CmmUnsafe ret)
-    stmtC (CmmCall temp_target results temp_args CmmUnsafe ret)
-    stmtC (CmmCall (CmmCallee resumeThread CCallConv) 
-			[ CmmHinted new_base AddrHint ]
-			[ CmmHinted (CmmReg (CmmLocal id)) AddrHint ]
-			CmmUnsafe ret)
+    stmtC (CmmCall (CmmCallee suspendThread CCallConv)
+                        [ CmmHinted id AddrHint ]
+                        [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint
+                        , CmmHinted (CmmLit (CmmInt (fromIntegral (fromEnum (playInterruptible safety))) wordWidth)) NoHint]
+                        ret)
+    stmtC (CmmCall temp_target results temp_args ret)
+    stmtC (CmmCall (CmmCallee resumeThread CCallConv)
+                        [ CmmHinted new_base AddrHint ]
+                        [ CmmHinted (CmmReg (CmmLocal id)) AddrHint ]
+                        ret)
     -- Assign the result to BaseReg: we
     -- might now have a different Capability!
     stmtC (CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)))
@@ -183,11 +176,11 @@ resumeThread  = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "resumeThre
 load_args_into_temps :: [CmmHinted CmmExpr] -> FCode [CmmHinted CmmExpr]
 load_args_into_temps = mapM arg_assign_temp
   where arg_assign_temp (CmmHinted e hint) = do
-	   tmp <- maybe_assign_temp e
-	   return (CmmHinted tmp hint)
-	
+           tmp <- maybe_assign_temp e
+           return (CmmHinted tmp hint)
+
 load_target_into_temp :: CmmCallTarget -> FCode CmmCallTarget
-load_target_into_temp (CmmCallee expr conv) = do 
+load_target_into_temp (CmmCallee expr conv) = do
   tmp <- maybe_assign_temp expr
   return (CmmCallee tmp conv)
 load_target_into_temp other_target =
@@ -196,13 +189,13 @@ load_target_into_temp other_target =
 maybe_assign_temp :: CmmExpr -> FCode CmmExpr
 maybe_assign_temp e
   | hasNoGlobalRegs e = return e
-  | otherwise          = do 
-	-- don't use assignTemp, it uses its own notion of "trivial"
-	-- expressions, which are wrong here.
+  | otherwise          = do
+        -- don't use assignTemp, it uses its own notion of "trivial"
+        -- expressions, which are wrong here.
         -- this is a NonPtr because it only duplicates an existing
-	reg <- newTemp (cmmExprType e) --TODO FIXME NOW
-	stmtC (CmmAssign (CmmLocal reg) e)
-	return (CmmReg (CmmLocal reg))
+        reg <- newTemp (cmmExprType e) --TODO FIXME NOW
+        stmtC (CmmAssign (CmmLocal reg) e)
+        return (CmmReg (CmmLocal reg))
 
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
@@ -218,7 +211,7 @@ emitSaveThreadState = do
   emitCloseNursery
   -- and save the current cost centre stack in the TSO when profiling:
   when opt_SccProfilingOn $
-	stmtC (CmmStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS)
+        stmtC (CmmStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS)
 
    -- CurrentNursery->free = Hp+1;
 emitCloseNursery :: Code
@@ -238,7 +231,7 @@ emitLoadThreadState = do
                               bWord),
         -- SpLim = stack->stack + RESERVED_STACK_WORDS;
         CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal stack)) stack_STACK)
-			            rESERVED_STACK_WORDS),
+                                    rESERVED_STACK_WORDS),
         -- HpAlloc = 0;
         --   HpAlloc is assumed to be set to non-zero only by a failed
         --   a heap check, see HeapStackCheck.cmm:GC_GENERIC
@@ -247,28 +240,28 @@ emitLoadThreadState = do
   emitOpenNursery
   -- and load the current cost centre stack from the TSO when profiling:
   when opt_SccProfilingOn $
-	stmtC (CmmStore curCCSAddr 
-                (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord))
+        stmtC $ storeCurCCS $
+                  CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) bWord
 
 emitOpenNursery :: Code
 emitOpenNursery = stmtsC [
         -- Hp = CurrentNursery->free - 1;
-	CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free gcWord) (-1)),
+        CmmAssign hp (cmmOffsetW (CmmLoad nursery_bdescr_free gcWord) (-1)),
 
-        -- HpLim = CurrentNursery->start + 
-	--		CurrentNursery->blocks*BLOCK_SIZE_W - 1;
-	CmmAssign hpLim
-	    (cmmOffsetExpr
-		(CmmLoad nursery_bdescr_start bWord)
-		(cmmOffset
-		  (CmmMachOp mo_wordMul [
-		    CmmMachOp (MO_SS_Conv W32 wordWidth)
-		      [CmmLoad nursery_bdescr_blocks b32],
-		    CmmLit (mkIntCLit bLOCK_SIZE)
-		   ])
-		  (-1)
-		)
-	    )
+        -- HpLim = CurrentNursery->start +
+        --              CurrentNursery->blocks*BLOCK_SIZE_W - 1;
+        CmmAssign hpLim
+            (cmmOffsetExpr
+                (CmmLoad nursery_bdescr_start bWord)
+                (cmmOffset
+                  (CmmMachOp mo_wordMul [
+                    CmmMachOp (MO_SS_Conv W32 wordWidth)
+                      [CmmLoad nursery_bdescr_blocks b32],
+                    CmmLit (mkIntCLit bLOCK_SIZE)
+                   ])
+                  (-1)
+                )
+            )
    ]
 
 nursery_bdescr_free, nursery_bdescr_start, nursery_bdescr_blocks :: CmmExpr
@@ -286,19 +279,19 @@ closureField :: ByteOff -> ByteOff
 closureField off = off + fixedHdrSize * wORD_SIZE
 
 stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
-stgSp		  = CmmReg sp
-stgHp		  = CmmReg hp
-stgCurrentTSO	  = CmmReg currentTSO
+stgSp             = CmmReg sp
+stgHp             = CmmReg hp
+stgCurrentTSO     = CmmReg currentTSO
 stgCurrentNursery = CmmReg currentNursery
 
 sp, spLim, hp, hpLim, currentTSO, currentNursery, hpAlloc :: CmmReg
-sp		  = CmmGlobal Sp
-spLim		  = CmmGlobal SpLim
-hp		  = CmmGlobal Hp
-hpLim		  = CmmGlobal HpLim
-currentTSO	  = CmmGlobal CurrentTSO
-currentNursery 	  = CmmGlobal CurrentNursery
-hpAlloc 	  = CmmGlobal HpAlloc
+sp                = CmmGlobal Sp
+spLim             = CmmGlobal SpLim
+hp                = CmmGlobal Hp
+hpLim             = CmmGlobal HpLim
+currentTSO        = CmmGlobal CurrentTSO
+currentNursery    = CmmGlobal CurrentNursery
+hpAlloc           = CmmGlobal HpAlloc
 
 -- -----------------------------------------------------------------------------
 -- For certain types passed to foreign calls, we adjust the actual
@@ -308,12 +301,12 @@ hpAlloc 	  = CmmGlobal HpAlloc
 shimForeignCallArg :: StgArg -> CmmExpr -> CmmExpr
 shimForeignCallArg arg expr
   | tycon == arrayPrimTyCon || tycon == mutableArrayPrimTyCon
-	= cmmOffsetB expr arrPtrsHdrSize
+        = cmmOffsetB expr arrPtrsHdrSize
 
   | tycon == byteArrayPrimTyCon || tycon == mutableByteArrayPrimTyCon
-	= cmmOffsetB expr arrWordsHdrSize
+        = cmmOffsetB expr arrWordsHdrSize
 
   | otherwise = expr
-  where	
-	-- should be a tycon app, since this is a foreign call
-	tycon = tyConAppTyCon (repType (stgArgType arg))
+  where
+        -- should be a tycon app, since this is a foreign call
+        tycon = tyConAppTyCon (repType (stgArgType arg))

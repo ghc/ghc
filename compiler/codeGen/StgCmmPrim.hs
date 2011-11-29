@@ -228,6 +228,9 @@ emitPrimOp [res] SparkOp [arg]
             [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
         emit (mkAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
 
+emitPrimOp [res] GetCCCSOp []
+   = emit (mkAssign (CmmLocal res) curCCS)
+
 emitPrimOp [res] ReadMutVarOp [mutv]
    = emit (mkAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))
 

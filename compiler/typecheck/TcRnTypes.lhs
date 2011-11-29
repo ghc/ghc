@@ -55,7 +55,7 @@ module TcRnTypes(
         singleCt, extendCts, isEmptyCts, isCTyEqCan, 
         isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe,
         isCIrredEvCan, isCNonCanonical,
-        SubGoalDepth,
+        SubGoalDepth, ctPred,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, addFlats, addImplics, mkFlatWC,
@@ -71,7 +71,7 @@ module TcRnTypes(
 	SkolemInfo(..),
 
         CtFlavor(..), pprFlavorArising, isWanted, 
-        isGivenOrSolved, isGiven_maybe,
+        isGivenOrSolved, isGiven_maybe, isSolved,
         isDerived,
 
 	-- Pretty printing
@@ -898,10 +898,28 @@ data Ct
       cc_depth  :: SubGoalDepth
     }
 
+\end{code}
 
+\begin{code}
+
+ctPred :: Ct -> PredType 
+ctPred (CNonCanonical { cc_id = v }) = evVarPred v
+ctPred (CDictCan { cc_class = cls, cc_tyargs = xis }) 
+  = mkClassPred cls xis
+ctPred (CTyEqCan { cc_tyvar = tv, cc_rhs = xi }) 
+  = mkEqPred (mkTyVarTy tv, xi)
+ctPred (CFunEqCan { cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 }) 
+  = mkEqPred(mkTyConApp fn xis1, xi2)
+ctPred (CIPCan { cc_ip_nm = nm, cc_ip_ty = xi }) 
+  = mkIPPred nm xi
+ctPred (CIrredEvCan { cc_ty = xi }) = xi
+\end{code}
+
+
+\begin{code}
 instance Outputable Ct where
   ppr ct = ppr (cc_flavor ct) <> braces (ppr (cc_depth ct))
-                  <+> ppr ev_var <+> dcolon <+> ppr (varType ev_var) 
+                  <+> ppr ev_var <+> dcolon <+> ppr (ctPred ct)
                   <+> parens (text ct_sort)
          where ev_var  = cc_id ct
                ct_sort = case ct of 
@@ -1210,14 +1228,17 @@ data CtFlavor
 
 data GivenKind
   = GivenOrig   -- Originates in some given, such as signature or pattern match
-  | GivenSolved -- Is given as result of being solved, maybe provisionally on
-                -- some other wanted constraints. 
+  | GivenSolved (Maybe EvTerm) 
+                -- Is given as result of being solved, maybe provisionally on
+                -- some other wanted constraints. We cache the evidence term 
+                -- sometimes here as well /as well as/ in the EvBinds, 
+                -- see Note [Optimizing Spontaneously Solved Coercions]
 
 instance Outputable CtFlavor where
-  ppr (Given _ GivenOrig)   = ptext (sLit "[G]")
-  ppr (Given _ GivenSolved) = ptext (sLit "[S]") -- Print [S] for Given/Solved's
-  ppr (Wanted {})           = ptext (sLit "[W]")
-  ppr (Derived {})          = ptext (sLit "[D]") 
+  ppr (Given _ GivenOrig)        = ptext (sLit "[G]")
+  ppr (Given _ (GivenSolved {})) = ptext (sLit "[S]") -- Print [S] for Given/Solved's
+  ppr (Wanted {})                = ptext (sLit "[W]")
+  ppr (Derived {})               = ptext (sLit "[D]")
 
 pprFlavorArising :: CtFlavor -> SDoc
 pprFlavorArising (Derived wl)   = pprArisingAt wl
@@ -1231,6 +1252,10 @@ isWanted _           = False
 isGivenOrSolved :: CtFlavor -> Bool
 isGivenOrSolved (Given {}) = True
 isGivenOrSolved _ = False
+
+isSolved :: CtFlavor -> Bool
+isSolved (Given _ (GivenSolved {})) = True
+isSolved _ = False
 
 isGiven_maybe :: CtFlavor -> Maybe GivenKind 
 isGiven_maybe (Given _ gk) = Just gk

@@ -13,7 +13,6 @@ module Vectorise.Builtins.Base (
   Builtins(..),
   
   -- * Projections
-  parray_PrimTyCon,
   selTy, selsTy,
   selReplicate,
   selTags,
@@ -71,9 +70,7 @@ aLL_DPH_PRIM_TYCONS = map tyConName [intPrimTyCon, {- floatPrimTyCon, -} doubleP
 --
 data Builtins 
         = Builtins 
-        { parrayTyCon          :: TyCon                     -- ^ PArray
-        , parray_PrimTyCons    :: NameEnv TyCon             -- ^ PArray_Int# etc.
-        , pdataTyCon           :: TyCon                     -- ^ PData
+        { pdataTyCon           :: TyCon                     -- ^ PData
         , pdatasTyCon          :: TyCon                     -- ^ PDatas
         , prClass              :: Class                     -- ^ PR
         , prTyCon              :: TyCon                     -- ^ PR
@@ -118,9 +115,6 @@ data Builtins
 -- Projections ----------------------------------------------------------------
 -- We use these wrappers instead of indexing the `Builtin` structure directly
 -- because they give nicer panic messages if the indexed thing cannot be found.
-
-parray_PrimTyCon :: TyCon -> Builtins -> TyCon
-parray_PrimTyCon tc bi = lookupEnvBuiltin "parray_PrimTyCon" (parray_PrimTyCons bi) (tyConName tc)
 
 selTy :: Int -> Builtins -> Type
 selTy           = indexBuiltin "selTy" selTys

@@ -80,6 +80,7 @@ typedef struct StgRegTable_ {
   StgPtr 	  rSpLim;
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
+  struct _CostCentreStack * rCCCS;  // current cost-centre-stack
   struct StgTSO_ *     rCurrentTSO;
   struct nursery_ *    rNursery;
   struct bdescr_ *     rCurrentNursery; /* Hp/HpLim point into this block */

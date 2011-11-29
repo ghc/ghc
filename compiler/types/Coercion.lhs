@@ -22,6 +22,7 @@ module Coercion (
         -- ** Functions over coercions
         coVarKind,
         coercionType, coercionKind, coercionKinds, isReflCo, liftedCoercionKind,
+        isReflCo_maybe,
         mkCoercionType,
 
 	-- ** Constructing coercions

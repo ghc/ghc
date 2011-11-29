@@ -239,8 +239,8 @@ mkBindsRep tycon =
   `unionBags`
     unitBag (L loc (mkFunBind (L loc to_RDR) to_matches))
       where
-        from_matches = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
-        to_matches   = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to_alts  ]
+        from_matches  = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
+        to_matches    = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to_alts  ]
         loc           = srcLocSpan (getSrcLoc tycon)
         datacons      = tyConDataCons tycon
 
@@ -267,7 +267,6 @@ tc_mkRepTyCon tycon metaDts mod =
      ; rep0Ty <- tc_mkRepTy tycon metaDts
     
        -- `rep_name` is a name we generate for the synonym
---     ; rep_name <- newImplicitBinder (tyConName tycon) mkGenR
      ; rep_name <- newGlobalBinder mod (mkGenR (nameOccName (tyConName tycon)))
                      (nameSrcSpan (tyConName tycon))
      ; let -- `tyvars` = [a,b]
