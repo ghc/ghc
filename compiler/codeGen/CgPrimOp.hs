@@ -38,6 +38,7 @@ import Module
 import Constants
 import Outputable
 import FastString
+import StaticFlags
 
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps
@@ -155,7 +156,13 @@ emitPrimOp [res] SparkOp [arg] live = do
   where
 	newspark = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark")))
 
-emitPrimOp [res] GetCCCSOp [] _live
+emitPrimOp [res] GetCCSOfOp [arg] _live
+  = stmtC (CmmAssign (CmmLocal res) val)
+  where
+    val | opt_SccProfilingOn = costCentreFrom (cmmUntag arg)
+        | otherwise          = CmmLit zeroCLit
+
+emitPrimOp [res] GetCurrentCCSOp [_dummy_arg] _live
    = stmtC (CmmAssign (CmmLocal res) curCCS)
 
 emitPrimOp [res] ReadMutVarOp [mutv] _

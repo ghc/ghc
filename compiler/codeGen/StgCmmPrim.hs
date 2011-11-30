@@ -42,6 +42,7 @@ import Constants
 import Module
 import FastString
 import Outputable
+import StaticFlags
 
 ------------------------------------------------------------------------
 --	Primitive operations and foreign calls
@@ -228,7 +229,13 @@ emitPrimOp [res] SparkOp [arg]
             [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
         emit (mkAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
 
-emitPrimOp [res] GetCCCSOp []
+emitPrimOp [res] GetCCSOfOp [arg]
+  = emit (mkAssign (CmmLocal res) val)
+  where
+    val | opt_SccProfilingOn = costCentreFrom (cmmUntag arg)
+        | otherwise          = CmmLit zeroCLit
+
+emitPrimOp [res] GetCurrentCCSOp [_dummy_arg]
    = emit (mkAssign (CmmLocal res) curCCS)
 
 emitPrimOp [res] ReadMutVarOp [mutv]
