@@ -23,6 +23,7 @@ data Platform
               platformArch                     :: Arch,
               platformOS                       :: OS,
               platformHasGnuNonexecStack       :: Bool,
+              platformHasIdentDirective        :: Bool,
               platformHasSubsectionsViaSymbols :: Bool
           }
         deriving (Read, Show, Eq)

@@ -193,6 +193,7 @@ initSysTools mbMinusB
         ; targetArch <- readSetting "target arch"
         ; targetOS <- readSetting "target os"
         ; targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
+        ; targetHasIdentDirective <- readSetting "target has .ident directive"
         ; targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
         ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
         -- On Windows, mingw is distributed with GHC,
@@ -257,6 +258,7 @@ initSysTools mbMinusB
                                               platformArch = targetArch,
                                               platformOS   = targetOS,
                                               platformHasGnuNonexecStack = targetHasGnuNonexecStack,
+                                              platformHasIdentDirective = targetHasIdentDirective,
                                               platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
                                           },
                         sTmpDir = normalise tmpdir,

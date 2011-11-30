@@ -11,6 +11,7 @@
  ("target os", "@HaskellTargetOs@"),
  ("target arch", "@HaskellTargetArch@"),
  ("target has GNU nonexec stack", "@HaskellHaveGnuNonexecStack@"),
+ ("target has .ident directive", "@HaskellHaveIdentDirective@"),
  ("target has subsections via symbols", "@HaskellHaveSubsectionsViaSymbols@")
  ]
 
