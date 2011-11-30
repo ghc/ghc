@@ -16,15 +16,19 @@
 module GHC.Stack (
     -- * Call stack
     currentCallStack,
+    whoCreated,
 
     -- * Internals
     CostCentreStack,
     CostCentre,
-    getCCCS,
+    getCurrentCCS,
+    getCCSOf,
     ccsCC,
     ccsParent,
     ccLabel,
     ccModule,
+    ccsToStrings,
+    renderStack
   ) where
 
 import Foreign
@@ -35,6 +39,7 @@ import GHC.Base
 import GHC.Ptr
 import GHC.Foreign as GHC
 import GHC.IO.Encoding
+import Data.List
 
 #define PROFILING
 #include "Rts.h"
@@ -42,8 +47,15 @@ import GHC.IO.Encoding
 data CostCentreStack
 data CostCentre
 
-getCCCS :: IO (Ptr CostCentreStack)
-getCCCS = IO $ \s -> case getCCCS## s of (## s', addr ##) -> (## s', Ptr addr ##)
+getCurrentCCS :: dummy -> IO (Ptr CostCentreStack)
+getCurrentCCS dummy = IO $ \s ->
+   case getCurrentCCS## dummy s of
+     (## s', addr ##) -> (## s', Ptr addr ##)
+
+getCCSOf :: a -> IO (Ptr CostCentreStack)
+getCCSOf obj = IO $ \s ->
+   case getCCSOf## obj s of
+     (## s', addr ##) -> (## s', Ptr addr ##)
 
 ccsCC :: Ptr CostCentreStack -> IO (Ptr CostCentre)
 ccsCC p = (# peek CostCentreStack, cc) p
@@ -67,8 +79,11 @@ ccModule p = (# peek CostCentre, module) p
 -- uninformative.
 
 currentCallStack :: IO [String]
-currentCallStack = do
-  let
+currentCallStack = ccsToStrings =<< getCurrentCCS ()
+
+ccsToStrings :: Ptr CostCentreStack -> IO [String]
+ccsToStrings ccs0 = go ccs0 []
+  where
     go ccs acc
      | ccs == nullPtr = return acc
      | otherwise = do
@@ -76,7 +91,17 @@ currentCallStack = do
         lbl <- GHC.peekCString utf8 =<< ccLabel cc
         mdl <- GHC.peekCString utf8 =<< ccModule cc
         parent <- ccsParent ccs
-        go parent ((mdl ++ '.':lbl) : acc)
-  --
-  ccs <- getCCCS
-  go ccs []
+        if (mdl == "MAIN" && lbl == "MAIN")
+           then return acc
+           else go parent ((mdl ++ '.':lbl) : acc)
+
+whoCreated :: a -> IO [String]
+whoCreated obj = do
+  ccs <- getCCSOf obj
+  ccsToStrings ccs
+
+renderStack :: [String] -> String
+renderStack strs =
+   "{ " ++
+       intercalate "\n  " (zipWith (++) (iterate (' ':) []) strs)
+    ++ " }"
