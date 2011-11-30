@@ -166,6 +166,20 @@ test('T5030',
      compile,
      ['-fcontext-stack=300'])
 
+test('T5631',
+     [# expected value: 629864032 (x86/Darwin)
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 1000000000,
+                                                      1200000000)),
+      # expected value: 1255998208 (amd64/Linux):
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 2000000000,
+                                                      2400000000)),
+       only_ways(['normal'])
+      ],
+     compile,
+     [''])
+
 test('parsing001',
      [# expected value: ?
       if_wordsize(32,
