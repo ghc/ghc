@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Supercompile.Core.Renaming (
     -- | Renamings
-    Renaming, emptyRenaming, mkIdentityRenaming,
+    Renaming, emptyRenaming, mkIdentityRenaming, mkTyVarRenaming,
     InScopeSet, emptyInScopeSet, mkInScopeSet,
     
     -- | Extending the renaming
@@ -113,6 +113,9 @@ emptyRenaming = (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 mkIdentityRenaming :: FreeVars -> Renaming
 mkIdentityRenaming fvs = (mkVarEnv [(x, varToCoreSyn x) | x <- id_list], mkVarEnv [(x, mkTyVarTy x) | x <- tv_list], mkVarEnv [(x, mkCoVarCo x) | x <- co_list])
   where (id_list, tv_list, co_list) = splitVarList (varSetElems fvs)
+
+mkTyVarRenaming :: [(TyVar, Type)] -> Renaming
+mkTyVarRenaming aas = (emptyVarEnv, mkVarEnv aas, emptyVarEnv)
 
 varToCoreSyn :: Var -> CoreSyn.CoreExpr
 varToCoreSyn = CoreSyn.Var

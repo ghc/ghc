@@ -22,7 +22,6 @@ import Supercompile.Utilities
 import Id         (mkLocalId)
 import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
-import Util       (sndOf3)
 import CoreUtils  (mkPiTypes)
 import qualified State as State
 
@@ -220,8 +219,8 @@ type FulfilmentT = StateT FulfilmentState
 fulfill :: Monad m => Promise -> (Deeds, FVedTerm) -> FulfilmentT m (Deeds, FVedTerm)
 fulfill p (deeds, e_body) = StateT $ \fs ->
   let fs' | fun p `M.member` fulfilments fs = fs
-          | otherwise                       = FS { fulfilments = M.insert (fun p) (tyVarIdLambdas (abstracted p) e_body) (fulfilments fs) }
-  in return ((deeds, var (fun p) `applyAbsVars` abstracted p), fs')
+          | otherwise                       = FS { fulfilments = M.insert (fun p) (absVarLambdas (abstracted p) e_body) (fulfilments fs) }
+  in return ((deeds, fun p `applyAbsVars` abstracted p), fs')
 
 runFulfilmentT :: Monad m => FulfilmentT m FVedTerm -> m FVedTerm
 runFulfilmentT mx = liftM (\(e, fs) -> letRec (M.toList (fulfilments fs)) e) $ unStateT mx (FS { fulfilments = M.empty })
@@ -234,7 +233,7 @@ promise state ms = (p, ms')
         x = mkLocalId h_name (vs_list `mkPiTypes` stateType state)
         p = P {
             fun        = x,
-            abstracted = vs_list,
+            abstracted = map mkLiveAbsVar vs_list,
             meaning    = state
           }
         ms' = MS {
@@ -255,7 +254,7 @@ memo opt state = do
   mb_res <- lift $ StateT $ \ms ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
-    case [ (p, (releaseStateDeed state, var (fun p) `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
+    case [ (p, (releaseStateDeed state, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
          | p <- promises ms
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                           match (meaning p) state]

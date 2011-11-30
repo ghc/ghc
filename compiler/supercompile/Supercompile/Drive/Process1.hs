@@ -225,18 +225,16 @@ promise p opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted p)
           optimised_fvs = optimised_fvs_incomplete `unionVarSet` unionVarSets (map varBndrFreeVars (varSetElems optimised_fvs_incomplete))
           abstracted'
             | not rEFINE_FULFILMENT_FVS = abstracted p
-            | otherwise = [if x `elemVarSet` optimised_fvs
-                            then x
-                            else x `setIdOccInfo` IAmDead
+            | otherwise = [x { absVarDead = absVarDead x || not (absVarVar x `elemVarSet` optimised_fvs) }
                           | x <- abstracted p]
       pprTrace "promise" (ppr optimised_fvs $$ ppr optimised_e) $
        ScpM $ \_e s k -> k () (s { pTreeHole = Split False [(p { abstracted = abstracted' },
-                               Fulfilled (tyVarIdLambdas abstracted' optimised_e))] (pTreeHole s) })
+                               Fulfilled (absVarLambdas abstracted' optimised_e))] (pTreeHole s) })
       
-      fmap (((mkVarSet abstracted' `unionVarSet` stateLetBounders (meaning p)) `unionVarSet`) . mkVarSet) getPromiseNames >>=
+      fmap (((mkVarSet (map absVarVar abstracted') `unionVarSet` stateLetBounders (meaning p)) `unionVarSet`) . mkVarSet) getPromiseNames >>=
         \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr (fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
       
-      return (a, var (fun p) `applyAbsVars` abstracted')
+      return (a, fun p `applyAbsVars` abstracted')
 
 -- No meaning, term: "legacy" term that can no longer be tied back to
 -- No meaning, no term: rolled back while still a promise
@@ -466,7 +464,7 @@ memo opt speculated state0 = do
     let state1 = gc state0 -- Necessary because normalisation might have made some stuff dead
     
     ps <- getPromises
-    case [ (p, (releaseStateDeed state0, var (fun p) `applyAbsVars` tb_dynamic_vs))
+    case [ (p, (releaseStateDeed state0, fun p `applyAbsVars` tb_dynamic_vs))
          | p <- ps
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                            match (meaning p) state1]
@@ -486,7 +484,7 @@ memo opt speculated state0 = do
 
         -- NB: promises are lexically scoped because they may refer to FVs
         x <- freshHName
-        promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = vs_list, meaning = state1, embedded = Nothing }) $
+        promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = map mkLiveAbsVar vs_list, meaning = state1, embedded = Nothing }) $
           do
             traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState True state1))
             -- FIXME: this is the site of the Dreadful Hack that makes it safe to match on reduced terms yet *drive* unreduced ones

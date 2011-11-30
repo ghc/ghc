@@ -12,7 +12,7 @@ module Supercompile.Drive.Process (
     AlreadySpeculated, nothingSpeculated,
     speculate,
 
-    AbsVar, renameAbsVar, applyAbsVars, stateAbsVars
+    AbsVar(..), mkLiveAbsVar, renameAbsVar, absVarLambdas, applyAbsVars, stateAbsVars
   ) where
 
 #include "HsVersions.h"
@@ -38,10 +38,16 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
-import Var        (isId, isTyVar)
-import Id         (idType, isDeadBinder, idOccInfo, zapIdOccInfo, zapFragileIdInfo, setIdOccInfo)
+import Var        (isId, isTyVar, varType, setVarType)
+import Id         (idType, idOccInfo, zapFragileIdInfo, setIdOccInfo)
 import Type       (isUnLiftedType, mkTyVarTy)
-import Coercion   (isCoVar, mkCoVarCo)
+import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind_maybe, mkCoercionType)
+import TyCon      (PrimRep(..))
+import Type       (typePrimRep, splitTyConApp_maybe)
+import TysPrim
+import TysWiredIn (unitTy)
+import Literal
+import VarEnv     (uniqAway)
 
 import qualified Control.Monad as Monad
 import Data.Ord
@@ -309,39 +315,101 @@ reduce' orig_state = go (mkLinearHistory rEDUCE_WQO) orig_state
 
 -- As Var, BUT we promise that the deadness information is correct on Ids. This lets
 -- us apply "undefined" instead of an actual argument.
-type AbsVar = Var
+--
+-- We *can't* just use AbsVar = Var because we need to be able to mark TyVars
+-- as dead - not just Ids.
+data AbsVar = AbsVar {
+    absVarDead :: Bool, -- ^ Dead variables will not be free in the result of applyAbsVars, and there are no guarantees about shadowing
+                        -- Live variables *will* be free in the result of applyAbsVars. Guaranteed not to shadow other AbsVars/any h-functions
+    absVarVar :: Var    -- ^ The 'Var' itself
+  }
 
+mkLiveAbsVar :: Var -> AbsVar
+mkLiveAbsVar x = AbsVar { absVarDead = False, absVarVar = x }
+
+-- We map *all* occurrences of dead TyVars to this type, to ensure that dead TyVars in the
+-- type of applied Ids match the applied dead TyVars. This type can be any closed type, as long
+-- as we use it consistently!
+deadTy :: Type
+deadTy = unitTy
+
+renameAbsVarType :: M.Map Var Var -> Var -> Var
+renameAbsVarType rn x = x `setVarType` renameType (mkInScopeSet as) complete_rn ty
+  where ty = varType x
+        as = tyVarsOfType ty
+        complete_rn = mkTyVarRenaming [(a, case M.lookup a rn of Nothing -> deadTy; Just a' -> mkTyVarTy a') | a <- varSetElems as]
+
+-- If a variable is not present in the input renaming, we assume that it has become dead
+-- and set the deadness information accordingly
 renameAbsVar :: M.Map Var Var -> AbsVar -> AbsVar
-renameAbsVar rn x | isId x    = x' `setIdOccInfo` idOccInfo x -- Transfer deadness information from the old AbsVar
-                  | otherwise = x'
-  where x' = M.findWithDefault (pprPanic "renameAbsVar" (ppr x)) x rn
-
-applyAbsVars :: Symantics ann => ann (TermF ann) -> [AbsVar] -> ann (TermF ann)
-applyAbsVars e []     = e
-applyAbsVars e (x:xs)
-  | isTyVar x
-  = applyAbsVars (e `tyApp` mkTyVarTy x) xs
-
-  | isCoVar x
-  = applyAbsVars (e `coApp` mkCoVarCo x) xs
-
-   -- A pretty cute hack here, though potentially quite confusing!
-   -- If you want to put "undefined" here instead then watch out: this counts
-   -- as an extra free variable, so it might trigger the assertion in Process.hs
-   -- that checks that the output term has no more FVs than the input.
-  | isDeadBinder x, not (isUnLiftedType ty)
-  = applyAbsVars (letRec [(x_zapped, var x_zapped)] $ e `app` x_zapped) xs
-
+renameAbsVar rn (AbsVar { absVarDead = dead, absVarVar = x })
+  | dead
+  = AbsVar { absVarDead = True,  absVarVar = renameAbsVarType rn x }
   | otherwise
-  = applyAbsVars (e `app` x_zapped) xs
+  = AbsVar { absVarDead = False, absVarVar = renameAbsVarType rn (M.findWithDefault (pprPanic "renameAbsVar" (ppr x)) x rn) }
 
-  where ty = idType x
-        x_zapped = zapFragileIdInfo (zapIdOccInfo x)
-        -- NB: Lint will choke on occurrences of dead Ids, so make sure we zap the deadness flag
-        -- Make sure we zap the "fragile" info too because the FVs of the unfolding are
-        -- not necessarily in scope.
+absVarLambdas :: Symantics ann => [AbsVar] -> ann (TermF ann) -> ann (TermF ann)
+absVarLambdas xs = tyVarIdLambdas (map absVarVar xs)
 
-stateAbsVars :: State -> [AbsVar]
+applyAbsVars :: Symantics ann => Var -> [AbsVar] -> ann (TermF ann)
+applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
+  where
+   go (fvs, e) absx = case absVarDead absx of
+    True -> (fvs, case () of
+      () -- We can encounter TyVars, where we should be able to instantiate them any way:
+         | isTyVar x
+         -> e `tyApp` deadTy
+         
+         -- Dead CoVars are easy:
+         | Just (ty1, ty2) <- coVarKind_maybe x
+         -> let_ x (coercion (mkUnsafeCo ty1 ty2)) (e `app` x)
+         
+         -- A pretty cute hack for lifted bindings, though potentially quite confusing!
+         -- If you want to put "undefined" here instead then watch out: this counts
+         -- as an extra free variable, so it might trigger the assertion in Process.hs
+         -- that checks that the output term has no more FVs than the input.
+         | not (isUnLiftedType ty)
+         -> letRec [(x, var x)] (e `app` x)
+         
+         -- We have to be more creative for *unlifted* bindings, since building a loop
+         -- changes the meaning of the program. Literals first:
+         | Just (tc, []) <- splitTyConApp_maybe ty
+         , Just lit <- absentLiteralOf tc
+         -> let_ x (literal lit) (e `app` x)
+         
+         -- If we get here we are getting desperate need to get *really* creative.
+         -- Just choose some value with the same *representation* as what we want and then
+         -- cast it to the right type:
+         | let (e_repr_ty, e_repr) = case typePrimRep ty of
+                 VoidRep   -> (mkCoercionType unitTy unitTy, coercion (mkUnsafeCo unitTy unitTy))
+                 IntRep    -> (intPrimTy,    literal (mkMachInt 0))
+                 WordRep   -> (wordPrimTy,   literal (mkMachWord 0))
+                 Int64Rep  -> (int64PrimTy,  literal (mkMachInt64 0))
+                 Word64Rep -> (word64PrimTy, literal (mkMachWord64 0))
+                 AddrRep   -> (addrPrimTy,   literal nullAddrLit)
+                 FloatRep  -> (floatPrimTy,  literal (mkMachChar 'x'))
+                 DoubleRep -> (doublePrimTy, literal (mkMachDouble 0))
+                 -- Unlifted thing of PtrRep: yes, this can really happen (ByteArray# etc)
+                 PtrRep    -> pprPanic "applyAbsVars: dead unlifted variable with PrimRep PtrRep: FIXME" (ppr ty)
+         -> let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x))
+         where shadowy_x = absVarVar absx
+               x = uniqAway (mkInScopeSet fvs) shadowy_x
+               ty = idType x
+    False -> (fvs `extendVarSet` x, case () of
+      () | isTyVar x
+         -> e `tyApp` mkTyVarTy x
+   
+         | isCoVar x
+         -> e `coApp` mkCoVarCo x_zapped
+   
+         | otherwise
+         -> e `app` x_zapped)
+         where x = absVarVar absx
+               x_zapped = zapFragileIdInfo x
+               -- NB: make sure we zap the "fragile" info because the FVs of the unfolding are
+               -- not necessarily in scope.
+
+stateAbsVars :: State -> [Var]
 stateAbsVars = sortLambdaBounds . varSetElems . stateLambdaBounders
 
 sortLambdaBounds :: [Var] -> [Var]

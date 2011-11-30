@@ -12,6 +12,7 @@ import Supercompile.Core.Tag
 import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.Residualise
 import Supercompile.Evaluator.Syntax
+import Supercompile.Evaluator.FreeVars
 
 import Supercompile.Termination.TagBag (stateTags)
 import Supercompile.Termination.Combinators hiding (generatedKey)
@@ -61,15 +62,23 @@ data MemoState = MS {
     hNames   :: Stream Name
   }
 
-promise :: State -> MemoState -> (Promise, MemoState)
-promise state ms = (p, ms')
+promise :: (State, State) -> MemoState -> (Promise, MemoState)
+promise (state, reduced_state) ms = (p, ms')
   where vs_list = stateAbsVars state
         h_name :< h_names' = hNames ms
         x = mkLocalId h_name (vs_list `mkPiTypes` stateType state)
         p = P {
             fun        = x,
-            abstracted = vs_list,
-            meaning    = state
+            -- We mark as dead any of those variables that are not in the stateLambdaBounders of
+            -- the *reduced* state. This serves two purposes:
+            --   1. The tieback we do right here can supply dummy values to those parameters rather
+            --      than applying the free variables. This may make some bindings above us dead.
+            --
+            --   2. We can get rid of the code in renameAbsVar that downgrades live AbsVars to dead
+            --      ones if they are not present in the renaming: only dead AbsVars are allowed to
+            --      be absent in the renaming.
+            abstracted = map (\v -> AbsVar { absVarDead = not (v `elemVarSet` stateLambdaBounders reduced_state), absVarVar = v }) vs_list,
+            meaning    = reduced_state
           }
         ms' = MS {
             promises = p : promises ms,
@@ -82,7 +91,7 @@ newtype FulfilmentState = FS {
   }
 
 fulfill :: Promise -> (Deeds, FVedTerm) -> FulfilmentState -> ((Deeds, FVedTerm), FulfilmentState)
-fulfill p (deeds, e_body) fs = ((deeds, var (fun p) `applyAbsVars` abstracted p), FS { fulfilments = (fun p, tyVarIdLambdas (abstracted p) e_body) : fulfilments fs })
+fulfill p (deeds, e_body) fs = ((deeds, fun p `applyAbsVars` abstracted p), FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : fulfilments fs })
 
 
 type Depth = Int
@@ -114,7 +123,7 @@ fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \(ms, hist, fs) -> case fulfill p res fs of (res', fs') -> return (res', (ms, hist, fs'))
 
 terminateM :: State -> ScpM a -> (State -> ScpM a) -> ScpM a
-terminateM state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(depth, stops, parent, already) -> trace ("depth: " ++ show depth) case terminate hist (parent, state) of
+terminateM state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(depth, stops, parent, already) -> trace ("depth: " ++ show depth) $ case terminate hist (parent, state) of
         Stop (_, shallow_state) -> trace ("stops: " ++ show stops) $
                                    unReaderT (unStateT (unScpM (mstop shallow_state)) (ms, hist,  fs)) (depth + 1, stops + 1, parent,             already) -- FIXME: prevent rollback?
         Continue hist'          -> unReaderT (unStateT (unScpM mcont)                 (ms, hist', fs)) (depth + 1, stops,     generatedKey hist', already)
@@ -165,18 +174,38 @@ memo :: (State -> ScpM (Deeds, FVedTerm))
      ->  State -> ScpM (Deeds, FVedTerm) 
 memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
-     -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
-    case [ (p, (releaseStateDeed state, var (fun p) `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
+    -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
+
+    -- Note [Matching after reduction]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    --
+    -- If we match on States *after* reduction, we might get the following problem. Our initial state could be:
+    --
+    --  let y = 1; p = (x, y) in snd p
+    --
+    -- This state has the free variables {x}. However, after reduction+GC it does not have any free variables.
+    -- Which set of free variables should we lambda-abstract the h-function over? Well, clearly we have to 
+    -- lambda-abstract over the pre-reduction FVs in case that "opt" does not do any reduction and leaves x as a
+    -- free variable.
+    --
+    -- A consequence of this decision is that we have to do something a bit weird at *tieback* site like this one:
+    --
+    --  let y = 1 in y
+    --
+    -- To tieback to the h-function for the initial state, we need to supply an x. Luckily, the act of reduction
+    -- proves that x is a dead variable and hence we should just be able to supply "undefined".
+    case [ (p, (releaseStateDeed state, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
          | p <- promises ms
          , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
-                          match (meaning p) state]
+                          match (meaning p) reduced_state]
          ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state), res)
                                      ; return res }, (ms, hist, fs))
               _          -> pure (do { traceRenderM ">sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state))
                                      ; res <- opt state
                                      ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
                                      ; fulfillM p res }, (ms', hist, fs))
-                where (p, ms') = promise state ms
+                where (p, ms') = promise (state, reduced_state) ms
+  where reduced_state = reduce state
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ runScpM $ liftM snd $ sc state

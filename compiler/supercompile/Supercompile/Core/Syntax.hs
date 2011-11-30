@@ -267,10 +267,13 @@ reflect (I e) = case e of
         Coercion co        -> Coercion co
 
 
-{-
 literal :: Symantics ann => Literal -> ann (TermF ann)
 literal = value . Literal
 
+coercion :: Symantics ann => Coercion -> ann (TermF ann)
+coercion = value . Coercion
+
+{-
 lambda :: Symantics ann => Var -> ann (TermF ann) -> ann (TermF ann)
 lambda x = value . Lambda x
 
