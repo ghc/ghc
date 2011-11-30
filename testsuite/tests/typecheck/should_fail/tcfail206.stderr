@@ -19,7 +19,7 @@ tcfail206.hs:11:5:
       `a' is a rigid type variable bound by
           the type signature for c :: a -> (a, Bool) at tcfail206.hs:11:1
     Expected type: a -> (a, Bool)
-      Actual type: Bool -> (Bool, Bool)
+      Actual type: a -> (a, a)
     In the expression: (True || False,)
     In an equation for `c': c = (True || False,)
 

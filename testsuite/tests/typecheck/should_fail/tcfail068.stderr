@@ -1,24 +1,24 @@
 
 tcfail068.hs:14:9:
-    Could not deduce (s ~ s1)
+    Could not deduce (s1 ~ s)
     from the context (Constructed a)
       bound by the type signature for
                  itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
       at tcfail068.hs:(12,1)-(14,31)
+      `s1' is a rigid type variable bound by
+           a type expected by the context: GHC.ST.ST s1 (IndTree s a)
+           at tcfail068.hs:13:9
       `s' is a rigid type variable bound by
           the type signature for
             itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
           at tcfail068.hs:12:1
-      `s1' is a rigid type variable bound by
-           a type expected by the context: GHC.ST.ST s1 (IndTree s a)
-           at tcfail068.hs:13:9
-    Expected type: GHC.ST.ST s1 (IndTree s a)
+    Expected type: GHC.ST.ST s (IndTree s1 a)
       Actual type: GHC.ST.ST s (STArray s (Int, Int) a)
     In the return type of a call of `newSTArray'
     In the first argument of `runST', namely
       `(newSTArray ((1, 1), n) x)'
 
-tcfail068.hs:20:9:
+tcfail068.hs:19:21:
     Could not deduce (s ~ s1)
     from the context (Constructed a)
       bound by the type signature for
@@ -33,11 +33,10 @@ tcfail068.hs:20:9:
       `s1' is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:18:9
-    Expected type: GHC.ST.ST s1 ()
-      Actual type: GHC.ST.ST s ()
-    In the return type of a call of `writeSTArray'
-    In the first argument of `(>>)', namely
-      `writeSTArray arr i (f val)'
+    Expected type: STArray s1 (Int, Int) a
+      Actual type: IndTree s a
+    In the first argument of `readSTArray', namely `arr'
+    In the first argument of `(>>=)', namely `readSTArray arr i'
 
 tcfail068.hs:24:35:
     Could not deduce (s ~ s1)
