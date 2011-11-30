@@ -843,16 +843,22 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
        ; sub_kind <- addErrCtxtM ctxt $ unifyKind k1 k2
 
        ; case (sub_kind, details1, details2) of
-           -- k1 <= k2, so update tv2
+           -- k1 < k2, so update tv2
            (LT, _, MetaTv _ ref2) -> updateMeta tv2 ref2 ty1
-           -- k2 <= k1, so update tv1
+
+           -- k2 < k1, so update tv1
            (GT, MetaTv _ ref1, _) -> updateMeta tv1 ref1 ty2
+
+	   -- k1 = k2, so we are free to update either way
            (EQ, MetaTv i1 ref1, MetaTv i2 ref2)
                 | nicer_to_update_tv1 i1 i2 -> updateMeta tv1 ref1 ty2
                 | otherwise                 -> updateMeta tv2 ref2 ty1
+           (EQ, MetaTv _ ref1, _) -> updateMeta tv1 ref1 ty2
+           (EQ, _, MetaTv _ ref2) -> updateMeta tv2 ref2 ty1
 
+	   -- Can't do it in-place, so defer
+	   -- This happens for skolems of all sorts
            (_, _, _) -> unSwap swapped (uType_defer origin) ty1 ty2 } 
-                        -- Defer for skolems of all sorts
   where
     k1       = tyVarKind tv1
     k2       = tyVarKind tv2

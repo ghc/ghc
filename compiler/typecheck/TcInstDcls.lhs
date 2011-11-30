@@ -52,7 +52,6 @@ import Bag
 import BasicTypes
 import DynFlags
 import FastString
-import HscTypes
 import Id
 import MkId
 import Name
@@ -380,20 +379,20 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; let { (local_info,
                 at_tycons_s)   = unzip local_info_tycons
              ; at_idx_tycons   = concat at_tycons_s ++ idx_tycons
-             ; implicit_things = concatMap implicitTyConThings at_idx_tycons
-             ; aux_binds       = mkRecSelBinds at_idx_tycons  }
+             ; at_things       = map ATyCon at_idx_tycons }
 
                 -- (2) Add the tycons of indexed types and their implicit
                 --     tythings to the global environment
-       ; tcExtendGlobalEnvImplicit
-             (map ATyCon at_idx_tycons ++ implicit_things) $ do {
+       ; tcExtendGlobalEnvImplicit at_things $ do
+       { tcg_env <- tcAddImplicits at_things
+       ; setGblEnv tcg_env $
 
 
                 -- Next, construct the instance environment so far, consisting
                 -- of
                 --   (a) local instance decls
                 --   (b) local family instance decls
-       ; addInsts local_info         $
+         addInsts local_info         $
          addFamInsts at_idx_tycons   $ do {
 
                 -- (3) Compute instances from "deriving" clauses;
@@ -422,7 +421,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
        ; return ( gbl_env
                 , (bagToList deriv_inst_info) ++ local_info
-                , aux_binds `plusHsValBinds` deriv_binds)
+                , deriv_binds)
     }}}
   where
     typInstCheck ty = is_cls (iSpec ty) `elem` typeableClassNames
@@ -945,7 +944,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_item (sel_id, dm_info)
       = case findMethodBind (idName sel_id) binds of
             Just user_bind -> tc_body sel_id standalone_deriv user_bind
-            Nothing        -> tc_default sel_id dm_info
+            Nothing        -> traceTc "tc_def" (ppr sel_id) >> 
+                              tc_default sel_id dm_info
 
     ----------------------
     tc_body :: Id -> Bool -> LHsBind Name -> TcM (TcId, LHsBind Id)
@@ -971,7 +971,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; tc_body sel_id False {- Not generated code? -} meth_bind }
 
     tc_default sel_id NoDefMeth     -- No default method at all
-      = do { warnMissingMethod sel_id
+      = do { traceTc "tc_def: warn" (ppr sel_id)
+           ; warnMissingMethod sel_id
            ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
                                          inst_tys sel_id
            ; return (meth_id, mkVarBind meth_id $
@@ -1002,7 +1003,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
            ; dm_id <- tcLookupId dm_name
            ; let dm_inline_prag = idInlinePragma dm_id
                  rhs = HsWrap (mkWpEvVarApps [self_dict] <.> mkWpTyApps inst_tys) $
-                         HsVar dm_id
+                       HsVar dm_id
 
                  meth_bind = mkVarBind local_meth_id (L loc rhs)
                  meth_id1 = meth_id `setInlinePragma` dm_inline_prag
@@ -1163,6 +1164,7 @@ derivBindCtxt sel_id clas tys _bind
 warnMissingMethod :: Id -> TcM ()
 warnMissingMethod sel_id
   = do { warn <- woptM Opt_WarnMissingMethods
+       ; traceTc "warn" (ppr sel_id <+> ppr warn <+> ppr (not (startsWithUnderscore (getOccName sel_id))))
        ; warnTc (warn  -- Warn only if -fwarn-missing-methods
                  && not (startsWithUnderscore (getOccName sel_id)))
                                         -- Don't warn about _foo methods

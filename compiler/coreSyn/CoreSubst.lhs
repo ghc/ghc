@@ -1197,16 +1197,15 @@ exprIsConApp_maybe id_unf expr
               mk_arg e = mkApps e args
         = dealWithCoercion co (con, substTys subst dfun_res_tys, map mk_arg ops)
 
-        -- Look through unfoldings, but only cheap ones, because
-        -- we are effectively duplicating the unfolding
+        -- Look through unfoldings, but only arity-zero one; 
+	-- if arity > 0 we are effectively inlining a function call,
+	-- and that is the business of callSiteInline.
+	-- In practice, without this test, most of the "hits" were
+	-- CPR'd workers getting inlined back into their wrappers,
         | Just rhs <- expandUnfolding_maybe unfolding
-        = -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
-          let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
-              res = go (Left in_scope') rhs cont
-          in WARN( unfoldingArity unfolding > 0 && isJust res,
-                   text "Interesting! exprIsConApp_maybe:" 
-                   <+> ppr fun <+> ppr expr)
-             res
+        , unfoldingArity unfolding == 0 
+        , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
+        = go (Left in_scope') rhs cont
         where
           unfolding = id_unf fun
 

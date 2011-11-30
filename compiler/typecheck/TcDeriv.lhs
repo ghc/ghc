@@ -337,7 +337,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
   ; let all_tycons = map ATyCon (bagToList newTyCons)
   ; gbl_env <- tcExtendGlobalEnv all_tycons $
-               tcExtendGlobalEnv (concatMap implicitTyThings all_tycons) $
+               tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
                tcExtendLocalFamInstEnv (map mkLocalFamInst (bagToList famInsts)) $
                tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
 
