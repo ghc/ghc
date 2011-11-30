@@ -1997,6 +1997,11 @@ loadArchive( char *path )
                we could do better. */
 #if defined(USE_MMAP)
             image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1);
+#elif defined(mingw32_HOST_OS)
+        // TODO: We would like to use allocateExec here, but allocateExec
+        //       cannot currently allocate blocks large enough.
+            image = VirtualAlloc(NULL, memberSize, MEM_RESERVE | MEM_COMMIT,
+                                 PAGE_EXECUTE_READWRITE);
 #elif defined(darwin_HOST_OS)
             /* See loadObj() */
             misalignment = machoGetMisalignment(f);
