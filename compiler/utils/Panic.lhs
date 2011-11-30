@@ -35,7 +35,7 @@ import Control.Concurrent ( MVar, ThreadId, withMVar, newMVar, modifyMVar_,
                             myThreadId )
 import Data.Dynamic
 import Debug.Trace	  ( trace )
-import System.IO.Unsafe	  ( unsafePerformIO )
+import System.IO.Unsafe
 import System.Exit
 import System.Environment
 
@@ -47,6 +47,9 @@ import System.Posix.Signals
 import GHC.ConsoleHandler
 #endif
 
+#if __GLASGOW_HASKELL__ >= 703
+import GHC.Stack
+#endif
 
 -- | GHC's own exception type 
 --   error messages all take the form:
@@ -160,7 +163,16 @@ handleGhcException = ghandle
 
 -- | Panics and asserts.
 panic, sorry, pgmError :: String -> a
+#if __GLASGOW_HASKELL__ >= 703
+panic    x = unsafeDupablePerformIO $ do
+   stack <- ccsToStrings =<< getCurrentCCS x
+   if null stack
+      then throwGhcException (Panic x)
+      else throwGhcException (Panic (x ++ '\n' : renderStack stack))
+#else
 panic    x = throwGhcException (Panic x)
+#endif
+
 sorry    x = throwGhcException (Sorry x)
 pgmError x = throwGhcException (ProgramError x)
 
