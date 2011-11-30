@@ -23,6 +23,7 @@ module Debug.Trace (
         -- $tracing
         trace,            -- :: String -> a -> a
         traceShow,
+        traceStack,
         traceIO,          -- :: String -> IO ()
         putTraceMsg,
 
@@ -34,10 +35,12 @@ module Debug.Trace (
 
 import Prelude
 import System.IO.Unsafe
+import Control.Monad
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign.C.String
 import qualified GHC.Exts as GHC
+import GHC.Stack
 #else
 import System.IO (hPutStrLn,stderr)
 #endif
@@ -155,3 +158,19 @@ traceEventIO = GHC.traceEventIO
 #else
 traceEventIO msg = (return $! length msg) >> return ()
 #endif
+
+-- | like 'trace', but additionally prints a call stack if one is
+-- available.
+--
+-- In the current GHC implementation, the call stack is only
+-- availble if the program was compiled with @-prof@; otherwise
+-- 'traceStack' behaves exactly like 'trace'.  Entries in the call
+-- stack correspond to @SCC@ annotations, so it is a good idea to use
+-- @-fprof-auto@ to add SCC annotations automatically.
+--
+traceStack :: String -> a -> a
+traceStack str expr = unsafePerformIO $ do
+   traceIO str
+   stack <- currentCallStack
+   when (not (null stack)) $ traceIO (renderStack stack)
+   return expr
