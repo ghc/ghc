@@ -55,6 +55,12 @@ $(libffi_STAMP_CONFIGURE):
 # will use cygwin symbolic links which cannot be read by mingw gcc.
 	chmod +x libffi/ln
 
+	# We need to use -MMD rather than -MD, as otherwise we get paths
+	# like c:/... in the dependency files on Windows, and the extra
+	# colons break make
+	mv libffi/build/Makefile.in libffi/build/Makefile.in.orig
+	sed "s/-MD/-MMD/" < libffi/build/Makefile.in.orig > libffi/build/Makefile.in
+
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
 	cd libffi && \
