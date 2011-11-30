@@ -128,13 +128,13 @@ terminateM state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(de
                                    unReaderT (unStateT (unScpM (mstop shallow_state)) (ms, hist,  fs)) (depth + 1, stops + 1, parent,             already) -- FIXME: prevent rollback?
         Continue hist'          -> unReaderT (unStateT (unScpM mcont)                 (ms, hist', fs)) (depth + 1, stops,     generatedKey hist', already)
 
-speculateM :: State -> (State -> ScpM a) -> ScpM a
-speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(depth, stops, parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (depth, stops, parent, already')
+speculateM :: (StepCount, State) -> ((StepCount, State) -> ScpM a) -> ScpM a
+speculateM (steps, state) mcont = ScpM $ StateT $ \s -> ReaderT $ \(depth, stops, parent, already) -> case speculate already (steps, mempty, state) of (already', (steps', _stats, state')) -> unReaderT (unStateT (unScpM (mcont (steps', state'))) s) (depth, stops, parent, already')
 
 
 sc, sc' :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
-sc' state = terminateM state (speculateM (reduce state) $ \state -> split state sc)
+sc' state = terminateM state (speculateM (reduceSteps state) $ \(_steps, state) -> split state sc)
                              (\shallow_state -> maybe (trce "split" shallow_state $ split state)
                                                       (trce "gen" shallow_state)
                                                       (generalise (mK_GENERALISER shallow_state state) state)

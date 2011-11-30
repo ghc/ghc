@@ -456,7 +456,7 @@ sc' hist speculated state = handlePrint $ (\raise -> check raise) `catchScpM` \g
     continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState False state'))
                        addStats stats
                        split state' (liftPB . sc hist speculated')
-      where (speculated', (stats, state')) = (if sPECULATION then speculate speculated else ((,) speculated)) $ reduce' state -- TODO: experiment with doing admissability-generalisation on reduced terms. My suspicion is that it won't help, though (such terms are already stuck or non-stuck but loopy: throwing stuff away does not necessarily remove loopiness).
+      where (speculated', (_steps, stats, state')) = (if sPECULATION then speculate speculated else ((,) speculated)) $ reduce' state -- TODO: experiment with doing admissability-generalisation on reduced terms. My suspicion is that it won't help, though (such terms are already stuck or non-stuck but loopy: throwing stuff away does not necessarily remove loopiness).
 
 memo :: (AlreadySpeculated -> State -> ScpBM (Deeds, Out FVedTerm))
      ->  AlreadySpeculated -> State -> ScpPM (Deeds, Out FVedTerm)

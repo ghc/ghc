@@ -8,7 +8,7 @@ module Supercompile.Drive.Process (
 
     SCStats(..), seqSCStats,
 
-    reduce, reduce', gc,
+    StepCount, reduce, reduce', reduceSteps, reduceStats, gc,
     AlreadySpeculated, nothingSpeculated,
     speculate,
 
@@ -48,6 +48,7 @@ import TysPrim
 import TysWiredIn (unitTy)
 import Literal
 import VarEnv     (uniqAway)
+import Util
 
 import qualified Control.Monad as Monad
 import Data.Ord
@@ -241,13 +242,13 @@ nothingSpeculated = S.empty
 --     xs0 = map (+1) ones
 --
 -- We can speculate x0 easily, but speculating xs0 gives rise to a x1 and xs1 of the same form. We must avoid looping here.
-speculate :: AlreadySpeculated -> (SCStats, State) -> (AlreadySpeculated, (SCStats, State))
-speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stats', (deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids', k, in_e)))
+speculate :: AlreadySpeculated -> (StepCount, SCStats, State) -> (AlreadySpeculated, (StepCount, SCStats, State))
+speculate speculated (steps, stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (steps', stats', (deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids', k, in_e)))
   where
     (h_values, h_non_values) = M.partition (maybe False (termIsValue . snd) . heapBindingTerm) h
     (h_non_values_unspeculated, h_non_values_speculated) = (h_non_values `exclude` speculated, h_non_values `restrict` speculated)
 
-    (stats', deeds', h_speculated_ok, h_speculated_failure, ids') = runSpecM (speculateManyMap (mkLinearHistory (cofmap fst wQO)) h_non_values_unspeculated) (stats, deeds, h_values, M.empty, ids)
+    (steps', stats', deeds', h_speculated_ok, h_speculated_failure, ids') = runSpecM (speculateManyMap (mkLinearHistory (cofmap fst wQO)) h_non_values_unspeculated) (steps, stats, deeds, h_values, M.empty, ids)
     
     speculateManyMap hist = speculateMany hist . concatMap M.toList . topologicalSort heapBindingFreeVars
     speculateMany hist = mapM_ (speculateOne hist)
@@ -259,20 +260,20 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
       | otherwise
       = speculation_failure
       where
-        speculation_failure = modifySpecState $ \(stats, deeds, h_speculated_ok, h_speculated_failure, ids) -> ((stats, deeds, h_speculated_ok, M.insert x' hb h_speculated_failure, ids), ())
+        speculation_failure = modifySpecState $ \(steps, stats, deeds, h_speculated_ok, h_speculated_failure, ids) -> ((steps, stats, deeds, h_speculated_ok, M.insert x' hb h_speculated_failure, ids), ())
         try_speculation in_e rb = Monad.join (modifySpecState go)
-          where go no_change@(stats, deeds, h_speculated_ok, h_speculated_failure, ids) = case terminate hist (state, rb) of
+          where go no_change@(steps, stats, deeds, h_speculated_ok, h_speculated_failure, ids) = case terminate hist (state, rb) of
                     Stop (_old_state, rb) -> (no_change, rb)
                     Continue hist -> case reduce' state of
-                        (extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
+                        (extra_steps, extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
                           | Just a <- traverse qaToAnswer qa
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
                                 in_e' = annedAnswerToInAnnedTerm (mkInScopeSet (annedFreeVars a)) a
-                          -> ((stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure, ids), speculateManyMap hist h_unspeculated)
+                          -> ((steps + extra_steps, stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure, ids), speculateManyMap hist h_unspeculated)
                         _ -> (no_change, speculation_failure)
                   where state = normalise (deeds, Heap h_speculated_ok ids, [], in_e)
 
-type SpecState = (SCStats, Deeds, PureHeap, PureHeap, InScopeSet)
+type SpecState = (StepCount, SCStats, Deeds, PureHeap, PureHeap, InScopeSet)
 newtype SpecM a = SpecM { unSpecM :: SpecState -> (SpecState -> a -> SpecState) -> SpecState }
 
 instance Functor SpecM where
@@ -291,22 +292,31 @@ runSpecM spec state = unSpecM spec state (\state () -> state)
 catchSpecM :: ((forall b. SpecM b) -> SpecM ()) -> SpecM () -> SpecM ()
 catchSpecM mx mcatch = SpecM $ \s k -> unSpecM (mx (SpecM $ \_s _k -> unSpecM mcatch s k)) s k
 
-reduce :: State -> State
-reduce = snd . reduce'
 
-reduce' :: State -> (SCStats, State)
-reduce' orig_state = go (mkLinearHistory rEDUCE_WQO) orig_state
+type StepCount = Int
+
+reduce :: State -> State
+reduce = thirdOf3 . reduce'
+
+reduceSteps :: State -> (StepCount, State)
+reduceSteps state = case reduce' state of (n, _, state') -> (n, state')
+
+reduceStats :: State -> (SCStats, State)
+reduceStats state = case reduce' state of (_, stats, state') -> (stats, state')
+
+reduce' :: State -> (StepCount, SCStats, State)
+reduce' orig_state = go (mkLinearHistory (cofmap snd rEDUCE_WQO)) 0 orig_state
   where
     -- NB: it is important that we ensure that reduce is idempotent if we have rollback on. I use this property to improve memoisation.
-    go hist state = -- traceRender ("reduce:step", pPrintFullState state) $
-                    case step state of
-        Nothing -> (mempty, state)
-        Just state' -> case terminate hist state of
-          Continue hist' -> go hist' state'
-          Stop old_state -> pprTrace "reduce-stop" (pPrintFullState False old_state $$ pPrintFullState False state) 
-                            -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
-                            -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
-                            (mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
+    go hist n state = -- traceRender ("reduce:step", pPrintFullState state) $
+                      n `seq` case step state of
+        Nothing -> (n, mempty, state)
+        Just state' -> case terminate hist (n, state) of
+          Continue hist' -> go hist' (n + 1) state'
+          Stop (old_n, old_state) -> pprTrace "reduce-stop" (pPrintFullState False old_state $$ pPrintFullState False state) 
+                                     -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
+                                     -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
+                                     (old_n, mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
 
 
 --

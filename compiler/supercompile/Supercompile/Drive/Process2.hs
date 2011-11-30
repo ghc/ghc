@@ -276,7 +276,7 @@ runSpecT :: SpecT m a -> m a
 runSpecT = runReaderT nothingSpeculated
 
 speculated :: State -> (State -> SpecT m a) -> SpecT m a
-speculated s k = ReaderT $ \already -> case speculate already (mempty, s) of (already, (_stats, s')) -> unReaderT (k s') already
+speculated s k = ReaderT $ \already -> case speculate already (0, mempty, s) of (already, (_steps, _stats, s')) -> unReaderT (k s') already
 
 liftSpeculatedStateT :: (forall a. State -> (State -> m a)        -> m a)
                      ->  State -> (State -> StateT s m a) -> StateT s m a
