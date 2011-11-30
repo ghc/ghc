@@ -2817,7 +2817,7 @@ cstring_from_section_name (UChar* name, UChar* strtab)
         int strtab_offset = strtol((char*)name+1,NULL,10);
         int len = strlen(((char*)strtab) + strtab_offset);
 
-        newstr = stgMallocBytes(len, "cstring_from_section_symbol_name");
+        newstr = stgMallocBytes(len+1, "cstring_from_section_symbol_name");
         strcpy((char*)newstr, (char*)((UChar*)strtab) + strtab_offset);
         return newstr;
     }
