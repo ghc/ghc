@@ -61,6 +61,11 @@ $(libffi_STAMP_CONFIGURE):
 	mv libffi/build/Makefile.in libffi/build/Makefile.in.orig
 	sed "s/-MD/-MMD/" < libffi/build/Makefile.in.orig > libffi/build/Makefile.in
 
+	# Their cmd invocation only works on msys. On cygwin it starts
+	# a cmd interactive shell. The replacement works in both environments.
+	mv libffi/build/ltmain.sh libffi/build/ltmain.sh.orig
+	sed 's#cmd //c echo "\$$1"#cmd /c "echo $$1"#' < libffi/build/ltmain.sh.orig > libffi/build/ltmain.sh
+
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
 	cd libffi && \
