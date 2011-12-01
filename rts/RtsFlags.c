@@ -249,7 +249,7 @@ usage_text[] = {
 "  -I<sec>  Perform full GC after <sec> idle time (default: 0.3, 0 == off)",
 #endif
 "",
-"  -T         Collect GC statistics (useful for in-program statistics access)"
+"  -T         Collect GC statistics (useful for in-program statistics access)",
 "  -t[<file>] One-line GC statistics (if <file> omitted, uses stderr)",
 "  -s[<file>] Summary  GC statistics (if <file> omitted, uses stderr)",
 "  -S[<file>] Detailed GC statistics (if <file> omitted, uses stderr)",
