@@ -39,7 +39,6 @@ import GHC.Base
 import GHC.Ptr
 import GHC.Foreign as GHC
 import GHC.IO.Encoding
-import Data.List
 
 #define PROFILING
 #include "Rts.h"
@@ -101,7 +100,4 @@ whoCreated obj = do
   ccsToStrings ccs
 
 renderStack :: [String] -> String
-renderStack strs =
-   "{ " ++
-       intercalate "\n  " (zipWith (++) (iterate (' ':) []) strs)
-    ++ " }"
+renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) strs
