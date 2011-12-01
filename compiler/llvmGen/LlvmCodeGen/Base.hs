@@ -210,7 +210,6 @@ genStringLabelRef cl
   = let ty = LMPointer $ LMArray 0 llvmWord
     in (LMGlobalVar cl ty External Nothing Nothing False, Nothing)
 
-
 -- ----------------------------------------------------------------------------
 -- * Misc
 --
