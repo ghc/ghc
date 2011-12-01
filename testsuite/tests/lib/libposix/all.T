@@ -11,7 +11,7 @@ test('posix004', [ reqlib('unix'), expect_fail_for(['threaded2']) ],
 test('posix005', [reqlib('unix'), expect_broken(5648)], compile_and_run, [''])
 
 test('posix006', reqlib('unix'), compile_and_run, [''])
-test('posix009', reqlib('unix'), compile_and_run, [''])
+test('posix009', [ omit_ways(threaded_ways), reqlib('unix') ], compile_and_run, [''])
 test('posix010', reqlib('unix'), compile_and_run, [''])
 
 # Uses forkProcess; doesn't work with threaded2
