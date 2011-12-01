@@ -1,7 +1,8 @@
 test('posix002', [ reqlib('unix'), omit_ways(prof_ways) ],
                  compile_and_run, [''])
 
-test('posix003', normal, compile_and_run, [''])
+# Skip on mingw32: assumes existence of 'pwd' and /tmp
+test('posix003', if_os('mingw32', skip), compile_and_run, [''])
 
 # Uses forkProcess; doesn't work with threaded2
 test('posix004', [ reqlib('unix'), expect_fail_for(['threaded2']) ],
