@@ -104,3 +104,6 @@ test('callstack001',
      [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
      compile_and_run, [''])
 
+test('callstack002',
+     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
+     compile_and_run, ['-fno-full-laziness -fno-state-hack'])

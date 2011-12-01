@@ -1,0 +1,16 @@
+f: 42
+Stack trace:
+  Main.CAF
+  Main.main
+  Main.main.xs
+  Main.map
+  Main.map.go
+  Main.f
+f: 43
+Stack trace:
+  Main.CAF
+  Main.main
+  Main.main.xs
+  Main.map
+  Main.map.go
+  Main.f
