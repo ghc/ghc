@@ -66,7 +66,7 @@ integer_cmm_int2Integerzh
    ALLOC_PRIM( SIZEOF_StgArrWords + WDS(1), NO_PTRS, integer_cmm_int2Integerzh );
 
    p = Hp - SIZEOF_StgArrWords;
-   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   SET_HDR(p, stg_ARR_WORDS_info, CCCS);
    StgArrWords_bytes(p) = SIZEOF_W;
 
    /* mpz_set_si is inlined here, makes things simpler */
@@ -100,7 +100,7 @@ integer_cmm_word2Integerzh
    ALLOC_PRIM( SIZEOF_StgArrWords + WDS(1), NO_PTRS, integer_cmm_word2Integerzh);
 
    p = Hp - SIZEOF_StgArrWords;
-   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   SET_HDR(p, stg_ARR_WORDS_info, CCCS);
    StgArrWords_bytes(p) = SIZEOF_W;
 
    if (val != 0) {
@@ -147,7 +147,7 @@ integer_cmm_int64ToIntegerzh
                NO_PTRS, integer_cmm_int64ToIntegerzh );
 
    p = Hp - SIZEOF_StgArrWords - WDS(words_needed) + WDS(1);
-   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   SET_HDR(p, stg_ARR_WORDS_info, CCCS);
    StgArrWords_bytes(p) = WDS(words_needed);
 
    if ( %lt(hi,0) ) {
@@ -202,7 +202,7 @@ integer_cmm_word64ToIntegerzh
                NO_PTRS, integer_cmm_word64ToIntegerzh );
 
    p = Hp - SIZEOF_StgArrWords - WDS(words_needed) + WDS(1);
-   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+   SET_HDR(p, stg_ARR_WORDS_info, CCCS);
    StgArrWords_bytes(p) = WDS(words_needed);
 
    if ( hi != 0 ) {
@@ -532,7 +532,7 @@ integer_cmm_decodeDoublezh
     /* Be prepared to tell Lennart-coded integer_cbits_decodeDouble
        where mantissa.d can be put (it does not care about the rest) */
     p = Hp - ARR_SIZE + WDS(1);
-    SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
+    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
     StgArrWords_bytes(p) = DOUBLE_MANTISSA_SIZE;
     MP_INT__mp_d(mp_tmp1) = BYTE_ARR_CTS(p);
 
