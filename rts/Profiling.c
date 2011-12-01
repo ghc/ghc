@@ -152,6 +152,10 @@ initProfiling1 (void)
             capabilities[n].r.rCCCS = CCS_SYSTEM;
         }
     }
+
+#ifdef THREADED_RTS
+    initMutex(&ccs_mutex);
+#endif
 }
 
 void
