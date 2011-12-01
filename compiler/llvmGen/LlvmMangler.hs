@@ -41,7 +41,7 @@ type Section = (B.ByteString, B.ByteString)
 
 -- | Read in assembly file and process
 llvmFixupAsm :: DynFlags -> FilePath -> FilePath -> IO ()
-llvmFixupAsm dflags f1 f2 = do
+llvmFixupAsm dflags f1 f2 = {-# SCC "llvm_mangler" #-} do
     showPass dflags "LlVM Mangler"
     r <- openBinaryFile f1 ReadMode
     w <- openBinaryFile f2 WriteMode
