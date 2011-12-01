@@ -127,14 +127,14 @@ step' normalising ei_state =
         Case e x ty alts -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts))                 : k, (rn, e))
           where (ids', rn', x') = renameNonRecBinder ids rn x
         Cast e co        
-          | isReflCo co' -> go (deeds + 1, heap,                                                                                   k, (rn, e))
-          | otherwise    -> go (deeds,     heap,    Tagged tg (CastIt co')                                                       : k, (rn, e))
+          | isReflCo co' -> go (deeds `releaseDeeds` 1, heap,                                                                                   k, (rn, e))
+          | otherwise    -> go (deeds,                  heap,    Tagged tg (CastIt co')                                                       : k, (rn, e))
           where co' = renameCoercion ids rn co
         Let x e1 e2
-          | isUnLiftedType (idType x) -> go (deeds,     Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) : k, in_e1)
-          | otherwise                 -> go (deeds + 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                      k, (rn', e2))
+          | isUnLiftedType (idType x) -> go (deeds,                  Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) : k, in_e1)
+          | otherwise                 -> go (deeds `releaseDeeds` 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                      k, (rn', e2))
           where (ids', rn', (x', in_e1)) = renameNonRecBound ids rn (x, e1)
-        LetRec xes e     -> go (deeds + 1, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
+        LetRec xes e     -> go (deeds `releaseDeeds` 1, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
           where (ids', rn', xes') = renameBounds ids rn xes
       where tg = annedTag e
 
@@ -146,7 +146,7 @@ step' normalising ei_state =
                   -> Answer  -- ^ Bound value, which we have *exactly* 1 deed for already that is not recorded in the Deeds itself
                   -> Maybe (Deeds, Answer) -- Outgoing deeds have that 1 latent deed included in them, and we have claimed deeds for the outgoing value
     prepareAnswer deeds x' a
-      | dUPLICATE_VALUES_EVALUATOR     = fmap (flip (,) a) $ claimDeeds (deeds + 1) (answerSize' a)
+      | dUPLICATE_VALUES_EVALUATOR     = fmap (flip (,) a) $ claimDeeds (deeds `releaseDeeds` 1) (answerSize' a)
        -- Avoid creating indirections to indirections: implements indirection compression
        -- FIXME: for cast things as well?
       | (Uncast, (_, Indirect _)) <- a = return (deeds, a)
@@ -183,13 +183,13 @@ step' normalising ei_state =
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
     unwind deeds h k tg_v a = uncons k >>= \(kf, k) -> case tagee kf of
-        TyApply ty'                    -> tyApply    (deeds + 1)          h k      a ty'
-        CoApply co'                    -> coApply    (deeds + 1)          h k      a co'
-        Apply x2'                      -> apply      deeds       (tag kf) h k      a x2'
-        Scrutinise x' ty' in_alts      -> scrutinise (deeds + 1)          h k tg_v a x' ty' in_alts
-        PrimApply pop tys' in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop tys' in_vs a in_es
-        StrictLet x' in_e2             -> strictLet  (deeds + 1)          h k tg_v a x' in_e2
-        CastIt co'                     -> cast       deeds       (tag kf) h k      a co'
+        TyApply ty'                    -> tyApply    (deeds `releaseDeeds` 1)          h k      a ty'
+        CoApply co'                    -> coApply    (deeds `releaseDeeds` 1)          h k      a co'
+        Apply x2'                      -> apply      deeds                    (tag kf) h k      a x2'
+        Scrutinise x' ty' in_alts      -> scrutinise (deeds `releaseDeeds` 1)          h k tg_v a x' ty' in_alts
+        PrimApply pop tys' in_vs in_es -> primop     deeds                    (tag kf) h k tg_v pop tys' in_vs a in_es
+        StrictLet x' in_e2             -> strictLet  (deeds `releaseDeeds` 1)          h k tg_v a x' in_e2
+        CastIt co'                     -> cast       deeds                    (tag kf) h k      a co'
         Update x'
           | normalising, dUPLICATE_VALUES_EVALUATOR -> Nothing -- If duplicating values, we ensure normalisation by not executing updates
           | otherwise                               -> update deeds h k tg_v x' a
@@ -217,13 +217,13 @@ step' normalising ei_state =
         tyApply deeds h@(Heap _ ids) k a ty' = do
             (mb_co, (rn, TyLambda x e_body)) <- deferenceLambdaish h a
             fmap (\deeds -> (deeds, h, case mb_co of Uncast -> k; CastBy co' tg_co -> Tagged tg_co (CastIt (co' `mk_inst` ty')) : k, (insertTypeSubst rn x ty', e_body))) $
-                 claimDeeds (deeds + answerSize' a) (annedSize e_body)
+                 claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)
           where mk_inst = mkInstCo ids
 
         coApply :: Deeds -> Heap -> Stack -> Answer -> Out Coercion -> Maybe UnnormalisedState
         coApply deeds h@(Heap _ ids) k a apply_co' = do
             (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h a
-            flip fmap (claimDeeds (deeds + answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
+            flip fmap (claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
                 Uncast           -> (deeds, h, k,                                 (insertCoercionSubst rn x apply_co', e_body))
                 CastBy co' tg_co -> (deeds, h, Tagged tg_co (CastIt res_co') : k, (insertCoercionSubst rn x cast_apply_co', e_body))
                   where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
@@ -242,9 +242,9 @@ step' normalising ei_state =
             (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) a
             case mb_co of
               Uncast -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
-                             claimDeeds (deeds + 1 + answerSize' a) (annedSize e_body)
+                             claimDeeds (deeds `releaseDeeds` 1 `releaseDeeds` answerSize' a) (annedSize e_body)
               CastBy co' tg_co -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
-                                       claimDeeds (deeds + answerSize' a) (annedSize e_arg + annedSize e_body)
+                                       claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_arg + annedSize e_body)
                 where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
                       Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
                       (arg_co', res_co') = (mkNthCo 0 co', mkNthCo 1 co')
@@ -256,7 +256,7 @@ step' normalising ei_state =
            -- always simple TyCons without any universally quantified type variables.
           | Literal l <- v_deref
           , case mb_co_deref_kind of Nothing -> True; Just (_, _, Pair from_ty' to_ty') -> from_ty' `eqType` to_ty'
-          , (deeds2, alt_e):_ <- [(deeds1 + annedAltsSize rest, (rn_alts, alt_e)) | ((LiteralAlt alt_l, alt_e), rest) <- bagContexts alts, alt_l == l]
+          , (deeds2, alt_e):_ <- [(deeds1 `releaseDeeds` annedAltsSize rest, (rn_alts, alt_e)) | ((LiteralAlt alt_l, alt_e), rest) <- bagContexts alts, alt_l == l]
           = Just (deeds2, Heap h1 ids, k, alt_e)
           
            -- Data is a big stinking mess! I hate you, KPush rule.
@@ -292,7 +292,7 @@ step' normalising ei_state =
                                                  cos' = map (renameCoercion ids rn_v_deref) cos
                                                  xs' = map (renameId rn_v_deref) xs
                                                  rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys')
-                                                 deeds2 = deeds1 + annedAltsSize rest
+                                                 deeds2 = deeds1 `releaseDeeds` annedAltsSize rest
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
                                                                Nothing     -> return (deeds2, h1, ids, insertIdRenamings (insertCoercionSubsts rn_alts' (alt_qs `zip` cos')) (alt_xs `zip` xs'))
                                                                Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (uncast_e_arg', alt_y, (dc_co, tg_co)) ->
@@ -306,7 +306,7 @@ step' normalising ei_state =
           = Just (deeds3, Heap h' ids', k, alt_e)
           
            -- Thank god, default alternatives are trivial:
-          | (deeds2, alt_e):_ <- [(deeds1 + annedAltsSize rest, (rn_alts, alt_e)) | ((DefaultAlt, alt_e), rest) <- bagContexts alts]
+          | (deeds2, alt_e):_ <- [(deeds1 `releaseDeeds` annedAltsSize rest, (rn_alts, alt_e)) | ((DefaultAlt, alt_e), rest) <- bagContexts alts]
           = Just (deeds2, Heap h1 ids, k, alt_e)
           
            -- This can legitimately occur, e.g. when supercompiling (if x then (case x of False -> 1) else 2)
@@ -316,8 +316,8 @@ step' normalising ei_state =
                 mb_co_deref_kind = case mb_co_deref of
                                      Uncast          -> Nothing
                                      CastBy co tg_co -> Just (co, tg_co, coercionKind co)
-                (deeds1, h1) | isDeadBinder wild' = (deeds0 + answerSize' a, h0)
-                             | otherwise          = (deeds0,                 M.insert wild' wild_hb h0)
+                (deeds1, h1) | isDeadBinder wild' = (deeds0 `releaseDeeds` answerSize' a, h0)
+                             | otherwise          = (deeds0,                              M.insert wild' wild_hb h0)
                                where wild_hb = internallyBound $ annedAnswerToInAnnedTerm ids (annedAnswer tg_v a)
                                -- NB: we add the *non-dereferenced* value to the heap for a case wildcard, because anything else may duplicate allocation
 
@@ -328,7 +328,7 @@ step' normalising ei_state =
             let as' = map (dereference h) $ map annee anned_as ++ [a]
                 tg_kf' = tg_kf { tagOccurrences = if oCCURRENCE_GENERALISATION then tagOccurrences tg_kf + sum (map tagOccurrences (tg_a : map annedTag anned_as)) else 1 }
             a' <- evaluatePrim ids tg_kf' pop tys' as'
-            deeds <- claimDeeds (deeds + sum (map annedSize anned_as) + answerSize' a + 1) (annedSize a') -- I don't think this can ever fail
+            deeds <- claimDeeds (deeds `releaseDeeds` (sum (map annedSize anned_as) + answerSize' a + 1)) (annedSize a') -- I don't think this can ever fail
             return (denormalise (deeds, heap, k, fmap Answer a'))
         primop deeds tg_kf h k tg_a pop tys' anned_as a in_es = case in_es of
             (in_e:in_es) -> Just (deeds, h, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
@@ -340,8 +340,8 @@ step' normalising ei_state =
         cast :: Deeds -> Tag -> Heap -> Stack -> Answer -> Coercion -> Maybe UnnormalisedState
         cast deeds tg_kf (Heap h ids) k (mb_co, in_v) co' = Just (deeds', Heap h ids, k, annedAnswerToInAnnedTerm ids (annedAnswer tg_kf ans'))
           where (deeds', ans') = case mb_co of
-                    Uncast           -> (deeds,     (CastBy co'                    tg_kf, in_v))
-                    CastBy co _tg_co -> (deeds + 1, (CastBy (mkTransCo ids co co') tg_kf, in_v))
+                    Uncast           -> (deeds,                  (CastBy co'                    tg_kf, in_v))
+                    CastBy co _tg_co -> (deeds `releaseDeeds` 1, (CastBy (mkTransCo ids co co') tg_kf, in_v))
 
         update :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Answer -> Maybe UnnormalisedState
         update deeds (Heap h ids) k tg_a x' a = do

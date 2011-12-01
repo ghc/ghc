@@ -219,7 +219,7 @@ generalise gen (deeds, Heap h ids, k, qa) = do
     pprTrace "generalise: (gen_kfs, gen_xs')" (ppr (gen_kfs, gen_xs')) $ return ()
     
     let (ctxt_id, ctxt_ids) = takeUniqFromSupply splitterUniqSupply
-    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed (qaType qa) (Once ctxt_id, denormalise (0, Heap M.empty ids, [], qa))))
+    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed (qaType qa) (Once ctxt_id, denormalise (emptyDeeds, Heap M.empty ids, [], qa))))
 
 {-# INLINE generaliseSplit #-}
 generaliseSplit :: MonadStatics m
@@ -446,7 +446,7 @@ optimiseBracketed :: MonadStatics m
                   -> (Deeds, RBracketed State)
                   -> m (Deeds, Out FVedTerm)
 optimiseBracketed opt (deeds, rbracketed) = liftM (second (shellWrapper (bracketedShell rbracketed))) $ optimiseMany optimise_one (deeds, bracketedHoles rbracketed)
-  where optimise_one (deeds, (Hole extra_bvs (s_deeds, s_heap, s_k, s_e))) = liftM (\(xes, (deeds, e)) -> (deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)) $ bindCapturedFloats (mkVarSet extra_bvs) $ opt (deeds + s_deeds, s_heap, s_k, s_e)
+  where optimise_one (deeds, (Hole extra_bvs (s_deeds, s_heap, s_k, s_e))) = liftM (\(xes, (deeds, e)) -> (deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)) $ bindCapturedFloats (mkVarSet extra_bvs) $ opt (deeds `plusDeeds` s_deeds, s_heap, s_k, s_e)
         -- Because h-functions might potentially refer to the lambda/case-alt bound variables around this hole,
         -- we use bindCapturedFloats to residualise such bindings within exactly this context.
         -- See Note [When to bind captured floats]
@@ -482,12 +482,12 @@ optimiseSplit opt deeds bracketeds_heap bracketed_focus = do
     -- 0) The "process tree" splits at this point. We can choose to distribute the deeds between the children in a number of ways
     let (deeds_initial, BracketedStuff bracketed_deeded_focus bracketeds_deeded_heap) = flip traverseAll (BracketedStuff bracketed_focus bracketeds_heap) $
           \states -> case dEEDS_POLICY of
-                       Proportional -> case apportion deeds (1 : map stateSize states) of (deeds_initial:deeds_rest) -> (deeds_initial, zipWithEqual "optimiseSplit" addStateDeeds deeds_rest states)
-                                                                                          _ -> panic "optimiseSplit: empty apportioned deeds"
+                       Proportional -> case apportionDeeds deeds (1 : map stateSize states) of (deeds_initial:deeds_rest) -> (deeds_initial, zipWithEqual "optimiseSplit" addStateDeeds deeds_rest states)
+                                                                                               _ -> panic "optimiseSplit: empty apportioned deeds"
                        _            -> (deeds, states)
     
-    MASSERT2(noChange (sumMap (sumMap releaseStateDeed) bracketeds_heap        + sumMap releaseStateDeed bracketed_focus        + deeds)
-                      (sumMap (sumMap releaseStateDeed) bracketeds_deeded_heap + sumMap releaseStateDeed bracketed_deeded_focus + deeds_initial),
+    MASSERT2(noChange (sumMapMonoid (sumMapMonoid releaseStateDeed) bracketeds_heap        `plusDeeds` sumMapMonoid releaseStateDeed bracketed_focus        `plusDeeds` deeds)
+                      (sumMapMonoid (sumMapMonoid releaseStateDeed) bracketeds_deeded_heap `plusDeeds` sumMapMonoid releaseStateDeed bracketed_deeded_focus `plusDeeds` deeds_initial),
              ppr deeds)
     
     (hes, (deeds, xes, e_focus)) <- bindCapturedFloats (dataSetToVarSet (M.keysSet bracketeds_heap)) $ do
@@ -503,7 +503,7 @@ optimiseSplit opt deeds bracketeds_heap bracketed_focus = do
         let resid_fvs = fvs_focus_hs `unionVarSet` fvedTermFreeVars e_focus
         (leftover_deeds, bracketeds_deeded_heap, _fvs, xes) <- optimiseLetBinds opt leftover_deeds bracketeds_deeded_heap resid_fvs
     
-        return (sumMap (sumMap releaseStateDeed) bracketeds_deeded_heap + leftover_deeds, xes, e_focus)
+        return (sumMapMonoid (sumMapMonoid releaseStateDeed) bracketeds_deeded_heap `plusDeeds` leftover_deeds, xes, e_focus)
     
     -- 3) Combine the residualised let bindings with the let body
     return (deeds, bindManyMixedLiftedness fvedTermFreeVars (xes ++ hes) e_focus)
@@ -589,7 +589,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         -- 2) Build a splitting for those elements of the heap we propose to residualise not in not_resid_xs
         -- TODO: I should residualise those Unfoldings whose free variables have become interesting due to intervening scrutinisation
         (h_not_residualised, h_residualised) = M.partitionWithKey (\x' _ -> x' `elemVarSet` not_resid_xs) h
-        bracketeds_nonupdated0 = M.mapMaybeWithKey (\x' hb -> do { guard (howBound hb == InternallyBound); return $ case heapBindingTerm hb of Nothing -> (error "Unimplemented: no tag for undefined", undefined "FIXME FIXME" (noneBracketed (fvedTerm (Var (undefined "tcLookupId" undefinedName))))); Just in_e@(_, e) -> (annedTag e, oneBracketed (idType x') (Once (idUnique x'), (0, Heap M.empty ids, [], in_e))) }) h_residualised
+        bracketeds_nonupdated0 = M.mapMaybeWithKey (\x' hb -> do { guard (howBound hb == InternallyBound); return $ case heapBindingTerm hb of Nothing -> (error "Unimplemented: no tag for undefined", undefined "FIXME FIXME" (noneBracketed (fvedTerm (Var (undefined "tcLookupId" undefinedName))))); Just in_e@(_, e) -> (annedTag e, oneBracketed (idType x') (Once (idUnique x'), (emptyDeeds, Heap M.empty ids, [], in_e))) }) h_residualised
         -- An idea from Arjan, which is sort of the dual of positive information propagation:
         -- TODO: this is too dangerous presently: we often end up adding an Update at the end just after we generalised it away, building ourselves a nice little loop :(
         -- I have tried to work around this by only introducing Update frames for those things that don't presently have one... but that also doesn't work because if we start
@@ -699,7 +699,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         inlineBracketHeap init_deeds = third3 rigidizeBracketed . inlineHeapT inline_one init_deeds
           where
             inline_one deeds (ent, state) = -- pprTrace "inline_one" (ppr (ent, stateFreeVars state', state)) $
-                                            (deeds', mkEnteredEnv ent $ stateFreeVars state', (0, heap', k', in_e'))
+                                            (deeds', mkEnteredEnv ent $ stateFreeVars state', (emptyDeeds, heap', k', in_e'))
               where
                 -- The elements of the Bracketed may contain proposed heap bindings gathered from Case frames.
                 -- However, we haven't yet claimed deeds for them :-(.
@@ -896,14 +896,14 @@ cheapifyHeap deeds (Heap h ids) = (deeds', Heap (M.fromList [(x', internallyBoun
     cheapify :: Deeds -> InScopeSet -> In AnnedTerm -> (Deeds, InScopeSet, [(Out Var, In AnnedTerm)], In AnnedTerm)
     cheapify deeds0 ids0 (rn, anned_e)
       | LetRec xes e <- annee anned_e
-      , let deeds1 = deeds0 + 1
+      , let deeds1 = deeds0 `releaseDeeds` 1
             (        ids1, rn', in_xes) = renameBounds ids0 rn xes
             (in_xs, in_es) = unzip in_xes
             (deeds2, ids2, floats0, in_es') = cheapifyMany deeds1 ids1 in_es
             (deeds3, ids3, floats1, in_e')  = cheapify deeds2 ids2 (rn', e)
       = (deeds3, ids3, zip in_xs in_es' ++ floats0 ++ floats1, in_e')
       | Let x e1 e2 <- annee anned_e
-      , let deeds1 = deeds0 + 1
+      , let deeds1 = deeds0 `releaseDeeds` 1
             (ids1, rn', (x', in_e1)) = renameNonRecBound ids0 rn (x, e1)
             (deeds2, ids2, floats0, in_e1')  = cheapify deeds1 ids1 in_e1
             (deeds3, ids3, floats1, in_e2')  = cheapify deeds2 ids2 (rn', e2)
@@ -1026,8 +1026,8 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
                                                                                `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
                                             alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
-            bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed ty' (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
-    StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> Shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed ty' (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
+            bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed ty' (Once ctxt_id, (emptyDeeds, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
+    StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> Shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed ty' (Once ctxt_id, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
       where ctxt_id = uniqFromSupply ctxt_ids
             ty' = inTermType ids in_e
     PrimApply pop tys' in_vs in_es -> zipBracketeds $ TailsUnknown (Shell emptyVarSet $ primOp pop tys') (zipWith Hole (repeat []) $ bracketed_vs ++ bracketed_hole : bracketed_es)
@@ -1036,7 +1036,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             
             -- 1) Split every value and expression remaining apart
             bracketed_vs = map (splitAnswer ids . annee) in_vs
-            bracketed_es  = zipWith (\ctxt_id in_e -> oneBracketed (inTermType ids in_e) (Once ctxt_id, (0, Heap M.empty ids, [], in_e))) ctxt_idss in_es)
+            bracketed_es  = zipWith (\ctxt_id in_e -> oneBracketed (inTermType ids in_e) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, [], in_e))) ctxt_idss in_es)
   where
     altConToValue :: Type -> In AltCon -> Maybe (ValueF ann)
     altConToValue ty' (rn, DataAlt dc as qs xs) = do
@@ -1059,7 +1059,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
 splitUpdate :: InScopeSet -> Tag -> [Out Var] -> Var -> Bracketed (Entered, UnnormalisedState)
             -> ([Out Var], M.Map (Out Var) (Bracketed (Entered, UnnormalisedState)), Bracketed (Entered, UnnormalisedState))
 splitUpdate ids tg_kf scruts x' bracketed_hole = (x' : scruts, M.singleton x' bracketed_hole,
-                                                  oneBracketed (idType x') (Once ctxt_id, (0, Heap M.empty ids, [], (mkIdentityRenaming (unitVarSet x'), annedTerm tg_kf (Var x')))))
+                                                  oneBracketed (idType x') (Once ctxt_id, (emptyDeeds, Heap M.empty ids, [], (mkIdentityRenaming (unitVarSet x'), annedTerm tg_kf (Var x')))))
   where ctxt_id = idUnique x'
 
 splitValue :: InScopeSet -> In AnnedValue -> Bracketed (Entered, UnnormalisedState)
@@ -1070,7 +1070,7 @@ splitValue ids in_v               = noneBracketed (value (detagAnnedValue' $ ren
 -- We create LambdaBound entries in the Heap for both type and value variables, so we can share the code:
 splitLambdaLike :: (Var -> FVedTerm -> ValueF FVed)
                 -> InScopeSet -> In (Var, AnnedTerm) -> Bracketed (Entered, UnnormalisedState)
-splitLambdaLike rebuild ids (rn, (x, e)) = zipBracketeds $ TailsUnknown (Shell emptyVarSet $ \[e'] -> value (rebuild x' e')) [Hole [x'] $ oneBracketed (inTermType ids' in_e) (Many, (0, Heap (M.singleton x' lambdaBound) ids', [], in_e))]
+splitLambdaLike rebuild ids (rn, (x, e)) = zipBracketeds $ TailsUnknown (Shell emptyVarSet $ \[e'] -> value (rebuild x' e')) [Hole [x'] $ oneBracketed (inTermType ids' in_e) (Many, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids', [], in_e))]
   where (ids', rn', x') = renameNonRecBinder ids rn x
         in_e = (rn', e)
 

@@ -313,22 +313,22 @@ stateSize (_, h, k, qa) = heapSize h + stackSize k + annedSize qa
 
 
 addStateDeeds :: Deeds -> (Deeds, a, b, c) -> (Deeds, a, b, c)
-addStateDeeds extra_deeds (deeds, h, k, in_e) = (extra_deeds + deeds, h, k, in_e)
+addStateDeeds extra_deeds (deeds, h, k, in_e) = (extra_deeds `plusDeeds` deeds, h, k, in_e)
 
 releaseHeapBindingDeeds :: Deeds -> HeapBinding -> Deeds
-releaseHeapBindingDeeds deeds hb = deeds + heapBindingSize hb
+releaseHeapBindingDeeds deeds hb = deeds `releaseDeeds` heapBindingSize hb
 
 releasePureHeapDeeds :: Deeds -> PureHeap -> Deeds
 releasePureHeapDeeds = M.fold (flip releaseHeapBindingDeeds)
 
 releaseStackDeeds :: Deeds -> Stack -> Deeds
-releaseStackDeeds = foldl' (\deeds kf -> deeds + stackFrameSize (tagee kf))
+releaseStackDeeds = foldl' (\deeds kf -> deeds `releaseDeeds` stackFrameSize (tagee kf))
 
 releaseUnnormalisedStateDeed :: UnnormalisedState -> Deeds
-releaseUnnormalisedStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (releasePureHeapDeeds (deeds + annedSize e) h) k
+releaseUnnormalisedStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (releasePureHeapDeeds (deeds `releaseDeeds` annedSize e) h) k
 
 releaseStateDeed :: State -> Deeds
-releaseStateDeed (deeds, Heap h _, k, a) = releaseStackDeeds (releasePureHeapDeeds (deeds + annedSize a) h) k
+releaseStateDeed (deeds, Heap h _, k, a) = releaseStackDeeds (releasePureHeapDeeds (deeds `releaseDeeds` annedSize a) h) k
 
 
 -- Unlifted bindings are irritating. They mean that the PureHeap has an implicit order that we need to carefully

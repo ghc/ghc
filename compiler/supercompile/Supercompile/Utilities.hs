@@ -42,6 +42,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.Graph as G
 import qualified Data.Foldable as Foldable
+import Data.Monoid
 
 import System.Directory
 import System.Exit
@@ -458,6 +459,9 @@ accumLN f = go
 
 sumMap :: (Foldable f, Num b) => (a -> b) -> f a -> b
 sumMap f = Foldable.foldr (\x n -> f x + n) 0
+
+sumMapMonoid :: (Foldable f, Monoid b) => (a -> b) -> f a -> b
+sumMapMonoid f = Foldable.foldr (\x n -> f x `mappend` n) mempty
 
 
 -- | Orders elements of a map into dependency order insofar as that is possible.

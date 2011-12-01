@@ -102,7 +102,8 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
                     where (i, tag_ids3) = takeUniqFromSupply tag_ids2
         
         -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
-        state = normalise ((bLOAT_FACTOR - 1) * annedSize anned_e, Heap (M.fromList h_unfoldings `M.union` M.fromList h_fvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
+        deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
+        state = normalise (deeds, Heap (M.fromList h_unfoldings `M.union` M.fromList h_fvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
 
 
 data SCStats = SCStats {
