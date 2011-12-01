@@ -342,11 +342,19 @@ initCapabilities( void )
  * soon as possible.
  * ------------------------------------------------------------------------- */
 
-void setContextSwitches(void)
+void contextSwitchAllCapabilities(void)
 {
     nat i;
     for (i=0; i < n_capabilities; i++) {
         contextSwitchCapability(&capabilities[i]);
+    }
+}
+
+void interruptAllCapabilities(void)
+{
+    nat i;
+    for (i=0; i < n_capabilities; i++) {
+        interruptCapability(&capabilities[i]);
     }
 }
 

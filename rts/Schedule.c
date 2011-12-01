@@ -415,6 +415,9 @@ run_thread:
     SetLastError(t->saved_winerror);
 #endif
 
+    // reset the interrupt flag before running Haskell code
+    cap->interrupt = 0;
+
     cap->in_haskell = rtsTrue;
 
     dirty_TSO(cap,t);
@@ -521,7 +524,7 @@ run_thread:
         break;
 
     case ThreadYielding:
-	if (scheduleHandleYield(cap, t, prev_what_next)) {
+        if (scheduleHandleYield(cap, t, prev_what_next)) {
             // shortcut for switching between compiler/interpreter:
 	    goto run_thread; 
 	}
@@ -1167,13 +1170,16 @@ scheduleHandleYield( Capability *cap, StgTSO *t, nat prev_what_next )
     // the CPU because the tick always arrives during GC).  This way
     // penalises threads that do a lot of allocation, but that seems
     // better than the alternative.
-    cap->context_switch = 0;
-    
+    if (cap->context_switch != 0) {
+        cap->context_switch = 0;
+        appendToRunQueue(cap,t);
+    } else {
+        pushOnRunQueue(cap,t);
+    }
+
     IF_DEBUG(sanity,
 	     //debugBelch("&& Doing sanity check on yielding TSO %ld.", t->id);
 	     checkTSO(t));
-
-    appendToRunQueue(cap,t);
 
     return rtsFalse;
 }
@@ -1371,7 +1377,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 	return cap;  // NOTE: task->cap might have changed here
     }
 
-    setContextSwitches();
+    interruptAllCapabilities();
 
     // The final shutdown GC is always single-threaded, because it's
     // possible that some of the Capabilities have no worker threads.
@@ -2145,7 +2151,7 @@ void
 interruptStgRts(void)
 {
     sched_state = SCHED_INTERRUPTING;
-    setContextSwitches();
+    interruptAllCapabilities();
 #if defined(THREADED_RTS)
     wakeUpRts();
 #endif

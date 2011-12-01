@@ -72,9 +72,19 @@ struct Capability_ {
     // block for allocating pinned objects into
     bdescr *pinned_object_block;
 
-    // Context switch flag. We used to have one global flag, now one 
-    // per capability. Locks required  : none (conflicts are harmless)
+    // Context switch flag.  When non-zero, this means: stop running
+    // Haskell code, and switch threads.
     int context_switch;
+
+    // Interrupt flag.  Like the context_switch flag, this also
+    // indicates that we should stop running Haskell code, but we do
+    // *not* switch threads.  This is used to stop a Capability in
+    // order to do GC, for example.
+    //
+    // The interrupt flag is always reset before we start running
+    // Haskell code, unlike the context_switch flag which is only
+    // reset after we have executed the context switch.
+    int interrupt;
 
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
@@ -275,8 +285,13 @@ void shutdownCapability (Capability *cap, Task *task, rtsBool wait_foreign);
 void shutdownCapabilities(Task *task, rtsBool wait_foreign);
 
 // cause all capabilities to context switch as soon as possible.
-void setContextSwitches(void);
+void contextSwitchAllCapabilities(void);
 INLINE_HEADER void contextSwitchCapability(Capability *cap);
+
+// cause all capabilities to stop running Haskell code and return to
+// the scheduler as soon as possible.
+void interruptAllCapabilities(void);
+INLINE_HEADER void interruptCapability(Capability *cap);
 
 // Free all capabilities
 void freeCapabilities (void);
@@ -346,14 +361,27 @@ discardSparksCap (Capability *cap)
 #endif
 
 INLINE_HEADER void
+stopCapability (Capability *cap)
+{
+    // setting HpLim to NULL tries to make the next heap check will
+    // fail, which will cause the thread to return to the scheduler.
+    // It may not work - the thread might be updating HpLim itself
+    // at the same time - so we also have the context_switch/interrupted
+    // flags as a sticky way to tell the thread to stop.
+    cap->r.rHpLim = NULL;
+}
+
+INLINE_HEADER void
+interruptCapability (Capability *cap)
+{
+    stopCapability(cap);
+    cap->interrupt = 1;
+}
+
+INLINE_HEADER void
 contextSwitchCapability (Capability *cap)
 {
-    // setting HpLim to NULL ensures that the next heap check will
-    // fail, and the thread will return to the scheduler.
-    cap->r.rHpLim = NULL;
-    // But just in case it didn't work (the target thread might be
-    // modifying HpLim at the same time), we set the end-of-block
-    // context-switch flag too:
+    stopCapability(cap);
     cap->context_switch = 1;
 }
 

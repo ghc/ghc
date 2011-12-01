@@ -238,6 +238,7 @@ main(int argc, char *argv[])
     struct_field(Capability, no);
     struct_field(Capability, mut_lists);
     struct_field(Capability, context_switch);
+    struct_field(Capability, interrupt);
     struct_field(Capability, sparks);
 
     struct_field(bdescr, start);
