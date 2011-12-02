@@ -437,6 +437,24 @@ MAIN            MAIN                    102           0    0.0    0.0   100.0  1
 
       <varlistentry>
 	<term>
+          <option>-fprof-auto-calls</option>:
+          <indexterm><primary><option>-fprof-auto-calls</option></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Adds an automatic <literal>SCC</literal> annotation to
+            all <emphasis>call sites</emphasis>.  This is particularly
+            useful when using profiling for the purposes of generating
+            stack traces; see the
+            function <literal>traceStack</literal> in the
+            module <literal>Debug.Trace</literal>, or
+            the <literal>-xc</literal> RTS flag
+            (<xref linkend="rts-options-debugging" />) for more
+            details.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-fprof-cafs</option>:
           <indexterm><primary><option>-fprof-cafs</option></primary></indexterm>
         </term>

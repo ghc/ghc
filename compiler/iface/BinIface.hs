@@ -938,26 +938,31 @@ instance Binary IsCafCC where
               _ -> do return NotCafCC
 
 instance Binary CostCentre where
-    put_ bh NoCostCentre = do
+    put_ bh (NormalCC aa ab ac _ad ae) = do
             putByte bh 0
-    put_ bh (NormalCC aa ab ac) = do
-            putByte bh 1
             put_ bh aa
             put_ bh ab
             put_ bh ac
-    put_ bh (AllCafsCC ae) = do
-            putByte bh 2
+            put_ bh ae
+    put_ bh (AllCafsCC ae _af) = do
+            putByte bh 1
             put_ bh ae
     get bh = do
             h <- getByte bh
             case h of
-              0 -> do return NoCostCentre
-              1 -> do aa <- get bh
+              0 -> do aa <- get bh
                       ab <- get bh
                       ac <- get bh
-                      return (NormalCC aa ab ac)
+                      ae <- get bh
+                      return (NormalCC aa ab ac noSrcSpan ae)
               _ -> do ae <- get bh
-                      return (AllCafsCC ae)
+                      return (AllCafsCC ae noSrcSpan)
+
+    -- We ignore the SrcSpans in CostCentres when we serialise them,
+    -- and set the SrcSpans to noSrcSpan when deserialising.  This is
+    -- ok, because we only need the SrcSpan when declaring the
+    -- CostCentre in the original module, it is not used by importing
+    -- modules.
 
 -------------------------------------------------------------------------
 --              IfaceTypes and friends

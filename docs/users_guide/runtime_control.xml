@@ -1290,7 +1290,7 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
 	<listitem>
 	  <para>(Only available when the program is compiled for
 	  profiling.)  When an exception is raised in the program,
-	  this option causes the current cost-centre-stack to be
+          this option causes a stack trace to be
           dumped to <literal>stderr</literal>.</para>
 
 	  <para>This can be particularly useful for debugging: if your
@@ -1337,6 +1337,12 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
           <para>Implementation details aside, the function names in
           the stack should hopefully give you enough clues to track
           down the bug.</para>
+
+          <para>
+            See also the function <literal>traceStack</literal> in the
+            module <literal>Debug.Trace</literal> for another way to
+            view call stacks.
+          </para>
         </listitem>
       </varlistentry>
 

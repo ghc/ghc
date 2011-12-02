@@ -33,6 +33,7 @@ import HscTypes
 import Platform
 import StaticFlags
 import TyCon
+import Unique
 import BasicTypes
 import MonadUtils
 import Maybes
@@ -177,8 +178,7 @@ data TickDensity
   | TickAllFunctions      -- for -prof-auto-all
   | TickTopFunctions      -- for -prof-auto-top
   | TickExportedFunctions -- for -prof-auto-exported
-  -- maybe also:
-  --  | TickCallSites        -- for stack tracing
+  | TickCallSites         -- for stack tracing
   deriving Eq
 
 mkDensity :: DynFlags -> TickDensity
@@ -188,8 +188,13 @@ mkDensity dflags
   | ProfAutoAll     <- profAuto dflags   = TickAllFunctions
   | ProfAutoTop     <- profAuto dflags   = TickTopFunctions
   | ProfAutoExports <- profAuto dflags   = TickExportedFunctions
+  | ProfAutoCalls   <- profAuto dflags   = TickCallSites
   | otherwise = panic "desnity"
-
+  -- ToDo: -fhpc is taking priority over -fprof-auto here.  It seems
+  -- that coverage works perfectly well with profiling, but you don't
+  -- get any auto-generated SCCs.  It would make perfect sense to
+  -- allow both of them, and indeed to combine some of the other flags
+  -- (-fprof-auto-calls -fprof-auto-top, for example)
 
 -- | Decide whether to add a tick to a binding or not.
 shouldTickBind  :: TickDensity
@@ -208,6 +213,7 @@ shouldTickBind density top_lev exported simple_pat inline
       TickTopFunctions      -> top_lev && not inline
       TickExportedFunctions -> exported && not inline
       TickForCoverage       -> True
+      TickCallSites         -> False
 
 shouldTickPatBind :: TickDensity -> Bool -> Bool
 shouldTickPatBind density top_lev
@@ -217,6 +223,7 @@ shouldTickPatBind density top_lev
       TickTopFunctions      -> top_lev
       TickExportedFunctions -> False
       TickForCoverage       -> False
+      TickCallSites         -> False
 
 -- -----------------------------------------------------------------------------
 -- Adding ticks to bindings
@@ -323,38 +330,60 @@ bindTick density name pos fvs = do
 
 -- selectively add ticks to interesting expressions
 addTickLHsExpr :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExpr (L pos e0) = do
+addTickLHsExpr e@(L pos e0) = do
   d <- getDensity
   case d of
+    TickForBreakPoints | isGoodBreakExpr e0 -> tick_it
     TickForCoverage    -> tick_it
-    TickForBreakPoints -> if isGoodBreakExpr e0 then tick_it else dont_tick_it
+    TickCallSites      | isCallSite e0      -> tick_it
     _other             -> dont_tick_it
  where
    tick_it      = allocTickBox (ExpBox False) False False pos $ addTickHsExpr e0
-   dont_tick_it = do e1 <- addTickHsExpr e0; return $ L pos e1
+   dont_tick_it = addTickLHsExprNever e
 
--- Add a tick to the expression no matter what it is.  There is one exception:
--- for the debugger, if the expression is a 'let', then we don't want to add
--- a tick here because there will definititely be a tick on the body anyway.
-addTickLHsExprAlways :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprAlways (L pos e0) = do
+-- Add a tick to an expression which is the RHS of an equation or a binding.
+-- We always consider these to be breakpoints, unless the expression is a 'let'
+-- (because the body will definitely have a tick somewhere).  ToDo: perhaps
+-- we should treat 'case' and 'if' the same way?
+addTickLHsExprRHS :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExprRHS e@(L pos e0) = do
   d <- getDensity
   case d of
-     TickForBreakPoints | HsLet _ _ <- e0 -> dont_tick_it
-                        | otherwise       -> tick_it
+     TickForBreakPoints | HsLet{} <- e0 -> dont_tick_it
+                        | otherwise     -> tick_it
      TickForCoverage -> tick_it
+     TickCallSites   | isCallSite e0 -> tick_it
      _other          -> dont_tick_it
  where
    tick_it      = allocTickBox (ExpBox False) False False pos $ addTickHsExpr e0
-   dont_tick_it = do e1 <- addTickHsExpr e0; return $ L pos e1
+   dont_tick_it = addTickLHsExprNever e
 
--- | A let body is ticked only if we're doing breakpoints.  For coverage, the
--- whole let is ticked, so there's no need to tick the body.
+-- The inner expression of an evaluation context:
+--    let binds in [], ( [] )
+-- we never tick these if we're doing HPC, but otherwise
+-- we treat it like an ordinary expression.
+addTickLHsExprEvalInner :: LHsExpr Id -> TM (LHsExpr Id)
+addTickLHsExprEvalInner e = do
+   d <- getDensity
+   case d of
+     TickForCoverage -> addTickLHsExprNever e
+     _otherwise      -> addTickLHsExpr e
+
+-- | A let body is treated differently from addTickLHsExprEvalInner
+-- above with TickForBreakPoints, because for breakpoints we always
+-- want to tick the body, even if it is not a redex.  See test
+-- break012.  This gives the user the opportunity to inspect the
+-- values of the let-bound variables.
 addTickLHsExprLetBody :: LHsExpr Id -> TM (LHsExpr Id)
-addTickLHsExprLetBody e
-   = ifDensity TickForBreakPoints
-         (addTickLHsExprAlways e)
-         (addTickLHsExprNever e)
+addTickLHsExprLetBody e@(L pos e0) = do
+  d <- getDensity
+  case d of
+     TickForBreakPoints | HsLet{} <- e0 -> dont_tick_it
+                        | otherwise     -> tick_it
+     _other -> addTickLHsExprEvalInner e
+ where
+   tick_it      = allocTickBox (ExpBox False) False False pos $ addTickHsExpr e0
+   dont_tick_it = addTickLHsExprNever e
 
 -- version of addTick that does not actually add a tick,
 -- because the scope of this tick is completely subsumed by 
@@ -369,13 +398,18 @@ isGoodBreakExpr :: HsExpr Id -> Bool
 isGoodBreakExpr (HsApp {})     = True
 isGoodBreakExpr (OpApp {})     = True
 isGoodBreakExpr (NegApp {})    = True
-isGoodBreakExpr (HsCase {})    = True
 isGoodBreakExpr (HsIf {})      = True
+isGoodBreakExpr (HsCase {})    = True
 isGoodBreakExpr (RecordCon {}) = True
 isGoodBreakExpr (RecordUpd {}) = True
 isGoodBreakExpr (ArithSeq {})  = True
 isGoodBreakExpr (PArrSeq {})   = True
 isGoodBreakExpr _other         = False 
+
+isCallSite :: HsExpr Id -> Bool
+isCallSite HsApp{}  = True
+isCallSite OpApp{}  = True
+isCallSite _ = False
 
 addTickLHsExprOptAlt :: Bool -> LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprOptAlt oneOfMany (L pos e0)
@@ -413,16 +447,14 @@ addTickHsExpr (NegApp e neg) =
 		(addTickLHsExpr e) 
 		(addTickSyntaxExpr hpcSrcSpan neg)
 addTickHsExpr (HsPar e) =
-        liftM HsPar $
-           ifDensity TickForCoverage (addTickLHsExprNever e)
-                                     (addTickLHsExpr e)
-addTickHsExpr (SectionL e1 e2) = 
+        liftM HsPar (addTickLHsExprEvalInner e)
+addTickHsExpr (SectionL e1 e2) =
 	liftM2 SectionL
 		(addTickLHsExpr e1)
-		(addTickLHsExpr e2)
+                (addTickLHsExprNever e2)
 addTickHsExpr (SectionR e1 e2) = 
 	liftM2 SectionR
-		(addTickLHsExpr e1)
+                (addTickLHsExprNever e1)
 		(addTickLHsExpr e2)
 addTickHsExpr (ExplicitTuple es boxity) =
         liftM2 ExplicitTuple
@@ -430,7 +462,8 @@ addTickHsExpr (ExplicitTuple es boxity) =
                 (return boxity)
 addTickHsExpr (HsCase e mgs) = 
 	liftM2 HsCase
-		(addTickLHsExpr e) 
+                (addTickLHsExpr e) -- not an EvalInner; e might not necessarily
+                                   -- be evaluated.
                 (addTickMatchGroup False mgs)
 addTickHsExpr (HsIf cnd e1 e2 e3) = 
 	liftM3 (HsIf cnd)
@@ -551,7 +584,7 @@ addTickGRHSBody isOneOfMany isLambda expr@(L pos e0) = do
          allocTickBox (ExpBox False) True{-count-} False{-not top-} pos $
            addTickHsExpr e0
     _otherwise ->
-       addTickLHsExprAlways expr
+       addTickLHsExprRHS expr
 
 addTickLStmts :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM [LStmt Id]
 addTickLStmts isGuard stmts = do
@@ -574,7 +607,7 @@ addTickStmt _isGuard (LastStmt e ret) = do
 addTickStmt _isGuard (BindStmt pat e bind fail) = do
 	liftM4 BindStmt
 		(addTickLPat pat)
-		(addTickLHsExprAlways e)
+		(addTickLHsExprRHS e)
 		(addTickSyntaxExpr hpcSrcSpan bind)
 		(addTickSyntaxExpr hpcSrcSpan fail)
 addTickStmt isGuard (ExprStmt e bind' guard' ty) = do
@@ -598,8 +631,8 @@ addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
                                     , trS_ret = returnExpr, trS_bind = bindExpr
                                     , trS_fmap = liftMExpr }) = do
     t_s <- addTickLStmts isGuard stmts
-    t_y <- fmapMaybeM  addTickLHsExprAlways by
-    t_u <- addTickLHsExprAlways using
+    t_y <- fmapMaybeM  addTickLHsExprRHS by
+    t_u <- addTickLHsExprRHS using
     t_f <- addTickSyntaxExpr hpcSrcSpan returnExpr
     t_b <- addTickSyntaxExpr hpcSrcSpan bindExpr
     t_m <- addTickSyntaxExpr hpcSrcSpan liftMExpr
@@ -616,7 +649,7 @@ addTickStmt isGuard stmt@(RecStmt {})
 
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
-                  | otherwise          = addTickLHsExprAlways e
+                  | otherwise          = addTickLHsExprRHS e
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ([LStmt Id], a) 
                       -> TM ([LStmt Id], a)
@@ -987,7 +1020,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path =
         cc_name | topOnly   = head decl_path
                 | otherwise = concat (intersperse "." decl_path)
 
-        cc = mkUserCC (mkFastString cc_name) (this_mod env)
+        cc = mkUserCC (mkFastString cc_name) (this_mod env) pos (mkCostCentreUnique c)
 
         count = countEntries && dopt Opt_ProfCountEntries (dflags env)
 

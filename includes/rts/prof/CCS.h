@@ -34,6 +34,7 @@ typedef struct _CostCentre {
 
     char * label;
     char * module;
+    char * srcloc;
 
     // used for accumulating costs at the end of the run...
     StgWord   time_ticks;
@@ -203,11 +204,12 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         // registered CCS list
  * Declaring Cost Centres & Cost Centre Stacks.
  * -------------------------------------------------------------------------- */
 
-# define CC_DECLARE(cc_ident,name,mod,caf,is_local)     \
+# define CC_DECLARE(cc_ident,name,mod,loc,caf,is_local) \
      is_local CostCentre cc_ident[1]                    \
        = {{ ccID       : 0,                             \
             label      : name,                          \
             module     : mod,                           \
+            srcloc     : loc,                           \
             time_ticks : 0,                             \
             mem_alloc  : 0,                             \
             link       : 0,                             \

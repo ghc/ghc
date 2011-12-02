@@ -309,10 +309,11 @@ dsExpr (ExplicitTuple tup_args boxity)
                   mkConApp (tupleCon (boxityNormalTupleSort boxity) (length tup_args))
                            (map (Type . exprType) args ++ args) }
 
-dsExpr (HsSCC cc expr) = do
+dsExpr (HsSCC cc expr@(L loc _)) = do
     mod_name <- getModuleDs
     count <- doptDs Opt_ProfCountEntries
-    Tick (ProfNote (mkUserCC cc mod_name) count True) <$> dsLExpr expr
+    uniq <- newUnique
+    Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True) <$> dsLExpr expr
 
 dsExpr (HsCoreAnn _ expr)
   = dsLExpr expr
