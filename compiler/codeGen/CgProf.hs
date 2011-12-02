@@ -35,7 +35,7 @@ module CgProf (
 #include "../includes/rts/Constants.h"
 	-- For LDV_CREATE_MASK, LDV_STATE_USE
 	-- which are StgWords
-#include "../includes/DerivedConstants.h"
+#include "../includes/dist-derivedconstants/header/DerivedConstants.h"
 	-- For REP_xxx constants, which are MachReps
 
 import ClosureInfo

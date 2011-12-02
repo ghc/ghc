@@ -41,7 +41,10 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 includes_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
-includes_CC_OPTS += -Iincludes -Irts
+includes_CC_OPTS += -Iincludes
+includes_CC_OPTS += -Iincludes/dist-derivedconstants/header
+includes_CC_OPTS += -Iincludes/dist-ghcconstants/header
+includes_CC_OPTS += -Irts
 
 ifneq "$(GhcWithSMP)" "YES"
 includes_CC_OPTS += -DNOSMP
@@ -126,7 +129,7 @@ endif
 # ---------------------------------------------------------------------------
 # Make DerivedConstants.h for the compiler
 
-includes_DERIVEDCONSTANTS = includes/DerivedConstants.h
+includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
 
 ifeq "$(PORTING_HOST)" "YES"
 
@@ -145,7 +148,7 @@ $(includes_dist-derivedconstants_depfile_c_asm) : $(includes_H_CONFIG) $(include
 includes/dist-derivedconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 
 ifneq "$(BINDIST)" "YES"
-$(includes_DERIVEDCONSTANTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext)
+$(includes_DERIVEDCONSTANTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
 	./$< >$@
 endif
 
@@ -154,7 +157,7 @@ endif
 # -----------------------------------------------------------------------------
 #
 
-includes_GHCCONSTANTS = includes/GHCConstants.h
+includes_GHCCONSTANTS = includes/dist-ghcconstants/header/GHCConstants.h
 
 ifeq "$(PORTING_HOST)" "YES"
 
@@ -175,7 +178,7 @@ $(includes_dist-ghcconstants_depfile_c_asm) : $(includes_H_CONFIG) $(includes_H_
 
 includes/dist-ghcconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 
-$(includes_GHCCONSTANTS) : $(INPLACE_BIN)/mkGHCConstants$(exeext)
+$(includes_GHCCONSTANTS) : $(INPLACE_BIN)/mkGHCConstants$(exeext) | $$(dir $$@)/.
 	./$< >$@
 endif
 
