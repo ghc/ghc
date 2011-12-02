@@ -87,13 +87,13 @@ Mutex ccs_mutex;
  *           traverse pinned memory.
  */
 
-CC_DECLARE(CC_MAIN,      "MAIN",        "MAIN",      CC_NOT_CAF, );
-CC_DECLARE(CC_SYSTEM,    "SYSTEM",      "SYSTEM",    CC_NOT_CAF, );
-CC_DECLARE(CC_GC,        "GC",          "GC",        CC_NOT_CAF, );
-CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", CC_NOT_CAF, );
-CC_DECLARE(CC_DONT_CARE, "DONT_CARE",   "MAIN",      CC_NOT_CAF, );
-CC_DECLARE(CC_PINNED,    "PINNED",      "SYSTEM",    CC_NOT_CAF, );
-CC_DECLARE(CC_IDLE,      "IDLE",        "IDLE",      CC_NOT_CAF, );
+CC_DECLARE(CC_MAIN,      "MAIN",        "MAIN",      "<built-in>", CC_NOT_CAF, );
+CC_DECLARE(CC_SYSTEM,    "SYSTEM",      "SYSTEM",    "<built-in>", CC_NOT_CAF, );
+CC_DECLARE(CC_GC,        "GC",          "GC",        "<built-in>", CC_NOT_CAF, );
+CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", "<built-in>", CC_NOT_CAF, );
+CC_DECLARE(CC_DONT_CARE, "DONT_CARE",   "MAIN",      "<built-in>", CC_NOT_CAF, );
+CC_DECLARE(CC_PINNED,    "PINNED",      "SYSTEM",    "<built-in>", CC_NOT_CAF, );
+CC_DECLARE(CC_IDLE,      "IDLE",        "IDLE",      "<built-in>", CC_NOT_CAF, );
 
 CCS_DECLARE(CCS_MAIN, 	    CC_MAIN,       );
 CCS_DECLARE(CCS_SYSTEM,	    CC_SYSTEM,     );

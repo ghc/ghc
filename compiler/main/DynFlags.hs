@@ -589,6 +589,7 @@ data ProfAuto
   | ProfAutoAll        -- ^ top-level and nested functions are annotated
   | ProfAutoTop        -- ^ top-level functions annotated only
   | ProfAutoExports    -- ^ exported functions annotated only
+  | ProfAutoCalls      -- ^ annotate call-sites
 
 data Settings = Settings {
   sTargetPlatform        :: Platform,    -- Filled in by SysTools
@@ -1637,6 +1638,7 @@ dynamic_flags = [
   , Flag "fprof-auto"             (noArg (\d -> d { profAuto = ProfAutoAll } ))
   , Flag "fprof-auto-top"         (noArg (\d -> d { profAuto = ProfAutoTop } ))
   , Flag "fprof-auto-exported"    (noArg (\d -> d { profAuto = ProfAutoExports } ))
+  , Flag "fprof-auto-calls"       (noArg (\d -> d { profAuto = ProfAutoCalls } ))
   , Flag "fno-prof-auto"          (noArg (\d -> d { profAuto = NoProfAuto } ))
 
         ------ Compiler flags -----------------------------------------------

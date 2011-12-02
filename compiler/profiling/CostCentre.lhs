@@ -15,7 +15,6 @@ module CostCentre (
 	CostCentreStack,
 	CollectedCCs,
         noCCS, currentCCS, dontCareCCS,
-	noCostCentre, noCCAttached,
         noCCSAttached, isCurrentCCS,
         maybeSingletonCCS,
 
@@ -25,6 +24,7 @@ module CostCentre (
 
 	pprCostCentreCore,
         costCentreUserName, costCentreUserNameFS,
+        costCentreSrcSpan,
 
 	cmpCostCentre	-- used for removing dups in a list
     ) where
@@ -35,6 +35,7 @@ import Module
 import Unique
 import Outputable	
 import FastTypes
+import SrcLoc
 import FastString
 import Util
 
@@ -43,20 +44,30 @@ import Data.Data
 -----------------------------------------------------------------------------
 -- Cost Centres
 
--- | A Cost Centre is the argument of an _scc_ expression.
+-- | A Cost Centre is a single @{-# SCC #-}@ annotation.
  
 data CostCentre
-  = NoCostCentre	-- Having this constructor avoids having
-			-- to use "Maybe CostCentre" all the time.
-
-  | NormalCC {  
-		cc_name :: CcName,	-- Name of the cost centre itself
-		cc_mod  :: Module,	-- Name of module defining this CC.
+  = NormalCC {
+                cc_key  :: {-# UNPACK #-} !Int,
+                 -- ^ Two cost centres may have the same name and
+                 -- module but different SrcSpans, so we need a way to
+                 -- distinguish them easily and give them different
+                 -- object-code labels.  So every CostCentre has a
+                 -- Unique that is distinct from every other
+                 -- CostCentre in the same module.
+                 --
+                 -- XXX: should really be using Unique here, but we
+                 -- need to derive Data below and there's no Data
+                 -- instance for Unique.
+                cc_name :: CcName,      -- ^ Name of the cost centre itself
+                cc_mod  :: Module,      -- ^ Name of module defining this CC.
+                cc_loc  :: SrcSpan,
                 cc_is_caf  :: IsCafCC   -- see below
     }
 
   | AllCafsCC {	
-		cc_mod  :: Module	-- Name of module defining this CC.
+                cc_mod  :: Module,      -- Name of module defining this CC.
+                cc_loc  :: SrcSpan
     }
   deriving (Data, Typeable)
 
@@ -64,9 +75,6 @@ type CcName = FastString
 
 data IsCafCC = NotCafCC | CafCC
   deriving (Eq, Ord, Data, Typeable)
-
-noCostCentre :: CostCentre
-noCostCentre = NoCostCentre
 
 
 instance Eq CostCentre where
@@ -80,10 +88,10 @@ cmpCostCentre :: CostCentre -> CostCentre -> Ordering
 cmpCostCentre (AllCafsCC  {cc_mod = m1}) (AllCafsCC  {cc_mod = m2})
   = m1 `compare` m2
 
-cmpCostCentre (NormalCC {cc_name = n1, cc_mod =  m1, cc_is_caf = c1}) 
-	      (NormalCC {cc_name = n2, cc_mod =  m2, cc_is_caf = c2}) 
-    -- first key is module name, then the name, then the cafness
-  = (m1 `compare` m2) `thenCmp` (n1 `compare` n2) `thenCmp` (c1 `compare` c2)
+cmpCostCentre NormalCC {cc_key = n1, cc_mod =  m1}
+              NormalCC {cc_key = n2, cc_mod =  m2}
+    -- first key is module name, then the integer key
+  = (m1 `compare` m2) `thenCmp` (n1 `compare` n2)
 
 cmpCostCentre other_1 other_2
   = let
@@ -92,18 +100,17 @@ cmpCostCentre other_1 other_2
     in
     if tag1 <# tag2 then LT else GT
   where
-    tag_CC NoCostCentre    = _ILIT(0)
-    tag_CC (NormalCC   {}) = _ILIT(1)
-    tag_CC (AllCafsCC  {}) = _ILIT(2)
+    tag_CC (NormalCC   {}) = _ILIT(0)
+    tag_CC (AllCafsCC  {}) = _ILIT(1)
 
 
 -----------------------------------------------------------------------------
 -- Predicates on CostCentre
 
 isCafCC :: CostCentre -> Bool
-isCafCC (AllCafsCC {})                   = True
+isCafCC (AllCafsCC {})                 = True
 isCafCC (NormalCC {cc_is_caf = CafCC}) = True
-isCafCC _		                 = False
+isCafCC _                              = False
 
 -- | Is this a cost-centre which records scc counts
 isSccCountCC :: CostCentre -> Bool
@@ -112,7 +119,6 @@ isSccCountCC cc | isCafCC cc  = False
 
 -- | Is this a cost-centre which can be sccd ?
 sccAbleCC :: CostCentre -> Bool
-sccAbleCC NoCostCentre  = panic "sccAbleCC:NoCostCentre"
 sccAbleCC cc | isCafCC cc = False
              | otherwise  = True
 
@@ -123,15 +129,17 @@ ccFromThisModule cc m = cc_mod cc == m
 -----------------------------------------------------------------------------
 -- Building cost centres
 
-mkUserCC :: FastString -> Module -> CostCentre
-mkUserCC cc_name mod
-  = NormalCC { cc_name = cc_name, cc_mod =  mod,
+mkUserCC :: FastString -> Module -> SrcSpan -> Unique -> CostCentre
+mkUserCC cc_name mod loc key
+  = NormalCC { cc_key = getKey key, cc_name = cc_name, cc_mod =  mod, cc_loc = loc,
                cc_is_caf = NotCafCC {-might be changed-}
     }
 
 mkAutoCC :: Id -> Module -> IsCafCC -> CostCentre
 mkAutoCC id mod is_caf
-  = NormalCC { cc_name = str, cc_mod =  mod,
+  = NormalCC { cc_key = getKey (getUnique id),
+               cc_name = str, cc_mod =  mod,
+               cc_loc = nameSrcSpan (getName id),
                cc_is_caf = is_caf
     }
   where 
@@ -144,8 +152,8 @@ mkAutoCC id mod is_caf
             | otherwise           = mkFastString $ showSDoc $
                                       ftext (occNameFS (getOccName id))
                                       <> char '_' <> pprUnique (getUnique name)
-mkAllCafsCC :: Module -> CostCentre
-mkAllCafsCC m = AllCafsCC { cc_mod = m }
+mkAllCafsCC :: Module -> SrcSpan -> CostCentre
+mkAllCafsCC m loc = AllCafsCC { cc_mod = m, cc_loc = loc }
 
 -----------------------------------------------------------------------------
 -- Cost Centre Stacks
@@ -198,10 +206,6 @@ noCCSAttached :: CostCentreStack -> Bool
 noCCSAttached NoCCS			= True
 noCCSAttached _				= False
 
-noCCAttached :: CostCentre -> Bool
-noCCAttached NoCostCentre		= True
-noCCAttached _				= False
-
 isCurrentCCS :: CostCentreStack -> Bool
 isCurrentCCS CurrentCCS			= True
 isCurrentCCS _	      			= False
@@ -253,16 +257,15 @@ instance Outputable CostCentre where
 
 -- Printing in Core
 pprCostCentreCore :: CostCentre -> SDoc
-pprCostCentreCore NoCostCentre
-  = text "__no_cc"
 pprCostCentreCore (AllCafsCC {cc_mod = m})
   = text "__sccC" <+> braces (ppr m)
-pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m,
+pprCostCentreCore (NormalCC {cc_key = key, cc_name = n, cc_mod = m, cc_loc = loc,
                              cc_is_caf = caf})
   = text "__scc" <+> braces (hsep [
-	ftext (zEncodeFS n),
-	ppr m,
-        pp_caf caf
+        ppr m <> char '.' <> ftext n,
+        ifPprDebug (ppr key),
+        pp_caf caf,
+        ifPprDebug (ppr loc)
     ])
 
 pp_caf :: IsCafCC -> SDoc
@@ -271,11 +274,11 @@ pp_caf _     = empty
 
 -- Printing as a C label
 ppCostCentreLbl :: CostCentre -> SDoc
-ppCostCentreLbl (NoCostCentre)		  = text "NONE_cc"
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
-ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
-  = ppr m <> char '_' <> ftext (zEncodeFS n) <> 
-	text (case is_caf of { CafCC -> "_CAF"; _ -> "" }) <> text "_cc"
+ppCostCentreLbl (NormalCC {cc_key = k, cc_name = n, cc_mod = m,
+                           cc_is_caf = is_caf})
+  = ppr m <> char '_' <> ftext (zEncodeFS n) <> char '_' <>
+        case is_caf of { CafCC -> ptext (sLit "CAF"); _ -> ppr (mkUniqueGrimily k)} <> text "_cc"
 
 -- This is the name to go in the user-displayed string, 
 -- recorded in the cost centre declaration
@@ -283,10 +286,12 @@ costCentreUserName :: CostCentre -> String
 costCentreUserName = unpackFS . costCentreUserNameFS
 
 costCentreUserNameFS :: CostCentre -> FastString
-costCentreUserNameFS (NoCostCentre)  = mkFastString "NO_CC"
 costCentreUserNameFS (AllCafsCC {})  = mkFastString "CAF"
 costCentreUserNameFS (NormalCC {cc_name = name, cc_is_caf = is_caf})
   =  case is_caf of
       CafCC -> mkFastString "CAF:" `appendFS` name
       _     -> name
+
+costCentreSrcSpan :: CostCentre -> SrcSpan
+costCentreSrcSpan = cc_loc
 \end{code}

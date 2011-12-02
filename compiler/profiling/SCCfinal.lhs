@@ -32,6 +32,8 @@ import UniqSupply       ( UniqSupply )
 import ListSetOps       ( removeDups )
 import Outputable
 import DynFlags
+import FastString
+import SrcLoc
 
 
 stgMassageForProfiling
@@ -60,7 +62,8 @@ stgMassageForProfiling dflags mod_name _us stg_binds
       fixed_cc_stacks ++ cc_stacks), stg_binds2)
   where
 
-    all_cafs_cc  = mkAllCafsCC mod_name
+    span = mkGeneralSrcSpan (mkFastString "<entire-module>") -- XXX do better
+    all_cafs_cc  = mkAllCafsCC mod_name span
     all_cafs_ccs = mkSingletonCCS all_cafs_cc
 
     ----------
@@ -244,8 +247,7 @@ thenMM_ expr cont = MassageM $ \mod ccs ->
 collectCC :: CostCentre -> MassageM ()
 collectCC cc
  = MassageM $ \mod_name (local_ccs, extern_ccs, ccss)
-  -> ASSERT(not (noCCAttached cc))
-     if (cc `ccFromThisModule` mod_name) then
+  -> if (cc `ccFromThisModule` mod_name) then
         ((cc : local_ccs, extern_ccs, ccss), ())
      else -- must declare it "extern"
         ((local_ccs, cc : extern_ccs, ccss), ())

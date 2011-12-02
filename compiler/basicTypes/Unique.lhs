@@ -56,10 +56,10 @@ module Unique (
 
     mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique,
         mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique,
+        mkCostCentreUnique,
 
 	mkBuiltinUnique,
-	mkPseudoUniqueC,
-	mkPseudoUniqueD,
+        mkPseudoUniqueD,
 	mkPseudoUniqueE,
 	mkPseudoUniqueH
     ) where
@@ -359,11 +359,10 @@ mkPArrDataConUnique a	        = mkUnique ':' (2*a)
 initTyVarUnique :: Unique
 initTyVarUnique = mkUnique 't' 0
 
-mkPseudoUniqueC, mkPseudoUniqueD, mkPseudoUniqueE, mkPseudoUniqueH,
+mkPseudoUniqueD, mkPseudoUniqueE, mkPseudoUniqueH,
    mkBuiltinUnique :: Int -> Unique
 
 mkBuiltinUnique i = mkUnique 'B' i
-mkPseudoUniqueC i = mkUnique 'C' i -- used for getUnique on Regs
 mkPseudoUniqueD i = mkUnique 'D' i -- used in NCG for getUnique on RealRegs
 mkPseudoUniqueE i = mkUnique 'E' i -- used in NCG spiller to create spill VirtualRegs
 mkPseudoUniqueH i = mkUnique 'H' i -- used in NCG spiller to create spill VirtualRegs
@@ -373,6 +372,9 @@ mkRegSingleUnique = mkUnique 'R'
 mkRegSubUnique    = mkUnique 'S'
 mkRegPairUnique   = mkUnique 'P'
 mkRegClassUnique  = mkUnique 'L'
+
+mkCostCentreUnique :: Int -> Unique
+mkCostCentreUnique = mkUnique 'C'
 
 mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique :: FastString -> Unique
 -- See Note [The Unique of an OccName] in OccName

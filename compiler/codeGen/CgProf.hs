@@ -170,11 +170,15 @@ emitCostCentreDecl cc = do
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.
                 -- Hence don't emit the package name in the module here.
+  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
+                   showSDoc (ppr (costCentreSrcSpan cc))
+           -- XXX going via FastString to get UTF-8 encoding is silly
   ; let
      lits = [ zero,   	-- StgInt ccID,
 	      label,	-- char *label,
 	      modl,	-- char *module,
-              zero,	-- StgWord time_ticks
+              loc,      -- char *srcloc,
+              zero,     -- StgWord time_ticks
               zero64,	-- StgWord64 mem_alloc
               is_caf,   -- StgInt is_caf
               zero      -- struct _CostCentre *link

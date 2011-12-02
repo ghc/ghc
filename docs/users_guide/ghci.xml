@@ -1659,7 +1659,8 @@ a :: a
         particular call to <literal>head</literal> in your program resulted in
         the error can be a painstaking process, usually involving
         <literal>Debug.Trace.trace</literal>, or compiling with
-        profiling and using <literal>+RTS -xc</literal> (see <xref
+        profiling and using <literal>Debug.Trace.traceStack</literal>
+        or <literal>+RTS -xc</literal> (see <xref
           linkend="prof-time-options" />).</para>
 
       <para>The GHCi debugger offers a way to hopefully shed some light on

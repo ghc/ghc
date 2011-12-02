@@ -38,7 +38,7 @@ module CoreSyn (
 	-- ** Simple 'Expr' access functions and predicates
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
-	collectArgs, coreExprCc, flattenBinds, 
+        collectArgs, flattenBinds,
 
         isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
@@ -1182,14 +1182,6 @@ collectArgs expr
   where
     go (App f a) as = go f (a:as)
     go e 	 as = (e, as)
-\end{code}
-
-\begin{code}
--- | Gets the cost centre enclosing an expression, if any.
--- It looks inside lambdas because @(scc \"foo\" \\x.e) = \\x. scc \"foo\" e@
-coreExprCc :: Expr b -> CostCentre
-coreExprCc (Tick (ProfNote { profNoteCC = cc}) _)   = cc
-coreExprCc _ = noCostCentre
 \end{code}
 
 %************************************************************************
