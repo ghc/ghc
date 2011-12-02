@@ -27,6 +27,7 @@ module GHC.Stack (
     ccsParent,
     ccLabel,
     ccModule,
+    ccSrcSpan,
     ccsToStrings,
     renderStack
   ) where
@@ -68,6 +69,9 @@ ccLabel p = (# peek CostCentre, label) p
 ccModule :: Ptr CostCentre -> IO CString
 ccModule p = (# peek CostCentre, module) p
 
+ccSrcSpan :: Ptr CostCentre -> IO CString
+ccSrcSpan p = (# peek CostCentre, srcloc) p
+
 -- | returns a '[String]' representing the current call stack.  This
 -- can be useful for debugging.
 --
@@ -89,10 +93,11 @@ ccsToStrings ccs0 = go ccs0 []
         cc  <- ccsCC ccs
         lbl <- GHC.peekCString utf8 =<< ccLabel cc
         mdl <- GHC.peekCString utf8 =<< ccModule cc
+        loc <- GHC.peekCString utf8 =<< ccSrcSpan cc
         parent <- ccsParent ccs
         if (mdl == "MAIN" && lbl == "MAIN")
            then return acc
-           else go parent ((mdl ++ '.':lbl) : acc)
+           else go parent ((mdl ++ '.':lbl ++ ' ':'(':loc ++ ")") : acc)
 
 whoCreated :: a -> IO [String]
 whoCreated obj = do
