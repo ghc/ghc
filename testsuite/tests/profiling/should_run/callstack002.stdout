@@ -1,8 +1,9 @@
 [84,86]
 Stack trace:
-  Main.CAF
-  Main.main
-  Main.main.xs
-  Main.map
-  Main.map.go
-  Main.f
+  Main.CAF (<entire-module>)
+  Main.main.xs (callstack002.hs:18:12-24)
+  Main.map (callstack002.hs:13:12-16)
+  Main.map.go (callstack002.hs:15:21-34)
+  Main.map.go (callstack002.hs:15:21-23)
+  Main.f (callstack002.hs:10:7-43)
+  Main.f (callstack002.hs:10:38-42)
