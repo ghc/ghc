@@ -447,9 +447,6 @@ pprLit platform lit = case lit of
         -- WARNING:
         --  * the lit must occur in the info table clbl2
         --  * clbl1 must be an SRT, a slow entry point or a large bitmap
-        -- The Mangler is expected to convert any reference to an SRT,
-        -- a slow entry point or a large bitmap
-        -- from an info table to an offset.
         -> mkW_ <> pprCLabelAddr clbl1 <> char '+' <> int i
 
     where
