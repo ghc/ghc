@@ -18,8 +18,7 @@ import OldCmm
 import FastString
 import qualified Outputable
 
-import Data.Maybe
-
+import Data.List (foldl')
 
 -- ----------------------------------------------------------------------------
 -- * Constants
@@ -51,37 +50,33 @@ genLlvmData env (sec, Statics lbl xs) =
     in (lbl, sec, alias, static)
 
 
-resolveLlvmDatas ::  LlvmEnv -> [LlvmUnresData] -> [LlvmData]
-                 -> (LlvmEnv, [LlvmData])
-resolveLlvmDatas env [] ldata
-  = (env, ldata)
-
-resolveLlvmDatas env (udata : rest) ldata
-  = let (env', ndata) = resolveLlvmData env udata
-    in resolveLlvmDatas env' rest (ldata ++ [ndata])
+resolveLlvmDatas ::  LlvmEnv -> [LlvmUnresData] -> (LlvmEnv, [LlvmData])
+resolveLlvmDatas env ldata
+  = foldl' res (env, []) ldata
+  where res (e, xs) ll =
+            let (e', nd) = resolveLlvmData e ll
+            in (e', nd:xs)
 
 -- | Fix up CLabel references now that we should have passed all CmmData.
 resolveLlvmData :: LlvmEnv -> LlvmUnresData -> (LlvmEnv, LlvmData)
 resolveLlvmData env (lbl, sec, alias, unres) =
     let (env', static, refs) = resDatas env unres ([], [])
-        refs'          = catMaybes refs
         struct         = Just $ LMStaticStruc static alias
         label          = strCLabel_llvm env lbl
         link           = if (externallyVisibleCLabel lbl)
                             then ExternallyVisible else Internal
         const          = isSecConstant sec
         glob           = LMGlobalVar label alias link Nothing Nothing const
-    in (env', (refs' ++ [(glob, struct)], [alias]))
-
+    in (env', ((glob,struct):refs, [alias]))
 
 -- | Should a data in this section be considered constant
 isSecConstant :: Section -> Bool
 isSecConstant Text                    = True
-isSecConstant Data                    = False
 isSecConstant ReadOnlyData            = True
 isSecConstant RelocatableReadOnlyData = True
-isSecConstant UninitialisedData       = False
 isSecConstant ReadOnlyData16          = True
+isSecConstant Data                    = False
+isSecConstant UninitialisedData       = False
 isSecConstant (OtherSection _)        = False
 
 
@@ -90,13 +85,13 @@ isSecConstant (OtherSection _)        = False
 --
 
 -- | Resolve data list
-resDatas :: LlvmEnv -> [UnresStatic] -> ([LlvmStatic], [Maybe LMGlobal])
-         -> (LlvmEnv, [LlvmStatic], [Maybe LMGlobal])
+resDatas :: LlvmEnv -> [UnresStatic] -> ([LlvmStatic], [LMGlobal])
+         -> (LlvmEnv, [LlvmStatic], [LMGlobal])
 
-resDatas env [] (stat, glob)
-  = (env, stat, glob)
+resDatas env [] (stats, glob)
+  = (env, stats, glob)
 
-resDatas env (cmm : rest) (stats, globs)
+resDatas env (cmm:rest) (stats, globs)
   = let (env', nstat, nglob) = resData env cmm
     in resDatas env' rest (stats ++ [nstat], globs ++ nglob)
 
@@ -106,9 +101,9 @@ resDatas env (cmm : rest) (stats, globs)
 -- module. If it has we can retrieve its type and make a pointer, otherwise
 -- we introduce a generic external definition for the referenced label and
 -- then make a pointer.
-resData :: LlvmEnv -> UnresStatic -> (LlvmEnv, LlvmStatic, [Maybe LMGlobal])
+resData :: LlvmEnv -> UnresStatic -> (LlvmEnv, LlvmStatic, [LMGlobal])
 
-resData env (Right stat) = (env, stat, [Nothing])
+resData env (Right stat) = (env, stat, [])
 
 resData env (Left cmm@(CmmLabel l)) =
     let label = strCLabel_llvm env l
@@ -120,14 +115,14 @@ resData env (Left cmm@(CmmLabel l)) =
                 let glob@(var, _) = genStringLabelRef label
                     env' =  funInsert label (pLower $ getVarType var) env
                     ptr  = LMStaticPointer var
-                in  (env', LMPtoI ptr lmty, [Just glob])
+                in  (env', LMPtoI ptr lmty, [glob])
             -- Referenced data exists in this module, retrieve type and make
             -- pointer to it.
             Just ty' ->
                 let var = LMGlobalVar label (LMPointer ty')
                             ExternallyVisible Nothing Nothing False
                     ptr  = LMStaticPointer var
-                in (env, LMPtoI ptr lmty, [Nothing])
+                in (env, LMPtoI ptr lmty, [])
 
 resData env (Left (CmmLabelOff label off)) =
     let (env', var, glob) = resData env (Left (CmmLabel label))
@@ -161,7 +156,6 @@ genData (CmmUninitialised bytes)
 genData (CmmStaticLit lit)
     = genStaticLit lit
 
-
 -- | Generate Llvm code for a static literal.
 --
 -- Will either generate the code or leave it unresolved if it is a 'CLabel'
@@ -182,7 +176,6 @@ genStaticLit (CmmBlock b) = Left $ CmmLabel $ infoTblLbl b
 
 genStaticLit (CmmHighStackMark)
     = panic "genStaticLit: CmmHighStackMark unsupported!"
-
 
 -- -----------------------------------------------------------------------------
 -- * Misc

@@ -57,8 +57,7 @@ basicBlocksCodeGen env ([]) (blocks, tops)
   = do let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
        let allocs' = concat allocs
        let ((BasicBlock id fstmts):rblks) = blocks'
-       fplog <- funPrologue
-       let fblocks = (BasicBlock id (fplog ++  allocs' ++ fstmts)):rblks
+       let fblocks = (BasicBlock id $ funPrologue ++  allocs' ++ fstmts):rblks
        return (env, fblocks, tops)
 
 basicBlocksCodeGen env (block:blocks) (lblocks', ltops')
@@ -1189,13 +1188,13 @@ genLit _ CmmHighStackMark
 --
 
 -- | Function prologue. Load STG arguments into variables for function.
-funPrologue :: UniqSM [LlvmStatement]
-funPrologue = liftM concat $ mapM getReg activeStgRegs
+funPrologue :: [LlvmStatement]
+funPrologue = concat $ map getReg activeStgRegs
     where getReg rr =
-            let reg = lmGlobalRegVar rr
-                arg = lmGlobalRegArg rr
+            let reg   = lmGlobalRegVar rr
+                arg   = lmGlobalRegArg rr
                 alloc = Assignment reg $ Alloca (pLower $ getVarType reg) 1
-            in return [alloc, Store arg reg]
+            in [alloc, Store arg reg]
 
 
 -- | Function epilogue. Load STG variables to use as argument for call.

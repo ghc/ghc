@@ -36,7 +36,8 @@ import System.IO
 llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 llvmCodeGen dflags h us cmms
   = let cmm = concat cmms
-        (cdata,env) = foldr split ([],initLlvmEnv (targetPlatform dflags)) cmm
+        (cdata,env) = {-# SCC "llvm_split" #-}
+                      foldr split ([],initLlvmEnv (targetPlatform dflags)) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
         split (CmmProc i l _) (d,e) =
             let lbl = strCLabel_llvm env $ case i of
@@ -51,7 +52,7 @@ llvmCodeGen dflags h us cmms
         ver  <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
         env' <- {-# SCC "llvm_datas_gen" #-}
                 cmmDataLlvmGens dflags bufh (setLlvmVer ver env) cdata []
-        _ <- {-# SCC "llvm_procs_gen" #-}
+        {-# SCC "llvm_procs_gen" #-}
              cmmProcLlvmGens dflags bufh us env' cmm 1 []
         bFlush bufh
         return  ()
@@ -65,19 +66,23 @@ cmmDataLlvmGens :: DynFlags -> BufHandle -> LlvmEnv -> [(Section,CmmStatics)]
 
 cmmDataLlvmGens dflags h env [] lmdata
   = let (env', lmdata') = {-# SCC "llvm_resolve" #-}
-                          resolveLlvmDatas env lmdata []
+                          resolveLlvmDatas env lmdata
         lmdoc = {-# SCC "llvm_data_ppr" #-}
                 Prt.vcat $ map pprLlvmData lmdata'
     in do
         dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" $ docToSDoc lmdoc
-        Prt.bufLeftRender h lmdoc
+        {-# SCC "llvm_data_out" #-}
+            Prt.bufLeftRender h lmdoc
         return env'
 
 cmmDataLlvmGens dflags h env (cmm:cmms) lmdata
-  = let lmdata'@(l, _, ty, _) = {-# SCC "llvm_data_gen" #-}
-                                genLlvmData env cmm
-        env' = funInsert (strCLabel_llvm env l) ty env
-    in cmmDataLlvmGens dflags h env' cmms (lmdata ++ [lmdata'])
+  = let lm@(l, _, ty, _) = {-# SCC "llvm_data_gen" #-}
+                           genLlvmData env cmm
+        env' = {-# SCC "llvm_data_insert" #-}
+               funInsert (strCLabel_llvm env l) ty env
+        lmdata' = {-# SCC "llvm_data_append" #-}
+                  lm:lmdata
+    in cmmDataLlvmGens dflags h env' cmms lmdata'
 
 
 -- -----------------------------------------------------------------------------
@@ -98,7 +103,7 @@ cmmProcLlvmGens _ h _ _ [] _ ivars
         usedArray = LMStaticArray (map cast ivars') ty
         lmUsed = (LMGlobalVar (fsLit "llvm.used") ty Appending
                   (Just $ fsLit "llvm.metadata") Nothing False, Just usedArray)
-    in Prt.bufLeftRender h $ {-# SCC "llvm_data_ppr" #-}
+    in Prt.bufLeftRender h $ {-# SCC "llvm_used_ppr" #-}
                              pprLlvmData ([lmUsed], [])
 
 cmmProcLlvmGens dflags h us env ((CmmData _ _) : cmms) count ivars
