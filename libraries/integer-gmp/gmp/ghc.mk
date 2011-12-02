@@ -152,7 +152,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 #	    CC=$(CC_STAGE1) $(SHELL) configure \
 #	          --enable-shared=yes --disable-static \
 #	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
-#	touch $@
+#	"$(TOUCH_CMD)" $@
 #
 #gmp.h: stamp.gmp.static
 #	$(CP) gmpbuild/gmp.h .
