@@ -25,7 +25,7 @@ $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/C
 $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
 $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
 
-$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs | $$(dir $$@)/. bootstrapping/.
+$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) --make $(GHC_CABAL_DIR)/Main.hs -o $@ \
 	       -no-user-package-conf \
 	       -Wall $(WERROR) \
@@ -36,7 +36,7 @@ $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs | $
 	       -ilibraries/filepath \
 	       -ilibraries/hpc \
 	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS)
-	touch $@
+	"$(TOUCH_CMD)" $@
 
 # touch is required, because otherwise if mkdirhier is newer, we
 # repeatedly rebuild ghc-cabal.

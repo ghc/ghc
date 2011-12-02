@@ -39,7 +39,7 @@ LIBFFI_PATH_MANGLE = PATH=$$(cygpath "$(TOP)")/libffi:$$PATH; export PATH;
 endif
 
 ifneq "$(BINDIST)" "YES"
-$(libffi_STAMP_CONFIGURE):
+$(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	$(call removeFiles,$(libffi_STAMP_STATIC_CONFIGURE))
 	$(call removeFiles,$(libffi_STAMP_STATIC_BUILD))
 	$(call removeFiles,$(libffi_STAMP_STATIC_INSTALL))
@@ -88,15 +88,15 @@ $(libffi_STAMP_CONFIGURE):
 	mv libffi/build/Makefile libffi/build/Makefile.orig
 	sed "s#wc -w#wc -w | sed 's/ //g'#" < libffi/build/Makefile.orig > libffi/build/Makefile
 
-	touch $@
+	"$(TOUCH_CMD)" $@
 
-$(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE)
+$(libffi_STAMP_BUILD): $(libffi_STAMP_CONFIGURE) $(TOUCH_DEP)
 	$(MAKE) -C libffi/build MAKEFLAGS=
-	touch $@
+	"$(TOUCH_CMD)" $@
 
-$(libffi_STAMP_INSTALL): $(libffi_STAMP_BUILD)
+$(libffi_STAMP_INSTALL): $(libffi_STAMP_BUILD) $(TOUCH_DEP)
 	$(MAKE) -C libffi/build MAKEFLAGS= install
-	touch $@
+	"$(TOUCH_CMD)" $@
 
 $(libffi_STATIC_LIB): $(libffi_STAMP_INSTALL)
 	@test -f $@ || { echo "$< exists, but $@ does not."; echo "Suggest removing $<."; exit 1; }

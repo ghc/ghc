@@ -107,9 +107,9 @@ endif
 ifneq "$(BINDIST)" "YES"
 rts_ffi_objs_stamp = rts/dist/ffi/stamp
 rts_ffi_objs       = rts/dist/ffi/*.o
-$(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) | $$(dir $$@)/.
+$(rts_ffi_objs_stamp): $(libffi_STATIC_LIB) $(TOUCH_DEP) | $$(dir $$@)/.
 	cd rts/dist/ffi && $(AR) x ../../../$(libffi_STATIC_LIB)
-	touch $@
+	"$(TOUCH_CMD)" $@
 
 # This is a little hacky. We don't know the SO version, so we only
 # depend on libffi.so, but copy libffi.so*

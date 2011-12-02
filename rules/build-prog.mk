@@ -94,9 +94,9 @@ $(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
 # INPLACE_BIN might be empty if we're distcleaning
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
-$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
+$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) $$(TOUCH_DEP) | $$$$(dir $$$$@)/.
 	"$$(CP)" -p $$< $$@
-	touch $$@
+	"$$(TOUCH_CMD)" $$@
 endif
 endif
 

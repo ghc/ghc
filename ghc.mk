@@ -553,6 +553,11 @@ BUILD_DIRS += \
    $(GHC_MKDIRHIER_DIR)
 endif
 
+ifeq "$(Windows)" "YES"
+BUILD_DIRS += \
+   $(GHC_TOUCHY_DIR)
+endif
+
 BUILD_DIRS += \
    docs/users_guide \
    docs/ext-core \
@@ -609,10 +614,6 @@ BUILD_DIRS += \
    utils/hpc \
    utils/runghc \
    ghc
-ifeq "$(Windows)" "YES"
-BUILD_DIRS += \
-   $(GHC_TOUCHY_DIR)
-endif
 
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
