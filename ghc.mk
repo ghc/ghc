@@ -765,7 +765,7 @@ TAGS: TAGS_compiler
 # -----------------------------------------------------------------------------
 # Installation
 
-install: install_libs install_packages install_libexecs install_headers \
+install: install_libs install_packages install_libexecs \
          install_libexec_scripts install_bins install_topdirs
 ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_docs
@@ -822,12 +822,6 @@ install_topdirs: $(INSTALL_TOPDIRS)
 	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	for i in $(INSTALL_TOPDIRS); do \
 		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(topdir)"); \
-	done
-
-install_headers: $(INSTALL_HEADERS)
-	$(call INSTALL_DIR,"$(DESTDIR)$(ghcheaderdir)")
-	for i in $(INSTALL_HEADERS); do \
-		$(call INSTALL_HEADER,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghcheaderdir)"); \
 	done
 
 install_docs: $(INSTALL_DOCS)
@@ -935,7 +929,6 @@ $(eval $(call bindist,.,\
     $(includes_H_FILES) \
     $(includes_DERIVEDCONSTANTS) \
     $(includes_GHCCONSTANTS) \
-    $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
     $(INSTALL_TOPDIRS) \
