@@ -1,4 +1,7 @@
-module Supercompile.Drive.Match (match) where
+module Supercompile.Drive.Match (
+    match,
+    Match, unMatch, match'
+  ) where
 
 #include "HsVersions.h"
 
@@ -36,8 +39,8 @@ traceSC _ = id
 --traceSC = trace
 
 
---newtype Match a = Match { unMatch :: Either String a }
-newtype Match a = Match { unMatch :: Maybe a }
+newtype Match a = Match { unMatch :: Either String a }
+--newtype Match a = Match { unMatch :: Maybe a }
 
 instance Functor Match where
     fmap = liftM
@@ -45,8 +48,8 @@ instance Functor Match where
 instance Monad Match where
     return = Match . return
     mx >>= fxmy = Match $ unMatch mx >>= (unMatch . fxmy)
-    --fail s = Match $ Left s
-    fail s = Match $ fail s
+    fail s = Match $ Left s
+    --fail s = Match $ fail s
 
 instance MonadFix Match where
     mfix xmy = Match (mfix (unMatch . xmy))
@@ -56,9 +59,9 @@ guard _   True  = return ()
 guard msg False = fail msg
 
 runMatch :: Match a -> Maybe a
--- runMatch (Match (Right x))  = Just x
--- runMatch (Match (Left msg)) = trace ("match " ++ msg) Nothing
-runMatch = unMatch
+runMatch (Match (Right x))  = Just x
+runMatch (Match (Left msg)) = {- trace ("match " ++ msg) -} Nothing
+--runMatch = unMatch
 
 matchRnEnv2 :: (a -> FreeVars) -> a -> a -> RnEnv2
 matchRnEnv2 f x y = mkRnEnv2 (mkInScopeSet (f x `unionVarSet` f y))
@@ -73,8 +76,13 @@ type MatchResult = M.Map Var Var
 match :: State -- ^ Tieback semantics
       -> State -- ^ This semantics
       -> Maybe MatchResult -- ^ Renaming from left to right
-match s_l@(_deeds_l, Heap h_l _, k_l, qa_l) s_r@(_deeds_r, Heap h_r _, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
-  runMatch $ do
+match s_l s_r = runMatch (match' s_l s_r)
+
+match' :: State
+      -> State
+      -> Match MatchResult
+match' s_l@(_deeds_l, Heap h_l _, k_l, qa_l) s_r@(_deeds_r, Heap h_r _, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
+  do
     let init_rn2 = matchRnEnv2 stateFreeVars s_l s_r
     (rn2, mfree_eqs2) <- mfix $ \(~(rn2, _)) -> matchEC init_rn2 rn2 k_l k_r
     free_eqs1 <- pprTraceSC "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
@@ -346,16 +354,17 @@ matchPureHeap rn2 init_free_eqs h_l h_r
       | otherwise = {- traceSC "matchLoop" $ -} case (M.lookup x_l h_l, M.lookup x_r h_r) of
            -- If matching an internal let, it is possible that variables occur free. Insist that free-ness matches:
           (Nothing, Nothing) -> go [] used_l used_r
-          (Just _, Nothing) -> fail "matchLoop: matching binding on left not present in the right"
-          (Nothing, Just _) -> fail "matchLoop: matching binding on right not present in the left"
+          (Just _, Nothing) -> failLoop "matching binding on left not present in the right"
+          (Nothing, Just _) -> failLoop "matching binding on right not present in the left"
           (Just hb_l, Just hb_r) -> case ((howBound &&& heapBindingTerm) hb_l, (howBound &&& heapBindingTerm) hb_r) of
                -- If the template provably doesn't use this heap binding, we can match it against anything at all
               ((InternallyBound, Nothing), _) -> go [] used_l used_r
                -- If the template internalises a binding of this form, check that the matchable semantics is the same.
                -- If the matchable doesn't have a corresponding binding tieback is impossible because we have less info this time.
-              ((InternallyBound, Just in_e_l), (_how_r, mb_in_e_r)) -> case mb_in_e_r of
+              ((InternallyBound, Just in_e_l), (how_r, mb_in_e_r)) -> case mb_in_e_r of
                   Just in_e_r | not (x_l `elemVarSet` used_l), not (x_r `elemVarSet` used_r) -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r >>= \extra_free_eqs -> go extra_free_eqs (markUsed x_l in_e_l used_l) (markUsed x_r in_e_r used_r)
-                  _ -> fail "matchLoop: can only match a termful InternallyBound on left against an actual term"
+                              | otherwise -> failLoop "one or other side of InternallyBound already used"
+                  Nothing -> failLoop $ "can only match a termful InternallyBound on left against an actual term, not a termless " ++ show how_r ++ " binding"
                -- If the template has no information but exposes a lambda, we can rename to tie back.
                -- If there is a corresponding binding in the matchable we can't tieback because we have more info this time.
                --
@@ -366,11 +375,11 @@ matchPureHeap rn2 init_free_eqs h_l h_r
               ((LambdaBound, Nothing), (_how_r, mb_in_e_r)) -> case mb_in_e_r of
                   Nothing -> (if _how_r == LetBound then pprTraceSC "Downgrading" (ppr x_l <+> ppr x_r) else id) $
                              go [] used_l used_r
-                  Just _ -> fail "matchLoop: cannot match termless LambdaBound on left against an actual term"
+                  Just _ -> failLoop "cannot match termless LambdaBound on left against an actual term"
                -- If the template has an unfolding, we must do lookthrough
               ((LambdaBound, Just in_e_l), (_how_r, mb_in_e_r)) -> case mb_in_e_r of
                   Just in_e_r | not (x_l `elemVarSet` used_l), not (x_r `elemVarSet` used_r) -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r >>= \extra_free_eqs -> go extra_free_eqs (markUsed x_l in_e_l used_l) (markUsed x_r in_e_r used_r)
-                  _ -> fail "matchLoop: can only match a termful LambdaBound on left against an actual term"
+                  _ -> failLoop "can only match a termful LambdaBound on left against an actual term"
                -- We assume the supercompiler gives us no-shadowing for let-bound names, so if two names are the same they must refer to the same thing
                -- NB: because I include this case, we may not include a renaming for some lambda-bound variables in the final knowns (if they are bound
                -- above the let-bound thing)
@@ -400,7 +409,7 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                   (Nothing,     Nothing)     -> go [] used_l used_r
                   (Just in_e_l, Just in_e_r) -> ASSERT2(inFreeVars annedTermFreeVars in_e_r `subVarSet` inFreeVars annedTermFreeVars in_e_l, text "match" <+> ppr (x_l, in_e_l, x_r, _how_r, in_e_r))
                                                 go [(x, x) | x <- varSetElems (inFreeVars annedTermFreeVars in_e_l)] (markUsed x_l in_e_l used_l) (markUsed x_r in_e_r used_r)
-                  _                          -> fail "matchLoop: insane LetBounds"
+                  _                          -> failLoop "insane LetBounds"
                -- If the template doesn't lambda abstract, we can't rename. Only tieback if we have an exact *name* match.
                --
                -- You might think that we could do better than this if both the LHS and RHS had unfoldings, by matching them.
@@ -411,8 +420,9 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                -- NB: we can treat this *almost* exactly like the LambdaBound+unfolding case now since we have the invariant that LetBound things never
                -- refer to LambdaBound things. *However* we anticipate that doing so would almost always fail to tieback, so we elect to just stick with
                -- the "cheap-but-inaccurate" name-matching heuristic.
-                | otherwise -> fail "matchLoop: LetBound"
-      where go extra_free_eqs used_l' used_r' = do
+                | otherwise -> failLoop "LetBound"
+      where failLoop rest = fail $ "matchLoop" ++ showPpr (x_l, x_r) ++ ": " ++ rest
+            go extra_free_eqs used_l' used_r' = do
                 -- Don't forget to match types/unfoldings of binders as well:
                 bndr_free_eqs <- matchBndrExtras rn2 x_l x_r
                 matchLoop ((x_l, x_r) : known) (bndr_free_eqs ++ extra_free_eqs ++ free_eqs) used_l' used_r'

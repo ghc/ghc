@@ -104,6 +104,29 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
         deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
         state = normalise (deeds, Heap (M.fromList h_unfoldings `M.union` M.fromList h_fvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
 
+        -- FIXME: instead of adding unfoldings as Let, (in order to sidestep the bug where Let stuff will be underspecialised)
+        -- we should add it them as normal bindings but pre-initialise the memo cache. Of course this will be bad in the case
+        -- where the existing RHSes for the unfoldings could be optimised by supercompilation, but perhaps we don't care.
+        --
+        -- Be sure to preinitialise the cache for all vanilla applications up to idArity, as well. By doing this we basically
+        -- assert that GHC's RHSes are optimially efficient for limited kinds of context.
+
+        -- TODO: I didn't implement this idea. It has to go into the splitter anyway.
+        --
+        -- We can treat the top level specially in the following way - any HeapBindings in the initial state that
+        -- *have no free variables* may be turned into LetBound things. This has the following benefits:
+        --  1. Matching such things can be done nominally
+        --  2. The supercompiler pretty-printer output is nicer (we often omit LetBound things from the output)
+        --
+        -- The no-bound-FVs check accomplishes two things:
+        --  1. It satisfies the invariant that no LambdaBound thing can be referred to by a LetBound thing (FIXME: still required??)
+        --  2. It ensures that residualising that binding right here does not cause remove some linearity
+        --  3. We sidestep the bug that can occur where specialisations of LetBound HeapBindings are not made
+        --     if one of their free variables get refined by a case expression (FIXME: not really??)
+        --
+        -- It is uniquely OK to do this at *top* level because otherwise we will end up trapping specialisations
+        -- lower down in the specialised output where they cannot be reused.
+
 
 data SCStats = SCStats {
     stat_reduce_stops :: !Int,

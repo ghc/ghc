@@ -20,8 +20,9 @@ import qualified Supercompile.Termination.Combinators as Combinators
 
 import Supercompile.Utilities
 
+import Var        (varName)
 import Id         (mkLocalId)
-import Name       (Name, mkSystemVarName)
+import Name       (Name, mkSystemVarName, getOccString)
 import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
 
@@ -32,10 +33,10 @@ import Data.Monoid (mempty)
 
 
 {--}
-type ProcessHistory = GraphicalHistory (NodeKey, State)
+type ProcessHistory = GraphicalHistory (NodeKey, (String, State))
 
 pROCESS_HISTORY :: ProcessHistory
-pROCESS_HISTORY = mkGraphicalHistory wQO
+pROCESS_HISTORY = mkGraphicalHistory (cofmap snd wQO)
 
 generatedKey :: ProcessHistory -> NodeKey
 generatedKey = Combinators.generatedKey
@@ -122,26 +123,35 @@ traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \(depth, _, _, _) -> pprTra
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \(ms, hist, fs) -> case fulfill p res fs of (res', fs') -> return (res', (ms, hist, fs'))
 
-terminateM :: State -> ScpM a -> (State -> ScpM a) -> ScpM a
-terminateM state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(depth, stops, parent, already) -> trace ("depth: " ++ show depth) $ case terminate hist (parent, state) of
-        Stop (_, shallow_state) -> trace ("stops: " ++ show stops) $
-                                   unReaderT (unStateT (unScpM (mstop shallow_state)) (ms, hist,  fs)) (depth + 1, stops + 1, parent,             already) -- FIXME: prevent rollback?
-        Continue hist'          -> unReaderT (unStateT (unScpM mcont)                 (ms, hist', fs)) (depth + 1, stops,     generatedKey hist', already)
+terminateM :: String -> State -> ScpM a -> (String -> State -> ScpM a) -> ScpM a
+terminateM h state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(depth, stops, parent, already) -> trace ("depth: " ++ show depth) $ case terminate hist (parent, (h, state)) of
+        Stop (_, (shallow_h, shallow_state))
+          -> trace ("stops: " ++ show stops) $
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state)) (ms, hist,  fs)) (depth + 1, stops + 1, parent,             already) -- FIXME: prevent rollback?
+        Continue hist'
+          -> unReaderT (unStateT (unScpM mcont)                           (ms, hist', fs)) (depth + 1, stops,     generatedKey hist', already)
+  -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
 
 speculateM :: State -> (State -> ScpM a) -> ScpM a
 speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(depth, stops, parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (depth, stops, parent, already')
 
 
-sc, sc' :: State -> ScpM (Deeds, FVedTerm)
+sc :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
-sc' state = terminateM state (speculateM (reduce state) $ \state -> split state sc)
-                             (\shallow_state -> maybe (trce "split" shallow_state $ split state)
-                                                      (trce "gen" shallow_state)
-                                                      (generalise (mK_GENERALISER shallow_state state) state)
-                                                      sc)
+
+sc' :: String -> State -> ScpM (Deeds, FVedTerm)
+sc' h state = terminateM h state (speculateM (reduce state) $ \state -> split state sc)
+                                 (\shallow_h shallow_state -> maybe (trce "split" shallow_h shallow_state $ split state)
+                                                                    (trce "gen" shallow_h shallow_state)
+                                                                    (generalise (mK_GENERALISER shallow_state state) state)
+                                                                    sc)
   where
-    trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
-                                                                    {- ppr shallow_state $$ -} pPrintFullState {-True-}False shallow_state $$ {- ppr state $$ -} pPrintFullState {-True-}False state)
+    trce how shallow_h shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ":" ++ shallow_h ++ ")")
+                                                  ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
+                                                   hang (text "Before:") 2 (trce1 shallow_state) $$
+                                                   hang (text "After:")  2 (trce1 state) $$
+                                                   (case unMatch (match' shallow_state state) of Left why -> text why))
+    trce1 state = pPrintFullState False state $$ pPrintFullState False (reduceForMatch state)
 
 -- Note [Prevent rollback loops by only rolling back when generalising]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -170,7 +180,7 @@ sc' state = terminateM state (speculateM (reduce state) $ \state -> split state 
 -- So we should probably work out why the existing supercompiler never builds dumb loops like this, so
 -- we can carefully preserve that property when making the Arjan modification.
 
-memo :: (State -> ScpM (Deeds, FVedTerm))
+memo :: (String -> State -> ScpM (Deeds, FVedTerm))
      ->  State -> ScpM (Deeds, FVedTerm) 
 memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
@@ -194,6 +204,12 @@ memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
     --
     -- To tieback to the h-function for the initial state, we need to supply an x. Luckily, the act of reduction
     -- proves that x is a dead variable and hence we should just be able to supply "undefined".
+    --
+    -- Note that:
+    --  1. Terms that match *after* reduction may not match *before* reduction. This is obvious, and the reason
+    --     that we match to reduce before matching in the first place
+    --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
+    --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
     case [ (p, (releaseStateDeed state, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
          | p <- promises ms
          , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
@@ -201,11 +217,14 @@ memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
          ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state), res)
                                      ; return res }, (ms, hist, fs))
               _          -> pure (do { traceRenderM ">sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state))
-                                     ; res <- opt state
+                                     ; res <- opt (getOccString (varName (fun p))) state
                                      ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
                                      ; fulfillM p res }, (ms', hist, fs))
                 where (p, ms') = promise (state, reduced_state) ms
-  where reduced_state = reduce (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
+  where reduced_state = reduceForMatch state
+
+reduceForMatch :: State -> State
+reduceForMatch state = gc $ reduce (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ runScpM $ liftM snd $ sc state

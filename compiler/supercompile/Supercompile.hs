@@ -5,6 +5,10 @@ module Supercompile (supercompileProgram, supercompileProgramSelective) where
 --  * Why does the supercompiler not match as much as it should? (e.g. Interpreter, UInterpreter)
 --  * Does the matcher match the types of variables bound in the heap?
 
+-- TODO: pre-transforming (case e1 of y { C z -> e2[z] }) to case (case e1 of y { C z -> z }) of z -> e2[z]
+-- might help us replace CPR more because even if we generalise away the e2[z] we potentially keep the unboxing.
+-- Probably can't/shouldn't do this if the wildcard binder y is used in the RHS.
+
 import Supercompile.Utilities
 import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S

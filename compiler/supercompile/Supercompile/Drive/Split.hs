@@ -173,6 +173,8 @@ split :: MonadStatics m
 split (deeds, Heap h ids, k, qa) opt
   = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (Heap h ids, [0..] `zip` k, \ids -> (qaScruts qa, splitQA ids (annee qa)))
 
+-- TODO: could do instance-matching on generalised parts of terms. It would make tieback faster when generalising,
+-- at the cost of pessimising some programs
 {-# INLINE generalise #-}
 generalise :: MonadStatics m
            => Generaliser
