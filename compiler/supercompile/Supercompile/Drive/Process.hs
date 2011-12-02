@@ -299,15 +299,20 @@ reduce' :: State -> (SCStats, State)
 reduce' orig_state = go (mkLinearHistory rEDUCE_WQO) orig_state
   where
     -- NB: it is important that we ensure that reduce is idempotent if we have rollback on. I use this property to improve memoisation.
-    go hist state = -- traceRender ("reduce:step", pPrintFullState state) $
-                    case step state of
-        Nothing -> (mempty, state)
-        Just state' -> case terminate hist state of
-          Continue hist' -> go hist' state'
-          Stop old_state -> pprTrace "reduce-stop" (pPrintFullState False old_state $$ pPrintFullState False state) 
-                            -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
-                            -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
-                            (mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
+    go hist state
+      = -- traceRender ("reduce:step", pPrintFullState state) $
+        case step state of
+          Just (deeds, heap, k, e)
+           | Just deeds' <- if bOUND_STEPS then claimStep deeds else Just deeds
+           , let state' = (deeds', heap, k, e)
+           -> case terminate hist state of
+            Continue hist' -> go hist' state'
+            Stop old_state -> pprTrace "reduce-stop" (pPrintFullState False old_state $$ pPrintFullState False state) 
+                              -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
+                              -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
+                              (mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
+          _ -> (mempty, state)
+
 
 
 --

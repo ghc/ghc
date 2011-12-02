@@ -21,6 +21,10 @@ dEEDS :: Bool
 dEEDS = "--deeds" `elem` aRGS
 --dEEDS = True
 
+bOUND_STEPS :: Bool
+bOUND_STEPS = "--bound-steps" `elem` aRGS
+--bOUND_STEPS = True
+
 data DeedsPolicy = FCFS | Proportional
                  deriving (Read)
 

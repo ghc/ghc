@@ -205,7 +205,7 @@ memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
                                      ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
                                      ; fulfillM p res }, (ms', hist, fs))
                 where (p, ms') = promise (state, reduced_state) ms
-  where reduced_state = reduce state
+  where reduced_state = reduce (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ runScpM $ liftM snd $ sc state
