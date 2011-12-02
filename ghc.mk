@@ -933,6 +933,8 @@ $(eval $(call bindist,.,\
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \
     $(includes_H_FILES) \
+    $(includes_DERIVEDCONSTANTS) \
+    $(includes_GHCCONSTANTS) \
     $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
