@@ -18,7 +18,6 @@ import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.Convert
 import Haddock.Interface.LexParseRn
-import Haddock.Interface.ExtractFnArgDocs
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -197,7 +196,7 @@ declInfos dflags gre decls =
             mbDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment
                        gre mbDocString
             fnArgsDoc <- fmap (Map.mapMaybe id) $
-                Traversable.forM (getDeclFnArgDocs d) $
+                Traversable.forM (typeDocs d) $
                 \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
 
             let subs_ = subordinates d
@@ -213,23 +212,16 @@ declInfos dflags gre decls =
 
 
 subordinates :: HsDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
-subordinates (TyClD d) = classDataSubs d
-subordinates _ = []
-
-
-classDataSubs :: TyClDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
-classDataSubs decl
+subordinates (TyClD decl)
   | isClassDecl decl = classSubs
   | isDataDecl  decl = dataSubs
-  | otherwise        = []
   where
-    classSubs = [ (name, doc, fnArgsDoc)
-                | (L _ d, doc) <- classDecls decl
+    classSubs = [ (name, doc, typeDocs d) | (L _ d, doc) <- classDecls decl
                 , name <- getMainDeclBinder d
-                , let fnArgsDoc = getDeclFnArgDocs d ]
-    dataSubs  = constrs ++ fields
+                ]
+    dataSubs = constrs ++ fields
       where
-        cons    = map unL $ tcdCons decl
+        cons = map unL $ tcdCons decl
         -- should we use the type-signature of the constructor
         -- and the docs of the fields to produce fnArgsDoc for the constr,
         -- just in case someone exports it without exporting the type
@@ -239,6 +231,24 @@ classDataSubs decl
         fields  = [ (unL n, maybeToList $ fmap unL doc, Map.empty)
                   | RecCon flds <- map con_details cons
                   , ConDeclField n _ doc <- flds ]
+subordinates _ = []
+
+
+-- | Extract function argument docs from inside types.
+typeDocs :: HsDecl Name -> Map Int HsDocString
+typeDocs d =
+  let docs = go 0 in
+  case d of
+    SigD (TypeSig _ ty) -> docs (unLoc ty)
+    ForD (ForeignImport _ ty _ _) -> docs (unLoc ty)
+    TyClD (TySynonym {tcdSynRhs = ty}) -> docs (unLoc ty)
+    _ -> Map.empty
+  where
+    go n (HsForAllTy _ _ _ ty) = go n (unLoc ty)
+    go n (HsFunTy (L _ (HsDocTy _ (L _ x))) (L _ ty)) = Map.insert n x $ go (n+1) ty
+    go n (HsFunTy _ ty) = go (n+1) (unLoc ty)
+    go n (HsDocTy _ (L _ doc)) = Map.singleton n doc
+    go _ _ = Map.empty
 
 
 -- | All the sub declarations of a class (that we handle), ordered by
@@ -259,8 +269,7 @@ topDecls :: HsGroup Name -> [(Decl, MaybeDocStrings)]
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 
 
--- | Take all declarations except pragmas, infix decls, rules and value
--- bindings from an 'HsGroup'.
+-- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup Name -> [Decl]
 ungroup group_ =
   mkDecls (concat   . hs_tyclds) TyClD  group_ ++

@@ -109,7 +109,6 @@ executable haddock
     Haddock.Interface
     Haddock.Interface.Rename
     Haddock.Interface.Create
-    Haddock.Interface.ExtractFnArgDocs
     Haddock.Interface.AttachInstances
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
@@ -172,7 +171,6 @@ library
     Haddock.Interface
     Haddock.Interface.Rename
     Haddock.Interface.Create
-    Haddock.Interface.ExtractFnArgDocs
     Haddock.Interface.AttachInstances
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
