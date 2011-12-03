@@ -96,7 +96,9 @@ module Test (
  $ a non /literal/ line $
 -}
 
-	f'
+	f',
+
+  withType, withoutType
    ) where
 
 import Hidden
@@ -402,6 +404,12 @@ newp = undefined
 -- but f' doesn't get link'd 'f\''
 f' :: Int
 
+-- | Comment on a definition without type signature
+withoutType = undefined
+
+-- | Comment on a definition with type signature
+withType :: Int
+withType = 1
 
 -- Add some definitions here so that this file can be compiled with GHC
 

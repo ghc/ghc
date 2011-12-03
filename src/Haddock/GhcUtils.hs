@@ -20,6 +20,7 @@ import Data.Version
 import Control.Applicative  ( (<$>) )
 import Control.Arrow
 import Data.Foldable hiding (concatMap)
+import Data.Function
 import Data.Traversable
 import Distribution.Compat.ReadP
 import Distribution.Text
@@ -141,6 +142,11 @@ isInstD (TyClD d) = isFamInstDecl d
 isInstD _ = False
 
 
+isValD :: HsDecl a -> Bool
+isValD (ValD _) = True
+isValD _ = False
+
+
 declATs :: HsDecl a -> [a]
 declATs (TyClD d) | isClassDecl d = map (tcdName . unL) $ tcdATs d
 declATs _ = []
@@ -165,6 +171,10 @@ unL (L _ x) = x
 
 reL :: a -> Located a
 reL = L undefined
+
+
+before :: Located a -> Located a -> Bool
+before = (<) `on` getLoc
 
 
 instance Foldable (GenLocated l) where
@@ -253,7 +263,7 @@ modifySessionDynFlags f = do
 -- | A variant of 'gbracket' where the return value from the first computation
 -- is not required.
 gbracket_ :: ExceptionMonad m => m a -> m b -> m c -> m c
-gbracket_ before after thing = gbracket before (const after) (const thing)
+gbracket_ before_ after thing = gbracket before_ (const after) (const thing)
 
 
 -------------------------------------------------------------------------------

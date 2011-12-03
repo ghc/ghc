@@ -25,6 +25,7 @@ import Control.Arrow
 import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Monoid
 import GHC hiding (NoLink)
 import OccName
 
@@ -289,7 +290,12 @@ data Doc id
   | DocPic String
   | DocAName String
   | DocExamples [Example]
-  deriving (Eq, Functor)
+  deriving (Functor)
+
+
+instance Monoid (Doc id) where
+  mempty  = DocEmpty
+  mappend = DocAppend
 
 
 unrenameDoc :: Doc DocName -> Doc Name
