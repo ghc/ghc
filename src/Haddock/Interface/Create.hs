@@ -212,19 +212,6 @@ declInfos dflags gre decls =
             return (parent, (mbDoc, fnArgsDoc), subs)
 
 
--- | If you know the HsDecl can't contain any docs
--- (e.g., it was loaded from a .hi file and you don't have a .haddock file
--- to help you find out about the subs or docs)
--- then you can use this to get its subs.
-subordinatesWithNoDocs :: HsDecl Name -> [(Name, DocForDecl Name)]
-subordinatesWithNoDocs decl = map noDocs (subordinates decl)
-  where
-    -- check the condition... or shouldn't we be checking?
-    noDocs (n, doc1, doc2) | null doc1, Map.null doc2
-        = (n, noDocForDecl)
-    noDocs _ = error ("no-docs thing has docs! " ++ pretty decl)
-
-
 subordinates :: HsDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
 subordinates (TyClD d) = classDataSubs d
 subordinates _ = []
@@ -254,31 +241,28 @@ classDataSubs decl
                   , ConDeclField n _ doc <- flds ]
 
 
--- All the sub declarations of a class (that we handle), ordered by
+-- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
 classDecls :: TyClDecl Name -> [(Decl, MaybeDocStrings)]
-classDecls = filterDecls . collectDocs . sortByLoc . declsFromClass
-
-
-declsFromClass :: TyClDecl a -> [Located (HsDecl a)]
-declsFromClass class_ = docs ++ defs ++ sigs ++ ats
+classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
-    docs = mkDecls tcdDocs DocD class_
-    defs = mkDecls (bagToList . tcdMeths) ValD class_
-    sigs = mkDecls tcdSigs SigD class_
-    ats  = mkDecls tcdATs TyClD class_
+    decls = docs ++ defs ++ sigs ++ ats
+    docs  = mkDecls tcdDocs DocD class_
+    defs  = mkDecls (bagToList . tcdMeths) ValD class_
+    sigs  = mkDecls tcdSigs SigD class_
+    ats   = mkDecls tcdATs TyClD class_
 
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup Name -> [(Decl, MaybeDocStrings)]
-topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGroup
+topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 
 
 -- | Take all declarations except pragmas, infix decls, rules and value
 -- bindings from an 'HsGroup'.
-declsFromGroup :: HsGroup Name -> [Decl]
-declsFromGroup group_ =
+ungroup :: HsGroup Name -> [Decl]
+ungroup group_ =
   mkDecls (concat   . hs_tyclds) TyClD  group_ ++
   mkDecls hs_derivds             DerivD group_ ++
   mkDecls hs_defds               DefD   group_ ++
@@ -546,7 +530,7 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
                 Nothing -> do
                    liftErrMsg $ tell
                       ["Warning: Couldn't find .haddock for export " ++ pretty t]
-                   let subs = subordinatesWithNoDocs (unLoc decl)
+                   let subs = [ (n, noDocForDecl) | (n, _, _) <- subordinates (unLoc decl) ]
                    return [ mkExportDecl t (decl, noDocForDecl, subs) ]
                 Just iface -> do
                    let subs = case Map.lookup t (instSubMap iface) of
