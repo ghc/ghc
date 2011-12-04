@@ -28,7 +28,6 @@ import Unique
 import Util
 
 import Data.List ( partition )
-import Control.Monad ( liftM )
 
 
 type LlvmStatements = OrdList LlvmStatement
