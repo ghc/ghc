@@ -24,7 +24,7 @@ module CgInfoTbls (
         cmmGetClosureType,
 	infoTable, infoTableClosureType,
 	infoTablePtrs, infoTableNonPtrs,
-	funInfoTable, makeRelativeRefTo
+	funInfoTable
   ) where
 
 
@@ -386,25 +386,3 @@ emitInfoTableAndCode
 emitInfoTableAndCode entry_ret_lbl info args blocks
   = emitProc info entry_ret_lbl args blocks
 
--------------------------------------------------------------------------
---
---	Position independent code
---
--------------------------------------------------------------------------
--- In order to support position independent code, we mustn't put absolute
--- references into read-only space. Info tables in the tablesNextToCode
--- case must be in .text, which is read-only, so we doctor the CmmLits
--- to use relative offsets instead.
-
--- Note that this is done even when the -fPIC flag is not specified,
--- as we want to keep binary compatibility between PIC and non-PIC.
-
-makeRelativeRefTo :: CLabel -> CmmLit -> CmmLit
-        
-makeRelativeRefTo info_lbl (CmmLabel lbl)
-  | tablesNextToCode
-  = CmmLabelDiffOff lbl info_lbl 0
-makeRelativeRefTo info_lbl (CmmLabelOff lbl off)
-  | tablesNextToCode
-  = CmmLabelDiffOff lbl info_lbl off
-makeRelativeRefTo _ lit = lit

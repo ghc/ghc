@@ -165,7 +165,9 @@ outputAsm dflags filenm flat_absC
 outputLlvm :: DynFlags -> FilePath -> [RawCmmGroup] -> IO ()
 outputLlvm dflags filenm flat_absC
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
-       doOutput filenm $ \f -> llvmCodeGen dflags f ncg_uniqs flat_absC
+       {-# SCC "llvm_output" #-} doOutput filenm $
+           \f -> {-# SCC "llvm_CodeGen" #-}
+                 llvmCodeGen dflags f ncg_uniqs flat_absC
 \end{code}
 
 
