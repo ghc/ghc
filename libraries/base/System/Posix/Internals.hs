@@ -480,13 +480,13 @@ foreign import ccall unsafe "HsBase.h mkfifo"
 foreign import ccall unsafe "HsBase.h pipe"
    c_pipe :: Ptr CInt -> IO CInt
 
-foreign import capi unsafe "HsBase.h sigemptyset"
+foreign import ccall unsafe "HsBase.h __hscore_sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO CInt
 
-foreign import capi unsafe "HsBase.h sigaddset"
+foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
-foreign import capi unsafe "HsBase.h sigprocmask"
+foreign import ccall unsafe "HsBase.h sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 
 foreign import ccall unsafe "HsBase.h tcgetattr"

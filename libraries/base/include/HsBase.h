@@ -181,6 +181,28 @@ INLINE int __hscore_s_issock(mode_t m) { return S_ISSOCK(m); }
 #endif
 #endif
 
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
+INLINE int
+__hscore_sigemptyset( sigset_t *set )
+{ return sigemptyset(set); }
+
+INLINE int
+__hscore_sigfillset( sigset_t *set )
+{ return sigfillset(set); }
+
+INLINE int
+__hscore_sigaddset( sigset_t * set, int s )
+{ return sigaddset(set,s); }
+
+INLINE int
+__hscore_sigdelset( sigset_t * set, int s )
+{ return sigdelset(set,s); }
+
+INLINE int
+__hscore_sigismember( sigset_t * set, int s )
+{ return sigismember(set,s); }
+#endif
+
 INLINE void *
 __hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
 { return memcpy(dst, src+src_off, sz); }
