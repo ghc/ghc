@@ -1542,7 +1542,7 @@ def normalise_prof (str):
     str = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',str)
 
     # strip results for CAFs, these tend to change unpredictably
-    str = re.sub('[ \t]*CAF.*\n','',str)
+    str = re.sub('[ \t]*(CAF|IDLE).*\n','',str)
 
     # XXX Ignore Main.main.  Sometimes this appears under CAF, and
     # sometimes under MAIN.

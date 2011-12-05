@@ -122,7 +122,7 @@ prof_ways = map (lambda x: x[0], \
                         config.way_flags.items()))
 
 threaded_ways = map (lambda x: x[0], \
-                 filter(lambda x: '-threaded' in x[1], \
+                 filter(lambda x: '-threaded' in x[1] or 'ghci' == x[0], \
                         config.way_flags.items()))
 
 opt_ways = map (lambda x: x[0], \

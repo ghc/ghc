@@ -102,5 +102,8 @@ test('T5559', # unicode in cost centre names
 
 test('callstack001',
      [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
-     compile_and_run, [''])
+     compile_and_run, ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
+test('callstack002',
+     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
+     compile_and_run, ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
