@@ -26,7 +26,7 @@ module TcType (
   --------------------------------
   -- Types 
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType, 
-  TcCoercion, TcTyVar, TcTyVarSet, TcKind, TcCoVar,
+  TcTyVar, TcTyVarSet, TcKind, TcCoVar,
 
   --------------------------------
   -- MetaDetails
@@ -166,8 +166,8 @@ import Class
 import Var
 import ForeignCall
 import VarSet
-import Type
 import Coercion
+import Type
 import TyCon
 
 -- others:
@@ -231,8 +231,6 @@ type TcType = Type 	-- A TcType can have mutable type variables
 	-- 	forall a. T
 	-- a cannot occur inside a MutTyVar in T; that is,
 	-- T is "flattened" before quantifying over a
-
-type TcCoercion = Coercion  -- A TcCoercion can contain TcTypes.
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -445,6 +443,8 @@ pprUserTypeCtxt (DataTyCtxt tc)   = ptext (sLit "the context of the data type de
 %*									*
 %************************************************************************
 
+Tidying is here becuase it has a special case for FlatSkol
+
 \begin{code}
 -- | This tidies up a type for printing in an error message, or in
 -- an interface file.
@@ -550,7 +550,6 @@ tidyKind = tidyType
 %************************************************************************
 
 \begin{code}
-
 tidyCo :: TidyEnv -> Coercion -> Coercion
 tidyCo env@(_, subst) co
   = go co
@@ -575,7 +574,6 @@ tidyCo env@(_, subst) co
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
-
 \end{code}
 
 %************************************************************************

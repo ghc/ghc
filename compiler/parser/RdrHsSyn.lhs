@@ -54,6 +54,7 @@ import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc,
 import Name             ( Name )
 import BasicTypes       ( maxPrecedence, Activation(..), RuleMatchInfo,
                           InlinePragma(..), InlineSpec(..) )
+import TcEvidence       ( idHsWrapper )
 import Lexer
 import TysWiredIn       ( unitTyCon )
 import ForeignCall

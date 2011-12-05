@@ -35,6 +35,7 @@ import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 import HsSyn
 import RnHsSyn
 import TcRnMonad
+import TcEvidence     ( emptyTcEvBinds )
 import RnTypes        ( rnIPName, rnHsSigType, rnLHsType, checkPrecMatch )
 import RnPat
 import RnEnv

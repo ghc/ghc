@@ -36,7 +36,7 @@ import TcHsType
 import TcUnify
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import Type
-import Coercion hiding (substTy)
+import TcEvidence
 import TyCon
 import DataCon
 import Class
@@ -1090,16 +1090,12 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
        ; mapAndUnzipM (tc_item rep_d_stuff) op_items }
   where
      loc = getSrcSpan dfun_id
-
-     inst_tvs = fst (tcSplitForAllTys (idType dfun_id))
      Just (init_inst_tys, _) = snocView inst_tys
-     rep_ty   = pFst (coercionKind co)  -- [p]
+     rep_ty   = pFst (tcCoercionKind co)  -- [p]
      rep_pred = mkClassPred clas (init_inst_tys ++ [rep_ty])
 
      -- co : [p] ~ T p
-     co = substCoWithTys (mkInScopeSet (mkVarSet tyvars))
-                         inst_tvs (mkTyVarTys tyvars) $
-          mkSymCo coi
+     co = mkTcSymCo (mkTcInstCos coi (mkTyVarTys tyvars))
 
      ----------------
      tc_item :: (TcEvBinds, EvVar) -> (Id, DefMeth) -> TcM (TcId, LHsBind TcId)
@@ -1121,8 +1117,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
      ----------------
      mk_op_wrapper :: Id -> EvVar -> HsWrapper
      mk_op_wrapper sel_id rep_d
-       = WpCast (liftCoSubstWith sel_tvs (map mkReflCo init_inst_tys ++ [co])
-                                 local_meth_ty)
+       = WpCast (liftTcCoSubstWith sel_tvs (map mkTcReflCo init_inst_tys ++ [co])
+                                   local_meth_ty)
          <.> WpEvApp (EvId rep_d)
          <.> mkWpTyApps (init_inst_tys ++ [rep_ty])
        where

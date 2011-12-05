@@ -31,7 +31,7 @@ module TypeRep (
 	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind,
 	Prec(..), maybeParen, pprTcApp, pprTypeNameApp, 
-        pprPrefixApp, pprArrowChain,
+        pprPrefixApp, pprArrowChain, ppr_type,
 
         -- Free variables
         tyVarsOfType, tyVarsOfTypes,

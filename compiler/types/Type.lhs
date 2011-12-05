@@ -36,7 +36,7 @@ module Type (
 
 	mkTyConApp, mkTyConTy,
 	tyConAppTyCon_maybe, tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs, 
-	splitTyConApp_maybe, splitTyConApp, 
+	splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
         mkPiKinds, mkPiType, mkPiTypes,
@@ -502,6 +502,13 @@ tyConAppArgs_maybe _                = Nothing
 
 tyConAppArgs :: Type -> [Type]
 tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty)
+
+tyConAppArgN :: Int -> Type -> Type
+-- Executing Nth
+tyConAppArgN n ty 
+  = case tyConAppArgs_maybe ty of
+      Just tys -> ASSERT2( n < length tys, ppr n <+> ppr tys ) tys !! n
+      Nothing  -> pprPanic "tyConAppArgN" (ppr n <+> ppr ty)
 
 -- | Attempts to tease a type apart into a type constructor and the application
 -- of a number of arguments to that constructor. Panics if that is not possible.

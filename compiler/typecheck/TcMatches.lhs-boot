@@ -7,7 +7,8 @@
 -- for details
 
 module TcMatches where
-import HsSyn	( GRHSs, MatchGroup, HsWrapper )
+import HsSyn	( GRHSs, MatchGroup )
+import TcEvidence( HsWrapper )
 import Name	( Name )
 import TcType	( TcRhoType )
 import TcRnTypes( TcM, TcId )

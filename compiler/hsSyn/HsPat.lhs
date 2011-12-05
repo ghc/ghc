@@ -29,6 +29,7 @@ import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, pprLExpr)
 import HsBinds
 import HsLit
 import HsTypes
+import TcEvidence
 import BasicTypes
 -- others:
 import PprCore          ( {- instance OutputableBndr TyVar -} )

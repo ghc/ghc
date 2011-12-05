@@ -122,14 +122,13 @@ Note [Evidence: EvIds and CoVars]
 * An EvId (evidence Id) is a *boxed*, term-level evidence variable 
   (dictionary, implicit parameter, or equality).
 
-* DictId, IpId, and EqVar are synonyms when we know what kind of
-  evidence we are talking about.  For example, an EqVar has type (t1 ~ t2).
-
 * A CoVar (coercion variable) is an *unboxed* term-level evidence variable
   of type (t1 ~# t2).  So it's the unboxed version of an EqVar.
 
-* Only CoVars can occur in Coercions (but NB the LCoercion hack; see
-  Note [LCoercions] in Coercion).
+* Only CoVars can occur in Coercions, EqVars appear in TcCoercions.
+
+* DictId, IpId, and EqVar are synonyms when we know what kind of
+  evidence we are talking about.  For example, an EqVar has type (t1 ~ t2).
 
 Note [Kind and type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

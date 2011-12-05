@@ -14,7 +14,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module TrieMap(
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
-   TypeMap, 
+   TypeMap, foldTypeMap, 
    CoercionMap, 
    MaybeMap, 
    ListMap,
@@ -487,6 +487,12 @@ data TypeMap a
        , tm_fun    :: TypeMap (TypeMap a)
        , tm_tc_app :: NameEnv (ListMap TypeMap a)
        , tm_forall :: TypeMap (BndrMap a) }
+
+instance Outputable a => Outputable (TypeMap a) where
+  ppr m = text "TypeMap elts" <+> ppr (foldTypeMap (:) [] m)
+
+foldTypeMap :: (a -> b -> b) -> b -> TypeMap a -> b
+foldTypeMap k z m = fdT k m z
 
 wrapEmptyTypeMap :: TypeMap a
 wrapEmptyTypeMap = TM { tm_var  = emptyTM

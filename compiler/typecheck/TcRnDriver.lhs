@@ -39,7 +39,8 @@ import RdrName
 import TcHsSyn
 import TcExpr
 import TcRnMonad
-import Coercion
+import TcEvidence
+import Coercion( pprCoAxiom )
 import FamInst
 import InstEnv
 import FamInstEnv

@@ -48,6 +48,7 @@ import RnHsSyn
 import TcRnMonad
 import RnEnv   ( polyKindsErr )
 import TcHsSyn ( mkZonkTcTyVar )
+import TcEvidence( HsWrapper )
 import TcEnv
 import TcMType
 import TcUnify

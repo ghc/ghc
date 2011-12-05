@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS -Wwarn -fno-warn-tabs #-}
+{-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -110,7 +110,7 @@ import TcType
 import DynFlags
 import Type
 
-import Coercion
+import TcEvidence
 import Class
 import TyCon
 import TypeRep 
@@ -123,11 +123,8 @@ import Bag
 import MonadUtils
 import VarSet
 
--- import Pair ( pSnd )
 import FastString
 import Util
-
-import HsBinds               -- for TcEvBinds stuff 
 import Id 
 import TcRnTypes
 
@@ -230,7 +227,7 @@ extendWorkListNonEq ct wl = wl { wl_rest = ct : wl_rest wl }
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic
 extendWorkListCt ct wl
- | isLCoVar (cc_id ct) = extendWorkListEq ct wl
+ | isEqVar (cc_id ct) = extendWorkListEq ct wl
  | otherwise = extendWorkListNonEq ct wl
 
 appendWorkListCt :: [Ct] -> WorkList -> WorkList
@@ -256,8 +253,8 @@ workListFromNonEq ct = extendWorkListNonEq ct emptyWorkList
 
 workListFromCt :: Ct -> WorkList
 -- Agnostic 
-workListFromCt ct | isLCoVar (cc_id ct) = workListFromEq ct 
-                  | otherwise           = workListFromNonEq ct
+workListFromCt ct | isEqVar (cc_id ct) = workListFromEq ct 
+                  | otherwise          = workListFromNonEq ct
 
 
 selectWorkItem :: WorkList -> (Maybe Ct, WorkList)
@@ -394,7 +391,7 @@ partitionCCanMap pred cmap
                                           new_acc_cts = acc_cts `andCts` cts_out
                                           (cts_out, cts_keep) = partitionBag pred this_cts
 
-partitionEqMap :: (Ct -> Bool) -> TyVarEnv (Ct,Coercion) -> ([Ct], TyVarEnv (Ct,Coercion))
+partitionEqMap :: (Ct -> Bool) -> TyVarEnv (Ct,TcCoercion) -> ([Ct], TyVarEnv (Ct,TcCoercion))
 partitionEqMap pred isubst 
   = let eqs_out = foldVarEnv extend_if_pred [] isubst
         eqs_in  = filterVarEnv_Directly (\_ (ct,_) -> not (pred ct)) isubst
@@ -413,7 +410,7 @@ extractUnsolvedCMap cmap =
 
 -- See Note [InertSet invariants]
 data InertSet 
-  = IS { inert_eqs     :: TyVarEnv (Ct,Coercion) 
+  = IS { inert_eqs     :: TyVarEnv (Ct,TcCoercion) 
          -- Must all be CTyEqCans! If an entry exists of the form: 
          --   a |-> ct,co
          -- Then ct = CTyEqCan { cc_tyvar = a, cc_rhs = xi } 
@@ -740,7 +737,7 @@ data EvVarCache
   = EvVarCache { evc_cache     :: TypeMap (EvVar,CtFlavor)    
                      -- Map from PredTys to Evidence variables
                      -- used to avoid creating new goals
-               , evc_flat_cache :: TypeMap (Coercion,(Xi,CtFlavor,FlatEqOrigin))
+               , evc_flat_cache :: TypeMap (TcCoercion,(Xi,CtFlavor,FlatEqOrigin))
                      -- Map from family-free heads (F xi) to family-free types.
                      -- Useful during flattening to share flatten skolem generation
                      -- The boolean flag:
@@ -1037,7 +1034,7 @@ getTcSEvVarCacheMap = do { cache_var <- getTcSEvVarCache
                          ; the_cache <- wrapTcS $ TcM.readTcRef cache_var 
                          ; return (evc_cache the_cache) }
 
-getTcSEvVarFlatCache :: TcS (TypeMap (Coercion,(Type,CtFlavor,FlatEqOrigin)))
+getTcSEvVarFlatCache :: TcS (TypeMap (TcCoercion,(Type,CtFlavor,FlatEqOrigin)))
 getTcSEvVarFlatCache = do { cache_var <- getTcSEvVarCache 
                           ; the_cache <- wrapTcS $ TcM.readTcRef cache_var 
                           ; return (evc_flat_cache the_cache) }
@@ -1064,8 +1061,8 @@ getTcEvBindsMap
        ; wrapTcS $ TcM.readTcRef ev_ref }
 
 
-setEqBind :: EqVar -> LCoercion -> CtFlavor -> TcS CtFlavor
-setEqBind eqv co fl = setEvBind eqv (EvCoercionBox co) fl
+setEqBind :: EqVar -> TcCoercion -> CtFlavor -> TcS CtFlavor
+setEqBind eqv co fl = setEvBind eqv (EvCoercion co) fl
 
 setWantedTyBind :: TcTyVar -> TcType -> TcS () 
 -- Add a type binding
@@ -1091,7 +1088,7 @@ setEvBind ev t fl
 
 #ifdef DEBUG
        ; binds <- getTcEvBindsMap
-       ; let cycle = any (reaches binds) (evterm_evs t)
+       ; let cycle = any (reaches binds) (evVarsOfTerm t)
        ; when cycle (fail_if_co_loop binds)
 #endif
        ; return $ 
@@ -1105,7 +1102,7 @@ setEvBind ev t fl
   where fail_if_co_loop binds
           = pprTrace "setEvBind" (vcat [ text "Cycle in evidence binds, evvar =" <+> ppr ev
                                        , ppr (evBindMapBinds binds) ]) $
-            when (isLCoVar ev) (pprPanic "setEvBind" (text "BUG: Coercion loop!"))
+            when (isEqVar ev) (pprPanic "setEvBind" (text "BUG: Coercion loop!"))
 
         reaches :: EvBindMap -> Var -> Bool 
         -- Does this evvar reach ev? 
@@ -1113,16 +1110,8 @@ setEvBind ev t fl
           where go ev0
                   | ev0 == ev = True
                   | Just (EvBind _ evtrm) <- lookupEvBind ebm ev0
-                  = any go (evterm_evs evtrm)
+                  = any go (evVarsOfTerm evtrm)
                   | otherwise = False
-
-        evterm_evs (EvId v) = [v]
-        evterm_evs (EvCoercionBox lco) = varSetElems $ coVarsOfCo lco
-        evterm_evs (EvDFunApp _ _ evs) = evs
-        evterm_evs (EvTupleSel v _)    = [v]
-        evterm_evs (EvSuperClass v _)  = [v]
-        evterm_evs (EvCast v co)       = v : varSetElems (coVarsOfCo co)
-        evterm_evs (EvTupleMk evs)     = evs
 #endif
 
 \end{code}
@@ -1357,7 +1346,8 @@ newEvVar fl pty
                                            --            but they don't come with guarantees
                                            --            that they can be solved and we don't 
                                            --            quantify over them.
-             -> do { traceTcS "newEvVar"  $  text "already cached, doing nothing"
+             -> do { traceTcS "newEvVar: already cached, doing nothing" 
+                              (ppr (evc_cache ecache))
                    ; return (EvVarCreated False cached_evvar) }
            _   -- Not cached or cached with worse flavor
              -> do { new <- force_new_ev_var eref ecache fl pty
@@ -1425,21 +1415,21 @@ updateFlatCache ev fl fn xis rhs_ty feq_origin
              new_flat_cache = alterTM fun_ty x_flat_cache flat_cache
              new_evc = ecache { evc_flat_cache = new_flat_cache }
        ; wrapTcS $ TcM.writeTcRef eref new_evc }
-  where x_flat_cache _ = Just (mkEqVarLCo ev,(rhs_ty,fl,feq_origin))
+  where x_flat_cache _ = Just (mkTcCoVarCo ev,(rhs_ty,fl,feq_origin))
         fun_ty = mkTyConApp fn xis
 
 
-pprEvVarCache :: TypeMap (Coercion,a) -> SDoc
+pprEvVarCache :: TypeMap (TcCoercion,a) -> SDoc
 pprEvVarCache tm = ppr (foldTM mk_pair tm [])
- where mk_pair (co,_) cos = (co, liftedCoercionKind co) : cos
+ where mk_pair (co,_) cos = (co, tcCoercionKind co) : cos
 
 
-newGivenEqVar :: CtFlavor -> TcType -> TcType -> Coercion -> TcS (CtFlavor,EvVar)
+newGivenEqVar :: CtFlavor -> TcType -> TcType -> TcCoercion -> TcS (CtFlavor,EvVar)
 -- Pre: fl is Given
 newGivenEqVar fl ty1 ty2 co 
   = do { ecv <- newEqVar fl ty1 ty2
        ; let v = evc_the_evvar ecv -- Will be a new EvVar by post of newEvVar
-       ; fl' <- setEvBind v (EvCoercionBox co) fl
+       ; fl' <- setEvBind v (EvCoercion co) fl
        ; return (fl',v) }
 
 newEqVar :: CtFlavor -> TcType -> TcType -> TcS EvVarCreated
@@ -1500,47 +1490,47 @@ matchFam tycon args = wrapTcS $ tcLookupFamInst tycon args
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 
-getInertEqs :: TcS (TyVarEnv (Ct,Coercion), InScopeSet)
+getInertEqs :: TcS (TyVarEnv (Ct,TcCoercion), InScopeSet)
 getInertEqs = do { inert <- getTcSInerts
                  ; return (inert_eqs inert, inert_eq_tvs inert) }
 
-getCtCoercion :: Ct -> Coercion
+getCtCoercion :: Ct -> TcCoercion
 -- Precondition: A CTyEqCan.
 getCtCoercion ct 
-  | Just (GivenSolved (Just (EvCoercionBox co))) <- maybe_given
+  | Just (GivenSolved (Just (EvCoercion co))) <- maybe_given
   = co
   | otherwise
-  = mkEqVarLCo (setVarType (cc_id ct) (ctPred ct))
+  = mkTcCoVarCo (setVarType (cc_id ct) (ctPred ct))
                 -- NB: The variable could be rewritten by a spontaneously
-                -- solved, so it is not safe to simply do a mkEqVarLCo (cc_id ct)
+                -- solved, so it is not safe to simply do a mkTcCoVarCo (cc_id ct)
                 -- Instead we use the most accurate type, given by ctPred c
   where maybe_given = isGiven_maybe (cc_flavor ct)
 
 -- See Note [LiftInertEqs]
-liftInertEqsTy :: (TyVarEnv (Ct,Coercion),InScopeSet)
+liftInertEqsTy :: (TyVarEnv (Ct, TcCoercion),InScopeSet)
                  -> CtFlavor
-                 -> PredType -> Coercion
+                 -> PredType -> TcCoercion
 liftInertEqsTy (subst,inscope) fl pty
   = ty_cts_subst subst inscope fl pty
 
 
-ty_cts_subst :: TyVarEnv (Ct,Coercion)
-             -> InScopeSet -> CtFlavor -> Type -> Coercion
+ty_cts_subst :: TyVarEnv (Ct, TcCoercion)
+             -> InScopeSet -> CtFlavor -> Type -> TcCoercion
 ty_cts_subst subst inscope fl ty 
   = go ty 
   where 
         go ty = go' ty
 
-        go' (TyVarTy tv)      = tyvar_cts_subst tv `orElse` Refl (TyVarTy tv)
-        go' (AppTy ty1 ty2)   = mkAppCo (go ty1) (go ty2) 
-        go' (TyConApp tc tys) = mkTyConAppCo tc (map go tys)  
+        go' (TyVarTy tv)      = tyvar_cts_subst tv `orElse` mkTcReflCo (TyVarTy tv)
+        go' (AppTy ty1 ty2)   = mkTcAppCo (go ty1) (go ty2) 
+        go' (TyConApp tc tys) = mkTcTyConAppCo tc (map go tys)  
 
-        go' (ForAllTy v ty)   = mkForAllCo v' $! co
+        go' (ForAllTy v ty)   = mkTcForAllCo v' $! co
                              where 
                                (subst',inscope',v') = upd_tyvar_bndr subst inscope v
                                co = ty_cts_subst subst' inscope' fl ty 
 
-        go' (FunTy ty1 ty2)   = mkFunCo (go ty1) (go ty2)
+        go' (FunTy ty1 ty2)   = mkTcFunCo (go ty1) (go ty2)
 
 
         tyvar_cts_subst tv  
@@ -1556,7 +1546,7 @@ ty_cts_subst subst inscope fl ty
                         -- But we do not want to monadically create a new EvVar. So, we
                         -- create an 'unused_ct' but we cache reflexivity as the 
                         -- associated coercion. 
-                    | otherwise = extendVarEnv subst v (unused_ct, Refl (TyVarTy new_v))
+                    | otherwise = extendVarEnv subst v (unused_ct, mkTcReflCo (TyVarTy new_v))
 
                 no_change = new_v == v 
                 new_v     = uniqAway inscope v 

@@ -25,6 +25,7 @@ import HsTypes
 import HsBinds
 
 -- others:
+import TcEvidence
 import CoreSyn
 import Var
 import Name

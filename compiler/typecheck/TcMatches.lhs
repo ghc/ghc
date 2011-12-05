@@ -36,7 +36,7 @@ import TysWiredIn
 import Id
 import TyCon
 import TysPrim
-import Coercion         ( isReflCo, mkSymCo )
+import TcEvidence
 import Outputable
 import Util
 import SrcLoc
@@ -153,7 +153,7 @@ matchFunTys
 matchFunTys herald arity res_ty thing_inside
   = do	{ (co, pat_tys, res_ty) <- matchExpectedFunTys herald arity res_ty
 	; res <- thing_inside pat_tys res_ty
-        ; return (coToHsWrapper (mkSymCo co), res) }
+        ; return (coToHsWrapper (mkTcSymCo co), res) }
 \end{code}
 
 %************************************************************************
@@ -734,7 +734,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op return_op) res_ty thing_insi
 	-- so for now we just check that it's the identity
     check_same actual expected
       = do { co <- unifyType actual expected
-	   ; unless (isReflCo co) $
+	   ; unless (isTcReflCo co) $
              failWithMisMatch [UnifyOrigin { uo_expected = expected
                                            , uo_actual = actual }] }
 

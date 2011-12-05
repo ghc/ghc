@@ -26,7 +26,6 @@ import Var
 import VarEnv ( ) -- unitVarEnv, mkInScopeSet
 
 import TcType
-import HsBinds
 
 import Class
 import TyCon
@@ -35,7 +34,7 @@ import IParam
 
 import FunDeps
 
-import Coercion
+import TcEvidence
 import Outputable
 
 import TcRnTypes
@@ -332,10 +331,10 @@ kickOutRewritableInerts ct
        ; traceTcS "Kick out" (ppr ct $$ ppr wl)
        ; updWorkListTcS (unionWorkList wl) }
 
-rewriteInertEqsFromInertEq :: (TcTyVar,Coercion, CtFlavor) -- A new substitution
-                           -> TyVarEnv (Ct,Coercion)       -- All inert equalities
-                           -> TcS (TyVarEnv (Ct,Coercion)) -- The new inert equalities
-rewriteInertEqsFromInertEq (subst_tv,subst_co, subst_fl) ieqs
+rewriteInertEqsFromInertEq :: (TcTyVar, TcCoercion, CtFlavor) -- A new substitution
+                           -> TyVarEnv (Ct, TcCoercion)       -- All inert equalities
+                           -> TcS (TyVarEnv (Ct,TcCoercion)) -- The new inert equalities
+rewriteInertEqsFromInertEq (subst_tv, subst_co, subst_fl) ieqs
 -- The goal: traverse the inert equalities and rewrite some of them, dropping some others
 -- back to the worklist. This is delicate, see Note [Delicate equality kick-out]
  = do { mieqs <- Traversable.mapM do_one ieqs 
@@ -362,23 +361,29 @@ rewriteInertEqsFromInertEq (subst_tv,subst_co, subst_fl) ieqs
          | otherwise -- Just keep it there
          = return $ Just (ct,inert_co)
          where 
+	   -- We have new guy         co : tv ~ something
+	   -- and old inert  {wanted} cv : tv' ~ rhs[tv]
+	   -- We want to rewrite to
+	   --  	      	     {wanted} cv' : tv' ~ rhs[something] 
+           --                cv = cv' ; rhs[Sym co]
+	   --                  
            rewrite_on_the_spot (ct,_inert_co)
-             = do { let rhs' = pSnd (liftedCoercionKind co)
+             = do { let rhs' = pSnd (tcCoercionKind co)
                   ; delCachedEvVar ev fl
                   ; evc <- newEqVar fl (mkTyVarTy tv) rhs'
-                  ; let ev' = evc_the_evvar evc
-                  ; let evco' = mkEqVarLCo ev' 
+                  ; let ev'   = evc_the_evvar evc
+                  ; let evco' = mkTcCoVarCo ev' 
                   ; fl' <- if isNewEvVar evc then
                                do { case fl of 
                                       Wanted {} 
-                                        -> setEqBind ev (evco' `mkTransCo` mkSymCo co) fl
+                                        -> setEqBind ev (evco' `mkTcTransCo` mkTcSymCo co) fl
                                       Given {} 
-                                        -> setEqBind ev' (mkEqVarLCo ev `mkTransCo` co) fl
+                                        -> setEqBind ev' (mkTcCoVarCo ev `mkTcTransCo` co) fl
                                       Derived {}
                                         -> return fl }
                            else
                                if isWanted fl then 
-                                   setEqBind ev (evco' `mkTransCo` mkSymCo co) fl
+                                   setEqBind ev (evco' `mkTcTransCo` mkTcSymCo co) fl
                                else return fl
                   ; let ct' = ct { cc_id = ev', cc_flavor = fl', cc_rhs = rhs' }
                   ; return (ct',evco') }
@@ -386,9 +391,9 @@ rewriteInertEqsFromInertEq (subst_tv,subst_co, subst_fl) ieqs
            fl  = cc_flavor ct
            tv  = cc_tyvar ct
            rhs = cc_rhs ct
-           co  = liftCoSubstWith [subst_tv] [subst_co] rhs
+           co  = liftTcCoSubstWith [subst_tv] [subst_co] rhs
 
-kick_out_rewritable :: Ct -> InertSet -> ((WorkList,TyVarEnv (Ct,Coercion)), InertSet)
+kick_out_rewritable :: Ct -> InertSet -> ((WorkList,TyVarEnv (Ct,TcCoercion)), InertSet)
 -- Returns ALL equalities, to be dealt with later
 kick_out_rewritable ct (IS { inert_eqs    = eqmap
                            , inert_eq_tvs = inscope
@@ -617,9 +622,9 @@ solveWithIdentity d eqv wd tv xi
                             ]
 
        ; setWantedTyBind tv xi
-       ; let refl_xi = mkReflCo xi
+       ; let refl_xi = mkTcReflCo xi
 
-       ; let solved_fl = mkSolvedFlavor wd UnkSkol (EvCoercionBox refl_xi) 
+       ; let solved_fl = mkSolvedFlavor wd UnkSkol (EvCoercion refl_xi) 
        ; (_,eqv_given) <- newGivenEqVar solved_fl (mkTyVarTy tv) xi refl_xi
 
        ; when (isWanted wd) $ do { _ <- setEqBind eqv refl_xi wd; return () }
@@ -805,7 +810,7 @@ doInteractWithInert (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_i
            Derived {} -> pprPanic "Unexpected derived IP" (ppr workItem)
            Wanted  {} ->
                do { _ <- setEvBind (cc_id workItem) 
-                            (mkEvCast id1 (mkSymCo (mkTyConAppCo (ipTyCon nm1) [mkEqVarLCo (evc_the_evvar eqv)]))) wfl
+                            (mkEvCast id1 (mkTcSymCo (mkTcTyConAppCo (ipTyCon nm1) [mkTcCoVarCo (evc_the_evvar eqv)]))) wfl
                   ; irWorkItemConsumed "IP/IP (solved by rewriting)" } }
 
 doInteractWithInert (CFunEqCan { cc_id = eqv1, cc_flavor = fl1, cc_fun = tc1
@@ -850,10 +855,10 @@ rewriteEqLHS LeftComesFromInert (eqv1,xi1) (eqv2,d,gw,xi2)
        ; gw' <- case gw of 
            Wanted {} 
                -> setEqBind eqv2 
-                    (mkEqVarLCo eqv1 `mkTransCo` mkSymCo (mkEqVarLCo eqv2')) gw
+                    (mkTcCoVarCo eqv1 `mkTcTransCo` mkTcSymCo (mkTcCoVarCo eqv2')) gw
            Given {}
                -> setEqBind eqv2'
-                    (mkSymCo (mkEqVarLCo eqv2) `mkTransCo` mkEqVarLCo eqv1) gw
+                    (mkTcSymCo (mkTcCoVarCo eqv2) `mkTcTransCo` mkTcCoVarCo eqv1) gw
            Derived {} 
                -> return gw
        ; when (isNewEvVar evc) $ 
@@ -868,10 +873,10 @@ rewriteEqLHS RightComesFromInert (eqv1,xi1) (eqv2,d,gw,xi2)
        ; gw' <- case gw of
            Wanted {} 
                -> setEqBind eqv2
-                    (mkEqVarLCo eqv1 `mkTransCo` mkEqVarLCo eqv2') gw
+                    (mkTcCoVarCo eqv1 `mkTcTransCo` mkTcCoVarCo eqv2') gw
            Given {}  
                -> setEqBind eqv2'
-                    (mkSymCo (mkEqVarLCo eqv1) `mkTransCo` mkEqVarLCo eqv2) gw
+                    (mkTcSymCo (mkTcCoVarCo eqv1) `mkTcTransCo` mkTcCoVarCo eqv2) gw
            Derived {} 
                -> return gw
 
@@ -1397,11 +1402,11 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = eqv, cc_flavor = fl
 			    -- RHS of a type function, so that it never
 			    -- appears in an error message
                             -- See Note [Type synonym families] in TyCon
-                         coe = mkAxInstCo coe_tc rep_tys 
+                         coe = mkTcAxInstCo coe_tc rep_tys 
                    ; case fl of
                        Wanted {} -> do { evc <- newEqVar fl rhs_ty xi -- Wanted version
                                        ; let eqv' = evc_the_evvar evc
-                                       ; let coercion = coe `mkTransCo` mkEqVarLCo eqv'
+                                       ; let coercion = coe `mkTcTransCo` mkTcCoVarCo eqv'
                                        ; _ <- setEqBind eqv coercion fl
                                        ; when (isNewEvVar evc) $ 
                                             (let ct = CNonCanonical { cc_id = eqv'
@@ -1410,7 +1415,7 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = eqv, cc_flavor = fl
                                              in updWorkListTcS (extendWorkListEq ct))
 
                                        ; let _solved   = workItem { cc_flavor = solved_fl }
-                                             solved_fl = mkSolvedFlavor fl UnkSkol (EvCoercionBox coercion)
+                                             solved_fl = mkSolvedFlavor fl UnkSkol (EvCoercion coercion)
 
                                        ; updateFlatCache eqv solved_fl tc args xi WhenSolved
 
@@ -1421,7 +1426,7 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = eqv, cc_flavor = fl
                                                      -- Cache in inerts the Solved item
 
                        Given {} -> do { (fl',eqv') <- newGivenEqVar fl xi rhs_ty $ 
-                                                         mkSymCo (mkEqVarLCo eqv) `mkTransCo` coe
+                                                         mkTcSymCo (mkTcCoVarCo eqv) `mkTcTransCo` coe
                                       ; let ct = CNonCanonical { cc_id = eqv'
                                                                , cc_flavor = fl'
                                                                , cc_depth = cc_depth workItem + 1}  

@@ -25,7 +25,7 @@ import TcPat
 import TcUnify
 import TcRnMonad
 import TcEnv
-import Coercion
+import TcEvidence
 import Id( mkLocalId )
 import Inst
 import Name
@@ -50,7 +50,7 @@ import Control.Monad
 \begin{code}
 tcProc :: InPat Name -> LHsCmdTop Name		-- proc pat -> expr
        -> TcRhoType				-- Expected type of whole proc expression
-       -> TcM (OutPat TcId, LHsCmdTop TcId, LCoercion)
+       -> TcM (OutPat TcId, LHsCmdTop TcId, TcCoercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
@@ -59,7 +59,7 @@ tcProc pat cmd exp_ty
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
 			  tcCmdTop cmd_env cmd [] res_ty
-        ; let res_co = mkTransCo co (mkAppCo co1 (mkReflCo res_ty))
+        ; let res_co = mkTcTransCo co (mkTcAppCo co1 (mkTcReflCo res_ty))
         ; return (pat', cmd', res_co) }
 \end{code}
 

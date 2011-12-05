@@ -31,8 +31,8 @@ import HsSyn
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
 import TcType
+import TcEvidence
 import Type
-import Coercion
 import CoreSyn
 import CoreUtils
 import CoreFVs
@@ -79,8 +79,7 @@ dsValBinds (ValBindsIn  _     _) _    = panic "dsValBinds ValBindsIn"
 -------------------------
 dsIPBinds :: HsIPBinds Id -> CoreExpr -> DsM CoreExpr
 dsIPBinds (IPBinds ip_binds ev_binds) body
-  = do  { ds_ev_binds <- dsTcEvBinds ev_binds
-        ; let inner = mkCoreLets ds_ev_binds body
+  = do  { let inner = mkCoreLets (dsTcEvBinds ev_binds) body
                 -- The dict bindings may not be in 
                 -- dependency order; hence Rec
         ; foldrM ds_ip_bind inner ip_binds }
@@ -128,12 +127,11 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
                , abs_exports = exports
                , abs_ev_binds = ev_binds
                , abs_binds = binds }) body
-  = do { ds_ev_binds <- dsTcEvBinds ev_binds
-       ; let body1 = foldr bind_export body exports
+  = do { let body1 = foldr bind_export body exports
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlBagM (\body bind -> dsStrictBind (unLoc bind) body) 
                             body1 binds 
-       ; return (mkCoreLets ds_ev_binds body2) }
+       ; return (mkCoreLets (dsTcEvBinds ev_binds) body2) }
 
 dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn 
                       , fun_tick = tick, fun_infix = inf }) body
@@ -217,11 +215,11 @@ dsExpr (HsLit lit)            = dsLit lit
 dsExpr (HsOverLit lit)        = dsOverLit lit
 
 dsExpr (HsWrap co_fn e)
-  = do { co_fn' <- dsHsWrapper co_fn
-       ; e' <- dsExpr e
+  = do { e' <- dsExpr e
+       ; let wrapped_e = dsHsWrapper co_fn e'
        ; warn_id <- woptDs Opt_WarnIdentities
-       ; when warn_id $ warnAboutIdentities e' co_fn'
-       ; return (co_fn' e') }
+       ; when warn_id $ warnAboutIdentities e' wrapped_e
+       ; return wrapped_e }
 
 dsExpr (NegApp expr neg_expr) 
   = App <$> dsExpr neg_expr <*> dsLExpr expr
@@ -546,12 +544,12 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 
                         -- Tediously wrap the application in a cast
                         -- Note [Update for GADTs]
-                 wrap_co = mkTyConAppCo tycon
+                 wrap_co = mkTcTyConAppCo tycon
                                 [ lookup tv ty | (tv,ty) <- univ_tvs `zip` out_inst_tys ]
                  lookup univ_tv ty = case lookupVarEnv wrap_subst univ_tv of
                                         Just co' -> co'
-                                        Nothing  -> mkReflCo ty
-                 wrap_subst = mkVarEnv [ (tv, mkSymCo (mkEqVarLCo eq_var))
+                                        Nothing  -> mkTcReflCo ty
+                 wrap_subst = mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo eq_var))
                                        | ((tv,_),eq_var) <- eq_spec `zip` eqs_vars ]
 
                  pat = noLoc $ ConPatOut { pat_con = noLoc con, pat_tvs = ex_tvs
@@ -806,14 +804,15 @@ mk_fail_msg pat = "Pattern match failure in do expression at " ++
 %*                                                                      *
 %************************************************************************
 
-Warn about functions that convert between one type and another
-when the to- and from- types are the same.  Then it's probably
-(albeit not definitely) the identity
+Warn about functions like toInteger, fromIntegral, that convert
+between one type and another when the to- and from- types are the
+same.  Then it's probably (albeit not definitely) the identity
+
 \begin{code}
-warnAboutIdentities :: CoreExpr -> (CoreExpr -> CoreExpr) -> DsM ()
-warnAboutIdentities (Var v) co_fn
+warnAboutIdentities :: CoreExpr -> CoreExpr -> DsM ()
+warnAboutIdentities (Var v) wrapped_fun
   | idName v `elem` conversionNames
-  , let fun_ty = exprType (co_fn (Var v))
+  , let fun_ty = exprType wrapped_fun
   , Just (arg_ty, res_ty) <- splitFunTy_maybe fun_ty
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = warnDs (vcat [ ptext (sLit "Call of") <+> ppr v <+> dcolon <+> ppr fun_ty
