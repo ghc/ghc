@@ -30,6 +30,7 @@ import RnEnv
 
 import FamInst
 import FamInstEnv
+import Coercion      
 import Type
 import TypeRep
 import ForeignCall
@@ -40,7 +41,6 @@ import RdrName
 import DataCon
 import TyCon
 import TcType
-import Coercion
 import PrelNames
 import DynFlags
 import Outputable

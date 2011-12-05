@@ -60,7 +60,7 @@ import TcIface
 import PrelNames
 import TysWiredIn
 import Id
-import Coercion
+import TcEvidence
 import Var
 import VarSet
 import RdrName
@@ -629,10 +629,10 @@ data InstBindings a
                         -- witness dictionary is identical to the argument 
                         -- dictionary.  Hence no bindings, no pragmas.
 
-        Coercion        -- The coercion maps from newtype to the representation type
-                        -- (mentioning type variables bound by the forall'd iSpec variables)
+        TcCoercion      -- The coercion maps from newtype to the representation type
+                        -- (quantified over type variables bound by the forall'd iSpec variables)
                         -- E.g.   newtype instance N [a] = N1 (Tree a)
-                        --        co : N [a] ~ Tree a
+                        --        co : forall a. N [a] ~ Tree a
 
         TyCon           -- The TyCon is the newtype N.  If it's indexed, then it's the 
                         -- representation TyCon, so that tyConDataCons returns [N1], 

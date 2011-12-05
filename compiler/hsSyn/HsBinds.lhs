@@ -27,7 +27,7 @@ import HsLit
 import HsTypes
 import PprCore ()
 import CoreSyn
-import Coercion
+import TcEvidence
 import Type
 import Name
 import NameSet
@@ -35,15 +35,11 @@ import BasicTypes
 import Outputable	
 import SrcLoc
 import Util
-import VarEnv
 import Var
 import Bag
-import Unique
 import FastString
 
-import Data.IORef( IORef )
 import Data.Data hiding ( Fixity )
-
 import Data.List ( intersect )
 \end{code}
 
@@ -437,227 +433,6 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
   ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
 \end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Coercion functions}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-data HsWrapper
-  = WpHole                      -- The identity coercion
-
-  | WpCompose HsWrapper HsWrapper
-       -- (wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]
-       --
-       -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
-       -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
-
-  | WpCast LCoercion          -- A cast:  [] `cast` co
-                              -- Guaranteed not the identity coercion
-
-        -- Evidence abstraction and application
-        -- (both dictionaries and coercions)
-  | WpEvLam EvVar               -- \d. []       the 'd' is an evidence variable
-  | WpEvApp EvTerm              -- [] d         the 'd' is evidence for a constraint
-
-	-- Kind and Type abstraction and application
-  | WpTyLam TyVar 	-- \a. []	the 'a' is a type/kind variable (not coercion var)
-  | WpTyApp KindOrType	-- [] t		the 't' is a type (not coercion)
-
-
-  | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
-                                -- so that the identity coercion is always exactly WpHole
-  deriving (Data, Typeable)
-
-
-data TcEvBinds
-  = TcEvBinds           -- Mutable evidence bindings
-       EvBindsVar       -- Mutable because they are updated "later"
-                        --    when an implication constraint is solved
-
-  | EvBinds             -- Immutable after zonking
-       (Bag EvBind)
-
-  deriving( Typeable )
-
-data EvBindsVar = EvBindsVar (IORef EvBindMap) Unique
-     -- The Unique is only for debug printing
-
------------------
-newtype EvBindMap = EvBindMap { ev_bind_varenv :: VarEnv EvBind } -- Map from evidence variables to evidence terms
-
-emptyEvBindMap :: EvBindMap
-emptyEvBindMap = EvBindMap { ev_bind_varenv = emptyVarEnv }
-
-extendEvBinds :: EvBindMap -> EvVar -> EvTerm -> EvBindMap
-extendEvBinds bs v t 
-  = EvBindMap { ev_bind_varenv = extendVarEnv (ev_bind_varenv bs) v (EvBind v t) }
-
-lookupEvBind :: EvBindMap -> EvVar -> Maybe EvBind
-lookupEvBind bs = lookupVarEnv (ev_bind_varenv bs)
-
-evBindMapBinds :: EvBindMap -> Bag EvBind
-evBindMapBinds bs 
-  = foldVarEnv consBag emptyBag (ev_bind_varenv bs)
-
------------------
-instance Data TcEvBinds where
-  -- Placeholder; we can't travers into TcEvBinds
-  toConstr _   = abstractConstr "TcEvBinds"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "TcEvBinds"
-
--- All evidence is bound by EvBinds; no side effects
-data EvBind = EvBind EvVar EvTerm
-
-data EvTerm
-  = EvId EvId                  -- Term-level variable-to-variable bindings
-                               -- (no coercion variables! they come via EvCoercionBox)
-
-  | EvCoercionBox LCoercion    -- (Boxed) coercion bindings
-
-  | EvCast EvVar LCoercion     -- d |> co
-
-  | EvDFunApp DFunId           -- Dictionary instance application
-       [Type] [EvVar]
-
-  | EvTupleSel EvId  Int       -- n'th component of the tuple
-
-  | EvTupleMk [EvId]           -- tuple built from this stuff
-
-  | EvSuperClass DictId Int    -- n'th superclass. Used for both equalities and
-                               -- dictionaries, even though the former have no
-                               -- selector Id.  We count up from _0_
-
-  deriving( Data, Typeable)
-\end{code}
-
-Note [EvBinds/EvTerm]
-~~~~~~~~~~~~~~~~~~~~~
-How evidence is created and updated. Bindings for dictionaries,
-and coercions and implicit parameters are carried around in TcEvBinds
-which during constraint generation and simplification is always of the
-form (TcEvBinds ref). After constraint simplification is finished it
-will be transformed to t an (EvBinds ev_bag).
-
-Evidence for coercions *SHOULD* be filled in using the TcEvBinds
-However, all EvVars that correspond to *wanted* coercion terms in
-an EvBind must be mutable variables so that they can be readily
-inlined (by zonking) after constraint simplification is finished.
-
-Conclusion: a new wanted coercion variable should be made mutable.
-[Notice though that evidence variables that bind coercion terms
- from super classes will be "given" and hence rigid]
-
-
-\begin{code}
-mkEvCast :: EvVar -> LCoercion -> EvTerm
-mkEvCast ev lco
-  | isReflCo lco = EvId ev
-  | otherwise    = EvCast ev lco
-
-emptyTcEvBinds :: TcEvBinds
-emptyTcEvBinds = EvBinds emptyBag
-
-isEmptyTcEvBinds :: TcEvBinds -> Bool
-isEmptyTcEvBinds (EvBinds b)    = isEmptyBag b
-isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
-
-(<.>) :: HsWrapper -> HsWrapper -> HsWrapper
-WpHole <.> c = c
-c <.> WpHole = c
-c1 <.> c2    = c1 `WpCompose` c2
-
-mkWpTyApps :: [Type] -> HsWrapper
-mkWpTyApps tys = mk_co_app_fn WpTyApp tys
-
-mkWpEvApps :: [EvTerm] -> HsWrapper
-mkWpEvApps args = mk_co_app_fn WpEvApp args
-
-mkWpEvVarApps :: [EvVar] -> HsWrapper
-mkWpEvVarApps vs = mkWpEvApps (map EvId vs)
-
-mkWpTyLams :: [TyVar] -> HsWrapper
-mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
-
-mkWpLams :: [Var] -> HsWrapper
-mkWpLams ids = mk_co_lam_fn WpEvLam ids
-
-mkWpLet :: TcEvBinds -> HsWrapper
--- This no-op is a quite a common case
-mkWpLet (EvBinds b) | isEmptyBag b = WpHole
-mkWpLet ev_binds                   = WpLet ev_binds
-
-mk_co_lam_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
-mk_co_lam_fn f as = foldr (\x wrap -> f x <.> wrap) WpHole as
-
-mk_co_app_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
--- For applications, the *first* argument must
--- come *last* in the composition sequence
-mk_co_app_fn f as = foldr (\x wrap -> wrap <.> f x) WpHole as
-
-idHsWrapper :: HsWrapper
-idHsWrapper = WpHole
-
-isIdHsWrapper :: HsWrapper -> Bool
-isIdHsWrapper WpHole = True
-isIdHsWrapper _      = False
-\end{code}
-
-Pretty printing
-
-\begin{code}
-instance Outputable HsWrapper where
-  ppr co_fn = pprHsWrapper (ptext (sLit "<>")) co_fn
-
-pprHsWrapper :: SDoc -> HsWrapper -> SDoc
--- In debug mode, print the wrapper
--- otherwise just print what's inside
-pprHsWrapper doc wrap
-  = getPprStyle (\ s -> if debugStyle s then (help (add_parens doc) wrap False) else doc)
-  where
-    help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
-    -- True  <=> appears in function application position
-    -- False <=> appears as body of let or lambda
-    help it WpHole             = it
-    help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>")
-                                              <+> pprParendCo co)]
-    help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
-    help it (WpTyApp ty)  = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
-    help it (WpEvLam id)  = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
-    help it (WpTyLam tv)  = add_parens $ sep [ptext (sLit "/\\") <> pp_bndr tv, it False]
-    help it (WpLet binds) = add_parens $ sep [ptext (sLit "let") <+> braces (ppr binds), it False]
-
-    pp_bndr v = pprBndr LambdaBind v <> dot
-
-    add_parens, no_parens :: SDoc -> Bool -> SDoc
-    add_parens d True  = parens d
-    add_parens d False = d
-    no_parens d _ = d
-
-instance Outputable TcEvBinds where
-  ppr (TcEvBinds v) = ppr v
-  ppr (EvBinds bs)  = ptext (sLit "EvBinds") <> braces (ppr bs)
-
-instance Outputable EvBindsVar where
-  ppr (EvBindsVar _ u) = ptext (sLit "EvBindsVar") <> angleBrackets (ppr u)
-
-instance Outputable EvBind where
-  ppr (EvBind v e)   = ppr v <+> equals <+> ppr e
-   -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
-
-instance Outputable EvTerm where
-  ppr (EvId v)           = ppr v
-  ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendCo co
-  ppr (EvCoercionBox co) = ptext (sLit "CO") <+> ppr co
-  ppr (EvTupleSel v n)   = ptext (sLit "tupsel") <> parens (ppr (v,n))
-  ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs
-  ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
-  ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
-\end{code}
 
 %************************************************************************
 %*                                                                      *

@@ -32,6 +32,7 @@ import RdrHsSyn
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
 import Lexer
 import RdrName
+import TcEvidence       ( emptyTcEvBinds )
 import TysPrim          ( liftedTypeKindTyConName, eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
                           unboxedSingletonTyCon, unboxedSingletonDataCon,

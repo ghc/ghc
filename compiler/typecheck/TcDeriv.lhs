@@ -32,6 +32,7 @@ import FamInstEnv
 import TcHsType
 import TcMType
 import TcSimplify
+import TcEvidence
 
 import RnBinds
 import RnEnv  
@@ -40,7 +41,6 @@ import HscTypes
 
 import Class
 import Type
-import Coercion
 import ErrUtils
 import MkId
 import DataCon
@@ -1443,7 +1443,7 @@ genInst :: Bool             -- True <=> standalone deriving
         -> OverlapFlag
         -> DerivSpec -> TcM (InstInfo RdrName, BagDerivStuff)
 genInst standalone_deriv oflag
-        spec@(DS { ds_tc = rep_tycon, ds_tc_args = rep_tc_args
+        spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype
                  , ds_name = name, ds_cls = clas })
   | is_newtype
@@ -1462,12 +1462,12 @@ genInst standalone_deriv oflag
 
     inst_spec = mkInstance oflag theta spec
     co1 = case tyConFamilyCoercion_maybe rep_tycon of
-              Just co_con -> mkAxInstCo co_con rep_tc_args
+              Just co_con -> mkTcAxInstCo co_con rep_tc_args
               Nothing     -> id_co
               -- Not a family => rep_tycon = main tycon
-    co2 = mkAxInstCo (newTyConCo rep_tycon) rep_tc_args
-    co  = co1 `mkTransCo` co2
-    id_co = mkReflCo (mkTyConApp rep_tycon rep_tc_args)
+    co2 = mkTcAxInstCo (newTyConCo rep_tycon) rep_tc_args
+    co  = mkTcForAllCos tvs (co1 `mkTcTransCo` co2)
+    id_co = mkTcReflCo (mkTyConApp rep_tycon rep_tc_args)
 
 -- Example: newtype instance N [a] = N1 (Tree a)
 --          deriving instance Eq b => Eq (N [(b,b)])

@@ -15,8 +15,8 @@ module TcRnMonad(
 
 import TcRnTypes        -- Re-export all
 import IOEnv            -- Re-export all
+import TcEvidence
 
-import Coercion
 import HsSyn hiding (LIE)
 import HscTypes
 import Module
@@ -381,11 +381,6 @@ newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply
         ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
-
-newCoVar :: TcType -> TcType -> TcRnIf gbl lcl EvVar
-newCoVar ty1 ty2
-  = do { uniq <- newUnique
-       ; return (mkLocalId (mkInternalName uniq (mkVarOccFS (fsLit "co")) noSrcSpan) (mkCoercionType ty1 ty2)) }
 
 newName :: OccName -> TcM Name
 newName occ

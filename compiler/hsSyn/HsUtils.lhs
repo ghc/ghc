@@ -82,9 +82,9 @@ import HsPat
 import HsTypes	
 import HsLit
 
+import TcEvidence
 import RdrName
 import Var
-import Coercion
 import TypeRep
 import DataCon
 import Name
@@ -171,37 +171,6 @@ mkLHsPar le@(L loc e) | hsExprNeedsParens e = L loc (HsPar le)
 mkParPat :: LPat name -> LPat name
 mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat lp)
                       | otherwise          = lp
-
---------- HsWrappers: type args, dict args, casts ---------
-mkLHsWrap :: HsWrapper -> LHsExpr id -> LHsExpr id
-mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
-
-mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
-mkHsWrap co_fn e | isIdHsWrapper co_fn = e
-		 | otherwise	       = HsWrap co_fn e
-
-mkHsWrapCo :: LCoercion -> HsExpr id -> HsExpr id
-mkHsWrapCo (Refl _) e = e
-mkHsWrapCo co       e = mkHsWrap (WpCast co) e
-
-mkLHsWrapCo :: LCoercion -> LHsExpr id -> LHsExpr id
-mkLHsWrapCo (Refl _) e         = e
-mkLHsWrapCo co       (L loc e) = L loc (mkHsWrap (WpCast co) e)
-
-coToHsWrapper :: LCoercion -> HsWrapper
-coToHsWrapper (Refl _) = idHsWrapper
-coToHsWrapper co       = WpCast co
-
-mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
-mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
-		       | otherwise	     = CoPat co_fn p ty
-
-mkHsWrapPatCo :: LCoercion -> Pat id -> Type -> Pat id
-mkHsWrapPatCo (Refl _) pat _  = pat
-mkHsWrapPatCo co       pat ty = CoPat (WpCast co) pat ty
-
-mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
-mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
 
 
 -------------------------------
@@ -404,6 +373,39 @@ missingTupArg :: HsTupArg a
 missingTupArg = Missing placeHolderType
 \end{code}
 
+\begin{code}
+--------- HsWrappers: type args, dict args, casts ---------
+mkLHsWrap :: HsWrapper -> LHsExpr id -> LHsExpr id
+mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
+
+mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
+mkHsWrap co_fn e | isIdHsWrapper co_fn = e
+		 | otherwise	       = HsWrap co_fn e
+
+mkHsWrapCo :: TcCoercion -> HsExpr id -> HsExpr id
+mkHsWrapCo co e | isTcReflCo co = e
+                | otherwise     = mkHsWrap (WpCast co) e
+
+mkLHsWrapCo :: TcCoercion -> LHsExpr id -> LHsExpr id
+mkLHsWrapCo co (L loc e) | isTcReflCo co = L loc e
+                         | otherwise     = L loc (mkHsWrap (WpCast co) e)
+
+coToHsWrapper :: TcCoercion -> HsWrapper
+coToHsWrapper co | isTcReflCo co = idHsWrapper
+                 | otherwise     = WpCast co
+
+mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
+mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
+		       | otherwise	     = CoPat co_fn p ty
+
+mkHsWrapPatCo :: TcCoercion -> Pat id -> Type -> Pat id
+mkHsWrapPatCo co pat ty | isTcReflCo co = pat
+                        | otherwise     = CoPat (WpCast co) pat ty
+
+mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
+mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
+\end{code}
+l
 %************************************************************************
 %*									*
 		Bindings; with a location at the top

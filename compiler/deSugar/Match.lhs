@@ -22,6 +22,7 @@ import {-#SOURCE#-} DsExpr (dsLExpr)
 import DynFlags
 import HsSyn		
 import TcHsSyn
+import TcEvidence
 import Check
 import CoreSyn
 import Literal
@@ -36,7 +37,6 @@ import DataCon
 import MatchCon
 import MatchLit
 import Type
-import Coercion
 import TysWiredIn
 import ListSetOps
 import SrcLoc
@@ -356,8 +356,7 @@ matchCoercion (var:vars) ty (eqns@(eqn1:_))
 	; var' <- newUniqueId var (hsPatType pat)
 	; match_result <- match (var':vars) ty $
                           map (decomposeFirstPat getCoPat) eqns
-	; co' <- dsHsWrapper co
-        ; let rhs' = co' (Var var)
+        ; let rhs' = dsHsWrapper co (Var var)
 	; return (mkCoLetMatchResult (NonRec var' rhs') match_result) }
 matchCoercion _ _ _ = panic "matchCoercion"
 
@@ -919,7 +918,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     --        equating different ways of writing a coercion)
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpCast co)       (WpCast co')        = co `coreEqCoercion` co'
+    wrap (WpCast co)       (WpCast co')        = co `eq_co` co'
     wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
     wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'
     -- Enhancement: could implement equality for more wrappers
@@ -928,8 +927,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool
-    ev_term (EvId a)          (EvId b)          = a==b
-    ev_term (EvCoercionBox a) (EvCoercionBox b) = coreEqCoercion a b
+    ev_term (EvId a)       (EvId b)       = a==b
+    ev_term (EvCoercion a) (EvCoercion b) = a `eq_co` b
     ev_term _ _ = False	
 
     ---------
@@ -938,6 +937,15 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list _  []     (_:_)  = False
     eq_list _  (_:_)  []     = False
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
+
+    ---------
+    eq_co :: TcCoercion -> TcCoercion -> Bool 
+    -- Just some simple cases
+    eq_co (TcRefl t1)             (TcRefl t2)             = eqType t1 t2
+    eq_co (TcCoVarCo v1) 	  (TcCoVarCo v2)          = v1==v2
+    eq_co (TcSymCo co1)    	  (TcSymCo co2)           = co1 `eq_co` co2
+    eq_co (TcTyConAppCo tc1 cos1) (TcTyConAppCo tc2 cos2) = tc1==tc2 && eq_list eq_co cos1 cos2
+    eq_co _ _ = False
 
 patGroup :: Pat Id -> PatGroup
 patGroup (WildPat {})       	      = PgAny

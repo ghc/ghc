@@ -35,7 +35,7 @@ import TcType
 import TcUnify
 import TcHsType
 import TysWiredIn
-import Coercion
+import TcEvidence
 import StaticFlags
 import TyCon
 import DataCon
@@ -199,7 +199,7 @@ res_ty free vars.
 %************************************************************************
 
 \begin{code}
-tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (LCoercion, TcId)
+tcPatBndr :: PatEnv -> Name -> TcSigmaType -> TcM (TcCoercion, TcId)
 -- (coi, xp) = tcPatBndr penv x pat_ty
 -- Then coi : pat_ty ~ typeof(xp)
 --
@@ -211,11 +211,11 @@ tcPatBndr (PE { pe_ctxt = LetPat lookup_sig no_gen}) bndr_name pat_ty
       
   | otherwise
   = do { bndr_id <- newNoSigLetBndr no_gen bndr_name pat_ty
-       ; return (mkReflCo pat_ty, bndr_id) }
+       ; return (mkTcReflCo pat_ty, bndr_id) }
 
 tcPatBndr (PE { pe_ctxt = _lam_or_proc }) bndr_name pat_ty
   = do { bndr <- mkLocalBinder bndr_name pat_ty
-       ; return (mkReflCo pat_ty, bndr) }
+       ; return (mkTcReflCo pat_ty, bndr) }
 
 ------------
 newSigLetBndr :: LetBndrSpec -> Name -> TcSigInfo -> TcM TcId
@@ -554,14 +554,14 @@ tc_pat penv (NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
 tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- ConPatOut, SigPatOut
 
 ----------------
-unifyPatType :: TcType -> TcType -> TcM LCoercion
+unifyPatType :: TcType -> TcType -> TcM TcCoercion
 -- In patterns we want a coercion from the
 -- context type (expected) to the actual pattern type
 -- But we don't want to reverse the args to unifyType because
 -- that controls the actual/expected stuff in error messages
 unifyPatType actual_ty expected_ty
   = do { coi <- unifyType actual_ty expected_ty
-       ; return (mkSymCo coi) }
+       ; return (mkTcSymCo coi) }
 \end{code}
 
 Note [Hopping the LIE in lazy patterns]
@@ -726,14 +726,14 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
 	} }
 
 ----------------------------
-matchExpectedPatTy :: (TcRhoType -> TcM (LCoercion, a))
+matchExpectedPatTy :: (TcRhoType -> TcM (TcCoercion, a))
                     -> TcRhoType -> TcM (HsWrapper, a) 
 -- See Note [Matching polytyped patterns]
 -- Returns a wrapper : pat_ty ~ inner_ty
 matchExpectedPatTy inner_match pat_ty
   | null tvs && null theta
   = do { (co, res) <- inner_match pat_ty
-       ; return (coToHsWrapper (mkSymCo co), res) }
+       ; return (coToHsWrapper (mkTcSymCo co), res) }
        	 -- The Sym is because the inner_match returns a coercion
 	 -- that is the other way round to matchExpectedPatTy
 
@@ -749,7 +749,7 @@ matchExpectedPatTy inner_match pat_ty
 matchExpectedConTy :: TyCon  	 -- The TyCon that this data 
 		    		 -- constructor actually returns
 		   -> TcRhoType  -- The type of the pattern
-		   -> TcM (LCoercion, [TcSigmaType])
+		   -> TcM (TcCoercion, [TcSigmaType])
 -- See Note [Matching constructor patterns]
 -- Returns a coercion : T ty1 ... tyn ~ pat_ty
 -- This is the same way round as matchExpectedListTy etc
@@ -764,10 +764,10 @@ matchExpectedConTy data_tc pat_ty
        ; co1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
        	     -- co1 : T (ty1,ty2) ~ pat_ty
 
-       ; let co2 = mkAxInstCo co_tc tys
+       ; let co2 = mkTcAxInstCo co_tc tys
        	     -- co2 : T (ty1,ty2) ~ T7 ty1 ty2
 
-       ; return (mkSymCo co2 `mkTransCo` co1, tys) }
+       ; return (mkTcSymCo co2 `mkTcTransCo` co1, tys) }
 
   | otherwise
   = matchExpectedTyConApp data_tc pat_ty

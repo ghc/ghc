@@ -14,7 +14,6 @@ module TcSimplify(
 
 #include "HsVersions.h"
 
-import HsSyn	       
 import TcRnMonad
 import TcErrors
 import TcMType
@@ -26,7 +25,7 @@ import Unify	( niFixTvSubst, niSubstTvSet )
 import Var
 import VarSet
 import VarEnv 
-import Coercion
+import TcEvidence
 import TypeRep
 import Name
 import NameEnv	( emptyNameEnv )
@@ -1046,7 +1045,7 @@ solveCTyFunEqs cts
       ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
   where
     solve_one (cv,tv,ty) = do { setWantedTyBind tv ty
-                              ; _ <- setEqBind cv (mkReflCo ty) $
+                              ; _ <- setEqBind cv (mkTcReflCo ty) $
                                        (Wanted $ panic "Met an already solved function equality!")
                               ; return () -- Don't care about flavors etc this is
                                           -- the last thing happening

@@ -120,7 +120,7 @@ deSugar hsc_env
                               else return (binds, hpcInfo, emptyModBreaks)
 
                      initDs hsc_env mod rdr_env type_env $ do
-                       do { ds_ev_binds <- dsEvBinds ev_binds
+                       do { let ds_ev_binds = dsEvBinds ev_binds
                           ; core_prs <- dsTopLHsBinds binds_cvr
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords

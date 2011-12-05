@@ -88,6 +88,7 @@ module TcRnTypes(
 
 import HsSyn
 import HscTypes
+import TcEvidence( EvBind, EvBindsVar, EvTerm )
 import Type
 import Class    ( Class )
 import TyCon    ( TyCon )
@@ -1348,6 +1349,9 @@ data SkolemInfo
 
   | BracketSkol         -- Template Haskell bracket
 
+  | UnifyForAllSkol     -- We are unifying two for-all types
+       TcType
+
   | UnkSkol             -- Unhelpful info (until I improve it)
 
 instance Outputable SkolemInfo where
@@ -1376,6 +1380,7 @@ pprSkolInfo (PatSkol dc mc)  = sep [ ptext (sLit "a pattern with constructor")
 pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
                                   , vcat [ ppr name <+> dcolon <+> ppr ty
                                          | (name,ty) <- ids ]]
+pprSkolInfo (UnifyForAllSkol ty) = ptext (sLit "the type") <+> ppr ty
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.  

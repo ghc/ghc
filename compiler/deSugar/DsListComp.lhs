@@ -19,6 +19,7 @@ import TcHsSyn
 import CoreSyn
 import MkCore
 
+import TcEvidence
 import DsMonad          -- the monadery used in the desugarer
 import DsUtils
 

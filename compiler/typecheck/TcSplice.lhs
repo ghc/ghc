@@ -55,6 +55,7 @@ import Class
 import Inst
 import TyCon
 import DataCon
+import TcEvidence( TcEvBinds(..) )
 import Id
 import IdInfo
 import DsMeta

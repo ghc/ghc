@@ -38,7 +38,7 @@ import Module
 import HscTypes
 import ErrUtils
 import DynFlags
-import HsSyn hiding ((<.>))
+import HsSyn
 import Finder
 import HeaderInfo
 import TcIface		( typecheckIface )

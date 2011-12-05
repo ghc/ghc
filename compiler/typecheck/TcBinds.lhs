@@ -21,6 +21,7 @@ import TcRnMonad
 import TcEnv
 import TcUnify
 import TcSimplify
+import TcEvidence
 import TcHsType
 import TcPat
 import TcMType

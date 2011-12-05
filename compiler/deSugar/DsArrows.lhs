@@ -32,6 +32,7 @@ import TcHsSyn
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds )
 
 import TcType
+import TcEvidence
 import Type
 import CoreSyn
 import CoreFVs

@@ -48,6 +48,7 @@ import HsSyn
 import TcHsSyn
 import TcRnMonad
 import TcEnv
+import TcEvidence
 import InstEnv
 import FunDeps
 import TcMType
@@ -223,7 +224,7 @@ instCallConstraints origin (pred : preds)
   = do  { traceTc "instCallConstraints" $ ppr (mkEqPred (ty1, ty2))
         ; co <- unifyType ty1 ty2
 	; co_fn <- instCallConstraints origin preds
-        ; return (co_fn <.> WpEvApp (EvCoercionBox co)) }
+        ; return (co_fn <.> WpEvApp (EvCoercion co)) }
 
   | otherwise
   = do	{ ev_var <- emitWanted origin pred

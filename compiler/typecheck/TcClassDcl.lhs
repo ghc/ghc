@@ -24,6 +24,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 import HsSyn
 import TcEnv
 import TcPat( addInlinePrags )
+import TcEvidence( idHsWrapper )
 import TcBinds
 import TcUnify
 import TcHsType
