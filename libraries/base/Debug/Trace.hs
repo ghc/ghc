@@ -166,7 +166,7 @@ traceEventIO msg = (return $! length msg) >> return ()
 -- availble if the program was compiled with @-prof@; otherwise
 -- 'traceStack' behaves exactly like 'trace'.  Entries in the call
 -- stack correspond to @SCC@ annotations, so it is a good idea to use
--- @-fprof-auto@ to add SCC annotations automatically.
+-- @-fprof-auto@ or @-fprof-auto-calls@ to add SCC annotations automatically.
 --
 traceStack :: String -> a -> a
 traceStack str expr = unsafePerformIO $ do
