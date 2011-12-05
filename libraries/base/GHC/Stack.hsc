@@ -105,4 +105,4 @@ whoCreated obj = do
   ccsToStrings ccs
 
 renderStack :: [String] -> String
-renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) strs
+renderStack strs = "Stack trace:" ++ concatMap ("\n  "++) (reverse strs)
