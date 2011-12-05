@@ -1136,6 +1136,11 @@ CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
 CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
+# These two are no longer generated, but we still clean them for a while
+# as they may still be in old GHC trees:
+CLEAN_FILES += includes/GHCConstants.h
+CLEAN_FILES += includes/DerivedConstants.h
+
 clean : clean_files clean_libraries
 
 .PHONY: clean_files
