@@ -145,7 +145,9 @@ emitPrimOp [res] SparkOp [arg] live = do
     stmtC (CmmAssign (CmmLocal tmp) arg)
 
     vols <- getVolatileRegs live
-    emitForeignCall' PlayRisky []
+    res' <- newTemp bWord
+    emitForeignCall' PlayRisky
+        [CmmHinted res' NoHint]
     	(CmmCallee newspark CCallConv) 
 	[   (CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint)
           , (CmmHinted arg AddrHint)  ] 

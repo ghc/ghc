@@ -223,8 +223,9 @@ emitPrimOp [res] SparkOp [arg]
         -- refer to arg twice (once to pass to newSpark(), and once to
         -- assign to res), so put it in a temporary.
         tmp <- assignTemp arg
+        tmp2 <- newTemp bWord
         emitCCall
-            []
+            [(tmp2,NoHint)]
             (CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
             [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
         emit (mkAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
