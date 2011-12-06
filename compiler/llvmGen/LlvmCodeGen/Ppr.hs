@@ -66,8 +66,8 @@ moduleLayout =
 
 -- | Header code for LLVM modules
 pprLlvmHeader :: Doc
-pprLlvmHeader = moduleLayout
-
+pprLlvmHeader =
+    moduleLayout $+$ ppLlvmFunctionDecls (map snd ghcInternalFunctions)
 
 -- | Pretty print LLVM data code
 pprLlvmData :: LlvmData -> Doc

@@ -13,6 +13,7 @@ module LlvmCodeGen.Base (
 
         LlvmEnv, initLlvmEnv, clearVars, varLookup, varInsert,
         funLookup, funInsert, getLlvmVer, setLlvmVer, getLlvmPlatform,
+        ghcInternalFunctions,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
@@ -154,27 +155,48 @@ type LlvmEnvMap = UniqFM LlvmType
 
 -- | Get initial Llvm environment.
 initLlvmEnv :: Platform -> LlvmEnv
-initLlvmEnv platform = LlvmEnv (emptyUFM, emptyUFM, defaultLlvmVersion, platform)
+initLlvmEnv platform = LlvmEnv (initFuncs, emptyUFM, defaultLlvmVersion, platform)
+    where initFuncs = listToUFM $ [ (n, LMFunction ty) | (n, ty) <- ghcInternalFunctions ]
+
+-- | Here we pre-initialise some functions that are used internally by GHC
+-- so as to make sure they have the most general type in the case that
+-- user code also uses these functions but with a different type than GHC
+-- internally. (Main offender is treating return type as 'void' instead of
+-- 'void *'. Fixes trac #5486.
+ghcInternalFunctions :: [(LMString, LlvmFunctionDecl)]
+ghcInternalFunctions =
+    [ mk "memcpy" i8Ptr [i8Ptr, i8Ptr, llvmWord]
+    , mk "memmove" i8Ptr [i8Ptr, i8Ptr, llvmWord]
+    , mk "memset" i8Ptr [i8Ptr, llvmWord, llvmWord]
+    , mk "newSpark" llvmWord [i8Ptr, i8Ptr]
+    ]
+  where
+    mk n ret args =
+        let n' = fsLit n
+        in (n', LlvmFunctionDecl n' ExternallyVisible CC_Ccc ret
+                                 FixedArgs (tysToParams args) Nothing)
 
 -- | Clear variables from the environment.
 clearVars :: LlvmEnv -> LlvmEnv
 clearVars (LlvmEnv (e1, _, n, p)) = {-# SCC "llvm_env_clear" #-}
     LlvmEnv (e1, emptyUFM, n, p)
 
--- | Insert functions into the environment.
+-- | Insert local variables into the environment.
 varInsert :: Uniquable key => key -> LlvmType -> LlvmEnv -> LlvmEnv
 varInsert s t (LlvmEnv (e1, e2, n, p)) = {-# SCC "llvm_env_vinsert" #-}
     LlvmEnv (e1, addToUFM e2 s t, n, p)
 
+-- | Insert functions into the environment.
 funInsert :: Uniquable key => key -> LlvmType -> LlvmEnv -> LlvmEnv
 funInsert s t (LlvmEnv (e1, e2, n, p)) = {-# SCC "llvm_env_finsert" #-}
     LlvmEnv (addToUFM e1 s t, e2, n, p)
 
--- | Lookup functions in the environment.
+-- | Lookup local variables in the environment.
 varLookup :: Uniquable key => key -> LlvmEnv -> Maybe LlvmType
 varLookup s (LlvmEnv (_, e2, _, _)) = {-# SCC "llvm_env_vlookup" #-}
     lookupUFM e2 s
 
+-- | Lookup functions in the environment.
 funLookup :: Uniquable key => key -> LlvmEnv -> Maybe LlvmType
 funLookup s (LlvmEnv (e1, _, _, _)) = {-# SCC "llvm_env_flookup" #-}
     lookupUFM e1 s
