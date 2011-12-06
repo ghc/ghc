@@ -7,4 +7,6 @@ setTestOpts(f)
 
 test('5054', reqlib('hmatrix'), compile, ['-package hmatrix'])
 test('5054_2', reqlib('hmatrix'), compile, ['-package hmatrix'])
+test('5486', normal, compile, [''])
+test('5681', normal, compile, [''])
 
