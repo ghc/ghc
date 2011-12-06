@@ -7,25 +7,19 @@ The Code Generator
 
 This module says how things get going at the top level.
 
-@codeGen@ is the interface to the outside world.  The \tr{cgTop*}
+@codeGen@ is the interface to the outside world. The \tr{cgTop*}
 functions drive the mangling of top-level bindings.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 module CodeGen ( codeGen ) where
 
 #include "HsVersions.h"
 
--- Kludge (??) so that CgExpr is reached via at least one non-SOURCE
--- import.  Before, that wasn't the case, and CM therefore didn't 
+-- Required so that CgExpr is reached via at least one non-SOURCE
+-- import. Before, that wasn't the case, and CM therefore didn't
 -- bother to compile it.
-import CgExpr           ( {-NOTHING!-} )	-- DO NOT DELETE THIS IMPORT
+import CgExpr ( {-NOTHING!-} ) -- DO NOT DELETE THIS IMPORT
 import CgProf
 import CgMonad
 import CgBindery
@@ -51,39 +45,30 @@ import TyCon
 import Module
 import ErrUtils
 import Panic
-\end{code}
 
-\begin{code}
 codeGen :: DynFlags
-	-> Module
-	-> [TyCon]
-        -> CollectedCCs         -- (Local/global) cost-centres needing declaring/registering.
-	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
-	-> HpcInfo
-        -> IO [CmmGroup]          -- Output
+        -> Module                     -- Module we are compiling
+        -> [TyCon]                    -- Type constructors
+        -> CollectedCCs               -- (Local/global) cost-centres needing declaring/registering.
+        -> [(StgBinding,[(Id,[Id])])] -- Bindings to convert, with SRTs
+        -> HpcInfo                    -- Profiling info
+        -> IO [CmmGroup]
+              -- N.B. returning '[Cmm]' and not 'Cmm' here makes it
+              -- possible for object splitting to split up the
+              -- pieces later.
 
-                -- N.B. returning '[Cmm]' and not 'Cmm' here makes it
-                -- possible for object splitting to split up the
-                -- pieces later.
-
-codeGen dflags this_mod data_tycons cost_centre_info stg_binds hpc_info
-  = do	
-  { showPass dflags "CodeGen"
-
--- Why?
---   ; mapM_ (\x -> seq x (return ())) data_tycons
-
-  ; code_stuff <- initC dflags this_mod $ do 
-		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
-		; cmm_tycons <- mapM cgTyCon data_tycons
-		; cmm_init   <- getCmm (mkModuleInit dflags cost_centre_info 
-                                             this_mod hpc_info)
-                ; return (cmm_init : cmm_binds ++ cmm_tycons)
-		}
-		-- Put datatype_stuff after code_stuff, because the
-		-- datatype closure table (for enumeration types) to
-		-- (say) PrelBase_True_closure, which is defined in
-		-- code_stuff
+codeGen dflags this_mod data_tycons cost_centre_info stg_binds hpc_info = do
+    showPass dflags "CodeGen"
+    code_stuff <-
+        initC dflags this_mod $ do
+            cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
+            cmm_tycons <- mapM cgTyCon data_tycons
+            cmm_init   <- getCmm (mkModuleInit dflags cost_centre_info this_mod hpc_info)
+            return (cmm_init : cmm_binds ++ cmm_tycons)
+                -- Put datatype_stuff after code_stuff, because the
+                -- datatype closure table (for enumeration types) to
+                -- (say) PrelBase_True_closure, which is defined in
+                -- code_stuff
 
                 -- Note [codegen-split-init] the cmm_init block must
                 -- come FIRST.  This is because when -split-objs is on
@@ -91,24 +76,23 @@ codeGen dflags this_mod data_tycons cost_centre_info stg_binds hpc_info
                 -- initialisation routines; see Note
                 -- [pipeline-split-init].
 
-  ; dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms (targetPlatform dflags) code_stuff)
-
-  ; return code_stuff }
+    dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms (targetPlatform dflags) code_stuff)
+    return code_stuff
 
 mkModuleInit
         :: DynFlags
-	-> CollectedCCs         -- cost centre info
-	-> Module
+        -> CollectedCCs         -- cost centre info
+        -> Module
         -> HpcInfo
-	-> Code
+        -> Code
 
 mkModuleInit dflags cost_centre_info this_mod hpc_info
-  = do	{ -- Allocate the static boolean that records if this
+  = do  { -- Allocate the static boolean that records if this
         ; whenC (opt_Hpc) $
               hpcTable this_mod hpc_info
 
-        ; whenC (opt_SccProfilingOn) $ do 
-	    initCostCentres cost_centre_info
+        ; whenC (opt_SccProfilingOn) $ do
+            initCostCentres cost_centre_info
 
             -- For backwards compatibility: user code may refer to this
             -- label for calling hs_add_root().
@@ -133,15 +117,15 @@ initCostCentres :: CollectedCCs -> Code
 initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
   | not opt_SccProfilingOn = nopC
   | otherwise
-  = do	{ mapM_ emitCostCentreDecl  	 local_CCs
-	; mapM_ emitCostCentreStackDecl  singleton_CCSs
+  = do  { mapM_ emitCostCentreDecl       local_CCs
+        ; mapM_ emitCostCentreStackDecl  singleton_CCSs
         }
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[codegen-top-bindings]{Converting top-level STG bindings}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 @cgTopBinding@ is only used for top-level bindings, since they need
@@ -157,45 +141,45 @@ variable.
 \begin{code}
 cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> Code
 cgTopBinding dflags (StgNonRec id rhs, srts)
-  = do	{ id' <- maybeExternaliseId dflags id
-	; mapM_ (mkSRT [id']) srts
-	; (id,info) <- cgTopRhs id' rhs
-	; addBindC id info 	-- Add the *un-externalised* Id to the envt,
-				-- so we find it when we look up occurrences
-	}
+  = do  { id' <- maybeExternaliseId dflags id
+        ; mapM_ (mkSRT [id']) srts
+        ; (id,info) <- cgTopRhs id' rhs
+        ; addBindC id info      -- Add the *un-externalised* Id to the envt,
+                                -- so we find it when we look up occurrences
+        }
 
 cgTopBinding dflags (StgRec pairs, srts)
-  = do	{ let (bndrs, rhss) = unzip pairs
-	; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
-	; let pairs' = zip bndrs' rhss
-	; mapM_ (mkSRT bndrs')  srts
-	; _new_binds <- fixC (\ new_binds -> do 
-		{ addBindsC new_binds
-		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
-	; nopC }
+  = do  { let (bndrs, rhss) = unzip pairs
+        ; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
+        ; let pairs' = zip bndrs' rhss
+        ; mapM_ (mkSRT bndrs')  srts
+        ; _new_binds <- fixC (\ new_binds -> do
+                { addBindsC new_binds
+                ; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
+        ; nopC }
 
 mkSRT :: [Id] -> (Id,[Id]) -> Code
 mkSRT _ (_,[])  = nopC
 mkSRT these (id,ids)
-  = do	{ ids <- mapFCs remap ids
-	; id  <- remap id
-	; emitRODataLits "CodeGen.mkSRT" (mkSRTLabel (idName id) (idCafInfo id)) 
-	       (map (\id -> CmmLabel $ mkClosureLabel (idName id) (idCafInfo id)) ids)
-	}
+  = do  { ids <- mapFCs remap ids
+        ; id  <- remap id
+        ; emitRODataLits "CodeGen.mkSRT" (mkSRTLabel (idName id) (idCafInfo id))
+               (map (\id -> CmmLabel $ mkClosureLabel (idName id) (idCafInfo id)) ids)
+        }
   where
-	-- Sigh, better map all the ids against the environment in 
-	-- case they've been externalised (see maybeExternaliseId below).
+        -- Sigh, better map all the ids against the environment in
+        -- case they've been externalised (see maybeExternaliseId below).
     remap id = case filter (==id) these of
-		(id':_) -> returnFC id'
-		[] -> do { info <- getCgIdInfo id; return (cgIdInfoId info) }
+                (id':_) -> returnFC id'
+                [] -> do { info <- getCgIdInfo id; return (cgIdInfoId info) }
 
 -- Urgh!  I tried moving the forkStatics call from the rhss of cgTopRhs
 -- to enclose the listFCs in cgTopBinding, but that tickled the
 -- statics "error" call in initC.  I DON'T UNDERSTAND WHY!
 
 cgTopRhs :: Id -> StgRhs -> FCode (Id, CgIdInfo)
-	-- The Id is passed along for setting up a binding...
-	-- It's already been externalised if necessary
+        -- The Id is passed along for setting up a binding...
+        -- It's already been externalised if necessary
 
 cgTopRhs bndr (StgRhsCon _cc con args)
   = forkStatics (cgTopRhsCon bndr con args)
@@ -209,9 +193,9 @@ cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Stuff to support splitting}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 If we're splitting the object, we need to externalise all the top-level names
@@ -221,18 +205,18 @@ which refers to this name).
 \begin{code}
 maybeExternaliseId :: DynFlags -> Id -> FCode Id
 maybeExternaliseId dflags id
-  | dopt Opt_SplitObjs dflags, 	-- Externalise the name for -split-objs
+  | dopt Opt_SplitObjs dflags,  -- Externalise the name for -split-objs
     isInternalName name = do { mod <- getModuleName
-			     ; returnFC (setIdName id (externalise mod)) }
-  | otherwise		= returnFC id
+                             ; returnFC (setIdName id (externalise mod)) }
+  | otherwise           = returnFC id
   where
     externalise mod = mkExternalName uniq mod new_occ loc
     name    = idName id
     uniq    = nameUnique name
     new_occ = mkLocalOcc uniq (nameOccName name)
     loc     = nameSrcSpan name
-	-- We want to conjure up a name that can't clash with any
-	-- existing name.  So we generate
-	--	Mod_$L243foo
-	-- where 243 is the unique.
+        -- We want to conjure up a name that can't clash with any
+        -- existing name.  So we generate
+        --      Mod_$L243foo
+        -- where 243 is the unique.
 \end{code}
