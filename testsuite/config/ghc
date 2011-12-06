@@ -68,7 +68,7 @@ config.way_flags = {
     'optasm'       : ['-O', '-fasm'],
     'llvm'         : ['-fllvm'],
     'optllvm'      : ['-O', '-fllvm'],
-    'debugllvm'    : ['-fllvm' '-keep-llvm-files'],
+    'debugllvm'    : ['-fllvm', '-keep-llvm-files'],
     'prof'         : ['-prof', '-auto-all', '-fasm'],
     'profasm'      : ['-O', '-prof', '-auto-all'],
     'profthreaded' : ['-O', '-prof', '-auto-all', '-threaded'],
