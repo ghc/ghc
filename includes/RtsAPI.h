@@ -181,32 +181,44 @@ HsBool       rts_getBool      ( HaskellObj );
    The versions ending in '_' allow you to specify an initial stack size.
    Note that these calls may cause Garbage Collection, so all HaskellObj
    references are rendered invalid by these calls.
+
+   All of these functions take a (Capability **) - there is a
+   Capability pointer both input and output.  We use an inout
+   parameter because this is less error-prone for the client than a
+   return value - the client could easily forget to use the return
+   value, whereas incorrectly using an inout parameter will usually
+   result in a type error.
    ------------------------------------------------------------------------- */
-Capability * 
-rts_eval (Capability *, HaskellObj p, /*out*/HaskellObj *ret);
 
-Capability * 
-rts_eval_ (Capability *, HaskellObj p, unsigned int stack_size, 
-	   /*out*/HaskellObj *ret);
+void rts_eval (/* inout */ Capability **,
+               /* in    */ HaskellObj p,
+               /* out */   HaskellObj *ret);
 
-Capability * 
-rts_evalIO (Capability *, HaskellObj p, /*out*/HaskellObj *ret);
+void rts_eval_ (/* inout */ Capability **,
+                /* in    */ HaskellObj p,
+                /* in    */ unsigned int stack_size,
+                /* out   */ HaskellObj *ret);
 
-Capability *
-rts_evalStableIO (Capability *, HsStablePtr s, /*out*/HsStablePtr *ret);
+void rts_evalIO (/* inout */ Capability **,
+                 /* in    */ HaskellObj p,
+                 /* out */   HaskellObj *ret);
 
-Capability * 
-rts_evalLazyIO (Capability *, HaskellObj p, /*out*/HaskellObj *ret);
+void rts_evalStableIO (/* inout */ Capability **,
+                       /* in    */ HsStablePtr s,
+                       /* out */   HsStablePtr *ret);
 
-Capability * 
-rts_evalLazyIO_ (Capability *, HaskellObj p, unsigned int stack_size, 
-		 /*out*/HaskellObj *ret);
+void rts_evalLazyIO (/* inout */ Capability **,
+                     /* in    */ HaskellObj p,
+                     /* out */   HaskellObj *ret);
 
-void
-rts_checkSchedStatus (char* site, Capability *);
+void rts_evalLazyIO_ (/* inout */ Capability **,
+                      /* in    */ HaskellObj p,
+                      /* in    */ unsigned int stack_size,
+                      /* out   */ HaskellObj *ret);
 
-SchedulerStatus
-rts_getSchedStatus (Capability *cap);
+void rts_checkSchedStatus (char* site, Capability *);
+
+SchedulerStatus rts_getSchedStatus (Capability *cap);
 
 /* --------------------------------------------------------------------------
    Wrapper closures

@@ -77,7 +77,7 @@ static snEntry *stable_ptr_free = NULL;
 static unsigned int SPT_size = 0;
 
 #ifdef THREADED_RTS
-static Mutex stable_mutex;
+Mutex stable_mutex;
 #endif
 
 static void enlargeStablePtrTable(void);

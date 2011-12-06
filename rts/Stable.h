@@ -33,6 +33,11 @@ void    updateStablePtrTable  ( rtsBool full );
 void    stablePtrPreGC        ( void );
 void    stablePtrPostGC       ( void );
 
+#ifdef THREADED_RTS
+// needed by Schedule.c:forkProcess()
+extern Mutex stable_mutex;
+#endif
+
 #include "EndPrivate.h"
 
 #endif /* STABLE_H */

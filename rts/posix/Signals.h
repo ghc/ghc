@@ -24,7 +24,7 @@ extern siginfo_t *next_pending_handler;
 void startSignalHandlers(Capability *cap);
 #endif
 
-Capability *ioManagerStartCap (Capability *cap);
+void ioManagerStartCap (/* inout */ Capability **cap);
 
 extern StgInt *signal_handlers;
 

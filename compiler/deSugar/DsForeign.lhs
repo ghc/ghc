@@ -609,8 +609,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   declareCResult
      ,   text "cap = rts_lock();"
           -- create the application + perform it.
-     ,   ptext (sLit "cap=rts_evalIO") <> parens (
-                cap <>
+     ,   ptext (sLit "rts_evalIO") <> parens (
+                char '&' <> cap <>
                 ptext (sLit "rts_apply") <> parens (
                     cap <>
                     text "(HaskellObj)"

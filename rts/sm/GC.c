@@ -259,7 +259,7 @@ GarbageCollect (rtsBool force_major_gc,
    * We don't try to parallelise minor GCs (unless the user asks for
    * it with +RTS -gn0), or mark/compact/sweep GC.
    */
-  if (gc_type == PENDING_GC_PAR) {
+  if (gc_type == SYNC_GC_PAR) {
       n_gc_threads = RtsFlags.ParFlags.nNodes;
   } else {
       n_gc_threads = 1;

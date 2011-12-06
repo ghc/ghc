@@ -40,8 +40,12 @@ Capability *capabilities = NULL;
 // locking, so we don't do that.
 Capability *last_free_capability = NULL;
 
-/* GC indicator, in scope for the scheduler, init'ed to false */
-volatile StgWord waiting_for_gc = 0;
+/*
+ * Indicates that the RTS wants to synchronise all the Capabilities
+ * for some reason.  All Capabilities should stop and return to the
+ * scheduler.
+ */
+volatile StgWord pending_sync = 0;
 
 /* Let foreign code get the current Capability -- assuming there is one!
  * This is useful for unsafe foreign calls because they are called with
@@ -422,12 +426,11 @@ releaseCapability_ (Capability* cap,
 	return;
     }
 
-    if (waiting_for_gc == PENDING_GC_SEQ) {
+    if (pending_sync == SYNC_GC_SEQ || pending_sync == SYNC_FORK) {
       last_free_capability = cap; // needed?
-      debugTrace(DEBUG_sched, "GC pending, set capability %d free", cap->no);
+      debugTrace(DEBUG_sched, "sync pending, set capability %d free", cap->no);
       return;
     } 
-
 
     // If the next thread on the run queue is a bound thread,
     // give this Capability to the appropriate Task.
@@ -536,7 +539,7 @@ releaseCapabilityAndQueueWorker (Capability* cap USED_IF_THREADS)
 #endif
 
 /* ----------------------------------------------------------------------------
- * waitForReturnCapability( Task *task )
+ * waitForReturnCapability (Capability **pCap, Task *task)
  *
  * Purpose:  when an OS thread returns from an external call,
  * it calls waitForReturnCapability() (via Schedule.resumeThread())
@@ -643,7 +646,7 @@ yieldCapability (Capability** pCap, Task *task)
 {
     Capability *cap = *pCap;
 
-    if (waiting_for_gc == PENDING_GC_PAR) {
+    if (pending_sync == SYNC_GC_PAR) {
         traceEventGcStart(cap);
         gcWorkerThread(cap);
         traceEventGcEnd(cap);

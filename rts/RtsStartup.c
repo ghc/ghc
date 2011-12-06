@@ -431,7 +431,7 @@ static void flushStdHandles(void)
 {
     Capability *cap;
     cap = rts_lock();
-    cap = rts_evalIO(cap, flushStdHandles_closure, NULL);
+    rts_evalIO(&cap, flushStdHandles_closure, NULL);
     rts_unlock(cap);
 }
 

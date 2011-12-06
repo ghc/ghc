@@ -421,36 +421,39 @@ createStrictIOThread(Capability *cap, nat stack_size,  StgClosure *closure)
    Evaluating Haskell expressions
    ------------------------------------------------------------------------- */
 
-Capability *
-rts_eval (Capability *cap, HaskellObj p, /*out*/HaskellObj *ret)
+void rts_eval (/* inout */ Capability **cap,
+               /* in    */ HaskellObj p,
+               /* out */   HaskellObj *ret)
 {
     StgTSO *tso;
     
-    tso = createGenThread(cap, RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret,cap);
+    tso = createGenThread(*cap, RtsFlags.GcFlags.initialStkSize, p);
+    scheduleWaitThread(tso,ret,cap);
 }
 
-Capability *
-rts_eval_ (Capability *cap, HaskellObj p, unsigned int stack_size, 
-	   /*out*/HaskellObj *ret)
+void rts_eval_ (/* inout */ Capability **cap,
+                /* in    */ HaskellObj p,
+                /* in    */ unsigned int stack_size,
+                /* out   */ HaskellObj *ret)
 {
     StgTSO *tso;
 
-    tso = createGenThread(cap, stack_size, p);
-    return scheduleWaitThread(tso,ret,cap);
+    tso = createGenThread(*cap, stack_size, p);
+    scheduleWaitThread(tso,ret,cap);
 }
 
 /*
  * rts_evalIO() evaluates a value of the form (IO a), forcing the action's
  * result to WHNF before returning.
  */
-Capability *
-rts_evalIO (Capability *cap, HaskellObj p, /*out*/HaskellObj *ret)
+void rts_evalIO (/* inout */ Capability **cap,
+                 /* in    */ HaskellObj p,
+                 /* out */   HaskellObj *ret)
 {
     StgTSO* tso; 
     
-    tso = createStrictIOThread(cap, RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret,cap);
+    tso = createStrictIOThread(*cap, RtsFlags.GcFlags.initialStkSize, p);
+    scheduleWaitThread(tso,ret,cap);
 }
 
 /*
@@ -459,49 +462,50 @@ rts_evalIO (Capability *cap, HaskellObj p, /*out*/HaskellObj *ret)
  * action's result to WHNF before returning.  The result is returned
  * in a StablePtr.
  */
-Capability *
-rts_evalStableIO (Capability *cap, HsStablePtr s, /*out*/HsStablePtr *ret)
+void rts_evalStableIO (/* inout */ Capability **cap,
+                       /* in    */ HsStablePtr s,
+                       /* out */   HsStablePtr *ret)
 {
     StgTSO* tso;
     StgClosure *p, *r;
     SchedulerStatus stat;
-    
+
     p = (StgClosure *)deRefStablePtr(s);
-    tso = createStrictIOThread(cap, RtsFlags.GcFlags.initialStkSize, p);
+    tso = createStrictIOThread(*cap, RtsFlags.GcFlags.initialStkSize, p);
     // async exceptions are always blocked by default in the created
     // thread.  See #1048.
     tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
-    cap = scheduleWaitThread(tso,&r,cap);
-    stat = rts_getSchedStatus(cap);
+    scheduleWaitThread(tso,&r,cap);
+    stat = rts_getSchedStatus(*cap);
 
     if (stat == Success && ret != NULL) {
 	ASSERT(r != NULL);
 	*ret = getStablePtr((StgPtr)r);
     }
-
-    return cap;
 }
 
 /*
  * Like rts_evalIO(), but doesn't force the action's result.
  */
-Capability *
-rts_evalLazyIO (Capability *cap, HaskellObj p, /*out*/HaskellObj *ret)
+void rts_evalLazyIO (/* inout */ Capability **cap,
+                     /* in    */ HaskellObj p,
+                     /* out */   HaskellObj *ret)
 {
     StgTSO *tso;
 
-    tso = createIOThread(cap, RtsFlags.GcFlags.initialStkSize, p);
-    return scheduleWaitThread(tso,ret,cap);
+    tso = createIOThread(*cap, RtsFlags.GcFlags.initialStkSize, p);
+    scheduleWaitThread(tso,ret,cap);
 }
 
-Capability *
-rts_evalLazyIO_ (Capability *cap, HaskellObj p, unsigned int stack_size, 
-		 /*out*/HaskellObj *ret)
+void rts_evalLazyIO_ (/* inout */ Capability **cap,
+                      /* in    */ HaskellObj p,
+                      /* in    */ unsigned int stack_size,
+                      /* out   */ HaskellObj *ret)
 {
     StgTSO *tso;
 
-    tso = createIOThread(cap, stack_size, p);
-    return scheduleWaitThread(tso,ret,cap);
+    tso = createIOThread(*cap, stack_size, p);
+    scheduleWaitThread(tso,ret,cap);
 }
 
 /* Convenience function for decoding the returned status. */
