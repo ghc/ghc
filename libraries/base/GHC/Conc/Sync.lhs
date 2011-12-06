@@ -49,6 +49,7 @@ module GHC.Conc.Sync
         , forkOnWithUnmask
         , numCapabilities -- :: Int
         , getNumCapabilities -- :: IO Int
+        , setNumCapabilities -- :: Int -> IO ()
         , numSparks      -- :: IO Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId
@@ -299,6 +300,21 @@ getNumCapabilities :: IO Int
 getNumCapabilities = do
    n <- peek n_capabilities
    return (fromIntegral n)
+
+{- |
+Set the number of Haskell threads that can run truly simultaneously
+(on separate physical processors) at any given time.
+
+GHC notes: in the current implementation, the value may only be
+/increased/, not decreased, by calling 'setNumCapabilities'.  The
+initial value is given by the @+RTS -N@ flag, and the current value
+may be obtained using 'getNumCapabilities'.
+-}
+setNumCapabilities :: Int -> IO ()
+setNumCapabilities i = c_setNumCapabilities (fromIntegral i)
+
+foreign import ccall safe "setNumCapabilities"
+  c_setNumCapabilities :: CUInt -> IO ()
 
 -- | Returns the number of sparks currently in the local spark pool
 numSparks :: IO Int
