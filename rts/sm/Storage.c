@@ -60,7 +60,7 @@ nursery *nurseries = NULL;     /* array of nurseries, size == n_capabilities */
 Mutex sm_mutex;
 #endif
 
-static void allocNurseries ( void );
+static void allocNurseries (nat from, nat to);
 
 static void
 initGeneration (generation *gen, int g)
@@ -94,7 +94,7 @@ initGeneration (generation *gen, int g)
 void
 initStorage( void )
 {
-    nat g, n;
+  nat g;
 
   if (generations != NULL) {
       // multi-init protection
@@ -146,9 +146,6 @@ initStorage( void )
   g0 = &generations[0];
   oldest_gen = &generations[RtsFlags.GcFlags.generations-1];
 
-  nurseries = stgMallocBytes(n_capabilities * sizeof(struct nursery_),
-                             "initStorage: nurseries");
-  
   /* Set up the destination pointers in each younger gen. step */
   for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
       generations[g].to = &generations[g+1];
@@ -168,14 +165,6 @@ initStorage( void )
 
   generations[0].max_blocks = 0;
 
-  /* The allocation area.  Policy: keep the allocation area
-   * small to begin with, even if we have a large suggested heap
-   * size.  Reason: we're going to do a major collection first, and we
-   * don't want it to be a big one.  This vague idea is borne out by 
-   * rigorous experimental evidence.
-   */
-  allocNurseries();
-
   weak_ptr_list = NULL;
   caf_list = END_OF_STATIC_LIST;
   revertible_caf_list = END_OF_STATIC_LIST;
@@ -192,19 +181,43 @@ initStorage( void )
 
   N = 0;
 
-  // allocate a block for each mut list
-  for (n = 0; n < n_capabilities; n++) {
-      for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-          capabilities[n].mut_lists[g] = allocBlock();
-      }
-  }
-
-  initGcThreads();
+  storageAddCapabilities(0, n_capabilities);
 
   IF_DEBUG(gc, statDescribeGens());
 
   RELEASE_SM_LOCK;
 }
+
+void storageAddCapabilities (nat from, nat to)
+{
+    nat n, g;
+
+    if (from > 0) {
+        nurseries = stgReallocBytes(nurseries, to * sizeof(struct nursery_),
+                                    "storageAddCapabilities");
+    } else {
+        nurseries = stgMallocBytes(to * sizeof(struct nursery_),
+                                    "storageAddCapabilities");
+    }
+
+    /* The allocation area.  Policy: keep the allocation area
+     * small to begin with, even if we have a large suggested heap
+     * size.  Reason: we're going to do a major collection first, and we
+     * don't want it to be a big one.  This vague idea is borne out by
+     * rigorous experimental evidence.
+     */
+    allocNurseries(from, to);
+
+    // allocate a block for each mut list
+    for (n = from; n < to; n++) {
+        for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
+            capabilities[n].mut_lists[g] = allocBlock();
+        }
+    }
+
+    initGcThreads(from, to);
+}
+
 
 void
 exitStorage (void)
@@ -445,11 +458,11 @@ allocNursery (bdescr *tail, nat blocks)
 }
 
 static void
-assignNurseriesToCapabilities (void)
+assignNurseriesToCapabilities (nat from, nat to)
 {
     nat i;
 
-    for (i = 0; i < n_capabilities; i++) {
+    for (i = from; i < to; i++) {
 	capabilities[i].r.rNursery        = &nurseries[i];
 	capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
 	capabilities[i].r.rCurrentAlloc   = NULL;
@@ -457,17 +470,17 @@ assignNurseriesToCapabilities (void)
 }
 
 static void
-allocNurseries( void )
+allocNurseries (nat from, nat to)
 { 
     nat i;
 
-    for (i = 0; i < n_capabilities; i++) {
-	nurseries[i].blocks = 
+    for (i = from; i < to; i++) {
+        nurseries[i].blocks =
             allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
 	nurseries[i].n_blocks =
             RtsFlags.GcFlags.minAllocAreaSize;
     }
-    assignNurseriesToCapabilities();
+    assignNurseriesToCapabilities(from, to);
 }
       
 lnat // words allocated
@@ -493,8 +506,7 @@ clearNurseries (void)
 void
 resetNurseries (void)
 {
-    assignNurseriesToCapabilities();
-
+    assignNurseriesToCapabilities(0, n_capabilities);
 }
 
 lnat

@@ -21,6 +21,10 @@ void initStorage(void);
 void exitStorage(void);
 void freeStorage(rtsBool free_heap);
 
+// Adding more Capabilities later: this function allocates nurseries
+// and initialises other storage-related things.
+void storageAddCapabilities (nat from, nat to);
+
 /* -----------------------------------------------------------------------------
    Storage manager state
    -------------------------------------------------------------------------- */

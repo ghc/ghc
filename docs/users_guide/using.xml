@@ -2112,8 +2112,10 @@ f "2"    = 2
     <sect2 id="parallel-options">
       <title>RTS options for SMP parallelism</title>
 
-      <para>To run a program on multiple CPUs, use the
-	RTS <option>-N</option> option:</para>
+      <para>There are two ways to run a program on multiple
+        processors:
+        call <literal>GHC.Conc.setNumCapabilities</literal> from your
+        program, or use the RTS <option>-N</option> option.</para>
 
       <variablelist>
 	<varlistentry>
@@ -2148,7 +2150,13 @@ f "2"    = 2
 
             <para>The current value of the <option>-N</option> option
               is available to the Haskell program
-              via <literal>GHC.Conc.numCapabilities</literal>.</para>
+              via <literal>GHC.Conc.getNumCapabilities</literal>, and
+              it may be changed while the program is running by
+              calling <literal>GHC.Conc.setNumCapabilities</literal>.
+              Note: in the current implementation,
+              the <option>-N</option> value may only
+              be <emphasis>increased</emphasis>, not decreased, by
+              calling <literal>GHC.Conc.setNumCapabilities</literal>.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>

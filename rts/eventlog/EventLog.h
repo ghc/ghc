@@ -26,6 +26,7 @@ void endEventLogging(void);
 void freeEventLogging(void);
 void abortEventLogging(void); // #4512 - after fork child needs to abort
 void flushEventLog(void);     // event log inherited from parent
+void moreCapEventBufs (nat from, nat to);
 
 /* 
  * Post a scheduler event to the capability's event buffer (an event

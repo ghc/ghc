@@ -622,7 +622,7 @@ stat_exit(int alloc)
                 statsPrintf("\n  Parallel GC work balance: %.2f (%ld / %ld, ideal %d)\n", 
                             (double)GC_par_avg_copied / (double)GC_par_max_copied,
                             (lnat)GC_par_avg_copied, (lnat)GC_par_max_copied,
-                            RtsFlags.ParFlags.nNodes
+                            n_capabilities
                     );
             }
 #endif

@@ -28,6 +28,7 @@ void initTracing (void);
 void endTracing  (void);
 void freeTracing (void);
 void resetTracing (void);
+void tracingAddCapapilities (nat from, nat to);
 
 #endif /* TRACING */
 

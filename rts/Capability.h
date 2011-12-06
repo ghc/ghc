@@ -165,6 +165,10 @@ regTableToCapability (StgRegTable *reg)
 //
 void initCapabilities (void);
 
+// Add and initialise more Capabilities
+//
+Capability * moreCapabilities (nat from, nat to);
+
 // Release a capability.  This is called by a Task that is exiting
 // Haskell to make a foreign call, or in various other cases when we
 // want to relinquish a Capability that we currently hold.
@@ -206,7 +210,7 @@ extern Capability *last_free_capability;
 //
 #define SYNC_GC_SEQ 1
 #define SYNC_GC_PAR 2
-#define SYNC_FORK   3
+#define SYNC_OTHER  3
 extern volatile StgWord pending_sync;
 
 // Acquires a capability at a return point.  If *cap is non-NULL, then

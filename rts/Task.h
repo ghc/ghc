@@ -235,6 +235,11 @@ void interruptWorkerTask (Task *task);
 
 #endif /* THREADED_RTS */
 
+// Update any (Capability *) pointers belonging to Tasks after the
+// Capability array is moved/resized.
+//
+void updateCapabilityRefs (void);
+
 // -----------------------------------------------------------------------------
 // INLINE functions... private from here on down:
 

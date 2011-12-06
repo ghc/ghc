@@ -57,4 +57,14 @@ extern unsigned int n_capabilities;
 extern Capability MainCapability;
 #endif
 
+//
+// Change the number of capabilities (only supports increasing the
+// current value at the moment).
+//
+#if defined(THREADED_RTS)
+extern void setNumCapabilities (nat new);
+#else
+extern void setNumCapabilities (nat new) GNU_ATTRIBUTE(__noreturn__);
+#endif
+
 #endif /* RTS_THREADS_H */

@@ -143,6 +143,13 @@ void resetTracing (void)
     }
 }
 
+void tracingAddCapapilities (nat from, nat to)
+{
+    if (eventlog_enabled) {
+        moreCapEventBufs(from,to);
+    }
+}
+
 /* ---------------------------------------------------------------------------
    Emitting trace messages/events
  --------------------------------------------------------------------------- */

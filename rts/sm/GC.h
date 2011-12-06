@@ -45,7 +45,7 @@ extern StgWord64 whitehole_spin;
 #endif
 
 void gcWorkerThread (Capability *cap);
-void initGcThreads (void);
+void initGcThreads (nat from, nat to);
 void freeGcThreads (void);
 
 #if defined(THREADED_RTS)

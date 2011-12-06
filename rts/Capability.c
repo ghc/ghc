@@ -27,6 +27,8 @@
 #include "STM.h"
 #include "RtsUtils.h"
 
+#include <string.h>
+
 // one global capability, this is the Capability for non-threaded
 // builds, and for +RTS -N1
 Capability MainCapability;
@@ -299,7 +301,6 @@ initCapabilities( void )
     traceCapsetCreate(CAPSET_CLOCKDOMAIN_DEFAULT, CapsetTypeClockdomain);
 
 #if defined(THREADED_RTS)
-    nat i;
 
 #ifndef REG_Base
     // We can't support multiple CPUs if BaseReg is not a register
@@ -309,23 +310,9 @@ initCapabilities( void )
     }
 #endif
 
+    n_capabilities = 0;
+    moreCapabilities(0, RtsFlags.ParFlags.nNodes);
     n_capabilities = RtsFlags.ParFlags.nNodes;
-
-    if (n_capabilities == 1) {
-	capabilities = &MainCapability;
-	// THREADED_RTS must work on builds that don't have a mutable
-	// BaseReg (eg. unregisterised), so in this case
-	// capabilities[0] must coincide with &MainCapability.
-    } else {
-	capabilities = stgMallocBytes(n_capabilities * sizeof(Capability),
-				      "initCapabilities");
-    }
-
-    for (i = 0; i < n_capabilities; i++) {
-	initCapability(&capabilities[i], i);
-    }
-
-    debugTrace(DEBUG_sched, "allocated %d capabilities", n_capabilities);
 
 #else /* !THREADED_RTS */
 
@@ -339,6 +326,46 @@ initCapabilities( void )
     // a worker Task to each Capability, which will quickly put the
     // Capability on the free list when it finds nothing to do.
     last_free_capability = &capabilities[0];
+}
+
+Capability *
+moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
+{
+#if defined(THREADED_RTS)
+    nat i;
+    Capability *old_capabilities = capabilities;
+
+    if (to == 1) {
+        // THREADED_RTS must work on builds that don't have a mutable
+        // BaseReg (eg. unregisterised), so in this case
+	// capabilities[0] must coincide with &MainCapability.
+        capabilities = &MainCapability;
+    } else {
+        capabilities = stgMallocBytes(to * sizeof(Capability),
+                                      "moreCapabilities");
+
+        if (from > 0) {
+            memcpy(capabilities, old_capabilities, from * sizeof(Capability));
+        }
+    }
+
+    for (i = from; i < to; i++) {
+	initCapability(&capabilities[i], i);
+    }
+
+    last_free_capability = NULL;
+
+    debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
+
+    // Return the old array to free later.
+    if (from > 1) {
+        return old_capabilities;
+    } else {
+        return NULL;
+    }
+#else
+    return NULL;
+#endif
 }
 
 /* ----------------------------------------------------------------------------
@@ -426,7 +453,10 @@ releaseCapability_ (Capability* cap,
 	return;
     }
 
-    if (pending_sync == SYNC_GC_SEQ || pending_sync == SYNC_FORK) {
+    // If there is a pending sync, then we should just leave the
+    // Capability free.  The thread trying to sync will be about to
+    // call waitForReturnCapability().
+    if (pending_sync != 0 && pending_sync != SYNC_GC_PAR) {
       last_free_capability = cap; // needed?
       debugTrace(DEBUG_sched, "sync pending, set capability %d free", cap->no);
       return;

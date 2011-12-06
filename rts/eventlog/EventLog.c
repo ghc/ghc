@@ -254,12 +254,8 @@ initEventLogging(void)
 #else
     n_caps = 1;
 #endif
-    capEventBuf = stgMallocBytes(n_caps * sizeof(EventsBuf),"initEventLogging");
+    moreCapEventBufs(0,n_caps);
 
-    for (c = 0; c < n_caps; ++c) {
-        // Init buffer for events.
-        initEventsBuf(&capEventBuf[c], EVENT_LOG_SIZE, c);
-    }
     initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
 
     // Write in buffer: the header begin marker.
@@ -417,7 +413,26 @@ endEventLogging(void)
     }
 }
 
-void 
+void
+moreCapEventBufs (nat from, nat to)
+{
+    nat c;
+
+    if (from > 0) {
+        capEventBuf = stgReallocBytes(capEventBuf, to * sizeof(EventsBuf),
+                                      "moreCapEventBufs");
+    } else {
+        capEventBuf = stgMallocBytes(to * sizeof(EventsBuf),
+                                     "moreCapEventBufs");
+    }
+
+    for (c = from; c < to; ++c) {
+        initEventsBuf(&capEventBuf[c], EVENT_LOG_SIZE, c);
+    }
+}
+
+
+void
 freeEventLogging(void)
 {
     StgWord8 c;
