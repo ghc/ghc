@@ -850,6 +850,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_readTVarIOzh)                   \
       SymI_HasProto(resumeThread)                       \
       SymI_HasProto(setNumCapabilities)                 \
+      SymI_HasProto(getNumberOfProcessors)              \
       SymI_HasProto(resolveObjs)                        \
       SymI_HasProto(stg_retryzh)                        \
       SymI_HasProto(rts_apply)                          \
