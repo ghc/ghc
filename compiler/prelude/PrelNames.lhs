@@ -1145,14 +1145,14 @@ selectorClassKey    = mkPreludeClassUnique 41
 %************************************************************************
 
 \begin{code}
-addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
+addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
     charPrimTyConKey, charTyConKey, doublePrimTyConKey, doubleTyConKey,
     floatPrimTyConKey, floatTyConKey, funTyConKey, intPrimTyConKey,
     intTyConKey, int8TyConKey, int16TyConKey, int32PrimTyConKey,
     int32TyConKey, int64PrimTyConKey, int64TyConKey,
     integerTyConKey, digitsTyConKey,
     listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
-    mutableArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
+    mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
     orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
     realWorldTyConKey, stablePtrPrimTyConKey, stablePtrTyConKey,
     anyTyConKey, eqTyConKey :: Unique
@@ -1191,6 +1191,8 @@ stablePtrPrimTyConKey                   = mkPreludeTyConUnique 35
 stablePtrTyConKey                       = mkPreludeTyConUnique 36
 anyTyConKey                             = mkPreludeTyConUnique 37
 eqTyConKey                              = mkPreludeTyConUnique 38
+arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 39
+mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 40
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,

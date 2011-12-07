@@ -826,6 +826,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_myThreadIdzh)                   \
       SymI_HasProto(stg_labelThreadzh)                  \
       SymI_HasProto(stg_newArrayzh)                     \
+      SymI_HasProto(stg_newArrayArrayzh)                     \
       SymI_HasProto(stg_newBCOzh)                       \
       SymI_HasProto(stg_newByteArrayzh)                 \
       SymI_HasProto_redirect(newCAF, newDynCAF)         \
