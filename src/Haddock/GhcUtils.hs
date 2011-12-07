@@ -78,7 +78,7 @@ isVarSym = isLexVarSym . occNameFS
 
 
 getMainDeclBinder :: HsDecl name -> [name]
-getMainDeclBinder (TyClD d) = [tcdName d]
+getMainDeclBinder (TyClD d) | not (isFamInstDecl d) = [tcdName d]
 getMainDeclBinder (ValD d) =
   case collectHsBindBinders d of
     []       -> []

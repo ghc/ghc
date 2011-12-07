@@ -36,30 +36,22 @@ renameInterface renamingEnv warnings iface =
   let localEnv = foldl fn renamingEnv (ifaceVisibleExports iface)
         where fn env name = Map.insert name (ifaceMod iface) env
 
-      docMap   = Map.map (\(_,x,_) -> x) (ifaceDeclMap iface)
-
-      -- make instance docs into 'docForDecls'
-      instDocs = [ (name, (Just doc, Map.empty))
-                 | (name, doc) <- Map.toList (ifaceInstanceDocMap iface) ]
-
-      docs     = Map.toList docMap ++ instDocs
-      renameMapElem (k,d) = do d' <- renameDocForDecl d; return (k, d')
-
       -- rename names in the exported declarations to point to things that
       -- are closer to, or maybe even exported by, the current module.
       (renamedExportItems, missingNames1)
         = runRnFM localEnv (renameExportItems (ifaceExportItems iface))
 
-      (rnDocMap, missingNames2)
-        = runRnFM localEnv (liftM Map.fromList (mapM renameMapElem docs))
+      (rnDocMap, missingNames2) = runRnFM localEnv (mapM renameDoc (ifaceDocMap iface))
 
-      (finalModuleDoc, missingNames3)
+      (rnArgMap, missingNames3) = runRnFM localEnv (mapM (mapM renameDoc) (ifaceArgMap iface))
+
+      (finalModuleDoc, missingNames4)
         = runRnFM localEnv (renameMaybeDoc (ifaceDoc iface))
 
       -- combine the missing names and filter out the built-ins, which would
       -- otherwise allways be missing.
       missingNames = nub $ filter isExternalName  -- XXX: isExternalName filters out too much
-                    (missingNames1 ++ missingNames2 ++ missingNames3)
+                    (missingNames1 ++ missingNames2 ++ missingNames3 ++ missingNames4)
 
       -- filter out certain built in type constructors using their string
       -- representation. TODO: use the Name constants from the GHC API.
@@ -77,6 +69,7 @@ renameInterface renamingEnv warnings iface =
 
     return $ iface { ifaceRnDoc         = finalModuleDoc,
                      ifaceRnDocMap      = rnDocMap,
+                     ifaceRnArgMap      = rnArgMap,
                      ifaceRnExportItems = renamedExportItems }
 
 

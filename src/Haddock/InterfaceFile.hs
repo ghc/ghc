@@ -65,9 +65,9 @@ binaryInterfaceMagic = 0xD0Cface
 -- we version our interface files accordingly.
 binaryInterfaceVersion :: Word16
 #if __GLASGOW_HASKELL__ == 702
-binaryInterfaceVersion = 18
+binaryInterfaceVersion = 19
 #elif __GLASGOW_HASKELL__ == 703
-binaryInterfaceVersion = 18
+binaryInterfaceVersion = 19
 #else
 #error Unknown GHC version
 #endif
@@ -355,10 +355,11 @@ instance Binary InterfaceFile where
 
 
 instance Binary InstalledInterface where
-  put_ bh (InstalledInterface modu info docMap exps visExps opts subMap) = do
+  put_ bh (InstalledInterface modu info docMap argMap exps visExps opts subMap) = do
     put_ bh modu
     put_ bh info
     put_ bh docMap
+    put_  bh argMap
     put_ bh exps
     put_ bh visExps
     put_ bh opts
@@ -368,12 +369,13 @@ instance Binary InstalledInterface where
     modu    <- get bh
     info    <- get bh
     docMap  <- get bh
+    argMap  <- get bh
     exps    <- get bh
     visExps <- get bh
     opts    <- get bh
     subMap  <- get bh
 
-    return (InstalledInterface modu info docMap
+    return (InstalledInterface modu info docMap argMap
             exps visExps opts subMap)
 
 
