@@ -56,6 +56,15 @@ hold a correct value (mnemonic: \"right\" also means \"correct\").
 data  Either a b  =  Left a | Right b
   deriving (Eq, Ord, Read, Show, Generic)
 
+instance Functor (Either a) where
+    fmap _ (Left x) = Left x
+    fmap f (Right y) = Right (f y)
+
+instance Monad (Either e) where
+    return = Right
+    Left  l >>= _ = Left l
+    Right r >>= k = k r
+
 -- | Case analysis for the 'Either' type.
 -- If the value is @'Left' a@, apply the first function to @a@;
 -- if it is @'Right' b@, apply the second function to @b@.

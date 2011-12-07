@@ -50,7 +50,6 @@ import Prelude hiding (id,(.))
 import Control.Category
 import Control.Arrow (Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
 import Control.Monad (liftM, ap, MonadPlus(..))
-import Control.Monad.Instances ()
 #ifndef __NHC__
 import Control.Monad.ST.Safe (ST)
 import qualified Control.Monad.ST.Lazy.Safe as Lazy (ST)
