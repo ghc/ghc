@@ -107,3 +107,9 @@ test('callstack001',
 test('callstack002',
      [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
      compile_and_run, ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
+
+# Should not stack overflow with -prof -auto-all
+test('T5363',
+     [ req_profiling, extra_ways(['prof']), only_ways(prof_ways) ],
+     compile_and_run, [''])
+
