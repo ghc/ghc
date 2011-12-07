@@ -2,26 +2,34 @@
 module Main (main) where
 
 import Control.Monad
+import qualified Data.ByteString.Char8 as BSC
 import Data.Function
 import Data.List
 import qualified Data.Map as Map
 import Data.Map (Map)
-import qualified Data.Set as Set
-import Data.Set (Set)
 import System.Environment
-import System.Exit
 import System.FilePath
-import System.IO
 
 data CleanWhat = CleanFile FilePath
                | CleanRec  FilePath
     deriving (Read, Show)
 
-data Tree = Node FileInfo (Map FilePath Tree)
+newtype FilePathFragment = FilePathFragment BSC.ByteString
+    deriving (Show, Eq, Ord)
+
+toFilePathFragments :: FilePath -> [FilePathFragment]
+toFilePathFragments
+    = map (FilePathFragment . BSC.pack) . splitDirectories . normalise
+
+fromFilePathFragments :: [FilePathFragment] -> FilePath
+fromFilePathFragments xs = joinPath $ map f $ reverse xs
+    where f (FilePathFragment frag) = BSC.unpack frag
+
+data Tree = Node !FileInfo !(Map FilePathFragment Tree)
 data FileInfo = FileInfo {
-                    fiBefore :: Bool,
-                    fiAfter :: Bool,
-                    fiDeleted :: Bool
+                    fiBefore :: !Bool,
+                    fiAfter :: !Bool,
+                    fiDeleted :: !Bool
                 }
 
 beforeFileInfo :: FileInfo
@@ -39,17 +47,21 @@ noFileInfo = FileInfo {
 
 readTree :: FileInfo -> FilePath -> IO (Tree)
 readTree fi fp = do xs <- readFile fp
-                    let ls = lines xs
                     return $ mkTree fi $ lines xs
 
 mkTree :: FileInfo -> [FilePath] -> Tree
-mkTree fi fps = f $ sort $ map splitDirectories $ map normalise fps
-    where f xs = let xs' = g $ groupBy ((==) `on` head)
+mkTree fi fps = f (sort fragss)
+    where fragss = map toFilePathFragments fps
+          f xs = let xs' = g $ groupBy ((==) `on` head)
                              $ filter (not . null) xs
                  in Node fi xs'
-          g xss = Map.fromList [ (head (head xs),
-                                  f (map tail xs))
+          g xss = mapFromList' [ (head (head xs), f (map tail xs))
                                | xs <- xss ]
+
+mapFromList' :: Ord a => [(a, b)] -> Map a b
+mapFromList' xs = seqAll xs `seq` Map.fromList xs
+    where seqAll [] = ()
+          seqAll ((x, y) : xys) = x `seq` y `seq` seqAll xys
 
 {-
 ... = OK: will happen if a file in a non-existant directory is rm'd [1]
@@ -67,7 +79,7 @@ BAD = suspicious: Why are we removing a file that existed before?
 -}
 pprSuspicious :: Tree -> [String]
 pprSuspicious t = f [] t
-    where f ps (Node fi m) = suspicious (joinPath (reverse ps)) fi
+    where f ps (Node fi m) = suspicious (fromFilePathFragments ps) fi
                           ++ concat [ f (p : ps) m' | (p, m') <- Map.toList m ]
           suspicious fp (FileInfo False True  False) = ["File not deleted:    " ++ show fp]
           suspicious fp (FileInfo True  False False) = ["File disappeared:    " ++ show fp]
@@ -77,7 +89,7 @@ pprSuspicious t = f [] t
 
 pprTree :: Tree -> [String]
 pprTree t = f [] t
-    where f ps (Node fi m) = (pprInfo fi ++ " " ++ joinPath (reverse ps))
+    where f ps (Node fi m) = (pprInfo fi ++ " " ++ fromFilePathFragments ps)
                            : concat [ f (p : ps) m' | (p, m') <- Map.toList m ]
 
 pprInfo :: FileInfo -> String
@@ -128,9 +140,9 @@ markSubtreeDeleted (Node fi m) = Node fi' (Map.map markSubtreeDeleted m)
                 if fiAfter fi then fi { fiDeleted = True } else fi
 
 at :: Tree -> FilePath -> (Tree -> Tree) -> Tree
-at t fp f = at' t (splitDirectories $ normalise fp) f
+at t fp f = at' t (toFilePathFragments fp) f
 
-at' :: Tree -> [FilePath] -> (Tree -> Tree) -> Tree
+at' :: Tree -> [FilePathFragment] -> (Tree -> Tree) -> Tree
 at' t           []       f = f t
 at' (Node fi m) (p : ps) f = Node fi m'
     where m' = Map.insert p (at' t ps f) m
