@@ -1031,7 +1031,7 @@ simplTick env tickish expr cont
   | not (tickishCanSplit tickish)
   = no_floating_past_tick
 
-  | Just expr' <- want_to_push_tick_inside
+  | interesting_cont, Just expr' <- push_tick_inside tickish expr
     -- see Note [case-of-scc-of-case]
   = simplExprF env expr' cont
 
@@ -1039,20 +1039,35 @@ simplTick env tickish expr cont
   = no_floating_past_tick -- was: wrap_floats, see below
 
  where
-  want_to_push_tick_inside
-     | not interesting_cont = Nothing
-     | not (tickishCanSplit tickish) = Nothing
+  interesting_cont = case cont of
+                        Select _ _ _ _ _ -> True
+                        _ -> False
+
+  push_tick_inside t expr0
+     | not (tickishCanSplit t) = Nothing
      | otherwise
-       = case expr of
+       = case expr0 of
+           Tick t' expr
+              -- scc t (tick t' E)
+              --   Pull the tick to the outside
+              -- This one is important for #5363
+              | not (tickishScoped t')
+                 -> Just (Tick t' (Tick t expr))
+
+              -- scc t (scc t' E)
+              --   Try to push t' into E first, and if that works,
+              --   try to push t in again
+              | Just expr' <- push_tick_inside t' expr
+                 -> push_tick_inside t expr'
+
+              | otherwise -> Nothing
+
            Case scrut bndr ty alts
-              -> Just (Case (mkTick tickish scrut) bndr ty alts')
-             where t_scope = mkNoTick tickish -- drop the tick on the dup'd ones
+              -> Just (Case (mkTick t scrut) bndr ty alts')
+             where t_scope = mkNoTick t -- drop the tick on the dup'd ones
                    alts'   = [ (c,bs, mkTick t_scope e) | (c,bs,e) <- alts]
            _other -> Nothing
     where
-      interesting_cont = case cont of
-                            Select _ _ _ _ _ -> True
-                            _ -> False
 
   no_floating_past_tick =
     do { let (inc,outc) = splitCont cont
