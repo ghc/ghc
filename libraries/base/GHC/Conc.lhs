@@ -40,6 +40,7 @@ module GHC.Conc
         , numCapabilities -- :: Int
         , getNumCapabilities -- :: IO Int
         , setNumCapabilities -- :: Int -> IO ()
+        , getNumProcessors   -- :: IO Int
         , numSparks       -- :: IO Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId

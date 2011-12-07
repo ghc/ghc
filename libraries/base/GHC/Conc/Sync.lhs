@@ -50,6 +50,7 @@ module GHC.Conc.Sync
         , numCapabilities -- :: Int
         , getNumCapabilities -- :: IO Int
         , setNumCapabilities -- :: Int -> IO ()
+        , getNumProcessors   -- :: IO Int
         , numSparks      -- :: IO Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId
@@ -315,6 +316,12 @@ setNumCapabilities i = c_setNumCapabilities (fromIntegral i)
 
 foreign import ccall safe "setNumCapabilities"
   c_setNumCapabilities :: CUInt -> IO ()
+
+getNumProcessors :: IO Int
+getNumProcessors = fmap fromIntegral c_getNumberOfProcessors
+
+foreign import ccall unsafe "getNumberOfProcessors"
+  c_getNumberOfProcessors :: IO CUInt
 
 -- | Returns the number of sparks currently in the local spark pool
 numSparks :: IO Int
