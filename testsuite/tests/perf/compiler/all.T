@@ -153,14 +153,14 @@ test('T4007',
      ['$MAKE -s --no-print-directory T4007'])
 
 test('T5030',
-     [# expected value: 629864032 (x86/Darwin)
+     [# expected value: 449368924 (x86/Linux)
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 450000000,
-                                                      550000000)),
-      # expected value: 1255998208 (amd64/Linux):
+          compiler_stats_num_field('bytes allocated', 400000000,
+                                                      500000000)),
+      # expected value: 902776064 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 900000000,
-                                                     1100000000)),
+          compiler_stats_num_field('bytes allocated', 800000000,
+                                                     1000000000)),
        only_ways(['normal'])
       ],
      compile,
