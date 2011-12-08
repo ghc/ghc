@@ -191,7 +191,8 @@ split :: MonadStatics m
       -> (State -> m (Deeds, Out FVedTerm))
       -> m (ResidTags, Deeds, Out FVedTerm)
 split (deeds, Heap h ids, k, qa) opt
-  = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (Heap h ids, [0..] `zip` k, \ids -> (qaScruts qa, splitQA ids (annedTag qa) (annee qa)))
+  = generaliseSplit opt ctxt_ids (IS.empty, emptyVarSet) deeds (Heap h ids, [0..] `zip` k, \ids -> (qaScruts qa, splitQA ctxt_id ids (annedTag qa) (annee qa)))
+  where (ctxt_id, ctxt_ids) = takeUniqFromSupply splitterUniqSupply
 
 -- TODO: could do instance-matching on generalised parts of terms. It would make tieback faster when generalising,
 -- at the cost of pessimising some programs
@@ -1069,11 +1070,13 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             ty' = inTermType ids in_e
     PrimApply pop tys' in_vs in_es -> zipBracketeds $ TailsUnknown (shell emptyVarSet $ primOp pop tys') (zipWith Hole (repeat []) $ bracketed_vs ++ bracketed_hole : bracketed_es)
       where -- 0) Manufacture context identifier (actually, an infinite number of them)
-            ctxt_idss = uniqsFromSupply ctxt_ids
+            (ctxt_ids0, ctxt_ids1) = splitUniqSupply ctxt_ids
+            ctxt_idss0 = uniqsFromSupply ctxt_ids0
+            ctxt_idss1 = uniqsFromSupply ctxt_ids1
             
             -- 1) Split every value and expression remaining apart
-            bracketed_vs = map (splitAnswer ids . annedToTagged) in_vs
-            bracketed_es  = zipWith (\ctxt_id in_e -> oneBracketed (inTermType ids in_e) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, [], in_e))) ctxt_idss in_es)
+            bracketed_vs = zipWith (\ctxt_id in_v -> splitAnswer ctxt_id ids (annedToTagged in_v)) ctxt_idss0 in_vs
+            bracketed_es  = zipWith (\ctxt_id in_e -> oneBracketed (inTermType ids in_e) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, [], in_e))) ctxt_idss1 in_es)
   where
     tg = tag kf
     shell = Shell (oneResidTag tg)
@@ -1102,15 +1105,15 @@ splitUpdate ids tg_kf scruts x' bracketed_hole = (x' : scruts, M.singleton x' br
                                                   oneBracketed (idType x') (Once ctxt_id, (emptyDeeds, Heap M.empty ids, [], (mkIdentityRenaming (unitVarSet x'), annedTerm tg_kf (Var x')))))
   where ctxt_id = idUnique x'
 
-splitValue :: InScopeSet -> Tag -> In AnnedValue -> Bracketed (Entered, UnnormalisedState)
-splitValue ids tg (rn, Lambda x e)   = splitLambdaLike Lambda   ids tg (rn, (x, e))
-splitValue ids tg (rn, TyLambda a e) = splitLambdaLike TyLambda ids tg (rn, (a, e))
-splitValue ids tg in_v               = noneBracketed tg (value (detagAnnedValue' $ renameIn (renameAnnedValue' ids) in_v))
+splitValue :: Unique -> InScopeSet -> Tag -> In AnnedValue -> Bracketed (Entered, UnnormalisedState)
+splitValue _       ids tg (rn, Lambda x e)   = splitLambdaLike Lambda   Many           ids tg (rn, (x, e))
+splitValue ctxt_id ids tg (rn, TyLambda a e) = splitLambdaLike TyLambda (Once ctxt_id) ids tg (rn, (a, e))
+splitValue _       ids tg in_v               = noneBracketed tg (value (detagAnnedValue' $ renameIn (renameAnnedValue' ids) in_v))
 
 -- We create LambdaBound entries in the Heap for both type and value variables, so we can share the code:
-splitLambdaLike :: (Var -> FVedTerm -> ValueF FVed)
+splitLambdaLike :: (Var -> FVedTerm -> ValueF FVed) -> Entered
                 -> InScopeSet -> Tag -> In (Var, AnnedTerm) -> Bracketed (Entered, UnnormalisedState)
-splitLambdaLike rebuild ids tg (rn, (x, e)) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) emptyVarSet $ \[e'] -> value (rebuild x' e')) [Hole [x'] $ oneBracketed (inTermType ids' in_e) (Many, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids', [], in_e))]
+splitLambdaLike rebuild entered ids tg (rn, (x, e)) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) emptyVarSet $ \[e'] -> value (rebuild x' e')) [Hole [x'] $ oneBracketed (inTermType ids' in_e) (entered, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids', [], in_e))]
   where (ids', rn', x') = renameNonRecBinder ids rn x
         in_e = (rn', e)
 
@@ -1119,12 +1122,12 @@ splitCoerced :: (a -> Bracketed (Entered, UnnormalisedState))
 splitCoerced f (Uncast,        x) = f x
 splitCoerced f (CastBy co' tg, x) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) (tyCoVarsOfCo co') $ \[e'] -> cast e' co') [Hole [] (f x)]
 
-splitQA :: InScopeSet -> Tag -> QA -> Bracketed (Entered, UnnormalisedState)
-splitQA _   tg (Question x') = noneBracketed tg (var x')
-splitQA ids tg (Answer a)    = splitCoerced (splitValue ids tg) a
+splitQA :: Unique -> InScopeSet -> Tag -> QA -> Bracketed (Entered, UnnormalisedState)
+splitQA _       _   tg (Question x') = noneBracketed tg (var x')
+splitQA ctxt_id ids tg (Answer a)    = splitCoerced (splitValue ctxt_id ids tg) a
 
-splitAnswer :: InScopeSet -> Tagged Answer -> Bracketed (Entered, UnnormalisedState)
-splitAnswer ids (Tagged tg a) = splitCoerced (splitValue ids tg) a
+splitAnswer :: Unique -> InScopeSet -> Tagged Answer -> Bracketed (Entered, UnnormalisedState)
+splitAnswer ctxt_id ids (Tagged tg a) = splitCoerced (splitValue ctxt_id ids tg) a
 
 inTermType :: InScopeSet -> In AnnedTerm -> Type
 inTermType ids = renameIn (renameType ids) . fmap termType
