@@ -23,7 +23,7 @@ instance Monoid Deeds where
     mappend = plusDeeds
 
 instance Bounded Deeds where
-    maxBound = Deeds { sizeLimit = maxBound, stepLimit = maxBound }
+    maxBound = Deeds { sizeLimit = maxBound `div` 2, stepLimit = maxBound `div` 2 } -- Try to avoid overflow :-)
     minBound = emptyDeeds
 
 emptyDeeds :: Deeds
