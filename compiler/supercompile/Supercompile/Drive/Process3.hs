@@ -98,52 +98,67 @@ fulfill p (deeds, e_body) fs = ((deeds, fun p `applyAbsVars` abstracted p), FS {
 type Depth = Int
 type StopCount = Int
 
-newtype ScpM a = ScpM { unScpM :: StateT (MemoState, ProcessHistory, FulfilmentState)
-                                         (ReaderT (Depth, StopCount, NodeKey, AlreadySpeculated) Identity) a }
+data ScpState = ScpState {
+    scpMemoState :: MemoState,
+    scpProcessHistory :: ProcessHistory,
+    scpFulfilmentState :: FulfilmentState,
+    scpResidTags :: ResidTags
+  }
+
+data ScpEnv = ScpEnv {
+    scpDepth :: Depth,
+    scpStopCount :: StopCount,
+    scpNodeKey :: NodeKey,
+    scpAlreadySpeculated :: AlreadySpeculated,
+    scpTagAnnotations :: TagAnnotations
+  }
+
+newtype ScpM a = ScpM { unScpM :: StateT ScpState
+                                         (ReaderT ScpEnv Identity) a }
                deriving (Functor, Applicative, Monad)
 
 instance MonadStatics ScpM where
     bindCapturedFloats _fvs mx = liftM ((,) []) mx -- FIXME: do something other than hope for the best
     monitorFVs = liftM ((,) emptyVarSet)
 
-runScpM :: ScpM FVedTerm -> FVedTerm
-runScpM me = letRec (fulfilments fs') e
+runScpM :: TagAnnotations -> ScpM FVedTerm -> FVedTerm
+runScpM tag_anns me = letRec (fulfilments fs') e
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
         ms = MS { promises = [], hNames = h_names }
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, (_ms', _hist', fs')) = unI $ unReaderT (unStateT (unScpM me) (ms, hist, fs)) (0, 0, parent, nothingSpeculated)
+        (e, ScpState _ms' _hist' fs' _resid_tags) = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags)) (ScpEnv 0 0 parent nothingSpeculated tag_anns)
 
 
 traceRenderM :: Outputable a => String -> a -> ScpM ()
-traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \(depth, _, _, _) -> pprTraceSC (replicate depth ' ' ++ msg) (pPrint x) $ pure ((), s) -- TODO: include depth, refine to ScpM monad only
+traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \env -> pprTraceSC (replicate (scpDepth env) ' ' ++ msg) (pPrint x) $ pure ((), s) -- TODO: include depth, refine to ScpM monad only
 
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
-fulfillM p res = ScpM $ StateT $ \(ms, hist, fs) -> case fulfill p res fs of (res', fs') -> return (res', (ms, hist, fs'))
+fulfillM p res = ScpM $ StateT $ \s -> case fulfill p res (scpFulfilmentState s) of (res', fs') -> return (res', s { scpFulfilmentState = fs' })
 
 terminateM :: String -> State -> ScpM a -> (String -> State -> ScpM a) -> ScpM a
-terminateM h state mcont mstop = ScpM $ StateT $ \(ms, hist, fs) -> ReaderT $ \(depth, stops, parent, already) -> trace ("depth: " ++ show depth) $ case terminate hist (parent, (h, state)) of
+terminateM h state mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> trace ("depth: " ++ show (scpDepth env)) $ case terminate (scpProcessHistory s) (scpNodeKey env, (h, state)) of
         Stop (_, (shallow_h, shallow_state))
-          -> trace ("stops: " ++ show stops) $
-             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state)) (ms, hist,  fs)) (depth + 1, stops + 1, parent,             already) -- FIXME: prevent rollback?
+          -> trace ("stops: " ++ show (scpStopCount env)) $
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state)) s)                                 (env { scpDepth = scpDepth env + 1, scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
         Continue hist'
-          -> unReaderT (unStateT (unScpM mcont)                           (ms, hist', fs)) (depth + 1, stops,     generatedKey hist', already)
+          -> unReaderT (unStateT (unScpM mcont)                           (s { scpProcessHistory = hist' })) (env { scpDepth = scpDepth env + 1, scpNodeKey = generatedKey hist' })
   -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
 
 speculateM :: State -> (State -> ScpM a) -> ScpM a
-speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \(depth, stops, parent, already) -> case speculate already (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (depth, stops, parent, already')
+speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \env -> case speculate (scpAlreadySpeculated env) (mempty, state) of (already', (_stats, state')) -> unReaderT (unStateT (unScpM (mcont state')) s) (env { scpAlreadySpeculated = already' })
 
 
 sc :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 sc' :: String -> State -> ScpM (Deeds, FVedTerm)
-sc' h state = terminateM h state (speculateM (reduce state) $ \state -> split state sc)
-                                 (\shallow_h shallow_state -> maybe (trce "split" shallow_h shallow_state $ split state)
+sc' h state = terminateM h state (speculateM (reduce state) $ \state -> my_split state sc)
+                                 (\shallow_h shallow_state -> maybe (trce "split" shallow_h shallow_state $ my_split state)
                                                                     (trce "gen" shallow_h shallow_state)
-                                                                    (generalise (mK_GENERALISER shallow_state state) state)
+                                                                    (my_generalise (mK_GENERALISER shallow_state state) state)
                                                                     sc)
   where
     trce how shallow_h shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ":" ++ shallow_h ++ ")")
@@ -152,6 +167,16 @@ sc' h state = terminateM h state (speculateM (reduce state) $ \state -> split st
                                                    hang (text "After:")  2 (trce1 state) $$
                                                    (case unMatch (match' shallow_state state) of Left why -> text why))
     trce1 state = pPrintFullState False state $$ pPrintFullState False (reduceForMatch state)
+
+    my_generalise gen = liftM (\splt -> insert_tags . splt) . generalise gen
+    my_split      opt =                 insert_tags . split opt
+    --insert_tags = liftM (\(_, deeds, e') -> (deeds, e'))
+    insert_tags mx = do
+      (resid_tags, deeds, e') <- mx
+      ScpM $ StateT $ \s -> ReaderT $ \env -> let resid_tags' = scpResidTags s `plusResidTags` resid_tags
+                                              in trace (tagSummary (scpTagAnnotations env) 1 30 resid_tags') $
+                                                 return ((), s { scpResidTags = resid_tags' })
+      return (deeds, e')
 
 -- Note [Prevent rollback loops by only rolling back when generalising]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -182,7 +207,7 @@ sc' h state = terminateM h state (speculateM (reduce state) $ \state -> split st
 
 memo :: (String -> State -> ScpM (Deeds, FVedTerm))
      ->  State -> ScpM (Deeds, FVedTerm) 
-memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
+memo opt state = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags) ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
     -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
 
@@ -215,11 +240,11 @@ memo opt state = join $ ScpM $ StateT $ \(ms, hist, fs) ->
          , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
                           match (meaning p) reduced_state]
          ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state), res)
-                                     ; return res }, (ms, hist, fs))
+                                     ; return res }, ScpState ms hist fs resid_tags)
               _          -> pure (do { traceRenderM ">sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state))
                                      ; res <- opt (getOccString (varName (fun p))) state
                                      ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
-                                     ; fulfillM p res }, (ms', hist, fs))
+                                     ; fulfillM p res }, ScpState ms' hist fs resid_tags)
                 where (p, ms') = promise (state, reduced_state) ms
   where reduced_state = reduceForMatch state
 
@@ -227,5 +252,5 @@ reduceForMatch :: State -> State
 reduceForMatch state = gc $ reduce (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runScpM $ liftM snd $ sc state
+supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ liftM snd $ sc state
   where state = prepareTerm unfoldings e

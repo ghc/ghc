@@ -4,6 +4,8 @@ module Supercompile.Drive.Process (
 
     rEDUCE_WQO, wQO, mK_GENERALISER,
 
+    TagAnnotations, tagAnnotations, tagSummary,
+
     prepareTerm,
 
     SCStats(..), seqSCStats,
@@ -22,6 +24,8 @@ import Supercompile.Core.Renaming
 --import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 
+import Supercompile.Drive.Split (ResidTags)
+
 import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.Evaluate
 import Supercompile.Evaluator.FreeVars
@@ -38,6 +42,7 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
+import Name       (getOccString)
 import Var        (isId, isTyVar, varType, setVarType)
 import Id         (idType, idOccInfo, zapFragileIdInfo, setIdOccInfo)
 import Type       (isUnLiftedType, mkTyVarTy)
@@ -52,6 +57,7 @@ import VarEnv     (uniqAway)
 import qualified Control.Monad as Monad
 import Data.Ord
 import qualified Data.Map as M
+import qualified Data.IntMap as IM
 import Data.Monoid
 import qualified Data.Set as S
 
@@ -83,8 +89,70 @@ mK_GENERALISER :: State -> State -> Generaliser
 --          | otherwise  = wqo1
 
 
+type TagAnnotations = IM.IntMap [String]
+
+tagSummary :: TagAnnotations -> Int -> Int -> ResidTags -> String
+tagSummary anns precision n resid_tags = unlines $ take n [intercalate "." ann ++ "\t" ++ show occs ++ "(" ++ show init_occs ++ ")" | (ann, (init_occs, occs)) <- sortBy (comparing (Down . snd . snd)) (M.toList ann_occs)]
+  where ann_occs = M.unionsWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) [M.singleton (take precision ann) (1, occs) | (tag, occs) <- IM.toList resid_tags, let Just ann = IM.lookup tag anns]
+        --total_occs = M.fold (+) 0 ann_occs
+
+tagAnnotations :: State -> TagAnnotations
+tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, hb) <- M.toList h, Just (_, e) <- [heapBindingTerm hb]] `IM.union` go_qa e_ann qa `IM.union` resid_tags
+  where
+    extAnn x ann = showSDoc (ppr x):ann
+
+    (e_ann, resid_tags) = foldr (\kf (ann, resid_tags) -> second (`IM.union` resid_tags) $ go_kf ann kf) ([], IM.empty) k
+    
+    go_qa :: [String] -> Anned QA -> TagAnnotations
+    go_qa ann qa = IM.insert (tagInt (annedTag qa)) ann $ go_qa' ann (annee qa)
+
+    go_qa' ann (Question _) = IM.empty
+    go_qa' ann (Answer a)   = go_answer' ann a
+
+    go_term :: [String] -> AnnedTerm -> TagAnnotations
+    go_term ann e = IM.insert (tagInt (annedTag e)) ann $ go_term' ann (annee e)
+
+    go_term' ann e = case e of
+      Var _ -> IM.empty
+      Value v -> go_value' ann v
+      TyApp e _ -> go_term ann e
+      CoApp e _ -> go_term ann e
+      App e _   -> go_term ann e
+      PrimOp _ _ es   -> IM.unions (map (go_term ann) es)
+      Case e x _ alts -> go_term (extAnn x ann) e `IM.union` IM.unions [go_term ann e | (_, e) <- alts]
+      Let x e1 e2     -> go_term (extAnn x ann) e1 `IM.union` go_term ann e2
+      LetRec xes e    -> IM.unions [go_term (extAnn x ann) e | (x, e) <- xes] `IM.union` go_term ann e
+      Cast e _        -> go_term ann e
+    
+    go_value' ann v = case v of
+        Indirect _   -> IM.empty
+        Literal _    -> IM.empty
+        Coercion _   -> IM.empty
+        TyLambda _ e -> go_term ann e
+        Lambda   _ e -> go_term ann e
+        Data _ _ _ _ -> IM.empty
+
+    go_answer :: [String] -> Anned Answer -> TagAnnotations
+    go_answer ann a = IM.insert (tagInt (annedTag a)) ann $ go_answer' ann (annee a)
+
+    go_answer' ann (_, (_, v)) = go_value' ann v
+
+    go_kf :: [String] -> Tagged StackFrame -> ([String], TagAnnotations)
+    go_kf ann kf = second (IM.insert (tagInt (tag kf)) ann) $ go_kf' ann (tagee kf)
+
+    go_kf' ann kf = case kf of
+      TyApply _ -> (ann, IM.empty)
+      CoApply _ -> (ann, IM.empty)
+      Apply _   -> (ann, IM.empty)
+      Scrutinise x _ (_, alts) -> (extAnn x ann, IM.unions [go_term ann e | (_, e) <- alts])
+      PrimApply _ _ as es -> (ann, IM.unions [go_answer ann a | a <- as] `IM.union` IM.unions [go_term ann e | (_, e) <- es])
+      StrictLet x (_, e)  -> (extAnn x ann, go_term ann e)
+      Update x            -> (extAnn x ann, IM.empty)
+      CastIt _            -> (ann, IM.empty)
+
+
 prepareTerm :: M.Map Var Term -> Term -> State
-prepareTerm unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
+prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
                            pprTraceSC "all input FVs" (ppr input_fvs) $
                            state
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply

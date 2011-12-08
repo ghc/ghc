@@ -312,13 +312,16 @@ sc' parent state = callCCish (\k -> try (RB k))
                                                                     ppr shallow_state $$ pPrintFullState True shallow_state $$ ppr state $$ pPrintFullState True state)
     try :: RollbackScpM -> ProcessM (LevelM (Deeds, Out FVedTerm))
     try rb = terminateM parent state rb
-               (\parent -> liftSpeculatedStateT speculated state $ \state' -> split (reduce state') (sc'' parent))
+               (\parent -> liftSpeculatedStateT speculated state $ \state' -> my_split (reduce state') (sc'' parent))
                -- (\_ shallow_state _ -> return $ maybe (trce "split" shallow_state $ split state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) state) (delayStateT (delayReaderT delay) . sc parent))
-               (\shallow_parent shallow_state shallow_rb -> trace "rb" $ doRB shallow_rb (split state (sc'' parent))
-                                                                                         (maybe (trce "split" shallow_state $ split shallow_state) (trce "gen" shallow_state) (generalise (mK_GENERALISER shallow_state state) shallow_state) (sc'' shallow_parent)))
+               (\shallow_parent shallow_state shallow_rb -> trace "rb" $ doRB shallow_rb (my_split state (sc'' parent))
+                                                                                         (maybe (trce "split" shallow_state $ my_split shallow_state) (trce "gen" shallow_state) (my_generalise (mK_GENERALISER shallow_state state) shallow_state) (sc'' shallow_parent)))
     
     sc'' :: Parent -> State -> LevelM (Deeds, Out FVedTerm)
     sc'' parent = delayStateT (delayReaderT delay) . sc parent
+
+    my_generalise gen = liftM (\splt -> liftM (\(_, deeds, e') -> (deeds, e')) . splt) . generalise gen
+    my_split      opt =                 liftM (\(_, deeds, e') -> (deeds, e')) . split opt
 
 sc :: Parent -> State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc parent = memo (sc' parent) . gc -- Garbage collection necessary because normalisation might have made some stuff dead
