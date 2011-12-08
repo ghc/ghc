@@ -118,6 +118,9 @@ instance Ord1 FVed where
 instance Outputable1 FVed where
     pprPrec1 prec (FVed _ x) = pprPrec prec x
 
+instance OutputableLambdas1 FVed where
+    pprPrecLam1 (FVed _ x) = pprPrecLam x
+
 instance Show a => Show (FVed a) where
     showsPrec = showsPrec1
 
