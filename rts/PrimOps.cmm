@@ -284,6 +284,9 @@ stg_casMutVarzh
     if (h != old) {
         RET_NP(1,h);
     } else {
+        if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+           foreign "C" dirty_MUT_VAR(BaseReg "ptr", mv "ptr") [];
+        }
         RET_NP(0,h);
     }
 }
