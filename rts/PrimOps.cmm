@@ -212,6 +212,45 @@ stg_unsafeThawArrayzh
   }
 }
 
+stg_newArrayArrayzh
+{
+    W_ words, n, arr, p, size;
+    /* Args: R1 = words */
+
+    n = R1;
+    MAYBE_GC(NO_PTRS,stg_newArrayArrayzh);
+
+    // the mark area contains one byte for each 2^MUT_ARR_PTRS_CARD_BITS words
+    // in the array, making sure we round up, and then rounding up to a whole
+    // number of words.
+    size = n + mutArrPtrsCardWords(n);
+    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
+    ("ptr" arr) = foreign "C" allocate(MyCapability() "ptr",words) [];
+    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
+
+    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
+    StgMutArrPtrs_ptrs(arr) = n;
+    StgMutArrPtrs_size(arr) = size;
+
+    // Initialise all elements of the array with a pointer to the new array
+    p = arr + SIZEOF_StgMutArrPtrs;
+  for:
+    if (p < arr + WDS(words)) {
+	W_[p] = arr;
+	p = p + WDS(1);
+	goto for;
+    }
+    // Initialise the mark bits with 0
+  for2:
+    if (p < arr + WDS(size)) {
+	W_[p] = 0;
+	p = p + WDS(1);
+	goto for2;
+    }
+
+    RET_P(arr);
+}
+
 
 /* -----------------------------------------------------------------------------
    MutVar primitives

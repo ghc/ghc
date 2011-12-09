@@ -826,6 +826,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_myThreadIdzh)                   \
       SymI_HasProto(stg_labelThreadzh)                  \
       SymI_HasProto(stg_newArrayzh)                     \
+      SymI_HasProto(stg_newArrayArrayzh)                     \
       SymI_HasProto(stg_newBCOzh)                       \
       SymI_HasProto(stg_newByteArrayzh)                 \
       SymI_HasProto_redirect(newCAF, newDynCAF)         \
@@ -849,6 +850,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_readTVarIOzh)                   \
       SymI_HasProto(resumeThread)                       \
       SymI_HasProto(setNumCapabilities)                 \
+      SymI_HasProto(getNumberOfProcessors)              \
       SymI_HasProto(resolveObjs)                        \
       SymI_HasProto(stg_retryzh)                        \
       SymI_HasProto(rts_apply)                          \

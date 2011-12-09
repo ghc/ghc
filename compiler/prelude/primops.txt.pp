@@ -733,7 +733,7 @@ section "Byte Arrays"
          index for reading from immutable byte arrays, and read/write
          for mutable byte arrays.  Each set contains operations for a
          range of useful primitive data types.  Each operation takes
-         an offset measured in terms of the size fo the primitive type
+         an offset measured in terms of the size of the primitive type
          being read or written.}
 
 ------------------------------------------------------------------------
@@ -1019,12 +1019,119 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
    The two arrays must not be the same array in different states, but this is not checked either.}
   with
   has_side_effects = True
-  code_size = { primOpCodeSizeForeignCall }
+  code_size = { primOpCodeSizeForeignCall + 4}
   can_fail = True
 
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
   {Copy a range of the first MutableByteArray# to the specified region in the second MutableByteArray#.
+   Both arrays must fully contain the specified ranges, but this is not checked.}
+  with
+  has_side_effects = True
+  code_size = { primOpCodeSizeForeignCall + 4 }
+  can_fail = True
+
+------------------------------------------------------------------------
+section "Arrays of arrays"
+	{Operations on {\tt ArrayArray\#}. An {\tt ArrayArray\#} contains references to {\em unpointed}
+	 arrays, such as {\tt ByteArray\#s}. Hence, it is not parameterised by the element types,
+	 just like a {\tt ByteArray\#}, but it needs to be scanned during GC, just like an {\tt Array#}.
+	 We represent an {\tt ArrayArray\#} exactly as a {\tt Array\#}, but provide element-type-specific
+	 indexing, reading, and writing.}
+------------------------------------------------------------------------
+
+primtype ArrayArray#
+
+primtype MutableArrayArray# s
+
+primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
+   Int# -> State# s -> (# State# s, MutableArrayArray# s #)
+   {Create a new mutable array of arrays with the specified number of elements,
+    in the specified state thread, with each element recursively referring to the
+    newly created array.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop  SameMutableArrayArrayOp "sameMutableArrayArray#" GenPrimOp
+   MutableArrayArray# s -> MutableArrayArray# s -> Bool
+
+primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
+   MutableArrayArray# s -> State# s -> (# State# s, ArrayArray# #)
+   {Make a mutable array of arrays immutable, without copying.}
+   with
+   has_side_effects = True
+
+primop  SizeofArrayArrayOp "sizeofArrayArray#" GenPrimOp
+   ArrayArray# -> Int#
+   {Return the number of elements in the array.}
+
+primop  SizeofMutableArrayArrayOp "sizeofMutableArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int#
+   {Return the number of elements in the array.}
+
+primop IndexArrayArrayOp_ByteArray "indexByteArrayArray#" GenPrimOp
+   ArrayArray# -> Int# -> ByteArray#
+   with can_fail = True
+
+primop IndexArrayArrayOp_ArrayArray "indexArrayArrayArray#" GenPrimOp
+   ArrayArray# -> Int# -> ArrayArray#
+   with can_fail = True
+
+primop  ReadArrayArrayOp_ByteArray "readByteArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> State# s -> (# State# s, ByteArray# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadArrayArrayOp_MutableByteArray "readMutableByteArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadArrayArrayOp_ArrayArray "readArrayArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> State# s -> (# State# s, ArrayArray# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadArrayArrayOp_MutableArrayArray "readMutableArrayArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableArrayArray# s #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteArrayArrayOp_ByteArray "writeByteArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> ByteArray# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteArrayArrayOp_MutableByteArray "writeMutableByteArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> MutableByteArray# s -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteArrayArrayOp_ArrayArray "writeArrayArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> ArrayArray# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteArrayArrayOp_MutableArrayArray "writeMutableArrayArrayArray#" GenPrimOp
+   MutableArrayArray# s -> Int# -> MutableArrayArray# s -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
+  ArrayArray# -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
+  {Copy a range of the ArrayArray# to the specified region in the MutableArrayArray#.
+   Both arrays must fully contain the specified ranges, but this is not checked.
+   The two arrays must not be the same array in different states, but this is not checked either.}
+  with
+  has_side_effects = True
+  can_fail = True
+  code_size = { primOpCodeSizeForeignCall }
+
+primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
+  MutableArrayArray# s -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
+  {Copy a range of the first MutableArrayArray# to the specified region in the second
+   MutableArrayArray#.
    Both arrays must fully contain the specified ranges, but this is not checked.}
   with
   has_side_effects = True

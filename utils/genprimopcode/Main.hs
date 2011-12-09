@@ -648,21 +648,22 @@ ppType (TyApp "ForeignObj#" []) = "foreignObjPrimTy"
 ppType (TyApp "BCO#"        []) = "bcoPrimTy"
 ppType (TyApp "()"          []) = "unitTy" 	-- unitTy is TysWiredIn's name for ()
 
-ppType (TyVar "a")               = "alphaTy"
-ppType (TyVar "b")               = "betaTy"
-ppType (TyVar "c")               = "gammaTy"
-ppType (TyVar "s")               = "deltaTy"
-ppType (TyVar "o")               = "openAlphaTy"
-ppType (TyApp "State#" [x])      = "mkStatePrimTy " ++ ppType x
-ppType (TyApp "MutVar#" [x,y])   = "mkMutVarPrimTy " ++ ppType x 
-                                   ++ " " ++ ppType y
-ppType (TyApp "MutableArray#" [x,y]) = "mkMutableArrayPrimTy " ++ ppType x
-                                    ++ " " ++ ppType y
+ppType (TyVar "a")                      = "alphaTy"
+ppType (TyVar "b")                      = "betaTy"
+ppType (TyVar "c")                      = "gammaTy"
+ppType (TyVar "s")                      = "deltaTy"
+ppType (TyVar "o")                      = "openAlphaTy"
 
-ppType (TyApp "MutableByteArray#" [x]) = "mkMutableByteArrayPrimTy " 
-                                   ++ ppType x
-
-ppType (TyApp "Array#" [x])      = "mkArrayPrimTy " ++ ppType x
+ppType (TyApp "State#" [x])             = "mkStatePrimTy " ++ ppType x
+ppType (TyApp "MutVar#" [x,y])          = "mkMutVarPrimTy " ++ ppType x 
+                                          ++ " " ++ ppType y
+ppType (TyApp "MutableArray#" [x,y])    = "mkMutableArrayPrimTy " ++ ppType x
+                                           ++ " " ++ ppType y
+ppType (TyApp "MutableArrayArray#" [x]) = "mkMutableArrayArrayPrimTy " ++ ppType x
+ppType (TyApp "MutableByteArray#" [x])  = "mkMutableByteArrayPrimTy " 
+                                          ++ ppType x
+ppType (TyApp "Array#" [x])             = "mkArrayPrimTy " ++ ppType x
+ppType (TyApp "ArrayArray#" [])         = "mkArrayArrayPrimTy"
 
 
 ppType (TyApp "Weak#"  [x])      = "mkWeakPrimTy " ++ ppType x

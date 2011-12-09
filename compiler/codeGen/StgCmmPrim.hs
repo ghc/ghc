@@ -307,8 +307,12 @@ emitPrimOp [res] DataToTagOp [arg]
 --	}
 emitPrimOp [res] UnsafeFreezeArrayOp [arg]
    = emit $ catAGraphs
-	 [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
-	   mkAssign (CmmLocal res) arg ]
+   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
+     mkAssign (CmmLocal res) arg ]
+emitPrimOp [res] UnsafeFreezeArrayArrayOp [arg]
+   = emit $ catAGraphs
+   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
+     mkAssign (CmmLocal res) arg ]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
 emitPrimOp [res] UnsafeFreezeByteArrayOp [arg]
@@ -626,6 +630,7 @@ translateOp SameMutVarOp           = Just mo_wordEq
 translateOp SameMVarOp             = Just mo_wordEq
 translateOp SameMutableArrayOp     = Just mo_wordEq
 translateOp SameMutableByteArrayOp = Just mo_wordEq
+translateOp SameMutableArrayArrayOp= Just mo_wordEq
 translateOp SameTVarOp             = Just mo_wordEq
 translateOp EqStablePtrOp          = Just mo_wordEq
 

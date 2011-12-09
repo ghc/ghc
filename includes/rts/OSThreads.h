@@ -183,8 +183,7 @@ extern void initCondition         ( Condition* pCond );
 extern void closeCondition        ( Condition* pCond );
 extern rtsBool broadcastCondition ( Condition* pCond );
 extern rtsBool signalCondition    ( Condition* pCond );
-extern rtsBool waitCondition      ( Condition* pCond, 
-				    Mutex* pMut );
+extern rtsBool waitCondition      ( Condition* pCond, Mutex* pMut );
 
 //
 // Mutexes
@@ -201,7 +200,6 @@ void  setThreadLocalVar (ThreadLocalKey *key, void *value);
 void  freeThreadLocalKey (ThreadLocalKey *key);
 
 // Processors and affinity
-nat  getNumberOfProcessors (void);
 void setThreadAffinity     (nat n, nat m);
 #endif // !CMINUSMINUS
 
@@ -213,12 +211,17 @@ void setThreadAffinity     (nat n, nat m);
 
 #endif /* defined(THREADED_RTS) */
 
+#ifndef CMINUSMINUS
 //
 // Support for forkOS (defined regardless of THREADED_RTS, but does
 // nothing when !THREADED_RTS).
 //
-#ifndef CMINUSMINUS
 int forkOS_createThread ( HsStablePtr entry );
+
+//
+// Returns the number of processor cores in the machine
+//
+nat getNumberOfProcessors (void);
 #endif
 
 #endif /* RTS_OSTHREADS_H */

@@ -308,4 +308,9 @@ forkOS_createThread ( HsStablePtr entry STG_UNUSED )
     return -1;
 }
 
+nat getNumberOfProcessors (void)
+{
+    return 1;
+}
+
 #endif /* !defined(THREADED_RTS) */
