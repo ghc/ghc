@@ -194,3 +194,15 @@ test('parsing001',
      compile_fail, [''])
 
 
+test('T783',
+     [ only_ways(['normal']),  # no optimisation for this one
+      # expected value: 175,569,928 (x86/Linux)
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 125000000,
+                                                      225000000)),
+      # expected value: 390895576 (amd64/Linux):
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 350000000,
+                                                      450000000))
+      ],
+      compile,[''])
