@@ -455,7 +455,7 @@ endif
 
 $(eval $(call dependencies,rts,dist,1))
 
-$(rts_dist_depfile_c_asm) : $(ffi_HEADER) $(DTRACEPROBES_H)
+$(rts_dist_depfile_c_asm) : $(libffi_HEADERS) $(DTRACEPROBES_H)
 
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported
@@ -506,6 +506,13 @@ endif
 INSTALL_LIBS += $(ALL_RTS_LIBS)
 INSTALL_LIBS += $(wildcard rts/dist/build/libffi$(soext)*)
 INSTALL_LIBS += $(wildcard rts/dist/build/libffi-5.dll)
+
+install: install_libffi_headers
+
+.PHONY: install_libffi_headers
+install_libffi_headers :
+	$(call INSTALL_DIR,"$(DESTDIR)$(ghcheaderdir)")
+	$(call INSTALL_HEADER,$(INSTALL_OPTS),$(libffi_HEADERS),"$(DESTDIR)$(ghcheaderdir)/")
 
 # -----------------------------------------------------------------------------
 # cleaning

@@ -251,6 +251,16 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         [HaskellHaveSubsectionsViaSymbols=False
          AC_MSG_RESULT(no)])
 
+    dnl ** check for .ident assembler directive
+
+    AC_MSG_CHECKING(whether your assembler supports .ident directive)
+    AC_COMPILE_IFELSE(
+        [AC_LANG_SOURCE([__asm__ (".ident \"GHC x.y.z\"");])],
+        [AC_MSG_RESULT(yes)
+         HaskellHaveIdentDirective=True],
+        [AC_MSG_RESULT(no)
+         HaskellHaveIdentDirective=False])
+
     dnl *** check for GNU non-executable stack note support (ELF only)
     dnl     (.section .note.GNU-stack,"",@progbits)
 
@@ -283,6 +293,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     AC_SUBST(HaskellTargetArch)
     AC_SUBST(HaskellTargetOs)
     AC_SUBST(HaskellHaveSubsectionsViaSymbols)
+    AC_SUBST(HaskellHaveIdentDirective)
     AC_SUBST(HaskellHaveGnuNonexecStack)
 ])
 
