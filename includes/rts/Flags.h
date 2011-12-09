@@ -170,6 +170,14 @@ struct PAR_FLAGS {
   unsigned int   parGcLoadBalancingGen;
                                  /* do load-balancing in this
                                   * generation and higher only */
+
+  unsigned int   parGcNoSyncWithIdle;
+                                 /* if a Capability has been idle for
+                                  * this many GCs, do not try to wake
+                                  * it up when doing a
+                                  * non-load-balancing parallel GC.
+                                  * (zero disables) */
+
   rtsBool        setAffinity;    /* force thread affinity with CPUs */
 };
 #endif /* THREADED_RTS */

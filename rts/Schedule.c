@@ -27,6 +27,7 @@
 #include "ProfHeap.h"
 #include "Weak.h"
 #include "sm/GC.h" // waitForGcThreads, releaseGCThreads, N
+#include "sm/GCThread.h"
 #include "Sparks.h"
 #include "Capability.h"
 #include "Task.h"
@@ -113,6 +114,11 @@ Mutex sched_mutex;
 
 #if !defined(mingw32_HOST_OS)
 #define FORKPROCESS_PRIMOP_SUPPORTED
+#endif
+
+// Local stats
+#ifdef THREADED_RTS
+static nat n_failed_trygrab_idles = 0, n_idle_caps = 0;
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -426,6 +432,7 @@ run_thread:
     cap->interrupt = 0;
 
     cap->in_haskell = rtsTrue;
+    cap->idle = 0;
 
     dirty_TSO(cap,t);
     dirty_STACK(cap,t->stackobj);
@@ -1413,6 +1420,7 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 {
     rtsBool heap_census;
 #ifdef THREADED_RTS
+    rtsBool idle_cap[n_capabilities];
     rtsBool gc_type;
     nat i, sync;
 #endif
@@ -1482,8 +1490,51 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
     }
     else
     {
-        // multi-threaded GC: make sure all the Capabilities donate one
-        // GC thread each.
+        // If we are load-balancing collections in this
+        // generation, then we require all GC threads to participate
+        // in the collection.  Otherwise, we only require active
+        // threads to participate, and we set gc_threads[i]->idle for
+        // any idle capabilities.  The rationale here is that waking
+        // up an idle Capability takes much longer than just doing any
+        // GC work on its behalf.
+
+        if (RtsFlags.ParFlags.parGcNoSyncWithIdle == 0
+            || (RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
+                N >= RtsFlags.ParFlags.parGcLoadBalancingGen)) {
+            for (i=0; i < n_capabilities; i++) {
+                idle_cap[i] = rtsFalse;
+            }
+        } else {
+            for (i=0; i < n_capabilities; i++) {
+                if (i == cap->no || capabilities[i].idle < RtsFlags.ParFlags.parGcNoSyncWithIdle) {
+                    idle_cap[i] = rtsFalse;
+                } else {
+                    idle_cap[i] = tryGrabCapability(&capabilities[i], task);
+                    if (!idle_cap[i]) {
+                        n_failed_trygrab_idles++;
+                    } else {
+                        n_idle_caps++;
+                    }
+                }
+            }
+        }
+
+        // We set the gc_thread[i]->idle flag if that
+        // capability/thread is not participating in this collection.
+        // We also keep a local record of which capabilities are idle
+        // in idle_cap[], because scheduleDoGC() is re-entrant:
+        // another thread might start a GC as soon as we've finished
+        // this one, and thus the gc_thread[]->idle flags are invalid
+        // as soon as we release any threads after GC.  Getting this
+        // wrong leads to a rare and hard to debug deadlock!
+
+        for (i=0; i < n_capabilities; i++) {
+            gc_threads[i]->idle = idle_cap[i];
+            capabilities[i].idle++;
+        }
+
+        // For all capabilities participating in this GC, wait until
+        // they have stopped mutating and are standing by for GC.
         waitForGcThreads(cap);
         
 #if defined(THREADED_RTS)
@@ -1565,6 +1616,18 @@ delete_threads_and_gc:
     if (gc_type == SYNC_GC_PAR)
     {
         releaseGCThreads(cap);
+        for (i = 0; i < n_capabilities; i++) {
+            if (i != cap->no) {
+                if (idle_cap[i]) {
+                    ASSERT(capabilities[i].running_task == task);
+                    task->cap = &capabilities[i];
+                    releaseCapability(&capabilities[i]);
+                } else {
+                    ASSERT(capabilities[i].running_task != task);
+                }
+            }
+        }
+        task->cap = cap;
     }
 #endif
 
@@ -2277,6 +2340,9 @@ exitScheduler (rtsBool wait_foreign USED_IF_THREADS)
     sched_state = SCHED_SHUTTING_DOWN;
 
     shutdownCapabilities(task, wait_foreign);
+
+    // debugBelch("n_failed_trygrab_idles = %d, n_idle_caps = %d\n",
+    //            n_failed_trygrab_idles, n_idle_caps);
 
     boundTaskExiting(task);
 }
