@@ -305,10 +305,10 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
         let platform = targetPlatform dflags
 
  	(us', native, imports, colorStats, linearStats)
-		<- cmmNativeGen dflags ncgImpl us cmm count
+                <- {-# SCC "cmmNativeGen" #-} cmmNativeGen dflags ncgImpl us cmm count
 
-	Pretty.bufLeftRender h
-		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map (pprNatCmmDecl ncgImpl platform) native
+        {-# SCC "pprNativeCode" #-} Pretty.bufLeftRender h
+                $ Pretty.vcat $ map (pprNatCmmDecl ncgImpl platform) native
 
            -- carefully evaluate this strictly.  Binding it with 'let'
            -- and then using 'seq' doesn't work, because the let
@@ -322,7 +322,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 	count' <- return $! count + 1;
 
 	-- force evaulation all this stuff to avoid space leaks
-	seqString (showSDoc $ vcat $ map (pprPlatform platform) imports) `seq` return ()
+        {-# SCC "seqString" #-} seqString (showSDoc $ vcat $ map (pprPlatform platform) imports) `seq` return ()
 
 	cmmNativeGens dflags ncgImpl
             h us' cmms
