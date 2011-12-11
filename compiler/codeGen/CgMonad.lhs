@@ -299,12 +299,11 @@ data HeapUsage =
   }
 \end{code}
 
-The heap high water mark is the larger of virtHp and hwHp.  The latter is
-only records the high water marks of forked-off branches, so to find the
-heap high water mark you have to take the max of virtHp and hwHp.  Remember,
-virtHp never retreats!
-
-Note Jan 04: ok, so why do we only look at the virtual Hp??
+virtHp keeps track of the next location to allocate an object at. realHp keeps
+track of what the Hp STG register actually points to. The reason these aren't
+always the same is that we want to be able to move the realHp in one go when
+allocating numerous objects to save having to bump it each time. virtHp we do
+bump each time but it doesn't create corresponding inefficient machine code.
 
 \begin{code}
 heapHWM :: HeapUsage -> VirtualHpOffset
