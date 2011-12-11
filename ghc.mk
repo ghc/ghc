@@ -929,6 +929,7 @@ $(eval $(call bindist,.,\
     $(includes_H_FILES) \
     $(includes_DERIVEDCONSTANTS) \
     $(includes_GHCCONSTANTS) \
+    $(libffi_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
     $(INSTALL_TOPDIRS) \
@@ -1207,9 +1208,10 @@ maintainer-clean : distclean
 .PHONY: all_libraries
 
 .PHONY: bootstrapping-files
-bootstrapping-files: includes/ghcautoconf.h
-bootstrapping-files: includes/DerivedConstants.h
-bootstrapping-files: includes/GHCConstants.h
+bootstrapping-files: $(includes_H_CONFIG)
+bootstrapping-files: $(includes_DERIVEDCONSTANTS)
+bootstrapping-files: $(includes_GHCCONSTANTS)
+bootstrapping-files: $(libffi_HEADERS)
 
 .DELETE_ON_ERROR:
 

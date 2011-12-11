@@ -32,7 +32,8 @@ libffi_EnableShared    = no
 endif
 
 libffi_STATIC_LIB  = libffi/build/inst/lib/libffi.a
-ffi_HEADER         = rts/dist/build/ffi.h
+libffi_HEADERS     = rts/dist/build/ffi.h \
+                     rts/dist/build/ffitarget.h
 
 ifeq "$(OSTYPE)" "cygwin"
 LIBFFI_PATH_MANGLE = PATH=$$(cygpath "$(TOP)")/libffi:$$PATH; export PATH;
@@ -101,9 +102,8 @@ $(libffi_STAMP_INSTALL): $(libffi_STAMP_BUILD) $(TOUCH_DEP)
 $(libffi_STATIC_LIB): $(libffi_STAMP_INSTALL)
 	@test -f $@ || { echo "$< exists, but $@ does not."; echo "Suggest removing $<."; exit 1; }
 
-$(ffi_HEADER): $(libffi_STAMP_INSTALL) | $$(dir $$@)/.
-	cp libffi/build/inst/lib/libffi-*/include/ffitarget.h $(dir $@)
-	cp libffi/build/inst/lib/libffi-*/include/ffi.h $@
+$(libffi_HEADERS): $(libffi_STAMP_INSTALL) | $$(dir $$@)/.
+	cp -f libffi/build/inst/lib/libffi-*/include/$(notdir $@) $@
 
 $(eval $(call clean-target,libffi,, \
     libffi/build $(wildcard libffi/stamp.ffi.*) libffi/dist-install))
