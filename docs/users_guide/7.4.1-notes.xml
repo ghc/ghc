@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-4-1">
+  <title>Release notes for version 7.4.1</title>
+
+  <para>
+    The significant changes to the various parts of the compiler are
+    listed in the following sections. There have also been numerous bug
+    fixes and performance improvements over the 7.2 branch.
+  </para>
+
+  <sect2>
+    <title>TODO</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          TODO
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+
+    <itemizedlist>
+        <listitem>
+            <para>
+                TODO
+            </para>
+        </listitem>
+    </itemizedlist>
+
+    <sect3>
+        <title>array</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.4.0.0 (was 0.3.0.3)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 4.5.0.0 (was 4.4.1.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bin-package-db</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.5.0.3 (was 0.5.0.2)
+                    It is now exposed by default.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bytestring</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.9.2.1 (was 0.9.2.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Cabal</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.14.0.0 (was 1.12.0.0)
+                    TODO: Create branch
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>containers</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.4.2.0 (was 0.4.1.0)
+                    TODO: Compare to 0.4.2.0 on hackage
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>deepseq</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    New package, version 1.2.0.1.
+                    TODO: Compare to 1.2.0.1 on hackage
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>directory</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.2 (was 1.1.0.1)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>extensible-exceptions</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.1.1.4 (was 0.1.1.3)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>filepath</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.3.0.0 (was 1.2.0.1)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc-prim</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell98</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.0.0.1 (was 2.0.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell2010</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.1 (was 1.1.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hoopl</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 3.8.7.3 (was 3.8.7.2)
+                    TODO Check this
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hpc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.5.1.1 (was 0.5.1.0)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>integer-gmp</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.4.0.0 (was 0.3.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-locale</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.0.0.4 (was 1.0.0.3)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.0 (was 1.0.0.7)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>pretty</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.1.0 (was 1.1.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>process</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.1 (was 1.1.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>template-haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.7.0.0 (was 2.6.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.4 (was 1.2.0.5)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>unix</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.5.1.0 (was 2.5.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Win32</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.2.2.0 (was 2.2.2.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+  </sect2>
+</sect1>
+
