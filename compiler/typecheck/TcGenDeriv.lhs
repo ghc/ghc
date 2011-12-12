@@ -11,7 +11,7 @@ This module is nominally ``subordinate'' to @TcDeriv@, which is the
 This is where we do all the grimy bindings' generation.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# OPTIONS -fno-warn-tabs -XScopedTypeVariables #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -1518,7 +1518,8 @@ data FFoldType a      -- Describes how to fold over a Type in a functor like way
 	, ft_forall  :: TcTyVar -> a -> a   -- Forall type                                     
      }
 
-functorLikeTraverse :: TyVar	     -- ^ Variable to look for
+functorLikeTraverse :: forall a. 
+                       TyVar	     -- ^ Variable to look for
 		    -> FFoldType a   -- ^ How to fold
 		    -> Type	     -- ^ Type to process
 		    -> a
@@ -1528,29 +1529,35 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
 			    , ft_bad_app = caseWrongArg, ft_forall = caseForAll })
 		    ty
   = fst (go False ty)
-  where -- go returns (result of type a, does type contain var)
-        go co ty | Just ty' <- coreView ty = go co ty'
-        go co (TyVarTy    v) | v == var = (if co then caseCoVar else caseVar,True)
-        go co (FunTy x y)  | isPredTy x = go co y
-                           | xc || yc   = (caseFun xr yr,True)
-            where (xr,xc) = go (not co) x
-                  (yr,yc) = go co       y
-        go co (AppTy    x y) | xc = (caseWrongArg,   True)
-                             | yc = (caseTyApp x yr, True)
-            where (_, xc) = go co x
-                  (yr,yc) = go co y
-        go co ty@(TyConApp con args)
-               | not (or xcs)     = (caseTrivial, False)   -- Variable does not occur
-               -- At this point we know that xrs, xcs is not empty,
-               -- and at least one xr is True
-               | isTupleTyCon con = (caseTuple (tupleTyConSort con) xrs, True)
-               | or (init xcs)    = (caseWrongArg, True)   -- T (..var..)    ty
-               | otherwise        =                        -- T (..no var..) ty
-                                    (caseTyApp (fst (splitAppTy ty)) (last xrs), True)
-            where (xrs,xcs) = unzip (map (go co) args)
-        go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)
-            where (xr,xc) = go co x
-        go _ _ = (caseTrivial,False)
+  where 
+    go :: Bool        -- Covariant or contravariant context
+       -> Type 
+       -> (a, Bool)   -- (result of type a, does type contain var)
+
+    go co ty | Just ty' <- coreView ty = go co ty'
+    go co (TyVarTy    v) | v == var = (if co then caseCoVar else caseVar,True)
+    go co (FunTy x y)  | isPredTy x = go co y
+                       | xc || yc   = (caseFun xr yr,True)
+        where (xr,xc) = go (not co) x
+              (yr,yc) = go co       y
+    go co (AppTy    x y) | xc = (caseWrongArg,   True)
+                         | yc = (caseTyApp x yr, True)
+        where (_, xc) = go co x
+              (yr,yc) = go co y
+    go co ty@(TyConApp con args)
+       | not (or xcs)     = (caseTrivial, False)   -- Variable does not occur
+       -- At this point we know that xrs, xcs is not empty,
+       -- and at least one xr is True
+       | isTupleTyCon con = (caseTuple (tupleTyConSort con) xrs, True)
+       | or (init xcs)    = (caseWrongArg, True)         -- T (..var..)    ty
+       | otherwise        = case splitAppTy_maybe ty of  -- T (..no var..) ty
+                              Nothing -> (caseWrongArg, True)   -- Non-decomposable (eg type function)
+                              Just (fun_ty, _) -> (caseTyApp fun_ty (last xrs), True)
+       where 
+         (xrs,xcs) = unzip (map (go co) args)
+    go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)
+        where (xr,xc) = go co x
+    go _ _ = (caseTrivial,False)
 
 -- Return all syntactic subterms of ty that contain var somewhere
 -- These are the things that should appear in instance constraints

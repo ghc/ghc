@@ -1024,7 +1024,7 @@ cond_functorOK allowFunctions (_, rep_tc)
     existential = ptext (sLit "must not have existential arguments")
     covariant 	= ptext (sLit "must not use the type variable in a function argument")
     functions 	= ptext (sLit "must not contain function types")
-    wrong_arg 	= ptext (sLit "must not use the type variable in an argument other than the last")
+    wrong_arg 	= ptext (sLit "must use the type variable only as the last argument of a data type")
 
 checkFlag :: ExtensionFlag -> Condition
 checkFlag flag (dflags, _)
