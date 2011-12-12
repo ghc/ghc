@@ -1,5 +1,5 @@
 
-test    ('dph-diophantine-opt' 
+test    ('dph-diophantine-copy-opt' 
         , [ alone
           , skip_if_fast
           , reqlib('dph-lifted-copy')
@@ -10,7 +10,7 @@ test    ('dph-diophantine-opt'
         , [ 'Main'
           , '-Odph -package dph-lifted-copy'])
 
-test    ('dph-diophantine-fast' 
+test    ('dph-diophantine-copy-fast' 
         , [ reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , extra_clean(['DiophantineVect.hi', 'DiophantineVect.o',
