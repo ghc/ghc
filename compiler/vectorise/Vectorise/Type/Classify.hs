@@ -43,7 +43,15 @@ classifyTyCons :: UniqFM Bool                     -- ^type constructor conversio
                -> ([TyCon], [TyCon], [TyCon])     -- ^tycons to be converted & not to be converted
 classifyTyCons convStatus tcs = classify [] [] [] convStatus (tyConGroups tcs)
   where
-    classify conv keep ignored _  [] = (conv, keep, ignored)
+
+--  ******** HACKS *********
+--  TyCons that were marked as 'keep' are instead put into the 'conv' list, 
+--  because keeping them was breaking the nbody example. 
+--  This needs to be fixed. -- BL 29/11/2011
+--  classify conv keep ignored _  [] = (conv, keep, ignored)
+    classify conv keep ignored _  [] = (conv ++ keep, [], ignored)
+--  ************************
+
     classify conv keep ignored cs ((tcs, ds) : rs)
       | can_convert && must_convert
       = classify (tcs ++ conv) keep ignored (cs `addListToUFM` [(tc, True) | tc <- tcs]) rs
