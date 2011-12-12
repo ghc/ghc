@@ -1060,6 +1060,11 @@ gcWorkerThread (Capability *cap)
 
     // Wait until we're told to wake up
     RELEASE_SPIN_LOCK(&gct->mut_spin);
+    // yieldThread();
+    //    Strangely, adding a yieldThread() here makes the CPU time
+    //    measurements more accurate on Linux, perhaps because it syncs
+    //    the CPU time across the multiple cores.  Without this, CPU time
+    //    is heavily skewed towards GC rather than MUT.
     gct->wakeup = GC_THREAD_STANDING_BY;
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->gc_spin);
