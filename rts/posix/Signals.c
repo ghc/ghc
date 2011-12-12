@@ -251,7 +251,7 @@ generic_handler(int sig USED_IF_THREADS,
 	stg_exit(EXIT_FAILURE);
     }
     
-    contextSwitchCapability(&MainCapability);
+    interruptCapability(&MainCapability);
 
 #endif /* THREADED_RTS */
 }
