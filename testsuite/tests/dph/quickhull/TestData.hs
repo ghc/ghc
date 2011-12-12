@@ -86,7 +86,7 @@ toPArrayPoints ps
 
 -- | Force points to be evaluated
 force pts 
-	= P.toUArray (QH.xsOf pts) U.!: 0 D.+ 
-          P.toUArray (QH.ysOf pts) U.!: 0
+	= U.index "TestData" (P.toUArray (QH.xsOf pts)) 0 D.+ 
+          U.index "TestData" (P.toUArray (QH.ysOf pts)) 0
 
    
