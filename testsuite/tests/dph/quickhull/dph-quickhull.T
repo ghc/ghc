@@ -42,7 +42,7 @@ test    ('dph-quickhull-copy-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -package dph-lifted-copy -package dph-prim-par'])
+          , '-O0 -package dph-lifted-copy -package dph-prim-par'])
 
 
 test    ('dph-quickhull-vseg-fast' 
@@ -56,5 +56,5 @@ test    ('dph-quickhull-vseg-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -package dph-lifted-vseg -package dph-prim-par'])
+          , '-O0 -package dph-lifted-vseg -package dph-prim-par'])
 

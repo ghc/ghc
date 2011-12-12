@@ -30,7 +30,7 @@ test    ('dph-words-copy-fast'
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -fno-spec-constr -package dph-lifted-copy -package dph-prim-par'])
+          , '-O0 -package dph-lifted-copy -package dph-prim-par'])
 
 
 test    ('dph-words-vseg-fast' 
@@ -40,5 +40,5 @@ test    ('dph-words-vseg-fast'
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-enable-rewrite-rules -fno-spec-constr -package dph-lifted-vseg -package dph-prim-par'])
+          , '-O0 -package dph-lifted-vseg -package dph-prim-par'])
 
