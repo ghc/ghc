@@ -41,11 +41,12 @@
 
 defaults
    has_side_effects = False
-   out_of_line      = False
+   out_of_line      = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
+   can_fail         = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
-   can_fail         = False
    strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity lazyDmd) TopRes) }
+
 
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
