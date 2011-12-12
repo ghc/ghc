@@ -1124,7 +1124,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS)
             for (i=0; i < n_threads; i++) {
                 if (i == me) continue;
                 write_barrier();
-                interruptAllCapabilities();
+                interruptCapability(&capabilities[i]);
                 if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
                     retry = rtsTrue;
                 }
