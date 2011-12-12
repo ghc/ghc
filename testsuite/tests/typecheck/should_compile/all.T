@@ -368,4 +368,5 @@ test('T5581', normal, compile, [''])
 test('T5655', normal, compile, [''])
 test('T5643', normal, compile, [''])
 test('T5595', normal, compile, [''])
+test('T5676', normal, compile, [''])
 
