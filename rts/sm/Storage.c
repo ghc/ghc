@@ -627,8 +627,11 @@ allocate (Capability *cap, lnat n)
 
         // Attempting to allocate an object larger than maxHeapSize
         // should definitely be disallowed.  (bug #1791)
-        if (RtsFlags.GcFlags.maxHeapSize > 0 && 
-            req_blocks >= RtsFlags.GcFlags.maxHeapSize) {
+        if ((RtsFlags.GcFlags.maxHeapSize > 0 &&
+             req_blocks >= RtsFlags.GcFlags.maxHeapSize) ||
+            req_blocks >= HS_INT32_MAX)   // avoid overflow when
+                                          // calling allocGroup() below
+        {
             heapOverflow();
             // heapOverflow() doesn't exit (see #2592), but we aren't
             // in a position to do a clean shutdown here: we
