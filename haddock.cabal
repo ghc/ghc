@@ -80,7 +80,7 @@ executable haddock
   default-language:     Haskell2010
   build-tools: alex >= 2.3, happy >= 1.18
   build-depends:
-    base >= 4.3 && < 4.5,
+    base >= 4.3 && < 4.6,
     filepath,
     directory,
     pretty,
@@ -88,7 +88,7 @@ executable haddock
     array,
     xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.10,
-    ghc >= 7.2 && < 7.4
+    ghc >= 7.2 && < 7.6
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
@@ -140,7 +140,7 @@ library
   default-language:     Haskell2010
   build-tools: alex >= 2.3, happy >= 1.18
   build-depends:
-    base >= 4.3 && < 4.5,
+    base >= 4.3 && < 4.6,
     filepath,
     directory,
     pretty,
@@ -148,7 +148,7 @@ library
     array,
     xhtml >= 3000.2 && < 3000.3,
     Cabal >= 1.10,
-    ghc >= 7.2 && < 7.4
+    ghc >= 7.2 && < 7.6
 
   if flag(in-ghc-tree)
     cpp-options: -DIN_GHC_TREE
