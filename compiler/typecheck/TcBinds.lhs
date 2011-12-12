@@ -1197,11 +1197,10 @@ mkSigFun sigs = lookupNameEnv env
 
 \begin{code}
 tcTySig :: LSig Name -> TcM [TcId]
-tcTySig (L span (TypeSig names ty))
-  = setSrcSpan span $ mapM f names
-  where
-    f (L _ name) = do  { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-                       ; return (mkLocalId name sigma_ty) }
+tcTySig (L span (TypeSig names@(L _ name1 : _) ty))
+  = setSrcSpan span $ 
+    do { sigma_ty <- tcHsSigType (FunSigCtxt name1) ty
+       ; return [ mkLocalId name sigma_ty | L _ name <- names ] }
 tcTySig (L _ (IdSig id))
   = return [id]
 tcTySig s = pprPanic "tcTySig" (ppr s)

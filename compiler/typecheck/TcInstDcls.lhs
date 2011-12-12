@@ -790,6 +790,38 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
    loc       = getSrcSpan dfun_id
 
 ------------------------------
+checkInstSig :: Class -> [TcType] -> LSig Name -> TcM ()
+-- Check that any type signatures have exactly the right type
+checkInstSig clas inst_tys (L loc (TypeSig names@(L _ name1:_) hs_ty))
+  = setSrcSpan loc $ 
+    do { inst_sigs <- xoptM Opt_InstanceSigs
+       ; if inst_sigs then 
+           do { sigma_ty <- tcHsSigType (FunSigCtxt name1) hs_ty
+              ; mapM_ (check sigma_ty) names }
+         else
+           addErrTc (misplacedInstSig names hs_ty) }
+  where
+    check sigma_ty (L _ n) 
+      = do { sel_id <- tcLookupId n
+           ; let meth_ty = instantiateMethod clas sel_id inst_tys
+           ; checkTc (sigma_ty `eqType` meth_ty)
+                     (badInstSigErr n meth_ty) }
+ 
+checkInstSig _ _ _ = return ()
+
+badInstSigErr :: Name -> Type -> SDoc
+badInstSigErr meth ty
+  = hang (ptext (sLit "Method signature does not match class; it should be"))
+       2 (pprPrefixName meth <+> dcolon <+> ppr ty)
+
+misplacedInstSig :: [Located Name] -> LHsType Name -> SDoc
+misplacedInstSig names hs_ty
+  = vcat [ hang (ptext (sLit "Illegal type signature in instance declaration:"))
+              2 (hang (hsep $ punctuate comma (map (pprPrefixName . unLoc) names))
+                    2 (dcolon <+> ppr hs_ty))
+         , ptext (sLit "(Use -XInstanceSigs to allow this)") ]
+
+------------------------------
 tcSuperClass :: [TcTyVar] -> [EvVar]
              -> (Id, PredType)
              -> TcM (TcId, LHsBinds TcId)
@@ -936,8 +968,9 @@ tcInstanceMethods :: DFunId -> Class -> [TcTyVar]
         --      forall tvs. theta => ...
 tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                   (spec_inst_prags, prag_fn)
-                  op_items (VanillaInst binds _ standalone_deriv)
-  = mapAndUnzipM tc_item op_items
+                  op_items (VanillaInst binds sigs standalone_deriv)
+  = do { mapM_ (checkInstSig clas inst_tys) sigs
+       ; mapAndUnzipM tc_item op_items }
   where
     ----------------------
     tc_item :: (Id, DefMeth) -> TcM (Id, LHsBind Id)
@@ -953,12 +986,14 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
       = add_meth_ctxt sel_id generated_code rn_bind $
         do { (meth_id, local_meth_id) <- mkMethIds clas tyvars dfun_ev_vars
                                                    inst_tys sel_id
-           ; let prags = prag_fn (idName sel_id)
+           ; let sel_name = idName sel_id
+                 prags = prag_fn (idName sel_id)
            ; meth_id1 <- addInlinePrags meth_id prags
            ; spec_prags <- tcSpecPrags meth_id1 prags
            ; bind <- tcInstanceMethodBody InstSkol
                           tyvars dfun_ev_vars
-                          meth_id1 local_meth_id meth_sig_fn
+                          meth_id1 local_meth_id 
+                          (mk_meth_sig_fn sel_name)
                           (mk_meth_spec_prags meth_id1 spec_prags)
                           rn_bind
            ; return (meth_id1, bind) }
@@ -1038,8 +1073,13 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                    [ L loc (SpecPrag meth_id wrap inl)
                    | L loc (SpecPrag _ wrap inl) <- spec_inst_prags])
 
-    loc = getSrcSpan dfun_id
-    meth_sig_fn _ = Just ([],loc)       -- The 'Just' says "yes, there's a type sig"
+    loc    = getSrcSpan dfun_id
+    sig_fn = mkSigFun sigs
+    mk_meth_sig_fn sel_name _meth_name 
+       = case sig_fn sel_name of 
+            Nothing -> Just ([],loc)
+            Just r  -> Just r 
+        -- The orElse 'Just' says "yes, in effect there's always a type sig"
         -- But there are no scoped type variables from local_method_id
         -- Only the ones from the instance decl itself, which are already
         -- in scope.  Example:

@@ -4347,7 +4347,40 @@ overlapping instances without the library client having to know.
 </para>
 </sect3>
 
+<sect3 id="instance-sigs">
+<title>Type signatures in instance declarations</title>
+<para>In Haskell, you can't write a type signature in an instance declaration, but it
+is sometimes convenient to do so, and the language extension <option>-XInstanceSigs</option>
+allows you to do so.  For example:
+<programlisting>
+  data T a = MkT a a
+  instance Eq a => Eq (T a) where
+    (==) :: T a -> T a -> Bool   -- The signature
+    (==) (MkT x1 x2) (MkTy y1 y2) = x1==y1 && x2==y2
+</programlisting>
+The type signature in the instance declaration must be precisely the same as
+the one in the class declaration, instantiated with the instance type.
+</para>
+<para>
+One stylistic reason for wanting to write a type signature is simple documentation.  Another
+is that you may want to bring scoped type variables into scope.  For example:
+<programlisting>
+class C a where
+  foo :: b -> a -> (a, [b])
 
+instance C a => C (T a) where
+  foo :: forall b. b -> T a -> (T a, [b])
+  foo x (T y) = (T y, xs)
+     where
+       xs :: [b]
+       xs = [x,x,x]
+</programlisting>
+Provided that you also specify <option>-XScopedTypeVariables</option> 
+(<xref linkend="scoped-type-variables"/>),
+the <literal>forall b</forall> scopes over the definition of <literal>foo</literal>,
+and in particular over the type signature for <literal>xs</literal>.
+</para>
+</sect3>
 
 </sect2>
 

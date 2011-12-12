@@ -160,8 +160,8 @@ unifyKindTcS ty1 ty2 ki1 ki2
   = wrapTcS $ TcM.addErrCtxtM ctxt $ do
       (_errs, mb_r) <- TcM.tryTc (TcM.unifyKindEq ki1 ki2)
       return (maybe False (const True) mb_r)
-  where ctxt = TcM.mkKindErrorCtxt ty1 ki1 ty2 ki2
-
+  where 
+    ctxt = TcM.mkKindErrorCtxt ty1 ki1 ty2 ki2
 \end{code}
 
 %************************************************************************
