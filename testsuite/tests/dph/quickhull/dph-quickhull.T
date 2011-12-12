@@ -32,7 +32,8 @@ test    ('dph-quickhull-vseg-opt'
 
 
 test    ('dph-quickhull-copy-fast' 
-        , [ extra_clean(['Main.hi', 'Main.o',
+        , [ alone
+          , extra_clean(['Main.hi', 'Main.o',
                          'QuickHullVect.hi', 'QuickHullVect.o',
                          'SVG.hi', 'SVG.o',
                          'TestData.hi', 'TestData.o',
@@ -46,7 +47,8 @@ test    ('dph-quickhull-copy-fast'
 
 
 test    ('dph-quickhull-vseg-fast' 
-        , [ extra_clean(['Main.hi', 'Main.o',
+        , [ alone
+          , extra_clean(['Main.hi', 'Main.o',
                          'QuickHullVect.hi', 'QuickHullVect.o',
                          'SVG.hi', 'SVG.o',
                          'TestData.hi', 'TestData.o',

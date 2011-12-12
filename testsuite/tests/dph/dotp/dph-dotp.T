@@ -22,7 +22,8 @@ test    ('dph-dotp-vseg-opt'
           , '-Odph -package dph-lifted-vseg -package dph-prim-par'])
 
 test    ('dph-dotp-copy-fast' 
-        , [ extra_clean(['Main.o', 'Main.hi', 'DotPVect.hi', 'DotPVect.o'])
+        , [ alone
+          , extra_clean(['Main.o', 'Main.hi', 'DotPVect.hi', 'DotPVect.o'])
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
@@ -31,7 +32,8 @@ test    ('dph-dotp-copy-fast'
           , '-O -fno-enable-rewrite-rules -package dph-lifted-copy -package dph-prim-par'])
 
 test    ('dph-dotp-vseg-fast' 
-        , [ extra_clean(['Main.o', 'Main.hi', 'DotPVect.hi', 'DotPVect.o'])
+        , [ alone
+          , extra_clean(['Main.o', 'Main.hi', 'DotPVect.hi', 'DotPVect.o'])
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 

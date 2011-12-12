@@ -24,7 +24,8 @@ test    ('dph-words-vseg-opt'
 
 
 test    ('dph-words-copy-fast' 
-        , [ extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
+        , [ alone
+          , extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
@@ -34,7 +35,8 @@ test    ('dph-words-copy-fast'
 
 
 test    ('dph-words-vseg-fast' 
-        , [ extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
+        , [ alone
+          , extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
