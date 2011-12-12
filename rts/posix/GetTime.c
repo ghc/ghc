@@ -60,6 +60,9 @@ Time getProcessCPUTime(void)
         res = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
         if (res == 0) {
             return SecondsToTime(ts.tv_sec) + NSToTime(ts.tv_nsec);
+        } else {
+            sysErrorBelch("clock_gettime");
+            stg_exit(EXIT_FAILURE);
         }
     }
 #endif
