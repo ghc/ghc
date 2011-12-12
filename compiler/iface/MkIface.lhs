@@ -633,6 +633,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
     this_pkg = thisPackage dflags
     (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph (mi_insts iface0)
     (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph (mi_rules iface0)
+        -- See Note [Orphans] in IfaceSyn
         -- ToDo: shouldn't we be splitting fam_insts into orphans and
         -- non-orphans?
     fam_insts = mi_fam_insts iface0
@@ -1548,6 +1549,8 @@ instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
                 -- Slightly awkward: we need the Class to get the fundeps
     (tvs, fds) = classTvsFds cls
     arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
+
+    -- See Note [When exactly is an instance decl an orphan?] in IfaceSyn
     orph | is_local cls_name = Just (nameOccName cls_name)
          | all isJust mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
          | otherwise         = Nothing

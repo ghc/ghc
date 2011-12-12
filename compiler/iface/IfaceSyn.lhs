@@ -298,8 +298,32 @@ that is what is seen by importing module with --make
 
 Note [Orphans]: the ifInstOrph and ifRuleOrph fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If a module contains any "orphans", then its interface file is read
-regardless, so that its instances are not missed. 
+Class instances, rules, and family instances are divided into orphans
+and non-orphans.  Roughly speaking, an instance/rule is an orphan if
+its left hand side mentions nothing defined in this module.  Orphan-hood
+has two major consequences
+
+ * A non-orphan is not finger-printerd separately.  Instead, for
+   fingerprinting purposes it is treated as part of the entity it
+   mentions on the LHS.  For example
+      data T = T1 | T2
+      instance Eq T where ....
+   The instance (Eq T) is incorprated as part of T's fingerprint.
+
+   In constrast, orphans are all fingerprinted together in the 
+   mi_orph_hash field of the ModIface. 
+  
+   See MkIface.addFingerprints.
+
+ * A module that contains orphans is called an "orphan module".  If
+   the module being compiled depends (transitively) on an oprhan
+   module M, then M.hi is read in regardless of whether M is oherwise
+   needed. This is to ensure that we don't miss any instance decls in
+   M.  But it's painful, because it means we need to keep track of all
+   the orphan modules below us.
+
+Orphan-hood is computed when we generate an IfaceInst, IfaceRule, or
+IfaceFamInst respectively: 
 
  - If an instance is an orphan its ifInstOprh field is Nothing
    Otherwise ifInstOrph is (Just n) where n is the Name of a
@@ -309,9 +333,13 @@ regardless, so that its instances are not missed.
  - Similarly for ifRuleOrph
    The computation is done by MkIface.coreRuleToIfaceRule
 
+Note [When exactly is an instance decl an orphan?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  (see MkIface.instanceToIfaceInst, which implements this)
 Roughly speaking, an instance is an orphan if its head (after the =>)
-mentions nothing defined in this module.  Functional dependencies
-complicate the situation though. Consider
+mentions nothing defined in this module.  
+
+Functional dependencies complicate the situation though. Consider
 
   module M where { class C a b | a -> b }
 
@@ -337,7 +365,7 @@ More precisely, an instance is an orphan iff
   defined in this module.
 
 (Note that these conditions hold trivially if the class is locally
-defined.)
+defined.)  
 
 Note [Versioning of instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
