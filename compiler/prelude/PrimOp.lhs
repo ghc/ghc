@@ -285,7 +285,7 @@ code generator will fall over if they aren't satisfied.
 
 %************************************************************************
 %*                                                                      *
-\subsubsection[PrimOp-ool]{Which PrimOps are out-of-line}
+            Which PrimOps are out-of-line
 %*                                                                      *
 %************************************************************************
 
@@ -299,15 +299,39 @@ primOpOutOfLine :: PrimOp -> Bool
 \end{code}
 
 
-primOpOkForSpeculation
-~~~~~~~~~~~~~~~~~~~~~~
+%************************************************************************
+%*                                                                      *
+            Failure and side effects
+%*                                                                      *
+%************************************************************************
+
+Note [PrimOp can_fail and has_side_effects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A primop that is neither can_fail nor has_side_effects can be
+   executed speculatively, any number of times
+
+ * A primop that is marked can_fail cannot be executed speculatively,
+   (becuase the might provoke the failure), but it can be repeated.
+   Why would you want to do that? Perhaps it might enable some
+   eta-expansion, if you can prove that the lambda is definitely
+   applied at least once. I guess we don't currently do that.
+
+ * A primop that is marked has_side_effects can be neither speculated
+   nor repeated; it must be executed exactly the right number of
+   times.
+
+So has_side_effects implies can_fail.  We don't currently exploit
+the case of primops that can_fail but do not have_side_effects.
+
+Note [primOpOkForSpeculation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sometimes we may choose to execute a PrimOp even though it isn't
 certain that its result will be required; ie execute them
 ``speculatively''.  The same thing as ``cheap eagerness.'' Usually
 this is OK, because PrimOps are usually cheap, but it isn't OK for
-(a)~expensive PrimOps and (b)~PrimOps which can fail.
-
-PrimOps that have side effects also should not be executed speculatively.
+  * PrimOps that are expensive 
+  * PrimOps which can fail
+  * PrimOps that have side effects
 
 Ok-for-speculation also means that it's ok *not* to execute the
 primop. For example
@@ -318,68 +342,9 @@ that has side effects mustn't be dicarded in this way, of course!
 
 See also @primOpIsCheap@ (below).
 
-
-\begin{code}
-primOpOkForSpeculation :: PrimOp -> Bool
-        -- See comments with CoreUtils.exprOkForSpeculation
-primOpOkForSpeculation op
-  = not (primOpHasSideEffects op || primOpOutOfLine op || primOpCanFail op)
-\end{code}
-
-
-primOpIsCheap
-~~~~~~~~~~~~~
-@primOpIsCheap@, as used in \tr{SimplUtils.lhs}.  For now (HACK
-WARNING), we just borrow some other predicates for a
-what-should-be-good-enough test.  "Cheap" means willing to call it more
-than once, and/or push it inside a lambda.  The latter could change the
-behaviour of 'seq' for primops that can fail, so we don't treat them as cheap.
-
-\begin{code}
-primOpIsCheap :: PrimOp -> Bool
-primOpIsCheap op = primOpOkForSpeculation op
--- In March 2001, we changed this to
---      primOpIsCheap op = False
--- thereby making *no* primops seem cheap.  But this killed eta
--- expansion on case (x ==# y) of True -> \s -> ...
--- which is bad.  In particular a loop like
---      doLoop n = loop 0
---     where
---         loop i | i == n    = return ()
---                | otherwise = bar i >> loop (i+1)
--- allocated a closure every time round because it doesn't eta expand.
---
--- The problem that originally gave rise to the change was
---      let x = a +# b *# c in x +# x
--- were we don't want to inline x. But primopIsCheap doesn't control
--- that (it's exprIsDupable that does) so the problem doesn't occur
--- even if primOpIsCheap sometimes says 'True'.
-\end{code}
-
-primOpCodeSize
-~~~~~~~~~~~~~~
-Gives an indication of the code size of a primop, for the purposes of
-calculating unfolding sizes; see CoreUnfold.sizeExpr.
-
-\begin{code}
-primOpCodeSize :: PrimOp -> Int
-#include "primop-code-size.hs-incl"
-
-primOpCodeSizeDefault :: Int
-primOpCodeSizeDefault = 1
-  -- CoreUnfold.primOpSize already takes into account primOpOutOfLine
-  -- and adds some further costs for the args in that case.
-
-primOpCodeSizeForeignCall :: Int
-primOpCodeSizeForeignCall = 4
-\end{code}
-
-\begin{code}
-primOpCanFail :: PrimOp -> Bool
-#include "primop-can-fail.hs-incl"
-\end{code}
-
-And some primops have side-effects and so, for example, must not be
+Note [primOpHasSideEffects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some primops have side-effects and so, for example, must not be
 duplicated.
 
 This predicate means a little more than just "modifies the state of
@@ -417,7 +382,78 @@ duplicated.
 \begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
 #include "primop-has-side-effects.hs-incl"
+
+primOpCanFail :: PrimOp -> Bool
+#include "primop-can-fail.hs-incl"
+
+primOpOkForSpeculation :: PrimOp -> Bool
+  -- See Note [primOpOkForSpeculation]
+  -- See comments with CoreUtils.exprOkForSpeculation
+primOpOkForSpeculation op
+  = not (primOpHasSideEffects op || primOpOutOfLine op || primOpCanFail op)
 \end{code}
+
+
+primOpIsCheap
+~~~~~~~~~~~~~
+@primOpIsCheap@, as used in \tr{SimplUtils.lhs}.  For now (HACK
+WARNING), we just borrow some other predicates for a
+what-should-be-good-enough test.  "Cheap" means willing to call it more
+than once, and/or push it inside a lambda.  The latter could change the
+behaviour of 'seq' for primops that can fail, so we don't treat them as cheap.
+
+\begin{code}
+primOpIsCheap :: PrimOp -> Bool
+primOpIsCheap op = primOpOkForSpeculation op
+-- In March 2001, we changed this to
+--      primOpIsCheap op = False
+-- thereby making *no* primops seem cheap.  But this killed eta
+-- expansion on case (x ==# y) of True -> \s -> ...
+-- which is bad.  In particular a loop like
+--      doLoop n = loop 0
+--     where
+--         loop i | i == n    = return ()
+--                | otherwise = bar i >> loop (i+1)
+-- allocated a closure every time round because it doesn't eta expand.
+--
+-- The problem that originally gave rise to the change was
+--      let x = a +# b *# c in x +# x
+-- were we don't want to inline x. But primopIsCheap doesn't control
+-- that (it's exprIsDupable that does) so the problem doesn't occur
+-- even if primOpIsCheap sometimes says 'True'.
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+               PrimOp code size
+%*                                                                      *
+%************************************************************************
+
+primOpCodeSize
+~~~~~~~~~~~~~~
+Gives an indication of the code size of a primop, for the purposes of
+calculating unfolding sizes; see CoreUnfold.sizeExpr.
+
+\begin{code}
+primOpCodeSize :: PrimOp -> Int
+#include "primop-code-size.hs-incl"
+
+primOpCodeSizeDefault :: Int
+primOpCodeSizeDefault = 1
+  -- CoreUnfold.primOpSize already takes into account primOpOutOfLine
+  -- and adds some further costs for the args in that case.
+
+primOpCodeSizeForeignCall :: Int
+primOpCodeSizeForeignCall = 4
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+               PrimOp types
+%*                                                                      *
+%************************************************************************
 
 \begin{code}
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
