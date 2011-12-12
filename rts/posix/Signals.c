@@ -267,10 +267,6 @@ void
 initUserSignals(void)
 {
     sigemptyset(&userSignals);
-#ifndef THREADED_RTS
-    getStablePtr((StgPtr)&base_GHCziConcziSignal_runHandlers_closure);
-    // needed to keep runHandler alive
-#endif
 }
 
 void
