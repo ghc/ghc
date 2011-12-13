@@ -654,20 +654,22 @@ carefullySplitNewType_maybe rec_nts tc tys
 -- of inspecting the type directly.
 
 -- | Discovers the primitive representation of a more abstract 'Type'
+-- Only applied to types of values
 typePrimRep :: Type -> PrimRep
 typePrimRep ty = case repType ty of
 		   TyConApp tc _ -> tyConPrimRep tc
 		   FunTy _ _	 -> PtrRep
-		   AppTy _ _	 -> PtrRep	-- See note below
+		   AppTy _ _	 -> PtrRep	-- See Note [AppTy rep] 
 		   TyVarTy _	 -> PtrRep
 		   _             -> pprPanic "typePrimRep" (ppr ty)
-	-- Types of the form 'f a' must be of kind *, not *#, so
-	-- we are guaranteed that they are represented by pointers.
-	-- The reason is that f must have kind *->*, not *->*#, because
-	-- (we claim) there is no way to constrain f's kind any other
-	-- way.
 \end{code}
 
+Note [AppTy rep]
+~~~~~~~~~~~~~~~~
+Types of the form 'f a' must be of kind *, not #, so we are guaranteed
+that they are represented by pointers.  The reason is that f must have
+kind (kk -> kk) and kk cannot be unlifted; see Note [The kind invariant] 
+in TypeRep.
 
 ---------------------------------------------------------------------
 				ForAllTy

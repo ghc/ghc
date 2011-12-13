@@ -64,48 +64,6 @@ import Pair
 import qualified Data.Data        as Data hiding ( TyCon )
 \end{code}
 
-	----------------------
-	A note about newtypes
-	----------------------
-
-Consider
-	newtype N = MkN Int
-
-Then we want N to be represented as an Int, and that's what we arrange.
-The front end of the compiler [TcType.lhs] treats N as opaque, 
-the back end treats it as transparent [Type.lhs].
-
-There's a bit of a problem with recursive newtypes
-	newtype P = MkP P
-	newtype Q = MkQ (Q->Q)
-
-Here the 'implicit expansion' we get from treating P and Q as transparent
-would give rise to infinite types, which in turn makes eqType diverge.
-Similarly splitForAllTys and splitFunTys can get into a loop.  
-
-Solution: 
-
-* Newtypes are always represented using TyConApp.
-
-* For non-recursive newtypes, P, treat P just like a type synonym after 
-  type-checking is done; i.e. it's opaque during type checking (functions
-  from TcType) but transparent afterwards (functions from Type).  
-  "Treat P as a type synonym" means "all functions expand NewTcApps 
-  on the fly".
-
-  Applications of the data constructor P simply vanish:
-	P x = x
-  
-
-* For recursive newtypes Q, treat the Q and its representation as 
-  distinct right through the compiler.  Applications of the data consructor
-  use a coerce:
-	Q = \(x::Q->Q). coerce Q x
-  They are rare, so who cares if they are a tiny bit less efficient.
-
-The typechecker (TcTyDecls) identifies enough type construtors as 'recursive'
-to cut all loops.  The other members of the loop may be marked 'non-recursive'.
-
 
 %************************************************************************
 %*									*
@@ -119,7 +77,7 @@ to cut all loops.  The other members of the loop may be marked 'non-recursive'.
 data Type
   = TyVarTy Var	-- ^ Vanilla type or kind variable (*never* a coercion variable)
 
-  | AppTy
+  | AppTy         -- See Note [AppTy invariant]
 	Type
 	Type		-- ^ Type application to something other than a 'TyCon'. Parameters:
 	                --
@@ -128,7 +86,7 @@ data Type
 	                --
 	                --  2) Argument type
 
-  | TyConApp
+  | TyConApp      -- See Note [AppTy invariant]
 	TyCon
 	[KindOrType]	-- ^ Application of a 'TyCon', including newtypes /and/ synonyms.
 	                -- Invariant: saturated appliations of 'FunTyCon' must
@@ -174,6 +132,27 @@ type Kind = Type
 type SuperKind = Type
 \end{code}
 
+Note [The kind invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The kinds
+   #          UnliftedTypeKind
+   ArgKind    super-kind of *, #
+   (#)        UbxTupleKind
+   OpenKind   super-kind of ArgKind, ubxTupleKind
+
+can never appear under an arrow or type constructor in a kind; they
+can only be at the top level of a kind.  It follows that primitive TyCons,
+which have a naughty pseudo-kind
+   State# :: * -> #
+must always be saturated, so that we can never get a type whose kind
+has a UnliftedTypeKind or ArgTypeKind underneath an arrow.
+
+Nor can we abstract over a type variable with any of these kinds.
+
+    k :: = kk | # | ArgKind | (#) | OpenKind 
+    kk :: = * | kk -> kk | T kk1 ... kkn
+
+So a type variable can only be abstracted kk.
 
 Note [Arguments to type constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

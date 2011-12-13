@@ -1116,6 +1116,10 @@ check_arg_type rank ty
 
 	; check_type rank' UT_NotOk ty
 	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
+             -- NB the isUnLiftedType test also checks for 
+             --    T State#
+             -- where there is an illegal partial application of State# (which has
+             -- kind * -> #); see Note [The kind invariant] in TypeRep
 
 ----------------------------------------
 forAllTyErr :: Rank -> Type -> SDoc
