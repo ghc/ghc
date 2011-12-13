@@ -195,6 +195,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.parGcGen          = 0;
     RtsFlags.ParFlags.parGcLoadBalancingEnabled = rtsTrue;
     RtsFlags.ParFlags.parGcLoadBalancingGen = 1;
+    RtsFlags.ParFlags.parGcNoSyncWithIdle   = 0;
     RtsFlags.ParFlags.setAffinity       = 0;
 #endif
 
@@ -367,6 +368,9 @@ usage_text[] = {
 "            (default: 1, -qb alone turns off load-balancing)",
 "  -qa       Use the OS to set thread affinity (experimental)",
 "  -qm       Don't automatically migrate threads between CPUs",
+"  -qi<n>    If a processor has been idle for the last <n> GCs, do not",
+"            wake it up for a non-load-balancing parallel GC.",
+"            (0 disables,  default: 0)",
 #endif
 "  --install-signal-handlers=<yes|no>",
 "            Install signal handlers (default: yes)",
@@ -1193,7 +1197,11 @@ error = rtsTrue;
                                 = strtol(rts_argv[arg]+3, (char **) NULL, 10);
                         }
                         break;
-		    case 'a':
+                    case 'i':
+                        RtsFlags.ParFlags.parGcNoSyncWithIdle
+                            = strtol(rts_argv[arg]+3, (char **) NULL, 10);
+                        break;
+                    case 'a':
 			RtsFlags.ParFlags.setAffinity = rtsTrue;
 			break;
 		    case 'm':

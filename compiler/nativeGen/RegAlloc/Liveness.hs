@@ -912,7 +912,7 @@ liveness1 liveregs blockmap (LiveInstr instr _)
                         , liveDieWrite  = mkUniqSet w_dying }))
 
         where
-            RU read written = regUsageOfInstr instr
+            !(RU read written) = regUsageOfInstr instr
 
             -- registers that were written here are dead going backwards.
             -- registers that were read here are live going backwards.

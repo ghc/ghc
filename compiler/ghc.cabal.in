@@ -444,7 +444,6 @@ Library
         GraphOps
         GraphPpr
         IOEnv
-        Interval
         ListSetOps
         Maybes
         MonadUtils

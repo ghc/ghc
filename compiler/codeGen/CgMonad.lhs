@@ -8,61 +8,55 @@ See the beginning of the top-level @CodeGen@ module, to see how this
 monadic stuff fits into the Big Picture.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 {-# LANGUAGE BangPatterns #-}
 module CgMonad (
-	Code,	-- type
-	FCode,	-- type
+        Code,
+        FCode,
 
-	initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
-	returnFC, fixC, fixC_, checkedAbsC, 
-	stmtC, stmtsC, labelC, emitStmts, nopC, whenC, newLabelC,
-	newUnique, newUniqSupply, 
+        initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
+        returnFC, fixC, fixC_, checkedAbsC, 
+        stmtC, stmtsC, labelC, emitStmts, nopC, whenC, newLabelC,
+        newUnique, newUniqSupply, 
 
-	CgStmts, emitCgStmts, forkCgStmts, cgStmtsToBlocks,
-	getCgStmts', getCgStmts,
-	noCgStmts, oneCgStmt, consCgStmt,
+        CgStmts, emitCgStmts, forkCgStmts, cgStmtsToBlocks,
+        getCgStmts', getCgStmts,
+        noCgStmts, oneCgStmt, consCgStmt,
 
-	getCmm,
-	emitDecl, emitProc, emitSimpleProc,
+        getCmm,
+        emitDecl, emitProc, emitSimpleProc,
 
-	forkLabelledCode,
-	forkClosureBody, forkStatics, forkAlts, forkEval,
-	forkEvalHelp, forkProc, codeOnly,
-	SemiTaggingStuff, ConTagZ,
+        forkLabelledCode,
+        forkClosureBody, forkStatics, forkAlts, forkEval,
+        forkEvalHelp, forkProc, codeOnly,
+        SemiTaggingStuff, ConTagZ,
 
-	EndOfBlockInfo(..),
-	setEndOfBlockInfo, getEndOfBlockInfo,
+        EndOfBlockInfo(..),
+        setEndOfBlockInfo, getEndOfBlockInfo,
 
-	setSRT, getSRT,
-	setSRTLabel, getSRTLabel, 
-	setTickyCtrLabel, getTickyCtrLabel,
+        setSRT, getSRT,
+        setSRTLabel, getSRTLabel, 
+        setTickyCtrLabel, getTickyCtrLabel,
 
-	StackUsage(..), HeapUsage(..),
-	VirtualSpOffset, VirtualHpOffset,
-	initStkUsage, initHpUsage,
-	getHpUsage,  setHpUsage,
-	heapHWM,
+        StackUsage(..), HeapUsage(..),
+        VirtualSpOffset, VirtualHpOffset,
+        initStkUsage, initHpUsage,
+        getHpUsage,  setHpUsage,
+        heapHWM,
 
-	getModuleName,
+        getModuleName,
 
-	Sequel(..), -- ToDo: unabstract?
+        Sequel(..),
 
-	-- ideally we wouldn't export these, but some other modules access internal state
-	getState, setState, getInfoDown, getDynFlags, getThisPackage, 
+        -- ideally we wouldn't export these, but some other modules access internal state
+        getState, setState, getInfoDown, getDynFlags, getThisPackage, 
 
-	-- more localised access to monad state	
-	getStkUsage, setStkUsage,
-	getBinds, setBinds, getStaticBinds,
+        -- more localised access to monad state 
+        getStkUsage, setStkUsage,
+        getBinds, setBinds, getStaticBinds,
 
-	-- out of general friendliness, we also export ...
-	CgInfoDownwards(..), CgState(..)	-- non-abstract
+        -- out of general friendliness, we also export ...
+        CgInfoDownwards(..), CgState(..)
     ) where
 
 #include "HsVersions.h"
@@ -88,14 +82,14 @@ import Outputable
 import Control.Monad
 import Data.List
 
-infixr 9 `thenC`	-- Right-associative!
+infixr 9 `thenC`
 infixr 9 `thenFC`
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[CgMonad-environment]{Stuff for manipulating environments}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 This monadery has some information that it only passes {\em
@@ -103,38 +97,38 @@ downwards}, as well as some ``state'' which is modified as we go
 along.
 
 \begin{code}
-data CgInfoDownwards	-- information only passed *downwards* by the monad
+data CgInfoDownwards    -- information only passed *downwards* by the monad
   = MkCgInfoDown {
-	cgd_dflags  :: DynFlags,
-	cgd_mod     :: Module,		-- Module being compiled
-	cgd_statics :: CgBindings,	-- [Id -> info] : static environment
-	cgd_srt_lbl :: CLabel,		-- label of the current SRT
-        cgd_srt     :: SRT,		-- the current SRT
-	cgd_ticky   :: CLabel,		-- current destination for ticky counts
-	cgd_eob     :: EndOfBlockInfo	-- Info for stuff to do at end of basic block:
+        cgd_dflags  :: DynFlags,
+        cgd_mod     :: Module,          -- Module being compiled
+        cgd_statics :: CgBindings,      -- [Id -> info] : static environment
+        cgd_srt_lbl :: CLabel,          -- label of the current SRT
+        cgd_srt     :: SRT,             -- the current SRT
+        cgd_ticky   :: CLabel,          -- current destination for ticky counts
+        cgd_eob     :: EndOfBlockInfo   -- Info for stuff to do at end of basic block:
   }
 
 initCgInfoDown :: DynFlags -> Module -> CgInfoDownwards
 initCgInfoDown dflags mod
-  = MkCgInfoDown {	cgd_dflags  = dflags,
-			cgd_mod     = mod,
-			cgd_statics = emptyVarEnv,
-			cgd_srt_lbl = error "initC: srt_lbl",
-			cgd_srt     = error "initC: srt",
-			cgd_ticky   = mkTopTickyCtrLabel,
-			cgd_eob     = initEobInfo }
+  = MkCgInfoDown {      cgd_dflags  = dflags,
+                        cgd_mod     = mod,
+                        cgd_statics = emptyVarEnv,
+                        cgd_srt_lbl = error "initC: srt_lbl",
+                        cgd_srt     = error "initC: srt",
+                        cgd_ticky   = mkTopTickyCtrLabel,
+                        cgd_eob     = initEobInfo }
 
 data CgState
   = MkCgState {
-     cgs_stmts :: OrdList CgStmt,	  -- Current proc
+     cgs_stmts :: OrdList CgStmt, -- Current proc
      cgs_tops  :: OrdList CmmDecl,
-	-- Other procedures and data blocks in this compilation unit
-	-- Both the latter two are ordered only so that we can 
-	-- reduce forward references, when it's easy to do so
+        -- Other procedures and data blocks in this compilation unit
+        -- Both the latter two are ordered only so that we can 
+        -- reduce forward references, when it's easy to do so
      
-     cgs_binds :: CgBindings,	-- [Id -> info] : *local* bindings environment
-     				-- Bindings for top-level things are given in
-				-- the info-down part
+     cgs_binds :: CgBindings,     -- [Id -> info] : *local* bindings environment
+                                  -- Bindings for top-level things are given in
+                                  -- the info-down part
      
      cgs_stk_usg :: StackUsage,
      cgs_hp_usg  :: HeapUsage,
@@ -144,10 +138,10 @@ data CgState
 initCgState :: UniqSupply -> CgState
 initCgState uniqs
   = MkCgState { cgs_stmts = nilOL, cgs_tops = nilOL,
-		cgs_binds = emptyVarEnv, 
-		cgs_stk_usg = initStkUsage, 
-		cgs_hp_usg = initHpUsage,
-		cgs_uniqs = uniqs }
+                cgs_binds = emptyVarEnv, 
+                cgs_stk_usg = initStkUsage, 
+                cgs_hp_usg = initHpUsage,
+                cgs_uniqs = uniqs }
 \end{code}
 
 @EndOfBlockInfo@ tells what to do at the end of this block of code or,
@@ -157,13 +151,13 @@ alternative.
 \begin{code}
 data EndOfBlockInfo
   = EndOfBlockInfo
-	VirtualSpOffset   -- Args Sp: trim the stack to this point at a
-			  -- return; push arguments starting just
-			  -- above this point on a tail call.
-			  
-			  -- This is therefore the stk ptr as seen
-			  -- by a case alternative.
-	Sequel
+        VirtualSpOffset   -- Args Sp: trim the stack to this point at a
+                          -- return; push arguments starting just
+                          -- above this point on a tail call.
+                          
+                          -- This is therefore the stk ptr as seen
+                          -- by a case alternative.
+        Sequel
 
 initEobInfo :: EndOfBlockInfo
 initEobInfo = EndOfBlockInfo 0 OnStack
@@ -175,18 +169,18 @@ block.
 
 \begin{code}
 data Sequel
-  = OnStack 		-- Continuation is on the stack
+  = OnStack          -- Continuation is on the stack
 
   | CaseAlts
-	  CLabel     -- Jump to this; if the continuation is for a vectored
-		     -- case this might be the label of a return vector
-	  SemiTaggingStuff
-	  Id	      -- The case binder, only used to see if it's dead
+          CLabel     -- Jump to this; if the continuation is for a vectored
+                     -- case this might be the label of a return vector
+          SemiTaggingStuff
+          Id          -- The case binder, only used to see if it's dead
 
 type SemiTaggingStuff
-  = Maybe			-- Maybe[1] we don't have any semi-tagging stuff...
-     ([(ConTagZ, CmmLit)],	-- Alternatives
-      CmmLit)			-- Default (will be a can't happen RTS label if can't happen)
+  = Maybe                   -- Maybe we don't have any semi-tagging stuff...
+     ([(ConTagZ, CmmLit)],  -- Alternatives
+      CmmLit)               -- Default (will be a can't happen RTS label if can't happen)
 
 -- The case branch is executed only from a successful semitagging
 -- venture, when a case has looked at a variable, found that it's
@@ -195,9 +189,9 @@ type SemiTaggingStuff
 \end{code}
 
 %************************************************************************
-%*									*
-		CgStmt type
-%*									*
+%*                                                                      *
+                CgStmt type
+%*                                                                      *
 %************************************************************************
 
 The CgStmts type is what the code generator outputs: it is a tree of
@@ -215,9 +209,9 @@ data CgStmt
 
 flattenCgStmts :: BlockId -> CgStmts -> [CmmBasicBlock]
 flattenCgStmts id stmts = 
-	case flatten (fromOL stmts) of
-	  ([],blocks)    -> blocks
-	  (block,blocks) -> BasicBlock id block : blocks
+        case flatten (fromOL stmts) of
+          ([],blocks)    -> blocks
+          (block,blocks) -> BasicBlock id block : blocks
  where
   flatten [] = ([],[])
 
@@ -233,84 +227,83 @@ flattenCgStmts id stmts =
   flatten (CgStmt stmt : stmts)
     | isJump stmt
     = case dropWhile isOrdinaryStmt stmts of
-	[]                     -> ( [stmt], [] )
-	[CgLabel id]	       -> ( [stmt], [BasicBlock id [CmmBranch id]])
-	(CgLabel id : stmts)   -> ( [stmt], BasicBlock id block : blocks )
-	    where (block,blocks) = flatten stmts
-	(CgFork fork_id stmts : ss) -> 
-	   flatten (CgFork fork_id stmts : CgStmt stmt : ss)
+        []                     -> ( [stmt], [] )
+        [CgLabel id]           -> ( [stmt], [BasicBlock id [CmmBranch id]])
+        (CgLabel id : stmts)   -> ( [stmt], BasicBlock id block : blocks )
+            where (block,blocks) = flatten stmts
+        (CgFork fork_id stmts : ss) -> 
+           flatten (CgFork fork_id stmts : CgStmt stmt : ss)
         (CgStmt {} : _) -> panic "CgStmt not seen as ordinary"
 
   flatten (s:ss) = 
-	case s of
-	  CgStmt stmt -> (stmt:block,blocks)
-	  CgLabel id  -> ([CmmBranch id],BasicBlock id block:blocks)
-	  CgFork fork_id stmts -> 
-		(block, BasicBlock fork_id fork_block : fork_blocks ++ blocks)
-		where (fork_block, fork_blocks) = flatten (fromOL stmts)
+        case s of
+          CgStmt stmt -> (stmt:block,blocks)
+          CgLabel id  -> ([CmmBranch id],BasicBlock id block:blocks)
+          CgFork fork_id stmts -> 
+                (block, BasicBlock fork_id fork_block : fork_blocks ++ blocks)
+                where (fork_block, fork_blocks) = flatten (fromOL stmts)
     where (block,blocks) = flatten ss
 
 isJump :: CmmStmt -> Bool
-isJump (CmmJump _ _) = True
-isJump (CmmBranch _) = True
+isJump (CmmJump   _ _) = True
+isJump (CmmBranch _  ) = True
 isJump (CmmSwitch _ _) = True
-isJump (CmmReturn _) = True
-isJump _ = False
+isJump (CmmReturn _  ) = True
+isJump _               = False
 
 isOrdinaryStmt :: CgStmt -> Bool
 isOrdinaryStmt (CgStmt _) = True
-isOrdinaryStmt _ = False
+isOrdinaryStmt _          = False
 \end{code}
 
 %************************************************************************
-%*									*
-		Stack and heap models
-%*									*
+%*                                                                      *
+                Stack and heap models
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
-type VirtualHpOffset = WordOff	-- Both are in
-type VirtualSpOffset = WordOff	-- units of words
+type VirtualHpOffset = WordOff  -- Both are in
+type VirtualSpOffset = WordOff  -- units of words
 
 data StackUsage 
   = StackUsage {
-	virtSp :: VirtualSpOffset,
-		-- Virtual offset of topmost allocated slot
+        virtSp :: VirtualSpOffset,
+                -- Virtual offset of topmost allocated slot
 
-	frameSp :: VirtualSpOffset,
-		-- Virtual offset of the return address of the enclosing frame.
-		-- This RA describes the liveness/pointedness of
-		-- all the stack from frameSp downwards
-		-- INVARIANT: less than or equal to virtSp
+        frameSp :: VirtualSpOffset,
+                -- Virtual offset of the return address of the enclosing frame.
+                -- This RA describes the liveness/pointedness of
+                -- all the stack from frameSp downwards
+                -- INVARIANT: less than or equal to virtSp
 
-	 freeStk :: [VirtualSpOffset], 
-		-- List of free slots, in *increasing* order
-		-- INVARIANT: all <= virtSp
-		-- All slots <= virtSp are taken except these ones
+         freeStk :: [VirtualSpOffset], 
+                -- List of free slots, in *increasing* order
+                -- INVARIANT: all <= virtSp
+                -- All slots <= virtSp are taken except these ones
 
-	 realSp :: VirtualSpOffset,	
-		-- Virtual offset of real stack pointer register
+         realSp :: VirtualSpOffset,     
+                -- Virtual offset of real stack pointer register
 
-	 hwSp :: VirtualSpOffset
-  }		   -- Highest value ever taken by virtSp
+         hwSp :: VirtualSpOffset
+  }                -- Highest value ever taken by virtSp
 
 -- INVARIANT: The environment contains no Stable references to
--- 	      stack slots below (lower offset) frameSp
---	      It can contain volatile references to this area though.
+--            stack slots below (lower offset) frameSp
+--            It can contain volatile references to this area though.
 
 data HeapUsage =
   HeapUsage {
-	virtHp :: VirtualHpOffset,	-- Virtual offset of highest-allocated word
-	realHp :: VirtualHpOffset	-- realHp: Virtual offset of real heap ptr
+        virtHp :: VirtualHpOffset,      -- Virtual offset of highest-allocated word
+        realHp :: VirtualHpOffset       -- realHp: Virtual offset of real heap ptr
   }
 \end{code}
 
-The heap high water mark is the larger of virtHp and hwHp.  The latter is
-only records the high water marks of forked-off branches, so to find the
-heap high water mark you have to take the max of virtHp and hwHp.  Remember,
-virtHp never retreats!
-
-Note Jan 04: ok, so why do we only look at the virtual Hp??
+virtHp keeps track of the next location to allocate an object at. realHp keeps
+track of what the Hp STG register actually points to. The reason these aren't
+always the same is that we want to be able to move the realHp in one go when
+allocating numerous objects to save having to bump it each time. virtHp we do
+bump each time but it doesn't create corresponding inefficient machine code.
 
 \begin{code}
 heapHWM :: HeapUsage -> VirtualHpOffset
@@ -322,44 +315,41 @@ Initialisation.
 \begin{code}
 initStkUsage :: StackUsage
 initStkUsage = StackUsage {
-			virtSp = 0,
-			frameSp = 0,
-			freeStk = [],
-			realSp = 0,
-			hwSp = 0
-	       }
-		
+                        virtSp = 0,
+                        frameSp = 0,
+                        freeStk = [],
+                        realSp = 0,
+                        hwSp = 0
+               }
+                
 initHpUsage :: HeapUsage 
 initHpUsage = HeapUsage {
-	      	virtHp = 0,
-		realHp = 0
-	      }
-\end{code}
+                virtHp = 0,
+                realHp = 0
+              }
 
-@stateIncUsage@$~e_1~e_2$ incorporates in $e_1$ the stack and heap high water
-marks found in $e_2$.
-
-\begin{code}
+-- | @stateIncUsafe@ sets the stack and heap high water marks of $arg1$ to
+-- be the max of the high water marks of $arg1$ and $arg2$.
 stateIncUsage :: CgState -> CgState -> CgState
 stateIncUsage s1 s2@(MkCgState { cgs_stk_usg = stk_usg, cgs_hp_usg = hp_usg })
      = s1 { cgs_hp_usg  = cgs_hp_usg  s1 `maxHpHw`  virtHp hp_usg,
-	    cgs_stk_usg = cgs_stk_usg s1 `maxStkHw` hwSp   stk_usg }
+            cgs_stk_usg = cgs_stk_usg s1 `maxStkHw` hwSp   stk_usg }
        `addCodeBlocksFrom` s2
-		
+                
 stateIncUsageEval :: CgState -> CgState -> CgState
 stateIncUsageEval s1 s2
      = s1 { cgs_stk_usg = cgs_stk_usg s1 `maxStkHw` hwSp (cgs_stk_usg s2) }
        `addCodeBlocksFrom` s2
-	-- We don't max the heap high-watermark because stateIncUsageEval is
-	-- used only in forkEval, which in turn is only used for blocks of code
-	-- which do their own heap-check.
+        -- We don't max the heap high-watermark because stateIncUsageEval is
+        -- used only in forkEval, which in turn is only used for blocks of code
+        -- which do their own heap-check.
 
 addCodeBlocksFrom :: CgState -> CgState -> CgState
 -- Add code blocks from the latter to the former
 -- (The cgs_stmts will often be empty, but not always; see codeOnly)
 s1 `addCodeBlocksFrom` s2
   = s1 { cgs_stmts = cgs_stmts s1 `appOL` cgs_stmts s2,
-	 cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2 }
+         cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2 }
 
 maxHpHw :: HeapUsage -> VirtualHpOffset -> HeapUsage
 hp_usg `maxHpHw` hw = hp_usg { virtHp = virtHp hp_usg `max` hw }
@@ -369,9 +359,9 @@ stk_usg `maxStkHw` hw = stk_usg { hwSp = hwSp stk_usg `max` hw }
 \end{code}
 
 %************************************************************************
-%*									*
-		The FCode monad
-%*									*
+%*                                                                      *
+                The FCode monad
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -379,8 +369,8 @@ newtype FCode a = FCode (CgInfoDownwards -> CgState -> (a, CgState))
 type Code       = FCode ()
 
 instance Monad FCode where
-	(>>=) = thenFC
-	return = returnFC
+        (>>=) = thenFC
+        return = returnFC
 
 {-# INLINE thenC #-}
 {-# INLINE thenFC #-}
@@ -392,10 +382,10 @@ The Abstract~C is not in the environment so as to improve strictness.
 initC :: DynFlags -> Module -> FCode a -> IO a
 
 initC dflags mod (FCode code)
-  = do	{ uniqs <- mkSplitUniqSupply 'c'
-	; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
-	      (res, _) -> return res
-	}
+  = do  { uniqs <- mkSplitUniqSupply 'c'
+        ; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
+              (res, _) -> return res
+        }
 
 returnFC :: a -> FCode a
 returnFC val = FCode (\_ state -> (val, state))
@@ -404,59 +394,51 @@ returnFC val = FCode (\_ state -> (val, state))
 \begin{code}
 thenC :: Code -> FCode a -> FCode a
 thenC (FCode m) (FCode k) = 
-  	FCode (\info_down state -> let (_,new_state) = m info_down state in 
-  		k info_down new_state)
+        FCode (\info_down state -> let (_,new_state) = m info_down state in 
+                k info_down new_state)
 
 listCs :: [Code] -> Code
 listCs [] = return ()
 listCs (fc:fcs) = do
-	fc
-	listCs fcs
-   	
+        fc
+        listCs fcs
+        
 mapCs :: (a -> Code) -> [a] -> Code
 mapCs = mapM_
-\end{code}
 
-\begin{code}
-thenFC	:: FCode a -> (a -> FCode c) -> FCode c
+thenFC  :: FCode a -> (a -> FCode c) -> FCode c
 thenFC (FCode m) k = FCode (
-	\info_down state ->
-		let 
+        \info_down state ->
+                let 
                         (m_result, new_state) = m info_down state
                         (FCode kcode) = k m_result
-		in 
-			kcode info_down new_state
-	)
+                in 
+                        kcode info_down new_state
+        )
 
 listFCs :: [FCode a] -> FCode [a]
 listFCs = sequence
 
 mapFCs :: (a -> FCode b) -> [a] -> FCode [b]
 mapFCs = mapM
-\end{code}
 
-And the knot-tying combinator:
-\begin{code}
+-- | Knot-tying combinator for @FCode@
 fixC :: (a -> FCode a) -> FCode a
-fixC fcode = FCode (
-	\info_down state -> 
-		let
-			FCode fc = fcode v
-			result@(v,_) = fc info_down state
-			--	    ^--------^
-		in
-			result
-	)
+fixC fcode = FCode $
+        \info_down state -> 
+                let FCode fc     = fcode v
+                    result@(v,_) = fc info_down state
+                in result
 
+-- | Knot-tying combinator that throws result away
 fixC_ :: (a -> FCode a) -> FCode ()
 fixC_ fcode = fixC fcode >> return ()
 \end{code}
 
 %************************************************************************
-%*									*
-	Operators for getting and setting the state and "info_down".
-
-%*									*
+%*                                                                      *
+        Operators for getting and setting the state and "info_down".
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -468,56 +450,55 @@ setState state = FCode $ \_ _ -> ((),state)
 
 getStkUsage :: FCode StackUsage
 getStkUsage = do
-	state <- getState
-	return $ cgs_stk_usg state
+        state <- getState
+        return $ cgs_stk_usg state
 
 setStkUsage :: StackUsage -> Code
 setStkUsage new_stk_usg = do
-	state <- getState
-	setState $ state {cgs_stk_usg = new_stk_usg}
+        state <- getState
+        setState $ state {cgs_stk_usg = new_stk_usg}
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
-	state <- getState
-	return $ cgs_hp_usg state
-	
+        state <- getState
+        return $ cgs_hp_usg state
+        
 setHpUsage :: HeapUsage -> Code
 setHpUsage new_hp_usg = do
-	state <- getState
-	setState $ state {cgs_hp_usg = new_hp_usg}
+        state <- getState
+        setState $ state {cgs_hp_usg = new_hp_usg}
 
 getBinds :: FCode CgBindings
 getBinds = do
-	state <- getState
-	return $ cgs_binds state
-	
+        state <- getState
+        return $ cgs_binds state
+        
 setBinds :: CgBindings -> FCode ()
 setBinds new_binds = do
-	state <- getState
-	setState $ state {cgs_binds = new_binds}
+        state <- getState
+        setState $ state {cgs_binds = new_binds}
 
 getStaticBinds :: FCode CgBindings
 getStaticBinds = do
-	info  <- getInfoDown
-	return (cgd_statics info)
+        info  <- getInfoDown
+        return (cgd_statics info)
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state -> 
-	let (retval, state2) = fcode info_down newstate in ((retval,state2), state)
+        let (retval, state2) = fcode info_down newstate in ((retval,state2), state)
 
 newUniqSupply :: FCode UniqSupply
 newUniqSupply = do
-	state <- getState
-	let (us1, us2) = splitUniqSupply (cgs_uniqs state)
-	setState $ state { cgs_uniqs = us1 }
-	return us2
+        state <- getState
+        let (us1, us2) = splitUniqSupply (cgs_uniqs state)
+        setState $ state { cgs_uniqs = us1 }
+        return us2
 
 newUnique :: FCode Unique
 newUnique = do
-	us <- newUniqSupply
-	return (uniqFromSupply us)
+        us <- newUniqSupply
+        return (uniqFromSupply us)
 
-------------------
 getInfoDown :: FCode CgInfoDownwards
 getInfoDown = FCode $ \info_down state -> (info_down,state)
 
@@ -536,14 +517,14 @@ doFCode (FCode fcode) info_down state = fcode info_down state
 
 
 %************************************************************************
-%*									*
-		Forking
-%*									*
+%*                                                                      *
+                Forking
+%*                                                                      *
 %************************************************************************
 
 @forkClosureBody@ takes a code, $c$, and compiles it in a completely
 fresh environment, except that:
-	- compilation info and statics are passed in unchanged.
+        - compilation info and statics are passed in unchanged.
 The current environment is passed on completely unaltered, except that
 abstract C from the fork is incorporated.
 
@@ -560,86 +541,86 @@ bindings and usage information is otherwise unchanged.
 \begin{code}
 forkClosureBody :: Code -> Code
 forkClosureBody body_code
-  = do	{ info <- getInfoDown
-	; us   <- newUniqSupply
-	; state <- getState
-   	; let	body_info_down = info { cgd_eob = initEobInfo }
-		((),fork_state)	= doFCode body_code body_info_down 
-					  (initCgState us)
-	; ASSERT( isNilOL (cgs_stmts fork_state) )
-	  setState $ state `addCodeBlocksFrom` fork_state }
-	
+  = do  { info <- getInfoDown
+        ; us   <- newUniqSupply
+        ; state <- getState
+        ; let   body_info_down = info { cgd_eob = initEobInfo }
+                ((),fork_state) = doFCode body_code body_info_down 
+                                          (initCgState us)
+        ; ASSERT( isNilOL (cgs_stmts fork_state) )
+          setState $ state `addCodeBlocksFrom` fork_state }
+        
 forkStatics :: FCode a -> FCode a
 forkStatics body_code
-  = do	{ info  <- getInfoDown
-	; us    <- newUniqSupply
-	; state <- getState
-	; let	rhs_info_down = info { cgd_statics = cgs_binds state,
-				       cgd_eob     = initEobInfo }
-		(result, fork_state_out) = doFCode body_code rhs_info_down 
-						   (initCgState us)
-	; ASSERT( isNilOL (cgs_stmts fork_state_out) )
-	  setState (state `addCodeBlocksFrom` fork_state_out)
-	; return result }
+  = do  { info  <- getInfoDown
+        ; us    <- newUniqSupply
+        ; state <- getState
+        ; let   rhs_info_down = info { cgd_statics = cgs_binds state,
+                                       cgd_eob     = initEobInfo }
+                (result, fork_state_out) = doFCode body_code rhs_info_down 
+                                                   (initCgState us)
+        ; ASSERT( isNilOL (cgs_stmts fork_state_out) )
+          setState (state `addCodeBlocksFrom` fork_state_out)
+        ; return result }
 
 forkProc :: Code -> FCode CgStmts
 forkProc body_code
-  = do	{ info_down <- getInfoDown
-	; us    <- newUniqSupply
-	; state <- getState
-	; let	fork_state_in = (initCgState us) 
-					{ cgs_binds   = cgs_binds state,
-					  cgs_stk_usg = cgs_stk_usg state,
-					  cgs_hp_usg  = cgs_hp_usg state }
-			-- ToDo: is the hp usage necesary?
-		(code_blks, fork_state_out) = doFCode (getCgStmts body_code) 
-						      info_down fork_state_in
-	; setState $ state `stateIncUsageEval` fork_state_out
-	; return code_blks }
+  = do  { info_down <- getInfoDown
+        ; us    <- newUniqSupply
+        ; state <- getState
+        ; let   fork_state_in = (initCgState us) 
+                                        { cgs_binds   = cgs_binds state,
+                                          cgs_stk_usg = cgs_stk_usg state,
+                                          cgs_hp_usg  = cgs_hp_usg state }
+                        -- ToDo: is the hp usage necesary?
+                (code_blks, fork_state_out) = doFCode (getCgStmts body_code) 
+                                                      info_down fork_state_in
+        ; setState $ state `stateIncUsageEval` fork_state_out
+        ; return code_blks }
 
-codeOnly :: Code -> Code
 -- Emit any code from the inner thing into the outer thing
 -- Do not affect anything else in the outer state
 -- Used in almost-circular code to prevent false loop dependencies
+codeOnly :: Code -> Code
 codeOnly body_code
-  = do	{ info_down <- getInfoDown
-	; us   <- newUniqSupply
-	; state <- getState
-	; let	fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state,
-					           cgs_stk_usg = cgs_stk_usg state,
-					           cgs_hp_usg  = cgs_hp_usg state }
-		((), fork_state_out) = doFCode body_code info_down fork_state_in
-	; setState $ state `addCodeBlocksFrom` fork_state_out }
+  = do  { info_down <- getInfoDown
+        ; us   <- newUniqSupply
+        ; state <- getState
+        ; let   fork_state_in = (initCgState us) { cgs_binds   = cgs_binds state,
+                                                   cgs_stk_usg = cgs_stk_usg state,
+                                                   cgs_hp_usg  = cgs_hp_usg state }
+                ((), fork_state_out) = doFCode body_code info_down fork_state_in
+        ; setState $ state `addCodeBlocksFrom` fork_state_out }
 \end{code}
 
 @forkAlts@ $bs~d$ takes fcodes $bs$ for the branches of a @case@, and
 an fcode for the default case $d$, and compiles each in the current
 environment.  The current environment is passed on unmodified, except
 that
-	- the worst stack high-water mark is incorporated
-	- the virtual Hp is moved on to the worst virtual Hp for the branches
+        - the worst stack high-water mark is incorporated
+        - the virtual Hp is moved on to the worst virtual Hp for the branches
 
 \begin{code}
 forkAlts :: [FCode a] -> FCode [a]
 
 forkAlts branch_fcodes
-  = do	{ info_down <- getInfoDown
-	; us <- newUniqSupply
-	; state <- getState
-	; let compile us branch 
-		= (us2, doFCode branch info_down branch_state)
-		where
-		  (us1,us2) = splitUniqSupply us
-	          branch_state = (initCgState us1) {
-					cgs_binds   = cgs_binds state,
-					cgs_stk_usg = cgs_stk_usg state,
-					cgs_hp_usg  = cgs_hp_usg state }
+  = do  { info_down <- getInfoDown
+        ; us <- newUniqSupply
+        ; state <- getState
+        ; let compile us branch 
+                = (us2, doFCode branch info_down branch_state)
+                where
+                  (us1,us2) = splitUniqSupply us
+                  branch_state = (initCgState us1) {
+                                        cgs_binds   = cgs_binds state,
+                                        cgs_stk_usg = cgs_stk_usg state,
+                                        cgs_hp_usg  = cgs_hp_usg state }
 
-	      (_us, results) = mapAccumL compile us branch_fcodes
-	      (branch_results, branch_out_states) = unzip results
-	; setState $ foldl stateIncUsage state branch_out_states
-		-- NB foldl.  state is the *left* argument to stateIncUsage
-	; return branch_results }
+              (_us, results) = mapAccumL compile us branch_fcodes
+              (branch_results, branch_out_states) = unzip results
+        ; setState $ foldl stateIncUsage state branch_out_states
+                -- NB foldl.  state is the *left* argument to stateIncUsage
+        ; return branch_results }
 \end{code}
 
 @forkEval@ takes two blocks of code.
@@ -659,43 +640,43 @@ usage.
 
 \begin{code}
 forkEval :: EndOfBlockInfo              -- For the body
-    	 -> Code			-- Code to set environment
-	 -> FCode Sequel		-- Semi-tagging info to store
-	 -> FCode EndOfBlockInfo	-- The new end of block info
+         -> Code                        -- Code to set environment
+         -> FCode Sequel                -- Semi-tagging info to store
+         -> FCode EndOfBlockInfo        -- The new end of block info
 
 forkEval body_eob_info env_code body_code
   = do  { (v, sequel) <- forkEvalHelp body_eob_info env_code body_code
- 	; returnFC (EndOfBlockInfo v sequel) }
+        ; returnFC (EndOfBlockInfo v sequel) }
 
 forkEvalHelp :: EndOfBlockInfo  -- For the body
-    	     -> Code		-- Code to set environment
-	     -> FCode a		-- The code to do after the eval
-	     -> FCode (VirtualSpOffset,	-- Sp
-		       a)		-- Result of the FCode
-	-- A disturbingly complicated function
+             -> Code            -- Code to set environment
+             -> FCode a         -- The code to do after the eval
+             -> FCode (VirtualSpOffset, -- Sp
+                       a)               -- Result of the FCode
+        -- A disturbingly complicated function
 forkEvalHelp body_eob_info env_code body_code
-  = do	{ info_down <- getInfoDown
-	; us   <- newUniqSupply
-	; state <- getState
-	; let { info_down_for_body = info_down {cgd_eob = body_eob_info}
-	      ; (_, env_state) = doFCode env_code info_down_for_body 
-					 (state {cgs_uniqs = us})
-	      ; state_for_body = (initCgState (cgs_uniqs env_state)) 
-					{ cgs_binds   = binds_for_body,
-	      				  cgs_stk_usg = stk_usg_for_body }
-	      ; binds_for_body   = nukeVolatileBinds (cgs_binds env_state)
-	      ; stk_usg_from_env = cgs_stk_usg env_state
-	      ; virtSp_from_env  = virtSp stk_usg_from_env
-	      ; stk_usg_for_body = stk_usg_from_env {realSp = virtSp_from_env,
-	      					     hwSp   = virtSp_from_env}
-	      ; (value_returned, state_at_end_return)
-	        	= doFCode body_code info_down_for_body state_for_body		
-	  } 
-	; ASSERT( isNilOL (cgs_stmts state_at_end_return) )
-		 -- The code coming back should consist only of nested declarations,
-		 -- notably of the return vector!
-	  setState $ state `stateIncUsageEval` state_at_end_return
-	; return (virtSp_from_env, value_returned) }
+  = do  { info_down <- getInfoDown
+        ; us   <- newUniqSupply
+        ; state <- getState
+        ; let { info_down_for_body = info_down {cgd_eob = body_eob_info}
+              ; (_, env_state) = doFCode env_code info_down_for_body 
+                                         (state {cgs_uniqs = us})
+              ; state_for_body = (initCgState (cgs_uniqs env_state)) 
+                                        { cgs_binds   = binds_for_body,
+                                          cgs_stk_usg = stk_usg_for_body }
+              ; binds_for_body   = nukeVolatileBinds (cgs_binds env_state)
+              ; stk_usg_from_env = cgs_stk_usg env_state
+              ; virtSp_from_env  = virtSp stk_usg_from_env
+              ; stk_usg_for_body = stk_usg_from_env {realSp = virtSp_from_env,
+                                                     hwSp   = virtSp_from_env}
+              ; (value_returned, state_at_end_return)
+                        = doFCode body_code info_down_for_body state_for_body           
+          } 
+        ; ASSERT( isNilOL (cgs_stmts state_at_end_return) )
+                 -- The code coming back should consist only of nested declarations,
+                 -- notably of the return vector!
+          setState $ state `stateIncUsageEval` state_at_end_return
+        ; return (virtSp_from_env, value_returned) }
 
 
 -- ----------------------------------------------------------------------------
@@ -720,10 +701,10 @@ newLabelC :: FCode BlockId
 newLabelC = do { u <- newUnique
                ; return $ mkBlockId u }
 
-checkedAbsC :: CmmStmt -> Code
 -- Emit code, eliminating no-ops
+checkedAbsC :: CmmStmt -> Code
 checkedAbsC stmt = emitStmts (if isNopStmt stmt then nilOL
-	 		      else unitOL stmt)
+                              else unitOL stmt)
 
 stmtsC :: [CmmStmt] -> Code
 stmtsC stmts = emitStmts (toOL stmts)
@@ -739,37 +720,37 @@ forkLabelledCode code = getCgStmts code >>= forkCgStmts
 
 emitCgStmt :: CgStmt -> Code
 emitCgStmt stmt
-  = do	{ state <- getState
-	; setState $ state { cgs_stmts = cgs_stmts state `snocOL` stmt }
-	}
+  = do  { state <- getState
+        ; setState $ state { cgs_stmts = cgs_stmts state `snocOL` stmt }
+        }
 
 emitDecl :: CmmDecl -> Code
 emitDecl decl
-  = do 	{ state <- getState
-	; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
+  = do  { state <- getState
+        ; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
 
 emitProc :: CmmInfo -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
 emitProc info lbl [] blocks
   = do  { let proc_block = CmmProc info lbl (ListGraph blocks)
-	; state <- getState
-	; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
+        ; state <- getState
+        ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 emitProc _ _ (_:_) _ = panic "emitProc called with nonempty args"
 
-emitSimpleProc :: CLabel -> Code -> Code
 -- Emit a procedure whose body is the specified code; no info table
+emitSimpleProc :: CLabel -> Code -> Code
 emitSimpleProc lbl code
-  = do	{ stmts <- getCgStmts code
-	; blks <- cgStmtsToBlocks stmts
-	; emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] blks }
+  = do  { stmts <- getCgStmts code
+        ; blks <- cgStmtsToBlocks stmts
+        ; emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] blks }
 
-getCmm :: Code -> FCode CmmGroup
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)
+getCmm :: Code -> FCode CmmGroup
 getCmm code 
-  = do	{ state1 <- getState
-	; ((), state2) <- withState code (state1 { cgs_tops  = nilOL })
-	; setState $ state2 { cgs_tops = cgs_tops state1 } 
+  = do  { state1 <- getState
+        ; ((), state2) <- withState code (state1 { cgs_tops  = nilOL })
+        ; setState $ state2 { cgs_tops = cgs_tops state1 } 
         ; return (fromOL (cgs_tops state2))
         }
 
@@ -783,31 +764,31 @@ getCmm code
 -- emit CgStmts into the current instruction stream
 emitCgStmts :: CgStmts -> Code
 emitCgStmts stmts
-  = do	{ state <- getState
-	; setState $ state { cgs_stmts = cgs_stmts state `appOL` stmts } }
+  = do  { state <- getState
+        ; setState $ state { cgs_stmts = cgs_stmts state `appOL` stmts } }
 
 -- emit CgStmts outside the current instruction stream, and return a label
 forkCgStmts :: CgStmts -> FCode BlockId
 forkCgStmts stmts
   = do  { id <- newLabelC
-	; emitCgStmt (CgFork id stmts)
-	; return id
-	}
+        ; emitCgStmt (CgFork id stmts)
+        ; return id
+        }
 
 -- turn CgStmts into [CmmBasicBlock], for making a new proc.
 cgStmtsToBlocks :: CgStmts -> FCode [CmmBasicBlock]
 cgStmtsToBlocks stmts
   = do  { id <- newLabelC
-	; return (flattenCgStmts id stmts)
-	}	
+        ; return (flattenCgStmts id stmts)
+        }       
 
 -- collect the code emitted by an FCode computation
 getCgStmts' :: FCode a -> FCode (a, CgStmts)
 getCgStmts' fcode
-  = do	{ state1 <- getState
-	; (a, state2) <- withState fcode (state1 { cgs_stmts = nilOL })
-	; setState $ state2 { cgs_stmts = cgs_stmts state1  }
-	; return (a, cgs_stmts state2) }
+  = do  { state1 <- getState
+        ; (a, state2) <- withState fcode (state1 { cgs_stmts = nilOL })
+        ; setState $ state2 { cgs_stmts = cgs_stmts state1  }
+        ; return (a, cgs_stmts state2) }
 
 getCgStmts :: FCode a -> FCode CgStmts
 getCgStmts fcode = do { (_,stmts) <- getCgStmts' fcode; return stmts }
@@ -832,14 +813,14 @@ getModuleName = do { info <- getInfoDown; return (cgd_mod info) }
 -- Get/set the end-of-block info
 
 setEndOfBlockInfo :: EndOfBlockInfo -> Code -> Code
-setEndOfBlockInfo eob_info code	= do
-	info  <- getInfoDown
-	withInfoDown code (info {cgd_eob = eob_info})
+setEndOfBlockInfo eob_info code = do
+        info  <- getInfoDown
+        withInfoDown code (info {cgd_eob = eob_info})
 
 getEndOfBlockInfo :: FCode EndOfBlockInfo
 getEndOfBlockInfo = do
-	info <- getInfoDown
-	return (cgd_eob info)
+        info <- getInfoDown
+        return (cgd_eob info)
 
 -- ----------------------------------------------------------------------------
 -- Get/set the current SRT label
@@ -848,14 +829,14 @@ getEndOfBlockInfo = do
 -- bindings use sub-sections of this SRT.  The label is passed down to
 -- the nested bindings via the monad.
 
-getSRTLabel :: FCode CLabel	-- Used only by cgPanic
+getSRTLabel :: FCode CLabel     -- Used only by cgPanic
 getSRTLabel = do info  <- getInfoDown
-		 return (cgd_srt_lbl info)
+                 return (cgd_srt_lbl info)
 
 setSRTLabel :: CLabel -> FCode a -> FCode a
 setSRTLabel srt_lbl code
   = do  info <- getInfoDown
-	withInfoDown code (info { cgd_srt_lbl = srt_lbl})
+        withInfoDown code (info { cgd_srt_lbl = srt_lbl})
 
 getSRT :: FCode SRT
 getSRT = do info <- getInfoDown
@@ -871,11 +852,11 @@ setSRT srt code
 
 getTickyCtrLabel :: FCode CLabel
 getTickyCtrLabel = do
-	info <- getInfoDown
-	return (cgd_ticky info)
+        info <- getInfoDown
+        return (cgd_ticky info)
 
 setTickyCtrLabel :: CLabel -> Code -> Code
 setTickyCtrLabel ticky code = do
-	info <- getInfoDown
-	withInfoDown code (info {cgd_ticky = ticky})
+        info <- getInfoDown
+        withInfoDown code (info {cgd_ticky = ticky})
 \end{code}
