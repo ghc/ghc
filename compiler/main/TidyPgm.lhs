@@ -505,11 +505,13 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
          , vectInfoScalarVars   = tidy_scalarVars
          }
   where
-      -- we only export mappings whose co-domain is exported (otherwise, the iface is inconsistent)
+      -- we only export mappings whose domain and co-domain is exported (otherwise, the iface is
+      -- inconsistent)
     tidy_vars = mkVarEnv [ (tidy_var, (tidy_var, tidy_var_v))
                          | (var, var_v) <- varEnvElts vars
                          , let tidy_var   = lookup_var var
                                tidy_var_v = lookup_var var_v
+                         , isExportedId tidy_var
                          , isExportedId tidy_var_v
                          ]
 
