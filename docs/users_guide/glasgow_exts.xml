@@ -4356,7 +4356,7 @@ allows you to do so.  For example:
   data T a = MkT a a
   instance Eq a => Eq (T a) where
     (==) :: T a -> T a -> Bool   -- The signature
-    (==) (MkT x1 x2) (MkTy y1 y2) = x1==y1 && x2==y2
+    (==) (MkT x1 x2) (MkTy y1 y2) = x1==y1 &amp;&amp; x2==y2
 </programlisting>
 The type signature in the instance declaration must be precisely the same as
 the one in the class declaration, instantiated with the instance type.
@@ -4377,7 +4377,7 @@ instance C a => C (T a) where
 </programlisting>
 Provided that you also specify <option>-XScopedTypeVariables</option> 
 (<xref linkend="scoped-type-variables"/>),
-the <literal>forall b</forall> scopes over the definition of <literal>foo</literal>,
+the <literal>forall b</literal> scopes over the definition of <literal>foo</literal>,
 and in particular over the type signature for <literal>xs</literal>.
 </para>
 </sect3>
