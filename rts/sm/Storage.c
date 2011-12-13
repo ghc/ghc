@@ -190,7 +190,7 @@ initStorage( void )
 
 void storageAddCapabilities (nat from, nat to)
 {
-    nat n, g;
+    nat n, g, i;
 
     if (from > 0) {
         nurseries = stgReallocBytes(nurseries, to * sizeof(struct nursery_),
@@ -198,6 +198,12 @@ void storageAddCapabilities (nat from, nat to)
     } else {
         nurseries = stgMallocBytes(to * sizeof(struct nursery_),
                                     "storageAddCapabilities");
+    }
+
+    // we've moved the nurseries, so we have to update the rNursery
+    // pointers from the Capabilities.
+    for (i = 0; i < to; i++) {
+        capabilities[i].r.rNursery = &nurseries[i];
     }
 
     /* The allocation area.  Policy: keep the allocation area
@@ -463,8 +469,7 @@ assignNurseriesToCapabilities (nat from, nat to)
     nat i;
 
     for (i = from; i < to; i++) {
-	capabilities[i].r.rNursery        = &nurseries[i];
-	capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
+        capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
 	capabilities[i].r.rCurrentAlloc   = NULL;
     }
 }
