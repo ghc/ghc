@@ -138,6 +138,11 @@ endif
 
 $(eval $(call get-ghc-field,GhcRTSWays,RTS ways))
 
+$(eval $(call get-ghc-field,AR,ar command))
+ifeq "$(AR)" ""
+AR = ar
+endif
+
 TOP_ABS := $(abspath $(TOP))
 $(eval $(call canonicalise,TOP_ABS))
 

@@ -18,7 +18,7 @@ generateVectorU n =
     let -- The std random function is too slow to generate really big vectors
         -- with.  Instead, we generate a short random vector and repeat that.
         randvec = U.randomRs k (-100, 100) rg
-        vec     = U.map (\i -> randvec U.!: (i `mod` k)) (U.enumFromTo 0 (n-1))
+        vec     = U.map (\i -> U.index "generateVectorU" randvec (i `mod` k)) (U.enumFromTo 0 (n-1))
     evaluate vec
     return vec
   where

@@ -21,7 +21,7 @@ runQuickhull pts
  = let result = quickhull pts
        resxs  = P.toUArray (QH.xsOf result)
        resys  = P.toUArray (QH.ysOf result)
-   in  resxs U.!: 0 `seq` (zip (U.toList resxs) (U.toList resys))
+   in  U.index "runQuickhull" resxs 0 `seq` (zip (U.toList resxs) (U.toList resys))
 
 
 -- Main Program ---------------------------------------------------------------
