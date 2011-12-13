@@ -700,29 +700,6 @@ lintTyBndrKind tv =
   else lintKind ki  -- type forall
 
 -------------------
-{-
-lint_prim_eq_co :: TyCon -> OutCoercion -> [OutCoercion] -> LintM (OutType,OutType)
-lint_prim_eq_co tc co arg_cos = case arg_cos of 
-  [co1,co2] -> do { (t1,s1) <- lintCoercion co1
-                  ; (t2,s2) <- lintCoercion co2
-                  ; checkL (typeKind t1 `eqKind` typeKind t2) $ 
-                    ptext (sLit "Mismatched arg kinds in coercion application:") <+> ppr co
-                  ; return (mkTyConApp tc [t1,t2], mkTyConApp tc [s1,s2]) }
-  _ -> failWithL (ptext (sLit "Unsaturated or oversaturated ~# coercion") <+> ppr co)
-
-lint_eq_co :: TyCon -> OutCoercion -> [OutCoercion] -> LintM (OutType,OutType) 
-lint_eq_co tc co arg_cos = case arg_cos of 
-  [co1,co2] -> do { (t1,s1) <- lintCoercion co1
-                  ; (t2,s2) <- lintCoercion co2
-                  ; checkL (typeKind t1 `eqKind` typeKind t2) $
-                    ptext (sLit "Mismatched arg kinds in coercion application:") <+> ppr co
-                  ; return (mkTyConApp tc [t1,t2], mkTyConApp tc [s1,s2]) }
-  [co1] -> do { (t1,s1) <- lintCoercion co1
-              ; return (mkTyConApp tc [t1], mkTyConApp tc [s1]) }
-  [] -> return (mkTyConApp tc [], mkTyConApp tc [])
-  _ -> failWithL (ptext (sLit "Oversaturated ~ coercion") <+> ppr co) 
--}
-
 lintKindCoercion :: OutCoercion -> LintM OutKind
 -- Kind coercions are only reflexivity because they mean kind
 -- instantiation.  See Note [Kind coercions] in Coercion
@@ -742,21 +719,6 @@ lintCoercion (Refl ty)
        ; return (ty, ty) }
 
 lintCoercion co@(TyConAppCo tc cos)
-{- DV: This grievous hack (from ghc-constraint-solver) should not be needed any more:
-  | tc `hasKey` eqPrimTyConKey      -- Just as in lintType, treat applications of (~) and (~#)
-  = lint_prim_eq_co tc co cos       -- specially to allow for polymorphism. This hack will 
-                                    -- hopefully go away when we merge in kind polymorphism.
-  | tc `hasKey` eqTyConKey
-  = lint_eq_co tc co cos
-
-  | otherwise
-  = do { (ss,ts) <- mapAndUnzipM lintCoercion cos
-       ; let kind_to_check = if (tc `hasKey` funTyConKey) && (length cos == 2)
-                             then mkArrowKinds [argTypeKind,openTypeKind] liftedTypeKind
-                             else tyConKind tc -- TODO: Fix this when kind polymorphism is in! 
-       ; check_co_app co kind_to_check ss
-       ; return (mkTyConApp tc ss, mkTyConApp tc ts) }
--}
   = do   -- We use the kind of the type constructor to know how many
          -- kind coercions we have (one kind coercion for one kind
          -- instantiation).
@@ -876,7 +838,10 @@ lintType ty@(FunTy t1 t2)
   = lint_ty_app ty (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind) [t1,t2]
 
 lintType ty@(TyConApp tc tys)
-  | tyConHasKind tc
+  | tyConHasKind tc   -- Guards for SuperKindOon
+  , not (isUnLiftedTyCon tc) || tys `lengthIs` tyConArity tc
+       -- Check that primitive types are saturated
+       -- See Note [The kind invariant] in TypeRep
   = lint_ty_app ty (tyConKind tc) tys
   | otherwise
   = failWithL (hang (ptext (sLit "Malformed type:")) 2 (ppr ty))
