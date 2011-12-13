@@ -1113,8 +1113,7 @@ tcPatSig ctxt sig res_ty
 	-- that should be brought into scope
 
 	; if null sig_tvs then do {
-		-- The type signature binds no type variables, 
-		-- and hence is rigid, so use it to zap the res_ty
+		-- Just do the subsumption check and return
                   wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty
 		; return (sig_ty, [], wrap)
         } else do {
