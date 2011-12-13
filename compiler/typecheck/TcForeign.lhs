@@ -84,8 +84,9 @@ normaliseFfiType' env ty0 = go [] ty0
     go rec_nts ty@(TyConApp tc tys)
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
-        | tc `hasKey` ioTyConKey
+        | tc_key `elem` [ioTyConKey, funPtrTyConKey]
         = children_only
+
         | isNewTyCon tc         -- Expand newtypes
         -- We can't just use isRecursiveTyCon here, as we need to allow
         -- some recursive types as described below
@@ -143,7 +144,7 @@ normaliseFfiType' env ty0 = go [] ty0
             -- because whether an FFI type is legal or not depends only on
             -- the top-level type constructor (e.g. "Ptr a" is valid for all a).
         where
-
+          tc_key = getUnique tc
           children_only = do xs <- mapM (go rec_nts) tys
                              let (cos, tys') = unzip xs
                              return (mkTyConAppCo tc cos, mkTyConApp tc tys')
@@ -230,6 +231,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ CWrapper) = do
         [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
                         checkForeignRes mustBeIO checkSafe isFFIDynResultTy    res_ty
+                                 -- ToDo: Why are res1_ty and res_ty not equal?
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr empty sig_ty)
