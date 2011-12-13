@@ -528,9 +528,6 @@ GhcPatchLevel	= @GhcPatchLevel@
 GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 
-# Keep this in sync with the variables in package-config.mk
-ghc_ge_613 = @ghc_ge_613@
-
 # Canonicalised ghc version number, used for easy (integer) version
 # comparisons.  We must expand $(GhcMinVersion) to two digits by
 # adding a leading zero if necessary:

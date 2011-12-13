@@ -25,7 +25,6 @@ $1_$2_ArSupportsAtFile = $$(ArSupportsAtFile_STAGE$3)
 
 # configuration stuff that depends on which GHC we're building with
 ifeq "$3" "0"
-$1_$2_ghc_ge_613 = $$(ghc_ge_613)
 $1_$2_HC_CONFIG = $$(GHC_STAGE0)
 $1_$2_HC_CONFIG_DEP =
 $1_$2_GHC_PKG = $$(GHC_PKG)
@@ -39,11 +38,8 @@ $1_$2_HC_PKGCONF = -package-conf $$(BOOTSTRAPPING_CONF)
 $1_$2_GHC_PKG_OPTS = --package-conf=$$(BOOTSTRAPPING_CONF)
 $1_$2_CONFIGURE_OPTS += --package-db=$$(TOP)/$$(BOOTSTRAPPING_CONF)
 $1_$2_MORE_HC_OPTS += -no-user-package-conf
-ifeq "$(ghc_ge_613)" "YES"
 $1_$2_MORE_HC_OPTS += -rtsopts
-endif
 else
-$1_$2_ghc_ge_613 = YES
 $1_$2_HC_PKGCONF = 
 $1_$2_HC_CONFIG = $$(TOP)/$$(GHC_STAGE1)
 $1_$2_HC_CONFIG_DEP = $$(GHC_STAGE1)
