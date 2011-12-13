@@ -303,7 +303,7 @@ and non-orphans.  Roughly speaking, an instance/rule is an orphan if
 its left hand side mentions nothing defined in this module.  Orphan-hood
 has two major consequences
 
- * A non-orphan is not finger-printerd separately.  Instead, for
+ * A non-orphan is not finger-printed separately.  Instead, for
    fingerprinting purposes it is treated as part of the entity it
    mentions on the LHS.  For example
       data T = T1 | T2
