@@ -34,6 +34,7 @@
 Capability MainCapability;
 
 nat n_capabilities = 0;
+nat enabled_capabilities = 0;
 Capability *capabilities = NULL;
 
 // Holds the Capability which last became free.  This is used so that
@@ -323,6 +324,8 @@ initCapabilities( void )
 
 #endif
 
+    enabled_capabilities = n_capabilities;
+
     // There are no free capabilities to begin with.  We will start
     // a worker Task to each Capability, which will quickly put the
     // Capability on the free list when it finds nothing to do.
@@ -493,7 +496,7 @@ releaseCapability_ (Capability* cap,
     // anything else to do, give the Capability to a worker thread.
     if (always_wakeup || 
         !emptyRunQueue(cap) || !emptyInbox(cap) ||
-        !emptySparkPoolCap(cap) || globalWorkToDo()) {
+        (!cap->disabled && !emptySparkPoolCap(cap)) || globalWorkToDo()) {
 	if (cap->spare_workers) {
 	    giveCapabilityToTask(cap,cap->spare_workers);
 	    // The worker Task pops itself from the queue;
@@ -682,7 +685,8 @@ yieldCapability (Capability** pCap, Task *task)
         gcWorkerThread(cap);
         traceEventGcEnd(cap);
         traceSparkCounters(cap);
-        return;
+        // See Note [migrated bound threads 2]
+        if (task->cap == cap) return;
     }
 
 	debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
@@ -767,6 +771,17 @@ yieldCapability (Capability** pCap, Task *task)
 //    Capability on which the bound thread currently lives.  So, if we
 //    hold Capabilty C, and task->cap == C, then task cannot be
 //    migrated under our feet.
+
+// Note [migrated bound threads 2]
+//
+// Second tricky case;
+//   - A bound Task becomes a GC thread
+//   - scheduleDoGC() migrates the thread belonging to this Task,
+//     because the Capability it is on is disabled
+//   - after GC, gcWorkerThread() returns, but now we are
+//     holding a Capability that is not the same as task->cap
+//   - Hence we must check for this case and immediately give up the
+//     cap we hold.
 
 /* ----------------------------------------------------------------------------
  * prodCapability
