@@ -651,7 +651,9 @@ GarbageCollect (rtsBool force_major_gc,
           zero_static_object_list(gct->scavenged_static_objects);
       } else {
           for (i = 0; i < n_gc_threads; i++) {
-              zero_static_object_list(gc_threads[i]->scavenged_static_objects);
+              if (!gc_threads[i]->idle) {
+                  zero_static_object_list(gc_threads[i]->scavenged_static_objects);
+              }
           }
       }
   }
