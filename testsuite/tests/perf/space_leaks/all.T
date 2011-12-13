@@ -37,3 +37,7 @@ test('T2762',
       only_ways(['normal']),
       extra_clean(['T2762A.hi', 'T2762A.o'])],
      compile_and_run, ['-O'])
+
+test('T4018',
+     [ only_ways(['optasm']), extra_run_opts('+RTS -M10m -RTS') ],
+     compile_and_run, ['-fno-state-hack'])
