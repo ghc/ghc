@@ -129,3 +129,8 @@ tests/dph/classes/dph-classes-fast
 tests/dph/dotp/dph-dotp-opt
 tests/dph/primespj/dph-primespj-opt
 tests/dph/words/dph-words-opt
+tests/array/should_run/arr020
+tests/dph/diophantine/dph-diophantine-copy-fast
+tests/dph/sumnats/dph-sumnats-copy
+tests/dph/sumnats/dph-sumnats-vseg
+tests/dph/diophantine/dph-diophantine-copy-opt
