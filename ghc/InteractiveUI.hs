@@ -1,13 +1,6 @@
 {-# OPTIONS -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSp
--- for details
-
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 -----------------------------------------------------------------------------
 --
@@ -1084,15 +1077,15 @@ defineMacro overwrite s = do
   macros <- liftIO (readIORef macros_ref)
   let defined = map cmdName macros
   if (null macro_name) 
-	then if null defined
+        then if null defined
                 then liftIO $ putStrLn "no macros defined"
                 else liftIO $ putStr ("the following macros are defined:\n" ++
                                       unlines defined)
-	else do
+        else do
   if (not overwrite && macro_name `elem` defined)
-	then ghcError (CmdLineError 
-		("macro '" ++ macro_name ++ "' is already defined"))
-	else do
+        then ghcError (CmdLineError 
+                ("macro '" ++ macro_name ++ "' is already defined"))
+        else do
 
   let filtered = [ cmd | cmd <- macros, cmdName cmd /= macro_name ]
 
@@ -1125,9 +1118,9 @@ undefineMacro str = mapM_ undef (words str)
  where undef macro_name = do
         cmds <- liftIO (readIORef macros_ref)
         if (macro_name `notElem` map cmdName cmds) 
-      	   then ghcError (CmdLineError 
-      		("macro '" ++ macro_name ++ "' is not defined"))
-      	   else do
+           then ghcError (CmdLineError 
+                ("macro '" ++ macro_name ++ "' is not defined"))
+           else do
             liftIO (writeIORef macros_ref (filter ((/= macro_name) . cmdName) cmds))
 
 
@@ -1154,15 +1147,15 @@ checkModule m = do
   ok <- handleSourceError (\e -> GHC.printException e >> return False) $ do
           r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
           liftIO $ putStrLn $ showSDoc $
-	   case GHC.moduleInfo r of
-	     cm | Just scope <- GHC.modInfoTopLevelScope cm ->
-		let
-		    (local,global) = ASSERT( all isExternalName scope )
-		    		     partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
-		in
-			(text "global names: " <+> ppr global) $$
-		        (text "local  names: " <+> ppr local)
-	     _ -> empty
+           case GHC.moduleInfo r of
+             cm | Just scope <- GHC.modInfoTopLevelScope cm ->
+                let
+                    (local,global) = ASSERT( all isExternalName scope )
+                                     partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
+                in
+                        (text "global names: " <+> ppr global) $$
+                        (text "local  names: " <+> ppr local)
+             _ -> empty
           return True
   afterLoad (successIf ok) False
 
@@ -1250,23 +1243,23 @@ setContextAfterLoad keep_ctxt ms = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- GHC.getTargets
   case [ m | Just m <- map (findTarget ms) targets ] of
-	[]    -> 
-	  let graph' = flattenSCCs (GHC.topSortModuleGraph True ms Nothing) in
-	  load_this (last graph')	  
-	(m:_) -> 
-	  load_this m
+        []    -> 
+          let graph' = flattenSCCs (GHC.topSortModuleGraph True ms Nothing) in
+          load_this (last graph')         
+        (m:_) -> 
+          load_this m
  where
    findTarget ms t
     = case filter (`matches` t) ms of
-	[]    -> Nothing
-	(m:_) -> Just m
+        []    -> Nothing
+        (m:_) -> Just m
 
    summary `matches` Target (TargetModule m) _ _
-	= GHC.ms_mod_name summary == m
+        = GHC.ms_mod_name summary == m
    summary `matches` Target (TargetFile f _) _ _ 
-	| Just f' <- GHC.ml_hs_file (GHC.ms_location summary)	= f == f'
+        | Just f' <- GHC.ml_hs_file (GHC.ms_location summary)   = f == f'
    _ `matches` _
-	= False
+        = False
 
    load_this summary | m <- GHC.ms_mod summary = do
         is_interp <- GHC.moduleIsInterpreted m
@@ -1312,9 +1305,9 @@ modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
   when (verbosity dflags > 0) $ do
    let mod_commas 
-	| null mods = text "none."
-	| otherwise = hsep (
-	    punctuate comma (map ppr mods)) <> text "."
+        | null mods = text "none."
+        | otherwise = hsep (
+            punctuate comma (map ppr mods)) <> text "."
    case ok of
     Failed ->
        liftIO $ putStrLn $ showSDoc (text "Failed, modules loaded: " <> mod_commas)
@@ -1500,7 +1493,7 @@ browseModule bang modl exports_only = do
             sorted_names = loc_sort local ++ occ_sort external
                 where 
                 (local,external) = ASSERT( all isExternalName names )
-				   partition ((==modl) . nameModule) names
+                                   partition ((==modl) . nameModule) names
                 occ_sort = sortBy (compare `on` nameOccName) 
                 -- try to sort by src location.  If the first name in
                 -- our list has a good source location, then they all should.
@@ -1524,13 +1517,13 @@ browseModule bang modl exports_only = do
             labels  [] = text "-- not currently imported"
             labels  l  = text $ intercalate "\n" $ map qualifier l
 
-	    qualifier :: Maybe [ModuleName] -> String
+            qualifier :: Maybe [ModuleName] -> String
             qualifier  = maybe "-- defined locally" 
                              (("-- imported via "++) . intercalate ", " 
                                . map GHC.moduleNameString)
             importInfo = RdrName.getGRE_NameQualifier_maybes rdr_env
 
-	    modNames :: [[Maybe [ModuleName]]]
+            modNames :: [[Maybe [ModuleName]]]
             modNames   = map (importInfo . GHC.getName) things
                                         
             -- annotate groups of imports with their import modules
@@ -1718,11 +1711,11 @@ setCmd ""
   = do st <- getGHCiState
        let opts = options st
        liftIO $ putStrLn (showSDoc (
-   	      text "options currently set: " <> 
-   	      if null opts
-   		   then text "none."
-   		   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
-   	   ))
+              text "options currently set: " <> 
+              if null opts
+                   then text "none."
+                   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
+           ))
        dflags <- getDynFlags
        liftIO $ putStrLn (showSDoc (
           text "GHCi-specific dynamic flag settings:" $$
@@ -1891,13 +1884,13 @@ setOpt, unsetOpt :: String -> GHCi ()
 
 setOpt str
   = case strToGHCiOpt str of
-	Nothing -> liftIO (putStrLn ("unknown option: '" ++ str ++ "'"))
-	Just o  -> setOption o
+        Nothing -> liftIO (putStrLn ("unknown option: '" ++ str ++ "'"))
+        Just o  -> setOption o
 
 unsetOpt str
   = case strToGHCiOpt str of
-	Nothing -> liftIO (putStrLn ("unknown option: '" ++ str ++ "'"))
-	Just o  -> unsetOption o
+        Nothing -> liftIO (putStrLn ("unknown option: '" ++ str ++ "'"))
+        Just o  -> unsetOption o
 
 strToGHCiOpt :: String -> (Maybe GHCiOption)
 strToGHCiOpt "m" = Just Multiline
@@ -1927,13 +1920,13 @@ showCmd str = do
         ["stop"]     -> liftIO $ putStrLn (show (stop st))
         ["imports"]  -> showImports
         ["modules" ] -> showModules
-	["bindings"] -> showBindings
-	["linker"]   -> liftIO showLinkerState
+        ["bindings"] -> showBindings
+        ["linker"]   -> liftIO showLinkerState
         ["breaks"]   -> showBkptTable
         ["context"]  -> showContext
         ["packages"]  -> showPackages
         ["languages"]  -> showLanguages
-	_ -> ghcError (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
+        _ -> ghcError (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
                                      "               | breaks | context | packages | languages ]"))
 
 showImports :: GHCi ()
@@ -1996,7 +1989,7 @@ showBindings = do
 printTyThing :: TyThing -> GHCi ()
 printTyThing tyth = do dflags <- getDynFlags
                        let pefas = dopt Opt_PrintExplicitForalls dflags
-		       printForUser (pprTyThing pefas tyth)
+                       printForUser (pprTyThing pefas tyth)
 
 showBkptTable :: GHCi ()
 showBkptTable = do
@@ -2320,7 +2313,7 @@ breakSwitch (arg1:rest)
         case loc of
             RealSrcLoc l ->
                ASSERT( isExternalName name ) 
-	       	    findBreakAndSet (GHC.nameModule name) $ 
+                    findBreakAndSet (GHC.nameModule name) $ 
                          findBreakByCoord (Just (GHC.srcLocFile l))
                                           (GHC.srcLocLine l, 
                                            GHC.srcLocCol l)
@@ -2482,7 +2475,7 @@ list2 [arg] = do
         case loc of
             RealSrcLoc l ->
                do tickArray <- ASSERT( isExternalName name )
-		  	       lift $ getTickArray (GHC.nameModule name)
+                               lift $ getTickArray (GHC.nameModule name)
                   let mb_span = findBreakByCoord (Just (GHC.srcLocFile l))
                                         (GHC.srcLocLine l, GHC.srcLocCol l)
                                         tickArray
@@ -2730,10 +2723,10 @@ expandPathIO :: String -> IO String
 expandPathIO path = 
   case dropWhile isSpace path of
    ('~':d) -> do
-	tilde <- getHomeDirectory -- will fail if HOME not defined
-	return (tilde ++ '/':d)
+        tilde <- getHomeDirectory -- will fail if HOME not defined
+        return (tilde ++ '/':d)
    other -> 
-	return other
+        return other
 
 wantInterpretedModule :: GHC.GhcMonad m => String -> m Module
 wantInterpretedModule str = do
