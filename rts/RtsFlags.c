@@ -41,6 +41,7 @@ char  **full_prog_argv = NULL;
 char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
 char  **rts_argv = NULL;
+int     rts_argv_size = 0;
 #if defined(mingw32_HOST_OS)
 // On Windows, we want to use GetCommandLineW rather than argc/argv,
 // but we need to mutate the command line arguments for withProgName and
@@ -405,6 +406,19 @@ strequal(const char *a, const char * b)
     return(strcmp(a, b) == 0);
 }
 
+// We can't predict up front how much space we'll need for rts_argv,
+// because it involves parsing ghc_rts_opts and GHCRTS, so we
+// expand it on demand.
+static void appendRtsArg (char *arg)
+{
+    if (rts_argc == rts_argv_size) {
+        rts_argv_size *= 2;
+        rts_argv = stgReallocBytes(rts_argv, rts_argv_size * sizeof (char *),
+                                   "RtsFlags.c:appendRtsArg");
+    }
+    rts_argv[rts_argc++] = arg;
+}
+
 static void splitRtsFlags(const char *s)
 {
     const char *c1, *c2;
@@ -421,7 +435,7 @@ static void splitRtsFlags(const char *s)
         t = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
         strncpy(t, c1, c2-c1);
         t[c2-c1] = '\0';
-        rts_argv[rts_argc++] = t;
+        appendRtsArg(t);
 
 	c1 = c2;
     } while (*c1 != '\0');
@@ -459,11 +473,12 @@ void setupRtsFlags (int *argc, char *argv[],
     *argc = 1;
     rts_argc = 0;
 
-    rts_argv = stgCallocBytes(total_arg + 1, sizeof (char *), "setupRtsFlags");
+    rts_argv_size = total_arg + 1;
+    rts_argv = stgMallocBytes(rts_argv_size * sizeof (char *), "setupRtsFlags");
 
     rts_argc0 = rts_argc;
 
-    // process arguments from the ghc_rts_opts global variable first.
+    // process arguments from the -with-rtsopts compile-time flag first
     // (arguments from the GHCRTS environment variable and the command
     // line override these).
     {
@@ -513,7 +528,7 @@ void setupRtsFlags (int *argc, char *argv[],
 	    mode = PGM;
 	}
         else if (mode == RTS) {
-            rts_argv[rts_argc++] = copyArg(argv[arg]);
+            appendRtsArg(copyArg(argv[arg]));
         }
         else {
             argv[(*argc)++] = argv[arg];
@@ -524,9 +539,10 @@ void setupRtsFlags (int *argc, char *argv[],
 	argv[(*argc)++] = argv[arg];
     }
     argv[*argc] = (char *) 0;
-    rts_argv[rts_argc] = (char *) 0;
 
     procRtsOpts(rts_argc0, rtsOptsEnabled);
+
+    appendRtsArg((char *)0);
 
     normaliseRtsOpts();
 
@@ -1790,6 +1806,7 @@ freeRtsArgv(void)
     freeArgv(rts_argc,rts_argv);
     rts_argc = 0;
     rts_argv = NULL;
+    rts_argv_size = 0;
 }
 
 /* ----------------------------------------------------------------------------
