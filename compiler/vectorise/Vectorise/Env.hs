@@ -98,6 +98,9 @@ data GlobalEnv
           -- *without* a right-hand side in the current or an imported module as well as type
           -- constructors that are automatically identified as scalar by the vectoriser (in
           -- 'Vectorise.Type.Env').  Scalar code may only operate on such data.
+          --
+          -- NB: Not all type constructors in that set are members of the 'Scalar' type class
+          --     (which can be trivially marshalled across scalar code boundaries).
         
         , global_novect_vars          :: VarSet
           -- ^Variables that are not vectorised.  (They may be referenced in the right-hand sides

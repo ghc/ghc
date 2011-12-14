@@ -32,6 +32,7 @@ import DataCon
 import TyCon
 import TcType
 import Type
+import PrelNames
 import NameSet
 import Var
 import VarEnv
@@ -311,11 +312,11 @@ vectDictExpr (Type ty)
 vectDictExpr (Coercion coe)
   = pprSorry "Vectorise.Exp.vectDictExpr: coercion" (ppr coe)
 
--- |Vectorise an expression of functional type, where all arguments and the result are of scalar
--- type (i.e., 'Int', 'Float', 'Double' etc.) and which does not contain any subcomputations that
--- involve parallel arrays.  Such functionals do not requires the full blown vectorisation
--- transformation; instead, they can be lifted by application of a member of the zipWith family
--- (i.e., 'map', 'zipWith', zipWith3', etc.)
+-- |Vectorise an expression of functional type, where all arguments and the result are of primitive
+-- types (i.e., 'Int', 'Float', 'Double' etc., which have instances of the 'Scalar' type class) and
+-- which does not contain any subcomputations that involve parallel arrays.  Such functionals do not
+-- requires the full blown vectorisation transformation; instead, they can be lifted by application
+-- of a member of the zipWith family (i.e., 'map', 'zipWith', zipWith3', etc.)
 --
 vectScalarFun :: Bool       -- ^ Was the function marked as scalar by the user?
               -> [Var]      -- ^ Functions names in same recursive binding group
@@ -328,15 +329,25 @@ vectScalarFun forceScalar recFns expr
             (arg_tys, res_ty) = splitFunTys (exprType expr)
       ; MASSERT( not $ null arg_tys )
       ; onlyIfV (ptext (sLit "not a scalar function"))
-                (forceScalar                              -- user asserts the functions is scalar
+                (forceScalar                                 -- user asserts the functions is scalar
                  ||
-                 all (is_scalar_ty scalarTyCons) arg_tys  -- check whether the function is scalar
-                  && is_scalar_ty scalarTyCons res_ty
+                 all is_primitive_ty arg_tys                 -- check whether the function is scalar
+                  && is_primitive_ty res_ty
                   && is_scalar scalarVars (is_scalar_ty scalarTyCons) expr
-                  && uses scalarVars expr)
+                  && uses scalarVars expr
+                  && length arg_tys <= mAX_DPH_SCALAR_ARGS)
         $ mkScalarFun arg_tys res_ty expr
       }
   where
+    -- !!!FIXME: We would like to allow scalar functions with arguments and results that can be
+    --           any 'scalarTyCons', but can't at the moment, as those argument and result types
+    --           need to be members of the 'Scalar' class (that in its current form would better
+    --           be called 'Primitive'). *ALSO* the hardcoded list of types is ugly!
+    is_primitive_ty ty
+      | Just (tycon, _) <- splitTyConApp_maybe ty
+      = tyConName tycon `elem` [boolTyConName, intTyConName, word8TyConName, doubleTyConName]
+      | otherwise = False
+
     is_scalar_ty scalarTyCons ty 
       | Just (tycon, _) <- splitTyConApp_maybe ty
       = tyConName tycon `elemNameSet` scalarTyCons
@@ -418,7 +429,9 @@ vectScalarFun forceScalar recFns expr
 
 mkScalarFun :: [Type] -> Type -> CoreExpr -> VM VExpr
 mkScalarFun arg_tys res_ty expr
-  = do { fn_var  <- hoistExpr (fsLit "fn") expr DontInline
+  = do { traceVt "mkScalarFun: " $ ppr expr
+
+       ; fn_var  <- hoistExpr (fsLit "fn") expr DontInline
        ; zipf    <- zipScalars arg_tys res_ty
        ; clo     <- scalarClosure arg_tys res_ty (Var fn_var) (zipf `App` Var fn_var)
        ; clo_var <- hoistExpr (fsLit "clo") clo DontInline
