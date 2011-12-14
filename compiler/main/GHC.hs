@@ -55,13 +55,16 @@ module GHC (
         TypecheckedMod, ParsedMod,
         moduleInfo, renamedSource, typecheckedSource,
         parsedSource, coreModule,
+
+        -- ** Compiling to Core
+        CoreModule(..),
         compileToCoreModule, compileToCoreSimplified,
         compileCoreToObj,
-        getModSummary,
 
 	-- * Inspecting the module structure of the program
 	ModuleGraph, ModSummary(..), ms_mod_name, ModLocation(..),
-	getModuleGraph,
+        getModSummary,
+        getModuleGraph,
 	isLoaded,
 	topSortModuleGraph,
 
