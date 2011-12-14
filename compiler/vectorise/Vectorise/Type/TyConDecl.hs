@@ -22,23 +22,21 @@ import Control.Monad
 --
 vectTyConDecls :: [TyCon] -> VM [TyCon]
 vectTyConDecls tcs = fixV $ \tcs' ->
-  do { mapM_ (uncurry defTyCon) (zipLazy tcs tcs')
-     ; mapM vectTyConDecl tcs
+  do { names' <- mapM (mkLocalisedName mkVectTyConOcc . tyConName) tcs
+     ; mapM_ (uncurry (uncurry defTyConName)) (tcs `zip` names' `zipLazy` tcs')
+     ; zipWithM vectTyConDecl tcs names'
      }
 
 -- |Vectorise a single type constructor.
 --
-vectTyConDecl :: TyCon -> VM TyCon
-vectTyConDecl tycon
+vectTyConDecl :: TyCon -> Name -> VM TyCon
+vectTyConDecl tycon name'
 
       -- Type constructor representing a type class
   | Just cls <- tyConClass_maybe tycon
   = do { unless (null $ classATs cls) $
            cantVectorise "Associated types are not yet supported" (ppr cls)
 
-           -- make the name of the vectorised class tycon: "Class" --> "V:Class"
-       ; name' <- mkLocalisedName mkVectTyConOcc (tyConName tycon)
-       
            -- vectorise superclass constraint (types)
        ; theta' <- mapM vectType (classSCTheta cls)
 
@@ -87,9 +85,6 @@ vectTyConDecl tycon
   = do { unless (all isVanillaDataCon (tyConDataCons tycon)) $
            cantVectorise "Currently only Haskell 2011 datatypes are supported" (ppr tycon)
   
-           -- make the name of the vectorised class tycon
-       ; name' <- mkLocalisedName mkVectTyConOcc (tyConName tycon)
-
            -- vectorise the data constructor of the class tycon
        ; rhs' <- vectAlgTyConRhs tycon (algTyConRhs tycon)
 
