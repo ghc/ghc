@@ -134,3 +134,12 @@ tests/dph/diophantine/dph-diophantine-copy-fast
 tests/dph/sumnats/dph-sumnats-copy
 tests/dph/sumnats/dph-sumnats-vseg
 tests/dph/diophantine/dph-diophantine-copy-opt
+tests/dph/classes/dph-classes-copy-fast
+tests/dph/dotp/dph-dotp-copy-fast
+tests/dph/dotp/dph-dotp-vseg-fast
+tests/dph/nbody/dph-nbody-vseg-fast
+tests/dph/primespj/dph-primespj-copy-fast
+tests/dph/quickhull/dph-quickhull-copy-fast
+tests/dph/quickhull/dph-quickhull-vseg-fast
+tests/dph/words/dph-words-copy-fast
+tests/dph/words/dph-words-vseg-fast
