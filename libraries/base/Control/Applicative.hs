@@ -156,8 +156,8 @@ instance Applicative Maybe where
 
 instance Alternative Maybe where
     empty = Nothing
-    Nothing <|> p = p
-    Just x <|> _ = Just x
+    Nothing <|> r = r
+    l       <|> _ = l
 
 instance Applicative [] where
     pure = return
