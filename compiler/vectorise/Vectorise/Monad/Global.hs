@@ -16,7 +16,7 @@ module Vectorise.Monad.Global (
   
   -- * TyCons
   lookupTyCon,
-  defTyCon, globalVectTyCons,
+  defTyConName, defTyCon, globalVectTyCons,
   
   -- * Datacons
   lookupDataCon,
@@ -136,9 +136,13 @@ lookupTyCon tc
 
 -- |Add a mapping between plain and vectorised `TyCon`s to the global environment.
 --
-defTyCon :: TyCon -> TyCon -> VM ()
-defTyCon tc tc'
-  = do { traceVt "add global tycon mapping:" (ppr tc <+> text "-->" <+> ppr tc') 
+-- The second argument is only to enable tracing for (mutually) recursively defined type
+-- constructors, where we /must not/ pull at the vectorised type constructors (because that would
+-- pull too early at the recursive knot).
+--
+defTyConName :: TyCon -> Name -> TyCon -> VM ()
+defTyConName tc nameOfTc' tc'
+  = do { traceVt "add global tycon mapping:" (ppr tc <+> text "-->" <+> ppr nameOfTc') 
 
            -- check for duplicate vectorisation
        ; currentDef <- readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
@@ -157,6 +161,11 @@ defTyCon tc tc'
                     = ptext (sLit "in module") <+> ppr mod
                     | otherwise
                     = ptext (sLit "in the current module")
+
+-- |Add a mapping between plain and vectorised `TyCon`s to the global environment.
+--
+defTyCon :: TyCon -> TyCon -> VM ()
+defTyCon tc tc' = defTyConName tc (tyConName tc') tc'
 
 -- |Get the set of all vectorised type constructors.
 --
