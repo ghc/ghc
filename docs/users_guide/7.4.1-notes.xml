@@ -22,10 +22,29 @@
   <sect2>
     <title>Libraries</title>
 
+    <para>
+        There have been some changes that have effected multiple
+        libraries:
+    </para>
+
     <itemizedlist>
         <listitem>
             <para>
-                TODO
+                The <literal>Num</literal> class no longer has
+                <literal>Eq</literal> or <literal>Show</literal>
+                superclasses. A number of other classes and
+                functions have therefore gained explicit
+                <literal>Eq</literal> or <literal>Show</literal>
+                constraints, rather than relying on a
+                <literal>Num</literal> constraint to provide them.
+            </para>
+        </listitem>
+
+        <listitem>
+            <para>
+                Many modules have been given Safe Haskell
+                <literal>Safe</literal>, <literal>Unsafe</literal> or
+                <literal>Trustworthy</literal> annotations.
             </para>
         </listitem>
     </itemizedlist>
@@ -41,7 +60,63 @@
 
             <listitem>
                 <para>
-                    TODO
+                    There are new modules
+                    <literal>Data.Array.IO.Safe</literal>,
+                    <literal>Data.Array.MArray.Safe</literal>,
+                    <literal>Data.Array.ST.Safe</literal> and
+                    <literal>Data.Array.Storable.Safe</literal>
+                    containing just the safe (in the Safe Haskell sense
+                    of the term) parts of their respective APIs, and
+                    <literal>Data.Array.Unsafe</literal> containing
+                    the unsafe parts of the
+                    <literal>Data.Array</literal> API.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new module
+                    <literal>Data.Array.Storable.Internals</literal>
+                    which exports some internal functions for the
+                    <literal>Data.Array.Storable</literal> API.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Array.IO.castIOUArray</literal>
+                    is now deprecated; use
+                    <literal>Data.Array.Unsafe.castIOUArray</literal>
+                    instead.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Array.ST.castSTUArray</literal>
+                    is now deprecated; use
+                    <literal>Data.Array.Unsafe.castSTUArray</literal>
+                    instead.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Array.MArray.unsafeFreeze</literal>
+                    and <literal>Data.Array.MArray.unsafeThaw</literal>
+                    are now deprecated; use
+                    <literal>Data.Array.Unsafe.unsafeFreeze</literal>
+                    and <literal>Data.Array.Unsafe.unsafeThaw</literal>
+                    instead.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Array.Storable.unsafeForeignPtrToStorableArray</literal>
+                    is now deprecated; use
+                    <literal>Data.Array.Unsafe.unsafeForeignPtrToStorableArray</literal>
+                    instead.
                 </para>
             </listitem>
         </itemizedlist>
@@ -58,7 +133,172 @@
 
             <listitem>
                 <para>
-                    TODO
+                    <literal>Data.List</literal> has a new function
+                    <literal>dropWhileEnd</literal>, which is similar to
+                    <literal>dropWhile</literal> except it removes the
+                    suffix of characters matching the predicate, rather
+                    than the prefix of characters.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Data.Bits.Bits</literal>
+                    class has two new methods
+                    <literal>unsafeShiftL</literal> and
+                    <literal>unsafeShiftR</literal> which perform shifts
+                    on the assumption that the amount to be shifted by
+                    is positive.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Data.Bits.Bits</literal>
+                    class has a new method <literal>popCount</literal>
+                    which returns the number of bits that are set in the
+                    value.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>C*</literal> types exported by
+                    <literal>Foreign.C.Types</literal> and
+                    <literal>System.Posix.Types</literal> are now
+                    exported non-abstractly, as the FFI now requires
+                    that the constructors for newtypes are visible.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>Data.Typeable</literal>,
+                    <literal>tyConString</literal> is now deprecated,
+                    in favour of the new
+                    <literal>tyConPackage</literal>,
+                    <literal>tyConModule</literal> and
+                    <literal>tyConName</literal> functions.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.Exts.traceEvent</literal>
+                    is now deprecated. You should use the new
+                    <literal>Debug.Trace.traceEventIO</literal>
+                    instead. There is also a new function
+                    <literal>Debug.Trace.traceEvent</literal> that is
+                    analogous to <literal>Debug.Trace.trace</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Debug.Trace.putTraceMsg</literal>
+                    is now deprecated in favour of the new function
+                    <literal>Debug.Trace.traceIO</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    When a program is compiled with
+                    <literal>-prof</literal>, GHC's run-time system now
+                    makes a stack trace (based on the SCCs defined)
+                    available to the program.
+                </para>
+                <para>
+                    There is a new function
+                    <literal>GHC.Exts.currentCallStack</literal> which
+                    returns the stack trace as a list of
+                    <literal>String</literal>s.
+                </para>
+                <para>
+                    There is also a new function
+                    <literal>Debug.Trace.traceStack</literal> which is
+                    like <literal>Debug.Trace.trace</literal> but also
+                    prints a call stack trace if one is available.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.Conc</literal> has a new function,
+                    <literal>getNumProcessors</literal>, which returns
+                    the number of CPUs that the machine has.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.Conc</literal> has a new function,
+                    <literal>setNumCapabilities</literal>, which sets
+                    the number of Haskell threads which can run
+                    simultaneously. Currently GHC only allows increasing
+                    the number of running threads.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The encodings used for the filesystem, for foreign
+                    calls, and for the locale, are now mutable.
+                    In order to alter them you need to use
+                    <literal>setLocaleEncoding</literal>,
+                    <literal>setFileSystemEncoding</literal> and
+                    <literal>setForeignEncoding</literal> from
+                    <literal>GHC.IO.Encoding</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Assertions are now better behaved; if an assertion
+                    fails then you will get an assertion error, rather
+                    than another <literal>_|_</literal> result from the
+                    expression that the assertion guards.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    A bug in the behaviour of
+                    <literal>scaleFloat</literal> on
+                    <literal>Float</literal> and
+                    <literal>Double</literal> when used with non-finite
+                    values has been fixed.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    A bug which meant that
+                    <literal>System.IO.fixIO</literal> was not
+                    threadsafe has been fixed.
+                </para>
+                <para>
+                    There is also now a new
+                    <literal>System.IO.Unsafe.unsafeFixIO</literal> that
+                    may be more efficient, but is not guaranteed to be
+                    threadsafe.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new module <literal>GHC.Stats</literal>
+                    which exports a function
+                    <literal>getGCStats</literal> which gives some info
+                    from the runtime system using the
+                    <literal>GCStats</literal> type.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Support for platforms where word size is less than
+                    32bits has been removed.
                 </para>
             </listitem>
         </itemizedlist>
@@ -70,12 +310,6 @@
             <listitem>
                 <para>
                     This is an internal package, and should not be used.
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                    TODO
                 </para>
             </listitem>
         </itemizedlist>
@@ -90,12 +324,6 @@
                     It is now exposed by default.
                 </para>
             </listitem>
-
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
         </itemizedlist>
     </sect3>
 
@@ -107,12 +335,6 @@
                     Version number 0.9.2.1 (was 0.9.2.0)
                 </para>
             </listitem>
-
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
         </itemizedlist>
     </sect3>
 
@@ -122,13 +344,14 @@
             <listitem>
                 <para>
                     Version number 1.14.0.0 (was 1.12.0.0)
-                    TODO: Create branch
                 </para>
             </listitem>
 
             <listitem>
                 <para>
-                    TODO
+                    For details of the changes to the Cabal library,
+                    plese see the Cabal changelog.
+                    TODO: add a link
                 </para>
             </listitem>
         </itemizedlist>
@@ -139,14 +362,76 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.4.2.0 (was 0.4.1.0)
-                    TODO: Compare to 0.4.2.0 on hackage
+                    Version number 0.4.2.1 (was 0.4.1.0)
                 </para>
             </listitem>
 
             <listitem>
                 <para>
-                    TODO
+                    <literal>Data.Map</literal>
+                    now exports
+                    <literal>foldr</literal>,
+                    <literal>foldr'</literal>,
+                    <literal>foldl</literal> and
+                    <literal>foldl'</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Set</literal>
+                    now exports
+                    <literal>foldr</literal>,
+                    <literal>foldr'</literal>,
+                    <literal>foldl</literal> and
+                    <literal>foldl'</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.IntMap</literal>
+                    now exports
+                    <literal>foldr</literal>,
+                    <literal>foldr'</literal>,
+                    <literal>foldl</literal>,
+                    <literal>foldl'</literal>,
+                    <literal>foldrWithKey</literal>,
+                    <literal>foldrWithKey'</literal>,
+                    <literal>foldlWithKey</literal> and
+                    <literal>foldlWithKey'</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.IntSet</literal>
+                    now exports
+                    <literal>foldr</literal>,
+                    <literal>foldr'</literal>,
+                    <literal>foldl</literal> and
+                    <literal>foldl'</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Map.foldWithKey</literal> is no
+                    longer deprecated, although it is expected to
+                    be deprecated again in the future.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now
+                    <literal>NFData</literal>
+                    instance for
+                    <literal>Data.Map.Map</literal>,
+                    <literal>Data.Set.Set</literal>,
+                    <literal>Data.IntMap.IntMap</literal>,
+                    <literal>Data.IntSet.IntSet</literal> and
+                    <literal>Data.Tree.Tree</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -157,8 +442,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    New package, version 1.2.0.1.
-                    TODO: Compare to 1.2.0.1 on hackage
+                    New package, version 1.3.0.0.
                 </para>
             </listitem>
         </itemizedlist>
@@ -172,12 +456,6 @@
                     Version number 1.1.0.2 (was 1.1.0.1)
                 </para>
             </listitem>
-
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
         </itemizedlist>
     </sect3>
 
@@ -187,12 +465,6 @@
             <listitem>
                 <para>
                     Version number 0.1.1.4 (was 0.1.1.3)
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                    TODO
                 </para>
             </listitem>
         </itemizedlist>
@@ -209,7 +481,10 @@
 
             <listitem>
                 <para>
-                    TODO
+                    A bug, which caused
+                    <literal>normalise "/"</literal> to return
+                    <literal>"/."</literal> rather than
+                    <literal>"/"</literal>, has been fixed.
                 </para>
             </listitem>
         </itemizedlist>
@@ -223,12 +498,6 @@
                     This is an internal package, and should not be used.
                 </para>
             </listitem>
-
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
         </itemizedlist>
     </sect3>
 
@@ -238,12 +507,6 @@
             <listitem>
                 <para>
                     Version number 2.0.0.1 (was 2.0.0.0)
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                    TODO
                 </para>
             </listitem>
         </itemizedlist>
@@ -257,12 +520,6 @@
                     Version number 1.1.0.1 (was 1.1.0.0)
                 </para>
             </listitem>
-
-            <listitem>
-                <para>
-                    TODO
-                </para>
-            </listitem>
         </itemizedlist>
     </sect3>
 
@@ -272,13 +529,14 @@
             <listitem>
                 <para>
                     Version number 3.8.7.3 (was 3.8.7.2)
-                    TODO Check this
                 </para>
             </listitem>
 
             <listitem>
                 <para>
-                    TODO
+                    A new <literal>liftFuel</literal> method has been
+                    added to
+                    <literal>Compiler.Hoopl.Fuel.FuelMonadT</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -306,7 +564,32 @@
 
             <listitem>
                 <para>
-                    TODO
+                    There is a new module
+                    <literal>GHC.Integer.GMP.Prim</literal>
+                    that exports the Haskell imports of the GMP
+                    functions. They are no longer exported by
+                    <literal>GHC.Integer.GMP.Internals</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.Integer.GMP.Internals</literal>
+                    now exports <literal>gcdInteger</literal> and
+                    <literal>lcmInteger</literal>. They are no longer
+                    exported by <literal>GHC.Integer</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function <literal>mkInteger</literal>
+                    exported from <literal>GHC.Integer.Type</literal>
+                    and <literal>GHC.Integer</literal>. It constructs an
+                    <literal>Integer</literal> from a
+                    <literal>Bool</literal> (indicating the sign) and a
+                    list of <literal>Int</literal>s (which provide the
+                    value, in 31-bit chunks, least-significant first).
                 </para>
             </listitem>
         </itemizedlist>
@@ -318,12 +601,6 @@
             <listitem>
                 <para>
                     Version number 1.0.0.4 (was 1.0.0.3)
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                    TODO
                 </para>
             </listitem>
         </itemizedlist>
@@ -340,7 +617,10 @@
 
             <listitem>
                 <para>
-                    TODO
+                    A bug which caused
+                    <literal>System.Time.formatCalendarTime</literal>
+                    to show a value 1 too low for the
+                    <literal>%j</literal> format specifier has been fixed.
                 </para>
             </listitem>
         </itemizedlist>
@@ -357,7 +637,25 @@
 
             <listitem>
                 <para>
-                    TODO
+                    The recommended module is now
+                    <literal>Text.PrettyPrint</literal> rather than
+                    <literal>Text.PrettyPrint.HughesPJ</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Both modules now export <literal>first</literal>,
+                    which takes two documents and returns the first
+                    provided it is non-empty, and the second otherwise.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Both modules now export
+                    <literal>reduceDoc</literal>
+                    TODO: Why?
                 </para>
             </listitem>
         </itemizedlist>
@@ -369,12 +667,6 @@
             <listitem>
                 <para>
                     Version number 1.1.0.1 (was 1.1.0.0)
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                    TODO
                 </para>
             </listitem>
         </itemizedlist>
@@ -391,7 +683,157 @@
 
             <listitem>
                 <para>
-                    TODO
+                    The
+                    <literal>Language.Haskell.TH.Syntax.Quasi</literal>
+                    class now has a <literal>qAddDependentFile</literal>
+                    method, which splices can use to indicate that the
+                    result of the splice depends upon the contents of
+                    a file. This tells the compiler that if the file
+                    has changed then it will need to recompile the
+                    module containing the splice.
+                </para>
+                <para>
+                    There is also a new helper function
+                    <literal>addDependentFile</literal> in
+                    <literal>Language.Haskell.TH.Syntax</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The
+                    <literal>Language.Haskell.TH.Syntax.Exp</literal>
+                    type now has <literal>UInfixE</literal> and
+                    <literal>ParensE</literal> constructors, and
+                    <literal>Language.Haskell.TH.Syntax.Pat</literal>
+                    gains corresponding <literal>UInfixP</literal>
+                    and <literal>ParensP</literal> constructors.
+                </para>
+                <para>
+                    There are corresponding helper functions
+                    <literal>uInfixE</literal>,
+                    <literal>parensE</literal>,
+                    <literal>uInfixP</literal> and
+                    <literal>parensP</literal> defined in
+                    <literal>Language.Haskell.TH.Lib</literal>
+                    and re-exported by
+                    <literal>Language.Haskell.TH</literal>.
+                </para>
+                <para>
+                    These constructors are used for infix expressions
+                    where the fixities of the operators are not known.
+                    The compiler will look up the fixities and
+                    reassociate the expression as necessary.
+                </para>
+                <para>
+                    There is also a new value
+                    <literal>Language.Haskell.TH.Ppr.unopPrec</literal>
+                    used when pretty-printing expressions of unknown
+                    fixity.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The
+                    <literal>Language.Haskell.TH.Syntax.Strict</literal>
+                    type now has an <literal>Unpacked</literal>
+                    constructor, which corresponds to the
+                    <literal>{-# UNPACK #-}</literal> pragma.
+                    There is a corresponding helper function
+                    <literal>Language.Haskell.TH.Lib.unpacked</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The
+                    <literal>Language.Haskell.TH.Syntax.Info</literal>
+                    type has a new constructor
+                    <literal>FamilyI</literal>, used when reifying a
+                    data or type family's name.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The
+                    <literal>Language.Haskell.TH.Syntax.ClassInstance</literal>
+                    type has been removed, and the
+                    <literal>ClassI</literal> constructor of
+                    <literal>Language.Haskell.TH.Syntax.Info</literal>
+                    now contains <literal>[InstanceDec]</literal>
+                    rather than <literal>[ClassInstance]</literal>.
+                </para>
+                <para>
+                    <literal>Language.Haskell.TH.Syntax.InstanceDec</literal>
+                    is a new type synonym of
+                    <literal>Language.Haskell.TH.Syntax.Dec</literal>,
+                    but its constructor is guaranteed to be one of
+                    <literal>InstanceD</literal> (with empty 
+                    <literal>[Dec]</literal>),
+                    <literal>DataInstD</literal> or
+                    <literal>NewtypeInstD</literal> (with empty derived
+                    <literal>[Name]</literal>), or
+                    <literal>TySynInstD</literal>.
+                </para>
+                <para>
+                    The <literal>qClassInstances</literal> method of the
+                    <literal>Language.Haskell.TH.Syntax.Quasi</literal>
+                    class has been replaced with a
+                    <literal>qReifyInstances</literal> method.
+                </para>
+                <para>
+                    Likewise, in
+                    <literal>Language.Haskell.TH.Syntax</literal>, the
+                    <literal>isClassInstance</literal> and
+                    <literal>classInstances</literal> functions have
+                    been replaced by <literal>isInstance</literal> and
+                    <literal>reifyInstances</literal>. They are also
+                    re-exported by
+                    <literal>Language.Haskell.TH</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The
+                    <literal>Language.Haskell.TH.Syntax.Quasi</literal>
+                    class now has a <literal>qLookupName</literal>
+                    method, which takes a
+                    <literal>Bool</literal>
+                    indictaing whether you are looking for a type or a
+                    value, and a
+                    <literal>String</literal>.
+                    It then tries to look up the name, returning a
+                    <literal>Maybe Name</literal> in the monad.
+                </para>
+                <para>
+                    There are also new helper functions
+                    <literal>lookupTypeName</literal> and
+                    <literal>lookupValueName</literal>, which are also
+                    re-exported by
+                    <literal>Language.Haskell.TH</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The
+                    <literal>Language.Haskell.TH.Syntax.Quasi</literal>
+                    class now has an <literal>Applicative</literal>
+                    superclass, rather than a <literal>Functor</literal>
+                    superclass. There is also now an
+                    <literal>Applicative</literal> instance for
+                    <literal>Language.Haskell.TH.Syntax.Q</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>NameSpace</literal> type is now
+                    abstractly re-exported by
+                    <literal>Language.Haskell.TH</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -408,7 +850,27 @@
 
             <listitem>
                 <para>
-                    TODO
+                    A <literal>RealFrac</literal>
+                    instance has been added for
+                    <literal>Data.Time.Clock.Scale.DiffTime</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>NFData</literal>
+                    instances have been added for
+                    <literal>Data.Time.Calendar.Days.Day</literal>,
+                    <literal>Data.Time.Clock.Scale.UniversalTime</literal>,
+                    <literal>Data.Time.Clock.Scale.DiffTime</literal>,
+                    <literal>Data.Time.Clock.TAI.AbsoluteTime</literal>,
+                    <literal>Data.Time.Clock.UTC.UTCTime</literal>,
+                    <literal>Data.Time.Clock.UTC.NominalDiffTime</literal>,
+                    <literal>Data.Time.LocalTime.LocalTime.LocalTime</literal>,
+                    <literal>Data.Time.LocalTime.LocalTime.ZonedTime</literal>,
+                    <literal>Data.Time.LocalTime.TimeOfDay.TimeOfDay</literal>
+                    and
+                    <literal>Data.Time.LocalTime.TimeZone.TimeZone</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -425,7 +887,34 @@
 
             <listitem>
                 <para>
-                    TODO
+                    <literal>System.Posix</literal> now re-exports
+                    <literal>System.Posix.DynamicLinker</literal>
+                    (although it hides the <literal>Default</literal>
+                    constructor, as that clashes with the constructor
+                    of the same name of the
+                    <literal>System.Posix.Signals.Handler</literal>
+                    type).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a raw bytestring version of the
+                    filepath and environment APIs. It uses a
+                    <literal>RawFilePath = ByteString</literal>
+                    type synonym, and adds a number of new exposed
+                    modules:
+                    <literal>System.Posix.ByteString</literal>,
+                    <literal>System.Posix.ByteString.FilePath</literal>,
+                    <literal>System.Posix.Directory.ByteString</literal>,
+                    <literal>System.Posix.DynamicLinker.Module.ByteString</literal>,
+                    <literal>System.Posix.DynamicLinker.ByteString</literal>,
+                    <literal>System.Posix.Files.ByteString</literal>,
+                    <literal>System.Posix.IO.ByteString</literal>,
+                    <literal>System.Posix.Env.ByteString</literal>,
+                    <literal>System.Posix.Process.ByteString</literal>,
+                    <literal>System.Posix.Temp.ByteString</literal> and
+                    <literal>System.Posix.Terminal.ByteString</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -442,7 +931,10 @@
 
             <listitem>
                 <para>
-                    TODO
+                    <literal>System.Win32.File</literal> now exports
+                    <literal>failIfWithRetry</literal>,
+                    <literal>failIfWithRetry_</literal> and
+                    <literal>failIfFalseWithRetry_</literal>.
                 </para>
             </listitem>
         </itemizedlist>
