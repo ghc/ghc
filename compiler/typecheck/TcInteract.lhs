@@ -746,9 +746,9 @@ doInteractWithInert
               -- situation for these and even if we did we'd have to be very careful to only
               -- create Derived's and not Wanteds. 
 
-              else let fd_eqns = improveFromAnother inert_pred_loc work_item_pred_loc
-                       wloc    = get_workitem_wloc fl2 
-                   in rewriteWithFunDeps fd_eqns tys2 wloc
+              else do { let fd_eqns = improveFromAnother inert_pred_loc work_item_pred_loc
+                      ; wloc  <- get_workitem_wloc fl2 
+                      ; rewriteWithFunDeps fd_eqns tys2 wloc }
                       -- See Note [Efficient Orientation], [When improvement happens]
 
        ; case any_fundeps of
@@ -764,9 +764,12 @@ doInteractWithInert
                -> do { emitFDWorkAsDerived fd_work (cc_depth workItem)
                      ; irKeepGoing "Cls/Cls (new fundeps)" } -- Just keep going without droping the inert 
        }
-  where get_workitem_wloc (Wanted wl)  = wl 
-        get_workitem_wloc (Derived wl) = wl 
-        get_workitem_wloc (Given {})   = panic "Unexpected given!"
+  where get_workitem_wloc (Wanted wl)  = return wl 
+        get_workitem_wloc (Derived wl) = return wl 
+        get_workitem_wloc (Given {})   = pprPanic "Unexpected given workitem!" $
+                                         vcat [ text "Work item =" <+> ppr workItem
+                                              , text "Inert item=" <+> ppr inertItem
+                                              ]
 
 
 -- Two pieces of irreducible evidence: if their types are *exactly identical* we can
