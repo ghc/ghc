@@ -1,5 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP, ForeignFunctionInterface, MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -39,7 +39,10 @@ import Control.Monad
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign.C.String
-import qualified GHC.Exts as GHC
+import GHC.Base
+import qualified GHC.Foreign
+import GHC.IO.Encoding
+import GHC.Ptr
 import GHC.Stack
 #else
 import System.IO (hPutStrLn,stderr)
@@ -154,7 +157,9 @@ traceEvent msg expr = unsafeDupablePerformIO $ do
 --
 traceEventIO :: String -> IO ()
 #ifdef __GLASGOW_HASKELL__
-traceEventIO = GHC.traceEventIO
+traceEventIO msg =
+  GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
+    case traceEvent# p s of s' -> (# s', () #)
 #else
 traceEventIO msg = (return $! length msg) >> return ()
 #endif
