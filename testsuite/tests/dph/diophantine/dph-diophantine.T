@@ -10,7 +10,8 @@ test    ('dph-diophantine-copy-opt'
           , '-Odph -package dph-lifted-copy'])
 
 test    ('dph-diophantine-copy-fast' 
-        , [ reqlib('dph-lifted-copy')
+        , [ alone
+          , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , extra_clean(['DiophantineVect.hi', 'DiophantineVect.o',
                          'Main.hi', 'Main.o'])

@@ -1,6 +1,7 @@
 
 test    ('dph-sumnats-copy' 
-        , [ extra_clean(['Main.hi', 'Main.o',
+        , [ alone
+          , extra_clean(['Main.hi', 'Main.o',
                          'SumNatsVect.hi', 'SumNatsVect.o'])
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
@@ -10,7 +11,8 @@ test    ('dph-sumnats-copy'
           , '-Odph -package dph-lifted-copy'])
 
 test    ('dph-sumnats-vseg' 
-        , [ extra_clean(['Main.hi', 'Main.o',
+        , [ alone
+          , extra_clean(['Main.hi', 'Main.o',
                          'SumNatsVect.hi', 'SumNatsVect.o'])
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')

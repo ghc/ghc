@@ -1,5 +1,6 @@
 test    ('dph-classes-copy-fast' 
-        , [ extra_clean(['Main.o', 'Main.hi', 'DefsVect.hi', 'DefsVect.o'])
+        , [ alone
+          , extra_clean(['Main.o', 'Main.hi', 'DefsVect.hi', 'DefsVect.o'])
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
