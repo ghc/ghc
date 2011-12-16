@@ -1296,7 +1296,7 @@ canEqLeafTyVarLeft d fl eqv tv s2       -- eqv : tv ~ s2
 
        ; if no_flattening_happened then
              if isNothing occ_check_result then 
-                 canEqFailure d fl eqv 
+                 canEqFailure d fl (setVarType eqv $ mkEqPred (mkTyVarTy tv, xi2'))
              else 
                  continueWith $ CTyEqCan { cc_id     = eqv
                                          , cc_flavor = fl
