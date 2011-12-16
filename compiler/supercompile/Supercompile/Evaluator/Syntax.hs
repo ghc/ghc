@@ -263,7 +263,10 @@ valueType (Literal l)         = literalType l
 valueType (Coercion co)       = coercionType co
 
 termType :: Copointed ann => ann (TermF ann) -> Type
-termType e = case extract e of
+termType = termType' . extract
+
+termType' :: Copointed ann => TermF ann -> Type
+termType' e = case e of
     Var x             -> idType x
     Value v           -> valueType v
     TyApp e a         -> termType e `applyTy` a

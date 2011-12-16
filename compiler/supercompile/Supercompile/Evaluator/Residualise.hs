@@ -1,4 +1,11 @@
-module Supercompile.Evaluator.Residualise (residualiseState, residualiseHeapBinding, pPrintHeap, pPrintFullState, pPrintFullUnnormalisedState) where
+module Supercompile.Evaluator.Residualise (
+    residualiseState, residualiseHeapBinding,
+    
+    pPrintHeap,
+
+    StatePrettiness, fullStatePrettiness, quietStatePrettiness,
+    pPrintFullState, pPrintFullUnnormalisedState
+  ) where
 
 import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.Syntax
@@ -9,8 +16,11 @@ import Supercompile.Core.Syntax
 
 import Supercompile.Utilities
 
+import Var (isLocalId)
+
 import Data.Either
 import qualified Data.Map as M
+import Data.Ord
 
 
 residualiseState :: State -> (Deeds, Out [(Var, PrettyFunction)], Out FVedTerm)
@@ -59,10 +69,23 @@ pPrintHeap :: Heap -> SDoc
 pPrintHeap (Heap h ids) = pPrint $ map (first (PrettyDoc . pPrintBndr LetBind)) $ floats_static_h ++ [(x, asPrettyFunction1 e) | (x, e) <- floats_nonstatic_h]
   where (floats_static_h, floats_nonstatic_h) = residualisePureHeap ids h
 
-pPrintFullState :: Bool -> State -> SDoc
-pPrintFullState include_statics = pPrintFullUnnormalisedState include_statics . denormalise
+data StatePrettiness = SP { includeLams :: Bool, includeStatics :: Bool }
 
-pPrintFullUnnormalisedState :: Bool -> UnnormalisedState -> SDoc
-pPrintFullUnnormalisedState include_statics state = text "Deeds:" <+> pPrint deeds $$ (if include_statics then pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) else empty) $$ body
+fullStatePrettiness, quietStatePrettiness :: StatePrettiness
+fullStatePrettiness = SP True True
+quietStatePrettiness = SP False False
+
+pPrintFullState :: StatePrettiness -> State -> SDoc
+pPrintFullState sp = pPrintFullUnnormalisedState sp . denormalise
+
+pPrintFullUnnormalisedState :: StatePrettiness -> UnnormalisedState -> SDoc
+pPrintFullUnnormalisedState sp state = text "Deeds:" <+> pPrint deeds $$ (if includeStatics sp then pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) else empty) $$ body
   where (deeds, floats_static, floats_nonstatic, e) = residualiseUnnormalisedState state
-        body = pPrintPrecLetRec noPrec floats_nonstatic (PrettyDoc (angleBrackets (pPrint e)))
+        floats_nonstatic_pretty
+          | includeLams sp = map (second asPrettyFunction) floats_nonstatic
+          | otherwise      = map snd $ sortBy (comparing (Down . fst)) $
+                               [(non_lam, (x, if non_lam then asPrettyFunction e
+                                                         else PrettyFunction (\_ -> text "..." <+> braces (hsep [ppr x <> char ',' | x <- varSetElems (fvedTermFreeVars e), isLocalId x]))))
+                               | (x, e) <- floats_nonstatic
+                               , let non_lam = case extract e of Value (Lambda _ _) -> False; Value (TyLambda _ _) -> False; _ -> True]
+        body = pPrintPrecWhere noPrec floats_nonstatic_pretty (PrettyDoc (angleBrackets (pPrint e)))

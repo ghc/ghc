@@ -369,7 +369,7 @@ addStats :: SCStats -> ScpM f f ()
 addStats scstats = ScpM $ \_e s k -> k () (let scstats' = stats s `mappend` scstats in scstats' `seqSCStats` s { stats = scstats' })
 
 recordStopped :: State -> ScpBM a -> ScpBM a
-recordStopped state mx = ScpM $ \e s k -> unScpM mx (e { pTreeContext = case pTreeContext e of (Promise p:rest) -> Promise p { embedded = Just (pPrintFullState False state) }:rest }) s k
+recordStopped state mx = ScpM $ \e s k -> unScpM mx (e { pTreeContext = case pTreeContext e of (Promise p:rest) -> Promise p { embedded = Just (pPrintFullState quietStatePrettiness state) }:rest }) s k
 
 
 type PrettyTree = PTree (Var, SDoc, Maybe SDoc, Maybe SDoc)
@@ -407,7 +407,7 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     unwindTree :: FulfilmentTree -> PrettyTree
     unwindTree = fmap unwindPromiseFulfilment
 
-    unwindPromiseFulfilment (p, f) = (fun p, pPrintFullState False (meaning p), embedded p,
+    unwindPromiseFulfilment (p, f) = (fun p, pPrintFullState quietStatePrettiness (meaning p), embedded p,
                                       case f of Captured         -> Nothing
                                                 RolledBack mb_e' -> fmap ppr mb_e'
                                                 Fulfilled e'     -> Just (ppr e'))
@@ -416,7 +416,7 @@ pprScpPM :: ScpM FulfilmentTree FulfilmentTree String
     unwindContext = flip $ foldl (flip unwindContextItem)
 
     unwindContextItem :: PTreeContextItem -> [PrettyTree] -> [PrettyTree]
-    unwindContextItem (Promise p)                  ts = [Split False [(fun p, pPrintFullState False (meaning p), embedded p, Nothing)] ts]
+    unwindContextItem (Promise p)                  ts = [Split False [(fun p, pPrintFullState quietStatePrettiness (meaning p), embedded p, Nothing)] ts]
      -- NB: don't put (Split True) here because otherwise it looks like everything on the way back to the root has been rolled back, when it fact it is only "in progress"
     unwindContextItem (BindCapturedFloats fvs ts') ts = map unwindTree ts' ++ [BoundCapturedFloats fvs ts]
 
@@ -453,7 +453,7 @@ sc' hist speculated state = handlePrint $ (\raise -> check raise) `catchScpM` \g
                         where gen = mK_GENERALISER shallower_state state
     stop gen state hist = do addStats $ mempty { stat_sc_stops = 1 }
                              liftM (\(_, deeds, e') -> (deeds, e')) $ maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (liftPB . sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
-    continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState False state'))
+    continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState quietStatePrettiness state'))
                        addStats stats
                        liftM (\(_, deeds, e') -> (deeds, e')) $ split state' (liftPB . sc hist speculated')
       where (speculated', (stats, state')) = (if sPECULATION then speculate speculated else ((,) speculated)) $ reduce' state -- TODO: experiment with doing admissability-generalisation on reduced terms. My suspicion is that it won't help, though (such terms are already stuck or non-stuck but loopy: throwing stuff away does not necessarily remove loopiness).
@@ -477,7 +477,7 @@ memo opt speculated state0 = do
                tb_dynamic_vs = map rn_fv (abstracted p)
          ] of
       (p, res):_ -> {- traceRender ("tieback", pPrintFullState state3, fst res) $ -} do
-        traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state1), res)
+        traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState fullStatePrettiness state1), res)
         ScpM $ \_ s k -> k res (s { pTreeHole = Tieback (fun p) })
       [] -> {- traceRender ("new drive", pPrintFullState state3) $ -} do
         let vs_list = stateAbsVars state1
@@ -486,7 +486,7 @@ memo opt speculated state0 = do
         x <- freshHName
         promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = map mkLiveAbsVar vs_list, meaning = state1, embedded = Nothing }) $
           do
-            traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState True state1))
+            traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState fullStatePrettiness state1))
             -- FIXME: this is the site of the Dreadful Hack that makes it safe to match on reduced terms yet *drive* unreduced ones
             -- I only add non-internally bound junk to the input heap because:
             --  a) Thats the only stuff I *need* to add to make sure the FVs etc match up properly
@@ -497,7 +497,7 @@ memo opt speculated state0 = do
             --
             -- FIXME: I'm not acquiring deeds for these....
             res <- opt speculated state1
-            traceRenderScpM "<sc" (x, PrettyDoc (pPrintFullState False state1), res)
+            traceRenderScpM "<sc" (x, PrettyDoc (pPrintFullState quietStatePrettiness state1), res)
             return res
 
 -- Several design choices here:

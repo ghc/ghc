@@ -1,9 +1,14 @@
 module Supercompile (supercompileProgram, supercompileProgramSelective) where
 
--- FIXME: I need to document the basis on which I push down unlifted heap bindings
+-- FIXME: I need to document the basis on which I push down unlifted heap bindings (they are all values, IIRC)
 -- TODO:
 --  * Why does the supercompiler not match as much as it should? (e.g. Interpreter, UInterpreter)
---  * Does the matcher match the types of variables bound in the heap?
+--  * We should probably claimStep when supercompiling the RHS of an explicit lambda bound by a recursive "let".
+--    Reason: it is tantamount to inlining the body one time. Note that we don't care about non-lambdas (we don't
+--    pay for inlining them) or non-values (we don't put a copy of a non-value in the heap along with the RHS).
+--
+--    If there isn't enough left, what do we do?? Obvious answer: lambda abstract over the function name.
+--    Better(?) answer: add it as a let-bound Nothing to the heap, so the resulting h-function is trapped by the residual letrec...
 
 -- TODO: pre-transforming (case e1 of y { C z -> e2[z] }) to case (case e1 of y { C z -> z }) of z -> e2[z]
 -- might help us replace CPR more because even if we generalise away the e2[z] we potentially keep the unboxing.

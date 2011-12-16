@@ -8,6 +8,7 @@ module Supercompile.Drive.Split (
 import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 import Supercompile.Core.Syntax
+import Supercompile.Core.Tag (dataConTag, literalTag)
 
 import Supercompile.Evaluator.Deeds
 import Supercompile.Evaluator.Evaluate (normalise)
@@ -24,7 +25,7 @@ import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo)
 import Var       (varUnique)
 import PrelNames (undefinedName)
 import Type      (splitTyConApp_maybe)
-import Util      (zipWithEqual, zipWith3Equal, zipWith4Equal)
+import Util      (zipWithEqual, zipWith3Equal)
 import Unique    (Uniquable)
 import Digraph
 import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
@@ -873,7 +874,7 @@ transitiveInline :: PureHeap          -- ^ What to inline. We have not claimed d
 transitiveInline init_h_inlineable _state@(deeds, Heap h ids, k, in_e)
     = -- (if not (S.null not_inlined_vs') then traceRender ("transitiveInline: generalise", not_inlined_vs') else id) $
       -- traceRender ("transitiveInline", "had bindings for", pureHeapBoundVars init_h_inlineable, "FVs were", state_fvs, "so inlining", pureHeapBoundVars h') $
-      ASSERT2(isEmptyVarSet (unnormalisedStateUncoveredVars final_state), ppr (M.keysSet h_inlineable, PrettyDoc $ pPrintFullUnnormalisedState False _state, PrettyDoc $ pPrintFullUnnormalisedState False final_state, unnormalisedStateUncoveredVars final_state, M.keysSet h', live'))
+      ASSERT2(isEmptyVarSet (unnormalisedStateUncoveredVars final_state), ppr (M.keysSet h_inlineable, PrettyDoc $ pPrintFullUnnormalisedState quietStatePrettiness _state, PrettyDoc $ pPrintFullUnnormalisedState quietStatePrettiness final_state, unnormalisedStateUncoveredVars final_state, M.keysSet h', live'))
       final_state
   where
     final_state = (deeds', Heap h' ids, k, in_e)
@@ -1020,6 +1021,27 @@ pushStackFrame kf deeds bracketed_hole = do
             Just deeds ->                                                                    (Just deeds, map (\(ent, state) -> (ent, third4 (++ [kf]) state)) fillers)
       where branch_factor = length fillers
 
+{-
+data Scrutinee = Scrut {
+    scrutAliases    :: [Out Var],
+    scrutBottomness :: Maybe Int -- Number of value arguments remaining until scrutinee is _|_
+  }
+
+-- The scrutinee bottomness check was introduced to deal with the fact that genregexps was
+-- compiling lots of specialisations of the *error case* of "succ" and "expand".
+--
+-- You might think that this wouldn't do much harm, because in the error case we have just
+-- as much information about the scrutinee as when it was totally unknown (e.g. when it is
+-- succ of an unknown quantity). In this case we would expect the unspecialised supercompiled
+-- context in which the errors occur would be reusable at other sites where the scrutinee was unknown.
+--
+-- Unfortunately, this is *not* the case because the normal case of "succ @Char" is to return a C#
+-- box, but the error case returns an error outside of a C# box. FIXME: this is still not much change,
+-- just need one extra residual stack frame to unpack the box before we reach shared code.
+--
+-- Note that this check only really helps functions for which we do not know the RHS (e.g. primops).
+-}
+
 splitStackFrame :: UniqSupply
                 -> InScopeSet
                 -> Tagged StackFrame
@@ -1057,12 +1079,12 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith4Equal "alt_hs" (\alt_rn alt_con alt_bvs alt_tg -> M.fromList (do Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
-                                                                                              let in_scrut_e@(_, scrut_e) = renamedTerm (annedTerm alt_tg (Value scrut_v))
-                                                                                              scrut <- scruts'
-                                                                                              return (scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
-                                                                               `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
-                                            alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
+            alt_hs = zipWith3Equal "alt_hs" (\alt_rn alt_con alt_bvs -> M.fromList (do Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
+                                                                                       let in_scrut_e@(_, scrut_e) = renamedTerm (fmap Value scrut_v)
+                                                                                       scrut <- scruts'
+                                                                                       return (scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
+                                                                        `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
+                                            alt_rns alt_cons alt_bvss -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
             bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed ty' (Once ctxt_id, (emptyDeeds, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
     StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed ty' (Once ctxt_id, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
@@ -1081,11 +1103,14 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
     tg = tag kf
     shell = Shell (oneResidTag tg)
 
-    altConToValue :: Type -> In AltCon -> Maybe (ValueF ann)
+    -- NB: I used to source the tag for the positive information from the tag of the case branch RHS, but that
+    -- leads to WAY TOO MUCH specialisation for examples like gen_regexps because we get lots of e.g. cons cells
+    -- that are all given different tags.
+    altConToValue :: Type -> In AltCon -> Maybe (Anned AnnedValue)
     altConToValue ty' (rn, DataAlt dc as qs xs) = do
         (_, univ_tys') <- splitTyConApp_maybe ty'
-        Just (Data dc (univ_tys' ++ map (lookupTyVarSubst rn) as) (map (lookupCoVarSubst rn) qs) (map (renameId rn) xs))
-    altConToValue _  (_,  LiteralAlt l) = Just (Literal l)
+        Just (annedValue (dataConTag dc) (Data dc (univ_tys' ++ map (lookupTyVarSubst rn) as) (map (lookupCoVarSubst rn) qs) (map (renameId rn) xs)))
+    altConToValue _  (_,  LiteralAlt l) = Just (annedValue (literalTag l) (Literal l))
     altConToValue _  (_,  DefaultAlt)   = Nothing
 
     zapAltConIdOccInfo :: AltCon -> AltCon

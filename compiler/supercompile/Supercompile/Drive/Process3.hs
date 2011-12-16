@@ -18,6 +18,7 @@ import Supercompile.Termination.TagBag (stateTags)
 import Supercompile.Termination.Combinators hiding (generatedKey)
 import qualified Supercompile.Termination.Combinators as Combinators
 
+import Supercompile.StaticFlags
 import Supercompile.Utilities
 
 import Var        (varName)
@@ -154,19 +155,21 @@ speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \env -> case speculate 
 sc :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
-sc' :: String -> State -> ScpM (Deeds, FVedTerm)
-sc' h state = terminateM h state (speculateM (reduce state) $ \state -> my_split state sc)
-                                 (\shallow_h shallow_state -> maybe (trce "split" shallow_h shallow_state $ my_split state)
-                                                                    (trce "gen" shallow_h shallow_state)
-                                                                    (my_generalise (mK_GENERALISER shallow_state state) state)
-                                                                    sc)
+sc' :: Maybe String -> State -> ScpM (Deeds, FVedTerm)
+sc' mb_h state = case mb_h of
+  Nothing -> speculateM (reduce state) $ \state -> my_split state sc
+  Just h  -> terminateM h state (speculateM (reduce state) $ \state -> my_split state sc)
+                                (\shallow_h shallow_state -> maybe (trce "split" shallow_h shallow_state $ my_split state)
+                                                                   (trce "gen" shallow_h shallow_state)
+                                                                   (my_generalise (mK_GENERALISER shallow_state state) state)
+                                                                   sc)
   where
     trce how shallow_h shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ":" ++ shallow_h ++ ")")
                                                   ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
                                                    hang (text "Before:") 2 (trce1 shallow_state) $$
                                                    hang (text "After:")  2 (trce1 state) $$
-                                                   (case unMatch (match' shallow_state state) of Left why -> text why))
-    trce1 state = pPrintFullState False state $$ pPrintFullState False (reduceForMatch state)
+                                                   (case unMatch (match' (reduceForMatch shallow_state) (reduceForMatch state)) of Left why -> text why))
+    trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (reduceForMatch state)
 
     my_generalise gen = liftM (\splt -> insert_tags . splt) . generalise gen
     my_split      opt =                 insert_tags . split opt
@@ -205,9 +208,11 @@ sc' h state = terminateM h state (speculateM (reduce state) $ \state -> my_split
 -- So we should probably work out why the existing supercompiler never builds dumb loops like this, so
 -- we can carefully preserve that property when making the Arjan modification.
 
-memo :: (String -> State -> ScpM (Deeds, FVedTerm))
-     ->  State -> ScpM (Deeds, FVedTerm) 
-memo opt state = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags) ->
+memo :: (Maybe String -> State -> ScpM (Deeds, FVedTerm))
+     ->  State -> ScpM (Deeds, FVedTerm)
+memo opt state
+  | skip_tieback = opt Nothing state
+  | otherwise = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags) ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
     -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
 
@@ -239,14 +244,41 @@ memo opt state = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags) ->
          | p <- promises ms
          , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
                           match (meaning p) reduced_state]
-         ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state), res)
+         ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                      ; return res }, ScpState ms hist fs resid_tags)
-              _          -> pure (do { traceRenderM ">sc" (fun p, PrettyDoc (pPrintFullState {-True-}False state))
-                                     ; res <- opt (getOccString (varName (fun p))) state
-                                     ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
+              _          -> pure (do { traceRenderM ">sc" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
+                                     ; res <- opt (Just (getOccString (varName (fun p)))) state
+                                     ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                      ; fulfillM p res }, ScpState ms' hist fs resid_tags)
                 where (p, ms') = promise (state, reduced_state) ms
   where reduced_state = reduceForMatch state
+        
+        -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
+        -- this, we tend to do things like:
+        --
+        --  h0 = D[let f = e in f] = let f = h1 in f
+        --  h1 = D[let f = e in e] = h0
+        --
+        -- This fix is inspired by Peter's supercompiler where matching (and indeed termination checking) is only
+        -- performed when the focus of evaluation is the name of a top level function. I haven't yet proved that
+        -- this is safe in my setting (FIXME). This might be problematic because Peter does not have a private
+        -- history for "reduce" like I do.
+        --
+        --
+        -- Version 2 of this change **prevents** tieback when the focus is an indirection. I'm reasonably
+        -- sure this is safe because of the way the splitter is defined and the fact that we have the invariant
+        -- that indirections never occur in the stack, and only occur in the heap as the whole HB RHS. This,
+        -- combined with the fact that they are acyclic seems to be enough to say that any sequence of splits
+        -- only has an indirection in the focus a finite number of times. (FIXME: it's OK that we don't check
+        -- the termination condition for those states where the stack is empty since reduce won't change the term.
+        -- But it's less clear that it is actually OK to skip termination check when we skip tieback in the other case!!)
+        skip_tieback | dUPLICATE_VALUES_EVALUATOR
+                     = False
+                     | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
+                     , Answer (_, (_, Indirect _)) <- annee qa
+                     = True
+                     | otherwise
+                     = False
 
 reduceForMatch :: State -> State
 reduceForMatch state = gc $ reduce (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation

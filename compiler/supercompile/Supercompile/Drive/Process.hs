@@ -23,6 +23,7 @@ import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 --import Supercompile.Core.Size
 import Supercompile.Core.Syntax
+import Supercompile.Core.Tag (dataConTag, literalTag)
 
 import Supercompile.Drive.Split (ResidTags)
 
@@ -119,7 +120,7 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
       CoApp e _ -> go_term ann e
       App e _   -> go_term ann e
       PrimOp _ _ es   -> IM.unions (map (go_term ann) es)
-      Case e x _ alts -> go_term (extAnn x ann) e `IM.union` IM.unions [go_term ann e | (_, e) <- alts]
+      Case e x _ alts -> go_term (extAnn x ann) e `IM.union` IM.unions [go_alt ann alt `IM.union` go_term ann e | (alt, e) <- alts]
       Let x e1 e2     -> go_term (extAnn x ann) e1 `IM.union` go_term ann e2
       LetRec xes e    -> IM.unions [go_term (extAnn x ann) e | (x, e) <- xes] `IM.union` go_term ann e
       Cast e _        -> go_term ann e
@@ -131,6 +132,11 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
         TyLambda _ e -> go_term ann e
         Lambda   _ e -> go_term ann e
         Data _ _ _ _ -> IM.empty
+
+    go_alt :: [String] -> AltCon -> TagAnnotations
+    go_alt ann (DataAlt dc _ _ _) = IM.singleton (tagInt (dataConTag dc)) ann
+    go_alt ann (LiteralAlt l)     = IM.singleton (tagInt (literalTag l))  ann
+    go_alt ann DefaultAlt         = IM.empty
 
     go_answer :: [String] -> Anned Answer -> TagAnnotations
     go_answer ann a = IM.insert (tagInt (annedTag a)) ann $ go_answer' ann (annee a)
@@ -247,7 +253,7 @@ instance Monoid SCStats where
 --
 -- TODO: have the garbage collector collapse (let x = True in x) to (True) -- but note that this requires onceness analysis
 gc :: State -> State
-gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredVars gced_state), ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState False _state), PrettyDoc (pPrintFullState False gced_state)))
+gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredVars gced_state), ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState quietStatePrettiness _state), PrettyDoc (pPrintFullState quietStatePrettiness gced_state)))
                                           gced_state
   where
     gced_state = (deeds2, Heap h' ids, k', in_e)
@@ -398,7 +404,7 @@ reduce' orig_state = go (mkLinearHistory rEDUCE_WQO) orig_state
            , let state' = (deeds', heap, k, e)
            -> case terminate hist state of
             Continue hist' -> go hist' state'
-            Stop old_state -> pprTrace "reduce-stop" (pPrintFullState False old_state $$ pPrintFullState False state) 
+            Stop old_state -> pprTrace "reduce-stop" (pPrintFullState quietStatePrettiness old_state $$ pPrintFullState quietStatePrettiness state) 
                               -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
                               -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
                               (mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
@@ -444,6 +450,10 @@ renameAbsVar rn (AbsVar { absVarDead = dead, absVarVar = x })
   = AbsVar { absVarDead = True,  absVarVar = renameAbsVarType rn x }
   | otherwise
   = AbsVar { absVarDead = False, absVarVar = renameAbsVarType rn (M.findWithDefault (pprPanic "renameAbsVar" (ppr x)) x rn) }
+
+-- FIXME: should abstract over RealWorld# as well. Two reasons:
+--  1. If the h-function is unlifted, this delays its evaluation (so its effects, if any, do not happen too early)
+--  2. This expresses to GHC that we don't necessarily want the work in h-functions to be shared
 
 absVarLambdas :: Symantics ann => [AbsVar] -> ann (TermF ann) -> ann (TermF ann)
 absVarLambdas xs = tyVarIdLambdas (map absVarVar xs)

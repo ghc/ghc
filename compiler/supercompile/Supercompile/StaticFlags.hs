@@ -17,6 +17,10 @@ parseEnum prefix def opts = fromMaybe def $ listToMaybe [parse opt | arg <- aRGS
   where parse = fromJust . flip lookup opts . map toLower
 
 
+iNSTANCE_MATCHING :: Bool
+--iNSTANCE_MATCHING = "--instance-matching" `elem` aRGS
+iNSTANCE_MATCHING = True
+
 dEEDS :: Bool
 dEEDS = "--deeds" `elem` aRGS
 --dEEDS = True

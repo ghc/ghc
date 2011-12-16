@@ -11,6 +11,7 @@ import Supercompile.Core.Syntax
 import Supercompile.Evaluator.FreeVars
 import Supercompile.Evaluator.Syntax
 
+import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (guard)
 
 import qualified CoreSyn as Core
@@ -18,7 +19,7 @@ import qualified CoreSyn as Core
 import Coercion
 import Var        (TyVar, isTyVar, isId, tyVarKind)
 import Id         (Id, idType, realIdUnfolding, idSpecialisation)
-import IdInfo     (SpecInfo(..))
+import IdInfo     (SpecInfo(..), emptySpecInfo)
 import VarEnv
 import TypeRep    (Kind, Type(..))
 import MonadUtils (mapMaybeM)
@@ -37,6 +38,21 @@ pprTraceSC _ _ = id
 traceSC :: String -> a -> a
 traceSC _ = id
 --traceSC = trace
+
+
+-- Note [Instance matching]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Instance matching is very, very dangerous from a correctness standpoint. If we start with:
+--
+--  let x = v[x] in x
+--
+-- Then reducing and splitting causes us to drive:
+--
+--  let x = v[x] in v
+--
+-- Note that the new term matches against the previous one if we can do instance matching, so
+-- if we are not careful we immediately build a loop. This really sucks.
 
 
 newtype Match a = Match { unMatch :: Either String a }
@@ -73,6 +89,31 @@ matchRnEnv2 f x y = mkRnEnv2 (mkInScopeSet (f x `unionVarSet` f y))
 
 type MatchResult = M.Map Var Var
 
+-- INVARIANTs:
+--   1. All the Vars are *not* rigidly bound (i.e. they are bound by a "let")
+--   2. The terms *may* contain free variables of any kind, rigidly bound or not
+--   3. The Vars in VarL/VarR are always CoVars/Ids, NEVER TyVars (might change this in the future)
+data MatchLR = VarL Var (Out (TermF Anned))
+             | VarR (Out (TermF Anned)) Var
+             | VarLR Var Var
+
+-- Need exact equality for matchPureHeap loop
+instance Eq MatchLR where
+    VarL x1 e1      == VarL x2 e2      = x1 == x2            && e1 `eqAnnedTerm` e2
+    VarR e1 x1      == VarR e2 x2      = e1 `eqAnnedTerm` e2 && x1 == x2
+    VarLR x_l1 x_r1 == VarLR x_l2 x_r2 = x_l1 == x_l2        && x_r1 == x_r2
+    _ == _ = False
+
+eqAnnedTerm :: TermF Anned -> TermF Anned -> Bool
+eqAnnedTerm e1 e2  = case runMatch (matchTerm' (matchRnEnv2 annedTermFreeVars' e1 e2) e1 e2) of
+    Nothing  -> False
+    Just lrs -> all (\lr -> case lr of VarLR x_l x_r | x_l == x_r -> True; _ -> False) lrs
+
+instance Outputable MatchLR where
+    pprPrec _ (VarL x e')   = ppr x  <+> text "<->" <+> ppr e'
+    pprPrec _ (VarR e' x)   = ppr e' <+> text "<->" <+> ppr x
+    pprPrec _ (VarLR x1 x2) = ppr x1 <+> text "<->" <+> ppr x2
+
 match :: State -- ^ Tieback semantics
       -> State -- ^ This semantics
       -> Maybe MatchResult -- ^ Renaming from left to right
@@ -93,22 +134,24 @@ matchAnned :: (a -> a -> b)
            -> Anned a -> Anned a -> b
 matchAnned f = f `on` annee
 
-matchQA :: RnEnv2 -> QA -> QA -> Match [(Var, Var)]
+matchQA :: RnEnv2 -> QA -> QA -> Match [MatchLR]
 matchQA rn2 (Question x_l') (Question x_r') = matchVar rn2 x_l' x_r'
+matchQA rn2 (Question x_l') (Answer in_v_r) = matchVarL rn2 x_l' (answerToAnnedTerm' (rnInScopeSet rn2) in_v_r) -- NB: these rely on the RnEnv2
+matchQA rn2 (Answer in_v_l) (Question x_r') = matchVarR rn2 (answerToAnnedTerm' (rnInScopeSet rn2) in_v_l) x_r' -- InScopeSet just like matchIn does
 matchQA rn2 (Answer in_v_l) (Answer in_v_r) = matchAnswer rn2 in_v_l in_v_r
-matchQA _ _ _ = fail "matchQA"
 
-matchAnswer :: RnEnv2 -> Answer -> Answer -> Match [(Var, Var)]
+matchAnswer :: RnEnv2 -> Answer -> Answer -> Match [MatchLR]
 matchAnswer rn2 = matchCoerced (matchIn renameAnnedValue' matchValue) rn2
 
-matchCoerced :: (RnEnv2 -> a -> a -> Match [(Var, Var)])
-             -> RnEnv2 -> Coerced a -> Coerced a -> Match [(Var, Var)]
+matchCoerced :: (RnEnv2 -> a -> a -> Match [MatchLR])
+             -> RnEnv2 -> Coerced a -> Coerced a -> Match [MatchLR]
 matchCoerced f rn2 (mb_co_l, x_l) (mb_co_r, x_r) = liftM2 (++) (matchMaybe (\co_l co_r -> matchCoercion rn2 co_l co_r) (castByCo mb_co_l) (castByCo mb_co_r)) (f rn2 x_l x_r) -- TODO: should match (Just Id) against Nothing
 
-matchKind :: Kind -> Kind -> Match [(Var, Var)]
+matchKind :: Kind -> Kind -> Match [MatchLR]
 matchKind k_l k_r = guard "matchKind" (k_l `isSubKind` k_r && k_r `isSubKind` k_l) >> return []
 
-matchType :: RnEnv2 -> Type -> Type -> Match [(Var, Var)]
+-- TODO: match type instantiation?
+matchType :: RnEnv2 -> Type -> Type -> Match [MatchLR]
 matchType rn2 (TyVarTy x_l)         (TyVarTy x_r)         = matchVar rn2 x_l x_r
 matchType rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 (++) (matchType rn2 ty1_l ty1_r) (matchType rn2 ty2_l ty2_r)
 matchType rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = guard "matchType: TyConApp" (tc_l == tc_r) >> matchList (matchType rn2) tys_l tys_r
@@ -116,7 +159,8 @@ matchType rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = liftM2 (++) (matchTy
 matchType rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchType rn2 ty_l ty_r
 matchType _ _ _ = fail "matchType"
 
-matchCoercion :: RnEnv2 -> Coercion -> Coercion -> Match [(Var, Var)]
+-- TODO: match coercion instantiation?
+matchCoercion :: RnEnv2 -> Coercion -> Coercion -> Match [MatchLR]
 matchCoercion rn2 (Refl ty_l)              (Refl ty_r)              = matchType rn2 (ty_l) (ty_r)
 matchCoercion rn2 (TyConAppCo tc_l cos_l)  (TyConAppCo tc_r cos_r)  = guard "matchCoercion: TyConAppCo" (tc_l == tc_r) >> matchList (matchCoercion rn2) (cos_l) (cos_r)
 matchCoercion rn2 (AppCo co1_l co2_l)      (AppCo co1_r co2_r)      = liftM2 (++) (matchCoercion rn2 (co1_l) (co1_r)) (matchCoercion rn2 (co2_l) (co2_r))
@@ -130,25 +174,30 @@ matchCoercion rn2 (NthCo i_l co_l)         (NthCo i_r co_r)         = guard "mat
 matchCoercion rn2 (InstCo co_l ty_l)       (InstCo co_r ty_r)       = liftM2 (++) (matchCoercion rn2 (co_l) (co_r)) (matchType rn2 (ty_l) (ty_r))
 matchCoercion _ _ _ = fail "matchCoercion"
 
-matchTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> Match [(Var, Var)]
-matchTerm rn2 = matchAnned go
-  where
-    go :: TermF Anned -> TermF Anned -> Match [(Var, Var)]
-    go (Var x_l)                  (Var x_r)                  = matchVar rn2 x_l x_r
-    go (Value v_l)                (Value v_r)                = matchValue rn2 v_l v_r
-    go (TyApp e_l ty_l)           (TyApp e_r ty_r)           = liftM2 (++) (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r)
-    go (App e_l x_l)              (App e_r x_r)              = liftM2 (++) (matchTerm rn2 e_l e_r) (matchVar   rn2 x_l x_r)
-    go (PrimOp pop_l tys_l es_l)  (PrimOp pop_r tys_r es_r)  = guard "matchTerm: primop" (pop_l == pop_r) >> liftM2 (++) (matchList (matchType rn2) tys_l tys_r) (matchList (matchTerm rn2) es_l es_r)
-    go (Case e_l x_l ty_l alts_l) (Case e_r x_r ty_r alts_r) = liftM3 app3 (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchAlts rn2 alts_l alts_r)
-    go (Let x_l e1_l e2_l)        (Let x_r e1_r e2_r)        = liftM2 (++) (matchTerm rn2 e1_l e1_r) $ matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchTerm rn2 e2_l e2_r
-    go (LetRec xes_l e_l)         (LetRec xes_r e_r)         = matchIdCoVarBndrs rn2 xs_l xs_r $ \rn2 -> liftM2 (++) (matchList (matchTerm rn2) es_l es_r) (matchTerm rn2 e_l e_r)
-      where (xs_l, es_l) = unzip xes_l
-            (xs_r, es_r) = unzip xes_r
-    go (Cast e_l co_l)            (Cast e_r co_r)            = liftM2 (++) (matchTerm rn2 (e_l) (e_r)) (matchCoercion rn2 (co_l) (co_r))
-    go _ _ = fail "matchTerm"
+matchTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> Match [MatchLR]
+matchTerm rn2 = matchAnned (matchTerm' rn2)
 
-matchValue :: RnEnv2 -> AnnedValue -> AnnedValue -> Match [(Var, Var)]
+-- TODO: allow lets on only one side? Useful for matching e.g. (let x = 2 in y + x) with (z + 2)
+matchTerm' :: RnEnv2 -> TermF Anned -> TermF Anned -> Match [MatchLR]
+matchTerm' rn2 (Var x_l)                  (Var x_r)                  = matchVar rn2 x_l x_r
+matchTerm' rn2 (Var x_l)                  e_r                        = matchVarL rn2 x_l e_r
+matchTerm' rn2 e_l                        (Var x_r)                  = matchVarR rn2 e_l x_r
+matchTerm' rn2 (Value v_l)                (Value v_r)                = matchValue rn2 v_l v_r
+matchTerm' rn2 (TyApp e_l ty_l)           (TyApp e_r ty_r)           = liftM2 (++) (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r)
+matchTerm' rn2 (App e_l x_l)              (App e_r x_r)              = liftM2 (++) (matchTerm rn2 e_l e_r) (matchVar   rn2 x_l x_r)
+matchTerm' rn2 (PrimOp pop_l tys_l es_l)  (PrimOp pop_r tys_r es_r)  = guard "matchTerm: primop" (pop_l == pop_r) >> liftM2 (++) (matchList (matchType rn2) tys_l tys_r) (matchList (matchTerm rn2) es_l es_r)
+matchTerm' rn2 (Case e_l x_l ty_l alts_l) (Case e_r x_r ty_r alts_r) = liftM3 app3 (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchAlts rn2 alts_l alts_r)
+matchTerm' rn2 (Let x_l e1_l e2_l)        (Let x_r e1_r e2_r)        = liftM2 (++) (matchTerm rn2 e1_l e1_r) $ matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchTerm rn2 e2_l e2_r
+matchTerm' rn2 (LetRec xes_l e_l)         (LetRec xes_r e_r)         = matchIdCoVarBndrs rn2 xs_l xs_r $ \rn2 -> liftM2 (++) (matchList (matchTerm rn2) es_l es_r) (matchTerm rn2 e_l e_r)
+  where (xs_l, es_l) = unzip xes_l
+        (xs_r, es_r) = unzip xes_r
+matchTerm' rn2 (Cast e_l co_l)            (Cast e_r co_r)            = liftM2 (++) (matchTerm rn2 (e_l) (e_r)) (matchCoercion rn2 (co_l) (co_r))
+matchTerm' _ _ _ = fail "matchTerm"
+
+matchValue :: RnEnv2 -> AnnedValue -> AnnedValue -> Match [MatchLR]
 matchValue rn2 (Indirect x_l)               (Indirect x_r)               = matchVar rn2 x_l x_r
+matchValue rn2 (Indirect x_l)               v_r                          = matchVarL rn2 x_l (Value v_r)
+matchValue rn2 v_l                          (Indirect x_r)               = matchVarR rn2 (Value v_l) x_r
 matchValue rn2 (TyLambda a_l e_l)           (TyLambda a_r e_r)           = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchTerm rn2 e_l e_r
 matchValue rn2 (Lambda x_l e_l)             (Lambda x_r e_r)             = matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchTerm rn2 e_l e_r
 matchValue rn2 (Data dc_l tys_l cos_l xs_l) (Data dc_r tys_r cos_r xs_r) = guard "matchValue: datacon" (dc_l == dc_r) >> liftM3 app3 (matchList (matchType rn2) tys_l tys_r) (matchList (matchCoercion rn2) cos_l cos_r) (matchList (matchVar rn2) xs_l xs_r)
@@ -156,68 +205,81 @@ matchValue _   (Literal l_l)                (Literal l_r)                = guard
 matchValue rn2 (Coercion co_l)              (Coercion co_r)              = matchCoercion rn2 (co_l) (co_r)
 matchValue _ _ _ = fail "matchValue"
 
-matchAlts :: RnEnv2 -> [AnnedAlt] -> [AnnedAlt] -> Match [(Var, Var)]
+matchAlts :: RnEnv2 -> [AnnedAlt] -> [AnnedAlt] -> Match [MatchLR]
 matchAlts rn2 = matchList (matchAlt rn2)
 
-matchAlt :: RnEnv2 -> AnnedAlt -> AnnedAlt -> Match [(Var, Var)]
+matchAlt :: RnEnv2 -> AnnedAlt -> AnnedAlt -> Match [MatchLR]
 matchAlt rn2 (alt_con_l, alt_e_l) (alt_con_r, alt_e_r) = matchAltCon rn2 alt_con_l alt_con_r $ \rn2 -> matchTerm rn2 alt_e_l alt_e_r
 
-matchAltCon :: RnEnv2 -> AltCon -> AltCon -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
+matchAltCon :: RnEnv2 -> AltCon -> AltCon -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchAltCon rn2 (DataAlt dc_l as_l qs_l xs_l) (DataAlt dc_r as_r qs_r xs_r) k = guard "matchAltCon: datacon" (dc_l == dc_r) >> (matchTyVarBndrs rn2 as_l as_r $ \rn2 -> matchIdCoVarBndrs rn2 qs_l qs_r $ \rn2 -> matchIdCoVarBndrs rn2 xs_l xs_r k)
 matchAltCon rn2 (LiteralAlt l_l)              (LiteralAlt l_r)              k = guard "matchAltCon: literal" (l_l == l_r) >> k rn2
 matchAltCon rn2 DefaultAlt                    DefaultAlt                    k = k rn2
 matchAltCon _ _ _ _ = fail "matchAltCon"
 
-matchVarBndr :: RnEnv2 -> Var -> Var -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
+matchVarBndr :: RnEnv2 -> Var -> Var -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchVarBndr rn2 v_l v_r | isId v_l,    isId v_r    = matchIdCoVarBndr rn2 v_l v_r
                          | isTyVar v_l, isTyVar v_r = matchTyVarBndr   rn2 v_l v_r
                          | otherwise                = fail "matchVarBndr"
 
-matchTyVarBndr :: RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
+matchTyVarBndr :: RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchTyVarBndr rn2 a_l a_r k = liftM2 (++) (matchKind (tyVarKind a_l) (tyVarKind a_r)) (k (rnBndr2 rn2 a_l a_r))
 
-matchIdCoVarBndr :: RnEnv2 -> Id -> Id -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
-matchIdCoVarBndr rn2 x_l x_r k = liftM2 (++) match_x (k rn2')
+matchIdCoVarBndr :: RnEnv2 -> Id -> Id -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
+matchIdCoVarBndr rn2 x_l x_r k = liftM2 (++) match_x $ k rn2' >>= if iNSTANCE_MATCHING then mapM (checkMatchLR x_l x_r) else return
   where (rn2', match_x) = matchIdCoVarBndr' rn2 rn2' x_l x_r
+
+checkMatchLR :: Id -> Id -> MatchLR -> Match MatchLR
+checkMatchLR x_l x_r lr = case lr of
+    VarL _ e_r | x_r `elemVarSet` annedTermFreeVars' e_r -> fail "checkMatchLR: deferred term mentioned rigid right variable"
+               | not (termIsCheap' e_r)                  -> fail "checkMatchLR: expensive deferred (right) term escaping lambda"
+    VarR e_l _ | x_l `elemVarSet` annedTermFreeVars' e_l -> fail "checkMatchLR: deferred term mentioned rigid left variable"
+               | not (termIsCheap' e_l)                  -> fail "checkMatchLR: expensive deferred (left) term escaping lambda"
+    _ -> return lr
 
 -- We have to be careful to match the "fragile" IdInfo for binders as well as the obvious type information
 -- (idSpecialisation :: Id -> SpecInfo, realIdUnfolding :: Id -> Unfolding)
-matchIdCoVarBndr' :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Id -> Id -> (RnEnv2, Match [(Var, Var)])
+matchIdCoVarBndr' :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Id -> Id -> (RnEnv2, Match [MatchLR])
 matchIdCoVarBndr' init_rn2 rn2 x_l x_r = (rnBndr2 init_rn2 x_l x_r, matchIdCoVarBndrExtras rn2 x_l x_r)
 
-matchBndrExtras :: RnEnv2 -> Var -> Var -> Match [(Var, Var)]
+matchBndrExtras :: RnEnv2 -> Var -> Var -> Match [MatchLR]
 matchBndrExtras rn2 v_l v_r
   | isId v_l,    isId v_r    = matchIdCoVarBndrExtras rn2 v_l v_r
   | isTyVar v_l, isTyVar v_r = matchTyVarBndrExtras   rn2 v_l v_r
   | otherwise                = fail "matchBndrExtras"
 
-matchTyVarBndrExtras :: RnEnv2 -> TyVar -> TyVar -> Match [(Var, Var)]
+matchTyVarBndrExtras :: RnEnv2 -> TyVar -> TyVar -> Match [MatchLR]
 matchTyVarBndrExtras _ a_l a_r = matchKind (tyVarKind a_l) (tyVarKind a_r)
 
-matchIdCoVarBndrExtras :: RnEnv2 -> Id -> Id -> Match [(Var, Var)]
+matchIdCoVarBndrExtras :: RnEnv2 -> Id -> Id -> Match [MatchLR]
 matchIdCoVarBndrExtras rn2 x_l x_r = liftM3 app3 (matchUnfolding rn2 (realIdUnfolding x_l) (realIdUnfolding x_r)) (matchSpecInfo rn2 (idSpecialisation x_l) (idSpecialisation x_r)) (matchType rn2 (idType x_l) (idType x_r))
 
-matchSpecInfo :: RnEnv2 -> SpecInfo -> SpecInfo -> Match [(Var, Var)]
+-- TODO: currently insists that the LHS has no unfolding/RULES. (This is not as bad as it seems since unstable unfoldings match). Can we do better?
+matchIdCoVarBndrExtrasL :: RnEnv2 -> Id -> TermF Anned -> Match [MatchLR]
+matchIdCoVarBndrExtrasL rn2 x_l e_r = liftM3 app3 (matchUnfolding rn2 (realIdUnfolding x_l) Core.noUnfolding) (matchSpecInfo rn2 (idSpecialisation x_l) emptySpecInfo) (matchType rn2 (idType x_l) (termType' e_r))
+
+-- TODO: currently insists that the LHS has no unfolding/RULES. (This is not as bad as it seems since unstable unfoldings match). Can we do better?
+matchIdCoVarBndrExtrasR :: RnEnv2 -> TermF Anned -> Id -> Match [MatchLR]
+matchIdCoVarBndrExtrasR rn2 e_l x_r = liftM3 app3 (matchUnfolding rn2 Core.noUnfolding (realIdUnfolding x_r)) (matchSpecInfo rn2 emptySpecInfo (idSpecialisation x_r)) (matchType rn2 (termType' e_l) (idType x_r))
+
+matchSpecInfo :: RnEnv2 -> SpecInfo -> SpecInfo -> Match [MatchLR]
 matchSpecInfo rn2 (SpecInfo rules_l _) (SpecInfo rules_r _) = matchList (matchRule rn2) rules_l rules_r
 
-matchRule :: RnEnv2 -> Core.CoreRule -> Core.CoreRule -> Match [(Var, Var)]
+matchRule :: RnEnv2 -> Core.CoreRule -> Core.CoreRule -> Match [MatchLR]
 matchRule _   (Core.BuiltinRule { Core.ru_name = name1 }) (Core.BuiltinRule { Core.ru_name = name2 }) = guard "matchRule: BuiltinRule" (name1 == name2) >> return [] -- NB: assume builtin rules generate RHSes without any free vars!
 matchRule rn2 (Core.Rule { Core.ru_bndrs = vs_l, Core.ru_args = args_l, Core.ru_rhs = rhs_l }) (Core.Rule { Core.ru_bndrs = vs_r, Core.ru_args = args_r, Core.ru_rhs = rhs_r }) = matchMany matchVarBndr rn2 vs_l vs_r $ \rn2 -> liftM2 (++) (matchList (matchCore rn2) args_l args_r) (matchCore rn2 rhs_l rhs_r)
 matchRule _ _ _ = fail "matchRule"
 
-matchUnfolding :: RnEnv2 -> Core.Unfolding -> Core.Unfolding -> Match [(Var, Var)]
+matchUnfolding :: RnEnv2 -> Core.Unfolding -> Core.Unfolding -> Match [MatchLR]
 matchUnfolding rn2 (Core.CoreUnfolding { Core.uf_tmpl = rhs1, Core.uf_src = src1 }) (Core.CoreUnfolding { Core.uf_tmpl = rhs2, Core.uf_src = src2 })
-  | Core.isStableSource src1,       Core.isStableSource src2       = matchCore rn2 rhs1 rhs2
-  | not (Core.isStableSource src1), not (Core.isStableSource src2) = return []
+  | Core.isStableSource src1, Core.isStableSource src2 = matchCore rn2 rhs1 rhs2
 matchUnfolding rn2 (Core.DFunUnfolding _ _ args1) (Core.DFunUnfolding _ _ args2) = matchList (matchCore rn2) args1 args2
 -- It is OK to match any *unstable* unfolding against any other one
-matchUnfolding _ Core.NoUnfolding Core.NoUnfolding   = return []
-matchUnfolding _ Core.NoUnfolding (Core.OtherCon _)  = return []
-matchUnfolding _ (Core.OtherCon _) Core.NoUnfolding  = return []
-matchUnfolding _ (Core.OtherCon _) (Core.OtherCon _) = return []
+matchUnfolding _ unf1 unf2 | not (Core.isStableUnfolding unf1), not (Core.isStableUnfolding unf2) = return []
 matchUnfolding _ _ _ = fail "matchUnfolding"
 
-matchCore :: RnEnv2 -> Core.CoreExpr -> Core.CoreExpr -> Match [(Var, Var)]
+-- TODO: match instantiation within Core?
+matchCore :: RnEnv2 -> Core.CoreExpr -> Core.CoreExpr -> Match [MatchLR]
 matchCore rn2 (Core.Var x_l)       (Core.Var x_r)       = matchVar rn2 x_l x_r
 matchCore _   (Core.Lit l_l)       (Core.Lit l_r)       = guard "matchCore: Lit" (l_l == l_r) >> return []
 matchCore rn2 (Core.App e1_l e2_l) (Core.App e1_r e2_r) = liftM2 (++) (matchCore rn2 e1_l e1_r) (matchCore rn2 e2_l e2_r)
@@ -237,16 +299,16 @@ matchCore rn2 (Core.Type ty_l)                (Core.Type ty_r)                = 
 matchCore rn2 (Core.Coercion co_l)            (Core.Coercion co_r)            = matchCoercion rn2 co_l co_r
 matchCore _ _ _ = fail "matchCore"
 
-matchCoreAlts :: RnEnv2 -> [Core.CoreAlt] -> [Core.CoreAlt] -> Match [(Var, Var)]
+matchCoreAlts :: RnEnv2 -> [Core.CoreAlt] -> [Core.CoreAlt] -> Match [MatchLR]
 matchCoreAlts rn2 = matchList (matchCoreAlt rn2)
 
-matchCoreAlt :: RnEnv2 -> Core.CoreAlt -> Core.CoreAlt -> Match [(Var, Var)]
+matchCoreAlt :: RnEnv2 -> Core.CoreAlt -> Core.CoreAlt -> Match [MatchLR]
 matchCoreAlt rn2 (alt_con_l, vs_l, alt_e_l) (alt_con_r, vs_r, alt_e_r) = guard "matchCoreAlt" (alt_con_l == alt_con_r) >> matchMany matchVarBndr rn2 vs_l vs_r (\rn2 -> matchCore rn2 alt_e_l alt_e_r)
 
-matchTyVarBndrs :: RnEnv2 -> [TyVar] -> [TyVar] -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
+matchTyVarBndrs :: RnEnv2 -> [TyVar] -> [TyVar] -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchTyVarBndrs = matchMany matchTyVarBndr
 
-matchIdCoVarBndrs :: RnEnv2 -> [Id] -> [Id] -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
+matchIdCoVarBndrs :: RnEnv2 -> [Id] -> [Id] -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchIdCoVarBndrs = matchMany matchIdCoVarBndr
 
 matchMany :: (RnEnv2 -> v -> v -> (RnEnv2 -> Match b) -> Match b)
@@ -255,24 +317,44 @@ matchMany _    rn2 []         []         k = k rn2
 matchMany mtch rn2 (x_l:xs_l) (x_r:xs_r) k = mtch rn2 x_l x_r $ \rn2 -> matchMany mtch rn2 xs_l xs_r k
 matchMany _ _ _ _ _ = fail "matchMany"
 
-matchVar :: RnEnv2 -> Out Id -> Out Id -> Match [(Var, Var)]
+matchVar :: RnEnv2 -> Out Id -> Out Id -> Match [MatchLR]
 matchVar rn2 x_l x_r = fmap maybeToList (matchVar_maybe rn2 x_l x_r)
 
-matchVar_maybe :: RnEnv2 -> Out Id -> Out Id -> Match (Maybe (Var, Var))
+matchVar_maybe :: RnEnv2 -> Out Id -> Out Id -> Match (Maybe MatchLR)
 matchVar_maybe rn2 x_l x_r = case (rnOccL_maybe rn2 x_l, rnOccR_maybe rn2 x_r) of
      -- Both rigidly bound: match iff they rename to the same thing
     (Just x_l', Just x_r') -> guard "matchVar: rigid" (x_l' == x_r') >> return Nothing
      -- Both bound by let: defer decision about matching
-    (Nothing, Nothing)     -> return (Just (x_l, x_r))
+    (Nothing, Nothing)     -> return (Just (VarLR x_l x_r))
      -- One bound by let and one bound rigidly: don't match
     _                      -> fail "matchVar: mismatch"
 
-matchList :: (a -> a -> Match [(Var, Var)])
-          -> [a] -> [a] -> Match [(Var, Var)]
+matchVarL :: RnEnv2 -> Out Id -> Out (TermF Anned) -> Match [MatchLR]
+matchVarL rn2 x_l e_r = fmap maybeToList (matchVarL_maybe rn2 x_l e_r)
+
+matchVarL_maybe :: RnEnv2 -> Out Id -> Out (TermF Anned) -> Match (Maybe MatchLR)
+matchVarL_maybe rn2 x_l e_r = guard "matchVarL_maybe: no instance matching"  iNSTANCE_MATCHING >> case rnOccL_maybe rn2 x_l of
+     -- Left rigidly bound: matching is impossible (assume we already tried matchVar_maybe)
+    Just _  -> fail "matchVar: rigid"
+     -- Both bound by let: defer decision about matching
+    Nothing -> return (Just (VarL x_l e_r))
+
+matchVarR :: RnEnv2 -> Out (TermF Anned) -> Out Id -> Match [MatchLR]
+matchVarR rn2 e_l x_r = fmap maybeToList (matchVarR_maybe rn2 e_l x_r)
+
+matchVarR_maybe :: RnEnv2 -> Out (TermF Anned) -> Out Id -> Match (Maybe MatchLR)
+matchVarR_maybe rn2 e_l x_r = guard "matchVarR_maybe: no instance matching" iNSTANCE_MATCHING >> case rnOccR_maybe rn2 x_r of
+     -- Right rigidly bound: matching is impossible (assume we already tried matchVar_maybe)
+    Just _  -> fail "matchVar: rigid"
+     -- Both bound by let: defer decision about matching
+    Nothing -> return (Just (VarR e_l x_r))
+
+matchList :: (a -> a -> Match [MatchLR])
+          -> [a] -> [a] -> Match [MatchLR]
 matchList mtch xs_l xs_r = fmap concat (zipWithEqualM mtch xs_l xs_r)
 
-matchMaybe :: (a -> a -> Match [(Var, Var)])
-           -> Maybe a -> Maybe a -> Match [(Var, Var)]
+matchMaybe :: (a -> a -> Match [MatchLR])
+           -> Maybe a -> Maybe a -> Match [MatchLR]
 matchMaybe _ Nothing    Nothing    = return []
 matchMaybe f (Just x_l) (Just x_r) = f x_l x_r
 matchMaybe _ _ _ = fail "matchMaybe"
@@ -281,15 +363,15 @@ matchIn :: (InScopeSet -> Renaming -> a -> a)
         -> (RnEnv2 -> a -> a -> Match b)
         -> RnEnv2 -> In a -> In a -> Match b
 matchIn rnm mtch rn2 (rn_l, x_l) (rn_r, x_r) = mtch rn2 (rnm iss rn_l x_l) (rnm iss rn_r x_r)
-  where iss = rnInScopeSet rn2 -- NB: this line is the only thing that relies on the RnEnv2 InScopeSet being correct
+  where iss = rnInScopeSet rn2 -- NB: this line is one of the few things that relies on the RnEnv2 InScopeSet being correct
 
-matchEC :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Stack -> Stack -> Match (RnEnv2, Match [(Var, Var)])
+matchEC :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Stack -> Stack -> Match (RnEnv2, Match [MatchLR])
 matchEC init_rn2 rn2 k_l k_r = foldZipEqualM (\(init_rn2', meqs) kf_l kf_r -> fmap (second (liftM2 (++) meqs)) $ matchECFrame init_rn2' rn2 kf_l kf_r) (init_rn2, return []) k_l k_r
 
-matchECFrame :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Tagged StackFrame -> Tagged StackFrame -> Match (RnEnv2, Match [(Var, Var)])
+matchECFrame :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Tagged StackFrame -> Tagged StackFrame -> Match (RnEnv2, Match [MatchLR])
 matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
   where
-    go :: StackFrame -> StackFrame -> Match (RnEnv2, Match [(Var, Var)])
+    go :: StackFrame -> StackFrame -> Match (RnEnv2, Match [MatchLR])
     go (Apply x_l')                          (Apply x_r')                          = return (init_rn2, matchVar rn2 x_l' x_r')
     go (TyApply ty_l')                       (TyApply ty_r')                       = return (init_rn2, matchType rn2 ty_l' ty_r')
     go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2, liftM2 (++) (matchType rn2 ty_l' ty_r') (matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedAlts matchAlts rn2 in_alts_l in_alts_r))
@@ -309,15 +391,18 @@ safeMkMatchResult eqs = guard "safeMkRenaming" (all (\(x_l, x_r) -> M.lookup x_l
   where eqs_map = M.fromList eqs
 
 
-trimBounds :: BoundVars -> BoundVars -> [(Var, Var)] -> Match [(Var, Var)]
+trimBounds :: BoundVars -> BoundVars -> [MatchLR] -> Match [(Var, Var)]
 trimBounds internally_bound_l internally_bound_r eqs
-  = flip mapMaybeM eqs $ \(x_l, x_r) -> case (x_l `elemVarSet` internally_bound_l, x_r `elemVarSet` internally_bound_r) of
-            (True,  True)  -> return Nothing           -- Both local, don't want it in the output
-            (False, False) -> return (Just (x_l, x_r)) -- Both free
-            _              -> fail "trimBounds"        -- Mismatch
+  = flip mapMaybeM eqs $ \lr -> case lr of VarLR x_l x_r -> case (x_l `elemVarSet` internally_bound_l, x_r `elemVarSet` internally_bound_r) of
+                                                              (True,  True)  -> return Nothing               -- Both local, don't want it in the output
+                                                              (False, False) -> return (Just (x_l, x_r))     -- Both free
+                                                              _              -> fail "trimBounds: boundness" -- Mismatch
+                                           VarL x_l _ | x_l `elemVarSet` internally_bound_l -> return Nothing
+                                           VarR _ x_r | x_r `elemVarSet` internally_bound_r -> return Nothing
+                                           _ -> fail "trimBounds: instantiation"
 
 -- FIXME: match binders in heap
-matchPureHeap :: RnEnv2 -> [(Var, Var)] -> PureHeap -> PureHeap -> Match [(Var, Var)]
+matchPureHeap :: RnEnv2 -> [MatchLR] -> PureHeap -> PureHeap -> Match [(Var, Var)]
 matchPureHeap rn2 init_free_eqs h_l h_r
   = matchLoop [] init_free_eqs emptyVarSet emptyVarSet >>=
     trimBounds (fst (pureHeapVars h_l) InternallyBound) (fst (pureHeapVars h_r) InternallyBound)
@@ -345,26 +430,30 @@ matchPureHeap rn2 init_free_eqs h_l h_r
     -- We can account for staticness using the standard generalisation mechanism, and there is no need for the
     -- matcher to have hacks like that (though we still have to be careful about how we match phantoms).
     
-    markUsed x' (_, e) used = if termIsCheap e then used else used `extendVarSet` x'
-    
     matchLoop known [] _ _ = return known
-    matchLoop known ((x_l, x_r):free_eqs) used_l used_r
+    matchLoop known (lr:free_eqs) used_l used_r
        -- Perhaps we have already assumed this equality is true?
-      | (x_l, x_r) `elem` known = matchLoop known free_eqs used_l used_r
-      | otherwise = {- traceSC "matchLoop" $ -} case (M.lookup x_l h_l, M.lookup x_r h_r) of
+       -- NB: it is OK to do exact syntactic equality on VarL/VarR here because we always rename new equalities generated in
+       -- this loop using the same InScopeSet (that from rn2) so only a finite number of distinct binders will be generated.
+      | lr `elem` known = matchLoop known free_eqs used_l used_r
+      | otherwise = {- traceSC "matchLoop" $ -} case (case lr of VarLR x_l x_r -> (go_template (matchBndrExtras rn2 x_l x_r)    ,     lookupUsed used_l x_l h_l,                         lookupUsed used_r x_r h_r)
+                                                                 VarL  x_l e_r -> (go_template (matchIdCoVarBndrExtrasL rn2 x_l e_r), lookupUsed used_l x_l h_l,                         Just (InternallyBound, Just (Just (used_r, e_r))))
+                                                                 VarR  e_l x_r -> (go_template (matchIdCoVarBndrExtrasR rn2 e_l x_r), Just (InternallyBound, Just (Just (used_l, e_l))), lookupUsed used_r x_r h_r)) of
            -- If matching an internal let, it is possible that variables occur free. Insist that free-ness matches:
-          (Nothing, Nothing) -> go [] used_l used_r
-          (Just _, Nothing) -> failLoop "matching binding on left not present in the right"
-          (Nothing, Just _) -> failLoop "matching binding on right not present in the left"
-          (Just hb_l, Just hb_r) -> case ((howBound &&& heapBindingTerm) hb_l, (howBound &&& heapBindingTerm) hb_r) of
+           -- TODO: actually I'm pretty sure that the heap binds *everything* now. These cases could probably be removed,
+           -- though they don't do any particular harm.
+          (go, Nothing, Nothing) -> go [] used_l used_r
+          (_,  Just _,  Nothing) -> failLoop "matching binding on left not present in the right"
+          (_,  Nothing, Just _)  -> failLoop "matching binding on right not present in the left"
+          (go, Just hb_l, Just hb_r) -> case (hb_l, hb_r) of
                -- If the template provably doesn't use this heap binding, we can match it against anything at all
               ((InternallyBound, Nothing), _) -> go [] used_l used_r
                -- If the template internalises a binding of this form, check that the matchable semantics is the same.
                -- If the matchable doesn't have a corresponding binding tieback is impossible because we have less info this time.
-              ((InternallyBound, Just in_e_l), (how_r, mb_in_e_r)) -> case mb_in_e_r of
-                  Just in_e_r | not (x_l `elemVarSet` used_l), not (x_r `elemVarSet` used_r) -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r >>= \extra_free_eqs -> go extra_free_eqs (markUsed x_l in_e_l used_l) (markUsed x_r in_e_r used_r)
-                              | otherwise -> failLoop "one or other side of InternallyBound already used"
-                  Nothing -> failLoop $ "can only match a termful InternallyBound on left against an actual term, not a termless " ++ show how_r ++ " binding"
+              ((InternallyBound, Just (Just (used_l', e_l'))), (how_r, mb_e_r')) -> case mb_e_r' of
+                  Just (Just (used_r', e_r')) -> matchTerm' rn2 e_l' e_r' >>= \extra_free_eqs -> go extra_free_eqs used_l' used_r'
+                  Just Nothing                -> failLoop "right side of InternallyBound already used"
+                  Nothing                     -> failLoop $ "can only match a termful InternallyBound on left against an actual term, not a termless " ++ show how_r ++ " binding"
                -- If the template has no information but exposes a lambda, we can rename to tie back.
                -- If there is a corresponding binding in the matchable we can't tieback because we have more info this time.
                --
@@ -372,14 +461,15 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                -- (almost certainly an sc-stop) is worse, though... Doing this really matters; see for example the Bernouilli benchmark.
                --
                -- TODO: give let-bound nothings tags and generalise to get the same effect?
-              ((LambdaBound, Nothing), (_how_r, mb_in_e_r)) -> case mb_in_e_r of
-                  Nothing -> (if _how_r == LetBound then pprTraceSC "Downgrading" (ppr x_l <+> ppr x_r) else id) $
+              ((LambdaBound, Nothing), (_how_r, mb_e_r')) -> case mb_e_r' of
+                  Nothing -> (if _how_r == LetBound then pprTraceSC "Downgrading" empty else id) $
                              go [] used_l used_r
                   Just _ -> failLoop "cannot match termless LambdaBound on left against an actual term"
                -- If the template has an unfolding, we must do lookthrough
-              ((LambdaBound, Just in_e_l), (_how_r, mb_in_e_r)) -> case mb_in_e_r of
-                  Just in_e_r | not (x_l `elemVarSet` used_l), not (x_r `elemVarSet` used_r) -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r >>= \extra_free_eqs -> go extra_free_eqs (markUsed x_l in_e_l used_l) (markUsed x_r in_e_r used_r)
-                  _ -> failLoop "can only match a termful LambdaBound on left against an actual term"
+              ((LambdaBound, Just (Just (used_l', e_l'))), (_how_r, mb_e_r')) -> case mb_e_r' of
+                  Just (Just (used_r', e_r')) -> matchTerm' rn2 e_l' e_r' >>= \extra_free_eqs -> go extra_free_eqs used_l' used_r'
+                  Just Nothing                -> failLoop "right side of LambdaBound already used"
+                  Nothing                     -> failLoop "can only match a termful LambdaBound on left against an actual term"
                -- We assume the supercompiler gives us no-shadowing for let-bound names, so if two names are the same they must refer to the same thing
                -- NB: because I include this case, we may not include a renaming for some lambda-bound variables in the final knowns (if they are bound
                -- above the let-bound thing)
@@ -404,11 +494,11 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                -- They are only guaranteed to match if the are **Let bound**, because in that case those binders must have been
                -- created by a common ancestor and hence we can just match the uniques to determine whether the binders are the "same".
                -- It is NOT safe to do this is both/either sides are LambdaBound, because we have no guarantee of a common ancestor in that case.
-              ((LetBound, mb_in_e_l), (_how_r, mb_in_e_r))
-                | x_l == x_r -> case (mb_in_e_l, mb_in_e_r) of
-                  (Nothing,     Nothing)     -> go [] used_l used_r
-                  (Just in_e_l, Just in_e_r) -> ASSERT2(inFreeVars annedTermFreeVars in_e_r `subVarSet` inFreeVars annedTermFreeVars in_e_l, text "match" <+> ppr (x_l, in_e_l, x_r, _how_r, in_e_r))
-                                                go [(x, x) | x <- varSetElems (inFreeVars annedTermFreeVars in_e_l)] (markUsed x_l in_e_l used_l) (markUsed x_r in_e_r used_r)
+              ((LetBound, mb_e_l'), (_how_r, mb_e_r'))
+                | VarLR x_l x_r <- lr, x_l == x_r -> case (mb_e_l', mb_e_r') of -- TODO: even match LetBounds against non-VarLR
+                  (Nothing,                     Nothing)                     -> go [] used_l used_r
+                  (Just (Just (used_l', e_l')), Just (Just (used_r', e_r'))) -> ASSERT2(annedTermFreeVars' e_r' `subVarSet` annedTermFreeVars' e_l', text "match" <+> ppr (x_l, e_l', x_r, _how_r, e_r'))
+                                                                                go [VarLR x x | x <- varSetElems (annedTermFreeVars' e_l')] used_l' used_r'
                   _                          -> failLoop "insane LetBounds"
                -- If the template doesn't lambda abstract, we can't rename. Only tieback if we have an exact *name* match.
                --
@@ -421,11 +511,24 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                -- refer to LambdaBound things. *However* we anticipate that doing so would almost always fail to tieback, so we elect to just stick with
                -- the "cheap-but-inaccurate" name-matching heuristic.
                 | otherwise -> failLoop "LetBound"
-      where failLoop rest = fail $ "matchLoop" ++ showPpr (x_l, x_r) ++ ": " ++ rest
-            go extra_free_eqs used_l' used_r' = do
+              _ -> failLoop "left side of InternallyBound/LambdaBound already used"
+      where -- First Maybe: whether or not the var is bound in the heap
+            -- Second Maybe: whether or not the HeapBinding actually has a term
+            -- Third Maybe: whether it is safe for work duplication to make use of that term
+            lookupUsed :: VarSet -> Var -> PureHeap -> Maybe (HowBound, Maybe (Maybe (VarSet, Out (TermF Anned))))
+            lookupUsed used x h = case M.lookup x h of
+              Nothing -> Nothing
+              Just hb -> Just (howBound hb, flip fmap (heapBindingTerm hb) $ \in_e -> let e' = renameIn (renameAnnedTerm (rnInScopeSet rn2)) in_e
+                                                                                      in case () of
+                                                                                              () | termIsCheap e'      -> Just (used, annee e')
+                                                                                                 | x `elemVarSet` used -> Nothing
+                                                                                                 | otherwise           -> Just (used `extendVarSet` x, annee e'))
+
+            failLoop rest = fail $ "matchLoop" ++ showPpr lr ++ ": " ++ rest
+            go_template mextras extra_free_eqs used_l' used_r' = do
                 -- Don't forget to match types/unfoldings of binders as well:
-                bndr_free_eqs <- matchBndrExtras rn2 x_l x_r
-                matchLoop ((x_l, x_r) : known) (bndr_free_eqs ++ extra_free_eqs ++ free_eqs) used_l' used_r'
+                bndr_free_eqs <- mextras
+                matchLoop (lr : known) (bndr_free_eqs ++ extra_free_eqs ++ free_eqs) used_l' used_r'
 
 app3 :: [a] -> [a] -> [a] -> [a]
 app3 x y z = x ++ y ++ z

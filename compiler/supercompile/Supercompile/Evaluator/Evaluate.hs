@@ -95,13 +95,13 @@ step s = guard reduced >> return result
 step' :: Bool -> Either State UnnormalisedState -> (Bool, State) -- The flag indicates whether we managed to reduce any steps *at all*
 step' normalising ei_state =
     (\res@(_reduced, stepped_state) -> let _deeds = either releaseStateDeed releaseUnnormalisedStateDeed ei_state
-                                           _doc = either (pPrintFullState False) (pPrintFullUnnormalisedState False) ei_state
+                                           _doc = either (pPrintFullState quietStatePrettiness) (pPrintFullUnnormalisedState quietStatePrettiness) ei_state
                                            _fvs = either stateFreeVars unnormalisedStateFreeVars ei_state in
                                        ASSERT2(noChange _deeds (releaseStateDeed stepped_state),
-                                               hang (text "step': deeds lost or gained:") 2 (_doc $$ pPrintFullState False stepped_state))
+                                               hang (text "step': deeds lost or gained:") 2 (_doc $$ pPrintFullState quietStatePrettiness stepped_state))
                                        ASSERT2(subVarSet (stateFreeVars stepped_state) _fvs,
                                                text "step': FVs" $$ hang (text "Before:") 2 (pPrint _fvs $$ _doc) $$
-                                                                    hang (text "After:")  2 (pPrint (stateFreeVars stepped_state) $$ pPrintFullState False stepped_state))
+                                                                    hang (text "After:")  2 (pPrint (stateFreeVars stepped_state) $$ pPrintFullState quietStatePrettiness stepped_state))
                                        -- traceRender (text "normalising" $$ nest 2 (pPrintFullUnnormalisedState state) $$ text "to" $$ nest 2 (pPrintFullState stepped_state)) $
                                        res) $
     go_entry ei_state

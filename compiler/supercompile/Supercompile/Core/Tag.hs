@@ -8,45 +8,66 @@ import Supercompile.Core.FreeVars
 import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 
+import qualified DataCon
+import Literal (hashLiteral)
+
 
 tagTerm :: UniqSupply -> Term -> TaggedTerm
-tagTerm = mkTagger (\i f (I e) -> Tagged (mkTag (getKey i)) (f e))
+tagTerm = mkTagger (\tg (I e) -> Tagged tg e)
 
 tagFVedTerm :: UniqSupply -> SizedFVedTerm -> TaggedSizedFVedTerm
-tagFVedTerm = mkTagger (\i f e -> Comp (Tagged (mkTag (getKey i)) (fmap f e)))
+tagFVedTerm = mkTagger (\tg e -> Comp (Tagged tg e))
+
+
+-- The guiding principle behind these two functions is that ideally there should only
+-- be one tag for a particular value. If we give every occurrence of (:) in the input
+-- program a different tag we can get weird situations (like gen_regexps) where programs
+-- are specialised on very long repititions of the same constructor.
+
+dataConTag :: DataCon -> Tag
+dataConTag dc = mkTag (negate (DataCon.dataConTag dc)) -- Works well because (hashLiteral l) is always positive
+
+literalTag :: Literal -> Tag
+literalTag = mkTag . hashLiteral
 
 
 {-# INLINE mkTagger #-}
-mkTagger :: (forall a b. Unique -> (a -> b) -> ann a -> ann' b)
+mkTagger :: (Copointed ann, Functor ann')
+         => (forall a. Tag -> ann a -> ann' a)
          -> UniqSupply -> ann (TermF ann) -> ann' (TermF ann')
 mkTagger rec = term
   where
-    term ids = rec i (term' ids')
+    tag_rec ids orig f = rec (mkTag (getKey i)) (replace orig (f ids'))
       where (i, ids') = takeUniqFromSupply ids
-    term' ids e = case e of
-        Var x             -> Var x
-        Value v           -> Value (value' ids v)
-        TyApp e ty        -> TyApp (term ids e) ty
-        CoApp e co        -> CoApp (term ids e) co
-        App e x           -> App (term ids e) x
-        PrimOp pop tys es -> PrimOp pop tys (zipWith term idss' es)
-          where idss' = listSplitUniqSupply ids
-        Case e x ty alts  -> Case (term ids0' e) x ty (alternatives ids1' alts)
-          where (ids0', ids1') = splitUniqSupply ids
-        Let x e1 e2       -> Let x (term ids0' e1) (term ids1' e2)
-          where (ids0', ids1') = splitUniqSupply ids
-        LetRec xes e      -> LetRec (zipWith (\ids'' (x, e) -> (x, term ids'' e)) idss' xes) (term ids1' e)
-          where (ids0', ids1') = splitUniqSupply ids
-                idss' = listSplitUniqSupply ids0'
-        Cast e co         -> Cast (term ids e) co
 
-    value' ids v = case v of
-        Indirect x         -> Indirect x
-        TyLambda x e       -> TyLambda x (term ids e)
-        Lambda x e         -> Lambda x (term ids e)
-        Data dc tys cos xs -> Data dc tys cos xs
-        Literal l          -> Literal l
-        Coercion co        -> Coercion co
+    replace orig hole = fmap (const hole) orig
+
+    term ids e = case extract e of
+        Var x             -> tag $ \_ -> Var x
+        Value v           -> value ids e v
+        TyApp e ty        -> tag $ \ids -> TyApp (term ids e) ty
+        CoApp e co        -> tag $ \ids -> CoApp (term ids e) co
+        App e x           -> tag $ \ids -> App (term ids e) x
+        PrimOp pop tys es -> tag $ \ids -> let idss' = listSplitUniqSupply ids
+                                           in PrimOp pop tys (zipWith term idss' es)
+        Case e x ty alts  -> tag $ \ids -> let (ids0', ids1') = splitUniqSupply ids
+                                           in Case (term ids0' e) x ty (alternatives ids1' alts)
+        Let x e1 e2       -> tag $ \ids -> let (ids0', ids1') = splitUniqSupply ids
+                                           in Let x (term ids0' e1) (term ids1' e2)
+        LetRec xes e      -> tag $ \ids -> let (ids0', ids1') = splitUniqSupply ids
+                                               idss' = listSplitUniqSupply ids0'
+                                           in LetRec (zipWith (\ids'' (x, e) -> (x, term ids'' e)) idss' xes) (term ids1' e)
+        Cast e co         -> tag $ \ids -> Cast (term ids e) co
+      where tag = tag_rec ids e
+
+    value ids e v = fmap Value $ case v of
+        Indirect x         -> tag $ \_ -> Indirect x
+        TyLambda x e       -> tag $ \ids -> TyLambda x (term ids e)
+        Lambda x e         -> tag $ \ids -> Lambda x (term ids e)
+        Data dc tys cos xs -> rec (dataConTag dc) (replace e (Data dc tys cos xs))
+        Literal l          -> rec (literalTag l)  (replace e (Literal l))
+        Coercion co        -> tag $ \_ -> Coercion co
+      where tag = tag_rec ids e
 
     alternatives = zipWith alternative . listSplitUniqSupply
     

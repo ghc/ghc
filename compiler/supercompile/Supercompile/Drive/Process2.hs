@@ -258,16 +258,16 @@ memo opt state = do
          | p <- promises ms
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                           match (meaning p) state]
-         ] of (p, res):_ -> pure (Right (do { traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState True state), res)
+         ] of (p, res):_ -> pure (Right (do { traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState fullStatePrettiness state), res)
                                             ; return res }), ms)
               _          -> pure (Left p, ms')
                 where (p, ms') = promise state ms
   case mb_res of
     Right res -> return res
     Left p  -> flip liftM (opt state) $ \mres ->
-                   (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState True state))
+                   (do { traceRenderScpM ">sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state))
                        ; res <- mres
-                       ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState False state), res)
+                       ; traceRenderScpM "<sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                        ; fulfill p res })
 
 type SpecT = ReaderT AlreadySpeculated
@@ -309,7 +309,7 @@ sc' :: Parent -> State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc' parent state = callCCish (\k -> try (RB k))
   where
     trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") (ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$
-                                                                    ppr shallow_state $$ pPrintFullState True shallow_state $$ ppr state $$ pPrintFullState True state)
+                                                                    ppr shallow_state $$ pPrintFullState fullStatePrettiness shallow_state $$ ppr state $$ pPrintFullState fullStatePrettiness state)
     try :: RollbackScpM -> ProcessM (LevelM (Deeds, Out FVedTerm))
     try rb = terminateM parent state rb
                (\parent -> liftSpeculatedStateT speculated state $ \state' -> my_split (reduce state') (sc'' parent))

@@ -182,10 +182,14 @@ pPrintPrecAlt _ (alt_con, alt_e) = hang (pPrintPrec noPrec alt_con <+> text "->"
 pPrintPrecLet :: (Outputable a, Outputable b) => Rational -> Var -> a -> b -> SDoc
 pPrintPrecLet prec x e e_body = prettyParen (prec > noPrec) $ hang (text "let") 2 (pPrintBndr LetBind x <+> text "=" <+> pPrintPrec noPrec e) $$ text "in" <+> pPrintPrec noPrec e_body
 
-pPrintPrecLetRec :: (Outputable a, Outputable b) => Rational -> [(Var, a)] -> b -> SDoc
+pPrintPrecLetRec, pPrintPrecWhere :: (Outputable a, Outputable b) => Rational -> [(Var, a)] -> b -> SDoc
 pPrintPrecLetRec prec xes e_body
   | [] <- xes = pPrintPrec prec e_body
   | otherwise = prettyParen (prec > noPrec) $ hang (text "letrec") 2 (vcat [hang (pPrintBndr LetBind x) 2 (text "=" <+> pPrintPrec noPrec e) | (x, e) <- xes]) $$ text "in" <+> pPrintPrec noPrec e_body
+
+pPrintPrecWhere prec xes e_body
+  | [] <- xes = pPrintPrec prec e_body
+  | otherwise = prettyParen (prec > noPrec) $ hang (pPrintPrec noPrec e_body) 1 $ hang (text "where") 1 $ vcat [hang (pPrintBndr LetBind x) 2 (text "=" <+> pPrintPrec noPrec e) | (x, e) <- xes]
 
 instance (Functor ann, OutputableLambdas1 ann) => Outputable (ValueF ann) where
     pprPrec = pprPrecDefault
@@ -220,14 +224,15 @@ termIsValue = isValue . extract
 
 -- Find those things that we are willing to duplicate.
 termIsCheap :: Copointed ann => ann (TermF ann) -> Bool
-termIsCheap = isCheap . extract
-  where
-    isCheap _ | cALL_BY_NAME = True -- A cunning hack. I think this is all that should be required...
-    isCheap (Var _)         = True
-    isCheap (Value _)       = True
-    isCheap (Cast e _)      = isCheap (extract e)
-    isCheap (Case e _ _ []) = isCheap (extract e) -- NB: important for pushing down let-bound applications of ``error''
-    isCheap _               = False
+termIsCheap = termIsCheap' . extract
+
+termIsCheap' :: Copointed ann => TermF ann -> Bool
+termIsCheap' _ | cALL_BY_NAME = True -- A cunning hack. I think this is all that should be required...
+termIsCheap' (Var _)         = True
+termIsCheap' (Value _)       = True
+termIsCheap' (Cast e _)      = termIsCheap e
+termIsCheap' (Case e _ _ []) = termIsCheap e -- NB: important for pushing down let-bound applications of ``error''
+termIsCheap' _               = False
 
 varString :: Var -> String
 varString = nameString . varName
