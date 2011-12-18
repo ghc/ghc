@@ -4,6 +4,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
+-----------------------------------------------------------------------------
+-- | This module provides access to internal garbage collection and
+-- memory usage statistics.  These statistics are not available unless
+-- a program is run with the @-T@ RTS flag.
+--
+-- This module is GHC-only and should not be considered portable.
+--
+-----------------------------------------------------------------------------
 module GHC.Stats
     ( GCStats(..)
     , getGCStats
