@@ -5,16 +5,26 @@ module DefsVect where
 
 import Data.Array.Parallel
 import Data.Array.Parallel.Prelude.Bool
-import Data.Array.Parallel.Prelude.Int  (Int)
+import Data.Array.Parallel.Prelude.Int  (Int, sumP)
 
 
 {-# VECTORISE class Eq #-}
+{-# VECTORISE SCALAR instance Eq Bool #-}
+-- {-# VECTORISE SCALAR instance Eq Char #-}
 {-# VECTORISE SCALAR instance Eq Int #-}
+{-# VECTORISE SCALAR instance Eq Word8 #-}
+-- {-# VECTORISE SCALAR instance Eq Float #-}
+{-# VECTORISE SCALAR instance Eq Double #-}
+{-# VECTORISE SCALAR instance Eq Ordering #-}
+{-# VECTORISE class Ord #-}
+{-# VECTORISE SCALAR instance Ord Bool #-}
+-- {-# VECTORISE SCALAR instance Ord Char #-}
+{-# VECTORISE SCALAR instance Ord Int #-}
+{-# VECTORISE SCALAR instance Ord Word8 #-}
+-- {-# VECTORISE SCALAR instance Ord Float #-}
+{-# VECTORISE SCALAR instance Ord Double #-}
+{-# VECTORISE SCALAR instance Ord Ordering #-}
 
--- {-# VECTORISE class Ord #-}
--- {-# VECTORISE SCALAR instance Ord Int #-}
-
--- {-# VECTORISE type Ordering #-}
 
 data MyBool = MyTrue | MyFalse
 

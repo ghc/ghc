@@ -143,3 +143,4 @@ tests/dph/quickhull/dph-quickhull-copy-fast
 tests/dph/quickhull/dph-quickhull-vseg-fast
 tests/dph/words/dph-words-copy-fast
 tests/dph/words/dph-words-vseg-fast
+tests/dph/classes/dph-classes-vseg-fast
