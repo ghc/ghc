@@ -221,6 +221,13 @@ rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys) = do
     tys' <- mapM (rnLHsTyKi isType doc) tys
     return (HsTupleTy tup_con tys')
 
+-- 1. Perhaps we should use a separate extension here?
+-- 2. Check that the integer is positive?
+rnHsTyKi isType _ numberTy@(HsNumberTy n) = do
+    poly_kinds <- xoptM Opt_PolyKinds
+    unless (poly_kinds || isType) (addErr (polyKindsErr numberTy))
+    return (HsNumberTy n)
+
 rnHsTyKi isType doc (HsAppTy ty1 ty2) = do
     ty1' <- rnLHsTyKi isType doc ty1
     ty2' <- rnLHsTyKi isType doc ty2

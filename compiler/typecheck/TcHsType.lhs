@@ -524,6 +524,11 @@ kc_hs_type ty@(HsExplicitTupleTy _ tys) exp_kind = do
   checkExpectedKind ty tupleKi exp_kind
   return (HsExplicitTupleTy (map snd ty_k_s) (map fst ty_k_s))
 
+kc_hs_type ty@(HsNumberTy n) exp_kind = do
+  -- XXX: Temporarily we use the Word type lifted to the kind level.
+  checkExpectedKind ty wordTy exp_kind
+  return (HsNumberTy n)
+
 kc_hs_type (HsWrapTy {}) _exp_kind =
     panic "kc_hs_type HsWrapTy"  -- We kind checked something twice
 
@@ -758,6 +763,9 @@ ds_type (HsExplicitTupleTy kis tys) = do
   kis' <- mapM zonkTcKindToKind kis
   tys' <- mapM dsHsType tys
   return $ mkTyConApp (buildPromotedDataTyCon (tupleCon BoxedTuple (length kis'))) (kis' ++ tys')
+
+ds_type (HsNumberTy n) =
+  failWithTc (ptext (sLit "ds_type: NumberTy not yet implemenetd"))
 
 ds_type (HsWrapTy (WpKiApps kappas) ty) = do
   tau <- ds_type ty

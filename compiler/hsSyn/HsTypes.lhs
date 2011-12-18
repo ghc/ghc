@@ -181,6 +181,8 @@ data HsType name
         [PostTcKind]     -- See Note [Promoted lists and tuples]
         [LHsType name]   
 
+  | HsNumberTy Integer    -- A promoted numeric literal.
+
   | HsWrapTy HsTyWrapper (HsType name)  -- only in typechecker output
   deriving (Data, Typeable)
 
@@ -553,6 +555,7 @@ ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
+ppr_mono_ty _    (HsNumberTy n)      = integer n
 
 ppr_mono_ty ctxt_prec (HsWrapTy (WpKiApps _kis) ty)
   = ppr_mono_ty ctxt_prec ty
