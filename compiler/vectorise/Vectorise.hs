@@ -218,15 +218,23 @@ vectTopBind b@(Rec bs)
 -- Add a vectorised binding to an imported top-level variable that has a VECTORISE [SCALAR] pragma
 -- in this module.
 --
+-- RESTIRCTION: Currently, we cannot use the pragma vor mutually recursive definitions.
+--
 vectImpBind :: Id -> VM CoreBind
 vectImpBind var
   = do {   -- Vectorise the right-hand side, create an appropriate top-level binding and add it
            -- to the vectorisation map.  For the non-lifted version, we refer to the original
            -- definition — i.e., 'Var var'.
-       ; (inline, isScalar, expr') <- vectTopRhs [] var (Var var)
-       ; var' <- vectTopBinder var inline expr'
-       ; when isScalar $ 
-           addGlobalScalarVar var
+           -- NB: To support recursive definitions, we tie a lazy knot.
+       ; (var', _, expr') <- fixV $
+           \ ~(_, inline, rhs) ->
+             do { var' <- vectTopBinder var inline rhs
+                ; (inline, isScalar, expr') <- vectTopRhs [] var (Var var)
+
+                ; when isScalar $ 
+                    addGlobalScalarVar var
+                ; return (var', inline, expr')
+                }
 
            -- We add any newly created hoisted top-level bindings.
        ; hs <- takeHoisted
