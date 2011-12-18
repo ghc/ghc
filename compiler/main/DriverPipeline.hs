@@ -137,10 +137,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
   -- We add the directory in which the .hs files resides) to the import path.
   -- This is needed when we try to compile the .hc file later, if it
   -- imports a _stub.h file that we created here.
-   let current_dir = case takeDirectory basename of
-                     "" -> "." -- XXX Hack required for filepath-1.1 and earlier
-                               -- (GHC 6.12 and earlier)
-                     d -> d
+   let current_dir = takeDirectory basename
        old_paths   = includePaths dflags0
        dflags      = dflags0 { includePaths = current_dir : old_paths }
        hsc_env     = hsc_env0 {hsc_dflags = dflags}
@@ -849,11 +846,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
-        let current_dir = case takeDirectory basename of
-                     "" -> "." -- XXX Hack required for filepath-1.1 and earlier
-                               -- (GHC 6.12 and earlier)
-                     d -> d
-
+        let current_dir = takeDirectory basename
             paths = includePaths dflags0
             dflags = dflags0 { includePaths = current_dir : paths }
 
