@@ -802,8 +802,8 @@ pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
                     , con_res = ResTyH98, con_doc = doc })
   = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details details]
   where
-    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprHsInfix con, ppr t2]
-    ppr_details (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
+    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc (unLoc con), ppr t2]
+    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc (unLoc con) : map ppr tys)
     ppr_details (RecCon fields)  = ppr con <+> pprConDeclFields fields
 
 pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
