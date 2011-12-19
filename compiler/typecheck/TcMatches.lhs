@@ -832,7 +832,8 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         ; return (RecStmt { recS_stmts = stmts', recS_later_ids = later_ids
                           , recS_rec_ids = rec_ids, recS_ret_fn = ret_op' 
                           , recS_mfix_fn = mfix_op', recS_bind_fn = bind_op'
-                          , recS_rec_rets = tup_rets, recS_ret_ty = stmts_ty }, thing)
+                          , recS_later_rets = [], recS_rec_rets = tup_rets
+                          , recS_ret_ty = stmts_ty }, thing)
         }}
 
 tcDoStmt _ stmt _ _

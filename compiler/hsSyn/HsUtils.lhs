@@ -233,7 +233,7 @@ mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
 
 emptyRecStmt = RecStmt { recS_stmts = [], recS_later_ids = [], recS_rec_ids = []
                        , recS_ret_fn = noSyntaxExpr, recS_mfix_fn = noSyntaxExpr
-		       , recS_bind_fn = noSyntaxExpr
+                       , recS_bind_fn = noSyntaxExpr, recS_later_rets = []
                        , recS_rec_rets = [], recS_ret_ty = placeHolderType }
 
 mkRecStmt stmts = emptyRecStmt { recS_stmts = stmts }

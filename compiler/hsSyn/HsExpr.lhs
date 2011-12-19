@@ -928,10 +928,11 @@ data StmtLR idL idR
      , recS_mfix_fn :: SyntaxExpr idR -- The mfix function
 
         -- These fields are only valid after typechecking
-     , recS_rec_rets :: [PostTcExpr] -- These expressions correspond 1-to-1 with
-                                     -- recS_rec_ids, and are the
-                                     -- expressions that should be returned by
-                                     -- the recursion.
+     , recS_later_rets :: [PostTcExpr] -- (only used in the arrow version)
+     , recS_rec_rets :: [PostTcExpr] -- These expressions correspond 1-to-1
+                                     -- with recS_later_ids and recS_rec_ids,
+                                     -- and are the expressions that should be
+                                     -- returned by the recursion.
                                      -- They may not quite be the Ids themselves,
                                      -- because the Id may be *polymorphic*, but
                                      -- the returned thing has to be *monomorphic*, 

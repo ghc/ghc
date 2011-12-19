@@ -792,7 +792,8 @@ zonkStmt env (ParStmt stmts_w_bndrs mzip_op bind_op return_op)
 
 zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_ids = rvs
                       , recS_ret_fn = ret_id, recS_mfix_fn = mfix_id, recS_bind_fn = bind_id
-                      , recS_rec_rets = rets, recS_ret_ty = ret_ty })
+                      , recS_later_rets = later_rets, recS_rec_rets = rec_rets
+                      , recS_ret_ty = ret_ty })
   = do { new_rvs <- zonkIdBndrs env rvs
        ; new_lvs <- zonkIdBndrs env lvs
        ; new_ret_ty  <- zonkTcTypeToType env ret_ty
@@ -803,12 +804,14 @@ zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_id
        ; (env2, new_segStmts) <- zonkStmts env1 segStmts
 	-- Zonk the ret-expressions in an envt that 
 	-- has the polymorphic bindings in the envt
-       ; new_rets <- mapM (zonkExpr env2) rets
+       ; new_later_rets <- mapM (zonkExpr env2) later_rets
+       ; new_rec_rets <- mapM (zonkExpr env2) rec_rets
        ; return (extendIdZonkEnv env new_lvs,     -- Only the lvs are needed
                  RecStmt { recS_stmts = new_segStmts, recS_later_ids = new_lvs
                          , recS_rec_ids = new_rvs, recS_ret_fn = new_ret_id
                          , recS_mfix_fn = new_mfix_id, recS_bind_fn = new_bind_id
-                         , recS_rec_rets = new_rets, recS_ret_ty = new_ret_ty }) }
+                         , recS_later_rets = new_later_rets
+                         , recS_rec_rets = new_rec_rets, recS_ret_ty = new_ret_ty }) }
 
 zonkStmt env (ExprStmt expr then_op guard_op ty)
   = zonkLExpr env expr		`thenM` \ new_expr ->
