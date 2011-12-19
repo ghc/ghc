@@ -318,6 +318,10 @@ vectDictExpr (Coercion coe)
 -- requires the full blown vectorisation transformation; instead, they can be lifted by application
 -- of a member of the zipWith family (i.e., 'map', 'zipWith', zipWith3', etc.)
 --
+-- Dictionary functions are also scalar functions (as dictionaries themselves are not vectorised,
+-- instead they become dictionaries of vectorised methods).  We treat them differently, though see
+-- "Note [Scalar dfuns]" in 'Vectorise'.
+--
 vectScalarFun :: Bool       -- ^ Was the function marked as scalar by the user?
               -> [Var]      -- ^ Functions names in same recursive binding group
               -> CoreExpr   -- ^ Expression to be vectorised
@@ -344,14 +348,20 @@ vectScalarFun forceScalar recFns expr
     --           need to be members of the 'Scalar' class (that in its current form would better
     --           be called 'Primitive'). *ALSO* the hardcoded list of types is ugly!
     is_primitive_ty ty
+      | isPredTy ty               -- dictionaries never get into the environment
+      = True
       | Just (tycon, _) <- splitTyConApp_maybe ty
       = tyConName tycon `elem` [boolTyConName, intTyConName, word8TyConName, doubleTyConName]
-      | otherwise = False
+      | otherwise 
+      = False
 
     is_scalar_ty scalarTyCons ty 
+      | isPredTy ty               -- dictionaries never get into the environment
+      = True
       | Just (tycon, _) <- splitTyConApp_maybe ty
       = tyConName tycon `elemNameSet` scalarTyCons
-      | otherwise = False
+      | otherwise 
+      = False
 
     -- Checks whether an expression contain a non-scalar subexpression. 
     --
@@ -427,9 +437,17 @@ vectScalarFun forceScalar recFns expr
 
     uses_alt funs (_, _bs, e) = uses funs e 
 
+-- Generate code for a scalar function by generating a scalar closure.  If the function is a
+-- dictionary function, vectorise it as dictionary code.
+-- 
 mkScalarFun :: [Type] -> Type -> CoreExpr -> VM VExpr
 mkScalarFun arg_tys res_ty expr
-  = do { traceVt "mkScalarFun: " $ ppr expr
+  | isPredTy res_ty
+  = do { vExpr <- vectDictExpr expr
+       ; return (vExpr, unused)
+       }
+  | otherwise
+  = do { traceVt "mkScalarFun: " $ ppr expr $$ ptext (sLit "  ::") <+> ppr (mkFunTys arg_tys res_ty)
 
        ; fn_var  <- hoistExpr (fsLit "fn") expr DontInline
        ; zipf    <- zipScalars arg_tys res_ty
@@ -438,6 +456,8 @@ mkScalarFun arg_tys res_ty expr
        ; lclo    <- liftPD (Var clo_var)
        ; return (Var clo_var, lclo)
        }
+  where
+    unused = error "Vectorise.Exp.mkScalarFun: we don't lift dictionary expressions"
 
 -- |Vectorise a dictionary function that has a 'VECTORISE SCALAR instance' pragma.
 -- 
