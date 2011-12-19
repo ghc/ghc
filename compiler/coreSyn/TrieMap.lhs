@@ -554,12 +554,10 @@ fdT k m = foldTM k (tm_var m)
 
 
 ------------------------
-data TyLitMap a
-  = EmptyTLM
-  | TLM { tlm_number :: Map.Map Integer a }
+data TyLitMap a = TLM { tlm_number :: Map.Map Integer a }
 
 emptyTyLitMap :: TyLitMap a
-emptyTyLitMap = EmptyTLM
+emptyTyLitMap = TLM { tlm_number = Map.empty }
 
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
