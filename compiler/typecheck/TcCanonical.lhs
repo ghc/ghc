@@ -564,6 +564,9 @@ flatten d ctxt ty
        --   else return (xi,co,no_flattening) 
        -- }
 
+
+flatten _ _ xi@(LiteralTy _) = return (xi, mkTcReflCo xi)
+
 flatten d ctxt v@(TyVarTy _)
   = do { ieqs <- getInertEqs
        ; let co = liftInertEqsTy ieqs ctxt v           -- co : v ~ ty
@@ -696,6 +699,7 @@ flatten d ctxt ty@(ForAllTy {})
   where under_families tvs rho 
             = go (mkVarSet tvs) rho 
             where go _bound (TyVarTy _tv) = False
+                  go _ (LiteralTy _) = False
                   go bound (TyConApp tc tys)
                       | isSynFamilyTyCon tc
                       , (args,rest) <- splitAt (tyConArity tc) tys
@@ -1390,6 +1394,8 @@ expandAway tv ty@(ForAllTy {})
 -- it and try again.
 expandAway tv ty@(TyConApp tc tys)
   = (mkTyConApp tc <$> mapM (expandAway tv) tys) <|> (tcView ty >>= expandAway tv)
+
+expandAway _ xi@(LiteralTy _) = return xi
 
 \end{code}
 

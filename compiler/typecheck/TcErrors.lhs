@@ -681,6 +681,7 @@ quickFlattenTy :: TcType -> TcM TcType
 quickFlattenTy ty | Just ty' <- tcView ty = quickFlattenTy ty'
 quickFlattenTy ty@(TyVarTy {})  = return ty
 quickFlattenTy ty@(ForAllTy {}) = return ty     -- See
+quickFlattenTy ty@(LiteralTy _) = return ty
   -- Don't flatten because of the danger or removing a bound variable
 quickFlattenTy (AppTy ty1 ty2) = do { fy1 <- quickFlattenTy ty1
                                     ; fy2 <- quickFlattenTy ty2
