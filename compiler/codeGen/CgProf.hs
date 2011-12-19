@@ -178,8 +178,8 @@ emitCostCentreDecl cc = do
 	      label,	-- char *label,
 	      modl,	-- char *module,
               loc,      -- char *srcloc,
+              zero64,   -- StgWord64 mem_alloc
               zero,     -- StgWord time_ticks
-              zero64,	-- StgWord64 mem_alloc
               is_caf,   -- StgInt is_caf
               zero      -- struct _CostCentre *link
 	    ] 
