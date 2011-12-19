@@ -37,8 +37,8 @@ typedef struct _CostCentre {
     char * srcloc;
 
     // used for accumulating costs at the end of the run...
-    StgWord   time_ticks;
     StgWord64 mem_alloc;      // align 8 (Note [struct alignment])
+    StgWord   time_ticks;
 
     StgInt is_caf;            // non-zero for a CAF cost centre
 
