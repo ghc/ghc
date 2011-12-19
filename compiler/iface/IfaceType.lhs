@@ -17,6 +17,7 @@ module IfaceType (
 	IfExtName, IfLclName, IfIPName,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceTyCon(..), IfaceCoCon(..),
+        IfaceTyLit(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 	ifaceTyConName,
 
@@ -83,9 +84,13 @@ data IfaceType	   -- A kind of universal type, used for types, kinds, and coerci
   | IfaceTyConApp IfaceTyCon [IfaceType]  -- Not necessarily saturated
 					  -- Includes newtypes, synonyms, tuples
   | IfaceCoConApp IfaceCoCon [IfaceType]  -- Always saturated
+  | IfaceLiteralTy IfaceTyLit
 
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
+
+data IfaceTyLit
+  = IfaceNumberTyLit Integer
 
 data IfaceTyCon 	-- Encodes type constructors, kind constructors
      			-- coercion constructors, the lot
@@ -241,6 +246,8 @@ ppr_ty :: Int -> IfaceType -> SDoc
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
 
+ppr_ty _ (IfaceLiteralTy n) = ppr_tylit n
+
 ppr_ty ctxt_prec (IfaceCoConApp tc tys) 
   = maybeParen ctxt_prec tYCON_PREC 
 	       (sep [ppr tc, nest 4 (sep (map pprParendIfaceType tys))])
@@ -302,6 +309,9 @@ ppr_tc :: IfaceTyCon -> SDoc
 ppr_tc tc@(IfaceTc ext_nm) = parenSymOcc (getOccName ext_nm) (ppr tc)
 ppr_tc tc		   = ppr tc
 
+ppr_tylit :: IfaceTyLit -> SDoc
+ppr_tylit (IfaceNumberTyLit n) = integer n
+
 -------------------
 instance Outputable IfaceTyCon where
   ppr (IfaceIPTc n)  = ppr (IPName n)
@@ -316,6 +326,9 @@ instance Outputable IfaceCoCon where
   ppr IfaceTransCo     = ptext (sLit "Trans")
   ppr IfaceInstCo      = ptext (sLit "Inst")
   ppr (IfaceNthCo d)   = ptext (sLit "Nth:") <> int d
+
+instance Outputable IfaceTyLit where
+  ppr = ppr_tylit
 
 -------------------
 pprIfaceContext :: IfaceContext -> SDoc
@@ -362,6 +375,7 @@ toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyVar tv)
 toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (FunTy t1 t2)     = IfaceFunTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (TyConApp tc tys) = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTypes tys)
+toIfaceType (LiteralTy n)     = IfaceLiteralTy (toIfaceTyLit n)
 toIfaceType (ForAllTy tv t)   = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
 
 toIfaceTyVar :: TyVar -> FastString
@@ -401,6 +415,9 @@ toIfaceWiredInTyCon tc nm
   | nm == ubxTupleKindTyConName     = IfaceUbxTupleKindTc
   | nm == tySuperKindTyConName      = IfaceSuperKindTc
   | otherwise		            = IfaceTc nm
+
+toIfaceTyLit :: TyLit -> IfaceTyLit
+toIfaceTyLit (NumberTyLit x) = IfaceNumberTyLit x
 
 ----------------
 toIfaceTypes :: [Type] -> [IfaceType]

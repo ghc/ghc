@@ -864,10 +864,16 @@ getTyDescription ty
       FunTy _ res      	     -> '-' : '>' : fun_result res
       TyConApp tycon _ 	     -> getOccString tycon
       ForAllTy _ ty          -> getTyDescription ty
+      LiteralTy n            -> getTyLitDescription n
     }
   where
     fun_result (FunTy _ res) = '>' : fun_result res
     fun_result other	     = getTyDescription other
+
+getTyLitDescription :: TyLit -> String
+getTyLitDescription l =
+  case l of
+    NumberTyLit n -> show n
 
 --------------------------------------
 --   CmmInfoTable-related things

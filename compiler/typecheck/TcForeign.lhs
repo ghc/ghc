@@ -169,6 +169,9 @@ normaliseFfiType' env ty0 = go [] ty0
     go _ ty@(TyVarTy _)
       = return (Refl ty, ty)
 
+    go _ ty@(LiteralTy _)
+      = return (Refl ty, ty)
+
     add_co co rec_nts ty
         = do (co', ty') <- go rec_nts ty
              return (mkTransCo co co', ty')

@@ -38,6 +38,7 @@ module TysPrim(
 	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind, constraintKind,
         mkArrowKind, mkArrowKinds,
+        typeNatKind,
 
         funTyCon, funTyConName,
         primTyCons,
@@ -340,6 +341,11 @@ openTypeKind     = kindTyConType openTypeKindTyCon
 argTypeKind      = kindTyConType argTypeKindTyCon
 ubxTupleKind     = kindTyConType ubxTupleKindTyCon
 constraintKind   = kindTyConType constraintKindTyCon
+
+ -- XXX: we should probably be using a different type than Word here...
+typeNatKind :: Kind
+typeNatKind = kindTyConType (mkKindTyCon wordTyConName tySuperKind)
+
 
 -- | Given two kinds @k1@ and @k2@, creates the 'Kind' @k1 -> k2@
 mkArrowKind :: Kind -> Kind -> Kind

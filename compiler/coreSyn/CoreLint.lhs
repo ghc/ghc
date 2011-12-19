@@ -846,9 +846,19 @@ lintType ty@(TyConApp tc tys)
   | otherwise
   = failWithL (hang (ptext (sLit "Malformed type:")) 2 (ppr ty))
 
+lintType ty@(LiteralTy l) = lintTyLit l >> return (typeKind ty)
+
 lintType (ForAllTy tv ty)
   = do { lintTyBndrKind tv
        ; addInScopeVar tv (lintType ty) }
+
+---
+
+lintTyLit :: TyLit -> LintM ()
+lintTyLit (NumberTyLit n)
+  | n >= 0    = return ()
+  | otherwise = failWithL msg
+    where msg = ptext (sLit "Negative type literal:") <+> integer n
 
 ----------------
 lint_ty_app :: Type -> Kind -> [OutType] -> LintM Kind

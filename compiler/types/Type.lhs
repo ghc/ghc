@@ -41,6 +41,8 @@ module Type (
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
         mkPiKinds, mkPiType, mkPiTypes,
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
+
+        mkLiteralTy, mkNumberTyLit, mkNumberTy, isNumberTy,
 	
 	-- (Newtypes)
 	newTyConInstRhs, carefullySplitNewType_maybe,
@@ -277,6 +279,7 @@ expandTypeSynonyms ty
       = go (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
       | otherwise
       = TyConApp tc (map go tys)
+    go (LiteralTy l)   = LiteralTy l
     go (TyVarTy tv)    = TyVarTy tv
     go (AppTy t1 t2)   = AppTy (go t1) (go t2)
     go (FunTy t1 t2)   = FunTy (go t1) (go t2)
@@ -400,6 +403,25 @@ splitAppTys ty = split ty ty []
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty _                     args = (orig_ty, args)
 
+\end{code}
+
+
+                      LiteralTy
+                      ~~~~~~~~~
+
+\begin{code}
+mkLiteralTy :: TyLit -> Type
+mkLiteralTy = LiteralTy
+
+mkNumberTyLit :: Integer -> TyLit
+mkNumberTyLit = NumberTyLit
+
+mkNumberTy :: Integer -> Type
+mkNumberTy n = mkLiteralTy (mkNumberTyLit n)
+
+isNumberTy :: Type -> Maybe Integer
+isNumberTy (LiteralTy (NumberTyLit n)) = Just n
+isNumberTy _                           = Nothing
 \end{code}
 
 
@@ -972,6 +994,7 @@ typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (ForAllTy _ t)  = 1 + typeSize t
 typeSize (TyConApp _ ts) = 1 + sum (map typeSize ts)
+typeSize (LiteralTy _)   = 1
 
 varSetElemsKvsFirst :: VarSet -> [TyVar]
 -- {k1,a,k2,b} --> [k1,k2,a,b]
@@ -1129,6 +1152,7 @@ seqType (AppTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (TyConApp tc tys) = tc `seq` seqTypes tys
 seqType (ForAllTy tv ty)  = tv `seq` seqType ty
+seqType (LiteralTy n)     = n `seq` ()
 
 seqTypes :: [Type] -> ()
 seqTypes []       = ()
@@ -1462,6 +1486,7 @@ subst_ty subst ty
     go (ForAllTy tv ty)  = case substTyVarBndr subst tv of
                               (subst', tv') ->
                                  ForAllTy tv' $! (subst_ty subst' ty)
+    go (LiteralTy n)     = n `seq` LiteralTy n
 
 substTyVar :: TvSubst -> TyVar  -> Type
 substTyVar (TvSubst _ tenv) tv
@@ -1549,6 +1574,7 @@ typeKind (TyConApp tc tys)
   = kindAppResult (tyConKind tc) tys
 
 typeKind (AppTy fun arg)      = kindAppResult (typeKind fun) [arg]
+typeKind (LiteralTy l)        = typeLiteralKind l
 typeKind (ForAllTy _ ty)      = typeKind ty
 typeKind (TyVarTy tyvar)      = tyVarKind tyvar
 typeKind (FunTy _arg res)
@@ -1561,6 +1587,12 @@ typeKind (FunTy _arg res)
     | otherwise             = ASSERT( isSubOpenTypeKind k ) liftedTypeKind
     where
       k = typeKind res
+
+
+typeLiteralKind :: TyLit -> Kind
+typeLiteralKind l =
+  case l of
+    NumberTyLit _ -> typeNatKind
 
 \end{code}
 

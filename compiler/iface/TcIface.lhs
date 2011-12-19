@@ -815,6 +815,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType (IfaceTyVar n)        = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
 tcIfaceType (IfaceAppTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (AppTy t1' t2') }
+tcIfaceType (IfaceLiteralTy l)    = do { l1 <- tcIfaceTyLit l; return (LiteralTy l1) }
 tcIfaceType (IfaceFunTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (FunTy t1' t2') }
 tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceTypes ts; return (mkTyConApp tc' ts') }
 tcIfaceType (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceType t; return (ForAllTy tv' t') }
@@ -826,6 +827,10 @@ tcIfaceTypes tys = mapM tcIfaceType tys
 -----------------------------------------
 tcIfaceCtxt :: IfaceContext -> IfL ThetaType
 tcIfaceCtxt sts = mapM tcIfaceType sts
+
+-----------------------------------------
+tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
+tcIfaceTyLit (IfaceNumberTyLit n) = return (NumberTyLit n)
 \end{code}
 
 %************************************************************************
@@ -840,6 +845,7 @@ tcIfaceCo (IfaceTyVar n)        = mkCoVarCo <$> tcIfaceCoVar n
 tcIfaceCo (IfaceAppTy t1 t2)    = mkAppCo <$> tcIfaceCo t1 <*> tcIfaceCo t2
 tcIfaceCo (IfaceFunTy t1 t2)    = mkFunCo <$> tcIfaceCo t1 <*> tcIfaceCo t2
 tcIfaceCo (IfaceTyConApp tc ts) = mkTyConAppCo <$> tcIfaceTyCon tc <*> mapM tcIfaceCo ts
+tcIfaceCo t@(IfaceLiteralTy _)  = mkReflCo <$> tcIfaceType t
 tcIfaceCo (IfaceCoConApp tc ts) = tcIfaceCoApp tc ts
 tcIfaceCo (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' ->
                                   mkForAllCo tv' <$> tcIfaceCo t

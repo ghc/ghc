@@ -615,7 +615,11 @@ uType_np origin orig_ty1 orig_ty2
       | tc1 == tc2	   -- See Note [TyCon app]
       = do { cos <- uList origin uType tys1 tys2
            ; return $ mkTcTyConAppCo tc1 cos }
-     
+
+    go (LiteralTy m) ty@(LiteralTy n)
+      | m == n
+      = return $ mkTcReflCo ty
+
 	-- See Note [Care with type applications]
     go (AppTy s1 t1) ty2
       | Just (s2,t2) <- tcSplitAppTy_maybe ty2
@@ -912,6 +916,7 @@ checkTauTvUpdate tv ty
       = Just (TyConApp tc tys') 
       | isSynTyCon tc, Just ty_expanded <- tcView this_ty
       = ok ty_expanded -- See Note [Type synonyms and the occur check] 
+    ok ty@(LiteralTy _) = Just ty
     ok (FunTy arg res) | Just arg' <- ok arg, Just res' <- ok res
                        = Just (FunTy arg' res') 
     ok (AppTy fun arg) | Just fun' <- ok fun, Just arg' <- ok arg 

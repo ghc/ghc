@@ -1524,6 +1524,7 @@ ty_cts_subst subst inscope fl ty
         go' (TyVarTy tv)      = tyvar_cts_subst tv `orElse` mkTcReflCo (TyVarTy tv)
         go' (AppTy ty1 ty2)   = mkTcAppCo (go ty1) (go ty2) 
         go' (TyConApp tc tys) = mkTcTyConAppCo tc (map go tys)  
+        go' ty@(LiteralTy _)  = mkTcReflCo ty
 
         go' (ForAllTy v ty)   = mkTcForAllCo v' $! co
                              where 

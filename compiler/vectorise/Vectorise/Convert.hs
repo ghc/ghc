@@ -78,6 +78,7 @@ identityConv (TyConApp tycon tys)
   = do { mapM_ identityConv tys
        ; identityConvTyCon tycon
        }
+identityConv (LiteralTy _)  = noV $ text "identityConv: not sure about literal types under vectorisation"
 identityConv (TyVarTy _)    = noV $ text "identityConv: type variable changes under vectorisation"
 identityConv (AppTy   _ _)  = noV $ text "identityConv: type appl. changes under vectorisation"
 identityConv (FunTy    _ _) = noV $ text "identityConv: function type changes under vectorisation"
