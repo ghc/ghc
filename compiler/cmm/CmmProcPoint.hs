@@ -103,34 +103,50 @@ instance Outputable Status where
                     (hsep $ punctuate comma $ map ppr $ setElems ps)
   ppr ProcPoint = text "<procpt>"
 
+--------------------------------------------------
+-- Proc point analysis
+
+procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelUniqSM (BlockEnv Status)
+-- Once you know what the proc-points are, figure out
+-- what proc-points each block is reachable from
+procPointAnalysis procPoints g =
+  liftM snd $ dataflowPassFwd g initProcPoints $ analFwd lattice forward
+  where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints]
+
+-- transfer equations
+
+forward :: FwdTransfer CmmNode Status
+forward = mkFTransfer transfer
+    where
+      transfer :: CmmNode e x -> Status -> Fact x Status
+      transfer n s
+         = case shapeX n of
+             Open   -> case n of
+                         CmmEntry id | ProcPoint <- s
+                                 -> ReachedBy $ setSingleton id
+                         _ -> s
+             Closed ->
+                mkFactBase lattice $ map (\id -> (id, x)) (successors l)
+
 lattice :: DataflowLattice Status
 lattice = DataflowLattice "direct proc-point reachability" unreached add_to
     where unreached = ReachedBy setEmpty
           add_to _ (OldFact ProcPoint) _ = (NoChange, ProcPoint)
-          add_to _ _ (NewFact ProcPoint) = (SomeChange, ProcPoint) -- because of previous case
-          add_to _ (OldFact (ReachedBy p)) (NewFact (ReachedBy p')) =
-              let union = setUnion p' p
-              in  if setSize union > setSize p then (SomeChange, ReachedBy union)
-                                               else (NoChange, ReachedBy p)
---------------------------------------------------
--- transfer equations
+          add_to _ _ (NewFact ProcPoint) = (SomeChange, ProcPoint)
+                       -- because of previous case
+          add_to _ (OldFact (ReachedBy p)) (NewFact (ReachedBy p'))
+             | setSize union > setSize p = (SomeChange, ReachedBy union)
+             | otherwise                 = (NoChange, ReachedBy p)
+           where
+             union = setUnion p' p
 
-forward :: FwdTransfer CmmNode Status
-forward = mkFTransfer3 first middle ((mkFactBase lattice . ) . last)
-    where first :: CmmNode C O -> Status -> Status
-          first (CmmEntry id) ProcPoint = ReachedBy $ setSingleton id
-          first  _ x = x
+----------------------------------------------------------------------
 
-          middle _ x = x
-
-          last :: CmmNode O C -> Status -> [(Label, Status)]
-          last (CmmCall {cml_cont = Just k}) _ = [(k, ProcPoint)]
-          last (CmmForeignCall {succ = k})   _ = [(k, ProcPoint)]
-          last l x = map (\id -> (id, x)) (successors l)
-
--- It is worth distinguishing two sets of proc points:
--- those that are induced by calls in the original graph
--- and those that are introduced because they're reachable from multiple proc points.
+-- It is worth distinguishing two sets of proc points: those that are
+-- induced by calls in the original graph and those that are
+-- introduced because they're reachable from multiple proc points.
+--
+-- Extract the set of Continuation BlockIds, see Note [Continuation BlockIds].
 callProcPoints      :: CmmGraph -> ProcPointSet
 callProcPoints g = foldGraphBlocks add (setSingleton (g_entry g)) g
   where add :: CmmBlock -> BlockSet -> BlockSet
@@ -139,17 +155,12 @@ callProcPoints g = foldGraphBlocks add (setSingleton (g_entry g)) g
                       CmmForeignCall {succ=k}     -> setInsert k set
                       _ -> set
 
-minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph -> FuelUniqSM ProcPointSet
+minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph
+                    -> FuelUniqSM ProcPointSet
 -- Given the set of successors of calls (which must be proc-points)
 -- figure out the minimal set of necessary proc-points
-minimalProcPointSet platform callProcPoints g = extendPPSet platform g (postorderDfs g) callProcPoints
-
-procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelUniqSM (BlockEnv Status)
--- Once you know what the proc-points are, figure out
--- what proc-points each block is reachable from
-procPointAnalysis procPoints g =
-  liftM snd $ dataflowPassFwd g initProcPoints $ analFwd lattice forward
-  where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints]
+minimalProcPointSet platform callProcPoints g
+  = extendPPSet platform g (postorderDfs g) callProcPoints
 
 extendPPSet :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> FuelUniqSM ProcPointSet
 extendPPSet platform g blocks procPoints =
@@ -179,10 +190,12 @@ extendPPSet platform g blocks procPoints =
            pps -> extendPPSet g blocks
                     (foldl extendBlockSet procPoints' pps)
 -}
-       case newPoint of Just id ->
-                          if setMember id procPoints' then panic "added old proc pt"
-                          else extendPPSet platform g blocks (setInsert id procPoints')
-                        Nothing -> return procPoints'
+       case newPoint of
+         Just id ->
+             if setMember id procPoints'
+                then panic "added old proc pt"
+                else extendPPSet platform g blocks (setInsert id procPoints')
+         Nothing -> return procPoints'
 
 
 ------------------------------------------------------------------------
@@ -481,6 +494,23 @@ splitAtProcPoints entry_label callPPs procPoints procMap
             -- pprTrace "splitting graphs" (ppr procs)
             procs
 splitAtProcPoints _ _ _ _ t@(CmmData _ _) = return [t]
+
+
+-- Only called from CmmProcPoint.splitAtProcPoints. NB. does a
+-- recursive lookup, see comment below.
+replaceBranches :: BlockEnv BlockId -> CmmGraph -> CmmGraph
+replaceBranches env g = mapGraphNodes (id, id, last) g
+  where
+    last :: CmmNode O C -> CmmNode O C
+    last (CmmBranch id)          = CmmBranch (lookup id)
+    last (CmmCondBranch e ti fi) = CmmCondBranch e (lookup ti) (lookup fi)
+    last (CmmSwitch e tbl)       = CmmSwitch e (map (fmap lookup) tbl)
+    last l@(CmmCall {})          = l
+    last l@(CmmForeignCall {})   = l
+    lookup id = fmap lookup (mapLookup id env) `orElse` id
+            -- XXX: this is a recursive lookup, it follows chains
+            -- until the lookup returns Nothing, at which point we
+            -- return the last BlockId
 
 ----------------------------------------------------------------
 

@@ -22,7 +22,7 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import Finder		( mkStubPaths )
 import PprC		( writeCs )
-import CmmLint		( cmmLint )
+import OldCmmLint       ( cmmLint )
 import Packages
 import Util
 import OldCmm           ( RawCmmGroup )

@@ -28,7 +28,9 @@ import Unique
 my_trace :: String -> SDoc -> a -> a
 my_trace = if False then pprTrace else \_ _ a -> a
 
--- Eliminate common blocks:
+-- -----------------------------------------------------------------------------
+-- Eliminate common blocks
+
 -- If two blocks are identical except for the label on the first node,
 -- then we can eliminate one of the blocks. To ensure that the semantics
 -- of the program are preserved, we have to rewrite each predecessor of the
@@ -42,59 +44,49 @@ my_trace = if False then pprTrace else \_ _ a -> a
 
 -- TODO: Use optimization fuel
 elimCommonBlocks :: CmmGraph -> CmmGraph
-elimCommonBlocks g =
-    upd_graph g . snd $ iterate common_block reset hashed_blocks
-                                (emptyUFM, mapEmpty)
-      where hashed_blocks    = map (\b -> (hash_block b, b)) (reverse (postorderDfs g))
-            reset (_, subst) = (emptyUFM, subst)
+elimCommonBlocks g = replaceLabels env g
+  where
+     env = iterate hashed_blocks mapEmpty
+     hashed_blocks = map (\b -> (hash_block b, b)) $ postorderDfs g
 
 -- Iterate over the blocks until convergence
-iterate :: (t -> a -> (Bool, t)) -> (t -> t) -> [a] -> t -> t
-iterate upd reset blocks state =
-  case foldl upd' (False, state) blocks of
-    (True,  state') -> iterate upd reset blocks (reset state')
-    (False, state') -> state'
-  where upd' (b, s) a = let (b', s') = upd s a in (b || b', s') -- lift to track changes
+iterate :: [(HashCode,CmmBlock)] -> BlockEnv BlockId -> BlockEnv BlockId
+iterate blocks subst =
+  case foldl common_block (False, emptyUFM, subst) blocks of
+    (changed,  _, subst)
+       | changed   -> iterate blocks subst
+       | otherwise -> subst
+
+type State  = (ChangeFlag, UniqFM [CmmBlock], BlockEnv BlockId)
+
+type ChangeFlag = Bool
+type HashCode = Int
 
 -- Try to find a block that is equal (or ``common'') to b.
-type BidMap = BlockEnv BlockId
-type State  = (UniqFM [CmmBlock], BidMap)
-common_block :: (Outputable h, Uniquable h) =>  State -> (h, CmmBlock) -> (Bool, State)
-common_block (bmap, subst) (hash, b) =
+common_block :: State -> (HashCode, CmmBlock) -> State
+common_block (old_change, bmap, subst) (hash, b) =
   case lookupUFM bmap hash of
     Just bs -> case (List.find (eqBlockBodyWith (eqBid subst) b) bs,
                      mapLookup bid subst) of
                  (Just b', Nothing)                         -> addSubst b'
                  (Just b', Just b'') | entryLabel b' /= b'' -> addSubst b'
-                 _ -> (False, (addToUFM bmap hash (b : bs), subst))
-    Nothing -> (False, (addToUFM bmap hash [b], subst))
+                 _ -> (old_change, addToUFM bmap hash (b : bs), subst)
+    Nothing -> (old_change, (addToUFM bmap hash [b], subst))
   where bid = entryLabel b
         addSubst b' = my_trace "found new common block" (ppr (entryLabel b')) $
-                      (True, (bmap, mapInsert bid (entryLabel b') subst))
+                      (True, bmap, mapInsert bid (entryLabel b') subst)
 
--- Given the map ``subst'' from BlockId -> BlockId, we rewrite the graph.
-upd_graph :: CmmGraph -> BidMap -> CmmGraph
-upd_graph g subst = mapGraphNodes (id, middle, last) g
-  where middle = mapExpDeep exp
-        last l = last' (mapExpDeep exp l)
-        last' :: CmmNode O C -> CmmNode O C
-        last' (CmmBranch bid)              = CmmBranch $ sub bid
-        last' (CmmCondBranch p t f)        = cond p (sub t) (sub f)
-        last' (CmmCall t (Just bid) a r o) = CmmCall t (Just $ sub bid) a r o
-        last' l@(CmmCall _ Nothing _ _ _)  = l
-        last' (CmmForeignCall t r a bid u i) = CmmForeignCall t r a (sub bid) u i
-        last' (CmmSwitch e bs)             = CmmSwitch e $ map (liftM sub) bs
-        cond p t f = if t == f then CmmBranch t else CmmCondBranch p t f
-        exp (CmmStackSlot (CallArea (Young id))       off) =
-             CmmStackSlot (CallArea (Young (sub id))) off
-        exp (CmmLit (CmmBlock id)) = CmmLit (CmmBlock (sub id))
-        exp e = e
-        sub = lookupBid subst
+
+-- -----------------------------------------------------------------------------
+-- Hashing and equality on blocks
+
+-- Below here is mostly boilerplate: hashing blocks ignoring labels,
+-- and comparing blocks modulo a label mapping.
 
 -- To speed up comparisons, we hash each basic block modulo labels.
 -- The hashing is a bit arbitrary (the numbers are completely arbitrary),
 -- but it should be fast and good enough.
-hash_block :: CmmBlock -> Int
+hash_block :: CmmBlock -> HashCode
 hash_block block =
   fromIntegral (foldBlockNodesB3 (hash_fst, hash_mid, hash_lst) block (0 :: Word32) .&. (0x7fffffff :: Word32))
   -- UniqFM doesn't like negative Ints
@@ -107,7 +99,7 @@ hash_block block =
         hash_node (CmmAssign r e) = hash_reg r + hash_e e
         hash_node (CmmStore e e') = hash_e e + hash_e e'
         hash_node (CmmUnsafeForeignCall t _ as) = hash_tgt t + hash_list hash_e as
-        hash_node (CmmBranch _) = 23 -- would be great to hash these properly
+        hash_node (CmmBranch _) = 23 -- NB. ignore the label
         hash_node (CmmCondBranch p _ _) = hash_e p
         hash_node (CmmCall e _ _ _ _) = hash_e e
         hash_node (CmmForeignCall t _ _ _ _ _) = hash_tgt t
@@ -143,9 +135,9 @@ hash_block block =
 -- Utilities: equality and substitution on the graph.
 
 -- Given a map ``subst'' from BlockID -> BlockID, we define equality.
-eqBid :: BidMap -> BlockId -> BlockId -> Bool
+eqBid :: BlockEnv BlockId -> BlockId -> BlockId -> Bool
 eqBid subst bid bid' = lookupBid subst bid == lookupBid subst bid'
-lookupBid :: BidMap -> BlockId -> BlockId
+lookupBid :: BlockEnv BlockId -> BlockId -> BlockId
 lookupBid subst bid = case mapLookup bid subst of
                         Just bid  -> lookupBid subst bid
                         Nothing -> bid

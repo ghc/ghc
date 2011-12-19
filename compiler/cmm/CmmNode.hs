@@ -78,6 +78,11 @@ data CmmNode e x where
 
       cml_cont :: Maybe Label,
           -- Label of continuation (Nothing for return or tail call)
+          --
+          -- Note [Continuation BlockId]: these BlockIds are called
+          -- Continuation BlockIds, and are the only BlockIds that can
+          -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)) or
+          -- (CmmStackSlot (Young b) _).
 
 -- ToDO: add this:
 --       cml_args_regs :: [GlobalReg],

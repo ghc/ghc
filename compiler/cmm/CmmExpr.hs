@@ -75,7 +75,8 @@ data Area
 
 data AreaId
   = Old            -- See Note [Old Area]
-  | Young BlockId
+  | Young BlockId  -- Invariant: must be a continuation BlockId
+                   -- See Note [Continuation BlockId] in CmmNode.
   deriving (Eq, Ord)
 
 {- Note [Old Area] 
@@ -120,7 +121,11 @@ data CmmLit
         -- It is also used inside the NCG during when generating
         -- position-independent code. 
   | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
-  | CmmBlock BlockId			-- Code label
+
+  | CmmBlock BlockId                    -- Code label
+        -- Invariant: must be a continuation BlockId
+        -- See Note [Continuation BlockId] in CmmNode.
+
   | CmmHighStackMark -- stands for the max stack space used during a procedure
   deriving Eq
 
