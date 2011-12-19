@@ -93,7 +93,7 @@ import HsSyn
 import CoreSyn
 import StringBuffer
 import Parser
-import Lexer hiding (getDynFlags)
+import Lexer
 import SrcLoc
 import TcRnDriver
 import TcIface          ( typecheckIface )
@@ -223,8 +223,8 @@ logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
 
-getDynFlags :: Hsc DynFlags
-getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
+instance HasDynFlags Hsc where
+    getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do

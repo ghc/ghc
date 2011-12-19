@@ -183,9 +183,15 @@ instance MonadUtils.MonadIO GHCi where
 instance Trans.MonadIO Ghc where
   liftIO = MonadUtils.liftIO
 
+instance HasDynFlags GHCi where
+  getDynFlags = getSessionDynFlags
+
 instance GhcMonad GHCi where
   setSession s' = liftGhc $ setSession s'
   getSession    = liftGhc $ getSession
+
+instance HasDynFlags (InputT GHCi) where
+  getDynFlags = lift getDynFlags
 
 instance GhcMonad (InputT GHCi) where
   setSession = lift . setSession
@@ -220,10 +226,6 @@ instance ExceptionMonad (InputT GHCi) where
   gmask f = Haskeline.block (f Haskeline.unblock) -- slightly wrong
   gblock = Haskeline.block
   gunblock = Haskeline.unblock
-
-getDynFlags :: GhcMonad m => m DynFlags
-getDynFlags = do
-  GHC.getSessionDynFlags
 
 setDynFlags :: DynFlags -> GHCi [PackageId]
 setDynFlags dflags = do 

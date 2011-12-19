@@ -865,8 +865,8 @@ addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
 -- Convenience accessors for useful fields of HscEnv
 
-getDynFlags :: CoreM DynFlags
-getDynFlags = fmap hsc_dflags getHscEnv
+instance HasDynFlags CoreM where
+    getDynFlags = fmap hsc_dflags getHscEnv
 
 -- | The original name cache is the current mapping from 'Module' and
 -- 'OccName' to a compiler-wide unique 'Name'

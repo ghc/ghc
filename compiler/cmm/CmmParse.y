@@ -21,7 +21,7 @@
 
 module CmmParse ( parseCmmFile ) where
 
-import CgMonad		hiding (getDynFlags)
+import CgMonad
 import CgExtCode
 import CgHeapery
 import CgUtils

@@ -379,8 +379,8 @@ newUnique = do
 getInfoDown :: FCode CgInfoDownwards
 getInfoDown = FCode $ \info_down state -> (info_down,state)
 
-getDynFlags :: FCode DynFlags
-getDynFlags = liftM cgd_dflags getInfoDown
+instance HasDynFlags FCode where
+    getDynFlags = liftM cgd_dflags getInfoDown
 
 getThisPackage :: FCode PackageId
 getThisPackage = liftM thisPackage getDynFlags

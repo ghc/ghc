@@ -1010,8 +1010,8 @@ emitFrozenError fl ev depth
              inerts_new = inerts { inert_frozen = extendCts (inert_frozen inerts) ct } 
        ; wrapTcS (TcM.writeTcRef inert_ref inerts_new) }
 
-getDynFlags :: TcS DynFlags
-getDynFlags = wrapTcS TcM.getDOpts
+instance HasDynFlags TcS where
+    getDynFlags = wrapTcS TcM.getDOpts
 
 getTcSContext :: TcS SimplContext
 getTcSContext = TcS (return . tcs_context)

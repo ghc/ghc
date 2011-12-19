@@ -1562,8 +1562,8 @@ failSpanMsgP span msg = P $ \_ -> PFailed span msg
 getPState :: P PState
 getPState = P $ \s -> POk s s
 
-getDynFlags :: P DynFlags
-getDynFlags = P $ \s -> POk s (dflags s)
+instance HasDynFlags P where
+    getDynFlags = P $ \s -> POk s (dflags s)
 
 withThisPackage :: (PackageId -> a) -> P a
 withThisPackage f

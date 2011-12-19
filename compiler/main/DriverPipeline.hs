@@ -595,8 +595,8 @@ getPipeEnv = P $ \env state -> return (state, env)
 getPipeState :: CompPipeline PipeState
 getPipeState = P $ \_env state -> return (state, state)
 
-getDynFlags :: CompPipeline DynFlags
-getDynFlags = P $ \_env state -> return (state, hsc_dflags (hsc_env state))
+instance HasDynFlags CompPipeline where
+    getDynFlags = P $ \_env state -> return (state, hsc_dflags (hsc_env state))
 
 setDynFlags :: DynFlags -> CompPipeline ()
 setDynFlags dflags = P $ \_env state ->
