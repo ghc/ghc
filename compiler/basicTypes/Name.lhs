@@ -430,6 +430,9 @@ instance Outputable Name where
 
 instance OutputableBndr Name where
     pprBndr _ name = pprName name
+    pprInfixOcc  = pprInfixName
+    pprPrefixOcc = pprPrefixName
+
 
 pprName :: Name -> SDoc
 pprName n@(Name {n_sort = sort, n_uniq = u, n_occ = occ})

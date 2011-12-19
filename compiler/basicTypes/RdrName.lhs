@@ -273,6 +273,9 @@ instance OutputableBndr RdrName where
 	| isTvOcc (rdrNameOcc n) = char '@' <+> ppr n
 	| otherwise		 = ppr n
 
+    pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
+    pprPrefixOcc rdr = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
+
 showRdrName :: RdrName -> String
 showRdrName r = showSDoc (ppr r)
 
