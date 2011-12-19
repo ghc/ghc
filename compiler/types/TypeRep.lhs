@@ -511,7 +511,9 @@ instance Outputable Type where
     ppr ty = pprType ty
 
 instance Outputable name => OutputableBndr (IPName name) where
-    pprBndr _ n = ppr n	-- Simple for now
+    pprBndr _ n   = ppr n	-- Simple for now
+    pprInfixOcc  n = ppr n 
+    pprPrefixOcc n = ppr n 
 
 ------------------
 	-- OK, here's the main printer

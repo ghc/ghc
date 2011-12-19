@@ -424,7 +424,7 @@ warnMissingSig msg id
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
         ; addWarnTcM (env1, mk_msg tidy_ty) }
   where
-    mk_msg ty = sep [ msg, nest 2 $ pprHsVar (idName id) <+> dcolon <+> ppr ty ]
+    mk_msg ty = sep [ msg, nest 2 $ pprPrefixName (idName id) <+> dcolon <+> ppr ty ]
 
 ---------------------------------------------
 zonkMonoBinds :: ZonkEnv -> SigWarn -> LHsBinds TcId -> TcM (LHsBinds Id)
