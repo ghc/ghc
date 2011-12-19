@@ -67,15 +67,28 @@ initSmpl :: DynFlags -> RuleBase -> (FamInstEnv, FamInstEnv)
 	 -> UniqSupply		-- No init count; set to 0
 	 -> Int			-- Size of the bindings
 	 -> SimplM a
-	 -> (a, SimplCount)
+	 -> (a, SimplCount, Maybe SDoc)
 
 initSmpl dflags rules fam_envs us size m
-  = case unSM m env us (zeroSimplCount dflags) of 
-	(result, _, count) -> (result, count)
+  = case unSM m env us (zeroSimplCount dflags) of
+    (result, _, count) ->
+        let mWarning = if st_max_ticks env <= simplCountN count
+                       then Just (msg count)
+                       else Nothing
+        in (result, count, mWarning)
   where
     env = STE { st_flags = dflags, st_rules = rules
     	      , st_max_ticks = computeMaxTicks dflags size
               , st_fams = fam_envs }
+    msg sc = vcat [ ptext (sLit "Warning: Simplifier ticks exhausted.")
+                  , ptext (sLit "To increase the limit, use -fsimpl-tick-factor=N (default 100)")
+                  , ptext (sLit "If you need to do this, let GHC HQ know, and what factor you needed")
+                  , pp_details sc
+                  , pprSimplCount sc ]
+    pp_details sc
+      | hasDetailedCounts sc = empty
+      | otherwise = ptext (sLit "To see detailed counts use -ddump-simpl-stats")
+
 
 computeMaxTicks :: DynFlags -> Int -> Int
 -- Compute the max simplifier ticks as
@@ -180,10 +193,19 @@ tick t = SM (\_st_env us sc -> let sc' = doSimplTick t sc
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
 checkedTick t 
-  = SM (\st_env us sc -> if st_max_ticks st_env <= simplCountN sc
+  = SM (\_st_env us sc ->
+                         {-
+                         This error is disabled for now due to #5539.
+                         We will still print a warning at the callsites
+                         of initSmpl.
+
+                         if st_max_ticks st_env <= simplCountN sc
                          then pprPanic "Simplifier ticks exhausted" (msg sc)
-                         else let sc' = doSimplTick t sc 
+                         else
+                         -}
+                              let sc' = doSimplTick t sc 
                               in sc' `seq` ((), us, sc'))
+{-
   where
     msg sc = vcat [ ptext (sLit "When trying") <+> ppr t
                   , ptext (sLit "To increase the limit, use -fsimpl-tick-factor=N (default 100)")
@@ -193,7 +215,7 @@ checkedTick t
     pp_details sc
       | hasDetailedCounts sc = empty
       | otherwise = ptext (sLit "To see detailed counts use -ddump-simpl-stats")
-                   
+-}
 
 freeTick :: Tick -> SimplM ()
 -- Record a tick, but don't add to the total tick count, which is

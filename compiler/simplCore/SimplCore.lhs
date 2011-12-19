@@ -489,8 +489,14 @@ simplifyExpr dflags expr
         ; us <-  mkSplitUniqSupply 's'
 
 	; let sz = exprSize expr
-              (expr', counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
+              (expr', counts, mWarn) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
 				 simplExprGently (simplEnvForGHCi dflags) expr
+
+        ; case mWarn of {
+              Just warning ->
+                  Err.errorMsg dflags warning ;
+              Nothing ->
+                  return () }
 
 	; Err.dumpIfSet (dopt Opt_D_dump_simpl_stats dflags)
 		  "Simplifier statistics" (pprSimplCount counts)
@@ -636,7 +642,13 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                 -- So the conditional didn't force counts1, because the
                 -- selection got duplicated.  Sigh!
            case initSmpl dflags rule_base2 fam_envs us1 sz simpl_binds of {
-                (env1, counts1) -> do {
+                (env1, counts1, mWarn) -> do {
+
+           case mWarn of {
+               Just warning ->
+                   Err.errorMsg dflags warning ;
+               Nothing ->
+                   return () } ;
 
            let  { binds1 = getFloatBinds env1
                 ; rules1 = substRulesForImportedIds (mkCoreSubst (text "imp-rules") env1) rules
