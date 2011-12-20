@@ -1096,7 +1096,7 @@ sdist-prep :
 
 .PHONY: sdist
 sdist : sdist-prep
-	"$(TAR_CMD)" chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
+	"$(TAR_CMD)" chf - $(SRC_DIST_NAME) 2>src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
 
 sdist-manifest : $(SRC_DIST_TARBALL)
 	tar tjf $(SRC_DIST_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
