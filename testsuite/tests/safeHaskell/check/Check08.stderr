@@ -1,0 +1,6 @@
+[1 of 3] Compiling Check08_B        ( Check08_B.hs, Check08_B.o )
+[2 of 3] Compiling Check08_A        ( Check08_A.hs, Check08_A.o )
+[3 of 3] Compiling Check08          ( Check08.hs, Check08.o )
+
+<no location info>:
+    The package (base) is required to be trusted but it isn't!
