@@ -39,3 +39,6 @@ test('Check04', normal, multi_compile, ['Check04', [
                                        ('Check04_1.hs', '-trust base')
                                        ], '-fpackage-trust'])
 
+# Check -fpackage-trust with no safe haskell flag is an error
+test('Check05', normal, compile, [''])
+

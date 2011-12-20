@@ -1,4 +1,4 @@
-{-# GHC_OPTIONS -fpackage-trust #-}
+{-# OPTIONS_GHC -fpackage-trust #-}
 {-# LANGUAGE Unsafe #-}
 module Check01 ( main' ) where
 
