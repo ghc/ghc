@@ -1619,12 +1619,23 @@ setContext starred not_starred = do
   setGHCContextFromGHCiState
 
 checkAdd :: Bool -> String -> GHCi InteractiveImport
-checkAdd star mstr
-  | star      = do m <- wantInterpretedModule mstr
-                   return (IIModule m)
-  | otherwise = do m <- lookupModule mstr
-                   return (IIDecl (simpleImportDecl (moduleName m)))
+checkAdd star mstr = do
+  dflags <- getDynFlags 
+  case safeLanguageOn dflags of
+    True | star -> ghcError $ CmdLineError "can't use * imports with Safe Haskell"
 
+    True -> do m <- lookupModule mstr
+               s <- GHC.isModuleTrusted m
+               case s of
+                 True  -> return $ IIDecl (simpleImportDecl $ moduleName m)
+                 False -> ghcError $ CmdLineError $ "can't import " ++ mstr
+                                                 ++ " as it isn't trusted."
+
+    False | star -> do m <- wantInterpretedModule mstr
+                       return $ IIModule m
+
+    False -> do m <- lookupModule mstr
+                return $ IIDecl (simpleImportDecl $ moduleName m)
 
 -- | Sets the GHC context from the GHCi state.  The GHC context is
 -- always set this way, we never modify it incrementally.

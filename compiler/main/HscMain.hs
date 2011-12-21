@@ -206,6 +206,9 @@ instance Monad Hsc where
 instance MonadIO Hsc where
     liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
 
+instance Functor Hsc where
+    fmap f m = m >>= \a -> return $ f a
+
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
@@ -982,30 +985,33 @@ checkSafeImports dflags tcg_env
     
     -- easier interface to work with
     checkSafe (_, _, False) = return Nothing
-    checkSafe (m, l, True ) = hscCheckSafe' dflags m l
+    checkSafe (m, l, True ) = fst `fmap` hscCheckSafe' dflags m l
 
 -- | Check that a module is safe to import.
 --
--- We return a package id if the safe import is OK and a Nothing otherwise
--- with the reason for the failure printed out.
-hscCheckSafe :: HscEnv -> Module -> SrcSpan -> IO (Maybe PackageId)
+-- We return True to indicate the import is safe and False otherwise
+-- although in the False case an exception may be thrown first.
+hscCheckSafe :: HscEnv -> Module -> SrcSpan -> IO Bool
 hscCheckSafe hsc_env m l = runHsc hsc_env $ do
     dflags <- getDynFlags
-    hscCheckSafe' dflags m l
+    pkgs <- snd `fmap` hscCheckSafe' dflags m l
+    when (packageTrustOn dflags) $ checkPkgTrust dflags pkgs
+    errs <- getWarnings
+    return $ isEmptyBag errs
 
-hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe PackageId)
+hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe PackageId, [PackageId])
 hscCheckSafe' dflags m l = do
-    tw <- isModSafe m l
+    (tw, pkgs) <- isModSafe m l
     case tw of
-        False              -> return Nothing
-        True | isHomePkg m -> return Nothing
-             | otherwise   -> return $ Just $ modulePackageId m
+        False              -> return (Nothing, pkgs)
+        True | isHomePkg m -> return (Nothing, pkgs)
+             | otherwise   -> return (Just $ modulePackageId m, pkgs)
   where
-    -- Is a module trusted? Return Nothing if True, or a String if it isn't,
-    -- containing the reason it isn't. Also return if the module trustworthy
-    -- (true) or safe (false) so we know if we should check if the package
-    -- itself is trusted in the future.
-    isModSafe :: Module -> SrcSpan -> Hsc (Bool)
+    -- Is a module trusted? If not, throw or log errors depending on the type.
+    -- Return (regardless of trusted or not) if the trust type requires the
+    -- modules own package be trusted and a list of other packages required to
+    -- be trusted (these later ones haven't been checked)
+    isModSafe :: Module -> SrcSpan -> Hsc (Bool, [PackageId])
     isModSafe m l = do
         iface <- lookup' m
         case iface of
@@ -1022,11 +1028,14 @@ hscCheckSafe' dflags m l = do
                     safeM = trust `elem` [Sf_SafeInfered, Sf_Safe, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted trust trust_own_pkg m
+                    -- pkg trust reqs
+                    pkgRs = map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                 case (safeM, safeP) of
                     -- General errors we throw but Safe errors we log
-                    (True, True ) -> return $ trust == Sf_Trustworthy
+                    (True, True ) -> return (trust == Sf_Trustworthy, pkgRs)
                     (True, False) -> liftIO . throwIO $ pkgTrustErr
-                    (False, _   ) -> logWarnings modTrustErr >> return (trust == Sf_Trustworthy)
+                    (False, _   ) -> logWarnings modTrustErr >>
+                                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
                     pkgTrustErr = mkSrcErr $ unitBag $ mkPlainErrMsg l $ ppr m
@@ -1058,7 +1067,18 @@ hscCheckSafe' dflags m l = do
         let pkgIfaceT = eps_PIT hsc_eps
             homePkgT  = hsc_HPT hsc_env
             iface     = lookupIfaceByModule dflags homePkgT pkgIfaceT m
+#ifdef GHCI
+        -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
+        -- as the compiler hasn't filled in the various module tables
+        -- so we need to call 'getModuleInterface' to load from disk
+        iface' <- case iface of
+            Just _  -> return iface
+            Nothing -> snd `fmap` (liftIO $ getModuleInterface hsc_env m)
+        return iface'
+#else 
         return iface
+#endif
+
 
     isHomePkg :: Module -> Bool
     isHomePkg m

@@ -84,9 +84,9 @@ module GHC (
 
         -- * Interactive evaluation
         getBindings, getInsts, getPrintUnqual,
-        findModule,
-        lookupModule,
+        findModule, lookupModule,
 #ifdef GHCI
+        isModuleTrusted,
         setContext, getContext, 
         getNamesInScope,
         getRdrNamesInScope,
@@ -1247,26 +1247,32 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
         Found _ m -> return m
         err       -> noModError (hsc_dflags hsc_env) noSrcSpan mod_name err
 
-lookupLoadedHomeModule  :: GhcMonad m => ModuleName -> m (Maybe Module)
+lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
   case lookupUFM (hsc_HPT hsc_env) mod_name of
     Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
     _not_a_home_module -> return Nothing
 
 #ifdef GHCI
+-- | Check that a module is safe to import (according to Safe Haskell).
+--
+-- We return True to indicate the import is safe and False otherwise
+-- although in the False case an error may be thrown first.
+isModuleTrusted :: GhcMonad m => Module -> m Bool
+isModuleTrusted m = withSession $ \hsc_env ->
+    liftIO $ hscCheckSafe hsc_env m noSrcSpan
+
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
 getHistorySpan h = withSession $ \hsc_env ->
-                          return$ InteractiveEval.getHistorySpan hsc_env h
+    return $ InteractiveEval.getHistorySpan hsc_env h
 
 obtainTermFromVal :: GhcMonad m => Int ->  Bool -> Type -> a -> m Term
-obtainTermFromVal bound force ty a =
-    withSession $ \hsc_env ->
-      liftIO $ InteractiveEval.obtainTermFromVal hsc_env bound force ty a
+obtainTermFromVal bound force ty a = withSession $ \hsc_env ->
+    liftIO $ InteractiveEval.obtainTermFromVal hsc_env bound force ty a
 
 obtainTermFromId :: GhcMonad m => Int -> Bool -> Id -> m Term
-obtainTermFromId bound force id =
-    withSession $ \hsc_env ->
-      liftIO $ InteractiveEval.obtainTermFromId hsc_env bound force id
+obtainTermFromId bound force id = withSession $ \hsc_env ->
+    liftIO $ InteractiveEval.obtainTermFromId hsc_env bound force id
 
 #endif
 
