@@ -1567,8 +1567,9 @@ moduleCmd str
           '-':stuff -> rest remModulesFromContext stuff
           stuff     -> rest setContext            stuff
 
-    rest op stuff = (op as bs, words stuff)
-       where (as,bs) = partitionWith starred strs
+    rest op stuff = (op as bs, stuffs)
+       where (as,bs) = partitionWith starred stuffs
+             stuffs  = words stuff
 
     sensible ('*':m) = looksLikeModuleName m
     sensible m       = looksLikeModuleName m
