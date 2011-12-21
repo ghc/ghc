@@ -1416,23 +1416,39 @@ isSafeModule m = do
                                     (GHC.moduleNameString $ GHC.moduleName m))
 
     let iface' = fromJust iface
-        trust  = showPpr $ getSafeMode $ GHC.mi_trust iface'
-        pkg    = if packageTrusted dflags m then "trusted" else "untrusted"
-        (good, bad) = tallyPkgs dflags $
-                        map fst $ filter snd $ dep_pkgs $ GHC.mi_deps iface'
+
+        trust = showPpr $ getSafeMode $ GHC.mi_trust iface'
+        pkgT  = packageTrusted dflags m
+        pkg   = if pkgT then "trusted" else "untrusted"
+        (good', bad') = tallyPkgs dflags $
+                            map fst $ filter snd $ dep_pkgs $ GHC.mi_deps iface'
+        (good, bad) = case GHC.mi_trust_pkg iface' of
+                          True | pkgT -> (modulePackageId m:good', bad')
+                          True        -> (good', modulePackageId m:bad')
+                          False       -> (good', bad')
 
     liftIO $ putStrLn $ "Trust type is (Module: " ++ trust ++ ", Package: " ++ pkg ++ ")"
-    when (not $ null good)
+    liftIO $ putStrLn $ "Package Trust: "
+                            ++ (if packageTrustOn dflags then "On" else "Off")
+
+    when (packageTrustOn dflags && not (null good))
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
                         (intercalate ", " $ map packageIdString good))
-    if (null bad)
-        then liftIO $ putStrLn $ mname ++ " is trusted!"
-        else do
+
+    case goodTrust (getSafeMode $ GHC.mi_trust iface') of
+        True | (null bad || not (packageTrustOn dflags)) ->
+            liftIO $ putStrLn $ mname ++ " is trusted!"
+
+        True -> do
             liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
                         ++ (intercalate ", " $ map packageIdString bad)
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
+        False -> liftIO $ putStrLn $ mname ++ " is NOT trusted!"
+
   where
+    goodTrust t = t `elem` [Sf_Safe, Sf_SafeInfered, Sf_Trustworthy]
+
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags m
