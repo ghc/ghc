@@ -168,18 +168,18 @@ data CmmStmt	-- Old-style
 	--	one  -> second block etc
 	-- Undefined outside range, and when there's a Nothing
 
-  | CmmJump CmmExpr      -- Jump to another C-- function,
+  | CmmJump CmmExpr  -- Jump to another C-- function,
 
-  | CmmReturn            -- Return from a native C-- function,
+  | CmmReturn        -- Return from a native C-- function,
       [HintedCmmActual]        -- with these return values. (parameters never used)
 
 data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: New.ForeignHint }
 	   	 deriving( Eq )
 
-type HintedCmmFormal  = CmmHinted CmmFormal
-type HintedCmmActual  = CmmHinted CmmActual
+type HintedCmmFormal = CmmHinted CmmFormal
+type HintedCmmActual = CmmHinted CmmActual
 
-data CmmSafety      = CmmUnsafe | CmmSafe C_SRT | CmmInterruptible
+data CmmSafety = CmmUnsafe | CmmSafe C_SRT | CmmInterruptible
 
 -- | enable us to fold used registers over '[CmmActual]' and '[CmmFormal]'
 instance UserOfLocalRegs CmmStmt where
