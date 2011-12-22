@@ -464,7 +464,7 @@ do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl
         -- the appropriate RTS stub.
         ; exit_blk_id <- forkLabelledCode $ do {
 			; emitStmts reg_save_code
-			; stmtC (CmmJump rts_lbl []) }
+			; stmtC (CmmJump rts_lbl) }
 
 	-- In the case of a heap-check failure, we must also set
 	-- HpAlloc.  NB. HpAlloc is *only* set if Hp has been

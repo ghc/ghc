@@ -153,7 +153,7 @@ pprStmt platform stmt = case stmt of
 
     CmmBranch ident          -> genBranch ident
     CmmCondBranch expr ident -> genCondBranch platform expr ident
-    CmmJump expr params      -> genJump platform expr params
+    CmmJump expr             -> genJump platform expr
     CmmReturn params         -> genReturn platform params
     CmmSwitch arg ids        -> genSwitch platform arg ids
 
@@ -203,8 +203,8 @@ genCondBranch platform expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: Platform -> CmmExpr -> [CmmHinted CmmExpr] -> SDoc
-genJump platform expr args =
+genJump :: Platform -> CmmExpr -> SDoc
+genJump platform expr =
     hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
@@ -212,8 +212,6 @@ genJump platform expr args =
                 else case expr of
                     CmmLoad (CmmReg _) _ -> pprExpr platform expr
                     _ -> parens (pprExpr platform expr)
-         , space
-         , parens  ( commafy $ map (pprPlatform platform) args )
          , semi ]
 
 

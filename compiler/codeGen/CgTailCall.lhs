@@ -123,7 +123,7 @@ performTailCall fun_info arg_amodes pending_assts
 	    EnterIt -> do
 		{ emitSimultaneously (node_asst `plusStmts` pending_assts) 
 		; let target     = entryCode (closureInfoPtr (CmmReg nodeReg))
-                      enterClosure = stmtC (CmmJump target [])
+                      enterClosure = stmtC (CmmJump target)
                       -- If this is a scrutinee
                       -- let's check if the closure is a constructor
                       -- so we can directly jump to the alternatives switch
@@ -203,7 +203,7 @@ performTailCall fun_info arg_amodes pending_assts
                    -- No, enter the closure.
                    ; enterClosure
                    ; labelC is_constr
-                   ; stmtC (CmmJump (entryCode $ CmmLit (CmmLabel lbl)) [])
+                   ; stmtC (CmmJump (entryCode $ CmmLit (CmmLabel lbl)))
                    }
 {-
               -- This is a scrutinee for a case expression
@@ -218,7 +218,7 @@ performTailCall fun_info arg_amodes pending_assts
                    ; stmtC (CmmCondBranch (cond1 tag) no_cons)
                    ; stmtC (CmmCondBranch (cond2 tag) no_cons)
                    -- Yes, jump to switch statement
-                   ; stmtC (CmmJump (CmmLit (CmmLabel lbl)) [])
+                   ; stmtC (CmmJump (CmmLit (CmmLabel lbl)))
                    ; labelC no_cons
                    -- No, enter the closure.
                    ; enterClosure
@@ -438,9 +438,9 @@ pushReturnAddress _ = nopC
 -- -----------------------------------------------------------------------------
 -- Misc.
 
-jumpToLbl :: CLabel -> Code
 -- Passes no argument to the destination procedure
-jumpToLbl lbl = stmtC (CmmJump (CmmLit (CmmLabel lbl)) [{- No args -}])
+jumpToLbl :: CLabel -> Code
+jumpToLbl lbl = stmtC (CmmJump (CmmLit (CmmLabel lbl)))
 
 assignToRegs :: [(CmmExpr, GlobalReg)] -> CmmStmts
 assignToRegs reg_args 

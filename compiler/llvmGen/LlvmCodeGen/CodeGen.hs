@@ -127,7 +127,7 @@ stmtToInstrs env stmt = case stmt of
         -> genCall env target res args ret
 
     -- Tail call
-    CmmJump arg _ -> genJump env arg
+    CmmJump arg -> genJump env arg
 
     -- CPS, only tail calls, no return's
     -- Actually, there are a few return statements that occur because of hand

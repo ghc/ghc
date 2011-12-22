@@ -374,7 +374,7 @@ mkSlowEntryCode cl_info reg_args
 
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
      stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
-     jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI cl_info)) []
+     jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI cl_info))
 \end{code}
 
 
@@ -590,7 +590,7 @@ link_caf cl_info _is_upd = do
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
         let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
-        stmtC (CmmJump target [])
+        stmtC (CmmJump target)
 
   ; returnFC hp_rel }
   where

@@ -249,7 +249,7 @@ flattenCgStmts id stmts =
     where (block,blocks) = flatten ss
 
 isJump :: CmmStmt -> Bool
-isJump (CmmJump   _ _) = True
+isJump (CmmJump   _  ) = True
 isJump (CmmBranch _  ) = True
 isJump (CmmSwitch _ _) = True
 isJump (CmmReturn _  ) = True

@@ -411,8 +411,8 @@ stmt	:: { ExtCode }
 		{ do as <- sequence $5; doSwitch $2 $3 as $6 }
 	| 'goto' NAME ';'
 		{ do l <- lookupLabel $2; stmtEC (CmmBranch l) }
-	| 'jump' expr maybe_actuals ';'
-		{ do e1 <- $2; e2 <- sequence $3; stmtEC (CmmJump e1 e2) }
+	| 'jump' expr ';'
+		{ do e <- $2; stmtEC (CmmJump e) }
         | 'return' maybe_actuals ';'
 		{ do e <- sequence $2; stmtEC (CmmReturn e) }
 	| 'if' bool_expr 'goto' NAME
@@ -945,7 +945,7 @@ emitRetUT args = do
                            -- or regs that we assign to, so better use
                            -- simultaneous assignments here (#3546)
   when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
-  stmtC (CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord)) [])
+  stmtC $ CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord))
   -- TODO (when using CPS): emitStmt (CmmReturn (map snd args))
 
 -- -----------------------------------------------------------------------------

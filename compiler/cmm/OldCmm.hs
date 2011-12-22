@@ -169,7 +169,6 @@ data CmmStmt	-- Old-style
 	-- Undefined outside range, and when there's a Nothing
 
   | CmmJump CmmExpr      -- Jump to another C-- function,
-      [HintedCmmActual]        -- with these parameters.  (parameters never used)
 
   | CmmReturn            -- Return from a native C-- function,
       [HintedCmmActual]        -- with these return values. (parameters never used)
@@ -195,7 +194,7 @@ instance UserOfLocalRegs CmmStmt where
       stmt (CmmBranch _)             = id
       stmt (CmmCondBranch e _)       = gen e
       stmt (CmmSwitch e _)           = gen e
-      stmt (CmmJump e es)            = gen e . gen es
+      stmt (CmmJump e)               = gen e
       stmt (CmmReturn es)            = gen es
 
       gen :: UserOfLocalRegs a => a -> b -> b
