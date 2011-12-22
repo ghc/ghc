@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module OldCmm (
         CmmGroup, GenCmmGroup, RawCmmGroup, CmmDecl, RawCmmDecl,
         ListGraph(..),
@@ -109,7 +102,7 @@ instance UserOfLocalRegs i => UserOfLocalRegs (GenBasicBlock i) where
     foldRegsUsed f set (BasicBlock _ l) = foldRegsUsed f set l
 
 blockId :: GenBasicBlock i -> BlockId
--- The branch block id is that of the first block in 
+-- The branch block id is that of the first block in
 -- the branch, which is that branch's entry point
 blockId (BasicBlock blk_id _ ) = blk_id
 
@@ -135,25 +128,25 @@ data CmmReturnInfo = CmmMayReturn
     deriving ( Eq )
 
 -----------------------------------------------------------------------------
---		CmmStmt
+--              CmmStmt
 -- A "statement".  Note that all branches are explicit: there are no
 -- control transfers to computed addresses, except when transfering
 -- control to a new function.
 -----------------------------------------------------------------------------
 
-data CmmStmt	-- Old-style
+data CmmStmt    -- Old-style
   = CmmNop
   | CmmComment FastString
 
-  | CmmAssign CmmReg CmmExpr	 -- Assign to register
+  | CmmAssign CmmReg CmmExpr     -- Assign to register
 
   | CmmStore CmmExpr CmmExpr     -- Assign to memory location.  Size is
                                  -- given by cmmExprType of the rhs.
 
-  | CmmCall	 		 -- A call (foreign, native or primitive), with 
+  | CmmCall                      -- A call (foreign, native or primitive), with
      CmmCallTarget
-     [HintedCmmFormal]		 -- zero or more results
-     [HintedCmmActual]		 -- zero or more arguments
+     [HintedCmmFormal]           -- zero or more results
+     [HintedCmmActual]           -- zero or more arguments
      CmmReturnInfo
   -- Some care is necessary when handling the arguments of these, see
   -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
@@ -163,10 +156,10 @@ data CmmStmt	-- Old-style
   | CmmCondBranch CmmExpr BlockId -- conditional branch
 
   | CmmSwitch CmmExpr [Maybe BlockId]   -- Table branch
-	-- The scrutinee is zero-based; 
-	--	zero -> first block
-	--	one  -> second block etc
-	-- Undefined outside range, and when there's a Nothing
+        -- The scrutinee is zero-based;
+        --      zero -> first block
+        --      one  -> second block etc
+        -- Undefined outside range, and when there's a Nothing
 
   | CmmJump CmmExpr  -- Jump to another C-- function,
 
@@ -174,7 +167,7 @@ data CmmStmt	-- Old-style
       [HintedCmmActual]        -- with these return values. (parameters never used)
 
 data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: New.ForeignHint }
-	   	 deriving( Eq )
+                 deriving( Eq )
 
 type HintedCmmFormal = CmmHinted CmmFormal
 type HintedCmmActual = CmmHinted CmmActual
@@ -184,7 +177,7 @@ data CmmSafety = CmmUnsafe | CmmSafe C_SRT | CmmInterruptible
 -- | enable us to fold used registers over '[CmmActual]' and '[CmmFormal]'
 instance UserOfLocalRegs CmmStmt where
   foldRegsUsed f (set::b) s = stmt s set
-    where 
+    where
       stmt :: CmmStmt -> b -> b
       stmt (CmmNop)                  = id
       stmt (CmmComment {})           = id
@@ -231,7 +224,7 @@ conditional jump are explicit. ---NR]
 
 One possible way to fix this would be:
 
-data CmmStat = 
+data CmmStat =
   ...
   | CmmJump CmmBranchDest
   | CmmCondJump CmmExpr CmmBranchDest
@@ -258,18 +251,18 @@ So we'll stick with the way it is, and add the optimisation to the NCG.
 -}
 
 -----------------------------------------------------------------------------
---		CmmCallTarget
+--              CmmCallTarget
 --
 -- The target of a CmmCall.
 -----------------------------------------------------------------------------
 
 data CmmCallTarget
-  = CmmCallee		-- Call a function (foreign or native)
-	CmmExpr 		-- literal label <=> static call
-				-- other expression <=> dynamic call
-	CCallConv		-- The calling convention
+  = CmmCallee           -- Call a function (foreign or native)
+        CmmExpr                 -- literal label <=> static call
+                                -- other expression <=> dynamic call
+        CCallConv               -- The calling convention
 
-  | CmmPrim		-- Call a "primitive" (eg. sin, cos)
-	CallishMachOp		-- These might be implemented as inline
-				-- code by the backend.
+  | CmmPrim             -- Call a "primitive" (eg. sin, cos)
+        CallishMachOp           -- These might be implemented as inline
+                                -- code by the backend.
   deriving Eq
