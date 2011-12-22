@@ -9,32 +9,38 @@
 module OldCmm (
         CmmGroup, GenCmmGroup, RawCmmGroup, CmmDecl, RawCmmDecl,
         ListGraph(..),
-        CmmInfo(..), UpdateFrame(..), CmmInfoTable(..), ClosureTypeInfo(..),
+
+        CmmInfo(..), CmmInfoTable(..), ClosureTypeInfo(..), UpdateFrame(..),
+
         CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
+
         cmmMapGraph, cmmTopMapGraph,
+
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
+
         CmmStmt(..), CmmReturnInfo(..), CmmHinted(..),
         HintedCmmFormal, HintedCmmActual,
+
         CmmSafety(..), CmmCallTarget(..),
-        New.GenCmmDecl(..),
-        New.ForeignHint(..),
+        New.GenCmmDecl(..), New.ForeignHint(..),
+
         module CmmExpr,
-        Section(..),
-        ProfilingInfo(..), C_SRT(..)
-  ) where
+
+        Section(..), ProfilingInfo(..), C_SRT(..)
+    ) where
 
 #include "HsVersions.h"
 
 import qualified Cmm as New
-import Cmm           ( CmmInfoTable(..), GenCmmGroup, CmmStatics(..), GenCmmDecl(..),
-                       CmmFormal, CmmActual, Section(..), CmmStatic(..),
-                       ProfilingInfo(..), ClosureTypeInfo(..) )
+import Cmm ( CmmInfoTable(..), GenCmmGroup, CmmStatics(..), GenCmmDecl(..),
+             CmmFormal, CmmActual, Section(..), CmmStatic(..),
+             ProfilingInfo(..), ClosureTypeInfo(..) )
 
 import BlockId
-import CmmExpr
-import ForeignCall
 import ClosureInfo
+import CmmExpr
 import FastString
+import ForeignCall
 
 
 -- A [[BlockId]] is a local label.
@@ -48,17 +54,17 @@ import FastString
 
 data CmmInfo
   = CmmInfo
-      (Maybe BlockId)     -- GC target. Nothing <=> CPS won't do stack check
-                          -- JD: NOT USED BY NEW CODE GEN
-      (Maybe UpdateFrame) -- Update frame
-      CmmInfoTable        -- Info table
+        (Maybe BlockId)     -- GC target. Nothing <=> CPS won't do stack check
+                            -- JD: NOT USED BY NEW CODE GEN
+        (Maybe UpdateFrame) -- Update frame
+        CmmInfoTable        -- Info table
 
 -- | A frame that is to be pushed before entry to the function.
 -- Used to handle 'update' frames.
-data UpdateFrame =
-    UpdateFrame
-      CmmExpr    -- Frame header.  Behaves like the target of a 'jump'.
-      [CmmExpr]  -- Frame remainder.  Behaves like the arguments of a 'jump'.
+data UpdateFrame
+  = UpdateFrame
+        CmmExpr    -- Frame header.  Behaves like the target of a 'jump'.
+        [CmmExpr]  -- Frame remainder.  Behaves like the arguments of a 'jump'.
 
 -----------------------------------------------------------------------------
 --  Cmm, CmmDecl, CmmBasicBlock
@@ -68,14 +74,15 @@ data UpdateFrame =
 -- re-orderd during code generation.
 
 -- | A control-flow graph represented as a list of extended basic blocks.
+--
+-- Code, may be empty.  The first block is the entry point.  The
+-- order is otherwise initially unimportant, but at some point the
+-- code gen will fix the order.
+--
+-- BlockIds must be unique across an entire compilation unit, since
+-- they are translated to assembly-language labels, which scope
+-- across a whole compilation unit.
 newtype ListGraph i = ListGraph [GenBasicBlock i]
-   -- ^ Code, may be empty.  The first block is the entry point.  The
-   -- order is otherwise initially unimportant, but at some point the
-   -- code gen will fix the order.
-
-   -- BlockIds must be unique across an entire compilation unit, since
-   -- they are translated to assembly-language labels, which scope
-   -- across a whole compilation unit.
 
 -- | Cmm with the info table as a data type
 type CmmGroup = GenCmmGroup CmmStatics CmmInfo (ListGraph CmmStmt)
@@ -101,31 +108,32 @@ type CmmBasicBlock   = GenBasicBlock CmmStmt
 instance UserOfLocalRegs i => UserOfLocalRegs (GenBasicBlock i) where
     foldRegsUsed f set (BasicBlock _ l) = foldRegsUsed f set l
 
-blockId :: GenBasicBlock i -> BlockId
--- The branch block id is that of the first block in
+-- | The branch block id is that of the first block in
 -- the branch, which is that branch's entry point
+blockId :: GenBasicBlock i -> BlockId
 blockId (BasicBlock blk_id _ ) = blk_id
 
 blockStmts :: GenBasicBlock i -> [i]
 blockStmts (BasicBlock _ stmts) = stmts
 
-
 mapBlockStmts :: (i -> i') -> GenBasicBlock i -> GenBasicBlock i'
 mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
+
 ----------------------------------------------------------------
 --   graph maps
 ----------------------------------------------------------------
 
 cmmMapGraph    :: (g -> g') -> GenCmmGroup d h g -> GenCmmGroup d h g'
-cmmTopMapGraph :: (g -> g') -> GenCmmDecl d h g -> GenCmmDecl d h g'
-
 cmmMapGraph f tops = map (cmmTopMapGraph f) tops
+
+cmmTopMapGraph :: (g -> g') -> GenCmmDecl d h g -> GenCmmDecl d h g'
 cmmTopMapGraph f (CmmProc h l g) = CmmProc h l (f g)
 cmmTopMapGraph _ (CmmData s ds)  = CmmData s ds
 
-data CmmReturnInfo = CmmMayReturn
-                   | CmmNeverReturns
-    deriving ( Eq )
+data CmmReturnInfo
+  = CmmMayReturn
+  | CmmNeverReturns
+  deriving ( Eq )
 
 -----------------------------------------------------------------------------
 --              CmmStmt
@@ -134,7 +142,7 @@ data CmmReturnInfo = CmmMayReturn
 -- control to a new function.
 -----------------------------------------------------------------------------
 
-data CmmStmt    -- Old-style
+data CmmStmt
   = CmmNop
   | CmmComment FastString
 
@@ -144,12 +152,12 @@ data CmmStmt    -- Old-style
                                  -- given by cmmExprType of the rhs.
 
   | CmmCall                      -- A call (foreign, native or primitive), with
-     CmmCallTarget
-     [HintedCmmFormal]           -- zero or more results
-     [HintedCmmActual]           -- zero or more arguments
-     CmmReturnInfo
-  -- Some care is necessary when handling the arguments of these, see
-  -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
+       CmmCallTarget
+       [HintedCmmFormal]           -- zero or more results
+       [HintedCmmActual]           -- zero or more arguments
+       CmmReturnInfo
+       -- Some care is necessary when handling the arguments of these, see
+       -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
 
   | CmmBranch BlockId             -- branch to another BB in this fn
 
@@ -165,13 +173,20 @@ data CmmStmt    -- Old-style
 
   | CmmReturn        -- Return from a native C-- function,
 
-data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: New.ForeignHint }
-                 deriving( Eq )
+data CmmHinted a
+  = CmmHinted {
+        hintlessCmm :: a,
+        cmmHint :: New.ForeignHint
+    }
+  deriving( Eq )
 
 type HintedCmmFormal = CmmHinted CmmFormal
 type HintedCmmActual = CmmHinted CmmActual
 
-data CmmSafety = CmmUnsafe | CmmSafe C_SRT | CmmInterruptible
+data CmmSafety
+  = CmmUnsafe
+  | CmmSafe C_SRT
+  | CmmInterruptible
 
 -- | enable us to fold used registers over '[CmmActual]' and '[CmmFormal]'
 instance UserOfLocalRegs CmmStmt where
@@ -201,13 +216,13 @@ instance UserOfSlots CmmCallTarget where
     foldSlotsUsed _ set (CmmPrim {})    = set
 
 instance UserOfLocalRegs a => UserOfLocalRegs (CmmHinted a) where
-  foldRegsUsed f set a = foldRegsUsed f set (hintlessCmm a)
+    foldRegsUsed f set a = foldRegsUsed f set (hintlessCmm a)
 
 instance UserOfSlots a => UserOfSlots (CmmHinted a) where
-  foldSlotsUsed f set a = foldSlotsUsed f set (hintlessCmm a)
+    foldSlotsUsed f set a = foldSlotsUsed f set (hintlessCmm a)
 
 instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmHinted a) where
-  foldRegsDefd f set a = foldRegsDefd f set (hintlessCmm a)
+    foldRegsDefd f set a = foldRegsDefd f set (hintlessCmm a)
 
 {-
 Discussion
@@ -265,3 +280,4 @@ data CmmCallTarget
         CallishMachOp           -- These might be implemented as inline
                                 -- code by the backend.
   deriving Eq
+
