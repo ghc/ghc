@@ -933,14 +933,23 @@ zonk_pat env (TuplePat pats boxed ty)
 	; (env', pats') <- zonkPats env pats
 	; return (env', TuplePat pats' boxed ty') }
 
-zonk_pat env p@(ConPatOut { pat_ty = ty, pat_dicts = evs, pat_binds = binds, pat_args = args })
-  = ASSERT( all isImmutableTyVar (pat_tvs p) ) 
+zonk_pat env p@(ConPatOut { pat_ty = ty, pat_tvs = tyvars
+                          , pat_dicts = evs, pat_binds = binds
+                          , pat_args = args })
+  = ASSERT( all isImmutableTyVar tyvars ) 
     do	{ new_ty <- zonkTcTypeToType env ty
-	; (env1, new_evs) <- zonkEvBndrsX env evs
+        ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
+          -- Must zonk the existential variables, because their
+          -- /kind/ need potential zonking.
+          -- cf typecheck/should_compile/tc221.hs
+	; (env1, new_evs) <- zonkEvBndrsX env0 evs
 	; (env2, new_binds) <- zonkTcEvBinds env1 binds
 	; (env', new_args) <- zonkConStuff env2 args
-	; returnM (env', p { pat_ty = new_ty, pat_dicts = new_evs, 
-			     pat_binds = new_binds, pat_args = new_args }) }
+	; returnM (env', p { pat_ty = new_ty, 
+                             pat_tvs = new_tyvars,
+                             pat_dicts = new_evs, 
+			     pat_binds = new_binds, 
+                             pat_args = new_args }) }
 
 zonk_pat env (LitPat lit) = return (env, LitPat lit)
 
@@ -1038,15 +1047,22 @@ zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
                              (varSetElemsKvsFirst unbound_tkvs)
                            ++ new_bndrs
 
-       ; return (HsRule name act final_bndrs new_lhs fv_lhs new_rhs fv_rhs) }
+       ; return $ 
+         HsRule name act final_bndrs new_lhs fv_lhs new_rhs fv_rhs }
   where
    zonk_bndr env (RuleBndr (L loc v)) 
-      = do { (env', v') <- zonk_it env v; return (env', RuleBndr (L loc v')) }
+      = do { (env', v') <- zonk_it env v
+           ; return (env', RuleBndr (L loc v')) }
    zonk_bndr _ (RuleBndrSig {}) = panic "zonk_bndr RuleBndrSig"
 
    zonk_it env v
-     | isId v     = do { v' <- zonkIdBndr env v; return (extendIdZonkEnv1 env v', v') }
-     | otherwise  = ASSERT( isImmutableTyVar v) return (env, v)
+     | isId v     = do { v' <- zonkIdBndr env v
+                       ; return (extendIdZonkEnv1 env v', v') }
+     | otherwise  = ASSERT( isImmutableTyVar v)
+                    zonkTyBndrX env v
+                    -- DV: used to be return (env,v) but that is plain 
+                    -- wrong because we may need to go inside the kind 
+                    -- of v and zonk there!
 \end{code}
 
 \begin{code}
@@ -1089,6 +1105,11 @@ zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcLCoToLCo env co
 zonkEvTerm env (EvCast v co)      = ASSERT( isId v) 
                                     do { co' <- zonkTcLCoToLCo env co
                                        ; return (mkEvCast (zonkIdOcc env v) co') }
+
+zonkEvTerm env (EvKindCast v co) = ASSERT( isId v) 
+                                    do { co' <- zonkTcLCoToLCo env co
+                                       ; return (mkEvKindCast (zonkIdOcc env v) co') }
+
 zonkEvTerm env (EvTupleSel v n)   = return (EvTupleSel (zonkIdOcc env v) n)
 zonkEvTerm env (EvTupleMk vs)     = return (EvTupleMk (map (zonkIdOcc env) vs))
 zonkEvTerm env (EvSuperClass d n) = return (EvSuperClass (zonkIdOcc env d) n)

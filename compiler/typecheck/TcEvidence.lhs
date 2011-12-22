@@ -16,7 +16,7 @@ module TcEvidence (
 
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, 
 
-  EvTerm(..), mkEvCast, evVarsOfTerm,
+  EvTerm(..), mkEvCast, evVarsOfTerm, mkEvKindCast,
 
   -- TcCoercion
   TcCoercion(..), 
@@ -447,26 +447,42 @@ evBindMapBinds bs
 data EvBind = EvBind EvVar EvTerm
 
 data EvTerm
-  = EvId EvId                  -- Term-level variable-to-variable bindings
-                               -- (no coercion variables! they come via EvCoercion)
+  = EvId EvId                    -- Term-level variable-to-variable bindings
+                                 -- (no coercion variables! they come via EvCoercion)
 
-  | EvCoercion TcCoercion      -- (Boxed) coercion bindings
+  | EvCoercion TcCoercion        -- (Boxed) coercion bindings
 
-  | EvCast EvVar TcCoercion    -- d |> co
+  | EvCast EvVar TcCoercion      -- d |> co
 
-  | EvDFunApp DFunId           -- Dictionary instance application
+  | EvDFunApp DFunId             -- Dictionary instance application
        [Type] [EvVar]
 
-  | EvTupleSel EvId  Int       -- n'th component of the tuple
+  | EvTupleSel EvId  Int         -- n'th component of the tuple
 
-  | EvTupleMk [EvId]           -- tuple built from this stuff
+  | EvTupleMk [EvId]             -- tuple built from this stuff
 
-  | EvSuperClass DictId Int    -- n'th superclass. Used for both equalities and
-                               -- dictionaries, even though the former have no
-                               -- selector Id.  We count up from _0_
-
+  | EvSuperClass DictId Int      -- n'th superclass. Used for both equalities and
+                                 -- dictionaries, even though the former have no
+                                 -- selector Id.  We count up from _0_
+  | EvKindCast EvVar TcCoercion  -- See Note [EvKindCast]
+           
   deriving( Data.Data, Data.Typeable)
 \end{code}
+
+Note [EvKindCast] 
+~~~~~~~~~~~~~~~~~ 
+
+EvKindCast g kco is produced when we have a constraint (g : s1 ~ s2) 
+but the kinds of s1 and s2 (k1 and k2 respectively) don't match but 
+are rather equal by a coercion. You may think that this coercion will
+always turn out to be ReflCo, so why is this needed? Because sometimes
+we will want to defer kind errors until the runtime and in these cases
+that coercion will be an 'error' term, which we want to evaluate rather
+than silently forget about!
+
+The relevant (and only) place where such a coercion is produced in 
+the simplifier is in emit_kind_constraint in TcCanonical.
+
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -492,6 +508,11 @@ mkEvCast ev lco
   | isTcReflCo lco = EvId ev
   | otherwise      = EvCast ev lco
 
+mkEvKindCast :: EvVar -> TcCoercion -> EvTerm
+mkEvKindCast ev lco
+  | isTcReflCo lco = EvId ev
+  | otherwise      = EvKindCast ev lco
+
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
 
@@ -508,6 +529,7 @@ evVarsOfTerm (EvTupleSel v _)    = [v]
 evVarsOfTerm (EvSuperClass v _)  = [v]
 evVarsOfTerm (EvCast v co)       = v : varSetElems (coVarsOfTcCo co)
 evVarsOfTerm (EvTupleMk evs)     = evs
+evVarsOfTerm (EvKindCast v co)   = v : varSetElems (coVarsOfTcCo co)
 \end{code}
 
 
@@ -561,6 +583,7 @@ instance Outputable EvBind where
 instance Outputable EvTerm where
   ppr (EvId v)           = ppr v
   ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
+  ppr (EvKindCast v co)  = ppr v <+> (ptext (sLit "`kind-cast`")) <+> pprParendTcCo co
   ppr (EvCoercion co)    = ptext (sLit "CO") <+> ppr co
   ppr (EvTupleSel v n)   = ptext (sLit "tupsel") <> parens (ppr (v,n))
   ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs
