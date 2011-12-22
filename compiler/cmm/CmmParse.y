@@ -413,8 +413,8 @@ stmt	:: { ExtCode }
 		{ do l <- lookupLabel $2; stmtEC (CmmBranch l) }
 	| 'jump' expr ';'
 		{ do e <- $2; stmtEC (CmmJump e) }
-        | 'return' maybe_actuals ';'
-		{ do e <- sequence $2; stmtEC (CmmReturn e) }
+        | 'return' ';'
+		{ stmtEC CmmReturn }
 	| 'if' bool_expr 'goto' NAME
 		{ do l <- lookupLabel $4; cmmRawIf $2 l }
 	| 'if' bool_expr '{' body '}' else 	
@@ -946,7 +946,6 @@ emitRetUT args = do
                            -- simultaneous assignments here (#3546)
   when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
   stmtC $ CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord))
-  -- TODO (when using CPS): emitStmt (CmmReturn (map snd args))
 
 -- -----------------------------------------------------------------------------
 -- If-then-else and boolean expressions

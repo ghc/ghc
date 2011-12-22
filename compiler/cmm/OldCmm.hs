@@ -164,7 +164,6 @@ data CmmStmt    -- Old-style
   | CmmJump CmmExpr  -- Jump to another C-- function,
 
   | CmmReturn        -- Return from a native C-- function,
-      [HintedCmmActual]        -- with these return values. (parameters never used)
 
 data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: New.ForeignHint }
                  deriving( Eq )
@@ -188,7 +187,7 @@ instance UserOfLocalRegs CmmStmt where
       stmt (CmmCondBranch e _)       = gen e
       stmt (CmmSwitch e _)           = gen e
       stmt (CmmJump e)               = gen e
-      stmt (CmmReturn es)            = gen es
+      stmt (CmmReturn)               = id
 
       gen :: UserOfLocalRegs a => a -> b -> b
       gen a set = foldRegsUsed f set a

@@ -252,7 +252,7 @@ isJump :: CmmStmt -> Bool
 isJump (CmmJump   _  ) = True
 isJump (CmmBranch _  ) = True
 isJump (CmmSwitch _ _) = True
-isJump (CmmReturn _  ) = True
+isJump (CmmReturn    ) = True
 isJump _               = False
 
 isOrdinaryStmt :: CgStmt -> Bool

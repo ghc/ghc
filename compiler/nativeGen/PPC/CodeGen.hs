@@ -142,7 +142,7 @@ stmtToInstrs stmt = do
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
     CmmJump arg           -> genJump arg
-    CmmReturn _           ->
+    CmmReturn             ->
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 

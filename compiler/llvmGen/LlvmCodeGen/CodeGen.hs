@@ -132,7 +132,7 @@ stmtToInstrs env stmt = case stmt of
     -- CPS, only tail calls, no return's
     -- Actually, there are a few return statements that occur because of hand
     -- written Cmm code.
-    CmmReturn _
+    CmmReturn
         -> return (env, unitOL $ Return Nothing, [])
 
 

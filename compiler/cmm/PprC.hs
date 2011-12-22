@@ -172,7 +172,7 @@ pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext (sLit "static ")
 pprStmt :: Platform -> CmmStmt -> SDoc
 
 pprStmt platform stmt = case stmt of
-    CmmReturn _  -> panic "pprStmt: return statement should have been cps'd away"
+    CmmReturn    -> panic "pprStmt: return statement should have been cps'd away"
     CmmNop       -> empty
     CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
                           -- XXX if the string contains "*/", we need to fix it

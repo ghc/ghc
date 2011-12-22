@@ -66,7 +66,7 @@ cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
                 stmt m (CmmCondBranch e b) = b:(expr m e)
                 stmt m (CmmSwitch e bs) = catMaybes bs ++ expr m e
                 stmt m (CmmJump e) = expr m e
-                stmt m (CmmReturn as) = actuals m as
+                stmt m (CmmReturn) = m
                 actuals m as = foldl' (\m h -> expr m (hintlessCmm h)) m as
                 -- We have to do a deep fold into CmmExpr because
                 -- there may be a BlockId in the CmmBlock literal.
