@@ -53,8 +53,10 @@ module GHC.Exts
         SpecConstrAnnotation(..),
 
         -- * The call stack
-        currentCallStack
+        currentCallStack,
 
+        -- * The Constraint kind
+        Constraint
        ) where
 
 import Prelude
