@@ -274,7 +274,7 @@ isLiftedTypeKind _                = False
 \begin{code}  
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
--- tyVarsOfType returns only the free *type* variables of a type
+-- tyVarsOfType returns only the free variables of a type
 -- For example, tyVarsOfType (a::k) returns {a}, not including the
 -- kind variable {k}
 tyVarsOfType (TyVarTy v)         = unitVarSet v
