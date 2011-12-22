@@ -7,15 +7,15 @@
 -----------------------------------------------------------------------------
 
 module CgForeignCall (
-  cgForeignCall,
-  emitForeignCall,
-  emitForeignCall',
-  shimForeignCallArg,
-  emitSaveThreadState, -- will be needed by the Cmm parser
-  emitLoadThreadState, -- ditto
-  emitCloseNursery,
-  emitOpenNursery,
- ) where
+        cgForeignCall,
+        emitForeignCall,
+        emitForeignCall',
+        shimForeignCallArg,
+        emitSaveThreadState, -- will be needed by the Cmm parser
+        emitLoadThreadState, -- ditto
+        emitCloseNursery,
+        emitOpenNursery,
+    ) where
 
 import StgSyn
 import CgProf
