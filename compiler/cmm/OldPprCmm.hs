@@ -221,7 +221,7 @@ genJump platform expr =
 --     return (a, b, c);
 --
 genReturn :: Platform -> SDoc
-genReturn platform =
+genReturn _ =
     hcat [ ptext (sLit "return") , semi ]
 
 -- --------------------------------------------------------------------------
