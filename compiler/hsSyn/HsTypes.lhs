@@ -195,6 +195,19 @@ mkHsOpTy :: LHsType name -> Located name -> LHsType name -> HsType name
 mkHsOpTy ty1 op ty2 = HsOpTy ty1 (WpKiApps [], op) ty2
 \end{code}
 
+Note [Unit tuples]
+~~~~~~~~~~~~~~~~~~
+Consider the type
+    type instance F Int = ()
+We want to parse that "()" 
+    as HsTupleTy HsBoxedOrConstraintTuple [], 
+NOT as HsTyVar unitTyCon
+
+Why? Because F might have kind (* -> Constraint), so we when parsing we
+don't know if that tuple is going to be a constraint tuple or an ordinary
+unit tuple.  The HsTupleSort flag is specifically designed to deal with
+that, but it has to work for unit tuples too.
+
 Note [Promotions (HsTyVar)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 HsTyVar: A name in a type or kind.

@@ -1047,20 +1047,22 @@ btype :: { LHsType RdrName }
         | atype                         { $1 }
 
 atype :: { LHsType RdrName }
-        : gtycon                        { L1 (HsTyVar (unLoc $1)) }
-        | tyvar                         { L1 (HsTyVar (unLoc $1)) }
-        | strict_mark atype             { LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
-        | '{' fielddecls '}'            {% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
-        | '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy HsBoxedOrConstraintTuple  ($2:$4) }
-        | '(#' comma_types1 '#)'        { LL $ HsTupleTy HsUnboxedTuple $2     }
-        | '[' ctype ']'                 { LL $ HsListTy  $2 }
-        | '[:' ctype ':]'               { LL $ HsPArrTy  $2 }
-        | '(' ctype ')'                 { LL $ HsParTy   $2 }
-        | '(' ctype '::' kind ')'       { LL $ HsKindSig $2 $4 }
-        | quasiquote                    { L1 (HsQuasiQuoteTy (unLoc $1)) }
-        | '$(' exp ')'                  { LL $ mkHsSpliceTy $2 }
-        | TH_ID_SPLICE                  { LL $ mkHsSpliceTy $ L1 $ HsVar $
-                                          mkUnqual varName (getTH_ID_SPLICE $1) }
+        : ntgtycon                       { L1 (HsTyVar (unLoc $1)) }      -- Not including unit tuples
+        | tyvar                          { L1 (HsTyVar (unLoc $1)) }      -- (See Note [Unit tuples])
+        | strict_mark atype              { LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
+        | '{' fielddecls '}'             {% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
+        | '(' ')'                        { LL $ HsTupleTy HsBoxedOrConstraintTuple []      }
+        | '(' ctype ',' comma_types1 ')' { LL $ HsTupleTy HsBoxedOrConstraintTuple ($2:$4) }
+        | '(#' '#)'                      { LL $ HsTupleTy HsUnboxedTuple           []      }       
+        | '(#' comma_types1 '#)'         { LL $ HsTupleTy HsUnboxedTuple           $2      }
+        | '[' ctype ']'                  { LL $ HsListTy  $2 }
+        | '[:' ctype ':]'                { LL $ HsPArrTy  $2 }
+        | '(' ctype ')'                  { LL $ HsParTy   $2 }
+        | '(' ctype '::' kind ')'        { LL $ HsKindSig $2 $4 }
+        | quasiquote                     { L1 (HsQuasiQuoteTy (unLoc $1)) }
+        | '$(' exp ')'                   { LL $ mkHsSpliceTy $2 }
+        | TH_ID_SPLICE                   { LL $ mkHsSpliceTy $ L1 $ HsVar $
+                                           mkUnqual varName (getTH_ID_SPLICE $1) }
                                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE qconid                          { LL $ HsTyVar $ unLoc $2 }
         | SIMPLEQUOTE  '(' ')'                        { LL $ HsTyVar $ getRdrName unitDataCon }

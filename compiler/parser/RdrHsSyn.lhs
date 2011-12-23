@@ -56,7 +56,7 @@ import BasicTypes       ( maxPrecedence, Activation(..), RuleMatchInfo,
                           InlinePragma(..), InlineSpec(..) )
 import TcEvidence       ( idHsWrapper )
 import Lexer
-import TysWiredIn       ( unitTyCon )
+import TysWiredIn       ( unitTyCon, unitDataCon )
 import ForeignCall
 import OccName          ( srcDataName, varName, isDataOcc, isTcOcc,
                           occNameString )
@@ -360,10 +360,12 @@ splitCon :: LHsType RdrName
 splitCon ty
  = split ty []
  where
-   split (L _ (HsAppTy t u)) ts = split t (u : ts)
-   split (L l (HsTyVar tc))  ts = do data_con <- tyConToDataCon l tc
-                                     return (data_con, mk_rest ts)
-   split (L l _) _              = parseErrorSDoc l (text "parse error in constructor in data/newtype declaration:" <+> ppr ty)
+   split (L _ (HsAppTy t u)) ts    = split t (u : ts)
+   split (L l (HsTyVar tc))  ts    = do data_con <- tyConToDataCon l tc
+                                        return (data_con, mk_rest ts)
+   split (L l (HsTupleTy _ [])) [] = return (L l (getRdrName unitDataCon), PrefixCon [])
+                                         -- See Note [Unit tuples] in HsTypes
+   split (L l _) _                 = parseErrorSDoc l (text "parse error in constructor in data/newtype declaration:" <+> ppr ty)
 
    mk_rest [L _ (HsRecTy flds)] = RecCon flds
    mk_rest ts                   = PrefixCon ts
@@ -535,12 +537,13 @@ checkTyClHdr ty
     goL (L l ty) acc = go l ty acc
 
     go l (HsTyVar tc) acc 
-        | isRdrTc tc         = return (L l tc, acc)
-                                     
+        | isRdrTc tc          = return (L l tc, acc)
     go _ (HsOpTy t1 (_, ltc@(L _ tc)) t2) acc
         | isRdrTc tc         = return (ltc, t1:t2:acc)
     go _ (HsParTy ty)    acc = goL ty acc
     go _ (HsAppTy t1 t2) acc = goL t1 (t2:acc)
+    go l (HsTupleTy _ []) [] = return (L l (getRdrName unitTyCon), [])
+                                   -- See Note [Unit tuples] in HsTypes
     go l _               _   = parseErrorSDoc l (text "Malformed head of type or class declaration:" <+> ppr ty)
 
 -- Check that associated type declarations of a class are all kind signatures.
@@ -560,13 +563,10 @@ checkContext (L l orig_t)
   = check orig_t
  where
   check (HsTupleTy _ ts)        -- (Eq a, Ord b) shows up as a tuple type
-    = return (L l ts)
+    = return (L l ts)           -- Ditto ()
 
   check (HsParTy ty)    -- to be sure HsParTy doesn't get into the way
     = check (unLoc ty)
-
-  check (HsTyVar t)     -- Empty context shows up as a unit type ()
-    | t == getRdrName unitTyCon = return (L l [])
 
   check _
     = return (L l [L l orig_t])
