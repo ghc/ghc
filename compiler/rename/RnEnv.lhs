@@ -20,7 +20,7 @@ module RnEnv (
 	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
 
 	lookupFixityRn, lookupTyFixityRn, 
-	lookupInstDeclBndr, lookupSubBndr, greRdrName,
+	lookupInstDeclBndr, lookupSubBndrOcc, greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
@@ -267,7 +267,7 @@ lookupInstDeclBndr cls what rdr
 	       	-- In an instance decl you aren't allowed
       	     	-- to use a qualified name for the method
 		-- (Although it'd make perfect sense.)
-       ; lookupSubBndr (ParentIs cls) doc rdr }
+       ; lookupSubBndrOcc (ParentIs cls) doc rdr }
   where
     doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
 
@@ -304,11 +304,11 @@ lookupConstructorFields con_name
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
 
-lookupSubBndr :: Parent  -- NoParent   => just look it up as usual
-			 -- ParentIs p => use p to disambiguate
-              -> SDoc -> RdrName 
-              -> RnM Name
-lookupSubBndr parent doc rdr_name
+lookupSubBndrOcc :: Parent  -- NoParent   => just look it up as usual
+		    	    -- ParentIs p => use p to disambiguate
+                 -> SDoc -> RdrName 
+                 -> RnM Name
+lookupSubBndrOcc parent doc rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
   = lookupExactOcc n
 
@@ -323,6 +323,7 @@ lookupSubBndr parent doc rdr_name
 		--     The latter does pickGREs, but we want to allow 'x'
 		--     even if only 'M.x' is in scope
 	    [gre] -> do { addUsedRdrName gre (used_rdr_name gre)
+                          -- Add a usage; this is an *occurrence* site
                         ; return (gre_name gre) }
 	    []    -> do { addErr (unknownSubordinateErr doc rdr_name)
 			; return (mkUnboundName rdr_name) }
@@ -669,6 +670,11 @@ lookupBindGroupOcc ctxt what rdr_name
        ; return (Right n') }  -- Maybe we should check the side conditions
        	 	      	      -- but it's a pain, and Exact things only show
 			      -- up when you know what you are doing
+
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
+  = do { n' <- lookupOrig rdr_mod rdr_occ
+       ; return (Right n') }
+
   | otherwise
   = case ctxt of 
       HsBootCtxt       -> lookup_top		    
