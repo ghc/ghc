@@ -217,3 +217,6 @@ test('T5597', extra_clean(['T5597a.hi','T5597a.o']),
               multimod_compile, ['T5597','-v0'])
 test('T5665', extra_clean(['T5665a.hi','T5665a.o']), 
               multimod_compile, ['T5665','-v0'])
+test('T5700', extra_clean(['T5700a.hi','T5700a.o']), 
+              multimod_compile, ['T5700','-v0 -ddump-splices'])
+
