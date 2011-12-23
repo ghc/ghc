@@ -28,12 +28,12 @@ f1 i = (# i #)
 --  Kind mis-match
 --  Expected kind `* -> *', but `(##)' has kind `? -> (#)'
 --  In the instance declaration for `Functor (##)'
-f1prefix :: Int# -> (# #) Int#
-f1prefix i = (# #) i
+f1prefix :: Int# -> (# #)
+f1prefix i = (# #)
 --test that prefix and non-prefix versions
 --are the same type by switching the case-argument
-f1pat a = case f1prefix a of (# i #) -> i +# 1#
-f1prepat a = case f1 a of (# #) i -> i +# 1#
+f1pat a = case f1prefix a of (# #) -> 1#
+f1prepat a = case f1 a of (# i #) -> i +# 1#
 
 f2 :: Int# -> (# Int#, Int# #)
 f2 i = (# i, i #)
