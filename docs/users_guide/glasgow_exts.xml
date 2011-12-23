@@ -2944,6 +2944,20 @@ data Counter a where
 As before, only one selector function is generated here, that for <literal>tag</literal>.
 Nevertheless, you can still use all the field names in pattern matching and record construction.
 </para></listitem>
+
+<listitem><para>
+In a GADT-style data type declaration there is no obvious way to specify that a data constructor
+should be infix, which makes a difference if you derive <literal>Show</literal> for the type.
+(Data constructors declared infix are displayed infix by the derived <literal>show</literal>.)
+So GHC implements the following design: a data constructor declared in a GADT-style data type
+declaration is displayed infix by <literal>Show</literal> iff (a) it is an operator symbol,
+(b) it has two arguments, (c) it has a programmer-supplied fixity declaration.  For example
+<programlisting>
+   infix 6 (:--:) 
+   data T a where
+     (:--:) :: Int -> Bool -> T Int
+</programlisting>
+</para></listitem>
 </itemizedlist></para>
 </sect2>
 

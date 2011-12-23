@@ -1055,9 +1055,9 @@ rnConDecls condecls
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
 rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
-                   	       , con_cxt = cxt, con_details = details
-                   	       , con_res = res_ty, con_doc = mb_doc
-                   	       , con_old_rec = old_rec, con_explicit = expl })
+                   	, con_cxt = cxt, con_details = details
+                   	, con_res = res_ty, con_doc = mb_doc
+                   	, con_old_rec = old_rec, con_explicit = expl })
   = do	{ addLocM checkConName name
     	; when old_rec (addWarn (deprecRecSyntax decl))
 	; new_name <- lookupLocatedTopBndrRn name
@@ -1084,35 +1084,43 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
         ; bindTyVarsRn doc new_tvs $ \new_tyvars -> do
 	{ new_context <- rnContext doc cxt
 	; new_details <- rnConDeclDetails doc details
-        ; (new_details', new_res_ty)  <- rnConResult doc new_details res_ty
+        ; (new_details', new_res_ty)  <- rnConResult doc (unLoc new_name) new_details res_ty
         ; return (decl { con_name = new_name, con_qvars = new_tyvars, con_cxt = new_context 
                        , con_details = new_details', con_res = new_res_ty, con_doc = mb_doc' }) }}
  where
     doc = ConDeclCtx name
     get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy HsBoxedTuple tys))
 
-rnConResult :: HsDocContext
+rnConResult :: HsDocContext -> Name
             -> HsConDetails (LHsType Name) [ConDeclField Name]
             -> ResType RdrName
             -> RnM (HsConDetails (LHsType Name) [ConDeclField Name],
                     ResType Name)
-rnConResult _ details ResTyH98 = return (details, ResTyH98)
-rnConResult doc details (ResTyGADT ty)
+rnConResult _   _   details ResTyH98 = return (details, ResTyH98)
+rnConResult doc con details (ResTyGADT ty)
   = do { ty' <- rnLHsType doc ty
        ; let (arg_tys, res_ty) = splitHsFunType ty'
           	-- We can finally split it up, 
 		-- now the renamer has dealt with fixities
 	        -- See Note [Sorting out the result type] in RdrHsSyn
 
-             details' = case details of
-       	     	           RecCon {}    -> details
-			   PrefixCon {} -> PrefixCon arg_tys
-			   InfixCon {}  -> pprPanic "rnConResult" (ppr ty)
-			  -- See Note [Sorting out the result type] in RdrHsSyn
-		
-       ; when (not (null arg_tys) && case details of { RecCon {} -> True; _ -> False })
-              (addErr (badRecResTy (docOfHsDocContext doc)))
-       ; return (details', ResTyGADT res_ty) }
+       ; case details of
+	   InfixCon {}  -> pprPanic "rnConResult" (ppr ty)
+	   -- See Note [Sorting out the result type] in RdrHsSyn
+
+       	   RecCon {}    -> do { unless (null arg_tys) 
+                                       (addErr (badRecResTy (docOfHsDocContext doc)))
+                              ; return (details, ResTyGADT res_ty) }
+
+	   PrefixCon {} | isSymOcc (getOccName con)  -- See Note [Infix GADT cons]
+                        , [ty1,ty2] <- arg_tys
+                        -> do { fix_env <- getFixityEnv
+                              ; return (if   con `elemNameEnv` fix_env 
+                                        then InfixCon ty1 ty2
+                                        else PrefixCon arg_tys
+                                       , ResTyGADT res_ty) }
+                        | otherwise
+                        -> return (PrefixCon arg_tys, ResTyGADT res_ty) }
 
 rnConDeclDetails :: HsDocContext
                  -> HsConDetails (LHsType RdrName) [ConDeclField RdrName]
@@ -1161,6 +1169,18 @@ badDataCon name
    = hsep [ptext (sLit "Illegal data constructor name"), quotes (ppr name)]
 \end{code}
 
+Note [Infix GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not currently have syntax to declare an infix constructor in GADT syntax,
+but it makes a (small) difference to the Show instance.  So as a slightly
+ad-hoc solution, we regard a GADT data constructor as infix if
+  a) it is an operator symbol
+  b) it has two arguments
+  c) there is a fixity declaration for it
+For example:
+   infix 6 (:--:) 
+   data T a where
+     (:--:) :: t1 -> t2 -> T Int
 
 %*********************************************************
 %*							*
