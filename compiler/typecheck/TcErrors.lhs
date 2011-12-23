@@ -23,6 +23,7 @@ import TcSMonad
 import TcType
 import TypeRep
 import Type
+import Kind ( isKind )
 import Class
 import Unify ( tcMatchTys )
 import Inst
@@ -465,8 +466,12 @@ addExtraInfo ctxt ty1 ty2
     extra2 = typeExtraInfoMsg (cec_encl ctxt) ty2
 
 misMatchMsg :: TcType -> TcType -> SDoc	   -- Types are already tidy
-misMatchMsg ty1 ty2 = sep [ ptext (sLit "Couldn't match type") <+> quotes (ppr ty1)
-	                  , nest 15 $ ptext (sLit "with") <+> quotes (ppr ty2)]
+misMatchMsg ty1 ty2 
+  = sep [ ptext cm_ty_or_knd <+> quotes (ppr ty1)
+	, nest 15 $ ptext (sLit "with") <+> quotes (ppr ty2)]
+  where cm_ty_or_knd
+          | isKind ty1 = sLit "Couldn't match kind"
+          | otherwise  = sLit "Couldn't match type"
 
 kindErrorMsg :: TcType -> TcType -> SDoc   -- Types are already tidy
 kindErrorMsg ty1 ty2

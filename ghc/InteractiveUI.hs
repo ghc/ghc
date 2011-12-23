@@ -1412,23 +1412,39 @@ isSafeModule m = do
                                     (GHC.moduleNameString $ GHC.moduleName m))
 
     let iface' = fromJust iface
-        trust  = showPpr $ getSafeMode $ GHC.mi_trust iface'
-        pkg    = if packageTrusted dflags m then "trusted" else "untrusted"
-        (good, bad) = tallyPkgs dflags $
-                        map fst $ filter snd $ dep_pkgs $ GHC.mi_deps iface'
+
+        trust = showPpr $ getSafeMode $ GHC.mi_trust iface'
+        pkgT  = packageTrusted dflags m
+        pkg   = if pkgT then "trusted" else "untrusted"
+        (good', bad') = tallyPkgs dflags $
+                            map fst $ filter snd $ dep_pkgs $ GHC.mi_deps iface'
+        (good, bad) = case GHC.mi_trust_pkg iface' of
+                          True | pkgT -> (modulePackageId m:good', bad')
+                          True        -> (good', modulePackageId m:bad')
+                          False       -> (good', bad')
 
     liftIO $ putStrLn $ "Trust type is (Module: " ++ trust ++ ", Package: " ++ pkg ++ ")"
-    when (not $ null good)
+    liftIO $ putStrLn $ "Package Trust: "
+                            ++ (if packageTrustOn dflags then "On" else "Off")
+
+    when (packageTrustOn dflags && not (null good))
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
                         (intercalate ", " $ map packageIdString good))
-    if (null bad)
-        then liftIO $ putStrLn $ mname ++ " is trusted!"
-        else do
+
+    case goodTrust (getSafeMode $ GHC.mi_trust iface') of
+        True | (null bad || not (packageTrustOn dflags)) ->
+            liftIO $ putStrLn $ mname ++ " is trusted!"
+
+        True -> do
             liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
                         ++ (intercalate ", " $ map packageIdString bad)
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
+        False -> liftIO $ putStrLn $ mname ++ " is NOT trusted!"
+
   where
+    goodTrust t = t `elem` [Sf_Safe, Sf_SafeInfered, Sf_Trustworthy]
+
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags md
@@ -1567,8 +1583,9 @@ moduleCmd str
           '-':stuff -> rest remModulesFromContext stuff
           stuff     -> rest setContext            stuff
 
-    rest op stuff = (op as bs, words stuff)
-       where (as,bs) = partitionWith starred strs
+    rest op stuff = (op as bs, stuffs)
+       where (as,bs) = partitionWith starred stuffs
+             stuffs  = words stuff
 
     sensible ('*':m) = looksLikeModuleName m
     sensible m       = looksLikeModuleName m
@@ -1618,12 +1635,23 @@ setContext starred not_starred = do
   setGHCContextFromGHCiState
 
 checkAdd :: Bool -> String -> GHCi InteractiveImport
-checkAdd star mstr
-  | star      = do m <- wantInterpretedModule mstr
-                   return (IIModule m)
-  | otherwise = do m <- lookupModule mstr
-                   return (IIDecl (simpleImportDecl (moduleName m)))
+checkAdd star mstr = do
+  dflags <- getDynFlags 
+  case safeLanguageOn dflags of
+    True | star -> ghcError $ CmdLineError "can't use * imports with Safe Haskell"
 
+    True -> do m <- lookupModule mstr
+               s <- GHC.isModuleTrusted m
+               case s of
+                 True  -> return $ IIDecl (simpleImportDecl $ moduleName m)
+                 False -> ghcError $ CmdLineError $ "can't import " ++ mstr
+                                                 ++ " as it isn't trusted."
+
+    False | star -> do m <- wantInterpretedModule mstr
+                       return $ IIModule m
+
+    False -> do m <- lookupModule mstr
+                return $ IIDecl (simpleImportDecl $ moduleName m)
 
 -- | Sets the GHC context from the GHCi state.  The GHC context is
 -- always set this way, we never modify it incrementally.
