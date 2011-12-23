@@ -42,7 +42,7 @@ import DataCon
 import Class
 import Var
 import VarEnv
-import VarSet     ( mkVarSet, varSetElems )
+import VarSet     ( mkVarSet, subVarSet, varSetElems )
 import Pair
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var), CoreExpr, varToCoreExpr )
@@ -61,7 +61,6 @@ import SrcLoc
 import Util
 
 import Control.Monad
-import Data.Maybe
 import Maybes     ( orElse )
 \end{code}
 
@@ -453,8 +452,9 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
                   badBootDeclErr
 
         ; (tyvars, theta, clas, inst_tys) <- tcHsInstHead InstDeclCtxt poly_ty
-        ; let mini_env = mkVarEnv (classTyVars clas `zip` inst_tys)
-
+        ; let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
+              mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
+                           
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
         ; idx_tycons0 <- tcExtendTyVarEnv tyvars $
@@ -463,30 +463,37 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
         -- Check for missing associated types and build them
         -- from their defaults (if available)
         ; let defined_ats = mkNameSet $ map (tcdName . unLoc) ats
-              check_at_instance (fam_tc, defs)
-                 -- User supplied instances ==> everything is OK
-                | tyConName fam_tc `elemNameSet` defined_ats = return (Nothing, [])
-                 -- No defaults ==> generate a warning
-                | null defs                                  = return (Just (tyConName fam_tc), [])
-                 -- No user instance, have defaults ==> instatiate them
-                | otherwise = do
-                    defs' <- forM defs $ \(ATD tvs pat_tys rhs _loc) -> do
-                      let mini_env_subst = mkTvSubst (mkInScopeSet (mkVarSet tvs)) mini_env
-                          tvs' = varSetElems (tyVarsOfType rhs')
-                          pat_tys' = substTys mini_env_subst pat_tys
-                          rhs' = substTy mini_env_subst rhs
-                      rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
-                      buildSynTyCon rep_tc_name tvs'
-                                    (SynonymTyCon rhs')
-                                    (mkArrowKinds (map tyVarKind tvs') (typeKind rhs'))
-                                    NoParentTyCon (Just (fam_tc, pat_tys'))
-                    return (Nothing, defs')
-        ; missing_at_stuff <- mapM check_at_instance (classATItems clas)
-        
-        ; let (omitted, idx_tycons1) = unzip missing_at_stuff
-        ; warn <- woptM Opt_WarnMissingMethods
-        ; mapM_ (warnTc warn . omittedATWarn) (catMaybes omitted)
 
+              mk_deflt_at_instances :: ClassATItem -> TcM [TyCon]
+              mk_deflt_at_instances (fam_tc, defs)
+                 -- User supplied instances ==> everything is OK
+                | tyConName fam_tc `elemNameSet` defined_ats 
+                = return []
+
+                 -- No defaults ==> generate a warning
+                | null defs
+                = do { warnMissingMethodOrAT "associated type" (tyConName fam_tc)
+                     ; return [] }
+
+                 -- No user instance, have defaults ==> instatiate them
+                 -- Example:   class C a where { type F a b :: *; type F a b = () }
+                 --            instance C [x]
+                 -- Then we want to generate the decl:   type F [x] b = ()
+                | otherwise 
+                = forM defs $ \(ATD _tvs pat_tys rhs _loc) ->
+                  do { let pat_tys' = substTys mini_subst pat_tys
+                           rhs'     = substTy  mini_subst rhs
+                           tv_set'  = tyVarsOfTypes pat_tys'
+                           tvs'     = varSetElems tv_set'
+                     ; rep_tc_name <- newFamInstTyConName (noLoc (tyConName fam_tc)) pat_tys'
+                     ; ASSERT( tyVarsOfType rhs' `subVarSet` tv_set' ) 
+                       buildSynTyCon rep_tc_name tvs'
+                                     (SynonymTyCon rhs')
+                                     (typeKind rhs')
+                                     NoParentTyCon (Just (fam_tc, pat_tys')) }
+
+        ; idx_tycons1 <- mapM mk_deflt_at_instances (classATItems clas)
+        
         -- Finally, construct the Core representation of the instance.
         -- (This no longer includes the associated types.)
         ; dfun_name <- newDFunName clas inst_tys (getLoc poly_ty)
@@ -1007,7 +1014,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     tc_default sel_id NoDefMeth     -- No default method at all
       = do { traceTc "tc_def: warn" (ppr sel_id)
-           ; warnMissingMethod sel_id
+           ; warnMissingMethodOrAT "method" (idName sel_id)
            ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
                                          inst_tys sel_id
            ; return (meth_id, mkVarBind meth_id $
@@ -1194,18 +1201,15 @@ derivBindCtxt sel_id clas tys _bind
                     <+> quotes (pprClassPred clas tys) <> colon)
           , nest 2 $ ptext (sLit "To see the code I am typechecking, use -ddump-deriv") ]
 
--- Too voluminous
---        , nest 2 $ pprSetDepth AllTheWay $ ppr bind ]
-
-warnMissingMethod :: Id -> TcM ()
-warnMissingMethod sel_id
+warnMissingMethodOrAT :: String -> Name -> TcM ()
+warnMissingMethodOrAT what name
   = do { warn <- woptM Opt_WarnMissingMethods
-       ; traceTc "warn" (ppr sel_id <+> ppr warn <+> ppr (not (startsWithUnderscore (getOccName sel_id))))
+       ; traceTc "warn" (ppr name <+> ppr warn <+> ppr (not (startsWithUnderscore (getOccName name))))
        ; warnTc (warn  -- Warn only if -fwarn-missing-methods
-                 && not (startsWithUnderscore (getOccName sel_id)))
+                 && not (startsWithUnderscore (getOccName name)))
                                         -- Don't warn about _foo methods
-                (ptext (sLit "No explicit method nor default method for")
-                 <+> quotes (ppr sel_id)) }
+                (ptext (sLit "No explicit") <+> text what <+> ptext (sLit "or default declaration for")
+                 <+> quotes (ppr name)) }
 \end{code}
 
 Note [Export helper functions]
@@ -1330,10 +1334,6 @@ instDeclCtxt2 dfun_ty
 
 inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = ptext (sLit "In the instance declaration for") <+> quotes doc
-
-omittedATWarn :: Name -> SDoc
-omittedATWarn at
-  = ptext (sLit "No explicit AT declaration for") <+> quotes (ppr at)
 
 badBootFamInstDeclErr :: SDoc
 badBootFamInstDeclErr

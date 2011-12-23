@@ -105,7 +105,7 @@ type ClassATItem = (TyCon, [ATDefault])
 
 -- Each associated type default template is a triple of:
 data ATDefault = ATD { -- TyVars of the RHS and family arguments 
-                       -- (including the class TVs)
+                       -- (including, but perhaps more than, the class TVs)
                        atDefaultTys     :: [TyVar],
                        -- The instantiated family arguments
                        atDefaultPats    :: [Type],
