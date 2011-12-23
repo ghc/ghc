@@ -56,7 +56,8 @@ module TysWiredIn (
 	mkTupleTy, mkBoxedTupleTy,
 	tupleTyCon, tupleCon, 
 	unitTyCon, unitDataCon, unitDataConId, pairTyCon, 
-	unboxedSingletonTyCon, unboxedSingletonDataCon,
+	unboxedUnitTyCon, unboxedUnitDataCon, 
+        unboxedSingletonTyCon, unboxedSingletonDataCon,
 	unboxedPairTyCon, unboxedPairDataCon,
 
         -- * Unit
@@ -366,6 +367,11 @@ unitDataConId = dataConWorkId unitDataCon
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon BoxedTuple 2
+
+unboxedUnitTyCon :: TyCon
+unboxedUnitTyCon   = tupleTyCon UnboxedTuple 0
+unboxedUnitDataCon :: DataCon
+unboxedUnitDataCon = tupleCon   UnboxedTuple 0
 
 unboxedSingletonTyCon :: TyCon
 unboxedSingletonTyCon   = tupleTyCon UnboxedTuple 1
