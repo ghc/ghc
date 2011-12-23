@@ -44,6 +44,9 @@ safePkg01:
 	echo 'M_SafePkg4'
 	'$(TEST_HC)' --show-iface dist/build/M_SafePkg4.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
+	echo 'M_SafePkg5'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg5.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	echo
 	echo 'Testing setting trust'
 	$(LGHC_PKG) trust safePkg01-1.0
 	$(LGHC_PKG) field safePkg01-1.0 trusted
