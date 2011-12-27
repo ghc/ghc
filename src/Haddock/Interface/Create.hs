@@ -353,45 +353,18 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
 
 -- | Collect the docs and attach them to the right declaration.
 collectDocs :: [Decl] -> [(Decl, [HsDocString])]
-collectDocs = collect Nothing []
+collectDocs = go Nothing []
+  where
+    go Nothing _ [] = []
+    go (Just prev) docs [] = finished prev docs []
+    go prev docs ((L _ (DocD (DocCommentNext str))):ds)
+      | Nothing <- prev = go Nothing (str:docs) ds
+      | Just decl <- prev = finished decl docs (go Nothing [str] ds)
+    go prev docs ((L _ (DocD (DocCommentPrev str))):ds) = go prev (str:docs) ds
+    go Nothing docs (d:ds) = go (Just d) docs ds
+    go (Just prev) docs (d:ds) = finished prev docs (go (Just d) [] ds)
 
-collect :: Maybe Decl -> [HsDocString] -> [Decl] -> [(Decl, [HsDocString])]
-collect d doc_so_far [] =
-   case d of
-        Nothing -> []
-        Just d0  -> finishedDoc d0 doc_so_far []
-
-collect d doc_so_far (e:es) =
-  case e of
-    L _ (DocD (DocCommentNext str)) ->
-      case d of
-        Nothing -> collect d (str:doc_so_far) es
-        Just d0 -> finishedDoc d0 doc_so_far (collect Nothing [str] es)
-
-    L _ (DocD (DocCommentPrev str)) -> collect d (str:doc_so_far) es
-
-    _ -> case d of
-      Nothing -> collect (Just e) doc_so_far es
-      Just d0 -> finishedDoc d0 doc_so_far (collect (Just e) [] es)
-
-
--- This used to delete all DocD:s, unless doc was DocEmpty,
--- which I suppose means you could kill a DocCommentNamed
--- by:
---
--- > -- | killer
--- >
--- > -- $victim
---
--- Anyway I accidentally deleted the DocEmpty condition without
--- realizing it was necessary for retaining some DocDs (at least
--- DocCommentNamed), so I'm going to try just not testing any conditions
--- and see if anything breaks.  It really shouldn't break anything
--- to keep more doc decls around, IMHO.
---
--- -Isaac
-finishedDoc :: Decl -> [HsDocString] -> [(Decl, [HsDocString])] -> [(Decl, [HsDocString])]
-finishedDoc d docs rest = (d, reverse docs) : rest
+    finished decl docs rest = (decl, reverse docs) : rest
 
 
 -- | Build the list of items that will become the documentation, from the
