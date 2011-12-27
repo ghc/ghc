@@ -1,6 +1,3 @@
-{- Note that declarations without type signatures are not included in the
-   documentation. They could be, but that's a missing feature. -}
-
 module Bug8 where
 
 infix -->

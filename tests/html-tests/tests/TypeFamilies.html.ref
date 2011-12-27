@@ -81,6 +81,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	    > <a href=""
 	    >F</a
 	    > a </li
+	  ><li class="src short"
+	  ><a href=""
+	    >g</a
+	    > :: <a href=""
+	    >B</a
+	    > <a href=""
+	    >Int</a
+	    > <a href=""
+	    >Integer</a
+	    ></li
 	  ></ul
 	></div
       ><div id="interface"
@@ -176,6 +186,18 @@ window.onload = function () {pageLoad();setSynopsis("mini_TypeFamilies.html");};
 	    >Doc for family
 </p
 	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:g" class="def"
+	    >g</a
+	    > :: <a href=""
+	    >B</a
+	    > <a href=""
+	    >Int</a
+	    > <a href=""
+	    >Integer</a
+	    ></p
 	  ></div
 	></div
       ></div

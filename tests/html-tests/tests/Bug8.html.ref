@@ -82,6 +82,42 @@ window.onload = function () {pageLoad();setSynopsis("mini_Bug8.html");};
 	      ></table
 	    ></div
 	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:-45--45--62-" class="def"
+	    >(--&gt;)</a
+	    > ::  t -&gt; t1 -&gt; <a href=""
+	    >Typ</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:-45--45--45--62-" class="def"
+	    >(---&gt;)</a
+	    > ::  [a] -&gt; <a href=""
+	    >Typ</a
+	    > -&gt; <a href=""
+	    >Typ</a
+	    ></p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:s" class="def"
+	    >s</a
+	    > ::  a</p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:t" class="def"
+	    >t</a
+	    > ::  a</p
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:main" class="def"
+	    >main</a
+	    > ::  a</p
+	  ></div
 	></div
       ></div
     ><div id="footer"

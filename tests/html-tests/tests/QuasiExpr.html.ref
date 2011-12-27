@@ -196,6 +196,12 @@ window.onload = function () {pageLoad();setSynopsis("mini_QuasiExpr.html");};
 	  ></div
 	><div class="top"
 	><p class="src"
+	  ><a name="v:expr" class="def"
+	    >expr</a
+	    > :: QuasiQuoter</p
+	  ></div
+	><div class="top"
+	><p class="src"
 	  ><a name="v:parseExprExp" class="def"
 	    >parseExprExp</a
 	    > :: <a href=""

@@ -42,7 +42,15 @@ window.onload = function () {pageLoad();setSynopsis("mini_TH2.html");};
 	>TH2</p
 	></div
       ><div id="interface"
-      ></div
+      ><h1
+	>Documentation</h1
+	><div class="top"
+	><p class="src"
+	  ><a name="v:f" class="def"
+	    >f</a
+	    > ::  t -&gt; t</p
+	  ></div
+	></div
       ></div
     ><div id="footer"
     ><p
