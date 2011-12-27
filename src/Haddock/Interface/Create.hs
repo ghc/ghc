@@ -153,7 +153,7 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 type Maps = (DocMap Name, ArgMap Name, SubMap, DeclMap)
 
 
-maps :: DynFlags -> GlobalRdrEnv -> [Instance] -> [Name] -> [(Decl, MaybeDocStrings)] -> ErrMsgM Maps
+maps :: DynFlags -> GlobalRdrEnv -> [Instance] -> [Name] -> [(Decl, [HsDocString])] -> ErrMsgM Maps
 maps dflags gre instances exports decls = do
   maps_ <- mapM f decls
   let mergeMaps (a,b,c,d) (x,y,z,w) =
@@ -164,7 +164,7 @@ maps dflags gre instances exports decls = do
   where
     instanceMap = M.fromList [ (getSrcSpan n, n) | i <- instances, let n = getName i ]
 
-    f :: (Decl, MaybeDocStrings) -> ErrMsgM Maps
+    f :: (Decl, [HsDocString]) -> ErrMsgM Maps
     f (decl@(L _ d), docs) = do
       mayDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre docs
       argDocs <- fmap (Map.mapMaybe id) $ Traversable.forM (typeDocs d) $
@@ -201,7 +201,7 @@ maps dflags gre instances exports decls = do
 -- with InstDecls).
 
 
-subordinates :: HsDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
+subordinates :: HsDecl Name -> [(Name, [HsDocString], Map Int HsDocString)]
 subordinates (TyClD decl)
   | isClassDecl decl = classSubs
   | isDataDecl  decl = dataSubs
@@ -243,7 +243,7 @@ typeDocs d =
 
 -- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
-classDecls :: TyClDecl Name -> [(Decl, MaybeDocStrings)]
+classDecls :: TyClDecl Name -> [(Decl, [HsDocString])]
 classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
@@ -255,7 +255,7 @@ classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
-topDecls :: HsGroup Name -> [(Decl, MaybeDocStrings)]
+topDecls :: HsGroup Name -> [(Decl, [HsDocString])]
 topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 
 
@@ -350,25 +350,12 @@ filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
 -- declaration.
 --------------------------------------------------------------------------------
 
-type MaybeDocStrings = [HsDocString]
--- avoid [] because we're appending from the left (quadratic),
--- and avoid adding another package dependency for haddock,
--- so use the difference-list pattern
-type MaybeDocStringsFast = MaybeDocStrings -> MaybeDocStrings
-docStringEmpty :: MaybeDocStringsFast
-docStringEmpty = id
-docStringSingleton :: HsDocString -> MaybeDocStringsFast
-docStringSingleton = (:)
-docStringAppend :: MaybeDocStringsFast -> MaybeDocStringsFast -> MaybeDocStringsFast
-docStringAppend = (.)
-docStringToList :: MaybeDocStringsFast -> MaybeDocStrings
-docStringToList = ($ [])
 
 -- | Collect the docs and attach them to the right declaration.
-collectDocs :: [Decl] -> [(Decl, MaybeDocStrings)]
-collectDocs = collect Nothing docStringEmpty
+collectDocs :: [Decl] -> [(Decl, [HsDocString])]
+collectDocs = collect Nothing []
 
-collect :: Maybe Decl -> MaybeDocStringsFast -> [Decl] -> [(Decl, MaybeDocStrings)]
+collect :: Maybe Decl -> [HsDocString] -> [Decl] -> [(Decl, [HsDocString])]
 collect d doc_so_far [] =
    case d of
         Nothing -> []
@@ -378,20 +365,14 @@ collect d doc_so_far (e:es) =
   case e of
     L _ (DocD (DocCommentNext str)) ->
       case d of
-        Nothing -> collect d
-                     (docStringAppend doc_so_far (docStringSingleton str))
-                     es
-        Just d0 -> finishedDoc d0 doc_so_far (collect Nothing
-                     (docStringSingleton str)
-                     es)
+        Nothing -> collect d (str:doc_so_far) es
+        Just d0 -> finishedDoc d0 doc_so_far (collect Nothing [str] es)
 
-    L _ (DocD (DocCommentPrev str)) -> collect d
-                     (docStringAppend doc_so_far (docStringSingleton str))
-                     es
+    L _ (DocD (DocCommentPrev str)) -> collect d (str:doc_so_far) es
 
     _ -> case d of
       Nothing -> collect (Just e) doc_so_far es
-      Just d0 -> finishedDoc d0 doc_so_far (collect (Just e) docStringEmpty es)
+      Just d0 -> finishedDoc d0 doc_so_far (collect (Just e) [] es)
 
 
 -- This used to delete all DocD:s, unless doc was DocEmpty,
@@ -409,8 +390,8 @@ collect d doc_so_far (e:es) =
 -- to keep more doc decls around, IMHO.
 --
 -- -Isaac
-finishedDoc :: Decl -> MaybeDocStringsFast -> [(Decl, MaybeDocStrings)] -> [(Decl, MaybeDocStrings)]
-finishedDoc d doc rest = (d, docStringToList doc) : rest
+finishedDoc :: Decl -> [HsDocString] -> [(Decl, [HsDocString])] -> [(Decl, [HsDocString])]
+finishedDoc d docs rest = (d, reverse docs) : rest
 
 
 -- | Build the list of items that will become the documentation, from the
