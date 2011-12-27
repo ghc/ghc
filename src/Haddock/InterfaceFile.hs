@@ -68,6 +68,10 @@ binaryInterfaceVersion :: Word16
 binaryInterfaceVersion = 19
 #elif __GLASGOW_HASKELL__ == 703
 binaryInterfaceVersion = 19
+#elif __GLASGOW_HASKELL__ == 704
+binaryInterfaceVersion = 19
+#elif __GLASGOW_HASKELL__ == 705
+binaryInterfaceVersion = 19
 #else
 #error Unknown GHC version
 #endif
