@@ -111,7 +111,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_B.html");};
     ><p
       >Produced by <a href=""
 	>Haddock</a
-	> version 2.9.4</p
+	> version 2.10.0</p
       ></div
     ></body
   ></html
