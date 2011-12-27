@@ -665,6 +665,16 @@ window.onload = function () {pageLoad();setSynopsis("mini_Test.html");};
 	    > :: <a href=""
 	    >Int</a
 	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >withType</a
+	    > :: <a href=""
+	    >Int</a
+	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >withoutType</a
+	    > ::  a</li
 	  ></ul
 	></div
       ><div id="interface"
@@ -2227,6 +2237,30 @@ test2
 		></code
 	      > 
  but f' doesn't get link'd 'f\''
+</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:withType" class="def"
+	    >withType</a
+	    > :: <a href=""
+	    >Int</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Comment on a definition with type signature
+</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:withoutType" class="def"
+	    >withoutType</a
+	    > ::  a</p
+	  ><div class="doc"
+	  ><p
+	    >Comment on a definition without type signature
 </p
 	    ></div
 	  ></div

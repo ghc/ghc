@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.Create
@@ -18,13 +19,15 @@ import Haddock.GhcUtils
 import Haddock.Utils
 import Haddock.Convert
 import Haddock.Interface.LexParseRn
-import Haddock.Interface.ExtractFnArgDocs
 
 import qualified Data.Map as Map
+import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import Data.Ord
+import Control.Applicative
 import Control.Monad
 import qualified Data.Traversable as Traversable
 
@@ -61,22 +64,20 @@ createInterface tm flags modMap instIfaceMap = do
         | otherwise = opts0
 
   (info, mbDoc)    <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre optDocHeader
-  decls0           <- liftErrMsg $ declInfos dflags gre (topDecls group_)
 
-  let localInsts     = filter (nameIsLocalOrFrom mdl . getName) instances
-      declDocs       = [ (decl, doc) | (L _ decl, (Just doc, _), _) <- decls0 ]
-      instanceDocMap = mkInstanceDocMap localInsts declDocs
+  let declsWithDocs = topDecls group_
+      (decls, _) = unzip declsWithDocs
+      localInsts = filter (nameIsLocalOrFrom mdl . getName) instances
+  (docMap, argMap, subMap, declMap) <- liftErrMsg $ maps dflags gre localInsts exportedNames declsWithDocs
 
-      decls         = filterOutInstances decls0
-      declMap       = mkDeclMap decls
-      exports0      = fmap (reverse . map unLoc) optExports
-      exports
+  let  exports0      = fmap (reverse . map unLoc) optExports
+       exports
         | OptIgnoreExports `elem` opts = Nothing
         | otherwise = exports0
 
-  liftErrMsg $ warnAboutFilteredDecls mdl decls0
+  liftErrMsg $ warnAboutFilteredDecls mdl decls
 
-  exportItems <- mkExportItems modMap mdl gre exportedNames decls declMap
+  exportItems <- mkExportItems modMap mdl gre exportedNames decls docMap argMap subMap declMap
                                exports instances instIfaceMap dflags
 
   let visibleNames = mkVisibleNames exportItems opts
@@ -102,15 +103,17 @@ createInterface tm flags modMap instIfaceMap = do
     ifaceDoc             = mbDoc,
     ifaceRnDoc           = Nothing,
     ifaceOptions         = opts,
+    ifaceDocMap          = docMap,
+    ifaceArgMap          = argMap,
     ifaceRnDocMap        = Map.empty,
+    ifaceRnArgMap        = Map.empty,
     ifaceExportItems     = prunedExportItems,
     ifaceRnExportItems   = [],
     ifaceExports         = exportedNames,
     ifaceVisibleExports  = visibleNames,
     ifaceDeclMap         = declMap,
-    ifaceSubMap          = mkSubMap declMap exportedNames,
+    ifaceSubMap          = subMap,
     ifaceInstances       = instances,
-    ifaceInstanceDocMap  = instanceDocMap,
     ifaceHaddockCoverage = coverage
   }
 
@@ -147,94 +150,68 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 --------------------------------------------------------------------------------
 
 
-mkInstanceDocMap :: [Instance] -> [(HsDecl name, doc)] -> Map Name doc
-mkInstanceDocMap instances decls =
-  -- We relate Instances to InstDecls using the SrcSpans buried inside them.
-  -- That should work for normal user-written instances (from looking at GHC
-  -- sources). We can assume that commented instances are user-written.
-  -- This lets us relate Names (from Instances) to comments (associated
-  -- with InstDecls).
-  let docMap = Map.fromList [ (loc, doc)
-                            | (InstD (InstDecl (L loc _) _ _ _), doc) <- decls ]
-
-  in Map.fromList [ (name, doc) | inst <- instances
-                  , let name = getName inst
-                  , Just doc <- [ Map.lookup (getSrcSpan name) docMap ] ]
+type Maps = (DocMap Name, ArgMap Name, SubMap, DeclMap)
 
 
--- | Make a sub map from a declaration map. Make sure we only include exported
--- names.
-mkSubMap :: Map Name DeclInfo -> [Name] -> Map Name [Name]
-mkSubMap declMap exports =
-  Map.filterWithKey (\k _ -> k `elem` exports) (Map.map filterSubs declMap)
+maps :: DynFlags -> GlobalRdrEnv -> [Instance] -> [Name] -> [(Decl, MaybeDocStrings)] -> ErrMsgM Maps
+maps dflags gre instances exports decls = do
+  maps_ <- mapM f decls
+  let mergeMaps (a,b,c,d) (x,y,z,w) =
+        (M.unionWith mappend a x, M.unionWith mappend b y,
+         M.unionWith mappend c z, M.unionWith mappend d w)
+  let emptyMaps = (M.empty, M.empty, M.empty, M.empty)
+  return (foldl' mergeMaps emptyMaps maps_)
   where
-    filterSubs (_, _, subs) = [ sub  | (sub, _) <- subs, sub `elem` exports ]
+    instanceMap = M.fromList [ (getSrcSpan n, n) | i <- instances, let n = getName i ]
+
+    f :: (Decl, MaybeDocStrings) -> ErrMsgM Maps
+    f (decl@(L _ d), docs) = do
+      mayDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre docs
+      argDocs <- fmap (Map.mapMaybe id) $ Traversable.forM (typeDocs d) $
+          \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
+
+      let subs_ = subordinates d
+      let subs_' = filter (\(name, _, _) -> name `elem` exports) subs_
+
+      (subDocs, subArgMap) <- unzip <$> (forM subs_' $ \(name, mbSubDocStr, subFnArgsDocStr) -> do
+        mbSubDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre mbSubDocStr
+        subFnArgsDoc <- fmap (Map.mapMaybe id) $ Traversable.forM subFnArgsDocStr $
+          \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
+        return ((name, mbSubDoc), (name, subFnArgsDoc)))
+
+      let subNames = map fst subDocs
+
+      let names = case d of
+            InstD (InstDecl (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)  -- See note [2].
+            _ -> filter (`elem` exports) (getMainDeclBinder d)
+
+      let docMap' = M.fromList (mapMaybe (\(n,doc) -> fmap (n,) doc) ([ (n, mayDoc) | n <- names ] ++ subDocs))
+      let argMap' = M.fromList [ (n, argDocs) | n <- names ] `mappend` M.fromList subArgMap
+      let subMap' = M.fromList [ (n, subNames) | n <- names ]
+      let dclMap' = M.fromList [ (n, [decl]) | n <- names ++ subNames ]
+      return (docMap', argMap', subMap', dclMap')
 
 
--- Make a map from names to 'DeclInfo's. Exclude declarations that don't have
--- names (e.g. instances and stand-alone documentation comments). Include
--- subordinate names, but map them to their parent declarations.
-mkDeclMap :: [DeclInfo] -> Map Name DeclInfo
-mkDeclMap decls = Map.fromList . concat $
-  [ decls_ ++ subDecls
-  | (parent@(L _ d), doc, subs) <- decls
-  , let decls_ = [ (name, (parent, doc, subs)) | name <- getMainDeclBinder d ]
-        subDecls = [ (n, (parent, doc', [])) | (n, doc') <- subs ]
-  , not (isDocD d), not (isInstD d) ]
-
-
-declInfos :: DynFlags -> GlobalRdrEnv -> [(Decl, MaybeDocStrings)] -> ErrMsgM [DeclInfo]
-declInfos dflags gre decls =
-  forM decls $ \(parent@(L _ d), mbDocString) -> do
-            mbDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment
-                       gre mbDocString
-            fnArgsDoc <- fmap (Map.mapMaybe id) $
-                Traversable.forM (getDeclFnArgDocs d) $
-                \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
-
-            let subs_ = subordinates d
-            subs <- forM subs_ $ \(subName, mbSubDocStr, subFnArgsDocStr) -> do
-                mbSubDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment
-                              gre mbSubDocStr
-                subFnArgsDoc <- fmap (Map.mapMaybe id) $
-                  Traversable.forM subFnArgsDocStr $
-                  \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
-                return (subName, (mbSubDoc, subFnArgsDoc))
-
-            return (parent, (mbDoc, fnArgsDoc), subs)
-
-
--- | If you know the HsDecl can't contain any docs
--- (e.g., it was loaded from a .hi file and you don't have a .haddock file
--- to help you find out about the subs or docs)
--- then you can use this to get its subs.
-subordinatesWithNoDocs :: HsDecl Name -> [(Name, DocForDecl Name)]
-subordinatesWithNoDocs decl = map noDocs (subordinates decl)
-  where
-    -- check the condition... or shouldn't we be checking?
-    noDocs (n, doc1, doc2) | null doc1, Map.null doc2
-        = (n, noDocForDecl)
-    noDocs _ = error ("no-docs thing has docs! " ++ pretty decl)
+-- Note [2]:
+------------
+-- We relate Instances to InstDecls using the SrcSpans buried inside them.
+-- That should work for normal user-written instances (from looking at GHC
+-- sources). We can assume that commented instances are user-written.
+-- This lets us relate Names (from Instances) to comments (associated
+-- with InstDecls).
 
 
 subordinates :: HsDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
-subordinates (TyClD d) = classDataSubs d
-subordinates _ = []
-
-
-classDataSubs :: TyClDecl Name -> [(Name, MaybeDocStrings, Map Int HsDocString)]
-classDataSubs decl
+subordinates (TyClD decl)
   | isClassDecl decl = classSubs
   | isDataDecl  decl = dataSubs
-  | otherwise        = []
   where
-    classSubs = [ (name, doc, fnArgsDoc)
-                | (L _ d, doc) <- classDecls decl
-                , name <- getMainDeclBinder d
-                , let fnArgsDoc = getDeclFnArgDocs d ]
-    dataSubs  = constrs ++ fields
+    classSubs = [ (name, doc, typeDocs d) | (L _ d, doc) <- classDecls decl
+                , name <- getMainDeclBinder d, not (isValD d)
+                ]
+    dataSubs = constrs ++ fields
       where
-        cons    = map unL $ tcdCons decl
+        cons = map unL $ tcdCons decl
         -- should we use the type-signature of the constructor
         -- and the docs of the fields to produce fnArgsDoc for the constr,
         -- just in case someone exports it without exporting the type
@@ -244,47 +221,61 @@ classDataSubs decl
         fields  = [ (unL n, maybeToList $ fmap unL doc, Map.empty)
                   | RecCon flds <- map con_details cons
                   , ConDeclField n _ doc <- flds ]
+subordinates _ = []
 
 
--- All the sub declarations of a class (that we handle), ordered by
+-- | Extract function argument docs from inside types.
+typeDocs :: HsDecl Name -> Map Int HsDocString
+typeDocs d =
+  let docs = go 0 in
+  case d of
+    SigD (TypeSig _ ty) -> docs (unLoc ty)
+    ForD (ForeignImport _ ty _ _) -> docs (unLoc ty)
+    TyClD (TySynonym {tcdSynRhs = ty}) -> docs (unLoc ty)
+    _ -> Map.empty
+  where
+    go n (HsForAllTy _ _ _ ty) = go n (unLoc ty)
+    go n (HsFunTy (L _ (HsDocTy _ (L _ x))) (L _ ty)) = Map.insert n x $ go (n+1) ty
+    go n (HsFunTy _ ty) = go (n+1) (unLoc ty)
+    go n (HsDocTy _ (L _ doc)) = Map.singleton n doc
+    go _ _ = Map.empty
+
+
+-- | All the sub declarations of a class (that we handle), ordered by
 -- source location, with documentation attached if it exists.
 classDecls :: TyClDecl Name -> [(Decl, MaybeDocStrings)]
-classDecls = filterDecls . collectDocs . sortByLoc . declsFromClass
-
-
-declsFromClass :: TyClDecl a -> [Located (HsDecl a)]
-declsFromClass class_ = docs ++ defs ++ sigs ++ ats
+classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
-    docs = mkDecls tcdDocs DocD class_
-    defs = mkDecls (bagToList . tcdMeths) ValD class_
-    sigs = mkDecls tcdSigs SigD class_
-    ats  = mkDecls tcdATs TyClD class_
+    decls = docs ++ defs ++ sigs ++ ats
+    docs  = mkDecls tcdDocs DocD class_
+    defs  = mkDecls (bagToList . tcdMeths) ValD class_
+    sigs  = mkDecls tcdSigs SigD class_
+    ats   = mkDecls tcdATs TyClD class_
 
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
 topDecls :: HsGroup Name -> [(Decl, MaybeDocStrings)]
-topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . declsFromGroup
+topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 
 
-filterOutInstances :: [(Located (HsDecl a), b, c)] -> [(Located (HsDecl a), b, c)]
-filterOutInstances = filter (\(L _ d, _, _) -> not (isInstD d))
-
-
--- | Take all declarations except pragmas, infix decls, rules and value
--- bindings from an 'HsGroup'.
-declsFromGroup :: HsGroup Name -> [Decl]
-declsFromGroup group_ =
-  mkDecls (concat . hs_tyclds)  TyClD  group_ ++
-  mkDecls hs_derivds            DerivD group_ ++
-  mkDecls hs_defds              DefD   group_ ++
-  mkDecls hs_fords              ForD   group_ ++
-  mkDecls hs_docs               DocD   group_ ++
-  mkDecls hs_instds             InstD  group_ ++
-  mkDecls (typesigs . hs_valds) SigD   group_
+-- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
+ungroup :: HsGroup Name -> [Decl]
+ungroup group_ =
+  mkDecls (concat   . hs_tyclds) TyClD  group_ ++
+  mkDecls hs_derivds             DerivD group_ ++
+  mkDecls hs_defds               DefD   group_ ++
+  mkDecls hs_fords               ForD   group_ ++
+  mkDecls hs_docs                DocD   group_ ++
+  mkDecls hs_instds              InstD  group_ ++
+  mkDecls (typesigs . hs_valds)  SigD   group_ ++
+  mkDecls (valbinds . hs_valds)  ValD   group_
   where
     typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
     typesigs _ = error "expected ValBindsOut"
+
+    valbinds (ValBindsOut binds _) = concatMap bagToList . snd . unzip $ binds
+    valbinds _ = error "expected ValBindsOut"
 
 
 -- | Take a field of declarations from a data structure and create HsDecls
@@ -298,11 +289,11 @@ sortByLoc :: [Located a] -> [Located a]
 sortByLoc = sortBy (comparing getLoc)
 
 
-warnAboutFilteredDecls :: Module -> [(LHsDecl Name, b, c)] -> ErrMsgM ()
+warnAboutFilteredDecls :: Module -> [LHsDecl Name] -> ErrMsgM ()
 warnAboutFilteredDecls mdl decls = do
   let modStr = moduleString mdl
   let typeInstances =
-        nub [ tcdName d | (L _ (TyClD d), _, _) <- decls, isFamInstDecl d ]
+        nub [ tcdName d | L _ (TyClD d) <- decls, isFamInstDecl d ]
 
   unless (null typeInstances) $
     tell [
@@ -311,7 +302,7 @@ warnAboutFilteredDecls mdl decls = do
       ++ "will be filtered out:\n  " ++ concat (intersperse ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
-  let instances = nub [ pretty i | (L _ (InstD (InstDecl i _ _ ats)), _, _) <- decls
+  let instances = nub [ pretty i | L _ (InstD (InstDecl i _ _ ats)) <- decls
                                  , not (null ats) ]
 
   unless (null instances) $
@@ -335,6 +326,7 @@ filterDecls decls = filter (isHandled . unL . fst) decls
     isHandled (TyClD {}) = True
     isHandled (InstD {}) = True
     isHandled (SigD d) = isVanillaLSig (reL d)
+    isHandled (ValD _) = True
     -- we keep doc declarations to be able to get at named docs
     isHandled (DocD _) = True
     isHandled _ = False
@@ -432,19 +424,24 @@ mkExportItems
   -> Module             -- this module
   -> GlobalRdrEnv
   -> [Name]             -- exported names (orig)
-  -> [DeclInfo]
-  -> Map Name DeclInfo  -- maps local names to declarations
+  -> [LHsDecl Name]
+  -> DocMap Name
+  -> ArgMap Name
+  -> SubMap
+  -> DeclMap  -- maps local names to declarations
   -> Maybe [IE Name]
   -> [Instance]
   -> InstIfaceMap
   -> DynFlags
   -> ErrMsgGhc [ExportItem Name]
-mkExportItems modMap thisMod gre exportedNames decls declMap
+mkExportItems modMap thisMod gre exportedNames decls0 docMap argMap subMap declMap
               optExports _ instIfaceMap dflags =
   case optExports of
-    Nothing      -> liftErrMsg $ fullContentsOfThisModule dflags gre decls
+    Nothing      -> liftErrMsg $ fullContentsOfThisModule dflags gre docMap argMap subMap decls
     Just exports -> liftM (nubBy commaDeclared . concat) $ mapM lookupExport exports
   where
+    decls = filter (\(L _ d) -> not (isInstD d || isValD d)) decls0
+
     -- A type signature can have multiple names, like:
     --   foo, bar :: Types..
     -- When going throug the exported names we have to take care to detect such
@@ -459,7 +456,7 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t _)     = declWith t
     lookupExport (IEModuleContents m)  =
-      moduleExports thisMod m dflags gre exportedNames decls modMap instIfaceMap
+      moduleExports thisMod m dflags gre exportedNames decls modMap instIfaceMap docMap argMap subMap
     lookupExport (IEGroup lev docStr)  = liftErrMsg $
       ifDoc (lexParseRnHaddockComment dflags DocSectionComment gre docStr)
             (\doc -> return [ ExportGroup lev "" doc ])
@@ -467,7 +464,7 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
       ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
             (\doc -> return [ ExportDoc doc ])
     lookupExport (IEDocNamed str)      = liftErrMsg $
-      ifDoc (findNamedDoc str [ unL d | (d,_,_) <- decls ])
+      ifDoc (findNamedDoc str [ unL d | d <- decls ])
             (\docStr ->
             ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
                   (\doc -> return [ ExportDoc doc ]))
@@ -481,8 +478,16 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
 
     declWith :: Name -> ErrMsgGhc [ ExportItem Name ]
     declWith t =
+      let doc = (Map.lookup t docMap, maybe Map.empty id (Map.lookup t argMap)) in
       case findDecl t of
-        Just (decl, doc, subs) ->
+        [L _ (ValD _)] -> do
+          -- Top-level binding without type signature
+          mayDecl <- ifaceDecl t
+          case mayDecl of
+            Nothing -> return [ ExportNoDecl t [] ]
+            Just decl -> return [ ExportDecl decl doc [] [] ]
+
+        ds | decl : _ <- filter (not . isValD . unLoc) ds ->
           let declNames = getMainDeclBinder (unL decl)
           in case () of
             _
@@ -504,7 +509,7 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
                    return []
 
               -- normal case
-              | otherwise -> return [ mkExportDecl t (newDecl, doc, subs) ]
+              | otherwise -> return [ mkExportDecl t newDecl (exportDecl t newDecl docMap argMap subMap) ]
                   where
                     -- Since a single signature might refer to many names, we
                     -- need to filter the ones that are actually exported. This
@@ -516,118 +521,29 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
                         -- fromJust is safe since we already checked in guards
                         -- that 't' is a name declared in this declaration.
                       _                  -> decl
-        Nothing -> do
-          -- If we can't find the declaration, it must belong to
-          -- another package
-          mbTyThing <- liftGhcToErrMsgGhc $ lookupName t
-          -- show the name as exported as well as the name's
-          -- defining module (because the latter is where we
-          -- looked for the .hi/.haddock).  It's to help people
-          -- debugging after all, so good to show more info.
-          let exportInfoString =
-                         moduleString thisMod ++ "." ++ getOccString t
-                      ++ ": "
-                      ++ pretty (nameModule t) ++ "." ++ getOccString t
 
-          case mbTyThing of
-            Nothing -> do
-              liftErrMsg $ tell
-                 ["Warning: Couldn't find TyThing for exported "
-                 ++ exportInfoString ++ "; not documenting."]
-              -- Is getting to here a bug in Haddock?
-              -- Aren't the .hi files always present?
-              return [ ExportNoDecl t [] ]
-            Just tyThing -> do
-              let hsdecl = tyThingToLHsDecl tyThing
-              -- This is not the ideal way to implement haddockumentation
-              -- for functions/values without explicit type signatures.
-              --
-              -- However I didn't find an easy way to implement it properly,
-              -- and as long as we're using lookupName it is going to find
-              -- the types of local inferenced binds.  If we don't check for
-              -- this at all, then we'll get the "warning: couldn't find
-              -- .haddock" which is wrong.
-              --
-              -- The reason this is not an ideal implementation
-              -- (besides that we take a trip to desugared syntax and back
-              -- unnecessarily)
-              -- is that Haddock won't be able to detect doc-strings being
-              -- attached to such a function, such as,
-              --
-              -- > -- | this is an identity function
-              -- > id a = a
-              --
-              -- . It's more difficult to say what it ought to mean in cases
-              -- where multiple exports are bound at once, like
-              --
-              -- > -- | comment...
-              -- > (a, b) = ...
-              --
-              -- especially since in the export-list they might not even
-              -- be next to each other.  But a proper implementation would
-              -- really need to find the type of *all* exports as well as
-              -- addressing all these issues.  This implementation works
-              -- adequately.  Do you see a way to improve the situation?
-              -- Please go ahead!  I got stuck trying to figure out how to
-              -- get the 'PostTcType's that we want for all the bindings
-              -- of an HsBind (you get 'LHsBinds' from 'GHC.typecheckedSource'
-              -- for example).
-              --
-              -- But I might be missing something obvious.  What's important
-              -- /here/ is that we behave reasonably when we run into one of
-              -- those exported type-inferenced values.
-              isLocalAndTypeInferenced <- liftGhcToErrMsgGhc $ do
-                    let mdl = nameModule t
-                    if modulePackageId mdl == thisPackage dflags then
-                      isLoaded (moduleName mdl)
-                    else return False
+        -- Declaration from another package
+        [] -> do
+          mayDecl <- ifaceDecl t
+          case mayDecl of
+            Nothing -> return [ ExportNoDecl t [] ]
+            Just decl -> do
+              -- We try to get the subs and docs
+              -- from the installed .haddock file for that package.
+              case Map.lookup (nameModule t) instIfaceMap of
+                Nothing -> do
+                   liftErrMsg $ tell
+                      ["Warning: Couldn't find .haddock for export " ++ pretty t]
+                   let subs = [ (n, noDocForDecl) | (n, _, _) <- subordinates (unLoc decl) ]
+                   return [ mkExportDecl t decl (noDocForDecl, subs) ]
+                Just iface -> do
+                   return [ mkExportDecl t decl (exportDecl t decl (instDocMap iface) (instArgMap iface) (instSubMap iface)) ]
 
-              if isLocalAndTypeInferenced then do
-                -- I don't think there can be any subs in this case,
-                -- currently?  But better not to rely on it.
-                let subs = subordinatesWithNoDocs (unLoc hsdecl)
-                return [ mkExportDecl t (hsdecl, noDocForDecl, subs) ]
-              else
-                -- We try to get the subs and docs
-                -- from the installed interface of that package.
-                case Map.lookup (nameModule t) instIfaceMap of
-                  -- It's Nothing in the cases where I thought
-                  -- Haddock has already warned the user: "Warning: The
-                  -- documentation for the following packages are not
-                  -- installed. No links will be generated to these packages:
-                  -- ..."
-                  -- But I guess it was Cabal creating that warning. Anyway,
-                  -- this is more serious than links: it's exported decls where
-                  -- we don't have the docs that they deserve!
-
-                  -- We could use 'subordinates' to find the Names of the subs
-                  -- (with no docs). Is that necessary? Yes it is, otherwise
-                  -- e.g. classes will be shown without their exported subs.
-                  Nothing -> do
-                     liftErrMsg $ tell
-                        ["Warning: Couldn't find .haddock for exported "
-                        ++ exportInfoString]
-                     let subs = subordinatesWithNoDocs (unLoc hsdecl)
-                     return [ mkExportDecl t (hsdecl, noDocForDecl, subs) ]
-                  Just iface -> do
-                     let subs = case Map.lookup t (instSubMap iface) of
-                             Nothing -> []
-                             Just x -> x
-                     return [ mkExportDecl t
-                       ( hsdecl
-                       , fromMaybe noDocForDecl $
-                            Map.lookup t (instDocMap iface)
-                       , map (\subt ->
-                                ( subt ,
-                                  fromMaybe noDocForDecl $
-                                     Map.lookup subt (instDocMap iface)
-                                )
-                             ) subs
-                       )]
+        _ -> return []
 
 
-    mkExportDecl :: Name -> DeclInfo -> ExportItem Name
-    mkExportDecl n (decl, doc, subs) = decl'
+    mkExportDecl :: Name -> Decl -> (DocForDecl Name, [(Name, DocForDecl Name)]) -> ExportItem Name
+    mkExportDecl n decl (doc, subs) = decl'
       where
         decl' = ExportDecl (restrictTo sub_names (extractDecl n mdl decl)) doc subs' []
         mdl = nameModule n
@@ -638,14 +554,32 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
     isExported = (`elem` exportedNames)
 
 
-    findDecl :: Name -> Maybe DeclInfo
+    findDecl :: Name -> [Decl]
     findDecl n
-      | m == thisMod = Map.lookup n declMap
+      | m == thisMod = maybe [] id (Map.lookup n declMap)
       | otherwise = case Map.lookup m modMap of
-                      Just iface -> Map.lookup n (ifaceDeclMap iface)
-                      Nothing -> Nothing
+                      Just iface -> maybe [] id (Map.lookup n (ifaceDeclMap iface))
+                      Nothing -> []
       where
         m = nameModule n
+
+
+ifaceDecl :: Name -> ErrMsgGhc (Maybe (LHsDecl Name))
+ifaceDecl t = do
+  mayTyThing <- liftGhcToErrMsgGhc $ lookupName t
+  case mayTyThing of
+    Nothing -> do
+      liftErrMsg $ tell ["Warning: Not found in environment: " ++ pretty t]
+      return Nothing
+    Just x -> return (Just (tyThingToLHsDecl x))
+
+
+exportDecl :: Name -> Decl -> DocMap Name -> ArgMap Name -> SubMap -> (DocForDecl Name, [(Name, DocForDecl Name)])
+exportDecl name _ docMap argMap subMap =
+  let lookupArgMap x = maybe M.empty id (M.lookup x argMap) in
+  let doc = (M.lookup name docMap, lookupArgMap name) in
+  let subs = [ (sub, (M.lookup sub docMap, lookupArgMap sub)) | sub <- maybe [] id (M.lookup name subMap) ] in
+  (doc, subs)
 
 
 -- | Return all export items produced by an exported module. That is, we're
@@ -666,12 +600,15 @@ moduleExports :: Module           -- ^ Module A
               -> DynFlags         -- ^ The flag used when typechecking A
               -> GlobalRdrEnv     -- ^ The renaming environment used for A
               -> [Name]           -- ^ All the exports of A
-              -> [DeclInfo]       -- ^ All the declarations in A
+              -> [Decl]       -- ^ All the declarations in A
               -> IfaceMap         -- ^ Already created interfaces
               -> InstIfaceMap     -- ^ Interfaces in other packages
+              -> DocMap Name
+              -> ArgMap Name
+              -> SubMap
               -> ErrMsgGhc [ExportItem Name] -- ^ Resulting export items
-moduleExports thisMod expMod dflags gre _exports decls ifaceMap instIfaceMap
-  | m == thisMod = liftErrMsg $ fullContentsOfThisModule dflags gre decls
+moduleExports thisMod expMod dflags gre _exports decls ifaceMap instIfaceMap docMap argMap subMap
+  | m == thisMod = liftErrMsg $ fullContentsOfThisModule dflags gre docMap argMap subMap decls
   | otherwise =
     case Map.lookup m ifaceMap of
       Just iface
@@ -709,17 +646,20 @@ moduleExports thisMod expMod dflags gre _exports decls ifaceMap instIfaceMap
 -- (For more information, see Trac #69)
 
 
-fullContentsOfThisModule :: DynFlags -> GlobalRdrEnv -> [DeclInfo] -> ErrMsgM [ExportItem Name]
-fullContentsOfThisModule dflags gre decls = liftM catMaybes $ mapM mkExportItem decls
+fullContentsOfThisModule :: DynFlags -> GlobalRdrEnv -> DocMap Name -> ArgMap Name -> SubMap -> [Decl] -> ErrMsgM [ExportItem Name]
+fullContentsOfThisModule dflags gre docMap argMap subMap decls = liftM catMaybes $ mapM mkExportItem decls
   where
-    mkExportItem (L _ (DocD (DocGroup lev docStr)), _, _) = do
-        mbDoc <- lexParseRnHaddockComment dflags DocSectionComment gre docStr
-        return $ fmap (ExportGroup lev "") mbDoc
-    mkExportItem (L _ (DocD (DocCommentNamed _ docStr)), _, _) = do
-        mbDoc <- lexParseRnHaddockComment dflags NormalHaddockComment gre docStr
-        return $ fmap ExportDoc mbDoc
-    mkExportItem (decl, doc, subs) = return $ Just $ ExportDecl decl doc subs []
-
+    mkExportItem (L _ (DocD (DocGroup lev docStr))) = do
+      mbDoc <- lexParseRnHaddockComment dflags DocSectionComment gre docStr
+      return $ fmap (ExportGroup lev "") mbDoc
+    mkExportItem (L _ (DocD (DocCommentNamed _ docStr))) = do
+      mbDoc <- lexParseRnHaddockComment dflags NormalHaddockComment gre docStr
+      return $ fmap ExportDoc mbDoc
+    mkExportItem decl
+      | name : _ <- getMainDeclBinder (unLoc decl) =
+        let (doc, subs) = exportDecl name decl docMap argMap subMap in
+        return $ Just (ExportDecl decl doc subs [])
+      | otherwise = return Nothing
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:
 -- it might be an individual record selector or a class method.  In these

@@ -22,7 +22,6 @@ module Documentation.Haddock (
   -- * Export items & declarations
   ExportItem(..),
   Decl,
-  DeclInfo,
   DocForDecl,
   FnArgsDoc,
 

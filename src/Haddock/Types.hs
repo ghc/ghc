@@ -25,6 +25,7 @@ import Control.Arrow
 import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Monoid
 import GHC hiding (NoLink)
 import OccName
 
@@ -35,8 +36,11 @@ import OccName
 
 
 type IfaceMap      = Map Module Interface
-type InstIfaceMap  = Map Module InstalledInterface
-type DocMap        = Map Name (Doc DocName)
+type InstIfaceMap  = Map Module InstalledInterface  -- TODO: rename
+type DocMap a      = Map Name (Doc a)
+type ArgMap a      = Map Name (Map Int (Doc a))
+type SubMap        = Map Name [Name]
+type DeclMap       = Map Name [Decl]
 type SrcMap        = Map PackageId FilePath
 type Decl          = LHsDecl Name
 type GhcDocHdr     = Maybe LHsDocString
@@ -76,11 +80,17 @@ data Interface = Interface
     -- | Declarations originating from the module. Excludes declarations without
     -- names (instances and stand-alone documentation comments). Includes
     -- names of subordinate declarations mapped to their parent declarations.
-  , ifaceDeclMap         :: Map Name DeclInfo
+  , ifaceDeclMap         :: Map Name [Decl]
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
-  , ifaceRnDocMap        :: Map Name (DocForDecl DocName)
+  , ifaceDocMap          :: DocMap Name
+  , ifaceArgMap          :: ArgMap Name
+
+    -- | Documentation of declarations originating from the module (including
+    -- subordinates).
+  , ifaceRnDocMap        :: DocMap DocName
+  , ifaceRnArgMap        :: ArgMap DocName
 
   , ifaceSubMap          :: Map Name [Name]
 
@@ -97,9 +107,6 @@ data Interface = Interface
 
     -- | Instances exported by the module.
   , ifaceInstances       :: ![Instance]
-
-    -- | Documentation of instances defined in the module.
-  , ifaceInstanceDocMap  :: Map Name (Doc Name)
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
@@ -119,7 +126,9 @@ data InstalledInterface = InstalledInterface
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
-  , instDocMap         :: Map Name (DocForDecl Name)
+  , instDocMap         :: DocMap Name
+
+  , instArgMap         :: ArgMap Name
 
     -- | All names exported by this module.
   , instExports        :: [Name]
@@ -141,7 +150,8 @@ toInstalledIface :: Interface -> InstalledInterface
 toInstalledIface interface = InstalledInterface
   { instMod            = ifaceMod            interface
   , instInfo           = ifaceInfo           interface
-  , instDocMap         = fmap unrenameDocForDecl $ ifaceRnDocMap interface
+  , instDocMap         = ifaceDocMap         interface
+  , instArgMap         = ifaceArgMap         interface
   , instExports        = ifaceExports        interface
   , instVisibleExports = ifaceVisibleExports interface
   , instOptions        = ifaceOptions        interface
@@ -201,11 +211,6 @@ data ExportItem name
 
   -- | A cross-reference to another module.
   | ExportModule Module
-
-
--- | A declaration that may have documentation, including its subordinates,
--- which may also have documentation.
-type DeclInfo = (Decl, DocForDecl Name, [(Name, DocForDecl Name)])
 
 
 -- | Arguments and result are indexed by Int, zero-based from the left,
@@ -289,7 +294,12 @@ data Doc id
   | DocPic String
   | DocAName String
   | DocExamples [Example]
-  deriving (Eq, Functor)
+  deriving (Functor)
+
+
+instance Monoid (Doc id) where
+  mempty  = DocEmpty
+  mappend = DocAppend
 
 
 unrenameDoc :: Doc DocName -> Doc Name
