@@ -40,9 +40,8 @@ type InstIfaceMap  = Map Module InstalledInterface  -- TODO: rename
 type DocMap a      = Map Name (Doc a)
 type ArgMap a      = Map Name (Map Int (Doc a))
 type SubMap        = Map Name [Name]
-type DeclMap       = Map Name [Decl]
+type DeclMap       = Map Name [LHsDecl Name]
 type SrcMap        = Map PackageId FilePath
-type Decl          = LHsDecl Name
 type GhcDocHdr     = Maybe LHsDocString
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
@@ -80,7 +79,7 @@ data Interface = Interface
     -- | Declarations originating from the module. Excludes declarations without
     -- names (instances and stand-alone documentation comments). Includes
     -- names of subordinate declarations mapped to their parent declarations.
-  , ifaceDeclMap         :: Map Name [Decl]
+  , ifaceDeclMap         :: Map Name [LHsDecl Name]
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
