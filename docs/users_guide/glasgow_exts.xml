@@ -5314,7 +5314,8 @@ Sum k1 k2 :: BOX
 L :: k1 -> Sum k1 k2
 R :: k2 -> Sum k1 k2
 </programlisting>
-Note that <literal>List</literal>, for instance, does not get kind
+where <literal>BOX</literal> is the (unique) sort that classifies kinds.
+Note that <literal>List</literal>, for instance, does not get sort
 <literal>BOX -> BOX</literal>, because we do not further classify kinds; all
 kinds have sort <literal>BOX</literal>.
 </para>
