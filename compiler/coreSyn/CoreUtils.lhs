@@ -1284,10 +1284,10 @@ data CoreStats = CS { cs_tm, cs_ty, cs_co :: Int }
 
 
 instance Outputable CoreStats where 
- ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3 }) = 
-    text "size of" <+> vcat [ text "terms     =" <+> int i1
-                            , text "types     =" <+> int i2
-                            , text "coercions =" <+> int i3 ]
+ ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3 })
+   = braces (sep [ptext (sLit "terms:")     <+> intWithCommas i1 <> comma,
+                  ptext (sLit "types:")     <+> intWithCommas i2 <> comma,
+                  ptext (sLit "coercions:") <+> intWithCommas i3])
 
 plusCS :: CoreStats -> CoreStats -> CoreStats
 plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1 })

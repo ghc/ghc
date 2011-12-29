@@ -162,7 +162,7 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
 
   | otherwise
   = Err.debugTraceMsg dflags 2 $
-    (text "Result size of" <+> hdr <+> equals <+> int (coreBindsSize binds))
+    (sep [text "Result size of" <+> hdr, nest 2 (equals <+> ppr (coreBindsStats binds))])
           -- Report result size 
 	  -- This has the side effect of forcing the intermediate to be evaluated
 

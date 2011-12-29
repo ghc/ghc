@@ -22,7 +22,7 @@ module Outputable (
         empty, nest,
         char,
         text, ftext, ptext,
-        int, integer, float, double, rational,
+        int, intWithCommas, integer, float, double, rational,
         parens, cparen, brackets, braces, quotes, quote, doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
@@ -830,6 +830,15 @@ quotedListWithOr xs = quotedList xs
 %************************************************************************
 
 \begin{code}
+intWithCommas :: Integral a => a -> SDoc
+-- Prints a big integer with commas, eg 345,821
+intWithCommas n
+  | n < 0     = char '-' <> intWithCommas (-n)
+  | q == 0    = int (fromIntegral r)
+  | otherwise = intWithCommas q <> comma <> int (fromIntegral r)
+  where
+    (q,r) = n `quotRem` 1000
+
 -- | Converts an integer to a verbal index:
 --
 -- > speakNth 1 = text "first"
