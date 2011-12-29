@@ -368,14 +368,15 @@ tc_bracket :: ThStage -> HsBracket Name -> TcM TcType
 tc_bracket outer_stage br@(VarBr _ name)     -- Note [Quoting names]
   = do  { thing <- tcLookup name
         ; case thing of
-            AGlobal _ -> return ()
+            AGlobal {} -> return ()
+            ATyVar {}  -> return ()
             ATcId { tct_level = bind_lvl, tct_id = id }
                 | thTopLevelId id       -- C.f TcExpr.checkCrossStageLifting
                 -> keepAliveTc id
                 | otherwise
                 -> do { checkTc (thLevel outer_stage + 1 == bind_lvl)
                                 (quotedNameStageErr br) }
-            _ -> pprPanic "th_bracket" (ppr name)
+            _ -> pprPanic "th_bracket" (ppr name $$ ppr thing)
 
         ; tcMetaTy nameTyConName        -- Result type is Var (not Q-monadic)
         }
