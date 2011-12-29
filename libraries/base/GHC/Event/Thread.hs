@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, ForeignFunctionInterface, NoImplicitPrelude #-}
 
 module GHC.Event.Thread

@@ -51,7 +51,7 @@ module Foreign.Marshal.Utils (
 import Data.Maybe
 import Foreign.Ptr              ( Ptr, nullPtr )
 import Foreign.Storable         ( Storable(poke) )
-import Foreign.C.Types          ( CSize )
+import Foreign.C.Types          ( CSize(..) )
 import Foreign.Marshal.Alloc    ( malloc, alloca )
 
 #ifdef __GLASGOW_HASKELL__
@@ -108,7 +108,7 @@ fromBool True   = 1
 
 -- |Convert a Boolean in numeric representation to a Haskell value
 --
-toBool :: Num a => a -> Bool
+toBool :: (Eq a, Num a) => a -> Bool
 toBool  = (/= 0)
 
 
@@ -178,3 +178,4 @@ moveBytes dest src size  = do _ <- memmove dest src (fromIntegral size)
 --
 foreign import ccall unsafe "string.h" memcpy  :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
 foreign import ccall unsafe "string.h" memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
+

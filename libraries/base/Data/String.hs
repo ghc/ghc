@@ -41,3 +41,4 @@ class IsString a where
 instance IsString [Char] where
     fromString xs = xs
 #endif
+

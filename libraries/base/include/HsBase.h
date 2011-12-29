@@ -201,35 +201,26 @@ __hscore_sigdelset( sigset_t * set, int s )
 INLINE int
 __hscore_sigismember( sigset_t * set, int s )
 { return sigismember(set,s); }
-
-INLINE int
-__hscore_utime( const char *file, const struct utimbuf *timep )
-{ return utime(file,timep); }
 #endif
-
-// This is used by dph:Data.Array.Parallel.Arr.BUArr, and shouldn't be
-INLINE void *
-__hscore_memcpy_dst_off( char *dst, int dst_off, char *src, size_t sz )
-{ return memcpy(dst+dst_off, src, sz); }
 
 INLINE void *
 __hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
 { return memcpy(dst, src+src_off, sz); }
 
 INLINE HsInt
-__hscore_bufsiz()
+__hscore_bufsiz(void)
 {
   return BUFSIZ;
 }
 
 INLINE int
-__hscore_seek_cur()
+__hscore_seek_cur(void)
 {
   return SEEK_CUR;
 }
 
 INLINE int
-__hscore_o_binary()
+__hscore_o_binary(void)
 {
 #if defined(_MSC_VER)
   return O_BINARY;
@@ -239,7 +230,7 @@ __hscore_o_binary()
 }
 
 INLINE int
-__hscore_o_rdonly()
+__hscore_o_rdonly(void)
 {
 #ifdef O_RDONLY
   return O_RDONLY;
@@ -629,39 +620,16 @@ INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
 	return (select(nfds,readfds,writefds,exceptfds,timeout));
 }
 
-// gettimeofday()-related
-
-#if !defined(__MINGW32__)
-
-INLINE HsInt sizeofTimeVal(void) { return sizeof(struct timeval); }
-
-INLINE HsWord64 getUSecOfDay(void)
-{
-    struct timeval tv;
-    gettimeofday(&tv, (struct timezone *) NULL);
-    // Don't forget to cast *before* doing the arithmetic, otherwise
-    // the arithmetic happens at the type of tv_sec, which is probably
-    // only 'int'.
-    return ((HsWord64)tv.tv_sec * 1000000 + (HsWord64)tv.tv_usec);
-}
-
-INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
-{
-    p->tv_sec  = usecs / 1000000;
-    p->tv_usec = usecs % 1000000;
-}
-#endif /* !defined(__MINGW32__) */
-
 #if darwin_HOST_OS
 // You should not access _environ directly on Darwin in a bundle/shared library.
 // See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html
 #include <crt_externs.h>
-INLINE char **__hscore_environ() { return *(_NSGetEnviron()); }
+INLINE char **__hscore_environ(void) { return *(_NSGetEnviron()); }
 #else
 /* ToDo: write a feature test that doesn't assume 'environ' to
  *    be in scope at link-time. */
 extern char** environ;
-INLINE char **__hscore_environ() { return environ; }
+INLINE char **__hscore_environ(void) { return environ; }
 #endif
 
 /* lossless conversions between pointers and integral types */
@@ -672,20 +640,6 @@ INLINE intptr_t  __hscore_to_intptr   (void *p)     { return (intptr_t)p; }
 
 void errorBelch2(const char*s, char *t);
 void debugBelch2(const char*s, char *t);
-
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-
-INLINE int fcntl_read(int fd, int cmd) {
-    return fcntl(fd, cmd);
-}
-INLINE int fcntl_write(int fd, int cmd, long arg) {
-    return fcntl(fd, cmd, arg);
-}
-INLINE int fcntl_lock(int fd, int cmd, struct flock *lock) {
-    return fcntl(fd, cmd, lock);
-}
-
-#endif
 
 #endif /* __HSBASE_H__ */
 

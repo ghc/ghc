@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NondecreasingIndentation, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP, NondecreasingIndentation, ForeignFunctionInterface, CApiFFI #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -14,6 +14,9 @@
 -- The standard CPUTime library.
 --
 -----------------------------------------------------------------------------
+
+#include "HsFFI.h"
+#include "HsBaseConfig.h"
 
 module System.CPUTime 
         (
@@ -39,8 +42,6 @@ import Foreign.C
 #if !defined(CLK_TCK)
 import System.IO.Unsafe (unsafePerformIO)
 #endif
-
-#include "HsBaseConfig.h"
 
 -- For _SC_CLK_TCK
 #if HAVE_UNISTD_H
@@ -110,9 +111,8 @@ getCPUTime = do
                 * 1000000)
 
 type CRUsage = ()
-foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
-#else
-# if defined(HAVE_TIMES)
+foreign import capi unsafe "HsBase.h getrusage" getrusage :: CInt -> Ptr CRUsage -> IO CInt
+#elif defined(HAVE_TIMES)
     allocaBytes (#const sizeof(struct tms)) $ \ p_tms -> do
     _ <- times p_tms
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
@@ -122,12 +122,11 @@ foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
 
 type CTms = ()
 foreign import ccall unsafe times :: Ptr CTms -> IO CClock
-# else
+#else
     ioException (IOError Nothing UnsupportedOperation 
                          "getCPUTime"
                          "can't get CPU time"
                          Nothing)
-# endif
 #endif
 
 #else /* win32 */
@@ -184,3 +183,4 @@ clockTicks =
 foreign import ccall unsafe sysconf :: CInt -> IO CLong
 #endif
 #endif /* __GLASGOW_HASKELL__ */
+

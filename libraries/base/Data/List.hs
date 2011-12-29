@@ -95,6 +95,7 @@ module Data.List
 
    , takeWhile         -- :: (a -> Bool) -> [a] -> [a]
    , dropWhile         -- :: (a -> Bool) -> [a] -> [a]
+   , dropWhileEnd      -- :: (a -> Bool) -> [a] -> [a]
    , span              -- :: (a -> Bool) -> [a] -> ([a], [a])
    , break             -- :: (a -> Bool) -> [a] -> ([a], [a])
 
@@ -227,6 +228,16 @@ infix 5 \\ -- comment to fool cpp
 
 -- -----------------------------------------------------------------------------
 -- List functions
+
+-- | The 'dropWhileEnd' function drops the largest suffix of a list
+-- in which the given predicate holds for all elements.  For example:
+--
+-- > dropWhileEnd isSpace "foo\n" == "foo"
+-- > dropWhileEnd isSpace "foo bar" == "foo bar"
+-- > dropWhileEnd isSpace ("foo\n" ++ undefined) == "foo" ++ undefined
+
+dropWhileEnd :: (a -> Bool) -> [a] -> [a]
+dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 
 -- | The 'stripPrefix' function drops the given prefix from a list.
 -- It returns 'Nothing' if the list did not start with the prefix
@@ -1105,3 +1116,4 @@ errorEmptyList fun =
   error ("Prelude." ++ fun ++ ": empty list")
 
 #endif /* !__GLASGOW_HASKELL__ */
+

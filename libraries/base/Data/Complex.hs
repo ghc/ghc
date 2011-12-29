@@ -42,8 +42,6 @@ module Data.Complex
         --  (RealFloat a) => Num        (Complex a)
         --  (RealFloat a) => Fractional (Complex a)
         --  (RealFloat a) => Floating   (Complex a)
-        -- 
-        -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 
         )  where
 
@@ -205,3 +203,4 @@ instance  (RealFloat a) => Floating (Complex a) where
     asinh z        =  log (z + sqrt (1+z*z))
     acosh z        =  log (z + (z+1) * sqrt ((z-1)/(z+1)))
     atanh z        =  0.5 * log ((1.0+z) / (1.0-z))
+

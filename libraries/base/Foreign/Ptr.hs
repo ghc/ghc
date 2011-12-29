@@ -162,3 +162,4 @@ foreign import ccall unsafe "__hscore_from_intptr"
 
 # endif /* !__GLASGOW_HASKELL__ */
 #endif /* !__NHC_ */
+

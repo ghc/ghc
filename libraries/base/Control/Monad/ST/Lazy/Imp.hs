@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples, Rank2Types #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -158,5 +159,4 @@ unsafeInterleaveST = strictToLazyST . ST.unsafeInterleaveST . lazyToStrictST
 
 unsafeIOToST :: IO a -> ST s a
 unsafeIOToST = strictToLazyST . ST.unsafeIOToST
-
 

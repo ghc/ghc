@@ -355,3 +355,4 @@ validate2       ::  Word16 -> Word16 -> Bool
 validate2 x1 x2 = x1 >= 0xD800 && x1 <= 0xDBFF &&
                   x2 >= 0xDC00 && x2 <= 0xDFFF
 {-# INLINE validate2 #-}
+

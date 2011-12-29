@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface, CApiFFI #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -53,7 +53,7 @@ import GHC.IO.IOMode
 import GHC.IO.Exception
 import GHC.IO.Device
 #ifndef mingw32_HOST_OS
-import {-# SOURCE #-} GHC.IO.Encoding (fileSystemEncoding)
+import {-# SOURCE #-} GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 #endif
 #elif __HUGS__
@@ -199,9 +199,9 @@ peekFilePath :: CString -> IO FilePath
 peekFilePathLen :: CStringLen -> IO FilePath
 
 #if __GLASGOW_HASKELL__
-withFilePath = GHC.withCString fileSystemEncoding
-peekFilePath = GHC.peekCString fileSystemEncoding
-peekFilePathLen = GHC.peekCStringLen fileSystemEncoding
+withFilePath fp f = getFileSystemEncoding >>= \enc -> GHC.withCString enc fp f
+peekFilePath fp = getFileSystemEncoding >>= \enc -> GHC.peekCString enc fp
+peekFilePathLen fp = getFileSystemEncoding >>= \enc -> GHC.peekCStringLen enc fp
 #else
 withFilePath = withCString
 peekFilePath = peekCString
@@ -459,13 +459,13 @@ foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
 
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-foreign import ccall unsafe "HsBase.h fcntl_read"
+foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h fcntl_write"
+foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_write :: CInt -> CInt -> CLong -> IO CInt
 
-foreign import ccall unsafe "HsBase.h fcntl_lock"
+foreign import capi unsafe "HsBase.h fcntl"
    c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
 
 foreign import ccall unsafe "HsBase.h fork"
@@ -495,7 +495,7 @@ foreign import ccall unsafe "HsBase.h tcgetattr"
 foreign import ccall unsafe "HsBase.h tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_utime"
+foreign import capi unsafe "HsBase.h utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
 foreign import ccall unsafe "HsBase.h waitpid"
@@ -578,3 +578,4 @@ foreign import ccall unsafe "__hscore_bufsiz"   dEFAULT_BUFFER_SIZE :: Int
 foreign import ccall unsafe "__hscore_seek_cur" sEEK_CUR :: CInt
 foreign import ccall unsafe "__hscore_seek_set" sEEK_SET :: CInt
 foreign import ccall unsafe "__hscore_seek_end" sEEK_END :: CInt
+

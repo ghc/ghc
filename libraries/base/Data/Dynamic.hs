@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
@@ -167,3 +168,4 @@ dynApp f x = case dynApply f x of
 
 dynTypeRep :: Dynamic -> TypeRep
 dynTypeRep (Dynamic tr _) = tr 
+

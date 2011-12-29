@@ -1,10 +1,10 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
-
 #ifndef __NHC__
 {-# LANGUAGE DeriveDataTypeable #-}
 #endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Fixed
@@ -246,3 +246,4 @@ instance HasResolution E12 where
     resolution _ = 1000000000000
 -- | resolution of 10^-12 = .000000000001
 type Pico = Fixed E12
+

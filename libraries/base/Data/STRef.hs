@@ -42,3 +42,4 @@ INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
 -- |Mutate the contents of an 'STRef'
 modifySTRef :: STRef s a -> (a -> a) -> ST s ()
 modifySTRef ref f = writeSTRef ref . f =<< readSTRef ref
+

@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -O2 #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Float.ConversionUtils
@@ -46,7 +47,7 @@ elim64# n e =
 
 #else
 
-#define TO64    toInt#
+#define TO64    integerToInt
 
 -- Double mantissae fit it Int#
 elim64# :: Int# -> Int# -> (# Integer, Int# #)
@@ -95,3 +96,4 @@ zeroCountArr =
                                 (# _, ba #) -> ba
     in case mkArr realWorld# of
         b -> BA b
+

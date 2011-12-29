@@ -29,6 +29,13 @@ module GHC.ConsoleHandler
 
 {-
 #include "rts/Signals.h"
+
+Note: this #include is inside a Haskell comment
+      but it brings into scope some #defines
+      that are used by CPP below (eg STG_SIG_DFL).
+      Having it in a comment means that there's no
+      danger that C-like crap will be misunderstood
+      by GHC
 -}
 
 import Foreign
@@ -40,11 +47,6 @@ import GHC.IO.Handle.Internals
 import GHC.Conc
 import Control.Concurrent.MVar
 import Data.Typeable
-
-#ifdef mingw32_HOST_OS
-import Data.Maybe
-import GHC.Base
-#endif
 
 data Handler
  = Default

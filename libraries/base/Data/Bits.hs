@@ -33,7 +33,9 @@ module Data.Bits (
     bitSize,           -- :: a -> Int
     isSigned,          -- :: a -> Bool
     shiftL, shiftR,    -- :: a -> Int -> a
-    rotateL, rotateR   -- :: a -> Int -> a
+    unsafeShiftL, unsafeShiftR,  -- :: a -> Int -> a
+    rotateL, rotateR,  -- :: a -> Int -> a
+    popCount           -- :: a -> Int
   )
 
   -- instance Bits Int
@@ -72,7 +74,7 @@ Minimal complete definition: '.&.', '.|.', 'xor', 'complement',
 ('shift' or ('shiftL' and 'shiftR')), ('rotate' or ('rotateL' and 'rotateR')),
 'bitSize' and 'isSigned'.
 -}
-class Num a => Bits a where
+class (Eq a, Num a) => Bits a where
     -- | Bitwise \"and\"
     (.&.) :: a -> a -> a
 
@@ -174,8 +176,19 @@ class Num a => Bits a where
     {-# INLINE shiftL #-}
     x `shiftL`  i = x `shift`  i
 
-    {-| Shift the first argument right by the specified number of bits
-        (which must be non-negative).
+    {-| Shift the argument left by the specified number of bits.  The
+        result is undefined for negative shift amounts and shift amounts
+        greater or equal to the 'bitSize'.
+
+        Defaults to 'shiftL' unless defined explicitly by an instance. -}
+    unsafeShiftL            :: a -> Int -> a
+    {-# INLINE unsafeShiftL #-}
+    x `unsafeShiftL` i = x `shiftL` i
+
+    {-| Shift the first argument right by the specified number of bits. The
+        result is undefined for negative shift amounts and shift amounts
+        greater or equal to the 'bitSize'.
+
         Right shifts perform sign extension on signed number types;
         i.e. they fill the top bits with 1 if the @x@ is negative
         and with 0 otherwise.
@@ -186,6 +199,18 @@ class Num a => Bits a where
     shiftR            :: a -> Int -> a
     {-# INLINE shiftR #-}
     x `shiftR`  i = x `shift`  (-i)
+
+    {-| Shift the first argument right by the specified number of bits, which
+        must be non-negative an smaller than the number of bits in the type.
+
+        Right shifts perform sign extension on signed number types;
+        i.e. they fill the top bits with 1 if the @x@ is negative
+        and with 0 otherwise.
+
+        Defaults to 'shiftR' unless defined explicitly by an instance. -}
+    unsafeShiftR            :: a -> Int -> a
+    {-# INLINE unsafeShiftR #-}
+    x `unsafeShiftR` i = x `shiftR` i
 
     {-| Rotate the argument left by the specified number of bits
         (which must be non-negative).
@@ -207,6 +232,17 @@ class Num a => Bits a where
     {-# INLINE rotateR #-}
     x `rotateR` i = x `rotate` (-i)
 
+    {-| Return the number of set bits in the argument.  This number is
+        known as the population count or the Hamming weight. -}
+    popCount          :: a -> Int
+    popCount = go 0
+      where
+        go !c 0 = c
+        go c w = go (c+1) (w .&. w - 1)  -- clear the least significant bit set
+    {- This implementation is intentionally naive.  Instances are
+       expected to override it with something optimized for their
+       size. -}
+
 instance Bits Int where
     {-# INLINE shift #-}
 
@@ -222,6 +258,10 @@ instance Bits Int where
     (I# x#) `shift` (I# i#)
         | i# >=# 0#        = I# (x# `iShiftL#` i#)
         | otherwise        = I# (x# `iShiftRA#` negateInt# i#)
+    (I# x#) `shiftL` (I# i#) = I# (x# `iShiftL#` i#)
+    (I# x#) `unsafeShiftL` (I# i#) = I# (x# `uncheckedIShiftL#` i#)
+    (I# x#) `shiftR` (I# i#) = I# (x# `iShiftRA#` i#)
+    (I# x#) `unsafeShiftR` (I# i#) = I# (x# `uncheckedIShiftRA#` i#)
 
     {-# INLINE rotate #-} 	-- See Note [Constant folding for rotate]
     (I# x#) `rotate` (I# i#) =
@@ -232,6 +272,8 @@ instance Bits Int where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
         !wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSize  _             = WORD_SIZE_IN_BITS
+
+    popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
 
 #else /* !__GLASGOW_HASKELL__ */
 
@@ -364,5 +406,4 @@ own to enable constant folding; for example 'shift':
            10000000 -> ww_sOb
          }
 -} 
-     
 

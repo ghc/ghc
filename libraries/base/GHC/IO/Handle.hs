@@ -562,8 +562,8 @@ hSetBinaryMode handle bin =
          flushCharBuffer h_
          closeTextCodecs h_
 
-         let mb_te | bin       = Nothing
-                   | otherwise = Just localeEncoding
+         mb_te <- if bin then return Nothing
+                         else fmap Just getLocaleEncoding
 
          openTextEncoding mb_te haType $ \ mb_encoder mb_decoder -> do
 
@@ -639,7 +639,7 @@ dupHandle_ :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
            -> IO Handle
 dupHandle_ new_dev filepath other_side h_@Handle__{..} mb_finalizer = do
    -- XXX wrong!
-  let mb_codec = if isJust haEncoder then Just localeEncoding else Nothing
+  mb_codec <- if isJust haEncoder then fmap Just getLocaleEncoding else return Nothing
   mkHandle new_dev filepath haType True{-buffered-} mb_codec
       NewlineMode { inputNL = haInputNL, outputNL = haOutputNL }
       mb_finalizer other_side
@@ -741,3 +741,4 @@ showHandle' filepath is_duplex h =
       where
        def :: Int 
        def = bufSize buf
+

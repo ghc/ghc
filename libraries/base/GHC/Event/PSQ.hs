@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
 
 -- Copyright (c) 2008, Ralf Hinze
@@ -481,3 +482,4 @@ seqToList (Sequ x) = x []
 
 instance Show a => Show (Sequ a) where
     showsPrec d a = showsPrec d (seqToList a)
+

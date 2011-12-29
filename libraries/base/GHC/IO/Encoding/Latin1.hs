@@ -150,3 +150,4 @@ latin1_checked_encode
            invalid = done InvalidSequence ir ow
     in
     loop ir0 ow0
+

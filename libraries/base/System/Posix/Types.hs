@@ -47,44 +47,44 @@ module System.Posix.Types (
 
   -- * POSIX data types
 #if defined(HTYPE_DEV_T)
-  CDev,
+  CDev(..),
 #endif
 #if defined(HTYPE_INO_T)
-  CIno,
+  CIno(..),
 #endif
 #if defined(HTYPE_MODE_T)
-  CMode,
+  CMode(..),
 #endif
 #if defined(HTYPE_OFF_T)
-  COff,
+  COff(..),
 #endif
 #if defined(HTYPE_PID_T)
-  CPid,
+  CPid(..),
 #endif
 #if defined(HTYPE_SSIZE_T)
-  CSsize,
+  CSsize(..),
 #endif
 
 #if defined(HTYPE_GID_T)
-  CGid,
+  CGid(..),
 #endif
 #if defined(HTYPE_NLINK_T)
-  CNlink,
+  CNlink(..),
 #endif
 #if defined(HTYPE_UID_T)
-  CUid,
+  CUid(..),
 #endif
 #if defined(HTYPE_CC_T)
-  CCc,
+  CCc(..),
 #endif
 #if defined(HTYPE_SPEED_T)
-  CSpeed,
+  CSpeed(..),
 #endif
 #if defined(HTYPE_TCFLAG_T)
-  CTcflag,
+  CTcflag(..),
 #endif
 #if defined(HTYPE_RLIM_T)
-  CRLim,
+  CRLim(..),
 #endif
 
   Fd(..),

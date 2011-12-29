@@ -37,7 +37,7 @@ import Foreign.C
 import Control.Exception.Base   ( bracket )
 -- import GHC.IO
 import GHC.IO.Exception
-import GHC.IO.Encoding (fileSystemEncoding)
+import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 import Data.List
 #ifdef mingw32_HOST_OS
@@ -127,7 +127,8 @@ getArgs =
    getProgArgv p_argc p_argv
    p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
-   peekArray (p - 1) (advancePtr argv 1) >>= mapM (GHC.peekCString fileSystemEncoding)
+   enc <- getFileSystemEncoding
+   peekArray (p - 1) (advancePtr argv 1) >>= mapM (GHC.peekCString enc)
 
 foreign import ccall unsafe "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
@@ -157,7 +158,8 @@ getProgName =
 
 unpackProgName  :: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do
-  s <- peekElemOff argv 0 >>= GHC.peekCString fileSystemEncoding
+  enc <- getFileSystemEncoding
+  s <- peekElemOff argv 0 >>= GHC.peekCString enc
   return (basename s)
 #endif
 
@@ -213,7 +215,7 @@ getEnv name =
     withCString name $ \s -> do
       litstring <- c_getenv s
       if litstring /= nullPtr
-        then GHC.peekCString fileSystemEncoding litstring
+        then getFileSystemEncoding >>= \enc -> GHC.peekCString enc litstring
         else ioe_missingEnvVar name
 
 foreign import ccall unsafe "getenv"
@@ -273,7 +275,8 @@ freeProgArgv argv = do
 
 setProgArgv :: [String] -> IO (Ptr CString)
 setProgArgv argv = do
-  vs <- mapM (GHC.newCString fileSystemEncoding) argv >>= newArray0 nullPtr
+  enc <- getFileSystemEncoding
+  vs <- mapM (GHC.newCString enc) argv >>= newArray0 nullPtr
   c_setProgArgv (genericLength argv) vs
   return vs
 
@@ -323,7 +326,8 @@ getEnvironment = do
    pBlock <- getEnvBlock
    if pBlock == nullPtr then return []
     else do
-      stuff <- peekArray0 nullPtr pBlock >>= mapM (GHC.peekCString fileSystemEncoding)
+      enc <- getFileSystemEncoding
+      stuff <- peekArray0 nullPtr pBlock >>= mapM (GHC.peekCString enc)
       return (map divvy stuff)
 
 foreign import ccall unsafe "__hscore_environ" 
@@ -336,3 +340,4 @@ divvy str =
     (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
     (name,_:value) -> (name,value)
 #endif  /* __GLASGOW_HASKELL__ */
+

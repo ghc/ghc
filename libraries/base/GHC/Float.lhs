@@ -102,15 +102,33 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     -- appropriately scaled exponent (an 'Int').  If @'decodeFloat' x@
     -- yields @(m,n)@, then @x@ is equal in value to @m*b^^n@, where @b@
     -- is the floating-point radix, and furthermore, either @m@ and @n@
-    -- are both zero or else @b^(d-1) <= m < b^d@, where @d@ is the value
-    -- of @'floatDigits' x@.  In particular, @'decodeFloat' 0 = (0,0)@.
+    -- are both zero or else @b^(d-1) <= 'abs' m < b^d@, where @d@ is
+    -- the value of @'floatDigits' x@.
+    -- In particular, @'decodeFloat' 0 = (0,0)@. If the type
+    -- contains a negative zero, also @'decodeFloat' (-0.0) = (0,0)@.
+    -- /The result of/ @'decodeFloat' x@ /is unspecified if either of/
+    -- @'isNaN' x@ /or/ @'isInfinite' x@ /is/ 'True'.
     decodeFloat         :: a -> (Integer,Int)
-    -- | 'encodeFloat' performs the inverse of 'decodeFloat'
+    -- | 'encodeFloat' performs the inverse of 'decodeFloat' in the
+    -- sense that for finite @x@ with the exception of @-0.0@,
+    -- @'uncurry' 'encodeFloat' ('decodeFloat' x) = x@.
+    -- @'encodeFloat' m n@ is one of the two closest representable
+    -- floating-point numbers to @m*b^^n@ (or @&#177;Infinity@ if overflow
+    -- occurs); usually the closer, but if @m@ contains too many bits,
+    -- the result may be rounded in the wrong direction.
     encodeFloat         :: Integer -> Int -> a
-    -- | the second component of 'decodeFloat'.
+    -- | 'exponent' corresponds to the second component of 'decodeFloat'.
+    -- @'exponent' 0 = 0@ and for finite nonzero @x@,
+    -- @'exponent' x = snd ('decodeFloat' x) + 'floatDigits' x@.
+    -- If @x@ is a finite floating-point number, it is equal in value to
+    -- @'significand' x * b ^^ 'exponent' x@, where @b@ is the
+    -- floating-point radix.
+    -- The behaviour is unspecified on infinite or @NaN@ values.
     exponent            :: a -> Int
-    -- | the first component of 'decodeFloat', scaled to lie in the open
-    -- interval (@-1@,@1@)
+    -- | The first component of 'decodeFloat', scaled to lie in the open
+    -- interval (@-1@,@1@), either @0.0@ or of absolute value @>= 1\/b@,
+    -- where @b@ is the floating-point radix.
+    -- The behaviour is unspecified on infinite or @NaN@ values.
     significand         :: a -> a
     -- | multiplies a floating-point number by an integer power of the radix
     scaleFloat          :: Int -> a -> a
@@ -143,7 +161,10 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     significand x       =  encodeFloat m (negate (floatDigits x))
                            where (m,_) = decodeFloat x
 
-    scaleFloat k x      =  encodeFloat m (n + clamp b k)
+    scaleFloat 0 x      =  x
+    scaleFloat k x
+      | isFix           =  x
+      | otherwise       =  encodeFloat m (n + clamp b k)
                            where (m,n) = decodeFloat x
                                  (l,h) = floatRange x
                                  d     = floatDigits x
@@ -156,6 +177,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
                                  -- for smaller than l - d.
                                  -- Add a little extra to keep clear
                                  -- from the boundary cases.
+                                 isFix = x == 0 || isNaN x || isInfinite x
 
     atan2 y x
       | x > 0            =  atan (y/x)
@@ -313,9 +335,13 @@ instance  RealFloat Float  where
     significand x       = case decodeFloat x of
                             (m,_) -> encodeFloat m (negate (floatDigits x))
 
-    scaleFloat k x      = case decodeFloat x of
+    scaleFloat 0 x      = x
+    scaleFloat k x
+      | isFix           = x
+      | otherwise       = case decodeFloat x of
                             (m,n) -> encodeFloat m (n + clamp bf k)
                         where bf = FLT_MAX_EXP - (FLT_MIN_EXP) + 4*FLT_MANT_DIG
+                              isFix = x == 0 || isFloatFinite x == 0
 
     isNaN x          = 0 /= isFloatNaN x
     isInfinite x     = 0 /= isFloatInfinite x
@@ -354,12 +380,12 @@ instance  Real Double  where
     toRational (D# x#)  =
         case decodeDoubleInteger x# of
           (# m, e# #)
-            | e# >=# 0#                                         ->
+            | e# >=# 0#                                     ->
                 shiftLInteger m e# :% 1
-            | (int2Word# (toInt# m) `and#` 1##) `eqWord#` 0##   ->
+            | (integerToWord m `and#` 1##) `eqWord#` 0##    ->
                 case elimZerosInteger m (negateInt# e#) of
                     (# n, d# #) ->  n :% shiftLInteger 1 d#
-            | otherwise                                         ->
+            | otherwise                                     ->
                 m :% shiftLInteger 1 (negateInt# e#)
 
 instance  Fractional Double  where
@@ -464,9 +490,13 @@ instance  RealFloat Double  where
     significand x       = case decodeFloat x of
                             (m,_) -> encodeFloat m (negate (floatDigits x))
 
-    scaleFloat k x      = case decodeFloat x of
+    scaleFloat 0 x      = x
+    scaleFloat k x
+      | isFix           = x
+      | otherwise       = case decodeFloat x of
                             (m,n) -> encodeFloat m (n + clamp bd k)
                         where bd = DBL_MAX_EXP - (DBL_MIN_EXP) + 4*DBL_MANT_DIG
+                              isFix = x == 0 || isDoubleFinite x == 0
 
     isNaN x             = 0 /= isDoubleNaN x
     isInfinite x        = 0 /= isDoubleInfinite x
@@ -819,20 +849,16 @@ fromRat' x = r
         p = floatDigits r
         (minExp0, _) = floatRange r
         minExp = minExp0 - p            -- the real minimum exponent
-        xMin   = toRational (expt b (p-1))
         xMax   = toRational (expt b p)
         p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
-        f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
-        (x', p') = scaleRat (toRational b) minExp xMin xMax p0 (x / f)
+        -- if x = n/d and ln = integerLogBase b n, ld = integerLogBase b d,
+        -- then b^(ln-ld-1) < x < b^(ln-ld+1)
+        f = if p0 < 0 then 1 :% expt b (-p0) else expt b p0 :% 1
+        x0 = x / f
+        -- if ln - ld >= minExp0, then b^(p-1) < x0 < b^(p+1), so there's at most
+        -- one scaling step needed, otherwise, x0 < b^p and no scaling is needed
+        (x', p') = if x0 >= xMax then (x0 / toRational b, p0+1) else (x0, p0)
         r = encodeFloat (round x') p'
-
--- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
-scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
-scaleRat b minExp xMin xMax p x
- | p <= minExp = (x, p)
- | x >= xMax   = scaleRat b minExp xMin xMax (p+1) (x/b)
- | x < xMin    = scaleRat b minExp xMin xMax (p-1) (x*b)
- | otherwise   = (x, p)
 
 -- Exponentiation with a cache for the most common numbers.
 minExpt, maxExpt :: Int
@@ -882,22 +908,24 @@ these brings a huge speedup since we need only shift and add instead
 of division.
 
 The below is an adaption of fromRat' for the conversion to
-Float or Double exploiting the know floatRadix and avoiding
+Float or Double exploiting the known floatRadix and avoiding
 divisions as much as possible.
 
 \begin{code}
 {-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Float,
                             Int -> Int -> Integer -> Integer -> Double #-}
 fromRat'' :: RealFloat a => Int -> Int -> Integer -> Integer -> a
+-- Invariant: n and d strictly positive
 fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
     case integerLog2IsPowerOf2# d of
       (# ld#, pw# #)
         | pw# ==# 0# ->
           case integerLog2# n of
-            ln# | ln# ># (ld# +# me#) ->
+            ln# | ln# >=# (ld# +# me# -# 1#) ->
+                  -- this means n/d >= 2^(minEx-1), i.e. we are guaranteed to get
+                  -- a normalised number, round to mantDigs bits
                   if ln# <# md#
-                    then encodeFloat (n `shiftL` (I# (md# -# 1# -# ln#)))
-                                        (I# (ln# +# 1# -# ld# -# md#))
+                    then encodeFloat n (I# (negateInt# ld#))
                     else let n'  = n `shiftR` (I# (ln# +# 1# -# md#))
                              n'' = case roundingMode# n (ln# -# md#) of
                                     0# -> n'
@@ -907,15 +935,13 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                                             _ -> n' + 1
                          in encodeFloat n'' (I# (ln# -# ld# +# 1# -# md#))
                 | otherwise ->
+                  -- n/d < 2^(minEx-1), a denorm or rounded to 2^(minEx-1)
+                  -- the exponent for encoding is always minEx-mantDigs
+                  -- so we must shift right by (minEx-mantDigs) - (-ld)
                   case ld# +# (me# -# md#) of
-                    ld'# | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0
-                         | ld'# ==# (ln# +# 1#) ->
-                           case integerLog2IsPowerOf2# n of
-                            (# _, 0# #) -> encodeFloat 0 0
-                            (# _, _ #)  -> encodeFloat 1 (minEx - mantDigs)
-                         | ld'# <=# 0#  ->
+                    ld'# | ld'# <=# 0#  -> -- we would shift left, so we don't shift
                            encodeFloat n (I# ((me# -# md#) -# ld'#))
-                         | otherwise    ->
+                         | ld'# <=# ln#  ->
                            let n' = n `shiftR` (I# ld'#)
                            in case roundingMode# n (ld'# -# 1#) of
                                 0# -> encodeFloat n' (minEx - mantDigs)
@@ -923,20 +949,28 @@ fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
                                         then encodeFloat n' (minEx-mantDigs)
                                         else encodeFloat (n' + 1) (minEx-mantDigs)
                                 _  -> encodeFloat (n' + 1) (minEx-mantDigs)
+                         | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0 -- result of shift < 0.5
+                         | otherwise ->  -- first bit of n shifted to 0.5 place
+                           case integerLog2IsPowerOf2# n of
+                            (# _, 0# #) -> encodeFloat 0 0  -- round to even
+                            (# _, _ #)  -> encodeFloat 1 (minEx - mantDigs)
         | otherwise ->
           let ln = I# (integerLog2# n)
               ld = I# ld#
+              -- 2^(ln-ld-1) < n/d < 2^(ln-ld+1)
               p0 = max minEx (ln - ld)
               (n', d')
                 | p0 < mantDigs = (n `shiftL` (mantDigs - p0), d)
                 | p0 == mantDigs = (n, d)
                 | otherwise     = (n, d `shiftL` (p0 - mantDigs))
+              -- if ln-ld < minEx, then n'/d' < 2^mantDigs, else
+              -- 2^(mantDigs-1) < n'/d' < 2^(mantDigs+1) and we
+              -- may need one scaling step
               scale p a b
-                | p <= minEx-mantDigs = (p,a,b)
-                | a < (b `shiftL` (mantDigs-1)) = (p-1, a `shiftL` 1, b)
                 | (b `shiftL` mantDigs) <= a = (p+1, a, b `shiftL` 1)
                 | otherwise = (p, a, b)
               (p', n'', d'') = scale (p0-mantDigs) n' d'
+              -- n''/d'' < 2^mantDigs and p' == minEx-mantDigs or n''/d'' >= 2^(mantDigs-1)
               rdq = case n'' `quotRem` d'' of
                      (q,r) -> case compare (r `shiftL` 1) d'' of
                                 LT -> q
@@ -1046,12 +1080,13 @@ foreign import ccall unsafe "isFloatNaN" isFloatNaN :: Float -> Int
 foreign import ccall unsafe "isFloatInfinite" isFloatInfinite :: Float -> Int
 foreign import ccall unsafe "isFloatDenormalized" isFloatDenormalized :: Float -> Int
 foreign import ccall unsafe "isFloatNegativeZero" isFloatNegativeZero :: Float -> Int
-
+foreign import ccall unsafe "isFloatFinite" isFloatFinite :: Float -> Int
 
 foreign import ccall unsafe "isDoubleNaN" isDoubleNaN :: Double -> Int
 foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int
 foreign import ccall unsafe "isDoubleDenormalized" isDoubleDenormalized :: Double -> Int
 foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Double -> Int
+foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
 \end{code}
 
 %*********************************************************

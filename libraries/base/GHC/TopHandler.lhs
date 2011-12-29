@@ -30,6 +30,7 @@ module GHC.TopHandler (
         runMainIO, runIO, runIOFastExit, runNonIO,
         topHandler, topHandlerFastExit,
         reportStackOverflow, reportError,
+        flushStdHandles
     ) where
 
 #include "HsBaseConfig.h"
@@ -68,9 +69,7 @@ runMainIO main =
            case m of
                Nothing  -> return ()
                Just tid -> throwTo tid (toException UserInterrupt)
-      a <- main
-      cleanUp
-      return a
+      main -- hs_exit() will flush
     `catch`
       topHandler
 
@@ -157,8 +156,8 @@ topHandlerFastExit err =
 --  another error, etc.)
 --
 real_handler :: (Int -> IO a) -> SomeException -> IO a
-real_handler exit se@(SomeException exn) =
-  cleanUp >>
+real_handler exit se@(SomeException exn) = do
+  flushStdHandles -- before any error output
   case cast exn of
       Just StackOverflow -> do
            reportStackOverflow
@@ -184,8 +183,8 @@ real_handler exit se@(SomeException exn) =
 -- try to flush stdout/stderr, but don't worry if we fail
 -- (these handles might have errors, and we don't want to go into
 -- an infinite loop).
-cleanUp :: IO ()
-cleanUp = do
+flushStdHandles :: IO ()
+flushStdHandles = do
   hFlush stdout `catchAny` \_ -> return ()
   hFlush stderr `catchAny` \_ -> return ()
 

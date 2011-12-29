@@ -27,7 +27,6 @@
 
 module Foreign.C.Types
         ( -- * Representations of C types
-#ifndef __NHC__
           -- $ctypes
 
           -- ** Integral types
@@ -37,20 +36,19 @@ module Foreign.C.Types
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
           -- 'Prelude.Bounded', 'Prelude.Real', 'Prelude.Integral' and
           -- 'Bits'.
-          CChar,  CSChar,  CUChar
-        , CShort, CUShort, CInt,   CUInt
-        , CLong,  CULong
-        , CPtrdiff, CSize, CWchar, CSigAtomic
-        , CLLong, CULLong
-        , CIntPtr, CUIntPtr
-        , CIntMax, CUIntMax
+          CChar(..),    CSChar(..),   CUChar(..)
+        , CShort(..),   CUShort(..),  CInt(..),      CUInt(..)
+        , CLong(..),    CULong(..)
+        , CPtrdiff(..), CSize(..),    CWchar(..),    CSigAtomic(..)
+        , CLLong(..),   CULLong(..)
+        , CIntPtr(..),  CUIntPtr(..), CIntMax(..),   CUIntMax(..)
 
           -- ** Numeric types
           -- | These types are are represented as @newtype@s of basic
           -- foreign types, and are instances of
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable' and 'Storable'.
-        , CClock,   CTime, CUSeconds, CSUSeconds
+        , CClock(..),   CTime(..),    CUSeconds(..), CSUSeconds(..)
 
         -- extracted from CTime, because we don't want this comment in
         -- the Haskell 2010 report:
@@ -67,21 +65,10 @@ module Foreign.C.Types
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
           -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
           -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
-        , CFloat,  CDouble
+        , CFloat(..),   CDouble(..)
 -- GHC doesn't support CLDouble yet
 #ifndef __GLASGOW_HASKELL__
-        , CLDouble
-#endif
-#else
-          -- Exported non-abstractly in nhc98 to fix an interface file problem.
-          CChar(..),    CSChar(..),   CUChar(..)
-        , CShort(..),   CUShort(..),  CInt(..),      CUInt(..)
-        , CLong(..),    CULong(..)
-        , CPtrdiff(..), CSize(..),    CWchar(..),    CSigAtomic(..)
-        , CLLong(..),   CULLong(..)
-        , CClock(..),   CTime(..),    CUSeconds(..), CSUSeconds(..)
-        , CFloat(..),   CDouble(..),  CLDouble(..)
-        , CIntPtr(..),  CUIntPtr(..), CIntMax(..),   CUIntMax(..)
+        , CLDouble(..)
 #endif
           -- ** Other types
 
@@ -96,6 +83,8 @@ import Data.Bits        ( Bits(..) )
 import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
 import Data.Word        ( Word8, Word16, Word32, Word64 )
 import {-# SOURCE #-} Data.Typeable
+  -- loop: Data.Typeable -> Data.List -> Data.Char -> GHC.Unicode
+  --            -> Foreign.C.Type
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -318,7 +307,8 @@ instance Bits T where { \
   complementBit (T x) n = T (complementBit x n) ; \
   testBit       (T x) n = testBit x n ; \
   bitSize       (T x)   = bitSize x ; \
-  isSigned      (T x)   = isSigned x }
+  isSigned      (T x)   = isSigned x ; \
+  popCount      (T x)   = popCount x }
 
 INSTANCE_BITS(CChar)
 INSTANCE_BITS(CSChar)
@@ -341,3 +331,4 @@ INSTANCE_BITS(CIntMax)
 INSTANCE_BITS(CUIntMax)
 
 #endif
+

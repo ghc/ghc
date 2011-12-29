@@ -62,7 +62,7 @@ module Foreign.Marshal.Alloc (
 ) where
 
 import Data.Maybe
-import Foreign.C.Types          ( CSize )
+import Foreign.C.Types          ( CSize(..) )
 import Foreign.Storable         ( Storable(sizeOf,alignment) )
 
 #ifndef __GLASGOW_HASKELL__
@@ -245,3 +245,4 @@ foreign import ccall unsafe "stdlib.h free"    _free    :: Ptr a -> IO ()
 -- used as a finalizer (cf 'Foreign.ForeignPtr.ForeignPtr') for storage
 -- allocated with 'malloc', 'mallocBytes', 'realloc' or 'reallocBytes'.
 foreign import ccall unsafe "stdlib.h &free" finalizerFree :: FinalizerPtr a
+

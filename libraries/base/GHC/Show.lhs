@@ -1,14 +1,29 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, BangPatterns, MagicHash, StandaloneDeriving #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, StandaloneDeriving,
+             MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
+
+#include "MachDeps.h"
+#if SIZEOF_HSWORD == 4
+#define DIGITS       9
+#define BASE         1000000000
+#elif SIZEOF_HSWORD == 8
+#define DIGITS       18
+#define BASE         1000000000000000000
+#else
+#error Please define DIGITS and BASE
+-- DIGITS should be the largest integer such that
+--     10^DIGITS < 2^(SIZEOF_HSWORD * 8 - 1)
+-- BASE should be 10^DIGITS. Note that ^ is not available yet.
+#endif
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Show
 -- Copyright   :  (c) The University of Glasgow, 1992-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -37,6 +52,7 @@ module GHC.Show
         where
 
 import GHC.Base
+import GHC.Num
 import Data.Maybe
 import GHC.List ((!!), foldr1, break)
 -- For defining instances for the generic deriving mechanism
@@ -98,7 +114,7 @@ type ShowS = String -> String
 -- >          where app_prec = 10
 -- >
 -- >        showsPrec d (u :^: v) = showParen (d > up_prec) $
--- >             showsPrec (up_prec+1) u . 
+-- >             showsPrec (up_prec+1) u .
 -- >             showString " :^: "      .
 -- >             showsPrec (up_prec+1) v
 -- >          where up_prec = 5
@@ -165,7 +181,7 @@ appPrec1 = I# 11#       -- appPrec + 1
 %*********************************************************
 
 \begin{code}
- 
+
 instance  Show ()  where
     showsPrec _ () = showString "()"
 
@@ -193,8 +209,8 @@ instance Show Int where
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s
     showsPrec p (Just x) s
-                          = (showParen (p > appPrec) $ 
-                             showString "Just " . 
+                          = (showParen (p > appPrec) $
+                             showString "Just " .
                              showsPrec appPrec1 x) s
 \end{code}
 
@@ -229,58 +245,58 @@ instance (Show a, Show b, Show c, Show d, Show e, Show f) => Show (a,b,c,d,e,f) 
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g)
         => Show (a,b,c,d,e,f,g) where
-  showsPrec _ (a,b,c,d,e,f,g) s 
+  showsPrec _ (a,b,c,d,e,f,g) s
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h)
          => Show (a,b,c,d,e,f,g,h) where
-  showsPrec _ (a,b,c,d,e,f,g,h) s 
+  showsPrec _ (a,b,c,d,e,f,g,h) s
         = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i)
          => Show (a,b,c,d,e,f,g,h,i) where
-  showsPrec _ (a,b,c,d,e,f,g,h,i) s 
-        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+  showsPrec _ (a,b,c,d,e,f,g,h,i) s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j)
          => Show (a,b,c,d,e,f,g,h,i,j) where
-  showsPrec _ (a,b,c,d,e,f,g,h,i,j) s 
-        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+  showsPrec _ (a,b,c,d,e,f,g,h,i,j) s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k)
          => Show (a,b,c,d,e,f,g,h,i,j,k) where
-  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k) s 
-        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k) s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l) where
-  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l) s 
-        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l) s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k, shows l] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l, Show m)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l,m) where
-  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m) s 
-        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m) s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k, shows l, shows m] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l, Show m, Show n)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
-  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m,n) s 
-        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m,n) s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k, shows l, shows m, shows n] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
           Show l, Show m, Show n, Show o)
          => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
-  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) s 
-        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+  showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h,
                       shows i, shows j, shows k, shows l, shows m, shows n, shows o] s
 
 show_tuple :: [ShowS] -> ShowS
@@ -351,7 +367,7 @@ showLitString :: String -> ShowS
 -- for non-printable characters. Does not add double-quotes around the
 -- whole thing; the caller should do that.
 -- The main difference from showLitChar (apart from the fact that the
--- argument is a string not a list) is that we must escape double-quotes 
+-- argument is a string not a list) is that we must escape double-quotes
 showLitString []         s = s
 showLitString ('"' : cs) s = showString "\\\"" (showLitString cs s)
 showLitString (c   : cs) s = showLitChar c (showLitString cs s)
@@ -362,13 +378,11 @@ showLitString (c   : cs) s = showLitChar c (showLitString cs s)
 
 showMultiLineString :: String -> [String]
 -- | Like 'showLitString' (expand escape characters using Haskell
--- escape conventions), but 
+-- escape conventions), but
 --   * break the string into multiple lines
 --   * wrap the entire thing in double quotes
--- Example:  @breakMultiLineString "hello\ngoodbye\nblah"@ 
--- returns   @["\"hello\\", "\\goodbye\\", "\\blah\"" ]@
--- where those "\\" are really just a single backslash
--- (but I'm writing them here as Haskell literals)
+-- Example:  @showMultiLineString "hello\ngoodbye\nblah"@
+-- returns   @["\"hello\\", "\\goodbye\\", "\\blah\""]@
 showMultiLineString str
   = go '\"' str
   where
@@ -388,10 +402,10 @@ protectEsc p f             = f . cont
 asciiTab :: [String]
 asciiTab = -- Using an array drags in the array module.  listArray ('\NUL', ' ')
            ["NUL", "SOH", "STX", "ETX", "EOT", "ENQ", "ACK", "BEL",
-            "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI", 
+            "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI",
             "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
-            "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US", 
-            "SP"] 
+            "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US",
+            "SP"]
 \end{code}
 
 Code specific for Ints.
@@ -439,3 +453,101 @@ deriving instance Show Arity
 deriving instance Show Associativity
 deriving instance Show Fixity
 \end{code}
+
+
+%*********************************************************
+%*                                                      *
+\subsection{The @Integer@ instances for @Show@}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+instance Show Integer where
+    showsPrec p n r
+        | p > 6 && n < 0 = '(' : integerToString n (')' : r)
+        -- Minor point: testing p first gives better code
+        -- in the not-uncommon case where the p argument
+        -- is a constant
+        | otherwise = integerToString n r
+    showList = showList__ (showsPrec 0)
+
+-- Divide an conquer implementation of string conversion
+integerToString :: Integer -> String -> String
+integerToString n0 cs0
+    | n0 < 0    = '-' : integerToString' (- n0) cs0
+    | otherwise = integerToString' n0 cs0
+    where
+    integerToString' :: Integer -> String -> String
+    integerToString' n cs
+        | n < BASE  = jhead (fromInteger n) cs
+        | otherwise = jprinth (jsplitf (BASE*BASE) n) cs
+
+    -- Split n into digits in base p. We first split n into digits
+    -- in base p*p and then split each of these digits into two.
+    -- Note that the first 'digit' modulo p*p may have a leading zero
+    -- in base p that we need to drop - this is what jsplith takes care of.
+    -- jsplitb the handles the remaining digits.
+    jsplitf :: Integer -> Integer -> [Integer]
+    jsplitf p n
+        | p > n     = [n]
+        | otherwise = jsplith p (jsplitf (p*p) n)
+
+    jsplith :: Integer -> [Integer] -> [Integer]
+    jsplith p (n:ns) =
+        case n `quotRemInteger` p of
+        (# q, r #) ->
+            if q > 0 then q : r : jsplitb p ns
+                     else     r : jsplitb p ns
+    jsplith _ [] = error "jsplith: []"
+
+    jsplitb :: Integer -> [Integer] -> [Integer]
+    jsplitb _ []     = []
+    jsplitb p (n:ns) = case n `quotRemInteger` p of
+                       (# q, r #) ->
+                           q : r : jsplitb p ns
+
+    -- Convert a number that has been split into digits in base BASE^2
+    -- this includes a last splitting step and then conversion of digits
+    -- that all fit into a machine word.
+    jprinth :: [Integer] -> String -> String
+    jprinth (n:ns) cs =
+        case n `quotRemInteger` BASE of
+        (# q', r' #) ->
+            let q = fromInteger q'
+                r = fromInteger r'
+            in if q > 0 then jhead q $ jblock r $ jprintb ns cs
+                        else jhead r $ jprintb ns cs
+    jprinth [] _ = error "jprinth []"
+
+    jprintb :: [Integer] -> String -> String
+    jprintb []     cs = cs
+    jprintb (n:ns) cs = case n `quotRemInteger` BASE of
+                        (# q', r' #) ->
+                            let q = fromInteger q'
+                                r = fromInteger r'
+                            in jblock q $ jblock r $ jprintb ns cs
+
+    -- Convert an integer that fits into a machine word. Again, we have two
+    -- functions, one that drops leading zeros (jhead) and one that doesn't
+    -- (jblock)
+    jhead :: Int -> String -> String
+    jhead n cs
+        | n < 10    = case unsafeChr (ord '0' + n) of
+            c@(C# _) -> c : cs
+        | otherwise = case unsafeChr (ord '0' + r) of
+            c@(C# _) -> jhead q (c : cs)
+        where
+        (q, r) = n `quotRemInt` 10
+
+    jblock = jblock' {- ' -} DIGITS
+
+    jblock' :: Int -> Int -> String -> String
+    jblock' d n cs
+        | d == 1    = case unsafeChr (ord '0' + n) of
+             c@(C# _) -> c : cs
+        | otherwise = case unsafeChr (ord '0' + r) of
+             c@(C# _) -> jblock' (d - 1) q (c : cs)
+        where
+        (q, r) = n `quotRemInt` 10
+\end{code}
+

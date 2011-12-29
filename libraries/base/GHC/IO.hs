@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude
            , BangPatterns
            , RankNTypes
@@ -6,6 +7,7 @@
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO
@@ -164,9 +166,9 @@ unsafePerformIO :: IO a -> a
 unsafePerformIO m = unsafeDupablePerformIO (noDuplicate >> m)
 
 {-| 
-This version of 'unsafePerformIO' is slightly more efficient,
+This version of 'unsafePerformIO' is more efficient
 because it omits the check that the IO is only being performed by a
-single thread.  Hence, when you write 'unsafeDupablePerformIO',
+single thread.  Hence, when you use 'unsafeDupablePerformIO',
 there is a possibility that the IO action may be performed multiple
 times (on a multiprocessor), and you should therefore ensure that
 it gives the same results each time.
@@ -381,7 +383,7 @@ onException io what = io `catchException` \e -> do _ <- what
 -- with exceptions masked, you can be sure that the library call will not be
 -- able to unmask exceptions again.  If you are writing library code and need
 -- to use asynchronous exceptions, the only way is to create a new thread;
--- see 'Control.Concurrent.forkIOUnmasked'.
+-- see 'Control.Concurrent.forkIOWithUnmask'.
 --
 -- Asynchronous exceptions may still be received while in the masked
 -- state if the masked thread /blocks/ in certain ways; see
@@ -469,4 +471,5 @@ a `finally` sequel =
 -- >   evaluate x = (return $! x) >>= return
 --
 evaluate :: a -> IO a
-evaluate a = IO $ \s -> let !va = a in (# s, va #) -- NB. see #2273
+evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
+

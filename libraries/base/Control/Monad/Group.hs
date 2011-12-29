@@ -1,4 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Group
@@ -32,3 +33,4 @@ class Monad m => MonadGroup m t where
 instance Ord t => MonadGroup [] t where
     mgroupWith = groupWith
 #endif
+

@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , ForeignFunctionInterface
            , GeneralizedNewtypeDeriving
@@ -30,7 +31,7 @@ import Control.Monad ((=<<), liftM, liftM2, unless)
 import Data.Bits (Bits, (.|.), (.&.))
 import Data.Maybe (Maybe(..))
 import Data.Monoid (Monoid(..))
-import Foreign.C.Types (CInt, CShort, CULong)
+import Foreign.C.Types (CInt(..), CShort(..), CULong(..))
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base

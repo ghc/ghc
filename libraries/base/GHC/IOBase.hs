@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -6,7 +7,7 @@
 -- Module      :  GHC.IOBase
 -- Copyright   :  (c) The University of Glasgow 1994-2009
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -15,9 +16,8 @@
 --
 -----------------------------------------------------------------------------
 
-
 module GHC.IOBase {-# DEPRECATED "use GHC.IO instead" #-} (
-    IO(..), unIO, failIO, liftIO, bindIO, thenIO, returnIO, 
+    IO(..), unIO, failIO, liftIO, bindIO, thenIO, returnIO,
     unsafePerformIO, unsafeInterleaveIO,
     unsafeDupablePerformIO, unsafeDupableInterleaveIO,
     noDuplicate,
@@ -26,23 +26,23 @@ module GHC.IOBase {-# DEPRECATED "use GHC.IO instead" #-} (
     stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
 
         -- References
-    IORef(..), newIORef, readIORef, writeIORef, 
+    IORef(..), newIORef, readIORef, writeIORef,
     IOArray(..), newIOArray, readIOArray, writeIOArray, unsafeReadIOArray, unsafeWriteIOArray,
     MVar(..),
 
         -- Handles, file descriptors,
-    FilePath,  
-    Handle(..), Handle__(..), HandleType(..), IOMode(..), FD, 
+    FilePath,
+    Handle(..), Handle__(..), HandleType(..), IOMode(..), FD,
     isReadableHandleType, isWritableHandleType, isReadWriteHandleType, showHandle,
 
         -- Buffers
-    -- Buffer(..), RawBuffer, BufferState(..), 
+    -- Buffer(..), RawBuffer, BufferState(..),
     BufferList(..), BufferMode(..),
-    --bufferIsWritable, bufferEmpty, bufferFull, 
+    --bufferIsWritable, bufferEmpty, bufferFull,
 
         -- Exceptions
     Exception(..), ArithException(..), AsyncException(..), ArrayException(..),
-    stackOverflow, heapOverflow, ioException, 
+    stackOverflow, heapOverflow, ioException,
     IOError, IOException(..), IOErrorType(..), ioError, userError,
     ExitCode(..),
     throwIO, block, unblock, blocked, catchAny, catchException,
@@ -62,7 +62,6 @@ import GHC.IOArray
 import GHC.IORef
 import GHC.MVar
 import Foreign.C.Types
-import GHC.Show
 import Data.Typeable
 
 type FD = CInt
@@ -91,3 +90,4 @@ instance Show BlockedIndefinitely where
 
 blockedIndefinitely :: SomeException -- for the RTS
 blockedIndefinitely = toException BlockedIndefinitely
+

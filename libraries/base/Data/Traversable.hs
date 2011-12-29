@@ -29,6 +29,8 @@
 -- functions of the same names from lists to any 'Traversable' functor.
 -- To avoid ambiguity, either import the "Prelude" hiding these names
 -- or qualify uses of these function names with an alias for this module.
+--
+-----------------------------------------------------------------------------
 
 module Data.Traversable (
     Traversable(..),
@@ -194,3 +196,4 @@ instance Functor Id where
 instance Applicative Id where
     pure = Id
     Id f <*> Id x = Id (f x)
+

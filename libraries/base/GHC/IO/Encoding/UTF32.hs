@@ -331,3 +331,4 @@ validate    :: Char -> Bool
 validate c = (x1 >= 0x0 && x1 < 0xD800) || (x1 > 0xDFFF && x1 <= 0x10FFFF)
    where x1 = ord c
 {-# INLINE validate #-}
+

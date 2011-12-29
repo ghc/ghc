@@ -83,3 +83,4 @@ throwIfNull  = throwIf (== nullPtr) . const
 --
 void     :: IO a -> IO ()
 void act  = act >> return ()
+

@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , ForeignFunctionInterface
            , GeneralizedNewtypeDeriving
@@ -5,8 +6,9 @@
            , BangPatterns
   #-}
 
---
--- | A binding to the epoll I/O event notification facility
+-----------------------------------------------------------------------------
+-- |
+-- A binding to the epoll I/O event notification facility
 --
 -- epoll is a variant of poll that can be used either as an edge-triggered or
 -- a level-triggered interface and scales well to large numbers of watched file
@@ -14,6 +16,8 @@
 --
 -- epoll decouples monitor an fd from the process of registering it.
 --
+-----------------------------------------------------------------------------
+
 module GHC.Event.EPoll
     (
       new
@@ -41,7 +45,7 @@ import Data.Bits (Bits, (.|.), (.&.))
 import Data.Monoid (Monoid(..))
 import Data.Word (Word32)
 import Foreign.C.Error (throwErrnoIfMinus1, throwErrnoIfMinus1_)
-import Foreign.C.Types (CInt)
+import Foreign.C.Types (CInt(..))
 import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
@@ -204,3 +208,4 @@ foreign import ccall safe "sys/epoll.h epoll_wait"
     c_epoll_wait :: CInt -> Ptr Event -> CInt -> CInt -> IO CInt
 
 #endif /* defined(HAVE_EPOLL) */
+

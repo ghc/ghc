@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, ForeignFunctionInterface,
              DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
@@ -277,7 +278,7 @@ start_console_handler r =
                     return ()
      Nothing -> return ()
 
-toWin32ConsoleEvent :: Num a => a -> Maybe ConsoleEvent
+toWin32ConsoleEvent :: (Eq a, Num a) => a -> Maybe ConsoleEvent
 toWin32ConsoleEvent ev =
    case ev of
        0 {- CTRL_C_EVENT-}        -> Just ControlC
@@ -323,3 +324,4 @@ foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
 
 foreign import stdcall "WaitForSingleObject"
    c_WaitForSingleObject :: HANDLE -> DWORD -> IO DWORD
+

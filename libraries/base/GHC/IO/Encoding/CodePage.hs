@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, BangPatterns, ForeignFunctionInterface, NoImplicitPrelude,
              NondecreasingIndentation, MagicHash #-}
+
 module GHC.IO.Encoding.CodePage(
 #if !defined(mingw32_HOST_OS)
  ) where
@@ -168,3 +169,4 @@ indexChar :: ConvArray Char -> Int -> Char
 indexChar (ConvArray p) (I# i) = C# (chr# (indexInt16OffAddr# p i))
 
 #endif
+

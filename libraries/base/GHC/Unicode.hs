@@ -32,7 +32,7 @@ module GHC.Unicode (
 
 import GHC.Base
 import GHC.Real        (fromIntegral)
-import Foreign.C.Types (CInt)
+import Foreign.C.Types (CInt(..))
 
 #include "HsBaseConfig.h"
 

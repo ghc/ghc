@@ -61,8 +61,9 @@ data BufferCodec from to state = BufferCodec {
    --
    -- Progress will usually be made by skipping the first element of the @from@
    -- buffer. This function should only be called if you are certain that you
-   -- wish to do this skipping, and if the @to@ buffer has at least one element
-   -- of free space.
+   -- wish to do this skipping and if the @to@ buffer has at least one element
+   -- of free space. Because this function deals with decoding failure, it assumes
+   -- that the from buffer has at least one element.
    --
    -- @recover@ may raise an exception rather than skipping anything.
    --
@@ -130,3 +131,4 @@ data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains in
                                       -- to output at least one encoded ASCII character, but the input contains
                                       -- an invalid or unrepresentable sequence
                     deriving (Eq, Show)
+

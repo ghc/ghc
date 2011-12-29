@@ -90,16 +90,16 @@ readInt :: Num a
 readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
 
 -- | Read an unsigned number in octal notation.
-readOct :: Num a => ReadS a
+readOct :: (Eq a, Num a) => ReadS a
 readOct = readP_to_S L.readOctP
 
 -- | Read an unsigned number in decimal notation.
-readDec :: Num a => ReadS a
+readDec :: (Eq a, Num a) => ReadS a
 readDec = readP_to_S L.readDecP
 
 -- | Read an unsigned number in hexadecimal notation.
 -- Both upper or lower case letters are allowed.
-readHex :: Num a => ReadS a
+readHex :: (Eq a, Num a) => ReadS a
 readHex = readP_to_S L.readHexP 
 
 -- | Reads an /unsigned/ 'RealFrac' value,
@@ -198,7 +198,7 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 
 -- | Shows a /non-negative/ 'Integral' number using the base specified by the
 -- first argument, and the character representation specified by the second.
-showIntAtBase :: Integral a => a -> (Int -> Char) -> a -> ShowS
+showIntAtBase :: (Integral a, Show a) => a -> (Int -> Char) -> a -> ShowS
 showIntAtBase base toChr n0 r0
   | base <= 1 = error ("Numeric.showIntAtBase: applied to unsupported base " ++ show base)
   | n0 <  0   = error ("Numeric.showIntAtBase: applied to negative number " ++ show n0)
@@ -213,9 +213,9 @@ showIntAtBase base toChr n0 r0
       r' = c : r
 
 -- | Show /non-negative/ 'Integral' numbers in base 16.
-showHex :: Integral a => a -> ShowS
+showHex :: (Integral a,Show a) => a -> ShowS
 showHex = showIntAtBase 16 intToDigit
 
 -- | Show /non-negative/ 'Integral' numbers in base 8.
-showOct :: Integral a => a -> ShowS
+showOct :: (Integral a, Show a) => a -> ShowS
 showOct = showIntAtBase 8  intToDigit

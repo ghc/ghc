@@ -147,7 +147,7 @@ peekCString    :: CString -> IO String
 #ifndef __GLASGOW_HASKELL__
 peekCString = peekCAString
 #else
-peekCString = GHC.peekCString foreignEncoding
+peekCString s = getForeignEncoding >>= flip GHC.peekCString s
 #endif
 
 -- | Marshal a C string with explicit length into a Haskell string.
@@ -156,7 +156,7 @@ peekCStringLen           :: CStringLen -> IO String
 #ifndef __GLASGOW_HASKELL__
 peekCStringLen = peekCAStringLen
 #else
-peekCStringLen = GHC.peekCStringLen foreignEncoding
+peekCStringLen s = getForeignEncoding >>= flip GHC.peekCStringLen s
 #endif
 
 -- | Marshal a Haskell string into a NUL terminated C string.
@@ -171,7 +171,7 @@ newCString :: String -> IO CString
 #ifndef __GLASGOW_HASKELL__
 newCString = newCAString
 #else
-newCString = GHC.newCString foreignEncoding
+newCString s = getForeignEncoding >>= flip GHC.newCString s
 #endif
 
 -- | Marshal a Haskell string into a C string (ie, character array) with
@@ -185,7 +185,7 @@ newCStringLen     :: String -> IO CStringLen
 #ifndef __GLASGOW_HASKELL__
 newCStringLen = newCAStringLen
 #else
-newCStringLen = GHC.newCStringLen foreignEncoding
+newCStringLen s = getForeignEncoding >>= flip GHC.newCStringLen s
 #endif
 
 -- | Marshal a Haskell string into a NUL terminated C string using temporary
@@ -201,7 +201,7 @@ withCString :: String -> (CString -> IO a) -> IO a
 #ifndef __GLASGOW_HASKELL__
 withCString = withCAString
 #else
-withCString = GHC.withCString foreignEncoding
+withCString s f = getForeignEncoding >>= \enc -> GHC.withCString enc s f
 #endif
 
 -- | Marshal a Haskell string into a C string (ie, character array)
@@ -215,7 +215,7 @@ withCStringLen         :: String -> (CStringLen -> IO a) -> IO a
 #ifndef __GLASGOW_HASKELL__
 withCStringLen = withCAStringLen
 #else
-withCStringLen = GHC.withCStringLen foreignEncoding
+withCStringLen s f = getForeignEncoding >>= \enc -> GHC.withCStringLen enc s f
 #endif
 
 
@@ -230,7 +230,7 @@ charIsRepresentable c = return (ord c < 256)
 -- -- | Determines whether a character can be accurately encoded in a 'CString'.
 -- -- Unrepresentable characters are converted to '?' or their nearest visual equivalent.
 charIsRepresentable :: Char -> IO Bool
-charIsRepresentable = GHC.charIsRepresentable foreignEncoding
+charIsRepresentable c = getForeignEncoding >>= flip GHC.charIsRepresentable c
 #endif
 
 -- single byte characters
@@ -484,10 +484,9 @@ newCWStringLen str  = newArrayLen (charsToCWchars str)
 withCWString :: String -> (CWString -> IO a) -> IO a
 withCWString  = withArray0 wNUL . charsToCWchars
 
--- | Marshal a Haskell string into a NUL terminated C wide string using
--- temporary storage.
---
--- * the Haskell string may /not/ contain any NUL characters
+-- | Marshal a Haskell string into a C wide string (i.e. wide
+-- character array) in temporary storage, with explicit length
+-- information.
 --
 -- * the memory is freed when the subcomputation terminates (either
 --   normally or via an exception), so the pointer to the temporary
@@ -542,3 +541,4 @@ castCharToCWchar :: Char -> CWchar
 castCharToCWchar ch = fromIntegral (ord ch)
 
 #endif /* !mingw32_HOST_OS */
+

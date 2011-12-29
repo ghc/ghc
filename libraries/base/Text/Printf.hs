@@ -111,12 +111,12 @@ instance (IsChar c) => PrintfType [c] where
 instance PrintfType (IO a) where
     spr fmts args = do
 	putStr (uprintf fmts (reverse args))
-	return undefined
+	return (error "PrintfType (IO a): result should not be used.")
 
 instance HPrintfType (IO a) where
     hspr hdl fmts args = do
 	hPutStr hdl (uprintf fmts (reverse args))
-	return undefined
+	return (error "HPrintfType (IO a): result should not be used.")
 
 instance (PrintfArg a, PrintfType r) => PrintfType (a -> r) where
     spr fmts args = \ a -> spr fmts (toUPrintf a : args)
@@ -328,3 +328,4 @@ fmterr, argerr, baderr :: a
 fmterr = perror "formatting string ended prematurely"
 argerr = perror "argument list ended prematurely"
 baderr = perror "bad argument"
+

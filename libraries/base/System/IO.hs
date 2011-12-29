@@ -253,12 +253,12 @@ import GHC.IO.Handle.FD
 import qualified GHC.IO.FD as FD
 import GHC.IO.Handle
 import GHC.IO.Handle.Text ( hGetBufSome, hPutStrLn )
-import GHC.IORef
 import GHC.IO.Exception ( userError )
 import GHC.IO.Encoding
 import GHC.Num
 import Text.Read
 import GHC.Show
+import GHC.MVar
 #endif
 
 #ifdef __HUGS__
@@ -413,6 +413,13 @@ readIO s        =  case (do { (x,t) <- reads s ;
                         [x]    -> return x
                         []     -> ioError (userError "Prelude.readIO: no parse")
                         _      -> ioError (userError "Prelude.readIO: ambiguous parse")
+
+-- | The Unicode encoding of the current locale
+--
+-- This is the initial locale encoding: if it has been subsequently changed by
+-- 'GHC.IO.Encoding.setLocaleEncoding' this value will not reflect that change.
+localeEncoding :: TextEncoding
+localeEncoding = initLocaleEncoding
 #endif  /* __GLASGOW_HASKELL__ */
 
 #ifndef __NHC__
@@ -462,15 +469,26 @@ withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
-    ref <- newIORef (throw NonTermination)
-    ans <- unsafeInterleaveIO (readIORef ref)
+    m <- newEmptyMVar
+    ans <- unsafeInterleaveIO (takeMVar m)
     result <- k ans
-    writeIORef ref result
+    putMVar m result
     return result
 
 -- NOTE: we do our own explicit black holing here, because GHC's lazy
 -- blackholing isn't enough.  In an infinite loop, GHC may run the IO
 -- computation a few times before it notices the loop, which is wrong.
+--
+-- NOTE2: the explicit black-holing with an IORef ran into trouble
+-- with multiple threads (see #5421), so now we use an MVar.  I'm
+-- actually wondering whether we should use readMVar rather than
+-- takeMVar, just in case it ends up being executed multiple times,
+-- but even then it would have to be masked to protect against async
+-- exceptions.  Ugh.  What we really need here is an IVar, or an
+-- atomic readMVar, or even STM.  All these seem like overkill.
+--
+-- See also System.IO.Unsafe.unsafeFixIO.
+--
 #endif
 
 #if defined(__NHC__)
@@ -573,8 +591,8 @@ openTempFile' loc tmp_dir template binary mode = do
                               False{-is_socket-} 
                               True{-is_nonblock-}
 
-         h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-}
-                           (Just localeEncoding)
+         enc <- getLocaleEncoding
+         h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
 
          return (filepath, h)
 #else
@@ -634,3 +652,4 @@ foreign import ccall "getpid" c_getpid :: IO Int
 -- It follows that an attempt to write to a file (using 'writeFile', for
 -- example) that was earlier opened by 'readFile' will usually result in
 -- failure with 'System.IO.Error.isAlreadyInUseError'.
+

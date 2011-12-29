@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, CPP, ForeignFunctionInterface, NoImplicitPrelude #-}
 
 module GHC.Event.Array
@@ -27,7 +28,7 @@ import Control.Monad hiding (forM_)
 import Data.Bits ((.|.), shiftR)
 import Data.IORef (IORef, atomicModifyIORef, newIORef, readIORef, writeIORef)
 import Data.Maybe
-import Foreign.C.Types (CSize)
+import Foreign.C.Types (CSize(..))
 import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import Foreign.Ptr (Ptr, nullPtr, plusPtr)
 import Foreign.Storable (Storable(..))
@@ -311,3 +312,4 @@ foreign import ccall unsafe "string.h memcpy"
 
 foreign import ccall unsafe "string.h memmove"
     memmove :: Ptr a -> Ptr a -> CSize -> IO (Ptr a)
+

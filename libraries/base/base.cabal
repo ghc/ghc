@@ -1,5 +1,5 @@
 name:           base
-version:        4.3.1.0
+version:        4.4.0.0
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
@@ -17,7 +17,7 @@ extra-tmp-files:
 extra-source-files:
                 config.guess config.sub install-sh
                 aclocal.m4 configure.ac configure
-                include/CTypes.h
+                include/CTypes.h include/md5.h
 
 source-repository head
     type:     git
@@ -38,7 +38,6 @@ Library {
             Foreign.Concurrent,
             GHC.Arr,
             GHC.Base,
-            GHC.Classes,
             GHC.Conc,
             GHC.Conc.IO,
             GHC.Conc.Signal,
@@ -51,6 +50,8 @@ Library {
             GHC.Err,
             GHC.Exception,
             GHC.Exts,
+            GHC.Fingerprint,
+            GHC.Fingerprint.Type,
             GHC.Float,
             GHC.Float.ConversionUtils,
             GHC.Float.RealFracMethods,
@@ -91,6 +92,8 @@ Library {
             GHC.Read,
             GHC.Real,
             GHC.ST,
+            GHC.Stack,
+            GHC.Stats,
             GHC.Show,
             GHC.Stable,
             GHC.Storable,
@@ -159,6 +162,7 @@ Library {
         Data.Traversable
         Data.Tuple,
         Data.Typeable,
+        Data.Typeable.Internal,
         Data.Unique,
         Data.Version,
         Data.Word,
@@ -219,6 +223,7 @@ Library {
         cbits/inputReady.c
         cbits/selectUtils.c
         cbits/primFloat.c
+        cbits/md5.c
     include-dirs: include
     includes:    HsBase.h
     install-includes:    HsBase.h HsBaseConfig.h EventConfig.h WCsubst.h consUtils.h Typeable.h

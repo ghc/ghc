@@ -16,6 +16,7 @@
 -- (see the array package).
 -- 
 -----------------------------------------------------------------------------
+
 module Data.Ix
     (
     -- * The 'Ix' class
@@ -35,8 +36,6 @@ module Data.Ix
     --  Ix ()
     --  (Ix a, Ix b) => Ix (a, b)
     --  ...
-
-    -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 
     -- * Deriving Instances of 'Ix'
     -- | Derived instance declarations for the class 'Ix' are only possible

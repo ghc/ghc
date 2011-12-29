@@ -531,3 +531,4 @@ longestChain = mapReduce id (maximumBy lengthCmp)
         lengthCmp []   []    = EQ
         lengthCmp []   _     = LT
         lengthCmp _    []    = GT
+

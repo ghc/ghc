@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, NoImplicitPrelude #-}
 module GHC.Event.Unique
     (
@@ -38,3 +39,4 @@ newUnique (US ref) = atomically $ do
   writeTVar ref u'
   return $ Unique u'
 {-# INLINE newUnique #-}
+

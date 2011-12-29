@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -15,6 +16,7 @@
 -- The IORef type
 --
 -----------------------------------------------------------------------------
+
 module GHC.IORef (
         IORef(..),
         newIORef, readIORef, writeIORef, atomicModifyIORef

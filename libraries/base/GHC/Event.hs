@@ -1,8 +1,13 @@
 {-# LANGUAGE Trustworthy #-}
+
+-- ----------------------------------------------------------------------------
 -- | This module provides scalable event notification for file
 -- descriptors and timeouts.
 --
 -- This module should be considered GHC internal.
+--
+-- ----------------------------------------------------------------------------
+
 module GHC.Event
     ( -- * Types
       EventManager
@@ -40,3 +45,4 @@ module GHC.Event
 
 import GHC.Event.Manager
 import GHC.Event.Thread (getSystemEventManager)
+

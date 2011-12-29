@@ -36,3 +36,4 @@ instance (Show a,Show b) => Show (a->b) where
                 where (value,result) = getTypes undefined
                       getTypes x = (x,a x)
 #endif
+

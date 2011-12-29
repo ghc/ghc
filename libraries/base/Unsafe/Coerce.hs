@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
 
 -----------------------------------------------------------------------------
@@ -25,6 +26,8 @@
 --   * In nhc98, the only representation-safe coercions are between Enum
 --     types with the same range (e.g. Int, Int32, Char, Word32),
 --     or between a newtype and the type that it wraps.
+--
+-----------------------------------------------------------------------------
 
 module Unsafe.Coerce (unsafeCoerce) where
 
@@ -41,3 +44,4 @@ import NonStdUnsafeCoerce (unsafeCoerce)
 #if defined(__HUGS__)
 import Hugs.IOExts (unsafeCoerce)
 #endif
+

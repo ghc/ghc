@@ -61,3 +61,4 @@ import NHC.FFI
 -- guarantee provided is that if they are passed back to Haskell land, the
 -- function 'deRefStablePtr' will be able to reconstruct the
 -- Haskell value referred to by the stable pointer.
+

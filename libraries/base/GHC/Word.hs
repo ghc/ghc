@@ -22,16 +22,12 @@
 -- #hide
 module GHC.Word (
     Word(..), Word8(..), Word16(..), Word32(..), Word64(..),
-    toEnumError, fromEnumError, succError, predError,
     uncheckedShiftL64#,
     uncheckedShiftRL64#
     ) where
 
 import Data.Bits
 
-#if WORD_SIZE_IN_BITS < 32
-import GHC.IntWord32
-#endif
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
 #endif
@@ -47,36 +43,6 @@ import GHC.Err
 import GHC.Float ()     -- for RealFrac methods
 
 ------------------------------------------------------------------------
--- Helper functions
-------------------------------------------------------------------------
-
-{-# NOINLINE toEnumError #-}
-toEnumError :: (Show a) => String -> Int -> (a,a) -> b
-toEnumError inst_ty i bnds =
-    error $ "Enum.toEnum{" ++ inst_ty ++ "}: tag (" ++
-            show i ++
-            ") is outside of bounds " ++
-            show bnds
-
-{-# NOINLINE fromEnumError #-}
-fromEnumError :: (Show a) => String -> a -> b
-fromEnumError inst_ty x =
-    error $ "Enum.fromEnum{" ++ inst_ty ++ "}: value (" ++
-            show x ++
-            ") is outside of Int's bounds " ++
-            show (minBound::Int, maxBound::Int)
-
-{-# NOINLINE succError #-}
-succError :: String -> a
-succError inst_ty =
-    error $ "Enum.succ{" ++ inst_ty ++ "}: tried to take `succ' of maxBound"
-
-{-# NOINLINE predError #-}
-predError :: String -> a
-predError inst_ty =
-    error $ "Enum.pred{" ++ inst_ty ++ "}: tried to take `pred' of minBound"
-
-------------------------------------------------------------------------
 -- type Word
 ------------------------------------------------------------------------
 
@@ -84,7 +50,14 @@ predError inst_ty =
 data Word = W# Word# deriving (Eq, Ord)
 
 instance Show Word where
-    showsPrec p x = showsPrec p (toInteger x)
+    showsPrec _ (W# w) = showWord w
+
+showWord :: Word# -> ShowS
+showWord w# cs
+ | w# `ltWord#` 10## = C# (chr# (ord# '0'# +# word2Int# w#)) : cs
+ | otherwise = case chr# (ord# '0'# +# word2Int# (w# `remWord#` 10##)) of
+               c# ->
+                   showWord (w# `quotWord#` 10##) (C# c# : cs)
 
 instance Num Word where
     (W# x#) + (W# y#)      = W# (x# `plusWord#` y#)
@@ -148,9 +121,7 @@ instance Bounded Word where
 
     -- use unboxed literals for maxBound, because GHC doesn't optimise
     -- (fromInteger 0xffffffff :: Word).
-#if WORD_SIZE_IN_BITS == 31
-    maxBound = W# (int2Word# 0x7FFFFFFF#)
-#elif WORD_SIZE_IN_BITS == 32
+#if WORD_SIZE_IN_BITS == 32
     maxBound = W# (int2Word# 0xFFFFFFFF#)
 #else
     maxBound = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
@@ -175,6 +146,10 @@ instance Bits Word where
     (W# x#) `shift` (I# i#)
         | i# >=# 0#          = W# (x# `shiftL#` i#)
         | otherwise          = W# (x# `shiftRL#` negateInt# i#)
+    (W# x#) `shiftL` (I# i#) = W# (x# `shiftL#` i#)
+    (W# x#) `unsafeShiftL` (I# i#) = W# (x# `uncheckedShiftL#` i#)
+    (W# x#) `shiftR` (I# i#) = W# (x# `shiftRL#` i#)
+    (W# x#) `unsafeShiftR` (I# i#) = W# (x# `uncheckedShiftRL#` i#)
     (W# x#) `rotate` (I# i#)
         | i'# ==# 0# = W# x#
         | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` (x# `uncheckedShiftRL#` (wsib -# i'#)))
@@ -183,6 +158,7 @@ instance Bits Word where
         !wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
     bitSize  _               = WORD_SIZE_IN_BITS
     isSigned _               = False
+    popCount (W# x#)         = I# (word2Int# (popCnt# x#))
 
 {-# RULES
 "fromIntegral/Int->Word"  fromIntegral = \(I# x#) -> W# (int2Word# x#)
@@ -279,6 +255,11 @@ instance Bits Word8 where
     (W8# x#) `shift` (I# i#)
         | i# >=# 0#           = W8# (narrow8Word# (x# `shiftL#` i#))
         | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
+    (W8# x#) `shiftL` (I# i#) = W8# (narrow8Word# (x# `shiftL#` i#))
+    (W8# x#) `unsafeShiftL` (I# i#) =
+        W8# (narrow8Word# (x# `uncheckedShiftL#` i#))
+    (W8# x#) `shiftR` (I# i#) = W8# (x# `shiftRL#` i#)
+    (W8# x#) `unsafeShiftR` (I# i#) = W8# (x# `uncheckedShiftRL#` i#)
     (W8# x#) `rotate` (I# i#)
         | i'# ==# 0# = W8# x#
         | otherwise  = W8# (narrow8Word# ((x# `uncheckedShiftL#` i'#) `or#`
@@ -287,6 +268,7 @@ instance Bits Word8 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
     bitSize  _                = 8
     isSigned _                = False
+    popCount (W8# x#)         = I# (word2Int# (popCnt8# x#))
 
 {-# RULES
 "fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
@@ -410,6 +392,11 @@ instance Bits Word16 where
     (W16# x#) `shift` (I# i#)
         | i# >=# 0#            = W16# (narrow16Word# (x# `shiftL#` i#))
         | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
+    (W16# x#) `shiftL` (I# i#) = W16# (narrow16Word# (x# `shiftL#` i#))
+    (W16# x#) `unsafeShiftL` (I# i#) =
+        W16# (narrow16Word# (x# `uncheckedShiftL#` i#))
+    (W16# x#) `shiftR` (I# i#) = W16# (x# `shiftRL#` i#)
+    (W16# x#) `unsafeShiftR` (I# i#) = W16# (x# `uncheckedShiftRL#` i#)
     (W16# x#) `rotate` (I# i#)
         | i'# ==# 0# = W16# x#
         | otherwise  = W16# (narrow16Word# ((x# `uncheckedShiftL#` i'#) `or#`
@@ -418,6 +405,7 @@ instance Bits Word16 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
     bitSize  _                = 16
     isSigned _                = False
+    popCount (W16# x#)        = I# (word2Int# (popCnt16# x#))
 
 {-# RULES
 "fromIntegral/Word8->Word16"   fromIntegral = \(W8# x#) -> W16# x#
@@ -460,103 +448,6 @@ instance Bits Word16 where
 ------------------------------------------------------------------------
 -- type Word32
 ------------------------------------------------------------------------
-
-#if WORD_SIZE_IN_BITS < 32
-
-data Word32 = W32# Word32#
--- ^ 32-bit unsigned integer type
-
-instance Eq Word32 where
-    (W32# x#) == (W32# y#) = x# `eqWord32#` y#
-    (W32# x#) /= (W32# y#) = x# `neWord32#` y#
-
-instance Ord Word32 where
-    (W32# x#) <  (W32# y#) = x# `ltWord32#` y#
-    (W32# x#) <= (W32# y#) = x# `leWord32#` y#
-    (W32# x#) >  (W32# y#) = x# `gtWord32#` y#
-    (W32# x#) >= (W32# y#) = x# `geWord32#` y#
-
-instance Num Word32 where
-    (W32# x#) + (W32# y#)  = W32# (int32ToWord32# (word32ToInt32# x# `plusInt32#` word32ToInt32# y#))
-    (W32# x#) - (W32# y#)  = W32# (int32ToWord32# (word32ToInt32# x# `minusInt32#` word32ToInt32# y#))
-    (W32# x#) * (W32# y#)  = W32# (int32ToWord32# (word32ToInt32# x# `timesInt32#` word32ToInt32# y#))
-    negate (W32# x#)       = W32# (int32ToWord32# (negateInt32# (word32ToInt32# x#)))
-    abs x                  = x
-    signum 0               = 0
-    signum _               = 1
-    fromInteger (S# i#)    = W32# (int32ToWord32# (intToInt32# i#))
-    fromInteger (J# s# d#) = W32# (integerToWord32# s# d#)
-
-instance Enum Word32 where
-    succ x
-        | x /= maxBound = x + 1
-        | otherwise     = succError "Word32"
-    pred x
-        | x /= minBound = x - 1
-        | otherwise     = predError "Word32"
-    toEnum i@(I# i#)
-        | i >= 0        = W32# (wordToWord32# (int2Word# i#))
-        | otherwise     = toEnumError "Word32" i (minBound::Word32, maxBound::Word32)
-    fromEnum x@(W32# x#)
-        | x <= fromIntegral (maxBound::Int)
-                        = I# (word2Int# (word32ToWord# x#))
-        | otherwise     = fromEnumError "Word32" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
-
-instance Integral Word32 where
-    quot    x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `quotWord32#` y#)
-        | otherwise                 = divZeroError
-    rem     x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `remWord32#` y#)
-        | otherwise                 = divZeroError
-    div     x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `quotWord32#` y#)
-        | otherwise                 = divZeroError
-    mod     x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `remWord32#` y#)
-        | otherwise                 = divZeroError
-    quotRem x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = (W32# (x# `quotWord32#` y#), W32# (x# `remWord32#` y#))
-        | otherwise                 = divZeroError
-    divMod  x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = (W32# (x# `quotWord32#` y#), W32# (x# `remWord32#` y#))
-        | otherwise                 = divZeroError
-    toInteger x@(W32# x#)
-        | x <= fromIntegral (maxBound::Int)  = S# (word2Int# (word32ToWord# x#))
-        | otherwise                 = case word32ToInteger# x# of (# s, d #) -> J# s d
-
-instance Bits Word32 where
-    {-# INLINE shift #-}
-
-    (W32# x#) .&.   (W32# y#)  = W32# (x# `and32#` y#)
-    (W32# x#) .|.   (W32# y#)  = W32# (x# `or32#`  y#)
-    (W32# x#) `xor` (W32# y#)  = W32# (x# `xor32#` y#)
-    complement (W32# x#)       = W32# (not32# x#)
-    (W32# x#) `shift` (I# i#)
-        | i# >=# 0#            = W32# (x# `shiftL32#` i#)
-        | otherwise            = W32# (x# `shiftRL32#` negateInt# i#)
-    (W32# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W32# x#
-        | otherwise  = W32# ((x# `shiftL32#` i'#) `or32#`
-                             (x# `shiftRL32#` (32# -# i'#)))
-        where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
-    bitSize  _                = 32
-    isSigned _                = False
-
-{-# RULES
-"fromIntegral/Int->Word32"    fromIntegral = \(I#   x#) -> W32# (int32ToWord32# (intToInt32# x#))
-"fromIntegral/Word->Word32"   fromIntegral = \(W#   x#) -> W32# (wordToWord32# x#)
-"fromIntegral/Word32->Int"    fromIntegral = \(W32# x#) -> I#   (word2Int# (word32ToWord# x#))
-"fromIntegral/Word32->Word"   fromIntegral = \(W32# x#) -> W#   (word32ToWord# x#)
-"fromIntegral/Word32->Word32" fromIntegral = id :: Word32 -> Word32
-  #-}
-
-#else 
 
 -- Word32 is represented in the same way as Word.
 #if WORD_SIZE_IN_BITS > 32
@@ -679,6 +570,11 @@ instance Bits Word32 where
     (W32# x#) `shift` (I# i#)
         | i# >=# 0#            = W32# (narrow32Word# (x# `shiftL#` i#))
         | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
+    (W32# x#) `shiftL` (I# i#) = W32# (narrow32Word# (x# `shiftL#` i#))
+    (W32# x#) `unsafeShiftL` (I# i#) =
+        W32# (narrow32Word# (x# `uncheckedShiftL#` i#))
+    (W32# x#) `shiftR` (I# i#) = W32# (x# `shiftRL#` i#)
+    (W32# x#) `unsafeShiftR` (I# i#) = W32# (x# `uncheckedShiftRL#` i#)
     (W32# x#) `rotate` (I# i#)
         | i'# ==# 0# = W32# x#
         | otherwise  = W32# (narrow32Word# ((x# `uncheckedShiftL#` i'#) `or#`
@@ -687,6 +583,7 @@ instance Bits Word32 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                = 32
     isSigned _                = False
+    popCount (W32# x#)        = I# (word2Int# (popCnt32# x#))
 
 {-# RULES
 "fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# x#
@@ -696,8 +593,6 @@ instance Bits Word32 where
 "fromIntegral/a->Word32"       fromIntegral = \x -> case fromIntegral x of W# x# -> W32# (narrow32Word# x#)
 "fromIntegral/Word32->a"       fromIntegral = \(W32# x#) -> fromIntegral (W# x#)
   #-}
-
-#endif
 
 instance Show Word32 where
 #if WORD_SIZE_IN_BITS < 33
@@ -805,6 +700,10 @@ instance Bits Word64 where
     (W64# x#) `shift` (I# i#)
         | i# >=# 0#            = W64# (x# `shiftL64#` i#)
         | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
+    (W64# x#) `shiftL` (I# i#) = W64# (x# `shiftL64#` i#)
+    (W64# x#) `unsafeShiftL` (I# i#) = W64# (x# `uncheckedShiftL64#` i#)
+    (W64# x#) `shiftR` (I# i#) = W64# (x# `shiftRL64#` i#)
+    (W64# x#) `unsafeShiftR` (I# i#) = W64# (x# `uncheckedShiftRL64#` i#)
     (W64# x#) `rotate` (I# i#)
         | i'# ==# 0# = W64# x#
         | otherwise  = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
@@ -813,6 +712,7 @@ instance Bits Word64 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
     isSigned _                = False
+    popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))
 
 -- give the 64-bit shift operations the same treatment as the 32-bit
 -- ones (see GHC.Base), namely we wrap them in tests to catch the
@@ -909,6 +809,10 @@ instance Bits Word64 where
     (W64# x#) `shift` (I# i#)
         | i# >=# 0#            = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
+    (W64# x#) `shiftL` (I# i#) = W64# (x# `shiftL#` i#)
+    (W64# x#) `unsafeShiftL` (I# i#) = W64# (x# `uncheckedShiftL#` i#)
+    (W64# x#) `shiftR` (I# i#) = W64# (x# `shiftRL#` i#)
+    (W64# x#) `unsafeShiftR` (I# i#) = W64# (x# `uncheckedShiftRL#` i#)
     (W64# x#) `rotate` (I# i#)
         | i'# ==# 0# = W64# x#
         | otherwise  = W64# ((x# `uncheckedShiftL#` i'#) `or#`
@@ -917,6 +821,7 @@ instance Bits Word64 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                = 64
     isSigned _                = False
+    popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))
 
 {-# RULES
 "fromIntegral/a->Word64" fromIntegral = \x -> case fromIntegral x of W# x# -> W64# x#
@@ -948,3 +853,4 @@ instance Ix Word64 where
 
 instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
+

@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, DeriveDataTypeable, MagicHash #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Exception
@@ -303,9 +304,12 @@ instance Show IOException where
          "" -> id
          _  -> showString " (" . showString s . showString ")")
 
+-- Note the use of "lazy". This means that
+--     assert False (throw e)
+-- will throw the assertion failure rather than e. See trac #5561.
 assertError :: Addr# -> Bool -> a -> a
 assertError str predicate v
-  | predicate = v
+  | predicate = lazy v
   | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
 
 unsupportedOperation :: IOError
@@ -336,3 +340,4 @@ untangle coded message
           _         -> (loc, "")
         }
     not_bar c = c /= '|'
+

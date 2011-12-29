@@ -50,8 +50,6 @@ module Data.Char
     , showLitChar       -- :: Char -> ShowS
     , lexLitChar        -- :: ReadS String
     , readLitChar       -- :: ReadS Char 
-
-     -- Implementation checked wrt. Haskell 98 lib report, 1/99.
     ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -209,3 +207,4 @@ isSeparator c = case generalCategory c of
 toTitle :: Char -> Char
 toTitle = toUpper
 #endif
+

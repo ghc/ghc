@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP
            , ForeignFunctionInterface
            , NoImplicitPrelude
@@ -35,7 +36,7 @@ import GHC.Real (fromIntegral)
 import GHC.Show (Show)
 import GHC.Word (Word8)
 import Foreign.C.Error (throwErrnoIfMinus1_)
-import Foreign.C.Types (CInt, CSize)
+import Foreign.C.Types (CInt(..), CSize(..))
 import Foreign.ForeignPtr (mallocForeignPtrBytes, withForeignPtr)
 import Foreign.Marshal (alloca, allocaBytes)
 import Foreign.Marshal.Array (allocaArray)
@@ -212,3 +213,4 @@ foreign import ccall "setIOManagerControlFd"
 
 foreign import ccall "setIOManagerWakeupFd"
    c_setIOManagerWakeupFd :: CInt -> IO ()
+

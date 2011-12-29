@@ -42,6 +42,8 @@ module Text.Read (
 #ifdef __GLASGOW_HASKELL__
    readListDefault,     -- :: Read a => ReadS [a]
    readListPrecDefault, -- :: Read a => ReadPrec [a]
+   readEither,          -- :: Read a => String -> Either String a
+   readMaybe            -- :: Read a => String -> Maybe a
 #endif
 
  ) where
@@ -50,6 +52,7 @@ module Text.Read (
 import GHC.Base
 import GHC.Read
 import Data.Either
+import Data.Maybe
 import Text.ParserCombinators.ReadP as P
 #endif
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
@@ -82,6 +85,9 @@ parens p = optional
 reads :: Read a => ReadS a
 reads = readsPrec minPrec
 
+-- | Parse a string using the 'Read' instance.
+-- Succeeds if there is exactly one valid result.
+-- A 'Left' value indicates a parse error.
 readEither :: Read a => String -> Either String a
 readEither s =
   case [ x | (x,"") <- readPrec_to_S read' minPrec s ] of
@@ -93,6 +99,13 @@ readEither s =
     do x <- readPrec
        lift P.skipSpaces
        return x
+
+-- | Parse a string using the 'Read' instance.
+-- Succeeds if there is exactly one valid result.
+readMaybe :: Read a => String -> Maybe a
+readMaybe s = case readEither s of
+                Left _  -> Nothing
+                Right a -> Just a
 
 -- | The 'read' function reads input from a string, which must be
 -- completely consumed by the input process.

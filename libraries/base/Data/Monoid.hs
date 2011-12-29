@@ -14,6 +14,7 @@
 --
 -- A class for monoids (types with an associative binary operation that
 -- has an identity) with various general-purpose instances.
+--
 -----------------------------------------------------------------------------
 
 module Data.Monoid (
@@ -276,3 +277,4 @@ prop_mconcatLast x =
         where listLastToMaybe [] = Nothing
               listLastToMaybe lst = Just (last lst)
 -- -}
+

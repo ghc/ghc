@@ -149,3 +149,4 @@ mapMaybe f (x:xs) =
   Just r  -> r:rs
 
 #endif /* else not __NHC__ */
+

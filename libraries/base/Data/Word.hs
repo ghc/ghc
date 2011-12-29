@@ -68,3 +68,4 @@ type Word = Word32
   truncate the shift count to the width of the type, for example @1 \<\<
   32 == 1@ in some C implementations. 
 -}
+

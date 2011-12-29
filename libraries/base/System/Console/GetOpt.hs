@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Console.GetOpt
@@ -392,3 +393,4 @@ processing to perform actions of the chosen monad, e.g. printing help or
 version messages, checking that file arguments exist, etc.
 
 -}
+

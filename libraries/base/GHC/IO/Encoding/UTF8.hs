@@ -357,3 +357,4 @@ validate4 x1 x2 x3 x4 = validate4_1 ||
                   between x2 0x80 0x8F &&
                   between x3 0x80 0xBF &&
                   between x4 0x80 0xBF
+

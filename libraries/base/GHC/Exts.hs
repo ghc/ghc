@@ -1,3 +1,4 @@
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE MagicHash, UnboxedTuples, DeriveDataTypeable #-}
 
 -----------------------------------------------------------------------------
@@ -49,8 +50,13 @@ module GHC.Exts
         traceEvent,
 
         -- * SpecConstr annotations
-        SpecConstrAnnotation(..)
+        SpecConstrAnnotation(..),
 
+        -- * The call stack
+        currentCallStack,
+
+        -- * The Constraint kind
+        Constraint
        ) where
 
 import Prelude
@@ -61,10 +67,11 @@ import GHC.Magic
 import GHC.Word
 import GHC.Int
 import GHC.Ptr
+import GHC.Stack
 import Data.String
 import Data.List
-import Foreign.C
 import Data.Data
+import qualified Debug.Trace
 
 -- XXX This should really be in Data.Tuple, where the definitions are
 maxTupleSize :: Int
@@ -112,10 +119,8 @@ groupByFB c n eq xs0 = groupByFBCore xs0
 -- tracing
 
 traceEvent :: String -> IO ()
-traceEvent msg = do
-  withCString msg $ \(Ptr p) -> IO $ \s ->
-    case traceEvent# p s of s' -> (# s', () #)
-
+traceEvent = Debug.Trace.traceEventIO
+{-# DEPRECATED traceEvent "Use Debug.Trace.traceEvent or Debug.Trace.traceEventIO" #-}
 
 
 {- **********************************************************************

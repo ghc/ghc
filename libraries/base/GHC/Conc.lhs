@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -38,6 +39,8 @@ module GHC.Conc
         , forkOnWithUnmask
         , numCapabilities -- :: Int
         , getNumCapabilities -- :: IO Int
+        , setNumCapabilities -- :: Int -> IO ()
+        , getNumProcessors   -- :: IO Int
         , numSparks       -- :: IO Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId

@@ -17,3 +17,4 @@ isDigit         :: Char -> Bool
 isOctDigit      :: Char -> Bool
 isHexDigit      :: Char -> Bool
 isAlphaNum      :: Char -> Bool
+

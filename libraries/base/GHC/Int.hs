@@ -1,13 +1,14 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, 
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash,
              StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Int
 -- Copyright   :  (c) The University of Glasgow 1997-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -26,9 +27,6 @@ module GHC.Int (
 
 import Data.Bits
 
-#if WORD_SIZE_IN_BITS < 32
-import GHC.IntWord32
-#endif
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
 #endif
@@ -68,7 +66,7 @@ instance Num Int8 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I8# (narrow8Int# (toInt# i))
+    fromInteger i          = I8# (narrow8Int# (integerToInt i))
 
 instance Real Int8 where
     toRational x = toInteger x % 1
@@ -93,26 +91,26 @@ instance Integral Int8 where
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I8# (narrow8Int# (x# `quotInt#` y#))
-    rem     x@(I8# x#) y@(I8# y#)
+    rem     (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I8# (narrow8Int# (x# `remInt#` y#))
     div     x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I8# (narrow8Int# (x# `divInt#` y#))
-    mod     x@(I8# x#) y@(I8# y#)
+    mod       (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I8# (narrow8Int# (x# `modInt#` y#))
     quotRem x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I8# (narrow8Int# (x# `quotInt#` y#)),
                                        I8# (narrow8Int# (x# `remInt#` y#)))
     divMod  x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I8# (narrow8Int# (x# `divInt#` y#)),
                                        I8# (narrow8Int# (x# `modInt#` y#)))
     toInteger (I8# x#)               = smallInteger x#
@@ -139,8 +137,12 @@ instance Bits Int8 where
     (I8# x#) `shift` (I# i#)
         | i# >=# 0#           = I8# (narrow8Int# (x# `iShiftL#` i#))
         | otherwise           = I8# (x# `iShiftRA#` negateInt# i#)
+    (I8# x#) `shiftL` (I# i#) = I8# (narrow8Int# (x# `iShiftL#` i#))
+    (I8# x#) `unsafeShiftL` (I# i#) = I8# (narrow8Int# (x# `uncheckedIShiftL#` i#))
+    (I8# x#) `shiftR` (I# i#) = I8# (x# `iShiftRA#` i#)
+    (I8# x#) `unsafeShiftR` (I# i#) = I8# (x# `uncheckedIShiftRA#` i#)
     (I8# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I8# x#
         | otherwise
         = I8# (narrow8Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -150,6 +152,7 @@ instance Bits Int8 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
     bitSize  _                = 8
     isSigned _                = True
+    popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
@@ -210,7 +213,7 @@ instance Num Int16 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I16# (narrow16Int# (toInt# i))
+    fromInteger i          = I16# (narrow16Int# (integerToInt i))
 
 instance Real Int16 where
     toRational x = toInteger x % 1
@@ -235,26 +238,26 @@ instance Integral Int16 where
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I16# (narrow16Int# (x# `quotInt#` y#))
-    rem     x@(I16# x#) y@(I16# y#)
+    rem       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I16# (narrow16Int# (x# `remInt#` y#))
     div     x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I16# (narrow16Int# (x# `divInt#` y#))
-    mod     x@(I16# x#) y@(I16# y#)
+    mod       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I16# (narrow16Int# (x# `modInt#` y#))
     quotRem x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I16# (narrow16Int# (x# `quotInt#` y#)),
                                         I16# (narrow16Int# (x# `remInt#` y#)))
     divMod  x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I16# (narrow16Int# (x# `divInt#` y#)),
                                         I16# (narrow16Int# (x# `modInt#` y#)))
     toInteger (I16# x#)              = smallInteger x#
@@ -281,8 +284,12 @@ instance Bits Int16 where
     (I16# x#) `shift` (I# i#)
         | i# >=# 0#            = I16# (narrow16Int# (x# `iShiftL#` i#))
         | otherwise            = I16# (x# `iShiftRA#` negateInt# i#)
+    (I16# x#) `shiftL` (I# i#) = I16# (narrow16Int# (x# `iShiftL#` i#))
+    (I16# x#) `unsafeShiftL` (I# i#) = I16# (narrow16Int# (x# `uncheckedIShiftL#` i#))
+    (I16# x#) `shiftR` (I# i#) = I16# (x# `iShiftRA#` i#)
+    (I16# x#) `unsafeShiftR` (I# i#) = I16# (x# `uncheckedIShiftRA#` i#)
     (I16# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I16# x#
         | otherwise
         = I16# (narrow16Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -292,6 +299,7 @@ instance Bits Int16 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
     bitSize  _                 = 16
     isSigned _                 = True
+    popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
 
 
 {-# RULES
@@ -336,140 +344,6 @@ instance Bits Int16 where
 -- type Int32
 ------------------------------------------------------------------------
 
-#if WORD_SIZE_IN_BITS < 32
-
-data Int32 = I32# Int32#
--- ^ 32-bit signed integer type
-
-instance Eq Int32 where
-    (I32# x#) == (I32# y#) = x# `eqInt32#` y#
-    (I32# x#) /= (I32# y#) = x# `neInt32#` y#
-
-instance Ord Int32 where
-    (I32# x#) <  (I32# y#) = x# `ltInt32#` y#
-    (I32# x#) <= (I32# y#) = x# `leInt32#` y#
-    (I32# x#) >  (I32# y#) = x# `gtInt32#` y#
-    (I32# x#) >= (I32# y#) = x# `geInt32#` y#
-
-instance Show Int32 where
-    showsPrec p x = showsPrec p (toInteger x)
-
-instance Num Int32 where
-    (I32# x#) + (I32# y#)  = I32# (x# `plusInt32#`  y#)
-    (I32# x#) - (I32# y#)  = I32# (x# `minusInt32#` y#)
-    (I32# x#) * (I32# y#)  = I32# (x# `timesInt32#` y#)
-    negate (I32# x#)       = I32# (negateInt32# x#)
-    abs x | x >= 0         = x
-          | otherwise      = negate x
-    signum x | x > 0       = 1
-    signum 0               = 0
-    signum _               = -1
-    fromInteger (S# i#)    = I32# (intToInt32# i#)
-    fromInteger (J# s# d#) = I32# (integerToInt32# s# d#)
-
-instance Enum Int32 where
-    succ x
-        | x /= maxBound = x + 1
-        | otherwise     = succError "Int32"
-    pred x
-        | x /= minBound = x - 1
-        | otherwise     = predError "Int32"
-    toEnum (I# i#)      = I32# (intToInt32# i#)
-    fromEnum x@(I32# x#)
-        | x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
-                        = I# (int32ToInt# x#)
-        | otherwise     = fromEnumError "Int32" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
-
-instance Integral Int32 where
-    quot    x@(I32# x#) y@(I32# y#)
-        | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I32# (x# `quotInt32#` y#)
-    rem     x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise               = I32# (x# `remInt32#` y#)
-    div     x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise               = I32# (x# `divInt32#` y#)
-    mod     x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise               = I32# (x# `modInt32#` y#)
-    quotRem x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise               = (I32# (x# `quotInt32#` y#),
-                                     I32# (x# `remInt32#` y#))
-    divMod  x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise               = (I32# (x# `divInt32#` y#),
-                                     I32# (x# `modInt32#` y#))
-    toInteger x@(I32# x#)
-	| x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
-                                  = smallInteger (int32ToInt# x#)
-        | otherwise               = case int32ToInteger# x# of (# s, d #) -> J# s d
-
-divInt32#, modInt32# :: Int32# -> Int32# -> Int32#
-x# `divInt32#` y#
-    | (x# `gtInt32#` intToInt32# 0#) && (y# `ltInt32#` intToInt32# 0#)
-        = ((x# `minusInt32#` y#) `minusInt32#` intToInt32# 1#) `quotInt32#` y#
-    | (x# `ltInt32#` intToInt32# 0#) && (y# `gtInt32#` intToInt32# 0#)
-        = ((x# `minusInt32#` y#) `plusInt32#` intToInt32# 1#) `quotInt32#` y#
-    | otherwise                = x# `quotInt32#` y#
-x# `modInt32#` y#
-    | (x# `gtInt32#` intToInt32# 0#) && (y# `ltInt32#` intToInt32# 0#) ||
-      (x# `ltInt32#` intToInt32# 0#) && (y# `gtInt32#` intToInt32# 0#)
-        = if r# `neInt32#` intToInt32# 0# then r# `plusInt32#` y# else intToInt32# 0#
-    | otherwise = r#
-    where
-    r# = x# `remInt32#` y#
-
-instance Read Int32 where
-    readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
-
-instance Bits Int32 where
-    {-# INLINE shift #-}
-
-    (I32# x#) .&.   (I32# y#)  = I32# (word32ToInt32# (int32ToWord32# x# `and32#` int32ToWord32# y#))
-    (I32# x#) .|.   (I32# y#)  = I32# (word32ToInt32# (int32ToWord32# x# `or32#`  int32ToWord32# y#))
-    (I32# x#) `xor` (I32# y#)  = I32# (word32ToInt32# (int32ToWord32# x# `xor32#` int32ToWord32# y#))
-    complement (I32# x#)       = I32# (word32ToInt32# (not32# (int32ToWord32# x#)))
-    (I32# x#) `shift` (I# i#)
-        | i# >=# 0#            = I32# (x# `iShiftL32#` i#)
-        | otherwise            = I32# (x# `iShiftRA32#` negateInt# i#)
-    (I32# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
-        = I32# x#
-        | otherwise
-        = I32# (word32ToInt32# ((x'# `shiftL32#` i'#) `or32#`
-                                (x'# `shiftRL32#` (32# -# i'#))))
-        where
-        x'# = int32ToWord32# x#
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
-    bitSize  _                 = 32
-    isSigned _                 = True
-
-
-{-# RULES
-"fromIntegral/Int->Int32"    fromIntegral = \(I#   x#) -> I32# (intToInt32# x#)
-"fromIntegral/Word->Int32"   fromIntegral = \(W#   x#) -> I32# (word32ToInt32# (wordToWord32# x#))
-"fromIntegral/Word32->Int32" fromIntegral = \(W32# x#) -> I32# (word32ToInt32# x#)
-"fromIntegral/Int32->Int"    fromIntegral = \(I32# x#) -> I#   (int32ToInt# x#)
-"fromIntegral/Int32->Word"   fromIntegral = \(I32# x#) -> W#   (int2Word# (int32ToInt# x#))
-"fromIntegral/Int32->Word32" fromIntegral = \(I32# x#) -> W32# (int32ToWord32# x#)
-"fromIntegral/Int32->Int32"  fromIntegral = id :: Int32 -> Int32
-  #-}
-
--- No rules for RealFrac methods if Int32 is larger than Int
-#else
-
 -- Int32 is represented in the same way as Int.
 #if WORD_SIZE_IN_BITS > 32
 -- Operations may assume and must ensure that it holds only values
@@ -492,7 +366,7 @@ instance Num Int32 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I32# (narrow32Int# (toInt# i))
+    fromInteger i          = I32# (narrow32Int# (integerToInt i))
 
 instance Enum Int32 where
     succ x
@@ -518,26 +392,34 @@ instance Integral Int32 where
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I32# (narrow32Int# (x# `quotInt#` y#))
-    rem     x@(I32# x#) y@(I32# y#)
+    rem       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- The quotRem CPU instruction fails for minBound `quotRem` -1,
+          -- but minBound `rem` -1 is well-defined (0). We therefore
+          -- special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I32# (narrow32Int# (x# `remInt#` y#))
     div     x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I32# (narrow32Int# (x# `divInt#` y#))
-    mod     x@(I32# x#) y@(I32# y#)
+    mod       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- The divMod CPU instruction fails for minBound `divMod` -1,
+          -- but minBound `mod` -1 is well-defined (0). We therefore
+          -- special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I32# (narrow32Int# (x# `modInt#` y#))
     quotRem x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I32# (narrow32Int# (x# `quotInt#` y#)),
                                      I32# (narrow32Int# (x# `remInt#` y#)))
     divMod  x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I32# (narrow32Int# (x# `divInt#` y#)),
                                      I32# (narrow32Int# (x# `modInt#` y#)))
     toInteger (I32# x#)              = smallInteger x#
@@ -555,8 +437,13 @@ instance Bits Int32 where
     (I32# x#) `shift` (I# i#)
         | i# >=# 0#            = I32# (narrow32Int# (x# `iShiftL#` i#))
         | otherwise            = I32# (x# `iShiftRA#` negateInt# i#)
+    (I32# x#) `shiftL` (I# i#) = I32# (narrow32Int# (x# `iShiftL#` i#))
+    (I32# x#) `unsafeShiftL` (I# i#) =
+        I32# (narrow32Int# (x# `uncheckedIShiftL#` i#))
+    (I32# x#) `shiftR` (I# i#) = I32# (x# `iShiftRA#` i#)
+    (I32# x#) `unsafeShiftR` (I# i#) = I32# (x# `uncheckedIShiftRA#` i#)
     (I32# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I32# x#
         | otherwise
         = I32# (narrow32Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -566,6 +453,7 @@ instance Bits Int32 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                 = 32
     isSigned _                 = True
+    popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (word2Int# x#)
@@ -606,8 +494,6 @@ instance Bits Int32 where
 "round/Double->Int32"
     forall x. round    (x :: Double) = (fromIntegral :: Int -> Int32) (round x)
   #-}
-
-#endif
 
 instance Real Int32 where
     toRational x = toInteger x % 1
@@ -677,26 +563,34 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I64# (x# `quotInt64#` y#)
-    rem     x@(I64# x#) y@(I64# y#)
+    rem       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- The quotRem CPU instruction fails for minBound `quotRem` -1,
+          -- but minBound `rem` -1 is well-defined (0). We therefore
+          -- special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I64# (x# `remInt64#` y#)
     div     x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I64# (x# `divInt64#` y#)
-    mod     x@(I64# x#) y@(I64# y#)
+    mod       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- The divMod CPU instruction fails for minBound `divMod` -1,
+          -- but minBound `mod` -1 is well-defined (0). We therefore
+          -- special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I64# (x# `modInt64#` y#)
     quotRem x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I64# (x# `quotInt64#` y#),
                                         I64# (x# `remInt64#` y#))
     divMod  x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I64# (x# `divInt64#` y#),
                                         I64# (x# `modInt64#` y#))
     toInteger (I64# x)               = int64ToInteger x
@@ -730,8 +624,12 @@ instance Bits Int64 where
     (I64# x#) `shift` (I# i#)
         | i# >=# 0#            = I64# (x# `iShiftL64#` i#)
         | otherwise            = I64# (x# `iShiftRA64#` negateInt# i#)
+    (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL64#` i#)
+    (I64# x#) `unsafeShiftL` (I# i#) = I64# (x# `uncheckedIShiftL64#` i#)
+    (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA64#` i#)
+    (I64# x#) `unsafeShiftR` (I# i#) = I64# (x# `uncheckedIShiftRA64#` i#)
     (I64# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I64# x#
         | otherwise
         = I64# (word64ToInt64# ((x'# `uncheckedShiftL64#` i'#) `or64#`
@@ -741,6 +639,8 @@ instance Bits Int64 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                 = 64
     isSigned _                 = True
+    popCount (I64# x#)         =
+        I# (word2Int# (popCnt64# (int64ToWord64# x#)))
 
 -- give the 64-bit shift operations the same treatment as the 32-bit
 -- ones (see GHC.Base), namely we wrap them in tests to catch the
@@ -752,8 +652,8 @@ iShiftL64#, iShiftRA64# :: Int64# -> Int# -> Int64#
 a `iShiftL64#` b  | b >=# 64# = intToInt64# 0#
 		  | otherwise = a `uncheckedIShiftL64#` b
 
-a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#) 
-					then intToInt64# (-1#) 
+a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#)
+					then intToInt64# (-1#)
 					else intToInt64# 0#
 		  | otherwise = a `uncheckedIShiftRA64#` b
 
@@ -791,7 +691,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I64# (toInt# i)
+    fromInteger i          = I64# (integerToInt i)
 
 instance Enum Int64 where
     succ x
@@ -810,25 +710,33 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I64# (x# `quotInt#` y#)
-    rem     x@(I64# x#) y@(I64# y#)
+    rem       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- The quotRem CPU instruction fails for minBound `quotRem` -1,
+          -- but minBound `rem` -1 is well-defined (0). We therefore
+          -- special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I64# (x# `remInt#` y#)
     div     x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
         | otherwise                  = I64# (x# `divInt#` y#)
-    mod     x@(I64# x#) y@(I64# y#)
+    mod       (I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- The divMod CPU instruction fails for minBound `divMod` -1,
+          -- but minBound `mod` -1 is well-defined (0). We therefore
+          -- special-case it.
+        | y == (-1)                  = 0
         | otherwise                  = I64# (x# `modInt#` y#)
     quotRem x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I64# (x# `quotInt#` y#), I64# (x# `remInt#` y#))
     divMod  x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
+          -- Note [Order of tests]
+        | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I64# (x# `divInt#` y#), I64# (x# `modInt#` y#))
     toInteger (I64# x#)              = smallInteger x#
 
@@ -845,8 +753,12 @@ instance Bits Int64 where
     (I64# x#) `shift` (I# i#)
         | i# >=# 0#            = I64# (x# `iShiftL#` i#)
         | otherwise            = I64# (x# `iShiftRA#` negateInt# i#)
+    (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL#` i#)
+    (I64# x#) `unsafeShiftL` (I# i#) = I64# (x# `uncheckedIShiftL#` i#)
+    (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA#` i#)
+    (I64# x#) `unsafeShiftR` (I# i#) = I64# (x# `uncheckedIShiftRA#` i#)
     (I64# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I64# x#
         | otherwise
         = I64# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -856,6 +768,7 @@ instance Bits Int64 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                 = 64
     isSigned _                 = True
+    popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#

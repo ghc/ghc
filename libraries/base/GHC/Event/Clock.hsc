@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface, CApiFFI #-}
 
 module GHC.Event.Clock (getCurrentTime) where
 
@@ -6,7 +7,7 @@ module GHC.Event.Clock (getCurrentTime) where
 
 import Foreign (Ptr, Storable(..), nullPtr, with)
 import Foreign.C.Error (throwErrnoIfMinus1_)
-import Foreign.C.Types (CInt, CLong, CTime, CSUSeconds)
+import Foreign.C.Types
 import GHC.Base
 import GHC.Err
 import GHC.Num
@@ -44,5 +45,6 @@ instance Storable CTimeval where
         #{poke struct timeval, tv_sec} ptr (sec tv)
         #{poke struct timeval, tv_usec} ptr (usec tv)
 
-foreign import ccall unsafe "sys/time.h gettimeofday" gettimeofday
+foreign import capi unsafe "HsBase.h gettimeofday" gettimeofday
     :: Ptr CTimeval -> Ptr () -> IO CInt
+
