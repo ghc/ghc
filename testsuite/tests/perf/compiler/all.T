@@ -206,3 +206,29 @@ test('T783',
                                                       450000000))
       ],
       compile,[''])
+
+test('T5321Fun',
+     [ only_ways(['normal']),  # no optimisation for this one
+      # expected value: 175,569,928 (x86/Linux)
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 1000000000,
+                                                      1100000000)),
+      # expected value: 390895576 (amd64/Linux):
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 2000000000,
+                                                      2200000000))
+      ],
+      compile,[''])
+
+test('T5321FD',
+     [ only_ways(['normal']),  # no optimisation for this one
+      # expected value: 175,569,928 (x86/Linux)
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 500000000,
+                                                      600000000)),
+      # expected value: 390895576 (amd64/Linux):
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 1000000000,
+                                                      1200000000))
+      ],
+      compile,[''])
