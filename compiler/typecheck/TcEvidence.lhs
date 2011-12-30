@@ -466,6 +466,9 @@ data EvTerm
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
   | EvKindCast EvVar TcCoercion  -- See Note [EvKindCast]
+
+  | EvInteger Integer            -- The dictionary for class "NatI"
+                                 -- Note [EvInteger]
            
   deriving( Data.Data, Data.Typeable)
 \end{code}
@@ -503,6 +506,38 @@ Conclusion: a new wanted coercion variable should be made mutable.
  from super classes will be "given" and hence rigid]
 
 
+Note [EvInteger]
+~~~~~~~~~~~~~~~~
+A part of the type-level naturals implementation is the class "NatI",
+which provides a "smart" constructor for defining singleton values.
+
+newtype NatS (n :: Nat) = NatS Integer
+
+class NatI n where
+  natS :: NatS n
+
+Conceptually, this class has infinitely many instances:
+
+instance NatI 0 where natS = NatS 0
+instance NatI 1 where natS = NatS 1
+instance NatI 2 where natS = NatS 2
+...
+
+In practice, we solve "NatI" predicates in the type-checker because we can't
+have infinately many instances.  The evidence (aka "dictionary")
+for "NatI n" is of the form "EvInteger n".
+
+We make the following assumptions about dictionaries in GHC:
+  1. The "dictionary" for classes with a single method---like NatI---is
+     a newtype for the type of the method, so using a evidence amounts
+     to a coercion, and
+  2. Newtypes use the same representation as their definition types.
+
+So, the evidence for "NatI" is just an integer wrapped in 2 newtypes:
+one to make it into a "NatS" value, and another to make it into "NatI" evidence.
+
+
+
 \begin{code}
 mkEvCast :: EvVar -> TcCoercion -> EvTerm
 mkEvCast ev lco
@@ -531,6 +566,7 @@ evVarsOfTerm (EvSuperClass v _)  = [v]
 evVarsOfTerm (EvCast v co)       = v : varSetElems (coVarsOfTcCo co)
 evVarsOfTerm (EvTupleMk evs)     = evs
 evVarsOfTerm (EvKindCast v co)   = v : varSetElems (coVarsOfTcCo co)
+evVarsOfTerm (EvInteger _)       = []
 \end{code}
 
 
@@ -590,5 +626,6 @@ instance Outputable EvTerm where
   ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
+  ppr (EvInteger n)      = integer n
 \end{code}
 

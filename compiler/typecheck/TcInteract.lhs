@@ -26,6 +26,7 @@ import Var
 import VarEnv ( ) -- unitVarEnv, mkInScopeSet
 
 import TcType
+import PrelNames (typeNatClassName)
 
 import Class
 import TyCon
@@ -56,6 +57,7 @@ import Pair ( pSnd )
 import UniqFM
 import FastString ( sLit ) 
 import DynFlags
+import Data.Word(Word)
 \end{code}
 **********************************************************************
 *                                                                    * 
@@ -1770,6 +1772,13 @@ data LookupInstResult
   | GenInst [WantedEvVar] EvTerm 
 
 matchClassInst :: InertSet -> Class -> [Type] -> WantedLoc -> TcS LookupInstResult
+
+matchClassInst _ clas [ ty ] _
+  | className clas == typeNatClassName
+  , Just n <- isNumberTy ty
+  , n <= fromIntegral (maxBound :: Word) = return (GenInst [] (EvInteger n))
+
+
 matchClassInst inerts clas tys loc
    = do { let pred = mkClassPred clas tys 
         ; mb_result <- matchClass clas tys

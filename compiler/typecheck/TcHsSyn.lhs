@@ -1112,6 +1112,7 @@ zonkEvTerm env (EvKindCast v co) = ASSERT( isId v)
 
 zonkEvTerm env (EvTupleSel v n)   = return (EvTupleSel (zonkIdOcc env v) n)
 zonkEvTerm env (EvTupleMk vs)     = return (EvTupleMk (map (zonkIdOcc env) vs))
+zonkEvTerm _   (EvInteger n)      = return (EvInteger n)
 zonkEvTerm env (EvSuperClass d n) = return (EvSuperClass (zonkIdOcc env d) n)
 zonkEvTerm env (EvDFunApp df tys tms)
   = do { tys' <- zonkTcTypeToTypes env tys

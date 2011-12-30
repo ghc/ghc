@@ -65,6 +65,7 @@ import FastString
 import Util
 
 import MonadUtils
+import Data.Word(Word)
 \end{code}
 
 %************************************************************************
@@ -706,6 +707,14 @@ dsEvTerm (EvSuperClass d n)
   where
     sc_sel_id  = classSCSelId cls n	-- Zero-indexed
     (cls, tys) = getClassPredTys (evVarPred d)    
+
+-- It would be better to make an Integer expression here, but this would
+-- require quite a bit of the surrounding code to be monadified.
+-- In the intereset of simplicity (and keeping changes incremental) we
+-- leave this for a later day.
+dsEvTerm (EvInteger n)
+  | n > fromIntegral (maxBound :: Word) = panic "dsEvTerm: Integer too big!"
+  | otherwise = mkWordExprWord (fromInteger n)
 
 ---------------------------------------
 dsTcCoercion :: TcCoercion -> (Coercion -> CoreExpr) -> CoreExpr
