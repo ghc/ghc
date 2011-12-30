@@ -17,7 +17,7 @@ module GHC.TypeNats
   , (:<=), (:+), (:*), (:^)
   ) where
 
-import GHC.Integer(Integer)
+import GHC.Word(Word)
 
 -- | This is the *kind* of type-level natural numbers.
 data Nat
@@ -38,13 +38,19 @@ type family (m :: Nat) :^ (n :: Nat) :: Nat
 -- | The type @NatS n@ is m \"singleton\" type containing only the value @n@.
 -- (Technically, there is also a bottom element).
 -- This type relates type-level naturals to run-time values.
-newtype NatS (n :: Nat) = NatS Integer
+-- NOTE: For the moment we support only singleton types that can fit in
+-- a 'Word'.
+newtype NatS (n :: Nat) = NatS Word
 
 -- | The class 'NatI' provides a \"smart\" constructor for values
--- of type @Nat n@.  There are built-in instances for all natural numbers.
+-- of type @Nat n@.  There are built-in instances for all natural numbers
+-- that fit in a 'Word'.  The 'Word' restriction can be lifted but that
+-- would require a bunch of code in "deSugar/DsBinds" to be monadified,
+-- because making integer expression is a monadic operation.  Not hard,
+-- but not yet done.
 --
 -- NOTE: The instances for 'NatI' are provided directly by GHC.
--- The built-in instances use the integer corresponding to the instance
+-- The built-in instances use the number corresponding to the instance
 -- as evidence.  This works because of the following two details about GHC:
 --   * The "dictionary" for classes with a single method is the method itself,
 --     so GHC simply coerces the dictionary into the value, and
