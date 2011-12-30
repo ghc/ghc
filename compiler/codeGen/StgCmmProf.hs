@@ -223,14 +223,14 @@ emitCostCentreDecl cc = do
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.
                 -- Hence don't emit the package name in the module here.
-  ; let lits = [ zero,   	-- StgInt ccID,
-	      	 label,	-- char *label,
-                 modl,  -- char *module,
-                 loc,   -- char *srcloc,
-                 zero,  -- StgWord time_ticks
-              	 zero64,	-- StgWord64 mem_alloc
-                 is_caf,   -- StgInt is_caf
-                 zero   -- struct _CostCentre *link
+  ; let lits = [ zero,    -- StgInt ccID,
+	      	 label,	  -- char *label,
+                 modl,    -- char *module,
+                 loc,     -- char *srcloc,
+                 zero64,  -- StgWord64 mem_alloc
+                 zero,    -- StgWord time_ticks
+                 is_caf,  -- StgInt is_caf
+                 zero     -- struct _CostCentre *link
 	       ] 
   ; emitDataLits (mkCCLabel cc) lits
   }

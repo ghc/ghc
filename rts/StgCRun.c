@@ -29,12 +29,24 @@
 #include "PosixSource.h"
 #include "ghcconfig.h"
 
+#ifdef sparc_HOST_ARCH
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
 #define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
+#else
+/* The other architectures do not require the actual register macro definitions
+ * here because they use hand written assembly to implement the StgRun
+ * function. Including Stg.h first will define the R1 values using GCC specific
+ * techniques, which we don't want for LLVM based C compilers. Since we don't
+ * actually need the real machine register definitions here, we include the
+ * headers in the opposite order to allow LLVM-based C compilers to work.
+ */
+#include "Rts.h"
+#include "Stg.h"
+#endif
 
 #include "StgRun.h"
 #include "Capability.h"

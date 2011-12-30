@@ -1,17 +1,11 @@
 %
 % (c) The University of Glasgow 2006
-% (c) The University of Glasgow 1992-2002
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
 
 -- | Highly random utility functions
+--
 module Util (
         -- * Flags dependent on the compiler build
         ghciSupported, debugIsOn, ncgDebugIsOn,
@@ -21,13 +15,13 @@ module Util (
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith,
-        
+
         unzipWith,
-        
+
         mapFst, mapSnd,
         mapAndUnzip, mapAndUnzip3,
         nOfThem, filterOut, partitionWith, splitEithers,
-        
+
         foldl1', foldl2, count, all2,
 
         lengthExceeds, lengthIs, lengthAtLeast,
@@ -51,13 +45,13 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortLe, sortWith, minWith, on, 
+        sortLe, sortWith, minWith, on,
 
         -- * Comparisons
         isEqual, eqListBy, eqMaybeBy,
         thenCmp, cmpList,
         removeSpaces,
-        
+
         -- * Edit distance
         fuzzyMatch, fuzzyLookup,
 
@@ -219,9 +213,9 @@ nTimes n f = f . nTimes (n-1) f
 \end{code}
 
 \begin{code}
-fstOf3   :: (a,b,c) -> a    
-sndOf3   :: (a,b,c) -> b    
-thirdOf3 :: (a,b,c) -> c    
+fstOf3   :: (a,b,c) -> a
+sndOf3   :: (a,b,c) -> b
+thirdOf3 :: (a,b,c) -> c
 fstOf3      (a,_,_) =  a
 sndOf3      (_,b,_) =  b
 thirdOf3    (_,_,c) =  c
@@ -760,7 +754,7 @@ restrictedDamerauLevenshteinDistanceWithLengths m n str1 str2
 
 restrictedDamerauLevenshteinDistance'
   :: (Bits bv) => bv -> Int -> Int -> String -> String -> Int
-restrictedDamerauLevenshteinDistance' _bv_dummy m n str1 str2 
+restrictedDamerauLevenshteinDistance' _bv_dummy m n str1 str2
   | [] <- str1 = n
   | otherwise  = extractAnswer $
                  foldl' (restrictedDamerauLevenshteinDistanceWorker
@@ -782,19 +776,19 @@ restrictedDamerauLevenshteinDistanceWorker str1_mvs top_bit_mask vector_mask
     (pm', d0', vp', vn', distance'')
   where
     pm' = IM.findWithDefault 0 (ord char2) str1_mvs
-    
+
     d0' = ((((sizedComplement vector_mask d0) .&. pm') `shiftL` 1) .&. pm)
       .|. ((((pm' .&. vp) + vp) .&. vector_mask) `xor` vp) .|. pm' .|. vn
           -- No need to mask the shiftL because of the restricted range of pm
 
     hp' = vn .|. sizedComplement vector_mask (d0' .|. vp)
     hn' = d0' .&. vp
-    
+
     hp'_shift = ((hp' `shiftL` 1) .|. 1) .&. vector_mask
     hn'_shift = (hn' `shiftL` 1) .&. vector_mask
     vp' = hn'_shift .|. sizedComplement vector_mask (d0' .|. hp'_shift)
     vn' = d0' .&. hp'_shift
-    
+
     distance' = if hp' .&. top_bit_mask /= 0 then distance + 1 else distance
     distance'' = if hn' .&. top_bit_mask /= 0 then distance' - 1 else distance'
 
@@ -843,16 +837,16 @@ fuzzyLookup user_entered possibilites
                                             poss_str user_entered
                        , distance <= fuzzy_threshold ]
   where
-    -- Work out an approriate match threshold: 
-    -- We report a candidate if its edit distance is <= the threshold, 
+    -- Work out an approriate match threshold:
+    -- We report a candidate if its edit distance is <= the threshold,
     -- The threshhold is set to about a quarter of the # of characters the user entered
-    -- 	 Length    Threshold
-    --	   1	     0		-- Don't suggest *any* candidates
-    --	   2	     1		-- for single-char identifiers
-    -- 	   3	     1
-    --	   4	     1
-    --	   5	     1
-    --	   6	     2
+    --   Length    Threshold
+    --     1         0          -- Don't suggest *any* candidates
+    --     2         1          -- for single-char identifiers
+    --     3         1
+    --     4         1
+    --     5         1
+    --     6         2
     --
     fuzzy_threshold = truncate $ fromIntegral (length user_entered + 2) / (4 :: Rational)
     mAX_RESULTS = 3
@@ -1129,14 +1123,15 @@ abstractDataType n = mkDataType n [abstractConstr n]
 
 \begin{code}
 charToC :: Word8 -> String
-charToC w = 
+charToC w =
   case chr (fromIntegral w) of
-	'\"' -> "\\\""
-	'\'' -> "\\\'"
-	'\\' -> "\\\\"
-	c | c >= ' ' && c <= '~' -> [c]
+        '\"' -> "\\\""
+        '\'' -> "\\\'"
+        '\\' -> "\\\\"
+        c | c >= ' ' && c <= '~' -> [c]
           | otherwise -> ['\\',
                          chr (ord '0' + ord c `div` 64),
                          chr (ord '0' + ord c `div` 8 `mod` 8),
                          chr (ord '0' + ord c         `mod` 8)]
 \end{code}
+

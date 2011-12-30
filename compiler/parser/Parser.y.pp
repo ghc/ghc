@@ -35,7 +35,7 @@ import RdrName
 import TcEvidence       ( emptyTcEvBinds )
 import TysPrim          ( liftedTypeKindTyConName, eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
-                          unboxedSingletonTyCon, unboxedSingletonDataCon,
+                          unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 import Type             ( funTyCon )
 import ForeignCall      ( Safety(..), CExportSpec(..), CLabelString,
@@ -1047,20 +1047,22 @@ btype :: { LHsType RdrName }
         | atype                         { $1 }
 
 atype :: { LHsType RdrName }
-        : gtycon                        { L1 (HsTyVar (unLoc $1)) }
-        | tyvar                         { L1 (HsTyVar (unLoc $1)) }
-        | strict_mark atype             { LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
-        | '{' fielddecls '}'            {% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
-        | '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy HsBoxedOrConstraintTuple  ($2:$4) }
-        | '(#' comma_types1 '#)'        { LL $ HsTupleTy HsUnboxedTuple $2     }
-        | '[' ctype ']'                 { LL $ HsListTy  $2 }
-        | '[:' ctype ':]'               { LL $ HsPArrTy  $2 }
-        | '(' ctype ')'                 { LL $ HsParTy   $2 }
-        | '(' ctype '::' kind ')'       { LL $ HsKindSig $2 $4 }
-        | quasiquote                    { L1 (HsQuasiQuoteTy (unLoc $1)) }
-        | '$(' exp ')'                  { LL $ mkHsSpliceTy $2 }
-        | TH_ID_SPLICE                  { LL $ mkHsSpliceTy $ L1 $ HsVar $
-                                          mkUnqual varName (getTH_ID_SPLICE $1) }
+        : ntgtycon                       { L1 (HsTyVar (unLoc $1)) }      -- Not including unit tuples
+        | tyvar                          { L1 (HsTyVar (unLoc $1)) }      -- (See Note [Unit tuples])
+        | strict_mark atype              { LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
+        | '{' fielddecls '}'             {% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
+        | '(' ')'                        { LL $ HsTupleTy HsBoxedOrConstraintTuple []      }
+        | '(' ctype ',' comma_types1 ')' { LL $ HsTupleTy HsBoxedOrConstraintTuple ($2:$4) }
+        | '(#' '#)'                      { LL $ HsTupleTy HsUnboxedTuple           []      }       
+        | '(#' comma_types1 '#)'         { LL $ HsTupleTy HsUnboxedTuple           $2      }
+        | '[' ctype ']'                  { LL $ HsListTy  $2 }
+        | '[:' ctype ':]'                { LL $ HsPArrTy  $2 }
+        | '(' ctype ')'                  { LL $ HsParTy   $2 }
+        | '(' ctype '::' kind ')'        { LL $ HsKindSig $2 $4 }
+        | quasiquote                     { L1 (HsQuasiQuoteTy (unLoc $1)) }
+        | '$(' exp ')'                   { LL $ mkHsSpliceTy $2 }
+        | TH_ID_SPLICE                   { LL $ mkHsSpliceTy $ L1 $ HsVar $
+                                           mkUnqual varName (getTH_ID_SPLICE $1) }
                                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE qconid                          { LL $ HsTyVar $ unLoc $2 }
         | SIMPLEQUOTE  '(' ')'                        { LL $ HsTyVar $ getRdrName unitDataCon }
@@ -1780,7 +1782,7 @@ con_list : con                  { L1 [$1] }
 sysdcon :: { Located DataCon }  -- Wired in data constructors
         : '(' ')'               { LL unitDataCon }
         | '(' commas ')'        { LL $ tupleCon BoxedTuple ($2 + 1) }
-        | '(#' '#)'             { LL $ unboxedSingletonDataCon }
+        | '(#' '#)'             { LL $ unboxedUnitDataCon }
         | '(#' commas '#)'      { LL $ tupleCon UnboxedTuple ($2 + 1) }
         | '[' ']'               { LL nilDataCon }
 
@@ -1792,24 +1794,31 @@ qconop :: { Located RdrName }
         : qconsym               { $1 }
         | '`' qconid '`'        { LL (unLoc $2) }
 
------------------------------------------------------------------------------
+----------------------------------------------------------------------------
 -- Type constructors
 
-gtycon  :: { Located RdrName }  -- A "general" qualified tycon
-        : oqtycon                       { $1 }
+
+-- See Note [Unit tuples] in HsTypes for the distinction 
+-- between gtycon and ntgtycon
+gtycon :: { Located RdrName }  -- A "general" qualified tycon, including unit tuples
+        : ntgtycon                      { $1 }
         | '(' ')'                       { LL $ getRdrName unitTyCon }
+        | '(#' '#)'                     { LL $ getRdrName unboxedUnitTyCon }
+
+ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit tuples
+        : oqtycon                       { $1 }
         | '(' commas ')'                { LL $ getRdrName (tupleTyCon BoxedTuple ($2 + 1)) }
-        | '(#' '#)'                     { LL $ getRdrName unboxedSingletonTyCon }
         | '(#' commas '#)'              { LL $ getRdrName (tupleTyCon UnboxedTuple ($2 + 1)) }
         | '(' '->' ')'                  { LL $ getRdrName funTyCon }
         | '[' ']'                       { LL $ listTyCon_RDR }
         | '[:' ':]'                     { LL $ parrTyCon_RDR }
         | '(' '~#' ')'                  { LL $ getRdrName eqPrimTyCon }
 
-oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon
+oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
+                                -- These can appear in export lists
         : qtycon                        { $1 }
         | '(' qtyconsym ')'             { LL (unLoc $2) }
-        | '(' '~' ')'                   { LL $ eqTyCon_RDR } -- In here rather than gtycon because I want to write it in the GHC.Types export list
+        | '(' '~' ')'                   { LL $ eqTyCon_RDR }
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified
         : qtyconsym                     { $1 }

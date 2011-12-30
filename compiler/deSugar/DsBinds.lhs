@@ -683,7 +683,9 @@ dsEvTerm (EvId v) = Var v
 
 dsEvTerm (EvCast v co) 
   = dsTcCoercion co $ mkCast (Var v) -- 'v' is always a lifted evidence variable so it is
-                                    -- unnecessary to call varToCoreExpr v here.
+                                     -- unnecessary to call varToCoreExpr v here.
+dsEvTerm (EvKindCast v co)
+  = dsTcCoercion co $ (\_ -> Var v)
 
 dsEvTerm (EvDFunApp df tys vars) = Var df `mkTyApps` tys `mkVarApps` vars
 dsEvTerm (EvCoercion co)         = dsTcCoercion co mkEqBox

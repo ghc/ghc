@@ -185,6 +185,7 @@ import Maybes
 import ListSetOps
 import Outputable
 import FastString
+
 import Data.List( mapAccumL )
 import Data.IORef
 \end{code}

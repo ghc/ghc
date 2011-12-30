@@ -22,7 +22,7 @@ module Outputable (
         empty, nest,
         char,
         text, ftext, ptext,
-        int, integer, float, double, rational,
+        int, intWithCommas, integer, float, double, rational,
         parens, cparen, brackets, braces, quotes, quote, doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
@@ -48,7 +48,7 @@ module Outputable (
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
-        pprHsChar, pprHsString, pprHsInfix, pprHsVar,
+        pprHsChar, pprHsString, 
         pprFastFilePath,
 
         -- * Controlling the style in which output is printed
@@ -743,6 +743,11 @@ data BindingSite = LambdaBind | CaseBind | LetBind
 class Outputable a => OutputableBndr a where
    pprBndr :: BindingSite -> a -> SDoc
    pprBndr _b x = ppr x
+
+   pprPrefixOcc, pprInfixOcc :: a -> SDoc
+      -- Print an occurrence of the name, suitable either in the 
+      -- prefix position of an application, thus   (f a b) or  ((+) x)
+      -- or infix position,                 thus   (a `f` b) or  (x + y)
 \end{code}
 
 %************************************************************************
@@ -777,27 +782,6 @@ pprInfixVar is_operator pp_v
   | otherwise   = char '`' <> pp_v <> char '`'
 
 ---------------------
--- pprHsVar and pprHsInfix use the gruesome isOperator, which
--- in turn uses (showSDoc (ppr v)), rather than isSymOcc (getOccName v).
--- Reason: it means that pprHsVar doesn't need a NamedThing context,
---         which none of the HsSyn printing functions do
-pprHsVar, pprHsInfix :: Outputable name => name -> SDoc
-pprHsVar   v = pprPrefixVar (isOperator pp_v) pp_v
-             where pp_v = ppr v
-pprHsInfix v = pprInfixVar  (isOperator pp_v) pp_v
-             where pp_v = ppr v
-
-isOperator :: SDoc -> Bool
-isOperator ppr_v
-  = case showSDocUnqual ppr_v of
-        ('(':_)   -> False              -- (), (,) etc
-        ('[':_)   -> False              -- []
-        ('$':c:_) -> not (isAlpha c)    -- Don't treat $d as an operator
-        (':':c:_) -> not (isAlpha c)    -- Don't treat :T as an operator
-        ('_':_)   -> False              -- Not an operator
-        (c:_)     -> not (isAlpha c)    -- Starts with non-alpha
-        _         -> False
-
 pprFastFilePath :: FastString -> SDoc
 pprFastFilePath path = text $ normalise $ unpackFS path
 \end{code}
@@ -846,6 +830,15 @@ quotedListWithOr xs = quotedList xs
 %************************************************************************
 
 \begin{code}
+intWithCommas :: Integral a => a -> SDoc
+-- Prints a big integer with commas, eg 345,821
+intWithCommas n
+  | n < 0     = char '-' <> intWithCommas (-n)
+  | q == 0    = int (fromIntegral r)
+  | otherwise = intWithCommas q <> comma <> int (fromIntegral r)
+  where
+    (q,r) = n `quotRem` 1000
+
 -- | Converts an integer to a verbal index:
 --
 -- > speakNth 1 = text "first"

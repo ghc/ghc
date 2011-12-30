@@ -29,7 +29,7 @@ module NCGMonad (
 	getNewRegPairNat,
 	getPicBaseMaybeNat, 
 	getPicBaseNat, 
-	getDynFlagsNat
+	getDynFlags
 ) 
  
 where
@@ -100,11 +100,9 @@ getUniqueNat = NatM $ \ (NatM_State us delta imports pic dflags) ->
     case takeUniqFromSupply us of
          (uniq, us') -> (uniq, (NatM_State us' delta imports pic dflags))
 
-
-getDynFlagsNat :: NatM DynFlags
-getDynFlagsNat 
-	= NatM $ \ (NatM_State us delta imports pic dflags) ->
-	          (dflags, (NatM_State us delta imports pic dflags))
+instance HasDynFlags NatM where
+    getDynFlags = NatM $ \ (NatM_State us delta imports pic dflags) ->
+                             (dflags, (NatM_State us delta imports pic dflags))
 
 
 getDeltaNat :: NatM Int
@@ -139,14 +137,14 @@ getNewLabelNat
 getNewRegNat :: Size -> NatM Reg
 getNewRegNat rep
  = do u <- getUniqueNat
-      dflags <- getDynFlagsNat
+      dflags <- getDynFlags
       return (RegVirtual $ targetMkVirtualReg (targetPlatform dflags) u rep)
 
 
 getNewRegPairNat :: Size -> NatM (Reg,Reg)
 getNewRegPairNat rep
  = do u <- getUniqueNat
-      dflags <- getDynFlagsNat
+      dflags <- getDynFlags
       let vLo = targetMkVirtualReg (targetPlatform dflags) u rep
       let lo  = RegVirtual $ targetMkVirtualReg (targetPlatform dflags) u rep
       let hi  = RegVirtual $ getHiVirtualRegFromLo vLo

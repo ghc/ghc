@@ -63,7 +63,7 @@ cmmTopCodeGen :: RawCmmDecl
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks))
  = do
-      dflags <- getDynFlagsNat
+      dflags <- getDynFlags
       let platform = targetPlatform dflags
       (nat_blocks,statics) <- mapAndUnzipM (basicBlockCodeGen platform) blocks
 

@@ -73,7 +73,7 @@ cmmTopCodeGen
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
-  dflags <- getDynFlagsNat
+  dflags <- getDynFlags
   let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
       os   = platformOS $ targetPlatform dflags
@@ -114,7 +114,7 @@ stmtsToInstrs stmts
 
 stmtToInstrs :: CmmStmt -> NatM InstrBlock
 stmtToInstrs stmt = do
-  dflags <- getDynFlagsNat
+  dflags <- getDynFlags
   case stmt of
     CmmNop         -> return nilOL
     CmmComment s   -> return (unitOL (COMMENT s))
@@ -357,13 +357,13 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
     return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
                          rlo
 iselExpr64 expr
-   = do dflags <- getDynFlagsNat
+   = do dflags <- getDynFlags
         pprPanic "iselExpr64(powerpc)" (pprPlatform (targetPlatform dflags) expr)
 
 
 
 getRegister :: CmmExpr -> NatM Register
-getRegister e = do dflags <- getDynFlagsNat
+getRegister e = do dflags <- getDynFlags
                    getRegister' dflags e
 
 getRegister' :: DynFlags -> CmmExpr -> NatM Register
@@ -555,7 +555,7 @@ getRegister' _ (CmmLit (CmmInt i rep))
 
 getRegister' _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
-    dflags <- getDynFlagsNat
+    dflags <- getDynFlags
     dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let size = floatSize frep
@@ -845,7 +845,7 @@ genCCall :: CmmCallTarget            -- function to call
          -> [HintedCmmActual]        -- arguments (of mixed type)
          -> NatM InstrBlock
 genCCall target dest_regs argsAndHints
- = do dflags <- getDynFlagsNat
+ = do dflags <- getDynFlags
       case platformOS (targetPlatform dflags) of
           OSLinux    -> genCCall' GCPLinux  target dest_regs argsAndHints
           OSDarwin   -> genCCall' GCPDarwin target dest_regs argsAndHints
@@ -1098,7 +1098,7 @@ genCCall' gcp target dest_regs argsAndHints
 
         outOfLineMachOp mop =
             do
-                dflags <- getDynFlagsNat
+                dflags <- getDynFlags
                 mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
                               mkForeignLabel functionName Nothing ForeignLabelInThisPackage IsFunction
                 let mopLabelOrExpr = case mopExpr of
@@ -1162,7 +1162,7 @@ genSwitch expr ids
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat II32
         lbl <- getNewLabelNat
-        dflags <- getDynFlagsNat
+        dflags <- getDynFlags
         dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let code = e_code `appOL` t_code `appOL` toOL [
@@ -1364,7 +1364,7 @@ coerceInt2FP fromRep toRep x = do
     lbl <- getNewLabelNat
     itmp <- getNewRegNat II32
     ftmp <- getNewRegNat FF64
-    dflags <- getDynFlagsNat
+    dflags <- getDynFlags
     dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let

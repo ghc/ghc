@@ -561,7 +561,7 @@ tcIfaceDataCons tycon_name tycon _ if_cons
         ; let orig_res_ty = mkFamilyTyConApp tycon 
                                 (substTyVars (mkTopTvSubst eq_spec) univ_tyvars)
 
-        ; buildDataCon name is_infix {- Not infix -}
+        ; buildDataCon name is_infix
                        stricts lbl_names
                        univ_tyvars ex_tyvars 
                        eq_spec theta 

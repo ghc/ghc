@@ -273,6 +273,9 @@ instance OutputableBndr RdrName where
 	| isTvOcc (rdrNameOcc n) = char '@' <+> ppr n
 	| otherwise		 = ppr n
 
+    pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
+    pprPrefixOcc rdr = pprPrefixVar (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
+
 showRdrName :: RdrName -> String
 showRdrName r = showSDoc (ppr r)
 
@@ -503,6 +506,7 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- ^ Take a list of GREs which have the right OccName
 -- Pick those GREs that are suitable for this RdrName
 -- And for those, keep only only the Provenances that are suitable
+-- Only used for Qual and Unqual, not Orig or Exact
 -- 
 -- Consider:
 --
@@ -519,7 +523,8 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- the locally-defined @f@, and a GRE for the imported @f@, with a /single/ 
 -- provenance, namely the one for @Baz(f)@.
 pickGREs rdr_name gres
-  = mapCatMaybes pick gres
+  = ASSERT2( isSrcRdrName rdr_name, ppr rdr_name )
+    mapCatMaybes pick gres
   where
     rdr_is_unqual = isUnqual rdr_name
     rdr_is_qual   = isQual_maybe rdr_name

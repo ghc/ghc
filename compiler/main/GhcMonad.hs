@@ -46,10 +46,9 @@ import Data.IORef
 -- If you do not use 'Ghc' or 'GhcT', make sure to call 'GHC.initGhcMonad'
 -- before any call to the GHC API functions can occur.
 --
-class (Functor m, MonadIO m, ExceptionMonad m) => GhcMonad m where
+class (Functor m, MonadIO m, ExceptionMonad m, HasDynFlags m) => GhcMonad m where
   getSession :: m HscEnv
   setSession :: HscEnv -> m ()
-
 
 -- | Call the argument with the current session.
 withSession :: GhcMonad m => (HscEnv -> m a) -> m a
@@ -120,6 +119,9 @@ instance ExceptionMonad Ghc where
                              in
                                 unGhc (f g_restore) s
 
+instance HasDynFlags Ghc where
+  getDynFlags = getSessionDynFlags
+
 instance GhcMonad Ghc where
   getSession = Ghc $ \(Session r) -> readIORef r
   setSession s' = Ghc $ \(Session r) -> writeIORef r s'
@@ -175,6 +177,9 @@ instance ExceptionMonad m => ExceptionMonad (GhcT m) where
                               g_restore (GhcT m) = GhcT $ \s -> io_restore (m s)
                            in
                               unGhcT (f g_restore) s
+
+instance (Functor m, ExceptionMonad m, MonadIO m) => HasDynFlags (GhcT m) where
+  getDynFlags = getSessionDynFlags
 
 instance (Functor m, ExceptionMonad m, MonadIO m) => GhcMonad (GhcT m) where
   getSession = GhcT $ \(Session r) -> liftIO $ readIORef r

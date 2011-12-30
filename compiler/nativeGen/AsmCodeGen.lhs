@@ -843,8 +843,8 @@ instance Monad CmmOptM where
 addImportCmmOpt :: CLabel -> CmmOptM ()
 addImportCmmOpt lbl = CmmOptM $ \(imports, _dflags) -> (# (), lbl:imports #)
 
-getDynFlagsCmmOpt :: CmmOptM DynFlags
-getDynFlagsCmmOpt = CmmOptM $ \(imports, dflags) -> (# dflags, imports #)
+instance HasDynFlags CmmOptM where
+    getDynFlags = CmmOptM $ \(imports, dflags) -> (# dflags, imports #)
 
 runCmmOpt :: DynFlags -> CmmOptM a -> (a, [CLabel])
 runCmmOpt dflags (CmmOptM f) = case f ([], dflags) of
@@ -895,7 +895,7 @@ cmmStmtConFold stmt
 
         CmmCondBranch test dest
            -> do test' <- cmmExprConFold DataReference test
-                 dflags <- getDynFlagsCmmOpt
+                 dflags <- getDynFlags
                  let platform = targetPlatform dflags
 	         return $ case test' of
 		   CmmLit (CmmInt 0 _) -> 
@@ -914,7 +914,7 @@ cmmStmtConFold stmt
 
 cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
 cmmExprConFold referenceKind expr = do
-    dflags <- getDynFlagsCmmOpt
+    dflags <- getDynFlags
     -- Skip constant folding if new code generator is running
     -- (this optimization is done in Hoopl)
     let expr' = if dopt Opt_TryNewCodeGen dflags
@@ -932,7 +932,7 @@ cmmExprCon _ other = other
 -- of things to do.
 cmmExprNative :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
 cmmExprNative referenceKind expr = do
-     dflags <- getDynFlagsCmmOpt
+     dflags <- getDynFlags
      let platform = targetPlatform dflags
          arch = platformArch platform
      case expr of

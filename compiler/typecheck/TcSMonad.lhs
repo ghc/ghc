@@ -60,7 +60,7 @@ module TcSMonad (
 
         -- Inerts 
     InertSet(..), 
-    getInertEqs, liftInertEqsTy, getCtCoercion,
+    getInertEqs, getCtCoercion,
     emptyInert, getTcSInerts, updInertSet, extractUnsolved,
     extractUnsolvedTcS, modifyInertTcS,
     updInertSetTcS, partitionCCanMap, partitionEqMap,
@@ -72,7 +72,7 @@ module TcSMonad (
     instDFunConstraints,          
     newFlexiTcSTy, instFlexiTcS,
 
-    compatKind, compatKindTcS, isSubKindTcS, unifyKindTcS,
+    compatKind, mkKindErrorCtxtTcS,
 
     TcsUntouchables,
     isTouchableMetaTyVar,
@@ -104,7 +104,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM 
        ( checkWellStaged, topIdLvl, tcGetDefaultTys )
-import {-# SOURCE #-} qualified TcUnify as TcM ( unifyKindEq, mkKindErrorCtxt )
+import {-# SOURCE #-} qualified TcUnify as TcM ( mkKindErrorCtxt )
 import Kind
 import TcType
 import DynFlags
@@ -113,7 +113,6 @@ import Type
 import TcEvidence
 import Class
 import TyCon
-import TypeRep 
 
 import Name
 import Var
@@ -145,23 +144,12 @@ import TrieMap
 compatKind :: Kind -> Kind -> Bool
 compatKind k1 k2 = k1 `isSubKind` k2 || k2 `isSubKind` k1 
 
-compatKindTcS :: Kind -> Kind -> TcS Bool
--- Because kind unification happens during constraint solving, we have
--- to make sure that two kinds are zonked before we compare them.
-compatKindTcS k1 k2 = wrapTcS (TcM.compatKindTcM k1 k2)
+mkKindErrorCtxtTcS :: Type -> Kind 
+                   -> Type -> Kind 
+                   -> ErrCtxt
+mkKindErrorCtxtTcS ty1 ki1 ty2 ki2
+  = (False,TcM.mkKindErrorCtxt ty1 ty2 ki1 ki2)
 
-isSubKindTcS :: Kind -> Kind -> TcS Bool
-isSubKindTcS k1 k2 = wrapTcS (TcM.isSubKindTcM k1 k2)
-
-unifyKindTcS :: Type -> Type     -- Context
-             -> Kind -> Kind     -- Corresponding kinds
-             -> TcS Bool
-unifyKindTcS ty1 ty2 ki1 ki2
-  = wrapTcS $ TcM.addErrCtxtM ctxt $ do
-      (_errs, mb_r) <- TcM.tryTc (TcM.unifyKindEq ki1 ki2)
-      return (maybe False (const True) mb_r)
-  where 
-    ctxt = TcM.mkKindErrorCtxt ty1 ki1 ty2 ki2
 \end{code}
 
 %************************************************************************
@@ -1010,8 +998,8 @@ emitFrozenError fl ev depth
              inerts_new = inerts { inert_frozen = extendCts (inert_frozen inerts) ct } 
        ; wrapTcS (TcM.writeTcRef inert_ref inerts_new) }
 
-getDynFlags :: TcS DynFlags
-getDynFlags = wrapTcS TcM.getDOpts
+instance HasDynFlags TcS where
+    getDynFlags = wrapTcS TcM.getDOpts
 
 getTcSContext :: TcS SimplContext
 getTcSContext = TcS (return . tcs_context)
@@ -1506,68 +1494,5 @@ getCtCoercion ct
                 -- Instead we use the most accurate type, given by ctPred c
   where maybe_given = isGiven_maybe (cc_flavor ct)
 
--- See Note [LiftInertEqs]
-liftInertEqsTy :: (TyVarEnv (Ct, TcCoercion),InScopeSet)
-                 -> CtFlavor
-                 -> PredType -> TcCoercion
-liftInertEqsTy (subst,inscope) fl pty
-  = ty_cts_subst subst inscope fl pty
 
-
-ty_cts_subst :: TyVarEnv (Ct, TcCoercion)
-             -> InScopeSet -> CtFlavor -> Type -> TcCoercion
-ty_cts_subst subst inscope fl ty 
-  = go ty 
-  where 
-        go ty = go' ty
-
-        go' (TyVarTy tv)      = tyvar_cts_subst tv `orElse` mkTcReflCo (TyVarTy tv)
-        go' (AppTy ty1 ty2)   = mkTcAppCo (go ty1) (go ty2) 
-        go' (TyConApp tc tys) = mkTcTyConAppCo tc (map go tys)  
-        go' ty@(LiteralTy _)  = mkTcReflCo ty
-
-        go' (ForAllTy v ty)   = mkTcForAllCo v' $! co
-                             where 
-                               (subst',inscope',v') = upd_tyvar_bndr subst inscope v
-                               co = ty_cts_subst subst' inscope' fl ty 
-
-        go' (FunTy ty1 ty2)   = mkTcFunCo (go ty1) (go ty2)
-
-
-        tyvar_cts_subst tv  
-          | Just (ct,co) <- lookupVarEnv subst tv, cc_flavor ct `canRewrite` fl  
-          = Just co -- Warn: use cached, not cc_id directly, because of alpha-renamings!
-          | otherwise = Nothing 
-
-        upd_tyvar_bndr subst inscope v 
-          = (new_subst, (inscope `extendInScopeSet` new_v), new_v)
-          where new_subst 
-                    | no_change = delVarEnv subst v
-                        -- Otherwise we have to extend the environment with /something/. 
-                        -- But we do not want to monadically create a new EvVar. So, we
-                        -- create an 'unused_ct' but we cache reflexivity as the 
-                        -- associated coercion. 
-                    | otherwise = extendVarEnv subst v (unused_ct, mkTcReflCo (TyVarTy new_v))
-
-                no_change = new_v == v 
-                new_v     = uniqAway inscope v 
-
-                unused_ct = CTyEqCan { cc_id     = unused_evvar
-                                     , cc_flavor = fl -- canRewrite is reflexive.
-                                     , cc_tyvar  = v 
-                                     , cc_rhs    = mkTyVarTy new_v 
-                                     , cc_depth  = unused_depth }
-                unused_depth = panic "ty_cts_subst: This depth should not be accessed!"
-                unused_evvar = panic "ty_cts_subst: This var is just an alpha-renaming!"
 \end{code}
-
-Note [LiftInertEqsTy]
-~~~~~~~~~~~~~~~~~~~~~~~ 
-The function liftInertEqPred behaves almost like liftCoSubst (in
-Coercion), but accepts a map TyVarEnv (Ct,Coercion) instead of a
-LiftCoSubst. This data structure is more convenient to use since we
-must apply the inert substitution /only/ if the inert equality 
-`canRewrite` the work item. There's admittedly some duplication of 
-functionality but it would be more tedious to cache and maintain 
-different flavors of LiftCoSubst structures in the inerts. 
-

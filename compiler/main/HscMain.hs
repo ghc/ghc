@@ -60,6 +60,7 @@ module HscMain
     , hscParseIdentifier
     , hscTcRcLookupName
     , hscTcRnGetInfo
+    , hscCheckSafe
 #ifdef GHCI
     , hscGetModuleInterface
     , hscRnImportDecls
@@ -93,7 +94,7 @@ import HsSyn
 import CoreSyn
 import StringBuffer
 import Parser
-import Lexer hiding (getDynFlags)
+import Lexer
 import SrcLoc
 import TcRnDriver
 import TcIface          ( typecheckIface )
@@ -205,6 +206,9 @@ instance Monad Hsc where
 instance MonadIO Hsc where
     liftIO io = Hsc $ \_ w -> do a <- io; return (a, w)
 
+instance Functor Hsc where
+    fmap f m = m >>= \a -> return $ f a
+
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
@@ -223,8 +227,8 @@ logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
 getHscEnv :: Hsc HscEnv
 getHscEnv = Hsc $ \e w -> return (e, w)
 
-getDynFlags :: Hsc DynFlags
-getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
+instance HasDynFlags Hsc where
+    getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do
@@ -886,9 +890,8 @@ hscFileFrontEnd mod_summary = do
 -- inference mode.
 hscCheckSafeImports :: TcGblEnv -> Hsc TcGblEnv
 hscCheckSafeImports tcg_env = do
-    hsc_env  <- getHscEnv
     dflags   <- getDynFlags
-    tcg_env' <- checkSafeImports dflags hsc_env tcg_env
+    tcg_env' <- checkSafeImports dflags tcg_env
     case safeLanguageOn dflags of
         True -> do
             -- we nuke user written RULES in -XSafe
@@ -911,22 +914,20 @@ hscCheckSafeImports tcg_env = do
             text "Rule \"" <> ftext n <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
--- | Validate that safe imported modules are actually safe.
--- For modules in the HomePackage (the package the module we
--- are compiling in resides) this just involves checking its
--- trust type is 'Safe' or 'Trustworthy'. For modules that
--- reside in another package we also must check that the
--- external pacakge is trusted. See the Note [Safe Haskell
--- Trust Check] above for more information.
+-- | Validate that safe imported modules are actually safe.  For modules in the
+-- HomePackage (the package the module we are compiling in resides) this just
+-- involves checking its trust type is 'Safe' or 'Trustworthy'. For modules
+-- that reside in another package we also must check that the external pacakge
+-- is trusted. See the Note [Safe Haskell Trust Check] above for more
+-- information.
 --
--- The code for this is quite tricky as the whole algorithm
--- is done in a few distinct phases in different parts of the
--- code base. See RnNames.rnImportDecl for where package trust
--- dependencies for a module are collected and unioned.
--- Specifically see the Note [RnNames . Tracking Trust Transitively]
--- and the Note [RnNames . Trust Own Package].
-checkSafeImports :: DynFlags -> HscEnv -> TcGblEnv -> Hsc TcGblEnv
-checkSafeImports dflags hsc_env tcg_env
+-- The code for this is quite tricky as the whole algorithm is done in a few
+-- distinct phases in different parts of the code base. See
+-- RnNames.rnImportDecl for where package trust dependencies for a module are
+-- collected and unioned.  Specifically see the Note [RnNames . Tracking Trust
+-- Transitively] and the Note [RnNames . Trust Own Package].
+checkSafeImports :: DynFlags -> TcGblEnv -> Hsc TcGblEnv
+checkSafeImports dflags tcg_env
     = do
         -- We want to use the warning state specifically for detecting if safe
         -- inference has failed, so store and clear any existing warnings.
@@ -941,7 +942,7 @@ checkSafeImports dflags hsc_env tcg_env
         clearWarnings
         logWarnings oldErrs
 
-        -- See the Note [ Safe Haskell Inference]
+        -- See the Note [Safe Haskell Inference]
         case (not $ isEmptyBag errs) of
 
             -- We have errors!
@@ -953,7 +954,7 @@ checkSafeImports dflags hsc_env tcg_env
 
             -- All good matey!
             False -> do
-                when (packageTrustOn dflags) $ checkPkgTrust pkg_reqs
+                when (packageTrustOn dflags) $ checkPkgTrust dflags pkg_reqs
                 -- add in trusted package requirements for this module
                 let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
                 return tcg_env { tcg_imports = imp_info `plusImportAvails` new_trust }
@@ -981,41 +982,36 @@ checkSafeImports dflags hsc_env tcg_env
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
         = return v1
+    
+    -- easier interface to work with
+    checkSafe (_, _, False) = return Nothing
+    checkSafe (m, l, True ) = fst `fmap` hscCheckSafe' dflags m l
 
-    lookup' :: Module -> Hsc (Maybe ModIface)
-    lookup' m = do
-        hsc_eps <- liftIO $ hscEPS hsc_env
-        let pkgIfaceT = eps_PIT hsc_eps
-            homePkgT = hsc_HPT hsc_env
-            iface = lookupIfaceByModule dflags homePkgT pkgIfaceT m
-        return iface
+-- | Check that a module is safe to import.
+--
+-- We return True to indicate the import is safe and False otherwise
+-- although in the False case an exception may be thrown first.
+hscCheckSafe :: HscEnv -> Module -> SrcSpan -> IO Bool
+hscCheckSafe hsc_env m l = runHsc hsc_env $ do
+    dflags <- getDynFlags
+    pkgs <- snd `fmap` hscCheckSafe' dflags m l
+    when (packageTrustOn dflags) $ checkPkgTrust dflags pkgs
+    errs <- getWarnings
+    return $ isEmptyBag errs
 
-    isHomePkg :: Module -> Bool
-    isHomePkg m
-        | thisPackage dflags == modulePackageId m = True
-        | otherwise                               = False
-
-    -- | Check the package a module resides in is trusted.
-    -- Safe compiled modules are trusted without requiring
-    -- that their package is trusted. For trustworthy modules,
-    -- modules in the home package are trusted but otherwise
-    -- we check the package trust flag.
-    packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
-    packageTrusted _ _ _
-        | not (packageTrustOn dflags)     = True
-    packageTrusted Sf_Safe        False _ = True
-    packageTrusted Sf_SafeInfered False _ = True
-    packageTrusted _ _ m
-        | isHomePkg m = True
-        | otherwise   = trusted $ getPackageDetails (pkgState dflags)
-                                                    (modulePackageId m)
-
-    -- Is a module trusted? Return Nothing if True, or a String
-    -- if it isn't, containing the reason it isn't. Also return
-    -- if the module trustworthy (true) or safe (false) so we know
-    -- if we should check if the package itself is trusted in the
-    -- future.
-    isModSafe :: Module -> SrcSpan -> Hsc (Bool)
+hscCheckSafe' :: DynFlags -> Module -> SrcSpan -> Hsc (Maybe PackageId, [PackageId])
+hscCheckSafe' dflags m l = do
+    (tw, pkgs) <- isModSafe m l
+    case tw of
+        False              -> return (Nothing, pkgs)
+        True | isHomePkg m -> return (Nothing, pkgs)
+             | otherwise   -> return (Just $ modulePackageId m, pkgs)
+  where
+    -- Is a module trusted? If not, throw or log errors depending on the type.
+    -- Return (regardless of trusted or not) if the trust type requires the
+    -- modules own package be trusted and a list of other packages required to
+    -- be trusted (these later ones haven't been checked)
+    isModSafe :: Module -> SrcSpan -> Hsc (Bool, [PackageId])
     isModSafe m l = do
         iface <- lookup' m
         case iface of
@@ -1032,11 +1028,14 @@ checkSafeImports dflags hsc_env tcg_env
                     safeM = trust `elem` [Sf_SafeInfered, Sf_Safe, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted trust trust_own_pkg m
+                    -- pkg trust reqs
+                    pkgRs = map fst $ filter snd $ dep_pkgs $ mi_deps iface'
                 case (safeM, safeP) of
                     -- General errors we throw but Safe errors we log
-                    (True, True ) -> return $ trust == Sf_Trustworthy
+                    (True, True ) -> return (trust == Sf_Trustworthy, pkgRs)
                     (True, False) -> liftIO . throwIO $ pkgTrustErr
-                    (False, _   ) -> logWarnings modTrustErr >> return (trust == Sf_Trustworthy)
+                    (False, _   ) -> logWarnings modTrustErr >>
+                                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
                     pkgTrustErr = mkSrcErr $ unitBag $ mkPlainErrMsg l $ ppr m
@@ -1047,30 +1046,60 @@ checkSafeImports dflags hsc_env tcg_env
                         <+> text "can't be safely imported!"
                         <+> text "The module itself isn't safe."
 
-    -- Here we check the transitive package trust requirements are OK still.
-    checkPkgTrust :: [PackageId] -> Hsc ()
-    checkPkgTrust pkgs =
-        case errors of
-            [] -> return ()
-            _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
-        where
-            errors = catMaybes $ map go pkgs
-            go pkg
-                | trusted $ getPackageDetails (pkgState dflags) pkg
-                = Nothing
-                | otherwise
-                = Just $ mkPlainErrMsg noSrcSpan
-                       $ text "The package (" <> ppr pkg <> text ") is required"
-                      <> text " to be trusted but it isn't!"
+    -- | Check the package a module resides in is trusted. Safe compiled
+    -- modules are trusted without requiring that their package is trusted. For
+    -- trustworthy modules, modules in the home package are trusted but
+    -- otherwise we check the package trust flag.
+    packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
+    packageTrusted _ _ _
+        | not (packageTrustOn dflags)     = True
+    packageTrusted Sf_Safe        False _ = True
+    packageTrusted Sf_SafeInfered False _ = True
+    packageTrusted _ _ m
+        | isHomePkg m = True
+        | otherwise   = trusted $ getPackageDetails (pkgState dflags)
+                                                    (modulePackageId m)
 
-    checkSafe :: (Module, SrcSpan, IsSafeImport) -> Hsc (Maybe PackageId)
-    checkSafe (_, _, False) = return Nothing
-    checkSafe (m, l, True ) = do
-        tw <- isModSafe m l
-        return $ pkg tw
-        where pkg False = Nothing
-              pkg True | isHomePkg m = Nothing
-                           | otherwise   = Just (modulePackageId m)
+    lookup' :: Module -> Hsc (Maybe ModIface)
+    lookup' m = do
+        hsc_env <- getHscEnv
+        hsc_eps <- liftIO $ hscEPS hsc_env
+        let pkgIfaceT = eps_PIT hsc_eps
+            homePkgT  = hsc_HPT hsc_env
+            iface     = lookupIfaceByModule dflags homePkgT pkgIfaceT m
+#ifdef GHCI
+        -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
+        -- as the compiler hasn't filled in the various module tables
+        -- so we need to call 'getModuleInterface' to load from disk
+        iface' <- case iface of
+            Just _  -> return iface
+            Nothing -> snd `fmap` (liftIO $ getModuleInterface hsc_env m)
+        return iface'
+#else 
+        return iface
+#endif
+
+
+    isHomePkg :: Module -> Bool
+    isHomePkg m
+        | thisPackage dflags == modulePackageId m = True
+        | otherwise                               = False
+
+-- | Check the list of packages are trusted.
+checkPkgTrust :: DynFlags -> [PackageId] -> Hsc ()
+checkPkgTrust dflags pkgs =
+    case errors of
+        [] -> return ()
+        _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
+    where
+        errors = catMaybes $ map go pkgs
+        go pkg
+            | trusted $ getPackageDetails (pkgState dflags) pkg
+            = Nothing
+            | otherwise
+            = Just $ mkPlainErrMsg noSrcSpan
+                   $ text "The package (" <> ppr pkg <> text ") is required"
+                  <> text " to be trusted but it isn't!"
 
 -- | Set module to unsafe and wipe trust information.
 --

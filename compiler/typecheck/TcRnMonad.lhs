@@ -23,6 +23,8 @@ import Module
 import RdrName
 import Name
 import Type
+import Kind ( isSuperKind )
+
 import TcType
 import InstEnv
 import FamInstEnv
@@ -1042,8 +1044,13 @@ captureUntouchables thing_inside
        ; return (res, TouchableRange low_meta high_meta) }
 
 isUntouchable :: TcTyVar -> TcM Bool
-isUntouchable tv = do { env <- getLclEnv
-                      ; return (varUnique tv < tcl_untch env) }
+isUntouchable tv
+    -- Kind variables are always touchable
+  | isSuperKind (tyVarKind tv) 
+  = return False
+  | otherwise 
+  = do { env <- getLclEnv
+       ; return (varUnique tv < tcl_untch env) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }
