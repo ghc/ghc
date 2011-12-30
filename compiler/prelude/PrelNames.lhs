@@ -269,6 +269,14 @@ basicKnownKeyNames
         -- Other classes
         randomClassName, randomGenClassName, monadPlusClassName,
 
+        -- Type-level naturals
+        typeNatKindConName,
+        typeNatClassName,
+        typeNatLeqClassName,
+        typeNatAddTyFamName,
+        typeNatMulTyFamName,
+        typeNatExpTyFamName,
+
         -- Annotation type checking
         toAnnotationWrapperName
 
@@ -329,7 +337,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
-    cONTROL_EXCEPTION_BASE :: Module
+    cONTROL_EXCEPTION_BASE, gHC_TYPENATS :: Module
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -381,6 +389,7 @@ gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
 rANDOM          = mkBaseModule (fsLit "System.Random")
 gHC_EXTS        = mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
+gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
 
 gHC_PARR' :: Module
 gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
@@ -1023,6 +1032,17 @@ randomClassName     = clsQual rANDOM (fsLit "Random")    randomClassKey
 randomGenClassName  = clsQual rANDOM (fsLit "RandomGen") randomGenClassKey
 isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
+-- Type-level naturals
+typeNatKindConName,
+  typeNatClassName, typeNatLeqClassName,
+  typeNatAddTyFamName, typeNatMulTyFamName, typeNatExpTyFamName :: Name
+typeNatKindConName  = tcQual  gHC_TYPENATS (fsLit "Nat")  typeNatKindConNameKey
+typeNatClassName    = clsQual gHC_TYPENATS (fsLit "NatI") typeNatClassNameKey
+typeNatLeqClassName = clsQual gHC_TYPENATS (fsLit ":<=")  typeNatLeqClassNameKey
+typeNatAddTyFamName = tcQual  gHC_TYPENATS (fsLit ":+")   typeNatAddTyFamNameKey
+typeNatMulTyFamName = tcQual  gHC_TYPENATS (fsLit ":*")   typeNatMulTyFamNameKey
+typeNatExpTyFamName = tcQual  gHC_TYPENATS (fsLit ":^")   typeNatExpTyFamNameKey
+
 -- dotnet interop
 objectTyConName :: Name
 objectTyConName     = tcQual   dOTNET (fsLit "Object") objectTyConKey
@@ -1136,6 +1156,10 @@ gen1ClassKey  = mkPreludeClassUnique 38
 datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
+
+typeNatClassNameKey, typeNatLeqClassNameKey :: Unique
+typeNatClassNameKey     = mkPreludeClassUnique 42
+typeNatLeqClassNameKey  = mkPreludeClassUnique 43
 \end{code}
 
 %************************************************************************
@@ -1317,6 +1341,15 @@ noSelTyConKey = mkPreludeTyConUnique 154
 
 repTyConKey  = mkPreludeTyConUnique 155
 rep1TyConKey = mkPreludeTyConUnique 156
+
+-- Type-level naturals
+typeNatKindConNameKey,
+  typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey
+  :: Unique
+typeNatKindConNameKey   = mkPreludeTyConUnique 160
+typeNatAddTyFamNameKey  = mkPreludeTyConUnique 161
+typeNatMulTyFamNameKey  = mkPreludeTyConUnique 162
+typeNatExpTyFamNameKey  = mkPreludeTyConUnique 163
 
 ---------------- Template Haskell -------------------
 --      USES TyConUniques 200-299

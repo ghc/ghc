@@ -342,9 +342,8 @@ argTypeKind      = kindTyConType argTypeKindTyCon
 ubxTupleKind     = kindTyConType ubxTupleKindTyCon
 constraintKind   = kindTyConType constraintKindTyCon
 
- -- XXX: we should probably be using a different type than Word here...
 typeNatKind :: Kind
-typeNatKind = kindTyConType (mkKindTyCon wordTyConName tySuperKind)
+typeNatKind = kindTyConType (mkKindTyCon typeNatKindConName tySuperKind)
 
 
 -- | Given two kinds @k1@ and @k2@, creates the 'Kind' @k1 -> k2@
