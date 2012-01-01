@@ -56,6 +56,7 @@ data OS
         | OSFreeBSD
         | OSOpenBSD
         | OSNetBSD
+        | OSKFreeBSD
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture and Extensions
@@ -87,6 +88,7 @@ osElfTarget OSNetBSD   = True
 osElfTarget OSSolaris2 = True
 osElfTarget OSDarwin   = False
 osElfTarget OSMinGW32  = False
+osElfTarget OSKFreeBSD = True
 osElfTarget OSUnknown  = False
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for
