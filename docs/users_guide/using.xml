@@ -2114,7 +2114,7 @@ f "2"    = 2
 
       <para>There are two ways to run a program on multiple
         processors:
-        call <literal>GHC.Conc.setNumCapabilities</literal> from your
+        call <literal>Control.Concurrent.setNumCapabilities</literal> from your
         program, or use the RTS <option>-N</option> option.</para>
 
       <variablelist>
@@ -2150,13 +2150,13 @@ f "2"    = 2
 
             <para>The current value of the <option>-N</option> option
               is available to the Haskell program
-              via <literal>GHC.Conc.getNumCapabilities</literal>, and
+              via <literal>Control.Concurrent.getNumCapabilities</literal>, and
               it may be changed while the program is running by
-              calling <literal>GHC.Conc.setNumCapabilities</literal>.
+              calling <literal>Control.Concurrent.setNumCapabilities</literal>.
               Note: in the current implementation,
               the <option>-N</option> value may only
               be <emphasis>increased</emphasis>, not decreased, by
-              calling <literal>GHC.Conc.setNumCapabilities</literal>.</para>
+              calling <literal>Control.Concurrent.setNumCapabilities</literal>.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -2192,7 +2192,7 @@ f "2"    = 2
             <para>
               This option is probably only of use for concurrent
               programs that explicitly schedule threads onto CPUs
-              with <literal>GHC.Conc.forkOnIO</literal>.
+              with <literal>Control.Concurrent.forkOn</literal>.
             </para>
           </listitem>
         </varlistentry>
