@@ -49,10 +49,10 @@ import Var        (isId, isTyVar, varType, setVarType)
 import Id         (idType, zapFragileIdInfo, localiseId)
 import MkId       (voidArgId, realWorldPrimId)
 import Type       (isUnLiftedType, mkTyVarTy)
-import Coercion   (isCoVar, isReflCo, mkCoVarCo, mkUnsafeCo, coVarKind_maybe, mkCoercionType)
+import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind_maybe)
 import CoreUtils  (mkPiTypes)
 import TyCon      (PrimRep(..))
-import Type       (mkFunTy, typePrimRep, splitTyConApp_maybe)
+import Type       (eqType, mkFunTy, typePrimRep, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn (unitTy)
 import Literal
@@ -499,6 +499,14 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
          , Just lit <- absentLiteralOf tc
          -> let_ x (literal lit) (e `app` x)
          
+         -- Special-case RealWorld# because it occurs so often and we can save a "let" and
+         -- "cast" in the output syntax by doing so:
+         --
+         -- (NB: the use of realWorldPrimId here and in the VoidRep case below means we have
+         -- to special-case realWorldPrimId in the post-SC free-variable sanity checks)
+         | ty `eqType` realWorldStatePrimTy
+         -> e `app` realWorldPrimId
+
          -- If we get here we are getting desperate need to get *really* creative.
          -- Just choose some value with the same *representation* as what we want and then
          -- cast it to the right type:
@@ -506,8 +514,6 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
                  -- This causes the simplifier to fail with an error about (!!) out of bounds because
                  -- it tries to reduce the cast coercion, causing it to decompose the unsafe coercion:
                  --VoidRep   -> (mkCoercionType unitTy unitTy, coercion (mkUnsafeCo unitTy unitTy))
-                 -- We'll do this instead, even though it means we have to special-case realWorldPrimId
-                 -- in the free-variable sanity checks:
                  VoidRep   -> (realWorldStatePrimTy, var realWorldPrimId)
                  IntRep    -> (intPrimTy,            literal (mkMachInt 0))
                  WordRep   -> (wordPrimTy,           literal (mkMachWord 0))
@@ -518,8 +524,7 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
                  DoubleRep -> (doublePrimTy,         literal (mkMachDouble 0))
                  -- Unlifted thing of PtrRep: yes, this can really happen (ByteArray# etc)
                  PtrRep    -> pprPanic "applyAbsVars: dead unlifted variable with PrimRep PtrRep: FIXME" (ppr ty)
-               co = mkUnsafeCo e_repr_ty ty
-         -> let_ x (if isReflCo co then e_repr else e_repr `cast` co) (e `app` x))
+         -> let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x))
          where shadowy_x = absVarBinder absx
                x = uniqAway (mkInScopeSet fvs) shadowy_x
                ty = idType x
