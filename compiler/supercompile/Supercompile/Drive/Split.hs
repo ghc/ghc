@@ -402,10 +402,6 @@ instance Accumulatable Bracketed where
     mapAccumTM f acc (TailsKnown ty mk_shell holes) = liftM (second (TailsKnown ty mk_shell)) $ mapAccumTM (mapAccumTM f) acc holes
     mapAccumTM f acc (TailsUnknown  shell    holes) = liftM (second (TailsUnknown shell))     $ mapAccumTM (mapAccumTM f) acc holes
 
-modifyShell :: (Shell -> Shell) -> Bracketed a -> Bracketed a
-modifyShell f (TailsKnown ty mk_shell holes) = TailsKnown ty (f . mk_shell) holes
-modifyShell f (TailsUnknown  shell    holes) = TailsUnknown  (f shell)      holes
-
 noneBracketed :: Tag -> Out FVedTerm -> Bracketed a
 noneBracketed tg a = TailsUnknown (Shell { shellExtraTags = oneResidTag tg, shellExtraFvs = freeVars a, shellWrapper = \[] -> a }) []
 
@@ -417,7 +413,7 @@ oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
                               [Tagged tg (CastIt co)] -> Just (CastBy co tg)
                               _                       -> Nothing
   , Just anned_a <- termToAnswer ids in_e
-  = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h `M.union` h') ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
+  = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h' `M.union` h) ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
     modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` fst (pureHeapVars h) LambdaBound }) $                    -- Fix bracket FVs by removing anything lambda-bound above
     splitAnswer ctxt_ids ids (annedToTagged (fmap (\a -> castAnswer ids a cast_by) anned_a))
   | otherwise
@@ -459,6 +455,10 @@ zipBracketeds (TailsKnown bty mk_bshell bholes) = case ei_holes of
                                  Right holes | is_tail   -> Left (bracketedHoles rbracketed ++ map tailishHole holes)
                                              | otherwise -> Right (map (TailishHole False) (bracketedHoles rbracketed) ++ holes))
             where rbracketed = rigidizeBracketed bracketed
+
+modifyShell :: (Shell -> Shell) -> Bracketed a -> Bracketed a
+modifyShell f (TailsKnown ty mk_shell holes) = TailsKnown ty (f . mk_shell) holes
+modifyShell f (TailsUnknown  shell    holes) = TailsUnknown  (f shell)      holes
 
 modifyTails :: forall a b. (Type -> Type) -> ([a] -> (b, [a])) -> Bracketed a -> Maybe (b, Bracketed a)
 modifyTails _     _ (TailsUnknown _ _)             = Nothing
