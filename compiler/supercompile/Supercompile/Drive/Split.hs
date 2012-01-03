@@ -417,8 +417,8 @@ oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
                               [Tagged tg (CastIt co)] -> Just (CastBy co tg)
                               _                       -> Nothing
   , Just anned_a <- termToAnswer ids in_e
-  = fmap (\(ent, (deeds, Heap h' ids', k', in_e')) -> (ent, (deeds, Heap (h `M.union` h') ids', k', in_e'))) $          -- Push heap of positive information/new lambda-bounds down
-    modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` dataSetToVarSet (M.keysSet h) }) $ -- Take advantage of the fact that this heap is "optional" to fix bracket FVs
+  = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h `M.union` h') ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
+    modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` dataSetToVarSet (M.keysSet h) }) $                       -- Take advantage of the fact that this heap is "optional" to fix bracket FVs
     splitAnswer ctxt_ids ids (annedToTagged (fmap (\a -> castAnswer ids a cast_by) anned_a))
   | otherwise
   = oneBracketed' ty (ent, (emptyDeeds, Heap h ids, k, in_e))
