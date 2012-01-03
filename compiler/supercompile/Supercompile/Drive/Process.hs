@@ -43,13 +43,14 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
-import Name       (getOccString)
 import Var        (isId, isTyVar, varType, setVarType)
-import Id         (idType, idOccInfo, zapFragileIdInfo, setIdOccInfo, localiseId)
+import Id         (idType, zapFragileIdInfo, localiseId)
+import MkId       (voidArgId)
 import Type       (isUnLiftedType, mkTyVarTy)
 import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind_maybe, mkCoercionType)
+import CoreUtils  (mkPiTypes)
 import TyCon      (PrimRep(..))
-import Type       (typePrimRep, splitTyConApp_maybe)
+import Type       (mkFunTy, typePrimRep, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn (unitTy)
 import Literal
@@ -451,10 +452,6 @@ renameAbsVar rn (AbsVar { absVarDead = dead, absVarVar = x })
   | otherwise
   = AbsVar { absVarDead = False, absVarVar = renameAbsVarType rn (M.findWithDefault (pprPanic "renameAbsVar" (ppr x)) x rn) }
 
--- FIXME: should abstract over RealWorld# as well. Two reasons:
---  1. If the h-function is unlifted, this delays its evaluation (so its effects, if any, do not happen too early)
---  2. This expresses to GHC that we don't necessarily want the work in h-functions to be shared
-
 -- NB: it's important that we use localiseId on the absVarVar at binding sites, or else if we start
 -- with a state where a global Id is lambda-bound (because there is no unfolding) we might end up having an h-function
 -- that is lambda-abstracted over a global Id, which causes the assembler to barf.
@@ -532,8 +529,16 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
                -- NB: make sure we zap the "fragile" info because the FVs of the unfolding are
                -- not necessarily in scope.
 
-stateAbsVars :: State -> [Var]
-stateAbsVars = sortLambdaBounds . varSetElems . stateLambdaBounders
+-- NB: we abstract over RealWorld# as well (cf WwLib). Two reasons:
+--  1. If the h-function is unlifted, this delays its evaluation (so its effects, if any, do not happen too early).
+--     This is also necessary since h-functions will be bound in one letrec after supercompilation is complete.
+--  2. This expresses to GHC that we don't necessarily want the work in h-functions to be shared.
+stateAbsVars :: Maybe FreeVars -> State -> ([AbsVar], Type)
+stateAbsVars mb_lvs state = (abstracted, realWorldStatePrimTy `mkFunTy` (vs_list `mkPiTypes` state_ty))
+  where vs_list = sortLambdaBounds (varSetElems (stateLambdaBounders state))
+        state_ty = stateType state
+        abstracted = AbsVar { absVarDead = True, absVarVar = voidArgId } :
+                     map (\v -> AbsVar { absVarDead = maybe False (not . (v `elemVarSet`)) mb_lvs, absVarVar = v }) vs_list
 
 sortLambdaBounds :: [Var] -> [Var]
 sortLambdaBounds = sortBy (comparing (not . isTyVar)) -- True type variables go first since coercion/value variables may reference them

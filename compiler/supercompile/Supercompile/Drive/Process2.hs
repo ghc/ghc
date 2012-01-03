@@ -22,7 +22,6 @@ import Supercompile.Utilities
 import Id         (mkLocalId)
 import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
-import CoreUtils  (mkPiTypes)
 import qualified State as State
 
 import qualified Data.Map as M
@@ -228,12 +227,12 @@ runFulfilmentT mx = liftM (\(e, fs) -> letRec (M.toList (fulfilments fs)) e) $ u
 
 promise :: State -> MemoState -> (Promise, MemoState)
 promise state ms = (p, ms')
-  where vs_list = stateAbsVars state
+  where (vs_list, h_ty) = stateAbsVars Nothing state
         h_name :< h_names' = hNames ms
-        x = mkLocalId h_name (vs_list `mkPiTypes` stateType state)
+        x = mkLocalId h_name h_ty
         p = P {
             fun        = x,
-            abstracted = map mkLiveAbsVar vs_list,
+            abstracted = vs_list,
             meaning    = state
           }
         ms' = MS {

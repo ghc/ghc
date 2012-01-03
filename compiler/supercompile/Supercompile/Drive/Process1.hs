@@ -28,13 +28,11 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
-import Id         (mkLocalId, setIdOccInfo)
+import Id         (mkLocalId)
 import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
-import CoreUtils  (mkPiTypes)
 import qualified State as State
 import State hiding (State, mapAccumLM)
-import BasicTypes (OccInfo(..))
 
 import Text.XHtml hiding (text)
 
@@ -480,11 +478,11 @@ memo opt speculated state0 = do
         traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState fullStatePrettiness state1), res)
         ScpM $ \_ s k -> k res (s { pTreeHole = Tieback (fun p) })
       [] -> {- traceRender ("new drive", pPrintFullState state3) $ -} do
-        let vs_list = stateAbsVars state1
+        let (vs_list, h_ty) = stateAbsVars Nothing state1
 
         -- NB: promises are lexically scoped because they may refer to FVs
         x <- freshHName
-        promise (P { fun = mkLocalId x (vs_list `mkPiTypes` stateType state1), abstracted = map mkLiveAbsVar vs_list, meaning = state1, embedded = Nothing }) $
+        promise (P { fun = mkLocalId x h_ty, abstracted = vs_list, meaning = state1, embedded = Nothing }) $
           do
             traceRenderScpM ">sc" (x, PrettyDoc (pPrintFullState fullStatePrettiness state1))
             -- FIXME: this is the site of the Dreadful Hack that makes it safe to match on reduced terms yet *drive* unreduced ones

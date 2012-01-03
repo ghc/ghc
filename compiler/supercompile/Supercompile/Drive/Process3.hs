@@ -25,7 +25,6 @@ import Var        (varName)
 import Id         (mkLocalId)
 import Name       (Name, mkSystemVarName, getOccString)
 import FastString (mkFastString)
-import CoreUtils  (mkPiTypes)
 
 import Control.Monad (join)
 
@@ -66,9 +65,9 @@ data MemoState = MS {
 
 promise :: (State, State) -> MemoState -> (Promise, MemoState)
 promise (state, reduced_state) ms = (p, ms')
-  where vs_list = stateAbsVars state
+  where (vs_list, h_ty) = stateAbsVars (Just (stateLambdaBounders reduced_state)) state
         h_name :< h_names' = hNames ms
-        x = mkLocalId h_name (vs_list `mkPiTypes` stateType state)
+        x = mkLocalId h_name h_ty
         p = P {
             fun        = x,
             -- We mark as dead any of those variables that are not in the stateLambdaBounders of
@@ -79,7 +78,7 @@ promise (state, reduced_state) ms = (p, ms')
             --   2. We can get rid of the code in renameAbsVar that downgrades live AbsVars to dead
             --      ones if they are not present in the renaming: only dead AbsVars are allowed to
             --      be absent in the renaming.
-            abstracted = map (\v -> AbsVar { absVarDead = not (v `elemVarSet` stateLambdaBounders reduced_state), absVarVar = v }) vs_list,
+            abstracted = vs_list,
             meaning    = reduced_state
           }
         ms' = MS {
