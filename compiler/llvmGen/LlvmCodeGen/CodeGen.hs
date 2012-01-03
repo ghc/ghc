@@ -127,7 +127,7 @@ stmtToInstrs env stmt = case stmt of
         -> genCall env target res args ret
 
     -- Tail call
-    CmmJump arg -> genJump env arg
+    CmmJump arg live     -> genJump env arg live
 
     -- CPS, only tail calls, no return's
     -- Actually, there are a few return statements that occur because of hand
@@ -470,19 +470,19 @@ cmmPrimOpFunctions env mop
     
 
 -- | Tail function calls
-genJump :: LlvmEnv -> CmmExpr -> UniqSM StmtData
+genJump :: LlvmEnv -> CmmExpr -> Maybe [GlobalReg] -> UniqSM StmtData
 
 -- Call to known function
-genJump env (CmmLit (CmmLabel lbl)) = do
+genJump env (CmmLit (CmmLabel lbl)) live = do
     (env', vf, stmts, top) <- getHsFunc env lbl
-    (stgRegs, stgStmts) <- funEpilogue
+    (stgRegs, stgStmts) <- funEpilogue live
     let s1  = Expr $ Call TailCall vf stgRegs llvmStdFunAttrs
     let s2  = Return Nothing
     return (env', stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
 
 
 -- Call to unknown function / address
-genJump env expr = do
+genJump env expr live = do
     let fty = llvmFunTy
     (env', vf, stmts, top) <- exprToVar env expr
 
@@ -494,7 +494,7 @@ genJump env expr = do
                      ++ show (ty) ++ ")"
 
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
-    (stgRegs, stgStmts) <- funEpilogue
+    (stgRegs, stgStmts) <- funEpilogue live
     let s2 = Expr $ Call TailCall v1 stgRegs llvmStdFunAttrs
     let s3 = Return Nothing
     return (env', stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2 `snocOL` s3,
@@ -1197,15 +1197,29 @@ funPrologue = concat $ map getReg activeStgRegs
 
 
 -- | Function epilogue. Load STG variables to use as argument for call.
-funEpilogue :: UniqSM ([LlvmVar], LlvmStatements)
-funEpilogue = do
-    let loadExpr r = do
-        let reg = lmGlobalRegVar r
-        (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
-        return (v, unitOL s)
+funEpilogue :: Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
+funEpilogue Nothing = do
     loads <- mapM loadExpr activeStgRegs
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
+  where
+    loadExpr r = do
+        let reg = lmGlobalRegVar r
+        (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
+        return (v, unitOL s)
+
+funEpilogue (Just live) = do
+    loads <- mapM loadExpr activeStgRegs
+    let (vars, stmts) = unzip loads
+    return (vars, concatOL stmts)
+  where
+    loadExpr r | r `elem` alwaysLive || r `elem` live = do
+        let reg = lmGlobalRegVar r
+        (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
+        return (v, unitOL s)
+    loadExpr r = do
+        let ty = (pLower . getVarType $ lmGlobalRegVar r)
+        return (LMLitVar $ LMUndefLit ty, unitOL Nop)
 
 
 -- | A serries of statements to trash all the STG registers.

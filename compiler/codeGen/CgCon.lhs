@@ -116,7 +116,7 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
             -> CostCentreStack    -- Where to grab cost centre from;
                                   -- current CCS if currentOrSubsumedCCS
             -> DataCon            -- The data constructor
-            -> [(CgRep,CmmExpr)] -- Its args
+            -> [(CgRep,CmmExpr)]  -- Its args
             -> FCode CgIdInfo     -- Return details about how to find it
 buildDynCon binder ccs con args
     = do dflags <- getDynFlags
@@ -348,12 +348,15 @@ cgReturnDataCon con amodes
                         | otherwise         -> build_it_then (jump_to deflt_lbl) }
 
             _otherwise  -- The usual case
-              -> build_it_then emitReturnInstr
+              -> build_it_then $ emitReturnInstr node_live
         }
   where
+    node_live   = Just [node]
     enter_it    = stmtsC [ CmmAssign nodeReg (cmmUntag (CmmReg nodeReg)),
-                           CmmJump (entryCode (closureInfoPtr (CmmReg nodeReg)))]
-    jump_to lbl = stmtC (CmmJump (CmmLit lbl))
+                           CmmJump (entryCode $ closureInfoPtr $ CmmReg nodeReg)
+                                   node_live
+                         ]
+    jump_to lbl = stmtC $ CmmJump (CmmLit lbl) node_live
     build_it_then return_code
       = do {    -- BUILD THE OBJECT IN THE HEAP
                 -- The first "con" says that the name bound to this
@@ -472,7 +475,7 @@ cgDataCon data_con
                            -- The case continuation code is expecting a tagged pointer
                            ; stmtC (CmmAssign nodeReg
                                               (tagCons data_con (CmmReg nodeReg)))
-                           ; performReturn emitReturnInstr }
+                           ; performReturn $ emitReturnInstr (Just []) }
                                 -- noStmts: Ptr to thing already in Node
 
         ; whenC (not (isNullaryRepDataCon data_con))

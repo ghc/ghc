@@ -250,10 +250,10 @@ emitAlgReturnTarget name branches mb_deflt fam_sz
 		-- global labels, so we can't use them at the 'call site'
 
 --------------------------------
-emitReturnInstr :: Code
-emitReturnInstr 
-  = do 	{ info_amode <- getSequelAmode
-	; stmtC (CmmJump (entryCode info_amode)) }
+emitReturnInstr :: Maybe [GlobalReg] -> Code
+emitReturnInstr live
+  = do { info_amode <- getSequelAmode
+       ; stmtC (CmmJump (entryCode info_amode) live) }
 
 -----------------------------------------------------------------------------
 --

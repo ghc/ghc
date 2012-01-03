@@ -3,7 +3,7 @@
 --
 
 module LlvmCodeGen.Regs (
-        lmGlobalRegArg, lmGlobalRegVar
+        lmGlobalRegArg, lmGlobalRegVar, alwaysLive
     ) where
 
 #include "HsVersions.h"
@@ -24,7 +24,7 @@ lmGlobalRegArg = lmGlobalReg "_Arg"
 
 {- Need to make sure the names here can't conflict with the unique generated
    names. Uniques generated names containing only base62 chars. So using say
-    the '_' char guarantees this.
+   the '_' char guarantees this.
 -}
 lmGlobalReg :: String -> GlobalReg -> LlvmVar
 lmGlobalReg suf reg
@@ -54,4 +54,8 @@ lmGlobalReg suf reg
         ptrGlobal    name = LMNLocalVar (fsLit name) llvmWordPtr
         floatGlobal  name = LMNLocalVar (fsLit name) LMFloat
         doubleGlobal name = LMNLocalVar (fsLit name) LMDouble
+
+-- | A list of STG Registers that should always be considered alive
+alwaysLive :: [GlobalReg]
+alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
 
