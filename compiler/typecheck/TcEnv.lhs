@@ -17,7 +17,7 @@ module TcEnv(
         tcLookupLocatedGlobal, tcLookupGlobal, 
         tcLookupField, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
-        tcLookupLocatedClass, tcLookupInstance,
+        tcLookupLocatedClass, tcLookupInstance, tcLookupAxiom,
         
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvTvs, tcExtendTcTyThingEnv,
@@ -45,7 +45,7 @@ module TcEnv(
         topIdLvl, thTopLevelId, thRnBrack, isBrackStage,
 
         -- New Ids
-        newLocalName, newDFunName, newFamInstTyConName, 
+        newLocalName, newDFunName, newFamInstTyConName, newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName
   ) where
 
@@ -164,6 +164,13 @@ tcLookupTyCon name = do
         ATyCon tc -> return tc
         _         -> wrongThingErr "type constructor" (AGlobal thing) name
 
+tcLookupAxiom :: Name -> TcM CoAxiom
+tcLookupAxiom name = do
+    thing <- tcLookupGlobal name
+    case thing of
+        ACoAxiom ax -> return ax
+        _           -> wrongThingErr "axiom" (AGlobal thing) name
+
 tcLookupLocatedGlobalId :: Located Name -> TcM Id
 tcLookupLocatedGlobalId = addLocM tcLookupId
 
@@ -176,7 +183,7 @@ tcLookupLocatedTyCon = addLocM tcLookupTyCon
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
 -- the same as in the instance declaration (modulo renaming).
 --
-tcLookupInstance :: Class -> [Type] -> TcM Instance
+tcLookupInstance :: Class -> [Type] -> TcM ClsInst
 tcLookupInstance cls tys
   = do { instEnv <- tcGetInstEnvs
        ; case lookupUniqueInstEnv instEnv cls tys of
@@ -610,7 +617,7 @@ as well as explicit user written ones.
 \begin{code}
 data InstInfo a
   = InstInfo {
-      iSpec   :: Instance,        -- Includes the dfun id.  Its forall'd type
+      iSpec   :: ClsInst,        -- Includes the dfun id.  Its forall'd type
       iBinds  :: InstBindings a   -- variables scope over the stuff in InstBindings!
     }
 
@@ -688,13 +695,17 @@ Make a name for the representation tycon of a family instance.  It's an
 newGlobalBinder.
 
 \begin{code}
-newFamInstTyConName :: Located Name -> [Type] -> TcM Name
-newFamInstTyConName (L loc tc_name) tys
+newFamInstTyConName, newFamInstAxiomName :: Located Name -> [Type] -> TcM Name
+newFamInstTyConName = mk_fam_inst_name id
+newFamInstAxiomName = mk_fam_inst_name mkInstTyCoOcc
+
+mk_fam_inst_name :: (OccName -> OccName) -> Located Name -> [Type] -> TcM Name
+mk_fam_inst_name adaptOcc (L loc tc_name) tys
   = do  { mod   <- getModule
         ; let info_string = occNameString (getOccName tc_name) ++ 
                             concatMap (occNameString.getDFunTyKey) tys
         ; occ   <- chooseUniqueOccTc (mkInstTyTcOcc info_string)
-        ; newGlobalBinder mod occ loc }
+        ; newGlobalBinder mod (adaptOcc occ) loc }
 \end{code}
 
 Stable names used for foreign exports and annotations.

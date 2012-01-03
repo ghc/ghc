@@ -27,6 +27,7 @@ import SrcLoc
 import Outputable
 import UniqFM
 import FastString
+import VarSet   ( varSetElems )
 
 import Maybes
 import Control.Monad
@@ -166,7 +167,7 @@ then we have a coercion (ie, type instance of family instance coercion)
 which implies that :R42T was declared as 'data instance T [a]'.
 
 \begin{code}
-tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (TyCon, [Type]))
+tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (FamInst, [Type]))
 tcLookupFamInst tycon tys
   | not (isFamilyTyCon tycon)
   = return Nothing
@@ -176,7 +177,7 @@ tcLookupFamInst tycon tys
        ; case lookupFamInstEnv instEnv tycon tys of
 	   []                      -> return Nothing
 	   ((fam_inst, rep_tys):_) 
-             -> return $ Just (famInstTyCon fam_inst, rep_tys)
+             -> return $ Just (fam_inst, rep_tys)
        }
 
 tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
@@ -189,8 +190,9 @@ tcLookupDataFamInst tycon tys
   = ASSERT( isAlgTyCon tycon )
     do { maybeFamInst <- tcLookupFamInst tycon tys
        ; case maybeFamInst of
-           Nothing      -> famInstNotFound tycon tys
-           Just famInst -> return famInst }
+           Nothing             -> famInstNotFound tycon tys
+           Just (famInst, tys) -> let tycon' = dataFamInstRepTyCon famInst
+                                  in return (tycon', tys) }
 
 famInstNotFound :: TyCon -> [Type] -> TcM a
 famInstNotFound tycon tys 
@@ -250,7 +252,7 @@ addLocalFamInst home_fie famInst = do
     let inst_envs = (eps_fam_inst_env eps, home_fie)
 
         -- Check for conflicting instance decls
-    skol_tvs <- tcInstSkolTyVars (tyConTyVars (famInstTyCon famInst))
+    skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars famInst))
     let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
     -- If there are any conflicts, we should probably error
     -- But, if we're allowed to overwrite and the conflict is in the home FIE,
@@ -285,7 +287,7 @@ checkForConflicts inst_envs famInst
 		-- We use tcInstSkolType because we don't want to allocate
 		-- fresh *meta* type variables.  
 
-       ; skol_tvs <- tcInstSkolTyVars (tyConTyVars (famInstTyCon famInst))
+       ; skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars famInst))
        ; let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
        ; unless (null conflicts) $
 	   conflictInstErr famInst (fst (head conflicts))

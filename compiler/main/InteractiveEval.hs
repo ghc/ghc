@@ -869,7 +869,7 @@ moduleIsInterpreted modl = withSession $ \h ->
 -- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
 -- The exact choice of which ones to show, and which to hide, is a judgement call.
 --      (see Trac #1581)
-getInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[Instance]))
+getInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
 getInfo name
   = withSession $ \hsc_env ->
     do mb_stuff <- liftIO $ hscTcRnGetInfo hsc_env name

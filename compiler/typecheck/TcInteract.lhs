@@ -20,10 +20,11 @@ import TcCanonical
 import VarSet
 import Type
 import Unify
+import FamInstEnv
+import Coercion( mkAxInstRHS )
 
 import Id 
 import Var
-import VarEnv ( ) -- unitVarEnv, mkInScopeSet
 
 import TcType
 
@@ -1507,16 +1508,12 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = eqv, cc_flavor = fl
                                        , cc_fun = tc, cc_tyargs = args, cc_rhs = xi })
   = ASSERT (isSynFamilyTyCon tc)   -- No associated data families have reached that far 
     do { match_res <- matchFam tc args   -- See Note [MATCHING-SYNONYMS]
-       ; case match_res of 
+       ; case match_res of
            Nothing -> return NoTopInt 
-           Just (rep_tc, rep_tys)
-             -> do { let Just coe_tc = tyConFamilyCoercion_maybe rep_tc
-                         Just rhs_ty = tcView (mkTyConApp rep_tc rep_tys)
-			    -- Eagerly expand away the type synonym on the
-			    -- RHS of a type function, so that it never
-			    -- appears in an error message
-                            -- See Note [Type synonym families] in TyCon
-                         coe = mkTcAxInstCo coe_tc rep_tys 
+           Just (famInst, rep_tys)
+             -> do { let coe_ax = famInstAxiom famInst
+                         rhs_ty = mkAxInstRHS coe_ax rep_tys
+                         coe    = mkTcAxInstCo coe_ax rep_tys 
                    ; case fl of
                        Wanted {} -> do { evc <- newEqVar fl rhs_ty xi -- Wanted version
                                        ; let eqv' = evc_the_evvar evc
@@ -1545,7 +1542,6 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = eqv, cc_flavor = fl
                                                                , cc_flavor = fl'
                                                                , cc_depth = cc_depth workItem + 1}  
                                       ; updWorkListTcS (extendWorkListEq ct) 
-
                                       ; return $ 
                                         SomeTopInt { tir_rule = "Fun/Top (given)"
                                                    , tir_new_item = ContinueWith workItem } }

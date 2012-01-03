@@ -1096,7 +1096,7 @@ data VectDecl name
   | HsVectInstIn                -- pre type-checking (always SCALAR)
       (LHsType name)
   | HsVectInstOut               -- post type-checking (always SCALAR)
-      Instance
+      ClsInst
   deriving (Data, Typeable)
 
 lvectDeclName :: NamedThing name => LVectDecl name -> Name

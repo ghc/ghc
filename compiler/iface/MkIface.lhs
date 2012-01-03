@@ -68,6 +68,7 @@ import CoreFVs
 import Class
 import Kind
 import TyCon
+import Coercion         ( coAxiomSplitLHS )
 import DataCon
 import Type
 import TcType
@@ -261,8 +262,9 @@ mkIface_ hsc_env maybe_old_fingerprint
                 ; iface_insts = map instanceToIfaceInst insts
                 ; iface_fam_insts = map famInstToIfaceFamInst fam_insts
                 ; iface_vect_info = flattenVectInfo vect_info
-                -- Check if we are in Safe Inference mode but we failed to pass
-                -- the muster
+
+                -- Check if we are in Safe Inference mode 
+                -- but we failed to pass the muster
                 ; safeMode    = if safeInferOn dflags && not safeInf
                                     then Sf_None
                                     else safeHaskell dflags
@@ -361,7 +363,7 @@ mkIface_ hsc_env maybe_old_fingerprint
      deliberatelyOmitted :: String -> a
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
-     ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
+     ifFamInstTcName = ifFamInstFam
 
      flattenVectInfo (VectInfo { vectInfoVar          = vVar
                                , vectInfoTyCon        = vTyCon
@@ -430,7 +432,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         -- see IfaceDeclABI below.
        declABI :: IfaceDecl -> IfaceDeclABI 
        declABI decl = (this_mod, decl, extras)
-        where extras = declExtras fix_fn non_orph_rules non_orph_insts decl
+        where extras = declExtras fix_fn non_orph_rules non_orph_insts
+                                  non_orph_fis decl
 
        edges :: [(IfaceDeclABI, Unique, [Unique])]
        edges = [ (abi, getUnique (ifName decl), out)
@@ -451,7 +454,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
        parent_map :: OccEnv OccName
        parent_map = foldr extend emptyOccEnv new_decls
           where extend d env = 
-                  extendOccEnvList env [ (b,n) | b <- ifaceDeclSubBndrs d ]
+                  extendOccEnvList env [ (b,n) | b <- ifaceDeclImplicitBndrs d ]
                   where n = ifName d
 
         -- strongly-connected groups of declarations, in dependency order
@@ -473,8 +476,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
           | otherwise
           = ASSERT2( isExternalName name, ppr name )
             let hash | nameModule name /= this_mod =  global_hash_fn name
-                     | otherwise = 
-                        snd (lookupOccEnv local_env (getOccName name)
+                     | otherwise = snd (lookupOccEnv local_env (getOccName name)
                            `orElse` pprPanic "urk! lookup local fingerprint" 
                                        (ppr name)) -- (undefined,fingerprint0))
                 -- This panic indicates that we got the dependency
@@ -484,8 +486,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 -- pprTraces below, run the compile again, and inspect
                 -- the output and the generated .hi file with
                 -- --show-iface.
-            in 
-            put_ bh hash
+            in put_ bh hash
 
         -- take a strongly-connected group of declarations and compute
         -- its fingerprint.
@@ -530,7 +531,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                        -> IO (OccEnv (OccName,Fingerprint))
        extend_hash_env env0 (hash,d) = do
           let
-            sub_bndrs = ifaceDeclSubBndrs d
+            sub_bndrs = ifaceDeclImplicitBndrs d
             fp_sub_bndr occ = computeFingerprint putNameLiterally (hash,occ)
           --
           sub_fps <- mapM fp_sub_bndr sub_bndrs
@@ -561,7 +562,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
    orphan_hash <- computeFingerprint (mk_put_name local_env)
-                      (map ifDFun orph_insts, orph_rules, fam_insts)
+                      (map ifDFun orph_insts, orph_rules, orph_fis)
 
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
@@ -619,7 +620,9 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_exp_hash    = export_hash,
                 mi_orphan_hash = orphan_hash,
                 mi_flag_hash   = flag_hash,
-                mi_orphan      = not (null orph_rules && null orph_insts
+                mi_orphan      = not (   null orph_rules
+                                      && null orph_insts
+                                      && null orph_fis
                                       && null (ifaceVectInfoVar (mi_vect_info iface0))),
                 mi_finsts      = not . null $ mi_fam_insts iface0,
                 mi_decls       = sorted_decls,
@@ -631,12 +634,9 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
     this_mod = mi_module iface0
     dflags = hsc_dflags hsc_env
     this_pkg = thisPackage dflags
-    (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph (mi_insts iface0)
-    (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph (mi_rules iface0)
-        -- See Note [Orphans] in IfaceSyn
-        -- ToDo: shouldn't we be splitting fam_insts into orphans and
-        -- non-orphans?
-    fam_insts = mi_fam_insts iface0
+    (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    (mi_insts iface0)
+    (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
+    (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
     fix_fn = mi_fix_fn iface0
 
 
@@ -700,7 +700,7 @@ data IfaceDeclExtras
 
   | IfaceDataExtras  
        Fixity                   -- Fixity of the tycon itself
-       [IfaceInstABI]           -- Local instances of this tycon
+       [IfaceInstABI]           -- Local class and family instances of this tycon
                                 -- See Note [Orphans] in IfaceSyn
        [(Fixity,[IfaceRule])]   -- For each construcotr, fixity and RULES
 
@@ -711,9 +711,15 @@ data IfaceDeclExtras
                                 -- See Note [Orphans] in IfaceSyn
        [(Fixity,[IfaceRule])]   -- For each class method, fixity and RULES
 
-  | IfaceSynExtras   Fixity
+  | IfaceSynExtras   Fixity [IfaceInstABI]
 
   | IfaceOtherDeclExtras
+
+-- When hashing a class or family instance, we hash only the 
+-- DFunId or CoAxiom, because that depends on all the 
+-- information about the instance.
+--
+type IfaceInstABI = IfExtName   -- Name of DFunId or CoAxiom that is evidence for the instance
 
 abiDecl :: IfaceDeclABI -> IfaceDecl
 abiDecl (_, decl, _) = decl
@@ -733,8 +739,8 @@ freeNamesDeclExtras (IfaceDataExtras  _ insts subs)
   = unionManyNameSets (mkNameSet insts : map freeNamesSub subs)
 freeNamesDeclExtras (IfaceClassExtras _ insts subs)
   = unionManyNameSets (mkNameSet insts : map freeNamesSub subs)
-freeNamesDeclExtras (IfaceSynExtras _)
-  = emptyNameSet
+freeNamesDeclExtras (IfaceSynExtras _ insts)
+  = mkNameSet insts
 freeNamesDeclExtras IfaceOtherDeclExtras
   = emptyNameSet
 
@@ -744,9 +750,9 @@ freeNamesSub (_,rules) = unionManyNameSets (map freeNamesIfRule rules)
 instance Outputable IfaceDeclExtras where
   ppr IfaceOtherDeclExtras       = empty
   ppr (IfaceIdExtras  fix rules) = ppr_id_extras fix rules
-  ppr (IfaceSynExtras fix)       = ppr fix
-  ppr (IfaceDataExtras fix insts stuff)  = vcat [ppr fix, ppr_insts insts,
-                                                 ppr_id_extras_s stuff]
+  ppr (IfaceSynExtras fix finsts) = vcat [ppr fix, ppr finsts]
+  ppr (IfaceDataExtras fix insts stuff) = vcat [ppr fix, ppr_insts insts,
+                                                ppr_id_extras_s stuff]
   ppr (IfaceClassExtras fix insts stuff) = vcat [ppr fix, ppr_insts insts,
                                                  ppr_id_extras_s stuff]
 
@@ -768,24 +774,26 @@ instance Binary IfaceDeclExtras where
    putByte bh 2; put_ bh fix; put_ bh insts; put_ bh cons
   put_ bh (IfaceClassExtras fix insts methods) = do
    putByte bh 3; put_ bh fix; put_ bh insts; put_ bh methods
-  put_ bh (IfaceSynExtras fix) = do
-   putByte bh 4; put_ bh fix
+  put_ bh (IfaceSynExtras fix finsts) = do
+   putByte bh 4; put_ bh fix; put_ bh finsts
   put_ bh IfaceOtherDeclExtras = do
    putByte bh 5
 
 declExtras :: (OccName -> Fixity)
            -> OccEnv [IfaceRule]
-           -> OccEnv [IfaceInst]
+           -> OccEnv [IfaceClsInst]
+           -> OccEnv [IfaceFamInst]
            -> IfaceDecl
            -> IfaceDeclExtras
 
-declExtras fix_fn rule_env inst_env decl
+declExtras fix_fn rule_env inst_env fi_env decl
   = case decl of
       IfaceId{} -> IfaceIdExtras (fix_fn n) 
                         (lookupOccEnvL rule_env n)
       IfaceData{ifCons=cons} -> 
                      IfaceDataExtras (fix_fn n)
-                        (map ifDFun $ lookupOccEnvL inst_env n)
+                        (map ifFamInstAxiom (lookupOccEnvL fi_env n) ++
+                         map ifDFun         (lookupOccEnvL inst_env n))
                         (map (id_extras . ifConOcc) (visibleIfConDecls cons))
       IfaceClass{ifSigs=sigs, ifATs=ats} -> 
                      IfaceClassExtras (fix_fn n)
@@ -794,18 +802,14 @@ declExtras fix_fn rule_env inst_env decl
                            -- Include instances of the associated types
                            -- as well as instances of the class (Trac #5147)
                         [id_extras op | IfaceClassOp op _ _ <- sigs]
-      IfaceSyn{} -> IfaceSynExtras (fix_fn n)
+      IfaceSyn{} -> IfaceSynExtras (fix_fn n) 
+                        (map ifFamInstAxiom (lookupOccEnvL fi_env n))
       _other -> IfaceOtherDeclExtras
   where
         n = ifName decl
         id_extras occ = (fix_fn occ, lookupOccEnvL rule_env occ)
         at_extras (IfaceAT decl _) = lookupOccEnvL inst_env (ifName decl)
 
---
--- When hashing an instance, we hash only the DFunId, because that
--- depends on all the information about the instance.
---
-type IfaceInstABI = IfExtName
 
 lookupOccEnvL :: OccEnv [v] -> OccName -> [v]
 lookupOccEnvL env k = lookupOccEnv env k `orElse` []
@@ -837,7 +841,7 @@ oldMD5 dflags bh = do
         return $! readHexFingerprint hash_str
 -}
 
-instOrphWarn :: PrintUnqualified -> Instance -> WarnMsg
+instOrphWarn :: PrintUnqualified -> ClsInst -> WarnMsg
 instOrphWarn unqual inst
   = mkWarnMsg (getSrcSpan inst) unqual $
     hang (ptext (sLit "Warning: orphan instance:")) 2 (pprInstanceHdr inst)
@@ -1419,9 +1423,7 @@ tyThingToIfaceDecl (ATyCon tycon)
   = IfaceSyn {  ifName    = getOccName tycon,
                 ifTyVars  = toIfaceTvBndrs tyvars,
                 ifSynRhs  = syn_rhs,
-                ifSynKind = syn_ki,
-                ifFamInst = famInstToIface (tyConFamInst_maybe tycon)
-             }
+                ifSynKind = syn_ki }
 
   | isAlgTyCon tycon
   = IfaceData { ifName    = getOccName tycon,
@@ -1430,7 +1432,7 @@ tyThingToIfaceDecl (ATyCon tycon)
                 ifCons    = ifaceConDecls (algTyConRhs tycon),
                 ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
                 ifGadtSyntax = isGadtSyntaxTyCon tycon,
-                ifFamInst = famInstToIface (tyConFamInst_maybe tycon)}
+                ifAxiom   = fmap coAxiomName (tyConFamilyCoercion_maybe tycon) }
 
   | isForeignTyCon tycon
   = IfaceForeign { ifName    = getOccName tycon,
@@ -1448,7 +1450,7 @@ tyThingToIfaceDecl (ATyCon tycon)
       IfNewTyCon  (ifaceConDecl con)
     ifaceConDecls (DataTyCon { data_cons = cons })  = 
       IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls DataFamilyTyCon {}                = IfOpenDataTyCon
+    ifaceConDecls DataFamilyTyCon {}                = IfDataFamTyCon
     ifaceConDecls (AbstractTyCon distinct)          = IfAbstractTyCon distinct
         -- The last case happens when a TyCon has been trimmed during tidying
         -- Furthermore, tyThingToIfaceDecl is also used
@@ -1472,11 +1474,16 @@ tyThingToIfaceDecl (ATyCon tycon)
 
     to_eq_spec spec = [(getOccName tv, toIfaceType ty) | (tv,ty) <- spec]
 
-    famInstToIface Nothing                    = Nothing
-    famInstToIface (Just (famTyCon, instTys)) = 
-      Just (toIfaceTyCon famTyCon, map toIfaceType instTys)
-
-tyThingToIfaceDecl c@(ACoAxiom _) = pprPanic "tyThingToIfaceDecl (ACoCon _)" (ppr c)
+tyThingToIfaceDecl (ACoAxiom ax)
+ = IfaceAxiom { ifName = name
+              , ifTyVars = tv_bndrs
+              , ifLHS = lhs
+              , ifRHS = rhs }
+ where
+   name = getOccName ax
+   tv_bndrs = toIfaceTvBndrs (coAxiomTyVars ax)
+   lhs = toIfaceType (coAxiomLHS ax)
+   rhs = toIfaceType (coAxiomRHS ax)
 
 tyThingToIfaceDecl (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)      -- Should be trimmed out earlier
@@ -1527,11 +1534,11 @@ getFS :: NamedThing a => a -> FastString
 getFS x = occNameFS (getOccName x)
 
 --------------------------
-instanceToIfaceInst :: Instance -> IfaceInst
-instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
+instanceToIfaceInst :: ClsInst -> IfaceClsInst
+instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag,
                                 is_cls = cls_name, is_tcs = mb_tcs })
   = ASSERT( cls_name == className cls )
-    IfaceInst { ifDFun    = dfun_name,
+    IfaceClsInst { ifDFun    = dfun_name,
                 ifOFlag   = oflag,
                 ifInstCls = cls_name,
                 ifInstTys = map do_rough mb_tcs,
@@ -1569,15 +1576,33 @@ instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst
-famInstToIfaceFamInst (FamInst { fi_tycon = tycon,
-                                 fi_fam = fam,
-                                 fi_tcs = mb_tcs })
-  = IfaceFamInst { ifFamInstTyCon  = toIfaceTyCon tycon
-                 , ifFamInstFam    = fam
-                 , ifFamInstTys    = map do_rough mb_tcs }
+famInstToIfaceFamInst (FamInst { fi_axiom  = axiom,
+                                 fi_fam    = fam,
+                                 fi_tcs    = mb_tcs })
+  = IfaceFamInst { ifFamInstAxiom = coAxiomName axiom
+                 , ifFamInstFam   = fam
+                 , ifFamInstTys   = map do_rough mb_tcs
+                 , ifFamInstOrph  = orph }
   where
     do_rough Nothing  = Nothing
     do_rough (Just n) = Just (toIfaceTyCon_name n)
+
+    fam_decl = tyConName . fst $ coAxiomSplitLHS axiom
+    mod = ASSERT( isExternalName (coAxiomName axiom) )
+          nameModule (coAxiomName axiom)
+    is_local name = nameIsLocalOrFrom mod name
+
+    lhs_names = filterNameSet is_local (orphNamesOfType (coAxiomLHS axiom))
+
+    orph | is_local fam_decl
+         = Just (nameOccName fam_decl)
+
+         | not (isEmptyNameSet lhs_names)
+         = Just (nameOccName (head (nameSetToList lhs_names)))
+
+
+         | otherwise
+         = Nothing
 
 --------------------------
 toIfaceLetBndr :: Id -> IfaceLetBndr

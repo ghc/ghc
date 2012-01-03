@@ -168,7 +168,7 @@ module GHC (
         pprFundeps,
 
         -- ** Instances
-        Instance, 
+        ClsInst, 
         instanceDFunId, 
         pprInstance, pprInstanceHdr,
         pprFamInst, pprFamInstHdr,
@@ -915,7 +915,7 @@ getBindings = withSession $ \hsc_env ->
     return $ icInScopeTTs $ hsc_IC hsc_env
 
 -- | Return the instances for the current interactive session.
-getInsts :: GhcMonad m => m ([Instance], [FamInst])
+getInsts :: GhcMonad m => m ([ClsInst], [FamInst])
 getInsts = withSession $ \hsc_env ->
     return $ ic_instances (hsc_IC hsc_env)
 
@@ -928,7 +928,7 @@ data ModuleInfo = ModuleInfo {
         minf_type_env  :: TypeEnv,
         minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
         minf_rdr_env   :: Maybe GlobalRdrEnv,   -- Nothing for a compiled/package mod
-        minf_instances :: [Instance],
+        minf_instances :: [ClsInst],
         minf_iface     :: Maybe ModIface
 #ifdef GHCI
        ,minf_modBreaks :: ModBreaks 
@@ -1011,7 +1011,7 @@ modInfoExports minf = nameSetToList $! minf_exports minf
 
 -- | Returns the instances defined by the specified module.
 -- Warning: currently unimplemented for package modules.
-modInfoInstances :: ModuleInfo -> [Instance]
+modInfoInstances :: ModuleInfo -> [ClsInst]
 modInfoInstances = minf_instances
 
 modInfoIsExportedName :: ModuleInfo -> Name -> Bool

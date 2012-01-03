@@ -447,12 +447,12 @@ data CoreRule
 	ru_act  :: Activation,          -- ^ When the rule is active
 
 	-- Rough-matching stuff
-	-- see comments with InstEnv.Instance( is_cls, is_rough )
+	-- see comments with InstEnv.ClsInst( is_cls, is_rough )
 	ru_fn    :: Name,	        -- ^ Name of the 'Id.Id' at the head of this rule
 	ru_rough :: [Maybe Name],	-- ^ Name at the head of each argument to the left hand side
 	
 	-- Proper-matching stuff
-	-- see comments with InstEnv.Instance( is_tvs, is_tys )
+	-- see comments with InstEnv.ClsInst( is_tvs, is_tys )
 	ru_bndrs :: [CoreBndr],         -- ^ Variables quantified over
 	ru_args  :: [CoreExpr],         -- ^ Left hand side arguments
 	

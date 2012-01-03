@@ -236,7 +236,7 @@ loadInterface doc_str mod from
         --
         -- The main thing is to add the ModIface to the PIT, but
         -- we also take the
-        --      IfaceDecls, IfaceInst, IfaceFamInst, IfaceRules, IfaceVectInfo
+        --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules, IfaceVectInfo
         -- out of the ModIface and put them into the big EPS pools
 
         -- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
@@ -372,7 +372,7 @@ loadDecl ignore_prags mod (_version, decl)
                 -- the names associated with the decl
           main_name      <- lookupOrig mod (ifName decl)
 --        ; traceIf (text "Loading decl for " <> ppr main_name)
-        ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclSubBndrs decl)
+        ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclImplicitBndrs decl)
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
@@ -402,7 +402,7 @@ loadDecl ignore_prags mod (_version, decl)
         -- (where the "MkT" is the *Name* associated with MkT, etc.)
         --
         -- We do this by mapping the implict_names to the associated
-        -- TyThings.  By the invariant on ifaceDeclSubBndrs and
+        -- TyThings.  By the invariant on ifaceDeclImplicitBndrs and
         -- implicitTyThings, we can use getOccName on the implicit
         -- TyThings to make this association: each Name's OccName should
         -- be the OccName of exactly one implictTyThing.  So the key is

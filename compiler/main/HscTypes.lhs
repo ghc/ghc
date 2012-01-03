@@ -119,7 +119,7 @@ import HsSyn
 import RdrName
 import Avail
 import Module
-import InstEnv          ( InstEnv, Instance )
+import InstEnv          ( InstEnv, ClsInst )
 import FamInstEnv
 import Rules            ( RuleBase )
 import CoreSyn          ( CoreProgram )
@@ -467,7 +467,7 @@ lookupIfaceByModule dflags hpt pit mod
 -- modules imported by this one, directly or indirectly, and are in the Home
 -- Package Table.  This ensures that we don't see instances from modules @--make@
 -- compiled before this one, but which are not below this one.
-hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([Instance], [FamInst])
+hptInstances :: HscEnv -> (ModuleName -> Bool) -> ([ClsInst], [FamInst])
 hptInstances hsc_env want_this_module
   = let (insts, famInsts) = unzip $ flip hptAllThings hsc_env $ \mod_info -> do
                 guard (want_this_module (moduleName (mi_module (hm_iface mod_info))))
@@ -693,7 +693,7 @@ data ModIface
                 -- 'HomeModInfo', but that leads to more plumbing.
 
                 -- Instance declarations and rules
-        mi_insts       :: [IfaceInst],     -- ^ Sorted class instance
+        mi_insts       :: [IfaceClsInst],     -- ^ Sorted class instance
         mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
         mi_rules       :: [IfaceRule],     -- ^ Sorted rules
         mi_orphan_hash :: !Fingerprint,    -- ^ Hash for orphan rules and class
@@ -771,7 +771,7 @@ data ModDetails
         -- The next two fields are created by the typechecker
         md_exports   :: [AvailInfo],
         md_types     :: !TypeEnv,       -- ^ Local type environment for this particular module
-        md_insts     :: ![Instance],    -- ^ 'DFunId's for the instances in this module
+        md_insts     :: ![ClsInst],    -- ^ 'DFunId's for the instances in this module
         md_fam_insts :: ![FamInst],
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
         md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
@@ -817,7 +817,7 @@ data ModGuts
                                          -- ToDo: I'm unconvinced this is actually used anywhere
         mg_tcs       :: ![TyCon],        -- ^ TyCons declared in this module
                                          -- (includes TyCons for classes)
-        mg_insts     :: ![Instance],     -- ^ Class instances declared in this module
+        mg_insts     :: ![ClsInst],     -- ^ Class instances declared in this module
         mg_fam_insts :: ![FamInst],      -- ^ Family instances declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
                                          -- See Note [Overall plumbing for rules] in Rules.lhs
@@ -937,7 +937,7 @@ data InteractiveContext
              -- ^ Variables defined automatically by the system (e.g.
              -- record field selectors).  See Notes [ic_sys_vars]
 
-         ic_instances  :: ([Instance], [FamInst]),
+         ic_instances  :: ([ClsInst], [FamInst]),
              -- ^ All instances and family instances created during
              -- this session.  These are grabbed en masse after each
              -- update to be sure that proper overlapping is retained.
@@ -1163,9 +1163,33 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 
 %************************************************************************
 %*                                                                      *
-                TyThing
+                Implicit TyThings
 %*                                                                      *
 %************************************************************************
+
+Note [Implicit TyThings]
+~~~~~~~~~~~~~~~~~~~~~~~~
+  DEFINITION: An "implicit" TyThing is one that does not have its own
+  IfaceDecl in an interface file.  Instead, its binding in the type
+  environment is created as part of typechecking the IfaceDecl for
+  some other thing.
+
+Examples:
+  * All DataCons are implicit, because they are generated from the
+    IfaceDecl for the data/newtype.  Ditto class methods.
+
+  * Record selectors are *not* implicit, because they get their own
+    free-standing IfaceDecl.
+
+  * Associated data/type families are implicit because they are
+    included in the IfaceDecl of the parent class.  (NB: the
+    IfaceClass decl happens to use IfaceDecl recursively for the
+    associated types, but that's irrelevant here.)
+
+  * Dictionary function Ids are not implict.
+
+  * Axioms for newtypes are implicit (same as above), but axioms
+    for data/type family instances are *not* implicit (like DFunIds).
 
 \begin{code}
 -- | Determine the 'TyThing's brought into scope by another 'TyThing'
@@ -1175,7 +1199,7 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 -- scope, just for a start!
 
 -- N.B. the set of TyThings returned here *must* match the set of
--- names returned by LoadIface.ifaceDeclSubBndrs, in the sense that
+-- names returned by LoadIface.ifaceDeclImplicitBndrs, in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
 -- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
@@ -1201,9 +1225,10 @@ implicitTyConThings :: TyCon -> [TyThing]
 implicitTyConThings tc
   = class_stuff ++
       -- fields (names of selectors)
-      -- (possibly) implicit coercion and family coercion
-      --   depending on whether it's a newtype or a family instance or both
+
+      -- (possibly) implicit newtype coercion
     implicitCoTyCon tc ++
+
       -- for each data constructor in order,
       --   the contructor, worker, and (possibly) wrapper
     concatMap (extras_plus . ADataCon) (tyConDataCons tc)
@@ -1218,14 +1243,11 @@ implicitTyConThings tc
 extras_plus :: TyThing -> [TyThing]
 extras_plus thing = thing : implicitTyThings thing
 
--- For newtypes and indexed data types (and both),
--- add the implicit coercion tycon
+-- For newtypes (only) add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc
-  = map ACoAxiom . catMaybes $ [-- Just if newtype, Nothing if not
-                              newTyConCo_maybe tc,
-                              -- Just if family instance, Nothing if not
-                              tyConFamilyCoercion_maybe tc]
+  | Just co <- newTyConCo_maybe tc = [ACoAxiom co]
+  | otherwise                      = []
 
 -- | Returns @True@ if there should be no interface-file declaration
 -- for this thing on its own: either it is built-in, or it is part
@@ -1235,7 +1257,7 @@ isImplicitTyThing :: TyThing -> Bool
 isImplicitTyThing (ADataCon {}) = True
 isImplicitTyThing (AnId id)     = isImplicitId id
 isImplicitTyThing (ATyCon tc)   = isImplicitTyCon tc
-isImplicitTyThing (ACoAxiom {}) = True
+isImplicitTyThing (ACoAxiom ax) = isImplicitCoAxiom ax
 
 -- | tyThingParent_maybe x returns (Just p)
 -- when pprTyThingInContext sould print a declaration for p
@@ -1321,13 +1343,14 @@ mkTypeEnvWithImplicits things =
   mkTypeEnv (concatMap implicitTyThings things)
 
 typeEnvFromEntities :: [Id] -> [TyCon] -> [FamInst] -> TypeEnv
-typeEnvFromEntities ids tcs faminsts =
+typeEnvFromEntities ids tcs famInsts =
   mkTypeEnv (   map AnId ids
              ++ map ATyCon all_tcs
              ++ concatMap implicitTyConThings all_tcs
+             ++ map (ACoAxiom . famInstAxiom) famInsts
             )
  where
-  all_tcs = tcs ++ map famInstTyCon faminsts
+  all_tcs = tcs ++ famInstsRepTyCons famInsts
 
 lookupTypeEnv = lookupNameEnv
 
@@ -1432,7 +1455,7 @@ mkIfaceHashCache pairs
   = \occ -> lookupOccEnv env occ
   where
     env = foldr add_decl emptyOccEnv pairs
-    add_decl (v,d) env0 = foldr add_imp env1 (ifaceDeclSubBndrs d)
+    add_decl (v,d) env0 = foldr add_imp env1 (ifaceDeclImplicitBndrs d)
       where
           decl_name = ifName d
           env1 = extendOccEnv env0 decl_name (decl_name, v)

@@ -338,14 +338,14 @@ tcDeriving tycl_decls inst_decls deriv_decls
   ; let all_tycons = map ATyCon (bagToList newTyCons)
   ; gbl_env <- tcExtendGlobalEnv all_tycons $
                tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
-               tcExtendLocalFamInstEnv (map mkLocalFamInst (bagToList famInsts)) $
+               tcExtendLocalFamInstEnv (bagToList famInsts) $
                tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
 
   ; return (addTcgDUs gbl_env rn_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name 
-                   -> Bag TyCon  -- ^ Empty data constructors
-                   -> Bag TyCon  -- ^ Rep type family instances
+                   -> Bag TyCon    -- ^ Empty data constructors
+                   -> Bag FamInst  -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repMetaTys repTyCons
       =    hang (ptext (sLit "Derived instances:"))
@@ -355,9 +355,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
               hangP "Generated datatypes for meta-information:"
                (vcat (map ppr (bagToList repMetaTys)))
            $$ hangP "Representation types:"
-                (vcat (map pprTyFamInst (bagToList repTyCons))))
+                (vcat (map ppr (bagToList repTyCons))))
     
-    pprTyFamInst t = ppr t <+> text "=" <+> ppr (synTyConType t)
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 
 
@@ -1349,7 +1348,7 @@ inferInstanceContexts oflag infer_specs
         the_pred = mkClassPred clas inst_tys
 
 ------------------------------------------------------------------
-mkInstance :: OverlapFlag -> ThetaType -> DerivSpec -> Instance
+mkInstance :: OverlapFlag -> ThetaType -> DerivSpec -> ClsInst
 mkInstance overlap_flag theta
 	    (DS { ds_name = dfun_name
 		, ds_tvs = tyvars, ds_cls = clas, ds_tys = tys })
@@ -1358,7 +1357,7 @@ mkInstance overlap_flag theta
     dfun = mkDictFunId dfun_name tyvars theta clas tys
 
 
-extendLocalInstEnv :: [Instance] -> TcM a -> TcM a
+extendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 -- Add new locally-defined instances; don't bother to check
 -- for functional dependency errors -- that'll happen in TcInstDcls
 extendLocalInstEnv dfuns thing_inside
