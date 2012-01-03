@@ -455,7 +455,7 @@ zipBracketeds (TailsKnown bty mk_bshell bholes) = case ei_holes of
                 \ty -> shell_extra_fvs ty `unionVarSet` nonRecBindersFreeVars bvs (bracketedExtraFvs rbracketed),
                 \ty es rev_es' -> case splitBy (bracketedHoles rbracketed) es of
                                     (es_here, es_later) -> shell_wrapper ty es_later (shellWrapper (bracketedShell rbracketed) es_here:rev_es'),
-                case ei_holes of Left holes -> Left (holes ++ bracketedHoles rbracketed)
+                case ei_holes of Left holes -> Left (bracketedHoles rbracketed ++ holes)
                                  Right holes | is_tail   -> Left (bracketedHoles rbracketed ++ map tailishHole holes)
                                              | otherwise -> Right (map (TailishHole False) (bracketedHoles rbracketed) ++ holes))
             where rbracketed = rigidizeBracketed bracketed
