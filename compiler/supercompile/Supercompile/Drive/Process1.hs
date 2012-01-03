@@ -229,7 +229,7 @@ promise p opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted p)
        ScpM $ \_e s k -> k () (s { pTreeHole = Split False [(p { abstracted = abstracted' },
                                Fulfilled (absVarLambdas abstracted' optimised_e))] (pTreeHole s) })
       
-      fmap (((mkVarSet (map absVarVar abstracted') `unionVarSet` stateLetBounders (meaning p)) `unionVarSet`) . mkVarSet) getPromiseNames >>=
+      fmap (((mkVarSet (map absVarVar abstracted') `unionVarSet` stateLetBounders (meaning p) `unionVarSet` extraOutputFvs) `unionVarSet`) . mkVarSet) getPromiseNames >>=
         \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr (fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
       
       return (a, fun p `applyAbsVars` abstracted')

@@ -14,7 +14,9 @@ module Supercompile.Drive.Process (
     AlreadySpeculated, nothingSpeculated,
     speculate,
 
-    AbsVar(..), mkLiveAbsVar, renameAbsVar, absVarLambdas, applyAbsVars, stateAbsVars
+    AbsVar(..), mkLiveAbsVar, renameAbsVar, absVarLambdas, applyAbsVars, stateAbsVars,
+
+    extraOutputFvs
   ) where
 
 #include "HsVersions.h"
@@ -45,9 +47,9 @@ import Supercompile.Utilities hiding (Monad(..))
 
 import Var        (isId, isTyVar, varType, setVarType)
 import Id         (idType, zapFragileIdInfo, localiseId)
-import MkId       (voidArgId)
+import MkId       (voidArgId, realWorldPrimId)
 import Type       (isUnLiftedType, mkTyVarTy)
-import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind_maybe, mkCoercionType)
+import Coercion   (isCoVar, isReflCo, mkCoVarCo, mkUnsafeCo, coVarKind_maybe, mkCoercionType)
 import CoreUtils  (mkPiTypes)
 import TyCon      (PrimRep(..))
 import Type       (mkFunTy, typePrimRep, splitTyConApp_maybe)
@@ -501,17 +503,23 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
          -- Just choose some value with the same *representation* as what we want and then
          -- cast it to the right type:
          | let (e_repr_ty, e_repr) = case typePrimRep ty of
-                 VoidRep   -> (mkCoercionType unitTy unitTy, coercion (mkUnsafeCo unitTy unitTy))
-                 IntRep    -> (intPrimTy,    literal (mkMachInt 0))
-                 WordRep   -> (wordPrimTy,   literal (mkMachWord 0))
-                 Int64Rep  -> (int64PrimTy,  literal (mkMachInt64 0))
-                 Word64Rep -> (word64PrimTy, literal (mkMachWord64 0))
-                 AddrRep   -> (addrPrimTy,   literal nullAddrLit)
-                 FloatRep  -> (floatPrimTy,  literal (mkMachChar 'x'))
-                 DoubleRep -> (doublePrimTy, literal (mkMachDouble 0))
+                 -- This causes the simplifier to fail with an error about (!!) out of bounds because
+                 -- it tries to reduce the cast coercion, causing it to decompose the unsafe coercion:
+                 --VoidRep   -> (mkCoercionType unitTy unitTy, coercion (mkUnsafeCo unitTy unitTy))
+                 -- We'll do this instead, even though it means we have to special-case realWorldPrimId
+                 -- in the free-variable sanity checks:
+                 VoidRep   -> (realWorldStatePrimTy, var realWorldPrimId)
+                 IntRep    -> (intPrimTy,            literal (mkMachInt 0))
+                 WordRep   -> (wordPrimTy,           literal (mkMachWord 0))
+                 Int64Rep  -> (int64PrimTy,          literal (mkMachInt64 0))
+                 Word64Rep -> (word64PrimTy,         literal (mkMachWord64 0))
+                 AddrRep   -> (addrPrimTy,           literal nullAddrLit)
+                 FloatRep  -> (floatPrimTy,          literal (mkMachChar 'x'))
+                 DoubleRep -> (doublePrimTy,         literal (mkMachDouble 0))
                  -- Unlifted thing of PtrRep: yes, this can really happen (ByteArray# etc)
                  PtrRep    -> pprPanic "applyAbsVars: dead unlifted variable with PrimRep PtrRep: FIXME" (ppr ty)
-         -> let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x))
+               co = mkUnsafeCo e_repr_ty ty
+         -> let_ x (if isReflCo co then e_repr else e_repr `cast` co) (e `app` x))
          where shadowy_x = absVarBinder absx
                x = uniqAway (mkInScopeSet fvs) shadowy_x
                ty = idType x
@@ -542,3 +550,8 @@ stateAbsVars mb_lvs state = (abstracted, realWorldStatePrimTy `mkFunTy` (vs_list
 
 sortLambdaBounds :: [Var] -> [Var]
 sortLambdaBounds = sortBy (comparing (not . isTyVar)) -- True type variables go first since coercion/value variables may reference them
+
+
+-- | Free variables that are allowed to be in the output term even though they weren't in the input (in addition to h-function names)
+extraOutputFvs :: FreeVars
+extraOutputFvs = unitVarSet realWorldPrimId
