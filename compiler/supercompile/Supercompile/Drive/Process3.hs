@@ -96,7 +96,6 @@ fulfill :: Promise -> (Deeds, FVedTerm) -> FulfilmentState -> ((Deeds, FVedTerm)
 fulfill p (deeds, e_body) fs = ((deeds, fun p `applyAbsVars` abstracted p), FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : fulfilments fs })
 
 
-type Depth = Int
 type StopCount = Int
 
 data ScpState = ScpState {
@@ -107,9 +106,9 @@ data ScpState = ScpState {
   }
 
 data ScpEnv = ScpEnv {
-    scpDepth :: Depth,
     scpStopCount :: StopCount,
     scpNodeKey :: NodeKey,
+    scpParents :: [Var],
     scpAlreadySpeculated :: AlreadySpeculated,
     scpTagAnnotations :: TagAnnotations
   }
@@ -130,22 +129,27 @@ runScpM tag_anns me = letRec (fulfilments fs') e
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, ScpState _ms' _hist' fs' _resid_tags) = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags)) (ScpEnv 0 0 parent nothingSpeculated tag_anns)
+        (e, ScpState _ms' _hist' fs' _resid_tags) = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
 
+
+scpDepth = length . scpParents
 
 traceRenderM :: Outputable a => String -> a -> ScpM ()
 traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \env -> pprTraceSC (replicate (scpDepth env) ' ' ++ msg) (pPrint x) $ pure ((), s) -- TODO: include depth, refine to ScpM monad only
+
+addParentM :: Promise -> ScpM a -> ScpM a
+addParentM p mx = ScpM $ StateT $ \s -> ReaderT $ \env ->  trace ("depth: " ++ show (scpDepth env) ++ ' ' : showSDoc (parens (hsep (map ppr (scpParents env))))) $ unReaderT (unStateT (unScpM mx) s) (env { scpParents = fun p : scpParents env })
 
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \s -> case fulfill p res (scpFulfilmentState s) of (res', fs') -> return (res', s { scpFulfilmentState = fs' })
 
 terminateM :: String -> State -> ScpM a -> (String -> State -> ScpM a) -> ScpM a
-terminateM h state mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> trace ("depth: " ++ show (scpDepth env)) $ case terminate (scpProcessHistory s) (scpNodeKey env, (h, state)) of
+terminateM h state mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case terminate (scpProcessHistory s) (scpNodeKey env, (h, state)) of
         Stop (_, (shallow_h, shallow_state))
           -> trace ("stops: " ++ show (scpStopCount env)) $
-             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state)) s)                                 (env { scpDepth = scpDepth env + 1, scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state)) s)                                 (env { scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
         Continue hist'
-          -> unReaderT (unStateT (unScpM mcont)                           (s { scpProcessHistory = hist' })) (env { scpDepth = scpDepth env + 1, scpNodeKey = generatedKey hist' })
+          -> unReaderT (unStateT (unScpM mcont)                           (s { scpProcessHistory = hist' })) (env { scpNodeKey = generatedKey hist' })
   -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
 
 speculateM :: State -> (State -> ScpM a) -> ScpM a
@@ -246,9 +250,9 @@ memo opt state
                           match (meaning p) reduced_state]
          ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                      ; return res }, ScpState ms hist fs resid_tags)
-              _          -> pure (do { traceRenderM ">sc" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
-                                     ; res <- opt (Just (getOccString (varName (fun p)))) state
-                                     ; traceRenderM "<sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
+              _          -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
+                                     ; res <- addParentM p $ opt (Just (getOccString (varName (fun p)))) state
+                                     ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                      ; fulfillM p res }, ScpState ms' hist fs resid_tags)
                 where (p, ms') = promise (state, reduced_state) ms
   where reduced_state = reduceForMatch state
