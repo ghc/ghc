@@ -45,7 +45,7 @@ import Supercompile.Utilities hiding (Monad(..))
 
 import Name       (getOccString)
 import Var        (isId, isTyVar, varType, setVarType)
-import Id         (idType, idOccInfo, zapFragileIdInfo, setIdOccInfo)
+import Id         (idType, idOccInfo, zapFragileIdInfo, setIdOccInfo, localiseId)
 import Type       (isUnLiftedType, mkTyVarTy)
 import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind_maybe, mkCoercionType)
 import TyCon      (PrimRep(..))
@@ -455,8 +455,20 @@ renameAbsVar rn (AbsVar { absVarDead = dead, absVarVar = x })
 --  1. If the h-function is unlifted, this delays its evaluation (so its effects, if any, do not happen too early)
 --  2. This expresses to GHC that we don't necessarily want the work in h-functions to be shared
 
+-- NB: it's important that we use localiseId on the absVarVar at binding sites, or else if we start
+-- with a state where a global Id is lambda-bound (because there is no unfolding) we might end up having an h-function
+-- that is lambda-abstracted over a global Id, which causes the assembler to barf.
+--
+-- (We will rely on a later simplifier run to propagate the local Id bindings down to the possibly-global Id use sites)
+--
+-- This will rarely happpen in practice because global variables should be Let-bound in the heap, which would prevent
+-- us from lambda-abstracting over them. However, it can happen if the global is abstracted due to generalisation,
+-- such as when the let-bound thing binds a (:) and we generalise away some other (:).
+absVarBinder :: AbsVar -> Var
+absVarBinder = localiseId . absVarVar
+
 absVarLambdas :: Symantics ann => [AbsVar] -> ann (TermF ann) -> ann (TermF ann)
-absVarLambdas xs = tyVarIdLambdas (map absVarVar xs)
+absVarLambdas xs = tyVarIdLambdas (map absVarBinder xs)
 
 applyAbsVars :: Symantics ann => Var -> [AbsVar] -> ann (TermF ann)
 applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
@@ -499,7 +511,7 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
                  -- Unlifted thing of PtrRep: yes, this can really happen (ByteArray# etc)
                  PtrRep    -> pprPanic "applyAbsVars: dead unlifted variable with PrimRep PtrRep: FIXME" (ppr ty)
          -> let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x))
-         where shadowy_x = absVarVar absx
+         where shadowy_x = absVarBinder absx
                x = uniqAway (mkInScopeSet fvs) shadowy_x
                ty = idType x
     False -> (fvs `extendVarSet` x, case () of
