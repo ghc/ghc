@@ -641,7 +641,7 @@ runOneCommand eh gCmd = do
                             (\c -> case removeSpaces c of
                                      ""   -> noSpace q
                                      ":{" -> multiLineCmd q
-                                     _    -> return (Just c) )
+                                     c'   -> return (Just c') )
     multiLineCmd q = do
       st <- lift getGHCiState
       let p = prompt st
