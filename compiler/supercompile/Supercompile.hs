@@ -265,12 +265,12 @@ coreBindsToCoreTerm should_sc binds
     -- unique and b) the internality of these names will be carried down on the next simplifier run, so this works.
     -- The ice is thin, though!
     sc_xs = bindersOfBinds sc_binds
-    internal_sc_binds = [case bind of NonRec x e -> NonRec (localiseVar x) e
-                                      Rec xes    -> Rec (map (first localiseVar) xes)
+    internal_sc_binds = [case bind of NonRec x e -> NonRec (localiseInternaliseId x) e
+                                      Rec xes    -> Rec (map (first localiseInternaliseId) xes)
                         | bind <- sc_binds]
     sc_xs_internal_xs = filter (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` bindersOfBinds internal_sc_binds)
     sc_internal_xs = map snd sc_xs_internal_xs
-    localiseVar x = setIdNotExported (x `setVarName` localiseName (varName x))
+    localiseInternaliseId x = setIdNotExported (x `setVarName` localiseName (varName x))
      -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
 
 mkChurchVarTup :: [Id] -> CoreExpr

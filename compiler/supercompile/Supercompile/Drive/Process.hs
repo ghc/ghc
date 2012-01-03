@@ -465,7 +465,11 @@ renameAbsVar rn (AbsVar { absVarDead = dead, absVarVar = x })
 -- us from lambda-abstracting over them. However, it can happen if the global is abstracted due to generalisation,
 -- such as when the let-bound thing binds a (:) and we generalise away some other (:).
 absVarBinder :: AbsVar -> Var
-absVarBinder = localiseId . absVarVar
+absVarBinder = localiseVar . absVarVar
+
+localiseVar :: Var -> Var
+localiseVar x | isId x    = localiseId x
+              | otherwise = x
 
 absVarLambdas :: Symantics ann => [AbsVar] -> ann (TermF ann) -> ann (TermF ann)
 absVarLambdas xs = tyVarIdLambdas (map absVarBinder xs)
