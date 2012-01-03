@@ -94,7 +94,7 @@ type TagAnnotations = IM.IntMap [String]
 
 tagSummary :: TagAnnotations -> Int -> Int -> ResidTags -> String
 tagSummary anns precision n resid_tags = unlines $ take n [intercalate "." ann ++ "\t" ++ show occs ++ "(" ++ show init_occs ++ ")" | (ann, (init_occs, occs)) <- sortBy (comparing (Down . snd . snd)) (M.toList ann_occs)]
-  where ann_occs = M.unionsWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) [M.singleton (take precision ann) (1, occs) | (tag, occs) <- IM.toList resid_tags, let Just ann = IM.lookup tag anns]
+  where ann_occs = M.unionsWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) [M.singleton (take precision ann) (1 :: Int, occs) | (tag, occs) <- IM.toList resid_tags, let Just ann = IM.lookup tag anns]
         --total_occs = M.fold (+) 0 ann_occs
 
 tagAnnotations :: State -> TagAnnotations
@@ -107,7 +107,7 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
     go_qa :: [String] -> Anned QA -> TagAnnotations
     go_qa ann qa = IM.insert (tagInt (annedTag qa)) ann $ go_qa' ann (annee qa)
 
-    go_qa' ann (Question _) = IM.empty
+    go_qa' _   (Question _) = IM.empty
     go_qa' ann (Answer a)   = go_answer' ann a
 
     go_term :: [String] -> AnnedTerm -> TagAnnotations
@@ -136,7 +136,7 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
     go_alt :: [String] -> AltCon -> TagAnnotations
     go_alt ann (DataAlt dc _ _ _) = IM.singleton (tagInt (dataConTag dc)) ann
     go_alt ann (LiteralAlt l)     = IM.singleton (tagInt (literalTag l))  ann
-    go_alt ann DefaultAlt         = IM.empty
+    go_alt _   DefaultAlt         = IM.empty
 
     go_answer :: [String] -> Anned Answer -> TagAnnotations
     go_answer ann a = IM.insert (tagInt (annedTag a)) ann $ go_answer' ann (annee a)
