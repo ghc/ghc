@@ -150,7 +150,7 @@ ppClass x = out x{tcdSigs=[]} :
             (map (reL . HsTyVar . hsTyVarName . unL) (tcdTyVars x))
 
 
-ppInstance :: Instance -> [String]
+ppInstance :: ClsInst -> [String]
 ppInstance x = [dropComment $ out x]
 
 

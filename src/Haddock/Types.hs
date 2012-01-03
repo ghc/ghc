@@ -105,7 +105,7 @@ data Interface = Interface
   , ifaceVisibleExports  :: ![Name]
 
     -- | Instances exported by the module.
-  , ifaceInstances       :: ![Instance]
+  , ifaceInstances       :: ![ClsInst]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.

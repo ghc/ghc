@@ -160,7 +160,7 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 type Maps = (DocMap Name, ArgMap Name, SubMap, DeclMap)
 
 
-mkMaps :: DynFlags -> GlobalRdrEnv -> [Instance] -> [Name] -> [(LHsDecl Name, [HsDocString])] -> ErrMsgM Maps
+mkMaps :: DynFlags -> GlobalRdrEnv -> [ClsInst] -> [Name] -> [(LHsDecl Name, [HsDocString])] -> ErrMsgM Maps
 mkMaps dflags gre instances exports decls = do
   maps <- mapM f decls
   let mergeMaps (a,b,c,d) (x,y,z,w) =
@@ -201,10 +201,10 @@ mkMaps dflags gre instances exports decls = do
 
 -- Note [2]:
 ------------
--- We relate Instances to InstDecls using the SrcSpans buried inside them.
+-- We relate ClsInsts to InstDecls using the SrcSpans buried inside them.
 -- That should work for normal user-written instances (from looking at GHC
 -- sources). We can assume that commented instances are user-written.
--- This lets us relate Names (from Instances) to comments (associated
+-- This lets us relate Names (from ClsInsts) to comments (associated
 -- with InstDecls).
 
 
@@ -384,7 +384,7 @@ mkExportItems
   -> [LHsDecl Name]
   -> Maps
   -> Maybe [IE Name]
-  -> [Instance]
+  -> [ClsInst]
   -> InstIfaceMap
   -> DynFlags
   -> ErrMsgGhc [ExportItem Name]

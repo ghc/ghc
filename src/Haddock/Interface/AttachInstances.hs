@@ -91,7 +91,7 @@ lookupInstDoc name iface ifaceMap instIfaceMap =
 
 -- | Like GHC's getInfo but doesn't cut things out depending on the
 -- interative context, which we don't set sufficiently anyway.
-getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[Instance]))
+getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[ClsInst]))
 getAllInfo name = withSession $ \hsc_env -> do 
    (_msgs, r) <- liftIO $ tcRnGetInfo hsc_env name
    return r
