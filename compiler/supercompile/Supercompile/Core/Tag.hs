@@ -10,6 +10,7 @@ import Supercompile.Core.Syntax
 
 import qualified DataCon
 import Literal (hashLiteral)
+import Var (varUnique)
 
 
 tagTerm :: UniqSupply -> Term -> TaggedTerm
@@ -25,7 +26,8 @@ tagFVedTerm = mkTagger (\tg e -> Comp (Tagged tg e))
 -- are specialised on very long repititions of the same constructor.
 
 dataConTag :: DataCon -> Tag
-dataConTag dc = mkTag (negate (DataCon.dataConTag dc)) -- Works well because (hashLiteral l) is always positive
+--dataConTag dc = mkTag (negate (DataCon.dataConTag dc)) -- Works well because (hashLiteral l) is always positive
+dataConTag = mkTag . getKey . varUnique . DataCon.dataConWorkId -- This is much better because otherwise [], True and all dictionary all get the same tag!!
 
 literalTag :: Literal -> Tag
 literalTag = mkTag . hashLiteral
