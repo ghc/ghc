@@ -793,6 +793,7 @@ pprGlobalReg gr = case gr of
     SpLim          -> ptext (sLit "SpLim")
     Hp             -> ptext (sLit "Hp")
     HpLim          -> ptext (sLit "HpLim")
+    CCCS           -> ptext (sLit "CCCS")
     CurrentTSO     -> ptext (sLit "CurrentTSO")
     CurrentNursery -> ptext (sLit "CurrentNursery")
     HpAlloc        -> ptext (sLit "HpAlloc")

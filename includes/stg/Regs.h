@@ -346,6 +346,12 @@ GLOBAL_REG_DECL(P_,Hp,REG_Hp)
 #define HpLim (BaseReg->rHpLim)
 #endif
 
+#if defined(REG_CCCS) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(P_,CCCS,REG_CCCS)
+#else
+#define CCCS (BaseReg->rCCCS)
+#endif
+
 #if defined(REG_CurrentTSO) && !defined(NO_GLOBAL_REG_DECLS)
 GLOBAL_REG_DECL(struct _StgTSO *,CurrentTSO,REG_CurrentTSO)
 #else
