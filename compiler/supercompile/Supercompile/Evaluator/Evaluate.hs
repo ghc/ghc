@@ -72,11 +72,6 @@ evaluatePrim iss tg pop tys args = do
             toVar_maybe (CoreSyn.Var x) = Just x
             toVar_maybe _               = Nothing
 
-castAnswer :: InScopeSet -> Answer -> Out CastBy -> Answer
-castAnswer _   (mb_co,  in_v)        Uncast           = (mb_co, in_v)
-castAnswer _   (Uncast, in_v)        mb_co'           = (mb_co', in_v)
-castAnswer iss (CastBy co _tg, in_v) (CastBy co' tg') = (CastBy (mkTransCo iss co co') tg', in_v)
-
 
 -- | Non-expansive simplification we can do everywhere safely
 --
@@ -168,7 +163,7 @@ step' normalising ei_state =
       -- NB: inlining values is non-normalising if dUPLICATE_VALUES_EVALUATOR is on (since doing things the long way would involve executing an update frame)
       | not (dUPLICATE_VALUES_EVALUATOR && normalising)
       , Just anned_a <- lookupAnswer (Heap h ids) x' -- NB: don't unwind *immediately* because we want that changing a Var into a Value in an empty stack is seen as a reduction 'step'
-      = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return $ denormalise (deeds, Heap h ids, k, fmap Answer $ annedAnswer (annedTag anned_a) a) }
+      = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return (deeds, Heap h ids, k, annedAnswerToInAnnedTerm ids $ annedAnswer (annedTag anned_a) a) }
       | otherwise = do
         hb <- M.lookup x' h
         -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
@@ -329,7 +324,7 @@ step' normalising ei_state =
                 tg_kf' = tg_kf { tagOccurrences = if oCCURRENCE_GENERALISATION then tagOccurrences tg_kf + sum (map tagOccurrences (tg_a : map annedTag anned_as)) else 1 }
             a' <- evaluatePrim ids tg_kf' pop tys' as'
             deeds <- claimDeeds (deeds `releaseDeeds` (sum (map annedSize anned_as) + answerSize' a + 1)) (annedSize a') -- I don't think this can ever fail
-            return (denormalise (deeds, heap, k, fmap Answer a'))
+            return (deeds, heap, k, annedAnswerToInAnnedTerm ids a')
         primop deeds tg_kf h k tg_a pop tys' anned_as a in_es = case in_es of
             (in_e:in_es) -> Just (deeds, h, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
             []           -> Nothing

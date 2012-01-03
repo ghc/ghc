@@ -114,15 +114,36 @@ data QA = Question (Out Id)
 instance Outputable QA where
     pprPrec prec = pPrintPrec prec . qaToAnnedTerm' emptyInScopeSet
 
+caseAnnedQA :: Anned QA -> Either (Anned (Out Id)) (Anned Answer)
+caseAnnedQA anned_qa = case extract anned_qa of
+    Question anned_q -> Left  (fmap (const anned_q) anned_qa)
+    Answer   anned_a -> Right (fmap (const anned_a) anned_qa)
+
+annedQAToInAnnedTerm :: InScopeSet -> Anned QA -> In AnnedTerm
+annedQAToInAnnedTerm iss anned_qa = case caseAnnedQA anned_qa of
+    Left  anned_q -> annedQuestionToInAnnedTerm anned_q
+    Right anned_a -> annedAnswerToInAnnedTerm iss anned_a
+
+
+annedQuestionToInAnnedTerm :: Anned (Out Id) -> In AnnedTerm
+annedQuestionToInAnnedTerm anned_q = renamedTerm (fmap Var anned_q)
+
+
 annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
 annedAnswerToInAnnedTerm iss = renamedTerm . fmap (answerToAnnedTerm' iss)
 
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
 answerToAnnedTerm' iss (mb_co, (rn, v)) = castValueToAnnedTerm' mb_co $ renameAnnedValue' iss rn v
 
+castAnswer :: InScopeSet -> Answer -> Out CastBy -> Answer
+castAnswer _   (mb_co,  in_v)        Uncast           = (mb_co, in_v)
+castAnswer _   (Uncast, in_v)        mb_co'           = (mb_co', in_v)
+castAnswer iss (CastBy co _tg, in_v) (CastBy co' tg') = (CastBy (mkTransCo iss co co') tg', in_v)
+
 castValueToAnnedTerm' :: CastBy -> ValueF Anned -> TermF Anned
 castValueToAnnedTerm' Uncast         v' = Value v'
 castValueToAnnedTerm' (CastBy co tg) v' = Cast (annedTerm tg (Value v')) co
+
 
 qaToAnnedTerm' :: InScopeSet -> QA -> TermF Anned
 qaToAnnedTerm' _   (Question x) = Var x
@@ -135,11 +156,9 @@ qaToAnswer qa = case qa of Answer a -> Just a; Question _ -> Nothing
 type UnnormalisedState = (Deeds, Heap, Stack, In AnnedTerm)
 type State = (Deeds, Heap, Stack, Anned QA)
 
+-- NB: denormalise could actually eagerly put any frame arising from CastBy into the stack, but this is more modular:
 denormalise :: State -> UnnormalisedState
-denormalise (deeds, h, k, qa) = case extract qa of
-    Question x              -> (deeds, h, k, (mkIdentityRenaming (unitVarSet x), annedTerm tg (Var x)))
-    Answer (mb_co, (rn, v)) -> (deeds, h, (case mb_co of Uncast -> id; CastBy co tg -> (Tagged tg (CastIt co) :)) k, (rn, annedTerm tg (Value v)))
-  where tg = annedTag qa
+denormalise (deeds, h@(Heap _ ids), k, qa) = (deeds, h, k, annedQAToInAnnedTerm ids qa)
 
 
 -- Invariant: LetBound things cannot refer to LambdaBound things.
@@ -207,13 +226,13 @@ instance Outputable Heap where
 
 type Stack = [Tagged StackFrame]
 data StackFrame = TyApply (Out Type)
-                | CoApply (Out Coercion)
+                | CoApply (Out NormalCo)
                 | Apply (Out Id)
                 | Scrutinise (Out Id) (Out Type) (In [AnnedAlt])
                 | PrimApply PrimOp [Out Type] [Anned Answer] [In AnnedTerm]
                 | StrictLet (Out Id) (In AnnedTerm)
                 | Update (Out Id)
-                | CastIt (Out Coercion)
+                | CastIt (Out NormalCo)
 
 instance Outputable StackFrame where
     pprPrec prec kf = case kf of
@@ -245,9 +264,9 @@ stackFrameType kf hole_ty = case tagee kf of
     CastIt co                     -> pSnd (coercionKind co)
 
 qaType :: Anned QA -> Type
-qaType anned_qa = case traverse (\qa -> case qa of Question x' -> Left (idType x'); Answer a -> Right a) anned_qa of
-    Left q_ty     -> q_ty
-    Right anned_a -> answerType anned_a
+qaType anned_qa = case caseAnnedQA anned_qa of
+    Left  anned_q -> idType (extract anned_q)
+    Right anned_a ->answerType anned_a
 
 answerType :: Anned Answer -> Type
 answerType a = case annee a of

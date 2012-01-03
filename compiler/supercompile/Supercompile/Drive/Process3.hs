@@ -256,8 +256,8 @@ memo opt state
         -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
         -- this, we tend to do things like:
         --
-        --  h0 = D[let f = e in f] = let f = h1 in f
-        --  h1 = D[let f = e in e] = h0
+        --  h0 = D[let f = v in f] = let f = h1 in f
+        --  h1 = D[let f = v in v] = h0
         --
         -- This fix is inspired by Peter's supercompiler where matching (and indeed termination checking) is only
         -- performed when the focus of evaluation is the name of a top level function. I haven't yet proved that
@@ -272,7 +272,14 @@ memo opt state
         -- only has an indirection in the focus a finite number of times. (FIXME: it's OK that we don't check
         -- the termination condition for those states where the stack is empty since reduce won't change the term.
         -- But it's less clear that it is actually OK to skip termination check when we skip tieback in the other case!!)
-        skip_tieback | dUPLICATE_VALUES_EVALUATOR
+        --
+        --
+        -- Version 3 of this fix is to "eagerly" split values in the splitter: when creating a Bracket for a term,
+        -- we split immediately if the term is a value. This is sufficient to fix the problem above, and it should
+        -- save even *more* memoisations!
+        skip_tieback | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
+                     = False
+                     | eAGER_SPLIT_VALUES
                      = False
                      | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
                      , Answer (_, (_, Indirect _)) <- annee qa

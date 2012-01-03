@@ -21,6 +21,9 @@ iNSTANCE_MATCHING :: Bool
 --iNSTANCE_MATCHING = "--instance-matching" `elem` aRGS
 iNSTANCE_MATCHING = True
 
+eAGER_SPLIT_VALUES :: Bool
+eAGER_SPLIT_VALUES = iNSTANCE_MATCHING -- For correctness given that we do instance matching
+
 dEEDS :: Bool
 dEEDS = "--deeds" `elem` aRGS
 --dEEDS = True
