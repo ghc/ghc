@@ -402,6 +402,10 @@ instance Accumulatable Bracketed where
     mapAccumTM f acc (TailsKnown ty mk_shell holes) = liftM (second (TailsKnown ty mk_shell)) $ mapAccumTM (mapAccumTM f) acc holes
     mapAccumTM f acc (TailsUnknown  shell    holes) = liftM (second (TailsUnknown shell))     $ mapAccumTM (mapAccumTM f) acc holes
 
+modifyShell :: (Shell -> Shell) -> Bracketed a -> Bracketed a
+modifyShell f (TailsKnown ty mk_shell holes) = TailsKnown ty (f . mk_shell) holes
+modifyShell f (TailsUnknown  shell    holes) = TailsUnknown  (f shell)      holes
+
 noneBracketed :: Tag -> Out FVedTerm -> Bracketed a
 noneBracketed tg a = TailsUnknown (Shell { shellExtraTags = oneResidTag tg, shellExtraFvs = freeVars a, shellWrapper = \[] -> a }) []
 
@@ -413,7 +417,8 @@ oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
                               [Tagged tg (CastIt co)] -> Just (CastBy co tg)
                               _                       -> Nothing
   , Just anned_a <- termToAnswer ids in_e
-  = fmap (\(ent, (deeds, Heap h' ids', k', in_e')) -> (ent, (deeds, Heap (h `M.union` h') ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down
+  = fmap (\(ent, (deeds, Heap h' ids', k', in_e')) -> (ent, (deeds, Heap (h `M.union` h') ids', k', in_e'))) $          -- Push heap of positive information/new lambda-bounds down
+    modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` dataSetToVarSet (M.keysSet h) }) $ -- Take advantage of the fact that this heap is "optional" to fix bracket FVs
     splitAnswer ctxt_ids ids (annedToTagged (fmap (\a -> castAnswer ids a cast_by) anned_a))
   | otherwise
   = oneBracketed' ty (ent, (emptyDeeds, Heap h ids, k, in_e))
