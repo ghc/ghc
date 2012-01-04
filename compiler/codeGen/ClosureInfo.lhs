@@ -963,7 +963,10 @@ infoTableLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI = fst . labelsFromCI
 
 entryLabelFromCI :: ClosureInfo -> CLabel
-entryLabelFromCI = snd . labelsFromCI
+entryLabelFromCI ci
+  | tablesNextToCode = info_lbl
+  | otherwise        = entry_lbl
+  where (info_lbl, entry_lbl) = labelsFromCI ci
 
 labelsFromCI :: ClosureInfo -> (CLabel, CLabel) -- (Info, Entry)
 labelsFromCI cl@(ClosureInfo { closureName = name,
