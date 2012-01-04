@@ -138,7 +138,7 @@ dsCImport :: Id
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
    let ty = pFst $ coercionKind co
-       fod = case tyConAppTyCon_maybe ty of
+       fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
                  IsFunction
