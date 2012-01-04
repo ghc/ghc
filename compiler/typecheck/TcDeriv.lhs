@@ -347,7 +347,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
                    -> Bag TyCon    -- ^ Empty data constructors
                    -> Bag FamInst  -- ^ Rep type family instances
                    -> SDoc
-    ddump_deriving inst_infos extra_binds repMetaTys repTyCons
+    ddump_deriving inst_infos extra_binds repMetaTys repFamInsts
       =    hang (ptext (sLit "Derived instances:"))
               2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
                  $$ ppr extra_binds)
@@ -355,10 +355,14 @@ tcDeriving tycl_decls inst_decls deriv_decls
               hangP "Generated datatypes for meta-information:"
                (vcat (map ppr (bagToList repMetaTys)))
            $$ hangP "Representation types:"
-                (vcat (map ppr (bagToList repTyCons))))
-    
+                (vcat (map pprRepTy (bagToList repFamInsts))))
+
     hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 
+-- Prints the representable type family instance
+pprRepTy :: FamInst -> SDoc
+pprRepTy fi
+  = pprFamInstHdr fi <+> ptext (sLit "=") <+> ppr (coAxiomRHS (famInstAxiom fi))
 
 renameDeriv :: Bool
 	    -> [InstInfo RdrName]
