@@ -374,7 +374,7 @@ mkSlowEntryCode cl_info reg_args
 
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
      stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
-     jump_to_entry = CmmJump (mkLblExpr (enterIdLabel name has_caf_refs)) []
+     jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI cl_info)) []
 \end{code}
 
 
