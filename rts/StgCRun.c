@@ -29,7 +29,7 @@
 #include "PosixSource.h"
 #include "ghcconfig.h"
 
-#ifdef sparc_HOST_ARCH
+#if defined(sparc_HOST_ARCH) || defined(USE_MINIINTERPRETER)
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
