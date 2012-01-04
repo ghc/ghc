@@ -174,15 +174,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             GET_ARM_ISA()
             test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT}\""
             ;;
-        alpha)
-            test -z "[$]2" || eval "[$]2=ArchAlpha"
-            ;;
-        mips|mipseb)
-            test -z "[$]2" || eval "[$]2=ArchMipseb"
-            ;;
-        mipsel)
-            test -z "[$]2" || eval "[$]2=ArchMipsel"
-            ;;
         hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
