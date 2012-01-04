@@ -347,7 +347,7 @@ GLOBAL_REG_DECL(P_,Hp,REG_Hp)
 #endif
 
 #if defined(REG_CCCS) && !defined(NO_GLOBAL_REG_DECLS)
-GLOBAL_REG_DECL(P_,CCCS,REG_CCCS)
+GLOBAL_REG_DECL(struct CostCentreStack_ *,CCCS,REG_CCCS)
 #else
 #define CCCS (BaseReg->rCCCS)
 #endif
