@@ -297,7 +297,7 @@ main(int argc, char *argv[])
     closure_field(StgTSO, flags);
     closure_field(StgTSO, dirty);
     closure_field(StgTSO, bq);
-    closure_field_("StgTSO_CCCS", StgTSO, prof.CCCS);
+    closure_field_("StgTSO_cccs", StgTSO, prof.cccs);
     closure_field(StgTSO, stackobj);
 
     closure_field(StgStack, sp);
