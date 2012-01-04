@@ -31,9 +31,9 @@ import qualified Data.Map as M
 
 
 pprTraceSC :: String -> SDoc -> a -> a
-pprTraceSC _ _ = id
+--pprTraceSC _ _ = id
 --pprTraceSC = pprTrace
---pprTraceSC msg doc a = traceSC (msg ++ ": " ++ showSDoc doc) a
+pprTraceSC msg doc a = traceSC (msg ++ ": " ++ showSDoc doc) a
 
 traceSC :: String -> a -> a
 traceSC _ = id
@@ -122,9 +122,16 @@ match s_l s_r = runMatch (match' s_l s_r)
 match' :: State
       -> State
       -> Match MatchResult
-match' s_l@(_deeds_l, Heap h_l _, k_l, qa_l) s_r@(_deeds_r, Heap h_r _, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
+match' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
   do
-    let init_rn2 = matchRnEnv2 stateFreeVars s_l s_r
+    -- It's very important that we don't just use the state free variables from both sides to construct the initial in scope set,
+    -- because we use it to match the stack and QA on each side *without* first extending it with variables bound by the PureHeap!
+    --
+    -- The InScopeSets from the Heap are guaranteed to take these into account (along with the stuff bound by the stack, but that
+    -- doesn't matter too much) so we just use those instead.
+    --
+    -- This was the source of a very confusing bug :-(
+    let init_rn2 = mkRnEnv2 (ids_l `unionInScope` ids_r)
     (rn2, mfree_eqs2) <- mfix $ \(~(rn2, _)) -> matchEC init_rn2 rn2 k_l k_r
     free_eqs1 <- pprTraceSC "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
     free_eqs2 <- pprTraceSC "match1" empty $ mfree_eqs2
@@ -240,7 +247,7 @@ checkMatchLR x_l x_r lr = case lr of
 -- We have to be careful to match the "fragile" IdInfo for binders as well as the obvious type information
 -- (idSpecialisation :: Id -> SpecInfo, realIdUnfolding :: Id -> Unfolding)
 matchIdCoVarBndr' :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Id -> Id -> (RnEnv2, Match [MatchLR])
-matchIdCoVarBndr' init_rn2 rn2 x_l x_r = (rnBndr2 init_rn2 x_l x_r, matchIdCoVarBndrExtras rn2 x_l x_r)
+matchIdCoVarBndr' init_rn2 rn2 x_l x_r = (pprTraceSC "matchIdCoVarBndr'" (ppr (x_l, x_r)) $ rnBndr2 init_rn2 x_l x_r, matchIdCoVarBndrExtras rn2 x_l x_r)
 
 matchBndrExtras :: RnEnv2 -> Var -> Var -> Match [MatchLR]
 matchBndrExtras rn2 v_l v_r
@@ -323,9 +330,9 @@ matchVar rn2 x_l x_r = fmap maybeToList (matchVar_maybe rn2 x_l x_r)
 matchVar_maybe :: RnEnv2 -> Out Id -> Out Id -> Match (Maybe MatchLR)
 matchVar_maybe rn2 x_l x_r = case (rnOccL_maybe rn2 x_l, rnOccR_maybe rn2 x_r) of
      -- Both rigidly bound: match iff they rename to the same thing
-    (Just x_l', Just x_r') -> guard "matchVar: rigid" (x_l' == x_r') >> return Nothing
+    (Just x_l', Just x_r') -> pprTraceSC "matchVar_maybe(rigid)" (ppr (x_l, x_r)) $ guard "matchVar: rigid" (x_l' == x_r') >> return Nothing
      -- Both bound by let: defer decision about matching
-    (Nothing, Nothing)     -> return (Just (VarLR x_l x_r))
+    (Nothing, Nothing)     -> pprTraceSC "matchVar_maybe(flexi)" (ppr (x_l, x_r)) $ return (Just (VarLR x_l x_r))
      -- One bound by let and one bound rigidly: don't match
     _                      -> fail "matchVar: mismatch"
 
@@ -436,9 +443,10 @@ matchPureHeap rn2 init_free_eqs h_l h_r
        -- NB: it is OK to do exact syntactic equality on VarL/VarR here because we always rename new equalities generated in
        -- this loop using the same InScopeSet (that from rn2) so only a finite number of distinct binders will be generated.
       | lr `elem` known = matchLoop known free_eqs used_l used_r
-      | otherwise = {- traceSC "matchLoop" $ -} case (case lr of VarLR x_l x_r -> (go_template (matchBndrExtras rn2 x_l x_r)    ,     lookupUsed used_l x_l h_l,                         lookupUsed used_r x_r h_r)
-                                                                 VarL  x_l e_r -> (go_template (matchIdCoVarBndrExtrasL rn2 x_l e_r), lookupUsed used_l x_l h_l,                         Just (InternallyBound, Just (Just (used_r, e_r))))
-                                                                 VarR  e_l x_r -> (go_template (matchIdCoVarBndrExtrasR rn2 e_l x_r), Just (InternallyBound, Just (Just (used_l, e_l))), lookupUsed used_r x_r h_r)) of
+      | otherwise = pprTraceSC "matchLoop" (ppr lr) $
+                    case (case lr of VarLR x_l x_r -> (go_template (matchBndrExtras rn2 x_l x_r)    ,     lookupUsed used_l x_l h_l,                         lookupUsed used_r x_r h_r)
+                                     VarL  x_l e_r -> (go_template (matchIdCoVarBndrExtrasL rn2 x_l e_r), lookupUsed used_l x_l h_l,                         Just (InternallyBound, Just (Just (used_r, e_r))))
+                                     VarR  e_l x_r -> (go_template (matchIdCoVarBndrExtrasR rn2 e_l x_r), Just (InternallyBound, Just (Just (used_l, e_l))), lookupUsed used_r x_r h_r)) of
            -- If matching an internal let, it is possible that variables occur free. Insist that free-ness matches:
            -- TODO: actually I'm pretty sure that the heap binds *everything* now. These cases could probably be removed,
            -- though they don't do any particular harm.
