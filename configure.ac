@@ -576,6 +576,10 @@ fi
 AC_CHECK_SIZEOF(unsigned short,     2)
 AC_CHECK_SIZEOF(void *,             4)
 
+dnl for use in settings.in
+WordSize=$ac_cv_sizeof_void_p
+AC_SUBST(WordSize)
+
 dnl ** what are alignment constraints on various types
 FP_CHECK_ALIGNMENT(char)
 FP_CHECK_ALIGNMENT(double)
