@@ -14,8 +14,6 @@ module Platform (
 
 where
 
-import Panic
-
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
 data Platform
@@ -89,5 +87,8 @@ osElfTarget OSNetBSD   = True
 osElfTarget OSSolaris2 = True
 osElfTarget OSDarwin   = False
 osElfTarget OSMinGW32  = False
-osElfTarget OSUnknown  = panic "Don't know if OSUnknown is elf"
-
+osElfTarget OSUnknown  = False
+ -- Defaulting to False is safe; it means don't rely on any
+ -- ELF-specific functionality.  It is important to have a default for
+ -- portability, otherwise we have to answer this question for every
+ -- new platform we compile on (even unreg).
