@@ -739,7 +739,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
      */
     if (RtsFlags.ProfFlags.showCCSOnException)
     {
-        fprintCCS_stderr(tso->prof.CCCS,exception,tso);
+        fprintCCS_stderr(tso->prof.cccs,exception,tso);
     }
 #endif
     // ASSUMES: the thread is not already complete or dead
