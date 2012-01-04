@@ -1132,7 +1132,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
         (_, univ_tys') <- splitTyConApp_maybe ty'
         Just (annedValue (dataConTag dc) (Data dc (univ_tys' ++ map (lookupTyVarSubst rn) as) (map (lookupCoVarSubst rn) qs) (map (renameId rn) xs)))
     altConToValue _  (_,  LiteralAlt l) = Just (annedValue (literalTag l) (Literal l))
-    altConToValue _  (_,  DefaultAlt)   = Nothing
+    altConToValue _  (_,  DefaultAlt)   = Nothing -- NB: could actually put an indirection in the heap in this case, for fun..
 
     zapAltConIdOccInfo :: AltCon -> AltCon
     zapAltConIdOccInfo (DataAlt dc as qs xs) = DataAlt dc as qs (map zapIdOccInfo xs)
