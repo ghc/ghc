@@ -22,6 +22,7 @@ data Platform
         = Platform {
               platformArch                     :: Arch,
               platformOS                       :: OS,
+              platformWordSize                 :: {-# UNPACK #-} !Int,
               platformHasGnuNonexecStack       :: Bool,
               platformHasIdentDirective        :: Bool,
               platformHasSubsectionsViaSymbols :: Bool
@@ -77,15 +78,7 @@ data ArmISAExt
 
 
 target32Bit :: Platform -> Bool
-target32Bit p = case platformArch p of
-                ArchUnknown -> panic "Don't know if ArchUnknown is 32bit"
-                ArchX86     -> True
-                ArchX86_64  -> False
-                ArchPPC     -> True
-                ArchPPC_64  -> False
-                ArchSPARC   -> True
-                ArchARM _ _ -> True
-
+target32Bit p = platformWordSize p == 4
 
 -- | This predicates tells us whether the OS supports ELF-like shared libraries.
 osElfTarget :: OS -> Bool
