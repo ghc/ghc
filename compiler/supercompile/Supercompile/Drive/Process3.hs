@@ -101,7 +101,9 @@ data ScpState = ScpState {
     scpMemoState :: MemoState,
     scpProcessHistory :: ProcessHistory,
     scpFulfilmentState :: FulfilmentState,
-    scpResidTags :: ResidTags
+    -- Debugging aids below this line:
+    scpResidTags :: ResidTags,
+    scpParentChildren :: ParentChildren
   }
 
 data ScpEnv = ScpEnv {
@@ -109,6 +111,7 @@ data ScpEnv = ScpEnv {
     scpNodeKey :: NodeKey,
     scpParents :: [Var],
     scpAlreadySpeculated :: AlreadySpeculated,
+    -- Debugging aids below this line:
     scpTagAnnotations :: TagAnnotations
   }
 
@@ -121,23 +124,34 @@ instance MonadStatics ScpM where
     monitorFVs = liftM ((,) emptyVarSet)
 
 runScpM :: TagAnnotations -> ScpM FVedTerm -> FVedTerm
-runScpM tag_anns me = letRec (fulfilments fs') e
+runScpM tag_anns me = letRec (fulfilments (scpFulfilmentState s')) e
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
         ms = MS { promises = [], hNames = h_names }
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, ScpState _ms' _hist' fs' _resid_tags) = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
+        (e, s') = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
 
 
+scpDepth :: ScpEnv -> Int
 scpDepth = length . scpParents
 
 traceRenderM :: Outputable a => String -> a -> ScpM ()
 traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \env -> pprTraceSC (replicate (scpDepth env) ' ' ++ msg) (pPrint x) $ pure ((), s) -- TODO: include depth, refine to ScpM monad only
 
-addParentM :: Promise -> ScpM a -> ScpM a
-addParentM p mx = ScpM $ StateT $ \s -> ReaderT $ \env ->  trace ("depth: " ++ show (scpDepth env) ++ ' ' : showSDoc (parens (hsep (map ppr (scpParents env))))) $ unReaderT (unStateT (unScpM mx) s) (env { scpParents = fun p : scpParents env })
+addParentM :: Promise -> (State -> ScpM (Deeds, FVedTerm)) -> State -> ScpM (Deeds, FVedTerm)
+addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
+  where
+    add_parent s env
+      | maybe False (scpDepth env >=) dEPTH_LIIMT
+      , let (deeds, _, e) = residualiseState state
+      = return ((deeds, e), s)
+      | otherwise
+      = trace ("depth: " ++ show (scpDepth env) ++ ' ' : showSDoc (parens (hsep (map ppr (scpParents env))))) $
+        unReaderT (unStateT (unScpM (opt state))
+                            (s { scpParentChildren = addChild (safeHead (scpParents env)) (fun p) (scpParentChildren s) }))
+                  (env { scpParents = fun p : scpParents env })
 
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \s -> case fulfill p res (scpFulfilmentState s) of (res', fs') -> return (res', s { scpFulfilmentState = fs' })
@@ -180,7 +194,7 @@ sc' mb_h state = case mb_h of
     insert_tags mx = do
       (resid_tags, deeds, e') <- mx
       ScpM $ StateT $ \s -> ReaderT $ \env -> let resid_tags' = scpResidTags s `plusResidTags` resid_tags
-                                              in trace (tagSummary (scpTagAnnotations env) 1 30 resid_tags') $
+                                              in trace (tagSummary (scpTagAnnotations env) 1 30 resid_tags' ++ "\n" ++ childrenSummary (scpParentChildren s)) $
                                                  return ((), s { scpResidTags = resid_tags' })
       return (deeds, e')
 
@@ -215,7 +229,7 @@ memo :: (Maybe String -> State -> ScpM (Deeds, FVedTerm))
      ->  State -> ScpM (Deeds, FVedTerm)
 memo opt state
   | skip_tieback = opt Nothing state
-  | otherwise = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags) ->
+  | otherwise = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags parent_children) ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
     -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
 
@@ -247,12 +261,12 @@ memo opt state
          | p <- promises ms
          , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
                           match (meaning p) reduced_state]
-         ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
-                                     ; return res }, ScpState ms hist fs resid_tags)
+         ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                                     ; return res }, ScpState ms hist fs resid_tags parent_children)
               _          -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
-                                     ; res <- addParentM p $ opt (Just (getOccString (varName (fun p)))) state
+                                     ; res <- addParentM p (opt (Just (getOccString (varName (fun p))))) state
                                      ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
-                                     ; fulfillM p res }, ScpState ms' hist fs resid_tags)
+                                     ; fulfillM p res }, ScpState ms' hist fs resid_tags parent_children)
                 where (p, ms') = promise (state, reduced_state) ms
   where reduced_state = reduceForMatch state
         

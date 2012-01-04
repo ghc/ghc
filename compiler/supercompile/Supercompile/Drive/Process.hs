@@ -4,6 +4,8 @@ module Supercompile.Drive.Process (
 
     rEDUCE_WQO, wQO, mK_GENERALISER,
 
+    ParentChildren, emptyParentChildren, addChild, childrenSummary,
+
     TagAnnotations, tagAnnotations, tagSummary,
 
     prepareTerm,
@@ -91,6 +93,20 @@ mK_GENERALISER :: State -> State -> Generaliser
 --          | otherwise              = wqo0
 --     wqo2 | sUB_GRAPHS = subGraphGeneralisation wqo1
 --          | otherwise  = wqo1
+
+
+type ParentChildren = M.Map (Maybe Var) [Var]
+
+emptyParentChildren :: ParentChildren
+emptyParentChildren = M.empty
+
+addChild :: Maybe Var -> Var -> ParentChildren -> ParentChildren
+addChild mb_parent child = M.alter (\mb_children -> Just (child : (mb_children `orElse` []))) mb_parent
+
+childrenSummary :: ParentChildren -> String
+childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++ ": " ++ intercalate " " (map show child_counts)  | (mb_parent, child_counts :: [Int]) <- ordered_counts]
+  where descendant_counts = flip M.map parent_children $ \children -> map ((+1) . sum . flip (M.findWithDefault [] . Just) descendant_counts) children
+        ordered_counts = sortBy (comparing (Down . sum . snd)) (M.toList descendant_counts)
 
 
 type TagAnnotations = IM.IntMap [String]
