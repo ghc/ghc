@@ -72,7 +72,7 @@ import Data.Array.Base
 import Data.Ix
 import Data.List
 import qualified Data.Sequence as Seq
-import Data.Monoid
+import Data.Monoid (mappend)
 import Data.Sequence (viewl, ViewL(..))
 import Foreign.Safe
 import System.IO.Unsafe
