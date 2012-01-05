@@ -33,6 +33,11 @@ bOUND_STEPS :: Bool
 bOUND_STEPS = "--bound-steps" `elem` aRGS
 --bOUND_STEPS = True
 
+-- For debugging very long-running supercompilation
+dEPTH_LIIMT :: Maybe Int
+dEPTH_LIIMT = Nothing
+--dEPTH_LIIMT = Just 40
+
 data DeedsPolicy = FCFS | Proportional
                  deriving (Read)
 
