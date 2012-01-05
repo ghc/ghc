@@ -219,6 +219,14 @@ def _extra_run_opts( opts, v ):
 
 # -----
 
+def extra_hc_opts( val ):
+    return lambda opts, v=val: _extra_hc_opts(opts, v);
+
+def _extra_hc_opts( opts, v ):
+    opts.extra_hc_opts = v
+
+# -----
+
 def extra_clean( files ):
     return lambda opts, v=files: _extra_clean(opts, v);
 
