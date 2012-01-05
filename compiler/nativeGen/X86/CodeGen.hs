@@ -1690,6 +1690,7 @@ genCCall32 target dest_regs args =
         use_sse2 <- sse2Enabled
         push_codes <- mapM (push_arg use_sse2) (reverse args)
         delta <- getDeltaNat
+        MASSERT (delta == delta0 - tot_arg_size)
 
         -- in
         -- deal with static vs dynamic call targets
@@ -1728,10 +1729,10 @@ genCCall32 target dest_regs args =
                       (if pop_size==0 then [] else
                        [ADD II32 (OpImm (ImmInt pop_size)) (OpReg esp)])
                       ++
-                      [DELTA (delta + tot_arg_size)]
+                      [DELTA delta0]
                    )
         -- in
-        setDeltaNat (delta + tot_arg_size)
+        setDeltaNat delta0
 
         let
             -- assign the results, if necessary
