@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1992-2004
+ * (c) The GHC Team, 1992-2012
  *
  * mkDerivedConstants.c
  *
@@ -17,11 +17,11 @@
  * We need offsets of profiled things... better be careful that this
  * doesn't affect the offsets of anything else.
  */
+
 #define PROFILING
 #define THREADED_RTS
 
 #include "Rts.h"
-
 #include "Stable.h"
 #include "Capability.h"
 
@@ -30,6 +30,10 @@
 #define str(a,b) #a "_" #b
 
 #define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))
+#define FIELD_SIZE(s_type, field) ((unsigned long)sizeof(((s_type*)0)->field))
+#define TYPE_SIZE(type) (sizeof(type))
+
+#pragma GCC poison sizeof
 
 #if defined(GEN_HASKELL)
 #define def_offset(str, offset)                          \
@@ -44,7 +48,7 @@
 #define ctype(type) /* nothing */
 #else
 #define ctype(type) \
-    printf("#define SIZEOF_" #type " %lu\n", (unsigned long)sizeof(type));
+    printf("#define SIZEOF_" #type " %lu\n", (unsigned long)TYPE_SIZE(type));
 #endif
 
 #if defined(GEN_HASKELL)
@@ -59,7 +63,7 @@
 */
 #define field_type_(str, s_type, field) \
     printf("#define REP_" str " b"); \
-    printf("%lu\n", (unsigned long)sizeof (__typeof__(((((s_type*)0)->field)))) * 8);
+    printf("%lu\n", FIELD_SIZE(s_type, field) * 8);
 #define field_type_gcptr_(str, s_type, field) \
     printf("#define REP_" str " gcptr\n");
 #endif
@@ -105,18 +109,18 @@
 #endif
 
 #define struct_size(s_type) \
-    def_size(#s_type, sizeof(s_type));
+    def_size(#s_type, TYPE_SIZE(s_type));
 
 /*
  * Size of a closure type, minus the header, named SIZEOF_<type>_NoHdr
  * Also, we #define SIZEOF_<type> to be the size of the whole closure for .cmm.
  */
 #define closure_size(s_type) \
-    def_size(#s_type "_NoHdr", sizeof(s_type) - sizeof(StgHeader)); \
-    def_closure_size(#s_type, sizeof(s_type) - sizeof(StgHeader));
+    def_size(#s_type "_NoHdr", TYPE_SIZE(s_type) - TYPE_SIZE(StgHeader)); \
+    def_closure_size(#s_type, TYPE_SIZE(s_type) - TYPE_SIZE(StgHeader));
 
 #define thunk_size(s_type) \
-    def_size(#s_type "_NoThunkHdr", sizeof(s_type) - sizeof(StgThunkHeader)); \
+    def_size(#s_type "_NoThunkHdr", TYPE_SIZE(s_type) - TYPE_SIZE(StgThunkHeader)); \
     closure_size(s_type)
 
 /* An access macro for use in C-- sources. */
@@ -124,7 +128,7 @@
     printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+OFFSET_" str "]\n");
 
 #define closure_field_offset_(str, s_type,field) \
-    def_offset(str, OFFSET(s_type,field) - sizeof(StgHeader));
+    def_offset(str, OFFSET(s_type,field) - TYPE_SIZE(StgHeader));
 
 #define closure_field_offset(s_type,field) \
     closure_field_offset_(str(s_type,field),s_type,field)
@@ -156,7 +160,7 @@
 
 /* Byte offset for a TSO field, minus the header and variable prof bit. */
 #define tso_payload_offset(s_type, field) \
-    def_offset(str(s_type,field), OFFSET(s_type,field) - sizeof(StgHeader) - sizeof(StgTSOProfInfo));
+    def_offset(str(s_type,field), OFFSET(s_type,field) - TYPE_SIZE(StgHeader) - TYPE_SIZE(StgTSOProfInfo));
 
 /* Full byte offset for a TSO field, for use from Cmm */
 #define tso_field_offset_macro(str) \
