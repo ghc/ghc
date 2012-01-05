@@ -393,6 +393,11 @@ matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
 --      a |-> True; ()<(a, a)> `match` c |-> True; d |-> True; ()<(c, d)>
 --      a |-> True; ()<(a, a)> `match` c |-> True; d |-> c; ()<(c, d)>
 -- However, I'm going to reject this for now (simpler).
+--
+-- TODO: arguably I should check that this is actually a true *bijection* not just a *function* because a renaming like
+-- {x |-> a, y |-> a} means that if we carrried on supercompiling here we could exploit more equalities (via positive information
+-- propagation - imagine we scrutinise x and later scrutinise y) and potentially get better code that at the tieback site. I need to
+-- check how important this is in practice.
 safeMkMatchResult :: [(Var, Var)] -> Match MatchResult
 safeMkMatchResult eqs = guard "safeMkRenaming" (all (\(x_l, x_r) -> M.lookup x_l eqs_map == Just x_r) eqs) >> return eqs_map
   where eqs_map = M.fromList eqs
