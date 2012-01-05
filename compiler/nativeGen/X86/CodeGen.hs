@@ -1744,9 +1744,11 @@ genCCall32 target dest_regs args =
                                                        (ImmInt 0)
                              sz = floatSize w
                          in toOL [ SUB II32 (OpImm (ImmInt b)) (OpReg esp),
+                                   DELTA (delta0 - b),
                                    GST sz fake0 tmp_amode,
                                    MOV sz (OpAddr tmp_amode) (OpReg r_dest),
-                                   ADD II32 (OpImm (ImmInt b)) (OpReg esp)]
+                                   ADD II32 (OpImm (ImmInt b)) (OpReg esp),
+                                   DELTA delta0]
                     else unitOL (GMOV fake0 r_dest)
               | isWord64 ty    = toOL [MOV II32 (OpReg eax) (OpReg r_dest),
                                         MOV II32 (OpReg edx) (OpReg r_dest_hi)]
