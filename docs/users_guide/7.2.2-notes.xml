@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-2-2">
+  <title>Release notes for version 7.2.2</title>
+
+  <para>
+    The 7.2.2 release is a bugfix release. The changes relative to 7.2.1
+    are listed below. The 7.2 branch is intended to be more of a
+    "technology preview" than normal GHC stable branches.
+  </para>
+
+  <itemizedlist>
+    <listitem>
+      <para>
+        All packages are now trusted by default. If you wish to make use
+        of Safe Haskell, you will need to manually untrust packages that
+        you do not wish to trust.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        An optimiser bug
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5453">#5453</ulink>)
+        which can cause segfaults has been fixed.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        A native code generator bug
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5393">#5393</ulink>)
+        which can cause segfaults on x86 and
+        amd64 has been fixed.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        A race condition in the runtime system
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5552">#5552</ulink>)
+        that can cause segfaults
+        has been fixed.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Exception handlers are now run in the <literal>mask</literal>
+        state, rather than the <literal>maskUninterruptible</literal>
+        state. Fixes a bug that could cause the GHCi debugger to hang
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/4988">#4988</ulink>),
+        amongst other things.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        The <literal>shutdownHaskellAndExit</literal> function now
+        immediately exits, even if <literal>hs_init</literal> has
+        been called multiple times.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        A bug arising when using type signature declarations in
+        Template Haskell splices
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5404">#5404</ulink>)
+        has been fixed.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        A bug arising when using class instances in
+        Template Haskell splices
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5410">#5410</ulink>)
+        has been fixed.
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Incorrectly encoded text at the end of a file is now handled
+        correctly
+        (<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5436">#5436</ulink>).
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        The base package is now version 4.4.1.0 (was 4.4.0.0).
+      </para>
+    </listitem>
+
+    <listitem>
+      <para>
+        Haddock is now version 2.9.4.
+      </para>
+    </listitem>
+  </itemizedlist>
+</sect1>
+

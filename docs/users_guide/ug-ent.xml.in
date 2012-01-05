@@ -3,6 +3,8 @@
 <!ENTITY flags          SYSTEM "flags.xml">
 <!ENTITY license        SYSTEM "license.xml">
 <!ENTITY intro          SYSTEM "intro.xml" >
+<!ENTITY oldrelnotes1   SYSTEM "7.2.1-notes.xml" >
+<!ENTITY oldrelnotes2   SYSTEM "7.2.2-notes.xml" >
 <!ENTITY relnotes1      SYSTEM "7.4.1-notes.xml" >
 <!ENTITY using          SYSTEM "using.xml" >
 <!ENTITY code-gens      SYSTEM "codegens.xml" >

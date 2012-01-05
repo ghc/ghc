@@ -1,0 +1,2159 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-2-1">
+  <title>Release notes for version 7.2.1</title>
+
+  <para>
+    The significant changes to the various parts of the compiler are
+    listed in the following sections. There have also been numerous bug
+    fixes and performance improvements over the 7.0 branch. The 7.2
+    branch is intended to be more of a "technology preview" than normal
+    GHC stable branches.
+  </para>
+
+  <sect2>
+    <title>Highlights</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          DPH support (<xref linkend="dph" />) has been significantly
+          improved.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A new feature Safe Haskell (<xref linkend="safe-haskell" />)
+          has been implemented.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to write compiler plugins
+          (<xref linkend="compiler-plugins" />).
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Language changes</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          It is now possible to give classes equality superclasses,
+          i.e. you can write something like
+          <literal>class (F a ~ b) => C a b where { ... }</literal>.
+          See <xref linkend="equality-constraints" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>TypeSynonymInstances</literal> extension now
+          correctly requires that instances are valid once the type
+          synonym is expanded. For example, in order to have
+        </para>
+<programlisting>
+instance SomeClass String where
+    ...
+</programlisting>
+        <para>
+          you need both <literal>TypeSynonymInstances</literal> and
+          <literal>FlexibleInstances</literal> enabled, as the latter
+          is necessary for
+        </para>
+<programlisting>
+instance SomeClass [Char] where
+    ...
+</programlisting>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>DatatypeContexts</literal> extension (which will
+          not be in the next Haskell language standard) is now off by
+          default, and deprecated. It is still enabled by the
+          <literal>Haskell98</literal> and
+          <literal>Haskell2010</literal> languages.
+          See <xref linkend="datatype-contexts" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new extension
+          <literal>NondecreasingIndentation</literal>, which controls
+          an extension to the layout rule that was previously always
+          enabled. It is now on by default, and (incorrectly, but for
+          backwards compatibility) on in <literal>Haskell98</literal>,
+          but off in <literal>Haskell2010</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>RelaxedLayout</literal> extension now
+          controls a small extension to the layout rule that GHC has
+          supported unconditionally for some time. It allows explicit
+          braces to be less indented than implicit braces, without
+          closing the implicit braces, e.g.:
+        </para>
+<programlisting>
+f x = case x of
+     False -> do
+    { return x; }
+</programlisting>
+        <para>
+          parses as
+        </para>
+<programlisting>
+f x = case x of
+     {False -> do
+    { return x; }}
+</programlisting>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new family of language extensions, collectively
+          known as &quot;Safe Haskell&quot;. This includes notions
+          of &quot;safe modules&quot;, &quot;trusted modules&quot;
+          and &quot;trusted packages&quot;.
+          See <xref linkend="safe-haskell" /> for more details.
+        </para>
+
+        <para>
+          The new <literal>SafeImports</literal> extension extends the
+          import declaration syntax to take an optional
+          <literal>safe</literal> keyword after the
+          <literal>import</literal> keyword, e.g. with
+        </para>
+<programlisting>
+import safe Network.Socket
+</programlisting>
+        <para>
+          compilation will only succeed if
+          <literal>Network.Socket</literal> is a &quot;trusted&quot; module.
+          See <xref linkend="safe-imports-ext" /> for more details.
+        </para>
+
+        <para>
+          The new <literal>Trustworthy</literal> extension means that
+          users of the package are able to declare that this module is
+          to be trusted, even though GHC can't infer that it is safe.
+          It implies the <literal>SafeImports</literal> extension.
+          See <xref linkend="safe-trust" /> for more details.
+        </para>
+
+        <para>
+          The new <literal>Safe</literal> extension means GHC will
+          check that a module's code is safe, and that all its imports
+          are trusted. It implies the <literal>SafeImports</literal>
+          extension, although all imports are required to be trusted
+          anyway.
+          See <xref linkend="safe-language" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new extension <literal>MonadComprehensions</literal>
+          allows comprehension syntax to be usde with any Monad, not
+          just lists. e.g.
+        </para>
+<programlisting>
+[ x + y | x &lt;- Just 1, y &lt;- Just 2 ]
+</programlisting>
+        <para>
+          evaluates to <literal>Just 3</literal>.
+          See <xref linkend="monad-comprehensions" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>DefaultSignatures</literal> extension
+          allows you to define a default implementation for
+          a class method that isn't as general as the method's type.
+          For example,
+        </para>
+<programlisting>
+class DefaultValue a where
+    defaultValue :: a
+    default defaultValue :: Num a => a
+    defaultValue = 3
+
+instance DefaultValue Int
+instance DefaultValue Float
+instance DefaultValue Char where
+    defaultValue = 'x'
+</programlisting>
+        <para>
+          See <xref linkend="class-default-signatures" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>DeriveGeneric</literal> extension allows
+          instances of the new <literal>GHC.Generics.Generic</literal>
+          class to be derived. Together with the
+          <literal>DefaultSignatures</literal> extension this allows
+          generic programming.
+          See <xref linkend="generic-programming" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>Generics</literal> extension has now been
+          removed. Use the new <literal>DefaultSignatures</literal> and
+          <literal>DeriveGeneric</literal> extensions instead.
+          The <literal>{| curly-pipe bracket |}</literal> syntax is thus
+          no longer recognised.
+        </para>
+
+        <para>
+          The <literal>-XGenerics</literal> flag will give a warning,
+          but the <literal>-fgenerics</literal> flag is no longer
+          accepted.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          When the new <literal>InterruptibleFFI</literal> extension is
+          enabled, it is now possible to annotate FFI imports as
+          <literal>interruptible</literal>, e.g.
+        </para>
+<programlisting>
+foreign import ccall interruptible
+    "sleep" :: CUint -> IO CUint
+</programlisting>
+        <para>
+          in which case for most foreign calls it is possible to
+          interrupt the foreign call by using <literal>throwTo</literal>
+          to throw an exception to the thread making the call.
+          See <xref linkend="ffi-interruptible" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>threadsafe</literal> FFI annotation is no longer
+          supported. Use <literal>safe</literal> instead.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>OverlappingInstances</literal> extension used to
+          allow overlapping instances only when all but the
+          most specific instance were compiled with
+          <literal>OverlappingInstances</literal>.
+          Now overlap is allowed if <emphasis>either</emphasis> all but
+          the most specific instance were compiled with
+          <literal>OverlappingInstances</literal>,
+          <emphasis>or</emphasis> if the most specific instance was
+          compiled with <literal>OverlappingInstances</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new extension <literal>GADTSyntax</literal>,
+          off by default, which permits generalised algebraic data type
+          syntax for declaring traditional Haskell datatypes. It is
+          enabled by the <literal>GADTs</literal> extension.
+          See <xref linkend="gadt-style" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>NewQualifiedOperators</literal> extension, which was
+          deprecated, has now been removed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There are new pragmas <literal>VECTORISE</literal>,
+          <literal>VECTORISE_SCALAR</literal> and
+          <literal>NOVECTORISE</literal> for controlling the behaviour
+          of the vectoriser.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Characters in the unicode <literal>OtherNumber</literal>
+          category are now treated as being 'digit's, rather than 'other
+          graphical' characters.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Warnings</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          The new <literal>-fwarn-identities</literal> flag warns about
+          uses of <literal>toInteger</literal>,
+          <literal>toRational</literal>, <literal>fromIntegral</literal>
+          and <literal>realToFrac</literal> which are the identity.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-fwarn-incomplete-uni-patterns</literal>
+          flag warns about pattern matches in a lambda expression or
+          pattern binding which could fail, e.g.
+        </para>
+<programlisting>
+h = \[] -> 2
+Just k = f y
+</programlisting>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-fwarn-missing-local-sigs</literal> flag
+          warns about polymorphic local bindings without type
+          signatures. The warning includes the inferred type.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-fwarn-missing-import-lists</literal> flag
+          warns if you use an unqualified import declaration that does
+          not explicitly list the entities brought into scope. For
+          example,
+        </para>
+<programlisting>
+import X (f)
+import Y
+import qualified Z
+</programlisting>
+        <para>
+          will warn about the import of <literal>Y</literal>, but not
+          <literal>X</literal> or <literal>Z</literal>. The rationale is
+          that if module <literal>Y</literal> is later changed to
+          export something called <literal>f</literal>, then any
+          references to <literal>f</literal> will become ambiguous.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Dumps</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          The previously-undocumented flag
+          <literal>-ddump-to-file</literal> causes the output from the
+          other <literal>-ddump-*</literal> flags to be put in
+          appropriately-named files, rather than printed on stdout.
+        </para>
+
+        <para>
+          This now also includes the <literal>-ddump-simpl</literal>
+          flag, whose output is put in
+          <literal>file_base_name.dump-simpl</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-dppr-noprags</literal> flag omits the
+          pragma info in dumps.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-ddump-rule-rewrites</literal> flag
+          dumps detailed information about all rules that fired
+          in this module.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-ddump-vect</literal> flag dumps the output
+          of the vectoriser.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-ddump-vt-trace</literal> flag makes the
+          vectoriser be very chatty about what it is up to.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-ddump-core-stats</literal> flag prints
+          a one-line summary of the size of the Core program at the
+          end of the optimisation pipeline.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-dppr-case-as-let</literal> flag prints
+          single-alternative case expressions as though they were
+          strict let expressions. This is helpful when your code
+          does a lot of unboxing.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-dsuppress-all</literal> flag suppresses
+          everything that can be suppressed, except for unique ids
+          (as this often makes the printout ambiguous). If you just
+          want to see the overall structure of the code, then start
+          here.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-dsuppress-idinfo</literal> flag 
+          suppresses extended information about identifiers where
+          they are bound. This includes strictness information and
+          inliner templates. Using this flag can cut the size of
+          the core dump in half, due to the lack of inliner templates.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-dsuppress-type-signatures</literal> flag 
+          suppresses the printing of type signatures.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-dsuppress-type-applications</literal> flag 
+          suppresses the printing of type applications.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>-dppr-colsNNN</literal> flag sets the width
+          of debugging output. Use this if your code is wrapping too
+          much. For example, <literal>-dppr-cols200</literal>.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Runtime system</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          The <literal>-k</literal> RTS flag, which sets the initial
+          thread stack size (default 1k), has been renamed
+          <literal>-ki</literal>. The old name still works, but may
+          be removed in a future version of GHC.
+        </para>
+
+        <para>
+          There are also new flags <literal>-kc</literal>, which
+          sets the stack chunk size (default 32k), and
+          <literal>-kb</literal>, which sets the stack chunk buffer
+          size (default 1k).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Profiling reports now use constant width columns, so large
+          values don't cause the layout to go wrong.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-L</literal> RTS flag, which sets the width of
+          the labels in heap profile graphs, can now also be used when
+          retainer profiling.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-qw</literal> RTS flag is now deprecated. It does
+          nothing, and will be removed in a future version of GHC.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          We now keep copies of the argument lists we are passed, so
+          it is safe for callers of <literal>hs_init()</literal> to
+          free the pointers they pass.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The archive loader now supports Darwin &quot;fat archives&quot;.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Linker scripts using <literal>INPUT</literal> are now supported.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>RtsFlags.h</literal> header file has finally been
+          removed; use <literal>Rts.h</literal> instead.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There are some new threadscope event types:
+          <informaltable>
+            <tgroup cols="2">
+            <tbody>
+                <row>
+                  <entry><literal>EVENT_CAPSET_CREATE</literal></entry>
+                  <entry>Create capability set</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_CAPSET_DELETE</literal></entry>
+                  <entry>Delete capability set</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_CAPSET_ASSIGN_CAP</literal></entry>
+                  <entry>Add capability to capability set</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_CAPSET_REMOVE_CAP</literal></entry>
+                  <entry>Remove capability from capability set</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_RTS_IDENTIFIER</literal></entry>
+                  <entry>RTS name and version</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_PROGRAM_ARGS</literal></entry>
+                  <entry>Program arguments</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_PROGRAM_ENV</literal></entry>
+                  <entry>Program environment variables</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_OSPROCESS_PID</literal></entry>
+                  <entry>Process ID</entry>
+                </row>
+                <row>
+                  <entry><literal>EVENT_OSPROCESS_PPID</literal></entry>
+                  <entry>Parent process ID</entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </informaltable>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The linker now supports <literal>kfreebsdgnu</literal>.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Compiler</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          When using Haskell code as a library, and calling it from
+          another language, it is no longer necessary to call the
+          <literal>hs_add_root</literal> function.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The &quot;evil mangler&quot; has been removed, and
+          registerised compilation via C is no longer supported.
+          This means that the
+          <literal>-fvia-c</literal>,
+          <literal>-fvia-C</literal>,
+          <literal>-keep-raw-s-file</literal>,
+          <literal>-keep-raw-s-files</literal>,
+          <literal>-pgmm</literal>,
+          <literal>-optm</literal>,
+          <literal>-monly-2-regs</literal>,
+          <literal>-monly-3-regs</literal> and
+          <literal>-monly-4-regs</literal>
+          flags are now deprecated, and
+          have no effect.
+          The <literal>-fasm-mangling</literal> and
+          <literal>-fno-asm-mangling</literal> flags have been removed.
+        </para>
+
+        <para>
+          Unregisterised compilation, for architectures for which
+          there is no native code generator, is still possible,
+          and still compiles via C.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Compiling Objective-C (<literal>.m</literal>) files is now
+          supported, assuming your <literal>gcc</literal> is capable
+          of compiling them.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new &quot;Safe Haskell&quot; extensions introduce three
+          new GHC flags: <literal>-trust P</literal> exposes package
+          <literal>P</literal> if it was hidden and considers it a
+          trusted package;
+          <literal>-distrust P</literal> exposes package
+          <literal>P</literal> if it was hidden and considers it an
+          untrusted package;
+          <literal>-distrust-all-packages</literal> considers all
+          packages distrusted unless they are explicitly set to be
+          trusted by subsequent command-line options.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Significant progress has been made on the new code generator,
+          but it is not yet ready for prime-time. If you want to try
+          it out, use the <literal>-fnew-codegen</literal> flag.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The Alpha native code generator had bitrotted, so has now
+          been removed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Running <literal>ghc -v ...</literal> will no longer pass
+          <literal>-v</literal> to <literal>gcc</literal>. You now need
+          to use <literal>ghc -v4 ...</literal> (or higher) instead.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-Odph</literal> flag is now equivalent to
+          <literal>-O2 -fsimplifier-phases=3 -fsimplifier-iterations=20</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new <literal>-fdph-none</literal> flag can be used
+          to specify that no DPH backend should be used. It is now the
+          default, i.e. <literal>-fdph-par</literal> or
+          <literal>-fdph-seq</literal> need to be explicitly specified
+          if required.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-n</literal> flag has been removed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-fmethod-sharing</literal> flag has been removed.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>GHCi</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          GHCi now has a multiline-input mode, enabled with
+          <literal>:set +m</literal>. For example,
+        </para>
+<programlisting>
+Prelude> :set +m
+Prelude> let x = 3
+Prelude|     y = 4
+Prelude| in x + y
+7
+Prelude>
+</programlisting>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>:script</literal> command takes a filename
+          as an argument, and executes each line in that file. It
+          supports multiline statements if the <literal>+m</literal>
+          mode is set.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>:issafe</literal> command tells you whether
+          a module is considered to be trusted or not.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          When resolving abbreviated GHCi commands, we now prefer
+          built-in commands to user defined commands. This makes things
+          more consistent, e.g. <literal>:i</literal> will always mean
+          <literal>:info</literal>, unless <literal>:i</literal> itself
+          is defined by the user.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>:m +M</literal> and <literal>import M</literal>
+          GHCi commands now do exactly the same thing.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          With a new flag <literal>-ghci-script</literal> you can specify
+          additional files to be read on startup, in the same way that
+          <literal>.ghci</literal> is.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>ghc-pkg</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          There are new ghc-pkg commands <literal>trust</literal>
+          and <literal>distrust</literal>, used for setting the
+          trustworthiness of packages for Safe Haskell.
+          See <xref linkend="package-management" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new flags
+          <literal>-expand-env-vars</literal>,
+          <literal>-expand-pkgroot</literal> and
+          <literal>-no-expand-pkgroot</literal>
+          control whether the <literal>${pkgroot}</literal>,
+          <literal>${pkgrooturl}</literal> and
+          <literal>${topdir}</literal> variables are expanded
+          when printing information.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>--auto-ghci-libs</literal> flag is deprecated,
+          and will be removed in a future version.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>hsc2hs</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          Cross-compilation is now supported by hsc2hs, for most features.
+          The new <literal>--cross-compile</literal>
+          (or <literal>-x</literal>) flag enables cross-compilation,
+          while <literal>--cross-safe</literal> checks that only
+          features for which cross-compilation works are used.
+          See <xref linkend="hsc2hs_cross" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>--keep-files</literal>
+          (or <literal>-k</literal>) flag makes hsc2hs keep the
+          intermediate files that it generates.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>GHC API</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          GHC now has support for &quot;plugins&quot;. This feature
+          allows you to write a Core-to-Core pass and have it
+          dynamically linked into an otherwise-unmodified GHC, and run
+          at a place you specify in the Core optimisation pipeline.
+        </para>
+
+        <para>
+          The new
+          <literal>-fplugin=<replaceable>module</replaceable></literal>
+          flag specifies that <replaceable>module</replaceable> is
+          to be used as a plugin, and
+          <literal>-fplugin-opt=<replaceable>module</replaceable>:<replaceable>args</replaceable></literal>
+          allows arguments to be passed to the plugin.
+        </para>
+
+        <para>
+          See <xref linkend="compiler-plugins" /> for more details.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Coercions now have their own datatype rather than being
+          represented as types. They are now value-level things,
+          rather than type-level things, although the value is zero
+          bits wide (like the State token).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>StmtLR</literal> datatype has a new constructor
+          <literal>LastStmt</literal>, which holds the final
+          (expression) statement of all comprehensions and
+          <literal>do</literal>-blocks.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>printExceptionAndWarnings</literal> function
+          has been deprecated, in favour of the new
+          <literal>printException</literal> function.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>SrcSpan</literal> and <literal>SrcLoc</literal>
+          types have been refactored so that the new
+          <literal>RealSrcSpan</literal> and
+          <literal>RealSrcLoc</literal> types are used when we have a
+          real location, rather than an &quot;unhelpful&quot; location.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The type of <literal>defaultErrorHandler</literal> has
+          changed. In particular, this means that you will normally
+          want to pass it <literal>defaultLogAction</literal> instead
+          of <literal>defaultDynFlags</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Calling <literal>withFlattenedDynflags</literal> is no longer
+          necessary, and the function has been removed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Several of the old native code generator modules gained an
+          <literal>Old</literal> prefix, when their names clashed with
+          modules in the new native code generator.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Build System and Infrastructure</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          GHC development now uses git repositories, rather than darcs
+          repositories. Instructions for getting source trees are on
+          <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building/GettingTheSources">the GHC wiki</ulink>.
+        </para>
+
+        <para>
+          The <literal>sync-all</literal> script, rather than the
+          <literal>darcs-all</literal> script, is now used for dealing
+          with repositories.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC >= 6.12 is now required to build GHC.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Building with gcc 4.6 now works.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          On Windows, we now bundle gcc 4.5.2-1 (was 4.5.0-1).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          GHC now works with LLVM 3.0.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The location of gcc, and various other settings, is now in a
+          <literal>settings</literal> file. The
+          <literal>extra-gcc-opts</literal> file is no longer used.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is no longer necessary to set
+          <literal>GhcWithLlvmCodeGen = YES</literal> in order to get
+          llvm support: llvm support is now always enabled.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new code generator is not yet ready for prime-time, but
+          if you want to experiment with it you can make it the default
+          by setting
+        </para>
+<programlisting>
+GhcStage1DefaultNewCodegen=YES
+GhcStage2DefaultNewCodegen=YES
+GhcStage3DefaultNewCodegen=YES
+</programlisting>
+        <para>
+          in your <literal>mk/build.mk</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Platforms with a vendor of <literal>softfloat</literal>, such
+          as <literal>armv5tel-softfloat-linux-gnueabi</literal>, are
+          now supported.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+
+    <itemizedlist>
+        <listitem>
+            <para>
+                Unicode support has generally been improved across
+                the core libraries. This has a few consequences:
+            </para>
+            
+            <para>
+                Code that has been using the <literal>*CString</literal>
+                functions may need to be corrected to use the
+                <literal>*CAString</literal> functions.
+            </para>
+
+            <para>
+                Users may now observe strings &mdash; particularly
+                those from the commandline &mdash; containing
+                private-use characters, i.e. those in the range 0xEF00
+                to 0xEFFF inclusive.
+            </para>
+
+            <para>
+                Programs may now get exceptions when writing strings
+                in the wrong encoding to (for example) stdout.
+            </para>
+        </listitem>
+    </itemizedlist>
+
+    <sect3>
+        <title>array</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.3.0.3 (was 0.3.0.2)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>base</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 4.4.0.0 (was 4.3.1.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Typeable</literal> module has been
+                    overhauled. The <literal>mkTyCon</literal>
+                    function has been deprecated; the preferable fix
+                    is to derive <literal>Typeable</literal> instead
+                    (see <xref linkend="deriving-typeable"/>),
+                    although there is also a replacement
+                    for <literal>mkTyCon</literal> in the form of a
+                    new function
+                    <literal>mkTyCon3</literal>, which takes separate
+                    strings for the package, module and name of the
+                    type constructor.
+                    Also, <literal>typeRepKey</literal> is deprecated,
+                    and both <literal>TypeRep</literal>
+                    and <literal>TyCon</literal> now
+                    have <literal>Ord</literal> instances which means
+                    they can be used as Map keys.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The result of <literal>gcd 0 0</literal> is now
+                    0, rather than throwing an exception.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The result of <literal>minBound `rem` -1</literal>
+                    and <literal>minBound `div` -1</literal> is now 0,
+                    rather than throwing an overflow exception.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Control.Concurrent</literal> now exports
+                    new functions
+                    <literal>forkIOWithUnmask</literal>,
+                    <literal>forkOn</literal>,
+                    <literal>forkOnWithUnmask</literal>,
+                    <literal>getNumCapabilities</literal> and
+                    <literal>threadCapability</literal>.
+                    The <literal>forkIOUnmasked</literal> function has
+                    been deprecated in favour of
+                    <literal>forkIOWithUnmask</literal>.
+                </para>
+
+                <para>
+                    The same changes have been made to
+                    <literal>GHC.Conc</literal> and
+                    <literal>GHC.Conc.Sync</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Control.Exception</literal> exports a new
+                    function <literal>allowInterrupt</literal> which, when
+                    invoked inside <literal>mask</literal>, allows a
+                    blocked asynchronous exception to be raised, if one
+                    exists.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.IO.Unsafe</literal> now exports
+                    the new function
+                    <literal>unsafeDupablePerformIO</literal>.
+                    This is a more efficient version of
+                    <literal>unsafePerformIO</literal>, but may run the
+                    IO action multiple times (currently, in GHC, only
+                    when multiple threads try to evaluate it
+                    simultaneously).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.IO.Error</literal> now exports
+                    new functions <literal>catchIOError</literal> and
+                    <literal>tryIOError</literal>.
+                    The <literal>try</literal> and <literal>catch</literal>
+                    functions are now deprecated.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.Encoding</literal> now exports three
+                    new <literal>TextEncoding</literal>s:
+                </para>
+
+                <para>
+                    The <literal>fileSystemEncoding</literal> encoding
+                    is the Unicode encoding of the current locale, but
+                    allows arbitrary undecodable bytes to be
+                    round-tripped through it. It is used to decode and
+                    encode command line arguments and environment
+                    variables on non-Windows platforms.
+                </para>
+
+                <para>
+                    The <literal>foreignEncoding</literal> encoding
+                    is the Unicode encoding of the current locale, but
+                    undecodable bytes are replaced with their closest
+                    visual match. It's used for the
+                    <literal>CString</literal> marshalling functions in
+                    <literal>Foreign.C.String</literal>.
+                </para>
+
+                <para>
+                    In the <literal>char8</literal> encoding Unicode
+                    code points are translated to bytes by taking the
+                    code point modulo 256. When decoding, bytes are
+                    translated directly into the equivalent code point.
+                    This encoding is also exported by
+                    <literal>System.IO</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The functions to make
+                    <literal>TextEncoding</literal>s now have
+                    <literal>mk*</literal> variants which take a
+                    <literal>CodingFailureMode</literal> argument.
+                    The new functions, together with what they
+                    generalise, are:
+                </para>
+
+                <para>
+                    <informaltable>
+                        <tgroup cols="3">
+                        <tbody>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.Latin1</literal></entry>
+                              <entry><literal>latin1</literal></entry>
+                              <entry><literal>mkLatin1</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.Latin1</literal></entry>
+                              <entry><literal>latin1_checked</literal></entry>
+                              <entry><literal>mkLatin1_checked</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF8</literal></entry>
+                              <entry><literal>utf8</literal></entry>
+                              <entry><literal>mkUTF8</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF8</literal></entry>
+                              <entry><literal>utf8_bom</literal></entry>
+                              <entry><literal>mkUTF8_bom</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF16</literal></entry>
+                              <entry><literal>utf16</literal></entry>
+                              <entry><literal>mkUTF16</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF16</literal></entry>
+                              <entry><literal>utf16be</literal></entry>
+                              <entry><literal>mkUTF16be</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF16</literal></entry>
+                              <entry><literal>utf16le</literal></entry>
+                              <entry><literal>mkUTF16le</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF32</literal></entry>
+                              <entry><literal>utf32</literal></entry>
+                              <entry><literal>mkUTF32</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF32</literal></entry>
+                              <entry><literal>utf32be</literal></entry>
+                              <entry><literal>mkUTF32be</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF32</literal></entry>
+                              <entry><literal>utf32le</literal></entry>
+                              <entry><literal>mkUTF32le</literal></entry>
+                            </row>
+                        </tbody>
+                        </tgroup>
+                    </informaltable>
+                </para>
+
+                <para>
+                    Similarly, there are new
+                    <literal>mkCodePageEncoding</literal> and
+                    <literal>mkLocaleEncoding</literal>
+                    generalisations of
+                    <literal>codePageEncoding</literal> and
+                    <literal>localeEncoding</literal> in
+                    <literal>GHC.IO.Encoding.CodePage</literal>.
+                </para>
+
+                <para>
+                    <literal>GHC.IO.Encoding.Iconv</literal> has
+                    been similarly altered, and now only exports
+                    <literal>iconvEncoding</literal>,
+                    <literal>mkIconvEncoding</literal>,
+                    <literal>localeEncoding</literal> and
+                    <literal>mkLocaleEncoding</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.Encoding.Types</literal> and
+                    <literal>GHC.IO.Encoding</literal> now export a new
+                    type <literal>CodingProgress</literal> which
+                    describes the state of a text encoder. The
+                    <literal>BufferCodec</literal>,
+                    <literal>DecodeBuffer</literal> and
+                    <literal>EncodeBuffer</literal> types have also
+                    changed.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO</literal> now exports bracket.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.blocked</literal> is now deprecated
+                    in favour of
+                    <literal>Control.Exception.getMaskingState</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.Show</literal> now exports two new
+                    helpers, <literal>showLitString</literal> (analogous
+                    to <literal>showLitChar</literal>) and
+                    <literal>showMultiLineString</literal> (which breaks
+                    a string containing newlines characters up into
+                    multiple strings).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The type of <literal>GHC.IO.FD.openFile</literal>
+                    has changed to include a flag for whether to
+                    open the file in non-blocking mode.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.Handle.FD</literal> now exports a
+                    variant <literal>openFileBlocking</literal> of
+                    <literal>openFile</literal>, which opens the file
+                    in blocking mode.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The type of
+                    <literal>Foreign.Marshal.Utils.maybeNew</literal>
+                    has been generalised to
+                    <literal>(a -> IO (Ptr b)) -> (Maybe a -> IO (Ptr b))</literal>
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Foreign.C.Types</literal> now exports new
+                    types <literal>CUSeconds</literal> and
+                    <literal>CSUSeconds</literal>, corresponding to the
+                    C types <literal>useconds_t</literal> and
+                    <literal>suseconds_t</literal> respectively.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.Posix.Internals</literal> new exports
+                    new functions <literal>peekFilePath</literal>
+                    and, on non-Windows platforms,
+                    <literal>peekFilePathLen</literal> and
+                    <literal>c_safe_open</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.List.inits</literal>,
+                    <literal>Data.List.tails</literal>,
+                    <literal>Data.List.intersperse</literal> and
+                    <literal>Data.List.intersectBy</literal>
+                    are now lazier.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Char</literal> no longer exports
+                    <literal>String</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.String</literal> now re-exports
+                    <literal>String</literal>,
+                    <literal>lines</literal>,
+                    <literal>unlines</literal>,
+                    <literal>words</literal> and
+                    <literal>unwords</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a <literal>Read</literal> instance for
+                    <literal>Data.Fixed.Fixed a</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now <literal>Eq</literal> instances for
+                    <literal>Control.Concurrent.Chan.Chan</literal>,
+                    <literal>Control.Concurrent.QSem.QSem</literal> and
+                    <literal>Control.Concurrent.QSemN.QSemN</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now <literal>Applicative</literal>
+                    instances for
+                    <literal>Control.Monad.ST.ST</literal> and
+                    <literal>Control.Monad.ST.Lazy.ST</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a
+                    <literal>Typeable</literal> instance for
+                    <literal>Control.Concurrent.SampleVar.SampleVar</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Most of <literal>GHC.PArr</literal> has been moved
+                    into the dph package. Only the
+                    <literal>[::]</literal> datatype remains.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new module
+                    <literal>Control.Monad.Group</literal>
+                    for monadic grouping (used for monad comprehensions).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new module
+                    <literal>Control.Monad.Zip</literal>
+                    for monadic zipping (used for monad comprehensions).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new internal module
+                    <literal>GHC.Foreign</literal> which provides
+                    versions of some C string functions generalised
+                    to be usable with any encoding.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new internal module
+                    <literal>GHC.IO.Encoding.Failure</literal> which
+                    provides functionality for specifying how text
+                    encoding and decoding fails.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    On Windows, there is a new internal module
+                    <literal>GHC.Windows</literal> which duplicates
+                    part of <literal>System.Win32.Types</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Some functions have been moved from
+                    <literal>GHC.Base</literal> down into
+                    <literal>GHC.Classes</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now new internal modules
+                    <literal>GHC.Float.ConversionUtils</literal> and
+                    <literal>GHC.Float.RealFracMethods</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The safe parts of the <literal>Foreign</literal>
+                    module are now in a new module
+                    <literal>Foreign.Safe</literal>.
+                    <literal>Foreign</literal> now reexports
+                    all the safe code it used to, as well as
+                    deprecated copies of the unsafe functions.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Foreign.ForeignPtr</literal> module
+                    has been split into
+                    <literal>Foreign.ForeignPtr.Safe</literal> and
+                    <literal>Foreign.ForeignPtr.Unsafe</literal>.
+                    <literal>Foreign.ForeignPtr</literal> now
+                    reexports
+                    <literal>Foreign.ForeignPtr.Safe</literal> and
+                    a deprecated copy of the unsafe function
+                    (<literal>unsafeForeignPtrToPtr</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Foreign.Marshal</literal> module
+                    has been split into
+                    <literal>Foreign.Marshal.Safe</literal> and
+                    <literal>Foreign.Marshal.Unsafe</literal>.
+                    <literal>Foreign.Marshal</literal> now
+                    reexports
+                    <literal>Foreign.Marshal.Safe</literal> and
+                    a deprecated copy of the unsafe function
+                    (<literal>unsafeLocalState</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Control.Monad.ST</literal> module
+                    has been split into
+                    <literal>Control.Monad.ST.Safe</literal> and
+                    <literal>Control.Monad.ST.Unsafe</literal>.
+                    <literal>Control.Monad.ST</literal> now
+                    reexports
+                    <literal>Control.Monad.ST.Safe</literal> and
+                    deprecated copies of the unsafe functions
+                    (<literal>unsafeInterleaveST</literal>,
+                    <literal>unsafeIOToST</literal> and
+                    <literal>unsafeSTToIO</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Control.Monad.ST.Lazy</literal> module
+                    has been split into
+                    <literal>Control.Monad.ST.Lazy.Safe</literal> and
+                    <literal>Control.Monad.ST.Lazy.Unsafe</literal>.
+                    <literal>Control.Monad.ST.Lazy</literal> now
+                    reexports
+                    <literal>Control.Monad.ST.Lazy.Safe</literal> and
+                    deprecated copies of the unsafe functions
+                    (<literal>unsafeInterleaveST</literal>
+                    and <literal>unsafeIOToST</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>System.Event</literal> module has been
+                    renamed <literal>GHC.Event</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Following the removal of
+                    <literal>DatatypeContexts</literal> from the
+                    language, the definitions of
+                    <literal>Control.Arrow.ArrowMonad</literal>,
+                    <literal>Array</literal> and
+                    <literal>Complex</literal> and
+                    <literal>Ratio</literal> have had their
+                    datatype contexts removed.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Many modules have been marked
+                    <literal>Trustworthy</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.Posix.Internals</literal> now
+                    exports a function <literal>puts</literal>, for
+                    debugging within the base package.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The Unicode data is now based on version 6.0.0 (was
+                    5.1.0) of the Unicode spec.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bin-package-db</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    New package, version 0.5.1.0.
+                    TODO: Bump version
+                    It is not exposed by default.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>bytestring</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.9.2.0 (was 0.9.1.10)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now an
+                    <literal>hPutNonBlocking</literal>
+                    function in
+                    <literal>Data.ByteString</literal>,
+                    <literal>Data.ByteString.Char8</literal>,
+                    <literal>Data.ByteString.Lazy</literal> and
+                    <literal>Data.ByteString.Lazy.Char8</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now <literal>hPutStrLn</literal>
+                    and <literal>putStrLn</literal> functions in
+                    <literal>Data.ByteString.Char8</literal> and
+                    <literal>Data.ByteString.Lazy.Char8</literal>.
+                </para>
+
+                <para>
+                    The functions in
+                    <literal>Data.ByteString</literal> and
+                    <literal>Data.ByteString.Lazy</literal>
+                    are now deprecated.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Cabal</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.12.0.0 (was 1.10.2.0)
+                    TODO: Currently we have 1.11.0. The branch needs to
+                    be created.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    For details of changes to Cabal, please see the
+                    Cabal changelog.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>containers</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.4.1.0 (was 0.4.0.0)
+                    TODO: Bump version
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Map</literal> now exports new
+                    functions <literal>foldrWithKey'</literal> and
+                    <literal>foldlWithKey'</literal>, which are strict
+                    variants of <literal>foldrWithKey</literal> and
+                    <literal>foldlWithKey</literal> respectively.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.IntMap</literal> now exports new
+                    functions <literal>insertWith'</literal> and
+                    <literal>insertWithKey'</literal>, which are strict
+                    variants of <literal>insertWith</literal> and
+                    <literal>insertWithKey</literal> respectively.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>directory</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.1 (was 1.1.0.0)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>extensible-exceptions</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.1.1.3 (was 0.1.1.2)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>filepath</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.2.0.1 (was 1.2.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The handling of &quot;.&quot; as a component in a
+                    <literal>FilePath</literal> is now more consistent.
+                    See <ulink url="http://hackage.haskell.org/trac/ghc/ticket/3975">#3975</ulink> for more information.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc-binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    GHC no longer includes this internal package.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>ghc-prim</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is an internal package, and should not be used.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell98</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.0.0.0 (was 1.1.0.1)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    It is no longer possible to use the haskell98
+                    package with the base package, as it now includes the
+                    <literal>Prelude</literal> and
+                    <literal>Numeric</literal> modules. The haskell98
+                    package is therefore now hidden by default.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>haskell2010</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.0 (was 1.0.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>splitAt</literal> function now
+                    has the correct strictness, as defined by the
+                    report.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hoopl</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is a new package, version 3.8.7.2.
+                    TODO: Bump version number. 3.8.7.1 is on hackage.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hpc</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.5.1.0 (was 0.5.0.6)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    A new function <literal>catchIO</literal> is now
+                    exported by <literal>Trace.Hpc.Util</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>integer-gmp</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 0.3.0.0 (was 0.2.0.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Now exposes two new modules,
+                    <literal>GHC.Integer.Logarithms</literal> and
+                    <literal>GHC.Integer.Logarithms.Internals</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>toInt#</literal> function has been
+                    renamed to <literal>integerToInt</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-locale</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.0.0.3 (was 1.0.0.2)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>old-time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.0.0.7 (was 1.0.0.6)
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>pretty</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.0 (was 1.0.1.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>sizedText</literal>,
+                    which allows you to specify the width that a string
+                    should be considered to have.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Doc</literal> type is now an instance
+                    of <literal>IsString</literal> and
+                    <literal>Monoid</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>process</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.1.0.0 (was 1.0.1.4)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>showCommandForUser</literal> in
+                    <literal>System.Process</literal> which,
+                    given a program and its arguments,
+                    returns a string suitable for pasting
+                    into sh (on POSIX OSs) or cmd.exe (on Windows).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>interruptProcessGroupOf</literal> in
+                    <literal>System.Process</literal> which
+                    sends an interrupt signal to the process group of
+                    the given process. On Unix systems, it sends the
+                    group the <literal>SIGINT</literal> signal.
+                    On Windows systems, it generates a
+                    <literal>CTRL_BREAK_EVENT</literal> and will only
+                    work for processes created using
+                    <literal>createProcess</literal> with the
+                    <literal>create_group</literal> flag set.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>CreateProcess</literal>
+                    constructor, exported by
+                    <literal>System.Process.Internals</literal> and
+                    <literal>System.Process</literal>, has a new
+                    <literal>Bool</literal> field
+                    <literal>create_group</literal>
+                    which specifies whether a process group should be created.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The type of <literal>withCEnvironment</literal>
+                    on Windows is now more consistent with other
+                    platforms, as the action now takes a
+                    <literal>Ptr CWString</literal> rather than
+                    <literal>Ptr ()</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>random</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    GHC no longer includes the random library
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>template-haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.6.0.0 (was 2.5.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>Language.Haskell.TH.Syntax</literal>
+                    the <literal>Exp</literal>, <literal>Pat</literal>
+                    and <literal>Type</literal> datatypes have new
+                    constructors <literal>UnboxedTupE</literal>,
+                    <literal>UnboxedTupP</literal> and
+                    <literal>UnboxedTupleT</literal> respectively.
+                    There are also new helper functions
+                    <literal>unboxedTupleTypeName</literal> and
+                    <literal>unboxedTupleDataName</literal>.
+                </para>
+
+                <para>
+                    There are corresponding helper functions
+                    <literal>unboxedTupE</literal>,
+                    <literal>unboxedTupP</literal> and
+                    <literal>unboxedTupleT</literal> in
+                    <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>Language.Haskell.TH.Syntax</literal>
+                    the <literal>Safety</literal> type has a new
+                    constructor <literal>Interruptible</literal>.
+                </para>
+
+                <para>
+                    There is a corresponding new value
+                    <literal>interruptible :: Safety</literal>
+                    in <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+
+                <para>
+                    However, the <literal>Threadsafe</literal>
+                    constructor and <literal>threadsafe</literal>
+                    helper have been removed, following the removal
+                    of the feature from GHC.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>Language.Haskell.TH.Syntax</literal>,
+                    the <literal>classInstances</literal> function now
+                    has type
+                    <literal>Name -> [Type] -> Q [ClassInstance]</literal>,
+                    and the <literal>qClassInstances</literal> instance
+                    of the <literal>Quasi</literal> class now has type
+                    <literal>Name -> [Type] -> m [ClassInstance]</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now helper functions
+                    <literal>pprString</literal> and
+                    <literal>hashParens</literal> exported from
+                    <literal>Language.Haskell.TH.Ppr</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The helper functions
+                    <literal>combine</literal>,
+                    <literal>rename</literal>,
+                    <literal>genpat</literal>,
+                    <literal>alpha</literal> and
+                    <literal>simpleMatch</literal>
+                    have been removed from
+                    <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>time</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 1.2.0.5 (was 1.2.0.3)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>%-</literal>, <literal>%_</literal>
+                    and <literal>%0</literal> specifiers can now be
+                    used. For example,
+                </para>
+<programlisting>
+> parseTime defaultTimeLocale "%-m/%e/%Y" "3/9/2011" :: Maybe Day
+Just 2011-03-09
+</programlisting>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The default year is now correctly in the range
+                    1969-2068, rather than 1900-1999.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Some cases in which an exception was thrown now
+                    correctly return <literal>Nothing</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>unix</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.5.0.0 (was 2.4.2.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>System.Posix.Process</literal>
+                    the <literal>createProcessGroup</literal>
+                    and <literal>setProcessGroupID</literal>
+                    functions have been deprecated.
+                </para>
+
+                <para>
+                    There are new functions, which subsume their
+                    functionality, called
+                    <literal>createProcessGroupFor</literal>,
+                    <literal>getProcessGroupIDOf</literal> and
+                    <literal>setProcessGroupIDOf</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>System.Posix.Error</literal>, there is a
+                    new variant of
+                    <literal>throwErrnoPathIfMinus1Retry</literal>
+                    called
+                    <literal>throwErrnoPathIfMinus1Retry_</literal>,
+                    which returns <literal>IO ()</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Win32</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.2.1.0 (was 2.2.0.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are new functions
+                    <literal>getProcessId</literal> and
+                    <literal>c_GetProcessId</literal> in
+                    <literal>System.Win32.Process</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+  </sect2>
+</sect1>
+
