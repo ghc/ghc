@@ -9,14 +9,1054 @@
   </para>
 
   <sect2>
-    <title>TODO</title>
+    <title>Highlights</title>
+
+    <para>
+        The highlights, since the 7.0 branch, are:
+    </para>
+
     <itemizedlist>
       <listitem>
         <para>
-          TODO
+          There is a new feature Safe Haskell
+          (<literal>-XSafe</literal>,
+           <literal>-XTrustworthy</literal>,
+           <literal>-XUnsafe</literal>):
+          <xref linkend="safe-haskell" />.
+          The design has changed since 7.2.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new feature kind polymorphism
+          (<literal>-XPolyKinds</literal>):
+          <xref linkend="kind-polymorphism-and-promotion" />.
+          A side-effect of this is that, when the extension is not
+          enabled, in certain circumstances kinds are now defaulted to
+          <literal>*</literal>
+          rather than being inferred.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new feature constraint kinds (-XConstraintKinds):
+          <xref linkend="constraint-kind" />.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to give any sort of declaration at the
+          ghci prompt:
+          <xref linkend="ghci-decls" />.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The profiling and hpc implementations have been merged and
+          overhauled. Visible changes include renaming of profiling
+          flags and the cost-centre stacks have a new semantics, which
+          should in most cases result in more useful and intuitive
+          profiles. The <literal>+RTS -xc</literal> flag now also gives
+          a stack trace.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to write compiler plugins:
+          <xref linkend="compiler-plugins" />.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          DPH support has been significantly improved.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is now preliminary support for registerised
+          compilation on the ARM platform, using LLVM.
         </para>
       </listitem>
     </itemizedlist>
+
+  <sect2>
+    <title>Full details</title>
+    <sect3>
+        <title>Language</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    GHC previously accepted this code:
+                </para>
+<programlisting>
+data T f = T
+
+class C a where
+    t :: f a -> T f
+</programlisting>
+                <para>
+                    inferring the kind of <literal>f</literal> as
+                    <literal>* -> *</literal>, but it now (correctly,
+                    according to the Haskell 98 and Haskell 2010
+                    standards) rejects it. You need to write this
+                    instead:
+                </para>
+<programlisting>
+{-# LANGUAGE KindSignatures #-}
+
+data T (f :: * -> *) = T
+
+class C a where
+    t :: f a -> T f
+</programlisting>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new extension
+                    <literal>PolyKinds</literal>.
+                    This provides 2 related new features:
+                </para>
+
+                <para>
+                    Firstly, suitable user-defined datatypes are now
+                    automatically "promoted" to kinds, e.g.
+                    <literal>Nat</literal> here:
+                </para>
+<programlisting>
+data Nat = Zero | Succ Nat
+data Vector :: * -> Nat -> * where
+    VNil :: Vector a Zero
+    VCons :: a -> Vector a n -> Vector a (Succ n)
+</programlisting>
+                <para>
+                    And secondly, it is now possible for kinds to be
+                    polymorphic. For example, instead of
+                </para>
+<programlisting>
+class Typeable (t :: *) where
+  typeOf :: t -> TypeRep
+
+class Typeable1 (t :: * -> *) where
+  typeOf1 :: t a -> TypeRep
+
+[...]
+
+instance Typeable  Int  where typeOf _ = TypeRep
+instance Typeable1 []   where typeOf _ = TypeRep
+</programlisting>
+                <para>
+                    you can now say
+                </para>
+<programlisting>
+data Proxy t = Proxy
+
+class Typeable t where
+  typeOf :: Proxy t -> TypeRep
+
+instance Typeable Int  where typeOf _ = TypeRep
+instance Typeable []   where typeOf _ = TypeRep
+</programlisting>
+                <para>
+                    and the kind of <literal>Proxy</literal> is
+                    polymorphic:
+                    <literal>forall k. k -> *</literal>.
+                </para>
+
+                <para>
+                    See
+                    <xref linkend="kind-polymorphism-and-promotion" />
+                    for more information.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The Safe Haskell feature, new in GHC 7.2, has been
+                    redesigned in GHC 7.4. The motivation was to stop
+                    Safe Haskell from causing compilation failures for
+                    people not interested in using it.
+                </para>
+
+                <para>
+                    GHC now tries to infer whether a module is
+                    safe, unless the new
+                    <literal>-fno-safe-infer</literal> flag is given.
+                    Therefore, as well as the old
+                    <literal>-XSafe</literal>, there is now a
+                    <literal>-XUnsafe</literal>
+                    flag to explicitly state that a module should be
+                    treated as unsafe. The old
+                    <literal>-XSafeImports</literal> has been removed.
+                </para>
+
+                <para>
+                    The new flags <literal>-fwarn-safe</literal> and
+                    <literal>-fwarn-unsafe</literal> give warnings
+                    when a module is inferred to be safe or unsafe,
+                    respectively.
+                </para>
+
+                <para>
+                    There is a new flag
+                    <literal>-fpackage-trust</literal>. This controls
+                    whether packages containing imported trustworthy
+                    modules must be marked as
+                    <literal>trusted</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a <literal>NOUNPACK</literal>
+                    pragma, which does the opposite of the existing
+                    <literal>PACK</literal> pragma. It is mainly useful
+                    when <literal>-funbox-strict-fields</literal> has
+                    been used, allowing you to declare that certain
+                    fields should not be unpacked.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC now requires, as per the standard, that
+                    if a <literal>newtype</literal> is used in an
+                    FFI declaration, then the constructor for that
+                    type must be in scope. For now you only get a
+                    warning if it is not, but in the future this will
+                    be an error.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new extension
+                    <literal>ConstraintKind</literal>
+                    which adds a new kind, called
+                    <literal>Constraint</literal>,
+                    to GHC's type system. Then, for example,
+                </para>
+<programlisting>
+Show :: * -> Constraint
+(?x::Int) :: Constraint
+(Int ~ a) :: Constraint
+</programlisting>
+                <para>
+                    You can now write <em>any</em> type with kind
+                    <literal>Constraint</literal> on the left of
+                    <literal>=&gt;</literal>, i.e. you can use type
+                    synonyms, type variables, indexed types, etc.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    It is now possible to derive an
+                    <literal>Eq</literal> instance for types with no
+                    constructors.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In the <literal>MonadComprehensions</literal>
+                    extension, the
+                    <literal>then group by e</literal>
+                    form has been removed. You now need to explicitly
+                    say
+                    <literal>then group by e using groupWith</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new extension
+                    <literal>TraditionalRecordSyntax</literal> which is
+                    on by default. When turned off, the standard Haskell
+                    record syntax cannot be used.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In DPH, it is now possible to vectorise things
+                    imported from other modules.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In DPH, the <literal>VECTORISE</literal> and
+                    <literal>VECTORISE SCALAR</literal> pragmas now have
+                    <literal>type</literal>, <literal>class</literal>
+                    and <literal>instance</literal> variants.
+                    See
+                    <ulink url="http://hackage.haskell.org/trac/ghc/wiki/DataParallel/VectPragma">VectPragma</ulink> for more details.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>-fdph-seq</literal>,
+                    <literal>-fdph-par</literal>,
+                    <literal>-fdph-this</literal> and
+                    <literal>-fdph-none</literal> flags have been
+                    removed. The vectoriser is now controlled by which
+                    <literal>Data.Array.Parallel</literal> and
+                    <literal>Data.Array.Parallel.Prim</literal>
+                    modules are in scope.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC now warns consistently about unused type
+                    variables.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC now implements the static pattern semantics
+                    as clarified by the Haskell' committee, i.e.
+                    the binding <literal>p = e</literal> is now
+                    equivalent to
+                </para>
+<programlisting>
+t = e
+f = case t of p -> f
+g = case t of p -> g
+</programlisting>
+                <para>
+                    where <literal>f</literal> and <literal>g</literal>
+                    are the variables bound by <literal>p</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>MonoPatBinds</literal>
+                    extension is now deprecated, and has no effect.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC will now reject a declaration if it infers a
+                    type for it that is impossible to use unambiguously.
+                    For example, given
+                </para>
+<programlisting>
+class Wob a b where
+    to :: a -> b
+    from :: b -> a
+
+foo x = [x, to (from x)]
+</programlisting>
+                <para>
+                    GHC would infer the ambiguous type
+                </para>
+<programlisting>
+foo :: forall a b. Wob a b => b -> [b]
+</programlisting>
+                <para>
+                    but it is impossible to use
+                    <literal>foo</literal> as
+                    <literal>a</literal> will always be ambiguous,
+                    so the declaration is rejected.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    It is now possible for associated types to have
+                    fresh parameters, e.g. this is now allowed:
+                </para>
+<programlisting>
+class C a where
+    type T a b :: *
+
+instance C Int
+    type T Int b = b -> b
+</programlisting>
+                <para>
+                    where <literal>T</literal> has a type index
+                    <literal>b</literal> that is not one of the class
+                    variables.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    It is now possible for multiple associated type
+                    declarations to be given in a single instance,
+                    e.g.
+                </para>
+<programlisting>
+class C a where
+    type T a x :: *
+
+data A
+data B
+
+instance C Int where
+    type T Int A = Int
+    type T Int B = Bool
+</programlisting>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The import and export of type family data
+                    constructors has been refined. You now need to be
+                    more explicit about what should be exported.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Associated type default declarations are now
+                    fully supported. These allow you to specify
+                    a default definition for a type that will be used
+                    if an instance doesn't define its own type, e.g.
+                </para>
+<programlisting>
+class Cls a where
+    type Typ a
+    type Typ a = Maybe a
+              
+instance Cls Int where
+</programlisting>
+                <para>
+                    See <xref linkend="assoc-decl-defs" /> for more
+                    information.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    You can now specify what simplifier phases
+                    <literal>SPECIALISE</literal> pragmas should be
+                    applied in, in the same way that you could for
+                    <literal>RULE</literal> pragmas, e.g. to specialise
+                    <literal>foo</literal> only in phase 1 use:
+                </para>
+<programlisting>
+{-# SPECIALISE [1] foo :: Int -> Int #-}
+</programlisting>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The typechecker is now able to do full constraint
+                    solving under a for-all, i.e. it can cope with the
+                    unification
+                    <literal>forall a. t1  ~  forall a. t2</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The kind <literal>?</literal> has been renamed to
+                    <literal>OpenKind</literal>, and
+                    <literal>??</literal> to <literal>ArgKind</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Compiler</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    The recompilation checker now takes into account
+                    what flags were used when compiling. For example,
+                    if you first run <literal>ghc -c Foo.hs</literal>,
+                    and then <literal>ghc -DBAR -c Foo.hs</literal>,
+                    then GHC will now recompile
+                    <literal>Foo.hs</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The recompilation checker now also tracks files that
+                    are <literal>#include</literal>d in Haskell sources.
+                </para>
+                <para>
+                    Note that we still don't get
+                    <literal>#include</literal>d files in the
+                    <literal>ghc -M</literal> output.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The simplifier now maintains a count of how much
+                    transformation it does, and prints a warning if
+                    that exceeds a limit defined by the new
+                    <literal>-fsimpl-tick-factor=N</literal> flag
+                    (default is 100). The intention is to detect when
+                    it seems likely that GHC has gone into an infinite
+                    loop. In the future, GHC may give an error when the
+                    limit is exceeded.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new flag
+                    <literal>-fpedantic-bottoms</literal> which makes
+                    GHC be more precise about its treatment of bottoms.
+                    In particular, it stops GHC eta-expanding through
+                    case expressions (which means performance can be
+                    worse).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC now knows how to call gcc to compile
+                    objective-c++ (<literal>.mm</literal> or
+                    <literal>.M</literal> files).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>-optm</literal>
+                    flag, which allowed extra arguments to be passed to
+                    the mangler, is now deprecated and does nothing.
+                    It will be removed in a future release.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC now works with LLVM version 3.0, and requires at
+                    least version 2.8.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    We now pass gcc
+                    <literal>-no_compact_unwind</literal>
+                    on OS X x86 (as well as x86_64), in order to avoid
+                    the
+                </para>
+<programlisting>
+ld: warning: could not create compact unwind for .LFB3: non-standard register 5 being saved in prolog
+</programlisting>
+                <para>
+                    warning.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The context stack depth, which defines how deeply
+                    the type constraint solver may reason, has been
+                    increased from 20 to 200, as some people were
+                    running into the limit.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    On x86, the new <literal>-msse4.2</literal>
+                    flag tells GHC that it may use SSE4.2 instructions.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new flag
+                    <literal>-dno-llvm-mangler</literal>
+                    which means the LLVM mangler isn't run. It is mainly
+                    useful when debugging GHC.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new flag
+                    <literal>-dsuppress-var-kinds</literal>
+                    which can make the output clearer when
+                    <literal>-dppr-debug</literal> is also used.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>-keep-llvm-files</literal>
+                    flag now implies <literal>-fllvm</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>-split-objs</literal> flag can now be
+                    used with the LLVM backend.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new flag <literal>-dumpdir</literal>
+                    which allows you to specify the directory in which
+                    the output of the <literal>-ddump-*</literal> flags
+                    should be put when <literal>-ddump-to-file</literal>
+                    is used. The <literal>-outputdir</literal> flag will
+                    now also set the dump directory.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Bitrotted registerised ports for mips, ia64, alpha,
+                    hppa1 and m68k have been removed.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>GHCi</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    It is now possible to give any top-level
+                    declaration at the GHCi prompt, e.g.
+                </para>
+<programlisting>
+Prelude> data D = C Int
+Prelude> let f (C i) = i in f (C 5)
+5
+</programlisting>
+                <para>
+                    The current set of declarations are shown by
+                    the new
+                    <literal>:show bindings</literal>
+                    command. See
+                    <xref linkend="ghci-decls" />.
+                    for more information
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new GHCi command
+                    <literal>:kind!</literal>
+                    which is like
+                    <literal>:kind</literal>
+                    except it also prints the normalised type; e.g., given
+                </para>
+<programlisting>
+type family F a
+type instance F Int = Bool
+</programlisting>
+                <para>
+                    we get
+                </para>
+<programlisting>
+*Main> :kind F Int
+F Int :: *
+*Main> :kind! F Int
+F Int :: *
+= Bool
+</programlisting>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new flag
+                    <literal>-fno-ghci-history</literal>
+                    which stops GHCi from loading and saving the GHCi
+                    command history from and to
+                    <literal>~/.ghc/ghci_history</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Library loading in GHCi has been improved; in
+                    particular, loading
+                    <literal>libstdc++.so</literal>
+                    now works, and GHCi will use
+                    <literal>.a</literal> archives to satisfy
+                    <literal>-lfoo</literal> flags on its commandline.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    When using
+                    <literal>:load</literal>, GHCi will not unload
+                    the current modules until it has successfully loaded
+                    the new ones. This fixes this old problem:
+                </para>
+<programlisting>
+Prelude> :l foo
+target `foo' is not a module name or a source file
+>
+</programlisting>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Template Haskell</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    GHC used to treat <literal>\|</literal>
+                    and <literal>\]</literal> within quasiquote as
+                    escaped characters, parsing them as
+                    <literal>|</literal> and <literal>]</literal>
+                    respectively. It now does not treat anything
+                    specially; if you would like to be able to include
+                    sequences such as <literal>|]</literal> inside a
+                    quasi-quote then you must define your own escaping
+                    mechanism in the quasi-quoter.
+                </para>
+            </listitem>
+            <listitem>
+                <para>
+                    The interaction between the recompilation checker
+                    and Template Haskell has been improved. We now
+                    track which modules are used by splices, and if
+                    a module is changed then any splices that use it
+                    will need to be rerun.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Profiling</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    The profiling, coverage (HPC) and breakpoints
+                    infrastructure has been overhauled, and the
+                    three systems are now much more unified.
+                </para>
+
+                <para>
+                    As a result of these changes, the cost-centre
+                    stacks have a new semantics, which should give
+                    more intuitive profiling results. HPC is also
+                    slightly improved: In particular, unused derived
+                    instances and record field names are now
+                    highlighted, and entry counts are more accurate.
+                </para>
+
+                <para>
+                    The <literal>+RTS -xc</literal> flag now also gives
+                    a stack trace.
+                </para>
+
+                <para>
+                    The
+                    <literal>-auto-all</literal> flag has been renamed
+                    to <literal>-fprof-auto</literal>,
+                    <literal>-auto</literal> renamed to
+                    <literal>-fprof-auto-exported</literal>, and
+                    <literal>-caf-all</literal> renamed to
+                    <literal>-fprof-cafs</literal>. The old names are
+                    also still accepted for now.
+                </para>
+
+                <para>
+                    There are also two new flags.
+                    The <literal>-fprof-auto-top</literal> flag
+                    annotates all top-level bindings with SCCs, and
+                    the <literal>-fprof-auto-calls</literal> flag
+                    adds SCCs to all applications. This last flag
+                    is particularly useful for stack traces.
+                </para>
+
+                <para>
+                    Another new flag
+                    <literal>-fprof-no-count-entries</literal>
+                    indicates that entry counts do not need to be
+                    maintained. This makes profiled code faster, and
+                    is particularly useful when heap profiling, as
+                    heap profiles do not use the entry counts.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Cost centre names are now in UTF8 rather than
+                    Latin-1.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now better heap profiling support for
+                    pinned objects (e.g. <literal>ByteStrings</literal>).
+                    Previously we were completely ignoring them,
+                    due to technical difficulties, but now count
+                    all the pinned object space (including gaps between
+                    pinned objects) as being type
+                    <literal>ARR_WORDS</literal>. This isn't ideal, but
+                    at least we do now account for the memory, and give
+                    it the right type.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The quotes in an <literal>SCC</literal> pragma can
+                    now be omitted if the SCC name is a valid Haskell
+                    variable name, e.g.
+                    <literal>{-# SCC  my_function #-} expr</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    It is now possible to use profiling when running on
+                    multiple capabilities (i.e. when running with
+                    <literal>+RTS -N</literal>). There is a new built-in
+                    cost centre called <literal>IDLE</literal>, which
+                    records the ticks of idle capabilities.
+                </para>
+
+                <para>
+                    There are still some rough edges. In particular,
+                    it is strongly recommended that you use the
+                    <literal>-fno-prof-count-entries</literal> flag
+                    or the program will run very slowly.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Event logging</title>
+        <itemizedlist>
+
+            <listitem>
+                <para>
+TODO:
+#define EVENT_SPARK_COUNTERS      34 /* (crt,dud,ovf,cnv,fiz,gcd,rem) */
+#define EVENT_SPARK_CREATE        35 /* ()                     */
+#define EVENT_SPARK_DUD           36 /* ()                     */
+#define EVENT_SPARK_OVERFLOW      37 /* ()                     */
+#define EVENT_SPARK_RUN           38 /* ()                     */
+#define EVENT_SPARK_STEAL         39 /* (victim_cap)           */
+#define EVENT_SPARK_FIZZLE        40 /* ()                     */
+#define EVENT_SPARK_GC            41 /* ()                     */
+#define EVENT_INTERN_STRING       42 /* (string, id) {not used by ghc} */
+
+                    TODO
+d77df1caad3a5f833aac9275938a0675e1ee6aac
+A new eventlog event containing 7 spark counters/statistics: sparks
+created, dud, overflowed, converted, GC'd, fizzled and remaining.
+These are maintained and logged separately for each capability.
+We log them at startup, on each GC (minor and major) and on shutdown.
+
+a5192d48e61a8ece69cddc43cc12625fcdcc56ec
+add a new trace class for spark events
+
+46b70749971341678c3e4d5cdb2b1ab1a13d039e
+Move GC tracing into a separate trace class
+
+Previously GC was included in the scheduler trace class. It can be
+enabled specifically with +RTS -vg or -lg, though note that both -v
+and -l on their own now default to a sensible set of trace classes,
+currently: scheduler, gc and sparks.
+
+084b64f22717b203b8d8c2ab7c057fb747e39593
+Add new fully-accurate per-spark trace/eventlog events
+
+Replaces the existing EVENT_RUN/STEAL_SPARK events with 7 new events
+covering all stages of the spark lifcycle:
+  create, dud, overflow, run, steal, fizzle, gc
+
+The sampled spark events are still available. There are now two event
+classes for sparks, the sampled and the fully accurate. They can be
+enabled/disabled independently. By default +RTS -l includes the sampled
+but not full detail spark events. Use +RTS -lf-p to enable the detailed
+'f' and disable the sampled 'p' spark.
+
+b0935476b64b4818e4b5653c756c648623753fd3
+Document the new +RTS -l flags in the +RTS --help output
+
+8f4f29f655fdda443861152a24588fcaba29b168
+Document the new +RTS -l options in the user guide
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new eventlog event
+                    <literal>EVENT_WALL_CLOCK_TIME</literal>
+                    which is used for matching the time of events
+                    between different processes.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new eventlog event
+                    <literal>EVENT_THREAD_LABEL</literal>
+                    which is emitted by the existing
+                    <literal>GHC.Conc.labelThread</literal>
+                    function. This allows tools such as
+                    ThreadScope to use thread labels rather
+                    than thread numbers.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+From aaaaf67b2fca9bd9b0027c983bfc9f9255b2bce5 Mon Sep 17 00:00:00 2001
+Subject: [PATCH 0695/1074] Add an RTS eventlog tracing class for user messages
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    On Windows, if the program name ends in
+                    <literal>.exe</literal> then the
+                    <literal>.exe</literal> is removed when making
+                    the eventlog filename.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Runtime system</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    The restrictions on what
+                    <literal>+RTS</literal>
+                    flags are available by default has changed.
+                    By default, you can now use the
+                    <literal>-t</literal>,
+                    <literal>-T</literal>,
+                    <literal>-s</literal> and
+                    <literal>-S</literal> RTS flags, provided you do not
+                    give them a filename argument.
+                </para>
+
+                <para>
+                    Additionally, when linking with
+                    <literal>-threaded</literal>, you can now use the
+                    <literal>+RTS -N</literal> flag without having
+                    to link with <literal>-rtsopts</literal>.
+                    Also, when linking with "developer" ways
+                    (<literal>-debug</literal>,
+                    <literal>-eventlog</literal> and
+                    <literal>-prof</literal>) all the way-specific flags
+                    are allowed; for example,
+                    <literal>+RTS -h</literal> is allowed when linking
+                    with <literal>-prof</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new RTS flag
+                    <literal>-T</literal>, which makes the RTS collect
+                    statistics (memory usage, etc) but not give any
+                    output. The new <literal>GHC.Stats</literal>
+                    module in the <literal>base</literal> package
+                    provides access to this data.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    You can now give the RTS flag
+                    <literal>-H</literal>
+                    (without an argument) and the runtime system
+                    will infer a sensible value to use. See
+                    <xref linkend="rts-options-gc" /> for more details.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    When using <literal>-no-hs-main</literal>
+                    and starting the runtime system yourself,
+                    if you wish to pass RTS flags then you will now
+                    need to use the new <literal>hs_init_ghc</literal>
+                    function. See <xref linkend="using-own-main" />
+                    for details.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The runtime system now supports using
+                    <literal>forkProcess</literal>
+                    when running with multiple capabilities
+                    (<literal>+RTS -N</literal>).
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Build system</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    You can now build GHC with Alex 3.0.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    TODO
+                    On OS X, with XCode >= 4.2, GHC will use
+                    gcc-4.2 rather than gcc.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now preliminary support for registerised
+                    compilation on the ARM platform, using LLVM.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Dynamic libraries are now supported on OSX x86_64.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHCi is now supported on kfreebsdgnu platforms.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    GHC now recognises the s390x architecture.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
   </sect2>
 
   <sect2>
@@ -320,7 +1360,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.5.1.0 (was 0.5.0.2)
+                    Version number 0.5.0.3 (was 0.5.0.2)
                     It is now exposed by default.
                 </para>
             </listitem>
@@ -528,7 +1568,7 @@
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 3.8.7.3 (was 3.8.7.1)
+                    Version number 3.8.7.3 (was 3.8.7.2)
                 </para>
             </listitem>
 
@@ -654,8 +1694,7 @@
             <listitem>
                 <para>
                     Both modules now export
-                    <literal>reduceDoc</literal>
-                    TODO: Why?
+                    <literal>reduceDoc</literal>.
                 </para>
             </listitem>
         </itemizedlist>
