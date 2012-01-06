@@ -16,16 +16,19 @@ import Supercompile.Evaluator.FreeVars
 import Supercompile.Evaluator.Residualise
 import Supercompile.Evaluator.Syntax
 
+import Supercompile.GHC (coreAltConToAltCon, altConToCoreAltCon)
+
 import Supercompile.Termination.Generaliser (Generaliser(..))
 
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
+import CoreUtils (filterAlts)
 import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo)
 import Var       (varUnique)
-import PrelNames (undefinedName)
+import PrelNames (undefinedName, wildCardKey)
 import Type      (splitTyConApp_maybe)
-import Util      (zipWithEqual, zipWith3Equal)
+import Util      (zipWithEqual, zipWith3Equal, thirdOf3)
 import Unique    (Uniquable)
 import Digraph
 import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
@@ -1079,10 +1082,19 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
     CoApply co' -> zipBracketeds $ TailsUnknown (shell (tyCoVarsOfCo co') $ \[e] -> e `coApp` co') [Hole [] bracketed_hole]
     Apply x2'   -> zipBracketeds $ TailsUnknown (shell (unitVarSet x2')   $ \[e] -> e `app` x2')   [Hole [] bracketed_hole]
     CastIt co'  -> zipBracketeds $ TailsUnknown (shell (tyCoVarsOfCo co') $ \[e] -> e `cast` co')  [Hole [] bracketed_hole]
-    Scrutinise x' ty' (rn, alts) -> -- (if null k_remaining then id else traceRender ("splitStack: FORCED SPLIT", M.keysSet entered_hole, [x' | Tagged _ (Update x') <- k_remaining])) $
-                                    -- (if not (null k_not_inlined) then traceRender ("splitStack: generalise", k_not_inlined) else id) $
-                                    zipBracketeds $ TailsKnown ty' (\final_ty' -> shell (tyVarsOfType final_ty') $ \(e_hole:es_alts) -> case_ e_hole x' final_ty' (alt_cons' `zip` es_alts)) (TailishHole False (Hole [] bracketed_hole) : zipWithEqual "Scrutinise" (\alt_bvs -> TailishHole True . Hole (x':alt_bvs)) alt_bvss bracketed_alts)
-      where (alt_cons, alt_es) = unzip alts
+    Scrutinise x' ty' (rn, unfiltered_alts)
+      -> -- (if null k_remaining then id else traceRender ("splitStack: FORCED SPLIT", M.keysSet entered_hole, [x' | Tagged _ (Update x') <- k_remaining])) $
+         -- (if not (null k_not_inlined) then traceRender ("splitStack: generalise", k_not_inlined) else id) $
+         zipBracketeds $ TailsKnown ty' (\final_ty' -> shell (tyVarsOfType final_ty') $ \(e_hole:es_alts) -> case_ e_hole x' final_ty' (alt_cons' `zip` es_alts)) (TailishHole False (Hole [] bracketed_hole) : zipWithEqual "Scrutinise" (\alt_bvs -> TailishHole True . Hole (x':alt_bvs)) alt_bvss bracketed_alts)
+      where -- These lines achieve two things:
+            --   1. Filter out any branches of the case which we know are impossible due to type refinement
+            --   2. Turn any remaining default cases into explicit constructors if possible (helps positive information propagation)
+            alts = [ (coreAltConToAltCon altcon xs, e)
+                   | (altcon, xs, e) <- thirdOf3 (filterAlts (repeat wildCardKey) (idType x') []
+                                                             [(altcon', xs, e) | (altcon, e) <- unfiltered_alts, let (altcon', xs) = altConToCoreAltCon altcon])
+                   ]
+
+            (alt_cons, alt_es) = unzip alts
             scruts' = x':scruts
 
             -- 0) Manufacture context identifier

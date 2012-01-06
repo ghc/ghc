@@ -14,10 +14,10 @@ module Supercompile (supercompileProgram, supercompileProgramSelective) where
 -- might help us replace CPR more because even if we generalise away the e2[z] we potentially keep the unboxing.
 -- Probably can't/shouldn't do this if the wildcard binder y is used in the RHS.
 
+import Supercompile.GHC
 import Supercompile.Utilities
 import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S
-import qualified Supercompile.Evaluator.Syntax as S
 import qualified Supercompile.Drive.Process1 as S ()
 import qualified Supercompile.Drive.Process2 as S ()
 import qualified Supercompile.Drive.Process3 as S
@@ -25,198 +25,23 @@ import qualified Supercompile.Drive.Process3 as S
 import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
 import CoreSyn
 import CoreFVs    (exprFreeVars)
-import CoreUtils  (exprType, bindNonRec)
-import CoreUnfold (exprIsConApp_maybe)
-import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo, mkAxInstCo)
-import DataCon    (DataCon, dataConWorkId, dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConName)
+import CoreUtils  (exprType)
+import Coercion   (isCoVar, mkCoVarCo, mkAxInstCo)
+import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConTyCon)
 import VarSet
 import VarEnv
 import Name       (localiseName, mkSystemName)
 import OccName    (mkVarOcc)
-import Var        (Var, isTyVar, varUnique, varName, setVarName)
+import Var        (Var, varUnique, varName, setVarName)
 import Id
-import MkId       (mkPrimOpId)
-import FastString (mkFastString, fsLit)
+import FastString (fsLit)
 import PrelNames  (undefinedName)
 import PrimOp     (primOpSig)
-import Type       (mkTyVarTy, mkForAllTy, mkFunTys, isUnLiftedType)
+import Type       (mkTyVarTy, mkForAllTy, mkFunTys)
 import TysPrim    (alphaTyVar, argAlphaTyVar)
 import TyCon      (newTyConCo_maybe)
 
-import Control.Monad
 import qualified Data.Map as M
-
-topUnique :: Unique
-anfUniqSupply' :: UniqSupply
-(topUnique, anfUniqSupply') = takeUniqFromSupply anfUniqSupply
-
-
--- | Descriptions of terms: used for building readable names for ANF-introduced variables
-data Description = Opaque String | ArgumentOf Description
-
-descriptionString :: Description -> String
-descriptionString = go (0 :: Int)
-  where
-    go n (Opaque s)     = s ++ (if n > 0 then show n else "")
-    go n (ArgumentOf d) = go (n + 1) d
-
-desc :: S.Term -> Description
-desc = desc' . unI
-
-desc' :: S.TermF Identity -> Description
-desc' (S.Var x)            = Opaque (S.varString x)
-desc' (S.Value _)          = Opaque "value"
-desc' (S.TyApp e1 _)       = argOf (desc e1)
-desc' (S.CoApp e1 _)       = argOf (desc e1)
-desc' (S.App e1 _)         = argOf (desc e1)
-desc' (S.PrimOp pop as es) = foldr (\() d -> argOf d) (Opaque (show pop)) (map (const ()) as ++ map (const ()) es)
-desc' (S.Case _ _ _ _)     = Opaque "case"
-desc' (S.Cast _ _)         = Opaque "cast"
-desc' (S.Let _ _ e)        = desc e
-desc' (S.LetRec _ e)       = desc e
-
-argOf :: Description -> Description
-argOf = ArgumentOf
-
-
-newtype ParseM a = ParseM { unParseM :: UniqSupply -> (UniqSupply, [(Var, S.Term)], a) }
-
-instance Functor ParseM where
-    fmap = liftM
-
-instance Monad ParseM where
-    return x = ParseM $ \s -> (s, [], x)
-    mx >>= fxmy = ParseM $ \s -> case unParseM mx s of (s, floats1, x) -> case unParseM (fxmy x) s of (s, floats2, y) -> (s, floats1 ++ floats2, y)
-
-instance MonadUnique ParseM where
-    getUniqueSupplyM = ParseM $ \us -> case splitUniqSupply us of (us1, us2) -> (us1, [], us2)
-
-runParseM' :: ParseM a -> ([(Var, S.Term)], a)
-runParseM' act = (floats, x)
-  where (_s, floats, x) = unParseM act anfUniqSupply'
-
-runParseM :: ParseM S.Term -> S.Term
-runParseM = uncurry (S.bindManyMixedLiftedness S.termFreeVars) . runParseM'
-
-freshFloatId :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Var)
-freshFloatId _ (I (S.Var x)) = return (Nothing, x)
-freshFloatId n e             = fmap (\x -> (Just (x, e), x)) $ mkSysLocalM (mkFastString n) (S.termType e)
-
-freshFloatCoVar :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Coercion)
-freshFloatCoVar _ (I (S.Value (S.Coercion co))) = return (Nothing, co)
-freshFloatCoVar n e                             = fmap (\x -> (Just (x, e), mkCoVarCo x)) $ mkSysLocalM (mkFastString n) (S.termType e)
-
-floatIt :: [(Var, S.Term)] -> ParseM ()
-floatIt floats = ParseM $ \s -> (s, floats, ())
-
-nameIt :: Description -> S.Term -> ParseM Var
-nameIt d e = freshFloatId ("a" ++ descriptionString d) e >>= \(mb_float, x) -> floatIt (maybeToList mb_float) >> return x
-
-nameCo :: Description -> S.Term -> ParseM Coercion
-nameCo d e = freshFloatCoVar ("c" ++ descriptionString d) e >>= \(mb_float, co) -> floatIt (maybeToList mb_float) >> return co
-
-bindFloats :: ParseM S.Term -> ParseM S.Term
-bindFloats = bindFloatsWith . fmap ((,) [])
-
-bindFloatsWith :: ParseM ([(Var, S.Term)], S.Term) -> ParseM S.Term
-bindFloatsWith act = ParseM $ \s -> case unParseM act s of (s, floats, (xes, e)) -> (s, [], S.bindManyMixedLiftedness S.termFreeVars (xes ++ floats) e)
-
-bindUnliftedFloats :: ParseM S.Term -> ParseM S.Term
-bindUnliftedFloats act = ParseM $ \s -> case unParseM act s of (s, floats, e) -> if any (isUnLiftedType . idType . fst) floats
-                                                                                 then (s, [], S.bindManyMixedLiftedness S.termFreeVars floats e)
-                                                                                 else (s, floats, e)
-
-appE :: S.Term -> S.Term -> ParseM S.Term
-appE e1 e2
-  | isCoVarType (S.termType e2) = fmap (e1 `S.coApp`) $ nameCo (argOf (desc e1)) e2
-  | otherwise                   = fmap (e1 `S.app`)   $ nameIt (argOf (desc e1)) e2
-
-
-
-conAppToTerm :: DataCon -> [CoreExpr] -> ParseM S.Term
-conAppToTerm dc es
-  | Just co_axiom <- newTyConCo_maybe (dataConTyCon dc)
-  , let [co_val_e] = co_val_es -- NB: newtypes may not have existential arguments
-  = fmap (`S.cast` mkAxInstCo co_axiom tys') $ coreExprToTerm co_val_e
-  | otherwise
-  = do -- Convert all arguments to supercompiler syntax and divide into type/coercion/value
-       co_val_es' <- mapM coreExprToTerm co_val_es
-       let (co_es', val_es') = span (isCoVarType . S.termType) co_val_es'
- 
-       -- Put each argument into a form suitable for an explicit value
-       -- NB: if any argument is non-trivial then the resulting binding will not be a simple value
-       -- (some let-bindings will surround it) and inlining will be impeded.
-       (d, cos') <- mapAccumLM (\d co_e' -> fmap ((,) (argOf d)) $ nameCo (argOf d) co_e')
-                               (Opaque (S.nameString (dataConName dc))) co_es'
-       (_, xs') <- mapAccumLM (\d val_e' -> fmap ((,) (argOf d)) $ nameIt (argOf d) val_e')
-                              d val_es'
-       return $ S.value (S.Data dc tys' cos' xs')
-  where
-    (tys', co_val_es) = takeWhileJust fromType_maybe es
-
-    fromType_maybe (Type ty) = Just ty
-    fromType_maybe _         = Nothing
-
-coreExprToTerm :: CoreExpr -> ParseM S.Term
-coreExprToTerm = term
-  where
-    -- PrimOp and (partially applied) Data are dealt with later on by generating appropriate unfoldings
-    -- We use exprIsConApp_maybe here to ensure we desugar explicit constructor use into something that looks cheap
-    term e | Just (dc, univ_tys, es) <- exprIsConApp_maybe (const NoUnfolding) e
-           = conAppToTerm dc (map Type univ_tys ++ es)
-    term (Var x)                   = return $ S.var x
-    term (Lit l)                   = return $ S.value (S.Literal l)
-    term (App e_fun (Type ty_arg)) = fmap (flip S.tyApp ty_arg) (term e_fun)
-    term (App e_fun e_arg)         = join $ liftM2 appE (term e_fun) (maybeUnLiftedTerm (exprType e_arg) e_arg)
-    term (Lam x e) | isTyVar x     = fmap (S.value . S.TyLambda x) (bindFloats (term e))
-                   | otherwise     = fmap (S.value . S.Lambda x) (bindFloats (term e))
-    term (Let (NonRec x e1) e2)    = liftM2 (S.let_ x) (maybeUnLiftedTerm (idType x) e1) (bindFloats (term e2))
-    term (Let (Rec xes) e)         = bindFloatsWith (liftM2 (,) (mapM (secondM term) xes) (term e))
-    term (Case e x ty alts)        = liftM2 (\e alts -> S.case_ e x ty alts) (term e) (mapM alt alts)
-    term (Cast e co)               = fmap (flip S.cast co) (term e)
-    term (Note _ e)                = term e -- FIXME: record notes
-    term (Type ty)                 = pprPanic "termToCoreExpr" (ppr ty)
-    term (Coercion co)             = return $ S.value (S.Coercion co)
-    
-    -- We can float unlifted bindings out of an unlifted argument/let
-    -- because they were certain to be evaluated anyway. Otherwise we have
-    -- to residualise all the floats if any of them were unlifted.
-    maybeUnLiftedTerm ty e
-      | isUnLiftedType ty = term e
-      | otherwise         = bindUnliftedFloats (term e)
-
-    alt (DEFAULT,    [], e) = fmap ((,) S.DefaultAlt)            $ bindFloats (term e)
-    alt (LitAlt l,   [], e) = fmap ((,) (S.LiteralAlt l))        $ bindFloats (term e)
-    alt (DataAlt dc, xs, e) = fmap ((,) (S.DataAlt dc as qs zs)) $ bindFloats (term e)
-      where (as, ys) = span isTyVar xs
-            (qs, zs) = span isCoVar ys
-    alt it                  = pprPanic "termToCoreExpr" (ppr it)
-
-termToCoreExpr :: S.Term -> CoreExpr
-termToCoreExpr = term
-  where
-    term e = case unI e of
-        S.Var x             -> Var x
-        S.Value v           -> value v
-        S.TyApp e ty        -> term e `App` Type ty
-        S.CoApp e co        -> term e `App` Coercion co
-        S.App e x           -> term e `App` Var x
-        S.PrimOp pop tys es -> Var (mkPrimOpId pop) `mkTyApps` tys `mkApps` map term es
-        S.Case e x ty alts  -> Case (term e) x ty (map alt alts)
-        S.Let x e1 e2       -> bindNonRec x (term e1) (term e2)
-        S.LetRec xes e      -> Let (Rec (map (second term) xes)) (term e)
-        S.Cast e co         -> Cast (term e) co
-    
-    value (S.Indirect x)         = Var x
-    value (S.Literal l)          = Lit l
-    value (S.Coercion co)        = Coercion co
-    value (S.TyLambda a e)       = Lam a (term e)
-    value (S.Lambda x e)         = Lam x (term e)
-    value (S.Data dc tys cos xs) = ((Var (dataConWorkId dc) `mkTyApps` tys) `mkCoApps` cos) `mkVarApps` xs
-    
-    alt (S.DataAlt dc as qs ys, e) = (DataAlt dc, as ++ qs ++ ys, term e)
-    alt (S.LiteralAlt l,        e) = (LitAlt l,   [],             term e)
-    alt (S.DefaultAlt,          e) = (DEFAULT,    [],             term e)
 
 -- Split input bindings into two lists:
 --  1) CoreBinds binding variables with at least one binder marked by the predicate,

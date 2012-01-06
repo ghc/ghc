@@ -125,7 +125,7 @@ data TermF ann = Var Id
                | CoApp (ann (TermF ann)) Coercion
                | App (ann (TermF ann)) Id
                | PrimOp PrimOp [Type] [ann (TermF ann)]
-               | Case (ann (TermF ann)) Id Type [AltF ann]
+               | Case (ann (TermF ann)) Id Type [AltF ann]  -- NB: unlike GHC, for convenience we allow the list of alternatives to be empty
                | Let Id (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case evaluation changes. Unlike GHC, we do NOT assume the RHSes of unlifted bindings are ok-for-speculation.
                | LetRec [(Id, ann (TermF ann))] (ann (TermF ann))
                | Cast (ann (TermF ann)) Coercion

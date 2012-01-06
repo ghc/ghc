@@ -446,6 +446,7 @@ Library
         UniqFM
         UniqSet
         Util
+        Supercompile.GHC
         Supercompile.Core.FreeVars
         Supercompile.Core.Renaming
         Supercompile.Core.Size
