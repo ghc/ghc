@@ -6,6 +6,7 @@ import Supercompile.Drive.Split
 import Supercompile.Drive.Process
 
 import Supercompile.Core.FreeVars
+import Supercompile.Core.Size (fvedTermSize)
 import Supercompile.Core.Syntax
 import Supercompile.Core.Tag
 
@@ -124,7 +125,7 @@ instance MonadStatics ScpM where
     monitorFVs = liftM ((,) emptyVarSet)
 
 runScpM :: TagAnnotations -> ScpM FVedTerm -> FVedTerm
-runScpM tag_anns me = letRec (fulfilments (scpFulfilmentState s')) e
+runScpM tag_anns me = fvedTermSize e' `seq` trace (showSDoc (deepestPath (scpParentChildren s'))) e'
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
         ms = MS { promises = [], hNames = h_names }
@@ -132,6 +133,7 @@ runScpM tag_anns me = letRec (fulfilments (scpFulfilmentState s')) e
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
         (e, s') = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
+        e' = letRec (fulfilments (scpFulfilmentState s')) e
 
 
 scpDepth :: ScpEnv -> Int
@@ -150,7 +152,7 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
       | otherwise
       = trace ("depth: " ++ show (scpDepth env) ++ ' ' : showSDoc (parens (hsep (map ppr (scpParents env))))) $
         unReaderT (unStateT (unScpM (opt state))
-                            (s { scpParentChildren = addChild (safeHead (scpParents env)) (fun p) (scpParentChildren s) }))
+                            (s { scpParentChildren = addChild (safeHead (scpParents env)) (fun p) (meaning p) (scpParentChildren s) }))
                   (env { scpParents = fun p : scpParents env })
 
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)

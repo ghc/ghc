@@ -4,7 +4,7 @@ module Supercompile.Drive.Process (
 
     rEDUCE_WQO, wQO, mK_GENERALISER,
 
-    ParentChildren, emptyParentChildren, addChild, childrenSummary,
+    ParentChildren, emptyParentChildren, addChild, childrenSummary, deepestPath,
 
     TagAnnotations, tagAnnotations, tagSummary,
 
@@ -95,18 +95,31 @@ mK_GENERALISER :: State -> State -> Generaliser
 --          | otherwise  = wqo1
 
 
-type ParentChildren = M.Map (Maybe Var) [Var]
+type ParentChildren = M.Map (Maybe Var) [(Var, State)]
 
 emptyParentChildren :: ParentChildren
 emptyParentChildren = M.empty
 
-addChild :: Maybe Var -> Var -> ParentChildren -> ParentChildren
-addChild mb_parent child = M.alter (\mb_children -> Just (child : (mb_children `orElse` []))) mb_parent
+addChild :: Maybe Var -> Var -> State -> ParentChildren -> ParentChildren
+addChild mb_parent child child_state = M.alter (\mb_children -> Just ((child, child_state) : (mb_children `orElse` []))) mb_parent
 
 childrenSummary :: ParentChildren -> String
 childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++ ": " ++ intercalate " " (map show child_counts)  | (mb_parent, child_counts :: [Int]) <- ordered_counts]
-  where descendant_counts = flip M.map parent_children $ \children -> map ((+1) . sum . flip (M.findWithDefault [] . Just) descendant_counts) children
+  where descendant_counts = flip M.map parent_children $ \children -> map ((+1) . sum . flip (M.findWithDefault [] . Just) descendant_counts . fst) children
         ordered_counts = sortBy (comparing (Down . sum . snd)) (M.toList descendant_counts)
+
+deepestPath :: ParentChildren -> SDoc
+deepestPath parent_children = maybe empty (show_chain M.empty . snd) (M.lookup Nothing deepest)
+  where deepest :: M.Map (Maybe Var) (Int, [(Var, State)])
+        deepest = flip M.map parent_children $ \children -> maximumBy (comparing fst) [(depth + 1, (fun, state):states) | (fun, state) <- children, let (depth, states) = M.findWithDefault (0, []) (Just fun) deepest]
+
+        show_chain :: M.Map Var Bool -> [(Var, State)] -> SDoc
+        show_chain _         [] = empty
+        show_chain known_bvs ((fun, state@(_, Heap h _, _, _)):states)
+          = hang (ppr fun) 2 (pPrintFullState (quietStatePrettiness { excludeBindings = unchanged_bvs }) state) $$
+            show_chain known_bvs' states
+          where known_bvs'  = M.map (maybe False (termIsValue . snd) . heapBindingTerm) h
+                unchanged_bvs = M.keysSet (M.filter id (M.intersectionWith (==) known_bvs known_bvs'))
 
 
 type TagAnnotations = IM.IntMap [String]

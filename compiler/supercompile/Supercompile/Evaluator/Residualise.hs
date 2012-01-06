@@ -3,7 +3,7 @@ module Supercompile.Evaluator.Residualise (
     
     pPrintHeap,
 
-    StatePrettiness, fullStatePrettiness, quietStatePrettiness,
+    StatePrettiness(..), fullStatePrettiness, quietStatePrettiness,
     pPrintFullState, pPrintFullUnnormalisedState
   ) where
 
@@ -20,6 +20,7 @@ import Var (isLocalId)
 
 import Data.Either
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Ord
 
 
@@ -69,18 +70,19 @@ pPrintHeap :: Heap -> SDoc
 pPrintHeap (Heap h ids) = pPrint $ map (first (PrettyDoc . pPrintBndr LetBind)) $ floats_static_h ++ [(x, asPrettyFunction1 e) | (x, e) <- floats_nonstatic_h]
   where (floats_static_h, floats_nonstatic_h) = residualisePureHeap ids h
 
-data StatePrettiness = SP { includeLams :: Bool, includeStatics :: Bool }
+data StatePrettiness = SP { includeLams :: Bool, includeStatics :: Bool, excludeBindings :: S.Set Var }
 
 fullStatePrettiness, quietStatePrettiness :: StatePrettiness
-fullStatePrettiness = SP True True
-quietStatePrettiness = SP False False
+fullStatePrettiness = SP True True S.empty
+quietStatePrettiness = SP False False S.empty
 
 pPrintFullState :: StatePrettiness -> State -> SDoc
 pPrintFullState sp = pPrintFullUnnormalisedState sp . denormalise
 
 pPrintFullUnnormalisedState :: StatePrettiness -> UnnormalisedState -> SDoc
-pPrintFullUnnormalisedState sp state = text "Deeds:" <+> pPrint deeds $$ (if includeStatics sp then pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) else empty) $$ body
-  where (deeds, floats_static, floats_nonstatic, e) = residualiseUnnormalisedState state
+pPrintFullUnnormalisedState sp state = text "Deeds:" <+> pPrint deeds $$ (if includeStatics sp then pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) else empty) $$ body $$ (if null floats_nonstatic_excluded then empty else ppr (S.fromList (map fst floats_nonstatic_excluded)))
+  where (deeds, floats_static, floats_nonstatic_unfiltered, e) = residualiseUnnormalisedState state
+        (floats_nonstatic_excluded, floats_nonstatic) = partition (flip S.member (excludeBindings sp) . fst) floats_nonstatic_unfiltered
         floats_nonstatic_pretty
           | includeLams sp = map (second asPrettyFunction) floats_nonstatic
           | otherwise      = map snd $ sortBy (comparing (Down . fst)) $
