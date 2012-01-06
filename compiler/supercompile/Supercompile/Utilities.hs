@@ -511,6 +511,7 @@ instance Accumulatable [] where
     mapAccumT  = mapAccumL
     mapAccumTM = mapAccumLM
 
+{-# INLINE mapAccumLM #-}
 mapAccumLM :: Monad m => (acc -> x -> m (acc, y)) -> acc -> [x] -> m (acc, [y])
 mapAccumLM f = go []
   where
@@ -536,15 +537,21 @@ traverseSome p f t = if null used_as' then (c, t') else error "traverseSome: rep
          | otherwise = return a
 
 
+{-# INLINE zipWithEqualM #-}
 zipWithEqualM :: Monad m => (a -> b -> m c) -> [a] -> [b] -> m [c]
-zipWithEqualM _ []     []     = return []
-zipWithEqualM f (x:xs) (y:ys) = liftM2 (:) (f x y) (zipWithEqualM f xs ys)
-zipWithEqualM _ _ _ = fail "zipWithEqualM"
+zipWithEqualM f = go
+  where
+    go []     []     = return []
+    go (x:xs) (y:ys) = liftM2 (:) (f x y) (zipWithEqualM f xs ys)
+    go _ _ = fail "zipWithEqualM"
 
+{-# INLINE foldZipEqualM #-}
 foldZipEqualM :: Monad m => (a -> b -> c -> m a) -> a -> [b] -> [c] -> m a
-foldZipEqualM _ acc []     []     = return acc
-foldZipEqualM f acc (x:xs) (y:ys) = f acc x y >>= \acc' -> foldZipEqualM f acc' xs ys
-foldZipEqualM _ _ _ _ = fail "foldZipEqualM"
+foldZipEqualM f = go
+  where
+   go acc []     []     = return acc
+   go acc (x:xs) (y:ys) = f acc x y >>= \acc' -> foldZipEqualM f acc' xs ys
+   go _ _ _ = fail "foldZipEqualM"
 
 
 -- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.
