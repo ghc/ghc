@@ -123,6 +123,8 @@ class TestRun:
        self.expected_passes = {}
        self.n_expected_failures = 0
        self.expected_failures = {}
+       self.n_missing_libs = 0
+       self.missing_libs = {}
        self.n_unexpected_passes = 0
        self.unexpected_passes = {}
        self.n_unexpected_failures = 0
