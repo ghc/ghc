@@ -13,7 +13,7 @@
 
 module SimplUtils (
 	-- Rebuilding
-	mkLam, mkCase, prepareAlts, tryEtaExpand,
+	mkLam, mkCase, prepareAlts, filterAlts, tryEtaExpand,
 
 	-- Inlining,
 	preInlineUnconditionally, postInlineUnconditionally, 
