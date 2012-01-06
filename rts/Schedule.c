@@ -1924,9 +1924,15 @@ void
 setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
 {
 #if !defined(THREADED_RTS)
-
-    barf("setNumCapabilities: not supported in the non-threaded RTS");
-
+    if (new_n_capabilities != 1) {
+        errorBelch("setNumCapabilities: not supported in the non-threaded RTS");
+    }
+    return;
+#elif defined(NOSMP)
+    if (new_n_capabilities != 1) {
+        errorBelch("setNumCapabilities: not supported on this platform");
+    }
+    return;
 #else
     Task *task;
     Capability *cap;
