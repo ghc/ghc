@@ -210,8 +210,14 @@ test('conc067', ignore_output, compile_and_run, [''])
 # than one CPU.
 test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
 
+if (ghc_with_smp == 0):
+   skip_if_not_smp = skip
+else:
+   skip_if_not_smp = normal
+
 test('setnumcapabilities001',
      [ only_ways(['threaded1','threaded2']),
        extra_run_opts('4 12 2000'),
-       reqlib('parallel') ],
+       reqlib('parallel'),
+       skip_if_not_smp ],
      compile_and_run, [''])
