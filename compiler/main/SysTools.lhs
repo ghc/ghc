@@ -192,6 +192,7 @@ initSysTools mbMinusB
                                 Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
         ; targetArch <- readSetting "target arch"
         ; targetOS <- readSetting "target os"
+        ; targetWordSize <- readSetting "target word size"
         ; targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
         ; targetHasIdentDirective <- readSetting "target has .ident directive"
         ; targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
@@ -257,6 +258,7 @@ initSysTools mbMinusB
                         sTargetPlatform = Platform {
                                               platformArch = targetArch,
                                               platformOS   = targetOS,
+                                              platformWordSize = targetWordSize,
                                               platformHasGnuNonexecStack = targetHasGnuNonexecStack,
                                               platformHasIdentDirective = targetHasIdentDirective,
                                               platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols

@@ -31,7 +31,7 @@ module Kind (
 	pprKind, pprParendKind,
 
         -- ** Deconstructing Kinds
-        kindFunResult, kindAppResult, synTyConResKind,
+        kindAppResult, synTyConResKind,
         splitKindFunTys, splitKindFunTysN, splitKindFunTy_maybe,
 
         -- ** Predicates on Kinds

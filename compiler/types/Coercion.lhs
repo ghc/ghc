@@ -24,13 +24,17 @@ module Coercion (
         isReflCo_maybe,
         mkCoercionType,
 
+        -- ** Functions over coercion axioms
+        coAxiomSplitLHS,
+
 	-- ** Constructing coercions
         mkReflCo, mkCoVarCo, 
-        mkAxInstCo, mkPiCo, mkPiCos,
+        mkAxInstCo, mkAxInstRHS,
+        mkPiCo, mkPiCos,
         mkSymCo, mkTransCo, mkNthCo,
 	mkInstCo, mkAppCo, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkUnsafeCo,
-        mkNewTypeCo, mkFamInstCo,
+        mkNewTypeCo, 
 
         -- ** Decomposition
         splitNewTypeRepCo_maybe, instNewTyCon_maybe, decomposeCo,
@@ -82,7 +86,7 @@ import TyCon
 import Var
 import VarEnv
 import VarSet
-import Maybes	( orElse )
+import Maybes   ( orElse )
 import Name	( Name, NamedThing(..), nameUnique )
 import OccName 	( parenSymOcc )
 import Util
@@ -275,6 +279,23 @@ may turn into
        C (Nth 0 g) ....
 Now (Nth 0 g) will optimise to Refl, but perhaps not instantly.
 
+
+%************************************************************************
+%*                                                                      *
+\subsection{Coercion axioms}
+%*                                                                      *
+%************************************************************************
+These functions are not in TyCon because they need knowledge about
+the type representation (from TypeRep)
+
+\begin{code}
+-- If `ax :: F a ~ b`, and `F` is a family instance, returns (F, [a])
+coAxiomSplitLHS :: CoAxiom -> (TyCon, [Type])
+coAxiomSplitLHS ax
+  = case splitTyConApp_maybe (coAxiomLHS ax) of
+      Just (tc,tys) -> (tc,tys)
+      Nothing       -> pprPanic "coAxiomSplitLHS" (ppr ax)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -511,6 +532,8 @@ mkReflCo :: Type -> Coercion
 mkReflCo = Refl
 
 mkAxInstCo :: CoAxiom -> [Type] -> Coercion
+-- mkAxInstCo can legitimately be called over-staturated; 
+-- i.e. with more type arguments than the coercion requires
 mkAxInstCo ax tys
   | arity == n_tys = AxiomInstCo ax rtys
   | otherwise      = ASSERT( arity < n_tys )
@@ -520,6 +543,19 @@ mkAxInstCo ax tys
     n_tys = length tys
     arity = coAxiomArity ax
     rtys  = map Refl tys
+
+mkAxInstRHS :: CoAxiom -> [Type] -> Type
+-- Instantiate the axiom with specified types,
+-- returning the instantiated RHS
+-- A companion to mkAxInstCo: 
+--    mkAxInstRhs ax tys = snd (coercionKind (mkAxInstCo ax tys))
+mkAxInstRHS ax tys
+  = ASSERT( tvs `equalLength` tys1 ) 
+    mkAppTys rhs' tys2
+  where
+    tvs          = coAxiomTyVars ax
+    (tys1, tys2) = splitAtList tvs tys
+    rhs'         = substTyWith tvs tys1 (coAxiomRHS ax)
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 mkAppCo :: Coercion -> Coercion -> Coercion
@@ -611,28 +647,12 @@ mkUnsafeCo ty1 ty2 = UnsafeCo ty1 ty2
 --   the free variables a subset of those 'TyVar's.
 mkNewTypeCo :: Name -> TyCon -> [TyVar] -> Type -> CoAxiom
 mkNewTypeCo name tycon tvs rhs_ty
-  = CoAxiom { co_ax_unique = nameUnique name
-            , co_ax_name   = name
-            , co_ax_tvs    = tvs
-            , co_ax_lhs    = mkTyConApp tycon (mkTyVarTys tvs)
-            , co_ax_rhs    = rhs_ty }
-
--- | Create a coercion identifying a @data@, @newtype@ or @type@ representation type
--- and its family instance.  It has the form @Co tvs :: F ts ~ R tvs@, where @Co@ is 
--- the coercion constructor built here, @F@ the family tycon and @R@ the (derived)
--- representation tycon.
-mkFamInstCo :: Name	-- ^ Unique name for the coercion tycon
-		  -> [TyVar]	-- ^ Type parameters of the coercion (@tvs@)
-		  -> TyCon	-- ^ Family tycon (@F@)
-		  -> [Type]	-- ^ Type instance (@ts@)
-		  -> TyCon	-- ^ Representation tycon (@R@)
-		  -> CoAxiom	-- ^ Coercion constructor (@Co@)
-mkFamInstCo name tvs family inst_tys rep_tycon
-  = CoAxiom { co_ax_unique = nameUnique name
-            , co_ax_name   = name
-            , co_ax_tvs    = tvs
-            , co_ax_lhs    = mkTyConApp family inst_tys 
-            , co_ax_rhs    = mkTyConApp rep_tycon (mkTyVarTys tvs) }
+  = CoAxiom { co_ax_unique   = nameUnique name
+            , co_ax_name     = name
+            , co_ax_implicit = True  -- See Note [Implicit axioms] in TyCon
+            , co_ax_tvs      = tvs
+            , co_ax_lhs      = mkTyConApp tycon (mkTyVarTys tvs)
+            , co_ax_rhs      = rhs_ty }
 
 mkPiCos :: [Var] -> Coercion -> Coercion
 mkPiCos vs co = foldr mkPiCo co vs

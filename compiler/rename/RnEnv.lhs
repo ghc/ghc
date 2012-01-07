@@ -454,32 +454,45 @@ lookupOccRn rdr_name = do
 
 -- lookupPromotedOccRn looks up an optionally promoted RdrName.
 lookupPromotedOccRn :: RdrName -> RnM Name
--- see Note [Demotion] in OccName
-lookupPromotedOccRn rdr_name = do {
-    -- 1. lookup the name
-    opt_name <- lookupOccRn_maybe rdr_name 
-  ; case opt_name of
-      -- 1.a. we found it!
-      Just name -> return name
-      -- 1.b. we did not find it -> 2
-      Nothing -> do {
-  ; -- 2. maybe it was implicitly promoted
-    case demoteRdrName rdr_name of
-      -- 2.a it was not in a promoted namespace
-      Nothing -> err
-      -- 2.b let's try every thing again -> 3
-      Just demoted_rdr_name -> do {
-  ; poly_kinds <- xoptM Opt_PolyKinds
-    -- 3. lookup again
-  ; opt_demoted_name <- lookupOccRn_maybe demoted_rdr_name ;
-  ; case opt_demoted_name of
-      -- 3.a. it was implicitly promoted, but confirm that we can promote
-      -- JPM: We could try to suggest turning on PolyKinds here
-      Just demoted_name -> if poly_kinds then return demoted_name else err
-      -- 3.b. use rdr_name to have a correct error message
-      Nothing -> err } } }
-  where err = unboundName WL_Any rdr_name
+-- see Note [Demotion] 
+lookupPromotedOccRn rdr_name 
+  = do { mb_name <- lookupOccRn_maybe rdr_name 
+       ; case mb_name of {
+             Just name -> return name ;
+             Nothing   -> 
 
+    do { -- Maybe it's the name of a *data* constructor
+         poly_kinds <- xoptM Opt_PolyKinds
+       ; mb_demoted_name <- case demoteRdrName rdr_name of
+                              Just demoted_rdr -> lookupOccRn_maybe demoted_rdr
+                              Nothing          -> return Nothing
+       ; case mb_demoted_name of
+           Nothing -> unboundName WL_Any rdr_name
+           Just demoted_name 
+             | poly_kinds -> return demoted_name
+             | otherwise  -> unboundNameX WL_Any rdr_name suggest_pk }}}
+  where 
+    suggest_pk = ptext (sLit "A data constructor of that name is in scope; did you mean -XPolyKinds?")
+\end{code}
+
+Note [Demotion]
+~~~~~~~~~~~~~~~
+When the user writes:
+  data Nat = Zero | Succ Nat
+  foo :: f Zero -> Int
+
+'Zero' in the type signature of 'foo' is parsed as:
+  HsTyVar ("Zero", TcClsName)
+
+When the renamer hits this occurence of 'Zero' it's going to realise
+that it's not in scope. But because it is renaming a type, it knows
+that 'Zero' might be a promoted data constructor, so it will demote
+its namespace to DataName and do a second lookup.
+
+The final result (after the renamer) will be:
+  HsTyVar ("Zero", DataName)
+
+\begin{code}
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupOccRn_maybe rdr_name
@@ -1125,13 +1138,16 @@ data WhereLooking = WL_Any        -- Any binding
                   | WL_LocalTop   -- Any top-level binding in this module
 
 unboundName :: WhereLooking -> RdrName -> RnM Name
-unboundName where_look rdr_name
+unboundName wl rdr = unboundNameX wl rdr empty
+
+unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
+unboundNameX where_look rdr_name extra
   = do  { show_helpful_errors <- doptM Opt_HelpfulErrors
-        ; let err = unknownNameErr rdr_name
+        ; let err = unknownNameErr rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
-          else do { extra_err <- unknownNameSuggestErr where_look rdr_name
-                  ; addErr (err $$ extra_err) }
+          else do { suggestions <- unknownNameSuggestErr where_look rdr_name
+                  ; addErr (err $$ suggestions) }
 
         ; env <- getGlobalRdrEnv;
 	; traceRn (vcat [unknownNameErr rdr_name, 

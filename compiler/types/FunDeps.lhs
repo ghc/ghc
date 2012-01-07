@@ -324,7 +324,7 @@ improveFromInstEnv inst_env pred@(ty, _)
 		-- Remember that instanceCantMatch treats both argumnents
 		-- symmetrically, so it's ok to trim the rough_tcs,
 		-- rather than trimming each inst_tcs in turn
-    , ispec@(Instance { is_tvs = qtvs, is_tys = tys_inst,
+    , ispec@(ClsInst { is_tvs = qtvs, is_tys = tys_inst,
 		 	is_tcs = inst_tcs }) <- instances
     , not (instanceCantMatch inst_tcs trimmed_tcs)
     , let p_inst = (mkClassPred cls tys_inst,
@@ -504,8 +504,8 @@ if s1 matches
 
 
 \begin{code}
-checkFunDeps :: (InstEnv, InstEnv) -> Instance
-	     -> Maybe [Instance]	-- Nothing  <=> ok
+checkFunDeps :: (InstEnv, InstEnv) -> ClsInst
+	     -> Maybe [ClsInst]	-- Nothing  <=> ok
 					-- Just dfs <=> conflict with dfs
 -- Check wheher adding DFunId would break functional-dependency constraints
 -- Used only for instance decls defined in the module being compiled
@@ -518,14 +518,14 @@ checkFunDeps inst_envs ispec
     cls_inst_env = classInstances inst_envs clas
     bad_fundeps  = badFunDeps cls_inst_env clas ins_tv_set ins_tys
 
-badFunDeps :: [Instance] -> Class
+badFunDeps :: [ClsInst] -> Class
 	   -> TyVarSet -> [Type]	-- Proposed new instance type
-	   -> [Instance]
+	   -> [ClsInst]
 badFunDeps cls_insts clas ins_tv_set ins_tys 
   = nubBy eq_inst $
     [ ispec | fd <- fds,	-- fds is often empty, so do this first!
 	      let trimmed_tcs = trimRoughMatchTcs clas_tvs fd rough_tcs,
-	      ispec@(Instance { is_tcs = inst_tcs, is_tvs = tvs, 
+	      ispec@(ClsInst { is_tcs = inst_tcs, is_tvs = tvs, 
 				is_tys = tys }) <- cls_insts,
 		-- Filter out ones that can't possibly match, 
 		-- based on the head of the fundep

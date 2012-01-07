@@ -29,7 +29,7 @@ int rts_isProfiled(void);
  * generator (compiler/codeGen/CgProf.hs).
  */
 
-typedef struct _CostCentre {
+typedef struct CostCentre_ {
     StgInt ccID;              // Unique Id, allocated by the RTS
 
     char * label;
@@ -42,17 +42,17 @@ typedef struct _CostCentre {
 
     StgInt is_caf;            // non-zero for a CAF cost centre
 
-    struct _CostCentre *link;
+    struct CostCentre_ *link;
 } CostCentre;
 
-typedef struct _CostCentreStack {
+typedef struct CostCentreStack_ {
     StgInt ccsID;               // unique ID, allocated by the RTS
 
     CostCentre *cc;             // Cost centre at the top of the stack
 
-    struct _CostCentreStack *prevStack;   // parent
-    struct _IndexTable      *indexTable;  // children
-    struct _CostCentreStack *root;        // root of stack
+    struct CostCentreStack_ *prevStack;   // parent
+    struct IndexTable_      *indexTable;  // children
+    struct CostCentreStack_ *root;        // root of stack
     StgWord    depth;           // number of items in the stack
 
     StgWord64  scc_count;       // Count of times this CCS is entered
@@ -103,10 +103,10 @@ typedef struct _CostCentreStack {
 // subsequent times we push a certain CC on a CCS we get the same
 // result).
 
-typedef struct _IndexTable {
+typedef struct IndexTable_ {
     CostCentre *cc;
     CostCentreStack *ccs;
-    struct _IndexTable *next;
+    struct IndexTable_ *next;
     unsigned int back_edge;
 } IndexTable;
 

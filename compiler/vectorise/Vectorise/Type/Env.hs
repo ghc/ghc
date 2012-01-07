@@ -229,12 +229,15 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            -- Build 'PRepr' and 'PData' instance type constructors and family instances for all
            -- type constructors with vectorised representations.
        ; reprs      <- mapM tyConRepr vect_tcs
-       ; repr_tcs   <- zipWith3M buildPReprTyCon  orig_tcs vect_tcs reprs
-       ; pdata_tcs  <- zipWith3M buildPDataTyCon  orig_tcs vect_tcs reprs
-       ; pdatas_tcs <- zipWith3M buildPDatasTyCon orig_tcs vect_tcs reprs
+       ; repr_fis   <- zipWith3M buildPReprTyCon  orig_tcs vect_tcs reprs
+       ; pdata_fis  <- zipWith3M buildPDataTyCon  orig_tcs vect_tcs reprs
+       ; pdatas_fis <- zipWith3M buildPDatasTyCon orig_tcs vect_tcs reprs
 
-       ; let inst_tcs  = repr_tcs ++ pdata_tcs ++ pdatas_tcs
-             fam_insts = map mkLocalFamInst inst_tcs
+       ; let fam_insts  = repr_fis ++ pdata_fis ++ pdatas_fis
+             repr_axs   = map famInstAxiom repr_fis
+             pdata_tcs  = famInstsRepTyCons pdata_fis
+             pdatas_tcs = famInstsRepTyCons pdatas_fis
+             
        ; updGEnv $ extendFamEnv fam_insts
 
            -- Generate workers for the vectorised data constructors, dfuns for the 'PA' instances of
@@ -262,7 +265,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
               ; dfuns <- sequence $
                            zipWith4 buildTyConPADict
                                     vect_tcs
-                                    repr_tcs
+                                    repr_axs
                                     pdata_tcs
                                     pdatas_tcs
 
@@ -272,7 +275,8 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
 
            -- Return the vectorised variants of type constructors as well as the generated instance
            -- type constructors, family instances, and dfun bindings.
-       ; return (new_tcs ++ inst_tcs ++ syn_tcs, fam_insts, binds)
+       ; return ( new_tcs ++ pdata_tcs ++ pdatas_tcs ++ syn_tcs
+                , fam_insts, binds)
        }
   where
     fst3 (a, _, _) = a
@@ -319,9 +323,9 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
 
 -- Helpers --------------------------------------------------------------------
 
-buildTyConPADict :: TyCon -> TyCon -> TyCon -> TyCon -> VM Var
-buildTyConPADict vect_tc prepr_tc pdata_tc pdatas_tc
- = tyConRepr vect_tc >>= buildPADict vect_tc prepr_tc pdata_tc pdatas_tc
+buildTyConPADict :: TyCon -> CoAxiom -> TyCon -> TyCon -> VM Var
+buildTyConPADict vect_tc prepr_ax pdata_tc pdatas_tc
+ = tyConRepr vect_tc >>= buildPADict vect_tc prepr_ax pdata_tc pdatas_tc
 
 -- Produce a custom-made worker for the data constructors of a vectorised data type.  This includes
 -- all data constructors that may be used in vetcorised code — i.e., all data constructors of data

@@ -641,7 +641,7 @@ runOneCommand eh gCmd = do
                             (\c -> case removeSpaces c of
                                      ""   -> noSpace q
                                      ":{" -> multiLineCmd q
-                                     _    -> return (Just c) )
+                                     c'   -> return (Just c') )
     multiLineCmd q = do
       st <- lift getGHCiState
       let p = prompt st
@@ -962,7 +962,7 @@ filterOutChildren get_thing xs
                      Just p  -> getName p `elemNameSet` all_names
                      Nothing -> False
 
-pprInfo :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.Instance]) -> SDoc
+pprInfo :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
 pprInfo pefas (thing, fixity, insts)
   =  pprTyThingInContextLoc pefas thing
   $$ show_fixity fixity
@@ -2005,7 +2005,7 @@ showBindings = do
         let pefas = dopt Opt_PrintExplicitForalls dflags
         mb_stuff <- GHC.getInfo (getName tt)
         return $ maybe (text "") (pprTT pefas) mb_stuff
-    pprTT :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.Instance]) -> SDoc
+    pprTT :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.ClsInst]) -> SDoc
     pprTT pefas (thing, fixity, _insts) =
         pprTyThing pefas thing
         $$ show_fixity fixity

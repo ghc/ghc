@@ -566,7 +566,8 @@ stat_exit(int alloc)
         // included in the GC stats.  We therefore subtract them to
         // obtain the actual GC cpu time.  XXX: we aren't doing this
         // for elapsed time.
-        gc_cpu -= 0 + PROF_VAL(RP_tot_time + HC_tot_time);
+        gc_cpu     -= 0 + PROF_VAL(RP_tot_time + HC_tot_time);
+        gc_elapsed -= 0 + PROF_VAL(RPe_tot_time + HCe_tot_time);
 
         init_cpu     = get_init_cpu();
         init_elapsed = get_init_elapsed();
@@ -691,24 +692,23 @@ stat_exit(int alloc)
 		    TimeToSecondsDbl(gc_elapsed)*100/TimeToSecondsDbl(tot_elapsed));
 #endif
 
-	    if (tot_cpu - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time) == 0)
+            if (mut_cpu == 0) {
 		showStgWord64(0, temp, rtsTrue/*commas*/);
-	    else
+            } else {
 		showStgWord64(
-		    (StgWord64)((GC_tot_alloc*sizeof(W_))/
-			     TimeToSecondsDbl(tot_cpu - GC_tot_cpu - 
-					 PROF_VAL(RP_tot_time + HC_tot_time))),
-		    temp, rtsTrue/*commas*/);
-	    
+                    (StgWord64)((GC_tot_alloc*sizeof(W_)) / TimeToSecondsDbl(mut_cpu)),
+                    temp, rtsTrue/*commas*/);
+            }
+
 	    statsPrintf("  Alloc rate    %s bytes per MUT second\n\n", temp);
 	
 	    statsPrintf("  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
-		    TimeToSecondsDbl(tot_cpu - GC_tot_cpu - 
+                    TimeToSecondsDbl(tot_cpu - gc_cpu -
 				PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100 
 		    / TimeToSecondsDbl(tot_cpu), 
-		    TimeToSecondsDbl(tot_cpu - GC_tot_cpu - 
-				PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100 
-		    / TimeToSecondsDbl(tot_elapsed));
+                    TimeToSecondsDbl(tot_cpu - gc_cpu -
+                                PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100
+                    / TimeToSecondsDbl(tot_elapsed));
 
             /*
             TICK_PRINT(1);

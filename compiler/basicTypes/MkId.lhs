@@ -26,6 +26,7 @@ module MkId (
 
         mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
         wrapFamInstBody, unwrapFamInstScrut,
+        wrapTypeFamInstBody, unwrapTypeFamInstScrut,
         mkUnpackCase, mkProductBox,
 
         -- And some particular Ids; see below for why they are wired in
@@ -227,7 +228,7 @@ mkDataConIds wrap_name wkr_name data_con
   = DCIds Nothing nt_work_id                 
 
   | any isBanged all_strict_marks      -- Algebraic, needs wrapper
-    || not (null eq_spec)              -- NB: LoadIface.ifaceDeclSubBndrs
+    || not (null eq_spec)              -- NB: LoadIface.ifaceDeclImplicitBndrs
     || isFamInstTyCon tycon            --     depends on this test
   = DCIds (Just alg_wrap_id) wrk_id
 
@@ -709,12 +710,22 @@ wrapFamInstBody tycon args body
   | otherwise
   = body
 
+-- Same as `wrapFamInstBody`, but for type family instances, which are
+-- represented by a `CoAxiom`, and not a `TyCon`
+wrapTypeFamInstBody :: CoAxiom -> [Type] -> CoreExpr -> CoreExpr
+wrapTypeFamInstBody axiom args body
+  = mkCast body (mkSymCo (mkAxInstCo axiom args))
+
 unwrapFamInstScrut :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapFamInstScrut tycon args scrut
   | Just co_con <- tyConFamilyCoercion_maybe tycon
   = mkCast scrut (mkAxInstCo co_con args)
   | otherwise
   = scrut
+
+unwrapTypeFamInstScrut :: CoAxiom -> [Type] -> CoreExpr -> CoreExpr
+unwrapTypeFamInstScrut axiom args scrut
+  = mkCast scrut (mkAxInstCo axiom args)
 \end{code}
 
 

@@ -689,7 +689,7 @@ checkHiBootIface
     local_export_env :: NameEnv AvailInfo
     local_export_env = availsToNameEnv local_exports
 
-    check_inst :: Instance -> TcM (Maybe (Id, Id))
+    check_inst :: ClsInst -> TcM (Maybe (Id, Id))
 	-- Returns a pair of the boot dfun in terms of the equivalent real dfun
     check_inst boot_inst
 	= case [dfun | inst <- local_insts, 
@@ -838,7 +838,7 @@ bootMisMatch thing boot_decl real_decl
 	  ptext (sLit "Main module:") <+> ppr real_decl,
 	  ptext (sLit "Boot file:  ") <+> ppr boot_decl]
 
-instMisMatch :: Instance -> SDoc
+instMisMatch :: ClsInst -> SDoc
 instMisMatch inst
   = hang (ppr inst)
        2 (ptext (sLit "is defined in the hs-boot file, but not in the module itself"))
@@ -1592,7 +1592,7 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO (Messages, Maybe (TyThing, Fixity, [Instance]))
+            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst]))
 
 -- Used to implement :info in GHCi
 --
@@ -1607,7 +1607,7 @@ tcRnGetInfo hsc_env name
 
 tcRnGetInfo' :: HscEnv
              -> Name
-             -> TcRn (TyThing, Fixity, [Instance])
+             -> TcRn (TyThing, Fixity, [ClsInst])
 tcRnGetInfo' hsc_env name
   = let ictxt = hsc_IC hsc_env in
     setInteractiveContext hsc_env ictxt $ do
@@ -1623,7 +1623,7 @@ tcRnGetInfo' hsc_env name
     ispecs <- lookupInsts thing
     return (thing, fixity, ispecs)
 
-lookupInsts :: TyThing -> TcM [Instance]
+lookupInsts :: TyThing -> TcM [ClsInst]
 lookupInsts (ATyCon tc)
   | Just cls <- tyConClass_maybe tc
   = do  { inst_envs <- tcGetInstEnvs
@@ -1734,7 +1734,7 @@ pprModGuts (ModGuts { mg_tcs = tcs
   = vcat [ ppr_types [] (mkTypeEnv (map ATyCon tcs)),
 	   ppr_rules rules ]
 
-ppr_types :: [Instance] -> TypeEnv -> SDoc
+ppr_types :: [ClsInst] -> TypeEnv -> SDoc
 ppr_types insts type_env
   = text "TYPE SIGNATURES" $$ nest 4 (ppr_sigs ids)
   where
@@ -1756,14 +1756,14 @@ ppr_tycons fam_insts type_env
          , text "COERCION AXIOMS" 
          ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
   where
-    fi_tycons = map famInstTyCon fam_insts
+    fi_tycons = famInstsRepTyCons fam_insts
     tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
     want_tycon tycon | opt_PprStyle_Debug = True
 	             | otherwise	  = not (isImplicitTyCon tycon) &&
 					    isExternalName (tyConName tycon) &&
 				            not (tycon `elem` fi_tycons)
 
-ppr_insts :: [Instance] -> SDoc
+ppr_insts :: [ClsInst] -> SDoc
 ppr_insts []     = empty
 ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
 

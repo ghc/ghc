@@ -737,9 +737,9 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
      * See also Exception.cmm:stg_raisezh.
      * This wasn't done for asynchronous exceptions originally; see #1450 
      */
-    if (RtsFlags.ProfFlags.showCCSOnException)
+    if (RtsFlags.ProfFlags.showCCSOnException && exception != NULL)
     {
-        fprintCCS_stderr(tso->prof.CCCS,exception,tso);
+        fprintCCS_stderr(tso->prof.cccs,exception,tso);
     }
 #endif
     // ASSUMES: the thread is not already complete or dead

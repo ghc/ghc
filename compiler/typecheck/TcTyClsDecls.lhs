@@ -558,7 +558,7 @@ tcTyClDecl1 parent _calc_isrec
   = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
   { traceTc "type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent Nothing
+  ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent
   ; return [ATyCon tycon] }
 
   -- "data family" declaration
@@ -569,8 +569,8 @@ tcTyClDecl1 parent _calc_isrec
   ; checkFamFlag tc_name
   ; extra_tvs <- tcDataKindSig kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
-  ; tycon <- buildAlgTyCon tc_name final_tvs []
-               DataFamilyTyCon Recursive True parent Nothing
+        tycon = buildAlgTyCon tc_name final_tvs []
+                              DataFamilyTyCon Recursive True parent
   ; return [ATyCon tycon] }
 
   -- "type" synonym declaration
@@ -580,7 +580,7 @@ tcTyClDecl1 _parent _calc_isrec
     tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
     { rhs_ty' <- tcCheckHsType rhs_ty kind
     ; tycon <- buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty')
-      	       		     kind NoParentTyCon Nothing
+                 kind NoParentTyCon
     ; return [ATyCon tycon] }
 
   -- "newtype" and "data"
@@ -606,7 +606,7 @@ tcTyClDecl1 _parent calc_isrec
 
   ; dataDeclChecks tc_name new_or_data stupid_theta cons
 
-  ; tycon <- fixM (\ tycon -> do
+  ; tycon <- fixM $ \ tycon -> do
 	{ let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
 	; data_cons <- tcConDecls new_or_data ex_ok tycon (final_tvs, res_ty) cons
 	; tc_rhs <-
@@ -616,9 +616,8 @@ tcTyClDecl1 _parent calc_isrec
 		   DataType -> return (mkDataTyConRhs data_cons)
 		   NewType  -> ASSERT( not (null data_cons) )
                                mkNewTyConRhs tc_name tycon (head data_cons)
-	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-	    (not h98_syntax) NoParentTyCon Nothing
-	})
+	; return (buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs
+	                        is_rec (not h98_syntax) NoParentTyCon) }
   ; return [ATyCon tycon] }
 
 tcTyClDecl1 _parent calc_isrec

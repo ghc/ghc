@@ -296,7 +296,7 @@ hscTcRcLookupName hsc_env name =
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
 
-hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [Instance]))
+hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [ClsInst]))
 hscTcRnGetInfo hsc_env name =
     runHsc hsc_env $ ioMsgMaybe' $ tcRnGetInfo hsc_env name
 

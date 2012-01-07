@@ -166,8 +166,8 @@ stmtToInstrs stmt = do
     CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
-    CmmJump arg _         -> genJump arg
-    CmmReturn _           ->
+    CmmJump arg           -> genJump arg
+    CmmReturn             ->
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
@@ -1690,6 +1690,7 @@ genCCall32 target dest_regs args =
         use_sse2 <- sse2Enabled
         push_codes <- mapM (push_arg use_sse2) (reverse args)
         delta <- getDeltaNat
+        MASSERT (delta == delta0 - tot_arg_size)
 
         -- in
         -- deal with static vs dynamic call targets
@@ -1728,10 +1729,10 @@ genCCall32 target dest_regs args =
                       (if pop_size==0 then [] else
                        [ADD II32 (OpImm (ImmInt pop_size)) (OpReg esp)])
                       ++
-                      [DELTA (delta + tot_arg_size)]
+                      [DELTA delta0]
                    )
         -- in
-        setDeltaNat (delta + tot_arg_size)
+        setDeltaNat delta0
 
         let
             -- assign the results, if necessary
@@ -1744,9 +1745,11 @@ genCCall32 target dest_regs args =
                                                        (ImmInt 0)
                              sz = floatSize w
                          in toOL [ SUB II32 (OpImm (ImmInt b)) (OpReg esp),
+                                   DELTA (delta0 - b),
                                    GST sz fake0 tmp_amode,
                                    MOV sz (OpAddr tmp_amode) (OpReg r_dest),
-                                   ADD II32 (OpImm (ImmInt b)) (OpReg esp)]
+                                   ADD II32 (OpImm (ImmInt b)) (OpReg esp),
+                                   DELTA delta0]
                     else unitOL (GMOV fake0 r_dest)
               | isWord64 ty    = toOL [MOV II32 (OpReg eax) (OpReg r_dest),
                                         MOV II32 (OpReg edx) (OpReg r_dest_hi)]

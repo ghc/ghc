@@ -44,13 +44,14 @@ import Name
 --
 buildPADict
         :: TyCon        -- ^ tycon of the type being vectorised.
-        -> TyCon        -- ^ tycon of the type used for the vectorised representation.
+        -> CoAxiom      -- ^ Coercion between the type and 
+                        --     its vectorised representation.
         -> TyCon        -- ^ PData  instance tycon
         -> TyCon        -- ^ PDatas instance tycon
         -> SumRepr      -- ^ representation used for the type being vectorised.
         -> VM Var       -- ^ name of the top-level dictionary function.
 
-buildPADict vect_tc prepr_tc pdata_tc pdatas_tc repr
+buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
  = polyAbstract tvs $ \args ->    -- The args are the dictionaries we lambda
                                   -- abstract over; and they are put in the
                                   -- envt, so when we need a (PA a) we can 
@@ -94,7 +95,7 @@ buildPADict vect_tc prepr_tc pdata_tc pdatas_tc repr
 
     method args dfun_name (name, build)
      = localV
-     $ do  expr     <- build vect_tc prepr_tc pdata_tc pdatas_tc repr
+     $ do  expr     <- build vect_tc prepr_ax pdata_tc pdatas_tc repr
            let body = mkLams (tvs ++ args) expr
            raw_var  <- newExportedVar (method_name dfun_name name) (exprType body)
            let var  = raw_var

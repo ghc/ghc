@@ -395,7 +395,7 @@ tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 tcGetInstEnvs = do { eps <- getEps; env <- getGblEnv;
 		     return (eps_inst_env eps, tcg_inst_env env) }
 
-tcExtendLocalInstEnv :: [Instance] -> TcM a -> TcM a
+tcExtendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
   -- Add new locally-defined instances
 tcExtendLocalInstEnv dfuns thing_inside
  = do { traceDFuns dfuns
@@ -405,7 +405,7 @@ tcExtendLocalInstEnv dfuns thing_inside
 			 tcg_inst_env = inst_env' }
       ; setGblEnv env' thing_inside }
 
-addLocalInst :: InstEnv -> Instance -> TcM InstEnv
+addLocalInst :: InstEnv -> ClsInst -> TcM InstEnv
 -- Check that the proposed new instance is OK, 
 -- and then add it to the home inst env
 -- If overwrite_inst, then we can overwrite a direct match
@@ -468,30 +468,30 @@ addLocalInst home_ie ispec = do
                     , let (_,_,_,dup_tys) = instanceHead dup_ispec
                     , isJust (tcMatchTys (mkVarSet tvs') tys' dup_tys)]
 
-traceDFuns :: [Instance] -> TcRn ()
+traceDFuns :: [ClsInst] -> TcRn ()
 traceDFuns ispecs
   = traceTc "Adding instances:" (vcat (map pp ispecs))
   where
     pp ispec = ppr (instanceDFunId ispec) <+> colon <+> ppr ispec
 	-- Print the dfun name itself too
 
-funDepErr :: Instance -> [Instance] -> TcRn ()
+funDepErr :: ClsInst -> [ClsInst] -> TcRn ()
 funDepErr ispec ispecs
   = addDictLoc ispec $
     addErr (hang (ptext (sLit "Functional dependencies conflict between instance declarations:"))
 	       2 (pprInstances (ispec:ispecs)))
-dupInstErr :: Instance -> Instance -> TcRn ()
+dupInstErr :: ClsInst -> ClsInst -> TcRn ()
 dupInstErr ispec dup_ispec
   = addDictLoc ispec $
     addErr (hang (ptext (sLit "Duplicate instance declarations:"))
 	       2 (pprInstances [ispec, dup_ispec]))
-overlappingInstErr :: Instance -> Instance -> TcRn ()
+overlappingInstErr :: ClsInst -> ClsInst -> TcRn ()
 overlappingInstErr ispec dup_ispec
   = addDictLoc ispec $
     addErr (hang (ptext (sLit "Overlapping instance declarations:"))
 	       2 (pprInstances [ispec, dup_ispec]))
 
-addDictLoc :: Instance -> TcRn a -> TcRn a
+addDictLoc :: ClsInst -> TcRn a -> TcRn a
 addDictLoc ispec thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where

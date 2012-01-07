@@ -549,7 +549,8 @@ zonkTcTypeAndSubst subst ty = zonkType zonk_tv ty
   where
     zonk_tv tv
       = do { z_tv <- updateTyVarKindM zonkTcKind tv
-           ; case tcTyVarDetails tv of
+           ; ASSERT ( isTcTyVar tv )
+             case tcTyVarDetails tv of
                 SkolemTv {}   -> return (TyVarTy z_tv)
                 RuntimeUnk {} -> return (TyVarTy z_tv)
                 FlatSkol ty   -> zonkType zonk_tv ty

@@ -174,15 +174,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             GET_ARM_ISA()
             test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT}\""
             ;;
-        alpha)
-            test -z "[$]2" || eval "[$]2=ArchAlpha"
-            ;;
-        mips|mipseb)
-            test -z "[$]2" || eval "[$]2=ArchMipseb"
-            ;;
-        mipsel)
-            test -z "[$]2" || eval "[$]2=ArchMipsel"
-            ;;
         hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
@@ -221,13 +212,16 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         freebsd)
             test -z "[$]2" || eval "[$]2=OSFreeBSD"
             ;;
+        kfreebsdgnu)
+            test -z "[$]2" || eval "[$]2=OSKFreeBSD"
+            ;;
         openbsd)
             test -z "[$]2" || eval "[$]2=OSOpenBSD"
             ;;
         netbsd)
             test -z "[$]2" || eval "[$]2=OSNetBSD"
             ;;
-        dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+        dragonfly|osf1|osf3|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         *)

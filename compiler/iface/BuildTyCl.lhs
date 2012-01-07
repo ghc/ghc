@@ -12,13 +12,13 @@
 -- for details
 
 module BuildTyCl (
-	buildSynTyCon, 
+        buildSynTyCon,
         buildAlgTyCon, 
         buildDataCon,
         buildPromotedDataTyCon,
         TcMethInfo, buildClass,
-	distinctAbstractTyConRhs, totallyAbstractTyConRhs,
-	mkNewTyConRhs, mkDataTyConRhs, 
+        distinctAbstractTyConRhs, totallyAbstractTyConRhs,
+        mkNewTyConRhs, mkDataTyConRhs, 
         newImplicitBinder
     ) where
 
@@ -49,69 +49,28 @@ import Unique           ( getUnique )
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] 
               -> SynTyConRhs
-	      -> Kind			-- ^ Kind of the RHS
-	      -> TyConParent
-	      -> Maybe (TyCon, [Type])    -- ^ family instance if applicable
+              -> Kind                   -- ^ Kind of the RHS
+              -> TyConParent
               -> TcRnIf m n TyCon
-buildSynTyCon tc_name tvs rhs rhs_kind parent mb_family 
-  | Just fam_inst_info <- mb_family
-  = ASSERT( isNoParent parent )
-    fixM $ \ tycon_rec -> do 
-    { fam_parent <- mkFamInstParentInfo tc_name tvs fam_inst_info tycon_rec 
-    ; return (mkSynTyCon tc_name kind tvs rhs fam_parent) }
-
-  | otherwise
+buildSynTyCon tc_name tvs rhs rhs_kind parent 
   = return (mkSynTyCon tc_name kind tvs rhs parent)
   where kind = mkPiKinds tvs rhs_kind
 
 ------------------------------------------------------
-buildAlgTyCon :: Name -> [TyVar]        -- ^ Kind variables adn type variables
-	      -> ThetaType		-- ^ Stupid theta
+buildAlgTyCon :: Name 
+              -> [TyVar]               -- ^ Kind variables and type variables
+	      -> ThetaType	       -- ^ Stupid theta
 	      -> AlgTyConRhs
 	      -> RecFlag
-	      -> Bool			-- ^ True <=> was declared in GADT syntax
+	      -> Bool		       -- ^ True <=> was declared in GADT syntax
               -> TyConParent
-	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
-	      -> TcRnIf m n TyCon
+	      -> TyCon
 
-buildAlgTyCon tc_name ktvs stupid_theta rhs is_rec gadt_syn
-	      parent mb_family
-  | Just fam_inst_info <- mb_family
-  = -- We need to tie a knot as the coercion of a data instance depends
-     -- on the instance representation tycon and vice versa.
-    ASSERT( isNoParent parent )
-    fixM $ \ tycon_rec -> do 
-    { fam_parent <- mkFamInstParentInfo tc_name ktvs fam_inst_info tycon_rec
-    ; return (mkAlgTyCon tc_name kind ktvs stupid_theta rhs
-		         fam_parent is_rec gadt_syn) }
+buildAlgTyCon tc_name ktvs stupid_theta rhs is_rec gadt_syn parent
+  = mkAlgTyCon tc_name kind ktvs stupid_theta rhs parent is_rec gadt_syn
+  where 
+    kind = mkPiKinds ktvs liftedTypeKind
 
-  | otherwise
-  = return (mkAlgTyCon tc_name kind ktvs stupid_theta rhs
-	               parent is_rec gadt_syn)
-  where kind = mkPiKinds ktvs liftedTypeKind
-
--- | If a family tycon with instance types is given, the current tycon is an
--- instance of that family and we need to
---
--- (1) create a coercion that identifies the family instance type and the
---     representation type from Step (1); ie, it is of the form 
---	   `Co tvs :: F ts ~ R tvs', where `Co' is the name of the coercion,
---	   `F' the family tycon and `R' the (derived) representation tycon,
---	   and
--- (2) produce a `TyConParent' value containing the parent and coercion
---     information.
---
-mkFamInstParentInfo :: Name -> [TyVar] 
-             	    -> (TyCon, [Type]) 
-             	    -> TyCon 
-             	    -> TcRnIf m n TyConParent
-mkFamInstParentInfo tc_name tvs (family, instTys) rep_tycon
-  = do { -- Create the coercion
-       ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
-       ; let co_tycon = mkFamInstCo co_tycon_name tvs
-                                    family instTys rep_tycon
-       ; return $ FamInstTyCon family instTys co_tycon }
-    
 ------------------------------------------------------
 distinctAbstractTyConRhs, totallyAbstractTyConRhs :: AlgTyConRhs
 distinctAbstractTyConRhs = AbstractTyCon True

@@ -141,8 +141,8 @@ stmtToInstrs stmt = do
     CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
-    CmmJump arg _         -> genJump arg
-    CmmReturn _           ->
+    CmmJump arg           -> genJump arg
+    CmmReturn             ->
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
@@ -849,12 +849,7 @@ genCCall target dest_regs argsAndHints
       case platformOS (targetPlatform dflags) of
           OSLinux    -> genCCall' GCPLinux  target dest_regs argsAndHints
           OSDarwin   -> genCCall' GCPDarwin target dest_regs argsAndHints
-          OSSolaris2 -> panic "PPC.CodeGen.genCCall: not defined for this os"
-          OSMinGW32  -> panic "PPC.CodeGen.genCCall: not defined for this os"
-          OSFreeBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
-          OSOpenBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
-          OSNetBSD   -> panic "PPC.CodeGen.genCCall: not defined for this os"
-          OSUnknown  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          _ -> panic "PPC.CodeGen.genCCall: not defined for this os"
 
 data GenCCallPlatform = GCPLinux | GCPDarwin
 

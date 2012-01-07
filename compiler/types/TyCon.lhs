@@ -22,7 +22,9 @@ module TyCon(
 	SynTyConRhs(..),
 
 	-- ** Coercion axiom constructors
-        CoAxiom(..), coAxiomName, coAxiomArity,
+        CoAxiom(..), 
+        coAxiomName, coAxiomArity, coAxiomTyVars,
+        coAxiomLHS, coAxiomRHS, isImplicitCoAxiom,
 
         -- ** Constructing TyCons
 	mkAlgTyCon,
@@ -71,7 +73,7 @@ module TyCon(
 	tyConArity,
         tyConParent,
 	tyConTuple_maybe, tyConClass_maybe, tyConIP_maybe,
-	tyConFamInst_maybe, tyConFamilyCoercion_maybe,tyConFamInstSig_maybe,
+	tyConFamInst_maybe, tyConFamInstSig_maybe, tyConFamilyCoercion_maybe,
         synTyConDefn, synTyConRhs, synTyConType,
         tyConExtName,           -- External name for foreign types
 	algTyConRhs,
@@ -138,47 +140,10 @@ Note [Type synonym families]
   translates to
     a SynTyCon 'F', whose SynTyConRhs is SynFamilyTyCon
 
-* Translation of type instance decl:
-	type instance F [a] = Maybe a
-  translates to a "representation TyCon", 'R:FList', where
-     R:FList is a SynTyCon, whose 
-       SynTyConRhs is (SynonymTyCon (Maybe a))
-       TyConParent is (FamInstTyCon F [a] co)
-         where co :: F [a] ~ R:FList a
-
-  It's very much as if the user had written
-       type instance F [a] = R:FList a
-       type R:FList a = Maybe a
-  Indeed, in GHC's internal representation, the RHS of every
-  'type instance' is simply an application of the representation
-  TyCon to the quantified varaibles.
-
-  The intermediate representation TyCon is a bit gratuitous, but 
-  it means that:
-
-        each 'type instance' decls is in 1-1 correspondance 
-	with its representation TyCon
-
-  So the result of typechecking a 'type instance' decl is just a
-  TyCon.  In turn this means that type and data families can be
-  treated uniformly.
-
 * Translation of type family decl:
 	type family F a :: *
   translates to
     a SynTyCon 'F', whose SynTyConRhs is SynFamilyTyCon
-
-* Translation of type instance decl:
-	type instance F [a] = Maybe a
-  translates to
-    A SynTyCon 'R:FList a', whose 
-       SynTyConRhs is (SynonymTyCon (Maybe a))
-       TyConParent is (FamInstTyCon F [a] co)
-         where co :: F [a] ~ R:FList a
-    Notice that we introduce a gratuitous vanilla type synonym
-       type R:FList a = Maybe a
-    solely so that type and data families can be treated more
-    uniformly, via a single FamInstTyCon descriptor        
 
 * In the future we might want to support
     * closed type families (esp when we have proper kinds)
@@ -570,7 +535,7 @@ data TyConParent
         Class		-- The class in whose declaration the family is declared
 			-- See Note [Associated families and their parent class]
 
-  -- | Type constructors representing an instance of a type family. Parameters:
+  -- | Type constructors representing an instance of a *data* family. Parameters:
   --
   --  1) The type family in question
   --
@@ -581,11 +546,17 @@ data TyConParent
   --  3) A 'CoTyCon' identifying the representation
   --  type with the type instance family
   | FamInstTyCon	  -- See Note [Data type families]
-    			  -- and Note [Type synonym families]
+        CoAxiom   -- The coercion constructor,
+                  -- always of kind   T ty1 ty2 ~ R:T a b c
+                  -- where T is the family TyCon, 
+                  -- and R:T is the representation TyCon (ie this one)
+                  -- and a,b,c are the tyConTyVars of this TyCon
+
+          -- Cached fields of the CoAxiom, but adjusted to
+          -- use the tyConTyVars of this TyCon
 	TyCon   -- The family TyCon
 	[Type]	-- Argument types (mentions the tyConTyVars of this TyCon)
 		-- Match in length the tyConTyVars of the family TyCon
-        CoAxiom   -- The coercion constructor
 
 	-- E.g.  data intance T [a] = ...
 	-- gives a representation tycon:
@@ -598,15 +569,15 @@ instance Outputable TyConParent where
     ppr (ClassTyCon cls)        = text "Class parent" <+> ppr cls
     ppr (IPTyCon n)             = text "IP parent" <+> ppr n
     ppr (AssocFamilyTyCon cls)  = text "Class parent (assoc. family)" <+> ppr cls
-    ppr (FamInstTyCon tc tys _) = text "Family parent (family instance)" <+> ppr tc <+> sep (map ppr tys)
+    ppr (FamInstTyCon _ tc tys) = text "Family parent (family instance)" <+> ppr tc <+> sep (map ppr tys)
 
 -- | Checks the invariants of a 'TyConParent' given the appropriate type class name, if any
 okParent :: Name -> TyConParent -> Bool
-okParent _       NoParentTyCon                    = True
-okParent tc_name (AssocFamilyTyCon cls)           = tc_name `elem` map tyConName (classATs cls)
-okParent tc_name (ClassTyCon cls)                 = tc_name == tyConName (classTyCon cls)
-okParent tc_name (IPTyCon ip)                     = tc_name == ipTyConName ip
-okParent _       (FamInstTyCon fam_tc tys _co_tc) = tyConArity fam_tc == length tys
+okParent _       NoParentTyCon               = True
+okParent tc_name (AssocFamilyTyCon cls)      = tc_name `elem` map tyConName (classATs cls)
+okParent tc_name (ClassTyCon cls)            = tc_name == tyConName (classTyCon cls)
+okParent tc_name (IPTyCon ip)                = tc_name == ipTyConName ip
+okParent _       (FamInstTyCon _ fam_tc tys) = tyConArity fam_tc == length tys
 
 isNoParent :: TyConParent -> Bool
 isNoParent NoParentTyCon = True
@@ -676,23 +647,21 @@ See Trac #4528.
 
 Note [Newtype coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-The NewTyCon field nt_co is a a TyCon (a coercion constructor in fact)
-which is used for coercing from the representation type of the
-newtype, to the newtype itself. For example,
+The NewTyCon field nt_co is a CoAxiom which is used for coercing from
+the representation type of the newtype, to the newtype itself. For
+example,
 
    newtype T a = MkT (a -> a)
 
-the NewTyCon for T will contain nt_co = CoT where CoT t : T t ~ t ->
-t.  This TyCon is a CoTyCon, so it does not have a kind on its
-own; it basically has its own typing rule for the fully-applied
-version.  If the newtype T has k type variables then CoT has arity at
-most k.  In the case that the right hand side is a type application
+the NewTyCon for T will contain nt_co = CoT where CoT t : T t ~ t -> t.  
+
+In the case that the right hand side is a type application
 ending with the same type variables as the left hand side, we
 "eta-contract" the coercion.  So if we had
 
    newtype S a = MkT [a]
 
-then we would generate the arity 0 coercion CoS : S ~ [].  The
+then we would generate the arity 0 axiom CoS : S ~ [].  The
 primary reason we do this is to make newtype deriving cleaner.
 
 In the paper we'd write
@@ -700,14 +669,6 @@ In the paper we'd write
 and then when we used CoT at a particular type, s, we'd say
 	CoT @ s
 which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
-
-But in GHC we instead make CoT into a new piece of type syntax, CoTyCon,
-(like instCoercionTyCon, symCoercionTyCon etc), which must always
-be saturated, but which encodes as
-	TyConApp CoT [s]
-In the vocabulary of the paper it's as if we had axiom declarations
-like
-	axiom CoT t :  T t ~ [t]
 
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
@@ -757,12 +718,14 @@ so the coercion tycon CoT must have
 \begin{code}
 -- | A 'CoAxiom' is a \"coercion constructor\", i.e. a named equality axiom.
 data CoAxiom
-  = CoAxiom                   -- type equality axiom.
-    { co_ax_unique :: Unique   -- unique identifier
-    , co_ax_name   :: Name     -- name for pretty-printing
-    , co_ax_tvs    :: [TyVar]  -- bound type variables 
-    , co_ax_lhs    :: Type     -- left-hand side of the equality
-    , co_ax_rhs    :: Type     -- right-hand side of the equality
+  = CoAxiom                   -- Type equality axiom.
+    { co_ax_unique   :: Unique      -- unique identifier
+    , co_ax_name     :: Name        -- name for pretty-printing
+    , co_ax_tvs      :: [TyVar]     -- bound type variables 
+    , co_ax_lhs      :: Type        -- left-hand side of the equality
+    , co_ax_rhs      :: Type        -- right-hand side of the equality
+    , co_ax_implicit :: Bool        -- True <=> the axiom is "implicit"
+                                    -- See Note [Implicit axioms]
     }
   deriving Typeable
 
@@ -771,7 +734,28 @@ coAxiomArity ax = length (co_ax_tvs ax)
 
 coAxiomName :: CoAxiom -> Name
 coAxiomName = co_ax_name
+
+coAxiomTyVars :: CoAxiom -> [TyVar]
+coAxiomTyVars = co_ax_tvs
+
+coAxiomLHS, coAxiomRHS :: CoAxiom -> Type
+coAxiomLHS = co_ax_lhs
+coAxiomRHS = co_ax_rhs
+
+isImplicitCoAxiom :: CoAxiom -> Bool
+isImplicitCoAxiom = co_ax_implicit
 \end{code}
+
+Note [Implicit axioms]
+~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Implicit TyThings] in HscTypes
+* A CoAxiom arising from data/type family instances is not "implicit".
+  That is, it has its own IfaceAxiom declaration in an interface file
+
+* The CoAxiom arising from a newtype declaration *is* "implicit".
+  That is, it does not have its own IfaceAxiom declaration in an
+  interface file; instead the CoAxiom is generated by type-checking
+  the newtype declaration
 
 
 %************************************************************************
@@ -1251,12 +1235,13 @@ isPromotedTypeTyCon _                      = False
 -- * Family instances are /not/ implicit as they represent the instance body
 --   (similar to a @dfun@ does that for a class instance).
 isImplicitTyCon :: TyCon -> Bool
-isImplicitTyCon tycon | isTyConAssoc tycon           = True
-		      | isSynTyCon tycon	     = False
-		      | isAlgTyCon tycon	     = isTupleTyCon tycon
-isImplicitTyCon _other                               = True
-        -- catches: FunTyCon, PrimTyCon, 
-        -- CoTyCon, SuperKindTyCon
+isImplicitTyCon tycon 
+  | isTyConAssoc tycon = True
+  | isSynTyCon tycon   = False
+  | isAlgTyCon tycon   = isTupleTyCon tycon
+  | otherwise          = True
+        -- 'otherwise' catches: FunTyCon, PrimTyCon, 
+        -- PromotedDataCon, PomotedTypeTyCon, SuperKindTyCon
 \end{code}
 
 
@@ -1465,15 +1450,15 @@ isFamInstTyCon tc = case tyConParent tc of
 tyConFamInstSig_maybe :: TyCon -> Maybe (TyCon, [Type], CoAxiom)
 tyConFamInstSig_maybe tc
   = case tyConParent tc of
-      FamInstTyCon f ts co_tc -> Just (f, ts, co_tc)
-      _                       -> Nothing
+      FamInstTyCon ax f ts -> Just (f, ts, ax)
+      _                    -> Nothing
 
 -- | If this 'TyCon' is that of a family instance, return the family in question
 -- and the instance types. Otherwise, return @Nothing@
 tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
 tyConFamInst_maybe tc
   = case tyConParent tc of
-      FamInstTyCon f ts _ -> Just (f, ts)
+      FamInstTyCon _ f ts -> Just (f, ts)
       _                   -> Nothing
 
 -- | If this 'TyCon' is that of a family instance, return a 'TyCon' which represents 
@@ -1482,7 +1467,7 @@ tyConFamInst_maybe tc
 tyConFamilyCoercion_maybe :: TyCon -> Maybe CoAxiom
 tyConFamilyCoercion_maybe tc
   = case tyConParent tc of
-      FamInstTyCon _ _ co -> Just co
+      FamInstTyCon co _ _ -> Just co
       _                   -> Nothing
 \end{code}
 

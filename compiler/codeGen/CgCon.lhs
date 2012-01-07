@@ -352,8 +352,8 @@ cgReturnDataCon con amodes
         }
   where
     enter_it    = stmtsC [ CmmAssign nodeReg (cmmUntag (CmmReg nodeReg)),
-                           CmmJump (entryCode (closureInfoPtr (CmmReg nodeReg))) [] ]
-    jump_to lbl = stmtC (CmmJump (CmmLit lbl) [])
+                           CmmJump (entryCode (closureInfoPtr (CmmReg nodeReg)))]
+    jump_to lbl = stmtC (CmmJump (CmmLit lbl))
     build_it_then return_code
       = do {    -- BUILD THE OBJECT IN THE HEAP
                 -- The first "con" says that the name bound to this

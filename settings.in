@@ -10,6 +10,7 @@
  ("perl command", "@SettingsPerlCommand@"),
  ("target os", "@HaskellTargetOs@"),
  ("target arch", "@HaskellTargetArch@"),
+ ("target word size", "@WordSize@"),
  ("target has GNU nonexec stack", "@HaskellHaveGnuNonexecStack@"),
  ("target has .ident directive", "@HaskellHaveIdentDirective@"),
  ("target has subsections via symbols", "@HaskellHaveSubsectionsViaSymbols@")

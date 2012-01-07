@@ -488,7 +488,7 @@ mustExposeTyCon exports tc
     exported_con con = any (`elemNameSet` exports) 
 			   (dataConName con : dataConFieldLabels con)
 
-tidyInstances :: (DFunId -> DFunId) -> [Instance] -> [Instance]
+tidyInstances :: (DFunId -> DFunId) -> [ClsInst] -> [ClsInst]
 tidyInstances tidy_dfun ispecs
   = map tidy ispecs
   where

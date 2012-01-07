@@ -881,7 +881,7 @@ INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
         /* Commit succeeded */
         StgTSO_trec(CurrentTSO) = outer;
         Sp = Sp + SIZEOF_StgCatchSTMFrame;
-        jump Sp(SP_OFF);
+        jump %ENTRY_CODE(Sp(SP_OFF));
       } else {
         /* Commit failed */
         W_ new_trec;

@@ -436,31 +436,41 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
                           ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
                           ifCons = rdr_cons, 
                           ifRec = is_rec, 
-                          ifFamInst = mb_family })
+                          ifAxiom = mb_axiom_name })
   = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
     { tc_name <- lookupIfaceTop occ_name
-    ; tycon <- fixM ( \ tycon -> do
+    ; tycon <- fixM $ \ tycon -> do
             { stupid_theta <- tcIfaceCtxt ctxt
+            ; parent' <- tc_parent tyvars mb_axiom_name
             ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
-            ; mb_fam_inst  <- tcFamInst mb_family
-            ; buildAlgTyCon tc_name tyvars stupid_theta cons is_rec
-                            gadt_syn parent mb_fam_inst
-            })
+            ; return (buildAlgTyCon tc_name tyvars stupid_theta 
+                                    cons is_rec gadt_syn parent') }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
+  where
+    tc_parent :: [TyVar] -> Maybe Name -> IfL TyConParent
+    tc_parent _ Nothing = return parent
+    tc_parent tyvars (Just ax_name)
+      = ASSERT( isNoParent parent )
+        do { ax <- tcIfaceCoAxiom ax_name
+           ; let (fam_tc, fam_tys) = coAxiomSplitLHS ax
+                 subst = zipTopTvSubst (coAxiomTyVars ax) (mkTyVarTys tyvars)
+                            -- The subst matches the tyvar of the TyCon
+                            -- with those from the CoAxiom.  They aren't
+                            -- necessarily the same, since the two may be
+                            -- gotten from separate interface-file declarations
+           ; return (FamInstTyCon ax fam_tc (substTys subst fam_tys)) }
 
 tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
                                   ifSynRhs = mb_rhs_ty,
-                                  ifSynKind = kind, ifFamInst = mb_family})
+                                  ifSynKind = kind })
    = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
      { tc_name  <- lookupIfaceTop occ_name
      ; rhs_kind <- tcIfaceType kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $ 
                    tc_syn_rhs mb_rhs_ty
-     ; fam_info <- tcFamInst mb_family
-     ; tycon <- buildSynTyCon tc_name tyvars rhs rhs_kind parent fam_info
-     ; return (ATyCon tycon)
-     }
+     ; tycon    <- buildSynTyCon tc_name tyvars rhs rhs_kind parent
+     ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n
      tc_syn_rhs Nothing   = return SynFamilyTyCon
@@ -493,13 +503,9 @@ tc_iface_decl _parent ignore_prags
           ; return (op_name, dm, op_ty) }
 
    tc_at cls (IfaceAT tc_decl defs_decls)
-     = do tc <- tc_iface_tc_decl (AssocFamilyTyCon cls) tc_decl
+     = do ATyCon tc <- tc_iface_decl (AssocFamilyTyCon cls) ignore_prags tc_decl
           defs <- mapM tc_iface_at_def defs_decls
           return (tc, defs)
-
-   tc_iface_tc_decl parent decl = do
-       ATyCon tc <- tc_iface_decl parent ignore_prags decl
-       return tc
 
    tc_iface_at_def (IfaceATD tvs pat_tys ty) =
        bindIfaceTyVars_AT tvs $
@@ -517,17 +523,25 @@ tc_iface_decl _ _ (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
         ; return (ATyCon (mkForeignTyCon name ext_name 
                                          liftedTypeKind 0)) }
 
-tcFamInst :: Maybe (IfaceTyCon, [IfaceType]) -> IfL (Maybe (TyCon, [Type]))
-tcFamInst Nothing           = return Nothing
-tcFamInst (Just (fam, tys)) = do { famTyCon <- tcIfaceTyCon fam
-                                 ; insttys <- mapM tcIfaceType tys
-                                 ; return $ Just (famTyCon, insttys) }
+tc_iface_decl _ _ (IfaceAxiom {ifName = tc_occ, ifTyVars = tv_bndrs,
+                               ifLHS = lhs, ifRHS = rhs })
+  = bindIfaceTyVars tv_bndrs $ \ tvs -> do
+    { tc_name <- lookupIfaceTop tc_occ
+    ; tc_lhs  <- tcIfaceType lhs
+    ; tc_rhs  <- tcIfaceType rhs
+    ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
+                          , co_ax_name     = tc_name
+                          , co_ax_implicit = False
+                          , co_ax_tvs      = tvs
+                          , co_ax_lhs      = tc_lhs
+                          , co_ax_rhs      = tc_rhs }
+    ; return (ACoAxiom axiom) }
 
 tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon _ if_cons
   = case if_cons of
         IfAbstractTyCon dis -> return (AbstractTyCon dis)
-        IfOpenDataTyCon  -> return DataFamilyTyCon
+        IfDataFamTyCon  -> return DataFamilyTyCon
         IfDataTyCon cons -> do  { data_cons <- mapM tc_con_decl cons
                                 ; return (mkDataTyConRhs data_cons) }
         IfNewTyCon con   -> do  { data_con <- tc_con_decl con
@@ -603,8 +617,8 @@ look at it.
 %************************************************************************
 
 \begin{code}
-tcIfaceInst :: IfaceInst -> IfL Instance
-tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
+tcIfaceInst :: IfaceClsInst -> IfL ClsInst
+tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag,
                               ifInstCls = cls, ifInstTys = mb_tcs })
   = do { dfun    <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
                      tcIfaceExtId dfun_occ
@@ -612,14 +626,12 @@ tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
        ; return (mkImportedInstance cls mb_tcs' dfun oflag) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
-tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 
-                               ifFamInstFam = fam, ifFamInstTys = mb_tcs })
---      { tycon'  <- forkM (ptext (sLit "Inst tycon") <+> ppr tycon) $
--- the above line doesn't work, but this below does => CPP in Haskell = evil!
-    = do tycon'  <- forkM (text ("Inst tycon") <+> ppr tycon) $
-                    tcIfaceTyCon tycon
+tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
+                             , ifFamInstAxiom = axiom_name } )
+    = do axiom' <- forkM (ptext (sLit "Axiom") <+> ppr axiom_name) $
+                   tcIfaceCoAxiom axiom_name
          let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-         return (mkImportedFamInst fam mb_tcs' tycon')
+         return (mkImportedFamInst fam mb_tcs' axiom')
 \end{code}
 
 

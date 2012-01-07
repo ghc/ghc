@@ -1408,13 +1408,12 @@ instance Binary IfaceDecl where
         put_ bh a6
         put_ bh a7
 
-    put_ bh (IfaceSyn a1 a2 a3 a4 a5) = do
+    put_ bh (IfaceSyn a1 a2 a3 a4) = do
         putByte bh 3
         put_ bh (occNameFS a1)
         put_ bh a2
         put_ bh a3
         put_ bh a4
-        put_ bh a5
 
     put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7) = do
         putByte bh 4
@@ -1425,6 +1424,13 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
         put_ bh a7
+        
+    put_ bh (IfaceAxiom a1 a2 a3 a4) = do
+        putByte bh 5
+        put_ bh (occNameFS a1)
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
 
     get bh = do
         h <- getByte bh
@@ -1449,10 +1455,9 @@ instance Binary IfaceDecl where
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
-                    a5 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
-                    return (IfaceSyn occ a2 a3 a4 a5)
-            _ -> do a1 <- get bh
+                    return (IfaceSyn occ a2 a3 a4)
+            4 -> do a1 <- get bh
                     a2 <- get bh
                     a3 <- get bh
                     a4 <- get bh
@@ -1461,9 +1466,15 @@ instance Binary IfaceDecl where
                     a7 <- get bh
                     occ <- return $! mkOccNameFS clsName a2
                     return (IfaceClass a1 occ a3 a4 a5 a6 a7)
+            _ -> do a1 <- get bh
+                    a2 <- get bh
+                    a3 <- get bh
+                    a4 <- get bh
+                    occ <- return $! mkOccNameFS tcName a1
+                    return (IfaceAxiom occ a2 a3 a4)
 
-instance Binary IfaceInst where
-    put_ bh (IfaceInst cls tys dfun flag orph) = do
+instance Binary IfaceClsInst where
+    put_ bh (IfaceClsInst cls tys dfun flag orph) = do
         put_ bh cls
         put_ bh tys
         put_ bh dfun
@@ -1475,18 +1486,20 @@ instance Binary IfaceInst where
         dfun <- get bh
         flag <- get bh
         orph <- get bh
-        return (IfaceInst cls tys dfun flag orph)
+        return (IfaceClsInst cls tys dfun flag orph)
 
 instance Binary IfaceFamInst where
-    put_ bh (IfaceFamInst fam tys tycon) = do
+    put_ bh (IfaceFamInst fam tys name orph) = do
         put_ bh fam
         put_ bh tys
-        put_ bh tycon
+        put_ bh name
+        put_ bh orph
     get bh = do
-        fam   <- get bh
-        tys   <- get bh
-        tycon <- get bh
-        return (IfaceFamInst fam tys tycon)
+        fam      <- get bh
+        tys      <- get bh
+        name     <- get bh
+        orph     <- get bh
+        return (IfaceFamInst fam tys name orph)
 
 instance Binary OverlapFlag where
     put_ bh (NoOverlap  b) = putByte bh 0 >> put_ bh b
@@ -1503,14 +1516,14 @@ instance Binary OverlapFlag where
 
 instance Binary IfaceConDecls where
     put_ bh (IfAbstractTyCon d) = putByte bh 0 >> put_ bh d
-    put_ bh IfOpenDataTyCon     = putByte bh 1
+    put_ bh IfDataFamTyCon     = putByte bh 1
     put_ bh (IfDataTyCon cs)    = putByte bh 2 >> put_ bh cs
     put_ bh (IfNewTyCon c)      = putByte bh 3 >> put_ bh c
     get bh = do
         h <- getByte bh
         case h of
             0 -> get bh >>= (return . IfAbstractTyCon)
-            1 -> return IfOpenDataTyCon
+            1 -> return IfDataFamTyCon
             2 -> get bh >>= (return . IfDataTyCon)
             _ -> get bh >>= (return . IfNewTyCon)
 
