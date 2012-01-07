@@ -79,7 +79,8 @@ dsValBinds (ValBindsIn  _     _) _    = panic "dsValBinds ValBindsIn"
 -------------------------
 dsIPBinds :: HsIPBinds Id -> CoreExpr -> DsM CoreExpr
 dsIPBinds (IPBinds ip_binds ev_binds) body
-  = do  { let inner = mkCoreLets (dsTcEvBinds ev_binds) body
+  = do  { ds_binds <- dsTcEvBinds ev_binds
+        ; let inner = mkCoreLets ds_binds body
                 -- The dict bindings may not be in 
                 -- dependency order; hence Rec
         ; foldrM ds_ip_bind inner ip_binds }
@@ -131,7 +132,8 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlBagM (\body bind -> dsStrictBind (unLoc bind) body) 
                             body1 binds 
-       ; return (mkCoreLets (dsTcEvBinds ev_binds) body2) }
+       ; ds_binds <- dsTcEvBinds ev_binds
+       ; return (mkCoreLets ds_binds body2) }
 
 dsStrictBind (FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn 
                       , fun_tick = tick, fun_infix = inf }) body
@@ -216,7 +218,7 @@ dsExpr (HsOverLit lit)        = dsOverLit lit
 
 dsExpr (HsWrap co_fn e)
   = do { e' <- dsExpr e
-       ; let wrapped_e = dsHsWrapper co_fn e'
+       ; wrapped_e <- dsHsWrapper co_fn e'
        ; warn_id <- woptDs Opt_WarnIdentities
        ; when warn_id $ warnAboutIdentities e' wrapped_e
        ; return wrapped_e }

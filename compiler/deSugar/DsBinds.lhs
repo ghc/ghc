@@ -32,6 +32,7 @@ import DsUtils
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
+import HscTypes(MonadThings)
 import CoreSubst
 import MkCore
 import CoreUtils
@@ -66,6 +67,7 @@ import Util
 
 import MonadUtils
 import Data.Word(Word)
+import Control.Monad(liftM)
 \end{code}
 
 %************************************************************************
@@ -109,7 +111,7 @@ dsHsBind (FunBind { fun_id = L _ fun, fun_matches = matches
                   , fun_infix = inf })
  = do	{ (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
         ; let body' = mkOptTickBox tick body
-              rhs = dsHsWrapper co_fn (mkLams args body')
+        ; rhs <- dsHsWrapper co_fn (mkLams args body')
         ; {- pprTrace "dsHsBind" (ppr fun <+> ppr (idInlinePragma fun)) $ -}
            return (unitOL (makeCorePair fun False 0 rhs)) }
 
@@ -133,9 +135,10 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
         , abe_mono = local, abe_prags = prags } <- export
   = do  { bind_prs    <- ds_lhs_binds binds
 	; let	core_bind = Rec (fromOL bind_prs)
-                rhs       = dsHsWrapper wrap $  -- Usually the identity
+        ; ds_binds <- dsTcEvBinds ev_binds
+        ; rhs <- dsHsWrapper wrap $  -- Usually the identity
 			    mkLams tyvars $ mkLams dicts $ 
-	                    mkCoreLets (dsTcEvBinds ev_binds) $
+	                    mkCoreLets ds_binds $
                             Let core_bind $
                             Var local
     
@@ -151,13 +154,14 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = exports, abs_ev_binds = ev_binds
                    , abs_binds = binds })
   = do  { bind_prs    <- ds_lhs_binds binds
+        ; ds_binds    <- dsTcEvBinds ev_binds
         ; let core_bind = Rec (fromOL bind_prs)
 	      	-- Monomorphic recursion possible, hence Rec
 
 	      tup_expr     = mkBigCoreVarTup locals
 	      tup_ty	   = exprType tup_expr
 	      poly_tup_rhs = mkLams tyvars $ mkLams dicts $
-	      		     mkCoreLets (dsTcEvBinds ev_binds) $
+	      		     mkCoreLets ds_binds $
 			     Let core_bind $
 	 	     	     tup_expr
 	      locals       = map abe_mono exports
@@ -167,11 +171,11 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 	; let mk_bind (ABE { abe_wrap = wrap, abe_poly = global
                            , abe_mono = local, abe_prags = spec_prags })
 	        = do { tup_id  <- newSysLocalDs tup_ty
-	             ; let rhs = dsHsWrapper wrap $ 
+	             ; rhs <- dsHsWrapper wrap $ 
                                  mkLams tyvars $ mkLams dicts $
 	      	     		 mkTupleSelector locals local tup_id $
 			         mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
-                           rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
+                     ; let rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
 		     ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
 		     ; let global' = addIdSpecialisations global rules
 		     ; return ((global', rhs) `consOL` spec_binds) }
@@ -400,8 +404,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   = putSrcSpanDs loc $ 
     do { let poly_name = idName poly_id
        ; spec_name <- newLocalName poly_name
-       ; let (bndrs, ds_lhs) = collectBinders (dsHsWrapper spec_co (Var poly_id))
-             spec_ty = mkPiTypes bndrs (exprType ds_lhs)
+       ; (bndrs, ds_lhs) <- liftM collectBinders
+                                  (dsHsWrapper spec_co (Var poly_id))
+       ; let spec_ty = mkPiTypes bndrs (exprType ds_lhs)
        ; case decomposeRuleLhs bndrs ds_lhs of {
            Left msg -> do { warnDs msg; return Nothing } ;
            Right (final_bndrs, _fn, args) -> do
@@ -439,8 +444,8 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        		        final_bndrs args
        			(mkVarApps (Var spec_id) bndrs)
 
-             spec_rhs  = dsHsWrapper spec_co poly_rhs
-             spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
+       ; spec_rhs <- dsHsWrapper spec_co poly_rhs
+       ; let spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
 
        ; return (Just (spec_pair `consOL` unf_pairs, rule))
        } } }
@@ -645,28 +650,29 @@ as the old one, but with an Internal name and no IdInfo.
 
 
 \begin{code}
-dsHsWrapper :: HsWrapper -> CoreExpr -> CoreExpr
-dsHsWrapper WpHole 	      e = e
-dsHsWrapper (WpTyApp ty)      e = App e (Type ty)
-dsHsWrapper (WpLet ev_binds)  e = mkCoreLets (dsTcEvBinds ev_binds) e
-dsHsWrapper (WpCompose c1 c2) e = dsHsWrapper c1 (dsHsWrapper c2 e) 
-dsHsWrapper (WpCast co)       e = dsTcCoercion co (mkCast e) 
-dsHsWrapper (WpEvLam ev)      e = Lam ev e 
-dsHsWrapper (WpTyLam tv)      e = Lam tv e 
-dsHsWrapper (WpEvApp evtrm)   e = App e (dsEvTerm evtrm)
+dsHsWrapper :: MonadThings m => HsWrapper -> CoreExpr -> m CoreExpr
+dsHsWrapper WpHole 	      e = return e
+dsHsWrapper (WpTyApp ty)      e = return $ App e (Type ty)
+dsHsWrapper (WpLet ev_binds)  e = do bs <- dsTcEvBinds ev_binds
+                                     return (mkCoreLets bs e)
+dsHsWrapper (WpCompose c1 c2) e = dsHsWrapper c1 =<< dsHsWrapper c2 e
+dsHsWrapper (WpCast co)       e = return $ dsTcCoercion co (mkCast e) 
+dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e 
+dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e 
+dsHsWrapper (WpEvApp evtrm)   e = liftM (App e) (dsEvTerm evtrm)
 
 --------------------------------------
-dsTcEvBinds :: TcEvBinds -> [CoreBind]
-dsTcEvBinds (TcEvBinds {}) = panic "dsEvBinds"	-- Zonker has got rid of this
+dsTcEvBinds :: MonadThings m => TcEvBinds -> m [CoreBind]
+dsTcEvBinds (TcEvBinds {}) = panic "dsEvBinds"    -- Zonker has got rid of this
 dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
 
-dsEvBinds :: Bag EvBind -> [CoreBind]
-dsEvBinds bs = map ds_scc (sccEvBinds bs)
+dsEvBinds :: MonadThings m => Bag EvBind -> m [CoreBind]
+dsEvBinds bs = mapM ds_scc (sccEvBinds bs)
   where
-    ds_scc (AcyclicSCC (EvBind v r)) = NonRec v (dsEvTerm r)
-    ds_scc (CyclicSCC bs)            = Rec (map ds_pair bs)
+    ds_scc (AcyclicSCC (EvBind v r)) = liftM (NonRec v) (dsEvTerm r)
+    ds_scc (CyclicSCC bs)            = liftM Rec (mapM ds_pair bs)
 
-    ds_pair (EvBind v r) = (v, dsEvTerm r)
+    ds_pair (EvBind v r) = liftM ((,) v) (dsEvTerm r)
 
 sccEvBinds :: Bag EvBind -> [SCC EvBind]
 sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
@@ -679,19 +685,20 @@ sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
 
 
 ---------------------------------------
-dsEvTerm :: EvTerm -> CoreExpr
-dsEvTerm (EvId v) = Var v
+dsEvTerm :: MonadThings m => EvTerm -> m CoreExpr
+dsEvTerm (EvId v) = return (Var v)
 
 dsEvTerm (EvCast v co) 
-  = dsTcCoercion co $ mkCast (Var v) -- 'v' is always a lifted evidence variable so it is
+  = return $ dsTcCoercion co $ mkCast (Var v) -- 'v' is always a lifted evidence variable so it is
                                      -- unnecessary to call varToCoreExpr v here.
 dsEvTerm (EvKindCast v co)
-  = dsTcCoercion co $ (\_ -> Var v)
+  = return $ dsTcCoercion co $ (\_ -> Var v)
 
-dsEvTerm (EvDFunApp df tys vars) = Var df `mkTyApps` tys `mkVarApps` vars
-dsEvTerm (EvCoercion co)         = dsTcCoercion co mkEqBox
+dsEvTerm (EvDFunApp df tys vars) = return (Var df `mkTyApps` tys `mkVarApps` vars)
+dsEvTerm (EvCoercion co)         = return $ dsTcCoercion co mkEqBox
 dsEvTerm (EvTupleSel v n)
    = ASSERT( isTupleTyCon tc )
+     return $
      Case (Var v) (mkWildValBinder (varType v)) (tys !! n) [(DataAlt dc, xs, Var v')]
   where
     (tc, tys) = splitTyConApp (evVarPred v)
@@ -699,11 +706,11 @@ dsEvTerm (EvTupleSel v n)
     v' = v `setVarType` ty_want
     xs = map mkWildValBinder tys_before ++ v' : map mkWildValBinder tys_after
     (tys_before, ty_want:tys_after) = splitAt n tys
-dsEvTerm (EvTupleMk vs) = Var (dataConWorkId dc) `mkTyApps` tys `mkVarApps` vs
+dsEvTerm (EvTupleMk vs) = return $ Var (dataConWorkId dc) `mkTyApps` tys `mkVarApps` vs
   where dc = tupleCon ConstraintTuple (length vs)
         tys = map varType vs
 dsEvTerm (EvSuperClass d n)
-  = Var sc_sel_id `mkTyApps` tys `App` Var d
+  = return $ Var sc_sel_id `mkTyApps` tys `App` Var d
   where
     sc_sel_id  = classSCSelId cls n	-- Zero-indexed
     (cls, tys) = getClassPredTys (evVarPred d)    
@@ -714,7 +721,7 @@ dsEvTerm (EvSuperClass d n)
 -- leave this for a later day.
 dsEvTerm (EvInteger n)
   | n > fromIntegral (maxBound :: Word) = panic "dsEvTerm: Integer too big!"
-  | otherwise = mkWordExprWord (fromInteger n)
+  | otherwise = return $ mkWordExprWord (fromInteger n)
 
 ---------------------------------------
 dsTcCoercion :: TcCoercion -> (Coercion -> CoreExpr) -> CoreExpr
