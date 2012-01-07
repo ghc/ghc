@@ -1174,6 +1174,12 @@ Subject: [PATCH 0695/1074] Add an RTS eventlog tracing class for user messages
 
             <listitem>
                 <para>
+                    TODO: &lt;&gt;
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
                     <literal>Data.List</literal> has a new function
                     <literal>dropWhileEnd</literal>, which is similar to
                     <literal>dropWhile</literal> except it removes the
