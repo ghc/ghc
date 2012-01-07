@@ -647,10 +647,10 @@ builtinIntegerRules =
   -- TODO: quotInteger rule
   -- TODO: remInteger rule
   -- TODO: encodeFloatInteger rule
-  -- TODO: floatFromInteger rule
+  rule_convert        "floatFromInteger"  floatFromIntegerName  mkFloatLitFloat,
   -- TODO: encodeDoubleInteger rule
   -- TODO: decodeDoubleInteger rule
-  -- TODO: doubleFromInteger rule
+  rule_convert        "doubleFromInteger" doubleFromIntegerName mkDoubleLitDouble,
   rule_binop          "gcdInteger"        gcdIntegerName        gcd,
   rule_binop          "lcmInteger"        lcmIntegerName        lcm,
   rule_binop          "andInteger"        andIntegerName        (.&.),
@@ -750,7 +750,7 @@ match_Integer_convert :: Num a
                       -> Maybe (Expr CoreBndr)
 match_Integer_convert convert id_unf [xl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert (fromIntegral x))
+  = Just (convert (fromInteger x))
 match_Integer_convert _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer)
