@@ -57,7 +57,6 @@ import Pair ( pSnd )
 import UniqFM
 import FastString ( sLit ) 
 import DynFlags
-import Data.Word(Word)
 \end{code}
 **********************************************************************
 *                                                                    * 
@@ -1775,8 +1774,7 @@ matchClassInst :: InertSet -> Class -> [Type] -> WantedLoc -> TcS LookupInstResu
 
 matchClassInst _ clas [ ty ] _
   | className clas == typeNatClassName
-  , Just n <- isNumberTy ty
-  , n <= fromIntegral (maxBound :: Word) = return (GenInst [] (EvInteger n))
+  , Just n <- isNumberTy ty = return (GenInst [] (EvInteger n))
 
 
 matchClassInst inerts clas tys loc
