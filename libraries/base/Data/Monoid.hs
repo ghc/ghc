@@ -20,6 +20,7 @@
 module Data.Monoid (
         -- * Monoid typeclass
         Monoid(..),
+        (<>),
         Dual(..),
         Endo(..),
         -- * Bool wrappers
@@ -87,6 +88,13 @@ class Monoid a where
         -- that an optimized version can be provided for specific types.
 
         mconcat = foldr mappend mempty
+
+infixr 6 <>
+
+-- | An infix synonym for 'mappend'.
+(<>) :: Monoid m => m -> m -> m
+(<>) = mappend
+{-# INLINE (<>) #-}
 
 -- Monoid instances.
 

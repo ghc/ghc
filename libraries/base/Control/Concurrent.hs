@@ -45,6 +45,7 @@ module Control.Concurrent (
         forkOn,
         forkOnWithUnmask,
         getNumCapabilities,
+        setNumCapabilities,
         threadCapability,
 
         -- * Scheduling
