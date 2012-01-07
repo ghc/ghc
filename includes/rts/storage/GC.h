@@ -67,7 +67,7 @@ typedef struct nursery_ {
 } nursery;
 
 typedef struct generation_ {
-    unsigned int   no;			// generation number
+    nat            no;			// generation number
 
     bdescr *       blocks;	        // blocks in this gen
     memcount       n_blocks;            // number of blocks
@@ -85,9 +85,9 @@ typedef struct generation_ {
     struct generation_ *to;		// destination gen for live objects
 
     // stats information
-    unsigned int collections;
-    unsigned int par_collections;
-    unsigned int failed_promotions;
+    nat collections;
+    nat par_collections;
+    nat failed_promotions;
 
     // ------------------------------------
     // Fields below are used during GC only
