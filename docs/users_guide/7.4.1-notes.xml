@@ -1180,6 +1180,15 @@ Subject: [PATCH 0695/1074] Add an RTS eventlog tracing class for user messages
 
             <listitem>
                 <para>
+                    TODO:
+commit f98a240c1c302c3d1ad56f764f4d09a03d68fbe4
+
+    Removing the MonadGroup class. This is to reflect the removal of the default
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
                     <literal>Data.List</literal> has a new function
                     <literal>dropWhileEnd</literal>, which is similar to
                     <literal>dropWhile</literal> except it removes the
