@@ -621,11 +621,17 @@ builtinRules
 
 builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
- [rule_convert        "integerToWord"     integerToWordName     mkWordLitWord,
+ [-- TODO: smallInteger rule
+  -- TODO: wordToInteger rule
+  rule_convert        "integerToWord"     integerToWordName     mkWordLitWord,
   rule_convert        "integerToInt"      integerToIntName      mkIntLitInt,
+  -- TODO: integerToWord64 rule
+  -- TODO: word64ToInteger rule
+  -- TODO: integerToInt64 rule
+  -- TODO: int64ToInteger rule
   rule_binop          "plusInteger"       plusIntegerName       (+),
-  rule_binop          "timesInteger"      timesIntegerName      (*),
   rule_binop          "minusInteger"      minusIntegerName      (-),
+  rule_binop          "timesInteger"      timesIntegerName      (*),
   rule_unop           "negateInteger"     negateIntegerName     negate,
   rule_binop_Bool     "eqInteger"         eqIntegerName         (==),
   rule_binop_Bool     "neqInteger"        neqIntegerName        (/=),
@@ -636,8 +642,15 @@ builtinIntegerRules =
   rule_binop_Bool     "ltInteger"         ltIntegerName         (<),
   rule_binop_Bool     "geInteger"         geIntegerName         (>=),
   rule_binop_Ordering "compareInteger"    compareIntegerName    compare,
-  rule_divop          "quotRemInteger"    quotRemIntegerName    quotRem,
   rule_divop          "divModInteger"     divModIntegerName     divMod,
+  rule_divop          "quotRemInteger"    quotRemIntegerName    quotRem,
+  -- TODO: quotInteger rule
+  -- TODO: remInteger rule
+  -- TODO: encodeFloatInteger rule
+  -- TODO: floatFromInteger rule
+  -- TODO: encodeDoubleInteger rule
+  -- TODO: decodeDoubleInteger rule
+  -- TODO: doubleFromInteger rule
   rule_binop          "gcdInteger"        gcdIntegerName        gcd,
   rule_binop          "lcmInteger"        lcmIntegerName        lcm,
   rule_binop          "andInteger"        andIntegerName        (.&.),
