@@ -258,7 +258,7 @@ PRIMOP_BITS = compiler/primop-data-decl.hs-incl        \
               compiler/primop-strictness.hs-incl       \
               compiler/primop-primop-info.hs-incl
 
-compiler_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
+compiler_CPP_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 compiler_CPP_OPTS += ${GhcCppOpts}
 
 $(PRIMOPS_TXT) compiler/parser/Parser.y: %: %.pp compiler/stage1/$(PLATFORM_H)

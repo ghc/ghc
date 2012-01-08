@@ -1111,7 +1111,7 @@ ifeq "$(BootingFromHc)" "YES"
 # flags explicitly to C compilations.
 SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
 SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
-SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR)
+SRC_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 endif
 
 # -----------------------------------------------------------------------------
@@ -1132,10 +1132,12 @@ CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
 CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
-# These two are no longer generated, but we still clean them for a while
+# These four are no longer generated, but we still clean them for a while
 # as they may still be in old GHC trees:
 CLEAN_FILES += includes/GHCConstants.h
 CLEAN_FILES += includes/DerivedConstants.h
+CLEAN_FILES += includes/ghcautoconf.h
+CLEAN_FILES += includes/ghcplatform.h
 
 clean : clean_files clean_libraries
 
