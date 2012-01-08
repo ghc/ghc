@@ -666,17 +666,12 @@ $(foreach p,$(PACKAGES_STAGE0),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
 
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
-libraries/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
+libraries/dist-haddock/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
 	cd libraries && sh gen_contents_index --inplace
 ifeq "$(phase)" "final"
-$(eval $(call all-target,library_doc_index,libraries/index.html))
+$(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
 endif
-INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
-CLEAN_FILES += $(wildcard libraries/doc-index*   \
-                          libraries/haddock*.css \
-                          libraries/haddock*.js  \
-                          libraries/index*.html  \
-                          libraries/*.gif)
+INSTALL_LIBRARY_DOCS += libraries/dist-haddock/*
 endif
 
 # -----------------------------------------------------------------------------
@@ -1164,6 +1159,11 @@ $(foreach lib,$(PACKAGES_STAGE0),\
 $(foreach lib,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2),\
   $(eval $(call clean-target,libraries/$(lib),dist-install,libraries/$(lib)/dist-install)))
 endif
+
+clean : clean_haddock_index
+.PHONY: clean_haddock_index
+clean_haddock_index:
+	$(call removeTrees,libraries/dist-haddock)
 
 clean : clean_bindistprep
 .PHONY: clean_bindistprep
