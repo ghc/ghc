@@ -253,7 +253,7 @@ emitAlgReturnTarget name branches mb_deflt fam_sz
 emitReturnInstr :: Code
 emitReturnInstr 
   = do 	{ info_amode <- getSequelAmode
-	; stmtC (CmmJump (entryCode info_amode) []) }
+	; stmtC (CmmJump (entryCode info_amode)) }
 
 -----------------------------------------------------------------------------
 --

@@ -1020,7 +1020,7 @@ fixStgRegStmt stmt
 
         CmmSwitch expr ids -> CmmSwitch (fixStgRegExpr expr) ids
 
-        CmmJump addr regs -> CmmJump (fixStgRegExpr addr) regs
+        CmmJump addr -> CmmJump (fixStgRegExpr addr)
 
         -- CmmNop, CmmComment, CmmBranch, CmmReturn
         _other -> stmt

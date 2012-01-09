@@ -2261,7 +2261,7 @@ f "2"    = 2
 	<term><option>-msse4.2</option>:</term>
 	<listitem>
           <para>
-				(x86 only, added in GHC 7.2.1) Use the SSE4.2 instruction set to
+				(x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
 				implement some floating point and bit operations when using the
 				<link linkend="native-code-gen">native code generator</link>. The
 				resulting compiled code will only run on processors that

@@ -13,7 +13,7 @@
  * PROFILING info in a TSO
  */
 typedef struct {
-  CostCentreStack *CCCS;	/* thread's current CCS */
+  CostCentreStack *cccs;       /* thread's current CCS */
 } StgTSOProfInfo;
 
 /*

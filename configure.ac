@@ -3,7 +3,7 @@ dnl (run "grep '^dnl \*' configure.ac | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
 dnl  (or some such) to see the outline of this file)
 dnl
 #
-# (c) The University of Glasgow 1994-2004
+# (c) The University of Glasgow 1994-2012
 #
 # Configure script template for GHC
 #
@@ -18,11 +18,11 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [7.5], [glasgow-haske
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
 
-# The primary version (e.g. 6.7, 6.6.1) is set in the AC_INIT line
+# The primary version (e.g. 7.5, 7.4.1) is set in the AC_INIT line
 # above.  If this is not a released version, then we will append the
-# date to the version number (e.g. 6.7.20070204).  The date is
+# date to the version number (e.g. 7.4.20111220).  The date is
 # constructed by finding the date of the most recent patch in the
-# darcs repository.  If this is a source distribution (not a darcs
+# git repository.  If this is a source distribution (not a git
 # checkout), then we ship a file 'VERSION' containing the full version
 # when the source distribution was created.
 
@@ -257,7 +257,7 @@ then
     NM="$hardtop/inplace/mingw/bin/nm.exe"
     fp_prog_ar_raw="$hardtop/inplace/mingw/bin/ar.exe"
 
-    # NB. If you update the tarbballs to a new version of gcc, don't
+    # NB. If you update the tarballs to a new version of gcc, don't
     # forget to tweak the paths in driver/gcc/gcc.c.
     if ! test -d inplace/mingw ||
          test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
@@ -669,8 +669,8 @@ then
   AC_DEFINE([HAVE_LIBM], [1], [Define to 1 if you need to link with libm])
 fi
 
-dnl ** check whether this machine has BFD and liberty installed (used for debugging)
-dnl    the order of these tests matters: bfd needs liberty
+dnl ** check whether this machine has BFD and libiberty installed (used for debugging)
+dnl    the order of these tests matters: bfd needs libiberty
 AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_uncompress_section_contents)
 
@@ -694,7 +694,7 @@ dnl --------------------------------------------------
 dnl ** can we get alloca?
 AC_FUNC_ALLOCA
 
-dnl ** Working vfork?
+dnl ** working vfork?
 AC_FUNC_FORK
 
 dnl ** determine whether or not const works
@@ -750,7 +750,7 @@ if test -n "$GTK_CONFIG"; then
 fi
 AC_SUBST([GTK_CONFIG])
 
-#Checking for PAPI
+# checking for PAPI
 AC_CHECK_LIB(papi, PAPI_library_init, HavePapiLib=YES, HavePapiLib=NO)
 AC_CHECK_HEADER([papi.h], [HavePapiHeader=YES], [HavePapiHeader=NO])
 AC_SUBST(HavePapiLib)
@@ -799,7 +799,7 @@ AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
 
-# We get caught by
+# We got caught by
 #     http://savannah.gnu.org/bugs/index.php?1516
 #     $(eval ...) inside conditionals causes errors
 # with make 3.80, so warn the user if it looks like they're about to

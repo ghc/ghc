@@ -105,7 +105,7 @@ ofZgraph g = Old.ListGraph $ mapMaybe convert_block $ postorderDfs g
                               , Just expr' <- maybeInvertCmmExpr expr -> Old.CmmCondBranch expr' fid : tail_of tid
                               | otherwise -> [Old.CmmCondBranch expr tid, Old.CmmBranch fid]
                             CmmSwitch arg ids -> [Old.CmmSwitch arg ids]
-                            CmmCall e _ _ _ _ -> [Old.CmmJump e []]
+                            CmmCall e _ _ _ _ -> [Old.CmmJump e]
                             CmmForeignCall {} -> panic "ofZgraph: CmmForeignCall"
                           tail_of bid = case foldBlockNodesB3 (first, middle, last) block () of
                                           Old.BasicBlock _ stmts -> stmts

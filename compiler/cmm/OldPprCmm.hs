@@ -153,8 +153,8 @@ pprStmt platform stmt = case stmt of
 
     CmmBranch ident          -> genBranch ident
     CmmCondBranch expr ident -> genCondBranch platform expr ident
-    CmmJump expr params      -> genJump platform expr params
-    CmmReturn params         -> genReturn platform params
+    CmmJump expr             -> genJump platform expr
+    CmmReturn                -> genReturn platform
     CmmSwitch arg ids        -> genSwitch platform arg ids
 
 -- Just look like a tuple, since it was a tuple before
@@ -203,8 +203,8 @@ genCondBranch platform expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: Platform -> CmmExpr -> [CmmHinted CmmExpr] -> SDoc
-genJump platform expr args =
+genJump :: Platform -> CmmExpr -> SDoc
+genJump platform expr =
     hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
@@ -212,8 +212,6 @@ genJump platform expr args =
                 else case expr of
                     CmmLoad (CmmReg _) _ -> pprExpr platform expr
                     _ -> parens (pprExpr platform expr)
-         , space
-         , parens  ( commafy $ map (pprPlatform platform) args )
          , semi ]
 
 
@@ -222,12 +220,9 @@ genJump platform expr args =
 --
 --     return (a, b, c);
 --
-genReturn :: Platform -> [CmmHinted CmmExpr] -> SDoc
-genReturn platform args =
-    hcat [ ptext (sLit "return")
-         , space
-         , parens  ( commafy $ map (pprPlatform platform) args )
-         , semi ]
+genReturn :: Platform -> SDoc
+genReturn _ =
+    hcat [ ptext (sLit "return") , semi ]
 
 -- --------------------------------------------------------------------------
 -- Tabled jump to local label

@@ -878,9 +878,9 @@ cmmStmtConFold stmt
                  src'  <- cmmExprConFold DataReference src
                  return $ CmmStore addr' src'
 
-        CmmJump addr regs
+        CmmJump addr
            -> do addr' <- cmmExprConFold JumpReference addr
-                 return $ CmmJump addr' regs
+                 return $ CmmJump addr'
 
         CmmCall target regs args returns
 	   -> do target' <- case target of

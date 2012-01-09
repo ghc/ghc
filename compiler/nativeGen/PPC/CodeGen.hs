@@ -141,8 +141,8 @@ stmtToInstrs stmt = do
     CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
-    CmmJump arg _         -> genJump arg
-    CmmReturn _           ->
+    CmmJump arg           -> genJump arg
+    CmmReturn             ->
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
