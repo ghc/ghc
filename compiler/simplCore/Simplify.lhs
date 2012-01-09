@@ -976,11 +976,6 @@ simplType env ty
 ---------------------------------
 simplCoercionF :: SimplEnv -> InCoercion -> SimplCont
                -> SimplM (SimplEnv, OutExpr)
--- We are simplifying a term of form (Coercion co)
--- Simplify the InCoercion, and then try to combine with the 
--- context, to implememt the rule
---     (Coercion co) |> g
---  =  Coercion (syn (nth 0 g) ; co ; nth 1 g) 
 simplCoercionF env co cont 
   = do { co' <- simplCoercion env co
        ; rebuild env (Coercion co') cont }
@@ -1164,7 +1159,7 @@ rebuild env expr cont
   = case cont of
       Stop {}                      -> return (env, expr)
       CoerceIt co cont             -> rebuild env (mkCast expr co) cont 
-                                         -- NB: mkCast implements the (Coercion co |> g) optimisation
+                                   -- NB: mkCast implements the (Coercion co |> g) optimisation
       Select _ bndr alts se cont   -> rebuildCase (se `setFloats` env) expr bndr alts cont
       StrictArg info _ cont        -> rebuildCall env (info `addArgTo` expr) cont
       StrictBind b bs body se cont -> do { env' <- simplNonRecX (se `setFloats` env) b expr
