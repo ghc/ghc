@@ -45,12 +45,19 @@ module RdrHsSyn (
         checkRecordSyntax,
         parseError,
         parseErrorSDoc,
+
+        -- Help with processing exports
+        ImpExpSubSpec(..),
+        mkModuleImpExp
+
     ) where
 
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
-                          isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
+                          isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace,
+                          rdrNameSpace )
+import OccName          ( tcClsName, isVarNameSpace )
 import Name             ( Name )
 import BasicTypes       ( maxPrecedence, Activation(..), RuleMatchInfo,
                           InlinePragma(..), InlineSpec(..) )
@@ -980,6 +987,24 @@ mkExtName :: RdrName -> CLabelString
 mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
 \end{code}
 
+--------------------------------------------------------------------------------
+-- Help with module system imports/exports
+
+\begin{code}
+data ImpExpSubSpec = ImpExpAbs | ImpExpAll | ImpExpList [ RdrName ]
+
+mkModuleImpExp :: RdrName -> ImpExpSubSpec -> IE RdrName
+mkModuleImpExp name subs =
+  case subs of
+    ImpExpAbs | isVarNameSpace (rdrNameSpace name)
+                  -> IEVar       name
+    ImpExpAbs     -> IEThingAbs  nameT
+    ImpExpAll     -> IEThingAll  nameT
+    ImpExpList xs -> IEThingWith nameT xs
+
+  where
+  nameT = setRdrNameSpace name tcClsName
+\end{code}
 
 -----------------------------------------------------------------------------
 -- Misc utils
