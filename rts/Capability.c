@@ -353,7 +353,7 @@ moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
 	initCapability(&capabilities[i], i);
     }
 
-    last_free_capability = NULL;
+    last_free_capability = &capabilities[0];
 
     debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
 
