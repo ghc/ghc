@@ -48,6 +48,7 @@ llvmCodeGen dflags h us cmms
     in do
         showPass dflags "LlVM CodeGen"
         bufh <- newBufHandle h
+        dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" $ docToSDoc pprLlvmHeader
         Prt.bufLeftRender bufh $ pprLlvmHeader
         ver  <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
         env' <- {-# SCC "llvm_datas_gen" #-}
