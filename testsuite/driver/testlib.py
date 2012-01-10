@@ -111,7 +111,7 @@ def _reqlib( opts, lib ):
         have_lib[lib] = got_it
 
     if not got_it:
-        opts.expect = 'fail'
+        opts.expect = 'missing-lib'
 
 def req_profiling( opts ):
     if not config.have_profiling:
@@ -216,6 +216,14 @@ def extra_run_opts( val ):
 
 def _extra_run_opts( opts, v ):
     opts.extra_run_opts = v
+
+# -----
+
+def extra_hc_opts( val ):
+    return lambda opts, v=val: _extra_hc_opts(opts, v);
+
+def _extra_hc_opts( opts, v ):
+    opts.extra_hc_opts = v
 
 # -----
 
@@ -699,7 +707,9 @@ def do_test(name, way, func, args):
             if config.use_threads:
                 t.lock.acquire()
 
-        if getTestOpts().expect != 'pass' and getTestOpts().expect != 'fail':
+        if getTestOpts().expect != 'pass' and \
+                getTestOpts().expect != 'fail' and \
+                getTestOpts().expect != 'missing-lib':
             framework_fail(name, way, 'bad expected ' + getTestOpts().expect)
 
         try:
@@ -727,11 +737,18 @@ def do_test(name, way, func, args):
                 reason = result['reason']
                 addFailingTestInfo(t.unexpected_failures, getTestOpts().testdir, name, reason, way)
             else:
-                t.n_expected_failures = t.n_expected_failures + 1
-                if name in t.expected_failures:
-                    t.expected_failures[name].append(way)
+                if getTestOpts().expect == 'missing-lib':
+                    t.n_missing_libs = t.n_missing_libs + 1
+                    if name in t.missing_libs:
+                        t.missing_libs[name].append(way)
+                    else:
+                        t.missing_libs[name] = [way]
                 else:
-                    t.expected_failures[name] = [way]
+                    t.n_expected_failures = t.n_expected_failures + 1
+                    if name in t.expected_failures:
+                        t.expected_failures[name].append(way)
+                    else:
+                        t.expected_failures[name] = [way]
         else:
             framework_fail(name, way, 'bad result ' + passFail)
     except:
@@ -1974,6 +1991,8 @@ def summary(t, file):
                + ' were skipped\n\n' \
                + string.rjust(`t.n_expected_passes`, 8)
                + ' expected passes\n' \
+               + string.rjust(`t.n_missing_libs`, 8)
+               + ' had missing libraries\n' \
                + string.rjust(`t.n_expected_failures`, 8) \
                + ' expected failures\n' \
                + string.rjust(`t.n_unexpected_passes`, 8) \
