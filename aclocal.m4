@@ -370,6 +370,18 @@ AC_DEFUN([FP_SETTINGS],
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
         SettingsTouchCommand='touch'
+        if test -z "$LlcCmd"
+        then
+          SettingsLlcCommand="llc"
+        else
+          SettingsLlcCommand="$LlcCmd"
+        fi
+        if test -z "$OptCmd"
+        then
+          SettingsOptCommand="opt"
+        else
+          SettingsOptCommand="$OptCmd"
+        fi
     fi
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsCCompilerFlags)
@@ -377,6 +389,8 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsTouchCommand)
+    AC_SUBST(SettingsLlcCommand)
+    AC_SUBST(SettingsOptCommand)
 ])
 
 
@@ -537,6 +551,35 @@ AC_ARG_WITH($2,
 )
 ]) # FP_ARG_WITH_PATH_GNU_PROG
 
+
+# FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
+# --------------------
+# XXX
+#
+# $1 = the variable to set
+# $2 = the command to look for
+#
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL],
+[
+AC_ARG_WITH($2,
+[AC_HELP_STRING([--with-$2=ARG],
+        [Use ARG as the path to $2 [default=autodetect]])],
+[
+    if test "$HostOS" = "mingw32"
+    then
+        AC_MSG_WARN([Request to use $withval will be ignored])
+    else
+        $1=$withval
+    fi
+],
+[
+    if test "$HostOS" != "mingw32"
+    then
+        AC_PATH_PROG([$1], [$2])
+    fi
+]
+)
+]) # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
 
 # FP_PROG_CONTEXT_DIFF
 # --------------------

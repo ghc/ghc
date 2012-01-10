@@ -349,6 +349,18 @@ FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
+dnl ** Which LLVM llc to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([LLC], [llc])
+LlcCmd="$LLC"
+AC_SUBST([LlcCmd])
+
+dnl ** Which LLVM opt to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OPT], [opt])
+OptCmd="$OPT"
+AC_SUBST([OptCmd])
+
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------
 AC_ARG_WITH([macosx-deployment-target],
