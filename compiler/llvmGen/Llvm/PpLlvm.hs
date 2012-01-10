@@ -39,14 +39,10 @@ import Unique
 -- | Print out a whole LLVM module.
 ppLlvmModule :: LlvmModule -> Doc
 ppLlvmModule (LlvmModule comments aliases globals decls funcs)
-  = ppLlvmComments comments
-    $+$ empty
-    $+$ ppLlvmAliases aliases
-    $+$ empty
-    $+$ ppLlvmGlobals globals
-    $+$ empty
-    $+$ ppLlvmFunctionDecls decls
-    $+$ empty
+  = ppLlvmComments comments $+$ newLine
+    $+$ ppLlvmAliases aliases $+$ newLine
+    $+$ ppLlvmGlobals globals $+$ newLine
+    $+$ ppLlvmFunctionDecls decls $+$ newLine
     $+$ ppLlvmFunctions funcs
 
 -- | Print out a multi-line comment, can be inside a function or on its own
@@ -80,6 +76,7 @@ ppLlvmGlobal (var@(LMGlobalVar _ _ link x a c), dat) =
         const' = if c then text "constant" else text "global"
 
     in ppAssignment var $ texts link <+> const' <+> rhs <> sect <> align
+       $+$ newLine
 
 ppLlvmGlobal oth = error $ "Non Global var ppr as global! " ++ show oth
 
@@ -90,7 +87,8 @@ ppLlvmAliases tys = vcat $ map ppLlvmAlias tys
 
 -- | Print out an LLVM type alias.
 ppLlvmAlias :: LlvmAlias -> Doc
-ppLlvmAlias (name, ty) = text "%" <> ftext name <+> equals <+> text "type" <+> texts ty
+ppLlvmAlias (name, ty)
+  = text "%" <> ftext name <+> equals <+> text "type" <+> texts ty $+$ newLine
 
 
 -- | Print out a list of function definitions.
@@ -109,6 +107,8 @@ ppLlvmFunction (LlvmFunction dec args attrs sec body) =
         $+$ lbrace
         $+$ ppLlvmBlocks body
         $+$ rbrace
+        $+$ newLine
+        $+$ newLine
 
 -- | Print out a function defenition header.
 ppLlvmFunctionHeader :: LlvmFunctionDecl -> [LMString] -> Doc
@@ -125,7 +125,6 @@ ppLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
                     (zip p args)
     in texts l <+> texts c <+> texts r <+> text "@" <> ftext n <> lparen <>
         (hcat $ intersperse (comma <> space) args') <> varg' <> rparen <> align
-
 
 -- | Print out a list of function declaration.
 ppLlvmFunctionDecls :: LlvmFunctionDecls -> Doc
@@ -146,7 +145,7 @@ ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
         args = hcat $ intersperse (comma <> space) $
                   map (\(t,a) -> texts t <+> ppSpaceJoin a) p
     in text "declare" <+> texts l <+> texts c <+> texts r <+> text "@" <>
-        ftext n <> lparen <> args <> varg' <> rparen <> align
+        ftext n <> lparen <> args <> varg' <> rparen <> align $+$ newLine
 
 
 -- | Print out a list of LLVM blocks.
@@ -157,9 +156,21 @@ ppLlvmBlocks blocks = vcat $ map ppLlvmBlock blocks
 -- It must be part of a function definition.
 ppLlvmBlock :: LlvmBlock -> Doc
 ppLlvmBlock (LlvmBlock blockId stmts)
-  = ppLlvmStatement (MkLabel blockId)
-        $+$ nest 4 (vcat $ map ppLlvmStatement stmts)
+  = go blockId stmts
+  where
+    lbreak acc []              = (Nothing, reverse acc, [])
+    lbreak acc (MkLabel id:xs) = (Just id, reverse acc, xs)
+    lbreak acc (x:xs)          = lbreak (x:acc) xs
 
+    go id code =
+        let (id2, block, rest) = lbreak [] code
+            ppRest = case id2 of
+                         Just id2' -> go id2' rest
+                         Nothing   -> empty
+        in ppLlvmBlockLabel id
+               $+$ nest 4 (vcat $ map ppLlvmStatement block)
+           $+$ newLine
+           $+$ ppRest
 
 -- | Print out an LLVM statement.
 ppLlvmStatement :: LlvmStatement -> Doc
@@ -169,7 +180,7 @@ ppLlvmStatement stmt
         Branch      target        -> ppBranch target
         BranchIf    cond ifT ifF  -> ppBranchIf cond ifT ifF
         Comment     comments      -> ppLlvmComments comments
-        MkLabel     label         -> (llvmSDoc $ pprUnique label) <> colon
+        MkLabel     label         -> ppLlvmBlockLabel label
         Store       value ptr     -> ppStore value ptr
         Switch      scrut def tgs -> ppSwitch scrut def tgs
         Return      result        -> ppReturn result
@@ -177,6 +188,9 @@ ppLlvmStatement stmt
         Unreachable               -> text "unreachable"
         Nop                       -> empty
 
+-- | Print out an LLVM block label.
+ppLlvmBlockLabel :: LlvmBlockId -> Doc
+ppLlvmBlockLabel id = (llvmSDoc $ pprUnique id) <> colon
 
 -- | Print out an LLVM expression.
 ppLlvmExpression :: LlvmExpression -> Doc
@@ -343,4 +357,8 @@ llvmSDoc d = Out.withPprStyleDoc (Out.mkCodeStyle Out.CStyle) d
 -- | Showable to Doc
 texts :: (Show a) => a -> Doc
 texts = (text . show)
+
+-- | Blank line.
+newLine :: Doc
+newLine = text ""
 

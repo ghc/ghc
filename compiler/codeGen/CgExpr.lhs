@@ -149,7 +149,7 @@ cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty)
 	; amode' <- assignTemp amode	-- We're going to use it twice,
 					-- so save in a temp if non-trivial
 	; stmtC (CmmAssign nodeReg (tagToClosure tycon amode'))
-	; performReturn emitReturnInstr }
+	; performReturn $ emitReturnInstr (Just [node]) }
    where
 	  -- If you're reading this code in the attempt to figure
 	  -- out why the compiler panic'ed here, it is probably because
@@ -172,7 +172,8 @@ cgExpr (StgOpApp (StgPrimOp primop) args res_ty)
 
   | ReturnsPrim VoidRep <- result_info
 	= do cgPrimOp [] primop args emptyVarSet
-	     performReturn emitReturnInstr
+             -- ToDo: STG Live -- worried about this
+	     performReturn $ emitReturnInstr (Just [])
 
   | ReturnsPrim rep <- result_info
 	= do res <- newTemp (typeCmmType res_ty)
@@ -191,7 +192,8 @@ cgExpr (StgOpApp (StgPrimOp primop) args res_ty)
 	     stmtC (CmmAssign nodeReg
                     (tagToClosure tycon
                      (CmmReg (CmmLocal tag_reg))))
-	     performReturn emitReturnInstr
+             -- ToDo: STG Live -- worried about this
+	     performReturn $ emitReturnInstr (Just [node])
   where
 	result_info = getPrimOpResultInfo primop
 

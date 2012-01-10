@@ -490,7 +490,7 @@ remote set-url [--push] <remote-name>
 
     The -r flag points to the root of the repository tree (see "which
     repos to use" below). For a repository on the local filesystem it
-    would point to the ghc reposiroty, and for a remote repository it
+    would point to the ghc repository, and for a remote repository it
     points to the directory containing "ghc.git".
 
 These commands just run the equivalent git command on each repository, passing

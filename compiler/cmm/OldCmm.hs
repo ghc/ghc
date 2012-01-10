@@ -146,32 +146,46 @@ data CmmStmt
   = CmmNop
   | CmmComment FastString
 
-  | CmmAssign CmmReg CmmExpr     -- Assign to register
+  | CmmAssign CmmReg CmmExpr      -- Assign to register
 
-  | CmmStore CmmExpr CmmExpr     -- Assign to memory location.  Size is
-                                 -- given by cmmExprType of the rhs.
+  | CmmStore CmmExpr CmmExpr      -- Assign to memory location. Size is
+                                  -- given by cmmExprType of the rhs.
 
-  | CmmCall                      -- A call (foreign, native or primitive), with
-       CmmCallTarget
-       [HintedCmmFormal]           -- zero or more results
-       [HintedCmmActual]           -- zero or more arguments
-       CmmReturnInfo
-       -- Some care is necessary when handling the arguments of these, see
-       -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
+  | CmmCall                       -- A call (foreign, native or primitive), with
+      CmmCallTarget
+      [HintedCmmFormal]            -- zero or more results
+      [HintedCmmActual]            -- zero or more arguments
+      CmmReturnInfo
+      -- Some care is necessary when handling the arguments of these, see
+      -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
 
   | CmmBranch BlockId             -- branch to another BB in this fn
 
   | CmmCondBranch CmmExpr BlockId -- conditional branch
 
-  | CmmSwitch CmmExpr [Maybe BlockId]   -- Table branch
-        -- The scrutinee is zero-based;
-        --      zero -> first block
-        --      one  -> second block etc
-        -- Undefined outside range, and when there's a Nothing
+  | CmmSwitch                     -- Table branch
+      CmmExpr                       -- The scrutinee is zero-based;
+      [Maybe BlockId]               --      zero -> first block
+                                    --      one  -> second block etc
+                                    -- Undefined outside range, and when
+                                    -- there's a Nothing
 
-  | CmmJump CmmExpr  -- Jump to another C-- function,
+  | CmmJump                       -- Jump to another C-- function,
+      CmmExpr                       -- Target
+      (Maybe [GlobalReg])           -- Live registers at call site;
+                                    --      Nothing -> no information, assume
+                                    --                 all live
+                                    --      Just .. -> info on liveness, []
+                                    --                 means no live registers
+                                    -- This isn't all 'live' registers, just
+                                    -- the argument STG registers that are live
+                                    -- AND also possibly mapped to machine
+                                    -- registers. (So Sp, Hp, HpLim... ect
+                                    -- are never included here as they are
+                                    -- always live, only R2.., D1.. are
+                                    -- on this list)
 
-  | CmmReturn        -- Return from a native C-- function,
+  | CmmReturn                     -- Return from a native C-- function,
 
 data CmmHinted a
   = CmmHinted {
@@ -201,7 +215,7 @@ instance UserOfLocalRegs CmmStmt where
       stmt (CmmBranch _)             = id
       stmt (CmmCondBranch e _)       = gen e
       stmt (CmmSwitch e _)           = gen e
-      stmt (CmmJump e)               = gen e
+      stmt (CmmJump e _)             = gen e
       stmt (CmmReturn)               = id
 
       gen :: UserOfLocalRegs a => a -> b -> b

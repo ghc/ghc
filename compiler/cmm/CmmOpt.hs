@@ -65,7 +65,7 @@ cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
                 stmt m (CmmBranch b) = b:m
                 stmt m (CmmCondBranch e b) = b:(expr m e)
                 stmt m (CmmSwitch e bs) = catMaybes bs ++ expr m e
-                stmt m (CmmJump e) = expr m e
+                stmt m (CmmJump e _) = expr m e
                 stmt m (CmmReturn) = m
                 actuals m as = foldl' (\m h -> expr m (hintlessCmm h)) m as
                 -- We have to do a deep fold into CmmExpr because
@@ -273,7 +273,7 @@ inlineStmt u a (CmmCall target regs es ret)
          es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
 inlineStmt u a (CmmCondBranch e d) = CmmCondBranch (inlineExpr u a e) d
 inlineStmt u a (CmmSwitch e d) = CmmSwitch (inlineExpr u a e) d
-inlineStmt u a (CmmJump e) = CmmJump (inlineExpr u a e)
+inlineStmt u a (CmmJump e live) = CmmJump (inlineExpr u a e) live
 inlineStmt _ _ other_stmt = other_stmt
 
 inlineExpr :: Unique -> CmmExpr -> CmmExpr -> CmmExpr
@@ -669,7 +669,7 @@ cmmLoopifyForC (CmmProc (Just info@(Statics info_lbl _)) entry_lbl
   where blocks' = [ BasicBlock id (map do_stmt stmts)
                   | BasicBlock id stmts <- blocks ]
 
-        do_stmt (CmmJump (CmmLit (CmmLabel lbl))) | lbl == jump_lbl
+        do_stmt (CmmJump (CmmLit (CmmLabel lbl)) _) | lbl == jump_lbl
                 = CmmBranch top_id
         do_stmt stmt = stmt
 
