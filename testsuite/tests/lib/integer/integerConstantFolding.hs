@@ -44,6 +44,8 @@ main = do p "plusInteger"        plusInteger
           p "divModInteger"     divModInteger
           p "shiftLInteger"     shiftLInteger
           p "shiftRInteger"     shiftRInteger
+          p "quotInteger"       quotInteger
+          p "remInteger"        remInteger
 
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
@@ -150,4 +152,10 @@ shiftLInteger = 100061 `shiftL` 4
 
 shiftRInteger :: Integer
 shiftRInteger = 100062 `shiftR` 4
+
+quotInteger :: Integer
+quotInteger = 100063 `quot` 156
+
+remInteger :: Integer
+remInteger = 100064 `rem` 156
 

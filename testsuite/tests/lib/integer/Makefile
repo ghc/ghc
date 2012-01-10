@@ -28,5 +28,7 @@ integerConstantFolding:
 	$(call CHECK,\<196\>,divModInteger)
 	$(call CHECK,\<1600976\>,shiftLInteger)
 	$(call CHECK,\<6253\>,shiftRInteger)
+	$(call CHECK,\<641\>,quotInteger)
+	$(call CHECK,\<68\>,remInteger)
 	./integerConstantFolding
 
