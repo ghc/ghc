@@ -642,10 +642,10 @@ builtinIntegerRules =
   rule_binop_Bool     "ltInteger"         ltIntegerName         (<),
   rule_binop_Bool     "geInteger"         geIntegerName         (>=),
   rule_binop_Ordering "compareInteger"    compareIntegerName    compare,
-  rule_divop          "divModInteger"     divModIntegerName     divMod,
-  rule_divop          "quotRemInteger"    quotRemIntegerName    quotRem,
-  -- TODO: quotInteger rule
-  -- TODO: remInteger rule
+  rule_divop_both     "divModInteger"     divModIntegerName     divMod,
+  rule_divop_both     "quotRemInteger"    quotRemIntegerName    quotRem,
+  rule_divop_one      "quotInteger"       quotIntegerName       quot,
+  rule_divop_one      "remInteger"        remIntegerName        rem,
   -- TODO: encodeFloatInteger rule
   rule_convert        "floatFromInteger"  floatFromIntegerName  mkFloatLitFloat,
   -- TODO: encodeDoubleInteger rule
@@ -668,9 +668,12 @@ builtinIntegerRules =
           rule_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop op }
-          rule_divop str name op
+          rule_divop_both str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
-                           ru_try = match_Integer_divop op }
+                           ru_try = match_Integer_divop_both op }
+          rule_divop_one str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Integer_divop_one op }
           rule_Int_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_Int_binop op }
@@ -773,11 +776,11 @@ match_Integer_binop binop id_unf [xl,yl]
 match_Integer_binop _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
-match_Integer_divop :: (Integer -> Integer -> (Integer, Integer))
-                    -> IdUnfoldingFun
-                    -> [Expr CoreBndr]
-                    -> Maybe (Expr CoreBndr)
-match_Integer_divop divop id_unf [xl,yl]
+match_Integer_divop_both :: (Integer -> Integer -> (Integer, Integer))
+                         -> IdUnfoldingFun
+                         -> [Expr CoreBndr]
+                         -> Maybe (Expr CoreBndr)
+match_Integer_divop_both divop id_unf [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
@@ -789,9 +792,20 @@ match_Integer_divop divop id_unf [xl,yl]
                                Type integerTy,
                                Lit (LitInteger r i),
                                Lit (LitInteger s i)]
-      _ -> panic "match_Integer_divop: mkIntegerId has the wrong type"
+      _ -> panic "match_Integer_divop_both: mkIntegerId has the wrong type"
+match_Integer_divop_both _ _ _ = Nothing
 
-match_Integer_divop _ _ _ = Nothing
+-- This helper is used for the quotRem and divMod functions
+match_Integer_divop_one :: (Integer -> Integer -> Integer)
+                        -> IdUnfoldingFun
+                        -> [Expr CoreBndr]
+                        -> Maybe (Expr CoreBndr)
+match_Integer_divop_one divop id_unf [xl,yl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
+  , y /= 0
+  = Just (Lit (LitInteger (x `divop` y) i))
+match_Integer_divop_one _ _ _ = Nothing
 
 match_Integer_Int_binop :: (Integer -> Int -> Integer)
                         -> IdUnfoldingFun

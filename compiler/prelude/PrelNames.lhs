@@ -259,6 +259,7 @@ basicKnownKeyNames
         absIntegerName, signumIntegerName,
         leIntegerName, gtIntegerName, ltIntegerName, geIntegerName,
         compareIntegerName, quotRemIntegerName, divModIntegerName,
+        quotIntegerName, remIntegerName,
         floatFromIntegerName, doubleFromIntegerName,
         gcdIntegerName, lcmIntegerName,
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
@@ -827,6 +828,7 @@ integerTyConName, mkIntegerName,
     absIntegerName, signumIntegerName,
     leIntegerName, gtIntegerName, ltIntegerName, geIntegerName,
     compareIntegerName, quotRemIntegerName, divModIntegerName,
+    quotIntegerName, remIntegerName,
     floatFromIntegerName, doubleFromIntegerName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
@@ -851,6 +853,8 @@ geIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "geInteger")         geI
 compareIntegerName    = varQual gHC_INTEGER_TYPE (fsLit "compareInteger")    compareIntegerIdKey
 quotRemIntegerName    = varQual gHC_INTEGER_TYPE (fsLit "quotRemInteger")    quotRemIntegerIdKey
 divModIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "divModInteger")     divModIntegerIdKey
+quotIntegerName       = varQual gHC_INTEGER_TYPE (fsLit "quotInteger")       quotIntegerIdKey
+remIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "remInteger")        remIntegerIdKey
 floatFromIntegerName  = varQual gHC_INTEGER_TYPE (fsLit "floatFromIntegerName")     floatFromIntegerIdKey
 doubleFromIntegerName = varQual gHC_INTEGER_TYPE (fsLit "doubleFromIntegerName")    doubleFromIntegerIdKey
 gcdIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "gcdInteger")        gcdIntegerIdKey
@@ -1446,6 +1450,7 @@ mkIntegerIdKey, smallIntegerIdKey, integerToWordIdKey, integerToIntIdKey,
     eqIntegerIdKey, neqIntegerIdKey, absIntegerIdKey, signumIntegerIdKey,
     leIntegerIdKey, gtIntegerIdKey, ltIntegerIdKey, geIntegerIdKey,
     compareIntegerIdKey, quotRemIntegerIdKey, divModIntegerIdKey,
+    quotIntegerIdKey, remIntegerIdKey,
     floatFromIntegerIdKey, doubleFromIntegerIdKey,
     gcdIntegerIdKey, lcmIntegerIdKey,
     andIntegerIdKey, orIntegerIdKey, xorIntegerIdKey, complementIntegerIdKey,
@@ -1469,16 +1474,18 @@ geIntegerIdKey                = mkPreludeMiscIdUnique 75
 compareIntegerIdKey           = mkPreludeMiscIdUnique 76
 quotRemIntegerIdKey           = mkPreludeMiscIdUnique 77
 divModIntegerIdKey            = mkPreludeMiscIdUnique 78
-floatFromIntegerIdKey         = mkPreludeMiscIdUnique 79
-doubleFromIntegerIdKey        = mkPreludeMiscIdUnique 80
-gcdIntegerIdKey               = mkPreludeMiscIdUnique 81
-lcmIntegerIdKey               = mkPreludeMiscIdUnique 82
-andIntegerIdKey               = mkPreludeMiscIdUnique 83
-orIntegerIdKey                = mkPreludeMiscIdUnique 84
-xorIntegerIdKey               = mkPreludeMiscIdUnique 85
-complementIntegerIdKey        = mkPreludeMiscIdUnique 86
-shiftLIntegerIdKey            = mkPreludeMiscIdUnique 87
-shiftRIntegerIdKey            = mkPreludeMiscIdUnique 88
+quotIntegerIdKey              = mkPreludeMiscIdUnique 79
+remIntegerIdKey               = mkPreludeMiscIdUnique 80
+floatFromIntegerIdKey         = mkPreludeMiscIdUnique 81
+doubleFromIntegerIdKey        = mkPreludeMiscIdUnique 82
+gcdIntegerIdKey               = mkPreludeMiscIdUnique 83
+lcmIntegerIdKey               = mkPreludeMiscIdUnique 84
+andIntegerIdKey               = mkPreludeMiscIdUnique 85
+orIntegerIdKey                = mkPreludeMiscIdUnique 86
+xorIntegerIdKey               = mkPreludeMiscIdUnique 87
+complementIntegerIdKey        = mkPreludeMiscIdUnique 88
+shiftLIntegerIdKey            = mkPreludeMiscIdUnique 89
+shiftRIntegerIdKey            = mkPreludeMiscIdUnique 90
 
 rootMainKey, runMainKey :: Unique
 rootMainKey                   = mkPreludeMiscIdUnique 100
