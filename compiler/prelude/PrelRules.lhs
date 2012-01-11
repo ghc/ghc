@@ -625,9 +625,9 @@ builtinIntegerRules =
   -- TODO: wordToInteger rule
   rule_convert        "integerToWord"     integerToWordName     mkWordLitWord,
   rule_convert        "integerToInt"      integerToIntName      mkIntLitInt,
-  -- TODO: integerToWord64 rule
+  rule_convert        "integerToWord64"   integerToWord64Name   mkWord64LitWord64,
   -- TODO: word64ToInteger rule
-  -- TODO: integerToInt64 rule
+  rule_convert        "integerToInt64"    integerToInt64Name    mkInt64LitInt64,
   -- TODO: int64ToInteger rule
   rule_binop          "plusInteger"       plusIntegerName       (+),
   rule_binop          "minusInteger"      minusIntegerName      (-),
@@ -646,9 +646,9 @@ builtinIntegerRules =
   rule_divop_both     "quotRemInteger"    quotRemIntegerName    quotRem,
   rule_divop_one      "quotInteger"       quotIntegerName       quot,
   rule_divop_one      "remInteger"        remIntegerName        rem,
-  -- TODO: encodeFloatInteger rule
+  rule_encodeFloat    "encodeFloatInteger"  encodeFloatIntegerName  mkFloatLitFloat,
   rule_convert        "floatFromInteger"  floatFromIntegerName  mkFloatLitFloat,
-  -- TODO: encodeDoubleInteger rule
+  rule_encodeFloat    "encodeDoubleInteger" encodeDoubleIntegerName mkDoubleLitDouble,
   -- TODO: decodeDoubleInteger rule
   rule_convert        "doubleFromInteger" doubleFromIntegerName mkDoubleLitDouble,
   rule_binop          "gcdInteger"        gcdIntegerName        gcd,
@@ -683,6 +683,9 @@ builtinIntegerRules =
           rule_binop_Ordering str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop_Ordering op }
+          rule_encodeFloat str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Integer_Int_encodeFloat op }
 
 ---------------------------------------------------
 -- The rule is this:
@@ -839,4 +842,15 @@ match_Integer_binop_Ordering binop id_unf [xl, yl]
              EQ -> eqVal
              GT -> gtVal
 match_Integer_binop_Ordering _ _ _ = Nothing
+
+match_Integer_Int_encodeFloat :: RealFloat a
+                              => (a -> Expr CoreBndr)
+                              -> IdUnfoldingFun
+                              -> [Expr CoreBndr]
+                              -> Maybe (Expr CoreBndr)
+match_Integer_Int_encodeFloat mkLit id_unf [xl,yl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
+  = Just (mkLit $ encodeFloat x (fromInteger y))
+match_Integer_Int_encodeFloat _ _ _ = Nothing
 \end{code}
