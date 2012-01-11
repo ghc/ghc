@@ -88,7 +88,7 @@ ppLlvmAliases tys = vcat $ map ppLlvmAlias tys
 -- | Print out an LLVM type alias.
 ppLlvmAlias :: LlvmAlias -> Doc
 ppLlvmAlias (name, ty)
-  = text "%" <> ftext name <+> equals <+> text "type" <+> texts ty $+$ newLine
+  = text "%" <> ftext name <+> equals <+> text "type" <+> texts ty
 
 
 -- | Print out a list of function definitions.
@@ -168,24 +168,25 @@ ppLlvmBlock (LlvmBlock blockId stmts)
                          Just id2' -> go id2' rest
                          Nothing   -> empty
         in ppLlvmBlockLabel id
-               $+$ nest 4 (vcat $ map ppLlvmStatement block)
+           $+$ (vcat $ map ppLlvmStatement block)
            $+$ newLine
            $+$ ppRest
 
 -- | Print out an LLVM statement.
 ppLlvmStatement :: LlvmStatement -> Doc
-ppLlvmStatement stmt
-  = case stmt of
-        Assignment  dst expr      -> ppAssignment dst (ppLlvmExpression expr)
-        Branch      target        -> ppBranch target
-        BranchIf    cond ifT ifF  -> ppBranchIf cond ifT ifF
-        Comment     comments      -> ppLlvmComments comments
+ppLlvmStatement stmt =
+  let ind = (text "  " <>)
+  in case stmt of
+        Assignment  dst expr      -> ind $ ppAssignment dst (ppLlvmExpression expr)
+        Branch      target        -> ind $ ppBranch target
+        BranchIf    cond ifT ifF  -> ind $ ppBranchIf cond ifT ifF
+        Comment     comments      -> ind $ ppLlvmComments comments
         MkLabel     label         -> ppLlvmBlockLabel label
-        Store       value ptr     -> ppStore value ptr
-        Switch      scrut def tgs -> ppSwitch scrut def tgs
-        Return      result        -> ppReturn result
-        Expr        expr          -> ppLlvmExpression expr
-        Unreachable               -> text "unreachable"
+        Store       value ptr     -> ind $ ppStore value ptr
+        Switch      scrut def tgs -> ind $ ppSwitch scrut def tgs
+        Return      result        -> ind $ ppReturn result
+        Expr        expr          -> ind $ ppLlvmExpression expr
+        Unreachable               -> ind $ text "unreachable"
         Nop                       -> empty
 
 -- | Print out an LLVM block label.
