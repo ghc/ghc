@@ -103,7 +103,7 @@ test('T4801',
       if_wordsize(32,
       #                    expected value: x86/OS X:  9651948
           compiler_stats_num_field('max_bytes_used',  9000000,
-                                                     10000000)),
+                                                     12000000)),
       # expected value: 18188272 (amd64/Linux)
       #                 10290952 (windows)
       if_wordsize(64,
