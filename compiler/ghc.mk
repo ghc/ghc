@@ -1,6 +1,6 @@
 # -----------------------------------------------------------------------------
 #
-# (c) 2009 The University of Glasgow
+# (c) 2009-2012 The University of Glasgow
 #
 # This file is part of the GHC build system.
 #
@@ -136,9 +136,6 @@ else
 	@echo 'cLibFFI               = False'                               >> $@
 endif
 	@echo done.
-
-# XXX 2010-08-19: This is a legacy clean. Remove later.
-$(eval $(call clean-target,compiler,config_hs,compiler/main/Config.hs))
 
 # -----------------------------------------------------------------------------
 # Create platform includes
