@@ -251,8 +251,8 @@ initSysTools mbMinusB
                 ld_args  = gcc_args
 
         -- We just assume on command line
-        ; let lc_prog = "llc"
-              lo_prog = "opt"
+        ; lc_prog <- getSetting "LLVM llc command"
+        ; lo_prog <- getSetting "LLVM opt command"
 
         ; return $ Settings {
                         sTargetPlatform = Platform {
