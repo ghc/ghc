@@ -438,7 +438,7 @@ $(eval $(call extra-packages))
 #
 # Ideally we should use the correct dependencies here to allow more
 # parallelism, but we don't know the dependencies until we've
-# generated the pacakge-data.mk files.
+# generated the package-data.mk files.
 define fixed_pkg_dep
 libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(fixed_pkg_prev)
 fixed_pkg_prev:=libraries/$1/$2/package-data.mk

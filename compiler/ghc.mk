@@ -357,7 +357,7 @@ compiler/main/DriverPipeline_HC_OPTS += -auto-all
 compiler/main/GhcMake_HC_OPTS        += -auto-all
 compiler/main/GHC_HC_OPTS            += -auto-all
 
-# or alternatively addd {-# OPTIONS_GHC -auto-all #-} to the top of
+# or alternatively add {-# OPTIONS_GHC -auto-all #-} to the top of
 # modules you're interested in.
 
 # We seem to still build the vanilla libraries even if we say
