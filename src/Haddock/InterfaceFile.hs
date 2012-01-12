@@ -65,13 +65,13 @@ binaryInterfaceMagic = 0xD0Cface
 -- we version our interface files accordingly.
 binaryInterfaceVersion :: Word16
 #if __GLASGOW_HASKELL__ == 702
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 703
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 704
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #elif __GLASGOW_HASKELL__ == 705
-binaryInterfaceVersion = 19
+binaryInterfaceVersion = 20
 #else
 #error Unknown GHC version
 #endif
@@ -469,6 +469,9 @@ instance (Binary id) => Binary (Doc id) where
     put_ bh (DocIdentifierUnchecked x) = do
             putByte bh 16
             put_ bh x
+    put_ bh (DocWarning ag) = do
+            putByte bh 17
+            put_ bh ag
     get bh = do
             h <- getByte bh
             case h of
@@ -523,6 +526,9 @@ instance (Binary id) => Binary (Doc id) where
               16 -> do
                     x <- get bh
                     return (DocIdentifierUnchecked x)
+              17 -> do
+                    ag <- get bh
+                    return (DocWarning ag)
               _ -> fail "invalid binary data found"
 
 

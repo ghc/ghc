@@ -235,6 +235,7 @@ markupTag = Markup {
   markupIdentifier           = box (TagInline "a") . str . out,
   markupIdentifierUnchecked  = box (TagInline "a") . str . out . snd,
   markupModule               = box (TagInline "a") . str,
+  markupWarning              = box (TagInline "i"),
   markupEmphasis             = box (TagInline "i"),
   markupMonospaced           = box (TagInline "tt"),
   markupPic                  = const $ str " ",

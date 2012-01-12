@@ -108,6 +108,7 @@ rename gre = rn
           a:b:_ | isTyConName a -> DocIdentifier a | otherwise -> DocIdentifier b
               -- If an id can refer to multiple things, we give precedence to type
               -- constructors.
+      DocWarning doc -> DocWarning (rn doc)
       DocEmphasis doc -> DocEmphasis (rn doc)
       DocMonospaced doc -> DocMonospaced (rn doc)
       DocUnorderedList docs -> DocUnorderedList (map rn docs)

@@ -1006,6 +1006,7 @@ parLatexMarkup ppId = Markup {
   markupIdentifier           = markupId ppId,
   markupIdentifierUnchecked  = markupId (ppVerbOccName . snd),
   markupModule               = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
+  markupWarning              = \p v -> emph (p v),
   markupEmphasis             = \p v -> emph (p v),
   markupMonospaced           = \p _ -> tt (p Mono),
   markupUnorderedList        = \p v -> itemizedList (map ($v) p) $$ text "",

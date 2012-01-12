@@ -429,6 +429,10 @@ div#style-menu-holder {
   padding-left: 2em;
 }
 
+.warning {
+  color: red;
+}
+
 .arguments {
   margin-top: -0.4em;
 }

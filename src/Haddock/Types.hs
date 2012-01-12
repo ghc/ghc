@@ -283,6 +283,7 @@ data Doc id
   | DocIdentifier id
   | DocIdentifierUnchecked (ModuleName, OccName)
   | DocModule String
+  | DocWarning (Doc id)
   | DocEmphasis (Doc id)
   | DocMonospaced (Doc id)
   | DocUnorderedList [Doc id]
@@ -324,6 +325,7 @@ data DocMarkup id a = Markup
   , markupIdentifier           :: id -> a
   , markupIdentifierUnchecked  :: (ModuleName, OccName) -> a
   , markupModule               :: String -> a
+  , markupWarning              :: a -> a
   , markupEmphasis             :: a -> a
   , markupMonospaced           :: a -> a
   , markupUnorderedList        :: [a] -> a

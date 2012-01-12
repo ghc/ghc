@@ -39,6 +39,7 @@ parHtmlMarkup qual ppId = Markup {
   markupIdentifierUnchecked  = thecode . ppUncheckedLink qual,
   markupModule               = \m -> let (mdl,ref) = break (=='#') m
                                      in ppModuleRef (mkModuleName mdl) ref,
+  markupWarning              = thediv ! [theclass "warning"],
   markupEmphasis             = emphasize,
   markupMonospaced           = thecode,
   markupUnorderedList        = unordList,
