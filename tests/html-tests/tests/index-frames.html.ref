@@ -1,0 +1,145 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><title
+    ></title
+    ><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean"
+     /><script src="haddock-util.js" type="text/javascript"
+    ></script
+    ><script type="text/javascript"
+    >//<![CDATA[
+window.onload = function () {pageLoad();};
+//]]>
+</script
+    ></head
+  ><body id="mini"
+  ><div id="module-list"
+    ><p class="caption"
+      >Modules</p
+      ><ul
+      ><li class="module"
+	><a href="" target="main"
+	  >A</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >B</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bug1</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bug2</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bug3</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bug4</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bug6</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bug7</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bug8</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Bugs</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >CrossPackageDocs</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Examples</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >FunArgs</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >GADTRecords</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Hash</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >NamedDoc</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >NoLayout</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >NonGreedy</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >QuasiExpr</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >QuasiQuote</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >TH</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >TH2</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Test</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Ticket112</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Ticket61</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Ticket75</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >TypeFamilies</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >TypeOperators</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Unicode</a
+	  ></li
+	><li class="module"
+	><a href="" target="main"
+	  >Visible</a
+	  ></li
+	></ul
+      ></div
+    ></body
+  ></html
+>
