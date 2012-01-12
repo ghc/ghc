@@ -21,7 +21,8 @@ module CoreUtils (
         exprType, coreAltType, coreAltsType,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
         exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
-        exprIsHNF, exprOkForSpeculation, exprIsBig, exprIsConLike,
+        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects,
+        exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
 
         -- * Expression and bindings size
@@ -752,35 +753,39 @@ it's applied only to dictionaries.
 --
 -- We can only do this if the @y + 1@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
-exprOkForSpeculation :: Expr b -> Bool
+exprOkForSpeculation, exprOkForSideEffects :: Expr b -> Bool
+exprOkForSpeculation = expr_ok primOpOkForSpeculation
+exprOkForSideEffects = expr_ok primOpOkForSideEffects
   -- Polymorphic in binder type
   -- There is one call at a non-Id binder type, in SetLevels
-exprOkForSpeculation (Lit _)      = True
-exprOkForSpeculation (Type _)     = True
-exprOkForSpeculation (Coercion _) = True
-exprOkForSpeculation (Var v)      = appOkForSpeculation v []
-exprOkForSpeculation (Cast e _)   = exprOkForSpeculation e
+
+expr_ok :: (PrimOp -> Bool) -> Expr b -> Bool
+expr_ok _ (Lit _)      = True
+expr_ok _ (Type _)     = True
+expr_ok _ (Coercion _) = True
+expr_ok primop_ok (Var v)      = app_ok primop_ok v []
+expr_ok primop_ok (Cast e _)   = expr_ok primop_ok e
 
 -- Tick annotations that *tick* cannot be speculated, because these
 -- are meant to identify whether or not (and how often) the particular
 -- source expression was evaluated at runtime.
-exprOkForSpeculation (Tick tickish e)
+expr_ok primop_ok (Tick tickish e)
    | tickishCounts tickish = False
-   | otherwise             = exprOkForSpeculation e
+   | otherwise             = expr_ok primop_ok e
 
-exprOkForSpeculation (Case e _ _ alts)
-  =  exprOkForSpeculation e  -- Note [exprOkForSpeculation: case expressions]
-  && all (\(_,_,rhs) -> exprOkForSpeculation rhs) alts
-  && altsAreExhaustive alts     -- Note [exprOkForSpeculation: exhaustive alts]
+expr_ok primop_ok (Case e _ _ alts)
+  =  expr_ok primop_ok e  -- Note [exprOkForSpeculation: case expressions]
+  && all (\(_,_,rhs) -> expr_ok primop_ok rhs) alts
+  && altsAreExhaustive alts     -- Note [Exhaustive alts]
 
-exprOkForSpeculation other_expr
+expr_ok primop_ok other_expr
   = case collectArgs other_expr of
-        (Var f, args) -> appOkForSpeculation f args
+        (Var f, args) -> app_ok primop_ok f args
         _             -> False
 
 -----------------------------
-appOkForSpeculation :: Id -> [Expr b] -> Bool
-appOkForSpeculation fun args
+app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
+app_ok primop_ok fun args
   = case idDetails fun of
       DFunId new_type ->  not new_type
          -- DFuns terminate, unless the dict is implemented 
@@ -794,7 +799,7 @@ appOkForSpeculation fun args
       PrimOpId op
         | isDivOp op              -- Special case for dividing operations that fail
         , [arg1, Lit lit] <- args -- only if the divisor is zero
-        -> not (isZeroLit lit) && exprOkForSpeculation arg1
+        -> not (isZeroLit lit) && expr_ok primop_ok arg1
                   -- Often there is a literal divisor, and this
                   -- can get rid of a thunk in an inner looop
 
@@ -802,14 +807,14 @@ appOkForSpeculation fun args
         -> True
 
         | otherwise
-        -> primOpOkForSpeculation op &&
-           all exprOkForSpeculation args
-                                  -- A bit conservative: we don't really need
+        -> primop_ok op        -- A bit conservative: we don't really need
+        && all (expr_ok primop_ok) args
+                                  
                                   -- to care about lazy arguments, but this is easy
 
       _other -> isUnLiftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
-             || (n_val_args ==0 && 
+             || (n_val_args == 0 && 
                  isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
              where
                n_val_args = valArgCount args
@@ -872,13 +877,13 @@ If exprOkForSpeculation doesn't look through case expressions, you get this:
 
 The inner case is redundant, and should be nuked.
 
-Note [exprOkForSpeculation: exhaustive alts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Exhaustive alts]
+~~~~~~~~~~~~~~~~~~~~~~
 We might have something like
   case x of {
     A -> ...
     _ -> ...(case x of { B -> ...; C -> ... })...
-Here, the inner case is fine, becuase the A alternative
+Here, the inner case is fine, because the A alternative
 can't happen, but it's not ok to float the inner case outside
 the outer one (even if we know x is evaluated outside), because
 then it would be non-exhaustive. See Trac #5453.
