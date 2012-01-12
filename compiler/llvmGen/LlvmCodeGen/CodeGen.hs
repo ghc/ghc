@@ -550,7 +550,7 @@ genStore env addr@(CmmMachOp (MO_Sub _) [
     = genStore_fast env addr r (negate $ fromInteger n) val
 
 -- generic case
-genStore env addr val = genStore_slow env addr val [top]
+genStore env addr val = genStore_slow env addr val [other]
 
 -- | CmmStore operation
 -- This is a special case for storing to a global register pointer
@@ -1032,7 +1032,7 @@ genLoad env e@(CmmMachOp (MO_Sub _) [
     = genLoad_fast env e r (negate $ fromInteger n) ty
 
 -- generic case
-genLoad env e ty = genLoad_slow env e ty [top]
+genLoad env e ty = genLoad_slow env e ty [other]
 
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
