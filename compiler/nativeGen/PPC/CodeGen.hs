@@ -358,7 +358,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
                          rlo
 iselExpr64 expr
    = do dflags <- getDynFlags
-        pprPanic "iselExpr64(powerpc)" (pprPlatform (targetPlatform dflags) expr)
+        pprPanic "iselExpr64(powerpc)" (pprExpr (targetPlatform dflags) expr)
 
 
 
