@@ -35,6 +35,8 @@ import HscTypes
 import Name
 import Bag
 import RdrName (GlobalRdrEnv)
+import TcRnTypes (tcg_warns)
+import FastString (unpackFS)
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -49,6 +51,7 @@ createInterface tm flags modMap instIfaceMap = do
       dflags        = ms_hspp_opts ms
       instances     = modInfoInstances mi
       exportedNames = modInfoExports mi
+      warnings      = tcg_warns . fst . tm_internals_ $ tm
 
   -- The renamed source should always be available to us, but it's best
   -- to be on the safe side.
@@ -68,7 +71,9 @@ createInterface tm flags modMap instIfaceMap = do
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
-  (info, mbDoc) <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre mayDocHeader
+  (info, mbDoc) <- do
+    (i, d) <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre mayDocHeader
+    return (i, addModuleWarnig warnings d)
 
   let declsWithDocs = topDecls group_
       (decls, _) = unzip declsWithDocs
@@ -123,6 +128,20 @@ createInterface tm flags modMap instIfaceMap = do
     ifaceInstances       = instances,
     ifaceHaddockCoverage = coverage
   }
+
+
+warningToDoc :: WarningTxt -> Doc id
+warningToDoc w = case w of
+  (DeprecatedTxt msg) -> format "Deprecated: " msg
+  (WarningTxt    msg) -> format "Warning: "    msg
+  where
+    format x xs = DocWarning . DocParagraph . DocString . concat $ x : map unpackFS xs
+
+
+addModuleWarnig :: Warnings -> Maybe (Doc id) -> Maybe (Doc id)
+addModuleWarnig warnings
+  | WarnAll w <- warnings = let d = warningToDoc w in Just . maybe d (mappend d)
+  | otherwise = id
 
 
 -------------------------------------------------------------------------------
