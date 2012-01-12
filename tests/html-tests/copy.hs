@@ -7,15 +7,16 @@ import Data.List
 import Control.Monad
 
 
+main :: IO ()
 main = do
   args <- getArgs
   dir <- getCurrentDirectory
   contents <- getDirectoryContents (dir </> "output")
   if not $ null args
     then
-      mapM copy [ "output" </> file  | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
+      mapM_ copy [ "output" </> file  | file <- contents, ".html" `isSuffixOf` file, takeBaseName file `elem` args  ]
     else
-      mapM copy [ "output" </> file | file <- contents, ".html" `isSuffixOf` file ]
+      mapM_ copy [ "output" </> file | file <- contents, ".html" `isSuffixOf` file ]
 
 
 copy file = do
