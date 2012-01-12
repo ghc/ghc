@@ -226,7 +226,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
       where
         loadOneModule :: ModuleName           -- the module to load
                       -> DsM Bool             -- under which condition
-                      -> Message              -- error message if module not found
+                      -> MsgDoc              -- error message if module not found
                       -> DsM GlobalRdrEnv     -- empty if condition 'False'
         loadOneModule modname check err
           = do { doLoad <- check
@@ -370,8 +370,7 @@ putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) 
 warnDs :: SDoc -> DsM ()
 warnDs warn = do { env <- getGblEnv 
                  ; loc <- getSrcSpanDs
-                 ; let msg = mkWarnMsg loc (ds_unqual env) 
-                                      (ptext (sLit "Warning:") <+> warn)
+                 ; let msg = mkWarnMsg loc (ds_unqual env)  warn
                  ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 
 failWithDs :: SDoc -> DsM a

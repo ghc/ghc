@@ -454,7 +454,7 @@ where the 'Left b' indicates that 'b' can be freely instantiated.
 --
 lookupUniqueInstEnv :: (InstEnv, InstEnv) 
                     -> Class -> [Type]
-                    -> Either Message (ClsInst, [Type])
+                    -> Either MsgDoc (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
   = case lookupInstEnv instEnv cls tys of
       ([(inst, inst_tys)], _, _) 

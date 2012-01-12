@@ -1516,25 +1516,25 @@ genDerivStuff loc fix_env clas name tycon
 %************************************************************************
 
 \begin{code}
-derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> Message
+derivingKindErr :: TyCon -> Class -> [Type] -> Kind -> MsgDoc
 derivingKindErr tc cls cls_tys cls_kind
   = hang (ptext (sLit "Cannot derive well-kinded instance of form")
 		<+> quotes (pprClassPred cls cls_tys <+> parens (ppr tc <+> ptext (sLit "..."))))
        2 (ptext (sLit "Class") <+> quotes (ppr cls)
 	    <+> ptext (sLit "expects an argument of kind") <+> quotes (pprKind cls_kind))
 
-derivingEtaErr :: Class -> [Type] -> Type -> Message
+derivingEtaErr :: Class -> [Type] -> Type -> MsgDoc
 derivingEtaErr cls cls_tys inst_ty
   = sep [ptext (sLit "Cannot eta-reduce to an instance of form"),
 	 nest 2 (ptext (sLit "instance (...) =>")
 		<+> pprClassPred cls (cls_tys ++ [inst_ty]))]
 
-typeFamilyPapErr :: TyCon -> Class -> [Type] -> Type -> Message
+typeFamilyPapErr :: TyCon -> Class -> [Type] -> Type -> MsgDoc
 typeFamilyPapErr tc cls cls_tys inst_ty
   = hang (ptext (sLit "Derived instance") <+> quotes (pprClassPred cls (cls_tys ++ [inst_ty])))
        2 (ptext (sLit "requires illegal partial application of data type family") <+> ppr tc)
 
-derivingThingErr :: Bool -> Class -> [Type] -> Type -> Message -> Message
+derivingThingErr :: Bool -> Class -> [Type] -> Type -> MsgDoc -> MsgDoc
 derivingThingErr newtype_deriving clas tys ty why
   = sep [(hang (ptext (sLit "Can't make a derived instance of"))
 	     2 (quotes (ppr pred))
@@ -1554,7 +1554,7 @@ standaloneCtxt :: LHsType Name -> SDoc
 standaloneCtxt ty = hang (ptext (sLit "In the stand-alone deriving instance for"))
 		       2 (quotes (ppr ty))
 
-derivInstCtxt :: PredType -> Message
+derivInstCtxt :: PredType -> MsgDoc
 derivInstCtxt pred
   = ptext (sLit "When deriving the instance for") <+> parens (ppr pred)
 \end{code}

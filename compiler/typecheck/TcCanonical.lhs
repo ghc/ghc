@@ -736,7 +736,7 @@ flatten d ctxt ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (tvs, rho) = splitForAllTys ty
-       ; when (under_families tvs rho) $ flattenForAllErrorTcS ctxt ty
+       ; when (under_families tvs rho) $ wrapErrTcS $ flattenForAllErrorTcS ctxt ty
        ; (rho', co) <- flatten d ctxt rho
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
 
@@ -818,26 +818,6 @@ canEq _d fl eqv ty1 ty2
               do { _ <- setEqBind eqv (mkTcReflCo ty1) fl; return () }
        ; return Stop }
 
--- Split up an equality between function types into two equalities.
-canEq d fl eqv (FunTy s1 t1) (FunTy s2 t2)
-  = do { argeqv <- newEqVar fl s1 s2
-       ; reseqv <- newEqVar fl t1 t2
-       ; let argeqv_v = evc_the_evvar argeqv
-             reseqv_v = evc_the_evvar reseqv
-       ; (fl1,fl2) <- case fl of
-           Wanted {} ->
-               do { _ <- setEqBind eqv (mkTcFunCo (mkTcCoVarCo argeqv_v) (mkTcCoVarCo reseqv_v)) fl
-                  ; return (fl,fl) }
-           Given {} ->
-               do { fl1 <- setEqBind argeqv_v (mkTcNthCo 0 (mkTcCoVarCo eqv)) fl
-                  ; fl2 <- setEqBind reseqv_v (mkTcNthCo 1 (mkTcCoVarCo eqv)) fl 
-                  ; return (fl1,fl2)
-                  }
-           Derived {} ->
-               return (fl,fl)
-
-       ; canEqEvVarsCreated d [fl2,fl1] [reseqv,argeqv] [t1,s1] [t2,s2] }
-
 -- If one side is a variable, orient and flatten,
 -- WITHOUT expanding type synonyms, so that we tend to 
 -- substitute a ~ Age rather than a ~ Int when @type Age = Int@
@@ -846,6 +826,11 @@ canEq d fl eqv ty1@(TyVarTy {}) ty2
 canEq d fl eqv ty1 ty2@(TyVarTy {})
   = canEqLeaf d fl eqv ty1 ty2
 
+-- See Note [Naked given applications]
+canEq d fl eqv ty1 ty2
+  | Just ty1' <- tcView ty1 = canEq d fl eqv ty1' ty2
+  | Just ty2' <- tcView ty2 = canEq d fl eqv ty1  ty2'
+
 canEq d fl eqv ty1@(TyConApp fn tys) ty2 
   | isSynFamilyTyCon fn, length tys == tyConArity fn
   = canEqLeaf d fl eqv ty1 ty2
@@ -853,14 +838,18 @@ canEq d fl eqv ty1 ty2@(TyConApp fn tys)
   | isSynFamilyTyCon fn, length tys == tyConArity fn
   = canEqLeaf d fl eqv ty1 ty2
 
-canEq d fl eqv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-  | isDecomposableTyCon tc1 && isDecomposableTyCon tc2
-  , tc1 == tc2
-  , length tys1 == length tys2
+canEq d fl eqv ty1 ty2
+  | Just (tc1,tys1) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2,tys2) <- tcSplitTyConApp_maybe ty2
+  , isDecomposableTyCon tc1 && isDecomposableTyCon tc2
   = -- Generate equalities for each of the corresponding arguments
-    do { let (kis1,  tys1') = span isKind tys1
+    if (tc1 /= tc2 || length tys1 /= length tys2)
+    -- Fail straight away for better error messages
+    then canEqFailure d fl eqv
+    else do {
+         let (kis1,  tys1') = span isKind tys1
              (_kis2, tys2') = span isKind tys2
-       ; let kicos = map mkTcReflCo kis1
+             kicos          = map mkTcReflCo kis1
 
        ; argeqvs <- zipWithM (newEqVar fl) tys1' tys2'
        ; fls <- case fl of 
@@ -878,16 +867,32 @@ canEq d fl eqv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
 
 -- See Note [Equality between type applications]
 --     Note [Care with type applications] in TcUnify
-canEq d fl eqv ty1 ty2
-  | Nothing <- tcView ty1  -- Naked applications ONLY
-  , Nothing <- tcView ty2  -- See Note [Naked given applications]
-  , Just (s1,t1) <- tcSplitAppTy_maybe ty1
+canEq d fl eqv ty1 ty2    -- e.g.  F a b ~ Maybe c
+                          -- where F has arity 1
+  | Just (s1,t1) <- tcSplitAppTy_maybe ty1
   , Just (s2,t2) <- tcSplitAppTy_maybe ty2
+  = canEqAppTy d fl eqv s1 t1 s2 t2
+
+canEq d fl eqv s1@(ForAllTy {}) s2@(ForAllTy {})
+ | tcIsForAllTy s1, tcIsForAllTy s2, 
+   Wanted {} <- fl 
+ = canEqFailure d fl eqv
+ | otherwise
+ = do { traceTcS "Ommitting decomposition of given polytype equality" (pprEq s1 s2)
+      ; return Stop }
+
+canEq d fl eqv _ _                               = canEqFailure d fl eqv
+
+-- Type application
+canEqAppTy :: SubGoalDepth 
+           -> CtFlavor -> EqVar -> Type -> Type -> Type -> Type
+           -> TcS StopOrContinue
+canEqAppTy d fl eqv s1 t1 s2 t2
   = ASSERT( not (isKind t1) && not (isKind t2) )
     if isGivenOrSolved fl then 
-        do { traceTcS "canEq/(app case)" $
+        do { traceTcS "canEq (app case)" $
                 text "Ommitting decomposition of given equality between: " 
-                    <+> ppr ty1 <+> text "and" <+> ppr ty2
+                    <+> ppr (AppTy s1 t1) <+> text "and" <+> ppr (AppTy s2 t2)
                    -- We cannot decompose given applications
                    -- because we no longer have 'left' and 'right'
            ; return Stop }
@@ -903,24 +908,29 @@ canEq d fl eqv ty1 ty2
            
            ; canEqEvVarsCreated d [fl,fl] [evc1,evc2] [s1,t1] [s2,t2] }
 
-
-canEq d fl eqv s1@(ForAllTy {}) s2@(ForAllTy {})
- | tcIsForAllTy s1, tcIsForAllTy s2, 
-   Wanted {} <- fl 
- = canEqFailure d fl eqv
- | otherwise
- = do { traceTcS "Ommitting decomposition of given polytype equality" (pprEq s1 s2)
-      ; return Stop }
-
--- Finally expand any type synonym applications.
-canEq d fl eqv ty1 ty2 | Just ty1' <- tcView ty1 = canEq d fl eqv ty1' ty2
-canEq d fl eqv ty1 ty2 | Just ty2' <- tcView ty2 = canEq d fl eqv ty1 ty2'
-canEq d fl eqv _ _                               = canEqFailure d fl eqv
-
 canEqFailure :: SubGoalDepth 
              -> CtFlavor -> EvVar -> TcS StopOrContinue
-canEqFailure d fl eqv = do { emitFrozenError fl eqv d; return Stop }
+canEqFailure d fl eqv 
+  = do { when (isWanted fl) (delCachedEvVar eqv fl) 
+          -- See Note [Combining insoluble constraints]
+       ; emitFrozenError fl eqv d
+       ; return Stop }
 \end{code}
+
+Note [Combining insoluble constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As this point we have an insoluble constraint, like Int~Bool.
+
+ * If it is Wanted, delete it from the cache, so that subsequent
+   Int~Bool constraints give rise to separate error messages
+
+ * But if it is Derived, DO NOT delete from cache.  A class constraint
+   may get kicked out of the inert set, and then have its functional
+   dependency Derived constraints generated a second time. In that
+   case we don't want to get two (or more) error messages by
+   generating two (or more) insoluble fundep constraints from the same
+   class constraint.
+   
 
 Note [Naked given applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

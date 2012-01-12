@@ -238,12 +238,12 @@ printOrThrowWarnings dflags warns
   = when (not (isEmptyBag warns)) $ do
       throwIO $ mkSrcErr $ warns `snocBag` warnIsErrorMsg
   | otherwise
-  = printBagOfWarnings dflags warns
+  = printBagOfErrors dflags warns
 
 handleFlagWarnings :: DynFlags -> [Located String] -> IO ()
 handleFlagWarnings dflags warns
  = when (wopt Opt_WarnDeprecatedFlags dflags) $ do
-        -- It would be nicer if warns :: [Located Message], but that
+        -- It would be nicer if warns :: [Located MsgDoc], but that
         -- has circular import problems.
       let bag = listToBag [ mkPlainWarnMsg loc (text warn)
                           | L loc warn <- warns ]

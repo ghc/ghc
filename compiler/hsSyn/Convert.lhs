@@ -48,25 +48,25 @@ import GHC.Exts
 -------------------------------------------------------------------
 --		The external interface
 
-convertToHsDecls :: SrcSpan -> [TH.Dec] -> Either Message [LHsDecl RdrName]
+convertToHsDecls :: SrcSpan -> [TH.Dec] -> Either MsgDoc [LHsDecl RdrName]
 convertToHsDecls loc ds = initCvt loc (mapM cvt_dec ds)
   where
     cvt_dec d = wrapMsg "declaration" d (cvtDec d)
 
-convertToHsExpr :: SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName)
+convertToHsExpr :: SrcSpan -> TH.Exp -> Either MsgDoc (LHsExpr RdrName)
 convertToHsExpr loc e 
   = initCvt loc $ wrapMsg "expression" e $ cvtl e
 
-convertToPat :: SrcSpan -> TH.Pat -> Either Message (LPat RdrName)
+convertToPat :: SrcSpan -> TH.Pat -> Either MsgDoc (LPat RdrName)
 convertToPat loc p
   = initCvt loc $ wrapMsg "pattern" p $ cvtPat p
 
-convertToHsType :: SrcSpan -> TH.Type -> Either Message (LHsType RdrName)
+convertToHsType :: SrcSpan -> TH.Type -> Either MsgDoc (LHsType RdrName)
 convertToHsType loc t
   = initCvt loc $ wrapMsg "type" t $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either Message a }
+newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc a }
 	-- Push down the source location;
 	-- Can fail, with a single error message
 
@@ -85,13 +85,13 @@ instance Monad CvtM where
 				    Left err -> Left err
 				    Right v  -> unCvtM (k v) loc
 
-initCvt :: SrcSpan -> CvtM a -> Either Message a
+initCvt :: SrcSpan -> CvtM a -> Either MsgDoc a
 initCvt loc (CvtM m) = m loc
 
 force :: a -> CvtM ()
 force a = a `seq` return ()
 
-failWith :: Message -> CvtM a
+failWith :: MsgDoc -> CvtM a
 failWith m = CvtM (\_ -> Left m)
 
 getL :: CvtM SrcSpan
@@ -232,7 +232,7 @@ cvtDec (TySynInstD tc tys rhs)
 	; returnL $ TyClD (TySynonym tc' tvs' tys' rhs') }
 
 ----------------
-cvt_ci_decs :: Message -> [TH.Dec]
+cvt_ci_decs :: MsgDoc -> [TH.Dec]
             -> CvtM (LHsBinds RdrName, 
                      [LSig RdrName], 
                      [LTyClDecl RdrName])
@@ -304,7 +304,7 @@ is_bind :: LHsDecl RdrName -> Either (LHsBind RdrName) (LHsDecl RdrName)
 is_bind (L loc (Hs.ValD bind)) = Left (L loc bind)
 is_bind decl		       = Right decl
 
-mkBadDecMsg :: Message -> [LHsDecl RdrName] -> Message
+mkBadDecMsg :: MsgDoc -> [LHsDecl RdrName] -> MsgDoc
 mkBadDecMsg doc bads 
   = sep [ ptext (sLit "Illegal declaration(s) in") <+> doc <> colon
         , nest 2 (vcat (map Outputable.ppr bads)) ]
@@ -437,7 +437,7 @@ cvtInlineSpec (Just (TH.InlineSpec inline conlike opt_activation))
 --		Declarations
 ---------------------------------------------------
 
-cvtLocalDecs :: Message -> [TH.Dec] -> CvtM (HsLocalBinds RdrName)
+cvtLocalDecs :: MsgDoc -> [TH.Dec] -> CvtM (HsLocalBinds RdrName)
 cvtLocalDecs doc ds 
   | null ds
   = return EmptyLocalBinds

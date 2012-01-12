@@ -130,7 +130,7 @@ tcHsBootSigs (ValBindsOut binds sigs)
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 tcHsBootSigs groups = pprPanic "tcHsBootSigs" (ppr groups)
 
-badBootDeclErr :: Message
+badBootDeclErr :: MsgDoc
 badBootDeclErr = ptext (sLit "Illegal declarations in an hs-boot file")
 
 ------------------------
@@ -739,7 +739,7 @@ tcVect (HsVectInstOut _)
 vectCtxt :: Outputable thing => thing -> SDoc
 vectCtxt thing = ptext (sLit "When checking the vectorisation declaration for") <+> ppr thing
 
-scalarTyConMustBeNullary :: Message
+scalarTyConMustBeNullary :: MsgDoc
 scalarTyConMustBeNullary = ptext (sLit "VECTORISE SCALAR type constructor must be nullary")
 
 --------------

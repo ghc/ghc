@@ -7,7 +7,6 @@
 -- for details
 
 module TcInteract ( 
-     solveInteractWanted, -- Solves [WantedEvVar]
      solveInteractGiven,  -- Solves [EvVar],GivenLoc
      solveInteractCts,    -- Solves [Cts]
   ) where  
@@ -104,20 +103,30 @@ solveInteractCts cts
                        -> Ct
                        -> TcS ([Ct],TypeMap (EvVar,CtFlavor))
         solve_or_cache (acc_cts,acc_cache) ct
-          | isIPPred pty
-          = return (ct:acc_cts,acc_cache) -- Do not use the cache, 
-                                          -- nor update it for IPPreds due to subtle shadowing
-          | Just (ev',fl') <- lookupTM pty acc_cache
+          | dont_cache (classifyPredType pred_ty)
+          = return (ct:acc_cts,acc_cache) 
+
+          | Just (ev',fl') <- lookupTM pred_ty acc_cache
           , fl' `canSolve` fl
           , isWanted fl
           = do { _ <- setEvBind ev (EvId ev') fl
                ; return (acc_cts,acc_cache) }
+
           | otherwise -- If it's a given keep it in the work list, even if it exists in the cache!
-          = return (ct:acc_cts, alterTM pty (\_ -> Just (ev,fl)) acc_cache)
+          = return (ct:acc_cts, alterTM pred_ty (\_ -> Just (ev,fl)) acc_cache)
           where fl = cc_flavor ct
                 ev = cc_id ct
-                pty = ctPred ct
+                pred_ty = ctPred ct
 
+        dont_cache :: PredTree -> Bool
+        -- Do not use the cache, not update it, if this is true
+        dont_cache (IPPred {}) = True    -- IPPreds have subtle shadowing
+        dont_cache (EqPred ty1 ty2)      -- Report Int ~ Bool errors separately
+          | Just tc1 <- tyConAppTyCon_maybe ty1
+          , Just tc2 <- tyConAppTyCon_maybe ty2
+          , tc1 /= tc2
+          = isDecomposableTyCon tc1 && isDecomposableTyCon tc2
+        dont_cache _ = False
 
 solveInteractGiven :: GivenLoc -> [EvVar] -> TcS () 
 solveInteractGiven gloc evs
@@ -125,14 +134,6 @@ solveInteractGiven gloc evs
   where mk_noncan ev = CNonCanonical { cc_id = ev
                                      , cc_flavor = Given gloc GivenOrig 
                                      , cc_depth = 0 }
-
-solveInteractWanted :: [WantedEvVar] -> TcS ()
--- Solve these wanteds along with current inerts and wanteds!
-solveInteractWanted wevs
-  = solveInteractCts (map mk_noncan wevs) 
-  where mk_noncan (EvVarX v w) 
-          = CNonCanonical { cc_id = v, cc_flavor = Wanted w, cc_depth = 0 }
-
 
 -- The main solver loop implements Note [Basic Simplifier Plan]
 ---------------------------------------------------------------
@@ -149,7 +150,7 @@ solveInteract
                       NoWorkRemaining     -- Done, successfuly (modulo frozen)
                         -> return ()
                       MaxDepthExceeded ct -- Failure, depth exceeded
-                        -> solverDepthErrorTcS (cc_depth ct) [ct]
+                        -> wrapErrTcS $ solverDepthErrorTcS (cc_depth ct) [ct]
                       NextWorkItem ct     -- More work, loop around!
                         -> runSolverPipeline thePipeline ct >> solve_loop }
        ; solve_loop }
@@ -1443,7 +1444,9 @@ doTopReact _inerts workItem@(CDictCan { cc_flavor = Derived loc
 
 -- Wanted dictionary
 doTopReact inerts workItem@(CDictCan { cc_flavor = fl@(Wanted loc)
-                                     , cc_class = cls, cc_tyargs = xis })
+                                     , cc_id    = dict_id
+                                     , cc_class = cls, cc_tyargs = xis
+                                     , cc_depth = depth })
   -- See Note [MATCHING-SYNONYMS]
   = do { traceTcS "doTopReact" (ppr workItem)
        ; instEnvs <- getInstEnvs
@@ -1457,7 +1460,7 @@ doTopReact inerts workItem@(CDictCan { cc_flavor = fl@(Wanted loc)
                do { lkup_inst_res  <- matchClassInst inerts cls xis loc
                   ; case lkup_inst_res of
                       GenInst wtvs ev_term
-                          -> doSolveFromInstance wtvs ev_term workItem
+                          -> doSolveFromInstance wtvs ev_term 
                       NoInstance
                           -> return NoTopInt
                   }
@@ -1467,31 +1470,26 @@ doTopReact inerts workItem@(CDictCan { cc_flavor = fl@(Wanted loc)
                   ; return SomeTopInt { tir_rule = "Dict/Top (fundeps)"
                                       , tir_new_item = ContinueWith workItem } } }
 
-   where doSolveFromInstance :: [WantedEvVar] 
-                             -> EvTerm 
-                             -> Ct 
-                             -> TcS TopInteractResult
+   where doSolveFromInstance :: [EvVar] -> EvTerm -> TcS TopInteractResult
          -- Precondition: evidence term matches the predicate of cc_id of workItem
-         doSolveFromInstance wtvs ev_term workItem
-            | null wtvs
-            = do { traceTcS "doTopReact/found nullary instance for" (ppr (cc_id workItem))
-                 ; _ <- setEvBind (cc_id workItem) ev_term fl
+         doSolveFromInstance evs ev_term 
+            | null evs
+            = do { traceTcS "doTopReact/found nullary instance for" (ppr dict_id)
+                 ; _ <- setEvBind dict_id ev_term fl
                  ; return $ 
                    SomeTopInt { tir_rule = "Dict/Top (solved, no new work)" 
                               , tir_new_item = Stop } } -- Don't put him in the inerts
             | otherwise 
-            = do { traceTcS "doTopReact/found non-nullary instance for" $ 
-                   ppr (cc_id workItem)
-                 ; _ <- setEvBind (cc_id workItem) ev_term fl
+            = do { traceTcS "doTopReact/found non-nullary instance for" (ppr dict_id)
+                 ; _ <- setEvBind dict_id ev_term fl
                         -- Solved and new wanted work produced, you may cache the 
                         -- (tentatively solved) dictionary as Solved given.
 --                 ; let _solved = workItem { cc_flavor = solved_fl }
 --                       solved_fl = mkSolvedFlavor fl UnkSkol
-                 ; let ct_from_wev (EvVarX v fl)
-                           = CNonCanonical { cc_id = v, cc_flavor = Wanted fl
-                                           , cc_depth  = cc_depth workItem + 1 }
-                       wtvs_cts = map ct_from_wev wtvs
-                 ; updWorkListTcS (appendWorkListCt wtvs_cts)
+                 ; let mk_new_wanted ev
+                           = CNonCanonical { cc_id = ev, cc_flavor = fl
+                                           , cc_depth  = depth + 1 }
+                 ; updWorkListTcS (appendWorkListCt (map mk_new_wanted evs))
                  ; return $
                    SomeTopInt { tir_rule     = "Dict/Top (solved, more work)"
                               , tir_new_item = Stop }
@@ -1763,7 +1761,7 @@ NB: The desugarer needs be more clever to deal with equalities
 \begin{code}
 data LookupInstResult
   = NoInstance
-  | GenInst [WantedEvVar] EvTerm 
+  | GenInst [EvVar] EvTerm 
 
 matchClassInst :: InertSet -> Class -> [Type] -> WantedLoc -> TcS LookupInstResult
 matchClassInst inerts clas tys loc
@@ -1798,10 +1796,9 @@ matchClassInst inerts clas tys loc
                    else do
                      { evc_vars <- instDFunConstraints theta (Wanted loc)
                      ; let ev_vars = map evc_the_evvar evc_vars
-                           new_evc_vars = filter isNewEvVar evc_vars 
-                           wevs = map (\v -> EvVarX (evc_the_evvar v) loc) new_evc_vars
-                                  -- wevs are only the real new variables that can be emitted 
-                     ; return $ GenInst wevs (EvDFunApp dfun_id tys ev_vars) }
+                           new_ev_vars = [evc_the_evvar evc | evc <- evc_vars, isNewEvVar evc]
+                           -- new_ev_vars are only the real new variables that can be emitted 
+                     ; return $ GenInst new_ev_vars (EvDFunApp dfun_id tys ev_vars) }
                  }
         }
    where 

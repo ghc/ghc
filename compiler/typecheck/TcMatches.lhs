@@ -31,6 +31,7 @@ import TcMType
 import TcType
 import TcBinds
 import TcUnify
+import TcErrors         ( misMatchMsg )
 import Name
 import TysWiredIn
 import Id
@@ -876,5 +877,22 @@ checkArgs fun (MatchGroup (match1:matches) _)
     args_in_match :: LMatch Name -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
 checkArgs fun _ = pprPanic "TcPat.checkArgs" (ppr fun) -- Matches always non-empty
+
+failWithMisMatch :: [EqOrigin] -> TcM a
+-- Generate the message when two types fail to match,
+-- going to some trouble to make it helpful.
+-- We take the failing types from the top of the origin stack
+-- rather than reporting the particular ones we are looking 
+-- at right now
+failWithMisMatch (item:origin)
+  = wrapEqCtxt origin $
+    do	{ ty_act <- zonkTcType (uo_actual item)
+        ; ty_exp <- zonkTcType (uo_expected item)
+        ; env0 <- tcInitTidyEnv
+        ; let (env1, pp_exp) = tidyOpenType env0 ty_exp
+              (env2, pp_act) = tidyOpenType env1 ty_act
+        ; failWithTcM (env2, misMatchMsg True pp_exp pp_act) }
+failWithMisMatch [] 
+  = panic "failWithMisMatch"
 \end{code}
 

@@ -63,7 +63,7 @@ import Module           ( ModuleName, moduleName )
 import UniqFM
 import DataCon		( dataConFieldLabels )
 import PrelNames        ( mkUnboundName, rOOT_MAIN, forall_tv_RDR )
-import ErrUtils		( Message )
+import ErrUtils		( MsgDoc )
 import SrcLoc
 import Outputable
 import Util
@@ -672,7 +672,7 @@ lookupSigOccRn ctxt sig
 
 lookupBindGroupOcc :: HsSigCtxt
 	           -> SDoc     
-	           -> RdrName -> RnM (Either Message Name)
+	           -> RdrName -> RnM (Either MsgDoc Name)
 -- Looks up the RdrName, expecting it to resolve to one of the 
 -- bound names passed in.  If not, return an appropriate error message
 --

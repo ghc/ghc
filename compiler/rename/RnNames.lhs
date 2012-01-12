@@ -725,9 +725,9 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
         -- data constructors of an associated family, we need separate
         -- AvailInfos for the data constructors and the family (as they have
         -- different parents).  See the discussion at occ_env.
-    lookup_ie :: Bool -> IE RdrName -> MaybeErr Message [(IE Name,AvailInfo)]
+    lookup_ie :: Bool -> IE RdrName -> MaybeErr MsgDoc [(IE Name,AvailInfo)]
     lookup_ie opt_typeFamilies ie
-      = let bad_ie :: MaybeErr Message a
+      = let bad_ie :: MaybeErr MsgDoc a
             bad_ie = Failed (badImportItemErr iface decl_spec ie all_avails)
 
             lookup_name rdr
@@ -1680,7 +1680,7 @@ typeItemErr name wherestr
           ptext (sLit "Use -XTypeFamilies to enable this extension") ]
 
 exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
-               -> Message
+               -> MsgDoc
 exportClashErr global_env name1 name2 ie1 ie2
   = vcat [ ptext (sLit "Conflicting exports for") <+> quotes (ppr occ) <> colon
          , ppr_export ie1' name1'
