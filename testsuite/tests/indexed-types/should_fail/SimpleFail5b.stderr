@@ -1,6 +1,6 @@
 
 SimpleFail5b.hs:31:12:
-    Couldn't match expected type `Int' with actual type `Char'
+    Couldn't match type `Char' with `Int'
     Expected type: S3 Int
       Actual type: S3 Char
     In the pattern: D3Char

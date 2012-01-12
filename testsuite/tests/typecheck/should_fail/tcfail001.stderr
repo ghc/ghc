@@ -1,5 +1,6 @@
 
 tcfail001.hs:9:2:
+    Couldn't match expected type `[t0] -> [a0]' with actual type `[a]'
     The equation(s) for `op' have one argument,
     but its type `[a]' has none
     In the instance declaration for `A [a]'

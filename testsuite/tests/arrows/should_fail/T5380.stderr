@@ -1,6 +1,6 @@
 
 T5380.hs:7:27:
-    Couldn't match type `not_bool' with `Bool'
+    Couldn't match expected type `not_bool' with actual type `Bool'
       `not_bool' is a rigid type variable bound by
                  the type signature for
                    testB :: not_bool -> (() -> ()) -> () -> not_unit
@@ -20,3 +20,5 @@ T5380.hs:7:34:
       Actual type: () -> ()
     In the expression: f
     In the expression: proc () -> if b then f -< () else f -< ()
+    In an equation for `testB':
+        testB b f = proc () -> if b then f -< () else f -< ()

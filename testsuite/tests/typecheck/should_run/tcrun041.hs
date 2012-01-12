@@ -23,7 +23,7 @@ h = (# ,1, #)
 
 
 unchanged :: a -> (# Int #)
-unchanged _binding = (# #) 1
+unchanged _binding = (# 1 #)
 
 
 main = do

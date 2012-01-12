@@ -1,7 +1,7 @@
 
 <interactive>:11:1:
-    Ambiguous type variable `a1' in the constraint:
-      (Show a1) arising from a use of `print'
-    Cannot resolve unknown runtime types: a1
+    No instance for (Show a1)
+      arising from a use of `print'
+    Cannot resolve unknown runtime type `a1'
     Use :print or :force to determine these types
     In a stmt of an interactive GHCi command: print it

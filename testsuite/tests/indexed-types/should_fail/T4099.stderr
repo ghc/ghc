@@ -1,13 +1,17 @@
 
 T4099.hs:11:14:
-    Couldn't match type `T b' with `T a0'
+    Couldn't match expected type `T a0' with actual type `T b'
     NB: `T' is a type function, and may not be injective
+    The type variable `a0' is ambiguous
+    Possible fix: add a type signature that fixes these type variable(s)
     In the first argument of `foo', namely `x'
     In the expression: foo x
     In an equation for `bar1': bar1 x = foo x
 
 T4099.hs:14:14:
-    Couldn't match type `T a1' with `Maybe b'
+    Couldn't match expected type `T a1' with actual type `Maybe b'
+    The type variable `a1' is ambiguous
+    Possible fix: add a type signature that fixes these type variable(s)
     In the first argument of `foo', namely `x'
     In the expression: foo x
     In an equation for `bar2': bar2 x = foo x

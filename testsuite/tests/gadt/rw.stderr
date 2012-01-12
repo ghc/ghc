@@ -1,6 +1,6 @@
 
 rw.hs:14:47:
-    Couldn't match type `a' with `Int'
+    Couldn't match expected type `a' with actual type `Int'
       `a' is a rigid type variable bound by
           the type signature for writeInt :: T a -> IORef a -> IO ()
           at rw.hs:13:1
@@ -17,3 +17,4 @@ rw.hs:19:51:
       Actual type: Bool -> Bool
     In the second argument of `(.)', namely `not'
     In the second argument of `(>>=)', namely `(print . not)'
+    In the expression: readIORef ref >>= (print . not)

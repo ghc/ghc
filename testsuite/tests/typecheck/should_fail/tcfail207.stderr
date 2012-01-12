@@ -1,7 +1,7 @@
 
 tcfail207.hs:5:7:
     Couldn't match expected type `[Int] -> [Int]'
-                with actual type `[a0]'
+                with actual type `[a1]'
     In the return type of a call of `take'
     Probable cause: `take' is applied to too many arguments
     In the expression: take x []

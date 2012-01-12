@@ -1,10 +1,11 @@
 
 tcfail178.hs:15:7:
-    Couldn't match expected type `[a0]' with actual type `()'
+    Couldn't match type `()' with `[a0]'
     Expected type: Bool -> [a0]
       Actual type: Bool -> ()
     In the first argument of `a', namely `y'
     In the expression: a y
+    In an equation for `c': c = a y
 
 tcfail178.hs:18:7:
     Couldn't match expected type `Bool -> [a0]' with actual type `()'

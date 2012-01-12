@@ -1,6 +1,6 @@
 
 tcfail171.hs:9:10:
-    No instances for (PrintfType b, PrintfArg a)
+    No instances for (PrintfArg a, PrintfType b)
       arising from a use of `printf'
     In the expression: printf "0x%x" x
     In an equation for `phex': phex x = printf "0x%x" x

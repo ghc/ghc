@@ -9,3 +9,4 @@ tcfail103.hs:15:23:
       Actual type: STRef t Int
     In the first argument of `readSTRef', namely `v'
     In the expression: readSTRef v
+    In an equation for `g': g = readSTRef v

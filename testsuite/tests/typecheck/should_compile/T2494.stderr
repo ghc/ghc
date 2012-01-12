@@ -9,6 +9,7 @@ T2494.hs:15:7:
       Actual type: Maybe (m a) -> Maybe (m a)
     In the first argument of `foo', namely `f'
     In the expression: foo f (foo g x)
+    When checking the transformation rule "foo/foo"
 
 T2494.hs:15:30:
     Couldn't match type `b' with `a'
@@ -20,3 +21,4 @@ T2494.hs:15:30:
       Actual type: Maybe (m b) -> Maybe (m b)
     In the second argument of `(.)', namely `g'
     In the first argument of `foo', namely `(f . g)'
+    In the expression: foo (f . g) x
