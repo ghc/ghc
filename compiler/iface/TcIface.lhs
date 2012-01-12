@@ -125,7 +125,7 @@ tcImportDecl name
             Succeeded thing -> return thing
             Failed err      -> failWithTc err }
 
-importDecl :: Name -> IfM lcl (MaybeErr Message TyThing)
+importDecl :: Name -> IfM lcl (MaybeErr MsgDoc TyThing)
 -- Get the TyThing for this Name from an interface file
 -- It's not a wired-in thing -- the caller caught that
 importDecl name

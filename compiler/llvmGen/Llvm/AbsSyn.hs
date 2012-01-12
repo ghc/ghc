@@ -31,6 +31,9 @@ data LlvmModule = LlvmModule  {
     -- | LLVM Alias type definitions.
     modAliases   :: [LlvmAlias],
 
+    -- | LLVM meta data.
+    modMeta      :: [LlvmMeta],
+
     -- | Global variables to include in the module.
     modGlobals   :: [LMGlobal],
 
@@ -138,7 +141,14 @@ data LlvmStatement
   -}
   | Nop
 
+  {- |
+    A LLVM statement with metadata attached to it.
+  -}
+  | MetaStmt [MetaData] LlvmStatement
+
   deriving (Show, Eq)
+
+type MetaData = (LMString, LlvmMetaUnamed)
 
 
 -- | Llvm Expressions
@@ -228,6 +238,11 @@ data LlvmExpression
                     expression is executed.
   -}
   | Asm LMString LMString LlvmType [LlvmVar] Bool Bool
+
+  {- |
+    A LLVM expression with metadata attached to it.
+  -}
+  | MetaExpr [MetaData] LlvmExpression
 
   deriving (Show, Eq)
 

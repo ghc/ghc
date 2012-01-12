@@ -1167,17 +1167,17 @@
 	  </row>
 
 	  <row>
-	    <entry><option>-fwarn-unrecognised-pragmas</option></entry>
-	    <entry>warn about uses of pragmas that GHC doesn't recognise</entry>
+	    <entry><option>-fdefer-type-errors</option></entry>
+	    <entry>Defer as many type errors as possible until runtime.</entry>
 	    <entry>dynamic</entry>
-	    <entry><option>-fno-warn-unrecognised-pragmas</option></entry>
+	    <entry><option>-fno-defer-type-errors</option></entry>
 	  </row>
 
 	  <row>
-	    <entry><option>-fwarn-warnings-deprecations</option></entry>
-	    <entry>warn about uses of functions &amp; types that have warnings or deprecated pragmas</entry>
+	    <entry><option>-fhelpful-errors</option></entry>
+	    <entry>Make suggestions for mis-spelled names.</entry>
 	    <entry>dynamic</entry>
-	    <entry><option>-fno-warn-warnings-deprecations</option></entry>
+	    <entry><option>-fno-helpful-errors</option></entry>
 	  </row>
 
 	  <row>
@@ -1282,6 +1282,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-monomorphism-restriction</option></entry>
+	    <entry>warn when the Monomorphism Restriction is applied</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-monomorphism-restriction</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-name-shadowing</option></entry>
 	    <entry>warn when names are shadowed</entry>
 	    <entry>dynamic</entry>
@@ -1318,10 +1325,10 @@
 	  </row>
 
 	  <row>
-	    <entry><option>-fwarn-monomorphism-restriction</option></entry>
-	    <entry>warn when the Monomorphism Restriction is applied</entry>
+	    <entry><option>-fwarn-unrecognised-pragmas</option></entry>
+	    <entry>warn about uses of pragmas that GHC doesn't recognise</entry>
 	    <entry>dynamic</entry>
-	    <entry><option>-fno-warn-monomorphism-restriction</option></entry>
+	    <entry><option>-fno-warn-unrecognised-pragmas</option></entry>
 	  </row>
 
 	  <row>
@@ -1375,6 +1382,13 @@
          inference.</entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-fno-warn-safe</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-warnings-deprecations</option></entry>
+	    <entry>warn about uses of functions &amp; types that have warnings or deprecated pragmas</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-warnings-deprecations</option></entry>
 	  </row>
 
 	  </tbody>

@@ -167,7 +167,7 @@ loadInterfaceWithException doc mod_name where_from
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
-              -> IfM lcl (MaybeErr Message ModIface)
+              -> IfM lcl (MaybeErr MsgDoc ModIface)
 
 -- loadInterface looks in both the HPT and PIT for the required interface
 -- If not found, it loads it, and puts it in the PIT (always). 
@@ -294,7 +294,7 @@ loadInterface doc_str mod from
     }}}}
 
 wantHiBootFile :: DynFlags -> ExternalPackageState -> Module -> WhereFrom
-               -> MaybeErr Message IsBootInterface
+               -> MaybeErr MsgDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
 wantHiBootFile dflags eps mod from
   = case from of
@@ -472,7 +472,7 @@ bumpDeclStats name
 findAndReadIface :: SDoc -> Module
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
                                         -- False <=> Look for .hi file
-                 -> TcRnIf gbl lcl (MaybeErr Message (ModIface, FilePath))
+                 -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
         -- Nothing <=> file not found, or unreadable, or illegible
         -- Just x  <=> successfully found and parsed 
 
@@ -537,7 +537,7 @@ findAndReadIface doc_str mod hi_boot_file
 
 \begin{code}
 readIface :: Module -> FilePath -> IsBootInterface 
-          -> TcRnIf gbl lcl (MaybeErr Message ModIface)
+          -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
         -- Succeeded iface <=> successfully found and parsed 
 
@@ -794,7 +794,7 @@ badIfaceFile file err
   = vcat [ptext (sLit "Bad interface file:") <+> text file, 
           nest 4 err]
 
-hiModuleNameMismatchWarn :: Module -> Module -> Message
+hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
 hiModuleNameMismatchWarn requested_mod read_mod = 
   withPprStyle defaultUserStyle $
     -- we want the Modules below to be qualified with package names,

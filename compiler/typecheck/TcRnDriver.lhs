@@ -191,7 +191,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		-- Process the export list
         traceRn (text "rn4a: before exports");
 	tcg_env <- rnExports (isJust maybe_mod) export_ies tcg_env ;
-	traceRn (text "rn4b: after exportss") ;
+	traceRn (text "rn4b: after exports") ;
 
                 -- Check that main is exported (must be after rnExports)
         checkMainExported tcg_env ;

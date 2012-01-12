@@ -184,7 +184,7 @@ lintPassResult dflags pass binds
        ; displayLintResults dflags pass warns errs binds  }
 
 displayLintResults :: DynFlags -> CoreToDo
-                   -> Bag Err.Message -> Bag Err.Message -> CoreProgram
+                   -> Bag Err.MsgDoc -> Bag Err.MsgDoc -> CoreProgram
                    -> IO ()
 displayLintResults dflags pass warns errs binds
   | not (isEmptyBag errs)

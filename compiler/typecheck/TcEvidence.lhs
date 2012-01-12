@@ -461,6 +461,10 @@ data EvTerm
 
   | EvTupleMk [EvId]             -- tuple built from this stuff
 
+  | EvDelayedError Type FastString  -- Used with Opt_DeferTypeErrors
+                               -- See Note [Deferring coercion errors to runtime]
+                               -- in TcSimplify
+
   | EvSuperClass DictId Int      -- n'th superclass. Used for both equalities and
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
@@ -523,12 +527,13 @@ isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 
 evVarsOfTerm :: EvTerm -> [EvVar]
 evVarsOfTerm (EvId v) = [v]
-evVarsOfTerm (EvCoercion co)     = varSetElems (coVarsOfTcCo co)
-evVarsOfTerm (EvDFunApp _ _ evs) = evs
-evVarsOfTerm (EvTupleSel v _)    = [v]
-evVarsOfTerm (EvSuperClass v _)  = [v]
-evVarsOfTerm (EvCast v co)       = v : varSetElems (coVarsOfTcCo co)
-evVarsOfTerm (EvTupleMk evs)     = evs
+evVarsOfTerm (EvCoercion co)      = varSetElems (coVarsOfTcCo co)
+evVarsOfTerm (EvDFunApp _ _ evs)  = evs
+evVarsOfTerm (EvTupleSel v _)     = [v]
+evVarsOfTerm (EvSuperClass v _)   = [v]
+evVarsOfTerm (EvCast v co)        = v : varSetElems (coVarsOfTcCo co)
+evVarsOfTerm (EvTupleMk evs)      = evs
+evVarsOfTerm (EvDelayedError _ _) = []
 evVarsOfTerm (EvKindCast v co)   = v : varSetElems (coVarsOfTcCo co)
 \end{code}
 
@@ -589,5 +594,7 @@ instance Outputable EvTerm where
   ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
+  ppr (EvDelayedError ty msg) =     ptext (sLit "error") 
+                                <+> sep [ char '@' <> ppr ty, ppr msg ]
 \end{code}
 

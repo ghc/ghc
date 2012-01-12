@@ -54,14 +54,13 @@ module TcRnTypes(
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, 
         singleCt, extendCts, isEmptyCts, isCTyEqCan, 
         isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe,
-        isCIrredEvCan, isCNonCanonical,
-        SubGoalDepth, ctPred,
+        isCIrredEvCan, isCNonCanonical, isWantedCt, isDerivedCt, 
+        isGivenCt_maybe, isGivenOrSolvedCt,
+        ctWantedLoc,
+        SubGoalDepth, mkNonCanonical, ctPred, 
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         andWC, addFlats, addImplics, mkFlatWC,
-
-        EvVarX(..), mkEvVarX, evVarOf, evVarX, evVarOfPred,
-        WantedEvVar,
 
         Implication(..),
         CtLoc(..), ctLocSpan, ctLocOrigin, setCtLocOrigin,
@@ -71,13 +70,15 @@ module TcRnTypes(
 
 	SkolemInfo(..),
 
-        CtFlavor(..), pprFlavorArising, isWanted, 
-        isGivenOrSolved, isGiven_maybe, isSolved,
-        isDerived,
+        CtFlavor(..), pprFlavorArising, 
+        mkSolvedFlavor, mkGivenFlavor, mkWantedFlavor,
+        isWanted, isGivenOrSolved, isGiven_maybe, isSolved,
+        isDerived, getWantedLoc, canSolve, canRewrite,
+        combineCtLoc, 
 
 	-- Pretty printing
-        pprEvVarTheta, pprWantedEvVar, pprWantedsWithLocs,
-	pprEvVars, pprEvVarWithType, pprWantedEvVarWithLoc,
+        pprEvVarTheta, pprWantedsWithLocs,
+	pprEvVars, pprEvVarWithType, 
         pprArising, pprArisingAt,
 
 	-- Misc other types
@@ -651,7 +652,7 @@ Note that:
 
 
 \begin{code}
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, Message))
+type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
 	-- Monadic so that we have a chance
 	-- to deal with bound type variables just before error
 	-- message construction
@@ -903,6 +904,8 @@ data Ct
 \end{code}
 
 \begin{code}
+mkNonCanonical :: EvVar -> CtFlavor -> Ct
+mkNonCanonical ev flav = CNonCanonical { cc_id = ev, cc_flavor = flav, cc_depth = 0}
 
 ctPred :: Ct -> PredType 
 ctPred (CNonCanonical { cc_id = v }) = evVarPred v
@@ -917,6 +920,57 @@ ctPred (CIPCan { cc_ip_nm = nm, cc_ip_ty = xi })
 ctPred (CIrredEvCan { cc_ty = xi }) = xi
 \end{code}
 
+
+%************************************************************************
+%*									*
+                    CtFlavor
+         The "flavor" of a canonical constraint
+%*									*
+%************************************************************************
+
+\begin{code}
+ctWantedLoc :: Ct -> WantedLoc
+-- Only works for Wanted/Derived
+ctWantedLoc ct = ASSERT2( not (isGivenOrSolved (cc_flavor ct)), ppr ct )
+                 getWantedLoc (cc_flavor ct)
+
+isWantedCt :: Ct -> Bool
+isWantedCt ct = isWanted (cc_flavor ct)
+
+isDerivedCt :: Ct -> Bool
+isDerivedCt ct = isDerived (cc_flavor ct)
+
+isGivenCt_maybe :: Ct -> Maybe GivenKind
+isGivenCt_maybe ct = isGiven_maybe (cc_flavor ct)
+
+isGivenOrSolvedCt :: Ct -> Bool
+isGivenOrSolvedCt ct = isGivenOrSolved (cc_flavor ct)
+
+isCTyEqCan :: Ct -> Bool 
+isCTyEqCan (CTyEqCan {})  = True 
+isCTyEqCan (CFunEqCan {}) = False
+isCTyEqCan _              = False 
+
+isCDictCan_Maybe :: Ct -> Maybe Class
+isCDictCan_Maybe (CDictCan {cc_class = cls })  = Just cls
+isCDictCan_Maybe _              = Nothing
+
+isCIPCan_Maybe :: Ct -> Maybe (IPName Name)
+isCIPCan_Maybe  (CIPCan {cc_ip_nm = nm }) = Just nm
+isCIPCan_Maybe _                = Nothing
+
+isCIrredEvCan :: Ct -> Bool
+isCIrredEvCan (CIrredEvCan {}) = True
+isCIrredEvCan _                = False
+
+isCFunEqCan_Maybe :: Ct -> Maybe TyCon
+isCFunEqCan_Maybe (CFunEqCan { cc_fun = tc }) = Just tc
+isCFunEqCan_Maybe _ = Nothing
+
+isCNonCanonical :: Ct -> Bool
+isCNonCanonical (CNonCanonical {}) = True 
+isCNonCanonical _ = False 
+\end{code}
 
 \begin{code}
 instance Outputable Ct where
@@ -951,31 +1005,6 @@ emptyCts = emptyBag
 
 isEmptyCts :: Cts -> Bool
 isEmptyCts = isEmptyBag
-
-isCTyEqCan :: Ct -> Bool 
-isCTyEqCan (CTyEqCan {})  = True 
-isCTyEqCan (CFunEqCan {}) = False
-isCTyEqCan _              = False 
-
-isCDictCan_Maybe :: Ct -> Maybe Class
-isCDictCan_Maybe (CDictCan {cc_class = cls })  = Just cls
-isCDictCan_Maybe _              = Nothing
-
-isCIPCan_Maybe :: Ct -> Maybe (IPName Name)
-isCIPCan_Maybe  (CIPCan {cc_ip_nm = nm }) = Just nm
-isCIPCan_Maybe _                = Nothing
-
-isCIrredEvCan :: Ct -> Bool
-isCIrredEvCan (CIrredEvCan {}) = True
-isCIrredEvCan _                = False
-
-isCFunEqCan_Maybe :: Ct -> Maybe TyCon
-isCFunEqCan_Maybe (CFunEqCan { cc_fun = tc }) = Just tc
-isCFunEqCan_Maybe _ = Nothing
-
-isCNonCanonical :: Ct -> Bool
-isCNonCanonical (CNonCanonical {}) = True 
-isCNonCanonical _ = False 
 \end{code}
 
 %************************************************************************
@@ -992,7 +1021,7 @@ v%************************************************************************
 \begin{code}
 
 data WantedConstraints
-  = WC { wc_flat  :: Cts                -- Unsolved constraints, all wanted
+  = WC { wc_flat  :: Cts               -- Unsolved constraints, all wanted
        , wc_impl  :: Bag Implication
        , wc_insol :: Cts               -- Insoluble constraints, can be
                                        -- wanted, given, or derived
@@ -1022,12 +1051,9 @@ andWC (WC { wc_flat = f1, wc_impl = i1, wc_insol = n1 })
        , wc_impl  = i1 `unionBags` i2
        , wc_insol = n1 `unionBags` n2 }
 
-addFlats :: WantedConstraints -> Bag WantedEvVar -> WantedConstraints
-addFlats wc wevs 
+addFlats :: WantedConstraints -> Bag Ct -> WantedConstraints
+addFlats wc cts
   = wc { wc_flat = wc_flat wc `unionBags` cts }
-  where cts = mapBag mk_noncan wevs 
-        mk_noncan (EvVarX v wl) 
-          = CNonCanonical { cc_id = v, cc_flavor = Wanted wl, cc_depth = 0}
 
 addImplics :: WantedConstraints -> Bag Implication -> WantedConstraints
 addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
@@ -1096,7 +1122,7 @@ data Implication
 	  -- However, we don't zonk ic_env when zonking the Implication
 	  -- Instead we do that when generating a skolem-escape error message
 
-      ic_skols  :: TcTyVarSet,   -- Introduced skolems 
+      ic_skols  :: [TcTyVar],    -- Introduced skolems 
       		   	         -- See Note [Skolems in an implication]
 
       ic_given  :: [EvVar],      -- Given evidence variables
@@ -1163,36 +1189,9 @@ will be able to report a more informative error:
 
 %************************************************************************
 %*									*
-            EvVarX, WantedEvVar, FlavoredEvVar
+            Pretty printing
 %*									*
 %************************************************************************
-
-\begin{code}
-data EvVarX a = EvVarX EvVar a
-     -- An evidence variable with accompanying info
-
-type WantedEvVar   = EvVarX WantedLoc     -- The location where it arose
-
-
-instance Outputable (EvVarX a) where
-  ppr (EvVarX ev _) = pprEvVarWithType ev
-  -- If you want to see the associated info,
-  -- use a more specific printing function
-
-mkEvVarX :: EvVar -> a -> EvVarX a
-mkEvVarX = EvVarX
-
-evVarOf :: EvVarX a -> EvVar
-evVarOf (EvVarX ev _) = ev
-
-evVarX :: EvVarX a -> a
-evVarX (EvVarX _ a) = a
-
-evVarOfPred :: EvVarX a -> PredType
-evVarOfPred wev = evVarPred (evVarOf wev)
-
-\end{code}
-
 
 \begin{code}
 pprEvVars :: [EvVar] -> SDoc	-- Print with their types
@@ -1209,11 +1208,6 @@ pprWantedsWithLocs wcs
   =  vcat [ pprBag ppr (wc_flat wcs)
           , pprBag ppr (wc_impl wcs)
           , pprBag ppr (wc_insol wcs) ]
-
-pprWantedEvVarWithLoc, pprWantedEvVar :: WantedEvVar -> SDoc
-pprWantedEvVarWithLoc (EvVarX v loc) = hang (pprEvVarWithType v)
-                                          2 (pprArisingAt loc)
-pprWantedEvVar        (EvVarX v _)   = pprEvVarWithType v
 \end{code}
 
 %************************************************************************
@@ -1242,6 +1236,11 @@ instance Outputable CtFlavor where
   ppr (Wanted {})                = ptext (sLit "[W]")
   ppr (Derived {})               = ptext (sLit "[D]")
 
+getWantedLoc :: CtFlavor -> WantedLoc
+getWantedLoc (Wanted wl)     = wl
+getWantedLoc (Derived wl)    = wl
+getWantedLoc flav@(Given {}) = pprPanic "getWantedLoc" (ppr flav)
+
 pprFlavorArising :: CtFlavor -> SDoc
 pprFlavorArising (Derived wl)   = pprArisingAt wl
 pprFlavorArising (Wanted  wl)   = pprArisingAt wl
@@ -1266,6 +1265,52 @@ isGiven_maybe _            = Nothing
 isDerived :: CtFlavor -> Bool 
 isDerived (Derived {}) = True
 isDerived _            = False
+
+canSolve :: CtFlavor -> CtFlavor -> Bool 
+-- canSolve ctid1 ctid2 
+-- The constraint ctid1 can be used to solve ctid2 
+-- "to solve" means a reaction where the active parts of the two constraints match.
+--  active(F xis ~ xi) = F xis 
+--  active(tv ~ xi)    = tv 
+--  active(D xis)      = D xis 
+--  active(IP nm ty)   = nm 
+--
+-- NB:  either (a `canSolve` b) or (b `canSolve` a) must hold
+-----------------------------------------
+canSolve (Given {})   _            = True 
+canSolve (Wanted {})  (Derived {}) = True
+canSolve (Wanted {})  (Wanted {})  = True
+canSolve (Derived {}) (Derived {}) = True  -- Important: derived can't solve wanted/given
+canSolve _ _ = False  	       	     	   -- (There is no *evidence* for a derived.)
+
+canRewrite :: CtFlavor -> CtFlavor -> Bool 
+-- canRewrite ctid1 ctid2 
+-- The *equality_constraint* ctid1 can be used to rewrite inside ctid2 
+canRewrite = canSolve 
+
+combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
+-- Precondition: At least one of them should be wanted 
+combineCtLoc (Wanted loc) _    = loc
+combineCtLoc _ (Wanted loc)    = loc
+combineCtLoc (Derived loc ) _  = loc
+combineCtLoc _ (Derived loc )  = loc
+combineCtLoc _ _ = panic "combineCtLoc: both given"
+
+mkSolvedFlavor :: CtFlavor -> SkolemInfo -> EvTerm -> CtFlavor
+-- To be called when we actually solve a wanted/derived (perhaps leaving residual goals)
+mkSolvedFlavor (Wanted  loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
+mkSolvedFlavor (Derived loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
+mkSolvedFlavor fl@(Given {}) _sk _evterm = pprPanic "Solving a given constraint!" $ ppr fl
+
+mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
+mkGivenFlavor (Wanted  loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
+mkGivenFlavor (Derived loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
+mkGivenFlavor fl@(Given {}) _sk = pprPanic "Solving a given constraint!" $ ppr fl
+
+mkWantedFlavor :: CtFlavor -> CtFlavor
+mkWantedFlavor (Wanted  loc) = Wanted loc
+mkWantedFlavor (Derived loc) = Wanted loc
+mkWantedFlavor fl@(Given {}) = pprPanic "mkWantedFlavor" (ppr fl)
 \end{code}
 
 %************************************************************************
@@ -1355,7 +1400,8 @@ data SkolemInfo
   | BracketSkol         -- Template Haskell bracket
 
   | UnifyForAllSkol     -- We are unifying two for-all types
-       TcType
+       [TcTyVar]        -- The instantiated skolem variables
+       TcType           -- The instantiated type *inside* the forall
 
   | UnkSkol             -- Unhelpful info (until I improve it)
 
@@ -1385,7 +1431,7 @@ pprSkolInfo (PatSkol dc mc)  = sep [ ptext (sLit "a pattern with constructor")
 pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
                                   , vcat [ ppr name <+> dcolon <+> ppr ty
                                          | (name,ty) <- ids ]]
-pprSkolInfo (UnifyForAllSkol ty) = ptext (sLit "the type") <+> ppr ty
+pprSkolInfo (UnifyForAllSkol tvs ty) = ptext (sLit "the type") <+> ppr (mkForAllTys tvs ty)
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.  

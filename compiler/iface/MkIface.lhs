@@ -844,7 +844,7 @@ oldMD5 dflags bh = do
 instOrphWarn :: PrintUnqualified -> ClsInst -> WarnMsg
 instOrphWarn unqual inst
   = mkWarnMsg (getSrcSpan inst) unqual $
-    hang (ptext (sLit "Warning: orphan instance:")) 2 (pprInstanceHdr inst)
+    hang (ptext (sLit "Orphan instance:")) 2 (pprInstanceHdr inst)
 
 ruleOrphWarn :: PrintUnqualified -> Module -> IfaceRule -> WarnMsg
 ruleOrphWarn unqual mod rule

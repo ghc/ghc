@@ -748,7 +748,7 @@ deprecatedDollar quoter
 data MetaOps th_syn hs_syn
   = MT { mt_desc :: String             -- Type of beast (expression, type etc)
        , mt_show :: th_syn -> String   -- How to show the th_syn thing
-       , mt_cvt  :: SrcSpan -> th_syn -> Either Message hs_syn
+       , mt_cvt  :: SrcSpan -> th_syn -> Either MsgDoc hs_syn
                                        -- How to convert to hs_syn
     }
 
@@ -801,7 +801,7 @@ runMetaD = runMetaQ declMetaOps
 ---------------
 runMeta :: (Outputable hs_syn)
         => Bool                 -- Whether code should be printed in the exception message
-        -> (SrcSpan -> x -> TcM (Either Message hs_syn))        -- How to run x
+        -> (SrcSpan -> x -> TcM (Either MsgDoc hs_syn))        -- How to run x
         -> LHsExpr Id           -- Of type x; typically x = Q TH.Exp, or something like that
         -> TcM hs_syn           -- Of type t
 runMeta show_code run_and_convert expr
@@ -902,8 +902,8 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
                   ; let i = getKey u
                   ; return (TH.mkNameU s i) }
 
-  qReport True msg  = addErr (text msg)
-  qReport False msg = addReport (text msg) empty
+  qReport True msg  = addErr  (text msg)
+  qReport False msg = addWarn (text msg)
 
   qLocation = do { m <- getModule
                  ; l <- getSrcSpanM

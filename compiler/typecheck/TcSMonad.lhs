@@ -30,7 +30,7 @@ module TcSMonad (
     canRewrite, canSolve,
     combineCtLoc, mkSolvedFlavor, mkGivenFlavor,
     mkWantedFlavor,
-    getWantedLoc,
+    ctWantedLoc,
 
     TcS, runTcS, failTcS, panicTcS, traceTcS, -- Basic functionality 
     traceFireTcS, bumpStepCountTcS, doWithInert,
@@ -600,82 +600,6 @@ extractRelevantInerts wi
 \end{code}
 
 
-
-
-%************************************************************************
-%*									*
-                    CtFlavor
-         The "flavor" of a canonical constraint
-%*									*
-%************************************************************************
-
-\begin{code}
-getWantedLoc :: Ct -> WantedLoc
-getWantedLoc ct 
-  = ASSERT (isWanted (cc_flavor ct))
-    case cc_flavor ct of 
-      Wanted wl -> wl 
-      _         -> pprPanic "Can't get WantedLoc of non-wanted constraint!" empty
-
-isWantedCt :: Ct -> Bool
-isWantedCt ct = isWanted (cc_flavor ct)
-isDerivedCt :: Ct -> Bool
-isDerivedCt ct = isDerived (cc_flavor ct)
-
-isGivenCt_maybe :: Ct -> Maybe GivenKind
-isGivenCt_maybe ct = isGiven_maybe (cc_flavor ct)
-
-isGivenOrSolvedCt :: Ct -> Bool
-isGivenOrSolvedCt ct = isGivenOrSolved (cc_flavor ct)
-
-
-canSolve :: CtFlavor -> CtFlavor -> Bool 
--- canSolve ctid1 ctid2 
--- The constraint ctid1 can be used to solve ctid2 
--- "to solve" means a reaction where the active parts of the two constraints match.
---  active(F xis ~ xi) = F xis 
---  active(tv ~ xi)    = tv 
---  active(D xis)      = D xis 
---  active(IP nm ty)   = nm 
---
--- NB:  either (a `canSolve` b) or (b `canSolve` a) must hold
------------------------------------------
-canSolve (Given {})   _            = True 
-canSolve (Wanted {})  (Derived {}) = True
-canSolve (Wanted {})  (Wanted {})  = True
-canSolve (Derived {}) (Derived {}) = True  -- Important: derived can't solve wanted/given
-canSolve _ _ = False  	       	     	   -- (There is no *evidence* for a derived.)
-
-canRewrite :: CtFlavor -> CtFlavor -> Bool 
--- canRewrite ctid1 ctid2 
--- The *equality_constraint* ctid1 can be used to rewrite inside ctid2 
-canRewrite = canSolve 
-
-combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
--- Precondition: At least one of them should be wanted 
-combineCtLoc (Wanted loc) _    = loc
-combineCtLoc _ (Wanted loc)    = loc
-combineCtLoc (Derived loc ) _  = loc
-combineCtLoc _ (Derived loc )  = loc
-combineCtLoc _ _ = panic "combineCtLoc: both given"
-
-mkSolvedFlavor :: CtFlavor -> SkolemInfo -> EvTerm -> CtFlavor
--- To be called when we actually solve a wanted/derived (perhaps leaving residual goals)
-mkSolvedFlavor (Wanted  loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
-mkSolvedFlavor (Derived loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
-mkSolvedFlavor fl@(Given {}) _sk _evterm = pprPanic "Solving a given constraint!" $ ppr fl
-
-mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
-mkGivenFlavor (Wanted  loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
-mkGivenFlavor (Derived loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
-mkGivenFlavor fl@(Given {}) _sk = pprPanic "Solving a given constraint!" $ ppr fl
-
-mkWantedFlavor :: CtFlavor -> CtFlavor
-mkWantedFlavor (Wanted  loc) = Wanted loc
-mkWantedFlavor (Derived loc) = Wanted loc
-mkWantedFlavor fl@(Given {}) = pprPanic "mkWantedFlavor" (ppr fl)
-\end{code}
-
 %************************************************************************
 %*									*
 %*		The TcS solver monad                                    *
@@ -842,7 +766,7 @@ runTcS context untouch is wl tcs
   = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
        ; ev_cache_var <- TcM.newTcRef $ 
                          EvVarCache { evc_cache = emptyTM, evc_flat_cache = emptyTM }
-       ; ev_binds_var@(EvBindsVar evb_ref _) <- TcM.newTcEvBinds
+       ; ev_binds_var <- TcM.newTcEvBinds
        ; step_count <- TcM.newTcRef 0
 
        ; inert_var <- TcM.newTcRef is 
@@ -871,8 +795,8 @@ runTcS context untouch is wl tcs
                                 <+> int count <+> ppr context)
          }
              -- And return
-       ; ev_binds      <- TcM.readTcRef evb_ref
-       ; return (res, evBindMapBinds ev_binds) }
+       ; ev_binds <- TcM.getTcEvBinds ev_binds_var
+       ; return (res, ev_binds) }
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
 

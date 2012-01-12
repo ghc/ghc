@@ -11,8 +11,8 @@ data Severity
   | SevError
   | SevFatal
 
-type Message = SDoc
+type MsgDoc = SDoc
 
-mkLocMessage :: SrcSpan -> Message -> Message
+mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
 \end{code}
 

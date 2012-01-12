@@ -1022,6 +1022,32 @@ ghc -c Foo.hs</screen>
     <variablelist>
 
       <varlistentry>
+	<term><option>-fdefer-type-errors</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fdefer-type-errors</option></primary>
+	  </indexterm>
+	  <indexterm><primary>warnings</primary></indexterm>
+	    <para>Defer as many type errors as possible until runtime.  
+            At compile time you get a warning (instead of an error).  At 
+            runtime, if you use a value that depends on a type error, you 
+            get a runtime error; but you can run any type-correct parts of your code 
+            just fine.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fhelpful-errors</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fhelpful-errors</option></primary>
+	  </indexterm>
+	  <indexterm><primary>warnings</primary></indexterm>
+	    <para>When a name or package is not found in scope, make
+            suggestions for the name or package you might have meant instead.</para>
+	  <para>This option is on by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-unrecognised-pragmas</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-unrecognised-pragmas</option></primary>
