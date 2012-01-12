@@ -1,6 +1,6 @@
 
 tcfail153.hs:6:9:
-    Couldn't match type `a' with `Bool'
+    Couldn't match expected type `a' with actual type `Bool'
       `a' is a rigid type variable bound by
           the type signature for f :: a -> [a] at tcfail153.hs:6:1
     In the first argument of `g', namely `x'

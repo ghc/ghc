@@ -2,12 +2,13 @@
 
 module Foo where
 
+import System.IO
 import Language.Haskell.TH
 
 type C = Int
 
 $(do
   a <- reify $ mkName "C"
-  report False $ show a
+  runIO $ hPutStrLn stderr (show a)
   return []
   )

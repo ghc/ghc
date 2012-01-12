@@ -17,3 +17,4 @@ tcfail192.hs:10:26:
       Actual type: [a] -> [a]
     In the return type of a call of `take'
     In the expression: take 5
+    In a stmt of a list comprehension: then group using take 5

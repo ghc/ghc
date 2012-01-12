@@ -63,4 +63,3 @@ foo = do
           putChar 'a'
           putChar 'a'
           putChar 'a'
-

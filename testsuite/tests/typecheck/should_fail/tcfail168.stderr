@@ -1,12 +1,17 @@
 
-tcfail168.hs:8:11:
-    Couldn't match expected type `Char -> a0' with actual type `IO ()'
-    In the return type of a call of `putChar'
-    Probable cause: `putChar' is applied to too many arguments
-    In a stmt of a 'do' block: putChar 'a'
+tcfail168.hs:7:11:
+    Couldn't match expected type `IO a0'
+                with actual type `Char -> IO ()'
+    In a stmt of a 'do' block: putChar
     In the expression:
       do { putChar;
            putChar 'a';
            putChar 'a';
            putChar 'a';
            .... }
+    In an equation for `foo':
+        foo
+          = do { putChar;
+                 putChar 'a';
+                 putChar 'a';
+                 .... }

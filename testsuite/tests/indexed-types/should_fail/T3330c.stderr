@@ -1,17 +1,20 @@
 
-T3330c.hs:23:33:
-    Kind incompatibility when matching types:
-      f0 :: * -> *
-      f0 x :: *
-    In the return type of a call of `Inl'
-    In the expression: Inl (plug rf df x)
-    In an equation for plug':
-        plug' (RSum rf rg) (Inl df) x = Inl (plug rf df x)
-
 T3330c.hs:23:43:
-    Couldn't match kind `*' with `* -> *'
-    Kind incompatibility when matching types:
-      Der ((->) x) :: * -> *
-      R :: (* -> *) -> *
+    Could not deduce (f1 ~ t0 x)
+    from the context (f ~ (f1 :+: g))
+      bound by a pattern with constructor
+                 RSum :: forall (f :: * -> *) (g :: * -> *).
+                         R f -> R g -> R (f :+: g),
+               in an equation for plug'
+      at T3330c.hs:23:8-17
+      `f1' is a rigid type variable bound by
+           a pattern with constructor
+             RSum :: forall (f :: * -> *) (g :: * -> *).
+                     R f -> R g -> R (f :+: g),
+           in an equation for plug'
+           at T3330c.hs:23:8
+    Expected type: Der ((->) x) (t0 x)
+      Actual type: R f1
     In the first argument of `plug', namely `rf'
     In the first argument of `Inl', namely `(plug rf df x)'
+    In the expression: Inl (plug rf df x)

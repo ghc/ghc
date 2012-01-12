@@ -1,5 +1,5 @@
 {-# LANGUAGE TupleSections, UnboxedTuples #-}
-module Main where
+module ShouldCompile where
 
 a :: Bool -> (Int, Bool)
 a = ( , True)
@@ -18,5 +18,3 @@ e = (#1, #)
 
 f :: a -> (#a, Bool#)
 f = (#True || False, #)
-
-main = return ()

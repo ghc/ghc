@@ -7,7 +7,9 @@
 
 module T3330a where
 
-import Control.Monad.Writer
+newtype Writer w a = Writer { runWriter :: (a, w) }
+execWriter :: Writer w a -> w
+execWriter m = snd (runWriter m)
 
 data AnyF (s :: * -> *) = AnyF
 class HFunctor (f :: (* -> *) -> * -> *)

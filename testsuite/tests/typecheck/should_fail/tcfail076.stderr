@@ -11,3 +11,4 @@ tcfail076.hs:18:82:
       Actual type: m res
     In the return type of a call of `cont'
     In the expression: cont a
+    In the first argument of `KContT', namely `(\ cont' -> cont a)'

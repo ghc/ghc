@@ -9,10 +9,11 @@ T2664.hs:31:33:
                              IO (PChan (a :*: b), PChan c)
       at T2664.hs:(23,5)-(31,87)
     NB: `Dual' is a type function, and may not be injective
-    Expected type: c
-      Actual type: Dual b :+: Dual a
     Expected type: PChan c
       Actual type: PChan (Dual b :+: Dual a)
     In the return type of a call of `E'
     In the expression:
       E (pchoose Right v newPChan) (pchoose Left v newPChan)
+    In the first argument of `return', namely
+      `(O $ takeMVar v, 
+        E (pchoose Right v newPChan) (pchoose Left v newPChan))'

@@ -11,7 +11,9 @@
 -- Of course, it'd be hard to fill in the "..." in this particular
 -- case, but that relies on observations about the form of the types
 -- of the class methods, surely beyond what a compiler should do.
--- That's why GHC accepts it
+--
+-- Still, the type is ambiguous because there's nothing to fix 'c'
+
 
 module ShouldFail where
 

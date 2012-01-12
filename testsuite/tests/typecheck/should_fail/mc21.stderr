@@ -7,3 +7,4 @@ mc21.hs:12:26:
       Actual type: [a] -> [a]
     In the return type of a call of `take'
     In the expression: take 5
+    In a stmt of a monad comprehension: then group using take 5

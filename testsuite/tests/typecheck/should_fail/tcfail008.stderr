@@ -1,7 +1,24 @@
 
+tcfail008.hs:3:5:
+    No instance for (Num a0)
+      arising from the literal `1'
+    The type variable `a0' is ambiguous
+    Possible cause: the monomorphism restriction applied to the following:
+      o :: [a0] (bound at tcfail008.hs:3:1)
+    Probable fix: give these definition(s) an explicit type signature
+                  or use -XNoMonomorphismRestriction
+    In the first argument of `(:)', namely `1'
+    In the expression: 1 : 2
+    In an equation for `o': o = 1 : 2
+
 tcfail008.hs:3:7:
     No instance for (Num [a0])
       arising from the literal `2'
+    The type variable `a0' is ambiguous
+    Possible cause: the monomorphism restriction applied to the following:
+      o :: [a0] (bound at tcfail008.hs:3:1)
+    Probable fix: give these definition(s) an explicit type signature
+                  or use -XNoMonomorphismRestriction
     Possible fix: add an instance declaration for (Num [a0])
     In the second argument of `(:)', namely `2'
     In the expression: 1 : 2

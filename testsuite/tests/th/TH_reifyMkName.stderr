@@ -1,3 +1,1 @@
-
-TH_reifyMkName.hs:9:3:
-    TyConI (TySynD Foo.C [] (ConT GHC.Types.Int))
+TyConI (TySynD Foo.C [] (ConT GHC.Types.Int))
