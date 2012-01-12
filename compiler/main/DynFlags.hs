@@ -251,6 +251,7 @@ data DynFlag
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
    | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA
+   | Opt_RegLiveness                    -- Use the STG Reg liveness information
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -1825,6 +1826,7 @@ fFlags = [
   ( "regs-graph",                       Opt_RegsGraph, nop ),
   ( "regs-iterative",                   Opt_RegsIterative, nop ),
   ( "llvm-tbaa",                        Opt_LlvmTBAA, nop),
+  ( "reg-liveness",                     Opt_RegLiveness, nop),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),
@@ -2074,6 +2076,7 @@ optLevelFlags
     , ([2],     Opt_SpecConstr)
     , ([2],     Opt_RegsGraph)
     , ([0,1,2], Opt_LlvmTBAA)
+    , ([0,1,2], Opt_RegLiveness)
 
 --     , ([2],     Opt_StaticArgumentTransformation)
 -- Max writes: I think it's probably best not to enable SAT with -O2 for the

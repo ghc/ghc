@@ -1608,6 +1608,23 @@
           </row>
 
           <row>
+            <entry><option>-freg-liveness</option></entry>
+            <entry>Track STG register liveness to avoid saving and restoring
+              dead registers, as well as freeing the dead ones for use in
+              intermediate code. (LLVM backend only).
+              
+              Traditionally GHC has reserved a set of machine registers for the
+              exclusive use of storing a stack pointer, heap pointer and
+              general purpose function argument registers (these are the so
+              called STG registers). This optimisation tracks the liveness of
+              the machine registers the STG registers are mapped to so that the
+              machine register can be used for other purposes when the STG
+              register are dead.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-reg-liveness</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fsimplifier-phases</option></entry>
             <entry>Set the number of phases for the simplifier (default 2).
               Ignored with <option>-O0</option>.</entry>

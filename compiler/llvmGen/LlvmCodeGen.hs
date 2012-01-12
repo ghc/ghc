@@ -37,7 +37,7 @@ llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 llvmCodeGen dflags h us cmms
   = let cmm = concat cmms
         (cdata,env) = {-# SCC "llvm_split" #-}
-                      foldr split ([],initLlvmEnv (targetPlatform dflags)) cmm
+                      foldr split ([], initLlvmEnv dflags) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
         split (CmmProc i l _) (d,e) =
             let lbl = strCLabel_llvm env $ case i of
