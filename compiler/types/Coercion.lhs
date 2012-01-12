@@ -624,12 +624,10 @@ mkNthCo n co        = ASSERT( ok_tc_app _ty1 n && ok_tc_app _ty2 n )
                     where
                       Pair _ty1 _ty2 = coercionKind co
 
-#ifdef DEBUG 
 ok_tc_app :: Type -> Int -> Bool
 ok_tc_app ty n = case splitTyConApp_maybe ty of
                    Just (_, tys) -> tys `lengthExceeds` n
                    Nothing       -> False
-#endif
 
 -- | Instantiates a 'Coercion' with a 'Type' argument. 
 mkInstCo :: Coercion -> Type -> Coercion
