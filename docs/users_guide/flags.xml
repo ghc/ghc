@@ -1546,6 +1546,15 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fllvm-tbaa</replaceable></entry>
+	      <entry>Turn on Typed Based Alias Analysis information in the LLVM
+	        backend. This enables more accurate and alias information in the LLVM
+	        backend for better optimisation. (default: Enabled)</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-llvm-tbaa</option></entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fmax-simplifier-iterations</option></entry>
 	      <entry>Set the max iterations for the simplifier</entry>
 	      <entry>dynamic</entry>
