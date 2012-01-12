@@ -17,7 +17,7 @@ module Haddock.Backends.Xhtml.Utils (
   spliceURL,
   groupId,
 
-  (<+>), char, nonEmpty,
+  (<+>), char,
   keyword, punctuate,
 
   braces, brackets, pabrackets, parens, parenList, ubxParenList,
@@ -117,15 +117,6 @@ comma  = char ','
 
 char :: Char -> Html
 char c = toHtml [c]
-
-
--- | Make an element that always has at least something (a non-breaking space)
--- If it would have otherwise been empty, then give it the class ".empty"
-nonEmpty :: (Html -> Html) -> Html -> Html
-nonEmpty el content_ =
-  if isNoHtml content_
-    then el ! [theclass "empty"] << spaceHtml
-    else el << content_
 
 
 quote :: Html -> Html
