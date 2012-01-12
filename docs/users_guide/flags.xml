@@ -1549,7 +1549,7 @@
             <entry><option>-fllvm-tbaa</replaceable></entry>
             <entry>Turn on Typed Based Alias Analysis information in the LLVM
               backend. This enables more accurate and alias information in the LLVM
-              backend for better optimisation. (default: Enabled)</entry>
+              backend for better optimisation. (default: enabled)</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-llvm-tbaa</option></entry>
           </row>
@@ -1611,7 +1611,7 @@
             <entry><option>-freg-liveness</option></entry>
             <entry>Track STG register liveness to avoid saving and restoring
               dead registers, as well as freeing the dead ones for use in
-              intermediate code. (LLVM backend only).
+              intermediate code. (LLVM backend only, default: enabled).
               
               Traditionally GHC has reserved a set of machine registers for the
               exclusive use of storing a stack pointer, heap pointer and
