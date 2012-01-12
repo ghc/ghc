@@ -7,6 +7,11 @@ T3055:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T3055.hs -ddump-simpl > T3055.simpl
 	grep 'I# (-28)' T3055.simpl | sed 's/.*\(I# (-28)\).*/\1/'
 
+T5658b:
+	$(RM) -f T5658b.o T5658b.hi 
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5658b.hs -ddump-simpl | grep --count indexIntArray
+# Trac 5658 meant that there were three calls to indexIntArray instead of two
+
 T3772:
 	$(RM) -f T3772*.hi T3772*.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T3772_A.hs 
