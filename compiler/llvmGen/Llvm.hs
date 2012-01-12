@@ -34,6 +34,9 @@ module Llvm (
         -- ** Some basic types
         i64, i32, i16, i8, i1, i8Ptr, llvmWord, llvmWordPtr,
 
+        -- ** Metadata types
+        LlvmMetaVal(..), LlvmMetaUnamed(..), LlvmMeta(..), MetaData,
+
         -- ** Operations on the type system.
         isGlobal, getLitType, getLit, getName, getPlainName, getVarType,
         getLink, getStatType, getGlobalVar, getGlobalType, pVarLift, pVarLower,
@@ -42,7 +45,8 @@ module Llvm (
         -- * Pretty Printing
         ppLlvmModule, ppLlvmComments, ppLlvmComment, ppLlvmGlobals,
         ppLlvmGlobal, ppLlvmFunctionDecls, ppLlvmFunctionDecl, ppLlvmFunctions,
-        ppLlvmFunction, ppLlvmAlias, ppLlvmAliases, llvmSDoc
+        ppLlvmFunction, ppLlvmAlias, ppLlvmAliases, ppLlvmMetas, ppLlvmMeta,
+        llvmSDoc
 
     ) where
 
