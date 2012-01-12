@@ -641,8 +641,21 @@ moduleExports thisMod expMod dflags gre _exports decls ifaceMap instIfaceMap map
 
 fullModuleContents :: DynFlags -> GlobalRdrEnv -> Maps -> [LHsDecl Name] -> ErrMsgGhc [ExportItem Name]
 fullModuleContents dflags gre (docMap, argMap, subMap, declMap) decls =
-  liftM catMaybes $ mapM mkExportItem decls
+  liftM catMaybes $ mapM mkExportItem (expandSig decls)
   where
+    -- A type signature can have multiple names, like:
+    --   foo, bar :: Types..
+    --
+    -- We go through the list of declarations and expand type signatures, so
+    -- that every type signature has exactly one name!
+    expandSig :: [LHsDecl name] -> [LHsDecl name]
+    expandSig = foldr f []
+      where
+        f :: LHsDecl name -> [LHsDecl name] -> [LHsDecl name]
+        f (L l (SigD (TypeSig    names t))) xs = foldr (\n acc -> L l (SigD (TypeSig    [n] t)) : acc) xs names
+        f (L l (SigD (GenericSig names t))) xs = foldr (\n acc -> L l (SigD (GenericSig [n] t)) : acc) xs names
+        f x xs = x : xs
+
     mkExportItem (L _ (DocD (DocGroup lev docStr))) = do
       mbDoc <- liftErrMsg $ lexParseRnHaddockComment dflags DocSectionComment gre docStr
       return $ fmap (ExportGroup lev "") mbDoc
