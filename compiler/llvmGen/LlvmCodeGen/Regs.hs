@@ -78,7 +78,7 @@ stgTBAA
     ]
 
 -- | Id values
-topN, stackN, heapN, rxN, baseN :: LlvmMetaUnamed
+topN, stackN, heapN, rxN, baseN, otherN:: LlvmMetaUnamed
 topN   = LMMetaUnamed 0
 stackN = LMMetaUnamed 1
 heapN  = LMMetaUnamed 2
@@ -87,7 +87,7 @@ baseN  = LMMetaUnamed 4
 otherN = LMMetaUnamed 5
 
 -- | The various TBAA types
-top, heap, stack, rx, base :: MetaData
+top, heap, stack, rx, base, other :: MetaData
 top   = (tbaa, topN)
 heap  = (tbaa, heapN)
 stack = (tbaa, stackN)
