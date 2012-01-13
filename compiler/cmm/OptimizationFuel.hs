@@ -61,8 +61,9 @@ anyFuelLeft (OptimizationFuel f) = f > 0
 oneLessFuel (OptimizationFuel f) = ASSERT (f > 0) (OptimizationFuel (f - 1))
 unlimitedFuel = OptimizationFuel infiniteFuel
 
-data FuelState = FuelState { fs_fuel :: OptimizationFuel, fs_lastpass :: String }
-newtype FuelUniqSM a = FUSM { unFUSM :: FuelState -> UniqSM (a, FuelState) }
+data FuelState = FuelState { fs_fuel :: {-# UNPACK #-} !OptimizationFuel,
+                             fs_lastpass :: String }
+newtype FuelUniqSM a = FUSM { unFUSM :: UniqSupply -> FuelState -> (# a, UniqSupply, FuelState #) }
 
 fuelConsumingPass :: String -> FuelConsumer a -> FuelUniqSM a
 fuelConsumingPass name f = do setFuelPass name
@@ -76,10 +77,11 @@ runFuelIO fs (FUSM f) =
     do pass <- readIORef (pass_ref fs)
        fuel <- readIORef (fuel_ref fs)
        u    <- mkSplitUniqSupply 'u'
-       let (a, FuelState fuel' pass') = initUs_ u $ f (FuelState fuel pass)
-       writeIORef (pass_ref fs) pass'
-       writeIORef (fuel_ref fs) fuel'
-       return a
+       case f u (FuelState fuel pass) of
+          (# a, _, FuelState fuel' pass' #) -> do
+            writeIORef (pass_ref fs) pass'
+            writeIORef (fuel_ref fs) fuel'
+            return a
 
 -- ToDo: Do we need the pass_ref when we are doing infinite fueld
 -- transformations?
@@ -87,21 +89,32 @@ runInfiniteFuelIO :: OptFuelState -> FuelUniqSM a -> IO a
 runInfiniteFuelIO fs (FUSM f) =
     do pass <- readIORef (pass_ref fs)
        u <- mkSplitUniqSupply 'u'
-       let (a, FuelState _ pass') = initUs_ u $ f (FuelState unlimitedFuel pass)
-       writeIORef (pass_ref fs) pass'
-       return a
+       case f u (FuelState unlimitedFuel pass) of
+          (# a, _, FuelState fuel' pass' #) -> do
+            writeIORef (pass_ref fs) pass'
+            return a
 
 instance Monad FuelUniqSM where
-  FUSM f >>= k = FUSM (\s -> f s >>= \(a, s') -> unFUSM (k a) s')
-  return a     = FUSM (\s -> return (a, s))
+  FUSM f >>= k = FUSM (\u s -> case f u s of (# a, u', s' #) ->
+                                                unFUSM (k a) u' s')
+  return a     = FUSM (\u s -> (# a, u, s #))
 
 instance MonadUnique FuelUniqSM where
-    getUniqueSupplyM = liftUniq getUniqueSupplyM
-    getUniqueM       = liftUniq getUniqueM
-    getUniquesM      = liftUniq getUniquesM
+    getUniqueSupplyM =
+       FUSM $ \us f -> case splitUniqSupply us of
+                         (us1,us2) -> (# us1, us2, f #)
+
+    getUniqueM =
+       FUSM $ \us f -> case splitUniqSupply us of
+                         (us1,us2) -> (# uniqFromSupply us1, us2, f #)
+
+    getUniquesM =
+       FUSM $ \us f -> case splitUniqSupply us of
+                         (us1,us2) -> (# uniqsFromSupply us1, us2, f #)
+
 
 liftUniq :: UniqSM x -> FuelUniqSM x
-liftUniq x = FUSM (\s -> x >>= (\u -> return (u, s)))
+liftUniq x = FUSM (\u s -> case initUs u x of (a,u') -> (# a, u', s #))
 
 class Monad m => FuelUsingMonad m where
   fuelGet      :: m OptimizationFuel
@@ -123,11 +136,11 @@ tryWithFuel r = do f <- fuelGet
 instance FuelUsingMonad FuelUniqSM where
   fuelGet          = extract fs_fuel
   lastFuelPass     = extract fs_lastpass
-  fuelSet fuel     = FUSM (\s -> return ((), s { fs_fuel     = fuel }))
-  setFuelPass pass = FUSM (\s -> return ((), s { fs_lastpass = pass }))
+  fuelSet fuel     = FUSM (\u s -> (# (), u, s { fs_fuel     = fuel } #))
+  setFuelPass pass = FUSM (\u s -> (# (), u, s { fs_lastpass = pass } #))
 
 extract :: (FuelState -> a) -> FuelUniqSM a
-extract f = FUSM (\s -> return (f s, s))
+extract f = FUSM (\u s -> (# f s, u, s #))
 
 instance FuelMonad FuelUniqSM where
   getFuel = liftM amountOfFuel fuelGet
@@ -136,6 +149,6 @@ instance FuelMonad FuelUniqSM where
 -- Don't bother to checkpoint the unique supply; it doesn't matter
 instance CheckpointMonad FuelUniqSM where
     type Checkpoint FuelUniqSM = FuelState
-    checkpoint = FUSM $ \fuel -> return (fuel, fuel) 
-    restart fuel = FUSM $ \_ -> return ((), fuel)
+    checkpoint = FUSM $ \u fuel -> (# fuel, u, fuel #)
+    restart fuel = FUSM $ \u _ -> (# (), u, fuel #)
 
