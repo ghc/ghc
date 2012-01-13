@@ -62,6 +62,7 @@ module StaticFlags (
 	opt_SimplExcessPrecision,
 	opt_NoOptCoercion,
 	opt_MaxWorkerArgs,
+        opt_AggressivePrimOps,
 
 	-- Unfolding control
 	opt_UF_CreationThreshold,
@@ -321,6 +322,11 @@ opt_NoStateHack			= lookUp  (fsLit "-fno-state-hack")
 opt_CprOff :: Bool
 opt_CprOff			= lookUp  (fsLit "-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
+
+opt_AggressivePrimOps :: Bool
+opt_AggressivePrimOps		= lookUp  (fsLit "-faggressive-primops")
+        -- See Note [Aggressive PrimOps] in PrimOp
+
 opt_MaxWorkerArgs :: Int
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
