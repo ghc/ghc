@@ -7,14 +7,14 @@ module Main(main) where
 import Control.Monad
 import Foreign.C
 
-main = do let d = 1e20 :: Double
-              f = 1e20 :: Float
-          test "sind" sind sin d
-          test "sinf" sinf sin f
-          test "cosd" cosd cos d
-          test "cosf" cosf cos f
-          test "tand" tand tan d
-          test "tanf" tanf tan f
+main = do let d = [0, pi, pi/2, pi/3, 1e10, 1e20] :: [Double]
+              f = [0, pi, pi/2, pi/3, 1e10, 1e20] :: [Float]
+          mapM_ (test "sind" sind sin) d
+          mapM_ (test "sinf" sinf sin) f
+          mapM_ (test "cosd" cosd cos) d
+          mapM_ (test "cosf" cosf cos) f
+          mapM_ (test "tand" tand tan) d
+          mapM_ (test "tanf" tanf tan) f
           putStrLn "Done"
 
 test :: (RealFloat a, Floating a, RealFloat b, Floating b, Show b)
@@ -22,7 +22,7 @@ test :: (RealFloat a, Floating a, RealFloat b, Floating b, Show b)
 test s f g x = do let y = realToFrac (f (realToFrac x))
                       z = g x
                   unless (y == z) $ do
-                      putStrLn s
+                      putStrLn (s ++ ' ':show x)
                       print y
                       print z
                       print $ decodeFloat y
