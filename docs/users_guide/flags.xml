@@ -1546,7 +1546,7 @@
           </row>
 
           <row>
-            <entry><option>-fllvm-tbaa</replaceable></entry>
+            <entry><option>-fllvm-tbaa</option></entry>
             <entry>Turn on Typed Based Alias Analysis information in the LLVM
               backend. This enables more accurate and alias information in the LLVM
               backend for better optimisation. (default: enabled)</entry>
