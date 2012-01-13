@@ -616,7 +616,7 @@ uType_np origin orig_ty1 orig_ty2
       = do { cos <- uList origin uType tys1 tys2
            ; return $ mkTcTyConAppCo tc1 cos }
 
-    go (LiteralTy m) ty@(LiteralTy n)
+    go (LitTy m) ty@(LitTy n)
       | m == n
       = return $ mkTcReflCo ty
 
@@ -916,7 +916,7 @@ checkTauTvUpdate tv ty
       = Just (TyConApp tc tys') 
       | isSynTyCon tc, Just ty_expanded <- tcView this_ty
       = ok ty_expanded -- See Note [Type synonyms and the occur check] 
-    ok ty@(LiteralTy _) = Just ty
+    ok ty@(LitTy {}) = Just ty
     ok (FunTy arg res) | Just arg' <- ok arg, Just res' <- ok res
                        = Just (FunTy arg' res') 
     ok (AppTy fun arg) | Just fun' <- ok fun, Just arg' <- ok arg 

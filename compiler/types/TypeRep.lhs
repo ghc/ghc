@@ -113,7 +113,7 @@ data Type
 	Var         -- Type or kind variable
 	Type	        -- ^ A polymorphic type
 
- | LiteralTy TyLit     -- ^ Type literals are simillar to type constructors.
+  | LitTy TyLit     -- ^ Type literals are simillar to type constructors.
 
   deriving (Data.Data, Data.Typeable)
 
@@ -289,7 +289,7 @@ tyVarsOfType :: Type -> VarSet
 -- kind variable {k}
 tyVarsOfType (TyVarTy v)         = unitVarSet v
 tyVarsOfType (TyConApp _ tys)    = tyVarsOfTypes tys
-tyVarsOfType (LiteralTy _)       = emptyVarSet
+tyVarsOfType (LitTy {})          = emptyVarSet
 tyVarsOfType (FunTy arg res)     = tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)     = tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty) = delVarSet (tyVarsOfType ty) tyvar
@@ -538,7 +538,7 @@ instance Outputable name => OutputableBndr (IPName name) where
 ppr_type :: Prec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
 ppr_type p (TyConApp tc tys)  = pprTcApp p ppr_type tc tys
-ppr_type p (LiteralTy l)      = ppr_tylit p l
+ppr_type p (LitTy l)          = ppr_tylit p l
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
 			   pprType t1 <+> ppr_type TyConPrec t2

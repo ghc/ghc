@@ -812,7 +812,7 @@ zonkType zonk_tc_tyvar ty
     go (TyConApp tc tys) = do tys' <- mapM go tys
                               return (TyConApp tc tys')
 
-    go (LiteralTy n)     = return (LiteralTy n)
+    go (LitTy n)         = return (LitTy n)
 
     go (FunTy arg res)   = do arg' <- go arg
                               res' <- go res
@@ -1082,7 +1082,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
     arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
     ubx_tup_msg = ubxArgTyErr ty
 
-check_type _ _ (LiteralTy _) = return ()
+check_type _ _ (LitTy {}) = return ()
 
 check_type _ _ ty = pprPanic "check_type" (ppr ty)
 
@@ -1749,7 +1749,7 @@ fvType :: Type -> [TyVar]
 fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
 fvType (TyVarTy tv)        = [tv]
 fvType (TyConApp _ tys)    = fvTypes tys
-fvType (LiteralTy _)       = []
+fvType (LitTy {})          = []
 fvType (FunTy arg res)     = fvType arg ++ fvType res
 fvType (AppTy fun arg)     = fvType fun ++ fvType arg
 fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
@@ -1760,9 +1760,9 @@ fvTypes tys                = concat (map fvType tys)
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors
 sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
-sizeType (TyVarTy _)       = 1
+sizeType (TyVarTy {})      = 1
 sizeType (TyConApp _ tys)  = sizeTypes tys + 1
-sizeType (LiteralTy _)     = 1
+sizeType (LitTy {})        = 1
 sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
 sizeType (ForAllTy _ ty)   = sizeType ty

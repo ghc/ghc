@@ -262,7 +262,7 @@ liftTcCoSubstWith tvs cos ty
                              Nothing -> mkTcReflCo ty
     go (AppTy t1 t2)     = mkTcAppCo (go t1) (go t2)
     go (TyConApp tc tys) = mkTcTyConAppCo tc (map go tys)
-    go ty@(LiteralTy _)  = mkTcReflCo ty
+    go ty@(LitTy {})     = mkTcReflCo ty
     go (ForAllTy tv ty)  = mkTcForAllCo tv (go ty)
     go (FunTy t1 t2)     = mkTcFunCo (go t1) (go t2)
 \end{code}

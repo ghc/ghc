@@ -846,7 +846,7 @@ lintType ty@(TyConApp tc tys)
   | otherwise
   = failWithL (hang (ptext (sLit "Malformed type:")) 2 (ppr ty))
 
-lintType ty@(LiteralTy l) = lintTyLit l >> return (typeKind ty)
+lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
 
 lintType (ForAllTy tv ty)
   = do { lintTyBndrKind tv

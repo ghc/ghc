@@ -84,7 +84,7 @@ data IfaceType	   -- A kind of universal type, used for types, kinds, and coerci
   | IfaceTyConApp IfaceTyCon [IfaceType]  -- Not necessarily saturated
 					  -- Includes newtypes, synonyms, tuples
   | IfaceCoConApp IfaceCoCon [IfaceType]  -- Always saturated
-  | IfaceLiteralTy IfaceTyLit
+  | IfaceLitTy IfaceTyLit
 
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
@@ -246,7 +246,7 @@ ppr_ty :: Int -> IfaceType -> SDoc
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
 
-ppr_ty _ (IfaceLiteralTy n) = ppr_tylit n
+ppr_ty _ (IfaceLitTy n) = ppr_tylit n
 
 ppr_ty ctxt_prec (IfaceCoConApp tc tys) 
   = maybeParen ctxt_prec tYCON_PREC 
@@ -375,7 +375,7 @@ toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyVar tv)
 toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (FunTy t1 t2)     = IfaceFunTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (TyConApp tc tys) = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTypes tys)
-toIfaceType (LiteralTy n)     = IfaceLiteralTy (toIfaceTyLit n)
+toIfaceType (LitTy n)         = IfaceLitTy (toIfaceTyLit n)
 toIfaceType (ForAllTy tv t)   = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
 
 toIfaceTyVar :: TyVar -> FastString

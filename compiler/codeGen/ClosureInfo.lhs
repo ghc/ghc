@@ -1097,7 +1097,7 @@ getTyDescription ty
       FunTy _ res      	     -> '-' : '>' : fun_result res
       TyConApp tycon _ 	     -> getOccString tycon
       ForAllTy _ ty          -> getTyDescription ty
-      LiteralTy n            -> getTyLitDescription n
+      LitTy n                -> getTyLitDescription n
     }
   where
     fun_result (FunTy _ res) = '>' : fun_result res

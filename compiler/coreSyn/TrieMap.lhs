@@ -523,7 +523,7 @@ lkT env ty m
     go (AppTy t1 t2)     = tm_app    >.> lkT env t1 >=> lkT env t2
     go (FunTy t1 t2)     = tm_fun    >.> lkT env t1 >=> lkT env t2
     go (TyConApp tc tys) = tm_tc_app >.> lkNamed tc >=> lkList (lkT env) tys
-    go (LiteralTy l)     = tm_tylit  >.> lkTyLit l
+    go (LitTy l)         = tm_tylit  >.> lkTyLit l
     go (ForAllTy tv ty)  = tm_forall >.> lkT (extendCME env tv) ty >=> lkBndr env tv
 
 -----------------
@@ -539,8 +539,7 @@ xtT env (ForAllTy tv ty)  f  m = m { tm_forall = tm_forall m |> xtT (extendCME e
                                                  |>> xtBndr env tv f }
 xtT env (TyConApp tc tys) f  m = m { tm_tc_app = tm_tc_app m |> xtNamed tc 
                                                  |>> xtList (xtT env) tys f }
-
-xtT _   (LiteralTy l)     f  m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
+xtT _   (LitTy l)         f  m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 
 fdT :: (a -> b -> b) -> TypeMap a -> b -> b
 fdT _ EmptyTM = \z -> z

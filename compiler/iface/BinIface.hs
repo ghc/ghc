@@ -1037,7 +1037,7 @@ instance Binary IfaceType where
     put_ bh (IfaceTyConApp tc tys)
       = do { putByte bh 21; put_ bh tc; put_ bh tys }
 
-    put_ bh (IfaceLiteralTy n)
+    put_ bh (IfaceLitTy n)
       = do { putByte bh 30; put_ bh n }
 
 
@@ -1081,7 +1081,7 @@ instance Binary IfaceType where
                         ; return (IfaceTyConApp tc tys) }
 
               30 -> do n <- get bh
-                       return (IfaceLiteralTy n)
+                       return (IfaceLitTy n)
 
               _  -> panic ("get IfaceType " ++ show h)
 
