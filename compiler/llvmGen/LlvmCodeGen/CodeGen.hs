@@ -16,13 +16,14 @@ import CgUtils ( activeStgRegs, callerSaves )
 import CLabel
 import OldCmm
 import qualified OldPprCmm as PprCmm
-import OrdList
 
+import DynFlags
 import FastString
 import ForeignCall
 import Outputable hiding ( panic, pprPanic )
 import qualified Outputable
 import Platform
+import OrdList
 import UniqSupply
 import Unique
 import Util
@@ -475,7 +476,7 @@ genJump :: LlvmEnv -> CmmExpr -> Maybe [GlobalReg] -> UniqSM StmtData
 -- Call to known function
 genJump env (CmmLit (CmmLabel lbl)) live = do
     (env', vf, stmts, top) <- getHsFunc env lbl
-    (stgRegs, stgStmts) <- funEpilogue live
+    (stgRegs, stgStmts) <- funEpilogue env live
     let s1  = Expr $ Call TailCall vf stgRegs llvmStdFunAttrs
     let s2  = Return Nothing
     return (env', stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
@@ -494,7 +495,7 @@ genJump env expr live = do
                      ++ show (ty) ++ ")"
 
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
-    (stgRegs, stgStmts) <- funEpilogue live
+    (stgRegs, stgStmts) <- funEpilogue env live
     let s2 = Expr $ Call TailCall v1 stgRegs llvmStdFunAttrs
     let s3 = Return Nothing
     return (env', stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2 `snocOL` s3,
@@ -550,7 +551,7 @@ genStore env addr@(CmmMachOp (MO_Sub _) [
     = genStore_fast env addr r (negate $ fromInteger n) val
 
 -- generic case
-genStore env addr val = genStore_slow env addr val [top]
+genStore env addr val = genStore_slow env addr val [other]
 
 -- | CmmStore operation
 -- This is a special case for storing to a global register pointer
@@ -1032,7 +1033,7 @@ genLoad env e@(CmmMachOp (MO_Sub _) [
     = genLoad_fast env e r (negate $ fromInteger n) ty
 
 -- generic case
-genLoad env e ty = genLoad_slow env e ty [top]
+genLoad env e ty = genLoad_slow env e ty [other]
 
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
@@ -1200,18 +1201,11 @@ funPrologue = concat $ map getReg activeStgRegs
 
 
 -- | Function epilogue. Load STG variables to use as argument for call.
-funEpilogue :: Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
-funEpilogue Nothing = do
-    loads <- mapM loadExpr activeStgRegs
-    let (vars, stmts) = unzip loads
-    return (vars, concatOL stmts)
-  where
-    loadExpr r = do
-        let reg  = lmGlobalRegVar r
-        (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
-        return (v, unitOL s)
+-- STG Liveness optimisation done here.
+funEpilogue :: LlvmEnv -> Maybe [GlobalReg] -> UniqSM ([LlvmVar], LlvmStatements)
 
-funEpilogue (Just live) = do
+-- Have information and liveness optimisation is enabled
+funEpilogue env (Just live) | dopt Opt_RegLiveness (getDflags env) = do
     loads <- mapM loadExpr activeStgRegs
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
@@ -1223,6 +1217,17 @@ funEpilogue (Just live) = do
     loadExpr r = do
         let ty = (pLower . getVarType $ lmGlobalRegVar r)
         return (LMLitVar $ LMUndefLit ty, unitOL Nop)
+
+-- don't do liveness optimisation
+funEpilogue _ _ = do
+    loads <- mapM loadExpr activeStgRegs
+    let (vars, stmts) = unzip loads
+    return (vars, concatOL stmts)
+  where
+    loadExpr r = do
+        let reg  = lmGlobalRegVar r
+        (v,s) <- doExpr (pLower $ getVarType reg) $ Load reg
+        return (v, unitOL s)
 
 
 -- | A serries of statements to trash all the STG registers.

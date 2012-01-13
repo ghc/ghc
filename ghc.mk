@@ -1037,20 +1037,29 @@ publish-docs:
 #
 # Directory in which we're going to build the src dist
 #
-SRC_DIST_NAME=ghc-$(ProjectVersion)
-SRC_DIST_DIR=$(SRC_DIST_NAME)
+SRC_DIST_ROOT      = sdistprep
+SRC_DIST_BASE_NAME = ghc-$(ProjectVersion)
+
+SRC_DIST_GHC_NAME          = ghc-$(ProjectVersion)
+SRC_DIST_GHC_ROOT          = $(SRC_DIST_ROOT)/ghc
+SRC_DIST_GHC_DIR           = $(SRC_DIST_GHC_ROOT)/$(SRC_DIST_BASE_NAME)
+SRC_DIST_GHC_TARBALL       = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME)-src.tar.bz2
+
+SRC_DIST_TESTSUITE_NAME    = testsuite-ghc-$(ProjectVersion)
+SRC_DIST_TESTSUITE_ROOT    = $(SRC_DIST_ROOT)/testsuite-ghc
+SRC_DIST_TESTSUITE_DIR     = $(SRC_DIST_TESTSUITE_ROOT)/$(SRC_DIST_BASE_NAME)
+SRC_DIST_TESTSUITE_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME)-src.tar.bz2
 
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS = mk rules docs distrib bindisttest libffi includes utils docs rts compiler ghc driver libraries ghc-tarballs
-SRC_DIST_FILES += \
-	configure.ac config.guess config.sub configure \
-	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in ghc.spec settings.in VERSION \
-	boot boot-pkgs packages ghc.mk
-
-SRC_DIST_TARBALL = $(SRC_DIST_NAME)-src.tar.bz2
+SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
+    utils docs rts compiler ghc driver libraries ghc-tarballs
+SRC_DIST_GHC_FILES += \
+    configure.ac config.guess config.sub configure \
+    aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
+    ghc.spec.in ghc.spec settings.in VERSION \
+    boot boot-pkgs packages ghc.mk
 
 VERSION :
 	echo $(ProjectVersion) >VERSION
@@ -1058,50 +1067,66 @@ VERSION :
 sdist : VERSION
 
 # Use:
-#     $(call sdist_file,compiler,stage2,cmm,Foo/Bar,CmmLex,x)
+#     $(call sdist_ghc_file,compiler,stage2,cmm,Foo/Bar,CmmLex,x)
 # to copy the generated file that replaces compiler/cmm/Foo/Bar/CmmLex.x, where
 # "stage2" is the dist dir.
-define sdist_file
-	"$(CP)" $1/$2/build/$4/$5.hs $(SRC_DIST_DIR)/$1/$3/$4
-	mv $(SRC_DIST_DIR)/$1/$3/$4/$5.$6 $(SRC_DIST_DIR)/$1/$3/$4/$5.$6.source
+define sdist_ghc_file
+	"$(CP)" $1/$2/build/$4/$5.hs $(SRC_DIST_GHC_DIR)/$1/$3/$4
+	mv $(SRC_DIST_GHC_DIR)/$1/$3/$4/$5.$6 $(SRC_DIST_GHC_DIR)/$1/$3/$4/$5.$6.source
 endef
 
-.PHONY: sdist-prep
-sdist-prep :
-	$(call removeTrees,$(SRC_DIST_DIR))
-	$(call removeFiles,$(SRC_DIST_TARBALL))
-	mkdir $(SRC_DIST_DIR)
-	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
-	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done
-	cd $(SRC_DIST_DIR) && $(MAKE) distclean
-	$(call removeTrees,$(SRC_DIST_DIR)/libraries/tarballs/)
-	$(call removeTrees,$(SRC_DIST_DIR)/libraries/stamp/)
-	$(call sdist_file,compiler,stage2,cmm,,CmmLex,x)
-	$(call sdist_file,compiler,stage2,cmm,,CmmParse,y)
-	$(call sdist_file,compiler,stage2,parser,,Lexer,x)
-	$(call sdist_file,compiler,stage2,parser,,Parser,y.pp)
-	$(call sdist_file,compiler,stage2,parser,,ParserCore,y)
-	$(call sdist_file,utils/hpc,dist-install,,,HpcParser,y)
-	$(call sdist_file,utils/genprimopcode,dist,,,Lexer,x)
-	$(call sdist_file,utils/genprimopcode,dist,,,Parser,y)
-	$(call sdist_file,utils/haddock,dist,src,Haddock,Lex,x)
-	$(call sdist_file,utils/haddock,dist,src,Haddock,Parse,y)
-	cd $(SRC_DIST_DIR) && $(call removeTrees,compiler/stage[123] mk/build.mk)
-	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name .git -o -name "autom4te*" -o -name "*~" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
+.PHONY: sdist-ghc-prep
+sdist-ghc-prep :
+	$(call removeTrees,$(SRC_DIST_GHC_ROOT))
+	$(call removeFiles,$(SRC_DIST_GHC_TARBALL))
+	-mkdir $(SRC_DIST_ROOT)
+	mkdir $(SRC_DIST_GHC_ROOT)
+	mkdir $(SRC_DIST_GHC_DIR)
+	cd $(SRC_DIST_GHC_DIR) && for i in $(SRC_DIST_GHC_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
+	cd $(SRC_DIST_GHC_DIR) && for i in $(SRC_DIST_GHC_FILES); do $(LN_S) $(TOP)/$$i .; done
+	cd $(SRC_DIST_GHC_DIR) && $(MAKE) distclean
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/tarballs/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/stamp/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/compiler/stage[123])
+	$(call removeFiles,$(SRC_DIST_GHC_DIR)/mk/build.mk)
+	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmLex,x)
+	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmParse,y)
+	$(call sdist_ghc_file,compiler,stage2,parser,,Lexer,x)
+	$(call sdist_ghc_file,compiler,stage2,parser,,Parser,y.pp)
+	$(call sdist_ghc_file,compiler,stage2,parser,,ParserCore,y)
+	$(call sdist_ghc_file,utils/hpc,dist-install,,,HpcParser,y)
+	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Lexer,x)
+	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Parser,y)
+	$(call sdist_ghc_file,utils/haddock,dist,src,Haddock,Lex,x)
+	$(call sdist_ghc_file,utils/haddock,dist,src,Haddock,Parse,y)
+	cd $(SRC_DIST_GHC_DIR) && "$(FIND)" $(SRC_DIST_GHC_DIRS) \( -name .git -o -name "autom4te*" -o -name "*~" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
+
+.PHONY: sdist-testsuite-prep
+sdist-testsuite-prep :
+	$(call removeTrees,$(SRC_DIST_TESTSUITE_ROOT))
+	$(call removeFiles,$(SRC_DIST_TESTSUITE_TARBALL))
+	-mkdir $(SRC_DIST_ROOT)
+	mkdir $(SRC_DIST_TESTSUITE_ROOT)
+	mkdir $(SRC_DIST_TESTSUITE_DIR)
+	mkdir $(SRC_DIST_TESTSUITE_DIR)/testsuite
+	cd $(SRC_DIST_TESTSUITE_DIR)/testsuite && lndir $(TOP)/testsuite
+	$(call removeTrees,$(SRC_DIST_TESTSUITE_DIR)/testsuite/.git)
 
 .PHONY: sdist
-sdist : sdist-prep
-	"$(TAR_CMD)" chf - $(SRC_DIST_NAME) 2>src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
+sdist : sdist-ghc-prep sdist-testsuite-prep
+	cd $(SRC_DIST_GHC_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_GHC_TARBALL)
+	cd $(SRC_DIST_TESTSUITE_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_TESTSUITE_TARBALL)
 
-sdist-manifest : $(SRC_DIST_TARBALL)
-	tar tjf $(SRC_DIST_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
+sdist-manifest : $(SRC_DIST_GHC_TARBALL)
+	tar tjf $(SRC_DIST_GHC_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
 
 # Upload the distribution(s)
 # Retrying is to work around buggy firewalls that corrupt large file transfers
 # over SSH.
 ifneq "$(PublishLocation)" ""
 publish-sdist :
-	$(call try10Times,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(SRC_DIST_GHC_TARBALL) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(SRC_DIST_TESTSUITE_TARBALL) $(PublishLocation)/dist)
 endif
 
 ifeq "$(BootingFromHc)" "YES"
