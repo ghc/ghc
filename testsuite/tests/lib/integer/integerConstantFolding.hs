@@ -48,6 +48,8 @@ main = do p "plusInteger"        plusInteger
           p "remInteger"        remInteger
           p "doubleFromInteger" doubleFromInteger
           p "floatFromInteger"  floatFromInteger
+          p "encodeIntegerDouble" encodeIntegerDouble
+          p "encodeIntegerFloat"  encodeIntegerFloat
 
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
@@ -170,4 +172,10 @@ doubleFromInteger = fromInteger 100065 + 100066
 
 floatFromInteger :: Float
 floatFromInteger = fromInteger 100067 + 100068
+
+encodeIntegerDouble :: Double
+encodeIntegerDouble = encodeFloat 100069 2
+
+encodeIntegerFloat :: Float
+encodeIntegerFloat = encodeFloat 100070 2
 

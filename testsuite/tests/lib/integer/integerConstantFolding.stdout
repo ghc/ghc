@@ -42,3 +42,5 @@ quotInteger: 641
 remInteger: 68
 doubleFromInteger: 200131.0
 floatFromInteger: 200135.0
+encodeIntegerDouble: 400276.0
+encodeIntegerFloat: 400280.0
