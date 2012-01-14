@@ -17,6 +17,40 @@
 
     <itemizedlist>
       <listitem>
+          <para>
+              The <literal>Num</literal> class no longer has
+              <literal>Eq</literal> or <literal>Show</literal>
+              superclasses. A number of other classes and
+              functions have therefore gained explicit
+              <literal>Eq</literal> or <literal>Show</literal>
+              constraints, rather than relying on a
+              <literal>Num</literal> constraint to provide them.
+          </para>
+
+          <para>
+             You can make code that works with both
+             Haskell98/Haskell2010 and GHC by:
+             <itemizedlist>
+               <listitem>
+                 <para>
+                   Whenever you make a <literal>Num</literal> instance
+                   of a type, also make <literal>Show</literal> and
+                   <literal>Eq</literal> instances, and
+                 </para>
+               </listitem>
+               <listitem>
+                 <para>
+                   Whenever you give a function, instance or class a
+                   <literal>Num t</literal> constraint, also give it
+                   <literal>Show t</literal> and
+                   <literal>Eq t</literal> constraints.
+                 </para>
+               </listitem>
+             </itemizedlist>
+           </para>
+      </listitem>
+
+      <listitem>
         <para>
           There is a new feature Safe Haskell
           (<literal>-XSafe</literal>,
@@ -1079,6 +1113,28 @@ Subject: [PATCH 0695/1074] Add an RTS eventlog tracing class for user messages
                 constraints, rather than relying on a
                 <literal>Num</literal> constraint to provide them.
             </para>
+
+            <para>
+               You can make code that works with both
+               Haskell98/Haskell2010 and GHC by:
+               <itemizedlist>
+                 <listitem>
+                   <para>
+                     Whenever you make a <literal>Num</literal> instance
+                     of a type, also make <literal>Show</literal> and
+                     <literal>Eq</literal> instances, and
+                   </para>
+                 </listitem>
+                 <listitem>
+                   <para>
+                     Whenever you give a function, instance or class a
+                     <literal>Num t</literal> constraint, also give it
+                     <literal>Show t</literal> and
+                     <literal>Eq t</literal> constraints.
+                   </para>
+                 </listitem>
+               </itemizedlist>
+             </para>
         </listitem>
 
         <listitem>
