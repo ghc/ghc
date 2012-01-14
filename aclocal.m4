@@ -1944,6 +1944,12 @@ AC_DEFUN([BOOTSTRAPPING_GHC_INFO_FIELD],[
 if test $GhcCanonVersion -ge 701
 then
     $1=`"$WithGhc" --info | grep "^ ,(\"$2\"," | sed -e 's/.*","//' -e 's/")$//'`
+    tmp=${$1#\$topdir/}
+    if test "${$1}" != "$tmp"
+    then
+        topdir=`"$WithGhc" --print-libdir | sed 's#\\\\#/#g'`
+        $1="$topdir/$tmp"
+    fi
 else
     $1=$3
 fi
