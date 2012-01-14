@@ -190,7 +190,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
                                               (Just location)
                                               maybe_stub_o
                                   -- The object filename comes from the ModLocation
-                            o_time <- getModificationTime object_filename
+                            o_time <- getModificationUTCTime object_filename
                             return ([DotO object_filename], o_time)
                     
                     let linkable = LM unlinked_time this_mod hs_unlinked
@@ -353,13 +353,13 @@ linkingNeeded dflags linkables pkg_deps = do
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
   let exe_file = exeFileName dflags
-  e_exe_time <- tryIO $ getModificationTime exe_file
+  e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
     Left _  -> return True
     Right t -> do
         -- first check object files and extra_ld_inputs
         extra_ld_inputs <- readIORef v_Ld_inputs
-        e_extra_times <- mapM (tryIO . getModificationTime) extra_ld_inputs
+        e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
         let (errs,extra_times) = splitEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
@@ -375,7 +375,7 @@ linkingNeeded dflags linkables pkg_deps = do
 
         pkg_libfiles <- mapM (uncurry findHSLib) pkg_hslibs
         if any isNothing pkg_libfiles then return True else do
-        e_lib_times <- mapM (tryIO . getModificationTime)
+        e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
         let (lib_errs,lib_times) = splitEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
@@ -906,7 +906,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
-        src_timestamp <- io $ getModificationTime (basename <.> suff)
+        src_timestamp <- io $ getModificationUTCTime (basename <.> suff)
 
         let hsc_lang = hscTarget dflags
         source_unchanged <- io $
@@ -919,7 +919,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
              else do o_file_exists <- doesFileExist o_file
                      if not o_file_exists
                         then return SourceModified       -- Need to recompile
-                        else do t2 <- getModificationTime o_file
+                        else do t2 <- getModificationUTCTime o_file
                                 if t2 > src_timestamp
                                   then return SourceUnmodified
                                   else return SourceModified

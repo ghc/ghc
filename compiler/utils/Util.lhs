@@ -76,6 +76,7 @@ module Util (
         -- * IO-ish utilities
         createDirectoryHierarchy,
         doesDirNameExist,
+        getModificationUTCTime,
         modificationTimeIfExists,
 
         global, consIORef, globalM,
@@ -113,7 +114,6 @@ import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, createDirectory,
                           getModificationTime )
 import System.FilePath
-import System.Time      ( ClockTime )
 
 import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit )
 import Data.Ratio       ( (%) )
@@ -121,6 +121,12 @@ import Data.Ord         ( comparing )
 import Data.Bits
 import Data.Word
 import qualified Data.IntMap as IM
+
+import Data.Time
+#if __GLASGOW_HASKELL__ < 705
+import Data.Time.Clock.POSIX
+import System.Time
+#endif
 
 infixr 9 `thenCmp`
 \end{code}
@@ -1029,12 +1035,24 @@ doesDirNameExist fpath = case takeDirectory fpath of
                          "" -> return True -- XXX Hack
                          _  -> doesDirectoryExist (takeDirectory fpath)
 
+-----------------------------------------------------------------------------
+-- Backwards compatibility definition of getModificationTime
+
+getModificationUTCTime :: FilePath -> IO UTCTime
+#if __GLASGOW_HASKELL__ < 705
+getModificationUTCTime f = do
+    TOD secs _ <- getModificationTime f
+    return $ posixSecondsToUTCTime (realToFrac secs)
+#else
+getModificationUTCTime = getModificationTime
+#endif
+
 -- --------------------------------------------------------------
 -- check existence & modification time at the same time
 
-modificationTimeIfExists :: FilePath -> IO (Maybe ClockTime)
+modificationTimeIfExists :: FilePath -> IO (Maybe UTCTime)
 modificationTimeIfExists f = do
-  (do t <- getModificationTime f; return (Just t))
+  (do t <- getModificationUTCTime f; return (Just t))
         `catchIO` \e -> if isDoesNotExistError e
                         then return Nothing
                         else ioError e

@@ -164,11 +164,11 @@ import Control.Monad    ( mplus, guard, liftM, when )
 import Data.Array       ( Array, array )
 import Data.IORef
 import Data.Map         ( Map )
+import Data.Time
 import Data.Word
 import Data.Typeable    ( Typeable )
 import Exception
 import System.FilePath
-import System.Time      ( ClockTime )
 
 -- -----------------------------------------------------------------------------
 -- Source Errors
@@ -356,7 +356,7 @@ data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
-      targetContents     :: Maybe (StringBuffer,ClockTime)
+      targetContents     :: Maybe (StringBuffer,UTCTime)
                                         -- ^ in-memory text buffer?
     }
 
@@ -1632,7 +1632,7 @@ data Usage
     }                                           -- ^ Module from the current package
   | UsageFile {
         usg_file_path  :: FilePath,
-        usg_mtime      :: ClockTime
+        usg_mtime      :: UTCTime
         -- ^ External file dependency. From a CPP #include or TH addDependentFile. Should be absolute.
   }
     deriving( Eq )
@@ -1803,8 +1803,8 @@ data ModSummary
         ms_mod          :: Module,              -- ^ Identity of the module
         ms_hsc_src      :: HscSource,           -- ^ The module source either plain Haskell, hs-boot or external core
         ms_location     :: ModLocation,         -- ^ Location of the various files belonging to the module
-        ms_hs_date      :: ClockTime,           -- ^ Timestamp of source file
-        ms_obj_date     :: Maybe ClockTime,     -- ^ Timestamp of object, if we have one
+        ms_hs_date      :: UTCTime,             -- ^ Timestamp of source file
+        ms_obj_date     :: Maybe UTCTime,       -- ^ Timestamp of object, if we have one
         ms_srcimps      :: [Located (ImportDecl RdrName)],      -- ^ Source imports of the module
         ms_textual_imps :: [Located (ImportDecl RdrName)],      -- ^ Non-source imports of the module from the module *text*
         ms_hspp_file    :: FilePath,            -- ^ Filename of preprocessed source file
@@ -2100,7 +2100,7 @@ stuff is the *dynamic* linker, and isn't present in a stage-1 compiler
 \begin{code}
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
-  linkableTime     :: ClockTime,        -- ^ Time at which this linkable was built
+  linkableTime     :: UTCTime,          -- ^ Time at which this linkable was built
                                         -- (i.e. when the bytecodes were produced,
                                         --       or the mod date on the files)
   linkableModule   :: Module,           -- ^ The linkable module itself
