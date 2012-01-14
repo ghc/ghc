@@ -349,6 +349,7 @@ AC_DEFUN([FP_SETTINGS],
     then
         SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
+        SettingsArCommand='$topdir/../mingw/bin/ar.exe'
         SettingsPerlCommand='$topdir/../perl/perl.exe'
         SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
         SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
@@ -356,6 +357,7 @@ AC_DEFUN([FP_SETTINGS],
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
+        SettingsArCommand="$ArCmd"
         SettingsPerlCommand="$PerlCmd"
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
@@ -363,6 +365,7 @@ AC_DEFUN([FP_SETTINGS],
     fi
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsCCompilerFlags)
+    AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsPerlCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
