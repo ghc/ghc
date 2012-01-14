@@ -226,6 +226,22 @@ main = do args &lt;- getArgs
 	  </varlistentry>
 
 	<varlistentry>
+	  <term>Extra instances</term>
+	  <listitem>
+	    <para>
+              The following extra instances are defined:
+            </para>
+<programlisting>
+instance Functor ((->) r)
+instance Monad ((->) r)
+instance Functor ((,) a)
+instance Functor (Either a)
+instance Monad (Either e)
+</programlisting>
+	    </listitem>
+	  </varlistentry>
+
+	<varlistentry>
 	  <term>Multiply-defined array elements&mdash;not checked:</term>
 	  <listitem>
 	    <para>This code fragment should
