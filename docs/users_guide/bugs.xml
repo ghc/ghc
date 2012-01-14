@@ -183,6 +183,49 @@ main = do args &lt;- getArgs
 	  </varlistentry>
 
 	<varlistentry>
+	  <term>Bits superclasses</term>
+	  <listitem>
+	    <para>
+              The <literal>Bits</literal> class does not have
+              a <literal>Num</literal> superclasses. It therefore
+              does not have default methods for the
+              <literal>bit</literal>,
+              <literal>testBit</literal> and
+              <literal>popCount</literal> methods.
+            </para>
+
+	    <para>
+              You can make code that works with both
+              Haskell2010 and GHC by:
+              <itemizedlist>
+                <listitem>
+                  <para>
+                    Whenever you make a <literal>Bits</literal> instance
+                    of a type, also make a <literal>Num</literal>
+                    instance, and
+                  </para>
+                </listitem>
+                <listitem>
+                  <para>
+                    Whenever you give a function, instance or class a
+                    <literal>Bits t</literal> constraint, also give it
+                    a <literal>Num t</literal> constraint, and
+                  </para>
+                </listitem>
+                <listitem>
+                  <para>
+                    Always define the <literal>bit</literal>,
+                    <literal>testBit</literal> and
+                    <literal>popCount</literal> methods in
+                    <literal>Bits</literal> instances.
+                  </para>
+                </listitem>
+              </itemizedlist>
+            </para>
+	    </listitem>
+	  </varlistentry>
+
+	<varlistentry>
 	  <term>Multiply-defined array elements&mdash;not checked:</term>
 	  <listitem>
 	    <para>This code fragment should
