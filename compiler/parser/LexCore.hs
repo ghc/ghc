@@ -12,12 +12,12 @@ isNameChar c = isAlpha c || isDigit c || (c == '_') || (c == '\'')
 isKeywordChar :: Char -> Bool
 isKeywordChar c = isAlpha c || (c == '_')
 
-lexer :: (Token -> P a) -> P a 
+lexer :: (Token -> P a) -> P a
 lexer cont []           = cont TKEOF []
 lexer cont ('\n':cs)    = \line -> lexer cont cs (line+1)
 lexer cont ('-':'>':cs) = cont TKrarrow cs
 
-lexer cont (c:cs) 
+lexer cont (c:cs)
       | isSpace c               = lexer cont cs
       | isLower c || (c == '_') = lexName cont TKname (c:cs)
       | isUpper c               = lexName cont TKcname (c:cs)
@@ -25,7 +25,7 @@ lexer cont (c:cs)
 
 lexer cont ('%':cs)     = lexKeyword cont cs
 lexer cont ('\'':cs)    = lexChar cont cs
-lexer cont ('\"':cs)    = lexString [] cont cs 
+lexer cont ('\"':cs)    = lexString [] cont cs
 lexer cont ('#':cs)     = cont TKhash cs
 lexer cont ('(':cs)     = cont TKoparen cs
 lexer cont (')':cs)     = cont TKcparen cs
@@ -60,7 +60,7 @@ lexChar _    cs           = panic ("lexChar: " ++ show cs)
 
 lexString :: String -> (Token -> [Char] -> Int -> ParseResult a)
           -> String -> Int -> ParseResult a
-lexString s cont ('\\':'x':h1:h0:cs) 
+lexString s cont ('\\':'x':h1:h0:cs)
     | isHexEscape [h1,h0]  = lexString (s++[hexToChar h1 h0]) cont cs
 lexString _ _    ('\\':_)  = failP "invalid string character" ['\\']
 lexString _ _    ('\'':_)  = failP "invalid string character" ['\'']
@@ -79,9 +79,9 @@ lexNum cont cs =
   case cs of
      ('-':cs) -> f (-1) cs
      _        -> f 1 cs
- where f sgn cs = 
+ where f sgn cs =
          case span isDigit cs of
-          (digits,'.':c:rest) 
+          (digits,'.':c:rest)
                 | isDigit c -> cont (TKrational (fromInteger sgn * r)) rest'
                 where ((r,rest'):_) = readFloat (digits ++ ('.':c:rest))
                 -- When reading a floating-point number, which is
@@ -95,7 +95,7 @@ lexName cont cstr cs = cont (cstr name) rest
 
 lexKeyword :: (Token -> [Char] -> Int -> ParseResult a) -> String -> Int
            -> ParseResult a
-lexKeyword cont cs = 
+lexKeyword cont cs =
    case span isKeywordChar cs of
       ("module",rest) -> cont TKmodule rest
       ("data",rest)  -> cont TKdata rest
@@ -111,5 +111,5 @@ lexKeyword cont cs =
       ("external",rest) -> cont TKexternal rest
       ("local",rest) -> cont TKlocal rest
       ("_",rest) -> cont TKwild rest
-      _ -> failP "invalid keyword" ('%':cs) 
+      _ -> failP "invalid keyword" ('%':cs)
 
