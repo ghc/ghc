@@ -436,17 +436,9 @@ mkExportItems
   (maps@(docMap, argMap, subMap, declMap)) optExports _ instIfaceMap dflags =
   case optExports of
     Nothing -> fullModuleContents dflags gre maps decls
-    Just exports -> liftM (nubBy commaDeclared . concat) $ mapM lookupExport exports
+    Just exports -> liftM concat $ mapM lookupExport exports
   where
     decls = filter (not . isInstD . unLoc) decls0
-
-    -- A type signature can have multiple names, like:
-    --   foo, bar :: Types..
-    -- When going throug the exported names we have to take care to detect such
-    -- situations and remove the duplicates.
-    commaDeclared (ExportDecl (L _ sig1) _ _ _) (ExportDecl (L _ sig2) _ _ _) =
-      getMainDeclBinder sig1 == getMainDeclBinder sig2
-    commaDeclared _ _ = False
 
 
     lookupExport (IEVar x)             = declWith x
@@ -505,13 +497,12 @@ mkExportItems
               -- normal case
               | otherwise -> return [ mkExportDecl t newDecl docs_ ]
                   where
-                    -- Since a single signature might refer to many names, we
-                    -- need to filter the ones that are actually exported. This
-                    -- requires modifying the type signatures to "hide" the
-                    -- names that are not exported.
+                    -- A single signature might refer to many names, but we
+                    -- create an export item for a single name only.  So we
+                    -- modify the signature to contain only that single name.
                     newDecl = case decl of
                       (L loc (SigD sig)) ->
-                        L loc . SigD . fromJust $ filterSigNames isExported sig
+                        L loc . SigD . fromJust $ filterSigNames (== t) sig
                         -- fromJust is safe since we already checked in guards
                         -- that 't' is a name declared in this declaration.
                       _                  -> decl
