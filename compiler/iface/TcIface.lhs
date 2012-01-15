@@ -733,9 +733,9 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
        ; tyConRes1   <- mapM (vectTyConVectMapping varsSet)  tycons
        ; tyConRes2   <- mapM (vectTyConReuseMapping varsSet) tyconsReuse
        ; vScalarVars <- mapM vectVar                         scalarVars
-       ; let (vTyCons, vDataCons) = unzip (tyConRes1 ++ tyConRes2)
+       ; let (vTyCons, vDataCons, vScSels) = unzip3 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
-                  { vectInfoVar          = mkVarEnv  vVars
+                  { vectInfoVar          = mkVarEnv  vVars `extendVarEnvList` concat vScSels
                   , vectInfoTyCon        = mkNameEnv vTyCons
                   , vectInfoDataCon      = mkNameEnv (concat vDataCons)
                   , vectInfoScalarVars   = mkVarSet  vScalarVars
@@ -753,6 +753,19 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                        tcIfaceExtId vName
            ; return (var, (var, vVar))
            }
+      -- where
+      --   lookupLocalOrExternalId name
+      --     = do { let mb_id = lookupTypeEnv typeEnv name
+      --          ; case mb_id of
+      --                -- id is local
+      --              Just (AnId id) -> return id
+      --                -- name is not an Id => internal inconsistency
+      --              Just _         -> notAnIdErr
+      --                -- Id is external
+      --              Nothing        -> tcIfaceExtId name
+      --          }
+      -- 
+      --   notAnIdErr = pprPanic "TcIface.tcIfaceVectInfo: not an id" (ppr name)
 
     vectVar name 
       = forkM (ptext (sLit "vect scalar var")  <+> ppr name)  $
@@ -767,13 +780,17 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
       = vectTyConMapping vars name name
 
     vectTyConMapping vars name vName
-      = do { tycon  <- lookupLocalOrExternal name
-           ; vTycon <- lookupLocalOrExternal vName
+      = do { tycon  <- lookupLocalOrExternalTyCon name
+           ; vTycon <- forkM (ptext (sLit "vTycon of") <+> ppr vName) $ 
+                         lookupLocalOrExternalTyCon vName
 
-               -- map the data constructors of the original type constructor to those of the
+               -- Map the data constructors of the original type constructor to those of the
                -- vectorised type constructor /unless/ the type constructor was vectorised
                -- abstractly; if it was vectorised abstractly, the workers of its data constructors
-               -- do not appear in the set of vectorised variables
+               -- do not appear in the set of vectorised variables.
+               --
+               -- NB: This is lazy!  We don't pull at the type constructors before we actually use
+               --     the data constructor mapping.
            ; let isAbstract | isClassTyCon tycon = False
                             | datacon:_ <- tyConDataCons tycon 
                                                  = not $ dataConWrapId datacon `elemVarSet` vars
@@ -784,14 +801,25 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                                                                         (tyConDataCons vTycon)
                                            ]
 
+                   -- Map the (implicit) superclass and methods selectors as they don't occur in
+                   -- the var map.
+                 vScSels    | Just cls  <- tyConClass_maybe tycon
+                            , Just vCls <- tyConClass_maybe vTycon 
+                            = [ (sel, (sel, vSel))
+                              | (sel, vSel) <- zip (classAllSelIds cls) (classAllSelIds vCls)
+                              ]
+                            | otherwise
+                            = []
+
            ; return ( (name, (tycon, vTycon))          -- (T, T_v)
                     , vDataCons                        -- list of (Ci, Ci_v)
+                    , vScSels                          -- list of (seli, seli_v)
                     )
            }
       where
           -- we need a fully defined version of the type constructor to be able to extract
           -- its data constructors etc.
-        lookupLocalOrExternal name
+        lookupLocalOrExternalTyCon name
           = do { let mb_tycon = lookupTypeEnv typeEnv name
                ; case mb_tycon of
                      -- tycon is local

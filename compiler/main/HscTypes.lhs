@@ -92,7 +92,7 @@ module HscTypes (
 
         -- * Vectorisation information
         VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo,
-        noIfaceVectInfo,
+        noIfaceVectInfo, isNoIfaceVectInfo,
 
         -- * Safe Haskell information
         hscGetSafeInf, hscSetSafeInf,
@@ -696,8 +696,8 @@ data ModIface
         mi_insts       :: [IfaceInst],     -- ^ Sorted class instance
         mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
         mi_rules       :: [IfaceRule],     -- ^ Sorted rules
-        mi_orphan_hash :: !Fingerprint,    -- ^ Hash for orphan rules and class
-                                           -- and family instances combined
+        mi_orphan_hash :: !Fingerprint,    -- ^ Hash for orphan rules, class and family
+                                           -- instances, and vectorise pragmas combined
 
         mi_vect_info :: !IfaceVectInfo,    -- ^ Vectorisation information
 
@@ -1543,6 +1543,8 @@ lookupFixity env n = case lookupNameEnv env n of
 --
 -- * A transformation rule in a module other than the one defining
 --   the function in the head of the rule
+--
+-- * A vectorisation pragma
 type WhetherHasOrphans   = Bool
 
 -- | Does this module define family instances?
@@ -1985,6 +1987,10 @@ concatVectInfo = foldr plusVectInfo noVectInfo
 
 noIfaceVectInfo :: IfaceVectInfo
 noIfaceVectInfo = IfaceVectInfo [] [] [] [] []
+
+isNoIfaceVectInfo :: IfaceVectInfo -> Bool
+isNoIfaceVectInfo (IfaceVectInfo l1 l2 l3 l4 l5)
+  = null l1 && null l2 && null l3 && null l4 && null l5
 
 instance Outputable VectInfo where
   ppr info = vcat

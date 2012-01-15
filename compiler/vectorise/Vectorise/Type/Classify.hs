@@ -23,6 +23,7 @@ import DataCon
 import TyCon
 import TypeRep
 import Type
+import PrelNames
 import Digraph
 
 
@@ -54,14 +55,21 @@ classifyTyCons convStatus tcs = classify [] [] [] convStatus (tyConGroups tcs)
       where
         refs = ds `delListFromUniqSet` tcs
 
-        can_convert  = isNullUFM (refs `minusUFM` cs) && all convertable tcs
+        can_convert  = (isNullUFM (refs `minusUFM` cs) && all convertable tcs)
+                       || isShowClass tcs
         must_convert = foldUFM (||) False (intersectUFM_C const cs refs)
+                       && (not . isShowClass $ tcs)
 
         -- We currently admit Haskell 2011-style data and newtype declarations as well as type
         -- constructors representing classes.
         convertable tc 
           = (isDataTyCon tc || isNewTyCon tc) && all isVanillaDataCon (tyConDataCons tc)
             || isClassTyCon tc
+            
+        -- !!!FIXME: currently we allow 'Show' in vectorised code without actually providing a
+        --   vectorised definition (to be able to vectorise 'Num')
+        isShowClass [tc] = tyConName tc == showClassName
+        isShowClass _    = False
 
 -- Used to group type constructors into mutually dependent groups.
 --

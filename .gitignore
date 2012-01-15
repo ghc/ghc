@@ -237,3 +237,5 @@ _darcs/
 
 
 /extra-gcc-opts
+
+.tm_properties

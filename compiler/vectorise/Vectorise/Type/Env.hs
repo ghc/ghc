@@ -147,14 +147,6 @@ vectTypeEnv :: [TyCon]                  -- Type constructors defined in this mod
 vectTypeEnv tycons vectTypeDecls vectClassDecls
   = do { traceVt "** vectTypeEnv" $ ppr tycons
 
-         -- Build a map containing all vectorised type constructor.  If they are scalar, they are
-         -- mapped to 'False' (vectorised type constructor == original type constructor).
-       ; allScalarTyConNames <- globalScalarTyCons  -- covers both current and imported modules
-       ; vectTyCons          <- globalVectTyCons
-       ; let vectTyConBase    = mapNameEnv (const True) vectTyCons   -- by default fully vectorised
-             vectTyConFlavour = foldNameSet (\n env -> extendNameEnv env n False) vectTyConBase
-                                            allScalarTyConNames
-
        ; let   -- {-# VECTORISE SCALAR type T -#} (imported and local tycons)
              localAbstractTyCons    = [tycon | VectType True tycon Nothing <- vectTypeDecls]
 
@@ -171,6 +163,23 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
              vectSpecialTyConNames  = mkNameSet . map tyConName $
                                         localAbstractTyCons ++ map fst3 vectTyConsWithRHS
              notVectSpecialTyCon tc = not $ (tyConName tc) `elemNameSet` vectSpecialTyConNames
+
+         -- Build a map containing all vectorised type constructor.  If they are scalar, they are
+         -- mapped to 'False' (vectorised type constructor == original type constructor).
+       ; allScalarTyConNames <- globalScalarTyCons  -- covers both current and imported modules
+       ; vectTyCons          <- globalVectTyCons
+       ; let vectTyConBase    = mapNameEnv (const True) vectTyCons    -- by default fully vectorised
+             vectTyConFlavour = vectTyConBase 
+                                `plusNameEnv` 
+                                mkNameEnv [ (tyConName tycon, True) 
+                                          | (tycon, _, _) <- vectTyConsWithRHS]
+                                `plusNameEnv`
+                                mkNameEnv [ (tcName, False)           -- original representation
+                                          | tcName <- nameSetToList allScalarTyConNames]
+                                `plusNameEnv`
+                                mkNameEnv [ (tyConName tycon, False)  -- original representation
+                                          | tycon <- localAbstractTyCons]
+                                            
 
            -- Split the list of 'TyCons' into the ones (1) that we must vectorise and those (2)
            -- that we could, but don't need to vectorise.  Type constructors that are not data
@@ -219,6 +228,12 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
            -- Vectorise all the data type declarations that we can and must vectorise (enter the
            -- type and data constructors into the vectorisation map on-the-fly.)
        ; new_tcs <- vectTyConDecls conv_tcs
+       
+       ; let dumpTc tc vTc = traceVt "---" (ppr tc <+> text "::" <+> ppr (dataConSig tc) $$
+                                            ppr vTc <+> text "::" <+> ppr (dataConSig vTc))
+             dataConSig tc | Just dc <- tyConSingleDataCon_maybe tc = dataConRepType dc
+                           | otherwise                              = panic "dataConSig"
+       ; zipWithM_ dumpTc (filter isClassTyCon conv_tcs) (filter isClassTyCon new_tcs)
 
            -- We don't need new representation types for dictionary constructors. The constructors
            -- are always fully applied, and we don't need to lift them to arrays as a dictionary

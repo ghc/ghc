@@ -674,7 +674,7 @@ rnHsVectDecl (HsVectClassOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectClassOut'"
 rnHsVectDecl (HsVectInstIn instTy)
   = do { instTy' <- rnLHsInstType (text "In a VECTORISE pragma") instTy
-       ; return (HsVectInstIn instTy', emptyFVs)
+       ; return (HsVectInstIn instTy', extractHsTyNames instTy')
        }
 rnHsVectDecl (HsVectInstOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectInstOut'"
