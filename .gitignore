@@ -1,2 +1,5 @@
 /dist/
 /tests/html-tests/output/
+/tests/html-tests/tests/doc-index.html.ref
+/tests/html-tests/tests/index-frames.html.ref
+/tests/html-tests/tests/index.html.ref
