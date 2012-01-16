@@ -462,17 +462,17 @@ lookupPromotedOccRn rdr_name
              Nothing   -> 
 
     do { -- Maybe it's the name of a *data* constructor
-         poly_kinds <- xoptM Opt_PolyKinds
+         data_kinds <- xoptM Opt_DataKinds
        ; mb_demoted_name <- case demoteRdrName rdr_name of
                               Just demoted_rdr -> lookupOccRn_maybe demoted_rdr
                               Nothing          -> return Nothing
        ; case mb_demoted_name of
            Nothing -> unboundName WL_Any rdr_name
            Just demoted_name 
-             | poly_kinds -> return demoted_name
+             | data_kinds -> return demoted_name
              | otherwise  -> unboundNameX WL_Any rdr_name suggest_pk }}}
   where 
-    suggest_pk = ptext (sLit "A data constructor of that name is in scope; did you mean -XPolyKinds?")
+    suggest_pk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
 \end{code}
 
 Note [Demotion]
@@ -1437,7 +1437,7 @@ kindSigErr thing
 polyKindsErr :: Outputable a => a -> SDoc
 polyKindsErr thing
   = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XPolyKinds"))
+       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
 
 
 badQualBndrErr :: RdrName -> SDoc

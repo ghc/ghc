@@ -68,7 +68,7 @@ import NameSet
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag( Opt_PolyKinds ) )
+import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
 import Util
 import UniqSupply
 import Outputable
@@ -1343,8 +1343,8 @@ sc_ds_var_app name arg_kis = do
   case mb_thing of
     Just (AGlobal (ATyCon tc))
       | isAlgTyCon tc || isTupleTyCon tc -> do
-      poly_kinds <- xoptM Opt_PolyKinds
-      unless poly_kinds $ addErr (polyKindsErr name)
+      data_kinds <- xoptM Opt_DataKinds
+      unless data_kinds $ addErr (polyKindsErr name)
       let tc_kind = tyConKind tc
       case isPromotableKind tc_kind of
         Just n | n == length arg_kis ->
