@@ -75,8 +75,8 @@ guard _   True  = return ()
 guard msg False = fail msg
 
 runMatch :: Match a -> Maybe a
-runMatch (Match (Right x))  = Just x
-runMatch (Match (Left msg)) = {- trace ("match " ++ msg) -} Nothing
+runMatch (Match (Right x))   = Just x
+runMatch (Match (Left _msg)) = {- trace ("match " ++ msg) -} Nothing
 --runMatch = unMatch
 
 matchRnEnv2 :: (a -> FreeVars) -> a -> a -> RnEnv2
@@ -537,7 +537,7 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                                                                                                  | x `elemVarSet` used -> Nothing
                                                                                                  | otherwise           -> Just (used `extendVarSet` x, annee e'))
 
-            failLoop rest = fail $ "matchLoop" ++ showPpr lr ++ ": " ++ rest
+            failLoop rest = fail $ "matchLoop: " ++ showPpr lr ++ ": " ++ rest
             go_template mextras extra_free_eqs used_l' used_r' = do
                 -- Don't forget to match types/unfoldings of binders as well:
                 bndr_free_eqs <- mextras
