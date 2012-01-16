@@ -152,14 +152,21 @@ test('conc034', compose(only_compiler_types(['ghc']),
 
 test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 
-# Omit for GHCi: firstly GHCi doesn't have unsafe FFI calls, and secondly
-# the main thread cannot receive the deadlock exception because it can be
-# woken up by ^C.
-# Omit for threaded2: this test is really bogus and fails to do anything
-# sensible for more than one CPU.
-test('conc036', compose(skip_if_fast,
-		  compose(omit_ways(['ghci','threaded2']),
-		    only_compiler_types(['ghc']))), compile_and_run, [''])
+# conc036: now skipped entirely.  This test attempts to check that
+# unsafe foreign calls block other threads, but doing that reliably is
+# probably impossible.  The last straw was when it started failing on
+# Windows around 7.4.x.
+#
+# OLD comments about hacks we tried to make it work:
+#   Omit for GHCi: firstly GHCi doesn't have unsafe FFI calls, and secondly
+#   the main thread cannot receive the deadlock exception because it can be
+#   woken up by ^C.
+#   Omit for threaded2: this test is really bogus and fails to do anything
+#   sensible for more than one CPU.
+#
+test('conc036', skip, compile_and_run, [''])
+
+
 # Interrupting foreign calls only makes sense if we are threaded
 test('foreignInterruptible', composes([skip_if_fast,
 			               only_threaded_ways,
