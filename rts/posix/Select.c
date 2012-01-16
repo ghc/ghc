@@ -118,13 +118,9 @@ awaitEvent(rtsBool wait)
     int maxfd = -1;
     rtsBool select_succeeded = rtsTrue;
     rtsBool unblock_all = rtsFalse;
-    struct timeval tv;
-    Time min;
+    struct timeval tv, *ptv;
     LowResTime now;
 
-    tv.tv_sec  = 0;
-    tv.tv_usec = 0;
-    
     IF_DEBUG(scheduler,
 	     debugBelch("scheduler: checking for threads blocked on I/O");
 	     if (wait) {
@@ -145,15 +141,7 @@ awaitEvent(rtsBool wait)
 	  return;
       }
 
-      if (!wait) {
-	  min = 0;
-      } else if (sleeping_queue != END_TSO_QUEUE) {
-          min = LowResTimeToTime(sleeping_queue->block_info.target - now);
-      } else {
-          min = (Time)-1;
-      }
-
-      /* 
+      /*
        * Collect all of the fd's that we're interested in
        */
       FD_ZERO(&rfd);
@@ -194,12 +182,23 @@ awaitEvent(rtsBool wait)
 	}
       }
 
+      if (wait) {
+          ptv = NULL;
+      } else if (sleeping_queue != END_TSO_QUEUE) {
+          Time min = LowResTimeToTime(sleeping_queue->block_info.target - now);
+          tv.tv_sec  = TimeToSeconds(min);
+          tv.tv_usec = TimeToUS(min) % 1000000;
+          ptv = &tv;
+      } else {
+          // just poll
+          tv.tv_sec  = 0;
+          tv.tv_usec = 0;
+          ptv = &tv;
+      }
+
       /* Check for any interesting events */
       
-      tv.tv_sec  = TimeToSeconds(min);
-      tv.tv_usec = TimeToUS(min) % 1000000;
-
-      while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
+      while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv)) < 0) {
 	  if (errno != EINTR) {
 	    /* Handle bad file descriptors by unblocking all the
 	       waiting threads. Why? Because a thread might have been
