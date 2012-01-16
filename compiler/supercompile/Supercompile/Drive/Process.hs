@@ -108,16 +108,23 @@ childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++
   where descendant_counts = flip M.map parent_children $ \children -> map ((+1) . sum . flip (M.findWithDefault [] . Just) descendant_counts . fst) children
         ordered_counts = sortBy (comparing (Down . sum . snd)) (M.toList descendant_counts)
 
-deepestPath :: ParentChildren -> SDoc
-deepestPath parent_children = maybe empty (show_chain M.empty . snd) (M.lookup Nothing deepest)
+-- NB: there may be many deepest paths, but this function only returns one of them
+deepestPath :: [(Var, FVedTerm)] -> ParentChildren -> SDoc
+deepestPath fulfils parent_children = maybe empty (\(_, states) -> show_meaning_chain M.empty states $$ show_fulfils_chain (map fst states)) (M.lookup Nothing deepest)
   where deepest :: M.Map (Maybe Var) (Int, [(Var, State)])
         deepest = flip M.map parent_children $ \children -> maximumBy (comparing fst) [(depth + 1, (fun, state):states) | (fun, state) <- children, let (depth, states) = M.findWithDefault (0, []) (Just fun) deepest]
 
-        show_chain :: M.Map Var Bool -> [(Var, State)] -> SDoc
-        show_chain _         [] = empty
-        show_chain known_bvs ((fun, state@(_, Heap h _, _, _)):states)
+        fulfils_map :: M.Map Var FVedTerm
+        fulfils_map = M.fromList fulfils
+
+        show_fulfils_chain :: [Var] -> SDoc
+        show_fulfils_chain = flip (pPrintPrecLetRec noPrec) (PrettyDoc (text "...")) . mapMaybe (\x -> fmap ((,) x) $ M.lookup x fulfils_map)
+
+        show_meaning_chain :: M.Map Var Bool -> [(Var, State)] -> SDoc
+        show_meaning_chain _         [] = empty
+        show_meaning_chain known_bvs ((fun, state@(_, Heap h _, _, _)):states)
           = hang (ppr fun) 2 (pPrintFullState (quietStatePrettiness { excludeBindings = unchanged_bvs }) state) $$
-            show_chain known_bvs' states
+            show_meaning_chain known_bvs' states
           where known_bvs'  = M.map (maybe False (termIsValue . snd) . heapBindingTerm) h
                 unchanged_bvs = M.keysSet (M.filter id (M.intersectionWith (==) known_bvs known_bvs'))
 

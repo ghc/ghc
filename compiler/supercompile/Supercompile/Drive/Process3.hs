@@ -125,7 +125,7 @@ instance MonadStatics ScpM where
     monitorFVs = liftM ((,) emptyVarSet)
 
 runScpM :: TagAnnotations -> ScpM FVedTerm -> FVedTerm
-runScpM tag_anns me = fvedTermSize e' `seq` trace (showSDoc (deepestPath (scpParentChildren s'))) e'
+runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc (deepestPath fulfils (scpParentChildren s'))) e'
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
         ms = MS { promises = [], hNames = h_names }
@@ -133,7 +133,8 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace (showSDoc (deepestPath (scpPar
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
         (e, s') = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
-        e' = letRec (fulfilments (scpFulfilmentState s')) e
+        fulfils = fulfilments (scpFulfilmentState s')
+        e' = letRec fulfils e
 
 
 scpDepth :: ScpEnv -> Int
