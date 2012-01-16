@@ -1090,8 +1090,8 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             --   1. Filter out any branches of the case which we know are impossible due to type refinement
             --   2. Turn any remaining default cases into explicit constructors if possible (helps positive information propagation)
             alts = [ (coreAltConToAltCon altcon xs, e)
-                   | (altcon, xs, e) <- thirdOf3 (filterAlts (repeat wildCardKey) (idType x') []
-                                                             [(altcon', xs, e) | (altcon, e) <- unfiltered_alts, let (altcon', xs) = altConToCoreAltCon altcon])
+                   | (altcon, xs, e) <- (if rEFINE_ALTS then thirdOf3 . filterAlts (repeat wildCardKey) (idType x') [] else id)
+                                            [(altcon', xs, e) | (altcon, e) <- unfiltered_alts, let (altcon', xs) = altConToCoreAltCon altcon]
                    ]
 
             (alt_cons, alt_es) = unzip alts
