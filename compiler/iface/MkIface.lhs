@@ -594,8 +594,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - flag abi hash
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
-                       export_hash,
-                       orphan_hash,
+                       export_hash,  -- includes orphan_hash
                        mi_warns iface0,
                        mi_vect_info iface0)
 
