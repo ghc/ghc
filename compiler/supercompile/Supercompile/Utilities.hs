@@ -542,7 +542,7 @@ zipWithEqualM :: Monad m => (a -> b -> m c) -> [a] -> [b] -> m [c]
 zipWithEqualM f = go
   where
     go []     []     = return []
-    go (x:xs) (y:ys) = liftM2 (:) (f x y) (zipWithEqualM f xs ys)
+    go (x:xs) (y:ys) = liftM2 (:) (f x y) (go xs ys)
     go _ _ = fail "zipWithEqualM"
 
 {-# INLINE foldZipEqualM #-}
@@ -550,7 +550,7 @@ foldZipEqualM :: Monad m => (a -> b -> c -> m a) -> a -> [b] -> [c] -> m a
 foldZipEqualM f = go
   where
    go acc []     []     = return acc
-   go acc (x:xs) (y:ys) = f acc x y >>= \acc' -> foldZipEqualM f acc' xs ys
+   go acc (x:xs) (y:ys) = f acc x y >>= \acc' -> go acc' xs ys
    go _ _ _ = fail "foldZipEqualM"
 
 
