@@ -168,9 +168,13 @@ test('conc036', skip, compile_and_run, [''])
 
 
 # Interrupting foreign calls only makes sense if we are threaded
-test('foreignInterruptible', composes([skip_if_fast,
-			               only_threaded_ways,
-				       only_compiler_types(['ghc'])]), compile_and_run, [''])
+test('foreignInterruptible', [skip_if_fast,
+                              if_os('mingw32',expect_fail),
+                              # I don't think we support interrupting Sleep()
+                              # on Windows.  --SDM
+                              only_threaded_ways,
+                              only_compiler_types(['ghc'])],
+      compile_and_run, [''])
 
 test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
