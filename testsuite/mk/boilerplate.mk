@@ -35,26 +35,6 @@ endif
 $(call canonicalise,$1)
 endef
 
-define get-ghc-rts-field # $1 = result variable, $2 = field name
-$1 := $$(shell '$$(TEST_HC)' +RTS --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
-endef
-
-define get-ghc-field # $1 = result variable, $2 = field name
-$1 := $$(shell '$$(TEST_HC)' --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
-endef
-
-define get-ghc-feature-bool # $1 = result variable, $2 = field name
-SHELL_RES := $$(shell '$$(TEST_HC)' --info | grep '^ .("$2",' | tr -d '\r' | sed -e 's/.*", *"//' -e 's/")$$$$//')
-$1 := $$(strip \
-	  $$(if $$(SHELL_RES), \
-         $$(if $$(subst YES,,$$(SHELL_RES)), \
-            $$(if $$(subst NO,,$$(SHELL_RES)), \
-               $$(warning ghc info field not YES or NO: $2: $$(SHELL_RES)), \
-               NO), \
-            YES), \
-         $$(warning ghc info field not found: $2)))
-endef
-
 ifeq "$(TEST_HC)" ""
 
 STAGE1_GHC := $(abspath $(TOP)/../inplace/bin/ghc-stage1)
@@ -136,9 +116,6 @@ ifeq "$(shell test -x '$(HPC)' && echo exists)" ""
 $(error Cannot find hpc: $(HPC))
 endif
 
-$(eval $(call get-ghc-field,GhcRTSWays,RTS ways))
-
-$(eval $(call get-ghc-field,AR,ar command))
 ifeq "$(AR)" ""
 AR = ar
 endif
@@ -151,7 +128,25 @@ CP = cp
 RM = rm -f
 PYTHON = python
 
-$(eval $(call get-ghc-rts-field,HostOS,Host OS))
+# -----------------------------------------------------------------------------
+# configuration of TEST_HC
+
+# ghc-config.hs is a short Haskell program that runs ghc --info, parses
+# the results, and emits a little .mk file with make bindings for the values.
+# This way we cache the results for different values of $(TEST_HC)
+
+$(TOP_ABS)/mk/ghc-config : $(TOP_ABS)/mk/ghc-config.hs
+	"$(TEST_HC)" --make -o $@ $<
+
+ghc-config-mk = $(TOP_ABS)/mk/ghcconfig$(subst /,_,$(subst \,_,$(TEST_HC))).mk
+
+$(ghc-config-mk) : $(TOP_ABS)/mk/ghc-config
+	$(TOP_ABS)/mk/ghc-config $(TEST_HC) >$@
+
+include $(ghc-config-mk)
+
+# -----------------------------------------------------------------------------
+
 ifeq "$(HostOS)" "mingw32"
 WINDOWS = YES
 else

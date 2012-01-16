@@ -21,4 +21,4 @@ endif
 
 clean distclean maintainer-clean:
 	$(MAKE) -C $(TOP)/timeout $@
-
+	$(RM) -f mk/*.o mk/*.hi mk/ghc-config mk/ghc-config.exe mk/ghcconfig*.mk

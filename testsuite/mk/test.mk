@@ -31,10 +31,6 @@ TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-
 
 RUNTEST_OPTS =
 
-$(eval $(call get-ghc-rts-field,WORDSIZE,Word size))
-$(eval $(call get-ghc-rts-field,TARGETPLATFORM,Target platform))
-$(eval $(call get-ghc-rts-field,TargetOS_CPP,Target OS))
-$(eval $(call get-ghc-rts-field,TargetARCH_CPP,Target architecture))
 ifeq "$(filter $(TargetOS_CPP), cygwin32 mingw32)" ""
 exeext =
 else
@@ -43,7 +39,6 @@ endif
 
 RUNTEST_OPTS += -e ghc_compiler_always_flags="'$(TEST_HC_OPTS)'"
 
-$(eval $(call get-ghc-feature-bool,GhcWithNativeCodeGen,Have native code generator))
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 RUNTEST_OPTS += -e ghc_with_native_codegen=1
 else
@@ -71,8 +66,6 @@ else
 RUNTEST_OPTS += -e ghc_with_dynamic_rts=0
 endif
 
-$(eval $(call get-ghc-field,GhcStage,Stage))
-$(eval $(call get-ghc-feature-bool,GhcWithInterpreter,Have interpreter))
 ifeq "$(GhcWithInterpreter)" "NO"
 RUNTEST_OPTS += -e ghc_with_interpreter=0
 else ifeq "$(GhcStage)" "1"
@@ -81,14 +74,12 @@ else
 RUNTEST_OPTS += -e ghc_with_interpreter=1
 endif
 
-$(eval $(call get-ghc-feature-bool,GhcUnregisterised,Unregisterised))
 ifeq "$(GhcUnregisterised)" "YES"
 RUNTEST_OPTS += -e ghc_unregisterised=1
 else
 RUNTEST_OPTS += -e ghc_unregisterised=0
 endif
 
-$(eval $(call get-ghc-feature-bool,GhcWithSMP,Support SMP))
 ifeq "$(GhcWithSMP)" "YES"
 RUNTEST_OPTS += -e ghc_with_smp=1
 else
