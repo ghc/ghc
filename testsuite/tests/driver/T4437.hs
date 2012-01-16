@@ -39,6 +39,7 @@ expectedGhcOnlyExtensions = ["ParallelArrays",
                              "AlternativeLayoutRuleTransitional",
                              "MonadComprehensions",
                              "TraditionalRecordSyntax",
+                             "DataKinds",
                              "PolyKinds",
                              "InstanceSigs",
                              "CApiFFI"]
