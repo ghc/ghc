@@ -30,5 +30,9 @@ integerConstantFolding:
 	$(call CHECK,\<6253\>,shiftRInteger)
 	$(call CHECK,\<641\>,quotInteger)
 	$(call CHECK,\<68\>,remInteger)
+	$(call CHECK,\<200131.0\>,doubleFromInteger)
+	$(call CHECK,\<200135.0\>,floatFromInteger)
+	$(call CHECK,\<400276.0\>,encodeIntegerDouble)
+	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
 	./integerConstantFolding
 
