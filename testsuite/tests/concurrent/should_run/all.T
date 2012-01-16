@@ -27,7 +27,7 @@ test('2910a', normal, compile_and_run, [''])
 test('3279', normal, compile_and_run, [''])
 
 # This test takes a long time with the default context switch interval
-test('3429', extra_run_opts('+RTS -i0.001 -RTS'), compile_and_run, [''])
+test('3429', extra_run_opts('+RTS -C0.001 -RTS'), compile_and_run, [''])
 
 # without -O, goes into an infinite loop
 # GHCi cannot deterct the infinite loop, because the thread is always reachable
