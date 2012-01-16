@@ -5,7 +5,7 @@ module Solver
 where
 import Data.Array.Parallel
 import Data.Array.Parallel.Prelude.Bool
-import Data.Array.Parallel.Prelude.Double
+import Data.Array.Parallel.Prelude.Double as D
 import qualified Data.Array.Parallel.Prelude.Int as I
 import qualified Prelude
 
@@ -67,9 +67,9 @@ buildTree bb particles
         subTrees                = [:buildTree bb' ps | (bb', ps) <- zipP boxes splitPnts:]
   
         (Box llx lly rux ruy)   = bb
-        sx                      = rux - llx
-        sy                      = ruy - lly
-        s                       = if sx < sy then sx else sy
+        sx                      = rux D.- llx
+        sy                      = ruy D.- lly
+        s                       = if sx D.< sy then sx else sy
 
 
 -- | Split massPoints according to their locations in the quadrants.
@@ -93,13 +93,13 @@ splitPoints b@(Box llx lly rux  ruy) particles
         b4              = Box midx lly  rux  midy
         boxes           = singletonP b1  +:+ singletonP b2  +:+ singletonP b3 +:+ singletonP b4 
         splitPars       = singletonP lls +:+ singletonP lus +:+ singletonP rus +:+ singletonP rls
-        (midx,  midy)   = ((llx + rux) / 2.0 , (lly + ruy) / 2.0) 
+        (midx,  midy)   = ((llx D.+ rux) D./ 2.0 , (lly D.+ ruy) D./ 2.0) 
 
 
 -- | Checks if particle is in box (excluding left and lower border)
 inBox :: BoundingBox -> MassPoint -> Bool
 inBox (Box llx  lly rux  ruy) (MP px  py  _) 
-        = (px > llx) && (px <= rux) && (py > lly) && (py <= ruy)
+        = (px D.> llx) && (px D.<= rux) && (py D.> lly) && (py D.<= ruy)
 
 
 -- | Calculate the centroid of some points.
@@ -107,7 +107,7 @@ calcCentroid:: [:MassPoint:] -> MassPoint
 calcCentroid mpts 
  = MP  (sumP xs / mass) (sumP ys / mass) mass
  where  mass     = sumP [: m | MP _ _ m  <- mpts :]
-        (xs, ys) = unzipP [: (m * x, m * y) | MP x y m <- mpts :]   
+        (xs, ys) = unzipP [: (m D.* x, m D.* y) | MP x y m <- mpts :]   
 
 
 -- | Calculate the accelleration of a point due to the points in the given tree.
@@ -132,12 +132,12 @@ accel   :: Double       -- ^ If the distance between the points is smaller than 
         -> Accel
 
 accel epsilon (MP x1 y1 _) (MP x2 y2 m)  
- = (aabs * dx / r , aabs * dy / r)  
- where  rsqr = (dx * dx) + (dy * dy) + epsilon * epsilon
+ = (aabs D.* dx D./ r , aabs D.* dy D./ r)  
+ where  rsqr = (dx D.* dx) D.+ (dy D.* dy) D.+ epsilon D.* epsilon
         r    = sqrt rsqr 
-        dx   = x1 - x2 
-        dy   = y1 - y2 
-        aabs = m / rsqr 
+        dx   = x1 D.- x2 
+        dy   = y1 D.- y2 
+        aabs = m D./ rsqr 
 
 
 -- | If the point is far from a cell in the tree then we can use
@@ -149,8 +149,8 @@ isFar   :: MassPoint    -- point being accelerated
         -> Bool
 
 isFar (MP x1 y1 m) s x2 y2 
- = let  dx      = x2 - x1
-        dy      = y2 - y1
-        dist    = sqrt (dx * dx + dy * dy)
-   in   (s / dist) < 1
+ = let  dx      = x2 D.- x1
+        dy      = y2 D.- y1
+        dist    = sqrt (dx D.* dx D.+ dy D.* dy)
+   in   (s D./ dist) D.< 1
 
