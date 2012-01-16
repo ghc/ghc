@@ -5199,10 +5199,12 @@ is not what we intend when defining length-indexed vectors.
 </para>
 
 <para>
-With the <option>-XPolyKinds</option> flag, users can specify better kinds for
-their programs. This flag enables two orthogonal but related features: kind
-polymorphism and user defined kinds through datatype promotion. With
-<option>-XPolyKinds</option>, the example above can then be rewritten to:
+With the flags <option>-XPolyKinds</option> and <option>-XDataKinds</option>,
+users get access to a richer kind language.
+<option>-XPolyKinds</option> enables kind polymorphism, while
+<option>-XDataKinds</option> enables user defined kinds through datatype
+promotion. With <option>-XDataKinds</option>, the example above can then be
+rewritten to:
 <programlisting>
 data Nat = Ze | Su Nat
 
@@ -5240,7 +5242,8 @@ class Typeable2 (t :: * -> * -> *) where
 </para>
 
 <para>
-Kind polymorphism allows us to merge all these classes into one:
+Kind polymorphism (with <option>-XPolyKinds</option>)
+allows us to merge all these classes into one:
 <programlisting>
 data Proxy t = Proxy
 
@@ -5259,8 +5262,8 @@ Note that the datatype <literal>Proxy</literal> has kind
 <para>
 There are some restrictions in the current implementation:
 <itemizedlist>
- <listitem><para>You cannot explicitly abstract over kinds, or mention kind
- variables. So the following are all rejected:
+ <listitem><para>You cannot (yet) explicitly abstract over kinds, or mention
+ kind variables. So the following are all rejected:
 <programlisting>
 data D1 (t :: k)
 
@@ -5284,8 +5287,7 @@ type instance F Int = Maybe
 <sect2 id="promotion">
 <title>Datatype promotion</title>
 <para>
-Along with kind polymorphism comes the ability to define custom named kinds.
-With <option>-XPolyKinds</option>, GHC automatically promotes every suitable
+With <option>-XDataKinds</option>, GHC automatically promotes every suitable
 datatype to be a kind, and its (value) constructors to be type constructors.
 The following types
 <programlisting>
