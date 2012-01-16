@@ -455,6 +455,9 @@ def _compile_cmd_prefix( opts, prefix ):
 def normalise_slashes( opts ):
     opts.extra_normaliser = normalise_slashes_
 
+def normalise_exe( opts ):
+    opts.extra_normaliser = normalise_exe_
+
 def normalise_fun( fun ):
     return lambda opts, f=fun: _normalise_fun(opts, f)
 
@@ -1585,6 +1588,10 @@ def normalise_prof (str):
 
 def normalise_slashes_( str ):
     str = re.sub('\\\\', '/', str)
+    return str
+
+def normalise_exe_( str ):
+    str = re.sub('\.exe', '', str)
     return str
 
 def normalise_output( str ):
