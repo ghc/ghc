@@ -20,10 +20,10 @@ module CoreUtils (
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
-        exprIsCheap, exprIsExpandable, exprIsCheap', FunAppAnalyser,
+        exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects,
-        exprIsBig, exprIsConLike, exprCertainlyTerminates,
-        rhsIsStatic, isHNFApp, isConLikeApp,
+        exprIsBig, exprIsConLike,
+        rhsIsStatic, isCheapApp, isExpandableApp,
 
         -- * Expression and bindings size
         coreBindsSize, exprSize,
@@ -553,63 +553,6 @@ dupAppSize = 8   -- Size of term we are prepared to duplicate
 
 %************************************************************************
 %*                                                                      *
-             FunAppAnalyser
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
--- | Given a function and the number of _value_ arguments,
--- return a boolean
-type FunAppAnalyser = Id -> Int -> Bool
-
-isHNFApp :: FunAppAnalyser
-isHNFApp fn n_val_args
-  =  isDataConWorkId fn
-  || n_val_args < idArity fn
-  || (n_val_args == 0 && (isEvaldUnfolding (idUnfolding fn) 
-                          || isUnLiftedType (idType fn)))
-
-isConLikeApp :: FunAppAnalyser
-isConLikeApp fn n_val_args
-  =  isConLikeId fn
-  || n_val_args < idArity fn
-  || (if n_val_args == 0 
-      then isConLikeUnfolding (idUnfolding fn)
-           || isUnLiftedType (idType fn)
-      else hack_me n_val_args (idType fn))
-  where
-  -- See if all the arguments are PredTys (implicit params or classes)
-  -- If so we'll regard it as expandable; see Note [Expandable overloadings]
-     hack_me 0 _ = True
-     hack_me n_val_args ty
-       | Just (_, ty) <- splitForAllTy_maybe ty   = hack_me n_val_args ty
-       | Just (arg, ty) <- splitFunTy_maybe ty
-       , isPredTy arg                             = hack_me (n_val_args-1) ty
-       | otherwise                                = False
-
-isTerminatingApp :: FunAppAnalyser
-isTerminatingApp fn n_val_args
-  | isPrimOpId fn = not (isBottomingId fn)
-  | otherwise     = isHNFApp fn n_val_args
-  -- Primops terminate, with the exception of, well, exceptions.
-  -- Their strictness signature tells us about them
-\end{code}
-
-Note [Expandable overloadings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose the user wrote this
-   {-# RULE  forall x. foo (negate x) = h x #-}
-   f x = ....(foo (negate x))....
-He'd expect the rule to fire. But since negate is overloaded, we might
-get this:
-    f = \d -> let n = negate d in \x -> ...foo (n x)...
-So we treat the application of a function (negate in this case) to a
-*dictionary* as expandable.  In effect, every function is CONLIKE when
-it's applied only to dictionaries.
-
-
-%************************************************************************
-%*                                                                      *
              exprIsCheap, exprIsExpandable
 %*                                                                      *
 %************************************************************************
@@ -653,14 +596,15 @@ False to exprIsCheap.
 
 \begin{code}
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap = exprIsCheap' isHNFApp
+exprIsCheap = exprIsCheap' isCheapApp
 
 exprIsExpandable :: CoreExpr -> Bool
-exprIsExpandable = exprIsCheap' isConLikeApp -- See Note [CONLIKE pragma] in BasicTypes
+exprIsExpandable = exprIsCheap' isExpandableApp -- See Note [CONLIKE pragma] in BasicTypes
 
-exprIsCheap' :: FunAppAnalyser -> CoreExpr -> Bool
+type CheapAppFun = Id -> Int -> Bool
+exprIsCheap' :: CheapAppFun -> CoreExpr -> Bool
 exprIsCheap' _        (Lit _)      = True
-exprIsCheap' _        (Type _)     = True
+exprIsCheap' _        (Type _)    = True
 exprIsCheap' _        (Coercion _) = True
 exprIsCheap' _        (Var _)      = True
 exprIsCheap' good_app (Cast e _)   = exprIsCheap' good_app e
@@ -736,7 +680,39 @@ exprIsCheap' good_app other_expr        -- Applications and variables
                                         -- lambda.  Particularly for dictionary field selection.
                 -- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
                 --      there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
+
+isCheapApp :: CheapAppFun
+isCheapApp fn n_val_args
+  = isDataConWorkId fn
+  || n_val_args < idArity fn
+
+isExpandableApp :: CheapAppFun
+isExpandableApp fn n_val_args
+  =  isConLikeId fn
+  || n_val_args < idArity fn
+  || go n_val_args (idType fn)
+  where
+  -- See if all the arguments are PredTys (implicit params or classes)
+  -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+     go 0 _ = True
+     go n_val_args ty
+       | Just (_, ty) <- splitForAllTy_maybe ty   = go n_val_args ty
+       | Just (arg, ty) <- splitFunTy_maybe ty
+       , isPredTy arg                             = go (n_val_args-1) ty
+       | otherwise                                = False
 \end{code}
+
+Note [Expandable overloadings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose the user wrote this
+   {-# RULE  forall x. foo (negate x) = h x #-}
+   f x = ....(foo (negate x))....
+He'd expect the rule to fire. But since negate is overloaded, we might
+get this:
+    f = \d -> let n = negate d in \x -> ...foo (n x)...
+So we treat the application of a function (negate in this case) to a
+*dictionary* as expandable.  In effect, every function is CONLIKE when
+it's applied only to dictionaries.
 
 
 %************************************************************************
@@ -879,11 +855,31 @@ isDivOp _                = False
 
 Note [exprOkForSpeculation: case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We keep going for case expressions.  This used to be vital,
-for the reason described in Note [exprCertainlyTerminates: case expressions],
-but exprOkForSpeculation isn't used for that any more.  So now it
-probably doesn't matter if said False for case expressions... but it's
-also fine to continue to accept case expressions.
+It's always sound for exprOkForSpeculation to return False, and we
+don't want it to take too long, so it bales out on complicated-looking
+terms.  Notably lets, which can be stacked very deeply; and in any
+case the argument of exprOkForSpeculation is usually in a strict context,
+so any lets will have been floated away.
+
+However, we keep going on case-expressions.  An example like this one
+showed up in DPH code (Trac #3717):
+    foo :: Int -> Int
+    foo 0 = 0
+    foo n = (if n < 5 then 1 else 2) `seq` foo (n-1)
+
+If exprOkForSpeculation doesn't look through case expressions, you get this:
+    T.$wfoo =
+      \ (ww :: GHC.Prim.Int#) ->
+        case ww of ds {
+          __DEFAULT -> case (case <# ds 5 of _ {
+                          GHC.Types.False -> lvl1;
+                          GHC.Types.True -> lvl})
+                       of _ { __DEFAULT ->
+                       T.$wfoo (GHC.Prim.-# ds_XkE 1) };
+          0 -> 0
+        }
+
+The inner case is redundant, and should be nuked.
 
 Note [Exhaustive alts]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -968,53 +964,57 @@ We say "yes", even though 'x' may not be evaluated.  Reasons
 -- happen: see "CoreSyn#let_app_invariant". This invariant states that arguments of
 -- unboxed type must be ok-for-speculation (or trivial).
 exprIsHNF :: CoreExpr -> Bool           -- True => Value-lambda, constructor, PAP
-exprIsHNF = exprIsHNFlike isHNFApp
+exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
+\end{code}
 
+\begin{code}
 -- | Similar to 'exprIsHNF' but includes CONLIKE functions as well as
 -- data constructors. Conlike arguments are considered interesting by the
--- inliner.  Like a HNF version of exprIsExpandable.
+-- inliner.
 exprIsConLike :: CoreExpr -> Bool       -- True => lambda, conlike, PAP
-exprIsConLike = exprIsHNFlike isConLikeApp
-
--- | Tests if an expression guarantees to terminate, 
--- when evaluated to head normal form
-exprCertainlyTerminates :: CoreExpr -> Bool
-exprCertainlyTerminates = exprIsHNFlike isTerminatingApp
+exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
 
 -- | Returns true for values or value-like expressions. These are lambdas,
 -- constructors / CONLIKE functions (as determined by the function argument)
 -- or PAPs.
 --
-exprIsHNFlike :: FunAppAnalyser -> CoreExpr -> Bool
-exprIsHNFlike app_is_hnf e = go e
+exprIsHNFlike :: (Var -> Bool) -> (Unfolding -> Bool) -> CoreExpr -> Bool
+exprIsHNFlike is_con is_con_unf = is_hnf_like
   where
-    go (Var v)              = app_is_hnf v 0
-    go (App e a) 
-          | isRuntimeArg a  = go_app e 1
-          | otherwise       = go e
-    go (Lit _)              = True
-    go (Type _)             = True       -- Types are honorary Values;
-                                         -- we don't mind copying them
-    go (Coercion _)         = True       -- Same for coercions
-    go (Lam b e)            = isRuntimeVar b || go e
-    go (Tick tickish e)     = not (tickishCounts tickish) && go e
+    is_hnf_like (Var v) -- NB: There are no value args at this point
+      =  is_con v       -- Catches nullary constructors,
+                        --      so that [] and () are values, for example
+      || idArity v > 0  -- Catches (e.g.) primops that don't have unfoldings
+      || is_con_unf (idUnfolding v)
+        -- Check the thing's unfolding; it might be bound to a value
+        -- We don't look through loop breakers here, which is a bit conservative
+        -- but otherwise I worry that if an Id's unfolding is just itself,
+        -- we could get an infinite loop
+
+    is_hnf_like (Lit _)          = True
+    is_hnf_like (Type _)         = True       -- Types are honorary Values;
+                                              -- we don't mind copying them
+    is_hnf_like (Coercion _)     = True       -- Same for coercions
+    is_hnf_like (Lam b e)        = isRuntimeVar b || is_hnf_like e
+    is_hnf_like (Tick tickish e) = not (tickishCounts tickish)
+                                      && is_hnf_like e
                                       -- See Note [exprIsHNF Tick]
-    go (Cast e _)           = go e
-    go (Let _ e)            = go e  -- Lazy let(rec)s don't affect us
-    go (Case e _ _ alts)    = go e && all (\(_,_,rhs) -> go rhs) alts
-                              -- Keep going for case expressions 
-                              -- See Note [exprCertainlyTerminates: case expressions]
+    is_hnf_like (Cast e _)           = is_hnf_like e
+    is_hnf_like (App e (Type _))     = is_hnf_like e
+    is_hnf_like (App e (Coercion _)) = is_hnf_like e
+    is_hnf_like (App e a)            = app_is_value e [a]
+    is_hnf_like (Let _ e)            = is_hnf_like e  -- Lazy let(rec)s don't affect us
+    is_hnf_like _                    = False
 
-    -- Gather up value arguments
-    go_app :: CoreExpr -> Int -> Bool
-    go_app (Var f)    n = app_is_hnf f n
-    go_app (App f a)  n
-      | isRuntimeArg a  = go_app f (n+1)
-      | otherwise       = go_app f n
-    go_app (Tick _ f) n = go_app f n
-    go_app (Cast f _) n = go_app f n
-    go_app _          _ = False
-
+    -- There is at least one value argument
+    app_is_value :: CoreExpr -> [CoreArg] -> Bool
+    app_is_value (Var fun) args
+      = idArity fun > valArgCount args    -- Under-applied function
+        || is_con fun                     --  or constructor-like
+    app_is_value (Tick _ f) as = app_is_value f as
+    app_is_value (Cast f _) as = app_is_value f as
+    app_is_value (App f a)  as = app_is_value f (a:as)
+    app_is_value _          _  = False
 
 {-
 Note [exprIsHNF Tick]
@@ -1032,33 +1032,6 @@ don't want to discard a seq on it.
 -}
 \end{code}
 
-Note [exprCertainlyTerminates: case expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's always sound for exprOkForSpeculation to return False, and we
-don't want it to take too long, so it bales out on complicated-looking
-terms.  Notably lets, which can be stacked very deeply; and in any
-case the argument of exprOkForSpeculation is usually in a strict context,
-so any lets will have been floated away.
-
-However, we keep going on case-expressions.  An example like this one
-showed up in DPH code (Trac #3717):
-    foo :: Int -> Int
-    foo 0 = 0
-    foo n = (if n < 5 then 1 else 2) `seq` foo (n-1)
-
-If exprOkForSpeculation doesn't look through case expressions, you get this:
-    T.$wfoo =
-      \ (ww :: GHC.Prim.Int#) ->
-        case ww of ds {
-          __DEFAULT -> case (case <# ds 5 of _ {
-                          GHC.Types.False -> lvl1;
-                          GHC.Types.True -> lvl})
-                       of _ { __DEFAULT ->
-                       T.$wfoo (GHC.Prim.-# ds_XkE 1) };
-          0 -> 0
-        }
-
-The inner case is redundant, and should be nuked.
 
 %************************************************************************
 %*                                                                      *

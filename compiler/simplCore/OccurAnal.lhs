@@ -28,7 +28,7 @@ module OccurAnal (
 
 import CoreSyn
 import CoreFVs
-import CoreUtils        ( exprIsTrivial, isDefaultAlt, isConLikeApp, mkCast )
+import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp, mkCast )
 import Id
 import Name( localiseName )
 import BasicTypes
@@ -1240,7 +1240,7 @@ occAnalApp env (Var fun, args)
   where
     fun_uniq = idUnique fun
     fun_uds  = mkOneOcc env fun (valArgCount args > 0)
-    is_exp   = isConLikeApp fun (valArgCount args)
+    is_exp = isExpandableApp fun (valArgCount args)
     	   -- See Note [CONLIKE pragma] in BasicTypes
 	   -- The definition of is_exp should match that in
 	   -- Simplify.prepareRhs

@@ -33,7 +33,6 @@ import Type		( isUnLiftedType )
 import VarSet
 import Util		( zipEqual, zipWithEqual, count )
 import UniqFM
-import StaticFlags      ( opt_AggressivePrimOps )
 import Outputable
 \end{code}
 
@@ -358,14 +357,7 @@ alternatives/default [default FVs always {\em first}!].
 \begin{code}
 fiExpr to_drop (_, AnnCase scrut case_bndr _ [(DEFAULT,[],rhs)])
   | isUnLiftedType (idType case_bndr)
-  , opt_AggressivePrimOps || exprOkForSideEffects (deAnnotate scrut)
--- It should be ok to float in ANY primop.
--- See Note [PrimOp can_fail and has_side_effects] in PrimOp
--- The AggressIvePrimOps flag lets us recover the earlier 
--- more conservative behaviour.  See Note [Aggressive PrimOps] in PrimOp
---
--- It would NOT be ok if a primop evaluated an unlifted
--- argument, but no primop does that.
+  , exprOkForSideEffects (deAnnotate scrut)
   = wrapFloats shared_binds $
     fiExpr (case_float : rhs_binds) rhs
   where
