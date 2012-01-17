@@ -142,9 +142,9 @@ data DynFlag
    = Opt_D_dump_cmm
    | Opt_D_dump_raw_cmm
    | Opt_D_dump_cmmz
-   | Opt_D_dump_cmmz_pretty
    -- All of the cmmz subflags (there are a lot!)  Automatically
    -- enabled if you run -ddump-cmmz
+   | Opt_D_dump_cmmz_cfg
    | Opt_D_dump_cmmz_cbe
    | Opt_D_dump_cmmz_proc
    | Opt_D_dump_cmmz_spills
@@ -1498,7 +1498,7 @@ dynamic_flags = [
   , Flag "ddump-cmm"               (setDumpFlag Opt_D_dump_cmm)
   , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
   , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
-  , Flag "ddump-cmmz-pretty"       (setDumpFlag Opt_D_dump_cmmz_pretty)
+  , Flag "ddump-cmmz-cfg"          (setDumpFlag Opt_D_dump_cmmz_cbe)
   , Flag "ddump-cmmz-cbe"          (setDumpFlag Opt_D_dump_cmmz_cbe)
   , Flag "ddump-cmmz-spills"       (setDumpFlag Opt_D_dump_cmmz_spills)
   , Flag "ddump-cmmz-proc"         (setDumpFlag Opt_D_dump_cmmz_proc)

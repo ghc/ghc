@@ -27,7 +27,7 @@ import UniqFM
 import Unique
 import BlockId
 
-import Compiler.Hoopl hiding (Unique)
+import Hoopl
 import Data.Maybe
 import Prelude hiding (succ, zip)
 

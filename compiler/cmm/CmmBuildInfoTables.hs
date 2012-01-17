@@ -55,7 +55,7 @@ import Platform
 import SMRep
 import UniqSupply
 
-import Compiler.Hoopl
+import Hoopl
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -216,7 +216,7 @@ cafTransfers platform = mkBTransfer3 first middle last
 
 cafAnal :: Platform -> CmmGraph -> FuelUniqSM CAFEnv
 cafAnal platform g
-    = liftM snd $ dataflowPassBwd g [] $ analBwd cafLattice (cafTransfers platform)
+    = dataflowAnalBwd g [] $ analBwd cafLattice (cafTransfers platform)
 
 -----------------------------------------------------------------------
 -- Building the SRTs

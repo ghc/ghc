@@ -13,17 +13,16 @@ where
 import BlockId
 import Cmm
 import CmmUtils
+import CmmContFlowOpt
 import Prelude hiding (iterate, succ, unzip, zip)
 
-import Compiler.Hoopl
+import Hoopl hiding (ChangeFlag)
 import Data.Bits
 import qualified Data.List as List
 import Data.Word
 import FastString
-import Control.Monad
 import Outputable
 import UniqFM
-import Unique
 
 my_trace :: String -> SDoc -> a -> a
 my_trace = if False then pprTrace else \_ _ a -> a
@@ -71,7 +70,7 @@ common_block (old_change, bmap, subst) (hash, b) =
                  (Just b', Nothing)                         -> addSubst b'
                  (Just b', Just b'') | entryLabel b' /= b'' -> addSubst b'
                  _ -> (old_change, addToUFM bmap hash (b : bs), subst)
-    Nothing -> (old_change, (addToUFM bmap hash [b], subst))
+    Nothing -> (old_change, addToUFM bmap hash [b], subst)
   where bid = entryLabel b
         addSubst b' = my_trace "found new common block" (ppr (entryLabel b')) $
                       (True, bmap, mapInsert bid (entryLabel b') subst)
@@ -142,11 +141,13 @@ lookupBid subst bid = case mapLookup bid subst of
                         Just bid  -> lookupBid subst bid
                         Nothing -> bid
 
--- Equality on the body of a block, modulo a function mapping block IDs to block IDs.
+-- Equality on the body of a block, modulo a function mapping block
+-- IDs to block IDs.
 eqBlockBodyWith :: (BlockId -> BlockId -> Bool) -> CmmBlock -> CmmBlock -> Bool
-eqBlockBodyWith eqBid block block' = middles == middles' && eqLastWith eqBid last last'
-  where (_, middles , JustC last  :: MaybeC C (CmmNode O C)) = blockToNodeList block
-        (_, middles', JustC last' :: MaybeC C (CmmNode O C)) = blockToNodeList block'
+eqBlockBodyWith eqBid block block'
+  = blockToList m == blockToList m' && eqLastWith eqBid l l'
+  where (_,m,l)   = blockSplit block
+        (_,m',l') = blockSplit block'
 
 eqLastWith :: (BlockId -> BlockId -> Bool) -> CmmNode O C -> CmmNode O C -> Bool
 eqLastWith eqBid (CmmBranch bid1) (CmmBranch bid2) = eqBid bid1 bid2

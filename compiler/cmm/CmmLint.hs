@@ -11,9 +11,10 @@ module CmmLint (
   ) where
 
 import Cmm
+import Outputable
 
 cmmLint :: CmmGraph -> IO ()
-cmmLint g = pprTrace "ToDo! CmmLint" return ()
+cmmLint g = return () -- TODO!!
 
 -- Things to check:
 --     - invariant on CmmBlock in CmmExpr (see comment there)

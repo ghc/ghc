@@ -28,7 +28,7 @@ import Platform
 import UniqSet
 import UniqSupply
 
-import Compiler.Hoopl
+import Hoopl
 
 import qualified Data.Map as Map
 
@@ -110,23 +110,23 @@ procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelUniqSM (BlockEnv Status)
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
 procPointAnalysis procPoints g =
-  liftM snd $ dataflowPassFwd g initProcPoints $ analFwd lattice forward
+  -- pprTrace "procPointAnalysis" (ppr procPoints) $
+  dataflowAnalFwd g initProcPoints $ analFwd lattice forward
   where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints]
 
 -- transfer equations
 
 forward :: FwdTransfer CmmNode Status
-forward = mkFTransfer transfer
+forward = mkFTransfer3 first middle last
     where
-      transfer :: CmmNode e x -> Status -> Fact x Status
-      transfer n s
-         = case shapeX n of
-             Open   -> case n of
-                         CmmEntry id | ProcPoint <- s
-                                 -> ReachedBy $ setSingleton id
-                         _ -> s
-             Closed ->
-                mkFactBase lattice $ map (\id -> (id, x)) (successors l)
+      first :: CmmNode C O -> Status -> Status
+      first (CmmEntry id) ProcPoint = ReachedBy $ setSingleton id
+      first  _ x = x
+
+      middle _ x = x
+
+      last :: CmmNode O C -> Status -> FactBase Status
+      last l x = mkFactBase lattice $ map (\id -> (id, x)) (successors l)
 
 lattice :: DataflowLattice Status
 lattice = DataflowLattice "direct proc-point reachability" unreached add_to
@@ -165,6 +165,7 @@ minimalProcPointSet platform callProcPoints g
 extendPPSet :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> FuelUniqSM ProcPointSet
 extendPPSet platform g blocks procPoints =
     do env <- procPointAnalysis procPoints g
+       -- pprTrace "extensPPSet" (ppr env) $ return ()
        let add block pps = let id = entryLabel block
                            in  case mapLookup id env of
                                  Just ProcPoint -> setInsert id pps
@@ -331,8 +332,9 @@ add_CopyIns callPPs protos blocks = mapFold maybe_insert_CopyIns mapEmpty blocks
              | not $ setMember bid callPPs
              , Just (Protocol c fs _area) <- mapLookup bid protos
              = let nodes     = copyInSlot c fs
-                   (h, m, l) = blockToNodeList block
-               in insertBlock (blockOfNodeList (h, nodes ++ m, l)) blocks
+                   (h, b) = blockSplitHead block
+                   block' = blockJoinHead h (blockFromList nodes `blockAppend` b)
+               in insertBlock block' blocks
              | otherwise = insertBlock block blocks
            where bid = entryLabel block
 

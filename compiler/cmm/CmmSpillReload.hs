@@ -23,7 +23,7 @@ import Outputable hiding (empty)
 import qualified Outputable as PP
 import UniqSet
 
-import Compiler.Hoopl hiding (Unique)
+import Hoopl
 import Data.Maybe
 import Prelude hiding (succ, zip)
 

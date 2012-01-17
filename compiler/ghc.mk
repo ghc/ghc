@@ -351,7 +351,7 @@ ifeq "$(GhcProfiled)" "YES"
 # parts of the compiler of interest, and then add further cost centres
 # as necessary.  Turn on -auto-all for individual modules like this:
 
-compiler/main/DriverPipeline_HC_OPTS += -auto-all
+# compiler/main/DriverPipeline_HC_OPTS += -auto-all
 compiler/main/GhcMake_HC_OPTS        += -auto-all
 compiler/main/GHC_HC_OPTS            += -auto-all
 

@@ -488,6 +488,8 @@ Library
         Vectorise.Env
         Vectorise.Exp
         Vectorise
+        Hoopl.Dataflow
+        Hoopl
 
     Exposed-Modules:
             AsmCodeGen

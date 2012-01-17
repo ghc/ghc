@@ -185,7 +185,7 @@ outOfLine ag = withFreshLabel "outOfLine" $ \l ->
                do g <- ag
                   return (case g of
                     Closed (GMany (JustO e) b _) -> note_unreachable e $ Opened $
-                                                      GMany (JustO $ BLast $ CmmBranch l) b (JustO $ BFirst $ CmmEntry l)
+                                                      GMany (JustO $ BlockOC BNil (CmmBranch l)) b (JustO $ BlockCO (CmmEntry l) BNil)
                     _                            -> panic "outOfLine"
                     :: CmmGraphOC)
 

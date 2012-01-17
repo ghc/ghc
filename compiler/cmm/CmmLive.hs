@@ -18,7 +18,7 @@ import Control.Monad
 import OptimizationFuel
 import PprCmmExpr ()
 
-import Compiler.Hoopl
+import Hoopl
 import Maybes
 import Outputable
 import UniqSet
@@ -45,7 +45,7 @@ type BlockEntryLiveness = BlockEnv CmmLive
 
 cmmLiveness :: CmmGraph -> FuelUniqSM BlockEntryLiveness
 cmmLiveness graph =
-  liftM check $ liftM snd $ dataflowPassBwd graph [] $ analBwd liveLattice xferLive
+  liftM check $ dataflowAnalBwd graph [] $ analBwd liveLattice xferLive
   where entry = g_entry graph
         check facts = noLiveOnEntry entry (expectJust "check" $ mapLookup entry facts) facts
 

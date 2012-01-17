@@ -3,7 +3,7 @@
 
 module CmmContFlowOpt
     ( cmmCfgOpts
-    , runCmmContFlowOpts
+    , cmmCfgOptsProc
     , removeUnreachableBlocks
     , replaceLabels
     )
@@ -16,9 +16,10 @@ import Digraph
 import Maybes
 import Outputable
 
-import Compiler.Hoopl
+import Hoopl
 import Control.Monad
 import Prelude hiding (succ, unzip, zip)
+import qualified Data.IntMap as Map
 
 -----------------------------------------------------------------------------
 --
@@ -26,11 +27,11 @@ import Prelude hiding (succ, unzip, zip)
 --
 -----------------------------------------------------------------------------
 
-runCmmContFlowOpts :: CmmGroup -> CmmGroup
-runCmmContFlowOpts = map (optProc cmmCfgOpts)
-
 cmmCfgOpts :: CmmGraph -> CmmGraph
 cmmCfgOpts = removeUnreachableBlocks . blockConcat
+
+cmmCfgOptsProc :: CmmDecl -> CmmDecl
+cmmCfgOptsProc = optProc cmmCfgOpts
 
 optProc :: (g -> g) -> GenCmmDecl d h g -> GenCmmDecl d h g
 optProc opt (CmmProc info lbl g) = CmmProc info lbl (opt g)
@@ -99,22 +100,22 @@ blockConcat g@CmmGraph { g_entry = entry_id }
      maybe_concat :: CmmBlock
                   -> (BlockEnv CmmBlock, BlockEnv BlockId)
                   -> (BlockEnv CmmBlock, BlockEnv BlockId)
-     maybe_concat block unchanged@(blocks, shortcut_map) =
+     maybe_concat block unchanged@(blocks, shortcut_map)
         | CmmBranch b' <- last
         , Just blk' <- mapLookup b' blocks
-        , shouldConcatWith b' blocks
-        -> (mapInsert bid (splice head blk') blocks, shortcut_map)
+        , shouldConcatWith b' blk'
+        = (mapInsert bid (splice head blk') blocks, shortcut_map)
 
         | Just b'   <- callContinuation_maybe last
         , Just blk' <- mapLookup b' blocks
-        , Just dest <- canShortcut b' blk'
-        -> (blocks, mapInsert b' dest shortcut_map)
+        , Just dest <- canShortcut blk'
+        = (blocks, mapInsert b' dest shortcut_map)
            -- replaceLabels will substitute dest for b' everywhere, later
 
         | otherwise = unchanged
         where
-          (head, last) = blockTail block
-          bid = entryLabel b
+          (head, last) = blockSplitTail block
+          bid = entryLabel block
 
      shouldConcatWith b block
        | num_preds b == 1    = True  -- only one predecessor: go for it
@@ -122,20 +123,20 @@ blockConcat g@CmmGraph { g_entry = entry_id }
        | otherwise           = False
        where num_preds bid = mapLookup bid backEdges `orElse` 0
 
-     canShortcut :: Block C C -> Maybe BlockId
+     canShortcut :: CmmBlock -> Maybe BlockId
      canShortcut block
-       | (_, middle, CmmBranch dest) <- blockHeadTail block
+       | (_, middle, CmmBranch dest) <- blockSplit block
        , isEmptyBlock middle
        = Just dest
        | otherwise
        = Nothing
 
      backEdges :: BlockEnv Int -- number of predecessors for each block
-     backEdges = mapMap setSize $ predMap blocks
-                    ToDo: add 1 for the entry id
+     backEdges = mapInsertWith (+) entry_id 1 $ -- add 1 for the entry id
+                   mapMap setSize $ predMap blocks
 
      splice :: Block CmmNode C O -> CmmBlock -> CmmBlock
-     splice head rest = head `cat` snd (blockHead rest)
+     splice head rest = head `blockAppend` snd (blockSplitHead rest)
 
 
 callContinuation_maybe :: CmmNode O C -> Maybe BlockId
@@ -143,9 +144,9 @@ callContinuation_maybe (CmmCall { cml_cont = Just b }) = Just b
 callContinuation_maybe (CmmForeignCall { succ = b })   = Just b
 callContinuation_maybe _ = Nothing
 
-okToDuplicate :: Block C C -> Bool
+okToDuplicate :: CmmBlock -> Bool
 okToDuplicate block
-  = case blockToNodeList block of (_, m, _) -> null m
+  = case blockSplit block of (_, m, _) -> isEmptyBlock m
   -- cheap and cheerful; we might expand this in the future to
   -- e.g. spot blocks that represent a single instruction or two
 
@@ -155,8 +156,8 @@ okToDuplicate block
 
 replaceLabels :: BlockEnv BlockId -> CmmGraph -> CmmGraph
 replaceLabels env g
-  | isEmptyMap env = g
-  | otherwise      = replace_eid . mapGraphNodes1 txnode
+  | mapNull env = g
+  | otherwise   = replace_eid $ mapGraphNodes1 txnode g
    where
      replace_eid g = g {g_entry = lookup (g_entry g)}
      lookup id = mapLookup id env `orElse` id
@@ -175,7 +176,7 @@ replaceLabels env g
      exp (CmmStackSlot (CallArea (Young id)) i) = CmmStackSlot (CallArea (Young (lookup id))) i
      exp e                                      = e
 
-mkCmmCondBranch :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+mkCmmCondBranch :: CmmExpr -> Label -> Label -> CmmNode O C
 mkCmmCondBranch p t f = if t == f then CmmBranch t else CmmCondBranch p t f
 
 ----------------------------------------------------------------
@@ -191,8 +192,6 @@ predMap blocks = foldr add_preds mapEmpty blocks -- find the back edges
 -----------------------------------------------------------------------------
 --
 -- Removing unreachable blocks
---
------------------------------------------------------------------------------
 
 removeUnreachableBlocks :: CmmGraph -> CmmGraph
 removeUnreachableBlocks g

@@ -11,6 +11,7 @@ module CmmPipeline (
 
 import CLabel
 import Cmm
+import CmmLint
 import CmmLive
 import CmmBuildInfoTables
 import CmmCommonBlockElim
@@ -74,10 +75,7 @@ cmmPipeline hsc_env (topSRT, rst) prog =
 
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (pprPlatform (targetPlatform dflags) cmms)
 
-     -- SRT is not affected by control flow optimization pass
-     let prog' = runCmmContFlowOpts cmms
-
-     return (topSRT, prog' : rst)
+     return (topSRT, cmms : rst)
 
 {- [Note global fuel]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -98,85 +96,90 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        -- insertLateReloads, rewriteAssignments?
 
        ----------- Control-flow optimisations ---------------
-       g <- return $ cmmCfgOpts g
+       g <- {-# SCC "cmmCfgOpts(1)" #-} return $ cmmCfgOpts g
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
 
        ----------- Eliminate common blocks -------------------
-       g <- return $ elimCommonBlocks g
+       g <- {-# SCC "elimCommonBlocks" #-} return $ elimCommonBlocks g
        dump Opt_D_dump_cmmz_cbe "Post common block elimination" g
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
 
        ----------- Proc points -------------------
-       let callPPs = callProcPoints g
-       procPoints <- run $ minimalProcPointSet (targetPlatform dflags) callPPs g
-       g <- run $ addProcPointProtocols callPPs procPoints g
+       let callPPs = {-# SCC "callProcPoints" #-} callProcPoints g
+       procPoints <- {-# SCC "minimalProcPointSet" #-} run $ minimalProcPointSet (targetPlatform dflags) callPPs g
+       g <- {-# SCC "addProcPointProtocols" #-} run $ addProcPointProtocols callPPs procPoints g
        dump Opt_D_dump_cmmz_proc "Post Proc Points Added" g
 
        ----------- Spills and reloads -------------------
-       g <- run $ dualLivenessWithInsertion procPoints g
+       g <- {-# SCC "dualLivenessWithInsertion" #-} run $ dualLivenessWithInsertion procPoints g
        dump Opt_D_dump_cmmz_spills "Post spills and reloads" g
 
        ----------- Sink and inline assignments -------------------
-       g <- runOptimization $ rewriteAssignments platform g
+       g <- {-# SCC "rewriteAssignments" #-} runOptimization $ rewriteAssignments platform g
        dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
 
        ----------- Eliminate dead assignments -------------------
-       g <- runOptimization $ removeDeadAssignments g
+       g <- {-# SCC "removeDeadAssignments" #-} runOptimization $ removeDeadAssignments g
        dump Opt_D_dump_cmmz_dead "Post remove dead assignments" g
 
        ----------- Zero dead stack slots (Debug only) ---------------
        -- Debugging: stubbing slots on death can cause crashes early
        g <- if opt_StubDeadValues
-                then run $ stubSlotsOnDeath g
+                then {-# SCC "stubSlotsOnDeath" #-} run $ stubSlotsOnDeath g
                 else return g
        dump Opt_D_dump_cmmz_stub "Post stub dead stack slots" g
 
        --------------- Stack layout ----------------
-       slotEnv <- run $ liveSlotAnal g
+       slotEnv <- {-# SCC "liveSlotAnal" #-} run $ liveSlotAnal g
        let spEntryMap = getSpEntryMap entry_off g
        mbpprTrace "live slot analysis results: " (ppr slotEnv) $ return ()
-       let areaMap = layout procPoints spEntryMap slotEnv entry_off g
+       let areaMap = {-# SCC "layout" #-} layout procPoints spEntryMap slotEnv entry_off g
        mbpprTrace "areaMap" (ppr areaMap) $ return ()
 
        ------------  Manifest the stack pointer --------
-       g  <- run $ manifestSP spEntryMap areaMap entry_off g
+       g  <- {-# SCC "manifestSP" #-} run $ manifestSP spEntryMap areaMap entry_off g
        dump Opt_D_dump_cmmz_sp "Post manifestSP" g
        -- UGH... manifestSP can require updates to the procPointMap.
        -- We can probably do something quicker here for the update...
 
        ------------- Split into separate procedures ------------
-       procPointMap  <- run $ procPointAnalysis procPoints g
-       dumpWith ppr Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
-       gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap
+       procPointMap  <- {-# SCC "procPointAnalysis" #-} run $ procPointAnalysis procPoints g
+       dumpWith dflags ppr Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
+       gs <- {-# SCC "splitAtProcPoints" #-} run $ splitAtProcPoints l callPPs procPoints procPointMap
                                        (CmmProc h l g)
-       mapM_ (dump Opt_D_dump_cmmz_split "Post splitting") gs
+       dumps Opt_D_dump_cmmz_split "Post splitting" gs
 
        ------------- More CAFs and foreign calls ------------
-       cafEnv <- run $ cafAnal platform g
+       cafEnv <- {-# SCC "cafAnal" #-} run $ cafAnal platform g
        let localCAFs = catMaybes $ map (localCAFInfo platform cafEnv) gs
        mbpprTrace "localCAFs" (pprPlatform platform localCAFs) $ return ()
 
-       gs <- run $ mapM (lowerSafeForeignCalls areaMap) gs
-       mapM_ (dump Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls") gs
+       gs <- {-# SCC "lowerSafeForeignCalls" #-} run $ mapM (lowerSafeForeignCalls areaMap) gs
+       dumps Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls" gs
 
        ----------- Control-flow optimisations ---------------
-       gs <- return $ map cmmCfgOpts gs
-       mapM_ (dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations") gs
+       gs <- {-# SCC "cmmCfgOpts(2)" #-} return $ map cmmCfgOptsProc gs
+       dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
-       gs <- return $ map (setInfoTableStackMap slotEnv areaMap) gs
-       mapM_ (dump Opt_D_dump_cmmz_info "after setInfoTableStackMap") gs
-       gs <- return $ map (bundleCAFs cafEnv) gs
-       mapM_ (dump Opt_D_dump_cmmz_cafs "after bundleCAFs") gs
+       gs <- {-# SCC "setInfoTableStackMap" #-} return $ map (setInfoTableStackMap slotEnv areaMap) gs
+       dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
+       gs <- {-# SCC "bundleCAFs" #-} return $ map (bundleCAFs cafEnv) gs
+       dumps Opt_D_dump_cmmz_cafs "after bundleCAFs" gs
        return (localCAFs, gs)
 
               -- gs        :: [ (CAFSet, CmmDecl) ]
               -- localCAFs :: [ (CLabel, CAFSet) ] -- statics filtered out(?)
 
   where dflags = hsc_dflags hsc_env
-        mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z
+        platform = targetPlatform dflags
+        mbpprTrace x y z | dopt Opt_D_dump_cmmz dflags = pprTrace x y z
+                         | otherwise = z
         dump = dumpGraph dflags
+
+        dumps flag name
+           = mapM_ (dumpWith dflags (pprPlatform platform) flag name)
 
         -- Runs a required transformation/analysis
         run = runInfiniteFuelIO (hsc_OptFuel hsc_env)
@@ -185,20 +188,19 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
         runOptimization = runFuelIO (hsc_OptFuel hsc_env)
 
 
-dumpGraph :: DynFlags -> DynFlag -> CmmGraph -> IO ()
-dumpGraph dflags flag g = do
+dumpGraph :: DynFlags -> DynFlag -> String -> CmmGraph -> IO ()
+dumpGraph dflags flag name g = do
   cmmLint g
-  dumpWith (pprPlatform platform)
-  where
-        platform = targetPlatform dflags
+  dumpWith dflags (pprPlatform (targetPlatform dflags)) flag name g
 
-        dumpWith pprFun flag txt g = do
-            -- ToDo: No easy way of say "dump all the cmmz, *and* split
-            -- them into files."  Also, -ddump-cmmz doesn't play nicely
-            -- with -ddump-to-file, since the headers get omitted.
-            dumpIfSet_dyn dflags flag txt (pprFun g)
-            when (not (dopt flag dflags)) $
-                dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (pprFun g)
+dumpWith :: DynFlags -> (a -> SDoc) -> DynFlag -> String -> a -> IO ()
+dumpWith dflags pprFun flag txt g = do
+         -- ToDo: No easy way of say "dump all the cmmz, *and* split
+         -- them into files."  Also, -ddump-cmmz doesn't play nicely
+         -- with -ddump-to-file, since the headers get omitted.
+   dumpIfSet_dyn dflags flag txt (pprFun g)
+   when (not (dopt flag dflags)) $
+      dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (pprFun g)
 
 -- This probably belongs in CmmBuildInfoTables?
 -- We're just finishing the job here: once we know what CAFs are defined

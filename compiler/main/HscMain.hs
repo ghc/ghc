@@ -1287,7 +1287,8 @@ tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
-    prog <- StgCmm.codeGen dflags this_mod data_tycons
+    prog <- {-# SCC "StgCmm" #-}
+            StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds hpc_info
     dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen"
                   (pprCmms platform prog)
@@ -1296,7 +1297,8 @@ tryNewCodeGen hsc_env this_mod data_tycons
     -- we must thread it through all the procedures as we cps-convert them.
     us <- mkSplitUniqSupply 'S'
     let initTopSRT = initUs_ us emptySRT
-    (topSRT, prog) <- foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
+    (topSRT, prog) <- {-# SCC "cmmPipeline" #-}
+                      foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
 
     let prog' = map cmmOfZgraph (srtToData topSRT : prog)
     dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprPlatform platform prog')

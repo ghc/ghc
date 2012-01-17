@@ -39,7 +39,7 @@ import OptimizationFuel
 import Outputable
 import SMRep (ByteOff)
 
-import Compiler.Hoopl
+import Hoopl
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -94,7 +94,7 @@ type SlotEnv   = BlockEnv SubAreaSet
   -- The sub-areas live on entry to the block
 
 liveSlotAnal :: CmmGraph -> FuelUniqSM SlotEnv
-liveSlotAnal g = liftM snd $ dataflowPassBwd g [] $ analBwd slotLattice liveSlotTransfers
+liveSlotAnal g = dataflowAnalBwd g [] $ analBwd slotLattice liveSlotTransfers
 
 -- Add the subarea s to the subareas in the list-set (possibly coalescing it with
 -- adjacent subareas), and also return whether s was a new addition.
