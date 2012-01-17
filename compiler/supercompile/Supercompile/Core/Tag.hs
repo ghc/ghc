@@ -8,10 +8,8 @@ import Supercompile.Core.FreeVars
 import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 
-import qualified DataCon
 import Unique (Uniquable(getUnique))
 import Literal (hashLiteral)
-import Var (varUnique)
 
 
 tagTerm :: UniqSupply -> Term -> TaggedTerm
