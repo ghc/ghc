@@ -409,6 +409,9 @@ noneBracketed :: Tag -> Out FVedTerm -> Bracketed a
 noneBracketed tg a = TailsUnknown (Shell { shellExtraTags = oneResidTag tg, shellExtraFvs = freeVars a, shellWrapper = \[] -> a }) []
 
 -- NB: I could use normalise here to make my life easier if transitiveInline didn't treat Bracketed heaps specially
+--
+-- NB: it is VERY IMPORTANT that you use oneBracketed' instead in contexts where you might want to use the tails of the bracketed.
+-- In particular, if you use oneBracketed to prepare the branches of a case expression then map-map fusion won't work!
 oneBracketed :: UniqSupply -> Type -> (Entered, (Heap, Stack, In AnnedTerm)) -> Bracketed (Entered, UnnormalisedState)
 oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
   | eAGER_SPLIT_VALUES
@@ -1098,7 +1101,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             scruts' = x':scruts
 
             -- 0) Manufacture context identifier
-            (ctxt_id, ctxt_ids0) = takeUniqFromSupply ctxt_ids
+            ctxt_id = uniqFromSupply ctxt_ids
             
             -- 1) Construct the floats for each case alternative
             -- We have to carefully zap OccInfo here because one of the case binders might be marked as dead,
@@ -1119,9 +1122,9 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
                                                                         `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
                                             alt_rns alt_cons alt_bvss -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
-            bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed ctxt_ids0 ty' (Once ctxt_id, (Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
-    StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed ctxt_ids0 ty' (Once ctxt_id, (Heap (M.singleton x' lambdaBound) ids, [], in_e))]
-      where (ctxt_id, ctxt_ids0) = takeUniqFromSupply ctxt_ids
+            bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
+    StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
+      where ctxt_id = uniqFromSupply ctxt_ids
             ty' = inTermType ids in_e
     PrimApply pop tys' in_vs in_es -> zipBracketeds $ TailsUnknown (shell emptyVarSet $ primOp pop tys') (zipWith Hole (repeat []) $ bracketed_vs ++ bracketed_hole : bracketed_es)
       where -- 0) Manufacture context identifier (actually, an infinite number of them)

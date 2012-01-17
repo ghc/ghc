@@ -26,8 +26,8 @@ eAGER_SPLIT_VALUES = iNSTANCE_MATCHING -- For correctness given that we do insta
 --eAGER_SPLIT_VALUES = False
 
 rEFINE_ALTS :: Bool
---rEFINE_ALTS = True
-rEFINE_ALTS = False
+rEFINE_ALTS = True
+--rEFINE_ALTS = False
 
 dEEDS :: Bool
 dEEDS = "--deeds" `elem` aRGS
@@ -39,8 +39,8 @@ bOUND_STEPS = "--bound-steps" `elem` aRGS
 
 -- For debugging very long-running supercompilation
 dEPTH_LIIMT :: Maybe Int
-dEPTH_LIIMT = Nothing
---dEPTH_LIIMT = Just 40
+--dEPTH_LIIMT = Nothing
+dEPTH_LIIMT = Just 80
 
 data DeedsPolicy = FCFS | Proportional
                  deriving (Read)
