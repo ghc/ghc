@@ -585,7 +585,8 @@ tcSpec poly_id prag@(SpecSig _ hs_ty inl)
   = addErrCtxt (spec_ctxt prag) $
     do  { spec_ty <- tcHsSigType sig_ctxt hs_ty
         ; warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
-                 (ptext (sLit "SPECIALISE pragma for non-overloaded function") <+> quotes (ppr poly_id))
+                 (ptext (sLit "SPECIALISE pragma for non-overloaded function") 
+                  <+> quotes (ppr poly_id))
                   -- Note [SPECIALISE pragmas]
         ; wrap <- tcSubType origin sig_ctxt (idType poly_id) spec_ty
         ; return (SpecPrag poly_id wrap inl) }

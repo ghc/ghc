@@ -51,7 +51,7 @@ import TysWiredIn ( eqBoxDataCon, tupleCon )
 import Id
 import Class
 import DataCon	( dataConWorkId )
-import Name	( localiseName )
+import Name	( Name, localiseName )
 import MkId	( seqId )
 import Var
 import VarSet
@@ -64,8 +64,9 @@ import OrdList
 import Bag
 import BasicTypes hiding ( TopLevel )
 import FastString
+import ErrUtils( MsgDoc )
 import Util
-
+import Control.Monad( when )
 import MonadUtils
 \end{code}
 
@@ -397,6 +398,13 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        	 		    -- Moreover, classops don't (currently) have an inl_sat arity set
 			    -- (it would be Just 0) and that in turn makes makeCorePair bleat
 
+  | no_act_spec && isNeverActive rule_act 
+  = putSrcSpanDs loc $ 
+    do { warnDs (ptext (sLit "Ignoring useless SPECIALISE pragma for NOINLINE function:")
+                 <+> quotes (ppr poly_id))
+       ; return Nothing  }  -- Function is NOINLINE, and the specialiation inherits that
+       	 		    -- See Note [Activation pragmas for SPECIALISE]
+
   | otherwise
   = putSrcSpanDs loc $ 
     do { let poly_name = idName poly_id
@@ -412,28 +420,6 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; let spec_id  = mkLocalId spec_name spec_ty 
          	            `setInlinePragma` inl_prag
          	 	    `setIdUnfolding`  spec_unf
-             id_inl = idInlinePragma poly_id
-
-	     -- See Note [Activation pragmas for SPECIALISE]
-             inl_prag | not (isDefaultInlinePragma spec_inl)    = spec_inl
-         	      | not is_local_id  -- See Note [Specialising imported functions]
-		      	    		 -- in OccurAnal
-                      , isStrongLoopBreaker (idOccInfo poly_id) = neverInlinePragma
-		      | otherwise                               = id_inl
-       	      -- Get the INLINE pragma from SPECIALISE declaration, or,
-              -- failing that, from the original Id
-
-             spec_prag_act = inlinePragmaActivation spec_inl
-
-	     -- See Note [Activation pragmas for SPECIALISE]
-	     -- no_act_spec is True if the user didn't write an explicit
-	     -- phase specification in the SPECIALISE pragma
-             no_act_spec = case inlinePragmaSpec spec_inl of
-                             NoInline -> isNeverActive  spec_prag_act
-                             _        -> isAlwaysActive spec_prag_act
-	     rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
-                      | otherwise   = spec_prag_act                   -- Specified by user
-
              rule =  mkRule False {- Not auto -} is_local_id
                         (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
        			rule_act poly_name
@@ -443,6 +429,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_rhs  = dsHsWrapper spec_co poly_rhs
              spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
 
+       ; when (isInlinePragma id_inl) (warnDs (specOnInline poly_name))
        ; return (Just (spec_pair `consOL` unf_pairs, rule))
        } } }
   where
@@ -457,6 +444,29 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              | otherwise = pprPanic "dsImpSpecs" (ppr poly_id)
 	                    -- The type checker has checked that it *has* an unfolding
 
+    id_inl = idInlinePragma poly_id
+
+    -- See Note [Activation pragmas for SPECIALISE]
+    inl_prag | not (isDefaultInlinePragma spec_inl)    = spec_inl
+             | not is_local_id  -- See Note [Specialising imported functions]
+             	    		 -- in OccurAnal
+             , isStrongLoopBreaker (idOccInfo poly_id) = neverInlinePragma
+             | otherwise                               = id_inl
+     -- Get the INLINE pragma from SPECIALISE declaration, or,
+     -- failing that, from the original Id
+
+    spec_prag_act = inlinePragmaActivation spec_inl
+
+    -- See Note [Activation pragmas for SPECIALISE]
+    -- no_act_spec is True if the user didn't write an explicit
+    -- phase specification in the SPECIALISE pragma
+    no_act_spec = case inlinePragmaSpec spec_inl of
+                    NoInline -> isNeverActive  spec_prag_act
+                    _        -> isAlwaysActive spec_prag_act
+    rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
+             | otherwise   = spec_prag_act                   -- Specified by user
+
+
 specUnfolding :: HsWrapper -> Type 
               -> Unfolding -> DsM (Unfolding, OrdList (Id,CoreExpr))
 {-   [Dec 10: TEMPORARILY commented out, until we can straighten out how to
@@ -469,6 +479,10 @@ specUnfolding wrap_fn spec_ty (DFunUnfolding _ _ ops)
 -}
 specUnfolding _ _ _
   = return (noUnfolding, nilOL)
+
+specOnInline :: Name -> MsgDoc
+specOnInline f = ptext (sLit "SPECIALISE pragma on INLINE function probably won't fire:") 
+                 <+> quotes (ppr f)
 \end{code}
 
 
