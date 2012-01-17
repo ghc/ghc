@@ -8,10 +8,8 @@
 module OptimizationFuel
     ( OptimizationFuel, amountOfFuel, tankFilledTo, unlimitedFuel, anyFuelLeft, oneLessFuel
     , OptFuelState, initOptFuelState
-    , FuelConsumer, FuelUsingMonad, FuelState
-    , fuelGet, fuelSet, lastFuelPass, setFuelPass
-    , fuelExhausted, fuelDec1, tryWithFuel
-    , runFuelIO, runInfiniteFuelIO, fuelConsumingPass
+    , FuelConsumer, FuelState
+    , runFuelIO, runInfiniteFuelIO
     , FuelUniqSM
     , liftUniq
     )
@@ -65,13 +63,6 @@ data FuelState = FuelState { fs_fuel :: {-# UNPACK #-} !OptimizationFuel,
                              fs_lastpass :: String }
 newtype FuelUniqSM a = FUSM { unFUSM :: UniqSupply -> FuelState -> (# a, UniqSupply, FuelState #) }
 
-fuelConsumingPass :: String -> FuelConsumer a -> FuelUniqSM a
-fuelConsumingPass name f = do setFuelPass name
-                              fuel <- fuelGet
-                              let (a, fuel') = f fuel
-                              fuelSet fuel'
-                              return a
-
 runFuelIO :: OptFuelState -> FuelUniqSM a -> IO a
 runFuelIO fs (FUSM f) =
     do pass <- readIORef (pass_ref fs)
@@ -90,7 +81,7 @@ runInfiniteFuelIO fs (FUSM f) =
     do pass <- readIORef (pass_ref fs)
        u <- mkSplitUniqSupply 'u'
        case f u (FuelState unlimitedFuel pass) of
-          (# a, _, FuelState fuel' pass' #) -> do
+          (# a, _, FuelState _fuel pass' #) -> do
             writeIORef (pass_ref fs) pass'
             return a
 
@@ -121,17 +112,6 @@ class Monad m => FuelUsingMonad m where
   fuelSet      :: OptimizationFuel -> m ()
   lastFuelPass :: m String
   setFuelPass  :: String -> m ()
-
-fuelExhausted :: FuelUsingMonad m => m Bool
-fuelExhausted = fuelGet >>= return . anyFuelLeft
-
-fuelDec1 :: FuelUsingMonad m => m ()
-fuelDec1 = fuelGet >>= fuelSet . oneLessFuel
-
-tryWithFuel :: FuelUsingMonad m => a -> m (Maybe a)
-tryWithFuel r = do f <- fuelGet
-                   if anyFuelLeft f then fuelSet (oneLessFuel f) >> return (Just r)
-                                    else return Nothing
 
 instance FuelUsingMonad FuelUniqSM where
   fuelGet          = extract fs_fuel
