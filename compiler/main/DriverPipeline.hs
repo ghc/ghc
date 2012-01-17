@@ -1306,6 +1306,8 @@ runPhase SplitAs _input_fn dflags
 
 runPhase LlvmOpt input_fn dflags
   = do
+    ver <- io $ readIORef (llvmVersion dflags)
+
     let lo_opts  = getOpts dflags opt_lo
         opt_lvl  = max 0 (min 2 $ optLevel dflags)
         -- don't specify anything if user has specified commands. We do this
@@ -1315,7 +1317,8 @@ runPhase LlvmOpt input_fn dflags
         optFlag  = if null lo_opts
                        then [SysTools.Option (llvmOpts !! opt_lvl)]
                        else []
-        tbaa | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+        tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
+             | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
 
 
@@ -1340,12 +1343,15 @@ runPhase LlvmOpt input_fn dflags
 
 runPhase LlvmLlc input_fn dflags
   = do
+    ver <- io $ readIORef (llvmVersion dflags)
+
     let lc_opts = getOpts dflags opt_lc
         opt_lvl = max 0 (min 2 $ optLevel dflags)
         rmodel | opt_PIC        = "pic"
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
-        tbaa | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+        tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
+             | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
              | otherwise                = "--enable-tbaa=false"
 
     -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
