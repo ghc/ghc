@@ -86,14 +86,8 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=0
 endif
 
-LLVM_VERSION = $(shell $(SHELL) -c "llvmc --version | grep version | sed 's/^.*version \([0-9]*\)\.\([0-9]*\).*$$/\1\.\2/'" 2> /dev/null)
-
-ifneq "$(LLVM_VERSION)" ""
-ifneq "$(LLVM_VERSION)" "2.7"
+ifneq "$(shell $(SHELL) -c 'llvmc --version | grep version' 2> /dev/null)" ""
 RUNTEST_OPTS += -e ghc_with_llvm=1
-else
-RUNTEST_OPTS += -e ghc_with_llvm=0
-endif
 else
 RUNTEST_OPTS += -e ghc_with_llvm=0
 endif
