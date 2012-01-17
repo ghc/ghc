@@ -138,10 +138,12 @@ PYTHON = python
 $(TOP_ABS)/mk/ghc-config : $(TOP_ABS)/mk/ghc-config.hs
 	"$(TEST_HC)" --make -o $@ $<
 
-ghc-config-mk = $(TOP_ABS)/mk/ghcconfig$(subst /,_,$(subst \,_,$(TEST_HC))).mk
+empty=
+space=$(empty) $(empty)
+ghc-config-mk = $(TOP_ABS)/mk/ghcconfig$(subst $(space),_,$(subst /,_,$(subst \,_,$(TEST_HC)))).mk
 
 $(ghc-config-mk) : $(TOP_ABS)/mk/ghc-config
-	$(TOP_ABS)/mk/ghc-config $(TEST_HC) >$@
+	$(TOP_ABS)/mk/ghc-config "$(TEST_HC)" >"$@" || $(RM) "$@"
 
 include $(ghc-config-mk)
 
