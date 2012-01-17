@@ -451,6 +451,17 @@ takeWhileJust f = go
         Nothing -> ([], x:xs)
         Just y  -> first (y:) $ go xs
 
+maximumsComparing :: Ord b => (a -> b) -> [a] -> [a]
+maximumsComparing _ []     = error "maximumsComparing: empty input"
+maximumsComparing f (x:xs) = go (f x) [x] xs
+  where
+    go _       maxs []     = reverse maxs
+    go the_max maxs (x:xs) = case this `compare` the_max of
+        LT -> go the_max maxs     xs
+        EQ -> go the_max (x:maxs) xs
+        GT -> go this    [x]      xs
+      where this = f x
+
 accumLN :: (acc -> (acc, a)) -> acc -> Int -> (acc, [a])
 accumLN f = go
   where

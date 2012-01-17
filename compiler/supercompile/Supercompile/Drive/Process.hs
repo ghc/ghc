@@ -110,15 +110,17 @@ childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++
 
 -- NB: there may be many deepest paths, but this function only returns one of them
 deepestPath :: [(Var, FVedTerm)] -> ParentChildren -> SDoc
-deepestPath fulfils parent_children = maybe empty (\(_, states) -> show_meaning_chain M.empty states $$ show_fulfils_chain (map fst states)) (M.lookup Nothing deepest)
-  where deepest :: M.Map (Maybe Var) (Int, [(Var, (State, Bool))])
-        deepest = flip M.map parent_children $ \children -> maximumBy (comparing fst) [(depth + 1, (fun, state):states) | (fun, state) <- children, let (depth, states) = M.findWithDefault (0, []) (Just fun) deepest]
+deepestPath fulfils parent_children = maybe empty (show_meaning_chains . snd) (M.lookup Nothing deepest)
+  where deepest :: M.Map (Maybe Var) (Int, [[(Var, (State, Bool))]])
+        deepest = flip M.map parent_children $ \children -> maximumByFst [(depth + 1, (fun, state):states) | (fun, state) <- children, let (depth, statess) = M.findWithDefault (0, [[]]) (Just fun) deepest, states <- statess]
 
         fulfils_map :: M.Map Var FVedTerm
         fulfils_map = M.fromList fulfils
 
         show_fulfils_chain :: [Var] -> SDoc
         show_fulfils_chain = flip (pPrintPrecLetRec noPrec) (PrettyDoc (text "...")) . mapMaybe (\x -> fmap ((,) x) $ M.lookup x fulfils_map)
+
+        show_meaning_chains = vcat . zipWith (\i states -> hang (text "Deepest Chain" <+> ppr (i :: Int)) 2 (show_meaning_chain M.empty states $$ show_fulfils_chain (map fst states))) [1..]
 
         show_meaning_chain :: M.Map Var Bool -> [(Var, (State, Bool))] -> SDoc
         show_meaning_chain _         [] = empty
@@ -127,6 +129,11 @@ deepestPath fulfils parent_children = maybe empty (\(_, states) -> show_meaning_
             show_meaning_chain known_bvs' states
           where known_bvs'  = M.map (maybe False (termIsValue . snd) . heapBindingTerm) h
                 unchanged_bvs = M.keysSet (M.filter id (M.intersectionWith (==) known_bvs known_bvs'))
+        
+        maximumByFst :: Ord a => [(a, b)] -> (a, [b])
+        maximumByFst xys = case maximumsComparing fst xys of
+          ((x, y):xys) -> (x, y:map snd xys)
+          []           -> error "maximumByFst"
 
 
 type TagAnnotations = IM.IntMap [String]
