@@ -588,7 +588,9 @@ data DynFlags = DynFlags {
   haddockOptions        :: Maybe String,
 
   -- | what kind of {-# SCC #-} to add automatically
-  profAuto              :: ProfAuto
+  profAuto              :: ProfAuto,
+
+  llvmVersion           :: IORef (Int)
  }
 
 class HasDynFlags m where
@@ -824,13 +826,15 @@ initDynFlags dflags = do
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
  refGeneratedDumps <- newIORef Set.empty
+ refLlvmVersion <- newIORef 28
  return dflags{
-        ways            = ways,
-        buildTag        = mkBuildTag (filter (not . wayRTSOnly) ways),
-        rtsBuildTag     = mkBuildTag ways,
-        filesToClean    = refFilesToClean,
-        dirsToClean     = refDirsToClean,
-        generatedDumps   = refGeneratedDumps
+        ways           = ways,
+        buildTag       = mkBuildTag (filter (not . wayRTSOnly) ways),
+        rtsBuildTag    = mkBuildTag ways,
+        filesToClean   = refFilesToClean,
+        dirsToClean    = refDirsToClean,
+        generatedDumps = refGeneratedDumps,
+        llvmVersion    = refLlvmVersion
         }
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
@@ -922,7 +926,8 @@ defaultDynFlags mySettings =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
         log_action = defaultLogAction,
-        profAuto = NoProfAuto
+        profAuto = NoProfAuto,
+        llvmVersion = panic "defaultDynFlags: No llvmVersion"
       }
 
 type LogAction = Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
