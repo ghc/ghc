@@ -143,7 +143,7 @@ scpDepth = length . scpParents
 traceRenderM :: Outputable a => String -> a -> ScpM ()
 traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \env -> pprTraceSC (replicate (scpDepth env) ' ' ++ msg) (pPrint x) $ pure ((), s) -- TODO: include depth, refine to ScpM monad only
 
-addParentM :: Promise -> (State -> ScpM (Deeds, FVedTerm)) -> State -> ScpM (Deeds, FVedTerm)
+addParentM :: Promise -> (State -> ScpM (Bool, (Deeds, FVedTerm))) -> State -> ScpM (Deeds, FVedTerm)
 addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
   where
     add_parent s env
@@ -152,9 +152,8 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
       = return ((deeds, e), s)
       | otherwise
       = trace ("depth: " ++ show (scpDepth env) ++ ' ' : showSDoc (parens (hsep (map ppr (scpParents env))))) $
-        unReaderT (unStateT (unScpM (opt state))
-                            (s { scpParentChildren = addChild (safeHead (scpParents env)) (fun p) (meaning p) (scpParentChildren s) }))
-                  (env { scpParents = fun p : scpParents env })
+        unReaderT (unStateT (unScpM (opt state)) s)
+                  (env { scpParents = fun p : scpParents env }) >>= \((gen, res), s') -> return (res, s' { scpParentChildren = addChild (safeHead (scpParents env)) (fun p) (meaning p) gen (scpParentChildren s') })
 
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \s -> case fulfill p res (scpFulfilmentState s) of (res', fs') -> return (res', s { scpFulfilmentState = fs' })
@@ -175,7 +174,7 @@ speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \env -> case speculate 
 sc :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
-sc' :: Maybe String -> State -> ScpM (Deeds, FVedTerm)
+sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm))
 sc' mb_h state = case mb_h of
   Nothing -> speculateM (reduce state) $ \state -> my_split state sc
   Just h  -> terminateM h state (speculateM (reduce state) $ \state -> my_split state sc)
@@ -191,8 +190,8 @@ sc' mb_h state = case mb_h of
                                                    (case unMatch (match' (reduceForMatch shallow_state) (reduceForMatch state)) of Left why -> text why))
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (reduceForMatch state)
 
-    my_generalise gen = liftM (\splt -> insert_tags . splt) . generalise gen
-    my_split      opt =                 insert_tags . split opt
+    my_generalise gen = liftM (\splt -> liftM ((,) True)  . insert_tags . splt) . generalise gen
+    my_split      opt =                 liftM ((,) False) . insert_tags . split opt
     --insert_tags = liftM (\(_, deeds, e') -> (deeds, e'))
     insert_tags mx = do
       (resid_tags, deeds, e') <- mx
@@ -228,10 +227,10 @@ sc' mb_h state = case mb_h of
 -- So we should probably work out why the existing supercompiler never builds dumb loops like this, so
 -- we can carefully preserve that property when making the Arjan modification.
 
-memo :: (Maybe String -> State -> ScpM (Deeds, FVedTerm))
+memo :: (Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)))
      ->  State -> ScpM (Deeds, FVedTerm)
 memo opt state
-  | skip_tieback = opt Nothing state
+  | skip_tieback = liftM snd $ opt Nothing state
   | otherwise = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags parent_children) ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
     -- I can't rename, so "rename" will cause an error. Not observed in practice yet.

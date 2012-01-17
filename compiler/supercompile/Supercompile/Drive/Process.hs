@@ -95,13 +95,13 @@ mK_GENERALISER :: State -> State -> Generaliser
 --          | otherwise  = wqo1
 
 
-type ParentChildren = M.Map (Maybe Var) [(Var, State)]
+type ParentChildren = M.Map (Maybe Var) [(Var, (State, Bool))]
 
 emptyParentChildren :: ParentChildren
 emptyParentChildren = M.empty
 
-addChild :: Maybe Var -> Var -> State -> ParentChildren -> ParentChildren
-addChild mb_parent child child_state = M.alter (\mb_children -> Just ((child, child_state) : (mb_children `orElse` []))) mb_parent
+addChild :: Maybe Var -> Var -> State -> Bool -> ParentChildren -> ParentChildren
+addChild mb_parent child child_state gen = M.alter (\mb_children -> Just ((child, (child_state, gen)) : (mb_children `orElse` []))) mb_parent
 
 childrenSummary :: ParentChildren -> String
 childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++ ": " ++ intercalate " " (map show child_counts)  | (mb_parent, child_counts :: [Int]) <- ordered_counts]
@@ -111,7 +111,7 @@ childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++
 -- NB: there may be many deepest paths, but this function only returns one of them
 deepestPath :: [(Var, FVedTerm)] -> ParentChildren -> SDoc
 deepestPath fulfils parent_children = maybe empty (\(_, states) -> show_meaning_chain M.empty states $$ show_fulfils_chain (map fst states)) (M.lookup Nothing deepest)
-  where deepest :: M.Map (Maybe Var) (Int, [(Var, State)])
+  where deepest :: M.Map (Maybe Var) (Int, [(Var, (State, Bool))])
         deepest = flip M.map parent_children $ \children -> maximumBy (comparing fst) [(depth + 1, (fun, state):states) | (fun, state) <- children, let (depth, states) = M.findWithDefault (0, []) (Just fun) deepest]
 
         fulfils_map :: M.Map Var FVedTerm
@@ -120,10 +120,10 @@ deepestPath fulfils parent_children = maybe empty (\(_, states) -> show_meaning_
         show_fulfils_chain :: [Var] -> SDoc
         show_fulfils_chain = flip (pPrintPrecLetRec noPrec) (PrettyDoc (text "...")) . mapMaybe (\x -> fmap ((,) x) $ M.lookup x fulfils_map)
 
-        show_meaning_chain :: M.Map Var Bool -> [(Var, State)] -> SDoc
+        show_meaning_chain :: M.Map Var Bool -> [(Var, (State, Bool))] -> SDoc
         show_meaning_chain _         [] = empty
-        show_meaning_chain known_bvs ((fun, state@(_, Heap h _, _, _)):states)
-          = hang (ppr fun) 2 (pPrintFullState (quietStatePrettiness { excludeBindings = unchanged_bvs }) state) $$
+        show_meaning_chain known_bvs ((fun, (state@(_, Heap h _, _, _), gen)):states)
+          = hang (ppr fun <+> (if gen then text "(GENERALISED)" else empty)) 2 (pPrintFullState (quietStatePrettiness { excludeBindings = unchanged_bvs }) state) $$
             show_meaning_chain known_bvs' states
           where known_bvs'  = M.map (maybe False (termIsValue . snd) . heapBindingTerm) h
                 unchanged_bvs = M.keysSet (M.filter id (M.intersectionWith (==) known_bvs known_bvs'))
