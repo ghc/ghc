@@ -294,8 +294,6 @@ incorrect.
 
  '{'            { L _ ITocurly }                        -- special symbols
  '}'            { L _ ITccurly }
- '{|'           { L _ ITocurlybar }
- '|}'           { L _ ITccurlybar }
  vocurly        { L _ ITvocurly } -- virtual open curly (from layout)
  vccurly        { L _ ITvccurly } -- virtual close curly (from layout)
  '['            { L _ ITobrack }
@@ -1427,14 +1425,6 @@ aexp1   :: { LHsExpr RdrName }
                                       ; checkRecordSyntax (LL r) }}
         | aexp2                 { $1 }
 
--- Here was the syntax for type applications that I was planning
--- but there are difficulties (e.g. what order for type args)
--- so it's not enabled yet.
--- But this case *is* used for the left hand side of a generic definition,
--- which is parsed as an expression before being munged into a pattern
-        | qcname '{|' type '|}'         { LL $ HsApp (sL (getLoc $1) (HsVar (unLoc $1)))
-                                                     (sL (getLoc $3) (HsType $3)) }
-
 aexp2   :: { LHsExpr RdrName }
         : ipvar                         { L1 (HsIPVar $! unLoc $1) }
         | qcname                        { L1 (HsVar   $! unLoc $1) }
@@ -1586,16 +1576,17 @@ squals :: { Located [LStmt RdrName] }   -- In reverse order, because the last
 --  | '{|' pquals '|}'                       { L1 [$2] }
 
 
--- It is possible to enable bracketing (associating) qualifier lists by uncommenting the lines with {| |}
--- above. Due to a lack of consensus on the syntax, this feature is not being used until we get user
--- demand.
+-- It is possible to enable bracketing (associating) qualifier lists
+-- by uncommenting the lines with {| |} above. Due to a lack of
+-- consensus on the syntax, this feature is not being used until we
+-- get user demand.
 
 transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
                         -- Function is applied to a list of stmts *in order*
-    : 'then' exp                           { LL $ \leftStmts -> (mkTransformStmt    leftStmts $2)    }
-    | 'then' exp 'by' exp                  { LL $ \leftStmts -> (mkTransformByStmt  leftStmts $2 $4) }
-    | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt   leftStmts $4)    }
-    | 'then' 'group' 'by' exp 'using' exp  { LL $ \leftStmts -> (mkGroupByUsingStmt leftStmts $4 $6) }
+    : 'then' exp                           { LL $ \ss -> (mkTransformStmt    ss $2)    }
+    | 'then' exp 'by' exp                  { LL $ \ss -> (mkTransformByStmt  ss $2 $4) }
+    | 'then' 'group' 'using' exp           { LL $ \ss -> (mkGroupUsingStmt   ss $4)    }
+    | 'then' 'group' 'by' exp 'using' exp  { LL $ \ss -> (mkGroupByUsingStmt ss $4 $6) }
 
 -- Note that 'group' is a special_id, which means that you can enable
 -- TransformListComp while still using Data.List.group. However, this

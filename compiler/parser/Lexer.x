@@ -509,8 +509,6 @@ data Token
 
   | ITocurly                    -- special symbols
   | ITccurly
-  | ITocurlybar                 -- {|, for type applications
-  | ITccurlybar                 -- |}, for type applications
   | ITvocurly
   | ITvccurly
   | ITobrack
