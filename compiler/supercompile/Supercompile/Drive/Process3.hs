@@ -191,6 +191,7 @@ sc' mb_h state = case mb_h of
                                                    (case unMatch (match' (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why))
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
+    -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
     my_generalise gen = liftM (\splt -> liftM ((,) True)  . insert_tags . splt) . generalise gen
     my_split      opt =                 liftM ((,) False) . insert_tags . split opt
     --insert_tags = liftM (\(_, deeds, e') -> (deeds, e'))
