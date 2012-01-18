@@ -1103,7 +1103,8 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith3Equal "alt_hs" (\alt_rn alt_con alt_bvs -> M.fromList (do Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
+            alt_hs = zipWith3Equal "alt_hs" (\alt_rn alt_con alt_bvs -> M.fromList (do guard pOSITIVE_INFORMATION
+                                                                                       Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
                                                                                        let in_scrut_e@(_, scrut_e) = renamedTerm (fmap Value scrut_v)
                                                                                        scrut <- scruts'
                                                                                        return (scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
