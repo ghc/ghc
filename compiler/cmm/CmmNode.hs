@@ -36,7 +36,7 @@ import Prelude hiding (succ)
 -- CmmNode
 
 data CmmNode e x where
-  CmmEntry :: Label -> CmmNode C O
+  CmmEntry :: {-# UNPACK #-} !Label -> CmmNode C O
 
   CmmComment :: FastString -> CmmNode O O
 
