@@ -1040,15 +1040,15 @@ publish-docs:
 SRC_DIST_ROOT      = sdistprep
 SRC_DIST_BASE_NAME = ghc-$(ProjectVersion)
 
-SRC_DIST_GHC_NAME          = ghc-$(ProjectVersion)
+SRC_DIST_GHC_NAME          = ghc-$(ProjectVersion)-src
 SRC_DIST_GHC_ROOT          = $(SRC_DIST_ROOT)/ghc
 SRC_DIST_GHC_DIR           = $(SRC_DIST_GHC_ROOT)/$(SRC_DIST_BASE_NAME)
-SRC_DIST_GHC_TARBALL       = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME)-src.tar.bz2
+SRC_DIST_GHC_TARBALL       = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME).tar.bz2
 
-SRC_DIST_TESTSUITE_NAME    = testsuite-ghc-$(ProjectVersion)
+SRC_DIST_TESTSUITE_NAME    = ghc-$(ProjectVersion)-testsuite
 SRC_DIST_TESTSUITE_ROOT    = $(SRC_DIST_ROOT)/testsuite-ghc
 SRC_DIST_TESTSUITE_DIR     = $(SRC_DIST_TESTSUITE_ROOT)/$(SRC_DIST_BASE_NAME)
-SRC_DIST_TESTSUITE_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME)-src.tar.bz2
+SRC_DIST_TESTSUITE_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).tar.bz2
 
 #
 # Files to include in source distributions
