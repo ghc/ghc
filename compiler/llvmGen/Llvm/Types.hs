@@ -7,6 +7,7 @@ module Llvm.Types where
 #include "HsVersions.h"
 
 import Data.Char
+import Data.Int
 import Data.List (intercalate)
 import Numeric
 
@@ -186,7 +187,9 @@ getPlainName (LMLitVar    x          ) = getLit x
 
 -- | Print a literal value. No type.
 getLit :: LlvmLit -> String
-getLit (LMIntLit   i _       ) = show ((fromInteger i)::Int)
+getLit (LMIntLit i (LMInt 32)) = show (fromInteger i :: Int32)
+getLit (LMIntLit i (LMInt 64)) = show (fromInteger i :: Int64)
+getLit (LMIntLit i _         ) = show (fromInteger i :: Int)
 getLit (LMFloatLit r LMFloat ) = fToStr $ realToFrac r
 getLit (LMFloatLit r LMDouble) = dToStr r
 getLit f@(LMFloatLit _ _) = error $ "Can't print this float literal!" ++ show f
