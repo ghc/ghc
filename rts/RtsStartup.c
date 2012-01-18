@@ -142,7 +142,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 
     /* Parse the flags, separating the RTS flags from the programs args */
     if (argc != NULL && argv != NULL) {
-	setFullProgArgv(*argc,*argv);
+        setFullProgArgv(*argc,*argv);
         setupRtsFlags(argc, *argv,
                       rts_config.rts_opts_enabled, rts_config.rts_opts);
     }
