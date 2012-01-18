@@ -333,7 +333,7 @@ void traverseSparkQueues (evac_fn evac, void *user);
 
 #ifdef THREADED_RTS
 
-INLINE_HEADER rtsBool emptyInbox(Capability *cap);;
+INLINE_HEADER rtsBool emptyInbox(Capability *cap);
 
 #endif // THREADED_RTS
 
