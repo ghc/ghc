@@ -29,15 +29,12 @@ import Var       (varUnique)
 import PrelNames (undefinedName, wildCardKey)
 import Type      (splitTyConApp_maybe)
 import Util      (zipWithEqual, zipWith3Equal, thirdOf3)
-import Unique    (Uniquable)
 import Digraph
-import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
 import UniqFM    (delListFromUFM_Directly)
 import VarEnv
 
 import Data.Traversable (fmapDefault, foldMapDefault)
 import qualified Data.Map as M
-import qualified Data.Set as S
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 
@@ -60,15 +57,6 @@ lfpFrom join init_x f = lfpFrom' init_x (\x -> f x `join` x)
                  | otherwise    = go x'
               where x' = f x
 
-
-dataSetToVarSet :: Uniquable a => S.Set a -> UniqSet a
-dataSetToVarSet = mkUniqSet . S.toList
-
-varSetToDataMap :: Ord a => b -> UniqSet a -> M.Map a b
-varSetToDataMap v = M.fromList . map (flip (,) v) . uniqSetToList
-
-restrictDataMapVarSet :: (Ord k, Uniquable k) => M.Map k v -> UniqSet k -> M.Map k v
-restrictDataMapVarSet m s = M.filterWithKey (\k _v -> k `elementOfUniqSet` s) m
 
 annedToTagged :: Anned a -> Tagged a
 annedToTagged x = Tagged (annedTag x) (annee x)

@@ -19,7 +19,8 @@ module Supercompile.Utilities (
 #include "HsVersions.h"
 
 import UniqSupply
-import Unique (Unique, getKey)
+import UniqSet
+import Unique (Uniquable(..), Unique, getKey)
 import UniqFM (UniqFM, eltsUFM)
 import Maybes (expectJust)
 import Outputable hiding (Depth)
@@ -510,6 +511,16 @@ exclude m s = M.fromDistinctAscList $ merge (M.toAscList m) (S.toAscList s)
         LT -> (k_m, v):merge kvs            (k_s:ks)
         EQ ->          merge kvs            ks
         GT ->          merge ((k_m, v):kvs) ks
+
+
+dataSetToVarSet :: Uniquable a => S.Set a -> UniqSet a
+dataSetToVarSet = mkUniqSet . S.toList
+
+varSetToDataMap :: Ord a => b -> UniqSet a -> M.Map a b
+varSetToDataMap v = M.fromList . map (flip (,) v) . uniqSetToList
+
+restrictDataMapVarSet :: (Ord k, Uniquable k) => M.Map k v -> UniqSet k -> M.Map k v
+restrictDataMapVarSet m s = M.filterWithKey (\k _v -> k `elementOfUniqSet` s) m
 
 
 class (Functor t, Foldable t) => Accumulatable t where

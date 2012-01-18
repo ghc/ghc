@@ -125,7 +125,8 @@ instance MonadStatics ScpM where
     monitorFVs = liftM ((,) emptyVarSet)
 
 runScpM :: TagAnnotations -> ScpM FVedTerm -> FVedTerm
-runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc (deepestPath fulfils (scpParentChildren s'))) e'
+runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc (deepestPath fulfils (scpParentChildren s')) ++
+                                                   "\nDepth histogram:\n" ++ showSDoc (depthHistogram (scpParentChildren s'))) e'
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
         ms = MS { promises = [], hNames = h_names }
@@ -187,8 +188,8 @@ sc' mb_h state = case mb_h of
                                                   ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
                                                    hang (text "Before:") 2 (trce1 shallow_state) $$
                                                    hang (text "After:")  2 (trce1 state) $$
-                                                   (case unMatch (match' (reduceForMatch shallow_state) (reduceForMatch state)) of Left why -> text why))
-    trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (reduceForMatch state)
+                                                   (case unMatch (match' (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why))
+    trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     my_generalise gen = liftM (\splt -> liftM ((,) True)  . insert_tags . splt) . generalise gen
     my_split      opt =                 liftM ((,) False) . insert_tags . split opt
@@ -270,7 +271,7 @@ memo opt state
                                      ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                      ; fulfillM p res }, ScpState ms' hist fs resid_tags parent_children)
                 where (p, ms') = promise (state, reduced_state) ms
-  where reduced_state = reduceForMatch state
+  where (state_did_reduce, reduced_state) = reduceForMatch state
         
         -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
         -- this, we tend to do things like:
@@ -299,15 +300,15 @@ memo opt state
         skip_tieback | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
                      = False
                      | eAGER_SPLIT_VALUES
-                     = False
+                     = not state_did_reduce -- EXPERIMENT: don't check for tieback on unreducable states if we eagerly split values (if we don't eagerly split values this can lead to divergence with e.g. (let xs = x:xs in xs))
                      | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
                      , Answer (_, (_, Indirect _)) <- annee qa
                      = True
                      | otherwise
                      = False
 
-reduceForMatch :: State -> State
-reduceForMatch state = gc $ reduce (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
+reduceForMatch :: State -> (Bool, State)
+reduceForMatch state = second gc $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ liftM snd $ sc state

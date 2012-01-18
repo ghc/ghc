@@ -4,7 +4,7 @@ module Supercompile.Drive.Process (
 
     rEDUCE_WQO, wQO, mK_GENERALISER,
 
-    ParentChildren, emptyParentChildren, addChild, childrenSummary, deepestPath,
+    ParentChildren, emptyParentChildren, addChild, childrenSummary, depthHistogram, deepestPath,
 
     TagAnnotations, tagAnnotations, tagSummary,
 
@@ -12,7 +12,7 @@ module Supercompile.Drive.Process (
 
     SCStats(..), seqSCStats,
 
-    reduce, reduce', gc,
+    reduce, reduceWithFlag, reduceWithStats, gc,
     AlreadySpeculated, nothingSpeculated,
     speculate,
 
@@ -58,7 +58,8 @@ import Type       (eqType, mkFunTy, typePrimRep, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn (unitTy)
 import Literal
-import VarEnv     (uniqAway)
+import VarEnv
+import Util       (thirdOf3)
 
 import qualified Control.Monad as Monad
 import Data.Ord
@@ -108,11 +109,27 @@ childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++
   where descendant_counts = flip M.map parent_children $ \children -> map ((+1) . sum . flip (M.findWithDefault [] . Just) descendant_counts . fst) children
         ordered_counts = sortBy (comparing (Down . sum . snd)) (M.toList descendant_counts)
 
--- NB: there may be many deepest paths, but this function only returns one of them
+depthHistogram :: ParentChildren -> SDoc
+depthHistogram parent_children = vcat [ppr depth <> char ',' <+> ppr count | (depth, count) <- IM.toList overall_depth_summary]
+  where depth_map :: M.Map (Maybe Var) Int
+        depth_map = M.foldrWithKey (\mb_fun children so_far -> let Just depth = M.lookup mb_fun depth_map
+                                                               in foldr (\(child_fun, _) -> M.insert (Just child_fun) (depth + 1)) so_far children)
+                                   (M.singleton Nothing 0) parent_children
+
+        summary_map :: M.Map (Maybe Var) (IM.IntMap Int)
+        summary_map = flip M.mapWithKey parent_children $ \mb_fun children -> let summaries = [M.findWithDefault IM.empty (Just child_fun) summary_map | (child_fun, _) <- children]
+                                                                                  Just depth = M.lookup mb_fun depth_map
+                                                                              in IM.unionsWith (+) (IM.singleton depth 1:summaries)
+        
+        Just overall_depth_summary = M.lookup Nothing summary_map
+
+-- NB: there may be many deepest paths
 deepestPath :: [(Var, FVedTerm)] -> ParentChildren -> SDoc
-deepestPath fulfils parent_children = maybe empty (show_meaning_chains . snd) (M.lookup Nothing deepest)
+deepestPath fulfils parent_children = show_meaning_chains deepest_from_root $$ summarise_leaves (map last deepest_from_root)
   where deepest :: M.Map (Maybe Var) (Int, [[(Var, (State, Bool))]])
         deepest = flip M.map parent_children $ \children -> maximumByFst [(depth + 1, (fun, state):states) | (fun, state) <- children, let (depth, statess) = M.findWithDefault (0, [[]]) (Just fun) deepest, states <- statess]
+        
+        Just (_, deepest_from_root) = M.lookup Nothing deepest
 
         fulfils_map :: M.Map Var FVedTerm
         fulfils_map = M.fromList fulfils
@@ -130,10 +147,56 @@ deepestPath fulfils parent_children = maybe empty (show_meaning_chains . snd) (M
           where known_bvs'  = M.map (maybe False (termIsValue . snd) . heapBindingTerm) h
                 unchanged_bvs = M.keysSet (M.filter id (M.intersectionWith (==) known_bvs known_bvs'))
         
+        summarise_leaves :: [(Var, (State, Bool))] -> SDoc
+        summarise_leaves leaves = vcat [ppr fun <> text ":" <+> maybe (text "?") showValueGroup (biggest_value_group state) | (fun, (state, _)) <- leaves]
+
+        biggest_value_group :: State -> Maybe (Var, VarEnv AnnedValue)
+        biggest_value_group = safeHead . stateValueGroups
+
         maximumByFst :: Ord a => [(a, b)] -> (a, [b])
         maximumByFst xys = case maximumsComparing fst xys of
           ((x, y):xys) -> (x, y:map snd xys)
           []           -> error "maximumByFst"
+
+-- NB: groups come out in order largest to smallest, and no groups are included if they are subsumed by another one
+stateValueGroups :: State -> [(Var, VarEnv AnnedValue)]
+stateValueGroups (_, Heap h ids, _, _) = subsume [] (sortBy (comparing (Down . length . varEnvElts . snd)) (map extend h_values_list))
+  where
+    -- For the purposes of this function, we only care about data structures that could derive from
+    -- positive information propagation -- i.e. we discard lambdas
+    h_values_list = [(x, renameAnnedValue' ids rn v) | (x, hb) <- M.toList h, Just (rn, Value v) <- [fmap (second extract) (heapBindingTerm hb)], case v of TyLambda _ _ -> False; Lambda _ _ -> False; _ -> True]
+    h_values = mkVarEnv h_values_list
+
+    extend (x, v) = (x, go (unitVarEnv x v))
+      where
+        go heap
+          | isEmptyVarEnv extra_heap
+          = heap
+          | otherwise
+          = go (heap `plusVarEnv` extra_heap)
+          where heap_fvs = foldVarEnv (\v fvs -> annedValueFreeVars' v `unionVarSet` fvs) emptyVarSet heap `minusVarEnv` heap
+                extra_heap = h_values `restrictVarEnv` heap_fvs
+    
+    subsume _       [] = []
+    subsume already ((root, group):groups)
+      | any (group `is_sub_env`) already
+      = subsume already groups
+      | otherwise
+      = (root, group) : subsume (group:already) groups
+    
+    is_sub_env s1 s2 = isEmptyVarEnv (s1 `minusVarEnv` s2)
+
+-- Quick and dirty hack for showing groups of values in something other than ANF
+showValueGroup :: (Var, VarEnv AnnedValue) -> SDoc
+showValueGroup (root, group) = go emptyVarSet noPrec root
+  where
+    go shown prec x = case lookupVarEnv group x of
+      Just v | not (x `elemVarSet` shown)  -- Break loops in recursive structures
+             , let shown' = shown `extendVarSet` x
+             -> case v of Indirect y         -> go shown' prec y
+                          Data dc tys cos ys -> pPrintPrecApps prec dc ([asPrettyFunction ty | ty <- tys] ++ [asPrettyFunction co | co <- cos] ++ [PrettyFunction (\prec -> go shown' prec y) | y <- ys])
+                          _ -> pprPrec prec v
+      _ -> pprPrec prec x
 
 
 type TagAnnotations = IM.IntMap [String]
@@ -201,6 +264,7 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
       StrictLet x (_, e)  -> (extAnn x ann, go_term ann e)
       Update x            -> (extAnn x ann, IM.empty)
       CastIt _            -> (ann, IM.empty)
+
 
 
 prepareTerm :: M.Map Var Term -> Term -> State
@@ -407,7 +471,7 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
         try_speculation in_e rb = Monad.join (modifySpecState go)
           where go no_change@(stats, deeds, h_speculated_ok, h_speculated_failure, ids) = case terminate hist (state, rb) of
                     Stop (_old_state, rb) -> (no_change, rb)
-                    Continue hist -> case reduce' state of
+                    Continue hist -> case reduceWithStats state of
                         (extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
                           | Just a <- traverse qaToAnswer qa
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
@@ -436,25 +500,32 @@ catchSpecM :: ((forall b. SpecM b) -> SpecM ()) -> SpecM () -> SpecM ()
 catchSpecM mx mcatch = SpecM $ \s k -> unSpecM (mx (SpecM $ \_s _k -> unSpecM mcatch s k)) s k
 
 reduce :: State -> State
-reduce = snd . reduce'
+reduce = thirdOf3 . reduce'
 
-reduce' :: State -> (SCStats, State)
-reduce' orig_state = go (mkLinearHistory rEDUCE_WQO) orig_state
+reduceWithFlag :: State -> (Bool, State)
+reduceWithFlag state = case reduce' state of (reduced, _, state') -> (reduced, state')
+
+reduceWithStats :: State -> (SCStats, State)
+reduceWithStats state = case reduce' state of (_, stats, state') -> (stats, state')
+
+reduce' :: State -> (Bool, SCStats, State)
+reduce' orig_state = go False (mkLinearHistory rEDUCE_WQO) orig_state
   where
     -- NB: it is important that we ensure that reduce is idempotent if we have rollback on. I use this property to improve memoisation.
-    go hist state
+    go can_step hist state
       = -- traceRender ("reduce:step", pPrintFullState state) $
         case step state of
           Just (deeds, heap, k, e)
            | Just deeds' <- if bOUND_STEPS then claimStep deeds else Just deeds
            , let state' = (deeds', heap, k, e)
            -> case terminate hist state of
-            Continue hist' -> go hist' state'
+            Continue hist' -> go True hist' state'
             Stop old_state -> pprTrace "reduce-stop" (pPrintFullState quietStatePrettiness old_state $$ pPrintFullState quietStatePrettiness state) 
                               -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
                               -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
-                              (mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
-          _ -> (mempty, state)
+                              (can_step, mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
+           | otherwise -> (True, mempty, state)
+          _ -> (can_step, mempty, state)
 
 
 
