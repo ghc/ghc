@@ -126,7 +126,7 @@ initTicker (Time interval, TickProc handle_tick)
         clockid_t clock;
 
         // Keep programs like valgrind happy
-	memset(&ev, 0, sizeof(ev));
+        memset(&ev, 0, sizeof(ev));
 
         ev.sigev_notify = SIGEV_SIGNAL;
         ev.sigev_signo  = ITIMER_SIGNAL;
