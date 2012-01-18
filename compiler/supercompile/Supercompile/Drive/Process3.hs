@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, RankNTypes #-}
 module Supercompile.Drive.Process3 (supercompile) where
 
 import Supercompile.Drive.Match
@@ -29,6 +29,7 @@ import FastString (mkFastString)
 
 import Control.Monad (join)
 
+import Data.Function (on)
 import qualified Data.Map as M
 import Data.Monoid (mempty)
 
@@ -116,8 +117,10 @@ data ScpEnv = ScpEnv {
     scpTagAnnotations :: TagAnnotations
   }
 
+type ScpResType = (FVedTerm, ScpState)
+
 newtype ScpM a = ScpM { unScpM :: StateT ScpState
-                                         (ReaderT ScpEnv Identity) a }
+                                         (ReaderT ScpEnv (ContT ScpResType Identity)) a }
                deriving (Functor, Applicative, Monad)
 
 instance MonadStatics ScpM where
@@ -133,10 +136,41 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, s') = unI $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
+        (e, s') = unI $ runContT $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
         fulfils = fulfilments (scpFulfilmentState s')
         e' = letRec fulfils e
 
+
+callCCM :: ((forall b. a -> ScpM b) -> ScpM a) -> ScpM a
+callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> jump_back (a, s' `rolledBackTo` s)))) s) env)
+
+catchM :: ((forall b. c -> ScpM b) -> ScpM a) -- ^ Action to try: supplies a function than can be called to "raise an exception". Raising an exception restores the original ScpEnv and ScpState
+       -> (c -> ScpM a)                       -- ^ Handler deferred to if an exception is raised
+       -> ScpM a                              -- ^ Result from either the main action or the handler
+catchM try handler = do
+    ei_exc_res <- callCCM $ \jump_back -> fmap Right (try (jump_back . Left))
+    case ei_exc_res of
+      Left exc  -> handler exc
+      Right res -> return res
+
+rolledBackTo :: ScpState -> ScpState -> ScpState
+rolledBackTo s s' = ScpState {
+      scpMemoState = MS {
+          promises = promises (scpMemoState s),
+          hNames   = hNames (scpMemoState s')
+        },
+      scpProcessHistory = scpProcessHistory s,
+      scpFulfilmentState = FS {
+          fulfilments = ((\funs' funs -> pruneFulfilments (fulfilments (scpFulfilmentState s')) (funs' `minusVarSet` funs)) `on` (mkVarSet . map fun . promises . scpMemoState)) s' s
+        },
+      scpResidTags      = scpResidTags s', -- FIXME: not totally accurate
+      scpParentChildren = scpParentChildren s'
+    }
+  where
+    pruneFulfilments fulfilments rolled_back
+      | null dump = fulfilments
+      | otherwise = pruneFulfilments keep (rolled_back `unionVarSet` mkVarSet (map fst dump))
+      where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
 
 scpDepth :: ScpEnv -> Int
 scpDepth = length . scpParents
