@@ -182,18 +182,18 @@ awaitEvent(rtsBool wait)
 	}
       }
 
-      if (wait) {
-          ptv = NULL;
+      if (!wait) {
+          // just poll
+          tv.tv_sec  = 0;
+          tv.tv_usec = 0;
+          ptv = &tv;
       } else if (sleeping_queue != END_TSO_QUEUE) {
           Time min = LowResTimeToTime(sleeping_queue->block_info.target - now);
           tv.tv_sec  = TimeToSeconds(min);
           tv.tv_usec = TimeToUS(min) % 1000000;
           ptv = &tv;
       } else {
-          // just poll
-          tv.tv_sec  = 0;
-          tv.tv_usec = 0;
-          ptv = &tv;
+          ptv = NULL;
       }
 
       /* Check for any interesting events */
