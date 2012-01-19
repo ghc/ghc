@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, RankNTypes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, RankNTypes, ImpredicativeTypes #-}
 module Supercompile.Drive.Process3 (supercompile) where
 
 import Supercompile.Drive.Match
@@ -15,6 +15,7 @@ import Supercompile.Evaluator.Residualise
 import Supercompile.Evaluator.Syntax
 import Supercompile.Evaluator.FreeVars
 
+import Supercompile.Termination.Generaliser (Generaliser)
 import Supercompile.Termination.TagBag (stateTags)
 import Supercompile.Termination.Combinators hiding (generatedKey)
 import qualified Supercompile.Termination.Combinators as Combinators
@@ -26,6 +27,7 @@ import Var        (varName)
 import Id         (mkLocalId)
 import Name       (Name, mkSystemVarName, getOccString)
 import FastString (mkFastString)
+import Util       (sndOf3)
 
 import Control.Monad (join)
 
@@ -35,10 +37,10 @@ import Data.Monoid (mempty)
 
 
 {--}
-type ProcessHistory = GraphicalHistory (NodeKey, (String, State))
+type ProcessHistory = GraphicalHistory (NodeKey, (String, State, forall b. Generaliser -> ScpM b))
 
 pROCESS_HISTORY :: ProcessHistory
-pROCESS_HISTORY = mkGraphicalHistory (cofmap snd wQO)
+pROCESS_HISTORY = mkGraphicalHistory (cofmap sndOf3 wQO)
 
 generatedKey :: ProcessHistory -> NodeKey
 generatedKey = Combinators.generatedKey
@@ -56,7 +58,8 @@ generatedKey _ = 0
 data Promise = P {
     fun        :: Var,      -- Name assigned in output program
     abstracted :: [AbsVar], -- Abstracted over these variables
-    meaning    :: State     -- Minimum adequate term
+    meaning    :: State,    -- Minimum adequate term
+    dumped     :: Bool      -- Already rolled back, and hence inaccessible?
   }
 
 
@@ -81,7 +84,8 @@ promise (state, reduced_state) ms = (p, ms')
             --      ones if they are not present in the renaming: only dead AbsVars are allowed to
             --      be absent in the renaming.
             abstracted = vs_list,
-            meaning    = reduced_state
+            meaning    = reduced_state,
+            dumped     = False
           }
         ms' = MS {
             promises = p : promises ms,
@@ -154,21 +158,30 @@ catchM try handler = do
       Right res -> return res
 
 rolledBackTo :: ScpState -> ScpState -> ScpState
-rolledBackTo s s' = ScpState {
+rolledBackTo s' s = ScpState {
       scpMemoState = MS {
-          promises = promises (scpMemoState s),
+          promises = mapMaybe (\p -> if fun p == fun (head (promises (scpMemoState s'))) -- The most recent promise in s' always has no work done on it, so don't report dumping
+                                      then Nothing
+                                      else Just $ if fun p `elemVarSet` rolled_back then p { dumped = True } else p) (promises (scpMemoState s')),
           hNames   = hNames (scpMemoState s')
         },
       scpProcessHistory = scpProcessHistory s,
       scpFulfilmentState = FS {
-          fulfilments = ((\funs' funs -> pruneFulfilments (fulfilments (scpFulfilmentState s')) (funs' `minusVarSet` funs)) `on` (mkVarSet . map fun . promises . scpMemoState)) s' s
+          fulfilments = rolled_fulfilments
         },
       scpResidTags      = scpResidTags s', -- FIXME: not totally accurate
       scpParentChildren = scpParentChildren s'
     }
   where
+    -- We have to roll back any promise on the "stack" above us. We don't have access to the stack directly, but we can compute this set
+    -- of promises by looking at *new* promises that are as yet unfulfilled:
+    init_rolled_back = (minusVarSet `on` (mkVarSet . map fun . promises . scpMemoState)) s' s `minusVarSet` mkVarSet (map fst (fulfilments (scpFulfilmentState s')))
+    -- NB: rolled_back includes both unfulfilled promises rolled back from the stack and fulfilments that have to be dumped as a result
+    (rolled_fulfilments, rolled_back) = pruneFulfilments (fulfilments (scpFulfilmentState s')) init_rolled_back
+
     pruneFulfilments fulfilments rolled_back
-      | null dump = fulfilments
+      | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " fulfilments:") (ppr rolled_back))
+                    (fulfilments, rolled_back)
       | otherwise = pruneFulfilments keep (rolled_back `unionVarSet` mkVarSet (map fst dump))
       where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
 
@@ -193,13 +206,13 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
 fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM p res = ScpM $ StateT $ \s -> case fulfill p res (scpFulfilmentState s) of (res', fs') -> return (res', s { scpFulfilmentState = fs' })
 
-terminateM :: String -> State -> ScpM a -> (String -> State -> ScpM a) -> ScpM a
-terminateM h state mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case terminate (scpProcessHistory s) (scpNodeKey env, (h, state)) of
-        Stop (_, (shallow_h, shallow_state))
+terminateM :: String -> State -> (forall b. Generaliser -> ScpM b) -> ScpM a -> (String -> State -> (forall b. Generaliser -> ScpM b) -> ScpM a) -> ScpM a
+terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case terminate (scpProcessHistory s) (scpNodeKey env, (h, state, rb)) of
+        Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
-             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state)) s)                                 (env { scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state shallow_rb)) s)                                 (env { scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
         Continue hist'
-          -> unReaderT (unStateT (unScpM mcont)                           (s { scpProcessHistory = hist' })) (env { scpNodeKey = generatedKey hist' })
+          -> unReaderT (unStateT (unScpM mcont)                                      (s { scpProcessHistory = hist' })) (env { scpNodeKey = generatedKey hist' })
   -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
 
 speculateM :: State -> (State -> ScpM a) -> ScpM a
@@ -212,17 +225,22 @@ sc = memo sc' . gc -- Garbage collection necessary because normalisation might h
 sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm))
 sc' mb_h state = case mb_h of
   Nothing -> speculateM (reduce state) $ \state -> my_split state sc
-  Just h  -> terminateM h state (speculateM (reduce state) $ \state -> my_split state sc)
-                                (\shallow_h shallow_state -> maybe (trce "split" shallow_h shallow_state $ my_split state)
-                                                                   (trce "gen" shallow_h shallow_state)
-                                                                   (my_generalise (mK_GENERALISER shallow_state state) state)
-                                                                   sc)
+  Just h  -> flip catchM try_generalise $ \rb ->
+               terminateM h state rb
+                 (speculateM (reduce state) $ \state -> my_split state sc)
+                 (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
+                                                         (if sC_ROLLBACK then shallow_rb else try_generalise) (mK_GENERALISER shallow_state state))
   where
-    trce how shallow_h shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ":" ++ shallow_h ++ ")")
-                                                  ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
-                                                   hang (text "Before:") 2 (trce1 shallow_state) $$
-                                                   hang (text "After:")  2 (trce1 state) $$
-                                                   (case unMatch (match' (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why))
+    try_generalise gen = maybe (trace "sc-stop(split)" $ my_split state)
+                               (trace "sc-stop(gen)")
+                               (my_generalise gen state)
+                               sc
+
+    trce shallow_h shallow_state = pprTraceSC ("Embedding:" ++ shallow_h)
+                                              ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
+                                               hang (text "Before:") 2 (trce1 shallow_state) $$
+                                               hang (text "After:")  2 (trce1 state) $$
+                                               (case unMatch (match' (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why))
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
@@ -299,6 +317,9 @@ memo opt state
          | p <- promises ms
          , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
                           match (meaning p) reduced_state]
+         , if dumped p
+            then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
+            else True
          ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
                                      ; return res }, ScpState ms hist fs resid_tags parent_children)
               _          -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
