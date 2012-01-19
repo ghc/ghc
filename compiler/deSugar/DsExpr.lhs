@@ -683,7 +683,7 @@ makes all list literals be generated via the simple route.
 dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
 dsExplicitList elt_ty xs
-  = do { dflags <- getDOptsDs
+  = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExpr xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
        ; if opt_SimpleListLiterals                      -- -fsimple-list-literals

@@ -66,7 +66,7 @@ matchCheck ::  DsMatchContext
             -> DsM MatchResult  -- Desugared result!
 
 matchCheck ctx vars ty qs
-  = do { dflags <- getDOptsDs
+  = do { dflags <- getDynFlags
        ; matchCheck_really dflags ctx vars ty qs }
 
 matchCheck_really :: DynFlags
