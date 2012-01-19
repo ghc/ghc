@@ -438,7 +438,7 @@ foldGraphBlocks :: (CmmBlock -> a -> a) -> a -> CmmGraph -> a
 foldGraphBlocks k z g = mapFold k z $ toBlockMap g
 
 postorderDfs :: CmmGraph -> [CmmBlock]
-postorderDfs g = postorder_dfs_from (toBlockMap g) (g_entry g)
+postorderDfs g = {-# SCC "postorderDfs" #-} postorder_dfs_from (toBlockMap g) (g_entry g)
 
 ----------------------------------------------------------------------
 ----- Splicing between blocks
