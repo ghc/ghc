@@ -284,8 +284,8 @@ sc' mb_h state = case mb_h of
 memo :: (Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)))
      ->  State -> ScpM (Deeds, FVedTerm)
 memo opt state
-  | skip_tieback = liftM snd $ opt Nothing state
-  | otherwise = join $ ScpM $ StateT $ \(ScpState ms hist fs resid_tags parent_children) ->
+  | Skip <- memo_how = liftM snd $ opt Nothing state
+  | otherwise = join $ ScpM $ StateT $ \s ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
     -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
 
@@ -314,19 +314,22 @@ memo opt state
     --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
     --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
     case [ (p, (releaseStateDeed state, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
-         | p <- promises ms
+         | p <- promises (scpMemoState s)
          , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
                           match (meaning p) reduced_state]
          , if dumped p
             then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
             else True
          ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                     ; return res }, ScpState ms hist fs resid_tags parent_children)
-              _          -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
+                                     ; return res }, s)
+              _          | CheckOnly <- memo_how
+                         -> pure (liftM snd $ opt Nothing state, s)
+                         | otherwise
+                         -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
                                      ; res <- addParentM p (opt (Just (getOccString (varName (fun p))))) state
                                      ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
-                                     ; fulfillM p res }, ScpState ms' hist fs resid_tags parent_children)
-                where (p, ms') = promise (state, reduced_state) ms
+                                     ; fulfillM p res }, s { scpMemoState = ms' })
+                where (p, ms') = promise (state, reduced_state) (scpMemoState s)
   where (state_did_reduce, reduced_state) = reduceForMatch state
         
         -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
@@ -353,15 +356,17 @@ memo opt state
         -- Version 3 of this fix is to "eagerly" split values in the splitter: when creating a Bracket for a term,
         -- we split immediately if the term is a value. This is sufficient to fix the problem above, and it should
         -- save even *more* memoisations!
-        skip_tieback | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
-                     = False
-                     | eAGER_SPLIT_VALUES
-                     = not state_did_reduce -- EXPERIMENT: don't check for tieback on unreducable states if we eagerly split values (if we don't eagerly split values this can lead to divergence with e.g. (let xs = x:xs in xs))
-                     | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
-                     , Answer (_, (_, Indirect _)) <- annee qa
-                     = True
-                     | otherwise
-                     = False
+        memo_how | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
+                 = CheckAndRemember
+                 | eAGER_SPLIT_VALUES
+                 = if state_did_reduce then CheckAndRemember else CheckOnly -- EXPERIMENT: don't check for tieback on unreducable states if we eagerly split values (if we don't eagerly split values this can lead to divergence with e.g. (let xs = x:xs in xs))
+                 | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
+                 , Answer (_, (_, Indirect _)) <- annee qa
+                 = Skip
+                 | otherwise
+                 = CheckAndRemember
+
+data MemoHow = Skip | CheckOnly | CheckAndRemember
 
 reduceForMatch :: State -> (Bool, State)
 reduceForMatch state = second gc $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
