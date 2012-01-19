@@ -1112,7 +1112,7 @@ checkShadowedOccs (global_env,local_env) loc_occs
 	-- Returns False for record selectors that are shadowed, when
 	-- punning or wild-cards are on (cf Trac #2723)
     is_shadowed_gre gre@(GRE { gre_par = ParentIs _ })
-	= do { dflags <- getDOpts
+	= do { dflags <- getDynFlags
 	     ; if (xopt Opt_RecordPuns dflags || xopt Opt_RecordWildCards dflags) 
 	       then do { is_fld <- is_rec_fld gre; return (not is_fld) }
 	       else return True }

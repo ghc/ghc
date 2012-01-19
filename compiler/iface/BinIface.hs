@@ -76,7 +76,7 @@ readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
     ncu <- mkNameCacheUpdater
-    dflags <- getDOpts
+    dflags <- getDynFlags
     liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
 
 readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath

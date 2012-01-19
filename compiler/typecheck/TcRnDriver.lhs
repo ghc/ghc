@@ -983,7 +983,7 @@ checkMain :: TcM TcGblEnv
 -- If we are in module Main, check that 'main' is defined.
 checkMain 
   = do { tcg_env   <- getGblEnv ;
-	 dflags    <- getDOpts ;
+	 dflags    <- getDynFlags ;
 	 check_main dflags tcg_env
     }
 
@@ -1065,7 +1065,7 @@ getMainFun dflags = case (mainFunIs dflags) of
 
 checkMainExported :: TcGblEnv -> TcM ()
 checkMainExported tcg_env = do
-  dflags    <- getDOpts
+  dflags    <- getDynFlags
   case tcg_main tcg_env of
     Nothing -> return () -- not the main module
     Just main_name -> do
@@ -1677,7 +1677,7 @@ rnDump doc = do { dumpOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" doc) }
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
- = do { dflags <- getDOpts ;
+ = do { dflags <- getDynFlags ;
 
 	-- Dump short output if -ddump-types or -ddump-tc
 	when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
@@ -1694,7 +1694,7 @@ tcDump env
 
 tcCoreDump :: ModGuts -> TcM ()
 tcCoreDump mod_guts
- = do { dflags <- getDOpts ;
+ = do { dflags <- getDynFlags ;
 	when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
  	     (dumpTcRn (pprModGuts mod_guts)) ;
 

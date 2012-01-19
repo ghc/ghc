@@ -1239,7 +1239,7 @@ checkStmt :: HsStmtContext Name
           -> LStmt RdrName 
           -> RnM ()
 checkStmt ctxt (L _ stmt)
-  = do { dflags <- getDOpts
+  = do { dflags <- getDynFlags
        ; case okStmt dflags ctxt stmt of 
            Nothing    -> return ()
            Just extra -> addErr (msg $$ extra) }

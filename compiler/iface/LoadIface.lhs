@@ -188,7 +188,7 @@ loadInterface doc_str mod from
         ; traceIf (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
                 -- Check whether we have the interface already
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of {
             Just iface 
                 -> return (Succeeded iface) ;   -- Already loaded
@@ -489,7 +489,7 @@ findAndReadIface doc_str mod hi_boot_file
                         nest 4 (ptext (sLit "reason:") <+> doc_str)])
 
         -- Check for GHC.Prim, and return its static interface
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; if mod == gHC_PRIM
           then return (Succeeded (ghcPrimIface,
                                    "<built in interface for GHC.Prim>"))
@@ -526,7 +526,7 @@ findAndReadIface doc_str mod hi_boot_file
         }}
             ; err -> do
                 { traceIf (ptext (sLit "...not found"))
-                ; dflags <- getDOpts
+                ; dflags <- getDynFlags
                 ; return (Failed (cannotFindInterface dflags 
                                         (moduleName mod) err)) }
         }

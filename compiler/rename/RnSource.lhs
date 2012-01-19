@@ -749,7 +749,7 @@ rnTyClDecls :: [Name] -> [[LTyClDecl RdrName]]
 -- Rename the declarations and do depedency analysis on them
 rnTyClDecls extra_deps tycl_ds
   = do { ds_w_fvs <- mapM (wrapLocFstM (rnTyClDecl Nothing)) (concat tycl_ds)
-       ; thisPkg  <- fmap thisPackage getDOpts
+       ; thisPkg  <- fmap thisPackage getDynFlags
        ; let add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
              add_boot_deps fvs | any (isInPackage thisPkg) (nameSetToList fvs)

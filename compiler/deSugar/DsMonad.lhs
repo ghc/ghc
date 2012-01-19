@@ -267,7 +267,7 @@ initDsTc thing_inside
   = do  { this_mod <- getModule
         ; tcg_env  <- getGblEnv
         ; msg_var  <- getErrsVar
-        ; dflags   <- getDOpts
+        ; dflags   <- getDynFlags
         ; let type_env = tcg_type_env tcg_env
               rdr_env  = tcg_rdr_env tcg_env
               ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env msg_var

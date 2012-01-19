@@ -254,17 +254,14 @@ setEnvs (gbl_env, lcl_env) = updEnv (\ env -> env { env_gbl = gbl_env, env_lcl =
 Command-line flags
 
 \begin{code}
-getDOpts :: TcRnIf gbl lcl DynFlags
-getDOpts = do { env <- getTopEnv; return (hsc_dflags env) }
-
 xoptM :: ExtensionFlag -> TcRnIf gbl lcl Bool
-xoptM flag = do { dflags <- getDOpts; return (xopt flag dflags) }
+xoptM flag = do { dflags <- getDynFlags; return (xopt flag dflags) }
 
 doptM :: DynFlag -> TcRnIf gbl lcl Bool
-doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
+doptM flag = do { dflags <- getDynFlags; return (dopt flag dflags) }
 
 woptM :: WarningFlag -> TcRnIf gbl lcl Bool
-woptM flag = do { dflags <- getDOpts; return (wopt flag dflags) }
+woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
 
 setXOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
@@ -457,7 +454,7 @@ traceOptTcRn flag doc = ifDOptM flag $ do
 
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv
-                  ; dflags <- getDOpts
+                  ; dflags <- getDynFlags
                   ; liftIO (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
 
 debugDumpTcRn :: SDoc -> TcRn ()
@@ -626,7 +623,7 @@ mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ErrMsg
 mkLongErrAt loc msg extra
   = do { traceTc "Adding error:" (mkLocMessage SevError loc (msg $$ extra)) ;
          rdr_env <- getGlobalRdrEnv ;
-         dflags <- getDOpts ;
+         dflags <- getDynFlags ;
          return $ mkLongErrMsg loc (mkPrintUnqualified dflags rdr_env) msg extra }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
@@ -649,7 +646,7 @@ reportWarning warn
 
 dumpDerivingInfo :: SDoc -> TcM ()
 dumpDerivingInfo doc
-  = do { dflags <- getDOpts
+  = do { dflags <- getDynFlags
        ; when (dopt Opt_D_dump_deriv dflags) $ do
        { rdr_env <- getGlobalRdrEnv
        ; let unqual = mkPrintUnqualified dflags rdr_env
@@ -719,7 +716,7 @@ tryTcErrs :: TcRn a -> TcRn (Messages, Maybe a)
 -- there might be warnings
 tryTcErrs thing
   = do  { (msgs, res) <- tryTc thing
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; let errs_found = errorsFound dflags msgs
         ; return (msgs, case res of
                           Nothing -> Nothing
@@ -775,7 +772,7 @@ ifErrsM :: TcRn r -> TcRn r -> TcRn r
 ifErrsM bale_out normal
  = do { errs_var <- getErrsVar ;
         msgs <- readTcRef errs_var ;
-        dflags <- getDOpts ;
+        dflags <- getDynFlags ;
         if errorsFound dflags msgs then
            bale_out
         else
@@ -908,7 +905,7 @@ add_warn msg extra_info
 add_warn_at :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 add_warn_at loc msg extra_info
   = do { rdr_env <- getGlobalRdrEnv ;
-         dflags <- getDOpts ;
+         dflags <- getDynFlags ;
          let { warn = mkLongWarnMsg loc (mkPrintUnqualified dflags rdr_env)
                                     msg extra_info } ;
          reportWarning warn }

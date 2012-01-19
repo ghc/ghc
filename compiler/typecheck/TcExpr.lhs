@@ -325,7 +325,7 @@ tcExpr (SectionR op arg2) res_ty
 
 tcExpr (SectionL arg1 op) res_ty
   = do { (op', op_ty) <- tcInferFun op
-       ; dflags <- getDOpts	    -- Note [Left sections]
+       ; dflags <- getDynFlags	    -- Note [Left sections]
        ; let n_reqd_args | xopt Opt_PostfixOperators dflags = 1
                          | otherwise                        = 2
 

@@ -1180,7 +1180,7 @@ check_valid_theta :: UserTypeCtxt -> [PredType] -> TcM ()
 check_valid_theta _ []
   = return ()
 check_valid_theta ctxt theta = do
-    dflags <- getDOpts
+    dflags <- getDynFlags
     warnTc (notNull dups) (dupPredWarn dups)
     mapM_ (check_pred_ty dflags ctxt) theta
   where
@@ -1487,7 +1487,7 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 \begin{code}
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas tys
-  = do { dflags <- getDOpts
+  = do { dflags <- getDynFlags
 
            -- Check language restrictions; 
            -- but not for SPECIALISE isntance pragmas

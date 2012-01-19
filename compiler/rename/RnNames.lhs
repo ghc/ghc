@@ -200,7 +200,7 @@ rnImportDecl this_mod
     -- and indeed we shouldn't do it here because the existence of
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
-    dflags <- getDOpts
+    dflags <- getDynFlags
     warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
@@ -964,7 +964,7 @@ rnExports explicit_mod exports
         -- written "module Main where ..."
         -- Reason: don't want to complain about 'main' not in scope
         --         in interactive mode
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; let real_exports
                  | explicit_mod = exports
                  | ghcLink dflags == LinkInMemory = Nothing

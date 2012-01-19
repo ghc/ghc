@@ -899,7 +899,7 @@ mkAmbigMsg ctxt cts
   | isEmptyVarSet ambig_tv_set
   = return (ctxt, False, empty)
   | otherwise
-  = do { dflags <- getDOpts
+  = do { dflags <- getDynFlags
        ; (ctxt', gbl_docs) <- findGlobals ctxt ambig_tv_set
        ; return (ctxt', True, mk_msg dflags gbl_docs) }
   where

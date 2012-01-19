@@ -331,7 +331,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; (inst_info, rn_binds, rn_dus) <-
             renameDeriv is_boot (inst_infos ++ (bagToList extraInstances)) binds
 
-	; dflags <- getDOpts
+	; dflags <- getDynFlags
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
 	         (ddump_deriving inst_info rn_binds newTyCons famInsts))
 
@@ -617,7 +617,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 
      mk_alg_eqn tycon tc_args
       | className cls `elem` typeableClassNames
-      = do { dflags <- getDOpts
+      = do { dflags <- getDynFlags
            ; case checkTypeableConditions (dflags, tycon) of
                Just err -> bale_out err
                Nothing  -> mk_typeable_eqn orig tvs cls tycon tc_args mtheta }
@@ -641,7 +641,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
       	   ; unless (isNothing mtheta || not hidden_data_cons)
       	   	    (bale_out (derivingHiddenErr tycon))
 
-      	   ; dflags <- getDOpts
+      	   ; dflags <- getDynFlags
       	   ; if isDataTyCon rep_tc then
       	   	mkDataTypeEqn orig dflags tvs cls cls_tys
       	   		      tycon tc_args rep_tc rep_tc_args mtheta
