@@ -477,7 +477,7 @@ lowerSafeForeignCall entry areaMap blocks bid m
                   caller_save <**>
                   mkUnsafeCall (ForeignTarget suspendThread
                                 (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
-                               [id] [CmmReg (CmmGlobal BaseReg), CmmLit (CmmInt (fromIntegral (fromEnum intrbl)) wordWidth)]
+                               [id] [CmmReg (CmmGlobal BaseReg), CmmLit (mkIntCLit (fromEnum intrbl))]
         midCall = mkUnsafeCall tgt rs as
         resume  = mkUnsafeCall (ForeignTarget resumeThread
                                 (ForeignConvention CCallConv [AddrHint] [AddrHint]))
