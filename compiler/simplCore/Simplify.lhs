@@ -221,7 +221,7 @@ simplTopBinds env0 binds0
                 -- It's rather as if the top-level binders were imported.
 		-- See note [Glomming] in OccurAnal.
         ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
-        ; dflags <- getDOptsSmpl
+        ; dflags <- getDynFlags
         ; let dump_flag = dopt Opt_D_verbose_core2core dflags
         ; env2 <- simpl_binds dump_flag env1 binds0
         ; freeTick SimplifierDone
@@ -1383,7 +1383,7 @@ simplIdF env var cont
 completeCall :: SimplEnv -> Id -> SimplCont -> SimplM (SimplEnv, OutExpr)
 completeCall env var cont
   = do  {   ------------- Try inlining ----------------
-          dflags <- getDOptsSmpl
+          dflags <- getDynFlags
         ; let  (lone_variable, arg_infos, call_cont) = contArgs cont
                 -- The args are OutExprs, obtained by *lazily* substituting
                 -- in the args found in cont.  These args are only examined
@@ -1559,7 +1559,7 @@ tryRules env rules fn args call_cont
            Just (rule, rule_rhs) ->
 
              do { checkedTick (RuleFired (ru_name rule))
-                ; dflags <- getDOptsSmpl
+                ; dflags <- getDynFlags
                 ; trace_dump dflags rule rule_rhs $
                   return (Just (ruleArity rule, rule_rhs)) }}}
   where
@@ -1835,7 +1835,7 @@ reallyRebuildCase env scrut case_bndr alts cont
 	-- Check for empty alternatives
 	; if null alts' then missingAlt env case_bndr alts cont
 	  else do
-        { dflags <- getDOptsSmpl
+        { dflags <- getDynFlags
         ; case_expr <- mkCase dflags scrut' case_bndr' alts'
 
 	-- Notice that rebuild gets the in-scope set from env', not alt_env
