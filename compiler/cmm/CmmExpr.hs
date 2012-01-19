@@ -62,7 +62,7 @@ instance Eq CmmExpr where	-- Equality ignores the types
   _e1               == _e2               = False
 
 data CmmReg 
-  = CmmLocal  LocalReg
+  = CmmLocal  {-# UNPACK #-} !LocalReg
   | CmmGlobal GlobalReg
   deriving( Eq, Ord )
 
@@ -103,7 +103,7 @@ type AreaMap    = Map Area Int
      -- relative to the oldest byte of the Old Area
 
 data CmmLit
-  = CmmInt Integer  Width
+  = CmmInt !Integer  Width
 	-- Interpretation: the 2's complement representation of the value
 	-- is truncated to the specified size.  This is easier than trying
 	-- to keep the value within range, because we don't know whether
@@ -168,7 +168,7 @@ maybeInvertCmmExpr _ = Nothing
 -----------------------------------------------------------------------------
 
 data LocalReg
-  = LocalReg !Unique CmmType
+  = LocalReg {-# UNPACK #-} !Unique CmmType
     -- ^ Parameters:
     --   1. Identifier
     --   2. Type
