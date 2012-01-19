@@ -46,8 +46,8 @@ nat large_alloc_lim;    /* GC if n_large_blocks in any nursery
 
 bdescr *exec_block;
 
-generation *generations = NULL;        /* all the generations */
-generation *g0                = NULL; /* generation 0, for convenience */
+generation *generations = NULL; /* all the generations */
+generation *g0          = NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 
 nursery *nurseries = NULL;     /* array of nurseries, size == n_capabilities */
@@ -92,7 +92,7 @@ initGeneration (generation *gen, int g)
 }
 
 void
-initStorage( void )
+initStorage (void)
 {
   nat g;
 
@@ -114,7 +114,7 @@ initStorage( void )
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.heapSizeSuggestion > 
       RtsFlags.GcFlags.maxHeapSize) {
-    RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
+      RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
   }
 
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
@@ -197,7 +197,7 @@ void storageAddCapabilities (nat from, nat to)
                                     "storageAddCapabilities");
     } else {
         nurseries = stgMallocBytes(to * sizeof(struct nursery_),
-                                    "storageAddCapabilities");
+                                   "storageAddCapabilities");
     }
 
     // we've moved the nurseries, so we have to update the rNursery
@@ -527,7 +527,7 @@ countNurseryBlocks (void)
 }
 
 static void
-resizeNursery ( nursery *nursery, nat blocks )
+resizeNursery (nursery *nursery, nat blocks)
 {
   bdescr *bd;
   nat nursery_blocks;
@@ -1163,10 +1163,10 @@ void freeExec (void *addr)
 #ifdef DEBUG
 
 // handy function for use in gdb, because Bdescr() is inlined.
-extern bdescr *_bdescr( StgPtr p );
+extern bdescr *_bdescr (StgPtr p);
 
 bdescr *
-_bdescr( StgPtr p )
+_bdescr (StgPtr p)
 {
     return Bdescr(p);
 }
