@@ -29,7 +29,7 @@ module DynFlags (
         xopt_set,
         xopt_unset,
         DynFlags(..),
-        HasDynFlags(..),
+        HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
         GhcMode(..), isOneShot,
@@ -348,6 +348,7 @@ data WarningFlag =
    | Opt_WarnAlternativeLayoutRuleTransitional
    | Opt_WarnUnsafe
    | Opt_WarnSafe
+   | Opt_WarnPointlessPragmas
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -595,6 +596,9 @@ data DynFlags = DynFlags {
 
 class HasDynFlags m where
     getDynFlags :: m DynFlags
+
+class ContainsDynFlags t where
+    extractDynFlags :: t -> DynFlags
 
 data ProfAuto
   = NoProfAuto         -- ^ no SCC annotations added
@@ -1790,7 +1794,8 @@ fWarningFlags = [
   ( "warn-wrong-do-bind",               Opt_WarnWrongDoBind, nop ),
   ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop ),
   ( "warn-unsafe",                      Opt_WarnUnsafe, setWarnUnsafe ),
-  ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ) ]
+  ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
+  ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ) ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec DynFlag]
@@ -2115,7 +2120,8 @@ standardWarnings
         Opt_WarnLazyUnliftedBindings,
         Opt_WarnDodgyForeignImports,
         Opt_WarnWrongDoBind,
-        Opt_WarnAlternativeLayoutRuleTransitional
+        Opt_WarnAlternativeLayoutRuleTransitional,
+        Opt_WarnPointlessPragmas
       ]
 
 minusWOpts :: [WarningFlag]

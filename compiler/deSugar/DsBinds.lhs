@@ -63,6 +63,7 @@ import Maybes
 import OrdList
 import Bag
 import BasicTypes hiding ( TopLevel )
+import DynFlags
 import FastString
 import ErrUtils( MsgDoc )
 import Util
@@ -429,7 +430,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              spec_rhs  = dsHsWrapper spec_co poly_rhs
              spec_pair = makeCorePair spec_id False (dictArity bndrs) spec_rhs
 
-       ; when (isInlinePragma id_inl) (warnDs (specOnInline poly_name))
+       ; dflags <- getDynFlags
+       ; when (isInlinePragma id_inl && wopt Opt_WarnPointlessPragmas dflags)
+              (warnDs (specOnInline poly_name))
        ; return (Just (spec_pair `consOL` unf_pairs, rule))
        } } }
   where

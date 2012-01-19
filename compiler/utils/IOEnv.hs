@@ -30,6 +30,7 @@ module IOEnv (
         atomicUpdMutVar, atomicUpdMutVar'
   ) where
 
+import DynFlags
 import Exception
 import Panic
 
@@ -87,6 +88,10 @@ instance Show IOEnvFailure where
     show IOEnvFailure = "IOEnv failure"
 
 instance Exception IOEnvFailure
+
+instance ContainsDynFlags env => HasDynFlags (IOEnv env) where
+    getDynFlags = do env <- getEnv
+                     return $ extractDynFlags env
 
 ----------------------------------------------------------------------
 -- Fundmantal combinators specific to the monad

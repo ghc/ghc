@@ -116,6 +116,7 @@ import UniqSupply
 import Unique
 import BasicTypes
 import Bag
+import DynFlags
 import Outputable
 import ListSetOps
 import FastString
@@ -186,6 +187,9 @@ data Env gbl lcl
 
         env_lcl  :: lcl      -- Nested stuff; changes as we go into 
     }
+
+instance ContainsDynFlags (Env gbl lcl) where
+    extractDynFlags env = hsc_dflags (env_top env)
 
 -- TcGblEnv describes the top-level of the module at the 
 -- point at which the typechecker is finished work.

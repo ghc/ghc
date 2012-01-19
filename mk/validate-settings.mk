@@ -66,6 +66,9 @@ libraries/Cabal/Cabal_dist-install_EXTRA_HC_OPTS += -w
 # Temporarily turn off incomplete-pattern warnings for containers
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
 
+# Temporarily turn off pointless-pragma warnings for containers
+libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-pointless-pragmas
+
 # bytestring has identities at the moment
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-identities
 
