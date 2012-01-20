@@ -20,10 +20,16 @@ main = do
   getGhcField fields "GhcUnregisterised" "Unregisterised"
   getGhcField fields "GhcWithSMP" "Support SMP"
   getGhcField fields "GhcRTSWays" "RTS ways"
-  getGhcField fields "AR" "ar command"
+  getGhcFieldWithDefault fields "AR" "ar command" "ar"
 
 getGhcField :: [(String,String)] -> String -> String -> IO ()
-getGhcField fields mkvar key = do
+getGhcField fields mkvar key =
    case lookup key fields of
       Nothing  -> fail ("No field: " ++ key)
+      Just val -> putStrLn (mkvar ++ '=':val)
+
+getGhcFieldWithDefault :: [(String,String)] -> String -> String -> String -> IO ()
+getGhcFieldWithDefault fields mkvar key deflt = do
+   case lookup key fields of
+      Nothing  -> putStrLn (mkvar ++ '=':deflt)
       Just val -> putStrLn (mkvar ++ '=':val)
