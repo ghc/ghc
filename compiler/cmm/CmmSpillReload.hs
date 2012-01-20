@@ -65,8 +65,8 @@ dualLiveLattice = DataflowLattice "variables live in registers and on stack" emp
           add _ (OldFact old) (NewFact new) = (changeIf $ change1 || change2, DualLive stack regs)
             where (change1, stack) = add1 (on_stack old) (on_stack new)
                   (change2, regs)  = add1 (in_regs old)  (in_regs new)
-          add1 old new = if sizeUniqSet join > sizeUniqSet old then (True, join) else (False, old)
-            where join = unionUniqSets old new
+          add1 old new = if sizeRegSet join > sizeRegSet old then (True, join) else (False, old)
+            where join = plusRegSet old new
 
 dualLivenessWithInsertion :: BlockSet -> CmmGraph -> FuelUniqSM CmmGraph
 dualLivenessWithInsertion procPoints g =
@@ -120,16 +120,16 @@ dualLiveTransfers entry procPoints = mkBTransfer3 first middle last
                   keep_stack_only k = DualLive (on_stack (lkp k)) emptyRegSet
 
 insertSpillsAndReloads :: CmmGraph -> BlockSet -> CmmBwdRewrite DualLive
-insertSpillsAndReloads graph procPoints = deepBwdRw3 first middle nothing
+insertSpillsAndReloads graph procPoints = mkBRewrite3 first middle nothing
   -- Beware: deepBwdRw with one polymorphic function seems more reasonable here,
   -- but GHC miscompiles it, see bug #4044.
     where first :: CmmNode C O -> Fact O DualLive -> CmmReplGraph C O
-          first e@(CmmEntry id) live = return $
+          first e@(CmmEntry id) live =
             if id /= (g_entry graph) && setMember id procPoints then
-              case map reload (uniqSetToList (in_regs live)) of
-                [] -> Nothing
-                is -> Just $ mkFirst e <*> mkMiddles is
-            else Nothing
+              case map reload (regSetToList (in_regs live)) of
+                [] -> return Nothing
+                is -> return $ Just $ mkFirst e <*> mkMiddles is
+            else return Nothing
           -- EZY: There was some dead code for handling the case where
           -- we were not splitting procedures.  Check Git history if
           -- you're interested (circa e26ea0f41).
@@ -152,15 +152,15 @@ reload r = CmmAssign (CmmLocal r) (CmmLoad (regSlot r) $ localRegType r)
 -- prettyprinting
 
 ppr_regs :: String -> RegSet -> SDoc
-ppr_regs s regs = text s <+> commafy (map ppr $ uniqSetToList regs)
+ppr_regs s regs = text s <+> commafy (map ppr $ regSetToList regs)
   where commafy xs = hsep $ punctuate comma xs
 
 instance Outputable DualLive where
   ppr (DualLive {in_regs = regs, on_stack = stack}) =
-      if isEmptyUniqSet regs && isEmptyUniqSet stack then
+      if nullRegSet regs && nullRegSet stack then
           text "<nothing-live>"
       else
-          nest 2 $ fsep [if isEmptyUniqSet regs then PP.empty
+          nest 2 $ fsep [if nullRegSet regs then PP.empty
                          else (ppr_regs "live in regs =" regs),
-                         if isEmptyUniqSet stack then PP.empty
+                         if nullRegSet stack then PP.empty
                          else (ppr_regs "live on stack =" stack)]

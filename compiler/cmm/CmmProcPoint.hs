@@ -318,7 +318,7 @@ pass_live_vars_as_args _liveness procPoints protos = protos'
               Nothing -> let live = emptyRegSet
                                     --lookupBlockEnv _liveness id `orElse`
                                     --panic ("no liveness at block " ++ show id)
-                             formals = uniqSetToList live
+                             formals = regSetToList live
                              prot = Protocol Private formals $ CallArea $ Young id
                          in  mapInsert id prot protos
 

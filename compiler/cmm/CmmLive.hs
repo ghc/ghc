@@ -33,8 +33,10 @@ type CmmLive = RegSet
 -- | The dataflow lattice
 liveLattice :: DataflowLattice CmmLive
 liveLattice = DataflowLattice "live LocalReg's" emptyRegSet add
-    where add _ (OldFact old) (NewFact new) = case unionUniqSets old new of
-            join -> (changeIf $ sizeUniqSet join > sizeUniqSet old, join)
+    where add _ (OldFact old) (NewFact new) =
+               (changeIf $ sizeRegSet join > sizeRegSet old, join)
+              where !join = plusRegSet old new
+
 
 -- | A mapping from block labels to the variables live on entry
 type BlockEntryLiveness = BlockEnv CmmLive
@@ -52,7 +54,7 @@ cmmLiveness graph =
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
 noLiveOnEntry :: BlockId -> CmmLive -> a -> a
 noLiveOnEntry bid in_fact x =
-  if isEmptyUniqSet in_fact then x
+  if nullRegSet in_fact then x
   else pprPanic "LocalReg's live-in to graph" (ppr bid <+> ppr in_fact)
 
 -- | The transfer equations use the traditional 'gen' and 'kill'
@@ -60,7 +62,7 @@ noLiveOnEntry bid in_fact x =
 gen  :: UserOfLocalRegs a    => a -> RegSet -> RegSet
 gen  a live = foldRegsUsed extendRegSet      live a
 kill :: DefinerOfLocalRegs a => a -> RegSet -> RegSet
-kill a live = foldRegsDefd delOneFromUniqSet live a
+kill a live = foldRegsDefd deleteFromRegSet live a
 
 gen_kill :: (DefinerOfLocalRegs a, UserOfLocalRegs a) => a -> CmmLive -> CmmLive
 gen_kill a = gen a . kill a

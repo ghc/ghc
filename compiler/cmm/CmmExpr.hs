@@ -16,7 +16,8 @@ module CmmExpr
     , DefinerOfLocalRegs, UserOfLocalRegs, foldRegsDefd, foldRegsUsed, filterRegsUsed
     , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
-            , plusRegSet, minusRegSet, timesRegSet
+            , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
+            , regSetToList
     , regUsedIn, regSlot
     , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, isStackSlotOf
     , module CmmMachOp
@@ -31,9 +32,10 @@ import CmmMachOp
 import BlockId
 import CLabel
 import Unique
-import UniqSet
 
 import Data.Map (Map)
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 -----------------------------------------------------------------------------
 --		CmmExpr
@@ -194,22 +196,35 @@ localRegType (LocalReg _ rep) = rep
 -----------------------------------------------------------------------------
 
 -- | Sets of local registers
-type RegSet              =  UniqSet LocalReg
+
+-- These are used for dataflow facts, and a common operation is taking
+-- the union of two RegSets and then asking whether the union is the
+-- same as one of the inputs.  UniqSet isn't good here, because
+-- sizeUniqSet is O(n) whereas Set.size is O(1), so we use ordinary
+-- Sets.
+
+type RegSet              =  Set LocalReg
 emptyRegSet             :: RegSet
+nullRegSet              :: RegSet -> Bool
 elemRegSet              :: LocalReg -> RegSet -> Bool
 extendRegSet            :: RegSet -> LocalReg -> RegSet
 deleteFromRegSet        :: RegSet -> LocalReg -> RegSet
 mkRegSet                :: [LocalReg] -> RegSet
 minusRegSet, plusRegSet, timesRegSet :: RegSet -> RegSet -> RegSet
+sizeRegSet              :: RegSet -> Int
+regSetToList            :: RegSet -> [LocalReg]
 
-emptyRegSet      = emptyUniqSet
-elemRegSet       = elementOfUniqSet
-extendRegSet     = addOneToUniqSet
-deleteFromRegSet = delOneFromUniqSet
-mkRegSet         = mkUniqSet
-minusRegSet      = minusUniqSet
-plusRegSet       = unionUniqSets
-timesRegSet      = intersectUniqSets
+emptyRegSet      = Set.empty
+nullRegSet       = Set.null
+elemRegSet       = Set.member
+extendRegSet     = flip Set.insert
+deleteFromRegSet = flip Set.delete
+mkRegSet         = Set.fromList
+minusRegSet      = Set.difference
+plusRegSet       = Set.union
+timesRegSet      = Set.intersection
+sizeRegSet       = Set.size
+regSetToList     = Set.toList
 
 class UserOfLocalRegs a where
   foldRegsUsed :: (b -> LocalReg -> b) -> b -> a -> b
@@ -237,7 +252,7 @@ instance DefinerOfLocalRegs LocalReg where
     foldRegsDefd f z r = f z r
 
 instance UserOfLocalRegs RegSet where
-    foldRegsUsed f = foldUniqSet (flip f)
+    foldRegsUsed f = Set.fold (flip f)
 
 instance UserOfLocalRegs CmmExpr where
   foldRegsUsed f z e = expr z e
