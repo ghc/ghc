@@ -7,6 +7,7 @@ TOP = .
 # being defined.
 ifneq "$(MAKECMDGOALS)" "clean"
 ifneq "$(MAKECMDGOALS)" "distclean"
+ifneq "$(MAKECMDGOALS)" "maintainer-clean"
 
 include $(TOP)/mk/boilerplate.mk
 
@@ -16,6 +17,7 @@ boot:
 all:
 	$(MAKE) -C $(TOP)/tests all
 
+endif
 endif
 endif
 
