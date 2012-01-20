@@ -10,7 +10,7 @@ import Compiler.Hoopl hiding
     FwdTransfer(..), FwdRewrite(..), FwdPass(..),
     BwdTransfer(..), BwdRewrite(..), BwdPass(..),
     noFwdRewrite, noBwdRewrite,
-    analyzeAndRewriteFwd, analyzeAndRewriteBwd,
+--    analyzeAndRewriteFwd, analyzeAndRewriteBwd,
     mkFactBase, Fact,
     mkBRewrite, mkBRewrite3, mkBTransfer, mkBTransfer3,
     mkFRewrite, mkFRewrite3, mkFTransfer, mkFTransfer3,

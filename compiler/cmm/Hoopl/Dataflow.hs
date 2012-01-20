@@ -27,6 +27,9 @@ import OptimizationFuel
 
 import Control.Monad
 import Data.Maybe
+import Data.Array
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IS
 
 import Compiler.Hoopl.Collections
 import Compiler.Hoopl.Fuel
@@ -35,6 +38,7 @@ import Compiler.Hoopl.Graph hiding (Graph) -- hiding so we can redefine
 import qualified Compiler.Hoopl.GraphUtil as U
 import Compiler.Hoopl.Label
 import Compiler.Hoopl.Util
+import Compiler.Hoopl.Dataflow (JoinFun)
 
 import Compiler.Hoopl.Dataflow (
     DataflowLattice(..), OldFact(..), NewFact(..), Fact
@@ -64,9 +68,15 @@ mkFRewrite3 :: forall n f.
 mkFRewrite3 f m l = FwdRewrite3 (lift f, lift m, lift l)
   where lift :: forall t t1 a. (t -> t1 -> FuelUniqSM (Maybe a))
                              -> t -> t1 -> FuelUniqSM (Maybe (a, FwdRewrite FuelUniqSM n f))
-        lift rw node fact = liftM (liftM asRew) (withFuel =<< rw node fact)
-        asRew :: forall t. t -> (t, FwdRewrite FuelUniqSM n f)
-        asRew g = (g, noFwdRewrite)
+        {-# INLINE lift #-}
+        lift rw node fact = do
+             a <- rw node fact
+             case a of
+               Nothing -> return Nothing
+               Just a  -> do f <- getFuel
+                             if f == 0
+                                then return Nothing
+                                else setFuel (f-1) >> return (Just (a,noFwdRewrite))
 
 noBwdRewrite :: BwdRewrite FuelUniqSM n f
 noBwdRewrite = BwdRewrite3 (noRewrite, noRewrite, noRewrite)
@@ -79,9 +89,15 @@ mkBRewrite3 :: forall n f.
 mkBRewrite3 f m l = BwdRewrite3 (lift f, lift m, lift l)
   where lift :: forall t t1 a. (t -> t1 -> FuelUniqSM (Maybe a))
                              -> t -> t1 -> FuelUniqSM (Maybe (a, BwdRewrite FuelUniqSM n f))
-        lift rw node fact = liftM (liftM asRew) (withFuel =<< rw node fact)
-        asRew :: t -> (t, BwdRewrite FuelUniqSM n f)
-        asRew g = (g, noBwdRewrite)
+        {-# INLINE lift #-}
+        lift rw node fact = do
+             a <- rw node fact
+             case a of
+               Nothing -> return Nothing
+               Just a  -> do f <- getFuel
+                             if f == 0
+                                then return Nothing
+                                else setFuel (f-1) >> return (Just (a,noBwdRewrite))
 
 -----------------------------------------------------------------------------
 --              Analyze and rewrite forward: the interface
@@ -291,10 +307,8 @@ analyzeBwd BwdPass { bp_lattice = lattice,
      where
        body  :: [Label] -> Fact C f -> Fact C f
        body entries f
-         = fixpoint_anal Bwd lattice do_block labels blockmap f
+         = fixpoint_anal Bwd lattice do_block entries blockmap f
          where
-           labels = map entryLabel (backwardBlockList entries blockmap)
-
            do_block :: forall x . Block n C x -> Fact x f -> FactBase f
            do_block b fb = mapSingleton (entryLabel b) (block b fb)
 
@@ -428,7 +442,7 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
                           return (g, mapSingleton (entryLabel b) f)
 
 
-backwardBlockList :: (LabelsPtr entries, NonLocal n) => entries -> Body n -> [Block n C C]
+backwardBlockList :: NonLocal n => [Label] -> Body n -> [Block n C C]
 -- This produces a list of blocks in order suitable for backward analysis,
 -- along with the list of Labels it may depend on for facts.
 backwardBlockList entries body = reverse $ forwardBlockList entries body
@@ -451,27 +465,26 @@ effects.)
 --      fixpoint (analysis only)
 -----------------------------------------------------------------------------
 
-     -- See Note [TxFactBase invariants]
+-- Note [newblocks]
+-- For a block whose input is *in* the initial fact base, and is
+-- reached by another block, but the join gives NoChange, we must
+-- still process it at least once to get its out facts.
 
-updateFact :: DataflowLattice f
-           -> LabelSet
+updateFact_anal :: f -> JoinFun f -> Bool
+           -> LabelSet         -- Note [newblocks]
            -> Label -> f       -- out fact
            -> ([Label], FactBase f)
            -> ([Label], FactBase f)
 -- See Note [TxFactBase change flag]
-updateFact lat newblocks lbl new_fact (cha, fbase)
-  | NoChange <- cha2, lbl `setMember` newblocks  = (cha,     fbase)
-  | otherwise         = (lbl:cha, mapInsert lbl res_fact fbase)
+updateFact_anal bot fact_join is_bwd newblocks lbl new_fact (cha, fbase)
+  = case lookupFact lbl fbase of
+      Nothing       -> (lbl:cha, mapInsert lbl new_fact fbase)
+      Just old_fact ->
+        case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
+           (NoChange, _) | can_say_no_change -> (cha, fbase)
+           (_,        f)                     -> (lbl:cha, mapInsert lbl f fbase)
   where
-    (cha2, res_fact) -- Note [Unreachable blocks]
-       = case lookupFact lbl fbase of
-           Nothing -> (SomeChange, new_fact_debug)  -- Note [Unreachable blocks]
-           Just old_fact -> join old_fact
-         where join old_fact = 
-                 fact_join lat lbl
-                   (OldFact old_fact) (NewFact new_fact)
-               (_, new_fact_debug) = join (fact_bot lat)
-
+    can_say_no_change = is_bwd || lbl `setMember` newblocks
 
 {-
 -- this doesn't work because it can't be implemented
@@ -488,52 +501,65 @@ fixpoint_anal :: forall n f. NonLocal n
  -> LabelMap (Block n C C)
  -> Fact C f -> FactBase f
 
-fixpoint_anal direction lat do_block entries blockmap init_fbase
-  = loop init_fbase entries setEmpty
+fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
+              do_block entries blockmap init_fbase
+  = loop start init_fbase setEmpty
   where
-    -- mapping from L -> Ls.  If the fact for L changes, re-analyse Ls.
-    dep_blocks :: LabelMap [Label]
+    blocks               = forwardBlockList entries blockmap
+    ordered_blocks       = case direction of
+                             Fwd -> blocks
+                             Bwd -> reverse blocks
+    block_arr            = listArray (0,length blocks - 1) ordered_blocks
+
+    start | Fwd <- direction
+          = IS.fromList (concatMap (\l -> mapFindWithDefault [] l dep_blocks) entries)
+          | otherwise        = IS.fromList [0 .. length blocks - 1]
+
+    -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
+    dep_blocks :: LabelMap [Int]
     dep_blocks = mapFromListWith (++)
-                        [ (l, [entryLabel b])
-                        | b <- mapElems blockmap
+                        [ (l, [ix])
+                        | (b,ix) <- zip ordered_blocks [0..]
                         , l <- case direction of
                                  Fwd -> [entryLabel b]
                                  Bwd -> successors b
                         ]
 
+    is_bwd = case direction of Bwd -> True; Fwd -> False
+
     loop
-       :: FactBase f  -- current factbase (increases monotonically)
-       -> [Label]     -- blocks still to analyse (Todo: use a better rep)
+       :: IntSet      -- blocks still to analyse
+       -> FactBase f  -- current factbase (increases monotonically)
        -> LabelSet
        -> FactBase f
 
-    loop fbase []         _newblocks = fbase
-    loop fbase (lbl:todo) newblocks = do
-      case mapLookup lbl blockmap of
-         Nothing  -> loop fbase todo newblocks
-         Just blk ->
-           -- trace ("analysing: " ++ show lbl) $ return ()
+    loop !todo fbase !newblocks
+      | IS.null todo = fbase
+      | (ix,todo') <- IS.deleteFindMin todo =
+           let blk = block_arr ! ix
+               lbl = entryLabel blk
+           in
+           -- trace ("analysing: " ++ show lbl) $
            let out_facts = do_block blk fbase
 
                (changed, fbase') = mapFoldWithKey
-                                     (updateFact lat newblocks)
+                                     (updateFact_anal bot join is_bwd newblocks)
                                      ([],fbase) out_facts
            in
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
            -- trace ("changed: " ++ show changed) $ return ()
      
            let to_analyse
-                 = filter (`notElem` todo) $
-                   concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
+                 = concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
            in
 
            -- trace ("to analyse: " ++ show to_analyse) $ return ()
 
-           let newblocks' = setInsert lbl newblocks
+           let newblocks' | is_bwd    = newblocks
+                          | otherwise = setInsert lbl newblocks
            in
 
-           loop fbase' (todo ++ to_analyse) newblocks'
-
+           loop (foldr IS.insert todo' to_analyse) fbase' newblocks'
 
 -----------------------------------------------------------------------------
 --      fixpoint: finding fixed points
@@ -541,25 +567,31 @@ fixpoint_anal direction lat do_block entries blockmap init_fbase
 
      -- See Note [TxFactBase invariants]
 
-updateFact_anal :: DataflowLattice f
+updateFact :: f -> JoinFun f -> Bool
            -> LabelMap (DBlock f n C C)
            -> Label -> f       -- out fact
            -> ([Label], FactBase f)
            -> ([Label], FactBase f)
 -- See Note [TxFactBase change flag]
-updateFact_anal lat newblocks lbl new_fact (cha, fbase)
-  | NoChange <- cha2, lbl `mapMember` newblocks  = (cha,     fbase)
-  | otherwise         = (lbl:cha, mapInsert lbl res_fact fbase)
+updateFact bot fact_join is_bwd newblocks lbl new_fact (cha, fbase)
+  = case lookupFact lbl fbase of
+      Nothing       -> (lbl:cha, mapInsert lbl new_fact fbase)
+                            -- Note [no old fact]
+      Just old_fact ->
+        case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
+           (NoChange, _) | can_say_no_change -> (cha, fbase)
+           (_,        f)                     -> (lbl:cha, mapInsert lbl f fbase)
   where
-    (cha2, res_fact) -- Note [Unreachable blocks]
-       = case lookupFact lbl fbase of
-           Nothing -> (SomeChange, new_fact_debug)  -- Note [Unreachable blocks]
-           Just old_fact -> join old_fact
-         where join old_fact = 
-                 fact_join lat lbl
-                   (OldFact old_fact) (NewFact new_fact)
-               (_, new_fact_debug) = join (fact_bot lat)
+    can_say_no_change = is_bwd || lbl `mapMember` newblocks
 
+{-
+Note [no old fact]
+
+We know that the new_fact is >= _|_, so we don't need to join.  However,
+if the new fact is also _|_, and we have already analysed its block,
+we don't need to record a change.  So there's a tradeoff here.  It turns
+out that always recording a change is faster.
+-}
 
 {-
 -- this doesn't work because it can't be implemented
@@ -575,10 +607,11 @@ fixpoint :: forall n f. NonLocal n
  -> LabelMap (Block n C C)
  -> (Fact C f -> FuelUniqSM (DG f n C C, Fact C f))
 
-fixpoint direction lat do_block entries blockmap init_fbase
+fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
+         do_block entries blockmap init_fbase
   = do
         -- trace ("fixpoint: " ++ show (case direction of Fwd -> True; Bwd -> False) ++ " " ++ show (mapKeys blockmap) ++ show entries ++ " " ++ show (mapKeys init_fbase)) $ return()
-        (fbase, newblocks) <- loop init_fbase entries mapEmpty
+        (fbase, newblocks) <- loop start init_fbase mapEmpty
         -- trace ("fixpoint DONE: " ++ show (mapKeys fbase) ++ show (mapKeys newblocks)) $ return()
         return (GMany NothingO newblocks NothingO,
                 mapDeleteList (mapKeys blockmap) fbase)
@@ -586,45 +619,57 @@ fixpoint direction lat do_block entries blockmap init_fbase
     -- for which we have facts and which are *not* in
     -- the blocks of the graph
   where
-    -- mapping from L -> Ls.  If the fact for L changes, re-analyse Ls.
-    dep_blocks :: LabelMap [Label]
+    blocks               = forwardBlockList entries blockmap
+    ordered_blocks       = case direction of
+                             Fwd -> blocks
+                             Bwd -> reverse blocks
+    block_arr            = listArray (0,length blocks - 1) ordered_blocks
+
+    start | Fwd <- direction
+          = IS.fromList (concatMap (\l -> mapFindWithDefault [] l dep_blocks) entries)
+          | otherwise        = IS.fromList [0 .. length blocks - 1]
+
+    -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
+    dep_blocks :: LabelMap [Int]
     dep_blocks = mapFromListWith (++)
-                        [ (l, [entryLabel b])
-                        | b <- mapElems blockmap
+                        [ (l, [ix])
+                        | (b,ix) <- zip ordered_blocks [0..]
                         , l <- case direction of
                                  Fwd -> [entryLabel b]
                                  Bwd -> successors b
                         ]
 
+    is_bwd = case direction of Bwd -> True; Fwd -> False
+
     loop
-       :: FactBase f  -- current factbase (increases monotonically)
-       -> [Label]     -- blocks still to analyse (Todo: use a better rep)
+       :: IntSet
+       -> FactBase f  -- current factbase (increases monotonically)
        -> LabelMap (DBlock f n C C)  -- transformed graph
        -> FuelUniqSM (FactBase f, LabelMap (DBlock f n C C))
 
-    loop fbase []         newblocks = return (fbase, newblocks)
-    loop fbase (lbl:todo) newblocks = do
-      case mapLookup lbl blockmap of
-         Nothing  -> loop fbase todo newblocks
-         Just blk -> do
+    loop !todo fbase !newblocks
+      | IS.null todo = return (fbase, newblocks)
+      | (ix,todo') <- IS.deleteFindMin todo = do
+           let blk = block_arr ! ix
+               lbl = entryLabel blk
+
            -- trace ("analysing: " ++ show lbl) $ return ()
            (rg, out_facts) <- do_block blk fbase
            let (changed, fbase') = mapFoldWithKey
-                                     (updateFact_anal lat newblocks)
+                                     (updateFact bot join is_bwd newblocks)
                                      ([],fbase) out_facts
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
            -- trace ("changed: " ++ show changed) $ return ()
      
            let to_analyse
-                 = filter (`notElem` todo) $
-                   concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
+                 = concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
 
            -- trace ("to analyse: " ++ show to_analyse) $ return ()
 
            let newblocks' = case rg of
                               GMany _ blks _ -> mapUnion blks newblocks
      
-           loop fbase' (todo ++ to_analyse) newblocks'
+           loop (foldr IS.insert todo' to_analyse) fbase' newblocks'
 
 
 {-  Note [TxFactBase invariants]
@@ -745,7 +790,8 @@ dgnilC = GMany NothingO emptyBody NothingO
 
 dgSplice = U.splice fzCat
   where fzCat :: DBlock f n e O -> DBlock t n O x -> DBlock f n e x
-        fzCat (DBlock f b1) (DBlock _ b2) = DBlock f (b1 `U.cat` b2)
+        fzCat (DBlock f b1) (DBlock _ b2) = DBlock f $! b1 `U.cat` b2
+        -- NB. strictness, this function is hammered.
 
 ----------------------------------------------------------------
 --       Utilities
