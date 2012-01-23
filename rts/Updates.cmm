@@ -50,7 +50,7 @@ INFO_TABLE_RET( stg_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
     
     updateWithIndirection(updatee,
                           R1,
-                          jump %ENTRY_CODE(Sp(0)));
+                          jump %ENTRY_CODE(Sp(0)) [R1]);
 }
 
 
@@ -72,21 +72,21 @@ INFO_TABLE_RET( stg_marked_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
         R1 = v;
         foreign "C" checkBlockingQueues(MyCapability() "ptr",
                                         CurrentTSO "ptr") [R1];
-        jump %ENTRY_CODE(Sp(0));
+        jump %ENTRY_CODE(Sp(0)) [R1];
     }
 
     // common case: it is still our BLACKHOLE
     if (v == CurrentTSO) {
         updateWithIndirection(updatee,
                               R1,
-                              jump %ENTRY_CODE(Sp(0)));
+                              jump %ENTRY_CODE(Sp(0)) [R1]);
     }
 
     // The other cases are all handled by the generic code
     foreign "C" updateThunk (MyCapability() "ptr", CurrentTSO "ptr", 
                              updatee "ptr", R1 "ptr") [R1];
 
-    jump %ENTRY_CODE(Sp(0));
+    jump %ENTRY_CODE(Sp(0)) [R1];
 }
 
 // Special update frame code for CAFs and eager-blackholed thunks: it
@@ -95,5 +95,6 @@ INFO_TABLE_RET( stg_marked_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
 // high watermark.
 INFO_TABLE_RET (stg_bh_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
 {
-    jump RET_LBL(stg_marked_upd_frame);
+    jump RET_LBL(stg_marked_upd_frame) [R1];
 }
+

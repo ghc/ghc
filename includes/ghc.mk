@@ -41,9 +41,7 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 includes_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
-includes_CC_OPTS += -Iincludes
-includes_CC_OPTS += -Iincludes/dist-derivedconstants/header
-includes_CC_OPTS += -Iincludes/dist-ghcconstants/header
+includes_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 includes_CC_OPTS += -Irts
 
 ifneq "$(GhcWithSMP)" "YES"
@@ -65,7 +63,7 @@ $(includes_H_CONFIG) :
 
 else
 
-$(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk
+$(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCAUTOCONF_H__"  >$@
 	@echo "#define __GHCAUTOCONF_H__" >>$@
@@ -76,7 +74,7 @@ $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk
 
 endif
 
-$(includes_H_PLATFORM) : includes/Makefile
+$(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCPLATFORM_H__"  >$@

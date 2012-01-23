@@ -480,9 +480,9 @@ export_subspec :: { Located ImpExpSubSpec }
         : {- empty -}                   { L0 ImpExpAbs }
         | '(' '..' ')'                  { LL ImpExpAll }
         | '(' ')'                       { LL (ImpExpList []) }
-        | '(' qcnames ')'               { LL (ImpExpList $2) }
+        | '(' qcnames ')'               { LL (ImpExpList (reverse $2)) }
 
-qcnames :: { [RdrName] }
+qcnames :: { [RdrName] }     -- A reversed list
         :  qcnames ',' qcname_ext       { unLoc $3 : $1 }
         |  qcname_ext                   { [unLoc $1]  }
 

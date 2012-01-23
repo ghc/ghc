@@ -1395,7 +1395,7 @@ funAppCtxt fun arg arg_no
        2 (quotes (ppr arg))
 
 funResCtxt :: LHsExpr Name -> TcType -> TcType 
-           -> TidyEnv -> TcM (TidyEnv, Message)
+           -> TidyEnv -> TcM (TidyEnv, MsgDoc)
 -- When we have a mis-match in the return type of a function
 -- try to give a helpful message about too many/few arguments
 funResCtxt fun fun_res_ty res_ty env0

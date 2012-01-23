@@ -32,12 +32,11 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 
-module OldPprCmm
-    ( pprStmt
-    , module PprCmmDecl
-    , module PprCmmExpr
-    )
-where
+module OldPprCmm (
+        pprStmt,
+        module PprCmmDecl,
+        module PprCmmExpr
+    ) where
 
 import BlockId
 import CLabel
@@ -45,7 +44,6 @@ import CmmUtils
 import OldCmm
 import PprCmmDecl
 import PprCmmExpr
-
 
 import BasicTypes
 import ForeignCall
@@ -109,7 +107,7 @@ pprStmt platform stmt = case stmt of
     -- ;
     CmmNop -> semi
 
-    --  // text
+    -- // text
     CmmComment s -> text "//" <+> ftext s
 
     -- reg = expr;
@@ -153,7 +151,7 @@ pprStmt platform stmt = case stmt of
 
     CmmBranch ident          -> genBranch ident
     CmmCondBranch expr ident -> genCondBranch platform expr ident
-    CmmJump expr             -> genJump platform expr
+    CmmJump expr live        -> genJump platform expr live
     CmmReturn                -> genReturn platform
     CmmSwitch arg ids        -> genSwitch platform arg ids
 
@@ -175,7 +173,6 @@ pprUpdateFrame platform (UpdateFrame expr args) =
                     _ -> parens (pprExpr platform expr)
          , space
          , parens  ( commafy $ map (pprPlatform platform) args ) ]
-
 
 -- --------------------------------------------------------------------------
 -- goto local label. [1], section 6.6
@@ -203,17 +200,17 @@ genCondBranch platform expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: Platform -> CmmExpr -> SDoc
-genJump platform expr =
+genJump :: Platform -> CmmExpr -> Maybe [GlobalReg] -> SDoc
+genJump platform expr live =
     hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
                 then pprExpr platform expr
                 else case expr of
                     CmmLoad (CmmReg _) _ -> pprExpr platform expr
-                    _ -> parens (pprExpr platform expr)
-         , semi ]
-
+                    _                    -> parens (pprExpr platform expr)
+         , semi <+> ptext (sLit "// ")
+         , maybe empty ppr live]
 
 -- --------------------------------------------------------------------------
 -- Return from a function. [1], Section 6.8.2 of version 1.128
@@ -264,3 +261,4 @@ genSwitch platform expr maybe_ids
 
 commafy :: [SDoc] -> SDoc
 commafy xs = fsep $ punctuate comma xs
+

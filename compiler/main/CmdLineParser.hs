@@ -80,8 +80,7 @@ addErr :: Monad m => String -> EwM m ()
 addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` L loc e, ws, ()))
 
 addWarn :: Monad m => String -> EwM m ()
-addWarn msg = EwM (\(L loc _) es ws -> return (es, ws `snocBag` L loc w, ()))
-  where w = "Warning: " ++ msg
+addWarn msg = EwM (\(L loc _) es ws -> return (es, ws `snocBag` L loc msg, ()))
 
 deprecate :: Monad m => String -> EwM m ()
 deprecate s = do

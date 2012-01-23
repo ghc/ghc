@@ -158,7 +158,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             test -z "[$]2" || eval "[$]2=ArchX86"
             ;;
         x86_64)
-            GET_ARM_ISA()
             test -z "[$]2" || eval "[$]2=ArchX86_64"
             ;;
         powerpc)
@@ -174,7 +173,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             GET_ARM_ISA()
             test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT}\""
             ;;
-        hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
+        alpha|mips|mipseb|mipsel|hppa|hppa1_1|ia64|m68k|rs6000|s390|s390x|sparc64|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         *)
@@ -371,6 +370,18 @@ AC_DEFUN([FP_SETTINGS],
         SettingsDllWrapCommand="/bin/false"
         SettingsWindresCommand="/bin/false"
         SettingsTouchCommand='touch'
+        if test -z "$LlcCmd"
+        then
+          SettingsLlcCommand="llc"
+        else
+          SettingsLlcCommand="$LlcCmd"
+        fi
+        if test -z "$OptCmd"
+        then
+          SettingsOptCommand="opt"
+        else
+          SettingsOptCommand="$OptCmd"
+        fi
     fi
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsCCompilerFlags)
@@ -378,6 +389,8 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsTouchCommand)
+    AC_SUBST(SettingsLlcCommand)
+    AC_SUBST(SettingsOptCommand)
 ])
 
 
@@ -538,6 +551,35 @@ AC_ARG_WITH($2,
 )
 ]) # FP_ARG_WITH_PATH_GNU_PROG
 
+
+# FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
+# --------------------
+# XXX
+#
+# $1 = the variable to set
+# $2 = the command to look for
+#
+AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL],
+[
+AC_ARG_WITH($2,
+[AC_HELP_STRING([--with-$2=ARG],
+        [Use ARG as the path to $2 [default=autodetect]])],
+[
+    if test "$HostOS" = "mingw32"
+    then
+        AC_MSG_WARN([Request to use $withval will be ignored])
+    else
+        $1=$withval
+    fi
+],
+[
+    if test "$HostOS" != "mingw32"
+    then
+        AC_PATH_PROG([$1], [$2])
+    fi
+]
+)
+]) # FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
 
 # FP_PROG_CONTEXT_DIFF
 # --------------------
@@ -1947,10 +1989,12 @@ AC_DEFUN([XCODE_VERSION],[
 # Finds where gcc is
 AC_DEFUN([FIND_GCC],[
     if test "$TargetOS_CPP" = "darwin" &&
-        test "$XCodeVersion1" -ge 4
+       test "$XCodeVersion1" -eq 4 &&
+       test "$XCodeVersion2" -lt 2
     then
-        # From Xcode 4, use 'gcc-4.2' to force the use of the gcc legacy
-        # backend (instead of the LLVM backend)
+        # In Xcode 4.1, 'gcc-4.2' is the gcc legacy backend (rather
+        # than the LLVM backend). We prefer the legacy gcc, but in
+        # Xcode 4.2 'gcc-4.2' was removed.
         FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc-4.2])
     else
         FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])

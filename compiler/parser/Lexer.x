@@ -145,7 +145,7 @@ haskell :-
 
 -- everywhere: skip whitespace and comments
 $white_no_nl+ ;
-$tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
+$tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 -- Everywhere: deal with nested comments.  We explicitly rule out
 -- pragmas, "{-#", so that we don't accidentally treat them as comments.
@@ -1484,7 +1484,7 @@ data ParseResult a
         SrcSpan         -- The start and end of the text span related to
                         -- the error.  Might be used in environments which can
                         -- show this span, e.g. by highlighting it.
-        Message         -- The error message
+        MsgDoc          -- The error message
 
 data PState = PState {
         buffer     :: StringBuffer,
@@ -1959,7 +1959,7 @@ getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
 srcParseErr
   :: StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
-  -> Message
+  -> MsgDoc
 srcParseErr buf len
   = hcat [ if null token
              then ptext (sLit "parse error (possibly incorrect indentation)")

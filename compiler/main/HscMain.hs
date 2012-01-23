@@ -266,7 +266,7 @@ throwErrors = liftIO . throwIO . mkSrcErr
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
 ioMsgMaybe :: IO (Messages, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
-    ((warns,errs), mb_r) <- liftIO $ ioA
+    ((warns,errs), mb_r) <- liftIO ioA
     logWarnings warns
     case mb_r of
         Nothing -> throwErrors errs
@@ -844,8 +844,7 @@ hscFileFrontEnd mod_summary = do
             return tcg_env'
   where
     pprMod t  = ppr $ moduleName $ tcg_mod t
-    errSafe t = text "Warning:" <+> quotes (pprMod t)
-                   <+> text "has been infered as safe!"
+    errSafe t = quotes (pprMod t) <+> text "has been infered as safe!"
 
 --------------------------------------------------------------
 -- Safe Haskell
@@ -1120,8 +1119,7 @@ wipeTrust tcg_env whyUnsafe = do
   where
     wiped_trust = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
     pprMod      = ppr $ moduleName $ tcg_mod tcg_env
-    whyUnsafe'  = vcat [ text "Warning:" <+> quotes pprMod
-                             <+> text "has been infered as unsafe!"
+    whyUnsafe'  = vcat [ quotes pprMod <+> text "has been infered as unsafe!"
                        , text "Reason:"
                        , nest 4 (vcat $ pprErrMsgBag whyUnsafe) ]
 

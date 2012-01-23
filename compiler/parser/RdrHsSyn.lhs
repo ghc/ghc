@@ -996,14 +996,14 @@ data ImpExpSubSpec = ImpExpAbs | ImpExpAll | ImpExpList [ RdrName ]
 mkModuleImpExp :: RdrName -> ImpExpSubSpec -> IE RdrName
 mkModuleImpExp name subs =
   case subs of
-    ImpExpAbs | isVarNameSpace (rdrNameSpace name)
-                  -> IEVar       name
-    ImpExpAbs     -> IEThingAbs  nameT
-    ImpExpAll     -> IEThingAll  nameT
-    ImpExpList xs -> IEThingWith nameT xs
+    ImpExpAbs 
+      | isVarNameSpace (rdrNameSpace name) -> IEVar       name
+      | otherwise                          -> IEThingAbs  nameT
+    ImpExpAll                              -> IEThingAll  nameT
+    ImpExpList xs                          -> IEThingWith nameT xs
 
   where
-  nameT = setRdrNameSpace name tcClsName
+    nameT = setRdrNameSpace name tcClsName
 \end{code}
 
 -----------------------------------------------------------------------------

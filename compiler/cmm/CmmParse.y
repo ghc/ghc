@@ -411,8 +411,8 @@ stmt	:: { ExtCode }
 		{ do as <- sequence $5; doSwitch $2 $3 as $6 }
 	| 'goto' NAME ';'
 		{ do l <- lookupLabel $2; stmtEC (CmmBranch l) }
-	| 'jump' expr ';'
-		{ do e <- $2; stmtEC (CmmJump e) }
+	| 'jump' expr vols ';'
+		{ do e <- $2; stmtEC (CmmJump e $3) }
         | 'return' ';'
 		{ stmtEC CmmReturn }
 	| 'if' bool_expr 'goto' NAME
@@ -940,12 +940,12 @@ doStore rep addr_code val_code
 emitRetUT :: [(CgRep,CmmExpr)] -> Code
 emitRetUT args = do
   tickyUnboxedTupleReturn (length args)  -- TICK
-  (sp, stmts) <- pushUnboxedTuple 0 args
+  (sp, stmts, live) <- pushUnboxedTuple 0 args
   emitSimultaneously stmts -- NB. the args might overlap with the stack slots
                            -- or regs that we assign to, so better use
                            -- simultaneous assignments here (#3546)
   when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
-  stmtC $ CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord))
+  stmtC $ CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) bWord)) (Just live)
 
 -- -----------------------------------------------------------------------------
 -- If-then-else and boolean expressions

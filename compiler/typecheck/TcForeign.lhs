@@ -468,7 +468,7 @@ checkCConv CmmCallConv  = panic "checkCConv CmmCallConv"
 Warnings
 
 \begin{code}
-check :: Bool -> Message -> TcM ()
+check :: Bool -> MsgDoc -> TcM ()
 check True _       = return ()
 check _    the_err = addErrTc the_err
 
@@ -483,7 +483,7 @@ argument, result :: SDoc
 argument = text "argument"
 result   = text "result"
 
-badCName :: CLabelString -> Message
+badCName :: CLabelString -> MsgDoc
 badCName target
   = sep [quotes (ppr target) <+> ptext (sLit "is not a valid C identifier")]
 

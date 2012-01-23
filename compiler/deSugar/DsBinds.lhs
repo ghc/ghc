@@ -32,7 +32,8 @@ import DsUtils
 
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
-import HscTypes(MonadThings)
+import HscTypes         ( MonadThings )
+import Literal          ( Literal(MachStr) )
 import CoreSubst
 import MkCore
 import CoreUtils
@@ -40,6 +41,7 @@ import CoreArity ( etaExpand )
 import CoreUnfold
 import CoreFVs
 import Digraph
+
 
 import TyCon      ( isTupleTyCon, tyConDataCons_maybe )
 import TcEvidence
@@ -712,7 +714,11 @@ dsEvTerm (EvSuperClass d n)
   = return $ Var sc_sel_id `mkTyApps` tys `App` Var d
   where
     sc_sel_id  = classSCSelId cls n	-- Zero-indexed
-    (cls, tys) = getClassPredTys (evVarPred d)    
+    (cls, tys) = getClassPredTys (evVarPred d)   
+dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
+  where 
+    errorId = rUNTIME_ERROR_ID
+    litMsg  = Lit (MachStr msg)
 
 dsEvTerm (EvInteger n) = mkIntegerExpr n
 

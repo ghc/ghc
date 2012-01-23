@@ -14,31 +14,37 @@
 #ifndef RTS_LINKER_H
 #define RTS_LINKER_H
 
+#if defined(mingw32_HOST_OS)
+typedef wchar_t pathchar;
+#else
+typedef char    pathchar;
+#endif
+
 /* initialize the object linker */
 void initLinker( void );
 
 /* insert a stable symbol in the hash table */
-void insertStableSymbol(char* obj_name, char* key, StgPtr data);
+void insertStableSymbol(pathchar* obj_name, char* key, StgPtr data);
 
 /* insert a symbol in the hash table */
-void insertSymbol(char* obj_name, char* key, void* data);
+void insertSymbol(pathchar* obj_name, char* key, void* data);
 
 /* lookup a symbol in the hash table */
 void *lookupSymbol( char *lbl );
 
 /* delete an object from the pool */
-HsInt unloadObj( char *path );
+HsInt unloadObj( pathchar *path );
 
 /* add an obj (populate the global symbol table, but don't resolve yet) */
-HsInt loadObj( char *path );
+HsInt loadObj( pathchar *path );
 
 /* add an arch (populate the global symbol table, but don't resolve yet) */
-HsInt loadArchive( char *path );
+HsInt loadArchive( pathchar *path );
 
 /* resolve all the currently unlinked objects in memory */
 HsInt resolveObjs( void );
 
 /* load a dynamic library */
-const char *addDLL( char* dll_name );
+const char *addDLL( pathchar* dll_name );
 
 #endif /* RTS_LINKER_H */
