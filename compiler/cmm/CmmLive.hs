@@ -90,7 +90,8 @@ xferLive = mkBTransfer3 fst mid lst
 removeDeadAssignments :: CmmGraph -> FuelUniqSM CmmGraph
 removeDeadAssignments g =
    liftM fst $ dataflowPassBwd g [] $ analRewBwd liveLattice xferLive rewrites
-   where rewrites = deepBwdRw3 nothing middle nothing
+   where rewrites = mkBRewrite3 nothing middle nothing
+         -- SDM: no need for deepBwdRw here, we only rewrite to empty
          -- Beware: deepBwdRw with one polymorphic function seems more reasonable here,
          -- but GHC panics while compiling, see bug #4045.
          middle :: CmmNode O O -> Fact O CmmLive -> CmmReplGraph O O
