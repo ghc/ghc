@@ -272,9 +272,9 @@ analyzeFwd FwdPass { fp_lattice = lattice,
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> f -> Fact x f
     block BNil            f = f
-    block (BlockCO n b)   f = (ftr n `cat` block b) f
-    block (BlockCC l b n) f = (ftr l `cat` block b `cat` ltr n) f
-    block (BlockOC   b n) f =             (block b `cat` ltr n) f
+    block (BlockCO n b)   f = (ftr n `cat`  block b) f
+    block (BlockCC l b n) f = (ftr l `cat` (block b `cat` ltr n)) f
+    block (BlockOC   b n) f =              (block b `cat` ltr n) f
 
     block (BMiddle n)     f = {-# SCC "b1" #-} mtr n f
     block (BCat b1 b2)    f = {-# SCC "b2" #-} (block b1 `cat` block b2) f
@@ -282,6 +282,7 @@ analyzeFwd FwdPass { fp_lattice = lattice,
     block (BTail n t)     f = {-# SCC "b4" #-} (mtr  n   `cat` block t) f
 
     {-# INLINE cat #-}
+    cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
     cat ft1 ft2 = \f -> ft2 $! ft1 f
 
 -- | if the graph being analyzed is open at the entry, there must
@@ -319,6 +320,7 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
     block (BlockOC   b n) f = ltr n f
 
     {-# INLINE cat #-}
+    cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
     cat ft1 ft2 = \f -> ft2 $! ft1 f
 
 ----------------------------------------------------------------
@@ -354,9 +356,9 @@ analyzeBwd BwdPass { bp_lattice = lattice,
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> Fact x f -> f
     block BNil            f = f
-    block (BlockCO n b)   f = (ftr n `cat` block b) f
-    block (BlockCC l b n) f = (ftr l `cat` block b `cat` ltr n) f
-    block (BlockOC   b n) f =             (block b `cat` ltr n) f
+    block (BlockCO n b)   f = (ftr n `cat`  block b) f
+    block (BlockCC l b n) f = ((ftr l `cat` block b) `cat` ltr n) f
+    block (BlockOC   b n) f =              (block b `cat` ltr n) f
 
     block (BMiddle n)     f = mtr n f
     block (BCat b1 b2)    f = (block b1 `cat` block b2) f
@@ -364,6 +366,7 @@ analyzeBwd BwdPass { bp_lattice = lattice,
     block (BTail n t)     f = (mtr  n   `cat` block t) f
 
     {-# INLINE cat #-}
+    cat :: forall f1 f2 f3 . (f2 -> f3) -> (f1 -> f2) -> (f1 -> f3)
     cat ft1 ft2 = \f -> ft1 $! ft2 f
 
 -----------------------------------------------------------------------------
