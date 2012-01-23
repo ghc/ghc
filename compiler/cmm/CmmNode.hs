@@ -40,10 +40,10 @@ data CmmNode e x where
 
   CmmComment :: FastString -> CmmNode O O
 
-  CmmAssign :: CmmReg -> CmmExpr -> CmmNode O O
+  CmmAssign :: !CmmReg -> !CmmExpr -> CmmNode O O
     -- Assign to register
 
-  CmmStore :: CmmExpr -> CmmExpr -> CmmNode O O
+  CmmStore :: !CmmExpr -> !CmmExpr -> CmmNode O O
     -- Assign to memory location.  Size is
     -- given by cmmExprType of the rhs.
 
