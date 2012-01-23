@@ -44,11 +44,11 @@ import qualified Data.Set as Set
 
 data CmmExpr
   = CmmLit CmmLit               -- Literal
-  | CmmLoad CmmExpr CmmType     -- Read memory location
-  | CmmReg CmmReg		-- Contents of register
+  | CmmLoad !CmmExpr !CmmType     -- Read memory location
+  | CmmReg !CmmReg              -- Contents of register
   | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
   | CmmStackSlot Area Int       -- addressing expression of a stack slot
-  | CmmRegOff CmmReg Int	
+  | CmmRegOff !CmmReg Int
 	-- CmmRegOff reg i
 	--        ** is shorthand only, meaning **
 	-- CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
