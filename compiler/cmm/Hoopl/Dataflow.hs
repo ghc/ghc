@@ -19,7 +19,7 @@ module Hoopl.Dataflow
   , wrapBR, wrapBR2
   , BwdRewrite,  mkBRewrite,  mkBRewrite3,  getBRewrite3, noBwdRewrite
   , analyzeAndRewriteFwd,  analyzeAndRewriteBwd
-  , analyzeFwd, analyzeBwd
+  , analyzeFwd, analyzeFwdBlocks, analyzeBwd
   )
 where
 
@@ -135,7 +135,7 @@ arfGraph :: forall n f e x .  NonLocal n =>
             Entries e -> Graph n e x -> Fact e f -> FuelUniqSM (DG f n e x, Fact x f)
 arfGraph pass@FwdPass { fp_lattice = lattice,
                         fp_transfer = transfer,
-                        fp_rewrite  = rewrite } entries = graph
+                        fp_rewrite  = rewrite } entries g in_fact = graph g in_fact
   where
     {- nested type synonyms would be so lovely here 
     type ARF  thing = forall e x . thing e x -> f        -> m (DG f n e x, Fact x f)
@@ -156,31 +156,31 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
         -> (f2 -> FuelUniqSM (DG f n a x, f3))
         -> (f1 -> FuelUniqSM (DG f n e x, f3))
 
-    graph GNil            = \f -> return (dgnil, f)
-    graph (GUnit blk)     = block blk
-    graph (GMany e bdy x) = (e `ebcat` bdy) `cat` exit x
+    graph GNil            f = return (dgnil, f)
+    graph (GUnit blk)     f = block blk f
+    graph (GMany e bdy x) f = ((e `ebcat` bdy) `cat` exit x) f
      where
       ebcat :: MaybeO e (Block n O C) -> Body n -> Fact e f -> FuelUniqSM (DG f n e C, Fact C f)
       exit  :: MaybeO x (Block n C O)           -> Fact C f -> FuelUniqSM (DG f n C x, Fact x f)
-      exit (JustO blk) = arfx block blk
-      exit NothingO    = \fb -> return (dgnilC, fb)
-      ebcat entry bdy = c entries entry
+      exit (JustO blk) f = arfx block blk f
+      exit NothingO    f = return (dgnilC, f)
+      ebcat entry bdy f = c entries entry f
        where c :: MaybeC e [Label] -> MaybeO e (Block n O C)
                 -> Fact e f -> FuelUniqSM (DG f n e C, Fact C f)
-             c NothingC (JustO entry)   = block entry `cat` body (successors entry) bdy
-             c (JustC entries) NothingO = body entries bdy
-             c _ _ = error "bogus GADT pattern match failure"
+             c NothingC (JustO entry)   f = (block entry `cat` body (successors entry) bdy) f
+             c (JustC entries) NothingO f = body entries bdy f
+             c _ _ _ = error "bogus GADT pattern match failure"
 
     -- Lift from nodes to blocks
-    block BNil          = \f -> return (dgnil, f)
-    block (BlockCO n b) = node n `cat` block b
-    block (BlockCC l b n) = node l `cat` block b `cat` node n
-    block (BlockOC   b n) =              block b `cat` node n
+    block BNil            f = return (dgnil, f)
+    block (BlockCO n b)   f = (node n `cat` block b) f
+    block (BlockCC l b n) f = (node l `cat` block b `cat` node n) f
+    block (BlockOC   b n) f =              (block b `cat` node n) f
 
-    block (BMiddle n)  = node n
-    block (BCat b1 b2) = block b1 `cat` block b2
-    block (BHead h n)  = block h  `cat` node n
-    block (BTail n t)  = node  n  `cat` block t
+    block (BMiddle n)     f = node n f
+    block (BCat b1 b2)    f = (block b1 `cat` block b2) f
+    block (BHead h n)     f = (block h  `cat` node n) f
+    block (BTail n t)     f = (node  n  `cat` block t) f
 
     {-# INLINE node #-}
     node :: forall e x . (ShapeLifter e x)
@@ -200,7 +200,8 @@ arfGraph pass@FwdPass { fp_lattice = lattice,
     {-# INLINE cat #-} 
     cat ft1 ft2 f = do { (g1,f1) <- ft1 f
                        ; (g2,f2) <- ft2 f1
-                       ; return (g1 `dgSplice` g2, f2) }
+                       ; let !g = g1 `dgSplice` g2
+                       ; return (g, f2) }
 
     arfx :: forall x .
             (Block n C x ->        f -> FuelUniqSM (DG f n C x, Fact x f))
@@ -268,19 +269,57 @@ analyzeFwd FwdPass { fp_lattice = lattice,
            do_block b fb = block b entryFact
              where entryFact = getFact lattice (entryLabel b) fb
 
+    -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> f -> Fact x f
-    block BNil            = id
-    block (BlockCO n b)   = ftr n `cat` block b
-    block (BlockCC l b n) = ftr l `cat` block b `cat` ltr n
-    block (BlockOC   b n) =             block b `cat` ltr n
+    block BNil            f = f
+    block (BlockCO n b)   f = (ftr n `cat` block b) f
+    block (BlockCC l b n) f = (ftr l `cat` block b `cat` ltr n) f
+    block (BlockOC   b n) f =             (block b `cat` ltr n) f
 
-    block (BMiddle n)     = mtr n
-    block (BCat b1 b2)    = block b1 `cat` block b2
-    block (BHead h n)     = block h  `cat` mtr n
-    block (BTail n t)     = mtr  n   `cat` block t
+    block (BMiddle n)     f = {-# SCC "b1" #-} mtr n f
+    block (BCat b1 b2)    f = {-# SCC "b2" #-} (block b1 `cat` block b2) f
+    block (BHead h n)     f = {-# SCC "b3" #-} (block h  `cat` mtr n) f
+    block (BTail n t)     f = {-# SCC "b4" #-} (mtr  n   `cat` block t) f
 
     {-# INLINE cat #-}
-    cat ft1 ft2 f = ft2 (ft1 f)
+    cat ft1 ft2 = \f -> ft2 $! ft1 f
+
+-- | if the graph being analyzed is open at the entry, there must
+--   be no other entry point, or all goes horribly wrong...
+analyzeFwdBlocks
+   :: forall n f e .  NonLocal n =>
+      FwdPass FuelUniqSM n f
+   -> MaybeC e [Label]
+   -> Graph n e C -> Fact e f
+   -> FactBase f
+analyzeFwdBlocks FwdPass { fp_lattice = lattice,
+                           fp_transfer = FwdTransfer3 (ftr, _, ltr) }
+  entries g in_fact = graph g in_fact
+  where
+    graph :: Graph n e C -> Fact e f -> FactBase f
+    graph (GMany entry blockmap NothingO)
+      = case (entries, entry) of
+         (NothingC, JustO entry)   -> block entry `cat` body (successors entry)
+         (JustC entries, NothingO) -> body entries
+         _ -> error "bogus GADT pattern match failure"
+     where
+       body  :: [Label] -> Fact C f -> Fact C f
+       body entries f
+         = fixpoint_anal Fwd lattice do_block entries blockmap f
+         where
+           do_block :: forall x . Block n C x -> FactBase f -> Fact x f
+           do_block b fb = block b entryFact
+             where entryFact = getFact lattice (entryLabel b) fb
+
+    -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
+    block :: forall e x . Block n e x -> f -> Fact x f
+    block BNil            f = f
+    block (BlockCO n b)   f = ftr n f
+    block (BlockCC l b n) f = (ftr l `cat` ltr n) f
+    block (BlockOC   b n) f = ltr n f
+
+    {-# INLINE cat #-}
+    cat ft1 ft2 = \f -> ft2 $! ft1 f
 
 ----------------------------------------------------------------
 --       Backward Analysis only
@@ -312,19 +351,20 @@ analyzeBwd BwdPass { bp_lattice = lattice,
            do_block :: forall x . Block n C x -> Fact x f -> FactBase f
            do_block b fb = mapSingleton (entryLabel b) (block b fb)
 
+    -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> Fact x f -> f
-    block BNil            = id
-    block (BlockCO n b)   = ftr n `cat` block b
-    block (BlockCC l b n) = ftr l `cat` block b `cat` ltr n
-    block (BlockOC   b n) =             block b `cat` ltr n
+    block BNil            f = f
+    block (BlockCO n b)   f = (ftr n `cat` block b) f
+    block (BlockCC l b n) f = (ftr l `cat` block b `cat` ltr n) f
+    block (BlockOC   b n) f =             (block b `cat` ltr n) f
 
-    block (BMiddle n)     = mtr n
-    block (BCat b1 b2)    = block b1 `cat` block b2
-    block (BHead h n)     = block h  `cat` mtr n
-    block (BTail n t)     = mtr  n   `cat` block t
+    block (BMiddle n)     f = mtr n f
+    block (BCat b1 b2)    f = (block b1 `cat` block b2) f
+    block (BHead h n)     f = (block h  `cat` mtr n) f
+    block (BTail n t)     f = (mtr  n   `cat` block t) f
 
     {-# INLINE cat #-}
-    cat ft1 ft2 f = ft1 (ft2 f)
+    cat ft1 ft2 = \f -> ft1 $! ft2 f
 
 -----------------------------------------------------------------------------
 --              Backward analysis and rewriting: the interface
@@ -362,7 +402,7 @@ arbGraph :: forall n f e x .
             Entries e -> Graph n e x -> Fact x f -> FuelUniqSM (DG f n e x, Fact e f)
 arbGraph pass@BwdPass { bp_lattice  = lattice,
                         bp_transfer = transfer,
-                        bp_rewrite  = rewrite } entries = graph
+                        bp_rewrite  = rewrite } entries g in_fact = graph g in_fact
   where
     {- nested type synonyms would be so lovely here 
     type ARB  thing = forall e x . thing e x -> Fact x f -> m (DG f n e x, f)
@@ -378,30 +418,31 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
         -> (info  -> FuelUniqSM (DG f n a x, info'))
         -> (info  -> FuelUniqSM (DG f n e x, info''))
 
-    graph GNil            = \f -> return (dgnil, f)
-    graph (GUnit blk)     = block blk
-    graph (GMany e bdy x) = (e `ebcat` bdy) `cat` exit x
+    graph GNil            f = return (dgnil, f)
+    graph (GUnit blk)     f = block blk f
+    graph (GMany e bdy x) f = ((e `ebcat` bdy) `cat` exit x) f
      where
       ebcat :: MaybeO e (Block n O C) -> Body n -> Fact C f -> FuelUniqSM (DG f n e C, Fact e f)
       exit  :: MaybeO x (Block n C O)           -> Fact x f -> FuelUniqSM (DG f n C x, Fact C f)
-      exit (JustO blk) = arbx block blk
-      exit NothingO    = \fb -> return (dgnilC, fb)
-      ebcat entry bdy = c entries entry
+      exit (JustO blk) f = arbx block blk f
+      exit NothingO    f = return (dgnilC, f)
+      ebcat entry bdy f = c entries entry f
        where c :: MaybeC e [Label] -> MaybeO e (Block n O C)
                 -> Fact C f -> FuelUniqSM (DG f n e C, Fact e f)
-             c NothingC (JustO entry)   = block entry `cat` body (successors entry) bdy
-             c (JustC entries) NothingO = body entries bdy
-             c _ _ = error "bogus GADT pattern match failure"
+             c NothingC (JustO entry)   f = (block entry `cat` body (successors entry) bdy) f
+             c (JustC entries) NothingO f = body entries bdy f
+             c _ _ _ = error "bogus GADT pattern match failure"
 
     -- Lift from nodes to blocks
-    block BNil            = \f -> return (dgnil, f)
-    block (BlockCO l b)   = node l `cat` block b
-    block (BlockCC l b n) = node l `cat` block b `cat` node n
-    block (BlockOC   b n) =              block b `cat` node n
-    block (BMiddle n)    = node n
-    block (BCat b1 b2)   = block b1 `cat` block b2
-    block (BHead h n)    = block h  `cat` node n
-    block (BTail n t)    = node  n  `cat` block t
+    block BNil            f = return (dgnil, f)
+    block (BlockCO n b)   f = (node n `cat` block b) f
+    block (BlockCC l b n) f = (node l `cat` block b `cat` node n) f
+    block (BlockOC   b n) f =              (block b `cat` node n) f
+
+    block (BMiddle n)     f = node n f
+    block (BCat b1 b2)    f = (block b1 `cat` block b2) f
+    block (BHead h n)     f = (block h  `cat` node n) f
+    block (BTail n t)     f = (node  n  `cat` block t) f
 
     {-# INLINE node #-}
     node n f
@@ -419,7 +460,8 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
     {-# INLINE cat #-} 
     cat ft1 ft2 f = do { (g2,f2) <- ft2 f
                        ; (g1,f1) <- ft1 f2
-                       ; return (g1 `dgSplice` g2, f1) }
+                       ; let !g = g1 `dgSplice` g2
+                       ; return (g, f1) }
 
     arbx :: forall x .
             (Block n C x -> Fact x f -> FuelUniqSM (DG f n C x, f))
@@ -505,11 +547,14 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
               do_block entries blockmap init_fbase
   = loop start init_fbase setEmpty
   where
-    blocks               = forwardBlockList entries blockmap
-    ordered_blocks       = case direction of
-                             Fwd -> blocks
-                             Bwd -> reverse blocks
-    block_arr            = listArray (0,length blocks - 1) ordered_blocks
+    is_bwd = case direction of Bwd -> True; Fwd -> False
+
+    blocks = forwardBlockList entries blockmap
+
+    ordered_blocks | is_bwd    = reverse blocks
+                   | otherwise = blocks
+
+    block_arr = listArray (0,length blocks - 1) ordered_blocks
 
     start | Fwd <- direction
           = IS.fromList (concatMap (\l -> mapFindWithDefault [] l dep_blocks) entries)
@@ -525,8 +570,6 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
                                  Bwd -> successors b
                         ]
 
-    is_bwd = case direction of Bwd -> True; Fwd -> False
-
     loop
        :: IntSet      -- blocks still to analyse
        -> FactBase f  -- current factbase (increases monotonically)
@@ -539,7 +582,7 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
            let blk = block_arr ! ix
                lbl = entryLabel blk
            in
-           -- trace ("analysing: " ++ show lbl) $
+           -- trace ("analysing: " ++ show (entryLabel blk)) $
            let out_facts = do_block blk fbase
 
                (changed, fbase') = mapFoldWithKey
@@ -651,9 +694,8 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
       | IS.null todo = return (fbase, newblocks)
       | (ix,todo') <- IS.deleteFindMin todo = do
            let blk = block_arr ! ix
-               lbl = entryLabel blk
 
-           -- trace ("analysing: " ++ show lbl) $ return ()
+           -- trace ("analysing: " ++ show (entryLabel blk)) $ return ()
            (rg, out_facts) <- do_block blk fbase
            let (changed, fbase') = mapFoldWithKey
                                      (updateFact bot join is_bwd newblocks)

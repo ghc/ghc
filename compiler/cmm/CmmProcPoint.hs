@@ -111,7 +111,7 @@ procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelUniqSM (BlockEnv Status)
 -- what proc-points each block is reachable from
 procPointAnalysis procPoints g =
   -- pprTrace "procPointAnalysis" (ppr procPoints) $
-  dataflowAnalFwd g initProcPoints $ analFwd lattice forward
+  dataflowAnalFwdBlocks g initProcPoints $ analFwd lattice forward
   where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints]
 
 -- transfer equations

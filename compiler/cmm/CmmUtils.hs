@@ -66,7 +66,8 @@ module CmmUtils(
         foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
       
         analFwd, analBwd, analRewFwd, analRewBwd,
-        dataflowPassFwd, dataflowPassBwd, dataflowAnalFwd, dataflowAnalBwd
+        dataflowPassFwd, dataflowPassBwd, dataflowAnalFwd, dataflowAnalBwd,
+        dataflowAnalFwdBlocks
   ) where
 
 #include "HsVersions.h"
@@ -523,6 +524,15 @@ dataflowAnalFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
 --  (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
 --  return facts
   return (analyzeFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts))
+
+dataflowAnalFwdBlocks :: NonLocal n =>
+                   GenCmmGraph n -> [(BlockId, f)]
+                -> FwdPass FuelUniqSM n f
+                -> FuelUniqSM (BlockEnv f)
+dataflowAnalFwdBlocks (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
+--  (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
+--  return facts
+  return (analyzeFwdBlocks fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts))
 
 dataflowAnalBwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
