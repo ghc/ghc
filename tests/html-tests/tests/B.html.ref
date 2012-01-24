@@ -55,6 +55,20 @@ window.onload = function () {pageLoad();setSynopsis("mini_B.html");};
 	    > :: <a href=""
 	    >Int</a
 	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >reExport</a
+	    > :: <a href=""
+	    >Int</a
+	    ></li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    >  <a href=""
+	    >X</a
+	    >  = <a href=""
+	    >X</a
+	    ></li
 	  ></ul
 	></div
       ><div id="interface"
@@ -103,6 +117,49 @@ window.onload = function () {pageLoad();setSynopsis("mini_B.html");};
 	      >Prelude</a
 	      >.
 </p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:reExport" class="def"
+	    >reExport</a
+	    > :: <a href=""
+	    >Int</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Should show up on the page for both modules A and B
+</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    >  <a name="t:X" class="def"
+	    >X</a
+	    >  </p
+	  ><div class="doc"
+	  ><p
+	    >Should show up on the page for both modules A and B
+</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a name="v:X" class="def"
+		  >X</a
+		  ></td
+		><td class="doc"
+		><p
+		  >Doc for consructor
+</p
+		  ></td
+		></tr
+	      ></table
 	    ></div
 	  ></div
 	></div

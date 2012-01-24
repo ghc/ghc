@@ -41,6 +41,46 @@ window.onload = function () {pageLoad();setSynopsis("mini_A.html");};
 	><p class="caption"
 	>A</p
 	></div
+      ><div id="synopsis"
+      ><p id="control.syn" class="caption expander" onclick="toggleSection('syn')"
+	>Synopsis</p
+	><ul id="section.syn" class="hide" onclick="toggleSection('syn')"
+	><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    >  <a href=""
+	    >A</a
+	    >  = <a href=""
+	    >A</a
+	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >other</a
+	    > :: <a href=""
+	    >Int</a
+	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >test2</a
+	    > :: <a href=""
+	    >Bool</a
+	    ></li
+	  ><li class="src short"
+	  ><span class="keyword"
+	    >data</span
+	    >  <a href=""
+	    >X</a
+	    >  = <a href=""
+	    >X</a
+	    ></li
+	  ><li class="src short"
+	  ><a href=""
+	    >reExport</a
+	    > :: <a href=""
+	    >Int</a
+	    ></li
+	  ></ul
+	></div
       ><div id="interface"
       ><h1
 	>Documentation</h1
@@ -81,6 +121,54 @@ window.onload = function () {pageLoad();setSynopsis("mini_A.html");};
 	    > :: <a href=""
 	    >Bool</a
 	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Doc for test2
+</p
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><span class="keyword"
+	    >data</span
+	    >  <a name="t:X" class="def"
+	    >X</a
+	    >  </p
+	  ><div class="doc"
+	  ><p
+	    >Should show up on the page for both modules A and B
+</p
+	    ></div
+	  ><div class="subs constructors"
+	  ><p class="caption"
+	    >Constructors</p
+	    ><table
+	    ><tr
+	      ><td class="src"
+		><a name="v:X" class="def"
+		  >X</a
+		  ></td
+		><td class="doc"
+		><p
+		  >Doc for consructor
+</p
+		  ></td
+		></tr
+	      ></table
+	    ></div
+	  ></div
+	><div class="top"
+	><p class="src"
+	  ><a name="v:reExport" class="def"
+	    >reExport</a
+	    > :: <a href=""
+	    >Int</a
+	    ></p
+	  ><div class="doc"
+	  ><p
+	    >Should show up on the page for both modules A and B
+</p
+	    ></div
 	  ></div
 	></div
       ></div
