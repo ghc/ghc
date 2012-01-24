@@ -25,8 +25,6 @@ module Data.Foldable (
     -- * Folds
     Foldable(..),
     -- ** Special biased folds
-    foldr',
-    foldl',
     foldrM,
     foldlM,
     -- ** Folding actions
@@ -64,6 +62,7 @@ import Prelude hiding (foldl, foldr, foldl1, foldr1, mapM_, sequence_,
                 elem, notElem, concat, concatMap, and, or, any, all,
                 sum, product, maximum, minimum)
 import qualified Prelude (foldl, foldr, foldl1, foldr1)
+import qualified Data.List as List (foldl')
 import Control.Applicative
 import Control.Monad (MonadPlus(..))
 import Data.Maybe (fromMaybe, listToMaybe)
@@ -124,11 +123,25 @@ class Foldable t where
     foldr :: (a -> b -> b) -> b -> t a -> b
     foldr f z t = appEndo (foldMap (Endo . f) t) z
 
+    -- | Right-associative fold of a structure, 
+    -- but with strict application of the operator.
+    foldr' :: (a -> b -> b) -> b -> t a -> b
+    foldr' f z0 xs = foldl f' id xs z0
+      where f' k x z = k $! f x z
+
     -- | Left-associative fold of a structure.
     --
     -- @'foldl' f z = 'Prelude.foldl' f z . 'toList'@
     foldl :: (a -> b -> a) -> a -> t b -> a
     foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
+
+    -- | Left-associative fold of a structure.
+    -- but with strict application of the operator.
+    --
+    -- @'foldl' f z = 'List.foldl'' f z . 'toList'@
+    foldl' :: (a -> b -> a) -> a -> t b -> a
+    foldl' f z0 xs = foldr f' id xs z0
+      where f' x k z = k $! f z x
 
     -- | A variant of 'foldr' that has no base case,
     -- and thus may only be applied to non-empty structures.
@@ -164,6 +177,7 @@ instance Foldable Maybe where
 instance Foldable [] where
     foldr = Prelude.foldr
     foldl = Prelude.foldl
+    foldl' = List.foldl'
     foldr1 = Prelude.foldr1
     foldl1 = Prelude.foldl1
 
@@ -173,23 +187,11 @@ instance Ix i => Foldable (Array i) where
     foldr1 f = Prelude.foldr1 f . elems
     foldl1 f = Prelude.foldl1 f . elems
 
--- | Fold over the elements of a structure,
--- associating to the right, but strictly.
-foldr' :: Foldable t => (a -> b -> b) -> b -> t a -> b
-foldr' f z0 xs = foldl f' id xs z0
-  where f' k x z = k $! f x z
-
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
 foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
 foldrM f z0 xs = foldl f' return xs z0
   where f' k x z = f x z >>= k
-
--- | Fold over the elements of a structure,
--- associating to the left, but strictly.
-foldl' :: Foldable t => (a -> b -> a) -> a -> t b -> a
-foldl' f z0 xs = foldr f' id xs z0
-  where f' x k z = k $! f z x
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the left, i.e. from left to right.
