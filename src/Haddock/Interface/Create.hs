@@ -34,7 +34,7 @@ import GHC hiding (flags)
 import HscTypes
 import Name
 import Bag
-import RdrName (GlobalRdrEnv)
+import RdrName
 import TcRnTypes (tcg_warns)
 import FastString (unpackFS)
 
@@ -79,29 +79,14 @@ createInterface tm flags modMap instIfaceMap = do
       (decls, _) = unzip declsWithDocs
       localInsts = filter (nameIsLocalOrFrom mdl . getName) instances
 
-  (docs, argMap, subMap, declMap) <- liftErrMsg $ mkMaps dflags gre localInsts exportedNames declsWithDocs
+  (docMap0, argMap, subMap, declMap) <- liftErrMsg $ mkMaps dflags gre localInsts exportedNames declsWithDocs
 
-  -- Attach warnings to documentation as appropriate.  If there is a warning
-  -- for an identifier with no documentation, create a piece of documentation,
-  -- that just contains the warning.
-  let docMap = warningMap `combine` docs
-        where
-          combine :: (Ord k, Monoid a) => Map k a -> Map k a -> Map k a
-          combine = M.unionWith mappend
-
-          warningMap = case warnings of
-            -- NOTE: warningMap may contain more elements than xs, e.g.  when
-            -- we have a warning for:
-            --
-            --   data Foo = Foo
-            --
-            -- So you can not just map over xs!
-            (WarnSome xs) -> foldr f M.empty exportedNames
-              where
-                f name m = case lookup (getOccName name) xs of
-                  Just x  -> M.insert name (warningToDoc x) m
-                  Nothing -> m
-            _ -> M.empty
+  -- Attach warnings to documentation. If there is a warning for an identifier
+  -- with no documentation, create a piece of documentation that just contains
+  -- the warning.
+  let docMap = foldl' (\m (n, d) -> M.insertWith mappend n d m) docMap0 l
+        where l = [ (gre_name elt, warningToDoc w) | WarnSome ws <- [warnings]
+                  , (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ ]
 
   let maps = (docMap, argMap, subMap, declMap)
 
