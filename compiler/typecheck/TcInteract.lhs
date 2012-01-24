@@ -96,25 +96,44 @@ solveInteractCts cts
        ; setTcSEvVarCacheMap new_evvar_cache 
        ; updWorkListTcS (appendWorkListCt cts_thinner) >> solveInteract }
  
-  where add_cts_in_cache evvar_cache = foldM solve_or_cache ([],evvar_cache)
-        solve_or_cache :: ([Ct],TypeMap (EvVar,CtFlavor)) 
-                       -> Ct
-                       -> TcS ([Ct],TypeMap (EvVar,CtFlavor))
-        solve_or_cache (acc_cts,acc_cache) ct
-          | isIPPred pty
-          = return (ct:acc_cts,acc_cache) -- Do not use the cache, 
-                                          -- nor update it for IPPreds due to subtle shadowing
-          | Just (ev',fl') <- lookupTM pty acc_cache
-          , fl' `canSolve` fl
-          , isWanted fl
-          = do { _ <- setEvBind ev (EvId ev') fl
-               ; return (acc_cts,acc_cache) }
-          | otherwise -- If it's a given keep it in the work list, even if it exists in the cache!
-          = return (ct:acc_cts, alterTM pty (\_ -> Just (ev,fl)) acc_cache)
-          where fl = cc_flavor ct
-                ev = cc_id ct
-                pty = ctPred ct
+  where
+    add_cts_in_cache evvar_cache cts
+      = do { ctxt <- getTcSContext
+           ; foldM (solve_or_cache (simplEqsOnly ctxt)) ([],evvar_cache) cts }
 
+    solve_or_cache :: Bool    -- Solve equalities only, not classes etc
+                   -> ([Ct],TypeMap (EvVar,CtFlavor))
+                   -> Ct
+                   -> TcS ([Ct],TypeMap (EvVar,CtFlavor))
+    solve_or_cache eqs_only (acc_cts,acc_cache) ct
+      | dont_cache eqs_only (classifyPredType pred_ty)
+      = return (ct:acc_cts,acc_cache)
+
+      | Just (ev',fl') <- lookupTM pred_ty acc_cache
+      , fl' `canSolve` fl
+      , isWanted fl
+      = do { _ <- setEvBind ev (EvId ev') fl
+           ; return (acc_cts,acc_cache) }
+
+      | otherwise -- If it's a given keep it in the work list, even if it exists in the cache!
+      = return (ct:acc_cts, alterTM pred_ty (\_ -> Just (ev,fl)) acc_cache)
+      where fl = cc_flavor ct
+            ev = cc_id ct
+            pred_ty = ctPred ct
+
+    dont_cache :: Bool -> PredTree -> Bool
+    -- Do not use the cache, not update it, if this is true
+    dont_cache _ (IPPred {}) = True    -- IPPreds have subtle shadowing
+    dont_cache _ (EqPred ty1 ty2)      -- Report Int ~ Bool errors separately
+      | Just tc1 <- tyConAppTyCon_maybe ty1
+      , Just tc2 <- tyConAppTyCon_maybe ty2
+      , tc1 /= tc2
+      = isDecomposableTyCon tc1 && isDecomposableTyCon tc2
+      | otherwise = False
+    dont_cache eqs_only _ = eqs_only
+            -- If we are simplifying equalities only,
+            -- do not cache non-equalities
+            -- See Note [Simplifying RULE lhs constraints] in TcSimplify
 
 solveInteractGiven :: GivenLoc -> [EvVar] -> TcS () 
 solveInteractGiven gloc evs
