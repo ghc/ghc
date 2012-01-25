@@ -81,10 +81,6 @@ Things to do:
    Old.Cmm. We should abstract it to work on both representations, it needs only to
    convert a CmmInfoTable to [CmmStatic].
 
- - The MkGraph currenty uses a different semantics for <*> than Hoopl. Maybe
-   we could convert codeGen/StgCmm* clients to the Hoopl's semantics?
-   It's all deeply unsatisfactory.
-
  - Improve performance of Hoopl.
 
    A nofib comparison of -fasm vs -fnewcodegen nofib compilation parameters
@@ -101,17 +97,11 @@ Things to do:
    When compiling nofib, ghc-head + libraries compiled with -fnew-codegen
    is 31.4% slower (http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.zipghcoldgen.txt).
 
-   So we generate a bit better code, but it takes us longer!
-
    EZY: Also importantly, Hoopl uses dramatically more memory than the
    old code generator.
 
  - Are all blockToNodeList and blockOfNodeList really needed? Maybe we could
    splice blocks instead?
-
-   In the CmmContFlowOpt.blockConcat, using Dataflow seems too clumsy. Still,
-   a block catenation function would be probably nicer than blockToNodeList
-   / blockOfNodeList combo.
 
  - lowerSafeForeignCall seems too lowlevel. Just use Dataflow. After that
    delete splitEntrySeq from HooplUtils.
