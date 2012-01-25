@@ -74,14 +74,14 @@ emitReturn :: [CmmExpr] -> FCode ()
 emitReturn results
   = do { sequel    <- getSequel;
        ; updfr_off <- getUpdFrameOff
-       ; emit $ mkComment $ mkFastString ("emitReturn: " ++ show sequel)
+       ; emitComment $ mkFastString ("emitReturn: " ++ show sequel)
        ; case sequel of
            Return _ ->
              do { adjustHpBackwards
                 ; emit (mkReturnSimple results updfr_off) }
            AssignTo regs adjust ->
              do { if adjust then adjustHpBackwards else return ()
-                ; emit (mkMultiAssign  regs results) }
+                ; emitMultiAssign  regs results }
        }
 
 emitCall :: (Convention, Convention) -> CmmExpr -> [CmmExpr] -> FCode ()
@@ -91,10 +91,10 @@ emitCall convs@(callConv, _) fun args
   = do	{ adjustHpBackwards
 	; sequel <- getSequel
 	; updfr_off <- getUpdFrameOff
-        ; emit $ mkComment $ mkFastString ("emitCall: " ++ show sequel)
+        ; emitComment $ mkFastString ("emitCall: " ++ show sequel)
 	; case sequel of
 	    Return _            -> emit (mkForeignJump callConv fun args updfr_off)
-	    AssignTo res_regs _ -> emit (mkCall fun convs res_regs args updfr_off)
+            AssignTo res_regs _ -> emit =<< mkCall fun convs res_regs args updfr_off
     }
 
 adjustHpBackwards :: FCode ()
@@ -179,7 +179,7 @@ slow_call fun args reps
   = do dflags <- getDynFlags
        let platform = targetPlatform dflags
        call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
-       emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc (pprPlatform platform fun) ++
+       emitComment $ mkFastString ("slow_call for " ++ showSDoc (pprPlatform platform fun) ++
                                         " with pat " ++ showSDoc (ftext rts_fun))
        emit (mkAssign nodeReg fun <*> call)
   where

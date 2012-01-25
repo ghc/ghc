@@ -127,7 +127,8 @@ emitForeignCall safety results target args _srt _ret
   | otherwise = do
     updfr_off <- getUpdFrameOff
     temp_target <- load_target_into_temp target
-    emit $ mkSafeCall temp_target results args updfr_off (playInterruptible safety)
+    emit =<< mkSafeCall temp_target results args updfr_off
+                (playInterruptible safety)
 
 
 {-
@@ -160,7 +161,7 @@ maybe_assign_temp e
         -- expressions, which are wrong here.
         -- this is a NonPtr because it only duplicates an existing
         reg <- newTemp (cmmExprType e) --TODO FIXME NOW
-        emit (mkAssign (CmmLocal reg) e)
+        emitAssign (CmmLocal reg) e
         return (CmmReg (CmmLocal reg))
 
 -- -----------------------------------------------------------------------------
@@ -182,12 +183,12 @@ saveThreadState =
 emitSaveThreadState :: BlockId -> FCode ()
 emitSaveThreadState bid = do
   -- CurrentTSO->stackobj->sp = Sp;
-  emit $ mkStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP)
+  emitStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP)
                  (CmmStackSlot (CallArea (Young bid)) (widthInBytes (typeWidth gcWord)))
   emit closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
   when opt_SccProfilingOn $
-        emit (mkStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS)
+        emitStore (cmmOffset stgCurrentTSO tso_CCCS) curCCS
 
    -- CurrentNursery->free = Hp+1;
 closeNursery :: CmmAGraph

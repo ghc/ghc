@@ -1,35 +1,17 @@
 {-# LANGUAGE GADTs #-}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
--- ToDo: remove -fno-warn-warnings-deprecations
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
--- ToDo: remove -fno-warn-incomplete-patterns
-{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-
--- Module for building CmmAGraphs.
-
--- As the CmmAGraph is a wrapper over Graph CmmNode O x, it is different
--- from Hoopl's AGraph. The current clients expect functions with the
--- same names Hoopl uses, so this module cannot be in the same namespace
--- as Compiler.Hoopl.
 
 module MkGraph
-  ( CmmAGraph
-  , emptyAGraph, (<*>), catAGraphs, outOfLine
+  ( CmmAGraph, CgStmt(..)
+  , (<*>), catAGraphs
   , mkLabel, mkMiddle, mkLast
-  , withFreshLabel, withUnique, lgraphOfAGraph, labelAGraph
+  , lgraphOfAGraph, labelAGraph
 
   , stackStubExpr
-  , mkNop, mkAssign, mkStore, mkCall, mkCmmCall, mkSafeCall, mkUnsafeCall, mkFinalCall
-         , mkJump, mkDirectJump, mkForeignJump, mkJumpGC, mkCbranch, mkSwitch
-         , mkReturn, mkReturnSimple, mkComment, mkCallEntry
-         , mkBranch, mkCmmIfThenElse, mkCmmIfThen, mkCmmWhileDo
-         , copyInOflow, copyInSlot, copyOutOflow, copyOutSlot
+  , mkNop, mkAssign, mkStore, mkUnsafeCall, mkFinalCall, lastWithArgs
+  , mkJump, mkDirectJump, mkForeignJump, mkJumpGC, mkCbranch, mkSwitch
+  , mkReturn, mkReturnSimple, mkComment, mkCallEntry, mkBranch
+  , copyInOflow, copyInSlot, copyOutOflow, copyOutSlot
+  , toCall, Transfer(..)
   )
 where
 
@@ -37,249 +19,214 @@ import BlockId
 import Cmm
 import CmmCallConv (assignArgumentsPos, ParamLocation(..))
 
+
 import Compiler.Hoopl hiding (Unique, (<*>), mkFirst, mkMiddle, mkLast, mkLabel, mkBranch, Shape(..))
-import qualified Compiler.Hoopl as H
-import Compiler.Hoopl.GHC (uniqueToLbl)
 import FastString
 import ForeignCall
 import Outputable
 import Prelude hiding (succ)
 import SMRep (ByteOff)
-import StaticFlags
-import Unique
 import UniqSupply
+import OrdList
 
 #include "HsVersions.h"
 
-{-
-A 'CmmAGraph' is an abstract version of a 'Graph CmmNode O x' from module
-'Cmm'.  The difference is that the 'CmmAGraph' can be eigher open of closed at
-exit and it can supply fresh Labels and Uniques.
 
-It also supports a splicing operation <*>, which is different from the Hoopl's
-<*>, because it splices two CmmAGraphs. Specifically, it can splice Graph
-O C and Graph O x. In this case, the open beginning of the second graph is
-thrown away.  In the debug mode this sequence is checked to be empty or
-containing a branch (see note [Branch follows branch]).
+-----------------------------------------------------------------------------
+-- Building Graphs
 
-When an CmmAGraph open at exit is being converted to a CmmGraph, the output
-exit sequence is considered unreachable. If the graph consist of one block
-only, if it not the case and we crash. Otherwise we just throw the exit
-sequence away (and in debug mode we test that it really was unreachable).
--}
 
-{-
-Node [Branch follows branch]
-============================
-Why do we say it's ok for a Branch to follow a Branch?
-Because the standard constructor mkLabel has fall-through
-semantics. So if you do a mkLabel, you finish the current block,
-giving it a label, and start a new one that branches to that label.
-Emitting a Branch at this point is fine:
-       goto L1; L2: ...stuff...
--}
+-- | CmmAGraph is a chunk of code consisting of:
+--
+--   * ordinary statements (assignments, stores etc.)
+--   * jumps
+--   * labels
+--   * out-of-line labelled blocks
+--
+-- The semantics is that control falls through labels and out-of-line
+-- blocks.  Everything after a jump up to the next label is by
+-- definition unreachable code, and will be discarded.
+--
+-- Two CmmAGraphs can be stuck together with <*>, with the meaning that
+-- control flows from the first to the second.
+--
+-- A 'CmmAGraph' can be turned into a 'CmmGraph' (closed at both ends)
+-- by providing a label for the entry point; see 'labelAGraph'.
+--
+type CmmAGraph = OrdList CgStmt
 
-data CmmGraphOC = Opened (Graph CmmNode O O)
-                | Closed (Graph CmmNode O C)
-type CmmAGraph = UniqSM CmmGraphOC     -- Graph open at entry
+data CgStmt
+  = CgLabel BlockId
+  | CgStmt  (CmmNode O O)
+  | CgLast  (CmmNode O C)
+  | CgFork  BlockId CmmAGraph
 
-{-
-MS: I began with
-  newtype CmmAGraph = forall x. AG (UniqSM (Graph CmmNode O x))
-but that does not work well, because we cannot take the graph
-out of the monad -- we do not know the type of what we would take
-out and pattern matching does not help, as we cannot pattern match
-on a graph inside the monad.
--}
+flattenCmmAGraph :: BlockId -> CmmAGraph -> CmmGraph
+flattenCmmAGraph id stmts =
+    CmmGraph { g_entry = id,
+               g_graph = GMany NothingO body NothingO }
+  where
+  (block, blocks) = flatten (fromOL stmts)
+  entry = blockJoinHead (CmmEntry id) block
+  body = foldr addBlock emptyBody (entry:blocks)
 
-data Transfer = Call | Jump | Ret deriving Eq
+  flatten :: [CgStmt] -> (Block CmmNode O C, [Block CmmNode C C])
+  flatten [] = panic "flatten []"
+
+  -- A label at the end of a function or fork: this label must not be reachable,
+  -- but it might be referred to from another BB that also isn't reachable.
+  -- Eliminating these has to be done with a dead-code analysis.  For now,
+  -- we just make it into a well-formed block by adding a recursive jump.
+  flatten [CgLabel id]
+    = (goto_id, [blockJoinHead (CmmEntry id) goto_id] )
+    where goto_id = blockJoinTail emptyBlock (CmmBranch id)
+
+  -- A jump/branch: throw away all the code up to the next label, because
+  -- it is unreachable.  Be careful to keep forks that we find on the way.
+  flatten (CgLast stmt : stmts)
+    = case dropWhile isOrdinaryStmt stmts of
+        [] ->
+            ( sing, [] )
+        [CgLabel id] ->
+            ( sing, [blockJoin (CmmEntry id) emptyBlock (CmmBranch id)] )
+        (CgLabel id : stmts) ->
+            ( sing, blockJoinHead (CmmEntry id) block : blocks )
+            where (block,blocks) = flatten stmts
+        (CgFork fork_id stmts : ss) -> 
+            flatten (CgFork fork_id stmts : CgLast stmt : ss)
+        _ -> panic "MkGraph.flatten"
+    where
+      sing = blockJoinTail emptyBlock stmt
+
+  flatten (s:ss) = 
+        case s of
+          CgStmt stmt -> (blockCons stmt block, blocks)
+          CgLabel id  -> (blockJoinTail emptyBlock (CmmBranch id),
+                          blockJoinHead (CmmEntry id) block : blocks)
+          CgFork fork_id stmts -> 
+                (block, blockJoinHead (CmmEntry fork_id) fork_block : fork_blocks ++ blocks)
+                where (fork_block, fork_blocks) = flatten (fromOL stmts)
+          _ -> panic "MkGraph.flatten"
+    where (block,blocks) = flatten ss
+
+isOrdinaryStmt :: CgStmt -> Bool
+isOrdinaryStmt (CgStmt _) = True
+isOrdinaryStmt (CgLast _) = True
+isOrdinaryStmt _          = False
+
+
 
 ---------- AGraph manipulation
 
-emptyAGraph    :: CmmAGraph
 (<*>)          :: CmmAGraph -> CmmAGraph -> CmmAGraph
+(<*>)           = appOL
+
 catAGraphs     :: [CmmAGraph] -> CmmAGraph
+catAGraphs      = concatOL
 
-mkLabel        :: BlockId     -> CmmAGraph  -- created a sequence "goto id; id:" as an AGraph
-mkMiddle       :: CmmNode O O -> CmmAGraph  -- creates an open AGraph from a given node
-mkLast         :: CmmNode O C -> CmmAGraph  -- created a closed AGraph from a given node
+-- | created a sequence "goto id; id:" as an AGraph
+mkLabel        :: BlockId -> CmmAGraph
+mkLabel bid     = unitOL (CgLabel bid)
 
-withFreshLabel :: String -> (BlockId -> CmmAGraph) -> CmmAGraph
-withUnique     :: (Unique -> CmmAGraph) -> CmmAGraph
+-- | creates an open AGraph from a given node
+mkMiddle        :: CmmNode O O -> CmmAGraph
+mkMiddle middle = unitOL (CgStmt middle)
 
+-- | created a closed AGraph from a given node
+mkLast         :: CmmNode O C -> CmmAGraph
+mkLast last     = unitOL (CgLast last)
+
+
+-- | allocate a fresh label for the entry point
 lgraphOfAGraph :: CmmAGraph -> UniqSM CmmGraph
-  -- ^ allocate a fresh label for the entry point
+lgraphOfAGraph g = do u <- getUniqueM
+                      return (flattenCmmAGraph (mkBlockId u) g)
+
+-- | use the given BlockId as the label of the entry point
 labelAGraph    :: BlockId -> CmmAGraph -> UniqSM CmmGraph
-  -- ^ use the given BlockId as the label of the entry point
+labelAGraph lbl ag = return (flattenCmmAGraph lbl ag)
 
 ---------- No-ops
 mkNop        :: CmmAGraph
+mkNop         = nilOL
+
 mkComment    :: FastString -> CmmAGraph
+#ifdef DEBUG
+-- SDM: generating all those comments takes time, this saved about 4% for me
+mkComment fs  = mkMiddle $ CmmComment fs
+#else
+mkComment _   = nilOL
+#endif
 
 ---------- Assignment and store
 mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
-mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
+mkAssign l r  = mkMiddle $ CmmAssign l r
 
----------- Calls
-mkCall       :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual] ->
-                  UpdFrameOffset -> CmmAGraph
-mkCmmCall    :: CmmExpr ->              [CmmFormal] -> [CmmActual] ->
-                  UpdFrameOffset -> CmmAGraph
-  -- Native C-- calling convention
-mkSafeCall    :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset -> Bool -> CmmAGraph
-mkUnsafeCall  :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> CmmAGraph
-mkFinalCall   :: CmmExpr -> CCallConv -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-  -- Never returns; like exit() or barf()
+mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
+mkStore  l r  = mkMiddle $ CmmStore  l r
 
 ---------- Control transfer
-mkJump          ::               CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkDirectJump    ::               CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkJumpGC        ::               CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkForeignJump   :: Convention -> CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
-mkCbranch       :: CmmExpr -> BlockId -> BlockId          -> CmmAGraph
-mkSwitch        :: CmmExpr -> [Maybe BlockId]             -> CmmAGraph
+mkJump          :: CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkJump e actuals updfr_off =
+  lastWithArgs Jump old NativeNodeCall actuals updfr_off $
+    toCall e Nothing updfr_off 0
+
+mkDirectJump    :: CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkDirectJump e actuals updfr_off =
+  lastWithArgs Jump old NativeDirectCall actuals updfr_off $
+    toCall e Nothing updfr_off 0
+
+mkJumpGC        :: CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkJumpGC e actuals updfr_off =
+  lastWithArgs Jump old GC actuals updfr_off $
+    toCall e Nothing updfr_off 0
+
+mkForeignJump   :: Convention -> CmmExpr -> [CmmActual] -> UpdFrameOffset
+                -> CmmAGraph
+mkForeignJump conv e actuals updfr_off =
+  lastWithArgs Jump old conv actuals updfr_off $
+    toCall e Nothing updfr_off 0
+
+mkCbranch       :: CmmExpr -> BlockId -> BlockId -> CmmAGraph
+mkCbranch pred ifso ifnot = mkLast (CmmCondBranch pred ifso ifnot)
+
+mkSwitch        :: CmmExpr -> [Maybe BlockId] -> CmmAGraph
+mkSwitch e tbl   = mkLast $ CmmSwitch e tbl
+
 mkReturn        :: CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkReturn e actuals updfr_off =
+  lastWithArgs Ret  old NativeReturn actuals updfr_off $
+    toCall e Nothing updfr_off 0
+    -- where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
+
 mkReturnSimple  :: [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkReturnSimple actuals updfr_off =
+  lastWithArgs Ret  old NativeReturn actuals updfr_off $
+    toCall e Nothing updfr_off 0
+    where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
 
 mkBranch        :: BlockId -> CmmAGraph
-mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> CmmAGraph
-mkCmmIfThen     :: CmmExpr -> CmmAGraph -> CmmAGraph
-mkCmmWhileDo    :: CmmExpr -> CmmAGraph -> CmmAGraph
+mkBranch bid     = mkLast (CmmBranch bid)
 
-outOfLine       :: CmmAGraph -> CmmAGraph
--- ^ The argument is an CmmAGraph that must have an
--- empty entry sequence and be closed at the end.
--- The result is a new CmmAGraph that is open at the
--- end and goes directly from entry to exit, with the
--- original graph sitting to the side out-of-line.
---
--- Example:  mkMiddle (x = 3)
---           <*> outOfLine (mkLabel L <*> ...stuff...)
---           <*> mkMiddle (y = x)
--- Control will flow directly from x=3 to y=x;
--- the block starting with L is "on the side".
---
--- N.B. algebraically forall g g' : g <*> outOfLine g' == outOfLine g' <*> g
+mkFinalCall   :: CmmExpr -> CCallConv -> [CmmActual] -> UpdFrameOffset
+              -> CmmAGraph
+mkFinalCall f _ actuals updfr_off =
+  lastWithArgs Call old NativeDirectCall actuals updfr_off $
+    toCall f Nothing updfr_off 0
+
+mkUnsafeCall  :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> CmmAGraph
+mkUnsafeCall t fs as = mkMiddle $ CmmUnsafeForeignCall t fs as
+
 
 --------------------------------------------------------------------------
 
--- ================ IMPLEMENTATION ================--
 
---------------------------------------------------
--- Raw CmmAGraph handling
-
-emptyAGraph = return $ Opened emptyGraph
-ag <*> ah = do g <- ag
-               h <- ah
-               return (case (g, h) of
-                 (Opened g, Opened h) -> Opened $ g H.<*> h
-                 (Opened g, Closed h) -> Closed $ g H.<*> h
-                 (Closed g, Opened GNil) -> Closed g
-                 (Closed g, Opened (GUnit e)) -> note_unreachable e $ Closed g
-                 (Closed g, Opened (GMany (JustO e) b x)) -> note_unreachable e $ Opened $ g H.|*><*| GMany NothingO b x
-                 (Closed g, Closed (GMany (JustO e) b x)) -> note_unreachable e $ Closed $ g H.|*><*| GMany NothingO b x
-                 :: CmmGraphOC)
-catAGraphs = foldl (<*>) emptyAGraph
-
-outOfLine ag = withFreshLabel "outOfLine" $ \l ->
-               do g <- ag
-                  return (case g of
-                    Closed (GMany (JustO e) b _) -> note_unreachable e $ Opened $
-                                                      GMany (JustO $ BlockOC BNil (CmmBranch l)) b (JustO $ BlockCO (CmmEntry l) BNil)
-                    _                            -> panic "outOfLine"
-                    :: CmmGraphOC)
-
-note_unreachable :: Block CmmNode O x -> a -> a
-note_unreachable block graph =
-  ASSERT (block_is_empty_or_label)  -- Note [Branch follows branch]
-  graph
-  where block_is_empty_or_label :: Bool
-        block_is_empty_or_label = case blockToNodeList block of
-                                    (NothingC, [], NothingC)            -> True
-                                    (NothingC, [], JustC (CmmBranch _)) -> True
-                                    _                                   -> False
-
-mkLabel bid = return $ Opened $ H.mkLast (CmmBranch bid) |*><*| H.mkFirst (CmmEntry bid)
-mkMiddle middle = return $ Opened $ H.mkMiddle middle
-mkLast last = return $ Closed $ H.mkLast last
-
-withUnique f = getUniqueM >>= f
-withFreshLabel _name f = getUniqueM >>= f . uniqueToLbl . intToUnique . getKey
-
-lgraphOfAGraph g = do u <- getUniqueM
-                      labelAGraph (mkBlockId u) g
-
-labelAGraph lbl ag = do g <- ag
-                        return $ CmmGraph {g_entry=lbl, g_graph=H.mkFirst (CmmEntry lbl) H.<*> closed g}
-  where closed :: CmmGraphOC -> Graph CmmNode O C
-        closed (Closed g) = g
-        closed (Opened g@(GMany entry body (JustO exit))) =
-          ASSERT (entryLabel exit `notElem` map entryLabel (postorder_dfs g))
-          GMany entry body NothingO
-        closed (Opened _) = panic "labelAGraph"
-
---------------------------------------------------
--- CmmAGraph constructions
-
-mkNop                     = emptyAGraph
-mkComment fs              = mkMiddle $ CmmComment fs
-mkStore  l r              = mkMiddle $ CmmStore  l r
-
--- NEED A COMPILER-DEBUGGING FLAG HERE
--- Sanity check: any value assigned to a pointer must be non-zero.
--- If it's 0, cause a crash immediately.
-mkAssign l r = if opt_StubDeadValues then assign l r <*> check l else assign l r
-  where assign l r = mkMiddle (CmmAssign l r)
-        check (CmmGlobal _) = mkNop
-        check l@(CmmLocal reg) = -- if a ptr arg is NULL, cause a crash!
-          if isGcPtrType ty then
-            mkCmmIfThen (CmmMachOp (MO_Eq w) [r, stackStubExpr w])
-                        (assign l (CmmLoad (CmmLit (CmmInt 0 w)) ty))
-          else mkNop
-            where ty = localRegType reg
-                  w  = typeWidth ty
-                  r  = CmmReg l
 
 
 -- Why are we inserting extra blocks that simply branch to the successors?
 -- Because in addition to the branch instruction, @mkBranch@ will insert
 -- a necessary adjustment to the stack pointer.
-mkCbranch pred ifso ifnot = mkLast (CmmCondBranch pred ifso ifnot)
-mkSwitch e tbl            = mkLast $ CmmSwitch e tbl
 
-mkSafeCall   t fs as upd i = withFreshLabel "safe call" $ body
-  where
-    body k =
-     (    mkStore (CmmStackSlot (CallArea (Young k)) (widthInBytes wordWidth))
-                  (CmmLit (CmmBlock k))
-      <*> mkLast (CmmForeignCall {tgt=t, res=fs, args=as, succ=k, updfr=upd, intrbl=i})
-      <*> mkLabel k)
-mkUnsafeCall t fs as = mkMiddle $ CmmUnsafeForeignCall t fs as
-
-mkBranch bid = mkLast (CmmBranch bid)
-
-mkCmmIfThenElse e tbranch fbranch =
-  withFreshLabel "end of if"     $ \endif ->
-  withFreshLabel "start of then" $ \tid ->
-  withFreshLabel "start of else" $ \fid ->
-    mkCbranch e tid fid <*>
-    mkLabel tid <*> tbranch <*> mkBranch endif <*>
-    mkLabel fid <*> fbranch <*> mkLabel endif
-
-mkCmmIfThen e tbranch
-  = withFreshLabel "end of if"     $ \endif ->
-    withFreshLabel "start of then" $ \tid ->
-      mkCbranch e tid endif <*>
-      mkLabel tid <*> tbranch <*> mkLabel endif
-
-mkCmmWhileDo e body =
-  withFreshLabel "loop test" $ \test ->
-  withFreshLabel "loop head" $ \head ->
-  withFreshLabel "end while" $ \endwhile ->
-    -- Forrest Baskett's while-loop layout
-    mkBranch test <*> mkLabel head <*> body
-                  <*> mkLabel test <*> mkCbranch e head endwhile
-                  <*> mkLabel endwhile
 
 -- For debugging purposes, we can stub out dead stack slots:
 stackStubExpr :: Width -> CmmExpr
@@ -333,17 +280,22 @@ oneCopySlotI _ (reg, _) (n, ms) =
 -- Factoring out the common parts of the copyout functions yielded something
 -- more complicated:
 
+data Transfer = Call | Jump | Ret deriving Eq
+
 copyOutOflow :: Convention -> Transfer -> Area -> [CmmActual] -> UpdFrameOffset ->
                               (Int, CmmAGraph)
+
 -- Generate code to move the actual parameters into the locations
--- required by the calling convention.  This includes a store for the return address.
+-- required by the calling convention.  This includes a store for the
+-- return address.
 --
--- The argument layout function ignores the pointer to the info table, so we slot that
--- in here. When copying-out to a young area, we set the info table for return
--- and adjust the offsets of the other parameters.
--- If this is a call instruction, we adjust the offsets of the other parameters.
+-- The argument layout function ignores the pointer to the info table,
+-- so we slot that in here. When copying-out to a young area, we set
+-- the info table for return and adjust the offsets of the other
+-- parameters.  If this is a call instruction, we adjust the offsets
+-- of the other parameters.
 copyOutOflow conv transfer area@(CallArea a) actuals updfr_off
-  = foldr co (init_offset, emptyAGraph) args'
+  = foldr co (init_offset, mkNop) args'
   where 
     co (v, RegisterParam r) (n, ms) = (n, mkAssign (CmmGlobal r) v <*> ms)
     co (v, StackParam off)  (n, ms) = (max n off, mkStore (CmmStackSlot area off) v <*> ms)
@@ -387,34 +339,8 @@ lastWithArgs transfer area conv actuals updfr_off last =
 -- procedure entry.
 old :: Area
 old = CallArea Old
-toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff -> ByteOff -> CmmAGraph
+
+toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff -> ByteOff
+       -> CmmAGraph
 toCall e cont updfr_off res_space arg_space =
   mkLast $ CmmCall e cont arg_space res_space updfr_off
-mkJump e actuals updfr_off =
-  lastWithArgs Jump old NativeNodeCall actuals updfr_off $ toCall e Nothing updfr_off 0
-mkDirectJump e actuals updfr_off =
-  lastWithArgs Jump old NativeDirectCall actuals updfr_off $ toCall e Nothing updfr_off 0
-mkJumpGC e actuals updfr_off =
-  lastWithArgs Jump old GC actuals updfr_off $ toCall e Nothing updfr_off 0
-mkForeignJump conv e actuals updfr_off =
-  lastWithArgs Jump old conv actuals updfr_off $ toCall e Nothing updfr_off 0
-mkReturn e actuals updfr_off =
-  lastWithArgs Ret  old NativeReturn actuals updfr_off $ toCall e Nothing updfr_off 0
-    -- where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
-mkReturnSimple actuals updfr_off =
-  lastWithArgs Ret  old NativeReturn actuals updfr_off $ toCall e Nothing updfr_off 0
-    where e = CmmLoad (CmmStackSlot (CallArea Old) updfr_off) gcWord
-
-mkFinalCall f _ actuals updfr_off =
-  lastWithArgs Call old NativeDirectCall actuals updfr_off $ toCall f Nothing updfr_off 0
-
-mkCmmCall f results actuals = mkCall f (NativeDirectCall, NativeReturn) results actuals
-
--- I'm dropping the SRT, but that should be okay: we plan to reconstruct it later.
-mkCall f (callConv, retConv) results actuals updfr_off =
-  withFreshLabel "call successor" $ \k ->
-    let area = CallArea $ Young k
-        (off, copyin) = copyInOflow retConv area results
-        copyout = lastWithArgs Call area callConv actuals updfr_off 
-                               (toCall f (Just k) updfr_off off)
-    in (copyout <*> mkLabel k <*> copyin)

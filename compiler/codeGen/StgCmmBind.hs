@@ -109,7 +109,7 @@ cgBind (StgNonRec name rhs)
         ; emit (init <*> body) }
 
 cgBind (StgRec pairs)
-  = do	{ ((new_binds, inits), body) <- getCodeR $ fixC (\ new_binds_inits ->
+  = do  { ((new_binds, inits), body) <- getCodeR $ fixC (\ new_binds_inits ->
                do { addBindsC $ fst new_binds_inits -- avoid premature deconstruction
                   ; liftM unzip $ listFCs [ cgRhs b e | (b,e) <- pairs ] })
        ; addBindsC new_binds
@@ -547,10 +547,10 @@ emitBlackHoleCode is_single_entry = do
 
   whenC eager_blackholing $ do
     tickyBlackHole (not is_single_entry)
-    emit (mkStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
-                  (CmmReg (CmmGlobal CurrentTSO)))
+    emitStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
+                  (CmmReg (CmmGlobal CurrentTSO))
     emitPrimCall [] MO_WriteBarrier []
-    emit (mkStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo)))
+    emitStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
 
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
 	-- Nota Bene: this function does not change Node (even if it's a CAF),
@@ -596,7 +596,7 @@ pushUpdateFrame es body
        offset <- foldM push updfr es
        withUpdFrameOff offset body
      where push off e =
-             do emit (mkStore (CmmStackSlot (CallArea Old) base) e)
+             do emitStore (CmmStackSlot (CallArea Old) base) e
                 return base
              where base = off + widthInBytes (cmmExprWidth e)
 
@@ -664,13 +664,13 @@ link_caf _is_upd = do
         -- node is live, so save it.
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
-  ; emit $ mkCmmIfThen
-      (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), CmmLit zeroCLit]) $
+  ; emit =<< mkCmmIfThen
+      (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), CmmLit zeroCLit])
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
-        let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
-        mkJump target [] 0
+       (let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
+        mkJump target [] 0)
 
   ; return hp_rel }
 

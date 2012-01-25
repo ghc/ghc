@@ -77,7 +77,7 @@ cgExpr (StgLetNoEscape _ _ binds expr) =
      ; let join_id = mkBlockId (uniqFromSupply us)
      ; cgLneBinds join_id binds
      ; cgExpr expr 
-     ; emit $ mkLabel join_id}
+     ; emitLabel join_id}
 
 cgExpr (StgCase expr _live_vars _save_vars bndr srt alt_type alts) =
   cgCase expr bndr srt alt_type alts
@@ -130,7 +130,7 @@ cgLetNoEscapeRhs
 cgLetNoEscapeRhs join_id local_cc bndr rhs =
   do { (info, rhs_body) <- getCodeR $ cgLetNoEscapeRhsBody local_cc bndr rhs 
      ; let (bid, _) = expectJust "cgLetNoEscapeRhs" $ maybeLetNoEscape info
-     ; emit (outOfLine $ mkLabel bid <*> rhs_body <*> mkBranch join_id)
+     ; emitOutOfLine bid $ rhs_body <*> mkBranch join_id
      ; return info
      }
 
@@ -319,7 +319,7 @@ cgCase (StgApp v []) bndr _ alt_type@(PrimAlt _) alts
     do { when (not reps_compatible) $
            panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
        ; v_info <- getCgIdInfo v
-       ; emit (mkAssign (CmmLocal (idToReg (NonVoid bndr))) (idInfoToAmode v_info))
+       ; emitAssign (CmmLocal (idToReg (NonVoid bndr))) (idInfoToAmode v_info)
        ; _ <- bindArgsToRegs [NonVoid bndr]
        ; cgAlts NoGcInAlts (NonVoid bndr) alt_type alts }
   where
@@ -330,8 +330,11 @@ cgCase scrut@(StgApp v []) _ _ (PrimAlt _) _
     do { mb_cc <- maybeSaveCostCentre True
        ; withSequel (AssignTo [idToReg (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
-       ; emit $ mkComment $ mkFastString "should be unreachable code"
-       ; emit $ withFreshLabel "l" (\l -> mkLabel l <*> mkBranch l)}
+       ; emitComment $ mkFastString "should be unreachable code"
+       ; l <- newLabelC
+       ; emitLabel l
+       ; emit (mkBranch l)
+       }
 
 {-
 case seq# a s of v
@@ -433,7 +436,7 @@ cgAlts gc_plan bndr (PrimAlt _) alts
 
 	      tagged_cmms' = [(lit,code) 
 			     | (LitAlt lit, code) <- tagged_cmms]
-	; emit (mkCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt) }
+        ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
   = do	{ tagged_cmms <- cgAltRhss gc_plan bndr alts
@@ -517,8 +520,8 @@ cgIdApp fun_id args
 cgLneJump :: BlockId -> [LocalReg] -> [StgArg] -> FCode ()
 cgLneJump blk_id lne_regs args	-- Join point; discard sequel
   = do	{ cmm_args <- getNonVoidArgAmodes args
-      	; emit (mkMultiAssign lne_regs cmm_args
-		<*> mkBranch blk_id) }
+        ; emitMultiAssign lne_regs cmm_args
+        ; emit (mkBranch blk_id) }
     
 cgTailCall :: Id -> CgIdInfo -> [StgArg] -> FCode ()
 cgTailCall fun_id fun_info args = do
@@ -532,24 +535,24 @@ cgTailCall fun_id fun_info args = do
       		do { let fun' = CmmLoad fun (cmmExprType fun)
                    ; [ret,call] <- forkAlts [
       			getCode $ emitReturn [fun],	-- Is tagged; no need to untag
-      			getCode $ do -- emit (mkAssign nodeReg fun)
+                        getCode $ do -- emitAssign nodeReg fun
                          emitCall (NativeNodeCall, NativeReturn)
                                   (entryCode fun') [fun]]  -- Not tagged
-      		   ; emit (mkCmmIfThenElse (cmmIsTagged fun) ret call) }
+                   ; emit =<< mkCmmIfThenElse (cmmIsTagged fun) ret call }
 
       	SlowCall -> do 	    -- A slow function call via the RTS apply routines
       		{ tickySlowCall lf_info args
-                ; emit $ mkComment $ mkFastString "slowCall"
+                ; emitComment $ mkFastString "slowCall"
       		; slowCall fun args }
     
       	-- A direct function call (possibly with some left-over arguments)
       	DirectEntry lbl arity -> do
 		{ tickyDirectCall arity args
  		; if node_points then
-                    do emit $ mkComment $ mkFastString "directEntry"
-                       emit (mkAssign nodeReg fun)
+                    do emitComment $ mkFastString "directEntry"
+                       emitAssign nodeReg fun
                        directCall lbl arity args
-		  else do emit $ mkComment $ mkFastString "directEntry else"
+                  else do emitComment $ mkFastString "directEntry else"
                           directCall lbl arity args }
 
 	JumpToIt {} -> panic "cgTailCall"	-- ???

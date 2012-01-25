@@ -109,7 +109,7 @@ allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
 
         -- ALLOCATE THE OBJECT
         ; base <- getHpRelOffset info_offset
-        ; emit (mkComment $ mkFastString "allocDynClosure")
+        ; emitComment $ mkFastString "allocDynClosure"
         ; emitSetDynHdr base info_ptr  use_cc
         ; let (cmm_args, offsets) = unzip amodes_w_offsets
         ; hpStore base cmm_args offsets
@@ -410,7 +410,8 @@ entryHeapCheck cl_info offset nodeSet arity args code
 altHeapCheck :: [LocalReg] -> FCode a -> FCode a
 altHeapCheck regs code
   = do updfr_sz <- getUpdFrameOff
-       heapCheck False (gc_call updfr_sz) code
+       gc_call_code <- gc_call updfr_sz
+       heapCheck False gc_call_code code
 
   where
     reg_exprs = map (CmmReg . CmmLocal) regs
@@ -451,7 +452,7 @@ heapCheck checkStack do_gc code
   = getHeapUsage $ \ hpHw ->
     -- Emit heap checks, but be sure to do it lazily so
     -- that the conditionals on hpHw don't cause a black hole
-    do  { emit $ do_checks checkStack hpHw do_gc
+    do  { codeOnly $ do_checks checkStack hpHw do_gc
         ; tickyAllocHeap hpHw
         ; doGranAllocate hpHw
         ; setRealHp hpHw
@@ -460,22 +461,27 @@ heapCheck checkStack do_gc code
 do_checks :: Bool       -- Should we check the stack?
           -> WordOff    -- Heap headroom
           -> CmmAGraph  -- What to do on failure
-          -> CmmAGraph
-do_checks checkStack alloc do_gc
-  = withFreshLabel "gc" $ \ loop_id ->
-    withFreshLabel "gc" $ \ gc_id   ->
-      mkLabel loop_id
-      <*> (let hpCheck = if alloc == 0 then mkNop
-                         else mkAssign hpReg bump_hp <*>
-                              mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
-           in if checkStack
-                 then mkCmmIfThenElse sp_oflo (mkBranch gc_id) hpCheck
-                 else hpCheck)
-      <*> mkComment (mkFastString "outOfLine should follow:")
-      <*> outOfLine (mkLabel gc_id
-                     <*> mkComment (mkFastString "outOfLine here")
-                     <*> do_gc
-                     <*> mkBranch loop_id)
+          -> FCode ()
+do_checks checkStack alloc do_gc = do
+  loop_id <- newLabelC
+  gc_id <- newLabelC
+  emitLabel loop_id
+  hp_check <- if alloc == 0
+                 then return mkNop
+                 else do
+                   ifthen <- mkCmmIfThen hp_oflo (alloc_n <*> mkBranch gc_id)
+                   return (mkAssign hpReg bump_hp <*> ifthen)
+
+  if checkStack
+     then emit =<< mkCmmIfThenElse sp_oflo (mkBranch gc_id) hp_check
+     else emit hp_check
+
+  emit $ mkComment (mkFastString "outOfLine should follow:")
+
+  emitOutOfLine gc_id $
+     mkComment (mkFastString "outOfLine here") <*>
+     do_gc <*>
+     mkBranch loop_id
                 -- Test for stack pointer exhaustion, then
                 -- bump heap pointer, and test for heap exhaustion
                 -- Note that we don't move the heap pointer unless the
