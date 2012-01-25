@@ -808,7 +808,8 @@ getDFunTyKey (FunTy _ _)     = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
 
 getDFunTyLitKey :: TyLit -> OccName
-getDFunTyLitKey (NumberTyLit n) = mkOccName Name.varName (show n)
+getDFunTyLitKey (NumTyLit n) = mkOccName Name.varName (show n)
+getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 \end{code}
 
 

@@ -42,7 +42,8 @@ module Type (
         mkPiKinds, mkPiType, mkPiTypes,
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
 
-        mkLiteralTy, mkNumberTyLit, mkNumberTy, isNumberTy,
+        mkNumLitTy, isNumLitTy,
+        mkStrLitTy, isStrLitTy,
 	
 	-- (Newtypes)
 	newTyConInstRhs, carefullySplitNewType_maybe,
@@ -407,21 +408,23 @@ splitAppTys ty = split ty ty []
 
 
                       LitTy
-                      ~~~~~~~~~
+                      ~~~~~
 
 \begin{code}
-mkLiteralTy :: TyLit -> Type
-mkLiteralTy = LitTy
+mkNumLitTy :: Integer -> Type
+mkNumLitTy n = LitTy (NumTyLit n)
 
-mkNumberTyLit :: Integer -> TyLit
-mkNumberTyLit = NumberTyLit
+isNumLitTy :: Type -> Maybe Integer
+isNumLitTy (LitTy (NumTyLit n)) = Just n
+isNumLitTy _                    = Nothing
 
-mkNumberTy :: Integer -> Type
-mkNumberTy n = mkLiteralTy (mkNumberTyLit n)
+mkStrLitTy :: FastString -> Type
+mkStrLitTy s = LitTy (StrTyLit s)
 
-isNumberTy :: Type -> Maybe Integer
-isNumberTy (LitTy (NumberTyLit n)) = Just n
-isNumberTy _                        = Nothing
+isStrLitTy :: Type -> Maybe FastString
+isStrLitTy (LitTy (StrTyLit s)) = Just s
+isStrLitTy _                    = Nothing
+
 \end{code}
 
 
@@ -1592,7 +1595,8 @@ typeKind (FunTy _arg res)
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind l =
   case l of
-    NumberTyLit _ -> typeNatKind
+    NumTyLit _ -> typeNatKind
+    StrTyLit _ -> typeStringKind
 
 \end{code}
 

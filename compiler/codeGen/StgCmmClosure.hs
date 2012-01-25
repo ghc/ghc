@@ -873,7 +873,8 @@ getTyDescription ty
 getTyLitDescription :: TyLit -> String
 getTyLitDescription l =
   case l of
-    NumberTyLit n -> show n
+    NumTyLit n -> show n
+    StrTyLit n -> show n
 
 --------------------------------------
 --   CmmInfoTable-related things

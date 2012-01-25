@@ -520,12 +520,16 @@ kc_hs_type ty@(HsExplicitTupleTy _ tys) exp_kind = do
   checkExpectedKind ty tupleKi exp_kind
   return (HsExplicitTupleTy (map snd ty_k_s) (map fst ty_k_s))
 
-kc_hs_type ty@(HsNumberTy n) exp_kind = do
-  checkExpectedKind ty typeNatKind exp_kind
-  return (HsNumberTy n)
+kc_hs_type ty@(HsTyLit tl) exp_kind = do
+  let k = case tl of
+            HsNumTy _ -> typeNatKind
+            HsStrTy _ -> typeStringKind
+  checkExpectedKind ty k exp_kind
+  return ty
 
 kc_hs_type (HsWrapTy {}) _exp_kind =
     panic "kc_hs_type HsWrapTy"  -- We kind checked something twice
+
 
 ---------------------------
 kcApps :: Outputable a
@@ -759,7 +763,9 @@ ds_type (HsExplicitTupleTy kis tys) = do
   tys' <- mapM dsHsType tys
   return $ mkTyConApp (buildPromotedDataTyCon (tupleCon BoxedTuple (length kis'))) (kis' ++ tys')
 
-ds_type (HsNumberTy n) = return (mkNumberTy n)
+ds_type (HsTyLit tl) = return $ case tl of
+                                  HsNumTy n -> mkNumLitTy n
+                                  HsStrTy s -> mkStrLitTy s
 
 ds_type (HsWrapTy (WpKiApps kappas) ty) = do
   tau <- ds_type ty

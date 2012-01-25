@@ -143,7 +143,7 @@ extract_lty (L loc ty) acc
       HsDocTy ty _              -> extract_lty ty acc
       HsExplicitListTy _ tys    -> extract_ltys tys acc
       HsExplicitTupleTy _ tys   -> extract_ltys tys acc
-      HsNumberTy _              -> acc
+      HsTyLit _                 -> acc
       HsWrapTy _ _              -> panic "extract_lty"
 
 extract_tv :: SrcSpan -> RdrName -> [Located RdrName] -> [Located RdrName]

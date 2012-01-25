@@ -1075,13 +1075,16 @@ instance Binary IfaceType where
               _  -> panic ("get IfaceType " ++ show h)
 
 instance Binary IfaceTyLit where
-  put_ bh (IfaceNumberTyLit n)  = putByte bh 1 >> put_ bh n
+  put_ bh (IfaceNumTyLit n)  = putByte bh 1 >> put_ bh n
+  put_ bh (IfaceStrTyLit n)  = putByte bh 2 >> put_ bh n
 
   get bh =
     do tag <- getByte bh
        case tag of
          1 -> do { n <- get bh
-                 ; return (IfaceNumberTyLit n) }
+                 ; return (IfaceNumTyLit n) }
+         2 -> do { n <- get bh
+                 ; return (IfaceStrTyLit n) }
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceTyCon where

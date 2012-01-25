@@ -88,7 +88,7 @@ extractHsTyNames ty
     		  	       	 		-- but I don't think it matters
     get (HsExplicitListTy _ tys) = extractHsTyNames_s tys
     get (HsExplicitTupleTy _ tys) = extractHsTyNames_s tys
-    get (HsNumberTy _)         = emptyNameSet
+    get (HsTyLit _)            = emptyNameSet
     get (HsWrapTy {})          = panic "extractHsTyNames"
 
 extractHsTyNames_s  :: [LHsType Name] -> NameSet

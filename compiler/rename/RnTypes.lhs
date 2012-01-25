@@ -223,10 +223,10 @@ rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys) = do
 
 -- 1. Perhaps we should use a separate extension here?
 -- 2. Check that the integer is positive?
-rnHsTyKi isType _ numberTy@(HsNumberTy n) = do
-    poly_kinds <- xoptM Opt_PolyKinds
-    unless (poly_kinds || isType) (addErr (polyKindsErr numberTy))
-    return (HsNumberTy n)
+rnHsTyKi isType _ tyLit@(HsTyLit t) = do
+    data_kinds <- xoptM Opt_DataKinds
+    unless (data_kinds || isType) (addErr (polyKindsErr tyLit))
+    return (HsTyLit t)
 
 rnHsTyKi isType doc (HsAppTy ty1 ty2) = do
     ty1' <- rnLHsTyKi isType doc ty1
@@ -270,6 +270,7 @@ rnHsTyKi isType doc (HsExplicitTupleTy kis tys) =
   ASSERT( isType )
   do tys' <- mapM (rnLHsType doc) tys
      return (HsExplicitTupleTy kis tys')
+
 
 --------------
 rnLHsTypes :: HsDocContext -> [LHsType RdrName]

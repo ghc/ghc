@@ -870,7 +870,8 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 
 -----------------------------------------
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
-tcIfaceTyLit (IfaceNumberTyLit n) = return (NumberTyLit n)
+tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
+tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
 \end{code}
 
 %************************************************************************

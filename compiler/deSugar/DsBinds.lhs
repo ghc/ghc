@@ -737,7 +737,10 @@ dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps`
     errorId = rUNTIME_ERROR_ID
     litMsg  = Lit (MachStr msg)
 
-dsEvTerm (EvInteger n) = mkIntegerExpr n
+dsEvTerm (EvLit l) =
+  case l of
+    EvNum n -> mkIntegerExpr n
+    EvStr s -> mkStringExprFS s
 
 ---------------------------------------
 dsTcCoercion :: TcCoercion -> (Coercion -> CoreExpr) -> CoreExpr

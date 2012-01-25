@@ -121,7 +121,8 @@ data Type
 -- NOTE:  Other parts of the code assume that type literals do not contain
 -- types or type variables.
 data TyLit
-  = NumberTyLit Integer
+  = NumTyLit Integer
+  | StrTyLit FastString
   deriving (Eq, Ord, Data.Data, Data.Typeable)
 
 type KindOrType = Type -- See Note [Arguments to type constructors]
@@ -574,7 +575,10 @@ ppr_tvar tv  -- Note [Infix type variables]
   = parenSymOcc (getOccName tv) (ppr tv)
 
 ppr_tylit :: Prec -> TyLit -> SDoc
-ppr_tylit _ (NumberTyLit n) = integer n
+ppr_tylit _ tl =
+  case tl of
+    NumTyLit n -> integer n
+    StrTyLit s -> text (show s)
 
 -------------------
 pprForAll :: [TyVar] -> SDoc

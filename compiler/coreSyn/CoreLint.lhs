@@ -855,10 +855,12 @@ lintType (ForAllTy tv ty)
 ---
 
 lintTyLit :: TyLit -> LintM ()
-lintTyLit (NumberTyLit n)
+lintTyLit (NumTyLit n)
   | n >= 0    = return ()
   | otherwise = failWithL msg
     where msg = ptext (sLit "Negative type literal:") <+> integer n
+lintTyLit (StrTyLit _) = return ()
+
 
 ----------------
 lint_ty_app :: Type -> Kind -> [OutType] -> LintM Kind

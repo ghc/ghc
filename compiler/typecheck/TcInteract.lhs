@@ -26,7 +26,7 @@ import Id
 import Var
 
 import TcType
-import PrelNames (typeNatClassName)
+import PrelNames (typeNatClassName, typeStringClassName)
 
 import Class
 import TyCon
@@ -1777,7 +1777,10 @@ matchClassInst :: InertSet -> Class -> [Type] -> WantedLoc -> TcS LookupInstResu
 
 matchClassInst _ clas [ ty ] _
   | className clas == typeNatClassName
-  , Just n <- isNumberTy ty = return (GenInst [] (EvInteger n))
+  , Just n <- isNumLitTy ty = return $ GenInst [] $ EvLit $ EvNum n
+
+  | className clas == typeStringClassName
+  , Just s <- isStrLitTy ty = return $ GenInst [] $ EvLit $ EvStr s
 
 
 matchClassInst inerts clas tys loc

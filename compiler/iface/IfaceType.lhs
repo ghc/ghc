@@ -90,7 +90,8 @@ type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
 
 data IfaceTyLit
-  = IfaceNumberTyLit Integer
+  = IfaceNumTyLit Integer
+  | IfaceStrTyLit FastString
 
 data IfaceTyCon 	-- Encodes type constructors, kind constructors
      			-- coercion constructors, the lot
@@ -310,7 +311,8 @@ ppr_tc tc@(IfaceTc ext_nm) = parenSymOcc (getOccName ext_nm) (ppr tc)
 ppr_tc tc		   = ppr tc
 
 ppr_tylit :: IfaceTyLit -> SDoc
-ppr_tylit (IfaceNumberTyLit n) = integer n
+ppr_tylit (IfaceNumTyLit n) = integer n
+ppr_tylit (IfaceStrTyLit n) = text (show n)
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -417,7 +419,8 @@ toIfaceWiredInTyCon tc nm
   | otherwise		            = IfaceTc nm
 
 toIfaceTyLit :: TyLit -> IfaceTyLit
-toIfaceTyLit (NumberTyLit x) = IfaceNumberTyLit x
+toIfaceTyLit (NumTyLit x) = IfaceNumTyLit x
+toIfaceTyLit (StrTyLit x) = IfaceStrTyLit x
 
 ----------------
 toIfaceTypes :: [Type] -> [IfaceType]

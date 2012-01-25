@@ -38,7 +38,7 @@ module TysPrim(
 	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind, constraintKind,
         mkArrowKind, mkArrowKinds,
-        typeNatKind,
+        typeNatKind, typeStringKind,
 
         funTyCon, funTyConName,
         primTyCons,
@@ -345,6 +345,8 @@ constraintKind   = kindTyConType constraintKindTyCon
 typeNatKind :: Kind
 typeNatKind = kindTyConType (mkKindTyCon typeNatKindConName tySuperKind)
 
+typeStringKind :: Kind
+typeStringKind = kindTyConType (mkKindTyCon typeStringKindConName tySuperKind)
 
 -- | Given two kinds @k1@ and @k2@, creates the 'Kind' @k1 -> k2@
 mkArrowKind :: Kind -> Kind -> Kind
