@@ -229,6 +229,16 @@ class  Monad m  where
     {-# INLINE (>>) #-}
     m >> k      = m >>= \_ -> k
     fail s      = error s
+
+instance Functor ((->) r) where
+    fmap = (.)
+
+instance Monad ((->) r) where
+    return = const
+    f >>= k = \ r -> k (f r) r
+
+instance Functor ((,) a) where
+    fmap f (x,y) = (x, f y)
 \end{code}
 
 

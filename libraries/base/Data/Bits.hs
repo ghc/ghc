@@ -36,8 +36,11 @@ module Data.Bits (
     unsafeShiftL, unsafeShiftR,  -- :: a -> Int -> a
     rotateL, rotateR,  -- :: a -> Int -> a
     popCount           -- :: a -> Int
-  )
+  ),
 
+  bitDefault,
+  testBitDefault,
+  popCountDefault
   -- instance Bits Int
   -- instance Bits Integer
  ) where
@@ -74,7 +77,7 @@ Minimal complete definition: '.&.', '.|.', 'xor', 'complement',
 ('shift' or ('shiftL' and 'shiftR')), ('rotate' or ('rotateL' and 'rotateR')),
 'bitSize' and 'isSigned'.
 -}
-class (Eq a, Num a) => Bits a where
+class Eq a => Bits a where
     -- | Bitwise \"and\"
     (.&.) :: a -> a -> a
 
@@ -155,16 +158,12 @@ class (Eq a, Num a) => Bits a where
         value of the argument is ignored -}
     isSigned          :: a -> Bool
 
-    {-# INLINE bit #-}
     {-# INLINE setBit #-}
     {-# INLINE clearBit #-}
     {-# INLINE complementBit #-}
-    {-# INLINE testBit #-}
-    bit i               = 1 `shiftL` i
     x `setBit` i        = x .|. bit i
     x `clearBit` i      = x .&. complement (bit i)
     x `complementBit` i = x `xor` bit i
-    x `testBit` i       = (x .&. bit i) /= 0
 
     {-| Shift the argument left by the specified number of bits
         (which must be non-negative).
@@ -235,18 +234,41 @@ class (Eq a, Num a) => Bits a where
     {-| Return the number of set bits in the argument.  This number is
         known as the population count or the Hamming weight. -}
     popCount          :: a -> Int
-    popCount = go 0
-      where
-        go !c 0 = c
-        go c w = go (c+1) (w .&. w - 1)  -- clear the least significant bit set
-    {- This implementation is intentionally naive.  Instances are
-       expected to override it with something optimized for their
-       size. -}
+
+-- | Default implementation for 'bit'.
+--
+-- Note that: @bitDefault i = 1 `shiftL` i@
+bitDefault :: (Bits a, Num a) => Int -> a
+bitDefault i = 1 `shiftL` i
+{-# INLINE bitDefault #-}
+
+-- | Default implementation for 'testBit'.
+--
+-- Note that: @testBitDefault x i = (x .&. bit i) /= 0@
+testBitDefault ::  (Bits a, Num a) => a -> Int -> Bool
+testBitDefault x i = (x .&. bit i) /= 0
+{-# INLINE testBitDefault #-}
+
+-- | Default implementation for 'popCount'.
+--
+-- This implementation is intentionally naive. Instances are expected to provide
+-- an optimized implementation for their size.
+popCountDefault :: (Bits a, Num a) => a -> Int
+popCountDefault = go 0
+ where
+   go !c 0 = c
+   go c w = go (c+1) (w .&. w - 1) -- clear the least significant
 
 instance Bits Int where
     {-# INLINE shift #-}
+    {-# INLINE bit #-}
+    {-# INLINE testBit #-}
 
 #ifdef __GLASGOW_HASKELL__
+    bit     = bitDefault
+
+    testBit = testBitDefault
+
     (I# x#) .&.   (I# y#)  = I# (word2Int# (int2Word# x# `and#` int2Word# y#))
 
     (I# x#) .|.   (I# y#)  = I# (word2Int# (int2Word# x# `or#`  int2Word# y#))
@@ -277,6 +299,8 @@ instance Bits Int where
 
 #else /* !__GLASGOW_HASKELL__ */
 
+    popCount               = popCountDefault
+
 #ifdef __HUGS__
     (.&.)                  = primAndInt
     (.|.)                  = primOrInt
@@ -293,6 +317,8 @@ instance Bits Int where
     complement             = nhc_primIntCompl
     shiftL                 = nhc_primIntLsh
     shiftR                 = nhc_primIntRsh
+    bit                    = bitDefault
+    testBit                = testBitDefault
     bitSize _              = 32
 #endif /* __NHC__ */
 
@@ -344,6 +370,10 @@ instance Bits Integer where
    shift x i | i >= 0    = x * 2^i
              | otherwise = x `div` 2^(-i)
 #endif
+
+   bit        = bitDefault
+   testBit    = testBitDefault
+   popCount   = popCountDefault
 
    rotate x i = shift x i   -- since an Integer never wraps around
 

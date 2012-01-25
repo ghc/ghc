@@ -129,6 +129,8 @@ instance Read Int8 where
 
 instance Bits Int8 where
     {-# INLINE shift #-}
+    {-# INLINE bit #-}
+    {-# INLINE testBit #-}
 
     (I8# x#) .&.   (I8# y#)   = I8# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I8# x#) .|.   (I8# y#)   = I8# (word2Int# (int2Word# x# `or#`  int2Word# y#))
@@ -153,6 +155,8 @@ instance Bits Int8 where
     bitSize  _                = 8
     isSigned _                = True
     popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
+    bit                       = bitDefault
+    testBit                   = testBitDefault
 
 {-# RULES
 "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
@@ -276,6 +280,8 @@ instance Read Int16 where
 
 instance Bits Int16 where
     {-# INLINE shift #-}
+    {-# INLINE bit #-}
+    {-# INLINE testBit #-}
 
     (I16# x#) .&.   (I16# y#)  = I16# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I16# x#) .|.   (I16# y#)  = I16# (word2Int# (int2Word# x# `or#`  int2Word# y#))
@@ -300,7 +306,8 @@ instance Bits Int16 where
     bitSize  _                 = 16
     isSigned _                 = True
     popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
-
+    bit                        = bitDefault
+    testBit                    = testBitDefault
 
 {-# RULES
 "fromIntegral/Word8->Int16"  fromIntegral = \(W8# x#) -> I16# (word2Int# x#)
@@ -429,6 +436,8 @@ instance Read Int32 where
 
 instance Bits Int32 where
     {-# INLINE shift #-}
+    {-# INLINE bit #-}
+    {-# INLINE testBit #-}
 
     (I32# x#) .&.   (I32# y#)  = I32# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I32# x#) .|.   (I32# y#)  = I32# (word2Int# (int2Word# x# `or#`  int2Word# y#))
@@ -454,6 +463,8 @@ instance Bits Int32 where
     bitSize  _                 = 32
     isSigned _                 = True
     popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
+    bit                        = bitDefault
+    testBit                    = testBitDefault
 
 {-# RULES
 "fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (word2Int# x#)
@@ -616,6 +627,8 @@ instance Read Int64 where
 
 instance Bits Int64 where
     {-# INLINE shift #-}
+    {-# INLINE bit #-}
+    {-# INLINE testBit #-}
 
     (I64# x#) .&.   (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `and64#` int64ToWord64# y#))
     (I64# x#) .|.   (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `or64#`  int64ToWord64# y#))
@@ -641,6 +654,8 @@ instance Bits Int64 where
     isSigned _                 = True
     popCount (I64# x#)         =
         I# (word2Int# (popCnt64# (int64ToWord64# x#)))
+    bit                        = bitDefault
+    testBit                    = testBitDefault
 
 -- give the 64-bit shift operations the same treatment as the 32-bit
 -- ones (see GHC.Base), namely we wrap them in tests to catch the
@@ -745,6 +760,8 @@ instance Read Int64 where
 
 instance Bits Int64 where
     {-# INLINE shift #-}
+    {-# INLINE bit #-}
+    {-# INLINE testBit #-}
 
     (I64# x#) .&.   (I64# y#)  = I64# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I64# x#) .|.   (I64# y#)  = I64# (word2Int# (int2Word# x# `or#`  int2Word# y#))
@@ -769,6 +786,8 @@ instance Bits Int64 where
     bitSize  _                 = 64
     isSigned _                 = True
     popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
+    bit                        = bitDefault
+    testBit                    = testBitDefault
 
 {-# RULES
 "fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#

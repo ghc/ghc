@@ -27,7 +27,6 @@ module Control.Monad.Fix (
 
 import Prelude
 import System.IO
-import Control.Monad.Instances ()
 import Data.Function (fix)
 #ifdef __HUGS__
 import Hugs.Prelude (MonadFix(mfix))
@@ -65,23 +64,18 @@ class (Monad m) => MonadFix m where
 
 -- Instances of MonadFix for Prelude monads
 
--- Maybe:
 instance MonadFix Maybe where
     mfix f = let a = f (unJust a) in a
              where unJust (Just x) = x
                    unJust Nothing  = error "mfix Maybe: Nothing"
 
--- List:
 instance MonadFix [] where
     mfix f = case fix (f . head) of
                []    -> []
                (x:_) -> x : mfix (tail . f)
 
--- IO:
 instance MonadFix IO where
     mfix = fixIO 
-
--- Prelude types with Monad instances in Control.Monad.Instances
 
 instance MonadFix ((->) r) where
     mfix f = \ r -> let a = f a r in a

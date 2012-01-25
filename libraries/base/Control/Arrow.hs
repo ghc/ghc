@@ -296,10 +296,17 @@ instance Monad m => ArrowApply (Kleisli m) where
 
 newtype ArrowMonad a b = ArrowMonad (a () b)
 
+instance Arrow a => Functor (ArrowMonad a) where
+    fmap f (ArrowMonad m) = ArrowMonad $ m >>> arr f
+
 instance ArrowApply a => Monad (ArrowMonad a) where
     return x = ArrowMonad (arr (\_ -> x))
     ArrowMonad m >>= f = ArrowMonad $
         m >>> arr (\x -> let ArrowMonad h = f x in (h, ())) >>> app
+
+instance (ArrowApply a, ArrowPlus a) => MonadPlus (ArrowMonad a) where
+   mzero = ArrowMonad zeroArrow
+   ArrowMonad x `mplus` ArrowMonad y = ArrowMonad (x <+> y)
 
 -- | Any instance of 'ArrowApply' can be made into an instance of
 --   'ArrowChoice' by defining 'left' = 'leftApp'.
