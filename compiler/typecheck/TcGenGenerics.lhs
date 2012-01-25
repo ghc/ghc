@@ -117,7 +117,7 @@ genGenericRepExtras tc mod =
 genDtMeta :: (TyCon, MetaTyCons) -> TcM BagDerivStuff
 genDtMeta (tc,metaDts) =
   do  loc <- getSrcSpanM
-      dflags <- getDOpts
+      dflags <- getDynFlags
       dClas <- tcLookupClass datatypeClassName
       let new_dfun_name clas tycon = newDFunName clas [mkTyConApp tycon []] loc
       d_dfun_name <- new_dfun_name dClas tc

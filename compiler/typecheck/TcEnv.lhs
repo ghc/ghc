@@ -558,7 +558,7 @@ tcGetDefaultTys :: Bool         -- True <=> interactive context
                         (Bool,  -- True <=> Use overloaded strings
                          Bool)) -- True <=> Use extended defaulting rules
 tcGetDefaultTys interactive
-  = do  { dflags <- getDOpts
+  = do  { dflags <- getDynFlags
         ; let ovl_strings = xopt Opt_OverloadedStrings dflags
               extended_defaults = interactive
                                || xopt Opt_ExtendedDefaultRules dflags

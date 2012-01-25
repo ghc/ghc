@@ -1364,17 +1364,10 @@ checkValidClass cls
 
         -- Check the associated type defaults are well-formed and instantiated
         -- See Note [Checking consistent instantiation]
-        ; mapM_ check_at_defs at_stuff
-
-  	-- Check that if the class has generic methods, then the
-	-- class has only one parameter.  We can't do generic
-	-- multi-parameter type classes!
-	; checkTc (unary || no_generics) (genericMultiParamErr cls)
-	}
+        ; mapM_ check_at_defs at_stuff	}
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
-    unary 	= isSingleton (snd (splitKiTyVars tyvars))  -- IA0_NOTE: only count type arguments
-    no_generics = null [() | (_, (GenDefMeth _)) <- op_stuff]
+    unary = isSingleton (snd (splitKiTyVars tyvars))  -- IA0_NOTE: only count type arguments
 
     check_op constrained_class_methods (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -1698,11 +1691,6 @@ noClassTyVarErr clas op
   = sep [ptext (sLit "The class method") <+> quotes (ppr op),
 	 ptext (sLit "mentions none of the type variables of the class") <+> 
 		ppr clas <+> hsep (map ppr (classTyVars clas))]
-
-genericMultiParamErr :: Class -> SDoc
-genericMultiParamErr clas
-  = ptext (sLit "The multi-parameter class") <+> quotes (ppr clas) <+> 
-    ptext (sLit "cannot have generic methods")
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls

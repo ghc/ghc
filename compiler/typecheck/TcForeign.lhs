@@ -246,14 +246,14 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
           check False (illegalForeignTyErr empty sig_ty)
           return idecl
         (arg1_ty:arg_tys) -> do
-          dflags <- getDOpts
+          dflags <- getDynFlags
           check (isFFIDynArgumentTy arg1_ty)
                 (illegalForeignTyErr argument arg1_ty)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
           checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
           return idecl
   | cconv == PrimCallConv = do
-      dflags <- getDOpts
+      dflags <- getDynFlags
       check (xopt Opt_GHCForeignImportPrim dflags)
             (text "Use -XGHCForeignImportPrim to allow `foreign import prim'.")
       checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
@@ -268,7 +268,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
       checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
       checkCConv cconv
       checkCTarget target
-      dflags <- getDOpts
+      dflags <- getDynFlags
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
@@ -383,7 +383,7 @@ checkForeignRes non_io_result_ok check_safe pred_res_ty ty
 
         -- Case for non-IO result type with FFI Import
         _ -> do
-            dflags <- getDOpts
+            dflags <- getDynFlags
             case (pred_res_ty ty && non_io_result_ok) of
                 -- handle normal typecheck fail, we want to handle this first and
                 -- only report safe haskell errors if the normal type check is OK.
@@ -440,7 +440,7 @@ checkCOrAsmOrLlvmOrDotNetOrInterp _
 
 checkCg :: (HscTarget -> Maybe SDoc) -> TcM ()
 checkCg check = do
-    dflags <- getDOpts
+    dflags <- getDynFlags
     let target = hscTarget dflags
     case target of
       HscNothing -> return ()
@@ -456,7 +456,7 @@ Calling conventions
 checkCConv :: CCallConv -> TcM ()
 checkCConv CCallConv    = return ()
 checkCConv CApiConv     = return ()
-checkCConv StdCallConv  = do dflags <- getDOpts
+checkCConv StdCallConv  = do dflags <- getDynFlags
                              let platform = targetPlatform dflags
                              unless (platformArch platform == ArchX86) $
                                  -- This is a warning, not an error. see #3336

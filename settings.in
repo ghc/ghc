@@ -1,7 +1,7 @@
 [("GCC extra via C opts", "@GccExtraViaCOpts@"),
  ("C compiler command", "@SettingsCCompilerCommand@"),
  ("C compiler flags", "@SettingsCCompilerFlags@"),
- ("ar command", "@ArCmd@"),
+ ("ar command", "@SettingsArCommand@"),
  ("ar flags", "@ArArgs@"),
  ("ar supports at file", "@ArSupportsAtFile@"),
  ("touch command", "@SettingsTouchCommand@"),

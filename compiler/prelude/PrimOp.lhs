@@ -12,7 +12,8 @@ module PrimOp (
         tagToEnumKey,
 
         primOpOutOfLine, primOpCodeSize,
-        primOpOkForSpeculation, primOpIsCheap,
+        primOpOkForSpeculation, primOpOkForSideEffects,
+        primOpIsCheap,
 
         getPrimOpResultInfo,  PrimOpResultInfo(..),
 
@@ -307,77 +308,93 @@ primOpOutOfLine :: PrimOp -> Bool
 
 Note [PrimOp can_fail and has_side_effects]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * A primop that is neither can_fail nor has_side_effects can be
-   executed speculatively, any number of times
+Both can_fail and has_side_effects mean that the primop has
+some effect that is not captured entirely by its result value.
 
- * A primop that is marked can_fail cannot be executed speculatively,
-   (becuase the might provoke the failure), but it can be repeated.
-   Why would you want to do that? Perhaps it might enable some
-   eta-expansion, if you can prove that the lambda is definitely
-   applied at least once. I guess we don't currently do that.
+   ----------  has_side_effects ---------------------
+   Has some imperative side effect, perhaps on the world (I/O),
+   or perhaps on some mutable data structure (writeIORef).
+   Generally speaking all such primops have a type like
+      State -> input -> (State, output)
+   so the state token guarantees ordering, and also ensures
+   that the primop is executed even if 'output' is discarded.
 
- * A primop that is marked has_side_effects can be neither speculated
-   nor repeated; it must be executed exactly the right number of
-   times.
+   ----------  can_fail ----------------------------
+   Can fail with a seg-fault or divide-by-zero error on some elements
+   of its input domain.  Main examples:
+      division (fails on zero demoninator
+      array indexing (fails if the index is out of bounds)
+   However (ASSUMPTION), these can_fail primops are ALWAYS surrounded
+   with a test that checks for the bad cases.  
 
-So has_side_effects implies can_fail.  We don't currently exploit
-the case of primops that can_fail but do not have_side_effects.
+Consequences:
+
+* You can discard a can_fail primop, or float it _inwards_.
+  But you cannot float it _outwards_, lest you escape the
+  dynamic scope of the test.  Example:
+      case d ># 0# of
+        True  -> case x /# d of r -> r +# 1
+        False -> 0
+  Here we must not float the case outwards to give
+      case x/# d of r ->
+      case d ># 0# of
+        True  -> r +# 1
+        False -> 0
+
+* I believe that exactly the same rules apply to a has_side_effects
+  primop; you can discard it (remember, the state token will keep
+  it alive if necessary), or float it in, but not float it out.
+
+  Example of the latter
+       if blah then let! s1 = writeMutVar s0 v True in s1
+               else s0
+  Notice that s0 is mentioned in both branches of the 'if', but 
+  only one of these two will actually be consumed.  But if we
+  float out to
+      let! s1 = writeMutVar s0 v True
+      in if blah then s1 else s0
+  the writeMutVar will be performed in both branches, which is
+  utterly wrong.
+
+* You cannot duplicate a has_side_effect primop.  You might wonder
+  how this can occur given the state token threading, but just look
+  at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get something like
+  this
+        p = case readMutVar# s v of
+              (# s', r #) -> (S# s', r)
+        s' = case p of (s', r) -> s'
+        r  = case p of (s', r) -> r
+
+  (All these bindings are boxed.)  If we inline p at its two call
+  sites, we get a catastrophe: because the read is performed once when
+  s' is demanded, and once when 'r' is demanded, which may be much 
+  later.  Utterly wrong.  Trac #3207 is real example of this happening.
+
+  However, it's fine to duplicate a can_fail primop.  That is
+  the difference between can_fail and has_side_effects.
+
+            can_fail     has_side_effects
+Discard        YES           YES
+Float in       YES           YES
+Float out      NO            NO
+Duplicate      YES           NO
+
+How do we achieve these effects?
 
 Note [primOpOkForSpeculation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Sometimes we may choose to execute a PrimOp even though it isn't
-certain that its result will be required; ie execute them
-``speculatively''.  The same thing as ``cheap eagerness.'' Usually
-this is OK, because PrimOps are usually cheap, but it isn't OK for
-  * PrimOps that are expensive 
-  * PrimOps which can fail
-  * PrimOps that have side effects
+  * The "no-float-out" thing is achieved by ensuring that we never
+    let-bind a can_fail or has_side_effects primop.  The RHS of a
+    let-binding (which can float in and out freely) satisfies
+    exprOkForSpeculation.  And exprOkForSpeculation is false of
+    can_fail and no_side_effect.
 
-Ok-for-speculation also means that it's ok *not* to execute the
-primop. For example
-        case op a b of
-          r -> 3
-Here the result is not used, so we can discard the primop.  Anything
-that has side effects mustn't be dicarded in this way, of course!
+  * So can_fail and no_side_effect primops will appear only as the
+    scrutinees of cases, and that's why the FloatIn pass is capable
+    of floating case bindings inwards.
 
-See also @primOpIsCheap@ (below).
+  * The no-duplicate thing is done via primOpIsCheap, by making
+    has_side_effects things (very very very) not-cheap!
 
-Note [primOpHasSideEffects]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some primops have side-effects and so, for example, must not be
-duplicated.
-
-This predicate means a little more than just "modifies the state of
-the world".  What it really means is "it cosumes the state on its
-input".  To see what this means, consider
-
- let
-     t = case readMutVar# v s0 of (# s1, x #) -> (S# s1, x)
-     y = case t of (s,x) -> x
- in
-     ... y ... y ...
-
-Now, this is part of an ST or IO thread, so we are guaranteed by
-construction that the program uses the state in a single-threaded way.
-Whenever the state resulting from the readMutVar# is demanded, the
-readMutVar# will be performed, and it will be ordered correctly with
-respect to other operations in the monad.
-
-But there's another way this could go wrong: GHC can inline t into y,
-and inline y.  Then although the original readMutVar# will still be
-correctly ordered with respect to the other operations, there will be
-one or more extra readMutVar#s performed later, possibly out-of-order.
-This really happened; see #3207.
-
-The property we need to capture about readMutVar# is that it consumes
-the State# value on its input.  We must retain the linearity of the
-State#.
-
-Our fix for this is to declare any primop that must be used linearly
-as having side-effects.  When primOpHasSideEffects is True,
-primOpOkForSpeculation will be False, and hence primOpIsCheap will
-also be False, and applications of the primop will never be
-duplicated.
 
 \begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
@@ -387,15 +404,19 @@ primOpCanFail :: PrimOp -> Bool
 #include "primop-can-fail.hs-incl"
 
 primOpOkForSpeculation :: PrimOp -> Bool
-  -- See Note [primOpOkForSpeculation]
+  -- See Note [primOpOkForSpeculation and primOpOkForFloatOut]
   -- See comments with CoreUtils.exprOkForSpeculation
 primOpOkForSpeculation op
   = not (primOpHasSideEffects op || primOpOutOfLine op || primOpCanFail op)
+
+primOpOkForSideEffects :: PrimOp -> Bool
+primOpOkForSideEffects op
+  = not (primOpHasSideEffects op)
 \end{code}
 
 
-primOpIsCheap
-~~~~~~~~~~~~~
+Note [primOpIsCheap]
+~~~~~~~~~~~~~~~~~~~~
 @primOpIsCheap@, as used in \tr{SimplUtils.lhs}.  For now (HACK
 WARNING), we just borrow some other predicates for a
 what-should-be-good-enough test.  "Cheap" means willing to call it more

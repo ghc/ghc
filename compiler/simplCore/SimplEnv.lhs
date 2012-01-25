@@ -397,6 +397,7 @@ classifyFF (NonRec bndr rhs)
   | otherwise		     = FltCareful
 
 doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> OutExpr -> SimplEnv -> Bool
+-- If you change this function look also at FloatIn.noFloatFromRhs
 doFloatFromRhs lvl rec str rhs (SimplEnv {seFloats = Floats fs ff}) 
   =  not (isNilOL fs) && want_to_float && can_float
   where

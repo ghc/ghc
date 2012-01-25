@@ -300,11 +300,11 @@ import Lexer
 import System.Directory ( doesFileExist, getCurrentDirectory )
 import Data.Maybe
 import Data.List        ( find )
+import Data.Time
 import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
 import Control.Monad
 import System.Exit      ( exitWith, ExitCode(..) )
-import System.Time      ( getClockTime )
 import Exception
 import Data.IORef
 import System.FilePath
@@ -812,7 +812,7 @@ compileToCore fn = do
 compileCoreToObj :: GhcMonad m => Bool -> CoreModule -> m ()
 compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
   dflags      <- getSessionDynFlags
-  currentTime <- liftIO $ getClockTime
+  currentTime <- liftIO $ getCurrentTime
   cwd         <- liftIO $ getCurrentDirectory
   modLocation <- liftIO $ mkHiOnlyModLocation dflags (hiSuf dflags) cwd
                    ((moduleNameSlashes . moduleName) mName)

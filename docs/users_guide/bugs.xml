@@ -150,6 +150,98 @@ main = do args &lt;- getArgs
 
       <variablelist>
 	<varlistentry>
+	  <term>Num superclasses</term>
+	  <listitem>
+	    <para>
+              The <literal>Num</literal> class does not have
+              <literal>Show</literal> or <literal>Eq</literal>
+              superclasses.
+            </para>
+
+	    <para>
+              You can make code that works with both
+              Haskell98/Haskell2010 and GHC by:
+              <itemizedlist>
+                <listitem>
+                  <para>
+                    Whenever you make a <literal>Num</literal> instance
+                    of a type, also make <literal>Show</literal> and
+                    <literal>Eq</literal> instances, and
+                  </para>
+                </listitem>
+                <listitem>
+                  <para>
+                    Whenever you give a function, instance or class a
+                    <literal>Num t</literal> constraint, also give it
+                    <literal>Show t</literal> and
+                    <literal>Eq t</literal> constraints.
+                  </para>
+                </listitem>
+              </itemizedlist>
+            </para>
+	    </listitem>
+	  </varlistentry>
+
+	<varlistentry>
+	  <term>Bits superclasses</term>
+	  <listitem>
+	    <para>
+              The <literal>Bits</literal> class does not have
+              a <literal>Num</literal> superclasses. It therefore
+              does not have default methods for the
+              <literal>bit</literal>,
+              <literal>testBit</literal> and
+              <literal>popCount</literal> methods.
+            </para>
+
+	    <para>
+              You can make code that works with both
+              Haskell2010 and GHC by:
+              <itemizedlist>
+                <listitem>
+                  <para>
+                    Whenever you make a <literal>Bits</literal> instance
+                    of a type, also make a <literal>Num</literal>
+                    instance, and
+                  </para>
+                </listitem>
+                <listitem>
+                  <para>
+                    Whenever you give a function, instance or class a
+                    <literal>Bits t</literal> constraint, also give it
+                    a <literal>Num t</literal> constraint, and
+                  </para>
+                </listitem>
+                <listitem>
+                  <para>
+                    Always define the <literal>bit</literal>,
+                    <literal>testBit</literal> and
+                    <literal>popCount</literal> methods in
+                    <literal>Bits</literal> instances.
+                  </para>
+                </listitem>
+              </itemizedlist>
+            </para>
+	    </listitem>
+	  </varlistentry>
+
+	<varlistentry>
+	  <term>Extra instances</term>
+	  <listitem>
+	    <para>
+              The following extra instances are defined:
+            </para>
+<programlisting>
+instance Functor ((->) r)
+instance Monad ((->) r)
+instance Functor ((,) a)
+instance Functor (Either a)
+instance Monad (Either e)
+</programlisting>
+	    </listitem>
+	  </varlistentry>
+
+	<varlistentry>
 	  <term>Multiply-defined array elements&mdash;not checked:</term>
 	  <listitem>
 	    <para>This code fragment should

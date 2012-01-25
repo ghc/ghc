@@ -345,7 +345,7 @@ dsFExport fn_id co ext_name cconv isDyn = do
                                 -- The function returns t
                                 Nothing                 -> (orig_res_ty, False)
 
-    dflags <- getDOpts
+    dflags <- getDynFlags
     return $
       mkFExportCBits dflags ext_name
                      (if isDyn then Nothing else Just fn_id)

@@ -513,6 +513,7 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                                tidy_var_v = lookup_var var_v
                          , isExportedId tidy_var
                          , isExportedId tidy_var_v
+                         , isDataConWorkId var || not (isImplicitId var)
                          ]
 
     tidy_scalarVars = mkVarSet [ lookup_var var 

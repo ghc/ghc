@@ -72,6 +72,7 @@ import Pair
 import Unique
 import Data.Maybe
 import BasicTypes
+import DynFlags
 import Panic
 import FastString
 import Control.Monad    ( when )
@@ -1106,7 +1107,7 @@ tcLookupTh name
 
           else do               -- It's imported
         { (eps,hpt) <- getEpsAndHpt
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; case lookupType dflags hpt (eps_PTE eps) name of
             Just thing -> return (AGlobal thing)
             Nothing    -> do { thing <- tcImportDecl name

@@ -564,10 +564,9 @@ stat_exit(int alloc)
 
         // heapCensus() is called by the GC, so RP and HC time are
         // included in the GC stats.  We therefore subtract them to
-        // obtain the actual GC cpu time.  XXX: we aren't doing this
-        // for elapsed time.
-        gc_cpu     -= 0 + PROF_VAL(RP_tot_time + HC_tot_time);
-        gc_elapsed -= 0 + PROF_VAL(RPe_tot_time + HCe_tot_time);
+        // obtain the actual GC cpu time.
+        gc_cpu     -= PROF_VAL(RP_tot_time + HC_tot_time);
+        gc_elapsed -= PROF_VAL(RPe_tot_time + HCe_tot_time);
 
         init_cpu     = get_init_cpu();
         init_elapsed = get_init_elapsed();

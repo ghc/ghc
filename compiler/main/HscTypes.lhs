@@ -92,7 +92,7 @@ module HscTypes (
 
         -- * Vectorisation information
         VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo,
-        noIfaceVectInfo,
+        noIfaceVectInfo, isNoIfaceVectInfo,
 
         -- * Safe Haskell information
         hscGetSafeInf, hscSetSafeInf,
@@ -164,11 +164,11 @@ import Control.Monad    ( mplus, guard, liftM, when )
 import Data.Array       ( Array, array )
 import Data.IORef
 import Data.Map         ( Map )
+import Data.Time
 import Data.Word
 import Data.Typeable    ( Typeable )
 import Exception
 import System.FilePath
-import System.Time      ( ClockTime )
 
 -- -----------------------------------------------------------------------------
 -- Source Errors
@@ -356,7 +356,7 @@ data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
-      targetContents     :: Maybe (StringBuffer,ClockTime)
+      targetContents     :: Maybe (StringBuffer,UTCTime)
                                         -- ^ in-memory text buffer?
     }
 
@@ -696,8 +696,8 @@ data ModIface
         mi_insts       :: [IfaceClsInst],     -- ^ Sorted class instance
         mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
         mi_rules       :: [IfaceRule],     -- ^ Sorted rules
-        mi_orphan_hash :: !Fingerprint,    -- ^ Hash for orphan rules and class
-                                           -- and family instances combined
+        mi_orphan_hash :: !Fingerprint,    -- ^ Hash for orphan rules, class and family
+                                           -- instances, and vectorise pragmas combined
 
         mi_vect_info :: !IfaceVectInfo,    -- ^ Vectorisation information
 
@@ -1566,6 +1566,8 @@ lookupFixity env n = case lookupNameEnv env n of
 --
 -- * A transformation rule in a module other than the one defining
 --   the function in the head of the rule
+--
+-- * A vectorisation pragma
 type WhetherHasOrphans   = Bool
 
 -- | Does this module define family instances?
@@ -1632,7 +1634,7 @@ data Usage
     }                                           -- ^ Module from the current package
   | UsageFile {
         usg_file_path  :: FilePath,
-        usg_mtime      :: ClockTime
+        usg_mtime      :: UTCTime
         -- ^ External file dependency. From a CPP #include or TH addDependentFile. Should be absolute.
   }
     deriving( Eq )
@@ -1803,8 +1805,8 @@ data ModSummary
         ms_mod          :: Module,              -- ^ Identity of the module
         ms_hsc_src      :: HscSource,           -- ^ The module source either plain Haskell, hs-boot or external core
         ms_location     :: ModLocation,         -- ^ Location of the various files belonging to the module
-        ms_hs_date      :: ClockTime,           -- ^ Timestamp of source file
-        ms_obj_date     :: Maybe ClockTime,     -- ^ Timestamp of object, if we have one
+        ms_hs_date      :: UTCTime,             -- ^ Timestamp of source file
+        ms_obj_date     :: Maybe UTCTime,       -- ^ Timestamp of object, if we have one
         ms_srcimps      :: [Located (ImportDecl RdrName)],      -- ^ Source imports of the module
         ms_textual_imps :: [Located (ImportDecl RdrName)],      -- ^ Non-source imports of the module from the module *text*
         ms_hspp_file    :: FilePath,            -- ^ Filename of preprocessed source file
@@ -2009,6 +2011,10 @@ concatVectInfo = foldr plusVectInfo noVectInfo
 noIfaceVectInfo :: IfaceVectInfo
 noIfaceVectInfo = IfaceVectInfo [] [] [] [] []
 
+isNoIfaceVectInfo :: IfaceVectInfo -> Bool
+isNoIfaceVectInfo (IfaceVectInfo l1 l2 l3 l4 l5)
+  = null l1 && null l2 && null l3 && null l4 && null l5
+
 instance Outputable VectInfo where
   ppr info = vcat
              [ ptext (sLit "variables     :") <+> ppr (vectInfoVar          info)
@@ -2100,7 +2106,7 @@ stuff is the *dynamic* linker, and isn't present in a stage-1 compiler
 \begin{code}
 -- | Information we can use to dynamically link modules into the compiler
 data Linkable = LM {
-  linkableTime     :: ClockTime,        -- ^ Time at which this linkable was built
+  linkableTime     :: UTCTime,          -- ^ Time at which this linkable was built
                                         -- (i.e. when the bytecodes were produced,
                                         --       or the mod date on the files)
   linkableModule   :: Module,           -- ^ The linkable module itself

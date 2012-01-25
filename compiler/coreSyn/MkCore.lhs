@@ -21,6 +21,9 @@ module MkCore (
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS,
 
+        -- * Floats
+        FloatBind(..), wrapFloat,
+
         -- * Constructing/deconstructing implicit parameter boxes
         mkIPUnbox, mkIPBox,
 
@@ -387,6 +390,25 @@ mkBigCoreTup = mkChunkified mkCoreTup
 -- | Build the type of a big tuple that holds the specified type of thing
 mkBigCoreTupTy :: [Type] -> Type
 mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+                Floats
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+data FloatBind 
+  = FloatLet  CoreBind
+  | FloatCase CoreExpr Id AltCon [Var]       
+      -- case e of y { C ys -> ... }
+      -- See Note [Floating cases] in SetLevels
+
+wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
+wrapFloat (FloatLet defns)       body = Let defns body
+wrapFloat (FloatCase e b con bs) body = Case e b (exprType body) [(con, bs, body)]
 \end{code}
 
 %************************************************************************

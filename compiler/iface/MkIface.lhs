@@ -111,7 +111,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.IORef
 import System.FilePath
-import System.Directory (getModificationTime)
 \end{code}
 
 
@@ -595,8 +594,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - flag abi hash
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
-                       export_hash,
-                       orphan_hash,
+                       export_hash,  -- includes orphan_hash
                        mi_warns iface0,
                        mi_vect_info iface0)
 
@@ -623,7 +621,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_orphan      = not (   null orph_rules
                                       && null orph_insts
                                       && null orph_fis
-                                      && null (ifaceVectInfoVar (mi_vect_info iface0))),
+                                      && isNoIfaceVectInfo (mi_vect_info iface0)),
                 mi_finsts      = not . null $ mi_fam_insts iface0,
                 mi_decls       = sorted_decls,
                 mi_hash_fn     = lookupOccEnv local_env }
@@ -886,7 +884,7 @@ mkOrphMap get_key decls
 mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath] -> IO [Usage]
 mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
   = do  { eps <- hscEPS hsc_env
-    ; mtimes <- mapM getModificationTime dependent_files
+    ; mtimes <- mapM getModificationUTCTime dependent_files
         ; let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                      dir_imp_mods used_names
         ; let usages = mod_usages ++ map to_file_usage (zip dependent_files mtimes)
@@ -1334,7 +1332,7 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
                                    usg_mtime = old_mtime } =
   liftIO $
     handleIO handle $ do
-      new_mtime <- getModificationTime file
+      new_mtime <- getModificationUTCTime file
       return $ old_mtime /= new_mtime
  where
    handle =

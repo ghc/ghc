@@ -466,8 +466,6 @@ dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
 FPTOOLS_SET_HASKELL_PLATFORM_VARS
 
-FP_SETTINGS
-
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF
 
@@ -487,6 +485,7 @@ FP_PROG_AR_NEEDS_RANLIB
 dnl ** Check to see whether ln -s works
 AC_PROG_LN_S
 
+FP_SETTINGS
 
 dnl ** Find the path to sed
 AC_PATH_PROGS(SedCmd,gsed sed,sed)

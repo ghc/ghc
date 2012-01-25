@@ -13,7 +13,7 @@ module LlvmCodeGen.Base (
 
         LlvmEnv, initLlvmEnv, clearVars, varLookup, varInsert,
         funLookup, funInsert, getLlvmVer, setLlvmVer, getLlvmPlatform,
-        ghcInternalFunctions,
+        getDflags, ghcInternalFunctions,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
@@ -32,6 +32,7 @@ import CLabel
 import CgUtils ( activeStgRegs )
 import Config
 import Constants
+import DynFlags
 import FastString
 import OldCmm
 import qualified Outputable as Outp
@@ -150,12 +151,13 @@ defaultLlvmVersion = 28
 --
 
 -- two maps, one for functions and one for local vars.
-newtype LlvmEnv = LlvmEnv (LlvmEnvMap, LlvmEnvMap, LlvmVersion, Platform)
+newtype LlvmEnv = LlvmEnv (LlvmEnvMap, LlvmEnvMap, LlvmVersion, DynFlags)
+
 type LlvmEnvMap = UniqFM LlvmType
 
 -- | Get initial Llvm environment.
-initLlvmEnv :: Platform -> LlvmEnv
-initLlvmEnv platform = LlvmEnv (initFuncs, emptyUFM, defaultLlvmVersion, platform)
+initLlvmEnv :: DynFlags -> LlvmEnv
+initLlvmEnv dflags = LlvmEnv (initFuncs, emptyUFM, defaultLlvmVersion, dflags)
     where initFuncs = listToUFM $ [ (n, LMFunction ty) | (n, ty) <- ghcInternalFunctions ]
 
 -- | Here we pre-initialise some functions that are used internally by GHC
@@ -211,7 +213,11 @@ setLlvmVer n (LlvmEnv (e1, e2, _, p)) = LlvmEnv (e1, e2, n, p)
 
 -- | Get the platform we are generating code for
 getLlvmPlatform :: LlvmEnv -> Platform
-getLlvmPlatform (LlvmEnv (_, _, _, p)) = p
+getLlvmPlatform (LlvmEnv (_, _, _, d)) = targetPlatform d
+
+-- | Get the DynFlags for this compilation pass
+getDflags :: LlvmEnv -> DynFlags
+getDflags (LlvmEnv (_, _, _, d)) = d
 
 -- ----------------------------------------------------------------------------
 -- * Label handling

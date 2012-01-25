@@ -10,6 +10,9 @@
 # Full build with max optimisation and everything enabled (very slow build)
 #BuildFlavour = perf
 
+# As above but build GHC using the LLVM backend
+#BuildFlavour = perf-llvm
+
 # Fast build with optimised libraries, no profiling (RECOMMENDED):
 #BuildFlavour = quick
 
@@ -41,6 +44,23 @@ ifeq "$(BuildFlavour)" "perf"
 SRC_HC_OPTS     = -O -H64m
 GhcStage1HcOpts = -O -fasm
 GhcStage2HcOpts = -O2 -fasm
+GhcHcOpts       = -Rghc-timing
+GhcLibHcOpts    = -O2
+GhcLibWays     += p
+
+ifeq "$(PlatformSupportsSharedLibs)" "YES"
+GhcLibWays += dyn
+endif
+
+endif
+
+# ---------------- Perf build using LLVM -------------------------------------
+
+ifeq "$(BuildFlavour)" "perf-llvm"
+
+SRC_HC_OPTS     = -O -H64m -fllvm
+GhcStage1HcOpts = -O -fllvm
+GhcStage2HcOpts = -O2 -fllvm
 GhcHcOpts       = -Rghc-timing
 GhcLibHcOpts    = -O2
 GhcLibWays     += p
@@ -151,10 +171,14 @@ endif
 
 ifeq "$(BuildFlavour)" "unreg"
 
+# Note that the LLVM backend works in unregisterised mode as well as
+# registerised mode. This often makes it a good choice for porting
+# GHC.
+
 GhcUnregisterised    = YES
 GhcWithNativeCodeGen = NO
 
-SRC_HC_OPTS          = -O -H64m
+SRC_HC_OPTS          = -O -H64m # -fllvm
 GhcStage1HcOpts      = -O
 GhcStage2HcOpts      = -O2
 GhcHcOpts            = -Rghc-timing
@@ -173,3 +197,4 @@ endif
 # NoFib settings
 NoFibWays =
 STRIP_CMD = :
+

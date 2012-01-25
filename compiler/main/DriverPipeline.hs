@@ -190,7 +190,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
                                               (Just location)
                                               maybe_stub_o
                                   -- The object filename comes from the ModLocation
-                            o_time <- getModificationTime object_filename
+                            o_time <- getModificationUTCTime object_filename
                             return ([DotO object_filename], o_time)
                     
                     let linkable = LM unlinked_time this_mod hs_unlinked
@@ -353,13 +353,13 @@ linkingNeeded dflags linkables pkg_deps = do
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
   let exe_file = exeFileName dflags
-  e_exe_time <- tryIO $ getModificationTime exe_file
+  e_exe_time <- tryIO $ getModificationUTCTime exe_file
   case e_exe_time of
     Left _  -> return True
     Right t -> do
         -- first check object files and extra_ld_inputs
         extra_ld_inputs <- readIORef v_Ld_inputs
-        e_extra_times <- mapM (tryIO . getModificationTime) extra_ld_inputs
+        e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
         let (errs,extra_times) = splitEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
@@ -375,7 +375,7 @@ linkingNeeded dflags linkables pkg_deps = do
 
         pkg_libfiles <- mapM (uncurry findHSLib) pkg_hslibs
         if any isNothing pkg_libfiles then return True else do
-        e_lib_times <- mapM (tryIO . getModificationTime)
+        e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
         let (lib_errs,lib_times) = splitEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
@@ -906,7 +906,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
-        src_timestamp <- io $ getModificationTime (basename <.> suff)
+        src_timestamp <- io $ getModificationUTCTime (basename <.> suff)
 
         let hsc_lang = hscTarget dflags
         source_unchanged <- io $
@@ -919,7 +919,7 @@ runPhase (Hsc src_flavour) input_fn dflags0
              else do o_file_exists <- doesFileExist o_file
                      if not o_file_exists
                         then return SourceModified       -- Need to recompile
-                        else do t2 <- getModificationTime o_file
+                        else do t2 <- getModificationUTCTime o_file
                                 if t2 > src_timestamp
                                   then return SourceUnmodified
                                   else return SourceModified
@@ -1306,15 +1306,21 @@ runPhase SplitAs _input_fn dflags
 
 runPhase LlvmOpt input_fn dflags
   = do
-    let lo_opts = getOpts dflags opt_lo
-    let opt_lvl = max 0 (min 2 $ optLevel dflags)
-    -- don't specify anything if user has specified commands. We do this for
-    -- opt but not llc since opt is very specifically for optimisation passes
-    -- only, so if the user is passing us extra options we assume they know
-    -- what they are doing and don't get in the way.
-    let optFlag = if null lo_opts
-                     then [SysTools.Option (llvmOpts !! opt_lvl)]
-                     else []
+    ver <- io $ readIORef (llvmVersion dflags)
+
+    let lo_opts  = getOpts dflags opt_lo
+        opt_lvl  = max 0 (min 2 $ optLevel dflags)
+        -- don't specify anything if user has specified commands. We do this
+        -- for opt but not llc since opt is very specifically for optimisation
+        -- passes only, so if the user is passing us extra options we assume
+        -- they know what they are doing and don't get in the way.
+        optFlag  = if null lo_opts
+                       then [SysTools.Option (llvmOpts !! opt_lvl)]
+                       else []
+        tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
+             | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+             | otherwise                = "--enable-tbaa=false"
+
 
     output_fn <- phaseOutputFilename LlvmLlc
 
@@ -1323,6 +1329,7 @@ runPhase LlvmOpt input_fn dflags
                     SysTools.Option "-o",
                     SysTools.FileOption "" output_fn]
                 ++ optFlag
+                ++ [SysTools.Option tbaa]
                 ++ map SysTools.Option lo_opts)
 
     return (LlvmLlc, output_fn)
@@ -1336,11 +1343,16 @@ runPhase LlvmOpt input_fn dflags
 
 runPhase LlvmLlc input_fn dflags
   = do
+    ver <- io $ readIORef (llvmVersion dflags)
+
     let lc_opts = getOpts dflags opt_lc
         opt_lvl = max 0 (min 2 $ optLevel dflags)
         rmodel | opt_PIC        = "pic"
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
+        tbaa | ver < 29                 = "" -- no tbaa in 2.8 and earlier
+             | dopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
+             | otherwise                = "--enable-tbaa=false"
 
     -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
     let next_phase = case dopt Opt_NoLlvmMangler dflags of
@@ -1356,6 +1368,7 @@ runPhase LlvmLlc input_fn dflags
                     SysTools.FileOption "" input_fn,
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
                 ++ map SysTools.Option lc_opts
+                ++ [SysTools.Option tbaa]
                 ++ map SysTools.Option fpOpts)
 
     return (next_phase, output_fn)
@@ -1373,7 +1386,7 @@ runPhase LlvmLlc input_fn dflags
                                       else if (elem VFPv3D16 ext)
                                            then ["-mattr=+v7,+vfp3,+d16"]
                                            else []
-                   _               -> []
+                   _                 -> []
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase

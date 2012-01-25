@@ -318,8 +318,9 @@ isCoVar v = isCoVarType (varType v)
 
 isCoVarType :: Type -> Bool
 isCoVarType ty 	    -- Tests for t1 ~# t2, the unboxed equality
-  | Just tc <- tyConAppTyCon_maybe ty = tc `hasKey` eqPrimTyConKey
-  | otherwise                         = False
+  = case splitTyConApp_maybe ty of
+      Just (tc,tys) -> tc `hasKey` eqPrimTyConKey && tys `lengthAtLeast` 2
+      Nothing       -> False
 \end{code}
 
 
@@ -456,8 +457,9 @@ pprCoAxiom ax
 --
 -- > decomposeCo 3 c = [nth 0 c, nth 1 c, nth 2 c]
 decomposeCo :: Arity -> Coercion -> [Coercion]
-decomposeCo arity co = [mkNthCo n co | n <- [0..(arity-1)] ]
-                       -- Remember, Nth is zero-indexed
+decomposeCo arity co 
+  = [mkNthCo n co | n <- [0..(arity-1)] ]
+           -- Remember, Nth is zero-indexed
 
 -- | Attempts to obtain the type variable underlying a 'Coercion'
 getCoVar_maybe :: Coercion -> Maybe CoVar
@@ -615,8 +617,17 @@ mkTransCo co (Refl _) = co
 mkTransCo co1 co2     = TransCo co1 co2
 
 mkNthCo :: Int -> Coercion -> Coercion
-mkNthCo n (Refl ty) = Refl (tyConAppArgN n ty)
-mkNthCo n co        = NthCo n co
+mkNthCo n (Refl ty) = ASSERT( ok_tc_app ty n ) 
+                      Refl (tyConAppArgN n ty)
+mkNthCo n co        = ASSERT( ok_tc_app _ty1 n && ok_tc_app _ty2 n )
+                      NthCo n co
+                    where
+                      Pair _ty1 _ty2 = coercionKind co
+
+ok_tc_app :: Type -> Int -> Bool
+ok_tc_app ty n = case splitTyConApp_maybe ty of
+                   Just (_, tys) -> tys `lengthExceeds` n
+                   Nothing       -> False
 
 -- | Instantiates a 'Coercion' with a 'Type' argument. 
 mkInstCo :: Coercion -> Type -> Coercion

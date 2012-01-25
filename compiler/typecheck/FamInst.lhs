@@ -21,6 +21,7 @@ import TypeRep
 import TcMType
 import TcRnMonad
 import TyCon
+import DynFlags
 import Name
 import Module
 import SrcLoc
@@ -92,7 +93,7 @@ listToSet l = Map.fromList (zip l (repeat ()))
 
 checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
 checkFamInstConsistency famInstMods directlyImpMods
-  = do { dflags     <- getDOpts
+  = do { dflags     <- getDynFlags
        ; (eps, hpt) <- getEpsAndHpt
 
        ; let { -- Fetch the iface of a given module.  Must succeed as

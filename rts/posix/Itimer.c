@@ -155,7 +155,7 @@ startTicker(void)
         struct itimerspec it;
         
         it.it_value.tv_sec  = TimeToSeconds(itimer_interval);
-        it.it_value.tv_nsec = TimeToNS(itimer_interval);
+        it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
         it.it_interval = it.it_value;
         
         if (timer_settime(timer, 0, &it, NULL) != 0) {
@@ -168,7 +168,7 @@ startTicker(void)
         struct itimerval it;
 
         it.it_value.tv_sec = TimeToSeconds(itimer_interval);
-        it.it_value.tv_usec = TimeToUS(itimer_interval);
+        it.it_value.tv_usec = TimeToUS(itimer_interval) % 1000000;
         it.it_interval = it.it_value;
         
         if (setitimer(ITIMER_REAL, &it, NULL) != 0) {

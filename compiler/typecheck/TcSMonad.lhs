@@ -923,7 +923,7 @@ emitFrozenError fl ev depth
        ; wrapTcS (TcM.writeTcRef inert_ref inerts_new) }
 
 instance HasDynFlags TcS where
-    getDynFlags = wrapTcS TcM.getDOpts
+    getDynFlags = wrapTcS getDynFlags
 
 getTcSContext :: TcS SimplContext
 getTcSContext = TcS (return . tcs_context)

@@ -59,7 +59,6 @@ import Data.Word
 import Data.Array
 import Data.IORef
 import Control.Monad
-import System.Time ( ClockTime(..) )
 
 
 -- ---------------------------------------------------------------------------
@@ -77,7 +76,7 @@ readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
     ncu <- mkNameCacheUpdater
-    dflags <- getDOpts
+    dflags <- getDynFlags
     liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
 
 readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
@@ -617,16 +616,6 @@ instance Binary AvailInfo where
               _ -> do ab <- get bh
                       ac <- get bh
                       return (AvailTC ab ac)
-
-    
--- where should this be located?
-instance Binary ClockTime where
-    put_ bh (TOD x y) = put_ bh x >> put_ bh y
-    
-    get bh = do
-        x <- get bh
-        y <- get bh
-        return $ TOD x y
 
 instance Binary Usage where
     put_ bh usg@UsagePackageModule{} = do 

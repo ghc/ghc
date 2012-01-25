@@ -623,16 +623,16 @@ instance Outputable EvBind where
    -- We cheat a bit and pretend EqVars are CoVars for the purposes of pretty printing
 
 instance Outputable EvTerm where
-  ppr (EvId v)                = ppr v
-  ppr (EvCast v co)           = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
-  ppr (EvKindCast v co)       = ppr v <+> (ptext (sLit "`kind-cast`")) <+> pprParendTcCo co
-  ppr (EvCoercion co)         = ptext (sLit "CO") <+> ppr co
-  ppr (EvTupleSel v n)        = ptext (sLit "tupsel") <> parens (ppr (v,n))
-  ppr (EvTupleMk vs)          = ptext (sLit "tupmk") <+> ppr vs
-  ppr (EvSuperClass d n)      = ptext (sLit "sc") <> parens (ppr (d,n))
-  ppr (EvDFunApp df tys ts)   = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
+  ppr (EvId v)           = ppr v
+  ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendTcCo co
+  ppr (EvKindCast v co)  = ppr v <+> (ptext (sLit "`kind-cast`")) <+> pprParendTcCo co
+  ppr (EvCoercion co)    = ptext (sLit "CO") <+> ppr co
+  ppr (EvTupleSel v n)   = ptext (sLit "tupsel") <> parens (ppr (v,n))
+  ppr (EvTupleMk vs)     = ptext (sLit "tupmk") <+> ppr vs
+  ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
+  ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
   ppr (EvInteger n)           = integer n
-  ppr (EvDelayedError ty msg) = ptext (sLit "error") 
+  ppr (EvDelayedError ty msg) =     ptext (sLit "error") 
                                 <+> sep [ char '@' <> ppr ty, ppr msg ]
 \end{code}
 

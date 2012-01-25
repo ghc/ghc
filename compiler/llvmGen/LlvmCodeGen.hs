@@ -27,6 +27,7 @@ import UniqSupply
 import Util
 import SysTools ( figureLlvmVersion )
 
+import Data.IORef ( writeIORef )
 import Data.Maybe ( fromMaybe )
 import System.IO
 
@@ -37,7 +38,7 @@ llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 llvmCodeGen dflags h us cmms
   = let cmm = concat cmms
         (cdata,env) = {-# SCC "llvm_split" #-}
-                      foldr split ([],initLlvmEnv (targetPlatform dflags)) cmm
+                      foldr split ([], initLlvmEnv dflags) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
         split (CmmProc i l _) (d,e) =
             let lbl = strCLabel_llvm env $ case i of
@@ -47,10 +48,12 @@ llvmCodeGen dflags h us cmms
             in (d,env')
     in do
         showPass dflags "LlVM CodeGen"
-        bufh <- newBufHandle h
         dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code" $ docToSDoc pprLlvmHeader
+        bufh <- newBufHandle h
         Prt.bufLeftRender bufh $ pprLlvmHeader
         ver  <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
+        -- cache llvm version for later use
+        writeIORef (llvmVersion dflags) ver
         env' <- {-# SCC "llvm_datas_gen" #-}
                 cmmDataLlvmGens dflags bufh (setLlvmVer ver env) cdata []
         {-# SCC "llvm_procs_gen" #-}
