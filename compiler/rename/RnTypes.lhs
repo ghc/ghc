@@ -197,7 +197,7 @@ rnHsTyKi isType doc (HsFunTy ty1 ty2) = do
 
 rnHsTyKi isType doc listTy@(HsListTy ty) = do
     data_kinds <- xoptM Opt_DataKinds
-    unless (data_kinds || isType) (addErr (polyKindsErr listTy))
+    unless (data_kinds || isType) (addErr (dataKindsErr listTy))
     ty' <- rnLHsTyKi isType doc ty
     return (HsListTy ty')
 
@@ -217,7 +217,7 @@ rnHsTyKi isType doc (HsPArrTy ty) = ASSERT ( isType ) do
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys) = do
     data_kinds <- xoptM Opt_DataKinds
-    unless (data_kinds || isType) (addErr (polyKindsErr tupleTy))
+    unless (data_kinds || isType) (addErr (dataKindsErr tupleTy))
     tys' <- mapM (rnLHsTyKi isType doc) tys
     return (HsTupleTy tup_con tys')
 

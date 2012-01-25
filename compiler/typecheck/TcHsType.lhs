@@ -46,7 +46,7 @@ import {-# SOURCE #-}	TcSplice( kcSpliceType )
 import HsSyn
 import RnHsSyn
 import TcRnMonad
-import RnEnv   ( polyKindsErr )
+import RnEnv   ( dataKindsErr )
 import TcHsSyn ( mkZonkTcTyVar )
 import TcEvidence( HsWrapper )
 import TcEnv
@@ -1344,7 +1344,7 @@ sc_ds_var_app name arg_kis = do
     Just (AGlobal (ATyCon tc))
       | isAlgTyCon tc || isTupleTyCon tc -> do
       data_kinds <- xoptM Opt_DataKinds
-      unless data_kinds $ addErr (polyKindsErr name)
+      unless data_kinds $ addErr (dataKindsErr name)
       let tc_kind = tyConKind tc
       case isPromotableKind tc_kind of
         Just n | n == length arg_kis ->
