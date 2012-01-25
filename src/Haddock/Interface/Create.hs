@@ -73,24 +73,19 @@ createInterface tm flags modMap instIfaceMap = do
 
   (info, mbDoc) <- do
     (i, d) <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre mayDocHeader
-    return (i, addModuleWarnig warnings d)
+    return (i, addModuleWarning warnings d)
 
   let declsWithDocs = topDecls group_
       (decls, _) = unzip declsWithDocs
       localInsts = filter (nameIsLocalOrFrom mdl . getName) instances
 
-  (docMap0, argMap, subMap, declMap) <- liftErrMsg $ mkMaps dflags gre localInsts exportedNames declsWithDocs
+  (docMap0, argMap, subMap, declMap) <-
+    liftErrMsg $ mkMaps dflags gre localInsts exportedNames declsWithDocs
 
-  -- Attach warnings to documentation. If there is a warning for an identifier
-  -- with no documentation, create a piece of documentation that just contains
-  -- the warning.
-  let docMap = foldl' (\m (n, d) -> M.insertWith mappend n d m) docMap0 l
-        where l = [ (gre_name elt, warningToDoc w) | WarnSome ws <- [warnings]
-                  , (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ ]
+  let docMap = addWarnings warnings gre exportedNames docMap0
+      maps = (docMap, argMap, subMap, declMap)
 
-  let maps = (docMap, argMap, subMap, declMap)
-
-  let exports0 = fmap (reverse . map unLoc) mayExports
+      exports0 = fmap (reverse . map unLoc) mayExports
       exports
        | OptIgnoreExports `elem` opts = Nothing
        | otherwise = exports0
@@ -103,18 +98,16 @@ createInterface tm flags modMap instIfaceMap = do
   let visibleNames = mkVisibleNames exportItems opts
 
   -- Measure haddock documentation coverage.
-  let
-    prunedExportItems0 = pruneExportItems exportItems
-    haddockable = 1 + length exportItems -- module + exports
-    haddocked = (if isJust mbDoc then 1 else 0) + length prunedExportItems0
-    coverage = (haddockable, haddocked)
+  let prunedExportItems0 = pruneExportItems exportItems
+      haddockable = 1 + length exportItems -- module + exports
+      haddocked = (if isJust mbDoc then 1 else 0) + length prunedExportItems0
+      coverage = (haddockable, haddocked)
 
   -- Prune the export list to just those declarations that have
   -- documentation, if the 'prune' option is on.
-  let
-    prunedExportItems
-      | OptPrune `elem` opts = prunedExportItems0
-      | otherwise = exportItems
+  let prunedExportItems
+        | OptPrune `elem` opts = prunedExportItems0
+        | otherwise = exportItems
 
   return Interface {
     ifaceMod             = mdl,
@@ -138,18 +131,38 @@ createInterface tm flags modMap instIfaceMap = do
   }
 
 
-warningToDoc :: WarningTxt -> Doc id
-warningToDoc w = case w of
+-------------------------------------------------------------------------------
+-- Warnings
+-------------------------------------------------------------------------------
+
+
+-- | Add warnings to documentation. If there is a warning for an identifier
+-- with no documentation, create a piece of documentation that just contains
+-- the warning.
+addWarnings :: Warnings -> GlobalRdrEnv -> [Name] -> DocMap Name -> DocMap Name
+addWarnings NoWarnings  _ _ dm = dm
+addWarnings (WarnAll _) _ _ dm = dm
+addWarnings (WarnSome ws) gre exps dm = M.unionWith (flip mappend) dm wm
+  where
+    wm = M.fromList
+      [ (n, warnToDoc w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
+      , let n = gre_name elt, n `elem` exps ]
+
+
+addModuleWarning :: Warnings -> Maybe (Doc id) -> Maybe (Doc id)
+addModuleWarning ws =
+  case ws of
+    NoWarnings -> id
+    WarnSome _ -> id
+    WarnAll w  -> let d = warnToDoc w in Just . maybe d (mappend d)
+
+
+warnToDoc :: WarningTxt -> Doc id
+warnToDoc w = case w of
   (DeprecatedTxt msg) -> format "Deprecated: " msg
   (WarningTxt    msg) -> format "Warning: "    msg
   where
     format x xs = DocWarning . DocParagraph . DocString . concat $ x : map unpackFS xs
-
-
-addModuleWarnig :: Warnings -> Maybe (Doc id) -> Maybe (Doc id)
-addModuleWarnig warnings
-  | WarnAll w <- warnings = let d = warningToDoc w in Just . maybe d (mappend d)
-  | otherwise = id
 
 
 -------------------------------------------------------------------------------
@@ -555,11 +568,12 @@ hiValExportItem name doc = do
 
 -- | Lookup docs for a declaration from maps.
 lookupDocs :: Name -> DocMap Name -> ArgMap Name -> SubMap -> (DocForDecl Name, [(Name, DocForDecl Name)])
-lookupDocs name docMap argMap subMap =
-  let lookupArgMap x = maybe M.empty id (M.lookup x argMap) in
-  let doc = (M.lookup name docMap, lookupArgMap name) in
-  let subs = [ (sub, (M.lookup sub docMap, lookupArgMap sub)) | sub <- maybe [] id (M.lookup name subMap) ] in
-  (doc, subs)
+lookupDocs n docMap argMap subMap =
+  let lookupArgDoc x = M.findWithDefault M.empty x argMap in
+  let doc = (M.lookup n docMap, lookupArgDoc n) in
+  let subs = M.findWithDefault [] n subMap in
+  let subDocs = [ (s, (M.lookup s docMap, lookupArgDoc s)) | s <- subs ] in
+  (doc, subDocs)
 
 
 -- | Return all export items produced by an exported module. That is, we're
