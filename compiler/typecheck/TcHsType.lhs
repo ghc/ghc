@@ -46,7 +46,7 @@ import {-# SOURCE #-}	TcSplice( kcSpliceType )
 import HsSyn
 import RnHsSyn
 import TcRnMonad
-import RnEnv   ( polyKindsErr )
+import RnEnv   ( dataKindsErr )
 import TcHsSyn ( mkZonkTcTyVar )
 import TcEvidence( HsWrapper )
 import TcEnv
