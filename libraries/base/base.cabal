@@ -98,7 +98,7 @@ Library {
             GHC.Stable,
             GHC.Storable,
             GHC.STRef,
-            GHC.TypeNats,
+            GHC.TypeLits,
             GHC.TopHandler,
             GHC.Unicode,
             GHC.Weak,

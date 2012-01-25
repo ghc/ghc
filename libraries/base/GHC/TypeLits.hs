@@ -9,38 +9,45 @@
 in the implementation of type-level natural numbers.  The programmer interface
 for workin with type-level naturals should be defined in a separate library. -}
 
-module GHC.TypeNats
-  ( -- * Basic Types
-    Nat
-  , NatS(..)
-  , NatI(..)
-  , (:<=), (:+), (:*), (:^)
+module GHC.TypeLits
+  ( -- * Kinds
+    Nat, Symbol
+
+    -- * Singleton type
+  , TNat(..), TSymbol(..)
+
+    -- * Linking type nad value level
+  , NatI(..), SymbolI(..)
+
+    -- * Functions on type nats
+  , type (<=), type (+), type (*), type (^)
   ) where
 
-import GHC.Word(Word)
+import GHC.Num(Integer)
+import GHC.Base(String)
 
 -- | This is the *kind* of type-level natural numbers.
 data Nat
 
--- | Comparsion of type-level naturals.
-class (m :: Nat) :<= (n :: Nat)
-
--- | Addition of type-level naturals.
-type family (m :: Nat) :+ (n :: Nat) :: Nat
-
--- | Multiplication of type-level naturals.
-type family (m :: Nat) :* (n :: Nat) :: Nat
-
--- | Exponentiation of type-level naturals.
-type family (m :: Nat) :^ (n :: Nat) :: Nat
+-- | This is the *kind* of type-level symbols.
+data Symbol
 
 
--- | The type @NatS n@ is m \"singleton\" type containing only the value @n@.
+--------------------------------------------------------------------------------
+
+-- | The type @TNat n@ is m \"singleton\" type containing only the value @n@.
 -- (Technically, there is also a bottom element).
 -- This type relates type-level naturals to run-time values.
--- NOTE: For the moment we support only singleton types that can fit in
--- a 'Word'.
-newtype NatS (n :: Nat) = NatS Word
+newtype TNat (n :: Nat) = TNat Integer
+
+-- | The type @TSymbol s@ is m \"singleton\" type containing only the value @s@.
+-- (Technically, there is also a bottom element).
+-- This type relates type-level symbols to run-time values.
+newtype TSymbol (n :: Symbol) = TSymbol String
+
+
+
+--------------------------------------------------------------------------------
 
 -- | The class 'NatI' provides a \"smart\" constructor for values
 -- of type @Nat n@.  There are built-in instances for all natural numbers
@@ -60,8 +67,29 @@ newtype NatS (n :: Nat) = NatS Word
 
 class NatI (n :: Nat) where
 
-  -- | The only defined element of type @Nat n@.
-  natS :: NatS n
+  -- | The only defined element of type @TNat n@.
+  tNat :: TNat n
 
+
+
+class SymbolI (n :: Symbol) where
+
+  -- | The only defined element of type @TSymbol n@.
+  tSymbol :: TSymbol n
+
+
+
+
+-- | Comparsion of type-level naturals.
+class (m :: Nat) <= (n :: Nat)
+
+-- | Addition of type-level naturals.
+type family (m :: Nat) + (n :: Nat) :: Nat
+
+-- | Multiplication of type-level naturals.
+type family (m :: Nat) * (n :: Nat) :: Nat
+
+-- | Exponentiation of type-level naturals.
+type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 
