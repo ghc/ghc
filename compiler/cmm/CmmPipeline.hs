@@ -29,6 +29,8 @@ import Data.Maybe
 import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Outputable
 import StaticFlags
 
@@ -89,7 +91,7 @@ global to one compiler session.
 -- -ddump-cmmz
 
 cpsTop :: HscEnv -> CmmDecl -> IO ([(CLabel, CAFSet)], [(CAFSet, CmmDecl)])
-cpsTop _ p@(CmmData {}) = return ([], [(Map.empty, p)])
+cpsTop _ p@(CmmData {}) = return ([], [(Set.empty, p)])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
        -- Why bother doing these early: dualLivenessWithInsertion,

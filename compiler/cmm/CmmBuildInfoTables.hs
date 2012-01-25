@@ -59,6 +59,8 @@ import Hoopl
 
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified FiniteMap as Map
 
 ----------------------------------------------------------------
@@ -192,26 +194,26 @@ setInfoTableStackMap _ _ t = t
 -----------------------------------------------------------------------
 -- Finding the CAFs used by a procedure
 
-type CAFSet = Map CLabel ()
+type CAFSet = Set CLabel
 type CAFEnv = BlockEnv CAFSet
 
 -- First, an analysis to find live CAFs.
 cafLattice :: DataflowLattice CAFSet
-cafLattice = DataflowLattice "live cafs" Map.empty add
-  where add _ (OldFact old) (NewFact new) = case old `Map.union` new of
-                                              new' -> (changeIf $ Map.size new' > Map.size old, new')
+cafLattice = DataflowLattice "live cafs" Set.empty add
+  where add _ (OldFact old) (NewFact new) = case old `Set.union` new of
+                                              new' -> (changeIf $ Set.size new' > Set.size old, new')
 
 cafTransfers :: Platform -> BwdTransfer CmmNode CAFSet
 cafTransfers platform = mkBTransfer3 first middle last
   where first  _ live = live
-        middle m live = foldExpDeep addCaf m live
-        last   l live = foldExpDeep addCaf l (joinOutFacts cafLattice l live)
+        middle m live = {-# SCC middle #-} foldExpDeep addCaf m live
+        last   l live = {-# SCC last #-} foldExpDeep addCaf l (joinOutFacts cafLattice l live)
         addCaf e set = case e of
                CmmLit (CmmLabel c)              -> add c set
                CmmLit (CmmLabelOff c _)         -> add c set
                CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
                _ -> set
-        add l s = if hasCAF l then Map.insert (toClosureLbl platform l) () s
+        add l s = if hasCAF l then Set.insert (toClosureLbl platform l) s
                               else s
 
 cafAnal :: Platform -> CmmGraph -> FuelUniqSM CAFEnv
@@ -268,13 +270,13 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 buildSRTs :: TopSRT -> Map CLabel CAFSet -> CAFSet ->
              FuelUniqSM (TopSRT, Maybe CmmDecl, C_SRT)
 buildSRTs topSRT topCAFMap cafs =
-  do let liftCAF lbl () z = -- get CAFs for functions without static closures
-           case Map.lookup lbl topCAFMap of Just cafs -> z `Map.union` cafs
-                                            Nothing   -> Map.insert lbl () z
+  do let liftCAF lbl z = -- get CAFs for functions without static closures
+           case Map.lookup lbl topCAFMap of Just cafs -> z `Set.union` cafs
+                                            Nothing   -> Set.insert lbl z
          -- For each label referring to a function f without a static closure,
          -- replace it with the CAFs that are reachable from f.
          sub_srt topSRT localCafs =
-           let cafs = Map.keys (Map.foldRightWithKey liftCAF Map.empty localCafs)
+           let cafs = Set.elems (Set.foldr liftCAF Set.empty localCafs)
                mkSRT topSRT =
                  do localSRTs <- procpointSRT (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
@@ -375,21 +377,21 @@ mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
           Map.insert l (flatten env cafset) env
         addToTop env (CyclicSCC nodes) =
           let (lbls, cafsets) = unzip nodes
-              cafset  = lbls `Map.deleteList` foldl Map.union Map.empty cafsets
+              cafset  = foldr Set.delete (foldl Set.union Set.empty cafsets) lbls
           in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
-        flatten env cafset = Map.foldRightWithKey (lookup env) Map.empty cafset
-        lookup env caf () cafset' =
-          case Map.lookup caf env of Just cafs -> Map.foldRightWithKey add cafset' cafs
-                                     Nothing -> add caf () cafset'
-        add caf () cafset' = Map.insert caf () cafset'
+        flatten env cafset = Set.foldr (lookup env) Set.empty cafset
+        lookup env caf cafset' =
+          case Map.lookup caf env of Just cafs -> Set.foldr add cafset' cafs
+                                     Nothing -> add caf cafset'
+        add caf cafset' = Set.insert caf cafset'
         g = stronglyConnCompFromEdgedVertices
-              (map (\n@(l, cafs) -> (n, l, Map.keys cafs)) localCAFs)
+              (map (\n@(l, cafs) -> (n, l, Set.elems cafs)) localCAFs)
 
 -- Bundle the CAFs used at a procpoint.
 bundleCAFs :: CAFEnv -> CmmDecl -> (CAFSet, CmmDecl)
 bundleCAFs cafEnv t@(CmmProc _ _ (CmmGraph {g_entry=entry})) =
   (expectJust "bundleCAFs" (mapLookup entry cafEnv), t)
-bundleCAFs _ t = (Map.empty, t)
+bundleCAFs _ t = (Set.empty, t)
 
 -- Construct the SRTs for the given procedure.
 setInfoTableSRT :: Map CLabel CAFSet -> TopSRT -> (CAFSet, CmmDecl) ->
@@ -489,7 +491,7 @@ lowerSafeForeignCall entry areaMap blocks bid m
                   loadThreadState load_tso load_stack
         -- We have to save the return value on the stack because its next use
         -- may appear in a different procedure due to procpoint splitting...
-        saveRetVals = foldl (<**>) emptyAGraph $ map (M.mkMiddle . spill) rs
+        saveRetVals = foldl (<**>) mkNop $ map (M.mkMiddle . spill) rs
         spill r = CmmStore (regSlot r) (CmmReg $ CmmLocal r)
         regSlot r@(LocalReg _ _) = CmmRegOff (CmmGlobal Sp) (sp_off - offset)
           where offset = w + expectJust "lowerForeign" (Map.lookup (RegSlot r) areaMap)
