@@ -160,43 +160,44 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 type Maps = (DocMap Name, ArgMap Name, SubMap, DeclMap)
 
 
-mkMaps :: DynFlags -> GlobalRdrEnv -> [Instance] -> [Name] -> [(LHsDecl Name, [HsDocString])] -> ErrMsgM Maps
+mkMaps :: DynFlags
+       -> GlobalRdrEnv
+       -> [Instance]
+       -> [Name]
+       -> [(LHsDecl Name, [HsDocString])]
+       -> ErrMsgM Maps
 mkMaps dflags gre instances exports decls = do
-  maps <- mapM f decls
-  let mergeMaps (a,b,c,d) (x,y,z,w) =
-        (M.unionWith mappend a x, M.unionWith mappend b y,
-         M.unionWith mappend c z, M.unionWith mappend d w)
-  let emptyMaps = (M.empty, M.empty, M.empty, M.empty)
-  return (foldl' mergeMaps emptyMaps maps)
+  (dm, am, sm, cm) <- unzip4 <$> mapM mappings decls
+  let f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
+      f = M.fromListWith mappend . concat
+  return (f dm, f am, f sm, f cm)
   where
-    instanceMap = M.fromList [ (getSrcSpan n, n) | i <- instances, let n = getName i ]
+    mappings (ldecl@(L _ decl), docs) = do
+      doc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre docs
+      argDocs <- fmap (M.mapMaybe id) $ Traversable.forM (typeDocs decl) $
+                   lexParseRnHaddockComment dflags NormalHaddockComment gre
 
-    f :: (LHsDecl Name, [HsDocString]) -> ErrMsgM Maps
-    f (decl@(L _ d), docs) = do
-      mayDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre docs
-      argDocs <- fmap (M.mapMaybe id) $ Traversable.forM (typeDocs d) $
-          \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
+      let subs = [ s | s@(n, _, _) <- subordinates decl, n `elem` exports ]
 
-      let subs_ = subordinates d
-      let subs_' = filter (\(name, _, _) -> name `elem` exports) subs_
-
-      (subDocs, subArgMap) <- unzip <$> (forM subs_' $ \(name, mbSubDocStr, subFnArgsDocStr) -> do
+      (subDocs, subArgMap) <- unzip <$> (forM subs $ \(n, mbSubDocStr, subFnArgsDocStr) -> do
         mbSubDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre mbSubDocStr
         subFnArgsDoc <- fmap (M.mapMaybe id) $ Traversable.forM subFnArgsDocStr $
-          \doc -> lexParseRnHaddockComment dflags NormalHaddockComment gre doc
-        return ((name, mbSubDoc), (name, subFnArgsDoc)))
+                          lexParseRnHaddockComment dflags NormalHaddockComment gre
+        return ((n, mbSubDoc), (n, subFnArgsDoc)))
+
+      let names = case decl of
+              -- See note [2].
+            InstD (InstDecl (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)
+            _ -> filter (`elem` exports) (getMainDeclBinder decl)
 
       let subNames = map fst subDocs
+          dm = [ (n, d) | (n, Just d) <- (zip names (repeat doc)) ++ subDocs ]
+          am = [ (n, argDocs) | n <- names ] ++ subArgMap
+          sm = [ (n, subNames) | n <- names ]
+          cm = [ (n, [ldecl]) | n <- names ++ subNames ]
+      return (dm, am, sm, cm)
 
-      let names = case d of
-            InstD (InstDecl (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)  -- See note [2].
-            _ -> filter (`elem` exports) (getMainDeclBinder d)
-
-      let docMap' = M.fromList (mapMaybe (\(n,doc) -> fmap (n,) doc) ([ (n, mayDoc) | n <- names ] ++ subDocs))
-      let argMap' = M.fromList [ (n, argDocs) | n <- names ] `mappend` M.fromList subArgMap
-      let subMap' = M.fromList [ (n, subNames) | n <- names ]
-      let dclMap' = M.fromList [ (n, [decl]) | n <- names ++ subNames ]
-      return (docMap', argMap', subMap', dclMap')
+    instanceMap = M.fromList [ (getSrcSpan n, n) | i <- instances, let n = getName i ]
 
 
 -- Note [2]:
