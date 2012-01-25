@@ -61,6 +61,11 @@ data LlvmFunction = LlvmFunction {
 
 type LlvmFunctions  = [LlvmFunction]
 
+data LlvmSyncOrdering = SyncAcquire
+                      | SyncRelease
+                      | SyncAcqRel
+                      | SyncSeqCst
+                      deriving (Show, Eq)
 
 -- | Llvm Statements
 data LlvmStatement
@@ -70,6 +75,11 @@ data LlvmStatement
       * source: Source expression
   -}
   = Assignment LlvmVar LlvmExpression
+
+  {- |
+    Memory fence operation
+  -}
+  | Fence Bool LlvmSyncOrdering
 
   {- |
     Always branch to the target label

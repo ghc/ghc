@@ -20,6 +20,9 @@ module Llvm (
         LlvmBlocks, LlvmBlock(..), LlvmBlockId,
         LlvmParamAttr(..), LlvmParameter,
 
+        -- * Fence synchronization
+        LlvmSyncOrdering(..),
+
         -- * Call Handling
         LlvmCallConvention(..), LlvmCallType(..), LlvmParameterListType(..),
         LlvmLinkageType(..), LlvmFuncAttr(..),

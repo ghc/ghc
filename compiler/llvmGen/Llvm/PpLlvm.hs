@@ -166,6 +166,7 @@ ppLlvmStatement :: LlvmStatement -> Doc
 ppLlvmStatement stmt
   = case stmt of
         Assignment  dst expr      -> ppAssignment dst (ppLlvmExpression expr)
+        Fence       st ord	  -> ppFence st ord
         Branch      target        -> ppBranch target
         BranchIf    cond ifT ifF  -> ppBranchIf cond ifT ifF
         Comment     comments      -> ppLlvmComments comments
@@ -254,6 +255,17 @@ ppCmpOp op left right =
 ppAssignment :: LlvmVar -> Doc -> Doc
 ppAssignment var expr = (text $ getName var) <+> equals <+> expr
 
+ppFence :: Bool -> LlvmSyncOrdering -> Doc
+ppFence st ord =
+  let singleThread = case st of True  -> text "singlethread"
+				False -> empty
+  in text "fence" <+> singleThread <+> ppSyncOrdering ord
+
+ppSyncOrdering :: LlvmSyncOrdering -> Doc
+ppSyncOrdering SyncAcquire = text "acquire"
+ppSyncOrdering SyncRelease = text "release"
+ppSyncOrdering SyncAcqRel  = text "acq_rel"
+ppSyncOrdering SyncSeqCst  = text "seq_cst"
 
 ppLoad :: LlvmVar -> Doc
 ppLoad var = text "load" <+> texts var
