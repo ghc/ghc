@@ -1300,7 +1300,8 @@ tryNewCodeGen hsc_env this_mod data_tycons
     (topSRT, prog) <- {-# SCC "cmmPipeline" #-}
                       foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
 
-    let prog' = map cmmOfZgraph (srtToData topSRT : prog)
+    let prog' = {-# SCC "cmmOfZgraph" #-}
+                map cmmOfZgraph (srtToData topSRT : prog)
     dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprPlatform platform prog')
     return prog'
 
