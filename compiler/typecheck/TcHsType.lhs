@@ -68,7 +68,7 @@ import NameSet
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag( Opt_PolyKinds ) )
+import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
 import Util
 import UniqSupply
 import Outputable
@@ -969,7 +969,7 @@ kindGeneralizeKinds kinds
          -- Zonk the kinds again, to pick up either the kind 
          -- variables we quantify over, or *, depending on whether
          -- zonkQuantifiedTyVars decided to generalise (which in
-         -- turn depends on PolyKinds)
+         -- turn depends on DataKinds)
        ; final_kinds <- mapM zonkTcKind zonked_kinds
 
        ; traceTc "generalizeKind" (    ppr kinds <+> ppr kvs_to_quantify
@@ -1348,8 +1348,8 @@ sc_ds_var_app name arg_kis = do
   case mb_thing of
     Just (AGlobal (ATyCon tc))
       | isAlgTyCon tc || isTupleTyCon tc -> do
-      poly_kinds <- xoptM Opt_PolyKinds
-      unless poly_kinds $ addErr (polyKindsErr name)
+      data_kinds <- xoptM Opt_DataKinds
+      unless data_kinds $ addErr (dataKindsErr name)
       let tc_kind = tyConKind tc
       case isPromotableKind tc_kind of
         Just n | n == length arg_kis ->

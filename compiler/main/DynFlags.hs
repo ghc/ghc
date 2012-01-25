@@ -402,6 +402,7 @@ data ExtensionFlag
    | Opt_RebindableSyntax
    | Opt_ConstraintKinds
    | Opt_PolyKinds                -- Kind polymorphism
+   | Opt_DataKinds                -- Datatype promotion
 
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
@@ -1945,6 +1946,7 @@ xFlags = [
   ( "RebindableSyntax",                 Opt_RebindableSyntax, nop ),
   ( "ConstraintKinds",                  Opt_ConstraintKinds, nop ),
   ( "PolyKinds",                        Opt_PolyKinds, nop ),
+  ( "DataKinds",                        Opt_DataKinds, nop ),
   ( "MonoPatBinds",                     Opt_MonoPatBinds,
     \ turn_on -> when turn_on $ deprecate "Experimental feature now removed; has no effect" ),
   ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
@@ -2030,8 +2032,6 @@ impliedFlags
 
     , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
                                                           -- all over the place
-
-    , (Opt_PolyKinds,        turnOn, Opt_KindSignatures)
 
     , (Opt_ImpredicativeTypes,  turnOn, Opt_RankNTypes)
 

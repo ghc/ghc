@@ -39,7 +39,7 @@ module RnEnv (
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches,
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr, kindSigErr, polyKindsErr, perhapsForallMsg,
+	dataTcOccs, unknownNameErr, kindSigErr, dataKindsErr, perhapsForallMsg,
 
         HsDocContext(..), docOfHsDocContext
     ) where
@@ -469,13 +469,13 @@ lookupPromotedOccRn rdr_name = do {
       Nothing -> err
       -- 2.b let's try every thing again -> 3
       Just demoted_rdr_name -> do {
-  ; poly_kinds <- xoptM Opt_PolyKinds
+  ; data_kinds <- xoptM Opt_DataKinds
     -- 3. lookup again
   ; opt_demoted_name <- lookupOccRn_maybe demoted_rdr_name ;
   ; case opt_demoted_name of
       -- 3.a. it was implicitly promoted, but confirm that we can promote
-      -- JPM: We could try to suggest turning on PolyKinds here
-      Just demoted_name -> if poly_kinds then return demoted_name else err
+      -- JPM: We could try to suggest turning on DataKinds here
+      Just demoted_name -> if data_kinds then return demoted_name else err
       -- 3.b. use rdr_name to have a correct error message
       Nothing -> err } } }
   where err = unboundName WL_Any rdr_name
@@ -1418,10 +1418,10 @@ kindSigErr thing
   = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
        2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
 
-polyKindsErr :: Outputable a => a -> SDoc
-polyKindsErr thing
+dataKindsErr :: Outputable a => a -> SDoc
+dataKindsErr thing
   = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XPolyKinds"))
+       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
 
 
 badQualBndrErr :: RdrName -> SDoc
