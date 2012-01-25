@@ -420,5 +420,14 @@ foldExp f (CmmSwitch e _) z                       = f e z
 foldExp f (CmmCall {cml_target=tgt}) z            = f tgt z
 foldExp f (CmmForeignCall {tgt=tgt, args=args}) z = foldr f (foldExpForeignTarget f tgt z) args
 
+{-# INLINE foldExpDeep #-}
 foldExpDeep :: (CmmExpr -> z -> z) -> CmmNode e x -> z -> z
-foldExpDeep f = foldExp $ wrapRecExpf f
+foldExpDeep f = foldExp go
+  where -- go :: CmmExpr -> z -> z
+        go e@(CmmMachOp _ es) z = gos es $! f e z
+        go e@(CmmLoad addr _) z = go addr $! f e z
+        go e                  z = f e z
+
+        gos [] z = z
+        gos (e:es) z = gos es $! f e z
+
