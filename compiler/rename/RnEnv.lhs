@@ -470,9 +470,9 @@ lookupPromotedOccRn rdr_name
            Nothing -> unboundName WL_Any rdr_name
            Just demoted_name 
              | data_kinds -> return demoted_name
-             | otherwise  -> unboundNameX WL_Any rdr_name suggest_pk }}}
+             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }}}
   where 
-    suggest_pk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
+    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
 \end{code}
 
 Note [Demotion]
