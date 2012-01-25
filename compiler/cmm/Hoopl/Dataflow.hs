@@ -351,7 +351,7 @@ analyzeBwd BwdPass { bp_lattice = lattice,
          = fixpoint_anal Bwd lattice do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> Fact x f -> FactBase f
-           do_block b fb = mapSingleton (entryLabel b) (block b fb)
+           do_block b fb = {-# SCC do_block #-} mapSingleton (entryLabel b) ({-# SCC block #-} block b fb)
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> Fact x f -> f
@@ -515,21 +515,18 @@ effects.)
 -- reached by another block, but the join gives NoChange, we must
 -- still process it at least once to get its out facts.
 
-updateFact_anal :: f -> JoinFun f -> Bool
-           -> LabelSet         -- Note [newblocks]
+updateFact_anal :: f -> JoinFun f
            -> Label -> f       -- out fact
            -> ([Label], FactBase f)
            -> ([Label], FactBase f)
 -- See Note [TxFactBase change flag]
-updateFact_anal bot fact_join is_bwd newblocks lbl new_fact (cha, fbase)
+updateFact_anal bot fact_join lbl new_fact (cha, fbase)
   = case lookupFact lbl fbase of
       Nothing       -> (lbl:cha, mapInsert lbl new_fact fbase)
       Just old_fact ->
         case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
-           (NoChange, _) | can_say_no_change -> (cha, fbase)
-           (_,        f)                     -> (lbl:cha, mapInsert lbl f fbase)
-  where
-    can_say_no_change = is_bwd || lbl `setMember` newblocks
+           (NoChange, _) -> (cha, fbase)
+           (_,        f) -> (lbl:cha, mapInsert lbl f fbase)
 
 {-
 -- this doesn't work because it can't be implemented
@@ -548,20 +545,16 @@ fixpoint_anal :: forall n f. NonLocal n
 
 fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
               do_block entries blockmap init_fbase
-  = loop start init_fbase setEmpty
+  = loop start init_fbase
   where
-    is_bwd = case direction of Bwd -> True; Fwd -> False
-
     blocks = forwardBlockList entries blockmap
 
-    ordered_blocks | is_bwd    = reverse blocks
-                   | otherwise = blocks
-
+    ordered_blocks       = case direction of
+                             Fwd -> blocks
+                             Bwd -> reverse blocks
     block_arr = listArray (0,length blocks - 1) ordered_blocks
 
-    start | Fwd <- direction
-          = IS.fromList (concatMap (\l -> mapFindWithDefault [] l dep_blocks) entries)
-          | otherwise        = IS.fromList [0 .. length blocks - 1]
+    start = IS.fromList [0 .. length blocks - 1]
 
     -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
     dep_blocks :: LabelMap [Int]
@@ -576,20 +569,18 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
     loop
        :: IntSet      -- blocks still to analyse
        -> FactBase f  -- current factbase (increases monotonically)
-       -> LabelSet
        -> FactBase f
 
-    loop !todo fbase !newblocks
+    loop !todo fbase
       | IS.null todo = fbase
       | (ix,todo') <- IS.deleteFindMin todo =
            let blk = block_arr ! ix
-               lbl = entryLabel blk
            in
            -- trace ("analysing: " ++ show (entryLabel blk)) $
            let out_facts = do_block blk fbase
 
                (changed, fbase') = mapFoldWithKey
-                                     (updateFact_anal bot join is_bwd newblocks)
+                                     (updateFact_anal bot join)
                                      ([],fbase) out_facts
            in
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
@@ -601,11 +592,7 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
 
            -- trace ("to analyse: " ++ show to_analyse) $ return ()
 
-           let newblocks' | is_bwd    = newblocks
-                          | otherwise = setInsert lbl newblocks
-           in
-
-           loop (foldr IS.insert todo' to_analyse) fbase' newblocks'
+           loop (foldr IS.insert todo' to_analyse) fbase'
 
 -----------------------------------------------------------------------------
 --      fixpoint: finding fixed points
@@ -613,22 +600,19 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
 
      -- See Note [TxFactBase invariants]
 
-updateFact :: f -> JoinFun f -> Bool
-           -> LabelMap (DBlock f n C C)
+updateFact :: f -> JoinFun f
            -> Label -> f       -- out fact
            -> ([Label], FactBase f)
            -> ([Label], FactBase f)
 -- See Note [TxFactBase change flag]
-updateFact bot fact_join is_bwd newblocks lbl new_fact (cha, fbase)
+updateFact bot fact_join lbl new_fact (cha, fbase)
   = case lookupFact lbl fbase of
       Nothing       -> (lbl:cha, mapInsert lbl new_fact fbase)
                             -- Note [no old fact]
       Just old_fact ->
         case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
-           (NoChange, _) | can_say_no_change -> (cha, fbase)
-           (_,        f)                     -> (lbl:cha, mapInsert lbl f fbase)
-  where
-    can_say_no_change = is_bwd || lbl `mapMember` newblocks
+           (NoChange, _) -> (cha, fbase)
+           (_,        f) -> (lbl:cha, mapInsert lbl f fbase)
 
 {-
 Note [no old fact]
@@ -671,9 +655,7 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
                              Bwd -> reverse blocks
     block_arr            = listArray (0,length blocks - 1) ordered_blocks
 
-    start | Fwd <- direction
-          = IS.fromList (concatMap (\l -> mapFindWithDefault [] l dep_blocks) entries)
-          | otherwise        = IS.fromList [0 .. length blocks - 1]
+    start = IS.fromList [0 .. length blocks - 1]
 
     -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
     dep_blocks :: LabelMap [Int]
@@ -684,8 +666,6 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
                                  Fwd -> [entryLabel b]
                                  Bwd -> successors b
                         ]
-
-    is_bwd = case direction of Bwd -> True; Fwd -> False
 
     loop
        :: IntSet
@@ -701,7 +681,7 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
            -- trace ("analysing: " ++ show (entryLabel blk)) $ return ()
            (rg, out_facts) <- do_block blk fbase
            let (changed, fbase') = mapFoldWithKey
-                                     (updateFact bot join is_bwd newblocks)
+                                     (updateFact bot join)
                                      ([],fbase) out_facts
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
            -- trace ("changed: " ++ show changed) $ return ()
