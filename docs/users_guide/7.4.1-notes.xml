@@ -63,6 +63,7 @@
 
       <listitem>
         <para>
+          TODO: DataKinds now split off
           There is a new feature kind polymorphism
           (<literal>-XPolyKinds</literal>):
           <xref linkend="kind-polymorphism-and-promotion" />.
@@ -155,6 +156,7 @@ class C a where
 
             <listitem>
                 <para>
+                    TODO: DataKinds now split off
                     There is a new extension
                     <literal>PolyKinds</literal>.
                     This provides 2 related new features:
