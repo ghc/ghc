@@ -532,12 +532,13 @@ cgTailCall fun_id fun_info args = do
       	ReturnIt -> emitReturn [fun]	-- ToDo: does ReturnIt guarantee tagged?
     
       	EnterIt -> ASSERT( null args )	-- Discarding arguments
-      		do { let fun' = CmmLoad fun (cmmExprType fun)
+                do { let entry = entryCode (closureInfoPtr fun)
                    ; [ret,call] <- forkAlts [
-      			getCode $ emitReturn [fun],	-- Is tagged; no need to untag
-                        getCode $ do -- emitAssign nodeReg fun
-                         emitCall (NativeNodeCall, NativeReturn)
-                                  (entryCode fun') [fun]]  -- Not tagged
+                        getCode $
+                          emitReturn [fun], -- Is tagged; no need to untag
+                        getCode $ do -- Not tagged
+                          emitCall (NativeNodeCall, NativeReturn) entry [fun]
+                        ]
                    ; emit =<< mkCmmIfThenElse (cmmIsTagged fun) ret call }
 
       	SlowCall -> do 	    -- A slow function call via the RTS apply routines
