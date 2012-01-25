@@ -25,11 +25,8 @@ where
 
 import OptimizationFuel
 
-import Control.Monad
 import Data.Maybe
 import Data.Array
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IS
 
 import Compiler.Hoopl.Collections
 import Compiler.Hoopl.Fuel
@@ -37,8 +34,8 @@ import Compiler.Hoopl.Graph hiding (Graph) -- hiding so we can redefine
                                            -- and include definition in paper
 import qualified Compiler.Hoopl.GraphUtil as U
 import Compiler.Hoopl.Label
-import Compiler.Hoopl.Util
 import Compiler.Hoopl.Dataflow (JoinFun)
+import Compiler.Hoopl.Util
 
 import Compiler.Hoopl.Dataflow (
     DataflowLattice(..), OldFact(..), NewFact(..), Fact
@@ -50,7 +47,7 @@ import Compiler.Hoopl.Dataflow (
   , mkBRewrite,  getBRewrite3
   )
 
-import Debug.Trace
+-- import Debug.Trace
 
 noRewrite :: a -> b -> FuelUniqSM (Maybe c)
 noRewrite _ _ = return Nothing
@@ -232,8 +229,8 @@ joinInFacts (lattice @ DataflowLattice {fact_bot = bot, fact_join = fj}) fb =
   mkFactBase lattice $ map botJoin $ mapToList fb
     where botJoin (l, f) = (l, snd $ fj l (OldFact bot) (NewFact f))
 
-forwardBlockList :: (NonLocal n, LabelsPtr entry)
-                 => entry -> Body n -> [Block n C C]
+forwardBlockList :: (NonLocal n)
+                 => [Label] -> Body n -> [Block n C C]
 -- This produces a list of blocks in order suitable for forward analysis,
 -- along with the list of Labels it may depend on for facts.
 forwardBlockList entries blks = postorder_dfs_from blks entries
@@ -315,9 +312,9 @@ analyzeFwdBlocks FwdPass { fp_lattice = lattice,
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> f -> Fact x f
     block BNil            f = f
-    block (BlockCO n b)   f = ftr n f
-    block (BlockCC l b n) f = (ftr l `cat` ltr n) f
-    block (BlockOC   b n) f = ltr n f
+    block (BlockCO n _)   f = ftr n f
+    block (BlockCC l _ n) f = (ftr l `cat` ltr n) f
+    block (BlockOC   _ n) f = ltr n f
 
     {-# INLINE cat #-}
     cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
@@ -554,7 +551,7 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
                              Bwd -> reverse blocks
     block_arr = listArray (0,length blocks - 1) ordered_blocks
 
-    start = IS.fromList [0 .. length blocks - 1]
+    start = [0 .. length blocks - 1]
 
     -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
     dep_blocks :: LabelMap [Int]
@@ -567,19 +564,18 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
                         ]
 
     loop
-       :: IntSet      -- blocks still to analyse
+       :: [Int]      -- blocks still to analyse
        -> FactBase f  -- current factbase (increases monotonically)
        -> FactBase f
 
-    loop !todo fbase
-      | IS.null todo = fbase
-      | (ix,todo') <- IS.deleteFindMin todo =
+    loop [] fbase = fbase
+    loop (ix:todo) fbase =
            let blk = block_arr ! ix
            in
            -- trace ("analysing: " ++ show (entryLabel blk)) $
            let out_facts = do_block blk fbase
 
-               (changed, fbase') = mapFoldWithKey
+               !(changed, fbase') = mapFoldWithKey
                                      (updateFact_anal bot join)
                                      ([],fbase) out_facts
            in
@@ -592,7 +588,7 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
 
            -- trace ("to analyse: " ++ show to_analyse) $ return ()
 
-           loop (foldr IS.insert todo' to_analyse) fbase'
+           loop (foldr insertIntHeap todo to_analyse) fbase'
 
 -----------------------------------------------------------------------------
 --      fixpoint: finding fixed points
@@ -655,7 +651,7 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
                              Bwd -> reverse blocks
     block_arr            = listArray (0,length blocks - 1) ordered_blocks
 
-    start = IS.fromList [0 .. length blocks - 1]
+    start = [0 .. length blocks - 1]
 
     -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
     dep_blocks :: LabelMap [Int]
@@ -668,14 +664,13 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
                         ]
 
     loop
-       :: IntSet
+       :: IntHeap
        -> FactBase f  -- current factbase (increases monotonically)
        -> LabelMap (DBlock f n C C)  -- transformed graph
        -> FuelUniqSM (FactBase f, LabelMap (DBlock f n C C))
 
-    loop !todo fbase !newblocks
-      | IS.null todo = return (fbase, newblocks)
-      | (ix,todo') <- IS.deleteFindMin todo = do
+    loop [] fbase newblocks = return (fbase, newblocks)
+    loop (ix:todo) fbase !newblocks = do
            let blk = block_arr ! ix
 
            -- trace ("analysing: " ++ show (entryLabel blk)) $ return ()
@@ -694,7 +689,7 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
            let newblocks' = case rg of
                               GMany _ blks _ -> mapUnion blks newblocks
      
-           loop (foldr IS.insert todo' to_analyse) fbase' newblocks'
+           loop (foldr insertIntHeap todo to_analyse) fbase' newblocks'
 
 
 {-  Note [TxFactBase invariants]
@@ -910,3 +905,20 @@ getFact lat l fb = case lookupFact l fb of Just  f -> f
 --
 -- It is an /unchecked/ run-time error for the argument passed to 'wrapFR',
 -- 'wrapFR2', 'wrapBR', or 'warpBR2' to return a function that does not respect fuel.
+
+-- -----------------------------------------------------------------------------
+-- a Heap of Int
+
+-- We should really use a proper Heap here, but my attempts to make
+-- one have not succeeded in beating the simple ordered list.  Another
+-- alternative is IntSet (using deleteFindMin), but that was also
+-- slower than the ordered list in my experiments --SDM 25/1/2012
+
+type IntHeap = [Int] -- ordered
+
+insertIntHeap :: Int -> [Int] -> [Int]
+insertIntHeap x [] = [x]
+insertIntHeap x (y:ys)
+  | x < y     = x : y : ys
+  | x == y    = x : ys
+  | otherwise = y : insertIntHeap x ys
