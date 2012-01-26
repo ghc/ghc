@@ -90,6 +90,11 @@ smallInteger i = S# i
 wordToInteger :: Word# -> Integer
 wordToInteger w = case word2Integer# w of (# s, d #) -> J# s d
 
+{-# RULES
+"integerToInt/smallInteger"   forall x . integerToInt  (smallInteger  x) = x
+"integerToWord/wordToInteger" forall x . integerToWord (wordToInteger x) = x
+ #-}
+
 {-# NOINLINE integerToWord #-}
 integerToWord :: Integer -> Word#
 integerToWord (S# i) = int2Word# i
@@ -120,6 +125,11 @@ int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) &&
                    then smallInteger (int64ToInt# i)
                    else case int64ToInteger# i of
                         (# s, d #) -> J# s d
+
+{-# RULES
+"integerToInt64/int64ToInteger"   forall x . integerToInt64  (int64ToInteger  x) = x
+"integerToWord64/word64ToInteger" forall x . integerToWord64 (word64ToInteger x) = x
+ #-}
 #endif
 
 integerToInt :: Integer -> Int#
