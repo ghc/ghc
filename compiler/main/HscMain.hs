@@ -115,7 +115,8 @@ import TyCon
 import Name
 import SimplStg         ( stg2stg )
 import CodeGen          ( codeGen )
-import OldCmm as Old    ( CmmGroup )
+import qualified OldCmm as Old
+import qualified Cmm as New
 import PprCmm           ( pprCmms )
 import CmmParse         ( parseCmmFile )
 import CmmBuildInfoTables
@@ -143,6 +144,10 @@ import UniqFM           ( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag
 import Exception
+import qualified Stream
+import Stream (Stream)
+
+import CLabel
 
 import Data.List
 import Control.Monad
@@ -1210,18 +1215,25 @@ hscGenHardCode cgguts mod_summary = do
                              stg_binds hpc_info
                     else {-# SCC "CodeGen" #-}
                          codeGen dflags this_mod data_tycons
-                             cost_centre_info
-                             stg_binds hpc_info
+                               cost_centre_info
+                               stg_binds hpc_info >>= return . Stream.fromList
+
 
         ------------------  Code output -----------------------
-        rawcmms <- {-# SCC "cmmToRawCmm" #-}
+        rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
                    cmmToRawCmm platform cmms
-        dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (pprPlatform platform rawcmms)
+
+        let dump a = do dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm"
+                           (pprPlatform platform a)
+                        return a
+            rawcmms1 = Stream.mapM dump rawcmms0
+
         (_stub_h_exists, stub_c_exists)
             <- {-# SCC "codeOutput" #-}
                codeOutput dflags this_mod location foreign_stubs
-               dependencies rawcmms
+               dependencies rawcmms1
         return stub_c_exists
+
 
 hscInteractive :: (ModIface, ModDetails, CgGuts)
                -> ModSummary
@@ -1267,7 +1279,7 @@ hscCompileCmmFile hsc_env filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        rawCmms <- cmmToRawCmm (targetPlatform dflags) [cmm]
+        rawCmms <- cmmToRawCmm (targetPlatform dflags) (Stream.yield cmm)
         _ <- codeOutput dflags no_mod no_loc NoStubs [] rawCmms
         return ()
   where
@@ -1282,28 +1294,55 @@ tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
                 -> CollectedCCs
                 -> [(StgBinding,[(Id,[Id])])]
                 -> HpcInfo
-                -> IO [Old.CmmGroup]
+                -> IO (Stream IO Old.CmmGroup ())
+         -- Note we produce a 'Stream' of CmmGroups, so that the
+         -- backend can be run incrementally.  Otherwise it generates all
+         -- the C-- up front, which has a significant space cost.
 tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
-    prog <- {-# SCC "StgCmm" #-}
+
+    let cmm_stream :: Stream IO New.CmmGroup ()
+        cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds hpc_info
-    dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen"
-                  (pprCmms platform prog)
+
+        -- codegen consumes a stream of CmmGroup, and produces a new
+        -- stream of CmmGroup (not necessarily synchronised: one
+        -- CmmGroup on input may produce many CmmGroups on output due
+        -- to proc-point splitting).
+
+    let dump1 a = do dumpIfSet_dyn dflags Opt_D_dump_cmmz
+                       "Cmm produced by new codegen"
+                       (pprPlatform platform a)
+                     return a
+
+        ppr_stream1 = Stream.mapM dump1 cmm_stream
 
     -- We are building a single SRT for the entire module, so
     -- we must thread it through all the procedures as we cps-convert them.
     us <- mkSplitUniqSupply 'S'
     let initTopSRT = initUs_ us emptySRT
-    (topSRT, prog) <- {-# SCC "cmmPipeline" #-}
-                      foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
 
-    let prog' = {-# SCC "cmmOfZgraph" #-}
-                map cmmOfZgraph (srtToData topSRT : prog)
-    dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprPlatform platform prog')
-    return prog'
+    let run_pipeline topSRT cmmgroup = do
+           (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT cmmgroup
+           return (topSRT,cmmOfZgraph cmmgroup)
+
+    let pipeline_stream = {-# SCC "cmmPipeline" #-} do
+          topSRT <- Stream.mapAccumL run_pipeline initTopSRT ppr_stream1
+          Stream.yield (cmmOfZgraph (srtToData topSRT))
+
+    let
+        dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" $
+                       pprPlatform platform a
+                     return a
+
+        ppr_stream2 = Stream.mapM dump2 pipeline_stream
+
+    return ppr_stream2
+
+
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
             -> IO ( [(StgBinding,[(Id,[Id])])] -- output program

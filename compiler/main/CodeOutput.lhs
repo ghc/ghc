@@ -30,6 +30,8 @@ import HscTypes
 import DynFlags
 import Config
 import SysTools
+import Stream           (Stream)
+import qualified Stream
 
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
@@ -55,35 +57,36 @@ codeOutput :: DynFlags
 	   -> ModLocation
 	   -> ForeignStubs
 	   -> [PackageId]
-           -> [RawCmmGroup]                       -- Compiled C--
+           -> Stream IO RawCmmGroup ()                       -- Compiled C--
            -> IO (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-})
 
-codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
+codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
   = 
-    -- You can have C (c_output) or assembly-language (ncg_output),
-    -- but not both.  [Allowing for both gives a space leak on
-    -- flat_abstractC.  WDP 94/10]
+    do  {
+        -- Lint each CmmGroup as it goes past
+        ; let linted_cmm_stream =
+                 if dopt Opt_DoCmmLinting dflags
+                    then Stream.mapM do_lint cmm_stream
+                    else cmm_stream
 
-    -- Dunno if the above comment is still meaningful now.  JRS 001024.
-
-    do	{ when (dopt Opt_DoCmmLinting dflags) $ do
-		{ showPass dflags "CmmLint"
-		; let lints = map (cmmLint (targetPlatform dflags)) flat_abstractC
-		; case firstJusts lints of
+              do_lint cmm = do
+                { showPass dflags "CmmLint"
+                ; case cmmLint (targetPlatform dflags) cmm of
 			Just err -> do { printDump err
 				       ; ghcExit dflags 1
 				       }
 			Nothing  -> return ()
-		}
+                ; return cmm
+                }
 
 	; showPass dflags "CodeOutput"
 	; let filenm = hscOutName dflags 
 	; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
 	; case hscTarget dflags of {
              HscInterpreted -> return ();
-             HscAsm         -> outputAsm dflags filenm flat_abstractC;
-             HscC           -> outputC dflags filenm flat_abstractC pkg_deps;
-             HscLlvm        -> outputLlvm dflags filenm flat_abstractC;
+             HscAsm         -> outputAsm dflags filenm linted_cmm_stream;
+             HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
+             HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
              HscNothing     -> panic "codeOutput: HscNothing"
 	  }
 	; return stubs_exist
@@ -103,12 +106,16 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 \begin{code}
 outputC :: DynFlags
         -> FilePath
-        -> [RawCmmGroup]
+        -> Stream IO RawCmmGroup ()
         -> [PackageId]
         -> IO ()
 
-outputC dflags filenm flat_absC packages
+outputC dflags filenm cmm_stream packages
   = do 
+       -- ToDo: make the C backend consume the C-- incrementally, by
+       -- pushing the cmm_stream inside (c.f. nativeCodeGen)
+       rawcmms <- Stream.collect cmm_stream
+
        -- figure out which header files to #include in the generated .hc file:
        --
        --   * extra_includes from packages
@@ -130,7 +137,7 @@ outputC dflags filenm flat_absC packages
        doOutput filenm $ \ h -> do
 	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
 	  hPutStr h cc_injects
-	  writeCs dflags h flat_absC
+          writeCs dflags h rawcmms
 \end{code}
 
 
@@ -141,14 +148,14 @@ outputC dflags filenm flat_absC packages
 %************************************************************************
 
 \begin{code}
-outputAsm :: DynFlags -> FilePath -> [RawCmmGroup] -> IO ()
-outputAsm dflags filenm flat_absC
+outputAsm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
+outputAsm dflags filenm cmm_stream
  | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        {-# SCC "OutputAsm" #-} doOutput filenm $
            \f -> {-# SCC "NativeCodeGen" #-}
-                 nativeCodeGen dflags f ncg_uniqs flat_absC
+                 nativeCodeGen dflags f ncg_uniqs cmm_stream
 
  | otherwise
   = panic "This compiler was built without a native code generator"
@@ -162,12 +169,17 @@ outputAsm dflags filenm flat_absC
 %************************************************************************
 
 \begin{code}
-outputLlvm :: DynFlags -> FilePath -> [RawCmmGroup] -> IO ()
-outputLlvm dflags filenm flat_absC
+outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
+outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
+
+       -- ToDo: make the LLVM backend consume the C-- incrementally,
+       -- by pushing the cmm_stream inside (c.f. nativeCodeGen)
+       rawcmms <- Stream.collect cmm_stream
+
        {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
-                 llvmCodeGen dflags f ncg_uniqs flat_absC
+                 llvmCodeGen dflags f ncg_uniqs rawcmms
 \end{code}
 
 

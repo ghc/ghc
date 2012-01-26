@@ -17,7 +17,7 @@
 module StgCmmMonad (
 	FCode,	-- type
 
-	initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
+        initC, runC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
 	returnFC, fixC, fixC_, nopC, whenC, 
 	newUnique, newUniqSupply, 
 
@@ -77,6 +77,7 @@ import Unique
 import UniqSupply
 import FastString
 import Outputable
+import Util
 
 import Compiler.Hoopl hiding (Unique, (<*>), mkLabel, mkBranch, mkLast)
 
@@ -103,12 +104,12 @@ instance Monad FCode where
 {-# INLINE thenFC #-}
 {-# INLINE returnFC #-}
 
-initC :: DynFlags -> Module -> FCode a -> IO a
-initC dflags mod (FCode code)
-  = do	{ uniqs <- mkSplitUniqSupply 'c'
-	; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
-	      (res, _) -> return res
-	}
+initC :: IO CgState
+initC  = do { uniqs <- mkSplitUniqSupply 'c'
+            ; return (initCgState uniqs) }
+
+runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
+runC dflags mod st (FCode code) = code (initCgInfoDown dflags mod) st
 
 returnFC :: a -> FCode a
 returnFC val = FCode (\_info_down state -> (val, state))

@@ -63,6 +63,12 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified FiniteMap as Map
 
+#if __GLASGOW_HASKELL__ < 704
+foldSet = Set.fold
+#else
+foldSet = Set.foldr
+#endif
+
 ----------------------------------------------------------------
 -- Building InfoTables
 
@@ -206,8 +212,8 @@ cafLattice = DataflowLattice "live cafs" Set.empty add
 cafTransfers :: Platform -> BwdTransfer CmmNode CAFSet
 cafTransfers platform = mkBTransfer3 first middle last
   where first  _ live = live
-        middle m live = {-# SCC middle #-} foldExpDeep addCaf m live
-        last   l live = {-# SCC last #-} foldExpDeep addCaf l (joinOutFacts cafLattice l live)
+        middle m live = foldExpDeep addCaf m live
+        last   l live = foldExpDeep addCaf l (joinOutFacts cafLattice l live)
         addCaf e set = case e of
                CmmLit (CmmLabel c)              -> add c set
                CmmLit (CmmLabelOff c _)         -> add c set
@@ -276,7 +282,7 @@ buildSRTs topSRT topCAFMap cafs =
          -- For each label referring to a function f without a static closure,
          -- replace it with the CAFs that are reachable from f.
          sub_srt topSRT localCafs =
-           let cafs = Set.elems (Set.foldr liftCAF Set.empty localCafs)
+           let cafs = Set.elems (foldSet liftCAF Set.empty localCafs)
                mkSRT topSRT =
                  do localSRTs <- procpointSRT (lbl topSRT) (elt_map topSRT) cafs
                     return (topSRT, localSRTs)
@@ -379,9 +385,9 @@ mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
           let (lbls, cafsets) = unzip nodes
               cafset  = foldr Set.delete (foldl Set.union Set.empty cafsets) lbls
           in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
-        flatten env cafset = Set.foldr (lookup env) Set.empty cafset
+        flatten env cafset = foldSet (lookup env) Set.empty cafset
         lookup env caf cafset' =
-          case Map.lookup caf env of Just cafs -> Set.foldr add cafset' cafs
+          case Map.lookup caf env of Just cafs -> foldSet add cafset' cafs
                                      Nothing -> add caf cafset'
         add caf cafset' = Set.insert caf cafset'
         g = stronglyConnCompFromEdgedVertices

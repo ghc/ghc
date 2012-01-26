@@ -19,6 +19,8 @@ import CmmUtils
 import CLabel
 import SMRep
 import Bitmap
+import Stream (Stream)
+import qualified Stream
 
 import Maybes
 import Constants
@@ -38,10 +40,16 @@ mkEmptyContInfoTable info_lbl
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = NoC_SRT }
 
-cmmToRawCmm :: Platform -> [Old.CmmGroup] -> IO [Old.RawCmmGroup]
+cmmToRawCmm :: Platform -> Stream IO Old.CmmGroup ()
+            -> IO (Stream IO Old.RawCmmGroup ())
 cmmToRawCmm platform cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
-       ; return (initUs_ uniqs (mapM (concatMapM (mkInfoTable platform)) cmms)) }
+       ; let do_one uniqs cmm = do
+                case initUs uniqs $ concatMapM (mkInfoTable platform) cmm of
+                  (b,uniqs') -> return (uniqs',b)
+                  -- NB. strictness fixes a space leak.  DO NOT REMOVE.
+       ; return (Stream.mapAccumL do_one uniqs cmms >> return ())
+       }
 
 -- Make a concrete info table, represented as a list of CmmStatic
 -- (it can't be simply a list of Word, because the SRT field is

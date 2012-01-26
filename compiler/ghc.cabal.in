@@ -455,6 +455,7 @@ Library
         Pretty
         Serialized
         State
+        Stream
         StringBuffer
         UniqFM
         UniqSet

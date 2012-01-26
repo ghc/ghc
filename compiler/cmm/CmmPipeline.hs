@@ -56,10 +56,10 @@ import StaticFlags
 --    we actually need to do the initial pass.
 cmmPipeline  :: HscEnv -- Compilation env including
                        -- dynamic flags: -dcmm-lint -ddump-cps-cmm
-             -> (TopSRT, [CmmGroup])    -- SRT table and accumulating list of compiled procs
+             -> TopSRT     -- SRT table and accumulating list of compiled procs
              -> CmmGroup             -- Input C-- with Procedures
-             -> IO (TopSRT, [CmmGroup]) -- Output CPS transformed C--
-cmmPipeline hsc_env (topSRT, rst) prog =
+             -> IO (TopSRT, CmmGroup) -- Output CPS transformed C--
+cmmPipeline hsc_env topSRT prog =
   do let dflags = hsc_dflags hsc_env
      --
      showPass dflags "CPSZ"
@@ -77,7 +77,7 @@ cmmPipeline hsc_env (topSRT, rst) prog =
 
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (pprPlatform (targetPlatform dflags) cmms)
 
-     return (topSRT, cmms : rst)
+     return (topSRT, cmms)
 
 {- [Note global fuel]
 ~~~~~~~~~~~~~~~~~~~~~
