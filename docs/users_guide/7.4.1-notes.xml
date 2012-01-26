@@ -888,53 +888,16 @@ target `foo' is not a module name or a source file
 
             <listitem>
                 <para>
-TODO:
-#define EVENT_SPARK_COUNTERS      34 /* (crt,dud,ovf,cnv,fiz,gcd,rem) */
-#define EVENT_SPARK_CREATE        35 /* ()                     */
-#define EVENT_SPARK_DUD           36 /* ()                     */
-#define EVENT_SPARK_OVERFLOW      37 /* ()                     */
-#define EVENT_SPARK_RUN           38 /* ()                     */
-#define EVENT_SPARK_STEAL         39 /* (victim_cap)           */
-#define EVENT_SPARK_FIZZLE        40 /* ()                     */
-#define EVENT_SPARK_GC            41 /* ()                     */
-#define EVENT_INTERN_STRING       42 /* (string, id) {not used by ghc} */
-
-                    TODO
-d77df1caad3a5f833aac9275938a0675e1ee6aac
-A new eventlog event containing 7 spark counters/statistics: sparks
-created, dud, overflowed, converted, GC'd, fizzled and remaining.
-These are maintained and logged separately for each capability.
-We log them at startup, on each GC (minor and major) and on shutdown.
-
-a5192d48e61a8ece69cddc43cc12625fcdcc56ec
-add a new trace class for spark events
-
-46b70749971341678c3e4d5cdb2b1ab1a13d039e
-Move GC tracing into a separate trace class
-
-Previously GC was included in the scheduler trace class. It can be
-enabled specifically with +RTS -vg or -lg, though note that both -v
-and -l on their own now default to a sensible set of trace classes,
-currently: scheduler, gc and sparks.
-
-084b64f22717b203b8d8c2ab7c057fb747e39593
-Add new fully-accurate per-spark trace/eventlog events
-
-Replaces the existing EVENT_RUN/STEAL_SPARK events with 7 new events
-covering all stages of the spark lifcycle:
-  create, dud, overflow, run, steal, fizzle, gc
-
-The sampled spark events are still available. There are now two event
-classes for sparks, the sampled and the fully accurate. They can be
-enabled/disabled independently. By default +RTS -l includes the sampled
-but not full detail spark events. Use +RTS -lf-p to enable the detailed
-'f' and disable the sampled 'p' spark.
-
-b0935476b64b4818e4b5653c756c648623753fd3
-Document the new +RTS -l flags in the +RTS --help output
-
-8f4f29f655fdda443861152a24588fcaba29b168
-Document the new +RTS -l options in the user guide
+                    There are new eventlog events
+                    <literal>EVENT_SPARK_COUNTERS</literal>
+                    <literal>EVENT_SPARK_CREATE</literal>
+                    <literal>EVENT_SPARK_DUD</literal>
+                    <literal>EVENT_SPARK_OVERFLOW</literal>
+                    <literal>EVENT_SPARK_RUN</literal>
+                    <literal>EVENT_SPARK_STEAL</literal>
+                    <literal>EVENT_SPARK_FIZZLE</literal> and
+                    <literal>EVENT_SPARK_GC</literal> for giving
+                    information about sparks.
                 </para>
             </listitem>
 
@@ -961,9 +924,26 @@ Document the new +RTS -l options in the user guide
 
             <listitem>
                 <para>
-                    TODO
-From aaaaf67b2fca9bd9b0027c983bfc9f9255b2bce5 Mon Sep 17 00:00:00 2001
-Subject: [PATCH 0695/1074] Add an RTS eventlog tracing class for user messages
+                    The eventlog class <literal>g</literal>
+                    is no longer ignored, but now controls whether
+                    events related to the garbage collector are emitted.
+                    There are also new event classes
+                    <literal>p</literal> and
+                    <literal>f</literal>, which contain sampled
+                    (approximate) and full (fully accurate)
+                    spark-related events respectively, and
+                    <literal>u</literal> which contains user events.
+                </para>
+
+                <para>
+                    There is also a meta eventlog class
+                    <literal>a</literal> which, when enabled or
+                    disabled, enables or disables all the classes.
+                </para>
+
+                <para>
+                    By default, all classes apart from
+                    <literal>f</literal> are enabled.
                 </para>
             </listitem>
 
@@ -1063,9 +1043,9 @@ Subject: [PATCH 0695/1074] Add an RTS eventlog tracing class for user messages
 
             <listitem>
                 <para>
-                    TODO
-                    On OS X, with XCode >= 4.2, GHC will use
-                    gcc-4.2 rather than gcc.
+                    On OS X, with XCode 4.0 and 4.1, GHC will use
+                    gcc-4.2 rather than gcc (which is based on LLVM,
+                    and currently produces slower code for GHC).
                 </para>
             </listitem>
 
@@ -1233,16 +1213,10 @@ Subject: [PATCH 0695/1074] Add an RTS eventlog tracing class for user messages
 
             <listitem>
                 <para>
-                    TODO: &lt;&gt;
-                </para>
-            </listitem>
-
-            <listitem>
-                <para>
-                    TODO:
-commit f98a240c1c302c3d1ad56f764f4d09a03d68fbe4
-
-    Removing the MonadGroup class. This is to reflect the removal of the default
+                    <literal>Data.Monoid</literal> now exports
+                    <literal>&lt;&gt;</literal> as an infix synonym for
+                    <literal>mappend</literal> It associates to the
+                    right, and has precedence 6.
                 </para>
             </listitem>
 
@@ -1412,6 +1386,23 @@ commit f98a240c1c302c3d1ad56f764f4d09a03d68fbe4
 
             <listitem>
                 <para>
+                    There is a new type
+                    <literal>GHC.Exts.Constraint</literal> which
+                    is used with the <literal>ConstraintKind</literal>
+                    extension.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Control.Monad.Group</literal> module,
+                    and the <literal>MonadGroup</literal> class that it
+                    defined, have been removed.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
                     Support for platforms where word size is less than
                     32bits has been removed.
                 </para>
@@ -1466,7 +1457,6 @@ commit f98a240c1c302c3d1ad56f764f4d09a03d68fbe4
                 <para>
                     For details of the changes to the Cabal library,
                     plese see the Cabal changelog.
-                    TODO: add a link
                 </para>
             </listitem>
         </itemizedlist>
