@@ -1240,7 +1240,6 @@ The Ids bound by previous Stmts in GHCi are currently
      to look at them, and :info expects the things it looks up to have
      tidy types
 
-
 --------------------------------------------------------------------------
                 Typechecking Stmts in GHCi
 
@@ -1262,7 +1261,6 @@ Here is the grand plan, implemented in tcUserStmt
 
         expr (of non-IO type,
           result not showable)  ==>     error
-
 
 \begin{code}
 
