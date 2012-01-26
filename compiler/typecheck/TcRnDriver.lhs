@@ -1306,7 +1306,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
         --   A. [it <- e; print it]     but not if it::()
         --   B. [it <- e]
         --   C. [let it = e; print it]
-        ; trace "match A" $ runPlans [    -- Plan A
+        ; runPlans [    -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
                        ; when (isUnitTy it_ty) failM
@@ -1320,7 +1320,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                         -- The two-step process avoids getting two errors: one from
                         -- the expression itself, and one from the 'print it' part
                         -- This two-step story is very clunky, alas
-                    do { _ <- trace "plan C" $ checkNoErrs (tcGhciStmts [let_stmt])
+                    do { _ <- checkNoErrs (tcGhciStmts [let_stmt])
                                 --- checkNoErrs defeats the error recovery of let-bindings
                        ; tcGhciStmts [let_stmt, print_it] }
           ]}
@@ -1340,12 +1340,12 @@ tcUserStmt stmt@(L loc (BindStmt {}))
         -- The plans are:
         --      [stmt; print v]         but not if v::()
         --      [stmt]
-        ; trace "match B" $ runPlans ((if print_bind_result then [print_plan] else []) ++
+        ; runPlans ((if print_bind_result then [print_plan] else []) ++
                     [tcGhciStmts [stmt]])
         }
 
 tcUserStmt stmt
-  = trace "match C" $ tcGhciStmts [stmt]
+  = tcGhciStmts [stmt]
 
 -- | Typecheck the statements given and then return the results of the
 -- statement in the form 'IO [()]'.
