@@ -21,7 +21,8 @@ module GhciMonad (
         runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
 
         printForUser, printForUserPartWay, prettyLocations,
-        initInterpBuffering, turnOffBuffering, flushInterpBuffers
+        initInterpBuffering, turnOffBuffering, flushInterpBuffers,
+        ghciHandleGhcException,
     ) where
 
 #include "HsVersions.h"
