@@ -198,10 +198,12 @@ runStmtWithLocation source linenumber expr step =
     let dflags'  = wopt_unset (hsc_dflags hsc_env) Opt_WarnUnusedBinds
         hsc_env' = hsc_env{ hsc_dflags = dflags' }
 
+    -- compile to value (IO [HValue]), don't run
     r <- liftIO $ hscStmtWithLocation hsc_env' expr source linenumber
 
     case r of
-      Nothing -> return (RunOk []) -- empty statement / comment
+      -- empty statement / comment
+      Nothing -> return (RunOk [])
 
       Just (tyThings, hval) -> do
         status <-

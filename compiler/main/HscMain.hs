@@ -1560,7 +1560,7 @@ hscParseThingWithLocation source linenumber parser str
     liftIO $ showPass dflags "Parser"
 
     let buf = stringToStringBuffer str
-        loc  = mkRealSrcLoc (fsLit source) linenumber 1
+        loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (mkPState dflags buf loc) of
         PFailed span err -> do
