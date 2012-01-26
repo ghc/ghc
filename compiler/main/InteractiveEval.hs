@@ -209,7 +209,7 @@ runStmtWithLocation source linenumber expr step =
         status <-
           withVirtualCWD $
             withBreakAction (isStep step) dflags' breakMVar statusMVar $ do
-                liftIO $ sandboxIO dflags' statusMVar thing_to_run
+                liftIO $ sandboxIO dflags' statusMVar hval
 
         let ic = hsc_IC hsc_env
             bindings = (ic_tythings ic, ic_rn_gbl_env ic)
