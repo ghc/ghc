@@ -348,7 +348,7 @@ analyzeBwd BwdPass { bp_lattice = lattice,
          = fixpoint_anal Bwd lattice do_block entries blockmap f
          where
            do_block :: forall x . Block n C x -> Fact x f -> FactBase f
-           do_block b fb = {-# SCC do_block #-} mapSingleton (entryLabel b) ({-# SCC block #-} block b fb)
+           do_block b fb = mapSingleton (entryLabel b) (block b fb)
 
     -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
     block :: forall e x . Block n e x -> Fact x f -> f
