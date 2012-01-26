@@ -1380,19 +1380,21 @@ A naked expression returns a singleton Name [it].
 
 #ifdef GHCI
 -- | Compile a stmt all the way to an HValue, but don't run it
-hscStmt :: HscEnv
-        -> String -- ^ The statement
-        -> IO (Maybe ([Id], HValue)) -- ^ 'Nothing' <==> empty statement
-                                     -- (or comment only), but no parse error
+--
+-- We return Nothing to indicate an empty statement (or comment only), not a
+-- parse error.
+hscStmt :: HscEnv -> String -> IO (Maybe ([Id], IO [HValue]))
 hscStmt hsc_env stmt = hscStmtWithLocation hsc_env stmt "<interactive>" 1
 
 -- | Compile a stmt all the way to an HValue, but don't run it
+--
+-- We return Nothing to indicate an empty statement (or comment only), not a
+-- parse error.
 hscStmtWithLocation :: HscEnv
                     -> String -- ^ The statement
                     -> String -- ^ The source
                     -> Int    -- ^ Starting line
-                    -> IO (Maybe ([Id], HValue)) -- ^ 'Nothing' <==> empty statement
-                                                 -- (or comment only), but no parse error
+                    -> IO (Maybe ([Id], IO [HValue]))
 hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
     maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
     case maybe_stmt of
@@ -1415,8 +1417,9 @@ hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
             let src_span = srcLocSpan interactiveSrcLoc
             hsc_env <- getHscEnv
             hval    <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
+            let hval_io = unsafeCoerce# hval :: IO [HValue]
 
-            return $ Just (ids, hval)
+            return $ Just (ids, hval_io)
 
 -- | Compile a decls
 hscDecls :: HscEnv

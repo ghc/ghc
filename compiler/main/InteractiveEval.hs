@@ -209,7 +209,6 @@ runStmtWithLocation source linenumber expr step =
         status <-
           withVirtualCWD $
             withBreakAction (isStep step) dflags' breakMVar statusMVar $ do
-                let thing_to_run = unsafeCoerce# hval :: IO [HValue]
                 liftIO $ sandboxIO dflags' statusMVar thing_to_run
 
         let ic = hsc_IC hsc_env
@@ -944,20 +943,18 @@ typeKind normalise str = withSession $ \hsc_env -> do
    liftIO $ hscKcType hsc_env normalise str
 
 -----------------------------------------------------------------------------
--- cmCompileExpr: compile an expression and deliver an HValue
+-- Compile an expression, run it and deliver the resulting HValue
 
 compileExpr :: GhcMonad m => String -> m HValue
 compileExpr expr = withSession $ \hsc_env -> do
   Just (ids, hval) <- liftIO $ hscStmt hsc_env ("let __cmCompileExpr = "++expr)
-                 -- Run it!
-  hvals <- liftIO (unsafeCoerce# hval :: IO [HValue])
-
+  hvals <- liftIO hval
   case (ids,hvals) of
     ([_],[hv]) -> return hv
-    _        -> panic "compileExpr"
+    _          -> panic "compileExpr"
 
 -- -----------------------------------------------------------------------------
--- Compile an expression into a dynamic
+-- Compile an expression, run it and return the result as a dynamic
 
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
 dynCompileExpr expr = do
@@ -979,8 +976,8 @@ dynCompileExpr expr = do
     setContext iis
     vals <- liftIO (unsafeCoerce# hvals :: IO [Dynamic])
     case (ids,vals) of
-        (_:[], v:[])    -> return v
-        _               -> panic "dynCompileExpr"
+        (_:[], v:[]) -> return v
+        _            -> panic "dynCompileExpr"
 
 -----------------------------------------------------------------------------
 -- show a module and it's source/object filenames
