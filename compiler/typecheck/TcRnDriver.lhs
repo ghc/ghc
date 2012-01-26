@@ -1234,9 +1234,9 @@ The Ids bound by previous Stmts in GHCi are currently
      global.
 
  (b) They retain their Internal names becuase we don't have a suitable
-     Module to name them with.  We could revisit this choice.
+     Module to name them with. We could revisit this choice.
 
- (c) Their types are tidied.  This is important, because :info may ask
+ (c) Their types are tidied. This is important, because :info may ask
      to look at them, and :info expects the things it looks up to have
      tidy types
 
@@ -1264,6 +1264,7 @@ Here is the grand plan, implemented in tcUserStmt
 
 \begin{code}
 
+-- | A plan is an attempt to lift some code into the IO monad.
 type PlanResult = ([Id], LHsExpr Id)
 type Plan = TcM PlanResult
 
@@ -1278,28 +1279,34 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 -- GHCi 'environemnt'.
 --
 -- By 'lift' and 'environment we mean that the code is changed to execute
--- properly in an IO monad. See Note [Interactively-bound Ids in GHCi]
--- above for more details.
+-- properly in an IO monad. See Note [Interactively-bound Ids in GHCi] above
+-- for more details. We do this lifting by trying different ways ('plans') of
+-- lifting the code into the IO monad and type checking each plan until one
+-- succeeds.
 tcUserStmt :: LStmt Name -> TcM PlanResult
 
 -- An expression typed at the prompt is treated very specially
 tcUserStmt (L loc (ExprStmt expr _ _ _))
   = do  { uniq <- newUnique
         ; let fresh_it  = itName uniq loc
-              the_bind  = L loc $ mkTopFunBind (L loc fresh_it) matches
               matches   = [mkMatch [] expr emptyLocalBinds]
+              -- [it = expr]
+              the_bind  = L loc $ mkTopFunBind (L loc fresh_it) matches
+              -- [let it = expr]
               let_stmt  = L loc $ LetStmt $ HsValBinds $
                           ValBindsOut [(NonRecursive,unitBag the_bind)] []
+              -- [it <- e]
               bind_stmt = L loc $ BindStmt (L loc (VarPat fresh_it)) expr
                                            (HsVar bindIOName) noSyntaxExpr
+              -- [; print it]
               print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
                                            (HsVar thenIOName) noSyntaxExpr placeHolderType
 
         -- The plans are:
-        --      [it <- e; print it]     but not if it::()
-        --      [it <- e]
-        --      [let it = e; print it]
-        ; runPlans [    -- Plan A
+        --   A. [it <- e; print it]     but not if it::()
+        --   B. [it <- e]
+        --   C. [let it = e; print it]
+        ; trace "match A" $ runPlans [    -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
                        ; when (isUnitTy it_ty) failM
@@ -1313,7 +1320,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                         -- The two-step process avoids getting two errors: one from
                         -- the expression itself, and one from the 'print it' part
                         -- This two-step story is very clunky, alas
-                    do { _ <- checkNoErrs (tcGhciStmts [let_stmt])
+                    do { _ <- trace "plan C" $ checkNoErrs (tcGhciStmts [let_stmt])
                                 --- checkNoErrs defeats the error recovery of let-bindings
                        ; tcGhciStmts [let_stmt, print_it] }
           ]}
@@ -1333,29 +1340,30 @@ tcUserStmt stmt@(L loc (BindStmt {}))
         -- The plans are:
         --      [stmt; print v]         but not if v::()
         --      [stmt]
-        ; runPlans ((if print_bind_result then [print_plan] else []) ++
+        ; trace "match B" $ runPlans ((if print_bind_result then [print_plan] else []) ++
                     [tcGhciStmts [stmt]])
         }
 
 tcUserStmt stmt
-  = tcGhciStmts [stmt]
+  = trace "match C" $ tcGhciStmts [stmt]
 
----------------------------
+-- | Typecheck the statements given and then return the results of the
+-- statement in the form 'IO [()]'.
 tcGhciStmts :: [LStmt Name] -> TcM PlanResult
 tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
         ret_id  <- tcLookupId returnIOName ;            -- return @ IO
         let {
-            ret_ty    = mkListTy unitTy ;
-            io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
-            tc_io_stmts stmts = tcStmtsAndThen GhciStmt tcDoStmt stmts io_ret_ty ;
+            ret_ty      = mkListTy unitTy ;
+            io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
+            tc_io_stmts = tcStmtsAndThen GhciStmt tcDoStmt stmts io_ret_ty ;
             names = collectLStmtsBinders stmts ;
          } ;
 
         -- OK, we're ready to typecheck the stmts
         traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
         ((tc_stmts, ids), lie) <- captureConstraints $
-                                  tc_io_stmts stmts  $ \ _ ->
+                                  tc_io_stmts $ \ _ ->
                                   mapM tcLookupId names  ;
                         -- Look up the names right in the middle,
                         -- where they will all be in scope
