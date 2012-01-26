@@ -487,6 +487,7 @@ runGHCiInput f = do
         (setComplete ghciCompleteWord $ defaultSettings {historyFile = histFile})
         f
 
+-- | How to get the next input line from the user
 nextInputLine :: Bool -> Bool -> InputT GHCi (Maybe String)
 nextInputLine show_prompt is_tty
   | is_tty = do
@@ -601,6 +602,7 @@ queryQueue = do
     c:cs -> do setGHCiState st{ cmdqueue = cs }
                return (Just c)
 
+-- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands = runCommands' handler
 
@@ -620,9 +622,12 @@ runCommands' eh gCmd = do
       Nothing -> return ()
       Just _  -> runCommands' eh gCmd
 
+-- | Evaluate a single line of user input (either :<command> or Haskell code)
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)
 runOneCommand eh gCmd = do
+  -- run a previously queued command if there is one, otherwise get new
+  -- input from user
   mb_cmd0 <- noSpace (lift queryQueue)
   mb_cmd1 <- maybe (noSpace gCmd) (return . Just) mb_cmd0
   case mb_cmd1 of
@@ -666,12 +671,19 @@ runOneCommand eh gCmd = do
             normSpace   x  = x
     -- SDM (2007-11-07): is userError the one to use here?
     collectError = userError "unterminated multiline command :{ .. :}"
+
+    -- | Handle a line of input
+    doCommand :: String -> InputT GHCi (Maybe Bool)
+
+    -- command
     doCommand (':' : cmd) = do
       result <- specialCommand cmd
       case result of
         True -> return Nothing
         _    -> return $ Just True
-    doCommand stmt        = do
+
+    -- haskell
+    doCommand stmt = do
       ml <- lift $ isOptionSet Multiline
       if ml
         then do
@@ -736,16 +748,23 @@ declPrefixes :: [String]
 declPrefixes = ["class ","data ","newtype ","type ","instance ", "deriving ",
                 "foreign "]
 
+-- | Entry point to execute some haskell code from user
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
+ -- empty
  | null (filter (not.isSpace) stmt)
  = return False
+
+ -- import
  | "import " `isPrefixOf` stmt
  = do addImportToContext stmt; return False
+
+ -- data, class, newtype...
  | any (flip isPrefixOf stmt) declPrefixes
  = do _ <- liftIO $ tryIO $ hFlushAll stdin
       result <- GhciMonad.runDecls stmt
       afterRunStmt (const True) (GHC.RunOk result)
+
  | otherwise
  = do -- In the new IO library, read handles buffer data even if the Handle
       -- is set to NoBuffering.  This causes problems for GHCi where there
@@ -758,8 +777,7 @@ runStmt stmt step
         Nothing     -> return False
         Just result -> afterRunStmt (const True) result
 
---afterRunStmt :: GHC.RunResult -> GHCi Bool
-                                 -- False <=> the statement failed to compile
+-- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.RunResult -> GHCi Bool
 afterRunStmt _ (GHC.RunException e) = throw e
 afterRunStmt step_here run_result = do
@@ -830,6 +848,7 @@ printTypeOfName n
 
 data MaybeCommand = GotCommand Command | BadCommand | NoLastCommand
 
+-- | Entry point for execution a ':<command>' input from user
 specialCommand :: String -> InputT GHCi Bool
 specialCommand ('!':str) = lift $ shellEscape (dropWhile isSpace str)
 specialCommand str = do
