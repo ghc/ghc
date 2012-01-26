@@ -36,3 +36,10 @@ integerConstantFolding:
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
 	./integerConstantFolding
 
+.PHONY: integerToInt_smallInteger
+integerToInt_smallInteger:
+	'$(TEST_HC)' -Wall -v0 -O -c integerToInt_smallInteger.hs -fforce-recomp -ddump-simpl > integerToInt_smallInteger.simpl
+# Rules should eliminate both functions
+	-grep integerToInt integerToInt_smallInteger.simpl
+	-grep smallInteger integerToInt_smallInteger.simpl
+
