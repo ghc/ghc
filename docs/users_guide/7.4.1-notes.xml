@@ -63,10 +63,9 @@
 
       <listitem>
         <para>
-          TODO: DataKinds now split off
           There is a new feature kind polymorphism
           (<literal>-XPolyKinds</literal>):
-          <xref linkend="kind-polymorphism-and-promotion" />.
+          <xref linkend="kind-polymorphism" />.
           A side-effect of this is that, when the extension is not
           enabled, in certain circumstances kinds are now defaulted to
           <literal>*</literal>
@@ -156,14 +155,8 @@ class C a where
 
             <listitem>
                 <para>
-                    TODO: DataKinds now split off
-                    There is a new extension
-                    <literal>PolyKinds</literal>.
-                    This provides 2 related new features:
-                </para>
-
-                <para>
-                    Firstly, suitable user-defined datatypes are now
+                    When the new <literal>DataKinds</literal> extension
+                    is enabled, suitable user-defined datatypes are
                     automatically "promoted" to kinds, e.g.
                     <literal>Nat</literal> here:
                 </para>
@@ -174,8 +167,16 @@ data Vector :: * -> Nat -> * where
     VCons :: a -> Vector a n -> Vector a (Succ n)
 </programlisting>
                 <para>
-                    And secondly, it is now possible for kinds to be
-                    polymorphic. For example, instead of
+                    See <xref linkend="promotion" /> for more
+                    information.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new extension
+                    <literal>PolyKinds</literal> which make it possible
+                    for kinds to be polymorphic. For example, instead of
                 </para>
 <programlisting>
 class Typeable (t :: *) where
@@ -209,7 +210,7 @@ instance Typeable []   where typeOf _ = TypeRep
 
                 <para>
                     See
-                    <xref linkend="kind-polymorphism-and-promotion" />
+                    <xref linkend="kind-polymorphism" />
                     for more information.
                 </para>
             </listitem>
