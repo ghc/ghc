@@ -84,6 +84,8 @@ import DsMeta           ( templateHaskellNames )
 import VarSet
 import VarEnv           ( emptyTidyEnv )
 import Panic
+
+import GHC.Exts
 #endif
 
 import Id
@@ -145,7 +147,6 @@ import UniqSupply       ( initUs_ )
 import Bag
 import Exception
 
-import GHC.Exts
 import Data.List
 import Control.Monad
 import Data.Maybe
