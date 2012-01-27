@@ -160,15 +160,17 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        gs <- {-# SCC "lowerSafeForeignCalls" #-} run $ mapM (lowerSafeForeignCalls areaMap) gs
        dumps Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls" gs
 
+       -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
+       gs <- {-# SCC "setInfoTableStackMap" #-} return $ map (setInfoTableStackMap slotEnv areaMap) gs
+       dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
+
        ----------- Control-flow optimisations ---------------
        gs <- {-# SCC "cmmCfgOpts(2)" #-} return $ map cmmCfgOptsProc gs
        dumps Opt_D_dump_cmmz_cfg "Post control-flow optimsations" gs
 
-       -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
-       gs <- {-# SCC "setInfoTableStackMap" #-} return $ map (setInfoTableStackMap slotEnv areaMap) gs
-       dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
        gs <- {-# SCC "bundleCAFs" #-} return $ map (bundleCAFs cafEnv) gs
        dumps Opt_D_dump_cmmz_cafs "after bundleCAFs" gs
+
        return (localCAFs, gs)
 
               -- gs        :: [ (CAFSet, CmmDecl) ]
