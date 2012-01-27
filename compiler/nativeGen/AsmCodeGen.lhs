@@ -303,9 +303,9 @@ cmmNativeGenStream dflags ncgImpl h us cmm_stream impAcc profAcc count
         case r of
           Left () -> return (reverse impAcc, reverse profAcc)
           Right (cmms, cmm_stream') -> do
-            (impAcc,profAcc) <- cmmNativeGens dflags ncgImpl h us cmms
+            (impAcc,profAcc,us') <- cmmNativeGens dflags ncgImpl h us cmms
                                               impAcc profAcc count
-            cmmNativeGenStream dflags ncgImpl h us cmm_stream'
+            cmmNativeGenStream dflags ncgImpl h us' cmm_stream'
                                               impAcc profAcc count
 
 
@@ -324,11 +324,12 @@ cmmNativeGens :: (PlatformOutputable statics, PlatformOutputable instr, Instruct
               -> Int
               -> IO ( [[CLabel]],
                       [([NatCmmDecl statics instr],
-                      Maybe [Color.RegAllocStats statics instr],
-                      Maybe [Linear.RegAllocStats])] )
+                       Maybe [Color.RegAllocStats statics instr],
+                       Maybe [Linear.RegAllocStats])],
+                      UniqSupply )
 
-cmmNativeGens _ _ _ _ [] impAcc profAcc _
-        = return (impAcc,profAcc)
+cmmNativeGens _ _ _ us [] impAcc profAcc _
+        = return (impAcc,profAcc,us)
 
 cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
  = do
