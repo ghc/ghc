@@ -14,7 +14,7 @@ module CgMonad (
         Code,
         FCode,
 
-        initC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
+        initC, runC, thenC, thenFC, listCs, listFCs, mapCs, mapFCs,
         returnFC, fixC, fixC_, checkedAbsC, 
         stmtC, stmtsC, labelC, emitStmts, nopC, whenC, newLabelC,
         newUnique, newUniqSupply, 
@@ -379,13 +379,12 @@ instance Monad FCode where
 The Abstract~C is not in the environment so as to improve strictness.
 
 \begin{code}
-initC :: DynFlags -> Module -> FCode a -> IO a
+initC :: IO CgState
+initC  = do { uniqs <- mkSplitUniqSupply 'c'
+            ; return (initCgState uniqs) }
 
-initC dflags mod (FCode code)
-  = do  { uniqs <- mkSplitUniqSupply 'c'
-        ; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
-              (res, _) -> return res
-        }
+runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
+runC dflags mod st (FCode code) = code (initCgInfoDown dflags mod) st
 
 returnFC :: a -> FCode a
 returnFC val = FCode (\_ state -> (val, state))

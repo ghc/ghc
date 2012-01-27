@@ -1214,9 +1214,9 @@ hscGenHardCode cgguts mod_summary = do
                              cost_centre_info
                              stg_binds hpc_info
                     else {-# SCC "CodeGen" #-}
-                         codeGen dflags this_mod data_tycons
+                         return (codeGen dflags this_mod data_tycons
                                cost_centre_info
-                               stg_binds hpc_info >>= return . Stream.fromList
+                               stg_binds hpc_info)
 
 
         ------------------  Code output -----------------------

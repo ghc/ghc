@@ -1074,7 +1074,8 @@ parseCmmFile dflags filename = do
         let msg = mkPlainErrMsg span err
         return ((emptyBag, unitBag msg), Nothing)
     POk pst code -> do
-        cmm <- initC dflags no_module (getCmm (unEC code initEnv [] >> return ()))
+        st <- initC
+        let (cmm,_) = runC dflags no_module st (getCmm (unEC code initEnv [] >> return ()))
         let ms = getMessages pst
         if (errorsFound dflags ms)
          then return (ms, Nothing)
