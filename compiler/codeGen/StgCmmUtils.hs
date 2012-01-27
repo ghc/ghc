@@ -816,7 +816,7 @@ assignTemp' e
 -- the nested bindings via the monad.
 
 getSRTInfo :: SRT -> FCode C_SRT
-getSRTInfo (SRTEntries {}) = panic "getSRTInfo"
+getSRTInfo (SRTEntries {}) = return NoC_SRT --panic "getSRTInfo"
 
 getSRTInfo (SRT off len bmp)
   | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]

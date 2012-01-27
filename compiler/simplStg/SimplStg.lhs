@@ -52,7 +52,9 @@ stg2stg dflags module_name binds
 	; (processed_binds, _, cost_centres) 
 		<- foldl_mn do_stg_pass (binds', us', ccs) (getStgToDo dflags)
 
-	; let srt_binds = computeSRTs processed_binds
+        ; let srt_binds
+               | dopt Opt_TryNewCodeGen dflags = zip processed_binds (repeat [])
+               | otherwise = computeSRTs processed_binds
 
 	; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:" 
 	     		(pprStgBindingsWithSRTs srt_binds)
