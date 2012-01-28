@@ -672,7 +672,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         "ldmfd sp!, {r4-r10, fp, ip, lr}\n\t"
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
-      : 
+      : "%r4", "%r5", "%r6", "%r8", "%r9", "%r10", "%fp", "%ip", "%lr"
     );
     return r;
 }
