@@ -67,6 +67,8 @@ $1_$2_CONFIGURE_OPTS += --with-gcc="$$(CC_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-cc="$$(CC_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += --with-ar="$$(AR_STAGE$3)"
 $1_$2_CONFIGURE_OPTS += --with-ranlib="$$(RANLIB)"
+$1_$2_CONFIGURE_OPTS += $$(if $$(ALEX),--with-alex="$$(ALEX)")
+$1_$2_CONFIGURE_OPTS += $$(if $$(HAPPY),--with-happy="$$(HAPPY)")
 
 ifneq "$$(BINDIST)" "YES"
 ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
