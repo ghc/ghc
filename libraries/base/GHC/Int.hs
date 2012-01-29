@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash,
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples,
              StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -105,8 +105,10 @@ instance Integral Int8 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I8# (narrow8Int# (x# `quotInt#` y#)),
-                                       I8# (narrow8Int# (x# `remInt#` y#)))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I8# (narrow8Int# q),
+                                            I8# (narrow8Int# r))
     divMod  x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
@@ -256,8 +258,10 @@ instance Integral Int16 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I16# (narrow16Int# (x# `quotInt#` y#)),
-                                        I16# (narrow16Int# (x# `remInt#` y#)))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I16# (narrow16Int# q),
+                                            I16# (narrow16Int# r))
     divMod  x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
@@ -421,8 +425,10 @@ instance Integral Int32 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I32# (narrow32Int# (x# `quotInt#` y#)),
-                                     I32# (narrow32Int# (x# `remInt#` y#)))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I32# (narrow32Int# q),
+                                            I32# (narrow32Int# r))
     divMod  x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
@@ -747,7 +753,9 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I64# (x# `quotInt#` y#), I64# (x# `remInt#` y#))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I64# q, I64# r)
     divMod  x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]

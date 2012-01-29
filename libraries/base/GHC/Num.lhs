@@ -96,10 +96,6 @@ instance  Num Int  where
     {-# INLINE fromInteger #-}	 -- Just to be sure!
     fromInteger i = I# (integerToInt i)
 
-quotRemInt :: Int -> Int -> (Int, Int)
-quotRemInt a@(I# _) b@(I# _) = (a `quotInt` b, a `remInt` b)
-    -- OK, so I made it a little stricter.  Shoot me.  (WDP 94/10)
-
 divModInt ::  Int -> Int -> (Int, Int)
 divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
     -- Stricter.  Sorry if you don't like it.  (WDP 94/10)

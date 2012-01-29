@@ -707,6 +707,11 @@ plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt :: Int -> Int -> In
 (I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
 (I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
 
+quotRemInt :: Int -> Int -> (Int, Int)
+(I# x) `quotRemInt` (I# y) = case x `quotRemInt#` y of
+                             (# q, r #) ->
+                                 (I# q, I# r)
+
 {-# RULES
 "x# +# 0#" forall x#. x# +# 0# = x#
 "0# +# x#" forall x#. 0# +# x# = x#
