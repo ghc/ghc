@@ -113,8 +113,10 @@ instance Integral Int8 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I8# (narrow8Int# (x# `divInt#` y#)),
-                                       I8# (narrow8Int# (x# `modInt#` y#)))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I8# (narrow8Int# d),
+                                            I8# (narrow8Int# m))
     toInteger (I8# x#)               = smallInteger x#
 
 instance Bounded Int8 where
@@ -266,8 +268,10 @@ instance Integral Int16 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I16# (narrow16Int# (x# `divInt#` y#)),
-                                        I16# (narrow16Int# (x# `modInt#` y#)))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I16# (narrow16Int# d),
+                                            I16# (narrow16Int# m))
     toInteger (I16# x#)              = smallInteger x#
 
 instance Bounded Int16 where
@@ -433,8 +437,10 @@ instance Integral Int32 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I32# (narrow32Int# (x# `divInt#` y#)),
-                                     I32# (narrow32Int# (x# `modInt#` y#)))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I32# (narrow32Int# d),
+                                            I32# (narrow32Int# m))
     toInteger (I32# x#)              = smallInteger x#
 
 instance Read Int32 where
@@ -760,7 +766,9 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I64# (x# `divInt#` y#), I64# (x# `modInt#` y#))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I64# d, I64# m)
     toInteger (I64# x#)              = smallInteger x#
 
 instance Read Int64 where

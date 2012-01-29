@@ -712,6 +712,18 @@ quotRemInt :: Int -> Int -> (Int, Int)
                              (# q, r #) ->
                                  (I# q, I# r)
 
+divModInt :: Int -> Int -> (Int, Int)
+(I# x) `divModInt` (I# y) = case x `divModInt#` y of
+                            (# q, r #) -> (I# q, I# r)
+
+divModInt# :: Int# -> Int# -> (# Int#, Int# #)
+x# `divModInt#` y#
+ | (x# ># 0#) && (y# <# 0#) = case (x# -# 1#) `quotRemInt#` y# of
+                              (# q, r #) -> (# q -# 1#, r +# y# +# 1# #)
+ | (x# <# 0#) && (y# ># 0#) = case (x# +# 1#) `quotRemInt#` y# of
+                              (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
+ | otherwise                = x# `quotRemInt#` y#
+
 {-# RULES
 "x# +# 0#" forall x#. x# +# 0# = x#
 "0# +# x#" forall x#. 0# +# x# = x#

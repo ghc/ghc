@@ -95,10 +95,6 @@ instance  Num Int  where
 
     {-# INLINE fromInteger #-}	 -- Just to be sure!
     fromInteger i = I# (integerToInt i)
-
-divModInt ::  Int -> Int -> (Int, Int)
-divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
-    -- Stricter.  Sorry if you don't like it.  (WDP 94/10)
 \end{code}
 
 %*********************************************************
