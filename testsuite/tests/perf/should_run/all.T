@@ -217,3 +217,19 @@ test('T5237',
      ],
     compile_and_run,
     ['-O ' + sse2_opts])
+
+test('T5536',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 2480000000,
+                                             2510000000)),
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 2480000000,
+                                             2510000000)),
+                           # expected value: 2492589480 (amd64/Linux)
+     extra_clean(['T5536.data']),
+     ignore_output,
+     only_ways(['normal'])
+     ],
+    compile_and_run,
+    ['-O'])
+

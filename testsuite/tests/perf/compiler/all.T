@@ -232,3 +232,15 @@ test('T5321FD',
                                                       1200000000))
       ],
       compile,[''])
+
+test('T5642',
+     [ only_ways(['normal']),
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 890000000,
+                                                      910000000)),
+      if_wordsize(64,
+      #                               expected value: 9019430056 (amd64/Linux):
+          compiler_stats_num_field('bytes allocated', 8900000000,
+                                                      9100000000))
+      ],
+      compile,['-O'])

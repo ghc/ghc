@@ -36,3 +36,12 @@ integerConstantFolding:
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
 	./integerConstantFolding
 
+.PHONY: fromToInteger
+fromToInteger:
+	'$(TEST_HC)' -Wall -v0 -O -c fromToInteger.hs -fforce-recomp -ddump-simpl > fromToInteger.simpl
+# Rules should eliminate all functions
+	-grep integerToInt fromToInteger.simpl
+	-grep smallInteger fromToInteger.simpl
+	-grep integerToWord fromToInteger.simpl
+	-grep wordToInteger fromToInteger.simpl
+
