@@ -420,7 +420,6 @@ foldExp f (CmmSwitch e _) z                       = f e z
 foldExp f (CmmCall {cml_target=tgt}) z            = f tgt z
 foldExp f (CmmForeignCall {tgt=tgt, args=args}) z = foldr f (foldExpForeignTarget f tgt z) args
 
-{-# INLINE foldExpDeep #-}
 foldExpDeep :: (CmmExpr -> z -> z) -> CmmNode e x -> z -> z
 foldExpDeep f = foldExp go
   where -- go :: CmmExpr -> z -> z
