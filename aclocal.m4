@@ -552,7 +552,7 @@ AC_ARG_WITH($2,
         fi
         if test -z "$$1"
         then
-            AC_MSG_ERROR([cannot find $3 in your PATH, no idea how to link])
+            AC_MSG_ERROR([cannot find $3 in your PATH])
         fi
     fi
 ]
