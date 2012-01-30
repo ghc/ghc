@@ -205,7 +205,8 @@ isStaticFlag f =
     "funfolding-dict-threshold",
     "funfolding-use-threshold",
     "funfolding-fun-discount",
-    "funfolding-keeness-factor"
+    "funfolding-keeness-factor",
+    "fsupercompiler"
      ]
 
 unregFlags :: [Located String]

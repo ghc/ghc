@@ -93,6 +93,9 @@ module StaticFlags (
     -- For the parser
     addOpt, removeOpt, addWay, getWayFlags, v_opt_C_ready,
 
+    -- For the supercompiler, which parses its static flags elsewhere
+    lookUp, lookup_def_int, lookup_str,
+    
     -- Saving/restoring globals
     saveStaticFlagGlobals, restoreStaticFlagGlobals
   ) where
