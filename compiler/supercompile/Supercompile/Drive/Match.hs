@@ -93,7 +93,7 @@ type MatchResult = M.Map Var Var
 --   1. All the Vars are *not* rigidly bound (i.e. they are bound by a "let")
 --   2. The terms *may* contain free variables of any kind, rigidly bound or not
 --   3. The Vars in VarL/VarR are always CoVars/Ids, NEVER TyVars (might change this in the future)
-data MatchLR = VarL Var (Out (TermF Anned)) -- FIXME: arguably we should not let these two float out of lambdas because they
+data MatchLR = VarL Var (Out (TermF Anned)) -- NB: we should not let these two float out of lambdas because they
              | VarR (Out (TermF Anned)) Var -- might match against top-level bindings and hence change work sharing
              | VarLR Var Var
 
@@ -195,9 +195,9 @@ matchTerm' rn2 (Value v_l)                (Value v_r)                = matchValu
 matchTerm' rn2 (TyApp e_l ty_l)           (TyApp e_r ty_r)           = liftM2 (++) (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r)
 matchTerm' rn2 (App e_l x_l)              (App e_r x_r)              = liftM2 (++) (matchTerm rn2 e_l e_r) (matchVar   rn2 x_l x_r)
 matchTerm' rn2 (PrimOp pop_l tys_l es_l)  (PrimOp pop_r tys_r es_r)  = guard "matchTerm: primop" (pop_l == pop_r) >> liftM2 (++) (matchList (matchType rn2) tys_l tys_r) (matchList (matchTerm rn2) es_l es_r)
-matchTerm' rn2 (Case e_l x_l ty_l alts_l) (Case e_r x_r ty_r alts_r) = liftM3 app3 (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchAlts rn2 alts_l alts_r)
-matchTerm' rn2 (Let x_l e1_l e2_l)        (Let x_r e1_r e2_r)        = liftM2 (++) (matchTerm rn2 e1_l e1_r) $ matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchTerm rn2 e2_l e2_r
-matchTerm' rn2 (LetRec xes_l e_l)         (LetRec xes_r e_r)         = matchIdCoVarBndrs rn2 xs_l xs_r $ \rn2 -> liftM2 (++) (matchList (matchTerm rn2) es_l es_r) (matchTerm rn2 e_l e_r)
+matchTerm' rn2 (Case e_l x_l ty_l alts_l) (Case e_r x_r ty_r alts_r) = liftM3 app3 (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr False rn2 x_l x_r $ \rn2 -> matchAlts rn2 alts_l alts_r)
+matchTerm' rn2 (Let x_l e1_l e2_l)        (Let x_r e1_r e2_r)        = liftM2 (++) (matchTerm rn2 e1_l e1_r) $ matchIdCoVarBndr False rn2 x_l x_r $ \rn2 -> matchTerm rn2 e2_l e2_r
+matchTerm' rn2 (LetRec xes_l e_l)         (LetRec xes_r e_r)         = matchIdCoVarBndrs False rn2 xs_l xs_r $ \rn2 -> liftM2 (++) (matchList (matchTerm rn2) es_l es_r) (matchTerm rn2 e_l e_r)
   where (xs_l, es_l) = unzip xes_l
         (xs_r, es_r) = unzip xes_r
 matchTerm' rn2 (Cast e_l co_l)            (Cast e_r co_r)            = liftM2 (++) (matchTerm rn2 (e_l) (e_r)) (matchCoercion rn2 (co_l) (co_r))
@@ -208,7 +208,7 @@ matchValue rn2 (Indirect x_l)               (Indirect x_r)               = match
 matchValue rn2 (Indirect x_l)               v_r                          = matchVarL rn2 x_l (Value v_r)
 matchValue rn2 v_l                          (Indirect x_r)               = matchVarR rn2 (Value v_l) x_r
 matchValue rn2 (TyLambda a_l e_l)           (TyLambda a_r e_r)           = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchTerm rn2 e_l e_r
-matchValue rn2 (Lambda x_l e_l)             (Lambda x_r e_r)             = matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchTerm rn2 e_l e_r
+matchValue rn2 (Lambda x_l e_l)             (Lambda x_r e_r)             = matchIdCoVarBndr True rn2 x_l x_r $ \rn2 -> matchTerm rn2 e_l e_r
 matchValue rn2 (Data dc_l tys_l cos_l xs_l) (Data dc_r tys_r cos_r xs_r) = guard "matchValue: datacon" (dc_l == dc_r) >> liftM3 app3 (matchList (matchType rn2) tys_l tys_r) (matchList (matchCoercion rn2) cos_l cos_r) (matchList (matchVar rn2) xs_l xs_r)
 matchValue _   (Literal l_l)                (Literal l_r)                = guard "matchValue: literal" (l_l == l_r) >> return []
 matchValue rn2 (Coercion co_l)              (Coercion co_r)              = matchCoercion rn2 (co_l) (co_r)
@@ -221,29 +221,29 @@ matchAlt :: RnEnv2 -> AnnedAlt -> AnnedAlt -> Match [MatchLR]
 matchAlt rn2 (alt_con_l, alt_e_l) (alt_con_r, alt_e_r) = matchAltCon rn2 alt_con_l alt_con_r $ \rn2 -> matchTerm rn2 alt_e_l alt_e_r
 
 matchAltCon :: RnEnv2 -> AltCon -> AltCon -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
-matchAltCon rn2 (DataAlt dc_l as_l qs_l xs_l) (DataAlt dc_r as_r qs_r xs_r) k = guard "matchAltCon: datacon" (dc_l == dc_r) >> (matchTyVarBndrs rn2 as_l as_r $ \rn2 -> matchIdCoVarBndrs rn2 qs_l qs_r $ \rn2 -> matchIdCoVarBndrs rn2 xs_l xs_r k)
+matchAltCon rn2 (DataAlt dc_l as_l qs_l xs_l) (DataAlt dc_r as_r qs_r xs_r) k = guard "matchAltCon: datacon" (dc_l == dc_r) >> (matchTyVarBndrs rn2 as_l as_r $ \rn2 -> matchIdCoVarBndrs False rn2 qs_l qs_r $ \rn2 -> matchIdCoVarBndrs False rn2 xs_l xs_r k)
 matchAltCon rn2 (LiteralAlt l_l)              (LiteralAlt l_r)              k = guard "matchAltCon: literal" (l_l == l_r) >> k rn2
 matchAltCon rn2 DefaultAlt                    DefaultAlt                    k = k rn2
 matchAltCon _ _ _ _ = fail "matchAltCon"
 
 matchVarBndr :: RnEnv2 -> Var -> Var -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
-matchVarBndr rn2 v_l v_r | isId v_l,    isId v_r    = matchIdCoVarBndr rn2 v_l v_r
-                         | isTyVar v_l, isTyVar v_r = matchTyVarBndr   rn2 v_l v_r
+matchVarBndr rn2 v_l v_r | isId v_l,    isId v_r    = matchIdCoVarBndr False rn2 v_l v_r -- Not lambdaish because this is only used for CoreAlts and rule template vars
+                         | isTyVar v_l, isTyVar v_r = matchTyVarBndr         rn2 v_l v_r
                          | otherwise                = fail "matchVarBndr"
 
 matchTyVarBndr :: RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchTyVarBndr rn2 a_l a_r k = liftM2 (++) (matchKind (tyVarKind a_l) (tyVarKind a_r)) (k (rnBndr2 rn2 a_l a_r))
 
-matchIdCoVarBndr :: RnEnv2 -> Id -> Id -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
-matchIdCoVarBndr rn2 x_l x_r k = liftM2 (++) match_x $ k rn2' >>= if iNSTANCE_MATCHING then mapM (checkMatchLR x_l x_r) else return
+matchIdCoVarBndr :: Bool -> RnEnv2 -> Id -> Id -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
+matchIdCoVarBndr lambdaish rn2 x_l x_r k = liftM2 (++) match_x $ k rn2' >>= if iNSTANCE_MATCHING then mapM (checkMatchLR lambdaish x_l x_r) else return
   where (rn2', match_x) = matchIdCoVarBndr' rn2 rn2' x_l x_r
 
-checkMatchLR :: Id -> Id -> MatchLR -> Match MatchLR
-checkMatchLR x_l x_r lr = case lr of
+checkMatchLR :: Bool -> Id -> Id -> MatchLR -> Match MatchLR
+checkMatchLR lambdaish x_l x_r lr = case lr of
     VarL _ e_r | x_r `elemVarSet` annedTermFreeVars' e_r -> fail "checkMatchLR: deferred term mentioned rigid right variable"
-               | not (termIsCheap' e_r)                  -> fail "checkMatchLR: expensive deferred (right) term escaping lambda"
+               | lambdaish, not (termIsCheap' e_r)       -> fail "checkMatchLR: expensive deferred (right) term escaping lambda"
     VarR e_l _ | x_l `elemVarSet` annedTermFreeVars' e_l -> fail "checkMatchLR: deferred term mentioned rigid left variable"
-               | not (termIsCheap' e_l)                  -> fail "checkMatchLR: expensive deferred (left) term escaping lambda"
+               | lambdaish, not (termIsCheap' e_l)       -> fail "checkMatchLR: expensive deferred (left) term escaping lambda"
     _ -> return lr
 
 -- We have to be careful to match the "fragile" IdInfo for binders as well as the obvious type information
@@ -293,15 +293,15 @@ matchCore rn2 (Core.Var x_l)       (Core.Var x_r)       = matchVar rn2 x_l x_r
 matchCore _   (Core.Lit l_l)       (Core.Lit l_r)       = guard "matchCore: Lit" (l_l == l_r) >> return []
 matchCore rn2 (Core.App e1_l e2_l) (Core.App e1_r e2_r) = liftM2 (++) (matchCore rn2 e1_l e1_r) (matchCore rn2 e2_l e2_r)
 matchCore rn2 (Core.Lam x_l e_l)   (Core.Lam x_r e_r)
-  | isId x_l,    isId x_r    = matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchCore rn2 e_l e_r
-  | isTyVar x_l, isTyVar x_r = matchTyVarBndr   rn2 x_l x_r $ \rn2 -> matchCore rn2 e_l e_r
+  | isId x_l,    isId x_r    = matchIdCoVarBndr True rn2 x_l x_r $ \rn2 -> matchCore rn2 e_l e_r
+  | isTyVar x_l, isTyVar x_r = matchTyVarBndr        rn2 x_l x_r $ \rn2 -> matchCore rn2 e_l e_r
 matchCore rn2 (Core.Let (Core.NonRec x_l e1_l) e2_l) (Core.Let (Core.NonRec x_r e1_r) e2_r)
-  | isId x_l, isId x_r = liftM2 (++) (matchCore rn2 e1_l e1_r) $ matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchCore rn2 e2_l e2_r
+  | isId x_l, isId x_r = liftM2 (++) (matchCore rn2 e1_l e1_r) $ matchIdCoVarBndr False rn2 x_l x_r $ \rn2 -> matchCore rn2 e2_l e2_r
 matchCore rn2 (Core.Let (Core.Rec xes_l) e_l) (Core.Let (Core.Rec xes_r) e_r)
-  = matchIdCoVarBndrs rn2 xs_l xs_r $ \rn2 -> liftM2 (++) (matchList (matchCore rn2) es_l es_r) (matchCore rn2 e_l e_r)
+  = matchIdCoVarBndrs False rn2 xs_l xs_r $ \rn2 -> liftM2 (++) (matchList (matchCore rn2) es_l es_r) (matchCore rn2 e_l e_r)
       where (xs_l, es_l) = unzip xes_l
             (xs_r, es_r) = unzip xes_r
-matchCore rn2 (Core.Case e_l x_l ty_l alts_l) (Core.Case e_r x_r ty_r alts_r) = liftM3 app3 (matchCore rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchCoreAlts rn2 alts_l alts_r)
+matchCore rn2 (Core.Case e_l x_l ty_l alts_l) (Core.Case e_r x_r ty_r alts_r) = liftM3 app3 (matchCore rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr False rn2 x_l x_r $ \rn2 -> matchCoreAlts rn2 alts_l alts_r)
 matchCore rn2 (Core.Cast e_l co_l)            (Core.Cast e_r co_r)            = liftM2 (++) (matchCore rn2 e_l e_r) (matchCoercion rn2 co_l co_r)
 matchCore rn2 (Core.Note no_l e_l)            (Core.Note no_r e_r)            = guard "matchCore: Note" (no_l == no_r) >> matchCore rn2 e_l e_r
 matchCore rn2 (Core.Type ty_l)                (Core.Type ty_r)                = matchType rn2 ty_l ty_r
@@ -317,8 +317,8 @@ matchCoreAlt rn2 (alt_con_l, vs_l, alt_e_l) (alt_con_r, vs_r, alt_e_r) = guard "
 matchTyVarBndrs :: RnEnv2 -> [TyVar] -> [TyVar] -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchTyVarBndrs = matchMany matchTyVarBndr
 
-matchIdCoVarBndrs :: RnEnv2 -> [Id] -> [Id] -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
-matchIdCoVarBndrs = matchMany matchIdCoVarBndr
+matchIdCoVarBndrs :: Bool -> RnEnv2 -> [Id] -> [Id] -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
+matchIdCoVarBndrs lambdaish = matchMany (matchIdCoVarBndr lambdaish)
 
 matchMany :: (RnEnv2 -> v -> v -> (RnEnv2 -> Match b) -> Match b)
           -> RnEnv2 -> [v] -> [v] -> (RnEnv2 -> Match b) -> Match b
@@ -389,9 +389,9 @@ matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
     go :: StackFrame -> StackFrame -> Match (RnEnv2, Match [MatchLR])
     go (Apply x_l')                          (Apply x_r')                          = return (init_rn2, matchVar rn2 x_l' x_r')
     go (TyApply ty_l')                       (TyApply ty_r')                       = return (init_rn2, matchType rn2 ty_l' ty_r')
-    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2, liftM2 (++) (matchType rn2 ty_l' ty_r') (matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedAlts matchAlts rn2 in_alts_l in_alts_r))
+    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2, liftM2 (++) (matchType rn2 ty_l' ty_r') (matchIdCoVarBndr False rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedAlts matchAlts rn2 in_alts_l in_alts_r))
     go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, guard "matchECFrame: primop" (pop_l == pop_r) >> liftM3 (\x y z -> x ++ y ++ z) (matchList (matchType rn2) tys_l' tys_r') (matchList (matchAnned (matchAnswer rn2)) as_l as_r) (matchList (matchIn renameAnnedTerm matchTerm rn2) in_es_l in_es_r))
-    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2, matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r)
+    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2, matchIdCoVarBndr False rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r)
     go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2, matchCoercion rn2 co_l' co_r')
     go (Update x_l')                         (Update x_r')                         = return (matchIdCoVarBndr' init_rn2 rn2 x_l' x_r')
     go _ _ = fail "matchECFrame"
