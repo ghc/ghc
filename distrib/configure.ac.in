@@ -21,6 +21,18 @@ FP_GMP
 bootstrap_target=`ghc/stage2/build/tmp/ghc-stage2 +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
 FPTOOLS_SET_PLATFORM_VARS
 
+BuildingCrossCompiler=NO
+PortingCompiler=NO
+CrossCompiling=NO
+CrossCompilePrefix=""
+TargetPlatformFull="${target}"
+
+AC_SUBST(BuildingCrossCompiler)  # 'toolchain' case
+AC_SUBST(PortingCompiler)        # 'port' case
+AC_SUBST(CrossCompiling)         # BuildingCrossCompiler OR PortingCompiler
+AC_SUBST(CrossCompilePrefix)
+AC_SUBST(TargetPlatformFull)
+
 #
 dnl ** Check Perl installation **
 #
@@ -51,7 +63,9 @@ XCODE_VERSION()
 
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
-FIND_GCC()
+FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
+CC="$WhatGccIsCalled"
+export CC
 
 FP_GCC_VERSION
 AC_PROG_CPP
