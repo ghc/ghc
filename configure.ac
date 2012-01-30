@@ -333,19 +333,75 @@ then
 fi
 AC_SUBST([SplitObjsBroken])
 
+dnl ** Building a cross compiler?
+dnl --------------------------------------------------------------
+BuildingCrossCompiler=NO
+PortingCompiler=NO
+CrossCompiling=NO
+# If 'host' and 'target' differ, then this means we are building a cross-compiler.
+if test "$host" != "$target" ; then
+    BuildingCrossCompiler=YES
+    CrossCompiling=YES
+    cross_compiling=yes   # This tells configure that it can accept just 'target',
+                          # otherwise you get
+                          #   configure: error: cannot run C compiled programs.
+                          #   If you meant to cross compile, use `--host'.
+fi
+if test "$build" != "$host" ; then
+    CrossCompiling=YES
+    PortingCompiler=YES
+fi
+# Note: cross_compiling is set to 'yes' in both 'port' and 'toolchain' cases
+if ! test "$host" == "$target" -o "$host" == "$build" ; then
+   AC_MSG_ERROR([
+You've selected:
+
+  build:  $build   (the architecture we're building on)
+  host:   $host    (the architecture the compiler we're building will execute on)
+  target: $target  (the architecture the compiler we're building will produce code for)
+
+host must equal build or target. The two allowed cases are:
+
+  --host=<arch> --target=<arch>   to _port_ GHC to run on a foreign architecture
+                                  and produce code for that architecture
+  --target=<arch>                 to build a cross compiler _toolchain_ that runs
+                                  locally but produces code for a foreign
+                                  architecture
+])
+fi
+if [[ "$CrossCompiling" == "YES" ]] ; then
+  CrossCompilePrefix="${target}-"
+else
+  CrossCompilePrefix=""
+fi
+TargetPlatformFull="${target}"
+AC_SUBST(BuildingCrossCompiler)  # 'toolchain' case
+AC_SUBST(PortingCompiler)        # 'port' case
+AC_SUBST(CrossCompiling)         # BuildingCrossCompiler OR PortingCompiler
+AC_SUBST(CrossCompilePrefix)
+AC_SUBST(TargetPlatformFull)
+AC_ARG_WITH([alien],
+[AC_HELP_STRING([--with-alien=ARG],
+  [Supply script for running target binaries locally when cross-compiling])],
+  [AlienScript="$withval"],
+  [AlienScript=""])
+AC_SUBST(AlienScript)
+
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
-FIND_GCC()
+FIND_GCC([WhatGccIsCalled], [gcc], [gcc])
+CC="$WhatGccIsCalled"
+export CC
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([LD], [ld])
+FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
 LdCmd="$LD"
 AC_SUBST([LdCmd])
 
 dnl ** Which nm to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])
+FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
@@ -642,17 +698,19 @@ dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r sched_setaffinity setlocale])
 
-AC_TRY_RUN([
-#include <sys/types.h>
-#include <sys/time.h>
-int main(void) {
-  struct itimerval tval;
-  tval.it_value.tv_sec = 1;
-  tval.it_value.tv_usec = 0;
-  tval.it_interval = tval.it_value;
-  return setitimer(ITIMER_VIRTUAL, &tval, (void*)0) != 0;
-}
-],[AC_DEFINE([HAVE_SETITIMER_VIRTUAL], [1], [Define to 1 if setitimer accepts ITIMER_VIRTUAL, 0 else.])])
+if test "$cross_compiling" = "no" ; then
+    AC_TRY_RUN([
+    #include <sys/types.h>
+    #include <sys/time.h>
+    int main(void) {
+      struct itimerval tval;
+      tval.it_value.tv_sec = 1;
+      tval.it_value.tv_usec = 0;
+      tval.it_interval = tval.it_value;
+      return setitimer(ITIMER_VIRTUAL, &tval, (void*)0) != 0;
+    }
+    ],[AC_DEFINE([HAVE_SETITIMER_VIRTUAL], [1], [Define to 1 if setitimer accepts ITIMER_VIRTUAL, 0 else.])])
+fi
 
 dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
 dnl ** _POSIX_C_SOURCE is defined
@@ -852,8 +910,11 @@ echo ["\
 fi
 
 echo ["\
-   Using GCC             : $WhatGccIsCalled
-      which is version   : $GccVersion
+   Using GCC                 : $WhatGccIsCalled
+      which is version       : $GccVersion
+   Building a cross compiler : $BuildingCrossCompiler
+   Porting to foreign arch   : $PortingCompiler
+   Alien script              : $AlienScript
 
    ld       : $LdCmd
    Happy    : $HappyCmd ($HappyVersion)

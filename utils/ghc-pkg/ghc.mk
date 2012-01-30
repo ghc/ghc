@@ -30,7 +30,7 @@ endif
 
 else
 
-$(GHC_PKG_INPLACE) : utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext) | $$(dir $$@)/. $(INPLACE_PACKAGE_CONF)/.
+$(GHC_PKG_INPLACE) : utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext) | $$(dir $$@)/. $(INPLACE_PACKAGE_CONF)/.
 	$(call removeFiles,$(wildcard $(INPLACE_PACKAGE_CONF)/*))
 ifeq "$(Windows)" "YES"
 	cp $< $@
@@ -51,7 +51,7 @@ endif
 #
 # ToDo: we might want to do this using ghc-cabal instead.
 #
-utils/ghc-pkg/dist/build/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs | bootstrapping/. $$(dir $$@)/. $(GHC_CABAL_INPLACE) 
+utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs | bootstrapping/. $$(dir $$@)/. $(GHC_CABAL_INPLACE) 
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
 	       -no-user-package-conf \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
@@ -82,30 +82,41 @@ $(eval $(call clean-target,utils/ghc-pkg,dist,\
    utils/ghc-pkg/Version.hs))
 
 # -----------------------------------------------------------------------------
-# Building ghc-pkg with stage 1
+# Cross-compile case: Install our dist version
+# Normal case: Build ghc-pkg with stage 1
 
-utils/ghc-pkg_dist-install_USES_CABAL = YES
+ifeq "$(BuildingCrossCompiler)" "YES"
+GHC_PKG_DISTDIR=dist
+else
+GHC_PKG_DISTDIR=dist-install
+endif
+
+utils/ghc-pkg_$(GHC_PKG_DISTDIR)_USES_CABAL = YES
 utils/ghc-pkg_PACKAGE = ghc-pkg
 
-utils/ghc-pkg_dist-install_PROG = ghc-pkg
-utils/ghc-pkg_dist-install_SHELL_WRAPPER = YES
-utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER = YES
-utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
-utils/ghc-pkg_dist-install_INSTALL_INPLACE = NO
+utils/ghc-pkg_$(GHC_PKG_DISTDIR)_PROG = ghc-pkg
+utils/ghc-pkg_$(GHC_PKG_DISTDIR)_SHELL_WRAPPER = YES
+utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_SHELL_WRAPPER = YES
+utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
+utils/ghc-pkg_$(GHC_PKG_DISTDIR)_INSTALL_INPLACE = NO
 
 ifeq "$(BootingFromHc)" "YES"
 utils/ghc-pkg_dist-install_OTHER_OBJS += $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_STAGE1_LIBS) $(ALL_RTS_LIBS) $(libffi_STATIC_LIB)
 endif
 
+ifeq "$(BuildingCrossCompiler)" "YES"
+$(eval $(call shell-wrapper,utils/ghc-pkg,dist))
+else
 $(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
+endif
 
 ifeq "$(Windows)" "NO"
 install: install_utils/ghc-pkg_link
 
-.PNONY: install_utils/ghc-pkg_link
+.PHONY: install_utils/ghc-pkg_link
 install_utils/ghc-pkg_link: 
 	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
 	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc-pkg")
-	$(LN_S) ghc-pkg-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghc-pkg"
+	$(LN_S) $(CrossCompilePrefix)ghc-pkg-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc-pkg"
 endif
 

@@ -150,6 +150,10 @@ $(eval $(call clean-target,compiler,config_hs,compiler/main/Config.hs))
 
 PLATFORM_H = ghc_boot_platform.h
 
+ifeq "$(BuildingCrossCompiler)" "YES"
+compiler/stage1/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
+	cp $< $@
+else
 compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
@@ -192,6 +196,7 @@ endif
 	@echo                                                    >> $@
 	@echo "#endif /* __PLATFORM_H__ */"                      >> $@
 	@echo "Done."
+endif
 
 # For stage2 and above, the BUILD platform is the HOST of stage1, and
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same

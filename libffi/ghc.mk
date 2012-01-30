@@ -82,7 +82,7 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	          --prefix=$(TOP)/libffi/build/inst \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
-	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
+	          --host=$(TargetPlatformFull)
 
 	# wc on OS X has spaces in its output, which libffi's Makefile
 	# doesn't expect, so we tweak it to sed them out
