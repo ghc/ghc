@@ -110,7 +110,7 @@ childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++
         ordered_counts = sortBy (comparing (Down . sum . snd)) (M.toList descendant_counts)
 
 depthHistogram :: ParentChildren -> SDoc
-depthHistogram parent_children = vcat [ppr depth <> char ',' <+> ppr count | (depth, count) <- IM.toList overall_depth_summary]
+depthHistogram parent_children = maybe empty (\overall_depth_summary -> vcat [ppr depth <> char ',' <+> ppr count | (depth, count) <- IM.toList overall_depth_summary]) (M.lookup Nothing summary_map)
   where depth_map :: M.Map (Maybe Var) Int
         depth_map = M.foldrWithKey (\mb_fun children so_far -> let Just depth = M.lookup mb_fun depth_map
                                                                in foldr (\(child_fun, _) -> M.insert (Just child_fun) (depth + 1)) so_far children)
@@ -120,16 +120,14 @@ depthHistogram parent_children = vcat [ppr depth <> char ',' <+> ppr count | (de
         summary_map = flip M.mapWithKey parent_children $ \mb_fun children -> let summaries = [M.findWithDefault IM.empty (Just child_fun) summary_map | (child_fun, _) <- children]
                                                                                   Just depth = M.lookup mb_fun depth_map
                                                                               in IM.unionsWith (+) (IM.singleton depth 1:summaries)
-        
-        Just overall_depth_summary = M.lookup Nothing summary_map
 
 -- NB: there may be many deepest paths
 deepestPath :: [(Var, FVedTerm)] -> ParentChildren -> SDoc
-deepestPath fulfils parent_children = show_meaning_chains deepest_from_root $$ summarise_leaves (map last deepest_from_root)
+deepestPath fulfils parent_children = maybe empty (\(_, deepest_from_root) -> show_meaning_chains deepest_from_root $$ summarise_leaves (map last deepest_from_root)) mb_deepest_from_root
   where deepest :: M.Map (Maybe Var) (Int, [[(Var, (State, Bool))]])
         deepest = flip M.map parent_children $ \children -> maximumByFst [(depth + 1, (fun, state):states) | (fun, state) <- children, let (depth, statess) = M.findWithDefault (0, [[]]) (Just fun) deepest, states <- statess]
         
-        Just (_, deepest_from_root) = M.lookup Nothing deepest
+        mb_deepest_from_root = M.lookup Nothing deepest
 
         fulfils_map :: M.Map Var FVedTerm
         fulfils_map = M.fromList fulfils
