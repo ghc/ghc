@@ -461,14 +461,16 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
     speculateOne :: LinearHistory (State, SpecM ()) -> (Out Var, HeapBinding) -> SpecM ()
     speculateOne hist (x', hb)
       | HB InternallyBound (Right in_e) <- hb
-      = (\rb -> try_speculation in_e rb) `catchSpecM` speculation_failure
+      = --pprTrace "speculateOne" (ppr (x', annedTag (snd in_e))) $
+        (\rb -> try_speculation in_e rb) `catchSpecM` speculation_failure
       | otherwise
       = speculation_failure
       where
         speculation_failure = modifySpecState $ \(stats, deeds, h_speculated_ok, h_speculated_failure, ids) -> ((stats, deeds, h_speculated_ok, M.insert x' hb h_speculated_failure, ids), ())
         try_speculation in_e rb = Monad.join (modifySpecState go)
           where go no_change@(stats, deeds, h_speculated_ok, h_speculated_failure, ids) = case terminate hist (state, rb) of
-                    Stop (_old_state, rb) -> (no_change, rb)
+                    Stop (_old_state, rb) -> pprTrace "speculation denied" (ppr x' {- $$ pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness _old_state -})
+                                             (no_change, rb)
                     Continue hist -> case reduceWithStats state of
                         (extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
                           | Just a <- traverse qaToAnswer qa
