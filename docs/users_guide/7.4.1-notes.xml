@@ -209,6 +209,8 @@ instance Typeable []   where typeOf _ = TypeRep
                 </para>
 
                 <para>
+                    This feature is not yet fully mature, but please
+                    do file bug reports if you run into problems.
                     See
                     <xref linkend="kind-polymorphism" />
                     for more information.
