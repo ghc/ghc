@@ -16,7 +16,7 @@ import Name     (Name, nameOccName)
 import OccName  (occNameString)
 import Id       (Id)
 import Literal  (Literal)
-import Type     (Type)
+import Type     (Type, mkTyVarTy)
 import Coercion (CoVar, Coercion, mkCvSubst, mkAxInstCo, mkReflCo, isReflCo)
 import PrimOp   (PrimOp)
 import PprCore  ()
@@ -325,15 +325,24 @@ lambdas :: Symantics ann => [Id] -> ann (TermF ann) -> ann (TermF ann)
 lambdas = flip $ foldr (\x -> value . Lambda x)
 
 tyVarIdLambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
-tyVarIdLambdas = flip $ foldr (\x -> value . tyVarIdLambda x)
-  where tyVarIdLambda x e | isTyVar x = TyLambda x e
-                          | otherwise = Lambda   x e
+tyVarIdLambdas = flip $ foldr tyVarIdLambda
+
+tyVarIdLambda :: Symantics ann => Var -> ann (TermF ann) -> ann (TermF ann)
+tyVarIdLambda x e | isTyVar x = value $ TyLambda x e
+                  | otherwise = value $ Lambda   x e
 
 tyApps :: Symantics ann => ann (TermF ann) -> [Type] -> ann (TermF ann)
 tyApps = foldl tyApp
 
 apps :: Symantics ann => ann (TermF ann) -> [Id] -> ann (TermF ann)
 apps = foldl app
+
+tyVarIdApps :: Symantics ann => ann (TermF ann) -> [Var] -> ann (TermF ann)
+tyVarIdApps = foldl tyVarIdApp
+
+tyVarIdApp :: Symantics ann => ann (TermF ann) -> Var -> ann (TermF ann)
+tyVarIdApp e x | isTyVar x = e `tyApp` mkTyVarTy x
+               | otherwise = e `app` x
 
 {-
 strictLet :: Symantics ann => Var -> ann (TermF ann) -> ann (TermF ann) -> ann (TermF ann)
