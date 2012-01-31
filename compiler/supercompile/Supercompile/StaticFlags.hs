@@ -19,8 +19,7 @@ iNSTANCE_MATCHING :: Bool
 iNSTANCE_MATCHING = not $ lookUp $ fsLit "-fsupercompiler-no-instance-matching"
 
 eAGER_SPLIT_VALUES :: Bool
-eAGER_SPLIT_VALUES = iNSTANCE_MATCHING -- For correctness given that we do instance matching
---eAGER_SPLIT_VALUES = False
+eAGER_SPLIT_VALUES = not $ lookUp $ fsLit "-fsupercompiler-no-eager-split-values"
 
 rEFINE_ALTS :: Bool
 rEFINE_ALTS = not $ lookUp $ fsLit "-fsupercompiler-no-refine-alts"
