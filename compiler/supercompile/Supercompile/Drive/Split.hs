@@ -234,8 +234,7 @@ generalise gen (deeds, Heap h ids, k, qa) = do
     pprTrace "generalise: (gen_kfs, gen_xs')" (ppr (gen_kfs, gen_xs')) $ return ()
     
     let (ctxt_id, ctxt_ids) = takeUniqFromSupply splitterUniqSupply
-        (ctxt_ids0, ctxt_ids1) = splitUniqSupply ctxt_ids
-    return $ \opt -> generaliseSplit opt ctxt_ids0 (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed ctxt_ids1 (qaType qa) (Once ctxt_id, (Heap M.empty ids, [], annedQAToInAnnedTerm ids qa))))
+    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed' (qaType qa) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, [], annedQAToInAnnedTerm ids qa))))
 
 {-# INLINE generaliseSplit #-}
 generaliseSplit :: MonadStatics m
