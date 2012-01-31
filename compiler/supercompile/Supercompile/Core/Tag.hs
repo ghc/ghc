@@ -8,7 +8,6 @@ import Supercompile.Core.FreeVars
 import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 
-import Unique (Uniquable(getUnique))
 import Literal (hashLiteral)
 
 
