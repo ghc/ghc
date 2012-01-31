@@ -1,35 +1,43 @@
 
-   ==============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 6.10.1
-   ==============================================================
+   =============================================================
+    The (Interactive) Glasgow Haskell Compiler -- version 7.4.1
+   =============================================================
 
-The GHC Team is pleased to announce a new major release of GHC. There
-have been a number of significant changes since the last major release,
-including:
+The GHC Team is pleased to announce a new major release of GHC, 7.4.1.
 
- * Some new language features have been implemented:
-   * Record syntax: wild-card patterns, punning, and field disambiguation
-   * Generalised quasi-quotes
-   * Generalised list comprehensions
-   * View patterns
+Here are some of the highlights of the 7.4 branch since 7.2 and 7.0:
 
- * Type families have been completely re-implemented
+  * The Num class no longer has Eq or Show superclasses.
 
- * Now comes with Haddock 2, which supports all GHC extensions
+  * There is a new feature Safe Haskell (-XSafe, -XTrustworthy, -XUnsafe).
+    The design has changed since 7.2.
 
- * Parallel garbage collection
+  * There is a new feature kind polymorphism (-XPolyKinds).
+    A side-effect of this is that, when the extension is not enabled, in
+    certain circumstances kinds are now defaulted to * rather than being
+    inferred.
 
- * Base provides extensible exceptions
+  * There is a new feature constraint kinds (-XConstraintKinds).
 
- * The GHC API is easier to use
+  * It is now possible to give any sort of declaration at the ghci prompt.
+    For example, you can now declare datatypes within ghci.
 
- * External core (output only) now works again
+  * The profiling and hpc implementations have been merged and overhauled.
+    Visible changes include renaming of profiling flags, and a new
+    semantics for the cost-centre stacks (which should in most cases
+    result in more useful and intuitive profiles). The +RTS -xc flag now
+    also gives a stack trace.
 
- * Data Parallel Haskell (DPH) comes as part of GHC
+  * It is now possible to write compiler plugins.
 
-The full release notes are here:
+  * DPH support has been significantly improved.
 
-  http://haskell.org/ghc/docs/6.10.1/html/users_guide/release-6-10-1.html
+  * There is now preliminary support for registerised compilation using
+    LLVM on the ARM platform.
+
+Full release notes are here:
+
+  http://www.haskell.org/ghc/docs/7.4.1/html/users_guide/release-7-4-1.html
 
 How to get it
 ~~~~~~~~~~~~~
