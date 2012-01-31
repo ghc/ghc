@@ -265,15 +265,16 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
 
 
 
-prepareTerm :: M.Map Var Term -> Term -> State
+prepareTerm :: M.Map Var Term -> Term -> (State,                        -- For use without memo-cache preinitalization
+                                          ([(State, FVedTerm)], State)) -- With preinitialization
 prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
                            pprTraceSC "all input FVs" (ppr input_fvs) $
-                           state
+                           (state, (preinit_with, preinit_state))
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
         anned_e = toAnnedTerm tag_ids0 e
         
         ((input_fvs, tag_ids2), h_unfoldings) = mapAccumL add_one_unfolding (annedTermFreeVars anned_e, tag_ids1) (M.toList unfoldings)
-          where add_one_unfolding (input_fvs', tag_ids1) (x', e) = ((input_fvs'', tag_ids2), (x', letBound (renamedTerm anned_e)))
+          where add_one_unfolding (input_fvs', tag_ids1) (x', e) = ((input_fvs'', tag_ids2), (x', renamedTerm anned_e))
                     where (tag_unf_ids, tag_ids2) = splitUniqSupply tag_ids1
                           anned_e = toAnnedTerm tag_unf_ids e
                           input_fvs'' = input_fvs' `unionVarSet` annedFreeVars anned_e
@@ -284,7 +285,17 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.t
         
         -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
         deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
-        state = normalise (deeds, Heap (M.fromList h_unfoldings `M.union` M.fromList h_fvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
+        rn = mkIdentityRenaming input_fvs
+        ids = mkInScopeSet input_fvs
+        mk_heap how_bound = Heap (M.fromList (map (second how_bound) h_unfoldings) `M.union` M.fromList h_fvs) ids
+        
+        state = normalise (deeds, mk_heap letBound, [], (rn, anned_e))
+        
+        preinit_state = normalise (deeds, preinit_heap, [], (rn, anned_e))
+        preinit_heap = mk_heap internallyBound
+
+        -- NB: we assume that unfoldings are guaranteed to be cheap and hence duplicatiable. I think this is reasonable.
+        preinit_with = [(gc (normalise (maxBound, preinit_heap, [], anned_e')), accessor_e) | (x', anned_e) <- h_unfoldings, (accessor_e, anned_e') <- eta ids (var x') anned_e]
 
         -- FIXME: instead of adding unfoldings as Let, (in order to sidestep the bug where Let stuff will be underspecialised)
         -- we should add it them as normal bindings but pre-initialise the memo cache. Of course this will be bad in the case
@@ -308,6 +319,23 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.t
         --
         -- It is uniquely OK to do this at *top* level because otherwise we will end up trapping specialisations
         -- lower down in the specialised output where they cannot be reused.
+
+-- Especially when we do eager value splitting, we might never actually match against the RHS of a binding like (map = \f xs -> ...).
+-- This "hack" is designed to work around this issue by doing some eager value splitting of our own on lambdas.
+eta :: InScopeSet -> FVedTerm -> In AnnedTerm -> [(FVedTerm, In AnnedTerm)]
+eta ids accessor_e0 in_e = (accessor_e0, in_e) : case termToAnswer ids in_e of
+  Just anned_a | (a_cast, (rn, v)) <- extract anned_a
+               , let accessor_e1 = case a_cast of Uncast      -> accessor_e0
+                                                  CastBy co _ -> accessor_e0 `cast` mkSymCo ids co
+                     mb_res@(Just (_, x, _)) = case v of
+                        Lambda   x e_body -> Just (accessor_e1 `app`   x',           x, e_body)
+                        TyLambda a e_body -> Just (accessor_e1 `tyApp` mkTyVarTy x', a, e_body)
+                        _                 -> Nothing
+                     (ids', rn', x') = renameNonRecBinder ids rn x
+               , Just (accessor_e2, _, e_body) <- mb_res
+               -> eta ids' accessor_e2 (rn', e_body)
+  _            -> []
+
 
 
 data SCStats = SCStats {

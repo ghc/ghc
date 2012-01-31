@@ -418,4 +418,4 @@ reduceForMatch state = second gc $ reduceWithFlag (case state of (_, h, k, e) ->
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ liftM snd $ sc state
-  where state = prepareTerm unfoldings e
+  where (state, _) = prepareTerm unfoldings e
