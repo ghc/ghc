@@ -26,7 +26,7 @@ module Language.Haskell.TH.Syntax(
 	Q, runQ, 
 	report,	recover, reify, 
         lookupTypeName, lookupValueName,
-	location, runIO,
+	location, runIO, addDependentFile,
         isInstance, reifyInstances,
 
 	-- * Names
