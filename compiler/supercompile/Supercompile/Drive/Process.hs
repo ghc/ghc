@@ -478,7 +478,11 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
                                 in_e' = annedAnswerToInAnnedTerm (mkInScopeSet (annedFreeVars a)) a
                           -> ((stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure, ids), speculateManyMap hist h_unspeculated)
                         _ -> (no_change, speculation_failure)
-                  where state = normalise (deeds, Heap h_speculated_ok ids, [], in_e)
+                  where state = gc (normalise (deeds, Heap h_speculated_ok ids, [], in_e))
+                        -- NB: try to avoid dead bindings in the state using 'gc' so that the termination condition
+                        -- is more lenient. This showed up in practice, in a version of LetRec.hs where we had:
+                        --   let dead = xs in 1 : xs `embed` let ys = 1 : ys in ys
+                        -- (Because the tag on the ys/xs indirections was the cons-cell tag)
 
 type SpecState = (SCStats, Deeds, PureHeap, PureHeap, InScopeSet)
 newtype SpecM a = SpecM { unSpecM :: SpecState -> (SpecState -> a -> SpecState) -> SpecState }
