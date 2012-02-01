@@ -306,6 +306,9 @@ basicKnownKeyNames
         , guardMName
         , liftMName
         , mzipName
+
+        -- GHCi Sandbox
+        , ghciIoClassName, ghciStepIoMName
     ]
 
 genericTyConNames :: [Name]
@@ -334,7 +337,7 @@ pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_TYPES, gHC_GENERICS,
     gHC_MAGIC,
-    gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_CSTRING,
+    gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_GHCI, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
@@ -353,6 +356,7 @@ gHC_CLASSES     = mkPrimModule (fsLit "GHC.Classes")
 
 gHC_BASE        = mkBaseModule (fsLit "GHC.Base")
 gHC_ENUM        = mkBaseModule (fsLit "GHC.Enum")
+gHC_GHCI        = mkBaseModule (fsLit "GHC.GHCi")
 gHC_SHOW        = mkBaseModule (fsLit "GHC.Show")
 gHC_READ        = mkBaseModule (fsLit "GHC.Read")
 gHC_NUM         = mkBaseModule (fsLit "GHC.Num")
@@ -971,15 +975,19 @@ datatypeClassName = clsQual gHC_GENERICS (fsLit "Datatype") datatypeClassKey
 constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
 selectorClassName = clsQual gHC_GENERICS (fsLit "Selector") selectorClassKey
 
+-- GHCi things
+ghciIoClassName, ghciStepIoMName :: Name
+ghciIoClassName = clsQual gHC_GHCI (fsLit "GHCiSandboxIO") ghciIoClassKey
+ghciStepIoMName = methName gHC_GHCI (fsLit "ghciStepIO") ghciStepIoMClassOpKey
+
 -- IO things
-ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,
-    failIOName :: Name
-ioTyConName       = tcQual  gHC_TYPES (fsLit "IO") ioTyConKey
-ioDataConName     = conName gHC_TYPES (fsLit "IO") ioDataConKey
-thenIOName        = varQual gHC_BASE (fsLit "thenIO") thenIOIdKey
-bindIOName        = varQual gHC_BASE (fsLit "bindIO") bindIOIdKey
-returnIOName      = varQual gHC_BASE (fsLit "returnIO") returnIOIdKey
-failIOName        = varQual gHC_IO (fsLit "failIO") failIOIdKey
+ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName, failIOName :: Name
+ioTyConName   = tcQual  gHC_TYPES (fsLit "IO") ioTyConKey
+ioDataConName = conName gHC_TYPES (fsLit "IO") ioDataConKey
+thenIOName    = varQual gHC_BASE (fsLit "thenIO") thenIOIdKey
+bindIOName    = varQual gHC_BASE (fsLit "bindIO") bindIOIdKey
+returnIOName  = varQual gHC_BASE (fsLit "returnIO") returnIOIdKey
+failIOName    = varQual gHC_IO (fsLit "failIO") failIOIdKey
 
 -- IO things
 printName :: Name
@@ -1179,6 +1187,9 @@ selectorClassKey    = mkPreludeClassUnique 41
 singIClassNameKey, typeNatLeqClassNameKey :: Unique
 singIClassNameKey       = mkPreludeClassUnique 42
 typeNatLeqClassNameKey  = mkPreludeClassUnique 43
+
+ghciIoClassKey :: Unique
+ghciIoClassKey        = mkPreludeClassUnique 44
 \end{code}
 
 %************************************************************************
@@ -1646,6 +1657,11 @@ guardMIdKey, liftMIdKey, mzipIdKey :: Unique
 guardMIdKey     = mkPreludeMiscIdUnique 194
 liftMIdKey      = mkPreludeMiscIdUnique 195
 mzipIdKey       = mkPreludeMiscIdUnique 196
+
+-- GHCi
+ghciStepIoMClassOpKey, ghciShowIoMClassOpKey :: Unique
+ghciStepIoMClassOpKey = mkPreludeMiscIdUnique 197
+ghciShowIoMClassOpKey = mkPreludeMiscIdUnique 198
 
 
 ---------------- Template Haskell -------------------
