@@ -329,7 +329,7 @@ isPromotableTyVar = isLiftedTypeKind . varType
 
 -- | Promotes a type to a kind. Assumes the argument is promotable.
 promoteType :: Type -> Kind
-promoteType (TyConApp tc tys) = mkTyConApp (mkPromotedTypeTyCon tc) 
+promoteType (TyConApp tc tys) = mkTyConApp (mkPromotedTyCon tc) 
                                            (map promoteType tys)
   -- T t1 .. tn  ~~>  'T k1 .. kn  where  ti ~~> ki
 promoteType (FunTy arg res) = mkArrowKind (promoteType arg) (promoteType res)

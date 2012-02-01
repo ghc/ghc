@@ -511,12 +511,13 @@ kc_hs_type (HsDocTy ty _) exp_kind
 kc_hs_type ty@(HsExplicitListTy _k tys) exp_kind
   = do { ty_k_s <- mapM kc_lhs_type_fresh tys
        ; kind <- unifyKinds (ptext (sLit "In a promoted list")) ty_k_s
-       ; checkExpectedKind ty (mkListTy kind) exp_kind
+       ; checkExpectedKind ty (mkPromotedListTy kind) exp_kind
        ; return (HsExplicitListTy kind (map fst ty_k_s)) }
 
 kc_hs_type ty@(HsExplicitTupleTy _ tys) exp_kind = do
   ty_k_s <- mapM kc_lhs_type_fresh tys
-  let tupleKi = mkTyConApp (tupleTyCon BoxedTuple (length tys)) (map snd ty_k_s)
+  let tycon   = promotedTupleTyCon BoxedTuple (length tys)
+      tupleKi = mkTyConApp tycon (map snd ty_k_s)
   checkExpectedKind ty tupleKi exp_kind
   return (HsExplicitTupleTy (map snd ty_k_s) (map fst ty_k_s))
 
@@ -1304,13 +1305,14 @@ sc_ds_hs_kind (HsFunTy ki1 ki2) =
 sc_ds_hs_kind (HsListTy ki) =
   do kappa <- sc_ds_lhs_kind ki
      checkWiredInTyCon listTyCon
-     return $ mkListTy kappa
+     return $ mkPromotedListTy kappa
 
 sc_ds_hs_kind (HsTupleTy _ kis) =
   do kappas <- mapM sc_ds_lhs_kind kis
      checkWiredInTyCon tycon
      return $ mkTyConApp tycon kappas
-  where tycon = tupleTyCon BoxedTuple (length kis)
+  where 
+     tycon = promotedTupleTyCon BoxedTuple (length kis)
 
 -- Argument not kind-shaped
 sc_ds_hs_kind k = panic ("sc_ds_hs_kind: " ++ showPpr k)
@@ -1327,15 +1329,16 @@ sc_ds_app ki                _   = failWithTc (quotes (ppr ki) <+>
 -- IA0_TODO: With explicit kind polymorphism I might need to add ATyVar
 sc_ds_var_app :: Name -> [Kind] -> TcM Kind
 -- Special case for * and Constraint kinds
+-- They are kinds already, so we don't need to promote them
 sc_ds_var_app name arg_kis
-  |    name == liftedTypeKindTyConName
-    || name == constraintKindTyConName = do
-    unless (null arg_kis)
-      (failWithTc (text "Kind" <+> ppr name <+> text "cannot be applied"))
-    thing <- tcLookup name
-    case thing of
-      AGlobal (ATyCon tc) -> return (mkTyConApp tc [])
-      _                   -> panic "sc_ds_var_app 1"
+  |  name == liftedTypeKindTyConName
+  || name == constraintKindTyConName
+  = do { unless (null arg_kis)
+           (failWithTc (text "Kind" <+> ppr name <+> text "cannot be applied"))
+       ; thing <- tcLookup name
+       ; case thing of
+           AGlobal (ATyCon tc) -> return (mkTyConApp tc [])
+           _                   -> panic "sc_ds_var_app 1" }
 
 -- General case
 sc_ds_var_app name arg_kis = do
@@ -1348,11 +1351,13 @@ sc_ds_var_app name arg_kis = do
       let tc_kind = tyConKind tc
       case isPromotableKind tc_kind of
         Just n | n == length arg_kis ->
-          return (mkTyConApp (mkPromotedTypeTyCon tc) arg_kis)
+          return (mkTyConApp (mkPromotedTyCon tc) arg_kis)
         Just _  -> err tc_kind "is not fully applied"
         Nothing -> err tc_kind "is not promotable"
+
     -- It is in scope, but not what we expected
     Just thing -> wrongThingErr "promoted type" thing name
+
     -- It is not in scope, but it passed the renamer: staging error
     Nothing    -> ASSERT2 ( isTyConName name, ppr name )
                   failWithTc (ptext (sLit "Promoted kind") <+> 

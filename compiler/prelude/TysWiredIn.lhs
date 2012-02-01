@@ -50,11 +50,12 @@ module TysWiredIn (
         -- * List
 	listTyCon, nilDataCon, consDataCon,
 	listTyCon_RDR, consDataCon_RDR, listTyConName,
-	mkListTy,
+	mkListTy, mkPromotedListTy,
 
 	-- * Tuples
 	mkTupleTy, mkBoxedTupleTy,
-	tupleTyCon, tupleCon, 
+	tupleTyCon, promotedTupleTyCon,
+        tupleCon, 
 	unitTyCon, unitDataCon, unitDataConId, pairTyCon, 
 	unboxedUnitTyCon, unboxedUnitDataCon, 
         unboxedSingletonTyCon, unboxedSingletonDataCon,
@@ -321,6 +322,9 @@ tupleTyCon sort i | i > mAX_TUPLE_SIZE = fst (mk_tuple sort i)	-- Build one spec
 tupleTyCon BoxedTuple   i = fst (boxedTupleArr   ! i)
 tupleTyCon UnboxedTuple i = fst (unboxedTupleArr ! i)
 tupleTyCon ConstraintTuple    i = fst (factTupleArr    ! i)
+
+promotedTupleTyCon :: TupleSort -> Arity -> TyCon
+promotedTupleTyCon sort i = mkPromotedTyCon (tupleTyCon sort i)
 
 tupleCon :: TupleSort -> Arity -> DataCon
 tupleCon sort i | i > mAX_TUPLE_SIZE = snd (mk_tuple sort i)	-- Build one specially
@@ -624,6 +628,12 @@ mkListTy ty = mkTyConApp listTyCon [ty]
 
 listTyCon :: TyCon
 listTyCon = pcRecDataTyCon listTyConName alpha_tyvar [nilDataCon, consDataCon]
+
+mkPromotedListTy :: Type -> Type
+mkPromotedListTy ty = mkTyConApp promotedListTyCon [ty]
+
+promotedListTyCon :: TyCon
+promotedListTyCon = mkPromotedTyCon listTyCon
 
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon

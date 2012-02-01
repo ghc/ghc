@@ -39,7 +39,7 @@ module TyCon(
         mkSuperKindTyCon,
         mkForeignTyCon,
 	mkPromotedDataTyCon,
-	mkPromotedTypeTyCon,
+	mkPromotedTyCon,
 
         -- ** Predicates on TyCons
         isAlgTyCon,
@@ -971,8 +971,8 @@ mkPromotedDataTyCon con name unique kind
   }
 
 -- | Create a promoted type constructor 'TyCon'
-mkPromotedTypeTyCon :: TyCon -> TyCon
-mkPromotedTypeTyCon con
+mkPromotedTyCon :: TyCon -> TyCon
+mkPromotedTyCon con
   = PromotedTypeTyCon {
         tyConName = getName con,
         tyConUnique = getUnique con,
