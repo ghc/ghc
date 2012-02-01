@@ -1626,6 +1626,7 @@ remModulesFromContext as bs = do
 addImportToContext :: String -> GHCi ()
 addImportToContext str = do
   idecl <- GHC.parseImportDecl str
+  _ <- GHC.lookupModule (unLoc (ideclName idecl)) Nothing  -- #5836
   modifyGHCiState $ \st ->
      st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
   setGHCContextFromGHCiState
