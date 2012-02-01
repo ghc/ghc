@@ -295,7 +295,9 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.t
         preinit_heap = mk_heap internallyBound
 
         -- NB: we assume that unfoldings are guaranteed to be cheap and hence duplicatiable. I think this is reasonable.
-        preinit_with = [(gc (normalise (maxBound, preinit_heap, [], anned_e')), accessor_e) | (x', anned_e) <- h_unfoldings, (accessor_e, anned_e') <- eta ids (var x') anned_e]
+        preinit_with = [(gc (normalise (maxBound, heap', [], anned_e')), accessor_e)
+                       | (x', anned_e) <- h_unfoldings
+                       , (heap', accessor_e, anned_e') <- eta preinit_heap (var x') anned_e]
 
         -- FIXME: instead of adding unfoldings as Let, (in order to sidestep the bug where Let stuff will be underspecialised)
         -- we should add it them as normal bindings but pre-initialise the memo cache. Of course this will be bad in the case
@@ -322,8 +324,8 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.t
 
 -- Especially when we do eager value splitting, we might never actually match against the RHS of a binding like (map = \f xs -> ...).
 -- This "hack" is designed to work around this issue by doing some eager value splitting of our own on lambdas.
-eta :: InScopeSet -> FVedTerm -> In AnnedTerm -> [(FVedTerm, In AnnedTerm)]
-eta ids accessor_e0 in_e = (accessor_e0, in_e) : case termToAnswer ids in_e of
+eta :: Heap -> FVedTerm -> In AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
+eta heap@(Heap h ids) accessor_e0 in_e = (heap, accessor_e0, in_e) : case termToAnswer ids in_e of
   Just anned_a | (a_cast, (rn, v)) <- extract anned_a
                , let accessor_e1 = case a_cast of Uncast      -> accessor_e0
                                                   CastBy co _ -> accessor_e0 `cast` mkSymCo ids co
@@ -333,9 +335,8 @@ eta ids accessor_e0 in_e = (accessor_e0, in_e) : case termToAnswer ids in_e of
                         _                 -> Nothing
                      (ids', rn', x') = renameNonRecBinder ids rn x
                , Just (accessor_e2, _, e_body) <- mb_res
-               -> eta ids' accessor_e2 (rn', e_body)
+               -> eta (Heap (M.insert x' lambdaBound h) ids') accessor_e2 (rn', e_body)
   _            -> []
-
 
 
 data SCStats = SCStats {

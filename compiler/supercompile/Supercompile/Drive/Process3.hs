@@ -68,8 +68,8 @@ data MemoState = MS {
     hNames   :: Stream Name
   }
 
-promise :: (State, State) -> MemoState -> (Promise, MemoState)
-promise (state, reduced_state) ms = (p, ms')
+promise :: MemoState -> (State, State) -> (MemoState, Promise)
+promise ms (state, reduced_state) = (ms', p)
   where (vs_list, h_ty) = stateAbsVars (Just (stateLambdaBounders reduced_state)) state
         h_name :< h_names' = hNames ms
         x = mkLocalId h_name h_ty
@@ -330,7 +330,7 @@ memo opt state
                                      ; res <- addParentM p (opt (Just (getOccString (varName (fun p))))) state
                                      ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                      ; fulfillM p res }, s { scpMemoState = ms' })
-                where (p, ms') = promise (state, reduced_state) (scpMemoState s)
+                where (ms', p) = promise (scpMemoState s) (state, reduced_state)
   where (state_did_reduce, reduced_state) = reduceForMatch state
         
         -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
@@ -417,5 +417,16 @@ reduceForMatch :: State -> (Bool, State)
 reduceForMatch state = second gc $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ liftM snd $ sc state
-  where (state, _) = prepareTerm unfoldings e
+supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ do
+    the_state <- if pREINITALIZE_MEMO_TABLE
+                  then preinitalise preinit_with >> return preinit_state
+                  else return state
+    liftM snd $ sc the_state
+  where (state, (preinit_with, preinit_state)) = prepareTerm unfoldings e
+
+preinitalise :: [(State, FVedTerm)] -> ScpM ()
+preinitalise states_fulfils = do
+    ps_es' <- ScpM $ StateT $ \s -> do
+          let (ms', ps_es') = mapAccumL (\ms (state, e') -> second (flip (,) e') $ promise ms (state, snd (reduceForMatch state))) (scpMemoState s) states_fulfils
+          return (ps_es', s { scpMemoState = ms' })
+    mapM_ (\(p, e') -> fulfillM p (emptyDeeds, e')) ps_es'
