@@ -1,3 +1,19 @@
+Changes in version 2.10.0
+
+ * Require GHC >= 7.4
+
+ * Safe Haskell indications on module pages
+
+ * Type declarations on identifiers no longer necessary
+
+ * Add flag --interface-version
+
+ * Warn when comment refers to in-scope identifier without documentation
+
+ * Bug fix: links to out-of-scope things (#78)
+
+ * Bug fix: module references to other packages work again
+
 Changes in version 2.9.4
 
   * Require GHC >= 7.2
