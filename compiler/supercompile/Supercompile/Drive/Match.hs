@@ -135,8 +135,10 @@ match' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_
     free_eqs1 <- pprTraceSC "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
     free_eqs2 <- pprTraceSC "match1" empty $ mfree_eqs2
     (Heap h_inst _, mr) <- pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap rn2 k_inst (free_eqs1 ++ free_eqs2) h_l (Heap h_r ids_r)
-    guard "match': instance" (null k_inst && M.null h_inst) -- FIXME
-    return mr
+    if null k_inst && M.null h_inst -- FIXME
+      then return mr
+      else pprTrace "instance found" (ppr (length k_inst, M.keysSet h_inst)) $
+           fail "match': instance"
 
 matchAnned :: (Tag -> a -> Tag -> a -> b)
             -> Anned a -> Anned a -> b
