@@ -53,6 +53,7 @@ import Digraph		( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 
 import Control.Monad
 import Maybes( orElse )
+import Data.List( partition )
 import Data.Maybe( isNothing )
 \end{code}
 
@@ -742,21 +743,28 @@ rnTyClDecls :: [Name] -> [[LTyClDecl RdrName]]
 rnTyClDecls extra_deps tycl_ds
   = do { ds_w_fvs <- mapM (wrapLocFstM (rnTyClDecl Nothing)) (concat tycl_ds)
        ; thisPkg  <- fmap thisPackage getDOpts
-       ; let add_boot_deps :: FreeVars -> FreeVars
+       ; let (fam_insts, non_fam_insts) = partition (isFamInstDecl . unLoc . fst) ds_w_fvs
+                  -- Ignore family instances when doing this dependency analysis
+                  -- because they don't have a binder
+
+             add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
              add_boot_deps fvs | any (isInPackage thisPkg) (nameSetToList fvs)
                                = fvs `plusFV` mkFVs extra_deps
                                | otherwise
                                = fvs
 
-             ds_w_fvs' = map (\(ds, fvs) -> (ds, add_boot_deps fvs)) ds_w_fvs
+             ds_w_fvs' = map (\(ds, fvs) -> (ds, add_boot_deps fvs)) non_fam_insts
 
              sccs :: [SCC (LTyClDecl Name)]
              sccs = depAnalTyClDecls ds_w_fvs'
 
-             all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs'
+             all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs
 
-       ; return (map flattenSCC sccs, all_fvs) }
+
+       ; return (map fst fam_insts : map flattenSCC sccs, all_fvs) }
+            -- Just put the family-instance group first;
+            -- it is treated separately anyway
 
 
 rnTyClDecl :: Maybe Name  -- Just cls => this TyClDecl is nested 
