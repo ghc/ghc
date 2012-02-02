@@ -241,19 +241,20 @@ sc' mb_h state = case mb_h of
                                               ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
                                                hang (text "Before:") 2 (trce1 shallow_state) $$
                                                hang (text "After:")  2 (trce1 state) $$
-                                               (case unMatch (match' (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why))
+                                               (case unMatch (matchWithReason (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why))
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
-    my_generalise gen = liftM (\splt -> liftM ((,) True)  . insert_tags . splt) . generalise gen
-    my_split      opt =                 liftM ((,) False) . insert_tags . split opt
-    --insert_tags = liftM (\(_, deeds, e') -> (deeds, e'))
-    insert_tags mx = do
-      (resid_tags, deeds, e') <- mx
-      ScpM $ StateT $ \s -> ReaderT $ \env -> let resid_tags' = scpResidTags s `plusResidTags` resid_tags
-                                              in trace (tagSummary (scpTagAnnotations env) 1 30 resid_tags' ++ "\n" ++ childrenSummary (scpParentChildren s)) $
-                                                 return ((), s { scpResidTags = resid_tags' })
-      return (deeds, e')
+    my_generalise gen = liftM (\splt -> liftM ((,) True)  . insertTagsM . splt) . generalise gen
+    my_split      opt =                 liftM ((,) False) . insertTagsM . split opt
+
+insertTagsM :: ScpM (ResidTags, a, b) -> ScpM (a, b)
+insertTagsM mx = do
+  (resid_tags, deeds, e') <- mx
+  ScpM $ StateT $ \s -> ReaderT $ \env -> let resid_tags' = scpResidTags s `plusResidTags` resid_tags
+                                          in trace (tagSummary (scpTagAnnotations env) 1 30 resid_tags' ++ "\n" ++ childrenSummary (scpParentChildren s)) $
+                                             return ((), s { scpResidTags = resid_tags' })
+  return (deeds, e')
 
 -- Note [Prevent rollback loops by only rolling back when generalising]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -284,132 +285,137 @@ sc' mb_h state = case mb_h of
 
 memo :: (Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)))
      ->  State -> ScpM (Deeds, FVedTerm)
-memo opt state
-  | Skip <- memo_how = liftM snd $ opt Nothing state
-  | otherwise = join $ ScpM $ StateT $ \s ->
-    -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
-    -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
-
-    -- Note [Matching after reduction]
-    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    --
-    -- If we match on States *after* reduction, we might get the following problem. Our initial state could be:
-    --
-    --  let y = 1; p = (x, y) in snd p
-    --
-    -- This state has the free variables {x}. However, after reduction+GC it does not have any free variables.
-    -- Which set of free variables should we lambda-abstract the h-function over? Well, clearly we have to 
-    -- lambda-abstract over the pre-reduction FVs in case that "opt" does not do any reduction and leaves x as a
-    -- free variable.
-    --
-    -- A consequence of this decision is that we have to do something a bit weird at *tieback* site like this one:
-    --
-    --  let y = 1 in y
-    --
-    -- To tieback to the h-function for the initial state, we need to supply an x. Luckily, the act of reduction
-    -- proves that x is a dead variable and hence we should just be able to supply "undefined".
-    --
-    -- Note that:
-    --  1. Terms that match *after* reduction may not match *before* reduction. This is obvious, and the reason
-    --     that we match to reduce before matching in the first place
-    --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
-    --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
-    case [ (p, (releaseStateDeed state, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
-         | p <- promises (scpMemoState s)
-         , Just rn_lr <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else pprTraceSC "match!" (ppr (fun p)) res) $
-                          match (meaning p) reduced_state]
-         , if dumped p
-            then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
-            else True
-         ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                     ; return res }, s)
-              _          | CheckOnly <- memo_how
-                         -> pure (liftM snd $ opt Nothing state, s)
-                         | otherwise
-                         -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
-                                     ; res <- addParentM p (opt (Just (getOccString (varName (fun p))))) state
-                                     ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
-                                     ; fulfillM p res }, s { scpMemoState = ms' })
-                where (ms', p) = promise (scpMemoState s) (state, reduced_state)
-  where (state_did_reduce, reduced_state) = reduceForMatch state
-        
-        -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
-        -- this, we tend to do things like:
+memo opt = memo_opt
+  where
+    memo_opt state
+      | Skip <- memo_how = liftM snd $ opt Nothing state
+      | otherwise = join $ ScpM $ StateT $ \s ->
+        -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
+        -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
+    
+        -- Note [Matching after reduction]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         --
-        --  [a] h0 = D[let f = v in f] = let f = h1 in f
-        --      h1 = D[let f = v in v] = h0
+        -- If we match on States *after* reduction, we might get the following problem. Our initial state could be:
         --
-        -- This fix is inspired by Peter's supercompiler where matching (and indeed termination checking) is only
-        -- performed when the focus of evaluation is the name of a top level function. I haven't yet proved that
-        -- this is safe in my setting (FIXME). This might be problematic because Peter does not have a private
-        -- history for "reduce" like I do.
+        --  let y = 1; p = (x, y) in snd p
         --
+        -- This state has the free variables {x}. However, after reduction+GC it does not have any free variables.
+        -- Which set of free variables should we lambda-abstract the h-function over? Well, clearly we have to 
+        -- lambda-abstract over the pre-reduction FVs in case that "opt" does not do any reduction and leaves x as a
+        -- free variable.
         --
-        -- Version 2 of this change **prevents** tieback when the focus is an indirection. I'm reasonably
-        -- sure this is safe because of the way the splitter is defined and the fact that we have the invariant
-        -- that indirections never occur in the stack, and only occur in the heap as the whole HB RHS. This,
-        -- combined with the fact that they are acyclic seems to be enough to say that any sequence of splits
-        -- only has an indirection in the focus a finite number of times. (FIXME: it's OK that we don't check
-        -- the termination condition for those states where the stack is empty since reduce won't change the term.
-        -- But it's less clear that it is actually OK to skip termination check when we skip tieback in the other case!!)
+        -- A consequence of this decision is that we have to do something a bit weird at *tieback* site like this one:
         --
+        --  let y = 1 in y
         --
-        -- Version 3 of this fix is to "eagerly" split values in the splitter: when creating a Bracket for a term,
-        -- we split immediately if the term is a value. This is sufficient to fix the problem above, and it should
-        -- save even *more* memoisations!
+        -- To tieback to the h-function for the initial state, we need to supply an x. Luckily, the act of reduction
+        -- proves that x is a dead variable and hence we should just be able to supply "undefined".
         --
-        -- The reason this works is critically dependant on the fact that indirections always point to *manifest values*,
-        -- and normalised states have "maximum update frames". If this wasn't the case, we could accidentally build a loop
-        -- via this route:
-        --      h0 = D[let f = e in f] = let f = h1 in f
-        --      h1 = D[e] = h0
-        --
-        -- FIXME: in fact, generalisation can throw away an outer update frame like this! This doesn't cause problems
-        -- because the matcher doesn't use update frames to do instance matching, but it *could* if we changed that...
-        --
-        --
-        -- In version 4 I didn't check for tieback on unreducable states if we eagerly split values.
-        -- Because if we don't eagerly split values this can lead to divergence with e.g.
-        --   [b] let xs = x:xs in x:xs => let xs = x:xs in x:xs => ...
-        -- (NB: this examples is an infinite chain which is entirely irreducible after normalisation)
-        --
-        -- But then I found that this diverged:
-        --   [c] let xs = \k -> k x xs in \k -> k x xs => let xs = \k -> k x xs in k x xs => let xs = \k -> k x xs in \k -> k x xs => ...
-        -- And with eager value splitting on, this diverges:
-        --   [d] let xs = \k -> k x xs in k x xs => let xs = \k -> k x xs in k x xs => ...
-        --
-        -- We also have to be careful with examples where intermediate states are reducible, like:
-        --   [e] let f = \x -> f x in f x => let f = \x -> f x in \x -> f x => let f = \x -> f x in f x => ...
-        -- And with eager value splitting:
-        --   [f] let f = \x -> f x in f x => let f = \x -> f x in f x => ...
-        --
-        -- So version 5 is as follows:
-        --  1. If state is already an answer:
-        --     a) If the answer is an indirection, skip (just like V2)
-        --     b) Otherwise, check and remember (just like V3 and not like V4)
-        --  2. If the state is not an answer then proceed like V5:
-        --     a) If the state is irreducible, skip (it might make sense to CheckOnly in this case, not sure)
-        --     b) If the state is reducible, check and remember
-        --
-        -- Now [a], [b], [c], and [e] above will converge even without eager value splitting.
-        -- In fact, if we turn eager value splitting on the supercompiler will diverge because [d] won't be halted by this version!
-        -- So version 5 is incompatible with eager value splitting.
-        --
-        --
-        -- Version 5a is an alternative to version 5 that is usable when eager value splitting is on. In this case:
-        --  1. If the state is already an answer, skip tieback (!)
-        --  2. Otherwise, check and remember (we can't Skip if the state is reducible because otherwise [f] will diverge)
-        --
-        -- This can only be used when eagerly splitting values or examples like [b] will diverge (note that [c] will still converge)
-        memo_how | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
-                 = CheckAndRemember -- Do the simple thing in this case, it worked great until we introduced instance matching!
-
-                 | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
-                 , Answer (_, (_, v)) <- annee qa
-                 = case v of Indirect _ -> Skip; _ -> if eAGER_SPLIT_VALUES then Skip else CheckAndRemember
-
-                 | otherwise
-                 = if state_did_reduce || eAGER_SPLIT_VALUES then CheckAndRemember else Skip
+        -- Note that:
+        --  1. Terms that match *after* reduction may not match *before* reduction. This is obvious, and the reason
+        --     that we match to reduce before matching in the first place
+        --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
+        --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
+        case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)) memo_opt)
+             | p <- promises (scpMemoState s)
+             , Just (heap_inst@(Heap h_inst _), k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
+                                                   match' (meaning p) reduced_state]
+             , let instance_match = not (M.null h_inst && null k_inst) -- FIXME: restrict instance matches
+                   -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
+                   Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
+             , if dumped p
+                then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
+                else True
+             ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (    pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                                         ; insertTagsM res }, s)
+                  _          | CheckOnly <- memo_how
+                             -> pure (liftM snd $ opt Nothing state, s)
+                             | otherwise
+                             -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
+                                         ; res <- addParentM p (opt (Just (getOccString (varName (fun p))))) state
+                                         ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
+                                         ; fulfillM p res }, s { scpMemoState = ms' })
+                    where (ms', p) = promise (scpMemoState s) (state, reduced_state)
+      where (state_did_reduce, reduced_state) = reduceForMatch state
+            
+            -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
+            -- this, we tend to do things like:
+            --
+            --  [a] h0 = D[let f = v in f] = let f = h1 in f
+            --      h1 = D[let f = v in v] = h0
+            --
+            -- This fix is inspired by Peter's supercompiler where matching (and indeed termination checking) is only
+            -- performed when the focus of evaluation is the name of a top level function. I haven't yet proved that
+            -- this is safe in my setting (FIXME). This might be problematic because Peter does not have a private
+            -- history for "reduce" like I do.
+            --
+            --
+            -- Version 2 of this change **prevents** tieback when the focus is an indirection. I'm reasonably
+            -- sure this is safe because of the way the splitter is defined and the fact that we have the invariant
+            -- that indirections never occur in the stack, and only occur in the heap as the whole HB RHS. This,
+            -- combined with the fact that they are acyclic seems to be enough to say that any sequence of splits
+            -- only has an indirection in the focus a finite number of times. (FIXME: it's OK that we don't check
+            -- the termination condition for those states where the stack is empty since reduce won't change the term.
+            -- But it's less clear that it is actually OK to skip termination check when we skip tieback in the other case!!)
+            --
+            --
+            -- Version 3 of this fix is to "eagerly" split values in the splitter: when creating a Bracket for a term,
+            -- we split immediately if the term is a value. This is sufficient to fix the problem above, and it should
+            -- save even *more* memoisations!
+            --
+            -- The reason this works is critically dependant on the fact that indirections always point to *manifest values*,
+            -- and normalised states have "maximum update frames". If this wasn't the case, we could accidentally build a loop
+            -- via this route:
+            --      h0 = D[let f = e in f] = let f = h1 in f
+            --      h1 = D[e] = h0
+            --
+            -- FIXME: in fact, generalisation can throw away an outer update frame like this! This doesn't cause problems
+            -- because the matcher doesn't use update frames to do instance matching, but it *could* if we changed that...
+            --
+            --
+            -- In version 4 I didn't check for tieback on unreducable states if we eagerly split values.
+            -- Because if we don't eagerly split values this can lead to divergence with e.g.
+            --   [b] let xs = x:xs in x:xs => let xs = x:xs in x:xs => ...
+            -- (NB: this examples is an infinite chain which is entirely irreducible after normalisation)
+            --
+            -- But then I found that this diverged:
+            --   [c] let xs = \k -> k x xs in \k -> k x xs => let xs = \k -> k x xs in k x xs => let xs = \k -> k x xs in \k -> k x xs => ...
+            -- And with eager value splitting on, this diverges:
+            --   [d] let xs = \k -> k x xs in k x xs => let xs = \k -> k x xs in k x xs => ...
+            --
+            -- We also have to be careful with examples where intermediate states are reducible, like:
+            --   [e] let f = \x -> f x in f x => let f = \x -> f x in \x -> f x => let f = \x -> f x in f x => ...
+            -- And with eager value splitting:
+            --   [f] let f = \x -> f x in f x => let f = \x -> f x in f x => ...
+            --
+            -- So version 5 is as follows:
+            --  1. If state is already an answer:
+            --     a) If the answer is an indirection, skip (just like V2)
+            --     b) Otherwise, check and remember (just like V3 and not like V4)
+            --  2. If the state is not an answer then proceed like V5:
+            --     a) If the state is irreducible, skip (it might make sense to CheckOnly in this case, not sure)
+            --     b) If the state is reducible, check and remember
+            --
+            -- Now [a], [b], [c], and [e] above will converge even without eager value splitting.
+            -- In fact, if we turn eager value splitting on the supercompiler will diverge because [d] won't be halted by this version!
+            -- So version 5 is incompatible with eager value splitting.
+            --
+            --
+            -- Version 5a is an alternative to version 5 that is usable when eager value splitting is on. In this case:
+            --  1. If the state is already an answer, skip tieback (!)
+            --  2. Otherwise, check and remember (we can't Skip if the state is reducible because otherwise [f] will diverge)
+            --
+            -- This can only be used when eagerly splitting values or examples like [b] will diverge (note that [c] will still converge)
+            memo_how | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
+                     = CheckAndRemember -- Do the simple thing in this case, it worked great until we introduced instance matching!
+    
+                     | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
+                     , Answer (_, (_, v)) <- annee qa
+                     = case v of Indirect _ -> Skip; _ -> if eAGER_SPLIT_VALUES then Skip else CheckAndRemember
+    
+                     | otherwise
+                     = if state_did_reduce || eAGER_SPLIT_VALUES then CheckAndRemember else Skip
 
 data MemoHow = Skip | CheckOnly | CheckAndRemember
 

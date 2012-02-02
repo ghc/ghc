@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module Supercompile.Drive.Split (
-    MonadStatics(..), split, generalise,
+    MonadStatics(..), split, instanceSplit, generalise,
     ResidTags, plusResidTags, emptyResidTags) where
 
 #include "HsVersions.h"
@@ -183,8 +183,18 @@ split :: MonadStatics m
       -> (State -> m (Deeds, Out FVedTerm))
       -> m (ResidTags, Deeds, Out FVedTerm)
 split (deeds, Heap h ids, k, qa) opt
-  = generaliseSplit opt ctxt_ids0 (IS.empty, emptyVarSet) deeds (Heap h ids, [0..] `zip` k, \ids -> (qaScruts qa, splitQA ctxt_ids1 ids (annedTag qa) (annee qa)))
+  = generaliseSplit opt ctxt_ids0 (IS.empty, emptyVarSet) deeds (Heap h ids, nameStack k, \ids -> (qaScruts qa, splitQA ctxt_ids1 ids (annedTag qa) (annee qa)))
   where (ctxt_ids0, ctxt_ids1) = splitUniqSupply splitterUniqSupply
+
+{-# INLINE instanceSplit #-}
+instanceSplit :: MonadStatics m
+              => (Deeds, Heap, Stack, Out FVedTerm)
+              -> (State -> m (Deeds, Out FVedTerm))
+              -> m (ResidTags, Deeds, Out FVedTerm)
+instanceSplit (deeds, heap, k, focus) opt = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (heap, nameStack k, \_ -> ([], noneBracketed' IM.empty focus)) -- FIXME: residualised tags? FIXME: scrutinee identity?
+
+nameStack :: Stack -> NamedStack
+nameStack = ([0..] `zip`)
 
 -- TODO: could do instance-matching on generalised parts of terms. It would make tieback faster when generalising,
 -- at the cost of pessimising some programs
@@ -194,7 +204,7 @@ generalise :: MonadStatics m
            -> State
            -> Maybe ((State -> m (Deeds, Out FVedTerm)) -> m (ResidTags, Deeds, Out FVedTerm))
 generalise gen (deeds, Heap h ids, k, qa) = do
-    let named_k = [0..] `zip` k
+    let named_k = nameStack k
     
     (gen_kfs, gen_xs') <- case gENERALISATION of
         NoGeneralisation -> Nothing
@@ -393,7 +403,10 @@ instance Accumulatable Bracketed where
     mapAccumTM f acc (TailsUnknown  shell    holes) = liftM (second (TailsUnknown shell))     $ mapAccumTM (mapAccumTM f) acc holes
 
 noneBracketed :: Tag -> Out FVedTerm -> Bracketed a
-noneBracketed tg a = TailsUnknown (Shell { shellExtraTags = oneResidTag tg, shellExtraFvs = freeVars a, shellWrapper = \[] -> a }) []
+noneBracketed = noneBracketed' . oneResidTag
+
+noneBracketed' :: IM.IntMap Int -> Out FVedTerm -> Bracketed a
+noneBracketed' tgs a = TailsUnknown (Shell { shellExtraTags = tgs, shellExtraFvs = freeVars a, shellWrapper = \[] -> a }) []
 
 -- NB: I could use normalise here to make my life easier if transitiveInline didn't treat Bracketed heaps specially
 --

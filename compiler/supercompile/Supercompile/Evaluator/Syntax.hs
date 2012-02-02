@@ -328,10 +328,14 @@ stackFrameSize kf = 1 + case kf of
     Update _                 -> 0
     CastIt _                 -> 0
 
+heapSize :: Heap -> Size
+heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
+
+stackSize :: Stack -> Size
+stackSize = sum . map (stackFrameSize . tagee)
+
 stateSize :: State -> Size
 stateSize (_, h, k, qa) = heapSize h + stackSize k + annedSize qa
-  where heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
-        stackSize = sum . map (stackFrameSize . tagee)
 
 
 addStateDeeds :: Deeds -> (Deeds, a, b, c) -> (Deeds, a, b, c)

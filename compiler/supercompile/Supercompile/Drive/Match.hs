@@ -1,6 +1,6 @@
 module Supercompile.Drive.Match (
-    match,
-    Match, unMatch, match'
+    match, match',
+    Match, unMatch, matchWithReason, matchWithReason'
   ) where
 
 #include "HsVersions.h"
@@ -116,12 +116,21 @@ instance Outputable MatchLR where
 match :: State -- ^ Tieback semantics
       -> State -- ^ This semantics
       -> Maybe MatchResult -- ^ Renaming from left to right
-match s_l s_r = runMatch (match' s_l s_r)
+match s_l s_r = runMatch (matchWithReason s_l s_r)
 
-match' :: State
-      -> State
-      -> Match MatchResult
-match' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
+match' :: State -> State -> Maybe (Heap, Stack, MatchResult)
+match' s_l s_r = runMatch (matchWithReason' s_l s_r)
+
+matchWithReason :: State -> State -> Match MatchResult
+matchWithReason s_l s_r = do
+    (Heap h_inst _, k_inst, mr) <- matchWithReason' s_l s_r
+    if null k_inst && M.null h_inst
+      then return mr
+      else -- pprTrace "instance found" (ppr (length k_inst, M.keysSet h_inst)) $
+           fail "matchWithReason: instance match only"
+
+matchWithReason' :: State -> State -> Match (Heap, Stack, MatchResult)
+matchWithReason' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
   do
     -- It's very important that we don't just use the state free variables from both sides to construct the initial in scope set,
     -- because we use it to match the stack and QA on each side *without* first extending it with variables bound by the PureHeap!
@@ -134,11 +143,8 @@ match' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_
     (rn2, k_inst, mfree_eqs2) <- mfix $ \(~(rn2, _, _)) -> matchEC init_rn2 rn2 k_l k_r
     free_eqs1 <- pprTraceSC "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
     free_eqs2 <- pprTraceSC "match1" empty $ mfree_eqs2
-    (Heap h_inst _, mr) <- pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap rn2 k_inst (free_eqs1 ++ free_eqs2) h_l (Heap h_r ids_r)
-    if null k_inst && M.null h_inst -- FIXME
-      then return mr
-      else pprTrace "instance found" (ppr (length k_inst, M.keysSet h_inst)) $
-           fail "match': instance"
+    (heap_inst, mr) <- pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap rn2 k_inst (free_eqs1 ++ free_eqs2) h_l (Heap h_r ids_r)
+    return (heap_inst, k_inst, mr)
 
 matchAnned :: (Tag -> a -> Tag -> a -> b)
             -> Anned a -> Anned a -> b
