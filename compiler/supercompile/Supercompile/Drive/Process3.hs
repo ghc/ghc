@@ -320,10 +320,12 @@ memo opt = memo_opt
         case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)) memo_opt)
              | p <- promises (scpMemoState s)
              , Just (heap_inst@(Heap h_inst _), k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
-                                                   match' (meaning p) reduced_state]
-             , let instance_match = not (M.null h_inst && null k_inst) -- FIXME: restrict instance matches
+                                                                   match' (meaning p) reduced_state]
+             , let instance_match = not (M.null h_inst && null k_inst)
                    -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                    Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
+             , not instance_match -- FIXME: less restrictive instance matches
+               -- FIXME: prefer "more exact" matches
              , if dumped p
                 then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
                 else True
