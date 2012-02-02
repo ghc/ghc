@@ -134,7 +134,7 @@ match' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_
     (rn2, k_inst, mfree_eqs2) <- mfix $ \(~(rn2, _, _)) -> matchEC init_rn2 rn2 k_l k_r
     free_eqs1 <- pprTraceSC "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
     free_eqs2 <- pprTraceSC "match1" empty $ mfree_eqs2
-    (Heap h_inst _, mr) <- pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap rn2 (free_eqs1 ++ free_eqs2) h_l (Heap h_r ids_r)
+    (Heap h_inst _, mr) <- pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap rn2 k_inst (free_eqs1 ++ free_eqs2) h_l (Heap h_r ids_r)
     guard "match': instance" (null k_inst && M.null h_inst) -- FIXME
     return mr
 
@@ -416,11 +416,12 @@ trimBounds internally_bound_l internally_bound_r eqs
                                            VarR _ x_r | x_r `elemVarSet` internally_bound_r -> return Nothing
                                            _ -> fail "trimBounds: instantiation"
 
-matchPureHeap :: RnEnv2 -> [MatchLR] -> PureHeap -> Heap -> Match (Heap, MatchResult)
-matchPureHeap rn2 init_free_eqs h_l (Heap h_r ids_r)
-  = do (h_inst, known) <- matchLoop [] (Heap M.empty ids_r) init_free_eqs emptyVarSet emptyVarSet
+matchPureHeap :: RnEnv2 -> Stack -> [MatchLR] -> PureHeap -> Heap -> Match (Heap, MatchResult)
+matchPureHeap rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
+  = do (heap_inst, used_r) <- fvsInstLoop (Heap M.empty ids_r) emptyVarSet k_inst_fvs
+       (heap_inst, known) <- matchLoop [] heap_inst init_free_eqs emptyVarSet used_r
        xys <- trimBounds (fst (pureHeapVars h_l) InternallyBound) (fst (pureHeapVars h_r) InternallyBound) known
-       liftM ((,) h_inst) (safeMkMatchResult xys)
+       liftM ((,) heap_inst) (safeMkMatchResult xys)
     -- NB: if there are dead bindings in the left PureHeap then the output Renaming will not contain a renaming for their binders.
     --
     -- NB: The resulting equalities must only relate local vars to local vars (in which case we can discard them, because
@@ -428,6 +429,8 @@ matchPureHeap rn2 init_free_eqs h_l (Heap h_r ids_r)
     --
     -- NB: We already know there are no eqs that relate update-frame bound (rigid) variables.
   where
+    (k_inst_bvs, k_inst_fvs) = stackOpenFreeVars k_inst
+
     -- NB: must respect work-sharing for non-values
     --  x |-> e1, y |-> e1; (x, y) `match` x |-> e1; (x, x) == Nothing
     --  x |-> e1; (x, x) `match` x |-> e1; y |-> e1; (x, y) == Nothing (though this is more questionable, it seems a consistent choice)
@@ -445,11 +448,6 @@ matchPureHeap rn2 init_free_eqs h_l (Heap h_r ids_r)
     -- We can account for staticness using the standard generalisation mechanism, and there is no need for the
     -- matcher to have hacks like that (though we still have to be careful about how we match phantoms).
     
-    -- LOOP INVARIANT:
-    --   matchLoop known h_inst free_eqs used_l used_r
-    --
-    -- 1.
-
     matchLoop known h_inst [] _ _ = return (h_inst, known)
     matchLoop known h_inst (lr:free_eqs) used_l used_r
        -- Perhaps we have already assumed this equality is true?
@@ -485,7 +483,7 @@ matchPureHeap rn2 init_free_eqs h_l (Heap h_r ids_r)
               ((LambdaBound, Left _), (how_r, mb_e_r')) -> case mb_e_r' of
                   Left _       -> (if how_r == LetBound then pprTraceSC "Downgrading" empty else id) $
                                   go h_inst [] used_l used_r
-                  Right mb_er' -> inst_loop h_inst ei_x_l_x_r how_r used_r (Right mb_er') >>= \(h_inst', used_r') -> go h_inst' [] used_l used_r'
+                  Right mb_er' -> instLoop h_inst ei_x_l_x_r how_r used_r (Right mb_er') >>= \(h_inst', used_r') -> go h_inst' [] used_l used_r'
                -- If the template has an unfolding, we must do lookthrough
               ((LambdaBound, Right (Just (used_l', e_l'))), (_how_r, mb_e_r')) -> case mb_e_r' of
                   Right (Just (used_r', e_r')) -> matchTerm rn2 e_l' e_r' >>= \extra_free_eqs -> go h_inst extra_free_eqs used_l' used_r'
@@ -533,59 +531,64 @@ matchPureHeap rn2 init_free_eqs h_l (Heap h_r ids_r)
                -- the "cheap-but-inaccurate" name-matching heuristic.
                 | otherwise -> failLoop "LetBound"
               _ -> failLoop "left side of InternallyBound/LambdaBound already used"
-      where -- First Maybe: whether or not the var is bound in the heap
-            -- Second Maybe: whether or not the HeapBinding actually has a term
-            -- Third Maybe: whether it is safe for work duplication to make use of that term
-            lookupUsed :: VarSet -> Var -> PureHeap -> Maybe (HowBound, Either (Maybe Tag) (Maybe (VarSet, Out AnnedTerm)))
-            lookupUsed used x h = case M.lookup x h of
-              Nothing -> Nothing
-              Just hb -> Just (howBound hb, flip (either Left) (heapBindingMeaning hb) $ \in_e -> let e' = renameIn (renameAnnedTerm (rnInScopeSet rn2)) in_e
-                                                                                                  in Right $ case () of () | termIsCheap e'      -> Just (used, e')
-                                                                                                                           | x `elemVarSet` used -> Nothing
-                                                                                                                           | otherwise           -> Just (used `extendVarSet` x, e'))
-
-
-            -- The key idea behind the "instantiation loop" is that to construct the heap that instantiates
-            -- the left hand side to obtain the right hand side, we have to copy some bindings from the right
-            -- into the instantiating heap. In particular, we must copy:
-            --  * Any binding for a variable which is unbound on the left
-            --  * Any binding which is referred to by any other copied binding
-            --
-            -- At the same time, we must avoid copying expensive bindings more than once (because of work duplication).
-            inst_loop :: Heap           -- ^ Instantiation heap to extend
-                      -> Either Var Var -- ^ Binder for the term on the RHS (if any: will be Left if coming from MatchR)
-                      -> HowBound       -- ^ How the term on the RHS was bound
-                      -> VarSet         -- ^ Things on the right that have already been used, BEFORE the copy
-                      -> Either (Maybe Tag) (Maybe (VarSet, Out AnnedTerm)) -- ^ Meaning. Contains a nested Nothing if we cannot take another copy of the term for work duplication reasons
-                      -> Match (Heap, VarSet) -- Returns final instantiation heap and things on the right that were used
-            inst_loop (Heap h_inst ids_r) ei_x_l_x_r how_r used_r mb_er'
-              -- If we know the name of the thing on the RHS and it is already in the heap, we need do no work at all
-              | Right x_r <- ei_x_l_x_r
-              , x_r `M.member` h_inst
-              = return (Heap h_inst ids_r, used_r)
-
-              -- Otherwise we have to insert some bindings
-              | otherwise = do
-                let (x_r', ids_r') = case ei_x_l_x_r of
-                      Left  x_l -> let x_r = uniqAway ids_r (zapFragileIdInfo x_l) -- NB: the incoming variable has already had the correct type set on it
-                                   in (x_r, ids_r `extendInScopeSet` x_r)
-                      Right x_r -> (x_r, ids_r)
-                (hb_meaning, used_r, fvs_r) <- case mb_er' of
-                  Left mb_tg                   -> return (Left mb_tg,               used_r,  emptyVarSet)
-                  Right (Just (used_r', e_r')) -> return (Right (renamedTerm e_r'), used_r', annedTermFreeVars e_r')
-                  Right Nothing                -> failLoop "right side already used in instance match"
-                
-                foldM (\(heap_inst, used_r) y_r -> case lookupUsed used_r y_r h_r of
-                                                     Just (how_r, mb_er') -> inst_loop heap_inst (Right y_r) how_r used_r mb_er'
-                                                     Nothing              -> failLoop "right heap binding not present")
-                      (Heap (M.insert x_r' (HB how_r hb_meaning) h_inst) ids_r', used_r) (varSetElems (fvs_r `unionVarSet` varBndrFreeVars x_r'))
-
-
-            failLoop rest = fail $ "matchLoop: " ++ showPpr lr ++ ": " ++ rest
-            go_template mextras h_inst extra_free_eqs used_l' used_r' = do
+      where go_template mextras h_inst extra_free_eqs used_l' used_r' = do
                 -- Don't forget to match types/unfoldings of binders as well:
                 bndr_free_eqs <- mextras
                 matchLoop (lr : known) h_inst (bndr_free_eqs ++ extra_free_eqs ++ free_eqs) used_l' used_r'
+            failLoop rest = fail $ "matchLoop: " ++ showPpr lr ++ ": " ++ rest
+    
+    -- First Maybe: whether or not the var is bound in the heap
+    -- Second Maybe: whether or not the HeapBinding actually has a term
+    -- Third Maybe: whether it is safe for work duplication to make use of that term
+    lookupUsed :: VarSet -> Var -> PureHeap -> Maybe (HowBound, Either (Maybe Tag) (Maybe (VarSet, Out AnnedTerm)))
+    lookupUsed used x h = case M.lookup x h of
+      Nothing -> Nothing
+      Just hb -> Just (howBound hb, flip (either Left) (heapBindingMeaning hb) $ \in_e -> let e' = renameIn (renameAnnedTerm (rnInScopeSet rn2)) in_e
+                                                                                          in Right $ case () of () | termIsCheap e'      -> Just (used, e')
+                                                                                                                   | x `elemVarSet` used -> Nothing
+                                                                                                                   | otherwise           -> Just (used `extendVarSet` x, e'))
+    -- The key idea behind the "instantiation loop" is that to construct the heap that instantiates
+    -- the left hand side to obtain the right hand side, we have to copy some bindings from the right
+    -- into the instantiating heap. In particular, we must copy:
+    --  * Any binding for a variable which is unbound on the left
+    --  * Any binding which is referred to by any other copied binding
+    --
+    -- At the same time, we must avoid copying expensive bindings more than once (because of work duplication).
+    instLoop :: Heap           -- ^ Instantiation heap to extend
+             -> Either Var Var -- ^ Binder for the term on the RHS (if any: will be Left if coming from MatchR)
+             -> HowBound       -- ^ How the term on the RHS was bound
+             -> VarSet         -- ^ Things on the right that have already been used, BEFORE the copy
+             -> Either (Maybe Tag) (Maybe (VarSet, Out AnnedTerm)) -- ^ Meaning. Contains a nested Nothing if we cannot take another copy of the term for work duplication reasons
+             -> Match (Heap, VarSet) -- Returns final instantiation heap and things on the right that were used
+    instLoop (Heap h_inst ids_r) ei_x_l_x_r how_r used_r mb_er'
+      -- If we know the name of the thing on the RHS and it is already in the instantiating heap, we need do no work at all
+      | Right x_r <- ei_x_l_x_r
+      , x_r `M.member` h_inst
+      = return (Heap h_inst ids_r, used_r)
+      -- Otherwise we have to insert some bindings
+      | otherwise = do
+        let (x_r', ids_r') = case ei_x_l_x_r of
+              Left  x_l -> let x_r = uniqAway ids_r (zapFragileIdInfo x_l) -- NB: the incoming variable has already had the correct type set on it
+                           in (x_r, ids_r `extendInScopeSet` x_r)
+              Right x_r -> (x_r, ids_r)
+        (hb_meaning, used_r, fvs_r) <- case mb_er' of
+          Left mb_tg                   -> return (Left mb_tg,               used_r,  emptyVarSet)
+          Right (Just (used_r', e_r')) -> return (Right (renamedTerm e_r'), used_r', annedTermFreeVars e_r')
+          Right Nothing                -> fail $ "instLoop(" ++ showPpr x_r' ++ "): right side already used in instance match"
+        
+        -- Transitively add the free variables of the copied bindings
+        fvsInstLoop (Heap (M.insert x_r' (HB how_r hb_meaning) h_inst) ids_r') used_r (fvs_r `unionVarSet` varBndrFreeVars x_r')
+
+    fvsInstLoop :: Heap -> VarSet -> FreeVars -> Match (Heap, VarSet)
+    fvsInstLoop heap_inst used_r fvs
+      = foldM (\(heap_inst, used_r) y_r -> case rnOccR_maybe rn2 y_r of
+                                             Just _ 
+                                               | y_r `elemVarSet` k_inst_bvs -> return (heap_inst, used_r) -- In the instantiating stack: no heap copying required
+                                               | otherwise                   -> fail $ "fvsInstLoop(" ++ showPpr y_r ++ "): heap instance reference to non-instantiating stack"
+                                             Nothing -> case lookupUsed used_r y_r h_r of -- Bound by the heap: must copy something
+                                               Just (how_r, mb_er') -> instLoop heap_inst (Right y_r) how_r used_r mb_er'
+                                               Nothing              -> fail $ "fvsInstLoop(" ++ showPpr y_r ++ "): right heap binding not present")
+              (heap_inst, used_r) (varSetElems fvs)
 
 app3 :: [a] -> [a] -> [a] -> [a]
 app3 x y z = x ++ y ++ z

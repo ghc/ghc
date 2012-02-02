@@ -227,7 +227,7 @@ generalise gen (deeds, Heap h ids, k, qa) = do
                     gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList pending_hbs, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr (x'', hb, heapBindingTag hb)) True]
                     
                     reached_xs' = M.foldrWithKey (\_x' hb fvs -> heapBindingFreeVars hb `unionVarSet` fvs)
-                                                 (unionVarSets (map (stackFrameFreeVars . tagee . snd) pending_kfs))
+                                                 (stackFreeVars (map snd pending_kfs))
                                                  pending_hbs
     
     -- If we can find some fraction of the stack or heap to drop that looks like it will be admissable, just residualise those parts and continue

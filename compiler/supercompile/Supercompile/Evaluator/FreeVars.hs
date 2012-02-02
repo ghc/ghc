@@ -1,7 +1,7 @@
 module Supercompile.Evaluator.FreeVars (
     inFreeVars,
     heapBindingFreeVars,
-    pureHeapBoundVars, stackBoundVars, stackFrameBoundVars, stackFrameFreeVars,
+    pureHeapBoundVars, stackBoundVars, stackFreeVars, stackOpenFreeVars, stackFrameBoundVars, stackFrameFreeVars,
     qaFreeVars, pureHeapVars,
     unnormalisedStateFreeVars, unnormalisedStateUncoveredVars,
     stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
@@ -28,7 +28,14 @@ pureHeapBoundVars = mkVarSet . M.keys -- I think its harmless to include variabl
 
 -- | Returns all the variables bound by the stack that we might have to residualise in the splitter
 stackBoundVars :: Stack -> BoundVars
-stackBoundVars = unionVarSets . map (stackFrameBoundVars . tagee)
+stackBoundVars = fst . stackOpenFreeVars
+
+-- | Returns all the variables referred to by the stack, even ones also bound by the stack
+stackFreeVars :: Stack -> FreeVars
+stackFreeVars = snd . stackOpenFreeVars
+
+stackOpenFreeVars :: Stack -> (BoundVars, FreeVars)
+stackOpenFreeVars = (unionVarSets *** unionVarSets) . unzip . map (stackFrameOpenFreeVars . tagee)
 
 stackFrameBoundVars :: StackFrame -> BoundVars
 stackFrameBoundVars = fst . stackFrameOpenFreeVars
@@ -53,8 +60,8 @@ unnormalisedStateVars :: UnnormalisedState -> (HowBound -> BoundVars, FreeVars)
 stateVars :: State -> (HowBound -> BoundVars, FreeVars)
 pureHeapVars :: PureHeap -> (HowBound -> BoundVars, FreeVars)
 (unnormalisedStateVars, stateVars, pureHeapVars)
-  = (\(_, Heap h _, k, in_e) -> finish $ pureHeapOpenFreeVars h (stackOpenFreeVars k (inFreeVars annedFreeVars in_e)),
-     \(_, Heap h _, k, a)    -> finish $ pureHeapOpenFreeVars h (stackOpenFreeVars k (annedFreeVars a)),
+  = (\(_, Heap h _, k, in_e) -> finish $ pureHeapOpenFreeVars h (stackOpenFreeVars' k (inFreeVars annedFreeVars in_e)),
+     \(_, Heap h _, k, a)    -> finish $ pureHeapOpenFreeVars h (stackOpenFreeVars' k (annedFreeVars a)),
      \h -> finish $ pureHeapOpenFreeVars h (emptyVarSet, emptyVarSet))
   where
     finish ((bvs_internal, bvs_lambda, bvs_let), fvs) = (\how -> case how of InternallyBound -> bvs_internal; LambdaBound -> bvs_lambda; LetBound -> bvs_let, fvs)
@@ -66,8 +73,8 @@ pureHeapVars :: PureHeap -> (HowBound -> BoundVars, FreeVars)
         LetBound        -> (bvs_internal, bvs_lambda, bvs_let `extendVarSet` x'),
         fvs `unionVarSet` heapBindingFreeVars hb)
     
-    stackOpenFreeVars :: Stack -> FreeVars -> (BoundVars, FreeVars)
-    stackOpenFreeVars k fvs = (unionVarSets *** (unionVarSet fvs . unionVarSets)) . unzip . map (stackFrameOpenFreeVars . tagee) $ k
+    stackOpenFreeVars' :: Stack -> FreeVars -> (BoundVars, FreeVars)
+    stackOpenFreeVars' k fvs = case stackOpenFreeVars k of (k_bvs, k_fvs) -> (k_bvs, fvs `unionVarSet` k_fvs)
 
 
 qaFreeVars :: QA -> FreeVars
