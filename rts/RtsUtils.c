@@ -130,7 +130,7 @@ heapOverflow(void)
     {
         /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
         OutOfHeapHook(0/*unknown request size*/,
-                      RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
+                      (lnat)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 
         heap_overflow = rtsTrue;
     }
