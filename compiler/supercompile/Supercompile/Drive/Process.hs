@@ -390,8 +390,8 @@ instance Monoid SCStats where
 --
 -- TODO: have the garbage collector collapse (let x = True in x) to (True) -- but note that this requires onceness analysis
 gc :: State -> State
-gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredVars gced_state), ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState quietStatePrettiness _state), PrettyDoc (pPrintFullState quietStatePrettiness gced_state)))
-                                          gced_state
+gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(stateUncoveredVars gced_state `subVarSet` stateUncoveredVars _state, ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState quietStatePrettiness _state), PrettyDoc (pPrintFullState quietStatePrettiness gced_state)))
+                                          gced_state -- We do not insist that *no* variables are uncovered because when used from the speculator this may not be true
   where
     gced_state = (deeds2, Heap h' ids, k', in_e)
     
