@@ -371,3 +371,5 @@ test('T5595', normal, compile, [''])
 test('T5676', normal, compile, [''])
 test('T4310', normal, compile, [''])
 
+test('T5792',normal,run_command,
+     ['$MAKE -s --no-print-directory T5792'])
