@@ -115,7 +115,10 @@ data CmmTopInfo   = TopInfo {info_tbl :: CmmInfoTable, stack_info :: CmmStackInf
 
 data CmmStackInfo
    = StackInfo {
-       arg_space :: ByteOff,            -- XXX: comment?
+       arg_space :: ByteOff,
+               -- number of bytes of arguments on the stack on entry to the
+               -- the proc.  This is filled in by StgCmm.codeGen, and used
+               -- by the stack allocator later.
        updfr_space :: Maybe ByteOff     -- XXX: comment?
    }
 
