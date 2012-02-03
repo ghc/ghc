@@ -199,17 +199,20 @@ void traceThreadStatus_ (StgTSO *tso);
 void traceEventStartup_ (int n_caps);
 
 /*
- * Events for describing capability sets in the eventlog
+ * Events for describing capabilities and capability sets in the eventlog
  *
  * Note: unlike other events, these are not conditional on TRACE_sched or
- * similar because they are not "real" events themselves but provide
- * information and context for other "real" events. Other events depend on
- * the capset info events so for simplicity, rather than working out if
- * they're necessary we always emit them. They should be very low volume.
+ * similar because capabilities and capability sets are important
+ * context for other events. Since other events depend on these events
+ * then for simplicity we always emit them, rather than working out if
+ * they're necessary . They should be very low volume.
  */
-void traceCapsetEvent_ (EventTypeNum tag,
-                        CapsetID capset,
-                        StgWord info);
+void traceCapEvent (Capability   *cap,
+                    EventTypeNum  tag);
+
+void traceCapsetEvent (EventTypeNum tag,
+                       CapsetID     capset,
+                       StgWord      info);
 
 void traceWallClockTime_(void);
 
@@ -233,7 +236,8 @@ void traceSparkCounters_ (Capability *cap,
 #define traceThreadStatus(class, tso) /* nothing */
 #define traceThreadLabel_(cap, tso, label) /* nothing */
 INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
-#define traceCapsetEvent_(tag, capset, info) /* nothing */
+#define traceCapEvent(cap, tag) /* nothing */
+#define traceCapsetEvent(tag, capset, info) /* nothing */
 #define traceWallClockTime_() /* nothing */
 #define traceOSProcessInfo_() /* nothing */
 #define traceSparkCounters_(cap, counters, remaining) /* nothing */
@@ -265,8 +269,6 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
     HASKELLEVENT_THREAD_RUNNABLE(cap, tid)
 #define dtraceMigrateThread(cap, tid, new_cap)          \
     HASKELLEVENT_MIGRATE_THREAD(cap, tid, new_cap)
-#define dtraceShutdown(cap)                             \
-    HASKELLEVENT_SHUTDOWN(cap)
 #define dtraceThreadWakeup(cap, tid, other_cap)         \
     HASKELLEVENT_THREAD_WAKEUP(cap, tid, other_cap)
 #define dtraceGcStart(cap)                              \
@@ -284,6 +286,14 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
 INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_STARTUP(num_caps);
 }
+#define dtraceCapCreate(cap)                            \
+    HASKELLEVENT_CAP_CREATE(cap)
+#define dtraceCapDelete(cap)                            \
+    HASKELLEVENT_CAP_DELETE(cap)
+#define dtraceCapEnable(cap)                            \
+    HASKELLEVENT_CAP_ENABLE(cap)
+#define dtraceCapDisable(cap)                           \
+    HASKELLEVENT_CAP_DISABLE(cap)
 #define dtraceUserMsg(cap, msg)                         \
     HASKELLEVENT_USER_MSG(cap, msg)
 #define dtraceGcIdle(cap)                               \
@@ -324,7 +334,6 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
 #define dtraceStopThread(cap, tid, status, info)        /* nothing */
 #define dtraceThreadRunnable(cap, tid)                  /* nothing */
 #define dtraceMigrateThread(cap, tid, new_cap)          /* nothing */
-#define dtraceShutdown(cap)                             /* nothing */
 #define dtraceThreadWakeup(cap, tid, other_cap)         /* nothing */
 #define dtraceGcStart(cap)                              /* nothing */
 #define dtraceGcEnd(cap)                                /* nothing */
@@ -337,6 +346,10 @@ INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceGcIdle(cap)                               /* nothing */
 #define dtraceGcWork(cap)                               /* nothing */
 #define dtraceGcDone(cap)                               /* nothing */
+#define dtraceCapCreate(cap)                            /* nothing */
+#define dtraceCapDelete(cap)                            /* nothing */
+#define dtraceCapEnable(cap)                            /* nothing */
+#define dtraceCapDisable(cap)                           /* nothing */
 #define dtraceCapsetCreate(capset, capset_type)         /* nothing */
 #define dtraceCapsetDelete(capset)                      /* nothing */
 #define dtraceCapsetAssignCap(capset, capno)            /* nothing */
@@ -413,10 +426,28 @@ INLINE_HEADER void traceEventMigrateThread(Capability *cap     STG_UNUSED,
                         (EventCapNo)new_cap);
 }
 
-INLINE_HEADER void traceEventShutdown(Capability *cap STG_UNUSED)
+INLINE_HEADER void traceCapCreate(Capability *cap STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_SHUTDOWN, 0, 0);
-    dtraceShutdown((EventCapNo)cap->no);
+    traceCapEvent(cap, EVENT_CAP_CREATE);
+    dtraceCapCreate((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceCapDelete(Capability *cap STG_UNUSED)
+{
+    traceCapEvent(cap, EVENT_CAP_DELETE);
+    dtraceCapDelete((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceCapEnable(Capability *cap STG_UNUSED)
+{
+    traceCapEvent(cap, EVENT_CAP_ENABLE);
+    dtraceCapEnable((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceCapDisable(Capability *cap STG_UNUSED)
+{
+    traceCapEvent(cap, EVENT_CAP_DISABLE);
+    dtraceCapDisable((EventCapNo)cap->no);
 }
 
 INLINE_HEADER void traceEventThreadWakeup(Capability *cap       STG_UNUSED, 
@@ -497,27 +528,27 @@ INLINE_HEADER void traceEventStartup(void)
 INLINE_HEADER void traceCapsetCreate(CapsetID   capset      STG_UNUSED,
                                      CapsetType capset_type STG_UNUSED)
 {
-    traceCapsetEvent_(EVENT_CAPSET_CREATE, capset, capset_type);
+    traceCapsetEvent(EVENT_CAPSET_CREATE, capset, capset_type);
     dtraceCapsetCreate(capset, capset_type);
 }
 
 INLINE_HEADER void traceCapsetDelete(CapsetID capset STG_UNUSED)
 {
-    traceCapsetEvent_(EVENT_CAPSET_DELETE, capset, 0);
+    traceCapsetEvent(EVENT_CAPSET_DELETE, capset, 0);
     dtraceCapsetDelete(capset);
 }
 
 INLINE_HEADER void traceCapsetAssignCap(CapsetID capset STG_UNUSED,
                                         nat      capno  STG_UNUSED)
 {
-    traceCapsetEvent_(EVENT_CAPSET_ASSIGN_CAP, capset, capno);
+    traceCapsetEvent(EVENT_CAPSET_ASSIGN_CAP, capset, capno);
     dtraceCapsetAssignCap(capset, capno);
 }
 
 INLINE_HEADER void traceCapsetRemoveCap(CapsetID capset STG_UNUSED,
                                         nat      capno  STG_UNUSED)
 {
-    traceCapsetEvent_(EVENT_CAPSET_REMOVE_CAP, capset, capno);
+    traceCapsetEvent(EVENT_CAPSET_REMOVE_CAP, capset, capno);
     dtraceCapsetRemoveCap(capset, capno);
 }
 

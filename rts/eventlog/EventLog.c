@@ -60,9 +60,13 @@ char *EventDesc[] = {
   [EVENT_STOP_THREAD]         = "Stop thread",
   [EVENT_THREAD_RUNNABLE]     = "Thread runnable",
   [EVENT_MIGRATE_THREAD]      = "Migrate thread",
-  [EVENT_SHUTDOWN]            = "Shutdown",
   [EVENT_THREAD_WAKEUP]       = "Wakeup thread",
   [EVENT_THREAD_LABEL]        = "Thread label",
+  [EVENT_STARTUP]             = "Create capabilities",
+  [EVENT_CAP_CREATE]          = "Create capability",
+  [EVENT_CAP_DELETE]          = "Delete capability",
+  [EVENT_CAP_DISABLE]         = "Disable capability",
+  [EVENT_CAP_ENABLE]          = "Enable capability",
   [EVENT_GC_START]            = "Starting GC",
   [EVENT_GC_END]              = "Finished GC",
   [EVENT_REQUEST_SEQ_GC]      = "Request sequential GC",
@@ -70,7 +74,6 @@ char *EventDesc[] = {
   [EVENT_CREATE_SPARK_THREAD] = "Create spark thread",
   [EVENT_LOG_MSG]             = "Log message",
   [EVENT_USER_MSG]            = "User message",
-  [EVENT_STARTUP]             = "Startup",
   [EVENT_GC_IDLE]             = "GC idle",
   [EVENT_GC_WORK]             = "GC working",
   [EVENT_GC_DONE]             = "GC done",
@@ -287,7 +290,11 @@ initEventLogging(void)
                 sizeof(EventThreadID) + sizeof(StgWord16) + sizeof(EventThreadID);
             break;
 
-        case EVENT_STARTUP:         // (cap count)
+        case EVENT_STARTUP:         // (cap_count)
+        case EVENT_CAP_CREATE:      // (cap)
+        case EVENT_CAP_DELETE:      // (cap)
+        case EVENT_CAP_ENABLE:      // (cap)
+        case EVENT_CAP_DISABLE:     // (cap)
             eventTypes[t].size = sizeof(EventCapNo);
             break;
 
@@ -322,7 +329,6 @@ initEventLogging(void)
                 sizeof(EventCapNo);
             break;
 
-        case EVENT_SHUTDOWN:        // (cap)
         case EVENT_REQUEST_SEQ_GC:  // (cap)
         case EVENT_REQUEST_PAR_GC:  // (cap)
         case EVENT_GC_START:        // (cap)
@@ -519,11 +525,6 @@ postSchedEvent (Capability *cap,
         break;
     }
 
-    case EVENT_SHUTDOWN:        // (cap)
-    {
-        break;
-    }
-
     default:
         barf("postSchedEvent: unknown event tag %d", tag);
     }
@@ -595,6 +596,36 @@ postSparkCountersEvent (Capability *cap,
     postWord64(eb,counters.gcd);
     postWord64(eb,counters.fizzled);
     postWord64(eb,remaining);
+}
+
+void
+postCapEvent (EventTypeNum  tag,
+              EventCapNo    capno)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForEvent(&eventBuf, tag)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(&eventBuf);
+    }
+    
+    postEventHeader(&eventBuf, tag);
+
+    switch (tag) {
+    case EVENT_CAP_CREATE:   // (cap)
+    case EVENT_CAP_DELETE:   // (cap)
+    case EVENT_CAP_ENABLE:   // (cap)
+    case EVENT_CAP_DISABLE:  // (cap)
+    {
+        postCapNo(&eventBuf,capno);
+        break;
+    }
+
+    default:
+        barf("postCapEvent: unknown event tag %d", tag);
+    }
+
+    RELEASE_LOCK(&eventBufMutex);
 }
 
 void postCapsetEvent (EventTypeNum tag,

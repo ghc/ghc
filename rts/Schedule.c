@@ -1985,6 +1985,7 @@ setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
         //
         for (n = new_n_capabilities; n < enabled_capabilities; n++) {
             capabilities[n].disabled = rtsTrue;
+            traceCapDisable(&capabilities[n]);
         }
         enabled_capabilities = new_n_capabilities;
     }
@@ -1996,6 +1997,7 @@ setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
         for (n = enabled_capabilities;
              n < new_n_capabilities && n < n_capabilities; n++) {
             capabilities[n].disabled = rtsFalse;
+            traceCapEnable(&capabilities[n]);
         }
         enabled_capabilities = n;
 
@@ -2003,7 +2005,8 @@ setNumCapabilities (nat new_n_capabilities USED_IF_THREADS)
 #if defined(TRACING)
             // Allocate eventlog buffers for the new capabilities.  Note this
             // must be done before calling moreCapabilities(), because that
-            // will emit events to add the new capabilities to capsets.
+            // will emit events about creating the new capabilities and adding
+            // them to existing capsets.
             tracingAddCapapilities(n_capabilities, new_n_capabilities);
 #endif
 

@@ -281,6 +281,7 @@ initCapability( Capability *cap, nat i )
     cap->r.rCCCS = NULL;
 #endif
 
+    traceCapCreate(cap);
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
     traceCapsetAssignCap(CAPSET_CLOCKDOMAIN_DEFAULT, i);
 #if defined(THREADED_RTS)
@@ -843,6 +844,8 @@ tryGrabCapability (Capability *cap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
+static void traceShutdownCapability (Capability *cap);
+
 void
 shutdownCapability (Capability *cap,
                     Task *task USED_IF_THREADS,
@@ -929,7 +932,7 @@ shutdownCapability (Capability *cap,
             continue;
         }
 
-        traceEventShutdown(cap);
+        traceShutdownCapability(cap);
 	RELEASE_LOCK(&cap->lock);
 	break;
     }
@@ -941,12 +944,20 @@ shutdownCapability (Capability *cap,
     // return via resumeThread() and attempt to grab cap->lock.
     // closeMutex(&cap->lock);
 
+#else /* THREADED_RTS */
+    traceShutdownCapability(cap);
+#endif
+}
+
+static void
+traceShutdownCapability (Capability *cap)
+{
+#if defined(THREADED_RTS)
     traceSparkCounters(cap);
-
-#endif /* THREADED_RTS */
-
+#endif
     traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);
     traceCapsetRemoveCap(CAPSET_CLOCKDOMAIN_DEFAULT, cap->no);
+    traceCapDelete(cap);
 }
 
 void

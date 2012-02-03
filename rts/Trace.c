@@ -228,9 +228,6 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
                        cap->no, (lnat)tso->id, thread_stop_reasons[info1]);
         }
         break;
-    case EVENT_SHUTDOWN:        // (cap)
-        debugBelch("cap %d: shutting down\n", cap->no);
-        break;
     default:
         debugBelch("cap %d: thread %lu: event %d\n\n", 
                    cap->no, (lnat)tso->id, tag);
@@ -304,9 +301,41 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag)
     }
 }
 
-void traceCapsetEvent_ (EventTypeNum tag,
-                        CapsetID capset,
-                        StgWord info)
+void traceCapEvent (Capability   *cap,
+                    EventTypeNum  tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        ACQUIRE_LOCK(&trace_utx);
+
+        tracePreface();
+        switch (tag) {
+        case EVENT_CAP_CREATE:   // (cap)
+            debugBelch("cap %d: initialised\n", cap->no);
+            break;
+        case EVENT_CAP_DELETE:   // (cap)
+            debugBelch("cap %d: shutting down\n", cap->no);
+            break;
+        case EVENT_CAP_ENABLE:   // (cap)
+            debugBelch("cap %d: enabling capability\n", cap->no);
+            break;
+        case EVENT_CAP_DISABLE:  // (cap)
+            debugBelch("cap %d: disabling capability\n", cap->no);
+            break;
+        }
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        if (eventlog_enabled) {
+            postCapEvent(tag, (EventCapNo)cap->no);
+        }
+    }
+}
+
+void traceCapsetEvent (EventTypeNum tag,
+                       CapsetID     capset,
+                       StgWord      info)
 {
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR && TRACE_sched)
