@@ -18,7 +18,7 @@ module CmmNode (
      CmmNode(..), ForeignHint(..), CmmFormal, CmmActual,
      UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..),
      mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
-     mapExpM, mapExpDeepM, wrapRecExpM
+     mapExpM, mapExpDeepM, wrapRecExpM, mapSuccessors
   ) where
 
 import CmmExpr
@@ -429,4 +429,12 @@ foldExpDeep f = foldExp go
 
         gos [] z = z
         gos (e:es) z = gos es $! f e z
+
+-- -----------------------------------------------------------------------------
+
+mapSuccessors :: (Label -> Label) -> CmmNode O C -> CmmNode O C
+mapSuccessors f (CmmBranch bid)        = CmmBranch (f bid)
+mapSuccessors f (CmmCondBranch p y n)  = CmmCondBranch p (f y) (f n)
+mapSuccessors f (CmmSwitch e arms)     = CmmSwitch e (map (fmap f) arms)
+mapSuccessors f n = n
 
