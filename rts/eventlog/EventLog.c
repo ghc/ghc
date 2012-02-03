@@ -619,6 +619,7 @@ postSparkCountersEvent (Capability *cap,
     }
     
     postEventHeader(eb, EVENT_SPARK_COUNTERS);
+    /* EVENT_SPARK_COUNTERS (crt,dud,ovf,cnv,gcd,fiz,rem) */
     postWord64(eb,counters.created);
     postWord64(eb,counters.dud);
     postWord64(eb,counters.overflowed);

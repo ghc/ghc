@@ -132,7 +132,7 @@
 #define EVENT_PROGRAM_ENV         31 /* (capset, environment_vector)  */
 #define EVENT_OSPROCESS_PID       32 /* (capset, pid)          */
 #define EVENT_OSPROCESS_PPID      33 /* (capset, parent_pid)   */
-#define EVENT_SPARK_COUNTERS      34 /* (crt,dud,ovf,cnv,fiz,gcd,rem) */
+#define EVENT_SPARK_COUNTERS      34 /* (crt,dud,ovf,cnv,gcd,fiz,rem) */
 #define EVENT_SPARK_CREATE        35 /* ()                     */
 #define EVENT_SPARK_DUD           36 /* ()                     */
 #define EVENT_SPARK_OVERFLOW      37 /* ()                     */
