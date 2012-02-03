@@ -12,14 +12,11 @@ where
 import BlockId
 import Cmm
 import CmmUtils
-import Digraph
 import Maybes
-import Outputable
 
 import Hoopl
 import Control.Monad
 import Prelude hiding (succ, unzip, zip)
-import qualified Data.IntMap as Map
 
 -----------------------------------------------------------------------------
 --
@@ -106,16 +103,30 @@ blockConcat g@CmmGraph { g_entry = entry_id }
         , shouldConcatWith b' blk'
         = (mapInsert bid (splice head blk') blocks, shortcut_map)
 
+        -- calls: if we can shortcut the continuation label, then
+        -- we must *also* remember to substitute for the label in the
+        -- code, because we will push it somewhere.
         | Just b'   <- callContinuation_maybe last
         , Just blk' <- mapLookup b' blocks
         , Just dest <- canShortcut blk'
         = (blocks, mapInsert b' dest shortcut_map)
            -- replaceLabels will substitute dest for b' everywhere, later
 
-        | otherwise = unchanged
+        -- non-calls: see if we can shortcut any of the successors.
+        | Nothing <- callContinuation_maybe last
+        = ( mapInsert bid (blockJoinTail head shortcut_last) blocks
+          , shortcut_map )
+
+        | otherwise
+        = (blocks, shortcut_map)
         where
           (head, last) = blockSplitTail block
           bid = entryLabel block
+          shortcut_last = mapSuccessors shortcut last
+          shortcut l =
+             case mapLookup l blocks of
+               Just b | Just dest <- canShortcut b  -> dest
+               _otherwise -> l
 
      shouldConcatWith b block
        | num_preds b == 1    = True  -- only one predecessor: go for it
