@@ -375,6 +375,22 @@ stat_endGC (gc_thread *gct,
         GC_par_max_copied += (StgWord64) max_copied;
         GC_par_avg_copied += (StgWord64) avg_copied;
 	GC_tot_cpu   += gc_cpu;
+        
+        /* For the moment we calculate both per-HEC and total allocation.
+	 * There is thus redundancy here, but for the moment we will calculate
+	 * it both the old and new way and assert they're the same.
+	 * When we're sure it's working OK then we can simplify things.
+	 * TODO: simplify calcAllocated and clearNurseries so they don't have
+	 *       to calculate the total
+	 */
+        {
+            lnat tot_alloc = 0;
+            lnat n;
+            for (n = 0; n < n_capabilities; n++) {
+                tot_alloc += capabilities[n].total_allocated;
+            }
+            ASSERT(GC_tot_alloc == tot_alloc);
+        }
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
 	    if (live > max_residency) {

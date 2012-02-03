@@ -497,7 +497,8 @@ clearNurseries (void)
 
     for (i = 0; i < n_capabilities; i++) {
         for (bd = nurseries[i].blocks; bd; bd = bd->link) {
-            allocated += (lnat)(bd->free - bd->start);
+            allocated                       += (lnat)(bd->free - bd->start);
+            capabilities[i].total_allocated += (lnat)(bd->free - bd->start);
             bd->free = bd->start;
             ASSERT(bd->gen_no == 0);
             ASSERT(bd->gen == g0);
@@ -656,6 +657,7 @@ allocate (Capability *cap, lnat n)
         initBdescr(bd, g0, g0);
         bd->flags = BF_LARGE;
         bd->free = bd->start + n;
+        cap->total_allocated += n;
         return bd->start;
     }
 

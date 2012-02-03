@@ -250,6 +250,7 @@ initCapability( Capability *cap, nat i )
     cap->spark_stats.gcd        = 0;
     cap->spark_stats.fizzled    = 0;
 #endif
+    cap->total_allocated        = 0;
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
     cap->f.stgGCEnter1     = (StgFunPtr)__stg_gc_enter_1;
