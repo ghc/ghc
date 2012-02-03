@@ -1,3 +1,8 @@
+module CmmStackLayout () where
+
+#if 0
+
+
 {-# OPTIONS_GHC -XGADTs -XNoMonoLocalBinds #-}
 -- Norman likes local bindings
 -- If this module lives on I'd like to get rid of the -XNoMonoLocalBinds
@@ -589,3 +594,4 @@ stubSlotsOnDeath g = liftM fst $ dataflowPassBwd g [] $ analRewBwd slotLattice
                                                  (stackStubExpr (widthFromBytes w))
                  in case rst of Nothing -> Just (mkMiddle m <*> store)
                                 Just g  -> Just (g <*> store)
+#endif

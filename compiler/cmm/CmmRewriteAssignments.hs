@@ -404,8 +404,8 @@ clobbers (CmmReg (CmmGlobal Hp), _) (_, _) = False
 -- ToDo: Also catch MachOp case
 clobbers (ss@CmmStackSlot{}, CmmReg (CmmLocal r)) (u, CmmLoad (ss'@CmmStackSlot{}) _)
     | getUnique r == u, ss == ss' = False -- No-op on the stack slot (XXX: Do we need this special case?)
-clobbers (CmmStackSlot (CallArea a) o, rhs) (_, expr) = f expr
-    where f (CmmLoad (CmmStackSlot (CallArea a') o') t)
+clobbers (CmmStackSlot a o, rhs) (_, expr) = f expr
+    where f (CmmLoad (CmmStackSlot a' o') t)
             = (a, o, widthInBytes (cmmExprWidth rhs)) `overlaps` (a', o', widthInBytes (typeWidth t))
           f (CmmLoad e _)    = containsStackSlot e
           f (CmmMachOp _ es) = or (map f es)
@@ -416,9 +416,6 @@ clobbers (CmmStackSlot (CallArea a) o, rhs) (_, expr) = f expr
           containsStackSlot (CmmMachOp _ es) = or (map containsStackSlot es)
           containsStackSlot (CmmStackSlot{}) = True
           containsStackSlot _ = False
-clobbers (CmmStackSlot (RegSlot l) _, _) (_, expr) = f expr
-    where f (CmmLoad (CmmStackSlot (RegSlot l') _) _) = l == l'
-          f _ = False
 clobbers _ (_, e) = f e
     where f (CmmLoad (CmmStackSlot _ _) _) = False
           f (CmmLoad{}) = True -- conservative
@@ -432,7 +429,7 @@ clobbers _ (_, e) = f e
 --      [ I32  ]
 --      [    F64     ]
 --      s'   -w'-    o'
-type CallSubArea = (AreaId, Int, Int) -- area, offset, width
+type CallSubArea = (Area, Int, Int) -- area, offset, width
 overlaps :: CallSubArea -> CallSubArea -> Bool
 overlaps (a, _, _) (a', _, _) | a /= a' = False
 overlaps (_, o, w) (_, o', w') =
@@ -457,7 +454,7 @@ invalidateVolatile :: BlockId -> AssignmentMap -> AssignmentMap
 invalidateVolatile k m = mapUFM p m
   where p (AlwaysInline e) = if exp e then AlwaysInline e else NeverOptimize
             where exp CmmLit{} = True
-                  exp (CmmLoad (CmmStackSlot (CallArea (Young k')) _) _)
+                  exp (CmmLoad (CmmStackSlot (Young k') _) _)
                     | k' == k = False
                   exp (CmmLoad (CmmStackSlot _ _) _) = True
                   exp (CmmMachOp _ es) = and (map exp es)
@@ -596,10 +593,6 @@ assignmentRewrite = mkFRewrite3 first middle last
                           where rep = typeWidth (localRegType r)
               _ -> old
         -- See Note [Soundness of store rewriting]
-        inlineExp assign old@(CmmLoad (CmmStackSlot (RegSlot r) _) _)
-          = case lookupUFM assign r of
-              Just (AlwaysInline x) -> x
-              _ -> old
         inlineExp _ old = old
 
         inlinable :: CmmNode e x -> Bool

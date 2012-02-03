@@ -18,7 +18,7 @@ module CmmBuildInfoTables
     , TopSRT, emptySRT, srtToData
     , bundleCAFs
     , lowerSafeForeignCalls
-    , cafTransfers, liveSlotTransfers
+    , cafTransfers
     , mkLiveness )
 where
 
@@ -98,7 +98,7 @@ foldSet = Set.foldr
 
 -- Also, don't forget to stop at the old end of the stack (oldByte),
 -- which may differ depending on whether there is an update frame.
-
+{-
 type RegSlotInfo
    = ( Int	  -- Offset from oldest byte of Old area
      , LocalReg   -- The register
@@ -172,15 +172,18 @@ live_ptrs oldByte slotEnv areaMap bid =
         slots :: SubAreaSet	 -- The SubAreaSet for 'bid'
         slots = expectJust "live_ptrs slots" $ mapLookup bid slotEnv
         youngByte = expectJust "live_ptrs bid_pos" $ Map.lookup (CallArea (Young bid)) areaMap
+-}
 
 -- Construct the stack maps for a procedure _if_ it needs an infotable.
 -- When wouldn't a procedure need an infotable? If it is a procpoint that
 -- is not the successor of a call.
+{-
 setInfoTableStackMap :: SlotEnv -> AreaMap -> CmmDecl -> CmmDecl
 setInfoTableStackMap slotEnv areaMap
      t@(CmmProc (TopInfo {stack_info=StackInfo {updfr_space = Just updfr_off}}) _ 
                 (CmmGraph {g_entry = eid}))
   = updInfo (const (live_ptrs updfr_off slotEnv areaMap eid)) id t
+-}
 setInfoTableStackMap _ _ t = t
                  
 
@@ -500,8 +503,8 @@ lowerSafeForeignCall entry areaMap blocks bid m
         saveRetVals = foldl (<**>) mkNop $ map (M.mkMiddle . spill) rs
         spill r = CmmStore (regSlot r) (CmmReg $ CmmLocal r)
         regSlot r@(LocalReg _ _) = CmmRegOff (CmmGlobal Sp) (sp_off - offset)
-          where offset = w + expectJust "lowerForeign" (Map.lookup (RegSlot r) areaMap)
-                sp_off = wORD_SIZE + expectJust "lowerForeign" (Map.lookup (CallArea area) areaMap)
+          where offset = w + expectJust "lowerForeign" Nothing -- XXX need to fix this: (Map.lookup (RegSlot r) areaMap)
+                sp_off = wORD_SIZE + expectJust "lowerForeign" (Map.lookup area areaMap)
                 area = if succ == entry then Old else Young succ
                 w = widthInBytes $ typeWidth $ localRegType r
         -- Note: The successor must be a procpoint, and we have already split,

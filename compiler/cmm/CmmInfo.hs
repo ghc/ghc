@@ -88,7 +88,7 @@ mkInfoTable :: Platform -> CmmDecl -> UniqSM [RawCmmDecl]
 mkInfoTable _ (CmmData sec dat) 
   = return [CmmData sec dat]
 
-mkInfoTable platform (CmmProc (CmmInfo _ _ info) entry_label blocks)
+mkInfoTable platform (CmmProc info entry_label blocks)
   | CmmNonInfoTable <- info   -- Code without an info table.  Easy.
   = return [CmmProc Nothing entry_label blocks]
                                
@@ -97,7 +97,8 @@ mkInfoTable platform (CmmProc (CmmInfo _ _ info) entry_label blocks)
        ; return (top_decls  ++
                  mkInfoTableAndCode info_lbl info_cts
                                     entry_label blocks) }
-  | otherwise = panic "mkInfoTable"  -- Patern match overlap check not clever enough
+  | otherwise = panic "mkInfoTable"
+                  -- Patern match overlap check not clever enough
 
 -----------------------------------------------------
 type InfoTableContents = ( [CmmLit]	     -- The standard part

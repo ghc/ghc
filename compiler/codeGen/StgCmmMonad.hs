@@ -611,7 +611,7 @@ emitLabel :: BlockId -> FCode ()
 emitLabel id = emitCgStmt (CgLabel id)
 
 emitComment :: FastString -> FCode ()
-#ifdef DEBUG
+#if 0 /* def DEBUG */
 emitComment s = emitCgStmt (CgStmt (CmmComment s))
 #else
 emitComment s = return ()
@@ -688,20 +688,18 @@ mkCmmIfThen e tbranch = do
 
 
 mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual]
-       -> UpdFrameOffset -> FCode CmmAGraph
-mkCall f (callConv, retConv) results actuals updfr_off = do
+       -> UpdFrameOffset -> (ByteOff,[(CmmExpr,ByteOff)]) -> FCode CmmAGraph
+mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
   k <- newLabelC
-  let area = CallArea $ Young k
+  let area = Young k
       (off, copyin) = copyInOflow retConv area results
-      copyout = lastWithArgs Call area callConv actuals updfr_off
-                               (toCall f (Just k) updfr_off off)
+      copyout = mkCallReturnsTo f callConv actuals k off updfr_off extra_stack
   return (copyout <*> mkLabel k <*> copyin)
-
 
 mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset
           -> FCode CmmAGraph
-mkCmmCall f results actuals
-   = mkCall f (NativeDirectCall, NativeReturn) results actuals
+mkCmmCall f results actuals updfr_off
+   = mkCall f (NativeDirectCall, NativeReturn) results actuals updfr_off (0,[])
 
 
 mkSafeCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
@@ -710,7 +708,7 @@ mkSafeCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
 mkSafeCall   t fs as upd i = do
   k <- newLabelC
   return
-     (    mkStore (CmmStackSlot (CallArea (Young k)) (widthInBytes wordWidth))
+     (    mkStore (CmmStackSlot (Young k) (widthInBytes wordWidth))
                   (CmmLit (CmmBlock k))
       <*> mkLast (CmmForeignCall {tgt=t, res=fs, args=as, succ=k, updfr=upd, intrbl=i})
       <*> mkLabel k)

@@ -21,7 +21,6 @@ import PprCmmExpr ()
 import Hoopl
 import Maybes
 import Outputable
-import UniqSet
 
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block
@@ -77,11 +76,7 @@ xferLive = mkBTransfer3 fst mid lst
         mid :: CmmNode O O -> CmmLive -> CmmLive
         mid n f = gen_kill n f
         lst :: CmmNode O C -> FactBase CmmLive -> CmmLive
-        -- slightly inefficient: kill is unnecessary for emptyRegSet
-        lst n f = gen_kill n
-                $ case n of CmmCall{}        -> emptyRegSet
-                            CmmForeignCall{} -> emptyRegSet
-                            _                -> joinOutFacts liveLattice n f
+        lst n f = gen_kill n $ joinOutFacts liveLattice n f
 
 -----------------------------------------------------------------------------
 -- Removing assignments to dead variables

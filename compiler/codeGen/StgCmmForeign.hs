@@ -184,7 +184,7 @@ emitSaveThreadState :: BlockId -> FCode ()
 emitSaveThreadState bid = do
   -- CurrentTSO->stackobj->sp = Sp;
   emitStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP)
-                 (CmmStackSlot (CallArea (Young bid)) (widthInBytes (typeWidth gcWord)))
+                 (CmmStackSlot (Young bid) (widthInBytes (typeWidth gcWord)))
   emit closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
   when opt_SccProfilingOn $

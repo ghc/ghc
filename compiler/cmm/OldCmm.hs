@@ -16,7 +16,7 @@
 module OldCmm (
         CmmGroup, GenCmmGroup, RawCmmGroup, CmmDecl, RawCmmDecl,
         ListGraph(..),
-        CmmInfo(..), UpdateFrame(..), CmmInfoTable(..), ClosureTypeInfo(..),
+        UpdateFrame(..), CmmInfoTable(..), ClosureTypeInfo(..),
         CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
         cmmMapGraph, cmmTopMapGraph,
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
@@ -53,13 +53,6 @@ import FastString
 --     Info Tables
 -----------------------------------------------------------------------------
 
-data CmmInfo
-  = CmmInfo
-      (Maybe BlockId)     -- GC target. Nothing <=> CPS won't do stack check
-                          -- JD: NOT USED BY NEW CODE GEN
-      (Maybe UpdateFrame) -- Update frame
-      CmmInfoTable        -- Info table
-
 -- | A frame that is to be pushed before entry to the function.
 -- Used to handle 'update' frames.
 data UpdateFrame =
@@ -85,8 +78,8 @@ newtype ListGraph i = ListGraph [GenBasicBlock i]
    -- across a whole compilation unit.
 
 -- | Cmm with the info table as a data type
-type CmmGroup = GenCmmGroup CmmStatics CmmInfo (ListGraph CmmStmt)
-type CmmDecl = GenCmmDecl CmmStatics CmmInfo (ListGraph CmmStmt)
+type CmmGroup = GenCmmGroup CmmStatics CmmInfoTable (ListGraph CmmStmt)
+type CmmDecl = GenCmmDecl CmmStatics CmmInfoTable (ListGraph CmmStmt)
 
 -- | Cmm with the info tables converted to a list of 'CmmStatic' along with the info
 -- table label. If we are building without tables-next-to-code there will be no statics

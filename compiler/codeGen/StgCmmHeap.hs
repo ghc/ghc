@@ -418,8 +418,8 @@ altHeapCheck regs code
 
     gc_call sp =
         case rts_label regs of
-             Just gc -> mkCall (CmmLit gc) (GC, GC) regs reg_exprs sp
-             Nothing -> mkCall generic_gc (GC, GC) [] [] sp
+             Just gc -> mkCall (CmmLit gc) (GC, GC) regs reg_exprs sp (0,[])
+             Nothing -> mkCall generic_gc (GC, GC) [] [] sp (0,[])
 
     rts_label [reg]
         | isGcPtrType ty = Just (mkGcLabel "stg_gc_unpt_r1")

@@ -12,6 +12,10 @@ module CmmSpillReload
   )
 where
 
+import Outputable
+dualLivenessWithInsertion = panic "BANG BANG BANG BANG BANG BANG CLICK CLICK"
+
+{-
 import BlockId
 import Cmm
 import CmmUtils
@@ -164,3 +168,4 @@ instance Outputable DualLive where
                          else (ppr_regs "live in regs =" regs),
                          if nullRegSet stack then PP.empty
                          else (ppr_regs "live on stack =" stack)]
+-}

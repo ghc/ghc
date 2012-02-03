@@ -18,8 +18,8 @@ module CmmExpr
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
             , regSetToList
-    , regUsedIn, regSlot
-    , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, isStackSlotOf
+    , regUsedIn
+    , Area(..), SubArea, SubAreaSet, AreaMap
     , module CmmMachOp
     , module CmmType
     )
@@ -71,11 +71,6 @@ data CmmReg
 -- | A stack area is either the stack slot where a variable is spilled
 -- or the stack space where function arguments and results are passed.
 data Area
-  = RegSlot  LocalReg
-  | CallArea AreaId
-  deriving (Eq, Ord)
-
-data AreaId
   = Old            -- See Note [Old Area]
   | Young BlockId  -- Invariant: must be a continuation BlockId
                    -- See Note [Continuation BlockId] in CmmNode.
@@ -285,17 +280,6 @@ reg `regUsedIn` CmmReg reg' 	 = reg == reg'
 reg `regUsedIn` CmmRegOff reg' _ = reg == reg'
 reg `regUsedIn` CmmMachOp _ es   = any (reg `regUsedIn`) es
 _   `regUsedIn` CmmStackSlot _ _ = False
-
------------------------------------------------------------------------------
---    Stack slots
------------------------------------------------------------------------------
-
-isStackSlotOf :: CmmExpr -> LocalReg -> Bool
-isStackSlotOf (CmmStackSlot (RegSlot r) _) r' = r == r'
-isStackSlotOf _ _ = False
-
-regSlot :: LocalReg -> CmmExpr
-regSlot r = CmmStackSlot (RegSlot r) (widthInBytes $ typeWidth $ localRegType r)
 
 -----------------------------------------------------------------------------
 --    Stack slot use information for expressions and other types [_$_]

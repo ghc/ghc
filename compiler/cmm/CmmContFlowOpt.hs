@@ -184,7 +184,7 @@ replaceLabels env g
 
      exp :: CmmExpr -> CmmExpr
      exp (CmmLit (CmmBlock bid))                = CmmLit (CmmBlock (lookup bid))
-     exp (CmmStackSlot (CallArea (Young id)) i) = CmmStackSlot (CallArea (Young (lookup id))) i
+     exp (CmmStackSlot (Young id) i) = CmmStackSlot (Young (lookup id)) i
      exp e                                      = e
 
 mkCmmCondBranch :: CmmExpr -> Label -> Label -> CmmNode O C

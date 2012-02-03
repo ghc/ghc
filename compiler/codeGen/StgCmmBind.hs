@@ -596,7 +596,7 @@ pushUpdateFrame es body
        offset <- foldM push updfr es
        withUpdFrameOff offset body
      where push off e =
-             do emitStore (CmmStackSlot (CallArea Old) base) e
+             do emitStore (CmmStackSlot Old base) e
                 return base
              where base = off + widthInBytes (cmmExprWidth e)
 

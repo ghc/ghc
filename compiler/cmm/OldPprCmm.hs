@@ -66,9 +66,6 @@ instance PlatformOutputable instr => PlatformOutputable (GenBasicBlock instr) wh
 instance PlatformOutputable CmmStmt where
     pprPlatform = pprStmt
 
-instance PlatformOutputable CmmInfo where
-    pprPlatform = pprInfo
-
 
 -- --------------------------------------------------------------------------
 instance PlatformOutputable CmmSafety where
@@ -76,22 +73,6 @@ instance PlatformOutputable CmmSafety where
   pprPlatform _ CmmInterruptible = ptext (sLit "_interruptible_call_")
   pprPlatform platform (CmmSafe srt) = pprPlatform platform srt
 
--- --------------------------------------------------------------------------
--- Info tables. The current pretty printer needs refinement
--- but will work for now.
---
--- For ideas on how to refine it, they used to be printed in the
--- style of C--'s 'stackdata' declaration, just inside the proc body,
--- and were labelled with the procedure name ++ "_info".
-pprInfo :: Platform -> CmmInfo -> SDoc
-pprInfo platform (CmmInfo _gc_target update_frame info_table) =
-    vcat [{-ptext (sLit "gc_target: ") <>
-                maybe (ptext (sLit "<none>")) ppr gc_target,-}
-          ptext (sLit "update_frame: ") <>
-                maybe (ptext (sLit "<none>"))
-                      (pprUpdateFrame platform)
-                      update_frame,
-          pprPlatform platform info_table]
 
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.

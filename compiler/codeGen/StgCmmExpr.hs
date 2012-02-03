@@ -532,16 +532,9 @@ cgTailCall fun_id fun_info args = do
       	ReturnIt -> emitReturn [fun]	-- ToDo: does ReturnIt guarantee tagged?
     
       	EnterIt -> ASSERT( null args )	-- Discarding arguments
-                do { let entry = entryCode (closureInfoPtr fun)
-                   ; [ret,call] <- forkAlts [
-                        getCode $
-                          emitReturn [fun], -- Is tagged; no need to untag
-                        getCode $ do -- Not tagged
-                          emitCall (NativeNodeCall, NativeReturn) entry [fun]
-                        ]
-                   ; emit =<< mkCmmIfThenElse (cmmIsTagged fun) ret call }
+                   emitEnter fun
 
-      	SlowCall -> do 	    -- A slow function call via the RTS apply routines
+        SlowCall -> do      -- A slow function call via the RTS apply routines
       		{ tickySlowCall lf_info args
                 ; emitComment $ mkFastString "slowCall"
       		; slowCall fun args }
@@ -563,6 +556,66 @@ cgTailCall fun_id fun_info args = do
     fun         = idInfoToAmode     fun_info
     lf_info     = cgIdInfoLF        fun_info
     node_points = nodeMustPointToIt lf_info
+
+
+emitEnter :: CmmExpr -> FCode ()
+emitEnter fun = do
+  { adjustHpBackwards
+  ; sequel <- getSequel
+  ; updfr_off <- getUpdFrameOff
+  ; case sequel of
+      -- For a return, we have the option of generating a tag-test or
+      -- not.  If the value is tagged, we can return directly, which
+      -- is quicker than entering the value.  This is a code
+      -- size/speed trade-off: when optimising for speed rather than
+      -- size we could generate the tag test.
+      --
+      -- Right now, we do what the old codegen did, and omit the tag
+      -- test, just generating an enter.
+      Return _ -> do
+        { let entry = entryCode $ closureInfoPtr $ CmmReg nodeReg
+        ; emit $ mkForeignJump NativeNodeCall entry
+                    [cmmUntag fun] updfr_off
+        }
+
+      -- The result will be scrutinised in the sequel.  This is where
+      -- we generate a tag-test to avoid entering the closure if
+      -- possible.
+      --
+      -- The generated code will be something like this:
+      --
+      --    R1 = fun  -- copyout
+      --    if (fun & 7 != 0) goto Lcall else goto Lret
+      --  Lcall:
+      --    call [fun] returns to Lret
+      --  Lret:
+      --    fun' = R1  -- copyin
+      --    ...
+      --
+      -- Note in particular that the label Lret is used as a
+      -- destination by both the tag-test and the call.  This is
+      -- becase Lret will necessarily be a proc-point, and we want to
+      -- ensure that we generate only one proc-point for this
+      -- sequence.
+      --
+      AssignTo res_regs _ -> do
+       { lret <- newLabelC
+       ; lcall <- newLabelC
+       ; let area = Young lret
+       ; let (off, copyin) = copyInOflow NativeReturn area res_regs
+             (outArgs, copyout) = copyOutOflow NativeNodeCall Call area
+                                          [fun] updfr_off (0,[])
+       ; let entry = entryCode (closureInfoPtr fun)
+             the_call = toCall entry (Just lret) updfr_off off outArgs
+       ; emit $
+           copyout <*>
+           mkCbranch (cmmIsTagged fun) lret lcall <*>
+           outOfLine lcall the_call <*>
+           mkLabel lret <*>
+           copyin
+       }
+  }
+
 
 
 {- Note [case on Bool]

@@ -111,7 +111,8 @@ type CmmBwdRewrite f = BwdRewrite FuelUniqSM CmmNode f
 --     Info Tables
 -----------------------------------------------------------------------------
 
-data CmmTopInfo   = TopInfo {info_tbl :: CmmInfoTable, stack_info :: CmmStackInfo}
+data CmmTopInfo   = TopInfo { info_tbl :: CmmInfoTable
+                            , stack_info :: CmmStackInfo }
 
 data CmmStackInfo
    = StackInfo {

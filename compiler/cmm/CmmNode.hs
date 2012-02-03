@@ -310,14 +310,14 @@ instance UserOfSlots ForeignTarget where
 instance DefinerOfSlots (CmmNode e x) where
   foldSlotsDefd f z n = case n of
     CmmStore (CmmStackSlot a i) expr -> f z (a, i, widthInBytes $ typeWidth $ cmmExprType expr)
-    CmmForeignCall {res=res} -> fold f z $ map foreign_call_slot res
+    -- CmmForeignCall {res=res} -> fold f z $ map foreign_call_slot res
     _ -> z
     where
           fold :: forall a b.
                   DefinerOfSlots a =>
                   (b -> SubArea -> b) -> b -> a -> b
           fold f z n = foldSlotsDefd f z n
-          foreign_call_slot r = case widthInBytes $ typeWidth $ localRegType r of w -> (RegSlot r, w, w)
+          -- foreign_call_slot r = case widthInBytes $ typeWidth $ localRegType r of w -> (RegSlot r, w, w)
 
 -----------------------------------
 -- mapping Expr in CmmNode

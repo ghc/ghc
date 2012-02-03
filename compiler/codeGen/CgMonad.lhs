@@ -728,7 +728,7 @@ emitDecl decl
   = do  { state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
 
-emitProc :: CmmInfo -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
+emitProc :: CmmInfoTable -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
 emitProc info lbl [] blocks
   = do  { let proc_block = CmmProc info lbl (ListGraph blocks)
         ; state <- getState
@@ -740,7 +740,7 @@ emitSimpleProc :: CLabel -> Code -> Code
 emitSimpleProc lbl code
   = do  { stmts <- getCgStmts code
         ; blks <- cgStmtsToBlocks stmts
-        ; emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] blks }
+        ; emitProc CmmNonInfoTable lbl [] blks }
 
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by

@@ -4,7 +4,7 @@
 module CmmProcPoint
     ( ProcPointSet, Status(..)
     , callProcPoints, minimalProcPointSet
-    , addProcPointProtocols, splitAtProcPoints, procPointAnalysis
+    , splitAtProcPoints, procPointAnalysis
     )
 where
 
@@ -248,6 +248,8 @@ algorithm would be just as good, so that's what we do.
 
 -}
 
+{-
+
 data Protocol = Protocol Convention [CmmFormal] Area
   deriving Eq
 instance Outputable Protocol where
@@ -371,6 +373,8 @@ add_CopyOuts protos procPoints g = foldGraphBlocks mb_copy_out (return mapEmpty)
                        return $ (b, foldl (flip insertBlock) bmap bs)
                   finish (b, bmap) = return $ insertBlock b bmap
           skip b bs = insertBlock b `liftM` bs
+-}
+
 
 -- At this point, we have found a set of procpoints, each of which should be
 -- the entry point of a procedure.

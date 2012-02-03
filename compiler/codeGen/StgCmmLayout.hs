@@ -15,7 +15,7 @@
 
 module StgCmmLayout (
 	mkArgDescr, 
-	emitCall, emitReturn,
+        emitCall, emitReturn, adjustHpBackwards,
 
 	emitClosureProcAndInfoTable,
 	emitClosureAndInfoTable,
@@ -41,10 +41,12 @@ import StgCmmEnv
 import StgCmmTicky
 import StgCmmMonad
 import StgCmmUtils
+import StgCmmProf
 
 import MkGraph
 import SMRep
 import Cmm
+import CmmUtils
 import CLabel
 import StgSyn
 import Id
@@ -53,6 +55,7 @@ import TyCon		( PrimRep(..) )
 import BasicTypes	( Arity )
 import DynFlags
 import StaticFlags
+import Module
 
 import Constants
 import Util
@@ -93,9 +96,30 @@ emitCall convs@(callConv, _) fun args
 	; updfr_off <- getUpdFrameOff
         ; emitComment $ mkFastString ("emitCall: " ++ show sequel)
 	; case sequel of
-	    Return _            -> emit (mkForeignJump callConv fun args updfr_off)
-            AssignTo res_regs _ -> emit =<< mkCall fun convs res_regs args updfr_off
+            Return _ ->
+             emit $ mkForeignJump callConv fun args updfr_off
+            AssignTo res_regs _ ->
+             emit =<< mkCall fun convs res_regs args updfr_off (0,[])
     }
+
+emitCallWithExtraStack
+   :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
+   -> (ByteOff, [(CmmExpr,ByteOff)]) -> FCode ()
+-- (cgCall fun args) makes a call to the entry-code of 'fun', 
+-- passing 'args', and returning the results to the current sequel
+emitCallWithExtraStack convs@(callConv, _) fun args extra_stack
+  = do	{ adjustHpBackwards
+	; sequel <- getSequel
+	; updfr_off <- getUpdFrameOff
+        ; emitComment $ mkFastString ("emitCallWithExtraStack: " ++ show sequel)
+        ; case sequel of
+            Return _ ->
+              emit $ mkForeignJumpExtra callConv fun args updfr_off extra_stack
+            AssignTo res_regs _ -> do
+              emit =<< mkCall fun convs res_regs args updfr_off extra_stack
+      }
+
+
 
 adjustHpBackwards :: FCode ()
 -- This function adjusts and heap pointers just before a tail call or
@@ -128,6 +152,19 @@ adjustHpBackwards
 --	Making calls: directCall and slowCall
 -------------------------------------------------------------------------
 
+-- General plan is:
+--   - we'll make *one* fast call, either to the function itself
+--     (directCall) or to stg_ap_<pat>_fast (slowCall)
+--     Any left-over arguments will be pushed on the stack,
+--
+--     e.g. Sp[old+8]  = arg1
+--          Sp[old+16] = arg2
+--          Sp[old+32] = stg_ap_pp_info
+--          R2 = arg3
+--          R3 = arg4
+--          call f() return to Nothing updfr_off: 32
+
+
 directCall :: CLabel -> Arity -> [StgArg] -> FCode ()
 -- (directCall f n args)
 -- calls f(arg1, ..., argn), and applies the result to the remaining args
@@ -140,8 +177,19 @@ directCall lbl arity stg_args
 slowCall :: CmmExpr -> [StgArg] -> FCode ()
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args 
-  = do	{ cmm_args <- getNonVoidArgAmodes stg_args
-	; slow_call fun cmm_args (argsReps stg_args) }
+  = do  { dflags <- getDynFlags
+        ; cmm_args <- getNonVoidArgAmodes stg_args
+        ; let platform = targetPlatform dflags
+        ; call <- getCode $ direct_call "slow_call"
+                       (mkRtsApFastLabel rts_fun) arity cmm_args reps
+        ; emitComment $ mkFastString ("slow_call for " ++
+                                      showSDoc (pprPlatform platform fun) ++
+                                      " with pat " ++ showSDoc (ftext rts_fun))
+        ; emit (mkAssign nodeReg fun <*> call)
+        }
+  where
+    reps = argsReps stg_args
+    (rts_fun, arity) = slowCallPattern reps
 
 --------------
 direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [ArgRep] -> FCode ()
@@ -149,7 +197,7 @@ direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [ArgRep] -> FCode ()
 --     the args exclude the void ones
 -- NB2: 'arity' refers to the *reps* 
 direct_call caller lbl arity args reps
-  | debugIsOn && arity > length reps	-- Too few args
+  | debugIsOn && arity > length reps  -- Too few args
   = do -- Caller should ensure that there enough args!
        dflags <- getDynFlags
        let platform = targetPlatform dflags
@@ -157,33 +205,77 @@ direct_call caller lbl arity args reps
                            <+> pprPlatform platform lbl <+> ppr (length reps)
                            <+> pprPlatform platform args <+> ppr reps )
 
-  | null rest_reps     -- Precisely the right number of arguments
+
+  | null rest_reps  -- Precisely the right number of arguments
   = emitCall (NativeDirectCall, NativeReturn) target args
 
-  | otherwise		-- Over-saturated call
+  | otherwise       -- Note [over-saturated calls]
   = ASSERT( arity == length initial_reps )
-    do	{ pap_id <- newTemp gcWord
-	; withSequel (AssignTo [pap_id] True)
-		     (emitCall (NativeDirectCall, NativeReturn) target fast_args)
-	; slow_call (CmmReg (CmmLocal pap_id)) 
-		    rest_args rest_reps }
+    emitCallWithExtraStack (NativeDirectCall, NativeReturn)
+                           target fast_args (mkStkOffsets stack_args)
   where
     target = CmmLit (CmmLabel lbl)
     (initial_reps, rest_reps) = splitAt arity reps
     arg_arity = count isNonV initial_reps
     (fast_args, rest_args) = splitAt arg_arity args
+    stack_args = slowArgs (zip rest_reps rest_args)
 
---------------
-slow_call :: CmmExpr -> [CmmExpr] -> [ArgRep] -> FCode ()
-slow_call fun args reps
-  = do dflags <- getDynFlags
-       let platform = targetPlatform dflags
-       call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
-       emitComment $ mkFastString ("slow_call for " ++ showSDoc (pprPlatform platform fun) ++
-                                        " with pat " ++ showSDoc (ftext rts_fun))
-       emit (mkAssign nodeReg fun <*> call)
+
+{-
+Note [over-saturated calls]
+
+The natural thing to do for an over-saturated call would be to call
+the function with the correct number of arguments, and then apply the
+remaining arguments to the value returned, e.g.
+
+  f a b c d   (where f has arity 2)
+  -->
+  r = call f(a,b)
+  call r(c,d)
+
+but this entails
+  - saving c and d on the stack
+  - making a continuation info table
+  - at the continuation, loading c and d off the stack into regs
+  - finally, call r
+
+Note that since there are a fixed number of different r's
+(e.g.  stg_ap_pp_fast), we can also pre-compile continuations
+that correspond to each of them, rather than generating a fresh
+one for each over-saturated call.
+
+Not only does this generate much less code, it is faster too.  We will
+generate something like:
+
+Sp[old+16] = c
+Sp[old+24] = d
+Sp[old+32] = stg_ap_pp_info
+call f(a,b) -- usual calling convention
+
+For the purposes of the CmmCall node, we count this extra stack as
+just more arguments that we are passing on the stack (cml_args).
+-}
+
+-- | 'slowArgs' takes a list of function arguments and prepares them for
+-- pushing on the stack for "extra" arguments to a function which requires
+-- fewer arguments than we currently have.
+slowArgs :: [(ArgRep,CmmExpr)] -> [(ArgRep,CmmExpr)]
+slowArgs [] = []
+slowArgs amodes
+  | opt_SccProfilingOn = save_cccs ++ this_pat ++ slowArgs rest
+  | otherwise          =              this_pat ++ slowArgs rest
   where
-    (rts_fun, arity) = slowCallPattern reps
+    (arg_pat, args, rest) = matchSlowPattern amodes
+    stg_ap_pat = mkCmmRetInfoLabel rtsPackageId arg_pat
+    this_pat   = (N, mkLblExpr stg_ap_pat) : args
+    save_cccs  = [(N, mkLblExpr save_cccs_lbl), (N, curCCS)]
+    save_cccs_lbl = mkCmmRetInfoLabel rtsPackageId (fsLit "stg_restore_cccs")
+
+matchSlowPattern :: [(ArgRep,CmmExpr)]
+                 -> (FastString, [(ArgRep,CmmExpr)], [(ArgRep,CmmExpr)])
+matchSlowPattern amodes = (arg_pat, these, rest)
+  where (arg_pat, n)  = slowCallPattern (map fst amodes)
+	(these, rest) = splitAt n amodes
 
 -- These cases were found to cover about 99% of all slow calls:
 slowCallPattern :: [ArgRep] -> (FastString, Arity)
@@ -203,6 +295,30 @@ slowCallPattern (F: _)		      = (fsLit "stg_ap_f", 1)
 slowCallPattern (D: _)		      = (fsLit "stg_ap_d", 1)
 slowCallPattern (L: _)		      = (fsLit "stg_ap_l", 1)
 slowCallPattern []		      = (fsLit "stg_ap_0", 0)
+
+
+-------------------------------------------------------------------------
+-- Fix the byte-offsets of a bunch of things to push on the stack
+
+-- This is used for pushing slow-call continuations.
+-- See Note [over-saturated calls].
+
+mkStkOffsets
+  :: [(ArgRep,CmmExpr)]           -- things to make offsets for
+  -> ( ByteOff                    -- OUTPUTS: Topmost allocated word
+     , [(CmmExpr, ByteOff)] )     -- things with offsets (voids filtered out)
+mkStkOffsets things
+    = loop 0 [] (reverse things)
+  where
+    loop offset offs [] = (offset,offs)
+    loop offset offs ((V,_):things) = loop offset offs things
+	-- ignore Void arguments
+    loop offset offs ((rep,thing):things)
+        = loop thing_off ((thing, thing_off):offs) things
+	where
+          thing_off = offset + argRepSizeW rep * wORD_SIZE
+	    -- offset of thing is offset+size, because we're 
+	    -- growing the stack *downwards* as the offsets increase.
 
 
 -------------------------------------------------------------------------

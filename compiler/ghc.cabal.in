@@ -94,7 +94,7 @@ Library
                 ForeignFunctionInterface, EmptyDataDecls,
                 TypeSynonymInstances, MultiParamTypeClasses,
                 FlexibleInstances, Rank2Types, ScopedTypeVariables,
-                DeriveDataTypeable, BangPatterns
+                DeriveDataTypeable, BangPatterns, GADTs
     if impl(ghc >= 7.1)
         Extensions: NondecreasingIndentation
 
@@ -203,6 +203,7 @@ Library
         CmmStackLayout
         CmmType
         CmmUtils
+        CmmLayoutStack
         MkGraph
         OldCmm
         OldCmmLint
