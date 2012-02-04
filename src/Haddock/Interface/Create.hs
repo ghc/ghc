@@ -142,7 +142,7 @@ createInterface tm flags modMap instIfaceMap = do
 addWarnings :: Warnings -> GlobalRdrEnv -> [Name] -> DocMap Name -> DocMap Name
 addWarnings NoWarnings  _ _ dm = dm
 addWarnings (WarnAll _) _ _ dm = dm
-addWarnings (WarnSome ws) gre exps dm = M.unionWith (flip mappend) dm wm
+addWarnings (WarnSome ws) gre exps dm = M.unionWith (flip (<>)) dm wm
   where
     wm = M.fromList
       [ (n, warnToDoc w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
@@ -154,7 +154,7 @@ addModuleWarning ws =
   case ws of
     NoWarnings -> id
     WarnSome _ -> id
-    WarnAll w  -> let d = warnToDoc w in Just . maybe d (mappend d)
+    WarnAll w  -> let d = warnToDoc w in Just . maybe d (d <>)
 
 
 warnToDoc :: WarningTxt -> Doc id
@@ -209,7 +209,7 @@ mkMaps :: DynFlags
 mkMaps dflags gre instances exports decls = do
   (dm, am, sm, cm) <- unzip4 <$> mapM mappings decls
   let f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
-      f = M.fromListWith mappend . concat
+      f = M.fromListWith (<>) . concat
   return (f dm, f am, f sm, f cm)
   where
     mappings (ldecl@(L _ decl), docs) = do
