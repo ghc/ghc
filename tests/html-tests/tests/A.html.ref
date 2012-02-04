@@ -25,7 +25,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_A.html");};
 	  >Index</a
 	  ></li
 	></ul
-      ><p class="caption" class="empty"
+      ><p class="caption empty"
       >&nbsp;</p
       ></div
     ><div id="content"

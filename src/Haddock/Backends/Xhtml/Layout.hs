@@ -18,6 +18,7 @@ module Haddock.Backends.Xhtml.Layout (
   divIndex, divAlphabet, divModuleList,
 
   sectionName,
+  nonEmptySectionName,
 
   shortDeclList,
   shortSubDecls,
@@ -64,6 +65,14 @@ sectionDiv i = thediv ! [identifier i]
 
 sectionName :: Html -> Html
 sectionName = paragraph ! [theclass "caption"]
+
+
+-- | Make an element that always has at least something (a non-breaking space)
+-- If it would have otherwise been empty, then give it the class ".empty"
+nonEmptySectionName :: Html -> Html
+nonEmptySectionName c
+  | isNoHtml c = paragraph ! [theclass "caption empty"] $ spaceHtml
+  | otherwise  = paragraph ! [theclass "caption"]       $ c
 
 
 divPackageHeader, divContent, divModuleHeader, divFooter,

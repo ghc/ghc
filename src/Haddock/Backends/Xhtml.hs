@@ -175,7 +175,7 @@ bodyHtml doctitle iface
         contentsButton maybe_contents_url,
         indexButton maybe_index_url])
             ! [theclass "links", identifier "page-menu"],
-      nonEmpty sectionName << doctitle
+      nonEmptySectionName << doctitle
       ],
     divContent << pageContent,
     divFooter << paragraph << (
