@@ -28,7 +28,7 @@ import Data.Monoid
 import Data.Ord
 import Control.Applicative
 import Control.Monad
-import qualified Data.Traversable as Traversable
+import qualified Data.Traversable as T
 
 import GHC hiding (flags)
 import HscTypes
@@ -72,7 +72,7 @@ createInterface tm flags modMap instIfaceMap = do
         | otherwise = opts0
 
   (info, mbDoc) <- do
-    (i, d) <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre mayDocHeader
+    (i, d) <- liftErrMsg $ processModuleHeader dflags gre mayDocHeader
     return (i, addModuleWarning warnings d)
 
   let declsWithDocs = topDecls group_
@@ -193,13 +193,16 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 
 
 --------------------------------------------------------------------------------
--- Declarations
+-- Maps
 --------------------------------------------------------------------------------
 
 
 type Maps = (DocMap Name, ArgMap Name, SubMap, DeclMap)
 
 
+-- | Create 'Maps' by looping through the declarations. For each declaration,
+-- find its names, its subordinates, and its doc strings. Process doc strings
+-- into 'Doc's.
 mkMaps :: DynFlags
        -> GlobalRdrEnv
        -> [Instance]
@@ -207,37 +210,35 @@ mkMaps :: DynFlags
        -> [(LHsDecl Name, [HsDocString])]
        -> ErrMsgM Maps
 mkMaps dflags gre instances exports decls = do
-  (dm, am, sm, cm) <- unzip4 <$> mapM mappings decls
-  let f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
-      f = M.fromListWith (<>) . concat
-  return (f dm, f am, f sm, f cm)
+  (a, b, c, d) <- unzip4 <$> mapM mappings decls
+  return (f a, f b, f c, f d)
   where
-    mappings (ldecl@(L _ decl), docs) = do
-      doc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre docs
-      argDocs <- fmap (M.mapMaybe id) $ Traversable.forM (typeDocs decl) $
-                   lexParseRnHaddockComment dflags NormalHaddockComment gre
+    f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
+    f = M.fromListWith (<>) . concat
 
+    mappings (ldecl, docStrs) = do
+      let decl = unLoc ldecl
+      let declDoc strs m = do
+            doc <- processDocStrings dflags gre strs
+            m' <- M.mapMaybe id <$> T.mapM (processDocStringParas dflags gre) m
+            return (doc, m')
+      (doc, args) <- declDoc docStrs (typeDocs decl)
       let subs = [ s | s@(n, _, _) <- subordinates decl, n `elem` exports ]
-
-      (subDocs, subArgMap) <- unzip <$> (forM subs $ \(n, mbSubDocStr, subFnArgsDocStr) -> do
-        mbSubDoc <- lexParseRnHaddockCommentList dflags NormalHaddockComment gre mbSubDocStr
-        subFnArgsDoc <- fmap (M.mapMaybe id) $ Traversable.forM subFnArgsDocStr $
-                          lexParseRnHaddockComment dflags NormalHaddockComment gre
-        return ((n, mbSubDoc), (n, subFnArgsDoc)))
-
-      let names = case decl of
-              -- See note [2].
-            InstD (InstDecl (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)
-            _ -> filter (`elem` exports) (getMainDeclBinder decl)
-
-      let subNames = map fst subDocs
-          dm = [ (n, d) | (n, Just d) <- (zip names (repeat doc)) ++ subDocs ]
-          am = [ (n, argDocs) | n <- names ] ++ subArgMap
-          sm = [ (n, subNames) | n <- names ]
-          cm = [ (n, [ldecl]) | n <- names ++ subNames ]
+      (subDocs, subArgs) <- unzip <$> mapM (\(_, strs, m) -> declDoc strs m) subs
+      let ns = names decl
+          subNs = [ n | (n, _, _) <- subs ]
+          dm = [ (n, d) | (n, Just d) <- zip ns (repeat doc) ++ zip subNs subDocs ]
+          am = [ (n, args) | n <- ns ] ++ zip subNs subArgs
+          sm = [ (n, subNs) | n <- ns ]
+          cm = [ (n, [ldecl]) | n <- ns ++ subNs ]
       return (dm, am, sm, cm)
 
+    instanceMap :: Map SrcSpan Name
     instanceMap = M.fromList [ (getSrcSpan n, n) | i <- instances, let n = getName i ]
+
+    names :: HsDecl Name -> [Name]
+    names (InstD (InstDecl (L l _) _ _ _)) = maybeToList (M.lookup l instanceMap)  -- See note [2].
+    names decl = filter (`elem` exports) (getMainDeclBinder decl)
 
 
 -- Note [2]:
@@ -249,6 +250,12 @@ mkMaps dflags gre instances exports decls = do
 -- with InstDecls).
 
 
+--------------------------------------------------------------------------------
+-- Declarations
+--------------------------------------------------------------------------------
+
+
+-- | Get all subordinate declarations inside a declaration, and their docs.
 subordinates :: HsDecl Name -> [(Name, [HsDocString], Map Int HsDocString)]
 subordinates (TyClD decl)
   | isClassDecl decl = classSubs
@@ -446,15 +453,15 @@ mkExportItems
     lookupExport (IEModuleContents m)  =
       moduleExports thisMod m dflags gre exportedNames decls modMap instIfaceMap maps
     lookupExport (IEGroup lev docStr)  = liftErrMsg $
-      ifDoc (lexParseRnHaddockComment dflags DocSectionComment gre docStr)
+      ifDoc (processDocString dflags gre docStr)
             (\doc -> return [ ExportGroup lev "" doc ])
     lookupExport (IEDoc docStr)        = liftErrMsg $
-      ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
+      ifDoc (processDocStringParas dflags gre docStr)
             (\doc -> return [ ExportDoc doc ])
     lookupExport (IEDocNamed str)      = liftErrMsg $
       ifDoc (findNamedDoc str [ unL d | d <- decls ])
             (\docStr ->
-            ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
+            ifDoc (processDocStringParas dflags gre docStr)
                   (\doc -> return [ ExportDoc doc ]))
 
 
@@ -656,10 +663,10 @@ fullModuleContents dflags gre (docMap, argMap, subMap, declMap) decls =
         f x xs = x : xs
 
     mkExportItem (L _ (DocD (DocGroup lev docStr))) = do
-      mbDoc <- liftErrMsg $ lexParseRnHaddockComment dflags DocSectionComment gre docStr
+      mbDoc <- liftErrMsg $ processDocString dflags gre docStr
       return $ fmap (ExportGroup lev "") mbDoc
     mkExportItem (L _ (DocD (DocCommentNamed _ docStr))) = do
-      mbDoc <- liftErrMsg $ lexParseRnHaddockComment dflags NormalHaddockComment gre docStr
+      mbDoc <- liftErrMsg $ processDocStringParas dflags gre docStr
       return $ fmap ExportDoc mbDoc
     mkExportItem (L _ (ValD d))
       | name:_ <- collectHsBindBinders d, Just [L _ (ValD _)] <- M.lookup name declMap =

@@ -42,7 +42,6 @@ type ArgMap a      = Map Name (Map Int (Doc a))
 type SubMap        = Map Name [Name]
 type DeclMap       = Map Name [LHsDecl Name]
 type SrcMap        = Map PackageId FilePath
-type GhcDocHdr     = Maybe LHsDocString
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 
 
