@@ -12,19 +12,20 @@
 module Haddock.Interface.Rename (renameInterface) where
 
 
-import Haddock.Types
 import Haddock.GhcUtils
+import Haddock.Types
 
-import GHC hiding (NoLink)
-import Name
 import Bag (emptyBag)
 import BasicTypes ( IPName(..), ipNameName )
+import GHC hiding (NoLink)
+import Name
 
+import Control.Applicative
+import Control.Monad hiding (mapM)
 import Data.List
 import qualified Data.Map as Map hiding ( Map )
-import Prelude hiding (mapM)
 import Data.Traversable (mapM)
-import Control.Monad hiding (mapM)
+import Prelude hiding (mapM)
 
 
 renameInterface :: LinkEnv -> Bool -> Interface -> ErrMsgM Interface
@@ -92,6 +93,9 @@ type RnM a = GenRnM Name a
 instance Monad (GenRnM n) where
   (>>=) = thenRn
   return = returnRn
+
+instance Functor (GenRnM n) where
+  fmap f x = do a <- x; return (f a)
 
 returnRn :: a -> GenRnM n a
 returnRn a   = RnM (const (a,[]))
@@ -211,7 +215,7 @@ renameLKind = renameLType
 
 renameMaybeLKind :: Maybe (LHsKind Name) -> RnM (Maybe (LHsKind DocName))
 renameMaybeLKind Nothing = return Nothing
-renameMaybeLKind (Just ki) = renameLKind ki >>= return . Just
+renameMaybeLKind (Just ki) = Just <$> renameLKind ki
 
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of
@@ -241,11 +245,11 @@ renameType t = case t of
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
 
-  HsOpTy a (w, (L loc op)) b -> do
+  HsOpTy a (w, L loc op) b -> do
     op' <- rename op
     a'  <- renameLType a
     b'  <- renameLType b
-    return (HsOpTy a' (w, (L loc op')) b')
+    return (HsOpTy a' (w, L loc op') b')
 
   HsParTy ty -> return . HsParTy =<< renameLType ty
 

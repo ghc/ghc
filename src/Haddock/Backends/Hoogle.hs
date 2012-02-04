@@ -101,7 +101,7 @@ out = f . unwords . map (dropWhile isSpace) . lines . showSDocUnqual . ppr
 
 
 operator :: String -> String
-operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = "(" ++ x:xs ++ ")"
+operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = '(' : x:xs ++ ")"
 operator x = x
 
 
@@ -124,7 +124,7 @@ ppExport _ = []
 ppSig :: Sig Name -> [String]
 ppSig (TypeSig names sig) = [operator prettyNames ++ " :: " ++ outHsType typ]
     where
-        prettyNames = concat . intersperse ", " $ map out names
+        prettyNames = intercalate ", " $ map out names
         typ = case unL sig of
                    HsForAllTy Explicit a b c -> HsForAllTy Implicit a b c
                    x -> x

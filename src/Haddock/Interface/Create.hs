@@ -350,7 +350,7 @@ warnAboutFilteredDecls mdl decls = do
     tell [
       "Warning: " ++ modStr ++ ": Instances of type and data "
       ++ "families are not yet supported. Instances of the following families "
-      ++ "will be filtered out:\n  " ++ concat (intersperse ", "
+      ++ "will be filtered out:\n  " ++ (intercalate ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
   let instances = nub [ pretty i | L _ (InstD (InstDecl i _ _ ats)) <- decls
@@ -359,7 +359,7 @@ warnAboutFilteredDecls mdl decls = do
   unless (null instances) $
     tell [
       "Warning: " ++ modStr ++ ": We do not support associated types in instances yet. "
-      ++ "These instances are affected:\n" ++ concat (intersperse ", " instances) ]
+      ++ "These instances are affected:\n" ++ intercalate ", " instances ]
 
 
 --------------------------------------------------------------------------------
@@ -371,7 +371,7 @@ warnAboutFilteredDecls mdl decls = do
 
 -- | Filter out declarations that we don't handle in Haddock
 filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
-filterDecls decls = filter (isHandled . unL . fst) decls
+filterDecls = filter (isHandled . unL . fst)
   where
     isHandled (ForD (ForeignImport {})) = True
     isHandled (TyClD {}) = True
@@ -408,10 +408,10 @@ collectDocs = go Nothing []
   where
     go Nothing _ [] = []
     go (Just prev) docs [] = finished prev docs []
-    go prev docs ((L _ (DocD (DocCommentNext str))):ds)
+    go prev docs (L _ (DocD (DocCommentNext str)) : ds)
       | Nothing <- prev = go Nothing (str:docs) ds
       | Just decl <- prev = finished decl docs (go Nothing [str] ds)
-    go prev docs ((L _ (DocD (DocCommentPrev str))):ds) = go prev (str:docs) ds
+    go prev docs (L _ (DocD (DocCommentPrev str)) : ds) = go prev (str:docs) ds
     go Nothing docs (d:ds) = go (Just d) docs ds
     go (Just prev) docs (d:ds) = finished prev docs (go (Just d) [] ds)
 
@@ -489,7 +489,7 @@ mkExportItems
 
               -- We should not show a subordinate by itself if any of its
               -- parents is also exported. See note [1].
-              | not $ t `elem` declNames,
+              | t `notElem` declNames,
                 Just p <- find isExported (parents t $ unL decl) ->
                 do liftErrMsg $ tell [
                      "Warning: " ++ moduleString thisMod ++ ": " ++
@@ -517,7 +517,7 @@ mkExportItems
           mayDecl <- hiDecl t
           case mayDecl of
             Nothing -> return [ ExportNoDecl t [] ]
-            Just decl -> do
+            Just decl ->
               -- We try to get the subs and docs
               -- from the installed .haddock file for that package.
               case M.lookup (nameModule t) instIfaceMap of
@@ -526,7 +526,7 @@ mkExportItems
                       ["Warning: Couldn't find .haddock for export " ++ pretty t]
                    let subs_ = [ (n, noDocForDecl) | (n, _, _) <- subordinates (unLoc decl) ]
                    return [ mkExportDecl t decl (noDocForDecl, subs_) ]
-                Just iface -> do
+                Just iface ->
                    return [ mkExportDecl t decl (lookupDocs t (instDocMap iface) (instArgMap iface) (instSubMap iface)) ]
 
         _ -> return []
@@ -736,9 +736,9 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
   data_ty = foldl (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) (map toTypeNoLoc tvs)
 
 
--- Pruning
+-- | Keep exprt items with docs.
 pruneExportItems :: [ExportItem Name] -> [ExportItem Name]
-pruneExportItems items = filter hasDoc items
+pruneExportItems = filter hasDoc
   where
     hasDoc (ExportDecl{expItemMbDoc = (d, _)}) = isJust d
     hasDoc _ = True
@@ -758,12 +758,12 @@ mkVisibleNames exports opts
 
 -- | Find a stand-alone documentation comment by its name.
 findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe HsDocString)
-findNamedDoc name decls = search decls
+findNamedDoc name = search
   where
     search [] = do
       tell ["Cannot find documentation for: $" ++ name]
       return Nothing
-    search ((DocD (DocCommentNamed name' doc)):rest)
+    search (DocD (DocCommentNamed name' doc) : rest)
       | name == name' = return (Just doc)
       | otherwise = search rest
     search (_other_decl : rest) = search rest

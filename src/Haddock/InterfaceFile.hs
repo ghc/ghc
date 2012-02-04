@@ -22,24 +22,25 @@ module Haddock.InterfaceFile (
 import Haddock.Types
 import Haddock.Utils hiding (out)
 
-import Data.List
-import Data.Word
+import Control.Monad
 import Data.Array
 import Data.IORef
+import Data.List
 import qualified Data.Map as Map
 import Data.Map (Map)
+import Data.Word
 
-import GHC hiding (NoLink)
-import Binary
 import BinIface (getSymtabName, getDictFastString)
-import Name
-import UniqSupply
-import UniqFM
-import IfaceEnv
-import HscTypes
-import GhcMonad (withSession)
+import Binary
 import FastMutInt
 import FastString
+import GHC hiding (NoLink)
+import GhcMonad (withSession)
+import HscTypes
+import IfaceEnv
+import Name
+import UniqFM
+import UniqSupply
 import Unique
 
 
@@ -110,8 +111,8 @@ writeInterfaceFile filename iface = do
                       bin_dict_map  = dict_map_ref }
 
   -- put the main thing
-  bh <- return $ setUserData bh0 $ newWriteState (putName bin_symtab)
-                                                 (putFastString bin_dict)
+  let bh = setUserData bh0 $ newWriteState (putName bin_symtab)
+                                           (putFastString bin_dict)
   put_ bh iface
 
   -- write the symtab pointer at the front of the file
@@ -295,12 +296,9 @@ putSymbolTable bh next_off symtab = do
 getSymbolTable :: BinHandle -> NameCache -> IO (NameCache, Array Int Name)
 getSymbolTable bh namecache = do
   sz <- get bh
-  od_names <- sequence (replicate sz (get bh))
-  let
-        arr = listArray (0,sz-1) names
-        (namecache', names) =
-                mapAccumR (fromOnDiskName arr) namecache od_names
-  --
+  od_names <- replicateM sz (get bh)
+  let arr = listArray (0,sz-1) names
+      (namecache', names) = mapAccumR (fromOnDiskName arr) namecache od_names
   return (namecache', arr)
 
 

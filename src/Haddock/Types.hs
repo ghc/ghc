@@ -430,7 +430,7 @@ throwE str = throw (HaddockException str)
 -- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
 -- but we can't just use @GhcT ErrMsgM@ because GhcT requires the
 -- transformed monad to be MonadIO.
-newtype ErrMsgGhc a = WriterGhc { runWriterGhc :: (Ghc (a, [ErrMsg])) }
+newtype ErrMsgGhc a = WriterGhc { runWriterGhc :: Ghc (a, [ErrMsg]) }
 --instance MonadIO ErrMsgGhc where
 --  liftIO = WriterGhc . fmap (\a->(a,[])) liftIO
 --er, implementing GhcMonad involves annoying ExceptionMonad and

@@ -431,7 +431,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
                           indexLinks nm entries
           many_entities ->
               td ! [ theclass "src" ] << toHtml str <-> td << spaceHtml </>
-                  aboves (map doAnnotatedEntity (zip [1..] many_entities))
+                  aboves (zipWith (curry doAnnotatedEntity) [1..] many_entities)
 
     doAnnotatedEntity :: (Integer, (Name, [(Module, Bool)])) -> HtmlTable
     doAnnotatedEntity (j,(nm,entries))
@@ -539,7 +539,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     maybe_doc_hdr
       = case exports of
           [] -> noHtml
-          ExportGroup _ _ _ : _ -> noHtml
+          ExportGroup {} : _ -> noHtml
           _ -> h1 << "Documentation"
 
     bdy =
@@ -621,7 +621,7 @@ ppModuleContents qual exports
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:
 numberSectionHeadings :: [ExportItem DocName] -> [ExportItem DocName]
-numberSectionHeadings exports = go 1 exports
+numberSectionHeadings = go 1
   where go :: Int -> [ExportItem DocName] -> [ExportItem DocName]
         go _ [] = []
         go n (ExportGroup lev _ doc : es)
