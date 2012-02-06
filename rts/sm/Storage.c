@@ -186,6 +186,13 @@ initStorage (void)
   IF_DEBUG(gc, statDescribeGens());
 
   RELEASE_SM_LOCK;
+
+  traceEventHeapInfo(CAPSET_HEAP_DEFAULT,
+                     RtsFlags.GcFlags.generations,
+                     RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE_W * sizeof(W_),
+                     RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W * sizeof(W_),
+                     MBLOCK_SIZE_W * sizeof(W_),
+                     BLOCK_SIZE_W  * sizeof(W_));
 }
 
 void storageAddCapabilities (nat from, nat to)

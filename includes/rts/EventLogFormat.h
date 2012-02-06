@@ -147,8 +147,18 @@
 #define EVENT_CAP_DELETE          46 /* (cap)                  */
 #define EVENT_CAP_DISABLE         47 /* (cap)                  */
 #define EVENT_CAP_ENABLE          48 /* (cap)                  */
+#define EVENT_HEAP_ALLOCATED      49 /* (heap_capset, alloc_bytes) */
+#define EVENT_HEAP_SIZE           50 /* (heap_capset, size_bytes) */
+#define EVENT_HEAP_LIVE           51 /* (heap_capset, live_bytes) */
+#define EVENT_HEAP_INFO_GHC       52 /* (heap_capset, n_generations,
+                                         max_heap_size, alloc_area_size,
+                                         mblock_size, block_size) */
+#define EVENT_GC_STATS_GHC        53 /* (heap_capset, generation,
+                                         copied_bytes, slop_bytes, frag_bytes,
+                                         par_n_threads,
+                                         par_max_copied, par_tot_copied) */
 
-/* Range 49 - 59 is available for new GHC and common events */
+/* Range 54 - 59 is available for new GHC and common events */
 
 /* Range 60 - 80 is used by eden for parallel tracing
  * see http://www.mathematik.uni-marburg.de/~eden/
@@ -161,7 +171,7 @@
  * ranges higher than this are reserved but not currently emitted by ghc.
  * This must match the size of the EventDesc[] array in EventLog.c
  */
-#define NUM_GHC_EVENT_TAGS        49
+#define NUM_GHC_EVENT_TAGS        54
 
 #if 0  /* DEPRECATED EVENTS: */
 /* we don't actually need to record the thread, it's implicit */

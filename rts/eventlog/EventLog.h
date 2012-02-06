@@ -97,6 +97,31 @@ void postThreadLabel(Capability    *cap,
                      EventThreadID  id,
                      char          *label);
 
+/*
+ * Various GC and heap events
+ */
+void postHeapEvent (Capability    *cap,
+                    EventTypeNum   tag,
+                    EventCapsetID  heap_capset,
+                    StgWord        info1);
+
+void postEventHeapInfo (EventCapsetID heap_capset,
+                        nat           gens,
+                        lnat          maxHeapSize,
+                        lnat          allocAreaSize,
+                        lnat          mblockSize,
+                        lnat          blockSize);
+
+void postEventGcStats  (Capability    *cap,
+                        EventCapsetID  heap_capset,
+                        nat            gen,
+                        lnat           copied,
+                        lnat           slop,
+                        lnat           fragmentation,
+                        nat            par_n_threads,
+                        lnat           par_max_copied,
+                        lnat           par_tot_copied);
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,

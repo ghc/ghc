@@ -738,9 +738,9 @@ GarbageCollect (rtsBool force_major_gc,
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(gct, allocated, live_words,
-             copied, N, par_max_copied, par_tot_copied,
-             live_blocks * BLOCK_SIZE_W - live_words /* slop */);
+  stat_endGC(cap, gct, allocated, live_words, copied,
+             live_blocks * BLOCK_SIZE_W - live_words /* slop */,
+             N, n_gc_threads, par_max_copied, par_tot_copied);
 
   // Guess which generation we'll collect *next* time
   initialise_N(force_major_gc);

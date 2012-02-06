@@ -98,6 +98,9 @@ void initTracing (void)
     TRACE_gc =
         RtsFlags.TraceFlags.gc ||
         RtsFlags.DebugFlags.gc;
+    if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
+        RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
+    }
 
     TRACE_spark_sampled =
         RtsFlags.TraceFlags.sparks_sampled;
@@ -299,6 +302,44 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag)
         /* currently all GC events are nullary events */
         postEvent(cap, tag);
     }
+}
+
+void traceHeapEvent_ (Capability   *cap,
+                      EventTypeNum  tag,
+                      CapsetID      heap_capset,
+                      lnat          info1)
+{
+    /* no stderr equivalent for these ones */
+    postHeapEvent(cap, tag, heap_capset, info1);
+}
+
+void traceEventHeapInfo_ (CapsetID    heap_capset,
+                          nat         gens,
+                          lnat        maxHeapSize,
+                          lnat        allocAreaSize,
+                          lnat        mblockSize,
+                          lnat        blockSize)
+{
+    /* no stderr equivalent for this one */
+    postEventHeapInfo(heap_capset, gens,
+                      maxHeapSize, allocAreaSize,
+                      mblockSize, blockSize);
+}
+
+void traceEventGcStats_  (Capability *cap,
+                          CapsetID    heap_capset,
+                          nat         gen,
+                          lnat        copied,
+                          lnat        slop,
+                          lnat        fragmentation,
+                          nat         par_n_threads,
+                          lnat        par_max_copied,
+                          lnat        par_tot_copied)
+{
+    /* no stderr equivalent for this one */
+    postEventGcStats(cap, heap_capset, gen,
+                     copied, slop, fragmentation,
+                     par_n_threads, par_max_copied, par_tot_copied);
 }
 
 void traceCapEvent (Capability   *cap,

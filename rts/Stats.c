@@ -330,9 +330,9 @@ stat_gcWorkerThreadDone (gc_thread *gct STG_UNUSED)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (gc_thread *gct,
-            lnat alloc, lnat live, lnat copied, nat gen,
-            lnat par_max_copied, lnat par_tot_copied, lnat slop)
+stat_endGC (Capability *cap, gc_thread *gct,
+            lnat alloc, lnat live, lnat copied, lnat slop, nat gen,
+            nat par_n_threads, lnat par_max_copied, lnat par_tot_copied)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
         RtsFlags.ProfFlags.doHeapProfile)
@@ -388,9 +388,26 @@ stat_endGC (gc_thread *gct,
             lnat n;
             for (n = 0; n < n_capabilities; n++) {
                 tot_alloc += capabilities[n].total_allocated;
+                traceEventHeapAllocated(&capabilities[n],
+                                        CAPSET_HEAP_DEFAULT,
+                                        capabilities[n].total_allocated * sizeof(W_));
             }
             ASSERT(GC_tot_alloc == tot_alloc);
         }
+        traceEventHeapSize(cap,
+	                   CAPSET_HEAP_DEFAULT,
+			   mblocks_allocated * MBLOCK_SIZE_W * sizeof(W_));
+        traceEventGcStats(cap,
+                          CAPSET_HEAP_DEFAULT,
+                          gen,
+                          copied * sizeof(W_),
+                          slop   * sizeof(W_),
+                          /* current loss due to fragmentation */
+                          (mblocks_allocated * BLOCKS_PER_MBLOCK - n_alloc_blocks)
+                                 * BLOCK_SIZE_W * sizeof(W_),
+                          par_n_threads,
+                          par_max_copied * sizeof(W_),
+                          par_tot_copied * sizeof(W_));
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
 	    if (live > max_residency) {
@@ -399,6 +416,9 @@ stat_endGC (gc_thread *gct,
             current_residency = live;
 	    residency_samples++;
 	    cumulative_residency += live;
+	    traceEventHeapLive(cap, 
+    	    	    	       CAPSET_HEAP_DEFAULT,
+	                       live * sizeof(W_));
 	}
 
         if (slop > max_slop) max_slop = slop;
