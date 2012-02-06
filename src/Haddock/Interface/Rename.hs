@@ -408,11 +408,14 @@ renameForD (ForeignExport lname ltype co x) = do
 
 
 renameInstD :: InstDecl Name -> RnM (InstDecl DocName)
-renameInstD (InstDecl ltype _ _ lATs) = do
+renameInstD (ClsInstDecl ltype _ _ lATs) = do
   ltype' <- renameLType ltype
   lATs' <- mapM renameLTyClD lATs
-  return (InstDecl ltype' emptyBag [] lATs')
+  return (ClsInstDecl ltype' emptyBag [] lATs')
 
+renameInstD (FamInstDecl d) = do
+  d' <- renameTyClD d
+  return (FamInstDecl d')
 
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
 renameExportItem item = case item of

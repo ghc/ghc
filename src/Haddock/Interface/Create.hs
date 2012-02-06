@@ -189,7 +189,7 @@ mkMaps dflags gre instances exports decls = do
       let subNames = map fst subDocs
 
       let names = case d of
-            InstD (InstDecl (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)  -- See note [2].
+            InstD (ClsInstDecl (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)  -- See note [2].
             _ -> filter (`elem` exports) (getMainDeclBinder d)
 
       let docMap' = M.fromList (mapMaybe (\(n,doc) -> fmap (n,) doc) ([ (n, mayDoc) | n <- names ] ++ subDocs))
@@ -296,7 +296,7 @@ warnAboutFilteredDecls :: Module -> [LHsDecl Name] -> ErrMsgM ()
 warnAboutFilteredDecls mdl decls = do
   let modStr = moduleString mdl
   let typeInstances =
-        nub [ tcdName d | L _ (TyClD d) <- decls, isFamInstDecl d ]
+        nub [ tcdName d | L _ (InstD (FamInstDecl d)) <- decls ]
 
   unless (null typeInstances) $
     tell [
@@ -305,7 +305,7 @@ warnAboutFilteredDecls mdl decls = do
       ++ "will be filtered out:\n  " ++ concat (intersperse ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
-  let instances = nub [ pretty i | L _ (InstD (InstDecl i _ _ ats)) <- decls
+  let instances = nub [ pretty i | L _ (InstD (ClsInstDecl i _ _ ats)) <- decls
                                  , not (null ats) ]
 
   unless (null instances) $
