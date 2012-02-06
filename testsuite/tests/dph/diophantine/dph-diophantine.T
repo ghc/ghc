@@ -1,7 +1,6 @@
 
 test    ('dph-diophantine-copy-opt' 
         , [ alone
-          , expect_broken(5817)
           , skip_if_fast
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
