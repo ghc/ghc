@@ -159,7 +159,8 @@ test('T5030',
                                                       500000000)),
       # expected value: 902776064 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 800000000,
+          compiler_stats_num_field('bytes allocated', 750000000,
+#                                                     (reduced from 80... Feb12)
                                                      1000000000)),
        only_ways(['normal'])
       ],
@@ -236,11 +237,12 @@ test('T5321FD',
 test('T5642',
      [ only_ways(['normal']),
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 890000000,
+          compiler_stats_num_field('bytes allocated', 840000000,
                                                       910000000)),
       if_wordsize(64,
-      #                               expected value: 9019430056 (amd64/Linux):
-          compiler_stats_num_field('bytes allocated', 8900000000,
+      #                               expected value: 8579867832 (amd64/Linux):
+      #                                                 (reduced from 90... Feb12)
+          compiler_stats_num_field('bytes allocated', 8400000000,
                                                       9100000000))
       ],
       compile,['-O'])
