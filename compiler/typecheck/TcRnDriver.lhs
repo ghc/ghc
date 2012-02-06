@@ -549,7 +549,7 @@ tcRnHsBootDecls decls
         ; mapM_ (badBootDecl "vect")    vect_decls
 
                 -- Typecheck type/class decls
-        ; traceTc "Tc2" empty
+        ; traceTc "Tc2 (boot)" empty
         ; tcg_env <- tcTyAndClassDecls emptyModDetails tycl_decls
         ; setGblEnv tcg_env    $ do {
 
@@ -892,7 +892,7 @@ tcTopSrcDecls boot_details
                    hs_valds  = val_binds })
  = do {         -- Type-check the type and class decls, and all imported decls
                 -- The latter come in via tycl_decls
-        traceTc "Tc2" empty ;
+        traceTc "Tc2 (src)" empty ;
 
         tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
         setGblEnv tcg_env       $ do {
@@ -1171,15 +1171,8 @@ tcRnStmt hsc_env ictxt rdr_stmt
   = initTcPrintErrors hsc_env iNTERACTIVE $
     setInteractiveContext hsc_env ictxt $ do {
 
-    -- Rename; use CmdLineMode because tcRnStmt is only used interactively
-    (([rn_stmt], _), fvs) <- rnStmts GhciStmt [rdr_stmt] $ \_ ->
-                             return ((), emptyFVs) ;
-    traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
-    failIfErrsM ;
-    rnDump (ppr rn_stmt) ;
-
     -- The real work is done here
-    (bound_ids, tc_expr) <- tcUserStmt rn_stmt ;
+    (bound_ids, tc_expr) <- tcUserStmt rdr_stmt ;
     zonked_expr <- zonkTopLExpr tc_expr ;
     zonked_ids  <- zonkTopBndrs bound_ids ;
 
@@ -1283,20 +1276,27 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 -- for more details. We do this lifting by trying different ways ('plans') of
 -- lifting the code into the IO monad and type checking each plan until one
 -- succeeds.
-tcUserStmt :: LStmt Name -> TcM PlanResult
+tcUserStmt :: LStmt RdrName -> TcM PlanResult
 
 -- An expression typed at the prompt is treated very specially
 tcUserStmt (L loc (ExprStmt expr _ _ _))
-  = do  { uniq <- newUnique
+  = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
+               -- Don't try to typecheck if the renamer fails!
+        ; uniq <- newUnique
         ; let fresh_it  = itName uniq loc
-              matches   = [mkMatch [] expr emptyLocalBinds]
+              matches   = [mkMatch [] rn_expr emptyLocalBinds]
               -- [it = expr]
-              the_bind  = L loc $ mkTopFunBind (L loc fresh_it) matches
+              the_bind  = L loc $ (mkTopFunBind (L loc fresh_it) matches) { bind_fvs = fvs }
+                          -- Care here!  In GHCi the expression might have
+                          -- free variables, and they in turn may have free type variables
+                          -- (if we are at a breakpoint, say).  We must put those free vars
+
+
               -- [let it = expr]
               let_stmt  = L loc $ LetStmt $ HsValBinds $
                           ValBindsOut [(NonRecursive,unitBag the_bind)] []
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt (L loc (VarPat fresh_it)) expr
+              bind_stmt = L loc $ BindStmt (L loc (VarPat fresh_it)) rn_expr
                                            (HsVar bindIOName) noSyntaxExpr
               -- [; print it]
               print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
@@ -1325,27 +1325,34 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                        ; tcGhciStmts [let_stmt, print_it] }
           ]}
 
-tcUserStmt stmt@(L loc (BindStmt {}))
-  | [v] <- collectLStmtBinders stmt             -- One binder, for a bind stmt
-  = do  { let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-                                          (HsVar thenIOName) noSyntaxExpr placeHolderType
+tcUserStmt rdr_stmt@(L loc _)
+  = do { (([rn_stmt], _), fvs) <- checkNoErrs $
+                                  rnStmts GhciStmt [rdr_stmt] $ \_ ->
+                                  return ((), emptyFVs) ;
+               -- Don't try to typecheck if the renamer fails!
+       ; traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
+       ; rnDump (ppr rn_stmt) ;
 
-        ; print_bind_result <- doptM Opt_PrintBindResult
-        ; let print_plan = do
-                  { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
-                  ; v_ty <- zonkTcType (idType v_id)
-                  ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
-                  ; return stuff }
+       ; opt_pr_flag <- doptM Opt_PrintBindResult
+       ; let print_result_plan
+               | opt_pr_flag                         -- The flag says "print result"   
+               , [v] <- collectLStmtBinders rn_stmt  -- One binder
+                           =  [mk_print_result_plan rn_stmt v]
+               | otherwise = []
 
         -- The plans are:
-        --      [stmt; print v]         but not if v::()
-        --      [stmt]
-        ; runPlans ((if print_bind_result then [print_plan] else []) ++
-                    [tcGhciStmts [stmt]])
-        }
-
-tcUserStmt stmt
-  = tcGhciStmts [stmt]
+        --      [stmt; print v]         if one binder and not v::()
+        --      [stmt]                  otherwise
+       ; runPlans (print_result_plan ++ [tcGhciStmts [rn_stmt]]) }
+  where
+    mk_print_result_plan rn_stmt v
+      = do { stuff@([v_id], _) <- tcGhciStmts [rn_stmt, print_v]
+           ; v_ty <- zonkTcType (idType v_id)
+           ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
+           ; return stuff }
+      where
+        print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
+                                    (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 -- | Typecheck the statements given and then return the results of the
 -- statement in the form 'IO [()]'.
