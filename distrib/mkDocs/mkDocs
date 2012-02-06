@@ -25,7 +25,7 @@ cd inst/share/doc/ghc/html/libraries
 mv ../../../../../../../windows/doc/html/libraries/Win32-* .
 sh gen_contents_index
 cd ..
-for i in Cabal haddock libraries users_guide
+for i in haddock libraries users_guide
 do
     tar -jcf ../../../../../../$i.html.tar.bz2 $i
 done
