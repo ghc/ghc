@@ -18,9 +18,11 @@ module HsDecls (
   isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
   isFamInstDecl, tcdName, tyClDeclTyVars,
   countTyClDecls,
+
   -- ** Instance declarations
   InstDecl(..), LInstDecl, NewOrData(..), FamilyFlavour(..),
-  instDeclATs,
+  FamInstDecl, LFamInstDecl, instDeclFamInsts,
+
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
   -- ** @RULE@ declarations
@@ -128,12 +130,15 @@ data HsGroup id
   = HsGroup {
         hs_valds  :: HsValBinds id,
 
-        hs_tyclds :: [[LTyClDecl id]],  
+        hs_tyclds :: [[LTyClDecl id]],
                 -- A list of mutually-recursive groups
+                -- No family-instances here; they are in hs_instds
                 -- Parser generates a singleton list;
                 -- renamer does dependency analysis
 
-        hs_instds :: [LInstDecl id],
+        hs_instds  :: [LInstDecl id],
+                -- Both class and family instance declarations in here
+
         hs_derivds :: [LDerivDecl id],
 
         hs_fixds  :: [LFixitySig id],
@@ -154,7 +159,8 @@ emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
 emptyRdrGroup = emptyGroup { hs_valds = emptyValBindsIn }
 emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
-emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], hs_derivds = [],
+emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], 
+                       hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
                        hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
@@ -430,8 +436,9 @@ Interface file code:
 -- In both cases, 'tcdVars' collects all variables we need to quantify over.
 
 type LTyClDecl name = Located (TyClDecl name)
-type TyClGroup name = [LTyClDecl name]  -- this is used in TcTyClsDecls to represent
+type TyClGroup name = [LTyClDecl name]  -- This is used in TcTyClsDecls to represent
                                         -- strongly connected components of decls
+                                        -- No familiy instances in here
 
 -- | A type or class declaration.
 data TyClDecl name
@@ -504,7 +511,7 @@ data TyClDecl name
                 tcdMeths   :: LHsBinds name,            -- ^ Default methods
                 tcdATs     :: [LTyClDecl name],         -- ^ Associated types; ie
                                                         --   only 'TyFamily'
-                tcdATDefs  :: [LTyClDecl name],         -- ^ Associated type defaults; ie
+                tcdATDefs  :: [LFamInstDecl name],      -- ^ Associated type defaults; ie
                                                         --   only 'TySynonym'
                 tcdDocs    :: [LDocDecl]                -- ^ Haddock docs
     }
@@ -602,15 +609,14 @@ tyClDeclTyVars (ForeignType {})                = []
 \end{code}
 
 \begin{code}
-countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int, Int)
-        -- class, synonym decls, data, newtype, family decls, family instances
+countTyClDecls :: [TyClDecl name] -> (Int, Int, Int, Int, Int)
+        -- class, synonym decls, data, newtype, family decls
 countTyClDecls decls 
  = (count isClassDecl    decls,
     count isSynDecl      decls,  -- excluding...
     count isDataTy       decls,  -- ...family...
     count isNewTy        decls,  -- ...instances
-    count isFamilyDecl   decls,
-    count isFamInstDecl  decls)
+    count isFamilyDecl   decls)
  where
    isDataTy TyData{tcdND = DataType, tcdTyPats = Nothing} = True
    isDataTy _                                             = False
@@ -833,18 +839,25 @@ pprConDecl (ConDecl {con_name = con, con_details = InfixCon {}, con_res = ResTyG
 \begin{code}
 type LInstDecl name = Located (InstDecl name)
 
-data InstDecl name
-  = InstDecl    (LHsType name)  -- Context => Class Instance-type
-                                -- Using a polytype means that the renamer conveniently
-                                -- figures out the quantified type variables for us.
-                (LHsBinds name)
-                [LSig name]     -- User-supplied pragmatic info
-                [LTyClDecl name]-- Associated types (ie, 'TyData' and
-                                -- 'TySynonym' only)
+type LFamInstDecl name = Located (FamInstDecl name)
+type FamInstDecl  name = TyClDecl name  -- Type or data family instance
+
+data InstDecl name  -- Both class and family instances
+  = ClsInstDecl    
+      (LHsType name)    -- Context => Class Instance-type
+                        -- Using a polytype means that the renamer conveniently
+                        -- figures out the quantified type variables for us.
+      (LHsBinds name)
+      [LSig name]          -- User-supplied pragmatic info
+      [LFamInstDecl name]  -- Family instances for associated types
+
+  | FamInstDecl         -- type/data family instance
+      (FamInstDecl name)
+
   deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
-    ppr (InstDecl inst_ty binds sigs ats)
+    ppr (ClsInstDecl inst_ty binds sigs ats)
       | null sigs && null ats && isEmptyBag binds  -- No "where" part
       = top_matter
 
@@ -855,10 +868,16 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
       where
         top_matter = ptext (sLit "instance") <+> ppr inst_ty
 
+    ppr (FamInstDecl decl) = ppr decl
+
 -- Extract the declarations of associated types from an instance
---
-instDeclATs :: [LInstDecl name] -> [LTyClDecl name]
-instDeclATs inst_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats]
+
+instDeclFamInsts :: [LInstDecl name] -> [LTyClDecl name]
+instDeclFamInsts inst_decls 
+  = concatMap do_one inst_decls
+  where
+    do_one (L _ (ClsInstDecl _ _ _ fam_insts)) = fam_insts
+    do_one (L loc (FamInstDecl fam_inst))      = [L loc fam_inst]
 \end{code}
 
 %************************************************************************

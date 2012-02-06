@@ -371,17 +371,16 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
             -- round)
 
             -- (1) Do class and family instance declarations
-       ; fam_insts       <- mapAndRecoverM tcTopFamInstDecl $
-                            filter (isFamInstDecl . unLoc) tycl_decls
-       ; inst_decl_stuff <- mapAndRecoverM tcLocalInstDecl1  inst_decls
+       ; inst_decl_stuff <- mapAndRecoverM tcLocalInstDecl1 inst_decls
 
-       ; let { (local_info, at_fam_insts_s) = unzip inst_decl_stuff
-             ; all_fam_insts = concat at_fam_insts_s ++ fam_insts }
+       ; let { (local_infos_s, fam_insts_s) = unzip inst_decl_stuff
+             ; all_fam_insts = concat fam_insts_s
+             ; local_infos   = concat local_infos_s }
 
             -- (2) Next, construct the instance environment so far, consisting of
             --   (a) local instance decls
             --   (b) local family instance decls
-       ; addClsInsts local_info      $
+       ; addClsInsts local_infos     $
          addFamInsts all_fam_insts   $ do
 
             -- (3) Compute instances from "deriving" clauses;
@@ -403,13 +402,13 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; when (safeLanguageOn dflags) $
              mapM_ (\x -> when (typInstCheck x)
                                (addErrAt (getSrcSpan $ iSpec x) typInstErr))
-                   local_info
+                   local_infos
        -- As above but for Safe Inference mode.
        ; when (safeInferOn dflags) $
-             mapM_ (\x -> when (typInstCheck x) recordUnsafeInfer) local_info
+             mapM_ (\x -> when (typInstCheck x) recordUnsafeInfer) local_infos
 
        ; return ( gbl_env
-                , (bagToList deriv_inst_info) ++ local_info
+                , bagToList deriv_inst_info ++ local_infos
                 , deriv_binds)
     }}
   where
@@ -437,12 +436,18 @@ addFamInsts fam_insts thing_inside
 
 \begin{code}
 tcLocalInstDecl1 :: LInstDecl Name
-                 -> TcM (InstInfo Name, [FamInst])
+                 -> TcM ([InstInfo Name], [FamInst])
         -- A source-file instance declaration
         -- Type-check all the stuff before the "where"
         --
         -- We check for respectable instance type, and context
-tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
+tcLocalInstDecl1 (L loc (FamInstDecl decl))
+  = setSrcSpan loc      $
+    tcAddDeclCtxt decl  $
+    do { fam_inst <- tcFamInstDecl TopLevel decl
+       ; return ([], [fam_inst]) }
+
+tcLocalInstDecl1 (L loc (ClsInstDecl poly_ty binds uprags ats))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
 
@@ -500,7 +505,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
               ispec 	= mkLocalInstance dfun overlap_flag
               inst_info = InstInfo { iSpec  = ispec, iBinds = VanillaInst binds uprags False }
 
-        ; return ( inst_info, fam_insts0 ++ concat fam_insts1) }
+        ; return ( [inst_info], fam_insts0 ++ concat fam_insts1) }
 \end{code}
 
 %************************************************************************
@@ -515,12 +520,6 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 
 \begin{code}
-tcTopFamInstDecl :: LTyClDecl Name -> TcM FamInst
-tcTopFamInstDecl (L loc decl)
-  = setSrcSpan loc      $
-    tcAddDeclCtxt decl  $
-    tcFamInstDecl TopLevel decl
-
 tcFamInstDecl :: TopLevelFlag -> TyClDecl Name -> TcM FamInst
 tcFamInstDecl top_lvl decl
   = do { -- Type family instances require -XTypeFamilies

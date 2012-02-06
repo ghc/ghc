@@ -101,13 +101,10 @@ tcTyAndClassDecls :: ModDetails
                   -> TcM TcGblEnv       -- Input env extended by types and classes
                                         -- and their implicit Ids,DataCons
 -- Fails if there are any errors
-tcTyAndClassDecls boot_details decls_s
-  = checkNoErrs $ do    -- The code recovers internally, but if anything gave rise to
+tcTyAndClassDecls boot_details tyclds_s
+  = checkNoErrs $       -- The code recovers internally, but if anything gave rise to
                         -- an error we'd better stop now, to avoid a cascade
-  { let tyclds_s = map (filterOut (isFamInstDecl . unLoc)) decls_s
-                   -- Remove family instance decls altogether
-                   -- They are dealt with by TcInstDcls
-  ; fold_env tyclds_s }  -- type check each group in dependency order folding the global env
+    fold_env tyclds_s   -- type check each group in dependency order folding the global env
   where
     fold_env :: [TyClGroup Name] -> TcM TcGblEnv
     fold_env [] = getGblEnv
@@ -379,7 +376,7 @@ kcTyClDecl decl@(TyFamily {})
   = kcFamilyDecl [] decl      -- the empty list signals a toplevel decl
 
 kcTyClDecl decl@(TyData {})
-  = ASSERT( not . isFamInstDecl $ decl )   -- must not be a family instance
+  = ASSERT2( not . isFamInstDecl $ decl, ppr decl )   -- must not be a family instance
     kcTyClDeclBody decl	$ \_ -> kcDataDecl decl
 
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})

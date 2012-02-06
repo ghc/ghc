@@ -129,10 +129,12 @@ repTopDs group
 	decls <- addBinds ss (do {
 			val_ds  <- rep_val_binds (hs_valds group) ;
 			tycl_ds <- mapM repTyClD (concat (hs_tyclds group)) ;
-			inst_ds <- mapM repInstD' (hs_instds group) ;
+			inst_ds <- mapM repInstD (hs_instds group) ;
 			for_ds <- mapM repForD (hs_fords group) ;
 			-- more needed
-			return (de_loc $ sort_by_loc $ val_ds ++ catMaybes tycl_ds ++ inst_ds ++ for_ds) }) ;
+			return (de_loc $ sort_by_loc $ 
+                                val_ds ++ catMaybes tycl_ds
+                                       ++ catMaybes inst_ds ++ for_ds) }) ;
 
 	decl_ty <- lookupType decQTyConName ;
 	let { core_list = coreList' decl_ty decls } ;
@@ -307,8 +309,12 @@ repLAssocFamInst = liftM de_loc . mapMaybeM repTyClD
 
 -- represent instance declarations
 --
-repInstD' :: LInstDecl Name -> DsM (SrcSpan, Core TH.DecQ)
-repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
+repInstD :: LInstDecl Name -> DsM (Maybe (SrcSpan, Core TH.DecQ))
+repInstD (L loc (FamInstDecl fi_decl))
+  = repTyClD (L loc fi_decl)
+
+
+repInstD (L loc (ClsInstDecl ty binds _ ats))	-- Ignore user pragmas for now
   = do { dec <- addTyVarBinds tvs $ \_ ->
 	    -- We must bring the type variables into scope, so their
 	    -- occurrences don't fail, even though the binders don't 
@@ -327,7 +333,7 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
                ; ats1 <- repLAssocFamInst ats
                ; decls <- coreList decQTyConName (ats1 ++ binds1)
                ; repInst cxt1 inst_ty1 decls }
-       ; return (loc, dec) }
+       ; return (Just (loc, dec)) }
  where
    Just (tvs, cxt, cls, tys) = splitHsInstDeclTy_maybe (unLoc ty)
 
