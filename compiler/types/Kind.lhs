@@ -48,10 +48,7 @@ module Kind (
 
         -- ** Functions on variables
         isKiVar, splitKiTyVars, partitionKiTyVars,
-        kiVarsOfKind, kiVarsOfKinds,
-
-        -- ** Promotion related functions
-        promoteType, isPromotableType, isPromotableKind,
+        kiVarsOfKind, kiVarsOfKinds
 
        ) where
 
@@ -251,8 +248,10 @@ isSubKind' duringTc k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
 
   | isSuperKindTyCon kc1 || isSuperKindTyCon kc2
     -- handles BOX
-    = ASSERT2( isSuperKindTyCon kc2 && null k1s && null k2s, ppr kc1 <+> ppr kc2 )
-      True
+    = WARN( not (isSuperKindTyCon kc2 && isSuperKindTyCon kc2 
+                  && null k1s && null k2s), 
+             ppr kc1 <+> ppr kc2 )
+      kc1 == kc2
 
   | otherwise = -- handles usual kinds (*, #, (#), etc.)
                 ASSERT2( null k1s && null k2s, ppr k1 <+> ppr k2 )
@@ -313,54 +312,4 @@ kiVarsOfKind = tyVarsOfType
 
 kiVarsOfKinds :: [Kind] -> VarSet
 kiVarsOfKinds = tyVarsOfTypes
-
--- Datatype promotion
-isPromotableType :: Type -> Bool
-isPromotableType = go emptyVarSet
-  where
-    go vars (TyConApp tc tys) = ASSERT( not (isPromotedDataTyCon tc) ) all (go vars) tys
-    go vars (FunTy arg res) = all (go vars) [arg,res]
-    go vars (TyVarTy tvar) = tvar `elemVarSet` vars
-    go vars (ForAllTy tvar ty) = isPromotableTyVar tvar && go (vars `extendVarSet` tvar) ty
-    go _ _ = panic "isPromotableType"  -- argument was not kind-shaped
-
-isPromotableTyVar :: TyVar -> Bool
-isPromotableTyVar = isLiftedTypeKind . varType
-
--- | Promotes a type to a kind. Assumes the argument is promotable.
-promoteType :: Type -> Kind
-promoteType (TyConApp tc tys) = mkTyConApp (mkPromotedTyCon tc) 
-                                           (map promoteType tys)
-  -- T t1 .. tn  ~~>  'T k1 .. kn  where  ti ~~> ki
-promoteType (FunTy arg res) = mkArrowKind (promoteType arg) (promoteType res)
-  -- t1 -> t2  ~~>  k1 -> k2  where  ti ~~> ki
-promoteType (TyVarTy tvar) = mkTyVarTy (promoteTyVar tvar)
-  -- a :: *  ~~>  a :: BOX
-promoteType (ForAllTy tvar ty) = ForAllTy (promoteTyVar tvar) (promoteType ty)
-  -- forall (a :: *). t  ~~> forall (a :: BOX). k  where  t ~~> k
-promoteType _ = panic "promoteType"  -- argument was not kind-shaped
-
-promoteTyVar :: TyVar -> KindVar
-promoteTyVar tvar = mkKindVar (tyVarName tvar) tySuperKind
-
--- If kind is [ *^n -> * ] returns [ Just n ], else returns [ Nothing ]
-isPromotableKind :: Kind -> Maybe Int
-isPromotableKind kind =
-  let (args, res) = splitKindFunTys kind in
-  if all isLiftedTypeKind (res:args)
-  then Just $ length args
-  else Nothing
-
-{- Note [Promoting a Type to a Kind]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We only promote the followings.
-- Type variables: a
-- Fully applied arrow types: tau -> sigma
-- Fully applied type constructors of kind:
-     n >= 0
-  /-----------\
-  * -> ... -> * -> *
-- Polymorphic types over type variables of kind star:
-  forall (a::*). tau
--}
 \end{code}

@@ -59,7 +59,7 @@ import Kind
 import Var
 import VarSet
 import TyCon
-import DataCon ( DataCon, dataConUserType )
+import DataCon
 import TysPrim ( liftedTypeKindTyConName, constraintKindTyConName )
 import Class
 import RdrName ( rdrNameSpace, nameRdrName )
@@ -72,7 +72,6 @@ import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
 import Util
 import UniqSupply
 import Outputable
-import BuildTyCl ( buildPromotedDataTyCon )
 import FastString
 import Control.Monad ( unless )
 \end{code}
@@ -747,14 +746,14 @@ ds_type (HsExplicitListTy kind tys) = do
   kind' <- zonkTcKindToKind kind
   ds_tys <- mapM dsHsType tys
   return $
-   foldr (\a b -> mkTyConApp (buildPromotedDataTyCon consDataCon) [kind', a, b])
-         (mkTyConApp (buildPromotedDataTyCon nilDataCon) [kind']) ds_tys
+   foldr (\a b -> mkTyConApp (buildPromotedDataCon consDataCon) [kind', a, b])
+         (mkTyConApp (buildPromotedDataCon nilDataCon) [kind']) ds_tys
 
 ds_type (HsExplicitTupleTy kis tys) = do
   MASSERT( length kis == length tys )
   kis' <- mapM zonkTcKindToKind kis
   tys' <- mapM dsHsType tys
-  return $ mkTyConApp (buildPromotedDataTyCon (tupleCon BoxedTuple (length kis'))) (kis' ++ tys')
+  return $ mkTyConApp (buildPromotedDataCon (tupleCon BoxedTuple (length kis'))) (kis' ++ tys')
 
 ds_type (HsWrapTy (WpKiApps kappas) ty) = do
   tau <- ds_type ty
@@ -809,7 +808,7 @@ ds_var_app name arg_tys
   = do { thing <- tcLookupGlobal name
        ; case thing of
            ATyCon tc   -> return (mkTyConApp tc arg_tys)
-           ADataCon dc -> return (mkTyConApp (buildPromotedDataTyCon dc) arg_tys) 
+           ADataCon dc -> return (mkTyConApp (buildPromotedDataCon dc) arg_tys) 
 	   _           -> wrongThingErr "type" (AGlobal thing) name }
 
 addKcTypeCtxt :: LHsType Name -> TcM a -> TcM a
@@ -1348,12 +1347,11 @@ sc_ds_var_app name arg_kis = do
       | isAlgTyCon tc || isTupleTyCon tc -> do
       data_kinds <- xoptM Opt_DataKinds
       unless data_kinds $ addErr (dataKindsErr name)
-      let tc_kind = tyConKind tc
-      case isPromotableKind tc_kind of
+      case isPromotableTyCon tc of
         Just n | n == length arg_kis ->
-          return (mkTyConApp (mkPromotedTyCon tc) arg_kis)
-        Just _  -> err tc_kind "is not fully applied"
-        Nothing -> err tc_kind "is not promotable"
+          return (mkTyConApp (buildPromotedTyCon tc) arg_kis)
+        Just _  -> err tc "is not fully applied"
+        Nothing -> err tc "is not promotable"
 
     -- It is in scope, but not what we expected
     Just thing -> wrongThingErr "promoted type" thing name
@@ -1363,9 +1361,9 @@ sc_ds_var_app name arg_kis = do
                   failWithTc (ptext (sLit "Promoted kind") <+> 
                               quotes (ppr name) <+>
                               ptext (sLit "used in a mutually recursive group"))
-
-  where err k m = failWithTc (    quotes (ppr name) <+> ptext (sLit "of kind")
-                              <+> quotes (ppr k)    <+> ptext (sLit m))
+  where 
+   err tc msg = failWithTc (quotes (ppr tc) <+> ptext (sLit "of kind")
+                        <+> quotes (ppr (tyConKind tc)) <+> ptext (sLit msg))
 
 \end{code}
 

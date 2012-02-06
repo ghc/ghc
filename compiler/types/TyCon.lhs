@@ -94,7 +94,7 @@ module TyCon(
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TypeRep ( Kind, Type, PredType )
-import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon, dataConName )
+import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
 import {-# SOURCE #-} IParam  ( ipTyConName )
 
 import Var
@@ -410,6 +410,7 @@ data TyCon
   | PromotedDataTyCon {	   	-- See Note [Promoted data constructors]
 	tyConUnique :: Unique, -- ^ Same Unique as the data constructor
 	tyConName   :: Name,   -- ^ Same Name as the data constructor
+	tyConArity  :: Arity, 
 	tc_kind     :: Kind,   -- ^ Translated type of the data constructor
         dataCon     :: DataCon -- ^ Corresponding data constructor
     }
@@ -419,6 +420,7 @@ data TyCon
 	tyConUnique :: Unique, -- ^ Same Unique as the type constructor
 	tyConName   :: Name,   -- ^ Same Name as the type constructor
 	tyConArity  :: Arity,  -- ^ n if ty_con :: * -> ... -> *  n times
+        tc_kind     :: Kind,   -- ^ Always tySuperKind
         ty_con      :: TyCon   -- ^ Corresponding type constructor
     }
 
@@ -961,25 +963,30 @@ mkSuperKindTyCon name
   }
 
 -- | Create a promoted data constructor 'TyCon'
-mkPromotedDataTyCon :: DataCon -> Name -> Unique -> Kind -> TyCon
-mkPromotedDataTyCon con name unique kind
+-- Somewhat dodgily, we give it the same Name 
+-- as the data constructor itself
+mkPromotedDataTyCon :: DataCon -> Name -> Unique -> Kind -> Arity -> TyCon
+mkPromotedDataTyCon con name unique kind arity
   = PromotedDataTyCon {
-        tyConName = name,
+        tyConName   = name,
         tyConUnique = unique,
-        tc_kind = kind,
-        dataCon = con
+        tyConArity  = arity,
+        tc_kind     = kind,
+        dataCon     = con
   }
 
 -- | Create a promoted type constructor 'TyCon'
-mkPromotedTyCon :: TyCon -> TyCon
-mkPromotedTyCon con
+-- Somewhat dodgily, we give it the same Name 
+-- as the type constructor itself
+mkPromotedTyCon :: TyCon -> Kind -> TyCon
+mkPromotedTyCon tc kind
   = PromotedTypeTyCon {
-        tyConName = getName con,
-        tyConUnique = getUnique con,
-        tyConArity = tyConArity con,
-        ty_con = con
+        tyConName   = getName tc,
+        tyConUnique = getUnique tc,
+        tyConArity  = tyConArity tc,
+        tc_kind     = kind,
+        ty_con      = tc
   }
-
 \end{code}
 
 \begin{code}
@@ -1288,15 +1295,9 @@ expand tvs rhs tys
 \end{code}
 
 \begin{code}
-
 tyConKind :: TyCon -> Kind
-tyConKind (FunTyCon          { tc_kind = k }) = k
-tyConKind (AlgTyCon          { tc_kind = k }) = k
-tyConKind (TupleTyCon        { tc_kind = k }) = k
-tyConKind (SynTyCon          { tc_kind = k }) = k
-tyConKind (PrimTyCon         { tc_kind = k }) = k
-tyConKind (PromotedDataTyCon { tc_kind = k }) = k
-tyConKind tc = pprPanic "tyConKind" (ppr tc)	-- SuperKindTyCon and CoTyCon
+tyConKind (SuperKindTyCon {}) = pprPanic "tyConKind" empty
+tyConKind tc                  = tc_kind tc
 
 tyConHasKind :: TyCon -> Bool
 tyConHasKind (SuperKindTyCon {}) = False
@@ -1499,8 +1500,7 @@ instance Uniquable TyCon where
     getUnique tc = tyConUnique tc
 
 instance Outputable TyCon where
-    ppr (PromotedDataTyCon {dataCon = dc}) = quote (ppr (dataConName dc))
-    ppr tc = ppr (getName tc)
+    ppr tc = ppr (tyConName tc)
 
 instance NamedThing TyCon where
     getName = tyConName

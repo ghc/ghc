@@ -664,31 +664,33 @@ lintInTy ty
 	; lintKind k
 	; return ty' }
 
-lintInCo :: InCoercion -> LintM OutCoercion
--- Check the coercion, and apply the substitution to it
--- See Note [Linting type lets]
-lintInCo co
-  = addLoc (InCo co) $
-    do  { co' <- applySubstCo co
-        ; _   <- lintCoercion co'
-        ; return co' }
-
 -------------------
 lintKind :: OutKind -> LintM ()
 -- Check well-formedness of kinds: *, *->*, Either * (* -> *), etc
+lintKind (TyVarTy kv) 
+ = do { checkTyCoVarInScope kv
+      ; unless (isSuperKind (varType kv))
+               (addErrL (hang (ptext (sLit "Badly kinded kind variable"))
+                            2 (ppr kv <+> dcolon <+> ppr (varType kv)))) }
+
 lintKind (FunTy k1 k2)
-  = lintKind k1 >> lintKind k2
+  = do { lintKind k1; lintKind k2 }
 
 lintKind kind@(TyConApp tc kis)
-  = do { unless (isSuperKindTyCon tc || tyConArity tc == length kis)
-           (addErrL malformed_kind)
-       ; mapM_ lintKind kis }
-  where
-    malformed_kind = hang (ptext (sLit "Malformed kind:")) 2 (quotes (ppr kind))
+  | not (isSuperKind (tyConKind tc))
+  = addErrL (hang (ptext (sLit "Type constructor") <+> quotes (ppr tc))
+                2 (ptext (sLit "cannot be used in a kind")))
+  
+  | not (tyConArity tc == length kis)
+  = addErrL (hang (ptext (sLit "Unsaturated ype constructor in kind"))
+                2 (quotes (ppr kind)))
 
-lintKind (TyVarTy kv) = checkTyCoVarInScope kv
+  | otherwise
+  = mapM_ lintKind kis
+
 lintKind kind
-  = addErrL (hang (ptext (sLit "Malformed kind:")) 2 (quotes (ppr kind)))
+  = addErrL (hang (ptext (sLit "Malformed kind:")) 
+          2 (quotes (ppr kind)))
 
 -------------------
 lintTyBndrKind :: OutTyVar -> LintM ()
@@ -699,16 +701,118 @@ lintTyBndrKind tv =
   then return ()    -- kind forall
   else lintKind ki  -- type forall
 
+----------
+checkTcApp :: OutCoercion -> Int -> Type -> LintM OutType
+checkTcApp co n ty
+  | Just tys <- tyConAppArgs_maybe ty
+  , n < length tys
+  = return (tys !! n)
+  | otherwise
+  = failWithL (hang (ptext (sLit "Bad getNth:") <+> ppr co)
+                  2 (ptext (sLit "Offending type:") <+> ppr ty))
+
 -------------------
+lintType :: OutType -> LintM Kind
+-- The returned Kind has itself been linted
+lintType (TyVarTy tv)
+  = do { checkTyCoVarInScope tv
+       ; let kind = tyVarKind tv
+       ; lintKind kind
+       ; WARN( isSuperKind kind, msg )
+         return kind }
+  where msg = hang (ptext (sLit "Expecting a type, but got a kind"))
+                 2 (ptext (sLit "Offending kind:") <+> ppr tv)
+
+lintType ty@(AppTy t1 t2) 
+  = do { k1 <- lintType t1
+       ; lint_ty_app ty k1 [t2] }
+
+lintType ty@(FunTy t1 t2)
+  = lint_ty_app ty (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind) [t1,t2]
+
+lintType ty@(TyConApp tc tys)
+  | tyConHasKind tc   -- Guards for SuperKindOon
+  , not (isUnLiftedTyCon tc) || tys `lengthIs` tyConArity tc
+       -- Check that primitive types are saturated
+       -- See Note [The kind invariant] in TypeRep
+  = lint_ty_app ty (tyConKind tc) tys
+  | otherwise
+  = failWithL (hang (ptext (sLit "Malformed type:")) 2 (ppr ty))
+
+lintType (ForAllTy tv ty)
+  = do { lintTyBndrKind tv
+       ; addInScopeVar tv (lintType ty) }
+
+----------------
+lint_ty_app :: Type -> Kind -> [OutType] -> LintM Kind
+lint_ty_app ty k tys 
+  = lint_kind_app (ptext (sLit "type") <+> quotes (ppr ty)) k tys
+
+----------------
+lint_co_app :: Coercion -> Kind -> [OutType] -> LintM ()
+lint_co_app ty k tys 
+  = do { _ <- lint_kind_app (ptext (sLit "coercion") <+> quotes (ppr ty)) k tys
+       ; return () }
+
+----------------
+lint_kind_app :: SDoc -> Kind -> [OutType] -> LintM Kind
+-- (lint_kind_app d fun_kind arg_tys)
+--    We have an application (f arg_ty1 .. arg_tyn),
+--    where f :: fun_kind
+-- Takes care of linting the OutTypes
+lint_kind_app doc kfn tys = go kfn tys
+  where
+    fail_msg = vcat [ hang (ptext (sLit "Kind application error in")) 2 doc
+                    , nest 2 (ptext (sLit "Function kind =") <+> ppr kfn)
+                    , nest 2 (ptext (sLit "Arg types =") <+> ppr tys) ]
+
+    go kfn [] = return kfn
+    go kfn (ty:tys) =
+      case splitKindFunTy_maybe kfn of
+      { Nothing ->
+          case splitForAllTy_maybe kfn of
+          { Nothing -> failWithL fail_msg
+          ; Just (kv, body) -> do
+              -- Something of kind (forall kv. body) gets instantiated
+              -- with ty. 'kv' is a kind variable and 'ty' is a kind.
+            { unless (isSuperKind (tyVarKind kv)) (addErrL fail_msg)
+            ; lintKind ty
+            ; go (substKiWith [kv] [ty] body) tys } }
+      ; Just (kfa, kfb) -> do
+          -- Something of kind (kfa -> kfb) is applied to ty. 'ty' is
+          -- a type accepting kind 'kfa'.
+        { k <- lintType ty
+        ; lintKind kfa
+        ; unless (k `isSubKind` kfa) (addErrL fail_msg)
+        ; go kfb tys } }
+
+\end{code}
+
+%************************************************************************
+%*									*
+         Linting coercions
+%*									*
+%************************************************************************
+
+\begin{code}
+lintInCo :: InCoercion -> LintM OutCoercion
+-- Check the coercion, and apply the substitution to it
+-- See Note [Linting type lets]
+lintInCo co
+  = addLoc (InCo co) $
+    do  { co' <- applySubstCo co
+        ; _   <- lintCoercion co'
+        ; return co' }
+
 lintKindCoercion :: OutCoercion -> LintM OutKind
 -- Kind coercions are only reflexivity because they mean kind
 -- instantiation.  See Note [Kind coercions] in Coercion
+lintKindCoercion (Refl k)
+  = do { lintKind k
+       ; return k }
 lintKindCoercion co
-  = do { (k1,k2) <- lintCoercion co
-       ; checkL (k1 `eqKind` k2) 
-                (hang (ptext (sLit "Non-refl kind coercion")) 
-                    2 (ppr co))
-       ; return k1 }
+  = failWithL (hang (ptext (sLit "Non-refl kind coercion")) 
+                  2 (ppr co))
 
 lintCoercion :: OutCoercion -> LintM (OutType, OutType)
 -- Check the kind of a coercion term, returning the kind
@@ -732,14 +836,14 @@ lintCoercion co@(TyConAppCo tc cos)
          -- kis are the kind instantiations of tc
        ; kis <- mapM lintKindCoercion cokis
        ; (ss,ts) <- mapAndUnzipM lintCoercion cotys
-       ; check_co_app co ki (kis ++ ss)
+       ; lint_co_app co ki (kis ++ ss)
        ; return (mkTyConApp tc (kis ++ ss), mkTyConApp tc (kis ++ ts)) }
 
 
 lintCoercion co@(AppCo co1 co2)
   = do { (s1,t1) <- lintCoercion co1
        ; (s2,t2) <- lintCoercion co2
-       ; check_co_app co (typeKind s1) [s2]
+       ; lint_co_app co (typeKind s1) [s2]
        ; return (mkAppTy s1 s2, mkAppTy t1 t2) }
 
 lintCoercion (ForAllCo v co)
@@ -808,85 +912,6 @@ lintCoercion (InstCo co arg_ty)
             | otherwise
             -> failWithL (ptext (sLit "Kind mis-match in inst coercion"))
 	  Nothing -> failWithL (ptext (sLit "Bad argument of inst")) }
-
-----------
-checkTcApp :: OutCoercion -> Int -> Type -> LintM OutType
-checkTcApp co n ty
-  | Just tys <- tyConAppArgs_maybe ty
-  , n < length tys
-  = return (tys !! n)
-  | otherwise
-  = failWithL (hang (ptext (sLit "Bad getNth:") <+> ppr co)
-                  2 (ptext (sLit "Offending type:") <+> ppr ty))
-
--------------------
-lintType :: OutType -> LintM Kind
-lintType (TyVarTy tv)
-  = do { checkTyCoVarInScope tv
-       ; let kind = tyVarKind tv
-       ; lintKind kind
-       ; WARN( isSuperKind kind, msg )
-         return kind }
-  where msg = hang (ptext (sLit "Expecting a type, but got a kind"))
-                 2 (ptext (sLit "Offending kind:") <+> ppr tv)
-
-lintType ty@(AppTy t1 t2) 
-  = do { k1 <- lintType t1
-       ; lint_ty_app ty k1 [t2] }
-
-lintType ty@(FunTy t1 t2)
-  = lint_ty_app ty (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind) [t1,t2]
-
-lintType ty@(TyConApp tc tys)
-  | tyConHasKind tc   -- Guards for SuperKindOon
-  , not (isUnLiftedTyCon tc) || tys `lengthIs` tyConArity tc
-       -- Check that primitive types are saturated
-       -- See Note [The kind invariant] in TypeRep
-  = lint_ty_app ty (tyConKind tc) tys
-  | otherwise
-  = failWithL (hang (ptext (sLit "Malformed type:")) 2 (ppr ty))
-
-lintType (ForAllTy tv ty)
-  = do { lintTyBndrKind tv
-       ; addInScopeVar tv (lintType ty) }
-
-----------------
-lint_ty_app :: Type -> Kind -> [OutType] -> LintM Kind
-lint_ty_app ty k tys = lint_kind_app (ptext (sLit "type") <+> quotes (ppr ty)) k tys
-
-----------------
-check_co_app :: Coercion -> Kind -> [OutType] -> LintM ()
-check_co_app ty k tys = lint_kind_app (ptext (sLit "coercion") <+> quotes (ppr ty)) k tys >> return ()
-
-----------------
-lint_kind_app :: SDoc -> Kind -> [OutType] -> LintM Kind
--- Takes care of linting the OutTypes
-lint_kind_app doc kfn tys = go kfn tys
-  where
-    fail_msg = vcat [ hang (ptext (sLit "Kind application error in")) 2 doc
-                    , nest 2 (ptext (sLit "Function kind =") <+> ppr kfn)
-                    , nest 2 (ptext (sLit "Arg types =") <+> ppr tys) ]
-
-    go kfn [] = return kfn
-    go kfn (ty:tys) =
-      case splitKindFunTy_maybe kfn of
-      { Nothing ->
-          case splitForAllTy_maybe kfn of
-          { Nothing -> failWithL fail_msg
-          ; Just (kv, body) -> do
-              -- Something of kind (forall kv. body) gets instantiated
-              -- with ty. 'kv' is a kind variable and 'ty' is a kind.
-            { unless (isSuperKind (tyVarKind kv)) (addErrL fail_msg)
-            ; lintKind ty
-            ; go (substKiWith [kv] [ty] body) tys } }
-      ; Just (kfa, kfb) -> do
-          -- Something of kind (kfa -> kfb) is applied to ty. 'ty' is
-          -- a type accepting kind 'kfa'.
-        { k <- lintType ty
-        ; lintKind kfa
-        ; unless (k `isSubKind` kfa) (addErrL fail_msg)
-        ; go kfb tys } }
-
 \end{code}
 
 %************************************************************************
