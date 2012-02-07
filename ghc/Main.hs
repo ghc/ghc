@@ -537,14 +537,21 @@ mode_flags =
                                             addFlag "-no-link" f))
   , Flag "M"            (PassFlag (setMode doMkDependHSMode))
   , Flag "E"            (PassFlag (setMode (stopBeforeMode anyHsc)))
-  , Flag "C"            (PassFlag (\f -> do setMode (stopBeforeMode HCc) f
-                                            addFlag "-fvia-C" f))
+  , Flag "C"            (PassFlag setGenerateC)
   , Flag "S"            (PassFlag (setMode (stopBeforeMode As)))
   , Flag "-make"        (PassFlag (setMode doMakeMode))
   , Flag "-interactive" (PassFlag (setMode doInteractiveMode))
   , Flag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , Flag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
   ]
+
+setGenerateC :: String -> EwM ModeM ()
+setGenerateC f
+  | cGhcUnregisterised /= "YES" = do
+        addWarn ("Compiler not unregisterised, so ignoring " ++ f)
+  | otherwise = do
+        setMode (stopBeforeMode HCc) f
+        addFlag "-fvia-C" f
 
 setMode :: Mode -> String -> EwM ModeM ()
 setMode newMode newFlag = liftEwM $ do
