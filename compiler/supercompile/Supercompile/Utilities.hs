@@ -619,6 +619,13 @@ supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
 (hFunctionsUniqSupply:anfUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:splitterUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply
 
 
+data Train a b = Car a (Train a b) | Loco b
+
+trainToList :: Train a b -> ([a], b)
+trainToList (Car a abs) = first (a:) (trainToList abs)
+trainToList (Loco b)    = ([], b)
+
+
 data Stream a = a :< Stream a
 
 listToStream :: [a] -> Stream a

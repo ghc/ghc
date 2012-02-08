@@ -63,19 +63,21 @@ data Promise = P {
   }
 
 
-appendHead :: [b] -> [(a, [b])] -> [(a, [b])]
-appendHead ys1 ((x, ys2):zs) = (x, ys1 ++ ys2):zs
-appendHead _   []            = error "Used promises after last fulfilment"
+appendHead :: [b] -> Train (a, [b]) [b] -> Train (a, [b]) [b]
+appendHead ys1 (Car (x, ys2) zs) = (x, ys1 ++ ys2) `Car` zs
+appendHead ys1 (Loco ys2)        = Loco (ys1 ++ ys2)
 
-leftExtension :: [a] -- ^ Longer list
-              -> [a] -- ^ Shorter list
-              -> ([a], [a]) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
-leftExtension xs ys = (reverse prefix_rev, suffix_rev)
-  where (prefix_rev, suffix_rev) = splitBy ys (reverse xs) -- NB: we actually assume ys == suffix_rev
+leftExtension :: Train a b -- ^ Longer list
+              -> Train a b -- ^ Shorter list
+              -> ([a], Train a b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
+leftExtension xs_train ys_train = (reverse prefix_rev, ys_train)
+  where (xs, _xs_loco) = trainToList xs_train
+        (ys, _ys_loco) = trainToList ys_train
+        (prefix_rev, _suffix_rev) = splitBy ys (reverse xs) -- NB: we actually assume ys == suffix_rev
 
 
 data MemoState = MS {
-    promises :: [(Maybe Promise, [Promise])], -- (parent, siblings) pairs, with those closest to current level first
+    promises :: Train (Promise, [Promise]) [Promise], -- (parent, siblings) pairs, with those closest to current level first
     hNames   :: Stream Name
   }
 
@@ -99,7 +101,7 @@ promise ms (state, reduced_state) = (ms', p)
             dumped     = False
           }
         ms' = MS {
-            promises = (Just p, []) : promises ms, -- Establishes a new level in the process tree
+            promises = (p, []) `Car` promises ms, -- Establishes a new level in the process tree
             hNames   = h_names'
           }
 
@@ -113,7 +115,7 @@ fulfill (deeds, e_body) fs ms
   = ((deeds, fun p `applyAbsVars` abstracted p),
      FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : fulfilments fs },
      ms { promises = appendHead (p:children) promises' })
-  where (Just p, children):promises' = promises ms
+  where (p, children) `Car` promises' = promises ms
 
 
 type StopCount = Int
@@ -151,7 +153,7 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
                                                    "\nDepth histogram:\n" ++ showSDoc (depthHistogram (scpParentChildren s'))) e'
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
-        ms = MS { promises = [(Nothing, [])], hNames = h_names }
+        ms = MS { promises = Loco [], hNames = h_names }
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
@@ -187,7 +189,7 @@ rolledBackTo s' s = ScpState {
   where
     -- We have to roll back any promise on the "stack" above us:
     (dangerous_promises, ok_promises) = (leftExtension `on` (promises . scpMemoState)) s' s
-    (spine_rolled_back, possibly_rolled_back) = (catMaybes *** concat) $ unzip dangerous_promises
+    (spine_rolled_back, possibly_rolled_back) = (second concat) $ unzip dangerous_promises
     -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result
     (rolled_fulfilments, rolled_back) = pruneFulfilments (scpFulfilmentState s') (mkVarSet (map fun spine_rolled_back))
 
@@ -331,14 +333,16 @@ memo opt = memo_opt
         --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
         --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
         case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)) memo_opt)
-             | (mb_p_parent, p_siblings) <- promises (scpMemoState s)
-             , p <- maybe id (:) mb_p_parent p_siblings
+             | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
+             , (mb_p_parent, p) <- [(Just p_parent, p_sibling) | (p_parent, p_siblings) <- parented_ps, p_sibling <- p_parent:p_siblings] ++
+                                   [(Nothing,       p_root)    | p_root <- unparented_ps]
              , Just (heap_inst@(Heap h_inst _), k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
                                                                    match' (meaning p) reduced_state]
              , let instance_match = not (M.null h_inst && null k_inst)
                    -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                    Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
-             , not instance_match -- FIXME: less restrictive instance matches
+               -- Alow instance matching against direct ancestors only, NOT their children
+             , not instance_match || fmap fun mb_p_parent == Just (fun p)
                -- FIXME: prefer "more exact" matches
              , if dumped p
                 then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
