@@ -752,8 +752,8 @@ mk_lit_switch scrut deflt [(lit,blk)]
     ne      = if isFloatType cmm_ty then MO_F_Ne rep else MO_Ne rep
 
 mk_lit_switch scrut deflt_blk_id branches
-  = do hi_blk <- mk_lit_switch scrut deflt_blk_id lo_branches
-       lo_blk <- mk_lit_switch scrut deflt_blk_id hi_branches
+  = do lo_blk <- mk_lit_switch scrut deflt_blk_id lo_branches
+       hi_blk <- mk_lit_switch scrut deflt_blk_id hi_branches
        mkCmmIfThenElse cond lo_blk hi_blk
   where
     n_branches = length branches
