@@ -63,8 +63,19 @@ data Promise = P {
   }
 
 
+appendHead :: [b] -> [(a, [b])] -> [(a, [b])]
+appendHead ys1 ((x, ys2):zs) = (x, ys1 ++ ys2):zs
+appendHead _   []            = error "Used promises after last fulfilment"
+
+leftExtension :: [a] -- ^ Longer list
+              -> [a] -- ^ Shorter list
+              -> ([a], [a]) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
+leftExtension xs ys = (reverse prefix_rev, suffix_rev)
+  where (prefix_rev, suffix_rev) = splitBy ys (reverse xs) -- NB: we actually assume ys == suffix_rev
+
+
 data MemoState = MS {
-    promises :: [Promise],
+    promises :: [(Maybe Promise, [Promise])], -- (parent, siblings) pairs, with those closest to current level first
     hNames   :: Stream Name
   }
 
@@ -88,7 +99,7 @@ promise ms (state, reduced_state) = (ms', p)
             dumped     = False
           }
         ms' = MS {
-            promises = p : promises ms,
+            promises = (Just p, []) : promises ms, -- Establishes a new level in the process tree
             hNames   = h_names'
           }
 
@@ -97,8 +108,12 @@ newtype FulfilmentState = FS {
     fulfilments :: [(Var, FVedTerm)]
   }
 
-fulfill :: Promise -> (Deeds, FVedTerm) -> FulfilmentState -> ((Deeds, FVedTerm), FulfilmentState)
-fulfill p (deeds, e_body) fs = ((deeds, fun p `applyAbsVars` abstracted p), FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : fulfilments fs })
+fulfill :: (Deeds, FVedTerm) -> FulfilmentState -> MemoState -> ((Deeds, FVedTerm), FulfilmentState, MemoState)
+fulfill (deeds, e_body) fs ms
+  = ((deeds, fun p `applyAbsVars` abstracted p),
+     FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : fulfilments fs },
+     ms { promises = appendHead (p:children) promises' })
+  where (Just p, children):promises' = promises ms
 
 
 type StopCount = Int
@@ -136,7 +151,7 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
                                                    "\nDepth histogram:\n" ++ showSDoc (depthHistogram (scpParentChildren s'))) e'
   where h_names = listToStream $ zipWith (\i uniq -> mkSystemVarName uniq (mkFastString ('h' : show (i :: Int))))
                                          [1..] (uniqsFromSupply hFunctionsUniqSupply)
-        ms = MS { promises = [], hNames = h_names }
+        ms = MS { promises = [(Nothing, [])], hNames = h_names }
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
@@ -160,29 +175,27 @@ catchM try handler = do
 rolledBackTo :: ScpState -> ScpState -> ScpState
 rolledBackTo s' s = ScpState {
       scpMemoState = MS {
-          promises = mapMaybe (\p -> if fun p == fun (head (promises (scpMemoState s'))) -- The most recent promise in s' always has no work done on it, so don't report dumping
-                                      then Nothing
-                                      else Just $ if fun p `elemVarSet` rolled_back then p { dumped = True } else p) (promises (scpMemoState s')),
+          -- The most recent promise in s' always has no work done on it, so don't report dumping for it
+          promises = appendHead [if fun p `elemVarSet` rolled_back then p { dumped = True } else p | p <- safeTail spine_rolled_back ++ possibly_rolled_back] ok_promises,
           hNames   = hNames (scpMemoState s')
         },
       scpProcessHistory = scpProcessHistory s,
-      scpFulfilmentState = FS {
-          fulfilments = rolled_fulfilments
-        },
+      scpFulfilmentState = rolled_fulfilments,
       scpResidTags      = scpResidTags s', -- FIXME: not totally accurate
       scpParentChildren = scpParentChildren s'
     }
   where
-    -- We have to roll back any promise on the "stack" above us. We don't have access to the stack directly, but we can compute this set
-    -- of promises by looking at *new* promises that are as yet unfulfilled:
-    init_rolled_back = (minusVarSet `on` (mkVarSet . map fun . promises . scpMemoState)) s' s `minusVarSet` mkVarSet (map fst (fulfilments (scpFulfilmentState s')))
-    -- NB: rolled_back includes both unfulfilled promises rolled back from the stack and fulfilments that have to be dumped as a result
-    (rolled_fulfilments, rolled_back) = pruneFulfilments (fulfilments (scpFulfilmentState s')) init_rolled_back
+    -- We have to roll back any promise on the "stack" above us:
+    (dangerous_promises, ok_promises) = (leftExtension `on` (promises . scpMemoState)) s' s
+    (spine_rolled_back, possibly_rolled_back) = (catMaybes *** concat) $ unzip dangerous_promises
+    -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result
+    (rolled_fulfilments, rolled_back) = pruneFulfilments (scpFulfilmentState s') (mkVarSet (map fun spine_rolled_back))
 
-    pruneFulfilments fulfilments rolled_back
+    pruneFulfilments :: FulfilmentState -> VarSet -> (FulfilmentState, VarSet)
+    pruneFulfilments (FS fulfilments) rolled_back
       | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " fulfilments:") (ppr rolled_back))
-                    (fulfilments, rolled_back)
-      | otherwise = pruneFulfilments keep (rolled_back `unionVarSet` mkVarSet (map fst dump))
+                    (FS fulfilments, rolled_back)
+      | otherwise = pruneFulfilments (FS keep) (rolled_back `unionVarSet` mkVarSet (map fst dump))
       where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
 
 scpDepth :: ScpEnv -> Int
@@ -203,8 +216,8 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
         unReaderT (unStateT (unScpM (opt state)) s)
                   (env { scpParents = fun p : scpParents env }) >>= \((gen, res), s') -> return (res, s' { scpParentChildren = addChild (safeHead (scpParents env)) (fun p) (meaning p) gen (scpParentChildren s') })
 
-fulfillM :: Promise -> (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
-fulfillM p res = ScpM $ StateT $ \s -> case fulfill p res (scpFulfilmentState s) of (res', fs') -> return (res', s { scpFulfilmentState = fs' })
+fulfillM :: (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
+fulfillM res = ScpM $ StateT $ \s -> case fulfill res (scpFulfilmentState s) (scpMemoState s) of (res', fs', ms') -> return (res', s { scpFulfilmentState = fs', scpMemoState = ms' })
 
 terminateM :: String -> State -> (forall b. Generaliser -> ScpM b) -> ScpM a -> (String -> State -> (forall b. Generaliser -> ScpM b) -> ScpM a) -> ScpM a
 terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case terminate (scpProcessHistory s) (scpNodeKey env, (h, state, rb)) of
@@ -318,7 +331,8 @@ memo opt = memo_opt
         --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
         --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
         case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)) memo_opt)
-             | p <- promises (scpMemoState s)
+             | (mb_p_parent, p_siblings) <- promises (scpMemoState s)
+             , p <- maybe id (:) mb_p_parent p_siblings
              , Just (heap_inst@(Heap h_inst _), k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
                                                                    match' (meaning p) reduced_state]
              , let instance_match = not (M.null h_inst && null k_inst)
@@ -337,7 +351,7 @@ memo opt = memo_opt
                              -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
                                          ; res <- addParentM p (opt (Just (getOccString (varName (fun p))))) state
                                          ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
-                                         ; fulfillM p res }, s { scpMemoState = ms' })
+                                         ; fulfillM res }, s { scpMemoState = ms' })
                     where (ms', p) = promise (scpMemoState s) (state, reduced_state)
       where (state_did_reduce, reduced_state) = reduceForMatch state
             
@@ -433,8 +447,8 @@ supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ do
   where (state, (preinit_with, preinit_state)) = prepareTerm unfoldings e
 
 preinitalise :: [(State, FVedTerm)] -> ScpM ()
-preinitalise states_fulfils = do
-    ps_es' <- ScpM $ StateT $ \s -> do
-          let (ms', ps_es') = mapAccumL (\ms (state, e') -> second (flip (,) e') $ promise ms (state, snd (reduceForMatch state))) (scpMemoState s) states_fulfils
-          return (ps_es', s { scpMemoState = ms' })
-    mapM_ (\(p, e') -> fulfillM p (emptyDeeds, e')) ps_es'
+preinitalise states_fulfils = forM_ states_fulfils $ \(state, e') -> do
+    ScpM $ StateT $ \s -> do
+        let (ms', _p) = promise (scpMemoState s) (state, snd (reduceForMatch state))
+        return ((), s { scpMemoState = ms' })
+    fulfillM (emptyDeeds, e')
