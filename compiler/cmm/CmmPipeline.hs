@@ -202,8 +202,14 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
 dumpGraph :: DynFlags -> DynFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
-  cmmLint g
+  when (dopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags (pprPlatform (targetPlatform dflags)) flag name g
+ where
+  do_lint g = case cmmLintGraph (targetPlatform dflags) g of
+                 Just err -> do { printDump err
+                                ; ghcExit dflags 1
+                                }
+                 Nothing  -> return ()
 
 dumpWith :: DynFlags -> (a -> SDoc) -> DynFlag -> String -> a -> IO ()
 dumpWith dflags pprFun flag txt g = do
