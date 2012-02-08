@@ -112,7 +112,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        let callPPs = {-# SCC "callProcPoints" #-} callProcPoints g
        procPoints <- {-# SCC "minimalProcPointSet" #-} run $ minimalProcPointSet (targetPlatform dflags) callPPs g
 
-       g <- {-# SCC "layoutStack" #-} run $ cmmLayoutStack procPoints entry_off g
+       (g, stackmaps) <- {-# SCC "layoutStack" #-}
+                         run $ cmmLayoutStack procPoints entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
 --       g <- {-# SCC "addProcPointProtocols" #-} run $ addProcPointProtocols callPPs procPoints g
@@ -167,8 +168,9 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 --       dumps Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls" gs
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
---       gs <- {-# SCC "setInfoTableStackMap" #-} return $ map (setInfoTableStackMap slotEnv areaMap) gs
---       dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
+       gs <- {-# SCC "setInfoTableStackMap" #-}
+             return $ map (setInfoTableStackMap stackmaps) gs
+       dumps Opt_D_dump_cmmz_info "after setInfoTableStackMap" gs
 
        ----------- Control-flow optimisations ---------------
        gs <- {-# SCC "cmmCfgOpts(2)" #-} return $ map cmmCfgOptsProc gs

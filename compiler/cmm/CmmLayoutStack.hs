@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards, GADTs #-}
 module CmmLayoutStack (
-       cmmLayoutStack
+       cmmLayoutStack, setInfoTableStackMap
   ) where
 
 import Cmm
@@ -39,26 +39,49 @@ instance Outputable StackSlot where
 -- "base", which is defined to be the address above the return address
 -- on the stack on entry to this CmmProc.
 --
---         |           | <- base
---         |-----------|
---         |    ret    | <- base + 8
---         |-----------|
---         .           .
---         .           .
---
 -- Lower addresses have higher StackLocs.
 --
 type StackLoc = ByteOff
+
+{-
+ A StackMap describes the stack at any given point.  At a continuation
+ it has a particular layout, like this:
+
+         |             | <- base
+         |-------------|
+         |     ret0    | <- base + 8
+         |-------------|
+         .  upd frame  . <- base + sm_ret_off
+         |-------------|
+         |             |
+         .    vars     .
+         . (live/dead) .
+         |             | <- base + sm_sp - sm_args
+         |-------------|
+         |    ret1     |
+         .  ret vals   . <- base + sm_sp    (<--- Sp points here)
+         |-------------|
+
+Why do we include the final return address (ret0) in our stack map?  I
+have absolutely no idea, but it seems to be done that way consistently
+in the rest of the code generator, so I played along here. --SDM
+
+Note that we will be constructing an info table for the continuation
+(ret1), which needs to describe the stack down to, but not including,
+the update frame (or ret0, if there is no update frame).
+-}
 
 data StackMap = StackMap
  {  sm_sp   :: StackLoc
        -- ^ the offset of Sp relative to the base on entry
        -- to this block.
  ,  sm_args :: ByteOff
- ,  sm_ret_off :: ByteOff
        -- ^ the number of bytes of arguments in the area for this block
        -- Defn: the offset of young(L) relative to the base is given by
        -- (sm_sp - sm_args) of the StackMap for block L.
+ ,  sm_ret_off :: ByteOff
+       -- ^ Number of words of stack that we do not describe with an info
+       -- table, because it contains an update frame.
  ,  sm_regs :: UniqFM (LocalReg,StackLoc)
        -- ^ regs on the stack
  }
@@ -71,7 +94,8 @@ instance Outputable StackMap where
      text "sm_regs = " <> ppr (eltsUFM sm_regs)
 
 
-cmmLayoutStack :: ProcPointSet -> ByteOff -> CmmGraph -> FuelUniqSM CmmGraph
+cmmLayoutStack :: ProcPointSet -> ByteOff -> CmmGraph
+               -> FuelUniqSM (CmmGraph, BlockEnv StackMap)
 cmmLayoutStack procpoints entry_args
                graph@(CmmGraph { g_entry = entry })
   = do
@@ -80,13 +104,13 @@ cmmLayoutStack procpoints entry_args
     pprTrace "liveness" (ppr liveness) $ return ()
     let blocks = postorderDfs graph
 
-    (_rec_stackmaps, rec_high_sp, new_blocks) <- liftUniq $
+    (final_stackmaps, final_high_sp, new_blocks) <- liftUniq $
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
             layout procpoints liveness entry entry_args
                    rec_stackmaps rec_high_sp blocks
 
-    pprTrace ("Sp HWM") (ppr rec_high_sp) $
-       return (ofBlockList entry new_blocks)
+    pprTrace ("Sp HWM") (ppr final_high_sp) $
+       return (ofBlockList entry new_blocks, final_stackmaps)
 
 
 
@@ -131,22 +155,27 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
       = do
        let (entry0@(CmmEntry entry_lbl), middle0, last0) = blockSplit b0
     
-       pprTrace "layout" (ppr entry_lbl <+> ppr acc_stackmaps) $ return ()
-    
        let stack0@StackMap { sm_sp = sp0 }
                = mapFindWithDefault
                      (pprPanic "no stack map for" (ppr entry_lbl))
                      entry_lbl acc_stackmaps
     
-       -- update the stack map to include the effects of assignments
+       pprTrace "layout" (ppr entry_lbl <+> ppr stack0) $ return ()
+    
+       -- Update the stack map to include the effects of assignments
        -- in this block
        let stack1 = foldBlockNodesF (procMiddle acc_stackmaps) middle0 stack0
     
-       -- insert reloads if necessary
+       -- Insert assignments to reload all the live variables if this
+       -- is a proc point
        let middle1 = if entry_lbl `setMember` procpoints
                         then foldr blockCons middle0 (insertReloads stack0)
                         else middle0
     
+       -- Look at the last node and if we are making a call or jumping to
+       -- a proc point, we must save the live variables, adjust Sp, and
+       -- construct the StackMaps for each of the successor blocks.
+       -- See handleLastNode for details.
        (saves, out, sp_off, last1, fixup_blocks)
            <- handleLastNode procpoints liveness cont_info
                              acc_stackmaps stack1 last0
@@ -154,6 +183,7 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
        let hwm'    = maximum (acc_hwm : map sm_sp (mapElems out))
            middle2 = maybeAddSpAdj sp_off $ foldl blockSnoc middle1 saves
     
+           -- manifest Sp: turn all CmmStackSlots into actual loads
            fiddle_middle = mapExpDeep (areaToSp sp0 sp_high final_stackmaps)
            fiddle_last   = mapExpDeep (areaToSp (sp0 - sp_off) sp_high
                                                 final_stackmaps)
@@ -164,7 +194,7 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
            fixup_blocks' = map (blockMapNodes3 (id, fiddle_middle, id))
                                fixup_blocks
     
-       pprTrace "layout2" (ppr out) $ return ()
+       pprTrace "layout(out)" (ppr out) $ return ()
     
        go bs stackmaps' hwm' (newblock' : fixup_blocks' ++ acc_blocks)
 
@@ -504,6 +534,35 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
 
    ( stackmap { sm_regs = final_regs , sm_sp = trim_sp }
    , push_assigs ++ save_assigs )
+
+
+-- -----------------------------------------------------------------------------
+-- Update info tables to include stack liveness
+
+
+setInfoTableStackMap :: BlockEnv StackMap -> CmmDecl -> CmmDecl
+setInfoTableStackMap stackmaps
+    (CmmProc top_info@TopInfo{..} l g@CmmGraph{g_entry = eid})
+  = CmmProc top_info{ info_tbl = fix_info info_tbl } l g
+  where
+    fix_info info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
+       info_tbl { cit_rep = StackRep (get_liveness eid) }
+    fix_info other = other
+
+    get_liveness :: BlockId -> Liveness
+    get_liveness lbl
+      = case mapLookup lbl stackmaps of
+          Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl)
+          Just sm -> stackMapToLiveness sm
+
+stackMapToLiveness :: StackMap -> Liveness
+stackMapToLiveness StackMap{..} =
+   reverse $ Array.elems $
+        accumArray (\_ x -> x) True (toWords sm_ret_off + 1,
+                                     toWords (sm_sp - sm_args)) live_words
+   where
+     live_words =  [ (toWords off, False)
+                   | (r,off) <- eltsUFM sm_regs, isGcPtrType (localRegType r) ]
 
 
 -- -----------------------------------------------------------------------------
