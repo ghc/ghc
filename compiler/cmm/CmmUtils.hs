@@ -418,7 +418,8 @@ toBlockList :: CmmGraph -> [CmmBlock]
 toBlockList g = mapElems $ toBlockMap g
 
 ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
-ofBlockList entry blocks = CmmGraph {g_entry=entry, g_graph=GMany NothingO body NothingO}
+ofBlockList entry blocks = CmmGraph { g_entry = entry
+                                    , g_graph = GMany NothingO body NothingO }
   where body = foldr addBlock emptyBody blocks
 
 bodyToBlockList :: Body CmmNode -> [CmmBlock]

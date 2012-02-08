@@ -77,8 +77,6 @@ type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
 --   (a) C--, i.e. populated with various C-- constructs
 --       (Cmm and RawCmm in OldCmm.hs)
 --   (b) Native code, populated with data/instructions
---
--- A second family of instances based on Hoopl is in Cmm.hs.
 
 -- | A top-level chunk, abstracted over the type of the contents of
 -- the basic blocks (Cmm or instructions are the likely instantiations).
