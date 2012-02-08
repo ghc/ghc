@@ -352,7 +352,7 @@ if test "$build" != "$host" ; then
     PortingCompiler=YES
 fi
 # Note: cross_compiling is set to 'yes' in both 'port' and 'toolchain' cases
-if ! test "$host" == "$target" -o "$host" == "$build" ; then
+if ! test "$host" = "$target" -o "$host" = "$build" ; then
    AC_MSG_ERROR([
 You've selected:
 
