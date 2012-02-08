@@ -31,9 +31,9 @@ dataToQa mkCon mkLit appCon antiQ t =
                 conName :: Name
                 conName =
                     case showConstr constr of
-                      "(:)"       -> Name (mkOccName ":") NameS
-                      con@"[]"    -> Name (mkOccName con) NameS
-                      con@('(':_) -> Name (mkOccName con) NameS
+                      "(:)"       -> Name (mkOccName ":") (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Types"))
+                      con@"[]"    -> Name (mkOccName con) (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Types"))
+                      con@('(':_) -> Name (mkOccName con) (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Tuple"))
                       con         -> mkNameG_d (tyConPackage tycon)
                                                (tyConModule tycon)
                                                con
