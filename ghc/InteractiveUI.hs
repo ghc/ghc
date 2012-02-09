@@ -1645,16 +1645,13 @@ addImportToContext str = do
      st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
   setGHCContextFromGHCiState
 
-setContext :: [String] -> [String] -> GHCi ()
-setContext starred not_starred = do
-  is1 <- mapM (checkAdd True)  starred
-  is2 <- mapM (checkAdd False) not_starred
-  let iss = foldr addNotSubsumed [] (is1++is2)
-  modifyGHCiState $ \st -> st { remembered_ctx = iss, transient_ctx = [] }
-                                -- delete the transient context
-  setGHCContextFromGHCiState
-
-checkAdd :: Bool -> String -> GHCi InteractiveImport
+-- TODO: ARGH! This is a mess! 'checkAdd' is called from many places and we
+-- have about 4 different variants of setGHCContext. All this import code needs
+-- to be refactored to something saner. We should do the sanity check on an
+-- import in 'checkAdd' and checkAdd only and only need to call checkAdd from
+-- one place ('setGHCContetFromGHCiState'). The code isn't even logically
+-- ordered!
+checkAdd :: Bool -> String -> GHCi (InteractiveImport)
 checkAdd star mstr = do
   dflags <- getDynFlags 
   case safeLanguageOn dflags of
@@ -1664,8 +1661,8 @@ checkAdd star mstr = do
                s <- GHC.isModuleTrusted m
                case s of
                  True  -> return $ IIDecl (simpleImportDecl $ moduleName m)
-                 False -> ghcError $ CmdLineError $ "can't import " ++ mstr
-                                                 ++ " as it isn't trusted."
+                 False -> ghcError $ CmdLineError $
+                     "can't import " ++ mstr ++ " as it isn't trusted."
 
     False | star -> do m <- wantInterpretedModule mstr
                        return $ IIModule m
@@ -1687,12 +1684,26 @@ checkAdd star mstr = do
 --
 setGHCContextFromGHCiState :: GHCi ()
 setGHCContextFromGHCiState = do
-  let ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
-      ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
   st <- getGHCiState
-  iidecls <- filterM (tryBool . ok) (transient_ctx st ++ remembered_ctx st)
-  setGHCContext iidecls
+  goodTran <- filterM (tryBool . ok) $ transient_ctx st
+  goodRemb <- filterM (tryBool . ok) $ remembered_ctx st
+  -- drop bad imports so we don't keep replaying it to the user!
+  modifyGHCiState $ \s -> s { transient_ctx  = goodTran }
+  modifyGHCiState $ \s -> s { remembered_ctx = goodRemb }
+  setGHCContext (goodTran ++ goodRemb)
 
+  where 
+    ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
+    ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
+
+setContext :: [String] -> [String] -> GHCi ()
+setContext starred not_starred = do
+  is1 <- mapM (checkAdd True)  starred
+  is2 <- mapM (checkAdd False) not_starred
+  let iss = foldr addNotSubsumed [] (is1++is2)
+  modifyGHCiState $ \st -> st { remembered_ctx = iss, transient_ctx = [] }
+                                -- delete the transient context
+  setGHCContextFromGHCiState
 
 -- | Sets the GHC contexts to the given set of imports, adding a Prelude
 -- import if there isn't an explicit one already.
@@ -2745,7 +2756,7 @@ tryBool :: GHCi a -> GHCi Bool
 tryBool m = do
     r <- ghciTry m
     case r of
-      Left _  -> return False
+      Left e  -> showException e >> return False
       Right _ -> return True
 
 -- ----------------------------------------------------------------------------
