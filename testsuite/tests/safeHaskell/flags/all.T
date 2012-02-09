@@ -54,6 +54,10 @@ test('SafeFlags26', normal, compile_fail, [''])
 # test -fno-safe-infer
 test('SafeFlags27', normal, compile, [''])
 
+# test package flags don't work
+test('SafeFlags28', normal, compile_fail, [''])
+test('SafeFlags29', normal, compile_fail, [''])
+
 # test certain flags are still allowed under -XSafe
 test('Flags01', normal, compile, ['-XSafe'])
 test('Flags02', normal, compile, ['-XSafe'])
