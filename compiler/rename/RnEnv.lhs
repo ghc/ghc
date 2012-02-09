@@ -507,7 +507,12 @@ lookupOccRn_maybe rdr_name
        { -- We allow qualified names on the command line to refer to
          --  *any* name exported by any module in scope, just as if there
          -- was an "import qualified M" declaration for every module.
-         allow_qual <- doptM Opt_ImplicitImportQualified
+         -- But we DONT allow it under Safe Haskell as we need to check
+         -- imports. We can and should instead check the qualified import
+         -- but at the moment this requires some refactoring so leave as a TODO
+       ; dflags <- getDynFlags
+       ; let allow_qual = dopt Opt_ImplicitImportQualified dflags &&
+                          not (safeDirectImpsReq dflags)
        ; is_ghci <- getIsGHCi
                -- This test is not expensive,
                -- and only happens for failed lookups
