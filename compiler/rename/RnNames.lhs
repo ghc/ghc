@@ -1512,7 +1512,10 @@ warnUnusedImport (L loc decl, used, unused)
                                    <+> ptext (sLit "import") <+> pp_mod <> parens empty ]
     msg2 = sep [pp_herald <+> quotes (pprWithCommas ppr unused),
                     text "from module" <+> quotes pp_mod <+> pp_not_used]
-    pp_herald   = text "The import of"
+    pp_herald  = text "The" <+> pp_qual <+> text "import of"
+    pp_qual
+      | ideclQualified decl = text "qualified"
+      | otherwise           = empty
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
 \end{code}
