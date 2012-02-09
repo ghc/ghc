@@ -1717,9 +1717,9 @@ package_flags = [
   , Flag "ignore-package"        (HasArg ignorePackage)
   , Flag "syslib"                (HasArg (\s -> do exposePackage s
                                                    deprecate "Use -package instead"))
+  , Flag "distrust-all-packages" (NoArg (setDynFlag Opt_DistrustAllPackages))
   , Flag "trust"                 (HasArg trustPackage)
   , Flag "distrust"              (HasArg distrustPackage)
-  , Flag "distrust-all-packages" (NoArg (setDynFlag Opt_DistrustAllPackages))
   ]
 
 type TurnOnFlag = Bool   -- True  <=> we are turning the flag on

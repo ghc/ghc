@@ -272,7 +272,7 @@ setBatchPackageFlags dflags pkgs = (maybeDistrustAll . maybeHideAll) pkgs
       | otherwise                           = pkgs'
 
     hide pkg = pkg{ exposed = False }
-    distrust pkg = pkg{ exposed = False }
+    distrust pkg = pkg{ trusted = False }
 
 -- TODO: This code is duplicated in utils/ghc-pkg/Main.hs
 mungePackagePaths :: FilePath -> FilePath -> PackageConfig -> PackageConfig
