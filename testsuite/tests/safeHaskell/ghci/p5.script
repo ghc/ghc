@@ -1,0 +1,13 @@
+-- Test unsetting safe
+:unset +s
+:set -XSafe
+
+:set -XSafe
+:unset -XSafe
+
+:set -XTrustworthy
+:unset -XTrustworthy
+
+:set -XUnsafe
+:unset -XUnsafe
+

@@ -1,0 +1,2 @@
+ghc-stage2: B.hs:1:14-19: Incompatible Safe Haskell flags! (Safe, Unsafe)
+Usage: For basic information, try the `--help' option.

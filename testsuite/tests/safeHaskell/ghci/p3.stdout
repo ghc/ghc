@@ -1,0 +1,3 @@
+can't import System.IO.Unsafe as it isn't trusted.
+*** Exception: bytestring-0.9.2.0:Data.ByteString can't be safely imported! The package (bytestring-0.9.2.0) the module resides in isn't trusted.
+
