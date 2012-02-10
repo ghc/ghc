@@ -2016,6 +2016,9 @@ AC_DEFUN([FIND_GCC],[
         # than the LLVM backend). We prefer the legacy gcc, but in
         # Xcode 4.2 'gcc-4.2' was removed.
         FP_ARG_WITH_PATH_GNU_PROG([$1], [gcc-4.2], [gcc-4.2])
+    elif test "$windows" = YES
+    then
+        $1="$CC"
     else
         FP_ARG_WITH_PATH_GNU_PROG([$1], [$2], [$3])
     fi
