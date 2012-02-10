@@ -1430,8 +1430,8 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     -- We grab the whole environment because of the overlapping that may have
     -- been done. See the notes at the definition of InteractiveContext
     -- (ic_instances) for more details.
-    let finsts = famInstEnvElts $ tcg_fam_inst_env tc_gblenv
-        insts  = instEnvElts $ tcg_inst_env tc_gblenv
+    let finsts = tcg_fam_insts tc_gblenv
+        insts  = tcg_insts     tc_gblenv
 
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE
