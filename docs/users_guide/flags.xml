@@ -1301,11 +1301,11 @@
           </row>
 
           <row>
-            <entry><option>-fwarn-orphans</option></entry>
+            <entry><option>-fwarn-orphans, -fwarn-auto-orphans</option></entry>
             <entry>warn when the module contains <link linkend="orphan-modules">orphan instance declarations
                 or rewrite rules</link></entry>
             <entry>dynamic</entry>
-            <entry><option>-fno-warn-orphans</option></entry>
+            <entry><option>-fno-warn-orphans, -fno-warn-auto-orphans</option></entry>
           </row>
 
           <row>
