@@ -1091,7 +1091,7 @@ get two defns for 'main' in the interface file!
 setInteractiveContext :: HscEnv -> InteractiveContext -> TcRn a -> TcRn a
 setInteractiveContext hsc_env icxt thing_inside
   = let -- Initialise the tcg_inst_env with instances from all home modules.
-        -- This mimics the more selective call to hptInstances in tcRnModule.
+        -- This mimics the more selective call to hptInstances in tcRnImports
         (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
         (ic_insts, ic_finsts) = ic_instances icxt
 
@@ -1143,9 +1143,11 @@ setInteractiveContext hsc_env icxt thing_inside
                                                (map getOccName visible_tmp_ids)
                                  -- Note [delete shadowed tcg_rdr_env entries]
         , tcg_type_env     = type_env
+        , tcg_insts        = ic_insts
         , tcg_inst_env     = extendInstEnvList
                               (extendInstEnvList (tcg_inst_env env) ic_insts)
                               home_insts
+        , tcg_fam_insts    = ic_finsts
         , tcg_fam_inst_env = extendFamInstEnvList
                               (extendFamInstEnvList (tcg_fam_inst_env env)
                                                     ic_finsts)
