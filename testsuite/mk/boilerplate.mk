@@ -145,8 +145,6 @@ empty=
 space=$(empty) $(empty)
 ghc-config-mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
 
-$(info TOP is $(TOP))
-$(info ghc-config-mk is $(ghc-config-mk))
 $(ghc-config-mk) : $(TOP)/mk/ghc-config
 	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@" || $(RM) "$@"
 
