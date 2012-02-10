@@ -120,6 +120,9 @@ ifeq "$(AR)" ""
 AR = ar
 endif
 
+# Be careful when using this. On Windows it ends up looking like
+# c:/foo/bar which confuses make, as make thinks that the : is Makefile
+# syntax
 TOP_ABS := $(abspath $(TOP))
 $(eval $(call canonicalise,TOP_ABS))
 
@@ -135,15 +138,15 @@ PYTHON = python
 # the results, and emits a little .mk file with make bindings for the values.
 # This way we cache the results for different values of $(TEST_HC)
 
-$(TOP_ABS)/mk/ghc-config : $(TOP_ABS)/mk/ghc-config.hs
+$(TOP)/mk/ghc-config : $(TOP)/mk/ghc-config.hs
 	"$(TEST_HC)" --make -o $@ $<
 
 empty=
 space=$(empty) $(empty)
-ghc-config-mk = $(TOP_ABS)/mk/ghcconfig$(subst $(space),_,$(subst /,_,$(subst \,_,$(TEST_HC)))).mk
+ghc-config-mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
 
-$(ghc-config-mk) : $(TOP_ABS)/mk/ghc-config
-	$(TOP_ABS)/mk/ghc-config "$(TEST_HC)" >"$@" || $(RM) "$@"
+$(ghc-config-mk) : $(TOP)/mk/ghc-config
+	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@" || $(RM) "$@"
 
 include $(ghc-config-mk)
 
