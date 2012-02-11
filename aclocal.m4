@@ -211,6 +211,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         freebsd)
             test -z "[$]2" || eval "[$]2=OSFreeBSD"
             ;;
+        dragonfly)
+            test -z "[$]2" || eval "[$]2=OSDragonFly"
+            ;;
         kfreebsdgnu)
             test -z "[$]2" || eval "[$]2=OSKFreeBSD"
             ;;
