@@ -10,7 +10,6 @@
 #
 # -----------------------------------------------------------------------------
 
-dir = ghc
 TOP = ..
 SPEC_TARGETS = 1 2 3 re1 re2 re3
 include $(TOP)/mk/sub-makefile.mk

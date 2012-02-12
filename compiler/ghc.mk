@@ -150,6 +150,10 @@ $(eval $(call clean-target,compiler,config_hs,compiler/main/Config.hs))
 
 PLATFORM_H = ghc_boot_platform.h
 
+ifeq "$(BuildingCrossCompiler)" "YES"
+compiler/stage1/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
+	cp $< $@
+else
 compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
@@ -192,6 +196,7 @@ endif
 	@echo                                                    >> $@
 	@echo "#endif /* __PLATFORM_H__ */"                      >> $@
 	@echo "Done."
+endif
 
 # For stage2 and above, the BUILD platform is the HOST of stage1, and
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same
@@ -488,13 +493,6 @@ $(eval $(call compiler-hs-dependency,PrimOp,$(PRIMOP_BITS)))
 # switch off the recompilation checker for those modules:
 compiler/prelude/PrimOp_HC_OPTS  += -fforce-recomp
 compiler/main/Constants_HC_OPTS  += -fforce-recomp
-
-# Workaround for #4003 in GHC 6.12.2.  It didn't happen in 6.12.1, and
-# will be fixed in 6.12.3.  Unfortunately we don't have a way to do
-# this for just stage1 in the build system.
-ifeq "$(GhcVersion)" "6.12.2"
-compiler/hsSyn/HsLit_HC_OPTS     += -fomit-interface-pragmas
-endif
 
 # LibFFI.hs #includes ffi.h
 compiler/stage2/build/LibFFI.hs : $(libffi_HEADERS)

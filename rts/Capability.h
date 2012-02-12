@@ -96,7 +96,11 @@ struct Capability_ {
     Task *spare_workers;
     nat n_spare_workers; // count of above
 
-    // This lock protects running_task, returning_tasks_{hd,tl}, wakeup_queue.
+    // This lock protects:
+    //    running_task
+    //    returning_tasks_{hd,tl}
+    //    wakeup_queue
+    //    inbox
     Mutex lock;
 
     // Tasks waiting to return from a foreign call, or waiting to make
@@ -108,6 +112,7 @@ struct Capability_ {
     Task *returning_tasks_tl;
 
     // Messages, or END_TSO_QUEUE.
+    // Locks required: cap->lock
     Message *inbox;
 
     SparkPool *sparks;

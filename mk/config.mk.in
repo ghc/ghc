@@ -139,7 +139,7 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 # the compiler you build with is generating registerised binaries), but
 # the stage2 compiler will be an unregisterised binary.
 #
-ifneq "$(findstring $(HostArch_CPP), i386 x86_64 powerpc arm)" ""
+ifneq "$(findstring $(TargetArch_CPP), i386 x86_64 powerpc arm)" ""
 GhcUnregisterised=NO
 else
 GhcUnregisterised=YES
@@ -151,8 +151,8 @@ endif
 # Target platforms supported:
 #   i386, powerpc
 #   AIX is not supported 
-ArchSupportsNCG=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64 powerpc sparc)))
-OsSupportsNCG=$(strip $(patsubst $(HostOS_CPP), YES, $(patsubst aix,,$(HostOS_CPP))))
+ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc)))
+OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst aix,,$(TargetOS_CPP))))
 
 # lazy test, because $(GhcUnregisterised) might be set in build.mk later.
 GhcWithNativeCodeGen=$(strip\
@@ -163,7 +163,7 @@ HaveLibDL = @HaveLibDL@
 
 # ArchSupportsSMP should be set iff there is support for that arch in
 # includes/stg/SMP.h
-ArchSupportsSMP=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64 sparc powerpc arm)))
+ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc arm)))
 
 # lazy test, because $(GhcUnregisterised) might be set in build.mk later.
 GhcWithSMP=$(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
@@ -171,8 +171,8 @@ GhcWithSMP=$(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
 
-OsSupportsGHCi=$(strip $(patsubst $(HostOS_CPP), YES, $(findstring $(HostOS_CPP), mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
-ArchSupportsGHCi=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64 powerpc sparc sparc64)))
+OsSupportsGHCi=$(strip $(patsubst $(TargetOS_CPP), YES, $(findstring $(TargetOS_CPP), mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd darwin kfreebsdgnu)))
+ArchSupportsGHCi=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc sparc sparc64)))
 
 ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
@@ -194,7 +194,7 @@ endif
 # Whether to use libffi for adjustors (foreign import "wrapper") or
 # not.  If we have built-in support (rts/Adjustor.c) then we use that,
 # otherwise we fall back on libffi, which is slightly slower.
-ArchHasAdjustorSupport = $(if $(findstring $(HostArch_CPP),i386 x86_64),YES,NO)
+ArchHasAdjustorSupport = $(if $(findstring $(TargetArch_CPP),i386 x86_64),YES,NO)
 ifeq "$(ArchHasAdjustorSupport)" "YES"
 UseLibFFIForAdjustors=NO
 else
@@ -515,9 +515,6 @@ GHC_STAGE1  = $(INPLACE_BIN)/ghc-stage1$(exeext)
 GHC_STAGE2  = $(INPLACE_BIN)/ghc-stage2$(exeext)
 GHC_STAGE3  = $(INPLACE_BIN)/ghc-stage3$(exeext)
 
-# Install stage 2 by default, can be changed to 3
-INSTALL_GHC_STAGE=2
-
 BOOTSTRAPPING_CONF = libraries/bootstrapping.conf
 
 INPLACE_PACKAGE_CONF = $(INPLACE_LIB)/package.conf.d
@@ -553,8 +550,17 @@ endif
 # the flag --with-gcc=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-WhatGccIsCalled = @WhatGccIsCalled@
-GccVersion      = @GccVersion@
+WhatGccIsCalled       = @WhatGccIsCalled@
+GccVersion            = @GccVersion@
+AlienScript           = @AlienScript@
+ifeq "$(phase)" "0"
+CrossCompilePrefix    =
+else
+CrossCompilePrefix    = @CrossCompilePrefix@
+endif
+# TargetPlatformFull retains the string passed to configure so we have it in
+# the necessary format to pass to libffi's configure.
+TargetPlatformFull    = @TargetPlatformFull@
 GccLT34         = @GccLT34@
 GccLT46         = @GccLT46@
 CC              = $(WhatGccIsCalled)
@@ -567,6 +573,22 @@ AS_STAGE0       = @CC_STAGE0@
 AS_STAGE1       = $(AS)
 AS_STAGE2       = $(AS)
 AS_STAGE3       = $(AS)
+
+# Cross-compiling options
+#
+# The 'toolchain' case: Cross-compiler to run locally:
+BuildingCrossCompiler = @BuildingCrossCompiler@
+# The 'port' case: Porting to a foreign architecture:
+PortingCompiler       = @PortingCompiler@
+# BuildingCrossCompiler OR PortingCompiler
+CrossCompiling        = @CrossCompiling@
+
+# Install stage 2 by default, or stage 1 in the cross compiler case. Can be changed to 3
+ifeq "$(BuildingCrossCompiler)" "YES"
+INSTALL_GHC_STAGE=1
+else
+INSTALL_GHC_STAGE=2
+endif
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC
@@ -596,6 +618,9 @@ SRC_HSC2HS_OPTS += --cross-safe
 endif
 SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)))
 SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
+ifeq "$(CrossCompiling)" "YES"
+SRC_HSC2HS_OPTS += --cross-compile
+endif
 
 #-----------------------------------------------------------------------------
 # Mingwex Library

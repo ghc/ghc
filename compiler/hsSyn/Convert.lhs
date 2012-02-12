@@ -195,7 +195,7 @@ cvtDec (InstanceD ctxt ty decs)
 	; ctxt' <- cvtContext ctxt
 	; L loc ty' <- cvtType ty
 	; let inst_ty' = L loc $ mkImplicitHsForAllTy ctxt' $ L loc ty'
-	; returnL $ InstD (InstDecl inst_ty' binds' sigs' ats') }
+	; returnL $ InstD (ClsInstDecl inst_ty' binds' sigs' ats') }
 
 cvtDec (ForeignD ford) 
   = do { ford' <- cvtForD ford
@@ -213,23 +213,25 @@ cvtDec (DataInstD ctxt tc tys constrs derivs)
   = do { (ctxt', tc', tvs', typats') <- cvt_tyinst_hdr ctxt tc tys
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
-       ; returnL $ TyClD (TyData { tcdND = DataType, tcdLName = tc', tcdCtxt = ctxt'
-                                  , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
-                                  , tcdCons = cons', tcdDerivs = derivs' }) }
+       ; returnL $ InstD $ FamInstDecl $
+                   TyData { tcdND = DataType, tcdLName = tc', tcdCtxt = ctxt'
+                          , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
+                          , tcdCons = cons', tcdDerivs = derivs' } }
 
 cvtDec (NewtypeInstD ctxt tc tys constr derivs)
   = do { (ctxt', tc', tvs', typats') <- cvt_tyinst_hdr ctxt tc tys
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
-       ; returnL $ TyClD (TyData { tcdND = NewType, tcdLName = tc', tcdCtxt = ctxt'
-                                  , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
-                                  , tcdCons = [con'], tcdDerivs = derivs' })
-       }
+       ; returnL $ InstD $ FamInstDecl $
+                   TyData { tcdND = NewType, tcdLName = tc', tcdCtxt = ctxt'
+                          , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
+                          , tcdCons = [con'], tcdDerivs = derivs' } }
 
 cvtDec (TySynInstD tc tys rhs)
   = do	{ (_, tc', tvs', tys') <- cvt_tyinst_hdr [] tc tys
 	; rhs' <- cvtType rhs
-	; returnL $ TyClD (TySynonym tc' tvs' tys' rhs') }
+	; returnL $ InstD $ FamInstDecl $ 
+                    TySynonym tc' tvs' tys' rhs' }
 
 ----------------
 cvt_ci_decs :: MsgDoc -> [TH.Dec]

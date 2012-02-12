@@ -421,6 +421,9 @@ sub scmall {
             scm ($localpath, $scm, "gc", @args)
                 unless $scm eq "darcs";
         }
+        elsif ($command =~ /^tag$/) {
+            scm ($localpath, $scm, "tag", @args);
+        }
         else {
             die "Unknown command: $command";
         }
@@ -514,6 +517,7 @@ any extra arguments to git:
   reset
   send
   status
+  tag
 
 -------------- Flags -------------------
 These flags are given *before* the command and modify the way sync-all behaves.

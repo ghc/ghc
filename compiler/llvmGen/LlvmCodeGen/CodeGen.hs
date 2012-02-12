@@ -137,16 +137,15 @@ stmtToInstrs env stmt = case stmt of
         -> return (env, unitOL $ Return Nothing, [])
 
 
--- | Foreign Calls
-genCall :: LlvmEnv -> CmmCallTarget -> [HintedCmmFormal] -> [HintedCmmActual]
-              -> CmmReturnInfo -> UniqSM StmtData
+-- | Memory barrier instruction for LLVM >= 3.0
+barrier :: LlvmEnv -> UniqSM StmtData
+barrier env = do
+    let s = Fence False SyncSeqCst
+    return (env, unitOL s, [])
 
--- Write barrier needs to be handled specially as it is implemented as an LLVM
--- intrinsic function.
-genCall env (CmmPrim MO_WriteBarrier) _ _ _
- | platformArch (getLlvmPlatform env) `elem` [ArchX86, ArchX86_64, ArchSPARC]
-    = return (env, nilOL, [])
- | otherwise = do
+-- | Memory barrier instruction for LLVM < 3.0
+oldBarrier :: LlvmEnv -> UniqSM StmtData
+oldBarrier env = do
     let fname = fsLit "llvm.memory.barrier"
     let funSig = LlvmFunctionDecl fname ExternallyVisible CC_Ccc LMVoid
                     FixedArgs (tysToParams [i1, i1, i1, i1, i1]) llvmFunAlign
@@ -166,6 +165,18 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _
     where
         lmTrue :: LlvmVar
         lmTrue  = mkIntLit i1 (-1)
+
+-- | Foreign Calls
+genCall :: LlvmEnv -> CmmCallTarget -> [HintedCmmFormal] -> [HintedCmmActual]
+              -> CmmReturnInfo -> UniqSM StmtData
+
+-- Write barrier needs to be handled specially as it is implemented as an LLVM
+-- intrinsic function.
+genCall env (CmmPrim MO_WriteBarrier) _ _ _
+ | platformArch (getLlvmPlatform env) `elem` [ArchX86, ArchX86_64, ArchSPARC]
+    = return (env, nilOL, [])
+ | getLlvmVer env > 29 = barrier env
+ | otherwise           = oldBarrier env
 
 -- Handle popcnt function specifically since GHC only really has i32 and i64
 -- types and things like Word8 are backed by an i32 and just present a logical

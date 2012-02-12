@@ -84,6 +84,8 @@ import DsMeta           ( templateHaskellNames )
 import VarSet
 import VarEnv           ( emptyTidyEnv )
 import Panic
+
+import GHC.Exts
 #endif
 
 import Id
@@ -1351,72 +1353,58 @@ myCoreToStg dflags this_mod prepd_binds = do
 %********************************************************************* -}
 
 {-
-When the UnlinkedBCOExpr is linked you get an HValue of type
-        IO [HValue]
-When you run it you get a list of HValues that should be
-the same length as the list of names; add them to the ClosureEnv.
+When the UnlinkedBCOExpr is linked you get an HValue of type *IO [HValue]* When
+you run it you get a list of HValues that should be the same length as the list
+of names; add them to the ClosureEnv.
 
-A naked expression returns a singleton Name [it].
-
-        What you type                   The IO [HValue] that hscStmt returns
-        -------------                   ------------------------------------
-        let pat = expr          ==>     let pat = expr in return [coerce HVal x, coerce HVal y, ...]
-                                        bindings: [x,y,...]
-
-        pat <- expr             ==>     expr >>= \ pat -> return [coerce HVal x, coerce HVal y, ...]
-                                        bindings: [x,y,...]
-
-        expr (of IO type)       ==>     expr >>= \ v -> return [v]
-          [NB: result not printed]      bindings: [it]
-
-
-        expr (of non-IO type,
-          result showable)      ==>     let v = expr in print v >> return [v]
-                                        bindings: [it]
-
-        expr (of non-IO type,
-          result not showable)  ==>     error
+A naked expression returns a singleton Name [it]. The stmt is lifted into the
+IO monad as explained in Note [Interactively-bound Ids in GHCi] in TcRnDriver
 -}
 
 #ifdef GHCI
 -- | Compile a stmt all the way to an HValue, but don't run it
-hscStmt :: HscEnv
-        -> String -- ^ The statement
-        -> IO (Maybe ([Id], HValue)) -- ^ 'Nothing' <==> empty statement
-                                     -- (or comment only), but no parse error
+--
+-- We return Nothing to indicate an empty statement (or comment only), not a
+-- parse error.
+hscStmt :: HscEnv -> String -> IO (Maybe ([Id], IO [HValue]))
 hscStmt hsc_env stmt = hscStmtWithLocation hsc_env stmt "<interactive>" 1
 
 -- | Compile a stmt all the way to an HValue, but don't run it
+--
+-- We return Nothing to indicate an empty statement (or comment only), not a
+-- parse error.
 hscStmtWithLocation :: HscEnv
                     -> String -- ^ The statement
                     -> String -- ^ The source
                     -> Int    -- ^ Starting line
-                    -> IO (Maybe ([Id], HValue)) -- ^ 'Nothing' <==> empty statement
-                                                 -- (or comment only), but no parse error
+                    -> IO (Maybe ([Id], IO [HValue]))
 hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
     maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
     case maybe_stmt of
         Nothing -> return Nothing
 
-        -- The real stuff
         Just parsed_stmt -> do
-             -- Rename and typecheck it
-            let icontext = hsc_IC hsc_env
-            (ids, tc_expr) <- ioMsgMaybe $
-                                  tcRnStmt hsc_env icontext parsed_stmt
+            let icntxt   = hsc_IC hsc_env
+                rdr_env  = ic_rn_gbl_env icntxt
+                type_env = mkTypeEnvWithImplicits (ic_tythings icntxt)
+                src_span = srcLocSpan interactiveSrcLoc
+
+            -- Rename and typecheck it
+            -- Here we lift the stmt into the IO monad, see Note
+            -- [Interactively-bound Ids in GHCi] in TcRnDriver
+            (ids, tc_expr) <- ioMsgMaybe $ tcRnStmt hsc_env icntxt parsed_stmt
+
             -- Desugar it
-            let rdr_env  = ic_rn_gbl_env icontext
-                type_env = mkTypeEnvWithImplicits (ic_tythings icontext)
             ds_expr <- ioMsgMaybe $
                            deSugarExpr hsc_env iNTERACTIVE rdr_env type_env tc_expr
             handleWarnings
 
             -- Then code-gen, and link it
-            let src_span = srcLocSpan interactiveSrcLoc
             hsc_env <- getHscEnv
             hval    <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
+            let hval_io = unsafeCoerce# hval :: IO [HValue]
 
-            return $ Just (ids, hval)
+            return $ Just (ids, hval_io)
 
 -- | Compile a decls
 hscDecls :: HscEnv
@@ -1442,8 +1430,8 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     -- We grab the whole environment because of the overlapping that may have
     -- been done. See the notes at the definition of InteractiveContext
     -- (ic_instances) for more details.
-    let finsts = famInstEnvElts $ tcg_fam_inst_env tc_gblenv
-        insts  = instEnvElts $ tcg_inst_env tc_gblenv
+    let finsts = tcg_fam_insts tc_gblenv
+        insts  = tcg_insts     tc_gblenv
 
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE
@@ -1560,7 +1548,7 @@ hscParseThingWithLocation source linenumber parser str
     liftIO $ showPass dflags "Parser"
 
     let buf = stringToStringBuffer str
-        loc  = mkRealSrcLoc (fsLit source) linenumber 1
+        loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (mkPState dflags buf loc) of
         PFailed span err -> do

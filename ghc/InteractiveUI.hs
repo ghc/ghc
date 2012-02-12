@@ -487,6 +487,7 @@ runGHCiInput f = do
         (setComplete ghciCompleteWord $ defaultSettings {historyFile = histFile})
         f
 
+-- | How to get the next input line from the user
 nextInputLine :: Bool -> Bool -> InputT GHCi (Maybe String)
 nextInputLine show_prompt is_tty
   | is_tty = do
@@ -601,6 +602,7 @@ queryQueue = do
     c:cs -> do setGHCiState st{ cmdqueue = cs }
                return (Just c)
 
+-- | The main read-eval-print loop
 runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands = runCommands' handler
 
@@ -620,9 +622,12 @@ runCommands' eh gCmd = do
       Nothing -> return ()
       Just _  -> runCommands' eh gCmd
 
+-- | Evaluate a single line of user input (either :<command> or Haskell code)
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)
 runOneCommand eh gCmd = do
+  -- run a previously queued command if there is one, otherwise get new
+  -- input from user
   mb_cmd0 <- noSpace (lift queryQueue)
   mb_cmd1 <- maybe (noSpace gCmd) (return . Just) mb_cmd0
   case mb_cmd1 of
@@ -666,12 +671,19 @@ runOneCommand eh gCmd = do
             normSpace   x  = x
     -- SDM (2007-11-07): is userError the one to use here?
     collectError = userError "unterminated multiline command :{ .. :}"
+
+    -- | Handle a line of input
+    doCommand :: String -> InputT GHCi (Maybe Bool)
+
+    -- command
     doCommand (':' : cmd) = do
       result <- specialCommand cmd
       case result of
         True -> return Nothing
         _    -> return $ Just True
-    doCommand stmt        = do
+
+    -- haskell
+    doCommand stmt = do
       ml <- lift $ isOptionSet Multiline
       if ml
         then do
@@ -736,16 +748,23 @@ declPrefixes :: [String]
 declPrefixes = ["class ","data ","newtype ","type ","instance ", "deriving ",
                 "foreign "]
 
+-- | Entry point to execute some haskell code from user
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
+ -- empty
  | null (filter (not.isSpace) stmt)
  = return False
+
+ -- import
  | "import " `isPrefixOf` stmt
  = do addImportToContext stmt; return False
+
+ -- data, class, newtype...
  | any (flip isPrefixOf stmt) declPrefixes
  = do _ <- liftIO $ tryIO $ hFlushAll stdin
       result <- GhciMonad.runDecls stmt
       afterRunStmt (const True) (GHC.RunOk result)
+
  | otherwise
  = do -- In the new IO library, read handles buffer data even if the Handle
       -- is set to NoBuffering.  This causes problems for GHCi where there
@@ -758,8 +777,7 @@ runStmt stmt step
         Nothing     -> return False
         Just result -> afterRunStmt (const True) result
 
---afterRunStmt :: GHC.RunResult -> GHCi Bool
-                                 -- False <=> the statement failed to compile
+-- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: (SrcSpan -> Bool) -> GHC.RunResult -> GHCi Bool
 afterRunStmt _ (GHC.RunException e) = throw e
 afterRunStmt step_here run_result = do
@@ -830,6 +848,7 @@ printTypeOfName n
 
 data MaybeCommand = GotCommand Command | BadCommand | NoLastCommand
 
+-- | Entry point for execution a ':<command>' input from user
 specialCommand :: String -> InputT GHCi Bool
 specialCommand ('!':str) = lift $ shellEscape (dropWhile isSpace str)
 specialCommand str = do
@@ -1621,31 +1640,31 @@ remModulesFromContext as bs = do
 addImportToContext :: String -> GHCi ()
 addImportToContext str = do
   idecl <- GHC.parseImportDecl str
+  _ <- GHC.lookupModule (unLoc (ideclName idecl)) Nothing  -- #5836
   modifyGHCiState $ \st ->
      st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
   setGHCContextFromGHCiState
 
-setContext :: [String] -> [String] -> GHCi ()
-setContext starred not_starred = do
-  is1 <- mapM (checkAdd True)  starred
-  is2 <- mapM (checkAdd False) not_starred
-  let iss = foldr addNotSubsumed [] (is1++is2)
-  modifyGHCiState $ \st -> st { remembered_ctx = iss, transient_ctx = [] }
-                                -- delete the transient context
-  setGHCContextFromGHCiState
-
-checkAdd :: Bool -> String -> GHCi InteractiveImport
+-- TODO: ARGH! This is a mess! 'checkAdd' is called from many places and we
+-- have about 4 different variants of setGHCContext. All this import code needs
+-- to be refactored to something saner. We should do the sanity check on an
+-- import in 'checkAdd' and checkAdd only and only need to call checkAdd from
+-- one place ('setGHCContetFromGHCiState'). The code isn't even logically
+-- ordered!
+checkAdd :: Bool -> String -> GHCi (InteractiveImport)
 checkAdd star mstr = do
   dflags <- getDynFlags 
   case safeLanguageOn dflags of
-    True | star -> ghcError $ CmdLineError "can't use * imports with Safe Haskell"
+    True | star -> do
+        liftIO $ putStrLn "Warning: can't use * imports with Safe Haskell; ignoring *"
+        checkAdd False mstr
 
     True -> do m <- lookupModule mstr
                s <- GHC.isModuleTrusted m
                case s of
                  True  -> return $ IIDecl (simpleImportDecl $ moduleName m)
-                 False -> ghcError $ CmdLineError $ "can't import " ++ mstr
-                                                 ++ " as it isn't trusted."
+                 False -> ghcError $ CmdLineError $
+                     "can't import " ++ mstr ++ " as it isn't trusted."
 
     False | star -> do m <- wantInterpretedModule mstr
                        return $ IIModule m
@@ -1667,12 +1686,28 @@ checkAdd star mstr = do
 --
 setGHCContextFromGHCiState :: GHCi ()
 setGHCContextFromGHCiState = do
-  let ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
-      ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
   st <- getGHCiState
-  iidecls <- filterM (tryBool . ok) (transient_ctx st ++ remembered_ctx st)
-  setGHCContext iidecls
+  goodTran <- mapMaybeM (tryBool . ok) $ transient_ctx st
+  goodRemb <- mapMaybeM (tryBool . ok) $ remembered_ctx st
+  -- drop bad imports so we don't keep replaying it to the user!
+  modifyGHCiState $ \s -> s { transient_ctx  = goodTran }
+  modifyGHCiState $ \s -> s { remembered_ctx = goodRemb }
+  setGHCContext (goodTran ++ goodRemb)
 
+  where 
+    ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
+    ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
+
+    mapMaybeM f xs = catMaybes `fmap` sequence (map f xs)
+
+setContext :: [String] -> [String] -> GHCi ()
+setContext starred not_starred = do
+  is1 <- mapM (checkAdd True)  starred
+  is2 <- mapM (checkAdd False) not_starred
+  let iss = foldr addNotSubsumed [] (is1++is2)
+  modifyGHCiState $ \st -> st { remembered_ctx = iss, transient_ctx = [] }
+                                -- delete the transient context
+  setGHCContextFromGHCiState
 
 -- | Sets the GHC contexts to the given set of imports, adding a Prelude
 -- import if there isn't an explicit one already.
@@ -2721,12 +2756,12 @@ ghciHandle h m = Haskeline.catch m $ \e -> unblock (h e)
 ghciTry :: GHCi a -> GHCi (Either SomeException a)
 ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)
 
-tryBool :: GHCi a -> GHCi Bool
+tryBool :: GHCi a -> GHCi (Maybe a)
 tryBool m = do
     r <- ghciTry m
     case r of
-      Left _  -> return False
-      Right _ -> return True
+      Left e  -> showException e >> return Nothing
+      Right a -> return $ Just a
 
 -- ----------------------------------------------------------------------------
 -- Utils

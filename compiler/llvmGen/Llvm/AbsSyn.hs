@@ -62,8 +62,24 @@ data LlvmFunction = LlvmFunction {
     funcBody  :: LlvmBlocks
   }
 
-type LlvmFunctions  = [LlvmFunction]
+type LlvmFunctions = [LlvmFunction]
 
+-- | LLVM ordering types for synchronization purposes. (Introduced in LLVM
+-- 3.0). Please see the LLVM documentation for a better description.
+data LlvmSyncOrdering
+  -- | Some partial order of operations exists.
+  = SyncUnord
+  -- | A single total order for operations at a single address exists.
+  | SyncMonotonic
+  -- | Acquire synchronization operation.
+  | SyncAcquire
+  -- | Release synchronization operation.
+  | SyncRelease
+  -- | Acquire + Release synchronization operation.
+  | SyncAcqRel
+  -- | Full sequential Consistency operation.
+  | SyncSeqCst
+  deriving (Show, Eq)
 
 -- | Llvm Statements
 data LlvmStatement
@@ -73,6 +89,11 @@ data LlvmStatement
       * source: Source expression
   -}
   = Assignment LlvmVar LlvmExpression
+
+  {- |
+    Memory fence operation
+  -}
+  | Fence Bool LlvmSyncOrdering
 
   {- |
     Always branch to the target label

@@ -39,7 +39,7 @@ module RnEnv (
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches,
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr, kindSigErr, polyKindsErr, perhapsForallMsg,
+	dataTcOccs, unknownNameErr, kindSigErr, dataKindsErr, perhapsForallMsg,
 
         HsDocContext(..), docOfHsDocContext
     ) where
@@ -470,9 +470,9 @@ lookupPromotedOccRn rdr_name
            Nothing -> unboundName WL_Any rdr_name
            Just demoted_name 
              | data_kinds -> return demoted_name
-             | otherwise  -> unboundNameX WL_Any rdr_name suggest_pk }}}
+             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }}}
   where 
-    suggest_pk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
+    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
 \end{code}
 
 Note [Demotion]
@@ -507,7 +507,12 @@ lookupOccRn_maybe rdr_name
        { -- We allow qualified names on the command line to refer to
          --  *any* name exported by any module in scope, just as if there
          -- was an "import qualified M" declaration for every module.
-         allow_qual <- doptM Opt_ImplicitImportQualified
+         -- But we DONT allow it under Safe Haskell as we need to check
+         -- imports. We can and should instead check the qualified import
+         -- but at the moment this requires some refactoring so leave as a TODO
+       ; dflags <- getDynFlags
+       ; let allow_qual = dopt Opt_ImplicitImportQualified dflags &&
+                          not (safeDirectImpsReq dflags)
        ; is_ghci <- getIsGHCi
                -- This test is not expensive,
                -- and only happens for failed lookups
@@ -1434,8 +1439,8 @@ kindSigErr thing
   = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
        2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
 
-polyKindsErr :: Outputable a => a -> SDoc
-polyKindsErr thing
+dataKindsErr :: Outputable a => a -> SDoc
+dataKindsErr thing
   = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr thing))
        2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
 

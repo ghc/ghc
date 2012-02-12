@@ -42,12 +42,18 @@ module DataCon (
 
         -- * Splitting product types
 	splitProductType_maybe, splitProductType, deepSplitProductType,
-        deepSplitProductType_maybe
+        deepSplitProductType_maybe,
+
+        -- ** Promotion related functions
+        promoteType, isPromotableType, isPromotableTyCon,
+        buildPromotedTyCon, buildPromotedDataCon,
     ) where
 
 #include "HsVersions.h"
 
 import Type
+import TypeRep( Type(..) )  -- Used in promoteType
+import Kind
 import Unify
 import Coercion
 import TyCon
@@ -61,6 +67,7 @@ import Util
 import BasicTypes
 import FastString
 import Module
+import VarEnv
 
 import qualified Data.Data as Data
 import qualified Data.Typeable
@@ -959,4 +966,86 @@ computeRep stricts tys
                       where
                         (_tycon, _tycon_args, arg_dc, arg_tys) 
                            = deepSplitProductType "unbox_strict_arg_ty" ty
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+        Promoting of data types to the kind level
+%*                                                                      *
+%************************************************************************
+
+These two 'buildPromoted..' functions are here because
+ * They belong together
+ * 'buildPromotedTyCon' is used by promoteType
+ * 'buildPromotedTyCon' depends on DataCon stuff
+
+\begin{code}
+buildPromotedTyCon :: TyCon -> TyCon
+buildPromotedTyCon tc
+  = mkPromotedTyCon tc tySuperKind
+
+buildPromotedDataCon :: DataCon -> TyCon
+buildPromotedDataCon dc 
+  = ASSERT ( isPromotableType ty )
+    mkPromotedDataTyCon dc (getName dc) (getUnique dc) kind arity
+  where 
+    ty    = dataConUserType dc
+    kind  = promoteType ty
+    arity = dataConSourceArity dc
+\end{code}
+
+Note [Promoting a Type to a Kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppsoe we have a data constructor D
+     D :: forall (a:*). Maybe a -> T a
+We promote this to be a type constructor 'D:
+     'D :: forall (k:BOX). 'Maybe k -> 'T k
+
+The transformation from type to kind is done by promoteType
+
+  * Convert forall (a:*) to forall (k:BOX), and substitute
+
+  * Ensure all foralls are at the top (no higher rank stuff)
+
+  * Ensure that all type constructors mentioned (Maybe and T
+    in the example) are promotable; that is, they have kind 
+          * -> ... -> * -> *
+
+\begin{code}
+isPromotableType :: Type -> Bool
+isPromotableType ty
+  = all (isLiftedTypeKind . tyVarKind) tvs
+    && go rho
+  where
+    (tvs, rho) = splitForAllTys ty
+    go (TyConApp tc tys) | Just n <- isPromotableTyCon tc
+                         = tys `lengthIs` n && all go tys
+    go (FunTy arg res)   = go arg && go res
+    go (TyVarTy tvar)    = tvar `elem` tvs
+    go _                 = False
+
+-- If tc's kind is [ *^n -> * ] returns [ Just n ], else returns [ Nothing ]
+isPromotableTyCon :: TyCon -> Maybe Int
+isPromotableTyCon tc
+  | all isLiftedTypeKind (res:args) = Just $ length args
+  | otherwise                       = Nothing
+  where
+    (args, res) = splitKindFunTys (tyConKind tc)
+
+-- | Promotes a type to a kind. 
+-- Assumes the argument satisfies 'isPromotableType'
+promoteType :: Type -> Kind
+promoteType ty
+  = mkForAllTys kvs (go rho)
+  where
+    (tvs, rho) = splitForAllTys ty
+    kvs = [ mkKindVar (tyVarName tv) tySuperKind | tv <- tvs ]
+    env = zipVarEnv tvs kvs
+
+    go (TyConApp tc tys) = mkTyConApp (buildPromotedTyCon tc) (map go tys)
+    go (FunTy arg res)   = mkArrowKind (go arg) (go res)
+    go (TyVarTy tv)      | Just kv <- lookupVarEnv env tv 
+                         = TyVarTy kv
+    go _ = panic "promoteType"  -- Argument did not satisfy isPromotableType
 \end{code}

@@ -1,11 +1,4 @@
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module TyCon where
 
 import Name (Name)
@@ -13,9 +6,9 @@ import Unique (Unique)
 
 data TyCon
 
-tyConName 	    :: TyCon -> Name
-tyConUnique 	    :: TyCon -> Unique
-isTupleTyCon	    :: TyCon -> Bool
+tyConName           :: TyCon -> Name
+tyConUnique         :: TyCon -> Unique
+isTupleTyCon        :: TyCon -> Bool
 isUnboxedTupleTyCon :: TyCon -> Bool
-isFunTyCon	    :: TyCon -> Bool
+isFunTyCon          :: TyCon -> Bool
 \end{code}

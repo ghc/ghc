@@ -9,7 +9,21 @@
 --
 -----------------------------------------------------------------------------
 
-module GhciMonad where
+module GhciMonad (
+        GHCi(..), startGHCi,
+        GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
+        GHCiOption(..), isOptionSet, setOption, unsetOption,
+        Command,
+        BreakLocation(..),
+        TickArray,
+        setDynFlags,
+
+        runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
+
+        printForUser, printForUserPartWay, prettyLocations,
+        initInterpBuffering, turnOffBuffering, flushInterpBuffers,
+        ghciHandleGhcException,
+    ) where
 
 #include "HsVersions.h"
 
@@ -249,6 +263,7 @@ printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   liftIO $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
 
+-- | Run a single Haskell expression
 runStmt :: String -> GHC.SingleStep -> GHCi (Maybe GHC.RunResult)
 runStmt expr step = do
   st <- getGHCiState

@@ -571,10 +571,7 @@ topdecls :: { OrdList (LHsDecl RdrName) }
 topdecl :: { OrdList (LHsDecl RdrName) }
         : cl_decl                               { unitOL (L1 (TyClD (unLoc $1))) }
         | ty_decl                               { unitOL (L1 (TyClD (unLoc $1))) }
-        | 'instance' inst_type where_inst
-            { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
-              in 
-              unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs ats)))}
+        | inst_decl                             { unitOL (L1 (InstD (unLoc $1))) }
         | stand_alone_deriving                  { unitOL (LL (DerivD (unLoc $1))) }
         | 'default' '(' comma_types0 ')'        { unitOL (LL $ DefD (DefaultDecl $3)) }
         | 'foreign' fdecl                       { unitOL (LL (unLoc $2)) }
@@ -633,12 +630,6 @@ ty_decl :: { LTyClDecl RdrName }
                 -- infix type constructors to be declared
                 {% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
 
-           -- type instance declarations
-        | 'type' 'instance' type '=' ctype
-                -- Note the use of type for the head; this allows
-                -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $5) True $3 $5 }
-
           -- ordinary data type or newtype declaration
         | data_or_newtype tycl_hdr constrs deriving
                 {% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) False $2 
@@ -659,18 +650,32 @@ ty_decl :: { LTyClDecl RdrName }
         | 'data' 'family' type opt_kind_sig
                 {% mkTyFamily (comb3 $1 $2 $4) DataFamily $3 (unLoc $4) }
 
+inst_decl :: { LInstDecl RdrName }
+        : 'instance' inst_type where_inst
+                 { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
+                   in L (comb3 $1 $2 $3) (ClsInstDecl $2 binds sigs ats) }
+
+           -- type instance declarations
+        | 'type' 'instance' type '=' ctype
+                -- Note the use of type for the head; this allows
+                -- infix type constructors and type patterns
+                {% do { L loc d <- mkTySynonym (comb2 $1 $5) True $3 $5
+                      ; return (L loc (FamInstDecl d)) } }
+
           -- data/newtype instance declaration
         | data_or_newtype 'instance' tycl_hdr constrs deriving
-                {% mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $3
-                            Nothing (reverse (unLoc $4)) (unLoc $5) }
+                {% do { L loc d <- mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $3
+                                      Nothing (reverse (unLoc $4)) (unLoc $5)
+                      ; return (L loc (FamInstDecl d)) } }
 
           -- GADT instance declaration
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $3
-                            (unLoc $4) (unLoc $5) (unLoc $6) }
-
+                {% do { L loc d <- mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $3
+                                            (unLoc $4) (unLoc $5) (unLoc $6)
+                      ; return (L loc (FamInstDecl d)) } }
+        
 -- Associated type family declarations
 --
 -- * They have a different syntax than on the toplevel (no family special
@@ -1071,8 +1076,8 @@ atype :: { LHsType RdrName }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')' { LL $ HsExplicitTupleTy [] ($3 : $5) }
         | SIMPLEQUOTE  '[' comma_types0 ']'           { LL $ HsExplicitListTy placeHolderKind $3 }
         | '[' ctype ',' comma_types1 ']'              { LL $ HsExplicitListTy placeHolderKind ($2 : $4) }
-        | INTEGER            { LL $ HsTyLit $ HsNumberTy $ getINTEGER $1 }
-        | STRING             { LL $ HsTyLit $ HsStringTy $ getSTRING  $1 }
+        | INTEGER            { LL $ HsTyLit $ HsNumTy $ getINTEGER $1 }
+        | STRING             { LL $ HsTyLit $ HsStrTy $ getSTRING  $1 }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
