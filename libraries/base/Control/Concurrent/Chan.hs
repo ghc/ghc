@@ -40,6 +40,7 @@ import Prelude
 
 import System.IO.Unsafe         ( unsafeInterleaveIO )
 import Control.Concurrent.MVar
+import Control.Exception (mask_)
 import Data.Typeable
 
 #include "Typeable.h"
@@ -51,7 +52,7 @@ import Data.Typeable
 -- |'Chan' is an abstract type representing an unbounded FIFO channel.
 data Chan a
  = Chan (MVar (Stream a))
-        (MVar (Stream a))
+        (MVar (Stream a)) -- Invariant: the Stream a is always an empty MVar
    deriving Eq
 
 INSTANCE_TYPEABLE1(Chan,chanTc,"Chan")
@@ -83,9 +84,20 @@ newChan = do
 writeChan :: Chan a -> a -> IO ()
 writeChan (Chan _ writeVar) val = do
   new_hole <- newEmptyMVar
-  modifyMVar_ writeVar $ \old_hole -> do
+  mask_ $ do
+    old_hole <- takeMVar writeVar
     putMVar old_hole (ChItem val new_hole)
-    return new_hole
+    putMVar writeVar new_hole
+
+-- The reason we don't simply do this:
+--
+--    modifyMVar_ writeVar $ \old_hole -> do
+--      putMVar old_hole (ChItem val new_hole)
+--      return new_hole
+--
+-- is because if an asynchronous exception is received after the 'putMVar'
+-- completes and before modifyMVar_ installs the new value, it will set the
+-- Chan's write end to a filled hole.
 
 -- |Read the next value from the 'Chan'.
 readChan :: Chan a -> IO a
