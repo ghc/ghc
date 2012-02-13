@@ -385,30 +385,12 @@ instance Monad FCode where
 {-# INLINE thenFC #-}
 {-# INLINE returnFC #-}
 
-<<<<<<< HEAD
-\begin{code}
 initC :: IO CgState
 initC  = do { uniqs <- mkSplitUniqSupply 'c'
             ; return (initCgState uniqs) }
 
 runC :: DynFlags -> Module -> CgState -> FCode a -> (a,CgState)
 runC dflags mod st (FCode code) = code (initCgInfoDown dflags mod) st
-||||||| merged common ancestors
-\begin{code}
-initC :: DynFlags -> Module -> FCode a -> IO a
-
-initC dflags mod (FCode code)
-  = do  { uniqs <- mkSplitUniqSupply 'c'
-        ; case code (initCgInfoDown dflags mod) (initCgState uniqs) of
-              (res, _) -> return res
-        }
-=======
-initC :: DynFlags -> Module -> FCode a -> IO a
-initC dflags mod (FCode code) = do
-    uniqs <- mkSplitUniqSupply 'c'
-    case code (initCgInfoDown dflags mod) (initCgState uniqs) of
-        (res, _) -> return res
->>>>>>> origin/master
 
 returnFC :: a -> FCode a
 returnFC val = FCode $ \_ state -> (val, state)
@@ -726,45 +708,19 @@ emitDecl decl = do
     state <- getState
     setState $ state { cgs_tops = cgs_tops state `snocOL` decl }
 
-<<<<<<< HEAD
 emitProc :: CmmInfoTable -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
-emitProc info lbl [] blocks
-  = do  { let proc_block = CmmProc info lbl (ListGraph blocks)
-        ; state <- getState
-        ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
-||||||| merged common ancestors
-emitProc :: CmmInfo -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
-emitProc info lbl [] blocks
-  = do  { let proc_block = CmmProc info lbl (ListGraph blocks)
-        ; state <- getState
-        ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
-=======
-emitProc :: CmmInfo -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
 emitProc info lbl [] blocks = do
     let proc_block = CmmProc info lbl (ListGraph blocks)
     state <- getState
     setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block }
->>>>>>> origin/master
 emitProc _ _ (_:_) _ = panic "emitProc called with nonempty args"
 
 -- Emit a procedure whose body is the specified code; no info table
 emitSimpleProc :: CLabel -> Code -> Code
-<<<<<<< HEAD
-emitSimpleProc lbl code
-  = do  { stmts <- getCgStmts code
-        ; blks <- cgStmtsToBlocks stmts
-        ; emitProc CmmNonInfoTable lbl [] blks }
-||||||| merged common ancestors
-emitSimpleProc lbl code
-  = do  { stmts <- getCgStmts code
-        ; blks <- cgStmtsToBlocks stmts
-        ; emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] blks }
-=======
 emitSimpleProc lbl code = do
     stmts <- getCgStmts code
     blks <- cgStmtsToBlocks stmts
-    emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] blks
->>>>>>> origin/master
+    emitProc CmmNonInfoTable lbl [] blks
 
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
