@@ -24,17 +24,13 @@ cmmOfZgraph tops = map mapTop tops
 
 data ValueDirection = Arguments | Results
 
-add_hints :: Convention -> ValueDirection -> [a] -> [Old.CmmHinted a]
+add_hints :: ForeignTarget -> ValueDirection -> [a] -> [Old.CmmHinted a]
 add_hints conv vd args = zipWith Old.CmmHinted args (get_hints conv vd)
 
-get_hints :: Convention -> ValueDirection -> [ForeignHint]
-get_hints (Foreign (ForeignConvention _ hints _)) Arguments = hints
-get_hints (Foreign (ForeignConvention _ _ hints)) Results   = hints
-get_hints _other_conv                             _vd       = repeat NoHint
-
-get_conv :: ForeignTarget -> Convention
-get_conv (PrimTarget _)       = NativeNodeCall -- JD: SUSPICIOUS
-get_conv (ForeignTarget _ fc) = Foreign fc
+get_hints :: ForeignTarget -> ValueDirection -> [ForeignHint]
+get_hints (ForeignTarget _ (ForeignConvention _ hints _)) Arguments = hints
+get_hints (ForeignTarget _ (ForeignConvention _ _ hints)) Results   = hints
+get_hints (PrimTarget _) _vd = repeat NoHint
 
 cmm_target :: ForeignTarget -> Old.CmmCallTarget
 cmm_target (PrimTarget op) = Old.CmmPrim op
@@ -89,8 +85,8 @@ ofZgraph g = Old.ListGraph $ mapMaybe convert_block $ postorderDfs g
                             CmmUnsafeForeignCall (PrimTarget MO_Touch) _ _ -> Old.CmmNop
                             CmmUnsafeForeignCall target ress args          -> 
                               Old.CmmCall (cmm_target target)
-                                          (add_hints (get_conv target) Results   ress)
-                                          (add_hints (get_conv target) Arguments args)
+                                          (add_hints target Results   ress)
+                                          (add_hints target Arguments args)
                                           Old.CmmMayReturn
 
                   last :: CmmNode O C -> () -> [Old.CmmStmt]
