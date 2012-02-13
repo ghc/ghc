@@ -2,6 +2,7 @@
 
 module Vectorise.Monad.Naming
   ( mkLocalisedName
+  , mkDerivedName
   , mkVectId
   , cloneVar
   , newExportedVar
@@ -35,16 +36,25 @@ import Control.Monad
 -- always an internal system name.
 --
 mkLocalisedName :: (Maybe String -> OccName -> OccName) -> Name -> VM Name
-mkLocalisedName mk_occ name = 
-  do { mod <- liftDs getModuleDs
-     ; u   <- liftDs newUnique
-     ; let occ_name = mkLocalisedOccName mod mk_occ name
+mkLocalisedName mk_occ name
+  = do { mod <- liftDs getModuleDs
+       ; u   <- liftDs newUnique
+       ; let occ_name = mkLocalisedOccName mod mk_occ name
 
-           new_name | isExternalName name = mkExternalName u mod occ_name (nameSrcSpan name)
-                    | otherwise           = mkSystemName   u     occ_name
+             new_name | isExternalName name = mkExternalName u mod occ_name (nameSrcSpan name)
+                      | otherwise           = mkSystemName   u     occ_name
 
-     ; return new_name
-     }
+       ; return new_name }
+
+mkDerivedName :: (OccName -> OccName) -> Name -> VM Name
+-- Similar to mkLocalisedName, but assumes the
+-- incoming name is from this module.  
+-- Works on External names only
+mkDerivedName mk_occ name 
+  = do { u   <- liftDs newUnique
+       ; return (mkExternalName u (nameModule name)  
+                                  (mk_occ (nameOccName name))
+                                  (nameSrcSpan name)) }
 
 -- |Produce the vectorised variant of an `Id` with the given vectorised type, while taking care that
 -- vectorised dfun ids must be dfuns again.

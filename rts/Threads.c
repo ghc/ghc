@@ -113,7 +113,7 @@ createThread(Capability *cap, nat size)
     tso->trec = NO_TREC;
 
 #ifdef PROFILING
-    tso->prof.CCCS = CCS_MAIN;
+    tso->prof.cccs = CCS_MAIN;
 #endif
     
     // put a stop frame on the stack

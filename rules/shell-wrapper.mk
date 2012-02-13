@@ -62,7 +62,7 @@ BINDIST_WRAPPERS += $$($1_$2_SHELL_WRAPPER_NAME)
 install: install_$1_$2_wrapper
 
 .PHONY: install_$1_$2_wrapper
-install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
+install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$(CrossCompilePrefix)$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
 install_$1_$2_wrapper:
 	$$(call INSTALL_DIR,"$$(DESTDIR)$$(bindir)")
 	$$(call removeFiles,                                        "$$(WRAPPER)")

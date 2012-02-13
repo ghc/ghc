@@ -167,7 +167,7 @@ loadInterfaceWithException doc mod_name where_from
 
 ------------------
 loadInterface :: SDoc -> Module -> WhereFrom
-              -> IfM lcl (MaybeErr Message ModIface)
+              -> IfM lcl (MaybeErr MsgDoc ModIface)
 
 -- loadInterface looks in both the HPT and PIT for the required interface
 -- If not found, it loads it, and puts it in the PIT (always). 
@@ -188,7 +188,7 @@ loadInterface doc_str mod from
         ; traceIf (text "Considering whether to load" <+> ppr mod <+> ppr from)
 
                 -- Check whether we have the interface already
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of {
             Just iface 
                 -> return (Succeeded iface) ;   -- Already loaded
@@ -236,7 +236,7 @@ loadInterface doc_str mod from
         --
         -- The main thing is to add the ModIface to the PIT, but
         -- we also take the
-        --      IfaceDecls, IfaceInst, IfaceFamInst, IfaceRules, IfaceVectInfo
+        --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules, IfaceVectInfo
         -- out of the ModIface and put them into the big EPS pools
 
         -- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
@@ -294,7 +294,7 @@ loadInterface doc_str mod from
     }}}}
 
 wantHiBootFile :: DynFlags -> ExternalPackageState -> Module -> WhereFrom
-               -> MaybeErr Message IsBootInterface
+               -> MaybeErr MsgDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
 wantHiBootFile dflags eps mod from
   = case from of
@@ -372,7 +372,7 @@ loadDecl ignore_prags mod (_version, decl)
                 -- the names associated with the decl
           main_name      <- lookupOrig mod (ifName decl)
 --        ; traceIf (text "Loading decl for " <> ppr main_name)
-        ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclSubBndrs decl)
+        ; implicit_names <- mapM (lookupOrig mod) (ifaceDeclImplicitBndrs decl)
 
         -- Typecheck the thing, lazily
         -- NB. Firstly, the laziness is there in case we never need the
@@ -402,7 +402,7 @@ loadDecl ignore_prags mod (_version, decl)
         -- (where the "MkT" is the *Name* associated with MkT, etc.)
         --
         -- We do this by mapping the implict_names to the associated
-        -- TyThings.  By the invariant on ifaceDeclSubBndrs and
+        -- TyThings.  By the invariant on ifaceDeclImplicitBndrs and
         -- implicitTyThings, we can use getOccName on the implicit
         -- TyThings to make this association: each Name's OccName should
         -- be the OccName of exactly one implictTyThing.  So the key is
@@ -472,7 +472,7 @@ bumpDeclStats name
 findAndReadIface :: SDoc -> Module
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
                                         -- False <=> Look for .hi file
-                 -> TcRnIf gbl lcl (MaybeErr Message (ModIface, FilePath))
+                 -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
         -- Nothing <=> file not found, or unreadable, or illegible
         -- Just x  <=> successfully found and parsed 
 
@@ -489,7 +489,7 @@ findAndReadIface doc_str mod hi_boot_file
                         nest 4 (ptext (sLit "reason:") <+> doc_str)])
 
         -- Check for GHC.Prim, and return its static interface
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; if mod == gHC_PRIM
           then return (Succeeded (ghcPrimIface,
                                    "<built in interface for GHC.Prim>"))
@@ -526,7 +526,7 @@ findAndReadIface doc_str mod hi_boot_file
         }}
             ; err -> do
                 { traceIf (ptext (sLit "...not found"))
-                ; dflags <- getDOpts
+                ; dflags <- getDynFlags
                 ; return (Failed (cannotFindInterface dflags 
                                         (moduleName mod) err)) }
         }
@@ -537,7 +537,7 @@ findAndReadIface doc_str mod hi_boot_file
 
 \begin{code}
 readIface :: Module -> FilePath -> IsBootInterface 
-          -> TcRnIf gbl lcl (MaybeErr Message ModIface)
+          -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
         -- Succeeded iface <=> successfully found and parsed 
 
@@ -794,7 +794,7 @@ badIfaceFile file err
   = vcat [ptext (sLit "Bad interface file:") <+> text file, 
           nest 4 err]
 
-hiModuleNameMismatchWarn :: Module -> Module -> Message
+hiModuleNameMismatchWarn :: Module -> Module -> MsgDoc
 hiModuleNameMismatchWarn requested_mod read_mod = 
   withPprStyle defaultUserStyle $
     -- we want the Modules below to be qualified with package names,

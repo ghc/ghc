@@ -36,7 +36,6 @@ import DataCon
 import MkId
 import FastString
 
-
 -- Simple Types ---------------------------------------------------------------
 
 voidType :: VM Type

@@ -579,7 +579,7 @@ data BindFlag
 
 \begin{code}
 newtype UM a = UM { unUM :: (TyVar -> BindFlag)
-		         -> MaybeErr Message a }
+		         -> MaybeErr MsgDoc a }
 
 instance Monad UM where
   return a = UM (\_tvs -> Succeeded a)
@@ -588,13 +588,13 @@ instance Monad UM where
 			   Failed err -> Failed err
 			   Succeeded v  -> unUM (k v) tvs)
 
-initUM :: (TyVar -> BindFlag) -> UM a -> MaybeErr Message a
+initUM :: (TyVar -> BindFlag) -> UM a -> MaybeErr MsgDoc a
 initUM badtvs um = unUM um badtvs
 
 tvBindFlag :: TyVar -> UM BindFlag
 tvBindFlag tv = UM (\tv_fn -> Succeeded (tv_fn tv))
 
-failWith :: Message -> UM a
+failWith :: MsgDoc -> UM a
 failWith msg = UM (\_tv_fn -> Failed msg)
 
 maybeErrToMaybe :: MaybeErr fail succ -> Maybe succ

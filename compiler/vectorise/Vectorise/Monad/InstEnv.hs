@@ -57,7 +57,8 @@ lookupFamInst tycon tys
   = ASSERT( isFamilyTyCon tycon )
     do { instEnv <- readGEnv global_fam_inst_env
        ; case lookupFamInstEnv instEnv tycon tys of
-           [(fam_inst, rep_tys)] -> return (famInstTyCon fam_inst, rep_tys)
+           [(fam_inst, rep_tys)] -> return ( dataFamInstRepTyCon fam_inst
+                                           , rep_tys)
            _other                -> 
              cantVectorise "VectMonad.lookupFamInst: not found: " 
                            (ppr $ mkTyConApp tycon tys)

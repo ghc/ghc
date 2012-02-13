@@ -21,6 +21,7 @@ module PprCore (
 
 import CoreSyn
 import Literal( pprLiteral )
+import Name( pprInfixName, pprPrefixName )
 import Var
 import Id
 import IdInfo
@@ -268,6 +269,8 @@ and @pprCoreExpr@ functions.
 \begin{code}
 instance OutputableBndr Var where
   pprBndr = pprCoreBinder
+  pprInfixOcc  = pprInfixName  . varName
+  pprPrefixOcc = pprPrefixName . varName
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder

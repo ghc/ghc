@@ -35,7 +35,7 @@ import RdrName
 import TcEvidence       ( emptyTcEvBinds )
 import TysPrim          ( liftedTypeKindTyConName, eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
-                          unboxedSingletonTyCon, unboxedSingletonDataCon,
+                          unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 import Type             ( funTyCon )
 import ForeignCall      ( Safety(..), CExportSpec(..), CLabelString,
@@ -294,8 +294,6 @@ incorrect.
 
  '{'            { L _ ITocurly }                        -- special symbols
  '}'            { L _ ITccurly }
- '{|'           { L _ ITocurlybar }
- '|}'           { L _ ITccurlybar }
  vocurly        { L _ ITvocurly } -- virtual open curly (from layout)
  vccurly        { L _ ITvccurly } -- virtual close curly (from layout)
  '['            { L _ ITobrack }
@@ -569,10 +567,7 @@ topdecls :: { OrdList (LHsDecl RdrName) }
 topdecl :: { OrdList (LHsDecl RdrName) }
         : cl_decl                               { unitOL (L1 (TyClD (unLoc $1))) }
         | ty_decl                               { unitOL (L1 (TyClD (unLoc $1))) }
-        | 'instance' inst_type where_inst
-            { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
-              in 
-              unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs ats)))}
+        | inst_decl                             { unitOL (L1 (InstD (unLoc $1))) }
         | stand_alone_deriving                  { unitOL (LL (DerivD (unLoc $1))) }
         | 'default' '(' comma_types0 ')'        { unitOL (LL $ DefD (DefaultDecl $3)) }
         | 'foreign' fdecl                       { unitOL (LL (unLoc $2)) }
@@ -631,12 +626,6 @@ ty_decl :: { LTyClDecl RdrName }
                 -- infix type constructors to be declared
                 {% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
 
-           -- type instance declarations
-        | 'type' 'instance' type '=' ctype
-                -- Note the use of type for the head; this allows
-                -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $5) True $3 $5 }
-
           -- ordinary data type or newtype declaration
         | data_or_newtype tycl_hdr constrs deriving
                 {% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) False $2 
@@ -657,18 +646,32 @@ ty_decl :: { LTyClDecl RdrName }
         | 'data' 'family' type opt_kind_sig
                 {% mkTyFamily (comb3 $1 $2 $4) DataFamily $3 (unLoc $4) }
 
+inst_decl :: { LInstDecl RdrName }
+        : 'instance' inst_type where_inst
+                 { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
+                   in L (comb3 $1 $2 $3) (ClsInstDecl $2 binds sigs ats) }
+
+           -- type instance declarations
+        | 'type' 'instance' type '=' ctype
+                -- Note the use of type for the head; this allows
+                -- infix type constructors and type patterns
+                {% do { L loc d <- mkTySynonym (comb2 $1 $5) True $3 $5
+                      ; return (L loc (FamInstDecl d)) } }
+
           -- data/newtype instance declaration
         | data_or_newtype 'instance' tycl_hdr constrs deriving
-                {% mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $3
-                            Nothing (reverse (unLoc $4)) (unLoc $5) }
+                {% do { L loc d <- mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $3
+                                      Nothing (reverse (unLoc $4)) (unLoc $5)
+                      ; return (L loc (FamInstDecl d)) } }
 
           -- GADT instance declaration
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $3
-                            (unLoc $4) (unLoc $5) (unLoc $6) }
-
+                {% do { L loc d <- mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $3
+                                            (unLoc $4) (unLoc $5) (unLoc $6)
+                      ; return (L loc (FamInstDecl d)) } }
+        
 -- Associated type family declarations
 --
 -- * They have a different syntax than on the toplevel (no family special
@@ -1047,20 +1050,22 @@ btype :: { LHsType RdrName }
         | atype                         { $1 }
 
 atype :: { LHsType RdrName }
-        : gtycon                        { L1 (HsTyVar (unLoc $1)) }
-        | tyvar                         { L1 (HsTyVar (unLoc $1)) }
-        | strict_mark atype             { LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
-        | '{' fielddecls '}'            {% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
-        | '(' ctype ',' comma_types1 ')'  { LL $ HsTupleTy HsBoxedOrConstraintTuple  ($2:$4) }
-        | '(#' comma_types1 '#)'        { LL $ HsTupleTy HsUnboxedTuple $2     }
-        | '[' ctype ']'                 { LL $ HsListTy  $2 }
-        | '[:' ctype ':]'               { LL $ HsPArrTy  $2 }
-        | '(' ctype ')'                 { LL $ HsParTy   $2 }
-        | '(' ctype '::' kind ')'       { LL $ HsKindSig $2 $4 }
-        | quasiquote                    { L1 (HsQuasiQuoteTy (unLoc $1)) }
-        | '$(' exp ')'                  { LL $ mkHsSpliceTy $2 }
-        | TH_ID_SPLICE                  { LL $ mkHsSpliceTy $ L1 $ HsVar $
-                                          mkUnqual varName (getTH_ID_SPLICE $1) }
+        : ntgtycon                       { L1 (HsTyVar (unLoc $1)) }      -- Not including unit tuples
+        | tyvar                          { L1 (HsTyVar (unLoc $1)) }      -- (See Note [Unit tuples])
+        | strict_mark atype              { LL (HsBangTy (unLoc $1) $2) }  -- Constructor sigs only
+        | '{' fielddecls '}'             {% checkRecordSyntax (LL $ HsRecTy $2) } -- Constructor sigs only
+        | '(' ')'                        { LL $ HsTupleTy HsBoxedOrConstraintTuple []      }
+        | '(' ctype ',' comma_types1 ')' { LL $ HsTupleTy HsBoxedOrConstraintTuple ($2:$4) }
+        | '(#' '#)'                      { LL $ HsTupleTy HsUnboxedTuple           []      }       
+        | '(#' comma_types1 '#)'         { LL $ HsTupleTy HsUnboxedTuple           $2      }
+        | '[' ctype ']'                  { LL $ HsListTy  $2 }
+        | '[:' ctype ':]'                { LL $ HsPArrTy  $2 }
+        | '(' ctype ')'                  { LL $ HsParTy   $2 }
+        | '(' ctype '::' kind ')'        { LL $ HsKindSig $2 $4 }
+        | quasiquote                     { L1 (HsQuasiQuoteTy (unLoc $1)) }
+        | '$(' exp ')'                   { LL $ mkHsSpliceTy $2 }
+        | TH_ID_SPLICE                   { LL $ mkHsSpliceTy $ L1 $ HsVar $
+                                           mkUnqual varName (getTH_ID_SPLICE $1) }
                                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE qconid                          { LL $ HsTyVar $ unLoc $2 }
         | SIMPLEQUOTE  '(' ')'                        { LL $ HsTyVar $ getRdrName unitDataCon }
@@ -1425,14 +1430,6 @@ aexp1   :: { LHsExpr RdrName }
                                       ; checkRecordSyntax (LL r) }}
         | aexp2                 { $1 }
 
--- Here was the syntax for type applications that I was planning
--- but there are difficulties (e.g. what order for type args)
--- so it's not enabled yet.
--- But this case *is* used for the left hand side of a generic definition,
--- which is parsed as an expression before being munged into a pattern
-        | qcname '{|' type '|}'         { LL $ HsApp (sL (getLoc $1) (HsVar (unLoc $1)))
-                                                     (sL (getLoc $3) (HsType $3)) }
-
 aexp2   :: { LHsExpr RdrName }
         : ipvar                         { L1 (HsIPVar $! unLoc $1) }
         | qcname                        { L1 (HsVar   $! unLoc $1) }
@@ -1584,16 +1581,17 @@ squals :: { Located [LStmt RdrName] }   -- In reverse order, because the last
 --  | '{|' pquals '|}'                       { L1 [$2] }
 
 
--- It is possible to enable bracketing (associating) qualifier lists by uncommenting the lines with {| |}
--- above. Due to a lack of consensus on the syntax, this feature is not being used until we get user
--- demand.
+-- It is possible to enable bracketing (associating) qualifier lists
+-- by uncommenting the lines with {| |} above. Due to a lack of
+-- consensus on the syntax, this feature is not being used until we
+-- get user demand.
 
 transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
                         -- Function is applied to a list of stmts *in order*
-    : 'then' exp                           { LL $ \leftStmts -> (mkTransformStmt    leftStmts $2)    }
-    | 'then' exp 'by' exp                  { LL $ \leftStmts -> (mkTransformByStmt  leftStmts $2 $4) }
-    | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt   leftStmts $4)    }
-    | 'then' 'group' 'by' exp 'using' exp  { LL $ \leftStmts -> (mkGroupByUsingStmt leftStmts $4 $6) }
+    : 'then' exp                           { LL $ \ss -> (mkTransformStmt    ss $2)    }
+    | 'then' exp 'by' exp                  { LL $ \ss -> (mkTransformByStmt  ss $2 $4) }
+    | 'then' 'group' 'using' exp           { LL $ \ss -> (mkGroupUsingStmt   ss $4)    }
+    | 'then' 'group' 'by' exp 'using' exp  { LL $ \ss -> (mkGroupByUsingStmt ss $4 $6) }
 
 -- Note that 'group' is a special_id, which means that you can enable
 -- TransformListComp while still using Data.List.group. However, this
@@ -1779,7 +1777,7 @@ con_list : con                  { L1 [$1] }
 sysdcon :: { Located DataCon }  -- Wired in data constructors
         : '(' ')'               { LL unitDataCon }
         | '(' commas ')'        { LL $ tupleCon BoxedTuple ($2 + 1) }
-        | '(#' '#)'             { LL $ unboxedSingletonDataCon }
+        | '(#' '#)'             { LL $ unboxedUnitDataCon }
         | '(#' commas '#)'      { LL $ tupleCon UnboxedTuple ($2 + 1) }
         | '[' ']'               { LL nilDataCon }
 
@@ -1791,24 +1789,31 @@ qconop :: { Located RdrName }
         : qconsym               { $1 }
         | '`' qconid '`'        { LL (unLoc $2) }
 
------------------------------------------------------------------------------
+----------------------------------------------------------------------------
 -- Type constructors
 
-gtycon  :: { Located RdrName }  -- A "general" qualified tycon
-        : oqtycon                       { $1 }
+
+-- See Note [Unit tuples] in HsTypes for the distinction 
+-- between gtycon and ntgtycon
+gtycon :: { Located RdrName }  -- A "general" qualified tycon, including unit tuples
+        : ntgtycon                      { $1 }
         | '(' ')'                       { LL $ getRdrName unitTyCon }
+        | '(#' '#)'                     { LL $ getRdrName unboxedUnitTyCon }
+
+ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit tuples
+        : oqtycon                       { $1 }
         | '(' commas ')'                { LL $ getRdrName (tupleTyCon BoxedTuple ($2 + 1)) }
-        | '(#' '#)'                     { LL $ getRdrName unboxedSingletonTyCon }
         | '(#' commas '#)'              { LL $ getRdrName (tupleTyCon UnboxedTuple ($2 + 1)) }
         | '(' '->' ')'                  { LL $ getRdrName funTyCon }
         | '[' ']'                       { LL $ listTyCon_RDR }
         | '[:' ':]'                     { LL $ parrTyCon_RDR }
         | '(' '~#' ')'                  { LL $ getRdrName eqPrimTyCon }
 
-oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon
+oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
+                                -- These can appear in export lists
         : qtycon                        { $1 }
         | '(' qtyconsym ')'             { LL (unLoc $2) }
-        | '(' '~' ')'                   { LL $ eqTyCon_RDR } -- In here rather than gtycon because I want to write it in the GHC.Types export list
+        | '(' '~' ')'                   { LL $ eqTyCon_RDR }
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified
         : qtyconsym                     { $1 }

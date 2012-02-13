@@ -60,12 +60,14 @@ and packages. Doing this without caching any trust information would be very
 slow as we would need to touch all packages and interface files a module depends
 on. To avoid this we make use of the property that if a modules Safe Haskell
 mode changes, this triggers a recompilation from that module in the dependcy
-graph. So we can just worry mostly about direct imports. There is one trust
-property that can change for a package though without recompliation being
-triggered, package trust. So we must check that all packages a module
-tranitively depends on to be trusted are still trusted when we are compiling
-this module (as due to recompilation avoidance some modules below may not be
-considered trusted any more without recompilation being triggered).
+graph. So we can just worry mostly about direct imports.
+
+There is one trust property that can change for a package though without
+recompliation being triggered: package trust. So we must check that all
+packages a module tranitively depends on to be trusted are still trusted when
+we are compiling this module (as due to recompilation avoidance some modules
+below may not be considered trusted any more without recompilation being
+triggered).
 
 We handle this by augmenting the existing transitive list of packages a module M
 depends on with a bool for each package that says if it must be trusted when the
@@ -110,7 +112,7 @@ haskell at all and simply imports B, should A inherit all the the trust
 requirements from B? Should A now also require that a package p is trusted since
 B required it?
 
-We currently say no but I saying yes also makes sense. The difference is, if a
+We currently say no but saying yes also makes sense. The difference is, if a
 module M that doesn't use Safe Haskell imports a module N that does, should all
 the trusted package requirements be dropped since M didn't declare that it cares
 about Safe Haskell (so -XSafe is more strongly associated with the module doing
@@ -198,7 +200,7 @@ rnImportDecl this_mod
     -- and indeed we shouldn't do it here because the existence of
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
-    dflags <- getDOpts
+    dflags <- getDynFlags
     warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
@@ -484,12 +486,8 @@ getLocalNonValBinders fixity_env
                 hs_tyclds = tycl_decls,
                 hs_instds = inst_decls,
                 hs_fords  = foreign_decls })
-  = do  { -- Separate out the family instance declarations
-          let (tyinst_decls, tycl_decls_noinsts)
-                   = partition (isFamInstDecl . unLoc) (concat tycl_decls)
-
-          -- Process all type/class decls *except* family instances
-        ; tc_avails <- mapM new_tc tycl_decls_noinsts
+  = do  { -- Process all type/class decls *except* family instances
+        ; tc_avails <- mapM new_tc (concat tycl_decls)
         ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
         ; setEnvs envs $ do {
             -- Bring these things into scope first
@@ -497,7 +495,6 @@ getLocalNonValBinders fixity_env
 
           -- Process all family instances
           -- to bring new data constructors into scope
-        ; ti_avails  <- mapM (new_ti Nothing) tyinst_decls
         ; nti_avails <- concatMapM new_assoc inst_decls
 
           -- Finish off with value binders:
@@ -508,7 +505,7 @@ getLocalNonValBinders fixity_env
                         | otherwise = for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
-        ; let avails    = ti_avails ++ nti_avails ++ val_avails
+        ; let avails    = nti_avails ++ val_avails
               new_bndrs = availsToNameSet avails `unionNameSets` 
                           availsToNameSet tc_avails
         ; envs <- extendGlobalRdrEnvRn avails fixity_env 
@@ -527,20 +524,25 @@ getLocalNonValBinders fixity_env
                             ; return (Avail nm) }
 
     new_tc tc_decl              -- NOT for type/data instances
-        = do { names@(main_name : _) <- mapM newTopSrcBinder (hsTyClDeclBinders tc_decl)
+        = do { let bndrs = hsTyClDeclBinders (unLoc tc_decl)
+             ; names@(main_name : _) <- mapM newTopSrcBinder bndrs
              ; return (AvailTC main_name names) }
 
-    new_ti :: Maybe Name -> LTyClDecl RdrName -> RnM AvailInfo
+    new_ti :: Maybe Name -> FamInstDecl RdrName -> RnM AvailInfo
     new_ti mb_cls ti_decl  -- ONLY for type/data instances
-        = do { main_name <- lookupTcdName mb_cls (unLoc ti_decl)
+        = ASSERT( isFamInstDecl ti_decl ) 
+          do { main_name <- lookupTcdName mb_cls ti_decl
              ; sub_names <- mapM newTopSrcBinder (hsTyClDeclBinders ti_decl)
              ; return (AvailTC (unLoc main_name) sub_names) }
                         -- main_name is not bound here!
 
     new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
-    new_assoc (L _ (InstDecl inst_ty _ _ ats))
+    new_assoc (L _ (FamInstDecl d)) 
+      = do { avail <- new_ti Nothing d
+           ; return [avail] }
+    new_assoc (L _ (ClsInstDecl inst_ty _ _ ats))
       = do { mb_cls_nm <- get_cls_parent inst_ty 
-           ; mapM (new_ti mb_cls_nm) ats }
+           ; mapM (new_ti mb_cls_nm . unLoc) ats }
       where
         get_cls_parent inst_ty
           | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
@@ -549,7 +551,8 @@ getLocalNonValBinders fixity_env
           = return Nothing
 
 lookupTcdName :: Maybe Name -> TyClDecl RdrName -> RnM (Located Name)
--- Used for TyData and TySynonym only
+-- Used for TyData and TySynonym only, 
+-- both ordinary ones and family instances
 -- See Note [Family instance binders]
 lookupTcdName mb_cls tc_decl
   | not (isFamInstDecl tc_decl)   -- The normal case
@@ -723,9 +726,9 @@ filterImports iface decl_spec (Just (want_hiding, import_items))
         -- data constructors of an associated family, we need separate
         -- AvailInfos for the data constructors and the family (as they have
         -- different parents).  See the discussion at occ_env.
-    lookup_ie :: Bool -> IE RdrName -> MaybeErr Message [(IE Name,AvailInfo)]
+    lookup_ie :: Bool -> IE RdrName -> MaybeErr MsgDoc [(IE Name,AvailInfo)]
     lookup_ie opt_typeFamilies ie
-      = let bad_ie :: MaybeErr Message a
+      = let bad_ie :: MaybeErr MsgDoc a
             bad_ie = Failed (badImportItemErr iface decl_spec ie all_avails)
 
             lookup_name rdr
@@ -962,7 +965,7 @@ rnExports explicit_mod exports
         -- written "module Main where ..."
         -- Reason: don't want to complain about 'main' not in scope
         --         in interactive mode
-        ; dflags <- getDOpts
+        ; dflags <- getDynFlags
         ; let real_exports
                  | explicit_mod = exports
                  | ghcLink dflags == LinkInMemory = Nothing
@@ -1509,7 +1512,10 @@ warnUnusedImport (L loc decl, used, unused)
                                    <+> ptext (sLit "import") <+> pp_mod <> parens empty ]
     msg2 = sep [pp_herald <+> quotes (pprWithCommas ppr unused),
                     text "from module" <+> quotes pp_mod <+> pp_not_used]
-    pp_herald   = text "The import of"
+    pp_herald  = text "The" <+> pp_qual <+> text "import of"
+    pp_qual
+      | ideclQualified decl = text "qualified"
+      | otherwise           = empty
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
 \end{code}
@@ -1678,7 +1684,7 @@ typeItemErr name wherestr
           ptext (sLit "Use -XTypeFamilies to enable this extension") ]
 
 exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
-               -> Message
+               -> MsgDoc
 exportClashErr global_env name1 name2 ie1 ie2
   = vcat [ ptext (sLit "Conflicting exports for") <+> quotes (ppr occ) <> colon
          , ppr_export ie1' name1'

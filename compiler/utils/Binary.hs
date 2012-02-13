@@ -76,6 +76,7 @@ import Foreign
 import Data.Array
 import Data.IORef
 import Data.Char                ( ord, chr )
+import Data.Time
 import Data.Typeable
 #if __GLASGOW_HASKELL__ >= 701
 import Data.Typeable.Internal
@@ -487,6 +488,23 @@ instance (Binary a, Binary b) => Binary (Either a b) where
                            case h of
                              0 -> do a <- get bh ; return (Left a)
                              _ -> do b <- get bh ; return (Right b)
+
+instance Binary UTCTime where
+    put_ bh u = do put_ bh (utctDay u)
+                   put_ bh (utctDayTime u)
+    get bh = do day <- get bh
+                dayTime <- get bh
+                return $ UTCTime { utctDay = day, utctDayTime = dayTime }
+
+instance Binary Day where
+    put_ bh d = put_ bh (toModifiedJulianDay d)
+    get bh = do i <- get bh
+                return $ ModifiedJulianDay { toModifiedJulianDay = i }
+
+instance Binary DiffTime where
+    put_ bh dt = put_ bh (toRational dt)
+    get bh = do r <- get bh
+                return $ fromRational r
 
 #if defined(__GLASGOW_HASKELL__) || 1
 --to quote binary-0.3 on this code idea,

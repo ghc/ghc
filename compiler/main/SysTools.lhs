@@ -192,6 +192,7 @@ initSysTools mbMinusB
                                 Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
         ; targetArch <- readSetting "target arch"
         ; targetOS <- readSetting "target os"
+        ; targetWordSize <- readSetting "target word size"
         ; targetHasGnuNonexecStack <- readSetting "target has GNU nonexec stack"
         ; targetHasIdentDirective <- readSetting "target has .ident directive"
         ; targetHasSubsectionsViaSymbols <- readSetting "target has subsections via symbols"
@@ -250,13 +251,14 @@ initSysTools mbMinusB
                 ld_args  = gcc_args
 
         -- We just assume on command line
-        ; let lc_prog = "llc"
-              lo_prog = "opt"
+        ; lc_prog <- getSetting "LLVM llc command"
+        ; lo_prog <- getSetting "LLVM opt command"
 
         ; return $ Settings {
                         sTargetPlatform = Platform {
                                               platformArch = targetArch,
                                               platformOS   = targetOS,
+                                              platformWordSize = targetWordSize,
                                               platformHasGnuNonexecStack = targetHasGnuNonexecStack,
                                               platformHasIdentDirective = targetHasIdentDirective,
                                               platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols

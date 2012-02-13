@@ -379,7 +379,7 @@ ppr_lexpr :: OutputableBndr id => LHsExpr id -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
 ppr_expr :: forall id. OutputableBndr id => HsExpr id -> SDoc
-ppr_expr (HsVar v)       = pprHsVar v
+ppr_expr (HsVar v)       = pprPrefixOcc v
 ppr_expr (HsIPVar v)     = ppr v
 ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
@@ -407,7 +407,7 @@ ppr_expr (OpApp e1 op _ e2)
       = hang (ppr op) 2 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [pp_e1, sep [pprHsInfix v, nest 2 pp_e2]]
+      = sep [pp_e1, sep [pprInfixOcc v, nest 2 pp_e2]]
 
 ppr_expr (NegApp e _) = char '-' <+> pprDebugParendExpr e
 
@@ -420,7 +420,7 @@ ppr_expr (SectionL expr op)
 
     pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
                        4 (hsep [pp_expr, ptext (sLit "x_ )")])
-    pp_infixly v = (sep [pp_expr, pprHsInfix v])
+    pp_infixly v = (sep [pp_expr, pprInfixOcc v])
 
 ppr_expr (SectionR op expr)
   = case unLoc op of
@@ -431,7 +431,7 @@ ppr_expr (SectionR op expr)
 
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext (sLit "x_")])
                        4 ((<>) pp_expr rparen)
-    pp_infixly v = sep [pprHsInfix v, pp_expr]
+    pp_infixly v = sep [pprInfixOcc v, pp_expr]
 
 ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens (boxityNormalTupleSort boxity) (fcat (ppr_tup_args exprs))
@@ -541,7 +541,7 @@ ppr_expr (HsArrApp arrow arg _ HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, ptext (sLit ">>-"), ppr_lexpr arrow]
 
 ppr_expr (HsArrForm (L _ (HsVar v)) (Just _) [arg1, arg2])
-  = sep [pprCmdArg (unLoc arg1), hsep [pprHsInfix v, pprCmdArg (unLoc arg2)]]
+  = sep [pprCmdArg (unLoc arg1), hsep [pprInfixOcc v, pprCmdArg (unLoc arg2)]]
 ppr_expr (HsArrForm op _ args)
   = hang (ptext (sLit "(|") <> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <> ptext (sLit "|)"))
@@ -928,10 +928,11 @@ data StmtLR idL idR
      , recS_mfix_fn :: SyntaxExpr idR -- The mfix function
 
         -- These fields are only valid after typechecking
-     , recS_rec_rets :: [PostTcExpr] -- These expressions correspond 1-to-1 with
-                                     -- recS_rec_ids, and are the
-                                     -- expressions that should be returned by
-                                     -- the recursion.
+     , recS_later_rets :: [PostTcExpr] -- (only used in the arrow version)
+     , recS_rec_rets :: [PostTcExpr] -- These expressions correspond 1-to-1
+                                     -- with recS_later_ids and recS_rec_ids,
+                                     -- and are the expressions that should be
+                                     -- returned by the recursion.
                                      -- They may not quite be the Ids themselves,
                                      -- because the Id may be *polymorphic*, but
                                      -- the returned thing has to be *monomorphic*, 

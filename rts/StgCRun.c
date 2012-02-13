@@ -29,12 +29,24 @@
 #include "PosixSource.h"
 #include "ghcconfig.h"
 
+#if defined(sparc_HOST_ARCH) || defined(USE_MINIINTERPRETER)
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
 #define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
+#else
+/* The other architectures do not require the actual register macro definitions
+ * here because they use hand written assembly to implement the StgRun
+ * function. Including Stg.h first will define the R1 values using GCC specific
+ * techniques, which we don't want for LLVM based C compilers. Since we don't
+ * actually need the real machine register definitions here, we include the
+ * headers in the opposite order to allow LLVM-based C compilers to work.
+ */
+#include "Rts.h"
+#include "Stg.h"
+#endif
 
 #include "StgRun.h"
 #include "Capability.h"
@@ -620,7 +632,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * save callee-saves registers on behalf of the STG code.
          */
-        "stmfd sp!, {r4-r10, fp, ip, lr}\n\t"
+        "stmfd sp!, {r4-r11, fp, ip, lr}\n\t"
 #if !defined(arm_HOST_ARCH_PRE_ARMv6)
         "vstmdb sp!, {d8-d11}\n\t"
 #endif
@@ -657,10 +669,10 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #if !defined(arm_HOST_ARCH_PRE_ARMv6)
         "vldmia sp!, {d8-d11}\n\t"
 #endif
-        "ldmfd sp!, {r4-r10, fp, ip, lr}\n\t"
+        "ldmfd sp!, {r4-r11, fp, ip, lr}\n\t"
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
-      : 
+      : "%r4", "%r5", "%r6", "%r8", "%r9", "%r10", "%r11", "%fp", "%ip", "%lr"
     );
     return r;
 }

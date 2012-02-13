@@ -16,7 +16,7 @@ endif
 # indicates a directory relative to the top of the source tree.
 
 GHC_UTILS_DIR           = utils
-GHC_INCLUDE_DIR         = includes
+GHC_INCLUDE_DIRS        = includes includes/dist includes/dist-derivedconstants/header includes/dist-ghcconstants/header
 GHC_COMPILER_DIR        = compiler
 GHC_PROG_DIR            = ghc
 GHC_RTS_DIR             = rts

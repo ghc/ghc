@@ -423,7 +423,7 @@ Things to note
  * We only do this with a single-alternative case
 
 Note [Check the output scrutinee for okForSpec]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
   case x of y { 
     A -> ....(case y of alts)....
@@ -432,7 +432,7 @@ Because of the binder-swap, the inner case will get substituted to
 (case x of ..).  So when testing whether the scrutinee is
 okForSpecuation we must be careful to test the *result* scrutinee ('x'
 in this case), not the *input* one 'y'.  The latter *is* ok for
-speculation here, but the former is not -- and ideed we can't float
+speculation here, but the former is not -- and indeed we can't float
 the inner case out, at least not unless x is also evaluated at its
 binding site.
 

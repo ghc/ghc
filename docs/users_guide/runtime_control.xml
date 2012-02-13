@@ -730,6 +730,10 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
 
       <varlistentry>
         <term>
+          <option>-T</option>
+          <indexterm><primary><option>-T</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
+        <term>
           <option>-t</option><optional><replaceable>file</replaceable></optional>
           <indexterm><primary><option>-t</option></primary><secondary>RTS option</secondary></indexterm>
         </term>
@@ -751,6 +755,7 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
 	  garbage collector, the amount of memory allocated, the
 	  maximum size of the heap, and so on.  The three
 	  variants give different levels of detail:
+          <option>-T</option> collects the data but produces no output
 	  <option>-t</option> produces a single line of output in the
 	  same format as GHC's <option>-Rghc-timing</option> option,
 	  <option>-s</option> produces a more detailed summary at the
@@ -762,6 +767,12 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
           <replaceable>file</replaceable>.  If
           <replaceable>file</replaceable> is omitted, then the output
           is sent to <constant>stderr</constant>.</para>
+
+    <para>
+        If you use the <literal>-T</literal> flag then, you should
+        access the statistics using
+        <ulink url="&libraryBaseLocation;/GHC-Stats.html">GHC.Stats</ulink>.
+    </para>
 
     <para>
         If you use the <literal>-t</literal> flag then, when your

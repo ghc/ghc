@@ -63,12 +63,12 @@ import Data.Word
 
 is32BitPlatform :: NatM Bool
 is32BitPlatform = do
-    dflags <- getDynFlagsNat
+    dflags <- getDynFlags
     return $ target32Bit (targetPlatform dflags)
 
 sse2Enabled :: NatM Bool
 sse2Enabled = do
-  dflags <- getDynFlagsNat
+  dflags <- getDynFlags
   case platformArch (targetPlatform dflags) of
       ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be
                     -- possible to make it optional, but we'd need to
@@ -81,7 +81,7 @@ sse2Enabled = do
 
 sse4_2Enabled :: NatM Bool
 sse4_2Enabled = do
-  dflags <- getDynFlagsNat
+  dflags <- getDynFlags
   return (dopt Opt_SSE4_2 dflags)
 
 if_sse2 :: NatM a -> NatM a -> NatM a
@@ -96,7 +96,7 @@ cmmTopCodeGen
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
-  dflags <- getDynFlagsNat
+  dflags <- getDynFlags
   let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
       os   = platformOS $ targetPlatform dflags
@@ -167,7 +167,7 @@ stmtToInstrs stmt = do
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
     CmmJump arg _         -> genJump arg
-    CmmReturn _           ->
+    CmmReturn             ->
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
@@ -400,7 +400,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
             )
 
 iselExpr64 expr
-   = do dflags <- getDynFlagsNat
+   = do dflags <- getDynFlags
         pprPanic "iselExpr64(i386)" (pprPlatform (targetPlatform dflags) expr)
 
 
@@ -887,7 +887,7 @@ getRegister' _ (CmmLit lit)
     in
         return (Any size code)
 
-getRegister' _ other = do dflags <- getDynFlagsNat
+getRegister' _ other = do dflags <- getDynFlags
                           pprPanic "getRegister(x86)" (pprPlatform (targetPlatform dflags) other)
 
 
@@ -1131,7 +1131,7 @@ isOperand _ _            = False
 memConstant :: Int -> CmmLit -> NatM Amode
 memConstant align lit = do
   lbl <- getNewLabelNat
-  dflags <- getDynFlagsNat
+  dflags <- getDynFlags
   (addr, addr_code) <- if target32Bit (targetPlatform dflags)
                        then do dynRef <- cmmMakeDynamicReference
                                              dflags
@@ -1228,10 +1228,10 @@ getCondCode (CmmMachOp mop [x, y])
       MO_U_Lt _ -> condIntCode LU  x y
       MO_U_Le _ -> condIntCode LEU x y
 
-      _other -> do dflags <- getDynFlagsNat
+      _other -> do dflags <- getDynFlags
                    pprPanic "getCondCode(x86,x86_64,sparc)" (pprPlatform (targetPlatform dflags) (CmmMachOp mop [x,y]))
 
-getCondCode other = do dflags <- getDynFlagsNat
+getCondCode other = do dflags <- getDynFlags
                        pprPanic "getCondCode(2)(x86,sparc)" (pprPlatform (targetPlatform dflags) other)
 
 
@@ -1621,7 +1621,7 @@ genCCall is32Bit (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
                          unitOL (POPCNT size (OpReg src_r)
                                  (getRegisterReg False (CmmLocal dst))))
         else do
-            dflags <- getDynFlagsNat
+            dflags <- getDynFlags
             targetExpr <- cmmMakeDynamicReference dflags addImportNat
                           CallReference lbl
             let target = CmmCallee targetExpr CCallConv
@@ -1690,6 +1690,7 @@ genCCall32 target dest_regs args =
         use_sse2 <- sse2Enabled
         push_codes <- mapM (push_arg use_sse2) (reverse args)
         delta <- getDeltaNat
+        MASSERT (delta == delta0 - tot_arg_size)
 
         -- in
         -- deal with static vs dynamic call targets
@@ -1728,10 +1729,10 @@ genCCall32 target dest_regs args =
                       (if pop_size==0 then [] else
                        [ADD II32 (OpImm (ImmInt pop_size)) (OpReg esp)])
                       ++
-                      [DELTA (delta + tot_arg_size)]
+                      [DELTA delta0]
                    )
         -- in
-        setDeltaNat (delta + tot_arg_size)
+        setDeltaNat delta0
 
         let
             -- assign the results, if necessary
@@ -1744,9 +1745,11 @@ genCCall32 target dest_regs args =
                                                        (ImmInt 0)
                              sz = floatSize w
                          in toOL [ SUB II32 (OpImm (ImmInt b)) (OpReg esp),
+                                   DELTA (delta0 - b),
                                    GST sz fake0 tmp_amode,
                                    MOV sz (OpAddr tmp_amode) (OpReg r_dest),
-                                   ADD II32 (OpImm (ImmInt b)) (OpReg esp)]
+                                   ADD II32 (OpImm (ImmInt b)) (OpReg esp),
+                                   DELTA delta0]
                     else unitOL (GMOV fake0 r_dest)
               | isWord64 ty    = toOL [MOV II32 (OpReg eax) (OpReg r_dest),
                                         MOV II32 (OpReg edx) (OpReg r_dest_hi)]
@@ -1959,7 +1962,7 @@ genCCall64 target dest_regs args =
              (arg_reg, arg_code) <- getSomeReg arg
              delta <- getDeltaNat
              setDeltaNat (delta-arg_size)
-             dflags <- getDynFlagsNat
+             dflags <- getDynFlags
              let platform = targetPlatform dflags
                  code' = code `appOL` arg_code `appOL` toOL [
                             SUB (intSize wordWidth) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
@@ -1992,7 +1995,7 @@ maxInlineSizeThreshold = 128
 outOfLineCmmOp :: CallishMachOp -> Maybe HintedCmmFormal -> [HintedCmmActual] -> NatM InstrBlock
 outOfLineCmmOp mop res args
   = do
-      dflags <- getDynFlagsNat
+      dflags <- getDynFlags
       targetExpr <- cmmMakeDynamicReference dflags addImportNat CallReference lbl
       let target = CmmCallee targetExpr CCallConv
 
@@ -2063,7 +2066,7 @@ genSwitch expr ids
   = do
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
-        dflags <- getDynFlagsNat
+        dflags <- getDynFlags
         dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)

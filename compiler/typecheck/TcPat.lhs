@@ -761,6 +761,9 @@ matchExpectedConTy data_tc pat_ty
   = do { (_, tys, subst) <- tcInstTyVars (tyConTyVars data_tc)
        	     -- tys = [ty1,ty2]
 
+       ; traceTc "matchExpectedConTy" (vcat [ppr data_tc, 
+                                             ppr (tyConTyVars data_tc),
+                                             ppr fam_tc, ppr fam_args])
        ; co1 <- unifyType (mkTyConApp fam_tc (substTys subst fam_args)) pat_ty
        	     -- co1 : T (ty1,ty2) ~ pat_ty
 

@@ -869,7 +869,7 @@ memInventory (rtsBool show)
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].part_list);
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].scavd_list);
           gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].todo_bd);
-      }	  
+      }
       gen_blocks[g] += genBlocks(&generations[g]);
   }
 
@@ -880,6 +880,7 @@ memInventory (rtsBool show)
       if (capabilities[i].pinned_object_block != NULL) {
           nursery_blocks += capabilities[i].pinned_object_block->blocks;
       }
+      nursery_blocks += countBlocks(capabilities[i].pinned_object_blocks);
   }
 
   retainer_blocks = 0;

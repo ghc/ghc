@@ -57,7 +57,7 @@ simpleImportDecl mn = ImportDecl {
 \end{code}
 
 \begin{code}
-instance (Outputable name) => Outputable (ImportDecl name) where
+instance (OutputableBndr name) => Outputable (ImportDecl name) where
     ppr (ImportDecl { ideclName = mod', ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
                     , ideclQualified = qual, ideclImplicit = implicit
@@ -134,12 +134,12 @@ ieNames (IEDocNamed       _   ) = []
 \end{code}
 
 \begin{code}
-instance (Outputable name) => Outputable (IE name) where
-    ppr (IEVar          var)    = pprHsVar var
+instance (OutputableBndr name, Outputable name) => Outputable (IE name) where
+    ppr (IEVar          var)    = pprPrefixOcc var
     ppr (IEThingAbs     thing)  = ppr thing
     ppr (IEThingAll     thing)  = hcat [ppr thing, text "(..)"]
     ppr (IEThingWith thing withs)
-        = pprHsVar thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
+        = pprPrefixOcc thing <> parens (fsep (punctuate comma (map pprPrefixOcc withs)))
     ppr (IEModuleContents mod')
         = ptext (sLit "module") <+> ppr mod'
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")

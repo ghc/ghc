@@ -138,7 +138,7 @@ dsCImport :: Id
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
    let ty = pFst $ coercionKind co
-       fod = case tyConAppTyCon_maybe ty of
+       fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
                  IsFunction
@@ -345,7 +345,7 @@ dsFExport fn_id co ext_name cconv isDyn = do
                                 -- The function returns t
                                 Nothing                 -> (orig_res_ty, False)
 
-    dflags <- getDOpts
+    dflags <- getDynFlags
     return $
       mkFExportCBits dflags ext_name
                      (if isDyn then Nothing else Just fn_id)

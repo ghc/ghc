@@ -169,31 +169,6 @@ lintCmmLast labels node = case node of
                                text "switch scrutinee is not a word: " <>
                                pprPlatform platform e <>
                                text " :: " <> ppr erep)
-
-  CmmCall { cml_target = target, cml_cont = cont } -> do
-          _ <- lintCmmExpr target
-          maybe (return ()) checkTarget cont
-
-  CmmForeignCall tgt _ args succ _ _ -> do
-          lintTarget tgt
-          mapM_ lintCmmExpr args
-          checkTarget succ
- where
-  checkTarget id
-     | setMember id labels = return ()
-     | otherwise = cmmLintErr (\_ -> text "Branch to nonexistent id" <+> ppr id)
-
-
-lintTarget :: ForeignTarget -> CmmLint ()
-lintTarget (ForeignTarget e _) = lintCmmExpr e >> return ()
-lintTarget (PrimTarget {})     = return ()
-
-
-checkCond :: CmmExpr -> CmmLint ()
-checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
-checkCond (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth = return () -- constant values
-checkCond expr
-    = cmmLintErr (\platform -> hang (text "expression is not a conditional:") 2
                        (pprPlatform platform expr))
 
 -- -----------------------------------------------------------------------------

@@ -1022,6 +1022,32 @@ ghc -c Foo.hs</screen>
     <variablelist>
 
       <varlistentry>
+	<term><option>-fdefer-type-errors</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fdefer-type-errors</option></primary>
+	  </indexterm>
+	  <indexterm><primary>warnings</primary></indexterm>
+	    <para>Defer as many type errors as possible until runtime.  
+            At compile time you get a warning (instead of an error).  At 
+            runtime, if you use a value that depends on a type error, you 
+            get a runtime error; but you can run any type-correct parts of your code 
+            just fine.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fhelpful-errors</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fhelpful-errors</option></primary>
+	  </indexterm>
+	  <indexterm><primary>warnings</primary></indexterm>
+	    <para>When a name or package is not found in scope, make
+            suggestions for the name or package you might have meant instead.</para>
+	  <para>This option is on by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-unrecognised-pragmas</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-unrecognised-pragmas</option></primary>
@@ -1393,13 +1419,14 @@ module M where
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-orphans</option>:</term>
+	<term><option>-fwarn-orphans, -fwarn-auto-orphans</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-orphans</option></primary></indexterm>
+	  <indexterm><primary><option>-fwarn-auto-orphans</option></primary></indexterm>
 	  <indexterm><primary>orphan instances, warning</primary></indexterm>
 	  <indexterm><primary>orphan rules, warning</primary></indexterm>
 
-	  <para>This option causes a warning to be emitted whenever the
+	  <para>These flags cause a warning to be emitted whenever the
 	    module contains an "orphan" instance declaration or rewrite rule.
 	    An instance declaration is an orphan if it appears in a module in
 	    which neither the class nor the type being instanced are declared
@@ -1411,6 +1438,11 @@ module M where
 	    play a role, whether or not the module's interface would otherwise
 	    be of any use.  See <xref linkend="orphan-modules"/> for details.
             </para>
+           <para>The flag <option>-fwarn-orphans</option> warns about user-written
+            orphan rules or instances.  The flag <option>-fwarn-auto-orphans</option>
+            warns about automatically-generated orphan rules, notably as a result of
+            specialising functions, for type classes (<literal>Specialise</literal>)
+            or argument values (<literal>SpecConstr</literal>).</para>
 	</listitem>
       </varlistentry>
 
@@ -2114,7 +2146,7 @@ f "2"    = 2
 
       <para>There are two ways to run a program on multiple
         processors:
-        call <literal>GHC.Conc.setNumCapabilities</literal> from your
+        call <literal>Control.Concurrent.setNumCapabilities</literal> from your
         program, or use the RTS <option>-N</option> option.</para>
 
       <variablelist>
@@ -2150,13 +2182,13 @@ f "2"    = 2
 
             <para>The current value of the <option>-N</option> option
               is available to the Haskell program
-              via <literal>GHC.Conc.getNumCapabilities</literal>, and
+              via <literal>Control.Concurrent.getNumCapabilities</literal>, and
               it may be changed while the program is running by
-              calling <literal>GHC.Conc.setNumCapabilities</literal>.
+              calling <literal>Control.Concurrent.setNumCapabilities</literal>.
               Note: in the current implementation,
               the <option>-N</option> value may only
               be <emphasis>increased</emphasis>, not decreased, by
-              calling <literal>GHC.Conc.setNumCapabilities</literal>.</para>
+              calling <literal>Control.Concurrent.setNumCapabilities</literal>.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -2192,7 +2224,7 @@ f "2"    = 2
             <para>
               This option is probably only of use for concurrent
               programs that explicitly schedule threads onto CPUs
-              with <literal>GHC.Conc.forkOnIO</literal>.
+              with <literal>Control.Concurrent.forkOn</literal>.
             </para>
           </listitem>
         </varlistentry>
@@ -2261,7 +2293,7 @@ f "2"    = 2
 	<term><option>-msse4.2</option>:</term>
 	<listitem>
           <para>
-				(x86 only, added in GHC 7.2.1) Use the SSE4.2 instruction set to
+				(x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
 				implement some floating point and bit operations when using the
 				<link linkend="native-code-gen">native code generator</link>. The
 				resulting compiled code will only run on processors that

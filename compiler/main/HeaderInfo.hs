@@ -123,7 +123,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
       		    	       ideclAs        = Nothing,
       		    	       ideclHiding    = Nothing  }
 
-parseError :: SrcSpan -> Message -> IO a
+parseError :: SrcSpan -> MsgDoc -> IO a
 parseError span err = throwOneError $ mkPlainErrMsg span err
 
 --------------------------------------------------------------

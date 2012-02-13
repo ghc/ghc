@@ -101,13 +101,10 @@ tcTyAndClassDecls :: ModDetails
                   -> TcM TcGblEnv       -- Input env extended by types and classes
                                         -- and their implicit Ids,DataCons
 -- Fails if there are any errors
-tcTyAndClassDecls boot_details decls_s
-  = checkNoErrs $ do    -- The code recovers internally, but if anything gave rise to
+tcTyAndClassDecls boot_details tyclds_s
+  = checkNoErrs $       -- The code recovers internally, but if anything gave rise to
                         -- an error we'd better stop now, to avoid a cascade
-  { let tyclds_s = map (filterOut (isFamInstDecl . unLoc)) decls_s
-                   -- Remove family instance decls altogether
-                   -- They are dealt with by TcInstDcls
-  ; fold_env tyclds_s }  -- type check each group in dependency order folding the global env
+    fold_env tyclds_s   -- type check each group in dependency order folding the global env
   where
     fold_env :: [TyClGroup Name] -> TcM TcGblEnv
     fold_env [] = getGblEnv
@@ -379,7 +376,7 @@ kcTyClDecl decl@(TyFamily {})
   = kcFamilyDecl [] decl      -- the empty list signals a toplevel decl
 
 kcTyClDecl decl@(TyData {})
-  = ASSERT( not . isFamInstDecl $ decl )   -- must not be a family instance
+  = ASSERT2( not . isFamInstDecl $ decl, ppr decl )   -- must not be a family instance
     kcTyClDeclBody decl	$ \_ -> kcDataDecl decl
 
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
@@ -558,7 +555,7 @@ tcTyClDecl1 parent _calc_isrec
   = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
   { traceTc "type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent Nothing
+  ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent
   ; return [ATyCon tycon] }
 
   -- "data family" declaration
@@ -569,8 +566,8 @@ tcTyClDecl1 parent _calc_isrec
   ; checkFamFlag tc_name
   ; extra_tvs <- tcDataKindSig kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
-  ; tycon <- buildAlgTyCon tc_name final_tvs []
-               DataFamilyTyCon Recursive True parent Nothing
+        tycon = buildAlgTyCon tc_name final_tvs []
+                              DataFamilyTyCon Recursive True parent
   ; return [ATyCon tycon] }
 
   -- "type" synonym declaration
@@ -580,7 +577,7 @@ tcTyClDecl1 _parent _calc_isrec
     tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
     { rhs_ty' <- tcCheckHsType rhs_ty kind
     ; tycon <- buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty')
-      	       		     kind NoParentTyCon Nothing
+                 kind NoParentTyCon
     ; return [ATyCon tycon] }
 
   -- "newtype" and "data"
@@ -606,7 +603,7 @@ tcTyClDecl1 _parent calc_isrec
 
   ; dataDeclChecks tc_name new_or_data stupid_theta cons
 
-  ; tycon <- fixM (\ tycon -> do
+  ; tycon <- fixM $ \ tycon -> do
 	{ let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
 	; data_cons <- tcConDecls new_or_data ex_ok tycon (final_tvs, res_ty) cons
 	; tc_rhs <-
@@ -616,9 +613,8 @@ tcTyClDecl1 _parent calc_isrec
 		   DataType -> return (mkDataTyConRhs data_cons)
 		   NewType  -> ASSERT( not (null data_cons) )
                                mkNewTyConRhs tc_name tycon (head data_cons)
-	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-	    (not h98_syntax) NoParentTyCon Nothing
-	})
+	; return (buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs
+	                        is_rec (not h98_syntax) NoParentTyCon) }
   ; return [ATyCon tycon] }
 
 tcTyClDecl1 _parent calc_isrec
@@ -1365,17 +1361,10 @@ checkValidClass cls
 
         -- Check the associated type defaults are well-formed and instantiated
         -- See Note [Checking consistent instantiation]
-        ; mapM_ check_at_defs at_stuff
-
-  	-- Check that if the class has generic methods, then the
-	-- class has only one parameter.  We can't do generic
-	-- multi-parameter type classes!
-	; checkTc (unary || no_generics) (genericMultiParamErr cls)
-	}
+        ; mapM_ check_at_defs at_stuff	}
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
-    unary 	= isSingleton (snd (splitKiTyVars tyvars))  -- IA0_NOTE: only count type arguments
-    no_generics = null [() | (_, (GenDefMeth _)) <- op_stuff]
+    unary = isSingleton (snd (splitKiTyVars tyvars))  -- IA0_NOTE: only count type arguments
 
     check_op constrained_class_methods (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -1699,11 +1688,6 @@ noClassTyVarErr clas op
   = sep [ptext (sLit "The class method") <+> quotes (ppr op),
 	 ptext (sLit "mentions none of the type variables of the class") <+> 
 		ppr clas <+> hsep (map ppr (classTyVars clas))]
-
-genericMultiParamErr :: Class -> SDoc
-genericMultiParamErr clas
-  = ptext (sLit "The multi-parameter class") <+> quotes (ppr clas) <+> 
-    ptext (sLit "cannot have generic methods")
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls

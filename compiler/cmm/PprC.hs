@@ -172,7 +172,7 @@ pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext (sLit "static ")
 pprStmt :: Platform -> CmmStmt -> SDoc
 
 pprStmt platform stmt = case stmt of
-    CmmReturn _  -> panic "pprStmt: return statement should have been cps'd away"
+    CmmReturn    -> panic "pprStmt: return statement should have been cps'd away"
     CmmNop       -> empty
     CmmComment _ -> empty -- (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
                           -- XXX if the string contains "*/", we need to fix it
@@ -248,7 +248,7 @@ pprStmt platform stmt = case stmt of
 
     CmmBranch ident          -> pprBranch ident
     CmmCondBranch expr ident -> pprCondBranch platform expr ident
-    CmmJump lbl _params      -> mkJMP_(pprExpr platform lbl) <> semi
+    CmmJump lbl _            -> mkJMP_(pprExpr platform lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch platform arg ids
 
 pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
@@ -757,12 +757,14 @@ isStrangeTypeReg (CmmLocal _)   = False
 isStrangeTypeReg (CmmGlobal g)  = isStrangeTypeGlobal g
 
 isStrangeTypeGlobal :: GlobalReg -> Bool
+isStrangeTypeGlobal CCCS                = True
 isStrangeTypeGlobal CurrentTSO          = True
 isStrangeTypeGlobal CurrentNursery      = True
 isStrangeTypeGlobal BaseReg             = True
 isStrangeTypeGlobal r                   = isFixedPtrGlobalReg r
 
 strangeRegType :: CmmReg -> Maybe SDoc
+strangeRegType (CmmGlobal CCCS) = Just (ptext (sLit "struct CostCentreStack_ *"))
 strangeRegType (CmmGlobal CurrentTSO) = Just (ptext (sLit "struct StgTSO_ *"))
 strangeRegType (CmmGlobal CurrentNursery) = Just (ptext (sLit "struct bdescr_ *"))
 strangeRegType (CmmGlobal BaseReg) = Just (ptext (sLit "struct StgRegTable_ *"))
@@ -793,6 +795,7 @@ pprGlobalReg gr = case gr of
     SpLim          -> ptext (sLit "SpLim")
     Hp             -> ptext (sLit "Hp")
     HpLim          -> ptext (sLit "HpLim")
+    CCCS           -> ptext (sLit "CCCS")
     CurrentTSO     -> ptext (sLit "CurrentTSO")
     CurrentNursery -> ptext (sLit "CurrentNursery")
     HpAlloc        -> ptext (sLit "HpAlloc")

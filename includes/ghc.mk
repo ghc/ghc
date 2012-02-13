@@ -41,9 +41,7 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 includes_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
-includes_CC_OPTS += -Iincludes
-includes_CC_OPTS += -Iincludes/dist-derivedconstants/header
-includes_CC_OPTS += -Iincludes/dist-ghcconstants/header
+includes_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 includes_CC_OPTS += -Irts
 
 ifneq "$(GhcWithSMP)" "YES"
@@ -65,7 +63,7 @@ $(includes_H_CONFIG) :
 
 else
 
-$(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk
+$(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCAUTOCONF_H__"  >$@
 	@echo "#define __GHCAUTOCONF_H__" >>$@
@@ -76,7 +74,7 @@ $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk
 
 endif
 
-$(includes_H_PLATFORM) : includes/Makefile
+$(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
 	@echo "#ifndef __GHCPLATFORM_H__"  >$@
@@ -131,7 +129,7 @@ endif
 
 includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
 
-ifeq "$(PORTING_HOST)" "YES"
+ifeq "$(PORTING_HOST)-$(AlienScript)" "YES-"
 
 DerivedConstants.h :
 	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
@@ -147,9 +145,18 @@ $(eval $(call build-prog,includes,dist-derivedconstants,0))
 $(includes_dist-derivedconstants_depfile_c_asm) : $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_FILES) $$(rts_H_FILES)
 includes/dist-derivedconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 
+ifneq "$(AlienScript)" ""
+$(INPLACE_BIN)/mkDerivedConstants$(exeext): includes/$(includes_dist-derivedconstants_C_SRCS) | $$(dir $$@)/.
+	$(WhatGccIsCalled) -o $@ $< $(CFLAGS) $(includes_CC_OPTS)
+endif
+
 ifneq "$(BINDIST)" "YES"
 $(includes_DERIVEDCONSTANTS) : $(INPLACE_BIN)/mkDerivedConstants$(exeext) | $$(dir $$@)/.
+ifeq "$(AlienScript)" ""
 	./$< >$@
+else
+	$(AlienScript) run ./$< >$@
+endif
 endif
 
 endif
@@ -159,7 +166,7 @@ endif
 
 includes_GHCCONSTANTS = includes/dist-ghcconstants/header/GHCConstants.h
 
-ifeq "$(PORTING_HOST)" "YES"
+ifeq "$(PORTING_HOST)-$(AlienScript)" "YES-"
 
 $(includes_GHCCONSTANTS) :
 	@echo "*** Cross-compiling: please copy DerivedConstants.h from the target system"
@@ -178,8 +185,17 @@ $(includes_dist-ghcconstants_depfile_c_asm) : $(includes_H_CONFIG) $(includes_H_
 
 includes/dist-ghcconstants/build/mkDerivedConstants.o : $(includes_H_CONFIG) $(includes_H_PLATFORM)
 
+ifneq "$(AlienScript)" ""
+$(INPLACE_BIN)/mkGHCConstants$(exeext): includes/$(includes_dist-ghcconstants_C_SRCS) | $$(dir $$@)/.
+	$(WhatGccIsCalled) -o $@ $< $(CFLAGS) $(includes_CC_OPTS) $(includes_dist-ghcconstants_CC_OPTS)
+endif
+
 $(includes_GHCCONSTANTS) : $(INPLACE_BIN)/mkGHCConstants$(exeext) | $$(dir $$@)/.
+ifeq "$(AlienScript)" ""
 	./$< >$@
+else
+	$(AlienScript) run ./$< >$@
+endif
 endif
 
 endif

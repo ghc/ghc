@@ -133,7 +133,7 @@ CHECKED_$1 = YES
 check_packages: check_$1
 .PHONY: check_$1
 check_$1: $$(GHC_CABAL_INPLACE)
-	$$(GHC_CABAL_INPLACE) check $1
+	CROSS_COMPILE="$(CrossCompilePrefix)" $$(GHC_CABAL_INPLACE) check $1
 endif
 
 ifneq "$3" "0"

@@ -86,6 +86,10 @@ endif
 ifneq "$(filter-out 2,$(stage))" ""
 ghc_stage2_NOT_NEEDED = YES
 endif
+# When cross-compiling, the stage 1 compiler is our release compiler, so omit stage 2
+ifeq "$(BuildingCrossCompiler)" "YES"
+ghc_stage2_NOT_NEEDED = YES
+endif
 # stage 3 has to be requested explicitly with stage=3
 ifneq "$(stage)" "3"
 ghc_stage3_NOT_NEEDED = YES
@@ -147,7 +151,7 @@ install: install_ghc_link
 .PNONY: install_ghc_link
 install_ghc_link: 
 	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc")
-	$(LN_S) ghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghc"
+	$(LN_S) $(CrossCompilePrefix)ghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc"
 else
 # On Windows we install the main binary as $(bindir)/ghc.exe
 # To get ghc-<version>.exe we have a little C program in driver/ghc
@@ -155,6 +159,6 @@ install: install_ghc_post
 .PHONY: install_ghc_post
 install_ghc_post: install_bins
 	$(call removeFiles,$(DESTDIR)$(bindir)/ghc.exe)
-	"$(MV)" -f $(DESTDIR)$(bindir)/ghc-stage$(INSTALL_GHC_STAGE).exe $(DESTDIR)$(bindir)/ghc.exe
+	"$(MV)" -f $(DESTDIR)$(bindir)/ghc-stage$(INSTALL_GHC_STAGE).exe $(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc.exe
 endif
 

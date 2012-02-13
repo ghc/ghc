@@ -228,6 +228,7 @@ initCapability( Capability *cap, nat i )
     cap->no = i;
     cap->in_haskell        = rtsFalse;
     cap->idle              = 0;
+    cap->disabled          = rtsFalse;
 
     cap->run_queue_hd      = END_TSO_QUEUE;
     cap->run_queue_tl      = END_TSO_QUEUE;
@@ -272,6 +273,7 @@ initCapability( Capability *cap, nat i )
     cap->transaction_tokens = 0;
     cap->context_switch = 0;
     cap->pinned_object_block = NULL;
+    cap->pinned_object_blocks = NULL;
 
 #ifdef PROFILING
     cap->r.rCCCS = CCS_SYSTEM;
@@ -357,7 +359,7 @@ moreCapabilities (nat from USED_IF_THREADS, nat to USED_IF_THREADS)
 	initCapability(&capabilities[i], i);
     }
 
-    last_free_capability = NULL;
+    last_free_capability = &capabilities[0];
 
     debugTrace(DEBUG_sched, "allocated %d more capabilities", to - from);
 

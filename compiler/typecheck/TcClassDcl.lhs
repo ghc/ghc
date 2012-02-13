@@ -363,7 +363,7 @@ mkGenericDefMethBind clas inst_tys sel_id dm_name
   = 	-- A generic default method
     	-- If the method is defined generically, we only have to call the
         -- dm_name.
-    do	{ dflags <- getDOpts
+    do	{ dflags <- getDynFlags
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
 		   (vcat [ppr clas <+> ppr inst_tys,
 			  nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))

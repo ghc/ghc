@@ -488,7 +488,7 @@ mustExposeTyCon exports tc
     exported_con con = any (`elemNameSet` exports) 
 			   (dataConName con : dataConFieldLabels con)
 
-tidyInstances :: (DFunId -> DFunId) -> [Instance] -> [Instance]
+tidyInstances :: (DFunId -> DFunId) -> [ClsInst] -> [ClsInst]
 tidyInstances tidy_dfun ispecs
   = map tidy ispecs
   where
@@ -513,6 +513,7 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                                tidy_var_v = lookup_var var_v
                          , isExportedId tidy_var
                          , isExportedId tidy_var_v
+                         , isDataConWorkId var || not (isImplicitId var)
                          ]
 
     tidy_scalarVars = mkVarSet [ lookup_var var 

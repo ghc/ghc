@@ -265,17 +265,26 @@ dmdAnal env dmd (Case scrut case_bndr ty [alt@(DataAlt dc, _, _)])
 			     idDemandInfo case_bndr'
 
 	(scrut_ty, scrut') = dmdAnal env scrut_dmd scrut
+        res_ty =           alt_ty1 `bothType` scrut_ty
     in
-    (alt_ty1 `bothType` scrut_ty, Case scrut' case_bndr' ty [alt'])
+--    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
+--                                  , text "scrut_ty" <+> ppr scrut_ty
+--                                  , text "alt_ty" <+> ppr alt_ty1
+--                                  , text "res_ty" <+> ppr res_ty ]) $
+    (res_ty, Case scrut' case_bndr' ty [alt'])
 
 dmdAnal env dmd (Case scrut case_bndr ty alts)
   = let
 	(alt_tys, alts')        = mapAndUnzip (dmdAnalAlt env dmd) alts
 	(scrut_ty, scrut')      = dmdAnal env evalDmd scrut
 	(alt_ty, case_bndr')	= annotateBndr (foldr1 lubType alt_tys) case_bndr
+        res_ty                  = alt_ty `bothType` scrut_ty
     in
---    pprTrace "dmdAnal:Case" (ppr alts $$ ppr alt_tys)
-    (alt_ty `bothType` scrut_ty, Case scrut' case_bndr' ty alts')
+--    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
+--                                   , text "scrut_ty" <+> ppr scrut_ty
+--                                   , text "alt_ty" <+> ppr alt_ty
+--                                   , text "res_ty" <+> ppr res_ty ]) $
+    (res_ty, Case scrut' case_bndr' ty alts')
 
 dmdAnal env dmd (Let (NonRec id rhs) body)
   = let
@@ -337,7 +346,7 @@ dmdAnalAlt env dmd (con,bndrs,rhs)
 	--	   other      -> return ()
 	-- So the 'y' isn't necessarily going to be evaluated
 	--
-	-- A more complete example where this shows up is:
+	-- A more complete example (Trac #148, #1592) where this shows up is:
 	--	do { let len = <expensive> ;
 	--	   ; when (...) (exitWith ExitSuccess)
 	--	   ; print len }
