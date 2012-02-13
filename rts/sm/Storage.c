@@ -744,8 +744,54 @@ allocatePinned (Capability *cap, lnat n)
     bd = cap->pinned_object_block;
     
     // If we don't have a block of pinned objects yet, or the current
-    // one isn't large enough to hold the new object, allocate a new one.
+    // one isn't large enough to hold the new object, get a new one.
     if (bd == NULL || (bd->free + n) > (bd->start + BLOCK_SIZE_W)) {
+
+        // stash the old block on cap->pinned_object_blocks.  On the
+        // next GC cycle these objects will be moved to
+        // g0->large_objects.
+        if (bd != NULL) {
+            dbl_link_onto(bd, &cap->pinned_object_blocks);
+        }
+
+        // We need to find another block.  We could just allocate one,
+        // but that means taking a global lock and we really want to
+        // avoid that (benchmarks that allocate a lot of pinned
+        // objects scale really badly if we do this).
+        //
+        // So first, we try taking the next block from the nursery, in
+        // the same way as allocate(), but note that we can only take
+        // an *empty* block, because we're about to mark it as
+        // BF_PINNED | BF_LARGE.
+        bd = cap->r.rCurrentNursery->link;
+        if (bd == NULL || bd->free != bd->start) { // must be empty!
+            // The nursery is empty, or the next block is non-empty:
+            // allocate a fresh block (we can't fail here).
+
+            // XXX in the case when the next nursery block is
+            // non-empty we aren't exerting any pressure to GC soon,
+            // so if this case ever happens then we could in theory
+            // keep allocating for ever without calling the GC. We
+            // can't bump g0->n_new_large_words because that will be
+            // counted towards allocation, and we're already counting
+            // our pinned obects as allocation in
+            // collect_pinned_object_blocks in the GC.
+            ACQUIRE_SM_LOCK;
+            bd = allocBlock();
+            RELEASE_SM_LOCK;
+            initBdescr(bd, g0, g0);
+        } else {
+            // we have a block in the nursery: steal it
+            cap->r.rCurrentNursery->link = bd->link;
+            if (bd->link != NULL) {
+                bd->link->u.back = cap->r.rCurrentNursery;
+            }
+            cap->r.rNursery->n_blocks--;
+        }
+
+        cap->pinned_object_block = bd;
+        bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
+
         // The pinned_object_block remains attached to the capability
         // until it is full, even if a GC occurs.  We want this
         // behaviour because otherwise the unallocated portion of the
@@ -759,17 +805,6 @@ allocatePinned (Capability *cap, lnat n)
         // the next GC the BF_EVACUATED flag will be cleared, and the
         // block will be promoted as usual (if anything in it is
         // live).
-        ACQUIRE_SM_LOCK;
-        if (bd != NULL) {
-            dbl_link_onto(bd, &g0->large_objects);
-            g0->n_large_blocks++;
-            g0->n_new_large_words += bd->free - bd->start;
-        }
-        cap->pinned_object_block = bd = allocBlock();
-        RELEASE_SM_LOCK;
-        initBdescr(bd, g0, g0);
-        bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
-	bd->free   = bd->start;
     }
 
     p = bd->free;

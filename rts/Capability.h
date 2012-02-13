@@ -76,6 +76,8 @@ struct Capability_ {
 
     // block for allocating pinned objects into
     bdescr *pinned_object_block;
+    // full pinned object blocks allocated since the last GC
+    bdescr *pinned_object_blocks;
 
     // Context switch flag.  When non-zero, this means: stop running
     // Haskell code, and switch threads.

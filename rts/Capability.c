@@ -273,6 +273,7 @@ initCapability( Capability *cap, nat i )
     cap->transaction_tokens = 0;
     cap->context_switch = 0;
     cap->pinned_object_block = NULL;
+    cap->pinned_object_blocks = NULL;
 
 #ifdef PROFILING
     cap->r.rCCCS = CCS_SYSTEM;
