@@ -1655,9 +1655,7 @@ checkAdd :: Bool -> String -> GHCi (InteractiveImport)
 checkAdd star mstr = do
   dflags <- getDynFlags 
   case safeLanguageOn dflags of
-    True | star -> do
-        liftIO $ putStrLn "Warning: can't use * imports with Safe Haskell; ignoring *"
-        checkAdd False mstr
+    True | star -> ghcError $ CmdLineError "can't use * imports with Safe Haskell"
 
     True -> do m <- lookupModule mstr
                s <- GHC.isModuleTrusted m
@@ -1687,8 +1685,8 @@ checkAdd star mstr = do
 setGHCContextFromGHCiState :: GHCi ()
 setGHCContextFromGHCiState = do
   st <- getGHCiState
-  goodTran <- mapMaybeM (tryBool . ok) $ transient_ctx st
-  goodRemb <- mapMaybeM (tryBool . ok) $ remembered_ctx st
+  goodTran <- filterM (tryBool . ok) $ transient_ctx st
+  goodRemb <- filterM (tryBool . ok) $ remembered_ctx st
   -- drop bad imports so we don't keep replaying it to the user!
   modifyGHCiState $ \s -> s { transient_ctx  = goodTran }
   modifyGHCiState $ \s -> s { remembered_ctx = goodRemb }
@@ -1697,8 +1695,6 @@ setGHCContextFromGHCiState = do
   where 
     ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
     ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
-
-    mapMaybeM f xs = catMaybes `fmap` sequence (map f xs)
 
 setContext :: [String] -> [String] -> GHCi ()
 setContext starred not_starred = do
@@ -2756,12 +2752,12 @@ ghciHandle h m = Haskeline.catch m $ \e -> unblock (h e)
 ghciTry :: GHCi a -> GHCi (Either SomeException a)
 ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)
 
-tryBool :: GHCi a -> GHCi (Maybe a)
+tryBool :: GHCi a -> GHCi Bool
 tryBool m = do
     r <- ghciTry m
     case r of
-      Left e  -> showException e >> return Nothing
-      Right a -> return $ Just a
+      Left e  -> showException e >> return False
+      Right _ -> return True
 
 -- ----------------------------------------------------------------------------
 -- Utils
