@@ -16,7 +16,6 @@
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * docs/Makefile
 #     * docs/docbook-cheat-sheet/Makefile
-#     * docs/ext-core/Makefile
 #     * docs/man/Makefile
 #     * docs/storage-mgmt/Makefile
 #     * docs/vh/Makefile
@@ -561,7 +560,6 @@ endif
 
 BUILD_DIRS += \
    docs/users_guide \
-   docs/ext-core \
    docs/man \
    $(GHC_UNLIT_DIR) \
    $(GHC_HP2PS_DIR)
