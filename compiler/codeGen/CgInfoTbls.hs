@@ -36,7 +36,7 @@ import CgBindery
 import CgCallConv
 import CgUtils
 import CgMonad
-import CmmBuildInfoTables
+import CmmUtils
 
 import OldCmm
 import CLabel
