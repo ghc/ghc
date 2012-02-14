@@ -728,7 +728,7 @@ wayNames = map wayName . ways
 --    from an imported module.  This will fail if no code has been generated
 --    for this module.  You can use 'GHC.needsTemplateHaskell' to detect
 --    whether this might be the case and choose to either switch to a
---    different target or avoid typechecking such modules.  (The latter may
+--    different target or avoid typechecking such modules.  (The latter may be
 --    preferable for security reasons.)
 --
 data HscTarget
