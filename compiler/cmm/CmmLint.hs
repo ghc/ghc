@@ -194,7 +194,7 @@ checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
 checkCond (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth = return () -- constant values
 checkCond expr
     = cmmLintErr (\platform -> hang (text "expression is not a conditional:") 2
-                       (pprPlatform platform expr))
+                         (pprPlatform platform expr))
 
 -- -----------------------------------------------------------------------------
 -- CmmLint monad

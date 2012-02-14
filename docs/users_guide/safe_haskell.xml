@@ -156,7 +156,7 @@
         <listitem>The design also relies on the Danger module not being able
           to access the <literal>UnsafeRIO</literal> constructor.
           Unfortunately Template Haskell can be used to subvert module
-          boundaries and so could be used gain access to this constructor.
+          boundaries and so could be used to gain access to this constructor.
         </listitem>
         <listitem>There is no way to place restrictions on the modules that
           the untrusted Danger module can import. This gives the author of

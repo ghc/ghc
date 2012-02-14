@@ -41,7 +41,8 @@ import CLabel
 import Util
 
 import Data.Array
-import System.Directory ( createDirectoryIfMissing )
+import Data.Time
+import System.Directory
 
 import Trace.Hpc.Mix
 import Trace.Hpc.Util
@@ -158,7 +159,7 @@ writeMixEntries dflags mod count entries filename
             tabStop = 8 -- <tab> counts as a normal char in GHC's location ranges.
 
         createDirectoryIfMissing True hpc_mod_dir
-        modTime <- getModificationTime filename
+        modTime <- getModificationUTCTime filename
         let entries' = [ (hpcPos, box) 
                        | (span,_,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
         when (length entries' /= count) $ do
@@ -1097,7 +1098,7 @@ type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 -- This hash only has to be hashed at Mix creation time,
 -- and is for sanity checking only.
 
-mixHash :: FilePath -> Integer -> Int -> [MixEntry] -> Int
+mixHash :: FilePath -> UTCTime -> Int -> [MixEntry] -> Int
 mixHash file tm tabstop entries = fromIntegral $ hashString
 	(show $ Mix file tm 0 tabstop entries)
 \end{code}

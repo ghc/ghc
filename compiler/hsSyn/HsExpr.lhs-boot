@@ -1,15 +1,8 @@
 \begin{code}
 {-# LANGUAGE KindSignatures #-}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module HsExpr where
 
-import SrcLoc	  ( Located )
+import SrcLoc     ( Located )
 import Outputable ( SDoc, OutputableBndr )
 import {-# SOURCE #-} HsPat  ( LPat )
 
@@ -34,17 +27,17 @@ type LHsExpr a = Located (HsExpr a)
 type SyntaxExpr a = HsExpr a
 
 pprLExpr :: (OutputableBndr i) => 
-	LHsExpr i -> SDoc
+        LHsExpr i -> SDoc
 
 pprExpr :: (OutputableBndr i) => 
-	HsExpr i -> SDoc
+        HsExpr i -> SDoc
 
 pprSplice :: (OutputableBndr i) => 
-	HsSplice i -> SDoc
+        HsSplice i -> SDoc
 
 pprPatBind :: (OutputableBndr b, OutputableBndr i) => 
-	LPat b -> GRHSs i -> SDoc
+        LPat b -> GRHSs i -> SDoc
 
 pprFunBind :: (OutputableBndr idL, OutputableBndr idR) => 
-	idL -> Bool -> MatchGroup idR -> SDoc
+        idL -> Bool -> MatchGroup idR -> SDoc
 \end{code}

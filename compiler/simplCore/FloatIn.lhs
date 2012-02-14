@@ -24,7 +24,8 @@ module FloatIn ( floatInwards ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils	( exprIsHNF, exprIsDupable )
+import MkCore
+import CoreUtils	( exprIsDupable, exprIsExpandable, exprOkForSideEffects )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf, idRuleAndUnfoldingVars )
 import Id		( isOneShotBndr, idType )
 import Var
@@ -119,26 +120,28 @@ the closure for a is not built.
 %************************************************************************
 
 \begin{code}
-type FreeVarsSet   = IdSet
+type FreeVarSet  = IdSet
+type BoundVarSet = IdSet
 
-type FloatingBinds = [(CoreBind, FreeVarsSet)]
-	-- In reverse dependency order (innermost binder first)
-
-	-- The FreeVarsSet is the free variables of the binding.  In the case
+data FloatInBind = FB BoundVarSet FreeVarSet FloatBind
+	-- The FreeVarSet is the free variables of the binding.  In the case
 	-- of recursive bindings, the set doesn't include the bound
 	-- variables.
 
-fiExpr :: FloatingBinds		-- Binds we're trying to drop
+type FloatInBinds = [FloatInBind]
+	-- In reverse dependency order (innermost binder first)
+
+fiExpr :: FloatInBinds		-- Binds we're trying to drop
 				-- as far "inwards" as possible
        -> CoreExprWithFVs	-- Input expr
        -> CoreExpr		-- Result
 
 fiExpr to_drop (_, AnnLit lit)     = ASSERT( null to_drop ) Lit lit
 fiExpr to_drop (_, AnnType ty)     = ASSERT( null to_drop ) Type ty
-fiExpr to_drop (_, AnnVar v)       = mkCoLets' to_drop (Var v)
-fiExpr to_drop (_, AnnCoercion co) = mkCoLets' to_drop (Coercion co)
+fiExpr to_drop (_, AnnVar v)       = wrapFloats to_drop (Var v)
+fiExpr to_drop (_, AnnCoercion co) = wrapFloats to_drop (Coercion co)
 fiExpr to_drop (_, AnnCast expr (fvs_co, co))
-  = mkCoLets' (drop_here ++ co_drop) $
+  = wrapFloats (drop_here ++ co_drop) $
     Cast (fiExpr e_drop expr) co
   where
     [drop_here, e_drop, co_drop] = sepBindsByDropPoint False [freeVarsOf expr, fvs_co] to_drop
@@ -149,10 +152,16 @@ need to get at all the arguments.  The next simplifier run will
 pull out any silly ones.
 
 \begin{code}
-fiExpr to_drop (_,AnnApp fun arg)
-  = mkCoLets' drop_here (App (fiExpr fun_drop fun) (fiExpr arg_drop arg))
+fiExpr to_drop (_,AnnApp fun arg@(arg_fvs, ann_arg))
+  | noFloatIntoRhs ann_arg  = wrapFloats drop_here $ wrapFloats arg_drop $
+                              App (fiExpr fun_drop fun) (fiExpr [] arg)
+       -- It's inconvenient to test for an unlifted arg here,
+       -- and it really doesn't matter if we float into one
+  | otherwise               = wrapFloats drop_here $
+                              App (fiExpr fun_drop fun) (fiExpr arg_drop arg)
   where
-    [drop_here, fun_drop, arg_drop] = sepBindsByDropPoint False [freeVarsOf fun, freeVarsOf arg] to_drop
+    [drop_here, fun_drop, arg_drop] 
+      = sepBindsByDropPoint False [freeVarsOf fun, arg_fvs] to_drop
 \end{code}
 
 Note [Floating in past a lambda group]
@@ -199,7 +208,7 @@ fiExpr to_drop lam@(_, AnnLam _ _)
   = mkLams bndrs (fiExpr to_drop body)
 
   | otherwise	 	-- Dump it all here
-  = mkCoLets' to_drop (mkLams bndrs (fiExpr [] body))
+  = wrapFloats to_drop (mkLams bndrs (fiExpr [] body))
 
   where
     (bndrs, body) = collectAnnBndrs lam
@@ -220,7 +229,7 @@ We don't float lets inwards past an SCC.
 fiExpr to_drop (_, AnnTick tickish expr)
   | tickishScoped tickish
   =     -- Wimp out for now - we could push values in
-    mkCoLets' to_drop (Tick tickish (fiExpr [] expr))
+    wrapFloats to_drop (Tick tickish (fiExpr [] expr))
 
   | otherwise
   = Tick tickish (fiExpr to_drop expr)
@@ -266,7 +275,7 @@ can't have unboxed bindings.
 So we make "extra_fvs" which is the rhs_fvs of such bindings, and
 arrange to dump bindings that bind extra_fvs before the entire let.
 
-Note [extra_fvs (s): free variables of rules]
+Note [extra_fvs (2): free variables of rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider 
   let x{rule mentioning y} = rhs in body 
@@ -280,13 +289,13 @@ idFreeVars.
 fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
   = fiExpr new_to_drop body
   where
-    body_fvs = freeVarsOf body
+    body_fvs = freeVarsOf body `delVarSet` id
 
     rule_fvs = idRuleAndUnfoldingVars id	-- See Note [extra_fvs (2): free variables of rules]
     extra_fvs | noFloatIntoRhs ann_rhs
 	      || isUnLiftedType (idType id) = rule_fvs `unionVarSet` rhs_fvs
 	      | otherwise		    = rule_fvs
-	-- See Note [extra_fvs (2): avoid floating into RHS]
+	-- See Note [extra_fvs (1): avoid floating into RHS]
 	-- No point in floating in only to float straight out again
 	-- Ditto ok-for-speculation unlifted RHSs
 
@@ -294,7 +303,8 @@ fiExpr to_drop (_,AnnLet (AnnNonRec id rhs@(rhs_fvs, ann_rhs)) body)
 	= sepBindsByDropPoint False [extra_fvs, rhs_fvs, body_fvs] to_drop
 
     new_to_drop = body_binds ++				-- the bindings used only in the body
-		  [(NonRec id rhs', rhs_fvs')] ++ 	-- the new binding itself
+		  [FB (unitVarSet id) rhs_fvs'
+                      (FloatLet (NonRec id rhs'))] ++ 	-- the new binding itself
 		  extra_binds ++			-- bindings from extra_fvs
 		  shared_binds  			-- the bindings used both in rhs and body
 
@@ -308,7 +318,7 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
   where
     (ids, rhss) = unzip bindings
     rhss_fvs = map freeVarsOf rhss
-    body_fvs = freeVarsOf body
+    body_fvs = freeVarsOf body 
 
 	-- See Note [extra_fvs (1,2)]
     rule_fvs = foldr (unionVarSet . idRuleAndUnfoldingVars) emptyVarSet ids
@@ -320,7 +330,8 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
 	= sepBindsByDropPoint False (extra_fvs:body_fvs:rhss_fvs) to_drop
 
     new_to_drop = body_binds ++		-- the bindings used only in the body
-		  [(Rec (fi_bind rhss_binds bindings), rhs_fvs')] ++
+		  [FB (mkVarSet ids) rhs_fvs' 
+                      (FloatLet (Rec (fi_bind rhss_binds bindings)))] ++
 					-- The new binding itself
 		  extra_binds ++	-- Note [extra_fvs (1,2)]
 		  shared_binds		-- Used in more than one place
@@ -330,7 +341,7 @@ fiExpr to_drop (_,AnnLet (AnnRec bindings) body)
 	       rule_fvs		-- Don't forget the rule variables!
 
     -- Push rhs_binds into the right hand side of the binding
-    fi_bind :: [FloatingBinds]	    -- one per "drop pt" conjured w/ fvs_of_rhss
+    fi_bind :: [FloatInBinds]	    -- one per "drop pt" conjured w/ fvs_of_rhss
 	    -> [(Id, CoreExprWithFVs)]
 	    -> [(Id, CoreExpr)]
 
@@ -344,17 +355,32 @@ bindings are: (a)~inside the scrutinee, (b)~inside one of the
 alternatives/default [default FVs always {\em first}!].
 
 \begin{code}
+fiExpr to_drop (_, AnnCase scrut case_bndr _ [(DEFAULT,[],rhs)])
+  | isUnLiftedType (idType case_bndr)
+  , exprOkForSideEffects (deAnnotate scrut)
+  = wrapFloats shared_binds $
+    fiExpr (case_float : rhs_binds) rhs
+  where
+    case_float = FB (unitVarSet case_bndr) scrut_fvs 
+                    (FloatCase scrut' case_bndr DEFAULT [])
+    scrut' = fiExpr scrut_binds scrut
+    [shared_binds, scrut_binds, rhs_binds]
+       = sepBindsByDropPoint False [freeVarsOf scrut, rhs_fvs] to_drop
+    rhs_fvs   = freeVarsOf rhs `delVarSet` case_bndr
+    scrut_fvs = freeVarsOf scrut
+
 fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)
-  = mkCoLets' drop_here1 $
-    mkCoLets' drop_here2 $
+  = wrapFloats drop_here1 $
+    wrapFloats drop_here2 $
     Case (fiExpr scrut_drops scrut) case_bndr ty
 	 (zipWith fi_alt alts_drops_s alts)
   where
 	-- Float into the scrut and alts-considered-together just like App
-    [drop_here1, scrut_drops, alts_drops] = sepBindsByDropPoint False [scrut_fvs, all_alts_fvs] to_drop
+    [drop_here1, scrut_drops, alts_drops] 
+       = sepBindsByDropPoint False [scrut_fvs, all_alts_fvs] to_drop
 
 	-- Float into the alts with the is_case flag set
-    (drop_here2 : alts_drops_s)           = sepBindsByDropPoint True alts_fvs alts_drops
+    (drop_here2 : alts_drops_s) = sepBindsByDropPoint True alts_fvs alts_drops
 
     scrut_fvs    = freeVarsOf scrut
     alts_fvs     = map alt_fvs alts
@@ -376,7 +402,9 @@ noFloatIntoRhs (AnnLam b _) = not (is_one_shot b)
 	-- boxing constructor into it, else we box it every time which is very bad
 	-- news indeed.
 
-noFloatIntoRhs rhs = exprIsHNF (deAnnotate' rhs)	-- We'd just float right back out again...
+noFloatIntoRhs rhs = exprIsExpandable (deAnnotate' rhs)	
+       -- We'd just float right back out again...
+       -- Should match the test in SimplEnv.doFloatFromRhs
 
 is_one_shot :: Var -> Bool
 is_one_shot b = isId b && isOneShotBndr b
@@ -407,9 +435,9 @@ We have to maintain the order on these drop-point-related lists.
 \begin{code}
 sepBindsByDropPoint
     :: Bool		    -- True <=> is case expression
-    -> [FreeVarsSet]	    -- One set of FVs per drop point
-    -> FloatingBinds 	    -- Candidate floaters
-    -> [FloatingBinds]      -- FIRST one is bindings which must not be floated
+    -> [FreeVarSet]	    -- One set of FVs per drop point
+    -> FloatInBinds 	    -- Candidate floaters
+    -> [FloatInBinds]      -- FIRST one is bindings which must not be floated
 			    -- inside any drop point; the rest correspond
 			    -- one-to-one with the input list of FV sets
 
@@ -419,7 +447,7 @@ sepBindsByDropPoint
 -- a binding (let x = E in B) might have a specialised version of
 -- x (say x') stored inside x, but x' isn't free in E or B.
 
-type DropBox = (FreeVarsSet, FloatingBinds)
+type DropBox = (FreeVarSet, FloatInBinds)
 
 sepBindsByDropPoint _is_case drop_pts []
   = [] : [[] | _ <- drop_pts]	-- cut to the chase scene; it happens
@@ -427,19 +455,19 @@ sepBindsByDropPoint _is_case drop_pts []
 sepBindsByDropPoint is_case drop_pts floaters
   = go floaters (map (\fvs -> (fvs, [])) (emptyVarSet : drop_pts))
   where
-    go :: FloatingBinds -> [DropBox] -> [FloatingBinds]
+    go :: FloatInBinds -> [DropBox] -> [FloatInBinds]
 	-- The *first* one in the argument list is the drop_here set
-	-- The FloatingBinds in the lists are in the reverse of
-	-- the normal FloatingBinds order; that is, they are the right way round!
+	-- The FloatInBinds in the lists are in the reverse of
+	-- the normal FloatInBinds order; that is, they are the right way round!
 
     go [] drop_boxes = map (reverse . snd) drop_boxes
 
-    go (bind_w_fvs@(bind, bind_fvs) : binds) drop_boxes@(here_box : fork_boxes)
+    go (bind_w_fvs@(FB bndrs bind_fvs bind) : binds) drop_boxes@(here_box : fork_boxes)
 	= go binds new_boxes
 	where
 	  -- "here" means the group of bindings dropped at the top of the fork
 
-	  (used_here : used_in_flags) = [ any (`elemVarSet` fvs) (bindersOf bind)
+	  (used_here : used_in_flags) = [ fvs `intersectsVarSet` bndrs
 					| (fvs, _) <- drop_boxes]
 
 	  drop_here = used_here || not can_push
@@ -460,7 +488,7 @@ sepBindsByDropPoint is_case drop_pts floaters
 		   || (is_case && 		-- We are looking at case alternatives
 		       n_used_alts > 1 && 	-- It's used in more than one
 		       n_used_alts < n_alts &&	-- ...but not all
-		       bindIsDupable bind)	-- and we can duplicate the binding
+		       floatIsDupable bind)	-- and we can duplicate the binding
 
 	  new_boxes | drop_here = (insert here_box : fork_boxes)
 		    | otherwise = (here_box : new_fork_boxes)
@@ -476,14 +504,19 @@ sepBindsByDropPoint is_case drop_pts floaters
     go _ _ = panic "sepBindsByDropPoint/go"
 
 
-floatedBindsFVs :: FloatingBinds -> FreeVarsSet
-floatedBindsFVs binds = unionVarSets (map snd binds)
+floatedBindsFVs :: FloatInBinds -> FreeVarSet
+floatedBindsFVs binds = foldr (unionVarSet . fbFVs) emptyVarSet binds
 
-mkCoLets' :: FloatingBinds -> CoreExpr -> CoreExpr
-mkCoLets' to_drop e = foldl (flip (Let . fst)) e to_drop
-	-- Remember to_drop is in *reverse* dependency order
+fbFVs :: FloatInBind -> VarSet
+fbFVs (FB _ fvs _) = fvs
 
-bindIsDupable :: Bind CoreBndr -> Bool
-bindIsDupable (Rec prs)    = all (exprIsDupable . snd) prs
-bindIsDupable (NonRec _ r) = exprIsDupable r
+wrapFloats :: FloatInBinds -> CoreExpr -> CoreExpr
+-- Remember FloatInBinds is in *reverse* dependency order
+wrapFloats []               e = e
+wrapFloats (FB _ _ fl : bs) e = wrapFloats bs (wrapFloat fl e)
+
+floatIsDupable :: FloatBind -> Bool
+floatIsDupable (FloatCase scrut _ _ _) = exprIsDupable scrut
+floatIsDupable (FloatLet (Rec prs))    = all (exprIsDupable . snd) prs
+floatIsDupable (FloatLet (NonRec _ r)) = exprIsDupable r
 \end{code}

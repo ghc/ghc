@@ -30,7 +30,7 @@ module TcSMonad (
     canRewrite, canSolve,
     combineCtLoc, mkSolvedFlavor, mkGivenFlavor,
     mkWantedFlavor,
-    getWantedLoc,
+    ctWantedLoc,
 
     TcS, runTcS, failTcS, panicTcS, traceTcS, -- Basic functionality 
     traceFireTcS, bumpStepCountTcS, doWithInert,
@@ -60,7 +60,7 @@ module TcSMonad (
 
         -- Inerts 
     InertSet(..), 
-    getInertEqs, liftInertEqsTy, getCtCoercion,
+    getInertEqs, getCtCoercion,
     emptyInert, getTcSInerts, updInertSet, extractUnsolved,
     extractUnsolvedTcS, modifyInertTcS,
     updInertSetTcS, partitionCCanMap, partitionEqMap,
@@ -72,7 +72,7 @@ module TcSMonad (
     instDFunConstraints,          
     newFlexiTcSTy, instFlexiTcS,
 
-    compatKind, compatKindTcS, isSubKindTcS, unifyKindTcS,
+    compatKind, mkKindErrorCtxtTcS,
 
     TcsUntouchables,
     isTouchableMetaTyVar,
@@ -104,7 +104,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM 
        ( checkWellStaged, topIdLvl, tcGetDefaultTys )
-import {-# SOURCE #-} qualified TcUnify as TcM ( unifyKindEq, mkKindErrorCtxt )
+import {-# SOURCE #-} qualified TcUnify as TcM ( mkKindErrorCtxt )
 import Kind
 import TcType
 import DynFlags
@@ -113,7 +113,6 @@ import Type
 import TcEvidence
 import Class
 import TyCon
-import TypeRep 
 
 import Name
 import Var
@@ -145,23 +144,12 @@ import TrieMap
 compatKind :: Kind -> Kind -> Bool
 compatKind k1 k2 = k1 `isSubKind` k2 || k2 `isSubKind` k1 
 
-compatKindTcS :: Kind -> Kind -> TcS Bool
--- Because kind unification happens during constraint solving, we have
--- to make sure that two kinds are zonked before we compare them.
-compatKindTcS k1 k2 = wrapTcS (TcM.compatKindTcM k1 k2)
+mkKindErrorCtxtTcS :: Type -> Kind 
+                   -> Type -> Kind 
+                   -> ErrCtxt
+mkKindErrorCtxtTcS ty1 ki1 ty2 ki2
+  = (False,TcM.mkKindErrorCtxt ty1 ty2 ki1 ki2)
 
-isSubKindTcS :: Kind -> Kind -> TcS Bool
-isSubKindTcS k1 k2 = wrapTcS (TcM.isSubKindTcM k1 k2)
-
-unifyKindTcS :: Type -> Type     -- Context
-             -> Kind -> Kind     -- Corresponding kinds
-             -> TcS Bool
-unifyKindTcS ty1 ty2 ki1 ki2
-  = wrapTcS $ TcM.addErrCtxtM ctxt $ do
-      (_errs, mb_r) <- TcM.tryTc (TcM.unifyKindEq ki1 ki2)
-      return (maybe False (const True) mb_r)
-  where 
-    ctxt = TcM.mkKindErrorCtxt ty1 ki1 ty2 ki2
 \end{code}
 
 %************************************************************************
@@ -612,82 +600,6 @@ extractRelevantInerts wi
 \end{code}
 
 
-
-
-%************************************************************************
-%*									*
-                    CtFlavor
-         The "flavor" of a canonical constraint
-%*									*
-%************************************************************************
-
-\begin{code}
-getWantedLoc :: Ct -> WantedLoc
-getWantedLoc ct 
-  = ASSERT (isWanted (cc_flavor ct))
-    case cc_flavor ct of 
-      Wanted wl -> wl 
-      _         -> pprPanic "Can't get WantedLoc of non-wanted constraint!" empty
-
-isWantedCt :: Ct -> Bool
-isWantedCt ct = isWanted (cc_flavor ct)
-isDerivedCt :: Ct -> Bool
-isDerivedCt ct = isDerived (cc_flavor ct)
-
-isGivenCt_maybe :: Ct -> Maybe GivenKind
-isGivenCt_maybe ct = isGiven_maybe (cc_flavor ct)
-
-isGivenOrSolvedCt :: Ct -> Bool
-isGivenOrSolvedCt ct = isGivenOrSolved (cc_flavor ct)
-
-
-canSolve :: CtFlavor -> CtFlavor -> Bool 
--- canSolve ctid1 ctid2 
--- The constraint ctid1 can be used to solve ctid2 
--- "to solve" means a reaction where the active parts of the two constraints match.
---  active(F xis ~ xi) = F xis 
---  active(tv ~ xi)    = tv 
---  active(D xis)      = D xis 
---  active(IP nm ty)   = nm 
---
--- NB:  either (a `canSolve` b) or (b `canSolve` a) must hold
------------------------------------------
-canSolve (Given {})   _            = True 
-canSolve (Wanted {})  (Derived {}) = True
-canSolve (Wanted {})  (Wanted {})  = True
-canSolve (Derived {}) (Derived {}) = True  -- Important: derived can't solve wanted/given
-canSolve _ _ = False  	       	     	   -- (There is no *evidence* for a derived.)
-
-canRewrite :: CtFlavor -> CtFlavor -> Bool 
--- canRewrite ctid1 ctid2 
--- The *equality_constraint* ctid1 can be used to rewrite inside ctid2 
-canRewrite = canSolve 
-
-combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
--- Precondition: At least one of them should be wanted 
-combineCtLoc (Wanted loc) _    = loc
-combineCtLoc _ (Wanted loc)    = loc
-combineCtLoc (Derived loc ) _  = loc
-combineCtLoc _ (Derived loc )  = loc
-combineCtLoc _ _ = panic "combineCtLoc: both given"
-
-mkSolvedFlavor :: CtFlavor -> SkolemInfo -> EvTerm -> CtFlavor
--- To be called when we actually solve a wanted/derived (perhaps leaving residual goals)
-mkSolvedFlavor (Wanted  loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
-mkSolvedFlavor (Derived loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
-mkSolvedFlavor fl@(Given {}) _sk _evterm = pprPanic "Solving a given constraint!" $ ppr fl
-
-mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
-mkGivenFlavor (Wanted  loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
-mkGivenFlavor (Derived loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
-mkGivenFlavor fl@(Given {}) _sk = pprPanic "Solving a given constraint!" $ ppr fl
-
-mkWantedFlavor :: CtFlavor -> CtFlavor
-mkWantedFlavor (Wanted  loc) = Wanted loc
-mkWantedFlavor (Derived loc) = Wanted loc
-mkWantedFlavor fl@(Given {}) = pprPanic "mkWantedFlavor" (ppr fl)
-\end{code}
-
 %************************************************************************
 %*									*
 %*		The TcS solver monad                                    *
@@ -854,7 +766,7 @@ runTcS context untouch is wl tcs
   = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
        ; ev_cache_var <- TcM.newTcRef $ 
                          EvVarCache { evc_cache = emptyTM, evc_flat_cache = emptyTM }
-       ; ev_binds_var@(EvBindsVar evb_ref _) <- TcM.newTcEvBinds
+       ; ev_binds_var <- TcM.newTcEvBinds
        ; step_count <- TcM.newTcRef 0
 
        ; inert_var <- TcM.newTcRef is 
@@ -883,8 +795,8 @@ runTcS context untouch is wl tcs
                                 <+> int count <+> ppr context)
          }
              -- And return
-       ; ev_binds      <- TcM.readTcRef evb_ref
-       ; return (res, evBindMapBinds ev_binds) }
+       ; ev_binds <- TcM.getTcEvBinds ev_binds_var
+       ; return (res, ev_binds) }
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
 
@@ -1010,8 +922,8 @@ emitFrozenError fl ev depth
              inerts_new = inerts { inert_frozen = extendCts (inert_frozen inerts) ct } 
        ; wrapTcS (TcM.writeTcRef inert_ref inerts_new) }
 
-getDynFlags :: TcS DynFlags
-getDynFlags = wrapTcS TcM.getDOpts
+instance HasDynFlags TcS where
+    getDynFlags = wrapTcS getDynFlags
 
 getTcSContext :: TcS SimplContext
 getTcSContext = TcS (return . tcs_context)
@@ -1209,7 +1121,8 @@ isTouchableMetaTyVar tv
 
 isTouchableMetaTyVar_InRange :: TcsUntouchables -> TcTyVar -> Bool 
 isTouchableMetaTyVar_InRange (untch,untch_tcs) tv 
-  = case tcTyVarDetails tv of 
+  = ASSERT2 ( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of 
       MetaTv TcsTv _ -> not (tv `elemVarSet` untch_tcs)
                         -- See Note [Touchable meta type variables] 
       MetaTv {}      -> inTouchableRange untch tv 
@@ -1481,7 +1394,7 @@ matchClass clas tys
 	}
         }
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe (TyCon, [Type]))
+matchFam :: TyCon -> [Type] -> TcS (Maybe (FamInst, [Type]))
 matchFam tycon args = wrapTcS $ tcLookupFamInst tycon args
 \end{code}
 
@@ -1506,67 +1419,5 @@ getCtCoercion ct
                 -- Instead we use the most accurate type, given by ctPred c
   where maybe_given = isGiven_maybe (cc_flavor ct)
 
--- See Note [LiftInertEqs]
-liftInertEqsTy :: (TyVarEnv (Ct, TcCoercion),InScopeSet)
-                 -> CtFlavor
-                 -> PredType -> TcCoercion
-liftInertEqsTy (subst,inscope) fl pty
-  = ty_cts_subst subst inscope fl pty
 
-
-ty_cts_subst :: TyVarEnv (Ct, TcCoercion)
-             -> InScopeSet -> CtFlavor -> Type -> TcCoercion
-ty_cts_subst subst inscope fl ty 
-  = go ty 
-  where 
-        go ty = go' ty
-
-        go' (TyVarTy tv)      = tyvar_cts_subst tv `orElse` mkTcReflCo (TyVarTy tv)
-        go' (AppTy ty1 ty2)   = mkTcAppCo (go ty1) (go ty2) 
-        go' (TyConApp tc tys) = mkTcTyConAppCo tc (map go tys)  
-
-        go' (ForAllTy v ty)   = mkTcForAllCo v' $! co
-                             where 
-                               (subst',inscope',v') = upd_tyvar_bndr subst inscope v
-                               co = ty_cts_subst subst' inscope' fl ty 
-
-        go' (FunTy ty1 ty2)   = mkTcFunCo (go ty1) (go ty2)
-
-
-        tyvar_cts_subst tv  
-          | Just (ct,co) <- lookupVarEnv subst tv, cc_flavor ct `canRewrite` fl  
-          = Just co -- Warn: use cached, not cc_id directly, because of alpha-renamings!
-          | otherwise = Nothing 
-
-        upd_tyvar_bndr subst inscope v 
-          = (new_subst, (inscope `extendInScopeSet` new_v), new_v)
-          where new_subst 
-                    | no_change = delVarEnv subst v
-                        -- Otherwise we have to extend the environment with /something/. 
-                        -- But we do not want to monadically create a new EvVar. So, we
-                        -- create an 'unused_ct' but we cache reflexivity as the 
-                        -- associated coercion. 
-                    | otherwise = extendVarEnv subst v (unused_ct, mkTcReflCo (TyVarTy new_v))
-
-                no_change = new_v == v 
-                new_v     = uniqAway inscope v 
-
-                unused_ct = CTyEqCan { cc_id     = unused_evvar
-                                     , cc_flavor = fl -- canRewrite is reflexive.
-                                     , cc_tyvar  = v 
-                                     , cc_rhs    = mkTyVarTy new_v 
-                                     , cc_depth  = unused_depth }
-                unused_depth = panic "ty_cts_subst: This depth should not be accessed!"
-                unused_evvar = panic "ty_cts_subst: This var is just an alpha-renaming!"
 \end{code}
-
-Note [LiftInertEqsTy]
-~~~~~~~~~~~~~~~~~~~~~~~ 
-The function liftInertEqPred behaves almost like liftCoSubst (in
-Coercion), but accepts a map TyVarEnv (Ct,Coercion) instead of a
-LiftCoSubst. This data structure is more convenient to use since we
-must apply the inert substitution /only/ if the inert equality 
-`canRewrite` the work item. There's admittedly some duplication of 
-functionality but it would be more tedious to cache and maintain 
-different flavors of LiftCoSubst structures in the inerts. 
-

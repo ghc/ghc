@@ -26,7 +26,7 @@ import CoreFVs
 import CoreMonad	( endPass, CoreToDo(..) )
 import CoreSyn
 import CoreSubst
-import MkCore
+import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here
 import Type
 import Literal
 import Coercion

@@ -14,14 +14,13 @@ module Platform (
 
 where
 
-import Panic
-
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
 data Platform
         = Platform {
               platformArch                     :: Arch,
               platformOS                       :: OS,
+              platformWordSize                 :: {-# UNPACK #-} !Int,
               platformHasGnuNonexecStack       :: Bool,
               platformHasIdentDirective        :: Bool,
               platformHasSubsectionsViaSymbols :: Bool
@@ -55,8 +54,10 @@ data OS
         | OSSolaris2
         | OSMinGW32
         | OSFreeBSD
+        | OSDragonFly
         | OSOpenBSD
         | OSNetBSD
+        | OSKFreeBSD
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture and Extensions
@@ -77,24 +78,21 @@ data ArmISAExt
 
 
 target32Bit :: Platform -> Bool
-target32Bit p = case platformArch p of
-                ArchUnknown -> panic "Don't know if ArchUnknown is 32bit"
-                ArchX86     -> True
-                ArchX86_64  -> False
-                ArchPPC     -> True
-                ArchPPC_64  -> False
-                ArchSPARC   -> True
-                ArchARM _ _ -> True
-
+target32Bit p = platformWordSize p == 4
 
 -- | This predicates tells us whether the OS supports ELF-like shared libraries.
 osElfTarget :: OS -> Bool
-osElfTarget OSLinux    = True
-osElfTarget OSFreeBSD  = True
-osElfTarget OSOpenBSD  = True
-osElfTarget OSNetBSD   = True
-osElfTarget OSSolaris2 = True
-osElfTarget OSDarwin   = False
-osElfTarget OSMinGW32  = False
-osElfTarget OSUnknown  = panic "Don't know if OSUnknown is elf"
-
+osElfTarget OSLinux     = True
+osElfTarget OSFreeBSD   = True
+osElfTarget OSDragonFly = True
+osElfTarget OSOpenBSD   = True
+osElfTarget OSNetBSD    = True
+osElfTarget OSSolaris2  = True
+osElfTarget OSDarwin    = False
+osElfTarget OSMinGW32   = False
+osElfTarget OSKFreeBSD  = True
+osElfTarget OSUnknown   = False
+ -- Defaulting to False is safe; it means don't rely on any
+ -- ELF-specific functionality.  It is important to have a default for
+ -- portability, otherwise we have to answer this question for every
+ -- new platform we compile on (even unreg).

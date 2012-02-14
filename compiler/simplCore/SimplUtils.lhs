@@ -1054,7 +1054,7 @@ mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplM OutExpr
 mkLam _b [] body 
   = return body
 mkLam _env bndrs body
-  = do	{ dflags <- getDOptsSmpl
+  = do	{ dflags <- getDynFlags
 	; mkLam' dflags bndrs body }
   where
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
@@ -1125,7 +1125,7 @@ because the latter is not well-kinded.
 tryEtaExpand :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 tryEtaExpand env bndr rhs
-  = do { dflags <- getDOptsSmpl
+  = do { dflags <- getDynFlags
        ; (new_arity, new_rhs) <- try_expand dflags
 
        ; WARN( new_arity < old_arity || new_arity < _dmd_arity, 

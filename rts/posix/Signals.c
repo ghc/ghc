@@ -519,9 +519,20 @@ empty_handler (int sig STG_UNUSED)
 
    The trick we use is:
      - catch SIGTSTP
-     - in the handler,  kill(getpid(),SIGTSTP)
+     - in the handler,  kill(getpid(),SIGSTOP)
      - when this returns, restore the TTY settings
    This means we don't have to catch SIGCONT too.
+
+   Note we don't re-throw SIGTSTP, we throw SIGSTOP instead.  This is
+   for a few reasons:
+
+      - re-throwing SIGTSTP would require temporarily restoring the
+        default sigaction.
+
+      - it doesn't work on certain buggy pthread implementations
+        (e.g. OpenBSD).
+
+      - throwing SIGTSTP seems slightly dodgy anyway.
 
    -------------------------------------------------------------------------- */
 
@@ -529,7 +540,7 @@ static void sigtstp_handler(int sig);
 static void set_sigtstp_action (rtsBool handle);
 
 static void
-sigtstp_handler (int sig)
+sigtstp_handler (int sig STG_UNUSED)
 {
     int fd;
     struct termios ts[3];
@@ -541,17 +552,8 @@ sigtstp_handler (int sig)
         }
     }
 
-    // de-install the SIGTSTP handler
-    set_sigtstp_action(rtsFalse);
-
     // really stop the process now
-    {
-        sigset_t mask;
-        sigemptyset(&mask);
-        sigaddset(&mask, sig);
-        sigprocmask(SIG_UNBLOCK, &mask, NULL);
-        kill(getpid(), sig);
-    }
+    kill(getpid(), SIGSTOP);
 
     // on return, restore the TTY state
     for (fd = 0; fd <= 2; fd++) {
@@ -559,8 +561,6 @@ sigtstp_handler (int sig)
             tcsetattr(0,TCSANOW,&ts[fd]);
         }
     }
-
-    set_sigtstp_action(rtsTrue);
 }
 
 static void

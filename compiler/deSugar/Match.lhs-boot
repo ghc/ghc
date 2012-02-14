@@ -1,42 +1,35 @@
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Match where
-import Var	( Id )
-import TcType	( Type )
-import DsMonad	( DsM, EquationInfo, MatchResult )
-import CoreSyn	( CoreExpr )
-import HsSyn	( LPat, HsMatchContext, MatchGroup )
-import Name	( Name )
+import Var      ( Id )
+import TcType   ( Type )
+import DsMonad  ( DsM, EquationInfo, MatchResult )
+import CoreSyn  ( CoreExpr )
+import HsSyn    ( LPat, HsMatchContext, MatchGroup )
+import Name     ( Name )
 
-match 	:: [Id]
+match   :: [Id]
         -> Type
-	-> [EquationInfo]
-	-> DsM MatchResult
+        -> [EquationInfo]
+        -> DsM MatchResult
 
 matchWrapper
-	:: HsMatchContext Name
+        :: HsMatchContext Name
         -> MatchGroup Id
-	-> DsM ([Id], CoreExpr)
+        -> DsM ([Id], CoreExpr)
 
 matchSimply
-	:: CoreExpr
-	-> HsMatchContext Name
-	-> LPat Id
-	-> CoreExpr
-	-> CoreExpr
-	-> DsM CoreExpr
+        :: CoreExpr
+        -> HsMatchContext Name
+        -> LPat Id
+        -> CoreExpr
+        -> CoreExpr
+        -> DsM CoreExpr
 
 matchSinglePat
-	:: CoreExpr
-	-> HsMatchContext Name
-	-> LPat Id
+        :: CoreExpr
+        -> HsMatchContext Name
+        -> LPat Id
         -> Type
-	-> MatchResult
-	-> DsM MatchResult
+        -> MatchResult
+        -> DsM MatchResult
 \end{code}

@@ -4,13 +4,6 @@
 \section{Code output phase}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
@@ -18,9 +11,9 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 import AsmCodeGen ( nativeCodeGen )
 import LlvmCodeGen ( llvmCodeGen )
 
-import UniqSupply	( mkSplitUniqSupply )
+import UniqSupply       ( mkSplitUniqSupply )
 
-import Finder		( mkStubPaths )
+import Finder           ( mkStubPaths )
 import PprC		( writeCs )
 import OldCmmLint       ( cmmLint )
 import Packages
@@ -33,10 +26,10 @@ import SysTools
 import Stream           (Stream)
 import qualified Stream
 
-import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
+import ErrUtils         ( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Module
-import Maybes		( firstJusts )
+import Maybes           ( firstJusts )
 
 import Control.Exception
 import Control.Monad
@@ -46,14 +39,14 @@ import System.IO
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Steering}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 codeOutput :: DynFlags
-	   -> Module
+           -> Module
 	   -> ModLocation
 	   -> ForeignStubs
 	   -> [PackageId]
@@ -88,9 +81,9 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps cmm_stream
              HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
              HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
              HscNothing     -> panic "codeOutput: HscNothing"
-	  }
-	; return stubs_exist
-	}
+          }
+        ; return stubs_exist
+        }
 
 doOutput :: String -> (Handle -> IO ()) -> IO ()
 doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
@@ -98,9 +91,9 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{C}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -125,26 +118,26 @@ outputC dflags filenm cmm_stream packages
        let rts = getPackageDetails (pkgState dflags) rtsPackageId
                        
        let cc_injects = unlines (map mk_include (includes rts))
-       	   mk_include h_file = 
-       	    case h_file of 
-       	       '"':_{-"-} -> "#include "++h_file
-       	       '<':_      -> "#include "++h_file
-       	       _          -> "#include \""++h_file++"\""
+           mk_include h_file = 
+            case h_file of 
+               '"':_{-"-} -> "#include "++h_file
+               '<':_      -> "#include "++h_file
+               _          -> "#include \""++h_file++"\""
 
        pkg_configs <- getPreloadPackagesAnd dflags packages
        let pkg_names = map (display.sourcePackageId) pkg_configs
 
        doOutput filenm $ \ h -> do
-	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+          hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
 	  hPutStr h cc_injects
           writeCs dflags h rawcmms
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Assembler}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -163,9 +156,9 @@ outputAsm dflags filenm cmm_stream
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{LLVM}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -184,14 +177,14 @@ outputLlvm dflags filenm cmm_stream
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Foreign import/export}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
-		   -> IO (Bool, 	-- Header file created
+                   -> IO (Bool,         -- Header file created
                           Maybe FilePath) -- C file created
 outputForeignStubs dflags mod location stubs
  = do
@@ -200,54 +193,54 @@ outputForeignStubs dflags mod location stubs
 
    case stubs of
      NoStubs -> do
-	-- When compiling External Core files, may need to use stub
-	-- files from a previous compilation
+        -- When compiling External Core files, may need to use stub
+        -- files from a previous compilation
         stub_h_exists <- doesFileExist stub_h
         return (stub_h_exists, Nothing)
 
      ForeignStubs h_code c_code -> do
         let
-	    stub_c_output_d = pprCode CStyle c_code
-	    stub_c_output_w = showSDoc stub_c_output_d
-	
-	    -- Header file protos for "foreign export"ed functions.
-	    stub_h_output_d = pprCode CStyle h_code
-	    stub_h_output_w = showSDoc stub_h_output_d
-	-- in
+            stub_c_output_d = pprCode CStyle c_code
+            stub_c_output_w = showSDoc stub_c_output_d
+        
+            -- Header file protos for "foreign export"ed functions.
+            stub_h_output_d = pprCode CStyle h_code
+            stub_h_output_w = showSDoc stub_h_output_d
+        -- in
 
         createDirectoryHierarchy (takeDirectory stub_h)
 
-	dumpIfSet_dyn dflags Opt_D_dump_foreign
+        dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
 
-	-- we need the #includes from the rts package for the stub files
-	let rts_includes = 
-	       let rts_pkg = getPackageDetails (pkgState dflags) rtsPackageId in
-	       concatMap mk_include (includes rts_pkg)
-	    mk_include i = "#include \"" ++ i ++ "\"\n"
+        -- we need the #includes from the rts package for the stub files
+        let rts_includes = 
+               let rts_pkg = getPackageDetails (pkgState dflags) rtsPackageId in
+               concatMap mk_include (includes rts_pkg)
+            mk_include i = "#include \"" ++ i ++ "\"\n"
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes | cLibFFI   = "#include \"ffi.h\"\n"
                          | otherwise = ""
 
-	stub_h_file_exists
+        stub_h_file_exists
            <- outputForeignStubs_help stub_h stub_h_output_w
-		("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
+                ("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
 
-	dumpIfSet_dyn dflags Opt_D_dump_foreign
+        dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
 
-	stub_c_file_exists
+        stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
-		("#define IN_STG_CODE 0\n" ++ 
-		 "#include \"Rts.h\"\n" ++
-		 rts_includes ++
-		 ffi_includes ++
-		 cplusplus_hdr)
-		 cplusplus_ftr
-	   -- We're adding the default hc_header to the stub file, but this
-	   -- isn't really HC code, so we need to define IN_STG_CODE==0 to
-	   -- avoid the register variables etc. being enabled.
+                ("#define IN_STG_CODE 0\n" ++ 
+                 "#include \"Rts.h\"\n" ++
+                 rts_includes ++
+                 ffi_includes ++
+                 cplusplus_hdr)
+                 cplusplus_ftr
+           -- We're adding the default hc_header to the stub file, but this
+           -- isn't really HC code, so we need to define IN_STG_CODE==0 to
+           -- avoid the register variables etc. being enabled.
 
         return (stub_h_file_exists, if stub_c_file_exists
                                        then Just stub_c

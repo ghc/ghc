@@ -8,9 +8,6 @@
 
 module TcCanonical(
     canonicalize,
-    canOccursCheck, canEq, canEvVar,
-    rewriteWithFunDeps,
-    emitFDWorkAsWanted, emitFDWorkAsDerived,
     StopOrContinue (..)
  ) where
 
@@ -19,8 +16,6 @@ module TcCanonical(
 import BasicTypes ( IPName )
 import TcErrors
 import TcRnTypes
-import FunDeps
-import qualified TcMType as TcM
 import TcType
 import Type
 import Kind
@@ -32,7 +27,7 @@ import Name ( Name )
 import Var
 import VarEnv
 import Outputable
-import Control.Monad    ( when, unless, zipWithM, foldM )
+import Control.Monad    ( when, unless, zipWithM )
 import MonadUtils
 import Control.Applicative ( (<|>) )
 
@@ -42,7 +37,6 @@ import TcSMonad
 import FastString
 
 import Data.Maybe ( isNothing )
-import Pair ( pSnd )
 
 \end{code}
 
@@ -204,11 +198,13 @@ canonicalize (CIrredEvCan { cc_id = ev, cc_flavor = fl
 
 canEvVar :: EvVar -> PredTree 
          -> SubGoalDepth -> CtFlavor -> TcS StopOrContinue
+-- Called only for non-canonical EvVars 
 canEvVar ev pred_classifier d fl 
   = case pred_classifier of
       ClassPred cls tys -> canClass d fl ev cls tys 
                                         `andWhenContinue` emit_superclasses
-      EqPred ty1 ty2    -> canEq    d fl ev ty1 ty2
+      EqPred ty1 ty2    -> canEq    d fl ev ty1 ty2 
+                                        `andWhenContinue` emit_kind_constraint
       IPPred nm ty      -> canIP    d fl ev nm ty
       IrredPred ev_ty   -> canIrred d fl ev ev_ty
       TuplePred tys     -> canTuple d fl ev tys
@@ -219,8 +215,57 @@ canEvVar ev pred_classifier d fl
           = do { sctxt <- getTcSContext
                ; unless (simplEqsOnly sctxt) $ 
                         newSCWorkFromFlavored d v_new fl cls xis_new
+               -- Arguably we should "seq" the coercions if they are derived, 
+               -- as we do below for emit_kind_constraint, to allow errors in
+               -- superclasses to be executed if deferred to runtime! 
                ; continueWith ct }
         emit_superclasses _ = panic "emit_superclasses of non-class!"
+
+        emit_kind_constraint ct@(CTyEqCan { cc_id = ev, cc_depth = d
+                                          , cc_flavor = fl, cc_tyvar = tv
+                                          , cc_rhs = ty })
+          = do_emit_kind_constraint ct ev d fl (mkTyVarTy tv) ty
+
+        emit_kind_constraint ct@(CFunEqCan { cc_id = ev, cc_depth = d
+                                           , cc_flavor = fl
+                                           , cc_fun = fn, cc_tyargs = xis1
+                                           , cc_rhs = xi2 })
+          = do_emit_kind_constraint ct ev d fl (mkTyConApp fn xis1) xi2
+        emit_kind_constraint ct = continueWith ct
+
+        do_emit_kind_constraint ct eqv d fl ty1 ty2 
+           | compatKind k1 k2 = continueWith ct
+           | otherwise
+           = do { keqv <- forceNewEvVar kind_co_fl (mkEqPred (k1,k2))
+                ; eqv' <- forceNewEvVar fl (mkEqPred (ty1,ty2))
+                ; _fl <- case fl of
+                   Wanted {}-> setEvBind eqv
+                                (mkEvKindCast eqv' (mkTcCoVarCo keqv)) fl
+                   Given {} -> setEvBind eqv'
+                                (mkEvKindCast eqv (mkTcCoVarCo keqv)) fl
+                   Derived {} -> return fl
+
+                ; canEq_ d kind_co_fl keqv k1 k2 -- Emit kind equality
+                ; continueWith (ct { cc_id = eqv' }) }
+           where k1 = typeKind ty1
+                 k2 = typeKind ty2
+                 ctxt = mkKindErrorCtxtTcS ty1 k1 ty2 k2
+                 -- Always create a Wanted kind equality even if 
+                 -- you are decomposing a given constraint.
+                 -- NB: DV finds this reasonable for now. Maybe we 
+                 --  have to revisit.
+                 kind_co_fl
+                   | Given (CtLoc _sk_info src_span err_ctxt) _ <- fl
+                   = let orig = TypeEqOrigin (UnifyOrigin ty1 ty2)
+                         ctloc = pushErrCtxtSameOrigin ctxt $
+                                 CtLoc orig src_span err_ctxt
+                     in Wanted ctloc
+                   | Wanted ctloc <- fl
+                   = Wanted (pushErrCtxtSameOrigin ctxt ctloc)
+                   | Derived ctloc <- fl
+                   = Derived (pushErrCtxtSameOrigin ctxt ctloc)
+                   | otherwise 
+                   = panic "do_emit_kind_constraint: non-CtLoc inside!"
 
 
 -- Tuple canonicalisation
@@ -555,26 +600,28 @@ flatten :: SubGoalDepth -- Depth
 flatten d ctxt ty 
   | Just ty' <- tcView ty
   = do { (xi, co) <- flatten d ctxt ty'
-       ; return (xi,co) }
-	
-       -- DV: The following is tedious to do but maybe we should return to this
-       -- Preserve type synonyms if possible
-       -- ; if no_flattening
-       --   then return (xi, mkTcReflCo xi,no_flattening) -- Importantly, not xi!
-       --   else return (xi,co,no_flattening) 
-       -- }
+       ; return (xi,co) } 
 
-flatten d ctxt v@(TyVarTy _)
+flatten d ctxt (TyVarTy tv)
   = do { ieqs <- getInertEqs
-       ; let co = liftInertEqsTy ieqs ctxt v           -- co : v ~ ty
-             ty = pSnd (tcCoercionKind co)
-       ; if v `eqType` ty then
-             return (ty,mkTcReflCo ty)
-         else -- NB recursive call. Why? See Note [Non-idempotent inert substitution]
-              -- Actually I believe that applying the substition only *twice* will suffice
-         
-             do { (ty_final,co') <- flatten d ctxt ty  -- co' : ty_final ~ ty
-                ; return (ty_final,co' `mkTcTransCo` mkTcSymCo co) } }
+       ; let mco = tv_eq_subst (fst ieqs) tv  -- co : v ~ ty
+       ; case mco of -- Done, but make sure the kind is zonked
+           Nothing -> 
+               do { let knd = tyVarKind tv
+                  ; (new_knd,_kind_co) <- flatten d ctxt knd
+                  ; let ty = mkTyVarTy (setVarType tv new_knd)
+                  ; return (ty, mkTcReflCo ty) }
+           -- NB recursive call. 
+           -- Why? See Note [Non-idempotent inert substitution]
+           -- Actually, I think applying the substition just twice will suffice
+           Just (co,ty) -> 
+               do { (ty_final,co') <- flatten d ctxt ty
+                  ; return (ty_final, co' `mkTcTransCo` mkTcSymCo co) } }  
+  where tv_eq_subst subst tv
+          | Just (ct,co) <- lookupVarEnv subst tv
+          , cc_flavor ct `canRewrite` ctxt
+          = Just (co,cc_rhs ct)
+          | otherwise = Nothing
 
 \end{code}
 
@@ -689,7 +736,7 @@ flatten d ctxt ty@(ForAllTy {})
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
   = do { let (tvs, rho) = splitForAllTys ty
-       ; when (under_families tvs rho) $ flattenForAllErrorTcS ctxt ty
+       ; when (under_families tvs rho) $ wrapErrTcS $ flattenForAllErrorTcS ctxt ty
        ; (rho', co) <- flatten d ctxt rho
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
 
@@ -771,26 +818,6 @@ canEq _d fl eqv ty1 ty2
               do { _ <- setEqBind eqv (mkTcReflCo ty1) fl; return () }
        ; return Stop }
 
--- Split up an equality between function types into two equalities.
-canEq d fl eqv (FunTy s1 t1) (FunTy s2 t2)
-  = do { argeqv <- newEqVar fl s1 s2
-       ; reseqv <- newEqVar fl t1 t2
-       ; let argeqv_v = evc_the_evvar argeqv
-             reseqv_v = evc_the_evvar reseqv
-       ; (fl1,fl2) <- case fl of
-           Wanted {} ->
-               do { _ <- setEqBind eqv (mkTcFunCo (mkTcCoVarCo argeqv_v) (mkTcCoVarCo reseqv_v)) fl
-                  ; return (fl,fl) }
-           Given {} ->
-               do { fl1 <- setEqBind argeqv_v (mkTcNthCo 0 (mkTcCoVarCo eqv)) fl
-                  ; fl2 <- setEqBind reseqv_v (mkTcNthCo 1 (mkTcCoVarCo eqv)) fl 
-                  ; return (fl1,fl2)
-                  }
-           Derived {} ->
-               return (fl,fl)
-
-       ; canEqEvVarsCreated d [fl2,fl1] [reseqv,argeqv] [t1,s1] [t2,s2] }
-
 -- If one side is a variable, orient and flatten,
 -- WITHOUT expanding type synonyms, so that we tend to 
 -- substitute a ~ Age rather than a ~ Int when @type Age = Int@
@@ -799,6 +826,11 @@ canEq d fl eqv ty1@(TyVarTy {}) ty2
 canEq d fl eqv ty1 ty2@(TyVarTy {})
   = canEqLeaf d fl eqv ty1 ty2
 
+-- See Note [Naked given applications]
+canEq d fl eqv ty1 ty2
+  | Just ty1' <- tcView ty1 = canEq d fl eqv ty1' ty2
+  | Just ty2' <- tcView ty2 = canEq d fl eqv ty1  ty2'
+
 canEq d fl eqv ty1@(TyConApp fn tys) ty2 
   | isSynFamilyTyCon fn, length tys == tyConArity fn
   = canEqLeaf d fl eqv ty1 ty2
@@ -806,14 +838,18 @@ canEq d fl eqv ty1 ty2@(TyConApp fn tys)
   | isSynFamilyTyCon fn, length tys == tyConArity fn
   = canEqLeaf d fl eqv ty1 ty2
 
-canEq d fl eqv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-  | isDecomposableTyCon tc1 && isDecomposableTyCon tc2
-  , tc1 == tc2
-  , length tys1 == length tys2
+canEq d fl eqv ty1 ty2
+  | Just (tc1,tys1) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2,tys2) <- tcSplitTyConApp_maybe ty2
+  , isDecomposableTyCon tc1 && isDecomposableTyCon tc2
   = -- Generate equalities for each of the corresponding arguments
-    do { let (kis1,  tys1') = span isKind tys1
+    if (tc1 /= tc2 || length tys1 /= length tys2)
+    -- Fail straight away for better error messages
+    then canEqFailure d fl eqv
+    else do {
+         let (kis1,  tys1') = span isKind tys1
              (_kis2, tys2') = span isKind tys2
-       ; let kicos = map mkTcReflCo kis1
+             kicos          = map mkTcReflCo kis1
 
        ; argeqvs <- zipWithM (newEqVar fl) tys1' tys2'
        ; fls <- case fl of 
@@ -831,16 +867,32 @@ canEq d fl eqv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
 
 -- See Note [Equality between type applications]
 --     Note [Care with type applications] in TcUnify
-canEq d fl eqv ty1 ty2
-  | Nothing <- tcView ty1  -- Naked applications ONLY
-  , Nothing <- tcView ty2  -- See Note [Naked given applications]
-  , Just (s1,t1) <- tcSplitAppTy_maybe ty1
+canEq d fl eqv ty1 ty2    -- e.g.  F a b ~ Maybe c
+                          -- where F has arity 1
+  | Just (s1,t1) <- tcSplitAppTy_maybe ty1
   , Just (s2,t2) <- tcSplitAppTy_maybe ty2
+  = canEqAppTy d fl eqv s1 t1 s2 t2
+
+canEq d fl eqv s1@(ForAllTy {}) s2@(ForAllTy {})
+ | tcIsForAllTy s1, tcIsForAllTy s2, 
+   Wanted {} <- fl 
+ = canEqFailure d fl eqv
+ | otherwise
+ = do { traceTcS "Ommitting decomposition of given polytype equality" (pprEq s1 s2)
+      ; return Stop }
+
+canEq d fl eqv _ _                               = canEqFailure d fl eqv
+
+-- Type application
+canEqAppTy :: SubGoalDepth 
+           -> CtFlavor -> EqVar -> Type -> Type -> Type -> Type
+           -> TcS StopOrContinue
+canEqAppTy d fl eqv s1 t1 s2 t2
   = ASSERT( not (isKind t1) && not (isKind t2) )
     if isGivenOrSolved fl then 
-        do { traceTcS "canEq/(app case)" $
+        do { traceTcS "canEq (app case)" $
                 text "Ommitting decomposition of given equality between: " 
-                    <+> ppr ty1 <+> text "and" <+> ppr ty2
+                    <+> ppr (AppTy s1 t1) <+> text "and" <+> ppr (AppTy s2 t2)
                    -- We cannot decompose given applications
                    -- because we no longer have 'left' and 'right'
            ; return Stop }
@@ -856,24 +908,29 @@ canEq d fl eqv ty1 ty2
            
            ; canEqEvVarsCreated d [fl,fl] [evc1,evc2] [s1,t1] [s2,t2] }
 
-
-canEq d fl eqv s1@(ForAllTy {}) s2@(ForAllTy {})
- | tcIsForAllTy s1, tcIsForAllTy s2, 
-   Wanted {} <- fl 
- = canEqFailure d fl eqv
- | otherwise
- = do { traceTcS "Ommitting decomposition of given polytype equality" (pprEq s1 s2)
-      ; return Stop }
-
--- Finally expand any type synonym applications.
-canEq d fl eqv ty1 ty2 | Just ty1' <- tcView ty1 = canEq d fl eqv ty1' ty2
-canEq d fl eqv ty1 ty2 | Just ty2' <- tcView ty2 = canEq d fl eqv ty1 ty2'
-canEq d fl eqv _ _                               = canEqFailure d fl eqv
-
 canEqFailure :: SubGoalDepth 
              -> CtFlavor -> EvVar -> TcS StopOrContinue
-canEqFailure d fl eqv = do { emitFrozenError fl eqv d; return Stop }
+canEqFailure d fl eqv 
+  = do { when (isWanted fl) (delCachedEvVar eqv fl) 
+          -- See Note [Combining insoluble constraints]
+       ; emitFrozenError fl eqv d
+       ; return Stop }
 \end{code}
+
+Note [Combining insoluble constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As this point we have an insoluble constraint, like Int~Bool.
+
+ * If it is Wanted, delete it from the cache, so that subsequent
+   Int~Bool constraints give rise to separate error messages
+
+ * But if it is Derived, DO NOT delete from cache.  A class constraint
+   may get kicked out of the inert set, and then have its functional
+   dependency Derived constraints generated a second time. In that
+   case we don't want to get two (or more) error messages by
+   generating two (or more) insoluble fundep constraints from the same
+   class constraint.
+   
 
 Note [Naked given applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1106,28 +1163,17 @@ canEqLeafOriented :: SubGoalDepth -- Depth
                   -> TcType -> TcType -> TcS StopOrContinue
 -- By now s1 will either be a variable or a type family application
 canEqLeafOriented d fl eqv s1 s2
-  | let k1 = typeKind s1
-  , let k2 = typeKind s2
-  -- Establish kind invariants for CFunEqCan and CTyEqCan
-  = do { are_compat <- compatKindTcS k1 k2
-       ; can_unify <- if not are_compat
-                      then unifyKindTcS s1 s2 k1 k2
-                      else return False
-         -- If the kinds cannot be unified or are not compatible, don't fail
-         -- right away; instead, emit a frozen error
-       ; if (not are_compat && not can_unify) then
-             canEqFailure d fl eqv
-         else can_eq_kinds_ok d fl eqv s1 s2 }
-
-  where can_eq_kinds_ok d fl eqv s1 s2
+  = can_eq_split_lhs d fl eqv s1 s2
+  where can_eq_split_lhs d fl eqv s1 s2
           | Just (fn,tys1) <- splitTyConApp_maybe s1
           = canEqLeafFunEqLeftRec d fl eqv (fn,tys1) s2
           | Just tv <- getTyVar_maybe s1
           = canEqLeafTyVarLeftRec d fl eqv tv s2
           | otherwise
           = pprPanic "canEqLeafOriented" $
-            text "Non-variable or non-family equality LHS" <+> ppr eqv <+> 
-                                                       dcolon <+> ppr (evVarPred eqv)
+            text "Non-variable or non-family equality LHS" <+> 
+                 ppr eqv <+> dcolon <+> ppr (evVarPred eqv)
+
 canEqLeafFunEqLeftRec :: SubGoalDepth
                       -> CtFlavor 
                       -> EqVar 
@@ -1471,117 +1517,3 @@ we first try expanding each of the ti to types which no longer contain
 a.  If this turns out to be impossible, we next try expanding F
 itself, and so on.
 
-
-%************************************************************************
-%*                                                                      *
-%*          Functional dependencies, instantiation of equations
-%*                                                                      *
-%************************************************************************
-
-When we spot an equality arising from a functional dependency,
-we now use that equality (a "wanted") to rewrite the work-item
-constraint right away.  This avoids two dangers
-
- Danger 1: If we send the original constraint on down the pipeline
-           it may react with an instance declaration, and in delicate
-	   situations (when a Given overlaps with an instance) that
-	   may produce new insoluble goals: see Trac #4952
-
- Danger 2: If we don't rewrite the constraint, it may re-react
-           with the same thing later, and produce the same equality
-           again --> termination worries.
-
-To achieve this required some refactoring of FunDeps.lhs (nicer
-now!).  
-
-\begin{code}
-rewriteWithFunDeps :: [Equation]
-                   -> [Xi] 
-                   -> WantedLoc 
-                   -> TcS (Maybe ([Xi], [TcCoercion], [(EvVar,WantedLoc)])) 
-                                           -- Not quite a WantedEvVar unfortunately
-                                           -- Because our intention could be to make 
-                                           -- it derived at the end of the day
--- NB: The flavor of the returned EvVars will be decided by the caller
--- Post: returns no trivial equalities (identities) and all EvVars returned are fresh
-rewriteWithFunDeps eqn_pred_locs xis wloc
- = do { fd_ev_poss <- mapM (instFunDepEqn wloc) eqn_pred_locs
-      ; let fd_ev_pos :: [(Int,(EqVar,WantedLoc))]
-            fd_ev_pos = concat fd_ev_poss
-            (rewritten_xis, cos) = unzip (rewriteDictParams fd_ev_pos xis)
-      ; if null fd_ev_pos then return Nothing
-        else return (Just (rewritten_xis, cos, map snd fd_ev_pos)) }
-
-instFunDepEqn :: WantedLoc -> Equation -> TcS [(Int,(EvVar,WantedLoc))]
--- Post: Returns the position index as well as the corresponding FunDep equality
-instFunDepEqn wl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
-                        , fd_pred1 = d1, fd_pred2 = d2 })
-  = do { let tvs = varSetElems qtvs
-       ; tvs' <- mapM instFlexiTcS tvs  -- IA0_TODO: we might need to do kind substitution
-       ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs')
-       ; foldM (do_one subst) [] eqs }
-  where 
-    do_one subst ievs (FDEq { fd_pos = i, fd_ty_left = ty1, fd_ty_right = ty2 })
-       = let sty1 = Type.substTy subst ty1 
-             sty2 = Type.substTy subst ty2 
-         in if eqType sty1 sty2 then return ievs -- Return no trivial equalities
-            else do { eqv <- newEqVar (Derived wl) sty1 sty2 -- Create derived or cached by deriveds
-                    ; let wl' = push_ctx wl 
-                    ; if isNewEvVar eqv then 
-                          return $ (i,(evc_the_evvar eqv,wl')):ievs 
-                      else -- We are eventually going to emit FD work back in the work list so 
-                           -- it is important that we only return the /freshly created/ and not 
-                           -- some existing equality!
-                          return ievs }
-
-    push_ctx :: WantedLoc -> WantedLoc 
-    push_ctx loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
-
-mkEqnMsg :: (TcPredType, SDoc) 
-         -> (TcPredType, SDoc) -> TidyEnv -> TcM (TidyEnv, SDoc)
-mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
-  = do  { zpred1 <- TcM.zonkTcPredType pred1
-        ; zpred2 <- TcM.zonkTcPredType pred2
-	; let { tpred1 = tidyType tidy_env zpred1
-              ; tpred2 = tidyType tidy_env zpred2 }
-	; let msg = vcat [ptext (sLit "When using functional dependencies to combine"),
-			  nest 2 (sep [ppr tpred1 <> comma, nest 2 from1]), 
-			  nest 2 (sep [ppr tpred2 <> comma, nest 2 from2])]
-	; return (tidy_env, msg) }
-
-rewriteDictParams :: [(Int,(EqVar,WantedLoc))] -- A set of coercions : (pos, ty' ~ ty)
-                  -> [Type]                    -- A sequence of types: tys
-                  -> [(Type, TcCoercion)]      -- Returns: [(ty', co : ty' ~ ty)]
-rewriteDictParams param_eqs tys
-  = zipWith do_one tys [0..]
-  where
-    do_one :: Type -> Int -> (Type, TcCoercion)
-    do_one ty n = case lookup n param_eqs of
-                    Just wev -> (get_fst_ty wev, mkTcCoVarCo (fst wev))
-                    Nothing  -> (ty,             mkTcReflCo ty)	-- Identity
-
-    get_fst_ty (wev,_wloc) 
-      | Just (ty1, _) <- getEqPredTys_maybe (evVarPred wev )
-      = ty1
-      | otherwise 
-      = panic "rewriteDictParams: non equality fundep!?"
-
-        
-emitFDWork :: Bool
-           -> [(EvVar,WantedLoc)] 
-           -> SubGoalDepth -> TcS () 
-emitFDWork as_wanted evlocs d 
-  = updWorkListTcS $ appendWorkListEqs fd_cts
-  where fd_cts = map mk_fd_ct evlocs 
-        mk_fl wl = if as_wanted then (Wanted wl) else (Derived wl)
-        mk_fd_ct (v,wl) = CNonCanonical { cc_id = v
-                                        , cc_flavor = mk_fl wl 
-                                        , cc_depth = d }
-
-emitFDWorkAsDerived, emitFDWorkAsWanted :: [(EvVar,WantedLoc)] 
-                                        -> SubGoalDepth 
-                                        -> TcS () 
-emitFDWorkAsDerived = emitFDWork False
-emitFDWorkAsWanted  = emitFDWork True 
-
-\end{code}

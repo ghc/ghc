@@ -62,15 +62,15 @@ import UniqFM
 import qualified Data.Map as Map
 import qualified FiniteMap as Map( insertListWith)
 
-import System.Directory ( doesFileExist, getModificationTime )
+import System.Directory
 import System.IO	( fixIO )
 import System.IO.Error	( isDoesNotExistError )
-import System.Time	( ClockTime )
 import System.FilePath
 import Control.Monad
 import Data.Maybe
 import Data.List
 import qualified Data.List as List
+import Data.Time
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -1200,7 +1200,7 @@ summariseFile
 	-> FilePath			-- source file name
 	-> Maybe Phase			-- start phase
         -> Bool                         -- object code allowed?
-	-> Maybe (StringBuffer,ClockTime)
+	-> Maybe (StringBuffer,UTCTime)
 	-> IO ModSummary
 
 summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
@@ -1214,10 +1214,10 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
 		-- return the cached summary if the source didn't change
 	src_timestamp <- case maybe_buf of
 			   Just (_,t) -> return t
-			   Nothing    -> liftIO $ getModificationTime file
+			   Nothing    -> liftIO $ getModificationUTCTime file
 		-- The file exists; we checked in getRootSummary above.
 		-- If it gets removed subsequently, then this 
-		-- getModificationTime may fail, but that's the right
+		-- getModificationUTCTime may fail, but that's the right
 		-- behaviour.
 
 	if ms_hs_date old_summary == src_timestamp 
@@ -1251,7 +1251,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
 
         src_timestamp <- case maybe_buf of
 			   Just (_,t) -> return t
-			   Nothing    -> liftIO $ getModificationTime file
+			   Nothing    -> liftIO $ getModificationUTCTime file
 			-- getMofificationTime may fail
 
         -- when the user asks to load a source file by name, we only
@@ -1285,7 +1285,7 @@ summariseModule
 	  -> IsBootInterface	-- True <=> a {-# SOURCE #-} import
 	  -> Located ModuleName	-- Imported module to be summarised
           -> Bool               -- object code allowed?
-	  -> Maybe (StringBuffer, ClockTime)
+	  -> Maybe (StringBuffer, UTCTime)
 	  -> [ModuleName]		-- Modules to exclude
 	  -> IO (Maybe ModSummary)	-- Its new summary
 
@@ -1306,7 +1306,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 	case maybe_buf of
 	   Just (_,t) -> check_timestamp old_summary location src_fn t
 	   Nothing    -> do
-		m <- tryIO (getModificationTime src_fn)
+		m <- tryIO (getModificationUTCTime src_fn)
 		case m of
 		   Right t -> check_timestamp old_summary location src_fn t
 		   Left e | isDoesNotExistError e -> find_it
@@ -1398,7 +1398,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 			      ms_obj_date  = obj_timestamp }))
 
 
-getObjTimestamp :: ModLocation -> Bool -> IO (Maybe ClockTime)
+getObjTimestamp :: ModLocation -> Bool -> IO (Maybe UTCTime)
 getObjTimestamp location is_boot
   = if is_boot then return Nothing
 	       else modificationTimeIfExists (ml_obj_file location)
@@ -1407,7 +1407,7 @@ getObjTimestamp location is_boot
 preprocessFile :: HscEnv
                -> FilePath
                -> Maybe Phase -- ^ Starting phase
-               -> Maybe (StringBuffer,ClockTime)
+               -> Maybe (StringBuffer,UTCTime)
                -> IO (DynFlags, FilePath, StringBuffer)
 preprocessFile hsc_env src_fn mb_phase Nothing
   = do

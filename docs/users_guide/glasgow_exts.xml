@@ -2944,6 +2944,20 @@ data Counter a where
 As before, only one selector function is generated here, that for <literal>tag</literal>.
 Nevertheless, you can still use all the field names in pattern matching and record construction.
 </para></listitem>
+
+<listitem><para>
+In a GADT-style data type declaration there is no obvious way to specify that a data constructor
+should be infix, which makes a difference if you derive <literal>Show</literal> for the type.
+(Data constructors declared infix are displayed infix by the derived <literal>show</literal>.)
+So GHC implements the following design: a data constructor declared in a GADT-style data type
+declaration is displayed infix by <literal>Show</literal> iff (a) it is an operator symbol,
+(b) it has two arguments, (c) it has a programmer-supplied fixity declaration.  For example
+<programlisting>
+   infix 6 (:--:) 
+   data T a where
+     (:--:) :: Int -> Bool -> T Int
+</programlisting>
+</para></listitem>
 </itemizedlist></para>
 </sect2>
 
@@ -5185,10 +5199,12 @@ is not what we intend when defining length-indexed vectors.
 </para>
 
 <para>
-With the <option>-XPolyKinds</option> flag, users can specify better kinds for
-their programs. This flag enables two orthogonal but related features: kind
-polymorphism and user defined kinds through datatype promotion. With
-<option>-XPolyKinds</option>, the example above can then be rewritten to:
+With the flags <option>-XPolyKinds</option> and <option>-XDataKinds</option>,
+users get access to a richer kind language.
+<option>-XPolyKinds</option> enables kind polymorphism, while
+<option>-XDataKinds</option> enables user defined kinds through datatype
+promotion. With <option>-XDataKinds</option>, the example above can then be
+rewritten to:
 <programlisting>
 data Nat = Ze | Su Nat
 
@@ -5226,7 +5242,8 @@ class Typeable2 (t :: * -> * -> *) where
 </para>
 
 <para>
-Kind polymorphism allows us to merge all these classes into one:
+Kind polymorphism (with <option>-XPolyKinds</option>)
+allows us to merge all these classes into one:
 <programlisting>
 data Proxy t = Proxy
 
@@ -5245,8 +5262,8 @@ Note that the datatype <literal>Proxy</literal> has kind
 <para>
 There are some restrictions in the current implementation:
 <itemizedlist>
- <listitem><para>You cannot explicitly abstract over kinds, or mention kind
- variables. So the following are all rejected:
+ <listitem><para>You cannot (yet) explicitly abstract over kinds, or mention
+ kind variables. So the following are all rejected:
 <programlisting>
 data D1 (t :: k)
 
@@ -5270,8 +5287,7 @@ type instance F Int = Maybe
 <sect2 id="promotion">
 <title>Datatype promotion</title>
 <para>
-Along with kind polymorphism comes the ability to define custom named kinds.
-With <option>-XPolyKinds</option>, GHC automatically promotes every suitable
+With <option>-XDataKinds</option>, GHC automatically promotes every suitable
 datatype to be a kind, and its (value) constructors to be type constructors.
 The following types
 <programlisting>
@@ -5300,7 +5316,8 @@ Sum k1 k2 :: BOX
 L :: k1 -> Sum k1 k2
 R :: k2 -> Sum k1 k2
 </programlisting>
-Note that <literal>List</literal>, for instance, does not get kind
+where <literal>BOX</literal> is the (unique) sort that classifies kinds.
+Note that <literal>List</literal>, for instance, does not get sort
 <literal>BOX -> BOX</literal>, because we do not further classify kinds; all
 kinds have sort <literal>BOX</literal>.
 </para>

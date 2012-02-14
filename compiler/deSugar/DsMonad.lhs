@@ -20,7 +20,7 @@ module DsMonad (
         mkPrintUnqualifiedDs,
         newUnique, 
         UniqSupply, newUniqueSupply,
-        getDOptsDs, getGhcModeDs, doptDs, woptDs,
+        getGhcModeDs, doptDs, woptDs,
         dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
         
         PArrBuiltin(..), 
@@ -226,7 +226,7 @@ initDs hsc_env mod rdr_env type_env thing_inside
       where
         loadOneModule :: ModuleName           -- the module to load
                       -> DsM Bool             -- under which condition
-                      -> Message              -- error message if module not found
+                      -> MsgDoc              -- error message if module not found
                       -> DsM GlobalRdrEnv     -- empty if condition 'False'
         loadOneModule modname check err
           = do { doLoad <- check
@@ -267,7 +267,7 @@ initDsTc thing_inside
   = do  { this_mod <- getModule
         ; tcg_env  <- getGblEnv
         ; msg_var  <- getErrsVar
-        ; dflags   <- getDOpts
+        ; dflags   <- getDynFlags
         ; let type_env = tcg_type_env tcg_env
               rdr_env  = tcg_rdr_env tcg_env
               ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env msg_var
@@ -346,9 +346,6 @@ We can also reach out and either set/grab location information from
 the @SrcSpan@ being carried around.
 
 \begin{code}
-getDOptsDs :: DsM DynFlags
-getDOptsDs = getDOpts
-
 doptDs :: DynFlag -> TcRnIf gbl lcl Bool
 doptDs = doptM
 
@@ -356,7 +353,7 @@ woptDs :: WarningFlag -> TcRnIf gbl lcl Bool
 woptDs = woptM
 
 getGhcModeDs :: DsM GhcMode
-getGhcModeDs =  getDOptsDs >>= return . ghcMode
+getGhcModeDs =  getDynFlags >>= return . ghcMode
 
 getModuleDs :: DsM Module
 getModuleDs = do { env <- getGblEnv; return (ds_mod env) }
@@ -370,8 +367,7 @@ putSrcSpanDs new_loc thing_inside = updLclEnv (\ env -> env {ds_loc = new_loc}) 
 warnDs :: SDoc -> DsM ()
 warnDs warn = do { env <- getGblEnv 
                  ; loc <- getSrcSpanDs
-                 ; let msg = mkWarnMsg loc (ds_unqual env) 
-                                      (ptext (sLit "Warning:") <+> warn)
+                 ; let msg = mkWarnMsg loc (ds_unqual env)  warn
                  ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 
 failWithDs :: SDoc -> DsM a

@@ -424,7 +424,11 @@ patchCCallTarget packageId callTarget
 
 \begin{code}
 rnSrcInstDecl :: InstDecl RdrName -> RnM (InstDecl Name, FreeVars)
-rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
+rnSrcInstDecl (FamInstDecl ty_decl)
+  = do { (ty_decl', fvs) <- rnTyClDecl Nothing ty_decl
+       ; return (FamInstDecl ty_decl', fvs) }
+
+rnSrcInstDecl (ClsInstDecl inst_ty mbinds uprags ats)
 	-- Used for both source and interface file decls
   = do { inst_ty' <- rnLHsInstType (text "In an instance declaration") inst_ty
        ; let Just (inst_tyvars, _, L _ cls,_) = splitLHsInstDeclTy_maybe inst_ty'
@@ -460,7 +464,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	                     renameSigs (InstDeclCtxt cls) spec_inst_prags
 
        ; let uprags' = spec_inst_prags' ++ other_sigs'
-       ; return (InstDecl inst_ty' mbinds' uprags' ats',
+       ; return (ClsInstDecl inst_ty' mbinds' uprags' ats',
 	         meth_fvs `plusFV` more_fvs
                           `plusFV` hsSigsFVs spec_inst_prags'
 		      	  `plusFV` extractHsTyNames inst_ty') }
@@ -682,7 +686,7 @@ rnHsVectDecl (HsVectClassOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectClassOut'"
 rnHsVectDecl (HsVectInstIn instTy)
   = do { instTy' <- rnLHsInstType (text "In a VECTORISE pragma") instTy
-       ; return (HsVectInstIn instTy', emptyFVs)
+       ; return (HsVectInstIn instTy', extractHsTyNames instTy')
        }
 rnHsVectDecl (HsVectInstOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectInstOut'"
@@ -749,7 +753,7 @@ rnTyClDecls :: [Name] -> [[LTyClDecl RdrName]]
 -- Rename the declarations and do depedency analysis on them
 rnTyClDecls extra_deps tycl_ds
   = do { ds_w_fvs <- mapM (wrapLocFstM (rnTyClDecl Nothing)) (concat tycl_ds)
-       ; thisPkg  <- fmap thisPackage getDOpts
+       ; thisPkg  <- fmap thisPackage getDynFlags
        ; let add_boot_deps :: FreeVars -> FreeVars
              -- See Note [Extra dependencies from .hs-boot files]
              add_boot_deps fvs | any (isInPackage thisPkg) (nameSetToList fvs)
@@ -764,6 +768,7 @@ rnTyClDecls extra_deps tycl_ds
 
              all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs'
 
+       ; traceRn (text "rnTycl"  <+> (ppr ds_w_fvs $$ ppr sccs))
        ; return (map flattenSCC sccs, all_fvs) }
 
 
@@ -995,12 +1000,16 @@ depAnalTyClDecls :: [(LTyClDecl Name, FreeVars)] -> [SCC (LTyClDecl Name)]
 depAnalTyClDecls ds_w_fvs
   = stronglyConnCompFromEdgedVertices edges
   where
-    edges = [ (d, tcdName (unLoc d), map get_assoc (nameSetToList fvs))
+    edges = [ (d, tcdName (unLoc d), map get_parent (nameSetToList fvs))
             | (d, fvs) <- ds_w_fvs ]
-    get_assoc n = lookupNameEnv assoc_env n `orElse` n
+
+    -- We also need to consider data constructor names since 
+    -- they may appear in types because of promotion.
+    get_parent n = lookupNameEnv assoc_env n `orElse` n
+
+    assoc_env :: NameEnv Name   -- Maps a data constructor back 
+                                -- to its parent type constructor
     assoc_env = mkNameEnv assoc_env_list
-    -- We also need to consider data constructor names since they may
-    -- appear in types because of promotion.
     assoc_env_list = do
       (L _ d, _) <- ds_w_fvs
       case d of
@@ -1055,9 +1064,9 @@ rnConDecls condecls
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name)
 rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
-                   	       , con_cxt = cxt, con_details = details
-                   	       , con_res = res_ty, con_doc = mb_doc
-                   	       , con_old_rec = old_rec, con_explicit = expl })
+                   	, con_cxt = cxt, con_details = details
+                   	, con_res = res_ty, con_doc = mb_doc
+                   	, con_old_rec = old_rec, con_explicit = expl })
   = do	{ addLocM checkConName name
     	; when old_rec (addWarn (deprecRecSyntax decl))
 	; new_name <- lookupLocatedTopBndrRn name
@@ -1084,35 +1093,43 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
         ; bindTyVarsRn doc new_tvs $ \new_tyvars -> do
 	{ new_context <- rnContext doc cxt
 	; new_details <- rnConDeclDetails doc details
-        ; (new_details', new_res_ty)  <- rnConResult doc new_details res_ty
+        ; (new_details', new_res_ty)  <- rnConResult doc (unLoc new_name) new_details res_ty
         ; return (decl { con_name = new_name, con_qvars = new_tyvars, con_cxt = new_context 
                        , con_details = new_details', con_res = new_res_ty, con_doc = mb_doc' }) }}
  where
     doc = ConDeclCtx name
     get_rdr_tvs tys  = extractHsRhoRdrTyVars cxt (noLoc (HsTupleTy HsBoxedTuple tys))
 
-rnConResult :: HsDocContext
+rnConResult :: HsDocContext -> Name
             -> HsConDetails (LHsType Name) [ConDeclField Name]
             -> ResType RdrName
             -> RnM (HsConDetails (LHsType Name) [ConDeclField Name],
                     ResType Name)
-rnConResult _ details ResTyH98 = return (details, ResTyH98)
-rnConResult doc details (ResTyGADT ty)
+rnConResult _   _   details ResTyH98 = return (details, ResTyH98)
+rnConResult doc con details (ResTyGADT ty)
   = do { ty' <- rnLHsType doc ty
        ; let (arg_tys, res_ty) = splitHsFunType ty'
           	-- We can finally split it up, 
 		-- now the renamer has dealt with fixities
 	        -- See Note [Sorting out the result type] in RdrHsSyn
 
-             details' = case details of
-       	     	           RecCon {}    -> details
-			   PrefixCon {} -> PrefixCon arg_tys
-			   InfixCon {}  -> pprPanic "rnConResult" (ppr ty)
-			  -- See Note [Sorting out the result type] in RdrHsSyn
-		
-       ; when (not (null arg_tys) && case details of { RecCon {} -> True; _ -> False })
-              (addErr (badRecResTy (docOfHsDocContext doc)))
-       ; return (details', ResTyGADT res_ty) }
+       ; case details of
+	   InfixCon {}  -> pprPanic "rnConResult" (ppr ty)
+	   -- See Note [Sorting out the result type] in RdrHsSyn
+
+       	   RecCon {}    -> do { unless (null arg_tys) 
+                                       (addErr (badRecResTy (docOfHsDocContext doc)))
+                              ; return (details, ResTyGADT res_ty) }
+
+	   PrefixCon {} | isSymOcc (getOccName con)  -- See Note [Infix GADT cons]
+                        , [ty1,ty2] <- arg_tys
+                        -> do { fix_env <- getFixityEnv
+                              ; return (if   con `elemNameEnv` fix_env 
+                                        then InfixCon ty1 ty2
+                                        else PrefixCon arg_tys
+                                       , ResTyGADT res_ty) }
+                        | otherwise
+                        -> return (PrefixCon arg_tys, ResTyGADT res_ty) }
 
 rnConDeclDetails :: HsDocContext
                  -> HsConDetails (LHsType RdrName) [ConDeclField RdrName]
@@ -1161,6 +1178,18 @@ badDataCon name
    = hsep [ptext (sLit "Illegal data constructor name"), quotes (ppr name)]
 \end{code}
 
+Note [Infix GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not currently have syntax to declare an infix constructor in GADT syntax,
+but it makes a (small) difference to the Show instance.  So as a slightly
+ad-hoc solution, we regard a GADT data constructor as infix if
+  a) it is an operator symbol
+  b) it has two arguments
+  c) there is a fixity declaration for it
+For example:
+   infix 6 (:--:) 
+   data T a where
+     (:--:) :: t1 -> t2 -> T Int
 
 %*********************************************************
 %*							*
@@ -1190,7 +1219,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     all_data_cons = [con | L _ (TyData { tcdCons = cons }) <- all_tycl_decls
     		         , L _ con <- cons ]
     all_tycl_decls = at_tycl_decls ++ concat tycl_decls
-    at_tycl_decls = instDeclATs inst_decls  -- Do not forget associated types!
+    at_tycl_decls = instDeclFamInsts inst_decls  -- Do not forget associated types!
 
     get_con (ConDecl { con_name = con, con_details = RecCon flds })
 	    (RecFields env fld_set)

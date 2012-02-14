@@ -125,6 +125,8 @@ _darcs/
 /docs/users_guide/ug-book.xml
 /docs/users_guide/ug-ent.xml
 /docs/users_guide/users_guide.xml
+/docs/users_guide/users_guide.pdf
+/docs/users_guide/users_guide.ps
 /docs/users_guide/users_guide/
 /docs/users_guide/what_glasgow_exts_does.gen.xml
 /driver/ghc/dist/
@@ -182,6 +184,7 @@ _darcs/
 /libraries/time/
 /libraries/*/dist-boot/
 /libraries/*/dist-install/
+/libraries/dist-haddock/
 /mk/are-validating.mk
 /mk/build.mk
 /mk/config.h
@@ -237,3 +240,5 @@ _darcs/
 
 
 /extra-gcc-opts
+
+.tm_properties

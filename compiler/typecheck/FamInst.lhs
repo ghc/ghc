@@ -21,13 +21,15 @@ import TypeRep
 import TcMType
 import TcRnMonad
 import TyCon
+import DynFlags
 import Name
 import Module
 import SrcLoc
 import Outputable
 import UniqFM
 import FastString
-
+import VarSet   ( varSetElems )
+import Util( filterOut )
 import Maybes
 import Control.Monad
 import Data.Map (Map)
@@ -91,7 +93,7 @@ listToSet l = Map.fromList (zip l (repeat ()))
 
 checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
 checkFamInstConsistency famInstMods directlyImpMods
-  = do { dflags     <- getDOpts
+  = do { dflags     <- getDynFlags
        ; (eps, hpt) <- getEpsAndHpt
 
        ; let { -- Fetch the iface of a given module.  Must succeed as
@@ -166,7 +168,7 @@ then we have a coercion (ie, type instance of family instance coercion)
 which implies that :R42T was declared as 'data instance T [a]'.
 
 \begin{code}
-tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (TyCon, [Type]))
+tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (FamInst, [Type]))
 tcLookupFamInst tycon tys
   | not (isFamilyTyCon tycon)
   = return Nothing
@@ -176,7 +178,7 @@ tcLookupFamInst tycon tys
        ; case lookupFamInstEnv instEnv tycon tys of
 	   []                      -> return Nothing
 	   ((fam_inst, rep_tys):_) 
-             -> return $ Just (famInstTyCon fam_inst, rep_tys)
+             -> return $ Just (fam_inst, rep_tys)
        }
 
 tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
@@ -189,8 +191,9 @@ tcLookupDataFamInst tycon tys
   = ASSERT( isAlgTyCon tycon )
     do { maybeFamInst <- tcLookupFamInst tycon tys
        ; case maybeFamInst of
-           Nothing      -> famInstNotFound tycon tys
-           Just famInst -> return famInst }
+           Nothing             -> famInstNotFound tycon tys
+           Just (famInst, tys) -> let tycon' = dataFamInstRepTyCon famInst
+                                  in return (tycon', tys) }
 
 famInstNotFound :: TyCon -> [Type] -> TcM a
 famInstNotFound tycon tys 
@@ -234,35 +237,44 @@ with standalone deriving declrations.
 tcExtendLocalFamInstEnv :: [FamInst] -> TcM a -> TcM a
 tcExtendLocalFamInstEnv fam_insts thing_inside
  = do { env <- getGblEnv
-      ; inst_env' <- foldlM addLocalFamInst (tcg_fam_inst_env env) fam_insts
-      ; let env' = env { tcg_fam_insts    = fam_insts ++ tcg_fam_insts env,
-			 tcg_fam_inst_env = inst_env' }
+      ; (inst_env', fam_insts') <- foldlM addLocalFamInst  
+                                          (tcg_fam_inst_env env, tcg_fam_insts env)
+                                          fam_insts
+      ; let env' = env { tcg_fam_insts    = fam_insts'
+		       , tcg_fam_inst_env = inst_env' }
       ; setGblEnv env' thing_inside 
       }
 
 -- Check that the proposed new instance is OK, 
 -- and then add it to the home inst env
-addLocalFamInst :: FamInstEnv -> FamInst -> TcM FamInstEnv
-addLocalFamInst home_fie famInst = do
-        -- Load imported instances, so that we report
-        -- overlaps correctly
-    eps <- getEps
-    let inst_envs = (eps_fam_inst_env eps, home_fie)
+addLocalFamInst :: (FamInstEnv,[FamInst]) -> FamInst -> TcM (FamInstEnv, [FamInst])
+addLocalFamInst (home_fie, my_fis) fam_inst 
+        -- home_fie includes home package and this module
+        -- my_fies is just the ones from this module
+  = do { isGHCi <- getIsGHCi
+ 
+           -- In GHCi, we *override* any identical instances
+           -- that are also defined in the interactive context
+      ; let (home_fie', my_fis') 
+              | isGHCi    = (deleteFromFamInstEnv home_fie fam_inst, 
+                             filterOut (identicalFamInst fam_inst) my_fis)
+              | otherwise = (home_fie, my_fis)
 
-        -- Check for conflicting instance decls
-    skol_tvs <- tcInstSkolTyVars (tyConTyVars (famInstTyCon famInst))
-    let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
-    -- If there are any conflicts, we should probably error
-    -- But, if we're allowed to overwrite and the conflict is in the home FIE,
-    -- then overwrite instead of error.
-    traceTc "checkForConflicts" (ppr conflicts $$ ppr famInst $$ ppr inst_envs)
-    isGHCi <- getIsGHCi
-    case conflicts of
-        dup : _ ->  case (isGHCi, home_conflicts) of
-                        (True, _ : _) -> return (overwriteFamInstEnv home_fie famInst)
-                        (_, _)        -> conflictInstErr famInst (fst dup) >> return (extendFamInstEnv home_fie famInst)
-                    where home_conflicts = lookupFamInstEnvConflicts' home_fie famInst skol_tvs
-        []      ->  return (extendFamInstEnv home_fie famInst)
+           -- Load imported instances, so that we report
+           -- overlaps correctly
+       ; eps <- getEps
+       ; skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars fam_inst))
+       ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
+             conflicts  = lookupFamInstEnvConflicts inst_envs fam_inst skol_tvs
+             home_fie'' = extendFamInstEnv home_fie fam_inst
+
+           -- Check for conflicting instance decls
+       ;  traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
+       ; case conflicts of
+            []      ->  return (home_fie'', fam_inst : my_fis')
+            dup : _ ->  do { conflictInstErr fam_inst (fst dup)
+                           ; return (home_fie, my_fis) }
+      }
 \end{code}
 
 %************************************************************************
@@ -285,7 +297,7 @@ checkForConflicts inst_envs famInst
 		-- We use tcInstSkolType because we don't want to allocate
 		-- fresh *meta* type variables.  
 
-       ; skol_tvs <- tcInstSkolTyVars (tyConTyVars (famInstTyCon famInst))
+       ; skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars famInst))
        ; let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
        ; unless (null conflicts) $
 	   conflictInstErr famInst (fst (head conflicts))

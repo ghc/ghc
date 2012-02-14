@@ -47,7 +47,7 @@ dsListComp :: [LStmt Id]
            -> Type              -- Type of entire list
            -> DsM CoreExpr
 dsListComp lquals res_ty = do
-    dflags <- getDOptsDs
+    dflags <- getDynFlags
     let quals = map unLoc lquals
         elt_ty = case tcTyConAppArgs res_ty of
                    [elt_ty] -> elt_ty

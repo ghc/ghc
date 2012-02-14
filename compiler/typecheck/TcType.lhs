@@ -58,7 +58,7 @@ module TcType (
   -- Predicates. 
   -- Again, newtypes are opaque
   eqType, eqTypes, eqPred, cmpType, cmpTypes, cmpPred, eqTypeX,
-  eqKind, 
+  pickyEqType, eqKind, 
   isSigmaTy, isOverloadedTy,
   isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
@@ -90,6 +90,7 @@ module TcType (
   tidyOpenKind,
   tidyTyVarBndr, tidyFreeTyVars,
   tidyOpenTyVar, tidyOpenTyVars,
+  tidyTyVarOcc,
   tidyTopType,
   tidyKind, 
   tidyCo, tidyCos,
@@ -473,7 +474,24 @@ tidyTyVarBndr tidy_env@(occ_env, subst) tyvar
 tidyFreeTyVars :: TidyEnv -> TyVarSet -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
-tidyFreeTyVars env tyvars = fst (tidyOpenTyVars env (varSetElems tyvars))
+tidyFreeTyVars (full_occ_env, var_env) tyvars 
+  = fst (tidyOpenTyVars (trimmed_occ_env, var_env) tv_list)
+
+  where
+    tv_list = varSetElems tyvars
+    
+    trimmed_occ_env = foldr mk_occ_env emptyOccEnv tv_list
+      -- The idea here is that we restrict the new TidyEnv to the 
+      -- _free_ vars of the type, so that we don't gratuitously rename
+      -- the _bound_ variables of the type
+
+    mk_occ_env :: TyVar -> TidyOccEnv -> TidyOccEnv
+    mk_occ_env tv env 
+       = case lookupOccEnv full_occ_env occ of
+            Just n  -> extendOccEnv env occ n
+            Nothing -> env
+       where
+         occ = getOccName tv
 
 ---------------
 tidyOpenTyVars :: TidyEnv -> [TyVar] -> (TidyEnv, [TyVar])
@@ -490,32 +508,35 @@ tidyOpenTyVar env@(_, subst) tyvar
 	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
 
 ---------------
-tidyType :: TidyEnv -> Type -> Type
-tidyType env@(_, subst) ty
-  = go ty
+tidyTyVarOcc :: TidyEnv -> TyVar -> Type
+tidyTyVarOcc env@(_, subst) tv
+  = case lookupVarEnv subst tv of
+	Nothing  -> expand tv
+	Just tv' -> expand tv'
   where
-    go (TyVarTy tv)	    = case lookupVarEnv subst tv of
-				Nothing  -> expand tv
-				Just tv' -> expand tv'
-    go (TyConApp tycon tys) = let args = map go tys
-			      in args `seqList` TyConApp tycon args
-    go (AppTy fun arg)	    = (AppTy $! (go fun)) $! (go arg)
-    go (FunTy fun arg)	    = (FunTy $! (go fun)) $! (go arg)
-    go (ForAllTy tv ty)	    = ForAllTy tvp $! (tidyType envp ty)
-			      where
-			        (envp, tvp) = tidyTyVarBndr env tv
-
     -- Expand FlatSkols, the skolems introduced by flattening process
     -- We don't want to show them in type error messages
     expand tv | isTcTyVar tv
               , FlatSkol ty <- tcTyVarDetails tv
-              = go ty
+              = WARN( True, text "I DON'T THINK THIS SHOULD EVER HAPPEN" <+> ppr tv <+> ppr ty )
+                tidyType env ty
               | otherwise
               = TyVarTy tv
 
 ---------------
 tidyTypes :: TidyEnv -> [Type] -> [Type]
 tidyTypes env tys = map (tidyType env) tys
+
+---------------
+tidyType :: TidyEnv -> Type -> Type
+tidyType env (TyVarTy tv)	  = tidyTyVarOcc env tv
+tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
+ 		                    in args `seqList` TyConApp tycon args
+tidyType env (AppTy fun arg)	  = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (FunTy fun arg)	  = (FunTy $! (tidyType env fun)) $! (tidyType env arg)
+tidyType env (ForAllTy tv ty)	  = ForAllTy tvp $! (tidyType envp ty)
+			          where
+			            (envp, tvp) = tidyTyVarBndr env tv
 
 ---------------
 -- | Grabs the free type variables, tidies them
@@ -1000,7 +1021,25 @@ tcInstHeadTyAppAllTyVars ty
     get_tv _             = Nothing
 \end{code}
 
+\begin{code}
+pickyEqType :: TcType -> TcType -> Bool
+-- Check when two types _look_ the same, _including_ synonyms.  
+-- So (pickyEqType String [Char]) returns False
+pickyEqType ty1 ty2
+  = go init_env ty1 ty2
+  where
+    init_env = mkRnEnv2 (mkInScopeSet (tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2))
+    go env (TyVarTy tv1)       (TyVarTy tv2)     = rnOccL env tv1 == rnOccR env tv2
+    go env (ForAllTy tv1 t1)   (ForAllTy tv2 t2) = go (rnBndr2 env tv1 tv2) t1 t2
+    go env (AppTy s1 t1)       (AppTy s2 t2)     = go env s1 s2 && go env t1 t2
+    go env (FunTy s1 t1)       (FunTy s2 t2)     = go env s1 s2 && go env t1 t2
+    go env (TyConApp tc1 ts1) (TyConApp tc2 ts2) = (tc1 == tc2) && gos env ts1 ts2
+    go _ _ _ = False
 
+    gos _   []       []       = True
+    gos env (t1:ts1) (t2:ts2) = go env t1 t2 && gos env ts1 ts2
+    gos _ _ _ = False
+\end{code}
 
 %************************************************************************
 %*									*

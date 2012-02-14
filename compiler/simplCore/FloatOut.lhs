@@ -17,12 +17,12 @@ module FloatOut ( floatOutwards ) where
 
 import CoreSyn
 import CoreUtils
+import MkCore
 import CoreArity	( etaExpand )
 import CoreMonad	( FloatOutSwitches(..) )
 
 import DynFlags		( DynFlags, DynFlag(..) )
 import ErrUtils		( dumpIfSet_dyn )
-import DataCon          ( DataCon )
 import Id		( Id, idArity, isBottomingId )
 import Var		( Var )
 import SetLevels
@@ -326,7 +326,7 @@ floatExpr (Let bind body)
 floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
   = case case_spec of
       FloatMe dest_lvl  -- Case expression moves  
-        | [(DataAlt con, bndrs, rhs)] <- alts
+        | [(con@(DataAlt {}), bndrs, rhs)] <- alts
         -> case floatExpr scrut of { (fse, fde, scrut') ->
     	   case floatExpr rhs   of { (fsb, fdb, rhs') ->
     	   let 
@@ -444,13 +444,6 @@ partitionByMajorLevel.
 
 
 \begin{code}
-data FloatBind 
-  = FloatLet FloatLet  
-
-  | FloatCase CoreExpr Id DataCon [Var]       
-      -- case e of y { C ys -> ... }
-      -- See Note [Floating cases] in SetLevels
-
 type FloatLet = CoreBind	-- INVARIANT: a FloatLet is always lifted
 type MajorEnv = M.IntMap MinorEnv	  -- Keyed by major level
 type MinorEnv = M.IntMap (Bag FloatBind)  -- Keyed by minor level
@@ -491,7 +484,7 @@ flattenMinor = M.fold unionBags emptyBag
 emptyFloats :: FloatBinds
 emptyFloats = FB emptyBag M.empty
 
-unitCaseFloat :: Level -> CoreExpr -> Id -> DataCon -> [Var] -> FloatBinds
+unitCaseFloat :: Level -> CoreExpr -> Id -> AltCon -> [Var] -> FloatBinds
 unitCaseFloat (Level major minor) e b con bs 
   = FB emptyBag (M.singleton major (M.singleton minor (unitBag (FloatCase e b con bs))))
 
@@ -514,12 +507,7 @@ plusMinor = M.unionWith unionBags
 
 install :: Bag FloatBind -> CoreExpr -> CoreExpr
 install defn_groups expr
-  = foldrBag install_group expr defn_groups
-  where
-    install_group (FloatLet defns) body 
-       = Let defns body
-    install_group (FloatCase e b con bs) body 
-       = Case e b (exprType body) [(DataAlt con, bs, body)]
+  = foldrBag wrapFloat expr defn_groups
 
 partitionByLevel
 	:: Level		-- Partitioning level

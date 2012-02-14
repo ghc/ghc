@@ -15,7 +15,7 @@ module SimplMonad (
 	-- The monad
 	SimplM,
 	initSmpl,
-	getDOptsSmpl, getSimplRules, getFamEnvs,
+	getSimplRules, getFamEnvs,
 
         -- Unique supply
         MonadUnique(..), newId,
@@ -31,7 +31,7 @@ import Type             ( Type )
 import FamInstEnv	( FamInstEnv )
 import Rules		( RuleBase )
 import UniqSupply
-import DynFlags		( DynFlags( simplTickFactor ) )
+import DynFlags
 import CoreMonad
 import Outputable
 import FastString
@@ -148,8 +148,8 @@ instance MonadUnique SimplM where
         = SM (\_st_env us sc -> case splitUniqSupply us of
                                 (us1, us2) -> (uniqsFromSupply us1, us2, sc))
 
-getDOptsSmpl :: SimplM DynFlags
-getDOptsSmpl = SM (\st_env us sc -> (st_flags st_env, us, sc))
+instance HasDynFlags SimplM where
+    getDynFlags = SM (\st_env us sc -> (st_flags st_env, us, sc))
 
 getSimplRules :: SimplM RuleBase
 getSimplRules = SM (\st_env us sc -> (st_rules st_env, us, sc))

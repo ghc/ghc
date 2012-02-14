@@ -147,8 +147,6 @@ pprConvention  Slow                 = text "<slow-convention>"
 pprConvention  GC                   = text "<gc-convention>"
 pprConvention  PrimOpCall           = text "<primop-call-convention>"
 pprConvention  PrimOpReturn         = text "<primop-ret-convention>"
-pprConvention (Foreign c)           = ppr c
-pprConvention (Private {})          = text "<private-convention>"
 
 pprForeignConvention :: ForeignConvention -> SDoc
 pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs

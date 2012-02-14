@@ -190,7 +190,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr])
 	-- compute expr and load it into r_dst_lo
 	(a_reg, a_code)	<- getSomeReg expr
 
-	dflags <- getDynFlagsNat
+	dflags <- getDynFlags
 	let platform = targetPlatform dflags
 	    code	= a_code
 		`appOL`	toOL
@@ -201,7 +201,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr])
 
 
 iselExpr64 expr
-   = do dflags <- getDynFlagsNat
+   = do dflags <- getDynFlags
         pprPanic "iselExpr64(sparc)" (pprPlatform (targetPlatform dflags) expr)
 
 

@@ -333,15 +333,35 @@ emitPrimOp [res] FreezeArrayOp [src,src_off,n] =
 emitPrimOp [res] ThawArrayOp [src,src_off,n] =
     emitCloneArray mkMAP_DIRTY_infoLabel res src src_off n
 
+emitPrimOp [] CopyArrayArrayOp [src,src_off,dst,dst_off,n] =
+    doCopyArrayOp src src_off dst dst_off n
+emitPrimOp [] CopyMutableArrayArrayOp [src,src_off,dst,dst_off,n] =
+    doCopyMutableArrayOp src src_off dst dst_off n
+
 -- Reading/writing pointer arrays
 
-emitPrimOp [r] ReadArrayOp  [obj,ix]    = doReadPtrArrayOp r obj ix
-emitPrimOp [r] IndexArrayOp [obj,ix]    = doReadPtrArrayOp r obj ix
+emitPrimOp [res] ReadArrayOp  [obj,ix]    = doReadPtrArrayOp res obj ix
+emitPrimOp [res] IndexArrayOp [obj,ix]    = doReadPtrArrayOp res obj ix
 emitPrimOp []  WriteArrayOp [obj,ix,v]  = doWritePtrArrayOp obj ix v
+
+emitPrimOp [res] IndexArrayArrayOp_ByteArray         [obj,ix]   = doReadPtrArrayOp res obj ix
+emitPrimOp [res] IndexArrayArrayOp_ArrayArray        [obj,ix]   = doReadPtrArrayOp res obj ix
+emitPrimOp [res] ReadArrayArrayOp_ByteArray          [obj,ix]   = doReadPtrArrayOp res obj ix
+emitPrimOp [res] ReadArrayArrayOp_MutableByteArray   [obj,ix]   = doReadPtrArrayOp res obj ix
+emitPrimOp [res] ReadArrayArrayOp_ArrayArray         [obj,ix]   = doReadPtrArrayOp res obj ix
+emitPrimOp [res] ReadArrayArrayOp_MutableArrayArray  [obj,ix]   = doReadPtrArrayOp res obj ix
+emitPrimOp []  WriteArrayArrayOp_ByteArray         [obj,ix,v] = doWritePtrArrayOp obj ix v
+emitPrimOp []  WriteArrayArrayOp_MutableByteArray  [obj,ix,v] = doWritePtrArrayOp obj ix v
+emitPrimOp []  WriteArrayArrayOp_ArrayArray        [obj,ix,v] = doWritePtrArrayOp obj ix v
+emitPrimOp []  WriteArrayArrayOp_MutableArrayArray [obj,ix,v] = doWritePtrArrayOp obj ix v
 
 emitPrimOp [res] SizeofArrayOp [arg]
    = emit $	mkAssign (CmmLocal res) (cmmLoadIndexW arg (fixedHdrSize + oFFSET_StgMutArrPtrs_ptrs) bWord)
 emitPrimOp [res] SizeofMutableArrayOp [arg]
+   = emitPrimOp [res] SizeofArrayOp [arg]
+emitPrimOp [res] SizeofArrayArrayOp [arg]
+   = emitPrimOp [res] SizeofArrayOp [arg]
+emitPrimOp [res] SizeofMutableArrayArrayOp [arg]
    = emitPrimOp [res] SizeofArrayOp [arg]
 
 -- IndexXXXoffAddr

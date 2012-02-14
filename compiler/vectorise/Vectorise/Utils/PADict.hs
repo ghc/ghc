@@ -113,19 +113,16 @@ paMethod method _ ty
 --
 -- Note that @ty@ is only used for error messages
 --
-prDictOfPReprInstTyCon :: Type -> TyCon -> [Type] -> VM CoreExpr
-prDictOfPReprInstTyCon ty prepr_tc prepr_args
-  | Just rhs <- coreView (mkTyConApp prepr_tc prepr_args)
+prDictOfPReprInstTyCon :: Type -> CoAxiom -> [Type] -> VM CoreExpr
+prDictOfPReprInstTyCon _ty prepr_ax prepr_args
   = do
+      let rhs = mkAxInstRHS prepr_ax prepr_args
       dict <- prDictOfReprType' rhs
       pr_co <- mkBuiltinCo prTyCon
-      let Just arg_co = tyConFamilyCoercion_maybe prepr_tc
       let co = mkAppCo pr_co
              $ mkSymCo
-             $ mkAxInstCo arg_co prepr_args
+             $ mkAxInstCo prepr_ax prepr_args
       return $ mkCast dict co
-
-  | otherwise = cantVectorise "Invalid PRepr type instance" (ppr ty)
 
 -- |Get the PR dictionary for a type. The argument must be a representation
 -- type.

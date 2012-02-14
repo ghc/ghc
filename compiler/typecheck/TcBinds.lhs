@@ -130,7 +130,7 @@ tcHsBootSigs (ValBindsOut binds sigs)
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 tcHsBootSigs groups = pprPanic "tcHsBootSigs" (ppr groups)
 
-badBootDeclErr :: Message
+badBootDeclErr :: MsgDoc
 badBootDeclErr = ptext (sLit "Illegal declarations in an hs-boot file")
 
 ------------------------
@@ -332,7 +332,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
     -- (as determined by sig_fn), returning a TcSigInfo for each
     ; tc_sig_fn <- tcInstSigs sig_fn binder_names
 
-    ; dflags   <- getDOpts
+    ; dflags   <- getDynFlags
     ; type_env <- getLclTypeEnv
     ; let plan = decideGeneralisationPlan dflags type_env 
                          binder_names bind_list tc_sig_fn
@@ -585,7 +585,8 @@ tcSpec poly_id prag@(SpecSig _ hs_ty inl)
   = addErrCtxt (spec_ctxt prag) $
     do  { spec_ty <- tcHsSigType sig_ctxt hs_ty
         ; warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
-                 (ptext (sLit "SPECIALISE pragma for non-overloaded function") <+> quotes (ppr poly_id))
+                 (ptext (sLit "SPECIALISE pragma for non-overloaded function") 
+                  <+> quotes (ppr poly_id))
                   -- Note [SPECIALISE pragmas]
         ; wrap <- tcSubType origin sig_ctxt (idType poly_id) spec_ty
         ; return (SpecPrag poly_id wrap inl) }
@@ -603,7 +604,7 @@ tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
 -- SPECIALISE pragamas for imported things
 tcImpPrags prags
   = do { this_mod <- getModule
-       ; dflags <- getDOpts
+       ; dflags <- getDynFlags
        ; if (not_specialising dflags) then
             return []
          else
@@ -739,7 +740,7 @@ tcVect (HsVectInstOut _)
 vectCtxt :: Outputable thing => thing -> SDoc
 vectCtxt thing = ptext (sLit "When checking the vectorisation declaration for") <+> ppr thing
 
-scalarTyConMustBeNullary :: Message
+scalarTyConMustBeNullary :: MsgDoc
 scalarTyConMustBeNullary = ptext (sLit "VECTORISE SCALAR type constructor must be nullary")
 
 --------------

@@ -46,7 +46,7 @@ import {-# SOURCE #-}	TcSplice( kcSpliceType )
 import HsSyn
 import RnHsSyn
 import TcRnMonad
-import RnEnv   ( polyKindsErr )
+import RnEnv   ( dataKindsErr )
 import TcHsSyn ( mkZonkTcTyVar )
 import TcEvidence( HsWrapper )
 import TcEnv
@@ -59,7 +59,7 @@ import Kind
 import Var
 import VarSet
 import TyCon
-import DataCon ( DataCon, dataConUserType )
+import DataCon
 import TysPrim ( liftedTypeKindTyConName, constraintKindTyConName )
 import Class
 import RdrName ( rdrNameSpace, nameRdrName )
@@ -68,11 +68,10 @@ import NameSet
 import TysWiredIn
 import BasicTypes
 import SrcLoc
-import DynFlags ( ExtensionFlag( Opt_PolyKinds ) )
+import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
 import Util
 import UniqSupply
 import Outputable
-import BuildTyCl ( buildPromotedDataTyCon )
 import FastString
 import Control.Monad ( unless )
 \end{code}
@@ -349,14 +348,10 @@ kc_hs_type (HsParTy ty) exp_kind = do
    ty' <- kc_lhs_type ty exp_kind
    return (HsParTy ty')
 
-kc_hs_type (HsTyVar name) exp_kind
-  -- Special case for the unit tycon so it benefits from kind overloading
-  | name == tyConName unitTyCon
-  = kc_hs_type (HsTupleTy HsBoxedOrConstraintTuple []) exp_kind
-  | otherwise = do 
-      (ty, k) <- kcTyVar name
-      checkExpectedKind ty k exp_kind
-      return ty
+kc_hs_type (HsTyVar name) exp_kind = do
+   (ty, k) <- kcTyVar name
+   checkExpectedKind ty k exp_kind
+   return ty
 
 kc_hs_type (HsListTy ty) exp_kind = do
     ty' <- kcLiftedType ty
@@ -515,12 +510,13 @@ kc_hs_type (HsDocTy ty _) exp_kind
 kc_hs_type ty@(HsExplicitListTy _k tys) exp_kind
   = do { ty_k_s <- mapM kc_lhs_type_fresh tys
        ; kind <- unifyKinds (ptext (sLit "In a promoted list")) ty_k_s
-       ; checkExpectedKind ty (mkListTy kind) exp_kind
+       ; checkExpectedKind ty (mkPromotedListTy kind) exp_kind
        ; return (HsExplicitListTy kind (map fst ty_k_s)) }
 
 kc_hs_type ty@(HsExplicitTupleTy _ tys) exp_kind = do
   ty_k_s <- mapM kc_lhs_type_fresh tys
-  let tupleKi = mkTyConApp (tupleTyCon BoxedTuple (length tys)) (map snd ty_k_s)
+  let tycon   = promotedTupleTyCon BoxedTuple (length tys)
+      tupleKi = mkTyConApp tycon (map snd ty_k_s)
   checkExpectedKind ty tupleKi exp_kind
   return (HsExplicitTupleTy (map snd ty_k_s) (map fst ty_k_s))
 
@@ -750,14 +746,14 @@ ds_type (HsExplicitListTy kind tys) = do
   kind' <- zonkTcKindToKind kind
   ds_tys <- mapM dsHsType tys
   return $
-   foldr (\a b -> mkTyConApp (buildPromotedDataTyCon consDataCon) [kind', a, b])
-         (mkTyConApp (buildPromotedDataTyCon nilDataCon) [kind']) ds_tys
+   foldr (\a b -> mkTyConApp (buildPromotedDataCon consDataCon) [kind', a, b])
+         (mkTyConApp (buildPromotedDataCon nilDataCon) [kind']) ds_tys
 
 ds_type (HsExplicitTupleTy kis tys) = do
   MASSERT( length kis == length tys )
   kis' <- mapM zonkTcKindToKind kis
   tys' <- mapM dsHsType tys
-  return $ mkTyConApp (buildPromotedDataTyCon (tupleCon BoxedTuple (length kis'))) (kis' ++ tys')
+  return $ mkTyConApp (buildPromotedDataCon (tupleCon BoxedTuple (length kis'))) (kis' ++ tys')
 
 ds_type (HsWrapTy (WpKiApps kappas) ty) = do
   tau <- ds_type ty
@@ -812,7 +808,7 @@ ds_var_app name arg_tys
   = do { thing <- tcLookupGlobal name
        ; case thing of
            ATyCon tc   -> return (mkTyConApp tc arg_tys)
-           ADataCon dc -> return (mkTyConApp (buildPromotedDataTyCon dc) arg_tys) 
+           ADataCon dc -> return (mkTyConApp (buildPromotedDataCon dc) arg_tys) 
 	   _           -> wrongThingErr "type" (AGlobal thing) name }
 
 addKcTypeCtxt :: LHsType Name -> TcM a -> TcM a
@@ -1308,13 +1304,14 @@ sc_ds_hs_kind (HsFunTy ki1 ki2) =
 sc_ds_hs_kind (HsListTy ki) =
   do kappa <- sc_ds_lhs_kind ki
      checkWiredInTyCon listTyCon
-     return $ mkListTy kappa
+     return $ mkPromotedListTy kappa
 
 sc_ds_hs_kind (HsTupleTy _ kis) =
   do kappas <- mapM sc_ds_lhs_kind kis
      checkWiredInTyCon tycon
      return $ mkTyConApp tycon kappas
-  where tycon = tupleTyCon BoxedTuple (length kis)
+  where 
+     tycon = promotedTupleTyCon BoxedTuple (length kis)
 
 -- Argument not kind-shaped
 sc_ds_hs_kind k = panic ("sc_ds_hs_kind: " ++ showPpr k)
@@ -1331,15 +1328,16 @@ sc_ds_app ki                _   = failWithTc (quotes (ppr ki) <+>
 -- IA0_TODO: With explicit kind polymorphism I might need to add ATyVar
 sc_ds_var_app :: Name -> [Kind] -> TcM Kind
 -- Special case for * and Constraint kinds
+-- They are kinds already, so we don't need to promote them
 sc_ds_var_app name arg_kis
-  |    name == liftedTypeKindTyConName
-    || name == constraintKindTyConName = do
-    unless (null arg_kis)
-      (failWithTc (text "Kind" <+> ppr name <+> text "cannot be applied"))
-    thing <- tcLookup name
-    case thing of
-      AGlobal (ATyCon tc) -> return (mkTyConApp tc [])
-      _                   -> panic "sc_ds_var_app 1"
+  |  name == liftedTypeKindTyConName
+  || name == constraintKindTyConName
+  = do { unless (null arg_kis)
+           (failWithTc (text "Kind" <+> ppr name <+> text "cannot be applied"))
+       ; thing <- tcLookup name
+       ; case thing of
+           AGlobal (ATyCon tc) -> return (mkTyConApp tc [])
+           _                   -> panic "sc_ds_var_app 1" }
 
 -- General case
 sc_ds_var_app name arg_kis = do
@@ -1347,24 +1345,25 @@ sc_ds_var_app name arg_kis = do
   case mb_thing of
     Just (AGlobal (ATyCon tc))
       | isAlgTyCon tc || isTupleTyCon tc -> do
-      poly_kinds <- xoptM Opt_PolyKinds
-      unless poly_kinds $ addErr (polyKindsErr name)
-      let tc_kind = tyConKind tc
-      case isPromotableKind tc_kind of
+      data_kinds <- xoptM Opt_DataKinds
+      unless data_kinds $ addErr (dataKindsErr name)
+      case isPromotableTyCon tc of
         Just n | n == length arg_kis ->
-          return (mkTyConApp (mkPromotedTypeTyCon tc) arg_kis)
-        Just _  -> err tc_kind "is not fully applied"
-        Nothing -> err tc_kind "is not promotable"
+          return (mkTyConApp (buildPromotedTyCon tc) arg_kis)
+        Just _  -> err tc "is not fully applied"
+        Nothing -> err tc "is not promotable"
+
     -- It is in scope, but not what we expected
     Just thing -> wrongThingErr "promoted type" thing name
+
     -- It is not in scope, but it passed the renamer: staging error
     Nothing    -> ASSERT2 ( isTyConName name, ppr name )
                   failWithTc (ptext (sLit "Promoted kind") <+> 
                               quotes (ppr name) <+>
                               ptext (sLit "used in a mutually recursive group"))
-
-  where err k m = failWithTc (    quotes (ppr name) <+> ptext (sLit "of kind")
-                              <+> quotes (ppr k)    <+> ptext (sLit m))
+  where 
+   err tc msg = failWithTc (quotes (ppr tc) <+> ptext (sLit "of kind")
+                        <+> quotes (ppr (tyConKind tc)) <+> ptext (sLit msg))
 
 \end{code}
 

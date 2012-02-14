@@ -9,7 +9,7 @@ The bits common to TcInstDcls and TcDeriv.
 \begin{code}
 module InstEnv (
         DFunId, OverlapFlag(..),
-        Instance(..), pprInstance, pprInstanceHdr, pprInstances, 
+        ClsInst(..), pprInstance, pprInstanceHdr, pprInstances, 
         instanceHead, mkLocalInstance, mkImportedInstance,
         instanceDFunId, setInstanceDFunId, instanceRoughTcs,
 
@@ -47,8 +47,8 @@ import Data.Maybe       ( isJust, isNothing )
 %************************************************************************
 
 \begin{code}
-data Instance 
-  = Instance { is_cls  :: Name  -- Class name
+data ClsInst 
+  = ClsInst { is_cls  :: Name  -- Class name
 
                 -- Used for "rough matching"; see Note [Rough-match field]
                 -- INVARIANT: is_tcs = roughMatchTcs is_tys
@@ -117,15 +117,15 @@ being equal to
   * the InstDecl used to construct the Instance.
 
 \begin{code}
-instanceDFunId :: Instance -> DFunId
+instanceDFunId :: ClsInst -> DFunId
 instanceDFunId = is_dfun
 
-setInstanceDFunId :: Instance -> DFunId -> Instance
+setInstanceDFunId :: ClsInst -> DFunId -> ClsInst
 setInstanceDFunId ispec dfun
    = ASSERT( idType dfun `eqType` idType (is_dfun ispec) )
         -- We need to create the cached fields afresh from
         -- the new dfun id.  In particular, the is_tvs in
-        -- the Instance must match those in the dfun!
+        -- the ClsInst must match those in the dfun!
         -- We assume that the only thing that changes is
         -- the quantified type variables, so the other fields
         -- are ok; hence the assert
@@ -133,27 +133,27 @@ setInstanceDFunId ispec dfun
    where 
      (tvs, _, _, tys) = tcSplitDFunTy (idType dfun)
 
-instanceRoughTcs :: Instance -> [Maybe Name]
+instanceRoughTcs :: ClsInst -> [Maybe Name]
 instanceRoughTcs = is_tcs
 \end{code}
 
 \begin{code}
-instance NamedThing Instance where
+instance NamedThing ClsInst where
    getName ispec = getName (is_dfun ispec)
 
-instance Outputable Instance where
+instance Outputable ClsInst where
    ppr = pprInstance
 
-pprInstance :: Instance -> SDoc
--- Prints the Instance as an instance declaration
+pprInstance :: ClsInst -> SDoc
+-- Prints the ClsInst as an instance declaration
 pprInstance ispec
   = hang (pprInstanceHdr ispec)
         2 (ptext (sLit "--") <+> pprDefinedAt (getName ispec))
 
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
-pprInstanceHdr :: Instance -> SDoc
--- Prints the Instance as an instance declaration
-pprInstanceHdr ispec@(Instance { is_flag = flag })
+pprInstanceHdr :: ClsInst -> SDoc
+-- Prints the ClsInst as an instance declaration
+pprInstanceHdr ispec@(ClsInst { is_flag = flag })
   = ptext (sLit "instance") <+> ppr flag
        <+> sep [pprThetaArrowTy theta, ppr res_ty]
   where
@@ -161,10 +161,10 @@ pprInstanceHdr ispec@(Instance { is_flag = flag })
     (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)
         -- Print without the for-all, which the programmer doesn't write
 
-pprInstances :: [Instance] -> SDoc
+pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
 
-instanceHead :: Instance -> ([TyVar], ThetaType, Class, [Type])
+instanceHead :: ClsInst -> ([TyVar], ThetaType, Class, [Type])
 instanceHead ispec = (tvs, theta, cls, tys)
    where
      (tvs, theta, tau) = tcSplitSigmaTy (idType dfun)
@@ -173,21 +173,21 @@ instanceHead ispec = (tvs, theta, cls, tys)
 
 mkLocalInstance :: DFunId
                 -> OverlapFlag
-                -> Instance
+                -> ClsInst
 -- Used for local instances, where we can safely pull on the DFunId
 mkLocalInstance dfun oflag
-  = Instance {  is_flag = oflag, is_dfun = dfun,
+  = ClsInst {  is_flag = oflag, is_dfun = dfun,
                 is_tvs = mkVarSet tvs, is_tys = tys,
                 is_cls = className cls, is_tcs = roughMatchTcs tys }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
 
 mkImportedInstance :: Name -> [Maybe Name]
-                   -> DFunId -> OverlapFlag -> Instance
+                   -> DFunId -> OverlapFlag -> ClsInst
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
 mkImportedInstance cls mb_tcs dfun oflag
-  = Instance {  is_flag = oflag, is_dfun = dfun,
+  = ClsInst {  is_flag = oflag, is_dfun = dfun,
                 is_tvs = mkVarSet tvs, is_tys = tys,
                 is_cls = cls, is_tcs = mb_tcs }
   where
@@ -354,13 +354,13 @@ or, to put it another way, we have
 type InstEnv = UniqFM ClsInstEnv        -- Maps Class to instances for that class
 
 newtype ClsInstEnv 
-  = ClsIE [Instance]    -- The instances for a particular class, in any order
+  = ClsIE [ClsInst]    -- The instances for a particular class, in any order
 
 instance Outputable ClsInstEnv where
   ppr (ClsIE is) = pprInstances is
 
 -- INVARIANTS:
---  * The is_tvs are distinct in each Instance
+--  * The is_tvs are distinct in each ClsInst
 --      of a ClsInstEnv (so we can safely unify them)
 
 -- Thus, the @ClassInstEnv@ for @Eq@ might contain the following entry:
@@ -371,10 +371,10 @@ instance Outputable ClsInstEnv where
 emptyInstEnv :: InstEnv
 emptyInstEnv = emptyUFM
 
-instEnvElts :: InstEnv -> [Instance]
+instEnvElts :: InstEnv -> [ClsInst]
 instEnvElts ie = [elt | ClsIE elts <- eltsUFM ie, elt <- elts]
 
-classInstances :: (InstEnv,InstEnv) -> Class -> [Instance]
+classInstances :: (InstEnv,InstEnv) -> Class -> [ClsInst]
 classInstances (pkg_ie, home_ie) cls 
   = get home_ie ++ get pkg_ie
   where
@@ -382,24 +382,24 @@ classInstances (pkg_ie, home_ie) cls
                 Just (ClsIE insts) -> insts
                 Nothing            -> []
 
-extendInstEnvList :: InstEnv -> [Instance] -> InstEnv
+extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
 extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs
 
-extendInstEnv :: InstEnv -> Instance -> InstEnv
-extendInstEnv inst_env ins_item@(Instance { is_cls = cls_nm })
+extendInstEnv :: InstEnv -> ClsInst -> InstEnv
+extendInstEnv inst_env ins_item@(ClsInst { is_cls = cls_nm })
   = addToUFM_C add inst_env cls_nm (ClsIE [ins_item])
   where
     add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
 
-overwriteInstEnv :: InstEnv -> Instance -> InstEnv
-overwriteInstEnv inst_env ins_item@(Instance { is_cls = cls_nm, is_tys = tys })
+overwriteInstEnv :: InstEnv -> ClsInst -> InstEnv
+overwriteInstEnv inst_env ins_item@(ClsInst { is_cls = cls_nm, is_tys = tys })
   = addToUFM_C add inst_env cls_nm (ClsIE [ins_item])
   where
     add (ClsIE cur_insts) _ = ClsIE (replaceInst cur_insts)
     
     rough_tcs  = roughMatchTcs tys
     replaceInst [] = [ins_item]
-    replaceInst (item@(Instance { is_tcs = mb_tcs,  is_tvs = tpl_tvs, 
+    replaceInst (item@(ClsInst { is_tcs = mb_tcs,  is_tvs = tpl_tvs, 
                                   is_tys = tpl_tys,
                                   is_dfun = dfun }) : rest)
     -- Fast check for no match, uses the "rough match" fields
@@ -431,13 +431,13 @@ type InstTypes = [Either TyVar Type]
         -- Right ty     => Instantiate with this type
         -- Left tv      => Instantiate with any type of this tyvar's kind
 
-type InstMatch = (Instance, InstTypes)
+type InstMatch = (ClsInst, InstTypes)
 \end{code}
 
 Note [InstTypes: instantiating types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A successful match is an Instance, together with the types at which
-        the dfun_id in the Instance should be instantiated
+A successful match is an ClsInst, together with the types at which
+        the dfun_id in the ClsInst should be instantiated
 The instantiating types are (Either TyVar Type)s because the dfun
 might have some tyvars that *only* appear in arguments
         dfun :: forall a b. C a b, Ord b => D [a]
@@ -454,7 +454,7 @@ where the 'Left b' indicates that 'b' can be freely instantiated.
 --
 lookupUniqueInstEnv :: (InstEnv, InstEnv) 
                     -> Class -> [Type]
-                    -> Either Message (Instance, [Type])
+                    -> Either MsgDoc (ClsInst, [Type])
 lookupUniqueInstEnv instEnv cls tys
   = case lookupInstEnv instEnv cls tys of
       ([(inst, inst_tys)], _, _) 
@@ -472,7 +472,7 @@ lookupUniqueInstEnv instEnv cls tys
 lookupInstEnv' :: InstEnv          -- InstEnv to look in
                -> Class -> [Type]  -- What we are looking for
                -> ([InstMatch],    -- Successful matches
-                   [Instance])     -- These don't match but do unify
+                   [ClsInst])     -- These don't match but do unify
 -- The second component of the result pair happens when we look up
 --      Foo [a]
 -- in an InstEnv that has entries for
@@ -495,7 +495,7 @@ lookupInstEnv' ie cls tys
 
     --------------
     find ms us [] = (ms, us)
-    find ms us (item@(Instance { is_tcs = mb_tcs, is_tvs = tpl_tvs, 
+    find ms us (item@(ClsInst { is_tcs = mb_tcs, is_tvs = tpl_tvs, 
                                  is_tys = tpl_tys, is_flag = oflag,
                                  is_dfun = dfun }) : rest)
         -- Fast check for no match, uses the "rough match" fields
@@ -537,7 +537,7 @@ lookupInstEnv' ie cls tys
 lookupInstEnv :: (InstEnv, InstEnv)     -- External and home package inst-env
                    -> Class -> [Type]   -- What we are looking for
                    -> ([InstMatch],     -- Successful matches
-                       [Instance],      -- These don't match but do unify
+                       [ClsInst],      -- These don't match but do unify
                        Bool)            -- True if error condition caused by
                                         -- SafeHaskell condition.
 

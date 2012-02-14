@@ -20,7 +20,7 @@ module RnEnv (
 	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
 
 	lookupFixityRn, lookupTyFixityRn, 
-	lookupInstDeclBndr, lookupSubBndr, greRdrName,
+	lookupInstDeclBndr, lookupSubBndrOcc, greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
@@ -39,7 +39,7 @@ module RnEnv (
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches,
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr, kindSigErr, polyKindsErr, perhapsForallMsg,
+	dataTcOccs, unknownNameErr, kindSigErr, dataKindsErr, perhapsForallMsg,
 
         HsDocContext(..), docOfHsDocContext
     ) where
@@ -63,7 +63,7 @@ import Module           ( ModuleName, moduleName )
 import UniqFM
 import DataCon		( dataConFieldLabels )
 import PrelNames        ( mkUnboundName, rOOT_MAIN, forall_tv_RDR )
-import ErrUtils		( Message )
+import ErrUtils		( MsgDoc )
 import SrcLoc
 import Outputable
 import Util
@@ -267,7 +267,7 @@ lookupInstDeclBndr cls what rdr
 	       	-- In an instance decl you aren't allowed
       	     	-- to use a qualified name for the method
 		-- (Although it'd make perfect sense.)
-       ; lookupSubBndr (ParentIs cls) doc rdr }
+       ; lookupSubBndrOcc (ParentIs cls) doc rdr }
   where
     doc = what <+> ptext (sLit "of class") <+> quotes (ppr cls)
 
@@ -304,11 +304,11 @@ lookupConstructorFields con_name
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
 
-lookupSubBndr :: Parent  -- NoParent   => just look it up as usual
-			 -- ParentIs p => use p to disambiguate
-              -> SDoc -> RdrName 
-              -> RnM Name
-lookupSubBndr parent doc rdr_name
+lookupSubBndrOcc :: Parent  -- NoParent   => just look it up as usual
+		    	    -- ParentIs p => use p to disambiguate
+                 -> SDoc -> RdrName 
+                 -> RnM Name
+lookupSubBndrOcc parent doc rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
   = lookupExactOcc n
 
@@ -323,6 +323,7 @@ lookupSubBndr parent doc rdr_name
 		--     The latter does pickGREs, but we want to allow 'x'
 		--     even if only 'M.x' is in scope
 	    [gre] -> do { addUsedRdrName gre (used_rdr_name gre)
+                          -- Add a usage; this is an *occurrence* site
                         ; return (gre_name gre) }
 	    []    -> do { addErr (unknownSubordinateErr doc rdr_name)
 			; return (mkUnboundName rdr_name) }
@@ -453,32 +454,45 @@ lookupOccRn rdr_name = do
 
 -- lookupPromotedOccRn looks up an optionally promoted RdrName.
 lookupPromotedOccRn :: RdrName -> RnM Name
--- see Note [Demotion] in OccName
-lookupPromotedOccRn rdr_name = do {
-    -- 1. lookup the name
-    opt_name <- lookupOccRn_maybe rdr_name 
-  ; case opt_name of
-      -- 1.a. we found it!
-      Just name -> return name
-      -- 1.b. we did not find it -> 2
-      Nothing -> do {
-  ; -- 2. maybe it was implicitly promoted
-    case demoteRdrName rdr_name of
-      -- 2.a it was not in a promoted namespace
-      Nothing -> err
-      -- 2.b let's try every thing again -> 3
-      Just demoted_rdr_name -> do {
-  ; poly_kinds <- xoptM Opt_PolyKinds
-    -- 3. lookup again
-  ; opt_demoted_name <- lookupOccRn_maybe demoted_rdr_name ;
-  ; case opt_demoted_name of
-      -- 3.a. it was implicitly promoted, but confirm that we can promote
-      -- JPM: We could try to suggest turning on PolyKinds here
-      Just demoted_name -> if poly_kinds then return demoted_name else err
-      -- 3.b. use rdr_name to have a correct error message
-      Nothing -> err } } }
-  where err = unboundName WL_Any rdr_name
+-- see Note [Demotion] 
+lookupPromotedOccRn rdr_name 
+  = do { mb_name <- lookupOccRn_maybe rdr_name 
+       ; case mb_name of {
+             Just name -> return name ;
+             Nothing   -> 
 
+    do { -- Maybe it's the name of a *data* constructor
+         data_kinds <- xoptM Opt_DataKinds
+       ; mb_demoted_name <- case demoteRdrName rdr_name of
+                              Just demoted_rdr -> lookupOccRn_maybe demoted_rdr
+                              Nothing          -> return Nothing
+       ; case mb_demoted_name of
+           Nothing -> unboundName WL_Any rdr_name
+           Just demoted_name 
+             | data_kinds -> return demoted_name
+             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }}}
+  where 
+    suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
+\end{code}
+
+Note [Demotion]
+~~~~~~~~~~~~~~~
+When the user writes:
+  data Nat = Zero | Succ Nat
+  foo :: f Zero -> Int
+
+'Zero' in the type signature of 'foo' is parsed as:
+  HsTyVar ("Zero", TcClsName)
+
+When the renamer hits this occurence of 'Zero' it's going to realise
+that it's not in scope. But because it is renaming a type, it knows
+that 'Zero' might be a promoted data constructor, so it will demote
+its namespace to DataName and do a second lookup.
+
+The final result (after the renamer) will be:
+  HsTyVar ("Zero", DataName)
+
+\begin{code}
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupOccRn_maybe rdr_name
@@ -493,7 +507,12 @@ lookupOccRn_maybe rdr_name
        { -- We allow qualified names on the command line to refer to
          --  *any* name exported by any module in scope, just as if there
          -- was an "import qualified M" declaration for every module.
-         allow_qual <- doptM Opt_ImplicitImportQualified
+         -- But we DONT allow it under Safe Haskell as we need to check
+         -- imports. We can and should instead check the qualified import
+         -- but at the moment this requires some refactoring so leave as a TODO
+       ; dflags <- getDynFlags
+       ; let allow_qual = dopt Opt_ImplicitImportQualified dflags &&
+                          not (safeDirectImpsReq dflags)
        ; is_ghci <- getIsGHCi
                -- This test is not expensive,
                -- and only happens for failed lookups
@@ -658,7 +677,7 @@ lookupSigOccRn ctxt sig
 
 lookupBindGroupOcc :: HsSigCtxt
 	           -> SDoc     
-	           -> RdrName -> RnM (Either Message Name)
+	           -> RdrName -> RnM (Either MsgDoc Name)
 -- Looks up the RdrName, expecting it to resolve to one of the 
 -- bound names passed in.  If not, return an appropriate error message
 --
@@ -669,6 +688,11 @@ lookupBindGroupOcc ctxt what rdr_name
        ; return (Right n') }  -- Maybe we should check the side conditions
        	 	      	      -- but it's a pain, and Exact things only show
 			      -- up when you know what you are doing
+
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
+  = do { n' <- lookupOrig rdr_mod rdr_occ
+       ; return (Right n') }
+
   | otherwise
   = case ctxt of 
       HsBootCtxt       -> lookup_top		    
@@ -1093,7 +1117,7 @@ checkShadowedOccs (global_env,local_env) loc_occs
 	-- Returns False for record selectors that are shadowed, when
 	-- punning or wild-cards are on (cf Trac #2723)
     is_shadowed_gre gre@(GRE { gre_par = ParentIs _ })
-	= do { dflags <- getDOpts
+	= do { dflags <- getDynFlags
 	     ; if (xopt Opt_RecordPuns dflags || xopt Opt_RecordWildCards dflags) 
 	       then do { is_fld <- is_rec_fld gre; return (not is_fld) }
 	       else return True }
@@ -1119,13 +1143,16 @@ data WhereLooking = WL_Any        -- Any binding
                   | WL_LocalTop   -- Any top-level binding in this module
 
 unboundName :: WhereLooking -> RdrName -> RnM Name
-unboundName where_look rdr_name
+unboundName wl rdr = unboundNameX wl rdr empty
+
+unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
+unboundNameX where_look rdr_name extra
   = do  { show_helpful_errors <- doptM Opt_HelpfulErrors
-        ; let err = unknownNameErr rdr_name
+        ; let err = unknownNameErr rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
-          else do { extra_err <- unknownNameSuggestErr where_look rdr_name
-                  ; addErr (err $$ extra_err) }
+          else do { suggestions <- unknownNameSuggestErr where_look rdr_name
+                  ; addErr (err $$ suggestions) }
 
         ; env <- getGlobalRdrEnv;
 	; traceRn (vcat [unknownNameErr rdr_name, 
@@ -1412,10 +1439,10 @@ kindSigErr thing
   = hang (ptext (sLit "Illegal kind signature for") <+> quotes (ppr thing))
        2 (ptext (sLit "Perhaps you intended to use -XKindSignatures"))
 
-polyKindsErr :: Outputable a => a -> SDoc
-polyKindsErr thing
+dataKindsErr :: Outputable a => a -> SDoc
+dataKindsErr thing
   = hang (ptext (sLit "Illegal kind:") <+> quotes (ppr thing))
-       2 (ptext (sLit "Perhaps you intended to use -XPolyKinds"))
+       2 (ptext (sLit "Perhaps you intended to use -XDataKinds"))
 
 
 badQualBndrErr :: RdrName -> SDoc

@@ -621,31 +621,44 @@ builtinRules
 
 builtinIntegerRules :: [CoreRule]
 builtinIntegerRules =
- [rule_convert        "integerToWord"     integerToWordName     mkWordLitWord,
-  rule_convert        "integerToInt"      integerToIntName      mkIntLitInt,
-  rule_binop          "plusInteger"       plusIntegerName       (+),
-  rule_binop          "timesInteger"      timesIntegerName      (*),
-  rule_binop          "minusInteger"      minusIntegerName      (-),
-  rule_unop           "negateInteger"     negateIntegerName     negate,
-  rule_binop_Bool     "eqInteger"         eqIntegerName         (==),
-  rule_binop_Bool     "neqInteger"        neqIntegerName        (/=),
-  rule_unop           "absInteger"        absIntegerName        abs,
-  rule_unop           "signumInteger"     signumIntegerName     signum,
-  rule_binop_Bool     "leInteger"         leIntegerName         (<=),
-  rule_binop_Bool     "gtInteger"         gtIntegerName         (>),
-  rule_binop_Bool     "ltInteger"         ltIntegerName         (<),
-  rule_binop_Bool     "geInteger"         geIntegerName         (>=),
-  rule_binop_Ordering "compareInteger"    compareIntegerName    compare,
-  rule_divop          "quotRemInteger"    quotRemIntegerName    quotRem,
-  rule_divop          "divModInteger"     divModIntegerName     divMod,
-  rule_binop          "gcdInteger"        gcdIntegerName        gcd,
-  rule_binop          "lcmInteger"        lcmIntegerName        lcm,
-  rule_binop          "andInteger"        andIntegerName        (.&.),
-  rule_binop          "orInteger"         orIntegerName         (.|.),
-  rule_binop          "xorInteger"        xorIntegerName        xor,
-  rule_unop           "complementInteger" complementIntegerName complement,
-  rule_Int_binop      "shiftLInteger"     shiftLIntegerName     shiftL,
-  rule_Int_binop      "shiftRInteger"     shiftRIntegerName     shiftR]
+ [-- TODO: smallInteger rule
+  -- TODO: wordToInteger rule
+  rule_convert        "integerToWord"       integerToWordName       mkWordLitWord,
+  rule_convert        "integerToInt"        integerToIntName        mkIntLitInt,
+  rule_convert        "integerToWord64"     integerToWord64Name     mkWord64LitWord64,
+  -- TODO: word64ToInteger rule
+  rule_convert        "integerToInt64"      integerToInt64Name      mkInt64LitInt64,
+  -- TODO: int64ToInteger rule
+  rule_binop          "plusInteger"         plusIntegerName         (+),
+  rule_binop          "minusInteger"        minusIntegerName        (-),
+  rule_binop          "timesInteger"        timesIntegerName        (*),
+  rule_unop           "negateInteger"       negateIntegerName       negate,
+  rule_binop_Bool     "eqInteger"           eqIntegerName           (==),
+  rule_binop_Bool     "neqInteger"          neqIntegerName          (/=),
+  rule_unop           "absInteger"          absIntegerName          abs,
+  rule_unop           "signumInteger"       signumIntegerName       signum,
+  rule_binop_Bool     "leInteger"           leIntegerName           (<=),
+  rule_binop_Bool     "gtInteger"           gtIntegerName           (>),
+  rule_binop_Bool     "ltInteger"           ltIntegerName           (<),
+  rule_binop_Bool     "geInteger"           geIntegerName           (>=),
+  rule_binop_Ordering "compareInteger"      compareIntegerName      compare,
+  rule_divop_both     "divModInteger"       divModIntegerName       divMod,
+  rule_divop_both     "quotRemInteger"      quotRemIntegerName      quotRem,
+  rule_divop_one      "quotInteger"         quotIntegerName         quot,
+  rule_divop_one      "remInteger"          remIntegerName          rem,
+  rule_encodeFloat    "encodeFloatInteger"  encodeFloatIntegerName  mkFloatLitFloat,
+  rule_convert        "floatFromInteger"    floatFromIntegerName    mkFloatLitFloat,
+  rule_encodeFloat    "encodeDoubleInteger" encodeDoubleIntegerName mkDoubleLitDouble,
+  -- TODO: decodeDoubleInteger rule
+  rule_convert        "doubleFromInteger"   doubleFromIntegerName   mkDoubleLitDouble,
+  rule_binop          "gcdInteger"          gcdIntegerName          gcd,
+  rule_binop          "lcmInteger"          lcmIntegerName          lcm,
+  rule_binop          "andInteger"          andIntegerName          (.&.),
+  rule_binop          "orInteger"           orIntegerName           (.|.),
+  rule_binop          "xorInteger"          xorIntegerName          xor,
+  rule_unop           "complementInteger"   complementIntegerName   complement,
+  rule_Int_binop      "shiftLInteger"       shiftLIntegerName       shiftL,
+  rule_Int_binop      "shiftRInteger"       shiftRIntegerName       shiftR]
     where rule_convert str name convert
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_convert convert }
@@ -655,9 +668,12 @@ builtinIntegerRules =
           rule_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop op }
-          rule_divop str name op
+          rule_divop_both str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
-                           ru_try = match_Integer_divop op }
+                           ru_try = match_Integer_divop_both op }
+          rule_divop_one str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Integer_divop_one op }
           rule_Int_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_Int_binop op }
@@ -667,6 +683,9 @@ builtinIntegerRules =
           rule_binop_Ordering str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop_Ordering op }
+          rule_encodeFloat str name op
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
+                           ru_try = match_Integer_Int_encodeFloat op }
 
 ---------------------------------------------------
 -- The rule is this:
@@ -737,7 +756,7 @@ match_Integer_convert :: Num a
                       -> Maybe (Expr CoreBndr)
 match_Integer_convert convert id_unf [xl]
   | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert (fromIntegral x))
+  = Just (convert (fromInteger x))
 match_Integer_convert _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer)
@@ -760,11 +779,11 @@ match_Integer_binop binop id_unf [xl,yl]
 match_Integer_binop _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
-match_Integer_divop :: (Integer -> Integer -> (Integer, Integer))
-                    -> IdUnfoldingFun
-                    -> [Expr CoreBndr]
-                    -> Maybe (Expr CoreBndr)
-match_Integer_divop divop id_unf [xl,yl]
+match_Integer_divop_both :: (Integer -> Integer -> (Integer, Integer))
+                         -> IdUnfoldingFun
+                         -> [Expr CoreBndr]
+                         -> Maybe (Expr CoreBndr)
+match_Integer_divop_both divop id_unf [xl,yl]
   | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
@@ -776,9 +795,20 @@ match_Integer_divop divop id_unf [xl,yl]
                                Type integerTy,
                                Lit (LitInteger r i),
                                Lit (LitInteger s i)]
-      _ -> panic "match_Integer_divop: mkIntegerId has the wrong type"
+      _ -> panic "match_Integer_divop_both: mkIntegerId has the wrong type"
+match_Integer_divop_both _ _ _ = Nothing
 
-match_Integer_divop _ _ _ = Nothing
+-- This helper is used for the quotRem and divMod functions
+match_Integer_divop_one :: (Integer -> Integer -> Integer)
+                        -> IdUnfoldingFun
+                        -> [Expr CoreBndr]
+                        -> Maybe (Expr CoreBndr)
+match_Integer_divop_one divop id_unf [xl,yl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitInteger y _) <- exprIsLiteral_maybe id_unf yl
+  , y /= 0
+  = Just (Lit (LitInteger (x `divop` y) i))
+match_Integer_divop_one _ _ _ = Nothing
 
 match_Integer_Int_binop :: (Integer -> Int -> Integer)
                         -> IdUnfoldingFun
@@ -812,4 +842,15 @@ match_Integer_binop_Ordering binop id_unf [xl, yl]
              EQ -> eqVal
              GT -> gtVal
 match_Integer_binop_Ordering _ _ _ = Nothing
+
+match_Integer_Int_encodeFloat :: RealFloat a
+                              => (a -> Expr CoreBndr)
+                              -> IdUnfoldingFun
+                              -> [Expr CoreBndr]
+                              -> Maybe (Expr CoreBndr)
+match_Integer_Int_encodeFloat mkLit id_unf [xl,yl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  , Just (MachInt y)      <- exprIsLiteral_maybe id_unf yl
+  = Just (mkLit $ encodeFloat x (fromInteger y))
+match_Integer_Int_encodeFloat _ _ _ = Nothing
 \end{code}

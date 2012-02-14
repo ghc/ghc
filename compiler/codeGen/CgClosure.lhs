@@ -362,6 +362,7 @@ mkSlowEntryCode cl_info reg_args
 	= mapAccumL (\off (rep,_) -> (off + cgRepSizeW rep, off))
 		    0 reps_w_regs
 
+
      load_assts = zipWithEqual "mk_load" mk_load reps_w_regs stk_offsets
      mk_load (rep,reg) offset = CmmAssign (CmmGlobal reg) 
 					  (CmmLoad (cmmRegOffW spReg offset)
@@ -374,7 +375,8 @@ mkSlowEntryCode cl_info reg_args
 
      stk_adj_pop   = CmmAssign spReg (cmmRegOffW spReg final_stk_offset)
      stk_adj_push  = CmmAssign spReg (cmmRegOffW spReg (- final_stk_offset))
-     jump_to_entry = CmmJump (mkLblExpr (enterLocalIdLabel name has_caf_refs)) []
+     live_regs     = Just $ map snd reps_w_regs
+     jump_to_entry = CmmJump (mkLblExpr (entryLabelFromCI cl_info)) live_regs
 \end{code}
 
 
@@ -412,6 +414,7 @@ funWrapper :: ClosureInfo 	-- Closure whose code body this is
 	   -> Code
 funWrapper closure_info arg_regs reg_save_code fun_body = do
   { let node_points = nodeMustPointToIt (closureLFInfo closure_info)
+        live        = Just $ map snd arg_regs
 
   {-
         -- Debugging: check that R1 has the correct tag
@@ -431,8 +434,7 @@ funWrapper closure_info arg_regs reg_save_code fun_body = do
   ; granYield arg_regs node_points
 
         -- Heap and/or stack checks wrap the function body
-  ; funEntryChecks closure_info reg_save_code 
-		   fun_body
+  ; funEntryChecks closure_info reg_save_code live fun_body
   }
 \end{code}
 
@@ -590,7 +592,7 @@ link_caf cl_info _is_upd = do
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
         let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
-        stmtC (CmmJump target [])
+        stmtC (CmmJump target $ Just [node])
 
   ; returnFC hp_rel }
   where

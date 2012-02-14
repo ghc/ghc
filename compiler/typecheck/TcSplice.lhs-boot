@@ -1,32 +1,25 @@
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module TcSplice where
-import HsSyn	( HsSplice, HsBracket, HsQuasiQuote,
+import HsSyn    ( HsSplice, HsBracket, HsQuasiQuote,
                   HsExpr, HsType, LHsType, LHsExpr, LPat, LHsDecl )
-import Name	( Name )
-import NameSet	( FreeVars )
-import RdrName	( RdrName )
+import Name     ( Name )
+import NameSet  ( FreeVars )
+import RdrName  ( RdrName )
 import TcRnTypes( TcM, TcId )
-import TcType	( TcRhoType, TcKind )
+import TcType   ( TcRhoType, TcKind )
 import Annotations ( Annotation, CoreAnnTarget )
 import qualified Language.Haskell.TH as TH
 
 tcSpliceExpr :: HsSplice Name
-	     -> TcRhoType
-	     -> TcM (HsExpr TcId)
+             -> TcRhoType
+             -> TcM (HsExpr TcId)
 
 kcSpliceType :: HsSplice Name -> FreeVars
-	     -> TcM (HsType Name, TcKind)
+             -> TcM (HsType Name, TcKind)
 
 tcBracket :: HsBracket Name 
-	  -> TcRhoType
-	  -> TcM (LHsExpr TcId)
+          -> TcRhoType
+          -> TcM (LHsExpr TcId)
 
 tcSpliceDecls :: LHsExpr Name -> TcM [LHsDecl RdrName]
 

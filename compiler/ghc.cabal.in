@@ -61,15 +61,18 @@ Library
     if !flag(base3) && !flag(base4)
         Build-Depends: base       < 3
 
+    if flag(stage1) && impl(ghc < 7.5)
+        Build-Depends: old-time   >= 1   && < 1.2
+
     if flag(base3) || flag(base4)
         Build-Depends: directory  >= 1   && < 1.2,
                        process    >= 1   && < 1.2,
                        bytestring >= 0.9 && < 0.10,
-                       old-time   >= 1   && < 1.1,
+                       time                 < 1.5,
                        containers >= 0.1 && < 0.5,
-                       array      >= 0.1 && < 0.4
+                       array      >= 0.1 && < 0.5
 
-    Build-Depends: filepath >= 1 && < 1.3
+    Build-Depends: filepath >= 1 && < 1.4
     Build-Depends: Cabal, hpc
     if os(windows)
         Build-Depends: Win32
@@ -94,7 +97,7 @@ Library
                 ForeignFunctionInterface, EmptyDataDecls,
                 TypeSynonymInstances, MultiParamTypeClasses,
                 FlexibleInstances, Rank2Types, ScopedTypeVariables,
-                DeriveDataTypeable, BangPatterns, GADTs
+                DeriveDataTypeable, BangPatterns
     if impl(ghc >= 7.1)
         Extensions: NondecreasingIndentation
 

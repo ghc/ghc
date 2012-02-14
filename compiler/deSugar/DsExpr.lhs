@@ -683,7 +683,7 @@ makes all list literals be generated via the simple route.
 dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
 -- See Note [Desugaring explicit lists]
 dsExplicitList elt_ty xs
-  = do { dflags <- getDOptsDs
+  = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExpr xs
        ; let (dynamic_prefix, static_suffix) = spanTail is_static xs'
        ; if opt_SimpleListLiterals                      -- -fsimple-list-literals
@@ -758,21 +758,21 @@ dsDo stmts
       = ASSERT( length rec_ids > 0 )
         goL (new_bind_stmt : stmts)
       where
-        new_bind_stmt = L loc $ BindStmt (mkLHsPatTup later_pats)
+        new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTup later_pats)
                                          mfix_app bind_op 
                                          noSyntaxExpr  -- Tuple cannot fail
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
-        tup_ty       = mkBoxedTupleTy (map idType tup_ids) -- Deals with singleton case
+        tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
         rec_tup_pats = map nlVarPat tup_ids
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
         mfix_app     = nlHsApp (noLoc mfix_op) mfix_arg
         mfix_arg     = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
                                                  (mkFunTy tup_ty body_ty))
-        mfix_pat     = noLoc $ LazyPat $ mkLHsPatTup rec_tup_pats
+        mfix_pat     = noLoc $ LazyPat $ mkBigLHsPatTup rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
-        ret_app      = nlHsApp (noLoc return_op) (mkLHsTupleExpr rets)
+        ret_app      = nlHsApp (noLoc return_op) (mkBigLHsTup rets)
         ret_stmt     = noLoc $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo, 
                      -- which ignores the return_op in the LastStmt,

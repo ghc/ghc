@@ -80,7 +80,7 @@ typedef struct StgRegTable_ {
   StgPtr 	  rSpLim;
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
-  struct _CostCentreStack * rCCCS;  // current cost-centre-stack
+  struct CostCentreStack_ * rCCCS;  // current cost-centre-stack
   struct StgTSO_ *     rCurrentTSO;
   struct nursery_ *    rNursery;
   struct bdescr_ *     rCurrentNursery; /* Hp/HpLim point into this block */
@@ -344,6 +344,12 @@ GLOBAL_REG_DECL(P_,Hp,REG_Hp)
 #error HpLim cannot be in a register
 #else
 #define HpLim (BaseReg->rHpLim)
+#endif
+
+#if defined(REG_CCCS) && !defined(NO_GLOBAL_REG_DECLS)
+GLOBAL_REG_DECL(struct CostCentreStack_ *,CCCS,REG_CCCS)
+#else
+#define CCCS (BaseReg->rCCCS)
 #endif
 
 #if defined(REG_CurrentTSO) && !defined(NO_GLOBAL_REG_DECLS)

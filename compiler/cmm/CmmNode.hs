@@ -223,14 +223,6 @@ data Convention
   | GC               -- Entry to the garbage collector: uses the node reg!
   | PrimOpCall       -- Calling prim ops
   | PrimOpReturn     -- Returning from prim ops
-  | Foreign          -- Foreign call/return
-        ForeignConvention
-  | Private
-        -- Used for control transfers within a (pre-CPS) procedure All
-        -- jump sites known, never pushed on the stack (hence no SRT)
-        -- You can choose whatever calling convention you please
-        -- (provided you make sure all the call sites agree)!
-        -- This data type eventually to be extended to record the convention.
   deriving( Eq )
 
 data ForeignConvention

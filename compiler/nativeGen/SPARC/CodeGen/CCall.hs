@@ -141,7 +141,7 @@ genCCall target dest_regs argsAndHints
         let transfer_code
                 = toOL (move_final vregs allArgRegs extraStackArgsHere)
                                 
-        dflags <- getDynFlagsNat
+        dflags <- getDynFlags
         return 
          $      argcode                 `appOL`
                 move_sp_down            `appOL`
@@ -276,7 +276,7 @@ outOfLineMachOp mop
  = do   let functionName
                 = outOfLineMachOp_table mop
         
-        dflags  <- getDynFlagsNat
+        dflags  <- getDynFlags
         mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference 
                 $  mkForeignLabel functionName Nothing ForeignLabelInExternalPackage IsFunction
 

@@ -443,8 +443,8 @@ linkExpr hsc_env span root_ul_bco
 	-- All wired-in names are in the base package, which we link
 	-- by default, so we can safely ignore them here.
  
-dieWith :: SrcSpan -> Message -> IO a
-dieWith span msg = ghcError (ProgramError (showSDoc (mkLocMessage span msg)))
+dieWith :: SrcSpan -> MsgDoc -> IO a
+dieWith span msg = ghcError (ProgramError (showSDoc (mkLocMessage SevFatal span msg)))
 
 
 checkNonStdWay :: DynFlags -> SrcSpan -> IO Bool

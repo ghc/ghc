@@ -54,6 +54,7 @@ import Outputable
 import FastString
 
 import Data.List
+import Data.Maybe (fromMaybe)
 \end{code}
 
 
@@ -273,21 +274,22 @@ an automatic context switch is done.
 A heap/stack check at a function or thunk entry point.
 
 \begin{code}
-funEntryChecks :: ClosureInfo -> CmmStmts -> Code -> Code
-funEntryChecks cl_info reg_save_code code 
-  = hpStkCheck cl_info True reg_save_code code
+funEntryChecks :: ClosureInfo -> CmmStmts -> Maybe [GlobalReg] -> Code -> Code
+funEntryChecks cl_info reg_save_code live code 
+  = hpStkCheck cl_info True reg_save_code live code
 
 thunkEntryChecks :: ClosureInfo -> Code -> Code
 thunkEntryChecks cl_info code 
-  = hpStkCheck cl_info False noStmts code
+  = hpStkCheck cl_info False noStmts (Just [node]) code
 
 hpStkCheck :: ClosureInfo	-- Function closure
 	   -> Bool 		-- Is a function? (not a thunk)
 	   -> CmmStmts		-- Register saves
+           -> Maybe [GlobalReg] -- Live registers
 	   -> Code
 	   -> Code
 
-hpStkCheck cl_info is_fun reg_save_code code
+hpStkCheck cl_info is_fun reg_save_code live code
   =  getFinalStackHW	$ \ spHw -> do
 	{ sp <- getRealSp
 	; let stk_words = spHw - sp
@@ -295,17 +297,18 @@ hpStkCheck cl_info is_fun reg_save_code code
 	    {	-- Emit heap checks, but be sure to do it lazily so 
 		-- that the conditionals on hpHw don't cause a black hole
 	      codeOnly $ do
-		{ do_checks stk_words hpHw full_save_code rts_label
+		{ do_checks stk_words hpHw full_save_code rts_label full_live
 		; tickyAllocHeap hpHw }
 	    ; setRealHp hpHw
 	    ; code }
 	}
   where
-    node_asst 
+    (node_asst, full_live)
 	| nodeMustPointToIt (closureLFInfo cl_info)
-	= noStmts
+	= (noStmts, live)
 	| otherwise
-	= oneStmt (CmmAssign nodeReg (CmmLit (CmmLabel closure_lbl)))
+	= (oneStmt (CmmAssign nodeReg (CmmLit (CmmLabel closure_lbl)))
+          ,Just $ node : fromMaybe [] live)
         -- Strictly speaking, we should tag node here.  But if
         -- node doesn't point to the closure, the code for the closure
         -- cannot depend on the value of R1 anyway, so we're safe.
@@ -349,12 +352,17 @@ altHeapCheck alt_type code
 	{ codeOnly $ do
 	     { do_checks 0 {- no stack chk -} hpHw
 			 noStmts {- nothign to save -}
-			 (rts_label alt_type)
+			 rts_label live
 	     ; tickyAllocHeap hpHw }
 	; setRealHp hpHw
 	; code }
   where
-    rts_label PolyAlt = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_unpt_r1")))
+    (rts_label, live) = gc_info alt_type
+
+    mkL l = CmmLit . CmmLabel $ mkCmmCodeLabel rtsPackageId (fsLit l)
+
+    gc_info PolyAlt = (mkL "stg_gc_unpt_r1" , Just [node])
+
       	-- Do *not* enter R1 after a heap check in
 	-- a polymorphic case.  It might be a function
 	-- and the entry code for a function (currently)
@@ -362,22 +370,21 @@ altHeapCheck alt_type code
 	--
 	-- However R1 is guaranteed to be a pointer
 
-    rts_label (AlgAlt _) = stg_gc_enter1
+    gc_info (AlgAlt _) = (stg_gc_enter1, Just [node])
 	-- Enter R1 after the heap check; it's a pointer
  	
-    rts_label (PrimAlt tc)
-      = CmmLit $ CmmLabel $ 
-	case primRepToCgRep (tyConPrimRep tc) of
-	  VoidArg   -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_noregs")
-	  FloatArg  -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_f1")
-	  DoubleArg -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_d1")
-	  LongArg   -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_l1")
+    gc_info (PrimAlt tc)
+      = case primRepToCgRep (tyConPrimRep tc) of
+	  VoidArg   -> (mkL "stg_gc_noregs", Just [])
+	  FloatArg  -> (mkL "stg_gc_f1", Just [FloatReg 1])
+	  DoubleArg -> (mkL "stg_gc_d1", Just [DoubleReg 1])
+	  LongArg   -> (mkL "stg_gc_l1", Just [LongReg 1])
 				-- R1 is boxed but unlifted: 
-	  PtrArg    -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_unpt_r1")
+	  PtrArg    -> (mkL "stg_gc_unpt_r1", Just [node])
 				-- R1 is unboxed:
-	  NonPtrArg -> mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_unbx_r1")
+	  NonPtrArg -> (mkL "stg_gc_unbx_r1", Just [node])
 
-    rts_label (UbxTupAlt _) = panic "altHeapCheck"
+    gc_info (UbxTupAlt _) = panic "altHeapCheck"
 \end{code}
 
 
@@ -404,7 +411,7 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
   | otherwise 
   = initHeapUsage $ \ hpHw -> do
 	{ codeOnly $ do { do_checks 0 {- no stack check -} hpHw
-				    full_fail_code rts_label
+				    full_fail_code rts_label live
 			; tickyAllocHeap hpHw }
 	; setRealHp hpHw
 	; code }
@@ -413,6 +420,7 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
     assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9 VNonGcPtr)) 	-- Ho ho ho!
 				(CmmLit (mkWordCLit liveness))
     liveness 	    = mkRegLiveness regs ptrs nptrs
+    live            = Just $ map snd regs
     rts_label	    = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_ut")))
 
 \end{code}
@@ -434,14 +442,15 @@ again on re-entry because someone else might have stolen the resource
 in the meantime.
 
 \begin{code}
-do_checks :: WordOff	-- Stack headroom
-	  -> WordOff	-- Heap  headroom
-	  -> CmmStmts	-- Assignments to perform on failure
-	  -> CmmExpr	-- Rts address to jump to on failure
+do_checks :: WordOff	       -- Stack headroom
+	  -> WordOff	       -- Heap  headroom
+	  -> CmmStmts	       -- Assignments to perform on failure
+	  -> CmmExpr	       -- Rts address to jump to on failure
+          -> Maybe [GlobalReg] -- Live registers
 	  -> Code
-do_checks 0 0 _ _   = nopC
+do_checks 0 0 _ _ _ = nopC
 
-do_checks _ hp _ _
+do_checks _ hp _ _ _
   | hp > bLOCKS_PER_MBLOCK * bLOCK_SIZE_W
   = sorry (unlines [
             "Trying to allocate more than " ++ show (bLOCKS_PER_MBLOCK * bLOCK_SIZE) ++ " bytes.", 
@@ -450,21 +459,22 @@ do_checks _ hp _ _
             "Suggestion: read data from a file instead of having large static data",
             "structures in the code."])
 
-do_checks stk hp reg_save_code rts_lbl
+do_checks stk hp reg_save_code rts_lbl live
   = do_checks' (CmmLit (mkIntCLit (stk*wORD_SIZE))) 
 	       (CmmLit (mkIntCLit (hp*wORD_SIZE)))
-	 (stk /= 0) (hp /= 0) reg_save_code rts_lbl
+	 (stk /= 0) (hp /= 0) reg_save_code rts_lbl live
 
 -- The offsets are now in *bytes*
-do_checks' :: CmmExpr -> CmmExpr -> Bool -> Bool -> CmmStmts -> CmmExpr -> Code
-do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl
+do_checks' :: CmmExpr -> CmmExpr -> Bool -> Bool -> CmmStmts -> CmmExpr 
+           -> Maybe [GlobalReg] -> Code
+do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl live
   = do	{ doGranAllocate hp_expr
 
         -- The failure block: this saves the registers and jumps to
         -- the appropriate RTS stub.
         ; exit_blk_id <- forkLabelledCode $ do {
 			; emitStmts reg_save_code
-			; stmtC (CmmJump rts_lbl []) }
+			; stmtC (CmmJump rts_lbl live) }
 
 	-- In the case of a heap-check failure, we must also set
 	-- HpAlloc.  NB. HpAlloc is *only* set if Hp has been
@@ -514,7 +524,8 @@ do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl
 \begin{code}
 hpChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 hpChkGen bytes liveness reentry
-  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assigns stg_gc_gen
+  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assigns
+          stg_gc_gen (Just activeStgRegs)
   where
     assigns = mkStmts [ mk_vanilla_assignment 9 liveness,
 	    		mk_vanilla_assignment 10 reentry ]
@@ -523,12 +534,14 @@ hpChkGen bytes liveness reentry
 -- we want to assign to Sp[0] on failure (used in AutoApply.cmm:BUILD_PAP).
 hpChkNodePointsAssignSp0 :: CmmExpr -> CmmExpr -> Code
 hpChkNodePointsAssignSp0 bytes sp0
-  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assign stg_gc_enter1
+  = do_checks' (CmmLit (mkIntCLit 0)) bytes False True assign
+          stg_gc_enter1 (Just [node])
   where assign = oneStmt (CmmStore (CmmReg spReg) sp0)
 
 stkChkGen :: CmmExpr -> CmmExpr -> CmmExpr -> Code
 stkChkGen bytes liveness reentry
-  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False assigns stg_gc_gen
+  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False assigns
+          stg_gc_gen (Just activeStgRegs)
   where
     assigns = mkStmts [ mk_vanilla_assignment 9 liveness,
 	    		mk_vanilla_assignment 10 reentry ]
@@ -539,7 +552,8 @@ mk_vanilla_assignment n e
 
 stkChkNodePoints :: CmmExpr -> Code
 stkChkNodePoints bytes
-  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False noStmts stg_gc_enter1
+  = do_checks' bytes (CmmLit (mkIntCLit 0)) True False noStmts
+          stg_gc_enter1 (Just [node])
 
 stg_gc_gen :: CmmExpr
 stg_gc_gen = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "stg_gc_gen")))

@@ -152,7 +152,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "case \"$ACTION\" in clean) rm -rf \"$GHC_UNPACKS_INTO\" ;; build) tar -jxf \"$BINDIST\" && cd \"$GHC_UNPACKS_INTO\" && ./configure --prefix=\"$INSTALL_PATH/$CONTENTS_FOLDER_PATH/usr\" ;; install) cd \"$GHC_UNPACKS_INTO\" && make install DESTDIR=\"$DSTROOT\" ;; *) echo \"Unknown action $ACTION\" >&2 ; exit 1 ;; esac ";
+			shellScript = "case \"$ACTION\" in clean) rm -rf \"$GHC_UNPACKS_INTO\" ;; build) tar -jxf \"$BINDIST\" && cd \"$GHC_UNPACKS_INTO\" && ./configure --prefix=\"$INSTALL_PATH/$CONTENTS_FOLDER_PATH/usr\" --with-gcc=/usr/bin/gcc --with-gcc-4.2=/usr/bin/gcc ;; install) cd \"$GHC_UNPACKS_INTO\" && make install DESTDIR=\"$DSTROOT\" ;; *) echo \"Unknown action $ACTION\" >&2 ; exit 1 ;; esac ";
 		};
 		E76B00450D52DFDB00A05A2F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;

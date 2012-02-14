@@ -380,7 +380,9 @@ endef
 define addPackage # args: $1 = package, $2 = condition
 ifneq "$(filter $1,$(PKGS_THAT_USE_TH)) $(GhcProfiled)" "$1 YES"
 ifeq "$(filter $1,$(PKGS_THAT_BUILD_WITH_STAGE2))" "$1"
+ifneq "$(BuildingCrossCompiler)" "YES"
 $(call addPackageGeneral,PACKAGES_STAGE2,$1,$2)
+endif
 else
 $(call addPackageGeneral,PACKAGES_STAGE1,$1,$2)
 endif
@@ -574,9 +576,15 @@ BUILD_DIRS += \
    $(GHC_GENPRIMOP_DIR)
 endif
 
+ifeq "$(BuildingCrossCompiler)-$(phase)" "YES-final"
+MAYBE_GHCI=
+else
+MAYBE_GHCI=driver/ghci
+endif
+
 BUILD_DIRS += \
    driver \
-   driver/ghci \
+   $(MAYBE_GHCI) \
    driver/ghc \
    driver/haddock \
    libffi \
@@ -600,23 +608,37 @@ else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
 BUILD_DIRS += libraries/integer-gmp/gmp
 endif
 
+ifeq "$(BuildingCrossCompiler)-$(phase)" "YES-final"
+MAYBE_COMPILER=
+MAYBE_GHCTAGS=
+MAYBE_HPC=
+MAYBE_RUNGHC=
+else
+MAYBE_COMPILER=compiler
+MAYBE_GHCTAGS=utils/ghctags
+MAYBE_HPC=utils/hpc
+MAYBE_RUNGHC=utils/runghc
+endif
+
 BUILD_DIRS += \
    utils/haddock \
    utils/haddock/doc \
-   compiler \
+   $(MAYBE_COMPILER) \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
    utils/testremove \
-   utils/ghctags \
+   $(MAYBE_GHCTAGS) \
    utils/ghc-pwd \
    $(GHC_CABAL_DIR) \
-   utils/hpc \
-   utils/runghc \
+   $(MAYBE_HPC) \
+   $(MAYBE_RUNGHC) \
    ghc
 
 ifneq "$(BINDIST)" "YES"
+ifneq "$(BuildingCrossCompiler)-$(phase)" "YES-final"
 BUILD_DIRS += \
    utils/mkUserGuidePart
+endif
 endif
 
 BUILD_DIRS += utils/count_lines
@@ -666,17 +688,12 @@ $(foreach p,$(PACKAGES_STAGE0),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
 
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
-libraries/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
+libraries/dist-haddock/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
 	cd libraries && sh gen_contents_index --inplace
 ifeq "$(phase)" "final"
-$(eval $(call all-target,library_doc_index,libraries/index.html))
+$(eval $(call all-target,library_doc_index,libraries/dist-haddock/index.html))
 endif
-INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
-CLEAN_FILES += $(wildcard libraries/doc-index*   \
-                          libraries/haddock*.css \
-                          libraries/haddock*.js  \
-                          libraries/index*.html  \
-                          libraries/*.gif)
+INSTALL_LIBRARY_DOCS += libraries/dist-haddock/*
 endif
 
 # -----------------------------------------------------------------------------
@@ -815,7 +832,7 @@ else
 	done
 # We rename ghc-stage2, so that the right program name is used in error
 # messages etc.
-	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/ghc-stage2" "$(DESTDIR)$(ghclibexecdir)/ghc"
+	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/ghc"
 endif
 
 install_topdirs: $(INSTALL_TOPDIRS)
@@ -860,9 +877,11 @@ INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
 
-INSTALLED_PKG_DIRS := $(addprefix libraries/,$(PACKAGES_STAGE1)) \
-                      compiler \
-                      $(addprefix libraries/,$(PACKAGES_STAGE2))
+INSTALLED_PKG_DIRS := $(addprefix libraries/,$(PACKAGES_STAGE1))
+ifeq "$(BuildingCrossCompiler)" "NO"
+INSTALLED_PKG_DIRS := $(INSTALLED_PKG_DIRS) compiler
+endif
+INSTALLED_PKG_DIRS := $(INSTALLED_PKG_DIRS) $(addprefix libraries/,$(PACKAGES_STAGE2))
 ifeq "$(InstallExtraPackages)" "NO"
 INSTALLED_PKG_DIRS := $(filter-out $(addprefix libraries/,$(EXTRA_PACKAGES)),\
                                    $(INSTALLED_PKG_DIRS))
@@ -884,6 +903,7 @@ install_packages: rts/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \
 	    $(call make-command,                                      \
+                   CROSS_COMPILE="$(CrossCompilePrefix)"              \
 	           "$(GHC_CABAL_INPLACE)" install                     \
 	                                  "$(INSTALLED_GHC_REAL)"     \
 	                                  "$(INSTALLED_GHC_PKG_REAL)" \
@@ -1042,20 +1062,29 @@ publish-docs:
 #
 # Directory in which we're going to build the src dist
 #
-SRC_DIST_NAME=ghc-$(ProjectVersion)
-SRC_DIST_DIR=$(SRC_DIST_NAME)
+SRC_DIST_ROOT      = sdistprep
+SRC_DIST_BASE_NAME = ghc-$(ProjectVersion)
+
+SRC_DIST_GHC_NAME          = ghc-$(ProjectVersion)-src
+SRC_DIST_GHC_ROOT          = $(SRC_DIST_ROOT)/ghc
+SRC_DIST_GHC_DIR           = $(SRC_DIST_GHC_ROOT)/$(SRC_DIST_BASE_NAME)
+SRC_DIST_GHC_TARBALL       = $(SRC_DIST_ROOT)/$(SRC_DIST_GHC_NAME).tar.bz2
+
+SRC_DIST_TESTSUITE_NAME    = ghc-$(ProjectVersion)-testsuite
+SRC_DIST_TESTSUITE_ROOT    = $(SRC_DIST_ROOT)/testsuite-ghc
+SRC_DIST_TESTSUITE_DIR     = $(SRC_DIST_TESTSUITE_ROOT)/$(SRC_DIST_BASE_NAME)
+SRC_DIST_TESTSUITE_TARBALL = $(SRC_DIST_ROOT)/$(SRC_DIST_TESTSUITE_NAME).tar.bz2
 
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS = mk rules docs distrib bindisttest libffi includes utils docs rts compiler ghc driver libraries ghc-tarballs
-SRC_DIST_FILES += \
-	configure.ac config.guess config.sub configure \
-	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in ghc.spec settings.in VERSION \
-	boot boot-pkgs packages ghc.mk
-
-SRC_DIST_TARBALL = $(SRC_DIST_NAME)-src.tar.bz2
+SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
+    utils docs rts compiler ghc driver libraries ghc-tarballs
+SRC_DIST_GHC_FILES += \
+    configure.ac config.guess config.sub configure \
+    aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
+    ghc.spec.in ghc.spec settings.in VERSION \
+    boot boot-pkgs packages ghc.mk
 
 VERSION :
 	echo $(ProjectVersion) >VERSION
@@ -1063,50 +1092,66 @@ VERSION :
 sdist : VERSION
 
 # Use:
-#     $(call sdist_file,compiler,stage2,cmm,Foo/Bar,CmmLex,x)
+#     $(call sdist_ghc_file,compiler,stage2,cmm,Foo/Bar,CmmLex,x)
 # to copy the generated file that replaces compiler/cmm/Foo/Bar/CmmLex.x, where
 # "stage2" is the dist dir.
-define sdist_file
-	"$(CP)" $1/$2/build/$4/$5.hs $(SRC_DIST_DIR)/$1/$3/$4
-	mv $(SRC_DIST_DIR)/$1/$3/$4/$5.$6 $(SRC_DIST_DIR)/$1/$3/$4/$5.$6.source
+define sdist_ghc_file
+	"$(CP)" $1/$2/build/$4/$5.hs $(SRC_DIST_GHC_DIR)/$1/$3/$4
+	mv $(SRC_DIST_GHC_DIR)/$1/$3/$4/$5.$6 $(SRC_DIST_GHC_DIR)/$1/$3/$4/$5.$6.source
 endef
 
-.PHONY: sdist-prep
-sdist-prep :
-	$(call removeTrees,$(SRC_DIST_DIR))
-	$(call removeFiles,$(SRC_DIST_TARBALL))
-	mkdir $(SRC_DIST_DIR)
-	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
-	cd $(SRC_DIST_DIR) && for i in $(SRC_DIST_FILES); do $(LN_S) $(TOP)/$$i .; done
-	cd $(SRC_DIST_DIR) && $(MAKE) distclean
-	$(call removeTrees,$(SRC_DIST_DIR)/libraries/tarballs/)
-	$(call removeTrees,$(SRC_DIST_DIR)/libraries/stamp/)
-	$(call sdist_file,compiler,stage2,cmm,,CmmLex,x)
-	$(call sdist_file,compiler,stage2,cmm,,CmmParse,y)
-	$(call sdist_file,compiler,stage2,parser,,Lexer,x)
-	$(call sdist_file,compiler,stage2,parser,,Parser,y.pp)
-	$(call sdist_file,compiler,stage2,parser,,ParserCore,y)
-	$(call sdist_file,utils/hpc,dist-install,,,HpcParser,y)
-	$(call sdist_file,utils/genprimopcode,dist,,,Lexer,x)
-	$(call sdist_file,utils/genprimopcode,dist,,,Parser,y)
-	$(call sdist_file,utils/haddock,dist,src,Haddock,Lex,x)
-	$(call sdist_file,utils/haddock,dist,src,Haddock,Parse,y)
-	cd $(SRC_DIST_DIR) && $(call removeTrees,compiler/stage[123] mk/build.mk)
-	cd $(SRC_DIST_DIR) && "$(FIND)" $(SRC_DIST_DIRS) \( -name .git -o -name "autom4te*" -o -name "*~" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
+.PHONY: sdist-ghc-prep
+sdist-ghc-prep :
+	$(call removeTrees,$(SRC_DIST_GHC_ROOT))
+	$(call removeFiles,$(SRC_DIST_GHC_TARBALL))
+	-mkdir $(SRC_DIST_ROOT)
+	mkdir $(SRC_DIST_GHC_ROOT)
+	mkdir $(SRC_DIST_GHC_DIR)
+	cd $(SRC_DIST_GHC_DIR) && for i in $(SRC_DIST_GHC_DIRS); do mkdir $$i; ( cd $$i && lndir $(TOP)/$$i ); done
+	cd $(SRC_DIST_GHC_DIR) && for i in $(SRC_DIST_GHC_FILES); do $(LN_S) $(TOP)/$$i .; done
+	cd $(SRC_DIST_GHC_DIR) && $(MAKE) distclean
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/tarballs/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/libraries/stamp/)
+	$(call removeTrees,$(SRC_DIST_GHC_DIR)/compiler/stage[123])
+	$(call removeFiles,$(SRC_DIST_GHC_DIR)/mk/build.mk)
+	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmLex,x)
+	$(call sdist_ghc_file,compiler,stage2,cmm,,CmmParse,y)
+	$(call sdist_ghc_file,compiler,stage2,parser,,Lexer,x)
+	$(call sdist_ghc_file,compiler,stage2,parser,,Parser,y.pp)
+	$(call sdist_ghc_file,compiler,stage2,parser,,ParserCore,y)
+	$(call sdist_ghc_file,utils/hpc,dist-install,,,HpcParser,y)
+	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Lexer,x)
+	$(call sdist_ghc_file,utils/genprimopcode,dist,,,Parser,y)
+	$(call sdist_ghc_file,utils/haddock,dist,src,Haddock,Lex,x)
+	$(call sdist_ghc_file,utils/haddock,dist,src,Haddock,Parse,y)
+	cd $(SRC_DIST_GHC_DIR) && "$(FIND)" $(SRC_DIST_GHC_DIRS) \( -name .git -o -name "autom4te*" -o -name "*~" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | "$(XARGS)" $(XARGS_OPTS) "$(RM)" $(RM_OPTS_REC)
+
+.PHONY: sdist-testsuite-prep
+sdist-testsuite-prep :
+	$(call removeTrees,$(SRC_DIST_TESTSUITE_ROOT))
+	$(call removeFiles,$(SRC_DIST_TESTSUITE_TARBALL))
+	-mkdir $(SRC_DIST_ROOT)
+	mkdir $(SRC_DIST_TESTSUITE_ROOT)
+	mkdir $(SRC_DIST_TESTSUITE_DIR)
+	mkdir $(SRC_DIST_TESTSUITE_DIR)/testsuite
+	cd $(SRC_DIST_TESTSUITE_DIR)/testsuite && lndir $(TOP)/testsuite
+	$(call removeTrees,$(SRC_DIST_TESTSUITE_DIR)/testsuite/.git)
 
 .PHONY: sdist
-sdist : sdist-prep
-	"$(TAR_CMD)" chf - $(SRC_DIST_NAME) 2>$src_log | bzip2 >$(TOP)/$(SRC_DIST_TARBALL)
+sdist : sdist-ghc-prep sdist-testsuite-prep
+	cd $(SRC_DIST_GHC_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_GHC_TARBALL)
+	cd $(SRC_DIST_TESTSUITE_ROOT) && "$(TAR_CMD)" chf - $(SRC_DIST_BASE_NAME) 2> src_ghc_log | bzip2 > $(TOP)/$(SRC_DIST_TESTSUITE_TARBALL)
 
-sdist-manifest : $(SRC_DIST_TARBALL)
-	tar tjf $(SRC_DIST_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
+sdist-manifest : $(SRC_DIST_GHC_TARBALL)
+	tar tjf $(SRC_DIST_GHC_TARBALL) | sed "s|^ghc-$(ProjectVersion)/||" | sort >sdist-manifest
 
 # Upload the distribution(s)
 # Retrying is to work around buggy firewalls that corrupt large file transfers
 # over SSH.
 ifneq "$(PublishLocation)" ""
 publish-sdist :
-	$(call try10Times,$(PublishCp) $(SRC_DIST_TARBALL) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(SRC_DIST_GHC_TARBALL) $(PublishLocation)/dist)
+	$(call try10Times,$(PublishCp) $(SRC_DIST_TESTSUITE_TARBALL) $(PublishLocation)/dist)
 endif
 
 ifeq "$(BootingFromHc)" "YES"
@@ -1116,7 +1161,7 @@ ifeq "$(BootingFromHc)" "YES"
 # flags explicitly to C compilations.
 SRC_CC_OPTS += -DNO_REGS -DUSE_MINIINTERPRETER
 SRC_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
-SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR)
+SRC_CC_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS))
 endif
 
 # -----------------------------------------------------------------------------
@@ -1137,10 +1182,12 @@ CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
 CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
 
-# These two are no longer generated, but we still clean them for a while
+# These four are no longer generated, but we still clean them for a while
 # as they may still be in old GHC trees:
 CLEAN_FILES += includes/GHCConstants.h
 CLEAN_FILES += includes/DerivedConstants.h
+CLEAN_FILES += includes/ghcautoconf.h
+CLEAN_FILES += includes/ghcplatform.h
 
 clean : clean_files clean_libraries
 
@@ -1154,7 +1201,10 @@ clean_libraries: $(patsubst %,clean_libraries/%_dist-boot,$(PACKAGES_STAGE0))
 
 clean_libraries:
 	$(call removeTrees,$(patsubst %, libraries/%/dist, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
-	$(call removeFiles,$(patsubst %, $(wildcard libraries/%/*.buildinfo), $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(wildcard $(patsubst %, libraries/%/*.buildinfo, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))))
+	$(call removeFiles,$(patsubst %, libraries/%/config.log, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(patsubst %, libraries/%/config.status, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(wildcard $(patsubst %, libraries/%/include/Hs*Config.h, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))))
 
 # We have to define a clean target for each library manually, because the
 # libraries/*/ghc.mk files are not included when we're cleaning.
@@ -1164,6 +1214,11 @@ $(foreach lib,$(PACKAGES_STAGE0),\
 $(foreach lib,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2),\
   $(eval $(call clean-target,libraries/$(lib),dist-install,libraries/$(lib)/dist-install)))
 endif
+
+clean : clean_haddock_index
+.PHONY: clean_haddock_index
+clean_haddock_index:
+	$(call removeTrees,libraries/dist-haddock)
 
 clean : clean_bindistprep
 .PHONY: clean_bindistprep
@@ -1184,10 +1239,6 @@ distclean : clean
 	$(call removeFiles,libraries/old-time/include/HsTimeConfig.h)
 	$(call removeTrees,utils/ghc-pwd/dist)
 	$(call removeTrees,inplace)
-
-	$(call removeFiles,$(patsubst %, libraries/%/config.log, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
-	$(call removeFiles,$(patsubst %, libraries/%/config.status, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
-	$(call removeFiles,$(patsubst %, $(wildcard,libraries/%/include/Hs*Config.h), $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 	$(call removeTrees,$(patsubst %, libraries/%/autom4te.cache, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 
 maintainer-clean : distclean

@@ -558,7 +558,7 @@ we are going to make EITHER
 
 EITHER (A)   v = e   (where v is fresh)
              x = case v of p -> x
-             y = case v of p -> x
+             y = case v of p -> y
 
 OR (B)       t = case e of p -> (x,y)
              x = case t of (x,_) -> x

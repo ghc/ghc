@@ -46,8 +46,8 @@ import Data.IORef       ( IORef, writeIORef, readIORef, atomicModifyIORef )
 import System.Directory
 import System.FilePath
 import Control.Monad
-import System.Time      ( ClockTime )
 import Data.List        ( partition )
+import Data.Time
 
 
 type FileExt = String   -- Filename extension
@@ -528,7 +528,7 @@ findObjectLinkableMaybe mod locn
 
 -- Make an object linkable when we know the object file exists, and we know
 -- its modification time.
-findObjectLinkable :: Module -> FilePath -> ClockTime -> IO Linkable
+findObjectLinkable :: Module -> FilePath -> UTCTime -> IO Linkable
 findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
   -- We used to look for _stub.o files here, but that was a bug (#706)
   -- Now GHC merges the stub.o into the main .o (#3687)

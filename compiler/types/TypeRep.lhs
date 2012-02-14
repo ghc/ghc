@@ -274,7 +274,7 @@ isLiftedTypeKind _                = False
 \begin{code}  
 tyVarsOfType :: Type -> VarSet
 -- ^ NB: for type synonyms tyVarsOfType does /not/ expand the synonym
--- tyVarsOfType returns only the free *type* variables of a type
+-- tyVarsOfType returns only the free variables of a type
 -- For example, tyVarsOfType (a::k) returns {a}, not including the
 -- kind variable {k}
 tyVarsOfType (TyVarTy v)         = unitVarSet v
@@ -511,7 +511,9 @@ instance Outputable Type where
     ppr ty = pprType ty
 
 instance Outputable name => OutputableBndr (IPName name) where
-    pprBndr _ n = ppr n	-- Simple for now
+    pprBndr _ n   = ppr n	-- Simple for now
+    pprInfixOcc  n = ppr n 
+    pprPrefixOcc n = ppr n 
 
 ------------------
 	-- OK, here's the main printer

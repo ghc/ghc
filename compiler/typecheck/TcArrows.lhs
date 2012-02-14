@@ -348,25 +348,32 @@ tcArrDoStmt env ctxt (BindStmt pat rhs _ _) res_ty thing_inside
                             thing_inside res_ty
 	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
-tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = laterNames
-                            , recS_rec_ids = recNames }) res_ty thing_inside
-  = do	{ rec_tys <- newFlexiTyVarTys (length recNames) liftedTypeKind
-	; let rec_ids = zipWith mkLocalId recNames rec_tys
-	; tcExtendIdEnv rec_ids $ do
-    	{ (stmts', (later_ids, rec_rets))
+tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
+                            , recS_rec_ids = rec_names }) res_ty thing_inside
+  = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
+        ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
+        ; let tup_ids = zipWith mkLocalId tup_names tup_elt_tys
+        ; tcExtendIdEnv tup_ids $ do
+        { (stmts', tup_rets)
 		<- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty	$ \ _res_ty' ->
 			-- ToDo: res_ty not really right
-		   do { rec_rets <- zipWithM tcCheckId recNames rec_tys
-		      ; later_ids <- tcLookupLocalIds laterNames
-		      ; return (later_ids, rec_rets) }
+                   zipWithM tcCheckId tup_names tup_elt_tys
 
-	; thing <- tcExtendIdEnv later_ids (thing_inside res_ty)
+        ; thing <- thing_inside res_ty
 		-- NB:	The rec_ids for the recursive things 
 		-- 	already scope over this part. This binding may shadow
 		--	some of them with polymorphic things with the same Name
 		--	(see note [RecStmt] in HsExpr)
 
+        ; let rec_ids = takeList rec_names tup_ids
+        ; later_ids <- tcLookupLocalIds later_names
+
+        ; let rec_rets = takeList rec_names tup_rets
+        ; let ret_table = zip tup_ids tup_rets
+        ; let later_rets = [r | i <- later_ids, (j, r) <- ret_table, i == j]
+
         ; return (emptyRecStmt { recS_stmts = stmts', recS_later_ids = later_ids
+                               , recS_later_rets = later_rets
                                , recS_rec_ids = rec_ids, recS_rec_rets = rec_rets
                                , recS_ret_ty = res_ty }, thing)
 	}}
