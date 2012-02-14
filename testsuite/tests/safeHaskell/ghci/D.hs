@@ -1,4 +1,4 @@
-module D where
+module D (a) where
 
 a :: Int
 a = 1

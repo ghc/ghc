@@ -16,4 +16,5 @@ test('p13', normal, ghci_script, ['p13.script'])
 test('p14', normal, ghci_script, ['p14.script'])
 test('p15', normal, ghci_script, ['p15.script'])
 test('p16', normal, ghci_script, ['p16.script'])
+test('p17', normal, ghci_script, ['p17.script'])
 
