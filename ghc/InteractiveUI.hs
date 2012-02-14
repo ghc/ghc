@@ -421,7 +421,7 @@ runGHCi paths maybe_exprs = do
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
   --
 
-  setGHCContext []
+  setGHCContextFromGHCiState
 
   when (read_dot_files) $ do
     mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ]
@@ -1285,7 +1285,12 @@ setContextAfterLoad keep_ctxt ms = do
 
    load_this summary | m <- GHC.ms_mod summary = do
         is_interp <- GHC.moduleIsInterpreted m
-        let new_ctx | is_interp = [IIModule m]
+        dflags <- getDynFlags
+        let star_ok = is_interp && not (safeLanguageOn dflags)
+              -- We import the module with a * iff
+              --   - it is interpreted, and
+              --   - -XSafe is off (it doesn't allow *-imports)
+        let new_ctx | star_ok   = [IIModule m]
                     | otherwise = [IIDecl $ simpleImportDecl (GHC.moduleName m)]
         setContextKeepingPackageModules keep_ctxt new_ctx
 
@@ -1612,6 +1617,14 @@ moduleCmd str
     starred ('*':m) = Left m
     starred m       = Right m
 
+
+-- -----------------------------------------------------------------------------
+-- Four ways to manipulate the context:
+--   (a) :module +<stuff>:     addModulesToContext
+--   (b) :module -<stuff>:     remModulesFromContext
+--   (c) :module <stuff>:      setContext
+--   (d) import <module>...:   addImportToContext
+
 addModulesToContext :: [String] -> [String] -> GHCi ()
 addModulesToContext as bs = do
    mapM_ (add True)  as
@@ -1637,14 +1650,6 @@ remModulesFromContext as bs = do
         st { remembered_ctx = filt (remembered_ctx st)
            , transient_ctx  = filt (transient_ctx st) }
 
-addImportToContext :: String -> GHCi ()
-addImportToContext str = do
-  idecl <- GHC.parseImportDecl str
-  _ <- GHC.lookupModule (unLoc (ideclName idecl)) Nothing  -- #5836
-  modifyGHCiState $ \st ->
-     st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
-  setGHCContextFromGHCiState
-
 setContext :: [String] -> [String] -> GHCi ()
 setContext starred not_starred = do
   is1 <- mapM (checkAdd True)  starred
@@ -1654,24 +1659,41 @@ setContext starred not_starred = do
                                 -- delete the transient context
   setGHCContextFromGHCiState
 
+addImportToContext :: String -> GHCi ()
+addImportToContext str = do
+  idecl <- GHC.parseImportDecl str
+  _ <- checkAdd False (moduleNameString (unLoc (ideclName idecl))) -- #5836
+  modifyGHCiState $ \st ->
+     st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
+  setGHCContextFromGHCiState
+
+
+-- -----------------------------------------------------------------------------
+-- Validate a module that we want to add to the context
+
 checkAdd :: Bool -> String -> GHCi InteractiveImport
 checkAdd star mstr = do
   dflags <- getDynFlags 
-  case safeLanguageOn dflags of
-    True | star -> ghcError $ CmdLineError "can't use * imports with Safe Haskell"
+  let safe = safeLanguageOn dflags
+  case star of
+    True | safe ->
+             ghcError $ CmdLineError "can't use * imports with Safe Haskell"
+         | otherwise -> do
+             m <- wantInterpretedModule mstr
+             return $ IIModule m
 
-    True -> do m <- lookupModule mstr
-               s <- GHC.isModuleTrusted m
-               case s of
-                 True  -> return $ IIDecl (simpleImportDecl $ moduleName m)
-                 False -> ghcError $ CmdLineError $ "can't import " ++ mstr
-                                                 ++ " as it isn't trusted."
+    False -> do
+       m <- lookupModule mstr
+       when safe $ do
+           t <- GHC.isModuleTrusted m
+           when (not t) $
+              ghcError $ CmdLineError $ "can't import " ++ mstr
+                                         ++ " as it isn't trusted."
+       return $ IIDecl (simpleImportDecl $ moduleName m)
 
-    False | star -> do m <- wantInterpretedModule mstr
-                       return $ IIModule m
 
-    False -> do m <- lookupModule mstr
-                return $ IIDecl (simpleImportDecl $ moduleName m)
+-- -----------------------------------------------------------------------------
+-- Update the GHC API's view of the context
 
 -- | Sets the GHC context from the GHCi state.  The GHC context is
 -- always set this way, we never modify it incrementally.
@@ -1689,19 +1711,22 @@ setGHCContextFromGHCiState :: GHCi ()
 setGHCContextFromGHCiState = do
   let ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
       ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
+      -- re-use checkAdd to check whether the module is valid.  If the
+      -- module does not exist, we do *not* want to print an error
+      -- here, we just want to silently keep the module in the context
+      -- until such time as the module reappears again.  So we ignore
+      -- the actual exception thrown by checkAdd, using tryBool to
+      -- turn it into a Bool.
   st <- getGHCiState
   iidecls <- filterM (tryBool . ok) (transient_ctx st ++ remembered_ctx st)
-  setGHCContext iidecls
+  GHC.setContext (maybeAddPrelude iidecls)
+ where
+  maybeAddPrelude :: [InteractiveImport] -> [InteractiveImport]
+  maybeAddPrelude iidecls
+    | any isPreludeImport iidecls = iidecls
+    | otherwise                   = iidecls ++ [implicitPreludeImport]
+    -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
 
-
--- | Sets the GHC contexts to the given set of imports, adding a Prelude
--- import if there isn't an explicit one already.
-setGHCContext :: [InteractiveImport] -> GHCi ()
-setGHCContext iidecls = GHC.setContext (iidecls ++ prel)
-  -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
-  where
-    prel | any isPreludeImport iidecls = []
-         | otherwise                   = [implicitPreludeImport]
 
 -- -----------------------------------------------------------------------------
 -- Utils on InteractiveImport
