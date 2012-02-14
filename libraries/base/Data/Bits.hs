@@ -257,7 +257,8 @@ popCountDefault :: (Bits a, Num a) => a -> Int
 popCountDefault = go 0
  where
    go !c 0 = c
-   go c w = go (c+1) (w .&. w - 1) -- clear the least significant
+   go c w = go (c+1) (w .&. (w - 1)) -- clear the least significant
+{-# INLINABLE popCountDefault #-}
 
 instance Bits Int where
     {-# INLINE shift #-}
