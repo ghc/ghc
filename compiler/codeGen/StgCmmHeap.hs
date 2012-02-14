@@ -151,9 +151,10 @@ mkStaticClosureFields
         :: CmmInfoTable
         -> CostCentreStack
         -> CafInfo
+        -> Bool                 -- SRT is non-empty?
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields info_tbl ccs caf_refs payload
+mkStaticClosureFields info_tbl ccs caf_refs has_srt payload
   = mkStaticClosure info_lbl ccs payload padding
         static_link_field saved_info_field
   where
@@ -178,8 +179,10 @@ mkStaticClosureFields info_tbl ccs caf_refs payload
         | otherwise  = ASSERT(null payload) [mkIntCLit 0]
 
     static_link_field
-        | is_caf || staticClosureNeedsLink info_tbl = [static_link_value]
-        | otherwise                                 = []
+        | is_caf || staticClosureNeedsLink has_srt info_tbl
+        = [static_link_value]
+        | otherwise
+        = []
 
     saved_info_field
         | is_caf     = [mkIntCLit 0]

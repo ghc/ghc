@@ -71,6 +71,7 @@ import Module
 import Literal
 import Digraph
 import ListSetOps
+import VarSet
 import Util
 import Unique
 import DynFlags
@@ -811,36 +812,13 @@ assignTemp' e
 --
 -------------------------------------------------------------------------
 
--- There is just one SRT for each top level binding; all the nested
--- bindings use sub-sections of this SRT.  The label is passed down to
--- the nested bindings via the monad.
-
-getSRTInfo :: SRT -> FCode C_SRT
-getSRTInfo (SRTEntries {}) = return NoC_SRT --panic "getSRTInfo"
-
-getSRTInfo (SRT off len bmp)
-  | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]
-  = do 	{ id <- newUnique
-	-- ; top_srt <- getSRTLabel
-        ; let srt_desc_lbl = mkLargeSRTLabel id
-        -- JD: We're not constructing and emitting SRTs in the back end,
-        -- which renders this code wrong (it now names a now-non-existent label).
-	-- ; emitRODataLits srt_desc_lbl
-        --      ( cmmLabelOffW top_srt off
-	--        : mkWordCLit (fromIntegral len)
-	--        : map mkWordCLit bmp)
-	; return (C_SRT srt_desc_lbl 0 srt_escape) }
-
-  | otherwise
-  = do	{ top_srt <- getSRTLabel
-	; return (C_SRT top_srt off (fromIntegral (head bmp))) }
-	-- The fromIntegral converts to StgHalfWord
-
-getSRTInfo NoSRT 
-  = -- TODO: Should we panic in this case?
-    -- Someone obviously thinks there should be an SRT
-    return NoC_SRT
-
+-- | Returns 'True' if there is a non-empty SRT, or 'False' otherwise
+-- NB. the SRT attached to an StgBind is still used in the new codegen
+-- to decide whether we need a static link field on a static closure
+-- or not.
+getSRTInfo :: SRT -> FCode Bool
+getSRTInfo (SRTEntries vs) = return (not (isEmptyVarSet vs))
+getSRTInfo _               = return False
 
 srt_escape :: StgHalfWord
 srt_escape = -1
