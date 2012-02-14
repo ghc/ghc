@@ -60,7 +60,7 @@ module CmmUtils(
         -- * Operations that probably don't belong here
         modifyGraph,
 
-        lastNode, replaceLastNode, insertBetween,
+        lastNode, replaceLastNode,
         ofBlockMap, toBlockMap, insertBlock,
         ofBlockList, toBlockList, bodyToBlockList,
         foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
@@ -441,49 +441,6 @@ foldGraphBlocks k z g = mapFold k z $ toBlockMap g
 
 postorderDfs :: CmmGraph -> [CmmBlock]
 postorderDfs g = {-# SCC "postorderDfs" #-} postorder_dfs_from (toBlockMap g) (g_entry g)
-
-----------------------------------------------------------------------
------ Splicing between blocks
--- Given a middle node, a block, and a successor BlockId,
--- we can insert the middle node between the block and the successor.
--- We return the updated block and a list of new blocks that must be added
--- to the graph.
--- The semantics is a bit tricky. We consider cases on the last node:
--- o For a branch, we can just insert before the branch,
---   but sometimes the optimizer does better if we actually insert
---   a fresh basic block, enabling some common blockification.
--- o For a conditional branch, switch statement, or call, we must insert
---   a new basic block.
--- o For a jump or return, this operation is impossible.
-
-insertBetween :: MonadUnique m => CmmBlock -> [CmmNode O O] -> BlockId -> m (CmmBlock, [CmmBlock])
-insertBetween b ms succId = insert $ lastNode b
-  where insert :: MonadUnique m => CmmNode O C -> m (CmmBlock, [CmmBlock])
-        insert (CmmBranch bid) =
-          if bid == succId then
-            do (bid', bs) <- newBlocks
-               return (replaceLastNode b (CmmBranch bid'), bs)
-          else panic "tried invalid block insertBetween"
-        insert (CmmCondBranch c t f) =
-          do (t', tbs) <- if t == succId then newBlocks else return $ (t, [])
-             (f', fbs) <- if f == succId then newBlocks else return $ (f, [])
-             return (replaceLastNode b (CmmCondBranch c t' f'), tbs ++ fbs)
-        insert (CmmSwitch e ks) =
-          do (ids, bs) <- mapAndUnzipM mbNewBlocks ks
-             return (replaceLastNode b (CmmSwitch e ids), join bs)
-        insert (CmmCall {}) =
-          panic "unimp: insertBetween after a call -- probably not a good idea"
-        insert (CmmForeignCall {}) =
-          panic "unimp: insertBetween after a foreign call -- probably not a good idea"
-
-        newBlocks :: MonadUnique m => m (BlockId, [CmmBlock])
-        newBlocks = do id <- liftM mkBlockId $ getUniqueM
-                       return $ (id, [blockOfNodeList (JustC (CmmEntry id), ms, JustC (CmmBranch succId))])
-        mbNewBlocks :: MonadUnique m => Maybe BlockId -> m (Maybe BlockId, [CmmBlock])
-        mbNewBlocks (Just k) = if k == succId then liftM fstJust newBlocks
-                               else return (Just k, [])
-        mbNewBlocks Nothing  = return (Nothing, [])
-        fstJust (id, bs) = (Just id, bs)
 
 -------------------------------------------------
 -- Running dataflow analysis and/or rewrites
