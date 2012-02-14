@@ -527,7 +527,6 @@ Library
             SPARC.CodeGen
             SPARC.CodeGen.Amode
             SPARC.CodeGen.Base
-            SPARC.CodeGen.CCall
             SPARC.CodeGen.CondCode
             SPARC.CodeGen.Gen32
             SPARC.CodeGen.Gen64

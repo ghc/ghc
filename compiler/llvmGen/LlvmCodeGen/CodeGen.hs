@@ -15,6 +15,7 @@ import BlockId
 import CgUtils ( activeStgRegs, callerSaves )
 import CLabel
 import OldCmm
+import OldCmmUtils
 import qualified OldPprCmm as PprCmm
 
 import DynFlags
@@ -221,6 +222,10 @@ genCall env t@(CmmPrim op) [] args CmmMayReturn | op == MO_Memcpy ||
         stmts = stmts1 `appOL` stmts2 `appOL` stmts3
                 `appOL` trashStmts `snocOL` call
     return (env2, stmts, top1 ++ top2)
+
+genCall env (CmmPrim op) results args _
+ | Just stmts <- expandCallishMachOp op results args
+    = stmtsToInstrs env stmts (nilOL, [])
 
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do
@@ -469,17 +474,17 @@ cmmPrimOpFunctions env mop
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
 
-    MO_WriteBarrier ->
-        panic $ "cmmPrimOpFunctions: MO_WriteBarrier not supported here"
-    MO_Touch ->
-        panic $ "cmmPrimOpFunctions: MO_Touch not supported here"
+    MO_S_QuotRem {} -> unsupported
+    MO_WriteBarrier -> unsupported
+    MO_Touch        -> unsupported
 
     where
         intrinTy1 = (if getLlvmVer env >= 28
                        then "p0i8.p0i8." else "") ++ show llvmWord
         intrinTy2 = (if getLlvmVer env >= 28
                        then "p0i8." else "") ++ show llvmWord
-    
+        unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
+                          ++ " not supported here")
 
 -- | Tail function calls
 genJump :: LlvmEnv -> CmmExpr -> Maybe [GlobalReg] -> UniqSM StmtData

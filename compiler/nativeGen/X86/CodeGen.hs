@@ -41,6 +41,7 @@ import BlockId
 import Module           ( primPackageId )
 import PprCmm           ()
 import OldCmm
+import OldCmmUtils
 import OldPprCmm        ()
 import CLabel
 
@@ -1675,6 +1676,11 @@ genCCall32 target dest_regs args =
         actuallyInlineFloatOp _ _ args
               = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
                       ++ show (length args) ++ ")"
+
+    (CmmPrim op, results)
+     | Just stmts <- expandCallishMachOp op results args ->
+        stmtsToInstrs stmts
+
     _ -> do
         let
             -- Align stack to 16n for calls, assuming a starting stack
@@ -1834,6 +1840,22 @@ genCCall64 target dest_regs args =
     (CmmPrim op, [res]) ->
         -- we only cope with a single result for foreign calls
         outOfLineCmmOp op (Just res) args
+
+    (CmmPrim (MO_S_QuotRem width), [CmmHinted res_q _, CmmHinted res_r _]) ->
+        case args of
+        [CmmHinted arg_x _, CmmHinted arg_y _] ->
+            do let size = intSize width
+                   reg_q = getRegisterReg True (CmmLocal res_q)
+                   reg_r = getRegisterReg True (CmmLocal res_r)
+               (y_reg, y_code) <- getRegOrMem arg_y
+               x_code <- getAnyReg arg_x
+               return $ y_code `appOL`
+                        x_code rax `appOL`
+                        toOL [CLTD size,
+                              IDIV size y_reg,
+                              MOV size (OpReg rax) (OpReg reg_q),
+                              MOV size (OpReg rdx) (OpReg reg_r)]
+        _ -> panic "genCCall64: Wrong number of arguments for MO_S_QuotRem"
 
     _ -> do
         -- load up the register arguments
@@ -2051,10 +2073,11 @@ outOfLineCmmOp mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
 
-              MO_WriteBarrier ->
-                  panic $ "outOfLineCmmOp: MO_WriteBarrier not supported here"
-              MO_Touch ->
-                  panic $ "outOfLineCmmOp: MO_Touch not supported here"
+              MO_S_QuotRem {} -> unsupported
+              MO_WriteBarrier -> unsupported
+              MO_Touch        -> unsupported
+        unsupported = panic ("outOfLineCmmOp: " ++ show mop
+                          ++ "not supported here")
 
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch

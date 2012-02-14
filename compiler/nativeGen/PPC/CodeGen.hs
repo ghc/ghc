@@ -42,6 +42,7 @@ import Platform
 import BlockId
 import PprCmm           ( pprExpr )
 import OldCmm
+import OldCmmUtils
 import CLabel
 
 -- The rest:
@@ -901,6 +902,10 @@ genCCall'
 genCCall' _ (CmmPrim MO_WriteBarrier) _ _
  = return $ unitOL LWSYNC
 
+genCCall' _ (CmmPrim op) results args
+ | Just stmts <- expandCallishMachOp op results args
+    = stmtsToInstrs stmts
+
 genCCall' gcp target dest_regs argsAndHints
   = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
@@ -1142,10 +1147,11 @@ genCCall' gcp target dest_regs argsAndHints
 
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
 
-                    MO_WriteBarrier ->
-                        panic $ "outOfLineCmmOp: MO_WriteBarrier not supported"
-                    MO_Touch ->
-                        panic $ "outOfLineCmmOp: MO_Touch not supported"
+                    MO_S_QuotRem {} -> unsupported
+                    MO_WriteBarrier -> unsupported
+                    MO_Touch        -> unsupported
+                unsupported = panic ("outOfLineCmmOp: " ++ show mop
+                                  ++ " not supported")
 
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
