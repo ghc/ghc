@@ -672,7 +672,21 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         "ldmfd sp!, {r4-r11, fp, ip, lr}\n\t"
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
-      : "%r4", "%r5", "%r6", "%r8", "%r9", "%r10", "%r11", "%fp", "%ip", "%lr"
+#if !defined(__thumb__)
+        /* In ARM mode, r11/fp is frame-pointer and so we cannot mark
+           it as clobbered. If we do so, GCC complains with error. */
+      : "%r4", "%r5", "%r6", "%r7", "%r8", "%r9", "%r10", "%ip", "%lr"
+#else
+        /* In Thumb mode r7 is frame-pointer and so we cannot mark it
+           as clobbered. On the other hand we mark as clobbered also
+           those regs not used in Thumb mode. Hard to judge if this is
+           needed, but certainly Haskell code is using them for
+           placing GHC's virtual registers there. See
+           includes/stg/MachRegs.h Please note that Haskell code is
+           compiled by GHC/LLVM into ARM code (not Thumb!), at least
+           as of February 2012 */
+      : "%r4", "%r5", "%r6", "%r8", "%r9", "%r10", "%fp", "%ip", "%lr"
+#endif
     );
     return r;
 }
