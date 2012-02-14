@@ -822,7 +822,7 @@ findGlobalRdrEnv hsc_env imports
     idecls :: [LImportDecl RdrName]
     idecls = [noLoc d | IIDecl d <- imports]
 
-    imods :: [Module]
+    imods :: [ModuleName]
     imods = [m | IIModule m <- imports]
 
 availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
@@ -836,9 +836,9 @@ availsToGlobalRdrEnv mod_name avails
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }
 
-mkTopLevEnv :: HomePackageTable -> Module -> IO GlobalRdrEnv
+mkTopLevEnv :: HomePackageTable -> ModuleName -> IO GlobalRdrEnv
 mkTopLevEnv hpt modl
-  = case lookupUFM hpt (moduleName modl) of
+  = case lookupUFM hpt modl of
       Nothing -> ghcError (ProgramError ("mkTopLevEnv: not a home module " ++
                                                 showSDoc (ppr modl)))
       Just details ->

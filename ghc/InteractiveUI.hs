@@ -575,8 +575,7 @@ mkPrompt = do
 
         rev_imports = reverse imports -- rightmost are the most recent
         modules_bit =
-             hsep [ char '*' <> ppr (GHC.moduleName m)
-                  | IIModule m <- rev_imports ] <+>
+             hsep [ char '*' <> ppr m | IIModule m <- rev_imports ] <+>
              hsep (map ppr [ myIdeclName d | IIDecl d <- rev_imports ])
 
          --  use the 'as' name if there is one
@@ -1290,8 +1289,8 @@ setContextAfterLoad keep_ctxt ms = do
               -- We import the module with a * iff
               --   - it is interpreted, and
               --   - -XSafe is off (it doesn't allow *-imports)
-        let new_ctx | star_ok   = [IIModule m]
-                    | otherwise = [IIDecl $ simpleImportDecl (GHC.moduleName m)]
+        let new_ctx | star_ok   = [mkIIModule (GHC.moduleName m)]
+                    | otherwise = [mkIIDecl   (GHC.moduleName m)]
         setContextKeepingPackageModules keep_ctxt new_ctx
 
 
@@ -1507,7 +1506,7 @@ guessCurrentModule cmd
        when (null imports) $ ghcError $
           CmdLineError (':' : cmd ++ ": no current module")
        case (head imports) of
-          IIModule m -> return m
+          IIModule m -> GHC.findModule m Nothing
           IIDecl d   -> GHC.findModule (unLoc (ideclName d)) (ideclPkgQual d)
 
 -- without bang, show items in context of their parents and omit children
@@ -1614,8 +1613,8 @@ moduleCmd str
     sensible ('*':m) = looksLikeModuleName m
     sensible m       = looksLikeModuleName m
 
-    starred ('*':m) = Left m
-    starred m       = Right m
+    starred ('*':m) = Left  (GHC.mkModuleName m)
+    starred m       = Right (GHC.mkModuleName m)
 
 
 -- -----------------------------------------------------------------------------
@@ -1625,71 +1624,64 @@ moduleCmd str
 --   (c) :module <stuff>:      setContext
 --   (d) import <module>...:   addImportToContext
 
-addModulesToContext :: [String] -> [String] -> GHCi ()
-addModulesToContext as bs = do
-   mapM_ (add True)  as
-   mapM_ (add False) bs
+addModulesToContext :: [ModuleName] -> [ModuleName] -> GHCi ()
+addModulesToContext starred unstarred = do
+   mapM_ addII (map mkIIModule starred ++ map mkIIDecl unstarred)
    setGHCContextFromGHCiState
- where
-   add :: Bool -> String -> GHCi ()
-   add star str = do
-     i <- checkAdd star str
-     modifyGHCiState $ \st ->
-        st { remembered_ctx = addNotSubsumed i (remembered_ctx st) }
 
-remModulesFromContext :: [String] -> [String] -> GHCi ()
-remModulesFromContext as bs = do
-   mapM_ rm (as ++ bs)
+remModulesFromContext :: [ModuleName] -> [ModuleName] -> GHCi ()
+remModulesFromContext  starred unstarred = do
+   mapM_ rm (starred ++ unstarred)
    setGHCContextFromGHCiState
  where
-   rm :: String -> GHCi ()
+   rm :: ModuleName -> GHCi ()
    rm str = do
-     m <- moduleName <$> lookupModule str
+     m <- moduleName <$> lookupModuleName str
      let filt = filter ((/=) m . iiModuleName)
      modifyGHCiState $ \st ->
         st { remembered_ctx = filt (remembered_ctx st)
            , transient_ctx  = filt (transient_ctx st) }
 
-setContext :: [String] -> [String] -> GHCi ()
-setContext starred not_starred = do
-  is1 <- mapM (checkAdd True)  starred
-  is2 <- mapM (checkAdd False) not_starred
-  let iss = foldr addNotSubsumed [] (is1++is2)
-  modifyGHCiState $ \st -> st { remembered_ctx = iss, transient_ctx = [] }
+setContext :: [ModuleName] -> [ModuleName] -> GHCi ()
+setContext starred unstarred = do
+  modifyGHCiState $ \st -> st { remembered_ctx = [], transient_ctx = [] }
                                 -- delete the transient context
-  setGHCContextFromGHCiState
+  addModulesToContext starred unstarred
 
 addImportToContext :: String -> GHCi ()
 addImportToContext str = do
   idecl <- GHC.parseImportDecl str
-  _ <- checkAdd False (moduleNameString (unLoc (ideclName idecl))) -- #5836
-  modifyGHCiState $ \st ->
-     st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
+  addII (IIDecl idecl)   -- #5836
   setGHCContextFromGHCiState
 
+-- Util used by addImportToContext and addModulesToContext
+addII :: InteractiveImport -> GHCi ()
+addII iidecl = do
+  checkAdd iidecl
+  modifyGHCiState $ \st ->
+     st { remembered_ctx = addNotSubsumed iidecl (remembered_ctx st) }
 
 -- -----------------------------------------------------------------------------
 -- Validate a module that we want to add to the context
 
-checkAdd :: Bool -> String -> GHCi InteractiveImport
-checkAdd star mstr = do
+checkAdd :: InteractiveImport -> GHCi ()
+checkAdd ii = do
   dflags <- getDynFlags 
   let safe = safeLanguageOn dflags
-  case star of
-    True | safe ->
-             ghcError $ CmdLineError "can't use * imports with Safe Haskell"
-         | otherwise -> do
-             m <- wantInterpretedModule mstr
-             return $ IIModule m
+  case ii of
+    IIModule modname
+       | safe -> ghcError $ CmdLineError "can't use * imports with Safe Haskell"
+       | otherwise -> wantInterpretedModuleName modname >> return ()
 
-    False -> do
-       m <- lookupModule mstr
+    IIDecl d -> do
+       let modname = unLoc (ideclName d)
+       m <- lookupModuleName modname
        when safe $ do
            t <- GHC.isModuleTrusted m
            when (not t) $
-              ghcError $ CmdLineError $ "can't import " ++ mstr
-                                         ++ " as it isn't trusted."
-       return $ IIDecl (simpleImportDecl $ moduleName m)
+                ghcError $ CmdLineError $
+                 "can't import " ++ moduleNameString modname
+                                 ++ " as it isn't trusted."
 
 
 -- -----------------------------------------------------------------------------
@@ -1709,16 +1701,14 @@ checkAdd star mstr = do
 --
 setGHCContextFromGHCiState :: GHCi ()
 setGHCContextFromGHCiState = do
-  let ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
-      ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
+  st <- getGHCiState
       -- re-use checkAdd to check whether the module is valid.  If the
       -- module does not exist, we do *not* want to print an error
       -- here, we just want to silently keep the module in the context
       -- until such time as the module reappears again.  So we ignore
       -- the actual exception thrown by checkAdd, using tryBool to
       -- turn it into a Bool.
-  st <- getGHCiState
-  iidecls <- filterM (tryBool . ok) (transient_ctx st ++ remembered_ctx st)
+  iidecls <- filterM (tryBool.checkAdd) (transient_ctx st ++ remembered_ctx st)
   GHC.setContext (maybeAddPrelude iidecls)
  where
   maybeAddPrelude :: [InteractiveImport] -> [InteractiveImport]
@@ -1731,27 +1721,17 @@ setGHCContextFromGHCiState = do
 -- -----------------------------------------------------------------------------
 -- Utils on InteractiveImport
 
--- | Returns True if the left import subsumes the right one.  Doesn't
--- need to be 100% accurate, conservatively returning False is fine.
---
--- Note that an IIModule does not necessarily subsume an IIDecl,
--- because e.g. a module might export a name that is only available
--- qualified within the module itself.
---
-iiSubsumes :: InteractiveImport -> InteractiveImport -> Bool
-iiSubsumes (IIModule m1) (IIModule m2) = m1==m2
-iiSubsumes (IIDecl d1) (IIDecl d2)      -- A bit crude
-  =  unLoc (ideclName d1) == unLoc (ideclName d2)
-     && ideclAs d1 == ideclAs d2
-     && (not (ideclQualified d1) || ideclQualified d2)
-     && (isNothing (ideclHiding d1) || ideclHiding d1 == ideclHiding d2)
-iiSubsumes _ _ = False
+mkIIModule :: ModuleName -> InteractiveImport
+mkIIModule = IIModule
 
-iiModules :: [InteractiveImport] -> [Module]
+mkIIDecl :: ModuleName -> InteractiveImport
+mkIIDecl = IIDecl . simpleImportDecl
+
+iiModules :: [InteractiveImport] -> [ModuleName]
 iiModules is = [m | IIModule m <- is]
 
 iiModuleName :: InteractiveImport -> ModuleName
-iiModuleName (IIModule m) = moduleName m
+iiModuleName (IIModule m) = m
 iiModuleName (IIDecl d)   = unLoc (ideclName d)
 
 preludeModuleName :: ModuleName
@@ -1769,6 +1749,23 @@ addNotSubsumed :: InteractiveImport
 addNotSubsumed i is
   | any (`iiSubsumes` i) is = is
   | otherwise               = i : filter (not . (i `iiSubsumes`)) is
+
+-- | Returns True if the left import subsumes the right one.  Doesn't
+-- need to be 100% accurate, conservatively returning False is fine.
+--
+-- Note that an IIModule does not necessarily subsume an IIDecl,
+-- because e.g. a module might export a name that is only available
+-- qualified within the module itself.
+--
+iiSubsumes :: InteractiveImport -> InteractiveImport -> Bool
+iiSubsumes (IIModule m1) (IIModule m2) = m1==m2
+iiSubsumes (IIDecl d1) (IIDecl d2)      -- A bit crude
+  =  unLoc (ideclName d1) == unLoc (ideclName d2)
+     && ideclAs d1 == ideclAs d2
+     && (not (ideclQualified d1) || ideclQualified d2)
+     && (isNothing (ideclHiding d1) || ideclHiding d1 == ideclHiding d2)
+iiSubsumes _ _ = False
+
 
 ----------------------------------------------------------------------------
 -- :set
@@ -2010,7 +2007,7 @@ showImports = do
       trans_ctx = transient_ctx st
 
       show_one (IIModule star_m)
-          = ":module +*" ++ moduleNameString (moduleName star_m)
+          = ":module +*" ++ moduleNameString star_m
       show_one (IIDecl imp) = showSDoc (ppr imp)
 
       prel_imp
@@ -2377,7 +2374,9 @@ breakSwitch (arg1:rest)
    | all isDigit arg1 = do
         imports <- GHC.getContext
         case iiModules imports of
-           (md : _) -> breakByModuleLine md (read arg1) rest
+           (mn : _) -> do
+              md <- lookupModuleName mn
+              breakByModuleLine md (read arg1) rest
            [] -> do
               liftIO $ putStrLn "Cannot find default module for breakpoint."
               liftIO $ putStrLn "Perhaps no modules are loaded for debugging?"
@@ -2539,7 +2538,9 @@ list2 [arg] | all isDigit arg = do
     imports <- GHC.getContext
     case iiModules imports of
         [] -> liftIO $ putStrLn "No module to list"
-        (md : _) -> listModuleLine md (read arg)
+        (mn : _) -> do
+          md <- lift $ lookupModuleName mn
+          listModuleLine md (read arg)
 list2 [arg1,arg2] | looksLikeModuleName arg1, all isDigit arg2 = do
         md <- wantInterpretedModule arg1
         listModuleLine md (read arg2)
@@ -2777,7 +2778,10 @@ tryBool m = do
 -- Utils
 
 lookupModule :: GHC.GhcMonad m => String -> m Module
-lookupModule mName = GHC.lookupModule (GHC.mkModuleName mName) Nothing
+lookupModule mName = lookupModuleName (GHC.mkModuleName mName)
+
+lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
+lookupModuleName mName = GHC.lookupModule mName Nothing
 
 isHomeModule :: Module -> Bool
 isHomeModule m = GHC.modulePackageId m == mainPackageId
@@ -2800,8 +2804,12 @@ expandPathIO p =
         return other
 
 wantInterpretedModule :: GHC.GhcMonad m => String -> m Module
-wantInterpretedModule str = do
-   modl <- lookupModule str
+wantInterpretedModule str = wantInterpretedModuleName (GHC.mkModuleName str)
+
+wantInterpretedModuleName :: GHC.GhcMonad m => ModuleName -> m Module
+wantInterpretedModuleName modname = do
+   modl <- lookupModuleName modname
+   let str = moduleNameString modname
    dflags <- getDynFlags
    when (GHC.modulePackageId modl /= thisPackage dflags) $
       ghcError (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))

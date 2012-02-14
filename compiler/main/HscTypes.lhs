@@ -1041,7 +1041,7 @@ data InteractiveImport
       -- ^ Bring the exports of a particular module
       -- (filtered by an import decl) into scope
 
-  | IIModule Module
+  | IIModule ModuleName
       -- ^ Bring into scope the entire top-level envt of
       -- of this module, including the things imported
       -- into it.
