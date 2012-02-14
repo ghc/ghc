@@ -17,6 +17,7 @@
 &lang-features;
 &ffi-chap;
 &extending-ghc;
+&external-core;
 &wrong;
 &utils;
 &win32-dll;
