@@ -75,7 +75,9 @@ The 'Bits' class defines bitwise operations over integral types.
 
 Minimal complete definition: '.&.', '.|.', 'xor', 'complement',
 ('shift' or ('shiftL' and 'shiftR')), ('rotate' or ('rotateL' and 'rotateR')),
-'bitSize' and 'isSigned'.
+'bitSize', 'isSigned', 'testBit', 'bit', and 'popCount'.  The latter three can
+be implemented using `testBitDefault', 'bitDefault, and 'popCountDefault', if
+@a@ is also an instance of 'Num'.
 -}
 class Eq a => Bits a where
     -- | Bitwise \"and\"
@@ -257,7 +259,8 @@ popCountDefault :: (Bits a, Num a) => a -> Int
 popCountDefault = go 0
  where
    go !c 0 = c
-   go c w = go (c+1) (w .&. w - 1) -- clear the least significant
+   go c w = go (c+1) (w .&. (w - 1)) -- clear the least significant
+{-# INLINABLE popCountDefault #-}
 
 instance Bits Int where
     {-# INLINE shift #-}
