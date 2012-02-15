@@ -76,7 +76,7 @@ guard msg False = fail msg
 
 runMatch :: Match a -> Maybe a
 runMatch (Match (Right x))   = Just x
-runMatch (Match (Left _msg)) = trace ("match " ++ _msg) Nothing
+runMatch (Match (Left _msg)) = {- trace ("match " ++ _msg) -} Nothing
 --runMatch = unMatch
 
 matchRnEnv2 :: (a -> FreeVars) -> a -> a -> RnEnv2
