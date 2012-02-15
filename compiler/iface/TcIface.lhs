@@ -432,6 +432,7 @@ tc_iface_decl _ ignore_prags (IfaceId {ifName = occ_name, ifType = iface_type,
         ; return (AnId (mkGlobalId details name ty info)) }
 
 tc_iface_decl parent _ (IfaceData {ifName = occ_name, 
+                          ifCType = cType, 
                           ifTyVars = tv_bndrs, 
                           ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
                           ifCons = rdr_cons, 
@@ -443,7 +444,7 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
             { stupid_theta <- tcIfaceCtxt ctxt
             ; parent' <- tc_parent tyvars mb_axiom_name
             ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
-            ; return (buildAlgTyCon tc_name tyvars stupid_theta 
+            ; return (buildAlgTyCon tc_name tyvars cType stupid_theta 
                                     cons is_rec gadt_syn parent') }
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }
@@ -462,6 +463,7 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
            ; return (FamInstTyCon ax fam_tc (substTys subst fam_tys)) }
 
 tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
+                                  ifCType = cType,
                                   ifSynRhs = mb_rhs_ty,
                                   ifSynKind = kind })
    = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
@@ -469,7 +471,7 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
      ; rhs_kind <- tcIfaceType kind     -- Note [Synonym kind loop]
      ; rhs      <- forkM (mk_doc tc_name) $ 
                    tc_syn_rhs mb_rhs_ty
-     ; tycon    <- buildSynTyCon tc_name tyvars rhs rhs_kind parent
+     ; tycon    <- buildSynTyCon tc_name tyvars cType rhs rhs_kind parent
      ; return (ATyCon tycon) }
    where
      mk_doc n = ptext (sLit "Type syonym") <+> ppr n

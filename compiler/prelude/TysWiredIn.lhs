@@ -241,6 +241,7 @@ pcTyCon is_enum is_rec name tyvars cons
     tycon = mkAlgTyCon name
 		(mkArrowKinds (map tyVarKind tyvars) liftedTypeKind)
                 tyvars
+                Nothing
                 []		-- No stupid theta
 		(DataTyCon cons is_enum)
 		NoParentTyCon
@@ -406,6 +407,7 @@ mkIPName ip tycon_u datacon_u dc_wrk_u co_ax_u = name_ip
     tycon      = mkAlgTyCon tycon_name
                    (liftedTypeKind `mkArrowKind` constraintKind)
                    [alphaTyVar]
+                   Nothing
                    []      -- No stupid theta
                    (NewTyCon { data_con    = datacon, 
                                nt_rhs      = mkTyVarTy alphaTyVar,
@@ -432,6 +434,7 @@ eqTyCon :: TyCon
 eqTyCon = mkAlgTyCon eqTyConName
             (ForAllTy kv $ mkArrowKinds [k, k] constraintKind)
             [kv, a, b]
+            Nothing
             []      -- No stupid theta
             (DataTyCon [eqBoxDataCon] False)
             NoParentTyCon

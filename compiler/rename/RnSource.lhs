@@ -799,7 +799,8 @@ rnTyClDecl mb_cls (TyFamily { tcdLName = tycon, tcdTyVars = tyvars
 
 -- "data", "newtype", "data instance, and "newtype instance" declarations
 -- both top level and (for an associated type) in an instance decl
-rnTyClDecl mb_cls tydecl@TyData {tcdND = new_or_data, tcdCtxt = context, 
+rnTyClDecl mb_cls tydecl@TyData {tcdND = new_or_data, tcdCType = cType,
+                                 tcdCtxt = context, 
 			   	 tcdLName = tycon, tcdTyVars = tyvars, 
 			   	 tcdTyPats = typats, tcdCons = condecls, 
 			   	 tcdKindSig = sig, tcdDerivs = derivs}
@@ -831,7 +832,8 @@ rnTyClDecl mb_cls tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		-- No need to check for duplicate constructor decls
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 
-	; return (TyData {tcdND = new_or_data, tcdCtxt = context', 
+	; return (TyData {tcdND = new_or_data, tcdCType = cType,
+               tcdCtxt = context', 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = sig',
 			   tcdCons = condecls', tcdDerivs = derivs'}, 
@@ -849,14 +851,16 @@ rnTyClDecl mb_cls tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 			     ; return (Just ds', extractHsTyNames_s ds') }
 
 -- "type" and "type instance" declarations
-rnTyClDecl mb_cls tydecl@(TySynonym { tcdTyVars = tyvars, tcdLName = name,
+rnTyClDecl mb_cls tydecl@(TySynonym { tcdTyVars = tyvars, tcdCType = cType,
+                          tcdLName = name,
 		  	              tcdTyPats = typats, tcdSynRhs = ty})
   = bindQTvs syn_doc mb_cls tyvars $ \ tyvars' -> do
     {    	 -- Checks for distinct tyvars
       name' <- lookupTcdName mb_cls tydecl
     ; (typats',fvs1) <- rnTyPats syn_doc name' typats
     ; (ty', fvs2)    <- rnHsTypeFVs syn_doc ty
-    ; return (TySynonym { tcdLName = name', tcdTyVars = tyvars'
+    ; return (TySynonym { tcdLName = name', tcdCType = cType
+                , tcdTyVars = tyvars'
     			, tcdTyPats = typats', tcdSynRhs = ty'}
              , extractHsTyVarBndrNames_s tyvars' (fvs1 `plusFV` fvs2)) }
   where

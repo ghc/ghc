@@ -99,7 +99,7 @@ genGenericRepExtras tc mod =
                         | (u,n) <- zip us [0..] ] | (us,m) <- zip uniqsS [0..] ]
         
         mkTyCon name = ASSERT( isExternalName name )
-                       buildAlgTyCon name [] [] distinctAbstractTyConRhs
+                       buildAlgTyCon name [] Nothing [] distinctAbstractTyConRhs
                                           NonRecursive False NoParentTyCon
 
       let metaDTyCon  = mkTyCon d_name

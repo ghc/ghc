@@ -60,6 +60,7 @@ module TyCon(
         tyConKind,
         tyConUnique,
         tyConTyVars,
+        tyConCType, tyConCType_maybe,
         tyConDataCons, tyConDataCons_maybe, tyConSingleDataCon_maybe,
         tyConFamilySize,
         tyConStupidTheta,
@@ -93,6 +94,7 @@ import {-# SOURCE #-} IParam  ( ipTyConName )
 import Var
 import Class
 import BasicTypes
+import ForeignCall
 import Name
 import PrelNames
 import Maybes
@@ -310,6 +312,9 @@ data TyCon
                                   -- 3. The family instance types if present
                                   --
                                   -- Note that it does /not/ scope over the data constructors.
+        tyConCType   :: Maybe CType, -- The C type that should be used
+                                     -- for this type when using the FFI
+                                     -- and CAPI
 
         algTcGadtSyntax  :: Bool,       -- ^ Was the data type declared with GADT syntax?
                                         -- If so, that doesn't mean it's a true GADT;
@@ -355,6 +360,9 @@ data TyCon
         tyConArity   :: Arity,
 
         tyConTyVars  :: [TyVar],        -- Bound tyvars
+        tyConCType   :: Maybe CType,    -- The C type that should be used
+                                        -- for this type when using the FFI
+                                        -- and CAPI
 
         synTcRhs     :: SynTyConRhs,    -- ^ Contains information about the
                                         -- expansion of the synonym
@@ -838,19 +846,22 @@ mkAlgTyCon :: Name
            -> Kind              -- ^ Kind of the resulting 'TyCon'
            -> [TyVar]           -- ^ 'TyVar's scoped over: see 'tyConTyVars'.
                                 --   Arity is inferred from the length of this list
+           -> Maybe CType       -- ^ The C type this type corresponds to
+                                --   when using the CAPI FFI
            -> [PredType]        -- ^ Stupid theta: see 'algTcStupidTheta'
            -> AlgTyConRhs       -- ^ Information about dat aconstructors
            -> TyConParent
            -> RecFlag           -- ^ Is the 'TyCon' recursive?
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name kind tyvars stupid rhs parent is_rec gadt_syn
+mkAlgTyCon name kind tyvars cType stupid rhs parent is_rec gadt_syn
   = AlgTyCon {
         tyConName        = name,
         tyConUnique      = nameUnique name,
         tc_kind          = kind,
         tyConArity       = length tyvars,
         tyConTyVars      = tyvars,
+        tyConCType       = cType,
         algTcStupidTheta = stupid,
         algTcRhs         = rhs,
         algTcParent      = ASSERT2( okParent name parent, ppr name $$ ppr parent ) parent,
@@ -861,12 +872,12 @@ mkAlgTyCon name kind tyvars stupid rhs parent is_rec gadt_syn
 -- | Simpler specialization of 'mkAlgTyCon' for classes
 mkClassTyCon :: Name -> Kind -> [TyVar] -> AlgTyConRhs -> Class -> RecFlag -> TyCon
 mkClassTyCon name kind tyvars rhs clas is_rec =
-  mkAlgTyCon name kind tyvars [] rhs (ClassTyCon clas) is_rec False
+  mkAlgTyCon name kind tyvars Nothing [] rhs (ClassTyCon clas) is_rec False
 
 -- | Simpler specialization of 'mkAlgTyCon' for implicit paramaters
 mkIParamTyCon :: Name -> Kind -> TyVar -> AlgTyConRhs -> RecFlag -> TyCon
 mkIParamTyCon name kind tyvar rhs is_rec =
-  mkAlgTyCon name kind [tyvar] [] rhs NoParentTyCon is_rec False
+  mkAlgTyCon name kind [tyvar] Nothing [] rhs NoParentTyCon is_rec False
 
 mkTupleTyCon :: Name
              -> Kind    -- ^ Kind of the resulting 'TyCon'
@@ -935,14 +946,15 @@ mkPrimTyCon' name kind arity rep is_unlifted
     }
 
 -- | Create a type synonym 'TyCon'
-mkSynTyCon :: Name -> Kind -> [TyVar] -> SynTyConRhs -> TyConParent -> TyCon
-mkSynTyCon name kind tyvars rhs parent
+mkSynTyCon :: Name -> Kind -> [TyVar] -> Maybe CType -> SynTyConRhs -> TyConParent -> TyCon
+mkSynTyCon name kind tyvars cType rhs parent
   = SynTyCon {
         tyConName = name,
         tyConUnique = nameUnique name,
         tc_kind = kind,
         tyConArity = length tyvars,
         tyConTyVars = tyvars,
+        tyConCType = cType,
         synTcRhs = rhs,
         synTcParent = parent
     }
@@ -1242,6 +1254,11 @@ isImplicitTyCon tycon
   | otherwise          = True
         -- 'otherwise' catches: FunTyCon, PrimTyCon,
         -- PromotedDataCon, PomotedTypeTyCon, SuperKindTyCon
+
+tyConCType_maybe :: TyCon -> Maybe CType
+tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc
+tyConCType_maybe tc@(SynTyCon {}) = tyConCType tc
+tyConCType_maybe _ = Nothing
 \end{code}
 
 

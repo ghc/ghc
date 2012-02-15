@@ -14,6 +14,8 @@ module ForeignCall (
         CCallSpec(..),
         CCallTarget(..), isDynamicTarget,
         CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
+
+        CType(..),
     ) where
 
 import FastString
@@ -227,6 +229,12 @@ instance Outputable CCallSpec where
         = text "__dyn_ccall" <> gc_suf <+> text "\"\""
 \end{code}
 
+\begin{code}
+-- | A C type, used in CAPI FFI calls
+newtype CType = CType FastString
+    deriving (Data, Typeable)
+\end{code}
+
 
 %************************************************************************
 %*                                                                      *
@@ -308,4 +316,9 @@ instance Binary CCallConv where
               2 -> do return PrimCallConv
               3 -> do return CmmCallConv
               _ -> do return CApiConv
+
+instance Binary CType where
+    put_ bh (CType fs) = put_ bh fs
+    get bh = do fs <- get bh
+                return (CType fs)
 \end{code}
