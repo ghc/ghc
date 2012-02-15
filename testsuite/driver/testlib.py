@@ -253,6 +253,24 @@ def _compiler_stats_num_field( opts, f, x, y ):
 
 # -----
 
+def stats_range_field( field, min, max ):
+    return lambda opts, f=field, x=min, y=max: _stats_range_field(opts, f, x, y);
+
+def _stats_range_field( opts, f, x, y ):
+    # copy the dictionary, as the config gets shared between all tests
+    opts.stats_range_fields = opts.stats_range_fields.copy()
+    opts.stats_range_fields[f] = (x, y)
+
+def compiler_stats_range_field( field, min, max ):
+    return lambda opts, f=field, x=min, y=max: _compiler_stats_range_field(opts, f, x, y);
+
+def _compiler_stats_range_field( opts, f, x, y ):
+    # copy the dictionary, as the config gets shared between all tests
+    opts.compiler_stats_range_fields = opts.compiler_stats_range_fields.copy()
+    opts.compiler_stats_range_fields[f] = (x, y)
+
+# -----
+
 def skip_if_no_ghci(opts):
     if not ('ghci' in config.run_ways):
         opts.skip = 1
@@ -949,13 +967,34 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Check -t stats info
 
-def checkStats(stats_file, num_fields):
+def checkStats(stats_file, range_fields, num_fields):
     result = passed()
     if len(num_fields) > 0:
         f = open(in_testdir(stats_file))
         contents = f.read()
         f.close()
 
+        for (field, (expected, dev)) in range_fields.items():
+            m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
+            if m == None:
+                print 'Failed to find field: ', field
+                result = failBecause('no such stats field')
+            val = int(m.group(1))
+
+            min = expected * ((100 - float(dev))/100);
+            max = expected * ((100 + float(dev))/100);
+
+            if val < min:
+                print field, val, 'is more than ' + repr(dev) + '%'
+                print 'less than the exepected value', expected
+                print 'If this is because you have improved GHC, please'
+                print 'update the test so that GHC doesn\'t regress again'
+                result = failBecause('stat too good')
+            if val > max:
+                print field, val, 'is more than ' + repr(dev) + '% greater than the expected value,', expected, max
+                result = failBecause('stat not good enough')
+
+        # ToDo: remove all uses of this, and delete it
         for (field, (min, max)) in num_fields.items():
             m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
             if m == None:
@@ -1058,7 +1097,8 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(stats_file, opts.compiler_stats_num_fields)
+    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields
+                                       , opts.compiler_stats_num_fields)
 
     if badResult(statsResult):
         return statsResult
@@ -1149,7 +1189,8 @@ def simple_run( name, way, prog, args ):
         if check_prof and not check_prof_ok(name):
             return failBecause('bad profile')
 
-    return checkStats(stats_file, opts.stats_num_fields)
+    return checkStats(stats_file, opts.stats_range_fields
+                                , opts.stats_num_fields)
 
 def rts_flags(way):
     if (way == ''):
