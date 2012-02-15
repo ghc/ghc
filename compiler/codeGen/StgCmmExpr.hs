@@ -284,14 +284,62 @@ data GcPlan
 			-- of the case alternative(s) into the upstream check
 
 -------------------------------------
--- See Note [case on Bool]
 cgCase :: StgExpr -> Id -> SRT -> AltType -> [StgAlt] -> FCode ()
+
+cgCase (StgOpApp (StgPrimOp op) args _) bndr _srt (AlgAlt tycon) alts
+  | isEnumerationTyCon tycon -- Note [case on bool]
+  = do { tag_expr <- do_enum_primop op args
+
+       -- If the binder is not dead, convert the tag to a constructor
+       -- and assign it.
+       ; when (not (isDeadBinder bndr)) $ do
+            { tmp_reg <- bindArgToReg (NonVoid bndr)
+            ; emitAssign (CmmLocal tmp_reg)
+                         (tagToClosure tycon tag_expr) }
+
+       ; (mb_deflt, branches) <- cgAlgAltRhss NoGcInAlts (NonVoid bndr) alts
+       ; emitSwitch tag_expr branches mb_deflt 0 (tyConFamilySize tycon - 1)
+       }
+  where
+    do_enum_primop :: PrimOp -> [StgArg] -> FCode CmmExpr
+    do_enum_primop TagToEnumOp [arg]  -- No code!
+      = getArgAmode (NonVoid arg)
+    do_enum_primop primop args
+      = do tmp <- newTemp bWord
+           cgPrimOp [tmp] primop args
+           return (CmmReg (CmmLocal tmp))
+
 {-
-cgCase (OpApp ) bndr srt AlgAlt [(DataAlt flase, a2]
-  | isBoolTy (idType bndr)
-  , isDeadBndr bndr
-  = 
+Note [case on bool]
+
+This special case handles code like
+
+  case a <# b of
+    True ->
+    False ->
+
+If we let the ordinary case code handle it, we'll get something like
+
+ tmp1 = a < b
+ tmp2 = Bool_closure_tbl[tmp1]
+ if (tmp2 & 7 != 0) then ... // normal tagged case
+
+but this junk won't optimise away.  What we really want is just an
+inline comparison:
+
+ if (a < b) then ...
+
+So we add a special case to generate
+
+ tmp1 = a < b
+ if (tmp1 == 0) then ...
+
+and later optimisations will further improve this.
+
+We should really change all these primops to return Int# instead, that
+would make this special case go away.
 -}
+
 
   -- Note [ticket #3132]: we might be looking at a case of a lifted Id
   -- that was cast to an unlifted type.  The Id will always be bottom,
@@ -439,17 +487,10 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
-  = do	{ tagged_cmms <- cgAltRhss gc_plan bndr alts
-	
+  = do  { (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
+
 	; let fam_sz   = tyConFamilySize tycon
 	      bndr_reg = CmmLocal (idToReg bndr)
-	      mb_deflt = case tagged_cmms of
-			   ((DEFAULT,rhs) : _) -> Just rhs
-			   _other	       -> Nothing
-		-- DEFAULT is always first, if present
-
-	      branches = [ (dataConTagZ con, cmm) 
-	   	         | (DataAlt con, cmm) <- tagged_cmms ]
 
                     -- Is the constructor tag in the node reg?
         ; if isSmallFamily fam_sz
@@ -469,6 +510,27 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
 cgAlts _ _ _ _ = panic "cgAlts"
 	-- UbxTupAlt and PolyAlt have only one alternative
+
+
+-------------------
+cgAlgAltRhss :: GcPlan -> NonVoid Id -> [StgAlt]
+             -> FCode ( Maybe CmmAGraph
+                      , [(ConTagZ, CmmAGraph)] )
+cgAlgAltRhss gc_plan bndr alts
+  = do { tagged_cmms <- cgAltRhss gc_plan bndr alts
+
+       ; let { mb_deflt = case tagged_cmms of
+                           ((DEFAULT,rhs) : _) -> Just rhs
+                           _other              -> Nothing
+                            -- DEFAULT is always first, if present
+
+              ; branches = [ (dataConTagZ con, cmm)
+                           | (DataAlt con, cmm) <- tagged_cmms ]
+              }
+
+       ; return (mb_deflt, branches)
+       }
+
 
 -------------------
 cgAltRhss :: GcPlan -> NonVoid Id -> [StgAlt] -> FCode [(AltCon, CmmAGraph)]
@@ -616,35 +678,6 @@ emitEnter fun = do
        }
   }
 
-
-
-{- Note [case on Bool]
-   ~~~~~~~~~~~~~~~~~~~
-A case on a Boolean value does two things:
-  1. It looks up the Boolean in a closure table and assigns the
-     result to the binder.
-  2. It branches to the True or False case through analysis
-     of the closure assigned to the binder.
-But the indirection through the closure table is unnecessary
-if the assignment to the binder will be dead code (use isDeadBndr).
-
-The following example illustrates how badly the code turns out:
-  STG:
-    case <=## [ww_s7Hx y_s7HD] of wild2_sbH8 {
-      GHC.Types.False -> <true  code> // sbH8 dead
-      GHC.Types.True  -> <false code> // sbH8 dead
-    };
-  Cmm:
-    _s7HD::F64 = F64[_sbH7::I64 + 7];  // MidAssign
-    _ccsW::I64 = %MO_F_Le_W64(_s7Hx::F64, _s7HD::F64);  // MidAssign
-    // emitReturn  // MidComment
-    _sbH8::I64 = I64[ghczmprim_GHCziBool_Bool_closure_tbl + (_ccsW::I64 << 3)];  // MidAssign
-    _ccsX::I64 = _sbH8::I64 & 7;  // MidAssign
-    if (_ccsX::I64 >= 2) goto ccsH; else goto ccsI;  // LastCondBranch
-
-The assignments to _sbH8 and _ccsX are completely unnecessary.
-Instead, we should branch based on the value of _ccsW.
--}
 
 {- Note [Better Alt Heap Checks]
 If two function calls can share a return point, then they will also
