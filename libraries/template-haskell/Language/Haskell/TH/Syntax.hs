@@ -66,6 +66,7 @@ import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad (liftM)
 import System.IO	( hPutStrLn, stderr )
 import Data.Char        ( isAlpha )
+import Data.Word        ( Word8 )
 
 -----------------------------------------------------
 --
@@ -792,7 +793,7 @@ data Lit = CharL Char
          | WordPrimL Integer
          | FloatPrimL Rational
          | DoublePrimL Rational
-         | StringPrimL String	-- ^ A primitive C-style string, type Addr#
+         | StringPrimL [Word8]	-- ^ A primitive C-style string, type Addr#
     deriving( Show, Eq, Data, Typeable )
 
     -- We could add Int, Float, Double etc, as we do in HsLit, 

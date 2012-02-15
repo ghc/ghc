@@ -9,6 +9,7 @@ module Language.Haskell.TH.Lib where
 
 import Language.Haskell.TH.Syntax
 import Control.Monad( liftM, liftM2 )
+import Data.Word( Word8 )
 
 ----------------------------------------------------------
 -- * Type synonyms
@@ -54,7 +55,7 @@ charL       :: Char -> Lit
 charL       = CharL
 stringL     :: String -> Lit
 stringL     = StringL
-stringPrimL :: String -> Lit
+stringPrimL :: [Word8] -> Lit
 stringPrimL = StringPrimL
 rationalL   :: Rational -> Lit
 rationalL   = RationalL

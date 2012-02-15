@@ -9,7 +9,8 @@ module Language.Haskell.TH.Ppr where
 import Text.PrettyPrint (render)
 import Language.Haskell.TH.PprLib
 import Language.Haskell.TH.Syntax
-import Data.Char ( toLower )
+import Data.Word ( Word8 )
+import Data.Char ( toLower, chr )
 import GHC.Show  ( showMultiLineString )
 
 nestDepth :: Int
@@ -173,8 +174,11 @@ pprLit i (DoublePrimL x) = parensIf (i > noPrec && x < 0)
 pprLit i (IntegerL x)    = parensIf (i > noPrec && x < 0) (integer x)
 pprLit _ (CharL c)       = text (show c)
 pprLit _ (StringL s)     = pprString s
-pprLit _ (StringPrimL s) = pprString s <> char '#'
+pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
 pprLit i (RationalL rat) = parensIf (i > noPrec) $ rational rat
+
+bytesToString :: [Word8] -> String
+bytesToString = map (chr . fromIntegral)
 
 pprString :: String -> Doc
 -- Print newlines as newlines with Haskell string escape notation, 
