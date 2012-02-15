@@ -153,6 +153,9 @@ qaToAnswer :: QA -> Maybe Answer
 qaToAnswer qa = case qa of Answer a -> Just a; Question _ -> Nothing
 
 
+type Generalised = Bool
+
+
 type UnnormalisedState = (Deeds, Heap, Stack, In AnnedTerm)
 type State = (Deeds, Heap, Stack, Anned QA)
 
@@ -174,7 +177,10 @@ data HowBound = InternallyBound | LambdaBound | LetBound
 instance Outputable HowBound where
     ppr = text . show
 
-data HeapBinding = HB { howBound :: HowBound, heapBindingMeaning :: Either (Maybe Tag) (In AnnedTerm) }
+-- Left (Left gen) == no term, previously generalised if gen
+-- Left (Right tg) == no term, bound by environment with tag tg (used by LetBound only I think)
+-- Right in_e      == term in_e
+data HeapBinding = HB { howBound :: HowBound, heapBindingMeaning :: Either (Either Generalised Tag) (In AnnedTerm) }
 
 pPrintPrecAnned :: Outputable (f a)
                 => (f a -> FreeVars)
@@ -201,17 +207,20 @@ pPrintPrecAnswer prec (CastBy co tg, v) = pPrintPrecCast prec (Tagged tg v) co
 instance Outputable HeapBinding where
     pprPrec prec (HB how mb_in_e) = case how of
         InternallyBound -> either (const empty) (pPrintPrecAnnedTerm prec) mb_in_e
-        LambdaBound     -> text "λ" <> angles (either (const empty) (pPrintPrecAnnedTerm noPrec) mb_in_e)
-        LetBound        -> text "l" <> angles (either (const empty) (pPrintPrecAnnedTerm noPrec) mb_in_e)
+        LambdaBound     -> text "λ" <> angles (either (either (\gen -> if gen then text "?" else empty) (const empty)) (pPrintPrecAnnedTerm noPrec) mb_in_e)
+        LetBound        -> text "l" <> angles (either (either (\gen -> if gen then text "?" else empty) (const empty)) (pPrintPrecAnnedTerm noPrec) mb_in_e)
 
 lambdaBound :: HeapBinding
-lambdaBound = HB LambdaBound (Left Nothing)
+lambdaBound = HB LambdaBound (Left (Left False))
+
+generalised :: HeapBinding
+generalised = HB LambdaBound (Left (Left True))
 
 internallyBound :: In AnnedTerm -> HeapBinding
 internallyBound in_e = HB InternallyBound (Right in_e)
 
 environmentallyBound :: Tag -> HeapBinding
-environmentallyBound tg = HB LetBound (Left (Just tg))
+environmentallyBound tg = HB LetBound (Left (Right tg))
 
 letBound :: In AnnedTerm -> HeapBinding
 letBound in_e = HB LetBound (Right in_e)
@@ -224,7 +233,7 @@ instance Outputable Heap where
     pprPrec prec (Heap h _) = pprPrec prec h
 
 
-type Stack = [Tagged StackFrame]
+type Stack = Train (Tagged StackFrame) Generalised
 data StackFrame = TyApply (Out Type)
                 | CoApply (Out NormalCo)
                 | Apply (Out Id)
@@ -250,7 +259,7 @@ stateType :: State -> Type
 stateType (_, _, k, qa) = stackType k (qaType qa)
 
 stackType :: Stack -> Type -> Type
-stackType k ty = foldl' (flip stackFrameType) ty k
+stackType k ty = trainCarFoldl' (flip stackFrameType) ty k
 
 stackFrameType :: Tagged StackFrame -> Type -> Type
 stackFrameType kf hole_ty = case tagee kf of
@@ -309,7 +318,7 @@ heapBindingTerm :: HeapBinding -> Maybe (In AnnedTerm)
 heapBindingTerm = either (const Nothing) Just . heapBindingMeaning
 
 heapBindingTag :: HeapBinding -> Maybe Tag
-heapBindingTag = either id (Just . annedTag . snd) . heapBindingMeaning
+heapBindingTag = either (either (const Nothing) Just) (Just . annedTag . snd) . heapBindingMeaning
 
 -- | Size of HeapBinding for Deeds purposes
 heapBindingSize :: HeapBinding -> Size
@@ -332,7 +341,7 @@ heapSize :: Heap -> Size
 heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
 
 stackSize :: Stack -> Size
-stackSize = sum . map (stackFrameSize . tagee)
+stackSize = trainCarFoldl' (\size kf -> size + stackFrameSize (tagee kf)) 0
 
 stateSize :: State -> Size
 stateSize (_, h, k, qa) = heapSize h + stackSize k + annedSize qa
@@ -347,8 +356,11 @@ releaseHeapBindingDeeds deeds hb = deeds `releaseDeeds` heapBindingSize hb
 releasePureHeapDeeds :: Deeds -> PureHeap -> Deeds
 releasePureHeapDeeds = M.fold (flip releaseHeapBindingDeeds)
 
+releaseStackFrameDeeds :: Deeds -> Tagged StackFrame -> Deeds
+releaseStackFrameDeeds deeds kf = deeds `releaseDeeds` stackFrameSize (tagee kf)
+
 releaseStackDeeds :: Deeds -> Stack -> Deeds
-releaseStackDeeds = foldl' (\deeds kf -> deeds `releaseDeeds` stackFrameSize (tagee kf))
+releaseStackDeeds = trainCarFoldl' releaseStackFrameDeeds
 
 releaseUnnormalisedStateDeed :: UnnormalisedState -> Deeds
 releaseUnnormalisedStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (releasePureHeapDeeds (deeds `releaseDeeds` annedSize e) h) k

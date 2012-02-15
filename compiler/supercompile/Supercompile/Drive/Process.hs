@@ -209,7 +209,7 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
   where
     extAnn x ann = showSDoc (ppr x):ann
 
-    (e_ann, resid_tags) = foldr (\kf (ann, resid_tags) -> second (`IM.union` resid_tags) $ go_kf ann kf) ([], IM.empty) k
+    (e_ann, resid_tags) = trainCarFoldr (\kf (ann, resid_tags) -> second (`IM.union` resid_tags) $ go_kf ann kf) ([], IM.empty) k
     
     go_qa :: [String] -> Anned QA -> TagAnnotations
     go_qa ann qa = IM.insert (tagInt (annedTag qa)) ann $ go_qa' ann (annee qa)
@@ -289,13 +289,13 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.t
         ids = mkInScopeSet input_fvs
         mk_heap how_bound = Heap (M.fromList (map (second how_bound) h_unfoldings) `M.union` M.fromList h_fvs) ids
         
-        state = normalise (deeds, mk_heap letBound, [], (rn, anned_e))
+        state = normalise (deeds, mk_heap letBound, Loco False, (rn, anned_e))
         
-        preinit_state = normalise (deeds, preinit_heap, [], (rn, anned_e))
+        preinit_state = normalise (deeds, preinit_heap, Loco False, (rn, anned_e))
         preinit_heap = mk_heap internallyBound
 
         -- NB: we assume that unfoldings are guaranteed to be cheap and hence duplicatiable. I think this is reasonable.
-        preinit_with = [(gc (normalise (maxBound, heap', [], anned_e')), accessor_e)
+        preinit_with = [(gc (normalise (maxBound, heap', Loco False, anned_e')), accessor_e)
                        | (x', anned_e) <- h_unfoldings
                        , (heap', accessor_e, anned_e') <- eta preinit_heap (var x') anned_e]
 
@@ -424,8 +424,10 @@ gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(stateUncoveredVars gced_state 
               | otherwise            = ((x', hb) : h_pending_kvs, h_output,                live)
     
     pruneLiveStack :: Deeds -> Stack -> FreeVars -> (Deeds, Stack)
-    pruneLiveStack deeds k live = (deeds `releaseStackDeeds` k_dead, k_live)
-      where (k_live, k_dead) = partition (\kf -> case tagee kf of Update x' -> x' `elemVarSet` live; _ -> True) k
+    pruneLiveStack init_deeds k live = trainFoldr (\kf (deeds, k_live) -> if (case tagee kf of Update x' -> x' `elemVarSet` live; _ -> True)
+                                                                          then (deeds, kf `Car` k_live)
+                                                                          else (deeds `releaseStackFrameDeeds` kf, k_live))
+                                                  (\gen deeds -> (deeds, Loco gen)) init_deeds k
 
 
 type AlreadySpeculated = S.Set Var
@@ -501,13 +503,13 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
                     Stop (_gced_old_state, rb) -> pprTrace "speculation denied" (ppr x' {- $$ pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness _old_state -})
                                              (no_change, rb)
                     Continue hist -> case reduceWithStats state of
-                        (extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
+                        (extra_stats, (deeds, Heap h_speculated_ok' ids, Loco _, qa))
                           | Just a <- traverse qaToAnswer qa
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
                                 in_e' = annedAnswerToInAnnedTerm (mkInScopeSet (annedFreeVars a)) a
                           -> ((stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure, ids), speculateManyMap hist h_unspeculated)
                         _ -> (no_change, speculation_failure)
-                  where state = normalise (deeds, Heap h_speculated_ok ids, [], in_e)
+                  where state = normalise (deeds, Heap h_speculated_ok ids, Loco False, in_e)
                         -- NB: try to avoid dead bindings in the state using 'gc' before the termination test so
                         -- that the termination condition is more lenient. This showed up in practice, in a version
                         -- of LetRec.hs where we had:

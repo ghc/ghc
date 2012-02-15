@@ -308,7 +308,7 @@ sc' :: Parent -> State -> ProcessM (LevelM (Deeds, Out FVedTerm))
 sc' parent state = callCCish (\k -> try (RB k))
   where
     trce how shallow_state = pprTraceSC ("sc-stop(" ++ how ++ ")") (ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$
-                                                                    ppr shallow_state $$ pPrintFullState fullStatePrettiness shallow_state $$ ppr state $$ pPrintFullState fullStatePrettiness state)
+                                                                    pPrintFullState fullStatePrettiness shallow_state $$ pPrintFullState fullStatePrettiness state)
     try :: RollbackScpM -> ProcessM (LevelM (Deeds, Out FVedTerm))
     try rb = terminateM parent state rb
                (\parent -> liftSpeculatedStateT speculated state $ \state' -> my_split (reduce state') (sc'' parent))

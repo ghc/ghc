@@ -194,7 +194,7 @@ instanceSplit :: MonadStatics m
 instanceSplit (deeds, heap, k, focus) opt = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (heap, nameStack k, \_ -> ([], noneBracketed' IM.empty focus)) -- FIXME: residualised tags? FIXME: scrutinee identity?
 
 nameStack :: Stack -> NamedStack
-nameStack = ([0..] `zip`)
+nameStack = snd . trainCarMapAccumL (\i kf -> (i + 1, (i, kf))) 0
 
 -- TODO: could do instance-matching on generalised parts of terms. It would make tieback faster when generalising,
 -- at the cost of pessimising some programs
@@ -209,19 +209,18 @@ generalise gen (deeds, Heap h ids, k, qa) = do
     (gen_kfs, gen_xs') <- case gENERALISATION of
         NoGeneralisation -> Nothing
         AllEligible -> guard (not (IS.null gen_kfs) || not (isEmptyVarSet gen_xs'')) >> return (gen_kfs, gen_xs'')
-          where gen_kfs = IS.fromList [i   | (i, kf) <- named_k, generaliseStackFrame gen kf]
+          where gen_kfs = IS.fromList [i   | (i, kf) <- trainCars named_k, generaliseStackFrame gen kf]
                 gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList h, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr (x'', hb, heapBindingTag hb)) True]
         StackFirst -> (guard (not (IS.null gen_kfs)) >> return (gen_kfs, emptyVarSet)) `mplus`
                       (guard (not (isEmptyVarSet gen_xs''))  >> return (IS.empty, gen_xs''))
-          where gen_kfs = IS.fromList [i   | (i, kf) <- named_k, generaliseStackFrame gen kf]
+          where gen_kfs = IS.fromList [i   | (i, kf) <- trainCars named_k, generaliseStackFrame gen kf]
                 gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList h, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr (x'', hb, heapBindingTag hb)) True]
         DependencyOrder want_first -> listToMaybe ((if want_first then id else reverse) possibilities)
           where -- We consider possibilities starting from the root of the term -- i.e. the bottom of the stack.
                 -- This is motivated by how the interaction with subgraph generalisation for TreeFlip/TreeSum.
                 -- FIXME: explain in more detail if this turns out to be sane.
-                possibilities = findGeneralisable False emptyVarSet (reverse named_k) h
+                possibilities = findGeneralisable False emptyVarSet (reverse (trainCars named_k)) h
                 
-                findGeneralisable :: Bool -> FreeVars -> NamedStack -> PureHeap -> [(IS.IntSet, Out VarSet)]
                 findGeneralisable done_qa pending_xs' unreached_kfs unreached_hbs
                    | done_qa && null pending_kfs && M.null pending_hbs
                    = []
@@ -237,14 +236,14 @@ generalise gen (deeds, Heap h ids, k, qa) = do
                     gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList pending_hbs, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr (x'', hb, heapBindingTag hb)) True]
                     
                     reached_xs' = M.foldrWithKey (\_x' hb fvs -> heapBindingFreeVars hb `unionVarSet` fvs)
-                                                 (stackFreeVars (map snd pending_kfs))
+                                                 (unionVarSets (map (stackFrameFreeVars . tagee . snd) pending_kfs))
                                                  pending_hbs
     
     -- If we can find some fraction of the stack or heap to drop that looks like it will be admissable, just residualise those parts and continue
     pprTrace "generalise: (gen_kfs, gen_xs')" (ppr (gen_kfs, gen_xs')) $ return ()
     
     let (ctxt_id, ctxt_ids) = takeUniqFromSupply splitterUniqSupply
-    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed' (qaType qa) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, [], annedQAToInAnnedTerm ids qa))))
+    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed' (qaType qa) (Once ctxt_id, (emptyDeeds, Heap M.empty ids, Loco False, annedQAToInAnnedTerm ids qa))))
 
 {-# INLINE generaliseSplit #-}
 generaliseSplit :: MonadStatics m
@@ -415,9 +414,9 @@ noneBracketed' tgs a = TailsUnknown (Shell { shellExtraTags = tgs, shellExtraFvs
 oneBracketed :: UniqSupply -> Type -> (Entered, (Heap, Stack, In AnnedTerm)) -> Bracketed (Entered, UnnormalisedState)
 oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
   | eAGER_SPLIT_VALUES
-  , Just cast_by <- case k of []                      -> Just Uncast
-                              [Tagged tg (CastIt co)] -> Just (CastBy co tg)
-                              _                       -> Nothing
+  , Just cast_by <- case k of Loco _                             -> Just Uncast
+                              Tagged tg (CastIt co) `Car` Loco _ -> Just (CastBy co tg)
+                              _                                  -> Nothing
   , Just anned_a <- termToAnswer ids in_e
   = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h' `M.union` h) ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
     modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` fst (pureHeapVars h) LambdaBound }) $                    -- Fix bracket FVs by removing anything lambda-bound above
@@ -465,6 +464,9 @@ zipBracketeds (TailsKnown bty mk_bshell bholes) = case ei_holes of
 modifyShell :: (Shell -> Shell) -> Bracketed a -> Bracketed a
 modifyShell f (TailsKnown ty mk_shell holes) = TailsKnown ty (f . mk_shell) holes
 modifyShell f (TailsUnknown  shell    holes) = TailsUnknown  (f shell)      holes
+
+modifyTails_ :: (Type -> Type) -> ([a] -> [a]) -> Bracketed a -> Maybe (Bracketed a)
+modifyTails_ mk_ty f = fmap snd . modifyTails mk_ty (\as -> ((), f as))
 
 modifyTails :: forall a b. (Type -> Type) -> ([a] -> (b, [a])) -> Bracketed a -> Maybe (b, Bracketed a)
 modifyTails _     _ (TailsUnknown _ _)             = Nothing
@@ -602,7 +604,7 @@ optimiseLetBinds opt leftover_deeds bracketeds_heap fvs' = -- traceRender ("opti
 
 -- TODO: I could use the improved entered info that comes from the final FVs to adjust the split and float more stuff inwards..
 
-type NamedStack = [(Int, Tagged StackFrame)]
+type NamedStack = Train (Int, Tagged StackFrame) Generalised
 
 splitt :: UniqSupply
        -> (IS.IntSet, Out VarSet)
@@ -642,7 +644,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         --
         -- NB: do NOT normalise at this stage because in transitiveInline we assume that State heaps are droppable!
         (deeds1a, bracketeds_updated, bracketed_focus)
-          = pushStack ctxt_ids0 ids deeds scruts [(need_not_resid_kf i kf, kf) | (i, kf) <- named_k] bracketed_qa
+          = pushStack ctxt_ids0 ids deeds scruts (fmapCars (\(i, kf) -> (need_not_resid_kf i kf, kf)) named_k) bracketed_qa
             
         need_not_resid_kf i kf
           | i `IS.member` gen_kfs
@@ -655,7 +657,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         -- 2) Build a splitting for those elements of the heap we propose to residualise not in not_resid_xs
         -- TODO: I should residualise those Unfoldings whose free variables have become interesting due to intervening scrutinisation
         (h_not_residualised, h_residualised) = M.partitionWithKey (\x' _ -> x' `elemVarSet` not_resid_xs) h
-        bracketeds_nonupdated0 = M.mapMaybeWithKey (\x' hb -> do { guard (howBound hb == InternallyBound); return $ case heapBindingTerm hb of Nothing -> (error "Unimplemented: no tag for undefined", undefined "FIXME FIXME" (noneBracketed (error "No tag for undefined") (fvedTerm (Var (undefined "tcLookupId" undefinedName))))); Just in_e@(_, e) -> (annedTag e, oneBracketed ctxt_ids1 (idType x') (Once (idUnique x'), (Heap M.empty ids, [], in_e))) }) h_residualised
+        bracketeds_nonupdated0 = M.mapMaybeWithKey (\x' hb -> do { guard (howBound hb == InternallyBound); return $ case heapBindingTerm hb of Nothing -> (error "Unimplemented: no tag for undefined", undefined "FIXME FIXME" (noneBracketed (error "No tag for undefined") (fvedTerm (Var (undefined "tcLookupId" undefinedName))))); Just in_e@(_, e) -> (annedTag e, oneBracketed ctxt_ids1 (idType x') (Once (idUnique x'), (Heap M.empty ids, Loco False, in_e))) }) h_residualised
         -- An idea from Arjan, which is sort of the dual of positive information propagation:
         -- TODO: this is too dangerous presently: we often end up adding an Update at the end just after we generalised it away, building ourselves a nice little loop :(
         -- I have tried to work around this by only introducing Update frames for those things that don't presently have one... but that also doesn't work because if we start
@@ -699,7 +701,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         --
         -- Basically the idea of this heap is "stuff we want to make available to push down"
         h_updated_phantoms = M.fromDistinctAscList [(x', lambdaBound) | x' <- M.keys bracketeds_updated] -- TODO: move this into h_cheap_and_phantoms?
-        h_inlineable = varSetToDataMap lambdaBound gen_xs `M.union` -- The exclusion just makes sure we don't inline explicitly generalised bindings (even phantom ones)
+        h_inlineable = varSetToDataMap generalised gen_xs `M.union` -- The exclusion just makes sure we don't inline explicitly generalised bindings (even phantom ones)
                        (h_not_residualised `M.union`                -- Take any non-residualised bindings from the input heap/stack...
                         h_cheap_and_phantom `M.union`               -- ...failing which, take concrete definitions for cheap heap bindings (even if they are also residualised) or phantom definitions for expensive ones...
                         h_updated_phantoms)                         -- ...failing which, take phantoms for things bound by update frames (if supercompilation couldn't turn these into values, GHC is unlikely to get anything good from seeing defs)
@@ -810,7 +812,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
                                                                                              unionVarSets (map (bracketedFreeVars stateFreeVars) (M.elems bracketeds_heap'))))
     
     -- Bound variables: those variables that I am interested in making a decision about whether to residualise or not
-    bound_xs = pureHeapBoundVars h `unionVarSet` stackBoundVars (map snd named_k)
+    bound_xs = pureHeapBoundVars h `unionVarSet` stackBoundVars (fmapCars snd named_k)
     
     -- Heap full of cheap expressions and any phantom stuff from the input heap but NOT from update frames
     -- Used within the main loop in the process of computing h_inlineable -- see comments there for the full meaning of this stuff.
@@ -819,8 +821,8 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
       | InternallyBound <- howBound hb
       , Just (_, e) <- heapBindingTerm hb
       = if termIsCheap e
-        then hb {                                    howBound = howToBindCheap e } -- Use binding heuristics to determine how to refer to the cheap thing
-        else hb { heapBindingMeaning = Left Nothing, howBound = LambdaBound }      -- GHC is unlikely to get any benefit from seeing the binding sites for non-cheap things
+        then hb {                                         howBound = howToBindCheap e } -- Use binding heuristics to determine how to refer to the cheap thing
+        else hb { heapBindingMeaning = Left (Left False), howBound = LambdaBound }      -- GHC is unlikely to get any benefit from seeing the binding sites for non-cheap things
        -- Inline phantom/unfolding stuff verbatim: there is no work duplication issue (the caller would not have created the bindings unless they were safe-for-duplication)
       | otherwise
       = hb
@@ -1017,21 +1019,25 @@ pushStack :: UniqSupply
           -> InScopeSet
           -> Deeds
           -> [Out Var]
-          -> [(Bool, Tagged StackFrame)]
+          -> Train (Bool, Tagged StackFrame) Generalised
           -> Bracketed (Entered, UnnormalisedState)
           -> (Deeds,
               M.Map (Out Var) (Bracketed (Entered, UnnormalisedState)),
               Bracketed (Entered, UnnormalisedState))
-pushStack _        _   deeds _      []                 bracketed_hole = (deeds, M.empty, bracketed_hole)
-pushStack ctxt_ids ids deeds scruts ((may_push, kf):k) bracketed_hole = second3 (`M.union` bracketed_heap') $ pushStack ctxt_ids2 ids deeds' scruts' k bracketed_hole'
+pushStack _        _   deeds _      (Loco gen)               bracketed_hole = (deeds, M.empty, setStackGeneralised gen bracketed_hole)
+pushStack ctxt_ids ids deeds scruts ((may_push, kf) `Car` k) bracketed_hole = second3 (`M.union` bracketed_heap') $ pushStack ctxt_ids2 ids deeds' scruts' k bracketed_hole'
   where
     (ctxt_ids1, ctxt_ids2) = splitUniqSupply ctxt_ids
 
     -- If we have access to hole tail positions, we should try to inline this stack frame into that tail position.
     -- If we do not have access to the tail positions of the hole, all we can do is rebuild a bit of residual syntax around the hole.
     (deeds', (scruts', bracketed_heap', bracketed_hole'))
-      = (guard may_push >> fmap (\(deeds', bracketed_hole') -> (deeds', ([], M.empty, bracketed_hole'))) (pushStackFrame kf deeds bracketed_hole)) `orElse`
-        (deeds, splitStackFrame ctxt_ids1 ids kf scruts bracketed_hole)
+      | may_push  = fmap (\(deeds', bracketed_hole') -> (deeds', ([], M.empty, bracketed_hole'))) (pushStackFrame kf deeds bracketed_hole) `orElse`
+                    (deeds, splitStackFrame ctxt_ids1 ids kf scruts                           bracketed_hole)
+      | otherwise = (deeds, splitStackFrame ctxt_ids1 ids kf scruts (setStackGeneralised True bracketed_hole))
+
+setStackGeneralised :: Generalised -> Bracketed (Entered, UnnormalisedState) -> Bracketed (Entered, UnnormalisedState)
+setStackGeneralised gen bracketed_hole = modifyTails_ id (map (second (third4 (fmapLoco (\_old_gen -> gen))))) bracketed_hole `orElse` bracketed_hole
 
 pushStackFrame :: Tagged StackFrame
                -> Deeds
@@ -1045,7 +1051,7 @@ pushStackFrame kf deeds bracketed_hole = do
     push :: [(Entered, UnnormalisedState)] -> (Maybe Deeds, [(Entered, UnnormalisedState)])
     push fillers = case claimDeeds deeds (stackFrameSize (tagee kf) * (branch_factor - 1)) of -- NB: subtract one because one occurrence is already "paid for". It is OK if the result is negative (i.e. branch_factor 0)!
             Nothing    -> trace (showSDoc $ text "pushStack-deeds" <+> pPrint branch_factor) (Nothing, fillers)
-            Just deeds ->                                                                    (Just deeds, map (\(ent, state) -> (ent, third4 (++ [kf]) state)) fillers)
+            Just deeds ->                                                                    (Just deeds, map (\(ent, state) -> (ent, third4 (`trainAppend` \_gen -> kf `Car` Loco False) state)) fillers)
       where branch_factor = length fillers
 
 {-
@@ -1123,8 +1129,8 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
                                                                         `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
                                             alt_rns alt_cons alt_bvss -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
-            bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
-    StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
+            bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap alt_h alt_ids, Loco False, alt_in_e))) alt_hs alt_idss alt_in_es
+    StrictLet x' in_e -> zipBracketeds $ TailsKnown ty' (\_final_ty' -> shell emptyVarSet $ \[e_hole, e_body] -> let_ x' e_hole e_body) [TailishHole False $ Hole [] bracketed_hole, TailishHole True $ Hole [x'] $ oneBracketed' ty' (Once ctxt_id, (emptyDeeds, Heap (M.singleton x' lambdaBound) ids, Loco False, in_e))]
       where ctxt_id = uniqFromSupply ctxt_ids
             ty' = inTermType ids in_e
     PrimApply pop tys' in_vs in_es -> zipBracketeds $ TailsUnknown (shell emptyVarSet $ primOp pop tys') (zipWith Hole (repeat []) $ bracketed_vs ++ bracketed_hole : bracketed_es)
@@ -1135,7 +1141,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             
             -- 1) Split every value and expression remaining apart
             bracketed_vs = zipWith (\ctxt_ids in_v -> splitAnswer ctxt_ids ids (annedToTagged in_v)) ctxt_idss0 in_vs
-            bracketed_es  = zipWith (\ctxt_ids in_e -> let (ctxt_id, ctxt_ids0) = takeUniqFromSupply ctxt_ids in oneBracketed ctxt_ids0 (inTermType ids in_e) (Once ctxt_id, (Heap M.empty ids, [], in_e))) ctxt_idss1 in_es)
+            bracketed_es  = zipWith (\ctxt_ids in_e -> let (ctxt_id, ctxt_ids0) = takeUniqFromSupply ctxt_ids in oneBracketed ctxt_ids0 (inTermType ids in_e) (Once ctxt_id, (Heap M.empty ids, Loco False, in_e))) ctxt_idss1 in_es)
   where
     tg = tag kf
     shell = Shell (oneResidTag tg)
@@ -1165,7 +1171,7 @@ splitUpdate :: UniqSupply -> InScopeSet -> Tag -> [Out Var] -> Var -> Bracketed 
             -> ([Out Var], M.Map (Out Var) (Bracketed (Entered, UnnormalisedState)), Bracketed (Entered, UnnormalisedState))
 splitUpdate ctxt_ids ids tg_kf scruts x' bracketed_hole
   = (x' : scruts, M.singleton x' bracketed_hole,
-     oneBracketed ctxt_ids (idType x') (Once ctxt_id, (Heap M.empty ids, [], (mkIdentityRenaming (unitVarSet x'), annedTerm tg_kf (Var x')))))
+     oneBracketed ctxt_ids (idType x') (Once ctxt_id, (Heap M.empty ids, Loco False, (mkIdentityRenaming (unitVarSet x'), annedTerm tg_kf (Var x')))))
   where ctxt_id = idUnique x'
 
 splitValue :: UniqSupply -> InScopeSet -> Tag -> In AnnedValue -> Bracketed (Entered, UnnormalisedState)
@@ -1177,7 +1183,7 @@ splitValue _        ids tg in_v               = noneBracketed tg (value (detagAn
 -- We create LambdaBound entries in the Heap for both type and value variables, so we can share the code:
 splitLambdaLike :: (Var -> FVedTerm -> ValueF FVed) -> Entered
                 -> UniqSupply -> InScopeSet -> Tag -> In (Var, AnnedTerm) -> Bracketed (Entered, UnnormalisedState)
-splitLambdaLike rebuild entered ctxt_ids ids tg (rn, (x, e)) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) emptyVarSet $ \[e'] -> value (rebuild x' e')) [Hole [x'] $ oneBracketed ctxt_ids (inTermType ids' in_e) (entered, (Heap (M.singleton x' lambdaBound) ids', [], in_e))]
+splitLambdaLike rebuild entered ctxt_ids ids tg (rn, (x, e)) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) emptyVarSet $ \[e'] -> value (rebuild x' e')) [Hole [x'] $ oneBracketed ctxt_ids (inTermType ids' in_e) (entered, (Heap (M.singleton x' lambdaBound) ids', Loco False, in_e))]
   where (ids', rn', x') = renameNonRecBinder ids rn x
         in_e = (rn', e)
 

@@ -621,9 +621,65 @@ supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
 
 data Train a b = Car a (Train a b) | Loco b
 
+{-# INLINE trainAppend #-}
+trainAppend :: Train a b -> (b -> Train a b') -> Train a b'
+trainAppend init_abs mk_tl = go init_abs
+  where go (Car a abs) = Car a (go abs)
+        go (Loco b)    = mk_tl b
+
+{-# INLINE fmapCars #-}
+fmapCars :: (a -> a') -> Train a b -> Train a' b
+fmapCars f = go
+  where go (Car a abs) = Car (f a) (go abs)
+        go (Loco b)    = Loco b
+
+fmapLoco :: (b -> b') -> Train a b -> Train a b'
+fmapLoco f abs = trainAppend abs (Loco . f)
+
+nullTrain :: Train a b -> Bool
+nullTrain (Car _ _) = False
+nullTrain (Loco _)  = True
+
+unconsTrain :: Train a b -> Maybe (a, Train a b)
+unconsTrain (Car a abs) = Just (a, abs)
+unconsTrain (Loco _)    = Nothing
+
 trainToList :: Train a b -> ([a], b)
 trainToList (Car a abs) = first (a:) (trainToList abs)
 trainToList (Loco b)    = ([], b)
+
+trainCars :: Train a b -> [a]
+trainCars (Car a abs) = a : trainCars abs
+trainCars (Loco _)    = []
+
+trainCarFoldl' :: (c -> a -> c) -> c -> Train a b -> c
+trainCarFoldl' f_car = trainFoldl' f_car (\s _a -> s)
+
+{-# INLINE trainFoldl' #-}
+trainFoldl' :: (c -> a -> c) -> (c -> b -> c) -> c -> Train a b -> c
+trainFoldl' f_car f_loco = go
+  where go s (Loco b)    = s `seq` f_loco s b
+        go s (Car a abs) = s `seq` go (f_car s a) abs
+
+trainCarFoldr :: (a -> c -> c) -> c -> Train a b -> c
+trainCarFoldr f_car = trainFoldr f_car (\_b s -> s)
+
+{-# INLINE trainFoldr #-}
+trainFoldr :: (a -> d -> d) -> (b -> c -> d) -> c -> Train a b -> d
+trainFoldr f_car f_loco = go
+  where go s (Loco b)    = f_loco b s
+        go s (Car a abs) = f_car a (go s abs)
+
+trainCarMapAccumL :: (acc -> a -> (acc, a')) -> acc -> Train a b -> (acc, Train a' b)
+trainCarMapAccumL f_car = trainMapAccumL f_car (,)
+
+{-# INLINE trainMapAccumL #-}
+trainMapAccumL :: (acc -> a -> (acc, a')) -> (acc -> b -> (acc, b')) -> acc -> Train a b -> (acc, Train a' b')
+trainMapAccumL f_car f_loco = go
+  where go s (Loco b) = (s', Loco b')
+          where (s', b') = f_loco s b
+        go s (Car a abs) = second (Car a') (go s' abs)
+          where (s', a') = f_car s a
 
 
 data Stream a = a :< Stream a

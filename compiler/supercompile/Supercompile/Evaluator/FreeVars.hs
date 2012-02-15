@@ -35,7 +35,7 @@ stackFreeVars :: Stack -> FreeVars
 stackFreeVars = snd . stackOpenFreeVars
 
 stackOpenFreeVars :: Stack -> (BoundVars, FreeVars)
-stackOpenFreeVars = (unionVarSets *** unionVarSets) . unzip . map (stackFrameOpenFreeVars . tagee)
+stackOpenFreeVars = (unionVarSets *** unionVarSets) . unzip . map (stackFrameOpenFreeVars . tagee) . trainCars
 
 stackFrameBoundVars :: StackFrame -> BoundVars
 stackFrameBoundVars = fst . stackFrameOpenFreeVars

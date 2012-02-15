@@ -71,9 +71,7 @@ leftExtension :: Train a b -- ^ Longer list
               -> Train a b -- ^ Shorter list
               -> ([a], Train a b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
 leftExtension xs_train ys_train = (reverse prefix_rev, ys_train)
-  where (xs, _xs_loco) = trainToList xs_train
-        (ys, _ys_loco) = trainToList ys_train
-        (prefix_rev, _suffix_rev) = splitBy ys (reverse xs) -- NB: we actually assume ys == suffix_rev
+  where (prefix_rev, _suffix_rev) = splitBy (trainCars ys_train) (reverse (trainCars xs_train)) -- NB: we actually assume ys == suffix_rev
 
 
 data MemoState = MS {
@@ -211,7 +209,7 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
   where
     add_parent s env
       | maybe False (scpDepth env >=) dEPTH_LIIMT
-      , let (deeds, _, e) = residualiseState state
+      , let (deeds, _statics, e, _gen) = residualiseState state
       = return ((deeds, e), s)
       | otherwise
       = trace ("depth: " ++ show (scpDepth env) ++ ' ' : showSDoc (parens (hsep (map ppr (scpParents env))))) $
@@ -336,18 +334,18 @@ memo opt = memo_opt
              | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
              , (mb_p_parent, p) <- [(Just p_parent, p_sibling) | (p_parent, p_siblings) <- parented_ps, p_sibling <- p_parent:p_siblings] ++
                                    [(Nothing,       p_root)    | p_root <- unparented_ps]
+             , let is_ancestor = fmap fun mb_p_parent == Just (fun p)
+                   mm = MM { matchInstanceMatching = if not iNSTANCE_MATCHING then NoInstances
+                                                                              else if is_ancestor then AllInstances else InstancesOfGeneralised }
              , Just (heap_inst@(Heap h_inst _), k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
-                                                                   match' (meaning p) reduced_state]
-             , let instance_match = not (M.null h_inst && null k_inst)
-                   -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
+                                                                   match' mm (meaning p) reduced_state]
+             , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                    Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
-               -- Alow instance matching against direct ancestors only, NOT their children
-             , not instance_match || fmap fun mb_p_parent == Just (fun p)
                -- FIXME: prefer "more exact" matches
              , if dumped p
                 then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
                 else True
-             ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (    pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+             ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
                                          ; insertTagsM res }, s)
                   _          | CheckOnly <- memo_how
                              -> pure (liftM snd $ opt Nothing state, s)
@@ -430,7 +428,7 @@ memo opt = memo_opt
             memo_how | dUPLICATE_VALUES_EVALUATOR || not iNSTANCE_MATCHING
                      = CheckAndRemember -- Do the simple thing in this case, it worked great until we introduced instance matching!
     
-                     | (_, _, [], qa) <- state -- NB: not safe to use reduced_state!
+                     | (_, _, Loco _, qa) <- state -- NB: not safe to use reduced_state!
                      , Answer (_, (_, v)) <- annee qa
                      = case v of Indirect _ -> Skip; _ -> if eAGER_SPLIT_VALUES then Skip else CheckAndRemember
     

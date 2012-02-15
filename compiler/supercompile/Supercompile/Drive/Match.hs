@@ -1,4 +1,5 @@
 module Supercompile.Drive.Match (
+    MatchMode(..), InstanceMatching(..),
     match, match',
     Match, unMatch, matchWithReason, matchWithReason'
   ) where
@@ -16,13 +17,13 @@ import Supercompile.Utilities hiding (guard)
 
 import qualified CoreSyn as Core
 
+import Util
 import Coercion
 import Var        (TyVar, isTyVar, isId, tyVarKind, setVarType)
 import Id         (Id, idType, realIdUnfolding, idSpecialisation, zapFragileIdInfo)
 import IdInfo     (SpecInfo(..), emptySpecInfo)
 import VarEnv
 import TypeRep    (Kind, Type(..))
-import MonadUtils (mapMaybeM)
 
 import Control.Monad.Fix
 
@@ -75,7 +76,7 @@ guard msg False = fail msg
 
 runMatch :: Match a -> Maybe a
 runMatch (Match (Right x))   = Just x
-runMatch (Match (Left _msg)) = {- trace ("match " ++ msg) -} Nothing
+runMatch (Match (Left _msg)) = trace ("match " ++ _msg) Nothing
 --runMatch = unMatch
 
 matchRnEnv2 :: (a -> FreeVars) -> a -> a -> RnEnv2
@@ -86,7 +87,19 @@ matchRnEnv2 f x y = mkRnEnv2 (mkInScopeSet (f x `unionVarSet` f y))
 --     mx1 `mplus` mx2 = Match $ unMatch mx1 `mplus` unMatch mx2
 
 
-type MatchResult = M.Map Var Var
+data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
+
+mayInstantiate :: InstanceMatching -> Generalised -> Bool
+mayInstantiate NoInstances            _   = False
+mayInstantiate InstancesOfGeneralised gen = gen
+mayInstantiate AllInstances           _   = True
+
+data MatchMode = MM {
+    matchInstanceMatching :: InstanceMatching
+  }
+
+
+type MatchRenaming = M.Map Var Var
 
 -- INVARIANTs:
 --   1. All the Vars are *not* rigidly bound (i.e. they are bound by a "let")
@@ -115,22 +128,17 @@ instance Outputable MatchLR where
 
 match :: State -- ^ Tieback semantics
       -> State -- ^ This semantics
-      -> Maybe MatchResult -- ^ Renaming from left to right
+      -> Maybe MatchRenaming -- ^ Renaming from left to right
 match s_l s_r = runMatch (matchWithReason s_l s_r)
 
-match' :: State -> State -> Maybe (Heap, Stack, MatchResult)
-match' s_l s_r = runMatch (matchWithReason' s_l s_r)
+match' :: MatchMode -> State -> State -> Maybe (Heap, Stack, MatchRenaming)
+match' mm s_l s_r = runMatch (matchWithReason' mm s_l s_r)
 
-matchWithReason :: State -> State -> Match MatchResult
-matchWithReason s_l s_r = do
-    (Heap h_inst _, k_inst, mr) <- matchWithReason' s_l s_r
-    if null k_inst && M.null h_inst
-      then return mr
-      else -- pprTrace "instance found" (ppr (length k_inst, M.keysSet h_inst)) $
-           fail "matchWithReason: instance match only"
+matchWithReason :: State -> State -> Match MatchRenaming
+matchWithReason s_l s_r = fmap thirdOf3 $ matchWithReason' (MM { matchInstanceMatching = NoInstances }) s_l s_r
 
-matchWithReason' :: State -> State -> Match (Heap, Stack, MatchResult)
-matchWithReason' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
+matchWithReason' :: MatchMode -> State -> State -> Match (Heap, Stack, MatchRenaming)
+matchWithReason' mm (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
   do
     -- It's very important that we don't just use the state free variables from both sides to construct the initial in scope set,
     -- because we use it to match the stack and QA on each side *without* first extending it with variables bound by the PureHeap!
@@ -140,10 +148,10 @@ matchWithReason' (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r
     --
     -- This was the source of a very confusing bug :-(
     let init_rn2 = mkRnEnv2 (ids_l `unionInScope` ids_r)
-    (rn2, k_inst, mfree_eqs2) <- mfix $ \(~(rn2, _, _)) -> matchEC init_rn2 rn2 k_l k_r
+    (rn2, k_inst, mfree_eqs2) <- mfix $ \(~(rn2, _, _)) -> matchEC mm init_rn2 rn2 k_l k_r
     free_eqs1 <- pprTraceSC "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
     free_eqs2 <- pprTraceSC "match1" empty $ mfree_eqs2
-    (heap_inst, mr) <- pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap rn2 k_inst (free_eqs1 ++ free_eqs2) h_l (Heap h_r ids_r)
+    (heap_inst, mr) <- pprTraceSC "match2" (ppr free_eqs1) $ matchPureHeap mm rn2 k_inst (free_eqs1 ++ free_eqs2) h_l (Heap h_r ids_r)
     return (heap_inst, k_inst, mr)
 
 matchAnned :: (Tag -> a -> Tag -> a -> b)
@@ -377,14 +385,14 @@ matchIn :: (InScopeSet -> Renaming -> a -> a)
 matchIn rnm mtch rn2 (rn_l, x_l) (rn_r, x_r) = mtch rn2 (rnm iss rn_l x_l) (rnm iss rn_r x_r)
   where iss = rnInScopeSet rn2 -- NB: this line is one of the few things that relies on the RnEnv2 InScopeSet being correct
 
-matchEC :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Stack -> Stack -> Match (RnEnv2, Stack, Match [MatchLR])
-matchEC init_rn2 rn2 = go (init_rn2, return [])
+matchEC :: MatchMode -> RnEnv2 -> RnEnv2 {- knot-tied -} -> Stack -> Stack -> Match (RnEnv2, Stack, Match [MatchLR])
+matchEC mm init_rn2 rn2 = go (init_rn2, return [])
   where
-    go (init_rn2', meqs) []         k_r        = return (init_rn2', k_r, meqs)
-    go _                 _          []         = fail "matchEC: instantiation on left"
-    go (init_rn2', meqs) (kf_l:k_l) (kf_r:k_r) = do
-      (init_rn2'', meqs') <- matchECFrame init_rn2' rn2 kf_l kf_r
-      go (init_rn2'', liftM2 (++) meqs meqs') k_l k_r
+    go (rn2', meqs) (Loco gen_l)   k_r            = guard "matchEC: instance match disallowed" (nullTrain k_r || mayInstantiate (matchInstanceMatching mm) gen_l) >> return (rn2', k_r, meqs)
+    go _            _              (Loco _)       = fail "matchEC: instantiation on left"
+    go (rn2', meqs) (Car kf_l k_l) (Car kf_r k_r) = do
+      (rn2'', meqs') <- matchECFrame rn2' rn2 kf_l kf_r
+      go (rn2'', liftM2 (++) meqs meqs') k_l k_r
 
 matchECFrame :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Tagged StackFrame -> Tagged StackFrame -> Match (RnEnv2, Match [MatchLR])
 matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
@@ -409,27 +417,16 @@ matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
 -- {x |-> a, y |-> a} means that if we carrried on supercompiling here we could exploit more equalities (via positive information
 -- propagation - imagine we scrutinise x and later scrutinise y) and potentially get better code that at the tieback site. I need to
 -- check how important this is in practice.
-safeMkMatchResult :: [(Var, Var)] -> Match MatchResult
-safeMkMatchResult eqs = guard "safeMkRenaming" (all (\(x_l, x_r) -> M.lookup x_l eqs_map == Just x_r) eqs) >> return eqs_map
+safeMkMatchRenaming :: [(Var, Var)] -> Match MatchRenaming
+safeMkMatchRenaming eqs = guard "safeMkMatchRenaming" (all (\(x_l, x_r) -> M.lookup x_l eqs_map == Just x_r) eqs) >> return eqs_map
   where eqs_map = M.fromList eqs
 
 
-trimBounds :: BoundVars -> BoundVars -> [MatchLR] -> Match [(Var, Var)]
-trimBounds internally_bound_l internally_bound_r eqs
-  = flip mapMaybeM eqs $ \lr -> case lr of VarLR x_l x_r -> case (x_l `elemVarSet` internally_bound_l, x_r `elemVarSet` internally_bound_r) of
-                                                              (True,  True)  -> return Nothing               -- Both local, don't want it in the output
-                                                              (False, False) -> return (Just (x_l, x_r))     -- Both free
-                                                              _              -> fail "trimBounds: boundness" -- Mismatch
-                                           VarL x_l _ | x_l `elemVarSet` internally_bound_l -> return Nothing
-                                           VarR _ x_r | x_r `elemVarSet` internally_bound_r -> return Nothing
-                                           _ -> fail "trimBounds: instantiation"
-
-matchPureHeap :: RnEnv2 -> Stack -> [MatchLR] -> PureHeap -> Heap -> Match (Heap, MatchResult)
-matchPureHeap rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
-  = do (heap_inst, used_r) <- fvsInstLoop (Heap M.empty ids_r) emptyVarSet k_inst_fvs
-       (heap_inst, known) <- matchLoop [] heap_inst init_free_eqs emptyVarSet used_r
-       xys <- trimBounds (fst (pureHeapVars h_l) InternallyBound) (fst (pureHeapVars h_r) InternallyBound) known
-       liftM ((,) heap_inst) (safeMkMatchResult xys)
+matchPureHeap :: MatchMode -> RnEnv2 -> Stack -> [MatchLR] -> PureHeap -> Heap -> Match (Heap, MatchRenaming)
+matchPureHeap mm rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
+  = do (h_inst, used_r) <- fvsInstLoop M.empty emptyVarSet k_inst_fvs
+       (heap_inst, xys) <- matchLoop [] (Heap h_inst ids_r) [] init_free_eqs emptyVarSet used_r
+       liftM ((,) heap_inst) (safeMkMatchRenaming xys)
     -- NB: if there are dead bindings in the left PureHeap then the output Renaming will not contain a renaming for their binders.
     --
     -- NB: The resulting equalities must only relate local vars to local vars (in which case we can discard them, because
@@ -456,29 +453,30 @@ matchPureHeap rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
     -- We can account for staticness using the standard generalisation mechanism, and there is no need for the
     -- matcher to have hacks like that (though we still have to be careful about how we match phantoms).
     
-    matchLoop known h_inst [] _ _ = return (h_inst, known)
-    matchLoop known h_inst (lr:free_eqs) used_l used_r
+    matchLoop _     heap_inst xys [] _ _ = return (heap_inst, xys)
+    matchLoop known (Heap h_inst ids_r) xys (lr:free_eqs) used_l used_r
        -- Perhaps we have already assumed this equality is true?
        -- NB: it is OK to do exact syntactic equality on VarL/VarR here because we always rename new equalities generated in
        -- this loop using the same InScopeSet (that from rn2) so only a finite number of distinct binders will be generated.
-      | lr `elem` known = matchLoop known h_inst free_eqs used_l used_r
+      | lr `elem` known = matchLoop known (Heap h_inst ids_r) xys free_eqs used_l used_r
       | otherwise = pprTraceSC "matchLoop" (ppr lr) $
-                    case (case lr of VarLR x_l x_r -> (go_template (matchBndrExtras rn2 x_l x_r)    ,     lookupUsed used_l x_l h_l,                          Right x_r,                             lookupUsed used_r x_r h_r)
-                                     VarL  x_l e_r -> (go_template (matchIdCoVarBndrExtrasL rn2 x_l e_r), lookupUsed used_l x_l h_l,                          Left  (x_l `setVarType` termType e_r), Just (InternallyBound, Right (Just (used_r, e_r))))
-                                     VarR  e_l x_r -> (go_template (matchIdCoVarBndrExtrasR rn2 e_l x_r), Just (InternallyBound, Right (Just (used_l, e_l))), Right x_r,                             lookupUsed used_r x_r h_r)) of
+                    case (case lr of VarLR x_l x_r -> (go_template (Just [(x_l, x_r)]) (matchBndrExtras rn2 x_l x_r),         ids_r,                        lookupUsed used_l x_l h_l,                          x_r, lookupUsed used_r x_r h_r)
+                                     VarL  x_l e_r -> (go_template (Just [(x_l, x_r)]) (matchIdCoVarBndrExtrasL rn2 x_l e_r), ids_r `extendInScopeSet` x_r, lookupUsed used_l x_l h_l,                          x_r, Just (InternallyBound, Right (Just (used_r, e_r))))
+                                       where x_r = uniqAway ids_r (zapFragileIdInfo (x_l `setVarType` termType e_r))
+                                     VarR  e_l x_r -> (go_template Nothing             (matchIdCoVarBndrExtrasR rn2 e_l x_r), ids_r,                        Just (InternallyBound, Right (Just (used_l, e_l))), x_r, lookupUsed used_r x_r h_r)) of
            -- If matching an internal let, it is possible that variables occur free. Insist that free-ness matches:
            -- TODO: actually I'm pretty sure that the heap binds *everything* now. These cases could probably be removed,
            -- though they don't do any particular harm.
-          (go, Nothing, _, Nothing) -> go h_inst [] used_l used_r
-          (_,  Just _,  _, Nothing) -> failLoop "matching binding on left not present in the right"
-          (_,  Nothing, _, Just _)  -> failLoop "matching binding on right not present in the left"
-          (go, Just hb_l, ei_x_l_x_r, Just hb_r) -> case (hb_l, hb_r) of
+          (go, ids_r, Nothing, _, Nothing) -> go False (Heap h_inst ids_r) [] used_l used_r
+          (_,  _,     Just _,  _, Nothing) -> failLoop "matching binding on left not present in the right"
+          (_,  _,     Nothing, _, Just _)  -> failLoop "matching binding on right not present in the left"
+          (go, ids_r, Just hb_l, ei_x_l_x_r, Just hb_r) -> case (hb_l, hb_r) of
                -- If the template provably doesn't use this heap binding, we can match it against anything at all
-              ((InternallyBound, Left _), _) -> go h_inst [] used_l used_r
+              ((InternallyBound, Left _), _) -> go True (Heap h_inst ids_r) [] used_l used_r
                -- If the template internalises a binding of this form, check that the matchable semantics is the same.
                -- If the matchable doesn't have a corresponding binding tieback is impossible because we have less info this time.
               ((InternallyBound, Right (Just (used_l', e_l'))), (how_r, mb_e_r')) -> case mb_e_r' of
-                  Right (Just (used_r', e_r')) -> matchTerm rn2 e_l' e_r' >>= \extra_free_eqs -> go h_inst extra_free_eqs used_l' used_r'
+                  Right (Just (used_r', e_r')) -> matchTerm rn2 e_l' e_r' >>= \extra_free_eqs -> go True (Heap h_inst ids_r) extra_free_eqs used_l' used_r'
                   Right Nothing                -> failLoop "right side of InternallyBound already used"
                   Left _                       -> failLoop $ "can only match a termful InternallyBound on left against an actual term, not a termless " ++ show how_r ++ " binding"
                -- If the template has no information but exposes a lambda, we can rename to tie back.
@@ -488,13 +486,17 @@ matchPureHeap rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
                -- (almost certainly an sc-stop) is worse, though... Doing this really matters; see for example the Bernouilli benchmark.
                --
                -- TODO: give let-bound nothings tags and generalise to get the same effect?
-              ((LambdaBound, Left _), (how_r, mb_e_r')) -> case mb_e_r' of
+              ((LambdaBound, Left stuff_l), (how_r, mb_e_r')) -> case mb_e_r' of
                   Left _       -> (if how_r == LetBound then pprTraceSC "Downgrading" empty else id) $
-                                  go h_inst [] used_l used_r
-                  Right mb_er' -> instLoop h_inst ei_x_l_x_r how_r used_r (Right mb_er') >>= \(h_inst', used_r') -> go h_inst' [] used_l used_r'
+                                  go False (Heap h_inst ids_r) [] used_l used_r
+                  Right mb_er' | Left gen_l <- stuff_l
+                               , mayInstantiate (matchInstanceMatching mm) gen_l
+                               -> instLoop h_inst ei_x_l_x_r how_r used_r (Right mb_er') >>= \(h_inst, used_r') -> go False (Heap h_inst ids_r) [] used_l used_r'
+                               | otherwise
+                               -> failLoop "instance match disallowed"
                -- If the template has an unfolding, we must do lookthrough
               ((LambdaBound, Right (Just (used_l', e_l'))), (_how_r, mb_e_r')) -> case mb_e_r' of
-                  Right (Just (used_r', e_r')) -> matchTerm rn2 e_l' e_r' >>= \extra_free_eqs -> go h_inst extra_free_eqs used_l' used_r'
+                  Right (Just (used_r', e_r')) -> matchTerm rn2 e_l' e_r' >>= \extra_free_eqs -> go False (Heap h_inst ids_r) extra_free_eqs used_l' used_r'
                   Right Nothing                -> failLoop "right side of LambdaBound already used"
                   Left _                       -> failLoop "can only match a termful LambdaBound on left against an actual term"
                -- We assume the supercompiler gives us no-shadowing for let-bound names, so if two names are the same they must refer to the same thing
@@ -523,9 +525,9 @@ matchPureHeap rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
                -- It is NOT safe to do this is both/either sides are LambdaBound, because we have no guarantee of a common ancestor in that case.
               ((LetBound, mb_e_l'), (_how_r, mb_e_r'))
                 | VarLR x_l x_r <- lr, x_l == x_r -> case (mb_e_l', mb_e_r') of -- TODO: even match LetBounds against non-VarLR
-                  (Left _ ,                      Left _)                       -> go h_inst [] used_l used_r
+                  (Left _ ,                      Left _)                       -> go True (Heap h_inst ids_r) [] used_l used_r
                   (Right (Just (used_l', e_l')), Right (Just (used_r', e_r'))) -> ASSERT2(annedTermFreeVars e_r' `subVarSet` annedTermFreeVars e_l', text "match" <+> ppr (x_l, e_l', x_r, _how_r, e_r'))
-                                                                                  go h_inst [VarLR x x | x <- varSetElems (annedTermFreeVars e_l')] used_l' used_r'
+                                                                                  go True (Heap h_inst ids_r) [VarLR x x | x <- varSetElems (annedTermFreeVars e_l')] used_l' used_r'
                   _                                                            -> failLoop "insane LetBounds"
                -- If the template doesn't lambda abstract, we can't rename. Only tieback if we have an exact *name* match.
                --
@@ -539,16 +541,20 @@ matchPureHeap rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
                -- the "cheap-but-inaccurate" name-matching heuristic.
                 | otherwise -> failLoop "LetBound"
               _ -> failLoop "left side of InternallyBound/LambdaBound already used"
-      where go_template mextras h_inst extra_free_eqs used_l' used_r' = do
+      where go_template mb_extra_xys mextras lhs_var_doesnt_need_rn heap_inst extra_free_eqs used_l' used_r' = do
                 -- Don't forget to match types/unfoldings of binders as well:
                 bndr_free_eqs <- mextras
-                matchLoop (lr : known) h_inst (bndr_free_eqs ++ extra_free_eqs ++ free_eqs) used_l' used_r'
+                extra_xys <- case mb_extra_xys of
+                  _ | lhs_var_doesnt_need_rn -> return []
+                  Just extra_xys             -> return extra_xys
+                  Nothing                    -> failLoop "cannot match VarR non-internally"
+                matchLoop (lr : known) heap_inst (extra_xys ++ xys) (bndr_free_eqs ++ extra_free_eqs ++ free_eqs) used_l' used_r'
             failLoop rest = fail $ "matchLoop: " ++ showPpr lr ++ ": " ++ rest
     
     -- First Maybe: whether or not the var is bound in the heap
     -- Second Maybe: whether or not the HeapBinding actually has a term
     -- Third Maybe: whether it is safe for work duplication to make use of that term
-    lookupUsed :: VarSet -> Var -> PureHeap -> Maybe (HowBound, Either (Maybe Tag) (Maybe (VarSet, Out AnnedTerm)))
+    lookupUsed :: VarSet -> Var -> PureHeap -> Maybe (HowBound, Either (Either Generalised Tag) (Maybe (VarSet, Out AnnedTerm)))
     lookupUsed used x h = case M.lookup x h of
       Nothing -> Nothing
       Just hb -> Just (howBound hb, flip (either Left) (heapBindingMeaning hb) $ \in_e -> let e' = renameIn (renameAnnedTerm (rnInScopeSet rn2)) in_e
@@ -562,41 +568,36 @@ matchPureHeap rn2 k_inst init_free_eqs h_l (Heap h_r ids_r)
     --  * Any binding which is referred to by any other copied binding
     --
     -- At the same time, we must avoid copying expensive bindings more than once (because of work duplication).
-    instLoop :: Heap           -- ^ Instantiation heap to extend
-             -> Either Var Var -- ^ Binder for the term on the RHS (if any: will be Left if coming from MatchR)
-             -> HowBound       -- ^ How the term on the RHS was bound
-             -> VarSet         -- ^ Things on the right that have already been used, BEFORE the copy
-             -> Either (Maybe Tag) (Maybe (VarSet, Out AnnedTerm)) -- ^ Meaning. Contains a nested Nothing if we cannot take another copy of the term for work duplication reasons
-             -> Match (Heap, VarSet) -- Returns final instantiation heap and things on the right that were used
-    instLoop (Heap h_inst ids_r) ei_x_l_x_r how_r used_r mb_er'
+    instLoop :: PureHeap  -- ^ Instantiation heap to extend
+             -> Var       -- ^ Binder for the term on the RHS (newly manufactured if coming from MatchR)
+             -> HowBound  -- ^ How the term on the RHS was bound
+             -> VarSet    -- ^ Things on the right that have already been used, BEFORE the copy
+             -> Either (Either Generalised Tag) (Maybe (VarSet, Out AnnedTerm)) -- ^ Meaning. Contains a nested Nothing if we cannot take another copy of the term for work duplication reasons
+             -> Match (PureHeap, VarSet) -- Returns final instantiation heap and things on the right that were used
+    instLoop h_inst x_r how_r used_r mb_er'
       -- If we know the name of the thing on the RHS and it is already in the instantiating heap, we need do no work at all
-      | Right x_r <- ei_x_l_x_r
-      , x_r `M.member` h_inst
-      = return (Heap h_inst ids_r, used_r)
+      | x_r `M.member` h_inst
+      = return (h_inst, used_r)
       -- Otherwise we have to insert some bindings
       | otherwise = do
-        let (x_r', ids_r') = case ei_x_l_x_r of
-              Left  x_l -> let x_r = uniqAway ids_r (zapFragileIdInfo x_l) -- NB: the incoming variable has already had the correct type set on it
-                           in (x_r, ids_r `extendInScopeSet` x_r)
-              Right x_r -> (x_r, ids_r)
         (hb_meaning, used_r, fvs_r) <- case mb_er' of
           Left mb_tg                   -> return (Left mb_tg,               used_r,  emptyVarSet)
           Right (Just (used_r', e_r')) -> return (Right (renamedTerm e_r'), used_r', annedTermFreeVars e_r')
-          Right Nothing                -> fail $ "instLoop(" ++ showPpr x_r' ++ "): right side already used in instance match"
+          Right Nothing                -> fail $ "instLoop(" ++ showPpr x_r ++ "): right side already used in instance match"
         
         -- Transitively add the free variables of the copied bindings
-        fvsInstLoop (Heap (M.insert x_r' (HB how_r hb_meaning) h_inst) ids_r') used_r (fvs_r `unionVarSet` varBndrFreeVars x_r')
+        fvsInstLoop (M.insert x_r (HB how_r hb_meaning) h_inst) used_r (fvs_r `unionVarSet` varBndrFreeVars x_r)
 
-    fvsInstLoop :: Heap -> VarSet -> FreeVars -> Match (Heap, VarSet)
-    fvsInstLoop heap_inst used_r fvs
-      = foldM (\(heap_inst, used_r) y_r -> case rnOccR_maybe rn2 y_r of
-                                             Just _ 
-                                               | y_r `elemVarSet` k_inst_bvs -> return (heap_inst, used_r) -- In the instantiating stack: no heap copying required
-                                               | otherwise                   -> fail $ "fvsInstLoop(" ++ showPpr y_r ++ "): heap instance reference to non-instantiating stack"
-                                             Nothing -> case lookupUsed used_r y_r h_r of -- Bound by the heap: must copy something
-                                               Just (how_r, mb_er') -> instLoop heap_inst (Right y_r) how_r used_r mb_er'
-                                               Nothing              -> fail $ "fvsInstLoop(" ++ showPpr y_r ++ "): right heap binding not present")
-              (heap_inst, used_r) (varSetElems fvs)
+    fvsInstLoop :: PureHeap -> VarSet -> FreeVars -> Match (PureHeap, VarSet)
+    fvsInstLoop h_inst used_r fvs
+      = foldM (\(h_inst, used_r) y_r -> case rnOccR_maybe rn2 y_r of
+                                          Just _ 
+                                            | y_r `elemVarSet` k_inst_bvs -> return (h_inst, used_r) -- In the instantiating stack: no heap copying required
+                                            | otherwise                   -> fail $ "fvsInstLoop(" ++ showPpr y_r ++ "): heap instance reference to non-instantiating stack"
+                                          Nothing -> case lookupUsed used_r y_r h_r of -- Bound by the heap: must copy something
+                                            Just (how_r, mb_er') -> instLoop h_inst y_r how_r used_r mb_er'
+                                            Nothing              -> fail $ "fvsInstLoop(" ++ showPpr y_r ++ "): right heap binding not present")
+              (h_inst, used_r) (varSetElems fvs)
 
 app3 :: [a] -> [a] -> [a] -> [a]
 app3 x y z = x ++ y ++ z

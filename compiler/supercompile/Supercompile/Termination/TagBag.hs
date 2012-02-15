@@ -38,7 +38,7 @@ stateTags (_, Heap h _, k, qa) = -- traceRender ("stateTags (TagBag)", M.map hea
     pureHeapTagBag = plusTagBags . map heapBindingTagBag . M.elems
  
     stackTagBag :: Stack -> TagBag
-    stackTagBag = mkTagBag . map stackFrameTag'
+    stackTagBag = mkTagBag . map stackFrameTag' . trainCars
  
     tagTagBag :: Tag -> TagBag
     tagTagBag = mkTagBag . return

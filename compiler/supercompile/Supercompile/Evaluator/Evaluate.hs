@@ -113,21 +113,21 @@ step' normalising ei_state =
      | otherwise = case annee e of
         Var x            -> go_question (deeds, heap, k, fmap (\(rn, Var _) -> renameId rn x) (renameAnned (rn, e)))
         Value v          -> pprPanic "step': values are always answers" (ppr v)
-        TyApp e ty       -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                                   : k, (rn, e))
-        CoApp e co       -> go (deeds, heap,        Tagged tg (CoApply (renameCoercion ids rn co))                               : k, (rn, e))
-        App e x          -> go (deeds, heap,        Tagged tg (Apply (renameId rn x))                                            : k, (rn, e))
+        TyApp e ty       -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                                   `Car` k, (rn, e))
+        CoApp e co       -> go (deeds, heap,        Tagged tg (CoApply (renameCoercion ids rn co))                               `Car` k, (rn, e))
+        App e x          -> go (deeds, heap,        Tagged tg (Apply (renameId rn x))                                            `Car` k, (rn, e))
         PrimOp pop tys es
-          | (e:es) <- es -> go (deeds, heap,        Tagged tg (PrimApply pop (map (renameType ids rn) tys) [] (map ((,) rn) es)) : k, (rn, e))
+          | (e:es) <- es -> go (deeds, heap,        Tagged tg (PrimApply pop (map (renameType ids rn) tys) [] (map ((,) rn) es)) `Car` k, (rn, e))
           | otherwise    -> pprPanic "step': nullary primops unsupported" (ppr pop)
-        Case e x ty alts -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts))                 : k, (rn, e))
+        Case e x ty alts -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts))                 `Car` k, (rn, e))
           where (ids', rn', x') = renameNonRecBinder ids rn x
         Cast e co        
-          | isReflCo co' -> go (deeds `releaseDeeds` 1, heap,                                                                                   k, (rn, e))
-          | otherwise    -> go (deeds,                  heap,    Tagged tg (CastIt co')                                                       : k, (rn, e))
+          | isReflCo co' -> go (deeds `releaseDeeds` 1, heap,                                                                                       k, (rn, e))
+          | otherwise    -> go (deeds,                  heap,    Tagged tg (CastIt co')                                                       `Car` k, (rn, e))
           where co' = renameCoercion ids rn co
         Let x e1 e2
-          | isUnLiftedType (idType x) -> go (deeds,                  Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) : k, in_e1)
-          | otherwise                 -> go (deeds `releaseDeeds` 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                      k, (rn', e2))
+          | isUnLiftedType (idType x) -> go (deeds,                  Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) `Car` k, in_e1)
+          | otherwise                 -> go (deeds `releaseDeeds` 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                          k, (rn', e2))
           where (ids', rn', (x', in_e1)) = renameNonRecBound ids rn (x, e1)
         LetRec xes e     -> go (deeds `releaseDeeds` 1, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
           where (ids', rn', xes') = renameBounds ids rn xes
@@ -172,12 +172,12 @@ step' normalising ei_state =
         return $ case k of
              -- Avoid creating consecutive update frames: implements "stack squeezing"
              -- FIXME: squeeze through casts as well?
-            kf : _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                         k, in_e)
-            _                              -> (deeds, Heap (M.delete x' h)                                                                                     ids, Tagged tg (Update x') : k, in_e)
+            kf `Car` _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                             k, in_e)
+            _                                  -> (deeds, Heap (M.delete x' h)                                                                                     ids, Tagged tg (Update x') `Car` k, in_e)
 
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
-    unwind deeds h k tg_v a = uncons k >>= \(kf, k) -> case tagee kf of
+    unwind deeds h k tg_v a = unconsTrain k >>= \(kf, k) -> case tagee kf of
         TyApply ty'                    -> tyApply    (deeds `releaseDeeds` 1)          h k      a ty'
         CoApply co'                    -> coApply    (deeds `releaseDeeds` 1)          h k      a co'
         Apply x2'                      -> apply      deeds                    (tag kf) h k      a x2'
@@ -211,7 +211,7 @@ step' normalising ei_state =
         tyApply :: Deeds -> Heap -> Stack -> Answer -> Out Type -> Maybe UnnormalisedState
         tyApply deeds h@(Heap _ ids) k a ty' = do
             (mb_co, (rn, TyLambda x e_body)) <- deferenceLambdaish h a
-            fmap (\deeds -> (deeds, h, case mb_co of Uncast -> k; CastBy co' tg_co -> Tagged tg_co (CastIt (co' `mk_inst` ty')) : k, (insertTypeSubst rn x ty', e_body))) $
+            fmap (\deeds -> (deeds, h, case mb_co of Uncast -> k; CastBy co' tg_co -> Tagged tg_co (CastIt (co' `mk_inst` ty')) `Car` k, (insertTypeSubst rn x ty', e_body))) $
                  claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)
           where mk_inst = mkInstCo ids
 
@@ -219,8 +219,8 @@ step' normalising ei_state =
         coApply deeds h@(Heap _ ids) k a apply_co' = do
             (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h a
             flip fmap (claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
-                Uncast           -> (deeds, h, k,                                 (insertCoercionSubst rn x apply_co', e_body))
-                CastBy co' tg_co -> (deeds, h, Tagged tg_co (CastIt res_co') : k, (insertCoercionSubst rn x cast_apply_co', e_body))
+                Uncast           -> (deeds, h, k,                                     (insertCoercionSubst rn x apply_co', e_body))
+                CastBy co' tg_co -> (deeds, h, Tagged tg_co (CastIt res_co') `Car` k, (insertCoercionSubst rn x cast_apply_co', e_body))
                   where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
                         -- You can derive this rule from the rules in "Practical aspects of evidence-based compilation" by combining:
                         --  1. TPush, to move the co' from the lambda to the argument and result (arg_co' and res_co')
@@ -238,7 +238,7 @@ step' normalising ei_state =
             case mb_co of
               Uncast -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
                              claimDeeds (deeds `releaseDeeds` 1 `releaseDeeds` answerSize' a) (annedSize e_body)
-              CastBy co' tg_co -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
+              CastBy co' tg_co -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', Tagged tg_co (CastIt res_co') `Car` k, (rn', e_body))) $
                                        claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_arg + annedSize e_body)
                 where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
                       Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
@@ -326,7 +326,7 @@ step' normalising ei_state =
             deeds <- claimDeeds (deeds `releaseDeeds` (sum (map annedSize anned_as) + answerSize' a + 1)) (annedSize a') -- I don't think this can ever fail
             return (deeds, heap, k, annedAnswerToInAnnedTerm ids a')
         primop deeds tg_kf h k tg_a pop tys' anned_as a in_es = case in_es of
-            (in_e:in_es) -> Just (deeds, h, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
+            (in_e:in_es) -> Just (deeds, h, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) `Car` k, in_e)
             []           -> Nothing
 
         strictLet :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> In AnnedTerm -> Maybe UnnormalisedState
