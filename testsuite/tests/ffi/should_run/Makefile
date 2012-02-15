@@ -20,3 +20,13 @@ ffi002_setup :
 5594_setup :
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c 5594.hs
 
+.PHONY: Capi_Ctype_001
+Capi_Ctype_001:
+	'$(HSC2HS)' Capi_Ctype_A_001.hsc
+	'$(HSC2HS)' Capi_Ctype_001.hsc
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c capi_ctype_001.c
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_A_001.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_001.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) capi_ctype_001.o Capi_Ctype_A_001.o Capi_Ctype_001.o -o Capi_Ctype_001
+	./Capi_Ctype_001
+
