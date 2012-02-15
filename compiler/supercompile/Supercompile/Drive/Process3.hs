@@ -337,8 +337,8 @@ memo opt = memo_opt
              , let is_ancestor = fmap fun mb_p_parent == Just (fun p)
                    mm = MM { matchInstanceMatching = if not iNSTANCE_MATCHING then NoInstances
                                                                               else if is_ancestor then AllInstances else InstancesOfGeneralised }
-             , Just (heap_inst@(Heap h_inst _), k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
-                                                                   match' mm (meaning p) reduced_state]
+             , Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
+                                                   match' mm (meaning p) reduced_state]
              , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                    Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
                -- FIXME: prefer "more exact" matches
