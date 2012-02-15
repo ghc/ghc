@@ -49,14 +49,16 @@ import Supercompile.Utilities hiding (Monad(..))
 
 import Var        (isId, isTyVar, varType, setVarType)
 import Id         (idType, zapFragileIdInfo, localiseId)
-import MkId       (voidArgId, realWorldPrimId)
+import MkId       (voidArgId, realWorldPrimId, mkPrimOpId)
 import Type       (isUnLiftedType, mkTyVarTy)
 import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind_maybe)
 import CoreUtils  (mkPiTypes)
 import TyCon      (PrimRep(..))
-import Type       (eqType, mkFunTy, typePrimRep, splitTyConApp_maybe)
+import Type       (eqType, mkFunTy, mkTyConApp, typePrimRep, splitTyConApp_maybe)
 import TysPrim
-import TysWiredIn (unitTy)
+import TysWiredIn (unitTy, unboxedPairDataCon, unboxedPairTyCon)
+import MkCore     (mkWildValBinder)
+import PrimOp     (PrimOp(MyThreadIdOp))
 import Literal
 import VarEnv
 import Util       (thirdOf3)
@@ -679,7 +681,11 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
                  FloatRep  -> (floatPrimTy,          literal (mkMachChar 'x'))
                  DoubleRep -> (doublePrimTy,         literal (mkMachDouble 0))
                  -- Unlifted thing of PtrRep: yes, this can really happen (ByteArray# etc)
-                 PtrRep    -> pprPanic "applyAbsVars: dead unlifted variable with PrimRep PtrRep: FIXME" (ppr ty)
+                 -- This is the most annoying case because there is no convenient global name of the right type
+                 PtrRep    -> (threadIdPrimTy,       case_ (var (mkPrimOpId MyThreadIdOp) `app` realWorldPrimId)
+                                                           (mkWildValBinder (unboxedPairTyCon `mkTyConApp` [realWorldStatePrimTy, threadIdPrimTy]))
+                                                           threadIdPrimTy [(DataAlt unboxedPairDataCon [] [] [mkWildValBinder realWorldStatePrimTy, x_tid], var x_tid)])
+                   where x_tid = x `setVarType` threadIdPrimTy
          -> let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x))
          where shadowy_x = absVarBinder absx
                x = uniqAway (mkInScopeSet fvs) shadowy_x
