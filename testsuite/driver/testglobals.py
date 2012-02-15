@@ -176,6 +176,11 @@ class TestOptions:
        # compile this test to .hc only
        self.compile_to_hc = 0
 
+       # We sometimes want to modify the compiler_always_flags, so
+       # they are copied from config.compiler_always_flags when we
+       # make a new instance of TestOptions.
+       self.compiler_always_flags = []
+
        # extra compiler opts for this test
        self.extra_hc_opts = ''
 

@@ -494,6 +494,7 @@ def newTestDir( dir ):
     # reset the options for this test directory
     thisdir_testopts = copy.copy(default_testopts)
     thisdir_testopts.testdir = dir
+    thisdir_testopts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
 # Actually doing tests
@@ -834,7 +835,7 @@ def run_command( name, way, cmd ):
 def ghci_script( name, way, script ):
     # filter out -fforce-recomp from compiler_always_flags, because we're
     # actually testing the recompilation behaviour in the GHCi tests.
-    flags = filter(lambda f: f != '-fforce-recomp', config.compiler_always_flags)
+    flags = filter(lambda f: f != '-fforce-recomp', getTestOpts().compiler_always_flags)
     flags.append(getTestOpts().extra_hc_opts)
 
     # We pass HC and HC_OPTS as environment variables, so that the
@@ -1035,7 +1036,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    comp_flags = config.compiler_always_flags
+    comp_flags = getTestOpts().compiler_always_flags
     if noforce:
         comp_flags = filter(lambda f: f != '-fforce-recomp', comp_flags)
 
@@ -1212,7 +1213,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     script.close()
 
     cmd = "'" + config.compiler + "' " \
-          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
           + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
@@ -1306,7 +1307,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
-          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts \
@@ -1336,7 +1337,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
-          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
           + to_compile + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts + ' ' \
