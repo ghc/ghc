@@ -122,9 +122,9 @@ eqAnnedTerm e1 e2  = case runMatch (matchTerm (matchRnEnv2 annedTermFreeVars e1 
     Just lrs -> all (\lr -> case lr of VarLR x_l x_r | x_l == x_r -> True; _ -> False) lrs
 
 instance Outputable MatchLR where
-    pprPrec _ (VarL x e')   = ppr x  <+> text "<->" <+> ppr e'
-    pprPrec _ (VarR e' x)   = ppr e' <+> text "<->" <+> ppr x
-    pprPrec _ (VarLR x1 x2) = ppr x1 <+> text "<->" <+> ppr x2
+    pprPrec _ (VarL x e')   = ppr x                   <+> text "<->" <+> text "..." {- ppr e' -}
+    pprPrec _ (VarR e' x)   = text "..." {- ppr e' -} <+> text "<->" <+> ppr x
+    pprPrec _ (VarLR x1 x2) = ppr x1                  <+> text "<->" <+> ppr x2
 
 match :: State -- ^ Tieback semantics
       -> State -- ^ This semantics
