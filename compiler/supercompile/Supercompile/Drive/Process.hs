@@ -329,7 +329,7 @@ eta heap@(Heap h ids) accessor_e0 in_e = (heap, accessor_e0, in_e) : case termTo
   Just anned_a | (a_cast, (rn, v)) <- extract anned_a
                , let accessor_e1 = case a_cast of Uncast      -> accessor_e0
                                                   CastBy co _ -> accessor_e0 `cast` mkSymCo ids co
-                     mb_res@(Just (_, x, _)) = case v of
+                     mb_res@(~(Just (_, x, _))) = case v of
                         Lambda   x e_body -> Just (accessor_e1 `app`   x',           x, e_body)
                         TyLambda a e_body -> Just (accessor_e1 `tyApp` mkTyVarTy x', a, e_body)
                         _                 -> Nothing
