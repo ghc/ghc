@@ -32,6 +32,7 @@ import Util       (sndOf3)
 import Control.Monad (join)
 
 import Data.Function (on)
+import qualified Data.Set as S
 import qualified Data.Map as M
 import Data.Monoid (mempty)
 
@@ -332,11 +333,16 @@ memo opt = memo_opt
         --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
         case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)) memo_opt)
              | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
-             , (mb_p_parent, p) <- [(Just p_parent, p_sibling) | (p_parent, p_siblings) <- parented_ps, p_sibling <- p_parent:p_siblings] ++
-                                   [(Nothing,       p_root)    | p_root <- unparented_ps]
-             , let is_ancestor = fmap fun mb_p_parent == Just (fun p)
-                   mm = MM { matchInstanceMatching = if not iNSTANCE_MATCHING then NoInstances
-                                                                              else if is_ancestor then AllInstances else InstancesOfGeneralised }
+             , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
+                                                  | (p_parent, p_siblings) <- parented_ps
+                                                  , let common_h_vars = case meaning p_parent of (_, Heap h _, _, _) -> M.keysSet h
+                                                  , p_sibling <- p_parent:p_siblings ] ++
+                                                  [ (p_root,    False,                         S.empty)
+                                                  | p_root <- unparented_ps ]
+             , let mm = MM { matchInstanceMatching = case () of () | not iNSTANCE_MATCHING -> NoInstances
+                                                                   | is_ancestor           -> AllInstances
+                                                                   | otherwise             -> InstancesOfGeneralised,
+                             matchCommonHeapVars = common_h_vars }
              , Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
                                                    match' mm (meaning p) reduced_state]
              , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
