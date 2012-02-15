@@ -300,8 +300,8 @@ addExportFlagsAndRules target exports keep_alive rules prs
 	-- isExternalName separates the user-defined top-level names from those
 	-- introduced by the type checker.
     is_exported :: Name -> Bool
-    is_exported | target == HscInterpreted = isExternalName
-		| otherwise 		   = (`elemNameSet` exports)
+    is_exported | targetRetainsAllBindings target = isExternalName
+                | otherwise                       = (`elemNameSet` exports)
 \end{code}
 
 

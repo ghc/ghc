@@ -286,7 +286,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                         mi_fixities    = fixities,
                         mi_warns       = warns,
                         mi_anns        = mkIfaceAnnotations anns,
-                        mi_globals     = Just rdr_env,
+                        mi_globals     = maybeGlobalRdrEnv rdr_env,
 
                         -- Left out deliberately: filled in by addFingerprints
                         mi_iface_hash  = fingerprint0,
@@ -343,7 +343,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                 -- correctly.  This stems from the fact that the interface had
                 -- not changed, so addFingerprints returns the old ModIface
                 -- with the old GlobalRdrEnv (mi_globals).
-        ; let final_iface = new_iface{ mi_globals = Just rdr_env }
+        ; let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
 
         ; return (errs_and_warns, Just (final_iface, no_change_at_all)) }}
   where
@@ -357,6 +357,17 @@ mkIface_ hsc_env maybe_old_fingerprint
      le_occ n1 n2 = nameOccName n1 <= nameOccName n2
 
      dflags = hsc_dflags hsc_env
+
+     -- We only fill in mi_globals if the module was compiled to byte
+     -- code.  Otherwise, the compiler may not have retained all the
+     -- top-level bindings and they won't be in the TypeEnv (see
+     -- Desugar.addExportFlagsAndRules).  The mi_globals field is used
+     -- by GHCi to decide whether the module has its full top-level
+     -- scope available.
+     maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
+     maybeGlobalRdrEnv rdr_env
+         | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
+         | otherwise                                   = Nothing
 
      deliberatelyOmitted :: String -> a
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
