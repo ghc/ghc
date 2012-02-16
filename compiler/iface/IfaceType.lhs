@@ -123,7 +123,7 @@ ifaceTyConName IfaceUnliftedTypeKindTc = unliftedTypeKindTyConName
 ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
 ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
 ifaceTyConName IfaceConstraintKindTc   = constraintKindTyConName
-ifaceTyConName IfaceSuperKindTc        = tySuperKindTyConName
+ifaceTyConName IfaceSuperKindTc        = superKindTyConName
 ifaceTyConName (IfaceTc ext)           = ext
 ifaceTyConName (IfaceIPTc n)           = pprPanic "ifaceTyConName:IPTc" (ppr n)
 	       		    	       	 -- Note [The Name of an IfaceAnyTc]
@@ -283,7 +283,7 @@ ppr_tc_app _         tc          []   = ppr_tc tc
 ppr_tc_app _         IfaceListTc [ty] = brackets (pprIfaceType ty)
 ppr_tc_app _         IfaceListTc _    = panic "ppr_tc_app IfaceListTc"
 
-ppr_tc_app _         IfacePArrTc [ty] = pabrackets (pprIfaceType ty)
+ppr_tc_app _         IfacePArrTc [ty] = paBrackets (pprIfaceType ty)
 ppr_tc_app _         IfacePArrTc _    = panic "ppr_tc_app IfacePArrTc"
 
 ppr_tc_app _         (IfaceTupTc sort _) tys =
@@ -326,10 +326,6 @@ pprIfaceContext theta = ppr_preds theta <+> darrow
 ppr_preds :: [IfacePredType] -> SDoc
 ppr_preds [pred] = ppr pred    -- No parens
 ppr_preds preds  = parens (sep (punctuate comma (map ppr preds))) 
-
--------------------
-pabrackets :: SDoc -> SDoc
-pabrackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
 %************************************************************************
@@ -399,7 +395,7 @@ toIfaceWiredInTyCon tc nm
   | nm == argTypeKindTyConName      = IfaceArgTypeKindTc
   | nm == constraintKindTyConName   = IfaceConstraintKindTc
   | nm == ubxTupleKindTyConName     = IfaceUbxTupleKindTc
-  | nm == tySuperKindTyConName      = IfaceSuperKindTc
+  | nm == superKindTyConName        = IfaceSuperKindTc
   | otherwise		            = IfaceTc nm
 
 ----------------

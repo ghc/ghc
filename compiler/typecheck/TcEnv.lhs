@@ -71,6 +71,7 @@ import TypeRep
 import Class
 import Name
 import NameEnv
+import VarEnv
 import HscTypes
 import DynFlags
 import SrcLoc
@@ -286,7 +287,7 @@ tcLookupTyVar :: Name -> TcM TcTyVar
 tcLookupTyVar name = do
     thing <- tcLookup name
     case thing of
-        ATyVar _ ty -> return (tcGetTyVar "tcLookupTyVar" ty)
+        ATyVar _ tv -> return tv
         _           -> pprPanic "tcLookupTyVar" (ppr name)
 
 tcLookupId :: Name -> TcM Id
@@ -340,18 +341,36 @@ tcExtendKindEnvTvs bndrs thing_inside
   = tcExtendKindEnv (map (hsTyVarNameKind . unLoc) bndrs)
                     (thing_inside bndrs)
 
+-----------------------
+-- Scoped type and kind variables
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
-  = tcExtendTyVarEnv2 [(tyVarName tv, mkTyVarTy tv) | tv <- tvs] thing_inside
+  = tcExtendTyVarEnv2 [(tyVarName tv, tv) | tv <- tvs] thing_inside
 
-tcExtendTyVarEnv2 :: [(Name,TcType)] -> TcM r -> TcM r
+tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 binds thing_inside 
-  = tc_extend_local_env [(name, ATyVar name ty) | (name, ty) <- binds] thing_inside
+  = tc_extend_local_env [(name, ATyVar name tv) | (name, tv) <- binds] $
+    do { env <- getLclEnv
+       ; let env' = env { tcl_tidy = add_tidy_tvs (tcl_tidy env) }
+       ; setLclEnv env' thing_inside }
+  where
+    add_tidy_tvs env = foldl add env binds
 
-getScopedTyVarBinds :: TcM [(Name, TcType)]
+    -- We initialise the "tidy-env", used for tidying types before printing,
+    -- by building a reverse map from the in-scope type variables to the
+    -- OccName that the programmer originally used for them
+    add :: TidyEnv -> (Name, TcTyVar) -> TidyEnv
+    add (env,subst) (name, tyvar)
+        = case tidyOccName env (nameOccName name) of
+            (env', occ') ->  (env', extendVarEnv subst tyvar tyvar')
+                where
+                  tyvar' = setTyVarName tyvar name'
+                  name'  = tidyNameOcc name occ'
+
+getScopedTyVarBinds :: TcM [(Name, TcTyVar)]
 getScopedTyVarBinds
   = do  { lcl_env <- getLclEnv
-        ; return [(name, ty) | ATyVar name ty <- nameEnvElts (tcl_env lcl_env)] }
+        ; return [(name, tv) | ATyVar name tv <- nameEnvElts (tcl_env lcl_env)] }
 \end{code}
 
 
@@ -398,8 +417,8 @@ tcExtendGhciEnv ids thing_inside
                         | id <- ids]
     thing_inside
   where
-    is_top id | isEmptyVarSet (tcTyVarsOfType (idType id)) = TopLevel
-              | otherwise                                  = NotTopLevel
+    is_top id | isEmptyVarSet (tyVarsOfType (idType id)) = TopLevel
+              | otherwise                                = NotTopLevel
 
 
 tc_extend_local_env :: [(Name, TcTyThing)] -> TcM a -> TcM a
@@ -435,8 +454,8 @@ tc_extend_local_env extra_env thing_inside
                          emptyVarSet
           NotTopLevel -> id_tvs
       where
-        id_tvs = tcTyVarsOfType (idType id)
-    get_tvs (_, ATyVar _ ty) = tcTyVarsOfType ty        -- See Note [Global TyVars]
+        id_tvs = tyVarsOfType (idType id)
+    get_tvs (_, ATyVar _ tv) = unitVarSet tv        -- See Note [Global TyVars]
     get_tvs other = pprPanic "get_tvs" (ppr other)
         
         -- Note [Global TyVars]

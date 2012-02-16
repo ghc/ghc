@@ -26,6 +26,7 @@ import TypeRep
 import Name ( Name )
 import Var
 import VarEnv
+import Util( equalLength )
 import Outputable
 import Control.Monad    ( when, unless, zipWithM )
 import MonadUtils
@@ -37,7 +38,7 @@ import TcSMonad
 import FastString
 
 import Data.Maybe ( isNothing )
-
+import Data.List  ( zip4 )
 \end{code}
 
 
@@ -111,16 +112,19 @@ andWhenContinue tcs1 tcs2
 
 Note [Caching for canonicals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-Our plan with pre-canonicalization is to be able to solve a constraint really fast from existing
-bindings in TcEvBinds. So one may think that the condition (isCNonCanonical) is not necessary. 
-However consider the following setup:
+Our plan with pre-canonicalization is to be able to solve a constraint
+really fast from existing bindings in TcEvBinds. So one may think that
+the condition (isCNonCanonical) is not necessary.  However consider
+the following setup:
 
 InertSet = { [W] d1 : Num t } 
 WorkList = { [W] d2 : Num t, [W] c : t ~ Int} 
 
-Now, we prioritize equalities, but in our concrete example (should_run/mc17.hs) the first (d2) constraint 
-is dealt with first, because (t ~ Int) is an equality that only later appears in the worklist since it is
-pulled out from a nested implication constraint. So, let's examine what happens:
+Now, we prioritize equalities, but in our concrete example
+(should_run/mc17.hs) the first (d2) constraint is dealt with first,
+because (t ~ Int) is an equality that only later appears in the
+worklist since it is pulled out from a nested implication
+constraint. So, let's examine what happens:
  
    - We encounter work item (d2 : Num t)
 
@@ -129,27 +133,33 @@ pulled out from a nested implication constraint. So, let's examine what happens:
               d2 := d1 
     and we discard d2 from the worklist. The inert set remains unaffected.
 
-   - Now the equation ([W] c : t ~ Int) is encountered and kicks-out (d1 : Num t) from the inerts.
-     Then that equation gets spontaneously solved, perhaps. We end up with:
+   - Now the equation ([W] c : t ~ Int) is encountered and kicks-out
+     (d1 : Num t) from the inerts.  Then that equation gets
+     spontaneously solved, perhaps. We end up with:
         InertSet : { [G] c : t ~ Int }
         WorkList : { [W] d1 : Num t} 
 
-   - Now we examine (d1), we observe that there is a binding for (Num t) in the evidence binds and 
-     we set: 
+   - Now we examine (d1), we observe that there is a binding for (Num
+     t) in the evidence binds and we set:
              d1 := d2 
      and end up in a loop!
 
-Now, the constraints that get kicked out from the inert set are always Canonical, so by restricting
-the use of the pre-canonicalizer to NonCanonical constraints we eliminate this danger. Moreover, for 
-canonical constraints we already have good caching mechanisms (effectively the interaction solver) 
-and we are interested in reducing things like superclasses of the same non-canonical constraint being 
-generated hence I don't expect us to lose a lot by introducing the (isCNonCanonical) restriction.
+Now, the constraints that get kicked out from the inert set are always
+Canonical, so by restricting the use of the pre-canonicalizer to
+NonCanonical constraints we eliminate this danger. Moreover, for
+canonical constraints we already have good caching mechanisms
+(effectively the interaction solver) and we are interested in reducing
+things like superclasses of the same non-canonical constraint being
+generated hence I don't expect us to lose a lot by introducing the
+(isCNonCanonical) restriction.
 
-A similar situation can arise in TcSimplify, at the end of the solve_wanteds function, where constraints
-from the inert set are returned as new work -- our substCt ensures however that if they are not rewritten
-by subst, they remain canonical and hence we will not attempt to solve them from the EvBinds. If on the 
-other hand they did get rewritten and are now non-canonical they will still not match the EvBinds, so we 
-are again good.
+A similar situation can arise in TcSimplify, at the end of the
+solve_wanteds function, where constraints from the inert set are
+returned as new work -- our substCt ensures however that if they are
+not rewritten by subst, they remain canonical and hence we will not
+attempt to solve them from the EvBinds. If on the other hand they did
+get rewritten and are now non-canonical they will still not match the
+EvBinds, so we are again good.
 
 
 
@@ -201,75 +211,21 @@ canEvVar :: EvVar -> PredTree
 -- Called only for non-canonical EvVars 
 canEvVar ev pred_classifier d fl 
   = case pred_classifier of
-      ClassPred cls tys -> canClass d fl ev cls tys 
-                                        `andWhenContinue` emit_superclasses
-      EqPred ty1 ty2    -> canEq    d fl ev ty1 ty2 
-                                        `andWhenContinue` emit_kind_constraint
-      IPPred nm ty      -> canIP    d fl ev nm ty
-      IrredPred ev_ty   -> canIrred d fl ev ev_ty
-      TuplePred tys     -> canTuple d fl ev tys
-  where emit_superclasses ct@(CDictCan {cc_id = v_new
-                                       , cc_tyargs = xis_new, cc_class = cls })
-            -- Add superclasses of this one here, See Note [Adding superclasses]. 
-            -- But only if we are not simplifying the LHS of a rule. 
-          = do { sctxt <- getTcSContext
-               ; unless (simplEqsOnly sctxt) $ 
-                        newSCWorkFromFlavored d v_new fl cls xis_new
-               -- Arguably we should "seq" the coercions if they are derived, 
-               -- as we do below for emit_kind_constraint, to allow errors in
-               -- superclasses to be executed if deferred to runtime! 
-               ; continueWith ct }
-        emit_superclasses _ = panic "emit_superclasses of non-class!"
-
-        emit_kind_constraint ct@(CTyEqCan { cc_id = ev, cc_depth = d
-                                          , cc_flavor = fl, cc_tyvar = tv
-                                          , cc_rhs = ty })
-          = do_emit_kind_constraint ct ev d fl (mkTyVarTy tv) ty
-
-        emit_kind_constraint ct@(CFunEqCan { cc_id = ev, cc_depth = d
-                                           , cc_flavor = fl
-                                           , cc_fun = fn, cc_tyargs = xis1
-                                           , cc_rhs = xi2 })
-          = do_emit_kind_constraint ct ev d fl (mkTyConApp fn xis1) xi2
-        emit_kind_constraint ct = continueWith ct
-
-        do_emit_kind_constraint ct eqv d fl ty1 ty2 
-           | compatKind k1 k2 = continueWith ct
-           | otherwise
-           = do { keqv <- forceNewEvVar kind_co_fl (mkEqPred (k1,k2))
-                ; eqv' <- forceNewEvVar fl (mkEqPred (ty1,ty2))
-                ; _fl <- case fl of
-                   Wanted {}-> setEvBind eqv
-                                (mkEvKindCast eqv' (mkTcCoVarCo keqv)) fl
-                   Given {} -> setEvBind eqv'
-                                (mkEvKindCast eqv (mkTcCoVarCo keqv)) fl
-                   Derived {} -> return fl
-
-                ; canEq_ d kind_co_fl keqv k1 k2 -- Emit kind equality
-                ; continueWith (ct { cc_id = eqv' }) }
-           where k1 = typeKind ty1
-                 k2 = typeKind ty2
-                 ctxt = mkKindErrorCtxtTcS ty1 k1 ty2 k2
-                 -- Always create a Wanted kind equality even if 
-                 -- you are decomposing a given constraint.
-                 -- NB: DV finds this reasonable for now. Maybe we 
-                 --  have to revisit.
-                 kind_co_fl
-                   | Given (CtLoc _sk_info src_span err_ctxt) _ <- fl
-                   = let orig = TypeEqOrigin (UnifyOrigin ty1 ty2)
-                         ctloc = pushErrCtxtSameOrigin ctxt $
-                                 CtLoc orig src_span err_ctxt
-                     in Wanted ctloc
-                   | Wanted ctloc <- fl
-                   = Wanted (pushErrCtxtSameOrigin ctxt ctloc)
-                   | Derived ctloc <- fl
-                   = Derived (pushErrCtxtSameOrigin ctxt ctloc)
-                   | otherwise 
-                   = panic "do_emit_kind_constraint: non-CtLoc inside!"
+      ClassPred cls tys -> canClassNC d fl ev cls tys 
+      EqPred ty1 ty2    -> canEqNC    d fl ev ty1 ty2 
+      IPPred nm ty      -> canIP      d fl ev nm ty
+      IrredPred ev_ty   -> canIrred   d fl ev ev_ty
+      TuplePred tys     -> canTuple   d fl ev tys
+\end{code}
 
 
--- Tuple canonicalisation
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%************************************************************************
+%*                                                                      *
+%*                      Tuple Canonicalization
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
 canTuple :: SubGoalDepth -- Depth 
          -> CtFlavor -> EvVar -> [PredType] -> TcS StopOrContinue
 canTuple d fl ev tys
@@ -289,9 +245,16 @@ canTuple d fl ev tys
                ; when (isNewEvVar evc) $
                       addToWork (canEvVar ev' (classifyPredType (evVarPred ev')) d fl')
                ; return ev' }
+\end{code}
 
--- Implicit Parameter Canonicalization
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+%************************************************************************
+%*                                                                      *
+%*                      Implicit Parameter Canonicalization
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
 canIP :: SubGoalDepth -- Depth 
       -> CtFlavor -> EvVar 
       -> IPName Name -> Type -> TcS StopOrContinue
@@ -332,16 +295,29 @@ same type, and at that point we can generate a flattened equality
 constraint between the types.  (On the other hand, the types in two
 class constraints for the same class MAY be equal, so they need to be
 flattened in the first place to facilitate comparing them.)
+
+%************************************************************************
+%*                                                                      *
+%*                      Class Canonicalization
+%*                                                                      *
+%************************************************************************
+
 \begin{code}
-
--- Class Canonicalization
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-canClass :: SubGoalDepth -- Depth
-         -> CtFlavor -> EvVar  
-         -> Class -> [Type] -> TcS StopOrContinue
+canClass, canClassNC 
+   :: SubGoalDepth -- Depth
+   -> CtFlavor -> EvVar  
+   -> Class -> [Type] -> TcS StopOrContinue
 -- Precondition: EvVar is class evidence 
--- Note: Does NOT add superclasses, but the /caller/ is responsible for adding them!
+
+-- The canClassNC version is used on non-canonical constraints
+-- and adds superclasses.  The plain canClass version is used
+-- for already-canonical class constraints (but which might have
+-- been subsituted or somthing), and hence do not need superclasses
+
+canClassNC d fl ev cls tys 
+  = canClass d fl ev cls tys 
+    `andWhenContinue` emitSuperclasses
+
 canClass d fl v cls tys
   = do { -- sctx <- getTcSContext
        ; (xis, cos) <- flattenMany d fl tys
@@ -367,6 +343,20 @@ canClass d fl v cls tys
                                                 , cc_tyargs = xis, cc_class = cls
                                                 , cc_depth  = d }
                    else return Stop } }
+
+emitSuperclasses :: Ct -> TcS StopOrContinue
+emitSuperclasses ct@(CDictCan { cc_id = v_new, cc_depth = d, cc_flavor = fl
+                              , cc_tyargs = xis_new, cc_class = cls })
+            -- Add superclasses of this one here, See Note [Adding superclasses]. 
+            -- But only if we are not simplifying the LHS of a rule. 
+ = do { sctxt <- getTcSContext
+      ; unless (simplEqsOnly sctxt) $ 
+               newSCWorkFromFlavored d v_new fl cls xis_new
+      -- Arguably we should "seq" the coercions if they are derived, 
+      -- as we do below for emit_kind_constraint, to allow errors in
+      -- superclasses to be executed if deferred to runtime! 
+      ; continueWith ct }
+emitSuperclasses _ = panic "emit_superclasses of non-class!"
 \end{code}
 
 Note [Adding superclasses]
@@ -495,10 +485,14 @@ is_improvement_pty ty = go (classifyPredType ty)
 \end{code}
 
 
+%************************************************************************
+%*                                                                      *
+%*                      Irreducibles canonicalization
+%*                                                                      *
+%************************************************************************
+
 
 \begin{code}
--- Irreducibles canonicalization
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 canIrred :: SubGoalDepth -- Depth
          -> CtFlavor -> EvVar -> TcType -> TcS StopOrContinue
 -- Precondition: ty not a tuple and no other evidence form
@@ -603,58 +597,7 @@ flatten d ctxt ty
        ; return (xi,co) } 
 
 flatten d ctxt (TyVarTy tv)
-  = do { ieqs <- getInertEqs
-       ; let mco = tv_eq_subst (fst ieqs) tv  -- co : v ~ ty
-       ; case mco of -- Done, but make sure the kind is zonked
-           Nothing -> 
-               do { let knd = tyVarKind tv
-                  ; (new_knd,_kind_co) <- flatten d ctxt knd
-                  ; let ty = mkTyVarTy (setVarType tv new_knd)
-                  ; return (ty, mkTcReflCo ty) }
-           -- NB recursive call. 
-           -- Why? See Note [Non-idempotent inert substitution]
-           -- Actually, I think applying the substition just twice will suffice
-           Just (co,ty) -> 
-               do { (ty_final,co') <- flatten d ctxt ty
-                  ; return (ty_final, co' `mkTcTransCo` mkTcSymCo co) } }  
-  where tv_eq_subst subst tv
-          | Just (ct,co) <- lookupVarEnv subst tv
-          , cc_flavor ct `canRewrite` ctxt
-          = Just (co,cc_rhs ct)
-          | otherwise = Nothing
-
-\end{code}
-
-Note [Non-idempotent inert substitution]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The inert substitution is not idempotent in the broad sense. It is only idempotent in 
-that it cannot rewrite the RHS of other inert equalities any further. An example of such 
-an inert substitution is:
-
- [Ś] g1 : ta8 ~ ta4
- [W] g2 : ta4 ~ a5Fj
-
-Observe that the wanted cannot rewrite the solved goal, despite the fact that ta4 appears on
-an RHS of an equality. Now, imagine a constraint:
-
- [W] g3: ta8 ~ Int 
-
-coming in. If we simply apply once the inert substitution we will get: 
-
- [W] g3_1: ta4 ~ Int 
-
-and because potentially ta4 is untouchable we will try to insert g3_1 in the inert set, 
-getting a panic since the inert only allows ONE equation per LHS type variable (as it 
-should).
-
-For this reason, when we reach to flatten a type variable, we flatten it recursively, 
-so that we can make sure that the inert substitution /is/ fully applied.
-
-This insufficient rewriting was the reason for #5668.
-
-\begin{code}
-
+  = flattenTyVar d ctxt tv
 
 flatten d ctxt (AppTy ty1 ty2)
   = do { (xi1,co1) <- flatten d ctxt ty1
@@ -751,8 +694,62 @@ flatten d ctxt ty@(ForAllTy {})
                   go bound (FunTy arg res)  = go bound arg || go bound res
                   go bound (AppTy fun arg)  = go bound fun || go bound arg
                   go bound (ForAllTy tv ty) = go (bound `extendVarSet` tv) ty
+\end{code}
 
+\begin{code}
+flattenTyVar :: SubGoalDepth -> CtFlavor -> TcTyVar -> TcS (Xi, TcCoercion)
+-- "Flattening" a type variable means to apply the substitution to it
+flattenTyVar d ctxt tv
+  = do { ieqs <- getInertEqs
+       ; let mco = tv_eq_subst (fst ieqs) tv  -- co : v ~ ty
+       ; case mco of -- Done, but make sure the kind is zonked
+           Nothing -> 
+               do { let knd = tyVarKind tv
+                  ; (new_knd,_kind_co) <- flatten d ctxt knd
+                  ; let ty = mkTyVarTy (setVarType tv new_knd)
+                  ; return (ty, mkTcReflCo ty) }
+           -- NB recursive call. 
+           -- Why? See Note [Non-idempotent inert substitution]
+           -- Actually, I think applying the substition just twice will suffice
+           Just (co,ty) -> 
+               do { (ty_final,co') <- flatten d ctxt ty
+                  ; return (ty_final, co' `mkTcTransCo` mkTcSymCo co) } }  
+  where tv_eq_subst subst tv
+          | Just (ct,co) <- lookupVarEnv subst tv
+          , cc_flavor ct `canRewrite` ctxt
+          = Just (co,cc_rhs ct)
+          | otherwise = Nothing
+\end{code}
 
+Note [Non-idempotent inert substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The inert substitution is not idempotent in the broad sense. It is only idempotent in 
+that it cannot rewrite the RHS of other inert equalities any further. An example of such 
+an inert substitution is:
+
+ [Ś] g1 : ta8 ~ ta4
+ [W] g2 : ta4 ~ a5Fj
+
+Observe that the wanted cannot rewrite the solved goal, despite the fact that ta4 appears on
+an RHS of an equality. Now, imagine a constraint:
+
+ [W] g3: ta8 ~ Int 
+
+coming in. If we simply apply once the inert substitution we will get: 
+
+ [W] g3_1: ta4 ~ Int 
+
+and because potentially ta4 is untouchable we will try to insert g3_1 in the inert set, 
+getting a panic since the inert only allows ONE equation per LHS type variable (as it 
+should).
+
+For this reason, when we reach to flatten a type variable, we flatten it recursively, 
+so that we can make sure that the inert substitution /is/ fully applied.
+
+This insufficient rewriting was the reason for #5668.
+
+\begin{code}
 getCachedFlatEq :: TyCon -> [Xi] -> CtFlavor 
                 -> FlatEqOrigin
                 -> TcS (Maybe (Xi, TcCoercion))
@@ -787,30 +784,43 @@ addToWork tcs_action = tcs_action >>= stop_or_emit
   where stop_or_emit Stop              = return ()
         stop_or_emit (ContinueWith ct) = updWorkListTcS $ 
                                          extendWorkListCt ct
+\end{code}
 
+
+%************************************************************************
+%*                                                                      *
+%*        Equalities
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
 canEqEvVarsCreated :: SubGoalDepth 
                    -> [CtFlavor] -> [EvVarCreated] -> [Type] -> [Type]
                    -> TcS StopOrContinue
-canEqEvVarsCreated _d _fl [] _ _    = return Stop
-canEqEvVarsCreated d (fl:fls) (evc:evcs) (ty1:tys1) (ty2:tys2) 
-  | isNewEvVar evc 
-  = let do_one evc0 sy1 sy2
-          | isNewEvVar evc0 
-          = canEq_ d fl (evc_the_evvar evc0) sy1 sy2
-          | otherwise = return ()
-    in do { _unused <- zipWith3M do_one evcs tys1 tys2 
-          ; canEq d fl (evc_the_evvar evc) ty1 ty2 }
-  | otherwise 
-  = canEqEvVarsCreated d fls evcs tys1 tys2
-canEqEvVarsCreated _ _ _ _ _ = return Stop
+canEqEvVarsCreated d fls evcs tys1 tys2
+  = ASSERT( equalLength fls evcs && equalLength fls tys1 && equalLength fls tys2 )
+    case filter is_new (zip4 fls evcs tys1 tys2) of
+      []             -> return Stop
+      (quad : quads) -> do { mapM_ (addToWork . do_quad) quads
+                           ; do_quad quad }
+      -- For the new EvVars, add all but one to the work list
+      -- and return the first (if any) for futher processing
+ where
+   is_new (_, evc, _, _) = isNewEvVar evc
+   do_quad (fl, evc, ty1, ty2) = canEqNC d fl (evc_the_evvar evc) ty1 ty2
+      -- Note the "NC": these are fresh equalities so we must be
+      -- careful to add their kind constraints
 
+-------------------------
+canEqNC, canEq 
+  :: SubGoalDepth 
+  -> CtFlavor -> EqVar 
+  -> Type -> Type -> TcS StopOrContinue
 
-canEq_ :: SubGoalDepth 
-       -> CtFlavor -> EqVar -> Type -> Type -> TcS ()
-canEq_ d fl eqv ty1 ty2 = addToWork (canEq d fl eqv ty1 ty2)
+canEqNC d fl ev ty1 ty2
+  = canEq d fl ev ty1 ty2
+    `andWhenContinue` emitKindConstraint
 
-canEq :: SubGoalDepth 
-      -> CtFlavor -> EqVar -> Type -> Type -> TcS StopOrContinue
 canEq _d fl eqv ty1 ty2
   | eqType ty1 ty2	-- Dealing with equality here avoids
     	     	 	-- later spurious occurs checks for a~a
@@ -883,6 +893,7 @@ canEq d fl eqv s1@(ForAllTy {}) s2@(ForAllTy {})
 
 canEq d fl eqv _ _                               = canEqFailure d fl eqv
 
+------------------------
 -- Type application
 canEqAppTy :: SubGoalDepth 
            -> CtFlavor -> EqVar -> Type -> Type -> Type -> Type
@@ -908,6 +919,7 @@ canEqAppTy d fl eqv s1 t1 s2 t2
            
            ; canEqEvVarsCreated d [fl,fl] [evc1,evc2] [s1,t1] [s2,t2] }
 
+------------------------
 canEqFailure :: SubGoalDepth 
              -> CtFlavor -> EvVar -> TcS StopOrContinue
 canEqFailure d fl eqv 
@@ -915,6 +927,61 @@ canEqFailure d fl eqv
           -- See Note [Combining insoluble constraints]
        ; emitFrozenError fl eqv d
        ; return Stop }
+
+------------------------
+emitKindConstraint :: Ct -> TcS StopOrContinue
+emitKindConstraint ct
+  = case ct of 
+      CTyEqCan { cc_id = ev, cc_depth = d
+               , cc_flavor = fl, cc_tyvar = tv
+               , cc_rhs = ty }
+          -> emit_kind_constraint ev d fl (mkTyVarTy tv) ty
+
+      CFunEqCan { cc_id = ev, cc_depth = d
+                , cc_flavor = fl
+                , cc_fun = fn, cc_tyargs = xis1
+                , cc_rhs = xi2 }
+          -> emit_kind_constraint ev d fl (mkTyConApp fn xis1) xi2
+      _   -> continueWith ct 
+  where
+    emit_kind_constraint eqv d fl ty1 ty2 
+       | compatKind k1 k2 
+       = continueWith ct
+       | otherwise
+       = do { keqv <- forceNewEvVar kind_co_fl (mkEqPred (k1,k2))
+            ; eqv' <- forceNewEvVar fl (mkEqPred (ty1,ty2))
+            ; _fl <- case fl of
+               Wanted {}-> setEvBind eqv
+                            (mkEvKindCast eqv' (mkTcCoVarCo keqv)) fl
+               Given {} -> setEvBind eqv'
+                            (mkEvKindCast eqv (mkTcCoVarCo keqv)) fl
+               Derived {} -> return fl
+
+            ; traceTcS "Emitting kind constraint" $
+                  vcat [ ppr keqv <+> dcolon <+> ppr (mkEqPred (k1,k2))
+                       , ppr eqv, ppr eqv' ] 
+            ; addToWork (canEq d kind_co_fl keqv k1 k2) -- Emit kind equality
+            ; continueWith (ct { cc_id = eqv' }) }
+       where 
+         k1 = typeKind ty1
+         k2 = typeKind ty2
+         ctxt = mkKindErrorCtxtTcS ty1 k1 ty2 k2
+         -- Always create a Wanted kind equality even if 
+         -- you are decomposing a given constraint.
+         -- NB: DV finds this reasonable for now. Maybe we 
+         --  have to revisit.
+         kind_co_fl
+           | Given (CtLoc _sk_info src_span err_ctxt) _ <- fl
+           = let orig = TypeEqOrigin (UnifyOrigin ty1 ty2)
+                 ctloc = pushErrCtxtSameOrigin ctxt $
+                         CtLoc orig src_span err_ctxt
+             in Wanted ctloc
+           | Wanted ctloc <- fl
+           = Wanted (pushErrCtxtSameOrigin ctxt ctloc)
+           | Derived ctloc <- fl
+           = Derived (pushErrCtxtSameOrigin ctxt ctloc)
+           | otherwise 
+           = panic "do_emit_kind_constraint: non-CtLoc inside!"
 \end{code}
 
 Note [Combining insoluble constraints]
@@ -1282,13 +1349,15 @@ canEqLeafTyVarLeftRec :: SubGoalDepth
                       -> TcTyVar -> TcType -> TcS StopOrContinue
 canEqLeafTyVarLeftRec d fl eqv tv s2              -- eqv :: tv ~ s2
   = do {  traceTcS "canEqLeafTyVarLeftRec" $ pprEq (mkTyVarTy tv) s2
-       ; (xi1,co1) <- flatten d fl (mkTyVarTy tv) -- co1 :: xi1 ~ tv
+       ; (xi1,co1) <- flattenTyVar d fl tv -- co1 :: xi1 ~ tv
        ; case isTcReflCo co1 of 
-             True -- If reflco and variable, just go on
-               | Just tv' <- getTyVar_maybe xi1 
-                 -> canEqLeafTyVarLeft d fl eqv tv' s2
-             _ -> -- If not a variable or not refl co, must rewrite and go on
-               do { delCachedEvVar eqv fl
+             True -> case getTyVar_maybe xi1 of
+                       Just tv' -> canEqLeafTyVarLeft d fl eqv tv' s2
+                       Nothing  -> canEq d fl eqv xi1 s2
+
+             False -> -- If not refl co, must rewrite and go on
+               do { traceTcS "celtlr: rewrite" (ppr xi1 $$ ppr co1)
+                  ; delCachedEvVar eqv fl
                   ; evc <- newEqVar fl xi1 s2  -- new_ev :: xi1 ~ s2
                   ; let new_ev = evc_the_evvar evc
                   ; fl' <- case fl of 

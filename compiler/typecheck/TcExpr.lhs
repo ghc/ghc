@@ -199,7 +199,7 @@ tcExpr (ExprWithTySig expr sig_ty) res_ty
       -- Remember to extend the lexical type-variable environment
       ; (gen_fn, expr') 
             <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
-      	       tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
+      	       tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` skol_tvs) $
 	             	       	-- See Note [More instantiated than scoped] in TcBinds
       	       tcMonoExprNC expr res_ty
 
@@ -892,7 +892,7 @@ tcInferFun fun
          -- Zonk the function type carefully, to expose any polymorphism
 	 -- E.g. (( \(x::forall a. a->a). blah ) e)
 	 -- We can see the rank-2 type of the lambda in time to genrealise e
-       ; fun_ty' <- zonkTcTypeCarefully fun_ty
+       ; fun_ty' <- zonkTcType fun_ty
 
        ; (wrap, rho) <- deeplyInstantiate AppOrigin fun_ty'
        ; return (mkLHsWrap wrap fun, rho) }

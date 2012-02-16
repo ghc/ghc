@@ -416,7 +416,7 @@ varTypeTcTyVars :: Var -> TyVarSet
 -- Find the type variables free in the type of the variable
 -- Remember, coercion variables can mention type variables...
 varTypeTcTyVars var
-  | isLocalId var = tcTyVarsOfType (idType var)
+  | isLocalId var = tyVarsOfType (idType var)
   | otherwise     = emptyVarSet -- Global Ids and non-coercion TyVars
 
 idFreeVars :: Id -> VarSet

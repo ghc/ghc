@@ -468,6 +468,7 @@ data EvTerm
   | EvSuperClass DictId Int      -- n'th superclass. Used for both equalities and
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
+
   | EvKindCast EvVar TcCoercion  -- See Note [EvKindCast]
            
   deriving( Data.Data, Data.Typeable)
@@ -475,7 +476,6 @@ data EvTerm
 
 Note [EvKindCast] 
 ~~~~~~~~~~~~~~~~~ 
-
 EvKindCast g kco is produced when we have a constraint (g : s1 ~ s2) 
 but the kinds of s1 and s2 (k1 and k2 respectively) don't match but 
 are rather equal by a coercion. You may think that this coercion will
@@ -485,8 +485,7 @@ that coercion will be an 'error' term, which we want to evaluate rather
 than silently forget about!
 
 The relevant (and only) place where such a coercion is produced in 
-the simplifier is in emit_kind_constraint in TcCanonical.
-
+the simplifier is in TcCanonical.emitKindConstraint.
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~

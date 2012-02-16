@@ -473,7 +473,7 @@ ppr_expr (ExplicitList _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (ExplicitPArr _ exprs)
-  = pa_brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
+  = paBrackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (RecordCon con_id _ rbinds)
   = hang (ppr con_id) 2 (ppr rbinds)
@@ -489,7 +489,7 @@ ppr_expr (ExprWithTySigOut expr sig)
          4 (ppr sig)
 
 ppr_expr (ArithSeq _ info) = brackets (ppr info)
-ppr_expr (PArrSeq  _ info) = pa_brackets (ppr info)
+ppr_expr (PArrSeq  _ info) = paBrackets (ppr info)
 
 ppr_expr EWildPat       = char '_'
 ppr_expr (ELazyPat e)   = char '~' <> pprParendExpr e
@@ -554,11 +554,6 @@ pprCmdArg (HsCmdTop cmd _ _ _)
 
 instance OutputableBndr id => Outputable (HsCmdTop id) where
     ppr = pprCmdArg
-
--- add parallel array brackets around a document
---
-pa_brackets :: SDoc -> SDoc
-pa_brackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
 HsSyn records exactly where the user put parens, with HsPar.
@@ -1132,7 +1127,7 @@ pprDo GhciStmt    stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
 pprDo ArrowExpr   stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
 pprDo MDoExpr     stmts = ptext (sLit "mdo") <+> ppr_do_stmts stmts
 pprDo ListComp    stmts = brackets    $ pprComp stmts
-pprDo PArrComp    stmts = pa_brackets $ pprComp stmts
+pprDo PArrComp    stmts = paBrackets $ pprComp stmts
 pprDo MonadComp   stmts = brackets    $ pprComp stmts
 pprDo _           _     = panic "pprDo" -- PatGuard, ParStmtCxt
 

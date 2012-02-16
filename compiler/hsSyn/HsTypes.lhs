@@ -560,7 +560,7 @@ ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (interpp'SP tys)
                     _              -> BoxedTuple
 ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> ppr kind)
 ppr_mono_ty _    (HsListTy ty)	     = brackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty _    (HsPArrTy ty)	     = pabrackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty _    (HsPArrTy ty)	     = paBrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec pREC_FUN (ppr n <+> dcolon <+> ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
@@ -613,10 +613,6 @@ ppr_fun_ty ctxt_prec ty1 ty2
     in
     maybeParen ctxt_prec pREC_FUN $
     sep [p1, ptext (sLit "->") <+> p2]
-
---------------------------
-pabrackets :: SDoc -> SDoc
-pabrackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
 

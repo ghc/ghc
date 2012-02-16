@@ -60,7 +60,7 @@ module TcMType (
   --------------------------------
   -- Zonking
   zonkType, zonkKind, zonkTcPredType, 
-  zonkTcTypeCarefully, skolemiseUnboundMetaTyVar,
+  skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
@@ -479,10 +479,17 @@ the environment.
 tcGetGlobalTyVars :: TcM TcTyVarSet
 tcGetGlobalTyVars
   = do { (TcLclEnv {tcl_tyvars = gtv_var}) <- getLclEnv
-       ; gbl_tvs  <- readMutVar gtv_var
-       ; gbl_tvs' <- zonkTcTyVarsAndFV gbl_tvs
+       ; gbl_tvs <- readMutVar gtv_var
+       ; tys     <- mapM zonk_tv (varSetElems gbl_tvs)
+       ; let gbl_tvs' = tyVarsOfTypes tys
        ; writeMutVar gtv_var gbl_tvs'
        ; return gbl_tvs' }
+  where
+    zonk_tv tv | isTcTyVar tv = zonkTcTyVar tv
+               | otherwise    = return (mkTyVarTy tv)
+    -- Hackily, the global tyvars can contain non-TcTyVars
+    -- These are added (only) in TcHsType.tcTyClTyVars, but it seems
+    -- painful to make them into TcTyVars there
 \end{code}
 
 -----------------  Type variables
@@ -495,29 +502,6 @@ zonkTcTyVarsAndFV :: TcTyVarSet -> TcM TcTyVarSet
 zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar (varSetElems tyvars)
 
 -----------------  Types
-zonkTcTypeCarefully :: TcType -> TcM TcType
--- Do not zonk type variables free in the environment
-zonkTcTypeCarefully ty = zonkTcType ty   -- I think this function is out of date
-
-{-
-  = do { env_tvs <- tcGetGlobalTyVars
-       ; zonkType (zonk_tv env_tvs) ty }
-  where
-    zonk_tv env_tvs tv
-      | tv `elemVarSet` env_tvs 
-      = return (TyVarTy tv)
-      | otherwise
-      = ASSERT( isTcTyVar tv )
-    	case tcTyVarDetails tv of
-          SkolemTv {}   -> return (TyVarTy tv)
-          RuntimeUnk {} -> return (TyVarTy tv)
-          FlatSkol ty   -> zonkType (zonk_tv env_tvs) ty
-          MetaTv _ ref  -> do { cts <- readMutVar ref
-                              ; case cts of
-			           Flexi       -> return (TyVarTy tv)
-			           Indirect ty -> zonkType (zonk_tv env_tvs) ty }
--}
-
 zonkTcType :: TcType -> TcM TcType
 -- Simply look through all Flexis
 zonkTcType ty = zonkType zonkTcTyVar ty
@@ -583,11 +567,11 @@ defaultKindVarToStar kv
          writeMetaTyVar kv liftedTypeKind
        ; return liftedTypeKind }
 
-zonkQuantifiedTyVars :: TcTyVarSet -> TcM [TcTyVar]
+zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TcTyVar]
 -- Precondition: a kind variable occurs before a type
 --               variable mentioning it in its kind
 zonkQuantifiedTyVars tyvars
-  = do { let (kvs, tvs) = partitionKiTyVars (varSetElems tyvars)
+  = do { let (kvs, tvs) = partitionKiTyVars tyvars
        ; poly_kinds <- xoptM Opt_PolyKinds
        ; if poly_kinds then
              mapM zonkQuantifiedTyVar (kvs ++ tvs)

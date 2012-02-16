@@ -597,47 +597,47 @@ pprTcApp _ _ tc []      -- No brackets for SymOcc
 	       | otherwise     = empty
 
 pprTcApp _ pp tc [ty]
-  | tc `hasKey` listTyConKey = brackets (pp TopPrec ty)
-  | tc `hasKey` parrTyConKey = ptext (sLit "[:") <> pp TopPrec ty <> ptext (sLit ":]")
-  | tc `hasKey` liftedTypeKindTyConKey   = ptext (sLit "*")
-  | tc `hasKey` unliftedTypeKindTyConKey = ptext (sLit "#")
-  | tc `hasKey` openTypeKindTyConKey     = ptext (sLit "OpenKind")
-  | tc `hasKey` ubxTupleKindTyConKey     = ptext (sLit "(#)")
-  | tc `hasKey` argTypeKindTyConKey      = ptext (sLit "ArgKind")
-  | Just n <- tyConIP_maybe tc           = ppr n <> ptext (sLit "::") <> pp TopPrec ty
+  | tc `hasKey` listTyConKey   = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
+  | tc `hasKey` parrTyConKey   = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
+  | Just n <- tyConIP_maybe tc = ppr n <> ptext (sLit "::") <> pp TopPrec ty
 
 pprTcApp p pp tc tys
   | isTupleTyCon tc && tyConArity tc == length tys
-  = tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
+  = pprPromotionQuote tc <>
+    tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
+
   | tc `hasKey` eqTyConKey -- We need to special case the type equality TyCon because
-                           -- its not a SymOcc so won't get printed infix
-  , [_, ty1,ty2] <- tys
-  = pprInfixApp p pp (getName tc) ty1 ty2
+  , [_, ty1,ty2] <- tys    -- with kind polymorphism it has 3 args, so won't get printed infix
+  = pprInfixApp p pp (ppr tc) ty1 ty2
+
   | otherwise
-  = pprTypeNameApp p pp (getName tc) tys
+  = ppr_type_name_app p pp (ppr tc) (isSymOcc (getOccName tc)) tys
 
 ----------------
 pprTypeApp :: NamedThing a => a -> [Type] -> SDoc
 -- The first arg is the tycon, or sometimes class
 -- Print infix if the tycon/class looks like an operator
-pprTypeApp tc tys = pprTypeNameApp TopPrec ppr_type (getName tc) tys
+pprTypeApp tc tys 
+  = pprTypeNameApp TopPrec ppr_type (getName tc) tys
 
 pprTypeNameApp :: Prec -> (Prec -> a -> SDoc) -> Name -> [a] -> SDoc
 -- Used for classes and coercions as well as types; that's why it's separate from pprTcApp
-pprTypeNameApp p pp tc tys
+pprTypeNameApp p pp name tys
+  = ppr_type_name_app p pp (ppr name) (isSymOcc (getOccName name)) tys
+
+ppr_type_name_app :: Prec -> (Prec -> a -> SDoc) -> SDoc -> Bool -> [a] -> SDoc
+ppr_type_name_app p pp pp_tc is_sym_occ tys
   | is_sym_occ           -- Print infix if possible
   , [ty1,ty2] <- tys  -- We know nothing of precedence though
-  = pprInfixApp p pp tc ty1 ty2
+  = pprInfixApp p pp pp_tc ty1 ty2
   | otherwise
-  = pprPrefixApp p (pprPrefixVar is_sym_occ (ppr tc)) (map (pp TyConPrec) tys)
-  where
-    is_sym_occ = isSymOcc (getOccName tc)
+  = pprPrefixApp p (pprPrefixVar is_sym_occ pp_tc) (map (pp TyConPrec) tys)
 
 ----------------
-pprInfixApp :: Prec -> (Prec -> a -> SDoc) -> Name -> a -> a -> SDoc
-pprInfixApp p pp tc ty1 ty2
+pprInfixApp :: Prec -> (Prec -> a -> SDoc) -> SDoc -> a -> a -> SDoc
+pprInfixApp p pp pp_tc ty1 ty2
   = maybeParen p FunPrec $
-    sep [pp FunPrec ty1, pprInfixVar True (ppr tc) <+> pp FunPrec ty2]
+    sep [pp FunPrec ty1, pprInfixVar True pp_tc <+> pp FunPrec ty2]
 
 pprPrefixApp :: Prec -> SDoc -> [SDoc] -> SDoc
 pprPrefixApp p pp_fun pp_tys = maybeParen p TyConPrec $

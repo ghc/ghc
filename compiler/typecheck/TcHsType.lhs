@@ -576,7 +576,7 @@ kcTyVar name         -- Could be a tyvar, a tycon, or a datacon
        ; thing <- tcLookup name
        ; traceTc "lk2" (ppr name <+> ppr thing)
        ; case thing of
-           ATyVar _ ty           -> wrap_mono (typeKind ty)
+           ATyVar _ tv           -> wrap_mono (tyVarKind tv)
            AThing kind           -> wrap_poly kind
            AGlobal (ATyCon tc)   -> wrap_poly (tyConKind tc)
            AGlobal (ADataCon dc) -> kcDataCon dc >>= wrap_poly
@@ -801,7 +801,7 @@ ds_var_app name arg_tys
   | isTvNameSpace (rdrNameSpace (nameRdrName name))
   = do { thing <- tcLookup name
        ; case thing of
-           ATyVar _ ty -> return (mkAppTys ty arg_tys)
+           ATyVar _ tv -> return (mkAppTys (mkTyVarTy tv) arg_tys)
 	   _           -> wrongThingErr "type" thing name }
 
   | otherwise
@@ -924,8 +924,10 @@ Hence using zonked_kinds when forming 'tyvars'.
 \begin{code}
 tcTyClTyVars :: Name -> [LHsTyVarBndr Name]	-- LHS of the type or class decl
              -> ([TyVar] -> Kind -> TcM a) -> TcM a
--- tcTyClTyVars T [a,b] calls thing_inside with
--- [k1,k2,a,b] (k2 -> *)  where T : forall k1 k2 (a:k1 -> *) (b:k1). k2 -> *
+-- (tcTyClTyVars T [a,b] thing_inside) 
+--   where T : forall k1 k2 (a:k1 -> *) (b:k1). k2 -> *
+--   calls thing_inside with arguments
+--      [k1,k2,a,b] (k2 -> *)  
 --
 -- No need to freshen the k's because they are just skolem 
 -- constants here, and we are at top level anyway.
@@ -954,13 +956,17 @@ kindGeneralizeKinds :: [TcKind] -> TcM ([KindVar], [Kind])
 kindGeneralizeKinds kinds 
   = do { -- Quantify over kind variables free in
          -- the kinds, and *not* in the environment
+       ; traceTc "kindGeneralizeKinds 1" (ppr kinds)
        ; zonked_kinds <- mapM zonkTcKind kinds
        ; gbl_tvs <- tcGetGlobalTyVars -- Already zonked
-       ; let kvs_to_quantify = tyVarsOfTypes zonked_kinds 
-                               `minusVarSet` gbl_tvs
+       ; tidy_env <- tcInitTidyEnv
+       ; let kvs_to_quantify = varSetElems (tyVarsOfTypes zonked_kinds
+                                            `minusVarSet` gbl_tvs)
 
-       ; kvs <- ASSERT2 (all isKiVar (varSetElems kvs_to_quantify), ppr kvs_to_quantify)
-                zonkQuantifiedTyVars kvs_to_quantify
+             (_, tidy_kvs_to_quantify) = tidyTyVarBndrs tidy_env kvs_to_quantify
+
+       ; kvs <- ASSERT2 (all isKiVar kvs_to_quantify, ppr kvs_to_quantify)
+                zonkQuantifiedTyVars tidy_kvs_to_quantify
 
          -- Zonk the kinds again, to pick up either the kind 
          -- variables we quantify over, or *, depending on whether
@@ -968,8 +974,8 @@ kindGeneralizeKinds kinds
          -- turn depends on PolyKinds)
        ; final_kinds <- mapM zonkTcKind zonked_kinds
 
-       ; traceTc "generalizeKind" (    ppr kinds <+> ppr kvs_to_quantify
-                                   <+> ppr kvs   <+> ppr final_kinds)
+       ; traceTc "kindGeneralizeKinds 2" (vcat [ ppr gbl_tvs, ppr kinds, ppr kvs_to_quantify
+                                        , ppr kvs, ppr final_kinds ])
        ; return (kvs, final_kinds) }
 
 kindGeneralizeKind :: TcKind -> TcM ( [KindVar]  -- these were flexi kind vars
@@ -1097,11 +1103,11 @@ tcHsPatSigType ctxt hs_ty
 tcPatSig :: UserTypeCtxt
 	 -> LHsType Name
 	 -> TcSigmaType
-	 -> TcM (TcType,	   -- The type to use for "inside" the signature
-		 [(Name, TcType)], -- The new bit of type environment, binding
-				   -- the scoped type variables
-                 HsWrapper)        -- Coercion due to unification with actual ty
-                                   -- Of shape:  res_ty ~ sig_ty
+	 -> TcM (TcType,	    -- The type to use for "inside" the signature
+		 [(Name, TcTyVar)], -- The new bit of type environment, binding
+				    -- the scoped type variables
+                 HsWrapper)         -- Coercion due to unification with actual ty
+                                    -- Of shape:  res_ty ~ sig_ty
 tcPatSig ctxt sig res_ty
   = do	{ (sig_tvs, sig_ty) <- tcHsPatSigType ctxt sig
     	-- sig_tvs are the type variables free in 'sig', 
@@ -1136,30 +1142,32 @@ tcPatSig ctxt sig res_ty
 
 	-- Now do a subsumption check of the pattern signature against res_ty
         ; sig_tvs' <- tcInstSigTyVars sig_tvs
-        ; let sig_ty' = substTyWith sig_tvs sig_tv_tys' sig_ty
-              sig_tv_tys' = mkTyVarTys sig_tvs'
+        ; let sig_ty' = substTyWith sig_tvs (mkTyVarTys sig_tvs') sig_ty
 	; wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty'
 
 	-- Check that each is bound to a distinct type variable,
 	-- and one that is not already in scope
         ; binds_in_scope <- getScopedTyVarBinds
-	; let tv_binds = map tyVarName sig_tvs `zip` sig_tv_tys'
+	; let tv_binds :: [(Name,TcTyVar)]
+              tv_binds = map tyVarName sig_tvs `zip` sig_tvs'
 	; check binds_in_scope tv_binds
 	
 	-- Phew!
         ; return (sig_ty', tv_binds, wrap)
         } }
   where
-    check _ [] = return ()
-    check in_scope ((n,ty):rest) = do { check_one in_scope n ty
-				      ; check ((n,ty):in_scope) rest }
+    check :: [(Name,TcTyVar)] -> [(Name, TcTyVar)] -> TcM ()
+    check _        []            = return ()
+    check in_scope ((n,tv):rest) = do { check_one in_scope n tv
+				      ; check ((n,tv):in_scope) rest }
 
-    check_one in_scope n ty
-	= checkTc (null dups) (dupInScope n (head dups) ty)
+    check_one :: [(Name,TcTyVar)] -> Name -> TcTyVar -> TcM ()
+    check_one in_scope n tv
+	= checkTc (null dups) (dupInScope n (head dups) tv)
 		-- Must not bind to the same type variable
 		-- as some other in-scope type variable
 	where
-	  dups = [n' | (n',ty') <- in_scope, eqType ty' ty]
+	  dups = [n' | (n',tv') <- in_scope, tv' == tv]
 \end{code}
 
 
@@ -1394,7 +1402,7 @@ badPatSigTvs sig_ty bad_tvs
          , ptext (sLit "To fix this, expand the type synonym") 
          , ptext (sLit "[Note: I hope to lift this restriction in due course]") ]
 
-dupInScope :: Name -> Name -> Type -> SDoc
+dupInScope :: Name -> Name -> TcTyVar -> SDoc
 dupInScope n n' _
   = hang (ptext (sLit "The scoped type variables") <+> quotes (ppr n) <+> ptext (sLit "and") <+> quotes (ppr n'))
        2 (vcat [ptext (sLit "are bound to the same type (variable)"),

@@ -1157,10 +1157,10 @@ reifyThing (ATcId {tct_id = id})
         ; fix <- reifyFixity (idName id)
         ; return (TH.VarI (reifyName id) ty2 Nothing fix) }
 
-reifyThing (ATyVar tv ty)
-  = do  { ty1 <- zonkTcType ty
-        ; ty2 <- reifyType ty1
-        ; return (TH.TyVarI (reifyName tv) ty2) }
+reifyThing (ATyVar tv tv1)
+  = do { ty1 <- zonkTcTyVar tv1
+       ; ty2 <- reifyType ty1
+       ; return (TH.TyVarI (reifyName tv) ty2) }
 
 reifyThing (AThing {}) = panic "reifyThing AThing"
 reifyThing ANothing = panic "reifyThing ANothing"

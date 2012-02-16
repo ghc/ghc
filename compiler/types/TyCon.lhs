@@ -29,7 +29,6 @@ module TyCon(
         mkLiftedPrimTyCon,
         mkTupleTyCon,
         mkSynTyCon,
-        mkSuperKindTyCon,
         mkForeignTyCon,
         mkPromotedDataTyCon,
         mkPromotedTyCon,
@@ -41,8 +40,8 @@ module TyCon(
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isSynTyCon, isClosedSynTyCon,
-        isSuperKindTyCon, isDecomposableTyCon,
-        isForeignTyCon, tyConHasKind,
+        isDecomposableTyCon,
+        isForeignTyCon, 
         isPromotedDataTyCon, isPromotedTypeTyCon,
 
         isInjectiveTyCon,
@@ -78,6 +77,7 @@ module TyCon(
         tcExpandTyCon_maybe, coreExpandTyCon_maybe,
         makeTyConAbstract,
         newTyConCo, newTyConCo_maybe,
+        pprPromotionQuote,
 
         -- * Primitive representations of Types
         PrimRep(..),
@@ -395,18 +395,6 @@ data TyCon
                                            --   holds the name of the imported thing
     }
 
-  -- | Super-kinds. These are "kinds-of-kinds" and are never seen in
-  -- Haskell source programs.  There are only two super-kinds: TY (aka
-  -- "box"), which is the super-kind of kinds that construct types
-  -- eventually, and CO (aka "diamond"), which is the super-kind of
-  -- kinds that just represent coercions.
-  --
-  -- Super-kinds have no kind themselves, and have arity zero
-  | SuperKindTyCon {
-        tyConUnique :: Unique,
-        tyConName   :: Name
-    }
-
   -- | Represents promoted data constructor.
   | PromotedDataTyCon {         -- See Note [Promoted data constructors]
         tyConUnique :: Unique, -- ^ Same Unique as the data constructor
@@ -421,7 +409,7 @@ data TyCon
         tyConUnique :: Unique, -- ^ Same Unique as the type constructor
         tyConName   :: Name,   -- ^ Same Name as the type constructor
         tyConArity  :: Arity,  -- ^ n if ty_con :: * -> ... -> *  n times
-        tc_kind     :: Kind,   -- ^ Always tySuperKind
+        tc_kind     :: Kind,   -- ^ Always TysPrim.superKind
         ty_con      :: TyCon   -- ^ Corresponding type constructor
     }
 
@@ -959,14 +947,6 @@ mkSynTyCon name kind tyvars cType rhs parent
         synTcParent = parent
     }
 
--- | Create a super-kind 'TyCon'
-mkSuperKindTyCon :: Name -> TyCon -- Super kinds always have arity zero
-mkSuperKindTyCon name
-  = SuperKindTyCon {
-        tyConName = name,
-        tyConUnique = nameUnique name
-  }
-
 -- | Create a promoted data constructor 'TyCon'
 -- Somewhat dodgily, we give it the same Name
 -- as the data constructor itself
@@ -1220,11 +1200,6 @@ isForeignTyCon :: TyCon -> Bool
 isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
 isForeignTyCon _                                   = False
 
--- | Is this a super-kind 'TyCon'?
-isSuperKindTyCon :: TyCon -> Bool
-isSuperKindTyCon (SuperKindTyCon {}) = True
-isSuperKindTyCon _                   = False
-
 -- | Is this a PromotedDataTyCon?
 isPromotedDataTyCon :: TyCon -> Bool
 isPromotedDataTyCon (PromotedDataTyCon {}) = True
@@ -1253,7 +1228,7 @@ isImplicitTyCon tycon
   | isAlgTyCon tycon   = isTupleTyCon tycon
   | otherwise          = True
         -- 'otherwise' catches: FunTyCon, PrimTyCon,
-        -- PromotedDataCon, PomotedTypeTyCon, SuperKindTyCon
+        -- PromotedDataCon, PomotedTypeTyCon
 
 tyConCType_maybe :: TyCon -> Maybe CType
 tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc
@@ -1306,12 +1281,7 @@ expand tvs rhs tys
 
 \begin{code}
 tyConKind :: TyCon -> Kind
-tyConKind (SuperKindTyCon {}) = pprPanic "tyConKind" empty
-tyConKind tc                  = tc_kind tc
-
-tyConHasKind :: TyCon -> Bool
-tyConHasKind (SuperKindTyCon {}) = False
-tyConHasKind _                   = True
+tyConKind = tc_kind
 
 -- | As 'tyConDataCons_maybe', but returns the empty list of constructors if no constructors
 -- could be found
@@ -1510,7 +1480,14 @@ instance Uniquable TyCon where
     getUnique tc = tyConUnique tc
 
 instance Outputable TyCon where
-    ppr tc = ppr (tyConName tc)
+  -- At the moment a promoted TyCon has the same Name as its
+  -- corresponding TyCon, so we add the quote to distinguish it here
+  ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
+
+pprPromotionQuote :: TyCon -> SDoc
+pprPromotionQuote (PromotedTypeTyCon {}) = char '\''
+pprPromotionQuote (PromotedDataTyCon {}) = char '\''
+pprPromotionQuote _                      = empty
 
 instance NamedThing TyCon where
     getName = tyConName

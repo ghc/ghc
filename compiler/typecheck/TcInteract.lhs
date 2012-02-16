@@ -542,7 +542,6 @@ trySpontaneousEqTwoWay d eqv gw tv1 tv2
     k1 = tyVarKind tv1
     k2 = tyVarKind tv2
     nicer_to_update_tv2 = isSigTyVar tv1 || isSystemName (Var.varName tv2)
-
 \end{code}
 
 Note [Kind errors] 

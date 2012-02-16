@@ -329,7 +329,7 @@ setTcTyVarDetails tv details = tv { tc_tv_details = details }
 
 mkKindVar :: Name -> SuperKind -> KindVar
 -- mkKindVar take a SuperKind as argument because we don't have access
--- to tySuperKind here.
+-- to superKind here.
 mkKindVar name kind = TyVar
   { varName    = name
   , realUnique = getKeyFastInt (nameUnique name)
