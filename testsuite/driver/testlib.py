@@ -125,6 +125,10 @@ def req_interp( opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
+def req_smp( opts ):
+    if not config.have_smp:
+        opts.expect = 'fail'
+
 def expect_broken( bug ):
     return lambda opts, b=bug: _expect_broken (opts, b )
 

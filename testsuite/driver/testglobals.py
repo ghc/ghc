@@ -87,6 +87,9 @@ class TestConfig:
         # Do we have shared libraries?
         self.have_shared_libs = False
 
+        # Do we have SMP support?
+        self.have_smp = False
+
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 

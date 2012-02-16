@@ -46,6 +46,7 @@ config.unregisterised = (ghc_unregisterised == 1)
 if (ghc_with_threaded_rts == 1):
     config.run_ways.append('threaded1')
     if (ghc_with_smp == 1):
+        config.have_smp = True
         config.run_ways.append('threaded2')
 
 if (ghc_with_dynamic_rts == 1):
