@@ -61,7 +61,7 @@ import MkCore     (mkWildValBinder)
 import PrimOp     (PrimOp(MyThreadIdOp))
 import Literal
 import VarEnv
-import Util       (thirdOf3)
+import Util       (fstOf3, thirdOf3)
 
 import qualified Control.Monad as Monad
 import Data.Ord
@@ -480,40 +480,70 @@ nothingSpeculated = S.empty
 --     xs0 = map (+1) ones
 --
 -- We can speculate x0 easily, but speculating xs0 gives rise to a x1 and xs1 of the same form. We must avoid looping here.
+--
+-- Note [Speculation termination]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- I was trying to work out why speculation was so slow on programs like $fReadInteger that used parser combinators.
+-- I never really worked it out, but I did find a possible problem. Consider this program:
+--
+--  foo |-> \x -> let f = let a = snd3 (foo x) in \y -> ...
+--                    g = let b = thd3 (foo x) in \y -> ...
+--                    h = let c = fst3 (foo x) in \y -> ...
+--                in (f, g, h)
+--  bar |-> foo z
+--
+-- With a tree-like history, we might speculate like this:
+--   bar -> f -> a -> b -> c -> a (!RB)
+--          g -> b -> c -> a -> b (!RB)
+--          h -> c -> a -> b -> c (!RB)
+--
+-- So we end up making O(n^2) calls to reduce.
+--
+-- My approach to preventing this sort of problem is to *thread* the history. The only thing we have to be careful of
+-- is that we don't roll back to a "node" which has already itself been rolled back (since that leads to a loop). This
+-- concern motivates us also threading the "forbidden" set and keeping track of "parents" using ids from "ids".
+--
+-- With this approach we get something more like:
+--   bar -> f -> a -> b -> c -> a (!RB)
+--          g -> b (!STOP)
+--          h -> c (!STOP)
 speculate :: AlreadySpeculated -> (SCStats, State) -> (AlreadySpeculated, (SCStats, State))
 speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stats', (deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids', k, in_e)))
   where
     (h_values, h_non_values) = M.partition (maybe False (termIsValue . snd) . heapBindingTerm) h
     (h_non_values_unspeculated, h_non_values_speculated) = (h_non_values `exclude` speculated, h_non_values `restrict` speculated)
 
-    (stats', deeds', h_speculated_ok, h_speculated_failure, ids') = runSpecM (speculateManyMap [] (mkLinearHistory (cofmap fst wQO)) h_non_values_unspeculated) (stats, deeds, h_values, M.empty, ids)
+    ((_hist, _forbidden, ids'), (stats', deeds', h_speculated_ok, h_speculated_failure)) = runSpecM (speculateManyMap [] h_non_values_unspeculated) ((mkLinearHistory (cofmap fstOf3 wQO), [], ids), (stats, deeds, h_values, M.empty))
     
-    speculateManyMap parents hist = speculateMany parents hist . concatMap M.toList . topologicalSort heapBindingFreeVars
-    speculateMany parents hist = mapM_ (speculateOne parents hist)
+    speculateManyMap parents = speculateMany parents . concatMap M.toList . topologicalSort heapBindingFreeVars
+    speculateMany parents = mapM_ (speculateOne parents)
     
-    speculateOne :: [String] -> LinearHistory (State, SpecM ()) -> (Out Var, HeapBinding) -> SpecM ()
-    speculateOne parents hist (x', hb)
+    speculateOne :: [Var] -> (Out Var, HeapBinding) -> SpecM ()
+    speculateOne parents (x', hb)
       | spec_trace "speculate" (ppr x') False
       = undefined
       | HB InternallyBound (Right in_e) <- hb
       = --pprTrace "speculateOne" (ppr (x', annedTag (snd in_e))) $
-        (\rb -> try_speculation in_e rb) `catchSpecM` speculation_failure
+        (\rb -> try_speculation in_e rb) `catchSpecM` speculation_failure (Just parents')
       | otherwise
-      = speculation_failure
+      = speculation_failure Nothing
       where
+        parents' = x' : parents
         spec_trace msg doc = pprTrace (replicate (length parents) ' ' ++ msg) doc
-        speculation_failure = modifySpecState $ \(stats, deeds, h_speculated_ok, h_speculated_failure, ids) -> ((stats, deeds, h_speculated_ok, M.insert x' hb h_speculated_failure, ids), ())
+        speculation_failure mb_forbidden = modifySpecState $ \((hist, forbidden, ids), (stats, deeds, h_speculated_ok, h_speculated_failure)) -> (((hist, maybe id (:) mb_forbidden forbidden, ids), (stats, deeds, h_speculated_ok, M.insert x' hb h_speculated_failure)), ())
         try_speculation in_e rb = Monad.join (modifySpecState go)
-          where go no_change@(stats, deeds, h_speculated_ok, h_speculated_failure, ids) = case terminate hist (gc state, SpecM $ spec_trace "rolled back to" (ppr x') . unSpecM rb) of
-                    Stop (_gced_old_state, rb) -> spec_trace "speculation denied" (ppr x' {- $$ pPrintFullState quietStatePrettiness (gc state) $$ pPrintFullState quietStatePrettiness _gced_old_state -})
-                                                  (no_change, rb)
+          where go no_change@((hist, forbidden, ids), (stats, deeds, h_speculated_ok, h_speculated_failure)) = case terminate hist (gc state, parents', SpecM $ spec_trace "rolled back to" (ppr x') . unSpecM rb) of
+                    Stop (_gced_old_state, old_parents', rb)
+                      -> spec_trace "speculation denied" (ppr x' {- $$ pPrintFullState quietStatePrettiness (gc state) $$ pPrintFullState quietStatePrettiness _gced_old_state -})
+                         (no_change, {- speculation_failure Nothing -} if any (`isSuffixOf` old_parents') forbidden then speculation_failure Nothing else rb) -- Don't allow rollback to rolled back region
                     Continue hist -> case reduceWithStats state of
                         (extra_stats, (deeds, Heap h_speculated_ok' ids, Loco _, qa))
                           | Just a <- traverse qaToAnswer qa
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
                                 in_e' = annedAnswerToInAnnedTerm (mkInScopeSet (annedFreeVars a)) a
-                          -> ((stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure, ids), speculateManyMap (showPpr x' : parents) hist h_unspeculated)
-                        _ -> (no_change, speculation_failure)
+                          -> (((hist, forbidden, ids), (stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure)), speculateManyMap parents' h_unspeculated)
+                        _ -> (no_change, speculation_failure Nothing)
                   where state = normalise (deeds, Heap h_speculated_ok ids, Loco False, in_e)
                         -- NB: try to avoid dead bindings in the state using 'gc' before the termination test so
                         -- that the termination condition is more lenient. This showed up in practice, in a version
@@ -524,7 +554,8 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
                         -- It's very important that we don' tjust gc the state itself because some of the h_speculated_ok
                         -- bindings might be live in the original state supplied to speculate, and we don't want to drop them!
 
-type SpecState = (SCStats, Deeds, PureHeap, PureHeap, InScopeSet)
+type SpecState = ((LinearHistory (State, [Var], SpecM ()), [[Var]], InScopeSet), -- Kept during a rollback
+                  (SCStats, Deeds, PureHeap, PureHeap))                          -- Discarded during a rollback
 newtype SpecM a = SpecM { unSpecM :: SpecState -> (SpecState -> a -> SpecState) -> SpecState }
 
 instance Functor SpecM where
@@ -541,7 +572,7 @@ runSpecM :: SpecM () -> SpecState -> SpecState
 runSpecM spec state = unSpecM spec state (\state () -> state)
 
 catchSpecM :: ((forall b. SpecM b) -> SpecM ()) -> SpecM () -> SpecM ()
-catchSpecM mx mcatch = SpecM $ \s k -> unSpecM (mx (SpecM $ \_s _k -> unSpecM mcatch s k)) s k
+catchSpecM mx mcatch = SpecM $ \s@(_, sr) k -> unSpecM (mx (SpecM $ \(sl, _) _k -> unSpecM mcatch (sl, sr) k)) s k
 
 reduce :: State -> State
 reduce = thirdOf3 . reduce'
