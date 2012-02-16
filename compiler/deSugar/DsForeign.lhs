@@ -669,10 +669,11 @@ showFFIType t = getOccString (getName (typeTyCon t))
 toCType :: Type -> SDoc
 toCType = f False
     where f voidOK t
-           -- First, if we have (Ptr t), then we need to convert t to a
-           -- C type and put a * after it.
+           -- First, if we have (Ptr t) of (FunPtr t), then we need to
+           -- convert t to a C type and put a * after it. If we don't
+           -- know a type for t, then "void" is fine, though.
            | Just (ptr, [t']) <- splitTyConApp_maybe t
-           , tyConName ptr == ptrTyConName
+           , tyConName ptr `elem` [ptrTyConName, funPtrTyConName]
               = f True t' <> char '*'
            -- Otherwise, if we have a type constructor application, then
            -- see if there is a C type associated with that constructor.
