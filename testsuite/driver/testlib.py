@@ -1587,10 +1587,6 @@ def normalise_errmsg( str ):
     str = re.sub('([^\\s])\\.exe', '\\1', str)
     # normalise slashes, minimise Windows/Unix filename differences
     str = re.sub('\\\\', '/', str)
-    # The inplace ghc's are called ghc-bin-stage[123] to avoid filename
-    # collisions, so we need to normalise that to just "ghc"
-    # (this is for the old build system, I think, so should be removable)
-    str = re.sub('ghc-bin-stage[123]', 'ghc', str)
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
     str = re.sub('ghc-stage[123]', 'ghc', str)
