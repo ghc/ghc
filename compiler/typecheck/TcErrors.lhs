@@ -992,20 +992,21 @@ find_thing tidy_env ignore_it (ATcId { tct_id = id })
 			 	   ppr (getSrcLoc id)))]
        ; return (tidy_env', Just msg) } }
 
-find_thing tidy_env ignore_it (ATyVar tv ty)
-  = do { (tidy_env1, tidy_ty) <- zonkTidyTcType tidy_env ty
+find_thing tidy_env ignore_it (ATyVar name tv)
+  = do { ty <- zonkTcTyVar tv
+       ; let (tidy_env1, tidy_ty) = tidyOpenType tidy_env ty
        ; if ignore_it tidy_ty then
 	    return (tidy_env, Nothing)
          else do
        { let -- The name tv is scoped, so we don't need to tidy it
-            msg = sep [ ptext (sLit "Scoped type variable") <+> quotes (ppr tv) <+> eq_stuff
+            msg = sep [ ptext (sLit "Scoped type variable") <+> quotes (ppr name) <+> eq_stuff
                       , nest 2 bound_at]
 
             eq_stuff | Just tv' <- tcGetTyVar_maybe tidy_ty
-		     , getOccName tv == getOccName tv' = empty
+		     , getOccName name == getOccName tv' = empty
 		     | otherwise = equals <+> ppr tidy_ty
 		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	    bound_at = parens $ ptext (sLit "bound at:") <+> ppr (getSrcLoc tv)
+	    bound_at = parens $ ptext (sLit "bound at:") <+> ppr (getSrcLoc name)
  
        ; return (tidy_env1, Just msg) } }
 

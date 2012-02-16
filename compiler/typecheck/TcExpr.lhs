@@ -199,7 +199,7 @@ tcExpr (ExprWithTySig expr sig_ty) res_ty
       -- Remember to extend the lexical type-variable environment
       ; (gen_fn, expr') 
             <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
-      	       tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
+      	       tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` skol_tvs) $
 	             	       	-- See Note [More instantiated than scoped] in TcBinds
       	       tcMonoExprNC expr res_ty
 

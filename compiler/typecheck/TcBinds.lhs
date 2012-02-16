@@ -399,7 +399,7 @@ tcPolyCheck sig@(TcSigInfo { sig_id = poly_id, sig_tvs = tvs, sig_scoped = scope
              prag_sigs = prag_fn (idName poly_id)
        ; (ev_binds, (binds', [mono_info])) 
             <- checkConstraints skol_info tvs ev_vars $
-               tcExtendTyVarEnv2 (scoped `zip` mkTyVarTys tvs)    $
+               tcExtendTyVarEnv2 (scoped `zip` tvs)   $
                tcMonoBinds (\_ -> Just sig) LetLclBndr rec_tc bind_list
 
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
