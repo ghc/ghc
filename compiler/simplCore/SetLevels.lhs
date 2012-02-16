@@ -419,7 +419,10 @@ the inner loop.
 Things to note
  * We can't float a case to top level
  * It's worth doing this float even if we don't float
-   the case outside a value lambda
+   the case outside a value lambda.  Example
+     case x of { 
+       MkT y -> (case y of I# w2 -> ..., case y of I# w2 -> ...)
+   If we floated the cases out we could eliminate one of them.
  * We only do this with a single-alternative case
 
 Note [Check the output scrutinee for okForSpec]

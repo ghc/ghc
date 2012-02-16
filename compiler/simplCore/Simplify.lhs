@@ -1668,6 +1668,22 @@ not want to transform to
    in blah
 because that builds an unnecessary thunk.
 
+Note [Case elimination: unlifted case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider 
+   case a +# b of r -> ...r...
+Then we do case-elimination (to make a let) followed by inlining,
+to get
+        .....(a +# b)....
+If we have
+   case indexArray# a i of r -> ...r...
+we might like to do the same, and inline the (indexArray# a i). 
+But indexArray# is not okForSpeculation, so we don't build a let
+in rebuildCase (lest it get floated *out*), so the inlining doesn't
+happen either.
+
+This really isn't a big deal I think. The let can be 
+
 
 Further notes about case elimination
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1788,6 +1804,7 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
       | otherwise    = exprOkForSpeculation scrut
             -- The case-binder is alive, but we may be able
             -- turn the case into a let, if the expression is ok-for-spec
+            -- See Note [Case elimination: unlifted case]
 
     ok_for_spec      = exprOkForSpeculation scrut
     is_plain_seq     = isDeadBinder case_bndr	-- Evaluation *only* for effect
