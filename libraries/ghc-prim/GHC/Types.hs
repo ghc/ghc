@@ -28,7 +28,7 @@ infixr 5 :
 
 data [] a = [] | a : [a]
 
-data Bool = False | True
+data {-# CTYPE "HsBool" #-} Bool = False | True
 
 {- | The character type 'Char' is an enumeration whose values represent
 Unicode (or equivalently ISO\/IEC 10646) characters (see
@@ -41,22 +41,22 @@ To convert a 'Char' to or from the corresponding 'Int' value defined
 by Unicode, use 'Prelude.toEnum' and 'Prelude.fromEnum' from the
 'Prelude.Enum' class respectively (or equivalently 'ord' and 'chr').
 -}
-data Char = C# Char#
+data {-# CTYPE "HsChar" #-} Char = C# Char#
 
 -- | A fixed-precision integer type with at least the range @[-2^29 .. 2^29-1]@.
 -- The exact range for a given implementation can be determined by using
 -- 'Prelude.minBound' and 'Prelude.maxBound' from the 'Prelude.Bounded' class.
-data Int = I# Int#
+data {-# CTYPE "HsInt" #-} Int = I# Int#
 
 -- | Single-precision floating point numbers.
 -- It is desirable that this type be at least equal in range and precision
 -- to the IEEE single-precision type.
-data Float = F# Float#
+data {-# CTYPE "HsFloat" #-} Float = F# Float#
 
 -- | Double-precision floating point numbers.
 -- It is desirable that this type be at least equal in range and precision
 -- to the IEEE double-precision type.
-data Double = D# Double#
+data {-# CTYPE "HsDouble" #-} Double = D# Double#
 
 data Ordering = LT | EQ | GT
 
