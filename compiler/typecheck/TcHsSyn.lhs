@@ -1159,10 +1159,11 @@ zonkEvBind env (EvBind var term)
       -- Fast path for variable-variable bindings 
       -- NB: could be optimized further! (e.g. SymCo cv)
         | Just cv <- getTcCoVar_maybe co 
-        -> do { let cv' = zonkIdOcc env cv -- Just lazily look up
+        -> do { let cv'   = zonkIdOcc env cv -- Just lazily look up
                     term' = EvCoercion (TcCoVarCo cv')
                     var'  = setVarType var (varType cv')
               ; return (EvBind var' term') }
+
       -- Ugly safe and slow path
       _ -> do { var'  <- {-# SCC "zonkEvBndr" #-} zonkEvBndr env var
               ; term' <- zonkEvTerm env term 
