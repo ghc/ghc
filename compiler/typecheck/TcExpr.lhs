@@ -892,7 +892,7 @@ tcInferFun fun
          -- Zonk the function type carefully, to expose any polymorphism
 	 -- E.g. (( \(x::forall a. a->a). blah ) e)
 	 -- We can see the rank-2 type of the lambda in time to genrealise e
-       ; fun_ty' <- zonkTcTypeCarefully fun_ty
+       ; fun_ty' <- zonkTcType fun_ty
 
        ; (wrap, rho) <- deeplyInstantiate AppOrigin fun_ty'
        ; return (mkLHsWrap wrap fun, rho) }

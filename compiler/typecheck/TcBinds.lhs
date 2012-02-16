@@ -371,7 +371,7 @@ tcPolyNoGen tc_sig_fn prag_fn rec_tc bind_list
        ; return (binds', mono_ids', NotTopLevel) }
   where
     tc_mono_info (name, _, mono_id)
-      = do { mono_ty' <- zonkTcTypeCarefully (idType mono_id)
+      = do { mono_ty' <- zonkTcType (idType mono_id)
              -- Zonk, mainly to expose unboxed types to checkStrictBinds
            ; let mono_id' = setIdType mono_id mono_ty'
            ; _specs <- tcSpecPrags mono_id' (prag_fn name)
@@ -471,7 +471,7 @@ mkExport :: PragFun
 -- Pre-condition: the qtvs and theta are already zonked
 
 mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
-  = do  { mono_ty <- zonkTcTypeCarefully (idType mono_id)
+  = do  { mono_ty <- zonkTcType (idType mono_id)
         ; let inferred_poly_ty = mkSigmaTy my_tvs theta mono_ty
               my_tvs   = filter (`elemVarSet` used_tvs) qtvs
               used_tvs = tyVarsOfTypes theta `unionVarSet` tyVarsOfType mono_ty

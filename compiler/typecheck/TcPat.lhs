@@ -275,21 +275,9 @@ checkUnboxedTuple :: TcType -> SDoc -> TcM ()
 -- (This shows up as a (more obscure) kind error 
 --  in the 'otherwise' case of tcMonoBinds.)
 checkUnboxedTuple ty what
-  = do { zonked_ty <- zonkTcTypeCarefully ty
+  = do { zonked_ty <- zonkTcType ty
        ; checkTc (not (isUnboxedTupleType zonked_ty))
                  (unboxedTupleErr what zonked_ty) }
-
--------------------
-{- Only needed if we re-add Method constraints 
-bindInstsOfPatId :: TcId -> TcM a -> TcM (a, TcEvBinds)
-bindInstsOfPatId id thing_inside
-  | not (isOverloadedTy (idType id))
-  = do { res <- thing_inside; return (res, emptyTcEvBinds) }
-  | otherwise
-  = do	{ (res, lie) <- captureConstraints thing_inside
-	; binds <- bindLocalMethods lie [id]
-	; return (res, binds) }
--}
 \end{code}
 
 Note [Polymorphism and pattern bindings]
