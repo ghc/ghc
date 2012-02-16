@@ -10,6 +10,7 @@ import Binary
 import BinIface ()
 import DynFlags
 import HscTypes
+import Module
 import Name
 import Fingerprint
 -- import Outputable
@@ -21,11 +22,12 @@ import System.FilePath (normalise)
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
 -- the finger print on important fields in @DynFlags@ so that
 -- the recompilation checker can use this fingerprint.
-fingerprintDynFlags :: DynFlags -> (BinHandle -> Name -> IO ())
+fingerprintDynFlags :: DynFlags -> Module -> (BinHandle -> Name -> IO ())
                     -> IO Fingerprint
 
-fingerprintDynFlags DynFlags{..} nameio =
-    let mainis   = (mainModIs, mainFunIs)
+fingerprintDynFlags DynFlags{..} this_mod nameio =
+    let mainis   = if mainModIs == this_mod then Just mainFunIs else Nothing
+                      -- see #5878
         -- pkgopts  = (thisPackage dflags, sort $ packageFlags dflags)
         safeHs   = setSafeMode safeHaskell
         -- oflags   = sort $ filter filterOFlags $ flags dflags
