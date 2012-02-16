@@ -38,7 +38,7 @@ import Data.Monoid (mempty)
 
 
 {--}
-type ProcessHistory = GraphicalHistory (NodeKey, (String, State, forall b. Generaliser -> ScpM b))
+type ProcessHistory = GraphicalHistory (NodeKey, (String, State, Generaliser -> ScpM ()))
 
 pROCESS_HISTORY :: ProcessHistory
 pROCESS_HISTORY = mkGraphicalHistory (cofmap sndOf3 wQO)
@@ -68,11 +68,13 @@ appendHead :: [b] -> Train (a, [b]) [b] -> Train (a, [b]) [b]
 appendHead ys1 (Car (x, ys2) zs) = (x, ys1 ++ ys2) `Car` zs
 appendHead ys1 (Loco ys2)        = Loco (ys1 ++ ys2)
 
-leftExtension :: Train a b -- ^ Longer list
-              -> Train a b -- ^ Shorter list
-              -> ([a], Train a b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
-leftExtension xs_train ys_train = (reverse prefix_rev, ys_train)
-  where (prefix_rev, Right _suffix_rev) = splitBy (trainCars ys_train) (reverse (trainCars xs_train)) -- NB: we actually assume ys == suffix_rev
+leftExtension :: Train (Promise, a) b -- ^ Longer list
+              -> Train (Promise, a) b -- ^ Shorter list
+              -> Maybe ([(Promise, a)], Train (Promise, a) b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
+leftExtension xs_train ys_train = case splitBy (trainCars ys_train) (reverse (trainCars xs_train)) of
+    -- We can only roll back to direct ancestors, or we risk loops/other madness
+    (prefix_rev, Right suffix_rev) | on (==) (map (fun . fst)) (trainCars ys_train) suffix_rev -> Just (reverse prefix_rev, ys_train)
+    (_, _) -> Nothing -- pprPanic "leftExtension" (ppr (on (,) (map (fun . fst) . trainCars) xs_train ys_train))
 
 
 data MemoState = MS {
@@ -161,20 +163,32 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         e' = letRec fulfils e
 
 
-callCCM :: ((forall b. a -> ScpM b) -> ScpM a) -> ScpM a
-callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> jump_back (a, s' `rolledBackTo` s)))) s) env)
+callCCM :: ((a -> ScpM ()) -> ScpM a) -> ScpM a
+callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) s) env)
 
-catchM :: ((forall b. c -> ScpM b) -> ScpM a) -- ^ Action to try: supplies a function than can be called to "raise an exception". Raising an exception restores the original ScpEnv and ScpState
-       -> (c -> ScpM a)                       -- ^ Handler deferred to if an exception is raised
-       -> ScpM a                              -- ^ Result from either the main action or the handler
+catchM :: ((c -> ScpM ()) -> ScpM a) -- ^ Action to try: supplies a function than can be called to "raise an exception". Raising an exception restores the original ScpEnv and ScpState
+       -> (c -> ScpM a)              -- ^ Handler deferred to if an exception is raised
+       -> ScpM a                     -- ^ Result from either the main action or the handler
 catchM try handler = do
     ei_exc_res <- callCCM $ \jump_back -> fmap Right (try (jump_back . Left))
     case ei_exc_res of
       Left exc  -> handler exc
       Right res -> return res
 
-rolledBackTo :: ScpState -> ScpState -> ScpState
-rolledBackTo s' s = ScpState {
+rolledBackTo :: ScpState -> ScpState -> Maybe ScpState
+rolledBackTo s' s = flip fmap (on leftExtension (promises . scpMemoState) s' s) $ \(dangerous_promises, ok_promises) ->
+  let -- We have to roll back any promise on the "stack" above us:
+      (spine_rolled_back, possibly_rolled_back) = (second concat) $ unzip dangerous_promises
+      -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result
+      (rolled_fulfilments, rolled_back) = pruneFulfilments (scpFulfilmentState s') (mkVarSet (map fun spine_rolled_back))
+
+      pruneFulfilments :: FulfilmentState -> VarSet -> (FulfilmentState, VarSet)
+      pruneFulfilments (FS fulfilments) rolled_back
+        | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " fulfilments:") (ppr rolled_back))
+                      (FS fulfilments, rolled_back)
+        | otherwise = pruneFulfilments (FS keep) (rolled_back `unionVarSet` mkVarSet (map fst dump))
+        where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
+  in ScpState {
       scpMemoState = MS {
           -- The most recent promise in s' always has no work done on it, so don't report dumping for it
           promises = appendHead [if fun p `elemVarSet` rolled_back then p { dumped = True } else p | p <- safeTail spine_rolled_back ++ possibly_rolled_back] ok_promises,
@@ -185,19 +199,6 @@ rolledBackTo s' s = ScpState {
       scpResidTags      = scpResidTags s', -- FIXME: not totally accurate
       scpParentChildren = scpParentChildren s'
     }
-  where
-    -- We have to roll back any promise on the "stack" above us:
-    (dangerous_promises, ok_promises) = (leftExtension `on` (promises . scpMemoState)) s' s
-    (spine_rolled_back, possibly_rolled_back) = (second concat) $ unzip dangerous_promises
-    -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result
-    (rolled_fulfilments, rolled_back) = pruneFulfilments (scpFulfilmentState s') (mkVarSet (map fun spine_rolled_back))
-
-    pruneFulfilments :: FulfilmentState -> VarSet -> (FulfilmentState, VarSet)
-    pruneFulfilments (FS fulfilments) rolled_back
-      | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " fulfilments:") (ppr rolled_back))
-                    (FS fulfilments, rolled_back)
-      | otherwise = pruneFulfilments (FS keep) (rolled_back `unionVarSet` mkVarSet (map fst dump))
-      where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
 
 scpDepth :: ScpEnv -> Int
 scpDepth = length . scpParents
@@ -220,7 +221,7 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
 fulfillM :: (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM res = ScpM $ StateT $ \s -> case fulfill res (scpFulfilmentState s) (scpMemoState s) of (res', fs', ms') -> return (res', s { scpFulfilmentState = fs', scpMemoState = ms' })
 
-terminateM :: String -> State -> (forall b. Generaliser -> ScpM b) -> ScpM a -> (String -> State -> (forall b. Generaliser -> ScpM b) -> ScpM a) -> ScpM a
+terminateM :: String -> State -> (Generaliser -> ScpM ()) -> ScpM a -> (String -> State -> (Generaliser -> ScpM ()) -> ScpM a) -> ScpM a
 terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case terminate (scpProcessHistory s) (scpNodeKey env, (h, state, rb)) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
@@ -244,18 +245,21 @@ sc' mb_h state = case mb_h of
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
-                                                         (if sC_ROLLBACK then shallow_rb else try_generalise) (mK_GENERALISER shallow_state state))
+                                                         (if sC_ROLLBACK then (\gen -> shallow_rb gen >> my_split state sc) else try_generalise) (mK_GENERALISER shallow_state state))
   where
     try_generalise gen = maybe (trace "sc-stop(split)" $ my_split state)
                                (trace "sc-stop(gen)")
                                (my_generalise gen state)
                                sc
 
+
+    -- FIXME: the "could have tied back" case is reachable (e.g. exp3_8 with unfoldings as internal bindings), and it doesn't appear to be
+    -- because of dumped promises (no "dumped" in output). I'm reasonably sure this should not happen :(
     trce shallow_h shallow_state = pprTraceSC ("Embedding:" ++ shallow_h)
                                               ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
                                                hang (text "Before:") 2 (trce1 shallow_state) $$
                                                hang (text "After:")  2 (trce1 state) $$
-                                               (case unMatch (matchWithReason (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why))
+                                               (case unMatch (matchWithReason (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why; Right _ -> text "!!! could have tied back"))
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
