@@ -2378,8 +2378,7 @@ breakSwitch (arg1:rest)
               md <- lookupModuleName mn
               breakByModuleLine md (read arg1) rest
            [] -> do
-              liftIO $ putStrLn "Cannot find default module for breakpoint."
-              liftIO $ putStrLn "Perhaps no modules are loaded for debugging?"
+              liftIO $ putStrLn "No modules are loaded with debugging support."
    | otherwise = do -- try parsing it as an identifier
         wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
