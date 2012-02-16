@@ -425,12 +425,13 @@ safeTail (_:xs) = xs
 expectHead :: String -> [a] -> a
 expectHead s = expectJust s . safeHead
 
-splitBy :: [b] -> [a] -> ([a], [a])
-splitBy []     xs     = ([], xs)
+splitBy :: [b] -> [a] -> ([a], Either [b] [a])
+splitBy []     xs     = ([], Right xs)
+splitBy (y:ys) []     = ([], Left (y:ys))
 splitBy (_:ys) (x:xs) = first (x:) $ splitBy ys xs
 
-splitByReverse :: [b] -> [a] -> ([a], [a])
-splitByReverse ys xs = case splitBy ys (reverse xs) of (xs1, xs2) -> (reverse xs2, reverse xs1)
+splitByReverse :: [b] -> [a] -> (Either [b] [a], [a])
+splitByReverse ys xs = case splitBy (reverse ys) (reverse xs) of (xs1, ei_ys1_xs2) -> (either (Left . reverse) (Right . reverse) ei_ys1_xs2, reverse xs1)
 
 listContexts :: [a] -> [([a], a, [a])]
 listContexts xs = zipWith (\is (t:ts) -> (is, t, ts)) (inits xs) (init (tails xs))

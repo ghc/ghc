@@ -72,7 +72,7 @@ leftExtension :: Train a b -- ^ Longer list
               -> Train a b -- ^ Shorter list
               -> ([a], Train a b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
 leftExtension xs_train ys_train = (reverse prefix_rev, ys_train)
-  where (prefix_rev, _suffix_rev) = splitBy (trainCars ys_train) (reverse (trainCars xs_train)) -- NB: we actually assume ys == suffix_rev
+  where (prefix_rev, Right _suffix_rev) = splitBy (trainCars ys_train) (reverse (trainCars xs_train)) -- NB: we actually assume ys == suffix_rev
 
 
 data MemoState = MS {

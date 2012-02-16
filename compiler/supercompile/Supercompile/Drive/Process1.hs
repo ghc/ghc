@@ -70,7 +70,7 @@ data Promise = P {
 
 instance MonadStatics ScpBM where
     bindCapturedFloats = bindFloats
-    monitorFVs mx = ScpM $ \e s k -> unScpM mx e s (\x s' -> let (fss_delta, _fss_common) = splitByReverse (pTreeHole s) (pTreeHole s')
+    monitorFVs mx = ScpM $ \e s k -> unScpM mx e s (\x s' -> let (Right fss_delta, _fss_common) = splitByReverse (pTreeHole s) (pTreeHole s')
                                                              in k (unionVarSets [fvedTermFreeVars e' | (_, e') <- concatMap fulfilmentTreeFulfilments fss_delta], x) s')
 
 -- Note [Floating h-functions past the let-bound variables to which they refer]
@@ -347,7 +347,7 @@ catchScpM :: ((forall b. c -> ScpBM b) -> ScpBM a) -- ^ Action to try: supplies 
 catchScpM f_try f_abort = ScpM $ \e s k -> unScpM (f_try (\c -> ScpM $ \e' s' _k' ->
     unScpM (f_abort c) e (if False -- dISCARD_FULFILMENTS_ON_ROLLBACK
                           then s
-                          else let (fss_candidates, _fss_common) = splitByReverse (pTreeContext e) (pTreeContext e')
+                          else let (Right fss_candidates, _fss_common) = splitByReverse (pTreeContext e) (pTreeContext e')
                                    
                                    -- Since we are rolling back we need to float as many of the fulfilments created in between here and the rollback point
                                    -- upwards. This means that we don't lose the work that we already did to supercompile those bindings.

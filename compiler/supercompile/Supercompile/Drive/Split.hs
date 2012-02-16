@@ -435,7 +435,7 @@ zipBracketeds (TailsUnknown bshell bholes) = TailsUnknown (Shell shell_tags shel
           = (plusResidTags shell_extra_tags (bracketedExtraTags rbracketed),
              shell_extra_fvs `unionVarSet` nonRecBindersFreeVars bvs (bracketedExtraFvs rbracketed),
              \es rev_es' -> case splitBy (bracketedHoles rbracketed) es of
-                              (es_here, es_later) -> shell_wrapper es_later (shellWrapper (bracketedShell rbracketed) es_here:rev_es'),
+                              (es_here, Right es_later) -> shell_wrapper es_later (shellWrapper (bracketedShell rbracketed) es_here:rev_es'),
              bracketedHoles rbracketed ++ holes)
           where rbracketed = rigidizeBracketed bracketed
 zipBracketeds (TailsKnown bty mk_bshell bholes) = case ei_holes of
@@ -450,12 +450,12 @@ zipBracketeds (TailsKnown bty mk_bshell bholes) = case ei_holes of
             -> (\ty -> plusResidTags (shell_extra_tags ty) (shellExtraTags (mk_shell ty)),
                 \ty -> shell_extra_fvs ty `unionVarSet` nonRecBindersFreeVars bvs (shellExtraFvs (mk_shell ty)),
                 \ty es rev_es' -> case splitBy holes' es of
-                                    (es_here, es_later) -> shell_wrapper ty es_later (shellWrapper (mk_shell ty) es_here:rev_es'),
+                                    (es_here, Right es_later) -> shell_wrapper ty es_later (shellWrapper (mk_shell ty) es_here:rev_es'),
                 Right (holes' ++ holes))
           _ -> (\ty -> plusResidTags (shell_extra_tags ty) (bracketedExtraTags rbracketed),
                 \ty -> shell_extra_fvs ty `unionVarSet` nonRecBindersFreeVars bvs (bracketedExtraFvs rbracketed),
                 \ty es rev_es' -> case splitBy (bracketedHoles rbracketed) es of
-                                    (es_here, es_later) -> shell_wrapper ty es_later (shellWrapper (bracketedShell rbracketed) es_here:rev_es'),
+                                    (es_here, Right es_later) -> shell_wrapper ty es_later (shellWrapper (bracketedShell rbracketed) es_here:rev_es'),
                 case ei_holes of Left holes -> Left (bracketedHoles rbracketed ++ holes)
                                  Right holes | is_tail   -> Left (bracketedHoles rbracketed ++ map tailishHole holes)
                                              | otherwise -> Right (map (TailishHole False) (bracketedHoles rbracketed) ++ holes))
