@@ -364,7 +364,7 @@ mkIface_ hsc_env maybe_old_fingerprint
      -- top-level bindings and they won't be in the TypeEnv (see
      -- Desugar.addExportFlagsAndRules).  The mi_globals field is used
      -- by GHCi to decide whether the module has its full top-level
-     -- scope available.
+     -- scope available. (#5534)
      maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
      maybeGlobalRdrEnv rdr_env
          | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
