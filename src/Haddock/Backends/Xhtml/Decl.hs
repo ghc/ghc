@@ -121,7 +121,7 @@ ppFor _ _ _ _ _ _ _ = error "ppFor"
 -- we skip type patterns for now
 ppTySyn :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool
         -> Qualification -> Html
-ppTySyn summary links loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode qual
+ppTySyn summary links loc doc (TySynonym (L _ name) _ ltyvars _ ltype) unicode qual
   = ppTypeOrFunSig summary links loc [name] (unLoc ltype) doc
                    (full, hdr, spaceHtml +++ equals) unicode qual
   where

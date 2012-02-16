@@ -323,7 +323,7 @@ ppFor _ _ _ _ =
 -- we skip type patterns for now
 ppTySyn :: SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool -> LaTeX
 
-ppTySyn loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode
+ppTySyn loc doc (TySynonym (L _ name) _ ltyvars _ ltype) unicode
   = ppTypeOrFunSig loc [name] (unLoc ltype) doc (full, hdr, char '=') unicode
   where
     hdr  = hsep (keyword "type" : ppDocBinder name : ppTyVars ltyvars)

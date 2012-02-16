@@ -86,7 +86,7 @@ synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
         tyvars    = synifyTyVars tvs
         typats    = map (synifyType WithinType) args
         hs_rhs_ty = synifyType WithinType rhs
-    in TySynonym name tyvars (Just typats) hs_rhs_ty
+    in TySynonym name Nothing tyvars (Just typats) hs_rhs_ty
   | otherwise
   = error "synifyAxiom" 
 
@@ -99,6 +99,7 @@ synifyTyCon tc
       -- no built-in type has any stupidTheta:
       (noLoc [])
       (synifyName tc)
+      Nothing
       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
       (zipWith
          (\fakeTyVar realKind -> noLoc $
@@ -163,8 +164,8 @@ synifyTyCon tc
   alg_deriv = Nothing
   syn_type = synifyType WithinType (synTyConType tc)
  in if isSynTyCon tc
-  then TySynonym name tyvars typats syn_type
-  else TyData alg_nd alg_ctx name tyvars typats (fmap synifyKind alg_kindSig) alg_cons alg_deriv
+  then TySynonym name Nothing tyvars typats syn_type
+  else TyData alg_nd alg_ctx name Nothing tyvars typats (fmap synifyKind alg_kindSig) alg_cons alg_deriv
 
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)

@@ -320,7 +320,7 @@ renameTyClD d = case d of
 --    return (TyFamily flav lname' ltyvars' kind' tckind)
     return (TyFamily flav lname' ltyvars' tckind')
 
-  TyData x lcontext lname ltyvars typats k cons _ -> do
+  TyData x lcontext lname cType ltyvars typats k cons _ -> do
     lcontext' <- renameLContext lcontext
     lname'    <- renameL lname
     ltyvars'  <- mapM renameLTyVarBndr ltyvars
@@ -328,14 +328,14 @@ renameTyClD d = case d of
     k'        <- renameMaybeLKind k
     cons'     <- mapM renameLCon cons
     -- I don't think we need the derivings, so we return Nothing
-    return (TyData x lcontext' lname' ltyvars' typats' k' cons' Nothing)
+    return (TyData x lcontext' lname' cType ltyvars' typats' k' cons' Nothing)
 
-  TySynonym lname ltyvars typats ltype -> do
+  TySynonym lname cType ltyvars typats ltype -> do
     lname'   <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     ltype'   <- renameLType ltype
     typats'  <- mapM (mapM renameLType) typats
-    return (TySynonym lname' ltyvars' typats' ltype')
+    return (TySynonym lname' cType ltyvars' typats' ltype')
 
   ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats at_defs _ -> do
     lcontext' <- renameLContext lcontext
