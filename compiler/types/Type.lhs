@@ -79,7 +79,7 @@ module Type (
         -- ** Common Kinds and SuperKinds
         anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind, constraintKind,
-        tySuperKind, 
+        superKind, 
 
         -- ** Common Kind type constructors
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
@@ -1544,7 +1544,7 @@ type SimpleKind = Kind
 typeKind :: Type -> Kind
 typeKind (TyConApp tc tys)
   | isPromotedTypeTyCon tc
-  = ASSERT( tyConArity tc == length tys ) tySuperKind
+  = ASSERT( tyConArity tc == length tys ) superKind
   | otherwise
   = kindAppResult (tyConKind tc) tys
 

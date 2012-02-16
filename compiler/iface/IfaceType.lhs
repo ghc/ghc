@@ -123,7 +123,7 @@ ifaceTyConName IfaceUnliftedTypeKindTc = unliftedTypeKindTyConName
 ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
 ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
 ifaceTyConName IfaceConstraintKindTc   = constraintKindTyConName
-ifaceTyConName IfaceSuperKindTc        = tySuperKindTyConName
+ifaceTyConName IfaceSuperKindTc        = superKindTyConName
 ifaceTyConName (IfaceTc ext)           = ext
 ifaceTyConName (IfaceIPTc n)           = pprPanic "ifaceTyConName:IPTc" (ppr n)
 	       		    	       	 -- Note [The Name of an IfaceAnyTc]
@@ -399,7 +399,7 @@ toIfaceWiredInTyCon tc nm
   | nm == argTypeKindTyConName      = IfaceArgTypeKindTc
   | nm == constraintKindTyConName   = IfaceConstraintKindTc
   | nm == ubxTupleKindTyConName     = IfaceUbxTupleKindTc
-  | nm == tySuperKindTyConName      = IfaceSuperKindTc
+  | nm == superKindTyConName        = IfaceSuperKindTc
   | otherwise		            = IfaceTc nm
 
 ----------------

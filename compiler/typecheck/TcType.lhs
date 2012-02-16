@@ -389,7 +389,7 @@ mkKindName unique = mkSystemName unique kind_var_occ
 mkMetaKindVar :: Unique -> IORef MetaDetails -> MetaKindVar
 mkMetaKindVar u r
   = mkTcTyVar (mkKindName u)
-              tySuperKind  -- not sure this is right,
+              superKind     -- not sure this is right,
                             -- do we need kind vars for
                             -- coercions?
               (MetaTv TauTv r)

@@ -41,7 +41,7 @@ import TyCon
 import DataCon
 import PrelNames
 import TysWiredIn
-import TysPrim          ( tySuperKindTyCon )
+import TysPrim          ( superKindTyCon )
 import BasicTypes       ( Arity, strongLoopBreaker )
 import Literal
 import qualified Var
@@ -1302,7 +1302,7 @@ tcIfaceTyCon IfaceUnliftedTypeKindTc = return unliftedTypeKindTyCon
 tcIfaceTyCon IfaceArgTypeKindTc      = return argTypeKindTyCon
 tcIfaceTyCon IfaceUbxTupleKindTc     = return ubxTupleKindTyCon
 tcIfaceTyCon IfaceConstraintKindTc   = return constraintKindTyCon
-tcIfaceTyCon IfaceSuperKindTc        = return tySuperKindTyCon
+tcIfaceTyCon IfaceSuperKindTc        = return superKindTyCon
 
 -- Even though we are in an interface file, we want to make
 -- sure the instances and RULES of this tycon are loaded 

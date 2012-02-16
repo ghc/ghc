@@ -732,7 +732,7 @@ dsEvTerm (EvDelayedError ty msg) = Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
 ---------------------------------------
 dsTcCoercion :: TcCoercion -> (Coercion -> CoreExpr) -> CoreExpr
 -- This is the crucial function that moves 
--- from LCoercions to Coercions; see Note [TcCoercions] in Coercion
+-- from TcCoercions to Coercions; see Note [TcCoercions] in Coercion
 -- e.g.  dsTcCoercion (trans g1 g2) k
 --       = case g1 of EqBox g1# ->
 --         case g2 of EqBox g2# ->

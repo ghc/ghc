@@ -12,7 +12,7 @@
 
 module Kind (
         -- * Main data type
-        Kind, typeKind,
+        SuperKind, Kind, typeKind,
 
 	-- Kinds
 	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
@@ -25,7 +25,7 @@ module Kind (
         constraintKindTyCon,
 
         -- Super Kinds
-	tySuperKind, tySuperKindTyCon, 
+	superKind, superKindTyCon, 
         
 	pprKind, pprParendKind,
 
@@ -37,7 +37,7 @@ module Kind (
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
         isUbxTupleKind, isArgTypeKind, isConstraintKind,
         isConstraintOrLiftedKind, isKind,
-        isSuperKind, noHashInKind,
+        isSuperKind, isSuperKindTyCon, noHashInKind,
         isLiftedTypeKindCon, isConstraintKindCon,
         isAnyKind, isAnyKindCon,
 
@@ -223,8 +223,11 @@ tcIsSubArgTypeKind _                = False
 
 -- | Is this a super-kind (i.e. a type-of-kinds)?
 isSuperKind :: Type -> Bool
-isSuperKind (TyConApp (skc) []) = isSuperKindTyCon skc
-isSuperKind _                   = False
+isSuperKind (TyConApp skc []) = isSuperKindTyCon skc
+isSuperKind _                 = False
+
+isSuperKindTyCon :: TyCon -> Bool
+isSuperKindTyCon tc = tc `hasKey` superKindTyConKey
 
 -- | Is this a kind (i.e. a type-of-types)?
 isKind :: Kind -> Bool
