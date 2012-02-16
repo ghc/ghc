@@ -279,7 +279,7 @@ prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.t
           where add_one_unfolding (input_fvs', tag_ids1) (x', e) = ((input_fvs'', tag_ids2), (x', renamedTerm anned_e))
                     where (tag_unf_ids, tag_ids2) = splitUniqSupply tag_ids1
                           anned_e = toAnnedTerm tag_unf_ids e
-                          input_fvs'' = input_fvs' `unionVarSet` annedFreeVars anned_e
+                          input_fvs'' = input_fvs' `unionVarSet` varBndrFreeVars x' `unionVarSet` annedFreeVars anned_e
         
         (_, h_fvs) = mapAccumL add_one_fv tag_ids2 (varSetElems input_fvs)
           where add_one_fv tag_ids2 x' = (tag_ids3, (x', environmentallyBound (mkTag (getKey i))))

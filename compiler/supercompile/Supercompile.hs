@@ -93,7 +93,17 @@ coreBindsToCoreTerm should_sc binds
     internal_sc_binds = [case bind of NonRec x e -> NonRec (localiseInternaliseId x) e
                                       Rec xes    -> Rec (map (first localiseInternaliseId) xes)
                         | bind <- sc_binds]
-    sc_xs_internal_xs = filter (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` bindersOfBinds internal_sc_binds)
+    -- Decide which things we should export from the supercompiled term using a Church tuple.
+    -- We need to export to the top level of the module those bindings that are *any* of:
+    --   1. Are exported by the module itself
+    --   2. Are free variables of the non-supercompiled bindings
+    --   3. Are free variables of the var binder for another top-level-exported thing
+    go exported exported' undecided
+       | null exported' = exported
+       | otherwise      = go (exported' ++ exported) exported'' undecided'
+      where (exported'', undecided') = partition (\(x, _) -> x `elemVarSet` exported_xs') undecided
+            exported_xs' = unionVarSets (map (S.idFreeVars . fst) exported')
+    sc_xs_internal_xs = uncurry (go []) (partition (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` bindersOfBinds internal_sc_binds))
     sc_internal_xs = map snd sc_xs_internal_xs
     localiseInternaliseId x = setIdNotExported (x `setVarName` localiseName (varName x))
      -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
@@ -119,7 +129,7 @@ termUnfoldings :: S.Term -> [(Var, S.Term)]
 termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
   where
     go new_fvs all_fvs all_xes
-      | isEmptyVarSet added_fvs = all_xes
+      | isEmptyVarSet added_fvs = all_xes -- FIXME: varBndrFreeVars?
       | otherwise               = go (unionVarSets (map (S.termFreeVars . snd) added_xes)) (all_fvs `unionVarSet` added_fvs) (added_xes ++ all_xes)
       where added_fvs = new_fvs `minusVarSet` all_fvs
             added_xes = [ (x, e)
