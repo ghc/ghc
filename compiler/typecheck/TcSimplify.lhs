@@ -240,7 +240,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs     <- tcGetGlobalTyVars            -- Already zonked
        ; zonked_taus <- zonkTcTypes (map snd name_taus)
-       ; let tvs_to_quantify = tyVarsOfTypes zonked_taus `minusVarSet` gbl_tvs
+       ; let tvs_to_quantify = varSetElems (tyVarsOfTypes zonked_taus `minusVarSet` gbl_tvs)
        	     		       -- tvs_to_quantify can contain both kind and type vars
        	                       -- See Note [Which variables to quantify]
        ; qtvs <- zonkQuantifiedTyVars tvs_to_quantify
@@ -333,7 +333,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                         -- they are also bound in ic_skols and we want them to be
                         -- tidied uniformly
 
-       ; qtvs_to_return <- zonkQuantifiedTyVars qtvs
+       ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
 
             -- Step 5
             -- Minimize `bound' and emit an implication
