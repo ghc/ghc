@@ -594,7 +594,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - (some of) dflags
    -- it returns two hashes, one that shouldn't change
    -- the abi hash and one that should
-   flag_hash <- fingerprintDynFlags dflags putNameLiterally
+   flag_hash <- fingerprintDynFlags dflags this_mod putNameLiterally
 
    -- the ABI hash depends on:
    --   - decls
@@ -1222,7 +1222,9 @@ checkVersions hsc_env mod_summary iface
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkFlagHash hsc_env iface = do
     let old_hash = mi_flag_hash iface
-    new_hash <- liftIO $ fingerprintDynFlags (hsc_dflags hsc_env) putNameLiterally
+    new_hash <- liftIO $ fingerprintDynFlags (hsc_dflags hsc_env)
+                                             (mi_module iface)
+                                             putNameLiterally
     case old_hash == new_hash of
         True  -> up_to_date (ptext $ sLit "Module flags unchanged")
         False -> out_of_date_hash (ptext $ sLit "  Module flags have changed")
