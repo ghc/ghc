@@ -682,10 +682,13 @@ inst_decl :: { LInstDecl RdrName }
 --
 at_decl_cls :: { LTyClDecl RdrName }
            -- type family declarations
-        : 'type' type opt_kind_sig
+        : 'type' capi_ctype type opt_kind_sig
                 -- Note the use of type for the head; this allows
-                -- infix type constructors to be declared
-                {% mkTyFamily (comb3 $1 $2 $3) TypeFamily $2 (unLoc $3) }
+                -- infix type constructors to be declared.
+                -- Note that we ignore the capi_ctype for now, but
+                -- we need it in the grammar or we get loads of
+                -- extra shift/reduce conflicts and parsing goes wrong.
+                {% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
 
            -- default type instance
         | 'type' capi_ctype type '=' ctype
