@@ -129,6 +129,29 @@ sub warning {
     }
 }
 
+sub gitNewWorkdir {
+    my $dir = shift;
+    my $target = shift;
+    my $target_dir = "$target/$dir";
+    my $pwd;
+
+    if ($dir eq '.') {
+        message "== running git-new-workdir . $target_dir @_";
+    } else {
+        message "== $dir: running git-new-workdir . $target_dir @_";
+        $pwd = getcwd();
+        chdir($dir);
+    }
+
+    system ("git-new-workdir", ".", $target_dir, @_) == 0
+        or $ignore_failure
+        or die "git-new-workdir failed: $?";
+
+    if ($dir ne '.') {
+        chdir($pwd);
+    }
+}
+
 sub scm {
     my $dir = shift;
     my $scm = shift;
@@ -343,6 +366,9 @@ sub scmall {
         elsif ($command =~ /^(?:pul|pull)$/) {
             scm ($localpath, $scm, "pull", @args);
         }
+        elsif ($command =~ /^(?:new-workdir)$/) {
+            gitNewWorkdir ($localpath, @args);
+        }
         elsif ($command =~ /^(?:s|se|sen|send)$/) {
             if ($scm eq "darcs") {
                 $command = "send";
@@ -511,6 +537,7 @@ any extra arguments to git:
   grep
   log
   new
+  new-workdir
   pull
   push
   repack
