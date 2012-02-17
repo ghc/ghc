@@ -481,7 +481,7 @@ mkTyVarEqErr ctxt ct oriented tv1 ty2
 
   -- So tv is a meta tyvar, and presumably it is
   -- an *untouchable* meta tyvar, else it'd have been unified
-  | not (k2 `isSubKind` k1)   	 -- Kind error
+  | not (k2 `tcIsSubKind` k1)   	 -- Kind error
   = mkErrorReport ctxt $ (kindErrorMsg (mkTyVarTy tv1) ty2)
 
   -- Occurs check

@@ -689,8 +689,8 @@ lintArrow what k1 k2   -- Eg lintArrow "type or kind `blah'" k1 k2
   | isSuperKind k1 
   = return superKind
   | otherwise
-  = do { unless (k1 `isSubKind` argTypeKind)  (addErrL (msg (ptext (sLit "argument")) k1))
-       ; unless (k2 `isSubKind` openTypeKind) (addErrL (msg (ptext (sLit "result"))   k2))
+  = do { unless (okArrowArgKind k1)    (addErrL (msg (ptext (sLit "argument")) k1))
+       ; unless (okArrowResultKind k2) (addErrL (msg (ptext (sLit "result"))   k2))
        ; return liftedTypeKind }
   where
     msg ar k
@@ -791,7 +791,11 @@ lintCoercion (CoVarCo cv)
   = do { checkTyCoVarInScope cv
        ; cv' <- lookupIdInScope cv 
        ; let (s,t) = coVarKind cv'
-       ; return (typeKind s, s, t) }
+             k     = typeKind s
+       ; when (isSuperKind k) $
+         checkL (s `eqKind` t) (hang (ptext (sLit "Non-refl kind equality"))
+                                   2 (ppr cv))
+       ; return (k, s, t) }
 
 lintCoercion (UnsafeCo ty1 ty2)
   = do { k1 <- lintType ty1
@@ -846,33 +850,27 @@ lintCoercion co@(AxiomInstCo (CoAxiom { co_ax_tvs = ktvs
                                       , co_ax_rhs = rhs })
                              cos)
   = do {  -- See Note [Kind instantiation in coercions]
-         let (kvs, tvs)   = splitKiTyVars ktvs
-             (kcos, tcos) = splitAt (length kvs) cos
-       ; unless (not (any isKiVar tvs)
-                 && kvs `equalLength` kcos 
-                 && tvs `equalLength` tcos) (bad_ax (ptext (sLit "lengths")))
-
-       ; kis <- mapM check_ki kcos
-       ; let tvs' = map (updateTyVarKind (Type.substTy subst)) tvs
-             subst = zipOpenTvSubst kvs kis
-       ; (tks, tys1, tys2) <- mapAndUnzip3M lintCoercion tcos
-
-       ; zipWithM_ check_ki2 tvs' tks
-       ; let lhs' = substTyWith ktvs (kis ++ tys1) lhs
-             rhs' = substTyWith ktvs (kis ++ tys2) rhs
-
+         unless (equalLength ktvs cos) (bad_ax (ptext (sLit "lengths")))
+       ; in_scope <- getInScope
+       ; let empty_subst = mkTvSubst in_scope emptyTvSubstEnv
+       ; (subst_l, subst_r) <- foldlM check_ki 
+                                      (empty_subst, empty_subst) 
+                                      (ktvs `zip` cos)
+       ; let lhs' = Type.substTy subst_l lhs
+             rhs' = Type.substTy subst_r rhs
        ; return (typeKind lhs', lhs', rhs') }
   where
     bad_ax what = addErrL (hang (ptext (sLit "Bad axiom application") <+> parens what)
                         2 (ppr co))
-    check_ki co
-      = do { (k, k1, k2) <- lintCoercion co
-           ; unless (isSuperKind k)  (bad_ax (ptext (sLit "check_ki1a")))
-           ; unless (k1 `eqKind` k2) (bad_ax (ptext (sLit "check_ki1b")))
-           ; return k1 }   -- Kind coercions must be refl
 
-    check_ki2 tv k = unless (k `isSubKind` tyVarKind tv) 
-                            (bad_ax (ptext (sLit "check_ki2")))
+    check_ki (subst_l, subst_r) (ktv, co)
+      = do { (k, t1, t2) <- lintCoercion co
+           ; let ktv_kind = Type.substTy subst_l (tyVarKind ktv)
+                  -- Using subst_l is ok, because subst_l and subst_r
+                  -- must agree on kind equalities
+           ; unless (k `isSubKind` ktv_kind) (bad_ax (ptext (sLit "check_ki2")))
+           ; return (Type.extendTvSubst subst_l ktv t1, 
+                     Type.extendTvSubst subst_r ktv t2) } 
 \end{code}
 
 %************************************************************************
@@ -992,6 +990,9 @@ updateTvSubst subst' m =
 
 getTvSubst :: LintM TvSubst
 getTvSubst = LintM (\ _ subst errs -> (Just subst, errs))
+
+getInScope :: LintM InScopeSet
+getInScope = LintM (\ _ subst errs -> (Just (getTvInScope subst), errs))
 
 applySubstTy :: InType -> LintM OutType
 applySubstTy ty = do { subst <- getTvSubst; return (Type.substTy subst ty) }

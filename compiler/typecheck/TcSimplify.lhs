@@ -1130,7 +1130,7 @@ getSolvableCTyFunEqs untch cts
       , isTouchableMetaTyVar_InRange untch tv
            -- And it's a *touchable* unification variable
 
-      , typeKind xi `isSubKind` tyVarKind tv
+      , typeKind xi `tcIsSubKind` tyVarKind tv
          -- Must do a small kind check since TcCanonical invariants 
          -- on family equations only impose compatibility, not subkinding
 

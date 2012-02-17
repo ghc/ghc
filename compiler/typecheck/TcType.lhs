@@ -37,6 +37,7 @@ module TcType (
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isAmbiguousTyVar, metaTvRef, 
   isFlexi, isIndirect, isRuntimeUnkSkol,
+  isTypeVar, isKindVar,
 
   --------------------------------
   -- Builders
@@ -118,7 +119,7 @@ module TcType (
   unliftedTypeKind, liftedTypeKind, argTypeKind,
   openTypeKind, constraintKind, mkArrowKind, mkArrowKinds, 
   isLiftedTypeKind, isUnliftedTypeKind, isSubOpenTypeKind, 
-  isSubArgTypeKind, isSubKind, splitKindFunTys, defaultKind,
+  isSubArgTypeKind, tcIsSubKind, splitKindFunTys, defaultKind,
   mkMetaKindVar,
 
   --------------------------------

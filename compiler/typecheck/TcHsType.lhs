@@ -887,7 +887,6 @@ tcTyVarBndrs bndrs thing_inside = do
   where
     zonk (name, kind)
       = do { kind' <- zonkTcKind kind
-           ; checkTc (noHashInKind kind') (ptext (sLit "Kind signature contains # or (#)"))
            ; return (mkTyVar name kind') }
 
 tcTyVarBndrsKindGen :: [LHsTyVarBndr Name] -> ([TyVar] -> TcM r) -> TcM r
@@ -964,8 +963,9 @@ kindGeneralizeKinds kinds
                                             `minusVarSet` gbl_tvs)
 
              (_, tidy_kvs_to_quantify) = tidyTyVarBndrs tidy_env kvs_to_quantify
+                           -- We do not get a later chance to tidy!
 
-       ; kvs <- ASSERT2 (all isKiVar kvs_to_quantify, ppr kvs_to_quantify)
+       ; kvs <- ASSERT2 (all isKindVar kvs_to_quantify, ppr kvs_to_quantify)
                 zonkQuantifiedTyVars tidy_kvs_to_quantify
 
          -- Zonk the kinds again, to pick up either the kind 

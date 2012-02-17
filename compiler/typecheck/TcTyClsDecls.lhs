@@ -1367,7 +1367,7 @@ checkValidClass cls
         ; mapM_ check_at_defs at_stuff	}
   where
     (tyvars, fundeps, theta, _, at_stuff, op_stuff) = classExtraBigSig cls
-    unary = isSingleton (snd (splitKiTyVars tyvars))  -- IA0_NOTE: only count type arguments
+    unary = count isTypeVar tyvars == 1   -- Ignore kind variables
 
     check_op constrained_class_methods (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
