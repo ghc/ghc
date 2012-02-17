@@ -448,6 +448,14 @@ emitPrimOp [res_q, res_r] IntQuotRemOp [arg_x, arg_y] _
                           CmmHinted arg_y NoHint]
                          CmmMayReturn
       in stmtC stmt
+emitPrimOp [res_q, res_r] WordQuotRemOp [arg_x, arg_y] _
+    = let stmt = CmmCall (CmmPrim (MO_U_QuotRem wordWidth))
+                         [CmmHinted res_q NoHint,
+                          CmmHinted res_r NoHint]
+                         [CmmHinted arg_x NoHint,
+                          CmmHinted arg_y NoHint]
+                         CmmMayReturn
+      in stmtC stmt
 
 emitPrimOp _ op _ _
  = pprPanic "emitPrimOp: can't translate PrimOp" (ppr op)

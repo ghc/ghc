@@ -280,6 +280,10 @@ primop   WordQuotOp   "quotWord#"   Dyadic   Word# -> Word# -> Word#
 primop   WordRemOp   "remWord#"   Dyadic   Word# -> Word# -> Word#
    with can_fail = True
 
+primop   WordQuotRemOp "quotRemWord#" GenPrimOp
+   Word# -> Word# -> (# Word#, Word# #)
+   with can_fail = True
+
 primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 

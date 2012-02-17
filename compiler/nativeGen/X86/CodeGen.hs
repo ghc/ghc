@@ -1841,23 +1841,30 @@ genCCall64 target dest_regs args =
         -- we only cope with a single result for foreign calls
         outOfLineCmmOp op (Just res) args
 
-    (CmmPrim (MO_S_QuotRem width), [CmmHinted res_q _, CmmHinted res_r _]) ->
-        case args of
-        [CmmHinted arg_x _, CmmHinted arg_y _] ->
-            do let size = intSize width
-                   reg_q = getRegisterReg True (CmmLocal res_q)
-                   reg_r = getRegisterReg True (CmmLocal res_r)
-               (y_reg, y_code) <- getRegOrMem arg_y
-               x_code <- getAnyReg arg_x
-               return $ y_code `appOL`
-                        x_code rax `appOL`
-                        toOL [CLTD size,
-                              IDIV size y_reg,
-                              MOV size (OpReg rax) (OpReg reg_q),
-                              MOV size (OpReg rdx) (OpReg reg_r)]
-        _ -> panic "genCCall64: Wrong number of arguments for MO_S_QuotRem"
+    (CmmPrim (MO_S_QuotRem width), _) -> divOp True  width dest_regs args
+    (CmmPrim (MO_U_QuotRem width), _) -> divOp False width dest_regs args
 
     _ -> genCCall64' target dest_regs args
+
+  where divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
+                           [CmmHinted arg_x _, CmmHinted arg_y _]
+            = do let size = intSize width
+                     reg_q = getRegisterReg True (CmmLocal res_q)
+                     reg_r = getRegisterReg True (CmmLocal res_r)
+                     widen | signed    = CLTD size
+                           | otherwise = XOR size (OpReg rdx) (OpReg rdx)
+                     instr | signed    = IDIV
+                           | otherwise = DIV
+                 (y_reg, y_code) <- getRegOrMem arg_y
+                 x_code <- getAnyReg arg_x
+                 return $ y_code `appOL`
+                          x_code rax `appOL`
+                          toOL [widen,
+                                instr size y_reg,
+                                MOV size (OpReg rax) (OpReg reg_q),
+                                MOV size (OpReg rdx) (OpReg reg_r)]
+        divOp _ _ _ _
+            = panic "genCCall64: Wrong number of arguments/results for divOp"
 
 genCCall64' :: CmmCallTarget            -- function to call
             -> [HintedCmmFormal]        -- where to put the result
@@ -2079,6 +2086,7 @@ outOfLineCmmOp mop res args
               MO_PopCnt _  -> fsLit "popcnt"
 
               MO_S_QuotRem {} -> unsupported
+              MO_U_QuotRem {} -> unsupported
               MO_WriteBarrier -> unsupported
               MO_Touch        -> unsupported
         unsupported = panic ("outOfLineCmmOp: " ++ show mop

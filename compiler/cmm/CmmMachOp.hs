@@ -441,6 +441,7 @@ data CallishMachOp
   | MO_F32_Sqrt
 
   | MO_S_QuotRem Width
+  | MO_U_QuotRem Width
 
   | MO_WriteBarrier
   | MO_Touch         -- Keep variables live (when using interior pointers)

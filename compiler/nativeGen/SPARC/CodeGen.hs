@@ -643,6 +643,7 @@ outOfLineMachOp_table mop
         MO_PopCnt w  -> fsLit $ popCntLabel w
 
         MO_S_QuotRem {} -> unsupported
+        MO_U_QuotRem {} -> unsupported
         MO_WriteBarrier -> unsupported
         MO_Touch        -> unsupported
     where unsupported = panic ("outOfLineCmmOp: " ++ show mop

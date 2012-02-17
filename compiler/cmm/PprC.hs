@@ -664,6 +664,7 @@ pprCallishMachOp_for_C mop
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
 
         MO_S_QuotRem {} -> unsupported
+        MO_U_QuotRem {} -> unsupported
         MO_Touch        -> unsupported
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
