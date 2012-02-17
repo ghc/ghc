@@ -832,6 +832,10 @@ tcApp (L loc (HsVar fun)) args res_ty
   , [arg] <- args
   = tcTagToEnum loc fun arg res_ty
 
+  | fun `hasKey` seqIdKey
+  , [arg1,arg2] <- args
+  = tcSeq loc fun arg1 arg2 res_ty
+
 tcApp fun args res_ty
   = do	{   -- Type-check the function
 	; (fun1, fun_tau) <- tcInferFun fun
@@ -1118,6 +1122,18 @@ constructors of F [Int] but here we have to do it explicitly.
 It's all grotesquely complicated.
 
 \begin{code}
+tcSeq :: SrcSpan -> Name -> LHsExpr Name -> LHsExpr Name 
+      -> TcRhoType -> TcM (HsExpr TcId)
+-- (seq e1 e2) :: res_ty
+-- We need a special typing rule because res_ty can be unboxed
+tcSeq loc fun_name arg1 arg2 res_ty
+  = do	{ fun <- tcLookupId fun_name
+        ; (arg1', arg1_ty) <- tcInfer (tcMonoExpr arg1)
+        ; arg2' <- tcMonoExpr arg2 res_ty
+        ; let fun'    = L loc (HsWrap ty_args (HsVar fun))
+              ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
+        ; return (HsApp (L loc (HsApp fun' arg1')) arg2') }
+
 tcTagToEnum :: SrcSpan -> Name -> LHsExpr Name -> TcRhoType -> TcM (HsExpr TcId)
 -- tagToEnum# :: forall a. Int# -> a
 -- See Note [tagToEnum#]   Urgh!
