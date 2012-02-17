@@ -142,7 +142,7 @@ import TrieMap
 
 \begin{code}
 compatKind :: Kind -> Kind -> Bool
-compatKind k1 k2 = k1 `isSubKind` k2 || k2 `isSubKind` k1 
+compatKind k1 k2 = k1 `tcIsSubKind` k2 || k2 `tcIsSubKind` k1 
 
 mkKindErrorCtxtTcS :: Type -> Kind 
                    -> Type -> Kind 
