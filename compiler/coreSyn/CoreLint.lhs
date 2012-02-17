@@ -7,13 +7,16 @@
 A ``lint'' pass to check for Core correctness
 
 \begin{code}
-{-# OPTIONS_GHC -fprof-auto #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
 -- for details
+
+#if __GLASGOW_HASKELL__ >= 704
+{-# OPTIONS_GHC -fprof-auto #-}
+#endif
 
 module CoreLint ( lintCoreBindings, lintUnfolding ) where
 

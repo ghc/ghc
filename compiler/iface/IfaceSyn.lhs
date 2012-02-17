@@ -68,6 +68,7 @@ data IfaceDecl
               ifIdInfo    :: IfaceIdInfo }
 
   | IfaceData { ifName       :: OccName,        -- Type constructor
+                ifCType      :: Maybe CType,    -- C type for CAPI FFI
                 ifTyVars     :: [IfaceTvBndr],  -- Type variables
                 ifCtxt       :: IfaceContext,   -- The "stupid theta"
                 ifCons       :: IfaceConDecls,  -- Includes new/data/data family info
@@ -79,6 +80,7 @@ data IfaceDecl
     }
 
   | IfaceSyn  { ifName    :: OccName,           -- Type constructor
+                ifCType   :: Maybe CType,       -- C type for CAPI FFI
                 ifTyVars  :: [IfaceTvBndr],     -- Type variables
                 ifSynKind :: IfaceKind,         -- Kind of the *rhs* (not of the tycon)
                 ifSynRhs  :: Maybe IfaceType    -- Just rhs for an ordinary synonyn

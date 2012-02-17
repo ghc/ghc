@@ -1432,12 +1432,14 @@ tyThingToIfaceDecl (ATyCon tycon)
 
   | isSynTyCon tycon
   = IfaceSyn {  ifName    = getOccName tycon,
+                ifCType   = tyConCType tycon,
                 ifTyVars  = toIfaceTvBndrs tyvars,
                 ifSynRhs  = syn_rhs,
                 ifSynKind = syn_ki }
 
   | isAlgTyCon tycon
   = IfaceData { ifName    = getOccName tycon,
+                ifCType   = tyConCType tycon,
                 ifTyVars  = toIfaceTvBndrs tyvars,
                 ifCtxt    = toIfaceContext (tyConStupidTheta tycon),
                 ifCons    = ifaceConDecls (algTyConRhs tycon),

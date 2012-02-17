@@ -558,7 +558,8 @@ tcFamInstDecl1 fam_tc (decl@TySynonym {})
        ; return (mkSynFamInst rep_tc_name t_tvs fam_tc t_typats t_rhs) }
 
   -- "newtype instance" and "data instance"
-tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data, tcdCtxt = ctxt
+tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data, tcdCType = cType
+                                   , tcdCtxt = ctxt
                                    , tcdTyVars = tvs, tcdTyPats = Just pats
                                    , tcdCons = cons})
   = do { -- Check that the family declaration is for the right kind
@@ -595,7 +596,7 @@ tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data, tcdCtxt = ctxt
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
               ; let fam_inst = mkDataFamInst axiom_name tvs' fam_tc pats' rep_tc
                     parent   = FamInstTyCon (famInstAxiom fam_inst) fam_tc pats'
-                    rep_tc   = buildAlgTyCon rep_tc_name tvs' stupid_theta tc_rhs 
+                    rep_tc   = buildAlgTyCon rep_tc_name tvs' cType stupid_theta tc_rhs 
                                              Recursive h98_syntax parent
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a

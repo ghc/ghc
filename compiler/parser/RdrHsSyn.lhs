@@ -192,31 +192,34 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
 mkTyData :: SrcSpan
          -> NewOrData
          -> Bool                -- True <=> data family instance
+         -> Maybe CType
          -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
          -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LTyClDecl RdrName)
-mkTyData loc new_or_data is_family (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
+mkTyData loc new_or_data is_family cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
 
        ; checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (tyvars, typats) <- checkTParams is_family tycl_hdr tparams
-       ; return (L loc (TyData { tcdND = new_or_data, tcdCtxt = cxt, tcdLName = tc,
+       ; return (L loc (TyData { tcdND = new_or_data, tcdCType = cType,
+                                 tcdCtxt = cxt, tcdLName = tc,
                                  tcdTyVars = tyvars, tcdTyPats = typats,
                                  tcdCons = data_cons,
                                  tcdKindSig = ksig, tcdDerivs = maybe_deriv })) }
 
 mkTySynonym :: SrcSpan
             -> Bool             -- True <=> type family instances
+            -> Maybe CType
             -> LHsType RdrName  -- LHS
             -> LHsType RdrName  -- RHS
             -> P (LTyClDecl RdrName)
-mkTySynonym loc is_family lhs rhs
+mkTySynonym loc is_family cType lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; (tyvars, typats) <- checkTParams is_family lhs tparams
-       ; return (L loc (TySynonym tc tyvars typats rhs)) }
+       ; return (L loc (TySynonym tc cType tyvars typats rhs)) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour

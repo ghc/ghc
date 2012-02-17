@@ -38,9 +38,7 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataC
                           unboxedUnitTyCon, unboxedUnitDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 import Type             ( funTyCon )
-import ForeignCall      ( Safety(..), CExportSpec(..), CLabelString,
-                          CCallConv(..), CCallTarget(..), defaultCCallConv
-                        )
+import ForeignCall
 import OccName          ( varName, dataName, tcClsName, tvName )
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
@@ -269,6 +267,7 @@ incorrect.
  '{-# VECTORISE'          { L _ ITvect_prag }
  '{-# VECTORISE_SCALAR'   { L _ ITvect_scalar_prag }
  '{-# NOVECTORISE'        { L _ ITnovect_prag }
+ '{-# CTYPE'              { L _ ITctype }
  '#-}'                                          { L _ ITclose_prag }
 
  '..'           { L _ ITdotdot }                        -- reserved symbols
@@ -610,7 +609,7 @@ cl_decl :: { LTyClDecl RdrName }
 --
 ty_decl :: { LTyClDecl RdrName }
            -- ordinary type synonyms
-        : 'type' type '=' ctypedoc
+        : 'type' capi_ctype type '=' ctypedoc
                 -- Note ctype, not sigtype, on the right of '='
                 -- We allow an explicit for-all but we don't insert one
                 -- in   type Foo a = (b,b)
@@ -618,7 +617,7 @@ ty_decl :: { LTyClDecl RdrName }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared 
-                {% mkTySynonym (comb2 $1 $4) False $2 $4 }
+                {% mkTySynonym (comb2 $1 $5) False $2 $3 $5 }
 
            -- type family declarations
         | 'type' 'family' type opt_kind_sig 
@@ -627,18 +626,18 @@ ty_decl :: { LTyClDecl RdrName }
                 {% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
 
           -- ordinary data type or newtype declaration
-        | data_or_newtype tycl_hdr constrs deriving
-                {% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) False $2 
-                            Nothing (reverse (unLoc $3)) (unLoc $4) }
+        | data_or_newtype capi_ctype tycl_hdr constrs deriving
+                {% mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) False $2 $3 
+                            Nothing (reverse (unLoc $4)) (unLoc $5) }
                                    -- We need the location on tycl_hdr in case 
                                    -- constrs and deriving are both empty
 
           -- ordinary GADT declaration
-        | data_or_newtype tycl_hdr opt_kind_sig 
+        | data_or_newtype capi_ctype tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% mkTyData (comb4 $1 $2 $4 $5) (unLoc $1) False $2 
-                            (unLoc $3) (unLoc $4) (unLoc $5) }
+                {% mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) False $2 $3 
+                            (unLoc $4) (unLoc $5) (unLoc $6) }
                                    -- We need the location on tycl_hdr in case 
                                    -- constrs and deriving are both empty
 
@@ -652,15 +651,15 @@ inst_decl :: { LInstDecl RdrName }
                    in L (comb3 $1 $2 $3) (ClsInstDecl $2 binds sigs ats) }
 
            -- type instance declarations
-        | 'type' 'instance' type '=' ctype
+        | 'type' 'instance' capi_ctype type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% do { L loc d <- mkTySynonym (comb2 $1 $5) True $3 $5
+                {% do { L loc d <- mkTySynonym (comb2 $1 $6) True $3 $4 $6
                       ; return (L loc (FamInstDecl d)) } }
 
           -- data/newtype instance declaration
         | data_or_newtype 'instance' tycl_hdr constrs deriving
-                {% do { L loc d <- mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $3
+                {% do { L loc d <- mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True Nothing $3
                                       Nothing (reverse (unLoc $4)) (unLoc $5)
                       ; return (L loc (FamInstDecl d)) } }
 
@@ -668,7 +667,7 @@ inst_decl :: { LInstDecl RdrName }
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% do { L loc d <- mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $3
+                {% do { L loc d <- mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True Nothing $3
                                             (unLoc $4) (unLoc $5) (unLoc $6)
                       ; return (L loc (FamInstDecl d)) } }
         
@@ -683,16 +682,19 @@ inst_decl :: { LInstDecl RdrName }
 --
 at_decl_cls :: { LTyClDecl RdrName }
            -- type family declarations
-        : 'type' type opt_kind_sig
+        : 'type' capi_ctype type opt_kind_sig
                 -- Note the use of type for the head; this allows
-                -- infix type constructors to be declared
-                {% mkTyFamily (comb3 $1 $2 $3) TypeFamily $2 (unLoc $3) }
+                -- infix type constructors to be declared.
+                -- Note that we ignore the capi_ctype for now, but
+                -- we need it in the grammar or we get loads of
+                -- extra shift/reduce conflicts and parsing goes wrong.
+                {% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
 
            -- default type instance
-        | 'type' type '=' ctype
+        | 'type' capi_ctype type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $4) True $2 $4 }
+                {% mkTySynonym (comb2 $1 $5) True $2 $3 $5 }
 
           -- data/newtype family declaration
         | 'data' type opt_kind_sig
@@ -702,22 +704,22 @@ at_decl_cls :: { LTyClDecl RdrName }
 --
 at_decl_inst :: { LTyClDecl RdrName }
            -- type instance declarations
-        : 'type' type '=' ctype
+        : 'type' capi_ctype type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $4) True $2 $4 }
+                {% mkTySynonym (comb2 $1 $5) True $2 $3 $5 }
 
         -- data/newtype instance declaration
-        | data_or_newtype tycl_hdr constrs deriving
-                {% mkTyData (comb4 $1 $2 $3 $4) (unLoc $1) True $2 
-                            Nothing (reverse (unLoc $3)) (unLoc $4) }
+        | data_or_newtype capi_ctype tycl_hdr constrs deriving
+                {% mkTyData (comb4 $1 $3 $4 $5) (unLoc $1) True $2 $3 
+                            Nothing (reverse (unLoc $4)) (unLoc $5) }
 
         -- GADT instance declaration
-        | data_or_newtype tycl_hdr opt_kind_sig 
+        | data_or_newtype capi_ctype tycl_hdr opt_kind_sig 
                  gadt_constrlist
                  deriving
-                {% mkTyData (comb4 $1 $2 $4 $5) (unLoc $1) True $2 
-                            (unLoc $3) (unLoc $4) (unLoc $5) }
+                {% mkTyData (comb4 $1 $3 $5 $6) (unLoc $1) True $2 $3 
+                            (unLoc $4) (unLoc $5) (unLoc $6) }
 
 data_or_newtype :: { Located NewOrData }
         : 'data'        { L1 DataType }
@@ -737,6 +739,10 @@ opt_kind_sig :: { Located (Maybe (LHsKind RdrName)) }
 tycl_hdr :: { Located (Maybe (LHsContext RdrName), LHsType RdrName) }
         : context '=>' type             { LL (Just $1, $3) }
         | type                          { L1 (Nothing, $1) }
+
+capi_ctype :: { Maybe CType }
+capi_ctype : '{-# CTYPE' STRING '#-}'      { Just (CType (getSTRING $2)) }
+           |                               { Nothing }
 
 -----------------------------------------------------------------------------
 -- Stand-alone deriving

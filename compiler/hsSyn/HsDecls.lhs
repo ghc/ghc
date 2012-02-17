@@ -465,6 +465,7 @@ data TyClDecl name
                 tcdCtxt   :: LHsContext name,           -- ^ Context
                 tcdLName  :: Located name,              -- ^ Type constructor
 
+                tcdCType  :: Maybe CType,
                 tcdTyVars :: [LHsTyVarBndr name],       -- ^ Type variables
                 tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns.
                   -- See Note [tcdTyVars and tcdTyPats] 
@@ -496,6 +497,7 @@ data TyClDecl name
     }
 
   | TySynonym { tcdLName  :: Located name,              -- ^ type constructor
+                tcdCType  :: Maybe CType,
                 tcdTyVars :: [LHsTyVarBndr name],       -- ^ type variables
                 tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns
                   -- See Note [tcdTyVars and tcdTyPats] 
