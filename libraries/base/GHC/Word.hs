@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -105,7 +105,9 @@ instance Integral Word where
         | y /= 0                = W# (x# `remWord#` y#)
         | otherwise             = divZeroError
     quotRem (W# x#) y@(W# y#)
-        | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
+        | y /= 0                = case x# `quotRemWord#` y# of
+                                  (# q, r #) ->
+                                      (W# q, W# r)
         | otherwise             = divZeroError
     divMod  (W# x#) y@(W# y#)
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
@@ -229,7 +231,9 @@ instance Integral Word8 where
         | y /= 0                  = W8# (x# `remWord#` y#)
         | otherwise               = divZeroError
     quotRem (W8# x#) y@(W8# y#)
-        | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
+        | y /= 0                  = case x# `quotRemWord#` y# of
+                                    (# q, r #) ->
+                                        (W8# q, W8# r)
         | otherwise               = divZeroError
     divMod  (W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
@@ -370,7 +374,9 @@ instance Integral Word16 where
         | y /= 0                    = W16# (x# `remWord#` y#)
         | otherwise                 = divZeroError
     quotRem (W16# x#) y@(W16# y#)
-        | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
+        | y /= 0                  = case x# `quotRemWord#` y# of
+                                    (# q, r #) ->
+                                        (W16# q, W16# r)
         | otherwise                 = divZeroError
     divMod  (W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
@@ -556,7 +562,9 @@ instance Integral Word32 where
         | y /= 0                    = W32# (x# `remWord#` y#)
         | otherwise                 = divZeroError
     quotRem (W32# x#) y@(W32# y#)
-        | y /= 0                    = (W32# (x# `quotWord#` y#), W32# (x# `remWord#` y#))
+        | y /= 0                  = case x# `quotRemWord#` y# of
+                                    (# q, r #) ->
+                                        (W32# q, W32# r)
         | otherwise                 = divZeroError
     divMod  (W32# x#) y@(W32# y#)
         | y /= 0                    = (W32# (x# `quotWord#` y#), W32# (x# `remWord#` y#))
@@ -699,7 +707,9 @@ instance Integral Word64 where
         | y /= 0                    = W64# (x# `remWord64#` y#)
         | otherwise                 = divZeroError
     quotRem (W64# x#) y@(W64# y#)
-        | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
+        | y /= 0                  = case x# `quotRemWord#` y# of
+                                    (# q, r #) ->
+                                        (W64# q, W64# r)
         | otherwise                 = divZeroError
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
@@ -807,7 +817,9 @@ instance Integral Word64 where
         | y /= 0                    = W64# (x# `remWord#` y#)
         | otherwise                 = divZeroError
     quotRem (W64# x#) y@(W64# y#)
-        | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
+        | y /= 0                  = case x# `quotRemWord#` y# of
+                                    (# q, r #) ->
+                                        (W64# q, W64# r)
         | otherwise                 = divZeroError
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
