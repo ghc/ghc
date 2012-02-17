@@ -286,7 +286,7 @@ catchJust
         -> IO a
 catchJust p a handler = catch a handler'
   where handler' e = case p e of 
-                        Nothing -> throw e
+                        Nothing -> throwIO e
                         Just b  -> handler b
 
 -- | A version of 'catch' with the arguments swapped around; useful in
@@ -312,7 +312,7 @@ handleJust p =  flip (catchJust p)
 
 mapException :: (Exception -> Exception) -> a -> a
 mapException f v = unsafePerformIO (catch (evaluate v)
-                                          (\x -> throw (f x)))
+                                          (\x -> throwIO (f x)))
 
 -----------------------------------------------------------------------------
 -- 'try' and variations.
@@ -344,7 +344,7 @@ tryJust p a = do
   case r of
         Right v -> return (Right v)
         Left  e -> case p e of
-                        Nothing -> throw e
+                        Nothing -> throwIO e
                         Just b  -> return (Left b)
 
 -----------------------------------------------------------------------------
@@ -389,8 +389,8 @@ catchDyn m k = New.catch m handler
                            (DynException dyn) ->
                                 case fromDynamic dyn of
                                     Just exception  -> k exception
-                                    Nothing -> throw ex
-                           _ -> throw ex
+                                    Nothing -> throwIO ex
+                           _ -> throwIO ex
 #endif
 
 -----------------------------------------------------------------------------
@@ -463,7 +463,7 @@ bracket before after thing =
     a <- before 
     r <- catch 
            (restore (thing a))
-           (\e -> do { _ <- after a; throw e })
+           (\e -> do { _ <- after a; throwIO e })
     _ <- after a
     return r
 #endif
@@ -479,7 +479,7 @@ a `finally` sequel =
   mask $ \restore -> do
     r <- catch 
              (restore a)
-             (\e -> do { _ <- sequel; throw e })
+             (\e -> do { _ <- sequel; throwIO e })
     _ <- sequel
     return r
 
@@ -500,7 +500,7 @@ bracketOnError before after thing =
     a <- before 
     catch 
         (restore (thing a))
-        (\e -> do { _ <- after a; throw e })
+        (\e -> do { _ <- after a; throwIO e })
 
 -- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
