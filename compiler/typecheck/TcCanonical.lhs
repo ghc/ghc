@@ -856,24 +856,21 @@ canEq d fl eqv ty1 ty2
     if (tc1 /= tc2 || length tys1 /= length tys2)
     -- Fail straight away for better error messages
     then canEqFailure d fl eqv
-    else do {
-         let (kis1,  tys1') = span isKind tys1
-             (_kis2, tys2') = span isKind tys2
-             kicos          = map mkTcReflCo kis1
+    else do
+       { argeqvs <- zipWithM (newEqVar fl) tys1 tys2
 
-       ; argeqvs <- zipWithM (newEqVar fl) tys1' tys2'
        ; fls <- case fl of 
            Wanted {} -> 
              do { _ <- setEqBind eqv
-                         (mkTcTyConAppCo tc1 (kicos ++ map (mkTcCoVarCo . evc_the_evvar) argeqvs)) fl
+                         (mkTcTyConAppCo tc1 (map (mkTcCoVarCo . evc_the_evvar) argeqvs)) fl
                 ; return (map (\_ -> fl) argeqvs) }
            Given {} ->
              let do_one argeqv n = setEqBind (evc_the_evvar argeqv) 
                                              (mkTcNthCo n (mkTcCoVarCo eqv)) fl
-             in zipWithM do_one argeqvs [(length kicos)..]
+             in zipWithM do_one argeqvs [0..]
            Derived {} -> return (map (\_ -> fl) argeqvs)
 
-       ; canEqEvVarsCreated d fls argeqvs tys1' tys2' }
+       ; canEqEvVarsCreated d fls argeqvs tys1 tys2 }
 
 -- See Note [Equality between type applications]
 --     Note [Care with type applications] in TcUnify
