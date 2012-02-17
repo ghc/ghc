@@ -985,7 +985,7 @@ data ForeignImport = -- import of a C entity
                      --
                      CImport  CCallConv       -- ccall or stdcall
                               Safety          -- interruptible, safe or unsafe
-                              FastString      -- name of C header
+                              (Maybe Header)  -- name of C header
                               CImportSpec     -- details of the C entity
   deriving (Data, Typeable)
 
@@ -1015,11 +1015,13 @@ instance OutputableBndr name => Outputable (ForeignDecl name) where
        2 (dcolon <+> ppr ty)
 
 instance Outputable ForeignImport where
-  ppr (CImport  cconv safety header spec) =
+  ppr (CImport  cconv safety mHeader spec) =
     ppr cconv <+> ppr safety <+> 
     char '"' <> pprCEntity spec <> char '"'
     where
-      pp_hdr = if nullFS header then empty else ftext header
+      pp_hdr = case mHeader of
+               Nothing -> empty
+               Just (Header header) -> ftext header
 
       pprCEntity (CLabel lbl) = 
         ptext (sLit "static") <+> pp_hdr <+> char '&' <> ppr lbl

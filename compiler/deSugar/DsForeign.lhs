@@ -127,8 +127,8 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id co (CImport cconv safety header spec) = do
-    (ids, h, c) <- dsCImport id co spec cconv safety header
+dsFImport id co (CImport cconv safety mHeader spec) = do
+    (ids, h, c) <- dsCImport id co spec cconv safety mHeader
     return (ids, h, c)
 
 dsCImport :: Id
@@ -136,7 +136,7 @@ dsCImport :: Id
           -> CImportSpec
           -> CCallConv
           -> Safety
-          -> FastString -- header
+          -> Maybe Header
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
    let ty = pFst $ coercionKind co
@@ -156,8 +156,8 @@ dsCImport id co (CLabel cid) cconv _ _ = do
 
 dsCImport id co (CFunction target) cconv@PrimCallConv safety _
   = dsPrimCall id co (CCall (CCallSpec target cconv safety))
-dsCImport id co (CFunction target) cconv safety header
-  = dsFCall id co (CCall (CCallSpec target cconv safety)) header
+dsCImport id co (CFunction target) cconv safety mHeader
+  = dsFCall id co (CCall (CCallSpec target cconv safety)) mHeader
 dsCImport id co CWrapper cconv _ _
   = dsFExportDynamic id co cconv
 
@@ -184,9 +184,9 @@ fun_type_arg_stdcall_info _other_conv _
 %************************************************************************
 
 \begin{code}
-dsFCall :: Id -> Coercion -> ForeignCall -> FastString
+dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsFCall fn_id co fcall headerFilename = do
+dsFCall fn_id co fcall mDeclHeader = do
     let
         ty                   = pFst $ coercionKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
@@ -217,7 +217,7 @@ dsFCall fn_id co fcall headerFilename = do
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include <" <> ftext h <> text ">"
-                                      | h <- nub headers ]
+                                      | Header h <- nub headers ]
                       fun_proto = cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
                       cRet
                        | isVoidRes =                   cCall
@@ -239,10 +239,8 @@ dsFCall fn_id co fcall headerFilename = do
                       argTypes = if null argTypeList
                                  then text "void"
                                  else hsep $ punctuate comma argTypeList
-                      mHeaders' = mHeader : mHeaders
-                      headers = if nullFS headerFilename
-                                then                  catMaybes mHeaders'
-                                else headerFilename : catMaybes mHeaders'
+                      mHeaders' = mDeclHeader : mHeader : mHeaders
+                      headers = catMaybes mHeaders'
                       argVals = hsep $ punctuate comma
                                     [ char 'a' <> int n
                                     | (_, n) <- zip arg_tys [1..] ]
@@ -676,7 +674,7 @@ showStgType t = text "Hs" <> text (showFFIType t)
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName (typeTyCon t))
 
-toCType :: Type -> (Maybe FastString, SDoc)
+toCType :: Type -> (Maybe Header, SDoc)
 toCType = f False
     where f voidOK t
            -- First, if we have (Ptr t) of (FunPtr t), then we need to

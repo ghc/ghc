@@ -916,7 +916,7 @@ mkImport :: CCallConv
 mkImport cconv safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
   let funcTarget = CFunction (StaticTarget entity Nothing)
-      importSpec = CImport PrimCallConv safety nilFS funcTarget
+      importSpec = CImport PrimCallConv safety Nothing funcTarget
   return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
 
   | otherwise = do
@@ -936,11 +936,11 @@ parseCImport cconv safety nm str =
    parse = do
        skipSpaces
        r <- choice [
-          string "dynamic" >> return (mk nilFS (CFunction DynamicTarget)),
-          string "wrapper" >> return (mk nilFS CWrapper),
+          string "dynamic" >> return (mk Nothing (CFunction DynamicTarget)),
+          string "wrapper" >> return (mk Nothing CWrapper),
           optional (string "static" >> skipSpaces) >>
-           (mk nilFS <$> cimp nm) +++
-           (do h <- munch1 hdr_char; skipSpaces; mk (mkFastString h) <$> cimp nm)
+           (mk Nothing <$> cimp nm) +++
+           (do h <- munch1 hdr_char; skipSpaces; mk (Just (Header (mkFastString h))) <$> cimp nm)
          ]
        skipSpaces
        return r

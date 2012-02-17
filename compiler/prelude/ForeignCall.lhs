@@ -15,7 +15,7 @@ module ForeignCall (
         CCallTarget(..), isDynamicTarget,
         CCallConv(..), defaultCCallConv, ccallConvToInt, ccallConvAttribute,
 
-        CType(..),
+        Header(..), CType(..),
     ) where
 
 import FastString
@@ -230,9 +230,13 @@ instance Outputable CCallSpec where
 \end{code}
 
 \begin{code}
+-- The filename for a C header file
+newtype Header = Header FastString
+    deriving (Eq, Data, Typeable)
+
 -- | A C type, used in CAPI FFI calls
-data CType = CType (Maybe FastString) -- header to include for this type
-                   FastString         -- the type itself
+data CType = CType (Maybe Header) -- header to include for this type
+                   FastString     -- the type itself
     deriving (Data, Typeable)
 \end{code}
 
@@ -324,4 +328,9 @@ instance Binary CType where
     get bh = do mh <- get bh
                 fs <- get bh
                 return (CType mh fs)
+
+instance Binary Header where
+    put_ bh (Header h) = put_ bh h
+    get bh = do h <- get bh
+                return (Header h)
 \end{code}

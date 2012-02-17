@@ -741,8 +741,8 @@ tycl_hdr :: { Located (Maybe (LHsContext RdrName), LHsType RdrName) }
         | type                          { L1 (Nothing, $1) }
 
 capi_ctype :: { Maybe CType }
-capi_ctype : '{-# CTYPE' STRING STRING '#-}' { Just (CType (Just (getSTRING $2)) (getSTRING $3)) }
-           | '{-# CTYPE'        STRING '#-}' { Just (CType Nothing               (getSTRING $2)) }
+capi_ctype : '{-# CTYPE' STRING STRING '#-}' { Just (CType (Just (Header (getSTRING $2))) (getSTRING $3)) }
+           | '{-# CTYPE'        STRING '#-}' { Just (CType Nothing                        (getSTRING $2)) }
            |                                 { Nothing }
 
 -----------------------------------------------------------------------------
