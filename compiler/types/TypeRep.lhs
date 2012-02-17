@@ -23,7 +23,7 @@ module TypeRep (
 
         -- Functions over types
         mkTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
-        isLiftedTypeKind,
+        isLiftedTypeKind, isSuperKind, isTypeVar, isKindVar,
         
         -- Pretty-printing
 	pprType, pprParendType, pprTypeApp,
@@ -257,11 +257,25 @@ mkTyConApp tycon tys
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = mkTyConApp tycon []
+\end{code}
 
+Some basic functions, put here to break loops eg with the pretty printer
+
+\begin{code}
 isLiftedTypeKind :: Kind -> Bool
--- This function is here because it's used in the pretty printer
 isLiftedTypeKind (TyConApp tc []) = tc `hasKey` liftedTypeKindTyConKey
 isLiftedTypeKind _                = False
+
+-- | Is this a super-kind (i.e. a type-of-kinds)?
+isSuperKind :: Type -> Bool
+isSuperKind (TyConApp skc []) = skc `hasKey` superKindTyConKey
+isSuperKind _                 = False
+
+isTypeVar :: Var -> Bool
+isTypeVar v = isTKVar v && not (isSuperKind (varType v))
+
+isKindVar :: Var -> Bool 
+isKindVar v = isTKVar v && isSuperKind (varType v)
 \end{code}
 
 
