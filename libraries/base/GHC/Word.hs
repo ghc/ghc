@@ -47,7 +47,7 @@ import GHC.Float ()     -- for RealFrac methods
 ------------------------------------------------------------------------
 
 -- |A 'Word' is an unsigned integral type, with the same size as 'Int'.
-data Word = W# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord" #-} Word = W# Word# deriving (Eq, Ord)
 
 instance Show Word where
     showsPrec _ (W# w) = showWord w
@@ -181,7 +181,7 @@ instance Bits Word where
 -- Word8 is represented in the same way as Word. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data Word8 = W8# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord8" #-} Word8 = W8# Word# deriving (Eq, Ord)
 -- ^ 8-bit unsigned integer type
 
 instance Show Word8 where
@@ -322,7 +322,7 @@ instance Bits Word8 where
 -- Word16 is represented in the same way as Word. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data Word16 = W16# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord16" #-} Word16 = W16# Word# deriving (Eq, Ord)
 -- ^ 16-bit unsigned integer type
 
 instance Show Word16 where
@@ -500,7 +500,7 @@ instance Bits Word16 where
 
 #endif
 
-data Word32 = W32# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord32" #-} Word32 = W32# Word# deriving (Eq, Ord)
 -- ^ 32-bit unsigned integer type
 
 instance Num Word32 where
@@ -643,7 +643,7 @@ instance Read Word32 where
 
 #if WORD_SIZE_IN_BITS < 64
 
-data Word64 = W64# Word64#
+data {-# CTYPE "HsWord64" #-} Word64 = W64# Word64#
 -- ^ 64-bit unsigned integer type
 
 instance Eq Word64 where
@@ -761,7 +761,7 @@ a `shiftRL64#` b | b >=# 64#  = wordToWord64# (int2Word# 0#)
 -- Operations may assume and must ensure that it holds only values
 -- from its logical range.
 
-data Word64 = W64# Word# deriving (Eq, Ord)
+data {-# CTYPE "HsWord64" #-} Word64 = W64# Word# deriving (Eq, Ord)
 -- ^ 64-bit unsigned integer type
 
 instance Num Word64 where
