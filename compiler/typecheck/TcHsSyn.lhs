@@ -46,7 +46,6 @@ import TcEvidence
 import TysPrim
 import TysWiredIn
 import Type
-import Kind
 import DataCon
 import Name
 import NameSet
@@ -1290,7 +1289,7 @@ zonkTvCollecting :: TcRef TyVarSet -> UnboundTyVarZonker
 -- Works on both types and kinds
 zonkTvCollecting unbound_tv_set tv
   = do { poly_kinds <- xoptM Opt_PolyKinds
-       ; if isKiVar tv && not poly_kinds then defaultKindVarToStar tv
+       ; if isKindVar tv && not poly_kinds then defaultKindVarToStar tv
          else do
        { tv' <- zonkQuantifiedTyVar tv
        ; tv_set <- readMutVar unbound_tv_set
@@ -1302,10 +1301,10 @@ zonkTypeZapping :: UnboundTyVarZonker
 -- It zaps unbound type variables to (), or some other arbitrary type
 -- Works on both types and kinds
 zonkTypeZapping tv
-  = do { let ty = if isKiVar tv
+  = do { let ty = if isKindVar tv
                   -- ty is actually a kind, zonk to AnyK
                   then anyKind
-                  else anyTypeOfKind (tyVarKind tv)
+                  else anyTypeOfKind (defaultKind (tyVarKind tv))
        ; writeMetaTyVar tv ty
        ; return ty }
 
