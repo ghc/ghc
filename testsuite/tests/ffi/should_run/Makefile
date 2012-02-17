@@ -30,3 +30,11 @@ Capi_Ctype_001:
 	'$(TEST_HC)' $(TEST_HC_OPTS) capi_ctype_001.o Capi_Ctype_A_001.o Capi_Ctype_001.o -o Capi_Ctype_001
 	./Capi_Ctype_001
 
+.PHONY: Capi_Ctype_002
+Capi_Ctype_002:
+	'$(HSC2HS)' Capi_Ctype_A_002.hsc
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_A_002.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_002.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) Capi_Ctype_A_002.o Capi_Ctype_002.o -o Capi_Ctype_002
+	./Capi_Ctype_002
+

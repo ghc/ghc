@@ -195,3 +195,9 @@ test('Capi_Ctype_001',
      run_command,
      ['$MAKE -s --no-print-directory Capi_Ctype_001'])
 
+test('Capi_Ctype_002',
+     extra_clean(['Capi_Ctype_A_002.o', 'Capi_Ctype_A_002.hi',
+                  'Capi_Ctype_A_002.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory Capi_Ctype_002'])
+
