@@ -183,13 +183,14 @@ isSubOpenTypeKindCon kc
   =  isSubArgTypeKindCon kc
   || isUbxTupleKindCon   kc
   || isOpenTypeKindCon   kc
-  || isConstraintKindCon kc   -- Needed for error (Num a) "blah"
-                              -- and so that (Ord a -> Eq a) is well-kinded
 
 isSubArgTypeKindCon kc
   =  isUnliftedTypeKindCon kc
   || isLiftedTypeKindCon   kc  
   || isArgTypeKindCon      kc     
+  || isConstraintKindCon kc   -- Needed for error (Num a) "blah"
+                              -- and so that (Ord a -> Eq a) is well-kinded
+                              -- and so that (# Eq a, Ord b #) is well-kinded
 
 isSubArgTypeKind :: Kind -> Bool
 -- ^ True of any sub-kind of ArgTypeKind 
