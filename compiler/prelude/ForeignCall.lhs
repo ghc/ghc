@@ -231,7 +231,8 @@ instance Outputable CCallSpec where
 
 \begin{code}
 -- | A C type, used in CAPI FFI calls
-newtype CType = CType FastString
+data CType = CType (Maybe FastString) -- header to include for this type
+                   FastString         -- the type itself
     deriving (Data, Typeable)
 \end{code}
 
@@ -318,7 +319,9 @@ instance Binary CCallConv where
               _ -> do return CApiConv
 
 instance Binary CType where
-    put_ bh (CType fs) = put_ bh fs
-    get bh = do fs <- get bh
-                return (CType fs)
+    put_ bh (CType mh fs) = do put_ bh mh
+                               put_ bh fs
+    get bh = do mh <- get bh
+                fs <- get bh
+                return (CType mh fs)
 \end{code}

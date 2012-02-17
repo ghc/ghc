@@ -214,11 +214,10 @@ dsFCall fn_id co fcall headerFilename = do
                                     mkFastString "_" `appendFS`
                                     cName
                       fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId) CApiConv safety)
-                      c = include
+                      c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
-                      include
-                       | nullFS headerFilename = empty
-                       | otherwise = text "#include <" <> ftext headerFilename <> text ">"
+                      includes = vcat [ text "#include <" <> ftext h <> text ">"
+                                      | h <- nub headers ]
                       fun_proto = cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
                       cRet
                        | isVoidRes =                   cCall
@@ -228,14 +227,22 @@ dsFCall fn_id co fcall headerFilename = do
                                    Just (_ioTyCon, res_ty) -> res_ty
                                    Nothing                 -> io_res_ty
                       isVoidRes = raw_res_ty `eqType` unitTy
-                      cResType | isVoidRes = text "void"
-                               | otherwise = toCType raw_res_ty
+                      (mHeader, cResType)
+                       | isVoidRes = (Nothing, text "void")
+                       | otherwise = toCType raw_res_ty
                       pprCconv = ccallConvAttribute CApiConv
-                      argTypes
-                       | null arg_tys = text "void"
-                       | otherwise = hsep $ punctuate comma
-                                         [ toCType t <+> char 'a' <> int n
-                                         | (t, n) <- zip arg_tys [1..] ]
+                      mHeadersArgTypeList
+                          = [ (header, cType <+> char 'a' <> int n)
+                            | (t, n) <- zip arg_tys [1..]
+                            , let (header, cType) = toCType t ]
+                      (mHeaders, argTypeList) = unzip mHeadersArgTypeList
+                      argTypes = if null argTypeList
+                                 then text "void"
+                                 else hsep $ punctuate comma argTypeList
+                      mHeaders' = mHeader : mHeaders
+                      headers = if nullFS headerFilename
+                                then                  catMaybes mHeaders'
+                                else headerFilename : catMaybes mHeaders'
                       argVals = hsep $ punctuate comma
                                     [ char 'a' <> int n
                                     | (_, n) <- zip arg_tys [1..] ]
@@ -498,7 +505,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 SDoc,           -- C type
                 Type,           -- Haskell type
                 CmmType)]       -- the CmmType
-  arg_info  = [ let stg_type = toCType ty in
+  arg_info  = [ let stg_type = showStgType ty in
                 (arg_cname n stg_type,
                  stg_type,
                  ty,
@@ -535,7 +542,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   res_hty_is_unit = res_hty `eqType` unitTy     -- Look through any newtypes
 
   cResType | res_hty_is_unit = text "void"
-           | otherwise       = toCType res_hty
+           | otherwise       = showStgType res_hty
 
   -- when the return type is integral and word-sized or smaller, it
   -- must be assigned as type ffi_arg (#3516).  To see what type
@@ -663,10 +670,13 @@ mkHObj t = text "rts_mk" <> text (showFFIType t)
 unpackHObj :: Type -> SDoc
 unpackHObj t = text "rts_get" <> text (showFFIType t)
 
+showStgType :: Type -> SDoc
+showStgType t = text "Hs" <> text (showFFIType t)
+
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName (typeTyCon t))
 
-toCType :: Type -> SDoc
+toCType :: Type -> (Maybe FastString, SDoc)
 toCType = f False
     where f voidOK t
            -- First, if we have (Ptr t) of (FunPtr t), then we need to
@@ -674,21 +684,23 @@ toCType = f False
            -- know a type for t, then "void" is fine, though.
            | Just (ptr, [t']) <- splitTyConApp_maybe t
            , tyConName ptr `elem` [ptrTyConName, funPtrTyConName]
-              = f True t' <> char '*'
+              = case f True t' of
+                (mh, cType') ->
+                    (mh, cType' <> char '*')
            -- Otherwise, if we have a type constructor application, then
            -- see if there is a C type associated with that constructor.
            -- Note that we aren't looking through type synonyms or
            -- anything, as it may be the synonym that is annotated.
            | TyConApp tycon _ <- t
-           , Just (CType cType) <- tyConCType_maybe tycon
-              = ftext cType
+           , Just (CType mHeader cType) <- tyConCType_maybe tycon
+              = (mHeader, ftext cType)
            -- If we don't know a C type for this type, then try looking
            -- through one layer of type synonym etc.
            | Just t' <- coreView t
               = f voidOK t'
            -- Otherwise we don't know the C type. If we are allowing
            -- void then return that; otherwise something has gone wrong.
-           | voidOK = ptext (sLit "void")
+           | voidOK = (Nothing, ptext (sLit "void"))
            | otherwise
               = pprPanic "toCType" (ppr t)
 
