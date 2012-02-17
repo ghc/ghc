@@ -38,6 +38,7 @@ module SimplUtils (
 
 import SimplEnv
 import CoreMonad        ( SimplifierMode(..), Tick(..) )
+import MkCore           ( sortQuantVars )
 import DynFlags
 import StaticFlags
 import CoreSyn

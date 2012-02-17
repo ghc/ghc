@@ -13,6 +13,7 @@ module MkCore (
         mkCoreApp, mkCoreApps, mkCoreConApps,
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder, mkWildEvBinder,
+        sortQuantVars,
         
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
@@ -84,7 +85,7 @@ import Outputable
 import FastString
 import UniqSupply
 import BasicTypes
-import Util             ( notNull, zipEqual )
+import Util             ( notNull, zipEqual, sortLe )
 import Pair
 import Constants
 
@@ -101,6 +102,23 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 %************************************************************************
 
 \begin{code}
+sortQuantVars :: [Var] -> [Var]
+-- Sort the variables (KindVars, TypeVars, and Ids) 
+-- into order: Kind, then Type, then Id
+sortQuantVars = sortLe le
+  where
+    v1 `le` v2 = case (is_tv v1, is_tv v2) of
+                   (True, False)  -> True
+                   (False, True)  -> False
+                   (True, True)   ->
+                     case (is_kv v1, is_kv v2) of
+                       (True, False) -> True
+                       (False, True) -> False
+                       _             -> v1 <= v2  -- Same family
+                   (False, False) -> v1 <= v2
+    is_tv v = isTyVar v
+    is_kv v = isKindVar v
+
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "CoreSyn#let_app_invariant")
 mkCoreLet :: CoreBind -> CoreExpr -> CoreExpr
