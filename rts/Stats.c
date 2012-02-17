@@ -40,7 +40,7 @@ static StgWord64 GC_tot_alloc      = 0;
 static StgWord64 GC_tot_copied     = 0;
 
 static StgWord64 GC_par_max_copied = 0;
-static StgWord64 GC_par_avg_copied = 0;
+static StgWord64 GC_par_tot_copied = 0;
 
 #ifdef PROFILING
 static Time RP_start_time  = 0, RP_tot_time  = 0;  // retainer prof user time
@@ -140,7 +140,7 @@ initStats0(void)
     GC_tot_alloc     = 0;
     GC_tot_copied    = 0;
     GC_par_max_copied = 0;
-    GC_par_avg_copied = 0;
+    GC_par_tot_copied = 0;
     GC_tot_cpu  = 0;
 
 #ifdef PROFILING
@@ -332,7 +332,7 @@ stat_gcWorkerThreadDone (gc_thread *gct STG_UNUSED)
 void
 stat_endGC (gc_thread *gct,
             lnat alloc, lnat live, lnat copied, nat gen,
-            lnat max_copied, lnat avg_copied, lnat slop)
+            lnat par_max_copied, lnat par_tot_copied, lnat slop)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
         RtsFlags.ProfFlags.doHeapProfile)
@@ -372,8 +372,8 @@ stat_endGC (gc_thread *gct,
 
 	GC_tot_copied += (StgWord64) copied;
 	GC_tot_alloc  += (StgWord64) alloc;
-        GC_par_max_copied += (StgWord64) max_copied;
-        GC_par_avg_copied += (StgWord64) avg_copied;
+        GC_par_max_copied += (StgWord64) par_max_copied;
+        GC_par_tot_copied += (StgWord64) par_tot_copied;
 	GC_tot_cpu   += gc_cpu;
         
         /* For the moment we calculate both per-HEC and total allocation.
@@ -642,11 +642,10 @@ stat_exit(int alloc)
             }
 
 #if defined(THREADED_RTS)
-            if (RtsFlags.ParFlags.parGcEnabled) {
-                statsPrintf("\n  Parallel GC work balance: %.2f (%ld / %ld, ideal %d)\n", 
-                            (double)GC_par_avg_copied / (double)GC_par_max_copied,
-                            (lnat)GC_par_avg_copied, (lnat)GC_par_max_copied,
-                            n_capabilities
+            if (RtsFlags.ParFlags.parGcEnabled && n_capabilities > 1) {
+                statsPrintf("\n  Parallel GC work balance: %.2f%% (serial 0%%, perfect 100%%)\n", 
+                            100 * (((double)GC_par_tot_copied / (double)GC_par_max_copied) - 1)
+                                / (n_capabilities - 1)
                     );
             }
 #endif
@@ -913,7 +912,7 @@ extern void getGCStats( GCStats *s )
     /* EZY: Being consistent with incremental output, but maybe should also discount init */
     s->cpu_seconds = TimeToSecondsDbl(current_cpu);
     s->wall_seconds = TimeToSecondsDbl(current_elapsed - end_init_elapsed);
-    s->par_avg_bytes_copied = GC_par_avg_copied*(StgWord64)sizeof(W_);
+    s->par_tot_bytes_copied = GC_par_tot_copied*(StgWord64)sizeof(W_);
     s->par_max_bytes_copied = GC_par_max_copied*(StgWord64)sizeof(W_);
 }
 // extern void getTaskStats( TaskStats **s ) {}

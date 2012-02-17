@@ -178,7 +178,7 @@ GarbageCollect (rtsBool force_major_gc,
 {
   bdescr *bd;
   generation *gen;
-  lnat live_blocks, live_words, allocated, max_copied, avg_copied;
+  lnat live_blocks, live_words, allocated, par_max_copied, par_tot_copied;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -443,8 +443,8 @@ GarbageCollect (rtsBool force_major_gc,
   }
 
   copied = 0;
-  max_copied = 0;
-  avg_copied = 0;
+  par_max_copied = 0;
+  par_tot_copied = 0;
   { 
       nat i;
       for (i=0; i < n_gc_threads; i++) {
@@ -457,13 +457,12 @@ GarbageCollect (rtsBool force_major_gc,
               debugTrace(DEBUG_gc,"   scav_find_work %ld",   gc_threads[i]->scav_find_work);
           }
           copied += gc_threads[i]->copied;
-          max_copied = stg_max(gc_threads[i]->copied, max_copied);
+          par_max_copied = stg_max(gc_threads[i]->copied, par_max_copied);
       }
+      par_tot_copied = copied;
       if (n_gc_threads == 1) {
-          max_copied = 0;
-          avg_copied = 0;
-      } else {
-          avg_copied = copied;
+          par_max_copied = 0;
+          par_tot_copied = 0;
       }
   }
 
@@ -740,7 +739,7 @@ GarbageCollect (rtsBool force_major_gc,
 
   // ok, GC over: tell the stats department what happened. 
   stat_endGC(gct, allocated, live_words,
-             copied, N, max_copied, avg_copied,
+             copied, N, par_max_copied, par_tot_copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */);
 
   // Guess which generation we'll collect *next* time
