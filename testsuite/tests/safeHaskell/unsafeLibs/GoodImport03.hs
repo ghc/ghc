@@ -22,7 +22,6 @@ import Control.Concurrent.QSemN
 import Control.Concurrent.SampleVar
 
 import Control.Exception
-import Control.OldException
 import Control.Exception.Base
 
 import Control.Monad
