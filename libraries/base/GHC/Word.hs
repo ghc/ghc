@@ -707,9 +707,7 @@ instance Integral Word64 where
         | y /= 0                    = W64# (x# `remWord64#` y#)
         | otherwise                 = divZeroError
     quotRem (W64# x#) y@(W64# y#)
-        | y /= 0                  = case x# `quotRemWord#` y# of
-                                    (# q, r #) ->
-                                        (W64# q, W64# r)
+        | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
         | otherwise                 = divZeroError
     divMod  (W64# x#) y@(W64# y#)
         | y /= 0                    = (W64# (x# `quotWord64#` y#), W64# (x# `remWord64#` y#))
