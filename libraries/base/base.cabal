@@ -120,7 +120,6 @@ Library {
         Control.Concurrent.SampleVar,
         Control.Exception,
         Control.Exception.Base
-        Control.OldException,
         Control.Monad,
         Control.Monad.Fix,
         Control.Monad.Instances,
