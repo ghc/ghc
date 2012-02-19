@@ -119,10 +119,6 @@ Things to do:
  - NB that CmmProcPoint line 283 has a hack that works around a GADT-related
    bug in 6.10.
 
- - SDM (2010-02-26) can we remove the Foreign constructor from Convention?
-   Reason: we never generate code for a function with the Foreign
-   calling convention, and the code for calling foreign calls is generated
-
  - AsmCodeGen has a generic Cmm optimiser; move this into new pipeline
    EZY (2011-04-16): The mini-inliner has been generalized and ported,
    but the constant folding and other optimizations need to still be
@@ -150,16 +146,6 @@ Things to do:
  - Consider module names
 
  - Top-level SRT threading is a bit ugly
-
- - Add type/newtype for CmmModule = [CmmGroup]    -- A module
-                        CmmGroup  = [CmmTop]      -- A .o file
-                        CmmTop    = Proc | Data   -- A procedure or data
-
- - This is a *change*: currently a CmmGroup is one function's-worth of code
-   regardless of SplitObjs.   Question: can we *always* generate M.o if there
-   is just one element in the list (rather than M/M1.o, M/M2.o etc)
-
-   One SRT per group.
 
  - See "CAFs" below; we want to totally refactor the way SRTs are calculated
 
