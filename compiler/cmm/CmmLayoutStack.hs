@@ -24,6 +24,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
+import Data.Bits
 
 #include "HsVersions.h"
 
@@ -183,20 +184,59 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
        let hwm'    = maximum (acc_hwm : map sm_sp (mapElems out))
            middle2 = maybeAddSpAdj sp_off $ foldl blockSnoc middle1 saves
     
+           area_off = getAreaOff final_stackmaps
+
            -- manifest Sp: turn all CmmStackSlots into actual loads
-           fiddle_middle = mapExpDeep (areaToSp sp0 sp_high final_stackmaps)
-           fiddle_last   = mapExpDeep (areaToSp (sp0 - sp_off) sp_high
-                                                final_stackmaps)
-    
+           adj_middle = mapExpDeep (areaToSp sp0            sp_high area_off)
+           adj_last   = optStackCheck .
+                        mapExpDeep (areaToSp (sp0 - sp_off) sp_high area_off)
+
+           middle3 = blockFromList $
+                     map adj_middle $
+                     elimStackStores stack0 final_stackmaps area_off $
+                     blockToList middle2
+
+           newblock = blockJoin entry0 middle3 (adj_last last1)
+
+           fixup_blocks' = map (blockMapNodes3 (id, adj_middle, id)) fixup_blocks
+
            stackmaps' = mapUnion acc_stackmaps out
-           newblock   = blockJoin entry0 middle2 last1
-           newblock'  = blockMapNodes3 (id, fiddle_middle, fiddle_last) newblock
-           fixup_blocks' = map (blockMapNodes3 (id, fiddle_middle, id))
-                               fixup_blocks
-    
+
        pprTrace "layout(out)" (ppr out) $ return ()
     
-       go bs stackmaps' hwm' (newblock' : fixup_blocks' ++ acc_blocks)
+       go bs stackmaps' hwm' (newblock : fixup_blocks' ++ acc_blocks)
+
+
+-- | Eliminate stores of the form
+--
+--    Sp[area+n] = r
+--
+-- when we know that r is already in the same slot as Sp[area+n].  We
+-- could do this in a later optimisation pass, but that would involve
+-- a separate analysis and we already have the information to hand
+-- here.  It helps clean up some extra stack stores in common cases.
+--
+-- Note that we may have to modify the StackMap as we walk through the
+-- code using procMiddle, since an assignment to a variable in the
+-- StackMap will invalidate its mapping there.
+--
+elimStackStores :: StackMap
+                -> BlockEnv StackMap
+                -> (Area -> ByteOff)
+                -> [CmmNode O O]
+                -> [CmmNode O O]
+elimStackStores stackmap stackmaps area_off nodes
+  = go stackmap nodes
+  where
+    go _stackmap [] = []
+    go stackmap (n:ns)
+     = case n of
+         CmmStore (CmmStackSlot area m) (CmmReg (CmmLocal r))
+            | Just (_,off) <- lookupUFM (sm_regs stackmap) r
+            , area_off area + m == off
+            -> pprTrace "eliminated a node!" (ppr r) $ go stackmap ns
+         _otherwise
+            -> n : go (procMiddle stackmaps n stackmap) ns
 
 
 -- This doesn't seem right somehow.  We need to find out whether this
@@ -234,7 +274,7 @@ maybeAddSpAdj sp_off block
 procMiddle :: BlockEnv StackMap -> CmmNode e x -> StackMap -> StackMap
 procMiddle stackmaps node sm
   = case node of
-     CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) t)
+     CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _)
        -> sm { sm_regs = addToUFM (sm_regs sm) r (r,loc) }
         where loc = getStackLoc area off stackmaps
      CmmAssign (CmmLocal r) _other
@@ -275,11 +315,31 @@ handleLastNode procpoints liveness cont_info stackmaps
       return ([], mapEmpty, sp_off, last, [])
 
     --  At each CmmCall with a continuation:
-    CmmCall{ cml_cont = Just cont_lbl, .. }
+    CmmCall{ cml_cont = Just cont_lbl, .. } ->
+       lastCall cont_lbl cml_args cml_ret_args cml_ret_off
+
+    CmmForeignCall{ succ = cont_lbl, .. } ->
+       lastCall cont_lbl 0{-no args-} 0{-no results-} (sm_ret_off stack0)
+
+    CmmBranch{..}     ->  handleProcPoints
+    CmmCondBranch{..} ->  handleProcPoints
+    CmmSwitch{..}     ->  handleProcPoints
+
+  where
+     lastCall :: BlockId -> ByteOff -> ByteOff -> ByteOff
+              -> UniqSM
+                      ( [CmmNode O O]
+                      , BlockEnv StackMap
+                      , ByteOff
+                      , CmmNode O C
+                      , [CmmBlock]
+                      )
+
+     lastCall cont_lbl cml_args cml_ret_args cml_ret_off
       -- If we have already seen this continuation before, then
       -- we just have to make the stack look the same:
       | Just cont_stack <- mapLookup cont_lbl stackmaps
-      ->
+      =
          return ( fixupStack stack0 cont_stack
                 , stackmaps
                 , sp0 - sm_sp cont_stack
@@ -288,7 +348,7 @@ handleLastNode procpoints liveness cont_info stackmaps
 
       -- a continuation we haven't seen before:
       -- allocate the stack frame for it.
-      | otherwise -> do
+      | otherwise = do
 
       -- get the set of LocalRegs live in the continuation
       let target_live = mapFindWithDefault Set.empty cont_lbl
@@ -328,11 +388,7 @@ handleLastNode procpoints liveness cont_info stackmaps
              , [] -- no new blocks
              )
 
-    CmmBranch{..}     ->  handleProcPoints
-    CmmCondBranch{..} ->  handleProcPoints
-    CmmSwitch{..}     ->  handleProcPoints
 
-  where
      handleProcPoints :: UniqSM ( [CmmNode O O]
                                 , BlockEnv StackMap
                                 , ByteOff
@@ -350,7 +406,7 @@ handleLastNode procpoints liveness cont_info stackmaps
                  , mapSuccessors fix_lbl last
                  , concat [ blk | (_,_,_,blk) <- pps ] )
 
-     -- For each proc point that is a successor of this block, we need to
+     -- For each proc point that is a successor of this block
      --   (a) if the proc point already has a stackmap, we need to
      --       shuffle the current stack to make it look the same.
      --       We have to insert a new block to make this happen.
@@ -384,10 +440,6 @@ handleLastNode procpoints liveness cont_info stackmaps
            return (l, tmp_lbl, stack3, [block])
 
 
-     passthrough :: BlockEnv StackMap
-     passthrough = mapFromList (zip (successors last) (repeat stack0))
-
-
 -- | create a sequence of assignments to establish the new StackMap,
 -- given the old StackMap.
 fixupStack :: StackMap -> StackMap -> [CmmNode O O]
@@ -414,29 +466,51 @@ OLD area.
 SpArgs(L) is the size of the young area for L, i.e. the number of
 arguments.
 
- - in block L, each reference to (OldArea[N]) turns into
+ - in block L, each reference to [old + N] turns into
    [Sp + Sp(L) - N]
 
- - in block L, each reference to (Young(L')[N]) turns into
+ - in block L, each reference to [young(L') + N] turns into
    [Sp + Sp(L) - Sp(L') + SpArgs(L') - N]
 
  - be careful with the last node of each block: Sp has already been adjusted
    to be Sp + Sp(L) - Sp(L')
 -}
 
-areaToSp :: ByteOff -> ByteOff -> BlockEnv StackMap -> CmmExpr -> CmmExpr
-areaToSp sp_old _sp_hwm stackmaps (CmmStackSlot area n) =
-  cmmOffset (CmmReg spReg) (sp_old - area_off - n)
-  where
-    area_off = case area of
-                 Old -> 0
-                 Young l ->
-                    case mapLookup l stackmaps of
-                       Just sm -> sm_sp sm - sm_args sm
-                       Nothing -> pprPanic "areaToSp(2)" (ppr l)
+areaToSp :: ByteOff -> ByteOff -> (Area -> StackLoc) -> CmmExpr -> CmmExpr
+areaToSp sp_old _sp_hwm area_off (CmmStackSlot area n) =
+  cmmOffset (CmmReg spReg) (sp_old - area_off area - n)
 areaToSp _ sp_hwm _ (CmmLit CmmHighStackMark) = CmmLit (mkIntCLit sp_hwm)
+areaToSp _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
+                      [CmmMachOp (MO_Sub _)
+                              [ CmmReg (CmmGlobal Sp)
+                              , CmmLit (CmmInt 0 _)],
+                       CmmReg (CmmGlobal SpLim)]) = CmmLit (CmmInt 0 wordWidth)
 areaToSp _ _ _ other = other
 
+-- Note [null stack check]
+--
+-- If the high-water Sp is zero, then we end up with
+--
+--   if (Sp - 0 < SpLim) then .. else ..
+--
+-- and possibly some dead code for the failure case.  Optimising this
+-- away depends on knowing that SpLim <= Sp, so it is really the job
+-- of the stack layout algorithm, hence we do it now.  This is also
+-- convenient because control-flow optimisation later will drop the
+-- dead code.
+
+optStackCheck :: CmmNode O C -> CmmNode O C
+optStackCheck n = -- Note [null stack check]
+ case n of
+   CmmCondBranch (CmmLit (CmmInt 0 _)) _true false -> CmmBranch false
+   other -> other
+
+getAreaOff :: BlockEnv StackMap -> (Area -> StackLoc)
+getAreaOff _ Old = 0
+getAreaOff stackmaps (Young l) =
+  case mapLookup l stackmaps of
+    Just sm -> sm_sp sm - sm_args sm
+    Nothing -> pprPanic "getAreaOff" (ppr l)
 
 -- -----------------------------------------------------------------------------
 -- Saving live registers
@@ -495,7 +569,7 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
        select_save :: [LocalReg] -> [StackSlot]
                    -> Maybe ([StackSlot], LocalReg, [LocalReg])
        select_save regs stack = go regs []
-         where go []     no_fit = Nothing
+         where go []     _no_fit = Nothing
                go (r:rs) no_fit
                  | Just rest <- dropEmpty words stack
                  = Just (replicate words Occupied ++ rest, r, rs++no_fit)
@@ -514,16 +588,14 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
               push r (n, assigs, regs)
                 = (n', assig : assigs, (r,(r,n')) : regs)
                 where
-                  w  = typeWidth (localRegType r)
-                  n' = n + widthInBytes w
+                  n' = n + localRegBytes r
                   assig = CmmStore (CmmStackSlot Old n')
                                    (CmmReg (CmmLocal r))
 
        trim_sp
           | not (null push_regs) = push_sp
           | otherwise
-          = case break notEmpty save_stack of
-              (empties, rest) -> n `plusW` (- length empties)
+          = n `plusW` (- length (takeWhile isEmpty save_stack))
 
        final_regs = regs1 `addListToUFM` push_regs
                           `addListToUFM` save_regs
@@ -532,9 +604,10 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
   -- XXX should be an assert
    if ( n /= max sp0 ret_off ) then pprPanic "allocate" (ppr n <+> ppr sp0 <+> ppr ret_off) else
 
+   if (trim_sp .&. (wORD_SIZE - 1)) /= 0  then pprPanic "allocate2" (ppr trim_sp <+> ppr final_regs <+> ppr push_sp) else
+
    ( stackmap { sm_regs = final_regs , sm_sp = trim_sp }
    , push_assigs ++ save_assigs )
-
 
 -- -----------------------------------------------------------------------------
 -- Update info tables to include stack liveness
@@ -555,6 +628,9 @@ setInfoTableStackMap stackmaps
           Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl)
           Just sm -> stackMapToLiveness sm
 
+setInfoTableStackMap _ d = d
+
+
 stackMapToLiveness :: StackMap -> Liveness
 stackMapToLiveness StackMap{..} =
    reverse $ Array.elems $
@@ -573,17 +649,14 @@ plusW b w = b + w * wORD_SIZE
 dropEmpty :: WordOff -> [StackSlot] -> Maybe [StackSlot]
 dropEmpty 0 ss           = Just ss
 dropEmpty n (Empty : ss) = dropEmpty (n-1) ss
-dropEmpty n _            = Nothing
+dropEmpty _ _            = Nothing
 
-pushEmpty :: ByteOff -> [StackSlot] -> [StackSlot]
-pushEmpty n stack = replicate (toWords n) Empty ++ stack
-
-notEmpty :: StackSlot -> Bool
-notEmpty Empty = False
-notEmpty _ = True
+isEmpty :: StackSlot -> Bool
+isEmpty Empty = True
+isEmpty _ = False
 
 localRegBytes :: LocalReg -> ByteOff
-localRegBytes r = widthInBytes (typeWidth (localRegType r))
+localRegBytes r = roundUpToWords (widthInBytes (typeWidth (localRegType r)))
 
 localRegWords :: LocalReg -> WordOff
 localRegWords = toWords . localRegBytes

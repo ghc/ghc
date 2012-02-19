@@ -14,7 +14,9 @@
 -- for details
 
 module StgCmmPrim (
-   cgOpApp
+   cgOpApp,
+   cgPrimOp -- internal(ish), used by cgCase to get code for a
+            -- comparison without also turning it into a Bool.
  ) where
 
 #include "HsVersions.h"

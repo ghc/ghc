@@ -948,7 +948,8 @@ cmmExprConFold referenceKind expr = do
     dflags <- getDynFlags
     -- Skip constant folding if new code generator is running
     -- (this optimization is done in Hoopl)
-    let expr' = if dopt Opt_TryNewCodeGen dflags
+    -- SDM: re-enabled for now, while cmmRewriteAssignments is turned off
+    let expr' = if False -- dopt Opt_TryNewCodeGen dflags
                     then expr
                     else cmmExprCon (targetPlatform dflags) expr
     cmmExprNative referenceKind expr'

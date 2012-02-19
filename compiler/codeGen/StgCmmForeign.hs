@@ -72,10 +72,7 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
               fc = ForeignConvention cconv arg_hints result_hints
               call_target = ForeignTarget cmm_target fc
 
-        ; srt <- getSRTInfo NoSRT        -- SLPJ: Not sure what SRT
-                                        -- is right here
-                                        -- JD: Does it matter in the new codegen?
-        ; emitForeignCall safety results call_target call_args srt CmmMayReturn }
+        ; emitForeignCall safety results call_target call_args CmmMayReturn }
   where
         -- in the stdcall calling convention, the symbol needs @size appended
         -- to it, where size is the total number of bytes of arguments.  We
@@ -93,9 +90,7 @@ emitCCall :: [(CmmFormal,ForeignHint)]
           -> [(CmmActual,ForeignHint)]
           -> FCode ()
 emitCCall hinted_results fn hinted_args
-  = emitForeignCall PlayRisky results target args
-                    NoC_SRT -- No SRT b/c we PlayRisky
-                    CmmMayReturn
+  = emitForeignCall PlayRisky results target args CmmMayReturn
   where
     (args, arg_hints) = unzip hinted_args
     (results, result_hints) = unzip hinted_results
@@ -105,7 +100,7 @@ emitCCall hinted_results fn hinted_args
 
 emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
 emitPrimCall res op args
-  = emitForeignCall PlayRisky res (PrimTarget op) args NoC_SRT CmmMayReturn
+  = emitForeignCall PlayRisky res (PrimTarget op) args CmmMayReturn
 
 -- alternative entry point, used by CmmParse
 emitForeignCall
@@ -113,11 +108,10 @@ emitForeignCall
         -> [CmmFormal]          -- where to put the results
         -> ForeignTarget        -- the op
         -> [CmmActual]          -- arguments
-        -> C_SRT                -- the SRT of the calls continuation
         -> CmmReturnInfo        -- This can say "never returns"
                                 --   only RTS procedures do this
         -> FCode ()
-emitForeignCall safety results target args _srt _ret
+emitForeignCall safety results target args _ret
   | not (playSafe safety) = do
     let (caller_save, caller_load) = callerSaveVolatileRegs
     emit caller_save

@@ -76,16 +76,16 @@ cgTopRhsClosure :: Id
 cgTopRhsClosure id ccs _ upd_flag srt args body = do
   {	-- LAY OUT THE OBJECT
     let name = idName id
-  ; lf_info  <- mkClosureLFInfo id TopLevel [] upd_flag args
-  ; srt_info <- getSRTInfo srt
+  ; lf_info <- mkClosureLFInfo id TopLevel [] upd_flag args
+  ; has_srt <- getSRTInfo srt
   ; mod_name <- getModuleName
   ; let descr         = closureDescription mod_name name
-	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
+        closure_info  = mkClosureInfo True id lf_info 0 0 descr
 	closure_label = mkLocalClosureLabel name (idCafInfo id)
     	cg_id_info    = litIdInfo id lf_info (CmmLabel closure_label)
         caffy         = idCafInfo id
         info_tbl      = mkCmmInfo closure_info -- XXX short-cut
-        closure_rep   = mkStaticClosureFields info_tbl ccs caffy []
+        closure_rep   = mkStaticClosureFields info_tbl ccs caffy has_srt []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep
@@ -161,8 +161,8 @@ cgRhs :: Id -> StgRhs -> FCode (CgIdInfo, CmmAGraph)
 cgRhs name (StgRhsCon cc con args)
   = buildDynCon name cc con args
 
-cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
-  = mkRhsClosure name cc bi (nonVoidIds fvs) upd_flag srt args body
+cgRhs name (StgRhsClosure cc bi fvs upd_flag _srt args body)
+  = mkRhsClosure name cc bi (nonVoidIds fvs) upd_flag args body
 
 ------------------------------------------------------------------------
 --		Non-constructor right hand sides
@@ -170,7 +170,7 @@ cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
 
 mkRhsClosure :: Id -> CostCentreStack -> StgBinderInfo
 	     -> [NonVoid Id]			-- Free vars
-	     -> UpdateFlag -> SRT
+             -> UpdateFlag
 	     -> [Id]			        -- Args
 	     -> StgExpr
 	     -> FCode (CgIdInfo, CmmAGraph)
@@ -214,8 +214,7 @@ for semi-obvious reasons.
 mkRhsClosure	bndr cc bi
 		[NonVoid the_fv]   		-- Just one free var
 		upd_flag		-- Updatable thunk
-		_srt
-		[]			-- A thunk
+                []                      -- A thunk
 		body@(StgCase (StgApp scrutinee [{-no args-}])
 		      _ _ _ _   -- ignore uniq, etc.
 		      (AlgAlt _)
@@ -246,8 +245,7 @@ mkRhsClosure	bndr cc bi
 mkRhsClosure    bndr cc bi
 		fvs
 		upd_flag
-		_srt
-		[]			-- No args; a thunk
+                []                      -- No args; a thunk
 		body@(StgApp fun_id args)
 
   | args `lengthIs` (arity-1)
@@ -268,7 +266,7 @@ mkRhsClosure    bndr cc bi
 	arity 	= length fvs
 
 ---------- Default case ------------------
-mkRhsClosure bndr cc _ fvs upd_flag srt args body
+mkRhsClosure bndr cc _ fvs upd_flag args body
   = do	{ 	-- LAY OUT THE OBJECT
 	-- If the binder is itself a free variable, then don't store
 	-- it in the closure.  Instead, just bind it to Node on entry.
@@ -287,8 +285,7 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 	-- MAKE CLOSURE INFO FOR THIS CLOSURE
 	; lf_info <- mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
 	; mod_name <- getModuleName
-	; c_srt <- getSRTInfo srt
-	; let	name  = idName bndr
+        ; let   name  = idName bndr
 		descr = closureDescription mod_name name
 		fv_details :: [(NonVoid Id, VirtualHpOffset)]
 		(tot_wds, ptr_wds, fv_details)
@@ -296,7 +293,7 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 				       (addIdReps (map stripNV reduced_fvs))
 		closure_info = mkClosureInfo False	-- Not static
 					     bndr lf_info tot_wds ptr_wds
-					     c_srt descr
+                                             descr
 
 	-- BUILD ITS INFO TABLE AND CODE
 	; forkClosureBody $
@@ -342,8 +339,7 @@ cgStdThunk bndr _cc _bndr_info _body lf_info payload
 	descr = closureDescription mod_name (idName bndr)
 	closure_info = mkClosureInfo False 	-- Not static
 				     bndr lf_info tot_wds ptr_wds
-				     NoC_SRT	-- No SRT for a std-form closure
-				     descr
+                                     descr
 
 --  ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
   ; let use_cc = curCCS; blame_cc = curCCS

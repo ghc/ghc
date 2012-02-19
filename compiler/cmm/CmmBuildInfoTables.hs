@@ -18,8 +18,7 @@ module CmmBuildInfoTables
     , TopSRT, emptySRT, srtToData
     , bundleCAFs
     , lowerSafeForeignCalls
-    , cafTransfers
-    , mkLiveness )
+    , cafTransfers )
 where
 
 #include "HsVersions.h"
