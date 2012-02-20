@@ -27,7 +27,7 @@ import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
 import Coercion   (isCoVar, mkCoVarCo, mkAxInstCo)
-import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConTyCon)
+import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConInstOrigArgTys, dataConTyCon, dataConWorkId)
 import VarSet
 import VarEnv
 import Name       (localiseName, mkSystemName)
@@ -37,6 +37,7 @@ import Id
 import FastString (fsLit)
 import PrelNames  (undefinedName)
 import PrimOp     (primOpSig)
+import TcType     (tcSplitDFunTy)
 import Type       (mkTyVarTy, mkForAllTy, mkFunTys)
 import TysPrim    (alphaTyVar, argAlphaTyVar)
 import TyCon      (newTyConCo_maybe)
@@ -143,7 +144,9 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
       | otherwise                          = case realIdUnfolding x of
         NoUnfolding                   -> Nothing
         OtherCon _                    -> Nothing
-        DFunUnfolding _ dc es         -> Just $ runParseM $ conAppToTerm dc es
+        DFunUnfolding _ dc es         -> Just $ runParseM $ coreExprToTerm $ mkLams as $ mkLams xs $ Var (dataConWorkId dc) `mkTyApps` cls_tys `mkApps` [(e `mkTyApps` map mkTyVarTy as) `mkVarApps` xs | e <- es]
+         where (as, theta, _cls, cls_tys) = tcSplitDFunTy (idType x)
+               xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques theta
         CoreUnfolding { uf_tmpl = e } -> Just $ runParseM $ coreExprToTerm e
          -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
     
