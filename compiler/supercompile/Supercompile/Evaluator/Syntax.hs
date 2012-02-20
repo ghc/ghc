@@ -265,7 +265,7 @@ stackFrameType kf hole_ty = case tagee kf of
     CoApply co                    -> hole_ty `applyFunTy` coercionType co
     Apply x                       -> hole_ty `applyFunTy` idType x
     Scrutinise _ ty _             -> ty
-    PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
+    PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map answerType in_as) `applyFunTy` hole_ty `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
     StrictLet _ in_e@(rn, e)      -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
     Update _                      -> hole_ty
     CastIt co                     -> pSnd (coercionKind co)
