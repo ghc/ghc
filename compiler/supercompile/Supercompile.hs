@@ -27,7 +27,7 @@ import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
 import Coercion   (isCoVar, mkCoVarCo, mkAxInstCo)
-import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConInstOrigArgTys, dataConTyCon, dataConWorkId)
+import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConWorkId)
 import VarSet
 import VarEnv
 import Name       (localiseName, mkSystemName)
