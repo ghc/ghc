@@ -15,10 +15,8 @@ import Supercompile.Utilities
 
 import Id       (Id, idType)
 import PrimOp   (primOpType)
-import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType, isUnLiftedType)
+import Type     (applyTy, applyTys, isUnLiftedType)
 import Pair     (pSnd)
-import DataCon  (dataConWorkId)
-import Literal  (literalType)
 import Coercion (coercionType, coercionKind)
 
 import qualified Data.Map as M
@@ -281,37 +279,6 @@ answerType :: Anned Answer -> Type
 answerType a = case annee a of
     (CastBy co _, _)       -> pSnd (coercionKind co)
     (Uncast,      (rn, v)) -> valueType (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
-
-valueType :: Copointed ann => ValueF ann -> Type
-valueType (Indirect x)        = idType x
-valueType (TyLambda x e)      = x `mkForAllTy` termType e
-valueType (Lambda x e)        = idType x `mkFunTy` termType e
-valueType (Data dc as cos xs) = ((idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map coercionType cos) `applyFunTys` map idType xs
-valueType (Literal l)         = literalType l
-valueType (Coercion co)       = coercionType co
-
-termType :: Copointed ann => ann (TermF ann) -> Type
-termType = termType' . extract
-
-termType' :: Copointed ann => TermF ann -> Type
-termType' e = case e of
-    Var x             -> idType x
-    Value v           -> valueType v
-    TyApp e a         -> termType e `applyTy` a
-    CoApp e co        -> termType e `applyFunTy` coercionType co
-    App e x           -> termType e `applyFunTy` idType x
-    PrimOp pop tys es -> (primOpType pop `applyTys` tys) `applyFunTys` map termType es
-    Case _ _ ty _     -> ty
-    Let _ _ e         -> termType e
-    LetRec _ e        -> termType e
-    Cast _ co         -> pSnd (coercionKind co)
-
-applyFunTy :: Type -> Type -> Type
-applyFunTy fun_ty got_arg_ty = ASSERT2(got_arg_ty `eqType` expected_arg_ty, text "applyFunTy:" <+> ppr got_arg_ty <+> ppr expected_arg_ty) res_ty
-  where (expected_arg_ty, res_ty) = splitFunTy fun_ty
-
-applyFunTys :: Type -> [Type] -> Type
-applyFunTys = foldl' applyFunTy
 
 
 heapBindingTerm :: HeapBinding -> Maybe (In AnnedTerm)

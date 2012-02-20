@@ -5,20 +5,24 @@ module Supercompile.Core.Syntax (
     DataCon, Var, Literal, Type, PrimOp
   ) where
 
+#include "HsVersions.h"
+
 import Supercompile.Utilities
 import Supercompile.StaticFlags
 
 import OptCoercion
 import VarEnv   (InScopeSet)
-import DataCon  (DataCon)
+import DataCon  (DataCon, dataConWorkId)
 import Var      (TyVar, Var, varName, isTyVar, varType)
 import Name     (Name, nameOccName)
 import OccName  (occNameString)
-import Id       (Id)
-import Literal  (Literal)
-import Type     (Type, mkTyVarTy)
-import Coercion (CoVar, Coercion, mkCvSubst, mkAxInstCo, mkReflCo, isReflCo)
+import Id       (Id, idType)
+import PrimOp   (primOpType)
+import Literal  (Literal, literalType)
+import Type     (Type, mkTyVarTy, applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy_maybe, eqType)
+import Coercion (CoVar, Coercion, coercionType, coercionKind, mkCvSubst, mkAxInstCo, mkReflCo, isReflCo)
 import PrimOp   (PrimOp)
+import Pair     (pSnd)
 import PprCore  ()
 
 
@@ -253,6 +257,39 @@ castByCo Uncast        = Nothing
 castByCo (CastBy co _) = Just co
 
 
+valueType :: Copointed ann => ValueF ann -> Type
+valueType (Indirect x)        = idType x
+valueType (TyLambda x e)      = x `mkForAllTy` termType e
+valueType (Lambda x e)        = idType x `mkFunTy` termType e
+valueType (Data dc as cos xs) = ((idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map coercionType cos) `applyFunTys` map idType xs
+valueType (Literal l)         = literalType l
+valueType (Coercion co)       = coercionType co
+
+termType :: Copointed ann => ann (TermF ann) -> Type
+termType = termType' . extract
+
+termType' :: Copointed ann => TermF ann -> Type
+termType' e = case e of
+    Var x             -> idType x
+    Value v           -> valueType v
+    TyApp e a         -> termType e `applyTy` a
+    CoApp e co        -> termType e `applyFunTy` coercionType co
+    App e x           -> termType e `applyFunTy` idType x
+    PrimOp pop tys es -> (primOpType pop `applyTys` tys) `applyFunTys` map termType es
+    Case _ _ ty _     -> ty
+    Let _ _ e         -> termType e
+    LetRec _ e        -> termType e
+    Cast _ co         -> pSnd (coercionKind co)
+
+applyFunTy :: Type -> Type -> Type
+applyFunTy fun_ty got_arg_ty = case splitFunTy_maybe fun_ty of
+    Just (expected_arg_ty, res_ty) -> ASSERT2(got_arg_ty `eqType` expected_arg_ty, text "applyFunTy:" <+> ppr got_arg_ty <+> ppr expected_arg_ty) res_ty
+    Nothing                        -> pprPanic "applyFunTy" (ppr fun_ty $$ ppr got_arg_ty)
+
+applyFunTys :: Type -> [Type] -> Type
+applyFunTys = foldl' applyFunTy
+
+
 class Functor ann => Symantics ann where
     var    :: Var -> ann (TermF ann)
     value  :: ValueF ann -> ann (TermF ann)
@@ -333,6 +370,9 @@ tyVarIdLambda x e | isTyVar x = value $ TyLambda x e
 
 tyApps :: Symantics ann => ann (TermF ann) -> [Type] -> ann (TermF ann)
 tyApps = foldl tyApp
+
+coApps :: Symantics ann => ann (TermF ann) -> [Coercion] -> ann (TermF ann)
+coApps = foldl coApp
 
 apps :: Symantics ann => ann (TermF ann) -> [Id] -> ann (TermF ann)
 apps = foldl app
