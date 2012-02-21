@@ -360,9 +360,6 @@ data TyCon
         tyConArity   :: Arity,
 
         tyConTyVars  :: [TyVar],        -- Bound tyvars
-        tyConCType   :: Maybe CType,    -- The C type that should be used
-                                        -- for this type when using the FFI
-                                        -- and CAPI
 
         synTcRhs     :: SynTyConRhs,    -- ^ Contains information about the
                                         -- expansion of the synonym
@@ -934,15 +931,14 @@ mkPrimTyCon' name kind arity rep is_unlifted
     }
 
 -- | Create a type synonym 'TyCon'
-mkSynTyCon :: Name -> Kind -> [TyVar] -> Maybe CType -> SynTyConRhs -> TyConParent -> TyCon
-mkSynTyCon name kind tyvars cType rhs parent
+mkSynTyCon :: Name -> Kind -> [TyVar] -> SynTyConRhs -> TyConParent -> TyCon
+mkSynTyCon name kind tyvars rhs parent
   = SynTyCon {
         tyConName = name,
         tyConUnique = nameUnique name,
         tc_kind = kind,
         tyConArity = length tyvars,
         tyConTyVars = tyvars,
-        tyConCType = cType,
         synTcRhs = rhs,
         synTcParent = parent
     }
@@ -1232,7 +1228,6 @@ isImplicitTyCon tycon
 
 tyConCType_maybe :: TyCon -> Maybe CType
 tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc
-tyConCType_maybe tc@(SynTyCon {}) = tyConCType tc
 tyConCType_maybe _ = Nothing
 \end{code}
 

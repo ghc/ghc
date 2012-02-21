@@ -1432,7 +1432,6 @@ tyThingToIfaceDecl (ATyCon tycon)
 
   | isSynTyCon tycon
   = IfaceSyn {  ifName    = getOccName tycon,
-                ifCType   = tyConCType tycon,
                 ifTyVars  = toIfaceTvBndrs tyvars,
                 ifSynRhs  = syn_rhs,
                 ifSynKind = syn_ki }

@@ -80,7 +80,6 @@ data IfaceDecl
     }
 
   | IfaceSyn  { ifName    :: OccName,           -- Type constructor
-                ifCType   :: Maybe CType,       -- C type for CAPI FFI
                 ifTyVars  :: [IfaceTvBndr],     -- Type variables
                 ifSynKind :: IfaceKind,         -- Kind of the *rhs* (not of the tycon)
                 ifSynRhs  :: Maybe IfaceType    -- Just rhs for an ordinary synonyn
@@ -455,11 +454,11 @@ pprIfaceDecl (IfaceId {ifName = var, ifType = ty,
 pprIfaceDecl (IfaceForeign {ifName = tycon})
   = hsep [ptext (sLit "foreign import type dotnet"), ppr tycon]
 
-pprIfaceDecl (IfaceSyn {ifName = tycon, ifCType = cType,
+pprIfaceDecl (IfaceSyn {ifName = tycon,
                         ifTyVars = tyvars,
                         ifSynRhs = Just mono_ty})
   = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (vcat [pprCType cType, equals <+> ppr mono_ty])
+       4 (vcat [equals <+> ppr mono_ty])
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
                         ifSynRhs = Nothing, ifSynKind = kind })

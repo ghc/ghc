@@ -161,7 +161,7 @@ cvtDec (PragmaD prag)
 cvtDec (TySynD tc tvs rhs)
   = do	{ (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
 	; rhs' <- cvtType rhs
-	; returnL $ TyClD (TySynonym tc' Nothing tvs' Nothing rhs') }
+	; returnL $ TyClD (TySynonym tc' tvs' Nothing rhs') }
 
 cvtDec (DataD ctxt tc tvs constrs derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
@@ -235,7 +235,7 @@ cvtDec (TySynInstD tc tys rhs)
   = do	{ (_, tc', tvs', tys') <- cvt_tyinst_hdr [] tc tys
 	; rhs' <- cvtType rhs
 	; returnL $ InstD $ FamInstDecl $ 
-                    TySynonym tc' Nothing tvs' tys' rhs' }
+                    TySynonym tc' tvs' tys' rhs' }
 
 ----------------
 cvt_ci_decs :: MsgDoc -> [TH.Dec]

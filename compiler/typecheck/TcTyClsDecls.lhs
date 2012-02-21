@@ -560,7 +560,7 @@ tcTyClDecl1 parent _calc_isrec
   = tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
   { traceTc "type family:" (ppr tc_name)
   ; checkFamFlag tc_name
-  ; tycon <- buildSynTyCon tc_name tvs' Nothing SynFamilyTyCon kind parent
+  ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent
   ; return [ATyCon tycon] }
 
   -- "data family" declaration
@@ -577,11 +577,11 @@ tcTyClDecl1 parent _calc_isrec
 
   -- "type" synonym declaration
 tcTyClDecl1 _parent _calc_isrec
-            (TySynonym {tcdLName = L _ tc_name, tcdCType = cType, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
+            (TySynonym {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
   = ASSERT( isNoParent _parent )
     tcTyClTyVars tc_name tvs $ \ tvs' kind -> do
     { rhs_ty' <- tcCheckHsType rhs_ty kind
-    ; tycon <- buildSynTyCon tc_name tvs' cType (SynonymTyCon rhs_ty')
+    ; tycon <- buildSynTyCon tc_name tvs' (SynonymTyCon rhs_ty')
                  kind NoParentTyCon
     ; return [ATyCon tycon] }
 

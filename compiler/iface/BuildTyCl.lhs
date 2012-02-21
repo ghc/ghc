@@ -46,13 +46,12 @@ import Outputable
 \begin{code}
 ------------------------------------------------------
 buildSynTyCon :: Name -> [TyVar] 
-              -> Maybe CType
               -> SynTyConRhs
               -> Kind                   -- ^ Kind of the RHS
               -> TyConParent
               -> TcRnIf m n TyCon
-buildSynTyCon tc_name tvs cType rhs rhs_kind parent 
-  = return (mkSynTyCon tc_name kind tvs cType rhs parent)
+buildSynTyCon tc_name tvs rhs rhs_kind parent 
+  = return (mkSynTyCon tc_name kind tvs rhs parent)
   where kind = mkPiKinds tvs rhs_kind
 
 ------------------------------------------------------

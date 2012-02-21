@@ -212,14 +212,13 @@ mkTyData loc new_or_data is_family cType (L _ (mcxt, tycl_hdr)) ksig data_cons m
 
 mkTySynonym :: SrcSpan
             -> Bool             -- True <=> type family instances
-            -> Maybe CType
             -> LHsType RdrName  -- LHS
             -> LHsType RdrName  -- RHS
             -> P (LTyClDecl RdrName)
-mkTySynonym loc is_family cType lhs rhs
+mkTySynonym loc is_family lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; (tyvars, typats) <- checkTParams is_family lhs tparams
-       ; return (L loc (TySynonym tc cType tyvars typats rhs)) }
+       ; return (L loc (TySynonym tc tyvars typats rhs)) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour

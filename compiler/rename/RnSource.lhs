@@ -851,7 +851,7 @@ rnTyClDecl mb_cls tydecl@TyData {tcdND = new_or_data, tcdCType = cType,
 			     ; return (Just ds', extractHsTyNames_s ds') }
 
 -- "type" and "type instance" declarations
-rnTyClDecl mb_cls tydecl@(TySynonym { tcdTyVars = tyvars, tcdCType = cType,
+rnTyClDecl mb_cls tydecl@(TySynonym { tcdTyVars = tyvars,
                           tcdLName = name,
 		  	              tcdTyPats = typats, tcdSynRhs = ty})
   = bindQTvs syn_doc mb_cls tyvars $ \ tyvars' -> do
@@ -859,7 +859,7 @@ rnTyClDecl mb_cls tydecl@(TySynonym { tcdTyVars = tyvars, tcdCType = cType,
       name' <- lookupTcdName mb_cls tydecl
     ; (typats',fvs1) <- rnTyPats syn_doc name' typats
     ; (ty', fvs2)    <- rnHsTypeFVs syn_doc ty
-    ; return (TySynonym { tcdLName = name', tcdCType = cType
+    ; return (TySynonym { tcdLName = name'
                 , tcdTyVars = tyvars'
     			, tcdTyPats = typats', tcdSynRhs = ty'}
              , extractHsTyVarBndrNames_s tyvars' (fvs1 `plusFV` fvs2)) }

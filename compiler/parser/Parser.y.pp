@@ -609,7 +609,7 @@ cl_decl :: { LTyClDecl RdrName }
 --
 ty_decl :: { LTyClDecl RdrName }
            -- ordinary type synonyms
-        : 'type' capi_ctype type '=' ctypedoc
+        : 'type' type '=' ctypedoc
                 -- Note ctype, not sigtype, on the right of '='
                 -- We allow an explicit for-all but we don't insert one
                 -- in   type Foo a = (b,b)
@@ -617,7 +617,7 @@ ty_decl :: { LTyClDecl RdrName }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared 
-                {% mkTySynonym (comb2 $1 $5) False $2 $3 $5 }
+                {% mkTySynonym (comb2 $1 $4) False $2 $4 }
 
            -- type family declarations
         | 'type' 'family' type opt_kind_sig 
@@ -651,10 +651,10 @@ inst_decl :: { LInstDecl RdrName }
                    in L (comb3 $1 $2 $3) (ClsInstDecl $2 binds sigs ats) }
 
            -- type instance declarations
-        | 'type' 'instance' capi_ctype type '=' ctype
+        | 'type' 'instance' type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% do { L loc d <- mkTySynonym (comb2 $1 $6) True $3 $4 $6
+                {% do { L loc d <- mkTySynonym (comb2 $1 $5) True $3 $5
                       ; return (L loc (FamInstDecl d)) } }
 
           -- data/newtype instance declaration
@@ -682,19 +682,16 @@ inst_decl :: { LInstDecl RdrName }
 --
 at_decl_cls :: { LTyClDecl RdrName }
            -- type family declarations
-        : 'type' capi_ctype type opt_kind_sig
+        : 'type' type opt_kind_sig
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared.
-                -- Note that we ignore the capi_ctype for now, but
-                -- we need it in the grammar or we get loads of
-                -- extra shift/reduce conflicts and parsing goes wrong.
-                {% mkTyFamily (comb3 $1 $3 $4) TypeFamily $3 (unLoc $4) }
+                {% mkTyFamily (comb3 $1 $2 $3) TypeFamily $2 (unLoc $3) }
 
            -- default type instance
-        | 'type' capi_ctype type '=' ctype
+        | 'type' type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $5) True $2 $3 $5 }
+                {% mkTySynonym (comb2 $1 $4) True $2 $4 }
 
           -- data/newtype family declaration
         | 'data' type opt_kind_sig
@@ -704,10 +701,10 @@ at_decl_cls :: { LTyClDecl RdrName }
 --
 at_decl_inst :: { LTyClDecl RdrName }
            -- type instance declarations
-        : 'type' capi_ctype type '=' ctype
+        : 'type' type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
-                {% mkTySynonym (comb2 $1 $5) True $2 $3 $5 }
+                {% mkTySynonym (comb2 $1 $4) True $2 $4 }
 
         -- data/newtype instance declaration
         | data_or_newtype capi_ctype tycl_hdr constrs deriving
