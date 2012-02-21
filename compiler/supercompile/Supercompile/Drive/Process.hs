@@ -51,13 +51,12 @@ import Var        (isId, isTyVar, varType, setVarType)
 import Id         (idType, zapFragileIdInfo, localiseId)
 import MkId       (voidArgId, realWorldPrimId, mkPrimOpId)
 import Type       (isUnLiftedType, mkTyVarTy)
-import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind_maybe)
-import CoreUtils  (mkPiTypes)
+import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind)
 import TyCon      (PrimRep(..))
-import Type       (eqType, mkFunTy, mkTyConApp, typePrimRep, splitTyConApp_maybe)
+import Type       (eqType, mkFunTy, mkPiTypes, mkTyConApp, typePrimRep, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn (unitTy, unboxedPairDataCon, unboxedPairTyCon)
-import MkCore     (mkWildValBinder)
+import MkCore     (mkWildValBinder, sortQuantVars)
 import PrimOp     (PrimOp(MyThreadIdOp))
 import Literal
 import VarEnv
@@ -672,7 +671,7 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
          -> e `tyApp` deadTy
          
          -- Dead CoVars are easy:
-         | Just (ty1, ty2) <- coVarKind_maybe x
+         | isCoVar x, let (ty1, ty2) = coVarKind x
          -> let_ x (coercion (mkUnsafeCo ty1 ty2)) (e `app` x)
          
          -- A pretty cute hack for lifted bindings, though potentially quite confusing!
@@ -741,13 +740,10 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
 --  2. This expresses to GHC that we don't necessarily want the work in h-functions to be shared.
 stateAbsVars :: Maybe FreeVars -> State -> ([AbsVar], Type)
 stateAbsVars mb_lvs state = (abstracted, realWorldStatePrimTy `mkFunTy` (vs_list `mkPiTypes` state_ty))
-  where vs_list = sortLambdaBounds (varSetElems (stateLambdaBounders state))
+  where vs_list = sortQuantVars (varSetElems (stateLambdaBounders state))
         state_ty = stateType state
         abstracted = AbsVar { absVarDead = True, absVarVar = voidArgId } :
                      map (\v -> AbsVar { absVarDead = maybe False (not . (v `elemVarSet`)) mb_lvs, absVarVar = v }) vs_list
-
-sortLambdaBounds :: [Var] -> [Var]
-sortLambdaBounds = sortBy (comparing (not . isTyVar)) -- True type variables go first since coercion/value variables may reference them
 
 
 -- | Free variables that are allowed to be in the output term even though they weren't in the input (in addition to h-function names)

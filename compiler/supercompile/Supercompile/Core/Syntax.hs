@@ -27,7 +27,7 @@ import PprCore  ()
 
 
 mkSymCo :: InScopeSet -> NormalCo -> NormalCo
-mkSymCo iss co = optCoercion (mkCvSubst iss) co
+mkSymCo iss co = optCoercion (mkCvSubst iss []) co
 
 mkTransCo :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
 mkTransCo = opt_trans

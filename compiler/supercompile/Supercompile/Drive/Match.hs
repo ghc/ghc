@@ -175,8 +175,9 @@ matchCoerced f rn2 tg_l (Uncast,           x_l) tg_r (Uncast,           x_r) = f
 matchCoerced f rn2 _    (CastBy co_l tg_l, x_l) _    (CastBy co_r tg_r, x_r) = liftM2 (++) (matchCoercion rn2 co_l co_r) (f rn2 tg_l x_l tg_r x_r)
 matchCoerced _ _ _ _ _ _ = fail "matchCoerced"
 
-matchKind :: Kind -> Kind -> Match [MatchLR]
-matchKind k_l k_r = guard "matchKind" (k_l `isSubKind` k_r && k_r `isSubKind` k_l) >> return []
+-- TODO: I don't know how complete support for polykinds actually *is* in the supercompiler, so this is a bit speculative:
+matchKind :: RnEnv2 -> Kind -> Kind -> Match [MatchLR]
+matchKind = matchType
 
 -- TODO: match type instantiation?
 matchType :: RnEnv2 -> Type -> Type -> Match [MatchLR]
@@ -251,7 +252,7 @@ matchVarBndr rn2 v_l v_r | isId v_l,    isId v_r    = matchIdCoVarBndr False rn2
                          | otherwise                = fail "matchVarBndr"
 
 matchTyVarBndr :: RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
-matchTyVarBndr rn2 a_l a_r k = liftM2 (++) (matchKind (tyVarKind a_l) (tyVarKind a_r)) (k (rnBndr2 rn2 a_l a_r))
+matchTyVarBndr rn2 a_l a_r k = liftM2 (++) (matchKind rn2 (tyVarKind a_l) (tyVarKind a_r)) (k (rnBndr2 rn2 a_l a_r))
 
 matchIdCoVarBndr :: Bool -> RnEnv2 -> Id -> Id -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchIdCoVarBndr lambdaish rn2 x_l x_r k = liftM2 (++) match_x $ k rn2' >>= if iNSTANCE_MATCHING then mapM (checkMatchLR lambdaish x_l x_r) else return
@@ -277,7 +278,7 @@ matchBndrExtras rn2 v_l v_r
   | otherwise                = fail "matchBndrExtras"
 
 matchTyVarBndrExtras :: RnEnv2 -> TyVar -> TyVar -> Match [MatchLR]
-matchTyVarBndrExtras _ a_l a_r = matchKind (tyVarKind a_l) (tyVarKind a_r)
+matchTyVarBndrExtras rn2 a_l a_r = matchKind rn2 (tyVarKind a_l) (tyVarKind a_r)
 
 matchIdCoVarBndrExtras :: RnEnv2 -> Id -> Id -> Match [MatchLR]
 matchIdCoVarBndrExtras rn2 x_l x_r = liftM3 app3 (matchUnfolding rn2 (realIdUnfolding x_l) (realIdUnfolding x_r)) (matchSpecInfo rn2 (idSpecialisation x_l) (idSpecialisation x_r)) (matchType rn2 (idType x_l) (idType x_r))
@@ -306,6 +307,13 @@ matchUnfolding rn2 (Core.DFunUnfolding _ _ args1) (Core.DFunUnfolding _ _ args2)
 matchUnfolding _ unf1 unf2 | not (Core.isStableUnfolding unf1), not (Core.isStableUnfolding unf2) = return []
 matchUnfolding _ _ _ = fail "matchUnfolding"
 
+matchTickish :: RnEnv2 -> Core.Tickish Id -> Core.Tickish Id -> Match [MatchLR]
+matchTickish rn2 (Core.Breakpoint { Core.breakpointId = id_l, Core.breakpointFVs = fvs_l }) (Core.Breakpoint { Core.breakpointId = id_r, Core.breakpointFVs = fvs_r })
+  = guard "matchTickish: Breakpoint" (id_l == id_r) >> matchList (matchVar rn2) fvs_l fvs_r
+matchTickish _ (Core.Breakpoint {}) _ = fail "matchTickish: Breakpoint vs ?"
+matchTickish _ _ (Core.Breakpoint {}) = fail "matchTickish: ? vs Breakpoint"
+matchTickish _ ti_l ti_r = guard "matchTickish: non-Breakpoint not exacttly equal" (ti_l == ti_r) >> return []
+
 -- TODO: match instantiation within Core?
 matchCore :: RnEnv2 -> Core.CoreExpr -> Core.CoreExpr -> Match [MatchLR]
 matchCore rn2 (Core.Var x_l)       (Core.Var x_r)       = matchVar rn2 x_l x_r
@@ -322,7 +330,7 @@ matchCore rn2 (Core.Let (Core.Rec xes_l) e_l) (Core.Let (Core.Rec xes_r) e_r)
             (xs_r, es_r) = unzip xes_r
 matchCore rn2 (Core.Case e_l x_l ty_l alts_l) (Core.Case e_r x_r ty_r alts_r) = liftM3 app3 (matchCore rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr False rn2 x_l x_r $ \rn2 -> matchCoreAlts rn2 alts_l alts_r)
 matchCore rn2 (Core.Cast e_l co_l)            (Core.Cast e_r co_r)            = liftM2 (++) (matchCore rn2 e_l e_r) (matchCoercion rn2 co_l co_r)
-matchCore rn2 (Core.Note no_l e_l)            (Core.Note no_r e_r)            = guard "matchCore: Note" (no_l == no_r) >> matchCore rn2 e_l e_r
+matchCore rn2 (Core.Tick ti_l e_l)            (Core.Tick ti_r e_r)            = liftM2 (++) (matchTickish rn2 ti_l ti_r) (matchCore rn2 e_l e_r)
 matchCore rn2 (Core.Type ty_l)                (Core.Type ty_r)                = matchType rn2 ty_l ty_r
 matchCore rn2 (Core.Coercion co_l)            (Core.Coercion co_r)            = matchCoercion rn2 co_l co_r
 matchCore _ _ _ = fail "matchCore"

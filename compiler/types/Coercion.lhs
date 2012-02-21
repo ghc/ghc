@@ -796,9 +796,6 @@ instance Outputable CvSubst where
 emptyCvSubst :: CvSubst
 emptyCvSubst = CvSubst emptyInScopeSet emptyVarEnv emptyVarEnv
 
-mkCvSubst :: InScopeSet -> CvSubst
-mkCvSubst iss = CvSubst iss emptyVarEnv emptyVarEnv
-
 isEmptyCvSubst :: CvSubst -> Bool
 isEmptyCvSubst (CvSubst _ tenv cenv) = isEmptyVarEnv tenv && isEmptyVarEnv cenv
 

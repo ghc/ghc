@@ -52,6 +52,7 @@ import CoreUnfold
 import Name
 import Id
 import Var
+import DataCon          ( dataConWorkId )
 import Demand
 import SimplMonad
 import Type	hiding( substTy )

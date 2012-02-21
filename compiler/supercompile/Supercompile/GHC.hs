@@ -162,7 +162,7 @@ coreExprToTerm = term
     term (Let (Rec xes) e)         = bindFloatsWith (liftM2 (,) (mapM (secondM term) xes) (term e))
     term (Case e x ty alts)        = liftM2 (\e alts -> S.case_ e x ty alts) (term e) (mapM alt alts)
     term (Cast e co)               = fmap (flip S.cast co) (term e)
-    term (Note _ e)                = term e -- FIXME: record notes
+    term (Tick _ e)                = term e -- FIXME: record ticks
     term (Type ty)                 = pprPanic "termToCoreExpr" (ppr ty)
     term (Coercion co)             = return $ S.value (S.Coercion co)
     

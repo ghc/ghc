@@ -146,9 +146,6 @@ asPrettyFunction1 = asPrettyFunction . Wrapper1
 instance Outputable IS.IntSet where
     ppr xs = braces $ hsep (punctuate comma (map ppr $ IS.toList xs))
 
-instance Outputable a => Outputable (S.Set a) where
-    ppr xs = braces $ hsep (punctuate comma (map ppr $ S.toList xs))
-
 
 newtype PrettyDoc = PrettyDoc SDoc
 
