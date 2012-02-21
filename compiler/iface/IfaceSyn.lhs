@@ -455,21 +455,23 @@ pprIfaceDecl (IfaceId {ifName = var, ifType = ty,
 pprIfaceDecl (IfaceForeign {ifName = tycon})
   = hsep [ptext (sLit "foreign import type dotnet"), ppr tycon]
 
-pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
+pprIfaceDecl (IfaceSyn {ifName = tycon, ifCType = cType,
+                        ifTyVars = tyvars,
                         ifSynRhs = Just mono_ty})
   = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars)
-       4 (vcat [equals <+> ppr mono_ty])
+       4 (vcat [pprCType cType, equals <+> ppr mono_ty])
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
                         ifSynRhs = Nothing, ifSynKind = kind })
   = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (dcolon <+> ppr kind)
 
-pprIfaceDecl (IfaceData {ifName = tycon, ifCtxt = context,
+pprIfaceDecl (IfaceData {ifName = tycon, ifCType = cType,
+                         ifCtxt = context,
                          ifTyVars = tyvars, ifCons = condecls,
                          ifRec = isrec, ifAxiom = mbAxiom})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       4 (vcat [pprRec isrec, pp_condecls tycon condecls,
+       4 (vcat [pprCType cType, pprRec isrec, pp_condecls tycon condecls,
                 pprAxiom mbAxiom])
   where
     pp_nd = case condecls of
@@ -490,6 +492,10 @@ pprIfaceDecl (IfaceAxiom {ifName = name, ifTyVars = tyvars,
                           ifLHS = lhs, ifRHS = rhs})
   = hang (ptext (sLit "axiom") <+> ppr name <+> ppr tyvars)
        2 (dcolon <+> ppr lhs <+> text "~#" <+> ppr rhs)
+
+pprCType :: Maybe CType -> SDoc
+pprCType Nothing = ptext (sLit "No C type associated")
+pprCType (Just cType) = ptext (sLit "C type:") <+> ppr cType
 
 pprRec :: RecFlag -> SDoc
 pprRec isrec = ptext (sLit "RecFlag") <+> ppr isrec

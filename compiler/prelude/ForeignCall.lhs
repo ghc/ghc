@@ -234,10 +234,19 @@ instance Outputable CCallSpec where
 newtype Header = Header FastString
     deriving (Eq, Data, Typeable)
 
+instance Outputable Header where
+    ppr (Header h) = quotes $ ppr h
+
 -- | A C type, used in CAPI FFI calls
 data CType = CType (Maybe Header) -- header to include for this type
                    FastString     -- the type itself
     deriving (Data, Typeable)
+
+instance Outputable CType where
+    ppr (CType mh ct) = hDoc <+> ftext ct
+        where hDoc = case mh of
+                     Nothing -> empty
+                     Just h -> ppr h
 \end{code}
 
 
