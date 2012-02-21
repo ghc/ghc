@@ -63,7 +63,6 @@ utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/
 	       -XCPP -XExistentialQuantification -XDeriveDataTypeable \
 	       -ilibraries/Cabal/Cabal \
 	       -ilibraries/filepath \
-	       -ilibraries/extensible-exceptions \
 	       -ilibraries/hpc \
 	       -ilibraries/binary/src \
 	       -ilibraries/bin-package-db

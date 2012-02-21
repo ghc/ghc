@@ -54,7 +54,7 @@
 #           o register each package into inplace/lib/package.conf
 #     * build libffi
 #     * With bootstrapping compiler:
-#	    o Build libraries/{filepath,hpc,extensible-exceptions,Cabal}
+#	    o Build libraries/{filepath,hpc,Cabal}
 #           o Build compiler (stage 1)
 #     * With stage 1:
 #           o Build libraries/*
@@ -333,7 +333,7 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc extensible-exceptions binary bin-package-db hoopl
+PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl
 
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
@@ -410,7 +410,6 @@ $(eval $(call addPackage,old-time))
 $(eval $(call addPackage,time))
 $(eval $(call addPackage,directory))
 $(eval $(call addPackage,process))
-$(eval $(call addPackage,extensible-exceptions))
 $(eval $(call addPackage,haskell98))
 $(eval $(call addPackage,haskell2010))
 $(eval $(call addPackage,hpc))

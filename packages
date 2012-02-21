@@ -54,7 +54,6 @@ libraries/Cabal                 -           packages/Cabal.git                  
 libraries/containers            -           packages/containers.git             git
 libraries/deepseq               -           packages/deepseq.git                git
 libraries/directory             -           packages/directory.git              git
-libraries/extensible-exceptions -           packages/extensible-exceptions.git  git
 libraries/filepath              -           packages/filepath.git               git
 libraries/ghc-prim              -           packages/ghc-prim.git               git
 libraries/haskeline             -           packages/haskeline.git              git
