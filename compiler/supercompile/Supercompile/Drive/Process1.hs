@@ -41,7 +41,7 @@ import Control.Exception (handleJust, AsyncException(UserInterrupt))
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 import qualified Data.Map as M
-import Data.Monoid
+import Data.Monoid (Monoid(mappend, mempty))
 import Data.Ord
 import qualified Data.Set as S
 

@@ -66,7 +66,7 @@ import qualified Control.Monad as Monad
 import Data.Ord
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
-import Data.Monoid
+import Data.Monoid (Monoid(mappend, mempty))
 import qualified Data.Set as S
 
 

@@ -3,7 +3,7 @@ module Supercompile.Evaluator.Deeds where
 import Supercompile.StaticFlags
 import Supercompile.Utilities
 
-import Data.Monoid
+import Data.Monoid (Monoid(mappend, mempty))
 
 
 -- | Number of unclaimed deeds. Invariant: always greater than or equal to 0

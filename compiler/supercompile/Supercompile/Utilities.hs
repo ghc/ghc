@@ -43,7 +43,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.Graph as G
 import qualified Data.Foldable as Foldable
-import Data.Monoid
+import Data.Monoid (Monoid(mappend, mempty))
 
 import System.Directory
 import System.Exit
