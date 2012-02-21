@@ -170,17 +170,6 @@ extern HsInt nocldstop;
 INLINE int __hscore_get_errno(void) { return errno; }
 INLINE void __hscore_set_errno(int e) { errno = e; }
 
-#if !defined(_MSC_VER)
-INLINE int __hscore_s_isreg(mode_t m)  { return S_ISREG(m);  }
-INLINE int __hscore_s_isdir(mode_t m)  { return S_ISDIR(m);  }
-INLINE int __hscore_s_isfifo(mode_t m) { return S_ISFIFO(m); }
-INLINE int __hscore_s_isblk(mode_t m)  { return S_ISBLK(m);  }
-INLINE int __hscore_s_ischr(mode_t m)  { return S_ISCHR(m);  }
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-INLINE int __hscore_s_issock(mode_t m) { return S_ISSOCK(m); }
-#endif
-#endif
-
 INLINE void *
 __hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
 { return memcpy(dst, src+src_off, sz); }

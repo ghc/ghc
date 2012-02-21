@@ -142,7 +142,7 @@ ARITHMETIC_TYPE(CDev,tyConCDev,"CDev",HTYPE_DEV_T)
 INTEGRAL_TYPE(CIno,tyConCIno,"CIno",HTYPE_INO_T)
 #endif
 #if defined(HTYPE_MODE_T)
-INTEGRAL_TYPE(CMode,tyConCMode,"CMode",HTYPE_MODE_T)
+INTEGRAL_TYPE_WITH_CTYPE(CMode,mode_t,tyConCMode,"CMode",HTYPE_MODE_T)
 #endif
 #if defined(HTYPE_OFF_T)
 INTEGRAL_TYPE(COff,tyConCOff,"COff",HTYPE_OFF_T)
