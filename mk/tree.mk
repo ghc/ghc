@@ -52,7 +52,7 @@ INPLACE_PERL            = $(INPLACE)/perl
 #
 ################################################################################
 
-BIN_DIST_INST_SUBDIR = "install dir"
+BIN_DIST_INST_SUBDIR = "install   dir"
 BIN_DIST_INST_DIR = bindisttest/$(BIN_DIST_INST_SUBDIR)
 
 ################################################################################
