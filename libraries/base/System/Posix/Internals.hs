@@ -90,7 +90,7 @@ type CGroup     = ()
 type CLconv     = ()
 type CPasswd    = ()
 type CSigaction = ()
-type CSigset    = ()
+type {-# CTYPE "sigset_t" #-} CSigset    = ()
 type CStat      = ()
 type CTermios   = ()
 type CTm        = ()
@@ -480,13 +480,13 @@ foreign import ccall unsafe "HsBase.h mkfifo"
 foreign import ccall unsafe "HsBase.h pipe"
    c_pipe :: Ptr CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_sigemptyset"
+foreign import capi unsafe "signal.h sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO CInt
 
-foreign import ccall unsafe "HsBase.h __hscore_sigaddset"
+foreign import capi unsafe "signal.h sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h sigprocmask"
+foreign import capi unsafe "signal.h sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO CInt
 
 foreign import ccall unsafe "HsBase.h tcgetattr"
