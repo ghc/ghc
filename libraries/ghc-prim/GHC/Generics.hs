@@ -146,7 +146,7 @@ data Associativity = LeftAssociative
 -- Eq, Show, Ord, and Read instances are in GHC.Int
 
 -- | Representable types of kind *.
--- This class is derivable in GHC with the DeriveRepresentable flag on.
+-- This class is derivable in GHC with the DeriveGeneric flag on.
 class Generic a where
   -- | Generic representation type
   type Rep a :: * -> *
