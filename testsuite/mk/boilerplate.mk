@@ -45,7 +45,7 @@ ifneq "$(wildcard $(STAGE1_GHC) $(STAGE1_GHC).exe)" ""
 
 IN_TREE_COMPILER = YES
 ifeq "$(BINDIST)" "YES"
-TEST_HC := $(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc
+TEST_HC := $(abspath $(TOP)/../)/bindisttest/install   dir/bin/ghc
 else ifeq "$(stage)" "1"
 TEST_HC := $(STAGE1_GHC)
 else ifeq "$(stage)" "3"
