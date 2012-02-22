@@ -14,8 +14,6 @@ data FooA = FooA {
                 ka :: CInt
             }
 
-type {-# CTYPE "Foo" #-} FooASyn = FooA
-
 instance Storable FooA where
     sizeOf _ = #size Foo
     alignment = sizeOf

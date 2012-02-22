@@ -19,10 +19,6 @@ main = do alloca $ \p ->
               do poke p (Foo 15 16 17)
                  r2 <- g p
                  print r2
-          alloca $ \p ->
-              do poke p (FooA 25 26 27)
-                 r3 <- h p
-                 print r3
 
 data {-# CTYPE "Foo" #-}
      Foo = Foo {
@@ -31,16 +27,11 @@ data {-# CTYPE "Foo" #-}
                k :: CInt
            }
 
-type FooASynSyn = FooASyn
-
 foreign import capi unsafe "capi_ctype_001.h f"
     f :: Ptr Foo -> IO CInt
 
 foreign import capi unsafe "capi_ctype_001.h g"
     g :: Ptr Foo -> IO CInt
-
-foreign import capi unsafe "capi_ctype_001.h g"
-    h :: Ptr FooASynSyn -> IO CInt
 
 instance Storable Foo where
     sizeOf _ = #size Foo
