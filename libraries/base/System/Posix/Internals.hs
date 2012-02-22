@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface, CApiFFI #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface, CApiFFI,
+             EmptyDataDecls #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -90,7 +91,7 @@ type CGroup     = ()
 type CLconv     = ()
 type CPasswd    = ()
 type CSigaction = ()
-type {-# CTYPE "sigset_t" #-} CSigset    = ()
+data {-# CTYPE "sigset_t" #-} CSigset
 type CStat      = ()
 type CTermios   = ()
 type CTm        = ()
