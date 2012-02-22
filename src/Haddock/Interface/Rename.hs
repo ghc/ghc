@@ -330,12 +330,12 @@ renameTyClD d = case d of
     -- I don't think we need the derivings, so we return Nothing
     return (TyData x lcontext' lname' cType ltyvars' typats' k' cons' Nothing)
 
-  TySynonym lname cType ltyvars typats ltype -> do
+  TySynonym lname ltyvars typats ltype -> do
     lname'   <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     ltype'   <- renameLType ltype
     typats'  <- mapM (mapM renameLType) typats
-    return (TySynonym lname' cType ltyvars' typats' ltype')
+    return (TySynonym lname' ltyvars' typats' ltype')
 
   ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats at_defs _ -> do
     lcontext' <- renameLContext lcontext

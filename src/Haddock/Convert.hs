@@ -86,7 +86,7 @@ synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
         tyvars    = synifyTyVars tvs
         typats    = map (synifyType WithinType) args
         hs_rhs_ty = synifyType WithinType rhs
-    in TySynonym name Nothing tyvars (Just typats) hs_rhs_ty
+    in TySynonym name tyvars (Just typats) hs_rhs_ty
   | otherwise
   = error "synifyAxiom" 
 
@@ -164,7 +164,7 @@ synifyTyCon tc
   alg_deriv = Nothing
   syn_type = synifyType WithinType (synTyConType tc)
  in if isSynTyCon tc
-  then TySynonym name Nothing tyvars typats syn_type
+  then TySynonym name tyvars typats syn_type
   else TyData alg_nd alg_ctx name Nothing tyvars typats (fmap synifyKind alg_kindSig) alg_cons alg_deriv
 
 
