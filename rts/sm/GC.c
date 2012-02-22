@@ -231,7 +231,7 @@ GarbageCollect (rtsBool force_major_gc,
   /* Approximate how much we allocated.  
    * Todo: only when generating stats? 
    */
-  allocated = calcAllocated(rtsFalse/* don't count the nursery yet */);
+  allocated = countLargeAllocated(); /* don't count the nursery yet */
 
   /* Figure out which generation to collect
    */

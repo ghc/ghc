@@ -235,7 +235,8 @@ void storageAddCapabilities (nat from, nat to)
 void
 exitStorage (void)
 {
-    stat_exit(calcAllocated(rtsTrue));
+    lnat allocated = updateNurseriesStats();
+    stat_exit(allocated);
 }
 
 void
@@ -904,34 +905,36 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------
- * calcAllocated()
+ * updateNurseriesStats()
  *
- * Approximate how much we've allocated: number of blocks in the
- * nursery + blocks allocated via allocate() - unused nusery blocks.
- * This leaves a little slop at the end of each block.
+ * Update the per-cap total_allocated numbers with an approximation of
+ * the amount of memory used in each cap's nursery. Also return the
+ * total across all caps.
+ * 
+ * Since this update is also performed by clearNurseries() then we only
+ * need this function for the final stats when the RTS is shutting down.
  * -------------------------------------------------------------------------- */
 
 lnat
-calcAllocated (rtsBool include_nurseries)
+updateNurseriesStats (void)
 {
-  nat allocated = 0;
-  nat i;
+    lnat allocated = 0;
+    nat i;
 
-  // When called from GC.c, we already have the allocation count for
-  // the nursery from resetNurseries(), so we don't need to walk
-  // through these block lists again.
-  if (include_nurseries)
-  {
-      for (i = 0; i < n_capabilities; i++) {
-          allocated += countOccupied(nurseries[i].blocks);
-      }
-  }
+    for (i = 0; i < n_capabilities; i++) {
+        int cap_allocated = countOccupied(nurseries[i].blocks);
+        capabilities[i].total_allocated += cap_allocated;
+        allocated                       += cap_allocated;
+    }
 
-  // add in sizes of new large and pinned objects
-  allocated += g0->n_new_large_words;
+    return allocated;
+}
 
-  return allocated;
-}  
+lnat
+countLargeAllocated (void)
+{
+    return g0->n_new_large_words;
+}
 
 lnat countOccupied (bdescr *bd)
 {

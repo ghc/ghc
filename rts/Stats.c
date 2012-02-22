@@ -588,6 +588,12 @@ stat_exit(int alloc)
 
 	GC_tot_alloc += alloc;
 
+        for (i = 0; i < n_capabilities; i++) {
+            traceEventHeapAllocated(&capabilities[i],
+                                    CAPSET_HEAP_DEFAULT,
+                                    capabilities[i].total_allocated * sizeof(W_));
+        }
+
 	/* Count total garbage collections */
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
 	    total_collections += generations[g].collections;
