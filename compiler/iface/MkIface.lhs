@@ -110,6 +110,7 @@ import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.IORef
+import System.Directory
 import System.FilePath
 \end{code}
 
@@ -391,7 +392,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 -----------------------------
 writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()
 writeIfaceFile dflags location new_iface
-    = do createDirectoryHierarchy (takeDirectory hi_file_path)
+    = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          writeBinIface dflags hi_file_path new_iface
     where hi_file_path = ml_hi_file location
 
