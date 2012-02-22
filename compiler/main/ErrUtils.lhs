@@ -40,6 +40,7 @@ import SrcLoc
 import DynFlags
 import StaticFlags      ( opt_ErrorSpans )
 
+import System.Directory
 import System.Exit      ( ExitCode(..), exitWith )
 import System.FilePath
 import Data.List
@@ -234,7 +235,7 @@ dumpSDoc dflags dflag hdr doc
                             mode = if append then AppendMode else WriteMode
                         when (not append) $
                             writeIORef gdref (Set.insert fileName gd)
-                        createDirectoryHierarchy (takeDirectory fileName)
+                        createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
                         hPrintDump handle doc
                         hClose handle

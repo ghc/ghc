@@ -1198,7 +1198,7 @@ runPhase As input_fn dflags
 
         -- we create directories for the object file, because it
         -- might be a hierarchical module.
-        io $ createDirectoryHierarchy (takeDirectory output_fn)
+        io $ createDirectoryIfMissing True (takeDirectory output_fn)
 
         io $ as_prog dflags
                        (map SysTools.Option as_opts
@@ -1237,7 +1237,7 @@ runPhase SplitAs _input_fn dflags
             osuf = objectSuf dflags
             split_odir  = base_o ++ "_" ++ osuf ++ "_split"
 
-        io $ createDirectoryHierarchy split_odir
+        io $ createDirectoryIfMissing True split_odir
 
         -- remove M_split/ *.o, because we're going to archive M_split/ *.o
         -- later and we don't want to pick up any old objects.
@@ -2126,6 +2126,6 @@ hscPostBackendPhase dflags _ hsc_lang =
 
 touchObjectFile :: DynFlags -> FilePath -> IO ()
 touchObjectFile dflags path = do
-  createDirectoryHierarchy $ takeDirectory path
+  createDirectoryIfMissing True $ takeDirectory path
   SysTools.touch dflags "Touching object file" path
 
