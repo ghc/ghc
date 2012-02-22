@@ -398,8 +398,8 @@ endif
 $(eval $(call addPackage,base))
 $(eval $(call addPackage,filepath))
 $(eval $(call addPackage,array))
-$(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,deepseq))
+$(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,containers))
 
 $(eval $(call addPackage,Win32,($$(Windows),YES)))
