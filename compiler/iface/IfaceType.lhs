@@ -18,7 +18,6 @@ module IfaceType (
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceTyCon(..), IfaceCoCon(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
-	ifaceTyConName,
 
 	-- Conversion from Type -> IfaceType
         toIfaceType, toIfaceKind, toIfaceContext,
@@ -87,20 +86,9 @@ data IfaceType	   -- A kind of universal type, used for types, kinds, and coerci
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
 
-data IfaceTyCon 	-- Encodes type constructors, kind constructors
-     			-- coercion constructors, the lot
-  = IfaceTc IfExtName	-- The common case
-  | IfaceIntTc | IfaceBoolTc | IfaceCharTc
-  | IfaceListTc | IfacePArrTc
-  | IfaceTupTc TupleSort Arity 
-  | IfaceIPTc IfIPName       -- Used for implicit parameter TyCons
-
-  -- Kind constructors
-  | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
-  | IfaceUbxTupleKindTc | IfaceArgTypeKindTc | IfaceConstraintKindTc
-
-  -- SuperKind constructor
-  | IfaceSuperKindTc  -- IA0_NOTE: You might want to check if I didn't forget something.
+-- Encodes type constructors, kind constructors
+-- coercion constructors, the lot
+newtype IfaceTyCon = IfaceTc { ifaceTyConName :: IfExtName }
 
   -- Coercion constructors
 data IfaceCoCon
@@ -109,39 +97,7 @@ data IfaceCoCon
   | IfaceReflCo    | IfaceUnsafeCo  | IfaceSymCo
   | IfaceTransCo   | IfaceInstCo
   | IfaceNthCo Int
-
-ifaceTyConName :: IfaceTyCon -> Name
-ifaceTyConName IfaceIntTc              = intTyConName
-ifaceTyConName IfaceBoolTc 	       = boolTyConName
-ifaceTyConName IfaceCharTc 	       = charTyConName
-ifaceTyConName IfaceListTc 	       = listTyConName
-ifaceTyConName IfacePArrTc 	       = parrTyConName
-ifaceTyConName (IfaceTupTc bx ar)      = getName (tupleTyCon bx ar)
-ifaceTyConName IfaceLiftedTypeKindTc   = liftedTypeKindTyConName
-ifaceTyConName IfaceOpenTypeKindTc     = openTypeKindTyConName
-ifaceTyConName IfaceUnliftedTypeKindTc = unliftedTypeKindTyConName
-ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
-ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
-ifaceTyConName IfaceConstraintKindTc   = constraintKindTyConName
-ifaceTyConName IfaceSuperKindTc        = superKindTyConName
-ifaceTyConName (IfaceTc ext)           = ext
-ifaceTyConName (IfaceIPTc n)           = pprPanic "ifaceTyConName:IPTc" (ppr n)
-	       		    	       	 -- Note [The Name of an IfaceAnyTc]
 \end{code}
-
-Note [The Name of an IfaceAnyTc]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-IA0_NOTE: This is an old comment. It needs to be updated with IPTc which
-I don't know about.
-
-It isn't easy to get the Name of an IfaceAnyTc in a pure way.  What you
-really need to do is to transform it to a TyCon, and get the Name of that.
-But doing so needs the monad because there's an IfaceKind inside, and we
-need a Kind.
-
-In fact, ifaceTyConName is only used for instances and rules, and we don't
-expect to instantiate those at these (internal-ish) Any types, so rather
-than solve this potential problem now, I'm going to defer it until it happens!
 
 %************************************************************************
 %*									*
@@ -214,9 +170,10 @@ pprIfaceIdBndr :: (IfLclName, IfaceType) -> SDoc
 pprIfaceIdBndr (name, ty) = hsep [ppr name, dcolon, ppr ty]
 
 pprIfaceTvBndr :: IfaceTvBndr -> SDoc
-pprIfaceTvBndr (tv, IfaceTyConApp IfaceLiftedTypeKindTc [])
-  = ppr tv
+pprIfaceTvBndr (tv, IfaceTyConApp tc [])
+  | ifaceTyConName tc == liftedTypeKindTyConName = ppr tv
 pprIfaceTvBndr (tv, kind) = parens (ppr tv <> dcolon <> ppr kind)
+
 pprIfaceTvBndrs :: [IfaceTvBndr] -> SDoc
 pprIfaceTvBndrs tyvars = hsep (map pprIfaceTvBndr tyvars)
 \end{code}
@@ -280,32 +237,29 @@ pprIfaceForAllPart tvs ctxt doc
 ppr_tc_app :: Int -> IfaceTyCon -> [IfaceType] -> SDoc
 ppr_tc_app _         tc          []   = ppr_tc tc
 
-ppr_tc_app _         IfaceListTc [ty] = brackets (pprIfaceType ty)
-ppr_tc_app _         IfaceListTc _    = panic "ppr_tc_app IfaceListTc"
 
-ppr_tc_app _         IfacePArrTc [ty] = paBrackets (pprIfaceType ty)
-ppr_tc_app _         IfacePArrTc _    = panic "ppr_tc_app IfacePArrTc"
-
-ppr_tc_app _         (IfaceTupTc sort _) tys =
-  tupleParens sort (sep (punctuate comma (map pprIfaceType tys)))
-
-ppr_tc_app _         (IfaceIPTc n) [ty] =
-  parens (ppr n <> dcolon <> pprIfaceType ty)
-ppr_tc_app _         (IfaceIPTc _) _ = panic "ppr_tc_app IfaceIPTc"
-
+ppr_tc_app _         (IfaceTc n) [ty] | n == listTyConName = brackets (pprIfaceType ty)
+ppr_tc_app _         (IfaceTc n) [ty] | n == parrTyConName = paBrackets (pprIfaceType ty)
+ppr_tc_app _         (IfaceTc n) tys
+  | Just (ATyCon tc) <- wiredInNameTyThing_maybe n
+  , Just sort <- tyConTuple_maybe tc
+  , tyConArity tc == length tys 
+  = tupleParens sort (sep (punctuate comma (map pprIfaceType tys)))
+  | Just (ATyCon tc) <- wiredInNameTyThing_maybe n
+  , Just ip <- tyConIP_maybe tc
+  , [ty] <- tys
+  = parens (ppr ip <> dcolon <> pprIfaceType ty)
 ppr_tc_app ctxt_prec tc tys
-  = maybeParen ctxt_prec tYCON_PREC 
+  = maybeParen ctxt_prec tYCON_PREC
                (sep [ppr_tc tc, nest 4 (sep (map pprParendIfaceType tys))])
 
 ppr_tc :: IfaceTyCon -> SDoc
 -- Wrap infix type constructors in parens
-ppr_tc tc@(IfaceTc ext_nm) = parenSymOcc (getOccName ext_nm) (ppr tc)
-ppr_tc tc		   = ppr tc
+ppr_tc tc = parenSymOcc (getOccName (ifaceTyConName tc)) (ppr tc)
 
 -------------------
 instance Outputable IfaceTyCon where
-  ppr (IfaceIPTc n)  = ppr (IPName n)
-  ppr other_tc       = ppr (ifaceTyConName other_tc)
+  ppr = ppr . ifaceTyConName
 
 instance Outputable IfaceCoCon where
   ppr (IfaceCoAx n)    = ppr n
@@ -368,35 +322,10 @@ toIfaceCoVar = occNameFS . getOccName
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
-toIfaceTyCon tc 
-  | isTupleTyCon tc            = IfaceTupTc (tupleTyConSort tc) (tyConArity tc)
-  | Just n <- tyConIP_maybe tc = IfaceIPTc (ipFastString n)
-  | otherwise	               = toIfaceTyCon_name (tyConName tc)
+toIfaceTyCon = toIfaceTyCon_name . tyConName
 
 toIfaceTyCon_name :: Name -> IfaceTyCon
-toIfaceTyCon_name nm
-  | Just (ATyCon tc) <- wiredInNameTyThing_maybe nm
-  = toIfaceWiredInTyCon tc nm
-  | otherwise
-  = IfaceTc nm
-
-toIfaceWiredInTyCon :: TyCon -> Name -> IfaceTyCon
-toIfaceWiredInTyCon tc nm
-  | isTupleTyCon tc                 = IfaceTupTc  (tupleTyConSort tc) (tyConArity tc)
-  | Just n <- tyConIP_maybe tc      = IfaceIPTc (ipFastString n)
-  | nm == intTyConName              = IfaceIntTc
-  | nm == boolTyConName             = IfaceBoolTc 
-  | nm == charTyConName             = IfaceCharTc 
-  | nm == listTyConName             = IfaceListTc 
-  | nm == parrTyConName             = IfacePArrTc 
-  | nm == liftedTypeKindTyConName   = IfaceLiftedTypeKindTc
-  | nm == unliftedTypeKindTyConName = IfaceUnliftedTypeKindTc
-  | nm == openTypeKindTyConName     = IfaceOpenTypeKindTc
-  | nm == argTypeKindTyConName      = IfaceArgTypeKindTc
-  | nm == constraintKindTyConName   = IfaceConstraintKindTc
-  | nm == ubxTupleKindTyConName     = IfaceUbxTupleKindTc
-  | nm == superKindTyConName        = IfaceSuperKindTc
-  | otherwise		            = IfaceTc nm
+toIfaceTyCon_name = IfaceTc
 
 ----------------
 toIfaceTypes :: [Type] -> [IfaceType]

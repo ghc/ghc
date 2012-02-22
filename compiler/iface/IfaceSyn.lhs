@@ -882,7 +882,6 @@ freeNamesIfExpr _ = emptyNameSet
 freeNamesIfTc :: IfaceTyCon -> NameSet
 freeNamesIfTc (IfaceTc tc) = unitNameSet tc
 -- ToDo: shouldn't we include IfaceIntTc & co.?
-freeNamesIfTc _ = emptyNameSet
 
 freeNamesIfCo :: IfaceCoCon -> NameSet
 freeNamesIfCo (IfaceCoAx tc) = unitNameSet tc
