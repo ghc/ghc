@@ -69,7 +69,7 @@ Library
                        process    >= 1   && < 1.2,
                        bytestring >= 0.9 && < 0.11,
                        time                 < 1.5,
-                       containers >= 0.1 && < 0.5,
+                       containers >= 0.1 && < 0.6,
                        array      >= 0.1 && < 0.5
 
     Build-Depends: filepath >= 1 && < 1.4
