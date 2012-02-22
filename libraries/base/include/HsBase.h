@@ -170,10 +170,6 @@ extern HsInt nocldstop;
 INLINE int __hscore_get_errno(void) { return errno; }
 INLINE void __hscore_set_errno(int e) { errno = e; }
 
-INLINE void *
-__hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
-{ return memcpy(dst, src+src_off, sz); }
-
 INLINE HsInt
 __hscore_bufsiz(void)
 {
