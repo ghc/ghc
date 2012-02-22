@@ -845,10 +845,8 @@ tryGrabCapability (Capability *cap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
-static void traceShutdownCapability (Capability *cap);
-
 void
-shutdownCapability (Capability *cap,
+shutdownCapability (Capability *cap USED_IF_THREADS,
                     Task *task USED_IF_THREADS,
                     rtsBool safe USED_IF_THREADS)
 {
@@ -933,7 +931,7 @@ shutdownCapability (Capability *cap,
             continue;
         }
 
-        traceShutdownCapability(cap);
+        traceSparkCounters(cap);
 	RELEASE_LOCK(&cap->lock);
 	break;
     }
@@ -944,21 +942,7 @@ shutdownCapability (Capability *cap,
     // threads performing foreign calls that will eventually try to 
     // return via resumeThread() and attempt to grab cap->lock.
     // closeMutex(&cap->lock);
-
-#else /* THREADED_RTS */
-    traceShutdownCapability(cap);
 #endif
-}
-
-static void
-traceShutdownCapability (Capability *cap)
-{
-#if defined(THREADED_RTS)
-    traceSparkCounters(cap);
-#endif
-    traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);
-    traceCapsetRemoveCap(CAPSET_CLOCKDOMAIN_DEFAULT, cap->no);
-    traceCapDelete(cap);
 }
 
 void
@@ -969,9 +953,6 @@ shutdownCapabilities(Task *task, rtsBool safe)
         ASSERT(task->incall->tso == NULL);
         shutdownCapability(&capabilities[i], task, safe);
     }
-    traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
-    traceCapsetDelete(CAPSET_CLOCKDOMAIN_DEFAULT);
-
 #if defined(THREADED_RTS)
     ASSERT(checkSparkCountInvariant());
 #endif
@@ -985,6 +966,9 @@ freeCapability (Capability *cap)
 #if defined(THREADED_RTS)
     freeSparkPool(cap->sparks);
 #endif
+    traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);
+    traceCapsetRemoveCap(CAPSET_CLOCKDOMAIN_DEFAULT, cap->no);
+    traceCapDelete(cap);
 }
 
 void
@@ -998,6 +982,8 @@ freeCapabilities (void)
 #else
     freeCapability(&MainCapability);
 #endif
+    traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
+    traceCapsetDelete(CAPSET_CLOCKDOMAIN_DEFAULT);
 }
 
 /* ---------------------------------------------------------------------------
