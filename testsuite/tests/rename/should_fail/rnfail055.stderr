@@ -12,21 +12,13 @@ RnFail055.hs-boot:4:1:
 
 RnFail055.hs-boot:6:6:
     Type constructor `S1' has conflicting definitions in the module and its hs-boot file
-    Main module: type S1 a b
-                     No C type associated
-                     = (a, b)
-    Boot file:   type S1 a b c
-                     No C type associated
-                     = (a, b)
+    Main module: type S1 a b = (a, b)
+    Boot file:   type S1 a b c = (a, b)
 
 RnFail055.hs-boot:8:6:
     Type constructor `S2' has conflicting definitions in the module and its hs-boot file
-    Main module: type S2 a b
-                     No C type associated
-                     = forall a. (a, b)
-    Boot file:   type S2 a b
-                     No C type associated
-                     = forall b. (a, b)
+    Main module: type S2 a b = forall a. (a, b)
+    Boot file:   type S2 a b = forall b. (a, b)
 
 RnFail055.hs-boot:12:6:
     Type constructor `T1' has conflicting definitions in the module and its hs-boot file
