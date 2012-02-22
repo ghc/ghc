@@ -570,7 +570,7 @@ foreign import ccall unsafe "HsBase.h __hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermi
 s_issock :: CMode -> Bool
 #if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
 s_issock cmode = c_s_issock cmode /= 0
-foreign import ccall unsafe "sys/stat.h S_ISSOCK" c_s_issock :: CMode -> CInt
+foreign import capi unsafe "sys/stat.h S_ISSOCK" c_s_issock :: CMode -> CInt
 #else
 s_issock _ = False
 #endif
