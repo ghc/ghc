@@ -10,6 +10,7 @@ module CmmType
     , Width(..)
     , widthInBits, widthInBytes, widthInLog, widthFromBytes
     , wordWidth, halfWordWidth, cIntWidth, cLongWidth
+    , halfWordMask
     , narrowU, narrowS
    )
 where
@@ -162,6 +163,11 @@ wordWidth | wORD_SIZE == 4 = W32
 halfWordWidth | wORD_SIZE == 4 = W16
               | wORD_SIZE == 8 = W32
               | otherwise      = panic "MachOp.halfWordRep: Unknown word size"
+
+halfWordMask :: Integer
+halfWordMask | wORD_SIZE == 4 = 0xFFFF
+             | wORD_SIZE == 8 = 0xFFFFFFFF
+             | otherwise      = panic "MachOp.halfWordMask: Unknown word size"
 
 -- cIntRep is the Width for a C-language 'int'
 cIntWidth, cLongWidth :: Width

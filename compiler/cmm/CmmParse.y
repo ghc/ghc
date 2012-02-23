@@ -912,13 +912,13 @@ primCall results_code name args_code vols safety
 		case safety of
 		  CmmUnsafe ->
 		    code (emitForeignCall' PlayRisky results
-		      (CmmPrim p) args vols NoC_SRT CmmMayReturn)
+		      (CmmPrim p Nothing) args vols NoC_SRT CmmMayReturn)
 		  CmmSafe srt ->
 		    code (emitForeignCall' PlaySafe results 
-		      (CmmPrim p) args vols NoC_SRT CmmMayReturn) where
+		      (CmmPrim p Nothing) args vols NoC_SRT CmmMayReturn) where
 		  CmmInterruptible ->
 		    code (emitForeignCall' PlayInterruptible results 
-		      (CmmPrim p) args vols NoC_SRT CmmMayReturn)
+		      (CmmPrim p Nothing) args vols NoC_SRT CmmMayReturn)
 
 doStore :: CmmType -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
 doStore rep addr_code val_code

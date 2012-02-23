@@ -12,8 +12,6 @@ module OldCmmUtils(
 
         maybeAssignTemp, loadArgsIntoTemps,
 
-        expandCallishMachOp,
-
         module CmmUtils,
   ) where
 
@@ -98,16 +96,4 @@ maybeAssignTemp uniques e
     | hasNoGlobalRegs e = (uniques, [], e)
     | otherwise         = (tail uniques, [CmmAssign local e], CmmReg local)
     where local = CmmLocal (LocalReg (head uniques) (cmmExprType e))
-
-expandCallishMachOp :: CallishMachOp -> [HintedCmmFormal] -> [HintedCmmActual]
-                    -> Maybe [CmmStmt]
-expandCallishMachOp (MO_S_QuotRem width) [CmmHinted res_q _, CmmHinted res_r _] args
-    = Just [CmmAssign (CmmLocal res_q) (CmmMachOp (MO_S_Quot width) args'),
-            CmmAssign (CmmLocal res_r) (CmmMachOp (MO_S_Rem  width) args')]
-    where args' = map hintlessCmm args
-expandCallishMachOp (MO_U_QuotRem width) [CmmHinted res_q _, CmmHinted res_r _] args
-    = Just [CmmAssign (CmmLocal res_q) (CmmMachOp (MO_U_Quot width) args'),
-            CmmAssign (CmmLocal res_r) (CmmMachOp (MO_U_Rem  width) args')]
-    where args' = map hintlessCmm args
-expandCallishMachOp _ _ _ = Nothing
 

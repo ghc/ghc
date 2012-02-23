@@ -42,7 +42,6 @@ import Platform
 import BlockId
 import PprCmm           ( pprExpr )
 import OldCmm
-import OldCmmUtils
 import CLabel
 
 -- The rest:
@@ -899,12 +898,11 @@ genCCall'
 -}
 
 
-genCCall' _ (CmmPrim MO_WriteBarrier) _ _
+genCCall' _ (CmmPrim MO_WriteBarrier _) _ _
  = return $ unitOL LWSYNC
 
-genCCall' _ (CmmPrim op) results args
- | Just stmts <- expandCallishMachOp op results args
-    = stmtsToInstrs stmts
+genCCall' _ (CmmPrim _ (Just mkStmts)) results args
+    = stmtsToInstrs (mkStmts results args)
 
 genCCall' gcp target dest_regs argsAndHints
   = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
@@ -919,7 +917,7 @@ genCCall' gcp target dest_regs argsAndHints
         (labelOrExpr, reduceToFF32) <- case target of
             CmmCallee (CmmLit (CmmLabel lbl)) _ -> return (Left lbl, False)
             CmmCallee expr _ -> return  (Right expr, False)
-            CmmPrim mop -> outOfLineMachOp mop
+            CmmPrim mop _ -> outOfLineMachOp mop
 
         let codeBefore = move_sp_down finalStack `appOL` passArgumentsCode
             codeAfter = move_sp_up finalStack `appOL` moveResult reduceToFF32
@@ -948,7 +946,7 @@ genCCall' gcp target dest_regs argsAndHints
                                 GCPLinux -> roundTo 16 finalStack
 
         -- need to remove alignment information
-        argsAndHints' | (CmmPrim mop) <- target,
+        argsAndHints' | (CmmPrim mop _) <- target,
                         (mop == MO_Memcpy ||
                          mop == MO_Memset ||
                          mop == MO_Memmove)
@@ -1149,6 +1147,7 @@ genCCall' gcp target dest_regs argsAndHints
 
                     MO_S_QuotRem {} -> unsupported
                     MO_U_QuotRem {} -> unsupported
+                    MO_Add2 {}      -> unsupported
                     MO_WriteBarrier -> unsupported
                     MO_Touch        -> unsupported
                 unsupported = panic ("outOfLineCmmOp: " ++ show mop

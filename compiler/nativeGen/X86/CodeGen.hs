@@ -41,7 +41,6 @@ import BlockId
 import Module           ( primPackageId )
 import PprCmm           ()
 import OldCmm
-import OldCmmUtils
 import OldPprCmm        ()
 import CLabel
 
@@ -1520,7 +1519,7 @@ genCCall
 -- Unroll memcpy calls if the source and destination pointers are at
 -- least DWORD aligned and the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall is32Bit (CmmPrim MO_Memcpy) _
+genCCall is32Bit (CmmPrim MO_Memcpy _) _
          [CmmHinted dst _, CmmHinted src _,
           CmmHinted (CmmLit (CmmInt n _)) _,
           CmmHinted (CmmLit (CmmInt align _)) _]
@@ -1563,7 +1562,7 @@ genCCall is32Bit (CmmPrim MO_Memcpy) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall _ (CmmPrim MO_Memset) _
+genCCall _ (CmmPrim MO_Memset _) _
          [CmmHinted dst _,
           CmmHinted (CmmLit (CmmInt c _)) _,
           CmmHinted (CmmLit (CmmInt n _)) _,
@@ -1602,11 +1601,11 @@ genCCall _ (CmmPrim MO_Memset) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall _ (CmmPrim MO_WriteBarrier) _ _ = return nilOL
+genCCall _ (CmmPrim MO_WriteBarrier _) _ _ = return nilOL
         -- write barrier compiles to no code on x86/x86-64;
         -- we keep it this long in order to prevent earlier optimisations.
 
-genCCall is32Bit (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
+genCCall is32Bit (CmmPrim (MO_PopCnt width) _) dest_regs@[CmmHinted dst _]
          args@[CmmHinted src _] = do
     sse4_2 <- sse4_2Enabled
     if sse4_2
@@ -1642,10 +1641,10 @@ genCCall32 :: CmmCallTarget            -- function to call
 genCCall32 target dest_regs args =
     case (target, dest_regs) of
     -- void return type prim op
-    (CmmPrim op, []) ->
+    (CmmPrim op _, []) ->
         outOfLineCmmOp op Nothing args
     -- we only cope with a single result for foreign calls
-    (CmmPrim op, [r_hinted@(CmmHinted r _)]) -> do
+    (CmmPrim op _, [r_hinted@(CmmHinted r _)]) -> do
         l1 <- getNewLabelNat
         l2 <- getNewLabelNat
         sse2 <- sse2Enabled
@@ -1677,9 +1676,8 @@ genCCall32 target dest_regs args =
               = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
                       ++ show (length args) ++ ")"
 
-    (CmmPrim op, results)
-     | Just stmts <- expandCallishMachOp op results args ->
-        stmtsToInstrs stmts
+    (CmmPrim _ (Just mkStmts), results) ->
+        stmtsToInstrs (mkStmts results args)
 
     _ -> do
         let
@@ -1710,7 +1708,7 @@ genCCall32 target dest_regs args =
                -> do { (dyn_r, dyn_c) <- getSomeReg expr
                      ; ASSERT( isWord32 (cmmExprType expr) )
                        return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
-            CmmPrim _
+            CmmPrim _ _
                 -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
                             ++ "probably because too many return values."
 
@@ -1833,20 +1831,19 @@ genCCall64 :: CmmCallTarget            -- function to call
 genCCall64 target dest_regs args =
     case (target, dest_regs) of
 
-    (CmmPrim op, []) ->
+    (CmmPrim op _, []) ->
         -- void return type prim op
         outOfLineCmmOp op Nothing args
 
-    (CmmPrim op, [res]) ->
+    (CmmPrim op _, [res]) ->
         -- we only cope with a single result for foreign calls
         outOfLineCmmOp op (Just res) args
 
-    (CmmPrim (MO_S_QuotRem width), _) -> divOp True  width dest_regs args
-    (CmmPrim (MO_U_QuotRem width), _) -> divOp False width dest_regs args
+    (CmmPrim (MO_S_QuotRem width) _, _) -> divOp True  width dest_regs args
+    (CmmPrim (MO_U_QuotRem width) _, _) -> divOp False width dest_regs args
 
-    (CmmPrim op, results)
-     | Just stmts <- expandCallishMachOp op results args ->
-        stmtsToInstrs stmts
+    (CmmPrim _ (Just mkStmts), results) ->
+        stmtsToInstrs (mkStmts results args)
 
     _ -> genCCall64' target dest_regs args
 
@@ -1915,7 +1912,7 @@ genCCall64' target dest_regs args = do
         CmmCallee expr conv
            -> do (dyn_r, dyn_c) <- getSomeReg expr
                  return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
-        CmmPrim _
+        CmmPrim _ _
             -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
                         ++ "probably because too many return values."
 
@@ -2091,6 +2088,7 @@ outOfLineCmmOp mop res args
 
               MO_S_QuotRem {} -> unsupported
               MO_U_QuotRem {} -> unsupported
+              MO_Add2 {}      -> unsupported
               MO_WriteBarrier -> unsupported
               MO_Touch        -> unsupported
         unsupported = panic ("outOfLineCmmOp: " ++ show mop

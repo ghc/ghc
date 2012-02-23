@@ -39,7 +39,6 @@ import NCGMonad
 -- Our intermediate code:
 import BlockId
 import OldCmm
-import OldCmmUtils
 import PIC
 import Reg
 import CLabel
@@ -381,17 +380,16 @@ genCCall
 --
 -- In the SPARC case we don't need a barrier.
 --
-genCCall (CmmPrim (MO_WriteBarrier)) _ _
+genCCall (CmmPrim (MO_WriteBarrier) _) _ _
  = do   return nilOL
 
-genCCall (CmmPrim op) results args
- | Just stmts <- expandCallishMachOp op results args
-    = stmtsToInstrs stmts
+genCCall (CmmPrim _ (Just mkStmts)) results args
+    = stmtsToInstrs (mkStmts results args)
 
 genCCall target dest_regs argsAndHints
  = do
         -- need to remove alignment information
-        let argsAndHints' | (CmmPrim mop) <- target,
+        let argsAndHints' | (CmmPrim mop _) <- target,
                             (mop == MO_Memcpy ||
                              mop == MO_Memset ||
                              mop == MO_Memmove)
@@ -423,7 +421,7 @@ genCCall target dest_regs argsAndHints
                  -> do  (dyn_c, [dyn_r]) <- arg_to_int_vregs expr
                         return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
 
-                CmmPrim mop
+                CmmPrim mop _
                  -> do  res     <- outOfLineMachOp mop
                         lblOrMopExpr <- case res of
                                 Left lbl -> do
@@ -644,6 +642,7 @@ outOfLineMachOp_table mop
 
         MO_S_QuotRem {} -> unsupported
         MO_U_QuotRem {} -> unsupported
+        MO_Add2 {}      -> unsupported
         MO_WriteBarrier -> unsupported
         MO_Touch        -> unsupported
     where unsupported = panic ("outOfLineCmmOp: " ++ show mop

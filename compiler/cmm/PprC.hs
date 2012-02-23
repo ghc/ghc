@@ -28,7 +28,6 @@ import BlockId
 import CLabel
 import ForeignCall
 import OldCmm
-import OldCmmUtils
 import OldPprCmm ()
 
 -- Utils
@@ -238,11 +237,10 @@ pprStmt platform stmt = case stmt of
                     pprCall platform cast_fn cconv results args <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
-    CmmCall (CmmPrim op) results args _ret
-     | Just stmts <- expandCallishMachOp op results args ->
-        vcat $ map (pprStmt platform) stmts
+    CmmCall (CmmPrim _ (Just mkStmts)) results args _ret ->
+        vcat $ map (pprStmt platform) (mkStmts results args)
 
-    CmmCall (CmmPrim op) results args _ret ->
+    CmmCall (CmmPrim op _) results args _ret ->
         pprCall platform ppr_fn CCallConv results args'
         where
         ppr_fn = pprCallishMachOp_for_C op
@@ -665,6 +663,7 @@ pprCallishMachOp_for_C mop
 
         MO_S_QuotRem {} -> unsupported
         MO_U_QuotRem {} -> unsupported
+        MO_Add2      {} -> unsupported
         MO_Touch        -> unsupported
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")

@@ -293,5 +293,8 @@ data CmmCallTarget
   | CmmPrim             -- Call a "primitive" (eg. sin, cos)
         CallishMachOp           -- These might be implemented as inline
                                 -- code by the backend.
-  deriving Eq
+        -- If we don't know how to implement the
+        -- mach op, then we can replace it with
+        -- this list of statements:
+        (Maybe ([HintedCmmFormal] -> [HintedCmmActual] -> [CmmStmt]))
 

@@ -61,7 +61,7 @@ cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
                 stmt m (CmmStore e1 e2) = expr (expr m e1) e2
                 stmt m (CmmCall c _ as _) = f (actuals m as) c
                     where f m (CmmCallee e _) = expr m e
-                          f m (CmmPrim _) = m
+                          f m (CmmPrim _ _) = m
                 stmt m (CmmBranch b) = b:m
                 stmt m (CmmCondBranch e b) = b:(expr m e)
                 stmt m (CmmSwitch e bs) = catMaybes bs ++ expr m e
@@ -269,7 +269,7 @@ inlineStmt u a (CmmStore e1 e2) = CmmStore (inlineExpr u a e1) (inlineExpr u a e
 inlineStmt u a (CmmCall target regs es ret)
    = CmmCall (infn target) regs es' ret
    where infn (CmmCallee fn cconv) = CmmCallee (inlineExpr u a fn) cconv
-         infn (CmmPrim p) = CmmPrim p
+         infn (CmmPrim p m) = CmmPrim p m
          es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
 inlineStmt u a (CmmCondBranch e d) = CmmCondBranch (inlineExpr u a e) d
 inlineStmt u a (CmmSwitch e d) = CmmSwitch (inlineExpr u a e) d

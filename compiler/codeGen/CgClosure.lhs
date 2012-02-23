@@ -485,7 +485,7 @@ emitBlackHoleCode is_single_entry = do
     stmtsC [
        CmmStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
                 (CmmReg (CmmGlobal CurrentTSO)),
-       CmmCall (CmmPrim MO_WriteBarrier) [] [] CmmMayReturn,
+       CmmCall (CmmPrim MO_WriteBarrier Nothing) [] [] CmmMayReturn,
        CmmStore (CmmReg nodeReg) (CmmReg (CmmGlobal EagerBlackholeInfo))
      ]
 \end{code}

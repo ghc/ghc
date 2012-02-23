@@ -269,6 +269,10 @@ primtype Word#
 primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+primop   WordAdd2Op  "plusWord2#"  GenPrimOp
+   Word# -> Word# -> (# Word#, Word# #)
+   with commutable = True
+
 primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
 
 primop   WordMulOp   "timesWord#"   Dyadic   Word# -> Word# -> Word#
