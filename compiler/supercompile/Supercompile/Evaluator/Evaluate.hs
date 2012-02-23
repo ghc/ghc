@@ -88,7 +88,7 @@ step s = guard reduced >> return result
   where (reduced, result) = step' False $ Left s
 
 step' :: Bool -> Either State UnnormalisedState -> (Bool, State) -- The flag indicates whether we managed to reduce any steps *at all*
-step' normalising ei_state =
+step' normalising ei_state = {-# SCC "step'" #-}
     (\res@(_reduced, stepped_state) -> let _deeds = either releaseStateDeed releaseUnnormalisedStateDeed ei_state
                                            _doc = either (pPrintFullState quietStatePrettiness) (pPrintFullUnnormalisedState quietStatePrettiness) ei_state
                                            _fvs = either stateFreeVars unnormalisedStateFreeVars ei_state in

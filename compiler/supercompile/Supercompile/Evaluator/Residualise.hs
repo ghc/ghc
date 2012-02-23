@@ -80,7 +80,9 @@ pPrintFullState :: StatePrettiness -> State -> SDoc
 pPrintFullState sp = pPrintFullUnnormalisedState sp . denormalise
 
 pPrintFullUnnormalisedState :: StatePrettiness -> UnnormalisedState -> SDoc
-pPrintFullUnnormalisedState sp state = text "Deeds:" <+> pPrint deeds $$ (if includeStatics sp then pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) else empty) $$ body $$ (if null floats_nonstatic_excluded then empty else ppr (S.fromList (map fst floats_nonstatic_excluded)))
+pPrintFullUnnormalisedState sp state
+  = {-# SCC "pPrintFullUnnormalisedState" #-}
+    text "Deeds:" <+> pPrint deeds $$ (if includeStatics sp then pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) else empty) $$ body $$ (if null floats_nonstatic_excluded then empty else ppr (S.fromList (map fst floats_nonstatic_excluded)))
   where (deeds, floats_static, floats_nonstatic_unfiltered, e, gen) = residualiseUnnormalisedState state
         (floats_nonstatic_excluded, floats_nonstatic) = partition (flip S.member (excludeBindings sp) . fst) floats_nonstatic_unfiltered
         floats_nonstatic_pretty

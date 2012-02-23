@@ -141,7 +141,7 @@ matchWithReason s_l s_r = fmap thirdOf3 $ matchWithReason' (MM { matchInstanceMa
 
 matchWithReason' :: MatchMode -> State -> State -> Match (Heap, Stack, MatchRenaming)
 matchWithReason' mm (_deeds_l, Heap h_l ids_l, k_l, qa_l) (_deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
-  do
+  {-# SCC "matchWithReason'" #-} do
     -- It's very important that we don't just use the state free variables from both sides to construct the initial in scope set,
     -- because we use it to match the stack and QA on each side *without* first extending it with variables bound by the PureHeap!
     --

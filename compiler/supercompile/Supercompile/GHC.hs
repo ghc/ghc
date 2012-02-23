@@ -146,7 +146,7 @@ conAppToTerm dc es
     fromType_maybe _         = Nothing
 
 coreExprToTerm :: CoreExpr -> ParseM S.Term
-coreExprToTerm = term
+coreExprToTerm init_e = {-# SCC "coreExprToTerm" #-} term init_e
   where
     -- PrimOp and (partially applied) Data are dealt with later on by generating appropriate unfoldings
     -- We use exprIsConApp_maybe here to ensure we desugar explicit constructor use into something that looks cheap

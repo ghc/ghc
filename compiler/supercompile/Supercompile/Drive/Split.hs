@@ -542,7 +542,7 @@ optimiseSplit :: MonadStatics m
               -> M.Map (Out Var) (RBracketed State)
               -> RBracketed State
               -> m (ResidTags, Deeds, Out FVedTerm)
-optimiseSplit opt deeds bracketeds_heap bracketed_focus = do
+optimiseSplit opt deeds bracketeds_heap bracketed_focus = {-# SCC "optimiseSplit'" #-}do
     -- 0) The "process tree" splits at this point. We can choose to distribute the deeds between the children in a number of ways
     let (deeds_initial, BracketedStuff bracketed_deeded_focus bracketeds_deeded_heap) = flip traverseAll (BracketedStuff bracketed_focus bracketeds_heap) $
           \states -> case dEEDS_POLICY of
@@ -614,7 +614,7 @@ splitt :: UniqSupply
            M.Map (Out Var) (RBracketed State), -- The residual "let" bindings
            RBracketed State)                   -- The residual "let" body
 splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed_qa))
-    = snd $ split_step split_fp
+    = {-# SCC "splitt'" #-} snd $ split_step split_fp
       -- Once we have the correct fixed point, go back and grab the associated information computed in the process
       -- of obtaining the fixed point. That is what we are interested in, not the fixed point itselF!
       -- TODO: eliminate redundant recomputation here?

@@ -268,7 +268,8 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
 
 prepareTerm :: M.Map Var Term -> Term -> (State,                        -- For use without memo-cache preinitalization
                                           ([(State, FVedTerm)], State)) -- With preinitialization
-prepareTerm unfoldings e = pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
+prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
+                           pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
                            pprTraceSC "all input FVs" (ppr input_fvs) $
                            (state, (preinit_with, preinit_state))
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
@@ -391,8 +392,10 @@ instance Monoid SCStats where
 --
 -- TODO: have the garbage collector collapse (let x = True in x) to (True) -- but note that this requires onceness analysis
 gc :: State -> State
-gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(stateUncoveredVars gced_state `subVarSet` stateUncoveredVars _state, ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState quietStatePrettiness _state), PrettyDoc (pPrintFullState quietStatePrettiness gced_state)))
-                                          gced_state -- We do not insist that *no* variables are uncovered because when used from the speculator this may not be true
+gc _state@(deeds0, Heap h ids, k, in_e)
+  = {-# SCC "gc" #-}
+    ASSERT2(stateUncoveredVars gced_state `subVarSet` stateUncoveredVars _state, ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState quietStatePrettiness _state), PrettyDoc (pPrintFullState quietStatePrettiness gced_state)))
+    gced_state -- We do not insist that *no* variables are uncovered because when used from the speculator this may not be true
   where
     gced_state = (deeds2, Heap h' ids, k', in_e)
     
@@ -508,7 +511,7 @@ nothingSpeculated = S.empty
 --          g -> b (!STOP)
 --          h -> c (!STOP)
 speculate :: AlreadySpeculated -> (SCStats, State) -> (AlreadySpeculated, (SCStats, State))
-speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stats', (deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids', k, in_e)))
+speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = {-# SCC "speculate" #-} (M.keysSet h, (stats', (deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids', k, in_e)))
   where
     (h_values, h_non_values) = M.partition (maybe False (termIsValue . snd) . heapBindingTerm) h
     (h_non_values_unspeculated, h_non_values_speculated) = (h_non_values `exclude` speculated, h_non_values `restrict` speculated)

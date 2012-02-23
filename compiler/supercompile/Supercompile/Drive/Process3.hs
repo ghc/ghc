@@ -222,7 +222,7 @@ fulfillM :: (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM res = ScpM $ StateT $ \s -> case fulfill res (scpFulfilmentState s) (scpMemoState s) of (res', fs', ms') -> return (res', s { scpFulfilmentState = fs', scpMemoState = ms' })
 
 terminateM :: String -> State -> (Generaliser -> ScpM ()) -> ScpM a -> (String -> State -> (Generaliser -> ScpM ()) -> ScpM a) -> ScpM a
-terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case terminate (scpProcessHistory s) (scpNodeKey env, (h, state, rb)) of
+terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (scpProcessHistory s) (scpNodeKey env, (h, state, rb))) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
              unReaderT (unStateT (unScpM (mstop shallow_h shallow_state shallow_rb)) s)                                 (env { scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
@@ -238,14 +238,14 @@ sc :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
 sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm))
-sc' mb_h state = case mb_h of
+sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
   Nothing -> speculateM (reduce state) $ \state -> -- traceRenderM "!sc" (PrettyDoc (pPrintFullState quietStatePrettiness state)) >>
                                                    my_split state sc
   Just h  -> flip catchM try_generalise $ \rb ->
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
-                                                         (if sC_ROLLBACK then (\gen -> shallow_rb gen >> my_split state sc) else try_generalise) (mK_GENERALISER shallow_state state))
+                                                         (if sC_ROLLBACK then (\gen -> shallow_rb gen >> my_split state sc) else try_generalise) ({-# SCC "mK_GENERALISER'" #-} mK_GENERALISER shallow_state state))
   where
     try_generalise gen = maybe (trace "sc-stop(split)" $ my_split state)
                                (trace "sc-stop(gen)")
@@ -303,7 +303,7 @@ insertTagsM mx = do
 
 memo :: (Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)))
      ->  State -> ScpM (Deeds, FVedTerm)
-memo opt = memo_opt
+memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
   where
     memo_opt state
       | Skip <- memo_how = liftM snd $ opt Nothing state
