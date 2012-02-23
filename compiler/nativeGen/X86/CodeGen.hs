@@ -1844,6 +1844,10 @@ genCCall64 target dest_regs args =
     (CmmPrim (MO_S_QuotRem width), _) -> divOp True  width dest_regs args
     (CmmPrim (MO_U_QuotRem width), _) -> divOp False width dest_regs args
 
+    (CmmPrim op, results)
+     | Just stmts <- expandCallishMachOp op results args ->
+        stmtsToInstrs stmts
+
     _ -> genCCall64' target dest_regs args
 
   where divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
