@@ -1841,6 +1841,19 @@ genCCall64 target dest_regs args =
 
     (CmmPrim (MO_S_QuotRem width) _, _) -> divOp True  width dest_regs args
     (CmmPrim (MO_U_QuotRem width) _, _) -> divOp False width dest_regs args
+    (CmmPrim (MO_Add2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
+        case args of
+        [CmmHinted arg_x _, CmmHinted arg_y _] ->
+            do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
+               lCode <- getAnyReg (CmmMachOp (MO_Add width) [arg_x, arg_y])
+               let size = intSize width
+                   reg_l = getRegisterReg True (CmmLocal res_l)
+                   reg_h = getRegisterReg True (CmmLocal res_h)
+                   code = hCode reg_h `appOL`
+                          lCode reg_l `snocOL`
+                          ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
+               return code
+        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
 
     (CmmPrim _ (Just mkStmts), results) ->
         stmtsToInstrs (mkStmts results args)
