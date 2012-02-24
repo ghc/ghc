@@ -278,6 +278,10 @@ primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
 primop   WordMulOp   "timesWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+primop   WordMul2Op  "timesWord2#"   GenPrimOp
+   Word# -> Word# -> (# Word#, Word# #)
+   with commutable = True
+
 primop   WordQuotOp   "quotWord#"   Dyadic   Word# -> Word# -> Word#
    with can_fail = True
 

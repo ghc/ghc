@@ -643,6 +643,7 @@ outOfLineMachOp_table mop
         MO_S_QuotRem {} -> unsupported
         MO_U_QuotRem {} -> unsupported
         MO_Add2 {}      -> unsupported
+        MO_U_Mul2 {}    -> unsupported
         MO_WriteBarrier -> unsupported
         MO_Touch        -> unsupported
     where unsupported = panic ("outOfLineCmmOp: " ++ show mop

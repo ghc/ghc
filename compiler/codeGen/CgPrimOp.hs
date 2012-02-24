@@ -33,6 +33,8 @@ import Outputable
 import FastString
 import StaticFlags
 
+import Control.Monad
+
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps
 
@@ -497,6 +499,52 @@ emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
                      hwm = CmmLit (CmmInt halfWordMask wordWidth)
           genericImpl _ _ = panic "emitPrimOp WordAdd2Op generic: bad lengths"
           stmt = CmmCall (CmmPrim (MO_Add2 wordWidth) (Just genericImpl))
+                         [CmmHinted res_h NoHint,
+                          CmmHinted res_l NoHint]
+                         [CmmHinted arg_x NoHint,
+                          CmmHinted arg_y NoHint]
+                         CmmMayReturn
+      stmtC stmt
+emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
+ = do let t = cmmExprType arg_x
+      xlyl <- liftM CmmLocal $ newLocalReg t
+      xlyh <- liftM CmmLocal $ newLocalReg t
+      xhyl <- liftM CmmLocal $ newLocalReg t
+      r    <- liftM CmmLocal $ newLocalReg t
+      -- This generic implementation is very simple and slow. We might
+      -- well be able to do better, but for now this at least works.
+      let genericImpl [CmmHinted res_h _, CmmHinted res_l _]
+                      [CmmHinted arg_x _, CmmHinted arg_y _]
+           = [CmmAssign xlyl
+                  (mul (bottomHalf arg_x) (bottomHalf arg_y)),
+              CmmAssign xlyh
+                  (mul (bottomHalf arg_x) (topHalf arg_y)),
+              CmmAssign xhyl
+                  (mul (topHalf arg_x) (bottomHalf arg_y)),
+              CmmAssign r
+                  (sum [topHalf    (CmmReg xlyl),
+                        bottomHalf (CmmReg xhyl),
+                        bottomHalf (CmmReg xlyh)]),
+              CmmAssign (CmmLocal res_l)
+                  (or (bottomHalf (CmmReg xlyl))
+                      (toTopHalf (CmmReg r))),
+              CmmAssign (CmmLocal res_h)
+                  (sum [mul (topHalf arg_x) (topHalf arg_y),
+                        bottomHalf (CmmReg xhyl),
+                        bottomHalf (CmmReg xlyh),
+                        topHalf    (CmmReg r)])]
+               where topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
+                     toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
+                     bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
+                     add x y = CmmMachOp (MO_Add wordWidth) [x, y]
+                     sum = foldl1 add
+                     mul x y = CmmMachOp (MO_Mul wordWidth) [x, y]
+                     or x y = CmmMachOp (MO_Or wordWidth) [x, y]
+                     hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
+                                          wordWidth)
+                     hwm = CmmLit (CmmInt halfWordMask wordWidth)
+          genericImpl _ _ = panic "emitPrimOp WordMul2Op generic: bad lengths"
+          stmt = CmmCall (CmmPrim (MO_U_Mul2 wordWidth) (Just genericImpl))
                          [CmmHinted res_h NoHint,
                           CmmHinted res_l NoHint]
                          [CmmHinted arg_x NoHint,
