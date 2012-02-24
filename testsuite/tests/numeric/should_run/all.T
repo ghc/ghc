@@ -55,4 +55,5 @@ test('4381', normal, compile_and_run, [''])
 test('4383', normal, compile_and_run, [''])
 
 test('add2', normal, compile_and_run, [''])
+test('mul2', normal, compile_and_run, [''])
 
