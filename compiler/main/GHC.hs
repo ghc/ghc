@@ -323,11 +323,12 @@ import Prelude hiding (init)
 -- Unless you want to handle exceptions yourself, you should wrap this around
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
-defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => LogAction -> m a -> m a
-defaultErrorHandler la inner =
+defaultErrorHandler :: (ExceptionMonad m, MonadIO m)
+                    => LogAction -> FlushOut -> m a -> m a
+defaultErrorHandler la (FlushOut flushOut) inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   ghandle (\exception -> liftIO $ do
-           hFlush stdout
+           flushOut
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
                 Just (ioe :: IOException) ->
@@ -347,7 +348,7 @@ defaultErrorHandler la inner =
   -- error messages propagated as exceptions
   handleGhcException
             (\ge -> liftIO $ do
-                hFlush stdout
+                flushOut
                 case ge of
                      PhaseFailed _ code -> exitWith code
                      Signal _ -> exitWith (ExitFailure 1)

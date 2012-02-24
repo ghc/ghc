@@ -16,7 +16,7 @@ module DynFlags (
         DynFlag(..),
         WarningFlag(..),
         ExtensionFlag(..),
-        LogAction,
+        LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
         dopt,
@@ -62,6 +62,8 @@ module DynFlags (
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultLogAction,
+        defaultFlushOut,
+        defaultFlushErr,
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlags,
@@ -129,7 +131,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import System.FilePath
-import System.IO        ( stderr, hPutChar )
+import System.IO
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -586,6 +588,8 @@ data DynFlags = DynFlags {
 
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
+  flushOut              :: FlushOut,
+  flushErr              :: FlushErr,
 
   haddockOptions        :: Maybe String,
 
@@ -942,6 +946,8 @@ defaultDynFlags mySettings =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
         log_action = defaultLogAction,
+        flushOut = defaultFlushOut,
+        flushErr = defaultFlushErr,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion"
       }
@@ -959,6 +965,16 @@ defaultLogAction severity srcSpan style msg
                    -- careful (#2302): printErrs prints in UTF-8, whereas
                    -- converting to string first and using hPutStr would
                    -- just emit the low 8 bits of each unicode char.
+
+newtype FlushOut = FlushOut (IO ())
+
+defaultFlushOut :: FlushOut
+defaultFlushOut = FlushOut $ hFlush stdout
+
+newtype FlushErr = FlushErr (IO ())
+
+defaultFlushErr :: FlushErr
+defaultFlushErr = FlushErr $ hFlush stderr
 
 {-
 Note [Verbosity levels]
