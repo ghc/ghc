@@ -530,9 +530,9 @@ emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
                       (toTopHalf (CmmReg r))),
               CmmAssign (CmmLocal res_h)
                   (sum [mul (topHalf arg_x) (topHalf arg_y),
-                        bottomHalf (CmmReg xhyl),
-                        bottomHalf (CmmReg xlyh),
-                        topHalf    (CmmReg r)])]
+                        topHalf (CmmReg xhyl),
+                        topHalf (CmmReg xlyh),
+                        topHalf (CmmReg r)])]
                where topHalf x = CmmMachOp (MO_U_Shr wordWidth) [x, hww]
                      toTopHalf x = CmmMachOp (MO_Shl wordWidth) [x, hww]
                      bottomHalf x = CmmMachOp (MO_And wordWidth) [x, hwm]
