@@ -1854,6 +1854,21 @@ genCCall64 target dest_regs args =
                           ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
                return code
         _ -> panic "genCCall64: Wrong number of arguments/results for add2"
+    (CmmPrim (MO_U_Mul2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
+        case args of
+        [CmmHinted arg_x _, CmmHinted arg_y _] ->
+            do (y_reg, y_code) <- getRegOrMem arg_y
+               x_code <- getAnyReg arg_x
+               let size = intSize width
+                   reg_h = getRegisterReg True (CmmLocal res_h)
+                   reg_l = getRegisterReg True (CmmLocal res_l)
+                   code = y_code `appOL`
+                          x_code rax `appOL`
+                          toOL [MUL2 size y_reg,
+                                MOV size (OpReg rdx) (OpReg reg_h),
+                                MOV size (OpReg rax) (OpReg reg_l)]
+               return code
+        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
 
     (CmmPrim _ (Just mkStmts), results) ->
         stmtsToInstrs (mkStmts results args)

@@ -609,6 +609,7 @@ pprInstr platform (IMUL2 sz op)  = pprSizeOp platform (sLit "imul") sz op
 
 -- x86_64 only
 pprInstr platform (MUL size op1 op2) = pprSizeOpOp platform (sLit "mul") size op1 op2
+pprInstr platform (MUL2 size op) = pprSizeOp platform (sLit "mul") size op
 
 pprInstr platform (FDIV size op1 op2) = pprSizeOpOp platform (sLit "div") size op1 op2
 
