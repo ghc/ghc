@@ -7,8 +7,8 @@ import Data.Bits
 
 main :: IO ()
 main = do f 5 6
-          f 0xFE36FB18 49
-          f 0xFE36FB18 0xFB29FC6A
+          f 0xFD94E3B7FE36FB18 49
+          f 0xFD94E3B7FE36FB18 0xFC1D8A3BFB29FC6A
 
 f :: Word -> Word -> IO ()
 f wx@(W# x) wy@(W# y)
