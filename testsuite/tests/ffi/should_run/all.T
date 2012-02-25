@@ -201,3 +201,8 @@ test('Capi_Ctype_002',
      run_command,
      ['$MAKE -s --no-print-directory Capi_Ctype_002'])
 
+test('ffi_parsing_001',
+     extra_clean(['ffi_parsing_001_c.o']),
+     compile_and_run,
+     ['ffi_parsing_001_c.c'])
+
