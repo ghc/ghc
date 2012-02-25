@@ -937,25 +937,33 @@ parseCImport cconv safety nm str =
        r <- choice [
           string "dynamic" >> return (mk Nothing (CFunction DynamicTarget)),
           string "wrapper" >> return (mk Nothing CWrapper),
-          optional (string "static" >> skipSpaces) >>
+          optional (token "static" >> skipSpaces) >>
            (mk Nothing <$> cimp nm) +++
            (do h <- munch1 hdr_char; skipSpaces; mk (Just (Header (mkFastString h))) <$> cimp nm)
          ]
        skipSpaces
        return r
 
+   token str = do _ <- string str
+                  toks <- look
+                  case toks of
+                      c : _
+                       | id_char c -> pfail
+                      _            -> return ()
+
    mk = CImport cconv safety
 
    hdr_char c = not (isSpace c) -- header files are filenames, which can contain
                                 -- pretty much any char (depending on the platform),
                                 -- so just accept any non-space character
-   id_char  c = isAlphaNum c || c == '_'
+   id_first_char c = isAlpha    c || c == '_'
+   id_char       c = isAlphaNum c || c == '_'
 
    cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
              +++ ((\c -> CFunction (StaticTarget c Nothing)) <$> cid)
           where
             cid = return nm +++
-                  (do c  <- satisfy (\c -> isAlpha c || c == '_')
+                  (do c  <- satisfy id_first_char
                       cs <-  many (satisfy id_char)
                       return (mkFastString (c:cs)))
 
