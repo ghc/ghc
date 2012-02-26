@@ -550,21 +550,6 @@ INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
 }
 #endif
 
-// select-related stuff
-
-#if !defined(__MINGW32__)
-INLINE int  hsFD_SETSIZE(void) { return FD_SETSIZE; }
-INLINE int  hsFD_ISSET(int fd, fd_set *fds) { return FD_ISSET(fd, fds); }
-INLINE void hsFD_SET(int fd, fd_set *fds) { FD_SET(fd, fds); }
-INLINE HsInt sizeof_fd_set(void) { return sizeof(fd_set); }
-extern void hsFD_ZERO(fd_set *fds);
-#endif
-
-INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
-                           fd_set *exceptfds, struct timeval *timeout) {
-	return (select(nfds,readfds,writefds,exceptfds,timeout));
-}
-
 #if darwin_HOST_OS
 // You should not access _environ directly on Darwin in a bundle/shared library.
 // See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html

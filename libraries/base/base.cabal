@@ -218,7 +218,6 @@ Library {
         cbits/consUtils.c
         cbits/iconv.c
         cbits/inputReady.c
-        cbits/selectUtils.c
         cbits/primFloat.c
         cbits/md5.c
     include-dirs: include
