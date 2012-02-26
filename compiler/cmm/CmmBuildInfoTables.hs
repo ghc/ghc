@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XGADTs -XNoMonoLocalBinds #-}
+{-# LANGUAGE GADTs, NoMonoLocalBinds #-}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
@@ -7,8 +7,8 @@
 -- for details
 
 -- Norman likes local bindings
--- If this module lives on I'd like to get rid of the -XNoMonoLocalBinds
--- flag in due course
+-- If this module lives on I'd like to get rid of the NoMonoLocalBinds
+-- extension in due course
 
 -- Todo: remove -fno-warn-warnings-deprecations
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
