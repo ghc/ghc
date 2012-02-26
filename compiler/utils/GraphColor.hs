@@ -1,7 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
-
--- The above warning supression flag is a temporary kludge.
-
 -- | Graph Coloring.
 --      This is a generic graph coloring library, abstracted over the type of
 --      the node keys, nodes and colors.
@@ -145,6 +141,19 @@ colorScan
 colorScan iterative triv spill graph
         = colorScan_spin iterative triv spill graph [] [] []
 
+colorScan_spin
+        :: ( Uniquable k, Uniquable cls, Uniquable color
+           , Ord k,       Eq cls
+           , Outputable k, Outputable cls)
+        => Bool
+        -> Triv k cls color
+        -> (Graph k cls color -> k)
+        -> Graph k cls color
+        -> [k]
+        -> [k]
+        -> [(k, k)]
+        -> ([k], [k], [(k, k)])
+
 colorScan_spin iterative triv spill graph
         ksTriv ksSpill kksCoalesce
 
@@ -215,6 +224,19 @@ colorScan_spin iterative triv spill graph
 --      and the graph isn't empty yet.. We'll have to choose a spill
 --      candidate and leave it uncolored.
 --
+colorScan_spill
+        :: ( Uniquable k, Uniquable cls, Uniquable color
+           , Ord k,       Eq cls
+           , Outputable k, Outputable cls)
+        => Bool
+        -> Triv k cls color
+        -> (Graph k cls color -> k)
+        -> Graph k cls color
+        -> [k]
+        -> [k]
+        -> [(k, k)]
+        -> ([k], [k], [(k, k)])
+
 colorScan_spill iterative triv spill graph
         ksTriv ksSpill kksCoalesce
 
