@@ -1,10 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 -- | Basic operations on graphs.
 --
 
@@ -197,6 +190,10 @@ addConflicts conflicts getClass
                 $ uniqSetToList conflicts)
 
 
+addConflictSet1 :: Uniquable k
+                => k -> (k -> cls) -> UniqSet k
+                -> UniqFM (Node k cls color)
+                -> UniqFM (Node k cls color)
 addConflictSet1 u getClass set
  = case delOneFromUniqSet set u of
     set' -> adjustWithDefaultUFM
@@ -292,6 +289,14 @@ coalesceGraph
 coalesceGraph aggressive triv graph
         = coalesceGraph' aggressive triv graph []
 
+coalesceGraph'
+        :: (Uniquable k, Ord k, Eq cls, Outputable k)
+        => Bool
+        -> Triv k cls color
+        -> Graph k cls color
+        -> [(k, k)]
+        -> ( Graph k cls color
+           , [(k, k)])
 coalesceGraph' aggressive triv graph kkPairsAcc
  = let
         -- find all the nodes that have coalescence edges
@@ -358,6 +363,16 @@ coalesceNodes aggressive triv graph (k1, k2)
         | otherwise
         = (graph, Nothing)
 
+coalesceNodes_merge
+        :: (Uniquable k, Ord k, Eq cls, Outputable k)
+        => Bool
+        -> Triv  k cls color
+        -> Graph k cls color
+        -> k -> k
+        -> Node k cls color
+        -> Node k cls color
+        -> (Graph k cls color, Maybe (k, k))
+
 coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
 
         -- sanity checks
@@ -393,6 +408,15 @@ coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
                         }
 
           in    coalesceNodes_check aggressive triv graph kMin kMax node
+
+coalesceNodes_check
+        :: (Uniquable k, Ord k, Eq cls, Outputable k)
+        => Bool
+        -> Triv  k cls color
+        -> Graph k cls color
+        -> k -> k
+        -> Node k cls color
+        -> (Graph k cls color, Maybe (k, k))
 
 coalesceNodes_check aggressive triv graph kMin kMax node
 
