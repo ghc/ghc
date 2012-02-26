@@ -575,8 +575,8 @@ foreign import capi unsafe "sys/stat.h S_ISSOCK" c_s_issock :: CMode -> CInt
 s_issock _ = False
 #endif
 
-foreign import ccall unsafe "__hscore_bufsiz"   dEFAULT_BUFFER_SIZE :: Int
-foreign import ccall unsafe "__hscore_seek_cur" sEEK_CUR :: CInt
-foreign import ccall unsafe "__hscore_seek_set" sEEK_SET :: CInt
-foreign import ccall unsafe "__hscore_seek_end" sEEK_END :: CInt
+foreign import ccall unsafe "__hscore_bufsiz"  dEFAULT_BUFFER_SIZE :: Int
+foreign import capi  unsafe "stdio.h value SEEK_CUR" sEEK_CUR :: CInt
+foreign import capi  unsafe "stdio.h value SEEK_SET" sEEK_SET :: CInt
+foreign import capi  unsafe "stdio.h value SEEK_END" sEEK_END :: CInt
 

@@ -177,12 +177,6 @@ __hscore_bufsiz(void)
 }
 
 INLINE int
-__hscore_seek_cur(void)
-{
-  return SEEK_CUR;
-}
-
-INLINE int
 __hscore_o_binary(void)
 {
 #if defined(_MSC_VER)
@@ -280,18 +274,6 @@ __hscore_o_nonblock( void )
 #else
   return 0;
 #endif
-}
-
-INLINE int
-__hscore_seek_set( void )
-{
-  return SEEK_SET;
-}
-
-INLINE int
-__hscore_seek_end( void )
-{
-  return SEEK_END;
 }
 
 INLINE int
