@@ -206,3 +206,8 @@ test('ffi_parsing_001',
      compile_and_run,
      ['ffi_parsing_001_c.c'])
 
+test('capi_value',
+     extra_clean(['capi_value_c.o']),
+     compile_and_run,
+     ['capi_value_c.c'])
+
