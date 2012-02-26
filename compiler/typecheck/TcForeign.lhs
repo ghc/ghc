@@ -263,13 +263,18 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
       checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
+      case target of
+          StaticTarget _ _ False
+           | not (null arg_tys) ->
+              addErrTc (text "`value' imports cannot have function types")
+          _ -> return ()
       return idecl
 
 
 -- This makes a convenient place to check
 -- that the C identifier is valid for C
 checkCTarget :: CCallTarget -> TcM ()
-checkCTarget (StaticTarget str _) = do
+checkCTarget (StaticTarget str _ _) = do
     checkCg checkCOrAsmOrLlvmOrDotNetOrInterp
     check (isCLabelString str) (badCName str)
 

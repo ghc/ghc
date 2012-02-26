@@ -127,6 +127,9 @@ data CCallTarget
 
   -- The first argument of the import is the name of a function pointer (an Addr#).
   --    Used when importing a label as "foreign import ccall "dynamic" ..."
+        Bool                            -- True => really a function
+                                        -- False => a value; only
+                                        -- allowed in CAPI imports
   | DynamicTarget
 
   deriving( Eq, Data, Typeable )
@@ -219,11 +222,14 @@ instance Outputable CCallSpec where
       gc_suf | playSafe safety = text "_GC"
              | otherwise       = empty
 
-      ppr_fun (StaticTarget fn Nothing)
-        = text "__pkg_ccall" <> gc_suf <+> pprCLabelString fn
-
-      ppr_fun (StaticTarget fn (Just pkgId))
-        = text "__pkg_ccall" <> gc_suf <+> ppr pkgId <+> pprCLabelString fn
+      ppr_fun (StaticTarget fn mPkgId isFun)
+        = text (if isFun then "__pkg_ccall"
+                         else "__pkg_ccall_value")
+       <> gc_suf
+       <+> (case mPkgId of
+            Nothing -> empty
+            Just pkgId -> ppr pkgId)
+       <+> pprCLabelString fn
 
       ppr_fun DynamicTarget
         = text "__dyn_ccall" <> gc_suf <+> text "\"\""
@@ -297,10 +303,11 @@ instance Binary CCallSpec where
           return (CCallSpec aa ab ac)
 
 instance Binary CCallTarget where
-    put_ bh (StaticTarget aa ab) = do
+    put_ bh (StaticTarget aa ab ac) = do
             putByte bh 0
             put_ bh aa
             put_ bh ab
+            put_ bh ac
     put_ bh DynamicTarget = do
             putByte bh 1
     get bh = do
@@ -308,7 +315,8 @@ instance Binary CCallTarget where
             case h of
               0 -> do aa <- get bh
                       ab <- get bh
-                      return (StaticTarget aa ab)
+                      ac <- get bh
+                      return (StaticTarget aa ab ac)
               _ -> do return DynamicTarget
 
 instance Binary CCallConv where

@@ -207,13 +207,13 @@ dsFCall fn_id co fcall mDeclHeader = do
 
     (fcall', cDoc) <-
               case fcall of
-              CCall (CCallSpec (StaticTarget cName mPackageId) CApiConv safety) ->
+              CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
                do fcall_uniq <- newUnique
                   let wrapperName = mkFastString "ghc_wrapper_" `appendFS`
                                     mkFastString (showSDoc (ppr fcall_uniq)) `appendFS`
                                     mkFastString "_" `appendFS`
                                     cName
-                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId) CApiConv safety)
+                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
                       c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
                       includes = vcat [ text "#include <" <> ftext h <> text ">"
@@ -222,7 +222,11 @@ dsFCall fn_id co fcall mDeclHeader = do
                       cRet
                        | isVoidRes =                   cCall
                        | otherwise = text "return" <+> cCall
-                      cCall = ppr cName <> parens argVals
+                      cCall = if isFun
+                              then ppr cName <> parens argVals
+                              else if null arg_tys
+                                    then ppr cName
+                                    else panic "dsFCall: Unexpected arguments to FFI value import"
                       raw_res_ty = case tcSplitIOType_maybe io_res_ty of
                                    Just (_ioTyCon, res_ty) -> res_ty
                                    Nothing                 -> io_res_ty

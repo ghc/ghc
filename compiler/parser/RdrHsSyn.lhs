@@ -914,7 +914,7 @@ mkImport :: CCallConv
          -> P (HsDecl RdrName)
 mkImport cconv safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
-  let funcTarget = CFunction (StaticTarget entity Nothing)
+  let funcTarget = CFunction (StaticTarget entity Nothing True)
       importSpec = CImport PrimCallConv safety Nothing funcTarget
   return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
 
@@ -937,9 +937,11 @@ parseCImport cconv safety nm str =
        r <- choice [
           string "dynamic" >> return (mk Nothing (CFunction DynamicTarget)),
           string "wrapper" >> return (mk Nothing CWrapper),
-          optional (token "static" >> skipSpaces) >>
-           (mk Nothing <$> cimp nm) +++
-           (do h <- munch1 hdr_char; skipSpaces; mk (Just (Header (mkFastString h))) <$> cimp nm)
+          do optional (token "static" >> skipSpaces)
+             ((mk Nothing <$> cimp nm) +++
+              (do h <- munch1 hdr_char
+                  skipSpaces
+                  mk (Just (Header (mkFastString h))) <$> cimp nm))
          ]
        skipSpaces
        return r
@@ -960,7 +962,15 @@ parseCImport cconv safety nm str =
    id_char       c = isAlphaNum c || c == '_'
 
    cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
-             +++ ((\c -> CFunction (StaticTarget c Nothing)) <$> cid)
+             +++ (do isFun <- case cconv of
+                              CApiConv ->
+                                  option True
+                                         (do token "value"
+                                             skipSpaces
+                                             return False)
+                              _ -> return True
+                     cid' <- cid
+                     return (CFunction (StaticTarget cid' Nothing isFun)))
           where
             cid = return nm +++
                   (do c  <- satisfy id_first_char

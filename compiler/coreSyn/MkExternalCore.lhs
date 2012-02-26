@@ -138,8 +138,10 @@ make_exp (Var v) = do
   isLocal <- isALocal vName
   return $
      case idDetails v of
-       FCallId (CCall (CCallSpec (StaticTarget nm _) callconv _)) 
+       FCallId (CCall (CCallSpec (StaticTarget nm _ True) callconv _)) 
            -> C.External (unpackFS nm) (showSDoc (ppr callconv)) (make_ty (varType v))
+       FCallId (CCall (CCallSpec (StaticTarget _ _ False) _ _)) ->
+           panic "make_exp: FFI values not supported"
        FCallId (CCall (CCallSpec DynamicTarget     callconv _)) 
            -> C.DynExternal            (showSDoc (ppr callconv)) (make_ty (varType v))
        -- Constructors are always exported, so make sure to declare them

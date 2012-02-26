@@ -169,8 +169,7 @@ foreign import ccall interruptible
           declarations, e.g.
 
 <programlisting>
-foreign import capi
-    "header.h f" :: CInt -> IO CInt
+foreign import capi "header.h f" f :: CInt -> IO CInt
 </programlisting>
 
           Rather than generating code to call <literal>f</literal>
@@ -179,6 +178,25 @@ foreign import capi
           <literal>header.h</literal>. Thus <literal>f</literal> can be
           called even if it may be defined as a CPP
           <literal>#define</literal> rather than a proper function.
+        </para>
+
+        <para>
+          When using <literal>capi</literal>, it is also possible to
+          import values, rather than functions. For example,
+
+<programlisting>
+foreign import capi "pi.h pi" c_pi :: CDouble
+</programlisting>
+
+          will work regardless of whether <literal>pi</literal> is
+          defined as
+<programlisting>
+const double pi = 3.14;
+</programlisting>
+          or with
+<programlisting>
+#define pi 3.14
+</programlisting>
         </para>
 
         <para>

@@ -407,8 +407,8 @@ patchCImportSpec packageId spec
 patchCCallTarget :: PackageId -> CCallTarget -> CCallTarget
 patchCCallTarget packageId callTarget
  = case callTarget of
- 	StaticTarget label Nothing
-	 -> StaticTarget label (Just packageId)
+ 	StaticTarget label Nothing isFun
+	 -> StaticTarget label (Just packageId) isFun
 
 	_			-> callTarget	
 

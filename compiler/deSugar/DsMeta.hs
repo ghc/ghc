@@ -350,10 +350,11 @@ repForD (L loc (ForeignImport name typ _ (CImport cc s mch cis)))
  where
     conv_cimportspec (CLabel cls) = notHandled "Foreign label" (doubleQuotes (ppr cls))
     conv_cimportspec (CFunction DynamicTarget) = return "dynamic"
-    conv_cimportspec (CFunction (StaticTarget fs _)) = return (unpackFS fs)
+    conv_cimportspec (CFunction (StaticTarget fs _ True)) = return (unpackFS fs)
+    conv_cimportspec (CFunction (StaticTarget _  _ False)) = panic "conv_cimportspec: values not supported yet"
     conv_cimportspec CWrapper = return "wrapper"
     static = case cis of
-                 CFunction (StaticTarget _ _) -> "static "
+                 CFunction (StaticTarget _ _ _) -> "static "
                  _ -> ""
     chStr = case mch of
             Nothing -> ""
