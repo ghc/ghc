@@ -416,10 +416,13 @@ foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
 
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__)
-foreign import ccall unsafe "HsBase.h __hscore_lseek"
+foreign import ccall unsafe "io.h _lseeki64"
    c_lseek :: CInt -> Int64 -> CInt -> IO Int64
 #else
-foreign import ccall unsafe "HsBase.h __hscore_lseek"
+-- We use CAPI as on some OSs (eg. Linux) this is wrapped by a macro
+-- which redirects to the 64-bit-off_t versions when large file
+-- support is enabled.
+foreign import capi unsafe "unistd.h lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
 #endif
 

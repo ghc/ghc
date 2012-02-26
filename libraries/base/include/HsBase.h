@@ -534,20 +534,6 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
 }
 #endif
 
-// These are wrapped because on some OSs (eg. Linux) they are
-// macros which redirect to the 64-bit-off_t versions when large file
-// support is enabled.
-//
-#if defined(__MINGW32__)
-INLINE off64_t __hscore_lseek(int fd, off64_t off, int whence) {
-	return (_lseeki64(fd,off,whence));
-}
-#else
-INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
-	return (lseek(fd,off,whence));
-}
-#endif
-
 #if darwin_HOST_OS
 // You should not access _environ directly on Darwin in a bundle/shared library.
 // See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html
