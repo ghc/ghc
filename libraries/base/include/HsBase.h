@@ -519,8 +519,6 @@ __hscore_fd_cloexec( void )
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
 
-INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
-
 #ifdef __MINGW32__
 INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
