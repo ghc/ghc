@@ -932,6 +932,16 @@ stg_atomicallyzh
   jump stg_ap_v_fast;
 }
 
+// A closure representing "atomically x".  This is used when a thread
+// inside a transaction receives an asynchronous exception; see #5866.
+// It is somewhat similar to the stg_raise closure.
+//
+INFO_TABLE(stg_atomically,1,0,THUNK_1_0,"atomically","atomically")
+{
+  R1 = StgThunk_payload(R1,0);
+  jump stg_atomicallyzh;
+}
+
 
 stg_catchSTMzh
 {
