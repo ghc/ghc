@@ -185,7 +185,7 @@ foreign import capi "header.h f" f :: CInt -> IO CInt
           import values, rather than functions. For example,
 
 <programlisting>
-foreign import capi "pi.h pi" c_pi :: CDouble
+foreign import capi "pi.h value pi" c_pi :: CDouble
 </programlisting>
 
           will work regardless of whether <literal>pi</literal> is
