@@ -202,9 +202,10 @@ genCall env t@(CmmPrim (MO_PopCnt w) _) [CmmHinted dst _] args _ = do
 
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
-genCall env t@(CmmPrim op _) [] args CmmMayReturn | op == MO_Memcpy ||
-                                                    op == MO_Memset ||
-                                                    op == MO_Memmove = do
+genCall env t@(CmmPrim op _) [] args CmmMayReturn
+ | op == MO_Memcpy ||
+   op == MO_Memset ||
+   op == MO_Memmove = do
     let (isVolTy, isVolVal) = if getLlvmVer env >= 28
                                  then ([i1], [mkIntLit i1 0]) else ([], [])
         argTy | op == MO_Memset = [i8Ptr, i8,    llvmWord, i32] ++ isVolTy
@@ -222,8 +223,8 @@ genCall env t@(CmmPrim op _) [] args CmmMayReturn | op == MO_Memcpy ||
                 `appOL` trashStmts `snocOL` call
     return (env2, stmts, top1 ++ top2)
 
-genCall env (CmmPrim _ (Just mkStmts)) results args _
-    = stmtsToInstrs env (mkStmts results args) (nilOL, [])
+genCall env (CmmPrim _ (Just stmts)) _ _ _
+    = stmtsToInstrs env stmts (nilOL, [])
 
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do

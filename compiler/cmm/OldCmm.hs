@@ -222,8 +222,8 @@ instance UserOfLocalRegs CmmStmt where
       gen a set = foldRegsUsed f set a
 
 instance UserOfLocalRegs CmmCallTarget where
-    foldRegsUsed f set (CmmCallee e _) = foldRegsUsed f set e
-    foldRegsUsed _ set (CmmPrim {})    = set
+    foldRegsUsed f set (CmmCallee e _)    = foldRegsUsed f set e
+    foldRegsUsed f set (CmmPrim _ mStmts) = foldRegsUsed f set mStmts
 
 instance UserOfSlots CmmCallTarget where
     foldSlotsUsed f set (CmmCallee e _) = foldSlotsUsed f set e
@@ -296,5 +296,5 @@ data CmmCallTarget
         -- If we don't know how to implement the
         -- mach op, then we can replace it with
         -- this list of statements:
-        (Maybe ([HintedCmmFormal] -> [HintedCmmActual] -> [CmmStmt]))
+        (Maybe [CmmStmt])
 

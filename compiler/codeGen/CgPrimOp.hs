@@ -443,13 +443,11 @@ emitPrimOp [res] op args live
      stmtC stmt
 
 emitPrimOp [res_q, res_r] IntQuotRemOp [arg_x, arg_y] _
-    = let genericImpl [CmmHinted res_q _, CmmHinted res_r _]
-                      [CmmHinted arg_x _, CmmHinted arg_y _]
+    = let genericImpl
               = [CmmAssign (CmmLocal res_q)
                            (CmmMachOp (MO_S_Quot wordWidth) [arg_x, arg_y]),
                  CmmAssign (CmmLocal res_r)
                            (CmmMachOp (MO_S_Rem  wordWidth) [arg_x, arg_y])]
-          genericImpl _ _ = panic "emitPrimOp IntQuotRemOp generic: bad lengths"
           stmt = CmmCall (CmmPrim (MO_S_QuotRem wordWidth) (Just genericImpl))
                          [CmmHinted res_q NoHint,
                           CmmHinted res_r NoHint]
@@ -458,13 +456,11 @@ emitPrimOp [res_q, res_r] IntQuotRemOp [arg_x, arg_y] _
                          CmmMayReturn
       in stmtC stmt
 emitPrimOp [res_q, res_r] WordQuotRemOp [arg_x, arg_y] _
-    = let genericImpl [CmmHinted res_q _, CmmHinted res_r _]
-                      [CmmHinted arg_x _, CmmHinted arg_y _]
+    = let genericImpl
               = [CmmAssign (CmmLocal res_q)
                            (CmmMachOp (MO_U_Quot wordWidth) [arg_x, arg_y]),
                  CmmAssign (CmmLocal res_r)
                            (CmmMachOp (MO_U_Rem  wordWidth) [arg_x, arg_y])]
-          genericImpl _ _ = panic "emitPrimOp WordQuotRemOp generic: bad lengths"
           stmt = CmmCall (CmmPrim (MO_U_QuotRem wordWidth) (Just genericImpl))
                          [CmmHinted res_q NoHint,
                           CmmHinted res_r NoHint]
@@ -477,8 +473,7 @@ emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
       r2 <- newLocalReg (cmmExprType arg_x)
       -- This generic implementation is very simple and slow. We might
       -- well be able to do better, but for now this at least works.
-      let genericImpl [CmmHinted res_h _, CmmHinted res_l _]
-                      [CmmHinted arg_x _, CmmHinted arg_y _]
+      let genericImpl
            = [CmmAssign (CmmLocal r1)
                   (add (bottomHalf arg_x) (bottomHalf arg_y)),
               CmmAssign (CmmLocal r2)
@@ -497,7 +492,6 @@ emitPrimOp [res_h, res_l] WordAdd2Op [arg_x, arg_y] _
                      hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
                                           wordWidth)
                      hwm = CmmLit (CmmInt halfWordMask wordWidth)
-          genericImpl _ _ = panic "emitPrimOp WordAdd2Op generic: bad lengths"
           stmt = CmmCall (CmmPrim (MO_Add2 wordWidth) (Just genericImpl))
                          [CmmHinted res_h NoHint,
                           CmmHinted res_l NoHint]
@@ -513,8 +507,7 @@ emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
       r    <- liftM CmmLocal $ newLocalReg t
       -- This generic implementation is very simple and slow. We might
       -- well be able to do better, but for now this at least works.
-      let genericImpl [CmmHinted res_h _, CmmHinted res_l _]
-                      [CmmHinted arg_x _, CmmHinted arg_y _]
+      let genericImpl
            = [CmmAssign xlyl
                   (mul (bottomHalf arg_x) (bottomHalf arg_y)),
               CmmAssign xlyh
@@ -543,7 +536,6 @@ emitPrimOp [res_h, res_l] WordMul2Op [arg_x, arg_y] _
                      hww = CmmLit (CmmInt (fromIntegral (widthInBits halfWordWidth))
                                           wordWidth)
                      hwm = CmmLit (CmmInt halfWordMask wordWidth)
-          genericImpl _ _ = panic "emitPrimOp WordMul2Op generic: bad lengths"
           stmt = CmmCall (CmmPrim (MO_U_Mul2 wordWidth) (Just genericImpl))
                          [CmmHinted res_h NoHint,
                           CmmHinted res_l NoHint]

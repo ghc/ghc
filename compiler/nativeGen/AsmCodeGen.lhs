@@ -880,7 +880,11 @@ cmmStmtConFold stmt
                               CmmCallee e conv -> do
                                 e' <- cmmExprConFold CallReference e
                                 return $ CmmCallee e' conv
-                              other -> return other
+                              op@(CmmPrim _ Nothing) ->
+                                return op
+                              CmmPrim op (Just stmts) ->
+                                do stmts' <- mapM cmmStmtConFold stmts
+                                   return $ CmmPrim op (Just stmts')
                  args' <- mapM (\(CmmHinted arg hint) -> do
                                   arg' <- cmmExprConFold DataReference arg
                                   return (CmmHinted arg' hint)) args

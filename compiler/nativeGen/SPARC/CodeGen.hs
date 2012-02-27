@@ -383,13 +383,13 @@ genCCall
 genCCall (CmmPrim (MO_WriteBarrier) _) _ _
  = do   return nilOL
 
-genCCall (CmmPrim _ (Just mkStmts)) results args
-    = stmtsToInstrs (mkStmts results args)
+genCCall (CmmPrim _ (Just stmts)) _ _
+    = stmtsToInstrs stmts
 
 genCCall target dest_regs argsAndHints
  = do
         -- need to remove alignment information
-        let argsAndHints' | (CmmPrim mop _) <- target,
+        let argsAndHints' | CmmPrim mop _ <- target,
                             (mop == MO_Memcpy ||
                              mop == MO_Memset ||
                              mop == MO_Memmove)

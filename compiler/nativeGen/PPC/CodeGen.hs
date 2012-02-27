@@ -901,8 +901,8 @@ genCCall'
 genCCall' _ (CmmPrim MO_WriteBarrier _) _ _
  = return $ unitOL LWSYNC
 
-genCCall' _ (CmmPrim _ (Just mkStmts)) results args
-    = stmtsToInstrs (mkStmts results args)
+genCCall' _ (CmmPrim _ (Just stmts)) _ _
+    = stmtsToInstrs stmts
 
 genCCall' gcp target dest_regs argsAndHints
   = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
@@ -946,7 +946,7 @@ genCCall' gcp target dest_regs argsAndHints
                                 GCPLinux -> roundTo 16 finalStack
 
         -- need to remove alignment information
-        argsAndHints' | (CmmPrim mop _) <- target,
+        argsAndHints' | CmmPrim mop _ <- target,
                         (mop == MO_Memcpy ||
                          mop == MO_Memset ||
                          mop == MO_Memmove)

@@ -1707,8 +1707,8 @@ genCCall32 target dest_regs args =
                return code
         _ -> panic "genCCall32: Wrong number of arguments/results for add2"
 
-    (CmmPrim _ (Just mkStmts), results) ->
-        stmtsToInstrs (mkStmts results args)
+    (CmmPrim _ (Just stmts), _) ->
+        stmtsToInstrs stmts
 
     _ -> genCCall32' target dest_regs args
 
@@ -1927,8 +1927,8 @@ genCCall64 target dest_regs args =
                return code
         _ -> panic "genCCall64: Wrong number of arguments/results for add2"
 
-    (CmmPrim _ (Just mkStmts), results) ->
-        stmtsToInstrs (mkStmts results args)
+    (CmmPrim _ (Just stmts), _) ->
+        stmtsToInstrs stmts
 
     _ -> genCCall64' target dest_regs args
 
