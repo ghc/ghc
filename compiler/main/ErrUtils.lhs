@@ -9,7 +9,7 @@ module ErrUtils (
         ErrMsg, WarnMsg, Severity(..),
         Messages, ErrorMessages, WarningMessages,
         errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
-        MsgDoc, mkLocMessage, printError, pprMessageBag, pprErrMsgBag, 
+        MsgDoc, mkLocMessage, pprMessageBag, pprErrMsgBag,
         pprLocErrMsg, makeIntoWarning,
         
         errorsFound, emptyMessages,
@@ -94,9 +94,6 @@ mkLocMessage severity locn msg
                  _other     -> empty                 
       -- For warnings, print    Foo.hs:34: Warning:
       --                           <the warning message>
-
-printError :: SrcSpan -> MsgDoc -> IO ()
-printError span msg = printErrs (mkLocMessage SevError span msg) defaultErrStyle
 
 makeIntoWarning :: ErrMsg -> ErrMsg
 makeIntoWarning err = err { errMsgSeverity = SevWarning }
