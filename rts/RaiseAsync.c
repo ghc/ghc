@@ -957,19 +957,64 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 tso->what_next = ThreadRunGHC;
                 goto done;
 	    }
-	    // Not stop_at_atomically... fall through and abort the
-	    // transaction.
-	    
-	case CATCH_STM_FRAME:
+            else
+            {
+                // Freezing an STM transaction.  Just aborting the
+                // transaction would be wrong; this is what we used to
+                // do, and it goes wrong if the ATOMICALLY_FRAME ever
+                // gets back onto the stack again, which it will do if
+                // the transaction is inside unsafePerformIO or
+                // unsafeInterleaveIO and hence inside an UPDATE_FRAME.
+                //
+                // So we want to make it so that if the enclosing
+                // computation is resumed, we will re-execute the
+                // transaction.  We therefore:
+                //
+                //   1. abort the current transaction
+                //   3. replace the stack up to and including the
+                //      atomically frame with a closure representing
+                //      a call to "atomically x", where x is the code
+                //      of the transaction.
+                //   4. continue stripping the stack
+                //
+                StgTRecHeader *trec = tso->trec;
+                StgTRecHeader *outer = trec->enclosing_trec;
+
+                StgThunk *atomically;
+                StgAtomicallyFrame *af = (StgAtomicallyFrame*)frame;
+
+                debugTraceCap(DEBUG_stm, cap,
+                              "raiseAsync: freezing atomically frame")
+                stmAbortTransaction(cap, trec);
+                stmFreeAbortedTRec(cap, trec);
+                tso->trec = outer;
+
+                atomically = (StgThunk*)allocate(cap,sizeofW(StgThunk)+1);
+                TICK_ALLOC_SE_THK(1,0);
+                SET_HDR(atomically,&stg_atomically_info,af->header.prof.ccs);
+                atomically->payload[0] = af->code;
+
+                // discard stack up to and including the ATOMICALLY_FRAME
+                frame += sizeofW(StgAtomicallyFrame);
+                sp = frame - 1;
+
+                // replace the ATOMICALLY_FRAME with call to atomically#
+                sp[0] = (W_)atomically;
+                continue;
+            }
+
+        case CATCH_STM_FRAME:
 	case CATCH_RETRY_FRAME:
-	    // IF we find an ATOMICALLY_FRAME then we abort the
-	    // current transaction and propagate the exception.  In
-	    // this case (unlike ordinary exceptions) we do not care
+            // CATCH frames within an atomically block: abort the
+            // inner transaction and continue.  Eventually we will
+            // hit the outer transaction that will get frozen (see
+            // above).
+            //
+            // In this case (unlike ordinary exceptions) we do not care
 	    // whether the transaction is valid or not because its
 	    // possible validity cannot have caused the exception
 	    // and will not be visible after the abort.
-
-		{
+        {
             StgTRecHeader *trec = tso -> trec;
             StgTRecHeader *outer = trec -> enclosing_trec;
 	    debugTraceCap(DEBUG_stm, cap,
@@ -978,8 +1023,8 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    stmFreeAbortedTRec(cap, trec);
             tso -> trec = outer;
             break;
-	    };
-	    
+        };
+
 	default:
 	    break;
 	}
