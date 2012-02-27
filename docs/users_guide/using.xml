@@ -2017,6 +2017,35 @@ f "2"    = 2
       <ulink
 	url="&libraryBaseLocation;/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>.  More information on Concurrent Haskell is provided in the documentation for that module.</para>
 
+    <para>
+      Optionally, the program may be linked with
+      the <option>-threaded</option> option (see
+      <xref linkend="options-linker" />.  This provides two benefits:
+
+      <itemizedlist>
+        <listitem>
+          <para>It enables the <option>-N</option><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm> RTS option to be
+            used, which allows threads to run in
+            parallel<indexterm><primary>parallelism</primary></indexterm>
+            on a
+            multiprocessor<indexterm><primary>multiprocessor</primary></indexterm><indexterm><primary>SMP</primary></indexterm>
+            or
+            multicore<indexterm><primary>multicore</primary></indexterm>
+            machine.  See <xref linkend="using-smp" />.</para>
+        </listitem>
+        <listitem>
+          <para>If a thread makes a foreign call (and the call is
+            not marked <literal>unsafe</literal>), then other
+            Haskell threads in the program will continue to run
+            while the foreign call is in progress.
+            Additionally, <literal>foreign export</literal>ed
+            Haskell functions may be called from multiple OS
+            threads simultaneously.  See
+            <xref linkend="ffi-threads" />.</para>
+        </listitem>
+      </itemizedlist>
+    </para>
+
     <para>The following RTS option(s) affect the behaviour of Concurrent
       Haskell programs:<indexterm><primary>RTS options, concurrent</primary></indexterm></para>
 
