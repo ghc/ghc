@@ -2174,9 +2174,6 @@ f "2"    = 2
               enabling the parallel garbage collector (see
               <xref linkend="rts-options-gc" />).</para>
 
-            <para>There is no means (currently) by which this value
-	      may vary after the program has started.</para>
-
             <para>The current value of the <option>-N</option> option
               is available to the Haskell program
               via <literal>Control.Concurrent.getNumCapabilities</literal>, and
