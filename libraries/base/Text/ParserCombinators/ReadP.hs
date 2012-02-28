@@ -82,9 +82,7 @@ module Text.ParserCombinators.ReadP
 import Control.Monad( MonadPlus(..), sequence, liftM2 )
 
 #ifdef __GLASGOW_HASKELL__
-#ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode ( isSpace  )
-#endif
 import GHC.List ( replicate, null )
 import GHC.Base
 #else

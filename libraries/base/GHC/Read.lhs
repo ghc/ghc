@@ -64,9 +64,7 @@ import Text.ParserCombinators.ReadPrec
 
 import Data.Maybe
 
-#ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode       ( isDigit )
-#endif
 import GHC.Num
 import GHC.Real
 import GHC.Float ()

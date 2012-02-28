@@ -235,14 +235,7 @@ instance Monoid a => Monoid (Maybe a) where
 
 -- | Maybe monoid returning the leftmost non-Nothing value.
 newtype First a = First { getFirst :: Maybe a }
-#ifndef __HADDOCK__
         deriving (Eq, Ord, Read, Show)
-#else  /* __HADDOCK__ */
-instance Eq a => Eq (First a)
-instance Ord a => Ord (First a)
-instance Read a => Read (First a)
-instance Show a => Show (First a)
-#endif
 
 instance Monoid (First a) where
         mempty = First Nothing
@@ -251,14 +244,7 @@ instance Monoid (First a) where
 
 -- | Maybe monoid returning the rightmost non-Nothing value.
 newtype Last a = Last { getLast :: Maybe a }
-#ifndef __HADDOCK__
         deriving (Eq, Ord, Read, Show)
-#else  /* __HADDOCK__ */
-instance Eq a => Eq (Last a)
-instance Ord a => Ord (Last a)
-instance Read a => Read (Last a)
-instance Show a => Show (Last a)
-#endif
 
 instance Monoid (Last a) where
         mempty = Last Nothing

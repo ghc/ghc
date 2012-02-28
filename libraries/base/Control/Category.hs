@@ -40,10 +40,7 @@ class Category cat where
 
 instance Category (->) where
     id = Prelude.id
-#ifndef __HADDOCK__
--- Haddock 1.x cannot parse this:
     (.) = (Prelude..)
-#endif
 
 -- | Right-to-left composition
 (<<<) :: Category cat => cat b c -> cat a b -> cat a c
