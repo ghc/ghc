@@ -28,6 +28,7 @@ module GHC.Enum(
    ) where
 
 import GHC.Base
+import GHC.Char
 import GHC.Integer
 import GHC.Num
 import GHC.Show

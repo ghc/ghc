@@ -35,6 +35,7 @@ import Text.ParserCombinators.ReadP
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+import GHC.Char
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
 import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )

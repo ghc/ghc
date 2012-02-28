@@ -26,6 +26,7 @@ import GHC.IO.Buffer
 import GHC.IO.Exception
 
 import GHC.Base
+import GHC.Char
 import GHC.Word
 import GHC.Show
 import GHC.Num

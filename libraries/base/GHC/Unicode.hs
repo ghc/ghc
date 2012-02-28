@@ -31,6 +31,7 @@ module GHC.Unicode (
     ) where
 
 import GHC.Base
+import GHC.Char
 import GHC.Real        (fromIntegral)
 import Foreign.C.Types (CInt(..))
 

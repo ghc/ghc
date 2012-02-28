@@ -109,7 +109,6 @@ import GHC.Types
 import GHC.Classes
 import GHC.CString
 import GHC.Prim
-import {-# SOURCE #-} GHC.Show
 import {-# SOURCE #-} GHC.Err
 import {-# SOURCE #-} GHC.IO (failIO)
 
@@ -457,13 +456,6 @@ type String = [Char]
 "x# `leChar#` x#" forall x#. x# `leChar#` x# = True
 "x# `ltChar#` x#" forall x#. x# `ltChar#` x# = False
   #-}
-
--- | The 'Prelude.toEnum' method restricted to the type 'Data.Char.Char'.
-chr :: Int -> Char
-chr i@(I# i#)
- | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
- | otherwise
-    = error ("Prelude.chr: bad argument: " ++ showSignedInt (I# 9#) i "")
 
 unsafeChr :: Int -> Char
 unsafeChr (I# i#) = C# (chr# i#)
