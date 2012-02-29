@@ -1081,7 +1081,7 @@ warnTcS loc warn_if doc
 getDefaultInfo ::  TcS (SimplContext, [Type], (Bool, Bool))
 getDefaultInfo 
   = do { ctxt <- getTcSContext
-       ; (tys, flags) <- wrapTcS (TcM.tcGetDefaultTys (isInteractive ctxt))
+       ; (tys, flags) <- wrapTcS TcM.tcGetDefaultTys
        ; return (ctxt, tys, flags) }
 
 -- Just get some environments needed for instance looking up and matching

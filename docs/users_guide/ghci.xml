@@ -2649,6 +2649,28 @@ bar
 
       <varlistentry>
 	<term>
+          <literal>:seti</literal> <optional><replaceable>option</replaceable>...</optional>
+          <indexterm><primary><literal>:seti</literal></primary></indexterm>
+        </term>
+	<listitem>
+          <para>
+            Like <literal>:set</literal>, but options set with
+            <literal>:seti</literal> affect only expressions and
+            commands typed at the prompt, and not modules loaded with
+            <literal>:load</literal> (in contrast, options set with
+            <literal>:set</literal> apply everywhere).  See <xref
+            linkend="ghci-interactive-options" />.
+          </para>
+          <para>
+            Without any arguments, displays the current set of options
+            that are applied to expressions and commands typed at the
+            prompt.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:show bindings</literal>
           <indexterm><primary><literal>:show bindings</literal></primary></indexterm>
         </term>
@@ -2824,8 +2846,9 @@ bar
   </sect1>
 
   <sect1 id="ghci-set">
-    <title>The <literal>:set</literal> command</title>
+    <title>The <literal>:set</literal> and <literal>:seti</literal> commands</title>
     <indexterm><primary><literal>:set</literal></primary></indexterm>
+    <indexterm><primary><literal>:seti</literal></primary></indexterm>
 
     <para>The <literal>:set</literal> command sets two types of
     options: GHCi options, which begin with
@@ -2945,7 +2968,71 @@ Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
       not take effect until the next reload.</para>
       <indexterm><primary>static</primary><secondary>options</secondary></indexterm>
     </sect2>
+
+    <sect2 id="ghci-interactive-options">
+      <title>Setting options for interactive evaluation only</title>
+
+      <para>
+        GHCi actually maintains two sets of options: one set that
+        applies when loading modules, and another set that applies for
+        expressions and commands typed at the prompt.  The
+        <literal>:set</literal> command modifies both, but there is
+        also a <literal>:seti</literal> command (for "set
+        interactive") that affects only the second set.
+      </para>
+
+      <para>
+        The two sets of options can be inspected using the
+        <literal>:set</literal> and <literal>:seti</literal> commands
+        respectively, with no arguments.  For example, in a clean GHCi
+        session we might see something like this:
+      </para>
+
+<screen>
+Prelude> :seti
+base language is: Haskell2010
+with the following modifiers:
+  -XNoDatatypeContexts
+  -XNondecreasingIndentation
+  -XExtendedDefaultRules
+GHCi-specific dynamic flag settings:
+other dynamic, non-language, flag settings:
+  -fimplicit-import-qualified
+warning settings:
+</screen>
+
+      <para>
+        Note that the option <option>-XExtendedDefaultRules</option>
+        is on, because we apply special defaulting rules to
+        expressions typed at the prompt (see <xref
+        linkend="extended-default-rules" />).
+      </para>
+
+      <para>
+        It is often useful to change the language options for
+        expressions typed at the prompt only, without having that
+        option apply to loaded modules too.  A good example is
+<screen>
+:seti -XNoMonomorphismRestriction
+</screen>
+        It would be undesirable if
+        <option>-XNoMonomorphismRestriction</option> were to apply to
+        loaded modules too: that might cause a compilation error, but
+        more commonly it will cause extra recompilation, because GHC
+        will think that it needs to recompile the module because the
+        flags have changed.
+      </para>
+
+      <para>
+        It is therefore good practice if you are setting language
+        options in your <literal>.ghci</literal> file, to use
+        <literal>:seti</literal> rather than <literal>:set</literal>
+        unless you really do want them to apply to all modules you
+        load in GHCi.
+      </para>
+    </sect2>
   </sect1>
+
   <sect1 id="ghci-dot-files">
     <title>The <filename>.ghci</filename> file</title>
     <indexterm><primary><filename>.ghci</filename></primary><secondary>file</secondary>
@@ -2976,7 +3063,14 @@ Prelude> :set -fno-warn-incomplete-patterns -XNoMultiParamTypeClasses
 
     <para>The <filename>ghci.conf</filename> file is most useful for
     turning on favourite options (eg. <literal>:set +s</literal>), and
-    defining useful macros.  Placing a <filename>.ghci</filename> file
+    defining useful macros.  Note: when setting language options in
+    this file it is usually desirable to use <literal>:seti</literal>
+    rather than <literal>:set</literal> (see <xref
+    linkend="ghci-interactive-options" />).
+    </para>
+
+    <para>
+    Placing a <filename>.ghci</filename> file
     in a directory with a Haskell project is a useful way to set
     certain project-wide options so you don't have to type them
     every time you start GHCi: eg. if your project uses multi-parameter 

@@ -572,15 +572,13 @@ thTopLevelId id = isGlobalId id || isExternalName (idName id)
 %************************************************************************
 
 \begin{code}
-tcGetDefaultTys :: Bool         -- True <=> interactive context
-                -> TcM ([Type], -- Default types
+tcGetDefaultTys :: TcM ([Type], -- Default types
                         (Bool,  -- True <=> Use overloaded strings
                          Bool)) -- True <=> Use extended defaulting rules
-tcGetDefaultTys interactive
+tcGetDefaultTys
   = do  { dflags <- getDynFlags
         ; let ovl_strings = xopt Opt_OverloadedStrings dflags
-              extended_defaults = interactive
-                               || xopt Opt_ExtendedDefaultRules dflags
+              extended_defaults = xopt Opt_ExtendedDefaultRules dflags
                                         -- See also Trac #1974 
               flags = (ovl_strings, extended_defaults)
     

@@ -16,7 +16,7 @@ module GhciMonad (
         Command,
         BreakLocation(..),
         TickArray,
-        setDynFlags,
+        getDynFlags,
 
         runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
 
@@ -228,10 +228,6 @@ instance ExceptionMonad (InputT GHCi) where
   gmask f = Haskeline.block (f Haskeline.unblock) -- slightly wrong
   gblock = Haskeline.block
   gunblock = Haskeline.unblock
-
-setDynFlags :: DynFlags -> GHCi [PackageId]
-setDynFlags dflags = do
-  GHC.setSessionDynFlags dflags
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt

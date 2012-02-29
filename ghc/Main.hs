@@ -155,6 +155,8 @@ main' postLoadMode dflags0 args flagWarnings = do
 
       -- turn on -fimplicit-import-qualified for GHCi now, so that it
       -- can be overriden from the command-line
+      -- XXX: this should really be in the interactive DynFlags, but
+      -- we don't set that until later in interactiveUI
       dflags1a | DoInteractive <- postLoadMode = imp_qual_enabled
                | DoEval _      <- postLoadMode = imp_qual_enabled
                | otherwise                 = dflags1

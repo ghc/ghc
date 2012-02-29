@@ -146,7 +146,9 @@ builtin_commands = [
   ("run",       keepGoing runRun,               completeFilename),
   ("script",    keepGoing' scriptCmd,           completeFilename),
   ("set",       keepGoing setCmd,               completeSetOptions),
+  ("seti",      keepGoing setiCmd,              completeSeti),
   ("show",      keepGoing showCmd,              completeShowOptions),
+  ("showi",     keepGoing showiCmd,             completeShowiOptions),
   ("sprint",    keepGoing sprintCmd,            completeExpression),
   ("step",      keepGoing stepCmd,              completeIdentifier),
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
@@ -253,6 +255,7 @@ helpText =
   " -- Commands for changing settings:\n" ++
   "\n" ++
   "   :set <option> ...           set options\n" ++
+  "   :seti <option> ...          set options for interactive evaluation only\n" ++
   "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
   "   :set prog <progname>        set the value returned by System.getProgName\n" ++
   "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
@@ -279,9 +282,10 @@ helpText =
   "   :show imports               show the current imports\n" ++
   "   :show modules               show the currently loaded modules\n" ++
   "   :show packages              show the currently active package flags\n" ++
-  "   :show languages             show the currently active language flags\n" ++
+  "   :show language              show the currently active language flags\n" ++
   "   :show <setting>             show value of <setting>, which is one of\n" ++
   "                                  [args, prog, prompt, editor, stop]\n" ++
+  "   :showi language             show language flags for interactive evaluation\n" ++
   "\n"
 
 findEditor :: IO String
@@ -329,6 +333,11 @@ interactiveUI srcs maybe_exprs = do
 
     -- Initialise buffering for the *interpreted* I/O system
    initInterpBuffering
+
+   -- The initial set of DynFlags used for interactive evaluation is the same
+   -- as the global DynFlags, plus -XExtendedDefaultRules
+   dflags <- getDynFlags
+   GHC.setInteractiveDynFlags (xopt_set dflags Opt_ExtendedDefaultRules)
 
    liftIO $ when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
@@ -1778,47 +1787,8 @@ iiSubsumes _ _ = False
 -- figure out which ones & disallow them.
 
 setCmd :: String -> GHCi ()
-setCmd ""
-  = do st <- getGHCiState
-       let opts = options st
-       liftIO $ putStrLn (showSDoc (
-              text "options currently set: " <>
-              if null opts
-                   then text "none."
-                   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
-           ))
-       dflags <- getDynFlags
-       liftIO $ putStrLn (showSDoc (
-          text "GHCi-specific dynamic flag settings:" $$
-              nest 2 (vcat (map (flagSetting dflags) ghciFlags))
-          ))
-       liftIO $ putStrLn (showSDoc (
-          text "other dynamic, non-language, flag settings:" $$
-              nest 2 (vcat (map (flagSetting dflags) others))
-          ))
-       liftIO $ putStrLn (showSDoc (
-          text "warning settings:" $$
-              nest 2 (vcat (map (warnSetting dflags) DynFlags.fWarningFlags))
-          ))
-
-  where flagSetting dflags (str, f, _)
-          | dopt f dflags = fstr str
-          | otherwise     = fnostr str
-        warnSetting dflags (str, f, _)
-          | wopt f dflags = fstr str
-          | otherwise     = fnostr str
-
-        fstr   str = text "-f"    <> text str
-        fnostr str = text "-fno-" <> text str
-
-        (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flgs)
-                                        DynFlags.fFlags
-        flgs = [Opt_PrintExplicitForalls
-                ,Opt_PrintBindResult
-                ,Opt_BreakOnException
-                ,Opt_BreakOnError
-                ,Opt_PrintEvldWithShow
-                ]
+setCmd ""   = showOptions False
+setCmd "-a" = showOptions True
 setCmd str
   = case getCmd str of
     Right ("args",   rest) ->
@@ -1835,6 +1805,61 @@ setCmd str
     _ -> case toArgs str of
          Left err -> liftIO (hPutStrLn stderr err)
          Right wds -> setOptions wds
+
+setiCmd :: String -> GHCi ()
+setiCmd ""   = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags False
+setiCmd "-a" = GHC.getInteractiveDynFlags >>= liftIO . showDynFlags True
+setiCmd str  =
+  case toArgs str of
+    Left err -> liftIO (hPutStrLn stderr err)
+    Right wds -> newDynFlags True wds
+
+showOptions :: Bool -> GHCi ()
+showOptions show_all
+  = do st <- getGHCiState
+       let opts = options st
+       liftIO $ putStrLn (showSDoc (
+              text "options currently set: " <>
+              if null opts
+                   then text "none."
+                   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
+           ))
+       getDynFlags >>= liftIO . showDynFlags show_all
+
+
+showDynFlags :: Bool -> DynFlags -> IO ()
+showDynFlags show_all dflags = do
+  showLanguages' show_all dflags
+  putStrLn $ showSDoc $
+     text "GHCi-specific dynamic flag settings:" $$
+         nest 2 (vcat (map (setting dopt) ghciFlags))
+  putStrLn $ showSDoc $
+     text "other dynamic, non-language, flag settings:" $$
+         nest 2 (vcat (map (setting dopt) others))
+  putStrLn $ showSDoc $
+     text "warning settings:" $$
+         nest 2 (vcat (map (setting wopt) DynFlags.fWarningFlags))
+  where
+        setting test (str, f, _)
+          | quiet     = empty
+          | is_on     = fstr str
+          | otherwise = fnostr str
+          where is_on = test f dflags
+                quiet = not show_all && test f default_dflags == is_on
+
+        default_dflags = defaultDynFlags (settings dflags)
+
+        fstr   str = text "-f"    <> text str
+        fnostr str = text "-fno-" <> text str
+
+        (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flgs)
+                                        DynFlags.fFlags
+        flgs = [Opt_PrintExplicitForalls
+                ,Opt_PrintBindResult
+                ,Opt_BreakOnException
+                ,Opt_BreakOnError
+                ,Opt_PrintEvldWithShow
+                ]
 
 setArgs, setOptions :: [String] -> GHCi ()
 setProg, setEditor, setStop, setPrompt :: String -> GHCi ()
@@ -1885,32 +1910,48 @@ setOptions wds =
       let (plus_opts, minus_opts)  = partitionWith isPlus wds
       mapM_ setOpt plus_opts
       -- then, dynamic flags
-      newDynFlags minus_opts
+      newDynFlags False minus_opts
 
-newDynFlags :: [String] -> GHCi ()
-newDynFlags minus_opts = do
-      dflags0 <- getDynFlags
-      let pkg_flags = packageFlags dflags0
-      (dflags1, leftovers, warns) <- liftIO $ GHC.parseDynamicFlags dflags0 $ map noLoc minus_opts
-      liftIO $ handleFlagWarnings dflags1 warns
+newDynFlags :: Bool -> [String] -> GHCi ()
+newDynFlags interactive_only minus_opts = do
+      let lopts = map noLoc minus_opts
 
+      idflags0 <- GHC.getInteractiveDynFlags
+      (idflags1, leftovers, warns) <- GHC.parseDynamicFlags idflags0 lopts
+
+      liftIO $ handleFlagWarnings idflags1 warns
       when (not $ null leftovers)
            (ghcError . CmdLineError
             $ "Some flags have not been recognized: "
             ++ (concat . intersperse ", " $ map unLoc leftovers))
 
-      new_pkgs <- setDynFlags dflags1
+      when (interactive_only &&
+              packageFlags idflags1 /= packageFlags idflags0) $ do
+          liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
+      GHC.setInteractiveDynFlags idflags1
 
-      -- if the package flags changed, we should reset the context
-      -- and link the new packages.
-      dflags2 <- getDynFlags
-      when (packageFlags dflags2 /= pkg_flags) $ do
-        liftIO $ hPutStrLn stderr "package flags have changed, resetting and loading new packages..."
-        GHC.setTargets []
-        _ <- GHC.load LoadAllTargets
-        liftIO (linkPackages dflags2 new_pkgs)
-        -- package flags changed, we can't re-use any of the old context
-        setContextAfterLoad False []
+      dflags0 <- getDynFlags
+      when (not interactive_only) $ do
+        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags dflags0 lopts
+        new_pkgs <- GHC.setProgramDynFlags dflags1
+
+        -- if the package flags changed, reset the context and link
+        -- the new packages.
+        dflags2 <- getDynFlags
+        when (packageFlags dflags2 /= packageFlags dflags0) $ do
+          liftIO $ hPutStrLn stderr "package flags have changed, resetting and loading new packages..."
+          GHC.setTargets []
+          _ <- GHC.load LoadAllTargets
+          liftIO $ linkPackages dflags2 new_pkgs
+          -- package flags changed, we can't re-use any of the old context
+          setContextAfterLoad False []
+          -- and copy the package state to the interactive DynFlags
+          idflags <- GHC.getInteractiveDynFlags
+          GHC.setInteractiveDynFlags
+              idflags{ pkgState = pkgState dflags2
+                     , pkgDatabase = pkgDatabase dflags2
+                     , packageFlags = packageFlags dflags2 }
+
       return ()
 
 
@@ -1941,7 +1982,7 @@ unsetOptions str
              mapM_ unsetOpt plus_opts
 
              no_flags <- mapM no_flag minus_opts
-             newDynFlags no_flags
+             newDynFlags False no_flags
 
 isMinus :: String -> Bool
 isMinus ('-':_) = True
@@ -1981,6 +2022,8 @@ optToStr RevertCAFs = "r"
 -- :show
 
 showCmd :: String -> GHCi ()
+showCmd ""   = showOptions False
+showCmd "-a" = showOptions True
 showCmd str = do
   st <- getGHCiState
   case words str of
@@ -1996,9 +2039,19 @@ showCmd str = do
         ["breaks"]   -> showBkptTable
         ["context"]  -> showContext
         ["packages"]  -> showPackages
-        ["languages"]  -> showLanguages
+        ["languages"] -> showLanguages -- backwards compat
+        ["language"]  -> showLanguages
+        ["lang"]      -> showLanguages -- useful abbreviation
         _ -> ghcError (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
-                                     "               | breaks | context | packages | languages ]"))
+                                     "               | breaks | context | packages | language ]"))
+
+showiCmd :: String -> GHCi ()
+showiCmd str = do
+  case words str of
+        ["languages"]  -> showiLanguages -- backwards compat
+        ["language"]   -> showiLanguages
+        ["lang"]       -> showiLanguages -- useful abbreviation
+        _ -> ghcError (CmdLineError ("syntax:  :showi language"))
 
 showImports :: GHCi ()
 showImports = do
@@ -2090,18 +2143,42 @@ showPackages = do
         showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
 
 showLanguages :: GHCi ()
-showLanguages = do
-   dflags <- getDynFlags
-   liftIO $ putStrLn $ showSDoc $ vcat $
-      text "active language flags:" :
-      [text ("  -X" ++ str) | (str, f, _) <- DynFlags.xFlags, xopt f dflags]
+showLanguages = getDynFlags >>= liftIO . showLanguages' False
 
+showiLanguages :: GHCi ()
+showiLanguages = GHC.getInteractiveDynFlags >>= liftIO . showLanguages' False
+
+showLanguages' :: Bool -> DynFlags -> IO ()
+showLanguages' show_all dflags =
+  putStrLn $ showSDoc $ vcat
+     [ text "base language is: " <>
+         case language dflags of
+           Nothing          -> text "Haskell2010"
+           Just Haskell98   -> text "Haskell98"
+           Just Haskell2010 -> text "Haskell2010"
+     , (if show_all then text "all active language options:"
+                    else text "with the following modifiers:") $$
+          nest 2 (vcat (map (setting xopt) DynFlags.xFlags))
+     ]
+  where
+   setting test (str, f, _)
+          | quiet     = empty
+          | is_on     = text "-X" <> text str
+          | otherwise = text "-XNo" <> text str
+          where is_on = test f dflags
+                quiet = not show_all && test f default_dflags == is_on
+
+   default_dflags =
+       defaultDynFlags (settings dflags) `lang_set`
+         case language dflags of
+           Nothing -> Just Haskell2010
+           other   -> other
 
 -- -----------------------------------------------------------------------------
 -- Completion
 
 completeCmd, completeMacro, completeIdentifier, completeModule,
-    completeSetModule,
+    completeSetModule, completeSeti, completeShowiOptions,
     completeHomeModule, completeSetOptions, completeShowOptions,
     completeHomeModuleOrFile, completeExpression
     :: CompletionFunc GHCi
@@ -2173,11 +2250,18 @@ completeSetOptions = wrapCompleter flagWordBreakChars $ \w -> do
     where opts = "args":"prog":"prompt":"editor":"stop":flagList
           flagList = map head $ group $ sort allFlags
 
+completeSeti = wrapCompleter flagWordBreakChars $ \w -> do
+  return (filter (w `isPrefixOf`) flagList)
+    where flagList = map head $ group $ sort allFlags
+
 completeShowOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) opts)
     where opts = ["args", "prog", "prompt", "editor", "stop",
                      "modules", "bindings", "linker", "breaks",
-                     "context", "packages", "languages"]
+                     "context", "packages", "language"]
+
+completeShowiOptions = wrapCompleter flagWordBreakChars $ \w -> do
+  return (filter (w `isPrefixOf`) ["language"])
 
 completeHomeModuleOrFile = completeWord Nothing filenameWordBreakChars
                 $ unionComplete (fmap (map simpleCompletion) . listHomeModules)

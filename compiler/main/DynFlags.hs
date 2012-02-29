@@ -16,6 +16,7 @@ module DynFlags (
         DynFlag(..),
         WarningFlag(..),
         ExtensionFlag(..),
+        Language(..),
         LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
@@ -28,6 +29,7 @@ module DynFlags (
         xopt,
         xopt_set,
         xopt_unset,
+        lang_set,
         DynFlags(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -1078,15 +1080,16 @@ xopt_unset dfs f
       in dfs { extensions = onoffs,
                extensionFlags = flattenExtensionFlags (language dfs) onoffs }
 
+lang_set :: DynFlags -> Maybe Language -> DynFlags
+lang_set dflags lang =
+   dflags {
+            language = lang,
+            extensionFlags = flattenExtensionFlags lang (extensions dflags)
+          }
+
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
-setLanguage l = upd f
-    where f dfs = let mLang = Just l
-                      oneoffs = extensions dfs
-                  in dfs {
-                         language = mLang,
-                         extensionFlags = flattenExtensionFlags mLang oneoffs
-                     }
+setLanguage l = upd (`lang_set` Just l)
 
 -- | Some modules have dependencies on others through the DynFlags rather than textual imports
 dynFlagDependencies :: DynFlags -> [ModuleName]
