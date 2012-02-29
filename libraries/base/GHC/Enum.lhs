@@ -32,7 +32,6 @@ import GHC.Char
 import GHC.Integer
 import GHC.Num
 import GHC.Show
-import Data.Tuple       ()              -- for dependencies
 default ()              -- Double isn't available yet
 \end{code}
 

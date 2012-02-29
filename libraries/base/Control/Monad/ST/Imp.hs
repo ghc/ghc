@@ -35,9 +35,7 @@ module Control.Monad.ST.Imp (
         unsafeSTToIO            -- :: ST s a -> IO a
     ) where
 
-#if defined(__GLASGOW_HASKELL__)
-import Control.Monad.Fix ()
-#else
+#if !defined(__GLASGOW_HASKELL__)
 import Control.Monad.Fix
 #endif
 
