@@ -587,7 +587,15 @@ pprInstr platform (NEG reg1 reg2) = pprUnary platform (sLit "neg") reg1 reg2
 pprInstr platform (NOT reg1 reg2) = pprUnary platform (sLit "not") reg1 reg2
 
 pprInstr platform (SLW reg1 reg2 ri) = pprLogic platform (sLit "slw") reg1 reg2 (limitShiftRI ri)
+
+pprInstr platform (SRW reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
+    -- Handle the case where we are asked to shift a 32 bit register by
+    -- less than zero or more than 31 bits. We convert this into a clear
+    -- of the destination register.
+    -- Fixes ticket http://hackage.haskell.org/trac/ghc/ticket/5900
+    pprInstr platform (XOR reg1 reg2 (RIReg reg2))
 pprInstr platform (SRW reg1 reg2 ri) = pprLogic platform (sLit "srw") reg1 reg2 (limitShiftRI ri)
+
 pprInstr platform (SRAW reg1 reg2 ri) = pprLogic platform (sLit "sraw") reg1 reg2 (limitShiftRI ri)
 pprInstr platform (RLWINM reg1 reg2 sh mb me) = hcat [
         ptext (sLit "\trlwinm\t"),
@@ -705,9 +713,9 @@ pprFSize FF64     = empty
 pprFSize FF32     = char 's'
 pprFSize _        = panic "PPC.Ppr.pprFSize: no match"
 
-    -- limit immediate argument for shift instruction to range 0..32
-    -- (yes, the maximum is really 32, not 31)
+    -- limit immediate argument for shift instruction to range 0..31
 limitShiftRI :: RI -> RI
-limitShiftRI (RIImm (ImmInt i)) | i > 32 || i < 0 = RIImm (ImmInt 32)
+limitShiftRI (RIImm (ImmInt i)) | i > 31 || i < 0 =
+  panic $ "PPC.Ppr: Shift by " ++ show i ++ " bits is not allowed."
 limitShiftRI x = x
 
