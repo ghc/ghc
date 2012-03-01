@@ -95,6 +95,11 @@ coreBindsToCoreTerm should_sc binds
       -- it over a useless arg of void representation.
     (sc_binds, dont_sc_binds, dont_sc_binds_fvs) = partitionBinds should_sc binds
     
+    -- We should zap fragile information on the Ids' we use within the tuple selector. The reasons are:
+    --  1. They may be mutually inter-referring, and the binders of a "case" are not simultaneously brought into scope
+    --  2. For some reason, GHC seems to have trouble optimising (let x = y in x) to (y) if x has an unfolding.
+    zappedBindersOfBinds = map zapFragileIdInfo . bindersOfBinds
+
     -- This is a sweet hack. Most of the top-level binders will be External names. It is a Bad Idea to locally-bind
     -- an External name, because several Externals with the same name but different uniques will generate clashing
     -- C labels at code-generation time (the unique is not included in the label).
@@ -103,7 +108,7 @@ coreBindsToCoreTerm should_sc binds
     -- Note that we leave the *use sites* totally intact: we rely on the fact that a) variables are compared only by
     -- unique and b) the internality of these names will be carried down on the next simplifier run, so this works.
     -- The ice is thin, though!
-    sc_xs = bindersOfBinds sc_binds
+    sc_xs = zappedBindersOfBinds sc_binds
     internal_sc_binds = [case bind of NonRec x e -> NonRec (localiseInternaliseId x) e
                                       Rec xes    -> Rec (map (first localiseInternaliseId) xes)
                         | bind <- sc_binds]
@@ -117,7 +122,7 @@ coreBindsToCoreTerm should_sc binds
        | otherwise      = go (exported' ++ exported) exported'' undecided'
       where (exported'', undecided') = partition (\(x, _) -> x `elemVarSet` exported_xs') undecided
             exported_xs' = unionVarSets (map (S.idFreeVars . fst) exported')
-    sc_xs_internal_xs = uncurry (go []) (partition (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` bindersOfBinds internal_sc_binds))
+    sc_xs_internal_xs = uncurry (go []) (partition (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` zappedBindersOfBinds internal_sc_binds))
     sc_internal_xs = map snd sc_xs_internal_xs
     localiseInternaliseId x = setIdNotExported (x `setVarName` localiseName (varName x))
      -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
