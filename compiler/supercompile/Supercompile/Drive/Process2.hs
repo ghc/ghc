@@ -329,5 +329,5 @@ foo :: LevelM (Out FVedTerm) -> ScpM (FulfilmentT Identity (Out FVedTerm))
 foo = undefined
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ unI $ runFulfilmentT $ runHistoryThreadM $ runMemoT $ runContT $ runScpM $ liftM (foo . fmap snd) $ sc 0 state
-  where (state, _) = prepareTerm unfoldings e
+supercompile unfoldings e = fVedTermToTerm $ letRec to_bind $ unI $ runFulfilmentT $ runHistoryThreadM $ runMemoT $ runContT $ runScpM $ liftM (foo . fmap snd) $ sc 0 state
+  where (_, (to_bind, state), _) = prepareTerm unfoldings e

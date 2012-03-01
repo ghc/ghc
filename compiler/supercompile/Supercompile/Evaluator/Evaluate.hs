@@ -166,9 +166,11 @@ step' normalising ei_state = {-# SCC "step'" #-}
       = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return (deeds, Heap h ids, k, annedAnswerToInAnnedTerm ids $ annedAnswer (annedTag anned_a) a) }
       | otherwise = do
         hb <- M.lookup x' h
-        -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
-        guard (howBound hb == InternallyBound)
         in_e <- heapBindingTerm hb
+        -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
+        if (howBound hb == InternallyBound)
+         then return ()
+         else trace ("force non-internal: " ++ show x') $ fail "force"
         return $ case k of
              -- Avoid creating consecutive update frames: implements "stack squeezing"
              -- FIXME: squeeze through casts as well?

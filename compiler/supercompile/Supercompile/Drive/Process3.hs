@@ -149,6 +149,9 @@ instance MonadStatics ScpM where
     bindCapturedFloats _fvs mx = liftM ((,) []) mx -- FIXME: do something other than hope for the best
     monitorFVs = liftM ((,) emptyVarSet)
 
+withScpEnv :: (ScpEnv -> ScpEnv) -> ScpM a -> ScpM a
+withScpEnv f mx = ScpM $ StateT $ \s -> ReaderT $ \env -> unReaderT (unStateT (unScpM mx) s) (f env)
+
 runScpM :: TagAnnotations -> ScpM FVedTerm -> FVedTerm
 runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc (deepestPath fulfils (scpParentChildren s')) ++
                                                    "\nDepth histogram:\n" ++ showSDoc (depthHistogram (scpParentChildren s'))) e'
@@ -451,12 +454,10 @@ reduceForMatch :: State -> (Bool, State)
 reduceForMatch state = second gc $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ do
-    the_state <- if pREINITALIZE_MEMO_TABLE
-                  then preinitalise preinit_with >> return preinit_state
-                  else return state
-    liftM snd $ sc the_state
-  where (state, (preinit_with, preinit_state)) = prepareTerm unfoldings e
+supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ start (liftM snd . sc)
+  where (bvs_unfoldings, (to_bind, state), (preinit_with, preinit_state)) = prepareTerm unfoldings e
+        start k | pREINITALIZE_MEMO_TABLE = preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
+                | otherwise               = liftM (letRec to_bind) $ k state
 
 preinitalise :: [(State, FVedTerm)] -> ScpM ()
 preinitalise states_fulfils = forM_ states_fulfils $ \(state, e') -> do

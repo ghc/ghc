@@ -266,12 +266,13 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
 
 
 
-prepareTerm :: M.Map Var Term -> Term -> (State,                        -- For use without memo-cache preinitalization
+prepareTerm :: M.Map Var Term -> Term -> (S.Set Var,                    -- Names of all unfoldings in the input heaps
+                                          ([(Var,   FVedTerm)], State), -- For use without memo-cache preinitalization
                                           ([(State, FVedTerm)], State)) -- With preinitialization
 prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                            pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
-                           pprTraceSC "all input FVs" (ppr input_fvs) $
-                           (state, (preinit_with, preinit_state))
+                           pprTraceSC "all input FVs" (ppr (input_fvs `delVarSetList` unfolding_bvs_list)) $
+                           (unfolding_bvs, (h''_must_be_bound, state), (preinit_with, preinit_state))
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
         anned_e = toAnnedTerm tag_ids0 e
         
@@ -281,20 +282,52 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                           anned_e = toAnnedTerm tag_unf_ids e
                           input_fvs'' = input_fvs' `unionVarSet` varBndrFreeVars x' `unionVarSet` annedFreeVars anned_e
         
-        (_, h_fvs) = mapAccumL add_one_fv tag_ids2 (varSetElems input_fvs)
+        h_fvs = M.fromList $ snd $ mapAccumL add_one_fv tag_ids2 (varSetElems input_fvs)
           where add_one_fv tag_ids2 x' = (tag_ids3, (x', environmentallyBound (mkTag (getKey i))))
                     where (i, tag_ids3) = takeUniqFromSupply tag_ids2
-        
-        -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
+
+        unfolding_bvs_list = map fst h_unfoldings
+        unfolding_bvs = S.fromList unfolding_bvs_list
         deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
+        (speculated, (_stats, deeds', Heap h' ids')) = speculateHeap S.empty (mempty, deeds, mk_heap internallyBound)
+
+        -- FIXME: refs to deeds and heap (unprimed versions)
+
+        -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
         rn = mkIdentityRenaming input_fvs
         ids = mkInScopeSet input_fvs
-        mk_heap how_bound = Heap (M.fromList (map (second how_bound) h_unfoldings) `M.union` M.fromList h_fvs) ids
+        mk_heap how_bound = Heap (M.fromList (map (second how_bound) h_unfoldings) `M.union` h_fvs) ids
+        heap_binding_is_value = maybe True (termIsValue . snd) . heapBindingTerm
+
+        -- When *not* doing memocache preinitialization, we still want to be able to speculate the unfoldings to
+        -- discover more values (after all, the evaluator can only inline LetBound values). But this might cause
+        -- us to create new top level bindings e.g. when speculating (x = let a = y |> co in D a).
+        --
+        -- The speculated heap' contain *internally bound* top level bindings (or the speculator won't do anything
+        -- to them) so we must be careful to change them to *let bound* before we put them in the user-visible heap.
         
-        state = normalise (deeds, mk_heap letBound, Loco False, (rn, anned_e))
+        -- First, eliminate any non-value unfolding bindings and anything that refers to them
+        (h'_value, h'_nonvalue) = M.partition heap_binding_is_value h'
+        h'' = go (M.keysSet h'_nonvalue) h'_value
+          where go eliminate h
+                  | M.null h_eliminated = h_trimmed
+                  | otherwise           = go (M.keysSet h_eliminated) h_trimmed
+                  where (h_eliminated, h_trimmed) = M.partition (\hb -> heapBindingFreeVars hb `intersectsVarSet` eliminate_set) h
+                        eliminate_set = dataSetToVarSet eliminate
         
-        preinit_state = normalise (deeds, preinit_heap, Loco False, (rn, anned_e))
-        preinit_heap = mk_heap internallyBound
+        -- Secondly, pull out any remaining bindings (which must be values) that didn't exist in the
+        -- unspeculated heap. These will be our new top-level bindings.
+        h''_must_be_bound = [ (x', detagAnnedTerm (renameIn (renameAnnedTerm ids') in_e))
+                            | (x', hb) <- M.toList h''
+                            , not (x' `S.member` unfolding_bvs)
+                            , Just in_e <- [heapBindingTerm hb] ]
+
+        state = normalise (deeds', Heap (M.map (\hb -> hb { howBound = LetBound }) h'' `M.union` h_fvs) ids', Loco False, (rn, anned_e))
+        
+        -- When doing memocache preinitialization, we don't want to include in the final heap any binding originating
+        -- from evaluating the top-level that cannot be proven to be a value, or else we risk work duplication
+        preinit_state = normalise (deeds', preinit_heap, Loco False, (rn, anned_e))
+        preinit_heap = Heap (M.filter heap_binding_is_value h' `M.union` h_fvs) ids'
 
         -- NB: we assume that unfoldings are guaranteed to be cheap and hence duplicatiable. I think this is reasonable.
         preinit_with = [(gc (normalise (maxBound, heap', Loco False, anned_e')), accessor_e)
@@ -326,19 +359,25 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 
 -- Especially when we do eager value splitting, we might never actually match against the RHS of a binding like (map = \f xs -> ...).
 -- This "hack" is designed to work around this issue by doing some eager value splitting of our own on lambdas.
+--
+-- It's cool to use normalise here instead of termToAnswer just in case we can do some sweet stuff like look through
+-- lets in the body or maybe even simplify a case given the stuff in the heap. (NB: there this does not cause work dup.)
+-- I won't go as far as using "speculate" because in that case "eta" could potentially yield an infinite list
+-- (for some non-HM-typeable programs).
 eta :: Heap -> FVedTerm -> In AnnedTerm -> [(Heap, FVedTerm, In AnnedTerm)]
-eta heap@(Heap h ids) accessor_e0 in_e = (heap, accessor_e0, in_e) : case termToAnswer ids in_e of
-  Just anned_a | (a_cast, (rn, v)) <- extract anned_a
-               , let accessor_e1 = case a_cast of Uncast      -> accessor_e0
-                                                  CastBy co _ -> accessor_e0 `cast` mkSymCo ids co
-                     mb_res@(~(Just (_, x, _))) = case v of
-                        Lambda   x e_body -> Just (accessor_e1 `app`   x',           x, e_body)
-                        TyLambda a e_body -> Just (accessor_e1 `tyApp` mkTyVarTy x', a, e_body)
-                        _                 -> Nothing
-                     (ids', rn', x') = renameNonRecBinder ids rn x
-               , Just (accessor_e2, _, e_body) <- mb_res
-               -> eta (Heap (M.insert x' lambdaBound h) ids') accessor_e2 (rn', e_body)
-  _            -> []
+eta heap accessor_e0 in_e = (heap, accessor_e0, in_e) : case normalise (maxBound, heap, Loco False, in_e) of
+  (_, Heap h ids, Loco _, anned_qa)
+    | Answer (a_cast, (rn, v)) <- extract anned_qa
+    , let accessor_e1 = case a_cast of Uncast      -> accessor_e0
+                                       CastBy co _ -> accessor_e0 `cast` mkSymCo ids co
+          mb_res@(~(Just (_, x, _))) = case v of
+             Lambda   x e_body -> Just (accessor_e1 `app`   x',           x, e_body)
+             TyLambda a e_body -> Just (accessor_e1 `tyApp` mkTyVarTy x', a, e_body)
+             _                 -> Nothing
+          (ids', rn', x') = renameNonRecBinder ids rn x
+    , Just (accessor_e2, _, e_body) <- mb_res
+    -> eta (Heap (M.insert x' lambdaBound h) ids') accessor_e2 (rn', e_body)
+  _ -> []
 
 
 data SCStats = SCStats {
@@ -511,7 +550,11 @@ nothingSpeculated = S.empty
 --          g -> b (!STOP)
 --          h -> c (!STOP)
 speculate :: AlreadySpeculated -> (SCStats, State) -> (AlreadySpeculated, (SCStats, State))
-speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = {-# SCC "speculate" #-} (M.keysSet h, (stats', (deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids', k, in_e)))
+speculate speculated (stats, (deeds, heap, k, in_e)) = (speculated', (stats', (deeds', heap', k, in_e)))
+  where (speculated', (stats', deeds', heap')) = speculateHeap speculated (stats, deeds, heap)
+
+speculateHeap :: AlreadySpeculated -> (SCStats, Deeds, Heap) -> (AlreadySpeculated, (SCStats, Deeds, Heap))
+speculateHeap speculated (stats, deeds, Heap h ids) = {-# SCC "speculate" #-} (M.keysSet h, (stats', deeds', Heap (h_non_values_speculated `M.union` h_speculated_ok `M.union` h_speculated_failure) ids'))
   where
     (h_values, h_non_values) = M.partition (maybe False (termIsValue . snd) . heapBindingTerm) h
     (h_non_values_unspeculated, h_non_values_speculated) = (h_non_values `exclude` speculated, h_non_values `restrict` speculated)
@@ -523,9 +566,8 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = {-# SCC "speculate"
     
     speculateOne :: [Var] -> (Out Var, HeapBinding) -> SpecM ()
     speculateOne parents (x', hb)
-      | spec_trace "speculate" (ppr x') False
-      = undefined
       | HB InternallyBound (Right in_e) <- hb
+      , spec_trace "speculate" (ppr x') True
       = --pprTrace "speculateOne" (ppr (x', annedTag (snd in_e))) $
         (\rb -> try_speculation in_e rb) `catchSpecM` speculation_failure (Just parents')
       | otherwise

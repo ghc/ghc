@@ -54,8 +54,8 @@ ifThenElse False _ y = y
 
 
 supercompile :: M.Map Var Term -> Term -> IO (SCStats, Term)
-supercompile unfoldings e = liftM (second fVedTermToTerm) $ runScpM $ fmap snd $ sc (mkLinearHistory (cofmap fst wQO)) S.empty state
-  where (state, _) = prepareTerm unfoldings e
+supercompile unfoldings e = liftM (second (fVedTermToTerm . letRec to_bind)) $ runScpM $ fmap snd $ sc (mkLinearHistory (cofmap fst wQO)) S.empty state
+  where (_, (to_bind, state), _) = prepareTerm unfoldings e
 
 --
 -- == The drive loop ==
