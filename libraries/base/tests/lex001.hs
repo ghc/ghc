@@ -1,5 +1,8 @@
 module Main where
 
+import Text.ParserCombinators.ReadP
+import qualified Text.Read.Lex
+
 testStrings
  = [    "0x3y",
         "0X3abx",
@@ -7,7 +10,12 @@ testStrings
         "0O334z",
 
         "NaN",
+        "NaNx",
         "Infinity",
+        "Infinityx",
+
+        "Wibble Foo",
+        "Wibble8_+",
 
         "34yy",
         "34.4x",
@@ -24,5 +32,8 @@ testStrings
 
 main = mapM test testStrings
 
-test s = print (lex s)
+test s = do print s
+            print (lex s)
+            print (readP_to_S Text.Read.Lex.lex s)
+            putStrLn ""
 
