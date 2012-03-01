@@ -19,6 +19,8 @@ module Text.Read.Lex
   -- lexing types
   ( Lexeme(..)  -- :: *; Show, Eq
 
+  , numberToInteger, numberToRational
+
   -- lexer
   , lex         -- :: ReadP Lexeme      Skips leading spaces
   , hsLex       -- :: ReadP String
@@ -64,10 +66,46 @@ data Lexeme
   | Punc   String       -- ^ Punctuation or reserved symbol, e.g. @(@, @::@
   | Ident  String       -- ^ Haskell identifier, e.g. @foo@, @Baz@
   | Symbol String       -- ^ Haskell symbol, e.g. @>>@, @:%@
-  | Int Integer         -- ^ Integer literal
-  | Rat Rational        -- ^ Floating point literal
+  | Number Number
   | EOF
  deriving (Eq, Show)
+
+data Number = MkNumber Int              -- Base
+                       Digits           -- Integral part
+            | MkDecimal Digits          -- Integral part
+                        (Maybe Digits)  -- Fractional part
+                        (Maybe Integer) -- Exponent
+            | NotANumber
+            | Infinity
+ deriving (Eq, Show)
+
+numberToInteger :: Number -> Maybe Integer
+numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
+numberToInteger (MkDecimal iPart Nothing mExp)
+    = let i = val 10 0 iPart
+      in case mExp of
+         Nothing             -> Just i
+         Just exp | exp >= 0 -> Just (i * (10 ^ exp))
+         _                   -> Nothing
+numberToInteger _ = Nothing
+
+numberToRational :: Number -> Rational
+numberToRational NotANumber = notANumber
+numberToRational Infinity   = infinity
+numberToRational (MkNumber base iPart) = val (fromIntegral base) 0 iPart % 1
+numberToRational (MkDecimal iPart mFPart mExp)
+ = let i = val 10 0 iPart
+   in case (mFPart, mExp) of
+      (Nothing, Nothing)     -> i % 1
+      (Nothing, Just exp)
+       | exp >= 0            -> (i * (10 ^ exp)) % 1
+       | otherwise           -> i % (10 ^ (- exp))
+      (Just fPart, Nothing)  -> fracExp 0   i fPart
+      (Just fPart, Just exp) -> fracExp exp i fPart
+      -- fracExp is a bit more efficient in calculating the Rational.
+      -- Instead of calculating the fractional part alone, then
+      -- adding the integral part and finally multiplying with
+      -- 10 ^ exp if an exponent was given, do it all at once.
 
 -- -----------------------------------------------------------------------------
 -- Lexing
@@ -130,8 +168,8 @@ lexId = lex_nan <++ lex_id
   where
         -- NaN and Infinity look like identifiers, so
         -- we parse them first.
-    lex_nan = (string "NaN"      >> return (Rat notANumber)) +++
-              (string "Infinity" >> return (Rat infinity))
+    lex_nan = (string "NaN"      >> return (Number NotANumber)) +++
+              (string "Infinity" >> return (Number Infinity))
 
     lex_id = do c <- satisfy isIdsChar
                 s <- munch isIdfChar
@@ -318,7 +356,7 @@ lexHexOct
   = do  _ <- char '0'
         base <- lexBaseChar
         digits <- lexDigits base
-        return (Int (val (fromIntegral base) 0 digits))
+        return (Number (MkNumber base digits))
 
 lexBaseChar :: ReadP Int
 -- Lex a single character indicating the base; fail if not there
@@ -335,23 +373,7 @@ lexDecNumber =
   do xs    <- lexDigits 10
      mFrac <- lexFrac <++ return Nothing
      mExp  <- lexExp  <++ return Nothing
-     return (value xs mFrac mExp)
- where
-  value xs mFrac mExp = valueFracExp (val 10 0 xs) mFrac mExp
-
-  valueFracExp :: Integer -> Maybe Digits -> Maybe Integer
-               -> Lexeme
-  valueFracExp a Nothing Nothing
-    = Int a                                             -- 43
-  valueFracExp a Nothing (Just exp)
-    | exp >= 0  = Int (a * (10 ^ exp))                  -- 43e7
-    | otherwise = Rat (a % (10 ^ (-exp)))               -- 43e-7
-  valueFracExp a (Just fs) mExp                         -- 4.3[e2]
-    = Rat (fracExp (fromMaybe 0 mExp) a fs)
-    -- Be a bit more efficient in calculating the Rational.
-    -- Instead of calculating the fractional part alone, then
-    -- adding the integral part and finally multiplying with
-    -- 10 ^ exp if an exponent was given, do it all at once.
+     return (Number (MkDecimal xs mFrac mExp))
 
 lexFrac :: ReadP (Maybe Digits)
 -- Read the fractional part; fail if it doesn't

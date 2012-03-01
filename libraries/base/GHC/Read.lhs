@@ -1,6 +1,6 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, PatternGuards #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -468,13 +468,13 @@ readNumber convert =
 
 
 convertInt :: Num a => L.Lexeme -> ReadPrec a
-convertInt (L.Int i) = return (fromInteger i)
-convertInt _         = pfail
+convertInt (L.Number n)
+ | Just i <- L.numberToInteger n = return (fromInteger i)
+convertInt _ = pfail
 
 convertFrac :: Fractional a => L.Lexeme -> ReadPrec a
-convertFrac (L.Int i) = return (fromInteger i)
-convertFrac (L.Rat r) = return (fromRational r)
-convertFrac _         = pfail
+convertFrac (L.Number n) = return (fromRational $ L.numberToRational n)
+convertFrac _            = pfail
 
 instance Read Int where
   readPrec     = readNumber convertInt
