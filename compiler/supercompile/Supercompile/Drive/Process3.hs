@@ -457,7 +457,7 @@ supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ start (liftM snd . sc)
   where (bvs_unfoldings, (to_bind, state), (preinit_with, preinit_state)) = prepareTerm unfoldings e
         start k | pREINITALIZE_MEMO_TABLE = preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
-                | otherwise               = liftM (letRec to_bind) $ k state
+                | otherwise               = liftM (bindManyMixedLiftedness fvedTermFreeVars to_bind) $ k state
 
 preinitalise :: [(State, FVedTerm)] -> ScpM ()
 preinitalise states_fulfils = forM_ states_fulfils $ \(state, e') -> do
