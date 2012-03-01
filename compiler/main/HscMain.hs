@@ -550,7 +550,7 @@ data HsCompiler a = HsCompiler {
   }
 
 genericHscCompile :: HsCompiler a
-                  -> (HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ())
+                  -> (HscEnv -> Maybe (Int,Int) -> RecompileRequired -> ModSummary -> IO ())
                   -> HscEnv -> ModSummary -> SourceModified
                   -> Maybe ModIface -> Maybe (Int, Int)
                   -> IO a
@@ -568,7 +568,7 @@ genericHscCompile compiler hscMessage hsc_env
     let mb_old_hash = fmap mi_iface_hash mb_checked_iface
 
     let skip iface = do
-            hscMessage hsc_env mb_mod_index RecompNotRequired mod_summary
+            hscMessage hsc_env mb_mod_index UpToDate mod_summary
             runHsc hsc_env $ hscNoRecomp compiler iface
 
         compile reason = do
@@ -591,12 +591,12 @@ genericHscCompile compiler hscMessage hsc_env
         -- doing for us in one-shot mode.
 
     case mb_checked_iface of
-        Just iface | not recomp_reqd ->
+        Just iface | not (recompileRequired recomp_reqd) ->
             if mi_used_th iface && not stable
                 then compile RecompForcedByTH
                 else skip iface
         _otherwise ->
-            compile RecompRequired
+            compile recomp_reqd
 
 hscCheckRecompBackend :: HsCompiler a -> TcGblEnv -> Compiler a
 hscCheckRecompBackend compiler tc_result hsc_env mod_summary
@@ -609,7 +609,7 @@ hscCheckRecompBackend compiler tc_result hsc_env mod_summary
 
     let mb_old_hash = fmap mi_iface_hash mb_checked_iface
     case mb_checked_iface of
-        Just iface | not recomp_reqd
+        Just iface | not (recompileRequired recomp_reqd)
             -> runHsc hsc_env $
                    hscNoRecomp compiler
                        iface{ mi_globals = Just (tcg_rdr_env tc_result) }
@@ -800,32 +800,33 @@ genModDetails old_iface
 -- Progress displayers.
 --------------------------------------------------------------
 
-data RecompReason = RecompNotRequired | RecompRequired | RecompForcedByTH
-    deriving Eq
-
-oneShotMsg :: HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ()
+oneShotMsg :: HscEnv -> Maybe (Int,Int) -> RecompileRequired -> ModSummary
+            -> IO ()
 oneShotMsg hsc_env _mb_mod_index recomp _mod_summary =
     case recomp of
-        RecompNotRequired ->
+        UpToDate ->
             compilationProgressMsg (hsc_dflags hsc_env) $
                    "compilation IS NOT required"
         _other ->
             return ()
 
-batchMsg :: HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ()
+batchMsg :: HscEnv -> Maybe (Int,Int) -> RecompileRequired -> ModSummary
+         -> IO ()
 batchMsg hsc_env mb_mod_index recomp mod_summary =
     case recomp of
-        RecompRequired -> showMsg "Compiling "
-        RecompNotRequired
-            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  "
+        MustCompile -> showMsg "Compiling " ""
+        UpToDate
+            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
             | otherwise -> return ()
-        RecompForcedByTH -> showMsg "Compiling [TH] "
+        RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+        RecompForcedByTH -> showMsg "Compiling " " [TH]"
     where
-        showMsg msg =
+        showMsg msg reason =
             compilationProgressMsg (hsc_dflags hsc_env) $
             (showModuleIndex mb_mod_index ++
             msg ++ showModMsg (hscTarget (hsc_dflags hsc_env))
-                              (recomp == RecompRequired) mod_summary)
+                              (recompileRequired recomp) mod_summary)
+                ++ reason
 
 --------------------------------------------------------------
 -- FrontEnds
