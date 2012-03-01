@@ -22,24 +22,24 @@ import qualified Supercompile.Drive.Process1 as S ()
 import qualified Supercompile.Drive.Process2 as S ()
 import qualified Supercompile.Drive.Process3 as S
 
-import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
+import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn, TupleSort(..))
 import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
+import MkCore     (mkWildValBinder)
 import Coercion   (isCoVar, mkCoVarCo, mkAxInstCo)
 import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConWorkId)
 import VarSet
-import VarEnv
-import Name       (localiseName, mkSystemName)
-import OccName    (mkVarOcc)
-import Var        (Var, varUnique, varName, setVarName)
+import Name       (localiseName)
+import Var        (Var, varName, setVarName)
 import Id
+import MkId       (realWorldPrimId)
 import FastString (fsLit)
-import PrelNames  (undefinedName)
 import PrimOp     (primOpSig)
 import TcType     (tcSplitDFunTy)
-import Type       (mkTyVarTy, mkForAllTy, mkFunTys)
-import TysPrim    (alphaTyVar, argAlphaTyVar)
+import Type       (mkTyVarTy, mkTyConApp)
+import TysPrim    (realWorldStatePrimTy)
+import TysWiredIn (tupleTyCon, tupleCon)
 import TyCon      (newTyConCo_maybe)
 
 import qualified Data.Map as M
@@ -70,16 +70,29 @@ partitionBinds should_sc initial_binds = go initial_inside [(b, unionVarSets (ma
 
 coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, Var -> [CoreBind])
 coreBindsToCoreTerm should_sc binds
-  = (mkLets internal_sc_binds (mkChurchVarTup sc_internal_xs),
-     \y -> [NonRec x (mkChurchTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
+  = (mkLets internal_sc_binds (mkLiftedVarTup sc_internal_xs),
+     \y -> [NonRec x (mkLiftedTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
   where
-    -- We put all the sc_binds into a local let, and use Church-encoded tuples to bind back to the top level the names of
+    -- We put all the sc_binds into a local let, and use unboxed tuples to bind back to the top level the names of
     -- any of those sc_binds that are either exported *or* in the free variables of something from dont_sc_binds.
     -- Making that list as small as possible allows the supercompiler to determine that more things are used linearly.
     --
     -- We used to use a standard "big tuple" to do the binding-back, but this breaks down if we need to include
     -- some variables of unlifted type (of kind #) or a dictionary (of kind Constraint) since the type arguments of
     -- the (,..,) tycon must be of kind *.
+    --
+    -- Then I tried to use a church-encoded tuple to do that, where the tuple (x, y, z) is encoded as
+    -- /\(a :: ArgTypeKind). \(k :: x_ty -> y_ty -> z_ty -> a). k x y z
+    -- And selected from by applying an appropriate type argument and continuation. Unfortunately, this type polymorphism,
+    -- while permitted by the type system, is an illusion: abstraction over types of kinds other than * only works
+    -- if the type abstractions all are beta-reduced away before code generation.
+      --
+      -- Another problem with this second approach is that GHC's inlining heuristics didn't tend to inline very
+      -- large encoded tuples even with explicit continutaion args, because the contination binder didn't get a
+      -- large enough discount.
+      --
+      -- My third attempt just encodes it as an unboxed tuple, which we contrive to buind at the top level by abstracting
+      -- it over a useless arg of void representation.
     (sc_binds, dont_sc_binds, dont_sc_binds_fvs) = partitionBinds should_sc binds
     
     -- This is a sweet hack. Most of the top-level binders will be External names. It is a Bad Idea to locally-bind
@@ -109,22 +122,17 @@ coreBindsToCoreTerm should_sc binds
     localiseInternaliseId x = setIdNotExported (x `setVarName` localiseName (varName x))
      -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
 
-mkChurchVarTup :: [Id] -> CoreExpr
-mkChurchVarTup []             = Var (mkVanillaGlobal undefinedName (mkForAllTy alphaTyVar (mkTyVarTy alphaTyVar)))
-mkChurchVarTup xs@(first_x:_) = Lam argAlphaTyVar $ Lam k $ Var k `mkVarApps` xs
-  where iss = mkInScopeSet (mkVarSet xs)
-        -- Gin up a name for the continuation argument from spit, glue, and an exhaustive set of shadowed names
-        --
-        -- FIXME: We have to lie and use argAlphaTyVar here because we want to instantiate it with types of
-        -- kind * and of kind Constraint.
-        --
-        -- The lie is that instantiation with types of kind # would be very bad!! Luckily this never happens
-        -- since the top level can never bind an unlifted value.
-        k = uniqAway iss $ mkLocalId (mkSystemName (varUnique first_x) (mkVarOcc "k"))
-                                     (map idType xs `mkFunTys` mkTyVarTy argAlphaTyVar)
 
-mkChurchTupleSelector :: [Var] -> Var -> CoreExpr -> CoreExpr
-mkChurchTupleSelector xs want_x tup_e = tup_e `App` Type (idType want_x) `App` mkLams xs (Var want_x)
+-- NB: I can't see any GHC code that prevents nullary unboxed tuples, but I'm not actually sure they work
+-- (note that in particular they get the same OccName as the unary versions).
+mkLiftedVarTup :: [Id] -> CoreExpr
+mkLiftedVarTup xs = Lam (mkWildValBinder realWorldStatePrimTy) $ Var (dataConWorkId (tupleCon UnboxedTuple (length xs))) `mkTyApps` map idType xs `mkVarApps` xs
+
+mkLiftedTupleSelector :: [Id] -> Id -> CoreExpr -> CoreExpr
+mkLiftedTupleSelector xs want_x tup_e
+  = Case (tup_e `App` Var realWorldPrimId) (mkWildValBinder (mkTyConApp (tupleTyCon UnboxedTuple n) (map idType xs))) (idType want_x)
+         [(DataAlt (tupleCon UnboxedTuple n), xs, Var want_x)]
+  where n = length xs
 
 termUnfoldings :: S.Term -> [(Var, S.Term)]
 termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
