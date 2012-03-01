@@ -793,16 +793,19 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
                -- NB: make sure we zap the "fragile" info because the FVs of the unfolding are
                -- not necessarily in scope.
 
--- NB: we abstract over RealWorld# as well (cf WwLib). Two reasons:
+-- NB: if there are no arguments, we abstract over RealWorld# as well (cf WwLib). Two reasons:
 --  1. If the h-function is unlifted, this delays its evaluation (so its effects, if any, do not happen too early).
 --     This is also necessary since h-functions will be bound in one letrec after supercompilation is complete.
---  2. This expresses to GHC that we don't necessarily want the work in h-functions to be shared.
+--  2. In other cases, this expresses to GHC that we don't necessarily want the work in h-functions to be shared.
 stateAbsVars :: Maybe FreeVars -> State -> ([AbsVar], Type)
-stateAbsVars mb_lvs state = (abstracted, realWorldStatePrimTy `mkFunTy` (vs_list `mkPiTypes` state_ty))
+stateAbsVars mb_lvs state
+  | any (isId . absVarVar) abstracted
+  = (abstracted,                                                       ty)
+  | otherwise
+  = (AbsVar { absVarDead = True, absVarVar = voidArgId } : abstracted, realWorldStatePrimTy `mkFunTy` ty)
   where vs_list = sortQuantVars (varSetElems (stateLambdaBounders state))
-        state_ty = stateType state
-        abstracted = AbsVar { absVarDead = True, absVarVar = voidArgId } :
-                     map (\v -> AbsVar { absVarDead = maybe False (not . (v `elemVarSet`)) mb_lvs, absVarVar = v }) vs_list
+        ty = vs_list `mkPiTypes` stateType state
+        abstracted = map (\v -> AbsVar { absVarDead = maybe False (not . (v `elemVarSet`)) mb_lvs, absVarVar = v }) vs_list
 
 
 -- | Free variables that are allowed to be in the output term even though they weren't in the input (in addition to h-function names)
