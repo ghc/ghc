@@ -454,10 +454,11 @@ reduceForMatch :: State -> (Bool, State)
 reduceForMatch state = second gc $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
-supercompile unfoldings e = fVedTermToTerm $ runScpM (tagAnnotations state) $ start (liftM snd . sc)
+supercompile unfoldings e = fVedTermToTerm $ start (liftM snd . sc)
   where (bvs_unfoldings, (to_bind, state), (preinit_with, preinit_state)) = prepareTerm unfoldings e
-        start k | pREINITALIZE_MEMO_TABLE = preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
-                | otherwise               = liftM (bindManyMixedLiftedness fvedTermFreeVars to_bind) $ k state
+        start k | pREINITALIZE_MEMO_TABLE = run $ preinitalise preinit_with >> withScpEnv (\e -> e { scpAlreadySpeculated = bvs_unfoldings `S.union` scpAlreadySpeculated e }) (k preinit_state)
+                | otherwise               = bindManyMixedLiftedness fvedTermFreeVars to_bind $ run $ k state
+        run = runScpM (tagAnnotations state)
 
 preinitalise :: [(State, FVedTerm)] -> ScpM ()
 preinitalise states_fulfils = forM_ states_fulfils $ \(state, e') -> do
