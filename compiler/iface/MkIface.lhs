@@ -1095,8 +1095,6 @@ data RecompileRequired
   | RecompBecause String
        -- ^ The .o/.hi files are up to date, but something else has changed
        -- to force recompilation; the String says what (one-line summary)
-  | RecompForcedByTH
-       -- ^ recompile is forced due to use of TH by the module
    deriving Eq
 
 recompileRequired :: RecompileRequired -> Bool

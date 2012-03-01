@@ -625,7 +625,7 @@ genericHscCompile compiler hscMessage hsc_env
     case mb_checked_iface of
         Just iface | not (recompileRequired recomp_reqd) ->
             if mi_used_th iface && not stable
-                then compile RecompForcedByTH
+                then compile (RecompBecause "TH")
                 else skip iface
         _otherwise ->
             compile recomp_reqd
@@ -851,7 +851,6 @@ batchMsg hsc_env mb_mod_index recomp mod_summary =
             | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
             | otherwise -> return ()
         RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
-        RecompForcedByTH -> showMsg "Compiling " " [TH]"
     where
         dflags = hsc_dflags hsc_env
         showMsg msg reason =
