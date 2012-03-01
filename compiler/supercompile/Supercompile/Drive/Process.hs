@@ -272,7 +272,9 @@ prepareTerm :: M.Map Var Term -> Term -> (S.Set Var,                    -- Names
 prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                            pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
                            pprTraceSC "all input FVs" (ppr (input_fvs `delVarSetList` unfolding_bvs_list)) $
-                           (unfolding_bvs, (h''_must_be_bound, state), (preinit_with, preinit_state))
+                           (unfolding_bvs, pprTraceSC "no-preinit unfoldings" (pPrintPrecLetRec noPrec (M.toList h'') (PrettyDoc (text "<stuff>")))
+                                                      (h''_must_be_bound, state),
+                                           (preinit_with, preinit_state))
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
         anned_e = toAnnedTerm tag_ids0 e
         
@@ -289,14 +291,12 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         unfolding_bvs_list = map fst h_unfoldings
         unfolding_bvs = S.fromList unfolding_bvs_list
         deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
-        (speculated, (_stats, deeds', Heap h' ids')) = speculateHeap S.empty (mempty, deeds, mk_heap internallyBound)
-
-        -- FIXME: refs to deeds and heap (unprimed versions)
+        (speculated, (_stats, deeds', Heap h' ids')) = speculateHeap S.empty (mempty, deeds, Heap (M.fromList (map (second internallyBound) h_unfoldings) `M.union` h_fvs) ids)
+        -- FIXME: use speculated
 
         -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
         rn = mkIdentityRenaming input_fvs
         ids = mkInScopeSet input_fvs
-        mk_heap how_bound = Heap (M.fromList (map (second how_bound) h_unfoldings) `M.union` h_fvs) ids
         heap_binding_is_value = maybe True (termIsValue . snd) . heapBindingTerm
 
         -- When *not* doing memocache preinitialization, we still want to be able to speculate the unfoldings to
@@ -306,14 +306,28 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         -- The speculated heap' contain *internally bound* top level bindings (or the speculator won't do anything
         -- to them) so we must be careful to change them to *let bound* before we put them in the user-visible heap.
         
-        -- First, eliminate any non-value unfolding bindings and anything that refers to them
+        -- First, eliminate any non-value unfolding bindings and any value binding that refers to any one
+        -- of them *that is not one of the original bindings*
+        --
+        -- Consider these unfoldings:
+        --  meth1 = \x -> ..
+        --  meth2 = fib 100
+        --  dict = D meth1 meth2
+        --
+        -- We don't want to make the whole dict unavailable just because meth2 isn't a value
+        --
+        -- However in this case:
+        --  foo = let a = fib 100 in D a
+        --
+        -- We do want to make "foo" unavailable as there is no value unfolding we can give it
+        -- that ensures that we share the work of "fib 100" with all other modules.
         (h'_value, h'_nonvalue) = M.partition heap_binding_is_value h'
         h'' = go (M.keysSet h'_nonvalue) h'_value
           where go eliminate h
                   | M.null h_eliminated = h_trimmed
                   | otherwise           = go (M.keysSet h_eliminated) h_trimmed
                   where (h_eliminated, h_trimmed) = M.partition (\hb -> heapBindingFreeVars hb `intersectsVarSet` eliminate_set) h
-                        eliminate_set = dataSetToVarSet eliminate
+                        eliminate_set = dataSetToVarSet (eliminate S.\\ unfolding_bvs)
         
         -- Secondly, pull out any remaining bindings (which must be values) that didn't exist in the
         -- unspeculated heap. These will be our new top-level bindings.
