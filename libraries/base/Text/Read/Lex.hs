@@ -79,12 +79,7 @@ data Number = MkNumber Int              -- Base
 
 numberToInteger :: Number -> Maybe Integer
 numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
-numberToInteger (MkDecimal iPart Nothing mExp)
-    = let i = val 10 0 iPart
-      in case mExp of
-         Nothing             -> Just i
-         Just exp | exp >= 0 -> Just (i * (10 ^ exp))
-         _                   -> Nothing
+numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
 numberToInteger _ = Nothing
 
 numberToRational :: Number -> Rational
