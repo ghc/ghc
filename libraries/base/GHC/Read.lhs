@@ -473,6 +473,8 @@ convertInt (L.Number n)
 convertInt _ = pfail
 
 convertFrac :: Fractional a => L.Lexeme -> ReadPrec a
+convertFrac (L.Ident "NaN")      = return (0 / 0)
+convertFrac (L.Ident "Infinity") = return (1 / 0)
 convertFrac (L.Number n) = return (fromRational $ L.numberToRational n)
 convertFrac _            = pfail
 

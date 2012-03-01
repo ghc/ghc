@@ -42,7 +42,7 @@ import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
 import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
 import GHC.Real( Integral, Rational, (%), fromIntegral,
-                 toInteger, (^), infinity, notANumber )
+                 toInteger, (^) )
 import GHC.List
 import GHC.Enum( maxBound )
 #else
@@ -75,8 +75,6 @@ data Number = MkNumber Int              -- Base
             | MkDecimal Digits          -- Integral part
                         (Maybe Digits)  -- Fractional part
                         (Maybe Integer) -- Exponent
-            | NotANumber
-            | Infinity
  deriving (Eq, Show)
 
 numberToInteger :: Number -> Maybe Integer
@@ -90,8 +88,6 @@ numberToInteger (MkDecimal iPart Nothing mExp)
 numberToInteger _ = Nothing
 
 numberToRational :: Number -> Rational
-numberToRational NotANumber = notANumber
-numberToRational Infinity   = infinity
 numberToRational (MkNumber base iPart) = val (fromIntegral base) 0 iPart % 1
 numberToRational (MkDecimal iPart mFPart mExp)
  = let i = val 10 0 iPart
@@ -164,26 +160,13 @@ lexSymbol =
 -- identifiers
 
 lexId :: ReadP Lexeme
-lexId = lex_nan <++ lex_id
+lexId = do c <- satisfy isIdsChar
+           s <- munch isIdfChar
+           return (Ident (c:s))
   where
-        -- NaN and Infinity look like identifiers, so
-        -- we parse them first.
-    lex_nan = (string "NaN"      >> return (Number NotANumber)) +++
-              (string "Infinity" >> return (Number Infinity))
-
-    lex_id = do c <- satisfy isIdsChar
-                s <- munch isIdfChar
-                return (Ident (c:s))
-
           -- Identifiers can start with a '_'
     isIdsChar c = isAlpha c || c == '_'
     isIdfChar c = isAlphaNum c || c `elem` "_'"
-
-#ifndef __GLASGOW_HASKELL__
-infinity, notANumber :: Rational
-infinity   = 1 :% 0
-notANumber = 0 :% 0
-#endif
 
 -- ---------------------------------------------------------------------------
 -- Lexing character literals
