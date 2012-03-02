@@ -449,10 +449,10 @@ data TyClDecl name
 
 
   | -- | @type/data family T :: *->*@
-    TyFamily {  tcdFlavour:: FamilyFlavour,             -- type or data
-                tcdLName  :: Located name,              -- type constructor
-                tcdTyVars :: [LHsTyVarBndr name],       -- type variables
-                tcdKind   :: Maybe (LHsKind name)       -- result kind
+    TyFamily {  tcdFlavour :: FamilyFlavour,             -- type or data
+                tcdLName   :: Located name,              -- type constructor
+                tcdTyVars  :: [LHsTyVarBndr name],       -- type variables
+                tcdKindSig :: Maybe (LHsKind name)       -- result kind
     }
 
 
@@ -501,7 +501,9 @@ data TyClDecl name
                 tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns
                   -- See Note [tcdTyVars and tcdTyPats] 
 
-                tcdSynRhs :: LHsType name               -- ^ synonym expansion
+                tcdSynRhs :: LHsType name,              -- ^ synonym expansion
+                tcdFVs    :: NameSet                    -- ^ Free tycons of the decl
+                                                        -- (Used for cycle detection)
     }
 
   | ClassDecl { tcdCtxt    :: LHsContext name,          -- ^ Context...
@@ -634,7 +636,7 @@ instance OutputableBndr name
         = hsep [ptext (sLit "foreign import type dotnet"), ppr ltycon]
 
     ppr (TyFamily {tcdFlavour = flavour, tcdLName = ltycon, 
-                   tcdTyVars = tyvars, tcdKind = mb_kind})
+                   tcdTyVars = tyvars, tcdKindSig = mb_kind})
       = pp_flavour <+> pp_decl_head [] ltycon tyvars Nothing <+> pp_kind
         where
           pp_flavour = case flavour of
@@ -766,7 +768,7 @@ data ConDecl name
     , con_details   :: HsConDeclDetails name
         -- ^ The main payload
 
-    , con_res       :: ResType name
+    , con_res       :: ResType (LHsType name)
         -- ^ Result type of the constructor
 
     , con_doc       :: Maybe LHsDocString
@@ -786,16 +788,16 @@ hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map cd_fld_type flds
 
-data ResType name
+data ResType ty
    = ResTyH98           -- Constructor was declared using Haskell 98 syntax
-   | ResTyGADT (LHsType name)   -- Constructor was declared using GADT-style syntax,
-                                --      and here is its result type
+   | ResTyGADT ty       -- Constructor was declared using GADT-style syntax,
+                        --      and here is its result type
    deriving (Data, Typeable)
 
-instance OutputableBndr name => Outputable (ResType name) where
+instance Outputable ty => Outputable (ResType ty) where
          -- Debugging only
-   ppr ResTyH98 = ptext (sLit "ResTyH98")
-   ppr (ResTyGADT ty) = ptext (sLit "ResTyGADT") <+> pprParendHsType (unLoc ty)
+   ppr ResTyH98       = ptext (sLit "ResTyH98")
+   ppr (ResTyGADT ty) = ptext (sLit "ResTyGADT") <+> ppr ty
 \end{code}
 
 
@@ -1061,10 +1063,10 @@ data RuleDecl name
 
 data RuleBndr name
   = RuleBndr (Located name)
-  | RuleBndrSig (Located name) (LHsType name)
+  | RuleBndrSig (Located name) (HsBndrSig (LHsType name))
   deriving (Data, Typeable)
 
-collectRuleBndrSigTys :: [RuleBndr name] -> [LHsType name]
+collectRuleBndrSigTys :: [RuleBndr name] -> [HsBndrSig (LHsType name)]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 instance OutputableBndr name => Outputable (RuleDecl name) where

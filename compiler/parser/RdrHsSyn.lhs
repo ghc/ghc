@@ -218,7 +218,9 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc is_family lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; (tyvars, typats) <- checkTParams is_family lhs tparams
-       ; return (L loc (TySynonym tc tyvars typats rhs)) }
+       ; return (L loc (TySynonym { tcdLName = tc
+                                  , tcdTyVars = tyvars, tcdTyPats = typats
+                                  , tcdSynRhs = rhs, tcdFVs = placeHolderNames })) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour
@@ -499,7 +501,7 @@ checkTyVars tycl_hdr tparms = mapM chk tparms
   where
         -- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar tv k placeHolderKind))
+        | isRdrTyVar tv    = return (L l (KindedTyVar tv (HsBSig k placeHolderBndrs) placeHolderKind))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
     chk t@(L l _)
@@ -636,7 +638,7 @@ checkAPat dynflags loc e0 = case e0 of
                             let t' = case t of
                                        L _ (HsForAllTy Implicit _ (L _ []) ty) -> ty
                                        other -> other
-                            return (SigPatIn e t')
+                            return (SigPatIn e (HsBSig t' placeHolderBndrs))
 
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _

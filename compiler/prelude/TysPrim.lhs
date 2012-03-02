@@ -477,7 +477,7 @@ keep different state threads separate.  It is represented by nothing at all.
 
 \begin{code}
 mkStatePrimTy :: Type -> Type
-mkStatePrimTy ty = mkTyConApp statePrimTyCon [ty]
+mkStatePrimTy ty = mkNakedTyConApp statePrimTyCon [ty]
 
 statePrimTyCon :: TyCon   -- See Note [The State# TyCon]
 statePrimTyCon	 = pcPrimTyCon statePrimTyConName 1 VoidRep
@@ -523,17 +523,17 @@ arrayArrayPrimTyCon        = pcPrimTyCon0 arrayArrayPrimTyConName          PtrRe
 mutableArrayArrayPrimTyCon = pcPrimTyCon  mutableArrayArrayPrimTyConName 1 PtrRep
 
 mkArrayPrimTy :: Type -> Type
-mkArrayPrimTy elt    	    = mkTyConApp arrayPrimTyCon [elt]
+mkArrayPrimTy elt    	    = mkNakedTyConApp arrayPrimTyCon [elt]
 byteArrayPrimTy :: Type
 byteArrayPrimTy	    	    = mkTyConTy byteArrayPrimTyCon
 mkArrayArrayPrimTy :: Type
 mkArrayArrayPrimTy = mkTyConTy arrayArrayPrimTyCon
 mkMutableArrayPrimTy :: Type -> Type -> Type
-mkMutableArrayPrimTy s elt  = mkTyConApp mutableArrayPrimTyCon [s, elt]
+mkMutableArrayPrimTy s elt  = mkNakedTyConApp mutableArrayPrimTyCon [s, elt]
 mkMutableByteArrayPrimTy :: Type -> Type
-mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
+mkMutableByteArrayPrimTy s  = mkNakedTyConApp mutableByteArrayPrimTyCon [s]
 mkMutableArrayArrayPrimTy :: Type -> Type
-mkMutableArrayArrayPrimTy s = mkTyConApp mutableArrayArrayPrimTyCon [s]
+mkMutableArrayArrayPrimTy s = mkNakedTyConApp mutableArrayArrayPrimTyCon [s]
 \end{code}
 
 %************************************************************************
@@ -547,7 +547,7 @@ mutVarPrimTyCon :: TyCon
 mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName 2 PtrRep
 
 mkMutVarPrimTy :: Type -> Type -> Type
-mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
+mkMutVarPrimTy s elt 	    = mkNakedTyConApp mutVarPrimTyCon [s, elt]
 \end{code}
 
 %************************************************************************
@@ -561,7 +561,7 @@ mVarPrimTyCon :: TyCon
 mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName 2 PtrRep
 
 mkMVarPrimTy :: Type -> Type -> Type
-mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
+mkMVarPrimTy s elt 	    = mkNakedTyConApp mVarPrimTyCon [s, elt]
 \end{code}
 
 %************************************************************************
@@ -575,7 +575,7 @@ tVarPrimTyCon :: TyCon
 tVarPrimTyCon = pcPrimTyCon tVarPrimTyConName 2 PtrRep
 
 mkTVarPrimTy :: Type -> Type -> Type
-mkTVarPrimTy s elt = mkTyConApp tVarPrimTyCon [s, elt]
+mkTVarPrimTy s elt = mkNakedTyConApp tVarPrimTyCon [s, elt]
 \end{code}
 
 %************************************************************************
@@ -589,7 +589,7 @@ stablePtrPrimTyCon :: TyCon
 stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName 1 AddrRep
 
 mkStablePtrPrimTy :: Type -> Type
-mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
+mkStablePtrPrimTy ty = mkNakedTyConApp stablePtrPrimTyCon [ty]
 \end{code}
 
 %************************************************************************
@@ -603,7 +603,7 @@ stableNamePrimTyCon :: TyCon
 stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName 1 PtrRep
 
 mkStableNamePrimTy :: Type -> Type
-mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
+mkStableNamePrimTy ty = mkNakedTyConApp stableNamePrimTyCon [ty]
 \end{code}
 
 %************************************************************************
@@ -630,7 +630,7 @@ weakPrimTyCon :: TyCon
 weakPrimTyCon = pcPrimTyCon weakPrimTyConName 1 PtrRep
 
 mkWeakPrimTy :: Type -> Type
-mkWeakPrimTy v = mkTyConApp weakPrimTyCon [v]
+mkWeakPrimTy v = mkNakedTyConApp weakPrimTyCon [v]
 \end{code}
 
 %************************************************************************
@@ -731,5 +731,5 @@ anyTyCon = mkLiftedPrimTyCon anyTyConName kind 1 PtrRep
   where kind = ForAllTy kKiVar (mkTyVarTy kKiVar)
 
 anyTypeOfKind :: Kind -> Type
-anyTypeOfKind kind = mkTyConApp anyTyCon [kind]
+anyTypeOfKind kind = mkNakedTyConApp anyTyCon [kind]
 \end{code}

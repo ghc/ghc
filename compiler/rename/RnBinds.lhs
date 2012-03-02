@@ -33,10 +33,9 @@ module RnBinds (
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
 import HsSyn
-import RnHsSyn
 import TcRnMonad
 import TcEvidence     ( emptyTcEvBinds )
-import RnTypes        ( rnIPName, rnHsSigType, rnLHsType, checkPrecMatch )
+import RnTypes        ( bindSigTyVarsFV, rnIPName, rnHsSigType, rnLHsType, checkPrecMatch )
 import RnPat
 import RnEnv
 import DynFlags
@@ -184,8 +183,8 @@ rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
 -- Return a single HsBindGroup with empty binds and renamed signatures
 rnTopBindsBoot (ValBindsIn mbinds sigs)
   = do	{ checkErr (isEmptyLHsBinds mbinds) (bindsInHsBootFile mbinds)
-	; sigs' <- renameSigs HsBootCtxt sigs
-	; return (ValBindsOut [] sigs', usesOnly (hsSigsFVs sigs')) }
+	; (sigs', fvs) <- renameSigs HsBootCtxt sigs
+	; return (ValBindsOut [] sigs', usesOnly fvs) }
 rnTopBindsBoot b = pprPanic "rnTopBindsBoot" (ppr b)
 \end{code}
 
@@ -291,13 +290,13 @@ rnValBindsRHS :: HsSigCtxt
               -> RnM (HsValBinds Name, DefUses)
 
 rnValBindsRHS ctxt (ValBindsIn mbinds sigs)
-  = do { sigs' <- renameSigs ctxt sigs
+  = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
        ; binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs')) mbinds
        ; case depAnalBinds binds_w_dus of
            (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
               where
                 valbind' = ValBindsOut anal_binds sigs'
-                valbind'_dus = anal_dus `plusDU` usesOnly (hsSigsFVs sigs')
+                valbind'_dus = anal_dus `plusDU` usesOnly sig_fvs
 			       -- Put the sig uses *after* the bindings
 			       -- so that the binders are removed from 
 			       -- the uses in the sigs
@@ -649,7 +648,7 @@ signatures.  We'd only need this if we wanted to report unused tyvars.
 \begin{code}
 renameSigs :: HsSigCtxt 
 	   -> [LSig RdrName]
-	   -> RnM [LSig Name]
+	   -> RnM ([LSig Name], FreeVars)
 -- Renames the signatures and performs error checks
 renameSigs ctxt sigs 
   = do	{ mapM_ dupSigDeclErr (findDupsEq overlapHsSig sigs)  -- Duplicate
@@ -662,12 +661,12 @@ renameSigs ctxt sigs
 		--	       op :: a -> a
  		--             default op :: Eq a => a -> a
 		
-	; sigs' <- mapM (wrapLocM (renameSig ctxt)) sigs
+	; (sigs', sig_fvs) <- mapFvRn (wrapLocFstM (renameSig ctxt)) sigs
 
 	; let (good_sigs, bad_sigs) = partition (okHsSig ctxt) sigs'
 	; mapM_ misplacedSigErr bad_sigs		 -- Misplaced
 
-	; return good_sigs } 
+	; return (good_sigs, sig_fvs) } 
 
 ----------------------
 -- We use lookupSigOccRn in the signatures, which is a little bit unsatisfactory
@@ -679,26 +678,26 @@ renameSigs ctxt sigs
 -- is in scope.  (I'm assuming that Baz.op isn't in scope unqualified.)
 -- Doesn't seem worth much trouble to sort this.
 
-renameSig :: HsSigCtxt -> Sig RdrName -> RnM (Sig Name)
+renameSig :: HsSigCtxt -> Sig RdrName -> RnM (Sig Name, FreeVars)
 -- FixitySig is renamed elsewhere.
 renameSig _ (IdSig x)
-  = return (IdSig x)	  -- Actually this never occurs
+  = return (IdSig x, emptyFVs)	  -- Actually this never occurs
 
 renameSig ctxt sig@(TypeSig vs ty)
   = do	{ new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-	; new_ty <- rnHsSigType (ppr_sig_bndrs vs) ty
-	; return (TypeSig new_vs new_ty) }
+	; (new_ty, fvs) <- rnHsSigType (ppr_sig_bndrs vs) ty
+	; return (TypeSig new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(GenericSig vs ty)
   = do	{ defaultSigs_on <- xoptM Opt_DefaultSignatures
         ; unless defaultSigs_on (addErr (defaultSigErr sig))
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
-	; new_ty <- rnHsSigType (ppr_sig_bndrs vs) ty
-	; return (GenericSig new_v new_ty) }
+	; (new_ty, fvs) <- rnHsSigType (ppr_sig_bndrs vs) ty
+	; return (GenericSig new_v new_ty, fvs) }
 
 renameSig _ (SpecInstSig ty)
-  = do	{ new_ty <- rnLHsType SpecInstSigCtx ty
-	; return (SpecInstSig new_ty) }
+  = do	{ (new_ty, fvs) <- rnLHsType SpecInstSigCtx ty
+	; return (SpecInstSig new_ty,fvs) }
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
@@ -708,16 +707,16 @@ renameSig ctxt sig@(SpecSig v ty inl)
   = do	{ new_v <- case ctxt of 
                      TopSigCtxt -> lookupLocatedOccRn v
                      _          -> lookupSigOccRn ctxt sig v
-	; new_ty <- rnHsSigType (quotes (ppr v)) ty
-	; return (SpecSig new_v new_ty inl) }
+	; (new_ty, fvs) <- rnHsSigType (quotes (ppr v)) ty
+	; return (SpecSig new_v new_ty inl, fvs) }
 
 renameSig ctxt sig@(InlineSig v s)
   = do	{ new_v <- lookupSigOccRn ctxt sig v
-	; return (InlineSig new_v s) }
+	; return (InlineSig new_v s, emptyFVs) }
 
 renameSig ctxt sig@(FixSig (FixitySig v f))
   = do	{ new_v <- lookupSigOccRn ctxt sig v
-	; return (FixSig (FixitySig new_v f)) }
+	; return (FixSig (FixitySig new_v f), emptyFVs) }
 
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
@@ -778,7 +777,6 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
 	{ (grhss', grhss_fvs) <- rnGRHSs ctxt grhss
 
 	; return (Match pats' Nothing grhss', grhss_fvs) }}
-	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
 
 resSigErr :: HsMatchContext Name -> Match RdrName -> HsType RdrName -> SDoc 
 resSigErr ctxt match ty

@@ -939,14 +939,17 @@ emitKindConstraint ct
                 , cc_fun = fn, cc_tyargs = xis1
                 , cc_rhs = xi2 }
           -> emit_kind_constraint ev d fl (mkTyConApp fn xis1) xi2
+
       _   -> continueWith ct 
   where
     emit_kind_constraint eqv d fl ty1 ty2 
-       | compatKind k1 k2 
-       = continueWith ct
+       | compatKind k1 k2    -- True when ty1,ty2 are themselves kinds,
+       = continueWith ct     -- because then k1, k2 are BOX
+       
        | otherwise
-       = do { keqv <- forceNewEvVar kind_co_fl (mkEqPred (k1,k2))
-            ; eqv' <- forceNewEvVar fl (mkEqPred (ty1,ty2))
+       = ASSERT( isKind k1 && isKind k2 )
+         do { keqv <- forceNewEvVar kind_co_fl (mkNakedEqPred superKind k1 k2)
+            ; eqv' <- forceNewEvVar fl (mkTcEqPred ty1 ty2)
             ; _fl <- case fl of
                Wanted {}-> setEvBind eqv
                             (mkEvKindCast eqv' (mkTcCoVarCo keqv)) fl
@@ -955,7 +958,7 @@ emitKindConstraint ct
                Derived {} -> return fl
 
             ; traceTcS "Emitting kind constraint" $
-                  vcat [ ppr keqv <+> dcolon <+> ppr (mkEqPred (k1,k2))
+                  vcat [ ppr keqv <+> dcolon <+> ppr (mkEqPred k1 k2)
                        , ppr eqv, ppr eqv' ] 
             ; addToWork (canEq d kind_co_fl keqv k1 k2) -- Emit kind equality
             ; continueWith (ct { cc_id = eqv' }) }
@@ -1215,7 +1218,7 @@ canEqLeaf d fl eqv s1 s2
          else return Stop 
        }
   | otherwise
-  = do { traceTcS "canEqLeaf" $ ppr (mkEqPred (s1,s2))
+  = do { traceTcS "canEqLeaf" $ ppr (mkEqPred s1 s2)
        ; canEqLeafOriented d fl eqv s1 s2 }
   where
     re_orient = reOrient fl 
@@ -1408,7 +1411,8 @@ canEqLeafTyVarLeft d fl eqv tv s2       -- eqv : tv ~ s2
 
        ; if no_flattening_happened then
              if isNothing occ_check_result then 
-                 canEqFailure d fl (setVarType eqv $ mkEqPred (mkTyVarTy tv, xi2'))
+                 canEqFailure d fl (setVarType eqv $ 
+                                     mkTcEqPred (mkTyVarTy tv) xi2')
              else 
                  continueWith $ CTyEqCan { cc_id     = eqv
                                          , cc_flavor = fl

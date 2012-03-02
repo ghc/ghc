@@ -122,7 +122,8 @@ instanceDFunId = is_dfun
 
 setInstanceDFunId :: ClsInst -> DFunId -> ClsInst
 setInstanceDFunId ispec dfun
-   = ASSERT( idType dfun `eqType` idType (is_dfun ispec) )
+   = ASSERT2( idType dfun `eqType` idType (is_dfun ispec)
+            , ppr dfun $$ ppr (idType dfun) $$ ppr (is_dfun ispec) $$ ppr (idType (is_dfun ispec)) )
         -- We need to create the cached fields afresh from
         -- the new dfun id.  In particular, the is_tvs in
         -- the ClsInst must match those in the dfun!

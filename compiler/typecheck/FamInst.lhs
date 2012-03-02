@@ -27,8 +27,8 @@ import Module
 import SrcLoc
 import Outputable
 import UniqFM
+import VarSet
 import FastString
-import VarSet   ( varSetElems )
 import Util( filterOut )
 import Maybes
 import Control.Monad
@@ -174,11 +174,12 @@ tcLookupFamInst tycon tys
   = return Nothing
   | otherwise
   = do { instEnv <- tcGetFamInstEnvs
-       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ ppr instEnv)
-       ; case lookupFamInstEnv instEnv tycon tys of
-	   []                      -> return Nothing
+       ; let mb_match = lookupFamInstEnv instEnv tycon tys 
+       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ pprTvBndrs (varSetElems (tyVarsOfTypes tys)) $$ ppr mb_match $$ ppr instEnv)
+       ; case mb_match of
+	   [] -> return Nothing
 	   ((fam_inst, rep_tys):_) 
-             -> return $ Just (fam_inst, rep_tys)
+              -> return $ Just (fam_inst, rep_tys)
        }
 
 tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
@@ -263,18 +264,15 @@ addLocalFamInst (home_fie, my_fis) fam_inst
            -- Load imported instances, so that we report
            -- overlaps correctly
        ; eps <- getEps
-       ; skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars fam_inst))
        ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
-             conflicts  = lookupFamInstEnvConflicts inst_envs fam_inst skol_tvs
              home_fie'' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls
-       ;  traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
-       ; case conflicts of
-            []      ->  return (home_fie'', fam_inst : my_fis')
-            dup : _ ->  do { conflictInstErr fam_inst (fst dup)
-                           ; return (home_fie, my_fis) }
-      }
+       ; no_conflict <- checkForConflicts inst_envs fam_inst
+       ; if no_conflict then
+            return (home_fie'', fam_inst : my_fis')
+         else 
+            return (home_fie,   my_fis) }
 \end{code}
 
 %************************************************************************
@@ -287,8 +285,8 @@ Check whether a single family instance conflicts with those in two instance
 environments (one for the EPS and one for the HPT).
 
 \begin{code}
-checkForConflicts :: FamInstEnvs -> FamInst -> TcM ()
-checkForConflicts inst_envs famInst
+checkForConflicts :: FamInstEnvs -> FamInst -> TcM Bool
+checkForConflicts inst_envs fam_inst
   = do { 	-- To instantiate the family instance type, extend the instance
 		-- envt with completely fresh template variables
 		-- This is important because the template variables must
@@ -297,11 +295,13 @@ checkForConflicts inst_envs famInst
 		-- We use tcInstSkolType because we don't want to allocate
 		-- fresh *meta* type variables.  
 
-       ; skol_tvs <- tcInstSkolTyVars (varSetElems (famInstTyVars famInst))
-       ; let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
-       ; unless (null conflicts) $
-	   conflictInstErr famInst (fst (head conflicts))
-       }
+       ; (_, skol_tvs) <- tcInstSkolTyVars (coAxiomTyVars (famInstAxiom fam_inst))
+       ; let conflicts = lookupFamInstEnvConflicts inst_envs fam_inst skol_tvs
+             no_conflicts = null conflicts
+       ; traceTc "checkForConflicts" (ppr conflicts $$ ppr fam_inst $$ ppr inst_envs)
+       ; unless no_conflicts $
+	   conflictInstErr fam_inst (fst (head conflicts))
+       ; return no_conflicts }
 
 conflictInstErr :: FamInst -> FamInst -> TcRn ()
 conflictInstErr famInst conflictingFamInst

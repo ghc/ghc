@@ -569,8 +569,8 @@ data TcTyThing
 	tct_closed :: TopLevelFlag,   -- See Note [Bindings with closed types]
 	tct_level  :: ThLevel }
 
-  | ATyVar  Name TcTyVar	-- The type to which the lexically scoped type vaiable
-				-- is currently refined. We only need the Name
+  | ATyVar  Name TcTyVar	-- The type variable to which the lexically scoped type 
+				-- variable is bound. We only need the Name
 				-- for error-message purposes; it is the corresponding
 				-- Name in the domain of the envt
 
@@ -919,9 +919,9 @@ ctPred (CNonCanonical { cc_id = v }) = evVarPred v
 ctPred (CDictCan { cc_class = cls, cc_tyargs = xis }) 
   = mkClassPred cls xis
 ctPred (CTyEqCan { cc_tyvar = tv, cc_rhs = xi }) 
-  = mkEqPred (mkTyVarTy tv, xi)
+  = mkTcEqPred (mkTyVarTy tv) xi
 ctPred (CFunEqCan { cc_fun = fn, cc_tyargs = xis1, cc_rhs = xi2 }) 
-  = mkEqPred(mkTyConApp fn xis1, xi2)
+  = mkTcEqPred (mkTyConApp fn xis1) xi2
 ctPred (CIPCan { cc_ip_nm = nm, cc_ip_ty = xi }) 
   = mkIPPred nm xi
 ctPred (CIrredEvCan { cc_ty = xi }) = xi

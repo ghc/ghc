@@ -132,7 +132,7 @@ data Pat id
 
         ------------ Pattern type signatures ---------------
   | SigPatIn        (LPat id)           -- Pattern with a type signature
-                    (LHsType id)
+                    (HsBndrSig (LHsType id))
 
   | SigPatOut       (LPat id)           -- Pattern with a type signature
                     Type

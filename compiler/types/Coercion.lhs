@@ -404,7 +404,7 @@ ppr_co p (AppCo co1 co2)       = maybeParen p TyConPrec $
                                  pprCo co1 <+> ppr_co TyConPrec co2
 ppr_co p co@(ForAllCo {})      = ppr_forall_co p co
 ppr_co _ (CoVarCo cv)          = parenSymOcc (getOccName cv) (ppr cv)
-ppr_co p (AxiomInstCo con cos) = pprTypeNameApp p ppr_co (getName con) cos
+ppr_co p (AxiomInstCo con cos) = angleBrackets (pprTypeNameApp p ppr_co (getName con) cos)
 
 ppr_co p (TransCo co1 co2) = maybeParen p FunPrec $
                              ppr_co FunPrec co1
@@ -504,7 +504,7 @@ coVarKind cv
 -- | Makes a coercion type from two types: the types whose equality 
 -- is proven by the relevant 'Coercion'
 mkCoercionType :: Type -> Type -> Type
-mkCoercionType = curry mkPrimEqType
+mkCoercionType = mkPrimEqPred
 
 isReflCo :: Coercion -> Bool
 isReflCo (Refl {}) = True

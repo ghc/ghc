@@ -356,7 +356,6 @@ Library
         RnEnv
         RnExpr
         RnHsDoc
-        RnHsSyn
         RnNames
         RnPat
         RnSource

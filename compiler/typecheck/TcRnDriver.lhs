@@ -1458,7 +1458,7 @@ tcRnType hsc_env ictxt normalise rdr_type
   = initTcPrintErrors hsc_env iNTERACTIVE $
     setInteractiveContext hsc_env ictxt $ do {
 
-    rn_type <- rnLHsType GHCiCtx rdr_type ;
+    (rn_type, _fvs) <- rnLHsType GHCiCtx rdr_type ;
     failIfErrsM ;
 
         -- Now kind-check the type

@@ -138,7 +138,7 @@ tc_cmd env (HsIf (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
         -- For arrows, need ifThenElse :: forall r. T -> r -> r -> r
         -- because we're going to apply it to the environment, not
         -- the return value.
-        ; [r_tv] <- tcInstSkolTyVars [alphaTyVar]
+        ; (_, [r_tv]) <- tcInstSkolTyVars [alphaTyVar]
 	; let r_ty = mkTyVarTy r_tv
         ; let if_ty = mkFunTys [pred_ty, r_ty, r_ty] r_ty
         ; checkTc (not (r_tv `elemVarSet` tyVarsOfType pred_ty))
@@ -245,7 +245,7 @@ tc_cmd env cmd@(HsDo do_or_lc stmts _) (cmd_stk, res_ty)
 tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)	
   = addErrCtxt (cmdCtxt cmd)	$
     do	{ cmds_w_tys <- zipWithM new_cmd_ty cmd_args [1..]
-        ; [w_tv]     <- tcInstSkolTyVars [alphaTyVar]
+        ; (_, [w_tv])     <- tcInstSkolTyVars [alphaTyVar]
 	; let w_ty = mkTyVarTy w_tv 	-- Just a convenient starting point
 
 		--  a ((w,t1) .. tn) t

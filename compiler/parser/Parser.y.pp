@@ -871,7 +871,7 @@ rule_var_list :: { [RuleBndr RdrName] }
 
 rule_var :: { RuleBndr RdrName }
         : varid                                 { RuleBndr $1 }
-        | '(' varid '::' ctype ')'              { RuleBndrSig $2 $4 }
+        | '(' varid '::' ctype ')'              { RuleBndrSig $2 (HsBSig $4 placeHolderBndrs) }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations (c.f. rules)
@@ -1102,7 +1102,7 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
         : tyvar                         { L1 (UserTyVar (unLoc $1) placeHolderKind) }
-        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) $4 placeHolderKind) }
+        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) (HsBSig $4 placeHolderBndrs) placeHolderKind) }
 
 fds :: { Located [Located (FunDep RdrName)] }
         : {- empty -}                   { noLoc [] }
@@ -1135,6 +1135,7 @@ akind :: { LHsKind RdrName }
         : '*'                    { L1 $ HsTyVar (nameRdrName liftedTypeKindTyConName) }
         | '(' kind ')'           { LL $ HsParTy $2 }
         | pkind                  { $1 }
+        | tyvar                  { L1 $ HsTyVar (unLoc $1) }
 
 pkind :: { LHsKind RdrName }  -- promoted type, see Note [Promotion]
         : qtycon                          { L1 $ HsTyVar $ unLoc $1 }

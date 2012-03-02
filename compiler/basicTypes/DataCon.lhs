@@ -563,7 +563,7 @@ mkDataCon name declared_infix
 	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
-eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
+eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
 
 mk_pred_strict_mark :: PredType -> HsBang
 mk_pred_strict_mark pred 

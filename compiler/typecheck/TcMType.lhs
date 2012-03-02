@@ -24,7 +24,7 @@ module TcMType (
   newFlexiTyVar,
   newFlexiTyVarTy,		-- Kind -> TcM TcType
   newFlexiTyVarTys,		-- Int -> Kind -> TcM [TcType]
-  newMetaKindVar, newMetaKindVars,
+  newMetaKindVar, newMetaKindVars, mkKindSigVar,
   mkTcTyVarName,
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
@@ -60,8 +60,8 @@ module TcMType (
   --------------------------------
   -- Zonking
   zonkType, zonkKind, zonkTcPredType, 
-  skolemiseUnboundMetaTyVar,
-  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
+  skolemiseSigTv, skolemiseUnboundMetaTyVar,
+  zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
 
@@ -116,12 +116,16 @@ import Data.List        ( (\\), partition, mapAccumL )
 
 \begin{code}
 newMetaKindVar :: TcM TcKind
-newMetaKindVar = do	{ uniq <- newUnique
-		; ref <- newMutVar Flexi
-		; return (mkTyVarTy (mkMetaKindVar uniq ref)) }
+newMetaKindVar = do { uniq <- newUnique
+		    ; ref <- newMutVar Flexi
+		    ; return (mkTyVarTy (mkMetaKindVar uniq ref)) }
 
 newMetaKindVars :: Int -> TcM [TcKind]
 newMetaKindVars n = mapM (\ _ -> newMetaKindVar) (nOfThem n ())
+
+mkKindSigVar :: Name -> KindVar
+-- Use the specified name; don't clone it
+mkKindSigVar n = mkTcTyVar n superKind (SkolemTv False)
 \end{code}
 
 
@@ -151,7 +155,7 @@ newEvVar ty = do { name <- newName (predTypeOccName ty)
 newEq :: TcType -> TcType -> TcM EvVar
 newEq ty1 ty2
   = do { name <- newName (mkVarOccFS (fsLit "cobox"))
-       ; return (mkLocalId name (mkEqPred (ty1, ty2))) }
+       ; return (mkLocalId name (mkTcEqPred ty1 ty2)) }
 
 newIP :: IPName Name -> TcType -> TcM IpId
 newIP ip ty
@@ -180,7 +184,7 @@ predTypeOccName ty = case classifyPredType ty of
 %************************************************************************
 
 \begin{code}
-tcInstType :: ([TyVar] -> TcM [TcTyVar]) 		-- How to instantiate the type variables
+tcInstType :: ([TyVar] -> TcM (TvSubst, [TcTyVar]))     -- How to instantiate the type variables
 	   -> TcType 					-- Type to instantiate
 	   -> TcM ([TcTyVar], TcThetaType, TcType)	-- Result
 		-- (type vars (excl coercion vars), preds (incl equalities), rho)
@@ -192,14 +196,8 @@ tcInstType inst_tyvars ty
 			 in
 			 return ([], theta, tau)
 
-	(tyvars, rho) -> do { tyvars' <- inst_tyvars tyvars
-
-			    ; let  tenv = zipTopTvSubst tyvars (mkTyVarTys tyvars')
-				-- Either the tyvars are freshly made, by inst_tyvars,
-                                -- or any nested foralls have different binders.
-                                -- Either way, zipTopTvSubst is ok
-
-			    ; let  (theta, tau) = tcSplitPhiTy (substTy tenv rho)
+	(tyvars, rho) -> do { (subst, tyvars') <- inst_tyvars tyvars
+			    ; let (theta, tau) = tcSplitPhiTy (substTy subst rho)
 			    ; return (tyvars', theta, tau) }
 
 tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
@@ -208,12 +206,12 @@ tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
 -- be in the type environment: it is lexically scoped.
 tcSkolDFunType ty = tcInstType (\tvs -> return (tcSuperSkolTyVars tvs)) ty
 
-tcSuperSkolTyVars :: [TyVar] -> [TcTyVar]
+tcSuperSkolTyVars :: [TyVar] -> (TvSubst, [TcTyVar])
 -- Make skolem constants, but do *not* give them new names, as above
 -- Moreover, make them "super skolems"; see comments with superSkolemTv
 -- see Note [Kind substitution when instantiating]
 -- Precondition: tyvars should be ordered (kind vars first)
-tcSuperSkolTyVars = snd . mapAccumL tcSuperSkolTyVar (mkTopTvSubst [])
+tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar (mkTopTvSubst [])
 
 tcSuperSkolTyVar :: TvSubst -> TyVar -> (TvSubst, TcTyVar)
 tcSuperSkolTyVar subst tv
@@ -239,14 +237,11 @@ tcInstSkolTyVar overlappable subst tyvar
     occ      = nameOccName old_name
     kind     = substTy subst (tyVarKind tyvar)
 
-tcInstSkolTyVars' :: Bool -> TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
--- Precondition: tyvars should be ordered (kind vars first)
--- see Note [Kind substitution when instantiating]
-tcInstSkolTyVars' isSuperSkol = mapAccumLM (tcInstSkolTyVar isSuperSkol)
-
 -- Wrappers
-tcInstSkolTyVars, tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
-tcInstSkolTyVars      = fmap snd . tcInstSkolTyVars' False (mkTopTvSubst [])
+tcInstSkolTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
+tcInstSkolTyVars = tcInstSkolTyVarsX (mkTopTvSubst [])
+
+tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
 tcInstSuperSkolTyVars = fmap snd . tcInstSkolTyVars' True  (mkTopTvSubst [])
 
 tcInstSkolTyVarsX, tcInstSuperSkolTyVarsX
@@ -254,17 +249,24 @@ tcInstSkolTyVarsX, tcInstSuperSkolTyVarsX
 tcInstSkolTyVarsX      subst = tcInstSkolTyVars' False subst
 tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True  subst
 
+tcInstSkolTyVars' :: Bool -> TvSubst -> [TyVar] -> TcM (TvSubst, [TcTyVar])
+-- Precondition: tyvars should be ordered (kind vars first)
+-- see Note [Kind substitution when instantiating]
+tcInstSkolTyVars' isSuperSkol = mapAccumLM (tcInstSkolTyVar isSuperSkol)
+
 tcInstSkolType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants
 -- Binding location comes from the monad
 tcInstSkolType ty = tcInstType tcInstSkolTyVars ty
 
-tcInstSigTyVars :: [TyVar] -> TcM [TcTyVar]
+tcInstSigTyVars :: [TyVar] -> TcM (TvSubst, [TcTyVar])
 -- Make meta SigTv type variables for patten-bound scoped type varaibles
 -- We use SigTvs for them, so that they can't unify with arbitrary types
 -- Precondition: tyvars should be ordered (kind vars first)
 -- see Note [Kind substitution when instantiating]
-tcInstSigTyVars = fmap snd . mapAccumLM tcInstSigTyVar (mkTopTvSubst [])
+tcInstSigTyVars = mapAccumLM tcInstSigTyVar (mkTopTvSubst [])
+	-- The tyvars are freshly made, by tcInstSigTyVar
+        -- So mkTopTvSubst [] is ok
 
 tcInstSigTyVar :: TvSubst -> TyVar -> TcM (TvSubst, TcTyVar)
 tcInstSigTyVar subst tv
@@ -481,27 +483,30 @@ the environment.
 tcGetGlobalTyVars :: TcM TcTyVarSet
 tcGetGlobalTyVars
   = do { (TcLclEnv {tcl_tyvars = gtv_var}) <- getLclEnv
-       ; gbl_tvs <- readMutVar gtv_var
-       ; tys     <- mapM zonk_tv (varSetElems gbl_tvs)
-       ; let gbl_tvs' = tyVarsOfTypes tys
+       ; gbl_tvs  <- readMutVar gtv_var
+       ; gbl_tvs' <- zonkTyVarsAndFV gbl_tvs
        ; writeMutVar gtv_var gbl_tvs'
        ; return gbl_tvs' }
   where
-    zonk_tv tv | isTcTyVar tv = zonkTcTyVar tv
-               | otherwise    = return (mkTyVarTy tv)
-    -- Hackily, the global tyvars can contain non-TcTyVars
-    -- These are added (only) in TcHsType.tcTyClTyVars, but it seems
-    -- painful to make them into TcTyVars there
 \end{code}
 
 -----------------  Type variables
 
 \begin{code}
+zonkTyVar :: TyVar -> TcM TcType
+-- Works on TyVars and TcTyVars
+zonkTyVar tv | isTcTyVar tv = zonkTcTyVar tv
+             | otherwise    = return (mkTyVarTy tv)
+   -- Hackily, when typechecking type and class decls
+   -- we have TyVars in scopeadded (only) in 
+   -- TcHsType.tcTyClTyVars, but it seems
+   -- painful to make them into TcTyVars there
+
+zonkTyVarsAndFV :: TyVarSet -> TcM TyVarSet
+zonkTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTyVar (varSetElems tyvars)
+
 zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
-
-zonkTcTyVarsAndFV :: TcTyVarSet -> TcM TcTyVarSet
-zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar (varSetElems tyvars)
 
 -----------------  Types
 zonkTcType :: TcType -> TcM TcType
@@ -640,6 +645,17 @@ skolemiseUnboundMetaTyVar tv details
 
         ; writeMetaTyVar tv (mkTyVarTy final_tv)
         ; return final_tv }
+
+skolemiseSigTv :: TcTyVar -> TcM TcTyVar
+-- In TcBinds we create SigTvs for type signatures
+-- but for singleton groups we want them to really be skolems
+-- which do not unify with each other
+skolemiseSigTv tv  
+  = ASSERT2( isSigTyVar tv, ppr tv )
+    do { writeMetaTyVarRef tv (metaTvRef tv) (mkTyVarTy skol_tv)
+       ; return skol_tv }
+  where
+    skol_tv = setTcTyVarDetails tv (SkolemTv False)
 \end{code}
 
 \begin{code}
@@ -803,12 +819,12 @@ zonkType zonk_tc_tyvar ty
 
 	-- The two interesting cases!
     go (TyVarTy tyvar) | isTcTyVar tyvar = zonk_tc_tyvar tyvar
-		       | otherwise	 = TyVarTy <$> updateTyVarKindM zonkTcKind tyvar
+		       | otherwise	 = TyVarTy <$> updateTyVarKindM go tyvar
 		-- Ordinary (non Tc) tyvars occur inside quantified types
 
     go (ForAllTy tyvar ty) = ASSERT( isImmutableTyVar tyvar ) do
                              ty' <- go ty
-                             tyvar' <- updateTyVarKindM zonkTcKind tyvar
+                             tyvar' <- updateTyVarKindM go tyvar
                              return (ForAllTy tyvar' ty')
 \end{code}
 
@@ -869,71 +885,74 @@ expectedKindInCtxt GhciCtxt       = Nothing
 expectedKindInCtxt ResSigCtxt     = Just openTypeKind
 expectedKindInCtxt ExprSigCtxt    = Just openTypeKind
 expectedKindInCtxt (ForSigCtxt _) = Just liftedTypeKind
+expectedKindInCtxt InstDeclCtxt   = Just constraintKind
+expectedKindInCtxt SpecInstCtxt   = Just constraintKind
 expectedKindInCtxt _              = Just argTypeKind
 
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
-checkValidType ctxt ty = do
-    traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
-    unboxed         <- xoptM Opt_UnboxedTuples
-    rank2           <- xoptM Opt_Rank2Types
-    rankn           <- xoptM Opt_RankNTypes
-    polycomp        <- xoptM Opt_PolymorphicComponents
-    constraintKinds <- xoptM Opt_ConstraintKinds
-    let 
-	gen_rank n | rankn     = ArbitraryRank
-	           | rank2     = Rank 2
-	           | otherwise = Rank n
-	rank
-	  = case ctxt of
-		 DefaultDeclCtxt-> MustBeMonoType
-		 ResSigCtxt	-> MustBeMonoType
-		 LamPatSigCtxt	-> gen_rank 0
-		 BindPatSigCtxt	-> gen_rank 0
-		 TySynCtxt _    -> gen_rank 0
+-- Not used for instance decls; checkValidInstance instead
+checkValidType ctxt ty 
+  = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
+       ; unboxed         <- xoptM Opt_UnboxedTuples
+       ; rank2           <- xoptM Opt_Rank2Types
+       ; rankn           <- xoptM Opt_RankNTypes
+       ; polycomp        <- xoptM Opt_PolymorphicComponents
+       ; constraintKinds <- xoptM Opt_ConstraintKinds
+       ; let gen_rank n | rankn     = ArbitraryRank
+	                | rank2     = Rank 2
+	                | otherwise = Rank n
+	     rank
+	       = case ctxt of
+	     	 DefaultDeclCtxt-> MustBeMonoType
+	     	 ResSigCtxt	-> MustBeMonoType
+	     	 LamPatSigCtxt	-> gen_rank 0
+	     	 BindPatSigCtxt	-> gen_rank 0
+	     	 TySynCtxt _    -> gen_rank 0
 
-		 ExprSigCtxt 	-> gen_rank 1
-		 FunSigCtxt _   -> gen_rank 1
-		 InfSigCtxt _   -> ArbitraryRank	-- Inferred type
-		 ConArgCtxt _   | polycomp -> gen_rank 2
-                                -- We are given the type of the entire
-                                -- constructor, hence rank 1
- 				| otherwise -> gen_rank 1
+	     	 ExprSigCtxt 	-> gen_rank 1
+	     	 FunSigCtxt _   -> gen_rank 1
+	     	 InfSigCtxt _   -> ArbitraryRank	-- Inferred type
+	     	 ConArgCtxt _   | polycomp -> gen_rank 2
+                                     -- We are given the type of the entire
+                                     -- constructor, hence rank 1
+ 	     			| otherwise -> gen_rank 1
 
-		 ForSigCtxt _	-> gen_rank 1
-		 SpecInstCtxt   -> gen_rank 1
+	     	 ForSigCtxt _	-> gen_rank 1
+	     	 SpecInstCtxt   -> gen_rank 1
                  ThBrackCtxt    -> gen_rank 1
-		 GhciCtxt       -> ArbitraryRank
+	     	 GhciCtxt       -> ArbitraryRank
                  _              -> panic "checkValidType"
-                                     -- Can't happen; not used for *user* sigs
+                                          -- Can't happen; not used for *user* sigs
 
-	actual_kind = typeKind ty
+	     actual_kind = typeKind ty
 
-        kind_ok = case expectedKindInCtxt ctxt of
-                    Nothing -> True
-                    Just k  -> tcIsSubKind actual_kind k
+             kind_ok = case expectedKindInCtxt ctxt of
+                         Nothing -> True
+                         Just k  -> tcIsSubKind actual_kind k
 	
-	ubx_tup 
-         | not unboxed = UT_NotOk
-         | otherwise   = case ctxt of
-	              	   TySynCtxt _ -> UT_Ok
-	              	   ExprSigCtxt -> UT_Ok
-	              	   ThBrackCtxt -> UT_Ok
-		      	   GhciCtxt    -> UT_Ok
-	              	   _           -> UT_NotOk
+	     ubx_tup 
+              | not unboxed = UT_NotOk
+              | otherwise   = case ctxt of
+	                   	   TySynCtxt _ -> UT_Ok
+	                   	   ExprSigCtxt -> UT_Ok
+	                   	   ThBrackCtxt -> UT_Ok
+	     	      	           GhciCtxt    -> UT_Ok
+	                   	   _           -> UT_NotOk
 
 	-- Check the internal validity of the type itself
-    check_type rank ubx_tup ty
+       ; check_type rank ubx_tup ty
 
 	-- Check that the thing has kind Type, and is lifted if necessary
 	-- Do this second, because we can't usefully take the kind of an 
 	-- ill-formed type such as (a~Int)
-    checkTc kind_ok (kindErr actual_kind)
+       ; checkTc kind_ok (kindErr actual_kind)
 
         -- Check that the thing does not have kind Constraint,
         -- if -XConstraintKinds isn't enabled
-    unless constraintKinds
-      $ checkTc (not (isConstraintKind actual_kind)) (predTupleErr ty)
+       ; unless constraintKinds $
+         checkTc (not (isConstraintKind actual_kind)) (predTupleErr ty)
+       }
 
 checkValidMonoType :: Type -> TcM ()
 checkValidMonoType ty = check_mono_type MustBeMonoType ty
@@ -1184,7 +1203,7 @@ check_pred_ty' dflags _ctxt (EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
 		-- families are permitted
        ; checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags) 
-                 (eqPredTyErr (mkEqPred (ty1, ty2)))
+                 (eqPredTyErr (mkEqPred ty1 ty2))
 
 		-- Check the form of the argument types
        ; checkValidMonoType ty1
@@ -1458,26 +1477,27 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
-checkValidInstHead ctxt clas tys
+checkValidInstHead ctxt clas cls_args
   = do { dflags <- getDynFlags
 
            -- Check language restrictions; 
            -- but not for SPECIALISE isntance pragmas
+       ; let ty_args = dropWhile isKind cls_args
        ; unless spec_inst_prag $
          do { checkTc (xopt Opt_TypeSynonymInstances dflags ||
-                       all tcInstHeadTyNotSynonym tys)
+                       all tcInstHeadTyNotSynonym ty_args)
                  (instTypeErr pp_pred head_type_synonym_msg)
             ; checkTc (xopt Opt_FlexibleInstances dflags ||
-                       all tcInstHeadTyAppAllTyVars tys)
+                       all tcInstHeadTyAppAllTyVars ty_args)
                  (instTypeErr pp_pred head_type_args_tyvars_msg)
             ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
-                       isSingleton (dropWhile isKind tys))  -- IA0_NOTE: only count type arguments
+                       isSingleton ty_args)  -- Only count type arguments
                  (instTypeErr pp_pred head_one_type_msg) }
 
          -- May not contain type family applications
-       ; mapM_ checkTyFamFreeness tys
+       ; mapM_ checkTyFamFreeness ty_args
 
-       ; mapM_ checkValidMonoType tys
+       ; mapM_ checkValidMonoType ty_args
 	-- For now, I only allow tau-types (not polytypes) in 
 	-- the head of an instance decl.  
 	-- 	E.g.  instance C (forall a. a->a) is rejected
@@ -1488,7 +1508,7 @@ checkValidInstHead ctxt clas tys
   where
     spec_inst_prag = case ctxt of { SpecInstCtxt -> True; _ -> False }
 
-    pp_pred = pprClassPred clas tys
+    pp_pred = pprClassPred clas cls_args
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
                 text "where T is not a synonym." $$
@@ -1540,13 +1560,16 @@ validDerivPred tv_set ty = case getClassPredTys_maybe ty of
 %************************************************************************
 
 \begin{code}
-checkValidInstance :: UserTypeCtxt -> LHsType Name -> [TyVar] -> ThetaType
-                   -> Class -> [TcType] -> TcM ()
-checkValidInstance ctxt hs_type tyvars theta clas inst_tys
-  = setSrcSpan (getLoc hs_type) $
+checkValidInstance :: UserTypeCtxt -> LHsType Name -> Type
+                   -> TcM ([TyVar], ThetaType, Class, [Type])
+checkValidInstance ctxt hs_type ty
+  = do { let (tvs, theta, tau) = tcSplitSigmaTy ty
+       ; case getClassPredTys_maybe tau of {
+           Nothing          -> failWithTc (ptext (sLit "Malformed instance type")) ;
+           Just (clas,inst_tys)  -> 
     do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
         ; checkValidTheta ctxt theta
-	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
+	; checkAmbiguity tvs theta (tyVarsOfTypes inst_tys)
 
 	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98 this will already have been done by checkValidTheta,
@@ -1558,7 +1581,7 @@ checkValidInstance ctxt hs_type tyvars theta clas inst_tys
 	-- The Coverage Condition
 	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
-        }
+        ; return (tvs, theta, clas, inst_tys) } } }
   where
     msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
 			 undecidableMsg])

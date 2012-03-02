@@ -761,17 +761,17 @@ lPatImplicits = hs_lpat
 %************************************************************************
 
 \begin{code}
-collectSigTysFromPats :: [InPat name] -> [LHsType name]
+collectSigTysFromPats :: [InPat name] -> [HsBndrSig (LHsType name)]
 collectSigTysFromPats pats = foldr collect_sig_lpat [] pats
 
-collectSigTysFromPat :: InPat name -> [LHsType name]
+collectSigTysFromPat :: InPat name -> [HsBndrSig (LHsType name)]
 collectSigTysFromPat pat = collect_sig_lpat pat []
 
-collect_sig_lpat :: InPat name -> [LHsType name] -> [LHsType name]
+collect_sig_lpat :: InPat name -> [HsBndrSig (LHsType name)] -> [HsBndrSig (LHsType name)]
 collect_sig_lpat pat acc = collect_sig_pat (unLoc pat) acc
 
-collect_sig_pat :: Pat name -> [LHsType name] -> [LHsType name]
-collect_sig_pat (SigPatIn pat ty)  	acc = collect_sig_lpat pat (ty:acc)
+collect_sig_pat :: Pat name -> [HsBndrSig (LHsType name)] -> [HsBndrSig (LHsType name)]
+collect_sig_pat (SigPatIn pat ty)   acc = collect_sig_lpat pat (ty:acc)
 
 collect_sig_pat (LazyPat pat)       acc = collect_sig_lpat pat acc
 collect_sig_pat (BangPat pat)       acc = collect_sig_lpat pat acc

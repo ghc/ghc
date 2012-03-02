@@ -25,8 +25,9 @@ module TcEnv(
         tcExtendGhciEnv, tcExtendLetEnv,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
         tcLookup, tcLookupLocated, tcLookupLocalIds, 
-        tcLookupId, tcLookupTyVar, getScopedTyVarBinds,
-        getInLocalScope,
+        tcLookupId, tcLookupTyVar, 
+        tcLookupLcl_maybe, 
+        getScopedTyVarBinds, getInLocalScope,
         wrongThingErr, pprBinders,
 
         tcExtendRecEnv,         -- For knot-tying
@@ -104,29 +105,27 @@ tcLookupGlobal :: Name -> TcM TyThing
 -- In GHCi, we may make command-line bindings (ghci> let x = True)
 -- that bind a GlobalId, but with an InternalName
 tcLookupGlobal name
-  = do  { env <- getGblEnv
-        
-                -- Try local envt
+  = do  {    -- Try local envt
+          env <- getGblEnv
         ; case lookupNameEnv (tcg_type_env env) name of { 
                 Just thing -> return thing ;
-                Nothing    -> do 
+                Nothing    ->
          
-                -- Try global envt
-        { hsc_env <- getTopEnv
-        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
-        ; case mb_thing of  {
-            Just thing -> return thing ;
-            Nothing    -> do
-
                 -- Should it have been in the local envt?
-        { case nameModule_maybe name of
-                Nothing -> notFound name -- Internal names can happen in GHCi
+          case nameModule_maybe name of {
+                Nothing -> notFound name ; -- Internal names can happen in GHCi
 
                 Just mod | mod == tcg_mod env   -- Names from this module 
-                         -> notFound name -- should be in tcg_type_env
-                         | otherwise
-                         -> tcImportDecl name   -- Go find it in an interface
-        }}}}}
+                         -> notFound name       -- should be in tcg_type_env
+                         | otherwise -> do
+
+           -- Try home package table and external package table
+        { hsc_env <- getTopEnv
+        ; mb_thing <- liftIO (lookupTypeHscEnv hsc_env name)
+        ; case mb_thing of  
+            Just thing -> return thing 
+            Nothing    -> tcImportDecl name   -- Go find it in an interface
+        }}}}
 
 tcLookupField :: Name -> TcM Id         -- Returns the selector Id
 tcLookupField name 
@@ -276,6 +275,11 @@ tcExtendRecEnv gbl_stuff thing_inside
 tcLookupLocated :: Located Name -> TcM TcTyThing
 tcLookupLocated = addLocM tcLookup
 
+tcLookupLcl_maybe :: Name -> TcM (Maybe TcTyThing)
+tcLookupLcl_maybe name
+  = do { local_env <- getLclTypeEnv
+       ; return (lookupNameEnv local_env name) }
+
 tcLookup :: Name -> TcM TcTyThing
 tcLookup name = do
     local_env <- getLclTypeEnv
@@ -284,11 +288,11 @@ tcLookup name = do
         Nothing    -> AGlobal <$> tcLookupGlobal name
 
 tcLookupTyVar :: Name -> TcM TcTyVar
-tcLookupTyVar name = do
-    thing <- tcLookup name
-    case thing of
-        ATyVar _ tv -> return tv
-        _           -> pprPanic "tcLookupTyVar" (ppr name)
+tcLookupTyVar name
+  = do { thing <- tcLookup name
+       ; case thing of
+           ATyVar _ tv -> return tv
+           _           -> pprPanic "tcLookupTyVar" (ppr name) }
 
 tcLookupId :: Name -> TcM Id
 -- Used when we aren't interested in the binding level, nor refinement. 
@@ -455,7 +459,9 @@ tc_extend_local_env extra_env thing_inside
           NotTopLevel -> id_tvs
       where
         id_tvs = tyVarsOfType (idType id)
-    get_tvs (_, ATyVar _ tv) = unitVarSet tv        -- See Note [Global TyVars]
+    get_tvs (_, ATyVar _ tv)                 -- See Note [Global TyVars]
+      = tyVarsOfType (tyVarKind tv) `extendVarSet` tv 
+      
     get_tvs other = pprPanic "get_tvs" (ppr other)
         
         -- Note [Global TyVars]
@@ -465,6 +471,8 @@ tc_extend_local_env extra_env thing_inside
         -- Here, g mustn't be generalised.  This is also important during
         -- class and instance decls, when we mustn't generalise the class tyvars
         -- when typechecking the methods.
+        --
+        -- Nor must we generalise g over any kind variables free in r's kind
 
 tcExtendGlobalTyVars :: IORef VarSet -> VarSet -> TcM (IORef VarSet)
 tcExtendGlobalTyVars gtv_var extra_global_tvs

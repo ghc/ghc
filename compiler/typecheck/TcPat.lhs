@@ -138,12 +138,11 @@ data TcSigInfo
   = TcSigInfo {
         sig_id     :: TcId,         --  *Polymorphic* binder for this value...
 
-        sig_scoped :: [Name],	    -- Scoped type variables
-		-- 1-1 correspondence with a prefix of sig_tvs
-		-- However, may be fewer than sig_tvs; 
-		-- see Note [More instantiated than scoped]
-        sig_tvs    :: [TcTyVar],    -- Instantiated type variables
-                                    -- See Note [Instantiate sig]
+        sig_tvs    :: [(Maybe Name, TcTyVar)],    
+                           -- Instantiated type and kind variables
+                           -- Just n <=> this skolem is lexically in scope with name n
+                           -- See Note [Kind vars in sig_tvs]
+                     	   -- See Note [More instantiated than scoped] in TcBinds
 
         sig_theta  :: TcThetaType,  -- Instantiated theta
 
@@ -157,6 +156,16 @@ instance Outputable TcSigInfo where
     ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
         = ppr id <+> ptext (sLit "::") <+> ppr tyvars <+> pprThetaArrowTy theta <+> ppr tau
 \end{code}
+
+Note [Kind vars in sig_tvs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With kind polymorphism a signature like
+  f :: forall f a. f a -> f a
+may actuallly give rise to 
+  f :: forall k. forall (f::k -> *) (a:k). f a -> f a
+So the sig_tvs will be [k,f,a], but only f,a are scoped.
+So the scoped ones are not necessarily the *inital* ones!
+
 
 Note [sig_tau may be polymorphic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

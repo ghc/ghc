@@ -23,6 +23,7 @@ import DynFlags
 import TcRnMonad
 import FamInst
 import TcEnv
+import TcTyClsDecls( tcFamTyPats )
 import TcClassDcl( tcAddDeclCtxt )	-- Small helper
 import TcGenDeriv			-- Deriv stuff
 import TcGenGenerics
@@ -498,7 +499,7 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
 deriveTyData :: (LHsType Name, LTyClDecl Name) -> TcM EarlyDerivSpec
 -- The deriving clause of a data or newtype declaration
 deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
-					           tcdTyVars = tv_names,
+					           tcdTyVars = hs_tvs,
 				    	           tcdTyPats = ty_pats }))
   = setSrcSpan loc     $	-- Use the location of the 'deriving' item
     tcAddDeclCtxt decl $
@@ -512,8 +513,8 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 
 	-- Given data T a b c = ... deriving( C d ),
 	-- we want to drop type variables from T so that (C d (T a)) is well-kinded
-	; let cls_tyvars = classTyVars cls
-	      kind = tyVarKind (last cls_tyvars)
+	; let cls_tyvars     = classTyVars cls
+	      kind           = tyVarKind (last cls_tyvars)
 	      (arg_kinds, _) = splitKindFunTys kind
 	      n_args_to_drop = length arg_kinds
 	      n_args_to_keep = tyConArity tc - n_args_to_drop
@@ -522,7 +523,9 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 	      inst_ty_kind   = typeKind inst_ty
 	      dropped_tvs    = mkVarSet (mapCatMaybes getTyVar_maybe args_to_drop)
 	      univ_tvs       = (mkVarSet tvs `extendVarSetList` deriv_tvs)
-					`minusVarSet` dropped_tvs
+		   	                     `minusVarSet` dropped_tvs
+  
+        ; traceTc "derivTyData" (pprTvBndrs tvs $$ ppr tc $$ ppr tc_args $$ pprTvBndrs (varSetElems $ tyVarsOfTypes tc_args) $$ ppr inst_ty)
 
 	-- Check that the result really is well-kinded
 	; checkTc (n_args_to_keep >= 0 && (inst_ty_kind `eqKind` kind))
@@ -556,11 +559,10 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
     get_lhs Nothing     = do { tc <- tcLookupTyCon tycon_name
 			     ; let tvs = tyConTyVars tc
 			     ; return (tvs, tc, mkTyVarTys tvs) }
-    -- JPM: to fix
-    get_lhs (Just pats) = do { let hs_app = nlHsTyConApp tycon_name pats
-			     ; (tvs, tc_app) <- tcHsQuantifiedType tv_names hs_app
-			     ; let (tc, tc_args) = tcSplitTyConApp tc_app
-			     ; return (tvs, tc, tc_args) }
+    get_lhs (Just pats) = do { fam_tc <- tcLookupTyCon tycon_name
+                             ; tcFamTyPats fam_tc hs_tvs pats (\_ -> return ()) $
+                                    \ tvs' pats' _ ->
+                               return (tvs', fam_tc, pats') }
 
 deriveTyData _other
   = panic "derivTyData"	-- Caller ensures that only TyData can happen

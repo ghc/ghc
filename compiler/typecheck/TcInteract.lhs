@@ -633,17 +633,22 @@ solveWithIdentity d eqv wd tv xi
                              text "Right Kind is     : " <+> ppr (typeKind xi)
                             ]
 
-       ; setWantedTyBind tv xi
-       ; let refl_xi = mkTcReflCo xi
+       ; let xi' = defaultKind xi      
+               -- We only instantiate kind unification variables
+               -- with simple kinds like *, not OpenKind or ArgKind
+               -- cf TcUnify.uUnboundKVar
+
+       ; setWantedTyBind tv xi'
+       ; let refl_xi = mkTcReflCo xi'
 
        ; let solved_fl = mkSolvedFlavor wd UnkSkol (EvCoercion refl_xi) 
-       ; (_,eqv_given) <- newGivenEqVar solved_fl (mkTyVarTy tv) xi refl_xi
+       ; (_,eqv_given) <- newGivenEqVar solved_fl (mkTyVarTy tv) xi' refl_xi
 
        ; when (isWanted wd) $ do { _ <- setEqBind eqv refl_xi wd; return () }
            -- We don't want to do this for Derived, that's why we use 'when (isWanted wd)'
        ; return $ SPSolved (CTyEqCan { cc_id     = eqv_given
                                      , cc_flavor = solved_fl
-                                     , cc_tyvar  = tv, cc_rhs = xi, cc_depth = d }) }
+                                     , cc_tyvar  = tv, cc_rhs = xi', cc_depth = d }) }
 \end{code}
 
 
@@ -1551,7 +1556,7 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = eqv, cc_flavor = fl
                                       ; return $ 
                                         SomeTopInt { tir_rule = "Fun/Top (given)"
                                                    , tir_new_item = ContinueWith workItem } }
-                       Derived {} -> do { evc <- newEvVar fl (mkEqPred (xi, rhs_ty))
+                       Derived {} -> do { evc <- newEvVar fl (mkTcEqPred xi rhs_ty)
                                         ; let eqv' = evc_the_evvar evc
                                         ; when (isNewEvVar evc) $ 
                                             (let ct = CNonCanonical { cc_id  = eqv'

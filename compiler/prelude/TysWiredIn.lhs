@@ -54,8 +54,8 @@ module TysWiredIn (
 
 	-- * Tuples
 	mkTupleTy, mkBoxedTupleTy,
-	tupleTyCon, promotedTupleTyCon,
-        tupleCon, 
+	tupleTyCon, tupleCon, 
+        promotedTupleTyCon, promotedTupleDataCon,
 	unitTyCon, unitDataCon, unitDataConId, pairTyCon, 
 	unboxedUnitTyCon, unboxedUnitDataCon, 
         unboxedSingletonTyCon, unboxedSingletonDataCon,
@@ -88,6 +88,7 @@ import TysPrim
 import Coercion
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module )
+import Type             ( mkTyConApp )
 import DataCon
 import Var
 import TyCon
@@ -327,6 +328,9 @@ tupleTyCon ConstraintTuple    i = fst (factTupleArr    ! i)
 
 promotedTupleTyCon :: TupleSort -> Arity -> TyCon
 promotedTupleTyCon sort i = buildPromotedTyCon (tupleTyCon sort i)
+
+promotedTupleDataCon :: TupleSort -> Arity -> TyCon
+promotedTupleDataCon sort i = buildPromotedDataCon (tupleCon sort i)
 
 tupleCon :: TupleSort -> Arity -> DataCon
 tupleCon sort i | i > mAX_TUPLE_SIZE = snd (mk_tuple sort i)	-- Build one specially

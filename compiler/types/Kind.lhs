@@ -276,9 +276,12 @@ defaultKind :: Kind -> Kind
 -- because that would allow a call like (f 3#) as well as (f True),
 -- and the calling conventions differ.
 -- This defaulting is done in TcMType.zonkTcTyVarBndr.
-defaultKind k
-  | isSubOpenTypeKind k = liftedTypeKind
-  | otherwise           = k
+--
+-- The test is really whether the kind is strictly above '*'
+defaultKind (TyConApp kc _args)
+  | isOpenTypeKindCon kc = ASSERT( null _args ) liftedTypeKind
+  | isArgTypeKindCon  kc = ASSERT( null _args ) liftedTypeKind
+defaultKind k = k
 
 -- Returns the free kind variables in a kind
 kiVarsOfKind :: Kind -> VarSet

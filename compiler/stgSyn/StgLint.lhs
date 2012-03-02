@@ -121,10 +121,10 @@ lint_binds_help (binder, rhs)
                (mkUnLiftedTyMsg binder rhs)
 
         -- Check match to RHS type
-	-- Actually we *can't* check the RHS type, because
-	-- unsafeCoerce means it really might not match at all
-	-- notably;  eg x::Int = (error @Bool "urk") |> unsafeCoerce...
-	-- case maybe_rhs_ty of
+        -- Actually we *can't* check the RHS type, because
+        -- unsafeCoerce means it really might not match at all
+        -- notably;  eg x::Int = (error @Bool "urk") |> unsafeCoerce...
+        -- case maybe_rhs_ty of
         --  Nothing     -> return ()
         --    Just rhs_ty -> checkTys binder_ty
         --                          rhs_ty
@@ -237,8 +237,8 @@ lintStgAlts alts scrut_ty = do
                            return (Just first_ty)
         where
           -- check ty = checkTys first_ty ty (mkCaseAltMsg alts)
-	  -- We can't check that the alternatives have the
-	  -- same type, becuase they don't, with unsafeCoerce#
+          -- We can't check that the alternatives have the
+          -- same type, becuase they don't, with unsafeCoerce#
 
 lintAlt :: Type -> (AltCon, [Id], [Bool], StgExpr) -> LintM (Maybe Type)
 lintAlt _ (DEFAULT, _, _, rhs)
@@ -398,8 +398,8 @@ checkFunApp fun_ty arg_tys msg
  where
   (mb_ty, mb_msg) = cfa True fun_ty arg_tys
 
-  cfa :: Bool -> Type -> [Type] -> (Maybe Type		-- Accurate result?
-                                   , Maybe MsgDoc)	-- Errors?
+  cfa :: Bool -> Type -> [Type] -> (Maybe Type          -- Accurate result?
+                                   , Maybe MsgDoc)      -- Errors?
 
   cfa accurate fun_ty []      -- Args have run out; that's fine
       = (if accurate then Just fun_ty else Nothing, Nothing)
@@ -446,12 +446,12 @@ stgEqType orig_ty1 orig_ty2
       | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
       , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
       , let res = if tc1 == tc2 
-        	  then equalLength tc_args1 tc_args2 
-        	    && and (zipWith go tc_args1 tc_args2)
-        	  else  -- TyCons don't match; but don't bleat if either is a 
-    		        -- family TyCon because a coercion might have made it 
-        	        -- equal to something else
-        	    (isFamilyTyCon tc1 || isFamilyTyCon tc2)
+                  then equalLength tc_args1 tc_args2 
+                    && and (zipWith go tc_args1 tc_args2)
+                  else  -- TyCons don't match; but don't bleat if either is a 
+                        -- family TyCon because a coercion might have made it 
+                        -- equal to something else
+                    (isFamilyTyCon tc1 || isFamilyTyCon tc2)
       = if res then True
         else 
         pprTrace "stgEqType: unequal" (vcat [ppr orig_ty1, ppr orig_ty2, ppr rep_ty1
@@ -459,7 +459,7 @@ stgEqType orig_ty1 orig_ty2
         False
 
       | otherwise = True  -- Conservatively say "fine".  
-      		    	  -- Type variables in particular
+                          -- Type variables in particular
 
 checkInScope :: Id -> LintM ()
 checkInScope id = LintM $ \loc scope errs

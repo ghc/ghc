@@ -221,6 +221,9 @@ initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
 %************************************************************************
 
 \begin{code}
+discardResult :: TcM a -> TcM ()
+discardResult a = a >> return ()
+
 getTopEnv :: TcRnIf gbl lcl HscEnv
 getTopEnv = do { env <- getEnv; return (env_top env) }
 

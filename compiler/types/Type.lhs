@@ -27,7 +27,7 @@ module Type (
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe,
 
-	mkAppTy, mkAppTys, splitAppTy, splitAppTys, 
+	mkAppTy, mkAppTys, mkNakedAppTys, splitAppTy, splitAppTys, 
 	splitAppTy_maybe, repSplitAppTy_maybe,
 
 	mkFunTy, mkFunTys, splitFunTy, splitFunTy_maybe, 
@@ -48,11 +48,11 @@ module Type (
 	-- Pred types
         mkFamilyTyConApp,
 	isDictLikeTy,
-        mkEqPred, mkClassPred,
+        mkNakedEqPred, mkEqPred, mkPrimEqPred,
+        mkClassPred,
 	mkIPPred,
         noParenPred, isClassPred, isEqPred, isIPPred,
-        mkPrimEqType,
-
+        
         -- Deconstructing predicate types
         PredTree(..), predTreePredType, classifyPredType,
         getClassPredTys, getClassPredTys_maybe,
@@ -131,7 +131,8 @@ module Type (
         substKiWith, substKisWith,
 
 	-- * Pretty-printing
-	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
+	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, 
+        pprTvBndr, pprTvBndrs, pprForAll,
 	pprEqPred, pprTheta, pprThetaArrowTy, pprClassPred, 
         pprKind, pprParendKind, pprSourceTyCon,
     ) where
@@ -326,11 +327,8 @@ invariant: use it.
 \begin{code}
 -- | Applies a type to another, as in e.g. @k a@
 mkAppTy :: Type -> Type -> Type
-mkAppTy orig_ty1 orig_ty2
-  = mk_app orig_ty1
-  where
-    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
-    mk_app _                 = AppTy orig_ty1 orig_ty2
+mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
+mkAppTy ty1               ty2 = AppTy ty1 ty2
 	-- Note that the TyConApp could be an 
 	-- under-saturated type synonym.  GHC allows that; e.g.
 	--	type Foo k = k a -> k a
@@ -341,18 +339,14 @@ mkAppTy orig_ty1 orig_ty2
 	-- but once the type synonyms are expanded all is well
 
 mkAppTys :: Type -> [Type] -> Type
-mkAppTys orig_ty1 []	    = orig_ty1
-	-- This check for an empty list of type arguments
-	-- avoids the needless loss of a type synonym constructor.
-	-- For example: mkAppTys Rational []
-	--   returns to (Ratio Integer), which has needlessly lost
-	--   the Rational part.
-mkAppTys orig_ty1 orig_tys2
-  = mk_app orig_ty1
-  where
-    mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
-				-- mkTyConApp: see notes with mkAppTy
-    mk_app _                 = foldl AppTy orig_ty1 orig_tys2
+mkAppTys ty1                []	 = ty1
+mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
+mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
+
+mkNakedAppTys :: Type -> [Type] -> Type
+mkNakedAppTys ty1           []	 = ty1
+mkNakedAppTys (TyConApp tc tys1) tys2 = mkNakedTyConApp tc (tys1 ++ tys2)
+mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -480,6 +474,16 @@ funArgTy ty                = pprPanic "funArgTy" (ppr ty)
 				~~~~~~~~
 
 \begin{code}
+-- | A key function: builds a 'TyConApp' or 'FunTy' as apppropriate to 
+-- its arguments.  Applies its arguments to the constructor from left to right.
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon tys
+  | isFunTyCon tycon, [ty1,ty2] <- tys
+  = FunTy ty1 ty2
+
+  | otherwise
+  = TyConApp tycon tys
+
 -- splitTyConApp "looks through" synonyms, because they don't
 -- mean a distinct type, but all other type-constructor applications
 -- including functions are returned as Just ..
@@ -832,21 +836,26 @@ Make PredTypes
 --------------------- Equality types ---------------------------------
 \begin{code}
 -- | Creates a type equality predicate
-mkEqPred :: (Type, Type) -> PredType
-mkEqPred (ty1, ty2)
-  -- IA0_TODO: The caller should give the kind.
-  = WARN ( not (k `eqKind` defaultKind k), ppr (k, ty1, ty2) )
+mkNakedEqPred :: Kind -> Type -> Type -> PredType
+mkNakedEqPred k ty1 ty2
+  = WARN( not (typeKind ty1 `isSubKind` k) || not (typeKind ty2 `isSubKind` k), 
+          ppr k $$ (ppr ty1 <+> dcolon <+> ppr (typeKind ty1)) 
+                $$ (ppr ty2 <+> dcolon <+> ppr (typeKind ty2)) )
     TyConApp eqTyCon [k, ty1, ty2]
-  where k = defaultKind (typeKind ty1)
---  where k = typeKind ty1
 
-mkPrimEqType :: (Type, Type) -> Type
-mkPrimEqType (ty1, ty2)
-  -- IA0_TODO: The caller should give the kind.
-  = WARN ( not (k `eqKind` defaultKind k), ppr (k, ty1, ty2) )
+mkEqPred :: Type -> Type -> PredType
+mkEqPred ty1 ty2
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
+    TyConApp eqTyCon [k, ty1, ty2]
+  where 
+    k = typeKind ty1
+
+mkPrimEqPred :: Type -> Type -> Type
+mkPrimEqPred ty1  ty2
+  = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
     TyConApp eqPrimTyCon [k, ty1, ty2]
-  where k = defaultKind (typeKind ty1)
---  where k = typeKind ty1
+  where 
+    k = typeKind ty1
 \end{code}
 
 --------------------- Implicit parameters ---------------------------------
@@ -914,7 +923,7 @@ data PredTree = ClassPred Class [Type]
 
 predTreePredType :: PredTree -> PredType
 predTreePredType (ClassPred clas tys) = mkClassPred clas tys
-predTreePredType (EqPred ty1 ty2)     = mkEqPred (ty1, ty2)
+predTreePredType (EqPred ty1 ty2)     = mkEqPred ty1 ty2
 predTreePredType (IPPred ip ty)       = mkIPPred ip ty
 predTreePredType (TuplePred tys)      = mkBoxedTupleTy tys
 predTreePredType (IrredPred ty)       = ty
@@ -1540,14 +1549,14 @@ typeKind (TyConApp tc tys)
 typeKind (AppTy fun arg)      = kindAppResult (typeKind fun) [arg]
 typeKind (ForAllTy _ ty)      = typeKind ty
 typeKind (TyVarTy tyvar)      = tyVarKind tyvar
-typeKind (FunTy _arg res)
+typeKind _ty@(FunTy _arg res)
     -- Hack alert.  The kind of (Int -> Int#) is liftedTypeKind (*), 
     --              not unliftedTypKind (#)
     -- The only things that can be after a function arrow are
     --   (a) types (of kind openTypeKind or its sub-kinds)
     --   (b) kinds (of super-kind TY) (e.g. * -> (* -> *))
     | isSuperKind k         = k
-    | otherwise             = ASSERT( isSubOpenTypeKind k ) liftedTypeKind
+    | otherwise             = ASSERT2( isSubOpenTypeKind k, ppr _ty $$ ppr k ) liftedTypeKind
     where
       k = typeKind res
 

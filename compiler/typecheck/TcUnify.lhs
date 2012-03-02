@@ -650,12 +650,11 @@ unifySigmaTy origin ty1 ty2
              (tvs2, body2) = tcSplitForAllTys ty2
 
        ; defer_or_continue (not (equalLength tvs1 tvs2)) $ do {
-         skol_tvs <- tcInstSkolTyVars tvs1
+         (subst1, skol_tvs) <- tcInstSkolTyVars tvs1
                   -- Get location from monad, not from tvs1
        ; let tys      = mkTyVarTys skol_tvs
-             in_scope = mkInScopeSet (mkVarSet skol_tvs)
-             phi1     = Type.substTy (mkTvSubst in_scope (zipTyEnv tvs1 tys)) body1
-             phi2     = Type.substTy (mkTvSubst in_scope (zipTyEnv tvs2 tys)) body2
+             phi1     = Type.substTy subst1                   body1
+             phi2     = Type.substTy (zipTopTvSubst tvs2 tys) body2
 	     skol_info = UnifyForAllSkol skol_tvs phi1
 
        ; (ev_binds, co) <- checkConstraints skol_info skol_tvs [] $
@@ -1161,7 +1160,7 @@ uUnboundKVar kv1 k2@(TyVarTy kv2)
 uUnboundKVar kv1 non_var_k2
   = do  { k2' <- zonkTcKind non_var_k2
         ; kindOccurCheck kv1 k2'
-        ; let k2'' = kindSimpleKind k2'
+        ; let k2'' = defaultKind k2'
                 -- MetaKindVars must be bound only to simple kinds
         ; writeMetaTyVar kv1 k2'' }
 
@@ -1171,13 +1170,6 @@ kindOccurCheck kv1 k2   -- k2 is zonked
   = if elemVarSet kv1 (tyVarsOfType k2)
     then failWithTc (kindOccurCheckErr kv1 k2)
     else return ()
-
-kindSimpleKind :: Kind -> SimpleKind
--- (kindSimpleKind k) returns a simple kind k' such that k' <= k
-kindSimpleKind k
-  | isOpenTypeKind k = liftedTypeKind
-  | isArgTypeKind  k = liftedTypeKind
-  | otherwise        = k
 
 mkKindErrorCtxt :: Type -> Type -> Kind -> Kind -> TidyEnv -> TcM (TidyEnv, SDoc)
 mkKindErrorCtxt ty1 ty2 k1 k2 env0

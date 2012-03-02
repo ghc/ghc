@@ -1112,7 +1112,7 @@ checkWellStagedDFun pred dfun_id loc
     bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
-pprEq ty1 ty2 = pprType $ mkEqPred (ty1,ty2)
+pprEq ty1 ty2 = pprType $ mkEqPred ty1 ty2
 
 isTouchableMetaTyVar :: TcTyVar -> TcS Bool
 isTouchableMetaTyVar tv 
@@ -1351,7 +1351,7 @@ newGivenEqVar fl ty1 ty2 co
 
 newEqVar :: CtFlavor -> TcType -> TcType -> TcS EvVarCreated
 newEqVar fl ty1 ty2 
-  = do { let pred = mkEqPred (ty1,ty2)
+  = do { let pred = mkTcEqPred ty1 ty2
        ; v <- newEvVar fl pred 
        ; traceTcS "newEqVar" (ppr v <+> dcolon <+> ppr pred)
        ; return v }
