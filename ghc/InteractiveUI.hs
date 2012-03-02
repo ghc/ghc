@@ -1317,7 +1317,7 @@ setContextKeepingPackageModules keep_ctx trans_ctx = do
   new_rem_ctx <- if keep_ctx then return rem_ctx
                              else keepPackageImports rem_ctx
   setGHCiState st{ remembered_ctx = new_rem_ctx,
-                   transient_ctx  = trans_ctx }
+                   transient_ctx  = filterSubsumed new_rem_ctx trans_ctx }
   setGHCContextFromGHCiState
 
 
@@ -1668,7 +1668,10 @@ addII :: InteractiveImport -> GHCi ()
 addII iidecl = do
   checkAdd iidecl
   modifyGHCiState $ \st ->
-     st { remembered_ctx = addNotSubsumed iidecl (remembered_ctx st) }
+     st { remembered_ctx = addNotSubsumed iidecl (remembered_ctx st)
+        , transient_ctx = filter (not . (iidecl `iiSubsumes`))
+                                 (transient_ctx st)
+        }
 
 -- -----------------------------------------------------------------------------
 -- Validate a module that we want to add to the context
@@ -1759,8 +1762,16 @@ addNotSubsumed i is
   | any (`iiSubsumes` i) is = is
   | otherwise               = i : filter (not . (i `iiSubsumes`)) is
 
+-- | @filterSubsumed is js@ returns the elements of @js@ not subsumed
+-- by any of @is@.
+filterSubsumed :: [InteractiveImport] -> [InteractiveImport]
+               -> [InteractiveImport]
+filterSubsumed is js = filter (\j -> not (any (`iiSubsumes` j) is)) js
+
 -- | Returns True if the left import subsumes the right one.  Doesn't
 -- need to be 100% accurate, conservatively returning False is fine.
+-- (EXCEPT: (IIModule m) *must* subsume itself, otherwise a panic in
+-- plusProv will ensue (#5904))
 --
 -- Note that an IIModule does not necessarily subsume an IIDecl,
 -- because e.g. a module might export a name that is only available
