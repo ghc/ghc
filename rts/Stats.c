@@ -287,18 +287,29 @@ stat_startGC (gc_thread *gct)
 }
 
 void
-stat_gcWorkerThreadStart (gc_thread *gct)
+stat_gcWorkerThreadStart (gc_thread *gct STG_UNUSED)
 {
+#if 0
+    /*
+     * We dont' collect per-thread GC stats any more, but this code
+     * could be used to do that if we want to in the future:
+     */
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
     {
         getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
         gct->gc_start_thread_cpu  = getThreadCPUTime();
     }
+#endif
 }
 
 void
-stat_gcWorkerThreadDone (gc_thread *gct)
+stat_gcWorkerThreadDone (gc_thread *gct STG_UNUSED)
 {
+#if 0
+    /*
+     * We dont' collect per-thread GC stats any more, but this code
+     * could be used to do that if we want to in the future:
+     */
     Time thread_cpu, elapsed, gc_cpu, gc_elapsed;
 
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
@@ -311,6 +322,7 @@ stat_gcWorkerThreadDone (gc_thread *gct)
     
         taskDoneGC(gct->cap->running_task, gc_cpu, gc_elapsed);
     }
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -326,16 +338,12 @@ stat_endGC (gc_thread *gct,
         RtsFlags.ProfFlags.doHeapProfile)
         // heap profiling needs GC_tot_time
     {
-        Time cpu, elapsed, thread_gc_cpu, gc_cpu, gc_elapsed;
+        Time cpu, elapsed, gc_cpu, gc_elapsed;
 	
         getProcessTimes(&cpu, &elapsed);
         gc_elapsed    = elapsed - gct->gc_start_elapsed;
 
-        thread_gc_cpu = getThreadCPUTime() - gct->gc_start_thread_cpu;
-
         gc_cpu = cpu - gct->gc_start_cpu;
-
-        taskDoneGC(gct->cap->running_task, thread_gc_cpu, gc_elapsed);
 
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
 	    nat faults = getPageFaults();
@@ -629,22 +637,10 @@ stat_exit(int alloc)
             statsPrintf("\n");
 
 #if defined(THREADED_RTS)
-	    {
-		nat i;
-		Task *task;
-                statsPrintf("                        MUT time (elapsed)       GC time  (elapsed)\n");
-		for (i = 0, task = all_tasks; 
-		     task != NULL; 
-		     i++, task = task->all_link) {
-		    statsPrintf("  Task %2d %-8s :  %6.2fs    (%6.2fs)     %6.2fs    (%6.2fs)\n",
-				i,
-				(task->worker) ? "(worker)" : "(bound)",
-				TimeToSecondsDbl(task->mut_time),
-				TimeToSecondsDbl(task->mut_etime),
-				TimeToSecondsDbl(task->gc_time),
-				TimeToSecondsDbl(task->gc_etime));
-		}
-	    }
+            statsPrintf("  TASKS: %d (%d bound, %d peak workers (%d total), using -N%d)\n",
+                        taskCount, taskCount - workerCount,
+                        peakWorkerCount, workerCount,
+                        n_capabilities);
 
 	    statsPrintf("\n");
 
