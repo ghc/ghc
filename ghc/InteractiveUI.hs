@@ -1289,7 +1289,7 @@ setContextKeepingPackageModules keep_ctx transient_ctx = do
   new_rem_ctx <- if keep_ctx then return rem_ctx
                              else keepPackageImports rem_ctx
   setGHCiState st{ remembered_ctx = new_rem_ctx,
-                   transient_ctx  = transient_ctx }
+                   transient_ctx  = filterSubsumed new_rem_ctx transient_ctx }
   setGHCContextFromGHCiState
 
 
@@ -1628,7 +1628,10 @@ addImportToContext str = do
   idecl <- GHC.parseImportDecl str
   _ <- GHC.lookupModule (unLoc (ideclName idecl)) Nothing  -- #5836
   modifyGHCiState $ \st ->
-     st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
+     st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st)
+        , transient_ctx = filter (not . ((IIDecl idecl) `iiSubsumes`))
+                                 (transient_ctx st)
+        }
   setGHCContextFromGHCiState
 
 setContext :: [String] -> [String] -> GHCi ()
@@ -1683,6 +1686,8 @@ setGHCContext iidecls = GHC.setContext (iidecls ++ prel)
 
 -- | Returns True if the left import subsumes the right one.  Doesn't
 -- need to be 100% accurate, conservatively returning False is fine.
+-- (EXCEPT: (IIModule m) *must* subsume itself, otherwise a panic in
+-- plusProv will ensue (#5904))
 --
 -- Note that an IIModule does not necessarily subsume an IIDecl,
 -- because e.g. a module might export a name that is only available
@@ -1719,6 +1724,12 @@ addNotSubsumed :: InteractiveImport
 addNotSubsumed i is
   | any (`iiSubsumes` i) is = is
   | otherwise               = i : filter (not . (i `iiSubsumes`)) is
+
+-- | @filterSubsumed is js@ returns the elements of @js@ not subsumed
+-- by any of @is@.
+filterSubsumed :: [InteractiveImport] -> [InteractiveImport]
+               -> [InteractiveImport]
+filterSubsumed is js = filter (\j -> not (any (`iiSubsumes` j) is)) js
 
 ----------------------------------------------------------------------------
 -- :set
