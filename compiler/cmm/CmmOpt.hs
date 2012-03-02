@@ -178,7 +178,8 @@ cmmMiniInlineStmts platform uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr
      cmmMiniInlineStmts platform uses stmts'
  where
   isTiny (CmmLit _) = True
-  isTiny (CmmReg _) = True
+  isTiny (CmmReg (CmmGlobal _)) = True
+         -- not CmmLocal: that might invalidate the usage analysis results
   isTiny _ = False
 
   foldExp (CmmMachOp op args) = cmmMachOpFold platform op args
@@ -200,7 +201,7 @@ lookForInlineMany u expr stmts = lookForInlineMany' u expr regset stmts
 lookForInlineMany' :: Unique -> CmmExpr -> RegSet -> [CmmStmt] -> (Int, [CmmStmt])
 lookForInlineMany' _ _ _ [] = (0, [])
 lookForInlineMany' u expr regset stmts@(stmt : rest)
-  | Just n <- lookupUFM (countUses stmt) u
+  | Just n <- lookupUFM (countUses stmt) u, okToInline expr stmt
   = case lookForInlineMany' u expr regset rest of
       (m, stmts) -> let z = n + m
                     in z `seq` (z, inlineStmt u expr stmt : stmts)
@@ -220,7 +221,7 @@ lookForInline u expr stmts = lookForInline' u expr regset stmts
 lookForInline' :: Unique -> CmmExpr -> RegSet -> [CmmStmt] -> Maybe [CmmStmt]
 lookForInline' _ _    _      [] = panic "lookForInline' []"
 lookForInline' u expr regset (stmt : rest)
-  | Just 1 <- lookupUFM (countUses stmt) u, ok_to_inline
+  | Just 1 <- lookupUFM (countUses stmt) u, okToInline expr stmt
   = Just (inlineStmt u expr stmt : rest)
 
   | okToSkip stmt u expr regset
@@ -231,15 +232,15 @@ lookForInline' u expr regset (stmt : rest)
   | otherwise 
   = Nothing
 
-  where
-        -- we don't inline into CmmCall if the expression refers to global
-        -- registers.  This is a HACK to avoid global registers clashing with
-        -- C argument-passing registers, really the back-end ought to be able
-        -- to handle it properly, but currently neither PprC nor the NCG can
-        -- do it.  See also CgForeignCall:load_args_into_temps.
-    ok_to_inline = case stmt of
-                     CmmCall{} -> hasNoGlobalRegs expr
-                     _ -> True
+
+-- we don't inline into CmmCall if the expression refers to global
+-- registers.  This is a HACK to avoid global registers clashing with
+-- C argument-passing registers, really the back-end ought to be able
+-- to handle it properly, but currently neither PprC nor the NCG can
+-- do it.  See also CgForeignCall:load_args_into_temps.
+okToInline :: CmmExpr -> CmmStmt -> Bool
+okToInline expr CmmCall{} = hasNoGlobalRegs expr
+okToInline _ _ = True
 
 -- Expressions aren't side-effecting.  Temporaries may or may not
 -- be single-assignment depending on the source (the old code
