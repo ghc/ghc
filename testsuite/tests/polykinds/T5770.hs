@@ -4,7 +4,6 @@
  #-}
 
 module T5770 where
-import GHC.Base
 
 convert :: a -> b
 convert = convert
