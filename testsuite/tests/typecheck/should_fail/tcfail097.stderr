@@ -1,6 +1,6 @@
 
-tcfail097.hs:5:1:
+tcfail097.hs:5:6:
     Ambiguous constraint `Eq a'
-        At least one of the forall'd type variables mentioned by the constraint
-        must be reachable from the type after the '=>'
+      At least one of the forall'd type variables mentioned by the constraint
+      must be reachable from the type after the '=>'
     In the type signature for `f': f :: Eq a => Int -> Int

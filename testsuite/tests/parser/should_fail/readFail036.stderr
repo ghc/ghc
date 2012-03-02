@@ -1,4 +1,5 @@
 
-readFail036.hs:4:1:
-    Illegal kind signature for `a'
+readFail036.hs:4:16:
+    Illegal kind signature: `*'
       Perhaps you intended to use -XKindSignatures
+    In the data type declaration for `Foo'

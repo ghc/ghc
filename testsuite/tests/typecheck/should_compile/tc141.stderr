@@ -1,6 +1,43 @@
 
-tc141.hs:11:15: Not in scope: type variable `a'
+tc141.hs:11:12:
+    You cannot bind scoped type variable `a'
+      in a pattern binding signature
+    In the pattern: p :: a
+    In the pattern: (p :: a, q :: a)
+    In a pattern binding: (p :: a, q :: a) = x
 
-tc141.hs:11:20: Not in scope: type variable `a'
+tc141.hs:11:31:
+    Couldn't match expected type `a1' with actual type `a'
+      `a1' is a rigid type variable bound by
+           an expression type signature: a1 at tc141.hs:11:31
+      `a' is a rigid type variable bound by
+          the inferred type of f :: (a, a) -> (t, a) at tc141.hs:11:1
+    In the expression: q :: a
+    In the expression: (q :: a, p)
+    In the expression: let (p :: a, q :: a) = x in (q :: a, p)
 
-tc141.hs:13:16: Not in scope: type variable `a'
+tc141.hs:13:13:
+    You cannot bind scoped type variable `a'
+      in a pattern binding signature
+    In the pattern: y :: a
+    In a pattern binding: y :: a = a
+    In the expression:
+      let y :: a = a in
+      let
+        v :: a
+        v = b
+      in v
+
+tc141.hs:15:18:
+    Couldn't match expected type `a1' with actual type `t1'
+      `a1' is a rigid type variable bound by
+           the type signature for v :: a1 at tc141.hs:14:19
+      `t1' is a rigid type variable bound by
+           the inferred type of g :: t -> t1 -> a at tc141.hs:13:1
+    In the expression: b
+    In an equation for `v': v = b
+    In the expression:
+      let
+        v :: a
+        v = b
+      in v

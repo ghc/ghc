@@ -4,14 +4,14 @@ tcfail068.hs:14:9:
     from the context (Constructed a)
       bound by the type signature for
                  itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
-      at tcfail068.hs:(12,1)-(14,31)
+      at tcfail068.hs:11:10-55
       `s1' is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:13:9
       `s' is a rigid type variable bound by
           the type signature for
             itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
-          at tcfail068.hs:12:1
+          at tcfail068.hs:11:53
     Expected type: GHC.ST.ST s1 (IndTree s a)
       Actual type: GHC.ST.ST s1 (STArray s1 (Int, Int) a)
     In the return type of a call of `newSTArray'
@@ -25,12 +25,12 @@ tcfail068.hs:19:21:
       bound by the type signature for
                  itiap :: Constructed a =>
                           (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
-      at tcfail068.hs:(17,1)-(21,19)
+      at tcfail068.hs:16:10-75
       `s' is a rigid type variable bound by
           the type signature for
             itiap :: Constructed a =>
                      (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
-          at tcfail068.hs:17:1
+          at tcfail068.hs:16:58
       `s1' is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:18:9
@@ -48,12 +48,12 @@ tcfail068.hs:24:35:
       bound by the type signature for
                  itrap :: Constructed a =>
                           ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
-      at tcfail068.hs:(24,1)-(32,41)
+      at tcfail068.hs:23:10-87
       `s' is a rigid type variable bound by
           the type signature for
             itrap :: Constructed a =>
                      ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
-          at tcfail068.hs:24:1
+          at tcfail068.hs:23:70
       `s1' is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (IndTree s a)
            at tcfail068.hs:24:29
@@ -75,7 +75,7 @@ tcfail068.hs:36:46:
                                -> c
                                -> IndTree s b
                                -> (c, IndTree s b)
-      at tcfail068.hs:(36,1)-(45,66)
+      at tcfail068.hs:(34,15)-(35,62)
       `s' is a rigid type variable bound by
           the type signature for
             itrapstate :: Constructed b =>
@@ -86,7 +86,7 @@ tcfail068.hs:36:46:
                           -> c
                           -> IndTree s b
                           -> (c, IndTree s b)
-          at tcfail068.hs:36:1
+          at tcfail068.hs:35:40
       `s1' is a rigid type variable bound by
            a type expected by the context: GHC.ST.ST s1 (c, IndTree s b)
            at tcfail068.hs:36:40

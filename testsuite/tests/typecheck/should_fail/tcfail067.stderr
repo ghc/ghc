@@ -1,6 +1,6 @@
 
-tcfail067.hs:1:14:
-    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+tcfail067.hs:1:14: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail067.hs:12:16:
     No instance for (Ord a)
@@ -20,7 +20,7 @@ tcfail067.hs:46:12:
     from the context (Show a)
       bound by the type signature for
                  showRange :: Show a => SubRange a -> String
-      at tcfail067.hs:(46,1)-(47,58)
+      at tcfail067.hs:45:14-43
     Possible fix:
       add (Ord a) to the context of
         the type signature for showRange :: Show a => SubRange a -> String
@@ -59,7 +59,7 @@ tcfail067.hs:74:5:
       bound by the type signature for
                  numSubRangeBinOp :: Num a =>
                                      (a -> a -> a) -> SubRange a -> SubRange a -> SubRange a
-      at tcfail067.hs:(73,1)-(76,53)
+      at tcfail067.hs:(71,21)-(72,58)
     Possible fix:
       add (Ord a) to the context of
         the type signature for
