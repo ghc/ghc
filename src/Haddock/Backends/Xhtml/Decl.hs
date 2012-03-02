@@ -121,7 +121,7 @@ ppFor _ _ _ _ _ _ _ = error "ppFor"
 -- we skip type patterns for now
 ppTySyn :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool
         -> Qualification -> Html
-ppTySyn summary links loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode qual
+ppTySyn summary links loc doc (TySynonym (L _ name) ltyvars _ ltype _) unicode qual
   = ppTypeOrFunSig summary links loc [name] (unLoc ltype) doc
                    (full, hdr, spaceHtml +++ equals) unicode qual
   where
@@ -163,7 +163,7 @@ ppTyFamHeader summary associated decl unicode qual =
 
   ppTyClBinderWithVars summary decl <+>
 
-  case tcdKind decl of
+  case tcdKindSig decl of
     Just kind -> dcolon unicode  <+> ppLKind unicode qual kind
     Nothing -> noHtml
 

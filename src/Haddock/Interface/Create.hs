@@ -159,7 +159,6 @@ parseOption other = tell ["Unrecognised option: " ++ other] >> return Nothing
 
 type Maps = (DocMap Name, ArgMap Name, SubMap, DeclMap)
 
-
 mkMaps :: DynFlags -> GlobalRdrEnv -> [ClsInst] -> [Name] -> [(LHsDecl Name, [HsDocString])] -> ErrMsgM Maps
 mkMaps dflags gre instances exports decls = do
   maps <- mapM f decls

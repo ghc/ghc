@@ -260,11 +260,13 @@ renameType t = case t of
 
 
 renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
-renameLTyVarBndr (L loc tv) = do
-  name' <- rename (hsTyVarName tv)
-  tyvar' <- replaceTyVarName tv name' renameLKind
-  return $ L loc tyvar'
-
+renameLTyVarBndr (L loc (UserTyVar n tck))
+  = do { n' <- rename n
+       ; return (L loc (UserTyVar n' tck)) }
+renameLTyVarBndr (L loc (KindedTyVar n (HsBSig k fvs) tck))
+  = do { n' <- rename n
+       ; k' <- renameLKind k
+       ; return (L loc (KindedTyVar n' (HsBSig k' fvs) tck)) }
 
 renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
@@ -330,12 +332,12 @@ renameTyClD d = case d of
     -- I don't think we need the derivings, so we return Nothing
     return (TyData x lcontext' lname' cType ltyvars' typats' k' cons' Nothing)
 
-  TySynonym lname ltyvars typats ltype -> do
+  TySynonym lname ltyvars typats ltype fvs -> do
     lname'   <- renameL lname
     ltyvars' <- mapM renameLTyVarBndr ltyvars
     ltype'   <- renameLType ltype
     typats'  <- mapM (mapM renameLType) typats
-    return (TySynonym lname' ltyvars' typats' ltype')
+    return (TySynonym lname' ltyvars' typats' ltype' fvs)
 
   ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats at_defs _ -> do
     lcontext' <- renameLContext lcontext

@@ -86,7 +86,7 @@ synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
         tyvars    = synifyTyVars tvs
         typats    = map (synifyType WithinType) args
         hs_rhs_ty = synifyType WithinType rhs
-    in TySynonym name tyvars (Just typats) hs_rhs_ty
+    in TySynonym name tyvars (Just typats) hs_rhs_ty placeHolderNames
   | otherwise
   = error "synifyAxiom" 
 
@@ -103,7 +103,9 @@ synifyTyCon tc
       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
       (zipWith
          (\fakeTyVar realKind -> noLoc $
-             KindedTyVar (getName fakeTyVar) (synifyKind realKind) placeHolderKind)
+             KindedTyVar (getName fakeTyVar) 
+                         (HsBSig (synifyKind realKind) placeHolderBndrs) 
+                         placeHolderKind)
          alphaTyVars --a, b, c... which are unfortunately all kind *
          (fst . splitKindFunTys $ tyConKind tc)
       )
@@ -164,7 +166,7 @@ synifyTyCon tc
   alg_deriv = Nothing
   syn_type = synifyType WithinType (synTyConType tc)
  in if isSynTyCon tc
-  then TySynonym name tyvars typats syn_type
+  then TySynonym name tyvars typats syn_type placeHolderNames
   else TyData alg_nd alg_ctx name Nothing tyvars typats (fmap synifyKind alg_kindSig) alg_cons alg_deriv
 
 
@@ -239,7 +241,7 @@ synifyTyVars = map synifyTyVar
       name = getName tv
      in if isLiftedTypeKind kind
         then UserTyVar name placeHolderKind
-        else KindedTyVar name (synifyKind kind) placeHolderKind
+        else KindedTyVar name (HsBSig (synifyKind kind) placeHolderBndrs) placeHolderKind
 
 
 --states of what to do with foralls:
