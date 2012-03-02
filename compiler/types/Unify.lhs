@@ -156,9 +156,6 @@ match :: MatchEnv	-- For the most part this is pushed downwards
 			--	in-scope set of the RnEnv2
       -> Type -> Type	-- Template and target respectively
       -> Maybe TvSubstEnv
--- This matcher works on core types; that is, it ignores PredTypes
--- Watch out if newtypes become transparent agin!
--- 	this matcher must respect newtypes
 
 match menv subst ty1 ty2 | Just ty1' <- coreView ty1 = match menv subst ty1' ty2
 			 | Just ty2' <- coreView ty2 = match menv subst ty1 ty2'

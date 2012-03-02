@@ -350,7 +350,7 @@ copyOutOflow conv transfer area@(CallArea a) actuals updfr_off
 
     (setRA, init_offset) =
       case a of Young id -> id `seq` -- Generate a store instruction for
-           	    	     	     -- the return address if making a call
+                                     -- the return address if making a call
                   if transfer == Call then
                     ([(CmmLit (CmmBlock id), StackParam init_offset)],
                      widthInBytes wordWidth)

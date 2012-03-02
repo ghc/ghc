@@ -24,9 +24,9 @@ module ListSetOps (
         hasNoDups, runs, removeDups, findDupsEq,
         equivClasses, equivClassesByUniq,
 
-	-- Remove redudant elts
-	removeRedundant	   -- Used in the ghc/InteractiveUI, 
-			   -- although not in the compiler itself
+        -- Remove redudant elts
+        removeRedundant    -- Used in the ghc/InteractiveUI, 
+                           -- although not in the compiler itself
    ) where
 
 #include "HsVersions.h"
@@ -220,7 +220,7 @@ findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
     where (eq_xs, neq_xs) = partition (eq x) xs
 
 removeRedundant :: (a -> a -> Bool)   -- True <=> discard the *second* argument
-		-> [a] -> [a]
+                -> [a] -> [a]
 -- Remove any element y for which 
 --     another element x is in the list
 -- and (x `subsumes` y)

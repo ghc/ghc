@@ -137,7 +137,7 @@ data ProfilingInfo
 -- we add a label for the table, and expect only the 'offset/length' form
 
 data C_SRT = NoC_SRT
-	   | C_SRT !CLabel !WordOff !StgHalfWord {-bitmap or escape-}
+           | C_SRT !CLabel !WordOff !StgHalfWord {-bitmap or escape-}
            deriving (Eq)
 
 needsSRT :: C_SRT -> Bool
