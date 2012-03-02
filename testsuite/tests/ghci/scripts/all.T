@@ -81,6 +81,8 @@ test('ghci056',
      ],
      ghci_script, ['ghci056.script'])
 
+test('ghci057', normal, ghci_script, ['ghci057.script'])
+
 test('2452', normal, ghci_script, ['2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
 
@@ -109,3 +111,5 @@ test('T5566', normal, ghci_script, ['T5566.script'])
 test('GhciKinds', normal, ghci_script, ['GhciKinds.script'])
 test('T5564', normal, ghci_script, ['T5564.script'])
 test('Defer02', normal, ghci_script, ['Defer02.script'])
+test('T5820', normal, ghci_script, ['T5820.script'])
+test('T5836', normal, ghci_script, ['T5836.script'])

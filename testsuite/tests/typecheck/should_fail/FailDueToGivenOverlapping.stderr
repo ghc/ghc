@@ -7,7 +7,7 @@ FailDueToGivenOverlapping.hs:27:9:
     Matching givens (or their superclasses):
       (E [Int])
         bound by the type signature for bar :: E [Int] => () -> ()
-        at FailDueToGivenOverlapping.hs:27:1-23
+        at FailDueToGivenOverlapping.hs:26:8-26
     (The choice depends on the instantiation of `t0')
     In the expression: eop [undefined]
     In an equation for `bar': bar _ = eop [undefined]

@@ -6,7 +6,7 @@ T4179.hs:26:16:
       bound by the type signature for
                  fCon :: (Functor x, DoC (FCon x)) =>
                          Con x -> A2 (FCon x) -> A3 (FCon x)
-      at T4179.hs:26:1-17
+      at T4179.hs:25:9-72
     NB: `A3' is a type function, and may not be injective
     Expected type: x (A2 (x (Con x)) -> A3 (x (Con x)))
                    -> A2 (x (Con x)) -> A3 (x (Con x))

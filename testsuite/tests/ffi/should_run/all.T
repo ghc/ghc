@@ -187,3 +187,27 @@ test('5594', [ omit_ways(['ghci']),
                # 5594_stub.h before compiling 5594_c.c, which
                # needs it.
                compile_and_run, ['5594_c.c -no-hs-main'])
+
+test('Capi_Ctype_001',
+     extra_clean(['Capi_Ctype_A_001.o', 'Capi_Ctype_A_001.hi',
+                  'capi_ctype_001_c.o',
+                  'Capi_Ctype_A_001.hs', 'Capi_Ctype_001.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory Capi_Ctype_001'])
+
+test('Capi_Ctype_002',
+     extra_clean(['Capi_Ctype_A_002.o', 'Capi_Ctype_A_002.hi',
+                  'Capi_Ctype_A_002.hs']),
+     run_command,
+     ['$MAKE -s --no-print-directory Capi_Ctype_002'])
+
+test('ffi_parsing_001',
+     extra_clean(['ffi_parsing_001_c.o']),
+     compile_and_run,
+     ['ffi_parsing_001_c.c'])
+
+test('capi_value',
+     extra_clean(['capi_value_c.o']),
+     compile_and_run,
+     ['capi_value_c.c'])
+

@@ -125,6 +125,10 @@ def req_interp( opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
+def req_smp( opts ):
+    if not config.have_smp:
+        opts.expect = 'fail'
+
 def expect_broken( bug ):
     return lambda opts, b=bug: _expect_broken (opts, b )
 
@@ -250,6 +254,24 @@ def _compiler_stats_num_field( opts, f, x, y ):
     # copy the dictionary, as the config gets shared between all tests
     opts.compiler_stats_num_fields = opts.compiler_stats_num_fields.copy()
     opts.compiler_stats_num_fields[f] = (x, y)
+
+# -----
+
+def stats_range_field( field, min, max ):
+    return lambda opts, f=field, x=min, y=max: _stats_range_field(opts, f, x, y);
+
+def _stats_range_field( opts, f, x, y ):
+    # copy the dictionary, as the config gets shared between all tests
+    opts.stats_range_fields = opts.stats_range_fields.copy()
+    opts.stats_range_fields[f] = (x, y)
+
+def compiler_stats_range_field( field, min, max ):
+    return lambda opts, f=field, x=min, y=max: _compiler_stats_range_field(opts, f, x, y);
+
+def _compiler_stats_range_field( opts, f, x, y ):
+    # copy the dictionary, as the config gets shared between all tests
+    opts.compiler_stats_range_fields = opts.compiler_stats_range_fields.copy()
+    opts.compiler_stats_range_fields[f] = (x, y)
 
 # -----
 
@@ -494,6 +516,7 @@ def newTestDir( dir ):
     # reset the options for this test directory
     thisdir_testopts = copy.copy(default_testopts)
     thisdir_testopts.testdir = dir
+    thisdir_testopts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
 # Actually doing tests
@@ -834,7 +857,7 @@ def run_command( name, way, cmd ):
 def ghci_script( name, way, script ):
     # filter out -fforce-recomp from compiler_always_flags, because we're
     # actually testing the recompilation behaviour in the GHCi tests.
-    flags = filter(lambda f: f != '-fforce-recomp', config.compiler_always_flags)
+    flags = filter(lambda f: f != '-fforce-recomp', getTestOpts().compiler_always_flags)
     flags.append(getTestOpts().extra_hc_opts)
 
     # We pass HC and HC_OPTS as environment variables, so that the
@@ -948,13 +971,34 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Check -t stats info
 
-def checkStats(stats_file, num_fields):
+def checkStats(stats_file, range_fields, num_fields):
     result = passed()
     if len(num_fields) > 0:
         f = open(in_testdir(stats_file))
         contents = f.read()
         f.close()
 
+        for (field, (expected, dev)) in range_fields.items():
+            m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
+            if m == None:
+                print 'Failed to find field: ', field
+                result = failBecause('no such stats field')
+            val = int(m.group(1))
+
+            min = expected * ((100 - float(dev))/100);
+            max = expected * ((100 + float(dev))/100);
+
+            if val < min:
+                print field, val, 'is more than ' + repr(dev) + '%'
+                print 'less than the exepected value', expected
+                print 'If this is because you have improved GHC, please'
+                print 'update the test so that GHC doesn\'t regress again'
+                result = failBecause('stat too good')
+            if val > max:
+                print field, val, 'is more than ' + repr(dev) + '% greater than the expected value,', expected, max
+                result = failBecause('stat not good enough')
+
+        # ToDo: remove all uses of this, and delete it
         for (field, (min, max)) in num_fields.items():
             m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
             if m == None:
@@ -1035,7 +1079,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
-    comp_flags = config.compiler_always_flags
+    comp_flags = getTestOpts().compiler_always_flags
     if noforce:
         comp_flags = filter(lambda f: f != '-fforce-recomp', comp_flags)
 
@@ -1057,7 +1101,8 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(stats_file, opts.compiler_stats_num_fields)
+    statsResult = checkStats(stats_file, opts.compiler_stats_range_fields
+                                       , opts.compiler_stats_num_fields)
 
     if badResult(statsResult):
         return statsResult
@@ -1148,7 +1193,8 @@ def simple_run( name, way, prog, args ):
         if check_prof and not check_prof_ok(name):
             return failBecause('bad profile')
 
-    return checkStats(stats_file, opts.stats_num_fields)
+    return checkStats(stats_file, opts.stats_range_fields
+                                , opts.stats_num_fields)
 
 def rts_flags(way):
     if (way == ''):
@@ -1212,7 +1258,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     script.close()
 
     cmd = "'" + config.compiler + "' " \
-          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
           + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
@@ -1306,7 +1352,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
-          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts \
@@ -1336,7 +1382,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
-          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(getTestOpts().compiler_always_flags,' ') + ' ' \
           + to_compile + ' ' \
           + extra_hc_opts + ' ' \
           + getTestOpts().extra_hc_opts + ' ' \
@@ -1541,10 +1587,6 @@ def normalise_errmsg( str ):
     str = re.sub('([^\\s])\\.exe', '\\1', str)
     # normalise slashes, minimise Windows/Unix filename differences
     str = re.sub('\\\\', '/', str)
-    # The inplace ghc's are called ghc-bin-stage[123] to avoid filename
-    # collisions, so we need to normalise that to just "ghc"
-    # (this is for the old build system, I think, so should be removable)
-    str = re.sub('ghc-bin-stage[123]', 'ghc', str)
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
     str = re.sub('ghc-stage[123]', 'ghc', str)

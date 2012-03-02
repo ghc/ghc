@@ -12,6 +12,7 @@ Thumbs.db
 *.BAK
 *.orig
 *.prof
+*.aux
 
 *_stub.h
 *_stub.c
@@ -1103,4 +1104,25 @@ tests/typecheck/should_run/testeq2
 tests/typecheck/testeq1/typecheck.testeq1
 
 tests/lib/IO/chinese-file-*
+
+tests/codeGen/should_run/5785
+tests/concurrent/should_run/conc069
+tests/concurrent/should_run/conc069a
+tests/concurrent/should_run/conc070
+tests/deSugar/should_run/T5742
+tests/dph/dotp/dph-dotp-copy-opt
+tests/dph/dotp/dph-dotp-vseg-opt
+tests/dph/nbody/dph-nbody-vseg-opt
+tests/dph/primespj/dph-primespj-copy-opt
+tests/dph/quickhull/dph-quickhull-copy-opt
+tests/dph/quickhull/dph-quickhull-vseg-opt
+tests/dph/smvm/dph-smvm-copy
+tests/dph/smvm/dph-smvm-vseg
+tests/dph/words/dph-words-copy-opt
+tests/dph/words/dph-words-vseg-opt
+tests/lib/integer/fromToInteger.simpl
+tests/perf/compiler/T5642.comp.stats
+tests/perf/should_run/T5536
+tests/perf/should_run/T5536.data
+tests/perf/should_run/T5536.stats
 

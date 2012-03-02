@@ -1,9 +1,9 @@
 
-FrozenErrorTests.hs:11:1:
+FrozenErrorTests.hs:10:8:
     Couldn't match type `a' with `T a'
       `a' is a rigid type variable bound by
           the type signature for foo :: a ~ T a => a -> a
-          at FrozenErrorTests.hs:11:1
+          at FrozenErrorTests.hs:10:15
     Inaccessible code in
       the type signature for foo :: a ~ T a => a -> a
 

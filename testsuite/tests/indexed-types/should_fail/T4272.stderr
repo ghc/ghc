@@ -27,10 +27,10 @@ T4272.hs:11:19:
     from the context (TermLike a)
       bound by the type signature for
                  laws :: TermLike a => TermFamily a a -> b
-      at T4272.hs:11:1-54
+      at T4272.hs:10:9-53
       `a' is a rigid type variable bound by
           the type signature for laws :: TermLike a => TermFamily a a -> b
-          at T4272.hs:11:1
+          at T4272.hs:10:16
     In the return type of a call of `terms'
     In the second argument of `prune', namely
       `(terms (undefined :: TermFamily a a))'

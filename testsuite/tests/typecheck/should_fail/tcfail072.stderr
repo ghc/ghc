@@ -4,7 +4,7 @@ tcfail072.hs:23:13:
     from the context (Ord p, Ord q)
       bound by the type signature for
                  g :: (Ord p, Ord q) => AB p q -> Bool
-      at tcfail072.hs:23:1-15
+      at tcfail072.hs:22:6-38
     The type variables `p0', `q0' are ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
     In the expression: g A

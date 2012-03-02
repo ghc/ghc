@@ -37,7 +37,7 @@
     Couldn't match expected type `a' with actual type `Char'
       `a' is a rigid type variable bound by
           the type signature for h :: a -> (Char, Char)
-          at ../../typecheck/should_run/Defer01.hs:34:1
+          at ../../typecheck/should_run/Defer01.hs:33:6
     In the expression: x
     In the expression: (x, 'c')
     In an equation for `h': h x = (x, 'c')
@@ -46,7 +46,7 @@
     Couldn't match expected type `Bool' with actual type `T a'
     In the return type of a call of `K'
     In the first argument of `not', namely `(K a)'
-    In the first argument of `seq', namely `(not (K a))'
+    In the expression: (not (K a))
 
 ../../typecheck/should_run/Defer01.hs:43:5: Warning:
     No instance for (MyClass a1)

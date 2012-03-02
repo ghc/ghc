@@ -5,7 +5,7 @@ T5300.hs:15:9:
       bound by the type signature for
                  f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
                        a1 -> StateT (T b2) m a2
-      at T5300.hs:15:1-36
+      at T5300.hs:14:7-69
     The type variable `c0' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
     In the first argument of `(>>=)', namely `f1 fm'

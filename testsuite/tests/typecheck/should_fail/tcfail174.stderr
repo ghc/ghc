@@ -23,7 +23,7 @@ tcfail174.hs:16:14:
       `a' is a rigid type variable bound by
           the type forall a. a -> a at tcfail174.hs:16:14
       `b' is a rigid type variable bound by
-          the type signature for h2 :: Capture b at tcfail174.hs:16:1
+          the type signature for h2 :: Capture b at tcfail174.hs:15:15
     Expected type: Capture (forall x. x -> b)
       Actual type: Capture (forall a. a -> a)
     In the first argument of `Capture', namely `g'

@@ -53,3 +53,7 @@ test('1603', skip, compile_and_run, [''])
 test('3676', expect_broken(3676), compile_and_run, [''])
 test('4381', normal, compile_and_run, [''])
 test('4383', normal, compile_and_run, [''])
+
+test('add2', normal, compile_and_run, [''])
+test('mul2', normal, compile_and_run, [''])
+

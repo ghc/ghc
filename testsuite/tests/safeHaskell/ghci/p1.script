@@ -1,0 +1,8 @@
+-- Test disabled language extensions
+:unset +s
+:set -XSafe
+
+:set -XTemplateHaskell
+
+:set -XGeneralizedNewtypeDeriving
+

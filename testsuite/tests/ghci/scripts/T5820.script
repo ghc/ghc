@@ -1,0 +1,4 @@
+:l T5820
+:i Foo
+data T = T
+:i Foo

@@ -1,5 +1,5 @@
 
-mod45.hs:5:3:
+mod45.hs:5:11:
     Illegal type signature in instance declaration:
       (==) :: T -> T -> Bool
     (Use -XInstanceSigs to allow this)

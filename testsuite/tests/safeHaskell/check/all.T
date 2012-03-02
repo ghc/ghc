@@ -57,3 +57,10 @@ test('Check08',
      extra_clean(['Check08_A.hi', 'Check08_A.o', 'Check08_B.hi', 'Check08_B.o']),
      multimod_compile_fail, ['Check08', ''])
 
+# check -distrust-all-packages flag works
+test('Check09', normal, compile_fail, ['-fpackage-trust -distrust-all-packages'])
+
+# as above but trust this time
+test('Check10', normal, compile,
+     ['-fpackage-trust -distrust-all-packages -trust bytestring -trust base'])
+

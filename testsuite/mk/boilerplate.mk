@@ -45,7 +45,7 @@ ifneq "$(wildcard $(STAGE1_GHC) $(STAGE1_GHC).exe)" ""
 
 IN_TREE_COMPILER = YES
 ifeq "$(BINDIST)" "YES"
-TEST_HC := $(abspath $(TOP)/../)/bindisttest/install dir/bin/ghc
+TEST_HC := $(abspath $(TOP)/../)/bindisttest/install   dir/bin/ghc
 else ifeq "$(stage)" "1"
 TEST_HC := $(STAGE1_GHC)
 else ifeq "$(stage)" "3"
@@ -120,6 +120,9 @@ ifeq "$(AR)" ""
 AR = ar
 endif
 
+# Be careful when using this. On Windows it ends up looking like
+# c:/foo/bar which confuses make, as make thinks that the : is Makefile
+# syntax
 TOP_ABS := $(abspath $(TOP))
 $(eval $(call canonicalise,TOP_ABS))
 
@@ -135,7 +138,7 @@ PYTHON = python
 # the results, and emits a little .mk file with make bindings for the values.
 # This way we cache the results for different values of $(TEST_HC)
 
-$(TOP_ABS)/mk/ghc-config : $(TOP_ABS)/mk/ghc-config.hs
+$(TOP)/mk/ghc-config : $(TOP)/mk/ghc-config.hs
 	"$(TEST_HC)" --make -o $@ $<
 
 empty=

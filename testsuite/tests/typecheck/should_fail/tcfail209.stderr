@@ -1,10 +1,10 @@
 
-tcfail209.hs:5:1:
+tcfail209.hs:5:6:
     Illegal irreducible constraint Showish a
     (Use -XConstraintKinds to permit this)
     In the type signature for `f': f :: Showish a => a -> a
 
-tcfail209.hs:8:1:
+tcfail209.hs:8:6:
     Illegal tuple constraint (Show a, Num a)
     (Use -XConstraintKinds to permit this)
     In the type signature for `g':

@@ -5,16 +5,17 @@ include $(TOP)/mk/test.mk
 ghci024:
 	@echo "~~~~~~~~~~ Testing :set"
 	printf ":set\n" \
+	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
+	@echo "~~~~~~~~~~ Testing :set -a"
+	printf ":set -a\n" \
 	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
 	    | grep -E "^([^ ]|  -fno-print-explicit-foralls|  -fno-warn-implicit-prelude)"
 	@echo "~~~~~~~~~~ Testing :show languages"
 	printf ":show languages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
-	    | grep -E "^([^ ]|  -XImplicitPrelude|  -XMagicHash)"
+	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
 	@echo "~~~~~~~~~~ Testing :show languages, with -XMagicHash"
 	printf ":set -XMagicHash\n:show languages\n" \
-	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \
-	    | grep -E "^([^ ]|  -XImplicitPrelude|  -XMagicHash)"
+	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci
 	@echo "~~~~~~~~~~ Testing :show packages"
 	printf ":show packages\n" \
 	    | '$(TEST_HC)' $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci \

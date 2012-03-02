@@ -1,0 +1,10 @@
+-- Test bad options
+
+:unset +s
+:set -XSafe
+
+-- we actually allow this for now but may want to revist this decision
+:set -trust base
+:set -distrust base
+:set -distrust-all
+

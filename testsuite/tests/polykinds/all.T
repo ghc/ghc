@@ -15,4 +15,13 @@ test('PolyKinds04', normal, compile_fail, [''])
 test('PolyKinds06', normal, compile_fail, [''])
 test('PolyKinds07', normal, compile_fail, [''])
 
-test('PolyKinds12', expect_fail, compile, [''])
+test('PolyKinds12', normal, compile, [''])
+
+test('T5798', normal, compile, [''])
+test('T5770', normal, compile, [''])
+test('T5771', normal, compile, [''])
+test('T5717', normal, compile, [''])
+
+test('Freeman', normal, compile_and_run, [''])
+test('MonoidsTF', normal, compile_and_run, [''])
+test('MonoidsFD', normal, compile_and_run, [''])

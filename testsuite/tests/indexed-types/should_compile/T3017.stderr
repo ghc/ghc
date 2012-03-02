@@ -9,6 +9,7 @@ TYPE CONSTRUCTORS
       type family Elem c :: *
       empty :: c insert :: Elem c -> c -> c
   data ListColl a
+      No C type associated
       RecFlag NonRecursive
       = L :: forall a. [a] -> ListColl a Stricts: _
       FamilyInstance: none
