@@ -502,7 +502,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
       = return []
     rn_dotdot (Just {}) Nothing _flds   -- ".." on record update
       = do { addErr (badDotDot ctxt); return [] }
-    rn_dotdot (Just n) (Just con) flds -- ".." on record con/pat
+    rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
       = ASSERT( n == length flds )
         do { loc <- getSrcSpanM	-- Rather approximate
            ; dd_flag <- xoptM Opt_RecordWildCards
@@ -526,11 +526,11 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
                    where
                      rdr = mkRdrUnqual (nameOccName fld)
 
-                 dot_dot_gres = [ gre 
+                 dot_dot_gres = [ head gres
                                 | fld <- con_fields
                                 , not (fld `elem` present_flds)
-                                , let gres@(gre:_) = lookupGRE_Name rdr_env fld
-                                , not (null gres)
+                                , let gres = lookupGRE_Name rdr_env fld
+                                , not (null gres)  -- Check field is in scope
                                 , case ctxt of
                                     HsRecFieldCon {} -> arg_in_scope fld
                                     _other           -> True ] 
