@@ -863,7 +863,7 @@ tryUnfolding dflags id lone_variable
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
- = pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
+ = pprTrace ("Considering inlining: " ++ showSDocDump (ppr id))
 		 (vcat [text "arg infos" <+> ppr arg_infos,
 			text "uf arity" <+> ppr uf_arity,
 			text "interesting continuation" <+> ppr cont_info,

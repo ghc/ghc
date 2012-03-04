@@ -1137,7 +1137,7 @@ specCalls subst rules_for_me calls_for_me fn rhs
 	   ; let
 		-- The rule to put in the function's specialisation is:
 		--	forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b  
-	        rule_name = mkFastString ("SPEC " ++ showSDoc (ppr fn <+> ppr spec_ty_args))
+	        rule_name = mkFastString ("SPEC " ++ showSDocDump (ppr fn <+> ppr spec_ty_args))
   		spec_env_rule = mkRule True {- Auto generated -} is_local
                                   rule_name
 				  inl_act 	-- Note [Auto-specialisation and RULES]
