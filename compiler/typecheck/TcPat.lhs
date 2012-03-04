@@ -251,12 +251,14 @@ newNoSigLetBndr (LetGblBndr prags) name ty
 ----------
 addInlinePrags :: TcId -> [LSig Name] -> TcM TcId
 addInlinePrags poly_id prags
-  = tc_inl inl_sigs
+  = do { traceTc "addInlinePrags" (ppr poly_id $$ ppr prags) 
+       ; tc_inl inl_sigs }
   where
     inl_sigs = filter isInlineLSig prags
     tc_inl [] = return poly_id
     tc_inl (L loc (InlineSig _ prag) : other_inls)
        = do { unless (null other_inls) (setSrcSpan loc warn_dup_inline)
+            ; traceTc "addInlinePrag" (ppr poly_id $$ ppr prag) 
             ; return (poly_id `setInlinePragma` prag) }
     tc_inl _ = panic "tc_inl"
 

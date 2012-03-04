@@ -294,7 +294,8 @@ kcTyClGroup decls
            ; let kc_kind = case thing of
                                AThing k -> k
                                _ -> pprPanic "kcTyClGroup" (ppr thing)
-           ; (kvs, kc_kind') <- kindGeneralizeKind kc_kind
+           ; kvs <- kindGeneralize (tyVarsOfType kc_kind)
+           ; kc_kind' <- zonkTcKind kc_kind
            ; return (name, mkForAllTys kvs kc_kind') }
 
 getInitialKinds :: LTyClDecl Name -> TcM [(Name, TcTyThing)]
@@ -433,6 +434,8 @@ kcFamilyDecl d = pprPanic "kcFamilyDecl" (ppr d)
 kcResultKind :: Maybe (LHsKind Name) -> Kind -> TcM ()
 kcResultKind Nothing res_k
   = discardResult (unifyKind res_k liftedTypeKind)
+      --             type family F a 
+      -- defaults to type family F a :: *
 kcResultKind (Just k) res_k
   = do { k' <- tcLHsKind k
        ; discardResult (unifyKind k' res_k) }
@@ -749,24 +752,18 @@ tcFamTyPats fam_tc tyvars arg_pats kind_checker thing_inside
                  = splitKindFunTysN fam_arity $
                    substKiWith fam_kvs fam_arg_kinds fam_body
 
-         -- Kind-check
-       ; (tvs, typats) <- tcHsTyVarBndrs tyvars $ \tvs -> do
+         -- Kind-check and quantify
+         -- See Note [Quantifying over family patterns]
+       ; (tkvs, typats) <- tcHsTyVarBndrsGen tyvars $ do
                 { typats <- tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds
                 ; kind_checker res_kind
-                ; return (tvs, typats) }
+                ; return (tyVarsOfTypes typats, typats) }
 
-         -- Quantify
-         -- See Note [Quantifying over family patterns]
-       ; let tv_kinds = map tyVarKind tvs
-       ; (kvs, kinds') <- kindGeneralizeKinds (tv_kinds ++ fam_arg_kinds)
-       ; typats'   <- zonkTcTypeToTypes emptyZonkEnv typats
+       ; all_args' <- zonkTcTypeToTypes emptyZonkEnv (fam_arg_kinds ++ typats)
        ; res_kind' <- zonkTcTypeToType emptyZonkEnv res_kind
-       ; let (tv_kinds', fam_arg_kinds') = splitAtList tv_kinds kinds'
-             tvs' = zipWith setTyVarKind tvs tv_kinds'
-             tkvs = kvs ++ tvs'   -- Kind and type variables
-       ; traceTc "tcFamPats" (ppr tvs' $$ ppr kvs $$ ppr kinds')
+       ; traceTc "tcFamPats" (ppr tkvs $$ ppr all_args' $$ ppr res_kind')
        ; tcExtendTyVarEnv tkvs $
-         thing_inside tkvs (fam_arg_kinds' ++ typats') res_kind' }
+         thing_inside tkvs all_args' res_kind' }
 \end{code}
 
 Note [Quantifying over family patterns]
@@ -876,21 +873,25 @@ tcConDecl new_or_data existential_ok rep_tycon res_tmpl 	-- Data types
                        , con_details = details, con_res = res_ty })
   = addErrCtxt (dataConCtxt name) $
     do { traceTc "tcConDecl 1" (ppr name)
-       ; (tvs', stuff) <- tcHsTyVarBndrsGen tvs $ 
+       ; (tvs', (ctxt', arg_tys', res_ty', is_infix, field_lbls, stricts)) 
+           <- tcHsTyVarBndrsGen tvs $ 
               do { ctxt'    <- tcHsContext ctxt
                  ; details' <- tcConArgs new_or_data details
                  ; res_ty'  <- tcConRes res_ty
-                 ; return (ctxt', details', res_ty') }
+                 ; let (is_infix, field_lbls, btys') = details'
+                       (arg_tys', stricts)           = unzip btys'
+                       ftvs = tyVarsOfTypes ctxt'     `unionVarSet`
+                              tyVarsOfTypes arg_tys'  `unionVarSet`
+                              case res_ty' of
+                                 ResTyH98     -> emptyVarSet
+                                 ResTyGADT ty -> tyVarsOfType ty
+                 ; return (ftvs, (ctxt', arg_tys', res_ty', is_infix, field_lbls, stricts)) }
 
-       ; let (ctxt', details', res_ty')    = stuff
-             (is_infix, field_lbls, btys') = details'
-             (arg_tys', stricts)           = unzip btys'
 
              -- Substitute, to account for the kind 
              -- unifications done by tcHsTyVarBndrsGen
-             ze = mkTyVarZonkEnv tvs'
-       
        ; traceTc "tcConDecl 2" (ppr name)
+       ; let ze = mkTyVarZonkEnv tvs'
        ; arg_tys' <- zonkTcTypeToTypes ze arg_tys'
        ; ctxt'    <- zonkTcTypeToTypes ze ctxt'
        ; res_ty'  <- case res_ty' of

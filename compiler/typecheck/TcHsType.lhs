@@ -30,7 +30,7 @@ module TcHsType (
         tcHsContext, tcInferApps, tcHsArgTys,
 
         ExpKind(..), ekConstraint, expArgKind, checkExpectedKind,
-        kindGeneralizeKind, kindGeneralizeKinds,
+        kindGeneralize,
 
 		-- Sort-checking kinds
 	tcLHsKind, 
@@ -823,53 +823,26 @@ tcHsTyVarBndr (L _ hs_tv)
 
 ------------------
 tcHsTyVarBndrsGen :: [LHsTyVarBndr Name] 
-	          -> TcM r 
-	          -> TcM ([TyVar], r)
+	          -> TcM (TcTyVarSet, r)  -- Result + free tyvars of thing inside
+	          -> TcM ([TyVar], r)     -- Generalised kind variables 
+                                          -- + zonked tyvars + result result
 -- tcHsTyVarBndrsGen [(f :: ?k -> *), (a :: ?k)] thing_inside
 -- Returns with tyvars [(k :: BOX), (f :: k -> *), (a :: k)]
 tcHsTyVarBndrsGen hs_tvs thing_inside
   = do { traceTc "tcHsTyVarBndrsGen" (ppr hs_tvs) 
-       ; (tvs, res) <- tcHsTyVarBndrs hs_tvs $ \ tvs ->
+       ; (tvs, (ftvs, res)) <- tcHsTyVarBndrs hs_tvs $ \ tvs ->
                        do { res <- thing_inside
                           ; return (tvs, res) }
        ; let kinds = map tyVarKind tvs
-       ; (kvs', zonked_kinds) <- kindGeneralizeKinds kinds
+       ; kvs' <- kindGeneralize (tyVarsOfTypes kinds `unionVarSet` 
+                                        (ftvs `delVarSetList` tvs))
+       ; zonked_kinds <- mapM zonkTcKind kinds
        ; let tvs' = zipWith setTyVarKind tvs zonked_kinds
                      -- See Note [Kinds of quantified type variables]
        ; traceTc "tcTyVarBndrsGen" (ppr (hs_tvs, kvs', tvs))
        ; return (kvs' ++ tvs', res) }
 
-------------------
--- Used when generalizing binders and type family patterns
--- It takes a kind from the type checker (like `k0 -> *`), and returns the 
--- final, kind-generalized kind (`forall k::BOX. k -> *`)
-kindGeneralizeKinds :: [TcKind] -> TcM ([KindVar], [Kind])
--- INVARIANT: the returned kinds are zonked, and
---            mention the returned kind variables
-kindGeneralizeKinds kinds 
-  = do { -- Quantify over kind variables free in
-         -- the kinds, and *not* in the environment
-       ; traceTc "kindGeneralizeKinds 1" (ppr kinds)
-
-       ; kvs <- kindGeneralize (tyVarsOfTypes kinds)
-
-         -- Zonk the kinds again, to pick up either the kind 
-         -- variables we quantify over, or *, depending on whether
-         -- zonkQuantifiedTyVars decided to generalise (which in
-         -- turn depends on PolyKinds)
-       ; final_kinds <- mapM zonkTcKind kinds
-
-       ; traceTc "kindGeneralizeKinds 2" (vcat [ ppr kinds, ppr kvs, ppr final_kinds ])
-       ; return (kvs, final_kinds) }
-
-
-kindGeneralizeKind :: TcKind -> TcM ([KindVar], Kind)    
--- Unary version of kindGeneralizeKinds
-kindGeneralizeKind kind
-  = do { kvs   <- kindGeneralize (tyVarsOfType kind)
-       ; kind' <- zonkTcKind kind
-       ; return (kvs, kind') }
-
+-------------------
 kindGeneralize :: TyVarSet -> TcM [KindVar]
 kindGeneralize tkvs
   = do { gbl_tvs  <- tcGetGlobalTyVars -- Already zonked
