@@ -143,10 +143,11 @@ $(TOP)/mk/ghc-config : $(TOP)/mk/ghc-config.hs
 
 empty=
 space=$(empty) $(empty)
-ghc-config-mk = $(TOP_ABS)/mk/ghcconfig$(subst :,_,$(subst $(space),_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
+ghc-config-mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
 
-$(ghc-config-mk) : $(TOP_ABS)/mk/ghc-config
-	$(TOP_ABS)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) -f "$@"; exit 1; fi
+$(ghc-config-mk) : $(TOP)/mk/ghc-config
+	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
+# If the ghc-config fails, remove $@, and fail
 
 include $(ghc-config-mk)
 
