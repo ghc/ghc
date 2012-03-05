@@ -1283,8 +1283,13 @@ tcIfaceGlobal name
 -- emasculated form (e.g. lacking data constructors).
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
-tcIfaceTyCon (IfaceTc name) = do { thing <- tcIfaceGlobal name
-                                 ; return (tyThingTyCon thing) }
+tcIfaceTyCon (IfaceTc name) 
+  = do { thing <- tcIfaceGlobal name
+       ; case thing of    -- A "type constructor" can be a promoted data constructor
+                          --           c.f. Trac #5881
+           ATyCon   tc -> return tc
+           ADataCon dc -> return (buildPromotedDataCon dc)
+           _ -> pprPanic "tcIfaceTyCon" (ppr name $$ ppr thing) }
 
 tcIfaceCoAxiom :: Name -> IfL CoAxiom
 tcIfaceCoAxiom name = do { thing <- tcIfaceGlobal name
