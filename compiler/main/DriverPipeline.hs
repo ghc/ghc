@@ -1183,14 +1183,17 @@ runPhase As input_fn dflags
                         = do
                             llvmVer <- io $ figureLlvmVersion dflags
                             return $ case llvmVer of
-                                Just n | n >= 30 -> SysTools.runClang
-                                _                -> SysTools.runAs
+                                -- using cGccLinkerOpts here but not clear if
+                                -- opt_c isn't a better choice
+                                Just n | n >= 30 ->
+                                    (SysTools.runClang, cGccLinkerOpts)
+
+                                _ -> (SysTools.runAs, getOpts dflags opt_a)
 
                         | otherwise
-                        = return SysTools.runAs
+                        = return (SysTools.runAs, getOpts dflags opt_a)
 
-        as_prog <- whichAsProg
-        let as_opts = getOpts dflags opt_a
+        (as_prog, as_opts) <- whichAsProg
         let cmdline_include_paths = includePaths dflags
 
         next_phase <- maybeMergeStub
