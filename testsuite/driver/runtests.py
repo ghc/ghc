@@ -102,6 +102,12 @@ if config.use_threads == 1:
     if (maj, min, pat) < (2, 5, 2):
         print "Warning: Ignoring request to use threads as python version < 2.5.2"
         config.use_threads = 0
+    # We also need to disable threads for python 2.7.2, because of
+    # this bug: http://bugs.python.org/issue13817
+    elif (maj, min, pat) == (2, 7, 2):
+        print "Warning: Ignoring request to use threads as python version is 2.7.2"
+        print "See http://bugs.python.org/issue13817 for details."
+        config.use_threads = 0
     if windows:
         print "Warning: Ignoring request to use threads as running on Windows"
         config.use_threads = 0
