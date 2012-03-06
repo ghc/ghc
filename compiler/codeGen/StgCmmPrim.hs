@@ -68,14 +68,9 @@ cgOpApp :: StgOp	-- The op
 
 -- Foreign calls 
 cgOpApp (StgFCallOp fcall _) stg_args res_ty 
-  = do	{ (res_regs, res_hints) <- newUnboxedTupleRegs res_ty
-	 	-- Choose result regs r1, r2
-		-- Note [Foreign call results]
-	; cgForeignCall res_regs res_hints fcall stg_args
-		-- r1, r2 = foo( x, y )
-	; emitReturn (map (CmmReg . CmmLocal) res_regs) }
-		-- return (r1, r2) 
-      
+  = cgForeignCall fcall stg_args res_ty
+      -- Note [Foreign call results]
+
 -- tagToEnum# is special: we need to pull the constructor 
 -- out of the table, and perform an appropriate return.
 

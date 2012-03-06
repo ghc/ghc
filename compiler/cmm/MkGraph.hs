@@ -12,6 +12,7 @@ module MkGraph
   , mkCbranch, mkSwitch
   , mkReturn, mkReturnSimple, mkComment, mkCallEntry, mkBranch
   , copyInOflow, copyOutOflow
+  , noExtraStack
   , toCall, Transfer(..)
   )
 where
@@ -188,8 +189,7 @@ mkJumpGC e actuals updfr_off =
 mkForeignJump   :: Convention -> CmmExpr -> [CmmActual] -> UpdFrameOffset
                 -> CmmAGraph
 mkForeignJump conv e actuals updfr_off =
-  lastWithArgs Jump Old conv actuals updfr_off $
-    toCall e Nothing updfr_off 0
+  mkForeignJumpExtra conv e actuals updfr_off noExtraStack
 
 mkForeignJumpExtra :: Convention -> CmmExpr -> [CmmActual]
                 -> UpdFrameOffset -> (ByteOff, [(CmmExpr, ByteOff)])
@@ -208,13 +208,11 @@ mkReturn        :: CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturn e actuals updfr_off =
   lastWithArgs Ret  Old NativeReturn actuals updfr_off $
     toCall e Nothing updfr_off 0
-    -- where e = CmmLoad (CmmStackSlot Old updfr_off) gcWord
 
 mkReturnSimple  :: [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturnSimple actuals updfr_off =
-  lastWithArgs Ret  Old NativeReturn actuals updfr_off $
-    toCall e Nothing updfr_off 0
-    where e = CmmLoad (CmmStackSlot Old updfr_off) gcWord
+  mkReturn e actuals updfr_off
+  where e = CmmLoad (CmmStackSlot Old updfr_off) gcWord
 
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)
@@ -346,9 +344,8 @@ lastWithArgs :: Transfer -> Area -> Convention -> [CmmActual]
              -> (ByteOff -> CmmAGraph)
              -> CmmAGraph
 lastWithArgs transfer area conv actuals updfr_off last =
-  let (outArgs, copies) = copyOutOflow conv transfer area actuals
-                             updfr_off noExtraStack in
-  copies <*> last outArgs
+  lastWithArgsAndExtraStack transfer area conv actuals
+                            updfr_off noExtraStack last
 
 lastWithArgsAndExtraStack :: Transfer -> Area -> Convention -> [CmmActual]
              -> UpdFrameOffset -> (ByteOff, [(CmmExpr,ByteOff)])

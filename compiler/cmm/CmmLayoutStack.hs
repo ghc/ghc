@@ -3,13 +3,20 @@ module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
 
+import StgCmmUtils      ( callerSaveVolatileRegs ) -- XXX
+import StgCmmForeign    ( saveThreadState, loadThreadState ) -- XXX
+
 import Cmm
 import BlockId
+import CLabel
 import CmmUtils
+import MkGraph
+import Module
+import ForeignCall
 import CmmLive
 import CmmProcPoint
 import SMRep
-import Hoopl
+import Hoopl hiding ((<*>), mkLast, mkMiddle)
 import OptimizationFuel
 import Constants
 import UniqSupply
@@ -177,30 +184,48 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
        -- a proc point, we must save the live variables, adjust Sp, and
        -- construct the StackMaps for each of the successor blocks.
        -- See handleLastNode for details.
-       (saves, out, sp_off, last1, fixup_blocks)
+       (middle2, sp_off, middle3, last1, fixup_blocks, out)
            <- handleLastNode procpoints liveness cont_info
                              acc_stackmaps stack1 last0
     
-       let hwm'    = maximum (acc_hwm : map sm_sp (mapElems out))
-           middle2 = maybeAddSpAdj sp_off $ foldl blockSnoc middle1 saves
-    
-           area_off = getAreaOff final_stackmaps
+       -- our block:
+       --    middle1          -- the original middle nodes
+       --    middle2          -- live variable saves from handleLastNode
+       --    Sp = Sp + sp_off -- Sp adjustment goes here
+       --    middle3          -- some more middle nodes from handleLastNode
+       --    last1            -- the last node
+       --
+       -- The next step is to manifest Sp: turn all the CmmStackSlots
+       -- into CmmLoads from Sp.  The adjustment for middle1/middle2
+       -- will be different from that for middle3/last1, because the
+       -- Sp adjustment intervenes.
+       --
+       let area_off    = getAreaOff final_stackmaps
 
-           -- manifest Sp: turn all CmmStackSlots into actual loads
-           adj_middle = mapExpDeep (areaToSp sp0            sp_high area_off)
-           adj_last   = optStackCheck .
-                        mapExpDeep (areaToSp (sp0 - sp_off) sp_high area_off)
+           adj_pre_sp, adj_post_sp :: CmmNode e x -> CmmNode e x
+           adj_pre_sp  = mapExpDeep (areaToSp sp0            sp_high area_off)
+           adj_post_sp = mapExpDeep (areaToSp (sp0 - sp_off) sp_high area_off)
 
-           middle3 = blockFromList $
-                     map adj_middle $
-                     elimStackStores stack0 final_stackmaps area_off $
-                     blockToList middle2
+           middle_pre  = maybeAddSpAdj sp_off $
+                         blockFromList $
+                         map adj_pre_sp $
+                         elimStackStores stack0 final_stackmaps area_off $
+                         blockToList $
+                         foldl blockSnoc middle1 middle2
 
-           newblock = blockJoin entry0 middle3 (adj_last last1)
+           middle_post = map adj_post_sp middle3
 
-           fixup_blocks' = map (blockMapNodes3 (id, adj_middle, id)) fixup_blocks
+           final_middle = foldl blockSnoc middle_pre middle_post
+           final_last   = optStackCheck (adj_post_sp last1)
+
+           newblock = blockJoin entry0 final_middle final_last
+
+           fixup_blocks' = map (blockMapNodes3 (id, adj_post_sp, id))
+                               fixup_blocks
 
            stackmaps' = mapUnion acc_stackmaps out
+
+           hwm' = maximum (acc_hwm : map sm_sp (mapElems out))
 
        pprTrace "layout(out)" (ppr out) $ return ()
     
@@ -292,16 +317,33 @@ getStackLoc (Young l) n stackmaps =
 -- -----------------------------------------------------------------------------
 -- Handling stack allocation for a last node
 
+-- We take a single last node and turn it into:
+--
+--    C1 (some statements)
+--    Sp = Sp + N
+--    C2 (some more statements)
+--    call f()          -- the actual last node
+--
+-- plus possibly some more blocks (we may have to add some fixup code
+-- between the last node and the continuation).
+--
+-- C1: is the code for saving the variables across this last node onto
+-- the stack, if the continuation is a call or jumps to a proc point.
+--
+-- C2: if the last node is a safe foreign call, we have to inject some
+-- extra code that goes *after* the Sp adjustment.
+
 handleLastNode
    :: ProcPointSet -> BlockEnv CmmLive -> BlockEnv ByteOff
    -> BlockEnv StackMap -> StackMap
    -> CmmNode O C
    -> UniqSM
-      ( [CmmNode O O]      -- assignments to save live variables
-      , BlockEnv StackMap  -- stackmaps for the continuations
-      , ByteOff            -- amount to adjust Sp before the jump
+      ( [CmmNode O O]      -- nodes to go *before* the Sp adjustment
+      , ByteOff            -- amount to adjust Sp
+      , [CmmNode O O]      -- nodes to go *after* the Sp adjustment
       , CmmNode O C        -- new last node
       , [CmmBlock]         -- new blocks
+      , BlockEnv StackMap  -- stackmaps for the continuations
       )
 
 handleLastNode procpoints liveness cont_info stackmaps
@@ -312,39 +354,45 @@ handleLastNode procpoints liveness cont_info stackmaps
     --  is cml_args, after popping any other junk from the stack.
     CmmCall{ cml_cont = Nothing, .. } -> do
       let sp_off = sp0 - cml_args
-      return ([], mapEmpty, sp_off, last, [])
+      return ([], sp_off, [], last, [], mapEmpty)
 
     --  At each CmmCall with a continuation:
     CmmCall{ cml_cont = Just cont_lbl, .. } ->
-       lastCall cont_lbl cml_args cml_ret_args cml_ret_off
+       lastCall cont_lbl [] cml_args cml_ret_args cml_ret_off
 
-    CmmForeignCall{ succ = cont_lbl, .. } ->
-       lastCall cont_lbl 0{-no args-} 0{-no results-} (sm_ret_off stack0)
+    CmmForeignCall{ succ = cont_lbl, .. } -> do
+       (mids, spoff, _, last', blocks, stackmap') <-
+          lastCall cont_lbl res wORD_SIZE wORD_SIZE (sm_ret_off stack0)
+            -- one word each for args and results: the return address
+       (extra_mids, last'') <- lowerSafeForeignCall last'
+       return (mids, spoff, extra_mids, last'', blocks, stackmap')
 
     CmmBranch{..}     ->  handleProcPoints
     CmmCondBranch{..} ->  handleProcPoints
     CmmSwitch{..}     ->  handleProcPoints
 
   where
-     lastCall :: BlockId -> ByteOff -> ByteOff -> ByteOff
+     lastCall :: BlockId -> [LocalReg] -> ByteOff -> ByteOff -> ByteOff
               -> UniqSM
                       ( [CmmNode O O]
-                      , BlockEnv StackMap
                       , ByteOff
+                      , [CmmNode O O]
                       , CmmNode O C
                       , [CmmBlock]
+                      , BlockEnv StackMap
                       )
 
-     lastCall cont_lbl cml_args cml_ret_args cml_ret_off
+     lastCall cont_lbl res_regs cml_args cml_ret_args cml_ret_off
       -- If we have already seen this continuation before, then
       -- we just have to make the stack look the same:
       | Just cont_stack <- mapLookup cont_lbl stackmaps
       =
          return ( fixupStack stack0 cont_stack
-                , stackmaps
                 , sp0 - sm_sp cont_stack
+                , []
                 , last
-                , [] )
+                , []
+                , stackmaps )
 
       -- a continuation we haven't seen before:
       -- allocate the stack frame for it.
@@ -353,6 +401,7 @@ handleLastNode procpoints liveness cont_info stackmaps
       -- get the set of LocalRegs live in the continuation
       let target_live = mapFindWithDefault Set.empty cont_lbl
                             liveness
+                           `Set.difference` Set.fromList res_regs
 
       -- the stack from the base to cml_ret_off is off-limits.
       -- our new stack frame contains:
@@ -382,18 +431,19 @@ handleLastNode procpoints liveness cont_info stackmaps
       -- emit an Sp adjustment, taking into account the call area
       --
       return ( assigs
-             , mapSingleton cont_lbl cont_stack
              , sp_off
+             , []
              , last
              , [] -- no new blocks
-             )
+             , mapSingleton cont_lbl cont_stack )
 
 
      handleProcPoints :: UniqSM ( [CmmNode O O]
-                                , BlockEnv StackMap
                                 , ByteOff
+                                , [CmmNode O O]
                                 , CmmNode O C
-                                , [CmmBlock] )
+                                , [CmmBlock]
+                                , BlockEnv StackMap )
 
      handleProcPoints = do
           pps <- mapM handleProcPoint (successors last)
@@ -401,10 +451,11 @@ handleLastNode procpoints liveness cont_info stackmaps
               lbl_map = mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
               fix_lbl l = mapLookup l lbl_map `orElse` l
           return ( []
-                 , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ]
                  , 0
+                 , []
                  , mapSuccessors fix_lbl last
-                 , concat [ blk | (_,_,_,blk) <- pps ] )
+                 , concat [ blk | (_,_,_,blk) <- pps ]
+                 , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
 
      -- For each proc point that is a successor of this block
      --   (a) if the proc point already has a stackmap, we need to
@@ -640,6 +691,112 @@ stackMapToLiveness StackMap{..} =
      live_words =  [ (toWords off, False)
                    | (r,off) <- eltsUFM sm_regs, isGcPtrType (localRegType r) ]
 
+
+-- -----------------------------------------------------------------------------
+-- Lowering safe foreign calls
+
+{-
+Note [lower safe foreign calls]
+
+We start with
+
+   Sp[young(L1)] = L1
+ ,-----------------------
+ | r1 = foo(x,y,z) returns to L1
+ '-----------------------
+ L1:
+   R1 = r1 -- copyIn, inserted by mkSafeCall
+   ...
+
+the stack layout algorithm will arrange to save and reload everything
+live across the call.  Our job now is to expand the call so we get
+
+   Sp[young(L1)] = L1
+ ,-----------------------
+ | SAVE_THREAD_STATE()
+ | token = suspendThread(BaseReg, interruptible)
+ | r = foo(x,y,z)
+ | BaseReg = resumeThread(token)
+ | LOAD_THREAD_STATE()
+ | R1 = r  -- copyOut
+ | jump L1
+ '-----------------------
+ L1:
+   r = R1 -- copyIn, inserted by mkSafeCall
+   ...
+
+Note the copyOut, which saves the results in the places that L1 is
+expecting them (see Note {safe foreign call convention]).
+-}
+
+
+lowerSafeForeignCall :: CmmNode O C -> UniqSM ([CmmNode O O], CmmNode O C)
+lowerSafeForeignCall CmmForeignCall { .. } =
+ do let
+    -- Both 'id' and 'new_base' are KindNonPtr because they're
+    -- RTS-only objects and are not subject to garbage collection
+    id <- newTemp bWord
+    new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
+    let (caller_save, caller_load) = callerSaveVolatileRegs
+    load_tso <- newTemp gcWord
+    load_stack <- newTemp gcWord
+    let suspend = saveThreadState <*>
+                  caller_save <*>
+                  mkMiddle (callSuspendThread id intrbl)
+        midCall = mkUnsafeCall tgt res args
+        resume  = mkMiddle (callResumeThread new_base id) <*>
+                  -- Assign the result to BaseReg: we
+                  -- might now have a different Capability!
+                  mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <*>
+                  caller_load <*>
+                  loadThreadState load_tso load_stack
+        -- Note: The successor must be a procpoint, and we have already split,
+        --       so we use a jump, not a branch.
+        succLbl = CmmLit (CmmLabel (infoTblLbl succ))
+
+        (ret_args, copyout) = copyOutOflow NativeReturn Jump (Young succ)
+                                           (map (CmmReg . CmmLocal) res)
+                                           updfr (0, [])
+
+        jump = CmmCall { cml_target   = succLbl
+                       , cml_cont     = Just succ
+                       , cml_args     = widthInBytes wordWidth
+                       , cml_ret_args = ret_args
+                       , cml_ret_off  = updfr }
+
+    graph' <- lgraphOfAGraph $ suspend <*>
+                               midCall <*>
+                               resume  <*>
+                               copyout <*>
+                               mkLast jump
+
+    case toBlockList graph' of
+      [one] -> let (_, middle, last) = blockSplit one
+               in return (blockToList middle, last)
+      _ -> panic "lowerSafeForeignCall0"
+
+lowerSafeForeignCall _ = panic "lowerSafeForeignCall1"
+
+
+foreignLbl :: FastString -> CmmExpr
+foreignLbl name = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId name))
+
+newTemp :: CmmType -> UniqSM LocalReg
+newTemp rep = getUniqueM >>= \u -> return (LocalReg u rep)
+
+callSuspendThread :: LocalReg -> Bool -> CmmNode O O
+callSuspendThread id intrbl =
+  CmmUnsafeForeignCall
+       (ForeignTarget (foreignLbl (fsLit "suspendThread"))
+             (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
+       [id] [CmmReg (CmmGlobal BaseReg), CmmLit (mkIntCLit (fromEnum intrbl))]
+
+callResumeThread :: LocalReg -> LocalReg -> CmmNode O O
+callResumeThread new_base id =
+  CmmUnsafeForeignCall
+       (ForeignTarget (foreignLbl (fsLit "resumeThread"))
+            (ForeignConvention CCallConv [AddrHint] [AddrHint]))
+       [new_base] [CmmReg (CmmLocal id)]
 
 -- -----------------------------------------------------------------------------
 

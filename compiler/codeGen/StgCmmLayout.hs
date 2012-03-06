@@ -67,13 +67,17 @@ import FastString	( mkFastString, FastString, fsLit )
 --		Call and return sequences
 ------------------------------------------------------------------------
 
-emitReturn :: [CmmExpr] -> FCode ()
--- Return multiple values to the sequel
+-- | Return multiple values to the sequel
 --
--- If the sequel is Return
---	return (x,y)
--- If the sequel is AssignTo [p,q]
---	p=x; q=y; 
+-- If the sequel is @Return@
+--
+-- >     return (x,y)
+--
+-- If the sequel is @AssignTo [p,q]@
+--
+-- >    p=x; q=y;
+--
+emitReturn :: [CmmExpr] -> FCode ()
 emitReturn results
   = do { sequel    <- getSequel;
        ; updfr_off <- getUpdFrameOff
@@ -87,26 +91,24 @@ emitReturn results
                 ; emitMultiAssign  regs results }
        }
 
-emitCall :: (Convention, Convention) -> CmmExpr -> [CmmExpr] -> FCode ()
--- (cgCall fun args) makes a call to the entry-code of 'fun', 
--- passing 'args', and returning the results to the current sequel
-emitCall convs@(callConv, _) fun args
-  = do	{ adjustHpBackwards
-	; sequel <- getSequel
-	; updfr_off <- getUpdFrameOff
-        ; emitComment $ mkFastString ("emitCall: " ++ show sequel)
-	; case sequel of
-            Return _ ->
-             emit $ mkForeignJump callConv fun args updfr_off
-            AssignTo res_regs _ ->
-             emit =<< mkCall fun convs res_regs args updfr_off (0,[])
-    }
 
+-- | @emitCall conv fun args@ makes a call to the entry-code of @fun@,
+-- using the call/return convention @conv@, passing @args@, and
+-- returning the results to the current sequel.
+--
+emitCall :: (Convention, Convention) -> CmmExpr -> [CmmExpr] -> FCode ()
+emitCall convs fun args
+  = emitCallWithExtraStack convs fun args noExtraStack
+
+
+-- | @emitCallWithExtraStack conv fun args stack@ makes a call to the
+-- entry-code of @fun@, using the call/return convention @conv@,
+-- passing @args@, pushing some extra stack frames described by
+-- @stack@, and returning the results to the current sequel.
+--
 emitCallWithExtraStack
    :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
    -> (ByteOff, [(CmmExpr,ByteOff)]) -> FCode ()
--- (cgCall fun args) makes a call to the entry-code of 'fun', 
--- passing 'args', and returning the results to the current sequel
 emitCallWithExtraStack convs@(callConv, _) fun args extra_stack
   = do	{ adjustHpBackwards
 	; sequel <- getSequel
@@ -118,7 +120,6 @@ emitCallWithExtraStack convs@(callConv, _) fun args extra_stack
             AssignTo res_regs _ -> do
               emit =<< mkCall fun convs res_regs args updfr_off extra_stack
       }
-
 
 
 adjustHpBackwards :: FCode ()
@@ -171,55 +172,67 @@ directCall :: CLabel -> Arity -> [StgArg] -> FCode ()
 -- The function f has arity n, and there are guaranteed at least n args
 -- Both arity and args include void args
 directCall lbl arity stg_args 
-  = do	{ cmm_args <- getNonVoidArgAmodes stg_args
-	; direct_call "directCall" lbl arity cmm_args (argsReps stg_args) }
+  = do  { argreps <- getArgRepsAmodes stg_args
+        ; direct_call "directCall" lbl arity argreps }
+
 
 slowCall :: CmmExpr -> [StgArg] -> FCode ()
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args 
   = do  { dflags <- getDynFlags
-        ; cmm_args <- getNonVoidArgAmodes stg_args
+        ; argsreps <- getArgRepsAmodes stg_args
+        ; let (rts_fun, arity) = slowCallPattern (map fst argsreps)
         ; let platform = targetPlatform dflags
         ; call <- getCode $ direct_call "slow_call"
-                       (mkRtsApFastLabel rts_fun) arity cmm_args reps
+                       (mkRtsApFastLabel rts_fun) arity argsreps
         ; emitComment $ mkFastString ("slow_call for " ++
                                       showSDoc (pprPlatform platform fun) ++
                                       " with pat " ++ showSDoc (ftext rts_fun))
         ; emit (mkAssign nodeReg fun <*> call)
         }
-  where
-    reps = argsReps stg_args
-    (rts_fun, arity) = slowCallPattern reps
+
 
 --------------
-direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [ArgRep] -> FCode ()
--- NB1: (length args) may be less than (length reps), because
---     the args exclude the void ones
--- NB2: 'arity' refers to the *reps* 
-direct_call caller lbl arity args reps
-  | debugIsOn && arity > length reps  -- Too few args
+direct_call :: String -> CLabel -> Arity -> [(ArgRep,Maybe CmmExpr)] -> FCode ()
+direct_call caller lbl arity args
+  | debugIsOn && arity > length args  -- Too few args
   = do -- Caller should ensure that there enough args!
        dflags <- getDynFlags
        let platform = targetPlatform dflags
-       pprPanic "direct_call" (text caller <+> ppr arity
-                           <+> pprPlatform platform lbl <+> ppr (length reps)
-                           <+> pprPlatform platform args <+> ppr reps )
+       pprPanic "direct_call" $
+            text caller <+> ppr arity <+>
+            pprPlatform platform lbl <+> ppr (length args) <+>
+            pprPlatform platform (map snd args) <+> ppr (map fst args)
 
-
-  | null rest_reps  -- Precisely the right number of arguments
-  = emitCall (NativeDirectCall, NativeReturn) target args
+  | null rest_args  -- Precisely the right number of arguments
+  = emitCall (NativeDirectCall, NativeReturn) target (nonVArgs args)
 
   | otherwise       -- Note [over-saturated calls]
-  = ASSERT( arity == length initial_reps )
-    emitCallWithExtraStack (NativeDirectCall, NativeReturn)
-                           target fast_args (mkStkOffsets stack_args)
+  = emitCallWithExtraStack (NativeDirectCall, NativeReturn)
+                           target (nonVArgs fast_args) (mkStkOffsets stack_args)
   where
     target = CmmLit (CmmLabel lbl)
-    (initial_reps, rest_reps) = splitAt arity reps
-    arg_arity = count isNonV initial_reps
-    (fast_args, rest_args) = splitAt arg_arity args
-    stack_args = slowArgs (zip rest_reps rest_args)
+    (fast_args, rest_args) = splitAt arity args
+    stack_args = slowArgs rest_args
 
+
+-- When constructing calls, it is easier to keep the ArgReps and the
+-- CmmExprs zipped together.  However, a void argument has no
+-- representation, so we need to use Maybe CmmExpr (the alternative of
+-- using zeroCLit or even undefined would work, but would be ugly).
+--
+getArgRepsAmodes :: [StgArg] -> FCode [(ArgRep, Maybe CmmExpr)]
+getArgRepsAmodes = mapM getArgRepAmode
+  where getArgRepAmode arg
+           | V <- rep  = return (V, Nothing)
+           | otherwise = do expr <- getArgAmode (NonVoid arg)
+                            return (rep, Just expr)
+           where rep = toArgRep (argPrimRep arg)
+
+nonVArgs :: [(ArgRep, Maybe CmmExpr)] -> [CmmExpr]
+nonVArgs [] = []
+nonVArgs ((_,Nothing)  : args) = nonVArgs args
+nonVArgs ((_,Just arg) : args) = arg : nonVArgs args
 
 {-
 Note [over-saturated calls]
@@ -259,23 +272,21 @@ just more arguments that we are passing on the stack (cml_args).
 -- | 'slowArgs' takes a list of function arguments and prepares them for
 -- pushing on the stack for "extra" arguments to a function which requires
 -- fewer arguments than we currently have.
-slowArgs :: [(ArgRep,CmmExpr)] -> [(ArgRep,CmmExpr)]
+slowArgs :: [(ArgRep, Maybe CmmExpr)] -> [(ArgRep, Maybe CmmExpr)]
 slowArgs [] = []
-slowArgs amodes
-  | opt_SccProfilingOn = save_cccs ++ this_pat ++ slowArgs rest
-  | otherwise          =              this_pat ++ slowArgs rest
+slowArgs args -- careful: reps contains voids (V), but args does not
+  | opt_SccProfilingOn = save_cccs ++ this_pat ++ slowArgs rest_args
+  | otherwise          =              this_pat ++ slowArgs rest_args
   where
-    (arg_pat, args, rest) = matchSlowPattern amodes
+    (arg_pat, n)            = slowCallPattern (map fst args)
+    (call_args, rest_args)  = splitAt n args
+
     stg_ap_pat = mkCmmRetInfoLabel rtsPackageId arg_pat
-    this_pat   = (N, mkLblExpr stg_ap_pat) : args
-    save_cccs  = [(N, mkLblExpr save_cccs_lbl), (N, curCCS)]
+    this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
+    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just curCCS)]
     save_cccs_lbl = mkCmmRetInfoLabel rtsPackageId (fsLit "stg_restore_cccs")
 
-matchSlowPattern :: [(ArgRep,CmmExpr)]
-                 -> (FastString, [(ArgRep,CmmExpr)], [(ArgRep,CmmExpr)])
-matchSlowPattern amodes = (arg_pat, these, rest)
-  where (arg_pat, n)  = slowCallPattern (map fst amodes)
-	(these, rest) = splitAt n amodes
+
 
 -- These cases were found to cover about 99% of all slow calls:
 slowCallPattern :: [ArgRep] -> (FastString, Arity)
@@ -304,16 +315,16 @@ slowCallPattern []		      = (fsLit "stg_ap_0", 0)
 -- See Note [over-saturated calls].
 
 mkStkOffsets
-  :: [(ArgRep,CmmExpr)]           -- things to make offsets for
+  :: [(ArgRep, Maybe CmmExpr)]    -- things to make offsets for
   -> ( ByteOff                    -- OUTPUTS: Topmost allocated word
      , [(CmmExpr, ByteOff)] )     -- things with offsets (voids filtered out)
 mkStkOffsets things
     = loop 0 [] (reverse things)
   where
     loop offset offs [] = (offset,offs)
-    loop offset offs ((V,_):things) = loop offset offs things
+    loop offset offs ((_,Nothing):things) = loop offset offs things
 	-- ignore Void arguments
-    loop offset offs ((rep,thing):things)
+    loop offset offs ((rep,Just thing):things)
         = loop thing_off ((thing, thing_off):offs) things
 	where
           thing_off = offset + argRepSizeW rep * wORD_SIZE
@@ -357,10 +368,7 @@ isNonV :: ArgRep -> Bool
 isNonV V = False
 isNonV _ = True
 
-argsReps :: [StgArg] -> [ArgRep]
-argsReps = map (toArgRep . argPrimRep)
-
-argRepSizeW :: ArgRep -> WordOff		-- Size in words
+argRepSizeW :: ArgRep -> WordOff                -- Size in words
 argRepSizeW N = 1
 argRepSizeW P = 1
 argRepSizeW F = 1

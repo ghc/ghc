@@ -17,7 +17,6 @@ module CmmBuildInfoTables
     , setInfoTableSRT
     , TopSRT, emptySRT, srtToData
     , bundleCAFs
-    , lowerSafeForeignCalls
     , cafTransfers )
 where
 
@@ -315,91 +314,3 @@ updInfoTbl toVars toSrt info_tbl@(CmmInfoTable {})
                            StackRep ls -> StackRep (toVars ls)
                            other       -> other }
 updInfoTbl _ _ t@CmmNonInfoTable = t
-  
-----------------------------------------------------------------
--- Safe foreign calls: We need to insert the code that suspends and resumes
--- the thread before and after a safe foreign call.
--- Why do we do this so late in the pipeline?
--- Because we need this code to appear without interrruption: you can't rely on the
--- value of the stack pointer between the call and resetting the thread state;
--- you need to have an infotable on the young end of the stack both when
--- suspending the thread and making the foreign call.
--- All of this is much easier if we insert the suspend and resume calls here.
-
--- At the same time, we prepare for the stages of the compiler that
--- build the proc points. We have to do this at the same time because
--- the safe foreign calls need special treatment with respect to infotables.
--- A safe foreign call needs an infotable even though it isn't
--- a procpoint. The following datatype captures the information
--- needed to generate the infotables along with the Cmm data and procedures.
-
--- JD: Why not do this while splitting procedures?
-lowerSafeForeignCalls :: AreaMap -> CmmDecl -> FuelUniqSM CmmDecl
-lowerSafeForeignCalls _ t@(CmmData _ _) = return t
-lowerSafeForeignCalls areaMap (CmmProc info l g@(CmmGraph {g_entry=entry})) = do
-  let block b mblocks = mblocks >>= lowerSafeCallBlock entry areaMap b
-  blocks <- foldGraphBlocks block (return mapEmpty) g
-  return $ CmmProc info l (ofBlockMap entry blocks)
-
--- If the block ends with a safe call in the block, lower it to an unsafe
--- call (with appropriate saves and restores before and after).
-lowerSafeCallBlock :: BlockId -> AreaMap -> CmmBlock -> BlockEnv CmmBlock
-                              -> FuelUniqSM (BlockEnv CmmBlock)
-lowerSafeCallBlock entry areaMap b blocks =
-  case blockToNodeList b of
-    (JustC (CmmEntry id), m, JustC l@(CmmForeignCall {})) -> lowerSafeForeignCall entry areaMap blocks id m l
-    _                                                    -> return $ insertBlock b blocks
-
--- Late in the code generator, we want to insert the code necessary
--- to lower a safe foreign call to a sequence of unsafe calls.
-lowerSafeForeignCall :: BlockId -> AreaMap -> BlockEnv CmmBlock -> BlockId -> [CmmNode O O] -> CmmNode O C
-                                -> FuelUniqSM (BlockEnv CmmBlock)
-lowerSafeForeignCall entry areaMap blocks bid m
-    (CmmForeignCall {tgt=tgt, res=rs, args=as, succ=succ, updfr = updfr_off, intrbl = intrbl}) =
- do let newTemp rep = getUniqueM >>= \u -> return (LocalReg u rep)
-    -- Both 'id' and 'new_base' are KindNonPtr because they're
-    -- RTS-only objects and are not subject to garbage collection
-    id <- newTemp bWord
-    new_base <- newTemp (cmmRegType (CmmGlobal BaseReg))
-    let (caller_save, caller_load) = callerSaveVolatileRegs
-    load_tso <- newTemp gcWord -- TODO FIXME NOW
-    load_stack <- newTemp gcWord -- TODO FIXME NOW
-    let (<**>) = (M.<*>)
-    let suspendThread = foreignLbl "suspendThread"
-        resumeThread  = foreignLbl "resumeThread"
-        foreignLbl name = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit name)))
-        suspend = saveThreadState <**>
-                  caller_save <**>
-                  mkUnsafeCall (ForeignTarget suspendThread
-                                (ForeignConvention CCallConv [AddrHint, NoHint] [AddrHint]))
-                               [id] [CmmReg (CmmGlobal BaseReg), CmmLit (mkIntCLit (fromEnum intrbl))]
-        midCall = mkUnsafeCall tgt rs as
-        resume  = mkUnsafeCall (ForeignTarget resumeThread
-                                (ForeignConvention CCallConv [AddrHint] [AddrHint]))
-                     [new_base] [CmmReg (CmmLocal id)] <**>
-                  -- Assign the result to BaseReg: we
-                  -- might now have a different Capability!
-                  mkAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)) <**>
-                  caller_load <**>
-                  loadThreadState load_tso load_stack
-        -- We have to save the return value on the stack because its next use
-        -- may appear in a different procedure due to procpoint splitting...
-        saveRetVals = foldl (<**>) mkNop $ map (M.mkMiddle . spill) rs
-        spill r = CmmStore (regSlot r) (CmmReg $ CmmLocal r)
-        regSlot r@(LocalReg _ _) = CmmRegOff (CmmGlobal Sp) (sp_off - offset)
-          where offset = w + expectJust "lowerForeign" Nothing -- XXX need to fix this: (Map.lookup (RegSlot r) areaMap)
-                sp_off = wORD_SIZE + expectJust "lowerForeign" (Map.lookup area areaMap)
-                area = if succ == entry then Old else Young succ
-                w = widthInBytes $ typeWidth $ localRegType r
-        -- Note: The successor must be a procpoint, and we have already split,
-        --       so we use a jump, not a branch.
-        succLbl = CmmLit (CmmLabel (infoTblLbl succ))
-        jump = CmmCall { cml_target  = succLbl, cml_cont = Nothing
-                       , cml_args    = widthInBytes wordWidth ,cml_ret_args = 0
-                       , cml_ret_off = updfr_off}
-    graph' <- liftUniq $ labelAGraph bid $ catAGraphs (map M.mkMiddle m) <**>
-                                           suspend <**> midCall <**>
-                                           resume  <**> saveRetVals <**> M.mkLast jump
-    return $ blocks `mapUnion` toBlockMap graph'
-lowerSafeForeignCall _ _ _ _ _ _ = panic "lowerSafeForeignCall was passed something else"
-

@@ -77,9 +77,6 @@ import Unique
 import UniqSupply
 import FastString
 import Outputable
-import Util
-
-import Compiler.Hoopl hiding (Unique, (<*>), mkLabel, mkBranch, mkLast)
 
 import Control.Monad
 import Data.List
@@ -614,7 +611,7 @@ emitComment :: FastString -> FCode ()
 #if 0 /* def DEBUG */
 emitComment s = emitCgStmt (CgStmt (CmmComment s))
 #else
-emitComment s = return ()
+emitComment _ = return ()
 #endif
 
 emitAssign :: CmmReg  -> CmmExpr -> FCode ()
@@ -707,12 +704,16 @@ mkSafeCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
            -> FCode CmmAGraph
 mkSafeCall   t fs as upd i = do
   k <- newLabelC
+  let (_off, copyout) = copyInOflow NativeReturn (Young k) fs
+    -- see Note [safe foreign call convention]
   return
      (    mkStore (CmmStackSlot (Young k) (widthInBytes wordWidth))
                   (CmmLit (CmmBlock k))
-      <*> mkLast (CmmForeignCall {tgt=t, res=fs, args=as, succ=k, updfr=upd, intrbl=i})
-      <*> mkLabel k)
-
+      <*> mkLast (CmmForeignCall { tgt=t, res=fs, args=as, succ=k
+                                 , updfr=upd, intrbl=i })
+      <*> mkLabel k
+      <*> copyout
+     )
 
 -- ----------------------------------------------------------------------------
 -- CgStmts
