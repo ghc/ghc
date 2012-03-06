@@ -86,7 +86,7 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=0
 endif
 
-ifneq "$(shell $(SHELL) -c 'llvmc --version | grep version' 2> /dev/null)" ""
+ifneq "$(shell $(SHELL) -c 'llc --version | grep version' 2> /dev/null)" ""
 RUNTEST_OPTS += -e ghc_with_llvm=1
 else
 RUNTEST_OPTS += -e ghc_with_llvm=0
