@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size = 26
+  Result size = 26
 
 Rec {
 xs :: GHC.Prim.Int# -> ()
