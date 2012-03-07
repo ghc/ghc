@@ -141,13 +141,6 @@ layout :: BlockSet                      -- proc points
 layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
   = go blocks init_stackmap entry_args []
   where
-    sp_high = final_hwm - entry_args
-        -- The stack check value is adjusted by the Sp offset on
-        -- entry to the proc, which is entry_args.  We are
-        -- assuming that we only do a stack check at the
-        -- beginning of a proc, and we don't modify Sp before the
-        -- check.
-
     (updfr, cont_info)  = collectContInfo blocks
 
     init_stackmap = mapSingleton entry StackMap{ sm_sp   = entry_args
@@ -195,42 +188,80 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
        --    middle3          -- some more middle nodes from handleLastNode
        --    last1            -- the last node
        --
-       -- The next step is to manifest Sp: turn all the CmmStackSlots
-       -- into CmmLoads from Sp.  The adjustment for middle1/middle2
-       -- will be different from that for middle3/last1, because the
-       -- Sp adjustment intervenes.
-       --
-       let area_off    = getAreaOff final_stackmaps
+       let middle_pre = blockToList $ foldl blockSnoc middle1 middle2
 
-           adj_pre_sp, adj_post_sp :: CmmNode e x -> CmmNode e x
-           adj_pre_sp  = mapExpDeep (areaToSp sp0            sp_high area_off)
-           adj_post_sp = mapExpDeep (areaToSp (sp0 - sp_off) sp_high area_off)
+           sp_high = final_hwm - entry_args
+              -- The stack check value is adjusted by the Sp offset on
+              -- entry to the proc, which is entry_args.  We are
+              -- assuming that we only do a stack check at the
+              -- beginning of a proc, and we don't modify Sp before the
+              -- check.
 
-           middle_pre  = maybeAddSpAdj sp_off $
-                         blockFromList $
-                         map adj_pre_sp $
-                         elimStackStores stack0 final_stackmaps area_off $
-                         blockToList $
-                         foldl blockSnoc middle1 middle2
-
-           middle_post = map adj_post_sp middle3
-
-           final_middle = foldl blockSnoc middle_pre middle_post
-           final_last   = optStackCheck (adj_post_sp last1)
-
-           newblock = blockJoin entry0 final_middle final_last
-
-           fixup_blocks' = map (blockMapNodes3 (id, adj_post_sp, id))
-                               fixup_blocks
+           final_blocks = manifestSp final_stackmaps stack0 sp0 sp_high entry0
+                              middle_pre sp_off middle3 last1 fixup_blocks
 
            stackmaps' = mapUnion acc_stackmaps out
 
-           hwm' = maximum (acc_hwm : map sm_sp (mapElems out))
+           hwm' = maximum (acc_hwm : (sp0 - sp_off) : map sm_sp (mapElems out))
 
-       pprTrace "layout(out)" (ppr out) $ return ()
-    
-       go bs stackmaps' hwm' (newblock : fixup_blocks' ++ acc_blocks)
+       pprTrace "layout(wibble)" (ppr out) $ return ()
 
+       go bs stackmaps' hwm' (final_blocks ++ acc_blocks)
+
+
+-- -----------------------------------------------------------------------------
+
+-- | Manifest Sp: turn all the CmmStackSlots into CmmLoads from Sp.  The
+-- block looks like this:
+--
+--    middle_pre       -- some middle nodes
+--    Sp = Sp + sp_off -- Sp adjustment goes here
+--    middle_post      -- some more middle nodes, after the Sp adjustment
+--    last             -- the last node
+--
+-- And we have some extra blocks too (that don't contain Sp adjustments)
+--
+-- The adjustment for middle_pre will be different from that for
+-- middle_post, because the Sp adjustment intervenes.
+--
+manifestSp
+   :: BlockEnv StackMap  -- StackMaps for other blocks
+   -> StackMap           -- StackMap for this block
+   -> ByteOff            -- Sp on entry to the block
+   -> ByteOff            -- SpHigh
+   -> CmmNode C O        -- first node
+   -> [CmmNode O O]      -- middle_pre
+   -> ByteOff            -- sp_off
+   -> [CmmNode O O]      -- middle_post
+   -> CmmNode O C        -- last node
+   -> [CmmBlock]         -- new blocks
+   -> [CmmBlock]         -- final blocks with Sp manifest
+
+manifestSp stackmaps stack0 sp0 sp_high
+           first middle_pre sp_off middle_post last fixup_blocks
+  = blockJoin first final_middle final_last : fixup_blocks'
+  where
+    area_off = getAreaOff stackmaps
+
+    adj_pre_sp, adj_post_sp :: CmmNode e x -> CmmNode e x
+    adj_pre_sp  = mapExpDeep (areaToSp sp0            sp_high area_off)
+    adj_post_sp = mapExpDeep (areaToSp (sp0 - sp_off) sp_high area_off)
+
+    middle_pre' = maybeAddSpAdj sp_off $
+                  blockFromList $
+                  map adj_pre_sp $
+                  elimStackStores stack0 stackmaps area_off $
+                  middle_pre
+
+    middle_post' = map adj_post_sp middle_post
+
+    final_middle = foldl blockSnoc middle_pre' middle_post'
+    final_last   = optStackCheck (adj_post_sp last)
+
+    fixup_blocks' = map (blockMapNodes3 (id, adj_post_sp, id)) fixup_blocks
+
+
+-- -----------------------------------------------------------------------------
 
 -- | Eliminate stores of the form
 --
@@ -444,6 +475,11 @@ handleLastNode procpoints liveness cont_info stackmaps
                                 , CmmNode O C
                                 , [CmmBlock]
                                 , BlockEnv StackMap )
+
+--     handleProcPoints
+--       | Just l <- future_continuation
+--       , nub $ filter (`setMember` procpoints) $ successors last == [l]
+--       =
 
      handleProcPoints = do
           pps <- mapM handleProcPoint (successors last)
