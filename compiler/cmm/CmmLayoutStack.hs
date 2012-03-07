@@ -117,8 +117,10 @@ cmmLayoutStack procpoints entry_args
             layout procpoints liveness entry entry_args
                    rec_stackmaps rec_high_sp blocks
 
+    new_blocks' <- liftUniq $ mapM lowerSafeForeignCall new_blocks
+
     pprTrace ("Sp HWM") (ppr final_high_sp) $
-       return (ofBlockList entry new_blocks, final_stackmaps)
+       return (ofBlockList entry new_blocks', final_stackmaps)
 
 
 
@@ -177,15 +179,16 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
        -- a proc point, we must save the live variables, adjust Sp, and
        -- construct the StackMaps for each of the successor blocks.
        -- See handleLastNode for details.
-       (middle2, sp_off, middle3, last1, fixup_blocks, out)
+       (middle2, sp_off, last1, fixup_blocks, out)
            <- handleLastNode procpoints liveness cont_info
                              acc_stackmaps stack1 last0
     
+       pprTrace "layout(out)" (ppr out) $ return ()
+
        -- our block:
        --    middle1          -- the original middle nodes
        --    middle2          -- live variable saves from handleLastNode
        --    Sp = Sp + sp_off -- Sp adjustment goes here
-       --    middle3          -- some more middle nodes from handleLastNode
        --    last1            -- the last node
        --
        let middle_pre = blockToList $ foldl blockSnoc middle1 middle2
@@ -198,15 +201,13 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
               -- check.
 
            final_blocks = manifestSp final_stackmaps stack0 sp0 sp_high entry0
-                              middle_pre sp_off middle3 last1 fixup_blocks
+                              middle_pre sp_off last1 fixup_blocks
 
-           stackmaps' = mapUnion acc_stackmaps out
+           acc_stackmaps' = mapUnion acc_stackmaps out
 
            hwm' = maximum (acc_hwm : (sp0 - sp_off) : map sm_sp (mapElems out))
 
-       pprTrace "layout(wibble)" (ppr out) $ return ()
-
-       go bs stackmaps' hwm' (final_blocks ++ acc_blocks)
+       go bs acc_stackmaps' hwm' (final_blocks ++ acc_blocks)
 
 
 -- -----------------------------------------------------------------------------
@@ -214,9 +215,8 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
 -- | Manifest Sp: turn all the CmmStackSlots into CmmLoads from Sp.  The
 -- block looks like this:
 --
---    middle_pre       -- some middle nodes
+--    middle_pre       -- the middle nodes
 --    Sp = Sp + sp_off -- Sp adjustment goes here
---    middle_post      -- some more middle nodes, after the Sp adjustment
 --    last             -- the last node
 --
 -- And we have some extra blocks too (that don't contain Sp adjustments)
@@ -230,16 +230,15 @@ manifestSp
    -> ByteOff            -- Sp on entry to the block
    -> ByteOff            -- SpHigh
    -> CmmNode C O        -- first node
-   -> [CmmNode O O]      -- middle_pre
+   -> [CmmNode O O]      -- middle
    -> ByteOff            -- sp_off
-   -> [CmmNode O O]      -- middle_post
    -> CmmNode O C        -- last node
    -> [CmmBlock]         -- new blocks
    -> [CmmBlock]         -- final blocks with Sp manifest
 
 manifestSp stackmaps stack0 sp0 sp_high
-           first middle_pre sp_off middle_post last fixup_blocks
-  = blockJoin first final_middle final_last : fixup_blocks'
+           first middle_pre sp_off last fixup_blocks
+  = final_block : fixup_blocks'
   where
     area_off = getAreaOff stackmaps
 
@@ -247,16 +246,15 @@ manifestSp stackmaps stack0 sp0 sp_high
     adj_pre_sp  = mapExpDeep (areaToSp sp0            sp_high area_off)
     adj_post_sp = mapExpDeep (areaToSp (sp0 - sp_off) sp_high area_off)
 
-    middle_pre' = maybeAddSpAdj sp_off $
-                  blockFromList $
-                  map adj_pre_sp $
-                  elimStackStores stack0 stackmaps area_off $
-                  middle_pre
+    final_middle = maybeAddSpAdj sp_off $
+                   blockFromList $
+                   map adj_pre_sp $
+                   elimStackStores stack0 stackmaps area_off $
+                   middle_pre
 
-    middle_post' = map adj_post_sp middle_post
+    final_last    = optStackCheck (adj_post_sp last)
 
-    final_middle = foldl blockSnoc middle_pre' middle_post'
-    final_last   = optStackCheck (adj_post_sp last)
+    final_block   = blockJoin first final_middle final_last
 
     fixup_blocks' = map (blockMapNodes3 (id, adj_post_sp, id)) fixup_blocks
 
@@ -371,7 +369,6 @@ handleLastNode
    -> UniqSM
       ( [CmmNode O O]      -- nodes to go *before* the Sp adjustment
       , ByteOff            -- amount to adjust Sp
-      , [CmmNode O O]      -- nodes to go *after* the Sp adjustment
       , CmmNode O C        -- new last node
       , [CmmBlock]         -- new blocks
       , BlockEnv StackMap  -- stackmaps for the continuations
@@ -385,18 +382,15 @@ handleLastNode procpoints liveness cont_info stackmaps
     --  is cml_args, after popping any other junk from the stack.
     CmmCall{ cml_cont = Nothing, .. } -> do
       let sp_off = sp0 - cml_args
-      return ([], sp_off, [], last, [], mapEmpty)
+      return ([], sp_off, last, [], mapEmpty)
 
     --  At each CmmCall with a continuation:
     CmmCall{ cml_cont = Just cont_lbl, .. } ->
        lastCall cont_lbl [] cml_args cml_ret_args cml_ret_off
 
     CmmForeignCall{ succ = cont_lbl, .. } -> do
-       (mids, spoff, _, last', blocks, stackmap') <-
-          lastCall cont_lbl res wORD_SIZE wORD_SIZE (sm_ret_off stack0)
+       lastCall cont_lbl res wORD_SIZE wORD_SIZE (sm_ret_off stack0)
             -- one word each for args and results: the return address
-       (extra_mids, last'') <- lowerSafeForeignCall last'
-       return (mids, spoff, extra_mids, last'', blocks, stackmap')
 
     CmmBranch{..}     ->  handleProcPoints
     CmmCondBranch{..} ->  handleProcPoints
@@ -407,7 +401,6 @@ handleLastNode procpoints liveness cont_info stackmaps
               -> UniqSM
                       ( [CmmNode O O]
                       , ByteOff
-                      , [CmmNode O O]
                       , CmmNode O C
                       , [CmmBlock]
                       , BlockEnv StackMap
@@ -420,7 +413,6 @@ handleLastNode procpoints liveness cont_info stackmaps
       =
          return ( fixupStack stack0 cont_stack
                 , sp0 - sm_sp cont_stack
-                , []
                 , last
                 , []
                 , stackmaps )
@@ -463,7 +455,6 @@ handleLastNode procpoints liveness cont_info stackmaps
       --
       return ( assigs
              , sp_off
-             , []
              , last
              , [] -- no new blocks
              , mapSingleton cont_lbl cont_stack )
@@ -471,7 +462,6 @@ handleLastNode procpoints liveness cont_info stackmaps
 
      handleProcPoints :: UniqSM ( [CmmNode O O]
                                 , ByteOff
-                                , [CmmNode O O]
                                 , CmmNode O C
                                 , [CmmBlock]
                                 , BlockEnv StackMap )
@@ -488,7 +478,6 @@ handleLastNode procpoints liveness cont_info stackmaps
               fix_lbl l = mapLookup l lbl_map `orElse` l
           return ( []
                  , 0
-                 , []
                  , mapSuccessors fix_lbl last
                  , concat [ blk | (_,_,_,blk) <- pps ]
                  , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
@@ -765,10 +754,10 @@ Note the copyOut, which saves the results in the places that L1 is
 expecting them (see Note {safe foreign call convention]).
 -}
 
-
-lowerSafeForeignCall :: CmmNode O C -> UniqSM ([CmmNode O O], CmmNode O C)
-lowerSafeForeignCall CmmForeignCall { .. } =
- do let
+lowerSafeForeignCall :: CmmBlock -> UniqSM CmmBlock
+lowerSafeForeignCall block
+  | (entry, middle, CmmForeignCall { .. }) <- blockSplit block
+  = do
     -- Both 'id' and 'new_base' are KindNonPtr because they're
     -- RTS-only objects and are not subject to garbage collection
     id <- newTemp bWord
@@ -807,11 +796,12 @@ lowerSafeForeignCall CmmForeignCall { .. } =
                                mkLast jump
 
     case toBlockList graph' of
-      [one] -> let (_, middle, last) = blockSplit one
-               in return (blockToList middle, last)
+      [one] -> let (_, middle', last) = blockSplit one
+               in return (blockJoin entry (middle `blockAppend` middle') last)
       _ -> panic "lowerSafeForeignCall0"
 
-lowerSafeForeignCall _ = panic "lowerSafeForeignCall1"
+  -- Block doesn't end in a safe foreign call:
+  | otherwise = return block
 
 
 foreignLbl :: FastString -> CmmExpr
