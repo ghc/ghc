@@ -660,13 +660,14 @@ link_caf _is_upd = do
         -- node is live, so save it.
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
+  ; updfr  <- getUpdFrameOff
   ; emit =<< mkCmmIfThen
       (CmmMachOp mo_wordEq [ CmmReg (CmmLocal ret), CmmLit zeroCLit])
         -- re-enter R1.  Doing this directly is slightly dodgy; we're
         -- assuming lots of things, like the stack pointer hasn't
         -- moved since we entered the CAF.
        (let target = entryCode (closureInfoPtr (CmmReg nodeReg)) in
-        mkJump target [] 0)
+        mkJump target [] updfr)
 
   ; return hp_rel }
 
