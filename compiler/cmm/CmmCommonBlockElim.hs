@@ -69,10 +69,11 @@ common_block (old_change, bmap, subst) (hash, b) =
                      mapLookup bid subst) of
                  (Just b', Nothing)                         -> addSubst b'
                  (Just b', Just b'') | entryLabel b' /= b'' -> addSubst b'
+                                     | otherwise -> (old_change, bmap, subst)
                  _ -> (old_change, addToUFM bmap hash (b : bs), subst)
     Nothing -> (old_change, addToUFM bmap hash [b], subst)
   where bid = entryLabel b
-        addSubst b' = my_trace "found new common block" (ppr (entryLabel b')) $
+        addSubst b' = my_trace "found new common block" (ppr bid <> char '=' <> ppr (entryLabel b')) $
                       (True, bmap, mapInsert bid (entryLabel b') subst)
 
 
