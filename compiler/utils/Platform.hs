@@ -56,6 +56,7 @@ data OS
         | OSOpenBSD
         | OSNetBSD
         | OSKFreeBSD
+        | OSHaiku
         deriving (Read, Show, Eq)
 
 -- | ARM Instruction Set Architecture and Extensions
@@ -89,6 +90,7 @@ osElfTarget OSDarwin   = False
 osElfTarget OSMinGW32  = False
 osElfTarget OSKFreeBSD = True
 osElfTarget OSUnknown  = False
+osElfTarget OSHaiku     = True
  -- Defaulting to False is safe; it means don't rely on any
  -- ELF-specific functionality.  It is important to have a default for
  -- portability, otherwise we have to answer this question for every
