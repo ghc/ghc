@@ -95,7 +95,7 @@ hash_block block =
         hash_lst m h = hash_node m + h `shiftL` 1
 
         hash_node :: CmmNode O x -> Word32
-        hash_node (CmmComment (FastString u _ _ _ _)) = cvt u
+        hash_node (CmmComment (FastString u _ _ _ _)) = 0 -- don't care
         hash_node (CmmAssign r e) = hash_reg r + hash_e e
         hash_node (CmmStore e e') = hash_e e + hash_e e'
         hash_node (CmmUnsafeForeignCall t _ as) = hash_tgt t + hash_list hash_e as
@@ -142,13 +142,53 @@ lookupBid subst bid = case mapLookup bid subst of
                         Just bid  -> lookupBid subst bid
                         Nothing -> bid
 
+-- Middle nodes and expressions can contain BlockIds, in particular in
+-- CmmStackSlot and CmmBlock, so we have to use a special equality for
+-- these.
+--
+eqMiddleWith :: (BlockId -> BlockId -> Bool)
+             -> CmmNode O O -> CmmNode O O -> Bool
+eqMiddleWith eqBid (CmmComment _) (CmmComment _) = True
+eqMiddleWith eqBid (CmmAssign r1 e1) (CmmAssign r2 e2)
+  = r1 == r2 && eqExprWith eqBid e1 e2
+eqMiddleWith eqBid (CmmStore l1 r1) (CmmStore l2 r2)
+  = eqExprWith eqBid l1 l2 && eqExprWith eqBid r1 r2
+eqMiddleWith eqBid (CmmUnsafeForeignCall t1 r1 a1)
+                   (CmmUnsafeForeignCall t2 r2 a2)
+  = t1 == t2 && r1 == r2 && and (zipWith (eqExprWith eqBid) a1 a2)
+eqMiddleWith _ _ _ = False
+
+eqExprWith :: (BlockId -> BlockId -> Bool)
+           -> CmmExpr -> CmmExpr -> Bool
+eqExprWith eqBid = eq
+ where
+  CmmLit l1          `eq` CmmLit l2          = eqLit l1 l2
+  CmmLoad e1 _       `eq` CmmLoad e2 _       = e1 `eq` e2
+  CmmReg r1          `eq` CmmReg r2          = r1==r2
+  CmmRegOff r1 i1    `eq` CmmRegOff r2 i2    = r1==r2 && i1==i2
+  CmmMachOp op1 es1  `eq` CmmMachOp op2 es2  = op1==op2 && es1 `eqs` es2
+  CmmStackSlot a1 i1 `eq` CmmStackSlot a2 i2 = eqArea a1 a2 && i1==i2
+  _e1                `eq` _e2                = False
+
+  xs `eqs` ys = and (zipWith eq xs ys)
+
+  eqLit (CmmBlock id1) (CmmBlock id2) = eqBid id1 id2
+  eqLit l1 l2 = l1 == l2
+
+  eqArea Old Old = True
+  eqArea (Young id1) (Young id2) = eqBid id1 id2
+  eqArea _ _ = False
+
 -- Equality on the body of a block, modulo a function mapping block
 -- IDs to block IDs.
 eqBlockBodyWith :: (BlockId -> BlockId -> Bool) -> CmmBlock -> CmmBlock -> Bool
 eqBlockBodyWith eqBid block block'
-  = blockToList m == blockToList m' && eqLastWith eqBid l l'
+  = and (zipWith (eqMiddleWith eqBid) (blockToList m) (blockToList m')) &&
+    eqLastWith eqBid l l'
   where (_,m,l)   = blockSplit block
         (_,m',l') = blockSplit block'
+
+
 
 eqLastWith :: (BlockId -> BlockId -> Bool) -> CmmNode O C -> CmmNode O C -> Bool
 eqLastWith eqBid (CmmBranch bid1) (CmmBranch bid2) = eqBid bid1 bid2
