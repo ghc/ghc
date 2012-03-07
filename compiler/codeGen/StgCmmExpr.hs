@@ -278,8 +278,7 @@ Hence: two basic plans for
 data GcPlan
   = GcInAlts 		-- Put a GC check at the start the case alternatives,
 	[LocalReg] 	-- which binds these registers
-	SRT		-- using this SRT
-  | NoGcInAlts		-- The scrutinee is a primitive value, or a call to a
+  | NoGcInAlts          -- The scrutinee is a primitive value, or a call to a
 			-- primitive op which does no GC.  Absorb the allocation
 			-- of the case alternative(s) into the upstream check
 
@@ -297,7 +296,8 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr _srt (AlgAlt tycon) alts
             ; emitAssign (CmmLocal tmp_reg)
                          (tagToClosure tycon tag_expr) }
 
-       ; (mb_deflt, branches) <- cgAlgAltRhss NoGcInAlts (NonVoid bndr) alts
+       ; (mb_deflt, branches) <- cgAlgAltRhss NoGcInAlts Nothing
+                                              (NonVoid bndr) alts
        ; emitSwitch tag_expr branches mb_deflt 0 (tyConFamilySize tycon - 1)
        }
   where
@@ -400,7 +400,7 @@ cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr srt alt_type alts
   = -- handle seq#, same return convention as vanilla 'a'.
     cgCase (StgApp a []) bndr srt alt_type alts
 
-cgCase scrut bndr srt alt_type alts 
+cgCase scrut bndr _srt alt_type alts
   = -- the general case
     do { up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
@@ -410,7 +410,7 @@ cgCase scrut bndr srt alt_type alts
                       | isSingleton alts = False
                       | up_hp_usg > 0    = False
                       | otherwise        = True
-             gc_plan = if gcInAlts then GcInAlts alt_regs srt else NoGcInAlts
+             gc_plan = if gcInAlts then GcInAlts alt_regs else NoGcInAlts
 
        ; mb_cc <- maybeSaveCostCentre simple_scrut
        ; withSequel (AssignTo alt_regs gcInAlts) (cgExpr scrut)
@@ -468,14 +468,14 @@ chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
 cgAlts :: GcPlan -> NonVoid Id -> AltType -> [StgAlt] -> FCode ()
 -- At this point the result of the case are in the binders
 cgAlts gc_plan _bndr PolyAlt [(_, _, _, rhs)]
-  = maybeAltHeapCheck gc_plan (cgExpr rhs)
+  = maybeAltHeapCheck gc_plan Nothing (cgExpr rhs)
   
 cgAlts gc_plan _bndr (UbxTupAlt _) [(_, _, _, rhs)]
-  = maybeAltHeapCheck gc_plan (cgExpr rhs)
+  = maybeAltHeapCheck gc_plan Nothing (cgExpr rhs)
 	-- Here bndrs are *already* in scope, so don't rebind them
 
 cgAlts gc_plan bndr (PrimAlt _) alts
-  = do	{ tagged_cmms <- cgAltRhss gc_plan bndr alts
+  = do  { tagged_cmms <- cgAltRhss gc_plan Nothing bndr alts
 
 	; let bndr_reg = CmmLocal (idToReg bndr)
 	      (DEFAULT,deflt) = head tagged_cmms
@@ -487,7 +487,11 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
-  = do  { (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
+  = do  { retry_lbl <- newLabelC
+        ; emitLabel retry_lbl -- Note [alg-alt heap checks]
+
+        ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan (Just retry_lbl)
+                                               bndr alts
 
 	; let fam_sz   = tyConFamilySize tycon
 	      bndr_reg = CmmLocal (idToReg bndr)
@@ -512,12 +516,32 @@ cgAlts _ _ _ _ = panic "cgAlts"
 	-- UbxTupAlt and PolyAlt have only one alternative
 
 
+-- Note [alg-alt heap check]
+--
+-- In an algebraic case with more than one alternative, we will have
+-- code like
+--
+-- L0:
+--   x = R1
+--   goto L1
+-- L1:
+--   if (x & 7 >= 2) then goto L2 else goto L3
+-- L2:
+--   Hp = Hp + 16
+--   if (Hp > HpLim) then goto L4
+--   ...
+-- L4:
+--   call gc() returns to L5
+-- L5:
+--   x = R1
+--   goto L1
+
 -------------------
-cgAlgAltRhss :: GcPlan -> NonVoid Id -> [StgAlt]
+cgAlgAltRhss :: GcPlan -> Maybe BlockId -> NonVoid Id -> [StgAlt]
              -> FCode ( Maybe CmmAGraph
                       , [(ConTagZ, CmmAGraph)] )
-cgAlgAltRhss gc_plan bndr alts
-  = do { tagged_cmms <- cgAltRhss gc_plan bndr alts
+cgAlgAltRhss gc_plan retry_lbl bndr alts
+  = do { tagged_cmms <- cgAltRhss gc_plan retry_lbl bndr alts
 
        ; let { mb_deflt = case tagged_cmms of
                            ((DEFAULT,rhs) : _) -> Just rhs
@@ -533,22 +557,26 @@ cgAlgAltRhss gc_plan bndr alts
 
 
 -------------------
-cgAltRhss :: GcPlan -> NonVoid Id -> [StgAlt] -> FCode [(AltCon, CmmAGraph)]
-cgAltRhss gc_plan bndr alts
+cgAltRhss :: GcPlan -> Maybe BlockId -> NonVoid Id -> [StgAlt]
+          -> FCode [(AltCon, CmmAGraph)]
+cgAltRhss gc_plan retry_lbl bndr alts
   = forkAlts (map cg_alt alts)
   where
     base_reg = idToReg bndr
     cg_alt :: StgAlt -> FCode (AltCon, CmmAGraph)
     cg_alt (con, bndrs, _uses, rhs)
       = getCodeR		  $
-	maybeAltHeapCheck gc_plan $
+        maybeAltHeapCheck gc_plan retry_lbl $
 	do { _ <- bindConArgs con base_reg bndrs
 	   ; cgExpr rhs
 	   ; return con }
 
-maybeAltHeapCheck :: GcPlan -> FCode a -> FCode a
-maybeAltHeapCheck NoGcInAlts        code = code
-maybeAltHeapCheck (GcInAlts regs _) code = altHeapCheck regs code
+maybeAltHeapCheck :: GcPlan -> Maybe BlockId -> FCode a -> FCode a
+maybeAltHeapCheck NoGcInAlts      mlbl code = code
+maybeAltHeapCheck (GcInAlts regs) mlbl code =
+  case mlbl of
+     Nothing -> altHeapCheck regs code
+     Just retry_lbl -> altHeapCheckReturnsTo regs retry_lbl code
 
 -----------------------------------------------------------------------------
 -- 	Tail calls
@@ -667,11 +695,14 @@ emitEnter fun = do
        ; let (off, copyin) = copyInOflow NativeReturn area res_regs
              (outArgs, copyout) = copyOutOflow NativeNodeCall Call area
                                           [fun] updfr_off (0,[])
-       ; let entry = entryCode (closureInfoPtr fun)
+         -- refer to fun via nodeReg after the copyout, to avoid having
+         -- both live simultaneously; this sometimes enables fun to be
+         -- inlined in the RHS of the R1 assignment.
+       ; let entry = entryCode (closureInfoPtr (CmmReg nodeReg))
              the_call = toCall entry (Just lret) updfr_off off outArgs
        ; emit $
            copyout <*>
-           mkCbranch (cmmIsTagged fun) lret lcall <*>
+           mkCbranch (cmmIsTagged (CmmReg nodeReg)) lret lcall <*>
            outOfLine lcall the_call <*>
            mkLabel lret <*>
            copyin

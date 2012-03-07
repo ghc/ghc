@@ -10,7 +10,7 @@ module StgCmmHeap (
         getVirtHp, setVirtHp, setRealHp,
         getHpRelOffset, hpRel,
 
-        entryHeapCheck, altHeapCheck,
+        entryHeapCheck, altHeapCheck, altHeapCheckReturnsTo,
 
         mkVirtHeapOffsets, mkVirtConstrOffsets,
         mkStaticClosureFields, mkStaticClosure,
@@ -20,7 +20,6 @@ module StgCmmHeap (
 
 #include "HsVersions.h"
 
-import CmmType
 import StgSyn
 import CLabel
 import StgCmmLayout
@@ -34,6 +33,7 @@ import StgCmmEnv
 
 import MkGraph
 
+import Hoopl hiding ((<*>), mkBranch)
 import SMRep
 import Cmm
 import CmmUtils
@@ -342,11 +342,12 @@ entryHeapCheck cl_info offset nodeSet arity args code
 
            args' = map (CmmReg . CmmLocal) args
            setN = case nodeSet of
-                          Just n  -> mkAssign nodeReg (CmmReg $ CmmLocal n)
+                          Just n  -> mkNop -- No need to assign R1, it already
+                                           -- points to the closure
                           Nothing -> mkAssign nodeReg $
                               CmmLit (CmmLabel $ staticClosureLabel platform cl_info)
 
-           {- Thunks:          Set R1 = node, jump GCEnter1
+           {- Thunks:          jump GCEnter1
               Function (fast): Set R1 = node, jump GCFun
               Function (slow): Set R1 = node, call generic_gc -}
            gc_call upd = setN <*> gc_lbl upd
@@ -361,7 +362,10 @@ entryHeapCheck cl_info offset nodeSet arity args code
             - GC calls, but until then this fishy code works -}
 
        updfr_sz <- getUpdFrameOff
-       heapCheck True (gc_call updfr_sz) code
+
+       loop_id <- newLabelC
+       emitLabel loop_id
+       heapCheck True (gc_call updfr_sz <*> mkBranch loop_id) code
 
 {-
     -- This code is slightly outdated now and we could easily keep the above
@@ -407,17 +411,24 @@ entryHeapCheck cl_info offset nodeSet arity args code
 -}
 
 
---------------------------------------------------------------
--- A heap/stack check at in a case alternative
+-- ------------------------------------------------------------
+-- A heap/stack check in a case alternative
 
 altHeapCheck :: [LocalReg] -> FCode a -> FCode a
 altHeapCheck regs code
+  = do loop_id <- newLabelC
+       emitLabel loop_id
+       altHeapCheckReturnsTo regs loop_id code
+
+altHeapCheckReturnsTo :: [LocalReg] -> Label -> FCode a -> FCode a
+altHeapCheckReturnsTo regs retry_lbl code
   = do updfr_sz <- getUpdFrameOff
        gc_call_code <- gc_call updfr_sz
-       heapCheck False gc_call_code code
+       heapCheck False (gc_call_code <*> mkBranch retry_lbl) code
 
   where
     reg_exprs = map (CmmReg . CmmLocal) regs
+      -- Note [stg_gc arguments]
 
     gc_call sp =
         case rts_label regs of
@@ -439,6 +450,23 @@ altHeapCheck regs code
             width = typeWidth ty
 
     rts_label _ = Nothing
+
+-- Note [stg_gc arguments]
+-- It might seem that we could avoid passing the arguments to the
+-- stg_gc function, because they are already in the right registers.
+-- While this is usually the case, it isn't always.  Sometimes the
+-- code generator has cleverly avoided the eval in a case, e.g. in
+-- ffi/should_run/4221.hs we found
+--
+--   case a_r1mb of z
+--     FunPtr x y -> ...
+--
+-- where a_r1mb is bound a top-level constructor, and is known to be
+-- evaluated.  The codegen just assigns x, y and z, and continues;
+-- R1 is never assigned.
+--
+-- So we'll have to rely on optimisations to eliminatethese
+-- assignments where possible.
 
 
 -- | The generic GC procedure; no params, no results
@@ -466,9 +494,7 @@ do_checks :: Bool       -- Should we check the stack?
           -> CmmAGraph  -- What to do on failure
           -> FCode ()
 do_checks checkStack alloc do_gc = do
-  loop_id <- newLabelC
   gc_id <- newLabelC
-  emitLabel loop_id
   hp_check <- if alloc == 0
                  then return mkNop
                  else do
@@ -483,8 +509,8 @@ do_checks checkStack alloc do_gc = do
 
   emitOutOfLine gc_id $
      mkComment (mkFastString "outOfLine here") <*>
-     do_gc <*>
-     mkBranch loop_id
+     do_gc -- this is expected to jump back somewhere
+
                 -- Test for stack pointer exhaustion, then
                 -- bump heap pointer, and test for heap exhaustion
                 -- Note that we don't move the heap pointer unless the
