@@ -32,6 +32,8 @@ import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
+import Data.List (nub)
+import Control.Monad (liftM)
 
 #include "HsVersions.h"
 
@@ -165,26 +167,30 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
     
        pprTrace "layout" (ppr entry_lbl <+> ppr stack0) $ return ()
     
-       -- Update the stack map to include the effects of assignments
-       -- in this block
+       -- (a) Update the stack map to include the effects of
+       --     assignments in this block
        let stack1 = foldBlockNodesF (procMiddle acc_stackmaps) middle0 stack0
     
-       -- Insert assignments to reload all the live variables if this
-       -- is a proc point
+       -- (b) Insert assignments to reload all the live variables if this
+       --     block is a proc point
        let middle1 = if entry_lbl `setMember` procpoints
                         then foldr blockCons middle0 (insertReloads stack0)
                         else middle0
     
-       -- Look at the last node and if we are making a call or jumping to
-       -- a proc point, we must save the live variables, adjust Sp, and
-       -- construct the StackMaps for each of the successor blocks.
-       -- See handleLastNode for details.
+       -- (c) Look at the last node and if we are making a call or
+       --     jumping to a proc point, we must save the live
+       --     variables, adjust Sp, and construct the StackMaps for
+       --     each of the successor blocks.  See handleLastNode for
+       --     details.
        (middle2, sp_off, last1, fixup_blocks, out)
            <- handleLastNode procpoints liveness cont_info
-                             acc_stackmaps stack1 last0
+                             acc_stackmaps stack1 middle0 last0
     
        pprTrace "layout(out)" (ppr out) $ return ()
 
+       -- (d) Manifest Sp: run over the nodes in the block and replace
+       --     CmmStackSlot with CmmLoad from Sp with a concrete offset.
+       --
        -- our block:
        --    middle1          -- the original middle nodes
        --    middle2          -- live variable saves from handleLastNode
@@ -211,6 +217,278 @@ layout procpoints liveness entry entry_args final_stackmaps final_hwm blocks
 
 
 -- -----------------------------------------------------------------------------
+
+-- This doesn't seem right somehow.  We need to find out whether this
+-- proc will push some update frame material at some point, so that we
+-- can avoid using that area of the stack for spilling.  The
+-- updfr_space field of the CmmProc *should* tell us, but it doesn't
+-- (I think maybe it gets filled in later when we do proc-point
+-- splitting).
+--
+-- So we'll just take the max of all the cml_ret_offs.  This could be
+-- unnecessarily pessimistic, but probably not in the code we
+-- generate.
+
+collectContInfo :: [CmmBlock] -> (ByteOff, BlockEnv ByteOff)
+collectContInfo blocks
+  = (maximum ret_offs, mapFromList (catMaybes mb_argss))
+ where
+  (mb_argss, ret_offs) = mapAndUnzip get_cont blocks
+
+  get_cont b =
+     case lastNode b of
+        CmmCall { cml_cont = Just l, .. }
+           -> (Just (l, cml_ret_args), cml_ret_off)
+        CmmForeignCall { .. }
+           -> (Just (succ, 0), updfr) -- ??
+        _other -> (Nothing, 0)
+
+
+-- -----------------------------------------------------------------------------
+-- Updating the StackMap from middle nodes
+
+-- Look for loads from stack slots, and update the StackMap.  This is
+-- purelyu for optimisation reasons, so that we can avoid saving a
+-- variable back to a different stack slot if it is already on the
+-- stack.
+--
+-- This happens a lot: for example when function arguments are passed
+-- on the stack and need to be immediately saved across a call, we
+-- want to just leave them where they are on the stack.
+--
+procMiddle :: BlockEnv StackMap -> CmmNode e x -> StackMap -> StackMap
+procMiddle stackmaps node sm
+  = case node of
+     CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _)
+       -> sm { sm_regs = addToUFM (sm_regs sm) r (r,loc) }
+        where loc = getStackLoc area off stackmaps
+     CmmAssign (CmmLocal r) _other
+       -> sm { sm_regs = delFromUFM (sm_regs sm) r }
+     _other
+       -> sm
+
+getStackLoc :: Area -> ByteOff -> BlockEnv StackMap -> StackLoc
+getStackLoc Old       n _         = n
+getStackLoc (Young l) n stackmaps =
+  case mapLookup l stackmaps of
+    Nothing -> pprPanic "getStackLoc" (ppr l)
+    Just sm -> sm_sp sm - sm_args sm + n
+
+
+-- -----------------------------------------------------------------------------
+-- Handling stack allocation for a last node
+
+-- We take a single last node and turn it into:
+--
+--    C1 (some statements)
+--    Sp = Sp + N
+--    C2 (some more statements)
+--    call f()          -- the actual last node
+--
+-- plus possibly some more blocks (we may have to add some fixup code
+-- between the last node and the continuation).
+--
+-- C1: is the code for saving the variables across this last node onto
+-- the stack, if the continuation is a call or jumps to a proc point.
+--
+-- C2: if the last node is a safe foreign call, we have to inject some
+-- extra code that goes *after* the Sp adjustment.
+
+handleLastNode
+   :: ProcPointSet -> BlockEnv CmmLive -> BlockEnv ByteOff
+   -> BlockEnv StackMap -> StackMap
+   -> Block CmmNode O O
+   -> CmmNode O C
+   -> UniqSM
+      ( [CmmNode O O]      -- nodes to go *before* the Sp adjustment
+      , ByteOff            -- amount to adjust Sp
+      , CmmNode O C        -- new last node
+      , [CmmBlock]         -- new blocks
+      , BlockEnv StackMap  -- stackmaps for the continuations
+      )
+
+handleLastNode procpoints liveness cont_info stackmaps
+               stack0@StackMap { sm_sp = sp0 } middle last
+ = case last of
+    --  At each return / tail call,
+    --  adjust Sp to point to the last argument pushed, which
+    --  is cml_args, after popping any other junk from the stack.
+    CmmCall{ cml_cont = Nothing, .. } -> do
+      let sp_off = sp0 - cml_args
+      return ([], sp_off, last, [], mapEmpty)
+
+    --  At each CmmCall with a continuation:
+    CmmCall{ cml_cont = Just cont_lbl, .. } ->
+       return $ lastCall cont_lbl cml_args cml_ret_args cml_ret_off
+
+    CmmForeignCall{ succ = cont_lbl, .. } -> do
+       return $ lastCall cont_lbl wORD_SIZE wORD_SIZE (sm_ret_off stack0)
+            -- one word each for args and results: the return address
+
+    CmmBranch{..}     ->  handleProcPoints
+    CmmCondBranch{..} ->  handleProcPoints
+    CmmSwitch{..}     ->  handleProcPoints
+
+  where
+     -- Calls and ForeignCalls are handled the same way:
+     lastCall :: BlockId -> ByteOff -> ByteOff -> ByteOff
+              -> ( [CmmNode O O]
+                 , ByteOff
+                 , CmmNode O C
+                 , [CmmBlock]
+                 , BlockEnv StackMap
+                 )
+     lastCall lbl cml_args cml_ret_args cml_ret_off
+      =  ( assignments
+         , spOffsetForCall sp0 cont_stack cml_args
+         , last
+         , [] -- no new blocks
+         , cont_stacks )
+      where
+         (assignments, cont_stack, cont_stacks)
+           | Just cont_stack <- mapLookup lbl stackmaps
+                 -- If we have already seen this continuation before, then
+                 -- we just have to make the stack look the same:
+           = (fixupStack stack0 cont_stack, cont_stack, mapEmpty)
+                 -- Otherwise, we have to allocate the stack frame
+           | otherwise
+           = (save_assignments, new_cont_stack, mapSingleton lbl new_cont_stack)
+           where
+            (new_cont_stack, save_assignments)
+               = setupStackFrame lbl liveness cml_ret_off cml_ret_args stack0
+
+     -- For other last nodes (branches), if any of the targets is a
+     -- proc point, we have to set up the stack to match what the proc
+     -- point is expecting.
+     --
+     handleProcPoints :: UniqSM ( [CmmNode O O]
+                                , ByteOff
+                                , CmmNode O C
+                                , [CmmBlock]
+                                , BlockEnv StackMap )
+
+     handleProcPoints
+       | let future_continuation = foldBlockNodesB f middle Nothing
+                where f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _))) _
+                         = Just l
+                      f _ r = r
+       , Just l <- future_continuation
+       , (nub $ filter (`setMember` procpoints) $ successors last) == [l]
+       , pprTrace "special" (ppr l) False
+       = undefined
+--       do
+--         (assigs, sp_off, _, _, out) <-
+--              lastCall l [] args ret_args ret_off
+
+        | otherwise = do
+          pps <- mapM handleProcPoint (successors last)
+          let lbl_map :: LabelMap Label
+              lbl_map = mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
+              fix_lbl l = mapLookup l lbl_map `orElse` l
+          return ( []
+                 , 0
+                 , mapSuccessors fix_lbl last
+                 , concat [ blk | (_,_,_,blk) <- pps ]
+                 , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
+
+     -- For each proc point that is a successor of this block
+     --   (a) if the proc point already has a stackmap, we need to
+     --       shuffle the current stack to make it look the same.
+     --       We have to insert a new block to make this happen.
+     --   (b) otherwise, call "allocate live stack0" to make the
+     --       stack map for the proc point
+     handleProcPoint :: BlockId
+                     -> UniqSM (BlockId, BlockId, StackMap, [CmmBlock])
+     handleProcPoint l
+        | not (l `setMember` procpoints) = return (l, l, stack0, [])
+        | otherwise = do
+           tmp_lbl <- liftM mkBlockId $ getUniqueM
+           let
+               (stack2, assigs) =
+                  case mapLookup l stackmaps of
+                    Just pp_sm -> (pp_sm, fixupStack stack0 pp_sm)
+                    Nothing    ->
+                      pprTrace "first visit to proc point"
+                                   (ppr l <+> ppr stack1) $
+                      (stack1, assigs)
+                      where
+                       cont_args = mapFindWithDefault 0 l cont_info
+                       (stack1, assigs) =
+                           setupStackFrame l liveness (sm_ret_off stack0)
+                                                       cont_args stack0
+
+               sp_off = sp0 - sm_sp stack2
+
+               block = blockJoin (CmmEntry tmp_lbl)
+                                 (maybeAddSpAdj sp_off (blockFromList assigs))
+                                 (CmmBranch l)
+           --
+           return (l, tmp_lbl, stack2, [block])
+
+
+  
+-- Sp is currently pointing to current_sp,
+-- we want it to point to
+--    (sm_sp cont_stack - sm_args cont_stack + args)
+-- so the difference is
+--    sp0 - (sm_sp cont_stack - sm_args cont_stack + args)
+spOffsetForCall :: ByteOff -> StackMap -> ByteOff -> ByteOff
+spOffsetForCall current_sp cont_stack args
+  = current_sp - (sm_sp cont_stack - sm_args cont_stack + args)
+
+
+-- | create a sequence of assignments to establish the new StackMap,
+-- given the old StackMap.
+fixupStack :: StackMap -> StackMap -> [CmmNode O O]
+fixupStack old_stack new_stack = concatMap move new_locs
+ where
+     old_map :: Map LocalReg ByteOff
+     old_map  = Map.fromList (stackSlotRegs old_stack)
+     new_locs = stackSlotRegs new_stack
+
+     move (r,n)
+       | Just m <- Map.lookup r old_map, n == m = []
+       | otherwise = [CmmStore (CmmStackSlot Old n)
+                               (CmmReg (CmmLocal r))]
+
+
+
+setupStackFrame
+             :: BlockId                 -- label of continuation
+             -> BlockEnv CmmLive        -- liveness
+             -> ByteOff      -- updfr
+             -> ByteOff      -- bytes of return values on stack
+             -> StackMap     -- current StackMap
+             -> (StackMap, [CmmNode O O])
+
+setupStackFrame lbl liveness updfr_off ret_args stack0
+  = (cont_stack, assigs)
+  where
+      -- get the set of LocalRegs live in the continuation
+      live = mapFindWithDefault Set.empty lbl liveness
+
+      -- the stack from the base to updfr_off is off-limits.
+      -- our new stack frame contains:
+      --   * saved live variables
+      --   * the return address [young(C) + 8]
+      --   * the args for the call,
+      --     which are replaced by the return values at the return
+      --     point.
+
+      -- everything up to updfr_off is off-limits
+      -- stack1 contains updfr_off, plus everything we need to save
+      (stack1, assigs) = allocate updfr_off live stack0
+
+      -- And the Sp at the continuation is:
+      --   sm_sp stack1 + ret_args
+      cont_stack = stack1{ sm_sp = sm_sp stack1 + ret_args
+                         , sm_args = ret_args
+                         , sm_ret_off = updfr_off
+                         }
+
+
+-- -----------------------------------------------------------------------------
+-- Manifesting Sp
 
 -- | Manifest Sp: turn all the CmmStackSlots into CmmLoads from Sp.  The
 -- block looks like this:
@@ -259,64 +537,12 @@ manifestSp stackmaps stack0 sp0 sp_high
     fixup_blocks' = map (blockMapNodes3 (id, adj_post_sp, id)) fixup_blocks
 
 
--- -----------------------------------------------------------------------------
-
--- | Eliminate stores of the form
---
---    Sp[area+n] = r
---
--- when we know that r is already in the same slot as Sp[area+n].  We
--- could do this in a later optimisation pass, but that would involve
--- a separate analysis and we already have the information to hand
--- here.  It helps clean up some extra stack stores in common cases.
---
--- Note that we may have to modify the StackMap as we walk through the
--- code using procMiddle, since an assignment to a variable in the
--- StackMap will invalidate its mapping there.
---
-elimStackStores :: StackMap
-                -> BlockEnv StackMap
-                -> (Area -> ByteOff)
-                -> [CmmNode O O]
-                -> [CmmNode O O]
-elimStackStores stackmap stackmaps area_off nodes
-  = go stackmap nodes
-  where
-    go _stackmap [] = []
-    go stackmap (n:ns)
-     = case n of
-         CmmStore (CmmStackSlot area m) (CmmReg (CmmLocal r))
-            | Just (_,off) <- lookupUFM (sm_regs stackmap) r
-            , area_off area + m == off
-            -> pprTrace "eliminated a node!" (ppr r) $ go stackmap ns
-         _otherwise
-            -> n : go (procMiddle stackmaps n stackmap) ns
-
-
--- This doesn't seem right somehow.  We need to find out whether this
--- proc will push some update frame material at some point, so that we
--- can avoid using that area of the stack for spilling.  The
--- updfr_space field of the CmmProc *should* tell us, but it doesn't
--- (I think maybe it gets filled in later when we do proc-point
--- splitting).
---
--- So we'll just take the max of all the cml_ret_offs.  This could be
--- unnecessarily pessimistic, but probably not in the code we
--- generate.
-
-collectContInfo :: [CmmBlock] -> (ByteOff, BlockEnv ByteOff)
-collectContInfo blocks
-  = (maximum ret_offs, mapFromList (catMaybes mb_argss))
- where
-  (mb_argss, ret_offs) = mapAndUnzip get_cont blocks
-
-  get_cont b =
-     case lastNode b of
-        CmmCall { cml_cont = Just l, .. }
-           -> (Just (l, cml_ret_args), cml_ret_off)
-        CmmForeignCall { .. }
-           -> (Just (succ, 0), updfr) -- ??
-        _other -> (Nothing, 0)
+getAreaOff :: BlockEnv StackMap -> (Area -> StackLoc)
+getAreaOff _ Old = 0
+getAreaOff stackmaps (Young l) =
+  case mapLookup l stackmaps of
+    Just sm -> sm_sp sm - sm_args sm
+    Nothing -> pprPanic "getAreaOff" (ppr l)
 
 
 maybeAddSpAdj :: ByteOff -> Block CmmNode O O -> Block CmmNode O O
@@ -325,217 +551,7 @@ maybeAddSpAdj sp_off block
    = block `blockSnoc` CmmAssign spReg (cmmOffset (CmmReg spReg) sp_off)
 
 
-procMiddle :: BlockEnv StackMap -> CmmNode e x -> StackMap -> StackMap
-procMiddle stackmaps node sm
-  = case node of
-     CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _)
-       -> sm { sm_regs = addToUFM (sm_regs sm) r (r,loc) }
-        where loc = getStackLoc area off stackmaps
-     CmmAssign (CmmLocal r) _other
-       -> sm { sm_regs = delFromUFM (sm_regs sm) r }
-     _other
-       -> sm
-
-getStackLoc :: Area -> ByteOff -> BlockEnv StackMap -> StackLoc
-getStackLoc Old       n _         = n
-getStackLoc (Young l) n stackmaps =
-  case mapLookup l stackmaps of
-    Nothing -> pprPanic "getStackLoc" (ppr l)
-    Just sm -> sm_sp sm - sm_args sm + n
-
--- -----------------------------------------------------------------------------
--- Handling stack allocation for a last node
-
--- We take a single last node and turn it into:
---
---    C1 (some statements)
---    Sp = Sp + N
---    C2 (some more statements)
---    call f()          -- the actual last node
---
--- plus possibly some more blocks (we may have to add some fixup code
--- between the last node and the continuation).
---
--- C1: is the code for saving the variables across this last node onto
--- the stack, if the continuation is a call or jumps to a proc point.
---
--- C2: if the last node is a safe foreign call, we have to inject some
--- extra code that goes *after* the Sp adjustment.
-
-handleLastNode
-   :: ProcPointSet -> BlockEnv CmmLive -> BlockEnv ByteOff
-   -> BlockEnv StackMap -> StackMap
-   -> CmmNode O C
-   -> UniqSM
-      ( [CmmNode O O]      -- nodes to go *before* the Sp adjustment
-      , ByteOff            -- amount to adjust Sp
-      , CmmNode O C        -- new last node
-      , [CmmBlock]         -- new blocks
-      , BlockEnv StackMap  -- stackmaps for the continuations
-      )
-
-handleLastNode procpoints liveness cont_info stackmaps
-               stack0@StackMap { sm_sp = sp0 } last
- = case last of
-    --  At each return / tail call,
-    --  adjust Sp to point to the last argument pushed, which
-    --  is cml_args, after popping any other junk from the stack.
-    CmmCall{ cml_cont = Nothing, .. } -> do
-      let sp_off = sp0 - cml_args
-      return ([], sp_off, last, [], mapEmpty)
-
-    --  At each CmmCall with a continuation:
-    CmmCall{ cml_cont = Just cont_lbl, .. } ->
-       lastCall cont_lbl [] cml_args cml_ret_args cml_ret_off
-
-    CmmForeignCall{ succ = cont_lbl, .. } -> do
-       lastCall cont_lbl res wORD_SIZE wORD_SIZE (sm_ret_off stack0)
-            -- one word each for args and results: the return address
-
-    CmmBranch{..}     ->  handleProcPoints
-    CmmCondBranch{..} ->  handleProcPoints
-    CmmSwitch{..}     ->  handleProcPoints
-
-  where
-     lastCall :: BlockId -> [LocalReg] -> ByteOff -> ByteOff -> ByteOff
-              -> UniqSM
-                      ( [CmmNode O O]
-                      , ByteOff
-                      , CmmNode O C
-                      , [CmmBlock]
-                      , BlockEnv StackMap
-                      )
-
-     lastCall cont_lbl res_regs cml_args cml_ret_args cml_ret_off
-      -- If we have already seen this continuation before, then
-      -- we just have to make the stack look the same:
-      | Just cont_stack <- mapLookup cont_lbl stackmaps
-      =
-         return ( fixupStack stack0 cont_stack
-                , sp0 - sm_sp cont_stack
-                , last
-                , []
-                , stackmaps )
-
-      -- a continuation we haven't seen before:
-      -- allocate the stack frame for it.
-      | otherwise = do
-
-      -- get the set of LocalRegs live in the continuation
-      let target_live = mapFindWithDefault Set.empty cont_lbl
-                            liveness
-                           `Set.difference` Set.fromList res_regs
-
-      -- the stack from the base to cml_ret_off is off-limits.
-      -- our new stack frame contains:
-      --   * saved live variables
-      --   * the return address [young(C) + 8]
-      --   * the args for the call,
-      --     which are replaced by the return values at the return
-      --     point.
-
-      -- everything up to cml_ret_off is off-limits: mark it Occupied
-      -- stack2 contains cml_ret_off, plus everything we need to save
-          (stack2, assigs) = allocate cml_ret_off target_live stack0
-
-      -- Sp is currently pointing to sp0,
-      -- we want it to point to (sm_sp stack2 + cml_args)
-      -- so the difference is sp0 - (sm_sp stack2 + cml_args)
-          sp_off = sp0 - (sm_sp stack2 + cml_args)
-
-      -- And the Sp at the continuation is:
-      --   sm_sp stack2 + cml_ret_args
-          cont_stack = stack2{ sm_sp = sm_sp stack2 + cml_ret_args
-                             , sm_args = cml_ret_args
-                             , sm_ret_off = cml_ret_off
-                             }
-
-      -- emit the necessary assignments of LocalRegs to stack slots
-      -- emit an Sp adjustment, taking into account the call area
-      --
-      return ( assigs
-             , sp_off
-             , last
-             , [] -- no new blocks
-             , mapSingleton cont_lbl cont_stack )
-
-
-     handleProcPoints :: UniqSM ( [CmmNode O O]
-                                , ByteOff
-                                , CmmNode O C
-                                , [CmmBlock]
-                                , BlockEnv StackMap )
-
---     handleProcPoints
---       | Just l <- future_continuation
---       , nub $ filter (`setMember` procpoints) $ successors last == [l]
---       =
-
-     handleProcPoints = do
-          pps <- mapM handleProcPoint (successors last)
-          let lbl_map :: LabelMap Label
-              lbl_map = mapFromList [ (l,tmp) | (l,tmp,_,_) <- pps ]
-              fix_lbl l = mapLookup l lbl_map `orElse` l
-          return ( []
-                 , 0
-                 , mapSuccessors fix_lbl last
-                 , concat [ blk | (_,_,_,blk) <- pps ]
-                 , mapFromList [ (l, sm) | (l,_,sm,_) <- pps ] )
-
-     -- For each proc point that is a successor of this block
-     --   (a) if the proc point already has a stackmap, we need to
-     --       shuffle the current stack to make it look the same.
-     --       We have to insert a new block to make this happen.
-     --   (b) otherwise, call "allocate live stack0" to make the
-     --       stack map for the proc point
-     handleProcPoint :: BlockId
-                     -> UniqSM (BlockId, BlockId, StackMap, [CmmBlock])
-     handleProcPoint l
-        | not (l `setMember` procpoints) = return (l, l, stack0, [])
-        | otherwise = do
-           tmp <- getUniqueM
-           let tmp_lbl = mkBlockId tmp
-               (assigs, stack3) = case mapLookup l stackmaps of
-                  Just pp_sm -> (fixupStack stack0 pp_sm, pp_sm)
-                  Nothing    -> pprTrace "first visit to proc point" (ppr l <+> ppr live $$ ppr stack1) $ (assigs, stack2)
-                    where
-                     live = mapFindWithDefault Set.empty l liveness
-                     (stack1, assigs) = allocate (sm_ret_off stack0) live stack0
-                     cont_args = mapFindWithDefault 0 l cont_info
-                     stack2 = stack1 { sm_sp   = sm_sp stack1 + cont_args
-                                     , sm_args = cont_args
-                                     }
-
-               sp_off = sp0 - sm_sp stack3
-
-               block = blockJoin
-                          (CmmEntry tmp_lbl)
-                          (maybeAddSpAdj sp_off (blockFromList assigs))
-                          (CmmBranch l)
-           --
-           return (l, tmp_lbl, stack3, [block])
-
-
--- | create a sequence of assignments to establish the new StackMap,
--- given the old StackMap.
-fixupStack :: StackMap -> StackMap -> [CmmNode O O]
-fixupStack old_stack new_stack = concatMap move new_locs
- where
-     old_map :: Map LocalReg ByteOff
-     old_map  = Map.fromList (stackSlotRegs old_stack)
-     new_locs = stackSlotRegs new_stack
-
-     move (r,n)
-       | Just m <- Map.lookup r old_map, n == m = []
-       | otherwise = [CmmStore (CmmStackSlot Old n)
-                               (CmmReg (CmmLocal r))]
-
--- -----------------------------------------------------------------------------
--- Updating references to CallAreas
-
 {-
-After running layout, we need to update all the references to stack areas.
-
 Sp(L) is the Sp offset on entry to block L relative to the base of the
 OLD area.
 
@@ -563,6 +579,7 @@ areaToSp _ _ _ (CmmMachOp (MO_U_Lt _)  -- Note [null stack check]
                        CmmReg (CmmGlobal SpLim)]) = CmmLit (CmmInt 0 wordWidth)
 areaToSp _ _ _ other = other
 
+-- -----------------------------------------------------------------------------
 -- Note [null stack check]
 --
 -- If the high-water Sp is zero, then we end up with
@@ -580,13 +597,6 @@ optStackCheck n = -- Note [null stack check]
  case n of
    CmmCondBranch (CmmLit (CmmInt 0 _)) _true false -> CmmBranch false
    other -> other
-
-getAreaOff :: BlockEnv StackMap -> (Area -> StackLoc)
-getAreaOff _ Old = 0
-getAreaOff stackmaps (Young l) =
-  case mapLookup l stackmaps of
-    Just sm -> sm_sp sm - sm_args sm
-    Nothing -> pprPanic "getAreaOff" (ppr l)
 
 -- -----------------------------------------------------------------------------
 -- Saving live registers
@@ -684,6 +694,41 @@ allocate ret_off live stackmap@StackMap{ sm_sp = sp0
 
    ( stackmap { sm_regs = final_regs , sm_sp = trim_sp }
    , push_assigs ++ save_assigs )
+
+
+-- -----------------------------------------------------------------------------
+
+-- | Eliminate stores of the form
+--
+--    Sp[area+n] = r
+--
+-- when we know that r is already in the same slot as Sp[area+n].  We
+-- could do this in a later optimisation pass, but that would involve
+-- a separate analysis and we already have the information to hand
+-- here.  It helps clean up some extra stack stores in common cases.
+--
+-- Note that we may have to modify the StackMap as we walk through the
+-- code using procMiddle, since an assignment to a variable in the
+-- StackMap will invalidate its mapping there.
+--
+elimStackStores :: StackMap
+                -> BlockEnv StackMap
+                -> (Area -> ByteOff)
+                -> [CmmNode O O]
+                -> [CmmNode O O]
+elimStackStores stackmap stackmaps area_off nodes
+  = go stackmap nodes
+  where
+    go _stackmap [] = []
+    go stackmap (n:ns)
+     = case n of
+         CmmStore (CmmStackSlot area m) (CmmReg (CmmLocal r))
+            | Just (_,off) <- lookupUFM (sm_regs stackmap) r
+            , area_off area + m == off
+            -> pprTrace "eliminated a node!" (ppr r) $ go stackmap ns
+         _otherwise
+            -> n : go (procMiddle stackmaps n stackmap) ns
+
 
 -- -----------------------------------------------------------------------------
 -- Update info tables to include stack liveness
