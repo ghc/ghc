@@ -58,9 +58,9 @@ data GCStats = GCStats
     -- lists held by the capabilities.  Can be used with
     -- 'parMaxBytesCopied' to determine how well parallel GC utilized
     -- all cores.
-    , parAvgBytesCopied :: !Int64
+    , parTotBytesCopied :: !Int64
     -- | Sum of number of bytes copied each GC by the most active GC
-    -- thread each GC.  The ratio of 'parAvgBytesCopied' divided by
+    -- thread each GC.  The ratio of 'parTotBytesCopied' divided by
     -- 'parMaxBytesCopied' approaches 1 for a maximally sequential
     -- run and approaches the number of threads (set by the RTS flag
     -- @-N@) for a maximally parallel run.
@@ -98,7 +98,7 @@ getGCStats = allocaBytes (#size GCStats) $ \p -> do
     gcWallSeconds <- (# peek GCStats, gc_wall_seconds) p
     cpuSeconds <- (# peek GCStats, cpu_seconds) p
     wallSeconds <- (# peek GCStats, wall_seconds) p
-    parAvgBytesCopied <- (# peek GCStats, par_avg_bytes_copied) p
+    parTotBytesCopied <- (# peek GCStats, par_tot_bytes_copied) p
     parMaxBytesCopied <- (# peek GCStats, par_max_bytes_copied) p
     return GCStats { .. }
 
