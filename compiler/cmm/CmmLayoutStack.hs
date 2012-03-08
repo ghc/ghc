@@ -343,21 +343,24 @@ handleLastNode procpoints liveness cont_info stackmaps
          , spOffsetForCall sp0 cont_stack cml_args
          , last
          , [] -- no new blocks
-         , cont_stacks )
+         , mapSingleton lbl cont_stack )
       where
-         (assignments, cont_stack, cont_stacks)
-           | Just cont_stack <- mapLookup lbl stackmaps
-                 -- If we have already seen this continuation before, then
-                 -- we just have to make the stack look the same:
-           = (fixupStack stack0 cont_stack, cont_stack, mapEmpty)
-                 -- Otherwise, we have to allocate the stack frame
-           | otherwise
-           = (save_assignments, new_cont_stack, mapSingleton lbl new_cont_stack)
-           where
-            (new_cont_stack, save_assignments)
-               = setupStackFrame lbl liveness cml_ret_off cml_ret_args stack0
+         (assignments, cont_stack) = prepareStack lbl cml_ret_args cml_ret_off
 
-     -- For other last nodes (branches), if any of the targets is a
+
+     prepareStack lbl cml_ret_args cml_ret_off
+       | Just cont_stack <- mapLookup lbl stackmaps
+             -- If we have already seen this continuation before, then
+             -- we just have to make the stack look the same:
+       = (fixupStack stack0 cont_stack, cont_stack)
+             -- Otherwise, we have to allocate the stack frame
+       | otherwise
+       = (save_assignments, new_cont_stack)
+       where
+        (new_cont_stack, save_assignments)
+           = setupStackFrame lbl liveness cml_ret_off cml_ret_args stack0
+
+
      -- proc point, we have to set up the stack to match what the proc
      -- point is expecting.
      --
@@ -368,17 +371,19 @@ handleLastNode procpoints liveness cont_info stackmaps
                                 , BlockEnv StackMap )
 
      handleProcPoints
-       | let future_continuation = foldBlockNodesB f middle Nothing
-                where f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _))) _
-                         = Just l
-                      f _ r = r
-       , Just l <- future_continuation
+         -- Note [diamond proc point]
+       | Just l <- futureContinuation middle
        , (nub $ filter (`setMember` procpoints) $ successors last) == [l]
-       , pprTrace "special" (ppr l) False
-       = undefined
---       do
---         (assigs, sp_off, _, _, out) <-
---              lastCall l [] args ret_args ret_off
+       = do
+         let cont_args = mapFindWithDefault 0 l cont_info
+             (assigs, cont_stack) = prepareStack l cont_args (sm_ret_off stack0)
+             out = mapFromList [ (l', cont_stack)
+                               | l' <- successors last ]
+         return ( assigs
+                , spOffsetForCall sp0 cont_stack wORD_SIZE
+                , last
+                , []
+                , out)
 
         | otherwise = do
           pps <- mapM handleProcPoint (successors last)
@@ -485,6 +490,159 @@ setupStackFrame lbl liveness updfr_off ret_args stack0
                          , sm_args = ret_args
                          , sm_ret_off = updfr_off
                          }
+
+
+-- -----------------------------------------------------------------------------
+-- Note [diamond proc point]
+--
+-- This special case looks for the pattern we get from a typical
+-- tagged case expression:
+--
+--   Sp[young(L1)] = L1
+--   if (R1 & 7) != 0 goto L1 else goto L2
+--  L2:
+--   call [R1] returns to L1
+--  L1: live: {y}
+--   x = R1
+--
+--
+-- If we let the generic case handle this, we get
+--
+--   Sp[-16] = L1
+--   if (R1 & 7) != 0 goto L1a else goto L2
+--  L2:
+--   Sp[-8] = y
+--   Sp = Sp - 16
+--   call [R1] returns to L1
+--  L1a:
+--   Sp[-8] = y
+--   Sp = Sp - 16
+--   goto L1
+--  L1:
+--   x = R1
+--
+-- The code for saving the live vars is duplicated in each branch, and
+-- furthermore there is an extra jump (assuming L1 is a proc point,
+-- which it probably is if there is a heap check).
+--
+-- So to fix this we look for
+--   (1) a block containing an assignment of a return address L
+--   (2) ending in a branch where one (and only) continuation goes to L,
+--       and no other continuations go to proc points.
+--
+-- If this happens, then we allocate the stack frame for L in the
+-- current block.
+--
+-- We know that it is safe to allocate the stack frame and save the
+-- live variables after the assignment of the return address, because
+-- stack areas are defined as overlapping, so there can be no reads
+-- from other stack areas after the return address assignment.
+--
+-- We could generalise (2), but that would make it a bit more
+-- complicated to handle, and this currently catches the common case.
+
+futureContinuation :: Block CmmNode O O -> Maybe BlockId
+futureContinuation middle = foldBlockNodesB f middle Nothing
+   where f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _))) _
+               = Just l
+         f _ r = r
+
+-- -----------------------------------------------------------------------------
+-- Saving live registers
+
+-- | Given a set of live registers and a StackMap, save all the registers
+-- on the stack and return the new StackMap and the assignments to do
+-- the saving.
+--
+allocate :: ByteOff -> RegSet -> StackMap -> (StackMap, [CmmNode O O])
+allocate ret_off live stackmap@StackMap{ sm_sp = sp0
+                                       , sm_regs = regs0 }
+ =
+  pprTrace "allocate" (ppr live $$ ppr stackmap) $
+
+   -- we only have to save regs that are not already in a slot
+   let to_save = filter (not . (`elemUFM` regs0)) (Set.elems live)
+       regs1   = filterUFM (\(r,_) -> elemRegSet r live) regs0
+   in
+
+   -- make a map of the stack
+   let stack = reverse $ Array.elems $
+               accumArray (\_ x -> x) Empty (1, toWords (max sp0 ret_off)) $
+                 ret_words ++ live_words
+            where ret_words =
+                   [ (x, Occupied)
+                   | x <- [ 1 .. toWords ret_off] ]
+                  live_words =
+                   [ (toWords x, Occupied)
+                   | (r,off) <- eltsUFM regs1,
+                     let w = localRegBytes r,
+                     x <- [ off, off-wORD_SIZE .. off - w + 1] ]
+   in
+
+   -- Pass over the stack: find slots to save all the new live variables,
+   -- choosing the oldest slots first (hence a foldr).
+   let
+       save slot ([], stack, n, assigs, regs) -- no more regs to save
+          = ([], slot:stack, n `plusW` 1, assigs, regs)
+       save slot (to_save, stack, n, assigs, regs)
+          = case slot of
+               Occupied ->  (to_save, Occupied:stack, n `plusW` 1, assigs, regs)
+               Empty
+                 | Just (stack', r, to_save') <-
+                       select_save to_save (slot:stack)
+                 -> let assig = CmmStore (CmmStackSlot Old n')
+                                         (CmmReg (CmmLocal r))
+                        n' = n `plusW` 1
+                   in
+                        (to_save', stack', n', assig : assigs, (r,(r,n')):regs)
+
+                 | otherwise
+                 -> (to_save, slot:stack, n `plusW` 1, assigs, regs)
+
+       -- we should do better here: right now we'll fit the smallest first,
+       -- but it would make more sense to fit the biggest first.
+       select_save :: [LocalReg] -> [StackSlot]
+                   -> Maybe ([StackSlot], LocalReg, [LocalReg])
+       select_save regs stack = go regs []
+         where go []     _no_fit = Nothing
+               go (r:rs) no_fit
+                 | Just rest <- dropEmpty words stack
+                 = Just (replicate words Occupied ++ rest, r, rs++no_fit)
+                 | otherwise
+                 = go rs (r:no_fit)
+                 where words = localRegWords r
+
+       -- fill in empty slots as much as possible
+       (still_to_save, save_stack, n, save_assigs, save_regs)
+          = foldr save (to_save, [], 0, [], []) stack
+
+       -- push any remaining live vars on the stack
+       (push_sp, push_assigs, push_regs)
+          = foldr push (n, [], []) still_to_save
+          where
+              push r (n, assigs, regs)
+                = (n', assig : assigs, (r,(r,n')) : regs)
+                where
+                  n' = n + localRegBytes r
+                  assig = CmmStore (CmmStackSlot Old n')
+                                   (CmmReg (CmmLocal r))
+
+       trim_sp
+          | not (null push_regs) = push_sp
+          | otherwise
+          = n `plusW` (- length (takeWhile isEmpty save_stack))
+
+       final_regs = regs1 `addListToUFM` push_regs
+                          `addListToUFM` save_regs
+
+   in
+  -- XXX should be an assert
+   if ( n /= max sp0 ret_off ) then pprPanic "allocate" (ppr n <+> ppr sp0 <+> ppr ret_off) else
+
+   if (trim_sp .&. (wORD_SIZE - 1)) /= 0  then pprPanic "allocate2" (ppr trim_sp <+> ppr final_regs <+> ppr push_sp) else
+
+   ( stackmap { sm_regs = final_regs , sm_sp = trim_sp }
+   , push_assigs ++ save_assigs )
 
 
 -- -----------------------------------------------------------------------------
@@ -597,103 +755,6 @@ optStackCheck n = -- Note [null stack check]
  case n of
    CmmCondBranch (CmmLit (CmmInt 0 _)) _true false -> CmmBranch false
    other -> other
-
--- -----------------------------------------------------------------------------
--- Saving live registers
-
--- | Given a set of live registers and a StackMap, save all the registers
--- on the stack and return the new StackMap and the assignments to do
--- the saving.
---
-allocate :: ByteOff -> RegSet -> StackMap -> (StackMap, [CmmNode O O])
-allocate ret_off live stackmap@StackMap{ sm_sp = sp0
-                                       , sm_regs = regs0 }
- =
-  pprTrace "allocate" (ppr live $$ ppr stackmap) $
-
-   -- we only have to save regs that are not already in a slot
-   let to_save = filter (not . (`elemUFM` regs0)) (Set.elems live)
-       regs1   = filterUFM (\(r,_) -> elemRegSet r live) regs0
-   in
-
-   -- make a map of the stack
-   let stack = reverse $ Array.elems $
-               accumArray (\_ x -> x) Empty (1, toWords (max sp0 ret_off)) $
-                 ret_words ++ live_words
-            where ret_words =
-                   [ (x, Occupied)
-                   | x <- [ 1 .. toWords ret_off] ]
-                  live_words =
-                   [ (toWords x, Occupied)
-                   | (r,off) <- eltsUFM regs1,
-                     let w = localRegBytes r,
-                     x <- [ off, off-wORD_SIZE .. off - w + 1] ]
-   in
-
-   -- Pass over the stack: find slots to save all the new live variables,
-   -- choosing the oldest slots first (hence a foldr).
-   let
-       save slot ([], stack, n, assigs, regs) -- no more regs to save
-          = ([], slot:stack, n `plusW` 1, assigs, regs)
-       save slot (to_save, stack, n, assigs, regs)
-          = case slot of
-               Occupied ->  (to_save, Occupied:stack, n `plusW` 1, assigs, regs)
-               Empty
-                 | Just (stack', r, to_save') <-
-                       select_save to_save (slot:stack)
-                 -> let assig = CmmStore (CmmStackSlot Old n')
-                                         (CmmReg (CmmLocal r))
-                        n' = n `plusW` 1
-                   in
-                        (to_save', stack', n', assig : assigs, (r,(r,n')):regs)
-
-                 | otherwise
-                 -> (to_save, slot:stack, n `plusW` 1, assigs, regs)
-
-       -- we should do better here: right now we'll fit the smallest first,
-       -- but it would make more sense to fit the biggest first.
-       select_save :: [LocalReg] -> [StackSlot]
-                   -> Maybe ([StackSlot], LocalReg, [LocalReg])
-       select_save regs stack = go regs []
-         where go []     _no_fit = Nothing
-               go (r:rs) no_fit
-                 | Just rest <- dropEmpty words stack
-                 = Just (replicate words Occupied ++ rest, r, rs++no_fit)
-                 | otherwise
-                 = go rs (r:no_fit)
-                 where words = localRegWords r
-
-       -- fill in empty slots as much as possible
-       (still_to_save, save_stack, n, save_assigs, save_regs)
-          = foldr save (to_save, [], 0, [], []) stack
-
-       -- push any remaining live vars on the stack
-       (push_sp, push_assigs, push_regs)
-          = foldr push (n, [], []) still_to_save
-          where
-              push r (n, assigs, regs)
-                = (n', assig : assigs, (r,(r,n')) : regs)
-                where
-                  n' = n + localRegBytes r
-                  assig = CmmStore (CmmStackSlot Old n')
-                                   (CmmReg (CmmLocal r))
-
-       trim_sp
-          | not (null push_regs) = push_sp
-          | otherwise
-          = n `plusW` (- length (takeWhile isEmpty save_stack))
-
-       final_regs = regs1 `addListToUFM` push_regs
-                          `addListToUFM` save_regs
-
-   in
-  -- XXX should be an assert
-   if ( n /= max sp0 ret_off ) then pprPanic "allocate" (ppr n <+> ppr sp0 <+> ppr ret_off) else
-
-   if (trim_sp .&. (wORD_SIZE - 1)) /= 0  then pprPanic "allocate2" (ppr trim_sp <+> ppr final_regs <+> ppr push_sp) else
-
-   ( stackmap { sm_regs = final_regs , sm_sp = trim_sp }
-   , push_assigs ++ save_assigs )
 
 
 -- -----------------------------------------------------------------------------
