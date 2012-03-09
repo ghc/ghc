@@ -91,7 +91,7 @@
 
 /*
  * The C backend likes to refer to labels by just mentioning their
- * names.  Howevver, when a symbol is declared as a variable in C, the
+ * names.  However, when a symbol is declared as a variable in C, the
  * C compiler will implicitly dereference it when it occurs in source.
  * So we must subvert this behaviour for .hc files by declaring
  * variables as arrays, which eliminates the implicit dereference.
