@@ -350,6 +350,8 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_GC_WORK(cap)
 #define dtraceGcDone(cap)                               \
     HASKELLEVENT_GC_DONE(cap)
+#define dtraceGcGlobalSync(cap)                         \
+    HASKELLEVENT_GC_GLOBAL_SYNC(cap)
 #define dtraceEventGcStats(heap_capset, gens,           \
                            copies, slop, fragmentation, \
                            par_n_threads,               \
@@ -419,6 +421,7 @@ INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceGcIdle(cap)                               /* nothing */
 #define dtraceGcWork(cap)                               /* nothing */
 #define dtraceGcDone(cap)                               /* nothing */
+#define dtraceGcGlobalSync(cap)                         /* nothing */
 #define dtraceEventGcStats(heap_capset, gens,           \
                            copies, slop, fragmentation, \
                            par_n_threads,               \
@@ -608,6 +611,12 @@ INLINE_HEADER void traceEventGcDone(Capability *cap STG_UNUSED)
 {
     traceGcEvent(cap, EVENT_GC_DONE);
     dtraceGcDone((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceEventGcGlobalSync(Capability *cap STG_UNUSED)
+{
+    traceGcEvent(cap, EVENT_GC_GLOBAL_SYNC);
+    dtraceGcGlobalSync((EventCapNo)cap->no);
 }
 
 INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,

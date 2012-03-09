@@ -349,6 +349,13 @@ stat_endGC (Capability *cap, gc_thread *gct,
     {
         Time cpu, elapsed, gc_cpu, gc_elapsed;
 
+        // Has to be emitted while all caps stopped for GC, but before GC_END.
+        // See trac.haskell.org/ThreadScope/wiki/RTSsummaryEvents
+        // for a detailed design rationale of the current setup
+        // of GC eventlog events.
+        traceEventGcGlobalSync(cap);
+	
+        // Emitted before GC_END on all caps, which simplifies tools code.
         traceEventGcStats(cap,
                           CAPSET_HEAP_DEFAULT,
                           gen,
@@ -360,7 +367,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
                           par_n_threads,
                           par_max_copied * sizeof(W_),
                           par_tot_copied * sizeof(W_));
-	
+
         getProcessTimes(&cpu, &elapsed);
 
         // Post EVENT_GC_END with the same timestamp as used for stats

@@ -282,6 +282,9 @@ static void traceGcEvent_stderr (Capability *cap, EventTypeNum tag)
       case EVENT_GC_DONE:         // (cap)
           debugBelch("cap %d: GC done\n", cap->no);
           break;
+      case EVENT_GC_GLOBAL_SYNC:  // (cap)
+          debugBelch("cap %d: all caps stopped for GC\n", cap->no);
+          break;
       default:
           barf("traceGcEvent: unknown event tag %d", tag);
           break;

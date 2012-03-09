@@ -71,6 +71,7 @@ char *EventDesc[] = {
   [EVENT_GC_END]              = "Finished GC",
   [EVENT_REQUEST_SEQ_GC]      = "Request sequential GC",
   [EVENT_REQUEST_PAR_GC]      = "Request parallel GC",
+  [EVENT_GC_GLOBAL_SYNC]      = "Synchronise stop-the-world GC",
   [EVENT_GC_STATS_GHC]        = "GC statistics",
   [EVENT_HEAP_INFO_GHC]       = "Heap static parameters",
   [EVENT_HEAP_ALLOCATED]      = "Total heap mem ever allocated",
@@ -341,6 +342,7 @@ initEventLogging(void)
         case EVENT_GC_IDLE:
         case EVENT_GC_WORK:
         case EVENT_GC_DONE:
+        case EVENT_GC_GLOBAL_SYNC:  // (cap)
         case EVENT_SPARK_CREATE:    // (cap)
         case EVENT_SPARK_DUD:       // (cap)
         case EVENT_SPARK_OVERFLOW:  // (cap)

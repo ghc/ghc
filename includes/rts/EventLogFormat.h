@@ -157,8 +157,9 @@
                                          copied_bytes, slop_bytes, frag_bytes,
                                          par_n_threads,
                                          par_max_copied, par_tot_copied) */
+#define EVENT_GC_GLOBAL_SYNC      54 /* ()                     */
 
-/* Range 54 - 59 is available for new GHC and common events */
+/* Range 55 - 59 is available for new GHC and common events */
 
 /* Range 60 - 80 is used by eden for parallel tracing
  * see http://www.mathematik.uni-marburg.de/~eden/
@@ -171,7 +172,7 @@
  * ranges higher than this are reserved but not currently emitted by ghc.
  * This must match the size of the EventDesc[] array in EventLog.c
  */
-#define NUM_GHC_EVENT_TAGS        54
+#define NUM_GHC_EVENT_TAGS        55
 
 #if 0  /* DEPRECATED EVENTS: */
 /* we don't actually need to record the thread, it's implicit */
