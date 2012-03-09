@@ -16,12 +16,12 @@ import CmmLive
 import CmmBuildInfoTables
 import CmmCommonBlockElim
 import CmmProcPoint
-import CmmSpillReload
 import CmmRewriteAssignments
-import CmmStackLayout
 import CmmContFlowOpt
 import OptimizationFuel
 import CmmLayoutStack
+import Hoopl
+import CmmUtils
 
 import DynFlags
 import ErrUtils
@@ -95,9 +95,6 @@ cpsTop :: HscEnv -> CmmDecl -> IO ([(CLabel, CAFSet)], [(CAFSet, CmmDecl)])
 cpsTop _ p@(CmmData {}) = return ([], [(Set.empty, p)])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
-       -- Why bother doing these early: dualLivenessWithInsertion,
-       -- insertLateReloads, rewriteAssignments?
-
        ----------- Control-flow optimisations ---------------
        g <- {-# SCC "cmmCfgOpts(1)" #-} return $ cmmCfgOpts g
        dump Opt_D_dump_cmmz_cfg "Post control-flow optimsations" g
@@ -110,62 +107,32 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ----------- Proc points -------------------
        let callPPs = {-# SCC "callProcPoints" #-} callProcPoints g
-       procPoints <- {-# SCC "minimalProcPointSet" #-} run $ minimalProcPointSet (targetPlatform dflags) callPPs g
+       procPoints <- {-# SCC "minimalProcPointSet" #-} run $
+                     minimalProcPointSet (targetPlatform dflags) callPPs g
 
+       ----------- Layout the stack and manifest Sp ---------------
+       -- (also does: removeDeadAssignments, and lowerSafeForeignCalls)
        (g, stackmaps) <- {-# SCC "layoutStack" #-}
                          run $ cmmLayoutStack procPoints entry_off g
        dump Opt_D_dump_cmmz_sp "Layout Stack" g
 
---       g <- {-# SCC "addProcPointProtocols" #-} run $ addProcPointProtocols callPPs procPoints g
---       dump Opt_D_dump_cmmz_proc "Post Proc Points Added" g
---
---       ----------- Spills and reloads -------------------
---       g <- {-# SCC "dualLivenessWithInsertion" #-} run $ dualLivenessWithInsertion procPoints g
---       dump Opt_D_dump_cmmz_spills "Post spills and reloads" g
---
 --       ----------- Sink and inline assignments -------------------
---       g <- {-# SCC "rewriteAssignments" #-} runOptimization $ rewriteAssignments platform g
+--       g <- {-# SCC "rewriteAssignments" #-} runOptimization $
+--            rewriteAssignments platform g
 --       dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
---
-
-       ----------- Eliminate dead assignments -------------------
-       g <- {-# SCC "removeDeadAssignments" #-} runOptimization $ removeDeadAssignments g
-       dump Opt_D_dump_cmmz_dead "Post remove dead assignments" g
-
---       ----------- Zero dead stack slots (Debug only) ---------------
---       -- Debugging: stubbing slots on death can cause crashes early
---       g <- if opt_StubDeadValues
---                then {-# SCC "stubSlotsOnDeath" #-} run $ stubSlotsOnDeath g
---                else return g
---       dump Opt_D_dump_cmmz_stub "Post stub dead stack slots" g
---
---       --------------- Stack layout ----------------
---       slotEnv <- {-# SCC "liveSlotAnal" #-} run $ liveSlotAnal g
---       let spEntryMap = getSpEntryMap entry_off g
---       mbpprTrace "live slot analysis results: " (ppr slotEnv) $ return ()
---       let areaMap = {-# SCC "layout" #-} layout procPoints spEntryMap slotEnv entry_off g
---       mbpprTrace "areaMap" (ppr areaMap) $ return ()
---
---       ------------  Manifest the stack pointer --------
---       g  <- {-# SCC "manifestSP" #-} run $ manifestSP spEntryMap areaMap entry_off g
---       dump Opt_D_dump_cmmz_sp "Post manifestSP" g
---       -- UGH... manifestSP can require updates to the procPointMap.
---       -- We can probably do something quicker here for the update...
 
        ------------- Split into separate procedures ------------
-       procPointMap  <- {-# SCC "procPointAnalysis" #-} run $ procPointAnalysis procPoints g
+       procPointMap  <- {-# SCC "procPointAnalysis" #-} run $
+                        procPointAnalysis procPoints g
        dumpWith dflags ppr Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
-       gs <- {-# SCC "splitAtProcPoints" #-} run $ splitAtProcPoints l callPPs procPoints procPointMap
-                                       (CmmProc h l g)
+       gs <- {-# SCC "splitAtProcPoints" #-} run $
+             splitAtProcPoints l callPPs procPoints procPointMap (CmmProc h l g)
        dumps Opt_D_dump_cmmz_split "Post splitting" gs
 
-       ------------- More CAFs and foreign calls ------------
+       ------------- More CAFs ------------------------------
        cafEnv <- {-# SCC "cafAnal" #-} run $ cafAnal platform g
        let localCAFs = catMaybes $ map (localCAFInfo platform cafEnv) gs
        mbpprTrace "localCAFs" (pprPlatform platform localCAFs) $ return ()
-
---       gs <- {-# SCC "lowerSafeForeignCalls" #-} run $ mapM (lowerSafeForeignCalls areaMap) gs
---       dumps Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls" gs
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
        gs <- {-# SCC "setInfoTableStackMap" #-}

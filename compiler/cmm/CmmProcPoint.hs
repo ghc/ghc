@@ -403,11 +403,12 @@ splitAtProcPoints entry_label callPPs procPoints procMap
                  []   -> graphEnv
                  [id] -> add graphEnv id bid b 
                  _    -> panic "Each block should be reachable from only one ProcPoint"
-             Nothing -> pprPanic "block not reached by a proc point?" (ppr bid)
+             Nothing -> graphEnv
            where bid = entryLabel b
          add graphEnv procId bid b = mapInsert procId graph' graphEnv
                where graph  = mapLookup procId graphEnv `orElse` mapEmpty
                      graph' = mapInsert bid b graph
+
      graphEnv <- return $ foldGraphBlocks addBlock emptyBlockMap g
      -- Build a map from proc point BlockId to pairs of:
      --  * Labels for their new procedures

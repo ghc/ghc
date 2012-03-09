@@ -37,7 +37,6 @@ import Bitmap
 import CLabel
 import Cmm
 import CmmUtils
-import CmmStackLayout
 import Module
 import FastString
 import ForeignCall

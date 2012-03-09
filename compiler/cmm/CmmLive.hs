@@ -48,7 +48,8 @@ cmmLiveness :: CmmGraph -> FuelUniqSM BlockEntryLiveness
 cmmLiveness graph =
   liftM check $ dataflowAnalBwd graph [] $ analBwd liveLattice xferLive
   where entry = g_entry graph
-        check facts = noLiveOnEntry entry (expectJust "check" $ mapLookup entry facts) facts
+        check facts = noLiveOnEntry entry
+                        (expectJust "check" $ mapLookup entry facts) facts
 
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
 noLiveOnEntry :: BlockId -> CmmLive -> a -> a
@@ -63,13 +64,11 @@ gen  a live = foldRegsUsed extendRegSet      live a
 kill :: DefinerOfLocalRegs a => a -> RegSet -> RegSet
 kill a live = foldRegsDefd deleteFromRegSet live a
 
-gen_kill :: (DefinerOfLocalRegs a, UserOfLocalRegs a) => a -> CmmLive -> CmmLive
+gen_kill :: (DefinerOfLocalRegs a, UserOfLocalRegs a)
+          => a -> CmmLive -> CmmLive
 gen_kill a = gen a . kill a
 
 -- | The transfer function
--- EZY: Bits of this analysis are duplicated in CmmSpillReload, though
--- it's not really easy to efficiently reuse all of this.  Keep in mind
--- if you need to update this analysis.
 xferLive :: BwdTransfer CmmNode CmmLive
 xferLive = mkBTransfer3 fst mid lst
   where fst _ f = f
@@ -82,18 +81,23 @@ xferLive = mkBTransfer3 fst mid lst
 -- Removing assignments to dead variables
 -----------------------------------------------------------------------------
 
-removeDeadAssignments :: CmmGraph -> FuelUniqSM CmmGraph
+removeDeadAssignments :: CmmGraph -> FuelUniqSM (CmmGraph, BlockEnv CmmLive)
 removeDeadAssignments g =
-   liftM fst $ dataflowPassBwd g [] $ analRewBwd liveLattice xferLive rewrites
+   dataflowPassBwd g [] $ analRewBwd liveLattice xferLive rewrites
    where rewrites = mkBRewrite3 nothing middle nothing
          -- SDM: no need for deepBwdRw here, we only rewrite to empty
-         -- Beware: deepBwdRw with one polymorphic function seems more reasonable here,
-         -- but GHC panics while compiling, see bug #4045.
+         -- Beware: deepBwdRw with one polymorphic function seems more
+         -- reasonable here, but GHC panics while compiling, see bug
+         -- #4045.
          middle :: CmmNode O O -> Fact O CmmLive -> CmmReplGraph O O
-         middle (CmmAssign (CmmLocal reg') _) live | not (reg' `elemRegSet` live) = return $ Just emptyGraph
+         middle (CmmAssign (CmmLocal reg') _) live
+                 | not (reg' `elemRegSet` live)
+                 = return $ Just emptyGraph
          -- XXX maybe this should be somewhere else...
-         middle (CmmAssign lhs (CmmReg rhs))   _ | lhs == rhs = return $ Just emptyGraph
-         middle (CmmStore lhs (CmmLoad rhs _)) _ | lhs == rhs = return $ Just emptyGraph
+         middle (CmmAssign lhs (CmmReg rhs))   _ | lhs == rhs
+                 = return $ Just emptyGraph
+         middle (CmmStore lhs (CmmLoad rhs _)) _ | lhs == rhs
+                 = return $ Just emptyGraph
          middle _ _ = return Nothing
 
          nothing :: CmmNode e x -> Fact x CmmLive -> CmmReplGraph e x

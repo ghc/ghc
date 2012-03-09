@@ -107,10 +107,10 @@ instance Outputable StackMap where
 cmmLayoutStack :: ProcPointSet -> ByteOff -> CmmGraph
                -> FuelUniqSM (CmmGraph, BlockEnv StackMap)
 cmmLayoutStack procpoints entry_args
-               graph@(CmmGraph { g_entry = entry })
+               graph0@(CmmGraph { g_entry = entry })
   = do
     pprTrace "cmmLayoutStack" (ppr entry_args) $ return ()
-    liveness <- cmmLiveness graph
+    (graph, liveness) <- removeDeadAssignments graph0
     pprTrace "liveness" (ppr liveness) $ return ()
     let blocks = postorderDfs graph
 
