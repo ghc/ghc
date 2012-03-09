@@ -35,6 +35,8 @@ Thumbs.db
 *.run.stdout
 *.run.stderr
 
+*bindisttest_install___dir_bin_ghc.mk
+
 # -----------------------------------------------------------------------------
 # specific generated files
 
