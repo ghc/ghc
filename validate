@@ -117,7 +117,7 @@ if [ $speed != "FAST" ]; then
     # This is a hack to make
     #     HADDOCK_DOCS = NO
     # work when validating.
-    if grep -q "^HADDOCK_DOCS[ 	]*=[ 	]*NO[ 	]*$" mk/validate.mk
+    if grep -q "^HADDOCK_DOCS.*=.*NO" mk/validate.mk
     then
         unset WITH_HADDOCK
         DO_HADDOCK=NO
