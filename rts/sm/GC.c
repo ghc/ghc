@@ -209,7 +209,7 @@ GarbageCollect (rtsBool force_major_gc,
   SET_GCT(gc_threads[cap->no]);
 
   // tell the stats department that we've started a GC 
-  stat_startGC(gct);
+  stat_startGC(cap, gct);
 
   // lock the StablePtr table
   stablePtrPreGC();

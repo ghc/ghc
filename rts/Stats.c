@@ -256,7 +256,7 @@ stat_endExit(void)
 static nat rub_bell = 0;
 
 void
-stat_startGC (gc_thread *gct)
+stat_startGC (Capability *cap, gc_thread *gct)
 {
     nat bell = RtsFlags.GcFlags.ringBell;
 
@@ -278,7 +278,16 @@ stat_startGC (gc_thread *gct)
 #endif
 
     getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
-    gct->gc_start_thread_cpu  = getThreadCPUTime();
+
+    // Post EVENT_GC_START with the same timestamp as used for stats
+    // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
+    // Here, as opposed to other places, the event is emitted on the cap
+    // that initiates the GC and external tools expect it to have the same
+    // timestamp as used in +RTS -s calculcations.
+    traceEventGcStartAtT(cap,
+                         TimeToNS(gct->gc_start_elapsed - start_init_elapsed));
+
+    gct->gc_start_thread_cpu = getThreadCPUTime();
 
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
     {
@@ -339,10 +348,29 @@ stat_endGC (Capability *cap, gc_thread *gct,
         // heap profiling needs GC_tot_time
     {
         Time cpu, elapsed, gc_cpu, gc_elapsed;
+
+        traceEventGcStats(cap,
+                          CAPSET_HEAP_DEFAULT,
+                          gen,
+                          copied * sizeof(W_),
+                          slop   * sizeof(W_),
+                          /* current loss due to fragmentation */
+                          (mblocks_allocated * BLOCKS_PER_MBLOCK - n_alloc_blocks)
+                                 * BLOCK_SIZE_W * sizeof(W_),
+                          par_n_threads,
+                          par_max_copied * sizeof(W_),
+                          par_tot_copied * sizeof(W_));
 	
         getProcessTimes(&cpu, &elapsed);
-        gc_elapsed    = elapsed - gct->gc_start_elapsed;
 
+        // Post EVENT_GC_END with the same timestamp as used for stats
+        // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
+        // Here, as opposed to other places, the event is emitted on the cap
+        // that initiates the GC and external tools expect it to have the same
+        // timestamp as used in +RTS -s calculcations.
+        traceEventGcEndAtT(cap, TimeToNS(elapsed - start_init_elapsed));
+
+        gc_elapsed = elapsed - gct->gc_start_elapsed;
         gc_cpu = cpu - gct->gc_start_cpu;
 
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
@@ -397,17 +425,6 @@ stat_endGC (Capability *cap, gc_thread *gct,
         traceEventHeapSize(cap,
 	                   CAPSET_HEAP_DEFAULT,
 			   mblocks_allocated * MBLOCK_SIZE_W * sizeof(W_));
-        traceEventGcStats(cap,
-                          CAPSET_HEAP_DEFAULT,
-                          gen,
-                          copied * sizeof(W_),
-                          slop   * sizeof(W_),
-                          /* current loss due to fragmentation */
-                          (mblocks_allocated * BLOCKS_PER_MBLOCK - n_alloc_blocks)
-                                 * BLOCK_SIZE_W * sizeof(W_),
-                          par_n_threads,
-                          par_max_copied * sizeof(W_),
-                          par_tot_copied * sizeof(W_));
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
 	    if (live > max_residency) {

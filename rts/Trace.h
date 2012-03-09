@@ -114,6 +114,16 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
 void traceGcEvent_ (Capability *cap, EventTypeNum tag);
 
 /* 
+ * Record a GC event at the explicitly given timestamp
+ */
+#define traceGcEventAtT(cap, ts, tag)   \
+    if (RTS_UNLIKELY(TRACE_gc)) {       \
+        traceGcEventAtT_(cap, ts, tag); \
+    }
+
+void traceGcEventAtT_ (Capability *cap, StgWord64 ts, EventTypeNum tag);
+
+/* 
  * Record a heap event
  */
 #define traceHeapEvent(cap, tag, heap_capset, info1) \
@@ -257,6 +267,7 @@ void traceSparkCounters_ (Capability *cap,
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
 #define traceSchedEvent2(cap, tag, tso, other, info) /* nothing */
 #define traceGcEvent(cap, tag) /* nothing */
+#define traceGcEventAtT(cap, ts, tag) /* nothing */
 #define traceEventGcStats_(cap, heap_capset, gen, \
                            copied, slop, fragmentation, \
                            par_n_threads, par_max_copied, par_tot_copied) /* nothing */
@@ -549,9 +560,23 @@ INLINE_HEADER void traceEventGcStart(Capability *cap STG_UNUSED)
     dtraceGcStart((EventCapNo)cap->no);
 }
 
+INLINE_HEADER void traceEventGcStartAtT(Capability *cap STG_UNUSED,
+                                        StgWord64   ts  STG_UNUSED)
+{
+    traceGcEventAtT(cap, ts, EVENT_GC_START);
+    dtraceGcStart((EventCapNo)cap->no);
+}
+
 INLINE_HEADER void traceEventGcEnd(Capability *cap STG_UNUSED)
 {
     traceGcEvent(cap, EVENT_GC_END);
+    dtraceGcEnd((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceEventGcEndAtT(Capability *cap STG_UNUSED,
+                                      StgWord64   ts  STG_UNUSED)
+{
+    traceGcEventAtT(cap, ts, EVENT_GC_END);
     dtraceGcEnd((EventCapNo)cap->no);
 }
 

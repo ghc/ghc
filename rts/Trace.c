@@ -304,6 +304,19 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag)
     }
 }
 
+void traceGcEventAtT_ (Capability *cap, StgWord64 ts, EventTypeNum tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceGcEvent_stderr(cap, tag);
+    } else
+#endif
+    {
+        /* assuming nullary events and explicitly inserting a timestamp */
+        postEventAtTimestamp(cap, ts, tag);
+    }
+}
+
 void traceHeapEvent_ (Capability   *cap,
                       EventTypeNum  tag,
                       CapsetID      heap_capset,

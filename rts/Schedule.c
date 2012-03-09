@@ -1631,7 +1631,6 @@ delete_threads_and_gc:
 
     heap_census = scheduleNeedHeapProfile(rtsTrue);
 
-    traceEventGcStart(cap);
 #if defined(THREADED_RTS)
     // reset pending_sync *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
@@ -1640,7 +1639,6 @@ delete_threads_and_gc:
 #else
     GarbageCollect(force_major || heap_census, heap_census, 0, cap);
 #endif
-    traceEventGcEnd(cap);
 
     traceSparkCounters(cap);
 

@@ -839,7 +839,7 @@ void postHeapEvent (Capability    *cap,
     case EVENT_HEAP_LIVE:          // (heap_capset, live_bytes)
     {
         postCapsetID(eb, heap_capset);
-        postWord64(eb,info1 /* alloc/size/live_bytes */);
+        postWord64(eb, info1 /* alloc/size/live_bytes */);
         break;
     }
 
@@ -922,6 +922,25 @@ postEvent (Capability *cap, EventTypeNum tag)
     }
 
     postEventHeader(eb, tag);
+}
+
+void
+postEventAtTimestamp (Capability *cap, EventTimestamp ts, EventTypeNum tag)
+{
+    EventsBuf *eb;
+
+    eb = &capEventBuf[cap->no];
+
+    if (!hasRoomForEvent(eb, tag)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(eb);
+    }
+
+    /* Normally we'd call postEventHeader(), but that generates its own
+       timestamp, so we go one level lower so we can write out
+       the timestamp we received as an argument. */
+    postEventTypeNum(eb, tag);
+    postWord64(eb, ts);
 }
 
 #define BUF 512
