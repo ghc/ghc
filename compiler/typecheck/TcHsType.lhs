@@ -208,7 +208,7 @@ tcHsDeriv hs_ty
        ; let (tvs, pred) = splitForAllTys ty
        ; case getClassPredTys_maybe pred of
            Just (cls, tys) -> return (tvs, cls, tys)
-           Nothing -> failWithTc (ptext (sLit "Illegal deriving item") <+> ppr hs_ty) }
+           Nothing -> failWithTc (ptext (sLit "Illegal deriving item") <+> quotes (ppr hs_ty)) }
 
 -- Used for 'VECTORISE [SCALAR] instance' declarations
 --
