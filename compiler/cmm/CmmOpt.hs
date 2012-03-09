@@ -202,9 +202,13 @@ lookForInlineMany' :: Unique -> CmmExpr -> RegSet -> [CmmStmt] -> (Int, [CmmStmt
 lookForInlineMany' _ _ _ [] = (0, [])
 lookForInlineMany' u expr regset stmts@(stmt : rest)
   | Just n <- lookupUFM (countUses stmt) u, okToInline expr stmt
-  = case lookForInlineMany' u expr regset rest of
-      (m, stmts) -> let z = n + m
-                    in z `seq` (z, inlineStmt u expr stmt : stmts)
+  = let stmt' = inlineStmt u expr stmt in
+    if okToSkip stmt' u expr regset
+       then case lookForInlineMany' u expr regset rest of
+                       (m, stmts) -> let z = n + m
+                                     in z `seq` (z, stmt' : stmts)
+       else (n, stmt' : rest)
+
 
   | okToSkip stmt u expr regset
   = case lookForInlineMany' u expr regset rest of
