@@ -4,16 +4,25 @@ mc24.hs:9:14:
       arising from the arithmetic sequence `1 .. 10'
     The type variable `a1' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Note: there are several potential instances:
+      instance Enum Double -- Defined in `GHC.Float'
+      instance Enum Float -- Defined in `GHC.Float'
+      instance Enum () -- Defined in `GHC.Enum'
+      ...plus five others
     In a stmt of a monad comprehension: x <- [1 .. 10]
     In a stmt of a monad comprehension: then group by x using take 2
     In the expression:
       [length x | x <- [1 .. 10], then group by x using take 2]
 
 mc24.hs:9:15:
-    No instance for (Num a1)
-      arising from the literal `1'
+    No instance for (Num a1) arising from the literal `1'
     The type variable `a1' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Note: there are several potential instances:
+      instance Num Double -- Defined in `GHC.Float'
+      instance Num Float -- Defined in `GHC.Float'
+      instance Num Int -- Defined in `GHC.Num'
+      ...plus one other
     In the expression: 1
     In a stmt of a monad comprehension: x <- [1 .. 10]
     In a stmt of a monad comprehension: then group by x using take 2
@@ -23,6 +32,10 @@ mc24.hs:10:9:
       arising from a statement in a monad comprehension
     The type variable `t0' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Note: there are several potential instances:
+      instance Monad ((->) r) -- Defined in `GHC.Base'
+      instance Monad IO -- Defined in `GHC.Base'
+      instance Monad [] -- Defined in `GHC.Base'
     In a stmt of a monad comprehension: then group by x using take 2
     In the expression:
       [length x | x <- [1 .. 10], then group by x using take 2]

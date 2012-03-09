@@ -1,12 +1,6 @@
 
 tcfail018.hs:5:10:
-    No instance for (Num [t0])
-      arising from the literal `1'
-    The type variable `t0' is ambiguous
-    Possible cause: the monomorphism restriction applied to the following:
-      a :: t0 (bound at tcfail018.hs:5:2)
-    Probable fix: give these definition(s) an explicit type signature
-                  or use -XNoMonomorphismRestriction
+    No instance for (Num [t0]) arising from the literal `1'
     Possible fix: add an instance declaration for (Num [t0])
     In the expression: 1
     In a pattern binding: (a : []) = 1

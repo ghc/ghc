@@ -1,8 +1,5 @@
 
 <interactive>:5:1:
-    No instance for (Show (t -> a))
-      arising from a use of `print'
-    Cannot resolve unknown runtime types `t', `a'
-    Use :print or :force to determine these types
+    No instance for (Show (t -> a)) arising from a use of `print'
     Possible fix: add an instance declaration for (Show (t -> a))
     In a stmt of an interactive GHCi command: print it

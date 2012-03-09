@@ -4,15 +4,24 @@ mc23.hs:9:15:
       arising from the arithmetic sequence `1 .. 10'
     The type variable `b0' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Note: there are several potential instances:
+      instance Enum Double -- Defined in `GHC.Float'
+      instance Enum Float -- Defined in `GHC.Float'
+      instance Enum () -- Defined in `GHC.Enum'
+      ...plus five others
     In a stmt of a monad comprehension: x <- [1 .. 10]
     In a stmt of a monad comprehension: then take 5 by x
     In the expression: [x | x <- [1 .. 10], then take 5 by x]
 
 mc23.hs:9:16:
-    No instance for (Num b0)
-      arising from the literal `1'
+    No instance for (Num b0) arising from the literal `1'
     The type variable `b0' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Note: there are several potential instances:
+      instance Num Double -- Defined in `GHC.Float'
+      instance Num Float -- Defined in `GHC.Float'
+      instance Num Int -- Defined in `GHC.Num'
+      ...plus one other
     In the expression: 1
     In a stmt of a monad comprehension: x <- [1 .. 10]
     In a stmt of a monad comprehension: then take 5 by x
@@ -22,6 +31,10 @@ mc23.hs:9:24:
       arising from a statement in a monad comprehension
     The type variable `t0' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
+    Note: there are several potential instances:
+      instance Monad ((->) r) -- Defined in `GHC.Base'
+      instance Monad IO -- Defined in `GHC.Base'
+      instance Monad [] -- Defined in `GHC.Base'
     In a stmt of a monad comprehension: then take 5 by x
     In the expression: [x | x <- [1 .. 10], then take 5 by x]
     In an equation for `z': z = [x | x <- [1 .. 10], then take 5 by x]

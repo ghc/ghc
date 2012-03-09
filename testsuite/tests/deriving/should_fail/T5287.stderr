@@ -2,8 +2,6 @@
 T5287.hs:6:29:
     No instance for (A e oops)
       arising from the 'deriving' clause of a data type declaration
-    The type variable `oops' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
     Possible fix:
       use a standalone 'deriving instance' declaration,
         so you can specify the instance context yourself

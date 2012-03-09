@@ -1,14 +1,22 @@
 
 <interactive>:6:1:
-    No instance for (Show a)
-      arising from a use of `print'
+    No instance for (Show a) arising from a use of `print'
     Cannot resolve unknown runtime type `a'
     Use :print or :force to determine these types
+    Note: there are several potential instances:
+      instance Show Double -- Defined in `GHC.Float'
+      instance Show Float -- Defined in `GHC.Float'
+      instance Show () -- Defined in `GHC.Show'
+      ...plus 24 others
     In a stmt of an interactive GHCi command: print it
 
 <interactive>:8:1:
-    No instance for (Show a)
-      arising from a use of `print'
+    No instance for (Show a) arising from a use of `print'
     Cannot resolve unknown runtime type `a'
     Use :print or :force to determine these types
+    Note: there are several potential instances:
+      instance Show Double -- Defined in `GHC.Float'
+      instance Show Float -- Defined in `GHC.Float'
+      instance Show () -- Defined in `GHC.Show'
+      ...plus 24 others
     In a stmt of an interactive GHCi command: print it
