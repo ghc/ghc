@@ -543,7 +543,8 @@ setupStackFrame lbl liveness updfr_off ret_args stack0
 
 futureContinuation :: Block CmmNode O O -> Maybe BlockId
 futureContinuation middle = foldBlockNodesB f middle Nothing
-   where f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _))) _
+   where f :: CmmNode a b -> Maybe BlockId -> Maybe BlockId
+         f (CmmStore (CmmStackSlot (Young l) _) (CmmLit (CmmBlock _))) _
                = Just l
          f _ r = r
 
