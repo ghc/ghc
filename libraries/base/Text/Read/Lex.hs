@@ -19,7 +19,7 @@ module Text.Read.Lex
   -- lexing types
   ( Lexeme(..)  -- :: *; Show, Eq
 
-  , numberToInteger, numberToRational
+  , numberToInteger, numberToRational, numberToRangedRational
 
   -- lexer
   , lex         -- :: ReadP Lexeme      Skips leading spaces
@@ -81,6 +81,40 @@ numberToInteger :: Number -> Maybe Integer
 numberToInteger (MkNumber base iPart) = Just (val (fromIntegral base) 0 iPart)
 numberToInteger (MkDecimal iPart Nothing Nothing) = Just (val 10 0 iPart)
 numberToInteger _ = Nothing
+
+-- This takes a floatRange, and if the Rational would be outside of
+-- the floatRange then it may return Nothing. Not that it will not
+-- /necessarily/ return Nothing, but it is good enough to fix the
+-- space problems in #5688
+-- Ways this is conservative:
+-- * the floatRange is in base 2, but we pretend it is in base 10
+-- * we pad the floateRange a bit, just in case it is very small
+--   and we would otherwise hit an edge case
+-- * We only worry about numbers that have an exponent. If they don't
+--   have an exponent then the Rational won't be much larger than the
+--   Number, so there is no problem
+numberToRangedRational :: (Int, Int) -> Number
+                       -> Maybe Rational -- Nothing = Inf
+numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
+    = let mFirstDigit = case dropWhile (0 ==) iPart of
+                        iPart'@(_ : _) -> Just (length iPart')
+                        [] -> case mFPart of
+                              Nothing -> Nothing
+                              Just fPart ->
+                                  case span (0 ==) fPart of
+                                  (_, []) -> Nothing
+                                  (zeroes, _) ->
+                                      Just (negate (length zeroes))
+      in case mFirstDigit of
+         Nothing -> Just 0
+         Just firstDigit ->
+             let firstDigit' = firstDigit + fromInteger exp
+             in if firstDigit' > (pos + 3)
+                then Nothing
+                else if firstDigit' < (neg - 3)
+                then Just 0
+                else Just (numberToRational n)
+numberToRangedRational _ n = Just (numberToRational n)
 
 numberToRational :: Number -> Rational
 numberToRational (MkNumber base iPart) = val (fromIntegral base) 0 iPart % 1
