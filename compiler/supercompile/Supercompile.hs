@@ -50,23 +50,24 @@ import qualified Data.Map as M
 --  2) The remaining CoreBinds. These may refer to those CoreBinds but are not referred
 --     to *by* them
 --
--- As a bonus, it returns the free variables of the bindings in the second list.
---
 -- NB: assumes no-shadowing at the top level. I don't want to have to rename stuff to
 -- commute CoreBinds...
-partitionBinds :: (Id -> Bool) -> [CoreBind] -> ([CoreBind], [CoreBind], S.FreeVars)
-partitionBinds should_sc initial_binds = go initial_inside [(b, unionVarSets (map S.idFreeVars (bindersOf b) ++ map exprFreeVars (rhssOfBind b))) | b <- initial_undecided]
+partitionBinds :: (Id -> Bool) -> [CoreBind] -> ([CoreBind], [CoreBind])
+partitionBinds should_sc initial_binds = go initial_inside initial_undecided
   where
     (initial_inside, initial_undecided) = partition (any should_sc . bindersOf) initial_binds
     
-    go :: [CoreBind] -> [(CoreBind, S.FreeVars)] -> ([CoreBind], [CoreBind], S.FreeVars)
+    go :: [CoreBind] -> [CoreBind] -> ([CoreBind], [CoreBind])
     go inside undecided
-        | null inside' = (inside, map fst undecided, unionVarSets (map snd undecided))
-        | otherwise    = first3 (inside ++) $ go (map fst inside') undecided'
+        | null inside' = (inside, undecided)
+        | otherwise    = first (inside ++) $ go inside' undecided'
       where
-        -- Move anything inside that refers to a binding that was moved inside last round
-        (inside', undecided') = partition (\(_, fvs) -> inside_bs `intersectsVarSet` fvs) undecided
-        inside_bs = mkVarSet [x | b <- inside, x <- bindersOf b]
+        -- Move anything inside that is referred to by a binding that was moved inside last round
+        inside_fvs = coreBindsFVs inside
+        (inside', undecided') = partition (\b -> any (`elemVarSet` inside_fvs) (bindersOf b)) undecided
+
+coreBindsFVs :: [CoreBind] -> S.FreeVars
+coreBindsFVs bs = unionVarSets [fvs | b <- bs, fvs <- map S.idFreeVars (bindersOf b) ++ map exprFreeVars (rhssOfBind b)]
 
 coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, Var -> [CoreBind])
 coreBindsToCoreTerm should_sc binds
@@ -79,21 +80,23 @@ coreBindsToCoreTerm should_sc binds
     --
     -- We used to use a standard "big tuple" to do the binding-back, but this breaks down if we need to include
     -- some variables of unlifted type (of kind #) or a dictionary (of kind Constraint) since the type arguments of
-    -- the (,..,) tycon must be of kind *.
+    -- the (,..,) tycon must be of kind *. The unlifted case isn't important (they can't occur at top level), but
+    -- the Constraint case is a killer.
     --
     -- Then I tried to use a church-encoded tuple to do that, where the tuple (x, y, z) is encoded as
     -- /\(a :: ArgTypeKind). \(k :: x_ty -> y_ty -> z_ty -> a). k x y z
     -- And selected from by applying an appropriate type argument and continuation. Unfortunately, this type polymorphism,
     -- while permitted by the type system, is an illusion: abstraction over types of kinds other than * only works
     -- if the type abstractions all are beta-reduced away before code generation.
-      --
-      -- Another problem with this second approach is that GHC's inlining heuristics didn't tend to inline very
-      -- large encoded tuples even with explicit continutaion args, because the contination binder didn't get a
-      -- large enough discount.
-      --
-      -- My third attempt just encodes it as an unboxed tuple, which we contrive to buind at the top level by abstracting
-      -- it over a useless arg of void representation.
-    (sc_binds, dont_sc_binds, dont_sc_binds_fvs) = partitionBinds should_sc binds
+    --
+    -- Another problem with this second approach is that GHC's inlining heuristics didn't tend to inline very
+    -- large encoded tuples even with explicit continutaion args, because the contination binder didn't get a
+    -- large enough discount.
+    --
+    -- My third attempt just encodes it as an unboxed tuple, which we contrive to buind at the top level by abstracting
+    -- it over a useless arg of void representation.
+    (sc_binds, dont_sc_binds) = partitionBinds should_sc binds
+    dont_sc_binds_fvs = coreBindsFVs dont_sc_binds
     
     -- We should zap fragile information on the Ids' we use within the tuple selector. The reasons are:
     --  1. They may be mutually inter-referring, and the binders of a "case" are not simultaneously brought into scope
