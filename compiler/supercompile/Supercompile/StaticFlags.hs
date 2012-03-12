@@ -139,7 +139,7 @@ pOSITIVE_INFORMATION = lookUp $ fsLit "-fsupercompiler-positive-information"
 --    in practice.
 
 pREINITALIZE_MEMO_TABLE :: Bool
-pREINITALIZE_MEMO_TABLE = lookUp $ fsLit "-fsupercompiler-no-preinitalize"
+pREINITALIZE_MEMO_TABLE = lookUp $ fsLit "-fsupercompiler-preinitalize"
 
 data DeedsPolicy = FCFS | Proportional
                  deriving (Read)
