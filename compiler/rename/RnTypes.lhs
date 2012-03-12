@@ -888,7 +888,8 @@ checkTH _ _ = return ()	-- OK
 #else
 checkTH e what 	-- Raise an error in a stage-1 compiler
   = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>  
-	          ptext (sLit "illegal in a stage-1 compiler"),
+	          ptext (sLit "requires GHC with interpreter support"),
+                  ptext (sLit "Perhaps you are using a stage-1 compiler?"),
 	          nest 2 (ppr e)])
 #endif   
 \end{code}
