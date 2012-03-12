@@ -1128,3 +1128,14 @@ tests/perf/should_run/T5536
 tests/perf/should_run/T5536.data
 tests/perf/should_run/T5536.stats
 
+tests/concurrent/should_run/5866
+tests/ffi/should_run/Capi_Ctype_001
+tests/ffi/should_run/Capi_Ctype_001.hs
+tests/ffi/should_run/Capi_Ctype_002
+tests/ffi/should_run/Capi_Ctype_A_001.hs
+tests/ffi/should_run/Capi_Ctype_A_002.hs
+tests/ffi/should_run/capi_value
+tests/ffi/should_run/ffi_parsing_001
+tests/numeric/should_run/add2
+tests/numeric/should_run/mul2
+
