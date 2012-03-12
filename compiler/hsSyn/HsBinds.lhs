@@ -485,6 +485,10 @@ data Sig name   -- Signatures and pragmas
         -- {-# SPECIALISE instance Eq [Int] #-}
   | SpecInstSig (LHsType name)  -- (Class tys); should be a specialisation of the
                                 -- current instance decl
+
+        -- A supercompilation pragma
+        -- {-# SUPERCOMPILE f #-}
+  | SupercompileSig (Located name) -- Function name
   deriving (Data, Typeable)
 
 
@@ -548,14 +552,19 @@ isSpecInstLSig _                      = False
 
 isPragLSig :: LSig name -> Bool
 -- Identifies pragmas
-isPragLSig (L _ (SpecSig {}))   = True
-isPragLSig (L _ (InlineSig {})) = True
-isPragLSig _                    = False
+isPragLSig (L _ (SpecSig {}))         = True
+isPragLSig (L _ (InlineSig {}))       = True
+isPragLSig (L _ (SupercompileSig {})) = True
+isPragLSig _                          = False
 
 isInlineLSig :: LSig name -> Bool
 -- Identifies inline pragmas
 isInlineLSig (L _ (InlineSig {})) = True
 isInlineLSig _                    = False
+
+isSupercompileLSig :: LSig name -> Bool
+isSupercompileLSig (L _ (SupercompileSig {})) = True
+isSupercompileLSig _                          = False
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = ptext (sLit "type signature")
@@ -564,6 +573,7 @@ hsSigDoc (IdSig {})             = ptext (sLit "id signature")
 hsSigDoc (SpecSig {})           = ptext (sLit "SPECIALISE pragma")
 hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
 hsSigDoc (SpecInstSig {})       = ptext (sLit "SPECIALISE instance pragma")
+hsSigDoc (SupercompileSig {})   = ptext (sLit "SUPERCOMPILE pragma")
 hsSigDoc (FixSig {})            = ptext (sLit "fixity declaration")
 \end{code}
 
@@ -579,6 +589,7 @@ overlapHsSig sig1 sig2 = case (unLoc sig1, unLoc sig2) of
   (TypeSig ns1 _,           TypeSig ns2 _)           -> ns1 `overlaps_with` ns2
   (GenericSig ns1 _,        GenericSig ns2 _)        -> ns1 `overlaps_with` ns2
   (InlineSig n1 _,          InlineSig n2 _)          -> unLoc n1 == unLoc n2
+  (SupercompileSig n1,      SupercompileSig n2)      -> unLoc n1 == unLoc n2
   -- For specialisations, we don't have equality over HsType, so it's not
   -- convenient to spot duplicate specialisations here.  Check for this later,
   -- when we're in Type land
@@ -598,6 +609,7 @@ ppr_sig (IdSig id)                = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig fix_sig)          = ppr fix_sig
 ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec var (ppr ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
+ppr_sig (SupercompileSig var)     = pragBrackets (ppr var)
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 
 instance Outputable name => Outputable (FixitySig name) where

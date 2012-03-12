@@ -705,6 +705,10 @@ renameSig ctxt sig@(InlineSig v s)
   = do	{ new_v <- lookupSigOccRn ctxt sig v
 	; return (InlineSig new_v s, emptyFVs) }
 
+renameSig ctxt sig@(SupercompileSig v)
+  = do  { new_v <- lookupSigOccRn ctxt sig v
+        ; return (SupercompileSig new_v) }
+
 renameSig ctxt sig@(FixSig (FixitySig v f))
   = do	{ new_v <- lookupSigOccRn ctxt sig v
 	; return (FixSig (FixitySig new_v f), emptyFVs) }
@@ -737,6 +741,9 @@ okHsSig ctxt (L _ sig)
 
      (SpecInstSig {}, InstDeclCtxt {}) -> True
      (SpecInstSig {}, _)               -> False
+
+     (SupercompileSig {}, HsBootCtxt) -> False
+     (SupercompileSig {}, _)          -> True
 \end{code}
 
 

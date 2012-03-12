@@ -358,6 +358,7 @@ ppIdInfo id info
     , (has_caf_info,   ptext (sLit "Caf=") <> ppr caf_info)
     , (has_strictness, ptext (sLit "Str=") <> pprStrictness str_info)
     , (has_unf,        ptext (sLit "Unf=") <> ppr unf_info)
+    , (has_unf,        ptext (sLit "SC=") <> ppr sc_info)
     , (not (null rules), ptext (sLit "RULES:") <+> vcat (map pprRule rules))
     ]	-- Inline pragma, occ, demand, lbvar info
 	-- printed out with all binders (when debug is on); 
@@ -378,6 +379,8 @@ ppIdInfo id info
 
     unf_info = unfoldingInfo info
     has_unf = hasSomeUnfolding unf_info
+
+    sc_info = supercompilePragInfo info
 
     rules = specInfoRules (specInfo info)
 

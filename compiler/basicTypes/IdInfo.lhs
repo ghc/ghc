@@ -43,6 +43,10 @@ module IdInfo (
 	InlinePragInfo,
 	inlinePragInfo, setInlinePragInfo,
 
+        -- ** The SupercompilePragInfo type
+        SupercompilePragInfo,
+        supercompilePragInfo, setSupercompilePragInfo,
+
 	-- ** The OccInfo type
 	OccInfo(..),
 	isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
@@ -93,6 +97,7 @@ import Data.Maybe
 infixl 	1 `setSpecInfo`,
 	  `setArityInfo`,
 	  `setInlinePragInfo`,
+          `setSupercompilePragInfo`,
 	  `setUnfoldingInfo`,
 	  `setLBVarInfo`,
 	  `setOccInfo`,
@@ -193,6 +198,7 @@ data IdInfo
 	cafInfo		:: CafInfo,		-- ^ 'Id' CAF info
         lbvarInfo	:: LBVarInfo,		-- ^ Info about a lambda-bound variable, if the 'Id' is one
 	inlinePragInfo	:: InlinePragma,	-- ^ Any inline pragma atached to the 'Id'
+        supercompilePragInfo :: SupercompilePragInfo, -- ^ Whether the 'Id' should be supercompiled
 	occInfo		:: OccInfo,		-- ^ How the 'Id' occurs in the program
 
 	strictnessInfo :: Maybe StrictSig,	-- ^ Id strictness information. Reason for Maybe: 
@@ -242,6 +248,8 @@ setSpecInfo :: IdInfo -> SpecInfo -> IdInfo
 setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
 setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
+setSupercompilePragInfo :: IdInfo -> SupercompilePragInfo -> IdInfo
+setSupercompilePragInfo info pr = pr `seq` info { supercompilePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }
 	-- Try to avoid spack leaks by seq'ing
@@ -286,6 +294,7 @@ vanillaIdInfo
 	    unfoldingInfo	= noUnfolding,
 	    lbvarInfo		= NoLBVarInfo,
 	    inlinePragInfo 	= defaultInlinePragma,
+            supercompilePragInfo = defaultSupercompilePragma,
 	    occInfo		= NoOccInfo,
 	    demandInfo	= Nothing,
 	    strictnessInfo   = Nothing
@@ -345,6 +354,20 @@ ppArityInfo n = hsep [ptext (sLit "Arity"), int n]
 -- The default 'InlinePragInfo' is 'AlwaysActive', so the info serves
 -- entirely as a way to inhibit inlining until we want it
 type InlinePragInfo = InlinePragma
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Supercompile-pragma information}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+-- | Tells us whether the binding should be supercompiled.
+type SupercompilePragInfo = Bool
+
+defaultSupercompilePragma :: Bool
+defaultSupercompilePragma = False
 \end{code}
 
 

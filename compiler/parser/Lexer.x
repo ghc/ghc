@@ -475,6 +475,7 @@ data Token
   | ITinline_prag InlineSpec RuleMatchInfo
   | ITspec_prag                 -- SPECIALISE
   | ITspec_inline_prag Bool     -- SPECIALISE INLINE (or NOINLINE)
+  | ITsupercompile_prag         -- SUPERCOMPILE
   | ITsource_prag
   | ITrules_prag
   | ITwarning_prag
@@ -2315,6 +2316,7 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                                           -- Spelling variant
                            ("notinline", token (ITinline_prag NoInline FunLike)),
                            ("specialize", token ITspec_prag),
+                           ("supercompile", token ITsupercompile_prag),
                            ("source", token ITsource_prag),
                            ("warning", token ITwarning_prag),
                            ("deprecated", token ITdeprecated_prag),

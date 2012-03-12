@@ -71,6 +71,9 @@ module Id (
 	idInlinePragma, setInlinePragma, modifyInlinePragma,
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
+        -- ** Supercompile pragma stuff
+        idSupercompilePragma, setSupercompilePragma,
+
 	-- ** One-shot lambdas
 	isOneShotBndr, isOneShotLambda, isStateHackType,
 	setOneShotLambda, clearOneShotLambda,
@@ -138,6 +141,7 @@ infixl 	1 `setIdUnfoldingLazily`,
 	  `setIdStrictness`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
+          `setSupercompilePragma`,
 	  `setInlineActivation`,
 	  `idCafInfo`
 \end{code}
@@ -583,6 +587,17 @@ idRuleMatchInfo id = inlinePragmaRuleMatchInfo (idInlinePragma id)
 
 isConLikeId :: Id -> Bool
 isConLikeId id = isDataConWorkId id || isConLike (idRuleMatchInfo id)
+\end{code}
+
+
+        ---------------------------------
+        -- SUPERCOMPILATION
+\begin{code}
+idSupercompilePragma :: Id -> SupercompilePragInfo
+idSupercompilePragma id = supercompilePragInfo (idInfo id)
+
+setSupercompilePragma :: Id -> SupercompilePragInfo -> Id
+setSupercompilePragma id prag = modifyIdInfo (`setSupercompilePragInfo` prag) id
 \end{code}
 
 

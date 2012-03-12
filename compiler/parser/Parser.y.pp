@@ -254,6 +254,7 @@ incorrect.
  '{-# INLINE'             { L _ (ITinline_prag _ _) }
  '{-# SPECIALISE'         { L _ ITspec_prag }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _) }
+ '{-# SUPERCOMPILE'       { L _ ITsupercompile_prag }
  '{-# SOURCE'                                   { L _ ITsource_prag }
  '{-# RULES'                                    { L _ ITrules_prag }
  '{-# CORE'                                     { L _ ITcore_prag }              -- hdaume: annotated core
@@ -1356,6 +1357,8 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                             | t <- $5] }
         | '{-# SPECIALISE' 'instance' inst_type '#-}'
                 { LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
+        | '{-# SUPERCOMPILE' qvar '#-}'
+                { LL $ unitOL (LL $ SigD (SupercompileSig $2)) }
 
 -----------------------------------------------------------------------------
 -- Expressions

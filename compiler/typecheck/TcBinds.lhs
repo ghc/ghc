@@ -47,6 +47,7 @@ import Outputable
 import FastString
 
 import Control.Monad
+import Data.List
 
 #include "HsVersions.h"
 \end{code}
@@ -430,7 +431,8 @@ tcPolyNoGen tc_sig_fn prag_fn rec_tc bind_list
       = do { mono_ty' <- zonkTcType (idType mono_id)
              -- Zonk, mainly to expose unboxed types to checkStrictBinds
            ; let mono_id' = setIdType mono_id mono_ty'
-           ; _specs <- tcSpecPrags mono_id' (prag_fn name)
+           ; (prags, _mono_id') <- addInlinePrags mono_id' (prag_fn name)
+           ; _specs <- tcSpecPrags mono_id' prags
            ; return mono_id' }
            -- NB: tcPrags generates error messages for
            --     specialisation pragmas for non-overloaded sigs
@@ -459,8 +461,8 @@ tcPolyCheck sig@(TcSigInfo { sig_id = poly_id, sig_tvs = tvs_w_scoped
                tcExtendTyVarEnv2 [(n,tv) | (Just n, tv) <- tvs_w_scoped] $
                tcMonoBinds (\_ -> Just sig) LetLclBndr rec_tc bind_list
 
+       ; (prag_sigs, poly_id) <- addInlinePrags poly_id prag_sigs
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
-       ; poly_id    <- addInlinePrags poly_id prag_sigs
 
        ; let (_, _, mono_id) = mono_info
              export = ABE { abe_wrap = idHsWrapper
@@ -538,7 +540,7 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
                            Just sig -> sig_id sig
                 -- poly_id has a zonked type
 
-        ; poly_id <- addInlinePrags poly_id prag_sigs
+        ; (prag_sigs, poly_id) <- addInlinePrags poly_id prag_sigs
         ; spec_prags <- tcSpecPrags poly_id prag_sigs
                 -- tcPrags requires a zonked poly_id
 
@@ -590,9 +592,10 @@ mkPragFun sigs binds = \n -> lookupNameEnv prag_env n `orElse` []
     prs = mapCatMaybes get_sig sigs
 
     get_sig :: LSig Name -> Maybe (Located Name, LSig Name)
-    get_sig (L l (SpecSig nm ty inl)) = Just (nm, L l $ SpecSig  nm ty (add_arity nm inl))
-    get_sig (L l (InlineSig nm inl))  = Just (nm, L l $ InlineSig nm   (add_arity nm inl))
-    get_sig _                         = Nothing
+    get_sig (L l (SpecSig nm ty inl))  = Just (nm, L l $ SpecSig  nm ty (add_arity nm inl))
+    get_sig (L l (InlineSig nm inl))   = Just (nm, L l $ InlineSig nm   (add_arity nm inl))
+    get_sig (L l (SupercompileSig nm)) = Just (nm, L l $ SupercompileSig nm)
+    get_sig _                          = Nothing
 
     add_arity (L _ n) inl_prag   -- Adjust inl_sat field to match visible arity of function
       | Just ar <- lookupNameEnv ar_env n,
@@ -622,15 +625,13 @@ tcSpecPrags :: Id -> [LSig Name]
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
 tcSpecPrags poly_id prag_sigs
-  = do { unless (null bad_sigs) warn_discarded_sigs
-       ; mapAndRecoverM (wrapLocM (tcSpec poly_id)) spec_sigs }
+  = do { spec_sigs' <- mapAndRecoverM (wrapLocM (tcSpec poly_id)) spec_sigs
+       ; unless (null prag_sigs') $
+            warnPrags poly_id prag_sigs' $
+                      ptext (sLit "Discarding unexpected pragmas for")
+       ; return spec_sigs' }
   where
-    spec_sigs = filter isSpecLSig prag_sigs
-    bad_sigs  = filter is_bad_sig prag_sigs
-    is_bad_sig s = not (isSpecLSig s || isInlineLSig s)
-
-    warn_discarded_sigs = warnPrags poly_id bad_sigs $
-                          ptext (sLit "Discarding unexpected pragmas for")
+    (spec_sigs, prag_sigs') = partition isSpecLSig prag_sigs
 
 
 --------------

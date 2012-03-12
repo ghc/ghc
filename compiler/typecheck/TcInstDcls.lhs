@@ -1099,7 +1099,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                           mkMethIds sig_fn clas tyvars dfun_ev_vars
                                                     inst_tys sel_id
            ; let prags = prag_fn (idName sel_id)
-           ; meth_id1 <- addInlinePrags meth_id prags
+           ; (prags, meth_id1) <- addInlinePrags meth_id prags
            ; spec_prags <- tcSpecPrags meth_id1 prags
            ; bind <- tcInstanceMethodBody InstSkol
                           tyvars dfun_ev_vars

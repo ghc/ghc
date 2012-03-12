@@ -218,8 +218,8 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn (sel_id, dm_info)
  	     -- type errors from tcInstanceMethodBody come from here
 
 
-           ; dm_id_w_inline <- addInlinePrags dm_id prags
-           ; spec_prags     <- tcSpecPrags dm_id prags
+           ; (prags, dm_id_w_inline) <- addInlinePrags dm_id prags
+           ; spec_prags <- tcSpecPrags dm_id prags
 
            ; let local_dm_ty = instantiateMethod clas dm_id (mkTyVarTys tyvars)
                  hs_ty       = lookupHsSig hs_sig_fn sel_name 

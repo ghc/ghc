@@ -47,6 +47,7 @@ import Util
 import Outputable
 import FastString
 import Control.Monad
+import Data.List (partition)
 \end{code}
 
 
@@ -233,7 +234,7 @@ newSigLetBndr LetLclBndr name sig
   = do { mono_name <- newLocalName name
        ; mkLocalBinder mono_name (sig_tau sig) }
 newSigLetBndr (LetGblBndr prags) name sig
-  = addInlinePrags (sig_id sig) (prags name)
+  = liftM snd $ addInlinePrags (sig_id sig) (prags name)
 
 ------------
 newNoSigLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
@@ -247,24 +248,24 @@ newNoSigLetBndr LetLclBndr name ty
        ; mkLocalBinder mono_name ty }
 newNoSigLetBndr (LetGblBndr prags) name ty 
   = do { id <- mkLocalBinder name ty
-       ; addInlinePrags id (prags name) }
+       ; liftM snd (addInlinePrags id (prags name)) }
 
 ----------
-addInlinePrags :: TcId -> [LSig Name] -> TcM TcId
-addInlinePrags poly_id prags
-  = do { traceTc "addInlinePrags" (ppr poly_id $$ ppr prags) 
-       ; tc_inl inl_sigs }
+addInlinePrags :: TcId -> [LSig Name] -> TcM ([LSig Name], TcId)
+addInlinePrags poly_id prags0 = do
+    traceTc "addInlinePrags" (ppr poly_id $$ ppr prags0)
+    poly_id <- one inls (sLit "INLINE")       poly_id $ \(InlineSig _ prag)   -> poly_id `setInlinePragma` prag
+    poly_id <- one sups (sLit "SUPERCOMPILE") poly_id $ \(SupercompileSig {}) -> poly_id `setSupercompilePragma` True
+    return (prags2, poly_id)
   where
-    inl_sigs = filter isInlineLSig prags
-    tc_inl [] = return poly_id
-    tc_inl (L loc (InlineSig _ prag) : other_inls)
-       = do { unless (null other_inls) (setSrcSpan loc warn_dup_inline)
-            ; traceTc "addInlinePrag" (ppr poly_id $$ ppr prag) 
-            ; return (poly_id `setInlinePragma` prag) }
-    tc_inl _ = panic "tc_inl"
+    (inls, prags1) = partition isInlineLSig       prags0
+    (sups, prags2) = partition isSupercompileLSig prags1
 
-    warn_dup_inline = warnPrags poly_id inl_sigs $
-                      ptext (sLit "Duplicate INLINE pragmas for")
+    one []                             _    nth _   = return nth
+    one all_prags@((L loc prag):prags) what _   jst = do
+        unless (null prags) $ setSrcSpan loc $ warnPrags poly_id all_prags $
+            ptext (sLit "Duplicate") <+> ptext what <+> ptext (sLit "pragmas for")
+        return (jst prag)
 
 warnPrags :: Id -> [LSig Name] -> SDoc -> TcM ()
 warnPrags id bad_sigs herald
