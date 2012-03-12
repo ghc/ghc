@@ -198,7 +198,9 @@ supercompile e = -- liftM (termToCoreExpr . snd) $
         e' = runParseM (coreExprToTerm e)
 
 supercompileProgram :: [CoreBind] -> IO [CoreBind]
-supercompileProgram = supercompileProgramSelective (const True)
+supercompileProgram binds = supercompileProgramSelective selector binds
+  where selector | any idSupercompilePragma (bindersOfBinds binds) = idSupercompilePragma
+                 | otherwise                                       = const True
 
 supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> IO [CoreBind]
 supercompileProgramSelective should_sc binds = liftM (\e' -> NonRec x e' : rebuild x) (supercompile e)
