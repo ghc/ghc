@@ -70,34 +70,34 @@ import System
 
 getWin32ProgArgv_certainly :: IO [String]
 getWin32ProgArgv_certainly = do
-	mb_argv <- getWin32ProgArgv
-	case mb_argv of
-	  Nothing   -> fmap dropRTSArgs getFullArgs
-	  Just argv -> return argv
+        mb_argv <- getWin32ProgArgv
+        case mb_argv of
+          Nothing   -> fmap dropRTSArgs getFullArgs
+          Just argv -> return argv
 
 withWin32ProgArgv :: [String] -> IO a -> IO a
 withWin32ProgArgv argv act = bracket begin setWin32ProgArgv (\_ -> act)
   where
     begin = do
-	  mb_old_argv <- getWin32ProgArgv
-	  setWin32ProgArgv (Just argv)
-	  return mb_old_argv
+          mb_old_argv <- getWin32ProgArgv
+          setWin32ProgArgv (Just argv)
+          return mb_old_argv
 
 getWin32ProgArgv :: IO (Maybe [String])
 getWin32ProgArgv = alloca $ \p_argc -> alloca $ \p_argv -> do
-	c_getWin32ProgArgv p_argc p_argv
-	argc <- peek p_argc
-	argv_p <- peek p_argv
-	if argv_p == nullPtr
-	 then return Nothing
-	 else do
-	  argv_ps <- peekArray (fromIntegral argc) argv_p
-	  fmap Just $ mapM peekCWString argv_ps
+        c_getWin32ProgArgv p_argc p_argv
+        argc <- peek p_argc
+        argv_p <- peek p_argv
+        if argv_p == nullPtr
+         then return Nothing
+         else do
+          argv_ps <- peekArray (fromIntegral argc) argv_p
+          fmap Just $ mapM peekCWString argv_ps
 
 setWin32ProgArgv :: Maybe [String] -> IO ()
 setWin32ProgArgv Nothing = c_setWin32ProgArgv 0 nullPtr
 setWin32ProgArgv (Just argv) = withMany withCWString argv $ \argv_ps -> withArrayLen argv_ps $ \argc argv_p -> do
-	c_setWin32ProgArgv (fromIntegral argc) argv_p
+        c_setWin32ProgArgv (fromIntegral argc) argv_p
 
 foreign import ccall unsafe "getWin32ProgArgv"
   c_getWin32ProgArgv :: Ptr CInt -> Ptr (Ptr CWString) -> IO ()
@@ -196,10 +196,10 @@ getEnv name = withCWString name $ \s -> try_size s 256
       res <- c_GetEnvironmentVariable s p_value size
       case res of
         0 -> do
-		  err <- c_GetLastError
-		  if err == eRROR_ENVVAR_NOT_FOUND
-		   then ioe_missingEnvVar name
-		   else throwGetLastError "getEnv"
+                  err <- c_GetLastError
+                  if err == eRROR_ENVVAR_NOT_FOUND
+                   then ioe_missingEnvVar name
+                   else throwGetLastError "getEnv"
         _ | res > size -> try_size s res -- Rare: size increased between calls to GetEnvironmentVariable
           | otherwise  -> peekCWString p_value
 
@@ -225,7 +225,7 @@ foreign import ccall unsafe "getenv"
 
 ioe_missingEnvVar :: String -> IO a
 ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
-											  "no environment variable" Nothing (Just name))
+    "no environment variable" Nothing (Just name))
 
 {-|
 'withArgs' @args act@ - while executing action @act@, have 'getArgs'
