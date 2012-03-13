@@ -143,7 +143,7 @@ To inline _smi:
 -}
 
 countUses :: UserOfLocalRegs a => a -> UniqFM Int
-countUses a = foldRegsUsed (\m r -> addToUFM m r (count m r + 1)) emptyUFM a
+countUses a = foldRegsUsed (\m r -> addToUFM_C (+) m r 1) emptyUFM a
   where count m r = lookupWithDefaultUFM m (0::Int) r
 
 cmmMiniInline :: Platform -> [CmmBasicBlock] -> [CmmBasicBlock]
@@ -155,7 +155,7 @@ cmmMiniInlineStmts :: Platform -> UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts _        _    [] = []
 cmmMiniInlineStmts platform uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
         -- not used: just discard this assignment
-  | Nothing <- lookupUFM uses u
+  | 0 <- lookupWithDefaultUFM uses 0 u
   = cmmMiniInlineStmts platform uses stmts
 
         -- used (foldable to small thing): try to inline at all the use sites
@@ -208,7 +208,6 @@ lookForInlineMany' u expr regset stmts@(stmt : rest)
                        (m, stmts) -> let z = n + m
                                      in z `seq` (z, stmt' : stmts)
        else (n, stmt' : rest)
-
 
   | okToSkip stmt u expr regset
   = case lookForInlineMany' u expr regset rest of
