@@ -48,7 +48,7 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
 import Var        (isId, isTyVar, varType, setVarType)
-import Id         (idType, zapFragileIdInfo, localiseId)
+import Id         (idType, zapFragileIdInfo, localiseId, isDictId)
 import MkId       (voidArgId, realWorldPrimId, mkPrimOpId)
 import Type       (isUnLiftedType, mkTyVarTy)
 import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind)
@@ -56,11 +56,11 @@ import TyCon      (PrimRep(..))
 import Type       (eqType, mkFunTy, mkPiTypes, mkTyConApp, typePrimRep, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn (unitTy, unboxedPairDataCon, unboxedPairTyCon)
-import MkCore     (mkWildValBinder, sortQuantVars)
+import MkCore     (mkWildValBinder, quantVarLe)
 import PrimOp     (PrimOp(MyThreadIdOp))
 import Literal
 import VarEnv
-import Util       (fstOf3, thirdOf3)
+import Util       (fstOf3, thirdOf3, sortLe)
 
 import qualified Control.Monad as Monad
 import Data.Ord
@@ -803,9 +803,23 @@ stateAbsVars mb_lvs state
   = (abstracted,                                                       ty)
   | otherwise
   = (AbsVar { absVarDead = True, absVarVar = voidArgId } : abstracted, realWorldStatePrimTy `mkFunTy` ty)
-  where vs_list = sortQuantVars (varSetElems (stateLambdaBounders state))
+  where vs_list = sortLe absVarLe (varSetElems (stateLambdaBounders state))
         ty = vs_list `mkPiTypes` stateType state
+
         abstracted = map (\v -> AbsVar { absVarDead = maybe False (not . (v `elemVarSet`)) mb_lvs, absVarVar = v }) vs_list
+
+-- Our custom ordering function ensures we get the following ordering:
+--  1. Kind variables
+--  2. Type variables
+--  3. Dictionary ids
+--  4. Other ids
+--
+-- The reason we want to sort dictionary ids earlier is so that GHC's own Specialise
+-- pass is able to specialise functions on them (it assumes they come after the type vars).
+absVarLe :: Var -> Var -> Bool
+absVarLe v1 v2
+  | isId v1, isId v2 = isDictId v1 >= isDictId v2
+  | otherwise        = quantVarLe v1 v2
 
 
 -- | Free variables that are allowed to be in the output term even though they weren't in the input (in addition to h-function names)

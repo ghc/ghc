@@ -13,7 +13,7 @@ module MkCore (
         mkCoreApp, mkCoreApps, mkCoreConApps,
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder, mkWildEvBinder,
-        sortQuantVars, castBottomExpr,
+        sortQuantVars, quantVarLe, castBottomExpr,
         
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
@@ -105,9 +105,10 @@ infixl 4 `mkCoreApp`, `mkCoreApps`
 sortQuantVars :: [Var] -> [Var]
 -- Sort the variables (KindVars, TypeVars, and Ids) 
 -- into order: Kind, then Type, then Id
-sortQuantVars = sortLe le
-  where
-    v1 `le` v2 = case (is_tv v1, is_tv v2) of
+sortQuantVars = sortLe quantVarLe
+
+quantVarLe :: Var -> Var -> Bool
+v1 `quantVarLe` v2 = case (is_tv v1, is_tv v2) of
                    (True, False)  -> True
                    (False, True)  -> False
                    (True, True)   ->
@@ -116,6 +117,7 @@ sortQuantVars = sortLe le
                        (False, True) -> False
                        _             -> v1 <= v2  -- Same family
                    (False, False) -> v1 <= v2
+  where
     is_tv v = isTyVar v
     is_kv v = isKindVar v
 
