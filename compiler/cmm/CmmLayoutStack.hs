@@ -467,7 +467,7 @@ setupStackFrame
              -> (StackMap, [CmmNode O O])
 
 setupStackFrame lbl liveness updfr_off ret_args stack0
-  = (cont_stack, assigs)
+  = (cont_stack, assignments)
   where
       -- get the set of LocalRegs live in the continuation
       live = mapFindWithDefault Set.empty lbl liveness
@@ -482,7 +482,7 @@ setupStackFrame lbl liveness updfr_off ret_args stack0
 
       -- everything up to updfr_off is off-limits
       -- stack1 contains updfr_off, plus everything we need to save
-      (stack1, assigs) = allocate updfr_off live stack0
+      (stack1, assignments) = allocate updfr_off live stack0
 
       -- And the Sp at the continuation is:
       --   sm_sp stack1 + ret_args
@@ -498,45 +498,53 @@ setupStackFrame lbl liveness updfr_off ret_args stack0
 -- This special case looks for the pattern we get from a typical
 -- tagged case expression:
 --
---   Sp[young(L1)] = L1
---   if (R1 & 7) != 0 goto L1 else goto L2
+--    Sp[young(L1)] = L1
+--    if (R1 & 7) != 0 goto L1 else goto L2
 --  L2:
---   call [R1] returns to L1
+--    call [R1] returns to L1
 --  L1: live: {y}
---   x = R1
---
+--    x = R1
 --
 -- If we let the generic case handle this, we get
 --
---   Sp[-16] = L1
---   if (R1 & 7) != 0 goto L1a else goto L2
+--    Sp[-16] = L1
+--    if (R1 & 7) != 0 goto L1a else goto L2
 --  L2:
---   Sp[-8] = y
---   Sp = Sp - 16
---   call [R1] returns to L1
+--    Sp[-8] = y
+--    Sp = Sp - 16
+--    call [R1] returns to L1
 --  L1a:
---   Sp[-8] = y
---   Sp = Sp - 16
---   goto L1
+--    Sp[-8] = y
+--    Sp = Sp - 16
+--    goto L1
 --  L1:
---   x = R1
+--    x = R1
 --
 -- The code for saving the live vars is duplicated in each branch, and
--- furthermore there is an extra jump (assuming L1 is a proc point,
--- which it probably is if there is a heap check).
+-- furthermore there is an extra jump in the fast path (assuming L1 is
+-- a proc point, which it probably is if there is a heap check).
 --
--- So to fix this we look for
+-- So to fix this we want to set up the stack frame before the
+-- conditional jump.  How do we know when to do this, and when it is
+-- safe?  The basic idea is, when we see the assignment
+-- 
+--   Sp[young(L)] = L
+-- 
+-- we know that
+--   * we are definitely heading for L
+--   * there can be no more reads from another stack area, because young(L)
+--     overlaps with it.
+--
+-- We don't necessarily know that everything live at L is live now
+-- (some might be assigned between here and the jump to L).  So we
+-- simplify and only do the optimisation when we see
+--
 --   (1) a block containing an assignment of a return address L
 --   (2) ending in a branch where one (and only) continuation goes to L,
 --       and no other continuations go to proc points.
 --
--- If this happens, then we allocate the stack frame for L in the
--- current block.
---
--- We know that it is safe to allocate the stack frame and save the
--- live variables after the assignment of the return address, because
--- stack areas are defined as overlapping, so there can be no reads
--- from other stack areas after the return address assignment.
+-- then we allocate the stack frame for L at the end of the block,
+-- before the branch.
 --
 -- We could generalise (2), but that would make it a bit more
 -- complicated to handle, and this currently catches the common case.
