@@ -44,9 +44,9 @@ type BlockEntryLiveness = BlockEnv CmmLive
 -- | Calculated liveness info for a CmmGraph
 -----------------------------------------------------------------------------
 
-cmmLiveness :: CmmGraph -> FuelUniqSM BlockEntryLiveness
+cmmLiveness :: CmmGraph -> BlockEntryLiveness
 cmmLiveness graph =
-  liftM check $ dataflowAnalBwd graph [] $ analBwd liveLattice xferLive
+  check $ dataflowAnalBwd graph [] $ analBwd liveLattice xferLive
   where entry = g_entry graph
         check facts = noLiveOnEntry entry
                         (expectJust "check" $ mapLookup entry facts) facts

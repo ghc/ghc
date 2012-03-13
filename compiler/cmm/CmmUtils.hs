@@ -477,11 +477,9 @@ dataflowPassFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
 dataflowAnalFwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
                 -> FwdPass FuelUniqSM n f
-                -> FuelUniqSM (BlockEnv f)
-dataflowAnalFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
---  (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
---  return facts
-  return (analyzeFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts))
+                -> BlockEnv f
+dataflowAnalFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd =
+  analyzeFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
 
 dataflowAnalFwdBlocks :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
@@ -495,11 +493,9 @@ dataflowAnalFwdBlocks (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
 dataflowAnalBwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]
                 -> BwdPass FuelUniqSM n f
-                -> FuelUniqSM (BlockEnv f)
-dataflowAnalBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd = do
---  (graph, facts, NothingO) <- analyzeAndRewriteBwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
---  return facts
-  return (analyzeBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts))
+                -> BlockEnv f
+dataflowAnalBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd =
+  analyzeBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
 
 dataflowPassBwd :: NonLocal n =>
                    GenCmmGraph n -> [(BlockId, f)]

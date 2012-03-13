@@ -130,7 +130,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        dumps Opt_D_dump_cmmz_split "Post splitting" gs
 
        ------------- More CAFs ------------------------------
-       cafEnv <- {-# SCC "cafAnal" #-} run $ cafAnal platform g
+       let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform g
        let localCAFs = catMaybes $ map (localCAFInfo platform cafEnv) gs
        mbpprTrace "localCAFs" (pprPlatform platform localCAFs) $ return ()
 

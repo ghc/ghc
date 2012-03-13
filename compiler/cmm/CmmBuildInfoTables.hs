@@ -107,7 +107,7 @@ cafTransfers platform = mkBTransfer3 first middle last
         add l s = if hasCAF l then Set.insert (toClosureLbl platform l) s
                               else s
 
-cafAnal :: Platform -> CmmGraph -> FuelUniqSM CAFEnv
+cafAnal :: Platform -> CmmGraph -> CAFEnv
 cafAnal platform g
     = dataflowAnalBwd g [] $ analBwd cafLattice (cafTransfers platform)
 
