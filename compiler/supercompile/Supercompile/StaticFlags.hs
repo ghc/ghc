@@ -216,3 +216,7 @@ rEDUCE_ROLLBACK = not $ lookUp $ fsLit "-fsupercompiler-no-reduce-rollback"
 
 sC_ROLLBACK :: Bool
 sC_ROLLBACK = not $ lookUp $ fsLit "-fsupercompiler-no-sc-rollback"
+
+
+tRACE :: Bool
+tRACE = lookUp $ fsLit "-fsupercompiler-trace"

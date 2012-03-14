@@ -207,7 +207,9 @@ scpDepth :: ScpEnv -> Int
 scpDepth = length . scpParents
 
 traceRenderM :: Outputable a => String -> a -> ScpM ()
-traceRenderM msg x = ScpM $ StateT $ \s -> ReaderT $ \env -> pprTraceSC (replicate (scpDepth env) ' ' ++ msg) (pPrint x) $ pure ((), s) -- TODO: include depth, refine to ScpM monad only
+traceRenderM msg x
+  | tRACE     = ScpM $ StateT $ \s -> ReaderT $ \env -> pprTraceSC (replicate (scpDepth env) ' ' ++ msg) (pPrint x) $ pure ((), s)
+  | otherwise = return ()
 
 addParentM :: Promise -> (State -> ScpM (Bool, (Deeds, FVedTerm))) -> State -> ScpM (Deeds, FVedTerm)
 addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
