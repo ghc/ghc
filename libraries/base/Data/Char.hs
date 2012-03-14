@@ -55,6 +55,7 @@ module Data.Char
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Arr (Ix)
+import GHC.Char
 import GHC.Real (fromIntegral)
 import GHC.Show
 import GHC.Read (Read, readLitChar, lexLitChar)

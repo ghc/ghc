@@ -34,10 +34,8 @@ module GHC.Err
        , undefined                 -- :: a
        ) where
 
-#ifndef __HADDOCK__
 import GHC.Types
 import GHC.Exception
-#endif
 \end{code}
 
 %*********************************************************

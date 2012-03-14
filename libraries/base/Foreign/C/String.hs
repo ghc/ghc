@@ -110,6 +110,7 @@ import Data.Word
 #ifdef __GLASGOW_HASKELL__
 import Control.Monad
 
+import GHC.Char
 import GHC.List
 import GHC.Real
 import GHC.Num

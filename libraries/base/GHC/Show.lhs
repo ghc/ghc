@@ -434,16 +434,20 @@ itos n# cs
         let !(I# minInt#) = minInt in
         if n# ==# minInt#
                 -- negateInt# minInt overflows, so we can't do that:
-           then '-' : itos' (negateInt# (n# `quotInt#` 10#))
-                             (itos' (negateInt# (n# `remInt#` 10#)) cs)
+           then '-' : (case n# `quotRemInt#` 10# of
+                       (# q, r #) ->
+                           itos' (negateInt# q) (itos' (negateInt# r) cs))
            else '-' : itos' (negateInt# n#) cs
     | otherwise = itos' n# cs
     where
     itos' :: Int# -> String -> String
     itos' x# cs'
         | x# <# 10#  = C# (chr# (ord# '0'# +# x#)) : cs'
-        | otherwise = case chr# (ord# '0'# +# (x# `remInt#` 10#)) of { c# ->
-                      itos' (x# `quotInt#` 10#) (C# c# : cs') }
+        | otherwise = case x# `quotRemInt#` 10# of
+                      (# q, r #) ->
+                          case chr# (ord# '0'# +# r) of
+                          c# ->
+                              itos' q (C# c# : cs')
 \end{code}
 
 Instances for types of the generic deriving mechanism.

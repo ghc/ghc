@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash,
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples,
              StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -50,7 +50,7 @@ import GHC.Float ()     -- for RealFrac methods
 -- Int8 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data Int8 = I8# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt8" #-} Int8 = I8# Int# deriving (Eq, Ord)
 -- ^ 8-bit signed integer type
 
 instance Show Int8 where
@@ -105,14 +105,18 @@ instance Integral Int8 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I8# (narrow8Int# (x# `quotInt#` y#)),
-                                       I8# (narrow8Int# (x# `remInt#` y#)))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I8# (narrow8Int# q),
+                                            I8# (narrow8Int# r))
     divMod  x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I8# (narrow8Int# (x# `divInt#` y#)),
-                                       I8# (narrow8Int# (x# `modInt#` y#)))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I8# (narrow8Int# d),
+                                            I8# (narrow8Int# m))
     toInteger (I8# x#)               = smallInteger x#
 
 instance Bounded Int8 where
@@ -201,7 +205,7 @@ instance Bits Int8 where
 -- Int16 is represented in the same way as Int. Operations may assume
 -- and must ensure that it holds only values from its logical range.
 
-data Int16 = I16# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt16" #-} Int16 = I16# Int# deriving (Eq, Ord)
 -- ^ 16-bit signed integer type
 
 instance Show Int16 where
@@ -256,14 +260,18 @@ instance Integral Int16 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I16# (narrow16Int# (x# `quotInt#` y#)),
-                                        I16# (narrow16Int# (x# `remInt#` y#)))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I16# (narrow16Int# q),
+                                            I16# (narrow16Int# r))
     divMod  x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I16# (narrow16Int# (x# `divInt#` y#)),
-                                        I16# (narrow16Int# (x# `modInt#` y#)))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I16# (narrow16Int# d),
+                                            I16# (narrow16Int# m))
     toInteger (I16# x#)              = smallInteger x#
 
 instance Bounded Int16 where
@@ -357,7 +365,7 @@ instance Bits Int16 where
 -- from its logical range.
 #endif
 
-data Int32 = I32# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt32" #-} Int32 = I32# Int# deriving (Eq, Ord)
 -- ^ 32-bit signed integer type
 
 instance Show Int32 where
@@ -421,14 +429,18 @@ instance Integral Int32 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I32# (narrow32Int# (x# `quotInt#` y#)),
-                                     I32# (narrow32Int# (x# `remInt#` y#)))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I32# (narrow32Int# q),
+                                            I32# (narrow32Int# r))
     divMod  x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I32# (narrow32Int# (x# `divInt#` y#)),
-                                     I32# (narrow32Int# (x# `modInt#` y#)))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I32# (narrow32Int# d),
+                                            I32# (narrow32Int# m))
     toInteger (I32# x#)              = smallInteger x#
 
 instance Read Int32 where
@@ -524,7 +536,7 @@ instance Ix Int32 where
 
 #if WORD_SIZE_IN_BITS < 64
 
-data Int64 = I64# Int64#
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int64#
 -- ^ 64-bit signed integer type
 
 instance Eq Int64 where
@@ -690,7 +702,7 @@ a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#)
 -- Operations may assume and must ensure that it holds only values
 -- from its logical range.
 
-data Int64 = I64# Int# deriving (Eq, Ord)
+data {-# CTYPE "HsInt64" #-} Int64 = I64# Int# deriving (Eq, Ord)
 -- ^ 64-bit signed integer type
 
 instance Show Int64 where
@@ -747,12 +759,16 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I64# (x# `quotInt#` y#), I64# (x# `remInt#` y#))
+        | otherwise                  = case x# `quotRemInt#` y# of
+                                       (# q, r #) ->
+                                           (I64# q, I64# r)
     divMod  x@(I64# x#) y@(I64# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = (I64# (x# `divInt#` y#), I64# (x# `modInt#` y#))
+        | otherwise                  = case x# `divModInt#` y# of
+                                       (# d, m #) ->
+                                           (I64# d, I64# m)
     toInteger (I64# x#)              = smallInteger x#
 
 instance Read Int64 where

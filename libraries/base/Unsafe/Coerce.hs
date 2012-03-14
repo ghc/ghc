@@ -34,7 +34,10 @@ module Unsafe.Coerce (unsafeCoerce) where
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Prim (unsafeCoerce#)
 unsafeCoerce :: a -> b
-unsafeCoerce = unsafeCoerce#
+unsafeCoerce x = unsafeCoerce# x
+  -- See Note [Unsafe coerce magic] in basicTypes/MkId
+  -- NB: Do not eta-reduce this definition, else the type checker 
+  -- give usafeCoerce the same (dangerous) type as unsafeCoerce#
 #endif
 
 #if defined(__NHC__)

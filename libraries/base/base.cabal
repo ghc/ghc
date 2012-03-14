@@ -38,6 +38,7 @@ Library {
             Foreign.Concurrent,
             GHC.Arr,
             GHC.Base,
+            GHC.Char,
             GHC.Conc,
             GHC.Conc.IO,
             GHC.Conc.Signal,
@@ -121,7 +122,6 @@ Library {
         Control.Concurrent.SampleVar,
         Control.Exception,
         Control.Exception.Base
-        Control.OldException,
         Control.Monad,
         Control.Monad.Fix,
         Control.Monad.Instances,
@@ -220,7 +220,6 @@ Library {
         cbits/consUtils.c
         cbits/iconv.c
         cbits/inputReady.c
-        cbits/selectUtils.c
         cbits/primFloat.c
         cbits/md5.c
     include-dirs: include

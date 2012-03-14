@@ -1,6 +1,7 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, PatternGuards,
+             ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -64,14 +65,13 @@ import Text.ParserCombinators.ReadPrec
 
 import Data.Maybe
 
-#ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode       ( isDigit )
-#endif
 import GHC.Num
 import GHC.Real
-import GHC.Float ()
+import GHC.Float
 import GHC.Show
 import GHC.Base
+import GHC.Err
 import GHC.Arr
 -- For defining instances for the generic deriving mechanism
 import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
@@ -470,13 +470,18 @@ readNumber convert =
 
 
 convertInt :: Num a => L.Lexeme -> ReadPrec a
-convertInt (L.Int i) = return (fromInteger i)
-convertInt _         = pfail
+convertInt (L.Number n)
+ | Just i <- L.numberToInteger n = return (fromInteger i)
+convertInt _ = pfail
 
-convertFrac :: Fractional a => L.Lexeme -> ReadPrec a
-convertFrac (L.Int i) = return (fromInteger i)
-convertFrac (L.Rat r) = return (fromRational r)
-convertFrac _         = pfail
+convertFrac :: forall a . RealFloat a => L.Lexeme -> ReadPrec a
+convertFrac (L.Ident "NaN")      = return (0 / 0)
+convertFrac (L.Ident "Infinity") = return (1 / 0)
+convertFrac (L.Number n) = let resRange = floatRange (undefined :: a)
+                           in case L.numberToRangedRational resRange n of
+                              Nothing -> return (1 / 0)
+                              Just rat -> return $ fromRational rat
+convertFrac _            = pfail
 
 instance Read Int where
   readPrec     = readNumber convertInt

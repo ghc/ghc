@@ -1,0 +1,40 @@
+>> CAUGHT return
+>> CAUGHT return undefined
+>> CAUGHT return Exception.throw
+>> CAUGHT return error
+>> MISSED fail
+>> MISSED error
+>> MISSED Exception.throw
+>> MISSED ioError ErrorCall
+>> MISSED ioError IOException
+>> MISSED undefined
+Prelude.catch MISSED return
+Prelude.catch MISSED return undefined
+Prelude.catch MISSED return Exception.throw
+Prelude.catch MISSED return error
+Prelude.catch CAUGHT fail
+Prelude.catch MISSED error
+Prelude.catch MISSED Exception.throw
+Prelude.catch MISSED ioError ErrorCall
+Prelude.catch CAUGHT ioError IOException
+Prelude.catch MISSED undefined
+Exception.catch MISSED return
+Exception.catch MISSED return undefined
+Exception.catch MISSED return Exception.throw
+Exception.catch MISSED return error
+Exception.catch CAUGHT fail
+Exception.catch CAUGHT error
+Exception.catch CAUGHT Exception.throw
+Exception.catch CAUGHT ioError ErrorCall
+Exception.catch CAUGHT ioError IOException
+Exception.catch CAUGHT undefined
+Exception.finally CAUGHT return
+Exception.finally CAUGHT return undefined
+Exception.finally CAUGHT return Exception.throw
+Exception.finally CAUGHT return error
+Exception.finally CAUGHT fail
+Exception.finally CAUGHT error
+Exception.finally CAUGHT Exception.throw
+Exception.finally CAUGHT ioError ErrorCall
+Exception.finally CAUGHT ioError IOException
+Exception.finally CAUGHT undefined

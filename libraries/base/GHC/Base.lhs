@@ -109,7 +109,6 @@ import GHC.Types
 import GHC.Classes
 import GHC.CString
 import GHC.Prim
-import {-# SOURCE #-} GHC.Show
 import {-# SOURCE #-} GHC.Err
 import {-# SOURCE #-} GHC.IO (failIO)
 
@@ -458,13 +457,6 @@ type String = [Char]
 "x# `ltChar#` x#" forall x#. x# `ltChar#` x# = False
   #-}
 
--- | The 'Prelude.toEnum' method restricted to the type 'Data.Char.Char'.
-chr :: Int -> Char
-chr i@(I# i#)
- | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
- | otherwise
-    = error ("Prelude.chr: bad argument: " ++ showSignedInt (I# 9#) i "")
-
 unsafeChr :: Int -> Char
 unsafeChr (I# i#) = C# (chr# i#)
 
@@ -706,6 +698,23 @@ plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt :: Int -> Int -> In
 (I# x) `remInt`   (I# y) = I# (x `remInt#`  y)
 (I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
 (I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
+
+quotRemInt :: Int -> Int -> (Int, Int)
+(I# x) `quotRemInt` (I# y) = case x `quotRemInt#` y of
+                             (# q, r #) ->
+                                 (I# q, I# r)
+
+divModInt :: Int -> Int -> (Int, Int)
+(I# x) `divModInt` (I# y) = case x `divModInt#` y of
+                            (# q, r #) -> (I# q, I# r)
+
+divModInt# :: Int# -> Int# -> (# Int#, Int# #)
+x# `divModInt#` y#
+ | (x# ># 0#) && (y# <# 0#) = case (x# -# 1#) `quotRemInt#` y# of
+                              (# q, r #) -> (# q -# 1#, r +# y# +# 1# #)
+ | (x# <# 0#) && (y# ># 0#) = case (x# +# 1#) `quotRemInt#` y# of
+                              (# q, r #) -> (# q -# 1#, r +# y# -# 1# #)
+ | otherwise                = x# `quotRemInt#` y#
 
 {-# RULES
 "x# +# 0#" forall x#. x# +# 0# = x#

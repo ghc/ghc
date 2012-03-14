@@ -27,9 +27,7 @@ import Control.Category ((.))
 import Data.Data        (Data)
 
 -- A version of Control.Category.>>> overloaded on Arrow
-#ifndef __HADDOCK__
 (>>>) :: forall arr. Arrow arr => forall a b c. arr a b -> arr b c -> arr a c
-#endif
 -- NB: the type of this function is the "shape" that GHC expects
 --     in tcInstClassOp.  So don't put all the foralls at the front!  
 --     Yes, this is a bit grotesque, but heck it works and the whole

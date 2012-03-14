@@ -148,9 +148,6 @@ extern HsWord64 getUSecOfDay(void);
 /* in inputReady.c */
 extern int fdReady(int fd, int write, int msecs, int isSock);
 
-/* in Signals.c */
-extern HsInt nocldstop;
-
 /* -----------------------------------------------------------------------------
    INLINE functions.
 
@@ -170,53 +167,10 @@ extern HsInt nocldstop;
 INLINE int __hscore_get_errno(void) { return errno; }
 INLINE void __hscore_set_errno(int e) { errno = e; }
 
-#if !defined(_MSC_VER)
-INLINE int __hscore_s_isreg(mode_t m)  { return S_ISREG(m);  }
-INLINE int __hscore_s_isdir(mode_t m)  { return S_ISDIR(m);  }
-INLINE int __hscore_s_isfifo(mode_t m) { return S_ISFIFO(m); }
-INLINE int __hscore_s_isblk(mode_t m)  { return S_ISBLK(m);  }
-INLINE int __hscore_s_ischr(mode_t m)  { return S_ISCHR(m);  }
-#if !defined(mingw32_HOST_OS) && !defined(__MINGW32__)
-INLINE int __hscore_s_issock(mode_t m) { return S_ISSOCK(m); }
-#endif
-#endif
-
-#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
-INLINE int
-__hscore_sigemptyset( sigset_t *set )
-{ return sigemptyset(set); }
-
-INLINE int
-__hscore_sigfillset( sigset_t *set )
-{ return sigfillset(set); }
-
-INLINE int
-__hscore_sigaddset( sigset_t * set, int s )
-{ return sigaddset(set,s); }
-
-INLINE int
-__hscore_sigdelset( sigset_t * set, int s )
-{ return sigdelset(set,s); }
-
-INLINE int
-__hscore_sigismember( sigset_t * set, int s )
-{ return sigismember(set,s); }
-#endif
-
-INLINE void *
-__hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
-{ return memcpy(dst, src+src_off, sz); }
-
 INLINE HsInt
 __hscore_bufsiz(void)
 {
   return BUFSIZ;
-}
-
-INLINE int
-__hscore_seek_cur(void)
-{
-  return SEEK_CUR;
 }
 
 INLINE int
@@ -317,18 +271,6 @@ __hscore_o_nonblock( void )
 #else
   return 0;
 #endif
-}
-
-INLINE int
-__hscore_seek_set( void )
-{
-  return SEEK_SET;
-}
-
-INLINE int
-__hscore_seek_end( void )
-{
-  return SEEK_END;
 }
 
 INLINE int
@@ -574,8 +516,6 @@ __hscore_fd_cloexec( void )
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
 
-INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
-
 #ifdef __MINGW32__
 INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
@@ -590,35 +530,6 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
 	return open(file,how,mode);
 }
 #endif
-
-// These are wrapped because on some OSs (eg. Linux) they are
-// macros which redirect to the 64-bit-off_t versions when large file
-// support is enabled.
-//
-#if defined(__MINGW32__)
-INLINE off64_t __hscore_lseek(int fd, off64_t off, int whence) {
-	return (_lseeki64(fd,off,whence));
-}
-#else
-INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
-	return (lseek(fd,off,whence));
-}
-#endif
-
-// select-related stuff
-
-#if !defined(__MINGW32__)
-INLINE int  hsFD_SETSIZE(void) { return FD_SETSIZE; }
-INLINE int  hsFD_ISSET(int fd, fd_set *fds) { return FD_ISSET(fd, fds); }
-INLINE void hsFD_SET(int fd, fd_set *fds) { FD_SET(fd, fds); }
-INLINE HsInt sizeof_fd_set(void) { return sizeof(fd_set); }
-extern void hsFD_ZERO(fd_set *fds);
-#endif
-
-INLINE int __hscore_select(int nfds, fd_set *readfds, fd_set *writefds,
-                           fd_set *exceptfds, struct timeval *timeout) {
-	return (select(nfds,readfds,writefds,exceptfds,timeout));
-}
 
 #if darwin_HOST_OS
 // You should not access _environ directly on Darwin in a bundle/shared library.
