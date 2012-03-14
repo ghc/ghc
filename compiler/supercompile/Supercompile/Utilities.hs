@@ -270,6 +270,7 @@ instance Outputable Tag where
 mkTag :: Int -> Tag
 mkTag i = TG (Fin i) 1
 
+{-# INLINE injectTag #-} -- Was accounting for 2% of allocations
 injectTag :: Int -> Tag -> Tag
 injectTag cls (TG (Fin i) occs) = TG (Fin (cls * i)) occs
 
@@ -384,6 +385,14 @@ extractJusts p = foldr step ([], [])
 
 secondM :: Functor f => (b -> f c) -> (a, b) -> f (a, c)
 secondM f (x, y) = fmap ((,) x) (f y)
+
+-- Stricter than 'first'
+first2 :: (a -> c) -> (a, b) -> (c, b)
+first2 f (a, b) = (f a, b)
+
+-- Stricter than 'second'
+second2 :: (b -> c) -> (a, b) -> (a, c)
+second2 f (a, b) = (a, f b)
 
 first3 :: (a -> d) -> (a, b, c) -> (d, b, c)
 first3 f (a, b, c) = (f a, b, c)
@@ -543,6 +552,12 @@ mapAccumLM f = go []
     go ys acc (x:xs) = do
       (acc, y) <- f acc x
       go (y:ys) acc xs
+
+{-# INLINE foldToMapAccumL #-}
+foldToMapAccumL :: (forall acc'. (x -> acc' -> acc') -> acc' -> f_x -> acc')
+                -> (acc -> x -> (acc, y))
+                -> acc -> f_x -> (acc, [y])
+foldToMapAccumL fold f init_acc xs = fold (\x (acc, ys) -> case f acc x of (acc', y) -> (acc', y:ys)) (init_acc, []) xs
 
 
 traverseAll :: Traversable t => ([a] -> (c, [b])) -> t a -> (c, t b)

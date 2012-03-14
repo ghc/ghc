@@ -284,6 +284,7 @@ answerType a = case annee a of
 heapBindingTerm :: HeapBinding -> Maybe (In AnnedTerm)
 heapBindingTerm = either (const Nothing) Just . heapBindingMeaning
 
+{-# INLINE heapBindingTag #-} -- Showed up as causing 2% of allocation in a run despite resulting Maybe never being stored
 heapBindingTag :: HeapBinding -> Maybe Tag
 heapBindingTag = either (either (const Nothing) Just) (Just . annedTag . snd) . heapBindingMeaning
 

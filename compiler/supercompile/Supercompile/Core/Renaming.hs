@@ -94,25 +94,37 @@ joinSubst iss (id_subst, tv_subst, co_subst) = mkSubst iss tv_subst co_subst id_
 --     This is the solution I've adopted, and it is implemented here in splitSubst:
 splitSubst :: Subst -> [(Var, Var)] -> (InScopeSet, Renaming)
 splitSubst (Subst iss id_subst tv_subst co_subst) extend
-  = (iss, (id_subst `extendVarEnvList` [(x, varToCoreSyn x') | (x, x') <- ids_extend],
-           tv_subst `extendVarEnvList` [(a, mkTyVarTy a')    | (a, a') <- tvs_extend],
-           co_subst `extendVarEnvList` [(q, mkCoVarCo q')    | (q, q') <- cos_extend]))
-  where (ids_extend, tvs_extend, cos_extend) = splitVarLikeList fst extend
+  = (iss, foldVarlikes (\f -> foldr (\x_x' -> f (fst x_x') x_x')) extend
+                       (\(x, x') -> first3  (\id_subst -> extendVarEnv id_subst x (varToCoreSyn x')))
+                       (\(a, a') -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a')))
+                       (\(q, q') -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q')))
+                       (id_subst, tv_subst, co_subst))
 
-splitVarLikeList :: (a -> Var) -> [a] -> ([a], [a], [a])
-splitVarLikeList f xs = (id_list, tv_list, co_list)
-  where (tv_list, coid_list) = partition (isTyVar . f) xs
-        (co_list, id_list)   = partition (isCoVar . f) coid_list
-
-splitVarList :: [Var] -> ([Id], [TyVar], [CoVar])
-splitVarList = splitVarLikeList id
+-- NB: this used to return a triple of lists, but I introduced this version due to profiling
+-- results that indicated a caller (renameFreeVars) was causing 2% of all allocations. It turns
+-- out that I managed to achieve deforestation in all of the callers by rewriting them to use this
+-- version instead.
+{-# INLINE foldVarlikes #-}
+foldVarlikes :: ((Var -> a -> b -> b) -> b -> f_a -> b)
+             -> f_a
+             -> (a -> b -> b) -- Id continuation
+             -> (a -> b -> b) -- TyVar continuation
+             -> (a -> b -> b) -- CoVar continuation
+             -> b -> b
+foldVarlikes fold as id tv co acc = fold go acc as
+  where go x a res | isTyVar x = tv a res
+                   | isCoVar x = co a res
+                   | otherwise = id a res
 
 emptyRenaming :: Renaming
 emptyRenaming = (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
 mkIdentityRenaming :: FreeVars -> Renaming
-mkIdentityRenaming fvs = (mkVarEnv [(x, varToCoreSyn x) | x <- id_list], mkVarEnv [(x, mkTyVarTy x) | x <- tv_list], mkVarEnv [(x, mkCoVarCo x) | x <- co_list])
-  where (id_list, tv_list, co_list) = splitVarList (varSetElems fvs)
+mkIdentityRenaming fvs = foldVarlikes (\f -> foldVarSet (\x -> f x x)) fvs
+                                      (\x -> first3  (\id_subst -> extendVarEnv id_subst x (varToCoreSyn x)))
+                                      (\a -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a)))
+                                      (\q -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q)))
+                                      (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
 mkTyVarRenaming :: [(TyVar, Type)] -> Renaming
 mkTyVarRenaming aas = (emptyVarEnv, mkVarEnv aas, emptyVarEnv)
@@ -163,10 +175,11 @@ inFreeVars :: (a -> FreeVars) -> In a -> FreeVars
 inFreeVars thing_fvs (rn, thing) = renameFreeVars rn (thing_fvs thing)
 
 renameFreeVars :: Renaming -> FreeVars -> FreeVars
-renameFreeVars rn fvs = mkVarSet (map (renameId rn) id_list) `unionVarSet`
-                        unionVarSets [tyVarsOfType (lookupTyVarSubst rn tv) | tv <- tv_list] `unionVarSet`
-                        unionVarSets [tyCoVarsOfCo (lookupCoVarSubst rn co) | co <- co_list]
-  where (id_list, tv_list, co_list) = splitVarList (varSetElems fvs)
+renameFreeVars rn fvs = foldVarlikes (\f -> foldVarSet (\x -> f x x)) fvs
+                                     (\x -> flip extendVarSet (renameId rn x))
+                                     (\a -> unionVarSet (tyVarsOfType (lookupTyVarSubst rn a)))
+                                     (\q -> unionVarSet (tyCoVarsOfCo (lookupCoVarSubst rn q)))
+                                     emptyVarSet
 
 renameType :: InScopeSet -> Renaming -> Type -> Type
 renameType iss rn = substTy (joinSubst iss rn)

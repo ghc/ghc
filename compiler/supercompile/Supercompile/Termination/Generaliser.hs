@@ -30,11 +30,14 @@ generaliserFromFinSet generalise_what = Generaliser {
   where should_generalise tg = IS.member (tagInt tg) generalise_what
 
 
+{-# INLINE pureHeapBindingTag' #-}
 pureHeapBindingTag' :: Tag -> Tag
 pureHeapBindingTag' = injectTag 5
 
+{-# INLINE stackFrameTag' #-}
 stackFrameTag' :: Tagged StackFrame -> Tag
 stackFrameTag' = injectTag 3 . tag
 
+{-# INLINE qaTag' #-}
 qaTag' :: Anned QA -> Tag
 qaTag' = injectTag 2 . annedTag

@@ -25,29 +25,25 @@ embedWithTagBags' :: (forall f. (Foldable f, Zippable f, Finite (f ())) => TTest
                   -> (TTest State, State -> State -> Generaliser)
 embedWithTagBags' nats = (cofmap stateTags (equalDomainT nats), generaliserFromGrowing stateTags)
 
+-- NB: I try very hard to avoid creating intermediate tag bags in this function because it
+-- accounts for a staggering fraction of the supercompiler's total allocation
 stateTags :: State -> TagBag
 stateTags (_, Heap h _, k, qa) = -- traceRender ("stateTags (TagBag)", M.map heapBindingTagBag h, map stackFrameTag' k, qaTag' qa) $
                                       -- traceRender ("stateTags:heap (TagBag)", M.map heapBindingTag h) $
                                       -- (\res -> traceRender ("stateTags (TagBag)", res) res) $
-                                      pureHeapTagBag h `plusTagBag` stackTagBag k `plusTagBag` tagTagBag (qaTag' qa)
+                                      pureHeapTagBag h (stackTagBag k (singletonTagBag (qaTag' qa) IM.empty))
   where
-    heapBindingTagBag :: HeapBinding -> TagBag
-    heapBindingTagBag = maybe (mkTagBag []) (tagTagBag . pureHeapBindingTag') . heapBindingTag
+    heapBindingTagBag :: HeapBinding -> TagBag -> TagBag
+    heapBindingTagBag = maybe id (singletonTagBag . pureHeapBindingTag') . heapBindingTag
       
-    pureHeapTagBag :: PureHeap -> TagBag
-    pureHeapTagBag = plusTagBags . map heapBindingTagBag . M.elems
+    pureHeapTagBag :: PureHeap -> TagBag -> TagBag
+    pureHeapTagBag = flip $ M.fold heapBindingTagBag -- NB: really a foldr, but the M.foldr synonym was added in a later version of containers
  
-    stackTagBag :: Stack -> TagBag
-    stackTagBag = mkTagBag . map stackFrameTag' . trainCars
+    stackTagBag :: Stack -> TagBag -> TagBag
+    stackTagBag = flip $ trainCarFoldr stackFrameTagBag
+
+    stackFrameTagBag :: Tagged StackFrame -> TagBag -> TagBag
+    stackFrameTagBag = singletonTagBag . stackFrameTag'
  
-    tagTagBag :: Tag -> TagBag
-    tagTagBag = mkTagBag . return
-    
-    mkTagBag :: [Tag] -> TagBag
-    mkTagBag = plusTagBags . map (\(TG i occs) -> IM.singleton (unFin i) occs)
-    
-    plusTagBag :: TagBag -> TagBag -> TagBag
-    plusTagBag = IM.unionWith (+)
-    
-    plusTagBags :: [TagBag] -> TagBag
-    plusTagBags = foldr plusTagBag IM.empty
+    singletonTagBag :: Tag -> TagBag -> TagBag
+    singletonTagBag (TG i occs) = IM.insert (unFin i) occs

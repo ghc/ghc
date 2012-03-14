@@ -266,37 +266,41 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
 
 
 
+-- Be very careful when you change this function. At one point it accounted for 10% of
+-- supercompile runtime, so I went to a lot of trouble to deforest everything in sight.
 prepareTerm :: M.Map Var Term -> Term -> (S.Set Var,                    -- Names of all unfoldings in the input heaps
                                           ([(Var,   FVedTerm)], State), -- For use without memo-cache preinitalization
                                           ([(State, FVedTerm)], State)) -- With preinitialization
 prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                            pprTraceSC "unfoldings" (pPrintPrecLetRec noPrec (M.toList unfoldings) (PrettyDoc (text "<stuff>"))) $
-                           pprTraceSC "all input FVs" (ppr (input_fvs `delVarSetList` unfolding_bvs_list)) $
+                           pprTraceSC "all input FVs" (ppr (input_fvs `delVarSetList` S.toList unfolding_bvs)) $
                            (unfolding_bvs, pprTraceSC "no-preinit unfoldings" (pPrintPrecLetRec noPrec (M.toList h'') (PrettyDoc (text "<stuff>")))
                                                       (h''_must_be_bound, state),
                                            (preinit_with, preinit_state))
   where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
         anned_e = toAnnedTerm tag_ids0 e
         
-        ((input_fvs, tag_ids2), h_unfoldings) = mapAccumL add_one_unfolding (annedTermFreeVars anned_e, tag_ids1) (M.toList unfoldings)
-          where add_one_unfolding (input_fvs', tag_ids1) (x', e) = ((input_fvs'', tag_ids2), (x', renamedTerm anned_e))
-                    where (tag_unf_ids, tag_ids2) = splitUniqSupply tag_ids1
+        -- NB: the code below assumes h_unfoldings is in ascending order so it can get a little speed boost
+        (input_fvs, tag_ids2, h_unfoldings) = foldr3WithKey' add_one_unfolding (annedTermFreeVars anned_e, tag_ids1, []) unfoldings
+          where add_one_unfolding x' e (input_fvs', tag_ids1, h_unfoldings) = (input_fvs'', tag_ids2, (x', renamedTerm anned_e):h_unfoldings)
+                    where !(tag_unf_ids, tag_ids2) = splitUniqSupply tag_ids1
                           anned_e = toAnnedTerm tag_unf_ids e
                           input_fvs'' = input_fvs' `unionVarSet` varBndrFreeVars x' `unionVarSet` annedFreeVars anned_e
         
-        h_fvs = M.fromList $ snd $ mapAccumL add_one_fv tag_ids2 (varSetElems input_fvs)
+        -- NB: foldVarSet is a right fold, so this use of fromDistinctAscList is justified
+        h_fvs = M.fromDistinctAscList $ snd $ foldToMapAccumL foldVarSet add_one_fv tag_ids2 input_fvs
           where add_one_fv tag_ids2 x' = (tag_ids3, (x', environmentallyBound (mkTag (getKey i))))
-                    where (i, tag_ids3) = takeUniqFromSupply tag_ids2
+                    where !(i, tag_ids3) = takeUniqFromSupply tag_ids2
 
-        unfolding_bvs_list = map fst h_unfoldings
-        unfolding_bvs = S.fromList unfolding_bvs_list
+        unfolding_bvs = S.fromDistinctAscList (map fst h_unfoldings)
         deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
-        (speculated, (_stats, deeds', Heap h' ids')) = speculateHeap S.empty (mempty, deeds, Heap (M.fromList (map (second internallyBound) h_unfoldings) `M.union` h_fvs) ids)
+        (speculated, (_stats, deeds', Heap h' ids')) = speculateHeap S.empty (mempty, deeds, Heap (M.fromDistinctAscList (map (second2 internallyBound) h_unfoldings) `M.union` h_fvs) ids)
         -- FIXME: use speculated
 
         -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
         rn = mkIdentityRenaming input_fvs
         ids = mkInScopeSet input_fvs
+        {-# INLINE heap_binding_is_value #-}
         heap_binding_is_value = maybe True (termIsValue . snd) . heapBindingTerm
 
         -- When *not* doing memocache preinitialization, we still want to be able to speculate the unfoldings to
@@ -321,14 +325,26 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         --
         -- We do want to make "foo" unavailable as there is no value unfolding we can give it
         -- that ensures that we share the work of "fib 100" with all other modules.
-        (h'_value, h'_nonvalue) = M.partition heap_binding_is_value h'
-        h'' = go (M.keysSet h'_nonvalue) h'_value
-          where go eliminate h
-                  | M.null h_eliminated = h_trimmed
-                  | otherwise           = go (M.keysSet h_eliminated) h_trimmed
-                  where (h_eliminated, h_trimmed) = M.partition (\hb -> heapBindingFreeVars hb `intersectsVarSet` eliminate_set) h
-                        eliminate_set = dataSetToVarSet (eliminate S.\\ unfolding_bvs)
-        
+        (eliminate_set_nonvalue, h'_value) = funny_partition (\hb -> hb { howBound = LetBound }) (not . heap_binding_is_value) h'
+        h'' = go eliminate_set_nonvalue h'_value
+          where go eliminate_set h
+                  | isEmptyVarSet eliminate_set' = h_trimmed
+                  | otherwise                    = go eliminate_set' h_trimmed
+                  where (eliminate_set', h_trimmed) = funny_partition id (\hb -> heapBindingFreeVars hb `intersectsVarSet` eliminate_set) h
+        -- Given a predicate and a heap, returns pair of:
+        --  1. The satisfying ids that are NOT available as imports
+        --  2. Heap containing just the unsatisfying elements
+        --
+        -- Also takes a "fiddle" function which is used to modify the unsatisfying
+        -- elements, so we can get just a *little* bit more deforestation.
+        {-# INLINE funny_partition #-}
+        funny_partition fiddle p h = foldl2WithKey' go (emptyVarSet, M.empty) h
+          where go (killed, kept) x' hb
+                 | p hb = if x' `S.member` unfolding_bvs
+                           then (killed, kept)
+                           else (extendVarSet killed x', kept)
+                 | otherwise = (killed, M.insert x' (fiddle hb) kept)
+
         -- Secondly, pull out any remaining bindings (which must be values) that didn't exist in the
         -- unspeculated heap. These will be our new top-level bindings.
         h''_must_be_bound = [ (x', detagAnnedTerm (renameIn (renameAnnedTerm ids') in_e))
@@ -336,7 +352,7 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                             , not (x' `S.member` unfolding_bvs)
                             , Just in_e <- [heapBindingTerm hb] ]
 
-        state = normalise (deeds', Heap (M.map (\hb -> hb { howBound = LetBound }) h'' `M.union` h_fvs) ids', Loco False, (rn, anned_e))
+        state = normalise (deeds', Heap (h'' `M.union` h_fvs) ids', Loco False, (rn, anned_e))
         
         -- When doing memocache preinitialization, we don't want to include in the final heap any binding originating
         -- from evaluating the top-level that cannot be proven to be a value, or else we risk work duplication
@@ -392,6 +408,48 @@ eta heap accessor_e0 in_e = (heap, accessor_e0, in_e) : case normalise (maxBound
     , Just (accessor_e2, _, e_body) <- mb_res
     -> eta (Heap (M.insert x' lambdaBound h) ids') accessor_e2 (rn', e_body)
   _ -> []
+
+
+{-# INLINE traverseWithKey #-}
+-- INLINE so it gets inlined before specialisation, eta-expanded so any automatic SCCs
+-- don't interfere with inlining (inlining doesn't look through SCCs for arguments!)
+traverseWithKey :: Applicative t => (k -> a -> t b) -> M.Map k a -> t (M.Map k b)
+#if (MIN_VERSION_containers(0,4,3))
+traverseWithKey f kvs = M.traverseWithKey f kvs
+#else
+traverseWithKey f = traverse (uncurry f) . M.mapWithKey (\k v -> (k, v))
+#endif
+
+newtype State2L s1 s2 a = State2L { unState2L :: s1 -> s2 -> (s1, s2) }
+
+instance Functor (State2L s1 s2) where
+    fmap _ = State2L . unState2L
+
+instance Applicative (State2L s1 s2) where
+    pure _ = State2L (,)
+    mf <*> mx = State2L $ \s1 s2 -> case unState2L mf s1 s2 of (s1, s2) -> unState2L mx s1 s2 -- NB: left side first
+
+newtype State3R s1 s2 s3 a = State3R { unState3R :: s1 -> s2 -> s3 -> (s1, s2, s3) }
+
+instance Functor (State3R s1 s2 s3) where
+    fmap _ = State3R . unState3R
+
+instance Applicative (State3R s1 s2 s3) where
+    pure _ = State3R (,,)
+    mf <*> mx = State3R $ \s1 s2 s3 -> case unState3R mx s1 s2 s3 of (s1, s2, s3) -> unState3R mf s1 s2 s3 -- NB: right side first
+
+-- You might wonder why we don't just use foldlWithKey and make the accumulator into a pair. The reason is that
+-- if we do that then (due to a problem in the strictness analyser, which I've emailed Simon about) the resulting
+-- loop will allocate a new pair on every iteration. If we specialise the traverseWithKey code instead then we can
+-- pass the components of the pair in seperate arguments and totally avoid the allocations. This is a Big Win,
+-- since prepareTerm was accounting for 10% of all allocations in some of my tests.
+{-# INLINE foldl2WithKey' #-}
+foldl2WithKey' :: ((a1, a2) -> k -> v -> (a1, a2)) -> (a1, a2) -> M.Map k v -> (a1, a2)
+foldl2WithKey' f (a1, a2) kvs = unState2L (traverseWithKey (\k v -> State2L $ \a1 a2 -> f (a1, a2) k v) kvs) a1 a2
+
+{-# INLINE foldr3WithKey' #-}
+foldr3WithKey' :: (k -> v -> (a1, a2, a3) -> (a1, a2, a3)) -> (a1, a2, a3) -> M.Map k v -> (a1, a2, a3)
+foldr3WithKey' f (a1, a2, a3) kvs = unState3R (traverseWithKey (\k v -> State3R $ \a1 a2 a3 -> f k v (a1, a2, a3)) kvs) a1 a2 a3
 
 
 data SCStats = SCStats {
@@ -455,28 +513,30 @@ gc _state@(deeds0, Heap h ids, k, in_e)
     -- We have to use stateAllFreeVars here rather than stateFreeVars because in order to safely prune the live stack we need
     -- variables bound by k to be part of the live set if they occur within in_e or the rest of the k
     live0 = stateAllFreeVars (deeds0, Heap M.empty ids, k, in_e)
-    (deeds1, _h_dead, h', live1) = inlineLiveHeap deeds0 h live0
+    (deeds1, h', live1) = inlineLiveHeap deeds0 h live0
     -- Collecting dead update frames doesn't make any new heap bindings dead since they don't refer to anything
     (deeds2, k') = pruneLiveStack deeds1 k live1
     
-    inlineLiveHeap :: Deeds -> PureHeap -> FreeVars -> (Deeds, PureHeap, PureHeap, FreeVars)
-    inlineLiveHeap deeds h live = (deeds `releasePureHeapDeeds` h_dead, h_dead, h_live, live')
+    inlineLiveHeap :: Deeds -> PureHeap -> FreeVars -> (Deeds, PureHeap, FreeVars)
+    inlineLiveHeap deeds h live = (foldr (flip releaseHeapBindingDeeds . snd) deeds h_dead_kvs, h_live, live')
       where
-        (h_dead, h_live, live') = heap_worker h M.empty live
+        (h_dead_kvs, h_live, live') = heap_worker (M.toAscList h) M.empty live
         
         -- This is just like Split.transitiveInline, but simpler since it never has to worry about running out of deeds:
-        heap_worker :: PureHeap -> PureHeap -> FreeVars -> (PureHeap, PureHeap, FreeVars)
+        heap_worker :: [(Var, HeapBinding)]   -- Possibly-dead heap as sorted list. NB: not a PureHeap map because creating..
+                    -> PureHeap -> FreeVars   -- ..the map on every iteration showed up as 6% of SC allocations!
+                    -> ([(Var, HeapBinding)], -- Dead heap
+                        PureHeap, FreeVars)
         heap_worker h_pending h_output live
           = if live == live'
             then (h_pending', h_output', live')
             else heap_worker h_pending' h_output' live'
           where 
-            (h_pending_kvs', h_output', live') = M.foldrWithKey consider_inlining ([], h_output, live) h_pending
-            h_pending' = M.fromDistinctAscList h_pending_kvs'
+            (h_pending', h_output', live') = foldr consider_inlining ([], h_output, live) h_pending
         
             -- NB: It's important that type variables become live after inlining a binding, or we won't
             -- necessarily lambda-abstract over all the free type variables of a h-function
-            consider_inlining x' hb (h_pending_kvs, h_output, live)
+            consider_inlining (x', hb) (h_pending_kvs, h_output, live)
               | x' `elemVarSet` live = (h_pending_kvs,            M.insert x' hb h_output, live `unionVarSet` heapBindingFreeVars hb `unionVarSet` varBndrFreeVars x')
               | otherwise            = ((x', hb) : h_pending_kvs, h_output,                live)
     
