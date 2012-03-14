@@ -88,8 +88,11 @@ altConFreeVars DefaultAlt           = id
 
 
 coercedFreeVars :: (a -> FreeVars) -> Coerced a -> FreeVars
-coercedFreeVars f (Uncast,      x) = f x
-coercedFreeVars f (CastBy co _, x) = f x `unionVarSet` tyCoVarsOfCo co
+coercedFreeVars f (cast_by, x) = f x `unionVarSet` castByFreeVars cast_by
+
+castByFreeVars :: CastBy -> FreeVars
+castByFreeVars Uncast        = emptyVarSet
+castByFreeVars (CastBy co _) = tyCoVarsOfCo co
 
 
 data FVed a = FVed { freeVars :: !FreeVars, fvee :: !a }

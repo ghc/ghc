@@ -656,10 +656,30 @@ speculateHeap speculated (stats, deeds, Heap h ids) = {-# SCC "speculate" #-} (M
                       -> spec_trace "speculation denied" (ppr x' {- $$ pPrintFullState quietStatePrettiness (gc state) $$ pPrintFullState quietStatePrettiness _gced_old_state -})
                          (no_change, {- speculation_failure Nothing -} if any (`isSuffixOf` old_parents') forbidden then speculation_failure Nothing else rb) -- Don't allow rollback to rolled back region
                     Continue hist -> case reduceWithStats state of
-                        (extra_stats, (deeds, Heap h_speculated_ok' ids, Loco _, qa))
-                          | Just a <- traverse qaToAnswer qa
+                        (extra_stats, (deeds, Heap h_speculated_ok' ids, k, qa))
+                          -- I used to insist that evaluation should reach an *answer*, but actually it's really good if we
+                          -- get any cheap thing -- so questions are OK, and even cast questions are permissible (cast answers
+                          -- will never occur in practice).
+                          --
+                          -- A case where this makes a difference is if we have:
+                          --   (+)_selector $dNumInteger
+                          -- It will normally get speculated to a Question:
+                          --   GHC.Integer.plusInteger
+                          -- Due to the fact that plusInteger does not have an unfolding.
+                          --
+                          -- If the speculator only keeps Answers then it wouldn't keep this result,
+                          -- and thus if we had something like:
+                          --  (let add = (+)_selector $dNumInteger in (.. add .., .. add ..))
+                          -- Then we got a residual let-binding for "add", and the two h-functions
+                          -- corresponding to each component of the tuple were lambda-abstracted
+                          -- over "add"!
+                          | Just cast_by <- stackToCast k
                           , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
-                                in_e' = annedAnswerToInAnnedTerm (mkInScopeSet (annedFreeVars a)) a
+                                -- NB: this "fmap" is safe for a rather delicate reason -- the renaming returned by annedQAToInAnnedTerm
+                                -- is an identity renaming that includes at least all of the variables in the input InScopeSet, *IN THE CASE
+                                -- THAT YOU PASS AN ANSWER*. This is just barely sufficient for our purposes due to the fact that "reduce" never
+                                -- returns an Answer with a cast pending on the stack -- it only returns such a Question.
+                                in_e' = fmap (castAnnedTerm cast_by) $ annedQAToInAnnedTerm (mkInScopeSet (castByFreeVars cast_by `unionVarSet` annedFreeVars qa)) qa
                           -> (((hist, forbidden, ids), (stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure)), speculateManyMap parents' h_unspeculated)
                         _ -> (no_change, speculation_failure Nothing)
                   where state = normalise (deeds, Heap h_speculated_ok ids, Loco False, in_e)

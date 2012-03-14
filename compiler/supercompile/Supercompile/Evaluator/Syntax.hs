@@ -144,7 +144,7 @@ annedQuestionToInAnnedTerm iss anned_q = (mkInScopeIdentityRenaming iss, fmap Va
 annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
 annedAnswerToInAnnedTerm iss anned_a = case annee anned_a of
   (Uncast,          (rn, v)) -> (rn,                                                                 fmap Value $ annedValue (annedTag anned_a) v)
-  (CastBy co co_tg, (rn, v)) -> (mkInScopeIdentityRenaming iss, annedTerm (annedTag anned_a) $ Cast (fmap Value $ annedValue co_tg      $ renameAnnedValue' iss rn v) co)
+  (CastBy co co_tg, (rn, v)) -> (mkInScopeIdentityRenaming iss, annedTerm (annedTag anned_a) $ Cast (fmap Value $ annedValue co_tg            $ renameAnnedValue' iss rn v) co)
 
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
 answerToAnnedTerm' iss (mb_co, (rn, v)) = case mb_co of
