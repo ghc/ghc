@@ -785,7 +785,7 @@ bindScopedKindVars hs_tvs thing_inside
   where
     kvs :: [KindVar]   -- All skolems
     kvs = [ mkKindSigVar kv 
-          | L _ (KindedTyVar _ (HsBSig _ kvs) _) <- hs_tvs
+          | L _ (KindedTyVar _ (HsBSig _ kvs)) <- hs_tvs
           , kv <- kvs ]
 
 tcHsTyVarBndrs :: [LHsTyVarBndr Name] 
@@ -818,7 +818,7 @@ tcHsTyVarBndr (L _ hs_tv)
            _ -> do
        { kind <- case hs_tv of
                    UserTyVar {} -> newMetaKindVar
-                   KindedTyVar _ (HsBSig kind _) _ -> tcLHsKind kind
+                   KindedTyVar _ (HsBSig kind _) -> tcLHsKind kind
        ; return (mkTyVar name kind) } } }
 
 ------------------
@@ -908,7 +908,7 @@ kcLookupKind nm
            _                   -> pprPanic "kcLookupKind" (ppr tc_ty_thing) }
 
 kcTyClTyVars :: Name -> [LHsTyVarBndr Name] -> (TcKind -> TcM a) -> TcM a
--- Used for the type varaibles of a type or class decl,
+-- Used for the type variables of a type or class decl,
 -- when doing the initial kind-check.  
 kcTyClTyVars name hs_tvs thing_inside
   = bindScopedKindVars hs_tvs $
@@ -920,10 +920,10 @@ kcTyClTyVars name hs_tvs thing_inside
         ; tcExtendKindEnv name_ks (thing_inside res_k) }
   where
     kc_tv :: LHsTyVarBndr Name -> Kind -> TcM (Name, Kind)
-    kc_tv (L _ (UserTyVar n _)) exp_k 
+    kc_tv (L _ (UserTyVar n)) exp_k 
       = do { check_in_scope n exp_k
            ; return (n, exp_k) }
-    kc_tv (L _ (KindedTyVar n (HsBSig hs_k _) _)) exp_k
+    kc_tv (L _ (KindedTyVar n (HsBSig hs_k _))) exp_k
       = do { k <- tcLHsKind hs_k
            ; _ <- unifyKind k exp_k
            ; check_in_scope n exp_k

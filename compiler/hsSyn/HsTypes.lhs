@@ -30,7 +30,6 @@ module HsTypes (
 	
 	mkExplicitHsForAllTy, mkImplicitHsForAllTy, hsExplicitTvs,
 	hsTyVarName, hsTyVarNames, 
-	hsTyVarKind, hsLTyVarKind, hsTyVarNameKind,
 	hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
 	splitHsInstDeclTy_maybe, splitLHsInstDeclTy_maybe,
         splitHsForAllTy, splitLHsForAllTy,
@@ -143,12 +142,10 @@ placeHolderBndrs = panic "placeHolderBndrs"
 data HsTyVarBndr name
   = UserTyVar		-- No explicit kinding
          name 		-- See Note [Printing KindedTyVars]
-         PostTcKind
 
   | KindedTyVar
          name
          (HsBndrSig (LHsKind name))   -- The user-supplied kind signature
-         PostTcKind
       --  *** NOTA BENE *** A "monotype" in a pragma can have
       -- for-alls in it, (mostly to do with dictionaries).  These
       -- must be explicitly Kinded.
@@ -374,19 +371,8 @@ hsExplicitTvs _                                   = []
 
 ---------------------
 hsTyVarName :: HsTyVarBndr name -> name
-hsTyVarName (UserTyVar n _)   = n
-hsTyVarName (KindedTyVar n _ _) = n
-
-hsTyVarKind :: HsTyVarBndr name -> Kind
-hsTyVarKind (UserTyVar _ k)   = k
-hsTyVarKind (KindedTyVar _ _ k) = k
-
-hsLTyVarKind :: LHsTyVarBndr name -> Kind
-hsLTyVarKind  = hsTyVarKind . unLoc
-
-hsTyVarNameKind :: HsTyVarBndr name -> (name, Kind)
-hsTyVarNameKind (UserTyVar n k)   = (n,k)
-hsTyVarNameKind (KindedTyVar n _ k) = (n,k)
+hsTyVarName (UserTyVar n)     = n
+hsTyVarName (KindedTyVar n _) = n
 
 hsLTyVarName :: LHsTyVarBndr name -> name
 hsLTyVarName = hsTyVarName . unLoc
@@ -493,8 +479,8 @@ instance (Outputable sig) => Outputable (HsBndrSig sig) where
     ppr (HsBSig ty _) = ppr ty
 
 instance (OutputableBndr name) => Outputable (HsTyVarBndr name) where
-    ppr (UserTyVar name _)      = ppr name
-    ppr (KindedTyVar name kind _) = parens $ hsep [ppr name, dcolon, ppr kind]
+    ppr (UserTyVar name)        = ppr name
+    ppr (KindedTyVar name kind) = parens $ hsep [ppr name, dcolon, ppr kind]
 
 pprHsForAll :: OutputableBndr name => HsExplicitFlag -> [LHsTyVarBndr name] ->  LHsContext name -> SDoc
 pprHsForAll exp tvs cxt 
