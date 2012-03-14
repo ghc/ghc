@@ -154,6 +154,10 @@ cvtDec (TH.SigD nm typ)
 	; ty' <- cvtType typ
 	; returnL $ Hs.SigD (TypeSig [nm'] ty') }
 
+cvtDec (TH.InfixD fx nm)
+  = do { nm' <- vNameL nm
+       ; returnL (Hs.SigD (FixSig (FixitySig nm' (cvtFixity fx)))) } 
+
 cvtDec (PragmaD prag)
   = do { prag' <- cvtPragmaD prag
        ; returnL $ Hs.SigD prag' }
@@ -250,7 +254,7 @@ cvt_ci_decs :: MsgDoc -> [TH.Dec]
 -- ie signatures, bindings, and associated types
 cvt_ci_decs doc decs
   = do  { decs' <- mapM cvtDec decs
-        ; let (ats', bind_sig_decs') = partitionWith is_tycl decs'
+        ; let (ats', bind_sig_decs') = partitionWith is_fam_inst decs'
 	; let (sigs', prob_binds') = partitionWith is_sig bind_sig_decs'
 	; let (binds', bads) = partitionWith is_bind prob_binds'
 	; unless (null bads) (failWith (mkBadDecMsg doc bads))
@@ -302,9 +306,9 @@ cvt_tyinst_hdr cxt tc tys
 --		Partitioning declarations
 -------------------------------------------------------------------
 
-is_tycl :: LHsDecl RdrName -> Either (LTyClDecl RdrName) (LHsDecl RdrName)
-is_tycl (L loc (Hs.TyClD tcd)) = Left (L loc tcd)
-is_tycl decl                   = Right decl
+is_fam_inst :: LHsDecl RdrName -> Either (LTyClDecl RdrName) (LHsDecl RdrName)
+is_fam_inst (L loc (Hs.InstD (FamInstDecl d))) = Left (L loc d)
+is_fam_inst decl                               = Right decl
 
 is_sig :: LHsDecl RdrName -> Either (LSig RdrName) (LHsDecl RdrName)
 is_sig (L loc (Hs.SigD sig)) = Left (L loc sig)
@@ -791,12 +795,11 @@ cvtTvs tvs = mapM cvt_tv tvs
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv (TH.PlainTV nm) 
   = do { nm' <- tName nm
-       ; returnL $ UserTyVar nm' placeHolderKind
-       }
+       ; returnL $ UserTyVar nm' }
 cvt_tv (TH.KindedTV nm ki) 
   = do { nm' <- tName nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar nm' (HsBSig ki' placeHolderBndrs) placeHolderKind }
+       ; returnL $ KindedTyVar nm' (HsBSig ki' placeHolderBndrs) }
 
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
@@ -877,9 +880,18 @@ cvtKind (ArrowK k1 k2) = do
   k2' <- cvtKind k2
   returnL (HsFunTy k1' k2')
 
-cvtMaybeKind :: Maybe TH.Kind -> CvtM (Maybe (LHsKind RdrName))
+cvtMaybeKind :: Maybe TH.Kind -> CvtM (Maybe (HsBndrSig (LHsKind RdrName)))
 cvtMaybeKind Nothing = return Nothing
-cvtMaybeKind (Just ki) = cvtKind ki >>= return . Just
+cvtMaybeKind (Just ki) = do { ki' <- cvtKind ki
+                            ; return (Just (HsBSig ki' placeHolderBndrs)) }
+
+-----------------------------------------------------------
+cvtFixity :: TH.Fixity -> Hs.Fixity
+cvtFixity (TH.Fixity prec dir) = Hs.Fixity prec (cvt_dir dir)
+   where
+     cvt_dir TH.InfixL = Hs.InfixL
+     cvt_dir TH.InfixR = Hs.InfixR
+     cvt_dir TH.InfixN = Hs.InfixN
 
 -----------------------------------------------------------
 
