@@ -172,7 +172,7 @@ genCall :: LlvmEnv -> CmmCallTarget -> [HintedCmmFormal] -> [HintedCmmActual]
 
 -- Write barrier needs to be handled specially as it is implemented as an LLVM
 -- intrinsic function.
-genCall env (CmmPrim MO_WriteBarrier) _ _ _
+genCall env (CmmPrim MO_WriteBarrier _) _ _ _
  | platformArch (getLlvmPlatform env) `elem` [ArchX86, ArchX86_64, ArchSPARC]
     = return (env, nilOL, [])
  | getLlvmVer env > 29 = barrier env
@@ -182,7 +182,7 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _
 -- types and things like Word8 are backed by an i32 and just present a logical
 -- i8 range. So we must handle conversions from i32 to i8 explicitly as LLVM
 -- is strict about types.
-genCall env t@(CmmPrim (MO_PopCnt w)) [CmmHinted dst _] args _ = do
+genCall env t@(CmmPrim (MO_PopCnt w) _) [CmmHinted dst _] args _ = do
     let width = widthToLlvmInt w
         dstTy = cmmToLlvmType $ localRegType dst
         funTy = \n -> LMFunction $ LlvmFunctionDecl n ExternallyVisible
@@ -202,9 +202,10 @@ genCall env t@(CmmPrim (MO_PopCnt w)) [CmmHinted dst _] args _ = do
 
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
-genCall env t@(CmmPrim op) [] args CmmMayReturn | op == MO_Memcpy ||
-                                                  op == MO_Memset ||
-                                                  op == MO_Memmove = do
+genCall env t@(CmmPrim op _) [] args CmmMayReturn
+ | op == MO_Memcpy ||
+   op == MO_Memset ||
+   op == MO_Memmove = do
     let (isVolTy, isVolVal) = if getLlvmVer env >= 28
                                  then ([i1], [mkIntLit i1 0]) else ([], [])
         argTy | op == MO_Memset = [i8Ptr, i8,    llvmWord, i32] ++ isVolTy
@@ -221,6 +222,9 @@ genCall env t@(CmmPrim op) [] args CmmMayReturn | op == MO_Memcpy ||
         stmts = stmts1 `appOL` stmts2 `appOL` stmts3
                 `appOL` trashStmts `snocOL` call
     return (env2, stmts, top1 ++ top2)
+
+genCall env (CmmPrim _ (Just stmts)) _ _ _
+    = stmtsToInstrs env stmts (nilOL, [])
 
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do
@@ -240,7 +244,7 @@ genCall env target res args ret = do
     -- extract Cmm call convention
     let cconv = case target of
             CmmCallee _ conv -> conv
-            CmmPrim   _      -> PrimCallConv
+            CmmPrim   _ _    -> PrimCallConv
 
     -- translate to LLVM call convention
     let lmconv = case cconv of
@@ -337,7 +341,7 @@ getFunPtr env funTy targ = case targ of
         (v2,s1) <- doExpr (pLift fty) $ Cast cast v1 (pLift fty)
         return (env', v2, stmts `snocOL` s1, top)
 
-    CmmPrim mop -> litCase $ cmmPrimOpFunctions env mop
+    CmmPrim mop _ -> litCase $ cmmPrimOpFunctions env mop
 
     where
         litCase name = do
@@ -469,17 +473,20 @@ cmmPrimOpFunctions env mop
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
 
-    MO_WriteBarrier ->
-        panic $ "cmmPrimOpFunctions: MO_WriteBarrier not supported here"
-    MO_Touch ->
-        panic $ "cmmPrimOpFunctions: MO_Touch not supported here"
+    MO_S_QuotRem {} -> unsupported
+    MO_U_QuotRem {} -> unsupported
+    MO_Add2 {}      -> unsupported
+    MO_U_Mul2 {}    -> unsupported
+    MO_WriteBarrier -> unsupported
+    MO_Touch        -> unsupported
 
     where
         intrinTy1 = (if getLlvmVer env >= 28
                        then "p0i8.p0i8." else "") ++ show llvmWord
         intrinTy2 = (if getLlvmVer env >= 28
                        then "p0i8." else "") ++ show llvmWord
-    
+        unsupported = panic ("cmmPrimOpFunctions: " ++ show mop
+                          ++ " not supported here")
 
 -- | Tail function calls
 genJump :: LlvmEnv -> CmmExpr -> Maybe [GlobalReg] -> UniqSM StmtData

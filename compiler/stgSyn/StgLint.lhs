@@ -391,8 +391,8 @@ checkFunApp fun_ty arg_tys msg
  where
   (mb_ty, mb_msg) = cfa True fun_ty arg_tys
 
-  cfa :: Bool -> Type -> [Type] -> (Maybe Type       -- Accurate result?
-                                   , Maybe MsgDoc)   -- Errors?
+  cfa :: Bool -> Type -> [Type] -> (Maybe Type          -- Accurate result?
+                                   , Maybe MsgDoc)      -- Errors?
 
   cfa accurate fun_ty []      -- Args have run out; that's fine
       = (if accurate then Just fun_ty else Nothing, Nothing)
@@ -439,12 +439,12 @@ stgEqType orig_ty1 orig_ty2
       | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
       , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
       , let res = if tc1 == tc2 
-              then equalLength tc_args1 tc_args2 
-                && and (zipWith go tc_args1 tc_args2)
-              else  -- TyCons don't match; but don't bleat if either is a 
-                    -- family TyCon because a coercion might have made it 
-                    -- equal to something else
-                (isFamilyTyCon tc1 || isFamilyTyCon tc2)
+                  then equalLength tc_args1 tc_args2 
+                    && and (zipWith go tc_args1 tc_args2)
+                  else  -- TyCons don't match; but don't bleat if either is a 
+                        -- family TyCon because a coercion might have made it 
+                        -- equal to something else
+                    (isFamilyTyCon tc1 || isFamilyTyCon tc2)
       = if res then True
         else 
         pprTrace "stgEqType: unequal" (vcat [ppr orig_ty1, ppr orig_ty2, ppr rep_ty1

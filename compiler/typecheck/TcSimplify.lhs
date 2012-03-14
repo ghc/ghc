@@ -97,20 +97,19 @@ simplifyDeriv :: CtOrigin
 -- Simplify 'wanted' as much as possibles
 -- Fail if not possible
 simplifyDeriv orig pred tvs theta 
-  = do { tvs_skols <- tcInstSkolTyVars tvs -- Skolemize
+  = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
       	 	-- The constraint solving machinery 
 		-- expects *TcTyVars* not TyVars.  
 		-- We use *non-overlappable* (vanilla) skolems
 		-- See Note [Overlap and deriving]
 
-       ; let skol_subst = zipTopTvSubst tvs $ map mkTyVarTy tvs_skols
-             subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
+       ; let subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
              skol_set   = mkVarSet tvs_skols
 	     doc = parens $ ptext (sLit "deriving") <+> parens (ppr pred)
 
        ; wanted <- newFlatWanteds orig (substTheta skol_subst theta)
 
-       ; traceTc "simplifyDeriv" (ppr tvs $$ ppr theta $$ ppr wanted)
+       ; traceTc "simplifyDeriv" (pprTvBndrs tvs $$ ppr theta $$ ppr wanted)
        ; (residual_wanted, _ev_binds1)
              <- runTcS (SimplInfer doc) NoUntouchables emptyInert emptyWorkList $
                 solveWanteds $ mkFlatWC wanted
@@ -240,7 +239,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs     <- tcGetGlobalTyVars            -- Already zonked
        ; zonked_taus <- zonkTcTypes (map snd name_taus)
-       ; let tvs_to_quantify = tyVarsOfTypes zonked_taus `minusVarSet` gbl_tvs
+       ; let tvs_to_quantify = varSetElems (tyVarsOfTypes zonked_taus `minusVarSet` gbl_tvs)
        	     		       -- tvs_to_quantify can contain both kind and type vars
        	                       -- See Note [Which variables to quantify]
        ; qtvs <- zonkQuantifiedTyVars tvs_to_quantify
@@ -248,13 +247,14 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
   | otherwise
   = do { zonked_wanteds <- zonkWC wanteds
-       ; zonked_taus    <- zonkTcTypes (map snd name_taus)
        ; gbl_tvs        <- tcGetGlobalTyVars
+       ; zonked_tau_tvs <- zonkTyVarsAndFV (tyVarsOfTypes (map snd name_taus))
        ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
 
        ; traceTc "simplifyInfer {"  $ vcat
              [ ptext (sLit "names =") <+> ppr (map fst name_taus)
-             , ptext (sLit "taus (zonked) =") <+> ppr zonked_taus
+             , ptext (sLit "taus =") <+> ppr (map snd name_taus)
+             , ptext (sLit "tau_tvs (zonked) =") <+> ppr zonked_tau_tvs
              , ptext (sLit "gbl_tvs =") <+> ppr gbl_tvs
              , ptext (sLit "closed =") <+> ppr _top_lvl
              , ptext (sLit "apply_mr =") <+> ppr apply_mr
@@ -266,8 +266,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 	     -- Then split the constraints on the baisis of those tyvars
 	     -- to avoid unnecessarily simplifying a class constraint
 	     -- See Note [Avoid unecessary constraint simplification]
-       ; let zonked_tau_tvs = tyVarsOfTypes zonked_taus
-             proto_qtvs = growWanteds gbl_tvs zonked_wanteds $
+       ; let proto_qtvs = growWanteds gbl_tvs zonked_wanteds $
                           zonked_tau_tvs `minusVarSet` gbl_tvs
              (perhaps_bound, surely_free)
                         = partitionBag (quantifyMe proto_qtvs) (wc_flat zonked_wanteds)
@@ -301,7 +300,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
             -- Split again simplified_perhaps_bound, because some unifications 
             -- may have happened, and emit the free constraints. 
        ; gbl_tvs        <- tcGetGlobalTyVars
-       ; zonked_tau_tvs <- zonkTcTyVarsAndFV zonked_tau_tvs
+       ; zonked_tau_tvs <- zonkTyVarsAndFV zonked_tau_tvs
        ; zonked_flats <- zonkCts (wc_flat simpl_results)
        ; let init_tvs 	     = zonked_tau_tvs `minusVarSet` gbl_tvs
              poly_qtvs       = growWantedEVs gbl_tvs zonked_flats init_tvs
@@ -333,7 +332,7 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
                         -- they are also bound in ic_skols and we want them to be
                         -- tidied uniformly
 
-       ; qtvs_to_return <- zonkQuantifiedTyVars qtvs
+       ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
 
             -- Step 5
             -- Minimize `bound' and emit an implication
@@ -786,6 +785,11 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
                 -- See Note [Solving Family Equations]
                 -- NB: remaining_flats has already had subst applied
 
+       ; traceTcS "solveWanteds finished with" $
+                 vcat [ text "remaining_unsolved_flats =" <+> ppr remaining_unsolved_flats
+                      , text "subst =" <+> ppr subst
+                      ]
+
        ; return $ 
          WC { wc_flat  = mapBag (substCt subst) remaining_unsolved_flats
             , wc_impl  = mapBag (substImplication subst) unsolved_implics
@@ -1131,7 +1135,7 @@ getSolvableCTyFunEqs untch cts
       , isTouchableMetaTyVar_InRange untch tv
            -- And it's a *touchable* unification variable
 
-      , typeKind xi `isSubKind` tyVarKind tv
+      , typeKind xi `tcIsSubKind` tyVarKind tv
          -- Must do a small kind check since TcCanonical invariants 
          -- on family equations only impose compatibility, not subkinding
 

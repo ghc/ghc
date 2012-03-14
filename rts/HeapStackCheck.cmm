@@ -102,7 +102,7 @@ import LeaveCriticalSection;
             } else {                                                    \
                 jump %ENTRY_CODE(Sp(0));                                \
             }                                                           \
-	} else {                                                        \
+        } else {                                                        \
             R1 = HeapOverflow;                                          \
             goto sched;                                                 \
         }                                                               \

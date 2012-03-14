@@ -95,7 +95,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 
 	     -- Now figure out what to quantify over
 	     -- c.f. TcSimplify.simplifyInfer
-       ; zonked_forall_tvs <- zonkTcTyVarsAndFV forall_tvs
+       ; zonked_forall_tvs <- zonkTyVarsAndFV forall_tvs
        ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
        ; let extra_bound_tvs = zonked_forall_tvs 	     
        	     		       `minusVarSet` gbl_tvs
@@ -124,8 +124,8 @@ tcRuleBndrs (RuleBndrSig var rn_ty : rule_bndrs)
 --		a::*, x :: a->a
   = do	{ let ctxt = FunSigCtxt (unLoc var)
 	; (tyvars, ty) <- tcHsPatSigType ctxt rn_ty
-        ; let skol_tvs = tcSuperSkolTyVars tyvars
-	      id_ty = substTyWith tyvars (mkTyVarTys skol_tvs) ty
+        ; let (subst, skol_tvs) = tcSuperSkolTyVars tyvars
+	      id_ty = substTy subst ty
 	      id = mkLocalId (unLoc var) id_ty
 
 	      -- The type variables scope over subsequent bindings; yuk

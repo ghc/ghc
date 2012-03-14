@@ -9,7 +9,7 @@ module ErrUtils (
         ErrMsg, WarnMsg, Severity(..),
         Messages, ErrorMessages, WarningMessages,
         errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
-        MsgDoc, mkLocMessage, printError, pprMessageBag, pprErrMsgBag, 
+        MsgDoc, mkLocMessage, pprMessageBag, pprErrMsgBag,
         pprLocErrMsg, makeIntoWarning,
         
         errorsFound, emptyMessages,
@@ -41,6 +41,7 @@ import SrcLoc
 import DynFlags
 import StaticFlags      ( opt_ErrorSpans )
 
+import System.Directory
 import System.Exit      ( ExitCode(..), exitWith )
 import System.FilePath
 import Data.List
@@ -94,9 +95,6 @@ mkLocMessage severity locn msg
                  _other     -> empty                 
       -- For warnings, print    Foo.hs:34: Warning:
       --                           <the warning message>
-
-printError :: SrcSpan -> MsgDoc -> IO ()
-printError span msg = printErrs (mkLocMessage SevError span msg) defaultErrStyle
 
 makeIntoWarning :: ErrMsg -> ErrMsg
 makeIntoWarning err = err { errMsgSeverity = SevWarning }
@@ -239,7 +237,7 @@ dumpSDoc dflags dflag hdr doc
                             mode = if append then AppendMode else WriteMode
                         when (not append) $
                             writeIORef gdref (Set.insert fileName gd)
-                        createDirectoryHierarchy (takeDirectory fileName)
+                        createDirectoryIfMissing True (takeDirectory fileName)
                         handle <- openFile fileName mode
                         hPrintDump handle doc
                         hClose handle

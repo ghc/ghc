@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2008
+ * (c) The GHC Team, 1998-2012
  *
  * Storage manager front end
  *
@@ -24,7 +24,7 @@
 #include "Arena.h"
 #include "Capability.h"
 #include "Schedule.h"
-#include "RetainerProfile.h"	// for counting memory blocks (memInventory)
+#include "RetainerProfile.h"        // for counting memory blocks (memInventory)
 #include "OSMem.h"
 #include "Trace.h"
 #include "GC.h"
@@ -46,8 +46,8 @@ nat large_alloc_lim;    /* GC if n_large_blocks in any nursery
 
 bdescr *exec_block;
 
-generation *generations = NULL;	/* all the generations */
-generation *g0		= NULL; /* generation 0, for convenience */
+generation *generations = NULL; /* all the generations */
+generation *g0          = NULL; /* generation 0, for convenience */
 generation *oldest_gen  = NULL; /* oldest generation, for convenience */
 
 nursery *nurseries = NULL;     /* array of nurseries, size == n_capabilities */
@@ -92,7 +92,7 @@ initGeneration (generation *gen, int g)
 }
 
 void
-initStorage( void )
+initStorage (void)
 {
   nat g;
 
@@ -114,7 +114,7 @@ initStorage( void )
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.heapSizeSuggestion > 
       RtsFlags.GcFlags.maxHeapSize) {
-    RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
+      RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
   }
 
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
@@ -134,8 +134,8 @@ initStorage( void )
 
   /* allocate generation info array */
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations 
-					     * sizeof(struct generation_),
-					     "initStorage: gens");
+                                             * sizeof(struct generation_),
+                                             "initStorage: gens");
 
   /* Initialise all generations */
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -155,9 +155,9 @@ initStorage( void )
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
       if (RtsFlags.GcFlags.generations == 1) {
-	  errorBelch("WARNING: compact/sweep is incompatible with -G1; disabled");
+          errorBelch("WARNING: compact/sweep is incompatible with -G1; disabled");
       } else {
-	  oldest_gen->mark = 1;
+          oldest_gen->mark = 1;
           if (RtsFlags.GcFlags.compact)
               oldest_gen->compact = 1;
       }
@@ -197,7 +197,7 @@ void storageAddCapabilities (nat from, nat to)
                                     "storageAddCapabilities");
     } else {
         nurseries = stgMallocBytes(to * sizeof(struct nursery_),
-                                    "storageAddCapabilities");
+                                   "storageAddCapabilities");
     }
 
     // we've moved the nurseries, so we have to update the rNursery
@@ -271,7 +271,7 @@ freeStorage (rtsBool free_heap)
 
       - it puts the CAF on the oldest generation's mutable list.
         This is so that we treat the CAF as a root when collecting
-	younger generations.
+        younger generations.
 
    ------------------
    Note [atomic CAF entry]
@@ -470,7 +470,7 @@ assignNurseriesToCapabilities (nat from, nat to)
 
     for (i = from; i < to; i++) {
         capabilities[i].r.rCurrentNursery = nurseries[i].blocks;
-	capabilities[i].r.rCurrentAlloc   = NULL;
+        capabilities[i].r.rCurrentAlloc   = NULL;
     }
 }
 
@@ -482,7 +482,7 @@ allocNurseries (nat from, nat to)
     for (i = from; i < to; i++) {
         nurseries[i].blocks =
             allocNursery(NULL, RtsFlags.GcFlags.minAllocAreaSize);
-	nurseries[i].n_blocks =
+        nurseries[i].n_blocks =
             RtsFlags.GcFlags.minAllocAreaSize;
     }
     assignNurseriesToCapabilities(from, to);
@@ -496,13 +496,13 @@ clearNurseries (void)
     bdescr *bd;
 
     for (i = 0; i < n_capabilities; i++) {
-	for (bd = nurseries[i].blocks; bd; bd = bd->link) {
+        for (bd = nurseries[i].blocks; bd; bd = bd->link) {
             allocated += (lnat)(bd->free - bd->start);
             bd->free = bd->start;
-	    ASSERT(bd->gen_no == 0);
-	    ASSERT(bd->gen == g0);
-	    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
-	}
+            ASSERT(bd->gen_no == 0);
+            ASSERT(bd->gen == g0);
+            IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
+        }
     }
 
     return allocated;
@@ -521,13 +521,13 @@ countNurseryBlocks (void)
     lnat blocks = 0;
 
     for (i = 0; i < n_capabilities; i++) {
-	blocks += nurseries[i].n_blocks;
+        blocks += nurseries[i].n_blocks;
     }
     return blocks;
 }
 
 static void
-resizeNursery ( nursery *nursery, nat blocks )
+resizeNursery (nursery *nursery, nat blocks)
 {
   bdescr *bd;
   nat nursery_blocks;
@@ -537,28 +537,28 @@ resizeNursery ( nursery *nursery, nat blocks )
 
   if (nursery_blocks < blocks) {
       debugTrace(DEBUG_gc, "increasing size of nursery to %d blocks", 
-		 blocks);
+                 blocks);
     nursery->blocks = allocNursery(nursery->blocks, blocks-nursery_blocks);
   } 
   else {
     bdescr *next_bd;
     
     debugTrace(DEBUG_gc, "decreasing size of nursery to %d blocks", 
-	       blocks);
+               blocks);
 
     bd = nursery->blocks;
     while (nursery_blocks > blocks) {
-	next_bd = bd->link;
-	next_bd->u.back = NULL;
-	nursery_blocks -= bd->blocks; // might be a large block
-	freeGroup(bd);
-	bd = next_bd;
+        next_bd = bd->link;
+        next_bd->u.back = NULL;
+        nursery_blocks -= bd->blocks; // might be a large block
+        freeGroup(bd);
+        bd = next_bd;
     }
     nursery->blocks = bd;
     // might have gone just under, by freeing a large block, so make
     // up the difference.
     if (nursery_blocks < blocks) {
-	nursery->blocks = allocNursery(nursery->blocks, blocks-nursery_blocks);
+        nursery->blocks = allocNursery(nursery->blocks, blocks-nursery_blocks);
     }
   }
   
@@ -574,7 +574,7 @@ resizeNurseriesFixed (nat blocks)
 {
     nat i;
     for (i = 0; i < n_capabilities; i++) {
-	resizeNursery(&nurseries[i], blocks);
+        resizeNursery(&nurseries[i], blocks);
     }
 }
 
@@ -628,7 +628,7 @@ allocate (Capability *cap, lnat n)
     CCS_ALLOC(cap->r.rCCCS,n);
     
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	lnat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
+        lnat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
 
         // Attempting to allocate an object larger than maxHeapSize
         // should definitely be disallowed.  (bug #1791)
@@ -644,19 +644,19 @@ allocate (Capability *cap, lnat n)
             // Allocating the memory would be bad, because the user
             // has requested that we not exceed maxHeapSize, so we
             // just exit.
-	    stg_exit(EXIT_HEAPOVERFLOW);
+            stg_exit(EXIT_HEAPOVERFLOW);
         }
 
         ACQUIRE_SM_LOCK
-	bd = allocGroup(req_blocks);
-	dbl_link_onto(bd, &g0->large_objects);
-	g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
+        bd = allocGroup(req_blocks);
+        dbl_link_onto(bd, &g0->large_objects);
+        g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
         g0->n_new_large_words += n;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
-	bd->flags = BF_LARGE;
-	bd->free = bd->start + n;
-	return bd->start;
+        bd->flags = BF_LARGE;
+        bd->free = bd->start + n;
+        return bd->start;
     }
 
     /* small allocation (<LARGE_OBJECT_THRESHOLD) */
@@ -733,7 +733,7 @@ allocatePinned (Capability *cap, lnat n)
     // If the request is for a large object, then allocate()
     // will give us a pinned object anyway.
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	p = allocate(cap, n);
+        p = allocate(cap, n);
         Bdescr(p)->flags |= BF_PINNED;
         return p;
     }
@@ -744,8 +744,54 @@ allocatePinned (Capability *cap, lnat n)
     bd = cap->pinned_object_block;
     
     // If we don't have a block of pinned objects yet, or the current
-    // one isn't large enough to hold the new object, allocate a new one.
+    // one isn't large enough to hold the new object, get a new one.
     if (bd == NULL || (bd->free + n) > (bd->start + BLOCK_SIZE_W)) {
+
+        // stash the old block on cap->pinned_object_blocks.  On the
+        // next GC cycle these objects will be moved to
+        // g0->large_objects.
+        if (bd != NULL) {
+            dbl_link_onto(bd, &cap->pinned_object_blocks);
+        }
+
+        // We need to find another block.  We could just allocate one,
+        // but that means taking a global lock and we really want to
+        // avoid that (benchmarks that allocate a lot of pinned
+        // objects scale really badly if we do this).
+        //
+        // So first, we try taking the next block from the nursery, in
+        // the same way as allocate(), but note that we can only take
+        // an *empty* block, because we're about to mark it as
+        // BF_PINNED | BF_LARGE.
+        bd = cap->r.rCurrentNursery->link;
+        if (bd == NULL || bd->free != bd->start) { // must be empty!
+            // The nursery is empty, or the next block is non-empty:
+            // allocate a fresh block (we can't fail here).
+
+            // XXX in the case when the next nursery block is
+            // non-empty we aren't exerting any pressure to GC soon,
+            // so if this case ever happens then we could in theory
+            // keep allocating for ever without calling the GC. We
+            // can't bump g0->n_new_large_words because that will be
+            // counted towards allocation, and we're already counting
+            // our pinned obects as allocation in
+            // collect_pinned_object_blocks in the GC.
+            ACQUIRE_SM_LOCK;
+            bd = allocBlock();
+            RELEASE_SM_LOCK;
+            initBdescr(bd, g0, g0);
+        } else {
+            // we have a block in the nursery: steal it
+            cap->r.rCurrentNursery->link = bd->link;
+            if (bd->link != NULL) {
+                bd->link->u.back = cap->r.rCurrentNursery;
+            }
+            cap->r.rNursery->n_blocks--;
+        }
+
+        cap->pinned_object_block = bd;
+        bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
+
         // The pinned_object_block remains attached to the capability
         // until it is full, even if a GC occurs.  We want this
         // behaviour because otherwise the unallocated portion of the
@@ -759,17 +805,6 @@ allocatePinned (Capability *cap, lnat n)
         // the next GC the BF_EVACUATED flag will be cleared, and the
         // block will be promoted as usual (if anything in it is
         // live).
-        ACQUIRE_SM_LOCK;
-        if (bd != NULL) {
-            dbl_link_onto(bd, &g0->large_objects);
-            g0->n_large_blocks++;
-            g0->n_new_large_words += bd->free - bd->start;
-        }
-        cap->pinned_object_block = bd = allocBlock();
-        RELEASE_SM_LOCK;
-        initBdescr(bd, g0, g0);
-        bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
-	bd->free   = bd->start;
     }
 
     p = bd->free;
@@ -792,7 +827,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
     Capability *cap = regTableToCapability(reg);
     if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
-	p->header.info = &stg_MUT_VAR_DIRTY_info;
+        p->header.info = &stg_MUT_VAR_DIRTY_info;
         recordClosureMutated(cap,p);
     }
 }
@@ -1060,24 +1095,24 @@ void *allocateExec (nat bytes, void **exec_ret)
     n  = (bytes + sizeof(W_) + 1) / sizeof(W_);
 
     if (n+1 > BLOCK_SIZE_W) {
-	barf("allocateExec: can't handle large objects");
+        barf("allocateExec: can't handle large objects");
     }
 
     if (exec_block == NULL || 
-	exec_block->free + n + 1 > exec_block->start + BLOCK_SIZE_W) {
-	bdescr *bd;
-	lnat pagesize = getPageSize();
-	bd = allocGroup(stg_max(1, pagesize / BLOCK_SIZE));
-	debugTrace(DEBUG_gc, "allocate exec block %p", bd->start);
-	bd->gen_no = 0;
-	bd->flags = BF_EXEC;
-	bd->link = exec_block;
-	if (exec_block != NULL) {
-	    exec_block->u.back = bd;
-	}
-	bd->u.back = NULL;
-	setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsTrue);
-	exec_block = bd;
+        exec_block->free + n + 1 > exec_block->start + BLOCK_SIZE_W) {
+        bdescr *bd;
+        lnat pagesize = getPageSize();
+        bd = allocGroup(stg_max(1, pagesize / BLOCK_SIZE));
+        debugTrace(DEBUG_gc, "allocate exec block %p", bd->start);
+        bd->gen_no = 0;
+        bd->flags = BF_EXEC;
+        bd->link = exec_block;
+        if (exec_block != NULL) {
+            exec_block->u.back = bd;
+        }
+        bd->u.back = NULL;
+        setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsTrue);
+        exec_block = bd;
     }
     *(exec_block->free) = n;  // store the size of this chunk
     exec_block->gen_no += n;  // gen_no stores the number of words allocated
@@ -1095,11 +1130,11 @@ void freeExec (void *addr)
     bdescr *bd = Bdescr((StgPtr)p);
 
     if ((bd->flags & BF_EXEC) == 0) {
-	barf("freeExec: not executable");
+        barf("freeExec: not executable");
     }
 
     if (*(StgPtr)p == 0) {
-	barf("freeExec: already free?");
+        barf("freeExec: already free?");
     }
 
     ACQUIRE_SM_LOCK;
@@ -1128,10 +1163,10 @@ void freeExec (void *addr)
 #ifdef DEBUG
 
 // handy function for use in gdb, because Bdescr() is inlined.
-extern bdescr *_bdescr( StgPtr p );
+extern bdescr *_bdescr (StgPtr p);
 
 bdescr *
-_bdescr( StgPtr p )
+_bdescr (StgPtr p)
 {
     return Bdescr(p);
 }

@@ -4,6 +4,16 @@
 %
 \section[TypeRep]{Type - friends' interface}
 
+Note [The Type-related module hierarchy]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Class
+  TyCon    imports Class
+  TypeRep 
+  TysPrim  imports TypeRep ( including mkTyConTy )
+  Kind     imports TysPrim ( mainly for primitive kinds )
+  Type     imports Kind
+  Coercion imports Type
+
 \begin{code}
 {-# OPTIONS -fno-warn-tabs #-}
 -- The above warning supression flag is a temporary kludge.
@@ -23,11 +33,11 @@ module TypeRep (
         PredType, ThetaType,      -- Synonyms
 
         -- Functions over types
-        mkTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
-        isLiftedTypeKind,
+        mkNakedTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
+        isLiftedTypeKind, isSuperKind, isTypeVar, isKindVar,
         
         -- Pretty-printing
-	pprType, pprParendType, pprTypeApp,
+	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
 	pprTyThing, pprTyThingCategory, 
 	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
@@ -60,6 +70,7 @@ import PrelNames
 import Outputable
 import FastString
 import Pair
+import StaticFlags( opt_PprStyle_Debug )
 
 -- libraries
 import qualified Data.Data        as Data hiding ( TyCon )
@@ -255,24 +266,36 @@ mkTyVarTy  = TyVarTy
 mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
--- | A key function: builds a 'TyConApp' or 'FunTy' as apppropriate to its arguments.
--- Applies its arguments to the constructor from left to right
-mkTyConApp :: TyCon -> [Type] -> Type
-mkTyConApp tycon tys
-  | isFunTyCon tycon, [ty1,ty2] <- tys
-  = FunTy ty1 ty2
-
-  | otherwise
-  = TyConApp tycon tys
+mkNakedTyConApp :: TyCon -> [Type] -> Type
+-- Builds a TyConApp 
+--   * without being strict in TyCon,
+--   * the TyCon should never be a saturated FunTyCon 
+-- Type.mkTyConApp is the usual one
+mkNakedTyConApp tc tys
+  = TyConApp (ASSERT( not (isFunTyCon tc && length tys == 2) ) tc) tys
 
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
-mkTyConTy tycon = mkTyConApp tycon []
+mkTyConTy tycon = TyConApp tycon []
+\end{code}
 
+Some basic functions, put here to break loops eg with the pretty printer
+
+\begin{code}
 isLiftedTypeKind :: Kind -> Bool
--- This function is here because it's used in the pretty printer
 isLiftedTypeKind (TyConApp tc []) = tc `hasKey` liftedTypeKindTyConKey
 isLiftedTypeKind _                = False
+
+-- | Is this a super-kind (i.e. a type-of-kinds)?
+isSuperKind :: Type -> Bool
+isSuperKind (TyConApp skc []) = skc `hasKey` superKindTyConKey
+isSuperKind _                 = False
+
+isTypeVar :: Var -> Bool
+isTypeVar v = isTKVar v && not (isSuperKind (varType v))
+
+isKindVar :: Var -> Bool 
+isKindVar v = isTKVar v && isSuperKind (varType v)
 \end{code}
 
 
@@ -294,6 +317,7 @@ tyVarsOfType (LitTy {})          = emptyVarSet
 tyVarsOfType (FunTy arg res)     = tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)     = tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty) = delVarSet (tyVarsOfType ty) tyvar
+                                   `unionVarSet` tyVarsOfType (tyVarKind tyvar)
 
 tyVarsOfTypes :: [Type] -> TyVarSet
 tyVarsOfTypes tys = foldr (unionVarSet . tyVarsOfType) emptyVarSet tys
@@ -583,7 +607,10 @@ ppr_tylit _ tl =
 -------------------
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
-pprForAll tvs = ptext (sLit "forall") <+> sep (map pprTvBndr tvs) <> dot
+pprForAll tvs = ptext (sLit "forall") <+> pprTvBndrs tvs <> dot
+
+pprTvBndrs :: [TyVar] -> SDoc
+pprTvBndrs tvs = sep (map pprTvBndr tvs)
 
 pprTvBndr :: TyVar -> SDoc
 pprTvBndr tv 
@@ -622,47 +649,49 @@ pprTcApp _ _ tc []      -- No brackets for SymOcc
 	       | otherwise     = empty
 
 pprTcApp _ pp tc [ty]
-  | tc `hasKey` listTyConKey = brackets (pp TopPrec ty)
-  | tc `hasKey` parrTyConKey = ptext (sLit "[:") <> pp TopPrec ty <> ptext (sLit ":]")
-  | tc `hasKey` liftedTypeKindTyConKey   = ptext (sLit "*")
-  | tc `hasKey` unliftedTypeKindTyConKey = ptext (sLit "#")
-  | tc `hasKey` openTypeKindTyConKey     = ptext (sLit "OpenKind")
-  | tc `hasKey` ubxTupleKindTyConKey     = ptext (sLit "(#)")
-  | tc `hasKey` argTypeKindTyConKey      = ptext (sLit "ArgKind")
-  | Just n <- tyConIP_maybe tc           = ppr n <> ptext (sLit "::") <> pp TopPrec ty
+  | tc `hasKey` listTyConKey   = pprPromotionQuote tc <> brackets   (pp TopPrec ty)
+  | tc `hasKey` parrTyConKey   = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
+  | Just n <- tyConIP_maybe tc = ppr n <> ptext (sLit "::") <> pp TopPrec ty
 
 pprTcApp p pp tc tys
   | isTupleTyCon tc && tyConArity tc == length tys
-  = tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
-  | tc `hasKey` eqTyConKey -- We need to special case the type equality TyCon because
-                           -- its not a SymOcc so won't get printed infix
-  , [_, ty1,ty2] <- tys
-  = pprInfixApp p pp (getName tc) ty1 ty2
+  = pprPromotionQuote tc <>
+    tupleParens (tupleTyConSort tc) (sep (punctuate comma (map (pp TopPrec) tys)))
+
+  | not opt_PprStyle_Debug
+  , tc `hasKey` eqTyConKey -- We need to special case the type equality TyCon because
+  , [_, ty1,ty2] <- tys    -- with kind polymorphism it has 3 args, so won't get printed infix
+                           -- With -dppr-debug switch this off so we can see the kind
+  = pprInfixApp p pp (ppr tc) ty1 ty2
+
   | otherwise
-  = pprTypeNameApp p pp (getName tc) tys
+  = ppr_type_name_app p pp (ppr tc) (isSymOcc (getOccName tc)) tys
 
 ----------------
 pprTypeApp :: NamedThing a => a -> [Type] -> SDoc
 -- The first arg is the tycon, or sometimes class
 -- Print infix if the tycon/class looks like an operator
-pprTypeApp tc tys = pprTypeNameApp TopPrec ppr_type (getName tc) tys
+pprTypeApp tc tys 
+  = pprTypeNameApp TopPrec ppr_type (getName tc) tys
 
 pprTypeNameApp :: Prec -> (Prec -> a -> SDoc) -> Name -> [a] -> SDoc
 -- Used for classes and coercions as well as types; that's why it's separate from pprTcApp
-pprTypeNameApp p pp tc tys
+pprTypeNameApp p pp name tys
+  = ppr_type_name_app p pp (ppr name) (isSymOcc (getOccName name)) tys
+
+ppr_type_name_app :: Prec -> (Prec -> a -> SDoc) -> SDoc -> Bool -> [a] -> SDoc
+ppr_type_name_app p pp pp_tc is_sym_occ tys
   | is_sym_occ           -- Print infix if possible
   , [ty1,ty2] <- tys  -- We know nothing of precedence though
-  = pprInfixApp p pp tc ty1 ty2
+  = pprInfixApp p pp pp_tc ty1 ty2
   | otherwise
-  = pprPrefixApp p (pprPrefixVar is_sym_occ (ppr tc)) (map (pp TyConPrec) tys)
-  where
-    is_sym_occ = isSymOcc (getOccName tc)
+  = pprPrefixApp p (pprPrefixVar is_sym_occ pp_tc) (map (pp TyConPrec) tys)
 
 ----------------
-pprInfixApp :: Prec -> (Prec -> a -> SDoc) -> Name -> a -> a -> SDoc
-pprInfixApp p pp tc ty1 ty2
+pprInfixApp :: Prec -> (Prec -> a -> SDoc) -> SDoc -> a -> a -> SDoc
+pprInfixApp p pp pp_tc ty1 ty2
   = maybeParen p FunPrec $
-    sep [pp FunPrec ty1, pprInfixVar True (ppr tc) <+> pp FunPrec ty2]
+    sep [pp FunPrec ty1, pprInfixVar True pp_tc <+> pp FunPrec ty2]
 
 pprPrefixApp :: Prec -> SDoc -> [SDoc] -> SDoc
 pprPrefixApp p pp_fun pp_tys = maybeParen p TyConPrec $

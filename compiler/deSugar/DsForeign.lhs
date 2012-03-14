@@ -11,6 +11,8 @@ module DsForeign ( dsForeigns ) where
 #include "HsVersions.h"
 import TcRnMonad        -- temp
 
+import TypeRep
+
 import CoreSyn
 
 import DsCCall
@@ -125,8 +127,8 @@ dsFImport :: Id
           -> Coercion
           -> ForeignImport
           -> DsM ([Binding], SDoc, SDoc)
-dsFImport id co (CImport cconv safety header spec) = do
-    (ids, h, c) <- dsCImport id co spec cconv safety header
+dsFImport id co (CImport cconv safety mHeader spec) = do
+    (ids, h, c) <- dsCImport id co spec cconv safety mHeader
     return (ids, h, c)
 
 dsCImport :: Id
@@ -134,7 +136,7 @@ dsCImport :: Id
           -> CImportSpec
           -> CCallConv
           -> Safety
-          -> FastString -- header
+          -> Maybe Header
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
    let ty = pFst $ coercionKind co
@@ -154,8 +156,8 @@ dsCImport id co (CLabel cid) cconv _ _ = do
 
 dsCImport id co (CFunction target) cconv@PrimCallConv safety _
   = dsPrimCall id co (CCall (CCallSpec target cconv safety))
-dsCImport id co (CFunction target) cconv safety header
-  = dsFCall id co (CCall (CCallSpec target cconv safety)) header
+dsCImport id co (CFunction target) cconv safety mHeader
+  = dsFCall id co (CCall (CCallSpec target cconv safety)) mHeader
 dsCImport id co CWrapper cconv _ _
   = dsFExportDynamic id co cconv
 
@@ -182,9 +184,9 @@ fun_type_arg_stdcall_info _other_conv _
 %************************************************************************
 
 \begin{code}
-dsFCall :: Id -> Coercion -> ForeignCall -> FastString
+dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
-dsFCall fn_id co fcall headerFilename = do
+dsFCall fn_id co fcall mDeclHeader = do
     let
         ty                   = pFst $ coercionKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
@@ -205,35 +207,44 @@ dsFCall fn_id co fcall headerFilename = do
 
     (fcall', cDoc) <-
               case fcall of
-              CCall (CCallSpec (StaticTarget cName mPackageId) CApiConv safety) ->
+              CCall (CCallSpec (StaticTarget cName mPackageId isFun) CApiConv safety) ->
                do fcall_uniq <- newUnique
                   let wrapperName = mkFastString "ghc_wrapper_" `appendFS`
                                     mkFastString (showSDoc (ppr fcall_uniq)) `appendFS`
                                     mkFastString "_" `appendFS`
                                     cName
-                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId) CApiConv safety)
-                      c = include
+                      fcall' = CCall (CCallSpec (StaticTarget wrapperName mPackageId True) CApiConv safety)
+                      c = includes
                        $$ fun_proto <+> braces (cRet <> semi)
-                      include
-                       | nullFS headerFilename = empty
-                       | otherwise = text "#include <" <> ftext headerFilename <> text ">"
+                      includes = vcat [ text "#include <" <> ftext h <> text ">"
+                                      | Header h <- nub headers ]
                       fun_proto = cResType <+> pprCconv <+> ppr wrapperName <> parens argTypes
                       cRet
                        | isVoidRes =                   cCall
                        | otherwise = text "return" <+> cCall
-                      cCall = ppr cName <> parens argVals
+                      cCall = if isFun
+                              then ppr cName <> parens argVals
+                              else if null arg_tys
+                                    then ppr cName
+                                    else panic "dsFCall: Unexpected arguments to FFI value import"
                       raw_res_ty = case tcSplitIOType_maybe io_res_ty of
                                    Just (_ioTyCon, res_ty) -> res_ty
                                    Nothing                 -> io_res_ty
                       isVoidRes = raw_res_ty `eqType` unitTy
-                      cResType | isVoidRes = text "void"
-                               | otherwise = showStgType raw_res_ty
+                      (mHeader, cResType)
+                       | isVoidRes = (Nothing, text "void")
+                       | otherwise = toCType raw_res_ty
                       pprCconv = ccallConvAttribute CApiConv
-                      argTypes
-                       | null arg_tys = text "void"
-                       | otherwise = hsep $ punctuate comma
-                                         [ showStgType t <+> char 'a' <> int n
-                                         | (t, n) <- zip arg_tys [1..] ]
+                      mHeadersArgTypeList
+                          = [ (header, cType <+> char 'a' <> int n)
+                            | (t, n) <- zip arg_tys [1..]
+                            , let (header, cType) = toCType t ]
+                      (mHeaders, argTypeList) = unzip mHeadersArgTypeList
+                      argTypes = if null argTypeList
+                                 then text "void"
+                                 else hsep $ punctuate comma argTypeList
+                      mHeaders' = mDeclHeader : mHeader : mHeaders
+                      headers = catMaybes mHeaders'
                       argVals = hsep $ punctuate comma
                                     [ char 'a' <> int n
                                     | (_, n) <- zip arg_tys [1..] ]
@@ -666,6 +677,34 @@ showStgType t = text "Hs" <> text (showFFIType t)
 
 showFFIType :: Type -> String
 showFFIType t = getOccString (getName (typeTyCon t))
+
+toCType :: Type -> (Maybe Header, SDoc)
+toCType = f False
+    where f voidOK t
+           -- First, if we have (Ptr t) of (FunPtr t), then we need to
+           -- convert t to a C type and put a * after it. If we don't
+           -- know a type for t, then "void" is fine, though.
+           | Just (ptr, [t']) <- splitTyConApp_maybe t
+           , tyConName ptr `elem` [ptrTyConName, funPtrTyConName]
+              = case f True t' of
+                (mh, cType') ->
+                    (mh, cType' <> char '*')
+           -- Otherwise, if we have a type constructor application, then
+           -- see if there is a C type associated with that constructor.
+           -- Note that we aren't looking through type synonyms or
+           -- anything, as it may be the synonym that is annotated.
+           | TyConApp tycon _ <- t
+           , Just (CType mHeader cType) <- tyConCType_maybe tycon
+              = (mHeader, ftext cType)
+           -- If we don't know a C type for this type, then try looking
+           -- through one layer of type synonym etc.
+           | Just t' <- coreView t
+              = f voidOK t'
+           -- Otherwise we don't know the C type. If we are allowing
+           -- void then return that; otherwise something has gone wrong.
+           | voidOK = (Nothing, ptext (sLit "void"))
+           | otherwise
+              = pprPanic "toCType" (ppr t)
 
 typeTyCon :: Type -> TyCon
 typeTyCon ty = case tcSplitTyConApp_maybe (repType ty) of

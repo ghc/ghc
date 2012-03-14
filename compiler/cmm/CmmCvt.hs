@@ -37,7 +37,7 @@ get_conv (PrimTarget _)       = NativeNodeCall -- JD: SUSPICIOUS
 get_conv (ForeignTarget _ fc) = Foreign fc
 
 cmm_target :: ForeignTarget -> Old.CmmCallTarget
-cmm_target (PrimTarget op) = Old.CmmPrim op
+cmm_target (PrimTarget op) = Old.CmmPrim op Nothing
 cmm_target (ForeignTarget e (ForeignConvention cc _ _)) = Old.CmmCallee e cc
 
 ofZgraph :: CmmGraph -> Old.ListGraph Old.CmmStmt

@@ -278,7 +278,7 @@ exp	:: { IfaceExpr }
 --	       "InlineMe"   -> IfaceNote IfaceInlineMe $3
 --            }
         | '%external' STRING aty   { IfaceFCall (ForeignCall.CCall 
-                                                    (CCallSpec (StaticTarget (mkFastString $2) Nothing) 
+                                                    (CCallSpec (StaticTarget (mkFastString $2) Nothing True) 
                                                                CCallConv PlaySafe)) 
                                                  $3 }
 
@@ -375,7 +375,9 @@ ifaceUnliftedTypeKind = ifaceTcType (IfaceTc unliftedTypeKindTyConName)
 ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
 
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
-toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOccFS tv)) (toHsKind k) placeHolderKind
+toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOccFS tv)) bsig placeHolderKind
+                  where
+                    bsig = HsBSig (toHsKind k) placeHolderBndrs
 
 ifaceExtRdrName :: Name -> RdrName
 ifaceExtRdrName name = mkOrig (nameModule name) (nameOccName name)

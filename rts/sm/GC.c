@@ -150,6 +150,7 @@ static StgWord dec_running          (void);
 static void wakeup_gc_threads       (nat me);
 static void shutdown_gc_threads     (nat me);
 static void collect_gct_blocks      (void);
+static lnat collect_pinned_object_blocks (void);
 
 #if 0 && defined(DEBUG)
 static void gcCAFs                  (void);
@@ -284,6 +285,10 @@ GarbageCollect (rtsBool force_major_gc,
 
   // check sanity *before* GC
   IF_DEBUG(sanity, checkSanity(rtsFalse /* before GC */, major_gc));
+
+  // gather blocks allocated using allocatePinned() from each capability
+  // and put them on the g0->large_object list.
+  collect_pinned_object_blocks();
 
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
@@ -1419,6 +1424,43 @@ collect_gct_blocks (void)
             RELEASE_SPIN_LOCK(&ws->gen->sync);
         }
     }
+}
+
+/* -----------------------------------------------------------------------------
+   During mutation, any blocks that are filled by allocatePinned() are
+   stashed on the local pinned_object_blocks list, to avoid needing to
+   take a global lock.  Here we collect those blocks from the
+   cap->pinned_object_blocks lists and put them on the
+   main g0->large_object list.
+
+   Returns: the number of words allocated this way, for stats
+   purposes.
+   -------------------------------------------------------------------------- */
+
+static lnat
+collect_pinned_object_blocks (void)
+{
+    nat n;
+    bdescr *bd, *prev;
+    lnat allocated = 0;
+
+    for (n = 0; n < n_capabilities; n++) {
+        prev = NULL;
+        for (bd = capabilities[n].pinned_object_blocks; bd != NULL; bd = bd->link) {
+            allocated += bd->free - bd->start;
+            prev = bd;
+        }
+        if (prev != NULL) {
+            prev->link = g0->large_objects;
+            if (g0->large_objects != NULL) {
+                g0->large_objects->u.back = prev;
+            }
+            g0->large_objects = capabilities[n].pinned_object_blocks;
+            capabilities[n].pinned_object_blocks = 0;
+        }
+    }
+
+    return allocated;
 }
 
 /* -----------------------------------------------------------------------------

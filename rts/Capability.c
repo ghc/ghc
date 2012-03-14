@@ -1,10 +1,10 @@
 /* ---------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2003-2006
+ * (c) The GHC Team, 2003-2012
  *
  * Capabilities
  *
- * A Capability represent the token required to execute STG code,
+ * A Capability represents the token required to execute STG code,
  * and all the state an OS thread/task needs to run Haskell code:
  * its STG registers, a pointer to its TSO, a nursery etc. During
  * STG execution, a pointer to the capabilitity is kept in a
@@ -273,6 +273,7 @@ initCapability( Capability *cap, nat i )
     cap->transaction_tokens = 0;
     cap->context_switch = 0;
     cap->pinned_object_block = NULL;
+    cap->pinned_object_blocks = NULL;
 
 #ifdef PROFILING
     cap->r.rCCCS = CCS_SYSTEM;
@@ -476,7 +477,7 @@ releaseCapability_ (Capability* cap,
 	// ThreadBlocked, but the thread may be back on the run queue
 	// by now.
 	task = cap->run_queue_hd->bound->task;
-	giveCapabilityToTask(cap,task);
+	giveCapabilityToTask(cap, task);
 	return;
     }
 
@@ -499,7 +500,7 @@ releaseCapability_ (Capability* cap,
         !emptyRunQueue(cap) || !emptyInbox(cap) ||
         (!cap->disabled && !emptySparkPoolCap(cap)) || globalWorkToDo()) {
 	if (cap->spare_workers) {
-	    giveCapabilityToTask(cap,cap->spare_workers);
+	    giveCapabilityToTask(cap, cap->spare_workers);
 	    // The worker Task pops itself from the queue;
 	    return;
 	}
@@ -663,7 +664,7 @@ waitForReturnCapability (Capability **pCap, Task *task)
     cap->r.rCCCS = CCS_SYSTEM;
 #endif
 
-    ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
+    ASSERT_FULL_CAPABILITY_INVARIANTS(cap, task);
 
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
 

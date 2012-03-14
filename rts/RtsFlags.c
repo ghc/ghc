@@ -361,8 +361,8 @@ usage_text[] = {
 "",
 #endif /* DEBUG */
 #if defined(THREADED_RTS) && !defined(NOSMP)
-"  -N<n>     Use <n> processors (default: 1)",
-"  -N        Determine the number of processors to use automatically",
+"  -N[<n>]   Use <n> processors (default: 1, -N alone determines",
+"            the number of processors to use automatically)",
 "  -qg[<n>]  Use parallel GC only for generations >= <n>",
 "            (default: 0, -qg alone turns off parallel GC)",
 "  -qb[<n>]  Use load-balancing in the parallel GC only for generations >= <n>",

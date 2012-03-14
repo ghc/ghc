@@ -34,8 +34,7 @@ import HsSyn
 import TcRnMonad
 import TcEnv		( thRnBrack )
 import RnEnv
-import RnTypes		( rnHsTypeFVs, rnSplice, rnIPName, checkTH,
-			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
+import RnTypes	
 import RnPat
 import DynFlags
 import BasicTypes	( FixityDirection(..) )
@@ -270,7 +269,7 @@ rnExpr (RecordUpd expr rbinds _ _ _)
 		  fvExpr `plusFV` fvRbinds) }
 
 rnExpr (ExprWithTySig expr pty)
-  = do	{ (pty', fvTy) <- rnHsTypeFVs ExprWithTySigCtx pty
+  = do	{ (pty', fvTy) <- rnLHsType ExprWithTySigCtx pty
 	; (expr', fvExpr) <- bindSigTyVarsFV (hsExplicitTvs pty') $
 		  	     rnLExpr expr
 	; return (ExprWithTySig expr' pty', fvExpr `plusFV` fvTy) }
@@ -283,7 +282,7 @@ rnExpr (HsIf _ p b1 b2)
        ; return (HsIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
 rnExpr (HsType a)
-  = rnHsTypeFVs HsTypeCtx a	`thenM` \ (t, fvT) -> 
+  = rnLHsType HsTypeCtx a	`thenM` \ (t, fvT) -> 
     return (HsType t, fvT)
 
 rnExpr (ArithSeq _ seq)
@@ -607,7 +606,7 @@ rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
 
 rnBracket (PatBr p) = rnPat ThPatQuote p $ \ p' -> return (PatBr p', emptyFVs)
 
-rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs TypBrCtx t
+rnBracket (TypBr t) = do { (t', fvs) <- rnLHsType TypBrCtx t
 			 ; return (TypBr t', fvs) }
 
 rnBracket (DecBrL decls) 

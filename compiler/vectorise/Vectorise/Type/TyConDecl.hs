@@ -96,6 +96,7 @@ vectTyConDecl tycon name'
        ; return $ buildAlgTyCon 
                     name'                   -- new name
                     (tyConTyVars tycon)     -- keep original type vars
+                    Nothing
                     []                      -- no stupid theta
                     rhs'                    -- new constructor defs
                     rec_flag                -- whether recursive

@@ -29,6 +29,7 @@ import DataCon
 import Var
 import VarSet
 import BasicTypes
+import ForeignCall
 import Name
 import MkId
 import Class
@@ -56,6 +57,7 @@ buildSynTyCon tc_name tvs rhs rhs_kind parent
 ------------------------------------------------------
 buildAlgTyCon :: Name 
               -> [TyVar]               -- ^ Kind variables and type variables
+	      -> Maybe CType
 	      -> ThetaType	       -- ^ Stupid theta
 	      -> AlgTyConRhs
 	      -> RecFlag
@@ -63,8 +65,8 @@ buildAlgTyCon :: Name
               -> TyConParent
 	      -> TyCon
 
-buildAlgTyCon tc_name ktvs stupid_theta rhs is_rec gadt_syn parent
-  = mkAlgTyCon tc_name kind ktvs stupid_theta rhs parent is_rec gadt_syn
+buildAlgTyCon tc_name ktvs cType stupid_theta rhs is_rec gadt_syn parent
+  = mkAlgTyCon tc_name kind ktvs cType stupid_theta rhs parent is_rec gadt_syn
   where 
     kind = mkPiKinds ktvs liftedTypeKind
 

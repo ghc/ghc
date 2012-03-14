@@ -25,7 +25,6 @@ module TcTyDecls(
 
 import TypeRep
 import HsSyn
-import RnHsSyn
 import Class
 import Type
 import HscTypes
@@ -62,7 +61,7 @@ We check for type synonym and class cycles on the *source* code.
 Main reasons:
 
   a) Otherwise we'd need a special function to extract type-synonym tycons
-        from a type, whereas we have extractHsTyNames already
+     from a type, whereas we already have the free vars pinned on the decl
 
   b) If we checked for type synonym loops after building the TyCon, we
         can't do a hoistForAllTys on the type synonym rhs, (else we fall into
@@ -111,11 +110,8 @@ synTyConsOfType ty
 \begin{code}
 mkSynEdges :: [LTyClDecl Name] -> [(LTyClDecl Name, Name, [Name])]
 mkSynEdges syn_decls = [ (ldecl, unLoc (tcdLName decl),
-                                 mk_syn_edges (tcdSynRhs decl))
+                                 nameSetToList (tcdFVs decl))
                        | ldecl@(L _ decl) <- syn_decls ]
-  where
-    mk_syn_edges rhs = [ tc | tc <- nameSetToList (extractHsTyNames rhs),
-                              not (isTyVarName tc) ]
 
 calcSynCycles :: [LTyClDecl Name] -> [SCC (LTyClDecl Name)]
 calcSynCycles = stronglyConnCompFromEdgedVertices . mkSynEdges

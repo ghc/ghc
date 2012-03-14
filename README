@@ -50,12 +50,12 @@ For full information on building GHC, see the GHC Building Guide [3].
 Here follows a summary - if you get into trouble, the Building Guide
 has all the answers.
 
-NB. you need GHC installed in order to build GHC, because the compiler
-is itself written in Haskell.  For instructions on how to port GHC to a
-new platform, see the Building Guide.
+Before building GHC you may need to install some other tools and
+libraries.  See "Setting up your system for building GHC" [8].
 
-If you're building from git sources (as opposed to a source
-distribution) then you also need to install Happy [4] and Alex [5].
+NB. in particular you need GHC installed in order to build GHC,
+because the compiler is itself written in Haskell.  For instructions
+on how to port GHC to a new platform, see the Building Guide [3].
 
 For building library documentation, you'll need Haddock [6].  To build
 the compiler documentation, you need a good DocBook XML toolchain and
@@ -93,6 +93,7 @@ References
  [5] http://www.haskell.org/alex/                       Alex
  [6] http://www.haskell.org/haddock/                    Haddock
  [7] http://hackage.haskell.org/trac/ghc/wiki/Building/SyncAll
+ [8] http://hackage.haskell.org/trac/ghc/wiki/Building/Preparation
 
 
 Contributors

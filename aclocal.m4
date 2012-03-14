@@ -223,7 +223,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         netbsd)
             test -z "[$]2" || eval "[$]2=OSNetBSD"
             ;;
-        dragonfly|osf1|osf3|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
+        haiku)
+            test -z "[$]2" || eval "[$]2=OSHaiku"
+            ;;
+        dragonfly|osf1|osf3|hpux|linuxaout|freebsd2|cygwin32|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix)
             test -z "[$]2" || eval "[$]2=OSUnknown"
             ;;
         *)
@@ -296,7 +299,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
 # GET_ARM_ISA
 # ----------------------------------
-# Get info about the ISA on the Arm arch
+# Get info about the ISA on the ARM arch
 AC_DEFUN([GET_ARM_ISA],
 [
     AC_COMPILE_IFELSE([
@@ -486,7 +489,7 @@ AC_DEFUN([FP_VISIBILITY_HIDDEN],
 
 # FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN
 # ----------------------------------
-# Little endian Arm on Linux with some ABIs has big endian word order
+# Little endian ARM on Linux with some ABIs has big endian word order
 # in doubles. Define FLOAT_WORDS_BIGENDIAN if this is the case.
 AC_DEFUN([FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN],
   [AC_CACHE_CHECK([whether float word order is big endian], [fptools_cv_float_word_order_bigendian],

@@ -175,12 +175,12 @@ data HsBindLR idL idR
         --  of this last construct.)
 
 data ABExport id
-  = ABE { abe_poly  :: id
+  = ABE { abe_poly  :: id           -- Any INLINE pragmas is attached to this Id
         , abe_mono  :: id
-        , abe_wrap  :: HsWrapper  -- See Note [AbsBinds wrappers]
+        , abe_wrap  :: HsWrapper    -- See Note [AbsBinds wrappers]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
-        , abe_prags :: TcSpecPrags }
-  deriving (Data, Typeable)
+        , abe_prags :: TcSpecPrags  -- SPECIALISE pragmas
+  } deriving (Data, Typeable)
 
 placeHolderNames :: NameSet
 -- Used for the NameSet in FunBind and PatBind prior to the renamer

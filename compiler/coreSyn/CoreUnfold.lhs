@@ -502,6 +502,81 @@ sizeExpr bOMB_OUT_SIZE top_args expr
                                  d2  -- Ignore d1
 \end{code}
 
+Note [Function application discount]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+I noticed that the output of the supercompiler generates a lot of code
+with this form:
+
+"""
+module Inlining where
+
+h1 k = k undefined undefined undefined
+        undefined undefined undefined
+        undefined undefined undefined
+        undefined undefined undefined
+        undefined undefined undefined
+        undefined undefined undefined
+
+a = h1 (\x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
+b = h1 (\_ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
+c = h1 (\_ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
+d = h1 (\_ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
+e = h1 (\_ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
+f = h1 (\_ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ -> x)
+g = h1 (\_ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ -> x)
+h = h1 (\_ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ -> x)
+i = h1 (\_ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ -> x)
+j = h1 (\_ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ -> x)
+k = h1 (\_ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ -> x)
+l = h1 (\_ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ -> x)
+m = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ -> x)
+n = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ -> x)
+o = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ -> x)
+p = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ -> x)
+q = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ -> x)
+r = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x -> x)
+"""
+
+With GHC head the applications of h1 are not inlined, which hurts the
+quality of the generated code a bit. I was wondering why h1 wasn't
+getting inlined into each of "a" to "i" - after all, it has a manifest
+lambda argument.
+
+It turns out that the code in CoreUnfold gives a fixed discount of
+opt_UF_FunAppDiscount to a function argument such as "k" if it applied
+to any arguments. This is enough to ensure that h1 is inlined if the number
+of arguments applied to k is below a certain limit, but if many arguments are
+applied to k then the fixed discount can't overcome the size of the
+chain of apps, and h1 is never inlined.
+
+My proposed solution is to change CoreUnfold.funSize so that longer
+chains of arguments being applied to a lambda-bound function give a
+bigger discount. The motivation for this is that we would *generally*
+expect that the lambda at the callsite has enough lambdas such that
+all of the applications within the body can be beta-reduced away. This
+change might lead to over eager inlining in cases like this, though:
+
+{{{
+h1 k = k x y z
+
+{-# NOINLINE g #-}
+g = ...
+
+main = ... h1 (\x -> g x) ...
+}}}
+
+In this case we aren't able to beta-reduce away all of the
+applications in the body of h1 because the lambda at the call site
+only binds 1 argument, not the 3 allowed by the type. I don't expect
+this case to be particularly common, however.
+
+I chose the bonus to be (size - 20) so that application to 1 arg got
+same bonus as the old fixed bonus (i.e. opt_UF_FunAppDiscount, which is 60).
+If you have the bonus being (size - 40) then $fMonad[]_$c>>= with interesting
+2nd arg doesn't inline in cryptarithm2 so we lose some deforestation, and
+overall binary size hardly falls.
+
 \begin{code}
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
@@ -541,13 +616,15 @@ funSize top_args fun n_val_args
   where
     some_val_args = n_val_args > 0
 
+        -- See Note [Function application discount]
     arg_discount | some_val_args && fun `elem` top_args
-    		 = unitBag (fun, opt_UF_FunAppDiscount)
+    		 = unitBag (fun, opt_UF_FunAppDiscount + (size - 20))
 		 | otherwise = emptyBag
 	-- If the function is an argument and is applied
 	-- to some values, give it an arg-discount
 
-    res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount
+        -- See Note [Function application discount]
+    res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount + (size - 20)
     		 | otherwise   	 	    = 0
         -- If the function is partially applied, show a result discount
     size | some_val_args = 10 * (1 + n_val_args)
@@ -863,7 +940,7 @@ tryUnfolding dflags id lone_variable
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
- = pprTrace ("Considering inlining: " ++ showSDoc (ppr id))
+ = pprTrace ("Considering inlining: " ++ showSDocDump (ppr id))
 		 (vcat [text "arg infos" <+> ppr arg_infos,
 			text "uf arity" <+> ppr uf_arity,
 			text "interesting continuation" <+> ppr cont_info,

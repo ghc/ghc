@@ -67,9 +67,9 @@ Library
     if flag(base3) || flag(base4)
         Build-Depends: directory  >= 1   && < 1.2,
                        process    >= 1   && < 1.2,
-                       bytestring >= 0.9 && < 0.10,
+                       bytestring >= 0.9 && < 0.11,
                        time                 < 1.5,
-                       containers >= 0.1 && < 0.5,
+                       containers >= 0.1 && < 0.6,
                        array      >= 0.1 && < 0.5
 
     Build-Depends: filepath >= 1 && < 1.4
@@ -356,7 +356,6 @@ Library
         RnEnv
         RnExpr
         RnHsDoc
-        RnHsSyn
         RnNames
         RnPat
         RnSource
@@ -527,7 +526,6 @@ Library
             SPARC.CodeGen
             SPARC.CodeGen.Amode
             SPARC.CodeGen.Base
-            SPARC.CodeGen.CCall
             SPARC.CodeGen.CondCode
             SPARC.CodeGen.Gen32
             SPARC.CodeGen.Gen64

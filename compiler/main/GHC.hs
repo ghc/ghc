@@ -24,8 +24,9 @@ module GHC (
         DynFlags(..), DynFlag(..), Severity(..), HscTarget(..), dopt,
         GhcMode(..), GhcLink(..), defaultObjectTarget,
         parseDynamicFlags,
-        getSessionDynFlags,
-        setSessionDynFlags,
+        getSessionDynFlags, setSessionDynFlags,
+        getProgramDynFlags, setProgramDynFlags,
+        getInteractiveDynFlags, setInteractiveDynFlags,
         parseStaticFlags,
 
         -- * Targets
@@ -323,11 +324,12 @@ import Prelude hiding (init)
 -- Unless you want to handle exceptions yourself, you should wrap this around
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
-defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => LogAction -> m a -> m a
-defaultErrorHandler la inner =
+defaultErrorHandler :: (ExceptionMonad m, MonadIO m)
+                    => LogAction -> FlushOut -> m a -> m a
+defaultErrorHandler la (FlushOut flushOut) inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   ghandle (\exception -> liftIO $ do
-           hFlush stdout
+           flushOut
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
                 Just (ioe :: IOException) ->
@@ -347,7 +349,7 @@ defaultErrorHandler la inner =
   -- error messages propagated as exceptions
   handleGhcException
             (\ge -> liftIO $ do
-                hFlush stdout
+                flushOut
                 case ge of
                      PhaseFailed _ code -> exitWith code
                      Signal _ -> exitWith (ExitFailure 1)
@@ -448,11 +450,33 @@ initGhcMonad mb_top_dir = do
 -- %*                                                                      *
 -- %************************************************************************
 
--- | Updates the DynFlags in a Session.  This also reads
--- the package database (unless it has already been read),
--- and prepares the compilers knowledge about packages.  It
--- can be called again to load new packages: just add new
--- package flags to (packageFlags dflags).
+-- $DynFlags
+--
+-- The GHC session maintains two sets of 'DynFlags':
+--
+--   * The "interactive" @DynFlags@, which are used for everything
+--     related to interactive evaluation, including 'runStmt',
+--     'runDecls', 'exprType', 'lookupName' and so on (everything
+--     under \"Interactive evaluation\" in this module).
+--
+--   * The "program" @DynFlags@, which are used when loading
+--     whole modules with 'load'
+--
+-- 'setInteractiveDynFlags', 'getInteractiveDynFlags' work with the
+-- interactive @DynFlags@.
+--
+-- 'setProgramDynFlags', 'getProgramDynFlags' work with the
+-- program @DynFlags@.
+--
+-- 'setSessionDynFlags' sets both @DynFlags@, and 'getSessionDynFlags'
+-- retrieves the program @DynFlags@ (for backwards compatibility).
+
+
+-- | Updates both the interactive and program DynFlags in a Session.
+-- This also reads the package database (unless it has already been
+-- read), and prepares the compilers knowledge about packages.  It can
+-- be called again to load new packages: just add new package flags to
+-- (packageFlags dflags).
 --
 -- Returns a list of new packages that may need to be linked in using
 -- the dynamic linker (see 'linkPackages') as a result of new package
@@ -462,8 +486,32 @@ initGhcMonad mb_top_dir = do
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [PackageId]
 setSessionDynFlags dflags = do
   (dflags', preload) <- liftIO $ initPackages dflags
-  modifySession (\h -> h{ hsc_dflags = dflags' })
+  modifySession $ \h -> h{ hsc_dflags = dflags'
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags' } }
   return preload
+
+-- | Sets the program 'DynFlags'.
+setProgramDynFlags :: GhcMonad m => DynFlags -> m [PackageId]
+setProgramDynFlags dflags = do
+  (dflags', preload) <- liftIO $ initPackages dflags
+  modifySession $ \h -> h{ hsc_dflags = dflags' }
+  return preload
+
+-- | Returns the program 'DynFlags'.
+getProgramDynFlags :: GhcMonad m => m DynFlags
+getProgramDynFlags = getSessionDynFlags
+
+-- | Set the 'DynFlags' used to evaluate interactive expressions.
+-- Note: this cannot be used for changes to packages.  Use
+-- 'setSessionDynFlags', or 'setProgramDynFlags' and then copy the
+-- 'pkgState' into the interactive @DynFlags@.
+setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
+setInteractiveDynFlags dflags = do
+  modifySession $ \h -> h{ hsc_IC = (hsc_IC h) { ic_dflags = dflags }}
+
+-- | Get the 'DynFlags' used to evaluate interactive expressions.
+getInteractiveDynFlags :: GhcMonad m => m DynFlags
+getInteractiveDynFlags = withSession $ \h -> return (ic_dflags (hsc_IC h))
 
 
 parseDynamicFlags :: Monad m =>

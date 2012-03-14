@@ -19,8 +19,8 @@ module ListSetOps (
         equivClasses, equivClassesByUniq,
 
         -- Remove redudant elts
-        removeRedundant   -- Used in the ghc/InteractiveUI, 
-                          -- although not in the compiler itself
+        removeRedundant    -- Used in the ghc/InteractiveUI, 
+                           -- although not in the compiler itself
    ) where
 
 #include "HsVersions.h"

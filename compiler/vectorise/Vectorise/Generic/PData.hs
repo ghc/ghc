@@ -47,6 +47,7 @@ buildDataFamInst name' fam_tc vect_tc rhs
             pat_tys  = [mkTyConApp vect_tc (mkTyVarTys tyvars)]
             rep_tc   = buildAlgTyCon name'
                            tyvars
+                           Nothing
                            []          -- no stupid theta
                            rhs
                            rec_flag    -- FIXME: is this ok?

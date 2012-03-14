@@ -78,7 +78,7 @@ import Data.Maybe
 main :: IO ()
 main = do
    hSetBuffering stdout NoBuffering
-   GHC.defaultErrorHandler defaultLogAction $ do
+   GHC.defaultErrorHandler defaultLogAction defaultFlushOut $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
 
@@ -155,6 +155,8 @@ main' postLoadMode dflags0 args flagWarnings = do
 
       -- turn on -fimplicit-import-qualified for GHCi now, so that it
       -- can be overriden from the command-line
+      -- XXX: this should really be in the interactive DynFlags, but
+      -- we don't set that until later in interactiveUI
       dflags1a | DoInteractive <- postLoadMode = imp_qual_enabled
                | DoEval _      <- postLoadMode = imp_qual_enabled
                | otherwise                 = dflags1
@@ -253,6 +255,10 @@ partition_args (arg:args) srcs objs
 
        - module names (not forgetting hierarchical module names),
 
+       - things beginning with '-' are flags that were not recognised by
+         the flag parser, and we want them to generate errors later in
+         checkOptions, so we class them as source files (#5921)
+
        - and finally we consider everything not containing a '.' to be
          a comp manager input, as shorthand for a .hs or .lhs filename.
 
@@ -262,6 +268,7 @@ partition_args (arg:args) srcs objs
 looks_like_an_input :: String -> Bool
 looks_like_an_input m =  isSourceFilename m
                       || looksLikeModuleName m
+                      || "-" `isPrefixOf` m
                       || '.' `notElem` m
 
 -- -----------------------------------------------------------------------------

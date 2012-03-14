@@ -13,7 +13,7 @@ FamInstEnv: Type checked family instance declarations
 -- for details
 
 module FamInstEnv (
-	FamInst(..), FamFlavor(..), famInstAxiom, famInstTyVars,
+	FamInst(..), FamFlavor(..), famInstAxiom, 
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon, 
         famInstLHS,
 	pprFamInst, pprFamInstHdr, pprFamInsts, 
@@ -124,9 +124,6 @@ dataFamInstRepTyCon fi
   = case fi_flavor fi of
        DataFamilyInst tycon -> tycon
        SynFamilyInst        -> pprPanic "dataFamInstRepTyCon" (ppr fi)
-
-famInstTyVars :: FamInst -> TyVarSet
-famInstTyVars = fi_tvs
 \end{code}
 
 \begin{code}
@@ -158,7 +155,9 @@ pprFamInstHdr (FamInst {fi_axiom = axiom, fi_flavor = flavor})
       | isTyConAssoc fam_tc = empty
       | otherwise           = ptext (sLit "instance")
 
-    pprHead = pprTypeApp fam_tc tys
+    pprHead = sep [ ifPprDebug (ptext (sLit "forall") 
+                       <+> pprTvBndrs (coAxiomTyVars axiom))
+                  , pprTypeApp fam_tc tys ]
     pprTyConSort = case flavor of
                      SynFamilyInst        -> ptext (sLit "type")
                      DataFamilyInst tycon
@@ -415,6 +414,7 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
 		  (ppr tpl_tvs <+> ppr tpl_tys) )
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
+         pprTrace "tcUnifyTys" (ppr tpl_tys $$ ppr match_tys $$ ppr fam_inst) $
          case tcUnifyTys instanceBindFun tpl_tys match_tys of
 	      Just subst | conflicting old_fam_inst subst -> Just subst
 	      _other	   	              	          -> Nothing
@@ -490,7 +490,7 @@ lookup_fam_inst_env' match_fun one_sided ie fam tys
     n_tys = length tys
     extra_tys = drop arity tys
     (match_tys, add_extra_tys) 
-       | arity > n_tys = (take arity tys, \res_tys -> res_tys ++ extra_tys)
+       | arity < n_tys = (take arity tys, \res_tys -> res_tys ++ extra_tys)
        | otherwise     = (tys,            \res_tys -> res_tys)
        	 -- The second case is the common one, hence functional representation
 

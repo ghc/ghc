@@ -175,7 +175,7 @@ newHscEnv dflags = do
     return HscEnv {  hsc_dflags       = dflags,
                      hsc_targets      = [],
                      hsc_mod_graph    = [],
-                     hsc_IC           = emptyInteractiveContext,
+                     hsc_IC           = emptyInteractiveContext dflags,
                      hsc_HPT          = emptyHomePackageTable,
                      hsc_EPS          = eps_var,
                      hsc_NC           = nc_var,
@@ -216,6 +216,13 @@ runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
     printOrThrowWarnings (hsc_dflags hsc_env) w
     return a
+
+-- A variant of runHsc that switches in the DynFlags from the
+-- InteractiveContext before running the Hsc computation.
+--
+runInteractiveHsc :: HscEnv -> Hsc a -> IO a
+runInteractiveHsc hsc_env =
+  runHsc (hsc_env { hsc_dflags = ic_dflags (hsc_IC hsc_env) })
 
 getWarnings :: Hsc WarningMessages
 getWarnings = Hsc $ \_ w -> return (w, w)
@@ -287,31 +294,36 @@ ioMsgMaybe' ioA = do
 
 #ifdef GHCI
 hscTcRnLookupRdrName :: HscEnv -> RdrName -> IO [Name]
-hscTcRnLookupRdrName hsc_env rdr_name =
-    runHsc hsc_env $ ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name
+hscTcRnLookupRdrName hsc_env0 rdr_name = runInteractiveHsc hsc_env0 $ do
+   hsc_env <- getHscEnv
+   ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name
 #endif
 
 hscTcRcLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
-hscTcRcLookupName hsc_env name =
-    runHsc hsc_env $ ioMsgMaybe' $ tcRnLookupName hsc_env name
+hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
+  hsc_env <- getHscEnv
+  ioMsgMaybe' $ tcRnLookupName hsc_env name
       -- ignore errors: the only error we're likely to get is
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
 
 hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [ClsInst]))
-hscTcRnGetInfo hsc_env name =
-    runHsc hsc_env $ ioMsgMaybe' $ tcRnGetInfo hsc_env name
+hscTcRnGetInfo hsc_env0 name = runInteractiveHsc hsc_env0 $ do
+  hsc_env <- getHscEnv
+  ioMsgMaybe' $ tcRnGetInfo hsc_env name
 
 #ifdef GHCI
 hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
-hscGetModuleInterface hsc_env mod =
-    runHsc hsc_env $ ioMsgMaybe $ getModuleInterface hsc_env mod
+hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
+  hsc_env <- getHscEnv
+  ioMsgMaybe $ getModuleInterface hsc_env mod
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
 hscRnImportDecls :: HscEnv -> [LImportDecl RdrName] -> IO GlobalRdrEnv
-hscRnImportDecls hsc_env import_decls =
-    runHsc hsc_env $ ioMsgMaybe $ tcRnImportDecls hsc_env import_decls
+hscRnImportDecls hsc_env0 import_decls = runInteractiveHsc hsc_env0 $ do
+  hsc_env <- getHscEnv
+  ioMsgMaybe $ tcRnImportDecls hsc_env import_decls
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -538,7 +550,7 @@ data HsCompiler a = HsCompiler {
   }
 
 genericHscCompile :: HsCompiler a
-                  -> (HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ())
+                  -> (HscEnv -> Maybe (Int,Int) -> RecompileRequired -> ModSummary -> IO ())
                   -> HscEnv -> ModSummary -> SourceModified
                   -> Maybe ModIface -> Maybe (Int, Int)
                   -> IO a
@@ -556,7 +568,7 @@ genericHscCompile compiler hscMessage hsc_env
     let mb_old_hash = fmap mi_iface_hash mb_checked_iface
 
     let skip iface = do
-            hscMessage hsc_env mb_mod_index RecompNotRequired mod_summary
+            hscMessage hsc_env mb_mod_index UpToDate mod_summary
             runHsc hsc_env $ hscNoRecomp compiler iface
 
         compile reason = do
@@ -579,12 +591,12 @@ genericHscCompile compiler hscMessage hsc_env
         -- doing for us in one-shot mode.
 
     case mb_checked_iface of
-        Just iface | not recomp_reqd ->
+        Just iface | not (recompileRequired recomp_reqd) ->
             if mi_used_th iface && not stable
                 then compile RecompForcedByTH
                 else skip iface
         _otherwise ->
-            compile RecompRequired
+            compile recomp_reqd
 
 hscCheckRecompBackend :: HsCompiler a -> TcGblEnv -> Compiler a
 hscCheckRecompBackend compiler tc_result hsc_env mod_summary
@@ -597,7 +609,7 @@ hscCheckRecompBackend compiler tc_result hsc_env mod_summary
 
     let mb_old_hash = fmap mi_iface_hash mb_checked_iface
     case mb_checked_iface of
-        Just iface | not recomp_reqd
+        Just iface | not (recompileRequired recomp_reqd)
             -> runHsc hsc_env $
                    hscNoRecomp compiler
                        iface{ mi_globals = Just (tcg_rdr_env tc_result) }
@@ -788,32 +800,33 @@ genModDetails old_iface
 -- Progress displayers.
 --------------------------------------------------------------
 
-data RecompReason = RecompNotRequired | RecompRequired | RecompForcedByTH
-    deriving Eq
-
-oneShotMsg :: HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ()
+oneShotMsg :: HscEnv -> Maybe (Int,Int) -> RecompileRequired -> ModSummary
+            -> IO ()
 oneShotMsg hsc_env _mb_mod_index recomp _mod_summary =
     case recomp of
-        RecompNotRequired ->
+        UpToDate ->
             compilationProgressMsg (hsc_dflags hsc_env) $
                    "compilation IS NOT required"
         _other ->
             return ()
 
-batchMsg :: HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ()
+batchMsg :: HscEnv -> Maybe (Int,Int) -> RecompileRequired -> ModSummary
+         -> IO ()
 batchMsg hsc_env mb_mod_index recomp mod_summary =
     case recomp of
-        RecompRequired -> showMsg "Compiling "
-        RecompNotRequired
-            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  "
+        MustCompile -> showMsg "Compiling " ""
+        UpToDate
+            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
             | otherwise -> return ()
-        RecompForcedByTH -> showMsg "Compiling [TH] "
+        RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+        RecompForcedByTH -> showMsg "Compiling " " [TH]"
     where
-        showMsg msg =
+        showMsg msg reason =
             compilationProgressMsg (hsc_dflags hsc_env) $
             (showModuleIndex mb_mod_index ++
             msg ++ showModMsg (hscTarget (hsc_dflags hsc_env))
-                              (recomp == RecompRequired) mod_summary)
+                              (recompileRequired recomp) mod_summary)
+                ++ reason
 
 --------------------------------------------------------------
 -- FrontEnds
@@ -1378,7 +1391,9 @@ hscStmtWithLocation :: HscEnv
                     -> String -- ^ The source
                     -> Int    -- ^ Starting line
                     -> IO (Maybe ([Id], IO [HValue]))
-hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
+hscStmtWithLocation hsc_env0 stmt source linenumber =
+ runInteractiveHsc hsc_env0 $ do
+    hsc_env <- getHscEnv
     maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
     case maybe_stmt of
         Nothing -> return Nothing
@@ -1418,7 +1433,9 @@ hscDeclsWithLocation :: HscEnv
                      -> String -- ^ The source
                      -> Int    -- ^ Starting line
                      -> IO ([TyThing], InteractiveContext)
-hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
+hscDeclsWithLocation hsc_env0 str source linenumber =
+ runInteractiveHsc hsc_env0 $ do
+    hsc_env <- getHscEnv
     L _ (HsModule{ hsmodDecls = decls }) <-
         hscParseThingWithLocation source linenumber parseModule str
 
@@ -1489,7 +1506,7 @@ hscDeclsWithLocation hsc_env str source linenumber = runHsc hsc_env $ do
     return (tythings, ictxt)
 
 hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
-hscImport hsc_env str = runHsc hsc_env $ do
+hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     (L _ (HsModule{hsmodImports=is})) <-
        hscParseThing parseModule str
     case is of
@@ -1502,7 +1519,8 @@ hscImport hsc_env str = runHsc hsc_env $ do
 hscTcExpr :: HscEnv
           -> String -- ^ The expression
           -> IO Type
-hscTcExpr hsc_env expr = runHsc hsc_env $ do
+hscTcExpr hsc_env0 expr = runInteractiveHsc hsc_env0 $ do
+    hsc_env <- getHscEnv
     maybe_stmt <- hscParseStmt expr
     case maybe_stmt of
         Just (L _ (ExprStmt expr _ _ _)) ->
@@ -1517,7 +1535,8 @@ hscKcType
   -> Bool            -- ^ Normalise the type
   -> String          -- ^ The type as a string
   -> IO (Type, Kind) -- ^ Resulting type (possibly normalised) and kind
-hscKcType hsc_env normalise str = runHsc hsc_env $ do
+hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
+    hsc_env <- getHscEnv
     ty <- hscParseType str
     ioMsgMaybe $ tcRnType hsc_env (hsc_IC hsc_env) normalise ty
 
@@ -1535,7 +1554,7 @@ hscParseType = hscParseThing parseType
 
 hscParseIdentifier :: HscEnv -> String -> IO (Located RdrName)
 hscParseIdentifier hsc_env str =
-    runHsc hsc_env $ hscParseThing parseIdentifier str
+    runInteractiveHsc hsc_env $ hscParseThing parseIdentifier str
 
 hscParseThing :: (Outputable thing) => Lexer.P thing -> String -> Hsc thing
 hscParseThing = hscParseThingWithLocation "<interactive>" 1

@@ -19,6 +19,7 @@ module MkIface (
 
         checkOldIface,  -- See if recompilation is required, by
                         -- comparing version information
+        RecompileRequired(..), recompileRequired,
 
         tyThingToIfaceDecl -- Converting things to their Iface equivalents
  ) where
@@ -110,6 +111,7 @@ import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.IORef
+import System.Directory
 import System.FilePath
 \end{code}
 
@@ -287,7 +289,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                         mi_fixities    = fixities,
                         mi_warns       = warns,
                         mi_anns        = mkIfaceAnnotations anns,
-                        mi_globals     = Just rdr_env,
+                        mi_globals     = maybeGlobalRdrEnv rdr_env,
 
                         -- Left out deliberately: filled in by addFingerprints
                         mi_iface_hash  = fingerprint0,
@@ -344,7 +346,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                 -- correctly.  This stems from the fact that the interface had
                 -- not changed, so addFingerprints returns the old ModIface
                 -- with the old GlobalRdrEnv (mi_globals).
-        ; let final_iface = new_iface{ mi_globals = Just rdr_env }
+        ; let final_iface = new_iface{ mi_globals = maybeGlobalRdrEnv rdr_env }
 
         ; return (errs_and_warns, Just (final_iface, no_change_at_all)) }}
   where
@@ -358,6 +360,17 @@ mkIface_ hsc_env maybe_old_fingerprint
      le_occ n1 n2 = nameOccName n1 <= nameOccName n2
 
      dflags = hsc_dflags hsc_env
+
+     -- We only fill in mi_globals if the module was compiled to byte
+     -- code.  Otherwise, the compiler may not have retained all the
+     -- top-level bindings and they won't be in the TypeEnv (see
+     -- Desugar.addExportFlagsAndRules).  The mi_globals field is used
+     -- by GHCi to decide whether the module has its full top-level
+     -- scope available. (#5534)
+     maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
+     maybeGlobalRdrEnv rdr_env
+         | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
+         | otherwise                                   = Nothing
 
      deliberatelyOmitted :: String -> a
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
@@ -380,7 +393,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 -----------------------------
 writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()
 writeIfaceFile dflags location new_iface
-    = do createDirectoryHierarchy (takeDirectory hi_file_path)
+    = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          writeBinIface dflags hi_file_path new_iface
     where hi_file_path = ml_hi_file location
 
@@ -583,7 +596,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - (some of) dflags
    -- it returns two hashes, one that shouldn't change
    -- the abi hash and one that should
-   flag_hash <- fingerprintDynFlags dflags putNameLiterally
+   flag_hash <- fingerprintDynFlags dflags this_mod putNameLiterally
 
    -- the ABI hash depends on:
    --   - decls
@@ -1073,11 +1086,28 @@ Trac #5362 for an example.  Such Names are always
 %*                                                                      *
         Load the old interface file for this module (unless
         we have it already), and check whether it is up to date
-        
 %*                                                                      *
 %************************************************************************
 
 \begin{code}
+data RecompileRequired
+  = UpToDate
+       -- ^ everything is up to date, recompilation is not required
+  | MustCompile
+       -- ^ The .hs file has been touched, or the .o/.hi file does not exist
+  | RecompBecause String
+       -- ^ The .o/.hi files are up to date, but something else has changed
+       -- to force recompilation; the String says what (one-line summary)
+  | RecompForcedByTH
+       -- ^ recompile is forced due to use of TH by the module
+   deriving Eq
+
+recompileRequired :: RecompileRequired -> Bool
+recompileRequired UpToDate = False
+recompileRequired _ = True
+
+
+
 -- | Top level function to check if the version of an old interface file
 -- is equivalent to the current source file the user asked us to compile.
 -- If the same, we can avoid recompilation. We return a tuple where the
@@ -1097,7 +1127,7 @@ checkOldIface hsc_env mod_summary source_modified maybe_iface
             check_old_iface hsc_env mod_summary source_modified maybe_iface
 
 check_old_iface :: HscEnv -> ModSummary -> SourceModified -> Maybe ModIface
-                -> IfG (Bool, Maybe ModIface)
+                -> IfG (RecompileRequired, Maybe ModIface)
 check_old_iface hsc_env mod_summary src_modified maybe_iface
   = let dflags = hsc_dflags hsc_env
         getIface =
@@ -1131,34 +1161,25 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
             -- avoid reading an interface; just return the one we might
             -- have been supplied with.
             True | not (isObjectTarget $ hscTarget dflags) ->
-                return (outOfDate, maybe_iface)
+                return (MustCompile, maybe_iface)
 
             -- Try and read the old interface for the current module
             -- from the .hi file left from the last time we compiled it
             True -> do
                 maybe_iface' <- getIface
-                return (outOfDate, maybe_iface')
+                return (MustCompile, maybe_iface')
 
             False -> do
                 maybe_iface' <- getIface
                 case maybe_iface' of
                     -- We can't retrieve the iface
-                    Nothing    -> return (outOfDate, Nothing)
+                    Nothing    -> return (MustCompile, Nothing)
 
                     -- We have got the old iface; check its versions
                     -- even in the SourceUnmodifiedAndStable case we
                     -- should check versions because some packages
                     -- might have changed or gone away.
                     Just iface -> checkVersions hsc_env mod_summary iface
-
--- | @recompileRequired@ is called from the HscMain.   It checks whether
--- a recompilation is required.  It needs access to the persistent state,
--- finder, etc, because it may have to load lots of interface files to
--- check their versions.
-type RecompileRequired = Bool
-upToDate, outOfDate :: Bool
-upToDate  = False  -- Recompile not required
-outOfDate = True   -- Recompile required
 
 -- | Check if a module is still the same 'version'.
 --
@@ -1180,9 +1201,9 @@ checkVersions hsc_env mod_summary iface
                         ppr (mi_module iface) <> colon)
 
        ; recomp <- checkFlagHash hsc_env iface
-       ; if recomp then return (outOfDate, Nothing) else do {
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
-       ; if recomp then return (outOfDate, Just iface) else do {
+       ; if recompileRequired recomp then return (recomp, Just iface) else do {
 
        -- Source code unchanged and no errors yet... carry on
        --
@@ -1211,10 +1232,13 @@ checkVersions hsc_env mod_summary iface
 checkFlagHash :: HscEnv -> ModIface -> IfG RecompileRequired
 checkFlagHash hsc_env iface = do
     let old_hash = mi_flag_hash iface
-    new_hash <- liftIO $ fingerprintDynFlags (hsc_dflags hsc_env) putNameLiterally
+    new_hash <- liftIO $ fingerprintDynFlags (hsc_dflags hsc_env)
+                                             (mi_module iface)
+                                             putNameLiterally
     case old_hash == new_hash of
         True  -> up_to_date (ptext $ sLit "Module flags unchanged")
-        False -> out_of_date_hash (ptext $ sLit "  Module flags have changed")
+        False -> out_of_date_hash "flags changed"
+                     (ptext $ sLit "  Module flags have changed")
                      old_hash new_hash
 
 -- If the direct imports of this module are resolved to targets that
@@ -1229,18 +1253,16 @@ checkFlagHash hsc_env iface = do
 -- Returns True if recompilation is required.
 checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
 checkDependencies hsc_env summary iface
- = orM (map dep_missing (ms_imps summary ++ ms_srcimps summary))
+ = checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
   where
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
 
    this_pkg = thisPackage (hsc_dflags hsc_env)
 
-   orM = foldr f (return False)
-    where f m rest = do b <- m; if b then return True else rest
-
    dep_missing (L _ (ImportDecl { ideclName = L _ mod, ideclPkgQual = pkg })) = do
      find_res <- liftIO $ findImportedModule hsc_env mod pkg
+     let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod
           | pkg == this_pkg
@@ -1248,20 +1270,20 @@ checkDependencies hsc_env summary iface
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"
-                         return outOfDate
+                         return (RecompBecause reason)
                  else
-                         return upToDate
+                         return UpToDate
           | otherwise
            -> if pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
                            text ", which is not among previous dependencies"
-                         return outOfDate
+                         return (RecompBecause reason)
                  else
-                         return upToDate
+                         return UpToDate
            where pkg = modulePackageId mod
-        _otherwise  -> return outOfDate
+        _otherwise  -> return (RecompBecause reason)
 
 needInterface :: Module -> (ModIface -> IfG RecompileRequired)
               -> IfG RecompileRequired
@@ -1275,8 +1297,10 @@ needInterface mod continue
         -- Instead, get an Either back which we can test
 
     case mb_iface of
-      Failed _ ->  (out_of_date (sep [ptext (sLit "Couldn't load interface for module"),
-                                      ppr mod]))
+      Failed _ -> do
+        traceHiDiffs (sep [ptext (sLit "Couldn't load interface for module"),
+                           ppr mod])
+        return MustCompile
                   -- Couldn't find or parse a module mentioned in the
                   -- old interface file.  Don't complain: it might
                   -- just be that the current module doesn't need that
@@ -1292,7 +1316,8 @@ checkModUsage _this_pkg UsagePackageModule{
                                 usg_mod = mod,
                                 usg_mod_hash = old_mod_hash }
   = needInterface mod $ \iface -> do
-    checkModuleFingerprint old_mod_hash (mi_mod_hash iface)
+    let reason = moduleNameString (moduleName mod) ++ " changed"
+    checkModuleFingerprint reason old_mod_hash (mi_mod_hash iface)
         -- We only track the ABI hash of package modules, rather than
         -- individual entity usages, so if the ABI hash changes we must
         -- recompile.  This is safe but may entail more recompilation when
@@ -1312,19 +1337,21 @@ checkModUsage this_pkg UsageHomeModule{
         new_decl_hash   = mi_hash_fn     iface
         new_export_hash = mi_exp_hash    iface
 
+        reason = moduleNameString mod_name ++ " changed"
+
         -- CHECK MODULE
-    recompile <- checkModuleFingerprint old_mod_hash new_mod_hash
-    if not recompile then return upToDate else do
-                                 
+    recompile <- checkModuleFingerprint reason old_mod_hash new_mod_hash
+    if not (recompileRequired recompile) then return UpToDate else do
+
         -- CHECK EXPORT LIST
-    checkMaybeHash maybe_old_export_hash new_export_hash
+    checkMaybeHash reason maybe_old_export_hash new_export_hash
         (ptext (sLit "  Export list changed")) $ do
 
         -- CHECK ITEMS ONE BY ONE
-    recompile <- checkList [ checkEntityUsage new_decl_hash u 
+    recompile <- checkList [ checkEntityUsage reason new_decl_hash u
                            | u <- old_decl_hash]
-    if recompile 
-      then return outOfDate     -- This one failed, so just bail out now
+    if recompileRequired recompile
+      then return recompile     -- This one failed, so just bail out now
       else up_to_date (ptext (sLit "  Great!  The bits I use are up to date"))
  
 
@@ -1333,65 +1360,72 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
   liftIO $
     handleIO handle $ do
       new_mtime <- getModificationUTCTime file
-      return $ old_mtime /= new_mtime
+      if (old_mtime /= new_mtime)
+         then return recomp
+         else return UpToDate
  where
+   recomp = RecompBecause (file ++ " changed")
    handle =
 #ifdef DEBUG
-       \e -> pprTrace "UsageFile" (text (show e)) $ return True
+       \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
 #else
-       \_ -> return True -- if we can't find the file, just recompile, don't fail
+       \_ -> return recomp -- if we can't find the file, just recompile, don't fail
 #endif
 
 ------------------------
-checkModuleFingerprint :: Fingerprint -> Fingerprint -> IfG RecompileRequired
-checkModuleFingerprint old_mod_hash new_mod_hash
+checkModuleFingerprint :: String -> Fingerprint -> Fingerprint
+                       -> IfG RecompileRequired
+checkModuleFingerprint reason old_mod_hash new_mod_hash
   | new_mod_hash == old_mod_hash
   = up_to_date (ptext (sLit "Module fingerprint unchanged"))
 
   | otherwise
-  = out_of_date_hash (ptext (sLit "  Module fingerprint has changed"))
+  = out_of_date_hash reason (ptext (sLit "  Module fingerprint has changed"))
                      old_mod_hash new_mod_hash
 
 ------------------------
-checkMaybeHash :: Maybe Fingerprint -> Fingerprint -> SDoc
+checkMaybeHash :: String -> Maybe Fingerprint -> Fingerprint -> SDoc
                -> IfG RecompileRequired -> IfG RecompileRequired
-checkMaybeHash maybe_old_hash new_hash doc continue
+checkMaybeHash reason maybe_old_hash new_hash doc continue
   | Just hash <- maybe_old_hash, hash /= new_hash
-  = out_of_date_hash doc hash new_hash
+  = out_of_date_hash reason doc hash new_hash
   | otherwise
   = continue
 
 ------------------------
-checkEntityUsage :: (OccName -> Maybe (OccName, Fingerprint))
+checkEntityUsage :: String
+                 -> (OccName -> Maybe (OccName, Fingerprint))
                  -> (OccName, Fingerprint)
                  -> IfG RecompileRequired
-checkEntityUsage new_hash (name,old_hash)
+checkEntityUsage reason new_hash (name,old_hash)
   = case new_hash name of
 
         Nothing       ->        -- We used it before, but it ain't there now
-                          out_of_date (sep [ptext (sLit "No longer exported:"), ppr name])
+                          out_of_date reason (sep [ptext (sLit "No longer exported:"), ppr name])
 
         Just (_, new_hash)      -- It's there, but is it up to date?
           | new_hash == old_hash -> do traceHiDiffs (text "  Up to date" <+> ppr name <+> parens (ppr new_hash))
-                                       return upToDate
-          | otherwise            -> out_of_date_hash (ptext (sLit "  Out of date:") <+> ppr name)
+                                       return UpToDate
+          | otherwise            -> out_of_date_hash reason (ptext (sLit "  Out of date:") <+> ppr name)
                                                      old_hash new_hash
 
-up_to_date, out_of_date :: SDoc -> IfG RecompileRequired
-up_to_date  msg = traceHiDiffs msg >> return upToDate
-out_of_date msg = traceHiDiffs msg >> return outOfDate
+up_to_date :: SDoc -> IfG RecompileRequired
+up_to_date  msg = traceHiDiffs msg >> return UpToDate
 
-out_of_date_hash :: SDoc -> Fingerprint -> Fingerprint -> IfG RecompileRequired
-out_of_date_hash msg old_hash new_hash 
-  = out_of_date (hsep [msg, ppr old_hash, ptext (sLit "->"), ppr new_hash])
+out_of_date :: String -> SDoc -> IfG RecompileRequired
+out_of_date reason msg = traceHiDiffs msg >> return (RecompBecause reason)
+
+out_of_date_hash :: String -> SDoc -> Fingerprint -> Fingerprint -> IfG RecompileRequired
+out_of_date_hash reason msg old_hash new_hash
+  = out_of_date reason (hsep [msg, ppr old_hash, ptext (sLit "->"), ppr new_hash])
 
 ----------------------
 checkList :: [IfG RecompileRequired] -> IfG RecompileRequired
 -- This helper is used in two places
-checkList []             = return upToDate
+checkList []             = return UpToDate
 checkList (check:checks) = do recompile <- check
-                              if recompile
-                                then return outOfDate
+                              if recompileRequired recompile
+                                then return recompile
                                 else checkList checks
 \end{code}
 
@@ -1425,6 +1459,7 @@ tyThingToIfaceDecl (ATyCon tycon)
 
   | isAlgTyCon tycon
   = IfaceData { ifName    = getOccName tycon,
+                ifCType   = tyConCType tycon,
                 ifTyVars  = toIfaceTvBndrs tyvars,
                 ifCtxt    = toIfaceContext (tyConStupidTheta tycon),
                 ifCons    = ifaceConDecls (algTyConRhs tycon),

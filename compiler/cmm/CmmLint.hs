@@ -134,7 +134,8 @@ lintCmmStmt platform labels = lint
             _ <- lintCmmExpr platform r
             return ()
           lint (CmmCall target _res args _) =
-              lintTarget platform target >> mapM_ (lintCmmExpr platform . hintlessCmm) args
+              do lintTarget platform labels target
+                 mapM_ (lintCmmExpr platform . hintlessCmm) args
           lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr platform e >> checkCond platform e
           lint (CmmSwitch e branches) = do
             mapM_ checkTarget $ catMaybes branches
@@ -149,9 +150,12 @@ lintCmmStmt platform labels = lint
           checkTarget id = if setMember id labels then return ()
                            else cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
 
-lintTarget :: Platform -> CmmCallTarget -> CmmLint ()
-lintTarget platform (CmmCallee e _) = lintCmmExpr platform e >> return ()
-lintTarget _        (CmmPrim {})    = return ()
+lintTarget :: Platform -> BlockSet -> CmmCallTarget -> CmmLint ()
+lintTarget platform _      (CmmCallee e _) = do _ <- lintCmmExpr platform e
+                                                return ()
+lintTarget _        _      (CmmPrim _ Nothing) = return ()
+lintTarget platform labels (CmmPrim _ (Just stmts))
+    = mapM_ (lintCmmStmt platform labels) stmts
 
 
 checkCond :: Platform -> CmmExpr -> CmmLint ()

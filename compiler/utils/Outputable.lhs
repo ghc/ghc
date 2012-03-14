@@ -23,7 +23,8 @@ module Outputable (
         char,
         text, ftext, ptext,
         int, intWithCommas, integer, float, double, rational,
-        parens, cparen, brackets, braces, quotes, quote, doubleQuotes, angleBrackets,
+        parens, cparen, brackets, braces, quotes, quote, 
+        doubleQuotes, angleBrackets, paBrackets,
         semi, comma, colon, dcolon, space, equals, dot, arrow, darrow,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
         blankLine,
@@ -387,29 +388,29 @@ renderWithStyle sdoc sty =
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: SDoc -> String
-showSDocOneLine d =
-  Pretty.showDocWith PageMode
+showSDocOneLine d 
+ = Pretty.showDocWith PageMode
     (runSDoc d (initSDocContext defaultUserStyle))
 
 showSDocForUser :: PrintUnqualified -> SDoc -> String
-showSDocForUser unqual doc =
-  show (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+showSDocForUser unqual doc
+ = show (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
 showSDocUnqual :: SDoc -> String
 -- Only used in the gruesome isOperator
-showSDocUnqual d =
-  show (runSDoc d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
+showSDocUnqual d 
+ = show (runSDoc d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
 showsPrecSDoc p d = showsPrec p (runSDoc d (initSDocContext defaultUserStyle))
 
 showSDocDump :: SDoc -> String
-showSDocDump d =
-  Pretty.showDocWith PageMode (runSDoc d (initSDocContext PprDump))
+showSDocDump d 
+ = Pretty.showDocWith PageMode (runSDoc d (initSDocContext defaultDumpStyle))
 
 showSDocDumpOneLine :: SDoc -> String
-showSDocDumpOneLine d =
-  Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext PprDump))
+showSDocDumpOneLine d
+ = Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext PprDump))
 
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (runSDoc d (initSDocContext PprDebug))
@@ -444,27 +445,31 @@ float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
 
-parens, braces, brackets, quotes, quote, doubleQuotes, angleBrackets :: SDoc -> SDoc
+parens, braces, brackets, quotes, quote, 
+        paBrackets, doubleQuotes, angleBrackets :: SDoc -> SDoc
 
-parens d       = SDoc $ Pretty.parens . runSDoc d
-braces d       = SDoc $ Pretty.braces . runSDoc d
-brackets d     = SDoc $ Pretty.brackets . runSDoc d
-quote d        = SDoc $ Pretty.quote . runSDoc d
-doubleQuotes d = SDoc $ Pretty.doubleQuotes . runSDoc d
+parens d        = SDoc $ Pretty.parens . runSDoc d
+braces d        = SDoc $ Pretty.braces . runSDoc d
+brackets d      = SDoc $ Pretty.brackets . runSDoc d
+quote d         = SDoc $ Pretty.quote . runSDoc d
+doubleQuotes d  = SDoc $ Pretty.doubleQuotes . runSDoc d
 angleBrackets d = char '<' <> d <> char '>'
+paBrackets d    = ptext (sLit "[:") <> d <> ptext (sLit ":]")
 
 cparen :: Bool -> SDoc -> SDoc
 
 cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 
 -- 'quotes' encloses something in single quotes...
--- but it omits them if the thing ends in a single quote
+-- but it omits them if the thing begins or ends in a single quote
 -- so that we don't get `foo''.  Instead we just have foo'.
 quotes d = SDoc $ \sty ->
-           let pp_d = runSDoc d sty in
-           case snocView (show pp_d) of
-             Just (_, '\'') -> pp_d
-             _other         -> Pretty.quotes pp_d
+           let pp_d = runSDoc d sty
+               str  = show pp_d
+           in case (str, snocView str) of
+             (_, Just (_, '\'')) -> pp_d
+             ('\'' : _, _)       -> pp_d
+             _other              -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
 darrow, lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
@@ -918,27 +923,27 @@ plural _   = char 's'
 
 pprPanic :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
-pprPanic    = pprAndThen panic
+pprPanic    = pprDebugAndThen panic
 
 pprSorry :: String -> SDoc -> a
 -- ^ Throw an exception saying "this isn't finished yet"
-pprSorry    = pprAndThen sorry
+pprSorry    = pprDebugAndThen sorry
 
 
 pprPgmError :: String -> SDoc -> a
 -- ^ Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
-pprPgmError = pprAndThen pgmError
+pprPgmError = pprDebugAndThen pgmError
 
 
 pprTrace :: String -> SDoc -> a -> a
 -- ^ If debug output is on, show some 'SDoc' on the screen
 pprTrace str doc x
    | opt_NoDebugOutput = x
-   | otherwise         = pprAndThen trace str doc x
+   | otherwise         = pprDebugAndThen trace str doc x
 
 pprDefiniteTrace :: String -> SDoc -> a -> a
 -- ^ Same as pprTrace, but show even if -dno-debug-output is on
-pprDefiniteTrace str doc x = pprAndThen trace str doc x
+pprDefiniteTrace str doc x = pprDebugAndThen trace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
@@ -947,33 +952,31 @@ pprPanicFastInt heading pretty_msg =
   where
     doc = text heading <+> pretty_msg
 
-
-pprAndThen :: (String -> a) -> String -> SDoc -> a
-pprAndThen cont heading pretty_msg =
-  cont (show (runSDoc doc (initSDocContext PprDebug)))
- where
-     doc = sep [text heading, nest 4 pretty_msg]
-
-assertPprPanic :: String -> Int -> SDoc -> a
--- ^ Panic with an assertation failure, recording the given file and line number.
--- Should typically be accessed with the ASSERT family of macros
-assertPprPanic file line msg
-  = panic (show (runSDoc doc (initSDocContext PprDebug)))
-  where
-    doc = sep [hsep[text "ASSERT failed! file",
-                           text file,
-                           text "line", int line],
-                    msg]
-
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 -- ^ Just warn about an assertion failure, recording the given file and line number.
 -- Should typically be accessed with the WARN macros
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = trace (show (runSDoc doc (initSDocContext defaultDumpStyle))) x
+  = pprDebugAndThen trace "WARNING:" doc x
   where
     doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
                msg]
+
+assertPprPanic :: String -> Int -> SDoc -> a
+-- ^ Panic with an assertation failure, recording the given file and line number.
+-- Should typically be accessed with the ASSERT family of macros
+assertPprPanic file line msg
+  = pprDebugAndThen panic "ASSERT failed!" doc
+  where
+    doc = sep [ hsep [ text "file", text file
+                     , text "line", int line ]
+              , msg ]
+
+pprDebugAndThen :: (String -> a) -> String -> SDoc -> a
+pprDebugAndThen cont heading pretty_msg 
+ = cont (show (runSDoc doc (initSDocContext PprDebug)))
+ where
+     doc = sep [text heading, nest 4 pretty_msg]
 \end{code}
 

@@ -74,7 +74,6 @@ module Util (
         maybeRead, maybeReadFuzzy,
 
         -- * IO-ish utilities
-        createDirectoryHierarchy,
         doesDirNameExist,
         getModificationUTCTime,
         modificationTimeIfExists,
@@ -109,10 +108,9 @@ import Data.List        hiding (group)
 import FastTypes
 #endif
 
-import Control.Monad    ( unless, liftM )
+import Control.Monad    ( liftM )
 import System.IO.Error as IO ( isDoesNotExistError )
-import System.Directory ( doesDirectoryExist, createDirectory,
-                          getModificationTime )
+import System.Directory ( doesDirectoryExist, getModificationTime )
 import System.FilePath
 
 import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit )
@@ -1016,16 +1014,6 @@ maybeReadFuzzy str = case reads str of
                          Just x
                      _ ->
                          Nothing
-
------------------------------------------------------------------------------
--- Create a hierarchy of directories
-
-createDirectoryHierarchy :: FilePath -> IO ()
-createDirectoryHierarchy dir | isDrive dir = return () -- XXX Hack
-createDirectoryHierarchy dir = do
-  b <- doesDirectoryExist dir
-  unless b $ do createDirectoryHierarchy (takeDirectory dir)
-                createDirectory dir
 
 -----------------------------------------------------------------------------
 -- Verify that the 'dirname' portion of a FilePath exists.

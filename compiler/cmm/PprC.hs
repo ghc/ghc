@@ -237,7 +237,10 @@ pprStmt platform stmt = case stmt of
                     pprCall platform cast_fn cconv results args <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
-    CmmCall (CmmPrim op) results args _ret ->
+    CmmCall (CmmPrim _ (Just stmts)) _ _ _ ->
+        vcat $ map (pprStmt platform) stmts
+
+    CmmCall (CmmPrim op _) results args _ret ->
         pprCall platform ppr_fn CCallConv results args'
         where
         ppr_fn = pprCallishMachOp_for_C op
@@ -658,7 +661,13 @@ pprCallishMachOp_for_C mop
         MO_Memmove      -> ptext (sLit "memmove")
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
 
-        MO_Touch -> panic $ "pprCallishMachOp_for_C: MO_Touch not supported!"
+        MO_S_QuotRem {} -> unsupported
+        MO_U_QuotRem {} -> unsupported
+        MO_Add2      {} -> unsupported
+        MO_U_Mul2    {} -> unsupported
+        MO_Touch        -> unsupported
+    where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
+                            ++ " not supported!")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines
@@ -926,12 +935,18 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)         = te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)          = te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es _)     = mapM_ (te_temp.hintlessCmm) rs >>
-                                  mapM_ (te_Expr.hintlessCmm) es
+te_Stmt (CmmCall target rs es _) = do te_Target target
+                                      mapM_ (te_temp.hintlessCmm) rs
+                                      mapM_ (te_Expr.hintlessCmm) es
 te_Stmt (CmmCondBranch e _)     = te_Expr e
 te_Stmt (CmmSwitch e _)         = te_Expr e
 te_Stmt (CmmJump e _)           = te_Expr e
 te_Stmt _                       = return ()
+
+te_Target :: CmmCallTarget -> TE ()
+te_Target (CmmCallee {})           = return ()
+te_Target (CmmPrim _ Nothing)      = return ()
+te_Target (CmmPrim _ (Just stmts)) = mapM_ te_Stmt stmts
 
 te_Expr :: CmmExpr -> TE ()
 te_Expr (CmmLit lit)            = te_Lit lit

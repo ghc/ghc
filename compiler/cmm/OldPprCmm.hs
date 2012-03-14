@@ -139,7 +139,7 @@ pprStmt platform stmt = case stmt of
                       _           -> ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
 
     -- Call a CallishMachOp, like sin or cos that might be implemented as a library call.
-    CmmCall (CmmPrim op) results args ret ->
+    CmmCall (CmmPrim op _) results args ret ->
         pprStmt platform (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
                                   results args ret)
         where

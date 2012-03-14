@@ -16,7 +16,6 @@
 #   * remove old Makefiles, add new stubs for building in subdirs
 #     * docs/Makefile
 #     * docs/docbook-cheat-sheet/Makefile
-#     * docs/ext-core/Makefile
 #     * docs/man/Makefile
 #     * docs/storage-mgmt/Makefile
 #     * docs/vh/Makefile
@@ -55,7 +54,7 @@
 #           o register each package into inplace/lib/package.conf
 #     * build libffi
 #     * With bootstrapping compiler:
-#	    o Build libraries/{filepath,hpc,extensible-exceptions,Cabal}
+#	    o Build libraries/{filepath,hpc,Cabal}
 #           o Build compiler (stage 1)
 #     * With stage 1:
 #           o Build libraries/*
@@ -334,7 +333,7 @@ PKGS_THAT_USE_TH := $(PKGS_THAT_ARE_DPH)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc extensible-exceptions binary bin-package-db hoopl
+PKGS_THAT_BUILD_WITH_STAGE0 = Cabal/Cabal hpc binary bin-package-db hoopl
 
 # $(EXTRA_PACKAGES)  is another classification, of packages built but
 #                    not installed
@@ -399,8 +398,8 @@ endif
 $(eval $(call addPackage,base))
 $(eval $(call addPackage,filepath))
 $(eval $(call addPackage,array))
-$(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,deepseq))
+$(eval $(call addPackage,bytestring))
 $(eval $(call addPackage,containers))
 
 $(eval $(call addPackage,Win32,($$(Windows),YES)))
@@ -411,7 +410,6 @@ $(eval $(call addPackage,old-time))
 $(eval $(call addPackage,time))
 $(eval $(call addPackage,directory))
 $(eval $(call addPackage,process))
-$(eval $(call addPackage,extensible-exceptions))
 $(eval $(call addPackage,haskell98))
 $(eval $(call addPackage,haskell2010))
 $(eval $(call addPackage,hpc))
@@ -440,7 +438,7 @@ $(eval $(call extra-packages))
 #
 # Ideally we should use the correct dependencies here to allow more
 # parallelism, but we don't know the dependencies until we've
-# generated the pacakge-data.mk files.
+# generated the package-data.mk files.
 define fixed_pkg_dep
 libraries/$1/$2/package-data.mk : $$(GHC_PKG_INPLACE) $$(fixed_pkg_prev)
 fixed_pkg_prev:=libraries/$1/$2/package-data.mk
@@ -561,7 +559,6 @@ endif
 
 BUILD_DIRS += \
    docs/users_guide \
-   docs/ext-core \
    docs/man \
    $(GHC_UNLIT_DIR) \
    $(GHC_HP2PS_DIR)

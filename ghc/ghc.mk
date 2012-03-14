@@ -148,7 +148,7 @@ INSTALL_LIBS += settings
 
 ifeq "$(Windows)" "NO"
 install: install_ghc_link
-.PNONY: install_ghc_link
+.PHONY: install_ghc_link
 install_ghc_link: 
 	$(call removeFiles,"$(DESTDIR)$(bindir)/ghc")
 	$(LN_S) $(CrossCompilePrefix)ghc-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghc"

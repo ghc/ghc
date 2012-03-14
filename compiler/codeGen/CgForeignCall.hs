@@ -78,9 +78,11 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   where
       (call_args, cmm_target)
         = case target of
+           StaticTarget _   _      False ->
+               panic "emitForeignCall: unexpected FFI value import"
            -- If the packageId is Nothing then the label is taken to be in the
            --   package currently being compiled.
-           StaticTarget lbl mPkgId
+           StaticTarget lbl mPkgId True
             -> let labelSource
                         = case mPkgId of
                                 Nothing         -> ForeignLabelInThisPackage

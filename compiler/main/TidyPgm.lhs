@@ -309,6 +309,9 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; omit_prags = dopt Opt_OmitInterfacePragmas dflags
               ; expose_all = dopt Opt_ExposeAllUnfoldings  dflags
               ; th         = xopt Opt_TemplateHaskell      dflags
+              ; data_kinds = xopt Opt_DataKinds            dflags
+              ; no_trim_types = th || data_kinds  
+                                -- See Note [When we can't trim types]
               }
         ; showPass dflags CoreTidy
 
@@ -334,7 +337,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 	      ; final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
 				    isExternalName (idName id)]
 
-              ; tidy_type_env = tidyTypeEnv omit_prags th export_set
+              ; tidy_type_env = tidyTypeEnv omit_prags no_trim_types export_set
                                       (extendTypeEnvWithIds type_env final_ids)
 
               ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
@@ -410,7 +413,7 @@ lookup_dfun type_env dfun_id
 
 --------------------------
 tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
-            -> Bool       -- Template Haskell is on
+            -> Bool       -- Type-trimming flag
             -> NameSet -> TypeEnv -> TypeEnv
 
 -- The competed type environment is gotten from
@@ -423,11 +426,11 @@ tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
 -- This truncates the type environment to include only the 
 -- exported Ids and things needed from them, which saves space
 
-tidyTypeEnv omit_prags th exports type_env
+tidyTypeEnv omit_prags no_trim_types exports type_env
  = let
         type_env1 = filterNameEnv (not . isWiredInName . getName) type_env
           -- (1) remove wired-in things
-        type_env2 | omit_prags = mapNameEnv (trimThing th exports) type_env1
+        type_env2 | omit_prags = mapNameEnv (trimThing no_trim_types exports) type_env1
                   | otherwise  = type_env1
           -- (2) trimmed if necessary
     in
@@ -436,9 +439,9 @@ tidyTypeEnv omit_prags th exports type_env
 --------------------------
 trimThing :: Bool -> NameSet -> TyThing -> TyThing
 -- Trim off inessentials, for boot files and no -O
-trimThing th exports (ATyCon tc)
-   | not th && not (mustExposeTyCon exports tc)
-   = ATyCon (makeTyConAbstract tc)	-- Note [Trimming and Template Haskell]
+trimThing no_trim_types exports (ATyCon tc)
+   | not (mustExposeTyCon no_trim_types exports tc)
+   = ATyCon (makeTyConAbstract tc)	-- Note [When we can't trim types]
 
 trimThing _th _exports (AnId id)
    | not (isImplicitId id) 
@@ -448,30 +451,61 @@ trimThing _th _exports other_thing
   = other_thing
 
 
-{- Note [Trimming and Template Haskell]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #2386) this
+{- Note [When we can't trim types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The basic idea of type trimming is to export algebraic data types
+abstractly (without their data constructors) when compiling without
+-O, unless of course they are explicitly exported by the user.  
+
+We always export synonyms, because they can be mentioned in the type
+of an exported Id.  We could do a full dependency analysis starting
+from the explicit exports, but that's quite painful, and not done for
+now.
+
+But there are some times we can't do that, indicated by the 'no_trim_types' flag.
+
+First, Template Haskell.  Consider (Trac #2386) this
 	module M(T, makeOne) where
 	  data T = Yay String
 	  makeOne = [| Yay "Yep" |]
 Notice that T is exported abstractly, but makeOne effectively exports it too!
 A module that splices in $(makeOne) will then look for a declartion of Yay,
 so it'd better be there.  Hence, brutally but simply, we switch off type
-constructor trimming if TH is enabled in this module. -}
+constructor trimming if TH is enabled in this module.
 
+Second, data kinds.  Consider (Trac #5912) 
+     {-# LANGUAGE DataKinds #-}
+     module M() where
+     data UnaryTypeC a = UnaryDataC a
+     type Bug = 'UnaryDataC
+We always export synonyms, so Bug is exposed, and that means that
+UnaryTypeC must be too, even though it's not explicitly exported.  In
+effect, DataKinds means that we'd need to do a full dependency analysis
+to see what data constructors are mentioned.  But we don't do that yet.
 
-mustExposeTyCon :: NameSet	-- Exports
+In these two cases we just switch off type trimming altogether.
+ -}
+
+mustExposeTyCon :: Bool         -- Type-trimming flag 
+                -> NameSet	-- Exports
 		-> TyCon	-- The tycon
 		-> Bool 	-- Can its rep be hidden?
 -- We are compiling without -O, and thus trying to write as little as 
 -- possible into the interface file.  But we must expose the details of
 -- any data types whose constructors or fields are exported
-mustExposeTyCon exports tc
-  | not (isAlgTyCon tc) 	-- Synonyms
+mustExposeTyCon no_trim_types exports tc
+  | no_trim_types               -- See Note [When we can't trim types]
   = True
+
+  | not (isAlgTyCon tc) 	-- Always expose synonyms (otherwise we'd have to
+                                -- figure out whether it was mentioned in the type
+                                -- of any other exported thing)
+  = True
+
   | isEnumerationTyCon tc	-- For an enumeration, exposing the constructors
   = True			-- won't lead to the need for further exposure
 				-- (This includes data types with no constructors.)
+
   | isFamilyTyCon tc		-- Open type family
   = True
 

@@ -200,18 +200,20 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
 mkTyData :: SrcSpan
          -> NewOrData
          -> Bool                -- True <=> data family instance
+         -> Maybe CType
          -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
          -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LTyClDecl RdrName)
-mkTyData loc new_or_data is_family (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
+mkTyData loc new_or_data is_family cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
 
        ; checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (tyvars, typats) <- checkTParams is_family tycl_hdr tparams
-       ; return (L loc (TyData { tcdND = new_or_data, tcdCtxt = cxt, tcdLName = tc,
+       ; return (L loc (TyData { tcdND = new_or_data, tcdCType = cType,
+                                 tcdCtxt = cxt, tcdLName = tc,
                                  tcdTyVars = tyvars, tcdTyPats = typats,
                                  tcdCons = data_cons,
                                  tcdKindSig = ksig, tcdDerivs = maybe_deriv })) }
@@ -224,7 +226,9 @@ mkTySynonym :: SrcSpan
 mkTySynonym loc is_family lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; (tyvars, typats) <- checkTParams is_family lhs tparams
-       ; return (L loc (TySynonym tc tyvars typats rhs)) }
+       ; return (L loc (TySynonym { tcdLName = tc
+                                  , tcdTyVars = tyvars, tcdTyPats = typats
+                                  , tcdSynRhs = rhs, tcdFVs = placeHolderNames })) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour
@@ -505,7 +509,7 @@ checkTyVars tycl_hdr tparms = mapM chk tparms
   where
         -- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar tv k placeHolderKind))
+        | isRdrTyVar tv    = return (L l (KindedTyVar tv (HsBSig k placeHolderBndrs) placeHolderKind))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
     chk t@(L l _)
@@ -642,7 +646,7 @@ checkAPat dynflags loc e0 = case e0 of
                             let t' = case t of
                                        L _ (HsForAllTy Implicit _ (L _ []) ty) -> ty
                                        other -> other
-                            return (SigPatIn e t')
+                            return (SigPatIn e (HsBSig t' placeHolderBndrs))
 
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _
@@ -920,8 +924,8 @@ mkImport :: CCallConv
          -> P (HsDecl RdrName)
 mkImport cconv safety (L loc entity, v, ty)
   | cconv == PrimCallConv                      = do
-  let funcTarget = CFunction (StaticTarget entity Nothing)
-      importSpec = CImport PrimCallConv safety nilFS funcTarget
+  let funcTarget = CFunction (StaticTarget entity Nothing True)
+      importSpec = CImport PrimCallConv safety Nothing funcTarget
   return (ForD (ForeignImport v ty noForeignImportCoercionYet importSpec))
 
   | otherwise = do
@@ -941,27 +945,45 @@ parseCImport cconv safety nm str =
    parse = do
        skipSpaces
        r <- choice [
-          string "dynamic" >> return (mk nilFS (CFunction DynamicTarget)),
-          string "wrapper" >> return (mk nilFS CWrapper),
-          optional (string "static" >> skipSpaces) >>
-           (mk nilFS <$> cimp nm) +++
-           (do h <- munch1 hdr_char; skipSpaces; mk (mkFastString h) <$> cimp nm)
+          string "dynamic" >> return (mk Nothing (CFunction DynamicTarget)),
+          string "wrapper" >> return (mk Nothing CWrapper),
+          do optional (token "static" >> skipSpaces)
+             ((mk Nothing <$> cimp nm) +++
+              (do h <- munch1 hdr_char
+                  skipSpaces
+                  mk (Just (Header (mkFastString h))) <$> cimp nm))
          ]
        skipSpaces
        return r
+
+   token str = do _ <- string str
+                  toks <- look
+                  case toks of
+                      c : _
+                       | id_char c -> pfail
+                      _            -> return ()
 
    mk = CImport cconv safety
 
    hdr_char c = not (isSpace c) -- header files are filenames, which can contain
                                 -- pretty much any char (depending on the platform),
                                 -- so just accept any non-space character
-   id_char  c = isAlphaNum c || c == '_'
+   id_first_char c = isAlpha    c || c == '_'
+   id_char       c = isAlphaNum c || c == '_'
 
    cimp nm = (ReadP.char '&' >> skipSpaces >> CLabel <$> cid)
-             +++ ((\c -> CFunction (StaticTarget c Nothing)) <$> cid)
+             +++ (do isFun <- case cconv of
+                              CApiConv ->
+                                  option True
+                                         (do token "value"
+                                             skipSpaces
+                                             return False)
+                              _ -> return True
+                     cid' <- cid
+                     return (CFunction (StaticTarget cid' Nothing isFun)))
           where
             cid = return nm +++
-                  (do c  <- satisfy (\c -> isAlpha c || c == '_')
+                  (do c  <- satisfy id_first_char
                       cs <-  many (satisfy id_char)
                       return (mkFastString (c:cs)))
 

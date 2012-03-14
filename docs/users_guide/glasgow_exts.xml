@@ -9239,7 +9239,7 @@ The following are good producers:
 <listitem>
 
 <para>
- Enumerations of <literal>Int</literal> and <literal>Char</literal> (e.g. <literal>['a'..'z']</literal>).
+ Enumerations of <literal>Int</literal>, <literal>Integer</literal> and <literal>Char</literal> (e.g. <literal>['a'..'z']</literal>).
 </para>
 </listitem>
 <listitem>

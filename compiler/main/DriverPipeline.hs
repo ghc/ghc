@@ -1176,14 +1176,17 @@ runPhase As input_fn dflags
                         = do
                             llvmVer <- io $ figureLlvmVersion dflags
                             return $ case llvmVer of
-                                Just n | n >= 30 -> SysTools.runClang
-                                _                -> SysTools.runAs
+                                -- using cGccLinkerOpts here but not clear if
+                                -- opt_c isn't a better choice
+                                Just n | n >= 30 ->
+                                    (SysTools.runClang, cGccLinkerOpts)
+
+                                _ -> (SysTools.runAs, getOpts dflags opt_a)
 
                         | otherwise
-                        = return SysTools.runAs
+                        = return (SysTools.runAs, getOpts dflags opt_a)
 
-        as_prog <- whichAsProg
-        let as_opts = getOpts dflags opt_a
+        (as_prog, as_opts) <- whichAsProg
         let cmdline_include_paths = includePaths dflags
 
         next_phase <- maybeMergeStub
@@ -1191,7 +1194,7 @@ runPhase As input_fn dflags
 
         -- we create directories for the object file, because it
         -- might be a hierarchical module.
-        io $ createDirectoryHierarchy (takeDirectory output_fn)
+        io $ createDirectoryIfMissing True (takeDirectory output_fn)
 
         io $ as_prog dflags
                        (map SysTools.Option as_opts
@@ -1230,7 +1233,7 @@ runPhase SplitAs _input_fn dflags
             osuf = objectSuf dflags
             split_odir  = base_o ++ "_" ++ osuf ++ "_split"
 
-        io $ createDirectoryHierarchy split_odir
+        io $ createDirectoryIfMissing True split_odir
 
         -- remove M_split/ *.o, because we're going to archive M_split/ *.o
         -- later and we don't want to pick up any old objects.
@@ -1453,9 +1456,9 @@ runPhase_MoveBinary dflags input_fn
         return True
     | otherwise = return True
 
-mkExtraCObj :: DynFlags -> String -> IO FilePath
-mkExtraCObj dflags xs
- = do cFile <- newTempName dflags "c"
+mkExtraObj :: DynFlags -> Suffix -> String -> IO FilePath
+mkExtraObj dflags extn xs
+ = do cFile <- newTempName dflags extn
       oFile <- newTempName dflags "o"
       writeFile cFile xs
       let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageId
@@ -1474,10 +1477,8 @@ mkExtraCObj dflags xs
 -- so now we generate and compile a main() stub as part of every
 -- binary and pass the -rtsopts setting directly to the RTS (#5373)
 --
-mkExtraObjToLinkIntoBinary :: DynFlags -> [PackageId] -> IO FilePath
-mkExtraObjToLinkIntoBinary dflags dep_packages = do
-   link_info <- getLinkInfo dflags dep_packages
-
+mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
+mkExtraObjToLinkIntoBinary dflags = do
    let have_rts_opts_flags =
          isJust (rtsOpts dflags) || case rtsOptsEnabled dflags of
                                         RtsOptsSafeOnly -> False
@@ -1487,10 +1488,7 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
       hPutStrLn stderr $ "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main.\n" ++
                          "    Call hs_init_ghc() from your main() function to set these options."
 
-   mkExtraCObj dflags (showSDoc (vcat [main,
-                                       link_opts link_info]
-                                   <> char '\n')) -- final newline, to
-                                                  -- keep gcc happy
+   mkExtraObj dflags "c" (showSDoc main)
 
   where
     main
@@ -1508,23 +1506,32 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
                 Just opts -> ptext (sLit "    __conf.rts_opts= ") <>
                                text (show opts) <> semi,
              ptext (sLit "    return hs_main(argc, argv, &ZCMain_main_closure,__conf);"),
-             char '}'
+             char '}',
+             char '\n' -- final newline, to keep gcc happy
            ]
 
-    link_opts info
-     | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
-     = empty
-     | otherwise = hcat [
-          text "__asm__(\"\\t.section ", text ghcLinkInfoSectionName,
-                                    text ",\\\"\\\",",
-                                    text elfSectionNote,
-                                    text "\\n",
+-- Write out the link info section into a new assembly file. Previously
+-- this was included as inline assembly in the main.c file but this
+-- is pretty fragile. gas gets upset trying to calculate relative offsets
+-- that span the .note section (notably .text) when debug info is present
+mkNoteObjsToLinkIntoBinary :: DynFlags -> [PackageId] -> IO [FilePath]
+mkNoteObjsToLinkIntoBinary dflags dep_packages = do
+   link_info <- getLinkInfo dflags dep_packages
 
-                    text "\\t.ascii \\\"", info', text "\\\"\\n\");" ]
+   if (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
+     then fmap (:[]) $ mkExtraObj dflags "s" (showSDoc (link_opts link_info))
+     else return []
+
+  where
+    link_opts info = hcat [
+          text "\t.section ", text ghcLinkInfoSectionName,
+                                   text ",\"\",",
+                                   text elfSectionNote,
+                                   text "\n",
+
+          text "\t.ascii \"", info', text "\"\n" ]
           where
-            -- we need to escape twice: once because we're inside a C string,
-            -- and again because we're inside an asm string.
-            info' = text $ (escape.escape) info
+            info' = text $ escape info
 
             escape :: String -> String
             escape = concatMap (charToC.fromIntegral.ord)
@@ -1661,7 +1668,8 @@ linkBinary dflags o_files dep_packages = do
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
-    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags dep_packages
+    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags
+    noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_packages
 
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
@@ -1778,7 +1786,7 @@ linkBinary dflags o_files dep_packages = do
                       ++ framework_path_opts
                       ++ framework_opts
                       ++ pkg_lib_path_opts
-                      ++ [extraLinkObj]
+                      ++ extraLinkObj:noteLinkObjs
                       ++ pkg_link_opts
                       ++ pkg_framework_path_opts
                       ++ pkg_framework_opts
@@ -2132,6 +2140,6 @@ hscPostBackendPhase dflags _ hsc_lang =
 
 touchObjectFile :: DynFlags -> FilePath -> IO ()
 touchObjectFile dflags path = do
-  createDirectoryHierarchy $ takeDirectory path
+  createDirectoryIfMissing True $ takeDirectory path
   SysTools.touch dflags "Touching object file" path
 

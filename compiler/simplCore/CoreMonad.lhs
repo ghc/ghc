@@ -137,7 +137,7 @@ showPass dflags pass = Err.showPass dflags (showSDoc (ppr pass))
 
 endPass :: DynFlags -> CoreToDo -> CoreProgram -> [CoreRule] -> IO ()
 endPass dflags pass binds rules
-  = do { dumpPassResult dflags mb_flag (ppr pass) empty binds rules
+  = do { dumpPassResult dflags mb_flag (ppr pass) (pprPassDetails pass) binds rules
        ; lintPassResult dflags pass binds }      
   where
     mb_flag = case coreDumpFlag pass of
@@ -167,9 +167,9 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
 	  -- This has the side effect of forcing the intermediate to be evaluated
 
   where
-    dump_doc  = vcat [ text "Result size =" <+> int (coreBindsSize binds)
-                     , extra_info
-		     , blankLine
+    dump_doc  = vcat [ nest 2 extra_info
+		     , nest 2 (text "Result size =" <+> int (coreBindsSize binds))
+                     , blankLine
                      , pprCoreBindings binds 
                      , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
@@ -307,7 +307,8 @@ instance Outputable CoreToDo where
   ppr (CoreDoPasses {})        = ptext (sLit "CoreDoPasses")
 
 pprPassDetails :: CoreToDo -> SDoc
-pprPassDetails (CoreDoSimplify n md) = ppr md <+> ptext (sLit "max-iterations=") <> int n
+pprPassDetails (CoreDoSimplify n md) = vcat [ ptext (sLit "Max iterations =") <+> int n 
+                                            , ppr md ]
 pprPassDetails _ = empty
 \end{code}
 

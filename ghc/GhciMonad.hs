@@ -16,13 +16,12 @@ module GhciMonad (
         Command,
         BreakLocation(..),
         TickArray,
-        setDynFlags,
+        getDynFlags,
 
         runStmt, runDecls, resume, timeIt, recordBreak, revertCAFs,
 
         printForUser, printForUserPartWay, prettyLocations,
         initInterpBuffering, turnOffBuffering, flushInterpBuffers,
-        ghciHandleGhcException,
     ) where
 
 #include "HsVersions.h"
@@ -31,7 +30,6 @@ import qualified GHC
 import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
-import Panic            hiding (showException)
 import Util
 import DynFlags
 import HscTypes
@@ -171,9 +169,6 @@ instance Monad GHCi where
 instance Functor GHCi where
     fmap f m = m >>= return . f
 
-ghciHandleGhcException :: (GhcException -> GHCi a) -> GHCi a -> GHCi a
-ghciHandleGhcException = handleGhcException
-
 getGHCiState :: GHCi GHCiState
 getGHCiState   = GHCi $ \r -> liftIO $ readIORef r
 setGHCiState :: GHCiState -> GHCi ()
@@ -233,10 +228,6 @@ instance ExceptionMonad (InputT GHCi) where
   gmask f = Haskeline.block (f Haskeline.unblock) -- slightly wrong
   gblock = Haskeline.block
   gunblock = Haskeline.unblock
-
-setDynFlags :: DynFlags -> GHCi [PackageId]
-setDynFlags dflags = do
-  GHC.setSessionDynFlags dflags
 
 isOptionSet :: GHCiOption -> GHCi Bool
 isOptionSet opt

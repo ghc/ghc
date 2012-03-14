@@ -252,8 +252,8 @@ repTyFamily :: LTyClDecl Name
             -> ProcessTyVarBinds TH.Dec
             -> DsM (Maybe (SrcSpan, Core TH.DecQ))
 repTyFamily (L loc (TyFamily { tcdFlavour = flavour,
-		               tcdLName = tc, tcdTyVars = tvs, 
-		               tcdKind = opt_kind }))
+		               tcdLName   = tc, tcdTyVars = tvs, 
+		               tcdKindSig = opt_kind }))
             tyVarBinds
   = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
        ; dec <- tyVarBinds tvs $ \bndrs ->
@@ -338,25 +338,27 @@ repInstD (L loc (ClsInstDecl ty binds _ ats))	-- Ignore user pragmas for now
    Just (tvs, cxt, cls, tys) = splitHsInstDeclTy_maybe (unLoc ty)
 
 repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
-repForD (L loc (ForeignImport name typ _ (CImport cc s ch cis)))
+repForD (L loc (ForeignImport name typ _ (CImport cc s mch cis)))
  = do MkC name' <- lookupLOcc name
       MkC typ' <- repLTy typ
       MkC cc' <- repCCallConv cc
       MkC s' <- repSafety s
       cis' <- conv_cimportspec cis
-      MkC str <- coreStringLit $ static
-                              ++ unpackFS ch ++ " "
-                              ++ cis'
+      MkC str <- coreStringLit (static ++ chStr ++ cis')
       dec <- rep2 forImpDName [cc', s', str, name', typ']
       return (loc, dec)
  where
     conv_cimportspec (CLabel cls) = notHandled "Foreign label" (doubleQuotes (ppr cls))
     conv_cimportspec (CFunction DynamicTarget) = return "dynamic"
-    conv_cimportspec (CFunction (StaticTarget fs _)) = return (unpackFS fs)
+    conv_cimportspec (CFunction (StaticTarget fs _ True)) = return (unpackFS fs)
+    conv_cimportspec (CFunction (StaticTarget _  _ False)) = panic "conv_cimportspec: values not supported yet"
     conv_cimportspec CWrapper = return "wrapper"
     static = case cis of
-                 CFunction (StaticTarget _ _) -> "static "
+                 CFunction (StaticTarget _ _ _) -> "static "
                  _ -> ""
+    chStr = case mch of
+            Nothing -> ""
+            Just (Header h) -> unpackFS h ++ " "
 repForD decl = notHandled "Foreign declaration" (ppr decl)
 
 repCCallConv :: CCallConv -> DsM (Core TH.Callconv)
@@ -401,7 +403,7 @@ in_subst _ []          = False
 in_subst n ((n',_):ns) = n==n' || in_subst n ns
 
 mkGadtCtxt :: [Name]		-- Tyvars of the data type
-           -> ResType Name
+           -> ResType (LHsType Name)
 	   -> DsM (HsContext Name, [(Name,Name)])
 -- Given a data type in GADT syntax, figure out the equality 
 -- context, so that we can represent it with an explicit 
@@ -605,7 +607,7 @@ repTyVarBndrWithKind :: LHsTyVarBndr Name
                      -> Core TH.Name -> DsM (Core TH.TyVarBndr)
 repTyVarBndrWithKind (L _ (UserTyVar {})) nm
   = repPlainTV nm
-repTyVarBndrWithKind (L _ (KindedTyVar _ ki _)) nm
+repTyVarBndrWithKind (L _ (KindedTyVar _ (HsBSig ki _) _)) nm
   = repKind ki >>= repKindedTV nm
 
 -- represent a type context

@@ -18,7 +18,7 @@ module CoreFVs (
         exprSomeFreeVars, exprsSomeFreeVars,
 
         -- * Free variables of Rules, Vars and Ids
-        varTypeTyVars, varTypeTcTyVars,
+        varTypeTyVars, 
         idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, rulesFreeVars,
@@ -406,18 +406,8 @@ delBinderFV b s = (s `delVarSet` b) `unionFVs` varTypeTyVars b
         -- Include coercion variables too!
 
 varTypeTyVars :: Var -> TyVarSet
--- Find the type variables free in the type of the variable
--- Remember, coercion variables can mention type variables...
-varTypeTyVars var
-  | isLocalId var = tyVarsOfType (idType var)
-  | otherwise     = emptyVarSet -- Global Ids and non-coercion TyVars
-
-varTypeTcTyVars :: Var -> TyVarSet
--- Find the type variables free in the type of the variable
--- Remember, coercion variables can mention type variables...
-varTypeTcTyVars var
-  | isLocalId var = tcTyVarsOfType (idType var)
-  | otherwise     = emptyVarSet -- Global Ids and non-coercion TyVars
+-- Find the type/kind variables free in the type of the id/tyvar
+varTypeTyVars var = tyVarsOfType (varType var)
 
 idFreeVars :: Id -> VarSet
 -- Type variables, rule variables, and inline variables

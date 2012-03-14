@@ -917,6 +917,10 @@ appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 -- context in which statements are executed in a GHC session.
 data InteractiveContext
   = InteractiveContext {
+         ic_dflags     :: DynFlags,
+             -- ^ The 'DynFlags' used to evaluate interative expressions
+             -- and statements.
+
          ic_imports    :: [InteractiveImport],
              -- ^ The GHCi context is extended with these imports
              --
@@ -977,9 +981,10 @@ hscDeclsWithLocation) and save them in ic_sys_vars.
 -}
 
 -- | Constructs an empty InteractiveContext.
-emptyInteractiveContext :: InteractiveContext
-emptyInteractiveContext
-  = InteractiveContext { ic_imports    = [],
+emptyInteractiveContext :: DynFlags -> InteractiveContext
+emptyInteractiveContext dflags
+  = InteractiveContext { ic_dflags     = dflags,
+                         ic_imports    = [],
                          ic_rn_gbl_env = emptyGlobalRdrEnv,
                          ic_tythings   = [],
                          ic_sys_vars   = [],
@@ -1041,7 +1046,7 @@ data InteractiveImport
       -- ^ Bring the exports of a particular module
       -- (filtered by an import decl) into scope
 
-  | IIModule Module
+  | IIModule ModuleName
       -- ^ Bring into scope the entire top-level envt of
       -- of this module, including the things imported
       -- into it.

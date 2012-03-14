@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2012
  *
  * Code for starting, stopping and restarting threads.
  *
@@ -34,7 +34,7 @@
    Returning from the STG world.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_stop_thread, STOP_FRAME,
+INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
 #if defined(PROFILING)
   W_ unused,
   W_ unused
@@ -101,7 +101,7 @@ stg_returnToSched
   jump StgReturn;
 }
 
-// A variant of stg_returntToSched that doesn't call threadPaused() on the
+// A variant of stg_returnToSched that doesn't call threadPaused() on the
 // current thread.  This is used for switching from compiled execution to the
 // interpreter, where calling threadPaused() on every switch would be too
 // expensive.
@@ -138,12 +138,12 @@ stg_threadFinished
     the int/char/whatever using the various get{Ty} functions provided
     by the RTS API.
 
-    forceIO takes care of this, performing the IO action and entering the
-    results that comes back.
+    stg_forceIO takes care of this, performing the IO action and entering
+    the results that comes back.
 
     ------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_forceIO, RET_SMALL)
+INFO_TABLE_RET(stg_forceIO, RET_SMALL)
 
 {
   Sp_adj(1);

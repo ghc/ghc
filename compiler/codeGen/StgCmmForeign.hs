@@ -56,7 +56,9 @@ cgForeignCall results result_hints (CCall (CCallSpec target cconv safety)) stg_a
   = do  { cmm_args <- getFCallArgs stg_args
         ; let ((call_args, arg_hints), cmm_target)
                 = case target of
-                   StaticTarget lbl mPkgId
+                   StaticTarget _   _      False ->
+                       panic "cgForeignCall: unexpected FFI value import"
+                   StaticTarget lbl mPkgId True
                      -> let labelSource
                                 = case mPkgId of
                                         Nothing         -> ForeignLabelInThisPackage

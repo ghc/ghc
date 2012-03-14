@@ -128,7 +128,7 @@ static nat n_failed_trygrab_idles = 0, n_idle_caps = 0;
 static Capability *schedule (Capability *initialCapability, Task *task);
 
 //
-// These function all encapsulate parts of the scheduler loop, and are
+// These functions all encapsulate parts of the scheduler loop, and are
 // abstracted only to make the structure and control flow of the
 // scheduler clearer.
 //

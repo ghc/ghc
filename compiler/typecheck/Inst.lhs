@@ -152,8 +152,7 @@ deeplySkolemise
 deeplySkolemise ty
   | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
   = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
-       ; tvs1 <- tcInstSkolTyVars tvs
-       ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs1)
+       ; (subst, tvs1) <- tcInstSkolTyVars tvs
        ; ev_vars1 <- newEvVars (substTheta subst theta)
        ; (wrap, tvs2, ev_vars2, rho) <- deeplySkolemise (substTy subst ty')
        ; return ( mkWpLams ids1
@@ -219,7 +218,7 @@ instCallConstraints _ [] = return idHsWrapper
 
 instCallConstraints origin (pred : preds)
   | Just (ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut
-  = do  { traceTc "instCallConstraints" $ ppr (mkEqPred (ty1, ty2))
+  = do  { traceTc "instCallConstraints" $ ppr (mkEqPred ty1 ty2)
         ; co <- unifyType ty1 ty2
 	; co_fn <- instCallConstraints origin preds
         ; return (co_fn <.> WpEvApp (EvCoercion co)) }

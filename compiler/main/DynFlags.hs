@@ -16,7 +16,8 @@ module DynFlags (
         DynFlag(..),
         WarningFlag(..),
         ExtensionFlag(..),
-        LogAction,
+        Language(..),
+        LogAction, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
         dopt,
@@ -28,10 +29,12 @@ module DynFlags (
         xopt,
         xopt_set,
         xopt_unset,
+        lang_set,
         DynFlags(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
+        targetRetainsAllBindings,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..),
@@ -61,6 +64,8 @@ module DynFlags (
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultLogAction,
+        defaultFlushOut,
+        defaultFlushErr,
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlags,
@@ -128,7 +133,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import System.FilePath
-import System.IO        ( stderr, hPutChar )
+import System.IO
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
@@ -585,6 +590,8 @@ data DynFlags = DynFlags {
 
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
+  flushOut              :: FlushOut,
+  flushErr              :: FlushErr,
 
   haddockOptions        :: Maybe String,
 
@@ -728,7 +735,7 @@ wayNames = map wayName . ways
 --    from an imported module.  This will fail if no code has been generated
 --    for this module.  You can use 'GHC.needsTemplateHaskell' to detect
 --    whether this might be the case and choose to either switch to a
---    different target or avoid typechecking such modules.  (The latter may
+--    different target or avoid typechecking such modules.  (The latter may be
 --    preferable for security reasons.)
 --
 data HscTarget
@@ -752,6 +759,17 @@ isObjectTarget HscC     = True
 isObjectTarget HscAsm   = True
 isObjectTarget HscLlvm  = True
 isObjectTarget _        = False
+
+-- | Does this target retain *all* top-level bindings for a module,
+-- rather than just the exported bindings, in the TypeEnv and compiled
+-- code (if any)?  In interpreted mode we do this, so that GHCi can
+-- call functions inside a module.  In HscNothing mode we also do it,
+-- so that Haddock can get access to the GlobalRdrEnv for a module
+-- after typechecking it.
+targetRetainsAllBindings :: HscTarget -> Bool
+targetRetainsAllBindings HscInterpreted = True
+targetRetainsAllBindings HscNothing     = True
+targetRetainsAllBindings _              = False
 
 -- | The 'GhcMode' tells us whether we're doing multi-module
 -- compilation (controlled via the "GHC" API) or one-shot
@@ -930,6 +948,8 @@ defaultDynFlags mySettings =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
         log_action = defaultLogAction,
+        flushOut = defaultFlushOut,
+        flushErr = defaultFlushErr,
         profAuto = NoProfAuto,
         llvmVersion = panic "defaultDynFlags: No llvmVersion"
       }
@@ -947,6 +967,16 @@ defaultLogAction severity srcSpan style msg
                    -- careful (#2302): printErrs prints in UTF-8, whereas
                    -- converting to string first and using hPutStr would
                    -- just emit the low 8 bits of each unicode char.
+
+newtype FlushOut = FlushOut (IO ())
+
+defaultFlushOut :: FlushOut
+defaultFlushOut = FlushOut $ hFlush stdout
+
+newtype FlushErr = FlushErr (IO ())
+
+defaultFlushErr :: FlushErr
+defaultFlushErr = FlushErr $ hFlush stderr
 
 {-
 Note [Verbosity levels]
@@ -1050,15 +1080,16 @@ xopt_unset dfs f
       in dfs { extensions = onoffs,
                extensionFlags = flattenExtensionFlags (language dfs) onoffs }
 
+lang_set :: DynFlags -> Maybe Language -> DynFlags
+lang_set dflags lang =
+   dflags {
+            language = lang,
+            extensionFlags = flattenExtensionFlags lang (extensions dflags)
+          }
+
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
-setLanguage l = upd f
-    where f dfs = let mLang = Just l
-                      oneoffs = extensions dfs
-                  in dfs {
-                         language = mLang,
-                         extensionFlags = flattenExtensionFlags mLang oneoffs
-                     }
+setLanguage l = upd (`lang_set` Just l)
 
 -- | Some modules have dependencies on others through the DynFlags rather than textual imports
 dynFlagDependencies :: DynFlags -> [ModuleName]

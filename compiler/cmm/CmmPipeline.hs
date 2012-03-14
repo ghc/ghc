@@ -1,6 +1,6 @@
-{-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+{-# LANGUAGE NoMonoLocalBinds #-}
 -- Norman likes local bindings
--- If this module lives on I'd like to get rid of this flag in due course
+-- If this module lives on I'd like to get rid of this extension in due course
 
 module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into

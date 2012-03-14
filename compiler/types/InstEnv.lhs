@@ -8,7 +8,7 @@ The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
 module InstEnv (
-        DFunId, OverlapFlag(..),
+        DFunId, OverlapFlag(..), InstMatch, ClsInstLookupResult,
         ClsInst(..), pprInstance, pprInstanceHdr, pprInstances, 
         instanceHead, mkLocalInstance, mkImportedInstance,
         instanceDFunId, setInstanceDFunId, instanceRoughTcs,
@@ -122,7 +122,8 @@ instanceDFunId = is_dfun
 
 setInstanceDFunId :: ClsInst -> DFunId -> ClsInst
 setInstanceDFunId ispec dfun
-   = ASSERT( idType dfun `eqType` idType (is_dfun ispec) )
+   = ASSERT2( idType dfun `eqType` idType (is_dfun ispec)
+            , ppr dfun $$ ppr (idType dfun) $$ ppr (is_dfun ispec) $$ ppr (idType (is_dfun ispec)) )
         -- We need to create the cached fields afresh from
         -- the new dfun id.  In particular, the is_tvs in
         -- the ClsInst must match those in the dfun!
@@ -432,6 +433,12 @@ type InstTypes = [Either TyVar Type]
         -- Left tv      => Instantiate with any type of this tyvar's kind
 
 type InstMatch = (ClsInst, InstTypes)
+
+type ClsInstLookupResult 
+     = ( [InstMatch]     -- Successful matches
+       , [ClsInst]       -- These don't match but do unify
+       , Bool)           -- True if error condition caused by
+                         -- SafeHaskell condition.
 \end{code}
 
 Note [InstTypes: instantiating types]
@@ -535,12 +542,9 @@ lookupInstEnv' ie cls tys
 ---------------
 -- This is the common way to call this function.
 lookupInstEnv :: (InstEnv, InstEnv)     -- External and home package inst-env
-                   -> Class -> [Type]   -- What we are looking for
-                   -> ([InstMatch],     -- Successful matches
-                       [ClsInst],      -- These don't match but do unify
-                       Bool)            -- True if error condition caused by
-                                        -- SafeHaskell condition.
-
+              -> Class -> [Type]   -- What we are looking for
+              -> ClsInstLookupResult
+ 
 lookupInstEnv (pkg_ie, home_ie) cls tys
   = (safe_matches, all_unifs, safe_fail)
   where

@@ -210,6 +210,11 @@ primop   IntRemOp    "remInt#"    Dyadic
    {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}.}
    with can_fail = True
 
+primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
+   Int# -> Int# -> (# Int#, Int# #)
+   {Rounds towards zero.}
+   with can_fail = True
+
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
 	 {Add with carry.  First member of result is (wrapped) sum; 
@@ -264,15 +269,27 @@ primtype Word#
 primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+primop   WordAdd2Op  "plusWord2#"  GenPrimOp
+   Word# -> Word# -> (# Word#, Word# #)
+   with commutable = True
+
 primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
 
 primop   WordMulOp   "timesWord#"   Dyadic   Word# -> Word# -> Word#
+   with commutable = True
+
+primop   WordMul2Op  "timesWord2#"   GenPrimOp
+   Word# -> Word# -> (# Word#, Word# #)
    with commutable = True
 
 primop   WordQuotOp   "quotWord#"   Dyadic   Word# -> Word# -> Word#
    with can_fail = True
 
 primop   WordRemOp   "remWord#"   Dyadic   Word# -> Word# -> Word#
+   with can_fail = True
+
+primop   WordQuotRemOp "quotRemWord#" GenPrimOp
+   Word# -> Word# -> (# Word#, Word# #)
    with can_fail = True
 
 primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#

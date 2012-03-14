@@ -39,13 +39,12 @@ import VarEnv
 import Bag
 import Maybes
 import ErrUtils         ( ErrMsg, makeIntoWarning, pprLocErrMsg )
+import SrcLoc           ( noSrcSpan )
 import Util
 import FastString
 import Outputable
 import DynFlags
 import Data.List        ( partition, mapAccumL )
-import Data.Either      ( partitionEithers )
--- import Control.Monad    ( when )
 \end{code}
 
 %************************************************************************
@@ -333,7 +332,7 @@ groupErrs mk_err (ct1 : rest)
 
 -- Add the "arising from..." part to a message about bunch of dicts
 addArising :: CtOrigin -> SDoc -> SDoc
-addArising orig msg = msg $$ nest 2 (pprArising orig)
+addArising orig msg = hang msg 2 (pprArising orig)
 
 pprWithArising :: [Ct] -> (WantedLoc, SDoc)
 -- Print something like
@@ -345,8 +344,8 @@ pprWithArising []
   = panic "pprWithArising"
 pprWithArising (ct:cts)
   | null cts
-  = (loc, hang (pprEvVarTheta [cc_id ct]) 
-             2 (pprArising (ctLocOrigin (ctWantedLoc ct))))
+  = (loc, addArising (ctLocOrigin (ctWantedLoc ct)) 
+                     (pprEvVarTheta [cc_id ct])) 
   | otherwise
   = (loc, vcat (map ppr_one (ct:cts)))
   where
@@ -481,7 +480,7 @@ mkTyVarEqErr ctxt ct oriented tv1 ty2
 
   -- So tv is a meta tyvar, and presumably it is
   -- an *untouchable* meta tyvar, else it'd have been unified
-  | not (k2 `isSubKind` k1)   	 -- Kind error
+  | not (k2 `tcIsSubKind` k1)   	 -- Kind error
   = mkErrorReport ctxt $ (kindErrorMsg (mkTyVarTy tv1) ty2)
 
   -- Occurs check
@@ -576,15 +575,14 @@ misMatchOrCND ctxt ct oriented ty1 ty2
        -- or there is no context, don't report the context
   = misMatchMsg oriented ty1 ty2
   | otherwise      
-  = couldNotDeduce givens ([mkEqPred (ty1, ty2)], orig)
+  = couldNotDeduce givens ([mkEqPred ty1 ty2], orig)
   where
     givens = getUserGivens ctxt
     orig   = TypeEqOrigin (UnifyOrigin ty1 ty2)
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
-  = vcat [ hang (ptext (sLit "Could not deduce") <+> pprTheta wanteds)
-              2 (pprArising orig)
+  = vcat [ addArising orig (ptext (sLit "Could not deduce") <+> pprTheta wanteds)
          , vcat (pp_givens givens)]
 
 pp_givens :: [([EvVar], GivenLoc)] -> [SDoc]
@@ -621,11 +619,14 @@ tyVarExtraInfoMsg implics ty
 
  | otherwise             -- Normal case
  = empty
-
  where
-   ppr_skol UnkSkol _   = ptext (sLit "is an unknown type variable")  -- Unhelpful
-   ppr_skol info    loc = sep [ptext (sLit "is a rigid type variable bound by"),
-                               sep [ppr info, ptext (sLit "at") <+> ppr loc]]
+   ppr_skol given_loc tv_loc
+     = case skol_info of
+         UnkSkol -> ptext (sLit "is an unknown type variable")
+         _ -> sep [ ptext (sLit "is a rigid type variable bound by"),
+                    sep [ppr skol_info, ptext (sLit "at") <+> ppr tv_loc]]
+     where
+       skol_info = ctLocOrigin given_loc
  
 kindErrorMsg :: TcType -> TcType -> SDoc   -- Types are already tidy
 kindErrorMsg ty1 ty2
@@ -658,8 +659,8 @@ misMatchMsg oriented ty1 ty2
 
 mkExpectedActualMsg :: Type -> Type -> SDoc
 mkExpectedActualMsg exp_ty act_ty
-  = vcat [ text "Expected type" <> colon <+> ppr exp_ty
-         , text "  Actual type" <> colon <+> ppr act_ty ]
+  = vcat [ text "Expected type:" <+> ppr exp_ty
+         , text "  Actual type:" <+> ppr act_ty ]
 \end{code}
 
 Note [Non-injective type functions]
@@ -682,107 +683,116 @@ Warn of loopy local equalities that were dropped.
 \begin{code}
 mkDictErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkDictErr ctxt cts 
-  = do { inst_envs <- tcGetInstEnvs
-       ; stuff <- mapM (mkOverlap ctxt inst_envs orig) cts
-       ; let (non_overlaps, overlap_errs) = partitionEithers stuff
-       ; if null non_overlaps
-         then mkErrorReport ctxt (vcat overlap_errs)
-         else do
-       { (ctxt', is_ambig, ambig_msg) <- mkAmbigMsg ctxt cts
-       ; mkErrorReport ctxt' 
-            (vcat [ mkNoInstErr givens non_overlaps orig
-                  , ambig_msg
-                  , mk_no_inst_fixes is_ambig non_overlaps]) } }
+  = ASSERT( not (null cts) )
+    do { inst_envs <- tcGetInstEnvs
+       ; lookups   <- mapM (lookup_cls_inst inst_envs) cts
+       ; let (no_inst_cts, overlap_cts) = partition is_no_inst lookups
+
+       -- Report definite no-instance errors, 
+       -- or (iff there are none) overlap errors
+       ; (ctxt, err) <- mk_dict_err ctxt (head (no_inst_cts ++ overlap_cts))
+       ; mkErrorReport ctxt err }
   where
-    (ct1:_) = cts
-    orig    = ctLocOrigin (ctWantedLoc ct1)
-
-    givens = getUserGivens ctxt
-
-    mk_no_inst_fixes is_ambig cts 
-      | null givens = show_fixes (fixes2 ++ fixes3)
-      | otherwise   = show_fixes (fixes1 ++ fixes2 ++ fixes3) 
+    no_givens = null (getUserGivens ctxt)
+    is_no_inst (ct, (matches, unifiers, _))
+      =  no_givens 
+      && null matches 
+      && (null unifiers || all (not . isAmbiguousTyVar) (varSetElems (tyVarsOfCt ct)))
+           
+    lookup_cls_inst inst_envs ct
+      = do { tys_flat <- mapM quickFlattenTy tys
+                -- Note [Flattening in error message generation]
+           ; return (ct, lookupInstEnv inst_envs clas tys_flat) }
       where
-        min_wanteds = map ctPred cts
-        instance_dicts = filterOut isTyVarClassPred min_wanteds
-		-- Insts for which it is worth suggesting an adding an 
-		-- instance declaration.  Exclude tyvar dicts.
+        (clas, tys) = getClassPredTys (ctPred ct)
 
-        fixes2 = case instance_dicts of
-                   []  -> []
-                   [_] -> [sep [ptext (sLit "add an instance declaration for"),
-                                pprTheta instance_dicts]]
-                   _   -> [sep [ptext (sLit "add instance declarations for"),
-                                pprTheta instance_dicts]]
-        fixes3 = case orig of
-                   DerivOrigin -> [drv_fix]
-                   _           -> []
+mk_dict_err :: ReportErrCtxt -> (Ct, ClsInstLookupResult)
+             -> TcM (ReportErrCtxt, SDoc)
+-- Report an overlap error if this class constraint results
+-- from an overlap (returning Left clas), otherwise return (Right pred)
+mk_dict_err ctxt (ct, (matches, unifiers, safe_haskell)) 
+  | null matches  -- No matches but perhaps several unifiers
+  = do { (ctxt', is_ambig, ambig_msg) <- mkAmbigMsg ctxt [ct]
+       ; return (ctxt', cannot_resolve_msg is_ambig ambig_msg) }
 
-        drv_fix = vcat [ptext (sLit "use a standalone 'deriving instance' declaration,"),
-                        nest 2 $ ptext (sLit "so you can specify the instance context yourself")]
+  | not safe_haskell   -- Some matches => overlap errors
+  = return (ctxt, overlap_msg)
 
-        fixes1 | not is_ambig
-               , (orig:origs) <- mapCatMaybes get_good_orig (cec_encl ctxt)
-               = [sep [ ptext (sLit "add") <+> pprTheta min_wanteds
-                        <+> ptext (sLit "to the context of")
-	              , nest 2 $ ppr_skol orig $$ 
-                                 vcat [ ptext (sLit "or") <+> ppr_skol orig 
-                                      | orig <- origs ]
-                 ]    ]
-               | otherwise = []
+  | otherwise
+  = return (ctxt, safe_haskell_msg)
+  where
+    orig        = ctLocOrigin (ctWantedLoc ct)
+    pred        = ctPred ct
+    (clas, tys) = getClassPredTys pred
+    ispecs      = [ispec | (ispec, _) <- matches]
+    givens      = getUserGivens ctxt
+    all_tyvars  = all isTyVarTy tys
 
-        ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
-        ppr_skol skol_info      = ppr skol_info
+    cannot_resolve_msg has_ambig_tvs ambig_msg
+      = vcat [ addArising orig (no_inst_herald <+> pprParendType pred)
+             , vcat (pp_givens givens)
+             , if has_ambig_tvs && (not (null unifiers) || not (null givens))
+               then ambig_msg $$ potential_msg
+               else empty
+             , show_fixes (inst_decl_fixes
+                           ++ add_to_ctxt_fixes has_ambig_tvs
+                           ++ drv_fixes) ]
+
+    potential_msg
+      | null unifiers = empty
+      | otherwise 
+      = hang (if isSingleton unifiers 
+              then ptext (sLit "Note: there is a potential instance available:")
+              else ptext (sLit "Note: there are several potential instances:"))
+    	   2 (ppr_insts unifiers)
+
+    add_to_ctxt_fixes has_ambig_tvs
+      | not has_ambig_tvs && all_tyvars
+      , (orig:origs) <- mapCatMaybes get_good_orig (cec_encl ctxt)
+      = [sep [ ptext (sLit "add") <+> pprParendType pred
+               <+> ptext (sLit "to the context of")
+	     , nest 2 $ ppr_skol orig $$ 
+                        vcat [ ptext (sLit "or") <+> ppr_skol orig 
+                             | orig <- origs ] ] ]
+      | otherwise = []
+
+    ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
+    ppr_skol skol_info      = ppr skol_info
 
 	-- Do not suggest adding constraints to an *inferred* type signature!
-        get_good_orig ic = case ctLocOrigin (ic_loc ic) of 
+    get_good_orig ic = case ctLocOrigin (ic_loc ic) of 
                              SigSkol (InfSigCtxt {}) _ -> Nothing
                              origin                    -> Just origin
 
+    no_inst_herald
+      | null givens && null matches = ptext (sLit "No instance for")
+      | otherwise                   = ptext (sLit "Could not deduce")
 
-    show_fixes :: [SDoc] -> SDoc
-    show_fixes []     = empty
-    show_fixes (f:fs) = sep [ ptext (sLit "Possible fix:")
-   	                   , nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
+    inst_decl_fixes
+      | all_tyvars = []
+      | otherwise  = [ sep [ ptext (sLit "add an instance declaration for")
+                           , pprParendType pred] ]
 
-mkNoInstErr :: [UserGiven] -> [Ct] -> CtOrigin -> SDoc
-mkNoInstErr givens cts orig
-  | null givens     -- Top level
-  = addArising orig $
-    ptext (sLit "No instance") <> plural cts
-    <+> ptext (sLit "for") <+> pprTheta theta
+    drv_fixes = case orig of
+                   DerivOrigin -> [drv_fix]
+                   _           -> []
 
-  | otherwise
-  = couldNotDeduce givens (theta, orig)
-  where
-   theta = map ctPred cts
-
-mkOverlap :: ReportErrCtxt -> (InstEnv,InstEnv) -> CtOrigin
-          -> Ct -> TcM (Either Ct SDoc)
--- Report an overlap error if this class constraint results
--- from an overlap (returning Left clas), otherwise return (Right pred)
-mkOverlap ctxt inst_envs orig ct
-  = do { tys_flat <- mapM quickFlattenTy tys
-           -- Note [Flattening in error message generation]
-
-       ; case lookupInstEnv inst_envs clas tys_flat of
-                ([], _, _) -> return (Left ct)    -- No match
-                res        -> return (Right (mk_overlap_msg res)) }
-  where
-    (clas, tys) = getClassPredTys (ctPred ct)
+    drv_fix = hang (ptext (sLit "use a standalone 'deriving instance' declaration,"))
+                 2 (ptext (sLit "so you can specify the instance context yourself"))
 
     -- Normal overlap error
-    mk_overlap_msg (matches, unifiers, False)
+    overlap_msg
       = ASSERT( not (null matches) )
         vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
 				<+> pprType (mkClassPred clas tys))
-    	     ,	sep [ptext (sLit "Matching instances") <> colon,
-    		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
 
              ,  if not (null matching_givens) then 
-                  sep [ptext (sLit "Matching givens (or their superclasses)") <> colon
+                  sep [ptext (sLit "Matching givens (or their superclasses):") 
                       , nest 2 (vcat matching_givens)]
                 else empty
+
+    	     ,	sep [ptext (sLit "Matching instances:"),
+    		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
 
              ,  if null matching_givens && isSingleton matches && null unifiers then
                 -- Intuitively, some given matched the wanted in their
@@ -791,7 +801,7 @@ mkOverlap ctxt inst_envs orig ct
                 -- constraints are non-flat and non-rewritten so we
                 -- simply report back the whole given
                 -- context. Accelerate Smart.hs showed this problem.
-                  sep [ ptext (sLit "There exists a (perhaps superclass) match") <> colon
+                  sep [ ptext (sLit "There exists a (perhaps superclass) match:") 
                       , nest 2 (vcat (pp_givens givens))]
                 else empty 
 
@@ -827,13 +837,13 @@ mkOverlap ctxt inst_envs orig ct
                            -> any ev_var_matches (immSuperClasses clas' tys')
                          Nothing -> False
 
-    -- Overlap error because of Safe Haskell (first match should be the most
-    -- specific match)
-    mk_overlap_msg (matches, _unifiers, True)
+    -- Overlap error because of Safe Haskell (first 
+    -- match should be the most specific match)
+    safe_haskell_msg
       = ASSERT( length matches > 1 )
         vcat [ addArising orig (ptext (sLit "Unsafe overlapping instances for") 
                         <+> pprType (mkClassPred clas tys))
-             , sep [ptext (sLit "The matching instance is") <> colon,
+             , sep [ptext (sLit "The matching instance is:"),
                     nest 2 (pprInstance $ head ispecs)]
              , vcat [ ptext $ sLit "It is compiled in a Safe module and as such can only"
                     , ptext $ sLit "overlap instances from the same module, however it"
@@ -841,8 +851,21 @@ mkOverlap ctxt inst_envs orig ct
                     , nest 2 (vcat [pprInstances $ tail ispecs])
                     ]
              ]
-        where
-            ispecs = [ispec | (ispec, _) <- matches]
+
+show_fixes :: [SDoc] -> SDoc
+show_fixes []     = empty
+show_fixes (f:fs) = sep [ ptext (sLit "Possible fix:")
+                        , nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
+
+ppr_insts :: [ClsInst] -> SDoc
+ppr_insts insts
+  = pprInstances (take 3 insts) $$ dot_dot_message
+  where
+    n_extra = length insts - 3
+    dot_dot_message 
+       | n_extra <= 0 = empty
+       | otherwise    = ptext (sLit "...plus") 
+                        <+> speakNOf n_extra (ptext (sLit "other"))
 
 ----------------------
 quickFlattenTy :: TcType -> TcM TcType
@@ -939,14 +962,15 @@ mkAmbigMsg ctxt cts
      			            -- if it is not already set!
              ]
 
-getSkolemInfo :: [Implication] -> TcTyVar -> SkolemInfo
+getSkolemInfo :: [Implication] -> TcTyVar -> GivenLoc
 -- Get the skolem info for a type variable 
 -- from the implication constraint that binds it
 getSkolemInfo [] tv
   = WARN( True, ptext (sLit "No skolem info:") <+> ppr tv )
-    UnkSkol
+    CtLoc UnkSkol noSrcSpan []
+
 getSkolemInfo (implic:implics) tv
-  | tv `elem` ic_skols implic = ctLocOrigin (ic_loc implic)
+  | tv `elem` ic_skols implic = ic_loc implic
   | otherwise                 = getSkolemInfo implics tv
 
 -----------------------
@@ -993,20 +1017,21 @@ find_thing tidy_env ignore_it (ATcId { tct_id = id })
 			 	   ppr (getSrcLoc id)))]
        ; return (tidy_env', Just msg) } }
 
-find_thing tidy_env ignore_it (ATyVar tv ty)
-  = do { (tidy_env1, tidy_ty) <- zonkTidyTcType tidy_env ty
+find_thing tidy_env ignore_it (ATyVar name tv)
+  = do { ty <- zonkTcTyVar tv
+       ; let (tidy_env1, tidy_ty) = tidyOpenType tidy_env ty
        ; if ignore_it tidy_ty then
 	    return (tidy_env, Nothing)
          else do
        { let -- The name tv is scoped, so we don't need to tidy it
-            msg = sep [ ptext (sLit "Scoped type variable") <+> quotes (ppr tv) <+> eq_stuff
+            msg = sep [ ptext (sLit "Scoped type variable") <+> quotes (ppr name) <+> eq_stuff
                       , nest 2 bound_at]
 
             eq_stuff | Just tv' <- tcGetTyVar_maybe tidy_ty
-		     , getOccName tv == getOccName tv' = empty
+		     , getOccName name == getOccName tv' = empty
 		     | otherwise = equals <+> ppr tidy_ty
 		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	    bound_at = parens $ ptext (sLit "bound at:") <+> ppr (getSrcLoc tv)
+	    bound_at = parens $ ptext (sLit "bound at:") <+> ppr (getSrcLoc name)
  
        ; return (tidy_env1, Just msg) } }
 

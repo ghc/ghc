@@ -1071,12 +1071,15 @@ specCalls subst rules_for_me calls_for_me fn rhs
                             (substInScope subst) 
        	 		    fn args rules_for_me)
 
-    mk_ty_args :: [Maybe Type] -> [CoreExpr]
-    mk_ty_args call_ts = zipWithEqual "spec_call" mk_ty_arg rhs_tyvars call_ts
-    	       where
-	          mk_ty_arg rhs_tyvar Nothing   = Type (mkTyVarTy rhs_tyvar)
-		  mk_ty_arg _	      (Just ty) = Type ty
-
+    mk_ty_args :: [Maybe Type] -> [TyVar] -> [CoreExpr]
+    mk_ty_args [] poly_tvs 
+      = ASSERT( null poly_tvs ) []
+    mk_ty_args (Nothing : call_ts) (poly_tv : poly_tvs)
+      = Type (mkTyVarTy poly_tv) : mk_ty_args call_ts poly_tvs
+    mk_ty_args (Just ty : call_ts) poly_tvs
+      = Type ty : mk_ty_args call_ts poly_tvs
+    mk_ty_args (Nothing : _) [] = panic "mk_ty_args"
+    
     ----------------------------------------------------------
 	-- Specialise to one particular call pattern
     spec_call :: CallInfo                         -- Call instance
@@ -1103,17 +1106,19 @@ specCalls subst rules_for_me calls_for_me fn rhs
 		-- poly_tyvars = [b] in the example above
 		-- spec_tyvars = [a,c] 
 		-- ty_args     = [t1,b,t3]
-		poly_tyvars   = [tv | (tv, Nothing) <- rhs_tyvars `zip` call_ts]
            	spec_tv_binds = [(tv,ty) | (tv, Just ty) <- rhs_tyvars `zip` call_ts]
 		spec_ty_args  = map snd spec_tv_binds
-	   	ty_args       = mk_ty_args call_ts
-	   	rhs_subst     = CoreSubst.extendTvSubstList subst spec_tv_binds
+	   	subst1        = CoreSubst.extendTvSubstList subst spec_tv_binds
+		(rhs_subst, poly_tyvars)   
+                              = CoreSubst.substBndrs subst1 
+                                   [tv | (tv, Nothing) <- rhs_tyvars `zip` call_ts]
 
 	   ; (rhs_subst1, inst_dict_ids) <- newDictBndrs rhs_subst rhs_dict_ids
 	     		  -- Clone rhs_dicts, including instantiating their types
 
 	   ; let (rhs_subst2, dx_binds) = bindAuxiliaryDicts rhs_subst1 $
 	     	 	      		  (my_zipEqual rhs_dict_ids inst_dict_ids call_ds)
+	         ty_args   = mk_ty_args call_ts poly_tyvars
 	         inst_args = ty_args ++ map Var inst_dict_ids
 
 	   ; if already_covered inst_args then
@@ -1132,7 +1137,7 @@ specCalls subst rules_for_me calls_for_me fn rhs
 	   ; let
 		-- The rule to put in the function's specialisation is:
 		--	forall b, d1',d2'.  f t1 b t3 d1' d2' = f1 b  
-	        rule_name = mkFastString ("SPEC " ++ showSDoc (ppr fn <+> ppr spec_ty_args))
+	        rule_name = mkFastString ("SPEC " ++ showSDocDump (ppr fn <+> ppr spec_ty_args))
   		spec_env_rule = mkRule True {- Auto generated -} is_local
                                   rule_name
 				  inl_act 	-- Note [Auto-specialisation and RULES]

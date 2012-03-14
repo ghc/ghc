@@ -198,8 +198,7 @@ load2 how_much mod_graph = do
         -- before we unload anything, make sure we don't leave an old
         -- interactive context around pointing to dead bindings.  Also,
         -- write the pruned HPT to allow the old HPT to be GC'd.
-        modifySession $ \_ -> hsc_env{ hsc_IC = emptyInteractiveContext,
-                                       hsc_HPT = pruned_hpt }
+        modifySession $ \_ -> discardIC $ hsc_env { hsc_HPT = pruned_hpt }
 
 	liftIO $ debugTraceMsg dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
 				text "Stable BCO:" <+> ppr stable_bco)
@@ -362,16 +361,20 @@ loadFinish _all_ok Failed
 -- Empty the interactive context and set the module context to the topmost
 -- newly loaded module, or the Prelude if none were loaded.
 loadFinish all_ok Succeeded
-  = do modifySession $ \hsc_env -> hsc_env{ hsc_IC = emptyInteractiveContext }
+  = do modifySession discardIC
        return all_ok
 
 
 -- Forget the current program, but retain the persistent info in HscEnv
 discardProg :: HscEnv -> HscEnv
 discardProg hsc_env
-  = hsc_env { hsc_mod_graph = emptyMG, 
-	      hsc_IC = emptyInteractiveContext,
-	      hsc_HPT = emptyHomePackageTable }
+  = discardIC $ hsc_env { hsc_mod_graph = emptyMG
+                        , hsc_HPT = emptyHomePackageTable }
+
+-- discard the contents of the InteractiveContext, but keep the DynFlags
+discardIC :: HscEnv -> HscEnv
+discardIC hsc_env
+  = hsc_env { hsc_IC = emptyInteractiveContext (ic_dflags (hsc_IC hsc_env)) }
 
 intermediateCleanTempFiles :: DynFlags -> [ModSummary] -> HscEnv -> IO ()
 intermediateCleanTempFiles dflags summaries hsc_env

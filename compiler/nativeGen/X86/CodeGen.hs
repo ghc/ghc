@@ -1519,7 +1519,7 @@ genCCall
 -- Unroll memcpy calls if the source and destination pointers are at
 -- least DWORD aligned and the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall is32Bit (CmmPrim MO_Memcpy) _
+genCCall is32Bit (CmmPrim MO_Memcpy _) _
          [CmmHinted dst _, CmmHinted src _,
           CmmHinted (CmmLit (CmmInt n _)) _,
           CmmHinted (CmmLit (CmmInt align _)) _]
@@ -1562,7 +1562,7 @@ genCCall is32Bit (CmmPrim MO_Memcpy) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall _ (CmmPrim MO_Memset) _
+genCCall _ (CmmPrim MO_Memset _) _
          [CmmHinted dst _,
           CmmHinted (CmmLit (CmmInt c _)) _,
           CmmHinted (CmmLit (CmmInt n _)) _,
@@ -1601,11 +1601,11 @@ genCCall _ (CmmPrim MO_Memset) _
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall _ (CmmPrim MO_WriteBarrier) _ _ = return nilOL
+genCCall _ (CmmPrim MO_WriteBarrier _) _ _ = return nilOL
         -- write barrier compiles to no code on x86/x86-64;
         -- we keep it this long in order to prevent earlier optimisations.
 
-genCCall is32Bit (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
+genCCall is32Bit (CmmPrim (MO_PopCnt width) _) dest_regs@[CmmHinted dst _]
          args@[CmmHinted src _] = do
     sse4_2 <- sse4_2Enabled
     if sse4_2
@@ -1641,10 +1641,10 @@ genCCall32 :: CmmCallTarget            -- function to call
 genCCall32 target dest_regs args =
     case (target, dest_regs) of
     -- void return type prim op
-    (CmmPrim op, []) ->
+    (CmmPrim op _, []) ->
         outOfLineCmmOp op Nothing args
     -- we only cope with a single result for foreign calls
-    (CmmPrim op, [r_hinted@(CmmHinted r _)]) -> do
+    (CmmPrim op _, [r_hinted@(CmmHinted r _)]) -> do
         l1 <- getNewLabelNat
         l2 <- getNewLabelNat
         sse2 <- sse2Enabled
@@ -1673,9 +1673,70 @@ genCCall32 target dest_regs args =
                    return (any (getRegisterReg False (CmmLocal r)))
 
         actuallyInlineFloatOp _ _ args
-              = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
+              = panic $ "genCCall32.actuallyInlineFloatOp: bad number of arguments! ("
                       ++ show (length args) ++ ")"
-    _ -> do
+
+    (CmmPrim (MO_S_QuotRem width) _, _) -> divOp True  width dest_regs args
+    (CmmPrim (MO_U_QuotRem width) _, _) -> divOp False width dest_regs args
+    (CmmPrim (MO_Add2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
+        case args of
+        [CmmHinted arg_x _, CmmHinted arg_y _] ->
+            do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
+               lCode <- getAnyReg (CmmMachOp (MO_Add width) [arg_x, arg_y])
+               let size = intSize width
+                   reg_l = getRegisterReg True (CmmLocal res_l)
+                   reg_h = getRegisterReg True (CmmLocal res_h)
+                   code = hCode reg_h `appOL`
+                          lCode reg_l `snocOL`
+                          ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
+               return code
+        _ -> panic "genCCall32: Wrong number of arguments/results for add2"
+    (CmmPrim (MO_U_Mul2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
+        case args of
+        [CmmHinted arg_x _, CmmHinted arg_y _] ->
+            do (y_reg, y_code) <- getRegOrMem arg_y
+               x_code <- getAnyReg arg_x
+               let size = intSize width
+                   reg_h = getRegisterReg True (CmmLocal res_h)
+                   reg_l = getRegisterReg True (CmmLocal res_l)
+                   code = y_code `appOL`
+                          x_code rax `appOL`
+                          toOL [MUL2 size y_reg,
+                                MOV size (OpReg rdx) (OpReg reg_h),
+                                MOV size (OpReg rax) (OpReg reg_l)]
+               return code
+        _ -> panic "genCCall32: Wrong number of arguments/results for add2"
+
+    (CmmPrim _ (Just stmts), _) ->
+        stmtsToInstrs stmts
+
+    _ -> genCCall32' target dest_regs args
+
+  where divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
+                           [CmmHinted arg_x _, CmmHinted arg_y _]
+            = do let size = intSize width
+                     reg_q = getRegisterReg True (CmmLocal res_q)
+                     reg_r = getRegisterReg True (CmmLocal res_r)
+                     widen | signed    = CLTD size
+                           | otherwise = XOR size (OpReg rdx) (OpReg rdx)
+                     instr | signed    = IDIV
+                           | otherwise = DIV
+                 (y_reg, y_code) <- getRegOrMem arg_y
+                 x_code <- getAnyReg arg_x
+                 return $ y_code `appOL`
+                          x_code rax `appOL`
+                          toOL [widen,
+                                instr size y_reg,
+                                MOV size (OpReg rax) (OpReg reg_q),
+                                MOV size (OpReg rdx) (OpReg reg_r)]
+        divOp _ _ _ _
+            = panic "genCCall32: Wrong number of arguments/results for divOp"
+
+genCCall32' :: CmmCallTarget            -- function to call
+            -> [HintedCmmFormal]        -- where to put the result
+            -> [HintedCmmActual]        -- arguments (of mixed type)
+            -> NatM InstrBlock
+genCCall32' target dest_regs args = do
         let
             -- Align stack to 16n for calls, assuming a starting stack
             -- alignment of 16n - word_size on procedure entry. Which we
@@ -1704,7 +1765,7 @@ genCCall32 target dest_regs args =
                -> do { (dyn_r, dyn_c) <- getSomeReg expr
                      ; ASSERT( isWord32 (cmmExprType expr) )
                        return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
-            CmmPrim _
+            CmmPrim _ _
                 -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
                             ++ "probably because too many return values."
 
@@ -1827,105 +1888,164 @@ genCCall64 :: CmmCallTarget            -- function to call
 genCCall64 target dest_regs args =
     case (target, dest_regs) of
 
-    (CmmPrim op, []) ->
+    (CmmPrim op _, []) ->
         -- void return type prim op
         outOfLineCmmOp op Nothing args
 
-    (CmmPrim op, [res]) ->
+    (CmmPrim op _, [res]) ->
         -- we only cope with a single result for foreign calls
         outOfLineCmmOp op (Just res) args
 
-    _ -> do
-        -- load up the register arguments
-        (stack_args, aregs, fregs, load_args_code)
-             <- load_args args allArgRegs allFPArgRegs nilOL
+    (CmmPrim (MO_S_QuotRem width) _, _) -> divOp True  width dest_regs args
+    (CmmPrim (MO_U_QuotRem width) _, _) -> divOp False width dest_regs args
+    (CmmPrim (MO_Add2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
+        case args of
+        [CmmHinted arg_x _, CmmHinted arg_y _] ->
+            do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
+               lCode <- getAnyReg (CmmMachOp (MO_Add width) [arg_x, arg_y])
+               let size = intSize width
+                   reg_l = getRegisterReg True (CmmLocal res_l)
+                   reg_h = getRegisterReg True (CmmLocal res_h)
+                   code = hCode reg_h `appOL`
+                          lCode reg_l `snocOL`
+                          ADC size (OpImm (ImmInteger 0)) (OpReg reg_h)
+               return code
+        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
+    (CmmPrim (MO_U_Mul2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
+        case args of
+        [CmmHinted arg_x _, CmmHinted arg_y _] ->
+            do (y_reg, y_code) <- getRegOrMem arg_y
+               x_code <- getAnyReg arg_x
+               let size = intSize width
+                   reg_h = getRegisterReg True (CmmLocal res_h)
+                   reg_l = getRegisterReg True (CmmLocal res_l)
+                   code = y_code `appOL`
+                          x_code rax `appOL`
+                          toOL [MUL2 size y_reg,
+                                MOV size (OpReg rdx) (OpReg reg_h),
+                                MOV size (OpReg rax) (OpReg reg_l)]
+               return code
+        _ -> panic "genCCall64: Wrong number of arguments/results for add2"
 
-        let
-            fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
-            int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
-            arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
-                    -- for annotating the call instruction with
-            sse_regs = length fp_regs_used
-            tot_arg_size = arg_size * length stack_args
+    (CmmPrim _ (Just stmts), _) ->
+        stmtsToInstrs stmts
+
+    _ -> genCCall64' target dest_regs args
+
+  where divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
+                           [CmmHinted arg_x _, CmmHinted arg_y _]
+            = do let size = intSize width
+                     reg_q = getRegisterReg True (CmmLocal res_q)
+                     reg_r = getRegisterReg True (CmmLocal res_r)
+                     widen | signed    = CLTD size
+                           | otherwise = XOR size (OpReg rdx) (OpReg rdx)
+                     instr | signed    = IDIV
+                           | otherwise = DIV
+                 (y_reg, y_code) <- getRegOrMem arg_y
+                 x_code <- getAnyReg arg_x
+                 return $ y_code `appOL`
+                          x_code rax `appOL`
+                          toOL [widen,
+                                instr size y_reg,
+                                MOV size (OpReg rax) (OpReg reg_q),
+                                MOV size (OpReg rdx) (OpReg reg_r)]
+        divOp _ _ _ _
+            = panic "genCCall64: Wrong number of arguments/results for divOp"
+
+genCCall64' :: CmmCallTarget            -- function to call
+            -> [HintedCmmFormal]        -- where to put the result
+            -> [HintedCmmActual]        -- arguments (of mixed type)
+            -> NatM InstrBlock
+genCCall64' target dest_regs args = do
+    -- load up the register arguments
+    (stack_args, aregs, fregs, load_args_code)
+         <- load_args args allArgRegs allFPArgRegs nilOL
+
+    let
+        fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
+        int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
+        arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
+                -- for annotating the call instruction with
+        sse_regs = length fp_regs_used
+        tot_arg_size = arg_size * length stack_args
 
 
-        -- Align stack to 16n for calls, assuming a starting stack
-        -- alignment of 16n - word_size on procedure entry. Which we
-        -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
-        (real_size, adjust_rsp) <-
-            if (tot_arg_size + wORD_SIZE) `rem` 16 == 0
-                then return (tot_arg_size, nilOL)
-                else do -- we need to adjust...
-                    delta <- getDeltaNat
-                    setDeltaNat (delta - wORD_SIZE)
-                    return (tot_arg_size + wORD_SIZE, toOL [
-                                    SUB II64 (OpImm (ImmInt wORD_SIZE)) (OpReg rsp),
-                                    DELTA (delta - wORD_SIZE) ])
+    -- Align stack to 16n for calls, assuming a starting stack
+    -- alignment of 16n - word_size on procedure entry. Which we
+    -- maintiain. See Note [rts/StgCRun.c : Stack Alignment on X86]
+    (real_size, adjust_rsp) <-
+        if (tot_arg_size + wORD_SIZE) `rem` 16 == 0
+            then return (tot_arg_size, nilOL)
+            else do -- we need to adjust...
+                delta <- getDeltaNat
+                setDeltaNat (delta - wORD_SIZE)
+                return (tot_arg_size + wORD_SIZE, toOL [
+                                SUB II64 (OpImm (ImmInt wORD_SIZE)) (OpReg rsp),
+                                DELTA (delta - wORD_SIZE) ])
 
-        -- push the stack args, right to left
-        push_code <- push_args (reverse stack_args) nilOL
-        delta <- getDeltaNat
+    -- push the stack args, right to left
+    push_code <- push_args (reverse stack_args) nilOL
+    delta <- getDeltaNat
 
-        -- deal with static vs dynamic call targets
-        (callinsns,_cconv) <-
-          case target of
-            CmmCallee (CmmLit (CmmLabel lbl)) conv
-               -> -- ToDo: stdcall arg sizes
-                  return (unitOL (CALL (Left fn_imm) arg_regs), conv)
-               where fn_imm = ImmCLbl lbl
-            CmmCallee expr conv
-               -> do (dyn_r, dyn_c) <- getSomeReg expr
-                     return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
-            CmmPrim _
-                -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
-                            ++ "probably because too many return values."
+    -- deal with static vs dynamic call targets
+    (callinsns,_cconv) <-
+      case target of
+        CmmCallee (CmmLit (CmmLabel lbl)) conv
+           -> -- ToDo: stdcall arg sizes
+              return (unitOL (CALL (Left fn_imm) arg_regs), conv)
+           where fn_imm = ImmCLbl lbl
+        CmmCallee expr conv
+           -> do (dyn_r, dyn_c) <- getSomeReg expr
+                 return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
+        CmmPrim _ _
+            -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
+                        ++ "probably because too many return values."
 
-        let
-            -- The x86_64 ABI requires us to set %al to the number of SSE2
-            -- registers that contain arguments, if the called routine
-            -- is a varargs function.  We don't know whether it's a
-            -- varargs function or not, so we have to assume it is.
-            --
-            -- It's not safe to omit this assignment, even if the number
-            -- of SSE2 regs in use is zero.  If %al is larger than 8
-            -- on entry to a varargs function, seg faults ensue.
-            assign_eax n = unitOL (MOV II32 (OpImm (ImmInt n)) (OpReg eax))
+    let
+        -- The x86_64 ABI requires us to set %al to the number of SSE2
+        -- registers that contain arguments, if the called routine
+        -- is a varargs function.  We don't know whether it's a
+        -- varargs function or not, so we have to assume it is.
+        --
+        -- It's not safe to omit this assignment, even if the number
+        -- of SSE2 regs in use is zero.  If %al is larger than 8
+        -- on entry to a varargs function, seg faults ensue.
+        assign_eax n = unitOL (MOV II32 (OpImm (ImmInt n)) (OpReg eax))
 
-        let call = callinsns `appOL`
-                   toOL (
-                        -- Deallocate parameters after call for ccall;
-                        -- stdcall has callee do it, but is not supported on
-                        -- x86_64 target (see #3336)
-                      (if real_size==0 then [] else
-                       [ADD (intSize wordWidth) (OpImm (ImmInt real_size)) (OpReg esp)])
-                      ++
-                      [DELTA (delta + real_size)]
-                   )
-        -- in
-        setDeltaNat (delta + real_size)
+    let call = callinsns `appOL`
+               toOL (
+                    -- Deallocate parameters after call for ccall;
+                    -- stdcall has callee do it, but is not supported on
+                    -- x86_64 target (see #3336)
+                  (if real_size==0 then [] else
+                   [ADD (intSize wordWidth) (OpImm (ImmInt real_size)) (OpReg esp)])
+                  ++
+                  [DELTA (delta + real_size)]
+               )
+    -- in
+    setDeltaNat (delta + real_size)
 
-        let
-            -- assign the results, if necessary
-            assign_code []     = nilOL
-            assign_code [CmmHinted dest _hint] =
-              case typeWidth rep of
-                    W32 | isFloatType rep -> unitOL (MOV (floatSize W32) (OpReg xmm0) (OpReg r_dest))
-                    W64 | isFloatType rep -> unitOL (MOV (floatSize W64) (OpReg xmm0) (OpReg r_dest))
-                    _ -> unitOL (MOV (cmmTypeSize rep) (OpReg rax) (OpReg r_dest))
-              where
-                    rep = localRegType dest
-                    r_dest = getRegisterReg True (CmmLocal dest)
-            assign_code _many = panic "genCCall.assign_code many"
+    let
+        -- assign the results, if necessary
+        assign_code []     = nilOL
+        assign_code [CmmHinted dest _hint] =
+          case typeWidth rep of
+                W32 | isFloatType rep -> unitOL (MOV (floatSize W32) (OpReg xmm0) (OpReg r_dest))
+                W64 | isFloatType rep -> unitOL (MOV (floatSize W64) (OpReg xmm0) (OpReg r_dest))
+                _ -> unitOL (MOV (cmmTypeSize rep) (OpReg rax) (OpReg r_dest))
+          where
+                rep = localRegType dest
+                r_dest = getRegisterReg True (CmmLocal dest)
+        assign_code _many = panic "genCCall.assign_code many"
 
-        return (load_args_code      `appOL`
-                adjust_rsp          `appOL`
-                push_code           `appOL`
-                assign_eax sse_regs `appOL`
-                call                `appOL`
-                assign_code dest_regs)
+    return (load_args_code      `appOL`
+            adjust_rsp          `appOL`
+            push_code           `appOL`
+            assign_eax sse_regs `appOL`
+            call                `appOL`
+            assign_code dest_regs)
 
-      where
-        arg_size = 8 -- always, at the mo
+  where arg_size = 8 -- always, at the mo
 
         load_args :: [CmmHinted CmmExpr]
                   -> [Reg]                  -- int regs avail for args
@@ -2051,10 +2171,14 @@ outOfLineCmmOp mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
 
-              MO_WriteBarrier ->
-                  panic $ "outOfLineCmmOp: MO_WriteBarrier not supported here"
-              MO_Touch ->
-                  panic $ "outOfLineCmmOp: MO_Touch not supported here"
+              MO_S_QuotRem {} -> unsupported
+              MO_U_QuotRem {} -> unsupported
+              MO_Add2 {}      -> unsupported
+              MO_U_Mul2 {}    -> unsupported
+              MO_WriteBarrier -> unsupported
+              MO_Touch        -> unsupported
+        unsupported = panic ("outOfLineCmmOp: " ++ show mop
+                          ++ "not supported here")
 
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch

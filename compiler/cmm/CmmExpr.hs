@@ -217,6 +217,10 @@ filterRegsUsed p e =
     foldRegsUsed (\regs r -> if p r then extendRegSet regs r else regs)
                  emptyRegSet e
 
+instance UserOfLocalRegs a => UserOfLocalRegs (Maybe a) where
+    foldRegsUsed f z (Just x) = foldRegsUsed f z x
+    foldRegsUsed _ z Nothing = z
+
 instance UserOfLocalRegs CmmReg where
     foldRegsUsed f z (CmmLocal reg) = f z reg
     foldRegsUsed _ z (CmmGlobal _)  = z

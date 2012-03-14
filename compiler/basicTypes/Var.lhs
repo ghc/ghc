@@ -39,7 +39,8 @@
 
 module Var (
         -- * The main data type and synonyms
-        Var, TyVar, CoVar, Id, KindVar, DictId, DFunId, EvVar, EqVar, EvId, IpId,
+        Var, CoVar, Id, DictId, DFunId, EvVar, EqVar, EvId, IpId,
+        TyVar, TypeVar, KindVar, TKVar,
 
 	-- ** Taking 'Var's apart
 	varName, varUnique, varType, 
@@ -54,7 +55,7 @@ module Var (
 	setIdExported, setIdNotExported,
 
         -- ** Predicates
-        isId, isTyVar, isTcTyVar,
+        isId, isTKVar, isTyVar, isTcTyVar,
         isLocalVar, isLocalId,
 	isGlobalId, isExportedId,
 	mustHaveLocalBinding,
@@ -102,7 +103,10 @@ import Data.Data
 \begin{code}
 type Id    = Var       -- A term-level identifier
 
-type TyVar   = Var     -- Type *or* kind variable
+type TyVar   = Var     -- Type *or* kind variable (historical)
+
+type TKVar   = Var     -- Type *or* kind variable (historical)
+type TypeVar = Var     -- Definitely a type variable
 type KindVar = Var     -- Definitely a kind variable
      	       	       -- See Note [Kind and type variables]
 
@@ -136,8 +140,8 @@ Before kind polymorphism, TyVar were used to mean type variables. Now
 they are use to mean kind *or* type variables. KindVar is used when we
 know for sure that it is a kind variable. In future, we might want to
 go over the whole compiler code to use:
-   - KiTyVar to mean kind or type variables
-   - TyVar   to mean         type variables only
+   - TKVar   to mean kind or type variables
+   - TypeVar to mean         type variables only
    - KindVar to mean kind         variables
 
 
@@ -157,13 +161,13 @@ in its @VarDetails@.
 -- | Essentially a typed 'Name', that may also contain some additional information
 -- about the 'Var' and it's use sites.
 data Var
-  = TyVar {  -- type and kind variables
+  = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
 	varName    :: !Name,
-	realUnique :: FastInt,		-- Key for fast comparison
-					-- Identical to the Unique in the name,
-					-- cached here for speed
-	varType       :: Kind           -- ^ The type or kind of the 'Var' in question
+	realUnique :: FastInt,	     -- Key for fast comparison
+				     -- Identical to the Unique in the name,
+				     -- cached here for speed
+	varType    :: Kind           -- ^ The type or kind of the 'Var' in question
  }
 
   | TcTyVar { 				-- Used only during type inference
@@ -329,7 +333,7 @@ setTcTyVarDetails tv details = tv { tc_tv_details = details }
 
 mkKindVar :: Name -> SuperKind -> KindVar
 -- mkKindVar take a SuperKind as argument because we don't have access
--- to tySuperKind here.
+-- to superKind here.
 mkKindVar name kind = TyVar
   { varName    = name
   , realUnique = getKeyFastInt (nameUnique name)
@@ -411,10 +415,13 @@ setIdNotExported id = ASSERT( isLocalId id )
 %************************************************************************
 
 \begin{code}
-isTyVar :: Var -> Bool          -- True of both type variables only
-isTyVar (TyVar {})   = True
-isTyVar (TcTyVar {}) = True
-isTyVar _            = False
+isTyVar :: Var -> Bool
+isTyVar = isTKVar     -- Historical
+
+isTKVar :: Var -> Bool  -- True of both type and kind variables
+isTKVar (TyVar {})   = True
+isTKVar (TcTyVar {}) = True
+isTKVar _            = False
 
 isTcTyVar :: Var -> Bool
 isTcTyVar (TcTyVar {}) = True

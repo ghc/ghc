@@ -941,13 +941,24 @@ $ cat foo.hspp</screen>
 
           <itemizedlist>
             <listitem>
-              <para>Parallelism<indexterm><primary>parallelism</primary></indexterm> on a multiprocessor<indexterm><primary>multiprocessor</primary></indexterm><indexterm><primary>SMP</primary></indexterm> or multicore<indexterm><primary>multicore</primary></indexterm>
-              machine.  See <xref linkend="using-smp" />.</para>
-
-              <para>The ability to make a foreign call that does not
-              block all other Haskell threads, and to invoke
-              foreign-exported Haskell functions from multiple OS
-              threads. See <xref linkend="ffi-threads" />.</para>
+              <para>It enables the <option>-N</option><indexterm><primary><option>-N<replaceable>x</replaceable></option></primary><secondary>RTS option</secondary></indexterm> RTS option to be
+                used, which allows threads to run in
+                parallel<indexterm><primary>parallelism</primary></indexterm>
+                on a
+                multiprocessor<indexterm><primary>multiprocessor</primary></indexterm><indexterm><primary>SMP</primary></indexterm>
+                or
+                multicore<indexterm><primary>multicore</primary></indexterm>
+                machine.  See <xref linkend="using-smp" />.</para>
+            </listitem>
+            <listitem>
+              <para>If a thread makes a foreign call (and the call is
+                not marked <literal>unsafe</literal>), then other
+                Haskell threads in the program will continue to run
+                while the foreign call is in progress.
+                Additionally, <literal>foreign export</literal>ed
+                Haskell functions may be called from multiple OS
+                threads simultaneously.  See
+                <xref linkend="ffi-threads" />.</para>
             </listitem>
           </itemizedlist>
         </listitem>

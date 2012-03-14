@@ -156,18 +156,20 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                    , abs_exports = exports, abs_ev_binds = ev_binds
                    , abs_binds = binds })
+         -- See Note [Desugaring AbsBinds]
   = do  { bind_prs    <- ds_lhs_binds binds
-        ; ds_binds    <- dsTcEvBinds ev_binds
-        ; let core_bind = Rec (fromOL bind_prs)
+        ; let core_bind = Rec [ makeCorePair (add_inline lcl_id) False 0 rhs
+                              | (lcl_id, rhs) <- fromOL bind_prs ]
 	      	-- Monomorphic recursion possible, hence Rec
 
+	      locals       = map abe_mono exports
 	      tup_expr     = mkBigCoreVarTup locals
 	      tup_ty	   = exprType tup_expr
-	      poly_tup_rhs = mkLams tyvars $ mkLams dicts $
+        ; ds_binds <- dsTcEvBinds ev_binds
+	; let poly_tup_rhs = mkLams tyvars $ mkLams dicts $
 	      		     mkCoreLets ds_binds $
 			     Let core_bind $
 	 	     	     tup_expr
-	      locals       = map abe_mono exports
 
 	; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)
 
@@ -180,13 +182,28 @@ dsHsBind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
 			         mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
                      ; let rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
 		     ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
-		     ; let global' = addIdSpecialisations global rules
+		     ; let global' = (global `setInlinePragma` defaultInlinePragma)
+                                             `addIdSpecialisations` rules
+                           -- Kill the INLINE pragma because it applies to
+                           -- the user written (local) function.  The global
+                           -- Id is just the selector.  Hmm.  
 		     ; return ((global', rhs) `consOL` spec_binds) }
 
         ; export_binds_s <- mapM mk_bind exports
 
 	; return ((poly_tup_id, poly_tup_rhs) `consOL` 
 		    concatOL export_binds_s) }
+  where
+    inline_env :: IdEnv Id   -- Maps a monomorphic local Id to one with
+                             -- the inline pragma from the source
+                             -- The type checker put the inline pragma
+                             -- on the *global* Id, so we need to transfer it
+    inline_env = mkVarEnv [ (lcl_id, setInlinePragma lcl_id prag)
+                          | ABE { abe_mono = lcl_id, abe_poly = gbl_id } <- exports
+                          , let prag = idInlinePragma gbl_id ]
+
+    add_inline :: Id -> Id    -- tran
+    add_inline lcl_id = lookupVarEnv inline_env lcl_id `orElse` lcl_id
 
 ------------------------
 makeCorePair :: Id -> Bool -> Arity -> CoreExpr -> (Id, CoreExpr)
@@ -222,6 +239,16 @@ dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity
 dictArity dicts = count isId dicts
 \end{code}
+
+[Desugaring AbsBinds]
+~~~~~~~~~~~~~~~~~~~~~
+In the general AbsBinds case we desugar the binding to this:
+
+       tup a (d:Num a) = let fm = ...gm...
+                             gm = ...fm...
+                         in (fm,gm)
+       f a d = case tup a d of { (fm,gm) -> fm }
+       g a d = case tup a d of { (fm,gm) -> fm }
 
 Note [Rules and inlining]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -745,7 +772,7 @@ dsEvTerm (EvLit l) =
 ---------------------------------------
 dsTcCoercion :: TcCoercion -> (Coercion -> CoreExpr) -> CoreExpr
 -- This is the crucial function that moves 
--- from LCoercions to Coercions; see Note [TcCoercions] in Coercion
+-- from TcCoercions to Coercions; see Note [TcCoercions] in Coercion
 -- e.g.  dsTcCoercion (trans g1 g2) k
 --       = case g1 of EqBox g1# ->
 --         case g2 of EqBox g2# ->

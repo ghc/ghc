@@ -1286,8 +1286,8 @@ eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
 -- Super Kinds constructors
-tySuperKindTyConKey :: Unique
-tySuperKindTyConKey                     = mkPreludeTyConUnique 85
+superKindTyConKey :: Unique
+superKindTyConKey                     = mkPreludeTyConUnique 85
 
 -- Kind constructors
 liftedTypeKindTyConKey, anyKindTyConKey, openTypeKindTyConKey,
@@ -1656,25 +1656,6 @@ mzipIdKey       = mkPreludeMiscIdUnique 196
 --      USES IdUniques 200-499
 -----------------------------------------------------
 \end{code}
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{Standard groups of types}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
-kindKeys :: [Unique]
-kindKeys = [ anyKindTyConKey
-           , liftedTypeKindTyConKey
-           , openTypeKindTyConKey
-           , unliftedTypeKindTyConKey
-           , ubxTupleKindTyConKey
-           , argTypeKindTyConKey
-           , constraintKindTyConKey ]
-\end{code}
-
 
 %************************************************************************
 %*                                                                      *

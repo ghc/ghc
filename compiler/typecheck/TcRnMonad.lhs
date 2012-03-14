@@ -147,6 +147,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
                 tcl_th_ctxt    = topStage,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
+                tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_meta       = meta_var,
@@ -220,6 +221,9 @@ initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
 %************************************************************************
 
 \begin{code}
+discardResult :: TcM a -> TcM ()
+discardResult a = a >> return ()
+
 getTopEnv :: TcRnIf gbl lcl HscEnv
 getTopEnv = do { env <- getEnv; return (env_top env) }
 
@@ -909,30 +913,11 @@ add_warn_at loc msg extra_info
          let { warn = mkLongWarnMsg loc (mkPrintUnqualified dflags rdr_env)
                                     msg extra_info } ;
          reportWarning warn }
-\end{code}
 
------------------------------------
-         Tidying
-
-We initialise the "tidy-env", used for tidying types before printing,
-by building a reverse map from the in-scope type variables to the
-OccName that the programmer originally used for them
-
-\begin{code}
 tcInitTidyEnv :: TcM TidyEnv
 tcInitTidyEnv
   = do  { lcl_env <- getLclEnv
-        ; let nm_tv_prs = [ (name, tcGetTyVar "tcInitTidyEnv" ty)
-                          | ATyVar name ty <- nameEnvElts (tcl_env lcl_env)
-                          , tcIsTyVarTy ty ]
-        ; return (foldl add emptyTidyEnv nm_tv_prs) }
-  where
-    add (env,subst) (name, tyvar)
-        = case tidyOccName env (nameOccName name) of
-            (env', occ') ->  (env', extendVarEnv subst tyvar tyvar')
-                where
-                  tyvar' = setTyVarName tyvar name'
-                  name'  = tidyNameOcc name occ'
+        ; return (tcl_tidy lcl_env) }
 \end{code}
 
 -----------------------------------

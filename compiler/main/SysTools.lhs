@@ -922,7 +922,8 @@ traceCmd dflags phase_name cmd_line action
  = do   { let verb = verbosity dflags
         ; showPass dflags phase_name
         ; debugTraceMsg dflags 3 (text cmd_line)
-        ; hFlush stderr
+        ; case flushErr dflags of
+              FlushErr io -> io
 
            -- And run it!
         ; action `catchIO` handle_exn verb

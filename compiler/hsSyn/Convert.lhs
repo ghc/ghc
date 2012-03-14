@@ -161,13 +161,16 @@ cvtDec (PragmaD prag)
 cvtDec (TySynD tc tvs rhs)
   = do	{ (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
 	; rhs' <- cvtType rhs
-	; returnL $ TyClD (TySynonym tc' tvs' Nothing rhs') }
+	; returnL $ TyClD (TySynonym { tcdLName = tc' 
+                                     , tcdTyVars = tvs', tcdTyPats = Nothing
+                                     , tcdSynRhs = rhs', tcdFVs = placeHolderNames }) }
 
 cvtDec (DataD ctxt tc tvs constrs derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
 	; cons' <- mapM cvtConstr constrs
 	; derivs' <- cvtDerivs derivs
-	; returnL $ TyClD (TyData { tcdND = DataType, tcdLName = tc', tcdCtxt = ctxt'
+	; returnL $ TyClD (TyData { tcdND = DataType, tcdCType = Nothing
+                                  , tcdLName = tc', tcdCtxt = ctxt'
                                   , tcdTyVars = tvs', tcdTyPats = Nothing, tcdKindSig = Nothing
                                   , tcdCons = cons', tcdDerivs = derivs' }) }
 
@@ -175,7 +178,8 @@ cvtDec (NewtypeD ctxt tc tvs constr derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
 	; con' <- cvtConstr constr
 	; derivs' <- cvtDerivs derivs
-	; returnL $ TyClD (TyData { tcdND = NewType, tcdLName = tc', tcdCtxt = ctxt'
+	; returnL $ TyClD (TyData { tcdND = NewType, tcdCType = Nothing
+                                  , tcdLName = tc', tcdCtxt = ctxt'
 	  	    	  	  , tcdTyVars = tvs', tcdTyPats = Nothing, tcdKindSig = Nothing
                                   , tcdCons = [con'], tcdDerivs = derivs'}) }
 
@@ -214,7 +218,8 @@ cvtDec (DataInstD ctxt tc tys constrs derivs)
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
        ; returnL $ InstD $ FamInstDecl $
-                   TyData { tcdND = DataType, tcdLName = tc', tcdCtxt = ctxt'
+                   TyData { tcdND = DataType, tcdCType = Nothing
+                          , tcdLName = tc', tcdCtxt = ctxt'
                           , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
                           , tcdCons = cons', tcdDerivs = derivs' } }
 
@@ -223,7 +228,8 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
        ; returnL $ InstD $ FamInstDecl $
-                   TyData { tcdND = NewType, tcdLName = tc', tcdCtxt = ctxt'
+                   TyData { tcdND = NewType, tcdCType = Nothing
+                          , tcdLName = tc', tcdCtxt = ctxt'
                           , tcdTyVars = tvs', tcdTyPats = typats', tcdKindSig = Nothing
                           , tcdCons = [con'], tcdDerivs = derivs' } }
 
@@ -231,7 +237,9 @@ cvtDec (TySynInstD tc tys rhs)
   = do	{ (_, tc', tvs', tys') <- cvt_tyinst_hdr [] tc tys
 	; rhs' <- cvtType rhs
 	; returnL $ InstD $ FamInstDecl $ 
-                    TySynonym tc' tvs' tys' rhs' }
+                    TySynonym { tcdLName = tc'
+                              , tcdTyVars = tvs', tcdTyPats = tys'
+                              , tcdSynRhs = rhs', tcdFVs = placeHolderNames } }
 
 ----------------
 cvt_ci_decs :: MsgDoc -> [TH.Dec]
@@ -749,9 +757,10 @@ cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat p' }
 cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p; return $ AsPat s' p' }
 cvtp TH.WildP          = return $ WildPat void
 cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
-		       	   ; return $ ConPatIn c' $ Hs.RecCon (HsRecFields fs' Nothing) }
+		       	    ; return $ ConPatIn c' $ Hs.RecCon (HsRecFields fs' Nothing) }
 cvtp (ListP ps)        = do { ps' <- cvtPats ps; return $ ListPat ps' void }
-cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t; return $ SigPatIn p' t' }
+cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
+                            ; return $ SigPatIn p' (HsBSig t' placeHolderBndrs) }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p; return $ ViewPat e' p' void }
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (HsRecField RdrName (LPat RdrName))
@@ -787,8 +796,7 @@ cvt_tv (TH.PlainTV nm)
 cvt_tv (TH.KindedTV nm ki) 
   = do { nm' <- tName nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar nm' ki' placeHolderKind
-       }
+       ; returnL $ KindedTyVar nm' (HsBSig ki' placeHolderBndrs) placeHolderKind }
 
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }

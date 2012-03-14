@@ -6,6 +6,13 @@ ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 \begin{code}
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+{-# OPTIONS_GHC -Wwarn #-}
+-- There are lots of warnings when GHCI_TABLES_NEXT_TO_CODE is off.
+-- It would be nice to fix this properly, but for now we turn -Werror
+-- off.
+#endif
+
 module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
                      , StgInfoTable(..)
                      ) where

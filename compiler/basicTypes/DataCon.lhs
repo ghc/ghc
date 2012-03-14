@@ -53,6 +53,7 @@ module DataCon (
 
 import Type
 import TypeRep( Type(..) )  -- Used in promoteType
+import PrelNames( liftedTypeKindTyConKey )
 import Kind
 import Unify
 import Coercion
@@ -562,7 +563,7 @@ mkDataCon name declared_infix
 	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
-eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
+eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv) ty | (tv,ty) <- spec ]
 
 mk_pred_strict_mark :: PredType -> HsBang
 mk_pred_strict_mark pred 
@@ -983,7 +984,7 @@ These two 'buildPromoted..' functions are here because
 \begin{code}
 buildPromotedTyCon :: TyCon -> TyCon
 buildPromotedTyCon tc
-  = mkPromotedTyCon tc tySuperKind
+  = mkPromotedTyCon tc (promoteKind (tyConKind tc))
 
 buildPromotedDataCon :: DataCon -> TyCon
 buildPromotedDataCon dc 
@@ -1040,7 +1041,7 @@ promoteType ty
   = mkForAllTys kvs (go rho)
   where
     (tvs, rho) = splitForAllTys ty
-    kvs = [ mkKindVar (tyVarName tv) tySuperKind | tv <- tvs ]
+    kvs = [ mkKindVar (tyVarName tv) superKind | tv <- tvs ]
     env = zipVarEnv tvs kvs
 
     go (TyConApp tc tys) = mkTyConApp (buildPromotedTyCon tc) (map go tys)
@@ -1048,4 +1049,12 @@ promoteType ty
     go (TyVarTy tv)      | Just kv <- lookupVarEnv env tv 
                          = TyVarTy kv
     go _ = panic "promoteType"  -- Argument did not satisfy isPromotableType
+
+promoteKind :: Kind -> SuperKind
+-- Promote the kind of a type constructor
+-- from (* -> * -> *) to (BOX -> BOX -> BOX) 
+promoteKind (TyConApp tc []) 
+  | tc `hasKey` liftedTypeKindTyConKey = superKind
+promoteKind (FunTy arg res) = FunTy (promoteKind arg) (promoteKind res)
+promoteKind k = pprPanic "promoteKind" (ppr k)
 \end{code}
