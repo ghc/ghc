@@ -354,6 +354,15 @@ forImpD cc s str n ty
  = do ty' <- ty
       return $ ForeignD (ImportF cc s str n ty')
 
+infixLD :: Int -> Name -> DecQ
+infixLD prec nm = return (InfixD (Fixity prec InfixL) nm)
+
+infixRD :: Int -> Name -> DecQ
+infixRD prec nm = return (InfixD (Fixity prec InfixR) nm)
+
+infixND :: Int -> Name -> DecQ
+infixND prec nm = return (InfixD (Fixity prec InfixN) nm)
+
 pragInlD :: Name -> InlineSpecQ -> DecQ
 pragInlD n ispec 
   = do

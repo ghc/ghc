@@ -235,9 +235,10 @@ ppr_dec _  (ClassD ctxt c xs fds ds)
     $$ where_clause ds
 ppr_dec _ (InstanceD ctxt i ds) = text "instance" <+> pprCxt ctxt <+> ppr i
                                   $$ where_clause ds
-ppr_dec _ (SigD f t) = ppr f <+> text "::" <+> ppr t
-ppr_dec _ (ForeignD f) = ppr f
-ppr_dec _ (PragmaD p) = ppr p
+ppr_dec _ (SigD f t)    = ppr f <+> text "::" <+> ppr t
+ppr_dec _ (ForeignD f)  = ppr f
+ppr_dec _ (InfixD fx n) = pprFixity n fx
+ppr_dec _ (PragmaD p)   = ppr p
 ppr_dec isTop (FamilyD flav tc tvs k) 
   = ppr flav <+> maybeFamily <+> ppr tc <+> hsep (map ppr tvs) <+> maybeKind
   where
