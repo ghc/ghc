@@ -39,6 +39,9 @@ annedFreeVars = freeVars . sizee . unComp . tagee . unComp
 annedTag :: Anned a -> Tag
 annedTag = tag . unComp
 
+annedToTagged :: Anned a -> Tagged a
+annedToTagged x = Tagged (annedTag x) (annee x)
+
 renameAnned :: In (Anned a) -> Anned (In a)
 renameAnned (rn, Comp (Tagged tg (Comp (Sized sz (FVed fvs x)))))
   = Comp (Tagged tg (Comp (Sized sz (FVed (renameFreeVars rn fvs) (rn, x)))))
@@ -90,6 +93,12 @@ toAnnedTerm :: UniqSupply -> Term -> AnnedTerm
 toAnnedTerm tag_ids = tagFVedTerm tag_ids . reflect
 
 
+-- NB: the way tags are laid out in an Answer is rather "funny". Unlike most other uses of CastBy,
+-- the tag in the CastBy (if present) should be wrapped around the *uncast* value, NOT around the
+-- *cast* value.
+--
+-- This means that if we want correct tag propagation we have to be very careful when we use an
+-- existing CastBy in the construction of an Answer.
 type Answer = Coerced (In (ValueF Anned))
 
 answerSize' :: Answer -> Size
@@ -117,31 +126,44 @@ caseAnnedQA anned_qa = case extract anned_qa of
     Question anned_q -> Left  (fmap (const anned_q) anned_qa)
     Answer   anned_a -> Right (fmap (const anned_a) anned_qa)
 
+-- NB: one of the callers in Speculate depends (rather delicately) on the fact that
+-- the renaming returned in the Question case mentions all of the things in the supplied
+-- InScopeSet, even though it could get away with just mentioning the single Var.
+--
+-- TODO: perhaps we can do something more satisfactory?
 annedQAToInAnnedTerm :: InScopeSet -> Anned QA -> In AnnedTerm
 annedQAToInAnnedTerm iss anned_qa = case caseAnnedQA anned_qa of
-    Left  anned_q -> annedQuestionToInAnnedTerm anned_q
+    Left  anned_q -> annedQuestionToInAnnedTerm iss anned_q
     Right anned_a -> annedAnswerToInAnnedTerm iss anned_a
 
 
-annedQuestionToInAnnedTerm :: Anned (Out Id) -> In AnnedTerm
-annedQuestionToInAnnedTerm anned_q = renamedTerm (fmap Var anned_q)
+annedQuestionToInAnnedTerm :: InScopeSet -> Anned (Out Id) -> In AnnedTerm
+annedQuestionToInAnnedTerm iss anned_q = (mkInScopeIdentityRenaming iss, fmap Var anned_q)
 
 
 annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
-annedAnswerToInAnnedTerm iss = renamedTerm . fmap (answerToAnnedTerm' iss)
+annedAnswerToInAnnedTerm iss anned_a = case annee anned_a of
+  (Uncast,          (rn, v)) -> (rn,                                                                 fmap Value $ annedValue (annedTag anned_a) v)
+  (CastBy co co_tg, (rn, v)) -> (mkInScopeIdentityRenaming iss, annedTerm (annedTag anned_a) $ Cast (fmap Value $ annedValue co_tg      $ renameAnnedValue' iss rn v) co)
 
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
-answerToAnnedTerm' iss (mb_co, (rn, v)) = castValueToAnnedTerm' mb_co $ renameAnnedValue' iss rn v
+answerToAnnedTerm' iss (mb_co, (rn, v)) = case mb_co of
+    Uncast       -> e'
+    CastBy co tg -> Cast (annedTerm tg e') co
+  where e' = Value $ renameAnnedValue' iss rn v
 
-castAnswer :: InScopeSet -> Answer -> Out CastBy -> Answer
-castAnswer _   (mb_co,  in_v)        Uncast           = (mb_co, in_v)
-castAnswer _   (Uncast, in_v)        mb_co'           = (mb_co', in_v)
-castAnswer iss (CastBy co _tg, in_v) (CastBy co' tg') = (CastBy (mkTransCo iss co co') tg', in_v)
+castAnnedAnswer :: InScopeSet -> Anned Answer -> Out CastBy -> Anned Answer
+castAnnedAnswer _   anned_a Uncast           = anned_a
+castAnnedAnswer iss anned_a (CastBy co' tg') = snd $ castTaggedAnswer iss (annedToTagged anned_a) (co', tg')
 
-castValueToAnnedTerm' :: CastBy -> ValueF Anned -> TermF Anned
-castValueToAnnedTerm' Uncast         v' = Value v'
-castValueToAnnedTerm' (CastBy co tg) v' = Cast (annedTerm tg (Value v')) co
+castTaggedAnswer :: InScopeSet -> Tagged Answer -> (NormalCo, Tag) -> (Maybe Tag, Anned Answer)
+castTaggedAnswer iss (Tagged tg (cast_by, in_v)) (co', tg') = (mb_dumped, annedAnswer tg' (castBy co'' tg, in_v))
+  where (mb_dumped, co'') = case cast_by of Uncast              -> (Nothing,        co')
+                                            CastBy co dumped_tg -> (Just dumped_tg, mkTransCo iss co co')
 
+castAnnedTerm :: CastBy -> AnnedTerm -> AnnedTerm
+castAnnedTerm Uncast         e = e
+castAnnedTerm (CastBy co tg) e = annedTerm tg (Cast e co)
 
 qaToAnnedTerm' :: InScopeSet -> QA -> TermF Anned
 qaToAnnedTerm' _   (Question x) = Var x
@@ -335,6 +357,12 @@ releaseUnnormalisedStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (r
 
 releaseStateDeed :: State -> Deeds
 releaseStateDeed (deeds, Heap h _, k, a) = releaseStackDeeds (releasePureHeapDeeds (deeds `releaseDeeds` annedSize a) h) k
+
+
+stackToCast :: Stack -> Maybe CastBy
+stackToCast (Loco _)                             = Just Uncast
+stackToCast (Tagged tg (CastIt co) `Car` Loco _) = Just (CastBy co tg)
+stackToCast _                                    = Nothing
 
 
 -- Unlifted bindings are irritating. They mean that the PureHeap has an implicit order that we need to carefully

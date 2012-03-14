@@ -58,9 +58,6 @@ lfpFrom join init_x f = lfpFrom' init_x (\x -> f x `join` x)
               where x' = f x
 
 
-annedToTagged :: Anned a -> Tagged a
-annedToTagged x = Tagged (annedTag x) (annee x)
-
 type ResidTags = IM.IntMap Int
 
 emptyResidTags :: ResidTags
@@ -414,13 +411,11 @@ noneBracketed' tgs a = TailsUnknown (Shell { shellExtraTags = tgs, shellExtraFvs
 oneBracketed :: UniqSupply -> Type -> (Entered, (Heap, Stack, In AnnedTerm)) -> Bracketed (Entered, UnnormalisedState)
 oneBracketed ctxt_ids ty (ent, (Heap h ids, k, in_e))
   | eAGER_SPLIT_VALUES
-  , Just cast_by <- case k of Loco _                             -> Just Uncast
-                              Tagged tg (CastIt co) `Car` Loco _ -> Just (CastBy co tg)
-                              _                                  -> Nothing
+  , Just cast_by <- stackToCast k
   , Just anned_a <- termToAnswer ids in_e
   = fmap (\(ent', (deeds, Heap h' ids', k', in_e')) -> (if isOnce ent then ent' else Many, (deeds, Heap (h' `M.union` h) ids', k', in_e'))) $ -- Push heap of positive information/new lambda-bounds down + fix hole Entereds
     modifyShell (\shell -> shell { shellExtraFvs = shellExtraFvs shell `minusVarSet` fst (pureHeapVars h) LambdaBound }) $                    -- Fix bracket FVs by removing anything lambda-bound above
-    splitAnswer ctxt_ids ids (annedToTagged (fmap (\a -> castAnswer ids a cast_by) anned_a))
+    splitAnswer ctxt_ids ids (annedToTagged (castAnnedAnswer ids anned_a cast_by))
   | otherwise
   = oneBracketed' ty (ent, (emptyDeeds, Heap h ids, k, in_e))
 
@@ -1187,17 +1182,18 @@ splitLambdaLike rebuild entered ctxt_ids ids tg (rn, (x, e)) = zipBracketeds $ T
   where (ids', rn', x') = renameNonRecBinder ids rn x
         in_e = (rn', e)
 
-splitCoerced :: (a -> Bracketed (Entered, UnnormalisedState))
-             -> Coerced a -> Bracketed (Entered, UnnormalisedState)
-splitCoerced f (Uncast,        x) = f x
-splitCoerced f (CastBy co' tg, x) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) (tyCoVarsOfCo co') $ \[e'] -> cast e' co') [Hole [] (f x)]
+splitCoerced :: (Tag -> a -> Bracketed (Entered, UnnormalisedState))
+             -> Tag -> Coerced a -> Bracketed (Entered, UnnormalisedState)
+splitCoerced f tg (Uncast,         x) = f tg x
+splitCoerced f tg (CastBy co' tg', x) = zipBracketeds $ TailsUnknown (Shell (oneResidTag tg) (tyCoVarsOfCo co') $ \[e'] -> cast e' co') [Hole [] (f tg' x)]
+ -- NB: the tg' in the CastBy is wrapped around the *x*, not the whole cast, so pass it down
 
 splitQA :: UniqSupply -> InScopeSet -> Tag -> QA -> Bracketed (Entered, UnnormalisedState)
 splitQA _        _   tg (Question x') = noneBracketed tg (var x')
-splitQA ctxt_ids ids tg (Answer a)    = splitCoerced (splitValue ctxt_ids ids tg) a
+splitQA ctxt_ids ids tg (Answer a)    = splitAnswer ctxt_ids ids (Tagged tg a)
 
 splitAnswer :: UniqSupply -> InScopeSet -> Tagged Answer -> Bracketed (Entered, UnnormalisedState)
-splitAnswer ctxt_ids ids (Tagged tg a) = splitCoerced (splitValue ctxt_ids ids tg) a
+splitAnswer ctxt_ids ids (Tagged tg a) = splitCoerced (splitValue ctxt_ids ids) tg a
 
 inTermType :: InScopeSet -> In AnnedTerm -> Type
 inTermType ids = renameIn (renameType ids) . fmap termType

@@ -2,7 +2,8 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Supercompile.Core.Renaming (
     -- | Renamings
-    Renaming, emptyRenaming, mkIdentityRenaming, mkTyVarRenaming,
+    Renaming, emptyRenaming,
+    mkInScopeIdentityRenaming, mkIdentityRenaming, mkTyVarRenaming,
     InScopeSet, emptyInScopeSet, mkInScopeSet,
     
     -- | Extending the renaming
@@ -125,6 +126,9 @@ mkIdentityRenaming fvs = foldVarlikes (\f -> foldVarSet (\x -> f x x)) fvs
                                       (\a -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a)))
                                       (\q -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q)))
                                       (emptyVarEnv, emptyVarEnv, emptyVarEnv)
+
+mkInScopeIdentityRenaming :: InScopeSet -> Renaming
+mkInScopeIdentityRenaming = mkIdentityRenaming . getInScopeVars
 
 mkTyVarRenaming :: [(TyVar, Type)] -> Renaming
 mkTyVarRenaming aas = (emptyVarEnv, mkVarEnv aas, emptyVarEnv)

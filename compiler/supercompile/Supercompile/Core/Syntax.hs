@@ -249,7 +249,7 @@ data CastBy = Uncast | CastBy NormalCo Tag -- INVARIANT: NormalCo is not Refl
 type Coerced a = (CastBy, a)
 
 castBy :: NormalCo -> Tag -> CastBy
-castBy co tg | isReflCo co = Uncast
+castBy co tg | isReflCo co = Uncast -- TODO: this throws away a tag (and hence a deed). But do I care any longer?
              | otherwise   = CastBy co tg
 
 castByCo :: CastBy -> Maybe NormalCo
