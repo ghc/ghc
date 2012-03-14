@@ -77,7 +77,7 @@ typedef struct {
 /* The type flags provide quick access to certain properties of a closure. */
 
 #define _HNF (1<<0)  /* head normal form?    */
-#define _BTM (1<<1)  /* bitmap-style layout? */
+#define _BTM (1<<1)  /* uses info->layout.bitmap */
 #define _NS  (1<<2)  /* non-sparkable        */
 #define _STA (1<<3)  /* static?              */
 #define _THU (1<<4)  /* thunk?               */

@@ -255,6 +255,10 @@ partition_args (arg:args) srcs objs
 
        - module names (not forgetting hierarchical module names),
 
+       - things beginning with '-' are flags that were not recognised by
+         the flag parser, and we want them to generate errors later in
+         checkOptions, so we class them as source files (#5921)
+
        - and finally we consider everything not containing a '.' to be
          a comp manager input, as shorthand for a .hs or .lhs filename.
 
@@ -264,6 +268,7 @@ partition_args (arg:args) srcs objs
 looks_like_an_input :: String -> Bool
 looks_like_an_input m =  isSourceFilename m
                       || looksLikeModuleName m
+                      || "-" `isPrefixOf` m
                       || '.' `notElem` m
 
 -- -----------------------------------------------------------------------------
