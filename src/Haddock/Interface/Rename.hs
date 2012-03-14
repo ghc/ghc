@@ -206,9 +206,12 @@ renameLType = mapM renameType
 renameLKind :: LHsKind Name -> RnM (LHsKind DocName)
 renameLKind = renameLType
 
-renameMaybeLKind :: Maybe (LHsKind Name) -> RnM (Maybe (LHsKind DocName))
+renameMaybeLKind :: Maybe (HsBndrSig (LHsKind Name)) 
+                 -> RnM (Maybe (HsBndrSig (LHsKind DocName)))
 renameMaybeLKind Nothing = return Nothing
-renameMaybeLKind (Just ki) = renameLKind ki >>= return . Just
+renameMaybeLKind (Just (HsBSig ki fvs))
+  = do { ki' <- renameLKind ki
+       ; return (Just (HsBSig ki' fvs)) }
 
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of
@@ -260,13 +263,13 @@ renameType t = case t of
 
 
 renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
-renameLTyVarBndr (L loc (UserTyVar n tck))
+renameLTyVarBndr (L loc (UserTyVar n))
   = do { n' <- rename n
-       ; return (L loc (UserTyVar n' tck)) }
-renameLTyVarBndr (L loc (KindedTyVar n (HsBSig k fvs) tck))
+       ; return (L loc (UserTyVar n')) }
+renameLTyVarBndr (L loc (KindedTyVar n (HsBSig k fvs)))
   = do { n' <- rename n
        ; k' <- renameLKind k
-       ; return (L loc (KindedTyVar n' (HsBSig k' fvs) tck)) }
+       ; return (L loc (KindedTyVar n' (HsBSig k' fvs))) }
 
 renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
