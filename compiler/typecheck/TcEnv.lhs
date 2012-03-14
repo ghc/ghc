@@ -20,7 +20,7 @@ module TcEnv(
         tcLookupLocatedClass, tcLookupInstance, tcLookupAxiom,
         
         -- Local environment
-        tcExtendKindEnv, tcExtendKindEnvTvs, tcExtendTcTyThingEnv,
+        tcExtendKindEnv, tcExtendTcTyThingEnv,
         tcExtendTyVarEnv, tcExtendTyVarEnv2, 
         tcExtendGhciEnv, tcExtendLetEnv,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
@@ -339,11 +339,6 @@ tcExtendKindEnv things thing_inside
   where
     upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
     extend env  = extendNameEnvList env [(n, AThing k) | (n,k) <- things]
-
-tcExtendKindEnvTvs :: [LHsTyVarBndr Name] -> ([LHsTyVarBndr Name] -> TcM r) -> TcM r
-tcExtendKindEnvTvs bndrs thing_inside
-  = tcExtendKindEnv (map (hsTyVarNameKind . unLoc) bndrs)
-                    (thing_inside bndrs)
 
 -----------------------
 -- Scoped type and kind variables
