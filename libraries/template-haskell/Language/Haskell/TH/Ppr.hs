@@ -388,7 +388,7 @@ pprParendType (TupleT n) = parens (hcat (replicate (n-1) comma))
 pprParendType (UnboxedTupleT n) = hashParens $ hcat $ replicate (n-1) comma
 pprParendType ArrowT     = parens (text "->")
 pprParendType ListT      = text "[]"
-pprParendType (LiteralT l) = pprTyLit l
+pprParendType (LitT l)   = pprTyLit l
 pprParendType other      = parens (ppr other)
 
 instance Ppr Type where
@@ -418,7 +418,8 @@ split t = go t []
           go ty           args = (ty, args)
 
 pprTyLit :: TyLit -> Doc
-pprTyLit (NumberTL n) = integer n
+pprTyLit (NumTyLit n) = integer n
+pprTyLit (StrTyLit s) = text (show s)
 
 instance Ppr TyLit where
   ppr = pprTyLit
@@ -430,7 +431,6 @@ instance Ppr TyVarBndr where
 
 instance Ppr Kind where
     ppr StarK          = char '*'
-    ppr NatK           = text "Nat"
     ppr (ArrowK k1 k2) = pprArrowArgKind k1 <+> text "->" <+> ppr k2
 
 pprArrowArgKind :: Kind -> Doc

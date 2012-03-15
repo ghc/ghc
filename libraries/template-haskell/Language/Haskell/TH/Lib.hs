@@ -461,8 +461,8 @@ arrowT = return ArrowT
 listT :: TypeQ
 listT = return ListT
 
-literalT :: TyLit -> TypeQ
-literalT l = return (LiteralT l)
+litT :: TyLit -> TypeQ
+litT l = return (LitT l)
 
 tupleT :: Int -> TypeQ
 tupleT i = return (TupleT i)
@@ -490,9 +490,13 @@ varStrictType v st = do (s, t) <- st
 
 -- * Type Literals
 
-numberTL :: Integer -> TyLitQ
-numberTL n = if n >= 0 then return (NumberTL n)
+numTyLit :: Integer -> TyLitQ
+numTyLit n = if n >= 0 then return (NumTyLit n)
                        else fail ("Negative type-level number: " ++ show n)
+
+strTyLit :: String -> TyLitQ
+strTyLit s = return (StrTyLit s)
+
 
 
 -------------------------------------------------------------------------------
@@ -506,9 +510,6 @@ kindedTV = KindedTV
 
 starK :: Kind
 starK = StarK
-
-natK :: Kind
-natK = NatK
 
 arrowK :: Kind -> Kind -> Kind
 arrowK = ArrowK
