@@ -295,14 +295,14 @@ then
         # NB. If you update the tarballs to a new version of gcc, don't
         # forget to tweak the paths in driver/gcc/gcc.c.
         if ! test -d inplace/mingw ||
-             test inplace/mingw -ot ghc-tarballs/mingw64/x86_64-w64-*.zip
+             test inplace/mingw -ot ghc-tarballs/mingw64/mingw-w64-bin_*.zip
         then
             AC_MSG_NOTICE([Making in-tree mingw tree])
             rm -rf inplace/mingw
             mkdir inplace/mingw
             (
                 cd inplace/mingw &&
-                unzip ../../ghc-tarballs/mingw64/x86_64-w64-*.zip
+                unzip ../../ghc-tarballs/mingw64/mingw-w64-bin_*.zip
             )
             AC_MSG_NOTICE([In-tree mingw tree created])
         fi
