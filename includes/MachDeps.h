@@ -83,19 +83,18 @@
 #define SIZEOF_WORD32           SIZEOF_UNSIGNED_INT
 #define ALIGNMENT_WORD32        ALIGNMENT_UNSIGNED_INT
 
-#if HAVE_LONG_LONG && SIZEOF_VOID_P < 8
-/* assume long long is 64 bits */
-#define SIZEOF_INT64            SIZEOF_LONG_LONG
-#define ALIGNMENT_INT64         ALIGNMENT_LONG_LONG
-#define SIZEOF_WORD64           SIZEOF_UNSIGNED_LONG_LONG
-#define ALIGNMENT_WORD64        ALIGNMENT_UNSIGNED_LONG_LONG
-#elif SIZEOF_LONG == 8
+#if SIZEOF_LONG == 8
 #define SIZEOF_INT64            SIZEOF_LONG
 #define ALIGNMENT_INT64         ALIGNMENT_LONG
 #define SIZEOF_WORD64           SIZEOF_UNSIGNED_LONG
 #define ALIGNMENT_WORD64        ALIGNMENT_UNSIGNED_LONG
+#elif HAVE_LONG_LONG && SIZEOF_LONG_LONG == 8
+#define SIZEOF_INT64            SIZEOF_LONG_LONG
+#define ALIGNMENT_INT64         ALIGNMENT_LONG_LONG
+#define SIZEOF_WORD64           SIZEOF_UNSIGNED_LONG_LONG
+#define ALIGNMENT_WORD64        ALIGNMENT_UNSIGNED_LONG_LONG
 #else
-#error GHC untested on this architecture: sizeof(void *) < 8 and no long longs.
+#error Cannot find a 64bit type.
 #endif
 
 #ifndef WORD_SIZE_IN_BITS

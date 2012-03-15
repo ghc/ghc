@@ -28,7 +28,7 @@ all_rts : $(ALL_RTS_LIBS)
 
 ALL_DIRS = hooks parallel sm eventlog
 
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(HostOS_CPP)" "mingw32"
 ALL_DIRS += win32
 else
 ALL_DIRS += posix
