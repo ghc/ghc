@@ -216,15 +216,8 @@ instance UserOfLocalRegs CmmCallTarget where
     foldRegsUsed f set (CmmCallee e _) = foldRegsUsed f set e
     foldRegsUsed _ set (CmmPrim {})    = set
 
-instance UserOfSlots CmmCallTarget where
-    foldSlotsUsed f set (CmmCallee e _) = foldSlotsUsed f set e
-    foldSlotsUsed _ set (CmmPrim {})    = set
-
 instance UserOfLocalRegs a => UserOfLocalRegs (CmmHinted a) where
     foldRegsUsed f set a = foldRegsUsed f set (hintlessCmm a)
-
-instance UserOfSlots a => UserOfSlots (CmmHinted a) where
-    foldSlotsUsed f set a = foldSlotsUsed f set (hintlessCmm a)
 
 instance DefinerOfLocalRegs a => DefinerOfLocalRegs (CmmHinted a) where
     foldRegsDefd f set a = foldRegsDefd f set (hintlessCmm a)

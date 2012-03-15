@@ -14,12 +14,11 @@ module CmmExpr
     , GlobalReg(..), globalRegType, spReg, hpReg, spLimReg, nodeReg, node, baseReg
     , VGcPtr(..), vgcFlag 	-- Temporary!
     , DefinerOfLocalRegs, UserOfLocalRegs, foldRegsDefd, foldRegsUsed, filterRegsUsed
-    , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
             , regSetToList
     , regUsedIn
-    , Area(..), SubArea, SubAreaSet, AreaMap
+    , Area(..)
     , module CmmMachOp
     , module CmmType
     )
@@ -91,13 +90,6 @@ pointer will point to the youngest incoming parameter, which is not
 necessarily at the young end of the Old area.
 
 End of note -}
-
-type SubArea    = (Area, Int, Int) -- area, offset, width
-type SubAreaSet = Map Area [SubArea]
-
-type AreaMap    = Map Area Int
-     -- Byte offset of the oldest byte of the Area, 
-     -- relative to the oldest byte of the Old Area
 
 data CmmLit
   = CmmInt !Integer  Width
@@ -280,38 +272,6 @@ reg `regUsedIn` CmmReg reg' 	 = reg == reg'
 reg `regUsedIn` CmmRegOff reg' _ = reg == reg'
 reg `regUsedIn` CmmMachOp _ es   = any (reg `regUsedIn`) es
 _   `regUsedIn` CmmStackSlot _ _ = False
-
------------------------------------------------------------------------------
---    Stack slot use information for expressions and other types [_$_]
------------------------------------------------------------------------------
-
--- Fold over the area, the offset into the area, and the width of the subarea.
-class UserOfSlots a where
-  foldSlotsUsed :: (b -> SubArea -> b) -> b -> a -> b
-
-class DefinerOfSlots a where
-  foldSlotsDefd :: (b -> SubArea -> b) -> b -> a -> b
-
-instance UserOfSlots CmmExpr where
-  foldSlotsUsed f z e = expr z e
-    where expr z (CmmLit _)          = z
-          expr z (CmmLoad (CmmStackSlot a i) ty) = f z (a, i, widthInBytes $ typeWidth ty)
-          expr z (CmmLoad addr _)    = foldSlotsUsed f z addr
-          expr z (CmmReg _)          = z
-          expr z (CmmMachOp _ exprs) = foldSlotsUsed f z exprs
-          expr z (CmmRegOff _ _)     = z
-          expr z (CmmStackSlot _ _)  = z
-
-instance UserOfSlots a => UserOfSlots [a] where
-  foldSlotsUsed _ set [] = set
-  foldSlotsUsed f set (x:xs) = foldSlotsUsed f (foldSlotsUsed f set x) xs
-
-instance DefinerOfSlots a => DefinerOfSlots [a] where
-  foldSlotsDefd _ set [] = set
-  foldSlotsDefd f set (x:xs) = foldSlotsDefd f (foldSlotsDefd f set x) xs
-
-instance DefinerOfSlots SubArea where
-    foldSlotsDefd f z a = f z a
 
 -----------------------------------------------------------------------------
 --		Global STG registers

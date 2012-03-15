@@ -280,37 +280,6 @@ instance DefinerOfLocalRegs (CmmNode e x) where
           fold f z n = foldRegsDefd f z n
 
 
-instance UserOfSlots (CmmNode e x) where
-  foldSlotsUsed f z n = case n of
-    CmmAssign _ expr -> fold f z expr
-    CmmStore addr rval -> fold f (fold f z addr) rval
-    CmmUnsafeForeignCall _ _ args -> fold f z args
-    CmmCondBranch expr _ _ -> fold f z expr
-    CmmSwitch expr _ -> fold f z expr
-    CmmCall {cml_target=tgt} -> fold f z tgt
-    CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
-    _ -> z
-    where fold :: forall a b.
-                       UserOfSlots a =>
-                       (b -> SubArea -> b) -> b -> a -> b
-          fold f z n = foldSlotsUsed f z n
-
-instance UserOfSlots ForeignTarget where
-  foldSlotsUsed  f z (ForeignTarget e _) = foldSlotsUsed f z e
-  foldSlotsUsed _f z (PrimTarget _)      = z
-
-instance DefinerOfSlots (CmmNode e x) where
-  foldSlotsDefd f z n = case n of
-    CmmStore (CmmStackSlot a i) expr -> f z (a, i, widthInBytes $ typeWidth $ cmmExprType expr)
-    -- CmmForeignCall {res=res} -> fold f z $ map foreign_call_slot res
-    _ -> z
-    where
-          fold :: forall a b.
-                  DefinerOfSlots a =>
-                  (b -> SubArea -> b) -> b -> a -> b
-          fold f z n = foldSlotsDefd f z n
-          -- foreign_call_slot r = case widthInBytes $ typeWidth $ localRegType r of w -> (RegSlot r, w, w)
-
 -----------------------------------
 -- mapping Expr in CmmNode
 
