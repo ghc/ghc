@@ -17,13 +17,14 @@ import qualified Data.Map as M
 
 import qualified CoreSyn as CoreSyn
 import CoreUnfold (exprIsConApp_maybe)
-import Coercion (liftCoSubstWith, coercionKind, isReflCo)
+import Coercion (liftCoSubstWith, coercionKind, isReflCo, mkUnsafeCo)
 import TyCon
 import Type
 import PrelRules
 import Id
 import DataCon
 import Pair
+import Demand (splitStrictSig, isBotRes)
 
 
 evaluatePrim :: InScopeSet -> Tag -> PrimOp -> [Type] -> [Answer] -> Maybe (Anned Answer)
@@ -167,6 +168,13 @@ step' normalising ei_state = {-# SCC "step'" #-}
       | not (dUPLICATE_VALUES_EVALUATOR && normalising)
       , Just anned_a <- lookupAnswer (Heap h ids) x' -- NB: don't unwind *immediately* because we want that changing a Var into a Value in an empty stack is seen as a reduction 'step'
       = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return (deeds, Heap h ids, k, annedAnswerToInAnnedTerm ids $ annedAnswer (annedTag anned_a) a) }
+      -- Try to trim the stack if the Id is guaranteed to bottom out after a certain number of arguments
+      -- This is really amazingly important because so many case branches bottom out in at least one branch,
+      -- and we can save supercompiling big case nests if we trim them out eagerly.
+      | Just (ds, res_d) <- fmap splitStrictSig $ idStrictness_maybe x'
+      , isBotRes res_d
+      , Just (h_extra, k) <- trimUnreachable (length ds) (idType x') k
+      = Just (deeds, Heap (h `M.union` h_extra) ids, k, renamedTerm (annedTerm tg (Var x')))
       | otherwise = do
         hb <- M.lookup x' h
         in_e <- heapBindingTerm hb
@@ -179,6 +187,37 @@ step' normalising ei_state = {-# SCC "step'" #-}
              -- FIXME: squeeze through casts as well?
             kf `Car` _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                             k, in_e)
             _                                  -> (deeds, Heap (M.delete x' h)                                                                                     ids, Tagged tg (Update x') `Car` k, in_e)
+
+    -- TODO: this function totally ignores deeds
+    trimUnreachable :: Int   -- Number of value arguments needed before evaluation bottoms out
+                    -> Type  -- Type of the possibly-bottoming thing in the hole
+                    -> Stack -- Stack consuming the hole
+                    -> Maybe (PureHeap, -- Heap bindings arising from any update frames we trimmed off
+                              Stack)    -- Trimmed stack (strictly "less" than the input one -- not necessarily shorter since we will replace e.g. a trailing Scrutinise with a Cast)
+    trimUnreachable = go
+      where
+        -- Ran out of stack: even if n == 0 we don't want to
+        -- trim the stack in these cases because we musn't return
+        -- Just if the tail of the stack is already trivial: doing
+        -- so would risk non-termination
+        go _ _       (Loco _)                           = Nothing
+        go _ _       (Tagged _ (CastIt _) `Car` Loco _) = Nothing
+        -- Got some non-trivial stack that is unreachable due to bottomness: kill it
+        go 0 hole_ty k@(Tagged cast_tg _ `Car` _) = Just $
+          trainFoldl' (\(!hole_ty,    !h) (Tagged tg kf) -> (stackFrameType' kf hole_ty, case kf of Update x' -> M.insert x' (internallyBound (renamedTerm (annedTerm tg (Var x')))) h; _ -> h))
+                      (\(!overall_ty, !h) gen -> (h, (if hole_ty `eqType` overall_ty then id else (Tagged cast_tg (CastIt (mkUnsafeCo hole_ty overall_ty)) `Car`)) $ Loco gen)) (hole_ty, M.empty) k
+        -- Haven't yet reached a bottom, but we might get enough arguments to reach
+        -- one in the future, so keep going
+        go n hole_ty (kf `Car` k) = mb_n' >>= \n' -> liftM (second (kf `Car`)) $ go n' (stackFrameType kf hole_ty) k
+          where mb_n' = case tagee kf of
+                          TyApply _         -> Just n
+                          CoApply _         -> Just (n - 1)
+                          Apply _           -> Just (n - 1)
+                          Scrutinise _ _ _  -> Nothing
+                          PrimApply _ _ _ _ -> Nothing
+                          StrictLet _ _     -> Nothing
+                          Update _          -> Just n
+                          CastIt _          -> Just n
 
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState

@@ -282,7 +282,10 @@ stackType :: Stack -> Type -> Type
 stackType k ty = trainCarFoldl' (flip stackFrameType) ty k
 
 stackFrameType :: Tagged StackFrame -> Type -> Type
-stackFrameType kf hole_ty = case tagee kf of
+stackFrameType = stackFrameType' . tagee
+
+stackFrameType' :: StackFrame -> Type -> Type
+stackFrameType' kf hole_ty = case kf of
     TyApply ty                    -> hole_ty `applyTy` ty
     CoApply co                    -> hole_ty `applyFunTy` coercionType co
     Apply x                       -> hole_ty `applyFunTy` idType x

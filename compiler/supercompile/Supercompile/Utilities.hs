@@ -661,6 +661,10 @@ trainToList :: Train a b -> ([a], b)
 trainToList (Car a abs) = first (a:) (trainToList abs)
 trainToList (Loco b)    = ([], b)
 
+trainLoco :: Train a b -> b
+trainLoco (Car _ abs) = trainLoco abs
+trainLoco (Loco b)    = b
+
 trainCars :: Train a b -> [a]
 trainCars (Car a abs) = a : trainCars abs
 trainCars (Loco _)    = []
@@ -669,7 +673,7 @@ trainCarFoldl' :: (c -> a -> c) -> c -> Train a b -> c
 trainCarFoldl' f_car = trainFoldl' f_car (\s _a -> s)
 
 {-# INLINE trainFoldl' #-}
-trainFoldl' :: (c -> a -> c) -> (c -> b -> c) -> c -> Train a b -> c
+trainFoldl' :: (c -> a -> c) -> (c -> b -> d) -> c -> Train a b -> d
 trainFoldl' f_car f_loco = go
   where go s (Loco b)    = s `seq` f_loco s b
         go s (Car a abs) = s `seq` go (f_car s a) abs
