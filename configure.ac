@@ -252,7 +252,7 @@ if test "$HostOS" = "mingw32"
 then
     test -d inplace || mkdir inplace
 
-    if test "$HostOS" = "i386"
+    if test "$HostArch" = "i386"
     then
         # NB. If you update the tarballs to a new version of gcc, don't
         # forget to tweak the paths in driver/gcc/gcc.c.
