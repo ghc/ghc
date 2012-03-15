@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
--- | Monadic front-end to Text.PrettyPrint.HughesPJ
+-- | Monadic front-end to Text.PrettyPrint
 
 module Language.Haskell.TH.PprLib (
 
@@ -37,7 +37,7 @@ module Language.Haskell.TH.PprLib (
 
 import Language.Haskell.TH.Syntax
     (Name(..), showName', NameFlavour(..), NameIs(..))
-import qualified Text.PrettyPrint.HughesPJ as HPJ
+import qualified Text.PrettyPrint as HPJ
 import Control.Monad (liftM, liftM2)
 import Data.Map ( Map )
 import qualified Data.Map as Map ( lookup, insert, empty )
@@ -208,7 +208,7 @@ hang d1 n d2 = do d1' <- d1
                   d2' <- d2
                   return (HPJ.hang d1' n d2')
 
--- punctuate uses the same definition as Text.PrettyPrint.HughesPJ
+-- punctuate uses the same definition as Text.PrettyPrint
 punctuate _ []     = []
 punctuate p (d:ds) = go d ds
                    where

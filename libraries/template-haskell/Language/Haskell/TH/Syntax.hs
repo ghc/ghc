@@ -24,19 +24,21 @@ module Language.Haskell.TH.Syntax(
 	Quasi(..), Lift(..), liftString,
 
 	Q, runQ, 
-	report,	recover, reify,
-	location, runIO,
-        isClassInstance, classInstances,
+	report,	recover, reify, 
+        lookupTypeName, lookupValueName,
+	location, runIO, addDependentFile,
+        isInstance, reifyInstances,
 
 	-- * Names
 	Name(..), mkName, newName, nameBase, nameModule,
         showName, showName', NameIs(..),
 
 	-- * The algebraic data types
+	-- $infix
 	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..),Cxt,
         TyLit(..),
 	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
-	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, ClassInstance(..),
+	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
 	InlineSpec(..),	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
 	Info(..), Loc(..), CharPos,
@@ -58,6 +60,7 @@ import GHC.Base		( Int(..), Int#, (<#), (==#) )
 import Language.Haskell.TH.Syntax.Internals
 import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
+import Control.Applicative( Applicative(..) )
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad (liftM)
@@ -70,7 +73,7 @@ import Data.Char        ( isAlpha )
 --
 -----------------------------------------------------
 
-class (Monad m, Functor m) => Quasi m where
+class (Monad m, Applicative m) => Quasi m where
   qNewName :: String -> m Name
 	-- ^ Fresh names
 
@@ -82,16 +85,21 @@ class (Monad m, Functor m) => Quasi m where
            -> m a		-- ^ Recover from the monadic 'fail'
  
 	-- Inspect the type-checker's environment
-  qReify :: Name -> m Info
-  qClassInstances :: Name -> [Type] -> m [ClassInstance]
-  		      -- Is (cls tys) an instance?
-		      -- Returns list of matching witnesses
+  qLookupName :: Bool -> String -> m (Maybe Name)
+       -- True <=> type namespace, False <=> value namespace
+  qReify          :: Name -> m Info
+  qReifyInstances :: Name -> [Type] -> m [Dec]
+       -- Is (n tys) an instance?
+       -- Returns list of matching instance Decs 
+       --    (with empty sub-Decs)
+       -- Works for classes and type functions
 
   qLocation :: m Loc
 
   qRunIO :: IO a -> m a
   -- ^ Input/output (dangerous)
 
+  qAddDependentFile :: FilePath -> m ()
 
 -----------------------------------------------------
 --	The IO instance of Quasi
@@ -112,10 +120,12 @@ instance Quasi IO where
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
 
+  qLookupName _ _     = badIO "lookupName"
   qReify _            = badIO "reify"
-  qClassInstances _ _ = badIO "classInstances"
+  qReifyInstances _ _ = badIO "classInstances"
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
+  qAddDependentFile _ = badIO "addDependentFile"
 
   qRunIO m = m
   
@@ -149,6 +159,10 @@ instance Monad Q where
 instance Functor Q where
   fmap f (Q x) = Q (fmap f x)
 
+instance Applicative Q where 
+  pure x = Q (pure x) 
+  Q f <*> Q x = Q (f <*> x) 
+
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
 newName :: String -> Q Name
@@ -162,17 +176,26 @@ recover :: Q a -- ^ recover with this one
         -> Q a
 recover (Q r) (Q m) = Q (qRecover r m)
 
+-- We don't export lookupName; the Bool isn't a great API
+-- Instead we export lookupTypeName, lookupValueName
+lookupName :: Bool -> String -> Q (Maybe Name)
+lookupName ns s = Q (qLookupName ns s)
+
+lookupTypeName, lookupValueName :: String -> Q (Maybe Name)
+lookupTypeName  s = Q (qLookupName True s)
+lookupValueName s = Q (qLookupName False s)
+
 -- | 'reify' looks up information about the 'Name'
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
 -- | 'classInstances' looks up instaces of a class
-classInstances :: Name -> [Type] -> Q [ClassInstance]
-classInstances cls tys = Q (qClassInstances cls tys)
+reifyInstances :: Name -> [Type] -> Q [Dec]
+reifyInstances cls tys = Q (qReifyInstances cls tys)
 
-isClassInstance :: Name -> [Type] -> Q Bool
-isClassInstance cls tys = do { dfuns <- classInstances cls tys
-                             ; return (not (null dfuns)) }
+isInstance :: Name -> [Type] -> Q Bool
+isInstance nm tys = do { decs <- reifyInstances nm tys
+                       ; return (not (null decs)) }
 
 -- | 'location' gives you the 'Location' at which this
 -- computation is spliced.
@@ -189,14 +212,23 @@ location = Q qLocation
 runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)
 
+-- | Record external files that runIO is using (dependent upon).
+-- The compiler can then recognize that it should re-compile the file using this TH when the external file changes.
+-- Note that ghc -M will still not know about these dependencies - it does not execute TH.
+-- Expects an absolute file path.
+addDependentFile :: FilePath -> Q ()
+addDependentFile fp = Q (qAddDependentFile fp)
+
 instance Quasi Q where
-  qNewName  	  = newName
-  qReport   	  = report
-  qRecover  	  = recover 
-  qReify    	  = reify
-  qClassInstances = classInstances
-  qLocation 	  = location
-  qRunIO    	  = runIO
+  qNewName  	    = newName
+  qReport   	    = report
+  qRecover  	    = recover 
+  qReify    	    = reify
+  qReifyInstances   = reifyInstances
+  qLookupName       = lookupName
+  qLocation 	    = location
+  qRunIO    	    = runIO
+  qAddDependentFile = addDependentFile
 
 
 ----------------------------------------------------
@@ -361,16 +393,12 @@ data Name = Name OccName NameFlavour deriving (Typeable, Data)
 data NameFlavour
   = NameS           -- ^ An unqualified name; dynamically bound
   | NameQ ModName   -- ^ A qualified name; dynamically bound
-
   | NameU Int#      -- ^ A unique local name
-
-
   | NameL Int#      -- ^ Local name bound outside of the TH AST
   | NameG NameSpace PkgName ModName -- ^ Global name bound outside of the TH AST:
                 -- An original name (occurrences only, not binders)
-                --
-				-- Need the namespace too to be sure which 
-				-- thing we are naming
+		-- Need the namespace too to be sure which 
+		-- thing we are naming
   deriving ( Typeable )
 
 -- |
@@ -577,7 +605,6 @@ mk_tup_name n_commas space
   = Name occ (NameG space (mkPkgName "ghc-prim") tup_mod)
   where
     occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
-    -- XXX Should it be GHC.Unit for 0 commas?
     tup_mod = mkModName "GHC.Tuple"
 
 -- Unboxed tuple data and type constructors
@@ -627,7 +654,7 @@ data Info
     --   and a list of its instances
     ClassI 
         Dec             -- Declaration of the class
-        [ClassInstance]	-- The instances of that class
+        [InstanceDec]	-- The instances of that class
 
   | ClassOpI
 	Name	-- The class op itself
@@ -635,7 +662,12 @@ data Info
 	Name 	-- Name of the parent class
 	Fixity
 
-  | TyConI Dec
+  | TyConI 
+        Dec
+
+  | FamilyI	-- Type/data families
+        Dec
+        [InstanceDec]
 
   | PrimTyConI 	-- Ones that can't be expressed with a data type 
 		-- decl, such as (->), Int#
@@ -662,15 +694,12 @@ data Info
 	Type	-- What it is bound to
   deriving( Show, Data, Typeable )
 
--- | 'ClassInstance' desribes a single instance of a class
-data ClassInstance 
-  = ClassInstance {
-      ci_dfun :: Name,	  -- The witness
-      ci_tvs  :: [TyVarBndr], 
-      ci_cxt  :: Cxt,
-      ci_cls  :: Name,  
-      ci_tys  :: [Type]
-    } deriving( Show, Data, Typeable )
+-- | 'InstanceDec' desribes a single instance of a class or type function
+-- It is just a 'Dec', but guaranteed to be one of the following:
+--   InstanceD (with empty [Dec])
+--   DataInstD or NewtypeInstD (with empty derived [Name])
+--   TySynInstD
+type InstanceDec = Dec
 
 data Fixity          = Fixity Int FixityDirection
     deriving( Eq, Show, Data, Typeable )
@@ -689,6 +718,68 @@ defaultFixity = Fixity maxPrecedence InfixL
 --	The main syntax data types
 --
 -----------------------------------------------------
+
+{- $infix #infix#
+Note [Unresolved infix]
+~~~~~~~~~~~~~~~~~~~~~~~
+
+When implementing antiquotation for quasiquoters, one often wants
+to parse strings into expressions:
+
+> parse :: String -> Maybe 'Exp'
+
+But how should we parse @a + b * c@? If we don't know the fixities of
+@+@ and @*@, we don't know whether to parse it as @a + (b * c)@ or @(a
++ b) * c@.
+
+In cases like this, use 'UInfixE' or 'UInfixP', which stand for
+\"unresolved infix expression\" and \"unresolved infix pattern\". When
+the compiler is given a splice containing a tree of @UInfixE@
+applications such as
+
+> UInfixE
+>   (UInfixE e1 op1 e2)
+>   op2
+>   (UInfixE e3 op3 e4)
+
+it will look up and the fixities of the relevant operators and
+reassociate the tree as necessary.
+
+  * trees will not be reassociated across 'ParensE' or 'ParensP',
+    which are of use for parsing expressions like
+
+    > (a + b * c) + d * e
+
+  * 'InfixE' and 'InfixP' expressions are never reassociated.
+
+  * The 'UInfixE' constructor doesn't support sections. Sections
+    such as @(a *)@ have no ambiguity, so 'InfixE' suffices. For longer
+    sections such as @(a + b * c -)@, use an 'InfixE' constructor for the
+    outer-most section, and use 'UInfixE' constructors for all
+    other operators:
+
+    > InfixE
+    >   Just (UInfixE ...a + b * c...)
+    >   op
+    >   Nothing
+
+    Sections such as @(a + b +)@ and @((a + b) +)@ should be rendered
+    into 'Exp's differently:
+
+    > (+ a + b)   ---> InfixE Nothing + (Just $ UInfixE a + b)
+    >                    -- will result in a fixity error if (+) is left-infix
+    > (+ (a + b)) ---> InfixE Nothing + (Just $ ParensE $ UInfixE a + b)
+    >                    -- no fixity errors
+
+  * Quoted expressions such as
+
+    > [| a * b + c |] :: Q Exp
+    > [p| a : b : c |] :: Q Pat
+
+    will never contain 'UInfixE', 'UInfixP', 'ParensE', or 'ParensP'
+    constructors.
+
+-}
 
 data Lit = CharL Char 
          | StringL String 
@@ -716,6 +807,12 @@ data Pat
   | UnboxedTupP [Pat]             -- ^ @{ (# p1,p2 #) }@
   | ConP Name [Pat]               -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
   | InfixP Pat Name Pat           -- ^ @foo ({x :+ y}) = e@
+  | UInfixP Pat Name Pat          -- ^ @foo ({x :+ y}) = e@
+                                  --
+                                  -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
+  | ParensP Pat                   -- ^ @{(p)}@
+                                  --
+                                  -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
   | TildeP Pat                    -- ^ @{ ~p }@
   | BangP Pat                     -- ^ @{ !p }@
   | AsP Name Pat                  -- ^ @{ x \@ p }@
@@ -757,6 +854,12 @@ data Exp
     -- Maybe there should be a var-or-con type?
     -- Or maybe we should leave it to the String itself?
 
+  | UInfixE Exp Exp Exp                -- ^ @{x + y}@
+                                       --
+                                       -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
+  | ParensE Exp                        -- ^ @{ (e) }@
+                                       --
+                                       -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
   | LamE [Pat] Exp                     -- ^ @{ \ p1 p2 -> e }@
   | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
   | UnboxedTupE [Exp]                  -- ^ @{ (# e1,e2 #) }  @
@@ -844,7 +947,7 @@ data Foreign = ImportF Callconv Safety String Name Type
 data Callconv = CCall | StdCall
           deriving( Show, Eq, Data, Typeable )
 
-data Safety = Unsafe | Safe | Threadsafe | Interruptible
+data Safety = Unsafe | Safe | Interruptible
         deriving( Show, Eq, Data, Typeable )
 
 data Pragma = InlineP     Name InlineSpec
@@ -863,7 +966,7 @@ data Pred = ClassP Name [Type]    -- ^ @Eq (Int, a)@
           | EqualP Type Type      -- ^ @F a ~ Bool@
           deriving( Show, Eq, Data, Typeable )
 
-data Strict = IsStrict | NotStrict
+data Strict = IsStrict | NotStrict | Unpacked
          deriving( Show, Eq, Data, Typeable )
 
 data Con = NormalC Name [StrictType]          -- ^ @C Int a@

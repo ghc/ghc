@@ -12,11 +12,11 @@ module Language.Haskell.TH(
 	reify, 		  -- :: Name -> Q Info
 	location,	  -- :: Q Location
 	runIO, 		  -- :: IO a -> Q a
-	isClassInstance,
-	classInstances,
+	lookupTypeName, lookupValueName,
+        isInstance, reifyInstances,
 
 	-- * Names
-	Name, 
+	Name, NameSpace,	-- Abstract
 	mkName,  	-- :: String -> Name
 	newName, 	-- :: String -> Q Name
 	nameBase,	-- :: Name -> String
@@ -31,8 +31,7 @@ module Language.Haskell.TH(
 	Pred(..), Match(..), Clause(..), Body(..), Guard(..), Stmt(..),
 	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..),
-	ClassInstance(..), Loc(..),
+	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
     -- * Library functions
@@ -46,7 +45,8 @@ module Language.Haskell.TH(
 	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
 	charL, stringL, stringPrimL,
     -- *** Patterns
-	litP, varP, tupP, conP, infixP, tildeP, bangP, asP, wildP, recP,
+	litP, varP, tupP, conP, uInfixP, parensP, infixP,
+	tildeP, bangP, asP, wildP, recP,
 	listP, sigP, viewP,
 	fieldPat,
 
@@ -54,7 +54,8 @@ module Language.Haskell.TH(
 	normalB, guardedB, normalG, normalGE, patG, patGE, match, clause, 
 
     -- *** Expressions
-	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
+	dyn, global, varE, conE, litE, appE, uInfixE, parensE,
+	infixE, infixApp, sectionL, sectionR, 
 	lamE, lam1E, tupE, condE, letE, caseE, appsE,
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
     -- **** Ranges
@@ -84,7 +85,7 @@ module Language.Haskell.TH(
     newtypeInstD, tySynInstD, 
     typeFam, dataFam,
     -- **** Foreign Function Interface (FFI)
-    cCall, stdCall, unsafe, safe, threadsafe, forImpD,
+    cCall, stdCall, unsafe, safe, forImpD,
     -- **** Pragmas
     -- | Just inline supported so far
     inlineSpecNoPhase, inlineSpecPhase,
