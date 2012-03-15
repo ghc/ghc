@@ -452,8 +452,28 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
 
 data MemoHow = Skip | CheckOnly | CheckAndRemember
 
+-- NB: don't garbage collect when reducing for a match!
+--
+-- If you do then you can start with this term:
+--   [1] let $dNum = ww3 in * a $dNum
+--
+-- Looks like this after reduction+GC:
+--   [2] case ww3 of Num ...
+--
+-- And if we reduce+split [1] instead we get:
+--   [3] case $dNum of Num ...
+--
+-- Reducing+GCing [3] term gives us [3] again, and that is alpha equivalent to [2],
+-- so we tie back to it rather than continuing. But that means our code is:
+--   let h @a ww3 = let $dNum = ww3
+--                  in h a $dNum
+--
+-- Which is a loop. So we need to do one of:
+--  1. Not GC before matching
+--  2. GC *after* reduction in the main codepath.
+--  3. Not eliminate dead update frames when GCing
 reduceForMatch :: State -> (Bool, State)
-reduceForMatch state = second gc $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
+reduceForMatch state = {- second gc -} $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ start (liftM snd . sc)
