@@ -31,14 +31,8 @@ compilation unit in which it appears.
 
 type BlockId = Hoopl.Label
 
-instance Uniquable BlockId where
-  getUnique label = getUnique (uniqueToInt $ lblToUnique label)
-
 mkBlockId :: Unique -> BlockId
 mkBlockId unique = uniqueToLbl $ intToUnique $ getKey unique
-
-instance Outputable BlockId where
-  ppr label = ppr (getUnique label)
 
 retPtLbl :: BlockId -> CLabel
 retPtLbl label = mkReturnPtLabel $ getUnique label
