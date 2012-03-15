@@ -783,9 +783,9 @@ dnl
 AC_DEFUN([FPTOOLS_HAPPY],
 [AC_PATH_PROG(HappyCmd,happy,)
 # Happy is passed to Cabal, so we need a native path
-if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${HappyCmd}"    != ""
+if test "$HostOS"      = "mingw32" && \
+   test "${OSTYPE}"   != "msys"    && \
+   test "${HappyCmd}" != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
     HappyCmd=`cygpath -m "${HappyCmd}"`
@@ -819,9 +819,9 @@ AC_DEFUN([FPTOOLS_ALEX],
 [
 AC_PATH_PROG(AlexCmd,alex,)
 # Alex is passed to Cabal, so we need a native path
-if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${AlexCmd}"     != ""
+if test "$HostOS"     = "mingw32" && \
+   test "${OSTYPE}"  != "msys"    && \
+   test "${AlexCmd}" != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
     AlexCmd=`cygpath -m "${AlexCmd}"`
