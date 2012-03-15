@@ -84,7 +84,13 @@ data MemoState = MS {
 
 promise :: MemoState -> (State, State) -> (MemoState, Promise)
 promise ms (state, reduced_state) = (ms', p)
-  where (vs_list, h_ty) = stateAbsVars (Just (stateLambdaBounders reduced_state)) state
+  where -- NB: because we stopped garbage-collecting in reduceForMatch, we need to garbage
+        -- collect here to ensure we mark as dead any lambda binders we won't be able to
+        -- determine a renaming for because they are dead.
+        --
+        -- If we don't do this then renameAbsVar will panic when it tries to lookup the renamed
+        -- version of a live variable.
+        (vs_list, h_ty) = stateAbsVars (Just (stateLambdaBounders (gc reduced_state))) state
         h_name :< h_names' = hNames ms
         x = mkLocalId h_name h_ty
         p = P {
