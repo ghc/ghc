@@ -280,7 +280,7 @@ name                                                                    \
                                                                         \
   s1 = W_TO_INT(R1);                                                    \
   d1 = R2;                                                              \
-  ul = R3;                                                              \
+  ul = W_TO_INT(R3);                                                    \
                                                                         \
   mp_tmp     = Sp - 1 * SIZEOF_MP_INT;                                  \
   mp_result  = Sp - 2 * SIZEOF_MP_INT;                                  \
