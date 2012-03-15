@@ -1303,7 +1303,7 @@ reifyFamilyInstance fi
 reifyType :: TypeRep.Type -> TcM TH.Type
 -- Monadic only because of failure
 reifyType ty@(ForAllTy _ _)        = reify_for_all ty
-reifyType (LitTy {})        = failWith $ ptext $ sLit "Type-level literal canont be reifyed yet."
+reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
 reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
@@ -1319,6 +1319,10 @@ reify_for_all ty
        ; return (TH.ForallT tvs' cxt' tau') }
   where
     (tvs, cxt, tau) = tcSplitSigmaTy ty
+
+reifyTyLit :: TypeRep.TyLit -> TcM TH.TyLit
+reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
+reifyTyLit (StrTyLit s) = return (TH.StrTyLit (unpackFS s))
 
 reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType

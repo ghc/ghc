@@ -297,6 +297,7 @@ cvt_tyinst_hdr cxt tc tys
            }
     collect (SigT (VarT tv) ki) = return [KindedTV tv ki]
     collect (SigT ty _)         = collect ty
+    collect (LitT _)    = return []
 
 -------------------------------------------------------------------
 --		Partitioning declarations
