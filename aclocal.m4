@@ -363,7 +363,7 @@ AC_DEFUN([FP_SETTINGS],
 [
     if test "$windows" = YES
     then
-        if test "$HostOS" = "x86_64"
+        if test "$HostArch" = "x86_64"
         then
             mingw_bin_prefix=x86_64-w64-mingw32-
         else
