@@ -200,7 +200,7 @@ instance (Functor ann, OutputableLambdas1 ann) => Outputable (ValueF ann) where
 
 instance (Functor ann, OutputableLambdas1 ann) => OutputableLambdas (ValueF ann) where
     pprPrecLam v = case v of
-        Indirect x         -> ([], flip pPrintPrec x)
+        Indirect x         -> ([], \prec -> text "!" <> pPrintPrec prec x)
         TyLambda x e       -> (x:xs, ppr_prec)
           where (xs, ppr_prec) = pprPrecLam1 e
         Lambda x e         -> (x:xs, ppr_prec)
