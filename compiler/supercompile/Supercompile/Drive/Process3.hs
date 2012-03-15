@@ -473,7 +473,7 @@ data MemoHow = Skip | CheckOnly | CheckAndRemember
 --  2. GC *after* reduction in the main codepath.
 --  3. Not eliminate dead update frames when GCing
 reduceForMatch :: State -> (Bool, State)
-reduceForMatch state = {- second gc -} $ reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
+reduceForMatch state = {- second gc $ -} reduceWithFlag (case state of (_, h, k, e) -> (maxBound, h, k, e)) -- Reduce ignoring deeds for better normalisation
 
 supercompile :: M.Map Var Term -> Term -> Term
 supercompile unfoldings e = fVedTermToTerm $ start (liftM snd . sc)
