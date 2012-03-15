@@ -35,8 +35,10 @@ import Prelude hiding (succ)
 ------------------------
 -- CmmNode
 
+#define ULabel {-# UNPACK #-} !Label
+
 data CmmNode e x where
-  CmmEntry :: {-# UNPACK #-} !Label -> CmmNode C O
+  CmmEntry :: ULabel -> CmmNode C O
 
   CmmComment :: FastString -> CmmNode O O
 
@@ -60,11 +62,12 @@ data CmmNode e x where
       --            bug for what can be put in arguments, see
       --            Note [Register Parameter Passing]
 
-  CmmBranch :: Label -> CmmNode O C  -- Goto another block in the same procedure
+  CmmBranch :: ULabel -> CmmNode O C
+                                   -- Goto another block in the same procedure
 
   CmmCondBranch :: {                 -- conditional branch
       cml_pred :: CmmExpr,
-      cml_true, cml_false :: Label
+      cml_true, cml_false :: ULabel
   } -> CmmNode O C
 
   CmmSwitch :: CmmExpr -> [Maybe Label] -> CmmNode O C -- Table branch
@@ -122,7 +125,7 @@ data CmmNode e x where
       tgt   :: ForeignTarget,   -- call target and convention
       res   :: [CmmFormal],     -- zero or more results
       args  :: [CmmActual],     -- zero or more arguments; see Note [Register parameter passing]
-      succ  :: Label,           -- Label of continuation
+      succ  :: ULabel,          -- Label of continuation
       updfr :: UpdFrameOffset,  -- where the update frame is (for building infotable)
       intrbl:: Bool             -- whether or not the call is interruptible
   } -> CmmNode O C

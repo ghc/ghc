@@ -43,10 +43,11 @@ import qualified Data.Set as Set
 
 data CmmExpr
   = CmmLit CmmLit               -- Literal
-  | CmmLoad !CmmExpr !CmmType     -- Read memory location
+  | CmmLoad !CmmExpr !CmmType   -- Read memory location
   | CmmReg !CmmReg              -- Contents of register
   | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
-  | CmmStackSlot Area Int       -- addressing expression of a stack slot
+  | CmmStackSlot Area {-# UNPACK #-} !Int
+                                -- addressing expression of a stack slot
   | CmmRegOff !CmmReg Int
 	-- CmmRegOff reg i
 	--        ** is shorthand only, meaning **
@@ -71,7 +72,7 @@ data CmmReg
 -- or the stack space where function arguments and results are passed.
 data Area
   = Old            -- See Note [Old Area]
-  | Young BlockId  -- Invariant: must be a continuation BlockId
+  | Young {-# UNPACK #-} !BlockId  -- Invariant: must be a continuation BlockId
                    -- See Note [Continuation BlockId] in CmmNode.
   deriving (Eq, Ord)
 
@@ -111,7 +112,7 @@ data CmmLit
         -- position-independent code. 
   | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
 
-  | CmmBlock BlockId                    -- Code label
+  | CmmBlock {-# UNPACK #-} !BlockId     -- Code label
         -- Invariant: must be a continuation BlockId
         -- See Note [Continuation BlockId] in CmmNode.
 
