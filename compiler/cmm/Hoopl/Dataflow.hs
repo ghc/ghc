@@ -273,10 +273,10 @@ analyzeFwd FwdPass { fp_lattice = lattice,
     block (BlockCC l b n) f = (ftr l `cat` (block b `cat` ltr n)) f
     block (BlockOC   b n) f =              (block b `cat` ltr n) f
 
-    block (BMiddle n)     f = {-# SCC "b1" #-} mtr n f
-    block (BCat b1 b2)    f = {-# SCC "b2" #-} (block b1 `cat` block b2) f
-    block (BHead h n)     f = {-# SCC "b3" #-} (block h  `cat` mtr n) f
-    block (BTail n t)     f = {-# SCC "b4" #-} (mtr  n   `cat` block t) f
+    block (BMiddle n)     f = mtr n f
+    block (BCat b1 b2)    f = (block b1 `cat` block b2) f
+    block (BHead h n)     f = (block h  `cat` mtr n) f
+    block (BTail n t)     f = (mtr  n   `cat` block t) f
 
     {-# INLINE cat #-}
     cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
@@ -477,17 +477,12 @@ arbGraph pass@BwdPass { bp_lattice  = lattice,
                     -- in the Body; the facts for Labels *in*
                     -- the Body are in the 'DG f n C C'
     body entries blockmap init_fbase
-      = fixpoint Bwd (bp_lattice pass) do_block (map entryLabel (backwardBlockList entries blockmap)) blockmap init_fbase
+      = fixpoint Bwd (bp_lattice pass) do_block entries blockmap init_fbase
       where
         do_block :: forall x. Block n C x -> Fact x f -> FuelUniqSM (DG f n C x, LabelMap f)
         do_block b f = do (g, f) <- block b f
                           return (g, mapSingleton (entryLabel b) f)
 
-
-backwardBlockList :: NonLocal n => [Label] -> Body n -> [Block n C C]
--- This produces a list of blocks in order suitable for backward analysis,
--- along with the list of Labels it may depend on for facts.
-backwardBlockList entries body = reverse $ forwardBlockList entries body
 
 {-
 
@@ -507,31 +502,8 @@ effects.)
 --      fixpoint (analysis only)
 -----------------------------------------------------------------------------
 
--- Note [newblocks]
--- For a block whose input is *in* the initial fact base, and is
--- reached by another block, but the join gives NoChange, we must
--- still process it at least once to get its out facts.
-
-updateFact_anal :: f -> JoinFun f
-           -> Label -> f       -- out fact
-           -> ([Label], FactBase f)
-           -> ([Label], FactBase f)
--- See Note [TxFactBase change flag]
-updateFact_anal bot fact_join lbl new_fact (cha, fbase)
-  = case lookupFact lbl fbase of
-      Nothing       -> (lbl:cha, mapInsert lbl new_fact fbase)
-      Just old_fact ->
-        case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
-           (NoChange, _) -> (cha, fbase)
-           (_,        f) -> (lbl:cha, mapInsert lbl f fbase)
-
-{-
--- this doesn't work because it can't be implemented
-class Monad m => FixpointMonad m where
-  observeChangedFactBase :: m (Maybe (FactBase f)) -> Maybe (FactBase f)
--}
-
 data Direction = Fwd | Bwd
+
 fixpoint_anal :: forall n f. NonLocal n
  => Direction
  -> DataflowLattice f
@@ -545,17 +517,19 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
   = loop start init_fbase
   where
     blocks = forwardBlockList entries blockmap
+    n = length blocks
 
-    ordered_blocks       = case direction of
-                             Fwd -> blocks
-                             Bwd -> reverse blocks
-    block_arr = listArray (0,length blocks - 1) ordered_blocks
+    ordered_blocks = case direction of
+                        Fwd -> blocks
+                        Bwd -> reverse blocks
 
-    start = [0 .. length blocks - 1]
+    block_arr = {-# SCC "block_arr" #-} listArray (0,n-1) ordered_blocks
+
+    start = {-# SCC "start" #-} [0 .. n-1]
 
     -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
     dep_blocks :: LabelMap [Int]
-    dep_blocks = mapFromListWith (++)
+    dep_blocks = {-# SCC "dep_blocks" #-} mapFromListWith (++)
                         [ (l, [ix])
                         | (b,ix) <- zip ordered_blocks [0..]
                         , l <- case direction of
@@ -568,47 +542,48 @@ fixpoint_anal direction DataflowLattice{ fact_bot = bot, fact_join = join }
        -> FactBase f  -- current factbase (increases monotonically)
        -> FactBase f
 
-    loop [] fbase = fbase
+    loop []        fbase = fbase
     loop (ix:todo) fbase =
-           let blk = block_arr ! ix
+           let
+               blk = block_arr ! ix
+
+               out_facts = {-# SCC "do_block" #-} do_block blk fbase
+
+               !(todo', fbase') = {-# SCC "mapFoldWithKey" #-}
+                     mapFoldWithKey (updateFact bot join dep_blocks)
+                                    (todo,fbase) out_facts
            in
            -- trace ("analysing: " ++ show (entryLabel blk)) $
-           let out_facts = do_block blk fbase
-
-               !(changed, fbase') = mapFoldWithKey
-                                     (updateFact_anal bot join)
-                                     ([],fbase) out_facts
-           in
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
            -- trace ("changed: " ++ show changed) $ return ()
-     
-           let to_analyse
-                 = concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
-           in
-
            -- trace ("to analyse: " ++ show to_analyse) $ return ()
 
-           loop (foldr insertIntHeap todo to_analyse) fbase'
+           loop todo' fbase'
+
+
 
 -----------------------------------------------------------------------------
 --      fixpoint: finding fixed points
 -----------------------------------------------------------------------------
 
-     -- See Note [TxFactBase invariants]
-
-updateFact :: f -> JoinFun f
+-- Shared by fixpoint and fixpoint_anal:
+--
+updateFact :: f -> JoinFun f -> LabelMap [Int]
            -> Label -> f       -- out fact
-           -> ([Label], FactBase f)
-           -> ([Label], FactBase f)
--- See Note [TxFactBase change flag]
-updateFact bot fact_join lbl new_fact (cha, fbase)
+           -> ([Int], FactBase f)
+           -> ([Int], FactBase f)
+
+updateFact bot fact_join dep_blocks lbl new_fact (todo, fbase)
   = case lookupFact lbl fbase of
-      Nothing       -> (lbl:cha, mapInsert lbl new_fact fbase)
-                            -- Note [no old fact]
+      Nothing       -> let !z = mapInsert lbl new_fact fbase in (changed, z)
+                           -- Note [no old fact]
       Just old_fact ->
         case fact_join lbl (OldFact old_fact) (NewFact new_fact) of
-           (NoChange, _) -> (cha, fbase)
-           (_,        f) -> (lbl:cha, mapInsert lbl f fbase)
+          (NoChange, _) -> (todo, fbase)
+          (_,        f) -> let !z = mapInsert lbl f fbase in (changed, z)
+  where
+     changed = foldr insertIntHeap todo $
+                 mapFindWithDefault [] lbl dep_blocks
 
 {-
 Note [no old fact]
@@ -619,11 +594,6 @@ we don't need to record a change.  So there's a tradeoff here.  It turns
 out that always recording a change is faster.
 -}
 
-{-
--- this doesn't work because it can't be implemented
-class Monad m => FixpointMonad m where
-  observeChangedFactBase :: m (Maybe (FactBase f)) -> Maybe (FactBase f)
--}
 
 fixpoint :: forall n f. NonLocal n
  => Direction
@@ -649,9 +619,10 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
     ordered_blocks       = case direction of
                              Fwd -> blocks
                              Bwd -> reverse blocks
-    block_arr            = listArray (0,length blocks - 1) ordered_blocks
+    block_arr            = listArray (0,n-1) ordered_blocks
 
-    start = [0 .. length blocks - 1]
+    start = [0 .. n-1]
+    n = length blocks
 
     -- mapping from L -> blocks.  If the fact for L changes, re-analyse blocks.
     dep_blocks :: LabelMap [Int]
@@ -675,21 +646,18 @@ fixpoint direction DataflowLattice{ fact_bot = bot, fact_join = join }
 
            -- trace ("analysing: " ++ show (entryLabel blk)) $ return ()
            (rg, out_facts) <- do_block blk fbase
-           let (changed, fbase') = mapFoldWithKey
-                                     (updateFact bot join)
-                                     ([],fbase) out_facts
+           let !(todo', fbase') =
+                  mapFoldWithKey (updateFact bot join dep_blocks)
+                                 (todo,fbase) out_facts
+
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
            -- trace ("changed: " ++ show changed) $ return ()
-     
-           let to_analyse
-                 = concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
-
            -- trace ("to analyse: " ++ show to_analyse) $ return ()
 
            let newblocks' = case rg of
                               GMany _ blks _ -> mapUnion blks newblocks
      
-           loop (foldr insertIntHeap todo to_analyse) fbase' newblocks'
+           loop todo' fbase' newblocks'
 
 
 {-  Note [TxFactBase invariants]
