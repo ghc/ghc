@@ -686,7 +686,8 @@ case $HostPlatform in
   esac ;;
 alpha-dec-osf*) fptools_cv_leading_underscore=no;;
 *cygwin32) fptools_cv_leading_underscore=yes;;
-*mingw32) fptools_cv_leading_underscore=yes;;
+i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
+x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
 
     # HACK: Apple doesn't seem to provide nlist in the 64-bit-libraries
 x86_64-apple-darwin*) fptools_cv_leading_underscore=yes;;

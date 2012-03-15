@@ -159,9 +159,9 @@ fi;
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
 then
-    ghc_host=`"${WithGhc}" +RTS --info | grep 'Host platform' | sed -e 's/.*, "//' -e 's/")//'`
+    ghc_host_os=`"${WithGhc}" +RTS --info | grep 'Host OS' | sed -e 's/.*, "//' -e 's/")//'`
 
-    if test "$ghc_host" = "i386-unknown-mingw32"
+    if test "$ghc_host_os" = "mingw32"
     then
         if test "${OSTYPE}" = "msys"
         then
@@ -447,10 +447,11 @@ dnl --------------------------------------------------------------
 dnl ** Can the unix package be built?
 dnl --------------------------------------------------------------
 
-if test x"$TargetPlatform" = x"i386-unknown-mingw32"; then
-   GhcLibsWithUnix=NO
+if test "$TargetOS" = "mingw32"
+then
+    GhcLibsWithUnix=NO
 else
-   GhcLibsWithUnix=YES
+    GhcLibsWithUnix=YES
 fi
 AC_SUBST([GhcLibsWithUnix])
 
@@ -571,9 +572,9 @@ AC_SUBST(HaveDtrace)
 
 AC_PATH_PROG(HSCOLOUR,HsColour)
 # HsColour is passed to Cabal, so we need a native path
-if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${HSCOLOUR}"    != ""
+if test "$HostOS"      = "mingw32" && \
+   test "${OSTYPE}"   != "msys"    && \
+   test "${HSCOLOUR}" != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
     HSCOLOUR=`cygpath -m ${HSCOLOUR}`
