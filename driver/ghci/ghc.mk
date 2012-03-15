@@ -34,7 +34,7 @@ driver/ghci_dist_PROG    = ghci$(exeext)
 driver/ghci_dist_INSTALL = YES
 driver/ghci_dist_OTHER_OBJS = driver/ghci/ghci.res
 
-$(eval $(call build-prog,driver/ghci,dist,0))
+$(eval $(call build-prog,driver/ghci,dist,1))
 
 driver/ghci_dist_PROG_VER = ghci-$(ProjectVersion)$(exeext)
 
