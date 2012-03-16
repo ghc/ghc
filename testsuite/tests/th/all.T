@@ -222,4 +222,5 @@ test('T5700', extra_clean(['T5700a.hi','T5700a.o']),
 test('T5721', normal, compile, ['-v0'])
 test('T1541', normal, compile, ['-v0'])
 test('T5883', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
+test('T5882', normal, compile, ['-v0'])
 
