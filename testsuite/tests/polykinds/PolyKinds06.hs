@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DataKinds, KindSignatures  #-}
 {-# LANGUAGE GADTs                      #-}
 
 module PolyKinds06 where
