@@ -2025,16 +2025,6 @@ The following syntax is stolen:
 
       <varlistentry>
 	<term>
-	  <literal>'<replaceable>varid</replaceable></literal>
-	</term>
-	<listitem><para>
-	Stolen by: <option>-XTemplateHaskell</option>and 
-                   <option>-XPolyKinds</option>
-	  </para></listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
 	  <literal>[:<replaceable>varid</replaceable>|</literal>
           <indexterm><primary>quasi-quotation</primary></indexterm>
 	</term>
@@ -5356,8 +5346,11 @@ type T1 = P     -- 1
 type T2 = 'P    -- promoted 2
 </programlisting>
 Note that promoted datatypes give rise to named kinds. Since these can never be
-ambiguous, we do not allow quotes in kind names.
+ambiguous, we do not allow quotes in kind names. 
 </para>
+<para>Just as in the case of Template Haskell (<xref linkend="th-syntax"/>), there is
+no way to quote a data constructor or type constructor whose second character
+is a single quote.</para>
 </sect3>
 
 <sect3 id="promoted-lists-and-tuples">
@@ -6871,7 +6864,7 @@ understand Template Haskell; see the <ulink url="http://haskell.org/haskellwiki/
 Wiki page</ulink>.
 </para>
 
-    <sect2>
+    <sect2 id="th-syntax">
       <title>Syntax</title>
 
       <para> Template Haskell has the following new syntactic
@@ -6931,7 +6924,19 @@ Wiki page</ulink>.
 		  <itemizedlist>
 		    <listitem><para> <literal>'f</literal> has type <literal>Name</literal>, and names the function <literal>f</literal>.
 		  Similarly <literal>'C</literal> has type <literal>Name</literal> and names the data constructor <literal>C</literal>.
-		  In general <literal>'</literal><replaceable>thing</replaceable> interprets <replaceable>thing</replaceable> in an expression context.
+		  In general <literal>'</literal><replaceable>thing</replaceable> 
+                  interprets <replaceable>thing</replaceable> in an expression context.</para>
+                    <para>A name whose second character is a single
+                    quote (sadly) cannot be quoted in this way,
+                    because it will be parsed instead as a quoted
+                    character.  For example, if the function is called
+                    <literal>f'7</literal> (which is a legal Haskell
+                    identifier), an attempt to quote it as
+                    <literal>'f'7</literal> would be parsed as the
+                    character literal <literal>'f'</literal> followed
+                    by the numeric literal <literal>7</literal>. There
+                    is no current escape mechanism in this (unusual)
+                    situation.
 		     </para></listitem>
 		    <listitem><para> <literal>''T</literal> has type <literal>Name</literal>, and names the type constructor  <literal>T</literal>.
 		  That is, <literal>''</literal><replaceable>thing</replaceable> interprets <replaceable>thing</replaceable> in a type context.
