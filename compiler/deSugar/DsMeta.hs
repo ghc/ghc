@@ -1808,7 +1808,7 @@ templateHaskellNames = [
     classDName, instanceDName, sigDName, forImpDName, 
     pragInlDName, pragSpecDName, pragSpecInlDName,
     familyNoKindDName, familyKindDName, dataInstDName, newtypeInstDName,
-    tySynInstDName, 
+    tySynInstDName, infixLDName, infixRDName, infixNDName,
     -- Cxt
     cxtName,
     -- Pred
