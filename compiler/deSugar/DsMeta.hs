@@ -179,12 +179,12 @@ repTyClD (L loc (TyData { tcdND = DataType, tcdCtxt = cxt, tcdKindSig = mb_kind,
 		          tcdLName = tc, tcdTyVars = tvs, tcdTyPats = opt_tys,
 		          tcdCons = cons, tcdDerivs = mb_derivs }))
   = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
-       ; more_tvs <- mk_extra_tvs mb_kind
-       ; dec <- addTyVarBinds (tvs ++ more_tvs) $ \bndrs -> 
+       ; tc_tvs <- mk_extra_tvs tvs mb_kind
+       ; dec <- addTyVarBinds tc_tvs $ \bndrs -> 
            do { cxt1     <- repLContext cxt
               ; opt_tys1 <- maybeMapM repLTys opt_tys   -- only for family insts
               ; opt_tys2 <- maybeMapM (coreList typeQTyConName) opt_tys1
-              ; cons1    <- mapM (repC (hsLTyVarNames tvs)) cons
+              ; cons1    <- mapM (repC (hsLTyVarNames tc_tvs)) cons
       	      ; cons2    <- coreList conQTyConName cons1
       	      ; derivs1  <- repDerivs mb_derivs
 	      ; bndrs1   <- coreList tyVarBndrTyConName bndrs
@@ -193,15 +193,16 @@ repTyClD (L loc (TyData { tcdND = DataType, tcdCtxt = cxt, tcdKindSig = mb_kind,
        ; return $ Just (loc, dec) 
        }
 
-repTyClD (L loc (TyData { tcdND = NewType, tcdCtxt = cxt, 
+repTyClD (L loc (TyData { tcdND = NewType, tcdCtxt = cxt, tcdKindSig = mb_kind,
 		          tcdLName = tc, tcdTyVars = tvs, tcdTyPats = opt_tys,
 		          tcdCons = [con], tcdDerivs = mb_derivs }))
   = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
-       ; dec <- addTyVarBinds tvs $ \bndrs -> 
+       ; tc_tvs <- mk_extra_tvs tvs mb_kind
+       ; dec <- addTyVarBinds tc_tvs $ \bndrs -> 
            do { cxt1     <- repLContext cxt
               ; opt_tys1 <- maybeMapM repLTys opt_tys   -- only for family insts
               ; opt_tys2 <- maybeMapM (coreList typeQTyConName) opt_tys1
-              ; con1     <- repC (hsLTyVarNames tvs) con
+              ; con1     <- repC (hsLTyVarNames tc_tvs) con
       	      ; derivs1  <- repDerivs mb_derivs
 	      ; bndrs1   <- coreList tyVarBndrTyConName bndrs
       	      ; repNewtype cxt1 tc1 bndrs1 opt_tys2 con1 derivs1
@@ -246,14 +247,15 @@ repTyClD (L loc d) = putSrcSpanDs loc $
 			; return Nothing }
 
 -------------------------
-mk_extra_tvs :: Maybe (HsBndrSig (LHsKind Name)) -> DsM [LHsTyVarBndr Name]
+mk_extra_tvs :: [LHsTyVarBndr Name] -> Maybe (HsBndrSig (LHsKind Name)) -> DsM [LHsTyVarBndr Name]
 -- If there is a kind signature it must be of form
 --    k1 -> .. -> kn -> *
 -- Return type variables [tv1:k1, tv2:k2, .., tvn:kn]
-mk_extra_tvs Nothing 
-  = return []
-mk_extra_tvs (Just (HsBSig hs_kind _))
-  = go hs_kind
+mk_extra_tvs tvs Nothing 
+  = return tvs
+mk_extra_tvs tvs (Just (HsBSig hs_kind _))
+  = do { extra_tvs <- go hs_kind
+       ; return (tvs ++ extra_tvs) }
   where
     go :: LHsKind Name -> DsM [LHsTyVarBndr Name]
     go (L loc (HsFunTy kind rest))
