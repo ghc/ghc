@@ -268,7 +268,7 @@ mkHsString s = HsString (mkFastString s)
 
 -------------
 userHsTyVarBndrs :: [Located name] -> [Located (HsTyVarBndr name)]
-userHsTyVarBndrs bndrs = [ L loc (UserTyVar v placeHolderKind) | L loc v <- bndrs ]
+userHsTyVarBndrs bndrs = [ L loc (UserTyVar v) | L loc v <- bndrs ]
 \end{code}
 
 

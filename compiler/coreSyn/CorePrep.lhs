@@ -870,10 +870,12 @@ get to a partial application:
 \begin{code}
 tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
 tryEtaReducePrep bndrs expr@(App _ _)
-  | ok_to_eta_reduce f &&
-    n_remaining >= 0 &&
-    and (zipWith ok bndrs last_args) &&
-    not (any (`elemVarSet` fvs_remaining) bndrs)
+  | ok_to_eta_reduce f
+  , n_remaining >= 0
+  , and (zipWith ok bndrs last_args)
+  , not (any (`elemVarSet` fvs_remaining) bndrs)
+  , exprIsHNF remaining_expr   -- Don't turn value into a non-value
+                               -- else the behaviour with 'seq' changes
   = Just remaining_expr
   where
     (f, args) = collectArgs expr
@@ -885,9 +887,9 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok bndr (Var arg) = bndr == arg
     ok _    _         = False
 
-	  -- we can't eta reduce something which must be saturated.
+	  -- We can't eta reduce something which must be saturated.
     ok_to_eta_reduce (Var f) = not (hasNoBinding f)
-    ok_to_eta_reduce _       = False --safe. ToDo: generalise
+    ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
 tryEtaReducePrep bndrs (Let bind@(NonRec _ r) body)
   | not (any (`elemVarSet` fvs) bndrs)

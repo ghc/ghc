@@ -414,7 +414,6 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
 		  (ppr tpl_tvs <+> ppr tpl_tys) )
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
-         pprTrace "tcUnifyTys" (ppr tpl_tys $$ ppr match_tys $$ ppr fam_inst) $
          case tcUnifyTys instanceBindFun tpl_tys match_tys of
 	      Just subst | conflicting old_fam_inst subst -> Just subst
 	      _other	   	              	          -> Nothing
