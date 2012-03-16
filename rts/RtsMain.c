@@ -108,11 +108,11 @@ int hs_main (int argc, char *argv[],     // program args
     progmain_closure = main_closure;
     rtsconfig = rts_config;
 
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
     BEGIN_CATCH
 #endif
     real_main();
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
     END_CATCH
 #endif
 }
