@@ -903,6 +903,15 @@ ppr_mono_ty ctxt_prec (HsParTy ty) unicode
 ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode
   = ppr_mono_lty ctxt_prec ty unicode
 
+ppr_mono_ty _ (HsTyLit t) u = ppr_tylit t u
+
+
+ppr_tylit :: HsTyLit -> Bool -> LaTeX
+ppr_tylit (HsNumTy n) _ = integer n
+ppr_tylit (HsStrTy s) _ = text (show s)
+  -- XXX: Ok in verbatim, but not otherwise
+  -- XXX: Do something with Unicode parameter?
+
 
 ppr_fun_ty :: Int -> LHsType DocName -> LHsType DocName -> Bool -> LaTeX
 ppr_fun_ty ctxt_prec ty1 ty2 unicode
