@@ -35,7 +35,7 @@ module StgSyn (
 
         -- utils
         stgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
-        isDllConApp, isStgTypeArg,
+        isDllConApp,
         stgArgType,
 
         pprStgBinding, pprStgBindings, pprStgBindingsWithSRTs,
@@ -99,11 +99,6 @@ data GenStgBinding bndr occ
 data GenStgArg occ
   = StgVarArg  occ
   | StgLitArg  Literal
-  | StgTypeArg Type     -- For when we want to preserve all type info
-
-isStgTypeArg :: StgArg -> Bool
-isStgTypeArg (StgTypeArg _) = True
-isStgTypeArg _              = False
 
 -- | Does this constructor application refer to
 -- anything in a different *Windows* DLL?
@@ -144,7 +139,6 @@ isAddrRep _       = False
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
-stgArgType (StgTypeArg _)  = panic "stgArgType called on stgTypeArg"
 \end{code}
 
 %************************************************************************
@@ -683,7 +677,6 @@ instance (Outputable bndr, Outputable bdee, Ord bdee)
 pprStgArg :: (Outputable bdee) => GenStgArg bdee -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
-pprStgArg (StgTypeArg ty) = char '@' <+> ppr ty
 
 pprStgExpr :: (Outputable bndr, Outputable bdee, Ord bdee)
            => GenStgExpr bndr bdee -> SDoc

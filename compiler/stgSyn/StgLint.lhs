@@ -83,7 +83,6 @@ lintStgBindings whodunnit binds
 lintStgArg :: StgArg -> LintM (Maybe Type)
 lintStgArg (StgLitArg lit) = return (Just (literalType lit))
 lintStgArg (StgVarArg v)   = lintStgVar v
-lintStgArg a               = pprPanic "lintStgArg" (ppr a)
 
 lintStgVar :: Id -> LintM (Maybe Kind)
 lintStgVar v = do checkInScope v
