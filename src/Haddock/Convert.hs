@@ -239,7 +239,7 @@ synifyTyVars = map synifyTyVar
       kind = tyVarKind tv
       name = getName tv
      in if isLiftedTypeKind kind
-        then UserTyVar name placeHolderKind
+        then UserTyVar name
         else KindedTyVar name (synifyKindSig kind)
 
 
