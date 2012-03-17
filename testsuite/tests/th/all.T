@@ -220,4 +220,9 @@ test('T5665', extra_clean(['T5665a.hi','T5665a.o']),
 test('T5700', extra_clean(['T5700a.hi','T5700a.o']), 
               multimod_compile, ['T5700','-v0 -ddump-splices'])
 test('T5721', normal, compile, ['-v0'])
+test('T1541', normal, compile, ['-v0'])
+test('T5883', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
+test('T5882', normal, compile, ['-v0'])
+test('T5886', extra_clean(['T5886a.hi','T5886a.o']), 
+              multimod_compile, ['T5886','-v0'])
 
