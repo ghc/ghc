@@ -212,8 +212,6 @@ finished it encodes (\x -> e) as (let f = \x -> e in f)
 
 \begin{code}
   | StgLam
-        Type       -- Type of whole lambda (useful when
-                   -- making a binder for it)
         [bndr]
         StgExpr    -- Body of lambda
 \end{code}
@@ -702,7 +700,7 @@ pprStgExpr (StgConApp con args)
 pprStgExpr (StgOpApp op args _)
   = hsep [ pprStgOp op, brackets (interppSP args)]
 
-pprStgExpr (StgLam _ bndrs body)
+pprStgExpr (StgLam bndrs body)
   =sep [ char '\\' <+> ppr bndrs <+> ptext (sLit "->"),
          pprStgExpr body ]
 

@@ -277,7 +277,7 @@ mkTopStgRhs :: DynFlags -> FreeVarsInfo
             -> SRT -> StgBinderInfo -> StgExpr
             -> StgRhs
 
-mkTopStgRhs _ rhs_fvs srt binder_info (StgLam _ bndrs body)
+mkTopStgRhs _ rhs_fvs srt binder_info (StgLam bndrs body)
   = StgRhsClosure noCCS binder_info
                   (getFVs rhs_fvs)
                   ReEntrant
@@ -343,7 +343,7 @@ coreToStgExpr expr@(Lam _ _)
         fvs             = args' `minusFVBinders` body_fvs
         escs            = body_escs `delVarSetList` args'
         result_expr | null args' = body
-                    | otherwise  = StgLam (exprType expr) args' body
+                    | otherwise  = StgLam args' body
 
     return (result_expr, fvs, escs)
 
@@ -783,7 +783,7 @@ mkStgRhs :: FreeVarsInfo -> SRT -> StgBinderInfo -> StgExpr -> StgRhs
 
 mkStgRhs _ _ _ (StgConApp con args) = StgRhsCon noCCS con args
 
-mkStgRhs rhs_fvs srt binder_info (StgLam _ bndrs body)
+mkStgRhs rhs_fvs srt binder_info (StgLam bndrs body)
   = StgRhsClosure noCCS binder_info
                   (getFVs rhs_fvs)
                   ReEntrant

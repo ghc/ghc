@@ -175,7 +175,7 @@ lintStgExpr (StgOpApp _ args res_ty) = runMaybeT $ do
     _maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
     return res_ty
 
-lintStgExpr (StgLam _ bndrs _) = do
+lintStgExpr (StgLam bndrs _) = do
     addErrL (ptext (sLit "Unexpected StgLam") <+> ppr bndrs)
     return Nothing
 
