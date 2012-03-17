@@ -22,6 +22,15 @@ ghc_stage2_CONFIGURE_OPTS += --flags=ghci
 ghc_stage3_CONFIGURE_OPTS += --flags=ghci
 endif
 
+ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
+# If we munge the stage1 version, and we're using a devel snapshot for
+# stage0, then stage1 may actually have an earlier version than stage0
+# (e.g. boot with ghc-7.5.20120316, building ghc-7.5). We therefore
+# need to tell Cabal to use version 7.5 of the ghc package when building
+# in ghc/stage1
+ghc_stage1_CONFIGURE_OPTS += --constraint "ghc == $(compiler_stage1_MUNGED_VERSION)"
+endif
+
 ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
 ghc_stage2_MORE_HC_OPTS = $(GhcStage2HcOpts)
 ghc_stage3_MORE_HC_OPTS = $(GhcStage3HcOpts)
