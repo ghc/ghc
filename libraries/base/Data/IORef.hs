@@ -23,7 +23,10 @@ module Data.IORef
         readIORef,            -- :: IORef a -> IO a
         writeIORef,           -- :: IORef a -> a -> IO ()
         modifyIORef,          -- :: IORef a -> (a -> a) -> IO ()
+        modifyIORef',         -- :: IORef a -> (a -> a) -> IO ()
         atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO b
+        atomicModifyIORef',   -- :: IORef a -> (a -> (a,b)) -> IO b
+        atomicWriteIORef,
 
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
         mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
@@ -66,10 +69,28 @@ mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
   case mkWeak# r# r f s of (# s1, w #) -> (# s1, Weak w #)
 #endif
 
--- |Mutate the contents of an 'IORef'
+-- |Mutate the contents of an 'IORef'.
+--
+-- Be warned that 'modifyIORef' does not apply the function strictly.  This
+-- means if the program calls 'modifyIORef' many times, but seldomly uses the
+-- value, thunks will pile up in memory resulting in a space leak.  This is a
+-- common mistake made when using an IORef as a counter.  For example, the
+-- following will likely produce a stack overflow:
+--
+-- >ref <- newIORef 0
+-- >replicateM_ 1000000 $ modifyIORef ref (+1)
+-- >readIORef ref >>= print
+--
+-- To avoid this problem, use 'modifyIORef'' instead.
 modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = readIORef ref >>= writeIORef ref . f
 
+-- |Strict version of 'modifyIORef'
+modifyIORef' :: IORef a -> (a -> a) -> IO ()
+modifyIORef' ref f = do
+    x <- readIORef ref
+    let x' = f x
+    x' `seq` writeIORef ref x'
 
 -- |Atomically modifies the contents of an 'IORef'.
 --
@@ -80,6 +101,15 @@ modifyIORef ref f = readIORef ref >>= writeIORef ref . f
 -- Extending the atomicity to multiple 'IORef's is problematic, so it
 -- is recommended that if you need to do anything more complicated
 -- then using 'Control.Concurrent.MVar.MVar' instead is a good idea.
+--
+-- 'atomicModifyIORef' does not apply the function strictly.  This is important
+-- to know even if all you are doing is replacing the value.  For example, this
+-- will leak memory:
+--
+-- >ref <- newIORef '1'
+-- >forever $ atomicModifyIORef ref (\_ -> ('2', ()))
+--
+-- Use 'atomicModifyIORef'' or 'atomicWriteIORef' to avoid this problem.
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 #if defined(__GLASGOW_HASKELL__)
@@ -98,6 +128,22 @@ atomicModifyIORef r f =
     writeIORef r a'
     return b
 #endif
+
+-- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
+-- in the 'IORef' as well as the value returned.
+atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
+atomicModifyIORef' ref f = do
+    b <- atomicModifyIORef ref
+            (\x -> let (a, b) = f x
+                    in (a, a `seq` b))
+    b `seq` return b
+
+-- | Variant of 'writeIORef' with the \"barrier to reordering\" property that
+-- 'atomicModifyIORef' has.
+atomicWriteIORef :: IORef a -> a -> IO ()
+atomicWriteIORef ref a = do
+    x <- atomicModifyIORef ref (\_ -> (a, ()))
+    x `seq` return ()
 
 {- $memmodel
 
