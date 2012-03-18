@@ -33,6 +33,14 @@
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
+
+/* We include windows.h very early, as on Win64 the CONTEXT type has
+   fields "R8", "R9" and "R10", which goes bad if we've already
+   #define'd those names for our own purposes (in stg/Regs.h) */
+#if defined(HAVE_WINDOWS_H)
+#include <windows.h>
+#endif
+
 #define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
