@@ -917,6 +917,8 @@ data Dec
   | SigD Name Type                -- ^ @{ length :: [a] -> Int }@
   | ForeignD Foreign
 
+  | InfixD Fixity Name            -- ^ @{ infix 3 foo }@
+
   -- | pragmas
   | PragmaD Pragma                -- ^ @{ {-# INLINE [1] foo #-} }@
 
