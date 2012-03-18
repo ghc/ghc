@@ -498,6 +498,9 @@ splitHsFunType other 	   	   = ([], other)
 instance (OutputableBndr name) => Outputable (HsType name) where
     ppr ty = pprHsType ty
 
+instance Outputable HsTyLit where
+    ppr = ppr_tylit
+
 instance (Outputable sig) => Outputable (HsBndrSig sig) where
     ppr (HsBSig ty _) = ppr ty
 
