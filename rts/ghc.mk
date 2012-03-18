@@ -313,6 +313,8 @@ rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCod
 
 ifeq "$(GhcUnregisterised)" "YES"
 rts/HeapStackCheck_HC_OPTS += -DGhcUnregisterised=1
+rts/PrimOps_HC_OPTS += -DGhcUnregisterised=1
+rts/Schedule_CC_OPTS += -DGhcUnregisterised=1
 endif
 
 # Compile various performance-critical pieces *without* -fPIC -dynamic
