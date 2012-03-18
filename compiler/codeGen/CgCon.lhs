@@ -72,7 +72,7 @@ cgTopRhsCon id con args
         ; when (platformOS (targetPlatform dflags) == OSMinGW32) $
               -- Windows DLLs have a problem with static cross-DLL refs.
               ASSERT( not (isDllConApp dflags con args) ) return ()
-        ; ASSERT( args `lengthIs` dataConRepArity con ) return ()
+        ; ASSERT( args `lengthIs` dataConRepRepArity con ) return ()
 
         -- LAY IT OUT
         ; amodes <- getArgAmodes args
@@ -324,7 +324,7 @@ cgReturnDataCon con amodes
       -- for it to be marked as "used" for LDV profiling.
   | opt_SccProfilingOn    = build_it_then enter_it
   | otherwise
-  = ASSERT( amodes `lengthIs` dataConRepArity con )
+  = ASSERT( amodes `lengthIs` dataConRepRepArity con )
     do  { EndOfBlockInfo _ sequel <- getEndOfBlockInfo
         ; case sequel of
             CaseAlts _ (Just (alts, deflt_lbl)) bndr
@@ -466,8 +466,8 @@ cgDataCon data_con
                                 ; ldvEnter (CmmReg nodeReg)
                                 ; body_code }
 
-            arg_reps :: [(CgRep, Type)]
-            arg_reps = [(typeCgRep ty, ty) | ty <- dataConRepArgTys data_con]
+            arg_reps :: [(CgRep, UnaryType)]
+            arg_reps = [(typeCgRep rep_ty, rep_ty) | ty <- dataConRepArgTys data_con, rep_ty <- flattenRepType (repType ty)]
 
             body_code = do {
                         -- NB: We don't set CC when entering data (WDP 94/06)

@@ -26,7 +26,7 @@ types that
 module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
-	Arity,
+	Arity, RepArity,
 	
 	Alignment,
 
@@ -101,7 +101,18 @@ import Data.Function (on)
 %************************************************************************
 
 \begin{code}
+-- | The number of value arguments that can be applied to a value before it does
+-- "real work". So:
+--  fib 100     has arity 0
+--  \x -> fib x has arity 1
 type Arity = Int
+
+-- | The number of represented arguments that can be applied to a value before it does
+-- "real work". So:
+--  fib 100                    has representation arity 0
+--  \x -> fib x                has representation arity 1
+--  \(# x, y #) -> fib (x + y) has representation arity 2
+type RepArity = Int
 \end{code}
 
 %************************************************************************

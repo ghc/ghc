@@ -247,7 +247,7 @@ tcHsConArgType NewType  bty = tcHsLiftedType (getBangType bty)
   -- Newtypes can't have bangs, but we don't check that
   -- until checkValidDataCon, so do not want to crash here
 
-tcHsConArgType DataType bty = tcHsArgType (getBangType bty)
+tcHsConArgType DataType bty = tcHsOpenType (getBangType bty)
   -- Can't allow an unlifted type for newtypes, because we're effectively
   -- going to remove the constructor while coercing it to a lifted type.
   -- And newtypes can't be bang'd
@@ -266,10 +266,10 @@ tc_hs_arg_tys what tys kinds
              | (ty,kind,n) <- zip3 tys kinds [1..] ]
 
 ---------------------------
-tcHsArgType, tcHsLiftedType :: LHsType Name -> TcM TcType
+tcHsOpenType, tcHsLiftedType :: LHsType Name -> TcM TcType
 -- Used for type signatures
 -- Do not do validity checking
-tcHsArgType ty 	  = addTypeCtxt ty $ tc_lhs_type ty ekArg  
+tcHsOpenType ty   = addTypeCtxt ty $ tc_lhs_type ty ekOpen
 tcHsLiftedType ty = addTypeCtxt ty $ tc_lhs_type ty ekLifted
 
 -- Like tcHsType, but takes an expected kind
@@ -331,7 +331,7 @@ tc_hs_type hs_ty@(HsTyVar name) exp_kind
        ; return ty }
 
 tc_hs_type ty@(HsFunTy ty1 ty2) exp_kind@(EK _ ctxt)
-  = do { ty1' <- tc_lhs_type ty1 (EK argTypeKind  ctxt)
+  = do { ty1' <- tc_lhs_type ty1 (EK openTypeKind ctxt)
        ; ty2' <- tc_lhs_type ty2 (EK openTypeKind ctxt)
        ; checkExpectedKind ty liftedTypeKind exp_kind
        ; return (mkFunTy ty1' ty2') }
@@ -477,7 +477,7 @@ tc_tuple hs_ty tup_sort tys exp_kind
   where
     arg_kind = case tup_sort of
                  HsBoxedTuple      -> liftedTypeKind
-                 HsUnboxedTuple    -> argTypeKind
+                 HsUnboxedTuple    -> openTypeKind
                  HsConstraintTuple -> constraintKind
                  _                 -> panic "tc_hs_type arg_kind"
     cxt_doc = case tup_sort of
@@ -500,7 +500,7 @@ finish_tuple hs_ty tup_sort tau_tys exp_kind
             _                 -> panic "tc_hs_type HsTupleTy"
 
     res_kind = case tup_sort of
-                 HsUnboxedTuple    -> ubxTupleKind
+                 HsUnboxedTuple    -> unliftedTypeKind
                  HsBoxedTuple      -> liftedTypeKind
                  HsConstraintTuple -> constraintKind
                  _                 -> panic "tc_hs_type arg_kind"
@@ -1192,9 +1192,9 @@ data ExpKind = EK TcKind SDoc
 instance Outputable ExpKind where
   ppr (EK k _) = ptext (sLit "Expected kind:") <+> ppr k
 
-ekLifted, ekArg, ekConstraint :: ExpKind
+ekLifted, ekOpen, ekConstraint :: ExpKind
 ekLifted     = EK liftedTypeKind (ptext (sLit "Expected"))
-ekArg        = EK argTypeKind    (ptext (sLit "Expected"))
+ekOpen       = EK openTypeKind   (ptext (sLit "Expected"))
 ekConstraint = EK constraintKind (ptext (sLit "Expected"))
 
 -- Build an ExpKind for arguments

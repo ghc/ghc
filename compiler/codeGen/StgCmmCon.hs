@@ -62,7 +62,7 @@ cgTopRhsCon id con args
         ; when (platformOS (targetPlatform dflags) == OSMinGW32) $
               -- Windows DLLs have a problem with static cross-DLL refs.
               ASSERT( not (isDllConApp dflags con args) ) return ()
-        ; ASSERT( args `lengthIs` dataConRepArity con ) return ()
+        ; ASSERT( args `lengthIs` dataConRepRepArity con ) return ()
 
         -- LAY IT OUT
         ; let

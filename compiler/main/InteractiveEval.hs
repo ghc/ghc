@@ -43,6 +43,7 @@ import HscMain
 import HsSyn
 import HscTypes
 import InstEnv
+import TyCon
 import Type     hiding( typeKind )
 import TcType           hiding( typeKind )
 import Var
@@ -609,8 +610,9 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
            -- Filter out any unboxed ids;
            -- we can't bind these at the prompt
        pointers = filter (\(id,_) -> isPointer id) vars
-       isPointer id | PtrRep <- idPrimRep id = True
-                    | otherwise              = False
+       isPointer id | UnaryRep ty <- repType (idType id)
+                    , PtrRep <- typePrimRep ty = True
+                    | otherwise                = False
 
        (ids, offsets) = unzip pointers
 
@@ -645,7 +647,6 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    --    - globalise the Id (Ids are supposed to be Global, apparently).
    --
    let result_ok = isPointer result_id
-                    && not (isUnboxedTupleType (idType result_id))
 
        all_ids | result_ok = result_id : new_ids
                | otherwise = new_ids
