@@ -263,7 +263,11 @@ ppr_tc_app ctxt_prec tc tys
 
 ppr_tc :: IfaceTyCon -> SDoc
 -- Wrap infix type constructors in parens
-ppr_tc tc = parenSymOcc (getOccName (ifaceTyConName tc)) (ppr tc)
+ppr_tc tc = wrap (ifaceTyConName tc) (ppr tc)
+  where
+  -- The kind * does not get wrapped in parens.
+  wrap name | name == liftedTypeKindTyConName = id
+  wrap name                                   = parenSymOcc (getOccName name)
 
 ppr_tylit :: IfaceTyLit -> SDoc
 ppr_tylit (IfaceNumTyLit n) = integer n
