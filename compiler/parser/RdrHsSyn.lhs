@@ -14,6 +14,7 @@ module RdrHsSyn (
         mkClassDecl, mkTyData, mkTyFamily, mkTySynonym,
         splitCon, mkInlinePragma,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
+        mkTyLit,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -250,6 +251,19 @@ mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))            = QuasiQuoteD qq
 mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ expr))) = SpliceD (SpliceDecl expr       Explicit)
 mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_expr Implicit)
+
+
+mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
+mkTyLit l =
+  do allowed <- extension typeLiteralsEnabled
+     if allowed
+       then return (HsTyLit `fmap` l)
+       else parseErrorSDoc (getLoc l)
+              (text "Illegal literal in type (use -XDataKinds to enable):" <+>
+              ppr l)
+
+
+
 \end{code}
 
 %************************************************************************
