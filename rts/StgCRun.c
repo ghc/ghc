@@ -259,11 +259,19 @@ StgRunIsImplementedInAssembler(void)
         /*
          * Set BaseReg
          */
+#if defined(mingw32_HOST_OS)
+        "movq %%rdx,%%r13\n\t"
+#else
         "movq %%rsi,%%r13\n\t"
+#endif
         /*
          * grab the function argument from the stack, and jump to it.
          */
+#if defined(mingw32_HOST_OS)
+        "movq %%rcx,%%rax\n\t"
+#else
         "movq %%rdi,%%rax\n\t"
+#endif
         "jmp *%%rax\n\t"
 
         ".globl " STG_RETURN "\n"
