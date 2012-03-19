@@ -63,7 +63,7 @@ import GHC.List (filter)
 import GHC.Num (Num(..))
 import GHC.Real ((/), fromIntegral )
 import GHC.Show (Show(..))
-import GHC.Event.Clock (getCurrentTime)
+import GHC.Event.Clock (getMonotonicTime)
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
                            Timeout(..))
@@ -256,7 +256,7 @@ step mgr@EventManager{..} tq = do
   -- next timeout.
   mkTimeout :: TimeoutQueue -> IO (Timeout, TimeoutQueue)
   mkTimeout q = do
-      now <- getCurrentTime
+      now <- getMonotonicTime
       applyEdits <- atomicModifyIORef emTimeouts $ \f -> (id, f)
       let (expired, q'') = let q' = applyEdits q in q' `seq` Q.atMost now q'
       sequence_ $ map Q.value expired
@@ -363,7 +363,7 @@ registerTimeout mgr us cb = do
   !key <- newUnique (emUniqueSource mgr)
   if us <= 0 then cb
     else do
-      now <- getCurrentTime
+      now <- getMonotonicTime
       let expTime = fromIntegral us / 1000000.0 + now
 
       -- We intentionally do not evaluate the modified map to WHNF here.
@@ -387,7 +387,7 @@ unregisterTimeout mgr (TK key) = do
 -- microseconds.
 updateTimeout :: EventManager -> TimeoutKey -> Int -> IO ()
 updateTimeout mgr (TK key) us = do
-  now <- getCurrentTime
+  now <- getMonotonicTime
   let expTime = fromIntegral us / 1000000.0 + now
 
   atomicModifyIORef (emTimeouts mgr) $ \f ->

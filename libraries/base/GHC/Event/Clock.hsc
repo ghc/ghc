@@ -1,11 +1,11 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface, CApiFFI #-}
 
-module GHC.Event.Clock (getCurrentTime) where
+module GHC.Event.Clock (getMonotonicTime) where
 
-#include <sys/time.h>
+#include "HsBase.h"
 
-import Foreign (Ptr, Storable(..), nullPtr, with)
+import Foreign
 import Foreign.C.Error (throwErrnoIfMinus1_)
 import Foreign.C.Types
 import GHC.Base
@@ -15,17 +15,50 @@ import GHC.Real
 
 -- TODO: Implement this for Windows.
 
--- | Return the current time, in seconds since Jan. 1, 1970.
-getCurrentTime :: IO Double
-getCurrentTime = do
+-- | Return monotonic time in seconds, since some unspecified starting point
+getMonotonicTime :: IO Double
+
+------------------------------------------------------------------------
+-- FFI binding
+
+#if HAVE_CLOCK_GETTIME
+
+getMonotonicTime = do
+    tv <- with (CTimespec 0 0) $ \tvptr -> do
+        throwErrnoIfMinus1_ "clock_gettime" (clock_gettime (#const CLOCK_ID) tvptr)
+        peek tvptr
+    let !t = realToFrac (sec tv) + realToFrac (nsec tv) / 1000000000.0
+    return t
+
+data CTimespec = CTimespec
+    { sec  :: {-# UNPACK #-} !CTime
+    , nsec :: {-# UNPACK #-} !CLong
+    }
+
+instance Storable CTimespec where
+    sizeOf _ = #size struct timespec
+    alignment _ = alignment (undefined :: CLong)
+
+    peek ptr = do
+        sec' <- #{peek struct timespec, tv_sec} ptr
+        nsec' <- #{peek struct timespec, tv_nsec} ptr
+        return $ CTimespec sec' nsec'
+
+    poke ptr tv = do
+        #{poke struct timespec, tv_sec} ptr (sec tv)
+        #{poke struct timespec, tv_nsec} ptr (nsec tv)
+
+foreign import capi unsafe "HsBase.h clock_gettime" clock_gettime
+    :: Int -> Ptr CTimespec -> IO CInt
+
+#else
+
+getMonotonicTime = do
     tv <- with (CTimeval 0 0) $ \tvptr -> do
         throwErrnoIfMinus1_ "gettimeofday" (gettimeofday tvptr nullPtr)
         peek tvptr
     let !t = realToFrac (sec tv) + realToFrac (usec tv) / 1000000.0
     return t
-
-------------------------------------------------------------------------
--- FFI binding
 
 data CTimeval = CTimeval
     { sec  :: {-# UNPACK #-} !CTime
@@ -48,3 +81,4 @@ instance Storable CTimeval where
 foreign import capi unsafe "HsBase.h gettimeofday" gettimeofday
     :: Ptr CTimeval -> Ptr () -> IO CInt
 
+#endif

@@ -104,6 +104,13 @@
 #elif HAVE_STDINT_H
 # include <stdint.h>
 #endif
+#if HAVE_CLOCK_GETTIME
+# ifdef _POSIX_MONOTONIC_CLOCK
+#  define CLOCK_ID CLOCK_MONOTONIC
+# else
+#  define CLOCK_ID CLOCK_REALTIME
+# endif
+#endif
 
 #if !defined(__MINGW32__) && !defined(irix_HOST_OS)
 # if HAVE_SYS_RESOURCE_H
