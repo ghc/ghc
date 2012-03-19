@@ -629,7 +629,11 @@ globalRegMaybe _                        = Nothing
 allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
 
 #elif x86_64_TARGET_ARCH
+#if defined(mingw32_HOST_OS)
+allArgRegs = map regSingle [rcx,rdx,r8,r9]
+#else
 allArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
+#endif
 
 #else
 allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
