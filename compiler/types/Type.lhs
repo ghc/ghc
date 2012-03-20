@@ -1222,20 +1222,27 @@ cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX (rnBndr2 env tv1
 cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2
+cmpTypeX _   (LitTy l1)          (LitTy l2)          = compare l1 l2
 
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < LitTy < TyConApp < ForAllTy < PredTy
 cmpTypeX _ (AppTy _ _)    (TyVarTy _)    = GT
 
 cmpTypeX _ (FunTy _ _)    (TyVarTy _)    = GT
 cmpTypeX _ (FunTy _ _)    (AppTy _ _)    = GT
 
+cmpTypeX _ (LitTy _)      (TyVarTy _)    = GT
+cmpTypeX _ (LitTy _)      (AppTy _ _)    = GT
+cmpTypeX _ (LitTy _)      (FunTy _ _)    = GT
+
 cmpTypeX _ (TyConApp _ _) (TyVarTy _)    = GT
 cmpTypeX _ (TyConApp _ _) (AppTy _ _)    = GT
 cmpTypeX _ (TyConApp _ _) (FunTy _ _)    = GT
+cmpTypeX _ (TyConApp _ _) (LitTy _)      = GT
 
 cmpTypeX _ (ForAllTy _ _) (TyVarTy _)    = GT
 cmpTypeX _ (ForAllTy _ _) (AppTy _ _)    = GT
 cmpTypeX _ (ForAllTy _ _) (FunTy _ _)    = GT
+cmpTypeX _ (ForAllTy _ _) (LitTy _)      = GT
 cmpTypeX _ (ForAllTy _ _) (TyConApp _ _) = GT
 
 cmpTypeX _ _              _              = LT
