@@ -1930,7 +1930,10 @@ genCCall64 target dest_regs args =
     (CmmPrim _ (Just stmts), _) ->
         stmtsToInstrs stmts
 
-    _ -> genCCall64' target dest_regs args
+    _ ->
+        do dflags <- getDynFlags
+           let platform = targetPlatform dflags
+           genCCall64' platform target dest_regs args
 
   where divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
                            [CmmHinted arg_x _, CmmHinted arg_y _]
@@ -1952,11 +1955,12 @@ genCCall64 target dest_regs args =
         divOp _ _ _ _
             = panic "genCCall64: Wrong number of arguments/results for divOp"
 
-genCCall64' :: CmmCallTarget            -- function to call
+genCCall64' :: Platform
+            -> CmmCallTarget            -- function to call
             -> [HintedCmmFormal]        -- where to put the result
             -> [HintedCmmActual]        -- arguments (of mixed type)
             -> NatM InstrBlock
-genCCall64' target dest_regs args = do
+genCCall64' platform target dest_regs args = do
     -- load up the register arguments
     (stack_args, aregs, fregs, load_args_code)
          <- load_args args allArgRegs allFPArgRegs nilOL
@@ -1967,7 +1971,7 @@ genCCall64' target dest_regs args = do
         arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
                 -- for annotating the call instruction with
         sse_regs = length fp_regs_used
-        tot_arg_size = arg_size * length stack_args
+        tot_arg_size = arg_size * (length stack_args + length int_regs_used)
 
 
     -- Align stack to 16n for calls, assuming a starting stack
@@ -1985,6 +1989,11 @@ genCCall64' target dest_regs args = do
 
     -- push the stack args, right to left
     push_code <- push_args (reverse stack_args) nilOL
+    -- On Win64, we also have to leave stack space for the arguments
+    -- that we are passing in registers
+    lss_code <- if platformOS platform == OSMinGW32
+                then leaveStackSpace (length int_regs_used)
+                else return nilOL
     delta <- getDeltaNat
 
     -- deal with static vs dynamic call targets
@@ -2041,6 +2050,7 @@ genCCall64' target dest_regs args = do
     return (load_args_code      `appOL`
             adjust_rsp          `appOL`
             push_code           `appOL`
+            lss_code            `appOL`
             assign_eax sse_regs `appOL`
             call                `appOL`
             assign_code dest_regs)
@@ -2082,9 +2092,7 @@ genCCall64' target dest_regs args = do
              (arg_reg, arg_code) <- getSomeReg arg
              delta <- getDeltaNat
              setDeltaNat (delta-arg_size)
-             dflags <- getDynFlags
-             let platform = targetPlatform dflags
-                 code' = code `appOL` arg_code `appOL` toOL [
+             let code' = code `appOL` arg_code `appOL` toOL [
                             SUB (intSize wordWidth) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
                             DELTA (delta-arg_size),
                             MOV (floatSize width) (OpReg arg_reg) (OpAddr  (spRel platform 0))]
@@ -2105,6 +2113,13 @@ genCCall64' target dest_regs args = do
             where
               arg_rep = cmmExprType arg
               width = typeWidth arg_rep
+
+        leaveStackSpace n = do
+             delta <- getDeltaNat
+             setDeltaNat (delta - n * arg_size)
+             return $ toOL [
+                         SUB II64 (OpImm (ImmInt (n * wORD_SIZE))) (OpReg rsp),
+                         DELTA (delta - n * arg_size)]
 
 -- | We're willing to inline and unroll memcpy/memset calls that touch
 -- at most these many bytes.  This threshold is the same as the one
