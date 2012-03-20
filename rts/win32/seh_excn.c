@@ -1,9 +1,11 @@
+#include "ghcconfig.h"
 #include "seh_excn.h"
 
 /*
  * Exception / signal handlers.
  */
-#if defined(__MINGW32__)
+#if defined(mingw32_HOST_OS)
+#if defined(i386_HOST_ARCH)
 jmp_buf seh_unwind_to;
 unsigned long seh_excn_code; /* variable used to communicate what kind of exception we've caught;nice. */
 
@@ -38,5 +40,6 @@ catchDivZero(struct _EXCEPTION_RECORD* rec,
      }
      return ExceptionContinueSearch;
 }
+#endif
 #endif
 

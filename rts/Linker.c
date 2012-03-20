@@ -396,10 +396,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(utime)                               \
       SymI_HasProto(waitpid)
 
-#elif !defined(mingw32_HOST_OS)
-#define RTS_MINGW_ONLY_SYMBOLS /**/
-#define RTS_CYGWIN_ONLY_SYMBOLS /**/
-#else /* defined(mingw32_HOST_OS) */
+#elif defined(mingw32_HOST_OS)
 #define RTS_POSIX_ONLY_SYMBOLS  /**/
 #define RTS_CYGWIN_ONLY_SYMBOLS /**/
 
@@ -413,6 +410,12 @@ typedef struct _RtsSymbolVal {
 #define RTS___MINGW_VFPRINTF_SYM SymI_HasProto(__mingw_vfprintf)
 #else
 #define RTS___MINGW_VFPRINTF_SYM /**/
+#endif
+
+#if defined(i386_HOST_ARCH)
+#define RTS_MINGW32_ONLY(X) X
+#else
+#define RTS_MINGW32_ONLY(X) /**/
 #endif
 
 /* These are statically linked from the mingw libraries into the ghc
@@ -444,7 +447,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(strcpy)                              \
       SymI_HasProto(strncpy)                             \
       SymI_HasProto(abort)                               \
-      SymI_NeedsProto(_alloca)                           \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_alloca))         \
       SymI_HasProto(isxdigit)                            \
       SymI_HasProto(isupper)                             \
       SymI_HasProto(ispunct)                             \
@@ -495,21 +498,25 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_NeedsProto(mktime)                            \
-      SymI_NeedsProto(_imp___timezone)                   \
-      SymI_NeedsProto(_imp___tzname)                     \
-      SymI_NeedsProto(_imp__tzname)                      \
-      SymI_NeedsProto(_imp___iob)                        \
-      SymI_NeedsProto(_imp___osver)                      \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___timezone)) \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___tzname))   \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp__tzname))    \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___iob))      \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___osver))    \
       SymI_NeedsProto(localtime)                         \
       SymI_NeedsProto(gmtime)                            \
       SymI_NeedsProto(opendir)                           \
       SymI_NeedsProto(readdir)                           \
       SymI_NeedsProto(rewinddir)                         \
-      SymI_NeedsProto(_imp____mb_cur_max)                \
-      SymI_NeedsProto(_imp___pctype)                     \
-      SymI_NeedsProto(__chkstk)                          \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp____mb_cur_max)) \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___pctype))   \
+      RTS_MINGW32_ONLY(SymI_NeedsProto(__chkstk))        \
       RTS_MINGW_GETTIMEOFDAY_SYM                         \
       SymI_NeedsProto(closedir)
+
+#else
+#define RTS_MINGW_ONLY_SYMBOLS /**/
+#define RTS_CYGWIN_ONLY_SYMBOLS /**/
 #endif
 
 
@@ -742,7 +749,7 @@ typedef struct _RtsSymbolVal {
 // We don't do this when compiling to Windows DLLs at the moment because
 //      it doesn't support cross package data references well.
 //
-#if defined(__PIC__) && defined(mingw32_HOST_OS)
+#if defined(__PIC__) && defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
 #define RTS_INTCHAR_SYMBOLS
 #else
 #define RTS_INTCHAR_SYMBOLS                             \
@@ -1069,7 +1076,7 @@ typedef struct _RtsSymbolVal {
 
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
-#if defined(__PIC__) && defined(mingw32_HOST_OS)
+#if defined(__PIC__) && defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
 #define SymE_HasProto(vvv)    SymE_HasProto(vvv);
 #define SymE_NeedsProto(vvv)    extern void _imp__ ## vvv (void);
 #else

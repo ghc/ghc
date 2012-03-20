@@ -405,8 +405,9 @@ endif
 endif
 
 ifeq "$(compiler_stage1_VERSION_MUNGED)" "YES"
+compiler_stage1_MUNGED_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
 define compiler_PACKAGE_MAGIC
-compiler_stage1_VERSION = $(subst .$(ProjectPatchLevel),,$(ProjectVersion))
+compiler_stage1_VERSION = $(compiler_stage1_MUNGED_VERSION)
 endef
 
 # Don't register the non-munged package

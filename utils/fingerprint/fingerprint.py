@@ -55,7 +55,7 @@ def fingerprint(source=None):
   `sync-all` command will be run to get the current fingerprint.
   """
   if source is None:
-    sync_all = ["./sync-all", "log", "HEAD^..", "--pretty=oneline"]
+    sync_all = ["./sync-all", "log", "-1", "--pretty=oneline"]
     source  = Popen(sync_all, stdout=PIPE).stdout
 
   lib = ""

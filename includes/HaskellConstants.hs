@@ -176,6 +176,12 @@ mAX_PTR_TAG = tAG_MASK
 cINT_SIZE :: Int
 cINT_SIZE = SIZEOF_INT
 
+cLONG_SIZE :: Int
+cLONG_SIZE = SIZEOF_LONG
+
+cLONG_LONG_SIZE :: Int
+cLONG_LONG_SIZE = SIZEOF_LONG_LONG
+
 -- Size of a storage manager block (in bytes).
 
 bLOCK_SIZE :: Int

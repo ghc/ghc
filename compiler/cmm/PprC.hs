@@ -1107,10 +1107,11 @@ pprHexVal w rep
         -- times values are unsigned.  This also helps eliminate occasional
         -- warnings about integer overflow from gcc.
 
-        -- on 32-bit platforms, add "ULL" to 64-bit literals
-      repsuffix W64 | wORD_SIZE == 4 = ptext (sLit "ULL")
-        -- on 64-bit platforms with 32-bit int, add "L" to 64-bit literals
-      repsuffix W64 | cINT_SIZE == 4 = ptext (sLit "UL")
+      repsuffix W64
+       | cINT_SIZE       == 8 = char 'U'
+       | cLONG_SIZE      == 8 = ptext (sLit "UL")
+       | cLONG_LONG_SIZE == 8 = ptext (sLit "ULL")
+       | otherwise            = panic "pprHexVal: Can't find a 64-bit type"
       repsuffix _ = char 'U'
 
       go 0 = empty
