@@ -47,15 +47,14 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (Monad(..))
 
-import Var        (isId, isTyVar, varType, setVarType)
+import Var        (isTyVar, isId, tyVarKind, varType, setVarType)
 import Id         (idType, zapFragileIdInfo, localiseId, isDictId)
 import MkId       (voidArgId, realWorldPrimId, mkPrimOpId)
-import Type       (isUnLiftedType, mkTyVarTy)
 import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind)
 import TyCon      (PrimRep(..))
-import Type       (eqType, mkFunTy, mkPiTypes, mkTyConApp, typePrimRep, splitTyConApp_maybe)
+import Type       (Kind, isUnLiftedType, mkTyVarTy, eqType, mkFunTy, mkPiTypes, mkTyConApp, typePrimRep, splitTyConApp_maybe)
 import TysPrim
-import TysWiredIn (unitTy, unboxedPairDataCon, unboxedPairTyCon)
+import TysWiredIn (unboxedPairDataCon, unboxedPairTyCon)
 import MkCore     (mkWildValBinder, quantVarLe)
 import PrimOp     (PrimOp(MyThreadIdOp))
 import Literal
@@ -769,14 +768,14 @@ mkLiveAbsVar x = AbsVar { absVarDead = False, absVarVar = x }
 -- We map *all* occurrences of dead TyVars to this type, to ensure that dead TyVars in the
 -- type of applied Ids match the applied dead TyVars. This type can be any closed type, as long
 -- as we use it consistently!
-deadTy :: Type
-deadTy = unitTy
+deadTy :: Kind -> Type
+deadTy = anyTypeOfKind
 
 renameAbsVarType :: M.Map Var Var -> Var -> Var
 renameAbsVarType rn x = x `setVarType` renameType (mkInScopeSet as) complete_rn ty
   where ty = varType x
         as = tyVarsOfType ty
-        complete_rn = mkTyVarRenaming [(a, case M.lookup a rn of Nothing -> deadTy; Just a' -> mkTyVarTy a') | a <- varSetElems as]
+        complete_rn = mkTyVarRenaming [(a, case M.lookup a rn of Nothing -> deadTy (tyVarKind a); Just a' -> mkTyVarTy a') | a <- varSetElems as]
 
 -- If a variable is not present in the input renaming, we assume that it has become dead
 -- and set the deadness information accordingly
@@ -813,7 +812,7 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
     True -> (fvs, case () of
       () -- We can encounter TyVars, where we should be able to instantiate them any way:
          | isTyVar x
-         -> e `tyApp` deadTy
+         -> e `tyApp` deadTy (tyVarKind x)
          
          -- Dead CoVars are easy:
          | isCoVar x, let (ty1, ty2) = coVarKind x
