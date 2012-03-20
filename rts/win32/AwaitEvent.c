@@ -27,13 +27,11 @@ static nat workerWaitingForRequests = 0;
 void
 awaitEvent(rtsBool wait)
 {
-  int ret;
-
   do {
     /* Try to de-queue completed IO requests
      */
     workerWaitingForRequests = 1;
-    ret = awaitRequests(wait);
+    awaitRequests(wait);
     workerWaitingForRequests = 0;
 
     // If a signal was raised, we need to service it

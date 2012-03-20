@@ -106,12 +106,13 @@ rnLHsType = rnLHsTyKi True
 rnLHsKind  :: HsDocContext -> LHsKind RdrName -> RnM (LHsKind Name, FreeVars)
 rnLHsKind = rnLHsTyKi False
 
-rnLHsMaybeKind  :: HsDocContext -> Maybe (LHsKind RdrName) 
-                -> RnM (Maybe (LHsKind Name), FreeVars)
-rnLHsMaybeKind _ Nothing = return (Nothing, emptyFVs)
-rnLHsMaybeKind doc (Just k) 
-  = do { (k', fvs) <- rnLHsKind doc k
-       ; return (Just k', fvs) }
+rnLHsMaybeKind  :: HsDocContext -> Maybe (HsBndrSig (LHsKind RdrName))
+                -> RnM (Maybe (HsBndrSig (LHsKind Name)), FreeVars)
+rnLHsMaybeKind _ Nothing 
+  = return (Nothing, emptyFVs)
+rnLHsMaybeKind doc (Just bsig) 
+  = rnHsBndrSig False doc bsig $ \ bsig' -> 
+    return (Just bsig', emptyFVs)
 
 rnHsType  :: HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 rnHsType = rnHsTyKi True
@@ -412,14 +413,14 @@ bindTyVarsRn doc tv_bndrs names thing_inside
   where
     go [] [] thing_inside = thing_inside []
 
-    go (L loc (UserTyVar _ tck) : tvs) (n : ns) thing_inside
+    go (L loc (UserTyVar _) : tvs) (n : ns) thing_inside
       = go tvs ns $ \ tvs' ->
-        thing_inside (L loc (UserTyVar n tck) : tvs')
+        thing_inside (L loc (UserTyVar n) : tvs')
 
-    go (L loc (KindedTyVar _ bsig tck) : tvs) (n : ns) thing_inside
+    go (L loc (KindedTyVar _ bsig) : tvs) (n : ns) thing_inside
       = rnHsBndrSig False doc bsig $ \ bsig' ->
         go tvs ns $ \ tvs' ->
-        thing_inside (L loc (KindedTyVar n bsig' tck) : tvs')
+        thing_inside (L loc (KindedTyVar n bsig') : tvs')
 
     -- Lists of unequal length
     go tvs names _ = pprPanic "bindTyVarsRn" (ppr tvs $$ ppr names)
@@ -896,7 +897,8 @@ checkTH _ _ = return ()	-- OK
 #else
 checkTH e what 	-- Raise an error in a stage-1 compiler
   = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>  
-	          ptext (sLit "illegal in a stage-1 compiler"),
+	          ptext (sLit "requires GHC with interpreter support"),
+                  ptext (sLit "Perhaps you are using a stage-1 compiler?"),
 	          nest 2 (ppr e)])
 #endif   
 \end{code}

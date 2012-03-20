@@ -622,6 +622,12 @@ ifeq "$(CrossCompiling)" "YES"
 SRC_HSC2HS_OPTS += --cross-compile
 endif
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+WINDRES = $(INPLACE_MINGW)/bin/windres
+else ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
+WINDRES = $(INPLACE_MINGW)/bin/x86_64-w64-mingw32-windres
+endif
+
 #-----------------------------------------------------------------------------
 # Mingwex Library
 #

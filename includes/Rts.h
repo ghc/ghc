@@ -17,6 +17,13 @@
 extern "C" {
 #endif
 
+/* We include windows.h very early, as on Win64 the CONTEXT type has
+   fields "R8", "R9" and "R10", which goes bad if we've already
+   #define'd those names for our own purposes (in stg/Regs.h) */
+#if defined(HAVE_WINDOWS_H)
+#include <windows.h>
+#endif
+
 #ifndef IN_STG_CODE
 #define IN_STG_CODE 0
 #endif

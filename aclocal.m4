@@ -363,12 +363,18 @@ AC_DEFUN([FP_SETTINGS],
 [
     if test "$windows" = YES
     then
-        SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
+        if test "$HostArch" = "x86_64"
+        then
+            mingw_bin_prefix=x86_64-w64-mingw32-
+        else
+            mingw_bin_prefix=
+        fi
+        SettingsCCompilerCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}gcc.exe"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2 $CONF_GCC_LINKER_OPTS_STAGE2"
-        SettingsArCommand='$topdir/../mingw/bin/ar.exe'
+        SettingsArCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}ar.exe"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
-        SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
-        SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
+        SettingsDllWrapCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}dllwrap.exe"
+        SettingsWindresCommand="\$topdir/../mingw/bin/${mingw_bin_prefix}windres.exe"
         SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
@@ -686,7 +692,8 @@ case $HostPlatform in
   esac ;;
 alpha-dec-osf*) fptools_cv_leading_underscore=no;;
 *cygwin32) fptools_cv_leading_underscore=yes;;
-*mingw32) fptools_cv_leading_underscore=yes;;
+i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
+x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
 
     # HACK: Apple doesn't seem to provide nlist in the 64-bit-libraries
 x86_64-apple-darwin*) fptools_cv_leading_underscore=yes;;
@@ -776,9 +783,9 @@ dnl
 AC_DEFUN([FPTOOLS_HAPPY],
 [AC_PATH_PROG(HappyCmd,happy,)
 # Happy is passed to Cabal, so we need a native path
-if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${HappyCmd}"    != ""
+if test "$HostOS"      = "mingw32" && \
+   test "${OSTYPE}"   != "msys"    && \
+   test "${HappyCmd}" != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
     HappyCmd=`cygpath -m "${HappyCmd}"`
@@ -812,9 +819,9 @@ AC_DEFUN([FPTOOLS_ALEX],
 [
 AC_PATH_PROG(AlexCmd,alex,)
 # Alex is passed to Cabal, so we need a native path
-if test "x$HostPlatform"  = "xi386-unknown-mingw32" && \
-   test "${OSTYPE}"      != "msys"                  && \
-   test "${AlexCmd}"     != ""
+if test "$HostOS"     = "mingw32" && \
+   test "${OSTYPE}"  != "msys"    && \
+   test "${AlexCmd}" != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
     AlexCmd=`cygpath -m "${AlexCmd}"`

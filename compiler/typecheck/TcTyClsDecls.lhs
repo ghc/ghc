@@ -431,13 +431,14 @@ kcFamilyDecl (TySynonym {}) = return ()
 kcFamilyDecl d = pprPanic "kcFamilyDecl" (ppr d)
 
 ------------------
-kcResultKind :: Maybe (LHsKind Name) -> Kind -> TcM ()
+kcResultKind :: Maybe (HsBndrSig (LHsKind Name)) -> Kind -> TcM ()
 kcResultKind Nothing res_k
   = discardResult (unifyKind res_k liftedTypeKind)
       --             type family F a 
       -- defaults to type family F a :: *
-kcResultKind (Just k) res_k
-  = do { k' <- tcLHsKind k
+kcResultKind (Just (HsBSig k ns)) res_k
+  = do { let kvs = map mkKindSigVar ns 
+       ; k' <- tcExtendTyVarEnv kvs (tcLHsKind k)
        ; discardResult (unifyKind k' res_k) }
 \end{code}
 

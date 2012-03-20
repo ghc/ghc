@@ -203,7 +203,7 @@ mkTyData :: SrcSpan
          -> Bool                -- True <=> data family instance
          -> Maybe CType
          -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
-         -> Maybe (LHsKind RdrName)
+         -> Maybe (HsBndrSig (LHsKind RdrName))
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LTyClDecl RdrName)
@@ -217,7 +217,8 @@ mkTyData loc new_or_data is_family cType (L _ (mcxt, tycl_hdr)) ksig data_cons m
                                  tcdCtxt = cxt, tcdLName = tc,
                                  tcdTyVars = tyvars, tcdTyPats = typats,
                                  tcdCons = data_cons,
-                                 tcdKindSig = ksig, tcdDerivs = maybe_deriv })) }
+                                 tcdKindSig = ksig,
+                                 tcdDerivs = maybe_deriv })) }
 
 mkTySynonym :: SrcSpan
             -> Bool             -- True <=> type family instances
@@ -234,7 +235,7 @@ mkTySynonym loc is_family lhs rhs
 mkTyFamily :: SrcSpan
            -> FamilyFlavour
            -> LHsType RdrName   -- LHS
-           -> Maybe (LHsKind RdrName) -- Optional kind signature
+           -> Maybe (HsBndrSig (LHsKind RdrName)) -- Optional kind signature
            -> P (LTyClDecl RdrName)
 mkTyFamily loc flavour lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
@@ -523,9 +524,9 @@ checkTyVars tycl_hdr tparms = mapM chk tparms
   where
         -- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar tv (HsBSig k placeHolderBndrs) placeHolderKind))
+        | isRdrTyVar tv    = return (L l (KindedTyVar tv (HsBSig k placeHolderBndrs)))
     chk (L l (HsTyVar tv))
-        | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
+        | isRdrTyVar tv    = return (L l (UserTyVar tv))
     chk t@(L l _)
         = parseErrorSDoc l $
           vcat [ sep [ ptext (sLit "Unexpected type") <+> quotes (ppr t)

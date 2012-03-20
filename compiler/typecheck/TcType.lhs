@@ -1176,7 +1176,7 @@ isOverloadedTy _               = False
 
 \begin{code}
 isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
-    isUnitTy, isCharTy :: Type -> Bool
+    isUnitTy, isCharTy, isAnyTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isIntegerTy    = is_tc integerTyConKey
@@ -1185,6 +1185,7 @@ isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
 isUnitTy       = is_tc unitTyConKey
 isCharTy       = is_tc charTyConKey
+isAnyTy        = is_tc anyTyConKey
 
 isStringTy :: Type -> Bool
 isStringTy ty
@@ -1354,9 +1355,11 @@ isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
 isFFIPrimArgumentTy :: DynFlags -> Type -> Bool
 -- Checks for valid argument type for a 'foreign import prim'
--- Currently they must all be simple unlifted types.
+-- Currently they must all be simple unlifted types, or the well-known type
+-- Any, which can be used to pass the address to a Haskell object on the heap to
+-- the foreign function.
 isFFIPrimArgumentTy dflags ty
-   = checkRepTyCon (legalFIPrimArgTyCon dflags) ty
+   = isAnyTy ty || checkRepTyCon (legalFIPrimArgTyCon dflags) ty
 
 isFFIPrimResultTy :: DynFlags -> Type -> Bool
 -- Checks for valid result type for a 'foreign import prim'

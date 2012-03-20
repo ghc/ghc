@@ -958,10 +958,9 @@ warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = pprDebugAndThen trace "WARNING:" doc x
+  = pprDebugAndThen trace str msg x
   where
-    doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
-               msg]
+    str = showSDoc (hsep [text "WARNING: file", text file <> comma, text "line", int line])
 
 assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.

@@ -726,9 +726,9 @@ data_or_newtype :: { Located NewOrData }
         : 'data'        { L1 DataType }
         | 'newtype'     { L1 NewType }
 
-opt_kind_sig :: { Located (Maybe (LHsKind RdrName)) }
+opt_kind_sig :: { Located (Maybe (HsBndrSig (LHsKind RdrName))) }
         :                               { noLoc Nothing }
-        | '::' kind                     { LL (Just $2) }
+        | '::' kind                     { LL (Just (HsBSig $2 placeHolderBndrs)) }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
@@ -1107,8 +1107,8 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
-        : tyvar                         { L1 (UserTyVar (unLoc $1) placeHolderKind) }
-        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) (HsBSig $4 placeHolderBndrs) placeHolderKind) }
+        : tyvar                         { L1 (UserTyVar (unLoc $1)) }
+        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) (HsBSig $4 placeHolderBndrs)) }
 
 fds :: { Located [Located (FunDep RdrName)] }
         : {- empty -}                   { noLoc [] }
