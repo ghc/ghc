@@ -105,11 +105,15 @@ emptyParentChildren = M.empty
 addChild :: Maybe Var -> Var -> State -> Bool -> ParentChildren -> ParentChildren
 addChild mb_parent child child_state gen = M.alter (\mb_children -> Just ((child, (child_state, gen)) : (mb_children `orElse` []))) mb_parent
 
+-- Shows nodes in the graph arranged by number of descendants:
 childrenSummary :: ParentChildren -> String
-childrenSummary parent_children = unlines [maybe "<root>" varString mb_parent ++ ": " ++ intercalate " " (map show child_counts)  | (mb_parent, child_counts :: [Int]) <- ordered_counts]
+childrenSummary parent_children = unlines [intercalate " " (map (maybe "<root>" varString) mb_parents) ++ ": " ++ intercalate " " (map show child_counts)
+                                          | (child_counts :: [Int], mb_parents) <- grouped_counts]
   where descendant_counts = flip M.map parent_children $ \children -> map ((+1) . sum . flip (M.findWithDefault [] . Just) descendant_counts . fst) children
         ordered_counts = sortBy (comparing (Down . sum . snd)) (M.toList descendant_counts)
+        grouped_counts = runs snd fst ordered_counts
 
+-- Shows the number of children at each depth:
 depthHistogram :: ParentChildren -> SDoc
 depthHistogram parent_children = maybe empty (\overall_depth_summary -> vcat [ppr depth <> char ',' <+> ppr count | (depth, count) <- IM.toList overall_depth_summary]) (M.lookup Nothing summary_map)
   where depth_map :: M.Map (Maybe Var) Int
@@ -122,6 +126,7 @@ depthHistogram parent_children = maybe empty (\overall_depth_summary -> vcat [pp
                                                                                   Just depth = M.lookup mb_fun depth_map
                                                                               in IM.unionsWith (+) (IM.singleton depth 1:summaries)
 
+-- Shows the deepest path encountered and the big values on the route there:
 -- NB: there may be many deepest paths
 deepestPath :: [(Var, FVedTerm)] -> ParentChildren -> SDoc
 deepestPath fulfils parent_children = maybe empty (\(_, deepest_from_root) -> show_meaning_chains deepest_from_root $$ summarise_leaves (map last deepest_from_root)) mb_deepest_from_root
@@ -200,6 +205,7 @@ showValueGroup (root, group) = go emptyVarSet noPrec root
 
 type TagAnnotations = IM.IntMap [String]
 
+-- Shows a guesstimate about what bits of original syntax residualised syntax was based on:
 tagSummary :: TagAnnotations -> Int -> Int -> ResidTags -> String
 tagSummary anns precision n resid_tags = unlines $ take n [intercalate "." ann ++ "\t" ++ show occs ++ "(" ++ show init_occs ++ ")" | (ann, (init_occs, occs)) <- sortBy (comparing (Down . snd . snd)) (M.toList ann_occs)]
   where ann_occs = M.unionsWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) [M.singleton (take precision ann) (1 :: Int, occs) | (tag, occs) <- IM.toList resid_tags, let Just ann = IM.lookup tag anns]

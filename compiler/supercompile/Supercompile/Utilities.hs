@@ -486,6 +486,15 @@ sumMap f = Foldable.foldr (\x n -> f x + n) 0
 sumMapMonoid :: (Foldable f, Monoid b) => (a -> b) -> f a -> b
 sumMapMonoid f = Foldable.foldr (\x n -> f x `mappend` n) mempty
 
+runs :: Eq b => (a -> b) -> (a -> c) -> [a] -> [(b, [c])]
+runs _ _ []     = []
+runs f g (x:xs) = go (f x) [g x] xs
+  where go b pending []     = [(b, reverse pending)]
+        go b pending (x:xs)
+          | b == b'   = go b (g x:pending) xs
+          | otherwise = (b, reverse pending) : go b' [g x] xs
+          where b' = f x
+
 
 -- | Orders elements of a map into dependency order insofar as that is possible.
 --
