@@ -69,10 +69,11 @@ partitionBinds should_sc initial_binds = go initial_inside initial_undecided
 coreBindsFVs :: [CoreBind] -> S.FreeVars
 coreBindsFVs bs = unionVarSets [fvs | b <- bs, fvs <- map S.idFreeVars (bindersOf b) ++ map exprFreeVars (rhssOfBind b)]
 
-coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, Var -> [CoreBind])
+coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, Var -> [(Var, CoreExpr)])
 coreBindsToCoreTerm should_sc binds
-  = (mkLets internal_sc_binds (mkLiftedVarTup sc_internal_xs),
-     \y -> [NonRec x (mkLiftedTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
+  = --pprTrace "coreBindsToCoreTerm" (ppr (bindersOfBinds binds, bindersOfBinds sc_binds, bindersOfBinds dont_sc_binds, dont_sc_binds_fvs, sc_xs_internal_xs, sc_xs, bindersOfBinds internal_sc_binds)) $
+    (mkLets internal_sc_binds (mkLiftedVarTup sc_internal_xs),
+     \y -> [(x, mkLiftedTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ flattenBinds dont_sc_binds)
   where
     -- We put all the sc_binds into a local let, and use unboxed tuples to bind back to the top level the names of
     -- any of those sc_binds that are either exported *or* in the free variables of something from dont_sc_binds.
@@ -206,6 +207,6 @@ supercompileProgram binds = supercompileProgramSelective selector binds
                  | otherwise                                       = const True
 
 supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> IO [CoreBind]
-supercompileProgramSelective should_sc binds = liftM (\e' -> NonRec x e' : rebuild x) (supercompile e)
+supercompileProgramSelective should_sc binds = liftM (\e' -> [Rec $ (x, e') : rebuild x]) (supercompile e)
   where x = mkSysLocal (fsLit "sc") topUnique (exprType e)
         (e, rebuild) = coreBindsToCoreTerm should_sc binds
