@@ -265,12 +265,11 @@ extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var r
 -- | Find the substitution for an 'Id' in the 'Subst'
 lookupIdSubst :: SDoc -> Subst -> Id -> CoreExpr
 lookupIdSubst doc (Subst in_scope ids _ _) v
-  | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
 	-- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> doc <+> ppr v 
-                            $$ ppr in_scope) 
+  | otherwise = WARN( isLocalId v, ptext (sLit "CoreSubst.lookupIdSubst") <+> doc <+> ppr v 
+                                   $$ ppr in_scope) 
 		Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
