@@ -171,6 +171,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
       -- Try to trim the stack if the Id is guaranteed to bottom out after a certain number of arguments
       -- This is really amazingly important because so many case branches bottom out in at least one branch,
       -- and we can save supercompiling big case nests if we trim them out eagerly.
+      --
+      -- The supercompiled size of Bernouilli decreased from 19193 to 16173 with this change.
       | Just (ds, res_d) <- fmap splitStrictSig $ idStrictness_maybe x'
       , isBotRes res_d
       , Just (h_extra, k) <- trimUnreachable (length ds) (idType x') k
