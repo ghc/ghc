@@ -90,22 +90,26 @@ module Util (
         -- * Utils for defining Data instances
         abstractConstr, abstractDataType, mkNoRepType,
 
-        -- * Utils for printing C code
-        charToC
+        -- * Utils for printing
+        iToBase62, charToC
     ) where
 
 #include "HsVersions.h"
 
 import Exception
 import Panic
+import FastTypes
 
 import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
 
-#ifdef DEBUG
-import FastTypes
+--just for implementing a fast [0,61) -> Char function
+#if defined(__GLASGOW_HASKELL__)
+import GHC.Exts (indexCharOffAddr#, Char(..))
+#else
+import Data.Array
 #endif
 
 import Control.Monad    ( liftM )
@@ -1119,6 +1123,43 @@ abstractConstr n = mkConstr (abstractDataType n) ("{abstract:"++n++"}") [] Prefi
 \begin{code}
 abstractDataType :: String -> DataType
 abstractDataType n = mkDataType n [abstractConstr n]
+
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection[Utils-base62]{Base-62 numbers}
+%*                                                                      *
+%************************************************************************
+
+A character-stingy way to read/write numbers (notably Uniques).
+The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
+Code stolen from Lennart.
+
+\begin{code}
+iToBase62 :: Int -> String
+iToBase62 n_
+  = ASSERT(n_ >= 0) go (iUnbox n_) ""
+  where
+    go n cs | n <# _ILIT(62)
+             = case chooseChar62 n of { c -> c `seq` (c : cs) }
+             | otherwise
+             =  case (quotRem (iBox n) 62) of { (q_, r_) ->
+                case iUnbox q_ of { q -> case iUnbox r_ of { r ->
+                case (chooseChar62 r) of { c -> c `seq`
+                (go q (c : cs)) }}}}
+
+    chooseChar62 :: FastInt -> Char
+    {-# INLINE chooseChar62 #-}
+#if defined(__GLASGOW_HASKELL__)
+    --then FastInt == Int#
+    chooseChar62 n = C# (indexCharOffAddr# chars62 n)
+    !chars62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
+#else
+    --Haskell98 arrays are portable
+    chooseChar62 n = (!) chars62 n
+    chars62 = listArray (0,61) "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#endif
 \end{code}
 
 %************************************************************************
