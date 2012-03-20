@@ -376,7 +376,7 @@ deleteBy                :: (a -> a -> Bool) -> a -> [a] -> [a]
 deleteBy _  _ []        = []
 deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 
--- | The '\\' function is list difference ((non-associative).
+-- | The '\\' function is list difference (non-associative).
 -- In the result of @xs@ '\\' @ys@, the first occurrence of each element of
 -- @ys@ in turn (if any) has been removed from @xs@.  Thus
 --
