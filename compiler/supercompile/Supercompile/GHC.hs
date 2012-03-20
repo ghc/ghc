@@ -79,12 +79,12 @@ instance Monad ParseM where
 instance MonadUnique ParseM where
     getUniqueSupplyM = ParseM $ \us -> case splitUniqSupply us of (us1, us2) -> (us1, [], us2)
 
-runParseM' :: ParseM a -> ([(Var, S.Term)], a)
-runParseM' act = (floats, x)
-  where (_s, floats, x) = unParseM act anfUniqSupply'
+runParseM' :: UniqSupply -> ParseM a -> ([(Var, S.Term)], a)
+runParseM' us act = (floats, x)
+  where (_s, floats, x) = unParseM act us
 
-runParseM :: ParseM S.Term -> S.Term
-runParseM = uncurry (S.bindManyMixedLiftedness S.termFreeVars) . runParseM'
+runParseM :: UniqSupply -> ParseM S.Term -> S.Term
+runParseM us = uncurry (S.bindManyMixedLiftedness S.termFreeVars) . runParseM' us
 
 freshFloatId :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Var)
 freshFloatId _ (I (S.Var x)) = return (Nothing, x)
