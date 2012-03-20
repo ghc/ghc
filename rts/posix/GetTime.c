@@ -11,21 +11,10 @@
 
 #include "Rts.h"
 #include "GetTime.h"
-
-#ifdef HAVE_TIME_H
-# include <time.h>
-#endif
-
-#ifdef HAVE_SYS_TIME_H
-# include <sys/time.h>
-#endif
+#include "Clock.h"
 
 #if HAVE_SYS_RESOURCE_H
 # include <sys/resource.h>
-#endif
-
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
 #endif
 
 #ifdef HAVE_SYS_TIMES_H
@@ -77,9 +66,17 @@ Time getProcessCPUTime(void)
 
 Time getProcessElapsedTime(void)
 {
+#ifdef HAVE_CLOCK_GETTIME
+    struct timespec ts;
+
+    clock_gettime(CLOCK_ID, &ts);
+    return SecondsToTime(ts.tv_sec) + NSToTime(ts.tv_nsec);
+#else
     struct timeval tv;
+
     gettimeofday(&tv, (struct timezone *) NULL);
     return SecondsToTime(tv.tv_sec) + USToTime(tv.tv_usec);
+#endif
 }
 
 void getProcessTimes(Time *user, Time *elapsed)
