@@ -1,5 +1,7 @@
 module Supercompile (supercompileProgram, supercompileProgramSelective) where
 
+#include "HsVersions.h"
+
 -- FIXME: I need to document the basis on which I push down unlifted heap bindings (they are all values, IIRC)
 -- TODO:
 --  * Why does the supercompiler not match as much as it should? (e.g. Interpreter, UInterpreter)
@@ -44,6 +46,8 @@ import TyCon      (newTyConCo_maybe)
 
 import qualified Data.Map as M
 
+type FlatCoreBinds = [(Id, CoreExpr)]
+
 -- Split input bindings into two lists:
 --  1) CoreBinds binding variables with at least one binder marked by the predicate,
 --     and any CoreBinds that those CoreBinds transitively refer to
@@ -52,28 +56,28 @@ import qualified Data.Map as M
 --
 -- NB: assumes no-shadowing at the top level. I don't want to have to rename stuff to
 -- commute CoreBinds...
-partitionBinds :: (Id -> Bool) -> [CoreBind] -> ([CoreBind], [CoreBind])
+partitionBinds :: (Id -> Bool) -> FlatCoreBinds -> (FlatCoreBinds, FlatCoreBinds)
 partitionBinds should_sc initial_binds = go initial_inside initial_undecided
   where
-    (initial_inside, initial_undecided) = partition (any should_sc . bindersOf) initial_binds
+    (initial_inside, initial_undecided) = partition (should_sc . fst) initial_binds
     
-    go :: [CoreBind] -> [CoreBind] -> ([CoreBind], [CoreBind])
+    go :: FlatCoreBinds -> FlatCoreBinds -> (FlatCoreBinds, FlatCoreBinds)
     go inside undecided
         | null inside' = (inside, undecided)
         | otherwise    = first (inside ++) $ go inside' undecided'
       where
         -- Move anything inside that is referred to by a binding that was moved inside last round
         inside_fvs = coreBindsFVs inside
-        (inside', undecided') = partition (\b -> any (`elemVarSet` inside_fvs) (bindersOf b)) undecided
+        (inside', undecided') = partition (\(x, _) -> x `elemVarSet` inside_fvs) undecided
 
-coreBindsFVs :: [CoreBind] -> S.FreeVars
-coreBindsFVs bs = unionVarSets [fvs | b <- bs, fvs <- map S.idFreeVars (bindersOf b) ++ map exprFreeVars (rhssOfBind b)]
+coreBindsFVs :: FlatCoreBinds -> S.FreeVars
+coreBindsFVs bs = unionVarSets [S.idFreeVars x `unionVarSet` exprFreeVars e | (x, e) <- bs]
 
-coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, Var -> [(Var, CoreExpr)])
+coreBindsToCoreTerm :: (Id -> Bool) -> FlatCoreBinds -> (CoreExpr, Var -> FlatCoreBinds)
 coreBindsToCoreTerm should_sc binds
   = --pprTrace "coreBindsToCoreTerm" (ppr (bindersOfBinds binds, bindersOfBinds sc_binds, bindersOfBinds dont_sc_binds, dont_sc_binds_fvs, sc_xs_internal_xs, sc_xs, bindersOfBinds internal_sc_binds)) $
-    (mkLets internal_sc_binds (mkLiftedVarTup sc_internal_xs),
-     \y -> [(x, mkLiftedTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ flattenBinds dont_sc_binds)
+    (Let (Rec internal_sc_binds) (mkLiftedVarTup sc_internal_xs),
+     \y -> [(x, mkLiftedTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
   where
     -- We put all the sc_binds into a local let, and use unboxed tuples to bind back to the top level the names of
     -- any of those sc_binds that are either exported *or* in the free variables of something from dont_sc_binds.
@@ -96,13 +100,13 @@ coreBindsToCoreTerm should_sc binds
     --
     -- My third attempt just encodes it as an unboxed tuple, which we contrive to buind at the top level by abstracting
     -- it over a useless arg of void representation.
-    (sc_binds, dont_sc_binds) = partitionBinds should_sc binds
+    (sc_binds, dont_sc_binds) = partitionBinds should_sc binds -- FIXME: experiment with just taking annotated binds, and relying on unfoldings for the rest (problematic for non-values, though!)
     dont_sc_binds_fvs = coreBindsFVs dont_sc_binds
     
     -- We should zap fragile information on the Ids' we use within the tuple selector. The reasons are:
     --  1. They may be mutually inter-referring, and the binders of a "case" are not simultaneously brought into scope
     --  2. For some reason, GHC seems to have trouble optimising (let x = y in x) to (y) if x has an unfolding.
-    zappedBindersOfBinds = map zapFragileIdInfo . bindersOfBinds
+    zappedBindersOfBinds = map (zapFragileIdInfo . fst)
 
     -- This is a sweet hack. Most of the top-level binders will be External names. It is a Bad Idea to locally-bind
     -- an External name, because several Externals with the same name but different uniques will generate clashing
@@ -113,9 +117,7 @@ coreBindsToCoreTerm should_sc binds
     -- unique and b) the internality of these names will be carried down on the next simplifier run, so this works.
     -- The ice is thin, though!
     sc_xs = zappedBindersOfBinds sc_binds
-    internal_sc_binds = [case bind of NonRec x e -> NonRec (localiseInternaliseId x) e
-                                      Rec xes    -> Rec (map (first localiseInternaliseId) xes)
-                        | bind <- sc_binds]
+    internal_sc_binds = map (first localiseInternaliseId) sc_binds
     -- Decide which things we should export from the supercompiled term using a Church tuple.
     -- We need to export to the top level of the module those bindings that are *any* of:
     --   1. Are exported by the module itself
@@ -209,4 +211,7 @@ supercompileProgram binds = supercompileProgramSelective selector binds
 supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> IO [CoreBind]
 supercompileProgramSelective should_sc binds = liftM (\e' -> [Rec $ (x, e') : rebuild x]) (supercompile e)
   where x = mkSysLocal (fsLit "sc") topUnique (exprType e)
-        (e, rebuild) = coreBindsToCoreTerm should_sc binds
+        -- NB: we assume no-shadowing at top level, which is probably reasonable
+        flat_binds = flattenBinds binds
+        (e, rebuild) = ASSERT(length (nub (map fst flat_binds)) == length flat_binds)
+                       coreBindsToCoreTerm should_sc flat_binds
