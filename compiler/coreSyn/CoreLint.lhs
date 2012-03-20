@@ -1026,7 +1026,7 @@ lookupIdInScope id
 		Nothing -> do { addErrL out_of_scope
 			      ; return id } }
   where
-    out_of_scope = ppr id <+> ptext (sLit "is out of scope")
+    out_of_scope = pprBndr LetBind id <+> ptext (sLit "is out of scope")
 
 
 oneTupleDataConId :: Id	-- Should not happen
@@ -1046,7 +1046,7 @@ checkInScope :: SDoc -> Var -> LintM ()
 checkInScope loc_msg var =
  do { subst <- getTvSubst
     ; checkL (not (mustHaveLocalBinding var) || (var `isInScope` subst))
-             (hsep [ppr var, loc_msg]) }
+             (hsep [pprBndr LetBind var, loc_msg]) }
 
 checkTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
