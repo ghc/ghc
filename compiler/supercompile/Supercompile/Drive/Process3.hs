@@ -119,7 +119,7 @@ newtype FulfilmentState = FS {
 
 fulfill :: (Deeds, FVedTerm) -> FulfilmentState -> MemoState -> ((Deeds, FVedTerm), FulfilmentState, MemoState)
 fulfill (deeds, e_body) fs ms
-  = ((deeds, fun p `applyAbsVars` abstracted p),
+  = ((deeds, applyAbsVars (fun p) Nothing (abstracted p)),
      FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : fulfilments fs },
      ms { promises = appendHead (p:children) promises' })
   where (p, children) `Car` promises' = promises ms
@@ -346,7 +346,7 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
         --     that we match to reduce before matching in the first place
         --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
         --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
-        case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)) memo_opt)
+        case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt)
              | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
              , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
                                                   | (p_parent, p_siblings) <- parented_ps

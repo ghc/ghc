@@ -219,7 +219,7 @@ fulfill :: Monad m => Promise -> (Deeds, FVedTerm) -> FulfilmentT m (Deeds, FVed
 fulfill p (deeds, e_body) = StateT $ \fs ->
   let fs' | fun p `M.member` fulfilments fs = fs
           | otherwise                       = FS { fulfilments = M.insert (fun p) (absVarLambdas (abstracted p) e_body) (fulfilments fs) }
-  in return ((deeds, fun p `applyAbsVars` abstracted p), fs')
+  in return ((deeds, applyAbsVars (fun p) Nothing (abstracted p)), fs')
 
 runFulfilmentT :: Monad m => FulfilmentT m FVedTerm -> m FVedTerm
 runFulfilmentT mx = liftM (\(e, fs) -> letRec (M.toList (fulfilments fs)) e) $ unStateT mx (FS { fulfilments = M.empty })
@@ -253,7 +253,7 @@ memo opt state = do
   mb_res <- lift $ StateT $ \ms ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
-    case [ (p, (releaseStateDeed state, fun p `applyAbsVars` map (renameAbsVar rn_lr) (abstracted p)))
+    case [ (p, (releaseStateDeed state, applyAbsVars (fun p) (Just rn_lr) (abstracted p)))
          | p <- promises ms
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                           match (meaning p) state]

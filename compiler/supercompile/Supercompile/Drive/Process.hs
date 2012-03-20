@@ -16,7 +16,7 @@ module Supercompile.Drive.Process (
     AlreadySpeculated, nothingSpeculated,
     speculate,
 
-    AbsVar(..), mkLiveAbsVar, renameAbsVar, absVarLambdas, applyAbsVars, stateAbsVars,
+    AbsVar(..), mkLiveAbsVar, absVarLambdas, applyAbsVars, stateAbsVars,
 
     extraOutputFvs
   ) where
@@ -771,20 +771,10 @@ mkLiveAbsVar x = AbsVar { absVarDead = False, absVarVar = x }
 deadTy :: Kind -> Type
 deadTy = anyTypeOfKind
 
-renameAbsVarType :: M.Map Var Var -> Var -> Var
-renameAbsVarType rn x = x `setVarType` renameType (mkInScopeSet as) complete_rn ty
+renameAbsVarType :: Renaming -> Var -> Var
+renameAbsVarType rn x = x `setVarType` renameType (mkInScopeSet as) rn ty
   where ty = varType x
         as = tyVarsOfType ty
-        complete_rn = mkTyVarRenaming [(a, case M.lookup a rn of Nothing -> deadTy (tyVarKind a); Just a' -> mkTyVarTy a') | a <- varSetElems as]
-
--- If a variable is not present in the input renaming, we assume that it has become dead
--- and set the deadness information accordingly
-renameAbsVar :: M.Map Var Var -> AbsVar -> AbsVar
-renameAbsVar rn (AbsVar { absVarDead = dead, absVarVar = x })
-  | dead
-  = AbsVar { absVarDead = True,  absVarVar = renameAbsVarType rn x }
-  | otherwise
-  = AbsVar { absVarDead = False, absVarVar = renameAbsVarType rn (M.findWithDefault (pprPanic "renameAbsVar" (ppr x)) x rn) }
 
 -- NB: it's important that we use localiseId on the absVarVar at binding sites, or else if we start
 -- with a state where a global Id is lambda-bound (because there is no unfolding) we might end up having an h-function
@@ -805,31 +795,32 @@ localiseVar x | isId x    = localiseId x
 absVarLambdas :: Symantics ann => [AbsVar] -> ann (TermF ann) -> ann (TermF ann)
 absVarLambdas xs = tyVarIdLambdas (map absVarBinder xs)
 
-applyAbsVars :: Symantics ann => Var -> [AbsVar] -> ann (TermF ann)
-applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
+applyAbsVars :: Symantics ann => Var -> Maybe (M.Map Var Var) -> [AbsVar] -> ann (TermF ann)
+applyAbsVars x mb_xs_rn xs = snd $ snd $ foldl go (unitVarSet x, (emptyRenaming, var x)) xs
   where
-   go (fvs, e) absx = case absVarDead absx of
+   go (fvs, (ty_rn, e)) absx = case absVarDead absx of
     True -> (fvs, case () of
       () -- We can encounter TyVars, where we should be able to instantiate them any way:
          | isTyVar x
-         -> e `tyApp` deadTy (tyVarKind x)
+         , let dead_ty = deadTy (tyVarKind x)
+         -> (insertTypeSubst ty_rn x dead_ty, e `tyApp` dead_ty)
          
          -- Dead CoVars are easy:
          | isCoVar x, let (ty1, ty2) = coVarKind x
-         -> let_ x (coercion (mkUnsafeCo ty1 ty2)) (e `app` x)
+         -> (ty_rn, let_ x (coercion (mkUnsafeCo ty1 ty2)) (e `app` x))
          
          -- A pretty cute hack for lifted bindings, though potentially quite confusing!
          -- If you want to put "undefined" here instead then watch out: this counts
          -- as an extra free variable, so it might trigger the assertion in Process.hs
          -- that checks that the output term has no more FVs than the input.
          | not (isUnLiftedType ty)
-         -> letRec [(x, var x)] (e `app` x)
+         -> (ty_rn, letRec [(x, var x)] (e `app` x))
          
          -- We have to be more creative for *unlifted* bindings, since building a loop
          -- changes the meaning of the program. Literals first:
          | Just (tc, []) <- splitTyConApp_maybe ty
          , Just lit <- absentLiteralOf tc
-         -> let_ x (literal lit) (e `app` x)
+         -> (ty_rn, let_ x (literal lit) (e `app` x))
          
          -- Special-case RealWorld# because it occurs so often and we can save a "let" and
          -- "cast" in the output syntax by doing so:
@@ -837,7 +828,7 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
          -- (NB: the use of realWorldPrimId here and in the VoidRep case below means we have
          -- to special-case realWorldPrimId in the post-SC free-variable sanity checks)
          | ty `eqType` realWorldStatePrimTy
-         -> e `app` realWorldPrimId
+         -> (ty_rn, e `app` realWorldPrimId)
 
          -- If we get here we are getting desperate need to get *really* creative.
          -- Just choose some value with the same *representation* as what we want and then
@@ -860,21 +851,23 @@ applyAbsVars x xs = snd (foldl go (unitVarSet x, var x) xs)
                                                            (mkWildValBinder (unboxedPairTyCon `mkTyConApp` [realWorldStatePrimTy, threadIdPrimTy]))
                                                            threadIdPrimTy [(DataAlt unboxedPairDataCon [] [] [mkWildValBinder realWorldStatePrimTy, x_tid], var x_tid)])
                    where x_tid = x `setVarType` threadIdPrimTy
-         -> let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x))
-         where shadowy_x = absVarBinder absx
+         -> (ty_rn, let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x)))
+         where -- NB: dead binders are not present in the renaming, so don't attempt to look them up
+               shadowy_x = renameAbsVarType ty_rn (absVarBinder absx)
                x = uniqAway (mkInScopeSet fvs) shadowy_x
                ty = idType x
-    False -> (fvs `extendVarSet` x, case () of
+    False -> (fvs `extendVarSet` x', case () of
       () | isTyVar x
-         -> e `tyApp` mkTyVarTy x
+         -> (insertTypeSubst ty_rn x (mkTyVarTy x'), e `tyApp` mkTyVarTy x')
    
          | isCoVar x
-         -> e `coApp` mkCoVarCo x_zapped
+         -> (ty_rn, e `coApp` mkCoVarCo x'_zapped)
    
          | otherwise
-         -> e `app` x_zapped)
+         -> (ty_rn, e `app` x'_zapped))
          where x = absVarVar absx
-               x_zapped = zapFragileIdInfo x
+               x' = renameAbsVarType ty_rn (maybe x (M.findWithDefault (pprPanic "renameAbsVar" (ppr x)) x) mb_xs_rn)
+               x'_zapped = zapFragileIdInfo x'
                -- NB: make sure we zap the "fragile" info because the FVs of the unfolding are
                -- not necessarily in scope.
 

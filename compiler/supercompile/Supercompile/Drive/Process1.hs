@@ -232,7 +232,7 @@ promise p opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted p)
       fmap (((mkVarSet (map absVarVar abstracted') `unionVarSet` stateLetBounders (meaning p) `unionVarSet` extraOutputFvs) `unionVarSet`) . mkVarSet) getPromiseNames >>=
         \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr (fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
       
-      return (a, fun p `applyAbsVars` abstracted')
+      return (a, applyAbsVars (fun p) Nothing abstracted')
 
 -- No meaning, term: "legacy" term that can no longer be tied back to
 -- No meaning, no term: rolled back while still a promise
@@ -462,17 +462,13 @@ memo opt speculated state0 = do
     let state1 = gc state0 -- Necessary because normalisation might have made some stuff dead
     
     ps <- getPromises
-    case [ (p, (releaseStateDeed state0, fun p `applyAbsVars` tb_dynamic_vs))
+    case [ (p, (releaseStateDeed state0, applyAbsVars (fun p) (Just rn_lr) (abstracted p)))
          | p <- ps
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                            match (meaning p) state1]
           -- NB: because I can trim reduce the set of things abstracted over above, it's OK if the renaming derived from the meanings renames vars that aren't in the abstracted list, but NOT vice-versa
          -- , let bad_renames = S.fromList (abstracted p) S.\\ M.keysSet (unRenaming rn_lr) in ASSERT2(S.null bad_renames, text "Renaming was inexhaustive:" <+> pPrint bad_renames $$ pPrint (fun p) $$ pPrintFullState (unI (meaning p)) $$ pPrint rn_lr $$ pPrintFullState state3) True
           -- ("tieback: FVs for " ++ showSDoc (pPrint (fun p) $$ text "Us:" $$ pPrint state3 $$ text "Them:" $$ pPrint (meaning p)))
-         , let rn_fv = renameAbsVar rn_lr
-                       -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
-                       -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
-               tb_dynamic_vs = map rn_fv (abstracted p)
          ] of
       (p, res):_ -> {- traceRender ("tieback", pPrintFullState state3, fst res) $ -} do
         traceRenderScpM "=sc" (fun p, PrettyDoc (pPrintFullState fullStatePrettiness state1), res)
