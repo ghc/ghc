@@ -65,7 +65,7 @@ import Bag
 import FastString
 import ForeignCall
 import MonadUtils
-import Util( equalLength )
+import Util( equalLength, filterOut )
 
 import Data.Maybe
 import Control.Monad
@@ -170,17 +170,36 @@ in repTyClD and repC.
 
 -}
 
+-- represent associated family instances
+--
+repTyClDs :: [LTyClDecl Name] -> DsM [Core TH.DecQ]
+repTyClDs ds = liftM de_loc (mapMaybeM repTyClD ds)
+
+
 repTyClD :: LTyClDecl Name -> DsM (Maybe (SrcSpan, Core TH.DecQ))
 
-repTyClD tydecl@(L _ (TyFamily {}))
-  = repTyFamily tydecl addTyVarBinds
+repTyClD (L loc (TyFamily { tcdFlavour = flavour,
+		            tcdLName   = tc, tcdTyVars = tvs, 
+		            tcdKindSig = opt_kind }))
+  = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
+       ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
+           do { flav   <- repFamilyFlavour flavour
+	      ; bndrs1 <- coreList tyVarBndrTyConName bndrs
+              ; case opt_kind of 
+                  Nothing -> repFamilyNoKind flav tc1 bndrs1
+                  Just (HsBSig ki _) 
+                    -> do { ki1 <- repKind ki 
+                          ; repFamilyKind flav tc1 bndrs1 ki1 }
+              }
+       ; return $ Just (loc, dec)
+       }
 
 repTyClD (L loc (TyData { tcdND = DataType, tcdCtxt = cxt, tcdKindSig = mb_kind,
 		          tcdLName = tc, tcdTyVars = tvs, tcdTyPats = opt_tys,
 		          tcdCons = cons, tcdDerivs = mb_derivs }))
   = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
        ; tc_tvs <- mk_extra_tvs tvs mb_kind
-       ; dec <- addTyVarBinds tc_tvs $ \bndrs -> 
+       ; dec <- addTyClTyVarBinds tc_tvs $ \bndrs -> 
            do { cxt1     <- repLContext cxt
               ; opt_tys1 <- maybeMapM repLTys opt_tys   -- only for family insts
               ; opt_tys2 <- maybeMapM (coreList typeQTyConName) opt_tys1
@@ -198,7 +217,7 @@ repTyClD (L loc (TyData { tcdND = NewType, tcdCtxt = cxt, tcdKindSig = mb_kind,
 		          tcdCons = [con], tcdDerivs = mb_derivs }))
   = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
        ; tc_tvs <- mk_extra_tvs tvs mb_kind
-       ; dec <- addTyVarBinds tc_tvs $ \bndrs -> 
+       ; dec <- addTyClTyVarBinds tc_tvs $ \bndrs -> 
            do { cxt1     <- repLContext cxt
               ; opt_tys1 <- maybeMapM repLTys opt_tys   -- only for family insts
               ; opt_tys2 <- maybeMapM (coreList typeQTyConName) opt_tys1
@@ -213,7 +232,7 @@ repTyClD (L loc (TyData { tcdND = NewType, tcdCtxt = cxt, tcdKindSig = mb_kind,
 repTyClD (L loc (TySynonym { tcdLName = tc, tcdTyVars = tvs, tcdTyPats = opt_tys,
                              tcdSynRhs = ty }))
   = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
-       ; dec <- addTyVarBinds tvs $ \bndrs -> 
+       ; dec <- addTyClTyVarBinds tvs $ \bndrs -> 
            do { opt_tys1 <- maybeMapM repLTys opt_tys   -- only for family insts
               ; opt_tys2 <- maybeMapM (coreList typeQTyConName) opt_tys1
 	      ; ty1      <- repLTy ty
@@ -233,7 +252,7 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
  	      ; sigs1  <- rep_sigs sigs
  	      ; binds1 <- rep_binds meth_binds
 	      ; fds1   <- repLFunDeps fds
-              ; ats1   <- repLAssocFamilys ats
+              ; ats1   <- repTyClDs ats
  	      ; decls1 <- coreList decQTyConName (ats1 ++ sigs1 ++ binds1)
 	      ; bndrs1 <- coreList tyVarBndrTyConName bndrs
  	      ; repClass cxt1 cls1 bndrs1 fds1 decls1 
@@ -275,31 +294,6 @@ mk_extra_tvs tvs (Just (HsBSig hs_kind _))
 
 
 -------------------------
--- The type variables in the head of families are treated differently when the
--- family declaration is associated.  In that case, they are usage, not binding
--- occurences.
---
-repTyFamily :: LTyClDecl Name 
-            -> ProcessTyVarBinds TH.Dec
-            -> DsM (Maybe (SrcSpan, Core TH.DecQ))
-repTyFamily (L loc (TyFamily { tcdFlavour = flavour,
-		               tcdLName   = tc, tcdTyVars = tvs, 
-		               tcdKindSig = opt_kind }))
-            tyVarBinds
-  = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
-       ; dec <- tyVarBinds tvs $ \bndrs ->
-           do { flav   <- repFamilyFlavour flavour
-	      ; bndrs1 <- coreList tyVarBndrTyConName bndrs
-              ; case opt_kind of 
-                  Nothing -> repFamilyNoKind flav tc1 bndrs1
-                  Just (HsBSig ki _) 
-                    -> do { ki1 <- repKind ki 
-                          ; repFamilyKind flav tc1 bndrs1 ki1 }
-              }
-       ; return $ Just (loc, dec)
-       }
-repTyFamily _ _ = panic "DsMeta.repTyFamily: internal error"
-
 -- represent fundeps
 --
 repLFunDeps :: [Located (FunDep Name)] -> DsM (Core [TH.FunDep])
@@ -319,24 +313,6 @@ repLFunDep (L _ (xs, ys)) = do xs' <- mapM lookupBinder xs
 repFamilyFlavour :: FamilyFlavour -> DsM (Core TH.FamFlavour)
 repFamilyFlavour TypeFamily = rep2 typeFamName []
 repFamilyFlavour DataFamily = rep2 dataFamName []
-
--- represent associated family declarations
---
-repLAssocFamilys :: [LTyClDecl Name] -> DsM [Core TH.DecQ]
-repLAssocFamilys = mapM repLAssocFamily
-  where
-    repLAssocFamily tydecl@(L _ (TyFamily {})) 
-      = liftM (snd . fromJust) $ repTyFamily tydecl lookupTyVarBinds
-    repLAssocFamily tydecl
-      = failWithDs msg
-      where
-        msg = ptext (sLit "Illegal associated declaration in class:") <+> 
-              ppr tydecl
-
--- represent associated family instances
---
-repLAssocFamInst :: [LTyClDecl Name] -> DsM [Core TH.DecQ]
-repLAssocFamInst = liftM de_loc . mapMaybeM repTyClD
 
 -- represent instance declarations
 --
@@ -362,7 +338,7 @@ repInstD (L loc (ClsInstDecl ty binds prags ats))
                ; inst_ty1 <- repTapps cls_tcon cls_tys
                ; binds1 <- rep_binds binds
                ; prags1 <- rep_sigs prags
-               ; ats1 <- repLAssocFamInst ats
+               ; ats1 <- repTyClDs ats
                ; decls <- coreList decQTyConName (ats1 ++ binds1 ++ prags1)
                ; repInst cxt1 inst_ty1 decls }
        ; return (Just (loc, dec)) }
@@ -632,17 +608,27 @@ addTyVarBinds tvs m
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
--- Look up a list of type variables; the computations passed as the second 
--- argument gets the *new* names on Core-level as an argument
---
-lookupTyVarBinds :: ProcessTyVarBinds a
-lookupTyVarBinds tvs m =
-  do
-    let names       = hsLTyVarNames tvs
-        mkWithKinds = map repTyVarBndrWithKind tvs
-    bndrs       <- mapM lookupBinder names 
-    kindedBndrs <- zipWithM ($) mkWithKinds bndrs
-    m kindedBndrs
+
+addTyClTyVarBinds :: ProcessTyVarBinds a
+-- Used for data/newtype declarations, and family instances,
+-- so that the nested type variables work right
+--    instance C (T a) where
+--      type W (T a) = blah
+-- The 'a' in the type instance is the one bound by the instance decl
+addTyClTyVarBinds tvs m
+  = do { let tv_names = hsLTyVarNames tvs
+       ; env <- dsGetMetaEnv
+       ; freshNames <- mkGenSyms (filterOut (`elemNameEnv` env) tv_names)
+       	    -- Make fresh names for the ones that are not already in scope
+            -- This makes things work for family declarations
+
+       ; term <- addBinds freshNames $ 
+	    	 do { kindedBndrs <- mapM mk_tv_bndr tvs
+	    	    ; m kindedBndrs }
+
+       ; wrapGenSyms freshNames term }
+  where
+    mk_tv_bndr tv = do { v <- lookupOcc (hsLTyVarName tv); repTyVarBndrWithKind tv v }
 
 -- Produce kinded binder constructors from the Haskell tyvar binders
 --
