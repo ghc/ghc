@@ -164,7 +164,7 @@ ppTyFamHeader summary associated decl unicode qual =
   ppTyClBinderWithVars summary decl <+>
 
   case tcdKindSig decl of
-    Just kind -> dcolon unicode  <+> ppLKind unicode qual kind
+    Just (HsBSig kind _) -> dcolon unicode  <+> ppLKind unicode qual kind
     Nothing -> noHtml
 
 

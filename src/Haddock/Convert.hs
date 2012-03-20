@@ -104,15 +104,14 @@ synifyTyCon tc
       (zipWith
          (\fakeTyVar realKind -> noLoc $
              KindedTyVar (getName fakeTyVar) 
-                         (HsBSig (synifyKind realKind) placeHolderBndrs) 
-                         placeHolderKind)
+                         (synifyKindSig realKind))
          alphaTyVars --a, b, c... which are unfortunately all kind *
          (fst . splitKindFunTys $ tyConKind tc)
       )
       -- assume primitive types aren't members of data/newtype families:
       Nothing
       -- we have their kind accurately:
-      (Just (synifyKind (tyConKind tc)))
+      (Just (synifyKindSig (tyConKind tc)))
       -- no algebraic constructors:
       []
       -- "deriving" needn't be specified:
@@ -121,7 +120,7 @@ synifyTyCon tc
       case synTyConRhs tc of
         SynFamilyTyCon ->
           TyFamily TypeFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
-               (Just (synifyKind (synTyConResKind tc))) -- placeHolderKind
+               (Just (synifyKindSig (synTyConResKind tc)))
         _ -> error "synifyTyCon: impossible open type synonym?"
   | isDataFamilyTyCon tc = --(why no "isOpenAlgTyCon"?)
       case algTyConRhs tc of
@@ -167,7 +166,7 @@ synifyTyCon tc
   syn_type = synifyType WithinType (synTyConType tc)
  in if isSynTyCon tc
   then TySynonym name tyvars typats syn_type placeHolderNames
-  else TyData alg_nd alg_ctx name Nothing tyvars typats (fmap synifyKind alg_kindSig) alg_cons alg_deriv
+  else TyData alg_nd alg_ctx name Nothing tyvars typats (fmap synifyKindSig alg_kindSig) alg_cons alg_deriv
 
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
@@ -240,8 +239,8 @@ synifyTyVars = map synifyTyVar
       kind = tyVarKind tv
       name = getName tv
      in if isLiftedTypeKind kind
-        then UserTyVar name placeHolderKind
-        else KindedTyVar name (HsBSig (synifyKind kind) placeHolderBndrs) placeHolderKind
+        then UserTyVar name
+        else KindedTyVar name (synifyKindSig kind)
 
 
 --states of what to do with foralls:
@@ -314,8 +313,8 @@ synifyTyLit :: TyLit -> HsTyLit
 synifyTyLit (NumTyLit n) = HsNumTy n
 synifyTyLit (StrTyLit s) = HsStrTy s
 
-synifyKind :: Kind -> LHsKind Name
-synifyKind = synifyType (error "synifyKind")
+synifyKindSig :: Kind -> HsBndrSig (LHsKind Name)
+synifyKindSig k = HsBSig (synifyType (error "synifyKind") k) placeHolderBndrs
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
                   ([HsType Name], Name, [HsType Name])
