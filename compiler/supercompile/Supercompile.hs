@@ -32,8 +32,6 @@ import MkCore     (mkWildValBinder)
 import Coercion   (isCoVar, mkCoVarCo, mkAxInstCo)
 import DataCon    (dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConWorkId)
 import VarSet
-import Name       (localiseName)
-import Var        (Var, varName, setVarName)
 import Id
 import MkId       (realWorldPrimId)
 import FastString (fsLit)
@@ -117,7 +115,8 @@ coreBindsToCoreTerm should_sc binds
     -- unique and b) the internality of these names will be carried down on the next simplifier run, so this works.
     -- The ice is thin, though!
     sc_xs = zappedBindersOfBinds sc_binds
-    internal_sc_binds = map (first localiseInternaliseId) sc_binds
+    -- NB: if we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
+    internal_sc_binds = map (first localiseId) sc_binds
     -- Decide which things we should export from the supercompiled term using a Church tuple.
     -- We need to export to the top level of the module those bindings that are *any* of:
     --   1. Are exported by the module itself
@@ -130,8 +129,6 @@ coreBindsToCoreTerm should_sc binds
             exported_xs' = unionVarSets (map (S.idFreeVars . fst) exported')
     sc_xs_internal_xs = uncurry (go []) (partition (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` zappedBindersOfBinds internal_sc_binds))
     sc_internal_xs = map snd sc_xs_internal_xs
-    localiseInternaliseId x = setIdNotExported (x `setVarName` localiseName (varName x))
-     -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
 
 
 -- NB: I can't see any GHC code that prevents nullary unboxed tuples, but I'm not actually sure they work

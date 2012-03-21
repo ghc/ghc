@@ -24,7 +24,7 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
 import CoreUtils (filterAlts)
-import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo)
+import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo, localiseId)
 import Var       (varUnique)
 import PrelNames (undefinedName, wildCardKey)
 import Type      (splitTyConApp_maybe)
@@ -1120,7 +1120,9 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
                                                                                        Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
                                                                                        let in_scrut_e@(_, scrut_e) = renamedTerm (fmap Value scrut_v)
                                                                                        scrut <- scruts'
-                                                                                       return (scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
+                                                                                       -- Localise the Id just in case this is the occurrence of a lambda-bound variable.
+                                                                                       -- We don't really want a Let-bound external name in the output!
+                                                                                       return (localiseId scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)))
                                                                         `M.union` M.fromList [(x, lambdaBound) | x <- x':alt_bvs]) -- NB: x' might be in scruts and union is left-biased
                                             alt_rns alt_cons alt_bvss -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
