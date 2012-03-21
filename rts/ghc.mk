@@ -312,7 +312,6 @@ rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
 rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
 
 ifeq "$(GhcUnregisterised)" "YES"
-rts/HeapStackCheck_HC_OPTS += -DGhcUnregisterised=1
 rts/PrimOps_HC_OPTS += -DGhcUnregisterised=1
 rts/Schedule_CC_OPTS += -DGhcUnregisterised=1
 endif

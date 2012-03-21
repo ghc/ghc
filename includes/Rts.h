@@ -143,6 +143,24 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define USED_IF_NOT_THREADS
 #endif
 
+#if SIZEOF_VOID_P == 8
+# if SIZEOF_LONG == 8
+#  define FMT_SizeT "lu"
+# elif SIZEOF_LONG_LONG == 8
+#  define FMT_SizeT "llu"
+# else
+#  error Cannot find format specifier for size_t size type
+# endif
+#elif SIZEOF_VOID_P == 4
+# if SIZEOF_INT == 4
+#  define FMT_SizeT "u"
+# else
+#  error Cannot find format specifier for size_t size type
+# endif
+#else
+# error Cannot handle this word size
+#endif
+
 /*
  * Getting printf formats right for platform-dependent typedefs
  */

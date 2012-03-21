@@ -98,6 +98,18 @@ StgFunPtr StgReturn(void)
 #define STG_RETURN "StgReturn"
 #endif
 
+#if defined(mingw32_HOST_OS)
+// On windows the stack has to be allocated 4k at a time, otherwise
+// we get a segfault.  The C compiler knows how to do this (it calls
+// _alloca()), so we make sure that we can allocate as much stack as
+// we need:
+StgWord8 *win32AllocStack(void)
+{
+    StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
+    return stack;
+}
+#endif
+
 /* -----------------------------------------------------------------------------
    x86 architecture
    -------------------------------------------------------------------------- */
@@ -211,18 +223,6 @@ StgRunIsImplementedInAssembler(void)
     );
 }
 
-#if defined(mingw32_HOST_OS)
-// On windows the stack has to be allocated 4k at a time, otherwise
-// we get a segfault.  The C compiler knows how to do this (it calls
-// _alloca()), so we make sure that we can allocate as much stack as
-// we need:
-StgWord8 *win32AllocStack(void)
-{
-    StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
-    return stack;
-}
-#endif
-
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -259,11 +259,19 @@ StgRunIsImplementedInAssembler(void)
         /*
          * Set BaseReg
          */
+#if defined(mingw32_HOST_OS)
+        "movq %%rdx,%%r13\n\t"
+#else
         "movq %%rsi,%%r13\n\t"
+#endif
         /*
          * grab the function argument from the stack, and jump to it.
          */
+#if defined(mingw32_HOST_OS)
+        "movq %%rcx,%%rax\n\t"
+#else
         "movq %%rdi,%%rax\n\t"
+#endif
         "jmp *%%rax\n\t"
 
         ".globl " STG_RETURN "\n"
