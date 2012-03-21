@@ -405,13 +405,137 @@ createAdjustor(int cconv, StgStablePtr hptr,
     }
     
 #elif defined(x86_64_HOST_ARCH)
+
+# if defined(mingw32_HOST_OS)
+    /*
+      stack at call:
+               argn
+               ...
+               arg5
+               return address
+               %rcx,%rdx,%r8,%r9 = arg1..arg4
+
+      if there are <4 integer args, then we can just push the
+      StablePtr into %rcx and shuffle the other args up.
+
+      If there are >=4 integer args, then we have to flush one arg
+      to the stack, and arrange to adjust the stack ptr on return.
+      The stack will be rearranged to this:
+
+             argn
+             ...
+             arg5
+             return address  *** <-- dummy arg in stub fn.
+             arg4
+             obscure_ccall_ret_code
+
+      This unfortunately means that the type of the stub function
+      must have a dummy argument for the original return address
+      pointer inserted just after the 4th integer argument.
+
+      Code for the simple case:
+
+   0:   4d 89 c1                mov    %r8,%r9
+   3:   49 89 d0                mov    %rdx,%r8
+   6:   48 89 ca                mov    %rcx,%rdx
+   9:   f2 0f 10 da             movsd  %xmm2,%xmm3
+   d:   f2 0f 10 d1             movsd  %xmm1,%xmm2
+  11:   f2 0f 10 c8             movsd  %xmm0,%xmm1
+  15:   48 8b 0d 0c 00 00 00    mov    0xc(%rip),%rcx    # 28 <.text+0x28>
+  1c:   ff 25 0e 00 00 00       jmpq   *0xe(%rip)        # 30 <.text+0x30>
+  22:   90                      nop
+  [...]
+
+
+  And the version for >=4 integer arguments:
+  (note: replace 2-6 with nops if the 4th argument is not a floating
+  point argument).
+
+   0:   41 51                   push   %r9
+   2:   f2 0f 11 1c 24          movsd  %xmm3,(%rsp)
+   7:   ff 35 23 00 00 00       pushq  0x23(%rip)        # 30 <.text+0x30>
+   d:   4d 89 c1                mov    %r8,%r9
+  10:   49 89 d0                mov    %rdx,%r8
+  13:   48 89 ca                mov    %rcx,%rdx
+  16:   f2 0f 10 da             movsd  %xmm2,%xmm3
+  1a:   f2 0f 10 d1             movsd  %xmm1,%xmm2
+  1e:   f2 0f 10 c8             movsd  %xmm0,%xmm1
+  22:   48 8b 0d 0f 00 00 00    mov    0xf(%rip),%rcx    # 38 <.text+0x38>
+  29:   ff 25 11 00 00 00       jmpq   *0x11(%rip)       # 40 <.text+0x40>
+  2f:   90                      nop
+  [...]
+
+    */
+    {  
+        int i = 0;
+        int fourthFloating;
+        char *c;
+        StgWord8 *adj_code;
+
+        // determine whether we have 4 or more integer arguments,
+        // and therefore need to flush one to the stack.
+        for (c = typeString; *c != '\0'; c++) {
+            i++;
+            if (i == 4) {
+                fourthFloating = (*c == 'f' || *c == 'd');
+                break;
+            }
+        }
+
+        if (i < 4) {
+            adjustor = allocateExec(0x38,&code);
+            adj_code = (StgWord8*)adjustor;
+
+            *(StgInt32 *)adj_code        = 0x49c1894d;
+            *(StgInt32 *)(adj_code+0x4)  = 0x8948d089;
+            *(StgInt32 *)(adj_code+0x8)  = 0x100ff2ca;
+            *(StgInt32 *)(adj_code+0xc)  = 0x100ff2da;
+            *(StgInt32 *)(adj_code+0x10) = 0x100ff2d1;
+            *(StgInt32 *)(adj_code+0x14) = 0x0d8b48c8;
+            *(StgInt32 *)(adj_code+0x18) = 0x0000000c;
+
+            *(StgInt32 *)(adj_code+0x1c) = 0x000e25ff;
+            *(StgInt32 *)(adj_code+0x20) = 0x00000000;
+            *(StgInt64 *)(adj_code+0x28) = (StgInt64)hptr;
+            *(StgInt64 *)(adj_code+0x30) = (StgInt64)wptr;
+        }
+        else
+        {
+            adjustor = allocateExec(0x48,&code);
+            adj_code = (StgWord8*)adjustor;
+
+            if (fourthFloating) {
+                *(StgInt32 *)adj_code        = 0x0ff25141;
+                *(StgInt32 *)(adj_code+0x4)  = 0xff241c11;
+            }
+            else {
+                *(StgInt32 *)adj_code        = 0x90905141;
+                *(StgInt32 *)(adj_code+0x4)  = 0xff909090;
+            }
+            *(StgInt32 *)(adj_code+0x8)  = 0x00002335;
+            *(StgInt32 *)(adj_code+0xc)  = 0xc1894d00;
+            *(StgInt32 *)(adj_code+0x10) = 0x48d08949;
+            *(StgInt32 *)(adj_code+0x14) = 0x0ff2ca89;
+            *(StgInt32 *)(adj_code+0x18) = 0x0ff2da10;
+            *(StgInt32 *)(adj_code+0x1c) = 0x0ff2d110;
+            *(StgInt32 *)(adj_code+0x20) = 0x8b48c810;
+            *(StgInt32 *)(adj_code+0x24) = 0x00000f0d;
+            *(StgInt32 *)(adj_code+0x28) = 0x1125ff00;
+            *(StgInt32 *)(adj_code+0x2c) = 0x00000000;
+            
+            *(StgInt64 *)(adj_code+0x30) = (StgInt64)obscure_ccall_ret_code;
+            *(StgInt64 *)(adj_code+0x38) = (StgInt64)hptr;
+            *(StgInt64 *)(adj_code+0x40) = (StgInt64)wptr;
+        }
+    }
+# else
     /*
       stack at call:
                argn
                ...
                arg7
                return address
-               %rdi,%rsi,%rdx,%rcx,%r8,%r9 = arg0..arg6
+               %rdi,%rsi,%rdx,%rcx,%r8,%r9 = arg1..arg6
 
       if there are <6 integer args, then we can just push the
       StablePtr into %edi and shuffle the other args up.
@@ -508,6 +632,9 @@ createAdjustor(int cconv, StgStablePtr hptr,
             *(StgInt64 *)(adj_code+0x38) = (StgInt64)wptr;
         }
     }
+# endif
+
+
 #elif defined(sparc_HOST_ARCH)
   /* Magic constant computed by inspecting the code length of the following
      assembly language snippet (offset and machine code prefixed):
