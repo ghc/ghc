@@ -27,6 +27,7 @@ import Pair
 import Demand (splitStrictSig, isBotRes)
 
 
+-- FIXME: this doesn't really work very well if the Answers are indirections, which is a common case!
 evaluatePrim :: InScopeSet -> Tag -> PrimOp -> [Type] -> [Answer] -> Maybe (Anned Answer)
 evaluatePrim iss tg pop tys args = do
     args' <- fmap (map CoreSyn.Type tys ++) $ mapM to args
