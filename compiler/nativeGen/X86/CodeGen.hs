@@ -2110,10 +2110,14 @@ genCCall64' platform target dest_regs args = do
         load_args_win ((CmmHinted arg _) : rest) usedInt usedFP
                       ((ireg, freg) : regs) code
             | isFloatType arg_rep = do
-                 -- XXX Should also set ireg?
                  arg_code <- getAnyReg arg
                  load_args_win rest (ireg : usedInt) (freg : usedFP) regs
-                               (code `appOL` arg_code freg)
+                               (code `appOL`
+                                arg_code freg `snocOL`
+                                -- If we are calling a varargs function
+                                -- then we need to define ireg as well
+                                -- as freg
+                                MOV II64 (OpReg freg) (OpReg ireg))
             | otherwise = do
                  arg_code <- getAnyReg arg
                  load_args_win rest (ireg : usedInt) usedFP regs
