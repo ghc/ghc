@@ -15,7 +15,7 @@ module X86.Regs (
         -- registers
         spRel,
         argRegs,
-        allArgRegs,
+        allIntArgRegs,
         callClobberedRegs,
         allMachRegNos,
         classOfRealReg,
@@ -406,7 +406,7 @@ xmm n = regSingle (firstxmm+n)
 -- horror show -----------------------------------------------------------------
 freeReg                 :: RegNo -> FastBool
 globalRegMaybe          :: GlobalReg -> Maybe RealReg
-allArgRegs              :: [Reg]
+allIntArgRegs           :: [Reg]
 callClobberedRegs       :: [Reg]
 
 #if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
@@ -626,17 +626,17 @@ globalRegMaybe _                        = Nothing
 --
 
 #if   i386_TARGET_ARCH
-allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
+allIntArgRegs = panic "X86.Regs.allIntArgRegs: should not be used!"
 
 #elif x86_64_TARGET_ARCH
 #if defined(mingw32_HOST_OS)
-allArgRegs = map regSingle [rcx,rdx,r8,r9]
+allIntArgRegs = map regSingle [rcx,rdx,r8,r9]
 #else
-allArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
+allIntArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
 #endif
 
 #else
-allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
+allIntArgRegs  = panic "X86.Regs.allIntArgRegs: not defined for this architecture"
 #endif
 
 
@@ -665,7 +665,7 @@ callClobberedRegs
 freeReg _               = 0#
 globalRegMaybe _        = panic "X86.Regs.globalRegMaybe: not defined"
 
-allArgRegs              = panic "X86.Regs.globalRegMaybe: not defined"
+allIntArgRegs           = panic "X86.Regs.globalRegMaybe: not defined"
 callClobberedRegs       = panic "X86.Regs.globalRegMaybe: not defined"
 
 

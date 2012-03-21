@@ -1963,11 +1963,11 @@ genCCall64' :: Platform
 genCCall64' platform target dest_regs args = do
     -- load up the register arguments
     (stack_args, aregs, fregs, load_args_code)
-         <- load_args args allArgRegs allFPArgRegs nilOL
+         <- load_args args allIntArgRegs allFPArgRegs nilOL
 
     let
         fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
-        int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
+        int_regs_used = reverse (drop (length aregs) (reverse allIntArgRegs))
         arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
                 -- for annotating the call instruction with
         sse_regs = length fp_regs_used
