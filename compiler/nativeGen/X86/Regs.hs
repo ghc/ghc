@@ -15,6 +15,7 @@ module X86.Regs (
         -- registers
         spRel,
         argRegs,
+        allArgRegs,
         allIntArgRegs,
         callClobberedRegs,
         allMachRegNos,
@@ -378,9 +379,6 @@ xmm13 = regSingle 37
 xmm14 = regSingle 38
 xmm15 = regSingle 39
 
-allFPArgRegs :: [Reg]
-allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
-
 ripRel :: Displacement -> AddrMode
 ripRel imm      = AddrBaseIndex EABaseRip EAIndexNone imm
 
@@ -406,7 +404,9 @@ xmm n = regSingle (firstxmm+n)
 -- horror show -----------------------------------------------------------------
 freeReg                 :: RegNo -> FastBool
 globalRegMaybe          :: GlobalReg -> Maybe RealReg
+allArgRegs              :: [(Reg, Reg)]
 allIntArgRegs           :: [Reg]
+allFPArgRegs            :: [Reg]
 callClobberedRegs       :: [Reg]
 
 #if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
@@ -625,20 +625,28 @@ globalRegMaybe _                        = Nothing
 
 --
 
-#if   i386_TARGET_ARCH
+#if defined(mingw32_HOST_OS) && x86_64_TARGET_ARCH
+
+allArgRegs = zip (map regSingle [rcx,rdx,r8,r9])
+                 (map regSingle [firstxmm ..])
+allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this platform"
+allFPArgRegs = panic "X86.Regs.allFPArgRegs: not defined for this platform"
+
+#else
+
+allArgRegs = panic "X86.Regs.allArgRegs: not defined for this arch"
+
+# if   i386_TARGET_ARCH
 allIntArgRegs = panic "X86.Regs.allIntArgRegs: should not be used!"
-
-#elif x86_64_TARGET_ARCH
-#if defined(mingw32_HOST_OS)
-allIntArgRegs = map regSingle [rcx,rdx,r8,r9]
-#else
+# elif x86_64_TARGET_ARCH
 allIntArgRegs = map regSingle [rdi,rsi,rdx,rcx,r8,r9]
-#endif
+# else
+allIntArgRegs = panic "X86.Regs.allIntArgRegs: not defined for this arch"
+# endif
 
-#else
-allIntArgRegs  = panic "X86.Regs.allIntArgRegs: not defined for this architecture"
-#endif
+allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
 
+#endif
 
 -- | these are the regs which we cannot assume stay alive over a C call.
 

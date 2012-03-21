@@ -1962,16 +1962,25 @@ genCCall64' :: Platform
             -> NatM InstrBlock
 genCCall64' platform target dest_regs args = do
     -- load up the register arguments
-    (stack_args, aregs, fregs, load_args_code)
-         <- load_args args allIntArgRegs allFPArgRegs nilOL
+    (stack_args, int_regs_used, fp_regs_used, load_args_code)
+         <-
+        if platformOS platform == OSMinGW32
+        then load_args_win args [] [] allArgRegs nilOL
+        else do (stack_args, aregs, fregs, load_args_code)
+                    <- load_args args allIntArgRegs allFPArgRegs nilOL
+                let fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
+                    int_regs_used = reverse (drop (length aregs) (reverse allIntArgRegs))
+                return (stack_args, int_regs_used, fp_regs_used, load_args_code)
 
     let
-        fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
-        int_regs_used = reverse (drop (length aregs) (reverse allIntArgRegs))
-        arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
+        arg_regs_used = int_regs_used ++ fp_regs_used
+        arg_regs = [eax] ++ arg_regs_used
                 -- for annotating the call instruction with
         sse_regs = length fp_regs_used
-        tot_arg_size = arg_size * (length stack_args + length int_regs_used)
+        arg_stack_slots = if platformOS platform == OSMinGW32
+                          then length stack_args + length allArgRegs
+                          else length stack_args
+        tot_arg_size = arg_size * arg_stack_slots
 
 
     -- Align stack to 16n for calls, assuming a starting stack
@@ -1992,7 +2001,7 @@ genCCall64' platform target dest_regs args = do
     -- On Win64, we also have to leave stack space for the arguments
     -- that we are passing in registers
     lss_code <- if platformOS platform == OSMinGW32
-                then leaveStackSpace (length int_regs_used)
+                then leaveStackSpace (length allArgRegs)
                 else return nilOL
     delta <- getDeltaNat
 
@@ -2085,6 +2094,32 @@ genCCall64' platform target dest_regs args = do
               push_this_arg = do
                 (args',ars,frs,code') <- load_args rest aregs fregs code
                 return ((CmmHinted arg hint):args', ars, frs, code')
+
+        load_args_win :: [CmmHinted CmmExpr]
+                      -> [Reg]        -- used int regs
+                      -> [Reg]        -- used FP regs
+                      -> [(Reg, Reg)] -- (int, FP) regs avail for args
+                      -> InstrBlock
+                      -> NatM ([CmmHinted CmmExpr],[Reg],[Reg],InstrBlock)
+        load_args_win args usedInt usedFP [] code
+            = return (args, usedInt, usedFP, code)
+            -- no more regs to use
+        load_args_win [] usedInt usedFP _ code
+            = return ([], usedInt, usedFP, code)
+            -- no more args to push
+        load_args_win ((CmmHinted arg _) : rest) usedInt usedFP
+                      ((ireg, freg) : regs) code
+            | isFloatType arg_rep = do
+                 -- XXX Should also set ireg?
+                 arg_code <- getAnyReg arg
+                 load_args_win rest (ireg : usedInt) (freg : usedFP) regs
+                               (code `appOL` arg_code freg)
+            | otherwise = do
+                 arg_code <- getAnyReg arg
+                 load_args_win rest (ireg : usedInt) usedFP regs
+                               (code `appOL` arg_code ireg)
+            where
+              arg_rep = cmmExprType arg
 
         push_args [] code = return code
         push_args ((CmmHinted arg _):rest) code
