@@ -27,7 +27,6 @@ import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 --import Supercompile.Core.Size
 import Supercompile.Core.Syntax
-import Supercompile.Core.Tag (dataConTag, literalTag)
 
 import Supercompile.Drive.Split (ResidTags)
 
@@ -204,60 +203,69 @@ showValueGroup (root, group) = go emptyVarSet noPrec root
 
 type TagAnnotations = IM.IntMap [String]
 
--- Shows a guesstimate about what bits of original syntax residualised syntax was based on:
+-- Shows a guesstimate about what bits of original syntax residualised syntax was based on.
+-- For each "cost centre", shows information in this format:
+--   #of bits of syntax(# of distinct tags)
 tagSummary :: TagAnnotations -> Int -> Int -> ResidTags -> String
-tagSummary anns precision n resid_tags = unlines $ take n [intercalate "." ann ++ "\t" ++ show occs ++ "(" ++ show init_occs ++ ")" | (ann, (init_occs, occs)) <- sortBy (comparing (Down . snd . snd)) (M.toList ann_occs)]
-  where ann_occs = M.unionsWith (\(x1, y1) (x2, y2) -> (x1 + x2, y1 + y2)) [M.singleton (take precision ann) (1 :: Int, occs) | (tag, occs) <- IM.toList resid_tags, let Just ann = IM.lookup tag anns]
-        --total_occs = M.fold (+) 0 ann_occs
+tagSummary anns precision n resid_tags = unlines $ take n [intercalate "." ann ++ "\t" ++ show_occs occs | (ann, occs) <- show_sorted_ann_occs] ++ ["Other:\t" ++ show_occs rest_occs]
+  where ann_occs = M.unionsWith plus_occs [M.singleton (take precision ann) (1 :: Int, occs) | (tag, occs) <- IM.toList resid_tags, let Just ann = IM.lookup tag anns]
+        plus_occs (x1, y1) (x2, y2) = (x1 + x2, y1 + y2)
+        show_occs (init_occs, occs) = show occs ++ "(" ++ show init_occs ++ ")"
+        sorted_ann_occs = sortBy (comparing (Down . snd . snd)) (M.toList ann_occs)
+        (show_sorted_ann_occs, rest_sorted_ann_occs) = splitAt n sorted_ann_occs
+        rest_occs = foldl' plus_occs (0, 0) (map snd rest_sorted_ann_occs)
 
 tagAnnotations :: State -> TagAnnotations
 tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, hb) <- M.toList h, Just (_, e) <- [heapBindingTerm hb]] `IM.union` go_qa e_ann qa `IM.union` resid_tags
   where
     extAnn x ann = showSDoc (ppr x):ann
 
+    insert' ann tg tag_anns = IM.insert (tagInt tg) ann tag_anns
+
+    insert ann tg (Nothing,    tag_anns) = insert'  ann  tg tag_anns
+    insert _   tg (Just (ann), tag_anns) = insert' [ann] tg tag_anns
+
     (e_ann, resid_tags) = trainCarFoldr (\kf (ann, resid_tags) -> second (`IM.union` resid_tags) $ go_kf ann kf) ([], IM.empty) k
     
     go_qa :: [String] -> Anned QA -> TagAnnotations
-    go_qa ann qa = IM.insert (tagInt (annedTag qa)) ann $ go_qa' ann (annee qa)
+    go_qa ann qa = insert ann (annedTag qa) $ go_qa' ann (annee qa)
 
-    go_qa' _   (Question _) = IM.empty
+    go_qa' _   (Question _) = (Nothing, IM.empty)
     go_qa' ann (Answer a)   = go_answer' ann a
 
     go_term :: [String] -> AnnedTerm -> TagAnnotations
-    go_term ann e = IM.insert (tagInt (annedTag e)) ann $ go_term' ann (annee e)
+    go_term ann e = insert ann (annedTag e) $ go_term' ann (annee e)
 
     go_term' ann e = case e of
-      Var _ -> IM.empty
+      Var _ -> (Nothing, IM.empty)
       Value v -> go_value' ann v
-      TyApp e _ -> go_term ann e
-      CoApp e _ -> go_term ann e
-      App e _   -> go_term ann e
-      PrimOp _ _ es   -> IM.unions (map (go_term ann) es)
-      Case e x _ alts -> go_term (extAnn x ann) e `IM.union` IM.unions [go_alt ann alt `IM.union` go_term ann e | (alt, e) <- alts]
-      Let x e1 e2     -> go_term (extAnn x ann) e1 `IM.union` go_term ann e2
-      LetRec xes e    -> IM.unions [go_term (extAnn x ann) e | (x, e) <- xes] `IM.union` go_term ann e
-      Cast e _        -> go_term ann e
+      TyApp e _ -> (Nothing, go_term ann e)
+      CoApp e _ -> (Nothing, go_term ann e)
+      App e _   -> (Nothing, go_term ann e)
+      PrimOp _ _ es   -> (Nothing, IM.unions (map (go_term ann) es))
+      Case e x _ alts -> (Nothing, go_term (extAnn x ann) e `IM.union` IM.unions [go_term ann e | (_, e) <- alts])
+      Let x e1 e2     -> (Nothing, go_term (extAnn x ann) e1 `IM.union` go_term ann e2)
+      LetRec xes e    -> (Nothing, IM.unions [go_term (extAnn x ann) e | (x, e) <- xes] `IM.union` go_term ann e)
+      Cast e _        -> (Nothing, go_term ann e)
     
+    -- NB: this is carefully set up so that we map all those tags that are likely to
+    -- be literalTags/dataConTags that occur multiple times in *all* tagged terms to
+    -- the same annotation.
     go_value' ann v = case v of
-        Indirect _   -> IM.empty
-        Literal _    -> IM.empty
-        Coercion _   -> IM.empty
-        TyLambda _ e -> go_term ann e
-        Lambda   _ e -> go_term ann e
-        Data _ _ _ _ -> IM.empty
-
-    go_alt :: [String] -> AltCon -> TagAnnotations
-    go_alt ann (DataAlt dc _ _ _) = IM.singleton (tagInt (dataConTag dc)) ann
-    go_alt ann (LiteralAlt l)     = IM.singleton (tagInt (literalTag l))  ann
-    go_alt _   DefaultAlt         = IM.empty
+        Indirect _    -> (Nothing,        IM.empty)
+        Literal l     -> (Just (show l),  IM.empty)
+        Coercion _    -> (Nothing,        IM.empty)
+        TyLambda _ e  -> (Nothing,        go_term ann e)
+        Lambda   _ e  -> (Nothing,        go_term ann e)
+        Data dc _ _ _ -> (Just (show dc), IM.empty)
 
     go_answer :: [String] -> Anned Answer -> TagAnnotations
-    go_answer ann a = IM.insert (tagInt (annedTag a)) ann $ go_answer' ann (annee a)
+    go_answer ann a = insert ann (annedTag a) $ go_answer' ann (annee a)
 
     go_answer' ann (_, (_, v)) = go_value' ann v
 
     go_kf :: [String] -> Tagged StackFrame -> ([String], TagAnnotations)
-    go_kf ann kf = second (IM.insert (tagInt (tag kf)) ann) $ go_kf' ann (tagee kf)
+    go_kf ann kf = second (insert' ann (tag kf)) $ go_kf' ann (tagee kf)
 
     go_kf' ann kf = case kf of
       TyApply _ -> (ann, IM.empty)
