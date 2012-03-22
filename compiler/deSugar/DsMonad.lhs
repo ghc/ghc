@@ -27,7 +27,7 @@ module DsMonad (
         dsLookupDPHRdrEnv, dsLookupDPHRdrEnv_maybe,
         dsInitPArrBuiltin,
 
-        DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
+        DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
         -- Warnings
         DsWarning, warnDs, failWithDs,
@@ -480,6 +480,9 @@ dsInitPArrBuiltin thing_inside
 \end{code}
 
 \begin{code}
+dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
+dsGetMetaEnv = do { env <- getLclEnv; return (ds_meta env) }
+
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
 dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (ds_meta env) name) }
 

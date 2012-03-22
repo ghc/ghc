@@ -818,7 +818,7 @@ lvlLamBndrs lvl bndrs
 \end{code}
 
 \begin{code}
-  -- Destintion level is the max Id level of the expression
+  -- Destination level is the max Id level of the expression
   -- (We'll abstract the type variables, if any.)
 destLevel :: LevelEnv -> VarSet -> Bool -> Maybe (Arity, StrictSig) -> Level
 destLevel env fvs is_function mb_bot
@@ -830,6 +830,7 @@ destLevel env fvs is_function mb_bot
   , countFreeIds fvs <= n_args
   = tOP_LEVEL	-- Send functions to top level; see
 		-- the comments with isFunction
+
   | otherwise = maxFvLevel isId env fvs  -- Max over Ids only; the tyvars
     	      		   	    	 -- will be abstracted
 

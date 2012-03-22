@@ -17,6 +17,13 @@
 extern "C" {
 #endif
 
+/* We include windows.h very early, as on Win64 the CONTEXT type has
+   fields "R8", "R9" and "R10", which goes bad if we've already
+   #define'd those names for our own purposes (in stg/Regs.h) */
+#if defined(HAVE_WINDOWS_H)
+#include <windows.h>
+#endif
+
 #ifndef IN_STG_CODE
 #define IN_STG_CODE 0
 #endif
@@ -134,6 +141,24 @@ void _assertFail(const char *filename, unsigned int linenum)
 #else
 #define USED_IF_THREADS STG_UNUSED
 #define USED_IF_NOT_THREADS
+#endif
+
+#if SIZEOF_VOID_P == 8
+# if SIZEOF_LONG == 8
+#  define FMT_SizeT "lu"
+# elif SIZEOF_LONG_LONG == 8
+#  define FMT_SizeT "llu"
+# else
+#  error Cannot find format specifier for size_t size type
+# endif
+#elif SIZEOF_VOID_P == 4
+# if SIZEOF_INT == 4
+#  define FMT_SizeT "u"
+# else
+#  error Cannot find format specifier for size_t size type
+# endif
+#else
+# error Cannot handle this word size
 #endif
 
 /*

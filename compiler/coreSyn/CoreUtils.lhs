@@ -15,7 +15,8 @@ module CoreUtils (
         mkAltExpr,
 
         -- * Taking expressions apart
-        findDefault, findAlt, isDefaultAlt, mergeAlts, trimConArgs,
+        findDefault, findAlt, isDefaultAlt,
+        mergeAlts, trimConArgs, filterAlts,
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType,
@@ -69,7 +70,7 @@ import Util
 import Pair
 import Data.Word
 import Data.Bits
-import Data.List ( mapAccumL )
+import Data.List
 \end{code}
 
 
@@ -342,18 +343,18 @@ This makes it easy to find, though it makes matching marginally harder.
 
 \begin{code}
 -- | Extract the default case alternative
-findDefault :: [CoreAlt] -> ([CoreAlt], Maybe CoreExpr)
+findDefault :: [(AltCon, [a], b)] -> ([(AltCon, [a], b)], Maybe b)
 findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null args ) (alts, Just rhs)
 findDefault alts                        =                     (alts, Nothing)
 
-isDefaultAlt :: CoreAlt -> Bool
+isDefaultAlt :: (AltCon, a, b) -> Bool
 isDefaultAlt (DEFAULT, _, _) = True
 isDefaultAlt _               = False
 
 
 -- | Find the case alternative corresponding to a particular
 -- constructor: panics if no such constructor exists
-findAlt :: AltCon -> [CoreAlt] -> Maybe CoreAlt
+findAlt :: AltCon -> [(AltCon, a, b)] -> Maybe (AltCon, a, b)
     -- A "Nothing" result *is* legitmiate
     -- See Note [Unreachable code]
 findAlt con alts
@@ -369,7 +370,7 @@ findAlt con alts
           GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
 
 ---------------------------------
-mergeAlts :: [CoreAlt] -> [CoreAlt] -> [CoreAlt]
+mergeAlts :: [(AltCon, a, b)] -> [(AltCon, a, b)] -> [(AltCon, a, b)]
 -- ^ Merge alternatives preserving order; alternatives in
 -- the first argument shadow ones in the second
 mergeAlts [] as2 = as2
@@ -394,6 +395,83 @@ trimConArgs :: AltCon -> [CoreArg] -> [CoreArg]
 trimConArgs DEFAULT      args = ASSERT( null args ) []
 trimConArgs (LitAlt _)   args = ASSERT( null args ) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
+\end{code}
+
+\begin{code}
+filterAlts :: [Unique]             -- ^ Supply of uniques used in case we have to manufacture a new AltCon
+           -> Type                 -- ^ Type of scrutinee (used to prune possibilities)
+           -> [AltCon]             -- ^ Constructors known to be impossible due to the form of the scrutinee
+           -> [(AltCon, [Var], a)] -- ^ Alternatives
+           -> ([AltCon], Bool, [(AltCon, [Var], a)])
+             -- Returns:
+             --  1. Constructors that will never be encountered by the *default* case (if any)
+             --  2. Whether we managed to refine the default alternative into a specific constructor (for statistcs only)
+             --  3. The new alternatives
+             --
+             -- NB: the final list of alternatives may be empty:
+             -- This is a tricky corner case.  If the data type has no constructors,
+             -- which GHC allows, then the case expression will have at most a default
+             -- alternative.
+             --
+             -- If callers need to preserve the invariant that there is always at least one branch
+             -- in a "case" statement then they will need to manually add a dummy case branch that just
+             -- calls "error" or similar.
+filterAlts us ty imposs_cons alts = (imposs_deflt_cons, refined_deflt, merged_alts)
+  where
+    (alts_wo_default, maybe_deflt) = findDefault alts
+    alt_cons = [con | (con,_,_) <- alts_wo_default]
+    imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
+      -- "imposs_deflt_cons" are handled 
+      --   EITHER by the context, 
+      --   OR by a non-DEFAULT branch in this case expression.
+
+    trimmed_alts = filterOut impossible_alt alts_wo_default
+    merged_alts  = mergeAlts trimmed_alts (maybeToList maybe_deflt')
+      -- We need the mergeAlts in case the new default_alt 
+      -- has turned into a constructor alternative.
+      -- The merge keeps the inner DEFAULT at the front, if there is one
+      -- and interleaves the alternatives in the right order
+
+    (refined_deflt, maybe_deflt') = case maybe_deflt of
+      Just deflt_rhs -> case mb_tc_app of
+        Just (tycon, inst_tys)
+          |     -- This branch handles the case where we are 
+                -- scrutinisng an algebraic data type
+            isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.  
+          , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
+                                        --      case x of { DEFAULT -> e }
+                                        -- and we don't want to fill in a default for them!
+          , Just all_cons <- tyConDataCons_maybe tycon
+          , let imposs_data_cons = [con | DataAlt con <- imposs_deflt_cons]   -- We now know it's a data type 
+                impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
+          -> case filterOut impossible all_cons of
+               -- Eliminate the default alternative
+               -- altogether if it can't match:
+               []    -> (False, Nothing)
+               -- It matches exactly one constructor, so fill it in:
+               [con] -> (True, Just (DataAlt con, ex_tvs ++ arg_ids, deflt_rhs))
+                 where (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
+               _     -> (False, Just (DEFAULT, [], deflt_rhs))
+
+          | debugIsOn, isAlgTyCon tycon
+          , null (tyConDataCons tycon)
+          , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
+                -- Check for no data constructors
+                -- This can legitimately happen for abstract types and type families,
+                -- so don't report that
+          -> pprTrace "prepareDefault" (ppr tycon)
+             (False, Just (DEFAULT, [], deflt_rhs))
+
+        _ -> (False, Just (DEFAULT, [], deflt_rhs))
+      Nothing -> (False, Nothing)
+  
+    mb_tc_app = splitTyConApp_maybe ty
+    Just (_, inst_tys) = mb_tc_app
+
+    impossible_alt :: (AltCon, a, b) -> Bool
+    impossible_alt (con, _, _) | con `elem` imposs_cons = True
+    impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
+    impossible_alt _                   = False
 \end{code}
 
 Note [Unreachable code]

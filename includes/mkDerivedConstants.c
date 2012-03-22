@@ -30,7 +30,7 @@
 #define str(a,b) #a "_" #b
 
 #define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))
-#define FIELD_SIZE(s_type, field) ((unsigned long)sizeof(((s_type*)0)->field))
+#define FIELD_SIZE(s_type, field) ((size_t)sizeof(((s_type*)0)->field))
 #define TYPE_SIZE(type) (sizeof(type))
 
 #pragma GCC poison sizeof
@@ -38,17 +38,17 @@
 #if defined(GEN_HASKELL)
 #define def_offset(str, offset)                          \
     printf("oFFSET_" str " :: Int\n");                   \
-    printf("oFFSET_" str " = %lu\n", (unsigned long)offset);
+    printf("oFFSET_" str " = %" FMT_SizeT "\n", (size_t)offset);
 #else
 #define def_offset(str, offset) \
-    printf("#define OFFSET_" str " %lu\n", (unsigned long)offset);
+    printf("#define OFFSET_" str " %" FMT_SizeT "\n", (size_t)offset);
 #endif
 
 #if defined(GEN_HASKELL)
 #define ctype(type) /* nothing */
 #else
 #define ctype(type) \
-    printf("#define SIZEOF_" #type " %lu\n", (unsigned long)TYPE_SIZE(type));
+    printf("#define SIZEOF_" #type " %" FMT_SizeT "\n", (size_t)TYPE_SIZE(type));
 #endif
 
 #if defined(GEN_HASKELL)
@@ -63,7 +63,7 @@
 */
 #define field_type_(str, s_type, field) \
     printf("#define REP_" str " b"); \
-    printf("%lu\n", FIELD_SIZE(s_type, field) * 8);
+    printf("%" FMT_SizeT "\n", FIELD_SIZE(s_type, field) * 8);
 #define field_type_gcptr_(str, s_type, field) \
     printf("#define REP_" str " gcptr\n");
 #endif
@@ -95,17 +95,17 @@
 #if defined(GEN_HASKELL)
 #define def_size(str, size)                \
     printf("sIZEOF_" str " :: Int\n");     \
-    printf("sIZEOF_" str " = %lu\n", (unsigned long)size);
+    printf("sIZEOF_" str " = %" FMT_SizeT "\n", (size_t)size);
 #else
 #define def_size(str, size) \
-    printf("#define SIZEOF_" str " %lu\n", (unsigned long)size);
+    printf("#define SIZEOF_" str " %" FMT_SizeT "\n", (size_t)size);
 #endif
 
 #if defined(GEN_HASKELL)
 #define def_closure_size(str, size) /* nothing */
 #else
 #define def_closure_size(str, size) \
-    printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%lu)\n", (unsigned long)size);
+    printf("#define SIZEOF_" str " (SIZEOF_StgHeader+%" FMT_SizeT ")\n", (size_t)size);
 #endif
 
 #define struct_size(s_type) \
@@ -193,9 +193,9 @@ main(int argc, char *argv[])
 #ifndef GEN_HASKELL
     printf("/* This file is created automatically.  Do not edit by hand.*/\n\n");
 
-    printf("#define STD_HDR_SIZE   %lu\n", (unsigned long)sizeofW(StgHeader) - sizeofW(StgProfHeader));
+    printf("#define STD_HDR_SIZE   %" FMT_SizeT "\n", (size_t)sizeofW(StgHeader) - sizeofW(StgProfHeader));
     /* grrr.. PROFILING is on so we need to subtract sizeofW(StgProfHeader) */
-    printf("#define PROF_HDR_SIZE  %lu\n", (unsigned long)sizeofW(StgProfHeader));
+    printf("#define PROF_HDR_SIZE  %" FMT_SizeT "\n", (size_t)sizeofW(StgProfHeader));
 
     printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
