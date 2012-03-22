@@ -1,7 +1,6 @@
 module Supercompile.StaticFlags where
 
 import Data.Char (toLower)
-import Data.Maybe
 
 import FastString
 import StaticFlags
@@ -9,13 +8,16 @@ import StaticFlags
 
 parseEnum :: String -> a -> [(String, a)] -> a
 parseEnum prefix def opts = maybe def parse $ lookup_str prefix
-  where parse = fromJust . flip lookup opts . map toLower
+  where parse = maybe (error "parseEnum: unknown option") id . flip lookup opts . map toLower
 
 
 -- The StaticFlagsParser admits any option beginning with -fsupercompiler
 
-sUPERINLINABLE_ONLY :: Bool
-sUPERINLINABLE_ONLY = not $ lookUp $ fsLit "-fsupercompiler-no-superinlinable-only"
+-- | The situations in which will demand a SUPERINLINABLE annotation is present
+data Superinlinability = ForEverything | ForRecursion | ForNothing
+
+sUPERINLINABILITY :: Superinlinability
+sUPERINLINABILITY = parseEnum "-fsupercompiler-superinlinability" ForNothing [("", ForRecursion), ("recursion", ForRecursion), ("everything", ForEverything), ("nothing", ForNothing)]
 
 iNSTANCE_MATCHING :: Bool
 iNSTANCE_MATCHING = not $ lookUp $ fsLit "-fsupercompiler-no-instance-matching"

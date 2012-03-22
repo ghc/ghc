@@ -1,4 +1,4 @@
-module Supercompile.Evaluator.Evaluate (normalise, step) where
+module Supercompile.Evaluator.Evaluate (normalise, step, shouldExposeUnfolding) where
 
 #include "HsVersions.h"
 
@@ -24,6 +24,7 @@ import PrelRules
 import Id
 import DataCon
 import Pair
+import BasicTypes
 import Demand (splitStrictSig, isBotRes)
 
 
@@ -152,13 +153,22 @@ step' normalising ei_state = {-# SCC "step'" #-}
       | (Uncast, (_, Indirect _)) <- a = return (deeds, a)
       | otherwise                      = return (deeds, (Uncast, (mkIdentityRenaming (unitVarSet x'), Indirect x')))
 
+    lookupHeap :: PureHeap -> Out Var -> Maybe (HowBound, In AnnedTerm)
+    lookupHeap h x' = do
+        hb <- M.lookup x' h
+        in_e <- heapBindingTerm hb
+        -- We have to check this here (not just when preparing unfoldings) because
+        -- we would like to also exclude local recursive loops, not just top-level ones
+        case shouldExposeUnfolding x' of
+            Nothing      -> return (howBound hb, in_e)
+            Just why_not -> pprTrace "Unavailable:" (ppr x') $
+                            fail why_not
+
     -- We have not yet claimed deeds for the result of this function
     lookupAnswer :: Heap -> Out Var -> Maybe (Anned Answer)
     lookupAnswer (Heap h ids) x' = do
-        hb <- M.lookup x' h
-        case heapBindingTerm hb of
-          Just in_e -> termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
-          Nothing   -> Nothing
+        (_how_bound, in_e) <- lookupHeap h x'
+        termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
     
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
@@ -179,10 +189,9 @@ step' normalising ei_state = {-# SCC "step'" #-}
       , Just (h_extra, k) <- trimUnreachable (length ds) (idType x') k
       = Just (deeds, Heap (h `M.union` h_extra) ids, k, renamedTerm (annedTerm tg (Var x')))
       | otherwise = do
-        hb <- M.lookup x' h
-        in_e <- heapBindingTerm hb
+        (how_bound, in_e) <- lookupHeap h x'
         -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
-        if (howBound hb == InternallyBound)
+        if (how_bound == InternallyBound)
          then return ()
          else trace ("force non-internal: " ++ show x') $ fail "force"
         return $ case k of
@@ -390,3 +399,25 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 Nothing                      -> pprTrace "update-deeds:" (pPrint x') Nothing
                 Just (deeds', prepared_in_v) -> Just (deeds', prepared_in_v)
             return (deeds', Heap (M.insert x' (internallyBound (annedAnswerToInAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, annedAnswerToInAnnedTerm ids (annedAnswer tg_a prepared_in_v))
+
+
+-- We don't want to expose an unfolding if it would not be inlineable in the initial phase.
+-- This gives normal RULES more of a chance to fire.
+shouldExposeUnfolding :: Id -> Maybe String
+shouldExposeUnfolding x = case inl_inline inl_prag of
+    Inlinable super
+      | only_if_superinlinable, not super  -> Just "INLINEABLE but not SUPERINLINABLE"
+    NoInline
+      | isActiveIn 2 (inl_act inl_prag)    -> Just "NONLINE"
+      | only_if_superinlinable             -> Just "(inactive) NOINLINE, not SUPERINLINABLE"
+    EmptyInlineSpec 
+      | only_if_superinlinable             -> Just "not SUPERINLINABLE"
+    _                                      -> Nothing
+  where inl_prag = idInlinePragma x
+        -- EXPERIMENT: only respect the SUPERINLINABLE distinction on *loop breakers*
+        -- The motivation is that we don't really want to go around annotating (GHC.Base.>>=),
+        -- bindIO, etc etc as SUPERINLINABLE.
+        only_if_superinlinable = case sUPERINLINABILITY of
+          ForRecursion  -> isStrongLoopBreaker (idOccInfo x)
+          ForEverything -> True
+          ForNothing    -> False

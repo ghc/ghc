@@ -18,14 +18,14 @@ module Supercompile (supercompileProgram, supercompileProgramSelective) where
 
 import Supercompile.GHC
 import Supercompile.Utilities
-import Supercompile.StaticFlags
 import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S
+import qualified Supercompile.Evaluator.Evaluate as S (shouldExposeUnfolding)
 import qualified Supercompile.Drive.Process1 as S ()
 import qualified Supercompile.Drive.Process2 as S ()
 import qualified Supercompile.Drive.Process3 as S
 
-import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn, TupleSort(..), isStrongLoopBreaker)
+import BasicTypes (TupleSort(..))
 import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
@@ -159,11 +159,22 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
                                                      Right e      -> (             xwhy_nots, (x, e):xes))
                            ([], []) added_fvs
 
+
+    -- NB: at this point we have already done prepareTerm, so used local bindings will be pushed into "e"
+    -- already. Thus all this code basically only affects imported functions. In this way, we exactly match
+    -- the behaviour of GHC's current Specialise pass, which:
+    --  * Exhaustively specialises *locally defined* functions on their dictionary arguments
+    --  * Specialises those *imported* functions that are marked Inlineable
+    --
+    -- NB: it is not sufficient to only check shouldExposeUnfolding here, because a non-recursive function
+    -- might have a *nested* recursive function, and we may want to prevent inlining of that one as well.
+    -- We still do check shouldExposeUnfolding here because we can avoid parsing+tagging those unfoldings
+    -- which can literall never be used.
     varUnfolding x
-      | Just pop <- isPrimOpId_maybe x          = Right $ primOpUnfolding pop
-      | Just dc <- isDataConWorkId_maybe x      = Right $ dataUnfolding dc
-      | Just why_not <- shouldExposeUnfolding x = Left why_not
-      | otherwise                               = case realIdUnfolding x of
+      | Just pop <- isPrimOpId_maybe x            = Right $ primOpUnfolding pop
+      | Just dc <- isDataConWorkId_maybe x        = Right $ dataUnfolding dc
+      | Just why_not <- S.shouldExposeUnfolding x = Left why_not
+      | otherwise                                 = case realIdUnfolding x of
         NoUnfolding                   -> Left "no unfolding"
         OtherCon _                    -> Left "no positive unfolding"
         DFunUnfolding _ dc es         -> Right $ runParseM us2 $ coreExprToTerm $ mkLams as $ mkLams xs $ Var (dataConWorkId dc) `mkTyApps` cls_tys `mkApps` [(e `mkTyApps` map mkTyVarTy as) `mkVarApps` xs | e <- es]
@@ -171,30 +182,6 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
                xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques theta
         CoreUnfolding { uf_tmpl = e } -> Right $ runParseM us2 $ coreExprToTerm e
          -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
-    
-    -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.
-    -- This gives normal RULES more of a chance to fire.
-    --
-    -- NB: at this point we have already done prepareTerm, so used local bindings will be pushed into "e"
-    -- already. Thus all this code basically only affects imported functions. In this way, we exactly match
-    -- the behaviour of GHC's current Specialise pass, which:
-    --  * Exhaustively specialises *locally defined* functions on their dictionary arguments
-    --  * Specialises those *imported* functions that are marked Inlineable
-    shouldExposeUnfolding x = case inl_inline inl_prag of
-        Inlinable super
-          | only_if_superinlinable, not super  -> Just "INLINEABLE but not SUPERINLINABLE"
-        NoInline
-          | isActiveIn 2 (inl_act inl_prag)    -> Just "NONLINE"
-          | only_if_superinlinable             -> Just "(inactive) NOINLINE, not SUPERINLINABLE"
-        EmptyInlineSpec 
-          | only_if_superinlinable             -> Just "not SUPERINLINABLE"
-        _                                      -> Nothing
-      where inl_prag = idInlinePragma x
-            -- EXPERIMENT: only respect the SUPERINLINABLE distinction on *loop breakers*
-            -- The motivation is that we don't really want to go around annotating (GHC.Base.>>=),
-            -- bindIO, etc etc as SUPERINLINABLE.
-            only_if_superinlinable | sUPERINLINABLE_ONLY = isStrongLoopBreaker (idOccInfo x)
-                                   | otherwise           = False
     
     primOpUnfolding pop = S.tyLambdas as $ S.lambdas xs $ S.primOp pop (map mkTyVarTy as) (map S.var xs)
       where (as, arg_tys, _res_ty, _arity, _strictness) = primOpSig pop
