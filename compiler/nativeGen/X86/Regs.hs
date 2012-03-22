@@ -673,8 +673,10 @@ callClobberedRegs
 freeReg _               = 0#
 globalRegMaybe _        = panic "X86.Regs.globalRegMaybe: not defined"
 
-allIntArgRegs           = panic "X86.Regs.globalRegMaybe: not defined"
-callClobberedRegs       = panic "X86.Regs.globalRegMaybe: not defined"
+allArgRegs              = panic "X86.Regs.allArgRegs: not defined"
+allIntArgRegs           = panic "X86.Regs.allIntArgRegs: not defined"
+allFPArgRegs            = panic "X86.Regs.allFPArgRegs: not defined"
+callClobberedRegs       = panic "X86.Regs.callClobberedRegs: not defined"
 
 
 #endif
