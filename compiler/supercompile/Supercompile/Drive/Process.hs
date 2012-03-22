@@ -27,6 +27,7 @@ import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 --import Supercompile.Core.Size
 import Supercompile.Core.Syntax
+import Supercompile.Core.Tag
 
 import Supercompile.Drive.Split (ResidTags)
 
@@ -243,10 +244,15 @@ tagAnnotations (_, Heap h _, k, qa) = IM.unions [go_term (extAnn x []) e | (x, h
       CoApp e _ -> (Nothing, go_term ann e)
       App e _   -> (Nothing, go_term ann e)
       PrimOp _ _ es   -> (Nothing, IM.unions (map (go_term ann) es))
-      Case e x _ alts -> (Nothing, go_term (extAnn x ann) e `IM.union` IM.unions [go_term ann e | (_, e) <- alts])
+      Case e x _ alts -> (Nothing, go_term (extAnn x ann) e `IM.union` IM.unions [go_alt_con alt_con $ go_term ann e | (alt_con, e) <- alts])
       Let x e1 e2     -> (Nothing, go_term (extAnn x ann) e1 `IM.union` go_term ann e2)
       LetRec xes e    -> (Nothing, IM.unions [go_term (extAnn x ann) e | (x, e) <- xes] `IM.union` go_term ann e)
       Cast e _        -> (Nothing, go_term ann e)
+
+    go_alt_con alt_con = case alt_con of
+      DataAlt dc _ _ _ -> insert' [show dc] (dataConTag dc)
+      LiteralAlt l     -> insert' [show l]  (literalTag l)
+      DefaultAlt       -> id
     
     -- NB: this is carefully set up so that we map all those tags that are likely to
     -- be literalTags/dataConTags that occur multiple times in *all* tagged terms to
