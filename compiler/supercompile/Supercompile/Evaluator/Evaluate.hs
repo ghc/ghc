@@ -139,8 +139,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
     -- TODO: in all the code below, I'm no longer sure whether we preserve deeds or not. In particular, the CastBy cases
     -- are a worry. But since the deeds stuff is probably on the way out I'm not trying to fix it right now.
 
-    go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) (\s -> (True, normalise s)) $ force  deeds h k (annedTag anned_x) (annee anned_x)
-    go_answer   (deeds, h, k, anned_a) = maybe (False, (deeds, h, k, fmap Answer anned_a))   (\s -> (True, normalise s)) $ unwind deeds h k (annedTag anned_a) (annee anned_a)
+    go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) ((,) True) $ force  deeds h k (annedTag anned_x) (annee anned_x)
+    go_answer   (deeds, h, k, anned_a) = maybe (False, (deeds, h, k, fmap Answer anned_a))   ((,) True) $ unwind deeds h k (annedTag anned_a) (annee anned_a)
 
     prepareAnswer :: Deeds
                   -> Out Var -- ^ Name to which the value is bound
@@ -173,12 +173,12 @@ step' normalising ei_state = {-# SCC "step'" #-}
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
     -- FIXME: look inside unfoldings
-    force :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Maybe UnnormalisedState
+    force :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Maybe State
     force deeds (Heap h ids) k tg x'
       -- NB: inlining values is non-normalising if dUPLICATE_VALUES_EVALUATOR is on (since doing things the long way would involve executing an update frame)
       | not (dUPLICATE_VALUES_EVALUATOR && normalising)
       , Just anned_a <- lookupAnswer (Heap h ids) x' -- NB: don't unwind *immediately* because we want that changing a Var into a Value in an empty stack is seen as a reduction 'step'
-      = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return (deeds, Heap h ids, k, annedAnswerToInAnnedTerm ids $ annedAnswer (annedTag anned_a) a) }
+      = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return $ normalise (deeds, Heap h ids, k, annedAnswerToInAnnedTerm ids $ annedAnswer (annedTag anned_a) a) }
       -- Try to trim the stack if the Id is guaranteed to bottom out after a certain number of arguments
       -- This is really amazingly important because so many case branches bottom out in at least one branch,
       -- and we can save supercompiling big case nests if we trim them out eagerly.
@@ -187,14 +187,14 @@ step' normalising ei_state = {-# SCC "step'" #-}
       | Just (ds, res_d) <- fmap splitStrictSig $ idStrictness_maybe x'
       , isBotRes res_d
       , Just (h_extra, k) <- trimUnreachable (length ds) (idType x') k
-      = Just (deeds, Heap (h `M.union` h_extra) ids, k, renamedTerm (annedTerm tg (Var x')))
+      = Just (deeds, Heap (h `M.union` h_extra) ids, k, fmap (\(Var x') -> Question x') (annedTerm tg (Var x'))) -- Kind of a hacky way to get an Anned Question!
       | otherwise = do
         (how_bound, in_e) <- lookupHeap h x'
         -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
         if (how_bound == InternallyBound)
          then return ()
          else trace ("force non-internal: " ++ show x') $ fail "force"
-        return $ case k of
+        return $ normalise $ case k of
              -- Avoid creating consecutive update frames: implements "stack squeezing"
              -- FIXME: squeeze through casts as well?
             kf `Car` _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                             k, in_e)
@@ -232,8 +232,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
                           CastIt _          -> Just n
 
     -- Deal with a value at the top of the stack
-    unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
-    unwind deeds h k tg_v a = unconsTrain k >>= \(kf, k) -> case tagee kf of
+    unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe State
+    unwind deeds h k tg_v a = unconsTrain k >>= \(kf, k) -> fmap normalise $ case tagee kf of
         TyApply ty'                    -> tyApply    (deeds `releaseDeeds` 1)          h k tg_v a ty'
         CoApply co'                    -> coApply    (deeds `releaseDeeds` 1)          h k tg_v a co'
         Apply x2'                      -> apply      deeds                    (tag kf) h k tg_v a x2'
