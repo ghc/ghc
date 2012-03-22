@@ -14,6 +14,8 @@ parseEnum prefix def opts = maybe def parse $ lookup_str prefix
 
 -- The StaticFlagsParser admits any option beginning with -fsupercompiler
 
+sUPERINLINABLE_ONLY :: Bool
+sUPERINLINABLE_ONLY = not $ lookUp $ fsLit "-fsupercompiler-no-superinlinable-only"
 
 iNSTANCE_MATCHING :: Bool
 iNSTANCE_MATCHING = not $ lookUp $ fsLit "-fsupercompiler-no-instance-matching"

@@ -741,17 +741,19 @@ instance Binary InlinePragma where
            return (InlinePragma a b c d)
 
 instance Binary InlineSpec where
-    put_ bh EmptyInlineSpec = putByte bh 0
-    put_ bh Inline          = putByte bh 1
-    put_ bh Inlinable       = putByte bh 2
-    put_ bh NoInline        = putByte bh 3
+    put_ bh EmptyInlineSpec   = putByte bh 0
+    put_ bh Inline            = putByte bh 1
+    put_ bh (Inlinable False) = putByte bh 2
+    put_ bh NoInline          = putByte bh 3
+    put_ bh (Inlinable True)  = putByte bh 4
 
     get bh = do h <- getByte bh
                 case h of
                   0 -> return EmptyInlineSpec
                   1 -> return Inline
-                  2 -> return Inlinable
-                  _ -> return NoInline
+                  2 -> return (Inlinable False)
+                  3 -> return NoInline
+                  _ -> return (Inlinable True)
 
 instance Binary HsBang where
     put_ bh HsNoBang        = putByte bh 0

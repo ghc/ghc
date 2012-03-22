@@ -18,6 +18,7 @@ module Supercompile (supercompileProgram, supercompileProgramSelective) where
 
 import Supercompile.GHC
 import Supercompile.Utilities
+import Supercompile.StaticFlags
 import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S
 import qualified Supercompile.Drive.Process1 as S ()
@@ -168,11 +169,17 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
     
     -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.
     -- This gives normal RULES more of a chance to fire.
+    --
+    -- NB: at this point we have already done prepareTerm, so used local bindings will be pushed into "e"
+    -- already. Thus all this code basically only affects imported functions. In this way, we exactly match
+    -- the behaviour of GHC's current Specialise pass, which:
+    --  * Exhaustively specialises *locally defined* functions on their dictionary arguments
+    --  * Specialises those *imported* functions that are marked Inlineable
     shouldExposeUnfolding x = case inl_inline inl_prag of
-        Inline          -> True
-        Inlinable       -> True
-        NoInline        -> isActiveIn 2 (inl_act inl_prag)
-        EmptyInlineSpec -> True
+        Inline          -> not sUPERINLINABLE_ONLY
+        Inlinable super -> not sUPERINLINABLE_ONLY || super
+        NoInline        -> not sUPERINLINABLE_ONLY && isActiveIn 2 (inl_act inl_prag)
+        EmptyInlineSpec -> not sUPERINLINABLE_ONLY
       where inl_prag = idInlinePragma x
     
     primOpUnfolding pop = S.tyLambdas as $ S.lambdas xs $ S.primOp pop (map mkTyVarTy as) (map S.var xs)

@@ -1157,15 +1157,15 @@ specCalls subst rules_for_me calls_for_me fn rhs
                   = neverInlinePragma	-- See Note [Specialising imported functions] in OccurAnal
                   | otherwise	
 		  = case inl_prag of
-                       InlinePragma { inl_inline = Inlinable } 
+                       InlinePragma { inl_inline = Inlinable _ } 
                           -> inl_prag { inl_inline = EmptyInlineSpec }
 		       _  -> inl_prag
 
 		spec_unf
                   = case inlinePragmaSpec spec_inl_prag of
-                      Inline    -> mkInlineUnfolding (Just spec_arity) spec_rhs
-                      Inlinable -> mkInlinableUnfolding spec_rhs
-                      _         -> NoUnfolding
+                      Inline      -> mkInlineUnfolding (Just spec_arity) spec_rhs
+                      Inlinable _ -> mkInlinableUnfolding spec_rhs
+                      _           -> NoUnfolding
 
 		--------------------------------------
 		-- Adding arity information just propagates it a bit faster

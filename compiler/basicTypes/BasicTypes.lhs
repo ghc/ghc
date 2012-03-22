@@ -74,7 +74,8 @@ module BasicTypes(
         isNeverActive, isAlwaysActive, isEarlyActive,
         RuleMatchInfo(..), isConLike, isFunLike, 
         InlineSpec(..), 
-        InlinePragma(..), defaultInlinePragma, alwaysInlinePragma, 
+        InlinePragma(..), Superinlinable,
+        defaultInlinePragma, alwaysInlinePragma, 
         neverInlinePragma, dfunInlinePragma, 
 	isDefaultInlinePragma, 
         isInlinePragma, isInlinablePragma, isAnyInlinePragma,
@@ -92,6 +93,7 @@ import Outputable
 
 import Data.Data hiding (Fixity)
 import Data.Function (on)
+import Data.Maybe (isJust)
 \end{code}
 
 %************************************************************************
@@ -719,11 +721,13 @@ data InlinePragma  	     -- Note [InlinePragma]
 
 data InlineSpec   -- What the user's INLINE pragama looked like
   = Inline
-  | Inlinable
+  | Inlinable Superinlinable
   | NoInline
   | EmptyInlineSpec
   deriving( Eq, Data, Typeable, Show )
 	-- Show needed for Lexer.x
+
+type Superinlinable = Bool -- Marked as superinlinable rather than just inlinable?
 \end{code}
 
 Note [InlinePragma]
@@ -822,16 +826,19 @@ isInlinePragma prag = case inl_inline prag of
                         _      -> False
 
 isInlinablePragma :: InlinePragma -> Bool
-isInlinablePragma prag = case inl_inline prag of
-                           Inlinable -> True
-                           _         -> False
+isInlinablePragma = isJust . isInlinablePragma_maybe
+
+isInlinablePragma_maybe :: InlinePragma -> Maybe Superinlinable
+isInlinablePragma_maybe prag = case inl_inline prag of
+                                 Inlinable si -> Just si
+                                 _            -> Nothing
 
 isAnyInlinePragma :: InlinePragma -> Bool
 -- INLINE or INLINABLE
 isAnyInlinePragma prag = case inl_inline prag of
-                        Inline    -> True
-                        Inlinable -> True
-                        _         -> False
+                        Inline      -> True
+                        Inlinable _ -> True
+                        _           -> False
  
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
@@ -859,10 +866,11 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = ptext (sLit "FUNLIKE")
 
 instance Outputable InlineSpec where
-   ppr Inline          = ptext (sLit "INLINE")
-   ppr NoInline        = ptext (sLit "NOINLINE")
-   ppr Inlinable       = ptext (sLit "INLINABLE")
-   ppr EmptyInlineSpec = empty
+   ppr Inline            = ptext (sLit "INLINE")
+   ppr NoInline          = ptext (sLit "NOINLINE")
+   ppr (Inlinable False) = ptext (sLit "INLINABLE")
+   ppr (Inlinable True)  = ptext (sLit "SUPERINLINABLE")
+   ppr EmptyInlineSpec   = empty
 
 instance Outputable InlinePragma where
   ppr (InlinePragma { inl_inline = inline, inl_act = activation
