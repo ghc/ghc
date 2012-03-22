@@ -404,18 +404,7 @@ tcAddDeclCtxt :: TyClDecl Name -> TcM a -> TcM a
 tcAddDeclCtxt decl thing_inside
   = addErrCtxt ctxt thing_inside
   where
-     thing | isClassDecl decl  = "class"
-	   | isTypeDecl decl   = "type synonym" ++ maybeInst
-	   | isDataDecl decl   = if tcdND decl == NewType 
-				 then "newtype" ++ maybeInst
-				 else "data type" ++ maybeInst
-	   | isFamilyDecl decl = "family"
-	   | otherwise         = panic "tcAddDeclCtxt/thing"
-
-     maybeInst | isFamInstDecl decl = " instance"
-	       | otherwise          = ""
-
-     ctxt = hsep [ptext (sLit "In the"), text thing, 
+     ctxt = hsep [ptext (sLit "In the"), pprTyClDeclFlavour decl, 
 		  ptext (sLit "declaration for"), quotes (ppr (tcdName decl))]
 
 badMethodErr :: Outputable a => a -> Name -> SDoc

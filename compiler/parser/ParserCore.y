@@ -127,18 +127,18 @@ tdefs	:: { [TyClDecl RdrName] }
 
 tdef	:: { TyClDecl RdrName }
 	: '%data' q_tc_name tv_bndrs '=' '{' cons '}' ';'
-	{ TyData { tcdND = DataType, tcdCtxt = noLoc [] 
-	         , tcdLName = noLoc (ifaceExtRdrName $2)
-	         , tcdTyVars = map toHsTvBndr $3
-	         , tcdTyPats = Nothing, tcdKindSig = Nothing
-	         , tcdCons = $6, tcdDerivs = Nothing } }
+	{ TyDecl { tcdLName = noLoc (ifaceExtRdrName $2)
+                 , tcdTyVars = map toHsTvBndr $3
+                 , tcdTyDefn = TyData { td_ND = DataType, td_ctxt = noLoc [] 
+     	                              , td_kindSig = Nothing
+                                      , td_cons = $6, td_derivs = Nothing } } }
 	| '%newtype' q_tc_name tv_bndrs trep ';'
-		{ let tc_rdr = ifaceExtRdrName $2 in
-		    TyData { tcdND = NewType, tcdCtxt = noLoc []
-			     , tcdLName = noLoc tc_rdr
-			     , tcdTyVars = map toHsTvBndr $3
-			     , tcdTyPats = Nothing, tcdKindSig = Nothing
-			     , tcdCons = $4 (rdrNameOcc tc_rdr), tcdDerivs = Nothing } }
+	{ let tc_rdr = ifaceExtRdrName $2 in
+          TyDecl { tcdLName = noLoc tc_rdr
+		 , tcdTyVars = map toHsTvBndr $3
+                 , tcdTyDefn = TyData { td_ND = NewType, td_ctxt = noLoc []
+		                      , td_kindSig = Nothing
+                                      , td_cons = $4 (rdrNameOcc tc_rdr), td_derivs = Nothing } } }
 
 -- For a newtype we have to invent a fake data constructor name
 -- It doesn't matter what it is, because it won't be used

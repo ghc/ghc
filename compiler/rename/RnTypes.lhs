@@ -26,7 +26,7 @@ module RnTypes (
 	rnSplice, checkTH,
 
         -- Binding related stuff
-        bindSigTyVarsFV, bindHsTyVars, bindTyClTyVars, rnHsBndrSig
+        bindSigTyVarsFV, bindHsTyVars, bindTyVarsRn, rnHsBndrSig
   ) where
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
@@ -36,7 +36,7 @@ import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
 
 import DynFlags
 import HsSyn
-import RdrHsSyn		( extractHsRhoRdrTyVars, extractHsTyRdrTyVars )
+import RdrHsSyn		( extractHsTyRdrTyVars, extractHsTysRdrTyVars )
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
 import TcRnMonad
@@ -121,14 +121,14 @@ rnHsKind = rnHsTyKi False
 
 rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
-rnHsTyKi isType doc (HsForAllTy Implicit _ ctxt ty) 
+rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty) 
   = ASSERT ( isType ) do
 	-- Implicit quantifiction in source code (no kinds on tyvars)
 	-- Given the signature  C => T  we universally quantify 
 	-- over FV(T) \ {in-scope-tyvars} 
     name_env <- getLocalRdrEnv
     let
-	mentioned = extractHsRhoRdrTyVars ctxt ty
+	mentioned = extractHsTysRdrTyVars (ty:ctxt)
 
 	-- Don't quantify over type variables that are in scope;
 	-- when GlasgowExts is off, there usually won't be any, except for
@@ -137,17 +137,17 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ ctxt ty)
 	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env) . unLoc) mentioned
 	tyvar_bndrs   = userHsTyVarBndrs forall_tyvars
 
-    rnForAll doc Implicit tyvar_bndrs ctxt ty
+    rnForAll doc Implicit tyvar_bndrs lctxt ty
 
-rnHsTyKi isType doc ty@(HsForAllTy Explicit forall_tyvars ctxt tau)
+rnHsTyKi isType doc ty@(HsForAllTy Explicit forall_tyvars lctxt@(L _ ctxt) tau)
   = ASSERT ( isType ) do { 	-- Explicit quantification.
          -- Check that the forall'd tyvars are actually 
 	 -- mentioned in the type, and produce a warning if not
-         let mentioned   = extractHsRhoRdrTyVars ctxt tau
+         let mentioned   = extractHsTysRdrTyVars (tau:ctxt)
              in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
        ; warnUnusedForAlls (in_type_doc $$ docOfHsDocContext doc) forall_tyvars mentioned
 
-       ; rnForAll doc Explicit forall_tyvars ctxt tau }
+       ; rnForAll doc Explicit forall_tyvars lctxt tau }
 
 rnHsTyKi isType _ (HsTyVar rdr_name)
   = do { name <- rnTyVar isType rdr_name
@@ -329,56 +329,6 @@ bindSigTyVarsFV tvs thing_inside
 		thing_inside 
 	  else
 		bindLocalNamesFV tvs thing_inside }
-
----------------
-bindTyClTyVars 
-    :: HsDocContext 
-    -> Maybe (Name, [Name])      -- Parent class and its tyvars
-                                 -- (but not kind vars)
-    -> [LHsTyVarBndr RdrName]
-    -> ([LHsTyVarBndr Name] -> RnM (a, FreeVars))
-    -> RnM (a, FreeVars)
--- Used for tyvar binders in type/class declarations
--- Just like bindHsTyVars, but deals with the case of associated
--- types, where the type variables may be already in scope
-bindTyClTyVars doc mb_cls tyvars thing_inside
-  | Just (_, cls_tvs) <- mb_cls   -- Associated type family or type instance
-  = do { let tv_rdr_names = map hsLTyVarLocName tyvars
-       	     -- *All* the free vars of the family patterns
-
-       -- Check for duplicated bindings
-       -- This test is irrelevant for data/type *instances*, where the tyvars
-       -- are the free tyvars of the patterns, and hence have no duplicates
-       -- But it's needed for data/type *family* decls
-       ; checkDupRdrNames tv_rdr_names
-
-       -- Make the Names for the tyvars
-       ; rdr_env <- getLocalRdrEnv
-       ; let mk_tv_name :: Located RdrName -> RnM Name
-              -- Use the same Name as the parent class decl
-             mk_tv_name (L l tv_rdr)
-               = case lookupLocalRdrEnv rdr_env tv_rdr of 
-                    Just n  -> return n
-                    Nothing -> newLocalBndrRn (L l tv_rdr)
-       ; tv_ns <- mapM mk_tv_name tv_rdr_names
-
-       ; (thing, fvs) <- bindTyVarsRn doc tyvars tv_ns thing_inside
-
-            -- See Note [Renaming associated types] 
-       ; let bad_tvs = fvs `intersectNameSet` mkNameSet cls_tvs
-       ; unless (isEmptyNameSet bad_tvs) (badAssocRhs (nameSetToList bad_tvs))
-
-       ; return (thing, fvs) }
-
-  | otherwise   -- Not associated, just fall through to bindHsTyVars
-  = bindHsTyVars doc tyvars thing_inside
-
-badAssocRhs :: [Name] -> RnM ()
-badAssocRhs ns
-  = addErr (hang (ptext (sLit "The RHS of an associated type declaration mentions type variable") 
-                  <> plural ns 
-                  <+> pprWithCommas (quotes . ppr) ns)
-               2 (ptext (sLit "All such variables must be bound on the LHS")))
 
 ---------------
 bindHsTyVars :: HsDocContext -> [LHsTyVarBndr RdrName]

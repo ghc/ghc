@@ -443,13 +443,14 @@ tcLocalInstDecl1 :: LInstDecl Name
         -- Type-check all the stuff before the "where"
         --
         -- We check for respectable instance type, and context
-tcLocalInstDecl1 (L loc (FamInstDecl decl))
+tcLocalInstDecl1 (L loc (FamInstD decl))
   = setSrcSpan loc      $
-    tcAddDeclCtxt decl  $
+    tcAddFamInstCtxt decl  $
     do { fam_inst <- tcFamInstDecl TopLevel decl
        ; return ([], [fam_inst]) }
 
-tcLocalInstDecl1 (L loc (ClsInstDecl poly_ty binds uprags ats))
+tcLocalInstDecl1 (L loc (ClsInstD { cid_poly_ty = poly_ty, cid_binds = binds
+                                  , cid_sigs = uprags, cid_fam_insts = ats }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
 
@@ -468,7 +469,7 @@ tcLocalInstDecl1 (L loc (ClsInstDecl poly_ty binds uprags ats))
 
         -- Check for missing associated types and build them
         -- from their defaults (if available)
-        ; let defined_ats = mkNameSet $ map (tcdName . unLoc) ats
+        ; let defined_ats = mkNameSet $ map famInstDeclName ats
 
               mk_deflt_at_instances :: ClassATItem -> TcM [FamInst]
               mk_deflt_at_instances (fam_tc, defs)
@@ -522,12 +523,12 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 
 \begin{code}
-tcFamInstDecl :: TopLevelFlag -> TyClDecl Name -> TcM FamInst
+tcFamInstDecl :: TopLevelFlag -> FamInstDecl Name -> TcM FamInst
 tcFamInstDecl top_lvl decl
   = do { -- Type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr decl)
-       ; let fam_tc_lname = tcdLName decl
+       ; let fam_tc_lname = fid_tycon decl
        ; type_families <- xoptM Opt_TypeFamilies
        ; is_boot <- tcIsHsBoot   -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl fam_tc_lname
@@ -544,10 +545,11 @@ tcFamInstDecl top_lvl decl
          -- This is where type and data decls are treated separately
        ; tcFamInstDecl1 fam_tc decl }
 
-tcFamInstDecl1 :: TyCon -> TyClDecl Name -> TcM FamInst
+tcFamInstDecl1 :: TyCon -> FamInstDecl Name -> TcM FamInst
 
   -- "type instance"
-tcFamInstDecl1 fam_tc (decl@TySynonym {})
+tcFamInstDecl1 fam_tc decl@(FamInstDecl { fid_tycon = fam_tc_name
+                                        , fid_defn = TySynonym {} })
   = do { -- (1) do the work of verifying the synonym
        ; (t_tvs, t_typats, t_rhs) <- tcSynFamInstDecl fam_tc decl
 
@@ -555,21 +557,22 @@ tcFamInstDecl1 fam_tc (decl@TySynonym {})
        ; checkValidFamInst t_typats t_rhs
 
          -- (3) construct representation tycon
-       ; rep_tc_name <- newFamInstAxiomName (tcdLName decl) t_typats
+       ; rep_tc_name <- newFamInstAxiomName fam_tc_name t_typats
 
        ; return (mkSynFamInst rep_tc_name t_tvs fam_tc t_typats t_rhs) }
 
   -- "newtype instance" and "data instance"
-tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data, tcdCType = cType
-                                   , tcdCtxt = ctxt
-                                   , tcdTyVars = tvs, tcdTyPats = Just pats
-                                   , tcdCons = cons})
+tcFamInstDecl1 fam_tc 
+    (FamInstDecl { fid_pats = pats
+                 , fid_tycon = fam_tc_name
+                 , fid_defn = defn@TyData { td_ND = new_or_data, td_cType = cType
+                                          , td_ctxt = ctxt, td_cons = cons } })
   = do { -- Check that the family declaration is for the right kind
          checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isAlgTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
          -- Kind check type patterns
-       ; tcFamTyPats fam_tc tvs pats (kcDataDecl decl) $ 
+       ; tcFamTyPats fam_tc pats (kcTyDefn defn) $ 
            \tvs' pats' res_kind -> do
 
          -- Check that left-hand side contains no type family applications
@@ -581,10 +584,10 @@ tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data, tcdCType = cType
        ; checkTc (isLiftedTypeKind res_kind) $ tooFewParmsErr (tyConArity fam_tc)
 
        ; stupid_theta <- tcHsContext ctxt
-       ; dataDeclChecks (tcdName decl) new_or_data stupid_theta cons
+       ; dataDeclChecks (tyConName fam_tc) new_or_data stupid_theta cons
 
          -- Construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName (tcdLName decl) pats'
+       ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newImplicitBinder rep_tc_name mkInstTyCoOcc
        ; let ex_ok = True       -- Existentials ok for type families!
              orig_res_ty = mkTyConApp fam_tc pats'
@@ -615,17 +618,15 @@ tcFamInstDecl1 fam_tc (decl@TyData { tcdND = new_or_data, tcdCType = cType
                         L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
                         _ -> True
 
-tcFamInstDecl1 _ d = pprPanic "tcFamInstDecl1" (ppr d)
-
 
 ----------------
-tcAssocDecl :: Class           -- ^ Class of associated type
-            -> VarEnv Type     -- ^ Instantiation of class TyVars
-            -> LTyClDecl Name  -- ^ RHS
+tcAssocDecl :: Class              -- ^ Class of associated type
+            -> VarEnv Type        -- ^ Instantiation of class TyVars
+            -> LFamInstDecl Name  -- ^ RHS
             -> TcM FamInst
 tcAssocDecl clas mini_env (L loc decl)
   = setSrcSpan loc      $
-    tcAddDeclCtxt decl  $
+    tcAddFamInstCtxt decl  $
     do { fam_inst <- tcFamInstDecl NotTopLevel decl
        ; let (fam_tc, at_tys) = famInstLHS fam_inst
 
