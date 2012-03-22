@@ -26,6 +26,7 @@ import CoreUnfold (exprIsConApp_maybe)
 import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo, mkAxInstCo)
 import DataCon    (DataCon, dataConWorkId, dataConTyCon, dataConName)
 import Var        (isTyVar)
+import PrimOp     (primOpSig)
 import Id
 import MkId       (mkPrimOpId)
 import FastString (mkFastString)
@@ -148,10 +149,18 @@ conAppToTerm dc es
 coreExprToTerm :: CoreExpr -> ParseM S.Term
 coreExprToTerm init_e = {-# SCC "coreExprToTerm" #-} term init_e
   where
-    -- PrimOp and (partially applied) Data are dealt with later on by generating appropriate unfoldings
-    -- We use exprIsConApp_maybe here to ensure we desugar explicit constructor use into something that looks cheap
+    -- Partially-applied PrimOp and Data are dealt with later on by generating appropriate unfoldings
+    -- We use exprIsConApp_maybe here to ensure we desugar explicit constructor use into something that looks cheap,
+    -- and we do our own thing to spot saturated primop applications
     term e | Just (dc, univ_tys, es) <- exprIsConApp_maybe (const NoUnfolding) e
            = conAppToTerm dc (map Type univ_tys ++ es)
+           | (Var x, es) <- collectArgs e
+           , Just pop <- isPrimOpId_maybe x
+           , (tys, es) <- takeWhileJust (\e -> case e of Type ty -> Just ty; _ -> Nothing) es
+           , all isValArg es
+           , (_,_,_,arity,_) <- primOpSig pop
+           , length es == arity
+           = fmap (S.primOp pop tys) (mapM term es)
     term (Var x)                   = return $ S.var x
     term (Lit l)                   = return $ S.value (S.Literal l)
     term (App e_fun (Type ty_arg)) = fmap (flip S.tyApp ty_arg) (term e_fun)

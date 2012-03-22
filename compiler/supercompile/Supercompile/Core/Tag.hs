@@ -9,6 +9,8 @@ import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 
 import Literal (hashLiteral)
+import Unique  (mkPrimOpIdUnique)
+import qualified PrimOp as PrimOp (primOpTag)
 
 
 tagTerm :: UniqSupply -> Term -> TaggedTerm
@@ -22,12 +24,22 @@ tagFVedTerm = mkTagger (\tg e -> Comp (Tagged tg e))
 -- be one tag for a particular value. If we give every occurrence of (:) in the input
 -- program a different tag we can get weird situations (like gen_regexps) where programs
 -- are specialised on very long repititions of the same constructor.
+--
+-- The special treatment of PrimOp has a similar reason, and is necessary because I started
+-- treating PrimOp specially and unfolding it without going through the wrapper if it is
+-- saturated. This saves us from ANFing the arguments to a primop, which is cool!
+
+uniqueToTag :: Unique -> Tag
+uniqueToTag = mkTag . negate . abs . getKey -- Works well because (hashLiteral l) is always positive
 
 dataConTag :: DataCon -> Tag
-dataConTag dc = mkTag (negate (abs (getKey (getUnique dc)))) -- Works well because (hashLiteral l) is always positive. Don't use dataConTag because tags are shared between DC families
+dataConTag = uniqueToTag . getUnique -- Don't use dataConTag because tags are shared between DC families, and [], True and all dictionary all get the same tag!!
 
 literalTag :: Literal -> Tag
 literalTag = mkTag . hashLiteral
+
+primOpTag :: PrimOp -> Tag
+primOpTag = uniqueToTag . mkPrimOpIdUnique . PrimOp.primOpTag
 
 
 {-# INLINE mkTagger #-}
@@ -47,8 +59,8 @@ mkTagger rec = term
         TyApp e ty        -> tag $ \ids -> TyApp (term ids e) ty
         CoApp e co        -> tag $ \ids -> CoApp (term ids e) co
         App e x           -> tag $ \ids -> App (term ids e) x
-        PrimOp pop tys es -> tag $ \ids -> let idss' = listSplitUniqSupply ids
-                                           in PrimOp pop tys (zipWith term idss' es)
+        PrimOp pop tys es -> rec (primOpTag pop) $ replace e $ let idss' = listSplitUniqSupply ids
+                                                               in PrimOp pop tys (zipWith term idss' es)
         Case e x ty alts  -> tag $ \ids -> let (ids0', ids1') = splitUniqSupply ids
                                            in Case (term ids0' e) x ty (alternatives ids1' alts)
         Let x e1 e2       -> tag $ \ids -> let (ids0', ids1') = splitUniqSupply ids
@@ -63,8 +75,8 @@ mkTagger rec = term
         Indirect x         -> tag $ \_ -> Indirect x
         TyLambda x e       -> tag $ \ids -> TyLambda x (term ids e)
         Lambda x e         -> tag $ \ids -> Lambda x (term ids e)
-        Data dc tys cos xs -> rec (dataConTag dc) (replace e (Data dc tys cos xs))
-        Literal l          -> rec (literalTag l)  (replace e (Literal l))
+        Data dc tys cos xs -> rec (dataConTag dc) $ replace e (Data dc tys cos xs)
+        Literal l          -> rec (literalTag l)  $ replace e (Literal l)
         Coercion co        -> tag $ \_ -> Coercion co
       where tag = tag_rec ids e
 
