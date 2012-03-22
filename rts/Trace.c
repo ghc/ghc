@@ -308,6 +308,7 @@ void traceCapsetEvent_ (EventTypeNum tag,
                         CapsetID capset,
                         StgWord info)
 {
+#if 0
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         ACQUIRE_LOCK(&trace_utx);
@@ -331,6 +332,7 @@ void traceCapsetEvent_ (EventTypeNum tag,
         }
         RELEASE_LOCK(&trace_utx);
     } else
+#endif
 #endif
     {
         if (eventlog_enabled) {
