@@ -25,7 +25,7 @@ import qualified Supercompile.Drive.Process1 as S ()
 import qualified Supercompile.Drive.Process2 as S ()
 import qualified Supercompile.Drive.Process3 as S
 
-import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn, TupleSort(..))
+import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn, TupleSort(..), isStrongLoopBreaker)
 import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
@@ -144,27 +144,32 @@ mkLiftedTupleSelector xs want_x tup_e
   where n = length xs
 
 termUnfoldings :: S.Term -> [(Var, S.Term)]
-termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
+termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
   where
-    go new_fvs all_fvs all_xes
-      | isEmptyVarSet added_fvs = all_xes -- FIXME: varBndrFreeVars?
-      | otherwise               = go (unionVarSets (map (S.termFreeVars . snd) added_xes)) (all_fvs `unionVarSet` added_fvs) (added_xes ++ all_xes)
+    -- FIXME: varBndrFreeVars?
+    go new_fvs all_fvs all_xwhy_nots all_xes
+      | isEmptyVarSet added_fvs = pprTrace "termUnfoldings" (vcat [hang (text why_not <> text ":") 2 (vcat (map ppr xs)) | (why_not, xs) <- groups snd fst all_xwhy_nots]) $
+                                  all_xes
+      | otherwise               = go (unionVarSets (map (S.termFreeVars . snd) added_xes)) (all_fvs `unionVarSet` added_fvs)
+                                     (added_xwhy_nots ++ all_xwhy_nots) (added_xes ++ all_xes)
       where added_fvs = new_fvs `minusVarSet` all_fvs
-            added_xes = [ (x, e)
-                        | x <- varSetElems added_fvs
-                        , Just e <- [varUnfolding x]]
+            (added_xwhy_nots, added_xes)
+              = foldVarSet (\x (xwhy_nots, xes) -> case varUnfolding x of
+                                                     Left why_not -> ((x, why_not):xwhy_nots,        xes)
+                                                     Right e      -> (             xwhy_nots, (x, e):xes))
+                           ([], []) added_fvs
 
     varUnfolding x
-      | Just pop <- isPrimOpId_maybe x     = Just $ primOpUnfolding pop
-      | Just dc <- isDataConWorkId_maybe x = Just $ dataUnfolding dc
-      | not (shouldExposeUnfolding x)      = Nothing
-      | otherwise                          = case realIdUnfolding x of
-        NoUnfolding                   -> Nothing
-        OtherCon _                    -> Nothing
-        DFunUnfolding _ dc es         -> Just $ runParseM us2 $ coreExprToTerm $ mkLams as $ mkLams xs $ Var (dataConWorkId dc) `mkTyApps` cls_tys `mkApps` [(e `mkTyApps` map mkTyVarTy as) `mkVarApps` xs | e <- es]
+      | Just pop <- isPrimOpId_maybe x          = Right $ primOpUnfolding pop
+      | Just dc <- isDataConWorkId_maybe x      = Right $ dataUnfolding dc
+      | Just why_not <- shouldExposeUnfolding x = Left why_not
+      | otherwise                               = case realIdUnfolding x of
+        NoUnfolding                   -> Left "no unfolding"
+        OtherCon _                    -> Left "no positive unfolding"
+        DFunUnfolding _ dc es         -> Right $ runParseM us2 $ coreExprToTerm $ mkLams as $ mkLams xs $ Var (dataConWorkId dc) `mkTyApps` cls_tys `mkApps` [(e `mkTyApps` map mkTyVarTy as) `mkVarApps` xs | e <- es]
          where (as, theta, _cls, cls_tys) = tcSplitDFunTy (idType x)
                xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques theta
-        CoreUnfolding { uf_tmpl = e } -> Just $ runParseM us2 $ coreExprToTerm e
+        CoreUnfolding { uf_tmpl = e } -> Right $ runParseM us2 $ coreExprToTerm e
          -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
     
     -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.
@@ -176,11 +181,20 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
     --  * Exhaustively specialises *locally defined* functions on their dictionary arguments
     --  * Specialises those *imported* functions that are marked Inlineable
     shouldExposeUnfolding x = case inl_inline inl_prag of
-        Inline          -> not sUPERINLINABLE_ONLY
-        Inlinable super -> not sUPERINLINABLE_ONLY || super
-        NoInline        -> not sUPERINLINABLE_ONLY && isActiveIn 2 (inl_act inl_prag)
-        EmptyInlineSpec -> not sUPERINLINABLE_ONLY
+        Inlinable super
+          | only_if_superinlinable, not super  -> Just "INLINEABLE but not SUPERINLINABLE"
+        NoInline
+          | isActiveIn 2 (inl_act inl_prag)    -> Just "NONLINE"
+          | only_if_superinlinable             -> Just "(inactive) NOINLINE, not SUPERINLINABLE"
+        EmptyInlineSpec 
+          | only_if_superinlinable             -> Just "not SUPERINLINABLE"
+        _                                      -> Nothing
       where inl_prag = idInlinePragma x
+            -- EXPERIMENT: only respect the SUPERINLINABLE distinction on *loop breakers*
+            -- The motivation is that we don't really want to go around annotating (GHC.Base.>>=),
+            -- bindIO, etc etc as SUPERINLINABLE.
+            only_if_superinlinable | sUPERINLINABLE_ONLY = isStrongLoopBreaker (idOccInfo x)
+                                   | otherwise           = False
     
     primOpUnfolding pop = S.tyLambdas as $ S.lambdas xs $ S.primOp pop (map mkTyVarTy as) (map S.var xs)
       where (as, arg_tys, _res_ty, _arity, _strictness) = primOpSig pop
