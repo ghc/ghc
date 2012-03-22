@@ -190,6 +190,12 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; checkL (not (isStrictId binder)
             || (isNonRec rec_flag && not (isTopLevel top_lvl_flag)))
            (mkStrictMsg binder)
+        -- Check that if the binder is local, it is not marked as exported
+       ; checkL (not (isExportedId binder) || isTopLevel top_lvl_flag)
+           (mkNonTopExportedMsg binder)
+        -- Check that if the binder is local, it does not have an external name
+       ; checkL (not (isExternalName (Var.varName binder)) || isTopLevel top_lvl_flag)
+           (mkNonTopExternalNameMsg binder)
         -- Check whether binder's specialisations contain any out-of-scope variables
        ; mapM_ (checkBndrIdInScope binder) bndr_vars 
 
@@ -1020,7 +1026,7 @@ lookupIdInScope id
 		Nothing -> do { addErrL out_of_scope
 			      ; return id } }
   where
-    out_of_scope = ppr id <+> ptext (sLit "is out of scope")
+    out_of_scope = pprBndr LetBind id <+> ptext (sLit "is out of scope")
 
 
 oneTupleDataConId :: Id	-- Should not happen
@@ -1040,7 +1046,7 @@ checkInScope :: SDoc -> Var -> LintM ()
 checkInScope loc_msg var =
  do { subst <- getTvSubst
     ; checkL (not (mustHaveLocalBinding var) || (var `isInScope` subst))
-             (hsep [ppr var, loc_msg]) }
+             (hsep [pprBndr LetBind var, loc_msg]) }
 
 checkTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
@@ -1220,6 +1226,13 @@ mkStrictMsg binder
 	      hsep [ptext (sLit "Binder's demand info:"), ppr (idDemandInfo binder)]
 	     ]
 
+mkNonTopExportedMsg :: Id -> MsgDoc
+mkNonTopExportedMsg binder
+  = hsep [ptext (sLit "Non-top-level binder is marked as exported:"), ppr binder]
+
+mkNonTopExternalNameMsg :: Id -> MsgDoc
+mkNonTopExternalNameMsg binder
+  = hsep [ptext (sLit "Non-top-level binder has an external name:"), ppr binder]
 
 mkKindErrMsg :: TyVar -> Type -> MsgDoc
 mkKindErrMsg tyvar arg_ty
