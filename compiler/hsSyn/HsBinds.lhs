@@ -470,8 +470,8 @@ data Sig name   -- Signatures and pragmas
 
         -- An inline pragma
         -- {#- INLINE f #-}
-  | InlineSig   (Located name)  -- Function name
-                InlinePragma    -- Never defaultInlinePragma
+  | InlineSig   (Maybe (Located name))  -- Function name: Nothing if applies to whole module
+                InlinePragma            -- Never defaultInlinePragma
 
         -- A specialisation pragma
         -- {-# SPECIALISE f :: Int -> Int #-}
@@ -588,7 +588,7 @@ overlapHsSig sig1 sig2 = case (unLoc sig1, unLoc sig2) of
   (IdSig n1,                IdSig n2)                -> n1 == n2
   (TypeSig ns1 _,           TypeSig ns2 _)           -> ns1 `overlaps_with` ns2
   (GenericSig ns1 _,        GenericSig ns2 _)        -> ns1 `overlaps_with` ns2
-  (InlineSig n1 _,          InlineSig n2 _)          -> unLoc n1 == unLoc n2
+  (InlineSig n1 _,          InlineSig n2 _)          -> fmap unLoc n1 == fmap unLoc n2
   (SupercompileSig n1,      SupercompileSig n2)      -> unLoc n1 == unLoc n2
   -- For specialisations, we don't have equality over HsType, so it's not
   -- convenient to spot duplicate specialisations here.  Check for this later,
@@ -608,7 +608,7 @@ ppr_sig (GenericSig vars ty)      = ptext (sLit "default") <+> pprVarSig (map un
 ppr_sig (IdSig id)                = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig fix_sig)          = ppr fix_sig
 ppr_sig (SpecSig var ty inl)      = pragBrackets (pprSpec var (ppr ty) inl)
-ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
+ppr_sig (InlineSig mb_var inl)    = pragBrackets (ppr inl <+> maybe (ptext (sLit "module")) ppr mb_var)
 ppr_sig (SupercompileSig var)     = pragBrackets (ppr var)
 ppr_sig (SpecInstSig ty)          = pragBrackets (ptext (sLit "SPECIALIZE instance") <+> ppr ty)
 

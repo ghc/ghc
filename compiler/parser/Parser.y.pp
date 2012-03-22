@@ -595,6 +595,8 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | '{-# VECTORISE' 'class' gtycon '#-}'  { unitOL $ LL $ VectD (HsVectClassIn $3) }
         | '{-# VECTORISE_SCALAR' 'instance' type '#-}'     
                                                 { unitOL $ LL $ VectD (HsVectInstIn $3) }
+        | '{-# INLINE' activation 'module' '#-}'        
+                                                { unitOL (LL $ SigD (InlineSig Nothing (mkInlinePragma (getINLINE $1) $2))) }
         | annotation { unitOL $1 }
         | decl                                  { unLoc $1 }
 
@@ -1347,7 +1349,7 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
         | infix prec ops        { LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
                                              | n <- unLoc $3 ] }
         | '{-# INLINE' activation qvar '#-}'        
-                { LL $ unitOL (LL $ SigD (InlineSig $3 (mkInlinePragma (getINLINE $1) $2))) }
+                { LL $ unitOL (LL $ SigD (InlineSig (Just $3) (mkInlinePragma (getINLINE $1) $2))) }
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
                 { let inl_prag = mkInlinePragma (EmptyInlineSpec, FunLike) $2
                   in LL $ toOL [ LL $ SigD (SpecSig $3 t inl_prag) 

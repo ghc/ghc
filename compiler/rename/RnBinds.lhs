@@ -53,6 +53,7 @@ import FastString
 import Data.List	( partition )
 import Maybes		( orElse )
 import Control.Monad
+import Data.Traversable ( traverse )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -701,13 +702,13 @@ renameSig ctxt sig@(SpecSig v ty inl)
 	; (new_ty, fvs) <- rnHsSigType (quotes (ppr v)) ty
 	; return (SpecSig new_v new_ty inl, fvs) }
 
-renameSig ctxt sig@(InlineSig v s)
-  = do	{ new_v <- lookupSigOccRn ctxt sig v
-	; return (InlineSig new_v s, emptyFVs) }
+renameSig ctxt sig@(InlineSig mb_v s)
+  = do	{ new_mb_v <- traverse (lookupSigOccRn ctxt sig) mb_v
+	; return (InlineSig new_mb_v s, emptyFVs) }
 
 renameSig ctxt sig@(SupercompileSig v)
   = do  { new_v <- lookupSigOccRn ctxt sig v
-        ; return (SupercompileSig new_v) }
+        ; return (SupercompileSig new_v, emptyFVs) }
 
 renameSig ctxt sig@(FixSig (FixitySig v f))
   = do	{ new_v <- lookupSigOccRn ctxt sig v

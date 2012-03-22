@@ -535,9 +535,9 @@ rep_sig (L _   (GenericSig nm _))     = failWithDs msg
   where msg = vcat  [ ptext (sLit "Illegal default signature for") <+> quotes (ppr nm)
                     , ptext (sLit "Default signatures are not supported by Template Haskell") ]
 
-rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
-rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
-rep_sig _                             = return []
+rep_sig (L loc (InlineSig (Just nm) ispec)) = rep_inline nm ispec loc
+rep_sig (L loc (SpecSig nm ty ispec))       = rep_specialise nm ty ispec loc
+rep_sig _                                   = return []
 
 rep_ty_sig :: SrcSpan -> LHsType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)

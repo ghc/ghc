@@ -413,7 +413,7 @@ cvt_conv TH.StdCall = StdCallConv
 cvtPragmaD :: Pragma -> CvtM (Sig RdrName)
 cvtPragmaD (InlineP nm ispec)
   = do { nm'    <- vNameL nm
-       ; return $ InlineSig nm' (cvtInlineSpec (Just ispec)) }
+       ; return $ InlineSig (Just nm') (cvtInlineSpec (Just ispec)) }
 
 cvtPragmaD (SpecialiseP nm ty opt_ispec)
   = do { nm' <- vNameL nm

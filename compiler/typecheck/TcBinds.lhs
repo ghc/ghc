@@ -47,6 +47,7 @@ import Outputable
 import FastString
 
 import Control.Monad
+import Data.Either
 import Data.List
 
 #include "HsVersions.h"
@@ -587,17 +588,18 @@ mkExport prag_fn qtvs theta (poly_name, mb_sig, mono_id)
 type PragFun = Name -> [LSig Name]
 
 mkPragFun :: [LSig Name] -> LHsBinds Name -> PragFun
-mkPragFun sigs binds = \n -> lookupNameEnv prag_env n `orElse` []
+mkPragFun sigs binds = \n -> map ($ n) defs ++ (lookupNameEnv prag_env n `orElse` [])
   where
-    prs = mapCatMaybes get_sig sigs
+    (defs, prs) = partitionEithers $ mapCatMaybes get_sig sigs
 
-    get_sig :: LSig Name -> Maybe (Located Name, LSig Name)
-    get_sig (L l (SpecSig nm ty inl))  = Just (nm, L l $ SpecSig  nm ty (add_arity nm inl))
-    get_sig (L l (InlineSig nm inl))   = Just (nm, L l $ InlineSig nm   (add_arity nm inl))
-    get_sig (L l (SupercompileSig nm)) = Just (nm, L l $ SupercompileSig nm)
-    get_sig _                          = Nothing
+    get_sig :: LSig Name -> Maybe (Either (Name -> LSig Name) (Located Name, LSig Name))
+    get_sig (L l (SpecSig nm ty inl))       = Just (Right (nm,    L l $ SpecSig   nm     ty (add_arity (unLoc nm) inl)))
+    get_sig (L l (InlineSig (Just nm) inl)) = Just (Right (nm,    L l $ InlineSig (Just nm) (add_arity (unLoc nm) inl)))
+    get_sig (L l (InlineSig Nothing   inl)) = Just (Left  (\nm -> L l $ InlineSig Nothing   (add_arity        nm  inl)))
+    get_sig (L l (SupercompileSig nm))      = Just (Right (nm,    L l $ SupercompileSig nm))
+    get_sig _                               = Nothing
 
-    add_arity (L _ n) inl_prag   -- Adjust inl_sat field to match visible arity of function
+    add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
       | Just ar <- lookupNameEnv ar_env n,
         Inline <- inl_inline inl_prag     = inl_prag { inl_sat = Just ar }
         -- add arity only for real INLINE pragmas, not INLINABLE

@@ -47,6 +47,7 @@ import Util
 import Outputable
 import FastString
 import Control.Monad
+import Data.Maybe (isJust)
 import Data.List (partition)
 \end{code}
 
@@ -258,8 +259,11 @@ addInlinePrags poly_id prags0 = do
     poly_id <- one sups (sLit "SUPERCOMPILE") poly_id $ \(SupercompileSig {}) -> poly_id `setSupercompilePragma` True
     return (prags2, poly_id)
   where
-    (inls, prags1) = partition isInlineLSig       prags0
-    (sups, prags2) = partition isSupercompileLSig prags1
+    (inls0, prags1) = partition isInlineLSig       prags0
+    (sups,  prags2) = partition isSupercompileLSig prags1
+
+    inls = if null specific then defs else specific
+      where (specific, defs) = partition (\(L _ (InlineSig mb_n _)) -> isJust mb_n) inls0
 
     one []                             _    nth _   = return nth
     one all_prags@((L loc prag):prags) what _   jst = do
