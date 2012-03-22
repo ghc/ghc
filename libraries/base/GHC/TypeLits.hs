@@ -174,8 +174,8 @@ instance Show (IsZero n) where
 
 data IsEven :: Nat -> * where
   IsEvenZero :: IsEven 0
-  IsEven     :: !(TNat n) -> IsEven (2 * n + 2)
-  IsOdd      :: !(TNat n) -> IsEven (2 * n + 1)
+  IsEven     :: !(TNat (n+1)) -> IsEven (2 * n + 2)
+  IsOdd      :: !(TNat n)     -> IsEven (2 * n + 1)
 
 isEven :: TNat n -> IsEven n
 isEven (TNat n) | n == 0      = unsafeCoerce IsEvenZero
