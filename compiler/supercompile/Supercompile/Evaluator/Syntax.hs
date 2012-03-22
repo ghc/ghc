@@ -339,6 +339,9 @@ stackSize = trainCarFoldl' (\size kf -> size + stackFrameSize (tagee kf)) 0
 stateSize :: State -> Size
 stateSize (_, h, k, qa) = heapSize h + stackSize k + annedSize qa
 
+unnormalisedStateSize :: UnnormalisedState -> Size
+unnormalisedStateSize (_, h, k, (_, e)) = heapSize h + stackSize k + annedSize e
+
 
 addStateDeeds :: Deeds -> (Deeds, a, b, c) -> (Deeds, a, b, c)
 addStateDeeds extra_deeds (deeds, h, k, in_e) = (extra_deeds `plusDeeds` deeds, h, k, in_e)

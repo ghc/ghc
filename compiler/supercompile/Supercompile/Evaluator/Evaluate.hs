@@ -153,22 +153,22 @@ step' normalising ei_state = {-# SCC "step'" #-}
       | (Uncast, (_, Indirect _)) <- a = return (deeds, a)
       | otherwise                      = return (deeds, (Uncast, (mkIdentityRenaming (unitVarSet x'), Indirect x')))
 
-    lookupHeap :: PureHeap -> Out Var -> Maybe (HowBound, In AnnedTerm)
+    lookupHeap :: PureHeap -> Out Var -> Maybe (HowBound, Superinlinable, In AnnedTerm)
     lookupHeap h x' = do
         hb <- M.lookup x' h
         in_e <- heapBindingTerm hb
         -- We have to check this here (not just when preparing unfoldings) because
         -- we would like to also exclude local recursive loops, not just top-level ones
         case shouldExposeUnfolding x' of
-            Nothing      -> return (howBound hb, in_e)
-            Just why_not -> pprTrace "Unavailable:" (ppr x') $
+            Right super  -> return (howBound hb, super, in_e)
+            Left why_not -> pprTrace "Unavailable:" (ppr x') $
                             fail why_not
 
     -- We have not yet claimed deeds for the result of this function
-    lookupAnswer :: Heap -> Out Var -> Maybe (Anned Answer)
+    lookupAnswer :: Heap -> Out Var -> Maybe (Superinlinable, Anned Answer)
     lookupAnswer (Heap h ids) x' = do
-        (_how_bound, in_e) <- lookupHeap h x'
-        termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
+        (_how_bound, super, in_e) <- lookupHeap h x'
+        fmap ((,) super) $ termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
     
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
@@ -177,7 +177,9 @@ step' normalising ei_state = {-# SCC "step'" #-}
     force deeds (Heap h ids) k tg x'
       -- NB: inlining values is non-normalising if dUPLICATE_VALUES_EVALUATOR is on (since doing things the long way would involve executing an update frame)
       | not (dUPLICATE_VALUES_EVALUATOR && normalising)
-      , Just anned_a <- lookupAnswer (Heap h ids) x' -- NB: don't unwind *immediately* because we want that changing a Var into a Value in an empty stack is seen as a reduction 'step'
+      , Just (_super, anned_a) <- lookupAnswer (Heap h ids) x'
+        -- NB: don't unwind *immediately* because we want that changing a Var into a Value in an empty stack is seen as a reduction 'step'
+        -- FIXME: I'm going to assume that we are using indirections so a force doesn't actualy duplicate any values, so we can ignore the superinlinability
       = do { (deeds, a) <- prepareAnswer deeds x' (annee anned_a); return $ normalise (deeds, Heap h ids, k, annedAnswerToInAnnedTerm ids $ annedAnswer (annedTag anned_a) a) }
       -- Try to trim the stack if the Id is guaranteed to bottom out after a certain number of arguments
       -- This is really amazingly important because so many case branches bottom out in at least one branch,
@@ -189,7 +191,9 @@ step' normalising ei_state = {-# SCC "step'" #-}
       , Just (h_extra, k) <- trimUnreachable (length ds) (idType x') k
       = Just (deeds, Heap (h `M.union` h_extra) ids, k, fmap (\(Var x') -> Question x') (annedTerm tg (Var x'))) -- Kind of a hacky way to get an Anned Question!
       | otherwise = do
-        (how_bound, in_e) <- lookupHeap h x'
+        -- NB: it doesn't matter if the thing we look up is superinlinable because we'll actually only need to check then when we come to
+        -- look it up as a *value*. In any case, the vast majority of SUPERINLINABLE things will be values, so we'll never get here.
+        (how_bound, _, in_e) <- lookupHeap h x'
         -- NB: we MUST NOT create update frames for non-concrete bindings!! This has bitten me in the past, and it is seriously confusing. 
         if (how_bound == InternallyBound)
          then return ()
@@ -197,6 +201,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
         return $ normalise $ case k of
              -- Avoid creating consecutive update frames: implements "stack squeezing"
              -- FIXME: squeeze through casts as well?
+             -- FIXME: can discard superinlinability of x'
             kf `Car` _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                             k, in_e)
             _                                  -> (deeds, Heap (M.delete x' h)                                                                                     ids, Tagged tg (Update x') `Car` k, in_e)
 
@@ -233,17 +238,17 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe State
-    unwind deeds h k tg_v a = unconsTrain k >>= \(kf, k) -> fmap normalise $ case tagee kf of
-        TyApply ty'                    -> tyApply    (deeds `releaseDeeds` 1)          h k tg_v a ty'
-        CoApply co'                    -> coApply    (deeds `releaseDeeds` 1)          h k tg_v a co'
-        Apply x2'                      -> apply      deeds                    (tag kf) h k tg_v a x2'
-        Scrutinise x' ty' in_alts      -> scrutinise (deeds `releaseDeeds` 1)          h k tg_v a x' ty' in_alts
-        PrimApply pop tys' in_vs in_es -> primop     deeds                    (tag kf) h k tg_v pop tys' in_vs a in_es
-        StrictLet x' in_e2             -> strictLet  (deeds `releaseDeeds` 1)          h k tg_v a x' in_e2
-        CastIt co'                     -> cast       deeds                    (tag kf) h k tg_v a co'
+    unwind deeds h k tg_v a = unconsTrain k >>= \(kf, k) -> case tagee kf of
+        TyApply ty'                    ->                  tyApply    (deeds `releaseDeeds` 1)          h k tg_v a ty'
+        CoApply co'                    ->                  coApply    (deeds `releaseDeeds` 1)          h k tg_v a co'
+        Apply x2'                      ->                  apply      deeds                    (tag kf) h k tg_v a x2'
+        Scrutinise x' ty' in_alts      -> fmap normalise $ scrutinise (deeds `releaseDeeds` 1)          h k tg_v a x' ty' in_alts
+        PrimApply pop tys' in_vs in_es -> fmap normalise $ primop     deeds                    (tag kf) h k tg_v pop tys' in_vs a in_es
+        StrictLet x' in_e2             -> fmap normalise $ strictLet  (deeds `releaseDeeds` 1)          h k tg_v a x' in_e2
+        CastIt co'                     -> fmap normalise $ cast       deeds                    (tag kf) h k tg_v a co'
         Update x'
           | normalising, dUPLICATE_VALUES_EVALUATOR -> Nothing -- If duplicating values, we ensure normalisation by not executing updates
-          | otherwise                               -> update deeds h k tg_v x' a
+          | otherwise                               -> fmap normalise $ update deeds h k tg_v x' a
       where
         -- When derereferencing an indirection, it is important that the resulting value is not stored anywhere. The reasons are:
         --  1) That would cause allocation to be duplicated if we residualised immediately afterwards, because the value would still be in the heap
@@ -255,25 +260,39 @@ step' normalising ei_state = {-# SCC "step'" #-}
         -- that the indirection "points to" are not affected by any of this. The exception is if we *retain* any subcomponent
         -- of the dereferenced thing - in this case we have to be sure to claim some deeds for that subcomponent. For example, if we
         -- dereference to get a lambda in our function application we had better claim deeds for the body.
-        dereference :: Heap -> Answer -> Answer
-        dereference h@(Heap _ ids) (mb_co, (rn, Indirect x)) | Just anned_a <- lookupAnswer h (renameId rn x) = dereference h (annee (castAnnedAnswer ids anned_a mb_co))
-        dereference _ a = a
+        dereference' :: Heap -> Superinlinable -> Answer -> (Superinlinable, Answer)
+        dereference' h@(Heap _ ids) _ (mb_co, (rn, Indirect x)) | Just (super, anned_a) <- lookupAnswer h (renameId rn x) = dereference' h super (annee (castAnnedAnswer ids anned_a mb_co))
+        dereference' _ super a = (super, a)
+
+        dereference h = snd . dereference' h False
     
-        deferenceLambdaish :: Heap -> Answer -> Maybe Answer
-        deferenceLambdaish h a@(_, (_, v))
+        deferenceLambdaish :: Heap -> Answer
+                           -> (Answer -> Maybe UnnormalisedState)
+                           -> Maybe State
+        deferenceLambdaish h a@(_, (_, v)) k
           | normalising, not dUPLICATE_VALUES_EVALUATOR, Indirect _ <- v = Nothing -- If not duplicating values, we ensure normalisation by not executing applications to non-explicit-lambdas
-          | otherwise = Just (dereference h a)
+          | otherwise = do
+            let (super, a') = dereference' h False a -- NB: inline lambdas are *not* superinlinable because we don't duplicate anything by beta-reducing
+            s' <- fmap normalise $ k a'
+            -- NB: you might think it would be OK to inline even when *normalising*, as long as the inlining
+            -- makes the term strictly smaller. This is very tempting, but we would have to check that the size
+            -- measure decreased by the inlining is the same as the size measure needed to prove normalisation of
+            -- the reduction system, and I'm too lazy to do that right now.
+            case stateSize s' `compare` either stateSize unnormalisedStateSize ei_state of
+              _ | super -> return s' -- We don't want to strictly increase the size by beta-reducing unless the lambda is marked SUPERINLINABLE
+              GT -> Nothing
+              _  -> return s'
     
-        tyApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Type -> Maybe UnnormalisedState
-        tyApply deeds h@(Heap _ ids) k tg_a a ty' = do
-            (mb_co, (rn, TyLambda x e_body)) <- deferenceLambdaish h a
+        tyApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Type -> Maybe State
+        tyApply deeds h@(Heap _ ids) k tg_a a ty' = deferenceLambdaish h a $ \(mb_co, (rn, e)) -> do
+            TyLambda x e_body <- return e
             fmap (\deeds -> (deeds, h, case mb_co of Uncast -> k; CastBy co' _tg_co -> Tagged tg_a (CastIt (co' `mk_inst` ty')) `Car` k, (insertTypeSubst rn x ty', e_body))) $
                  claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)
           where mk_inst = mkInstCo ids
 
-        coApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Coercion -> Maybe UnnormalisedState
-        coApply deeds h@(Heap _ ids) k tg_a a apply_co' = do
-            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h a
+        coApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Coercion -> Maybe State
+        coApply deeds h@(Heap _ ids) k tg_a a apply_co' = deferenceLambdaish h a $ \(mb_co, (rn, e)) -> do
+            Lambda x e_body <- return e
             flip fmap (claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
                 Uncast            -> (deeds, h, k,                                    (insertCoercionSubst rn x apply_co', e_body))
                 CastBy co' _tg_co -> (deeds, h, Tagged tg_a (CastIt res_co') `Car` k, (insertCoercionSubst rn x cast_apply_co', e_body))
@@ -288,9 +307,9 @@ step' normalising ei_state = {-# SCC "step'" #-}
                         mk_trans = mkTransCo ids
                         mk_sym = mkSymCo ids
 
-        apply :: Deeds -> Tag -> Heap -> Stack -> Tag -> Answer -> Out Var -> Maybe UnnormalisedState
-        apply deeds tg_kf (Heap h ids) k tg_a a x' = do
-            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) a
+        apply :: Deeds -> Tag -> Heap -> Stack -> Tag -> Answer -> Out Var -> Maybe State
+        apply deeds tg_kf (Heap h ids) k tg_a a x' = deferenceLambdaish (Heap h ids) a $ \(mb_co, (rn, e)) -> do
+            Lambda x e_body <- return e
             case mb_co of
               Uncast -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
                              claimDeeds (deeds `releaseDeeds` 1 `releaseDeeds` answerSize' a) (annedSize e_body)
@@ -403,16 +422,18 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
 -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.
 -- This gives normal RULES more of a chance to fire.
-shouldExposeUnfolding :: Id -> Maybe String
+shouldExposeUnfolding :: Id -> Either String Superinlinable
 shouldExposeUnfolding x = case inl_inline inl_prag of
+    Inline                                 -> Right True -- Don't check for size increase at all if marked INLINE
     Inlinable super
-      | only_if_superinlinable, not super  -> Just "INLINEABLE but not SUPERINLINABLE"
+      | only_if_superinlinable, not super  -> Left "INLINEABLE but not SUPERINLINABLE"
+      | otherwise                          -> Right super
     NoInline
-      | isActiveIn 2 (inl_act inl_prag)    -> Just "NONLINE"
-      | only_if_superinlinable             -> Just "(inactive) NOINLINE, not SUPERINLINABLE"
+      | isActiveIn 2 (inl_act inl_prag)    -> Left "NONLINE"
+      | only_if_superinlinable             -> Left "(inactive) NOINLINE, not SUPERINLINABLE"
     EmptyInlineSpec 
-      | only_if_superinlinable             -> Just "not SUPERINLINABLE"
-    _                                      -> Nothing
+      | only_if_superinlinable             -> Left "not SUPERINLINABLE"
+    _                                      -> Right False
   where inl_prag = idInlinePragma x
         -- EXPERIMENT: only respect the SUPERINLINABLE distinction on *loop breakers*
         -- The motivation is that we don't really want to go around annotating (GHC.Base.>>=),
