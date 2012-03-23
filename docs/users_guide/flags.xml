@@ -1502,6 +1502,20 @@
           </row>
 
           <row>
+            <entry><option>-fvectorise</option></entry>
+            <entry>Enable vectorisation of nested data parallelism</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-vectorise</option></entry>
+          </row>
+
+          <row>
+            <entry><option>-favoid-vect</option></entry>
+            <entry>Enable vectorisation avoidance (EXPERIMENTAL)</entry>
+            <entry>dynamic</entry>
+            <entry><option>-fno-avoid-vect</option></entry>
+          </row>
+
+          <row>
             <entry><option>-fexcess-precision</option></entry>
             <entry>Enable excess intermediate precision</entry>
             <entry>dynamic</entry>
