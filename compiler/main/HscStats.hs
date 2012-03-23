@@ -1,70 +1,58 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
-%
-\section[GHC_Stats]{Statistics for per-module compilations}
-
-\begin{code}
+-- |
+-- Statistics for per-module compilations
+--
+-- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
+--
 module HscStats ( ppSourceStats ) where
 
-#include "HsVersions.h"
-
+import Bag
 import HsSyn
 import Outputable
-import SrcLoc
-import Bag
-import Util
 import RdrName
+import SrcLoc
+import Util
 
 import Data.Char
-\end{code}
 
-%************************************************************************
-%*                                                                      *
-\subsection{Statistics}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+-- | Source Statistics
 ppSourceStats :: Bool -> Located (HsModule RdrName) -> SDoc
 ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
- = (if short then hcat else vcat)
+  = (if short then hcat else vcat)
         (map pp_val
-               [("ExportAll        ", export_all), -- 1 if no export list
-                ("ExportDecls      ", export_ds),
-                ("ExportModules    ", export_ms),
-                ("Imports          ", imp_no),
-                ("  ImpSafe        ", imp_safe),
-                ("  ImpQual        ", imp_qual),
-                ("  ImpAs          ", imp_as),
-                ("  ImpAll         ", imp_all),
-                ("  ImpPartial     ", imp_partial),
-                ("  ImpHiding      ", imp_hiding),
-                ("FixityDecls      ", fixity_sigs),
-                ("DefaultDecls     ", default_ds),
-                ("TypeDecls        ", type_ds),
-                ("DataDecls        ", data_ds),
-                ("NewTypeDecls     ", newt_ds),
-                ("TypeFamilyDecls  ", type_fam_ds),
-                ("DataConstrs      ", data_constrs),
-                ("DataDerivings    ", data_derivs),
-                ("ClassDecls       ", class_ds),
-                ("ClassMethods     ", class_method_ds),
-                ("DefaultMethods   ", default_method_ds),
-                ("InstDecls        ", inst_ds),
-                ("InstMethods      ", inst_method_ds),
-                ("InstType         ", inst_type_ds),
-                ("InstData         ", inst_data_ds),
-                ("TypeSigs         ", bind_tys),
-                ("GenericSigs      ", generic_sigs),
-                ("ValBinds         ", val_bind_ds),
-                ("FunBinds         ", fn_bind_ds),
-                ("InlineMeths      ", method_inlines),
-                ("InlineBinds      ", bind_inlines),
---              ("SpecialisedData  ", data_specs),
---              ("SpecialisedInsts ", inst_specs),
-                ("SpecialisedMeths ", method_specs),
-                ("SpecialisedBinds ", bind_specs)
-               ])
+            [("ExportAll        ", export_all), -- 1 if no export list
+             ("ExportDecls      ", export_ds),
+             ("ExportModules    ", export_ms),
+             ("Imports          ", imp_no),
+             ("  ImpSafe        ", imp_safe),
+             ("  ImpQual        ", imp_qual),
+             ("  ImpAs          ", imp_as),
+             ("  ImpAll         ", imp_all),
+             ("  ImpPartial     ", imp_partial),
+             ("  ImpHiding      ", imp_hiding),
+             ("FixityDecls      ", fixity_sigs),
+             ("DefaultDecls     ", default_ds),
+             ("TypeDecls        ", type_ds),
+             ("DataDecls        ", data_ds),
+             ("NewTypeDecls     ", newt_ds),
+             ("TypeFamilyDecls  ", type_fam_ds),
+             ("DataConstrs      ", data_constrs),
+             ("DataDerivings    ", data_derivs),
+             ("ClassDecls       ", class_ds),
+             ("ClassMethods     ", class_method_ds),
+             ("DefaultMethods   ", default_method_ds),
+             ("InstDecls        ", inst_ds),
+             ("InstMethods      ", inst_method_ds),
+             ("InstType         ", inst_type_ds),
+             ("InstData         ", inst_data_ds),
+             ("TypeSigs         ", bind_tys),
+             ("GenericSigs      ", generic_sigs),
+             ("ValBinds         ", val_bind_ds),
+             ("FunBinds         ", fn_bind_ds),
+             ("InlineMeths      ", method_inlines),
+             ("InlineBinds      ", bind_inlines),
+             ("SpecialisedMeths ", method_specs),
+             ("SpecialisedBinds ", bind_specs)
+            ])
   where
     decls = map unLoc ldecls
 
@@ -73,21 +61,21 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
       | not short   = hcat [text str, int n]
       | otherwise   = hcat [text (trim str), equals, int n, semi]
     
-    trim ls     = takeWhile (not.isSpace) (dropWhile isSpace ls)
+    trim ls    = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
     (fixity_sigs, bind_tys, bind_specs, bind_inlines, generic_sigs) 
         = count_sigs [d | SigD d <- decls]
                 -- NB: this omits fixity decls on local bindings and
-                -- in class decls.  ToDo
+                -- in class decls. ToDo
 
-    tycl_decls  = [d | TyClD d <- decls]
+    tycl_decls = [d | TyClD d <- decls]
     (class_ds, type_ds, data_ds, newt_ds, type_fam_ds) = 
       countTyClDecls tycl_decls
 
-    inst_decls  = [d | InstD d <- decls]
-    inst_ds     = length inst_decls
-    default_ds  = count (\ x -> case x of { DefD{} -> True; _ -> False}) decls
-    val_decls   = [d | ValD d <- decls]
+    inst_decls = [d | InstD d <- decls]
+    inst_ds    = length inst_decls
+    default_ds = count (\ x -> case x of { DefD{} -> True; _ -> False}) decls
+    val_decls  = [d | ValD d <- decls]
 
     real_exports = case exports of { Nothing -> []; Just es -> es }
     n_exports    = length real_exports
@@ -115,12 +103,12 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 
     count_sigs sigs = foldr add5 (0,0,0,0,0) (map sig_info sigs)
 
-    sig_info (FixSig _)         = (1,0,0,0,0)
-    sig_info (TypeSig _ _)      = (0,1,0,0,0)
-    sig_info (SpecSig _ _ _)    = (0,0,1,0,0)
-    sig_info (InlineSig _ _)    = (0,0,0,1,0)
-    sig_info (GenericSig _ _)   = (0,0,0,0,1)
-    sig_info _                  = (0,0,0,0,0)
+    sig_info (FixSig _)       = (1,0,0,0,0)
+    sig_info (TypeSig _ _)    = (0,1,0,0,0)
+    sig_info (SpecSig _ _ _)  = (0,0,1,0,0)
+    sig_info (InlineSig _ _)  = (0,0,0,1,0)
+    sig_info (GenericSig _ _) = (0,0,0,0,1)
+    sig_info _                = (0,0,0,0,0)
 
     import_info (L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
                                  , ideclAs = as, ideclHiding = spec }))
@@ -170,13 +158,4 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)
     add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
     add7 (x1,x2,x3,x4,x5,x6,x7) (y1,y2,y3,y4,y5,y6,y7) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6,x7+y7)
-\end{code}
-
-
-
-
-
-
-
-
 
