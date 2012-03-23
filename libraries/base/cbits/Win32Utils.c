@@ -110,17 +110,50 @@ void maperrno (void)
 			errno = EINVAL;
 }
 
-HsWord64 getUSecOfDay(void)
+// Number of ticks per second used by the QueryPerformanceFrequency
+// implementaiton, represented by a 64-bit union type.
+static LARGE_INTEGER qpc_frequency = {.QuadPart = 0};
+
+// Initialize qpc_frequency. This function should be called before any call to
+// getMonotonicUSec.  If QPC is not supported on this system, qpc_frequency is
+// set to 0.
+void initializeTimer()
 {
-    HsWord64 t;
-    FILETIME ft;
-    GetSystemTimeAsFileTime(&ft);
-    t = ((HsWord64)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-    t = t / 10LL;
-    /* FILETIMES are in units of 100ns,
-       so we divide by 10 to get microseconds */
-    return t;
+    BOOL qpc_supported = QueryPerformanceFrequency(&qpc_frequency);
+    if (!qpc_supported)
+    {
+        qpc_frequency.QuadPart = 0;
+    }
+}
+
+HsWord64 getMonotonicUSec()
+{
+    if (qpc_frequency.QuadPart)
+    {
+        // system_time is a 64-bit union type used to represent the
+        // tick count returned by QueryPerformanceCounter
+        LARGE_INTEGER system_time;
+
+        // get the tick count.
+        QueryPerformanceCounter(&system_time);
+
+        // compute elapsed seconds as double
+        double secs = (double)system_time.QuadPart /
+                      (double)qpc_frequency.QuadPart;
+
+        // return elapsed time in microseconds
+        return (HsWord64)(secs * 1e6);
+    }
+    else // fallback to GetTickCount
+    {
+        // NOTE: GetTickCount is a 32-bit millisecond value, so it wraps around
+        // every 49 days.
+        DWORD count = GetTickCount();
+
+        // getTickCount is in milliseconds, so multiply it by 1000 to get
+        // microseconds.
+        return (HsWord64)count * 1000;
+    }
 }
 
 #endif
-

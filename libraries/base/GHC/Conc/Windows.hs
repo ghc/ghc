@@ -140,7 +140,7 @@ waitForDelayEventSTM usecs = do
 
 calculateTarget :: Int -> IO USecs
 calculateTarget usecs = do
-    now <- getUSecOfDay
+    now <- getMonotonicUSec
     return $ now + (fromIntegral usecs)
 
 data DelayReq
@@ -167,8 +167,13 @@ foreign import ccall unsafe "getOrSetGHCConcWindowsIOManagerThreadStore"
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning
-  | threaded  = startIOManagerThread
+  | threaded  = initializeIOManager
   | otherwise = return ()
+
+initializeIOManager :: IO ()
+initializeIOManager = do
+    initializeTimer
+    startIOManagerThread
 
 startIOManagerThread :: IO ()
 startIOManagerThread = do
@@ -195,8 +200,11 @@ delayTime (DelaySTM t _) = t
 
 type USecs = Word64
 
-foreign import ccall unsafe "getUSecOfDay"
-  getUSecOfDay :: IO USecs
+foreign import ccall unsafe "getMonotonicUSec"
+  getMonotonicUSec :: IO USecs
+
+foreign import ccall unsafe "initializeTimer"
+  initializeTimer :: IO ()
 
 {-# NOINLINE prodding #-}
 prodding :: IORef Bool
@@ -232,7 +240,7 @@ service_loop wakeup old_delays = do
   new_delays <- atomicModifyIORef pendingDelays (\a -> ([],a))
   let  delays = foldr insertDelay old_delays new_delays
 
-  now <- getUSecOfDay
+  now <- getMonotonicUSec
   (delays', timeout) <- getDelay now delays
 
   r <- c_WaitForSingleObject wakeup timeout
