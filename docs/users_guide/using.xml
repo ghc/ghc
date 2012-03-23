@@ -1776,61 +1776,6 @@ f "2"    = 2
       <variablelist>
         <varlistentry>
           <term>
-            <option>-fexcess-precision</option>
-            <indexterm><primary><option>-fexcess-precision</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>When this option is given, intermediate floating
-            point values can have a <emphasis>greater</emphasis>
-            precision/range than the final type.  Generally this is a
-            good thing, but some programs may rely on the exact
-            precision/range of
-            <literal>Float</literal>/<literal>Double</literal> values
-            and should not use this option for their compilation.</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fignore-asserts</option>
-            <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Causes GHC to ignore uses of the function
-            <literal>Exception.assert</literal> in source code (in
-            other words, rewriting <literal>Exception.assert p
-            e</literal> to <literal>e</literal> (see <xref
-            linkend="assertions"/>).  This flag is turned on by
-            <option>-O</option>.
-            </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fignore-interface-pragmas</option>
-            <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Tells GHC to ignore all inessential information when reading interface files.
-            That is, even if <filename>M.hi</filename> contains unfolding or strictness information
-            for a function, GHC will ignore that information.</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fliberate-case</option>
-            <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Turn on the liberate-case transformation.</para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
             <option>-fno-cse</option>
             <indexterm><primary><option>-fno-cse</option></primary></indexterm>
           </term>
@@ -1843,12 +1788,105 @@ f "2"    = 2
 
         <varlistentry>
           <term>
+            <option>-fstrictness</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
             <option>-fno-strictness</option>
             <indexterm><primary><option>-fno-strictness</option></primary></indexterm>
           </term>
           <listitem>
             <para>Turns off the strictness analyser; sometimes it eats
             too many cycles.</para>
+            TODO: Maybe document positive cases and remove all negative cases?
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-funbox-strict-fields</option>:
+            <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
+            <indexterm><primary>strict constructor fields</primary></indexterm>
+            <indexterm><primary>constructor fields, strict</primary></indexterm>
+          </term>
+          <listitem>
+            <para>This option causes all constructor fields which are marked
+            strict (i.e. &ldquo;!&rdquo;) to be unpacked if possible. It is
+            equivalent to adding an <literal>UNPACK</literal> pragma to every
+            strict constructor field (see <xref linkend="unpack-pragma"/>).
+            </para>
+
+            <para>This option is a bit of a sledgehammer: it might sometimes
+            make things worse. Selectively unboxing fields by using
+            <literal>UNPACK</literal> pragmas might be better. An alternative
+            is to use <option>-funbox-strict-fields</option> to turn on
+            unboxing by default but disable it for certain constructor
+            fields using the <literal>NOUNPACK</literal> pragma (see
+            <xref linkend="nounpack-pragma"/>).</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fspec-constr</option>
+            <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turn on call-pattern specialisation.</para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fno-specialise</option>
+            <indexterm><primary><option>-fno-specialise</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turns off the automatic specialisation of overloaded functions.</para>
+            TODO: Document optimisation, probably change to a positive, not a -fno-* description.
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fstatic-argument-transformation</option>
+            <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turn on the static argument transformation.</para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-ffloat-in</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fno-float-in</option>
+            <indexterm><primary><option>-fno-float-in</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turns off the float-in transformation.</para>
+            TODO: Maybe document positive cases and remove all negative cases?
           </listitem>
         </varlistentry>
 
@@ -1878,22 +1916,71 @@ f "2"    = 2
 
         <varlistentry>
           <term>
-            <option>-fno-float-in</option>
-            <indexterm><primary><option>-fno-float-in</option></primary></indexterm>
+            <option>-fdo-lambda-eta-expansion</option>
+            <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turns off the float-in transformation.</para>
+            <para>
+            </para>
             TODO: Document optimisation
           </listitem>
         </varlistentry>
 
         <varlistentry>
           <term>
-            <option>-fno-specialise</option>
-            <indexterm><primary><option>-fno-specialise</option></primary></indexterm>
+            <option>-fdo-eta-reduction</option>
+            <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turns off the automatic specialisation of overloaded functions.</para>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fcase-merge</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fliberate-case</option>
+            <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Turn on the liberate-case transformation.</para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdicts-cheap</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-feager-blackholing</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
             TODO: Document optimisation
           </listitem>
         </varlistentry>
@@ -1928,24 +2015,6 @@ f "2"    = 2
 
         <varlistentry>
           <term>
-            <option>-fomit-interface-pragmas</option>
-            <indexterm><primary><option>-fomit-interface-pragmas</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Tells GHC to omit all inessential information from the
-            interface file generated for the module being compiled (say M).
-            This means that a module importing M will see only the
-            <emphasis>types</emphasis> of the functions that M exports, but
-            not their unfoldings, strictness info, etc.  Hence, for example,
-            no function exported by M will be inlined into an importing module.
-            The benefit is that modules that import M will need to be
-            recompiled less often (only when M's exports change their type, not
-            when they change their implementation).</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
             <option>-fsimpl-tick-factor=<replaceable>n</replaceable></option>
             <indexterm><primary><option>-fsimpl-tick-factor</option></primary></indexterm>
           </term>
@@ -1964,52 +2033,6 @@ f "2"    = 2
             you can use <option>-fddump-simpl-stats</option> to generate a much more detailed list.
             Usually that identifies the loop quite accurately, because some numbers are very large.
             </para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fstatic-argument-transformation</option>
-            <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Turn on the static argument transformation.</para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fspec-constr</option>
-            <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Turn on call-pattern specialisation.</para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-funbox-strict-fields</option>:
-            <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
-            <indexterm><primary>strict constructor fields</primary></indexterm>
-            <indexterm><primary>constructor fields, strict</primary></indexterm>
-          </term>
-          <listitem>
-            <para>This option causes all constructor fields which are marked
-            strict (i.e. &ldquo;!&rdquo;) to be unpacked if possible. It is
-            equivalent to adding an <literal>UNPACK</literal> pragma to every
-            strict constructor field (see <xref linkend="unpack-pragma"/>).
-            </para>
-
-            <para>This option is a bit of a sledgehammer: it might sometimes
-            make things worse. Selectively unboxing fields by using
-            <literal>UNPACK</literal> pragmas might be better. An alternative
-            is to use <option>-funbox-strict-fields</option> to turn on
-            unboxing by default but disable it for certain constructor
-            fields using the <literal>NOUNPACK</literal> pragma (see
-            <xref linkend="nounpack-pragma"/>).</para>
           </listitem>
         </varlistentry>
 
@@ -2078,90 +2101,6 @@ f "2"    = 2
 
         <varlistentry>
           <term>
-            <option>-feager-blackholing</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fstrictness</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-ffloat-in</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fdo-lambda-eta-expansion</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fdo-eta-reduction</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fcase-merge</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fdicts-cheap</option>
-            <indexterm><primary><option></option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
             <option>-fvectorise</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
@@ -2211,24 +2150,107 @@ f "2"    = 2
         <varlistentry>
           <term>
             <option>-fregs-liveness</option>
-            <indexterm><primary><option></option></primary></indexterm>
+            <indexterm><primary><option>-fregs-liveness</option></primary></indexterm>
+            <indexterm><primary>registers</primary></indexterm>
+            <indexterm><primary>stg registers</primary></indexterm>
+            <indexterm><primary>llvm optimisations</primary></indexterm>
           </term>
           <listitem>
-            <para>
-            </para>
-            TODO: Document optimisation
+            <para><emphasis>This flag only works with the LLVM
+            (<option>-fllvm</option>) backend.</emphasis></para>
+
+            <para>GHC stores some state information that the runtime /
+            execution model needs frequent access to in the underlying
+            hardware registers. GHC historically has simply reserved these
+            registers for exclusive use for this purpose, stopping them being
+            using by intermediate code in a function. This optimisation
+            instead tracks when GHC actually needs to store this state and in
+            cases where it doesn't need it, frees up those hardware registers
+            for use.</para>
+
+            <para>Since GHC 7.6.1</para>
           </listitem>
         </varlistentry>
 
         <varlistentry>
           <term>
             <option>-fllvm-tbaa</option>
-            <indexterm><primary><option></option></primary></indexterm>
+            <indexterm><primary><option>-fllvm-tbaa</option></primary></indexterm>
+            <indexterm><primary>alias analysis</primary></indexterm>
+            <indexterm><primary>llvm optimisations</primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para><emphasis>This flag only works with the LLVM
+            (<option>-fllvm</option>) backend.</emphasis></para>
+
+            <para>This optimisation enhances the alias analysis pass done by
+            the LLVM code generator which should result in more efficient
+            code as many other optimisations rely on accurate alias
+            information.</para>
+
+            <para>Since GHC 7.6.1</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fexcess-precision</option>
+            <indexterm><primary><option>-fexcess-precision</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>When this option is given, intermediate floating
+            point values can have a <emphasis>greater</emphasis>
+            precision/range than the final type.  Generally this is a
+            good thing, but some programs may rely on the exact
+            precision/range of
+            <literal>Float</literal>/<literal>Double</literal> values
+            and should not use this option for their compilation.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fignore-asserts</option>
+            <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Causes GHC to ignore uses of the function
+            <literal>Exception.assert</literal> in source code (in
+            other words, rewriting <literal>Exception.assert p
+            e</literal> to <literal>e</literal> (see <xref
+            linkend="assertions"/>).  This flag is turned on by
+            <option>-O</option>.
             </para>
-            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fignore-interface-pragmas</option>
+            <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Tells GHC to ignore all inessential information when reading interface files.
+            That is, even if <filename>M.hi</filename> contains unfolding or strictness information
+            for a function, GHC will ignore that information.</para>
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fomit-interface-pragmas</option>
+            <indexterm><primary><option>-fomit-interface-pragmas</option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>Tells GHC to omit all inessential information from the
+            interface file generated for the module being compiled (say M).
+            This means that a module importing M will see only the
+            <emphasis>types</emphasis> of the functions that M exports, but
+            not their unfoldings, strictness info, etc.  Hence, for example,
+            no function exported by M will be inlined into an importing module.
+            The benefit is that modules that import M will need to be
+            recompiled less often (only when M's exports change their type, not
+            when they change their implementation).</para>
           </listitem>
         </varlistentry>
 
