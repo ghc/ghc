@@ -1,11 +1,4 @@
 {-# OPTIONS -cpp #-}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 ------------------------------------------------------------------
 -- A primop-table mangling program                              --
 ------------------------------------------------------------------
@@ -79,15 +72,15 @@ main = getArgs >>= \args ->
 
                       "--make-haskell-wrappers" 
                          -> putStr (gen_wrappers p_o_specs)
-			
+                        
                       "--make-haskell-source" 
                          -> putStr (gen_hs_source p_o_specs)
 
                       "--make-ext-core-source"
                          -> putStr (gen_ext_core_source entries)
 
-		      "--make-latex-doc"
-			 -> putStr (gen_latex_doc p_o_specs)
+                      "--make-latex-doc"
+                         -> putStr (gen_latex_doc p_o_specs)
 
                       _ -> error "Should not happen, known_args out of sync?"
                    )
@@ -122,81 +115,81 @@ gen_hs_source (Info defaults entries) =
     ++ "consumed by haddock.\n"
     ++ "-}\n"
     ++ "\n"
-	++ "-----------------------------------------------------------------------------\n"
-	++ "-- |\n"
-	++ "-- Module      :  GHC.Prim\n"
-	++ "-- \n"
-	++ "-- Maintainer  :  cvs-ghc@haskell.org\n"
-	++ "-- Stability   :  internal\n"
-	++ "-- Portability :  non-portable (GHC extensions)\n"
-	++ "--\n"
-	++ "-- GHC\'s primitive types and operations.\n"
-	++ "-- Use GHC.Exts from the base package instead of importing this\n"
-	++ "-- module directly.\n"
-	++ "--\n" 
-	++ "-----------------------------------------------------------------------------\n"
-	++ "module GHC.Prim (\n"
-	++ unlines (map (("\t" ++) . hdr) entries)
-	++ ") where\n"
+        ++ "-----------------------------------------------------------------------------\n"
+        ++ "-- |\n"
+        ++ "-- Module      :  GHC.Prim\n"
+        ++ "-- \n"
+        ++ "-- Maintainer  :  cvs-ghc@haskell.org\n"
+        ++ "-- Stability   :  internal\n"
+        ++ "-- Portability :  non-portable (GHC extensions)\n"
+        ++ "--\n"
+        ++ "-- GHC\'s primitive types and operations.\n"
+        ++ "-- Use GHC.Exts from the base package instead of importing this\n"
+        ++ "-- module directly.\n"
+        ++ "--\n" 
+        ++ "-----------------------------------------------------------------------------\n"
+        ++ "module GHC.Prim (\n"
+        ++ unlines (map (("\t" ++) . hdr) entries)
+        ++ ") where\n"
     ++ "\n"
     ++ "import GHC.Types\n"
     ++ "\n"
     ++ "{-\n"
-	++ unlines (map opt defaults)
+        ++ unlines (map opt defaults)
     ++ "-}\n"
-	++ unlines (concatMap ent entries) ++ "\n\n\n"
-     where opt (OptionFalse n)	  = n ++ " = False"
-           opt (OptionTrue n)	  = n ++ " = True"
-	   opt (OptionString n v) = n ++ " = { " ++ v ++ "}"
+        ++ unlines (concatMap ent entries) ++ "\n\n\n"
+     where opt (OptionFalse n)    = n ++ " = False"
+           opt (OptionTrue n)     = n ++ " = True"
+           opt (OptionString n v) = n ++ " = { " ++ v ++ "}"
            opt (OptionInteger n v) = n ++ " = " ++ show v
 
-	   hdr s@(Section {})			 = sec s
-	   hdr (PrimOpSpec { name = n })	 = wrapOp n ++ ","
-	   hdr (PseudoOpSpec { name = n })	 = wrapOp n ++ ","
-	   hdr (PrimTypeSpec { ty = TyApp n _ }) = wrapTy n ++ ","
-	   hdr (PrimTypeSpec {})                 = error "Illegal type spec"
+           hdr s@(Section {})                    = sec s
+           hdr (PrimOpSpec { name = n })         = wrapOp n ++ ","
+           hdr (PseudoOpSpec { name = n })       = wrapOp n ++ ","
+           hdr (PrimTypeSpec { ty = TyApp n _ }) = wrapTy n ++ ","
+           hdr (PrimTypeSpec {})                 = error "Illegal type spec"
 
-	   ent   (Section {})	   = []
-	   ent o@(PrimOpSpec {})   = spec o
-	   ent o@(PrimTypeSpec {}) = spec o
-	   ent o@(PseudoOpSpec {}) = spec o
+           ent   (Section {})      = []
+           ent o@(PrimOpSpec {})   = spec o
+           ent o@(PrimTypeSpec {}) = spec o
+           ent o@(PseudoOpSpec {}) = spec o
 
-	   sec s = "\n-- * " ++ escape (title s) ++ "\n"
-			++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s) ++ "\n"
+           sec s = "\n-- * " ++ escape (title s) ++ "\n"
+                        ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ desc s) ++ "\n"
 
-	   spec o = comm : decls
-	     where decls = case o of
-			PrimOpSpec { name = n, ty = t }	  ->
+           spec o = comm : decls
+             where decls = case o of
+                        PrimOpSpec { name = n, ty = t }   ->
                             [ wrapOp n ++ " :: " ++ pprTy t,
                               wrapOp n ++ " = let x = x in x" ]
-			PseudoOpSpec { name = n, ty = t } ->
+                        PseudoOpSpec { name = n, ty = t } ->
                             [ wrapOp n ++ " :: " ++ pprTy t,
                               wrapOp n ++ " = let x = x in x" ]
-			PrimTypeSpec { ty = t }	  ->
+                        PrimTypeSpec { ty = t }   ->
                             [ "data " ++ pprTy t ]
-			Section { } -> []
+                        Section { } -> []
 
-		   comm = case (desc o) of
-		   	[] -> ""
-			d -> "\n" ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ d)
+                   comm = case (desc o) of
+                        [] -> ""
+                        d -> "\n" ++ (unlines $ map ("-- " ++ ) $ lines $ unlatex $ escape $ "|" ++ d)
 
-	   wrapOp nm | isAlpha (head nm) = nm
-		     | otherwise	 = "(" ++ nm ++ ")"
-	   wrapTy nm | isAlpha (head nm) = nm
-		     | otherwise	 = "(" ++ nm ++ ")"
-	   unlatex s = case s of
-	   	'\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
-		'{':'\\':'t':'t':cs -> markup "@" "@" cs
-		'{':'\\':'i':'t':cs -> markup "/" "/" cs
-		c : cs -> c : unlatex cs
-		[] -> []
-	   markup s t xs = s ++ mk (dropWhile isSpace xs)
-	   	where mk ""	   = t
-	              mk ('\n':cs) = ' ' : mk cs
-	              mk ('}':cs)  = t ++ unlatex cs
-	              mk (c:cs)	   = c : mk cs
-	   escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
-	   	where special = "/'`\"@<"
+           wrapOp nm | isAlpha (head nm) = nm
+                     | otherwise         = "(" ++ nm ++ ")"
+           wrapTy nm | isAlpha (head nm) = nm
+                     | otherwise         = "(" ++ nm ++ ")"
+           unlatex s = case s of
+                '\\':'t':'e':'x':'t':'t':'t':'{':cs -> markup "@" "@" cs
+                '{':'\\':'t':'t':cs -> markup "@" "@" cs
+                '{':'\\':'i':'t':cs -> markup "/" "/" cs
+                c : cs -> c : unlatex cs
+                [] -> []
+           markup s t xs = s ++ mk (dropWhile isSpace xs)
+                where mk ""        = t
+                      mk ('\n':cs) = ' ' : mk cs
+                      mk ('}':cs)  = t ++ unlatex cs
+                      mk (c:cs)    = c : mk cs
+           escape = concatMap (\c -> if c `elem` special then '\\':c:[] else c:[])
+                where special = "/'`\"@<"
 
 pprTy :: Ty -> String
 pprTy = pty
@@ -333,167 +326,167 @@ gen_ext_core_source entries =
 gen_latex_doc :: Info -> String
 gen_latex_doc (Info defaults entries)
    = "\\primopdefaults{" 
-	 ++ mk_options defaults
-	 ++ "}\n"
+         ++ mk_options defaults
+         ++ "}\n"
      ++ (concat (map mk_entry entries))
      where mk_entry (PrimOpSpec {cons=constr,name=n,ty=t,cat=c,desc=d,opts=o}) =
-   		 "\\primopdesc{" 
-		 ++ latex_encode constr ++ "}{"
-		 ++ latex_encode n ++ "}{"
-		 ++ latex_encode (zencode n) ++ "}{"
-		 ++ latex_encode (show c) ++ "}{"
-		 ++ latex_encode (mk_source_ty t) ++ "}{"
-		 ++ latex_encode (mk_core_ty t) ++ "}{"
-		 ++ d ++ "}{"
-		 ++ mk_options o
-		 ++ "}\n"
+                 "\\primopdesc{" 
+                 ++ latex_encode constr ++ "}{"
+                 ++ latex_encode n ++ "}{"
+                 ++ latex_encode (zencode n) ++ "}{"
+                 ++ latex_encode (show c) ++ "}{"
+                 ++ latex_encode (mk_source_ty t) ++ "}{"
+                 ++ latex_encode (mk_core_ty t) ++ "}{"
+                 ++ d ++ "}{"
+                 ++ mk_options o
+                 ++ "}\n"
            mk_entry (Section {title=ti,desc=d}) =
-		 "\\primopsection{" 
-		 ++ latex_encode ti ++ "}{"
-		 ++ d ++ "}\n"
+                 "\\primopsection{" 
+                 ++ latex_encode ti ++ "}{"
+                 ++ d ++ "}\n"
            mk_entry (PrimTypeSpec {ty=t,desc=d,opts=o}) =
-   		 "\\primtypespec{"
-		 ++ latex_encode (mk_source_ty t) ++ "}{"
-		 ++ latex_encode (mk_core_ty t) ++ "}{"
-		 ++ d ++ "}{"
-		 ++ mk_options o
-		 ++ "}\n"
+                 "\\primtypespec{"
+                 ++ latex_encode (mk_source_ty t) ++ "}{"
+                 ++ latex_encode (mk_core_ty t) ++ "}{"
+                 ++ d ++ "}{"
+                 ++ mk_options o
+                 ++ "}\n"
            mk_entry (PseudoOpSpec {name=n,ty=t,desc=d,opts=o}) =
-		 "\\pseudoopspec{"
-		 ++ latex_encode (zencode n) ++ "}{"
-		 ++ latex_encode (mk_source_ty t) ++ "}{"
-		 ++ latex_encode (mk_core_ty t) ++ "}{"
-		 ++ d ++ "}{"
-		 ++ mk_options o
-		 ++ "}\n"
-	   mk_source_ty typ = pty typ
-	     where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
-		   pty t = pbty t
-		   pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
-		   pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
-		   pbty t = paty t
-		   paty (TyVar tv) = tv
-		   paty t = "(" ++ pty t ++ ")"
-	   
-	   mk_core_ty typ = foralls ++ (pty typ)
-	     where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
-		   pty t = pbty t
-		   pbty (TyApp tc ts) = (zencode tc) ++ (concat (map (' ':) (map paty ts)))
-		   pbty (TyUTup ts) = (zencode (utuplenm (length ts))) ++ (concat ((map (' ':) (map paty ts))))
-		   pbty t = paty t
-		   paty (TyVar tv) = zencode tv
-		   paty (TyApp tc []) = zencode tc
-		   paty t = "(" ++ pty t ++ ")"
-		   utuplenm 1 = "(# #)"
-		   utuplenm n = "(#" ++ (replicate (n-1) ',') ++ "#)"
-		   foralls = if tvars == [] then "" else "%forall " ++ (tbinds tvars)
-		   tvars = tvars_of typ
-		   tbinds [] = ". " 
-		   tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
-		   tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
-	   tvars_of (TyF t1 t2) = tvars_of t1 `union` tvars_of t2
-	   tvars_of (TyApp _ ts) = foldl union [] (map tvars_of ts)
-	   tvars_of (TyUTup ts) = foldr union [] (map tvars_of ts)
-	   tvars_of (TyVar tv) = [tv]
-	   
+                 "\\pseudoopspec{"
+                 ++ latex_encode (zencode n) ++ "}{"
+                 ++ latex_encode (mk_source_ty t) ++ "}{"
+                 ++ latex_encode (mk_core_ty t) ++ "}{"
+                 ++ d ++ "}{"
+                 ++ mk_options o
+                 ++ "}\n"
+           mk_source_ty typ = pty typ
+             where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+                   pty t = pbty t
+                   pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
+                   pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
+                   pbty t = paty t
+                   paty (TyVar tv) = tv
+                   paty t = "(" ++ pty t ++ ")"
+           
+           mk_core_ty typ = foralls ++ (pty typ)
+             where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+                   pty t = pbty t
+                   pbty (TyApp tc ts) = (zencode tc) ++ (concat (map (' ':) (map paty ts)))
+                   pbty (TyUTup ts) = (zencode (utuplenm (length ts))) ++ (concat ((map (' ':) (map paty ts))))
+                   pbty t = paty t
+                   paty (TyVar tv) = zencode tv
+                   paty (TyApp tc []) = zencode tc
+                   paty t = "(" ++ pty t ++ ")"
+                   utuplenm 1 = "(# #)"
+                   utuplenm n = "(#" ++ (replicate (n-1) ',') ++ "#)"
+                   foralls = if tvars == [] then "" else "%forall " ++ (tbinds tvars)
+                   tvars = tvars_of typ
+                   tbinds [] = ". " 
+                   tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
+                   tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
+           tvars_of (TyF t1 t2) = tvars_of t1 `union` tvars_of t2
+           tvars_of (TyApp _ ts) = foldl union [] (map tvars_of ts)
+           tvars_of (TyUTup ts) = foldr union [] (map tvars_of ts)
+           tvars_of (TyVar tv) = [tv]
+           
            mk_options o =
-	     "\\primoptions{"
-	      ++ mk_has_side_effects o ++ "}{"
-	      ++ mk_out_of_line o ++ "}{"
-	      ++ mk_commutable o ++ "}{"
- 	      ++ mk_needs_wrapper o ++ "}{"
-	      ++ mk_can_fail o ++ "}{"
-	      ++ latex_encode (mk_strictness o) ++ "}{"
-	      ++ "}"
+             "\\primoptions{"
+              ++ mk_has_side_effects o ++ "}{"
+              ++ mk_out_of_line o ++ "}{"
+              ++ mk_commutable o ++ "}{"
+              ++ mk_needs_wrapper o ++ "}{"
+              ++ mk_can_fail o ++ "}{"
+              ++ latex_encode (mk_strictness o) ++ "}{"
+              ++ "}"
 
-  	   mk_has_side_effects o = mk_bool_opt o "has_side_effects" "Has side effects." "Has no side effects."
-	   mk_out_of_line o = mk_bool_opt o "out_of_line" "Implemented out of line." "Implemented in line."
-  	   mk_commutable o = mk_bool_opt o "commutable" "Commutable." "Not commutable."
-  	   mk_needs_wrapper o = mk_bool_opt o "needs_wrapper" "Needs wrapper." "Needs no wrapper."
-	   mk_can_fail o = mk_bool_opt o "can_fail" "Can fail." "Cannot fail."
+           mk_has_side_effects o = mk_bool_opt o "has_side_effects" "Has side effects." "Has no side effects."
+           mk_out_of_line o = mk_bool_opt o "out_of_line" "Implemented out of line." "Implemented in line."
+           mk_commutable o = mk_bool_opt o "commutable" "Commutable." "Not commutable."
+           mk_needs_wrapper o = mk_bool_opt o "needs_wrapper" "Needs wrapper." "Needs no wrapper."
+           mk_can_fail o = mk_bool_opt o "can_fail" "Can fail." "Cannot fail."
 
-	   mk_bool_opt o opt_name if_true if_false =
-	     case lookup_attrib opt_name o of
-	       Just (OptionTrue _) -> if_true
-	       Just (OptionFalse _) -> if_false
-	       Just (OptionString _ _) -> error "String value for boolean option"
+           mk_bool_opt o opt_name if_true if_false =
+             case lookup_attrib opt_name o of
+               Just (OptionTrue _) -> if_true
+               Just (OptionFalse _) -> if_false
+               Just (OptionString _ _) -> error "String value for boolean option"
                Just (OptionInteger _ _) -> error "Integer value for boolean option"
                Nothing -> ""
-	   
-	   mk_strictness o = 
-	     case lookup_attrib "strictness" o of
-	       Just (OptionString _ s) -> s  -- for now
-	       Just _ -> error "Boolean value for strictness"
-	       Nothing -> "" 
+           
+           mk_strictness o = 
+             case lookup_attrib "strictness" o of
+               Just (OptionString _ s) -> s  -- for now
+               Just _ -> error "Boolean value for strictness"
+               Nothing -> "" 
 
-	   zencode xs =
-	     case maybe_tuple xs of
-		Just n  -> n		-- Tuples go to Z2T etc
-		Nothing -> concat (map encode_ch xs)
-	     where
-	       maybe_tuple "(# #)" = Just("Z1H")
-	       maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-						(n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
-						_		   -> Nothing
-	       maybe_tuple "()" = Just("Z0T")
-	       maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-						(n, ')' : _) -> Just ('Z' : shows (n+1) "T")
-						_	     -> Nothing
-	       maybe_tuple _    	     = Nothing
-	       
-	       count_commas :: Int -> String -> (Int, String)
-	       count_commas n (',' : cs) = count_commas (n+1) cs
-	       count_commas n cs	  = (n,cs)
-	       
-	       unencodedChar :: Char -> Bool	-- True for chars that don't need encoding
-	       unencodedChar 'Z' = False
-	       unencodedChar 'z' = False
-	       unencodedChar c   = isAlphaNum c
-	       
-	       encode_ch :: Char -> String
-	       encode_ch c | unencodedChar c = [c]	-- Common case first
-	       
-	       -- Constructors
-	       encode_ch '('  = "ZL"	-- Needed for things like (,), and (->)
-	       encode_ch ')'  = "ZR"	-- For symmetry with (
-	       encode_ch '['  = "ZM"
-	       encode_ch ']'  = "ZN"
-	       encode_ch ':'  = "ZC"
-	       encode_ch 'Z'  = "ZZ"
-	       
-	       -- Variables
-	       encode_ch 'z'  = "zz"
-	       encode_ch '&'  = "za"
-	       encode_ch '|'  = "zb"
-	       encode_ch '^'  = "zc"
-	       encode_ch '$'  = "zd"
-	       encode_ch '='  = "ze"
-	       encode_ch '>'  = "zg"
-	       encode_ch '#'  = "zh"
-	       encode_ch '.'  = "zi"
-	       encode_ch '<'  = "zl"
-	       encode_ch '-'  = "zm"
-	       encode_ch '!'  = "zn"
-	       encode_ch '+'  = "zp"
-	       encode_ch '\'' = "zq"
-	       encode_ch '\\' = "zr"
-	       encode_ch '/'  = "zs"
-	       encode_ch '*'  = "zt"
-	       encode_ch '_'  = "zu"
-	       encode_ch '%'  = "zv"
-	       encode_ch c    = 'z' : shows (ord c) "U"
-		       
-	   latex_encode [] = []
-	   latex_encode (c:cs) | c `elem` "#$%&_^{}" = "\\" ++ c:(latex_encode cs)
-	   latex_encode ('~':cs) = "\\verb!~!" ++ (latex_encode cs)
-	   latex_encode ('\\':cs) = "$\\backslash$" ++ (latex_encode cs)
-	   latex_encode (c:cs) = c:(latex_encode cs)
+           zencode xs =
+             case maybe_tuple xs of
+                Just n  -> n            -- Tuples go to Z2T etc
+                Nothing -> concat (map encode_ch xs)
+             where
+               maybe_tuple "(# #)" = Just("Z1H")
+               maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
+                                                (n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
+                                                _                  -> Nothing
+               maybe_tuple "()" = Just("Z0T")
+               maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
+                                                (n, ')' : _) -> Just ('Z' : shows (n+1) "T")
+                                                _            -> Nothing
+               maybe_tuple _                 = Nothing
+               
+               count_commas :: Int -> String -> (Int, String)
+               count_commas n (',' : cs) = count_commas (n+1) cs
+               count_commas n cs          = (n,cs)
+               
+               unencodedChar :: Char -> Bool    -- True for chars that don't need encoding
+               unencodedChar 'Z' = False
+               unencodedChar 'z' = False
+               unencodedChar c   = isAlphaNum c
+               
+               encode_ch :: Char -> String
+               encode_ch c | unencodedChar c = [c]      -- Common case first
+               
+               -- Constructors
+               encode_ch '('  = "ZL"    -- Needed for things like (,), and (->)
+               encode_ch ')'  = "ZR"    -- For symmetry with (
+               encode_ch '['  = "ZM"
+               encode_ch ']'  = "ZN"
+               encode_ch ':'  = "ZC"
+               encode_ch 'Z'  = "ZZ"
+               
+               -- Variables
+               encode_ch 'z'  = "zz"
+               encode_ch '&'  = "za"
+               encode_ch '|'  = "zb"
+               encode_ch '^'  = "zc"
+               encode_ch '$'  = "zd"
+               encode_ch '='  = "ze"
+               encode_ch '>'  = "zg"
+               encode_ch '#'  = "zh"
+               encode_ch '.'  = "zi"
+               encode_ch '<'  = "zl"
+               encode_ch '-'  = "zm"
+               encode_ch '!'  = "zn"
+               encode_ch '+'  = "zp"
+               encode_ch '\'' = "zq"
+               encode_ch '\\' = "zr"
+               encode_ch '/'  = "zs"
+               encode_ch '*'  = "zt"
+               encode_ch '_'  = "zu"
+               encode_ch '%'  = "zv"
+               encode_ch c    = 'z' : shows (ord c) "U"
+                       
+           latex_encode [] = []
+           latex_encode (c:cs) | c `elem` "#$%&_^{}" = "\\" ++ c:(latex_encode cs)
+           latex_encode ('~':cs) = "\\verb!~!" ++ (latex_encode cs)
+           latex_encode ('\\':cs) = "$\\backslash$" ++ (latex_encode cs)
+           latex_encode (c:cs) = c:(latex_encode cs)
 
 gen_wrappers :: Info -> String
 gen_wrappers (Info _ entries)
    = "{-# LANGUAGE NoImplicitPrelude, UnboxedTuples #-}\n"
-	-- Dependencies on Prelude must be explicit in libraries/base, but we
-	-- don't need the Prelude here so we add NoImplicitPrelude.
+        -- Dependencies on Prelude must be explicit in libraries/base, but we
+        -- don't need the Prelude here so we add NoImplicitPrelude.
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
      ++ "import GHC.Types (Bool)\n"
@@ -646,7 +639,7 @@ ppType (TyApp "RealWorld"   []) = "realWorldTy"
 ppType (TyApp "ThreadId#"   []) = "threadIdPrimTy"
 ppType (TyApp "ForeignObj#" []) = "foreignObjPrimTy"
 ppType (TyApp "BCO#"        []) = "bcoPrimTy"
-ppType (TyApp "()"          []) = "unitTy" 	-- unitTy is TysWiredIn's name for ()
+ppType (TyApp "()"          []) = "unitTy"      -- unitTy is TysWiredIn's name for ()
 
 ppType (TyVar "a")                      = "alphaTy"
 ppType (TyVar "b")                      = "betaTy"

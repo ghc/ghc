@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module Annotations (
     -- * Main Annotation data types
     Annotation(..),
@@ -40,14 +33,14 @@ import Data.Word        ( Word8 )
 data Annotation = Annotation {
         ann_target :: CoreAnnTarget,    -- ^ The target of the annotation
         ann_value :: Serialized         -- ^ 'Serialized' version of the annotation that 
-		     			--   allows recovery of its value or can
+                                        --   allows recovery of its value or can
                                         --   be persisted to an interface file
     }
 
 -- | An annotation target
 data AnnTarget name 
   = NamedTarget name          -- ^ We are annotating something with a name: 
-     	       	      	      --      a type or identifier
+                              --      a type or identifier
   | ModuleTarget Module       -- ^ We are annotating a particular module
 
 -- | The kind of annotation target found in the middle end of the compiler
