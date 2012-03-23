@@ -31,7 +31,8 @@ main = putStrLn "Hello, World!"
     <para>To compile the program, use GHC like this:</para>
 
 <screen>
-$ ghc hello.hs</screen>
+$ ghc hello.hs
+</screen>
 
      <para>(where <literal>$</literal> represents the prompt: don't
        type it).  GHC will compile the source
@@ -58,7 +59,8 @@ $ ghc hello.hs</screen>
 
 <screen>
 $ ./hello
-Hello World!</screen>
+Hello World!
+</screen>
 
     <para>
       If your program contains multiple modules, then you only need to
@@ -725,7 +727,8 @@ olleh
       <para>Thus, a common invocation would be: </para>
 
 <screen>
-ghc -c Foo.hs</screen>
+ghc -c Foo.hs
+</screen>
 
       <para>to compile the Haskell source file
       <filename>Foo.hs</filename> to an object file
@@ -874,19 +877,25 @@ ghc -c Foo.hs</screen>
 
           <para>For example:</para>
 
-<screen>test.hs:3:6: parse error on input `where'</screen>
+<screen>
+test.hs:3:6: parse error on input `where'
+</screen>
 
           <para>becomes:</para>
 
-<screen>test296.hs:3:6-10: parse error on input `where'</screen>
+<screen>
+test296.hs:3:6-10: parse error on input `where'
+</screen>
 
           <para>And multi-line spans are possible too:</para>
 
-<screen>test.hs:(5,4)-(6,7):
+<screen>
+test.hs:(5,4)-(6,7):
     Conflicting definitions for `a'
     Bound at: test.hs:5:4
               test.hs:6:7
-    In the binding group for: a, b, a</screen>
+    In the binding group for: a, b, a
+</screen>
 
           <para>Note that line numbers start counting at one, but
           column numbers start at zero.  This choice was made to
@@ -1100,13 +1109,17 @@ ghc -c Foo.hs</screen>
           </indexterm>
           <para>Causes a warning to be emitted for foreign imports of
           the following form:</para>
+
 <programlisting>
 foreign import "f" f :: FunPtr t
 </programlisting>
+
           <para>on the grounds that it probably should be</para>
+
 <programlisting>
 foreign import "&amp;f" f :: FunPtr t
 </programlisting>
+
           <para>The first form declares that `f` is a (pure) C
           function that takes no arguments and returns a pointer to a
           C function with type `t`, whereas the second form declares
@@ -1246,9 +1259,11 @@ foreign import "&amp;f" f :: FunPtr t
           non-empty lists, so the compiler will emit a warning about
           this when <option>-fwarn-incomplete-patterns</option> is
           enabled.
+
 <programlisting>
 g [] = 2
 </programlisting>
+
           This option isn't enabled by default because it can be
           a bit noisy, and it doesn't always indicate a bug in the
           program.  However, it's generally considered good practice
@@ -1259,10 +1274,12 @@ g [] = 2
           similar, except that it
           applies only to lambda-expressions and pattern bindings, constructs
           that only allow a single pattern:
+
 <programlisting>
 h = \[] -> 2
 Just k = f y
 </programlisting>
+
           </para>
         </listitem>
       </varlistentry>
@@ -1325,6 +1342,7 @@ f foo = foo { x = 6 }
             that does not explicitly list the entities brought into scope. For
             example
       </para>
+
 <programlisting>
 module M where
   import X( f )
@@ -1332,6 +1350,7 @@ module M where
   import qualified Z
   p x = f x x
 </programlisting>
+
         <para>
           The <option>-fwarn-import-lists</option> flag will warn about the import
           of <literal>Y</literal> but not <literal>X</literal>
@@ -1756,9 +1775,11 @@ f "2"    = 2
 
       <variablelist>
         <varlistentry>
-          <term><option>-fexcess-precision</option>:</term>
-          <listitem>
+          <term>
+            <option>-fexcess-precision</option>
             <indexterm><primary><option>-fexcess-precision</option></primary></indexterm>
+          </term>
+          <listitem>
             <para>When this option is given, intermediate floating
             point values can have a <emphasis>greater</emphasis>
             precision/range than the final type.  Generally this is a
@@ -1770,9 +1791,11 @@ f "2"    = 2
         </varlistentry>
 
         <varlistentry>
-          <term><option>-fignore-asserts</option>:</term>
-          <listitem>
+          <term>
+            <option>-fignore-asserts</option>
             <indexterm><primary><option>-fignore-asserts</option></primary></indexterm>
+          </term>
+          <listitem>
             <para>Causes GHC to ignore uses of the function
             <literal>Exception.assert</literal> in source code (in
             other words, rewriting <literal>Exception.assert p
@@ -1802,6 +1825,7 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turn on the liberate-case transformation.</para>
+            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1812,7 +1836,7 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turns off the common-sub-expression elimination optimisation.
-              Can be useful if you have some <literal>unsafePerformIO</literal>
+            Can be useful if you have some <literal>unsafePerformIO</literal>
             expressions that you don't want commoned-up.</para>
           </listitem>
         </varlistentry>
@@ -1835,8 +1859,10 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turns off the full laziness optimisation (also known as
-              let-floating).  Full laziness increases sharing, which can lead
+              let-floating). Full laziness increases sharing, which can lead
               to increased memory residency.</para>
+
+            TODO: Document optimisation
 
             <para>NOTE: GHC doesn't implement complete full-laziness.
             When optimisation in on, and
@@ -1857,6 +1883,7 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turns off the float-in transformation.</para>
+            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1867,6 +1894,7 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turns off the automatic specialisation of overloaded functions.</para>
+            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1877,9 +1905,9 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turn off the "state hack" whereby any lambda with a
-              <literal>State#</literal> token as argument is considered to be
-              single-entry, hence it is considered OK to inline things inside
-              it.  This can improve performance of IO and ST monad code, but it
+            <literal>State#</literal> token as argument is considered to be
+            single-entry, hence it is considered OK to inline things inside
+            it. This can improve performance of IO and ST monad code, but it
             runs the risk of reducing sharing.</para>
           </listitem>
         </varlistentry>
@@ -1891,10 +1919,10 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Make GHC be more precise about its treatment of bottom (but see also
-                     <option>-fno-state-hack</option>). In particular, stop GHC 
-                     eta-expanding through a case expression, which is good for
-                     performance, but bad if you are using <literal>seq</literal> on
-                     partial applications.</para>
+            <option>-fno-state-hack</option>). In particular, stop GHC 
+            eta-expanding through a case expression, which is good for
+            performance, but bad if you are using <literal>seq</literal> on
+            partial applications.</para>
           </listitem>
         </varlistentry>
 
@@ -1904,15 +1932,15 @@ f "2"    = 2
             <indexterm><primary><option>-fomit-interface-pragmas</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Tells GHC to omit all inessential information from the interface file
-              generated for the module being compiled (say M).  This means that a module
-              importing M will see only the <emphasis>types</emphasis> of the functions that M exports, but not
-              their unfoldings, strictness info, etc.  Hence, for example,
-              no function exported by M will be inlined
-              into an importing module.  The benefit is that modules that import M will
-              need to be recompiled less often (only when M's exports change their type,
-              not when they change their implementation).
-              </para>
+            <para>Tells GHC to omit all inessential information from the
+            interface file generated for the module being compiled (say M).
+            This means that a module importing M will see only the
+            <emphasis>types</emphasis> of the functions that M exports, but
+            not their unfoldings, strictness info, etc.  Hence, for example,
+            no function exported by M will be inlined into an importing module.
+            The benefit is that modules that import M will need to be
+            recompiled less often (only when M's exports change their type, not
+            when they change their implementation).</para>
           </listitem>
         </varlistentry>
 
@@ -1923,18 +1951,19 @@ f "2"    = 2
           </term>
           <listitem>
             <para>GHC's optimiser can diverge if you write rewrite rules (<xref linkend="rewrite-rules"/>) 
-              that don't terminate, or (less satisfactorily) if you
-              code up recursion through data types
-              (<xref linkend="bugs-ghc"/>).  To avoid making the compiler fall into an infinite
-              loop, the optimiser carries a "tick count" and stops inlining and applying rewrite rules
-              when this count is exceeded.  The limit is set as a multiple of the program size, so 
-              bigger programs get more ticks. The <option>-fsimpl-tick-factor</option> flag lets
-              you change the multiplier. The default is 100; numbers larger than 100 give more ticks,
-              and numbers smaller than 100 give fewer.</para>
+            that don't terminate, or (less satisfactorily) if you
+            code up recursion through data types
+            (<xref linkend="bugs-ghc"/>).  To avoid making the compiler fall into an infinite
+            loop, the optimiser carries a "tick count" and stops inlining and applying rewrite rules
+            when this count is exceeded.  The limit is set as a multiple of the program size, so 
+            bigger programs get more ticks. The <option>-fsimpl-tick-factor</option> flag lets
+            you change the multiplier. The default is 100; numbers larger than 100 give more ticks,
+            and numbers smaller than 100 give fewer.</para>
+
             <para>If the tick-count expires, GHC summarises what simplifier steps it has done; 
             you can use <option>-fddump-simpl-stats</option> to generate a much more detailed list.
             Usually that identifies the loop quite accurately, because some numbers are very large.
-              </para>
+            </para>
           </listitem>
         </varlistentry>
 
@@ -1945,6 +1974,7 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turn on the static argument transformation.</para>
+            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1955,6 +1985,7 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Turn on call-pattern specialisation.</para>
+            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1966,22 +1997,19 @@ f "2"    = 2
             <indexterm><primary>constructor fields, strict</primary></indexterm>
           </term>
           <listitem>
-            <para>This option causes all constructor fields which are
-            marked strict (i.e. &ldquo;!&rdquo;) to be unboxed or
-            unpacked if possible.  It is equivalent to adding an
-            <literal>UNPACK</literal> pragma to every strict
-            constructor field (see <xref
-            linkend="unpack-pragma"/>).</para>
+            <para>This option causes all constructor fields which are marked
+            strict (i.e. &ldquo;!&rdquo;) to be unpacked if possible. It is
+            equivalent to adding an <literal>UNPACK</literal> pragma to every
+            strict constructor field (see <xref linkend="unpack-pragma"/>).
+            </para>
 
-            <para>This option is a bit of a sledgehammer: it might
-            sometimes make things worse.  Selectively unboxing fields
-            by using <literal>UNPACK</literal> pragmas might be
-            better. An alternative is to use
-        <option>-funbox-strict-fields</option> to turn on
-        unboxing by default but disable it for certain constructor
-        fields using the <literal>NOUNPACK</literal> pragma
-        (see <xref linkend="nounpack-pragma"/>).
-        </para>
+            <para>This option is a bit of a sledgehammer: it might sometimes
+            make things worse. Selectively unboxing fields by using
+            <literal>UNPACK</literal> pragmas might be better. An alternative
+            is to use <option>-funbox-strict-fields</option> to turn on
+            unboxing by default but disable it for certain constructor
+            fields using the <literal>NOUNPACK</literal> pragma (see
+            <xref linkend="nounpack-pragma"/>).</para>
           </listitem>
         </varlistentry>
 
@@ -1993,40 +2021,49 @@ f "2"    = 2
             <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
           <listitem>
-            <para>(Default: 45) Governs the maximum size that GHC will
-            allow a function unfolding to be.   (An unfolding has a
-            &ldquo;size&rdquo; that reflects the cost in terms of
-            &ldquo;code bloat&rdquo; of expanding that unfolding
-            at a call site. A bigger function would be assigned a
-            bigger cost.) </para>
+            <para>(Default: 45) Governs the maximum size that GHC will allow a
+            function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
+            that reflects the cost in terms of &ldquo;code bloat&rdquo; of
+            expanding (aka inlining) that unfolding at a call site. A bigger
+            function would be assigned a bigger cost.) </para>
 
-            <para> Consequences: (a) nothing larger than this will be
+            <para>Consequences: (a) nothing larger than this will be
             inlined (unless it has an INLINE pragma); (b) nothing
             larger than this will be spewed into an interface
             file. </para>
 
-
-            <para> Increasing this figure is more likely to result in longer
-            compile times than faster code.  The next option is more
-            useful:</para>
+            <para>Increasing this figure is more likely to result in longer
+            compile times than faster code. The
+            <option>-funfolding-use-threshold</option> is more useful.
+            </para>
           </listitem>
         </varlistentry>
 
         <varlistentry>
-          <term><option>-funfolding-use-threshold=<replaceable>n</replaceable></option></term>
-          <listitem>
+          <term>
+            <option>-funfolding-use-threshold=<replaceable>n</replaceable></option>
             <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
             <indexterm><primary>inlining, controlling</primary></indexterm>
             <indexterm><primary>unfolding, controlling</primary></indexterm>
-
-            <para>(Default: 8) This is the magic cut-off figure for
-            unfolding: below this size, a function definition will be
-            unfolded at the call-site, any bigger and it won't.  The
-            size computed for a function depends on two things: the
-            actual size of the expression minus any discounts that
+          </term>
+          <listitem>
+            <para>(Default: 8) This is the magic cut-off figure for unfolding
+            (aka inlining): below this size, a function definition will be
+            unfolded at the call-site, any bigger and it won't. The size
+            computed for a function depends on two things: the actual size of
+            the expression minus any discounts that
             apply (see <option>-funfolding-con-discount</option>).</para>
+
+            <para>The difference between this and
+            <option>-funfolding-creation-threshold</option> is that this one
+            determines if a function definition will be inlined at a call
+            site. The other option determines if a function definition will
+            be kept around to begin with for potential inlining.</para>
+
+            TODO: Is above para correct?
           </listitem>
         </varlistentry>
+
       </variablelist>
 
     </sect2>
