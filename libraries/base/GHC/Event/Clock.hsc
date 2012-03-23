@@ -6,12 +6,15 @@ module GHC.Event.Clock (getMonotonicTime) where
 #include "HsBase.h"
 
 import Foreign
-import Foreign.C.Error (throwErrnoIfMinus1_)
 import Foreign.C.Types
 import GHC.Base
+import GHC.Real
+
+#if !darwin_HOST_OS
+import Foreign.C.Error (throwErrnoIfMinus1_)
 import GHC.Err
 import GHC.Num
-import GHC.Real
+#endif
 
 -- TODO: Implement this for Windows.
 
@@ -50,6 +53,18 @@ instance Storable CTimespec where
 
 foreign import capi unsafe "HsBase.h clock_gettime" clock_gettime
     :: Int -> Ptr CTimespec -> IO CInt
+
+#elif darwin_HOST_OS
+
+getMonotonicTime = do
+    with 0.0 $ \timeptr -> do
+    absolute_time timeptr
+    ctime <- peek timeptr
+    let !time = realToFrac ctime
+    return time
+
+foreign import capi unsafe "HsBase.h absolute_time" absolute_time ::
+    Ptr CDouble -> IO ()
 
 #else
 

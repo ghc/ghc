@@ -217,6 +217,7 @@ Library {
         cbits/PrelIOUtils.c
         cbits/WCsubst.c
         cbits/Win32Utils.c
+        cbits/DarwinUtils.c
         cbits/consUtils.c
         cbits/iconv.c
         cbits/inputReady.c
