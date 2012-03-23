@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSp
--- for details
-
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module GhciTags (
   createCTagsWithLineNumbersCmd,
@@ -65,12 +58,12 @@ ghciCreateTagsFile kind file = do
   createTagsFile kind file
 
 -- ToDo: 
--- 	- remove restriction that all modules must be interpreted
---	  (problem: we don't know source locations for entities unless
---	  we compiled the module.
+--      - remove restriction that all modules must be interpreted
+--        (problem: we don't know source locations for entities unless
+--        we compiled the module.
 --
---	- extract createTagsFile so it can be used from the command-line
---	  (probably need to fix first problem before this is useful).
+--      - extract createTagsFile so it can be used from the command-line
+--        (probably need to fix first problem before this is useful).
 --
 createTagsFile :: TagsKind -> FilePath -> GHCi ()
 createTagsFile tagskind tagsFile = do
