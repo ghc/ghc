@@ -1919,7 +1919,7 @@ f "2"    = 2
           </term>
           <listitem>
             <para>Make GHC be more precise about its treatment of bottom (but see also
-            <option>-fno-state-hack</option>). In particular, stop GHC 
+            <option>-fno-state-hack</option>). In particular, stop GHC
             eta-expanding through a case expression, which is good for
             performance, but bad if you are using <literal>seq</literal> on
             partial applications.</para>
@@ -2061,6 +2061,174 @@ f "2"    = 2
             be kept around to begin with for potential inlining.</para>
 
             TODO: Is above para correct?
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fexpose-all-unfoldings</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-feager-blackholing</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fstrictness</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-ffloat-in</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdo-lambda-eta-expansion</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdo-eta-reduction</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fcase-merge</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fdicts-cheap</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fvectorise</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-favoid-vect</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fregs-graph</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fregs-iterative</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fregs-liveness</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
+          </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <option>-fllvm-tbaa</option>
+            <indexterm><primary><option></option></primary></indexterm>
+          </term>
+          <listitem>
+            <para>
+            </para>
+            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
