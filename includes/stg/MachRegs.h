@@ -164,8 +164,10 @@
 #define REG_D1    xmm5
 #define REG_D2    xmm6
 
+#if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_R3
 #define CALLER_SAVES_R4
+#endif
 #define CALLER_SAVES_R5
 #define CALLER_SAVES_R6
 
@@ -175,7 +177,9 @@
 #define CALLER_SAVES_F4
 
 #define CALLER_SAVES_D1
+#if !defined(mingw32_HOST_OS)
 #define CALLER_SAVES_D2
+#endif
 
 #define MAX_REAL_VANILLA_REG 6
 #define MAX_REAL_FLOAT_REG   4
