@@ -49,7 +49,8 @@ module RdrHsSyn (
 
         -- Help with processing exports
         ImpExpSubSpec(..),
-        mkModuleImpExp
+        mkModuleImpExp,
+        mkTypeImpExp
 
     ) where
 
@@ -1041,6 +1042,14 @@ mkModuleImpExp name subs =
 
   where
     nameT = setRdrNameSpace name tcClsName
+
+mkTypeImpExp :: Located RdrName -> P (Located RdrName)
+mkTypeImpExp name =
+  do allowed <- extension explicitNamespacesEnabled
+     if allowed
+       then return (fmap (`setRdrNameSpace` tcClsName) name)
+       else parseErrorSDoc (getLoc name)
+              (text "Illegal keyword 'type' (use -XExplicitNamespaces to enable)")
 \end{code}
 
 -----------------------------------------------------------------------------

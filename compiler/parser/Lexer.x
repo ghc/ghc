@@ -57,6 +57,7 @@ module Lexer (
    extension, bangPatEnabled, datatypeContextsEnabled,
    traditionalRecordSyntaxEnabled,
    typeLiteralsEnabled,
+   explicitNamespacesEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -1809,6 +1810,9 @@ traditionalRecordSyntaxBit :: Int
 traditionalRecordSyntaxBit = 27
 typeLiteralsBit :: Int
 typeLiteralsBit = 28
+explicitNamespacesBit :: Int
+explicitNamespacesBit = 29
+
 
 always :: Int -> Bool
 always           _     = True
@@ -1854,6 +1858,9 @@ traditionalRecordSyntaxEnabled :: Int -> Bool
 traditionalRecordSyntaxEnabled flags = testBit flags traditionalRecordSyntaxBit
 typeLiteralsEnabled :: Int -> Bool
 typeLiteralsEnabled flags = testBit flags typeLiteralsBit
+
+explicitNamespacesEnabled :: Int -> Bool
+explicitNamespacesEnabled flags = testBit flags explicitNamespacesBit
 
 -- PState for parsing options pragmas
 --
@@ -1914,6 +1921,7 @@ mkPState flags buf loc =
                .|. safeHaskellBit              `setBitIf` safeImportsOn                     flags
                .|. traditionalRecordSyntaxBit  `setBitIf` xopt Opt_TraditionalRecordSyntax  flags
                .|. typeLiteralsBit             `setBitIf` xopt Opt_DataKinds flags
+               .|. explicitNamespacesBit       `setBitIf` xopt Opt_ExplicitNamespaces flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

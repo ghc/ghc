@@ -486,9 +486,7 @@ qcnames :: { [RdrName] }     -- A reversed list
 qcname_ext :: { Located RdrName }       -- Variable or data constructor
                                         -- or tagged type constructor
         :  qcname                       { $1 }
-        |  'type' qcname                { sL (comb2 $1 $2) 
-                                             (setRdrNameSpace (unLoc $2) 
-                                                              tcClsName)  }
+        |  'type' qcname                {% mkTypeImpExp (LL (unLoc $2)) }
 
 -- Cannot pull into qcname_ext, as qcname is also used in expression.
 qcname  :: { Located RdrName }  -- Variable or data constructor
