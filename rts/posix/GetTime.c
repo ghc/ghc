@@ -71,6 +71,17 @@ Time getProcessElapsedTime(void)
 
     clock_gettime(CLOCK_ID, &ts);
     return SecondsToTime(ts.tv_sec) + NSToTime(ts.tv_nsec);
+#elif defined(darwin_HOST_OS)
+    uint64_t time = mach_absolute_time();
+    static double scaling_factor = 0.0;
+
+    if (scaling_factor == 0.0) {
+        mach_timebase_info_data_t info;
+        (void) mach_timebase_info(&info);
+        scaling_factor = (double)info.numer / (double)info.denom;
+    }
+
+    return (Time)((double)time * scaling_factor);
 #else
     struct timeval tv;
 
