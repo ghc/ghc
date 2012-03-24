@@ -45,24 +45,14 @@
           Documentation for the GHC API.
         </P>
       </LI>
-
-<!--
-      <LI>
-        <P>
-          <B><A HREF="Cabal/index.html">Cabal</A></B>
-        </P>
-        <P>An infrastructure for building and distributing Haskell
-        software.</P>
-      </LI>
--->
     </UL>
 
-    <P>For more information, see the following:</p>
-    <ul>
-      <li><p><a href="http://www.haskell.org/ghc/">GHC Home Page</a></p></li>
-      <li><p><a href="http://hackage.haskell.org/trac/ghc/">
-        GHC Developers Home</a></p></li>
-    </ul>
+    <P>For more information, see the following:</P>
+    <UL>
+      <LI><P><A href="http://www.haskell.org/ghc/">GHC Home Page</A></P></LI>
+      <LI><P><A href="http://hackage.haskell.org/trac/ghc/">
+        GHC Developers Home</A></P></LI>
+    </UL>
   </BODY>
 </HTML>
 

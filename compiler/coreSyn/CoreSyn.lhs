@@ -917,10 +917,10 @@ instance Outputable AltCon where
 instance Show AltCon where
   showsPrec p con = showsPrecSDoc p (ppr con)
 
-cmpAlt :: Alt b -> Alt b -> Ordering
+cmpAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Ordering
 cmpAlt (con1, _, _) (con2, _, _) = con1 `cmpAltCon` con2
 
-ltAlt :: Alt b -> Alt b -> Bool
+ltAlt :: (AltCon, a, b) -> (AltCon, a, b) -> Bool
 ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering

@@ -3,38 +3,31 @@
 %
 
 -- ---------------------------------------------------------------------------
--- 	The dynamic linker for object code (.o .so .dll files)
+--      The dynamic linker for object code (.o .so .dll files)
 -- ---------------------------------------------------------------------------
 
 Primarily, this module consists of an interface to the C-land dynamic linker.
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
-module ObjLink ( 
-   initObjLinker,	 -- :: IO ()
-   loadDLL,		 -- :: String -> IO (Maybe String)
-   loadArchive,     	 -- :: String -> IO ()
-   loadObj,     	 -- :: String -> IO ()
-   unloadObj,   	 -- :: String -> IO ()
+module ObjLink (
+   initObjLinker,        -- :: IO ()
+   loadDLL,              -- :: String -> IO (Maybe String)
+   loadArchive,          -- :: String -> IO ()
+   loadObj,              -- :: String -> IO ()
+   unloadObj,            -- :: String -> IO ()
    insertSymbol,         -- :: String -> String -> Ptr a -> IO ()
-   lookupSymbol,	 -- :: String -> IO (Maybe (Ptr a))
-   resolveObjs  	 -- :: IO SuccessFlag
+   lookupSymbol,         -- :: String -> IO (Maybe (Ptr a))
+   resolveObjs           -- :: IO SuccessFlag
   )  where
 
 import Panic
-import BasicTypes	( SuccessFlag, successIf )
-import Config		( cLeadingUnderscore )
+import BasicTypes       ( SuccessFlag, successIf )
+import Config           ( cLeadingUnderscore )
 import Util
 
 import Control.Monad    ( when )
 import Foreign.C
-import Foreign		( nullPtr )
+import Foreign          ( nullPtr )
 import GHC.Exts         ( Ptr(..) )
 import System.Posix.Internals ( CFilePath, withFilePath )
 import System.FilePath  ( dropExtension )
@@ -57,8 +50,8 @@ lookupSymbol str_in = do
    withCAString str $ \c_str -> do
      addr <- c_lookupSymbol c_str
      if addr == nullPtr
-	then return Nothing
-	else return (Just addr)
+        then return Nothing
+        else return (Just addr)
 
 prefixUnderscore :: String -> String
 prefixUnderscore
@@ -85,9 +78,9 @@ loadDLL str0 = do
   --
   maybe_errmsg <- withFilePath str $ \dll -> c_addDLL dll
   if maybe_errmsg == nullPtr
-	then return Nothing
-	else do str <- peekCString maybe_errmsg
-		return (Just str)
+        then return Nothing
+        else do str <- peekCString maybe_errmsg
+                return (Just str)
 
 loadArchive :: String -> IO ()
 loadArchive str = do
