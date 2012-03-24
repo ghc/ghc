@@ -741,8 +741,8 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 (_, op) ty2) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode qual <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode qual
   where
-    ppr_op = if not (isSymOcc occName) then quote (ppLDocName qual op) else ppLDocName qual op
-    occName = nameOccName . getName . unLoc $ op
+    ppr_op = if not (isSymOcc occ) then quote (ppLDocName qual op) else ppLDocName qual op
+    occ = nameOccName . getName . unLoc $ op
 
 ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 --  = parens (ppr_mono_lty pREC_TOP ty)
