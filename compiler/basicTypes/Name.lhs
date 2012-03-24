@@ -168,6 +168,9 @@ Wired-in thing  => The thing (Id, TyCon) is fully known to the compiler,
 All built-in syntax is for wired-in things.
 
 \begin{code}
+instance HasOccName Name where
+  occName = nameOccName
+
 nameUnique		:: Name -> Unique
 nameOccName		:: Name -> OccName 
 nameModule		:: Name -> Module
