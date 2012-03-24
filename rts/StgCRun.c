@@ -306,7 +306,7 @@ StgRunIsImplementedInAssembler(void)
         :
         : "i"(RESERVED_C_STACK_BYTES),
 #if defined(mingw32_HOST_OS)
-          "i"(72 /*stack frame size*/)
+          "i"(80 /*stack frame size; 8 too large to make the alignment right*/)
 #else
           "i"(48 /*stack frame size*/)
 #endif
