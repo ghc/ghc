@@ -6,22 +6,15 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module PPC.Ppr (
-	pprNatCmmDecl,
-	pprBasicBlock,
-	pprSectionHeader,
-	pprData,
-	pprInstr,
-	pprSize,
-	pprImm,
-	pprDataItem,
+        pprNatCmmDecl,
+        pprBasicBlock,
+        pprSectionHeader,
+        pprData,
+        pprInstr,
+        pprSize,
+        pprImm,
+        pprDataItem,
 )
 
 where
@@ -40,7 +33,7 @@ import OldCmm
 
 import CLabel
 
-import Unique		( pprUnique, Uniquable(..) )
+import Unique                ( pprUnique, Uniquable(..) )
 import Platform
 import Pretty
 import FastString
@@ -209,23 +202,23 @@ pprReg platform r
 pprSize :: Size -> Doc
 pprSize x 
  = ptext (case x of
-		II8	-> sLit "b"
-	        II16	-> sLit "h"
-		II32	-> sLit "w"
-		FF32	-> sLit "fs"
-		FF64	-> sLit "fd"
-		_	-> panic "PPC.Ppr.pprSize: no match")
-		
-		
+                II8        -> sLit "b"
+                II16        -> sLit "h"
+                II32        -> sLit "w"
+                FF32        -> sLit "fs"
+                FF64        -> sLit "fd"
+                _        -> panic "PPC.Ppr.pprSize: no match")
+                
+                
 pprCond :: Cond -> Doc
 pprCond c 
  = ptext (case c of {
-		ALWAYS  -> sLit "";
-		EQQ	-> sLit "eq";	NE    -> sLit "ne";
-		LTT     -> sLit "lt";  GE    -> sLit "ge";
-		GTT     -> sLit "gt";  LE    -> sLit "le";
-		LU      -> sLit "lt";  GEU   -> sLit "ge";
-		GU      -> sLit "gt";  LEU   -> sLit "le"; })
+                ALWAYS  -> sLit "";
+                EQQ        -> sLit "eq";        NE    -> sLit "ne";
+                LTT     -> sLit "lt";  GE    -> sLit "ge";
+                GTT     -> sLit "gt";  LE    -> sLit "le";
+                LU      -> sLit "lt";  GEU   -> sLit "ge";
+                GU      -> sLit "gt";  LEU   -> sLit "le"; })
 
 
 pprImm :: Platform -> Imm -> Doc
@@ -294,21 +287,21 @@ pprDataItem :: Platform -> CmmLit -> Doc
 pprDataItem platform lit
   = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
-	imm = litToImm lit
+        imm = litToImm lit
 
-	ppr_item II8   _ = [ptext (sLit "\t.byte\t") <> pprImm platform imm]
+        ppr_item II8   _ = [ptext (sLit "\t.byte\t") <> pprImm platform imm]
 
-	ppr_item II32  _ = [ptext (sLit "\t.long\t") <> pprImm platform imm]
+        ppr_item II32  _ = [ptext (sLit "\t.long\t") <> pprImm platform imm]
 
-	ppr_item FF32 (CmmFloat r _)
+        ppr_item FF32 (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
              in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm platform (ImmInt b)) bs
 
-    	ppr_item FF64 (CmmFloat r _)
+        ppr_item FF64 (CmmFloat r _)
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm platform (ImmInt b)) bs
 
-	ppr_item II16 _	= [ptext (sLit "\t.short\t") <> pprImm platform imm]
+        ppr_item II16 _        = [ptext (sLit "\t.short\t") <> pprImm platform imm]
 
         ppr_item II64 (CmmInt x _)  =
                 [ptext (sLit "\t.long\t")
@@ -317,8 +310,8 @@ pprDataItem platform lit
                  ptext (sLit "\t.long\t")
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 
-	ppr_item _ _
-		= panic "PPC.Ppr.pprDataItem: no match"
+        ppr_item _ _
+                = panic "PPC.Ppr.pprDataItem: no match"
 
 
 pprInstr :: Platform -> Instr -> Doc
@@ -342,145 +335,145 @@ pprInstr _ (LDATA _ _)
 {-
 pprInstr _ (SPILL reg slot)
    = hcat [
-   	ptext (sLit "\tSPILL"),
-	char '\t',
-	pprReg platform reg,
-	comma,
-	ptext (sLit "SLOT") <> parens (int slot)]
+           ptext (sLit "\tSPILL"),
+        char '\t',
+        pprReg platform reg,
+        comma,
+        ptext (sLit "SLOT") <> parens (int slot)]
 
 pprInstr _ (RELOAD slot reg)
    = hcat [
-   	ptext (sLit "\tRELOAD"),
-	char '\t',
-	ptext (sLit "SLOT") <> parens (int slot),
-	comma,
-	pprReg platform reg]
+           ptext (sLit "\tRELOAD"),
+        char '\t',
+        ptext (sLit "SLOT") <> parens (int slot),
+        comma,
+        pprReg platform reg]
 -}
 
 pprInstr platform (LD sz reg addr) = hcat [
-	char '\t',
-	ptext (sLit "l"),
-	ptext (case sz of
-	    II8  -> sLit "bz"
-	    II16 -> sLit "hz"
-	    II32 -> sLit "wz"
-	    FF32 -> sLit "fs"
-	    FF64 -> sLit "fd"
-	    _	 -> panic "PPC.Ppr.pprInstr: no match"
-	    ),
+        char '\t',
+        ptext (sLit "l"),
+        ptext (case sz of
+            II8  -> sLit "bz"
+            II16 -> sLit "hz"
+            II32 -> sLit "wz"
+            FF32 -> sLit "fs"
+            FF64 -> sLit "fd"
+            _         -> panic "PPC.Ppr.pprInstr: no match"
+            ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
-	char '\t',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprAddr platform addr
+        char '\t',
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprAddr platform addr
     ]
 pprInstr platform (LA sz reg addr) = hcat [
-	char '\t',
-	ptext (sLit "l"),
-	ptext (case sz of
-	    II8  -> sLit "ba"
-	    II16 -> sLit "ha"
-	    II32 -> sLit "wa"
-	    FF32 -> sLit "fs"
-	    FF64 -> sLit "fd"
-	    _	 -> panic "PPC.Ppr.pprInstr: no match"
-	    ),
+        char '\t',
+        ptext (sLit "l"),
+        ptext (case sz of
+            II8  -> sLit "ba"
+            II16 -> sLit "ha"
+            II32 -> sLit "wa"
+            FF32 -> sLit "fs"
+            FF64 -> sLit "fd"
+            _         -> panic "PPC.Ppr.pprInstr: no match"
+            ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
-	char '\t',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprAddr platform addr
+        char '\t',
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprAddr platform addr
     ]
 pprInstr platform (ST sz reg addr) = hcat [
-	char '\t',
-	ptext (sLit "st"),
-	pprSize sz,
+        char '\t',
+        ptext (sLit "st"),
+        pprSize sz,
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
-	char '\t',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprAddr platform addr
+        char '\t',
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprAddr platform addr
     ]
 pprInstr platform (STU sz reg addr) = hcat [
-	char '\t',
-	ptext (sLit "st"),
-	pprSize sz,
-	ptext (sLit "u\t"),
+        char '\t',
+        ptext (sLit "st"),
+        pprSize sz,
+        ptext (sLit "u\t"),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprAddr platform addr
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprAddr platform addr
     ]
 pprInstr platform (LIS reg imm) = hcat [
-	char '\t',
-	ptext (sLit "lis"),
-	char '\t',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprImm platform imm
+        char '\t',
+        ptext (sLit "lis"),
+        char '\t',
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprImm platform imm
     ]
 pprInstr platform (LI reg imm) = hcat [
-	char '\t',
-	ptext (sLit "li"),
-	char '\t',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprImm platform imm
+        char '\t',
+        ptext (sLit "li"),
+        char '\t',
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprImm platform imm
     ]
 pprInstr platform (MR reg1 reg2) 
     | reg1 == reg2 = empty
     | otherwise = hcat [
-	char '\t',
-	case targetClassOfReg platform reg1 of
-	    RcInteger -> ptext (sLit "mr")
-	    _ -> ptext (sLit "fmr"),
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2
+        char '\t',
+        case targetClassOfReg platform reg1 of
+            RcInteger -> ptext (sLit "mr")
+            _ -> ptext (sLit "fmr"),
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2
     ]
 pprInstr platform (CMP sz reg ri) = hcat [
-	char '\t',
-	op,
-	char '\t',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprRI platform ri
+        char '\t',
+        op,
+        char '\t',
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprRI platform ri
     ]
     where
-	op = hcat [
-		ptext (sLit "cmp"),
-		pprSize sz,
-		case ri of
-		    RIReg _ -> empty
-		    RIImm _ -> char 'i'
-	    ]
+        op = hcat [
+                ptext (sLit "cmp"),
+                pprSize sz,
+                case ri of
+                    RIReg _ -> empty
+                    RIImm _ -> char 'i'
+            ]
 pprInstr platform (CMPL sz reg ri) = hcat [
-	char '\t',
-	op,
-	char '\t',
-	pprReg platform reg,
-	ptext (sLit ", "),
-	pprRI platform ri
+        char '\t',
+        op,
+        char '\t',
+        pprReg platform reg,
+        ptext (sLit ", "),
+        pprRI platform ri
     ]
     where
-	op = hcat [
-		ptext (sLit "cmpl"),
-		pprSize sz,
-		case ri of
-		    RIReg _ -> empty
-		    RIImm _ -> char 'i'
-	    ]
+        op = hcat [
+                ptext (sLit "cmpl"),
+                pprSize sz,
+                case ri of
+                    RIReg _ -> empty
+                    RIImm _ -> char 'i'
+            ]
 pprInstr platform (BCC cond blockid) = hcat [
-	char '\t',
-	ptext (sLit "b"),
-	pprCond cond,
-	char '\t',
-	pprCLabel_asm platform lbl
+        char '\t',
+        ptext (sLit "b"),
+        pprCond cond,
+        char '\t',
+        pprCLabel_asm platform lbl
     ]
     where lbl = mkAsmTempLabel (getUnique blockid)
 
@@ -498,40 +491,40 @@ pprInstr platform (BCCFAR cond blockid) = vcat [
     where lbl = mkAsmTempLabel (getUnique blockid)
 
 pprInstr platform (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
-	char '\t',
-	ptext (sLit "b"),
-	char '\t',
-	pprCLabel_asm platform lbl
+        char '\t',
+        ptext (sLit "b"),
+        char '\t',
+        pprCLabel_asm platform lbl
     ]
 
 pprInstr platform (MTCTR reg) = hcat [
-	char '\t',
-	ptext (sLit "mtctr"),
-	char '\t',
-	pprReg platform reg
+        char '\t',
+        ptext (sLit "mtctr"),
+        char '\t',
+        pprReg platform reg
     ]
 pprInstr _ (BCTR _ _) = hcat [
-	char '\t',
-	ptext (sLit "bctr")
+        char '\t',
+        ptext (sLit "bctr")
     ]
 pprInstr platform (BL lbl _) = hcat [
-	ptext (sLit "\tbl\t"),
+        ptext (sLit "\tbl\t"),
         pprCLabel_asm platform lbl
     ]
 pprInstr _ (BCTRL _) = hcat [
-	char '\t',
-	ptext (sLit "bctrl")
+        char '\t',
+        ptext (sLit "bctrl")
     ]
 pprInstr platform (ADD reg1 reg2 ri) = pprLogic platform (sLit "add") reg1 reg2 ri
 pprInstr platform (ADDIS reg1 reg2 imm) = hcat [
-	char '\t',
-	ptext (sLit "addis"),
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2,
-	ptext (sLit ", "),
-	pprImm platform imm
+        char '\t',
+        ptext (sLit "addis"),
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2,
+        ptext (sLit ", "),
+        pprImm platform imm
     ]
 
 pprInstr platform (ADDC reg1 reg2 reg3) = pprLogic platform (sLit "addc") reg1 reg2 (RIReg reg3)
@@ -552,17 +545,17 @@ pprInstr platform (MULLW_MayOflo reg1 reg2 reg3) = vcat [
                                           ptext (sLit "2, 31, 31") ]
     ]
 
-    	-- for some reason, "andi" doesn't exist.
-	-- we'll use "andi." instead.
+            -- for some reason, "andi" doesn't exist.
+        -- we'll use "andi." instead.
 pprInstr platform (AND reg1 reg2 (RIImm imm)) = hcat [
-	char '\t',
-	ptext (sLit "andi."),
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2,
-	ptext (sLit ", "),
-	pprImm platform imm
+        char '\t',
+        ptext (sLit "andi."),
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2,
+        ptext (sLit ", "),
+        pprImm platform imm
     ]
 pprInstr platform (AND reg1 reg2 ri) = pprLogic platform (sLit "and") reg1 reg2 ri
 
@@ -570,31 +563,39 @@ pprInstr platform (OR reg1 reg2 ri) = pprLogic platform (sLit "or") reg1 reg2 ri
 pprInstr platform (XOR reg1 reg2 ri) = pprLogic platform (sLit "xor") reg1 reg2 ri
 
 pprInstr platform (XORIS reg1 reg2 imm) = hcat [
-	char '\t',
-	ptext (sLit "xoris"),
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2,
-	ptext (sLit ", "),
-	pprImm platform imm
+        char '\t',
+        ptext (sLit "xoris"),
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2,
+        ptext (sLit ", "),
+        pprImm platform imm
     ]
 
 pprInstr platform (EXTS sz reg1 reg2) = hcat [
-	char '\t',
-	ptext (sLit "exts"),
-	pprSize sz,
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2
+        char '\t',
+        ptext (sLit "exts"),
+        pprSize sz,
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2
     ]
 
 pprInstr platform (NEG reg1 reg2) = pprUnary platform (sLit "neg") reg1 reg2
 pprInstr platform (NOT reg1 reg2) = pprUnary platform (sLit "not") reg1 reg2
 
 pprInstr platform (SLW reg1 reg2 ri) = pprLogic platform (sLit "slw") reg1 reg2 (limitShiftRI ri)
+
+pprInstr platform (SRW reg1 reg2 (RIImm (ImmInt i))) | i > 31 || i < 0 =
+    -- Handle the case where we are asked to shift a 32 bit register by
+    -- less than zero or more than 31 bits. We convert this into a clear
+    -- of the destination register.
+    -- Fixes ticket http://hackage.haskell.org/trac/ghc/ticket/5900
+    pprInstr platform (XOR reg1 reg2 (RIReg reg2))
 pprInstr platform (SRW reg1 reg2 ri) = pprLogic platform (sLit "srw") reg1 reg2 (limitShiftRI ri)
+
 pprInstr platform (SRAW reg1 reg2 ri) = pprLogic platform (sLit "sraw") reg1 reg2 (limitShiftRI ri)
 pprInstr platform (RLWINM reg1 reg2 sh mb me) = hcat [
         ptext (sLit "\trlwinm\t"),
@@ -616,14 +617,14 @@ pprInstr platform (FDIV sz reg1 reg2 reg3) = pprBinaryF platform (sLit "fdiv") s
 pprInstr platform (FNEG reg1 reg2) = pprUnary platform (sLit "fneg") reg1 reg2
 
 pprInstr platform (FCMP reg1 reg2) = hcat [
-	char '\t',
-	ptext (sLit "fcmpu\tcr0, "),
-	    -- Note: we're using fcmpu, not fcmpo
-	    -- The difference is with fcmpo, compare with NaN is an invalid operation.
-	    -- We don't handle invalid fp ops, so we don't care
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2
+        char '\t',
+        ptext (sLit "fcmpu\tcr0, "),
+            -- Note: we're using fcmpu, not fcmpo
+            -- The difference is with fcmpo, compare with NaN is an invalid operation.
+            -- We don't handle invalid fp ops, so we don't care
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2
     ]
 
 pprInstr platform (FCTIWZ reg1 reg2) = pprUnary platform (sLit "fctiwz") reg1 reg2
@@ -639,17 +640,17 @@ pprInstr _ (CRNOR dst src1 src2) = hcat [
     ]
 
 pprInstr platform (MFCR reg) = hcat [
-	char '\t',
-	ptext (sLit "mfcr"),
-	char '\t',
-	pprReg platform reg
+        char '\t',
+        ptext (sLit "mfcr"),
+        char '\t',
+        pprReg platform reg
     ]
 
 pprInstr platform (MFLR reg) = hcat [
-	char '\t',
-	ptext (sLit "mflr"),
-	char '\t',
-	pprReg platform reg
+        char '\t',
+        ptext (sLit "mflr"),
+        char '\t',
+        pprReg platform reg
     ]
 
 pprInstr platform (FETCHPC reg) = vcat [
@@ -664,42 +665,42 @@ pprInstr _ LWSYNC = ptext (sLit "\tlwsync")
 
 pprLogic :: Platform -> LitString -> Reg -> Reg -> RI -> Doc
 pprLogic platform op reg1 reg2 ri = hcat [
-	char '\t',
-	ptext op,
-	case ri of
-	    RIReg _ -> empty
-	    RIImm _ -> char 'i',
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2,
-	ptext (sLit ", "),
-	pprRI platform ri
+        char '\t',
+        ptext op,
+        case ri of
+            RIReg _ -> empty
+            RIImm _ -> char 'i',
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2,
+        ptext (sLit ", "),
+        pprRI platform ri
     ]
 
 
 pprUnary :: Platform -> LitString -> Reg -> Reg -> Doc
 pprUnary platform op reg1 reg2 = hcat [
-	char '\t',
-	ptext op,
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2
+        char '\t',
+        ptext op,
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2
     ]
     
     
 pprBinaryF :: Platform -> LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprBinaryF platform op sz reg1 reg2 reg3 = hcat [
-	char '\t',
-	ptext op,
-	pprFSize sz,
-	char '\t',
-	pprReg platform reg1,
-	ptext (sLit ", "),
-	pprReg platform reg2,
-	ptext (sLit ", "),
-	pprReg platform reg3
+        char '\t',
+        ptext op,
+        pprFSize sz,
+        char '\t',
+        pprReg platform reg1,
+        ptext (sLit ", "),
+        pprReg platform reg2,
+        ptext (sLit ", "),
+        pprReg platform reg3
     ]
     
 pprRI :: Platform -> RI -> Doc
@@ -708,13 +709,13 @@ pprRI platform (RIImm r) = pprImm platform r
 
 
 pprFSize :: Size -> Doc
-pprFSize FF64	= empty
-pprFSize FF32	= char 's'
-pprFSize _	= panic "PPC.Ppr.pprFSize: no match"
+pprFSize FF64     = empty
+pprFSize FF32     = char 's'
+pprFSize _        = panic "PPC.Ppr.pprFSize: no match"
 
-    -- limit immediate argument for shift instruction to range 0..32
-    -- (yes, the maximum is really 32, not 31)
+    -- limit immediate argument for shift instruction to range 0..31
 limitShiftRI :: RI -> RI
-limitShiftRI (RIImm (ImmInt i)) | i > 32 || i < 0 = RIImm (ImmInt 32)
+limitShiftRI (RIImm (ImmInt i)) | i > 31 || i < 0 =
+  panic $ "PPC.Ppr: Shift by " ++ show i ++ " bits is not allowed."
 limitShiftRI x = x
 

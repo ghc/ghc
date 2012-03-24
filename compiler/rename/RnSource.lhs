@@ -1048,7 +1048,7 @@ rnConDecls = mapFvRn (wrapLocFstM rnConDecl)
 
 rnConDecl :: ConDecl RdrName -> RnM (ConDecl Name, FreeVars)
 rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
-                   	, con_cxt = lcxt@(L _ cxt), con_details = details
+                   	, con_cxt = lcxt@(L loc cxt), con_details = details
                    	, con_res = res_ty, con_doc = mb_doc
                    	, con_old_rec = old_rec, con_explicit = expl })
   = do	{ addLocM checkConName name
@@ -1068,7 +1068,7 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
          -- With an Explicit forall, check for unused binders
 	 -- With Implicit, find the mentioned ones, and use them as binders
 	; new_tvs <- case expl of
-	    	       Implicit -> return (userHsTyVarBndrs mentioned_tvs)
+	    	       Implicit -> return (userHsTyVarBndrs loc mentioned_tvs)
             	       Explicit -> do { warnUnusedForAlls (docOfHsDocContext doc) tvs mentioned_tvs
                                       ; return tvs }
 

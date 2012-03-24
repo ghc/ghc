@@ -252,6 +252,7 @@ data DynFlag
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
    | Opt_Vectorise
+   | Opt_AvoidVect
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
@@ -1865,10 +1866,11 @@ fFlags = [
   ( "run-cpsz",                         Opt_RunCPSZ, nop ),
   ( "new-codegen",                      Opt_TryNewCodeGen, nop ),
   ( "vectorise",                        Opt_Vectorise, nop ),
+  ( "avoid-vect",                       Opt_AvoidVect, nop ),
   ( "regs-graph",                       Opt_RegsGraph, nop ),
   ( "regs-iterative",                   Opt_RegsIterative, nop ),
   ( "llvm-tbaa",                        Opt_LlvmTBAA, nop),
-  ( "reg-liveness",                     Opt_RegLiveness, nop),
+  ( "regs-liveness",                    Opt_RegLiveness, nop),
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),

@@ -1,12 +1,12 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
-<HTML>
-<HEAD>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
    <meta http-equiv="content-type" content="text/html;charset=iso-8859-1">
-   <TITLE>Style Guidelines for fptools</TITLE>
-</HEAD>
-<BODY>
+   <title>Style Guidelines for fptools</title>
+</head>
+<body>
 
-<H1>Style Guidelines for fptools</h1>
+<h1>Style Guidelines for fptools</h1>
 
 <h2>Comments</h2>
 
@@ -36,7 +36,7 @@ the only Microsoft Press book that's worth reading.)
 
 <p><li>
 Autoconf documentation.
-See also <a href="http://peti.gmd.de/autoconf-archive/">The autoconf macro archive</a> and 
+See also <a href="http://peti.gmd.de/autoconf-archive/">The autoconf macro archive</a> and
 <a href="http://www.cyclic.com/cyclic-pages/autoconf.html">Cyclic Software's description</a>
 
 <p><li> <a
@@ -166,7 +166,7 @@ Avoid conditional code like this:
 </pre>
 
 Instead, add an appropriate test to the configure.ac script and use
-the result of that test instead. 
+the result of that test instead.
 
 <pre>
   #ifdef HAVE_BSD_H
@@ -260,8 +260,8 @@ typedef enum
 piece of incomplete/broken code.
 
 <p><li> When testing, try to make infrequent things happen often.
-     For example, make a context switch/gc/etc happen every time a 
-     context switch/gc/etc can happen.  The system will run like a 
+     For example, make a context switch/gc/etc happen every time a
+     context switch/gc/etc can happen.  The system will run like a
      pig but it'll catch a lot of bugs.
 
 </ul>
@@ -335,7 +335,7 @@ Inline functions should be "static inline" because:
 gcc will delete static inlines if not used or theyre always inlined.
 
 <li>
-  if they're externed, we could get conflicts between 2 copies of the 
+  if they're externed, we could get conflicts between 2 copies of the
   same function if, for some reason, gcc is unable to delete them.
   If they're static, we still get multiple copies but at least they don't conflict.
 </ul>
@@ -379,7 +379,7 @@ in the library.
 </pre>
 
 <p><li>
-Don't define macros that expand to a list of statements.  
+Don't define macros that expand to a list of statements.
 You could just use braces as in:
 
 <pre>
@@ -393,7 +393,7 @@ You could just use braces as in:
 (but it's usually better to use an inline function instead - see above).
 
 <p><li>
-Don't even write macros that expand to 0 statements - they can mess you 
+Don't even write macros that expand to 0 statements - they can mess you
 up as well.  Use the doNothing macro instead.
 <pre>
   #define doNothing() do { } while (0)
@@ -421,32 +421,32 @@ Try to use ANSI C's enum feature when defining lists of constants of
 the same type.  Among other benefits, you'll notice that gdb uses the
 name instead of its (usually inscrutable) number when printing values
 with enum types and gdb will let you use the name in expressions you
-type.  
+type.
 
 <p>
 Examples:
 <pre>
     typedef enum { /* N.B. Used as indexes into arrays */
-     NO_HEAP_PROFILING,		
-     HEAP_BY_CC,		
-     HEAP_BY_MOD,		
-     HEAP_BY_GRP,		
-     HEAP_BY_DESCR,		
-     HEAP_BY_TYPE,		
-     HEAP_BY_TIME		
+     NO_HEAP_PROFILING,
+     HEAP_BY_CC,
+     HEAP_BY_MOD,
+     HEAP_BY_GRP,
+     HEAP_BY_DESCR,
+     HEAP_BY_TYPE,
+     HEAP_BY_TIME
     } ProfilingFlags;
 </pre>
 instead of
 <pre>
-    # define NO_HEAP_PROFILING	0	/* N.B. Used as indexes into arrays */
-    # define HEAP_BY_CC		1
-    # define HEAP_BY_MOD	2
-    # define HEAP_BY_GRP	3
-    # define HEAP_BY_DESCR	4
-    # define HEAP_BY_TYPE	5
-    # define HEAP_BY_TIME	6
+    # define NO_HEAP_PROFILING 0 /* N.B. Used as indexes into arrays */
+    # define HEAP_BY_CC        1
+    # define HEAP_BY_MOD       2
+    # define HEAP_BY_GRP       3
+    # define HEAP_BY_DESCR     4
+    # define HEAP_BY_TYPE      5
+    # define HEAP_BY_TIME      6
 </pre>
-and 
+and
 <pre>
     typedef enum {
      CCchar    = 'C',

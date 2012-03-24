@@ -1,4 +1,3 @@
-
 {
 {-# LANGUAGE BangPatterns #-} -- required for versions of Happy before 1.18.6
 {-# OPTIONS -w -Wwarn #-}

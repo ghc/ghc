@@ -1,4 +1,3 @@
-
 module ParserM (
     -- Parser Monad
     ParserM(..), AlexInput, run_parser,

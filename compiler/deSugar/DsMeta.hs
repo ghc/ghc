@@ -184,12 +184,11 @@ repTyClD (L loc (TyFamily { tcdFlavour = flavour,
   = do { tc1 <- lookupLOcc tc 		-- See note [Binders and occurrences] 
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
            do { flav   <- repFamilyFlavour flavour
-	      ; bndrs1 <- coreList tyVarBndrTyConName bndrs
-              ; case opt_kind of 
-                  Nothing -> repFamilyNoKind flav tc1 bndrs1
+	      ; case opt_kind of 
+                  Nothing -> repFamilyNoKind flav tc1 bndrs
                   Just (HsBSig ki _) 
                     -> do { ki1 <- repKind ki 
-                          ; repFamilyKind flav tc1 bndrs1 ki1 }
+                          ; repFamilyKind flav tc1 bndrs ki1 }
               }
        ; return $ Just (loc, dec)
        }
@@ -293,19 +292,6 @@ repFamilyFlavour :: FamilyFlavour -> DsM (Core TH.FamFlavour)
 repFamilyFlavour TypeFamily = rep2 typeFamName []
 repFamilyFlavour DataFamily = rep2 dataFamName []
 
--- represent associated family declarations
---
-repLAssocFamilys :: [LTyClDecl Name] -> DsM [Core TH.DecQ]
-repLAssocFamilys = mapM repLAssocFamily
-  where
-    repLAssocFamily tydecl@(L _ (TyFamily {})) 
-      = liftM (snd . fromJust) $ repTyFamily tydecl lookupTyVarBinds
-    repLAssocFamily tydecl
-      = failWithDs msg
-      where
-        msg = ptext (sLit "Illegal associated declaration in class:") <+> 
-              ppr tydecl
-
 -- Represent instance declarations
 --
 repInstD :: LInstDecl Name -> DsM (SrcSpan, Core TH.DecQ)
@@ -342,7 +328,7 @@ repFamInstD (FamInstDecl { fid_tycon = tc_name, fid_pats = HsBSig tys tv_names, 
   = do { tc <- lookupLOcc tc_name 		-- See note [Binders and occurrences]  
        ; let loc = getLoc tc_name
              hs_tvs = [ L loc (UserTyVar n) | n <- tv_names]   -- Yuk
-       ; addTyVarBinds hs_tvs $ \ bndrs ->
+       ; addTyClTyVarBinds hs_tvs $ \ bndrs ->
          do { tys1 <- repLTys tys
             ; tys2 <- coreList typeQTyConName tys1
             ; repTyDefn tc bndrs (Just tys2) tv_names defn } }
@@ -586,20 +572,13 @@ rep_InlinePrag (InlinePragma { inl_act = activation, inl_rule = match, inl_inlin
 -- 			Types
 -------------------------------------------------------
 
--- We process type variable bindings in two ways, either by generating fresh
--- names or looking up existing names.  The difference is crucial for type
--- families, depending on whether they are associated or not.
---
-type ProcessTyVarBinds a = 
-         [LHsTyVarBndr Name]	                       -- the binders to be added
-      -> (Core [TH.TyVarBndr] -> DsM (Core (TH.Q a)))  -- action in the ext env
-      -> DsM (Core (TH.Q a))
-
+addTyVarBinds :: [LHsTyVarBndr Name]	                       -- the binders to be added
+              -> (Core [TH.TyVarBndr] -> DsM (Core (TH.Q a)))  -- action in the ext env
+              -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
---
-addTyVarBinds :: ProcessTyVarBinds a
+
 addTyVarBinds tvs m
   = do { freshNames <- mkGenSyms (hsLTyVarNames tvs)
        ; term <- addBinds freshNames $ 
@@ -610,7 +589,10 @@ addTyVarBinds tvs m
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
-addTyClTyVarBinds :: ProcessTyVarBinds a
+addTyClTyVarBinds :: [LHsTyVarBndr Name]
+                  -> (Core [TH.TyVarBndr] -> DsM (Core (TH.Q a)))
+                  -> DsM (Core (TH.Q a))
+
 -- Used for data/newtype declarations, and family instances,
 -- so that the nested type variables work right
 --    instance C (T a) where
@@ -624,12 +606,14 @@ addTyClTyVarBinds tvs m
             -- This makes things work for family declarations
 
        ; term <- addBinds freshNames $ 
-	    	 do { kindedBndrs <- mapM mk_tv_bndr tvs
-	    	    ; m kindedBndrs }
+	    	 do { kbs1 <- mapM mk_tv_bndr tvs
+                    ; kbs2 <- coreList tyVarBndrTyConName kbs1
+	    	    ; m kbs2 }
 
        ; wrapGenSyms freshNames term }
   where
-    mk_tv_bndr tv = do { v <- lookupOcc (hsLTyVarName tv); repTyVarBndrWithKind tv v }
+    mk_tv_bndr tv = do { v <- lookupOcc (hsLTyVarName tv)
+                       ; repTyVarBndrWithKind tv v }
 
 -- Produce kinded binder constructors from the Haskell tyvar binders
 --

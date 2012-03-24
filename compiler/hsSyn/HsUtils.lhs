@@ -269,8 +269,9 @@ mkHsBSig :: a -> HsBndrSig a
 mkHsBSig x = HsBSig x placeHolderBndrs
 
 -------------
-userHsTyVarBndrs :: [Located name] -> [Located (HsTyVarBndr name)]
-userHsTyVarBndrs bndrs = [ L loc (UserTyVar v) | L loc v <- bndrs ]
+userHsTyVarBndrs :: SrcSpan -> [Located name] -> [Located (HsTyVarBndr name)]
+-- Caller sets location
+userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | L _ v <- bndrs ]
 \end{code}
 
 

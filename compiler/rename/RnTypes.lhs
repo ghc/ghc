@@ -121,7 +121,7 @@ rnHsKind = rnHsTyKi False
 
 rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
-rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty) 
+rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L loc ctxt) ty) 
   = ASSERT ( isType ) do
 	-- Implicit quantifiction in source code (no kinds on tyvars)
 	-- Given the signature  C => T  we universally quantify 
@@ -135,7 +135,7 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
 	-- class signatures:
 	--	class C a where { op :: a -> a }
 	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env) . unLoc) mentioned
-	tyvar_bndrs   = userHsTyVarBndrs forall_tyvars
+	tyvar_bndrs   = userHsTyVarBndrs loc forall_tyvars
 
     rnForAll doc Implicit tyvar_bndrs lctxt ty
 
