@@ -693,9 +693,9 @@ pp_decl_head :: OutputableBndr name
    -> Maybe [LHsType name]
    -> SDoc
 pp_decl_head context thing tyvars Nothing       -- no explicit type patterns
-  = hsep [pprHsContext context, ppr thing, interppSP tyvars]
+  = hsep [pprHsContext context, pprPrefixOcc (unLoc thing), interppSP tyvars]
 pp_decl_head context thing _      (Just typats) -- explicit type patterns
-  = hsep [ pprHsContext context, ppr thing
+  = hsep [ pprHsContext context, pprPrefixOcc (unLoc thing)
          , hsep (map (pprParendHsType.unLoc) typats)]
 
 pp_condecls :: OutputableBndr name => [LConDecl name] -> SDoc
