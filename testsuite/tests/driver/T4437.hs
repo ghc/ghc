@@ -41,6 +41,7 @@ expectedGhcOnlyExtensions = ["ParallelArrays",
                              "TraditionalRecordSyntax",
                              "DataKinds",
                              "PolyKinds",
+                             "ExplicitNamespaces",
                              "InstanceSigs",
                              "CApiFFI"]
 
