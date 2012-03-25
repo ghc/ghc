@@ -352,6 +352,7 @@ test('tc257', normal, compile, [''])
 test('tc258', normal, compile, [''])
 test('tc259', normal, compile, [''])
 test('tc260', normal, compile, [''])
+test('tc261', normal, compile, [''])
 
 test('GivenOverlapping', normal, compile, [''])
 test('SilentParametersOverlapping', normal, compile, [''])

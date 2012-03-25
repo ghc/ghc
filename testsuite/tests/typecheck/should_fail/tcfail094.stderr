@@ -1,2 +1,3 @@
 
-tcfail094.hs:7:14: parse error on input `1'
+tcfail094.hs:7:14:
+    Illegal literal in type (use -XDataKinds to enable): 1

@@ -18,9 +18,9 @@ import Data.Monoid (Monoid(..))
 
 -- First we define the type class Monoidy:
 
-class Monoidy (~>) comp id m | m (~>) → comp id where
-  munit :: id ~> m
-  mjoin :: m `comp` m ~> m
+class Monoidy to comp id m | m to → comp id where
+  munit :: id `to` m
+  mjoin :: (m `comp` m) `to` m
 
 -- We use functional dependencies to help the typechecker understand that
 -- m and ~> uniquely determine comp (times) and id.
