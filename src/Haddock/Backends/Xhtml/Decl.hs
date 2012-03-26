@@ -697,8 +697,8 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 (_, op) ty2) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
     ppr_mono_lty pREC_OP ty1 unicode qual <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode qual
   where
-    ppr_op = if not (isSymOcc occName) then quote (ppLDocName qual op) else ppLDocName qual op
-    occName = nameOccName . getName . unLoc $ op
+    ppr_op = if not (isSymOcc occ) then quote (ppLDocName qual op) else ppLDocName qual op
+    occ = nameOccName . getName . unLoc $ op
 
 ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 --  = parens (ppr_mono_lty pREC_TOP ty)
@@ -706,6 +706,12 @@ ppr_mono_ty ctxt_prec (HsParTy ty) unicode qual
 
 ppr_mono_ty ctxt_prec (HsDocTy ty _) unicode qual
   = ppr_mono_lty ctxt_prec ty unicode qual
+
+ppr_mono_ty _ (HsTyLit n) _ _ = ppr_tylit n
+
+ppr_tylit :: HsTyLit -> Html
+ppr_tylit (HsNumTy n) = toHtml (show n)
+ppr_tylit (HsStrTy s) = toHtml (show s)
 
 
 ppr_fun_ty :: Int -> LHsType DocName -> LHsType DocName -> Bool -> Qualification -> Html

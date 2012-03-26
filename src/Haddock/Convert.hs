@@ -304,6 +304,11 @@ synifyType s forallty@(ForAllTy _tv _ty) =
       sTau = synifyType WithinType tau
      in noLoc $
            HsForAllTy forallPlicitness sTvs sCtx sTau
+synifyType _ (LitTy t) = noLoc $ HsTyLit $ synifyTyLit t
+
+synifyTyLit :: TyLit -> HsTyLit
+synifyTyLit (NumTyLit n) = HsNumTy n
+synifyTyLit (StrTyLit s) = HsStrTy s
 
 synifyKindSig :: Kind -> HsBndrSig (LHsKind Name)
 synifyKindSig k = HsBSig (synifyType (error "synifyKind") k) placeHolderBndrs

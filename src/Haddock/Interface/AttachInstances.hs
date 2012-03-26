@@ -106,7 +106,9 @@ getAllInfo name = withSession $ \hsc_env -> do
 -- in Haddock output) and unifying special tycons with normal ones.
 -- For the benefit of the user (looks nice and predictable) and the
 -- tests (which prefer output to be deterministic).
-data SimpleType = SimpleType Name [SimpleType] deriving (Eq,Ord)
+data SimpleType = SimpleType Name [SimpleType]
+                | SimpleTyLit TyLit
+                  deriving (Eq,Ord)
 
 
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], Name, [SimpleType])
@@ -126,6 +128,7 @@ instHead (_, _, cls, args)
       where (SimpleType s ts) = simplify t1
     simplify (TyVarTy v) = SimpleType (tyVarName v) []
     simplify (TyConApp tc ts) = SimpleType (tyConName tc) (map simplify ts)
+    simplify (LitTy l) = SimpleTyLit l
 
 
 -- sortImage f = sortBy (\x y -> compare (f x) (f y))

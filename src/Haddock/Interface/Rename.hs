@@ -259,6 +259,8 @@ renameType t = case t of
     doc' <- renameLDocHsSyn doc
     return (HsDocTy ty' doc')
 
+  HsTyLit x -> return (HsTyLit x)
+
   _ -> error "renameType"
 
 
