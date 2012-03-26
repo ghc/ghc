@@ -136,11 +136,13 @@ stmtToInstrs env stmt = case stmt of
         -> return (env, unitOL $ Return Nothing, [])
 
 
+-- | Memory barrier instruction for LLVM >= 3.0
 barrier :: LlvmEnv -> UniqSM StmtData
 barrier env = do
-    let s = Fence False SyncAcqRel
+    let s = Fence False SyncSeqCst
     return (env, unitOL s, [])
 
+-- | Memory barrier instruction for LLVM < 3.0
 oldBarrier :: LlvmEnv -> UniqSM StmtData
 oldBarrier env = do
     let fname = fsLit "llvm.memory.barrier"
@@ -172,7 +174,8 @@ genCall :: LlvmEnv -> CmmCallTarget -> [HintedCmmFormal] -> [HintedCmmActual]
 genCall env (CmmPrim MO_WriteBarrier) _ _ _
  | platformArch (getLlvmPlatform env) `elem` [ArchX86, ArchX86_64, ArchSPARC]
     = return (env, nilOL, [])
- | otherwise = barrier env
+ | getLlvmVer env > 29 = barrier env
+ | otherwise           = oldBarrier env
 
 -- Handle popcnt function specifically since GHC only really has i32 and i64
 -- types and things like Word8 are backed by an i32 and just present a logical
