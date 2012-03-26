@@ -135,7 +135,7 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
 	-- when GlasgowExts is off, there usually won't be any, except for
 	-- class signatures:
 	--	class C a where { op :: a -> a }
-	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env) . unLoc) mentioned
+	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env)) mentioned
 	tyvar_bndrs   = userHsTyVarBndrs loc forall_tyvars
 
     rnForAll doc Implicit tyvar_bndrs lctxt ty
@@ -374,19 +374,20 @@ rnHsBndrSig :: Bool    -- True <=> type sig, False <=> kind sig
             -> HsBndrSig (LHsType RdrName)
             -> (HsBndrSig (LHsType Name) -> RnM (a, FreeVars))
             -> RnM (a, FreeVars)
-rnHsBndrSig is_type doc (HsBSig ty _) thing_inside
+rnHsBndrSig is_type doc (HsBSig ty@(L loc _) _) thing_inside
   = do { name_env <- getLocalRdrEnv
        ; let tv_bndrs  = [ tv | tv <- extractHsTyRdrTyVars ty
-			      , not (unLoc tv `elemLocalRdrEnv` name_env) ]
+			      , not (tv `elemLocalRdrEnv` name_env) ]
 
        ; checkHsBndrFlags is_type doc ty tv_bndrs 
-       ; bindLocatedLocalsFV tv_bndrs $ \ tv_names -> do
+       ; tv_names <- newLocalBndrsRn [L loc tv | tv <- tv_bndrs]
+       ; bindLocalNamesFV tv_names $ do
        { (ty', fvs1) <- rnLHsTyKi is_type doc ty
        ; (res, fvs2) <- thing_inside (HsBSig ty' tv_names)
        ; return (res, fvs1 `plusFV` fvs2) } }
 
 checkHsBndrFlags :: Bool -> HsDocContext 
-                 -> LHsType RdrName -> [Located RdrName] -> RnM ()
+                 -> LHsType RdrName -> [RdrName] -> RnM ()
 checkHsBndrFlags is_type doc ty tv_bndrs
   | is_type     -- Type
   = do { sig_ok <- xoptM Opt_ScopedTypeVariables
@@ -398,7 +399,7 @@ checkHsBndrFlags is_type doc ty tv_bndrs
        ; unless (poly_kind || null tv_bndrs) 
                 (addErr (badKindBndrs doc ty tv_bndrs)) }
 
-badKindBndrs :: HsDocContext -> LHsKind RdrName -> [Located RdrName] -> SDoc
+badKindBndrs :: HsDocContext -> LHsKind RdrName -> [RdrName] -> SDoc
 badKindBndrs doc _kind kvs
   = vcat [ hang (ptext (sLit "Kind signature mentions kind variable") <> plural kvs
                  <+> pprQuotedList kvs)
@@ -762,14 +763,13 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 %*********************************************************
 
 \begin{code}
-warnUnusedForAlls :: SDoc -> [LHsTyVarBndr RdrName] -> [Located RdrName] -> TcM ()
-warnUnusedForAlls in_doc bound used
+warnUnusedForAlls :: SDoc -> [LHsTyVarBndr RdrName] -> [RdrName] -> TcM ()
+warnUnusedForAlls in_doc bound mentioned_rdrs
   = ifWOptM Opt_WarnUnusedMatches $
     mapM_ add_warn bound_but_not_used
   where
     bound_names        = hsLTyVarLocNames bound
     bound_but_not_used = filterOut ((`elem` mentioned_rdrs) . unLoc) bound_names
-    mentioned_rdrs     = map unLoc used
 
     add_warn (L loc tv) 
       = addWarnAt loc $

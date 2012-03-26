@@ -70,11 +70,11 @@ import Bag              ( Bag, emptyBag, consBag, foldrBag )
 import Outputable
 import FastString
 import Maybes
-
+import Util             ( filterOut )
 import Control.Applicative ((<$>))
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
-import Data.List        ( nubBy )
+import Data.List        ( nub, nubBy )
 import Data.Char
 
 #include "HsVersions.h"
@@ -91,24 +91,24 @@ extractHsTyRdrNames finds the free variables of a HsType
 It's used when making the for-alls explicit.
 
 \begin{code}
-extractHsTyRdrTyVars :: LHsType RdrName -> [Located RdrName]
-extractHsTyRdrTyVars ty = nubBy eqLocated (extract_lty ty [])
+extractHsTyRdrTyVars :: LHsType RdrName -> [RdrName]
+extractHsTyRdrTyVars ty = nub (extract_lty ty [])
 
-extractHsTysRdrTyVars :: [LHsType RdrName] -> [Located RdrName]
-extractHsTysRdrTyVars ty = nubBy eqLocated (extract_ltys ty [])
+extractHsTysRdrTyVars :: [LHsType RdrName] -> [RdrName]
+extractHsTysRdrTyVars ty = nub (extract_ltys ty [])
 
-extract_lctxt :: LHsContext RdrName -> [Located RdrName] -> [Located RdrName]
+extract_lctxt :: LHsContext RdrName -> [RdrName] -> [RdrName]
 extract_lctxt ctxt acc = foldr extract_lty acc (unLoc ctxt)
 
-extract_ltys :: [LHsType RdrName] -> [Located RdrName] -> [Located RdrName]
+extract_ltys :: [LHsType RdrName] -> [RdrName] -> [RdrName]
 extract_ltys tys acc = foldr extract_lty acc tys
 
 -- IA0_NOTE: Should this function also return kind variables?
 -- (explicit kind poly)
-extract_lty :: LHsType RdrName -> [Located RdrName] -> [Located RdrName]
-extract_lty (L loc ty) acc
+extract_lty :: LHsType RdrName -> [RdrName] -> [RdrName]
+extract_lty (L _ ty) acc
   = case ty of
-      HsTyVar tv                -> extract_tv loc tv acc
+      HsTyVar tv                -> extract_tv tv acc
       HsBangTy _ ty             -> extract_lty ty acc
       HsRecTy flds              -> foldr (extract_lty . cd_fld_type) acc flds
       HsAppTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
@@ -118,14 +118,14 @@ extract_lty (L loc ty) acc
       HsFunTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
       HsIParamTy _ ty           -> extract_lty ty acc
       HsEqTy ty1 ty2            -> extract_lty ty1 (extract_lty ty2 acc)
-      HsOpTy ty1 (_, (L loc tv)) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
+      HsOpTy ty1 (_, (L _ tv)) ty2 -> extract_tv tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty                -> extract_lty ty acc
       HsCoreTy {}               -> acc  -- The type is closed
       HsQuasiQuoteTy {}         -> acc  -- Quasi quotes mention no type variables
       HsSpliceTy {}             -> acc  -- Type splices mention no type variables
       HsKindSig ty _            -> extract_lty ty acc
       HsForAllTy _ [] cx ty     -> extract_lctxt cx (extract_lty ty acc)
-      HsForAllTy _ tvs cx ty    -> acc ++ (filter ((`notElem` locals) . unLoc) $
+      HsForAllTy _ tvs cx ty    -> acc ++ (filterOut (`elem` locals) $
                                            extract_lctxt cx (extract_lty ty []))
                                 where
                                    locals = hsLTyVarNames tvs
@@ -134,9 +134,9 @@ extract_lty (L loc ty) acc
       HsExplicitTupleTy _ tys   -> extract_ltys tys acc
       HsWrapTy _ _              -> panic "extract_lty"
 
-extract_tv :: SrcSpan -> RdrName -> [Located RdrName] -> [Located RdrName]
-extract_tv loc tv acc | isRdrTyVar tv = L loc tv : acc
-                      | otherwise     = acc
+extract_tv :: RdrName -> [RdrName] -> [RdrName]
+extract_tv tv acc | isRdrTyVar tv = tv : acc
+                  | otherwise     = acc
 
 extractGenericPatTyVars :: LHsBinds RdrName -> [Located RdrName]
 -- Get the type variables out of the type patterns in a bunch of

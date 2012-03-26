@@ -482,8 +482,13 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
 rnFamInstDecl :: Maybe (Name, [Name]) -> FamInstDecl RdrName -> RnM (FamInstDecl Name, FreeVars)
 rnFamInstDecl mb_cls (FamInstDecl { fid_tycon = tycon, fid_pats = HsBSig pats _, fid_defn = defn })
   = do { tycon'   <- lookupFamInstName (fmap fst mb_cls) tycon
-       ; tv_names <- mkTyVarBndrNames mb_cls (extractHsTysRdrTyVars pats)
+       ; let loc = case pats of
+                     []             -> pprPanic "rnFamInstDecl" (ppr tycon)
+                     (L loc _ : []) -> loc
+                     (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
+       ; tv_names <- mkTyVarBndrNames mb_cls (map (L loc) (extractHsTysRdrTyVars pats))
        	     -- All the free vars of the family patterns
+             -- with a sensible binding location
        ; bindLocalNamesFV tv_names $ 
     do { (pats', pat_fvs) <- rnLHsTypes (TyDataCtx tycon) pats
        ; (defn', rhs_fvs) <- rnTyDefn tycon defn
@@ -1059,7 +1064,7 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
 	   -- For GADT syntax, the tvs are all the quantified tyvars
 	   -- Hence the 'filter' in the ResTyH98 case only
         ; rdr_env <- getLocalRdrEnv
-        ; let in_scope     = (`elemLocalRdrEnv` rdr_env) . unLoc
+        ; let in_scope tv  = tv `elemLocalRdrEnv` rdr_env
 	      arg_tys      = hsConDeclArgTys details
 	      mentioned_tvs = case res_ty of
 	      	    	       ResTyH98 -> filterOut in_scope (get_rdr_tvs arg_tys)
