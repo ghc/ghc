@@ -1,2 +1,2 @@
 
-mod89.hs:3:19: parse error on input `('
+mod89.hs:3:16: Module `Prelude' does not export `map(..)'

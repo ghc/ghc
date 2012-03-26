@@ -17,11 +17,11 @@ import Data.Monoid (Monoid(..))
 
 -- First we define the type class Monoidy:
 
-class Monoidy ((~>) :: k0 -> k1 -> *) (m :: k1)  where
-  type MComp (~>) m :: k1 -> k1 -> k0
-  type MId   (~>) m :: k0
-  munit :: MId (~>) m ~> m
-  mjoin :: MComp (~>) m m m ~> m
+class Monoidy (to :: k0 -> k1 -> *) (m :: k1)  where
+  type MComp to m :: k1 -> k1 -> k0
+  type MId   to m :: k0
+  munit :: MId to m `to` m
+  mjoin :: MComp to m m m `to` m
 
 -- We use functional dependencies to help the typechecker understand that
 -- m and ~> uniquely determine comp (times) and id.
