@@ -121,12 +121,13 @@ rnHsKind = rnHsTyKi False
 
 rnHsTyKi :: Bool -> HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
 
-rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L loc ctxt) ty) 
+rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty) 
   = ASSERT ( isType ) do
 	-- Implicit quantifiction in source code (no kinds on tyvars)
 	-- Given the signature  C => T  we universally quantify 
 	-- over FV(T) \ {in-scope-tyvars} 
     name_env <- getLocalRdrEnv
+    loc <- getSrcSpanM
     let
 	mentioned = extractHsTysRdrTyVars (ty:ctxt)
 
