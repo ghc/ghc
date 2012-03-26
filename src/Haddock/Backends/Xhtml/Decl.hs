@@ -29,7 +29,6 @@ import Haddock.Types
 import           Control.Monad         ( join )
 import           Data.List             ( intersperse )
 import qualified Data.Map as Map
-import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
 import GHC
@@ -43,12 +42,9 @@ ppDecl :: Bool -> LinksInfo -> LHsDecl DocName ->
           Bool -> Qualification -> Html
 ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances subdocs unicode qual = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam summ False links loc mbDoc d unicode qual
-  TyClD d@(TyData {})
-    | Nothing <- tcdTyPats d     -> ppDataDecl summ links instances subdocs loc mbDoc d unicode qual
-    | Just _  <- tcdTyPats d     -> ppDataInst summ links loc mbDoc d
-  TyClD d@(TySynonym {})
-    | Nothing <- tcdTyPats d     -> ppTySyn summ links loc (mbDoc, fnArgsDoc) d unicode qual
-    | Just _  <- tcdTyPats d     -> ppTyInst summ False links loc mbDoc d unicode qual
+  TyClD d@(TyDecl{ tcdTyDefn = defn })   
+      | isHsDataDefn defn        -> ppDataDecl summ links instances subdocs loc mbDoc d unicode qual
+      | otherwise                -> ppTySyn summ links loc (mbDoc, fnArgsDoc) d unicode qual
   TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc subdocs d unicode qual
   SigD (TypeSig lnames (L _ t))  -> ppFunSig summ links loc (mbDoc, fnArgsDoc) (map unLoc lnames) t unicode qual
   ForD d                         -> ppFor summ links loc (mbDoc, fnArgsDoc) d unicode qual
@@ -121,7 +117,9 @@ ppFor _ _ _ _ _ _ _ = error "ppFor"
 -- we skip type patterns for now
 ppTySyn :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool
         -> Qualification -> Html
-ppTySyn summary links loc doc (TySynonym (L _ name) ltyvars _ ltype _) unicode qual
+ppTySyn summary links loc doc (TyDecl { tcdLName = L _ name, tcdTyVars = ltyvars
+                                      , tcdTyDefn = TySynonym { td_synRhs = ltype } }) 
+        unicode qual
   = ppTypeOrFunSig summary links loc [name] (unLoc ltype) doc
                    (full, hdr, spaceHtml +++ equals) unicode qual
   where
@@ -187,50 +185,6 @@ ppTyFam summary associated links loc mbDoc decl unicode qual
 
 
 --------------------------------------------------------------------------------
--- * Indexed data types
---------------------------------------------------------------------------------
-
-
-ppDataInst :: a
-ppDataInst = undefined
-
-
---------------------------------------------------------------------------------
--- * Indexed newtypes
---------------------------------------------------------------------------------
-
--- TODO
--- ppNewTyInst = undefined
-
-
---------------------------------------------------------------------------------
--- * Indexed types
---------------------------------------------------------------------------------
-
-
-ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
-            TyClDecl DocName -> Bool -> Qualification -> Html
-ppTyInst summary associated links loc mbDoc decl unicode qual
-
-  | summary   = ppTyInstHeader True associated decl unicode qual
-  | otherwise = header_ +++ maybeDocSection qual mbDoc
-
-  where
-    docname = tcdName decl
-
-    header_ = topDeclElem links loc [docname]
-                (ppTyInstHeader summary associated decl unicode qual)
-
-
-ppTyInstHeader :: Bool -> Bool -> TyClDecl DocName -> Bool -> Qualification -> Html
-ppTyInstHeader _ _ decl unicode qual =
-  keyword "type instance" <+>
-  ppAppNameTypes (tcdName decl) typeArgs unicode qual
-  where
-    typeArgs = map unLoc . fromJust . tcdTyPats $ decl
-
-
---------------------------------------------------------------------------------
 -- * Associated Types
 --------------------------------------------------------------------------------
 
@@ -240,7 +194,6 @@ ppAssocType :: Bool -> LinksInfo -> DocForDecl DocName -> LTyClDecl DocName -> B
 ppAssocType summ links doc (L loc decl) unicode qual =
   case decl of
     TyFamily  {} -> ppTyFam summ True links loc (fst doc) decl unicode qual
-    TySynonym {} -> ppTySyn summ links loc doc decl unicode qual
     _            -> error "declaration type not supported by ppAssocType"
 
 
@@ -353,6 +306,8 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _ _) lo
             [ ppAssocType summary links doc at unicode qual | at <- ats
               , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]  ++
 
+                -- ToDo: add associated type defaults
+
             [ ppFunSig summary links loc doc names typ unicode qual
               | L _ (TypeSig lnames (L _ typ)) <- sigs
               , let doc = lookupAnySubdoc (head names) subdocs
@@ -385,6 +340,7 @@ ppClassDecl summary links instances loc mbDoc subdocs
 
     hdr = ppClassHdr summary lctxt (unLoc lname) ltyvars lfds
 
+    -- ToDo: add assocatied typ defaults
     atBit = subAssociatedTypes [ ppAssocType summary links doc at unicode qual
                       | at <- ats
                       , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]
@@ -448,7 +404,7 @@ ppShortDataDecl summary _links _loc dataDecl unicode qual
     doConstr c con = toHtml [c] <+> ppShortConstr summary (unLoc con) unicode qual
     doGADTConstr con = ppShortConstr summary (unLoc con) unicode qual
 
-    cons      = tcdCons dataDecl
+    cons      = td_cons (tcdTyDefn dataDecl)
     resTy     = (con_res . unLoc . head) cons
 
 
@@ -463,7 +419,7 @@ ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode qual
 
   where
     docname   = unLoc . tcdLName $ dataDecl
-    cons      = tcdCons dataDecl
+    cons      = td_cons (tcdTyDefn dataDecl)
     resTy     = (con_res . unLoc . head) cons
 
     header_ = topDeclElem links loc [docname] (ppDataHeader summary dataDecl unicode qual
@@ -618,15 +574,15 @@ ppShortField summary unicode qual (ConDeclField (L _ name) ltype _)
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: Bool -> TyClDecl DocName -> Bool -> Qualification -> Html
-ppDataHeader summary decl unicode qual
-  | not (isDataDecl decl) = error "ppDataHeader: illegal argument"
-  | otherwise =
-    -- newtype or data
-    (if tcdND decl == NewType then keyword "newtype" else keyword "data") <+>
+ppDataHeader summary decl@(TyDecl { tcdTyDefn = TyData { td_ND = nd, td_ctxt = ctxt } }) 
+             unicode qual
+  = -- newtype or data
+    (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }) <+>
     -- context
-    ppLContext (tcdCtxt decl) unicode qual <+>
+    ppLContext ctxt unicode qual <+>
     -- T a b c ..., or a :+: b
     ppTyClBinderWithVars summary decl
+ppDataHeader _ _ _ _ = error "ppDataHeader: illegal argument"
 
 
 --------------------------------------------------------------------------------

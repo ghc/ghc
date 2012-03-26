@@ -325,22 +325,11 @@ renameTyClD d = case d of
 --    return (TyFamily flav lname' ltyvars' kind' tckind)
     return (TyFamily flav lname' ltyvars' tckind')
 
-  TyData x lcontext lname cType ltyvars typats k cons _ -> do
-    lcontext' <- renameLContext lcontext
+  TyDecl { tcdLName = lname, tcdTyVars = tyvars, tcdTyDefn = defn, tcdFVs = fvs } -> do
     lname'    <- renameL lname
-    ltyvars'  <- mapM renameLTyVarBndr ltyvars
-    typats'   <- mapM (mapM renameLType) typats
-    k'        <- renameMaybeLKind k
-    cons'     <- mapM renameLCon cons
-    -- I don't think we need the derivings, so we return Nothing
-    return (TyData x lcontext' lname' cType ltyvars' typats' k' cons' Nothing)
-
-  TySynonym lname ltyvars typats ltype fvs -> do
-    lname'   <- renameL lname
-    ltyvars' <- mapM renameLTyVarBndr ltyvars
-    ltype'   <- renameLType ltype
-    typats'  <- mapM (mapM renameLType) typats
-    return (TySynonym lname' ltyvars' typats' ltype' fvs)
+    tyvars'  <- mapM renameLTyVarBndr tyvars
+    defn'     <- renameTyDefn defn
+    return (TyDecl { tcdLName = lname', tcdTyVars = tyvars', tcdTyDefn = defn', tcdFVs = fvs })
 
   ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats at_defs _ -> do
     lcontext' <- renameLContext lcontext
@@ -349,15 +338,36 @@ renameTyClD d = case d of
     lfundeps' <- mapM renameLFunDep lfundeps
     lsigs'    <- mapM renameLSig lsigs
     ats'      <- mapM renameLTyClD ats
-    at_defs'  <- mapM renameLTyClD at_defs
+    at_defs'  <- mapM (mapM renameFamInstD) at_defs
     -- we don't need the default methods or the already collected doc entities
     return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag ats' at_defs' [])
 
   where
-    renameLCon (L loc con) = return . L loc =<< renameCon con
-    renameCon decl@(ConDecl { con_name = lname, con_qvars = ltyvars
-                            , con_cxt = lcontext, con_details = details
-                            , con_res = restype, con_doc = mbldoc }) = do
+    renameLFunDep (L loc (xs, ys)) = do
+      xs' <- mapM rename xs
+      ys' <- mapM rename ys
+      return (L loc (xs', ys'))
+
+    renameLSig (L loc sig) = return . L loc =<< renameSig sig
+
+renameTyDefn :: HsTyDefn Name -> RnM (HsTyDefn DocName)
+renameTyDefn (TyData { td_ND = nd, td_ctxt = lcontext, td_cType = cType
+                     , td_kindSig = k, td_cons = cons }) = do
+    lcontext' <- renameLContext lcontext
+    k'        <- renameMaybeLKind k
+    cons'     <- mapM (mapM renameCon) cons
+    -- I don't think we need the derivings, so we return Nothing
+    return (TyData { td_ND = nd, td_ctxt = lcontext', td_cType = cType
+                   , td_kindSig = k', td_cons = cons', td_derivs = Nothing })
+
+renameTyDefn (TySynonym { td_synRhs = ltype }) = do
+    ltype'   <- renameLType ltype
+    return (TySynonym { td_synRhs = ltype' })
+
+renameCon :: ConDecl Name -> RnM (ConDecl DocName)
+renameCon decl@(ConDecl { con_name = lname, con_qvars = ltyvars
+                        , con_cxt = lcontext, con_details = details
+                        , con_res = restype, con_doc = mbldoc }) = do
       lname'    <- renameL lname
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- renameLContext lcontext
@@ -366,7 +376,7 @@ renameTyClD d = case d of
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (decl { con_name = lname', con_qvars = ltyvars', con_cxt = lcontext'
                    , con_details = details', con_res = restype', con_doc = mbldoc' })
-
+  where
     renameDetails (RecCon fields) = return . RecCon =<< mapM renameField fields
     renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
     renameDetails (InfixCon a b) = do
@@ -382,14 +392,6 @@ renameTyClD d = case d of
 
     renameResType (ResTyH98) = return ResTyH98
     renameResType (ResTyGADT t) = return . ResTyGADT =<< renameLType t
-
-    renameLFunDep (L loc (xs, ys)) = do
-      xs' <- mapM rename xs
-      ys' <- mapM rename ys
-      return (L loc (xs', ys'))
-
-    renameLSig (L loc sig) = return . L loc =<< renameSig sig
-
 
 renameSig :: Sig Name -> RnM (Sig DocName)
 renameSig sig = case sig of
@@ -413,14 +415,22 @@ renameForD (ForeignExport lname ltype co x) = do
 
 
 renameInstD :: InstDecl Name -> RnM (InstDecl DocName)
-renameInstD (ClsInstDecl ltype _ _ lATs) = do
+renameInstD (ClsInstD ltype _ _ lATs) = do
   ltype' <- renameLType ltype
-  lATs' <- mapM renameLTyClD lATs
-  return (ClsInstDecl ltype' emptyBag [] lATs')
+  lATs' <- mapM (mapM renameFamInstD) lATs
+  return (ClsInstD ltype' emptyBag [] lATs')
 
-renameInstD (FamInstDecl d) = do
-  d' <- renameTyClD d
-  return (FamInstDecl d')
+renameInstD (FamInstD d) = do
+  d' <- renameFamInstD d
+  return (FamInstD d')
+
+renameFamInstD :: FamInstDecl Name -> RnM (FamInstDecl DocName)
+renameFamInstD (FamInstDecl { fid_tycon = tc, fid_pats = HsBSig pats fvs, fid_defn = defn })
+  = do { tc' <- renameL tc
+       ; pats' <- mapM renameLType pats
+       ; defn' <- renameTyDefn defn 
+       ; return (FamInstDecl { fid_tycon = tc', fid_pats = HsBSig pats' fvs, fid_defn = defn' }) }
+
 
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
 renameExportItem item = case item of

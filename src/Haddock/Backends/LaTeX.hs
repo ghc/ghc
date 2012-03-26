@@ -278,12 +278,14 @@ ppDecl :: LHsDecl DocName
 
 ppDecl (L loc decl) (mbDoc, fnArgsDoc) instances subdocs = case decl of
   TyClD d@(TyFamily {})          -> ppTyFam False loc mbDoc d unicode
-  TyClD d@(TyData {})
-    | Nothing <- tcdTyPats d     -> ppDataDecl instances subdocs loc mbDoc d unicode
-    | Just _  <- tcdTyPats d     -> ppDataInst loc mbDoc d
-  TyClD d@(TySynonym {})
-    | Nothing <- tcdTyPats d     -> ppTySyn loc (mbDoc, fnArgsDoc) d unicode
-    | Just _  <- tcdTyPats d     -> ppTyInst False loc mbDoc d unicode
+  TyClD d@(TyDecl{ tcdTyDefn = defn })   
+      | isHsDataDefn defn        -> ppDataDecl instances subdocs loc mbDoc d unicode
+      | otherwise                -> ppTySyn loc (mbDoc, fnArgsDoc) d unicode
+--    | Just _  <- tcdTyPats d     -> ppDataInst loc mbDoc d
+-- Family instances happen via FamInst now
+--  TyClD d@(TySynonym {})         
+--    | Just _  <- tcdTyPats d    -> ppTyInst False loc mbDoc d unicode
+-- Family instances happen via FamInst now
   TyClD d@(ClassDecl {})         -> ppClassDecl instances loc mbDoc subdocs d unicode
   SigD (TypeSig lnames (L _ t))  -> ppFunSig loc (mbDoc, fnArgsDoc) (map unLoc lnames) t unicode
   ForD d                         -> ppFor loc (mbDoc, fnArgsDoc) d unicode
@@ -299,17 +301,6 @@ ppTyFam _ _ _ _ _ =
   error "type family declarations are currently not supported by --latex"
 
 
-ppDataInst :: a
-ppDataInst =
-  error "data instance declarations are currently not supported by --latex"
-
-
-ppTyInst :: Bool -> SrcSpan -> Maybe (Doc DocName) ->
-            TyClDecl DocName -> Bool -> LaTeX
-ppTyInst _ _ _ _ _ =
-  error "type instance declarations are currently not supported by --latex"
-
-
 ppFor :: SrcSpan -> DocForDecl DocName -> ForeignDecl DocName -> Bool -> LaTeX
 ppFor _ _ _ _ =
   error "foreign declarations are currently not supported by --latex"
@@ -323,7 +314,8 @@ ppFor _ _ _ _ =
 -- we skip type patterns for now
 ppTySyn :: SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool -> LaTeX
 
-ppTySyn loc doc (TySynonym (L _ name) ltyvars _ ltype _) unicode
+ppTySyn loc doc (TyDecl { tcdLName = L _ name, tcdTyVars = ltyvars
+                        , tcdTyDefn = TySynonym { td_synRhs = ltype } }) unicode
   = ppTypeOrFunSig loc [name] (unLoc ltype) doc (full, hdr, char '=') unicode
   where
     hdr  = hsep (keyword "type" : ppDocBinder name : ppTyVars ltyvars)
@@ -559,7 +551,7 @@ ppDataDecl instances subdocs _loc mbDoc dataDecl unicode
    $$ instancesBit
 
   where
-    cons      = tcdCons dataDecl
+    cons      = td_cons (tcdTyDefn dataDecl)
     resTy     = (con_res . unLoc . head) cons
 
     body = catMaybes [constrBit, fmap docToLaTeX mbDoc]
@@ -705,27 +697,15 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: TyClDecl DocName -> Bool -> LaTeX
-ppDataHeader decl unicode
-  | not (isDataDecl decl) = error "ppDataHeader: illegal argument"
-  | otherwise =
-    -- newtype or data
-    (if tcdND decl == NewType then keyword "newtype" else keyword "data") <+>
+ppDataHeader (TyDecl { tcdLName = L _ name, tcdTyVars = tyvars
+                     , tcdTyDefn = TyData { td_ND = nd, td_ctxt = ctxt } }) unicode
+  = -- newtype or data
+    (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }) <+>
     -- context
-    ppLContext (tcdCtxt decl) unicode <+>
+    ppLContext ctxt unicode <+>
     -- T a b c ..., or a :+: b
-    ppTyClBinderWithVars False decl
-
-
---------------------------------------------------------------------------------
--- * TyClDecl helpers
---------------------------------------------------------------------------------
-
-
--- | Print a type family / newtype / data / class binder and its variables 
-ppTyClBinderWithVars :: Bool -> TyClDecl DocName -> LaTeX
-ppTyClBinderWithVars summ decl =
-  ppAppDocNameNames summ (unLoc $ tcdLName decl) (tyvarNames $ tcdTyVars decl)
-
+    ppAppDocNameNames False name (tyvarNames tyvars)
+ppDataHeader _ _ = error "ppDataHeader: illegal argument"
 
 --------------------------------------------------------------------------------
 -- * Type applications

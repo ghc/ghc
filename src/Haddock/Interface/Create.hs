@@ -188,7 +188,7 @@ mkMaps dflags gre instances exports decls = do
       let subNames = map fst subDocs
 
       let names = case d of
-            InstD (ClsInstDecl (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)  -- See note [2].
+            InstD (ClsInstD (L l _) _ _ _) -> maybeToList (M.lookup l instanceMap)  -- See note [2].
             _ -> filter (`elem` exports) (getMainDeclBinder d)
 
       let docMap' = M.fromList (mapMaybe (\(n,doc) -> fmap (n,) doc) ([ (n, mayDoc) | n <- names ] ++ subDocs))
@@ -217,7 +217,7 @@ subordinates (TyClD decl)
                 ]
     dataSubs = constrs ++ fields
       where
-        cons = map unL $ tcdCons decl
+        cons = map unL $ (td_cons (tcdTyDefn decl))
         constrs = [ (unL $ con_name c, maybeToList $ fmap unL $ con_doc c, M.empty)
                   | c <- cons ]
         fields  = [ (unL n, maybeToList $ fmap unL doc, M.empty)
@@ -233,7 +233,7 @@ typeDocs d =
   case d of
     SigD (TypeSig _ ty) -> docs (unLoc ty)
     ForD (ForeignImport _ ty _ _) -> docs (unLoc ty)
-    TyClD (TySynonym {tcdSynRhs = ty}) -> docs (unLoc ty)
+    TyClD (TyDecl { tcdTyDefn = TySynonym {td_synRhs = ty}}) -> docs (unLoc ty)
     _ -> M.empty
   where
     go n (HsForAllTy _ _ _ ty) = go n (unLoc ty)
@@ -295,7 +295,7 @@ warnAboutFilteredDecls :: Module -> [LHsDecl Name] -> ErrMsgM ()
 warnAboutFilteredDecls mdl decls = do
   let modStr = moduleString mdl
   let typeInstances =
-        nub [ tcdName d | L _ (InstD (FamInstDecl d)) <- decls ]
+        nub [ unLoc (fid_tycon d) | L _ (InstD (FamInstD d)) <- decls ]
 
   unless (null typeInstances) $
     tell [
@@ -304,7 +304,7 @@ warnAboutFilteredDecls mdl decls = do
       ++ "will be filtered out:\n  " ++ concat (intersperse ", "
       $ map (occNameString . nameOccName) typeInstances) ]
 
-  let instances = nub [ pretty i | L _ (InstD (ClsInstDecl i _ _ ats)) <- decls
+  let instances = nub [ pretty i | L _ (InstD (ClsInstD i _ _ ats)) <- decls
                                  , not (null ats) ]
 
   unless (null instances) $
@@ -644,7 +644,7 @@ extractDecl name mdl decl
           _ -> error "internal: extractDecl"
       TyClD d | isDataDecl d ->
         let (n, tyvar_names) = name_and_tyvars d
-            L pos sig = extractRecSel name mdl n tyvar_names (tcdCons d)
+            L pos sig = extractRecSel name mdl n tyvar_names (td_cons (tcdTyDefn d))
         in L pos (SigD sig)
       _ -> error "internal: extractDecl"
   where

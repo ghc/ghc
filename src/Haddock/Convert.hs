@@ -69,61 +69,57 @@ tyThingToLHsDecl t = noLoc $ case t of
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
-  ACoAxiom ax -> TyClD (synifyAxiom ax)
+  ACoAxiom ax -> InstD (FamInstD (synifyAxiom ax))
 
   -- a data-constructor alone just gets rendered as a function:
   ADataCon dc -> SigD (TypeSig [synifyName dc]
     (synifyType ImplicitizeForAll (dataConUserType dc)))
 
-synifyATDefault :: TyCon -> LTyClDecl Name
+synifyATDefault :: TyCon -> LFamInstDecl Name
 synifyATDefault tc = noLoc (synifyAxiom ax)
   where Just ax = tyConFamilyCoercion_maybe tc
 
-synifyAxiom :: CoAxiom -> TyClDecl Name
+synifyAxiom :: CoAxiom -> FamInstDecl Name
 synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
   | Just (tc, args) <- tcSplitTyConApp_maybe lhs
   = let name      = synifyName tc
-        tyvars    = synifyTyVars tvs
         typats    = map (synifyType WithinType) args
         hs_rhs_ty = synifyType WithinType rhs
-    in TySynonym name tyvars (Just typats) hs_rhs_ty placeHolderNames
+    in FamInstDecl { fid_tycon = name 
+                   , fid_pats = HsBSig typats (map tyVarName tvs)
+                   , fid_defn = TySynonym hs_rhs_ty }
   | otherwise
   = error "synifyAxiom" 
 
 synifyTyCon :: TyCon -> TyClDecl Name
 synifyTyCon tc
-  | isFunTyCon tc || isPrimTyCon tc =
-    TyData
-      -- arbitrary lie, they are neither algebraic data nor newtype:
-      DataType
-      -- no built-in type has any stupidTheta:
-      (noLoc [])
-      (synifyName tc)
-      Nothing
-      -- tyConTyVars doesn't work on fun/prim, but we can make them up:
-      (zipWith
-         (\fakeTyVar realKind -> noLoc $
-             KindedTyVar (getName fakeTyVar) 
-                         (synifyKindSig realKind))
-         alphaTyVars --a, b, c... which are unfortunately all kind *
-         (fst . splitKindFunTys $ tyConKind tc)
-      )
-      -- assume primitive types aren't members of data/newtype families:
-      Nothing
-      -- we have their kind accurately:
-      (Just (synifyKindSig (tyConKind tc)))
-      -- no algebraic constructors:
-      []
-      -- "deriving" needn't be specified:
-      Nothing
-  | isSynFamilyTyCon tc =
-      case synTyConRhs tc of
+  | isFunTyCon tc || isPrimTyCon tc 
+  = TyDecl { tcdLName = synifyName tc
+           , tcdTyVars =       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
+                         zipWith
+                            (\fakeTyVar realKind -> noLoc $
+                                KindedTyVar (getName fakeTyVar) 
+                                            (synifyKindSig realKind))
+                            alphaTyVars --a, b, c... which are unfortunately all kind *
+                            (fst . splitKindFunTys $ tyConKind tc)
+           , tcdTyDefn = TyData { td_ND = DataType  -- arbitrary lie, they are neither 
+                                                    -- algebraic data nor newtype:
+                                , td_ctxt = noLoc []
+                                , td_cType = Nothing
+                                , td_kindSig = Just (synifyKindSig (tyConKind tc))
+                                               -- we have their kind accurately:
+                                , td_cons = []  -- No constructors
+                                , td_derivs = Nothing }
+           , tcdFVs = placeHolderNames }
+  | isSynFamilyTyCon tc 
+  = case synTyConRhs tc of
         SynFamilyTyCon ->
           TyFamily TypeFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
                (Just (synifyKindSig (synTyConResKind tc)))
         _ -> error "synifyTyCon: impossible open type synonym?"
-  | isDataFamilyTyCon tc = --(why no "isOpenAlgTyCon"?)
-      case algTyConRhs tc of
+  | isDataFamilyTyCon tc 
+  = --(why no "isOpenAlgTyCon"?)
+    case algTyConRhs tc of
         DataFamilyTyCon ->
           TyFamily DataFamily (synifyName tc) (synifyTyVars (tyConTyVars tc))
                Nothing --always kind '*'
@@ -139,9 +135,6 @@ synifyTyCon tc
   alg_ctx = synifyCtx (tyConStupidTheta tc)
   name = synifyName tc
   tyvars = synifyTyVars (tyConTyVars tc)
-  typats = case tyConFamInst_maybe tc of
-     Nothing -> Nothing
-     Just (_, indexes) -> Just (map (synifyType WithinType) indexes)
   alg_kindSig = Just (tyConKind tc)
   -- The data constructors.
   --
@@ -164,10 +157,14 @@ synifyTyCon tc
   -- "deriving" doesn't affect the signature, no need to specify any.
   alg_deriv = Nothing
   syn_type = synifyType WithinType (synTyConType tc)
- in if isSynTyCon tc
-  then TySynonym name tyvars typats syn_type placeHolderNames
-  else TyData alg_nd alg_ctx name Nothing tyvars typats (fmap synifyKindSig alg_kindSig) alg_cons alg_deriv
-
+  defn | isSynTyCon tc = TySynonym syn_type
+       | otherwise = TyData { td_ND = alg_nd, td_ctxt = alg_ctx
+                            , td_cType = Nothing
+                            , td_kindSig = fmap synifyKindSig alg_kindSig
+                            , td_cons    = alg_cons 
+                            , td_derivs  = alg_deriv }
+ in TyDecl { tcdLName = name, tcdTyVars = tyvars, tcdTyDefn = defn
+           , tcdFVs = placeHolderNames }
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its

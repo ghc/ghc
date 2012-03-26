@@ -562,12 +562,8 @@ processForMiniSynopsis mdl unicode qual (ExportDecl (L _loc decl0) _doc _ _insts
   ((divTopDecl <<).(declElem <<)) `fmap` case decl0 of
     TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
         (TyFamily{}) -> [ppTyFamHeader True False d unicode qual]
-        (TyData{tcdTyPats = ps})
-          | Nothing <- ps -> [keyword "data" <+> b]
-          | Just _ <- ps  -> [keyword "data" <+> keyword "instance" <+> b]
-        (TySynonym{tcdTyPats = ps})
-          | Nothing <- ps -> [keyword "type" <+> b]
-          | Just _ <- ps  -> [keyword "type" <+> keyword "instance" <+> b]
+        (TyDecl{ tcdTyDefn = TyData {} }) -> [keyword "data" <+> b]
+        (TyDecl{ tcdTyDefn = TySynonym {} }) -> [keyword "type" <+> b]
         (ClassDecl {})    -> [keyword "class" <+> b]
         _ -> []
     SigD (TypeSig lnames (L _ _)) ->

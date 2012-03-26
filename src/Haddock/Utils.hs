@@ -125,18 +125,24 @@ toInstalledDescription = hmi_description . instInfo
 
 restrictTo :: [Name] -> LHsDecl Name -> LHsDecl Name
 restrictTo names (L loc decl) = L loc $ case decl of
-  TyClD d | isDataDecl d && tcdND d == DataType ->
-    TyClD (d { tcdCons = restrictCons names (tcdCons d) })
-  TyClD d | isDataDecl d && tcdND d == NewType ->
-    case restrictCons names (tcdCons d) of
-      []    -> TyClD (d { tcdND = DataType, tcdCons = [] })
-      [con] -> TyClD (d { tcdCons = [con] })
-      _ -> error "Should not happen"
+  TyClD d | isDataDecl d  -> 
+    TyClD (d { tcdTyDefn = restrictTyDefn names (tcdTyDefn d) })
   TyClD d | isClassDecl d ->
     TyClD (d { tcdSigs = restrictDecls names (tcdSigs d),
                tcdATs = restrictATs names (tcdATs d) })
   _ -> decl
 
+restrictTyDefn :: [Name] -> HsTyDefn Name -> HsTyDefn Name
+restrictTyDefn _ defn@(TySynonym {})
+  = defn
+restrictTyDefn names defn@(TyData { td_ND = new_or_data, td_cons = cons })
+  | DataType <- new_or_data
+  = defn { td_cons = restrictCons names cons }
+  | otherwise    -- Newtype
+  = case restrictCons names cons of
+      []    -> defn { td_ND = DataType, td_cons = [] }
+      [con] -> defn { td_cons = [con] }
+      _ -> error "Should not happen"
 
 restrictCons :: [Name] -> [LConDecl Name] -> [LConDecl Name]
 restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]

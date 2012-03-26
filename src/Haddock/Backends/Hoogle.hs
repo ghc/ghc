@@ -111,9 +111,10 @@ operator x = x
 ppExport :: ExportItem Name -> [String]
 ppExport (ExportDecl decl dc subdocs _) = doc (fst dc) ++ f (unL decl)
     where
-        f (TyClD d@TyData{}) = ppData d subdocs
+        f (TyClD d@TyDecl{})
+            | isDataDecl d      = ppData d subdocs
+            | otherwise         = ppSynonym d
         f (TyClD d@ClassDecl{}) = ppClass d
-        f (TyClD d@TySynonym{}) = ppSynonym d
         f (ForD (ForeignImport name typ _ _)) = ppSig $ TypeSig [name] typ
         f (ForD (ForeignExport name typ _ _)) = ppSig $ TypeSig [name] typ
         f (SigD sig) = ppSig sig
@@ -129,10 +130,6 @@ ppSig (TypeSig names sig) = [operator prettyNames ++ " :: " ++ outHsType typ]
                    HsForAllTy Explicit a b c -> HsForAllTy Implicit a b c
                    x -> x
 ppSig _ = []
-
-
-ppSynonym :: TyClDecl Name -> [String]
-ppSynonym x = [out x]
 
 
 -- note: does not yet output documentation for class methods
@@ -154,10 +151,15 @@ ppInstance :: ClsInst -> [String]
 ppInstance x = [dropComment $ out x]
 
 
+ppSynonym :: TyClDecl Name -> [String]
+ppSynonym x = [out x]
+
 ppData :: TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
-ppData x subdocs = showData x{tcdCons=[],tcdDerivs=Nothing} :
-                   concatMap (ppCtor x subdocs . unL) (tcdCons x)
+ppData decl@(TyDecl { tcdTyDefn = defn }) subdocs
+    = showData decl{ tcdTyDefn = defn { td_cons=[],td_derivs=Nothing }} :
+      concatMap (ppCtor decl subdocs . unL) (td_cons defn)
     where
+        
         -- GHC gives out "data Bar =", we want to delete the equals
         -- also writes data : a b, when we want data (:) a b
         showData d = unwords $ map f $ if last xs == "=" then init xs else xs
@@ -165,6 +167,7 @@ ppData x subdocs = showData x{tcdCons=[],tcdDerivs=Nothing} :
                 xs = words $ out d
                 nam = out $ tcdLName d
                 f w = if w == nam then operator nam else w
+ppData _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
 lookupCon :: [(Name, DocForDecl Name)] -> Located Name -> Maybe (Doc Name)
