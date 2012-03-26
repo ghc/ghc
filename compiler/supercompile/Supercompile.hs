@@ -74,7 +74,8 @@ coreBindsFVs bs = unionVarSets [S.idFreeVars x `unionVarSet` exprFreeVars e | (x
 
 coreBindsToCoreTerm :: (Id -> Bool) -> FlatCoreBinds -> (CoreExpr, Var -> FlatCoreBinds)
 coreBindsToCoreTerm should_sc binds
-  = --pprTrace "coreBindsToCoreTerm" (ppr (bindersOfBinds binds, bindersOfBinds sc_binds, bindersOfBinds dont_sc_binds, dont_sc_binds_fvs, sc_xs_internal_xs, sc_xs, bindersOfBinds internal_sc_binds)) $
+  = pprTrace "coreBindsToCoreTerm" (hang (text "Supercompiling")     2 (ppr (map fst sc_binds)) $$
+                                    hang (text "Not supercompiling") 2 (ppr (map fst dont_sc_binds))) $
     (Let (Rec internal_sc_binds) (mkLiftedVarTup sc_internal_xs),
      \y -> [(x, mkLiftedTupleSelector sc_internal_xs internal_x (Var y)) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
   where
@@ -155,7 +156,10 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
       where added_fvs = new_fvs `minusVarSet` all_fvs
             (added_xwhy_nots, added_xes)
               = foldVarSet (\x (xwhy_nots, xes) -> case varUnfolding x of
-                                                     Left why_not -> ((x, why_not):xwhy_nots,        xes)
+                                                     Left why_not | isPrimOpId x || isJust (isFCallId_maybe x)
+                                                                  -> (             xwhy_nots,        xes) -- Suppress noisy errors
+                                                                  | otherwise
+                                                                  -> ((x, why_not):xwhy_nots,        xes)
                                                      Right e      -> (             xwhy_nots, (x, e):xes))
                            ([], []) added_fvs
 
@@ -173,7 +177,7 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
     varUnfolding x
       | Just pop <- isPrimOpId_maybe x            = Right $ primOpUnfolding pop
       | Just dc <- isDataConWorkId_maybe x        = Right $ dataUnfolding dc
-      | Just why_not <- S.shouldExposeUnfolding x = Left why_not
+      | Left why_not <- S.shouldExposeUnfolding x = Left why_not
       | otherwise                                 = case realIdUnfolding x of
         NoUnfolding                   -> Left "no unfolding"
         OtherCon _                    -> Left "no positive unfolding"

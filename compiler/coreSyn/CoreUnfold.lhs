@@ -36,7 +36,7 @@ module CoreUnfold (
 	couldBeSmallEnoughToInline, inlineBoringOk,
 	certainlyWillInline, smallEnoughToInline,
 
-	callSiteInline, CallCtxt(..),
+	callSiteInline, tryUnfolding, CallCtxt(..),
 
         -- Reexport from CoreSubst (it only live there so it can be used
         -- by the Very Simple Optimiser)
@@ -865,12 +865,13 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and* 
       -- be a loop breaker  (maybe the knot is not yet untied)
-	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top 
+	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top
 		      , uf_is_work_free = is_wf, uf_arity = uf_arity
                       , uf_guidance = guidance, uf_expandable = is_exp }
-          | active_unfolding -> tryUnfolding dflags id lone_variable 
-                                    arg_infos cont_info unf_template is_top 
+          | active_unfolding -> if tryUnfolding dflags id lone_variable
+                                    arg_infos cont_info is_top
                                     is_wf is_exp uf_arity guidance
+                                then Just unf_template else Nothing
           | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
           -> pprTrace "Inactive unfolding:" (ppr id) Nothing
           | otherwise -> Nothing
@@ -879,10 +880,10 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
 	DFunUnfolding {} -> Nothing 	-- Never unfold a DFun
 
 tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
-             -> CoreExpr -> Bool -> Bool -> Bool -> Arity -> UnfoldingGuidance
-	     -> Maybe CoreExpr	
-tryUnfolding dflags id lone_variable 
-             arg_infos cont_info unf_template is_top 
+             -> Bool -> Bool -> Bool -> Arity -> UnfoldingGuidance
+	     -> Bool
+tryUnfolding dflags id lone_variable
+             arg_infos cont_info is_top
              is_wf is_exp uf_arity guidance
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
@@ -897,15 +898,12 @@ tryUnfolding dflags id lone_variable
 			text "guidance" <+> ppr guidance,
 			extra_doc,
 			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
-	         result
-  | otherwise  = result
+	         yes_or_no
+  | otherwise  = yes_or_no
 
   where
     n_val_args = length arg_infos
     saturated  = n_val_args >= uf_arity
-
-    result | yes_or_no = Just unf_template
-           | otherwise = Nothing
 
     interesting_args = any nonTriv arg_infos 
     	-- NB: (any nonTriv arg_infos) looks at the

@@ -16,7 +16,8 @@ import Supercompile.Utilities
 import qualified Data.Map as M
 
 import qualified CoreSyn as CoreSyn
-import CoreUnfold (exprIsConApp_maybe)
+import CoreUnfold
+import DynFlags (DynFlag(..), defaultDynFlags, dopt_set)
 import Coercion (liftCoSubstWith, coercionKind, isReflCo, mkUnsafeCo)
 import TyCon
 import Type
@@ -26,6 +27,7 @@ import DataCon
 import Pair
 import BasicTypes
 import Demand (splitStrictSig, isBotRes)
+import Util
 
 
 -- FIXME: this doesn't really work very well if the Answers are indirections, which is a common case!
@@ -75,6 +77,42 @@ evaluatePrim iss tg pop tys args = do
             toVar_maybe (CoreSyn.Var x) = Just x
             toVar_maybe _               = Nothing
 
+type StackSummary = (Bool, [ArgSummary], CallCtxt)
+
+summariseStack :: PureHeap -> Stack -> StackSummary
+summariseStack h k = trainCarFoldr go (True, [], BoringCtxt) k
+  where go kf (lone_variable, arg_infos, cont_info) = case tagee kf of
+          TyApply _         -> (lone_variable,           arg_infos, cont_info)
+          CoApply _         -> (False, TrivArg         : arg_infos, ValAppCtxt)
+          Apply x'          -> (False, summariseArg x' : arg_infos, ValAppCtxt)
+          Scrutinise _ _ _  -> (True,                           [], CaseCtxt)
+          PrimApply _ _ _ _ -> (True,                           [], ArgCtxt False)
+          StrictLet _ _     -> (True,                           [], ArgCtxt False)
+          Update _          -> (True,                           [], BoringCtxt)
+          CastIt _          -> (lone_variable,           arg_infos, cont_info)
+
+        summariseArg x' = case M.lookup x' h of
+          Just hb | Just (_, e) <- heapBindingTerm hb -> if termIsValue e then ValueArg else NonTrivArg
+          _ -> TrivArg
+
+-- Can't use callSiteInline because it never inlines stuff with DFunUnfolding!
+ghcHeuristics :: Id -> StackSummary -> Bool
+ghcHeuristics x (lone_variable, arg_infos, cont_info) = case idUnfolding x of
+  CoreSyn.CoreUnfolding { CoreSyn.uf_tmpl = unf_template, CoreSyn.uf_is_top = is_top 
+                        , CoreSyn.uf_is_cheap = is_cheap, CoreSyn.uf_arity = uf_arity
+                        , CoreSyn.uf_guidance = guidance }
+                           -> tryUnfolding dflags1 x lone_variable 
+                                           arg_infos cont_info is_top 
+                                           is_cheap uf_arity guidance
+  CoreSyn.NoUnfolding      -> False
+  CoreSyn.OtherCon {}      -> False
+  -- GHC actually only looks through DFunUnfoldings in exprIsConApp_maybe,
+  -- but I'll do this rough heuristic instead:
+  CoreSyn.DFunUnfolding {} -> length arg_infos >= idArity x
+ where dflags0 = defaultDynFlags (error "ghcHeuristics: DynFlags used!")
+       -- Set these two flags so that we get information about failed inlinings:
+       dflags1 | tRACE     = dopt_set (dopt_set dflags0 Opt_D_verbose_core2core) Opt_D_dump_inlinings
+               | otherwise = dflags0
 
 -- | Non-expansive simplification we can do everywhere safely
 --
@@ -167,8 +205,10 @@ step' normalising ei_state = {-# SCC "step'" #-}
     -- We have not yet claimed deeds for the result of this function
     lookupAnswer :: Heap -> Out Var -> Maybe (Superinlinable, Anned Answer)
     lookupAnswer (Heap h ids) x' = do
-        (_how_bound, super, in_e) <- lookupHeap h x'
-        fmap ((,) super) $ termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
+        (how_bound, super, in_e) <- lookupHeap h x'
+        -- EXPERIMENT: claim that anything bound *internally* is superinlinable so we don't end up
+        -- with as many stupid manifest beta reductions
+        fmap ((,) (super || how_bound == InternallyBound)) $ termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
     
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
@@ -266,36 +306,52 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
         dereference h = snd . dereference' h False
     
-        deferenceLambdaish :: Heap -> Answer
-                           -> (Answer -> Maybe UnnormalisedState)
-                           -> Maybe State
-        deferenceLambdaish h a@(_, (_, v)) k
+        dereferenceLambdaish :: Heap -> StackSummary -> Answer
+                             -> (Answer -> Maybe UnnormalisedState)
+                             -> Maybe State
+        dereferenceLambdaish h@(Heap _ ids) k_summary a@(_, (_, v)) kont
           | normalising, not dUPLICATE_VALUES_EVALUATOR, Indirect _ <- v = Nothing -- If not duplicating values, we ensure normalisation by not executing applications to non-explicit-lambdas
           | otherwise = do
             let (super, a') = dereference' h False a -- NB: inline lambdas are *not* superinlinable because we don't duplicate anything by beta-reducing
-            s' <- fmap normalise $ k a'
+            s' <- fmap normalise $ kont a'
             -- NB: you might think it would be OK to inline even when *normalising*, as long as the inlining
             -- makes the term strictly smaller. This is very tempting, but we would have to check that the size
             -- measure decreased by the inlining is the same as the size measure needed to prove normalisation of
             -- the reduction system, and I'm too lazy to do that right now.
+            --
+            -- NB: it is hard to get a size-decrease check like this to work well. Consider:
+            --  bindIO getArgs (\x -> e)
+            -- This has 2 applications and one lambda (I've omitted all casts, since they cost 0). If we inline we get:
+            --  \s -> case getArgs s of (# x, s #) -> e s
+            -- This has 2 applications, one lambda, and ONE CASE EXPRESSION. So things must have got worse! But bindIO with
+            -- one known argument is almost a canonical example of the kind of thing we *would* like to inline, and the example
+            -- above assumes perfect reduction: note in particular that we've beta-reduced the (\x -> e) away entirely (and
+            -- done so within a case branch), so to even get this far we need "deep normalisation" *and* inlining used-once lams
+            -- as part of this check.
+            --
+            -- Perhaps if we had deep normalisation + GC we could get these results by penalising heap allocation heavily?
+            -- If so we must remember to do it for heap bindings *and* letrecs.
             case stateSize s' `compare` either stateSize unnormalisedStateSize ei_state of
               _ | super -> return s' -- We don't want to strictly increase the size by beta-reducing unless the lambda is marked SUPERINLINABLE
-              GT -> Nothing
+                | Indirect x' <- v
+                , ghcHeuristics x' k_summary
+                -> return s' -- It might still be OK to get larger if GHC's inlining heuristics say we should
+              GT -> pprTrace "Unwanted:" (ppr (answerToAnnedTerm' ids a)) Nothing
               _  -> return s'
-    
+
         tyApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Type -> Maybe State
-        tyApply deeds h@(Heap _ ids) k tg_a a ty' = deferenceLambdaish h a $ \(mb_co, (rn, e)) -> do
+        tyApply deeds heap@(Heap h ids) k tg_a a ty' = dereferenceLambdaish heap (summariseStack h k) a $ \(mb_co, (rn, e)) -> do
             TyLambda x e_body <- return e
-            fmap (\deeds -> (deeds, h, case mb_co of Uncast -> k; CastBy co' _tg_co -> Tagged tg_a (CastIt (co' `mk_inst` ty')) `Car` k, (insertTypeSubst rn x ty', e_body))) $
+            fmap (\deeds -> (deeds, heap, case mb_co of Uncast -> k; CastBy co' _tg_co -> Tagged tg_a (CastIt (co' `mk_inst` ty')) `Car` k, (insertTypeSubst rn x ty', e_body))) $
                  claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)
           where mk_inst = mkInstCo ids
 
         coApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Coercion -> Maybe State
-        coApply deeds h@(Heap _ ids) k tg_a a apply_co' = deferenceLambdaish h a $ \(mb_co, (rn, e)) -> do
+        coApply deeds heap@(Heap h ids) k tg_a a apply_co' = dereferenceLambdaish heap (summariseStack h k) a $ \(mb_co, (rn, e)) -> do
             Lambda x e_body <- return e
             flip fmap (claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
-                Uncast            -> (deeds, h, k,                                    (insertCoercionSubst rn x apply_co', e_body))
-                CastBy co' _tg_co -> (deeds, h, Tagged tg_a (CastIt res_co') `Car` k, (insertCoercionSubst rn x cast_apply_co', e_body))
+                Uncast            -> (deeds, heap, k,                                    (insertCoercionSubst rn x apply_co', e_body))
+                CastBy co' _tg_co -> (deeds, heap, Tagged tg_a (CastIt res_co') `Car` k, (insertCoercionSubst rn x cast_apply_co', e_body))
                   where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
                         -- You can derive this rule from the rules in "Practical aspects of evidence-based compilation" by combining:
                         --  1. TPush, to move the co' from the lambda to the argument and result (arg_co' and res_co')
@@ -308,7 +364,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                         mk_sym = mkSymCo ids
 
         apply :: Deeds -> Tag -> Heap -> Stack -> Tag -> Answer -> Out Var -> Maybe State
-        apply deeds tg_kf (Heap h ids) k tg_a a x' = deferenceLambdaish (Heap h ids) a $ \(mb_co, (rn, e)) -> do
+        apply deeds tg_kf (Heap h ids) k tg_a a x' = dereferenceLambdaish (Heap h ids) (summariseStack h k) a $ \(mb_co, (rn, e)) -> do
             Lambda x e_body <- return e
             case mb_co of
               Uncast -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $

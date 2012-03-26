@@ -24,7 +24,7 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
 import CoreUtils (filterAlts)
-import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo, localiseId)
+import Id        (idUnique, idType, isDeadBinder, zapIdOccInfo, localiseId, isOneShotBndr)
 import Var       (varUnique)
 import PrelNames (undefinedName, wildCardKey)
 import Type      (splitTyConApp_maybe)
@@ -1172,7 +1172,23 @@ splitUpdate ctxt_ids ids tg_kf scruts x' bracketed_hole
   where ctxt_id = idUnique x'
 
 splitValue :: UniqSupply -> InScopeSet -> Tag -> In AnnedValue -> Bracketed (Entered, UnnormalisedState)
-splitValue ctxt_ids ids tg (rn, Lambda x e)   = splitLambdaLike Lambda   Many           ctxt_ids ids tg (rn, (x, e))
+splitValue ctxt_ids ids tg (rn, Lambda x e)   = splitLambdaLike Lambda   ent            ctxt_ids0 ids tg (rn, (x, e))
+  where -- This is really necessary if we want to fuse a top-level non-value with some consuming context in the IO monad
+        --
+        -- NB: this is rather interesting. If I have:
+        --   x = e1
+        --   y = v2[x]
+        --   z = \a -> e3[y]
+        --
+        -- If I start supercompiling with y as the root, I might be able to fuse e1 into v2 if the occurrence
+        -- within the RHS of y is Once. However, if I start from z then I may not be able to do this fusion if
+        -- y occurs in a Many context because the value portion v2 will be moved down and the expression portion
+        -- x will be left residualised above the lambda.
+        --
+        -- What I gain from this behaviour, of course, is that v2 may fuse with e3, which is probably more valuable
+        -- in general anyway. 
+        (ent, ctxt_ids0) | isOneShotBndr x = first Once $ takeUniqFromSupply ctxt_ids
+                         | otherwise       = (Many, ctxt_ids)
 splitValue ctxt_ids ids tg (rn, TyLambda a e) = splitLambdaLike TyLambda (Once ctxt_id) ctxt_ids0 ids tg (rn, (a, e))
   where (ctxt_id, ctxt_ids0) = takeUniqFromSupply ctxt_ids
 splitValue _        ids tg in_v               = noneBracketed tg (value (detagAnnedValue' $ renameIn (renameAnnedValue' ids) in_v))
