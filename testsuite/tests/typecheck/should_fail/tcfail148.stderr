@@ -3,4 +3,4 @@ tcfail148.hs:5:28:
     Expecting one more argument to `List'
     In the type `List'
     In the definition of data constructor `Cons'
-    In the data type declaration for `List'
+    In the data declaration for `List'

@@ -4,4 +4,4 @@ tcfail132.hs:17:37:
     The first argument of `T' should have kind `* -> * -> * -> *',
     but `Object f' f t' has kind `* -> * -> *'
     In the type `T (Object f' f t) (DUnit t)'
-    In the type synonym declaration for `LiftObject'
+    In the type declaration for `LiftObject'

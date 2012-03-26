@@ -2,7 +2,7 @@
 tcfail179.hs:14:39:
     Couldn't match expected type `s' with actual type `x'
       `s' is a rigid type variable bound by
-          the type signature for run :: T s -> Int at tcfail179.hs:12:10
+          the type signature for run :: T s -> Int at tcfail179.hs:12:8
       `x' is a rigid type variable bound by
           a pattern with constructor
             T :: forall s x. (s -> (x -> s) -> (x, s, Int)) -> T s,

@@ -3,4 +3,4 @@ T5716.hs:13:33:
     `U1' of type `DF * Int -> U' is not promotable
     In the type `I (U1 DFInt)'
     In the definition of data constructor `I1'
-    In the data type declaration for `I'
+    In the data declaration for `I'

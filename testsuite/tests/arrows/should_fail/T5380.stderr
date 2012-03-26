@@ -15,7 +15,7 @@ T5380.hs:7:34:
       `not_unit' is a rigid type variable bound by
                  the type signature for
                    testB :: not_bool -> (() -> ()) -> () -> not_unit
-                 at T5380.hs:6:42
+                 at T5380.hs:6:10
     Expected type: () -> not_unit
       Actual type: () -> ()
     In the expression: f

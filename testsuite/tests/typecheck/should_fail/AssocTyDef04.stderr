@@ -2,5 +2,5 @@
 AssocTyDef04.hs:6:18:
     Expecting one more argument to `Maybe'
     In the type `Maybe'
-    In the type synonym instance default declaration for `Typ'
+    In the type instance declaration for `Typ'
     In the class declaration for `Cls'

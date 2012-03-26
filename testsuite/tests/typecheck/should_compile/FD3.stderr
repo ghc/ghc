@@ -3,7 +3,7 @@ FD3.hs:15:15:
     Couldn't match type `a' with `([Char], a)'
       `a' is a rigid type variable bound by
           the type signature for translate :: (String, a) -> A a
-          at FD3.hs:14:23
+          at FD3.hs:14:14
     When using functional dependencies to combine
       MkA a a,
         arising from the dependency `a -> b'

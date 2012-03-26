@@ -2,9 +2,9 @@
 T2494.hs:15:7:
     Couldn't match type `b' with `a'
       `b' is a rigid type variable bound by
-          the RULE "foo/foo" at T2494.hs:14:46
+          the RULE "foo/foo" at T2494.hs:14:16
       `a' is a rigid type variable bound by
-          the RULE "foo/foo" at T2494.hs:13:46
+          the RULE "foo/foo" at T2494.hs:13:16
     Expected type: Maybe (m b) -> Maybe (m b)
       Actual type: Maybe (m a) -> Maybe (m a)
     In the first argument of `foo', namely `f'
@@ -14,9 +14,9 @@ T2494.hs:15:7:
 T2494.hs:15:30:
     Couldn't match type `b' with `a'
       `b' is a rigid type variable bound by
-          the RULE "foo/foo" at T2494.hs:14:46
+          the RULE "foo/foo" at T2494.hs:14:16
       `a' is a rigid type variable bound by
-          the RULE "foo/foo" at T2494.hs:13:46
+          the RULE "foo/foo" at T2494.hs:13:16
     Expected type: Maybe (m b) -> Maybe (m a)
       Actual type: Maybe (m b) -> Maybe (m b)
     In the second argument of `(.)', namely `g'

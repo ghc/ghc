@@ -3,7 +3,7 @@ T2714.hs:8:5:
     Couldn't match type `a' with `f0 b'
       `a' is a rigid type variable bound by
           the type signature for f :: ((a -> b) -> b) -> forall c. c -> a
-          at T2714.hs:7:8
+          at T2714.hs:7:6
     Expected type: ((a -> b) -> b) -> c -> a
       Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
     In the expression: ffmap

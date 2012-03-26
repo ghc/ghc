@@ -14,8 +14,8 @@ data Trivial2 a = Trivial2 a
 
 -- Foldable with function type
 data Infinite a = Infinite (Int -> a)
-   deriving (Functor,Foldable,Traversable)
+   deriving (Functor,Foldable)
 
 -- Foldable with function type
 data Cont r a = Cont ((a -> r) -> r)
-   deriving (Functor,Foldable,Traversable)
+   deriving (Functor,Traversable)

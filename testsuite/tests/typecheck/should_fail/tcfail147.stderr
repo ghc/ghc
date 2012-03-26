@@ -3,4 +3,4 @@ tcfail147.hs:7:19:
     Expecting one more argument to `XClass'
     In the type `XClass'
     In the definition of data constructor `XCon'
-    In the data type declaration for `XData'
+    In the data declaration for `XData'

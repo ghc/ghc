@@ -3,4 +3,4 @@ PolyKinds04.hs:5:16:
     Expecting one more argument to `Maybe'
     In the type `A Maybe'
     In the definition of data constructor `B1'
-    In the data type declaration for `B'
+    In the data declaration for `B'

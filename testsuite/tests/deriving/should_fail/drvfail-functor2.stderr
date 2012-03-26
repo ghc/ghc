@@ -1,6 +1,6 @@
 
-drvfail-functor2.hs:1:29:
-    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+drvfail-functor2.hs:1:29: Warning:
+    -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 drvfail-functor2.hs:7:14:
     Can't make a derived instance of `Functor InFunctionArgument':
@@ -20,7 +20,7 @@ drvfail-functor2.hs:15:14:
 drvfail-functor2.hs:20:14:
     Can't make a derived instance of `Functor StupidConstraint':
       Data type `StupidConstraint' must not have a class context (Eq a)
-    In the data type declaration for `StupidConstraint'
+    In the data declaration for `StupidConstraint'
 
 drvfail-functor2.hs:26:14:
     No instance for (Functor NoFunctor)

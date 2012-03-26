@@ -5,7 +5,7 @@ tcfail201.hs:18:28:
           the type signature for
             gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)
                        -> (forall g. g -> c g) -> a -> c a
-          at tcfail201.hs:15:78
+          at tcfail201.hs:15:12
     In the pattern: DocParagraph hsDoc
     In a case alternative:
         (DocParagraph hsDoc) -> z DocParagraph `k` hsDoc

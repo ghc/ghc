@@ -3,4 +3,4 @@ tcfail162.hs:10:33:
     Expecting one more argument to `ForeignPtr'
     In the type `ForeignPtr'
     In the definition of data constructor `Foo'
-    In the data type declaration for `Foo'
+    In the data declaration for `Foo'

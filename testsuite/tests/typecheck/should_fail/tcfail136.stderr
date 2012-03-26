@@ -3,4 +3,4 @@ tcfail136.hs:9:35:
     Expecting one more argument to `SymDict'
     In the type `SymDict'
     In the definition of data constructor `SymTable'
-    In the data type declaration for `SymTable'
+    In the data declaration for `SymTable'

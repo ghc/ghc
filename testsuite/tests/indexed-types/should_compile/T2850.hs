@@ -16,6 +16,8 @@ instance M Bool where
 instance K (B Bool) where
   bar = id
 
+-- The 'deriving K' gives the (K (B Int)) instance
+-- needed for the superclasses of M
 instance M Int where
   newtype B Int = BInt (B Bool) deriving K
   foo = id

@@ -14,7 +14,7 @@ T3330a.hs:19:36:
     Couldn't match type `ix' with `r ix0 -> Writer [AnyF s0] (r ix0)'
       `ix' is a rigid type variable bound by
            the type signature for children :: s ix -> PF s r ix -> [AnyF s]
-           at T3330a.hs:18:15
+           at T3330a.hs:18:13
     Expected type: s0 ix0 -> ix
       Actual type: s0 ix0 -> r ix0 -> Writer [AnyF s0] (r ix0)
     In the second argument of `hmapM', namely `collect'
