@@ -17,6 +17,7 @@ module RdrHsSyn (
         mkTyFamily, 
         splitCon, mkInlinePragma,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
+        mkTyLit,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -47,12 +48,20 @@ module RdrHsSyn (
         checkRecordSyntax,
         parseError,
         parseErrorSDoc,
+
+        -- Help with processing exports
+        ImpExpSubSpec(..),
+        mkModuleImpExp,
+        mkTypeImpExp
+
     ) where
 
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import RdrName          ( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
-                          isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
+                          isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace,
+                          rdrNameSpace )
+import OccName          ( tcClsName, isVarNameSpace )
 import Name             ( Name )
 import BasicTypes       ( maxPrecedence, Activation(..), RuleMatchInfo,
                           InlinePragma(..), InlineSpec(..) )
@@ -132,6 +141,7 @@ extract_lty (L _ ty) acc
       HsDocTy ty _              -> extract_lty ty acc
       HsExplicitListTy _ tys    -> extract_ltys tys acc
       HsExplicitTupleTy _ tys   -> extract_ltys tys acc
+      HsTyLit _                 -> acc
       HsWrapTy _ _              -> panic "extract_lty"
 
 extract_tv :: RdrName -> [RdrName] -> [RdrName]
@@ -267,6 +277,19 @@ mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
 mkTopSpliceDecl (L _ (HsQuasiQuoteE qq))            = QuasiQuoteD qq
 mkTopSpliceDecl (L _ (HsSpliceE (HsSplice _ expr))) = SpliceD (SpliceDecl expr       Explicit)
 mkTopSpliceDecl other_expr                          = SpliceD (SpliceDecl other_expr Implicit)
+
+
+mkTyLit :: Located (HsTyLit) -> P (LHsType RdrName)
+mkTyLit l =
+  do allowed <- extension typeLiteralsEnabled
+     if allowed
+       then return (HsTyLit `fmap` l)
+       else parseErrorSDoc (getLoc l)
+              (text "Illegal literal in type (use -XDataKinds to enable):" <+>
+              ppr l)
+
+
+
 \end{code}
 
 %************************************************************************
@@ -991,6 +1014,32 @@ mkExtName :: RdrName -> CLabelString
 mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
 \end{code}
 
+--------------------------------------------------------------------------------
+-- Help with module system imports/exports
+
+\begin{code}
+data ImpExpSubSpec = ImpExpAbs | ImpExpAll | ImpExpList [ RdrName ]
+
+mkModuleImpExp :: RdrName -> ImpExpSubSpec -> IE RdrName
+mkModuleImpExp name subs =
+  case subs of
+    ImpExpAbs 
+      | isVarNameSpace (rdrNameSpace name) -> IEVar       name
+      | otherwise                          -> IEThingAbs  nameT
+    ImpExpAll                              -> IEThingAll  nameT
+    ImpExpList xs                          -> IEThingWith nameT xs
+
+  where
+    nameT = setRdrNameSpace name tcClsName
+
+mkTypeImpExp :: Located RdrName -> P (Located RdrName)
+mkTypeImpExp name =
+  do allowed <- extension explicitNamespacesEnabled
+     if allowed
+       then return (fmap (`setRdrNameSpace` tcClsName) name)
+       else parseErrorSDoc (getLoc name)
+              (text "Illegal keyword 'type' (use -XExplicitNamespaces to enable)")
+\end{code}
 
 -----------------------------------------------------------------------------
 -- Misc utils

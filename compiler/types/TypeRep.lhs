@@ -28,6 +28,7 @@ Note [The Type-related module hierarchy]
 module TypeRep (
 	TyThing(..),
 	Type(..),
+        TyLit(..),
         KindOrType, Kind, SuperKind,
         PredType, ThetaType,      -- Synonyms
 
@@ -39,7 +40,7 @@ module TypeRep (
 	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
 	pprTyThing, pprTyThingCategory, 
 	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
-        pprKind, pprParendKind,
+        pprKind, pprParendKind, pprTyLit,
 	Prec(..), maybeParen, pprTcApp, pprTypeNameApp, 
         pprPrefixApp, pprArrowChain, ppr_type,
 
@@ -123,7 +124,17 @@ data Type
 	Var         -- Type or kind variable
 	Type	        -- ^ A polymorphic type
 
+  | LitTy TyLit     -- ^ Type literals are simillar to type constructors.
+
   deriving (Data.Data, Data.Typeable)
+
+
+-- NOTE:  Other parts of the code assume that type literals do not contain
+-- types or type variables.
+data TyLit
+  = NumTyLit Integer
+  | StrTyLit FastString
+  deriving (Eq, Ord, Data.Data, Data.Typeable)
 
 type KindOrType = Type -- See Note [Arguments to type constructors]
 
@@ -302,6 +313,7 @@ tyVarsOfType :: Type -> VarSet
 -- kind variable {k}
 tyVarsOfType (TyVarTy v)         = unitVarSet v
 tyVarsOfType (TyConApp _ tys)    = tyVarsOfTypes tys
+tyVarsOfType (LitTy {})          = emptyVarSet
 tyVarsOfType (FunTy arg res)     = tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)     = tyVarsOfType fun `unionVarSet` tyVarsOfType arg
 tyVarsOfType (ForAllTy tyvar ty) = delVarSet (tyVarsOfType ty) tyvar
@@ -474,6 +486,9 @@ pprType, pprParendType :: Type -> SDoc
 pprType       ty = ppr_type TopPrec ty
 pprParendType ty = ppr_type TyConPrec ty
 
+pprTyLit :: TyLit -> SDoc
+pprTyLit = ppr_tylit TopPrec
+
 pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
@@ -534,6 +549,9 @@ pprThetaArrowTy preds   = parens (fsep (punctuate comma (map (ppr_type TopPrec) 
 instance Outputable Type where
     ppr ty = pprType ty
 
+instance Outputable TyLit where
+   ppr = pprTyLit
+
 instance Outputable name => OutputableBndr (IPName name) where
     pprBndr _ n   = ppr n	-- Simple for now
     pprInfixOcc  n = ppr n 
@@ -545,6 +563,7 @@ instance Outputable name => OutputableBndr (IPName name) where
 ppr_type :: Prec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
 ppr_type p (TyConApp tc tys)  = pprTcApp p ppr_type tc tys
+ppr_type p (LitTy l)          = ppr_tylit p l
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
 			   pprType t1 <+> ppr_type TyConPrec t2
@@ -578,6 +597,12 @@ ppr_forall_type p ty
 ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
   = parenSymOcc (getOccName tv) (ppr tv)
+
+ppr_tylit :: Prec -> TyLit -> SDoc
+ppr_tylit _ tl =
+  case tl of
+    NumTyLit n -> integer n
+    StrTyLit s -> text (show s)
 
 -------------------
 pprForAll :: [TyVar] -> SDoc

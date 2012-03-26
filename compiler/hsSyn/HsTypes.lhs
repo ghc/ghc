@@ -22,6 +22,7 @@ module HsTypes (
 	HsContext, LHsContext,
 	HsQuasiQuote(..),
         HsTyWrapper(..),
+        HsTyLit(..),
 
 	LBangType, BangType, HsBang(..), 
         getBangType, getBangStrictness, 
@@ -212,8 +213,16 @@ data HsType name
         [PostTcKind]     -- See Note [Promoted lists and tuples]
         [LHsType name]   
 
+  | HsTyLit HsTyLit      -- A promoted numeric literal.
+
   | HsWrapTy HsTyWrapper (HsType name)  -- only in typechecker output
   deriving (Data, Typeable)
+
+
+data HsTyLit
+  = HsNumTy Integer
+  | HsStrTy FastString
+    deriving (Data, Typeable)
 
 data HsTyWrapper
   = WpKiApps [Kind]  -- kind instantiation: [] k1 k2 .. kn
@@ -475,6 +484,9 @@ splitHsFunType other 	   	   = ([], other)
 instance (OutputableBndr name) => Outputable (HsType name) where
     ppr ty = pprHsType ty
 
+instance Outputable HsTyLit where
+    ppr = ppr_tylit
+
 instance (Outputable sig) => Outputable (HsBndrSig sig) where
     ppr (HsBSig ty _) = ppr ty
 
@@ -576,6 +588,7 @@ ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 ppr_mono_ty _    (HsExplicitListTy _ tys) = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
+ppr_mono_ty _    (HsTyLit t)         = ppr_tylit t
 
 ppr_mono_ty ctxt_prec (HsWrapTy (WpKiApps _kis) ty)
   = ppr_mono_ty ctxt_prec ty
@@ -623,6 +636,11 @@ ppr_fun_ty ctxt_prec ty1 ty2
     in
     maybeParen ctxt_prec pREC_FUN $
     sep [p1, ptext (sLit "->") <+> p2]
+
+--------------------------
+ppr_tylit :: HsTyLit -> SDoc
+ppr_tylit (HsNumTy i) = integer i
+ppr_tylit (HsStrTy s) = text (show s)
 \end{code}
 
 

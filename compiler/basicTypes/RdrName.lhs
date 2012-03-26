@@ -130,6 +130,10 @@ data RdrName
 %************************************************************************
 
 \begin{code}
+
+instance HasOccName RdrName where
+  occName = rdrNameOcc
+
 rdrNameOcc :: RdrName -> OccName
 rdrNameOcc (Qual _ occ) = occ
 rdrNameOcc (Unqual occ) = occ

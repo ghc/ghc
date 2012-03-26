@@ -46,6 +46,7 @@ import HsUtils
 import HsDoc
 
 -- others:
+import OccName          ( HasOccName )
 import IfaceSyn		( IfaceBinding )
 import Outputable
 import SrcLoc
@@ -97,7 +98,7 @@ data HsExtCore name	-- Read from Foo.hcr
 instance Outputable Char where
   ppr c = text [c]
 
-instance (OutputableBndr name)
+instance (OutputableBndr name, HasOccName name)
 	=> Outputable (HsModule name) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)

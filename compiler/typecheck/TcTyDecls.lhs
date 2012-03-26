@@ -233,7 +233,8 @@ calcClassCycles cls
       | otherwise
       = flip (foldr (expandType seen path)) tys
 
-    expandType _    _    (TyVarTy _)      = id
+    expandType _    _    (TyVarTy {})     = id
+    expandType _    _    (LitTy {})       = id
     expandType seen path (AppTy t1 t2)    = expandType seen path t1 . expandType seen path t2
     expandType seen path (FunTy t1 t2)    = expandType seen path t1 . expandType seen path t2
     expandType seen path (ForAllTy _tv t) = expandType seen path t
@@ -468,7 +469,8 @@ tcTyConsOfType ty
   where
      go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
      go ty | Just ty' <- tcView ty = go ty'
-     go (TyVarTy _)                = emptyNameEnv
+     go (TyVarTy {})               = emptyNameEnv
+     go (LitTy {})                 = emptyNameEnv
      go (TyConApp tc tys)          = go_tc tc tys
      go (AppTy a b)                = go a `plusNameEnv` go b
      go (FunTy a b)                = go a `plusNameEnv` go b

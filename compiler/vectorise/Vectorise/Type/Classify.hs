@@ -114,4 +114,5 @@ tyConsOfType (TyConApp tc tys) = extend (tyConsOfTypes tys)
 tyConsOfType (AppTy a b)       = tyConsOfType a `unionUniqSets` tyConsOfType b
 tyConsOfType (FunTy a b)       = (tyConsOfType a `unionUniqSets` tyConsOfType b)
                                  `addOneToUniqSet` funTyCon
+tyConsOfType (LitTy _)         = emptyUniqSet
 tyConsOfType (ForAllTy _ ty)   = tyConsOfType ty

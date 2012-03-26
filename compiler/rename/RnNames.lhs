@@ -1611,7 +1611,7 @@ dodgyImportWarn item = dodgyMsg (ptext (sLit "import")) item
 dodgyExportWarn :: Name -> SDoc
 dodgyExportWarn item = dodgyMsg (ptext (sLit "export")) item
 
-dodgyMsg :: OutputableBndr n => SDoc -> n -> SDoc
+dodgyMsg :: (OutputableBndr n, HasOccName n) => SDoc -> n -> SDoc
 dodgyMsg kind tc
   = sep [ ptext (sLit "The") <+> kind <+> ptext (sLit "item") <+> quotes (ppr (IEThingAll tc))
                 <+> ptext (sLit "suggests that"),

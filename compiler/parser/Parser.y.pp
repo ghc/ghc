@@ -464,27 +464,29 @@ exp_doc :: { LIE RdrName }
         : docsection    { L1 (case (unLoc $1) of (n, doc) -> IEGroup n doc) }
         | docnamed      { L1 (IEDocNamed ((fst . unLoc) $1)) } 
         | docnext       { L1 (IEDoc (unLoc $1)) }       
-                       
+
+
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { LIE RdrName }
-        :  qvar                         { L1 (IEVar (unLoc $1)) }
-        |  oqtycon                      { L1 (IEThingAbs (unLoc $1)) }
-        |  oqtycon '(' '..' ')'         { LL (IEThingAll (unLoc $1)) }
-        |  oqtycon '(' ')'              { LL (IEThingWith (unLoc $1) []) }
-        |  oqtycon '(' qcnames ')'      { LL (IEThingWith (unLoc $1) (reverse $3)) }
+        : qcname_ext export_subspec     { LL (mkModuleImpExp (unLoc $1)
+                                                             (unLoc $2)) }
         |  'module' modid               { LL (IEModuleContents (unLoc $2)) }
 
-qcnames :: { [RdrName] }
+export_subspec :: { Located ImpExpSubSpec }
+        : {- empty -}                   { L0 ImpExpAbs }
+        | '(' '..' ')'                  { LL ImpExpAll }
+        | '(' ')'                       { LL (ImpExpList []) }
+        | '(' qcnames ')'               { LL (ImpExpList (reverse $2)) }
+
+qcnames :: { [RdrName] }     -- A reversed list
         :  qcnames ',' qcname_ext       { unLoc $3 : $1 }
         |  qcname_ext                   { [unLoc $1]  }
 
 qcname_ext :: { Located RdrName }       -- Variable or data constructor
                                         -- or tagged type constructor
         :  qcname                       { $1 }
-        |  'type' qcon                  { sL (comb2 $1 $2) 
-                                             (setRdrNameSpace (unLoc $2) 
-                                                              tcClsName)  }
+        |  'type' qcname                {% mkTypeImpExp (LL (unLoc $2)) }
 
 -- Cannot pull into qcname_ext, as qcname is also used in expression.
 qcname  :: { Located RdrName }  -- Variable or data constructor
@@ -1078,6 +1080,8 @@ atype :: { LHsType RdrName }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')' { LL $ HsExplicitTupleTy [] ($3 : $5) }
         | SIMPLEQUOTE  '[' comma_types0 ']'           { LL $ HsExplicitListTy placeHolderKind $3 }
         | '[' ctype ',' comma_types1 ']'              { LL $ HsExplicitListTy placeHolderKind ($2 : $4) }
+        | INTEGER            {% mkTyLit $ LL $ HsNumTy $ getINTEGER $1 }
+        | STRING             {% mkTyLit $ LL $ HsStrTy $ getSTRING  $1 }
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -1836,10 +1840,16 @@ tycon   :: { Located RdrName }  -- Unqualified
 
 qtyconsym :: { Located RdrName }
         : QCONSYM                       { L1 $! mkQual tcClsName (getQCONSYM $1) }
+        | QVARSYM                       { L1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym                      { $1 }
 
+-- Does not include "!", because that is used for strictness marks
+--               or ".", because that separates the quantified type vars from the rest
 tyconsym :: { Located RdrName }
         : CONSYM                        { L1 $! mkUnqual tcClsName (getCONSYM $1) }
+        | VARSYM                        { L1 $! mkUnqual tcClsName (getVARSYM $1) }
+        | '*'                           { L1 $! mkUnqual tcClsName (fsLit "*")    }
+
 
 -----------------------------------------------------------------------------
 -- Operators
@@ -1873,11 +1883,9 @@ qvaropm :: { Located RdrName }
 
 tyvar   :: { Located RdrName }
 tyvar   : tyvarid               { $1 }
-        | '(' tyvarsym ')'      { LL (unLoc $2) }
 
 tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'       { LL (unLoc $2) }
-        | tyvarsym              { $1 }
         | '.'                   {% parseErrorSDoc (getLoc $1) 
                                       (vcat [ptext (sLit "Illegal symbol '.' in type"), 
                                              ptext (sLit "Perhaps you intended -XRankNTypes or similar flag"),
@@ -1890,12 +1898,6 @@ tyvarid :: { Located RdrName }
         | 'unsafe'              { L1 $! mkUnqual tvName (fsLit "unsafe") }
         | 'safe'                { L1 $! mkUnqual tvName (fsLit "safe") }
         | 'interruptible'       { L1 $! mkUnqual tvName (fsLit "interruptible") }
-
-tyvarsym :: { Located RdrName }
--- Does not include "!", because that is used for strictness marks
---               or ".", because that separates the quantified type vars from the rest
---               or "*", because that's used for kinds
-tyvarsym : VARSYM               { L1 $! mkUnqual tvName (getVARSYM $1) }
 
 -----------------------------------------------------------------------------
 -- Variables 

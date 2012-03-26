@@ -290,7 +290,6 @@ cvt_tyinst_hdr cxt tc tys
        ; tys' <- mapM cvtType tys
        ; return (cxt', tc', mkHsBSig tys') }
 
-
 -------------------------------------------------------------------
 --		Partitioning declarations
 -------------------------------------------------------------------

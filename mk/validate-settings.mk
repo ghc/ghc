@@ -9,7 +9,7 @@ SRC_CC_OPTS     += -Wall $(WERROR)
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
 # we turn it on explicitly for consistency with other users
 ifeq "$(GccLT46)" "NO"
-SRC_CC_OPTS	    += -Werror=unused-but-set-variable
+SRC_CC_OPTS     += -Werror=unused-but-set-variable
 # gcc 4.6 gives 3 warning for giveCapabilityToTask not being inlined
 SRC_CC_OPTS     += -Wno-error=inline
 endif

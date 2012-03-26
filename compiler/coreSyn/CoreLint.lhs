@@ -679,6 +679,9 @@ lintType ty@(TyConApp tc tys)
 lintType (ForAllTy tv ty)
   = do { lintTyBndrKind tv
        ; addInScopeVar tv (lintType ty) }
+
+lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
+
 \end{code}
 
 
@@ -717,6 +720,13 @@ lint_co_app ty k tys
   = lint_app (ptext (sLit "coercion") <+> quotes (ppr ty)) k tys
 
 ----------------
+lintTyLit :: TyLit -> LintM ()
+lintTyLit (NumTyLit n)
+  | n >= 0    = return ()
+  | otherwise = failWithL msg
+    where msg = ptext (sLit "Negative type literal:") <+> integer n
+lintTyLit (StrTyLit _) = return ()
+
 lint_app :: SDoc -> LintedKind -> [(LintedType,LintedKind)] -> LintM Kind
 -- (lint_app d fun_kind arg_tys)
 --    We have an application (f arg_ty1 .. arg_tyn),

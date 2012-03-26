@@ -226,6 +226,13 @@ rnHsTyKi isType doc tupleTy@(HsTupleTy tup_con tys)
        ; (tys', fvs) <- mapFvRn (rnLHsTyKi isType doc) tys
        ; return (HsTupleTy tup_con tys', fvs) }
 
+-- 1. Perhaps we should use a separate extension here?
+-- 2. Check that the integer is positive?
+rnHsTyKi isType _ tyLit@(HsTyLit t)
+  = do { data_kinds <- xoptM Opt_DataKinds
+       ; unless (data_kinds || isType) (addErr (dataKindsErr tyLit))
+       ; return (HsTyLit t, emptyFVs) }
+
 rnHsTyKi isType doc (HsAppTy ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi isType doc ty1
        ; (ty2', fvs2) <- rnLHsTyKi isType doc ty2
@@ -287,6 +294,7 @@ rnTyVar :: Bool -> RdrName -> RnM Name
 rnTyVar is_type rdr_name
   | is_type   = lookupTypeOccRn rdr_name
   | otherwise = lookupKindOccRn rdr_name
+
 
 --------------
 rnLHsTypes :: HsDocContext -> [LHsType RdrName]

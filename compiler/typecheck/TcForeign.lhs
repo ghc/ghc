@@ -155,8 +155,8 @@ normaliseFfiType' env ty0 = go [] ty0
       = do (coi,nty1) <- go rec_nts ty1
            return (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
 
-    go _ ty@(TyVarTy _)
-      = return (Refl ty, ty)
+    go _ ty@(TyVarTy {}) = return (Refl ty, ty)
+    go _ ty@(LitTy {})   = return (Refl ty, ty)
 
     add_co co rec_nts ty
         = do (co', ty') <- go rec_nts ty

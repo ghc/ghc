@@ -18,6 +18,7 @@ module Kind (
 	anyKind, liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind, constraintKind,
         mkArrowKind, mkArrowKinds,
+        typeNatKind, typeStringKind,
 
         -- Kind constructors...
         anyKindTyCon, liftedTypeKindTyCon, openTypeKindTyCon,

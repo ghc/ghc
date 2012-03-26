@@ -948,6 +948,7 @@ floatEqualities skols can_given wantders
           | FlatSkol ty <- tcTyVarDetails tv = tvs_under_fsks ty
           | otherwise                        = unitVarSet tv
         tvs_under_fsks (TyConApp _ tys) = unionVarSets (map tvs_under_fsks tys)
+        tvs_under_fsks (LitTy {})       = emptyVarSet
         tvs_under_fsks (FunTy arg res)  = tvs_under_fsks arg `unionVarSet` tvs_under_fsks res
         tvs_under_fsks (AppTy fun arg)  = tvs_under_fsks fun `unionVarSet` tvs_under_fsks arg
         tvs_under_fsks (ForAllTy tv ty) -- The kind of a coercion binder 

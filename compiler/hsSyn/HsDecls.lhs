@@ -623,7 +623,7 @@ pp_vanilla_decl_head :: OutputableBndr name
    -> HsContext name
    -> SDoc
 pp_vanilla_decl_head thing tyvars context
- = hsep [pprHsContext context, ppr thing, interppSP tyvars]
+ = hsep [pprHsContext context, pprPrefixOcc (unLoc thing), interppSP tyvars]
 
 pp_fam_inst_head :: OutputableBndr name
    => Located name
@@ -631,7 +631,7 @@ pp_fam_inst_head :: OutputableBndr name
    -> HsContext name
    -> SDoc
 pp_fam_inst_head thing (HsBSig typats _)  context -- explicit type patterns
-   = hsep [ ptext (sLit "instancs"), pprHsContext context, ppr thing
+   = hsep [ ptext (sLit "instance"), pprHsContext context, pprPrefixOcc (unLoc thing)
           , hsep (map (pprParendHsType.unLoc) typats)]
 
 pp_condecls :: OutputableBndr name => [LConDecl name] -> SDoc

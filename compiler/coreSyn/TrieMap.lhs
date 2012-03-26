@@ -30,6 +30,7 @@ import TypeRep
 import Var
 import UniqFM
 import Unique( Unique )
+import FastString(FastString)
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -486,7 +487,10 @@ data TypeMap a
        , tm_app    :: TypeMap (TypeMap a)
        , tm_fun    :: TypeMap (TypeMap a)
        , tm_tc_app :: NameEnv (ListMap TypeMap a)
-       , tm_forall :: TypeMap (BndrMap a) }
+       , tm_forall :: TypeMap (BndrMap a)
+       , tm_tylit  :: TyLitMap a
+       }
+
 
 instance Outputable a => Outputable (TypeMap a) where
   ppr m = text "TypeMap elts" <+> ppr (foldTypeMap (:) [] m)
@@ -499,7 +503,8 @@ wrapEmptyTypeMap = TM { tm_var  = emptyTM
                       , tm_app  = EmptyTM
                       , tm_fun  = EmptyTM
                       , tm_tc_app = emptyNameEnv
-                      , tm_forall = EmptyTM }
+                      , tm_forall = EmptyTM
+                      , tm_tylit  = emptyTyLitMap }
 
 instance TrieMap TypeMap where
    type Key TypeMap = Type
@@ -519,6 +524,7 @@ lkT env ty m
     go (AppTy t1 t2)     = tm_app    >.> lkT env t1 >=> lkT env t2
     go (FunTy t1 t2)     = tm_fun    >.> lkT env t1 >=> lkT env t2
     go (TyConApp tc tys) = tm_tc_app >.> lkNamed tc >=> lkList (lkT env) tys
+    go (LitTy l)         = tm_tylit  >.> lkTyLit l
     go (ForAllTy tv ty)  = tm_forall >.> lkT (extendCME env tv) ty >=> lkBndr env tv
 
 -----------------
@@ -534,6 +540,7 @@ xtT env (ForAllTy tv ty)  f  m = m { tm_forall = tm_forall m |> xtT (extendCME e
                                                  |>> xtBndr env tv f }
 xtT env (TyConApp tc tys) f  m = m { tm_tc_app = tm_tc_app m |> xtNamed tc 
                                                  |>> xtList (xtT env) tys f }
+xtT _   (LitTy l)         f  m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 
 fdT :: (a -> b -> b) -> TypeMap a -> b -> b
 fdT _ EmptyTM = \z -> z
@@ -542,6 +549,33 @@ fdT k m = foldTM k (tm_var m)
         . foldTM (foldTM k) (tm_fun m)
         . foldTM (foldTM k) (tm_tc_app m)
         . foldTM (foldTM k) (tm_forall m)
+        . foldTyLit k (tm_tylit m)
+
+
+
+------------------------
+data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
+                      , tlm_string :: Map.Map FastString a
+                      }
+
+emptyTyLitMap :: TyLitMap a
+emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = Map.empty }
+
+lkTyLit :: TyLit -> TyLitMap a -> Maybe a
+lkTyLit l =
+  case l of
+    NumTyLit n -> tlm_number >.> Map.lookup n
+    StrTyLit n -> tlm_string >.> Map.lookup n
+
+xtTyLit :: TyLit -> XT a -> TyLitMap a -> TyLitMap a
+xtTyLit l f m =
+  case l of
+    NumTyLit n -> m { tlm_number = tlm_number m |> Map.alter f n }
+    StrTyLit n -> m { tlm_string = tlm_string m |> Map.alter f n }
+
+foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
+foldTyLit l m = flip (Map.fold l) (tlm_string m)
+              . flip (Map.fold l) (tlm_number m)
 \end{code}
 
 
