@@ -760,7 +760,7 @@ simplUnfolding env top_lvl id _
        }
   where
     act      = idInlineActivation id
-    rule_env = updMode (updModeForInlineRules act) env
+    rule_env = updMode (\mode -> let mode' = updModeForInlineRules act mode in case src of InlineStable -> mode' { sm_rules = False }; _ -> mode') env
        	       -- See Note [Simplifying inside InlineRules] in SimplUtils
 
 simplUnfolding _ top_lvl id new_rhs _
