@@ -27,10 +27,11 @@ import DataCon
 import Pair
 import BasicTypes
 import Demand (splitStrictSig, isBotRes)
-import Util
 
 
 -- FIXME: this doesn't really work very well if the Answers are indirections, which is a common case!
+-- However, this is not so serious a problem since I started spotting manifest primops applications and
+-- avoiding going through the wrapper to compile them.
 evaluatePrim :: InScopeSet -> Tag -> PrimOp -> [Type] -> [Answer] -> Maybe (Anned Answer)
 evaluatePrim iss tg pop tys args = do
     args' <- fmap (map CoreSyn.Type tys ++) $ mapM to args
@@ -77,10 +78,10 @@ evaluatePrim iss tg pop tys args = do
             toVar_maybe (CoreSyn.Var x) = Just x
             toVar_maybe _               = Nothing
 
-type StackSummary = (Bool, [ArgSummary], CallCtxt)
+type ContextSummary = (Bool, [ArgSummary], CallCtxt)
 
-summariseStack :: PureHeap -> Stack -> StackSummary
-summariseStack h k = trainCarFoldr go (True, [], BoringCtxt) k
+summariseContext :: PureHeap -> Stack -> ContextSummary
+summariseContext h k = trainCarFoldr go (True, [], BoringCtxt) k
   where go kf (lone_variable, arg_infos, cont_info) = case tagee kf of
           TyApply _         -> (lone_variable,           arg_infos, cont_info)
           CoApply _         -> (False, TrivArg         : arg_infos, ValAppCtxt)
@@ -96,20 +97,19 @@ summariseStack h k = trainCarFoldr go (True, [], BoringCtxt) k
           _ -> TrivArg
 
 -- Can't use callSiteInline because it never inlines stuff with DFunUnfolding!
-ghcHeuristics :: Id -> StackSummary -> Bool
+ghcHeuristics :: Id -> ContextSummary -> Bool
 ghcHeuristics x (lone_variable, arg_infos, cont_info) = case idUnfolding x of
-  CoreSyn.CoreUnfolding { CoreSyn.uf_tmpl = unf_template, CoreSyn.uf_is_top = is_top 
-                        , CoreSyn.uf_is_cheap = is_cheap, CoreSyn.uf_arity = uf_arity
-                        , CoreSyn.uf_guidance = guidance }
+  CoreSyn.CoreUnfolding { CoreSyn.uf_is_top = is_top,  CoreSyn.uf_is_cheap = is_cheap
+                        , CoreSyn.uf_arity = uf_arity, CoreSyn.uf_guidance = guidance }
                            -> tryUnfolding dflags1 x lone_variable 
                                            arg_infos cont_info is_top 
                                            is_cheap uf_arity guidance
   CoreSyn.NoUnfolding      -> False
   CoreSyn.OtherCon {}      -> False
   -- GHC actually only looks through DFunUnfoldings in exprIsConApp_maybe,
-  -- but I'll do this rough heuristic instead:
+  -- so I'll do this rough heuristic instead:
   CoreSyn.DFunUnfolding {} -> length arg_infos >= idArity x
- where dflags0 = defaultDynFlags (error "ghcHeuristics: DynFlags used!")
+ where dflags0 = defaultDynFlags (error "ghcHeuristics: Settings in DynFlags used!")
        -- Set these two flags so that we get information about failed inlinings:
        dflags1 | tRACE     = dopt_set (dopt_set dflags0 Opt_D_verbose_core2core) Opt_D_dump_inlinings
                | otherwise = dflags0
@@ -199,16 +199,18 @@ step' normalising ei_state = {-# SCC "step'" #-}
         -- we would like to also exclude local recursive loops, not just top-level ones
         case shouldExposeUnfolding x' of
             Right super  -> return (howBound hb, super, in_e)
-            Left why_not -> pprTrace "Unavailable:" (ppr x') $
-                            fail why_not
+            Left why_not
+              -- EXPERIMENT: claim that anything bound *internally* is superinlinable so we don't end up
+              -- with as many stupid manifest beta reductions
+              -- | how_bound == InternallyBound -> return (howBound hb, True, in_e)
+              | otherwise -> pprTrace "Unavailable:" (ppr x' <+> parens (text why_not)) $
+                             fail why_not
 
     -- We have not yet claimed deeds for the result of this function
     lookupAnswer :: Heap -> Out Var -> Maybe (Superinlinable, Anned Answer)
     lookupAnswer (Heap h ids) x' = do
-        (how_bound, super, in_e) <- lookupHeap h x'
-        -- EXPERIMENT: claim that anything bound *internally* is superinlinable so we don't end up
-        -- with as many stupid manifest beta reductions
-        fmap ((,) (super || how_bound == InternallyBound)) $ termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
+        (_how_bound, super, in_e) <- lookupHeap h x'
+        fmap ((,) super) $ termToAnswer ids in_e -- FIXME: it would be cooler if we could exploit cheap non-values in unfoldings as well..
     
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
@@ -306,7 +308,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
         dereference h = snd . dereference' h False
     
-        dereferenceLambdaish :: Heap -> StackSummary -> Answer
+        dereferenceLambdaish :: Heap -> ContextSummary -> Answer
                              -> (Answer -> Maybe UnnormalisedState)
                              -> Maybe State
         dereferenceLambdaish h@(Heap _ ids) k_summary a@(_, (_, v)) kont
@@ -331,23 +333,40 @@ step' normalising ei_state = {-# SCC "step'" #-}
             --
             -- Perhaps if we had deep normalisation + GC we could get these results by penalising heap allocation heavily?
             -- If so we must remember to do it for heap bindings *and* letrecs.
-            case stateSize s' `compare` either stateSize unnormalisedStateSize ei_state of
-              _ | super -> return s' -- We don't want to strictly increase the size by beta-reducing unless the lambda is marked SUPERINLINABLE
+            guard $ case () of
+              _ -- If the lambda is marked SUPERINLINABLE, always inline it
+                | super
+                -> True
+                -- If inlining gets us to a value, accept it. This is a bit ad-hoc for two reasons:
+                --  1. We might reach a value now, and then later apply two more arguments to effectively unconditionally inline a full application
+                --  2. We might need to do another round of inlining to actually expose a value e.g. g in (f = \x y -> e; g = \x -> f x; h = g x)
+                -- However, this is important so that speculation is able to turn partial applications into explicit values
+                | (_, _, k, qa) <- s'
+                , Answer _ <- annee qa
+                , Just _ <- stackToCast k
+                -> True
+                -- If the result is actually smaller, accept it (this catches manifest values)
+                | stateSize s' <= either stateSize unnormalisedStateSize ei_state
+                -> True
+                -- It might still be OK to get larger if GHC's inlining heuristics say we should
                 | Indirect x' <- v
                 , ghcHeuristics x' k_summary
-                -> return s' -- It might still be OK to get larger if GHC's inlining heuristics say we should
-              GT -> pprTrace "Unwanted:" (ppr (answerToAnnedTerm' ids a)) Nothing
-              _  -> return s'
+                -> True
+                -- Otherwise, we don't want to beta-reduce
+                | otherwise
+                -> pprTrace "Unwanted:" (ppr (answerToAnnedTerm' ids a)) False
+            (case v of Indirect x' -> pprTrace "Inlining" (ppr x'); _ -> id) $
+              return s'
 
         tyApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Type -> Maybe State
-        tyApply deeds heap@(Heap h ids) k tg_a a ty' = dereferenceLambdaish heap (summariseStack h k) a $ \(mb_co, (rn, e)) -> do
+        tyApply deeds heap@(Heap h ids) k tg_a a ty' = dereferenceLambdaish heap (summariseContext h k) a $ \(mb_co, (rn, e)) -> do
             TyLambda x e_body <- return e
             fmap (\deeds -> (deeds, heap, case mb_co of Uncast -> k; CastBy co' _tg_co -> Tagged tg_a (CastIt (co' `mk_inst` ty')) `Car` k, (insertTypeSubst rn x ty', e_body))) $
                  claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)
           where mk_inst = mkInstCo ids
 
         coApply :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Coercion -> Maybe State
-        coApply deeds heap@(Heap h ids) k tg_a a apply_co' = dereferenceLambdaish heap (summariseStack h k) a $ \(mb_co, (rn, e)) -> do
+        coApply deeds heap@(Heap h ids) k tg_a a apply_co' = dereferenceLambdaish heap (summariseContext h k) a $ \(mb_co, (rn, e)) -> do
             Lambda x e_body <- return e
             flip fmap (claimDeeds (deeds `releaseDeeds` answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
                 Uncast            -> (deeds, heap, k,                                    (insertCoercionSubst rn x apply_co', e_body))
@@ -364,7 +383,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                         mk_sym = mkSymCo ids
 
         apply :: Deeds -> Tag -> Heap -> Stack -> Tag -> Answer -> Out Var -> Maybe State
-        apply deeds tg_kf (Heap h ids) k tg_a a x' = dereferenceLambdaish (Heap h ids) (summariseStack h k) a $ \(mb_co, (rn, e)) -> do
+        apply deeds tg_kf (Heap h ids) k tg_a a x' = dereferenceLambdaish (Heap h ids) (summariseContext h k) a $ \(mb_co, (rn, e)) -> do
             Lambda x e_body <- return e
             case mb_co of
               Uncast -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
@@ -478,15 +497,43 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
 -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.
 -- This gives normal RULES more of a chance to fire.
+--
+-- NB: this only controls whether a particular definition is available for inlining at all.
+-- For the inlining to actualy happen we also make a check at the call-site that considers
+-- whether it is benefical to inline the definition into the particular context we find.
+--
+-- NB: a place where these heuristics really hurt is:
+--   {-# INLINE [0] foldr #-}
+--   foldr k z = go
+--             where
+--               go []     = z
+--               go (y:ys) = y `k` go ys
+--
+-- Although foldr gets inlined by the supercompiler, "go" is a local recursive loop which
+-- doesn't get inlined at all. See also:
+--  {-# SUPERINLINABLE sum #-}
+--  sum     l       = sum' l 0
+--    where
+--      sum' []     a = a
+--      sum' (x:xs) a = sum' xs (a+x)
+--
+-- A possible solution is to mark all those Ids syntactically contained within a SUPERINLINABLE
+-- unfolding as SUPERINLINABLE if they are not explicitly INLINE/NOINLINE. We can do this when
+-- we construct the unfoldings in the first place.
 shouldExposeUnfolding :: Id -> Either String Superinlinable
 shouldExposeUnfolding x = case inl_inline inl_prag of
+    -- NB: we don't check the activation on INLINE things because so many activations
+    -- are used to ensure that e.g. RULE-based fusion works properly, and NOINLINE will
+    -- generally impede supercompiler-directed fusion.
+    --
+    -- Our philosophy: if it is *ever* inlinable (in any phase), expose it
     Inline                                 -> Right True -- Don't check for size increase at all if marked INLINE
     Inlinable super
       | only_if_superinlinable, not super  -> Left "INLINEABLE but not SUPERINLINABLE"
       | otherwise                          -> Right super
     NoInline
-      | isActiveIn 2 (inl_act inl_prag)    -> Left "NONLINE"
-      | only_if_superinlinable             -> Left "(inactive) NOINLINE, not SUPERINLINABLE"
+      | isNeverActive (inl_act inl_prag)   -> Left "unconditional NONLINE"
+      | only_if_superinlinable             -> Left "conditional NOINLINE, not SUPERINLINABLE"
     EmptyInlineSpec 
       | only_if_superinlinable             -> Left "not SUPERINLINABLE"
     _                                      -> Right False

@@ -22,7 +22,7 @@ import qualified Supercompile.Evaluator.Syntax as S
 import CoreSyn
 import MkCore     (mkImpossibleExpr)
 import CoreUtils  (exprType, bindNonRec)
-import CoreUnfold (exprIsConApp_maybe)
+import CoreUnfold
 import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo, mkAxInstCo)
 import DataCon    (DataCon, dataConWorkId, dataConTyCon, dataConName)
 import Var        (isTyVar)
@@ -87,9 +87,11 @@ runParseM' us act = (floats, x)
 runParseM :: UniqSupply -> ParseM S.Term -> S.Term
 runParseM us = uncurry (S.bindManyMixedLiftedness S.termFreeVars) . runParseM' us
 
-freshFloatId :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Var)
-freshFloatId _ (I (S.Var x)) = return (Nothing, x)
-freshFloatId n e             = fmap (\x -> (Just (x, e), x)) $ mkSysLocalM (mkFastString n) (S.termType e)
+freshFloatId :: String -> (CoreExpr, S.Term) -> ParseM (Maybe (Var, S.Term), Var)
+freshFloatId _ (_, I (S.Var x)) = return (Nothing, x)
+freshFloatId n (old_e, e)       = fmap (\x -> let x' = x `setIdUnfolding` mkUnfolding InlineRhs False (isBottomingId x) old_e in (Just (x', e), x')) $ mkSysLocalM (mkFastString n) (S.termType e)
+ -- NB: we are careful to give fresh binders an unfolding so that the evaluator can use
+ -- GHC's inlining heuristics to decide whether it is profitable to inline the RHS
 
 freshFloatCoVar :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Coercion)
 freshFloatCoVar _ (I (S.Value (S.Coercion co))) = return (Nothing, co)
@@ -98,7 +100,7 @@ freshFloatCoVar n e                             = fmap (\x -> (Just (x, e), mkCo
 floatIt :: [(Var, S.Term)] -> ParseM ()
 floatIt floats = ParseM $ \s -> (s, floats, ())
 
-nameIt :: Description -> S.Term -> ParseM Var
+nameIt :: Description -> (CoreExpr, S.Term) -> ParseM Var
 nameIt d e = freshFloatId ("a" ++ descriptionString d) e >>= \(mb_float, x) -> floatIt (maybeToList mb_float) >> return x
 
 nameCo :: Description -> S.Term -> ParseM Coercion
@@ -115,10 +117,10 @@ bindUnliftedFloats act = ParseM $ \s -> case unParseM act s of (s, floats, e) ->
                                                                                  then (s, [], S.bindManyMixedLiftedness S.termFreeVars floats e)
                                                                                  else (s, floats, e)
 
-appE :: S.Term -> S.Term -> ParseM S.Term
-appE e1 e2
+appE :: S.Term -> (CoreExpr, S.Term) -> ParseM S.Term
+appE e1 (old_e2, e2)
   | isCoVarType (S.termType e2) = fmap (e1 `S.coApp`) $ nameCo (argOf (desc e1)) e2
-  | otherwise                   = fmap (e1 `S.app`)   $ nameIt (argOf (desc e1)) e2
+  | otherwise                   = fmap (e1 `S.app`)   $ nameIt (argOf (desc e1)) (old_e2, e2)
 
 
 
@@ -128,20 +130,18 @@ conAppToTerm dc es
   , let [co_val_e] = co_val_es -- NB: newtypes may not have existential arguments
   = fmap (`S.cast` mkAxInstCo co_axiom tys') $ coreExprToTerm co_val_e
   | otherwise
-  = do -- Convert all arguments to supercompiler syntax and divide into type/coercion/value
-       co_val_es' <- mapM coreExprToTerm co_val_es
-       let (co_es', val_es') = span (isCoVarType . S.termType) co_val_es'
- 
-       -- Put each argument into a form suitable for an explicit value
+  = do -- Put each argument into a form suitable for an explicit value
        -- NB: if any argument is non-trivial then the resulting binding will not be a simple value
        -- (some let-bindings will surround it) and inlining will be impeded.
-       (d, cos') <- mapAccumLM (\d co_e' -> fmap ((,) (argOf d)) $ nameCo (argOf d) co_e')
-                               (Opaque (S.nameString (dataConName dc))) co_es'
-       (_, xs') <- mapAccumLM (\d val_e' -> fmap ((,) (argOf d)) $ nameIt (argOf d) val_e')
-                              d val_es'
+       (d, cos') <- mapAccumLM (\d co_e -> fmap ((,) (argOf d)) $ coreExprToTerm co_e >>= nameCo (argOf d))
+                               (Opaque (S.nameString (dataConName dc))) co_es
+       (_, xs') <- mapAccumLM (\d val_e -> fmap ((,) (argOf d)) $ coreExprToTerm val_e >>= \val_e' -> nameIt (argOf d) (val_e, val_e'))
+                              d val_es
        return $ S.value (S.Data dc tys' cos' xs')
   where
+    -- Divide into type/coercion/value
     (tys', co_val_es) = takeWhileJust fromType_maybe es
+    (co_es, val_es) = span (isCoVarType . exprType) co_val_es
 
     fromType_maybe (Type ty) = Just ty
     fromType_maybe _         = Nothing
@@ -164,7 +164,7 @@ coreExprToTerm init_e = {-# SCC "coreExprToTerm" #-} term init_e
     term (Var x)                   = return $ S.var x
     term (Lit l)                   = return $ S.value (S.Literal l)
     term (App e_fun (Type ty_arg)) = fmap (flip S.tyApp ty_arg) (term e_fun)
-    term (App e_fun e_arg)         = join $ liftM2 appE (term e_fun) (maybeUnLiftedTerm (exprType e_arg) e_arg)
+    term (App e_fun e_arg)         = join $ liftM2 appE (term e_fun) (fmap ((,) e_arg) $ maybeUnLiftedTerm (exprType e_arg) e_arg)
     term (Lam x e) | isTyVar x     = fmap (S.value . S.TyLambda x) (bindFloats (term e))
                    | otherwise     = fmap (S.value . S.Lambda x) (bindFloats (term e))
     term (Let (NonRec x e1) e2)    = liftM2 (S.let_ x) (maybeUnLiftedTerm (idType x) e1) (bindFloats (term e2))

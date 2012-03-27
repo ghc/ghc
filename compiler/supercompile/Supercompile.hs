@@ -25,7 +25,7 @@ import qualified Supercompile.Drive.Process1 as S ()
 import qualified Supercompile.Drive.Process2 as S ()
 import qualified Supercompile.Drive.Process3 as S
 
-import BasicTypes (TupleSort(..))
+import BasicTypes
 import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
@@ -175,17 +175,18 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
     -- We still do check shouldExposeUnfolding here because we can avoid parsing+tagging those unfoldings
     -- which can literall never be used.
     varUnfolding x
-      | Just pop <- isPrimOpId_maybe x            = Right $ primOpUnfolding pop
-      | Just dc <- isDataConWorkId_maybe x        = Right $ dataUnfolding dc
-      | Left why_not <- S.shouldExposeUnfolding x = Left why_not
-      | otherwise                                 = case realIdUnfolding x of
-        NoUnfolding                   -> Left "no unfolding"
-        OtherCon _                    -> Left "no positive unfolding"
-        DFunUnfolding _ dc es         -> Right $ runParseM us2 $ coreExprToTerm $ mkLams as $ mkLams xs $ Var (dataConWorkId dc) `mkTyApps` cls_tys `mkApps` [(e `mkTyApps` map mkTyVarTy as) `mkVarApps` xs | e <- es]
-         where (as, theta, _cls, cls_tys) = tcSplitDFunTy (idType x)
-               xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques theta
-        CoreUnfolding { uf_tmpl = e } -> Right $ runParseM us2 $ coreExprToTerm e
-         -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
+      | Just pop <- isPrimOpId_maybe x     = Right $ primOpUnfolding pop
+      | Just dc <- isDataConWorkId_maybe x = Right $ dataUnfolding dc
+      | otherwise                          = case S.shouldExposeUnfolding x of
+        Left why_not -> Left why_not
+        Right super  -> case realIdUnfolding x of
+          NoUnfolding                   -> Left "no unfolding"
+          OtherCon _                    -> Left "no positive unfolding"
+          DFunUnfolding _ dc es         -> Right $ runParseM us2 $ coreExprToTerm $ mkLams as $ mkLams xs $ Var (dataConWorkId dc) `mkTyApps` cls_tys `mkApps` [(e `mkTyApps` map mkTyVarTy as) `mkVarApps` xs | e <- es]
+           where (as, theta, _cls, cls_tys) = tcSplitDFunTy (idType x)
+                 xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques theta
+          CoreUnfolding { uf_tmpl = e } -> Right $ (if super then markSuperinlinable else id) $ runParseM us2 $ coreExprToTerm e
+           -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
     
     primOpUnfolding pop = S.tyLambdas as $ S.lambdas xs $ S.primOp pop (map mkTyVarTy as) (map S.var xs)
       where (as, arg_tys, _res_ty, _arity, _strictness) = primOpSig pop
@@ -213,6 +214,39 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet [] []
     -- than we pass down to runParseM. 
     (us1, us2) = splitUniqSupply anfUniqSupply'
     bv_uniques = uniqsFromSupply us1
+
+-- NB: this is used to deal with SUPERINLINABLE bindings which have locally bound loops which
+-- are *not* marked SUPERINLINABLE
+--
+-- TODO: this is actually useless if we just say that all InternallyBound things are SUPERINLINABLE
+markSuperinlinable :: S.Term -> S.Term
+--markSuperinlinable = id
+{--}
+markSuperinlinable = term
+  where
+    term e = flip fmap e $ \e -> case e of
+      S.Var x -> S.Var x
+      S.Value v -> S.Value $ case v of
+        S.Lambda   x e -> S.Lambda   x (term e)
+        S.TyLambda a e -> S.TyLambda a (term e)
+        _              -> v
+      S.TyApp e ty -> S.TyApp (term e) ty
+      S.CoApp e co -> S.CoApp (term e) co
+      S.App   e x  -> S.App   (term e) x
+      S.PrimOp pop tys es -> S.PrimOp pop tys (map term es)
+      S.Case e x ty alts  -> S.Case (term e) x ty (map (second term) alts)
+      S.Let x e1 e2       -> S.Let (bndr x) (term e1) (term e2)
+      S.LetRec xes e      -> S.LetRec (map (bndr *** term) xes) (term e)
+      S.Cast e co         -> S.Cast (term e) co
+
+    bndr x = x `setInlinePragma` (idInlinePragma x) { inl_inline = case inl_inline (idInlinePragma x) of
+                                                                     Inline          -> Inline
+                                                                     Inlinable _     -> Inlinable True
+                                                                     NoInline        -> NoInline
+                                                                     EmptyInlineSpec -> Inlinable True }
+{--}
+
+
 
 supercompile :: CoreExpr -> IO CoreExpr
 supercompile e = -- liftM (termToCoreExpr . snd) $

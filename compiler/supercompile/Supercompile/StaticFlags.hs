@@ -17,7 +17,7 @@ parseEnum prefix def opts = maybe def parse $ lookup_str prefix
 data Superinlinability = ForEverything | ForRecursion | ForNothing
 
 sUPERINLINABILITY :: Superinlinability
-sUPERINLINABILITY = parseEnum "-fsupercompiler-superinlinability" ForNothing [("", ForRecursion), ("recursion", ForRecursion), ("everything", ForEverything), ("nothing", ForNothing)]
+sUPERINLINABILITY = parseEnum "-fsupercompiler-superinlinability" ForRecursion [("", ForRecursion), ("recursion", ForRecursion), ("everything", ForEverything), ("nothing", ForNothing)]
 
 iNSTANCE_MATCHING :: Bool
 iNSTANCE_MATCHING = not $ lookUp $ fsLit "-fsupercompiler-no-instance-matching"
