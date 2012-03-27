@@ -6,7 +6,7 @@ Functions over HsSyn specialised to RdrName.
 \begin{code}
 module RdrHsSyn (
         extractHsTyRdrTyVars,
-        extractHsRhoRdrTyVars, extractGenericPatTyVars,
+        extractHsRhoRdrTyVars,
 
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
@@ -151,17 +151,6 @@ extract_lty (L loc ty) acc
 extract_tv :: SrcSpan -> RdrName -> [Located RdrName] -> [Located RdrName]
 extract_tv loc tv acc | isRdrTyVar tv = L loc tv : acc
                       | otherwise     = acc
-
-extractGenericPatTyVars :: LHsBinds RdrName -> [Located RdrName]
--- Get the type variables out of the type patterns in a bunch of
--- possibly-generic bindings in a class declaration
-extractGenericPatTyVars binds
-  = nubBy eqLocated (foldrBag get [] binds)
-  where
-    get (L _ (FunBind { fun_matches = MatchGroup ms _ })) acc = foldr (get_m.unLoc) acc ms
-    get _                                                 acc = acc
-
-    get_m _ acc = acc
 \end{code}
 
 
