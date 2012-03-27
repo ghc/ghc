@@ -6,7 +6,6 @@ Functions over HsSyn specialised to RdrName.
 \begin{code}
 module RdrHsSyn (
         extractHsTyRdrTyVars, extractHsTysRdrTyVars,
-        extractGenericPatTyVars,
 
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
@@ -75,7 +74,7 @@ import PrelNames        ( forall_tv_RDR )
 import DynFlags
 import SrcLoc
 import OrdList          ( OrdList, fromOL )
-import Bag              ( Bag, emptyBag, consBag, foldrBag )
+import Bag              ( Bag, emptyBag, consBag )
 import Outputable
 import FastString
 import Maybes
@@ -83,7 +82,7 @@ import Util             ( filterOut )
 import Control.Applicative ((<$>))
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
-import Data.List        ( nub, nubBy )
+import Data.List        ( nub )
 import Data.Char
 
 #include "HsVersions.h"
@@ -147,17 +146,6 @@ extract_lty (L _ ty) acc
 extract_tv :: RdrName -> [RdrName] -> [RdrName]
 extract_tv tv acc | isRdrTyVar tv = tv : acc
                   | otherwise     = acc
-
-extractGenericPatTyVars :: LHsBinds RdrName -> [Located RdrName]
--- Get the type variables out of the type patterns in a bunch of
--- possibly-generic bindings in a class declaration
-extractGenericPatTyVars binds
-  = nubBy eqLocated (foldrBag get [] binds)
-  where
-    get (L _ (FunBind { fun_matches = MatchGroup ms _ })) acc = foldr (get_m.unLoc) acc ms
-    get _                                                 acc = acc
-
-    get_m _ acc = acc
 \end{code}
 
 
