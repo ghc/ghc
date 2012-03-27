@@ -889,7 +889,8 @@ hGetBufSome h ptr count
                                         -- that bufReadNBNonEmpty will not
                                         -- issue another read.
             else
-              bufReadNBNonEmpty h_ buf (castPtr ptr) 0 count
+              let count' = min count (bufferElems buf)
+              in bufReadNBNonEmpty h_ buf (castPtr ptr) 0 count'
 
 haFD :: Handle__ -> FD
 haFD h_@Handle__{..} =
