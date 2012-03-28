@@ -2149,51 +2149,6 @@ f "2"    = 2
 
         <varlistentry>
           <term>
-            <option>-fregs-liveness</option>
-            <indexterm><primary><option>-fregs-liveness</option></primary></indexterm>
-            <indexterm><primary>registers</primary></indexterm>
-            <indexterm><primary>stg registers</primary></indexterm>
-            <indexterm><primary>llvm optimisations</primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>This flag only works with the LLVM
-            (<option>-fllvm</option>) backend.</emphasis></para>
-
-            <para>GHC stores some state information that the runtime /
-            execution model needs frequent access to in the underlying
-            hardware registers. GHC historically has simply reserved these
-            registers for exclusive use for this purpose, stopping them being
-            using by intermediate code in a function. This optimisation
-            instead tracks when GHC actually needs to store this state and in
-            cases where it doesn't need it, frees up those hardware registers
-            for use.</para>
-
-            <para>Since GHC 7.6.1</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fllvm-tbaa</option>
-            <indexterm><primary><option>-fllvm-tbaa</option></primary></indexterm>
-            <indexterm><primary>alias analysis</primary></indexterm>
-            <indexterm><primary>llvm optimisations</primary></indexterm>
-          </term>
-          <listitem>
-            <para><emphasis>This flag only works with the LLVM
-            (<option>-fllvm</option>) backend.</emphasis></para>
-
-            <para>This optimisation enhances the alias analysis pass done by
-            the LLVM code generator which should result in more efficient
-            code as many other optimisations rely on accurate alias
-            information.</para>
-
-            <para>Since GHC 7.6.1</para>
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
             <option>-fexcess-precision</option>
             <indexterm><primary><option>-fexcess-precision</option></primary></indexterm>
           </term>
