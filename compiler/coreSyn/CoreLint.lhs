@@ -271,7 +271,7 @@ lintCoreExpr (Cast expr co)
   = do { expr_ty <- lintCoreExpr expr
        ; co' <- applySubstCo co
        ; (_, from_ty, to_ty) <- lintCoercion co'
-       ; checkTys from_ty expr_ty (mkCastErr from_ty expr_ty)
+       ; checkTys from_ty expr_ty (mkCastErr expr co' from_ty expr_ty)
        ; return to_ty }
 
 lintCoreExpr (Tick (Breakpoint _ ids) expr)
@@ -1270,12 +1270,14 @@ mkUnboxedTupleMsg binder
   = vcat [hsep [ptext (sLit "A variable has unboxed tuple type:"), ppr binder],
 	  hsep [ptext (sLit "Binder's type:"), ppr (idType binder)]]
 
-mkCastErr :: Type -> Type -> MsgDoc
-mkCastErr from_ty expr_ty
+mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
+mkCastErr expr co from_ty expr_ty
   = vcat [ptext (sLit "From-type of Cast differs from type of enclosed expression"),
 	  ptext (sLit "From-type:") <+> ppr from_ty,
-	  ptext (sLit "Type of enclosed expr:") <+> ppr expr_ty
-    ]
+	  ptext (sLit "Type of enclosed expr:") <+> ppr expr_ty,
+          ptext (sLit "Actual enclosed expr:") <+> ppr expr,
+          ptext (sLit "Coercion used in cast:") <+> ppr co
+         ]
 
 dupVars :: [[Var]] -> MsgDoc
 dupVars vars
