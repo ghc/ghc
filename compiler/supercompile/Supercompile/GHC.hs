@@ -92,6 +92,7 @@ freshFloatId _ (_, I (S.Var x)) = return (Nothing, x)
 freshFloatId n (old_e, e)       = fmap (\x -> let x' = x `setIdUnfolding` mkUnfolding InlineRhs False (isBottomingId x) old_e in (Just (x', e), x')) $ mkSysLocalM (mkFastString n) (S.termType e)
  -- NB: we are careful to give fresh binders an unfolding so that the evaluator can use
  -- GHC's inlining heuristics to decide whether it is profitable to inline the RHS
+ -- FIXME: this doesn't work at all because substituting into binders zaps their (unstable) unfoldings
 
 freshFloatCoVar :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Coercion)
 freshFloatCoVar _ (I (S.Value (S.Coercion co))) = return (Nothing, co)

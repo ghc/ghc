@@ -72,11 +72,12 @@ renameAnnedValue = renameTaggedSizedFVedValue
 renameAnnedValue' = renameTaggedSizedFVedValue'
 renameAnnedAlts = renameTaggedSizedFVedAlts
 
-detagAnnedTerm = taggedSizedFVedTermToFVedTerm
-detagAnnedTerm' = taggedSizedFVedTermToFVedTerm'
-detagAnnedValue = taggedSizedFVedValueToFVedValue
-detagAnnedValue' = taggedSizedFVedValue'ToFVedValue'
-detagAnnedAlts = taggedSizedFVedAltsToFVedAlts
+annedTermToTerm = taggedSizedFVedTermToTerm
+annedTermToFVedTerm = taggedSizedFVedTermToFVedTerm
+annedTermToFVedTerm' = taggedSizedFVedTermToFVedTerm'
+annedValueToFVedValue = taggedSizedFVedValueToFVedValue
+annedValueToFVedValue' = taggedSizedFVedValue'ToFVedValue'
+annedAltsToFVedAlts = taggedSizedFVedAltsToFVedAlts
 
 
 annedTerm :: Tag -> TermF Anned -> AnnedTerm

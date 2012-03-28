@@ -13,7 +13,6 @@ import Supercompile.Evaluator.Syntax
 import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 import Supercompile.Core.Syntax
-import Supercompile.Core.Tag
 
 import Supercompile.Utilities
 
@@ -30,11 +29,11 @@ class Symantics ann => Symantics' ann where
     fvs :: ann (TermF ann) -> FreeVars
 
 instance Symantics' Identity where
-    inject = taggedSizedFVedTermToTerm
+    inject = annedTermToTerm
     fvs = termFreeVars
 
 instance Symantics' FVed where
-    inject = detagAnnedTerm
+    inject = annedTermToFVedTerm
     fvs = fvedTermFreeVars
 
 

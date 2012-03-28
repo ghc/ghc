@@ -366,7 +366,7 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
 
         -- Secondly, pull out any remaining bindings (which must be values) that didn't exist in the
         -- unspeculated heap. These will be our new top-level bindings.
-        h''_must_be_bound = [ (x', detagAnnedTerm (renameIn (renameAnnedTerm ids') in_e))
+        h''_must_be_bound = [ (x', annedTermToFVedTerm (renameIn (renameAnnedTerm ids') in_e))
                             | (x', hb) <- M.toList h''
                             , not (x' `S.member` unfolding_bvs)
                             , Just in_e <- [heapBindingTerm hb] ]

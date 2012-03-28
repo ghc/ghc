@@ -1191,7 +1191,7 @@ splitValue ctxt_ids ids tg (rn, Lambda x e)   = splitLambdaLike Lambda   ent    
                          | otherwise       = (Many, ctxt_ids)
 splitValue ctxt_ids ids tg (rn, TyLambda a e) = splitLambdaLike TyLambda (Once ctxt_id) ctxt_ids0 ids tg (rn, (a, e))
   where (ctxt_id, ctxt_ids0) = takeUniqFromSupply ctxt_ids
-splitValue _        ids tg in_v               = noneBracketed tg (value (detagAnnedValue' $ renameIn (renameAnnedValue' ids) in_v))
+splitValue _        ids tg in_v               = noneBracketed tg (value (annedValueToFVedValue' $ renameIn (renameAnnedValue' ids) in_v))
 
 -- We create LambdaBound entries in the Heap for both type and value variables, so we can share the code:
 splitLambdaLike :: (Var -> FVedTerm -> ValueF FVed) -> Entered

@@ -10,6 +10,7 @@ import Supercompile.Evaluator.Syntax
 import Supercompile.Core.Renaming
 import Supercompile.Core.Syntax
 
+import Supercompile.GHC (termToCoreExpr)
 import Supercompile.StaticFlags
 import Supercompile.Utilities
 
@@ -97,26 +98,39 @@ summariseContext h k = trainCarFoldr go (True, [], BoringCtxt) k
           _ -> TrivArg
 
 -- Can't use callSiteInline because it never inlines stuff with DFunUnfolding!
-ghcHeuristics :: Id -> ContextSummary -> Bool
-ghcHeuristics x (lone_variable, arg_infos, cont_info) = case idUnfolding x of
-  CoreSyn.CoreUnfolding { CoreSyn.uf_is_top = is_top,  CoreSyn.uf_is_cheap = is_cheap
-                        , CoreSyn.uf_arity = uf_arity, CoreSyn.uf_guidance = guidance }
-                           -> tryUnfolding dflags1 x lone_variable 
-                                           arg_infos cont_info is_top 
-                                           is_cheap uf_arity guidance
-  CoreSyn.NoUnfolding      -> trce (text "No unfolding") False
-  CoreSyn.OtherCon {}      -> trce (text "No positive unfolding") False
-  -- GHC actually only looks through DFunUnfoldings in exprIsConApp_maybe,
-  -- so I'll do this rough heuristic instead:
-  CoreSyn.DFunUnfolding {} -> trce (text "Dictionary unfolding") length arg_infos >= idArity x
- where dflags0 = defaultDynFlags (error "ghcHeuristics: Settings in DynFlags used!")
-       -- Set these two flags so that we get information about failed inlinings:
-       dflags1 | tRACE     = dopt_set (dopt_set dflags0 Opt_D_verbose_core2core) Opt_D_dump_inlinings
-               | otherwise = dflags0
+ghcHeuristics :: Id -> AnnedTerm {- try not to pull on this, it does a lot of work -}
+              -> ContextSummary -> Bool
+ghcHeuristics x e (lone_variable, arg_infos, cont_info)
+  = (try (idUnfolding x) `mplus` try answer_unf) `orElse` trce (text "No unfolding") False
+  where
+    try unf = case unf of
+      CoreSyn.CoreUnfolding { CoreSyn.uf_is_top = is_top, CoreSyn.uf_is_work_free = is_work_free, CoreSyn.uf_expandable = expandable
+                      , CoreSyn.uf_arity = arity, CoreSyn.uf_guidance = guidance }
+                         -> trce_fail (ppr (CoreSyn.uf_tmpl unf)) $
+                            Just $ tryUnfolding dflags1 x lone_variable 
+                                                arg_infos cont_info is_top 
+                                                is_cheap uf_arity guidance
+                                                is_work_free expandable
+                                                arity guidance
+      -- GHC actually only looks through DFunUnfoldings in exprIsConApp_maybe,
+      -- so I'll do this rough heuristic instead:
+      CoreSyn.DFunUnfolding {} -> trce (text "Dictionary unfolding") $ Just $ length arg_infos >= idArity x
+      CoreSyn.NoUnfolding      -> Nothing
+      CoreSyn.OtherCon {}      -> Nothing
 
-       trce :: SDoc -> a -> a
-       trce | tRACE     = pprTrace ("Considering inlining: " ++ showSDoc (ppr x))
-            | otherwise = flip const
+    dflags0 = defaultDynFlags (error "ghcHeuristics: Settings in DynFlags used!")
+    -- Set these two flags so that we get information about failed inlinings:
+    dflags1 | tRACE     = dopt_set (dopt_set dflags0 Opt_D_verbose_core2core) Opt_D_dump_inlinings
+            | otherwise = dflags0
+
+    trce :: SDoc -> a -> a
+    trce | tRACE     = pprTrace ("Considering inlining: " ++ showSDoc (ppr x))
+         | otherwise = flip const
+
+    -- NB: I'm not particularly happy that I may have to make up a whole new unfolding at ever
+    -- occurrence site, but GHC makes it hard to do otherwise because any binding with a non-stable
+    -- Unfolding pinned to it gets the Unfolding zapped by GHC's renamer
+    answer_unf = mkUnfolding CoreSyn.InlineRhs False False (termToCoreExpr (annedTermToTerm e))
 
 -- | Non-expansive simplification we can do everywhere safely
 --
@@ -354,7 +368,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 -> True
                 -- It might still be OK to get larger if GHC's inlining heuristics say we should
                 | Indirect x' <- v
-                , ghcHeuristics x' k_summary
+                , ghcHeuristics x' (annedTerm tg_v (answerToAnnedTerm' ids a')) k_summary -- NB: the tag is irrelevant
                 -> True
                 -- Otherwise, we don't want to beta-reduce
                 | otherwise
