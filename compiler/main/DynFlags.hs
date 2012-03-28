@@ -229,7 +229,7 @@ data DynFlag
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
-   | Opt_NoLlvmMangler
+   | Opt_NoLlvmMangler                 -- hidden flag
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
 
@@ -256,8 +256,8 @@ data DynFlag
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
-   | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA
-   | Opt_RegLiveness                    -- Use the STG Reg liveness information
+   | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
+   | Opt_RegLiveness                    -- Use the STG Reg liveness information (hidden flag)
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -1641,7 +1641,7 @@ dynamic_flags = [
   , Flag "dshow-passes"            (NoArg (do forceRecompile
                                               setVerbosity $ Just 2))
   , Flag "dfaststring-stats"       (NoArg (setDynFlag Opt_D_faststring_stats))
-  , Flag "dno-llvm-mangler"        (NoArg (setDynFlag Opt_NoLlvmMangler))
+  , Flag "dno-llvm-mangler"        (NoArg (setDynFlag Opt_NoLlvmMangler)) -- hidden flag
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
@@ -1870,8 +1870,8 @@ fFlags = [
   ( "avoid-vect",                       Opt_AvoidVect, nop ),
   ( "regs-graph",                       Opt_RegsGraph, nop ),
   ( "regs-iterative",                   Opt_RegsIterative, nop ),
-  ( "llvm-tbaa",                        Opt_LlvmTBAA, nop),
-  ( "regs-liveness",                    Opt_RegLiveness, nop),
+  ( "llvm-tbaa",                        Opt_LlvmTBAA, nop), -- hidden flag
+  ( "regs-liveness",                    Opt_RegLiveness, nop), -- hidden flag
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),
