@@ -614,7 +614,11 @@ uType_np origin orig_ty1 orig_ty2
       | tc1 == tc2, length tys1 == length tys2
       = do { cos <- zipWithM (uType origin) tys1 tys2
            ; return $ mkTcTyConAppCo tc1 cos }
-     
+
+    go (LitTy m) ty@(LitTy n)
+      | m == n
+      = return $ mkTcReflCo ty
+
 	-- See Note [Care with type applications]
         -- Do not decompose FunTy against App; 
         -- it's often a type error, so leave it for the constraint solver
@@ -884,6 +888,7 @@ checkTauTvUpdate tv ty
       = Just (TyConApp tc tys') 
       | isSynTyCon tc, Just ty_expanded <- tcView this_ty
       = ok ty_expanded -- See Note [Type synonyms and the occur check] 
+    ok ty@(LitTy {}) = Just ty
     ok (FunTy arg res) | Just arg' <- ok arg, Just res' <- ok res
                        = Just (FunTy arg' res') 
     ok (AppTy fun arg) | Just fun' <- ok fun, Just arg' <- ok arg 

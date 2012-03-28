@@ -54,7 +54,7 @@ mAX_SPEC_AP_SIZE = MAX_SPEC_AP_SIZE
 mIN_PAYLOAD_SIZE ::Int
 mIN_PAYLOAD_SIZE = MIN_PAYLOAD_SIZE
 
-mIN_INTLIKE, mAX_INTLIKE :: Int	
+mIN_INTLIKE, mAX_INTLIKE :: Int
 mIN_INTLIKE = MIN_INTLIKE
 mAX_INTLIKE = MAX_INTLIKE
 
@@ -68,7 +68,7 @@ mUT_ARR_PTRS_CARD_BITS = MUT_ARR_PTRS_CARD_BITS
 -- A section of code-generator-related MAGIC CONSTANTS.
 
 mAX_Vanilla_REG :: Int
-mAX_Vanilla_REG	= MAX_VANILLA_REG
+mAX_Vanilla_REG = MAX_VANILLA_REG
 
 mAX_Float_REG :: Int
 mAX_Float_REG = MAX_FLOAT_REG
@@ -86,7 +86,7 @@ mAX_Real_Float_REG :: Int
 mAX_Real_Float_REG = MAX_REAL_FLOAT_REG
 
 mAX_Real_Double_REG :: Int
-mAX_Real_Double_REG	= MAX_REAL_DOUBLE_REG
+mAX_Real_Double_REG     = MAX_REAL_DOUBLE_REG
 
 mAX_Real_Long_REG :: Int
 #ifdef MAX_REAL_LONG_REG
@@ -175,6 +175,12 @@ mAX_PTR_TAG = tAG_MASK
 
 cINT_SIZE :: Int
 cINT_SIZE = SIZEOF_INT
+
+cLONG_SIZE :: Int
+cLONG_SIZE = SIZEOF_LONG
+
+cLONG_LONG_SIZE :: Int
+cLONG_LONG_SIZE = SIZEOF_LONG_LONG
 
 -- Size of a storage manager block (in bytes).
 

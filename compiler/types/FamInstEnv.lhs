@@ -414,7 +414,6 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
 		  (ppr tpl_tvs <+> ppr tpl_tys) )
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
-         pprTrace "tcUnifyTys" (ppr tpl_tys $$ ppr match_tys $$ ppr fam_inst) $
          case tcUnifyTys instanceBindFun tpl_tys match_tys of
 	      Just subst | conflicting old_fam_inst subst -> Just subst
 	      _other	   	              	          -> Nothing
@@ -654,6 +653,7 @@ normaliseType env ty
   | Just ty' <- coreView ty = normaliseType env ty' 
 normaliseType env (TyConApp tc tys)
   = normaliseTcApp env tc tys
+normaliseType _env ty@(LitTy {}) = (Refl ty, ty)
 normaliseType env (AppTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2

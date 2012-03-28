@@ -22,7 +22,7 @@ module RnEnv (
 	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
 
 	lookupFixityRn, lookupTyFixityRn, 
-	lookupInstDeclBndr, lookupSubBndrOcc, lookupTcdName,
+	lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
         greRdrName,
         lookupSubBndrGREs, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
@@ -272,22 +272,13 @@ lookupInstDeclBndr cls what rdr
 
 
 -----------------------------------------------
-lookupTcdName :: Maybe Name -> TyClDecl RdrName -> RnM (Located Name)
--- Used for TyData and TySynonym only, 
--- both ordinary ones and family instances
+lookupFamInstName :: Maybe Name -> Located RdrName -> RnM (Located Name)
+-- Used for TyData and TySynonym family instances only, 
 -- See Note [Family instance binders]
-lookupTcdName mb_cls tc_decl
-  | not (isFamInstDecl tc_decl)   -- The normal case
-  = ASSERT2( isNothing mb_cls, ppr tc_rdr )     -- Parser prevents this
-    lookupLocatedTopBndrRn tc_rdr
-
-  | Just cls <- mb_cls      -- Associated type; c.f RnBinds.rnMethodBind
+lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f RnBinds.rnMethodBind
   = wrapLocM (lookupInstDeclBndr cls (ptext (sLit "associated type"))) tc_rdr
-
-  | otherwise               -- Family instance; tc_rdr is an *occurrence*
+lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
   = lookupLocatedOccRn tc_rdr 
-  where
-    tc_rdr = tcdLName tc_decl
 
 -----------------------------------------------
 lookupConstructorFields :: Name -> RnM [Name]

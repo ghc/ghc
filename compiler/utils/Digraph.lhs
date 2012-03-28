@@ -429,12 +429,6 @@ instance Show a => Show (Tree a) where
 showTree :: Show a => Tree a -> String
 showTree  = drawTree . mapTree show
 
-instance Show a => Show (Forest a) where
-  showsPrec _ f s = showForest f ++ s
-
-showForest :: Show a => Forest a -> String
-showForest  = unlines . map showTree
-
 drawTree        :: Tree String -> String
 drawTree         = unlines . draw
 

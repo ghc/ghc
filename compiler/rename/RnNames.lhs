@@ -529,10 +529,10 @@ getLocalNonValBinders fixity_env
              ; return (AvailTC main_name names) }
 
     new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
-    new_assoc (L _ (FamInstDecl d)) 
+    new_assoc (L _ (FamInstD d)) 
       = do { avail <- new_ti Nothing d
            ; return [avail] }
-    new_assoc (L _ (ClsInstDecl inst_ty _ _ ats))
+    new_assoc (L _ (ClsInstD { cid_poly_ty = inst_ty, cid_fam_insts = ats }))
       | Just (_, _, L loc cls_rdr, _) <- splitLHsInstDeclTy_maybe inst_ty
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
            ; mapM (new_ti (Just cls_nm) . unLoc) ats }
@@ -542,9 +542,8 @@ getLocalNonValBinders fixity_env
 
     new_ti :: Maybe Name -> FamInstDecl RdrName -> RnM AvailInfo
     new_ti mb_cls ti_decl  -- ONLY for type/data instances
-        = ASSERT( isFamInstDecl ti_decl ) 
-          do { main_name <- lookupTcdName mb_cls ti_decl
-             ; sub_names <- mapM newTopSrcBinder (hsTyClDeclBinders ti_decl)
+        = do { main_name <- lookupFamInstName mb_cls (fid_tycon ti_decl)
+             ; sub_names <- mapM newTopSrcBinder (hsFamInstBinders ti_decl)
              ; return (AvailTC (unLoc main_name) sub_names) }
                         -- main_name is not bound here!
 \end{code}
@@ -1612,7 +1611,7 @@ dodgyImportWarn item = dodgyMsg (ptext (sLit "import")) item
 dodgyExportWarn :: Name -> SDoc
 dodgyExportWarn item = dodgyMsg (ptext (sLit "export")) item
 
-dodgyMsg :: OutputableBndr n => SDoc -> n -> SDoc
+dodgyMsg :: (OutputableBndr n, HasOccName n) => SDoc -> n -> SDoc
 dodgyMsg kind tc
   = sep [ ptext (sLit "The") <+> kind <+> ptext (sLit "item") <+> quotes (ppr (IEThingAll tc))
                 <+> ptext (sLit "suggests that"),

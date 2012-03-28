@@ -950,6 +950,7 @@ ty_co_subst subst ty
     go (ForAllTy v ty)   = mkForAllCo v' $! (ty_co_subst subst' ty)
                          where
                            (subst', v') = liftCoSubstTyVarBndr subst v
+    go ty@(LitTy {})     = mkReflCo ty
 
 liftCoSubstTyVar :: LiftCoSubst -> TyVar -> Maybe Coercion
 liftCoSubstTyVar (LCS _ cenv) tv = lookupVarEnv cenv tv 

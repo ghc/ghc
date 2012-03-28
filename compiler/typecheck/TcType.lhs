@@ -174,7 +174,9 @@ import TyCon
 
 -- others:
 import DynFlags
-import Name hiding (varName)
+import Name -- hiding (varName)
+            -- We use this to make dictionaries for type literals.
+            -- Perhaps there's a better way to do this?
 import NameSet
 import VarEnv
 import PrelNames
@@ -529,6 +531,7 @@ tidyTypes env tys = map (tidyType env) tys
 
 ---------------
 tidyType :: TidyEnv -> Type -> Type
+tidyType _   (LitTy n)            = LitTy n
 tidyType env (TyVarTy tv)	  = tidyTyVarOcc env tv
 tidyType env (TyConApp tycon tys) = let args = tidyTypes env tys
  		                    in args `seqList` TyConApp tycon args
@@ -609,13 +612,14 @@ tidyCos env = map (tidyCo env)
 tcTyFamInsts :: Type -> [(TyCon, [Type])]
 tcTyFamInsts ty 
   | Just exp_ty <- tcView ty    = tcTyFamInsts exp_ty
-tcTyFamInsts (TyVarTy _)          = []
+tcTyFamInsts (TyVarTy _)        = []
 tcTyFamInsts (TyConApp tc tys) 
-  | isSynFamilyTyCon tc           = [(tc, tys)]
+  | isSynFamilyTyCon tc         = [(tc, tys)]
   | otherwise                   = concat (map tcTyFamInsts tys)
-tcTyFamInsts (FunTy ty1 ty2)      = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
-tcTyFamInsts (AppTy ty1 ty2)      = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
-tcTyFamInsts (ForAllTy _ ty)      = tcTyFamInsts ty
+tcTyFamInsts (LitTy {})         = []
+tcTyFamInsts (FunTy ty1 ty2)    = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
+tcTyFamInsts (AppTy ty1 ty2)    = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
+tcTyFamInsts (ForAllTy _ ty)    = tcTyFamInsts ty
 \end{code}
 
 %************************************************************************
@@ -662,6 +666,7 @@ exactTyVarsOfType ty
     go ty | Just ty' <- tcView ty = go ty'  -- This is the key line
     go (TyVarTy tv)         = unitVarSet tv
     go (TyConApp _ tys)     = exactTyVarsOfTypes tys
+    go (LitTy {})           = emptyVarSet
     go (FunTy arg res)      = go arg `unionVarSet` go res
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
     go (ForAllTy tyvar ty)  = delVarSet (go ty) tyvar
@@ -808,9 +813,14 @@ getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
 getDFunTyKey ty | Just ty' <- tcView ty = getDFunTyKey ty'
 getDFunTyKey (TyVarTy tv)    = getOccName tv
 getDFunTyKey (TyConApp tc _) = getOccName tc
+getDFunTyKey (LitTy x)       = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
 getDFunTyKey (FunTy _ _)     = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
+
+getDFunTyLitKey :: TyLit -> OccName
+getDFunTyLitKey (NumTyLit n) = mkOccName Name.varName (show n)
+getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 \end{code}
 
 
@@ -1219,6 +1229,7 @@ tcTyVarsOfType :: Type -> TcTyVarSet
 tcTyVarsOfType (TyVarTy tv)	    = if isTcTyVar tv then unitVarSet tv
 						      else emptyVarSet
 tcTyVarsOfType (TyConApp _ tys)     = tcTyVarsOfTypes tys
+tcTyVarsOfType (LitTy {})           = emptyVarSet
 tcTyVarsOfType (FunTy arg res)	    = tcTyVarsOfType arg `unionVarSet` tcTyVarsOfType res
 tcTyVarsOfType (AppTy fun arg)	    = tcTyVarsOfType fun `unionVarSet` tcTyVarsOfType arg
 tcTyVarsOfType (ForAllTy tyvar ty)  = tcTyVarsOfType ty `delVarSet` tyvar
@@ -1243,6 +1254,7 @@ orphNamesOfType ty | Just ty' <- tcView ty = orphNamesOfType ty'
 orphNamesOfType (TyVarTy _)		   = emptyNameSet
 orphNamesOfType (TyConApp tycon tys)       = orphNamesOfTyCon tycon
                                              `unionNameSets` orphNamesOfTypes tys
+orphNamesOfType (LitTy {})          = emptyNameSet
 orphNamesOfType (FunTy arg res)	    = orphNamesOfType arg `unionNameSets` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)	    = orphNamesOfType fun `unionNameSets` orphNamesOfType arg
 orphNamesOfType (ForAllTy _ ty)	    = orphNamesOfType ty

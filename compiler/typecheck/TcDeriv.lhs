@@ -23,7 +23,7 @@ import DynFlags
 import TcRnMonad
 import FamInst
 import TcEnv
-import TcTyClsDecls( tcFamTyPats )
+import TcTyClsDecls( tcFamTyPats, tcAddFamInstCtxt )
 import TcClassDcl( tcAddDeclCtxt )	-- Small helper
 import TcGenDeriv			-- Deriv stuff
 import TcGenGenerics
@@ -447,27 +447,58 @@ makeDerivSpecs :: Bool
 	       -> [LDerivDecl Name] 
 	       -> TcM [EarlyDerivSpec]
 makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
-  | is_boot     -- No 'deriving' at all in hs-boot files
-  = do  { mapM_ add_deriv_err deriv_locs 
-        ; return [] }
-  | otherwise
-  = do  { eqns1 <- mapAndRecoverM deriveTyData all_tydata
-        ; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
-        ; return (eqns1 ++ eqns2) }
+  = do  { eqns1 <- concatMapM (recoverM (return []) . deriveTyDecl) tycl_decls
+        ; eqns2 <- concatMapM (recoverM (return []) . deriveInstDecl) inst_decls
+        ; eqns3 <- mapAndRecoverM deriveStandalone deriv_decls
+        ; let eqns = eqns1 ++ eqns2 ++ eqns3
+        ; if is_boot then   -- No 'deriving' at all in hs-boot files
+              do { unless (null eqns) (add_deriv_err (head eqns))
+                 ; return [] }
+          else return eqns }
   where
-    extractTyDataPreds decls
-      = [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
+    add_deriv_err eqn 
+       = setSrcSpan loc $
+         addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
+                    2 (ptext (sLit "Use an instance declaration instead")))
+       where
+         loc = case eqn of  { Left ds -> ds_loc ds; Right ds -> ds_loc ds }
 
-    all_tydata :: [(LHsType Name, LTyClDecl Name)]
-        -- Derived predicate paired with its data type declaration
-    all_tydata = extractTyDataPreds (instDeclFamInsts inst_decls ++ tycl_decls)
+------------------------------------------------------------------
+deriveTyDecl :: LTyClDecl Name -> TcM [EarlyDerivSpec]
+deriveTyDecl (L _ decl@(TyDecl { tcdLName = L _ tc_name
+                               , tcdTyDefn = TyData { td_derivs = Just preds } }))
+  = tcAddDeclCtxt decl $
+    do { tc <- tcLookupTyCon tc_name
+       ; let tvs = tyConTyVars tc
+             tys = mkTyVarTys tvs
+       ; mapM (deriveTyData tvs tc tys) preds }
 
-    deriv_locs = map (getLoc . snd) all_tydata
-                 ++ map getLoc deriv_decls
+deriveTyDecl _ = return []
 
-    add_deriv_err loc = setSrcSpan loc $
-                        addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
-                                   2 (ptext (sLit "Use an instance declaration instead")))
+------------------------------------------------------------------
+deriveInstDecl :: LInstDecl Name -> TcM [EarlyDerivSpec]
+deriveInstDecl (L _ (FamInstD fam_inst))
+  = deriveFamInst fam_inst
+deriveInstDecl (L _ (ClsInstD { cid_fam_insts = fam_insts }))
+  = concatMapM (deriveFamInst . unLoc) fam_insts
+
+------------------------------------------------------------------
+deriveFamInst :: FamInstDecl Name -> TcM [EarlyDerivSpec]
+deriveFamInst decl@(FamInstDecl { fid_tycon = L _ tc_name, fid_pats = pats
+                                , fid_defn = TyData { td_derivs = Just preds } })
+  = tcAddFamInstCtxt decl $
+    do { fam_tc <- tcLookupTyCon tc_name
+       ; tcFamTyPats fam_tc pats (\_ -> return ()) $ \ tvs' pats' _ ->
+         mapM (deriveTyData tvs' fam_tc pats') preds }
+	-- Tiresomely we must figure out the "lhs", which is awkward for type families
+	-- E.g.   data T a b = .. deriving( Eq )
+	-- 	    Here, the lhs is (T a b)
+	--	  data instance TF Int b = ... deriving( Eq )
+	--	    Here, the lhs is (TF Int b)
+	-- But if we just look up the tycon_name, we get is the *family*
+	-- tycon, but not pattern types -- they are in the *rep* tycon.
+
+deriveFamInst _ = return []
 
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM EarlyDerivSpec
@@ -496,16 +527,14 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
                    (Just theta) }
 
 ------------------------------------------------------------------
-deriveTyData :: (LHsType Name, LTyClDecl Name) -> TcM EarlyDerivSpec
+deriveTyData :: [TyVar] -> TyCon -> [Type] 
+             -> LHsType Name           -- The deriving predicate
+             -> TcM EarlyDerivSpec
 -- The deriving clause of a data or newtype declaration
-deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
-					           tcdTyVars = hs_tvs,
-				    	           tcdTyPats = ty_pats }))
+deriveTyData tvs tc tc_args (L loc deriv_pred)
   = setSrcSpan loc     $	-- Use the location of the 'deriving' item
-    tcAddDeclCtxt decl $
-    do	{ (tvs, tc, tc_args) <- get_lhs ty_pats
-	; tcExtendTyVarEnv tvs $	-- Deriving preds may (now) mention
-					-- the type variables for the type constructor
+    tcExtendTyVarEnv tvs $	-- Deriving preds may (now) mention
+	         		-- the type variables for the type constructor
 
     do	{ (deriv_tvs, cls, cls_tys) <- tcHsDeriv deriv_pred
 		-- The "deriv_pred" is a LHsType to take account of the fact that for
@@ -525,7 +554,8 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 	      univ_tvs       = (mkVarSet tvs `extendVarSetList` deriv_tvs)
 		   	                     `minusVarSet` dropped_tvs
   
-        ; traceTc "derivTyData" (pprTvBndrs tvs $$ ppr tc $$ ppr tc_args $$ pprTvBndrs (varSetElems $ tyVarsOfTypes tc_args) $$ ppr inst_ty)
+        ; traceTc "derivTyData" (pprTvBndrs tvs $$ ppr tc $$ ppr tc_args $$ 
+                     pprTvBndrs (varSetElems $ tyVarsOfTypes tc_args) $$ ppr inst_ty)
 
 	-- Check that the result really is well-kinded
 	; checkTc (n_args_to_keep >= 0 && (inst_ty_kind `eqKind` kind))
@@ -547,25 +577,7 @@ deriveTyData (L loc deriv_pred, L _ decl@(TyData { tcdLName = L _ tycon_name,
 	; checkTc (not (isFamilyTyCon tc) || n_args_to_drop == 0)
 		  (typeFamilyPapErr tc cls cls_tys inst_ty)
 
-	; mkEqnHelp DerivOrigin (varSetElemsKvsFirst univ_tvs) cls cls_tys inst_ty Nothing } }
-  where
-	-- Tiresomely we must figure out the "lhs", which is awkward for type families
-	-- E.g.   data T a b = .. deriving( Eq )
-	-- 	    Here, the lhs is (T a b)
-	--	  data instance TF Int b = ... deriving( Eq )
-	--	    Here, the lhs is (TF Int b)
-	-- But if we just look up the tycon_name, we get is the *family*
-	-- tycon, but not pattern types -- they are in the *rep* tycon.
-    get_lhs Nothing     = do { tc <- tcLookupTyCon tycon_name
-			     ; let tvs = tyConTyVars tc
-			     ; return (tvs, tc, mkTyVarTys tvs) }
-    get_lhs (Just pats) = do { fam_tc <- tcLookupTyCon tycon_name
-                             ; tcFamTyPats fam_tc hs_tvs pats (\_ -> return ()) $
-                                    \ tvs' pats' _ ->
-                               return (tvs', fam_tc, pats') }
-
-deriveTyData _other
-  = panic "derivTyData"	-- Caller ensures that only TyData can happen
+	; mkEqnHelp DerivOrigin (varSetElemsKvsFirst univ_tvs) cls cls_tys inst_ty Nothing } 
 \end{code}
 
 Note [Deriving, type families, and partial applications]

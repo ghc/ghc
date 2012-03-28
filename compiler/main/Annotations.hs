@@ -1,37 +1,30 @@
-%
-% (c) The University of Glasgow 2006
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
-%
-
-\begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
+-- |
+-- Support for source code annotation feature of GHC. That is the ANN pragma.
+-- 
+-- (c) The University of Glasgow 2006
+-- (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+--
 module Annotations (
-    -- * Main Annotation data types
-    Annotation(..),
-    AnnTarget(..), CoreAnnTarget, 
-    getAnnTargetName_maybe,
-    
-    -- * AnnEnv for collecting and querying Annotations
-    AnnEnv,
-    mkAnnEnv, extendAnnEnvList, plusAnnEnv, emptyAnnEnv, findAnns,
-    deserializeAnns
-  ) where
+        -- * Main Annotation data types
+        Annotation(..),
+        AnnTarget(..), CoreAnnTarget, 
+        getAnnTargetName_maybe,
 
-import Name
+        -- * AnnEnv for collecting and querying Annotations
+        AnnEnv,
+        mkAnnEnv, extendAnnEnvList, plusAnnEnv, emptyAnnEnv, findAnns,
+        deserializeAnns
+    ) where
+
 import Module           ( Module )
+import Name
 import Outputable
-import UniqFM
 import Serialized
+import UniqFM
 import Unique
 
-import Data.Typeable
 import Data.Maybe
+import Data.Typeable
 import Data.Word        ( Word8 )
 
 
@@ -40,14 +33,14 @@ import Data.Word        ( Word8 )
 data Annotation = Annotation {
         ann_target :: CoreAnnTarget,    -- ^ The target of the annotation
         ann_value :: Serialized         -- ^ 'Serialized' version of the annotation that 
-		     			--   allows recovery of its value or can
+                                        --   allows recovery of its value or can
                                         --   be persisted to an interface file
     }
 
 -- | An annotation target
 data AnnTarget name 
   = NamedTarget name          -- ^ We are annotating something with a name: 
-     	       	      	      --      a type or identifier
+                              --      a type or identifier
   | ModuleTarget Module       -- ^ We are annotating a particular module
 
 -- | The kind of annotation target found in the middle end of the compiler
@@ -57,6 +50,7 @@ instance Functor AnnTarget where
     fmap f (NamedTarget nm) = NamedTarget (f nm)
     fmap _ (ModuleTarget mod) = ModuleTarget mod
 
+-- | Get the 'name' of an annotation target if it exists.
 getAnnTargetName_maybe :: AnnTarget name -> Maybe name
 getAnnTargetName_maybe (NamedTarget nm) = Just nm
 getAnnTargetName_maybe _                = Nothing
@@ -74,20 +68,25 @@ instance Outputable Annotation where
     ppr ann = ppr (ann_target ann)
 
 -- | A collection of annotations
-newtype AnnEnv = MkAnnEnv (UniqFM [Serialized])
 -- Can't use a type synonym or we hit bug #2412 due to source import
+newtype AnnEnv = MkAnnEnv (UniqFM [Serialized])
 
+-- | An empty annotation environment.
 emptyAnnEnv :: AnnEnv
 emptyAnnEnv = MkAnnEnv emptyUFM
 
+-- | Construct a new annotation environment that contains the list of
+-- annotations provided.
 mkAnnEnv :: [Annotation] -> AnnEnv
 mkAnnEnv = extendAnnEnvList emptyAnnEnv
 
+-- | Add the given annotation to the environment.
 extendAnnEnvList :: AnnEnv -> [Annotation] -> AnnEnv
 extendAnnEnvList (MkAnnEnv env) anns 
   = MkAnnEnv $ addListToUFM_C (++) env $
     map (\ann -> (getUnique (ann_target ann), [ann_value ann])) anns
 
+-- | Union two annotation environments.
 plusAnnEnv :: AnnEnv -> AnnEnv -> AnnEnv
 plusAnnEnv (MkAnnEnv env1) (MkAnnEnv env2) = MkAnnEnv $ plusUFM_C (++) env1 env2
 
@@ -105,4 +104,4 @@ findAnns deserialize (MkAnnEnv ann_env)
 deserializeAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> UniqFM [a]
 deserializeAnns deserialize (MkAnnEnv ann_env)
   = mapUFM (mapMaybe (fromSerialized deserialize)) ann_env
-\end{code}
+

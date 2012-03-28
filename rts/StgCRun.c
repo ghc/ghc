@@ -33,6 +33,14 @@
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
+
+/* We include windows.h very early, as on Win64 the CONTEXT type has
+   fields "R8", "R9" and "R10", which goes bad if we've already
+   #define'd those names for our own purposes (in stg/Regs.h) */
+#if defined(HAVE_WINDOWS_H)
+#include <windows.h>
+#endif
+
 #define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
@@ -88,6 +96,18 @@ StgFunPtr StgReturn(void)
 #else
 #define STG_RUN "StgRun"
 #define STG_RETURN "StgReturn"
+#endif
+
+#if defined(mingw32_HOST_OS)
+// On windows the stack has to be allocated 4k at a time, otherwise
+// we get a segfault.  The C compiler knows how to do this (it calls
+// _alloca()), so we make sure that we can allocate as much stack as
+// we need:
+StgWord8 *win32AllocStack(void)
+{
+    StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
+    return stack;
+}
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -203,18 +223,6 @@ StgRunIsImplementedInAssembler(void)
     );
 }
 
-#if defined(mingw32_HOST_OS)
-// On windows the stack has to be allocated 4k at a time, otherwise
-// we get a segfault.  The C compiler knows how to do this (it calls
-// _alloca()), so we make sure that we can allocate as much stack as
-// we need:
-StgWord8 *win32AllocStack(void)
-{
-    StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
-    return stack;
-}
-#endif
-
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -239,23 +247,36 @@ StgRunIsImplementedInAssembler(void)
          */
         ".globl " STG_RUN "\n"
         STG_RUN ":\n\t"
-        "subq %0, %%rsp\n\t"
+        "subq %1, %%rsp\n\t"
         "movq %%rsp, %%rax\n\t"
-        "addq %0-48, %%rax\n\t"
+        "subq %0, %%rsp\n\t"
         "movq %%rbx,0(%%rax)\n\t"
         "movq %%rbp,8(%%rax)\n\t"
         "movq %%r12,16(%%rax)\n\t"
         "movq %%r13,24(%%rax)\n\t"
         "movq %%r14,32(%%rax)\n\t"
         "movq %%r15,40(%%rax)\n\t"
+#if defined(mingw32_HOST_OS)
+        "movq %%rdi,48(%%rax)\n\t"
+        "movq %%rsi,56(%%rax)\n\t"
+        "movq %%xmm6,64(%%rax)\n\t"
+#endif
         /*
          * Set BaseReg
          */
+#if defined(mingw32_HOST_OS)
+        "movq %%rdx,%%r13\n\t"
+#else
         "movq %%rsi,%%r13\n\t"
+#endif
         /*
          * grab the function argument from the stack, and jump to it.
          */
+#if defined(mingw32_HOST_OS)
+        "movq %%rcx,%%rax\n\t"
+#else
         "movq %%rdi,%%rax\n\t"
+#endif
         "jmp *%%rax\n\t"
 
         ".globl " STG_RETURN "\n"
@@ -266,18 +287,30 @@ StgRunIsImplementedInAssembler(void)
         /*
          * restore callee-saves registers.  (Don't stomp on %%rax!)
          */
+        "addq %0, %%rsp\n\t"
         "movq %%rsp, %%rdx\n\t"
-        "addq %0-48, %%rdx\n\t"
+        "addq %1, %%rsp\n\t"
         "movq 0(%%rdx),%%rbx\n\t"       /* restore the registers saved above */
         "movq 8(%%rdx),%%rbp\n\t"
         "movq 16(%%rdx),%%r12\n\t"
         "movq 24(%%rdx),%%r13\n\t"
         "movq 32(%%rdx),%%r14\n\t"
         "movq 40(%%rdx),%%r15\n\t"
-        "addq %0, %%rsp\n\t"
+#if defined(mingw32_HOST_OS)
+        "movq 48(%%rdx),%%rdi\n\t"
+        "movq 56(%%rdx),%%rsi\n\t"
+        "movq 64(%%rdx),%%xmm6\n\t"
+#endif
         "retq"
 
-        : : "i"(RESERVED_C_STACK_BYTES + 48 /*stack frame size*/));
+        :
+        : "i"(RESERVED_C_STACK_BYTES),
+#if defined(mingw32_HOST_OS)
+          "i"(80 /*stack frame size; 8 too large to make the alignment right*/)
+#else
+          "i"(48 /*stack frame size*/)
+#endif
+        );
         /*
          * See Note [Stack Alignment on X86]
          */

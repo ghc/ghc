@@ -17,6 +17,7 @@ module IfaceType (
 	IfExtName, IfLclName, IfIPName,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceTyCon(..), IfaceCoCon(..),
+        IfaceTyLit(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 
 	-- Conversion from Type -> IfaceType
@@ -82,9 +83,14 @@ data IfaceType	   -- A kind of universal type, used for types, kinds, and coerci
   | IfaceTyConApp IfaceTyCon [IfaceType]  -- Not necessarily saturated
 					  -- Includes newtypes, synonyms, tuples
   | IfaceCoConApp IfaceCoCon [IfaceType]  -- Always saturated
+  | IfaceLitTy IfaceTyLit
 
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
+
+data IfaceTyLit
+  = IfaceNumTyLit Integer
+  | IfaceStrTyLit FastString
 
 -- Encodes type constructors, kind constructors
 -- coercion constructors, the lot
@@ -198,6 +204,8 @@ ppr_ty :: Int -> IfaceType -> SDoc
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
 
+ppr_ty _ (IfaceLitTy n) = ppr_tylit n
+
 ppr_ty ctxt_prec (IfaceCoConApp tc tys) 
   = maybeParen ctxt_prec tYCON_PREC 
 	       (sep [ppr tc, nest 4 (sep (map pprParendIfaceType tys))])
@@ -255,7 +263,15 @@ ppr_tc_app ctxt_prec tc tys
 
 ppr_tc :: IfaceTyCon -> SDoc
 -- Wrap infix type constructors in parens
-ppr_tc tc = parenSymOcc (getOccName (ifaceTyConName tc)) (ppr tc)
+ppr_tc tc = wrap (ifaceTyConName tc) (ppr tc)
+  where
+  -- The kind * does not get wrapped in parens.
+  wrap name | name == liftedTypeKindTyConName = id
+  wrap name                                   = parenSymOcc (getOccName name)
+
+ppr_tylit :: IfaceTyLit -> SDoc
+ppr_tylit (IfaceNumTyLit n) = integer n
+ppr_tylit (IfaceStrTyLit n) = text (show n)
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -270,6 +286,9 @@ instance Outputable IfaceCoCon where
   ppr IfaceTransCo     = ptext (sLit "Trans")
   ppr IfaceInstCo      = ptext (sLit "Inst")
   ppr (IfaceNthCo d)   = ptext (sLit "Nth:") <> int d
+
+instance Outputable IfaceTyLit where
+  ppr = ppr_tylit
 
 -------------------
 pprIfaceContext :: IfaceContext -> SDoc
@@ -312,6 +331,7 @@ toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyVar tv)
 toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (FunTy t1 t2)     = IfaceFunTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (TyConApp tc tys) = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTypes tys)
+toIfaceType (LitTy n)         = IfaceLitTy (toIfaceTyLit n)
 toIfaceType (ForAllTy tv t)   = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
 
 toIfaceTyVar :: TyVar -> FastString
@@ -326,6 +346,10 @@ toIfaceTyCon = toIfaceTyCon_name . tyConName
 
 toIfaceTyCon_name :: Name -> IfaceTyCon
 toIfaceTyCon_name = IfaceTc
+
+toIfaceTyLit :: TyLit -> IfaceTyLit
+toIfaceTyLit (NumTyLit x) = IfaceNumTyLit x
+toIfaceTyLit (StrTyLit x) = IfaceStrTyLit x
 
 ----------------
 toIfaceTypes :: [Type] -> [IfaceType]

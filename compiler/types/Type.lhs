@@ -41,6 +41,9 @@ module Type (
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
         mkPiKinds, mkPiType, mkPiTypes,
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
+
+        mkNumLitTy, isNumLitTy,
+        mkStrLitTy, isStrLitTy,
 	
 	-- (Newtypes)
 	newTyConInstRhs, carefullySplitNewType_maybe,
@@ -280,6 +283,7 @@ expandTypeSynonyms ty
       = go (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
       | otherwise
       = TyConApp tc (map go tys)
+    go (LitTy l)       = LitTy l
     go (TyVarTy tv)    = TyVarTy tv
     go (AppTy t1 t2)   = AppTy (go t1) (go t2)
     go (FunTy t1 t2)   = FunTy (go t1) (go t2)
@@ -395,6 +399,27 @@ splitAppTys ty = split ty ty []
     split _       (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty _                     args = (orig_ty, args)
+
+\end{code}
+
+
+                      LitTy
+                      ~~~~~
+
+\begin{code}
+mkNumLitTy :: Integer -> Type
+mkNumLitTy n = LitTy (NumTyLit n)
+
+isNumLitTy :: Type -> Maybe Integer
+isNumLitTy (LitTy (NumTyLit n)) = Just n
+isNumLitTy _                    = Nothing
+
+mkStrLitTy :: FastString -> Type
+mkStrLitTy s = LitTy (StrTyLit s)
+
+isStrLitTy :: Type -> Maybe FastString
+isStrLitTy (LitTy (StrTyLit s)) = Just s
+isStrLitTy _                    = Nothing
 
 \end{code}
 
@@ -978,7 +1003,8 @@ getIPPredTy_maybe ty = case splitTyConApp_maybe ty of
 
 \begin{code}
 typeSize :: Type -> Int
-typeSize (TyVarTy _)     = 1
+typeSize (LitTy {})      = 1
+typeSize (TyVarTy {})    = 1
 typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
 typeSize (ForAllTy _ t)  = 1 + typeSize t
@@ -1122,6 +1148,7 @@ isPrimitiveType ty = case splitTyConApp_maybe ty of
 
 \begin{code}
 seqType :: Type -> ()
+seqType (LitTy n)         = n `seq` ()
 seqType (TyVarTy tv) 	  = tv `seq` ()
 seqType (AppTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
@@ -1195,20 +1222,27 @@ cmpTypeX env (ForAllTy tv1 t1)   (ForAllTy tv2 t2)   = cmpTypeX (rnBndr2 env tv1
 cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2
+cmpTypeX _   (LitTy l1)          (LitTy l2)          = compare l1 l2
 
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
+    -- Deal with the rest: TyVarTy < AppTy < FunTy < LitTy < TyConApp < ForAllTy < PredTy
 cmpTypeX _ (AppTy _ _)    (TyVarTy _)    = GT
 
 cmpTypeX _ (FunTy _ _)    (TyVarTy _)    = GT
 cmpTypeX _ (FunTy _ _)    (AppTy _ _)    = GT
 
+cmpTypeX _ (LitTy _)      (TyVarTy _)    = GT
+cmpTypeX _ (LitTy _)      (AppTy _ _)    = GT
+cmpTypeX _ (LitTy _)      (FunTy _ _)    = GT
+
 cmpTypeX _ (TyConApp _ _) (TyVarTy _)    = GT
 cmpTypeX _ (TyConApp _ _) (AppTy _ _)    = GT
 cmpTypeX _ (TyConApp _ _) (FunTy _ _)    = GT
+cmpTypeX _ (TyConApp _ _) (LitTy _)      = GT
 
 cmpTypeX _ (ForAllTy _ _) (TyVarTy _)    = GT
 cmpTypeX _ (ForAllTy _ _) (AppTy _ _)    = GT
 cmpTypeX _ (ForAllTy _ _) (FunTy _ _)    = GT
+cmpTypeX _ (ForAllTy _ _) (LitTy _)      = GT
 cmpTypeX _ (ForAllTy _ _) (TyConApp _ _) = GT
 
 cmpTypeX _ _              _              = LT
@@ -1448,6 +1482,7 @@ subst_ty :: TvSubst -> Type -> Type
 subst_ty subst ty
    = go ty
   where
+    go (LitTy n)         = n `seq` LitTy n
     go (TyVarTy tv)      = substTyVar subst tv
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
@@ -1547,6 +1582,7 @@ typeKind (TyConApp tc tys)
   = kindAppResult (tyConKind tc) tys
 
 typeKind (AppTy fun arg)      = kindAppResult (typeKind fun) [arg]
+typeKind (LitTy l)            = typeLiteralKind l
 typeKind (ForAllTy _ ty)      = typeKind ty
 typeKind (TyVarTy tyvar)      = tyVarKind tyvar
 typeKind _ty@(FunTy _arg res)
@@ -1559,6 +1595,13 @@ typeKind _ty@(FunTy _arg res)
     | otherwise             = ASSERT2( isSubOpenTypeKind k, ppr _ty $$ ppr k ) liftedTypeKind
     where
       k = typeKind res
+
+
+typeLiteralKind :: TyLit -> Kind
+typeLiteralKind l =
+  case l of
+    NumTyLit _ -> typeNatKind
+    StrTyLit _ -> typeStringKind
 
 \end{code}
 

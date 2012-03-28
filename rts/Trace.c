@@ -309,7 +309,10 @@ void traceCapsetEvent_ (EventTypeNum tag,
                         StgWord info)
 {
 #ifdef DEBUG
-    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR && TRACE_sched)
+        // When events go to stderr, it is annoying to see the capset
+        // events every time, so we only emit them with -Ds.
+    {
         ACQUIRE_LOCK(&trace_utx);
 
         tracePreface();

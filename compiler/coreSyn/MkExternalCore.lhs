@@ -218,11 +218,12 @@ make_ty t = make_ty' t
  
 -- note calls to make_ty so as to expand types recursively
 make_ty' :: Type -> C.Ty
-make_ty' (TyVarTy tv)    	 = C.Tvar (make_var_id (tyVarName tv))
-make_ty' (AppTy t1 t2) 		 = C.Tapp (make_ty t1) (make_ty t2)
-make_ty' (FunTy t1 t2) 		 = make_ty (TyConApp funTyCon [t1,t2])
-make_ty' (ForAllTy tv t) 	 = C.Tforall (make_tbind tv) (make_ty t)
-make_ty' (TyConApp tc ts) 	 = make_tyConApp tc ts
+make_ty' (TyVarTy tv)     = C.Tvar (make_var_id (tyVarName tv))
+make_ty' (AppTy t1 t2) 	  = C.Tapp (make_ty t1) (make_ty t2)
+make_ty' (FunTy t1 t2) 	  = make_ty (TyConApp funTyCon [t1,t2])
+make_ty' (ForAllTy tv t)  = C.Tforall (make_tbind tv) (make_ty t)
+make_ty' (TyConApp tc ts) = make_tyConApp tc ts
+make_ty' (LitTy {})       = panic "MkExernalCore can't do literal types yet"
 
 -- Newtypes are treated just like any other type constructor; not expanded
 -- Reason: predTypeRep does substitution and, while substitution deals

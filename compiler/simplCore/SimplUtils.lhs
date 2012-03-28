@@ -44,7 +44,6 @@ import StaticFlags
 import CoreSyn
 import qualified CoreSubst
 import PprCore
-import DataCon	( dataConCannotMatch, dataConWorkId )
 import CoreFVs
 import CoreUtils
 import CoreArity
@@ -56,7 +55,7 @@ import Demand
 import SimplMonad
 import Type	hiding( substTy )
 import Coercion hiding( substCo )
-import TyCon
+import DataCon          ( dataConWorkId )
 import VarSet
 import BasicTypes
 import Util
@@ -65,7 +64,7 @@ import Outputable
 import FastString
 import Pair
 
-import Data.List
+import Control.Monad    ( when )
 \end{code}
 
 
@@ -1495,97 +1494,18 @@ of the inner case y, which give us nowhere to go!
 
 \begin{code}
 prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
-prepareAlts scrut case_bndr' alts
-  = do	{ let (alts_wo_default, maybe_deflt) = findDefault alts
-	      alt_cons = [con | (con,_,_) <- alts_wo_default]
-	      imposs_deflt_cons = nub (imposs_cons ++ alt_cons)
-		-- "imposs_deflt_cons" are handled 
-		--   EITHER by the context, 
-		--   OR by a non-DEFAULT branch in this case expression.
-
-	; default_alts <- prepareDefault case_bndr' mb_tc_app 
-					 imposs_deflt_cons maybe_deflt
-
-	; let trimmed_alts = filterOut impossible_alt alts_wo_default
-	      merged_alts  = mergeAlts trimmed_alts default_alts
-		-- We need the mergeAlts in case the new default_alt 
-		-- has turned into a constructor alternative.
-		-- The merge keeps the inner DEFAULT at the front, if there is one
-		-- and interleaves the alternatives in the right order
-
-	; return (imposs_deflt_cons, merged_alts) }
+prepareAlts scrut case_bndr' alts = do
+    us <- getUniquesM
+    -- Case binder is needed just for its type. Note that as an
+    --   OutId, it has maximum information; this is important.
+    --   Test simpl013 is an example
+    let (imposs_deflt_cons, refined_deflt, alts') = filterAlts us (varType case_bndr') imposs_cons alts
+    when refined_deflt $ tick (FillInCaseDefault case_bndr')
+    return (imposs_deflt_cons, alts')
   where
-    mb_tc_app = splitTyConApp_maybe (idType case_bndr')
-    Just (_, inst_tys) = mb_tc_app 
-
     imposs_cons = case scrut of
 		    Var v -> otherCons (idUnfolding v)
 		    _     -> []
-
-    impossible_alt :: CoreAlt -> Bool
-    impossible_alt (con, _, _) | con `elem` imposs_cons = True
-    impossible_alt (DataAlt con, _, _) = dataConCannotMatch inst_tys con
-    impossible_alt _                   = False
-
-
-prepareDefault :: OutId		-- Case binder; need just for its type. Note that as an
-				--   OutId, it has maximum information; this is important.
-				--   Test simpl013 is an example
-	       -> Maybe (TyCon, [Type])	-- Type of scrutinee, decomposed
-	       -> [AltCon]	-- These cons can't happen when matching the default
-	       -> Maybe InExpr	-- Rhs
-	       -> SimplM [InAlt]	-- Still unsimplified
-					-- We use a list because it's what mergeAlts expects,
-
---------- Fill in known constructor -----------
-prepareDefault case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
-  | 	-- This branch handles the case where we are 
-	-- scrutinisng an algebraic data type
-    isAlgTyCon tycon		-- It's a data type, tuple, or unboxed tuples.  
-  , not (isNewTyCon tycon)	-- We can have a newtype, if we are just doing an eval:
-				-- 	case x of { DEFAULT -> e }
-				-- and we don't want to fill in a default for them!
-  , Just all_cons <- tyConDataCons_maybe tycon
-  , not (null all_cons)	
-	-- This is a tricky corner case.  If the data type has no constructors,
-	-- which GHC allows, then the case expression will have at most a default
-	-- alternative.  We don't want to eliminate that alternative, because the
-	-- invariant is that there's always one alternative.  It's more convenient
-	-- to leave	
-	--	case x of { DEFAULT -> e }     
-	-- as it is, rather than transform it to
-	--	error "case cant match"
-	-- which would be quite legitmate.  But it's a really obscure corner, and
-	-- not worth wasting code on.
-  , let imposs_data_cons = [con | DataAlt con <- imposs_cons]	-- We now know it's a data type 
-	impossible con   = con `elem` imposs_data_cons || dataConCannotMatch inst_tys con
-  = case filterOut impossible all_cons of
-	[]    -> return []	-- Eliminate the default alternative
-				-- altogether if it can't match
-
-	[con] -> 	-- It matches exactly one constructor, so fill it in
-		 do { tick (FillInCaseDefault case_bndr)
-                    ; us <- getUniquesM
-                    ; let (ex_tvs, arg_ids) = dataConRepInstPat us con inst_tys
-                    ; return [(DataAlt con, ex_tvs ++ arg_ids, deflt_rhs)] }
-
-	_ -> return [(DEFAULT, [], deflt_rhs)]
-
-  | debugIsOn, isAlgTyCon tycon
-  , null (tyConDataCons tycon)
-  , not (isFamilyTyCon tycon || isAbstractTyCon tycon)
-	-- Check for no data constructors
-        -- This can legitimately happen for abstract types and type families,
-        -- so don't report that
-  = pprTrace "prepareDefault" (ppr case_bndr <+> ppr tycon)
-        $ return [(DEFAULT, [], deflt_rhs)]
-
---------- Catch-all cases -----------
-prepareDefault _case_bndr _bndr_ty _imposs_cons (Just deflt_rhs)
-  = return [(DEFAULT, [], deflt_rhs)]
-
-prepareDefault _case_bndr _bndr_ty _imposs_cons Nothing
-  = return []	-- No default branch
 \end{code}
 
 

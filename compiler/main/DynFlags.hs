@@ -229,7 +229,7 @@ data DynFlag
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
-   | Opt_NoLlvmMangler
+   | Opt_NoLlvmMangler                 -- hidden flag
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
 
@@ -252,11 +252,12 @@ data DynFlag
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
    | Opt_Vectorise
+   | Opt_AvoidVect
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
-   | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA
-   | Opt_RegLiveness                    -- Use the STG Reg liveness information
+   | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
+   | Opt_RegLiveness                    -- Use the STG Reg liveness information (hidden flag)
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -449,6 +450,7 @@ data ExtensionFlag
    | Opt_RankNTypes
    | Opt_ImpredicativeTypes
    | Opt_TypeOperators
+   | Opt_ExplicitNamespaces
    | Opt_PackageImports
    | Opt_ExplicitForAll
    | Opt_AlternativeLayoutRule
@@ -1639,7 +1641,7 @@ dynamic_flags = [
   , Flag "dshow-passes"            (NoArg (do forceRecompile
                                               setVerbosity $ Just 2))
   , Flag "dfaststring-stats"       (NoArg (setDynFlag Opt_D_faststring_stats))
-  , Flag "dno-llvm-mangler"        (NoArg (setDynFlag Opt_NoLlvmMangler))
+  , Flag "dno-llvm-mangler"        (NoArg (setDynFlag Opt_NoLlvmMangler)) -- hidden flag
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
@@ -1865,10 +1867,11 @@ fFlags = [
   ( "run-cpsz",                         Opt_RunCPSZ, nop ),
   ( "new-codegen",                      Opt_TryNewCodeGen, nop ),
   ( "vectorise",                        Opt_Vectorise, nop ),
+  ( "avoid-vect",                       Opt_AvoidVect, nop ),
   ( "regs-graph",                       Opt_RegsGraph, nop ),
   ( "regs-iterative",                   Opt_RegsIterative, nop ),
-  ( "llvm-tbaa",                        Opt_LlvmTBAA, nop),
-  ( "reg-liveness",                     Opt_RegLiveness, nop),
+  ( "llvm-tbaa",                        Opt_LlvmTBAA, nop), -- hidden flag
+  ( "regs-liveness",                    Opt_RegLiveness, nop), -- hidden flag
   ( "gen-manifest",                     Opt_GenManifest, nop ),
   ( "embed-manifest",                   Opt_EmbedManifest, nop ),
   ( "ext-core",                         Opt_EmitExternalCore, nop ),
@@ -1973,6 +1976,7 @@ xFlags = [
   ( "RankNTypes",                       Opt_RankNTypes, nop ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop),
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
+  ( "ExplicitNamespaces",               Opt_ExplicitNamespaces, nop ),
   ( "RecursiveDo",                      Opt_RecursiveDo,     -- Enables 'mdo'
     deprecatedForExtension "DoRec"),
   ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword
@@ -2084,7 +2088,11 @@ impliedFlags
     , (Opt_TypeFamilies,     turnOn, Opt_MonoLocalBinds)
 
     , (Opt_TypeFamilies,     turnOn, Opt_KindSignatures)  -- Type families use kind signatures
-                                                          -- all over the place
+
+    -- We turn this on so that we can export associated type
+    -- type synonyms in subordinates (e.g. MyClass(type AssocType))
+    , (Opt_TypeFamilies,     turnOn, Opt_ExplicitNamespaces)
+    , (Opt_TypeOperators, turnOn, Opt_ExplicitNamespaces)
 
     , (Opt_ImpredicativeTypes,  turnOn, Opt_RankNTypes)
 
@@ -2215,6 +2223,7 @@ glasgowExtsFlags = [
            , Opt_LiberalTypeSynonyms
            , Opt_RankNTypes
            , Opt_TypeOperators
+           , Opt_ExplicitNamespaces
            , Opt_DoRec
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls

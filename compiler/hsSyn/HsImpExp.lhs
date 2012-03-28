@@ -12,6 +12,7 @@ module HsImpExp where
 
 import Module           ( ModuleName )
 import HsDoc            ( HsDocString )
+import OccName          ( HasOccName(..), isTcOcc, isSymOcc )
 
 import Outputable
 import FastString
@@ -57,7 +58,7 @@ simpleImportDecl mn = ImportDecl {
 \end{code}
 
 \begin{code}
-instance (OutputableBndr name) => Outputable (ImportDecl name) where
+instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) where
     ppr (ImportDecl { ideclName = mod', ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
                     , ideclQualified = qual, ideclImplicit = implicit
@@ -134,12 +135,20 @@ ieNames (IEDocNamed       _   ) = []
 \end{code}
 
 \begin{code}
-instance (OutputableBndr name, Outputable name) => Outputable (IE name) where
+
+pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
+pprImpExp name = type_pref <+> pprPrefixOcc name
+    where
+    occ = occName name
+    type_pref | isTcOcc occ && isSymOcc occ = ptext (sLit "type")
+              | otherwise                   = empty
+
+instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
     ppr (IEVar          var)    = pprPrefixOcc var
-    ppr (IEThingAbs     thing)  = ppr thing
-    ppr (IEThingAll     thing)  = hcat [ppr thing, text "(..)"]
+    ppr (IEThingAbs     thing)  = pprImpExp thing
+    ppr (IEThingAll     thing)  = hcat [pprImpExp thing, text "(..)"]
     ppr (IEThingWith thing withs)
-        = pprPrefixOcc thing <> parens (fsep (punctuate comma (map pprPrefixOcc withs)))
+        = pprImpExp thing <> parens (fsep (punctuate comma (map pprImpExp withs)))
     ppr (IEModuleContents mod')
         = ptext (sLit "module") <+> ppr mod'
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")

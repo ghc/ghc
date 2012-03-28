@@ -33,7 +33,7 @@ module HsUtils(
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
-  mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
+  mkLHsTupleExpr, mkLHsVarTuple, missingTupArg, mkHsBSig, 
 
   -- Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
@@ -69,7 +69,7 @@ module HsUtils(
   collectSigTysFromPats, collectSigTysFromPat,
 
   hsLTyClDeclBinders, hsTyClDeclBinders, hsTyClDeclsBinders, 
-  hsForeignDeclsBinders, hsGroupBinders,
+  hsForeignDeclsBinders, hsGroupBinders, hsFamInstBinders,
   
   -- Collecting implicit binders
   lStmtsImplicits, hsValBindsImplicits, lPatImplicits
@@ -96,7 +96,6 @@ import Util
 import Bag
 
 import Data.Either
-import Data.Maybe
 \end{code}
 
 
@@ -266,9 +265,13 @@ unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
 mkHsString :: String -> HsLit
 mkHsString s = HsString (mkFastString s)
 
+mkHsBSig :: a -> HsBndrSig a
+mkHsBSig x = HsBSig x placeHolderBndrs
+
 -------------
-userHsTyVarBndrs :: [Located name] -> [Located (HsTyVarBndr name)]
-userHsTyVarBndrs bndrs = [ L loc (UserTyVar v placeHolderKind) | L loc v <- bndrs ]
+userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]
+-- Caller sets location
+userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar v) | v <- bndrs ]
 \end{code}
 
 
@@ -622,9 +625,10 @@ hsTyClDeclsBinders :: [[LTyClDecl Name]] -> [Located (InstDecl Name)] -> [Name]
 -- We need to look at instance declarations too, 
 -- because their associated types may bind data constructors
 hsTyClDeclsBinders tycl_decls inst_decls
-  = [n | d <- instDeclFamInsts inst_decls ++ concat tycl_decls
-       , L _ n <- hsLTyClDeclBinders d]
+  = map unLoc (concatMap (concatMap hsLTyClDeclBinders) tycl_decls ++
+               concatMap (hsInstDeclBinders . unLoc) inst_decls)
 
+-------------------
 hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- ^ Returns all the /binding/ names of the decl, along with their SrcLocs.
 -- The first one is guaranteed to be the name of the decl. For record fields
@@ -632,24 +636,37 @@ hsLTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- occurence.  We use the equality to filter out duplicate field names
 hsLTyClDeclBinders (L _ d) = hsTyClDeclBinders d
 
+-------------------
 hsTyClDeclBinders :: Eq name => TyClDecl name -> [Located name]
 hsTyClDeclBinders (TyFamily    {tcdLName = name}) = [name]
 hsTyClDeclBinders (ForeignType {tcdLName = name}) = [name]
 
-hsTyClDeclBinders (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
+hsTyClDeclBinders (ClassDecl { tcdLName = cls_name, tcdSigs = sigs
+                             , tcdATs = ats, tcdATDefs = fam_insts })
   = cls_name : 
-    concatMap hsLTyClDeclBinders ats ++ [n | L _ (TypeSig ns _) <- sigs, n <- ns]
+    concatMap hsLTyClDeclBinders ats ++ 
+    concatMap (hsFamInstBinders . unLoc) fam_insts ++
+    [n | L _ (TypeSig ns _) <- sigs, n <- ns]
 
-hsTyClDeclBinders (TySynonym   {tcdLName = name, tcdTyPats = mb_pats }) 
-  | isJust mb_pats = []
-  | otherwise      = [name]
+hsTyClDeclBinders (TyDecl { tcdLName = name, tcdTyDefn = defn }) 
+  = name : hsTyDefnBinders defn
+
+-------------------
+hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
+hsInstDeclBinders (ClsInstD { cid_fam_insts = fis }) = concatMap (hsFamInstBinders . unLoc) fis
+hsInstDeclBinders (FamInstD fi) = hsFamInstBinders fi
+
+-------------------
+hsFamInstBinders :: Eq name => FamInstDecl name -> [Located name]
+hsFamInstBinders (FamInstDecl { fid_defn = defn }) = hsTyDefnBinders defn
+
+-------------------
+hsTyDefnBinders :: Eq name => HsTyDefn name -> [Located name]
+hsTyDefnBinders (TySynonym {})              = []
+hsTyDefnBinders (TyData { td_cons = cons }) = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
-hsTyClDeclBinders (TyData {tcdLName = tc_name, tcdCons = cons, tcdTyPats = mb_pats })
-  | isJust mb_pats = hsConDeclsBinders cons
-  | otherwise      = tc_name : hsConDeclsBinders cons
-  -- See Note [Binders in family instances]
-
+-------------------
 hsConDeclsBinders :: (Eq name) => [LConDecl name] -> [Located name]
   -- See hsTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
