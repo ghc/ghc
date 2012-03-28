@@ -558,7 +558,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     //
     if (old_stack->sp > old_stack->stack + old_stack->stack_size / 2)
     {
-        chunk_size = 2 * (old_stack->stack_size + sizeofW(StgStack));
+        chunk_size = stg_max(2 * (old_stack->stack_size + sizeofW(StgStack)),
+                             RtsFlags.GcFlags.stkChunkSize);
     }
     else
     {
