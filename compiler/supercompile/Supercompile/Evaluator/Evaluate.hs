@@ -101,7 +101,10 @@ summariseContext h k = trainCarFoldr go (True, [], BoringCtxt) k
 ghcHeuristics :: Id -> AnnedTerm {- try not to pull on this, it does a lot of work -}
               -> ContextSummary -> Bool
 ghcHeuristics x e (lone_variable, arg_infos, cont_info)
-  = (try (idUnfolding x) `mplus` try answer_unf) `orElse` trce (text "No unfolding") False
+  | isStrongLoopBreaker (idOccInfo x)
+  = False -- NB: have to check this (not just use idUnfolding) because we might consider "e"
+  | otherwise
+  = (try (realIdUnfolding x) `mplus` try answer_unf) `orElse` trce (text "No unfolding") False
   where
     try unf = case unf of
       CoreSyn.CoreUnfolding { CoreSyn.uf_is_top = is_top, CoreSyn.uf_is_work_free = is_work_free, CoreSyn.uf_expandable = expandable
