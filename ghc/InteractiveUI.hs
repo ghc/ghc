@@ -446,10 +446,8 @@ runGHCi paths maybe_exprs = do
   when (not (null paths)) $ do
      ok <- ghciHandle (\e -> do showException e; return Failed) $
                 -- TODO: this is a hack.
-                runInputTWithPrefs defaultPrefs defaultSettings $ do
-                    let (filePaths, phases) = unzip paths
-                    filePaths' <- mapM (Encoding.decode . BS.pack) filePaths
-                    loadModule (zip filePaths' phases)
+                runInputTWithPrefs defaultPrefs defaultSettings $
+                    loadModule paths
      when (isJust maybe_exprs && failed ok) $
         liftIO (exitWith (ExitFailure 1))
 
@@ -2884,10 +2882,7 @@ isHomeModule m = GHC.modulePackageId m == mainPackageId
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
 expandPath :: MonadIO m => String -> InputT m String
-expandPath p = do
-    exp_path <- liftIO $ expandPathIO p
-    e <- fmap BS.unpack $ Encoding.encode exp_path
-    return e
+expandPath = liftIO . expandPathIO
 
 expandPathIO :: String -> IO String
 expandPathIO p =
