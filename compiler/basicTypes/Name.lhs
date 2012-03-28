@@ -55,7 +55,7 @@ module Name (
 	nameOccName, nameModule, nameModule_maybe,
 	tidyNameOcc, 
 	hashName, localiseName,
-  mkLocalisedOccName,
+        mkLocalisedOccName,
 
 	nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
 

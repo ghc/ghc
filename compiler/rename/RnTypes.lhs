@@ -703,7 +703,7 @@ rnSplice (HsSplice n expr)
 	; gbl_rdr <- getGlobalRdrEnv
 	; let gbl_names = mkNameSet [gre_name gre | gre <- globalRdrEnvElts gbl_rdr, 
 						    isLocalGRE gre]
-	      lcl_names = mkNameSet (occEnvElts lcl_rdr)
+	      lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
 	; return (HsSplice n' expr', fvs `plusFV` lcl_names `plusFV` gbl_names) }
 

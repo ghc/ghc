@@ -406,7 +406,8 @@ extendGlobalRdrEnvRn avails new_fixities
               new_occs = map (nameOccName . gre_name) gres
               rdr_env_TH = transformGREs qual_gre new_occs rdr_env
               rdr_env_GHCi = delListFromOccEnv rdr_env new_occs
-              lcl_env1 = lcl_env { tcl_rdr = delListFromOccEnv (tcl_rdr lcl_env) new_occs }
+
+              lcl_env1 = lcl_env { tcl_rdr = delLocalRdrEnvList (tcl_rdr lcl_env) new_occs }
               (rdr_env2, lcl_env2) | shadowP   = (rdr_env_TH,   lcl_env1)
                                    | isGHCi    = (rdr_env_GHCi, lcl_env1)
                                    | otherwise = (rdr_env,      lcl_env)
@@ -975,8 +976,7 @@ rnExports explicit_mod exports
         ; (rn_exports, avails) <- exports_from_avail real_exports rdr_env imports this_mod
         ; let final_avails = nubAvails avails    -- Combine families
 
-        ; traceRn (vcat [ text "rnExports: RdrEnv:" <+> ppr rdr_env
-                        , text "     Exports:" <+> ppr final_avails] )
+        ; traceRn (text "rnExports: Exports:" <+> ppr final_avails)
 
         ; return (tcg_env { tcg_exports    = final_avails,
                             tcg_rn_exports = case tcg_rn_exports tcg_env of
