@@ -226,4 +226,5 @@ test('T5882', normal, compile, ['-v0'])
 test('T5886', extra_clean(['T5886a.hi','T5886a.o']), 
               multimod_compile, ['T5886','-v0'])
 test('T4135', normal, compile, ['-v0'])
+test('T5971', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 

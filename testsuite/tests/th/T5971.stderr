@@ -1,0 +1,9 @@
+
+T5971.hs:6:7:
+    The exact Name `x' is not in scope
+      Probable cause: you used a unique name (NameU) in Template Haskell but did not bind it
+    In the result of the splice:
+      $(newName "x" >>= varE)
+    To see what the splice expanded to, use -ddump-splices
+    In the expression: $(newName "x" >>= varE)
+    In a pattern binding: _ = $(newName "x" >>= varE)
