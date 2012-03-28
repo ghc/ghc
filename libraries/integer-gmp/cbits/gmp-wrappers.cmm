@@ -269,7 +269,7 @@ name                                                                    \
 {                                                                       \
   CInt s1;                                                              \
   W_ d1;                                                                \
-  CLong ul;                                                             \
+  CInt ul;                                                              \
   W_ mp_tmp;                                                            \
   W_ mp_result;                                                         \
                                                                         \
