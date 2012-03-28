@@ -535,7 +535,7 @@ uType_defer items ty1 ty2
   = ASSERT( not (null items) )
     do { eqv <- newEq ty1 ty2
        ; loc <- getCtLoc (TypeEqOrigin (last items))
-       ; emitFlat (mkNonCanonical eqv (Wanted loc))
+       ; emitFlat $ mkNonCanonical (Wanted loc eqv)
 
        -- Error trace only
        -- NB. do *not* call mkErrInfo unless tracing is on, because

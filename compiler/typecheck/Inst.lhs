@@ -85,7 +85,7 @@ emitWanteds origin theta = mapM (emitWanted origin) theta
 emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred = do { loc <- getCtLoc origin
                             ; ev  <- newWantedEvVar pred
-                            ; emitFlat (mkNonCanonical ev (Wanted loc))
+                            ; emitFlat (mkNonCanonical (Wanted loc ev))
                             ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
@@ -527,7 +527,7 @@ tyVarsOfCt (CFunEqCan { cc_tyargs = tys, cc_rhs = xi }) = tyVarsOfTypes (xi:tys)
 tyVarsOfCt (CDictCan { cc_tyargs = tys }) 	        = tyVarsOfTypes tys
 tyVarsOfCt (CIPCan { cc_ip_ty = ty })                   = tyVarsOfType ty
 tyVarsOfCt (CIrredEvCan { cc_ty = ty })                 = tyVarsOfType ty
-tyVarsOfCt (CNonCanonical { cc_id = ev })               = tyVarsOfEvVar ev
+tyVarsOfCt (CNonCanonical { cc_flavor = fl })           = tyVarsOfType (ctFlavPred fl)
 
 tyVarsOfCDict :: Ct -> TcTyVarSet 
 tyVarsOfCDict (CDictCan { cc_tyargs = tys }) = tyVarsOfTypes tys
@@ -563,19 +563,29 @@ tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet
 tidyCt :: TidyEnv -> Ct -> Ct
 -- Also converts it to non-canonical
 tidyCt env ct 
-  = CNonCanonical { cc_id     = tidyEvVar env (cc_id ct)
-                  , cc_flavor = tidyFlavor env (cc_flavor ct)
+  = CNonCanonical { cc_flavor = tidy_flavor env (cc_flavor ct)
                   , cc_depth  = cc_depth ct } 
+  where tidy_flavor :: TidyEnv -> CtFlavor -> CtFlavor
+        tidy_flavor env (Given { flav_gloc = gloc, flav_evar = evar })
+          = Given { flav_gloc = tidyGivenLoc env gloc
+                  , flav_evar = tidyEvVar env evar }
+        tidy_flavor env (Solved { flav_gloc = gloc
+                                , flav_evar = evar }) 
+          = Solved { flav_gloc  = tidyGivenLoc env gloc
+                   , flav_evar = tidyEvVar env evar }
+        tidy_flavor env (Wanted { flav_wloc = wloc
+                                , flav_evar = evar })
+          = Wanted { flav_wloc = wloc -- Interesting: no tidying needed?
+                   , flav_evar = tidyEvVar env evar }
+        tidy_flavor env (Derived { flav_wloc = wloc, flav_der_pty = pty })
+          = Derived { flav_wloc = wloc, flav_der_pty = tidyType env pty }
 
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
 tidyEvVar env var = setVarType var (tidyType env (varType var))
 
-tidyFlavor :: TidyEnv -> CtFlavor -> CtFlavor
-tidyFlavor env (Given loc gk) = Given (tidyGivenLoc env loc) gk
-tidyFlavor _   fl          = fl
-
 tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
-tidyGivenLoc env (CtLoc skol span ctxt) = CtLoc (tidySkolemInfo env skol) span ctxt
+tidyGivenLoc env (CtLoc skol span ctxt) 
+  = CtLoc (tidySkolemInfo env skol) span ctxt
 
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
 tidySkolemInfo env (SigSkol cx ty) = SigSkol cx (tidyType env ty)
@@ -595,13 +605,12 @@ substCt :: TvSubst -> Ct -> Ct
 -- Conservatively converts it to non-canonical:
 -- Postcondition: if the constraint does not get rewritten
 substCt subst ct
-  | ev <- cc_id ct, pty <- evVarPred (cc_id ct) 
+  | pty <- ctPred ct
   , sty <- substTy subst pty 
   = if sty `eqType` pty then 
         ct { cc_flavor = substFlavor subst (cc_flavor ct) }
     else 
-        CNonCanonical { cc_id  = setVarType ev sty 
-                      , cc_flavor = substFlavor subst (cc_flavor ct)
+        CNonCanonical { cc_flavor = substFlavor subst (cc_flavor ct)
                       , cc_depth  = cc_depth ct }
 
 substWC :: TvSubst -> WantedConstraints -> WantedConstraints
@@ -626,11 +635,24 @@ substEvVar :: TvSubst -> EvVar -> EvVar
 substEvVar subst var = setVarType var (substTy subst (varType var))
 
 substFlavor :: TvSubst -> CtFlavor -> CtFlavor
-substFlavor subst (Given loc gk) = Given (substGivenLoc subst loc) gk
-substFlavor _     fl             = fl
+substFlavor subst (Given { flav_gloc = gloc, flav_evar = evar })
+  = Given { flav_gloc = substGivenLoc subst gloc
+          , flav_evar = substEvVar subst evar }
+substFlavor subst (Solved { flav_gloc = gloc, flav_evar = evar })
+  = Solved { flav_gloc = substGivenLoc subst gloc
+           , flav_evar = substEvVar subst evar }
+
+substFlavor subst (Wanted { flav_wloc = wloc, flav_evar = evar })
+  = Wanted { flav_wloc  = wloc
+           , flav_evar = substEvVar subst evar }
+
+substFlavor subst (Derived { flav_wloc = wloc, flav_der_pty = pty })
+  = Derived { flav_wloc = wloc
+            , flav_der_pty = substTy subst pty }
 
 substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
-substGivenLoc subst (CtLoc skol span ctxt) = CtLoc (substSkolemInfo subst skol) span ctxt
+substGivenLoc subst (CtLoc skol span ctxt) 
+  = CtLoc (substSkolemInfo subst skol) span ctxt
 
 substSkolemInfo :: TvSubst -> SkolemInfo -> SkolemInfo
 substSkolemInfo subst (SigSkol cx ty) = SigSkol cx (substTy subst ty)
