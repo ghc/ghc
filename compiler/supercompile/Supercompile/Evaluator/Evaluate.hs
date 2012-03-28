@@ -104,15 +104,19 @@ ghcHeuristics x (lone_variable, arg_infos, cont_info) = case idUnfolding x of
                            -> tryUnfolding dflags1 x lone_variable 
                                            arg_infos cont_info is_top 
                                            is_cheap uf_arity guidance
-  CoreSyn.NoUnfolding      -> False
-  CoreSyn.OtherCon {}      -> False
+  CoreSyn.NoUnfolding      -> trce (text "No unfolding") False
+  CoreSyn.OtherCon {}      -> trce (text "No positive unfolding") False
   -- GHC actually only looks through DFunUnfoldings in exprIsConApp_maybe,
   -- so I'll do this rough heuristic instead:
-  CoreSyn.DFunUnfolding {} -> length arg_infos >= idArity x
+  CoreSyn.DFunUnfolding {} -> trce (text "Dictionary unfolding") length arg_infos >= idArity x
  where dflags0 = defaultDynFlags (error "ghcHeuristics: Settings in DynFlags used!")
        -- Set these two flags so that we get information about failed inlinings:
        dflags1 | tRACE     = dopt_set (dopt_set dflags0 Opt_D_verbose_core2core) Opt_D_dump_inlinings
                | otherwise = dflags0
+
+       trce :: SDoc -> a -> a
+       trce | tRACE     = pprTrace ("Considering inlining: " ++ showSDoc (ppr x))
+            | otherwise = flip const
 
 -- | Non-expansive simplification we can do everywhere safely
 --
