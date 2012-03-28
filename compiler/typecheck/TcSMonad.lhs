@@ -1309,6 +1309,9 @@ setEvBind ev t
   = do { tc_evbinds <- getTcEvBinds
        ; wrapTcS $ TcM.addTcEvBind tc_evbinds ev t
 
+       ; traceTcS "setEvBind" $ vcat [ text "ev =" <+> ppr ev
+                                     , text "t  =" <+> ppr t ]
+
 #ifdef DEBUG
        ; binds <- getTcEvBindsMap
        ; let cycle = any (reaches binds) (evVarsOfTerm t)
@@ -1377,7 +1380,7 @@ xCtFlavor :: CtFlavor              -- Original flavor
 xCtFlavor = xCtFlavor_cache True          
 
 
-xCtFlavor_cache :: Bool -- True = if wanted add to the solved bag!    
+xCtFlavor_cache :: Bool            -- True = if wanted add to the solved bag!    
           -> CtFlavor              -- Original flavor   
           -> [TcPredType]          -- New predicate types
           -> XEvTerm               -- Instructions about how to manipulate evidence
@@ -1445,9 +1448,9 @@ rewriteCtFlavor_cache cache fl pty co
                Solved gl ev -> Solved gl (setVarType ev pty))
   | otherwise 
   = xCtFlavor_cache cache fl [pty] (XEvTerm ev_comp ev_decomp) cont
-  where ev_comp [x] = EvCast x co
+  where ev_comp [x] = mkEvCast x co
         ev_comp _   = panic "Coercion can only have one subgoal"
-        ev_decomp x = [EvCast x (mkTcSymCo co)]
+        ev_decomp x = [mkEvCast x (mkTcSymCo co)]
         cont []     = return Nothing
         cont [fl]   = return $ Just fl
         cont _      = panic "At most one constraint can be subgoal of coercion!"

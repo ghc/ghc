@@ -53,7 +53,7 @@ import TrieMap
 import VarEnv
 import qualified Data.Traversable as Traversable
 
-import Control.Monad( when )
+import Control.Monad( when, unless )
 import Pair ( pSnd )
 import UniqFM
 import FastString ( sLit ) 
@@ -945,10 +945,12 @@ doInteractWithInert ii@(CFunEqCan { cc_flavor = fl1, cc_fun = tc1
          vcat [ text "workitem =" <+> ppr wi
               , text "inertitem=" <+> ppr ii ]
          
-       ; xCtFlavor fl2 [mkTcEqPred xi2 xi1] (xev co1) $ what_next d2
+       ; xCtFlavor_cache False fl2 [mkTcEqPred xi2 xi1] (xev co1) $ what_next d2
+                         -- Why not simply xCtFlavor? See Note [Cache-caused loops] 
        ; irWorkItemConsumed "FunEq/FunEq" }
   | fl2 `canSolve` fl1 && lhss_match
-  = do { xCtFlavor fl1 [mkTcEqPred xi1 xi2] (xev co2) $ what_next d1
+  = do { xCtFlavor_cache False fl1 [mkTcEqPred xi1 xi2] (xev co2) $ what_next d1
+                         -- Why not simply xCtFlavor? See Note [Cache-caused loops] 
        ; irInertConsumed "FunEq/FunEq"}
   where
     lhss_match = tc1 == tc2 && eqTypes args1 args2 
@@ -965,6 +967,42 @@ doInteractWithInert ii@(CFunEqCan { cc_flavor = fl1, cc_fun = tc1
                  xcomp _   = panic "No more goals!"
     
 doInteractWithInert _ _ = irKeepGoing "NOP"
+
+\end{code}
+
+Note [Cache-caused loops]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+It is very dangerous to cache a rewritten wanted family equation as 'solved' in our 
+solved cache (which is the default behaviour or xCtFlavor), because the interaction 
+may not be contributing towards a solution. Here is an example:
+
+Initial inert set:
+  [W] g1 : F a ~ beta1
+Work item:
+  [W] g2 : F a ~ beta2
+The work item will react with the inert yielding the _same_ inert set plus:
+    i)   Will set g2 := g1 `cast` g3   
+    ii)  Will add to our solved cache that [S] g2 : F a ~ beta2
+    iii) Will emit [W] g3 : beta1 ~ beta2 
+Now, the g3 work item will be spontaneously solved to [G] g3 : beta1 ~ beta2
+and then it will react the item in the inert ([W] g1 : F a ~ beta1). So it 
+will set 
+      g1 := g ; sym g3 
+and what is g? Well it would ideally be a new goal of type (F a ~ beta2) but
+remember that we have this in our solved cache, and it is ... g2! In short we 
+created the evidence loop:
+
+        g2 := g1 ; g3 
+        g3 := refl
+        g1 := g2 ; sym g3 
+
+To avoid this situation we do not cache as solved any workitems (or inert) 
+which did not really made a 'step' towards proving some goal. Solved's are 
+just an optimization so we don't lose anything in terms of completeness of 
+solving.
+
+\begin{code}
+
 
 {- DELETE 
 rewriteEqLHS :: WhichComesFromInert -> (EqVar,Xi) -> (EqVar,SubGoalDepth,CtFlavor,Xi) -> TcS ()
@@ -1641,7 +1679,8 @@ doTopReact _inerts workItem@(CFunEqCan { cc_flavor = fl, cc_depth = d
        ; case match_res of
            Nothing -> return NoTopInt 
            Just (famInst, rep_tys)
-             -> do { mb_already_solved <- lkpFunEqCache (mkTyConApp tc args)
+             -> do { traceTcS "doTopReact: Family instance matched, but looking in solved funeq cache first" $ empty
+                   ; mb_already_solved <- lkpFunEqCache (mkTyConApp tc args)
                    ; let (coe,rhs_ty) 
                            | Just cached_ct <- mb_already_solved
                            = (mkTcCoVarCo (ctId "doTopReact" cached_ct), 
@@ -1687,21 +1726,32 @@ lkpFunEqCache :: TcType -> TcS (Maybe Ct)
 lkpFunEqCache fam_head 
   = do { (subst,_inscope) <- getInertEqs 
        ; fun_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
+       ; traceTcS "lkpFunEqCache" $ text "fam_head =" <+> ppr fam_head
        ; rewrite_cached $ 
          lookupTypeMap_mod subst cc_rhs fam_head (unCtFamHeadMap fun_cache) }
   where rewrite_cached Nothing = return Nothing
-        rewrite_cached (Just (CFunEqCan { cc_flavor = fl, cc_depth = d
-                                        , cc_fun = tc, cc_tyargs = xis
-                                        , cc_rhs = xi}))
+        rewrite_cached (Just ct@(CFunEqCan { cc_flavor = fl, cc_depth = d
+                                           , cc_fun = tc, cc_tyargs = xis
+                                           , cc_rhs = xi}))
           = ASSERT (isSolved fl)
             do { (xis_subst,cos) <- flattenMany d fl xis 
                                     -- cos :: xis_subst ~ xis 
                ; (xi_subst,co) <- flatten d fl xi
                                     -- co :: xi_subst ~ xi
+               ; let flat_fam_head = mkTyConApp tc xis_subst 
+
+               ; unless (flat_fam_head `eqType` fam_head) $ 
+                        pprPanic "lkpFunEqCache" (vcat [ text "Cached (solved) constraint =" <+> ppr ct
+                                                       , text "Flattened constr. head     =" <+> ppr flat_fam_head ])
+               ; traceTcS "lkpFunEqCache" $ text "Flattened constr. rhs = " <+> ppr xi_subst 
+                                                  
+
                ; let new_pty = mkTcEqPred (mkTyConApp tc xis_subst) xi_subst
-                     new_co = mkTcTyConAppCo tc cos      `mkTcTransCo` 
-                              mkTcCoVarCo (flav_evar fl) `mkTcTransCo` 
-                              mkTcSymCo co
+                     new_co  = mkTcTyConAppCo eqTyCon [ mkTcReflCo (typeKind xi_subst)
+                                                      , mkTcTyConAppCo tc cos
+                                                      , co ]
+                               -- new_co :: (F xis_subst ~  xi_subst) ~ (F xis ~ xi)
+                               -- new_co = (~) <k> (F cos) co
                ; new_fl <- rewriteCtFlavor fl new_pty new_co 
                ; case new_fl of
                     Nothing 

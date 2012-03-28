@@ -1369,7 +1369,7 @@ canEqLeafOriented d fl s1 s2
 canEqLeafFunEqLeftRec :: SubGoalDepth
                       -> CtFlavor
                       -> (TyCon,[TcType]) -> TcType -> TcS StopOrContinue
-canEqLeafFunEqLeftRec d fl (fn,tys1) ty2  -- eqv :: F tys1 ~ ty2
+canEqLeafFunEqLeftRec d fl (fn,tys1) ty2  -- fl :: F tys1 ~ ty2
   = do { traceTcS "canEqLeafFunEqLeftRec" $ pprEq (mkTyConApp fn tys1) ty2
        ; (xis1,cos1) <- 
            {-# SCC "flattenMany" #-}
@@ -1500,14 +1500,16 @@ canEqLeafTyVarLeftRec :: SubGoalDepth
 canEqLeafTyVarLeftRec d fl tv s2              -- fl :: tv ~ s2
   = do {  traceTcS "canEqLeafTyVarLeftRec" $ pprEq (mkTyVarTy tv) s2
        ; (xi1,co1) <- flattenTyVar d fl tv -- co1 :: xi1 ~ tv        
+       ; let is_still_var = isJust (getTyVar_maybe xi1) 
        
        ; traceTcS "canEqLeafTyVarLeftRec2" $ empty 
          
        ; let co = mkTcTyConAppCo eqTyCon $ 
                   [mkTcReflCo (typeKind s2), co1, mkTcReflCo s2]
              -- co :: (xi1 ~ s2) ~ (tv ~ s2)
-       ; mb <- rewriteCtFlavor fl (mkTcEqPred xi1 s2) co
-       
+       ; mb <- rewriteCtFlavor_cache (if is_still_var then False else True) fl (mkTcEqPred xi1 s2) co
+                -- See Note [Caching loops]
+
        ; traceTcS "canEqLeafTyVarLeftRec3" $ empty 
                
        ; case mb of
