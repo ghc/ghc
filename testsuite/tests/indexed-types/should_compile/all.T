@@ -182,3 +182,9 @@ test('ClassEqContext3', normal, compile, [''])
 test('HO', normal, compile, [''])
 
 
+# The point about this test is that it compiles the two T5955
+# modules *separately*
+test('T5955',
+     extra_clean(['T5955.o', 'T5955.hi', 'T5955a.o', 'T5955a.hi']),
+     run_command,
+     ['$MAKE -s --no-print-directory T5955'])
