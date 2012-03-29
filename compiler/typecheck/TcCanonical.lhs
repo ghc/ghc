@@ -1379,7 +1379,8 @@ canEqLeafFunEqLeftRec d fl (fn,tys1) ty2  -- fl :: F tys1 ~ ty2
        ; let fam_head = mkTyConApp fn xis1
          -- Fancy higher-dimensional coercion between equalities!
        ; let co = mkTcTyConAppCo eqTyCon $ 
-                  [mkTcReflCo (typeKind ty2), mkTcTyConAppCo fn cos1, mkTcReflCo ty2]
+                  [mkTcReflCo (defaultKind $ typeKind ty2), mkTcTyConAppCo fn cos1, mkTcReflCo ty2]
+             -- Why defaultKind? Same reason as the comment on TcType/mkTcEqPred. I trully hate this (DV)
              -- co :: (F xis1 ~ ty2) ~ (F tys1 ~ ty2)
              
        ; mb <- rewriteCtFlavor fl (mkTcEqPred fam_head ty2) co
@@ -1451,7 +1452,9 @@ canEqLeafFunEqLeft d fl (fn,xis1) s2
           
       ; let fam_head = mkTyConApp fn xis1
       -- Fancy coercion between equalities! But it should just work! 
-      ; let co = mkTcTyConAppCo eqTyCon $ [mkTcReflCo (typeKind s2), mkTcReflCo fam_head, co2]
+      ; let co = mkTcTyConAppCo eqTyCon $ [ mkTcReflCo (defaultKind $ typeKind s2)
+                                          , mkTcReflCo fam_head, co2 ]
+            -- Why defaultKind? Same reason as the comment at TcType/mkTcEqPred
             -- co :: (F xis1 ~ xi2) ~ (F xis1 ~ s2)
             --           new pred         old pred
       ; mb <- rewriteCtFlavor fl (mkTcEqPred fam_head xi2) co
@@ -1504,8 +1507,8 @@ canEqLeafTyVarLeftRec d fl tv s2              -- fl :: tv ~ s2
        
        ; traceTcS "canEqLeafTyVarLeftRec2" $ empty 
          
-       ; let co = mkTcTyConAppCo eqTyCon $ 
-                  [mkTcReflCo (typeKind s2), co1, mkTcReflCo s2]
+       ; let co = mkTcTyConAppCo eqTyCon $ [ mkTcReflCo (defaultKind $ typeKind s2)
+                                           , co1, mkTcReflCo s2]
              -- co :: (xi1 ~ s2) ~ (tv ~ s2)
        ; mb <- rewriteCtFlavor_cache (if is_still_var then False else True) fl (mkTcEqPred xi1 s2) co
                 -- See Note [Caching loops]
@@ -1569,7 +1572,7 @@ canEqLeafTyVarLeft d fl tv s2       -- eqv : tv ~ s2
              not_occ_err = isJust occ_check_result
                   -- Delicate: don't want to cache as solved a constraint with occurs error!
              co = mkTcTyConAppCo eqTyCon $
-                  [mkTcReflCo (typeKind s2), mkTcReflCo tv_ty, co2]
+                  [mkTcReflCo (defaultKind $ typeKind s2), mkTcReflCo tv_ty, co2]
        ; mb <- rewriteCtFlavor_cache not_occ_err fl (mkTcEqPred tv_ty xi2') co
        ; case mb of
            Just new_fl -> if not_occ_err then 
