@@ -550,14 +550,9 @@ lkT_mod env s f ty m
     go env s (AppTy t1 t2)     = tm_app    >.> lkT_mod env s f t1 >=> lkT_mod env s f t2
     go env s (FunTy t1 t2)     = tm_fun    >.> lkT_mod env s f t1 >=> lkT_mod env s f t2
     go env s (TyConApp tc tys) = tm_tc_app >.> lkNamed tc >=> lkList (lkT_mod env s f) tys
+    go _env _s (LitTy l)           = tm_tylit  >.> lkTyLit l
     go _env _s (ForAllTy _tv _ty)  = const Nothing
-    {- TODO: bleah the following is wrong! 
-      = let (s',inscope') = substTyVarBndr tv (s,inscope)
-        in 
-      let s' = delVarEnv s tv  -- I think it's enough to just restrict substution
-                                 -- without renaming anything
-        in tm_forall >.> lkT_mod (extendCME env tv) s' f ty >=> lkBndr env tv
-     -}
+    {- DV TODO: Add proper lookup for ForAll -}
 
 lookupTypeMap_mod :: TyVarEnv a -- A substitution to be applied to the /keys/ of type map 
                   -> (a -> Type)
