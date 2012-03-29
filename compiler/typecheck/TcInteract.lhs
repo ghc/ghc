@@ -297,8 +297,6 @@ Case 1: In Rewriting Equalities (function rewriteEqLHS)
     canonicalize (xi1 ~ xi2) if (b) comes from the inert set, or (xi2
     ~ xi1) if (a) comes from the inert set.
     
-    This choice is implemented using the WhichComesFromInert flag. 
-
 Case 2: Functional Dependencies 
     Again, we should prefer, if possible, the inert variables on the RHS
 
@@ -818,7 +816,7 @@ NB: In previous versions of TcInteract the extra guard (not (isCFunEqCan wi)) wa
 but family reactions were actually happening earlier, during canonicalization. So the behaviour 
 has not changed -- previously this tricky point was completely lost and worked by accident.
 
-\begin{code}   
+\begin{code}
 --------------------------------------------
 
 doInteractWithInert :: Ct -> Ct -> TcS InteractResult
@@ -974,15 +972,36 @@ doInteractWithInert ii@(CFunEqCan { cc_flavor = fl1, cc_fun = tc1
   = irWorkItemConsumed "FunEq/FunEq" 
   | fl1 `canSolve` fl2 && lhss_match
   = do { traceTcS "interact with inerts: FunEq/FunEq" $ 
-         vcat [ text "workitem =" <+> ppr wi
-              , text "inertitem=" <+> ppr ii ]
-         
-       ; xCtFlavor_cache False fl2 [mkTcEqPred xi2 xi1] (xev co1) $ what_next d2
-                         -- Why not simply xCtFlavor? See Note [Cache-caused loops] 
+         vcat [ text "workItem =" <+> ppr wi
+              , text "inertItem=" <+> ppr ii ]
+
+       ; let xev = XEvTerm xcomp xdecomp
+             -- xcomp : [(xi2 ~ xi1)] -> (F args ~ xi2) 
+             xcomp [x] = EvCoercion (co1 `mkTcTransCo` mk_sym_co x)
+             xcomp _   = panic "No more goals!"
+             -- xdecomp : (F args ~ xi2) -> [(xi2 ~ xi1)]                 
+             xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` co1)]
+
+       ; xCtFlavor_cache False fl2 [mkTcEqPred xi2 xi1] xev $ what_next d2
+                         -- Why not simply xCtFlavor? See Note [Cache-caused loops]
+                         -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
        ; irWorkItemConsumed "FunEq/FunEq" }
   | fl2 `canSolve` fl1 && lhss_match
-  = do { xCtFlavor_cache False fl1 [mkTcEqPred xi1 xi2] (xev co2) $ what_next d1
-                         -- Why not simply xCtFlavor? See Note [Cache-caused loops] 
+  = do { traceTcS "interact with inerts: FunEq/FunEq" $ 
+         vcat [ text "workItem =" <+> ppr wi
+              , text "inertItem=" <+> ppr ii ]
+
+       ; let xev = XEvTerm xcomp xdecomp
+              -- xcomp : [(xi2 ~ xi1)] -> [(F args ~ xi1)]
+             xcomp [x] = EvCoercion (co2 `mkTcTransCo` mkTcCoVarCo x)
+             xcomp _ = panic "No more goals!"
+             -- xdecomp : (F args ~ xi1) -> [(xi2 ~ xi1)]
+             xdecomp x = [EvCoercion (mkTcSymCo co2 `mkTcTransCo` mkTcCoVarCo x)]
+
+       ; xCtFlavor_cache False fl1 [mkTcEqPred xi2 xi1] xev $ what_next d1
+                          -- Why not simply xCtFlavor? See Note [Cache-caused loops]
+                          -- Why not (mkTcEqPred xi1 xi2)? See Note [Efficient orientation]
+
        ; irInertConsumed "FunEq/FunEq"}
   where
     lhss_match = tc1 == tc2 && eqTypes args1 args2 
@@ -993,10 +1012,6 @@ doInteractWithInert ii@(CFunEqCan { cc_flavor = fl1, cc_fun = tc1
     co1 = mkTcCoVarCo $ flav_evar fl1
     co2 = mkTcCoVarCo $ flav_evar fl2
     mk_sym_co x = mkTcSymCo (mkTcCoVarCo x)
-    xev co = XEvTerm xcomp xdecomp
-           where xdecomp x = [EvCoercion (mk_sym_co x `mkTcTransCo` co)]
-                 xcomp [x] = EvCoercion (co `mkTcTransCo` mk_sym_co x)
-                 xcomp _   = panic "No more goals!"
     
 doInteractWithInert _ _ = irKeepGoing "NOP"
 
