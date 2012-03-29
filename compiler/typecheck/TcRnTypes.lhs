@@ -1325,47 +1325,12 @@ canRewrite :: CtFlavor -> CtFlavor -> Bool
 -- The equality constraint ct1 can be used to rewrite inside ct2 
 canRewrite = canSolve 
 
-{- DELETEME
-combineCtLoc :: CtFlavor -> CtFlavor -> WantedLoc
--- Precondition: At least one of them should be wanted 
-combineCtLoc (Wanted loc) _    = loc
-combineCtLoc _ (Wanted loc)    = loc
-combineCtLoc (Derived loc ) _  = loc
-combineCtLoc _ (Derived loc )  = loc
-combineCtLoc _ _ = panic "combineCtLoc: both given"
-
-
-mkSolvedFlavor :: CtFlavor -> SkolemInfo -> EvTerm -> CtFlavor
--- To be called when we actually solve a wanted/derived (perhaps leaving residual goals)
-mkSolvedFlavor (Wanted  loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
-mkSolvedFlavor (Derived loc) sk  evterm  = Given (setCtLocOrigin loc sk) (GivenSolved (Just evterm))
-mkSolvedFlavor fl@(Given {}) _sk _evterm = pprPanic "Solving a given constraint!" $ ppr fl
--}
-
--- combineWantedLoc :: Maybe WantedLoc -> Maybe WantedLoc -> WantedLoc 
--- -- Precondition: at least one is Just
--- combineWantedLoc (Just wl) _ = wl
--- combineWantedLoc _ (Just wl) = wl
--- combineWantedLoc _ _         = panic "combineCtLoc: both given!" 
-
 
 mkGivenLoc :: WantedLoc -> SkolemInfo -> GivenLoc
 mkGivenLoc wl sk = setCtLocOrigin wl sk
 
 mkSolvedLoc :: WantedLoc -> SkolemInfo -> GivenLoc
 mkSolvedLoc wl sk = setCtLocOrigin wl sk
-
-{- DELETEME
-mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
-mkGivenFlavor (Wanted  loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
-mkGivenFlavor (Derived loc) sk  = Given (setCtLocOrigin loc sk) GivenOrig
-mkGivenFlavor fl@(Given {}) _sk = pprPanic "Solving a given constraint!" $ ppr fl
-
-mkWantedFlavor :: CtFlavor -> CtFlavor
-mkWantedFlavor (Wanted  loc) = Wanted loc
-mkWantedFlavor (Derived loc) = Wanted loc
-mkWantedFlavor fl@(Given {}) = pprPanic "mkWantedFlavor" (ppr fl)
--}
 
 \end{code}
 

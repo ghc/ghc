@@ -96,55 +96,6 @@ solveInteractCts cts
   = do { traceTcS "solveInteractCtS" (vcat [ text "cts =" <+> ppr cts ]) 
        ; updWorkListTcS (appendWorkListCt cts) >> solveInteract }
 
-{- DELETEME 
-  = do { evvar_cache <- getTcSEvVarCacheMap
-       ; (cts_thinner, new_evvar_cache) <- add_cts_in_cache evvar_cache cts
-       ; traceTcS "solveInteractCts" (vcat [ text "cts_original =" <+> ppr cts, 
-                                             text "cts_thinner  =" <+> ppr cts_thinner
-                                           ])
-       ; setTcSEvVarCacheMap new_evvar_cache 
-       ; updWorkListTcS (appendWorkListCt cts_thinner) >> solveInteract }
- 
-  where 
-    add_cts_in_cache evvar_cache cts
-      = do { ctxt <- getTcSContext
-           ; foldM (solve_or_cache (simplEqsOnly ctxt)) ([],evvar_cache) cts }
-
-    solve_or_cache :: Bool    -- Solve equalities only, not classes etc
-                   -> ([Ct],TypeMap (EvVar,CtFlavor)) 
-                   -> Ct
-                   -> TcS ([Ct],TypeMap (EvVar,CtFlavor))
-    solve_or_cache eqs_only (acc_cts,acc_cache) ct
-      | dont_cache eqs_only (classifyPredType pred_ty)
-      = return (ct:acc_cts,acc_cache) 
-
-      | Just (ev',fl') <- lookupTM pred_ty acc_cache
-      , fl' `canSolve` fl
-      , isWanted fl
-      = do { _ <- setEvBind ev (EvId ev') fl
-           ; return (acc_cts,acc_cache) }
-
-      | otherwise -- If it's a given keep it in the work list, even if it exists in the cache!
-      = return (ct:acc_cts, alterTM pred_ty (\_ -> Just (ev,fl)) acc_cache)
-      where fl = cc_flavor ct
-            ev = cc_id ct
-            pred_ty = ctPred ct
-
-    dont_cache :: Bool -> PredTree -> Bool
-    -- Do not use the cache, not update it, if this is true
-    dont_cache _ (IPPred {}) = True    -- IPPreds have subtle shadowing
-    dont_cache _ (EqPred ty1 ty2)      -- Report Int ~ Bool errors separately
-      | Just tc1 <- tyConAppTyCon_maybe ty1
-      , Just tc2 <- tyConAppTyCon_maybe ty2
-      , tc1 /= tc2
-      = isDecomposableTyCon tc1 && isDecomposableTyCon tc2
-      | otherwise = False
-    dont_cache eqs_only _ = eqs_only
-            -- If we are simplifying equalities only, 
-            -- do not cache non-equalities
-            -- See Note [Simplifying RULE lhs constraints] in TcSimplify
--}
-
 solveInteractGiven :: GivenLoc -> [EvVar] -> TcS () 
 solveInteractGiven gloc evs
   = solveInteractCts (map mk_noncan evs)
@@ -420,28 +371,7 @@ rewriteInertEqsFromInertEq (subst_tv, subst_co, subst_fl) ieqs
                                    vcat [ text "original   ="<+>ppr ct
                                         , text "new eqpred ="<+>ppr new_eq_pred ]
                   }
-{- DELETEME 
-             = do { let rhs' = pSnd (tcCoercionKind co)
-                  ; delCachedEvVar ev fl
-                  ; evc <- newEqVar fl (mkTyVarTy tv) rhs'
-                  ; let ev'   = evc_the_evvar evc
-                  ; let evco' = mkTcCoVarCo ev' 
-                  ; fl' <- if isNewEvVar evc then
-                               do { case fl of 
-                                      Wanted {} 
-                                        -> setEqBind ev (evco' `mkTcTransCo` mkTcSymCo co) fl
-                                      Given {} 
-                                        -> setEqBind ev' (mkTcCoVarCo ev `mkTcTransCo` co) fl
-                                      Derived {}
-                                        -> return fl }
-                           else
-                               if isWanted fl then 
-                                   setEqBind ev (evco' `mkTcTransCo` mkTcSymCo co) fl
-                               else return fl
-                  ; let ct' = ct { cc_id = ev', cc_flavor = fl', cc_rhs = rhs' }
-                  ; return (ct',evco') }
-           ev  = cc_id ct
--}
+
 
 kick_out_rewritable :: Ct 
                     -> InertSet 
@@ -916,45 +846,6 @@ doInteractWithInert (CIPCan { cc_flavor = ifl, cc_ip_nm = nm1, cc_ip_ty = ty1 })
           | Derived wl _ <- ifl = wl
           | otherwise = panic "Solve IP: no WantedLoc!"
     
-  {-- DELETEME
-       ; when (isWanted  wfl) $
-             do { setEvBind (flav_evar wfl) (mkEvCast (flav_evar ifl)
-
-                 
-       ; mb_new_fl <- rewriteCtFlavor wfl 
-                        (mkTyConApp (ipTyCon nm1) [ty1]) -- IP x ty1
-                        (mkTcTyConAppCo (ipTyCon nm1) [mkTcCoVarCo cv])
-                                                          -- IP x ty1 ~ IP x ty2
-       ; case mb_new_fl of
-            Nothing -> pprPanic "Unexpected cached IP constraint!" empty
-            Just new_fl -> irWorkItemConsumed "IP/IP (solved by rewriting)" }
-  where new_wloc
-          | Wanted wl _  <- wfl = wl
-          | Derived wl _ <- wfl = wl
-          | Wanted wl _  <- ifl = wl
-          | Derived wl _ <- ifl = wl
-          | otherwise = panic "Solve IP: no WantedLoc!"
-
-      eqv <- newWantedEvVar (mkEqPred ty2 ty1) 
-                -- See Note [Efficient Orientation]
-       ; 
-      let flav = Wanted (combineCtLoc ifl wfl)
-       ; eqv <- newEqVar flav ty2 ty1 -- See Note [Efficient Orientation]
-       ; when (isNewEvVar eqv) $
-              (let ct = CNonCanonical { cc_id     = evc_the_evvar eqv 
-                                      , cc_flavor = flav
-                                      , cc_depth  = cc_depth workItem }
-              in updWorkListTcS (extendWorkListEq ct))
-
-       ; case wfl of
-           Given   {} -> pprPanic "Unexpected given IP" (ppr workItem)
-           Derived {} -> pprPanic "Unexpected derived IP" (ppr workItem)
-           Wanted  {} ->
-               do { _ <- setEvBind (cc_id workItem) 
-                            (mkEvCast id1 (mkTcSymCo (mkTcTyConAppCo (ipTyCon nm1) [mkTcCoVarCo (evc_the_evvar eqv)]))) wfl
-                  ; irWorkItemConsumed "IP/IP (solved by rewriting)" } }
--}
-
 
 doInteractWithInert ii@(CFunEqCan { cc_flavor = fl1, cc_fun = tc1
                                   , cc_tyargs = args1, cc_rhs = xi1, cc_depth = d1 }) 
@@ -1049,55 +940,6 @@ just an optimization so we don't lose anything in terms of completeness of
 solving.
 
 \begin{code}
-
-
-{- DELETE 
-rewriteEqLHS :: WhichComesFromInert -> (EqVar,Xi) -> (EqVar,SubGoalDepth,CtFlavor,Xi) -> TcS ()
--- Used to ineract two equalities of the following form: 
--- First Equality:   co1: (XXX ~ xi1)  
--- Second Equality:  cv2: (XXX ~ xi2) 
--- Where the cv1 `canRewrite` cv2 equality 
--- We have an option of creating new work (xi1 ~ xi2) OR (xi2 ~ xi1), 
---    See Note [Efficient Orientation] for that 
-rewriteEqLHS LeftComesFromInert (eqv1,xi1) (eqv2,d,gw,xi2) 
-  = do { delCachedEvVar eqv2 gw -- Similarly to canonicalization!
-       ; evc <- newEqVar gw xi2 xi1
-       ; let eqv2' = evc_the_evvar evc
-       ; gw' <- case gw of 
-           Wanted {} 
-               -> setEqBind eqv2 
-                    (mkTcCoVarCo eqv1 `mkTcTransCo` mkTcSymCo (mkTcCoVarCo eqv2')) gw
-           Given {}
-               -> setEqBind eqv2'
-                    (mkTcSymCo (mkTcCoVarCo eqv2) `mkTcTransCo` mkTcCoVarCo eqv1) gw
-           Derived {} 
-               -> return gw
-       ; when (isNewEvVar evc) $ 
-              updWorkListTcS (extendWorkListEq (CNonCanonical { cc_id     = eqv2'
-                                                              , cc_flavor = gw'
-                                                              , cc_depth  = d } ) ) }
-
-rewriteEqLHS RightComesFromInert (eqv1,xi1) (eqv2,d,gw,xi2) 
-  = do { delCachedEvVar eqv2 gw -- Similarly to canonicalization!
-       ; evc <- newEqVar gw xi1 xi2
-       ; let eqv2' = evc_the_evvar evc
-       ; gw' <- case gw of
-           Wanted {} 
-               -> setEqBind eqv2
-                    (mkTcCoVarCo eqv1 `mkTcTransCo` mkTcCoVarCo eqv2') gw
-           Given {}  
-               -> setEqBind eqv2'
-                    (mkTcSymCo (mkTcCoVarCo eqv1) `mkTcTransCo` mkTcCoVarCo eqv2) gw
-           Derived {} 
-               -> return gw
-
-       ; when (isNewEvVar evc) $
-              updWorkListTcS (extendWorkListEq (CNonCanonical { cc_id = eqv2'
-                                                              , cc_flavor = gw'
-                                                              , cc_depth  = d } ) ) }
-
--}
-
 
 solveOneFromTheOther :: String    -- Info 
                      -> CtFlavor  -- Inert 
@@ -1537,17 +1379,6 @@ instFunDepEqn wl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
     push_ctx :: WantedLoc -> WantedLoc 
     push_ctx loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
 
-{- DELETEME              
-              eqv <- newEqVar (Derived wl) sty1 sty2 -- Create derived or cached by deriveds
-                    ; let wl' = push_ctx wl 
-                    ; if isNewEvVar eqv then 
-                          return $ (i,(evc_the_evvar eqv,wl')):ievs 
-                      else -- We are eventually going to emit FD work back in the work list so 
-                           -- it is important that we only return the /freshly created/ and not 
-                           -- some existing equality!
-                          return ievs }
--}
-
 
 mkEqnMsg :: (TcPredType, SDoc) 
          -> (TcPredType, SDoc) -> TidyEnv -> TcM (TidyEnv, SDoc)
@@ -1829,55 +1660,6 @@ updFunEqCache fun_eq@(CFunEqCan { cc_fun = tc, cc_tyargs = xis })
              -- Or _ct? depends on which caches more steps of computation
         key = mkTyConApp tc xis
 updFunEqCache other = pprPanic "updFunEqCache:Non family equation" $ ppr other
-
-
-{- DELETEME
-                   ; case fl of
-                       Wanted {} -> do { evc <- newEqVar fl rhs_ty xi -- Wanted version
-                                       ; let eqv' = evc_the_evvar evc
-                                       ; let coercion = coe `mkTcTransCo` mkTcCoVarCo eqv'
-                                       ; _ <- setEqBind eqv coercion fl
-                                       ; when (isNewEvVar evc) $ 
-                                            (let ct = CNonCanonical { cc_id = eqv'
-                                                                    , cc_flavor = fl 
-                                                                    , cc_depth = cc_depth workItem + 1} 
-                                             in updWorkListTcS (extendWorkListEq ct))
-
-                                       ; let _solved   = workItem { cc_flavor = solved_fl }
-                                             solved_fl = mkSolvedFlavor fl UnkSkol (EvCoercion coercion)
-
-                                       ; updateFlatCache eqv solved_fl tc args xi WhenSolved
-
-                                       ; return $ 
-                                         SomeTopInt { tir_rule = "Fun/Top (solved, more work)"
-                                                    , tir_new_item = Stop } }
-                                                  --  , tir_new_item = ContinueWith solved } }
-                                                     -- Cache in inerts the Solved item
-
-                       Given {} -> do { (fl',eqv') <- newGivenEqVar fl xi rhs_ty $ 
-                                                         mkTcSymCo (mkTcCoVarCo eqv) `mkTcTransCo` coe
-                                      ; let ct = CNonCanonical { cc_id = eqv'
-                                                               , cc_flavor = fl'
-                                                               , cc_depth = cc_depth workItem + 1}  
-                                      ; updWorkListTcS (extendWorkListEq ct) 
-                                      ; return $ 
-                                        SomeTopInt { tir_rule = "Fun/Top (given)"
-                                                   , tir_new_item = ContinueWith workItem } }
-                       Derived {} -> do { evc <- newEvVar fl (mkTcEqPred xi rhs_ty)
-                                        ; let eqv' = evc_the_evvar evc
-                                        ; when (isNewEvVar evc) $ 
-                                            (let ct = CNonCanonical { cc_id  = eqv'
-                                                                 , cc_flavor = fl
-                                                                 , cc_depth  = cc_depth workItem + 1 } 
-                                             in updWorkListTcS (extendWorkListEq ct)) 
-                                        ; return $ 
-                                          SomeTopInt { tir_rule = "Fun/Top (derived)"
-                                                     , tir_new_item = Stop } }
-                   }
-       }
-
--}
-
 
 \end{code}
 
