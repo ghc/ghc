@@ -403,7 +403,7 @@ rewriteInertEqsFromInertEq (subst_tv, subst_co, subst_fl) ieqs
            rewrite_on_the_spot ct
              = do { let rhs_co = liftTcCoSubstWith [subst_tv] [subst_co] rhs
                         eq_co  = mkTcTyConAppCo eqTyCon $ 
-                                   [ mkTcReflCo (typeKind rhs)
+                                   [ mkTcReflCo (defaultKind $ typeKind rhs)
                                    , mkTcReflCo (mkTyVarTy tv)
                                    , mkTcSymCo rhs_co ]
                         new_rhs = pSnd (tcCoercionKind rhs_co)
@@ -754,7 +754,10 @@ interactWithInertsStage :: WorkItem -> TcS StopOrContinue
 -- react with anything at this stage. 
 interactWithInertsStage wi 
   = do { ctxt <- getTcSContext
-       ; if simplEqsOnly ctxt then 
+       ; if simplEqsOnly ctxt && not (isCFunEqCan wi) then 
+                    -- Why not just "simplEqsOnly"? Well our inert sets can't tolerate two family 
+                    -- equations with the /same/ head so we have to enable some reactions. The 
+                    -- example that breaks otherwise is indexed_types/should_compile/T2291.hs 
              return (ContinueWith wi)
          else 
            do { traceTcS "interactWithInerts" $ text "workitem = " <+> ppr wi
@@ -1564,18 +1567,19 @@ tryTopReact :: WorkItem -> TcS StopOrContinue
 tryTopReact wi 
  = do { inerts <- getTcSInerts
       ; ctxt   <- getTcSContext
-      ; if simplEqsOnly ctxt then return (ContinueWith wi) -- or Stop?
+      ; if simplEqsOnly ctxt then 
+          return (ContinueWith wi) 
         else 
           do { tir <- doTopReact inerts wi
-               ; case tir of 
-                   NoTopInt 
-                       -> return (ContinueWith wi)
-                   SomeTopInt rule what_next 
-                       -> do { bumpStepCountTcS 
-                             ; traceFireTcS (cc_depth wi) $
-                               ptext (sLit "Top react:") <+> text rule
-                             ; return what_next }
-               } }
+             ; case tir of 
+                 NoTopInt 
+                     -> return (ContinueWith wi)
+                 SomeTopInt rule what_next 
+                     -> do { bumpStepCountTcS 
+                           ; traceFireTcS (cc_depth wi) $
+                             ptext (sLit "Top react:") <+> text rule
+                           ; return what_next }
+             } }
 
 data TopInteractResult 
  = NoTopInt
@@ -1747,7 +1751,7 @@ lkpFunEqCache fam_head
                                                   
 
                ; let new_pty = mkTcEqPred (mkTyConApp tc xis_subst) xi_subst
-                     new_co  = mkTcTyConAppCo eqTyCon [ mkTcReflCo (typeKind xi_subst)
+                     new_co  = mkTcTyConAppCo eqTyCon [ mkTcReflCo (defaultKind $ typeKind xi_subst)
                                                       , mkTcTyConAppCo tc cos
                                                       , co ]
                                -- new_co :: (F xis_subst ~  xi_subst) ~ (F xis ~ xi)
