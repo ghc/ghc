@@ -678,13 +678,15 @@ flatten d fl (TyConApp tc tys)
                            -- cache as well when we interact an equality with the inert. 
                            -- The design choice is: do we keep the flat cache rewritten or not?
                            -- For now I say we don't keep it fully rewritten.
-                          do { let rhs_xi = cc_rhs ct
+                          do { traceTcS "flatten/flat-cache hit" $ ppr ct
+                             ; let rhs_xi = cc_rhs ct
                              ; (flat_rhs_xi,co) <- flatten (cc_depth ct) (cc_flavor ct) rhs_xi
-                             ; let final_co = mkTcCoVarCo (ctId "flatten" ct) `mkTcTransCo` (mkTcSymCo co)
+                             ; let final_co = mkTcCoVarCo (ctId ct) `mkTcTransCo` (mkTcSymCo co)
                              ; return (final_co, flat_rhs_xi,[]) }
                           
                     _ | isGivenOrSolved fl -- Given or Solved: make new flatten skolem
-                        -> do { rhs_xi_var <- newFlattenSkolemTy fam_ty
+                        -> do { traceTcS "flatten/flat-cache miss" $ empty 
+                              ; rhs_xi_var <- newFlattenSkolemTy fam_ty
                               ; mg <- newGivenEvVar (mkTcEqPred fam_ty rhs_xi_var) 
                                                    (EvCoercion (mkTcReflCo fam_ty)) 
                               ; case mg of 
@@ -700,7 +702,8 @@ flatten d fl (TyConApp tc tys)
                                         ; return (mkTcCoVarCo eqv, rhs_xi_var, [ct]) }
                                    Cached {} -> panic "flatten TyConApp, var must be fresh!" }
                       | otherwise -- Wanted or Derived: make new unification variable
-                        -> do { rhs_xi_var <- newFlexiTcSTy (typeKind fam_ty)
+                        -> do { traceTcS "flatten/flat-cache miss" $ empty 
+                              ; rhs_xi_var <- newFlexiTcSTy (typeKind fam_ty)
                               ; mw <- newWantedEvVar (mkTcEqPred fam_ty rhs_xi_var)
                               ; case mw of
                                    Fresh eqv -> 
@@ -768,7 +771,7 @@ flattenTyVar d ctxt tv
   where tv_eq_subst subst tv
           | Just ct <- lookupVarEnv subst tv
           , cc_flavor ct `canRewrite` ctxt
-          = Just (mkTcCoVarCo (ctId "tv_eq_subst" ct),cc_rhs ct)
+          = Just (mkTcCoVarCo (ctId ct),cc_rhs ct)
                  -- NB: even if ct is Derived we are not going to 
                  -- touch the actual coercion so we are fine. 
           | otherwise = Nothing

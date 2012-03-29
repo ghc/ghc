@@ -163,7 +163,7 @@ deferToRuntime ev_binds_var ctxt mk_err_msg ct
   , Wanted loc _ <- fl
   = do { err <- setCtLoc loc $
                 mk_err_msg ctxt ct
-       ; let ev_id   = ctId "deferToRuntime" ct -- Prec satisfied: Wanted
+       ; let ev_id   = ctId ct -- Prec satisfied: Wanted
              err_msg = pprLocErrMsg err
              err_fs  = mkFastString $ showSDoc $ 
                        err_msg $$ text "(deferred type error)"

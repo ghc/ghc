@@ -920,9 +920,9 @@ ctPred (CIPCan { cc_ip_nm = nm, cc_ip_ty = xi })
 ctPred (CIrredEvCan { cc_ty = xi }) = xi
 
 
-ctId :: String -> Ct -> EvVar
+ctId :: Ct -> EvVar
 -- Precondition: not a derived!
-ctId origin ct = ctFlavId origin (cc_flavor ct)
+ctId ct = ctFlavId (cc_flavor ct)
 
 \end{code}
 
@@ -1252,13 +1252,12 @@ ctFlavPred (Solved _ evar) = evVarPred evar
 ctFlavPred (Wanted _ evar) = evVarPred evar
 ctFlavPred (Derived { flav_der_pty = pty }) = pty
 
-ctFlavId :: String -> CtFlavor -> EvVar
+ctFlavId :: CtFlavor -> EvVar
 -- Precondition: can't be derived
-ctFlavId origin (Derived _ pty) 
+ctFlavId (Derived _ pty) 
   = pprPanic "ctFlavId: derived constraint cannot have id" $ 
-    vcat [ text "origin=" <+> text origin
-         , text "pty   =" <+> ppr pty ]
-ctFlavId _ fl = flav_evar fl
+    text "pty   =" <+> ppr pty
+ctFlavId fl = flav_evar fl
 
 instance Outputable CtFlavor where
   ppr fl = case fl of

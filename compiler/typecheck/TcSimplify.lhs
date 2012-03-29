@@ -611,7 +611,7 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
        -- Don't quantify over equalities (judgement call here)
        ; let (eqs, dicts) = partitionBag (isEqPred . ctPred)
                                          (wc_flat lhs_results)
-             lhs_dicts    = map (ctId "tcSimplify") (bagToList dicts)
+             lhs_dicts    = map ctId (bagToList dicts)
                                  -- Dicts and implicit parameters
                                  -- NB: dicts come from lhs_results which
                                  -- are all Wanted, hence have ids, hence

@@ -52,6 +52,7 @@ import TrieMap
 
 import VarEnv
 import qualified Data.Traversable as Traversable
+import Data.Maybe ( isJust )
 
 import Control.Monad( when, unless )
 import Pair ( pSnd )
@@ -878,7 +879,7 @@ doInteractWithInert (CIPCan { cc_flavor = ifl, cc_ip_nm = nm1, cc_ip_ty = ty1 })
        ; case wfl of
             Wanted  {} ->
               let ip_co = mkTcTyConAppCo (ipTyCon nm1) [mkTcCoVarCo cv]
-              in do { setEvBind (ctId "doInteractWithInert" workItem) $
+              in do { setEvBind (ctId workItem) $
                       mkEvCast (flav_evar ifl) (mkTcSymCo ip_co)
                     ; irWorkItemConsumed "IP/IP (solved by rewriting)" }
             _ -> pprPanic "Unexpected IP constraint" (ppr workItem) }
@@ -1084,7 +1085,7 @@ solveOneFromTheOther info ifl workItem
        ; irWorkItemConsumed ("Solved " ++ info) }
   where 
      wfl = cc_flavor workItem
-     wid = ctId "solveOneFromtheOther" workItem
+     wid = ctId workItem
      iid = flav_evar ifl
 
 \end{code}
@@ -1683,11 +1684,13 @@ doTopReact _inerts workItem@(CFunEqCan { cc_flavor = fl, cc_depth = d
        ; case match_res of
            Nothing -> return NoTopInt 
            Just (famInst, rep_tys)
-             -> do { traceTcS "doTopReact: Family instance matched, but looking in solved funeq cache first" $ empty
-                   ; mb_already_solved <- lkpFunEqCache (mkTyConApp tc args)
+             -> do { mb_already_solved <- lkpFunEqCache (mkTyConApp tc args)
+                   ; traceTcS "doTopReact: Family instance matches" $ 
+                     vcat [ text "solved-fun-cache" <+> if isJust mb_already_solved then text "hit" else text "miss"
+                          , text "workItem =" <+> ppr workItem ]
                    ; let (coe,rhs_ty) 
                            | Just cached_ct <- mb_already_solved
-                           = (mkTcCoVarCo (ctId "doTopReact" cached_ct), 
+                           = (mkTcCoVarCo (ctId cached_ct), 
                                   cc_rhs cached_ct)
                            | otherwise 
                            = let coe_ax = famInstAxiom famInst
@@ -1730,7 +1733,8 @@ lkpFunEqCache :: TcType -> TcS (Maybe Ct)
 lkpFunEqCache fam_head 
   = do { (subst,_inscope) <- getInertEqs 
        ; fun_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
-       ; traceTcS "lkpFunEqCache" $ text "fam_head =" <+> ppr fam_head
+       ; traceTcS "lkpFunEqCache" $ vcat [ text "fam_head    =" <+> ppr fam_head
+                                         , text "funeq cache =" <+> pprCtTypeMap (unCtFamHeadMap fun_cache) ]
        ; rewrite_cached $ 
          lookupTypeMap_mod subst cc_rhs fam_head (unCtFamHeadMap fun_cache) }
   where rewrite_cached Nothing = return Nothing

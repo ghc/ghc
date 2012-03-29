@@ -1340,7 +1340,7 @@ newGivenEvVar pty evterm
   = do { is <- getTcSInerts
        ; case lookupInInerts is pty of
             Just ct | isGivenOrSolvedCt ct 
-                    -> return (Cached (ctId "newGivenEvVar" ct))
+                    -> return (Cached (ctId ct))
             _ -> do { new_ev <- wrapTcS $ TcM.newEvVar pty
                     ; setEvBind new_ev evterm
                     ; return (Fresh new_ev) } }
@@ -1350,8 +1350,10 @@ newWantedEvVar pty
   = do { is <- getTcSInerts
        ; case lookupInInerts is pty of
             Just ct | not (isDerivedCt ct) 
-                    -> return (Cached (ctId "newWantedEvVar" ct))
+                    -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ct
+                          ; return (Cached (ctId ct)) }
             _ -> do { new_ev <- wrapTcS $ TcM.newEvVar pty
+                    ; traceTcS "newWantedEvVar/cache miss" $ ppr new_ev
                     ; return (Fresh new_ev) } }
 
 newDerived :: TcPredType -> TcS (MaybeNew TcPredType)
@@ -1812,6 +1814,6 @@ getCtCoercion bs ct
 
       _ -> mkTcCoVarCo (setVarType cc_id (ctPred ct))
       
-  where cc_id = ctId "getCtCoercion" ct
+  where cc_id = ctId ct
 
 \end{code}
