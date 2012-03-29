@@ -203,13 +203,13 @@ buildClass :: Bool		-- True <=> do not include unfoldings
 	   -> TcRnIf m n Class
 
 buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
-  = do	{ traceIf (text "buildClass")
+  = fixM  $ \ rec_clas -> 	-- Only name generation inside loop
+    do	{ traceIf (text "buildClass")
 	; datacon_name <- newImplicitBinder tycon_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
 		-- because one should import the class to get the binding for 
 		-- the datacon
 
-	; fixM (\ rec_clas -> do {	-- Only name generation inside loop
 
 	; op_items <- mapM (mk_op_item rec_clas) sig_stuff
 	  		-- Build the selector id and default method id
@@ -278,8 +278,7 @@ buildClass no_unf tycon_name tvs sc_theta fds at_items sig_stuff tc_isrec
 				 op_items tycon
 	      }
 	; traceIf (text "buildClass" <+> ppr tycon) 
-	; return result
-	})}
+	; return result }
   where
     mk_op_item :: Class -> TcMethInfo -> TcRnIf n m ClassOpItem
     mk_op_item rec_clas (op_name, dm_spec, _) 

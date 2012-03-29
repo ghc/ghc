@@ -558,7 +558,8 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     //
     if (old_stack->sp > old_stack->stack + old_stack->stack_size / 2)
     {
-        chunk_size = 2 * (old_stack->stack_size + sizeofW(StgStack));
+        chunk_size = stg_max(2 * (old_stack->stack_size + sizeofW(StgStack)),
+                             RtsFlags.GcFlags.stkChunkSize);
     }
     else
     {
@@ -578,11 +579,6 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     new_stack->sp = new_stack->stack + new_stack->stack_size;
 
     tso->tot_stack_size += new_stack->stack_size;
-
-    new_stack->sp -= sizeofW(StgUnderflowFrame);
-    frame = (StgUnderflowFrame*)new_stack->sp;
-    frame->info = &stg_stack_underflow_frame_info;
-    frame->next_chunk  = old_stack;
 
     {
         StgWord *sp;
@@ -611,6 +607,28 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
             sp += size;
         }
 
+        if (sp == old_stack->stack + old_stack->stack_size) {
+            //
+            // the old stack chunk is now empty, so we do *not* insert
+            // an underflow frame pointing back to it.  There are two
+            // cases: either the old stack chunk was the last one, in
+            // which case it ends with a STOP_FRAME, or it is not the
+            // last one, and it already ends with an UNDERFLOW_FRAME
+            // pointing to the previous chunk.  In the latter case, we
+            // will copy the UNDERFLOW_FRAME into the new stack chunk.
+            // In both cases, the old chunk will be subsequently GC'd.
+            //
+            // With the default settings, -ki1k -kb1k, this means the
+            // first stack chunk will be discarded after the first
+            // overflow, being replaced by a non-moving 32k chunk.
+            //
+        } else {
+            new_stack->sp -= sizeofW(StgUnderflowFrame);
+            frame = (StgUnderflowFrame*)new_stack->sp;
+            frame->info = &stg_stack_underflow_frame_info;
+            frame->next_chunk  = old_stack;
+        }
+
         // copy the stack chunk between tso->sp and sp to
         //   new_tso->sp + (tso->sp - sp)
         chunk_words = sp - old_stack->sp;
@@ -621,14 +639,6 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 
         old_stack->sp += chunk_words;
         new_stack->sp -= chunk_words;
-    }
-
-    // if the old stack chunk is now empty, discard it.  With the
-    // default settings, -ki1k -kb1k, this means the first stack chunk
-    // will be discarded after the first overflow, being replaced by a
-    // non-moving 32k chunk.
-    if (old_stack->sp == old_stack->stack + old_stack->stack_size) {
-        frame->next_chunk = (StgStack*)END_TSO_QUEUE; // dummy
     }
 
     tso->stackobj = new_stack;

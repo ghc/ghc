@@ -84,6 +84,9 @@ instance Eq ModulePair where
 instance Ord ModulePair where
   mp1 `compare` mp2 = canon mp1 `compare` canon mp2
 
+instance Outputable ModulePair where
+  ppr (ModulePair m1 m2) = angleBrackets (ppr m1 <> comma <+> ppr m2)
+
 -- Sets of module pairs
 --
 type ModulePairSet = Map ModulePair ()

@@ -480,27 +480,41 @@ tc_iface_decl parent _ (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs,
 
 tc_iface_decl _parent ignore_prags
             (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_occ,
-                 ifTyVars = tv_bndrs, ifFDs = rdr_fds, 
+                         ifTyVars = tv_bndrs, ifFDs = rdr_fds, 
                          ifATs = rdr_ats, ifSigs = rdr_sigs, 
                          ifRec = tc_isrec })
 -- ToDo: in hs-boot files we should really treat abstract classes specially,
 --       as we do abstract tycons
   = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
     { tc_name <- lookupIfaceTop tc_occ
-    ; ctxt <- tcIfaceCtxt rdr_ctxt
+    ; traceIf (text "tc-iface-class1" <+> ppr tc_occ)
+    ; ctxt <- mapM tc_sc rdr_ctxt
+    ; traceIf (text "tc-iface-class2" <+> ppr tc_occ)
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
+    ; traceIf (text "tc-iface-class3" <+> ppr tc_occ)
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
+              ; traceIf (text "tc-iface-class4" <+> ppr tc_occ)
               ; buildClass ignore_prags tc_name tyvars ctxt fds ats sigs tc_isrec }
     ; return (ATyCon (classTyCon cls)) }
   where
+   tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceType pred)
+        -- The *length* of the superclasses is used by buildClass, and hence must
+        -- not be inside the thunk.  But the *content* maybe recursive and hence
+        -- must be lazy (via forkM).  Example:
+        --     class C (T a) => D a where
+        --       data T a
+        -- Here the associated type T is knot-tied with the class, and
+        -- so we must not pull on T too eagerly.  See Trac #5970
+   mk_sc_doc pred = ptext (sLit "Superclass") <+> ppr pred
+
    tc_sig (IfaceClassOp occ dm rdr_ty)
      = do { op_name <- lookupIfaceTop occ
-          ; op_ty   <- forkM (mk_doc op_name rdr_ty) (tcIfaceType rdr_ty)
+          ; op_ty   <- forkM (mk_op_doc op_name rdr_ty) (tcIfaceType rdr_ty)
                 -- Must be done lazily for just the same reason as the 
                 -- type of a data con; to avoid sucking in types that
-                -- it mentions unless it's necessray to do so
+                -- it mentions unless it's necessary to do so
           ; return (op_name, dm, op_ty) }
 
    tc_at cls (IfaceAT tc_decl defs_decls)
@@ -513,7 +527,7 @@ tc_iface_decl _parent ignore_prags
          \tvs' -> liftM2 (\pats tys -> ATD tvs' pats tys noSrcSpan)
                            (mapM tcIfaceType pat_tys) (tcIfaceType ty)
 
-   mk_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
+   mk_op_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
 
    tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
                            ; tvs2' <- mapM tcIfaceTyVar tvs2
@@ -619,8 +633,8 @@ look at it.
 
 \begin{code}
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
-tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag,
-                              ifInstCls = cls, ifInstTys = mb_tcs })
+tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag
+                          , ifInstCls = cls, ifInstTys = mb_tcs })
   = do { dfun    <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
                      tcIfaceExtId dfun_occ
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
@@ -629,10 +643,10 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_occ, ifOFlag = oflag,
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
                              , ifFamInstAxiom = axiom_name } )
-    = do axiom' <- forkM (ptext (sLit "Axiom") <+> ppr axiom_name) $
-                   tcIfaceCoAxiom axiom_name
-         let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-         return (mkImportedFamInst fam mb_tcs' axiom')
+    = do { axiom' <- forkM (ptext (sLit "Axiom") <+> ppr axiom_name) $
+                     tcIfaceCoAxiom axiom_name
+         ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+         ; return (mkImportedFamInst fam mb_tcs' axiom') }
 \end{code}
 
 
