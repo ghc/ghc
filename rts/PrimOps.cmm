@@ -206,6 +206,33 @@ stg_unsafeThawArrayzh ( gcptr arr )
   }
 }
 
+stg_casArrayzh
+/* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #) */
+{
+    W_ arr, p, ind, old, new, h, len;
+    arr = R1; // anything else?
+    ind = R2;
+    old = R3;
+    new = R4;
+
+    p = arr + SIZEOF_StgMutArrPtrs + WDS(ind);
+    (h) = foreign "C" cas(p, old, new) [];
+    
+    if (h != old) {
+        // Failure, return what was there instead of 'old':
+        RET_NP(1,h);
+    } else {
+        // Compare and Swap Succeeded:
+        if (GET_INFO(arr) == stg_MUT_ARR_PTRS_CLEAN_info) {
+           SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
+           len = StgMutArrPtrs_ptrs(arr);
+           // The write barrier.  We must write a byte into the mark table:
+           I8[arr + SIZEOF_StgMutArrPtrs + WDS(len) + (ind >> MUT_ARR_PTRS_CARD_BITS )] = 1;
+        }
+        RET_NP(0,h);
+    }
+}
+
 stg_newArrayArrayzh ( W_ n /* words */ )
 {
     W_ words, size;

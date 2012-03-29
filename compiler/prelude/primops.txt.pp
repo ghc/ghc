@@ -794,6 +794,14 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
 
+primop CasArrayOp  "casArray#" GenPrimOp
+   MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
+   {Unsafe, machine-level atomic compare and swap on an element within an Array.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+
 ------------------------------------------------------------------------
 section "Byte Arrays"
 	{Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of
