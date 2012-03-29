@@ -758,11 +758,16 @@ abandonAll = do
 --          with the partial computation, which still ends in takeMVar,
 --          so any attempt to evaluate one of these thunks will block
 --          unless we fill in the MVar.
+--      (c) wait for the thread to terminate by taking its status MVar.  This
+--          step is necessary to prevent race conditions with
+--          -fbreak-on-exception (see #5975).
 --  See test break010.
 abandon_ :: Resume -> IO ()
 abandon_ r = do
   killThread (resumeThreadId r)
   putMVar (resumeBreakMVar r) ()
+  _ <- takeMVar (resumeStatMVar r)
+  return ()
 
 -- -----------------------------------------------------------------------------
 -- Bounded list, optimised for repeated cons
