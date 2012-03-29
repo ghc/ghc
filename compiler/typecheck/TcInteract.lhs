@@ -756,9 +756,7 @@ interactWithInertsStage :: WorkItem -> TcS StopOrContinue
 interactWithInertsStage wi 
   = do { ctxt <- getTcSContext
        ; if simplEqsOnly ctxt && not (isCFunEqCan wi) then 
-                    -- Why not just "simplEqsOnly"? Well our inert sets can't tolerate two family 
-                    -- equations with the /same/ head so we have to enable some reactions. The 
-                    -- example that breaks otherwise is indexed_types/should_compile/T2291.hs 
+                    -- Why not just "simplEqsOnly"? See Note [SimplEqsOnly and InteractWithInerts]
              return (ContinueWith wi)
          else 
            do { traceTcS "interactWithInerts" $ text "workitem = " <+> ppr wi
@@ -790,7 +788,37 @@ interactWithInertsStage wi
                        -> do { updInertSetTcS atomic_inert
                              ; return (ContinueWith wi) }
                }
-   
+
+\end{code}
+
+Note [SimplEqsOnly and InteractWithInerts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It may be possible when we are simplifying a RULE that we have two wanted constraints
+of the form: 
+  [W] c1 : F Int ~ Bool
+  [W] c2 : F Int ~ alpha
+
+When we simplify RULES we only do equality reactions (simplEqsOnly). So the question is:
+are we allowed to do type family interactions? We definitely do not want to apply top-level
+family and dictionary instances but what should we do with the constraint set above? 
+
+Suppose that c1 gets processed first and enters the inert. Remember that he will enter a 
+CtFamHead map with (F Int) as the index. Now c2 comes along, we can't add him to the inert
+set since it has exactly the same key, so we'd better react him with the inert c1. In fact 
+one might think that we should react him anyway to learn that (alpha ~ Bool). This is why
+we allow CFunEqCan's to perform reactions with the inerts. 
+
+If we don't allow this, we will try to add both elements to the inert set and will panic! 
+The relevant example that fails when we don't allow such family reactions is:
+
+        indexed_types/should_compile/T2291.hs
+
+NB: In previous versions of TcInteract the extra guard (not (isCFunEqCan wi)) was not there 
+but family reactions were actually happening earlier, during canonicalization. So the behaviour 
+has not changed -- previously this tricky point was completely lost and worked by accident.
+
+\begin{code}   
 --------------------------------------------
 
 doInteractWithInert :: Ct -> Ct -> TcS InteractResult
