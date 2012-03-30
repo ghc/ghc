@@ -40,7 +40,7 @@ typedef
    ProddableBlock;
 
 /* Jump Islands are sniplets of machine code required for relative
- * address relocations on the PowerPC.
+ * address relocations on the PowerPC, x86_64 and ARM.
  */
 typedef struct {
 #ifdef powerpc_HOST_ARCH
@@ -53,6 +53,8 @@ typedef struct {
 #elif x86_64_HOST_ARCH
     uint64_t    addr;
     uint8_t     jumpIsland[6];
+#elif arm_HOST_ARCH
+    uint8_t     jumpIsland[16];
 #endif
 } SymbolExtra;
 
@@ -104,7 +106,7 @@ typedef struct _ObjectCode {
     unsigned int pltIndex;
 #endif
 
-#if powerpc_HOST_ARCH || x86_64_HOST_ARCH
+#if powerpc_HOST_ARCH || x86_64_HOST_ARCH || arm_HOST_ARCH
     SymbolExtra    *symbol_extras;
     unsigned long   first_symbol_extra;
     unsigned long   n_symbol_extras;
