@@ -1494,6 +1494,7 @@ of the inner case y, which give us nowhere to go!
 
 \begin{code}
 prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+-- The returned alternatives can be empty, none are possible
 prepareAlts scrut case_bndr' alts = do
     us <- getUniquesM
     -- Case binder is needed just for its type. Note that as an
