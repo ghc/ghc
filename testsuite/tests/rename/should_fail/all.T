@@ -101,3 +101,4 @@ test('T5745',
      multimod_compile_fail, ['T5745', '-v0'])
 test('T5892a', normal, compile_fail, [''])
 test('T5892b', normal, compile_fail, [''])
+test('T5951', normal, compile_fail, [''])
