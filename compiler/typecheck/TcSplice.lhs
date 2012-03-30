@@ -828,7 +828,7 @@ runMeta show_code run_and_convert expr
         ; either_hval <- tryM $ liftIO $
                          HscMain.hscCompileCoreExpr hsc_env src_span ds_expr
         ; case either_hval of {
-            Left exn   -> failWithTc (mk_msg "compile and link" exn) ;
+            Left exn   -> fail_with_exn "compile and link" exn ;
             Right hval -> do
 
         {       -- Coerce it to Q t, and run it
@@ -856,12 +856,16 @@ runMeta show_code run_and_convert expr
             Right v -> return v
             Left se -> case fromException se of
                          Just IOEnvFailure -> failM -- Error already in Tc monad
-                         _ -> failWithTc (mk_msg "run" se)      -- Exception
+                         _ -> fail_with_exn "run" se -- Exception
         }}}
   where
-    mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",
-                         nest 2 (text (Panic.showException exn)),
-                         if show_code then nest 2 (text "Code:" <+> ppr expr) else empty]
+    -- see Note [Concealed TH exceptions]
+    fail_with_exn phase exn = do
+        exn_msg <- liftIO $ Panic.safeShowException exn
+        let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
+                        nest 2 (text exn_msg),
+                        if show_code then nest 2 (text "Code:" <+> ppr expr) else empty]
+        failWithTc msg
 \end{code}
 
 Note [Exceptions in TH]
@@ -892,6 +896,21 @@ like that.  Here's how it's processed:
                 in the error-bag (above)
         - other errors, we add an error to the bag
     and then fail
+
+Note [Concealed TH exceptions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When displaying the error message contained in an exception originated from TH
+code, we need to make sure that the error message itself does not contain an
+exception.  For example, when executing the following splice:
+
+    $( error ("foo " ++ error "bar") )
+
+the message for the outer exception is a thunk which will throw the inner
+exception when evaluated.
+
+For this reason, we display the message of a TH exception using the
+'safeShowException' function, which recursively catches any exception thrown
+when showing an error message.
 
 
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:

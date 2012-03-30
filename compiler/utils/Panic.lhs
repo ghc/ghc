@@ -22,7 +22,7 @@ module Panic (
 
      panic, sorry, panicFastInt, assertPanic, trace,
      
-     Exception.Exception(..), showException, try, tryMost, throwTo,
+     Exception.Exception(..), showException, safeShowException, try, tryMost, throwTo,
 
      installSignalHandlers, interruptTargetThread
 ) where
@@ -113,6 +113,18 @@ short_usage = "Usage: For basic information, try the `--help' option."
 showException :: Exception e => e -> String
 showException = show
 
+-- | Show an exception which can possibly throw other exceptions.
+-- Used when displaying exception thrown within TH code.
+safeShowException :: Exception e => e -> IO String
+safeShowException e = do
+    -- ensure the whole error message is evaluated inside try
+    r <- try (return $! forceList (showException e))
+    case r of
+        Right msg -> return msg
+        Left e' -> safeShowException (e' :: SomeException)
+    where
+        forceList [] = []
+        forceList xs@(x : xt) = x `seq` forceList xt `seq` xs
 
 -- | Append a description of the given exception to this string.
 showGhcException :: GhcException -> String -> String
