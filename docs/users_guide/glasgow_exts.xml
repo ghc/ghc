@@ -2093,8 +2093,9 @@ NilSet :: Set a
 ConsSet :: Eq a => a -> Set a -> Set a
 </programlisting>
 
-<para>In GHC this feature is an extension called
-<literal>DatatypeContexts</literal>, and on by default.</para>
+<para>This is widely considered a misfeature, and is going to be removed from
+the language.  In GHC, it is controlled by the deprecated extension
+<literal>DatatypeContexts</literal>.</para>
 </sect2>
 
 <sect2 id="infix-tycons">
