@@ -309,9 +309,9 @@ tcLookupId name = do
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at
 -- the same level as the lookup.  Only used in one place...
-tcLookupLocalIds ns = do
-    env <- getLclEnv
-    return (map (lookup (tcl_env env) (thLevel (tcl_th_ctxt env))) ns)
+tcLookupLocalIds ns 
+  = do { env <- getLclEnv
+       ; return (map (lookup (tcl_env env) (thLevel (tcl_th_ctxt env))) ns) }
   where
     lookup lenv lvl name 
         = case lookupNameEnv lenv name of
@@ -328,17 +328,11 @@ getInLocalScope = do { lcl_env <- getLclTypeEnv
 \begin{code}
 tcExtendTcTyThingEnv :: [(Name, TcTyThing)] -> TcM r -> TcM r
 tcExtendTcTyThingEnv things thing_inside
-  = updLclEnv upd thing_inside
-  where
-    upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
-    extend env  = extendNameEnvList env things
+  = updLclEnv (extend_local_env things) thing_inside
 
 tcExtendKindEnv :: [(Name, TcKind)] -> TcM r -> TcM r
-tcExtendKindEnv things thing_inside
-  = updLclEnv upd thing_inside
-  where
-    upd lcl_env = lcl_env { tcl_env = extend (tcl_env lcl_env) }
-    extend env  = extendNameEnvList env [(n, AThing k) | (n,k) <- things]
+tcExtendKindEnv name_kind_prs
+  = tcExtendTcTyThingEnv [(n, AThing k) | (n,k) <- name_kind_prs]
 
 -----------------------
 -- Scoped type and kind variables
@@ -432,9 +426,7 @@ tc_extend_local_env :: [(Name, TcTyThing)] -> TcM a -> TcM a
 tc_extend_local_env extra_env thing_inside
   = do  { traceTc "env2" (ppr extra_env)
         ; env1 <- getLclEnv
-        ; let le'      = extendNameEnvList     (tcl_env env1) extra_env
-              rdr_env' = extendLocalRdrEnvList (tcl_rdr env1) (map fst extra_env)
-              env2     = env1 {tcl_env = le', tcl_rdr = rdr_env'}
+        ; let env2 = extend_local_env extra_env env1
         ; env3 <- extend_gtvs env2
         ; setLclEnv env3 thing_inside }
   where
@@ -468,6 +460,12 @@ tc_extend_local_env extra_env thing_inside
         -- when typechecking the methods.
         --
         -- Nor must we generalise g over any kind variables free in r's kind
+
+extend_local_env :: [(Name, TcTyThing)] -> TcLclEnv -> TcLclEnv
+-- Extend the local TcTypeEnv *and* the local LocalRdrEnv simultaneously
+extend_local_env pairs env@(TcLclEnv { tcl_rdr = rdr_env, tcl_env = type_env })
+  = env { tcl_rdr = extendLocalRdrEnvList rdr_env (map fst pairs)
+        , tcl_env = extendNameEnvList type_env pairs }
 
 tcExtendGlobalTyVars :: IORef VarSet -> VarSet -> TcM (IORef VarSet)
 tcExtendGlobalTyVars gtv_var extra_global_tvs
