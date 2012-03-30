@@ -117,4 +117,5 @@ test('weak001', normal, compile_and_run, [''])
 test('4006', if_msys(expect_fail), compile_and_run, [''])
 
 test('5943', normal, compile_and_run, [''])
+test('T5962', normal, compile_and_run, [''])
 
