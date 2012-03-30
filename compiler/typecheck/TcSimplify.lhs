@@ -698,10 +698,12 @@ simplifyCheck ctxt wanteds
 
        ; traceTc "simplifyCheck }" $ ptext (sLit "unsolved =") <+> ppr unsolved
 
+       ; traceTc "reportUnsolved {" empty
        -- See Note [Deferring coercion errors to runtime]
        ; runtimeCoercionErrors <- doptM Opt_DeferTypeErrors
        ; eb2 <- reportUnsolved runtimeCoercionErrors unsolved 
-       
+       ; traceTc "reportUnsolved }" empty
+
        ; return (eb1 `unionBags` eb2) }
 \end{code}
 
