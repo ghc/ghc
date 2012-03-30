@@ -17,6 +17,7 @@ module TcSMonad (
     appendWorkListCt, appendWorkListEqs, unionWorkList, selectWorkItem,
 
     getTcSWorkList, updWorkListTcS, updWorkListTcS_return, keepWanted,
+    getTcSWorkListTvs, 
 
     Ct(..), Xi, tyVarsOfCt, tyVarsOfCts, tyVarsOfCDicts, 
     emitFrozenError,
@@ -196,7 +197,10 @@ better rewrite it as much as possible before reporting it as an error to the use
 \begin{code}
 
 -- See Note [WorkList]
-data WorkList = WorkList { wl_eqs  :: [Ct], wl_funeqs :: [Ct], wl_rest :: [Ct] }
+data WorkList = WorkList { wl_eqs    :: [Ct]
+                         , wl_funeqs :: [Ct]
+                         , wl_rest   :: [Ct] 
+                         }
 
 
 unionWorkList :: WorkList -> WorkList -> WorkList
@@ -204,6 +208,7 @@ unionWorkList new_wl orig_wl =
    WorkList { wl_eqs    = wl_eqs new_wl ++ wl_eqs orig_wl
             , wl_funeqs = wl_funeqs new_wl ++ wl_funeqs orig_wl
             , wl_rest   = wl_rest new_wl ++ wl_rest orig_wl }
+
 
 extendWorkListEq :: Ct -> WorkList -> WorkList
 -- Extension by equality
@@ -215,7 +220,8 @@ extendWorkListEq ct wl
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
-extendWorkListNonEq ct wl = wl { wl_rest = ct : wl_rest wl }
+extendWorkListNonEq ct wl 
+  = wl { wl_rest = ct : wl_rest wl }
 
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic
@@ -236,7 +242,7 @@ isEmptyWorkList wl
   = null (wl_eqs wl) &&  null (wl_rest wl) && null (wl_funeqs wl)
 
 emptyWorkList :: WorkList
-emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [], wl_funeqs = []}
+emptyWorkList = WorkList { wl_eqs  = [], wl_rest = [], wl_funeqs = [] }
 
 workListFromEq :: Ct -> WorkList
 workListFromEq ct = extendWorkListEq ct emptyWorkList
@@ -963,6 +969,16 @@ getTcSInerts = getTcSInertsRef >>= wrapTcS . (TcM.readTcRef)
 
 getTcSWorkList :: TcS WorkList
 getTcSWorkList = getTcSWorkListRef >>= wrapTcS . (TcM.readTcRef) 
+
+
+getTcSWorkListTvs :: TcS TyVarSet
+-- Return the variables of the worklist
+getTcSWorkListTvs 
+  = do { wl <- getTcSWorkList
+       ; return $
+         cts_tvs (wl_eqs wl) `unionVarSet` cts_tvs (wl_funeqs wl) `unionVarSet` cts_tvs (wl_rest wl) }
+  where cts_tvs = foldr (unionVarSet . tyVarsOfCt) emptyVarSet 
+
 
 updWorkListTcS :: (WorkList -> WorkList) -> TcS () 
 updWorkListTcS f 

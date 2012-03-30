@@ -597,6 +597,15 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
 	     	 -- We allow ourselves to unify environment 
 		 -- variables; hence *no untouchables*
 
+-- DV: SPJ and I discussed a new plan here:
+-- Step 1: Simplify everything in the same bag
+-- Step 2: zonk away the lhs constraints and get only the non-trivial ones
+-- Step 3: do the implications with these constraints
+-- This will have the advantage that (i) we no longer need simplEqsOnly flag
+-- and (ii) will fix problems appearing from touchable unification variables
+-- in the givens, manifested by #5853
+-- TODO ... 
+
        ; (lhs_results, lhs_binds)
               <- runTcS (SimplRuleLhs name) untch emptyInert emptyWorkList $
                  solveWanteds zonked_lhs
@@ -944,7 +953,10 @@ floatEqualities skols can_given wantders
   | hasEqualities can_given = (emptyBag, wantders)
           -- Note [Float Equalities out of Implications]
   | otherwise = partitionBag is_floatable wantders
-  
+
+-- TODO: Maybe we should try out /not/ floating constraints that contain touchables only, 
+-- since they are inert and not going to interact with anything more in a more global scope.
+
   where skol_set = mkVarSet skols
         is_floatable :: Ct -> Bool
         is_floatable ct
@@ -1089,6 +1101,8 @@ Note [Float Equalities out of Implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 We want to float equalities out of vanilla existentials, but *not* out 
 of GADT pattern matches. 
+
+---> TODO Expand in accordance to our discussion
 
 
 \begin{code}

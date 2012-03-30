@@ -736,6 +736,12 @@ flatten d ctxt ty@(ForAllTy {})
        ; (rho', co) <- flatten d ctxt rho
        ; return (mkForAllTys tvs rho', foldr mkTcForAllCo co tvs) }
 
+-- DV: Simon and I have a better plan here related to #T5934 and that plan is to 
+-- first normalize completely the rho type with respect to the top-level instances, 
+-- and then flatten out only the family equations that do not mention the quantified
+-- variable. Keep the rest as they are. There is no worry that we don't normalize with
+-- the givens because the givens can't possibly mention the quantified variable anyway!
+
   where under_families tvs rho 
             = go (mkVarSet tvs) rho 
             where go _bound (TyVarTy _tv) = False

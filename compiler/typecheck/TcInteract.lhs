@@ -335,8 +335,23 @@ rewriteInertEqsFromInertEq (subst_tv, subst_co, subst_fl) ieqs
          = if fl `canRewrite` subst_fl then
                -- If also the inert can rewrite the subst it's totally safe 
                -- to rewrite on the spot
-               do { ct' <- rewrite_on_the_spot ct
-                  ; return $ Just ct' }
+               do { 
+
+{- DV: I thought this might work but not because you don't have the full knowledge of the 
+   implications (just the worklist). And it's a bit tedious. SPJ and I discussed about breaking
+   the 'idempotent substitution' invariant to be a little more lazy. -} 
+
+                    -- DV: Very experimental! 
+                    -- If it's a given equality and its LHS does not appear in the worklist
+                    -- there is no point in rewriting him. In fact there is not point in keeping him, 
+                    -- at all, is there? 
+                    worklist_tvs <- getTcSWorkListTvs 
+                  ; if isGiven (cc_flavor ct) && not (tyVarsOfCt ct `elemVarSet` worklist_tvs) then
+                        return Nothing
+                    else do { 
+                     ct' <- rewrite_on_the_spot ct
+                    ; return $ Just ct' } 
+                 }
            else -- We have to throw inert back to worklist for occurs checks 
               do { updWorkListTcS (extendWorkListEq ct)
                  ; return Nothing }
@@ -388,10 +403,11 @@ kick_out_rewritable ct is@(IS { inert_cans =
                               , inert_frozen = frozen })
   = ((kicked_out,eqmap), remaining)
   where
+    rest_out = fro_out `andCts` dicts_out 
+                   `andCts` ips_out `andCts` irs_out
     kicked_out = WorkList { wl_eqs    = []
                           , wl_funeqs = bagToList feqs_out
-                          , wl_rest   = bagToList (fro_out `andCts` dicts_out 
-                                          `andCts` ips_out `andCts` irs_out) }
+                          , wl_rest   = bagToList rest_out }
   
     remaining = is { inert_cans = IC { inert_eqs = emptyVarEnv
                                      , inert_eq_tvs = inscope 
