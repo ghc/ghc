@@ -157,9 +157,12 @@ funResultTy trFun trArg
 
 -- | Adds a TypeRep argument to a TypeRep.
 mkAppTy :: TypeRep -> TypeRep -> TypeRep
-mkAppTy (TypeRep tr_k tc trs) arg_tr
-  = let (TypeRep arg_k _ _) = arg_tr
-     in  TypeRep (fingerprintFingerprints [tr_k,arg_k]) tc (trs++[arg_tr])
+mkAppTy (TypeRep _ tc trs) arg_tr = mkTyConApp tc (trs ++ [arg_tr])
+   -- Notice that we call mkTyConApp to construct the fingerprint from tc and
+   -- the arg fingerprints.  Simply combining the current fingerprint with
+   -- the new one won't give the same answer, but of course we want to 
+   -- ensure that a TypeRep of the same shape has the same fingerprint!
+   -- See Trac #5962
 
 -- | Builds a 'TyCon' object representing a type constructor.  An
 -- implementation of "Data.Typeable" should ensure that the following holds:
