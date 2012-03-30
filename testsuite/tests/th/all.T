@@ -125,7 +125,7 @@ test('TH_dataD1', normal, compile_fail, ['-v0'])
 test('TH_ppr1', normal, compile_and_run, [''])
 
 test('TH_fail', normal, compile_fail, ['-v0'])
-test('TH_scopedTvs', normal, compile_fail, ['-v0'])
+test('TH_scopedTvs', normal, compile, ['-v0'])
 
 test('TH_runIO', normal, compile_fail, ['-v0'])
 
