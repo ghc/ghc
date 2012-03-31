@@ -5371,6 +5371,52 @@ Note that this requires <option>-XTypeOperators</option>.
 </para>
 </sect3>
 
+<sect3 id="promoted-literals">
+<title>Promoted Literals</title>
+<para>
+Numeric and string literals are prmoted to the type level, giving convenient
+access to a large number of predefined type-level constants.  Numeric literals
+are of kind <literal>Nat</literal>, while string literals are of kind
+<literal>Symbol</literal>.  These kinds are defined in the module
+<literal>GHC.TypeLits</literal>.
+</para>
+
+<para>
+Here is an exampe of using type-level numeric literals to provide a safe
+interface to a low-level function:
+<programlisting>
+import GHC.TypeLits
+import Data.Word
+import Foreign
+
+newtype ArrPtr (n :: Nat) a = ArrPtr (Ptr a)
+
+clearPage :: ArrPtr 4096 Word8 -> IO ()
+clearPage (ArrPtr p) = ...
+</programlisting>
+</para>
+
+<para>
+Here is an example of using type-level string literals to simulate
+simple record operations:
+<programlisting>
+data Label (l :: Symbol) = Get
+
+class Has a l b | a l -> b where
+  from :: a -> Label l -> b
+
+data Point = Point Int Int deriving Show
+
+instance Has Point "x" Int where from (Point x _) _ = x
+instance Has Point "y" Int where from (Point _ y) _ = y
+
+example = from (Point 1 2) (Get :: Label "x")
+</programlisting>
+</para>
+</sect3>
+
+
+
 </sect2>
 
 <sect2 id="kind-polymorphism-limitations">
