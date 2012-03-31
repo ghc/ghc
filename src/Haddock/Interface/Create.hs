@@ -35,7 +35,7 @@ import HscTypes
 import Name
 import Bag
 import RdrName
-import TcRnTypes (tcg_warns)
+import TcRnTypes
 import FastString (unpackFS)
 
 
@@ -51,7 +51,7 @@ createInterface tm flags modMap instIfaceMap = do
       dflags        = ms_hspp_opts ms
       instances     = modInfoInstances mi
       exportedNames = modInfoExports mi
-      warnings      = tcg_warns . fst . tm_internals_ $ tm
+      (TcGblEnv {tcg_rdr_env = gre, tcg_warns = warnings}, _) = tm_internals_ tm
 
   -- The renamed source should always be available to us, but it's best
   -- to be on the safe side.
@@ -62,9 +62,17 @@ createInterface tm flags modMap instIfaceMap = do
         return (emptyRnGroup, Nothing, Nothing)
       Just (x, _, y, z) -> return (x, y, z)
 
+{-
   -- The pattern-match should not fail, because createInterface is only
   -- done on loaded modules.
-  Just gre <- liftGhcToErrMsgGhc $ lookupLoadedHomeModuleGRE (moduleName mdl)
+  gre0 <- liftGhcToErrMsgGhc $ lookupLoadedHomeModuleGRE (moduleName mdl)
+  gre <-
+    case gre0 of
+      Nothing -> do
+        liftErrMsg $ tell [ "Warning: Could not find module in renaming environment: " ++ pretty mdl ]
+        return emptyGlobalRdrEnv
+      Just gre -> return gre
+-}
 
   opts0 <- liftErrMsg $ mkDocOpts (haddockOptions dflags) flags mdl
   let opts
