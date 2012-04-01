@@ -30,6 +30,7 @@ import Control.Applicative
 import Control.Monad
 import qualified Data.Traversable as T
 
+import qualified SrcLoc
 import GHC hiding (flags)
 import HscTypes
 import Name
@@ -106,6 +107,18 @@ createInterface tm flags modMap instIfaceMap = do
         | OptPrune `elem` opts = prunedExportItems0
         | otherwise = exportItems
 
+  let abbrevs =
+        case tm_renamed_source tm of
+          Nothing -> M.empty
+          Just (_,impDecls,_,_) ->
+            M.fromList $
+            mapMaybe (\(SrcLoc.L _ impDecl) -> do
+              abbrev <- ideclAs impDecl
+              return
+                (case ideclName impDecl of SrcLoc.L _ name -> name,
+                 abbrev))
+              impDecls
+
   return Interface {
     ifaceMod             = mdl,
     ifaceOrigFilename    = msHsFilePath ms,
@@ -123,6 +136,7 @@ createInterface tm flags modMap instIfaceMap = do
     ifaceVisibleExports  = visibleNames,
     ifaceDeclMap         = declMap,
     ifaceSubMap          = subMap,
+    ifaceModuleAbbrevs   = abbrevs,
     ifaceInstances       = instances,
     ifaceHaddockCoverage = coverage
   }

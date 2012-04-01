@@ -126,7 +126,7 @@ options backwardsCompat =
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
       "page heading",
     Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUAL")
-      "qualification of names, one of \n'none' (default), 'full', 'local'\nor 'relative'",
+      "qualification of names, one of \n'none' (default), 'full', 'local'\n'relative' or 'abbreviate'",
     Option ['?']  ["help"]  (NoArg Flag_Help)
       "display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
@@ -232,13 +232,14 @@ optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
 qualification :: [Flag] -> Either String QualOption
 qualification flags =
   case map (map Char.toLower) [ str | Flag_Qualification str <- flags ] of
-      []           -> Right OptNoQual
-      ["none"]     -> Right OptNoQual
-      ["full"]     -> Right OptFullQual
-      ["local"]    -> Right OptLocalQual
-      ["relative"] -> Right OptRelativeQual
-      [arg]        -> Left $ "unknown qualification type " ++ show arg
-      _:_          -> Left "qualification option given multiple times"
+      []             -> Right OptNoQual
+      ["none"]       -> Right OptNoQual
+      ["full"]       -> Right OptFullQual
+      ["local"]      -> Right OptLocalQual
+      ["relative"]   -> Right OptRelativeQual
+      ["abbreviate"] -> Right OptAbbreviateQual
+      [arg]          -> Left $ "unknown qualification type " ++ show arg
+      _:_            -> Left "qualification option given multiple times"
 
 
 verbosity :: [Flag] -> Verbosity

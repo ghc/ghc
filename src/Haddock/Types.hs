@@ -103,12 +103,15 @@ data Interface = Interface
     -- module.
   , ifaceVisibleExports  :: ![Name]
 
+    -- | Abbreviations of module imports as in @import A.B.C as C@.
+  , ifaceModuleAbbrevs   :: AbbreviationMap
+
     -- | Instances exported by the module.
   , ifaceInstances       :: ![Instance]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
-  , ifaceHaddockCoverage  :: (Int,Int)
+  , ifaceHaddockCoverage :: (Int,Int)
   }
 
 
@@ -375,18 +378,27 @@ data DocOption
 
 -- | Option controlling how to qualify names
 data QualOption
-  = OptNoQual        -- ^ Never qualify any names.
-  | OptFullQual      -- ^ Qualify all names fully.
-  | OptLocalQual     -- ^ Qualify all imported names fully.
-  | OptRelativeQual  -- ^ Like local, but strip module prefix
-                     --   from modules in the same hierarchy.
+  = OptNoQual         -- ^ Never qualify any names.
+  | OptFullQual       -- ^ Qualify all names fully.
+  | OptLocalQual      -- ^ Qualify all imported names fully.
+  | OptRelativeQual   -- ^ Like local, but strip module prefix
+                      --   from modules in the same hierarchy.
+  | OptAbbreviateQual -- ^ Uses abbreviations of module names
+                      --   as suggested by module import renamings.
+                      --   However, we are unfortunately not able
+                      --   to maintain the original qualifications.
+                      --   Image a re-export of a whole module,
+                      --   how could the re-exported identifiers be qualified?
+
+type AbbreviationMap = Map ModuleName ModuleName
 
 data Qualification
   = NoQual
   | FullQual
   | LocalQual Module
   | RelativeQual Module
-       -- ^ @Maybe Module@ contains the current module.
+  | AbbreviateQual AbbreviationMap Module
+       -- ^ @Module@ contains the current module.
        --   This way we can distinguish imported and local identifiers.
 
 makeContentsQual :: QualOption -> Qualification
@@ -395,13 +407,14 @@ makeContentsQual qual =
     OptNoQual -> NoQual
     _         -> FullQual
 
-makeModuleQual :: QualOption -> Module -> Qualification
-makeModuleQual qual mdl =
+makeModuleQual :: QualOption -> AbbreviationMap -> Module -> Qualification
+makeModuleQual qual abbrevs mdl =
   case qual of
-    OptLocalQual    -> LocalQual mdl
-    OptRelativeQual -> RelativeQual mdl
-    OptFullQual     -> FullQual
-    OptNoQual       -> NoQual
+    OptLocalQual      -> LocalQual mdl
+    OptRelativeQual   -> RelativeQual mdl
+    OptAbbreviateQual -> AbbreviateQual abbrevs mdl
+    OptFullQual       -> FullQual
+    OptNoQual         -> NoQual
 
 
 -----------------------------------------------------------------------------

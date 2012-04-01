@@ -24,6 +24,7 @@ import Haddock.Types
 import Haddock.Utils
 
 import Text.XHtml hiding ( name, title, p, quote )
+import qualified Data.Map as M
 import qualified Data.List as List
 
 import GHC
@@ -64,24 +65,33 @@ ppQualifyName qual name mdl =
   case qual of
     NoQual   -> ppName name
     FullQual -> ppFullQualName mdl name
-    LocalQual localmdl
-      | moduleString mdl == moduleString localmdl -> ppName name
-      | otherwise -> ppFullQualName mdl name
+    LocalQual localmdl ->
+      if moduleString mdl == moduleString localmdl
+        then ppName name
+        else ppFullQualName mdl name
     RelativeQual localmdl ->
       case List.stripPrefix (moduleString localmdl) (moduleString mdl) of
         -- local, A.x -> x
-        Just []      -> ppQualifyName NoQual name mdl
+        Just []      -> ppName name
         -- sub-module, A.B.x -> B.x
         Just ('.':m) -> toHtml $ m ++ '.' : getOccString name
         -- some module with same prefix, ABC.x -> ABC.x
-        Just _       -> ppQualifyName FullQual name mdl
+        Just _       -> ppFullQualName mdl name
         -- some other module, D.x -> D.x
-        Nothing      -> ppQualifyName FullQual name mdl
+        Nothing      -> ppFullQualName mdl name
+    AbbreviateQual abbrevs localmdl ->
+      case (moduleString mdl == moduleString localmdl,
+            M.lookup (moduleName mdl) abbrevs) of
+        (False, Just abbrev) -> ppQualName abbrev name
+        _ -> ppName name
 
 
 ppFullQualName :: Module -> Name -> Html
 ppFullQualName mdl name = toHtml $ moduleString mdl ++ '.' : getOccString name
 
+ppQualName :: ModuleName -> Name -> Html
+ppQualName mdlName name =
+  toHtml $ moduleNameString mdlName ++ '.' : getOccString name
 
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)
