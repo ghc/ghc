@@ -79,10 +79,10 @@ ppQualifyName qual name mdl =
         Just _       -> ppFullQualName mdl name
         -- some other module, D.x -> D.x
         Nothing      -> ppFullQualName mdl name
-    AbbreviateQual abbrevs localmdl ->
+    AliasedQual aliases localmdl ->
       case (moduleString mdl == moduleString localmdl,
-            M.lookup mdl abbrevs) of
-        (False, Just abbrev) -> ppQualName abbrev name
+            M.lookup mdl aliases) of
+        (False, Just alias) -> ppQualName alias name
         _ -> ppName name
 
 

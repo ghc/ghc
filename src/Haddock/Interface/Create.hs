@@ -109,8 +109,8 @@ createInterface tm flags modMap instIfaceMap = do
         | OptPrune `elem` opts = prunedExportItems0
         | otherwise = exportItems
 
-  let abbrevs =
-        mkAbbrevMap dflags $ tm_renamed_source tm
+  let aliases =
+        mkAliasMap dflags $ tm_renamed_source tm
 
   return Interface {
     ifaceMod             = mdl,
@@ -129,25 +129,25 @@ createInterface tm flags modMap instIfaceMap = do
     ifaceVisibleExports  = visibleNames,
     ifaceDeclMap         = declMap,
     ifaceSubMap          = subMap,
-    ifaceModuleAbbrevs   = abbrevs,
+    ifaceModuleAliases   = aliases,
     ifaceInstances       = instances,
     ifaceHaddockCoverage = coverage
   }
 
-mkAbbrevMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
-mkAbbrevMap dflags mRenamedSource =
+mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
+mkAliasMap dflags mRenamedSource =
   case mRenamedSource of
     Nothing -> M.empty
     Just (_,impDecls,_,_) ->
       M.fromList $
       mapMaybe (\(SrcLoc.L _ impDecl) -> do
-        abbrev <- ideclAs impDecl
+        alias <- ideclAs impDecl
         return $
           (lookupModuleDyn dflags
              (fmap Module.fsToPackageId $
               ideclPkgQual impDecl)
              (case ideclName impDecl of SrcLoc.L _ name -> name),
-           abbrev))
+           alias))
         impDecls
 
 -- similar to GHC.lookupModule
