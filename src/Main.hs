@@ -189,6 +189,11 @@ renderStep flags pkgs interfaces = do
 render :: [Flag] -> [Interface] -> [InstalledInterface] -> SrcMap -> IO ()
 render flags ifaces installedIfaces srcMap = do
 
+  opt_qualification <-
+    case qualification flags of
+      Left msg -> throwE msg
+      Right q -> return q
+
   let
     title                = fromMaybe "" (optTitle flags)
     unicode              = Flag_UseUnicode `elem` flags
@@ -198,7 +203,6 @@ render flags ifaces installedIfaces srcMap = do
     opt_index_url        = optIndexUrl       flags
     odir                 = outputDir         flags
     opt_latex_style      = optLaTeXStyle     flags
-    opt_qualification    = qualification     flags
 
     visibleIfaces    = [ i | i <- ifaces, OptHide `notElem` ifaceOptions i ]
 
