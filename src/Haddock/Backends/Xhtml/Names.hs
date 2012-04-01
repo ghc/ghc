@@ -52,7 +52,10 @@ ppDocName qual docName =
   case docName of
     Documented name mdl ->
       linkIdOcc mdl (Just (nameOccName name)) << ppQualifyName qual name mdl
-    Undocumented name -> ppQualifyName qual name (nameModule name)
+    Undocumented name
+      | isExternalName name || isWiredInName name ->
+          ppQualifyName qual name (nameModule name)
+      | otherwise -> ppName name
 
 
 -- | Render a name depending on the selected qualification mode
