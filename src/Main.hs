@@ -57,6 +57,7 @@ import Paths_haddock
 import GHC hiding (flags, verbosity)
 import Config
 import DynFlags hiding (flags, verbosity)
+import StaticFlags (saveStaticFlagGlobals, restoreStaticFlagGlobals)
 import Panic (panic, handleGhcException)
 import Module
 
@@ -290,7 +291,7 @@ dumpInterfaceFile path ifaces homeLinks = writeInterfaceFile path ifaceFile
 -- | Start a GHC session with the -haddock flag set. Also turn off
 -- compilation and linking. Then run the given 'Ghc' action.
 withGhc :: String -> [String] -> (DynFlags -> Ghc a) -> IO a
-withGhc libDir flags ghcActs = do
+withGhc libDir flags ghcActs = saveStaticFlagGlobals >>= \savedFlags -> do
   -- TODO: handle warnings?
   (restFlags, _) <- parseStaticFlags (map noLoc flags)
   runGhc (Just libDir) $ do
@@ -308,6 +309,7 @@ withGhc libDir flags ghcActs = do
         -- dynamic or static linking at all!
         _ <- setSessionDynFlags dynflags'''
         ghcActs dynflags'''
+  `finally` restoreStaticFlagGlobals savedFlags
   where
     parseGhcFlags :: Monad m => DynFlags -> [Located String]
                   -> [String] -> m DynFlags
