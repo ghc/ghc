@@ -66,7 +66,7 @@ ppHtml :: String
        -> Maybe String                 -- ^ The contents URL (--use-contents)
        -> Maybe String                 -- ^ The index URL (--use-index)
        -> Bool                         -- ^ Whether to use unicode in output (--use-unicode)
-       -> Qualification                -- ^ How to qualify names
+       -> QualOption                   -- ^ How to qualify names
        -> Bool                         -- ^ Output pretty html (newlines and indenting)
        -> IO ()
 
@@ -83,7 +83,7 @@ ppHtml doctitle maybe_package ifaces odir prologue
         themes maybe_index_url maybe_source_url maybe_wiki_url
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
-        prologue debug qual
+        prologue debug (makeContentsQual qual)
 
   when (isNothing maybe_index_url) $
     ppHtmlIndex odir doctitle maybe_package
@@ -461,7 +461,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 ppHtmlModule
         :: FilePath -> String -> Themes
         -> SourceURLs -> WikiURLs
-        -> Maybe String -> Maybe String -> Bool -> Qualification
+        -> Maybe String -> Maybe String -> Bool -> QualOption
         -> Bool -> Interface -> IO ()
 ppHtmlModule odir doctitle themes
   maybe_source_url maybe_wiki_url
@@ -469,10 +469,7 @@ ppHtmlModule odir doctitle themes
   let
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
-      real_qual = case qual of
-          LocalQual Nothing    -> LocalQual (Just mdl)
-          RelativeQual Nothing -> RelativeQual (Just mdl)
-          _                     -> qual
+      real_qual = makeModuleQual qual mdl
       html =
         headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes +++
         bodyHtml doctitle (Just iface)
@@ -484,8 +481,7 @@ ppHtmlModule odir doctitle themes
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
-  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode qual debug
-
+  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode real_qual debug
 
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
   -> Interface -> Bool -> Qualification -> Bool -> IO ()

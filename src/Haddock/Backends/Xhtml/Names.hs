@@ -64,14 +64,10 @@ ppQualifyName qual name mdl =
   case qual of
     NoQual   -> ppName name
     FullQual -> ppFullQualName mdl name
-    -- this is just in case, it should never happen
-    LocalQual Nothing -> ppQualifyName FullQual name mdl
-    LocalQual (Just localmdl)
+    LocalQual localmdl
       | moduleString mdl == moduleString localmdl -> ppName name
       | otherwise -> ppFullQualName mdl name
-    -- again, this never happens
-    RelativeQual Nothing -> ppQualifyName FullQual name mdl
-    RelativeQual (Just localmdl) ->
+    RelativeQual localmdl ->
       case List.stripPrefix (moduleString localmdl) (moduleString mdl) of
         -- local, A.x -> x
         Just []      -> ppQualifyName NoQual name mdl

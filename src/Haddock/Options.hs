@@ -229,13 +229,13 @@ optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]
 
 
-qualification :: [Flag] -> Qualification
+qualification :: [Flag] -> QualOption
 qualification flags =
   case map (map Char.toLower) [ str | Flag_Qualification str <- flags ] of
-      "full":_     -> FullQual
-      "local":_    -> LocalQual Nothing
-      "relative":_ -> RelativeQual Nothing
-      _            -> NoQual
+      "full":_     -> OptFullQual
+      "local":_    -> OptLocalQual
+      "relative":_ -> OptRelativeQual
+      _            -> OptNoQual
 
 
 verbosity :: [Flag] -> Verbosity

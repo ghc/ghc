@@ -374,12 +374,34 @@ data DocOption
 
 
 -- | Option controlling how to qualify names
+data QualOption
+  = OptNoQual        -- ^ Never qualify any names.
+  | OptFullQual      -- ^ Qualify all names fully.
+  | OptLocalQual     -- ^ Qualify all imported names fully.
+  | OptRelativeQual  -- ^ Like local, but strip module prefix
+                     --   from modules in the same hierarchy.
+
 data Qualification
-  = NoQual                       -- ^ Never qualify any names.
-  | FullQual                     -- ^ Qualify all names fully.
-  | LocalQual (Maybe Module)     -- ^ Qualify all imported names fully.
-  | RelativeQual (Maybe Module)  -- ^ Like local, but strip module prefix.
-                                 --   from modules in the same hierarchy.
+  = NoQual
+  | FullQual
+  | LocalQual Module
+  | RelativeQual Module
+       -- ^ @Maybe Module@ contains the current module.
+       --   This way we can distinguish imported and local identifiers.
+
+makeContentsQual :: QualOption -> Qualification
+makeContentsQual qual =
+  case qual of
+    OptNoQual -> NoQual
+    _         -> FullQual
+
+makeModuleQual :: QualOption -> Module -> Qualification
+makeModuleQual qual mdl =
+  case qual of
+    OptLocalQual    -> LocalQual mdl
+    OptRelativeQual -> RelativeQual mdl
+    OptFullQual     -> FullQual
+    OptNoQual       -> NoQual
 
 
 -----------------------------------------------------------------------------
