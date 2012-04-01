@@ -390,7 +390,7 @@ data QualOption
                       --   Image a re-export of a whole module,
                       --   how could the re-exported identifiers be qualified?
 
-type AbbreviationMap = Map ModuleName ModuleName
+type AbbreviationMap = Map Module ModuleName
 
 data Qualification
   = NoQual

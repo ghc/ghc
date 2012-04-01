@@ -81,7 +81,7 @@ ppQualifyName qual name mdl =
         Nothing      -> ppFullQualName mdl name
     AbbreviateQual abbrevs localmdl ->
       case (moduleString mdl == moduleString localmdl,
-            M.lookup (moduleName mdl) abbrevs) of
+            M.lookup mdl abbrevs) of
         (False, Just abbrev) -> ppQualName abbrev name
         _ -> ppName name
 

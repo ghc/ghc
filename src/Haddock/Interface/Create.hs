@@ -30,6 +30,8 @@ import Control.Applicative
 import Control.Monad
 import qualified Data.Traversable as T
 
+import qualified Packages
+import qualified Module
 import qualified SrcLoc
 import GHC hiding (flags)
 import HscTypes
@@ -108,16 +110,7 @@ createInterface tm flags modMap instIfaceMap = do
         | otherwise = exportItems
 
   let abbrevs =
-        case tm_renamed_source tm of
-          Nothing -> M.empty
-          Just (_,impDecls,_,_) ->
-            M.fromList $
-            mapMaybe (\(SrcLoc.L _ impDecl) -> do
-              abbrev <- ideclAs impDecl
-              return
-                (case ideclName impDecl of SrcLoc.L _ name -> name,
-                 abbrev))
-              impDecls
+        mkAbbrevMap dflags $ tm_renamed_source tm
 
   return Interface {
     ifaceMod             = mdl,
@@ -140,6 +133,34 @@ createInterface tm flags modMap instIfaceMap = do
     ifaceInstances       = instances,
     ifaceHaddockCoverage = coverage
   }
+
+mkAbbrevMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
+mkAbbrevMap dflags mRenamedSource =
+  case mRenamedSource of
+    Nothing -> M.empty
+    Just (_,impDecls,_,_) ->
+      M.fromList $
+      mapMaybe (\(SrcLoc.L _ impDecl) -> do
+        abbrev <- ideclAs impDecl
+        return $
+          (lookupModuleDyn dflags
+             (fmap Module.fsToPackageId $
+              ideclPkgQual impDecl)
+             (case ideclName impDecl of SrcLoc.L _ name -> name),
+           abbrev))
+        impDecls
+
+-- similar to GHC.lookupModule
+lookupModuleDyn ::
+  DynFlags -> Maybe PackageId -> ModuleName -> Module
+lookupModuleDyn _ (Just pkgId) mdlName =
+  Module.mkModule pkgId mdlName
+lookupModuleDyn dflags Nothing mdlName =
+  flip Module.mkModule mdlName $
+  case filter snd $
+       Packages.lookupModuleInAllPackages dflags mdlName of
+    (pkgId,_):_ -> Packages.packageConfigId pkgId
+    [] -> Module.mainPackageId
 
 
 -------------------------------------------------------------------------------
