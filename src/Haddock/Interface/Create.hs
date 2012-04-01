@@ -77,7 +77,7 @@ createInterface tm flags modMap instIfaceMap = do
       localInsts = filter (nameIsLocalOrFrom mdl . getName) instances
 
   (docMap0, argMap, subMap, declMap) <-
-    liftErrMsg $ mkMaps dflags gre localInsts exportedNames declsWithDocs
+    liftErrMsg $ mkMaps dflags gre localInsts declsWithDocs
 
   let docMap = addWarnings warnings gre exportedNames docMap0
       maps = (docMap, argMap, subMap, declMap)
@@ -203,10 +203,9 @@ type Maps = (DocMap Name, ArgMap Name, SubMap, DeclMap)
 mkMaps :: DynFlags
        -> GlobalRdrEnv
        -> [Instance]
-       -> [Name]
        -> [(LHsDecl Name, [HsDocString])]
        -> ErrMsgM Maps
-mkMaps dflags gre instances exports decls = do
+mkMaps dflags gre instances decls = do
   (a, b, c, d) <- unzip4 <$> mapM mappings decls
   return (f a, f b, f c, f d)
   where
@@ -220,7 +219,7 @@ mkMaps dflags gre instances exports decls = do
             m' <- M.mapMaybe id <$> T.mapM (processDocStringParas dflags gre) m
             return (doc, m')
       (doc, args) <- declDoc docStrs (typeDocs decl)
-      let subs = [ s | s@(n, _, _) <- subordinates decl, n `elem` exports ]
+      let subs = subordinates decl
       (subDocs, subArgs) <- unzip <$> mapM (\(_, strs, m) -> declDoc strs m) subs
       let ns = names decl
           subNs = [ n | (n, _, _) <- subs ]
@@ -235,7 +234,7 @@ mkMaps dflags gre instances exports decls = do
 
     names :: HsDecl Name -> [Name]
     names (InstD (InstDecl (L l _) _ _ _)) = maybeToList (M.lookup l instanceMap)  -- See note [2].
-    names decl = filter (`elem` exports) (getMainDeclBinder decl)
+    names decl = getMainDeclBinder decl
 
 
 -- Note [2]:
