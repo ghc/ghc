@@ -6,6 +6,7 @@
 <!ENTITY oldrelnotes1   SYSTEM "7.2.1-notes.xml" >
 <!ENTITY oldrelnotes2   SYSTEM "7.2.2-notes.xml" >
 <!ENTITY relnotes1      SYSTEM "7.4.1-notes.xml" >
+<!ENTITY relnotes2      SYSTEM "7.4.2-notes.xml" >
 <!ENTITY using          SYSTEM "using.xml" >
 <!ENTITY code-gens      SYSTEM "codegens.xml" >
 <!ENTITY runtime        SYSTEM "runtime_control.xml" >

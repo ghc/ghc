@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="release-7-4-2">
+  <title>Release notes for version 7.4.2</title>
+
+  <para>
+    The 7.4.2 release is a bugfix release. The changes relative to 7.4.1 are
+    listed below.
+  </para>
+
+  <sect2>
+    <title>Compiler</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          A bug in dependency analysis of type declarations in the presence of
+          type families (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5826">#5826</ulink>)
+          has been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The "Heap exhausted" error message was truncating the reported heap
+          size to 32 bits (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5838">#5838</ulink>).
+          This has now been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The register clobber list in the ARM runtime now includes extra
+          registers (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5824">#5824</ulink>).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A crash due to a buffer overflow during RTS argument processing
+          (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5851">#5851</ulink>)
+          has been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A blocked STM computation inside <literal>unsafePerformIO</literal>
+          or <literal>unsafeInterleaveIO</literal> would segfault when resuming
+          after an asynchronous exception (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5866">#5866</ulink>).
+          This has now been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A race condition when creating directories during parallel builds
+          (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5891">#5891</ulink>)
+          has been fixed.
+          </para>
+        </listitem>
+
+        <listitem>
+          <para>
+          Changed behavior of the <literal>--main-is</literal> flag so that it
+          forces recompilation of fewer modules (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5878">#5878</ulink>).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The wording of the help text for the <literal>-N</literal> flag has
+          been improved (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5896">#5896</ulink>).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Fixed command line options passed to <literal>clang</literal>, when
+          used as the assembler (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5903">#5903</ulink>).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Changed behavior of unrecognized flags (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5921">#5921</ulink>).
+          Any unrecognized argument starting with a <literal>'-'</literal> now produces an
+          error, instead of being passed to the linker.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A bug in code generation on PowerPC (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5900">#5900</ulink>)
+          resulting in an invalid operand for a shift instruction has been
+          fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Updated LLVM backend to support the new "fence" instruction instead
+          of the llvm.memory.barrier intrinsic (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5814">#5814</ulink>).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          ARM support in the RTS linker (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5839">#5839</ulink>)
+          has been implemented.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          An RTS crash in <literal>threadStackOverflow</literal> (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5214">#5214</ulink>)
+          has been fixed.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>GHCi</title>
+
+    <itemizedlist>
+      <listitem>
+        <para>
+          Fixed bug (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5836">#5836</ulink>)
+          where GHCi would silently accept an import statement for a
+          non-existing module.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Fixed bug (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5904">#5904</ulink>)
+          which caused GHCi to crash when a *-module was loaded twice.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>:edit</literal> command in GHCi now causes the current
+          module to be automatically reloaded after exiting from the editor
+          (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5343">#5343</ulink>).
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A GHCi bug (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5534">#5534</ulink>)
+          causing compiled modules not to be loaded correctly has been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Fixed bug (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5979">#5979</ulink>)
+          where a failed import in GHCi with -XPackageImport would cause
+          successive imports to fail.
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Libraries</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          Fixed bug (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5872">#5872</ulink>)
+          in the default implementation of <literal>popCount</literal> in
+          <literal>Data.Bits</literal>.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A potential race condition in
+          <literal>Control.Concurrent.Chan</literal> (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5870">#5870</ulink>)
+          has been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          An <literal>MVar</literal> bug which could cause deadlocks (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5943">#5943</ulink>)
+          has been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Fixed a bug in <literal>hGetBufSome</literal> (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5843">#5843</ulink>)
+          which was causing <literal>Data.ByteString.hGetSome</literal> to
+          block on Windows in some situations.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          Fixed crash while parsing numeric values in exponential notation
+          (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5688">#5688</ulink>).
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Tools</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          <literal>hp2ps</literal> can now handle backslashes in identifiers
+          correctly (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5800">#5800</ulink>).
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+</sect1>
