@@ -228,4 +228,5 @@ test('T5886', extra_clean(['T5886a.hi','T5886a.o']),
 test('T4135', normal, compile, ['-v0'])
 test('T5971', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('T5968', normal, compile, ['-v0'])
-
+test('T5984', extra_clean(['T5984_Lib.hi', 'T5984_Lib.o']),
+              multimod_compile, ['T5984', '-v0 -ddump-splices'])
