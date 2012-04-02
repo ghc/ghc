@@ -400,18 +400,23 @@ trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 \begin{code}
 filterAlts :: [Unique]             -- ^ Supply of uniques used in case we have to manufacture a new AltCon
            -> Type                 -- ^ Type of scrutinee (used to prune possibilities)
-           -> [AltCon]             -- ^ Constructors known to be impossible due to the form of the scrutinee
+           -> [AltCon]             -- ^ 'imposs_cons': constructors known to be impossible due to the form of the scrutinee
            -> [(AltCon, [Var], a)] -- ^ Alternatives
            -> ([AltCon], Bool, [(AltCon, [Var], a)])
              -- Returns:
-             --  1. Constructors that will never be encountered by the *default* case (if any)
-             --  2. Whether we managed to refine the default alternative into a specific constructor (for statistcs only)
-             --  3. The new alternatives
+             --  1. Constructors that will never be encountered by the 
+             --     *default* case (if any).  A superset of imposs_cons
+             --  2. Whether we managed to refine the default alternative into a specific constructor (for statistics only)
+             --  3. The new alternatives, trimmed by
+             --        a) remove imposs_cons
+             --        b) remove constructors which can't match because of GADTs
+             --      and with the DEFAULT expanded to a DataAlt if there is exactly
+             --      remaining constructor that can match
              --
              -- NB: the final list of alternatives may be empty:
              -- This is a tricky corner case.  If the data type has no constructors,
-             -- which GHC allows, then the case expression will have at most a default
-             -- alternative.
+             -- which GHC allows, or if the imposs_cons covers all constructors (after taking 
+             -- account of GADTs), then no alternatives can match.
              --
              -- If callers need to preserve the invariant that there is always at least one branch
              -- in a "case" statement then they will need to manually add a dummy case branch that just

@@ -981,6 +981,12 @@
             <entry><option>-XNoTypeOperators</option></entry>
           </row>
           <row>
+            <entry><option>-XExplicitNamespaces</option></entry>
+            <entry>Enable using the keyword <literal>type</literal> to specify the namespace of entries in imports and exports.</entry>
+            <entry>dynamic</entry>
+            <entry><option>-XNoExplicitNamespaces</option></entry>
+          </row>
+          <row>
             <entry><option>-XDoRec</option></entry>
             <entry>Enable <link linkend="recursive-do-notation">recursive do notation</link>.</entry>
             <entry>dynamic</entry>

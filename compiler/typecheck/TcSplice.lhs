@@ -390,7 +390,9 @@ tc_bracket _ (ExpBr expr)
         -- Result type is ExpQ (= Q Exp)
 
 tc_bracket _ (TypBr typ)
-  = do  { _ <- tcHsSigTypeNC ThBrackCtxt typ
+  = do  { _ <- tcLHsType typ    -- Do not check type validity; we can have a bracket
+                                -- inside a "knot" where things are not yet settled
+                                --    eg   data T a = MkT $(foo  [t| a |])
         ; tcMetaTy typeQTyConName }
         -- Result type is Type (= Q Typ)
 

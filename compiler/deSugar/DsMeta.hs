@@ -115,8 +115,9 @@ repTopP pat = do { ss <- mkGenSyms (collectPatBinders pat)
 
 repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
 repTopDs group
- = do { let { bndrs = hsGroupBinders group } ;
-	ss <- mkGenSyms bndrs ;
+ = do { let { tv_bndrs = hsSigTvBinders (hs_valds group)
+            ; bndrs = tv_bndrs ++ hsGroupBinders group } ;
+	ss <- pprTrace "reptop" (ppr bndrs $$ ppr tv_bndrs) $ mkGenSyms bndrs ;
 
 	-- Bind all the names mainly to avoid repeated use of explicit strings.
 	-- Thus	we get
@@ -146,8 +147,35 @@ repTopDs group
       }
 
 
-{- 	Note [Binders and occurrences]
-	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+hsSigTvBinders :: HsValBinds Name -> [Name]
+-- See Note [Scoped type variables in bindings]
+hsSigTvBinders binds
+  = [hsLTyVarName tv | L _ (TypeSig _ (L _ (HsForAllTy Explicit tvs _ _))) <- sigs, tv <- tvs]
+  where
+    sigs = case binds of
+     	     ValBindsIn  _ sigs -> sigs
+     	     ValBindsOut _ sigs -> sigs
+
+
+{- Notes
+
+Note [Scoped type variables in bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f :: forall a. a -> a
+   f x = x::a
+Here the 'forall a' brings 'a' into scope over the binding group.
+To achieve this we 
+
+  a) Gensym a binding for 'a' at the same time as we do one for 'f'
+     collecting the relevant binders with hsSigTvBinders
+
+  b) When processing the 'forall', don't gensym
+
+The relevant places are signposted with references to this Note
+
+Note [Binders and occurrences]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we desugar [d| data T = MkT |]
 we want to get
 	Data "T" [] [Con "MkT" []] []
@@ -497,7 +525,7 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
-rep_sig (L loc (TypeSig nms ty))      = rep_proto nms ty loc
+rep_sig (L loc (TypeSig nms ty))      = mapM (rep_ty_sig loc ty) nms
 rep_sig (L _   (GenericSig nm _))     = failWithDs msg
   where msg = vcat  [ ptext (sLit "Illegal default signature for") <+> quotes (ppr nm)
                     , ptext (sLit "Default signatures are not supported by Template Haskell") ]
@@ -506,16 +534,27 @@ rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig _                             = return []
 
-rep_proto :: [Located Name] -> LHsType Name -> SrcSpan
-          -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_proto nms ty loc
-  = mapM f nms
+rep_ty_sig :: SrcSpan -> LHsType Name -> Located Name
+           -> DsM (SrcSpan, Core TH.DecQ)
+rep_ty_sig loc (L _ ty) nm 
+  = do { nm1 <- lookupLOcc nm
+       ; ty1 <- rep_ty ty
+       ; sig <- repProto nm1 ty1
+       ; return (loc, sig) }
   where
-    f nm = do { nm1 <- lookupLOcc nm
-              ; ty1 <- repLTy ty
-              ; sig <- repProto nm1 ty1
-              ; return (loc, sig)
-              }
+    -- We must special-case the top-level explicit for-all of a TypeSig
+    -- See Note [Scoped type variables in bindings]
+    rep_ty (HsForAllTy Explicit tvs ctxt ty)
+      = do { let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
+                                         ; repTyVarBndrWithKind tv name }
+           ; bndrs1 <- mapM rep_in_scope_tv tvs
+           ; bndrs2 <- coreList tyVarBndrTyConName bndrs1
+           ; ctxt1  <- repLContext ctxt
+           ; ty1    <- repLTy ty
+           ; repTForall bndrs2 ctxt1 ty1 }
+
+    rep_ty ty = repTy ty  
+
 
 rep_inline :: Located Name 
            -> InlinePragma	-- Never defaultInlinePragma
@@ -675,7 +714,7 @@ repTy (HsForAllTy _ tvs ctxt ty)  =
 
 repTy (HsTyVar n)
   | isTvOcc (nameOccName n) = do 
-			        tv1 <- lookupTvOcc n
+			        tv1 <- lookupOcc n
 			        repTvar tv1
   | otherwise		    = do 
 			        tc1 <- lookupOcc n
@@ -976,11 +1015,12 @@ repBinds EmptyLocalBinds
 repBinds b@(HsIPBinds _) = notHandled "Implicit parameters" (ppr b)
 
 repBinds (HsValBinds decs)
- = do	{ let { bndrs = collectHsValBinders decs }
+ = do	{ let { bndrs = hsSigTvBinders decs ++ collectHsValBinders decs }
 		-- No need to worrry about detailed scopes within
 		-- the binding group, because we are talking Names
 		-- here, so we can safely treat it as a mutually 
 		-- recursive group
+                -- For hsSigTvBinders see Note [Scoped type variables in bindings]
 	; ss        <- mkGenSyms bndrs
 	; prs       <- addBinds ss (rep_val_binds decs)
 	; core_list <- coreList decQTyConName 
@@ -1211,18 +1251,6 @@ lookupOcc n
 		Just (Bound x)  -> return (coreVar x)
 		Just (Splice _) -> pprPanic "repE:lookupOcc" (ppr n) 
     }
-
-lookupTvOcc :: Name -> DsM (Core TH.Name)
--- Type variables can't be staged and are not lexically scoped in TH
-lookupTvOcc n	
-  = do {  mb_val <- dsLookupMetaEnv n ;
-          case mb_val of
-		Just (Bound x)  -> return (coreVar x)
-		_               -> failWithDs msg
-    }
-  where
-    msg = vcat  [ ptext (sLit "Illegal lexically-scoped type variable") <+> quotes (ppr n)
-		, ptext (sLit "Lexically scoped type variables are not supported by Template Haskell") ]
 
 globalVar :: Name -> DsM (Core TH.Name)
 -- Not bound by the meta-env
