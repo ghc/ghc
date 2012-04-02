@@ -55,7 +55,7 @@ import qualified Data.Traversable as Traversable
 import Data.Maybe ( isJust )
 
 import Control.Monad( when, unless )
-import Pair ( pSnd )
+import Pair ()
 import UniqFM
 import FastString ( sLit ) 
 import DynFlags
@@ -316,9 +316,10 @@ kickOutRewritableInerts ct
 rewriteInertEqsFromInertEq :: (TcTyVar, TcCoercion, CtFlavor) -- A new substitution
                            -> TyVarEnv Ct                     -- All the inert equalities
                            -> TcS (TyVarEnv Ct)               -- The new inert equalities
-rewriteInertEqsFromInertEq (subst_tv, subst_co, subst_fl) ieqs
--- The goal: traverse the inert equalities and rewrite some of them, dropping some others
--- back to the worklist. This is delicate, see Note [Delicate equality kick-out]
+rewriteInertEqsFromInertEq (subst_tv, _subst_co, subst_fl) ieqs
+-- The goal: traverse the inert equalities and throw some of them back to the worklist
+-- if you have to rewrite and recheck them for occurs check errors. 
+-- This is delicate, see Note [Delicate equality kick-out]
  = do { mieqs <- Traversable.mapM do_one ieqs 
       ; traceTcS "Original inert equalities:" (ppr ieqs)
       ; let flatten_justs elem venv
@@ -330,63 +331,18 @@ rewriteInertEqsFromInertEq (subst_tv, subst_co, subst_fl) ieqs
 
  where do_one ct
          | subst_fl `canRewrite` fl && (subst_tv `elemVarSet` tyVarsOfCt ct) 
-           -- Annoyingly inefficient, but we can't simply check 
-           -- that isReflCo co because of cached solved ReflCo evidence.
          = if fl `canRewrite` subst_fl then
-               -- If also the inert can rewrite the subst it's totally safe 
-               -- to rewrite on the spot
-               do { 
-
-{- DV: I thought this might work but not because you don't have the full knowledge of the 
-   implications (just the worklist). And it's a bit tedious. SPJ and I discussed about breaking
-   the 'idempotent substitution' invariant to be a little more lazy. -} 
-
-                    -- DV: Very experimental! 
-                    -- If it's a given equality and its LHS does not appear in the worklist
-                    -- there is no point in rewriting him. In fact there is not point in keeping him, 
-                    -- at all, is there? 
-                    worklist_tvs <- getTcSWorkListTvs 
-                  ; if isGiven (cc_flavor ct) && not (tyVarsOfCt ct `elemVarSet` worklist_tvs) then
-                        return Nothing
-                    else do { 
-                     ct' <- rewrite_on_the_spot ct
-                    ; return $ Just ct' } 
-                 }
+               -- If also the inert can rewrite the subst then there is no danger of 
+               -- occurs check errors sor keep it there. No need to rewrite the inert equality
+               -- (as we did in the past): See Note [Non-idempotent inert substitution]
+             return (Just ct)
+             -- used to be: rewrite_on_the_spot ct >>= ( return . Just )
            else -- We have to throw inert back to worklist for occurs checks 
-              do { updWorkListTcS (extendWorkListEq ct)
-                 ; return Nothing }
+             updWorkListTcS (extendWorkListEq ct) >> return Nothing
          | otherwise -- Just keep it there
-         = return $ Just ct
+         = return (Just ct)
          where 
-           -- We have that:    subst_co :: subst_tv ~ tau
-           -- An an old inert: tv ~ rhs
-           -- That we want to rewrite on-the-spot to tv ~ rhs[tau/subst_tv]
            fl  = cc_flavor ct
-           tv  = cc_tyvar ct
-           rhs = cc_rhs ct
-           
-           rewrite_on_the_spot ct
-             = do { let rhs_co = liftTcCoSubstWith [subst_tv] [subst_co] rhs
-                        eq_co  = mkTcTyConAppCo eqTyCon $ 
-                                   [ mkTcReflCo (defaultKind $ typeKind rhs)
-                                   , mkTcReflCo (mkTyVarTy tv)
-                                   , mkTcSymCo rhs_co ]
-                        new_rhs = pSnd (tcCoercionKind rhs_co)
-                        new_eq_pred = mkTcEqPred (mkTyVarTy tv) new_rhs
-                        -- eq_co ::  (tv ~ rhs[s/x]) ~ (tv ~ rhs[x])
-                        
-                  ; mb_fl <- rewriteCtFlavor fl new_eq_pred eq_co
-                  ; case mb_fl of
-                       Just new_fl -> return $
-                                      ct {cc_flavor=new_fl,cc_rhs=new_rhs}
-                       Nothing -> -- Weird, rewritten constraint was solved
-                                  -- before -- I am uncertain about what to do
-                         pprPanic "Interesting: \
-                                   rewrote inert equality to existing!" $ 
-                                   vcat [ text "original   ="<+>ppr ct
-                                        , text "new eqpred ="<+>ppr new_eq_pred ]
-                  }
-
 
 kick_out_rewritable :: Ct 
                     -> InertSet 
@@ -451,25 +407,24 @@ Note [Delicate equality kick-out]
 Delicate:
 When kicking out rewritable constraints, it would be safe to simply
 kick out all rewritable equalities, but instead we only kick out those
-that, when rewritten, may result in occur-check errors. We rewrite the
-rest on the spot. Example:
+that, when rewritten, may result in occur-check errors. Example:
 
-          WorkItem =   [S] a ~ b
+          WorkItem =   [G] a ~ b
           Inerts   = { [W] b ~ [a] }
 Now at this point the work item cannot be further rewritten by the
-inert (due to the weaker inert flavor), so we are examining if we can
-instead rewrite the inert from the workitem. But if we rewrite it on
-the spot we have to recanonicalize because of the danger of occurs
-errors.  On the other hand if the inert flavor was just as powerful or
-more powerful than the workitem flavor, the work-item could not have
-reached this stage (because it would have already been rewritten by
-the inert).
+inert (due to the weaker inert flavor). Instead the workitem can 
+rewrite the inert leading to potential occur check errors. So we must
+kick the inert out. On the other hand, if the inert flavor was as 
+powerful or more powerful than the workitem flavor, the work-item could 
+not have reached this stage (because it would have already been 
+rewritten by the inert).
 
 The coclusion is: we kick out the 'dangerous' equalities that may
-require recanonicalization (occurs checks) and the rest we rewrite
-unconditionally without further checks, on-the-spot with function
-rewriteInertEqsFromInertEq.
+require recanonicalization (occurs checks) and the rest we keep 
+there in the inerts without further checks.
 
+In the past we used to rewrite-on-the-spot those equalities that we keep in,
+but this is no longer necessary see Note [Non-idempotent inert substitution].
 
 \begin{code}
 data SPSolveResult = SPCantSolve
