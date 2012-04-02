@@ -1364,12 +1364,13 @@ safeFlagCheck :: Bool -> DynFlags -> (DynFlags, [Located String])
 safeFlagCheck _  dflags | not (safeLanguageOn dflags || safeInferOn dflags)
                         = (dflags, [])
 
+-- safe or safe-infer ON
 safeFlagCheck cmdl dflags =
     case safeLanguageOn dflags of
         True -> (dflags', warns)
 
         -- throw error if -fpackage-trust by itself with no safe haskell flag
-        False | not cmdl && safeInferOn dflags && packageTrustOn dflags
+        False | not cmdl && packageTrustOn dflags
               -> (dopt_unset dflags' Opt_PackageTrust,
                   [L (pkgTrustOnLoc dflags') $
                       "-fpackage-trust ignored;" ++
