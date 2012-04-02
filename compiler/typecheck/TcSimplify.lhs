@@ -821,22 +821,10 @@ simpl_loop n implics
 
        ; inerts <- getTcSInerts
        ; let ((_,unsolved_flats),_) = extractUnsolved inerts
-
-             {- DELETEME
-       ; ecache_pre <- getTcSEvVarCacheMap
-       ; let pr = ppr ((\k z m -> foldTM k m z) (:) [] ecache_pre)
-       ; traceTcS "ecache_pre"  $ pr
-              -} 
                                       
        ; improve_eqs <- if not (isEmptyBag implic_eqs)
                         then return implic_eqs
                         else applyDefaultingRules unsolved_flats
-
-                             {- DELETEME
-       ; ecache_post <- getTcSEvVarCacheMap
-       ; let po = ppr ((\k z m -> foldTM k m z) (:) [] ecache_post)
-       ; traceTcS "ecache_po"  $ po
-                -}
 
        ; traceTcS "solveWanteds: simpl_loop end" $
              vcat [ text "improve_eqs      =" <+> ppr improve_eqs
