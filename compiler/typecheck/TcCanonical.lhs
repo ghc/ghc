@@ -682,8 +682,9 @@ flattenTyVar d ctxt tv
                   ; let ty = mkTyVarTy (setVarType tv new_knd)
                   ; return (ty, mkTcReflCo ty) }
            -- NB recursive call. 
-           -- Why? See Note [Non-idempotent inert substitution]
-           -- Actually, I think applying the substition just twice will suffice
+           -- Why? Because inert subst. non-idempotent, Note [Detailed InertCans Invariants]
+           -- In fact, because of flavors, it couldn't possibly be idempotent,
+           -- this is explained in Note [Non-idempotent inert substitution]
            Just (co,ty) -> 
                do { (ty_final,co') <- flatten d ctxt ty
                   ; return (ty_final, co' `mkTcTransCo` mkTcSymCo co) } }  

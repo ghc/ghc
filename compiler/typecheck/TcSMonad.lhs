@@ -432,11 +432,37 @@ The InertCans represents a collection of constraints with the following properti
   1 All canonical
   2 All Given or Wanted or Derived. No (partially) Solved
   3 No two dictionaries with the same head
-  4 No two family equations with the same head
-  5 Family equations inert with top-level
-  6 Dictionaries have no matching instance at top level
-  7 Constraints are fully rewritten with respect to the equality constraints (CTyEqCan)
-  8 Equalities form an idempotent substitution (taking flavors into consideration)
+  4 No two family equations with the same head 
+      NB: This is enforced by construction since we use a CtFamHeadMap for inert_funeqs
+  5 Family equations inert wrt top-level family axioms
+  6 Dictionaries have no matching top-level instance 
+  
+  7 Non-equality constraints are fully rewritten with respect to the equalities (CTyEqCan)
+
+  8 Equalities _do_not_ form an idempotent substitution but they are guarranteed to not have
+    any occurs errors. Additional notes: 
+
+       - The lack of idempotence of the inert substitution implies that we must make sure 
+         that when we rewrite a constraint we apply the substitution /recursively/ to the 
+         types involved. Currently the one AND ONLY way in the whole constraint solver 
+         that we rewrite types and constraints wrt to the inert substitution is 
+         TcCanonical/flattenTyVar.
+
+       - In the past we did try to have the inert substituion as idempotent as possible but
+         this would only be true for constraints of the same flavor, so in total the inert 
+         substitution could not be idempotent, due to flavor-related issued. 
+         Note [Non-idempotent inert substitution] explains what is going on. 
+
+       - Whenever a constraint ends up in the worklist we do recursively apply exhaustively
+         the inert substitution to it to check for occurs errors but if an equality is already
+         in the inert set and we can guarantee that adding a new equality will not cause the
+         first equality to have an occurs check then we do not rewrite the inert equality. 
+         This happens in TcInteract, rewriteInertEqsFromInertEq. 
+         
+         See Note [Delicate equality kick-out] to see which inert equalities can safely stay
+         in the inert set and which must be kicked out to be rewritten and re-checked for 
+         occurs errors. 
+
   9 Given family or dictionary constraints don't mention touchable unification variables
 \begin{code}
 

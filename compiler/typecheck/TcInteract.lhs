@@ -319,7 +319,7 @@ rewriteInertEqsFromInertEq :: (TcTyVar, TcCoercion, CtFlavor) -- A new substitut
 rewriteInertEqsFromInertEq (subst_tv, _subst_co, subst_fl) ieqs
 -- The goal: traverse the inert equalities and throw some of them back to the worklist
 -- if you have to rewrite and recheck them for occurs check errors. 
--- This is delicate, see Note [Delicate equality kick-out]
+-- To see which ones we must throw out see Note [Delicate equality kick-out]
  = do { mieqs <- Traversable.mapM do_one ieqs 
       ; traceTcS "Original inert equalities:" (ppr ieqs)
       ; let flatten_justs elem venv
@@ -334,7 +334,8 @@ rewriteInertEqsFromInertEq (subst_tv, _subst_co, subst_fl) ieqs
          = if fl `canRewrite` subst_fl then
                -- If also the inert can rewrite the subst then there is no danger of 
                -- occurs check errors sor keep it there. No need to rewrite the inert equality
-               -- (as we did in the past): See Note [Non-idempotent inert substitution]
+               -- (as we did in the past) because of point (8) of 
+               -- Note [Detailed InertCans Invariants] and 
              return (Just ct)
              -- used to be: rewrite_on_the_spot ct >>= ( return . Just )
            else -- We have to throw inert back to worklist for occurs checks 
