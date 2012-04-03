@@ -1031,8 +1031,8 @@ hscCheckSafe' dflags m l = do
         case iface of
             -- can't load iface to check trust!
             Nothing -> throwErrors $ unitBag $ mkPlainErrMsg l
-                        $ text "Can't load the interface file for" <+> ppr m <>
-                          text ", to check that it can be safely imported"
+                         $ text "Can't load the interface file for" <+> ppr m
+                           <> text ", to check that it can be safely imported"
 
             -- got iface, check trust
             Just iface' -> do
@@ -1053,14 +1053,14 @@ hscCheckSafe' dflags m l = do
 
                 where
                     pkgTrustErr = mkSrcErr $ unitBag $ mkPlainErrMsg l $
-                        sep [ ppr (moduleName m) <> text ":"
-                            , text "Can't be safely imported!"
+                        sep [ ppr (moduleName m)
+                                <> text ": Can't be safely imported!"
                             , text "The package (" <> ppr (modulePackageId m)
-                                  <> text ") the module resides in isn't trusted."
+                                <> text ") the module resides in isn't trusted."
                             ]
                     modTrustErr = unitBag $ mkPlainErrMsg l $
-                        sep [ ppr (moduleName m) <> text ":"
-                            , text "Can't be safely imported!"
+                        sep [ ppr (moduleName m)
+                                <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
 
     -- | Check the package a module resides in is trusted. Safe compiled
@@ -1115,8 +1115,8 @@ checkPkgTrust dflags pkgs =
             = Nothing
             | otherwise
             = Just $ mkPlainErrMsg noSrcSpan
-                   $ text "The package (" <> ppr pkg <> text ") is required"
-                  <> text " to be trusted but it isn't!"
+                   $ text "The package (" <> ppr pkg <> text ") is required" <>
+                     text " to be trusted but it isn't!"
 
 -- | Set module to unsafe and wipe trust information.
 --
@@ -1139,18 +1139,14 @@ wipeTrust tcg_env whyUnsafe = do
     pprMod        = ppr $ moduleName $ tcg_mod tcg_env
     whyUnsafe' df = vcat [ quotes pprMod <+> text "has been infered as unsafe!"
                          , text "Reason:"
-                         , nest 4 $
-                             (vcat $ badFlags df) $+$
-                             (vcat $ pprErrMsgBagWithLoc whyUnsafe)
+                         , nest 4 $ (vcat $ badFlags df) $+$
+                                    (vcat $ pprErrMsgBagWithLoc whyUnsafe)
                          ]
-
     badFlags df   = concat $ map (badFlag df) unsafeFlags
-
     badFlag df (str,loc,on,_)
         | on df     = [mkLocMessage SevOutput (loc df) $
                             text str <+> text "is not allowed in Safe Haskell"]
         | otherwise = []
-
 
 --------------------------------------------------------------
 -- Simplifiers
