@@ -219,8 +219,7 @@ tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh CWrapper) = do
     case arg_tys of
         [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
-                        checkForeignRes mustBeIO checkSafe isFFIDynResultTy    res_ty
-                                 -- ToDo: Why are res1_ty and res_ty not equal?
+                        checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr empty sig_ty)
@@ -235,7 +234,8 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
           check False (illegalForeignTyErr empty sig_ty)
         (arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          check (isFFIDynArgumentTy arg1_ty)
+          let curried_res_ty = foldr FunTy res_ty arg_tys
+          check (isFFIDynTy curried_res_ty arg1_ty)
                 (illegalForeignTyErr argument arg1_ty)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
           checkForeignRes nonIOok checkSafe (isFFIImportResultTy dflags) res_ty
