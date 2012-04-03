@@ -1052,13 +1052,16 @@ hscCheckSafe' dflags m l = do
                                      return (trust == Sf_Trustworthy, pkgRs)
 
                 where
-                    pkgTrustErr = mkSrcErr $ unitBag $ mkPlainErrMsg l $ ppr m
-                        <+> text "can't be safely imported!" <+> text "The package ("
-                        <> ppr (modulePackageId m)
-                        <> text ") the module resides in isn't trusted."
-                    modTrustErr = unitBag $ mkPlainErrMsg l $ ppr m
-                        <+> text "can't be safely imported!"
-                        <+> text "The module itself isn't safe."
+                    pkgTrustErr = mkSrcErr $ unitBag $ mkPlainErrMsg l $
+                        sep [ ppr (moduleName m) <> text ":"
+                            , text "Can't be safely imported!"
+                            , text "The package (" <> ppr (modulePackageId m)
+                                  <> text ") the module resides in isn't trusted."
+                            ]
+                    modTrustErr = unitBag $ mkPlainErrMsg l $
+                        sep [ ppr (moduleName m) <> text ":"
+                            , text "Can't be safely imported!"
+                            , text "The module itself isn't safe." ]
 
     -- | Check the package a module resides in is trusted. Safe compiled
     -- modules are trusted without requiring that their package is trusted. For
@@ -1126,17 +1129,27 @@ wipeTrust tcg_env whyUnsafe = do
 
     when (wopt Opt_WarnUnsafe dflags)
          (logWarnings $ unitBag $
-             mkPlainWarnMsg (warnUnsafeOnLoc dflags) whyUnsafe')
+             mkPlainWarnMsg (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ hscSetSafeInf env False
     return $ tcg_env { tcg_imports = wiped_trust }
 
   where
-    wiped_trust = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
-    pprMod      = ppr $ moduleName $ tcg_mod tcg_env
-    whyUnsafe'  = vcat [ quotes pprMod <+> text "has been infered as unsafe!"
-                       , text "Reason:"
-                       , nest 4 (vcat $ pprErrMsgBag whyUnsafe) ]
+    wiped_trust   = (tcg_imports tcg_env) { imp_trust_pkgs = [] }
+    pprMod        = ppr $ moduleName $ tcg_mod tcg_env
+    whyUnsafe' df = vcat [ quotes pprMod <+> text "has been infered as unsafe!"
+                         , text "Reason:"
+                         , nest 4 $
+                             (vcat $ badFlags df) $+$
+                             (vcat $ pprErrMsgBagWithLoc whyUnsafe)
+                         ]
+
+    badFlags df   = concat $ map (badFlag df) unsafeFlags
+
+    badFlag df (str,loc,on,_)
+        | on df     = [mkLocMessage SevOutput (loc df) $
+                            text str <+> text "is not allowed in Safe Haskell"]
+        | otherwise = []
 
 
 --------------------------------------------------------------
