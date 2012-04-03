@@ -884,7 +884,13 @@ emitKindConstraint ct
                   xcomp _   = panic "emit_kind_constraint:can't happen"
                   xdecomp x = [mkEvKindCast x (mkTcCoVarCo kev)]
                   xev = XEvTerm xcomp xdecomp
-              in xCtFlavor fl [mkTcEqPred ty1 ty2] xev what_next }
+              in xCtFlavor_cache False fl [mkTcEqPred ty1 ty2] xev what_next }
+                     -- Important: Do not cache original as Solved since we are supposed to 
+                     -- solve /exactly/ the same constraint later! Example:
+                     -- (alpha :: kappa0) 
+                     -- (T :: *)
+                     -- Equality is: (alpha ~ T), so we will emitConstraint (kappa0 ~ *) but
+                     -- we don't want to say that (alpha ~ T) is now Solved!
        where 
          what_next [new_fl] = continueWith (ct { cc_flavor = new_fl }) 
          what_next _ = return Stop
