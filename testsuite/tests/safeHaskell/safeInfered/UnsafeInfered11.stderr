@@ -3,9 +3,11 @@
 UnsafeInfered11_A.hs:1:16:
     Warning: `UnsafeInfered11_A' has been infered as unsafe!
     Reason:
-        Rule "lookupx/T" ignored
-        User defined rules are disabled under Safe Haskell
+        UnsafeInfered11_A.hs:17:11:
+            Rule "lookupx/T" ignored
+            User defined rules are disabled under Safe Haskell
 [2 of 2] Compiling UnsafeInfered11  ( UnsafeInfered11.hs, UnsafeInfered11.o )
 
 UnsafeInfered11.hs:5:1:
-    main:UnsafeInfered11_A can't be safely imported! The module itself isn't safe.
+    UnsafeInfered11_A: Can't be safely imported!
+    The module itself isn't safe.

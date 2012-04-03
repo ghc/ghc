@@ -2,4 +2,5 @@
 [2 of 2] Compiling UnsafeInfered08  ( UnsafeInfered08.hs, UnsafeInfered08.o )
 
 UnsafeInfered08.hs:4:1:
-    main:UnsafeInfered08_A can't be safely imported! The module itself isn't safe.
+    UnsafeInfered08_A: Can't be safely imported!
+    The module itself isn't safe.

@@ -2,4 +2,5 @@
 [2 of 2] Compiling UnsafeInfered10  ( UnsafeInfered10.hs, UnsafeInfered10.o )
 
 UnsafeInfered10.hs:5:1:
-    main:UnsafeInfered10_A can't be safely imported! The module itself isn't safe.
+    UnsafeInfered10_A: Can't be safely imported!
+    The module itself isn't safe.

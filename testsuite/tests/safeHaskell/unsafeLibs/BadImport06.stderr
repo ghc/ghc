@@ -1,3 +1,4 @@
 
 BadImport06.hs:5:1:
-    base:Debug.Trace can't be safely imported! The module itself isn't safe.
+    Debug.Trace: Can't be safely imported!
+    The module itself isn't safe.

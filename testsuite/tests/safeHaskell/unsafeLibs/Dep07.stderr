@@ -1,3 +1,4 @@
 
 Dep07.hs:4:1:
-    base:GHC.ForeignPtr can't be safely imported! The module itself isn't safe.
+    GHC.ForeignPtr: Can't be safely imported!
+    The module itself isn't safe.

@@ -1,3 +1,4 @@
 
 BadImport05.hs:5:1:
-    base:System.IO.Unsafe can't be safely imported! The module itself isn't safe.
+    System.IO.Unsafe: Can't be safely imported!
+    The module itself isn't safe.

@@ -3,4 +3,5 @@
 [3 of 3] Compiling UnsafeInfered09  ( UnsafeInfered09.hs, UnsafeInfered09.o )
 
 UnsafeInfered09.hs:4:1:
-    main:UnsafeInfered09_A can't be safely imported! The module itself isn't safe.
+    UnsafeInfered09_A: Can't be safely imported!
+    The module itself isn't safe.
