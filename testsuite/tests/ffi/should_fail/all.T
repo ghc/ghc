@@ -10,3 +10,4 @@ test('ccfail004', only_compiler_types(['ghc']), multimod_compile_fail, ['ccfail0
 test('ccfail005', only_compiler_types(['ghc']), compile_fail, [''])
 test('ccall_value', normal, compile_fail, [''])
 test('capi_value_function', normal, compile_fail, [''])
+test('T5664', normal, compile_fail, ['-v0'])
