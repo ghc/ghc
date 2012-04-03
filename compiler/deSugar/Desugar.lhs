@@ -20,6 +20,7 @@ import StaticFlags
 import HscTypes
 import HsSyn
 import TcRnTypes
+import TcRnMonad ( finalSafeMode )
 import MkIface
 import Id
 import Name
@@ -169,6 +170,7 @@ deSugar hsc_env
 
         ; used_th <- readIORef tc_splice_used
         ; dep_files <- readIORef dependent_files
+        ; safe_mode <- finalSafeMode dflags tcg_env
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
@@ -194,6 +196,7 @@ deSugar hsc_env
                 mg_modBreaks    = modBreaks,
                 mg_vect_decls   = ds_vects,
                 mg_vect_info    = noVectInfo,
+                mg_safe_haskell = safe_mode,
                 mg_trust_pkg    = imp_trust_own_pkg imports,
                 mg_dependent_files = dep_files
               }

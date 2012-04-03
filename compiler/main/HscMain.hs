@@ -169,7 +169,6 @@ newHscEnv dflags = do
     fc_var  <- newIORef emptyUFM
     mlc_var <- newIORef emptyModuleEnv
     optFuel <- initOptFuelState
-    safe_var <- newIORef True
     return HscEnv {  hsc_dflags       = dflags,
                      hsc_targets      = [],
                      hsc_mod_graph    = [],
@@ -180,8 +179,7 @@ newHscEnv dflags = do
                      hsc_FC           = fc_var,
                      hsc_MLC          = mlc_var,
                      hsc_OptFuel      = optFuel,
-                     hsc_type_env_var = Nothing,
-                     hsc_safeInf      = safe_var }
+                     hsc_type_env_var = Nothing }
 
 
 knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
@@ -388,10 +386,7 @@ type RenamedStuff =
 hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
                    -> IO (TcGblEnv, RenamedStuff)
 hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
-    tc_result <- {-# SCC "Typecheck-Rename" #-}
-                 ioMsgMaybe $
-                     tcRnModule hsc_env (ms_hsc_src mod_summary)
-                                True rdr_module
+    tc_result <- tcRnModule' hsc_env mod_summary True rdr_module
 
         -- This 'do' is in the Maybe monad!
     let rn_info = do decl <- tcg_rn_decls tc_result
@@ -401,6 +396,35 @@ hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
                      return (decl,imports,exports,doc_hdr)
 
     return (tc_result, rn_info)
+
+-- wrapper around tcRnModule to handle safe haskell extras
+tcRnModule' :: HscEnv -> ModSummary -> Bool -> HsParsedModule
+            -> Hsc TcGblEnv
+tcRnModule' hsc_env sum save_rn_syntax mod = do
+    tcg_res <- {-# SCC "Typecheck-Rename" #-}
+               ioMsgMaybe $
+                   tcRnModule hsc_env (ms_hsc_src sum) save_rn_syntax mod
+
+    tcSafeOK <- liftIO $ readIORef (tcg_safeInfer tcg_res)
+    dflags   <- getDynFlags
+
+    -- end of the Safe Haskell line, how to respond to user?
+    if not (safeHaskellOn dflags) || (safeInferOn dflags && not tcSafeOK)
+        -- if safe haskell off or safe infer failed, wipe trust
+        then wipeTrust tcg_res emptyBag
+
+        -- module safe, throw warning if needed
+        else do
+            tcg_res' <- hscCheckSafeImports tcg_res
+            safe <- liftIO $ readIORef (tcg_safeInfer tcg_res')
+            when (safe && wopt Opt_WarnSafe dflags)
+                 (logWarnings $ unitBag $
+                     mkPlainWarnMsg (warnSafeOnLoc dflags) $ errSafe tcg_res')
+            return tcg_res'
+  where
+    pprMod t  = ppr $ moduleName $ tcg_mod t
+    errSafe t = text "Warning:" <+> quotes (pprMod t)
+                   <+> text "has been infered as safe!"
 
 -- | Convert a typechecked module to Core
 hscDesugar :: HscEnv -> ModSummary -> TcGblEnv -> IO ModGuts
@@ -426,9 +450,11 @@ hscDesugar' mod_location tc_result = do
 -- we should use fingerprint versions instead.
 makeSimpleIface :: HscEnv -> Maybe ModIface -> TcGblEnv -> ModDetails
                 -> IO (ModIface,Bool)
-makeSimpleIface hsc_env maybe_old_iface tc_result details =
-    runHsc hsc_env $ ioMsgMaybe $
-        mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) details tc_result
+makeSimpleIface hsc_env maybe_old_iface tc_result details = runHsc hsc_env $ do
+    safe_mode <- hscGetSafeMode tc_result
+    ioMsgMaybe $ do
+        mkIfaceTc hsc_env (fmap mi_iface_hash maybe_old_iface) safe_mode
+                  details tc_result
 
 -- | Make a 'ModDetails' from the results of typechecking. Used when
 -- typechecking only, as opposed to full compilation.
@@ -528,7 +554,7 @@ data HsCompiler a = HsCompiler {
                      -> Hsc a,
 
     -- | Code generation for normal modules.
-    hscGenOutput :: ModGuts  -> ModSummary -> Maybe Fingerprint
+    hscGenOutput :: ModGuts -> ModSummary -> Maybe Fingerprint
                  -> Hsc a
   }
 
@@ -818,31 +844,8 @@ hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
 hscFileFrontEnd mod_summary = do
     hpm <- hscParse' mod_summary
     hsc_env <- getHscEnv
-    dflags  <- getDynFlags
-    tcg_env <-
-        {-# SCC "Typecheck-Rename" #-}
-        ioMsgMaybe $
-            tcRnModule hsc_env (ms_hsc_src mod_summary) False hpm
-    tcSafeOK <- liftIO $ readIORef (tcg_safeInfer tcg_env)
-
-    -- end of the Safe Haskell line, how to respond to user?
-    if not (safeHaskellOn dflags) || (safeInferOn dflags && not tcSafeOK)
-
-        -- if safe haskell off or safe infer failed, wipe trust
-        then wipeTrust tcg_env emptyBag
-
-        -- module safe, throw warning if needed
-        else do
-            tcg_env' <- hscCheckSafeImports tcg_env
-            safe <- liftIO $ hscGetSafeInf hsc_env
-            when (safe && wopt Opt_WarnSafe dflags)
-                 (logWarnings $ unitBag $
-                     mkPlainWarnMsg (warnSafeOnLoc dflags) $ errSafe tcg_env')
-            return tcg_env'
-  where
-    pprMod t  = ppr $ moduleName $ tcg_mod t
-    errSafe t = text "Warning:" <+> quotes (pprMod t)
-                   <+> text "has been infered as safe!"
+    tcg_env <- tcRnModule' hsc_env mod_summary False hpm
+    return tcg_env
 
 --------------------------------------------------------------
 -- Safe Haskell
@@ -1091,14 +1094,13 @@ checkPkgTrust dflags pkgs =
 -- it should be a central and single failure method.
 wipeTrust :: TcGblEnv -> WarningMessages -> Hsc TcGblEnv
 wipeTrust tcg_env whyUnsafe = do
-    env    <- getHscEnv
     dflags <- getDynFlags
 
     when (wopt Opt_WarnUnsafe dflags)
          (logWarnings $ unitBag $
              mkPlainWarnMsg (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
-    liftIO $ hscSetSafeInf env False
+    liftIO $ writeIORef (tcg_safeInfer tcg_env) False
     return $ tcg_env { tcg_imports = wiped_trust }
 
   where
@@ -1115,6 +1117,12 @@ wipeTrust tcg_env whyUnsafe = do
         | on df     = [mkLocMessage (loc df) $
                             text str <+> text "is not allowed in Safe Haskell"]
         | otherwise = []
+
+-- | Figure out the final correct safe haskell mode
+hscGetSafeMode :: TcGblEnv -> Hsc SafeHaskellMode
+hscGetSafeMode tcg_env = do
+    dflags  <- getDynFlags
+    liftIO $ finalSafeMode dflags tcg_env
 
 --------------------------------------------------------------
 -- Simplifiers
@@ -1137,12 +1145,13 @@ hscSimpleIface :: TcGblEnv
                -> Maybe Fingerprint
                -> Hsc (ModIface, Bool, ModDetails)
 hscSimpleIface tc_result mb_old_iface = do
-    hsc_env <- getHscEnv
-    details <- liftIO $ mkBootModDetailsTc hsc_env tc_result
+    hsc_env   <- getHscEnv
+    details   <- liftIO $ mkBootModDetailsTc hsc_env tc_result
+    safe_mode <- hscGetSafeMode tc_result
     (new_iface, no_change)
         <- {-# SCC "MkFinalIface" #-}
            ioMsgMaybe $
-               mkIfaceTc hsc_env mb_old_iface details tc_result
+               mkIfaceTc hsc_env mb_old_iface safe_mode details tc_result
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
     return (new_iface, no_change, details)
@@ -1564,21 +1573,23 @@ hscParseThingWithLocation source linenumber parser str
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing)
             return thing
 
-hscCompileCore :: HscEnv -> Bool -> ModSummary -> CoreProgram -> IO ()
-hscCompileCore hsc_env simplify mod_summary binds = runHsc hsc_env $ do
-    guts <- maybe_simplify (mkModGuts (ms_mod mod_summary) binds)
-    (iface, changed, _details, cgguts) <- hscNormalIface guts Nothing
-    hscWriteIface iface changed mod_summary
-    _ <- hscGenHardCode cgguts mod_summary
-    return ()
+hscCompileCore :: HscEnv -> Bool -> SafeHaskellMode -> ModSummary
+               -> CoreProgram -> IO ()
+hscCompileCore hsc_env simplify safe_mode mod_summary binds
+  = runHsc hsc_env $ do
+        guts <- maybe_simplify (mkModGuts (ms_mod mod_summary) safe_mode binds)
+        (iface, changed, _details, cgguts) <- hscNormalIface guts Nothing
+        hscWriteIface iface changed mod_summary
+        _ <- hscGenHardCode cgguts mod_summary
+        return ()
 
   where
     maybe_simplify mod_guts | simplify = hscSimplify' mod_guts
                             | otherwise = return mod_guts
 
 -- Makes a "vanilla" ModGuts.
-mkModGuts :: Module -> CoreProgram -> ModGuts
-mkModGuts mod binds =
+mkModGuts :: Module -> SafeHaskellMode -> CoreProgram -> ModGuts
+mkModGuts mod safe binds =
     ModGuts {
         mg_module       = mod,
         mg_boot         = False,
@@ -1603,6 +1614,7 @@ mkModGuts mod binds =
         mg_vect_info    = noVectInfo,
         mg_inst_env     = emptyInstEnv,
         mg_fam_inst_env = emptyFamInstEnv,
+        mg_safe_haskell = safe,
         mg_trust_pkg    = False,
         mg_dependent_files = []
     }

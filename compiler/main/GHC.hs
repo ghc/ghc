@@ -78,10 +78,12 @@ module GHC (
 	modInfoIsExportedName,
 	modInfoLookupName,
         modInfoIface,
+        modInfoSafe,
 	lookupGlobalName,
 	findGlobalAnns,
         mkPrintUnqualifiedForModule,
         ModIface(..),
+        SafeHaskellMode(..),
 
         -- * Querying the environment
         packageDbModules,
@@ -260,6 +262,7 @@ import HscMain
 import GhcMake
 import DriverPipeline	( compile' )
 import GhcMonad
+import TcRnMonad        ( finalSafeMode )
 import TcRnTypes
 import Packages
 import NameSet
@@ -696,6 +699,7 @@ typecheckModule pmod = do
                       HsParsedModule { hpm_module = parsedSource pmod,
                                        hpm_src_files = pm_extra_src_files pmod }
  details <- liftIO $ makeSimpleDetails hsc_env_tmp tc_gbl_env
+ safe    <- liftIO $ finalSafeMode (ms_hspp_opts ms) tc_gbl_env
  return $
      TypecheckedModule {
        tm_internals_          = (tc_gbl_env, details),
@@ -708,7 +712,8 @@ typecheckModule pmod = do
            minf_exports   = availsToNameSet $ md_exports details,
            minf_rdr_env   = Just (tcg_rdr_env tc_gbl_env),
            minf_instances = md_insts details,
-           minf_iface     = Nothing
+           minf_iface     = Nothing,
+           minf_safe      = safe
 #ifdef GHCI
           ,minf_modBreaks = emptyModBreaks
 #endif
@@ -782,12 +787,16 @@ data CoreModule
       -- | Type environment for types declared in this module
       cm_types    :: !TypeEnv,
       -- | Declarations
-      cm_binds    :: CoreProgram
+      cm_binds    :: CoreProgram,
+      -- | Safe Haskell mode
+      cm_safe     :: SafeHaskellMode
     }
 
 instance Outputable CoreModule where
-   ppr (CoreModule {cm_module = mn, cm_types = te, cm_binds = cb}) =
-      text "%module" <+> ppr mn <+> ppr te $$ vcat (map ppr cb)
+   ppr (CoreModule {cm_module = mn, cm_types = te, cm_binds = cb,
+                    cm_safe = sf})
+    = text "%module" <+> ppr mn <+> parens (ppr sf) <+> ppr te
+      $$ vcat (map ppr cb)
 
 -- | This is the way to get access to the Core bindings corresponding
 -- to a module. 'compileToCore' parses, typechecks, and
@@ -824,7 +833,7 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
   modLocation <- liftIO $ mkHiOnlyModLocation dflags (hiSuf dflags) cwd
                    ((moduleNameSlashes . moduleName) mName)
 
-  let modSummary = ModSummary { ms_mod = mName,
+  let modSum = ModSummary { ms_mod = mName,
          ms_hsc_src = ExtCoreFile,
          ms_location = modLocation,
          -- By setting the object file timestamp to Nothing,
@@ -843,7 +852,7 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
       }
 
   hsc_env <- getSession
-  liftIO $ hscCompileCore hsc_env simplify modSummary (cm_binds cm)
+  liftIO $ hscCompileCore hsc_env simplify (cm_safe cm) modSum (cm_binds cm)
 
 
 compileCore :: GhcMonad m => Bool -> FilePath -> m CoreModule
@@ -861,7 +870,7 @@ compileCore simplify fn = do
        mod_guts <- coreModule `fmap`
                       -- TODO: space leaky: call hsc* directly?
                       (desugarModule =<< typecheckModule =<< parseModule modSummary)
-       liftM gutsToCoreModule $
+       liftM (gutsToCoreModule (mg_safe_haskell mod_guts)) $
          if simplify
           then do
              -- If simplify is true: simplify (hscSimplify), then tidy
@@ -878,18 +887,22 @@ compileCore simplify fn = do
   where -- two versions, based on whether we simplify (thus run tidyProgram,
         -- which returns a (CgGuts, ModDetails) pair, or not (in which case
         -- we just have a ModGuts.
-        gutsToCoreModule :: Either (CgGuts, ModDetails) ModGuts -> CoreModule
-        gutsToCoreModule (Left (cg, md))  = CoreModule {
+        gutsToCoreModule :: SafeHaskellMode
+                         -> Either (CgGuts, ModDetails) ModGuts
+                         -> CoreModule
+        gutsToCoreModule safe_mode (Left (cg, md)) = CoreModule {
           cm_module = cg_module cg,
-          cm_types = md_types md,
-          cm_binds = cg_binds cg
+          cm_types  = md_types md,
+          cm_binds  = cg_binds cg,
+          cm_safe   = safe_mode
         }
-        gutsToCoreModule (Right mg) = CoreModule {
+        gutsToCoreModule safe_mode (Right mg) = CoreModule {
           cm_module  = mg_module mg,
           cm_types   = typeEnvFromEntities (bindersOfBinds (mg_binds mg))
                                            (mg_tcs mg)
                                            (mg_fam_insts mg),
-          cm_binds   = mg_binds mg
+          cm_binds   = mg_binds mg,
+          cm_safe    = safe_mode
          }
 
 -- %************************************************************************
@@ -936,9 +949,10 @@ data ModuleInfo = ModuleInfo {
 	minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
 	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
 	minf_instances :: [Instance],
-        minf_iface     :: Maybe ModIface
+        minf_iface     :: Maybe ModIface,
+        minf_safe      :: SafeHaskellMode
 #ifdef GHCI
-       ,minf_modBreaks :: ModBreaks 
+       ,minf_modBreaks :: ModBreaks
 #endif
   }
 	-- We don't want HomeModInfo here, because a ModuleInfo applies
@@ -979,6 +993,7 @@ getPackageModuleInfo hsc_env mdl
 			minf_rdr_env   = Just $! availsToGlobalRdrEnv (moduleName mdl) avails,
 			minf_instances = error "getModuleInfo: instances for package module unimplemented",
                         minf_iface     = Just iface,
+                        minf_safe      = getSafeMode $ mi_trust iface,
                         minf_modBreaks = emptyModBreaks  
 		}))
 #else
@@ -999,7 +1014,8 @@ getHomeModuleInfo hsc_env mdl =
 			minf_exports   = availsToNameSet (md_exports details),
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
 			minf_instances = md_insts details,
-                        minf_iface     = Just iface
+                        minf_iface     = Just iface,
+                        minf_safe      = getSafeMode $ mi_trust iface
 #ifdef GHCI
                        ,minf_modBreaks = getModBreaks hmi
 #endif
@@ -1043,6 +1059,10 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
+
+-- | Retrieve module safe haskell mode
+modInfoSafe :: ModuleInfo -> SafeHaskellMode
+modInfoSafe = minf_safe
 
 #ifdef GHCI
 modInfoModBreaks :: ModuleInfo -> ModBreaks

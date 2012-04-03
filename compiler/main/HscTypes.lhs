@@ -95,7 +95,6 @@ module HscTypes (
         noIfaceVectInfo, isNoIfaceVectInfo,
 
         -- * Safe Haskell information
-        hscGetSafeInf, hscSetSafeInf,
         IfaceTrustInfo, getSafeMode, setSafeMode, noIfaceTrustInfo,
         trustInfoToNum, numToTrustInfo, IsSafeImport,
 
@@ -324,23 +323,11 @@ data HscEnv
                 -- by limiting the number of transformations,
                 -- we can use binary search to help find compiler bugs.
 
-        hsc_type_env_var :: Maybe (Module, IORef TypeEnv),
+        hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
                 -- the 'IfGblEnv'. See 'TcRnTypes.tcg_type_env_var' for
                 -- 'TcRunTypes.TcGblEnv'
-
-        hsc_safeInf :: {-# UNPACK #-} !(IORef Bool)
-                -- ^ Have we infered the module being compiled as
-                -- being safe?
  }
-
--- | Get if the current module is considered safe or not by inference.
-hscGetSafeInf :: HscEnv -> IO Bool
-hscGetSafeInf hsc_env = readIORef (hsc_safeInf hsc_env)
-
--- | Set if the current module is considered safe or not by inference.
-hscSetSafeInf :: HscEnv -> Bool -> IO ()
-hscSetSafeInf hsc_env b = writeIORef (hsc_safeInf hsc_env) b
 
 -- | Retrieve the ExternalPackageState cache.
 hscEPS :: HscEnv -> IO ExternalPackageState
@@ -842,6 +829,8 @@ data ModGuts
         mg_fam_inst_env :: FamInstEnv,
         -- ^ Type-family instance enviroment for /home-package/ modules
         -- (including this one); c.f. 'tcg_fam_inst_env'
+        mg_safe_haskell :: SafeHaskellMode,
+        -- ^ Safe Haskell mode
         mg_trust_pkg    :: Bool,
         -- ^ Do we need to trust our own package for Safe Haskell?
         -- See Note [RnNames . Trust Own Package]

@@ -1104,8 +1104,17 @@ setStage s = updLclEnv (\ env -> env { tcl_th_ctxt = s })
 %************************************************************************
 
 \begin{code}
+-- | Mark that safe inference has failed
 recordUnsafeInfer :: TcM ()
 recordUnsafeInfer = getGblEnv >>= \env -> writeTcRef (tcg_safeInfer env) False
+
+-- | Figure out the final correct safe haskell mode
+finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
+finalSafeMode dflags tcg_env = do
+    safeInf <- readIORef (tcg_safeInfer tcg_env)
+    return $ if safeInferOn dflags && not safeInf
+        then Sf_None
+        else safeHaskell dflags
 \end{code}
 
 
