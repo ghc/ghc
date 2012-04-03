@@ -1418,11 +1418,17 @@ rewriteCtFlavor_cache _cache (Derived wl _pty_orig) pty_new _co
 rewriteCtFlavor_cache cache fl pty co
   | isTcReflCo co
   -- If just reflexivity then you may re-use the same variable as optimization
-  = return (Just $ case fl of
-               Derived wl _pty_orig -> Derived wl pty
-               Given gl ev  -> Given  gl (setVarType ev pty)
-               Wanted wl ev -> Wanted wl (setVarType ev pty)
-               Solved gl ev -> Solved gl (setVarType ev pty))
+  = if ctFlavPred fl `eqType` pty then 
+      -- E.g. for type synonyms we want to use the original type 
+      -- since it's not flattened to report better error messages.
+      return $ Just fl
+    else 
+      -- E.g. because we rewrite with a spontaneously solved one
+      return (Just $ case fl of
+                 Derived wl _pty_orig -> Derived wl pty
+                 Given gl ev  -> Given  gl (setVarType ev pty)
+                 Wanted wl ev -> Wanted wl (setVarType ev pty)
+                 Solved gl ev -> Solved gl (setVarType ev pty))
   | otherwise 
   = xCtFlavor_cache cache fl [pty] (XEvTerm ev_comp ev_decomp) cont
   where ev_comp [x] = mkEvCast x co
