@@ -67,8 +67,9 @@ lexParseRnMbHaddockComment dflags hty gre (Just d) = lexParseRnHaddockComment df
 
 
 -- yes, you always get a HaddockModInfo though it might be empty
-lexParseRnHaddockModHeader :: DynFlags -> GlobalRdrEnv -> GhcDocHdr -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
-lexParseRnHaddockModHeader dflags gre mbStr = do
+lexParseRnHaddockModHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> GhcDocHdr
+                           -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
+lexParseRnHaddockModHeader dflags gre safety mbStr = do
   (hmi, docn) <-
     case mbStr of
       Nothing -> return failure
@@ -79,9 +80,8 @@ lexParseRnHaddockModHeader dflags gre mbStr = do
             tell ["haddock module header parse failed: " ++ mess]
             return failure
           Right (info, doc) -> return (renameHmi gre info, Just (rename gre doc))
-  return (hmi { hmi_safety = safety }, docn)
+  return (hmi { hmi_safety = Just $ showPpr safety }, docn)
   where
-    safety  = Just $ showPpr $ safeHaskell dflags
     failure = (emptyHaddockModInfo, Nothing)
 
 

@@ -45,6 +45,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   let ms            = pm_mod_summary . tm_parsed_module $ tm
       mi            = moduleInfo tm
+      safety        = modInfoSafe mi
       mdl           = ms_mod ms
       dflags        = ms_hspp_opts ms
       instances     = modInfoInstances mi
@@ -68,7 +69,7 @@ createInterface tm flags modMap instIfaceMap = do
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
-  (info, mbDoc) <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre mayDocHeader
+  (info, mbDoc) <- liftErrMsg $ lexParseRnHaddockModHeader dflags gre safety mayDocHeader
 
   let declsWithDocs = topDecls group_
       (decls, _) = unzip declsWithDocs
