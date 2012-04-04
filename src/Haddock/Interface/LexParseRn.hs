@@ -113,7 +113,7 @@ rename gre = rn
       DocCodeBlock doc -> DocCodeBlock (rn doc)
       DocIdentifierUnchecked x -> DocIdentifierUnchecked x
       DocModule str -> DocModule str
-      DocURL str -> DocURL str
+      DocHyperlink l -> DocHyperlink l
       DocPic str -> DocPic str
       DocAName str -> DocAName str
       DocExamples e -> DocExamples e

@@ -10,7 +10,7 @@
 module Haddock.Parse where
 
 import Haddock.Lex
-import Haddock.Types (Doc(..), Example(Example))
+import Haddock.Types (Doc(..), Example(Example), Hyperlink(..))
 import Haddock.Doc
 import HsSyn
 import RdrName
@@ -107,7 +107,7 @@ seq1	:: { Doc RdrName }
 elem1	:: { Doc RdrName }
 	: STRING		{ DocString $1 }
 	| '/../'                { DocEmphasis (DocString $1) }
-	| URL			{ DocURL $1 }
+	| URL			{ DocHyperlink (Hyperlink $1 Nothing) }
 	| PIC                   { DocPic $1 }
 	| ANAME			{ DocAName $1 }
 	| IDENT			{ DocIdentifier $1 }
