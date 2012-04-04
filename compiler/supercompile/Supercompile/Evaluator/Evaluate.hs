@@ -1,4 +1,4 @@
-module Supercompile.Evaluator.Evaluate (normalise, step, shouldExposeUnfolding) where
+module Supercompile.Evaluator.Evaluate (normalise, step, gc, shouldExposeUnfolding) where
 
 #include "HsVersions.h"
 
@@ -329,6 +329,8 @@ step' normalising ei_state = {-# SCC "step'" #-}
 
         dereference h = snd . dereference' h False
     
+        -- NB: assumes that ei_state has the same size as what we would return from "step" if the dereferencing fails.
+        -- At the time of writing, this invariant holds (since turning terms into equivalent stack frames doesn't change size)
         dereferenceLambdaish :: Heap -> ContextSummary -> Answer
                              -> (Answer -> Maybe UnnormalisedState)
                              -> Maybe State
@@ -367,7 +369,10 @@ step' normalising ei_state = {-# SCC "step'" #-}
                 , Just _ <- stackToCast k
                 -> True
                 -- If the result is actually smaller, accept it (this catches manifest values)
-                | stateSize s' <= either stateSize unnormalisedStateSize ei_state
+                -- NB: garbage collect before comparison in case we inlined an internallyBound thing
+                -- into its only use site, which is a very important case to catch!
+                -- TODO: should gc the unnormalised state as well.. but risks non-termination?
+                | stateSize (gc s') <= either (stateSize . gc) unnormalisedStateSize ei_state
                 -> True
                 -- It might still be OK to get larger if GHC's inlining heuristics say we should
                 | Indirect x' <- v
@@ -566,3 +571,75 @@ shouldExposeUnfolding x = case inl_inline inl_prag of
           ForRecursion  -> isStrongLoopBreaker (idOccInfo x)
           ForEverything -> True
           ForNothing    -> False
+
+
+-- We used to garbage-collect in the evaluator, when we executed the rule for update frames. This had two benefits:
+--  1) We don't have to actually update the heap or even claim a new deed
+--  2) We make the supercompiler less likely to terminate, because GCing so tends to reduce TagBag sizes
+--
+-- However, this caused problems with speculation: to prevent incorrectly garbage collecting bindings from the invisible "enclosing"
+-- heap when we speculated one of the bindings from the heap, we had to pass around an extra "live set" of parts of the heap that might
+-- be referred to later on. Furthermore:
+--  * Finding FVs when executing every update step was a bit expensive (though they were memoized on each of the State components)
+--  * This didn't GC cycles (i.e. don't consider stuff from the Heap that was only referred to by the thing being removed as "GC roots")
+--  * It didn't seem to make any difference to the benchmark numbers anyway
+--
+-- You might think a good alternative approach is to:
+-- 1. Drop dead update frames in transitiveInline (which is anyway responsible for ensuring there is no dead stuff in the stack)
+-- 2. "Squeeze" just before the matcher: this shorts out indirections-to-indirections and does update-frame stack squeezing.
+--    You might also think that it would be cool to just do this in normalisation, but then when normalising during specualation the enclosing
+--    context wouldn't get final_rned :-(
+--
+-- HOWEVER. That doesn't work properly because normalisation itself can introduce dead bindings - i.e. in order to be guaranteed to
+-- catch all the junk we have to GC normalised bindings, not the pre-normalised ones that transitiveInline sees. So instead I did
+-- both points 1 and 2 right just before we go to the matcher.
+--
+-- HOWEVER. Simon suggested something that made me realise that actually we could do squeezing of consecutive update frames and
+-- indirection chains in the evaluator (and thus the normaliser) itself, which is even cooler. Thus all that is left to do in the
+-- GC is to make a "global" analysis that drops stuff that is definitely dead. We *still* want to run this just before the matcher because
+-- although dead heap bindings don't bother it, it would be confused by dead update frames.
+--
+-- TODO: have the garbage collector collapse (let x = True in x) to (True) -- but note that this requires onceness analysis
+gc :: State -> State
+gc _state@(deeds0, Heap h ids, k, in_e)
+  = {-# SCC "gc" #-}
+    ASSERT2(stateUncoveredVars gced_state `subVarSet` stateUncoveredVars _state, ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState quietStatePrettiness _state), PrettyDoc (pPrintFullState quietStatePrettiness gced_state)))
+    gced_state -- We do not insist that *no* variables are uncovered because when used from the speculator this may not be true
+  where
+    gced_state = (deeds2, Heap h' ids, k', in_e)
+    
+    -- We have to use stateAllFreeVars here rather than stateFreeVars because in order to safely prune the live stack we need
+    -- variables bound by k to be part of the live set if they occur within in_e or the rest of the k
+    live0 = stateAllFreeVars (deeds0, Heap M.empty ids, k, in_e)
+    (deeds1, h', live1) = inlineLiveHeap deeds0 h live0
+    -- Collecting dead update frames doesn't make any new heap bindings dead since they don't refer to anything
+    (deeds2, k') = pruneLiveStack deeds1 k live1
+    
+    inlineLiveHeap :: Deeds -> PureHeap -> FreeVars -> (Deeds, PureHeap, FreeVars)
+    inlineLiveHeap deeds h live = (foldr (flip releaseHeapBindingDeeds . snd) deeds h_dead_kvs, h_live, live')
+      where
+        (h_dead_kvs, h_live, live') = heap_worker (M.toAscList h) M.empty live
+        
+        -- This is just like Split.transitiveInline, but simpler since it never has to worry about running out of deeds:
+        heap_worker :: [(Var, HeapBinding)]   -- Possibly-dead heap as sorted list. NB: not a PureHeap map because creating..
+                    -> PureHeap -> FreeVars   -- ..the map on every iteration showed up as 6% of SC allocations!
+                    -> ([(Var, HeapBinding)], -- Dead heap
+                        PureHeap, FreeVars)
+        heap_worker h_pending h_output live
+          = if live == live'
+            then (h_pending', h_output', live')
+            else heap_worker h_pending' h_output' live'
+          where 
+            (h_pending', h_output', live') = foldr consider_inlining ([], h_output, live) h_pending
+        
+            -- NB: It's important that type variables become live after inlining a binding, or we won't
+            -- necessarily lambda-abstract over all the free type variables of a h-function
+            consider_inlining (x', hb) (h_pending_kvs, h_output, live)
+              | x' `elemVarSet` live = (h_pending_kvs,            M.insert x' hb h_output, live `unionVarSet` heapBindingFreeVars hb `unionVarSet` varBndrFreeVars x')
+              | otherwise            = ((x', hb) : h_pending_kvs, h_output,                live)
+    
+    pruneLiveStack :: Deeds -> Stack -> FreeVars -> (Deeds, Stack)
+    pruneLiveStack init_deeds k live = trainFoldr (\kf (deeds, k_live) -> if (case tagee kf of Update x' -> x' `elemVarSet` live; _ -> True)
+                                                                          then (deeds, kf `Car` k_live)
+                                                                          else (deeds `releaseStackFrameDeeds` kf, k_live))
+                                                  (\gen deeds -> (deeds, Loco gen)) init_deeds k
