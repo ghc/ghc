@@ -64,8 +64,9 @@ process parse dflags gre (HsDocString fs) = do
      Just doc -> return (Just (rename gre doc))
 
 
-processModuleHeader :: DynFlags -> GlobalRdrEnv -> Maybe LHsDocString -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
-processModuleHeader dflags gre mayStr = do
+processModuleHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsDocString
+                    -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
+processModuleHeader dflags gre safety mayStr = do
   (hmi, doc) <-
     case mayStr of
       Nothing -> return failure
@@ -79,8 +80,7 @@ processModuleHeader dflags gre mayStr = do
             let hmi' = hmi { hmi_description = rename gre <$> hmi_description hmi }
                 doc' = rename gre doc
             return (hmi', Just doc')
-  let safety = Just $ showPpr $ safeHaskell dflags
-  return (hmi { hmi_safety = safety }, doc)
+  return (hmi { hmi_safety = Just $ showPpr safety }, doc)
   where
     failure = (emptyHaddockModInfo, Nothing)
 
