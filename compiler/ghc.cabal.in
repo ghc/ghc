@@ -80,7 +80,7 @@ Library
     Extensions: CPP, MagicHash, UnboxedTuples, PatternGuards,
                 ForeignFunctionInterface, EmptyDataDecls,
                 TypeSynonymInstances, MultiParamTypeClasses,
-                FlexibleInstances, Rank2Types, ScopedTypeVariables,
+                FlexibleInstances, RankNTypes, ScopedTypeVariables,
                 DeriveDataTypeable, BangPatterns
     if impl(ghc >= 7.1)
         Extensions: NondecreasingIndentation
