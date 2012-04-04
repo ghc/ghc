@@ -108,16 +108,16 @@ ghcHeuristics x e (lone_variable, arg_infos, cont_info)
   where
     try unf = case unf of
       CoreSyn.CoreUnfolding { CoreSyn.uf_is_top = is_top, CoreSyn.uf_is_work_free = is_work_free, CoreSyn.uf_expandable = expandable
-                      , CoreSyn.uf_arity = arity, CoreSyn.uf_guidance = guidance }
-                         -> trce_fail (ppr (CoreSyn.uf_tmpl unf)) $
-                            Just $ tryUnfolding dflags1 x lone_variable 
-                                                arg_infos cont_info is_top 
-                                                is_cheap uf_arity guidance
-                                                is_work_free expandable
-                                                arity guidance
+                            , CoreSyn.uf_arity = arity, CoreSyn.uf_guidance = guidance }
+                               -> trce_fail (ppr (CoreSyn.uf_tmpl unf)) $
+                                  Just $ tryUnfolding dflags1 x lone_variable 
+                                                      arg_infos cont_info is_top 
+                                                      is_work_free expandable
+                                                      arity guidance
       -- GHC actually only looks through DFunUnfoldings in exprIsConApp_maybe,
       -- so I'll do this rough heuristic instead:
-      CoreSyn.DFunUnfolding {} -> trce (text "Dictionary unfolding") $ Just $ length arg_infos >= idArity x
+      CoreSyn.DFunUnfolding {} -> trce_fail (text "Unsaturated dictionary unfolding") $
+                                  Just $ length arg_infos >= idArity x
       CoreSyn.NoUnfolding      -> Nothing
       CoreSyn.OtherCon {}      -> Nothing
 
@@ -125,6 +125,10 @@ ghcHeuristics x e (lone_variable, arg_infos, cont_info)
     -- Set these two flags so that we get information about failed inlinings:
     dflags1 | tRACE     = dopt_set (dopt_set dflags0 Opt_D_verbose_core2core) Opt_D_dump_inlinings
             | otherwise = dflags0
+
+    trce_fail :: SDoc -> Maybe Bool -> Maybe Bool
+    --trce_fail doc (Just False) = trce doc (Just False)
+    trce_fail _   mb_x         = mb_x
 
     trce :: SDoc -> a -> a
     trce | tRACE     = pprTrace ("Considering inlining: " ++ showSDoc (ppr x))

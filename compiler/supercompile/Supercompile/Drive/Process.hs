@@ -684,7 +684,8 @@ reduce' orig_state = go False (mkLinearHistory rEDUCE_WQO) orig_state
                               -- let smmrse s@(_, _, _, qa) = pPrintFullState s $$ case annee qa of Question _ -> text "Question"; Answer _ -> text "Answer" in
                               -- pprPreview2 "reduce-stop" (smmrse old_state) (smmrse state) $
                               (can_step, mempty { stat_reduce_stops = 1 }, if rEDUCE_ROLLBACK then old_state else state') -- TODO: generalise?
-           | otherwise -> (True, mempty, state)
+           | otherwise -> pprTrace "reduce-stop(deeds)" empty $
+                          (True, mempty, state)
           _ -> (can_step, mempty, state)
 
 
