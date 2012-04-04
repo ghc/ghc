@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, UnboxedTuples #-}
+{-# LANGUAGE RankNTypes, ImplicitParams, UnboxedTuples #-}
 
 -- Test two slightly exotic things about type signatures
 
