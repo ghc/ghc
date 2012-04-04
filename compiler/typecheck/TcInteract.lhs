@@ -268,8 +268,7 @@ spontaneousSolveStage workItem
         spont_solve (SPSolved workItem')           -- Post: workItem' must be equality
           = do { bumpStepCountTcS
                ; traceFireTcS (cc_depth workItem) $
-                 ptext (sLit "Spontaneous") 
-                           <+> parens (ppr (cc_flavor workItem)) <+> ppr workItem
+                 ptext (sLit "Spontaneous:") <+> ppr workItem
 
                  -- NB: will add the item in the inerts
                ; kickOutRewritableInerts workItem'
@@ -669,9 +668,9 @@ interactWithInertsStage wi
         interact_next (ContinueWith wi) atomic_inert 
           = do { ir <- doInteractWithInert atomic_inert wi
                ; let mk_msg rule keep_doc 
-                       = text rule <+> keep_doc
-      	                 <+> vcat [ ptext (sLit "Inert =") <+> ppr atomic_inert
-      	                          , ptext (sLit "Work =")  <+> ppr wi ]
+                       = vcat [ text rule <+> keep_doc
+                              , ptext (sLit "InertItem =") <+> ppr atomic_inert
+                              , ptext (sLit "WorkItem  =") <+> ppr wi ]
                ; case ir of 
                    IRWorkItemConsumed { ir_fire = rule } 
                        -> do { bumpStepCountTcS
@@ -1424,7 +1423,8 @@ tryTopReact wi
                  SomeTopInt rule what_next 
                      -> do { bumpStepCountTcS 
                            ; traceFireTcS (cc_depth wi) $
-                             ptext (sLit "Top react:") <+> text rule
+                             vcat [ ptext (sLit "Top react:") <+> text rule
+                                  , text "WorkItem =" <+> ppr wi ]
                            ; return what_next }
              } }
 
@@ -1851,6 +1851,9 @@ matchClassInst inerts clas tys loc
    = do { let pred = mkClassPred clas tys 
         ; mb_result <- matchClass clas tys
         ; untch <- getUntouchables
+        ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
+                                           , text "inerts=" <+> ppr inerts
+                                           , text "untouchables=" <+> ppr untch ]
         ; case mb_result of
             MatchInstNo   -> return NoInstance
             MatchInstMany -> return NoInstance -- defer any reactions of a multitude until

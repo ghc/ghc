@@ -1453,6 +1453,7 @@ matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Either TyVar TcT
 matchClass clas tys
   = do	{ let pred = mkClassPred clas tys 
         ; instEnvs <- getInstEnvs
+        ; traceTcS "matchClass" $ text "instEnvs=" <+> ppr instEnvs
         ; case lookupInstEnv instEnvs clas tys of {
             ([], unifs, _)               -- Nothing matches  
                 -> do { traceTcS "matchClass not matching"
