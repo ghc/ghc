@@ -1338,9 +1338,8 @@ isFFIExportResultTy :: Type -> Bool
 isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
 isFFIDynTy :: Type -> Type -> Bool
--- The type in a foreign import dynamic must be Ptr, FunPtr, Addr,
--- or a newtype of either, and the wrapped function type must be equal
--- to the given type.
+-- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
+-- either, and the wrapped function type must be equal to the given type.
 -- We assume that all types have been run through normalizeFfiType, so we don't
 -- need to worry about expanding newtypes here.
 isFFIDynTy expected ty
@@ -1355,8 +1354,7 @@ isFFIDynTy expected ty
     = False
 
 isFFILabelTy :: Type -> Bool
--- The type of a foreign label must be Ptr, FunPtr, Addr,
--- or a newtype of either.
+-- The type of a foreign label must be Ptr, FunPtr, or a newtype of either.
 isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
 isFFIPrimArgumentTy :: DynFlags -> Type -> Bool

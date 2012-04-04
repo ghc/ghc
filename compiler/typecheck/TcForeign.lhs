@@ -210,10 +210,9 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ _ _ (CLabel _))
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh CWrapper) = do
         -- Foreign wrapper (former f.e.d.)
-        -- The type must be of the form ft -> IO (FunPtr ft), where ft is a
-        -- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
-        -- as ft -> IO Addr is accepted, too.  The use of the latter two forms
-        -- is DEPRECATED, though.
+        -- The type must be of the form ft -> IO (FunPtr ft), where ft is a valid
+        -- foreign type.  For legacy reasons ft -> IO (Ptr ft) is accepted, too.
+        -- The use of the latter form is DEPRECATED, though.
     checkCg checkCOrAsmOrLlvmOrInterp
     cconv' <- checkCConv cconv
     case arg_tys of
@@ -229,7 +228,7 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety mh (CFunction ta
   | isDynamicTarget target = do -- Foreign import dynamic
       checkCg checkCOrAsmOrLlvmOrInterp
       cconv' <- checkCConv cconv
-      case arg_tys of           -- The first arg must be Ptr, FunPtr, or Addr
+      case arg_tys of           -- The first arg must be Ptr or FunPtr
         []                -> do
           check False (illegalForeignTyErr empty sig_ty)
         (arg1_ty:arg_tys) -> do
