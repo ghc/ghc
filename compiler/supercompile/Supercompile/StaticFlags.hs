@@ -215,6 +215,9 @@ rEFINE_FULFILMENT_FVS :: Bool
 rEFINE_FULFILMENT_FVS = not $ lookUp $ fsLit "-fsupercompiler-no-refine-fulfilment-fvs"
 
 
+hISTORY_TREE :: Bool
+hISTORY_TREE = not $ lookUp $ fsLit "-fsupercompiler-no-history-tree"
+
 rEDUCE_ROLLBACK :: Bool
 rEDUCE_ROLLBACK = not $ lookUp $ fsLit "-fsupercompiler-no-reduce-rollback"
 

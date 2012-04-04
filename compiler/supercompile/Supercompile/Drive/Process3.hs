@@ -129,7 +129,7 @@ type StopCount = Int
 
 data ScpState = ScpState {
     scpMemoState :: MemoState,
-    scpProcessHistory :: ProcessHistory,
+    scpProcessHistoryState :: ProcessHistory,
     scpFulfilmentState :: FulfilmentState,
     -- Debugging aids below this line:
     scpResidTags :: ResidTags,
@@ -137,6 +137,7 @@ data ScpState = ScpState {
   }
 
 data ScpEnv = ScpEnv {
+    scpProcessHistoryEnv :: ProcessHistory,
     scpStopCount :: StopCount,
     scpNodeKey :: NodeKey,
     scpParents :: [Var],
@@ -167,7 +168,7 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         hist = pROCESS_HISTORY
         fs = FS { fulfilments = [] }
         parent = generatedKey hist
-        (e, s') = unI $ runContT $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv 0 parent [] nothingSpeculated tag_anns)
+        (e, s') = unI $ runContT $ unReaderT (unStateT (unScpM me) (ScpState ms hist fs emptyResidTags emptyParentChildren)) (ScpEnv hist 0 parent [] nothingSpeculated tag_anns)
         fulfils = fulfilments (scpFulfilmentState s')
         e' = letRec fulfils e
 
@@ -203,10 +204,10 @@ rolledBackTo s' s = flip fmap (on leftExtension (promises . scpMemoState) s' s) 
           promises = appendHead [if fun p `elemVarSet` rolled_back then p { dumped = True } else p | p <- safeTail spine_rolled_back ++ possibly_rolled_back] ok_promises,
           hNames   = hNames (scpMemoState s')
         },
-      scpProcessHistory = scpProcessHistory s,
-      scpFulfilmentState = rolled_fulfilments,
-      scpResidTags      = scpResidTags s', -- FIXME: not totally accurate
-      scpParentChildren = scpParentChildren s'
+      scpProcessHistoryState = scpProcessHistoryState s,
+      scpFulfilmentState     = rolled_fulfilments,
+      scpResidTags           = scpResidTags s', -- FIXME: not totally accurate
+      scpParentChildren      = scpParentChildren s'
     }
 
 scpDepth :: ScpEnv -> Int
@@ -233,12 +234,12 @@ fulfillM :: (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM res = ScpM $ StateT $ \s -> case fulfill res (scpFulfilmentState s) (scpMemoState s) of (res', fs', ms') -> return (res', s { scpFulfilmentState = fs', scpMemoState = ms' })
 
 terminateM :: String -> State -> (Generaliser -> ScpM ()) -> ScpM a -> (String -> State -> (Generaliser -> ScpM ()) -> ScpM a) -> ScpM a
-terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (scpProcessHistory s) (scpNodeKey env, (h, state, rb))) of
+terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (if hISTORY_TREE then scpProcessHistoryEnv env else scpProcessHistoryState s) (scpNodeKey env, (h, state, rb))) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
-             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state shallow_rb)) s)                                 (env { scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
+             unReaderT (unStateT (unScpM (mstop shallow_h shallow_state shallow_rb)) s)                                      (env { scpStopCount = scpStopCount env + 1}) -- FIXME: prevent rollback?
         Continue hist'
-          -> unReaderT (unStateT (unScpM mcont)                                      (s { scpProcessHistory = hist' })) (env { scpNodeKey = generatedKey hist' })
+          -> unReaderT (unStateT (unScpM mcont)                                      (s { scpProcessHistoryState = hist' })) (env { scpNodeKey = generatedKey hist', scpProcessHistoryEnv = hist' })
   -- TODO: record the names of the h-functions on the way to the current one instead of a Int depth
 
 speculateM :: State -> (State -> ScpM a) -> ScpM a
