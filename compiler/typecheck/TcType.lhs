@@ -102,8 +102,7 @@ module TcType (
   isFFIImportResultTy, -- :: DynFlags -> Type -> Bool
   isFFIExportResultTy, -- :: Type -> Bool
   isFFIExternalTy,     -- :: Type -> Bool
-  isFFIDynArgumentTy,  -- :: Type -> Bool
-  isFFIDynResultTy,    -- :: Type -> Bool
+  isFFIDynTy,          -- :: Type -> Type -> Bool
   isFFIPrimArgumentTy, -- :: DynFlags -> Type -> Bool
   isFFIPrimResultTy,   -- :: DynFlags -> Type -> Bool
   isFFILabelTy,        -- :: Type -> Bool
@@ -1338,19 +1337,24 @@ isFFIImportResultTy dflags ty
 isFFIExportResultTy :: Type -> Bool
 isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
-isFFIDynArgumentTy :: Type -> Bool
--- The argument type of a foreign import dynamic must be Ptr, FunPtr, Addr,
--- or a newtype of either.
-isFFIDynArgumentTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
-
-isFFIDynResultTy :: Type -> Bool
--- The result type of a foreign export dynamic must be Ptr, FunPtr, Addr,
--- or a newtype of either.
-isFFIDynResultTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
+isFFIDynTy :: Type -> Type -> Bool
+-- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
+-- either, and the wrapped function type must be equal to the given type.
+-- We assume that all types have been run through normalizeFfiType, so we don't
+-- need to worry about expanding newtypes here.
+isFFIDynTy expected ty
+    -- Note [Foreign import dynamic]
+    -- In the example below, expected would be 'CInt -> IO ()', while ty would
+    -- be 'FunPtr (CDouble -> IO ())'.
+    | Just (tc, [ty']) <- splitTyConApp_maybe ty
+    , tyConUnique tc `elem` [ptrTyConKey, funPtrTyConKey]
+    , eqType ty' expected
+    = True
+    | otherwise
+    = False
 
 isFFILabelTy :: Type -> Bool
--- The type of a foreign label must be Ptr, FunPtr, Addr,
--- or a newtype of either.
+-- The type of a foreign label must be Ptr, FunPtr, or a newtype of either.
 isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
 isFFIPrimArgumentTy :: DynFlags -> Type -> Bool
@@ -1400,6 +1404,21 @@ checkRepTyConKey :: [Unique] -> Type -> Bool
 checkRepTyConKey keys
   = checkRepTyCon (\tc -> tyConUnique tc `elem` keys)
 \end{code}
+
+Note [Foreign import dynamic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A dynamic stub must be of the form 'FunPtr ft -> ft' where ft is any foreign
+type.  Similarly, a wrapper stub must be of the form 'ft -> IO (FunPtr ft)'.
+
+We use isFFIDynTy to check whether a signature is well-formed. For example,
+given a (illegal) declaration like:
+
+foreign import ccall "dynamic"
+  foo :: FunPtr (CDouble -> IO ()) -> CInt -> IO ()
+
+isFFIDynTy will compare the 'FunPtr' type 'CDouble -> IO ()' with the curried
+result type 'CInt -> IO ()', and return False, as they are not equal.
+
 
 ----------------------------------------------
 These chaps do the work; they are not exported
