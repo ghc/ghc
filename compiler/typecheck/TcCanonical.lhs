@@ -309,10 +309,13 @@ canClass d fl cls tys
              xi = mkClassPred cls xis
              
        ; mb <- rewriteCtFlavor fl xi co
+
        ; case mb of
-           Just new_fl -> continueWith $ 
-                          CDictCan { cc_flavor = new_fl
-                                   , cc_tyargs = xis, cc_class = cls, cc_depth = d }
+           Just new_fl -> 
+             let (ClassPred cls xis_for_dict) = classifyPredType (ctFlavPred new_fl)
+             in continueWith $ 
+                CDictCan { cc_flavor = new_fl
+                         , cc_tyargs = xis_for_dict, cc_class = cls, cc_depth = d }
            Nothing -> return Stop }
 
 emitSuperclasses :: Ct -> TcS StopOrContinue
