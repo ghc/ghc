@@ -350,6 +350,7 @@ TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
 '$('            { L _ ITparenEscape   }     -- $( exp )
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
+TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 %monad { P } { >>= } { return }
 %lexer { lexer } { L _ ITeof }
@@ -1360,6 +1361,10 @@ quasiquote :: { Located (HsQuasiQuote RdrName) }
                                 ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
                                 ; quoterId = mkUnqual varName quoter }
                             in L1 (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
+        | TH_QQUASIQUOTE  { let { loc = getLoc $1
+                                ; ITqQuasiQuote (qual, quoter, quote, quoteSpan) = unLoc $1
+                                ; quoterId = mkQual varName (qual, quoter) }
+                            in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
 
 exp   :: { LHsExpr RdrName }
         : infixexp '::' sigtype         { LL $ ExprWithTySig $1 $3 }
