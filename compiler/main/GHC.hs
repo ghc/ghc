@@ -73,8 +73,8 @@ module GHC (
         modInfoLookupName,
         modInfoIface,
         modInfoSafe,
-	lookupGlobalName,
-	findGlobalAnns,
+        lookupGlobalName,
+        findGlobalAnns,
         mkPrintUnqualifiedForModule,
         ModIface(..),
         SafeHaskellMode(..),
@@ -986,9 +986,9 @@ getPrintUnqual = withSession $ \hsc_env ->
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
-	minf_type_env  :: TypeEnv,
-	minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
-	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
+        minf_type_env  :: TypeEnv,
+        minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
+        minf_rdr_env   :: Maybe GlobalRdrEnv,   -- Nothing for a compiled/package mod
         minf_instances :: [ClsInst],
         minf_iface     :: Maybe ModIface,
         minf_safe      :: SafeHaskellMode
@@ -1051,10 +1051,10 @@ getHomeModuleInfo hsc_env mdl =
       let details = hm_details hmi
           iface   = hm_iface hmi
       return (Just (ModuleInfo {
-			minf_type_env  = md_types details,
-			minf_exports   = availsToNameSet (md_exports details),
-			minf_rdr_env   = mi_globals $! hm_iface hmi,
-			minf_instances = md_insts details,
+                        minf_type_env  = md_types details,
+                        minf_exports   = availsToNameSet (md_exports details),
+                        minf_rdr_env   = mi_globals $! hm_iface hmi,
+                        minf_instances = md_insts details,
                         minf_iface     = Just iface,
                         minf_safe      = getSafeMode $ mi_trust iface
 #ifdef GHCI
