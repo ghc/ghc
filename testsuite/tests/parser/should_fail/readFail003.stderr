@@ -10,3 +10,27 @@ readFail003.hs:4:27:
         | otherwise = a
         where
             nullity = null
+
+readFail003.hs:5:27:
+    Occurs check: cannot construct the infinite type:
+      t0 = (t0, [a0], [a1])
+    In the expression: a
+    In a pattern binding:
+      ~(a, b, c)
+        | nullity b = a
+        | nullity c = a
+        | otherwise = a
+        where
+            nullity = null
+
+readFail003.hs:6:27:
+    Occurs check: cannot construct the infinite type:
+      t0 = (t0, [a0], [a1])
+    In the expression: a
+    In a pattern binding:
+      ~(a, b, c)
+        | nullity b = a
+        | nullity c = a
+        | otherwise = a
+        where
+            nullity = null

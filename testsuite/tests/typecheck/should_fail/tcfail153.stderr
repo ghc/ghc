@@ -1,9 +1,11 @@
 
-tcfail153.hs:6:9:
-    Couldn't match expected type `a' with actual type `Bool'
+tcfail153.hs:6:7:
+    Couldn't match type `a' with `Bool'
       `a' is a rigid type variable bound by
           the type signature for f :: a -> [a] at tcfail153.hs:5:6
-    In the first argument of `g', namely `x'
+    Expected type: [a]
+      Actual type: [Bool]
+    In the return type of a call of `g'
     In the expression: g x
     In an equation for `f':
         f x

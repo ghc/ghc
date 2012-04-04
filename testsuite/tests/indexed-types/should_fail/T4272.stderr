@@ -1,29 +1,6 @@
 
-T4272.hs:11:16:
-    Couldn't match type `TermFamily (TermFamily x0 x0)'
-                  with `TermFamily x0'
-    NB: `TermFamily' is a type function, and may not be injective
-    The type variable `x0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
-    Expected type: TermFamily x0 x0
-      Actual type: TermFamily a a
-    In the first argument of `prune', namely `t'
-    In the expression: prune t (terms (undefined :: TermFamily a a))
-    In an equation for `laws':
-        laws t = prune t (terms (undefined :: TermFamily a a))
-
-T4272.hs:11:16:
-    Occurs check: cannot construct the infinite type:
-      x0 = TermFamily x0 x0
-    Expected type: TermFamily x0 x0
-      Actual type: TermFamily a a
-    In the first argument of `prune', namely `t'
-    In the expression: prune t (terms (undefined :: TermFamily a a))
-    In an equation for `laws':
-        laws t = prune t (terms (undefined :: TermFamily a a))
-
-T4272.hs:11:19:
-    Could not deduce (a ~ TermFamily x0 x0)
+T4272.hs:11:26:
+    Could not deduce (a ~ TermFamily a a)
     from the context (TermLike a)
       bound by the type signature for
                  laws :: TermLike a => TermFamily a a -> b
@@ -31,7 +8,10 @@ T4272.hs:11:19:
       `a' is a rigid type variable bound by
           the type signature for laws :: TermLike a => TermFamily a a -> b
           at T4272.hs:10:16
-    In the return type of a call of `terms'
+    Expected type: TermFamily a (TermFamily a a)
+      Actual type: TermFamily a a
+    In the first argument of `terms', namely
+      `(undefined :: TermFamily a a)'
     In the second argument of `prune', namely
       `(terms (undefined :: TermFamily a a))'
     In the expression: prune t (terms (undefined :: TermFamily a a))

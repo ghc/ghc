@@ -10,13 +10,13 @@ T3330a.hs:19:34:
     In the first argument of `execWriter', namely `(hmapM p collect x)'
     In the expression: execWriter (hmapM p collect x)
 
-T3330a.hs:19:36:
+T3330a.hs:19:44:
     Couldn't match type `ix' with `r ix0 -> Writer [AnyF s0] (r ix0)'
       `ix' is a rigid type variable bound by
            the type signature for children :: s ix -> PF s r ix -> [AnyF s]
            at T3330a.hs:18:13
-    Expected type: s0 ix0 -> ix
-      Actual type: s0 ix0 -> r ix0 -> Writer [AnyF s0] (r ix0)
-    In the second argument of `hmapM', namely `collect'
+    Expected type: PF s r (r ix0 -> Writer [AnyF s0] (r ix0))
+      Actual type: PF s r ix
+    In the third argument of `hmapM', namely `x'
     In the first argument of `execWriter', namely `(hmapM p collect x)'
     In the expression: execWriter (hmapM p collect x)

@@ -12,15 +12,3 @@ T3208b.hs:15:10:
       Actual type: OTerm a0
     In the expression: fce (apply f)
     In an equation for fce': fce' f = fce (apply f)
-
-T3208b.hs:15:15:
-    Could not deduce (STerm a ~ OTerm a0)
-    from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
-      bound by the type signature for
-                 fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
-      at T3208b.hs:14:9-56
-    The type variable `a0' is ambiguous
-    Possible fix: add a type signature that fixes these type variable(s)
-    In the first argument of `fce', namely `(apply f)'
-    In the expression: fce (apply f)
-    In an equation for fce': fce' f = fce (apply f)
