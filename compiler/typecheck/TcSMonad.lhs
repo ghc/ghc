@@ -65,7 +65,7 @@ module TcSMonad (
         -- Inerts 
     InertSet(..), InertCans(..), 
     getInertEqs, getCtCoercion,
-    emptyInert, getTcSInerts, updInertSet, extractUnsolved,
+    emptyInert, getTcSInerts, lookupInInerts, updInertSet, extractUnsolved,
     extractUnsolvedTcS, modifyInertTcS,
     updInertSetTcS, partitionCCanMap, partitionEqMap,
     getRelevantCts, extractRelevantInerts,

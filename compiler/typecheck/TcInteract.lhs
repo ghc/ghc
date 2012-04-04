@@ -208,7 +208,8 @@ React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canoni
 
 \begin{code}
 thePipeline :: [(String,SimplifierStage)]
-thePipeline = [ ("canonicalization",        canonicalizationStage)
+thePipeline = [ ("lookup-in-inerts",        lookupInInertsStage)
+              , ("canonicalization",        canonicalizationStage)
               , ("spontaneous solve",       spontaneousSolveStage)
               , ("interact with inerts",    interactWithInertsStage)
               , ("top-level reactions",     topReactionsStage) ]
@@ -216,6 +217,25 @@ thePipeline = [ ("canonicalization",        canonicalizationStage)
 
 
 \begin{code}
+
+-- A quick lookup everywhere to see if we know about this constraint
+--------------------------------------------------------------------
+lookupInInertsStage :: SimplifierStage
+lookupInInertsStage ct
+  | isWantedCt ct
+  = do { is <- getTcSInerts
+       ; ctxt <- getTcSContext
+       ; case lookupInInerts is (ctPred ct) of
+           Just ct_cached 
+             | (not $ isDerivedCt ct) && (not $ simplEqsOnly ctxt) 
+               -- Don't share if we are simplifying a RULE 
+               -- see Note [Simplifying RULE lhs constraints]
+             -> setEvBind (ctId ct) (EvId (ctId ct_cached)) >> 
+                return Stop
+           _ -> continueWith ct }
+  | otherwise -- I could do something like that for givens 
+              -- as well I suppose but it is not a big deal
+  = continueWith ct
 
 
 -- The canonicalization stage, see TcCanonical for details
