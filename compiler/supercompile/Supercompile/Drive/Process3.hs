@@ -71,10 +71,8 @@ appendHead ys1 (Loco ys2)        = Loco (ys1 ++ ys2)
 leftExtension :: Train (Promise, a) b -- ^ Longer list
               -> Train (Promise, a) b -- ^ Shorter list
               -> Maybe ([(Promise, a)], Train (Promise, a) b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
-leftExtension xs_train ys_train = case splitBy (trainCars ys_train) (reverse (trainCars xs_train)) of
+leftExtension = trainLeftExtensionBy (\orig@(p1, _) (p2, _) -> if fun p1 == fun p2 then Just orig else Nothing) (\b1 _b2 -> Just b1)
     -- We can only roll back to direct ancestors, or we risk loops/other madness
-    (prefix_rev, Right suffix_rev) | on (==) (map (fun . fst)) (trainCars ys_train) suffix_rev -> Just (reverse prefix_rev, ys_train)
-    (_, _) -> Nothing -- pprPanic "leftExtension" (ppr (on (,) (map (fun . fst) . trainCars) xs_train ys_train))
 
 
 data MemoState = MS {
@@ -174,7 +172,7 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
 
 
 callCCM :: ((a -> ScpM ()) -> ScpM a) -> ScpM a
-callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> trace "rollback failed" $ return ((), s')))) s) env)
+callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) s) env)
 
 catchM :: ((c -> ScpM ()) -> ScpM a) -- ^ Action to try: supplies a function than can be called to "raise an exception". Raising an exception restores the original ScpEnv and ScpState
        -> (c -> ScpM a)              -- ^ Handler deferred to if an exception is raised
@@ -186,7 +184,9 @@ catchM try handler = do
       Right res -> return res
 
 rolledBackTo :: ScpState -> ScpState -> Maybe ScpState
-rolledBackTo s' s = flip fmap (on leftExtension (promises . scpMemoState) s' s) $ \(dangerous_promises, ok_promises) ->
+rolledBackTo s' s = case on leftExtension (promises . scpMemoState) s' s of
+ Nothing -> pprTrace "rollback failed" (on (curry ppr) (fmapTrain (map fun . uncurry (:)) (map fun) . promises . scpMemoState) s' s) Nothing
+ Just (dangerous_promises, ok_promises) -> Just $
   let -- We have to roll back any promise on the "stack" above us:
       (spine_rolled_back, possibly_rolled_back) = (second concat) $ unzip dangerous_promises
       -- NB: rolled_back includes names of both unfulfilled promises rolled back from the stack and fulfilled promises that have to be dumped as a result

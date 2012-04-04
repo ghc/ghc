@@ -648,17 +648,23 @@ supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
 
 data Train a b = Car a (Train a b) | Loco b
 
+instance (Outputable a, Outputable b) => Outputable (Train a b) where
+    ppr xs = brackets (fsep (punctuate comma (trainFoldr (\a -> (ppr a :)) (\b -> (ppr b :)) [] xs)))
+
 {-# INLINE trainAppend #-}
 trainAppend :: Train a b -> (b -> Train a b') -> Train a b'
 trainAppend init_abs mk_tl = go init_abs
   where go (Car a abs) = Car a (go abs)
         go (Loco b)    = mk_tl b
 
-{-# INLINE fmapCars #-}
-fmapCars :: (a -> a') -> Train a b -> Train a' b
-fmapCars f = go
+{-# INLINE fmapTrain #-}
+fmapTrain :: (a -> a') -> (b -> b') -> Train a b -> Train a' b'
+fmapTrain f g = go
   where go (Car a abs) = Car (f a) (go abs)
-        go (Loco b)    = Loco b
+        go (Loco b)    = Loco (g b)
+
+fmapCars :: (a -> a') -> Train a b -> Train a' b
+fmapCars f = fmapTrain f id
 
 fmapLoco :: (b -> b') -> Train a b -> Train a b'
 fmapLoco f abs = trainAppend abs (Loco . f)
@@ -711,6 +717,25 @@ trainMapAccumL f_car f_loco = go
           where (s', b') = f_loco s b
         go s (Car a abs) = second (Car a') (go s' abs)
           where (s', a') = f_car s a
+
+{-# INLINE trainLeftExtensionBy #-}
+trainLeftExtensionBy :: (a1 -> a2 -> Maybe a)
+                     -> (b1 -> b2 -> Maybe b)
+                     -> Train a1 b1 -- ^ Longer list
+                     -> Train a2 b2 -- ^ Shorter list
+                     -> Maybe ([a1], Train a b) -- Pair of the prefix present in the longer list and the common suffix (== shorter list)
+trainLeftExtensionBy f_car f_loco xs ys = do
+    loco <- f_loco xs_loco ys_loco
+    go (reverse xs_cars) (reverse ys_cars) (Loco loco)
+  where
+    (xs_cars, xs_loco) = trainToList xs
+    (ys_cars, ys_loco) = trainToList ys
+
+    go xs_cars         []              train = Just (reverse xs_cars, train)
+    go []              _               _     = Nothing
+    go (x_car:xs_cars) (y_car:ys_cars) train = do
+        car <- f_car x_car y_car
+        go xs_cars ys_cars (Car car train)
 
 
 data Stream a = a :< Stream a
