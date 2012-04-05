@@ -135,32 +135,35 @@ mkIface :: HscEnv
                                 --          to write it
 
 mkIface hsc_env maybe_old_fingerprint mod_details
-         ModGuts{     mg_module     = this_mod,
-                      mg_boot       = is_boot,
-                      mg_used_names = used_names,
-                      mg_used_th    = used_th,
-                      mg_deps       = deps,
-                      mg_dir_imps   = dir_imp_mods,
-                      mg_rdr_env    = rdr_env,
-                      mg_fix_env    = fix_env,
-                      mg_warns      = warns,
-                      mg_hpc_info   = hpc_info,
-                      mg_trust_pkg  = self_trust,
+         ModGuts{     mg_module       = this_mod,
+                      mg_boot         = is_boot,
+                      mg_used_names   = used_names,
+                      mg_used_th      = used_th,
+                      mg_deps         = deps,
+                      mg_dir_imps     = dir_imp_mods,
+                      mg_rdr_env      = rdr_env,
+                      mg_fix_env      = fix_env,
+                      mg_warns        = warns,
+                      mg_hpc_info     = hpc_info,
+                      mg_safe_haskell = safe_mode,
+                      mg_trust_pkg    = self_trust,
                       mg_dependent_files = dependent_files
                     }
         = mkIface_ hsc_env maybe_old_fingerprint
                    this_mod is_boot used_names used_th deps rdr_env fix_env
-                   warns hpc_info dir_imp_mods self_trust dependent_files mod_details
+                   warns hpc_info dir_imp_mods self_trust dependent_files
+                   safe_mode mod_details
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
 -- object code at all ('HscNothing').
 mkIfaceTc :: HscEnv
           -> Maybe Fingerprint  -- The old fingerprint, if we have it
+          -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
           -> TcGblEnv           -- Usages, deprecations, etc
           -> IO (Messages, Maybe (ModIface, Bool))
-mkIfaceTc hsc_env maybe_old_fingerprint mod_details
+mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
   tc_result@TcGblEnv{ tcg_mod = this_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
@@ -180,7 +183,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
           mkIface_ hsc_env maybe_old_fingerprint
                    this_mod (isHsBoot hsc_src) used_names used_th deps rdr_env
                    fix_env warns hpc_info (imp_mods imports)
-                   (imp_trust_own_pkg imports) dep_files mod_details
+                   (imp_trust_own_pkg imports) dep_files safe_mode mod_details
         
 
 mkUsedNames :: TcGblEnv -> NameSet
@@ -226,11 +229,12 @@ mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> ImportedMods -> Bool
          -> [FilePath]
+         -> SafeHaskellMode
          -> ModDetails
          -> IO (Messages, Maybe (ModIface, Bool))
 mkIface_ hsc_env maybe_old_fingerprint 
          this_mod is_boot used_names used_th deps rdr_env fix_env src_warns
-         hpc_info dir_imp_mods pkg_trust_req dependent_files
+         hpc_info dir_imp_mods pkg_trust_req dependent_files safe_mode
          ModDetails{  md_insts     = insts, 
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
@@ -244,7 +248,6 @@ mkIface_ hsc_env maybe_old_fingerprint
 --      to expose in the interface
 
   = do  { usages  <- mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files
-        ; safeInf <- hscGetSafeInf hsc_env
 
         ; let   { entities = typeEnvElts type_env ;
                   decls  = [ tyThingToIfaceDecl entity
@@ -263,13 +266,7 @@ mkIface_ hsc_env maybe_old_fingerprint
                 ; iface_insts = map instanceToIfaceInst insts
                 ; iface_fam_insts = map famInstToIfaceFamInst fam_insts
                 ; iface_vect_info = flattenVectInfo vect_info
-
-                -- Check if we are in Safe Inference mode 
-                -- but we failed to pass the muster
-                ; safeMode    = if safeInferOn dflags && not safeInf
-                                    then Sf_None
-                                    else safeHaskell dflags
-                ; trust_info  = setSafeMode safeMode
+                ; trust_info  = setSafeMode safe_mode
 
                 ; intermediate_iface = ModIface { 
                         mi_module      = this_mod,
