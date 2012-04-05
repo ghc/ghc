@@ -32,6 +32,8 @@ import UniqFM
 import Unique( Unique )
 import FastString(FastString)
 
+import Unify ( niFixTvSubst )
+
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 import VarEnv
@@ -529,36 +531,38 @@ lkT env ty m
 
 
 lkT_mod :: CmEnv  
-        -> TyVarEnv a   -- A substitution 
-        -> (a -> Type)
+        -> TyVarEnv Type -- TvSubstEnv 
         -> Type
         -> TypeMap b -> Maybe b 
-lkT_mod env s f ty m
+lkT_mod env s ty m
   | EmptyTM <- m = Nothing
   | Just ty' <- coreView ty
-  = lkT_mod env s f ty' m
-  | isEmptyVarEnv candidates 
+  = lkT_mod env s ty' m
+  | [] <- candidates 
   = go env s ty m
   | otherwise
-  = Just $ head (varEnvElts candidates) -- Yikes!
-  where  
-    candidates = filterVarEnv_Directly find_matching (vm_fvar $ tm_var m)
-    find_matching tv _b = case lookupVarEnv_Directly s tv of
-      Nothing -> False
-      Just a -> f a `eqType` ty            
+  = Just $ snd (head candidates) -- Yikes!
+  where
+     -- Hopefully intersects is much smaller than traversing the whole vm_fvar
+    intersects = eltsUFM $
+                 intersectUFM_C (,) s (vm_fvar $ tm_var m)
+    candidates = [ (u,ct) | (u,ct) <- intersects
+                          , Type.substTy (niFixTvSubst s) u `eqType` ty ]
+                  
     go env _s (TyVarTy v)      = tm_var    >.> lkVar env v
-    go env s (AppTy t1 t2)     = tm_app    >.> lkT_mod env s f t1 >=> lkT_mod env s f t2
-    go env s (FunTy t1 t2)     = tm_fun    >.> lkT_mod env s f t1 >=> lkT_mod env s f t2
-    go env s (TyConApp tc tys) = tm_tc_app >.> lkNamed tc >=> lkList (lkT_mod env s f) tys
-    go _env _s (LitTy l)           = tm_tylit  >.> lkTyLit l
-    go _env _s (ForAllTy _tv _ty)  = const Nothing
+    go env s (AppTy t1 t2)     = tm_app    >.> lkT_mod env s t1 >=> lkT_mod env s t2
+    go env s (FunTy t1 t2)     = tm_fun    >.> lkT_mod env s t1 >=> lkT_mod env s t2
+    go env s (TyConApp tc tys) = tm_tc_app >.> lkNamed tc >=> lkList (lkT_mod env s) tys
+    go _env _s (LitTy l)       = tm_tylit  >.> lkTyLit l
+    go _env _s (ForAllTy _tv _ty) = const Nothing
+    
     {- DV TODO: Add proper lookup for ForAll -}
 
 lookupTypeMap_mod :: TyVarEnv a -- A substitution to be applied to the /keys/ of type map 
                   -> (a -> Type)
                   -> Type 
                   -> TypeMap b -> Maybe b
-lookupTypeMap_mod = lkT_mod emptyCME
+lookupTypeMap_mod s f = lkT_mod emptyCME (mapVarEnv f s)
 
 -----------------
 xtT :: CmEnv -> Type -> XT a -> TypeMap a -> TypeMap a
