@@ -251,7 +251,9 @@ lookupExactOcc name
 
   where
     exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
-                      2 (ptext (sLit "Probable cause: you used a unique name (NameU) in Template Haskell but did not bind it"))
+                      2 (vcat [ ptext (sLit "Probable cause: you used a unique name (NameU), perhaps via newName,")
+                              , ptext (sLit "in Template Haskell, but did not bind it")
+                              , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
 
 -----------------------------------------------
 lookupInstDeclBndr :: Name -> SDoc -> RdrName -> RnM Name
