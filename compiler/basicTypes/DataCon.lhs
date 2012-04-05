@@ -989,7 +989,7 @@ buildPromotedTyCon tc
 buildPromotedDataCon :: DataCon -> TyCon
 buildPromotedDataCon dc 
   = ASSERT ( isPromotableType ty )
-    mkPromotedDataTyCon dc (getName dc) (getUnique dc) kind arity
+    mkPromotedDataCon dc (getName dc) (getUnique dc) kind arity
   where 
     ty    = dataConUserType dc
     kind  = promoteType ty
