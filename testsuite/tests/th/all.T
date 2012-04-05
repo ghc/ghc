@@ -233,3 +233,4 @@ test('T5984', extra_clean(['T5984_Lib.hi', 'T5984_Lib.o']),
 test('T5555', extra_clean(['T5555_Lib.hi', 'T5555_Lib.o']),
               multimod_compile, ['T5555', '-v0'])
 test('T5976', normal, compile_fail, ['-v0'])
+test('T5795', normal, compile_fail, ['-v0'])
