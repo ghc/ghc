@@ -5,7 +5,7 @@ import Foreign.Ptr   --import Foreign
                  --import GlaExts
                  --import Int
                  --import Word
-type Addr = Ptr ()
+type Addr = FunPtr (Int -> IO ())
 foreign import ccall "wrapper" d8  :: (Int -> IO ())  -> IO Addr
 
 -- exporting functions

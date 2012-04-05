@@ -2,7 +2,7 @@
 module ShouldCompile where
 
 import Foreign
-type Addr = Ptr ()
+type Addr = FunPtr (IO ())
 newtype NPtr a = NPtr Addr
 
 foreign import ccall "wrapper" mkFoo :: IO () -> IO (NPtr Int)
