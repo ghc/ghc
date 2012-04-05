@@ -485,10 +485,11 @@ designed to mark functions like "filter" as strong loop breakers on the basis th
   1. The RHS of filter mentions the local function "filterFB"
   2. We have a rule which mentions "filterFB" on the LHS and "filter" on the RHS
 
-So for each RULE for an *imported* function we are going to add dependency edges between
-the FVS of the rule LHS and the FVS of the rule RHS. We don't do anything special for
-RULES on local functions because the standard occurrence analysis stuff is pretty good
-at getting loop-breakerness correct there.
+So for each RULE for an *imported* function we are going to add
+dependency edges between the *local* FVS of the rule LHS and the
+*local* FVS of the rule RHS. We don't do anything special for RULES on
+local functions because the standard occurrence analysis stuff is
+pretty good at getting loop-breakerness correct there.
 
 It is important to note that even with this extra hack we aren't always going to get
 things right. For example, it might be that the rule LHS mentions an imported Id,

@@ -1576,7 +1576,7 @@ type SimpleKind = Kind
 \begin{code}
 typeKind :: Type -> Kind
 typeKind (TyConApp tc tys)
-  | isPromotedTypeTyCon tc
+  | isPromotedTyCon tc
   = ASSERT( tyConArity tc == length tys ) superKind
   | otherwise
   = kindAppResult (tyConKind tc) tys
