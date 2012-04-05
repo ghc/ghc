@@ -123,7 +123,7 @@ test('T4801',
      [''])
 
 test('T3064',
-     [ expect_broken( 3064 ),
+     [# expect_broken( 3064 ),
       # expected value: 9 (x86/Linux 30-03-2011):
       if_wordsize(32,
           compiler_stats_num_field('peak_megabytes_allocated', 7, 12)),
