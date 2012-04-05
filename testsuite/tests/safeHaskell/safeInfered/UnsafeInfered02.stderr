@@ -2,4 +2,5 @@
 [2 of 2] Compiling UnsafeInfered02  ( UnsafeInfered02.hs, UnsafeInfered02.o )
 
 UnsafeInfered02.hs:4:1:
-    main:UnsafeInfered02_A can't be safely imported! The module itself isn't safe.
+    UnsafeInfered02_A: Can't be safely imported!
+    The module itself isn't safe.
