@@ -339,6 +339,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
         -- Just discard the auxiliary bindings; they are generated
         -- only for Haskell source code, and should already be in Core
    tcg_env   <- tcTyAndClassDecls emptyModDetails rn_decls ;
+   safe_mode <- liftIO $ finalSafeMode (hsc_dflags hsc_env) tcg_env ;
    dep_files <- liftIO $ readIORef (tcg_dependent_files tcg_env) ;
 
    setGblEnv tcg_env $ do {
@@ -366,20 +367,21 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
                                 mg_fam_insts = tcg_fam_insts tcg_env,
                                 mg_inst_env  = tcg_inst_env tcg_env,
                                 mg_fam_inst_env = tcg_fam_inst_env tcg_env,
-                                mg_rules     = [],
-                                mg_vect_decls = [],
-                                mg_anns      = [],
-                                mg_binds     = core_binds,
+                                mg_rules        = [],
+                                mg_vect_decls   = [],
+                                mg_anns         = [],
+                                mg_binds        = core_binds,
 
                                 -- Stubs
-                                mg_rdr_env   = emptyGlobalRdrEnv,
-                                mg_fix_env   = emptyFixityEnv,
-                                mg_warns     = NoWarnings,
-                                mg_foreign   = NoStubs,
-                                mg_hpc_info  = emptyHpcInfo False,
-                                mg_modBreaks = emptyModBreaks,
-                                mg_vect_info = noVectInfo,
-                                mg_trust_pkg = False,
+                                mg_rdr_env      = emptyGlobalRdrEnv,
+                                mg_fix_env      = emptyFixityEnv,
+                                mg_warns        = NoWarnings,
+                                mg_foreign      = NoStubs,
+                                mg_hpc_info     = emptyHpcInfo False,
+                                mg_modBreaks    = emptyModBreaks,
+                                mg_vect_info    = noVectInfo,
+                                mg_safe_haskell = safe_mode,
+                                mg_trust_pkg    = False,
                                 mg_dependent_files = dep_files
                             } } ;
 

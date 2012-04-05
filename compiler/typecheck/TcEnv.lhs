@@ -518,16 +518,20 @@ checkWellStaged pp_thing bind_lvl use_lvl
   = return ()                   -- E.g.  \x -> [| $(f x) |]
 
   | bind_lvl == outerLevel      -- GHC restriction on top level splices
-  = failWithTc $ 
-    sep [ptext (sLit "GHC stage restriction:") <+>  pp_thing,
-         nest 2 (vcat [ ptext (sLit "is used in a top-level splice or annotation,")
-                      , ptext (sLit "and must be imported, not defined locally")])]
+  = stageRestrictionError pp_thing
 
   | otherwise                   -- Badly staged
   = failWithTc $                -- E.g.  \x -> $(f x)
     ptext (sLit "Stage error:") <+> pp_thing <+> 
         hsep   [ptext (sLit "is bound at stage") <+> ppr bind_lvl,
                 ptext (sLit "but used at stage") <+> ppr use_lvl]
+
+stageRestrictionError :: SDoc -> TcM a
+stageRestrictionError pp_thing
+  = failWithTc $ 
+    sep [ ptext (sLit "GHC stage restriction:")
+        , nest 2 (vcat [ pp_thing <+> ptext (sLit "is used in a top-level splice or annotation,")
+                       , ptext (sLit "and must be imported, not defined locally")])]
 
 topIdLvl :: Id -> ThLevel
 -- Globals may either be imported, or may be from an earlier "chunk" 
@@ -763,19 +767,35 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 
 notFound :: Name -> TcM TyThing
 notFound name 
-  = do { (_gbl,lcl) <- getEnvs
-       ; failWithTc (vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
+  = do { lcl_env <- getLclEnv
+       ; let stage = tcl_th_ctxt lcl_env
+       ; case stage of   -- See Note [Out of scope might be a staging error]
+           Splice -> stageRestrictionError (quotes (ppr name))
+           _ -> failWithTc $
+                vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
                      ptext (sLit "is not in scope during type checking, but it passed the renamer"),
-                     ptext (sLit "tcl_env of environment:") <+> ppr (tcl_env lcl)]
+                     ptext (sLit "tcl_env of environment:") <+> ppr (tcl_env lcl_env)]
                        -- Take case: printing the whole gbl env can
                        -- cause an infnite loop, in the case where we
                        -- are in the middle of a recursive TyCon/Class group;
                        -- so let's just not print it!  Getting a loop here is
                        -- very unhelpful, because it hides one compiler bug with another
-                    ) }
+       }
 
 wrongThingErr :: String -> TcTyThing -> Name -> TcM a
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
                 ptext (sLit "used as a") <+> text expected)
 \end{code}
+
+Note [Out of scope might be a staging error]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  x = 3
+  data T = MkT $(foo x)
+
+This is really a staging error, because we can't run code involving 'x'.
+But in fact the type checker processes types first, so 'x' won't even be
+in the type envt when we look for it in $(foo x).  So inside splices we
+report something missing from the type env as a staging error.
+See Trac #5752 and #5795.

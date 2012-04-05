@@ -444,13 +444,14 @@ tc_hs_type (HsCoreTy ty) exp_kind
 
 
 #ifdef GHCI	/* Only if bootstrapped */
--- This looks highly bogus to me
+-- This looks highly suspect to me
+-- It will really only be fixed properly when we do the TH
+-- reorganisation so that type splices happen in the renamer
 tc_hs_type hs_ty@(HsSpliceTy sp fvs _) exp_kind 
-  = do { (ty, kind) <- tcSpliceType sp fvs
+  = do { s <- getStage
+       ; traceTc "tc_hs_type: splice" (ppr sp $$ ppr s) 
+       ; (ty, kind) <- tcSpliceType sp fvs
        ; checkExpectedKind hs_ty kind exp_kind
-
---        ; kind' <- zonkType (mkZonkTcTyVar (\ _ -> return liftedTypeKind) mkTyVarTy) 
---                            kind
 --                     -- See Note [Kind of a type splice]
        ; return ty }
 #else

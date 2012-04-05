@@ -18,10 +18,10 @@ struct gc_thread_;
 void      stat_startInit(void);
 void      stat_endInit(void);
 
-void      stat_startGC(struct gc_thread_ *gct);
-void      stat_endGC  (struct gc_thread_ *gct, lnat alloc, lnat live, 
-		       lnat copied, nat gen,
-                       lnat max_copied, lnat avg_copied, lnat slop);
+void      stat_startGC(Capability *cap, struct gc_thread_ *gct);
+void      stat_endGC  (Capability *cap, struct gc_thread_ *gct,
+                       lnat alloc, lnat live, lnat copied, lnat slop, nat gen,
+                       nat n_gc_threads, lnat par_max_copied, lnat par_tot_copied);
 
 void stat_gcWorkerThreadStart (struct gc_thread_ *gct);
 void stat_gcWorkerThreadDone  (struct gc_thread_ *gct);

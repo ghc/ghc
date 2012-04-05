@@ -336,13 +336,13 @@ tcDeriving tycl_decls inst_decls deriv_decls
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
 	         (ddump_deriving inst_info rn_binds newTyCons famInsts))
 
-  ; let all_tycons = map ATyCon (bagToList newTyCons)
-  ; gbl_env <- tcExtendGlobalEnv all_tycons $
-               tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
-               tcExtendLocalFamInstEnv (bagToList famInsts) $
-               tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
+        ; let all_tycons = map ATyCon (bagToList newTyCons)
+        ; gbl_env <- tcExtendGlobalEnv all_tycons $
+                     tcExtendGlobalEnvImplicit (concatMap implicitTyThings all_tycons) $
+                     tcExtendLocalFamInstEnv (bagToList famInsts) $
+                     tcExtendLocalInstEnv (map iSpec (bagToList inst_info)) getGblEnv
 
-  ; return (addTcgDUs gbl_env rn_dus, inst_info, rn_binds) }
+        ; return (addTcgDUs gbl_env rn_dus, inst_info, rn_binds) }
   where
     ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name 
                    -> Bag TyCon    -- ^ Empty data constructors

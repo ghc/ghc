@@ -159,10 +159,11 @@ reportTidyWanteds ctxt insols flats implics
 deferToRuntime :: EvBindsVar -> ReportErrCtxt -> (ReportErrCtxt -> Ct -> TcM ErrMsg) 
                -> Ct -> TcM ()
 deferToRuntime ev_binds_var ctxt mk_err_msg ct 
-  | Wanted loc <- cc_flavor ct
+  | fl <- cc_flavor ct
+  , Wanted loc _ <- fl
   = do { err <- setCtLoc loc $
                 mk_err_msg ctxt ct
-       ; let ev_id   = cc_id ct
+       ; let ev_id   = ctId ct -- Prec satisfied: Wanted
              err_msg = pprLocErrMsg err
              err_fs  = mkFastString $ showSDoc $ 
                        err_msg $$ text "(deferred type error)"
@@ -323,8 +324,8 @@ groupErrs mk_err (ct1 : rest)
 
    same_group :: CtFlavor -> CtFlavor -> Bool
    same_group (Given l1 _) (Given l2 _) = same_loc l1 l2
-   same_group (Derived l1) (Derived l2) = same_loc l1 l2
-   same_group (Wanted l1)  (Wanted l2)  = same_loc l1 l2
+   same_group (Derived l1 _) (Derived l2 _) = same_loc l1 l2
+   same_group (Wanted l1 _)  (Wanted l2 _)  = same_loc l1 l2
    same_group _ _ = False
 
    same_loc :: CtLoc o -> CtLoc o -> Bool
@@ -345,7 +346,7 @@ pprWithArising []
 pprWithArising (ct:cts)
   | null cts
   = (loc, addArising (ctLocOrigin (ctWantedLoc ct)) 
-                     (pprEvVarTheta [cc_id ct])) 
+                     (pprTheta [ctPred ct]))
   | otherwise
   = (loc, vcat (map ppr_one (ct:cts)))
   where
@@ -425,22 +426,23 @@ mkEqErr _ [] = panic "mkEqErr"
 mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
 -- Wanted constraints only!
 mkEqErr1 ctxt ct
-  = case cc_flavor ct of
-       Given gl gk -> mkEqErr_help ctxt2 ct False ty1 ty2
-              where
-                 ctxt2 = ctxt { cec_extra = cec_extra ctxt $$ 
-                                inaccessible_msg gl gk }  
-    
-       flav -> do { let orig = ctLocOrigin (getWantedLoc flav)
-                  ; (ctxt1, orig') <- zonkTidyOrigin ctxt orig
-                  ; mk_err ctxt1 orig' }
+  = if isGivenOrSolved flav then 
+      let ctx2 = ctxt { cec_extra = cec_extra ctxt $$ inaccessible_msg flav }
+      in mkEqErr_help ctx2 ct False ty1 ty2
+    else
+      do { let orig = ctLocOrigin (getWantedLoc flav)
+         ; (ctxt1, orig') <- zonkTidyOrigin ctxt orig
+         ; mk_err ctxt1 orig' }
   where
-     -- If a GivenSolved then we should not report inaccessible code
-    inaccessible_msg loc GivenOrig = hang (ptext (sLit "Inaccessible code in"))
-                                        2 (ppr (ctLocOrigin loc))
-    inaccessible_msg _ _ = empty
 
-    (ty1, ty2) = getEqPredTys (evVarPred (cc_id ct))
+    flav = cc_flavor ct
+
+    inaccessible_msg (Given loc _) = hang (ptext (sLit "Inaccessible code in"))
+                                        2 (ppr (ctLocOrigin loc))
+    -- If a Solved then we should not report inaccessible code
+    inaccessible_msg _ = empty
+
+    (ty1, ty2) = getEqPredTys (ctPred ct)
 
        -- If the types in the error message are the same as the types
        -- we are unifying, don't add the extra expected/actual message
@@ -1072,6 +1074,19 @@ solverDepthErrorTcS depth stack
   = failWith msg
   | otherwise
   = setCtFlavorLoc (cc_flavor top_item) $
+    do { zstack <- mapM zonkCt stack
+       ; env0 <- tcInitTidyEnv
+       ; let zstack_tvs = foldr (unionVarSet . tyVarsOfCt) emptyVarSet zstack
+             tidy_env = tidyFreeTyVars env0 zstack_tvs
+             tidy_cts = map (tidyCt tidy_env) zstack
+       ; failWithTcM (tidy_env, hang msg 2 (vcat (map (ppr . ctPred) tidy_cts))) }
+  where
+    top_item = head stack
+    msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int depth
+               , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
+
+{- DV: Changing this because Derived's no longer have ids ... Kind of a corner case ...
+  = setCtFlavorLoc (cc_flavor top_item) $
     do { ev_vars <- mapM (zonkEvVar . cc_id) stack
        ; env0 <- tcInitTidyEnv
        ; let tidy_env = tidyFreeTyVars env0 (tyVarsOfEvVars ev_vars)
@@ -1081,6 +1096,8 @@ solverDepthErrorTcS depth stack
     top_item = head stack
     msg = vcat [ ptext (sLit "Context reduction stack overflow; size =") <+> int depth
                , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
+-}
+
 
 flattenForAllErrorTcS :: CtFlavor -> TcType -> TcM a
 flattenForAllErrorTcS fl ty
@@ -1100,9 +1117,10 @@ flattenForAllErrorTcS fl ty
 
 \begin{code}
 setCtFlavorLoc :: CtFlavor -> TcM a -> TcM a
-setCtFlavorLoc (Wanted  loc)   thing = setCtLoc loc thing
-setCtFlavorLoc (Derived loc)   thing = setCtLoc loc thing
-setCtFlavorLoc (Given loc _gk) thing = setCtLoc loc thing
+setCtFlavorLoc (Wanted  loc _) thing = setCtLoc loc thing
+setCtFlavorLoc (Derived loc _) thing = setCtLoc loc thing
+setCtFlavorLoc (Given loc _)   thing = setCtLoc loc thing
+setCtFlavorLoc (Solved loc _)  thing = setCtLoc loc thing
 \end{code}
 
 %************************************************************************

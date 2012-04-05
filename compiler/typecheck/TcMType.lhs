@@ -686,18 +686,29 @@ zonkWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
 zonkCt :: Ct -> TcM Ct 
 -- Zonking a Ct conservatively gives back a CNonCanonical
 zonkCt ct 
-  = do { v'  <- zonkEvVar (cc_id ct)
-       ; fl' <- zonkFlavor (cc_flavor ct)
+  = do { fl' <- zonkFlavor (cc_flavor ct)
        ; return $ 
-         CNonCanonical { cc_id = v'
-                       , cc_flavor = fl'
+         CNonCanonical { cc_flavor = fl'
                        , cc_depth = cc_depth ct } }
 zonkCts :: Cts -> TcM Cts
 zonkCts = mapBagM zonkCt
 
 zonkFlavor :: CtFlavor -> TcM CtFlavor
-zonkFlavor (Given loc gk) = do { loc' <- zonkGivenLoc loc; return (Given loc' gk) }
-zonkFlavor fl             = return fl
+zonkFlavor (Given loc evar) 
+  = do { loc' <- zonkGivenLoc loc
+       ; evar' <- zonkEvVar evar
+       ; return (Given loc' evar') }
+zonkFlavor (Solved loc evar) 
+  = do { loc' <- zonkGivenLoc loc
+       ; evar' <- zonkEvVar evar
+       ; return (Solved loc' evar') }
+zonkFlavor (Wanted loc evar)
+  = do { evar' <- zonkEvVar evar
+       ; return (Wanted loc evar') }
+zonkFlavor (Derived loc pty)
+  = do { pty' <- zonkTcType pty
+       ; return (Derived loc pty') }
+
 
 zonkGivenLoc :: GivenLoc -> TcM GivenLoc
 -- GivenLocs may have unification variables inside them!
