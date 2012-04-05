@@ -321,6 +321,10 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
   "[" @varid "|"  / { ifExtension qqEnabled }
                      { lex_quasiquote_tok }
+
+  -- qualified quasi-quote (#5555)
+  "[" @qual @varid "|"  / { ifExtension qqEnabled }
+                          { lex_qquasiquote_tok }
 }
 
 <0> {
@@ -562,7 +566,14 @@ data Token
   | ITidEscape   FastString     --  $x
   | ITparenEscape               --  $(
   | ITtyQuote                   --  ''
-  | ITquasiQuote (FastString,FastString,RealSrcSpan) --  [:...|...|]
+  | ITquasiQuote (FastString,FastString,RealSrcSpan)
+    -- ITquasiQuote(quoter, quote, loc)
+    -- represents a quasi-quote of the form
+    -- [quoter| quote |]
+  | ITqQuasiQuote (FastString,FastString,FastString,RealSrcSpan)
+    -- ITqQuasiQuote(Qual, quoter, quote, loc)
+    -- represents a qualified quasi-quote of the form
+    -- [Qual.quoter| quote |]
 
   -- Arrow notation extension
   | ITproc
@@ -1422,6 +1433,18 @@ getCharOrFail i =  do
 
 -- -----------------------------------------------------------------------------
 -- QuasiQuote
+
+lex_qquasiquote_tok :: Action
+lex_qquasiquote_tok span buf len = do
+  let (qual, quoter) = splitQualName (stepOn buf) (len - 2) False
+  quoteStart <- getSrcLoc
+  quote <- lex_quasiquote quoteStart ""
+  end <- getSrcLoc
+  return (L (mkRealSrcSpan (realSrcSpanStart span) end)
+           (ITqQuasiQuote (qual,
+                           quoter,
+                           mkFastString (reverse quote),
+                           mkRealSrcSpan quoteStart end)))
 
 lex_quasiquote_tok :: Action
 lex_quasiquote_tok span buf len = do

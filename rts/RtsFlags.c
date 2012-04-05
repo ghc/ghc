@@ -305,7 +305,7 @@ usage_text[] = {
 #  endif
 "             where [flags] can contain:",
 "                s    scheduler events",
-"                g    GC events",
+"                g    GC and heap events",
 "                p    par spark events (sampled)",
 "                f    par spark events (full detail)",
 "                u    user events (emitted from Haskell code)",

@@ -686,18 +686,29 @@ zonkWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
 zonkCt :: Ct -> TcM Ct 
 -- Zonking a Ct conservatively gives back a CNonCanonical
 zonkCt ct 
-  = do { v'  <- zonkEvVar (cc_id ct)
-       ; fl' <- zonkFlavor (cc_flavor ct)
+  = do { fl' <- zonkFlavor (cc_flavor ct)
        ; return $ 
-         CNonCanonical { cc_id = v'
-                       , cc_flavor = fl'
+         CNonCanonical { cc_flavor = fl'
                        , cc_depth = cc_depth ct } }
 zonkCts :: Cts -> TcM Cts
 zonkCts = mapBagM zonkCt
 
 zonkFlavor :: CtFlavor -> TcM CtFlavor
-zonkFlavor (Given loc gk) = do { loc' <- zonkGivenLoc loc; return (Given loc' gk) }
-zonkFlavor fl             = return fl
+zonkFlavor (Given loc evar) 
+  = do { loc' <- zonkGivenLoc loc
+       ; evar' <- zonkEvVar evar
+       ; return (Given loc' evar') }
+zonkFlavor (Solved loc evar) 
+  = do { loc' <- zonkGivenLoc loc
+       ; evar' <- zonkEvVar evar
+       ; return (Solved loc' evar') }
+zonkFlavor (Wanted loc evar)
+  = do { evar' <- zonkEvVar evar
+       ; return (Wanted loc evar') }
+zonkFlavor (Derived loc pty)
+  = do { pty' <- zonkTcType pty
+       ; return (Derived loc pty') }
+
 
 zonkGivenLoc :: GivenLoc -> TcM GivenLoc
 -- GivenLocs may have unification variables inside them!
@@ -897,32 +908,42 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 checkValidType ctxt ty 
   = do { traceTc "checkValidType" (ppr ty <+> text "::" <+> ppr (typeKind ty))
        ; unboxed         <- xoptM Opt_UnboxedTuples
-       ; rank2           <- xoptM Opt_Rank2Types
-       ; rankn           <- xoptM Opt_RankNTypes
+       ; rank2_flag      <- xoptM Opt_Rank2Types
+       ; rankn_flag      <- xoptM Opt_RankNTypes
        ; polycomp        <- xoptM Opt_PolymorphicComponents
        ; constraintKinds <- xoptM Opt_ConstraintKinds
-       ; let gen_rank n | rankn     = ArbitraryRank
-	                | rank2     = Rank 2
-	                | otherwise = Rank n
-	     rank
+       ; let gen_rank :: Rank -> Rank
+             gen_rank r | rankn_flag = ArbitraryRank
+	                | rank2_flag = r2
+	                | otherwise  = r
+
+             rank2 = gen_rank r2
+             rank1 = gen_rank r1
+             rank0 = gen_rank r0
+
+             r0 = rankZeroMonoType
+             r1 = LimitedRank True r0
+             r2 = LimitedRank True r1
+
+             rank
 	       = case ctxt of
 	     	 DefaultDeclCtxt-> MustBeMonoType
 	     	 ResSigCtxt	-> MustBeMonoType
-	     	 LamPatSigCtxt	-> gen_rank 0
-	     	 BindPatSigCtxt	-> gen_rank 0
-	     	 TySynCtxt _    -> gen_rank 0
+	     	 LamPatSigCtxt	-> rank0
+	     	 BindPatSigCtxt	-> rank0
+	     	 TySynCtxt _    -> rank0
 
-	     	 ExprSigCtxt 	-> gen_rank 1
-	     	 FunSigCtxt _   -> gen_rank 1
+	     	 ExprSigCtxt 	-> rank1
+	     	 FunSigCtxt _   -> rank1
 	     	 InfSigCtxt _   -> ArbitraryRank	-- Inferred type
-	     	 ConArgCtxt _   | polycomp -> gen_rank 2
+	     	 ConArgCtxt _   | polycomp -> rank2
                                      -- We are given the type of the entire
                                      -- constructor, hence rank 1
- 	     			| otherwise -> gen_rank 1
+ 	     			| otherwise -> rank1
 
-	     	 ForSigCtxt _	-> gen_rank 1
-	     	 SpecInstCtxt   -> gen_rank 1
-                 ThBrackCtxt    -> gen_rank 1
+	     	 ForSigCtxt _	-> rank1
+	     	 SpecInstCtxt   -> rank1
+                 ThBrackCtxt    -> rank1
 	     	 GhciCtxt       -> ArbitraryRank
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
@@ -960,23 +981,38 @@ checkValidMonoType :: Type -> TcM ()
 checkValidMonoType ty = check_mono_type MustBeMonoType ty
 \end{code}
 
+Note [Higher rank types]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Technically 
+	    Int -> forall a. a->a
+is still a rank-1 type, but it's not Haskell 98 (Trac #5957).  So the
+validity checker allow a forall after an arrow only if we allow it
+before -- that is, with Rank2Types or RankNTypes
 
 \begin{code}
 data Rank = ArbitraryRank	  -- Any rank ok
-          | MustBeMonoType  	  -- Monotype regardless of flags
-	  | TyConArgMonoType	  -- Monotype but could be poly if -XImpredicativeTypes
-	  | SynArgMonoType	  -- Monotype but could be poly if -XLiberalTypeSynonyms
-          | Rank Int		  -- Rank n, but could be more with -XRankNTypes
 
-decRank :: Rank -> Rank		  -- Function arguments
-decRank (Rank 0)   = Rank 0
-decRank (Rank n)   = Rank (n-1)
-decRank other_rank = other_rank
+          | LimitedRank   -- Note [Higher rank types]
+                 Bool     -- Forall ok at top
+                 Rank     -- Use for function arguments
 
-nonZeroRank :: Rank -> Bool
-nonZeroRank ArbitraryRank = True
-nonZeroRank (Rank n) 	  = n>0
-nonZeroRank _        	  = False
+          | MonoType SDoc   -- Monotype, with a suggestion of how it could be a polytype
+  
+          | MustBeMonoType  -- Monotype regardless of flags
+
+rankZeroMonoType, tyConArgMonoType, synArgMonoType :: Rank
+rankZeroMonoType = MonoType (ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types"))
+tyConArgMonoType = MonoType (ptext (sLit "Perhaps you intended to use -XImpredicativeTypes"))
+synArgMonoType   = MonoType (ptext (sLit "Perhaps you intended to use -XLiberalTypeSynonyms"))
+
+funArgResRank :: Rank -> (Rank, Rank)		  -- Function argument and result
+funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
+funArgResRank other_rank               = (other_rank, other_rank)
+
+forAllAllowed :: Rank -> Bool
+forAllAllowed ArbitraryRank             = True
+forAllAllowed (LimitedRank forall_ok _) = forall_ok
+forAllAllowed _        	                = False
 
 ----------------------------------------
 data UbxTupFlag = UT_Ok	| UT_NotOk
@@ -1000,7 +1036,7 @@ check_type :: Rank -> UbxTupFlag -> Type -> TcM ()
 
 check_type rank ubx_tup ty
   | not (null tvs && null theta)
-  = do	{ checkTc (nonZeroRank rank) (forAllTyErr rank ty)
+  = do	{ checkTc (forAllAllowed rank) (forAllTyErr rank ty)
 		-- Reject e.g. (Maybe (?x::Int => Int)), 
 		-- with a decent error message
 	; check_valid_theta SigmaCtxt theta
@@ -1012,8 +1048,10 @@ check_type rank ubx_tup ty
 check_type _ _ (TyVarTy _) = return ()
 
 check_type rank _ (FunTy arg_ty res_ty)
-  = do	{ check_type (decRank rank) UT_NotOk arg_ty
-	; check_type rank 	    UT_Ok    res_ty }
+  = do	{ check_type arg_rank UT_NotOk arg_ty
+	; check_type res_rank UT_Ok    res_ty }
+  where
+    (arg_rank, res_rank) = funArgResRank rank
 
 check_type rank _ (AppTy ty1 ty2)
   = do	{ check_arg_type rank ty1
@@ -1033,7 +1071,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 	; liberal <- xoptM Opt_LiberalTypeSynonyms
 	; if not liberal || isSynFamilyTyCon tc then
 		-- For H98 and synonym families, do check the type args
-		mapM_ (check_mono_type SynArgMonoType) tys
+		mapM_ (check_mono_type synArgMonoType) tys
 
 	  else	-- In the liberal case (only for closed syns), expand then check
 	  case tcView ty of   
@@ -1046,7 +1084,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 	; checkTc (ubx_tup_ok ub_tuples_allowed) ubx_tup_msg
 
 	; impred <- xoptM Opt_ImpredicativeTypes	
-	; let rank' = if impred then ArbitraryRank else TyConArgMonoType
+	; let rank' = if impred then ArbitraryRank else tyConArgMonoType
 		-- c.f. check_arg_type
 		-- However, args are allowed to be unlifted, or
 		-- more unboxed tuples, so can't use check_arg_ty
@@ -1097,7 +1135,7 @@ check_arg_type rank ty
 	; let rank' = case rank of 	    -- Predictive => must be monotype
 	      	        MustBeMonoType     -> MustBeMonoType  -- Monotype, regardless
 			_other | impred    -> ArbitraryRank
-			       | otherwise -> TyConArgMonoType
+			       | otherwise -> tyConArgMonoType
 			-- Make sure that MustBeMonoType is propagated, 
 			-- so that we don't suggest -XImpredicativeTypes in
 			--    (Ord (forall a.a)) => a -> a
@@ -1117,10 +1155,9 @@ forAllTyErr rank ty
           , suggestion ]
   where
     suggestion = case rank of
-    	       	   Rank _ -> ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types")
-    	       	   TyConArgMonoType -> ptext (sLit "Perhaps you intended to use -XImpredicativeTypes")
-    	       	   SynArgMonoType -> ptext (sLit "Perhaps you intended to use -XLiberalTypeSynonyms")
-		   _ -> empty      -- Polytype is always illegal
+    	       	   LimitedRank {} -> ptext (sLit "Perhaps you intended to use -XRankNTypes or -XRank2Types")
+    	       	   MonoType d     -> d
+		   _              -> empty      -- Polytype is always illegal
 
 unliftedArgErr, ubxArgTyErr :: Type -> SDoc
 unliftedArgErr  ty = sep [ptext (sLit "Illegal unlifted type:"), ppr ty]

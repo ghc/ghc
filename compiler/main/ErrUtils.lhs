@@ -9,7 +9,7 @@ module ErrUtils (
         ErrMsg, WarnMsg, Severity(..),
         Messages, ErrorMessages, WarningMessages,
         errMsgSpans, errMsgContext, errMsgShortDoc, errMsgExtraInfo,
-        MsgDoc, mkLocMessage, pprMessageBag, pprErrMsgBag,
+        MsgDoc, mkLocMessage, pprMessageBag, pprErrMsgBag, pprErrMsgBagWithLoc,
         pprLocErrMsg, makeIntoWarning,
         
         errorsFound, emptyMessages,
@@ -143,6 +143,9 @@ pprErrMsgBag bag
     | ErrMsg { errMsgShortDoc  = d,
                errMsgExtraInfo = e,
                errMsgContext   = unqual } <- sortMsgBag bag ]
+
+pprErrMsgBagWithLoc :: Bag ErrMsg -> [SDoc]
+pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag bag ]
 
 pprLocErrMsg :: ErrMsg -> SDoc
 pprLocErrMsg (ErrMsg { errMsgSpans     = spans

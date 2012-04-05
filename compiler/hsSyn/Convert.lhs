@@ -183,7 +183,7 @@ cvtDec (NewtypeD ctxt tc tvs constr derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
 	; con' <- cvtConstr constr
 	; derivs' <- cvtDerivs derivs
-        ; let defn = TyData { td_ND = DataType, td_cType = Nothing
+        ; let defn = TyData { td_ND = NewType, td_cType = Nothing
                             , td_ctxt = ctxt'
                             , td_kindSig = Nothing
                             , td_cons = [con'], td_derivs = derivs' } 

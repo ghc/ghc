@@ -199,6 +199,8 @@ match menv subst (AppTy ty1a ty1b) ty2
   = do { subst' <- match menv subst ty1a ty2a
        ; match menv subst' ty1b ty2b }
 
+match _ subst (LitTy x) (LitTy y) | x == y  = return subst
+
 match _ _ _ _
   = Nothing
 
@@ -339,6 +341,8 @@ typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
 	| Just (f1, a1) <- repSplitAppTy_maybe ty1
 	= cant_match f1 f2 || cant_match a1 a2
 
+    cant_match (LitTy x) (LitTy y) = x /= y
+
     cant_match _ _ = False      -- Safe!
 
 -- Things we could add;
@@ -452,6 +456,8 @@ unify subst ty1 (AppTy ty2a ty2b)
   | Just (ty1a, ty1b) <- repSplitAppTy_maybe ty1
   = do	{ subst' <- unify subst ty1a ty2a
         ; unify subst' ty1b ty2b }
+
+unify subst (LitTy x) (LitTy y) | x == y = return subst
 
 unify _ ty1 ty2 = failWith (misMatch ty1 ty2)
 	-- ForAlls??

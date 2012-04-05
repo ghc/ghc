@@ -1946,6 +1946,7 @@ simplAlts :: SimplEnv
           -> SimplM (OutExpr, OutId, [OutAlt])  -- Includes the continuation
 -- Like simplExpr, this just returns the simplified alternatives;
 -- it does not return an environment
+-- The returned alternatives can be empty, none are possible
 
 simplAlts env scrut case_bndr alts cont'
   = -- pprTrace "simplAlts" (ppr alts $$ ppr (seTvSubst env)) $

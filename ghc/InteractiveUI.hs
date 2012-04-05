@@ -1688,7 +1688,8 @@ checkAdd ii = do
 
     IIDecl d -> do
        let modname = unLoc (ideclName d)
-       m <- lookupModuleName modname
+           pkgqual = ideclPkgQual d
+       m <- GHC.lookupModule modname pkgqual
        when safe $ do
            t <- GHC.isModuleTrusted m
            when (not t) $

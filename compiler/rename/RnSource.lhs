@@ -431,8 +431,12 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
                         , cid_sigs = uprags, cid_fam_insts = ats })
 	-- Used for both source and interface file decls
   = do { (inst_ty', inst_fvs) <- rnLHsInstType (text "In an instance declaration") inst_ty
-       ; let Just (inst_tyvars, _, L _ cls,_) = splitLHsInstDeclTy_maybe inst_ty'
-             (spec_inst_prags, other_sigs) = partition isSpecInstLSig uprags
+       ; case splitLHsInstDeclTy_maybe inst_ty' of {
+           Nothing -> return (ClsInstD { cid_poly_ty = inst_ty', cid_binds = emptyLHsBinds
+                                       , cid_sigs = [], cid_fam_insts = [] }, inst_fvs) ;
+           Just (inst_tyvars, _, L _ cls,_) ->
+
+    do { let (spec_inst_prags, other_sigs) = partition isSpecInstLSig uprags
              tv_names = hsLTyVarNames inst_tyvars
 
        -- Rename the associated types, and type signatures
@@ -467,7 +471,7 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
                           , cid_sigs = uprags', cid_fam_insts = ats' },
 	         meth_fvs `plusFV` more_fvs
                           `plusFV` spec_inst_fvs
-		      	  `plusFV` inst_fvs) }
+		      	  `plusFV` inst_fvs) } } }
              -- We return the renamed associated data type declarations so
              -- that they can be entered into the list of type declarations
              -- for the binding group, but we also keep a copy in the instance.

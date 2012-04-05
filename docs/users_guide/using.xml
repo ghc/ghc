@@ -1770,18 +1770,21 @@ f "2"    = 2
       They are normally set via the <option>-O</option> options
       described above, and as such, you shouldn't need to set any of
       them explicitly (indeed, doing so could lead to unexpected
-      results).  However, there are one or two that may be of
-      interest:</para>
+      results).  A flag <option>-fwombat</option> can be negated by 
+     saying <option>-fno-wombat</option>.  The flags below are off by default,
+     except where noted below.
+     </para>
 
       <variablelist>
         <varlistentry>
           <term>
-            <option>-fno-cse</option>
-            <indexterm><primary><option>-fno-cse</option></primary></indexterm>
+            <option>-fcse</option>
+            <indexterm><primary><option>-fcse</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turns off the common-sub-expression elimination optimisation.
-            Can be useful if you have some <literal>unsafePerformIO</literal>
+            <para><emphasis>On by default.</emphasis>.  Enables the common-sub-expression 
+            elimination optimisation.
+            Switching this off can be useful if you have some <literal>unsafePerformIO</literal>
             expressions that you don't want commoned-up.</para>
           </listitem>
         </varlistentry>
@@ -1792,21 +1795,10 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para> <emphasis>On by default.</emphasis>.  
+            Switch on the strictness analyser. There is a very old paper about GHC's 
+           strictness analyser, <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/simple-strictnes-analyser.ps.gz">Measuring the effectiveness of a simple strictness analyser</ulink>, but the current one is quite a bit different.
             </para>
-            TODO: Document optimisation
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fno-strictness</option>
-            <indexterm><primary><option>-fno-strictness</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Turns off the strictness analyser; sometimes it eats
-            too many cycles.</para>
-            TODO: Maybe document positive cases and remove all negative cases?
           </listitem>
         </varlistentry>
 
@@ -1840,19 +1832,21 @@ f "2"    = 2
             <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turn on call-pattern specialisation.</para>
-            TODO: Document optimisation
+            <para><emphasis>Off by default, but enabled by -O2.</emphasis>
+            Turn on call-pattern specialisation; see <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm">Call-pattern specialisation for Haskell programs</ulink>.</para>
           </listitem>
         </varlistentry>
 
         <varlistentry>
           <term>
-            <option>-fno-specialise</option>
-            <indexterm><primary><option>-fno-specialise</option></primary></indexterm>
+            <option>-fspecialise</option>
+            <indexterm><primary><option>-fspecialise</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turns off the automatic specialisation of overloaded functions.</para>
-            TODO: Document optimisation, probably change to a positive, not a -fno-* description.
+            <para><emphasis>On by default.</emphasis>
+            Specialise each type-class-overloaded function defined in this module for the types at which 
+            it is called in this module.  Also specialise imported functions that have an INLINABLE pragma
+            (<xref linkend="inlinable-pragma"/>) for the types at which they are called in this module.</para>
           </listitem>
         </varlistentry>
 
@@ -1862,8 +1856,7 @@ f "2"    = 2
             <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turn on the static argument transformation.</para>
-            TODO: Document optimisation
+            <para>Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop. See Chapter 7 of <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz">Andre Santos's PhD thesis</ulink></para>
           </listitem>
         </varlistentry>
 
@@ -1873,35 +1866,24 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para> <emphasis>On by default.</emphasis>
+            Float let-bindings inwards, nearer their binding site.  See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">Let-floating: moving bindings to give faster programs (ICFP'96)</ulink>.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
         <varlistentry>
           <term>
-            <option>-fno-float-in</option>
-            <indexterm><primary><option>-fno-float-in</option></primary></indexterm>
+            <option>-ffull-laziness</option>
+            <indexterm><primary><option>-ffull-laziness</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turns off the float-in transformation.</para>
-            TODO: Maybe document positive cases and remove all negative cases?
-          </listitem>
-        </varlistentry>
-
-        <varlistentry>
-          <term>
-            <option>-fno-full-laziness</option>
-            <indexterm><primary><option>-fno-full-laziness</option></primary></indexterm>
-          </term>
-          <listitem>
-            <para>Turns off the full laziness optimisation (also known as
-              let-floating). Full laziness increases sharing, which can lead
+            <para><emphasis>On by default.</emphasis>
+              Run the full laziness optimisation (also known as
+              let-floating), which floats let-bindings outside enclosing lambdas, in the hope they will be thereby be computed less often. 
+              See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">Let-floating: moving bindings to give faster programs (ICFP'96)</ulink>.
+             Full laziness increases sharing, which can lead
               to increased memory residency.</para>
-
-            TODO: Document optimisation
-
             <para>NOTE: GHC doesn't implement complete full-laziness.
             When optimisation in on, and
             <option>-fno-full-laziness</option> is not given, some
@@ -1919,10 +1901,8 @@ f "2"    = 2
             <option>-fdo-lambda-eta-expansion</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-          <listitem>
-            <para>
+          <listitem><para> <emphasis>On by default.</emphasis> Eta-expand let-bindings to increase their arity.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1931,10 +1911,9 @@ f "2"    = 2
             <option>-fdo-eta-reduction</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-          <listitem>
-            <para>
+          <listitem> <para> <emphasis>On by default.</emphasis> 
+            Eta-reduce lambda expressions, if doing so gets rid of a whole group of lambdas.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1944,9 +1923,21 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para><emphasis>On by default.</emphasis> 
+            Merge immediately-nested case expressions that scrutinse the same variable. Example
+<programlisting>
+  case x of
+     Red -> e1
+     _   -> case x of 
+              Blue -> e2
+              Green -> e3
+==>
+  case x of
+     Red -> e1
+     Blue -> e2
+     Green -> e2
+</programlisting>
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1956,8 +1947,10 @@ f "2"    = 2
             <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turn on the liberate-case transformation.</para>
-            TODO: Document optimisation
+            <para><emphasis>Off by default, but enabled by -O2.</emphasis> 
+            Turn on the liberate-case transformation.  This unrolls recursive function once in its own RHS, to
+            avoid repeated case analysis of free variables.  It's a bit like the call-pattern specialiser
+            (<option>-fspec-constr</option>) but for free variables rather than arguments.</para>
           </listitem>
         </varlistentry>
 
@@ -1967,9 +1960,8 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para> A very experimental flag that makes dictionary-valued expressions seem cheap to the optimiser.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -1979,9 +1971,9 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para> Usually GHC black-holes a thunk only when it switches threads.  This flag makes it do so
+            as soon as the thunk is entered.  See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/">Haskell on a shared-memory multiprocessor</ulink>.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -2079,11 +2071,9 @@ f "2"    = 2
 
             <para>The difference between this and
             <option>-funfolding-creation-threshold</option> is that this one
-            determines if a function definition will be inlined at a call
-            site. The other option determines if a function definition will
-            be kept around to begin with for potential inlining.</para>
-
-            TODO: Is above para correct?
+            determines if a function definition will be inlined <emphasis>at a call
+            site</emphasis>. The other option determines if a function definition will
+            be kept around at all for potential inlining.</para>
           </listitem>
         </varlistentry>
 
@@ -2093,9 +2083,8 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para>An experimental flag to expose all unfoldings, even for very large or recursive functions.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -2105,7 +2094,7 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para>Data Parallel Haskell.
             </para>
             TODO: Document optimisation
           </listitem>
@@ -2117,7 +2106,7 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para>Data Parallel Haskell.
             </para>
             TODO: Document optimisation
           </listitem>
