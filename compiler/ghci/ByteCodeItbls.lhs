@@ -15,7 +15,7 @@ ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 
 module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
                      , StgInfoTable(..)
-                     , State(..), runState, evalState, execState, MonadT
+                     , State(..), runState, evalState, execState, MonadT(..)
                      ) where
 
 #include "HsVersions.h"
