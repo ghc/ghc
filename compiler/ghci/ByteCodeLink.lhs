@@ -39,8 +39,6 @@ import GHC.Arr          ( Array(..), STArray(..) )
 import GHC.IO           ( IO(..) )
 import GHC.Exts
 import GHC.Ptr          ( castPtr )
-
-import Data.Word
 \end{code}
 
 
@@ -109,18 +107,15 @@ linkBCO' ie ce (UnlinkedBCO _ arity insns_barr bitmap literalsSS ptrsSS)
         let n_literals = sizeSS literalsSS
             n_ptrs     = sizeSS ptrsSS
 
-        ptrs_arr <- if n_ptrs > 65535
-                    then panic "linkBCO: >= 64k ptrs"
-                    else mkPtrsArray ie ce (fromIntegral n_ptrs) ptrs
+        ptrs_arr <- mkPtrsArray ie ce n_ptrs ptrs
 
         let
             !ptrs_parr = case ptrs_arr of Array _lo _hi _n parr -> parr
 
             litRange
-             | n_literals > 65535 = panic "linkBCO: >= 64k literals"
              | n_literals > 0     = (0, fromIntegral n_literals - 1)
              | otherwise          = (1, 0)
-            literals_arr :: UArray Word16 Word
+            literals_arr :: UArray Word Word
             literals_arr = listArray litRange linked_literals
             !literals_barr = case literals_arr of UArray _lo _hi _n barr -> barr
 
@@ -130,7 +125,7 @@ linkBCO' ie ce (UnlinkedBCO _ arity insns_barr bitmap literalsSS ptrsSS)
 
 
 -- we recursively link any sub-BCOs while making the ptrs array
-mkPtrsArray :: ItblEnv -> ClosureEnv -> Word16 -> [BCOPtr] -> IO (Array Word16 HValue)
+mkPtrsArray :: ItblEnv -> ClosureEnv -> Word -> [BCOPtr] -> IO (Array Word HValue)
 mkPtrsArray ie ce n_ptrs ptrs = do
   let ptrRange = if n_ptrs > 0 then (0, n_ptrs-1) else (1, 0)
   marr <- newArray_ ptrRange
@@ -164,7 +159,7 @@ instance MArray IOArray e IO where
     unsafeWrite (IOArray marr) i e = stToIO (unsafeWrite marr i e)
 
 -- XXX HACK: we should really have a new writeArray# primop that takes a BCO#.
-writeArrayBCO :: IOArray Word16 a -> Int -> BCO# -> IO ()
+writeArrayBCO :: IOArray Word a -> Int -> BCO# -> IO ()
 writeArrayBCO (IOArray (STArray _ _ _ marr#)) (I# i#) bco# = IO $ \s# ->
   case (unsafeCoerce# writeArray#) marr# i# bco# s# of { s# ->
   (# s#, () #) }

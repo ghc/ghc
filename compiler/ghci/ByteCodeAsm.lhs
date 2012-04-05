@@ -216,8 +216,8 @@ data Operand
   | LabelOp Word16
 
 data Assembler a
-  = AllocPtr (IO BCOPtr) (Word16 -> Assembler a)
-  | AllocLit [BCONPtr] (Word16 -> Assembler a)
+  = AllocPtr (IO BCOPtr) (Word -> Assembler a)
+  | AllocLit [BCONPtr] (Word -> Assembler a)
   | AllocLabel Word16 (Assembler a)
   | Emit Word16 [Operand] (Assembler a)
   | NullAsm a
@@ -230,13 +230,13 @@ instance Monad Assembler where
   AllocLabel lbl k >>= f = AllocLabel lbl (k >>= f)
   Emit w ops k >>= f = Emit w ops (k >>= f)
 
-ioptr :: IO BCOPtr -> Assembler Word16
+ioptr :: IO BCOPtr -> Assembler Word
 ioptr p = AllocPtr p return
 
-ptr :: BCOPtr -> Assembler Word16
+ptr :: BCOPtr -> Assembler Word
 ptr = ioptr . return
 
-lit :: [BCONPtr] -> Assembler Word16
+lit :: [BCONPtr] -> Assembler Word
 lit l = AllocLit l return
 
 label :: Word16 -> Assembler ()
@@ -253,12 +253,12 @@ runAsm e (AllocPtr p_io k) = do
   p <- lift p_io
   w <- State $ \(st_i0,st_l0,st_p0) -> do
     let st_p1 = addToSS st_p0 p
-    return ((st_i0,st_l0,st_p1), sizeSS16 st_p0)
+    return ((st_i0,st_l0,st_p1), sizeSS st_p0)
   runAsm e $ k w
 runAsm e (AllocLit lits k) = do
   w <- State $ \(st_i0,st_l0,st_p0) -> do
     let st_l1 = addListToSS st_l0 lits
-    return ((st_i0,st_l1,st_p0), sizeSS16 st_l0)
+    return ((st_i0,st_l1,st_p0), sizeSS st_l0)
   runAsm e $ k w
 runAsm e (AllocLabel _ k) = runAsm e k
 runAsm e (Emit w ops k) = do
@@ -350,23 +350,23 @@ assembleI dflags i = case i of
   PUSH_LL o1 o2            -> emit bci_PUSH_LL [SmallOp o1, SmallOp o2]
   PUSH_LLL o1 o2 o3        -> emit bci_PUSH_LLL [SmallOp o1, SmallOp o2, SmallOp o3]
   PUSH_G nm                -> do p <- ptr (BCOPtrName nm)
-                                 emit bci_PUSH_G [SmallOp p]
+                                 emit bci_PUSH_G [Op p]
   PUSH_PRIMOP op           -> do p <- ptr (BCOPtrPrimOp op)
-                                 emit bci_PUSH_G [SmallOp p]
+                                 emit bci_PUSH_G [Op p]
   PUSH_BCO proto           -> do let ul_bco = assembleBCO dflags proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
-                                 emit bci_PUSH_G [SmallOp p]
+                                 emit bci_PUSH_G [Op p]
   PUSH_ALTS proto          -> do let ul_bco = assembleBCO dflags proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
-                                 emit bci_PUSH_ALTS [SmallOp p]
+                                 emit bci_PUSH_ALTS [Op p]
   PUSH_ALTS_UNLIFTED proto pk
                            -> do let ul_bco = assembleBCO dflags proto
                                  p <- ioptr (liftM BCOPtrBCO ul_bco)
-                                 emit (push_alts pk) [SmallOp p]
+                                 emit (push_alts pk) [Op p]
   PUSH_UBX (Left lit) nws  -> do np <- literal lit
-                                 emit bci_PUSH_UBX [SmallOp np, SmallOp nws]
+                                 emit bci_PUSH_UBX [Op np, SmallOp nws]
   PUSH_UBX (Right aa) nws  -> do np <- addr aa
-                                 emit bci_PUSH_UBX [SmallOp np, SmallOp nws]
+                                 emit bci_PUSH_UBX [Op np, SmallOp nws]
 
   PUSH_APPLY_N             -> emit bci_PUSH_APPLY_N []
   PUSH_APPLY_V             -> emit bci_PUSH_APPLY_V []
@@ -388,24 +388,24 @@ assembleI dflags i = case i of
   MKPAP     off sz         -> emit bci_MKPAP [SmallOp off, SmallOp sz]
   UNPACK    n              -> emit bci_UNPACK [SmallOp n]
   PACK      dcon sz        -> do itbl_no <- lit [BCONPtrItbl (getName dcon)]
-                                 emit bci_PACK [SmallOp itbl_no, SmallOp sz]
+                                 emit bci_PACK [Op itbl_no, SmallOp sz]
   LABEL     lbl            -> label lbl
   TESTLT_I  i l            -> do np <- int i
-                                 emit bci_TESTLT_I [SmallOp np, LabelOp l]
+                                 emit bci_TESTLT_I [Op np, LabelOp l]
   TESTEQ_I  i l            -> do np <- int i
-                                 emit bci_TESTEQ_I [SmallOp np, LabelOp l]
+                                 emit bci_TESTEQ_I [Op np, LabelOp l]
   TESTLT_W  w l            -> do np <- word w
-                                 emit bci_TESTLT_W [SmallOp np, LabelOp l]
+                                 emit bci_TESTLT_W [Op np, LabelOp l]
   TESTEQ_W  w l            -> do np <- word w
-                                 emit bci_TESTEQ_W [SmallOp np, LabelOp l]
+                                 emit bci_TESTEQ_W [Op np, LabelOp l]
   TESTLT_F  f l            -> do np <- float f
-                                 emit bci_TESTLT_F [SmallOp np, LabelOp l]
+                                 emit bci_TESTLT_F [Op np, LabelOp l]
   TESTEQ_F  f l            -> do np <- float f
-                                 emit bci_TESTEQ_F [SmallOp np, LabelOp l]
+                                 emit bci_TESTEQ_F [Op np, LabelOp l]
   TESTLT_D  d l            -> do np <- double d
-                                 emit bci_TESTLT_D [SmallOp np, LabelOp l]
+                                 emit bci_TESTLT_D [Op np, LabelOp l]
   TESTEQ_D  d l            -> do np <- double d
-                                 emit bci_TESTEQ_D [SmallOp np, LabelOp l]
+                                 emit bci_TESTEQ_D [Op np, LabelOp l]
   TESTLT_P  i l            -> emit bci_TESTLT_P [SmallOp i, LabelOp l]
   TESTEQ_P  i l            -> emit bci_TESTEQ_P [SmallOp i, LabelOp l]
   CASEFAIL                 -> emit bci_CASEFAIL []
@@ -415,10 +415,10 @@ assembleI dflags i = case i of
   RETURN                   -> emit bci_RETURN []
   RETURN_UBX rep           -> emit (return_ubx rep) []
   CCALL off m_addr i       -> do np <- addr m_addr
-                                 emit bci_CCALL [SmallOp off, SmallOp np, SmallOp i]
+                                 emit bci_CCALL [SmallOp off, Op np, SmallOp i]
   BRK_FUN array index info -> do p1 <- ptr (BCOPtrArray array)
                                  p2 <- ptr (BCOPtrBreakInfo info)
-                                 emit bci_BRK_FUN [SmallOp p1, SmallOp index, SmallOp p2]
+                                 emit bci_BRK_FUN [Op p1, SmallOp index, Op p2]
 
   where
     literal (MachLabel fs (Just sz) _)
