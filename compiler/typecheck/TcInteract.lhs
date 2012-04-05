@@ -1597,12 +1597,18 @@ doTopReact _inerts _workItem = return NoTopInt
 
 lkpFunEqCache :: TcType -> TcS (Maybe Ct)
 lkpFunEqCache fam_head 
-  = do { (subst,_inscope) <- getInertEqs 
+  = do { (_subst,_inscope) <- getInertEqs 
        ; fun_cache <- getTcSInerts >>= (return . inert_solved_funeqs)
        ; traceTcS "lkpFunEqCache" $ vcat [ text "fam_head    =" <+> ppr fam_head
                                          , text "funeq cache =" <+> pprCtTypeMap (unCtFamHeadMap fun_cache) ]
        ; rewrite_cached $ 
-         lookupTypeMap_mod subst cc_rhs fam_head (unCtFamHeadMap fun_cache) }
+         lookupTM fam_head (unCtFamHeadMap fun_cache) }
+-- The two different calls do not seem to make a significant difference in 
+-- terms of hit/miss rate for many memory-critical/performance tests but the
+-- latter blows up the space on the heap somehow ... It maybe the niFixTvSubst.
+-- So, I am simply disabling it for now, until we investigate a bit more.
+--       lookupTypeMap_mod subst cc_rhs fam_head (unCtFamHeadMap fun_cache) }
+ 
   where rewrite_cached Nothing = return Nothing
         rewrite_cached (Just ct@(CFunEqCan { cc_flavor = fl, cc_depth = d
                                            , cc_fun = tc, cc_tyargs = xis

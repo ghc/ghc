@@ -604,7 +604,11 @@ modifyInertTcS upd
 
 
 addToSolved :: Ct -> TcS ()
-addToSolved ct 
+-- Don't do any caching for IP preds because of delicate shadowing
+addToSolved ct
+  | isIPPred (ctPred ct)  
+  = return () 
+  | otherwise
   = ASSERT ( isSolved (cc_flavor ct) )
     updInertSetTcS ct
 
@@ -637,8 +641,10 @@ extractUnsolved (IS { inert_cans = IC { inert_eqs    = eqs
                                       , inert_dicts  = dicts
                                       }
                     , inert_frozen = frozen
-                    , inert_solved = _solved
-                    , inert_flat_cache = _flat_cache })
+                    , inert_solved = solved
+                    , inert_flat_cache = flat_cache 
+                    , inert_solved_funeqs = funeq_cache
+                    })
   
   = let is_solved  = IS { inert_cans = IC { inert_eqs    = solved_eqs
                                           , inert_eq_tvs = eq_tvs
@@ -648,15 +654,12 @@ extractUnsolved (IS { inert_cans = IC { inert_eqs    = eqs
                                           , inert_funeqs = solved_funeqs }
                         , inert_frozen = emptyCts -- All out
                                          
-                            -- DV: For solved and the flat cache, I am flushing them here:
-                            -- Solved cts may depend on wanteds which we kick out. But later
-                            -- we may try to re-solve some kicked-out wanteds and I am worried 
-                            -- that there is a danger or evidence loops if we keep the solved 
-                            -- in for caching purposes. So I am flushing the solved and the 
-                            -- flattening cache, quite conservatively.
-                        , inert_solved        = CtPredMap emptyTM
-                        , inert_flat_cache    = CtFamHeadMap emptyTM
-                        , inert_solved_funeqs = CtFamHeadMap emptyTM
+                              -- At some point, I used to flush all the solved, in 
+                              -- fear of evidence loops. But I think we are safe, 
+                              -- flushing is why T3064 had become slower
+                        , inert_solved        = solved      -- CtPredMap emptyTM
+                        , inert_flat_cache    = flat_cache  -- CtFamHeadMap emptyTM
+                        , inert_solved_funeqs = funeq_cache -- CtFamHeadMap emptyTM
                         }
     in ((frozen, unsolved), is_solved)
 
@@ -1287,18 +1290,17 @@ setEvBind ev t
        ; traceTcS "setEvBind" $ vcat [ text "ev =" <+> ppr ev
                                      , text "t  =" <+> ppr t ]
 
-#ifdef DEBUG
+#ifndef DEBUG
+       ; return () }
+#else
        ; binds <- getTcEvBindsMap
        ; let cycle = any (reaches binds) (evVarsOfTerm t)
-       ; when cycle (fail_if_co_loop binds)
-#endif
-       ; return () }
+       ; when cycle (fail_if_co_loop binds) }
 
-#ifdef DEBUG
   where fail_if_co_loop binds
-          = pprTrace "setEvBind" (vcat [ text "Cycle in evidence binds, evvar =" <+> ppr ev
-                                       , ppr (evBindMapBinds binds) ]) $
-            when (isEqVar ev) (pprPanic "setEvBind" (text "BUG: Coercion loop!"))
+          = do { traceTcS "Cycle in evidence binds" $ vcat [ text "evvar =" <+> ppr ev
+                                                           , ppr (evBindMapBinds binds) ]
+               ; when (isEqVar ev) (pprPanic "setEvBind" (text "BUG: Coercion loop!")) }
 
         reaches :: EvBindMap -> Var -> Bool 
         -- Does this evvar reach ev? 
@@ -1453,7 +1455,7 @@ matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Either TyVar TcT
 matchClass clas tys
   = do	{ let pred = mkClassPred clas tys 
         ; instEnvs <- getInstEnvs
-        ; traceTcS "matchClass" $ text "instEnvs=" <+> ppr instEnvs
+--        ; traceTcS "matchClass" $ empty -- text "instEnvs=" <+> ppr instEnvs
         ; case lookupInstEnv instEnvs clas tys of {
             ([], unifs, _)               -- Nothing matches  
                 -> do { traceTcS "matchClass not matching"
