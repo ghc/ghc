@@ -473,7 +473,7 @@ data EvTerm
 
   | EvKindCast EvVar TcCoercion  -- See Note [EvKindCast]
 
-  | EvLit EvLit                  -- The dictionary for class "NatI"
+  | EvLit EvLit                  -- Dictionary for class "SingI" for type lits.
                                  -- Note [EvLit]
 
   deriving( Data.Data, Data.Typeable)
@@ -519,33 +519,39 @@ Conclusion: a new wanted coercion variable should be made mutable.
 
 Note [EvLit]
 ~~~~~~~~~~~~
-A part of the type-level naturals implementation is the class "NatI",
+A part of the type-level literals implementation is the class "SingI",
 which provides a "smart" constructor for defining singleton values.
 
-newtype TNat (n :: Nat) = TNat Integer
+newtype Sing n = Sing (SingRep n)
 
-class NatI n where
-  tNat :: TNat n
+class SingI n where
+  sing :: Sing n
+
+type family SingRep a
+type instance SingRep (a :: Nat)    = Integer
+type instance SingRep (a :: Symbol) = String
 
 Conceptually, this class has infinitely many instances:
 
-instance NatI 0 where natS = TNat 0
-instance NatI 1 where natS = TNat 1
-instance NatI 2 where natS = TNat 2
+instance Sing 0       where sing = Sing 0
+instance Sing 1       where sing = Sing 1
+instance Sing 2       where sing = Sing 2
+instance Sing "hello" where sing = Sing "hello"
 ...
 
-In practice, we solve "NatI" predicates in the type-checker because we can't
+In practice, we solve "SingI" predicates in the type-checker because we can't
 have infinately many instances.  The evidence (aka "dictionary")
-for "NatI n" is of the form "EvLit (EvNum n)".
+for "SingI (n :: Nat)" is of the form "EvLit (EvNum n)".
 
 We make the following assumptions about dictionaries in GHC:
-  1. The "dictionary" for classes with a single method---like NatI---is
+  1. The "dictionary" for classes with a single method---like SingI---is
      a newtype for the type of the method, so using a evidence amounts
      to a coercion, and
   2. Newtypes use the same representation as their definition types.
 
-So, the evidence for "NatI" is just an integer wrapped in 2 newtypes:
-one to make it into a "TNat" value, and another to make it into "NatI" evidence.
+So, the evidence for "SingI" is just a value of the representation type,
+wrapped in two newtype constructors: one to make it into a "Sing" value,
+and another to make it into "SingI" evidence.
 
 
 \begin{code}
