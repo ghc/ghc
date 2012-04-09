@@ -121,6 +121,7 @@ rename dflags gre = rn
       DocHyperlink l -> DocHyperlink l
       DocPic str -> DocPic str
       DocAName str -> DocAName str
+      DocProperty p -> DocProperty p
       DocExamples e -> DocExamples e
       DocEmpty -> DocEmpty
       DocString str -> DocString str

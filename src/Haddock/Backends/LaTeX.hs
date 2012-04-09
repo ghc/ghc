@@ -1003,6 +1003,7 @@ parLatexMarkup ppId = Markup {
   markupCodeBlock            = \p _ -> quote (verb (p Verb)) $$ text "",
   markupHyperlink            = \l _ -> markupLink l,
   markupAName                = \_ _ -> empty,
+  markupProperty             = \p _ -> quote $ verb $ text p,
   markupExample              = \e _ -> quote $ verb $ text $ unlines $ map exampleToString e
   }
   where

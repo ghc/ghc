@@ -35,6 +35,8 @@ import Data.List  (stripPrefix)
 	'-'	{ (TokBullet,_) }
 	'(n)'	{ (TokNumber,_) }
 	'>..'	{ (TokBirdTrack $$,_) }
+	PPROMPT	{ (TokPropertyPrompt $$,_) }
+	PEXP	{ (TokPropertyExpression $$,_) }
 	PROMPT	{ (TokExamplePrompt $$,_) }
 	RESULT	{ (TokExampleResult $$,_) }
 	EXP	{ (TokExampleExpression $$,_) }
@@ -73,11 +75,15 @@ defpara :: { (Doc RdrName, Doc RdrName) }
 para    :: { Doc RdrName }
 	: seq			{ docParagraph $1 }
 	| codepara		{ DocCodeBlock $1 }
+	| property		{ DocProperty $1 }
 	| examples		{ DocExamples $1 }
 
 codepara :: { Doc RdrName }
 	: '>..' codepara	{ docAppend (DocString $1) $2 }
 	| '>..'			{ DocString $1 }
+
+property :: { String }
+	: PPROMPT PEXP		{ strip $2 }
 
 examples :: { [Example] }
 	: example examples	{ $1 : $2 }

@@ -50,6 +50,7 @@ parHtmlMarkup qual ppId = Markup {
   markupHyperlink            = \(Hyperlink url mLabel) -> anchor ! [href url] << fromMaybe url mLabel,
   markupAName                = \aname -> namedAnchor aname << "",
   markupPic                  = \path -> image ! [src path],
+  markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml
   }
   where

@@ -202,6 +202,7 @@ renameDoc d = case d of
   DocHyperlink l -> return (DocHyperlink l)
   DocPic str -> return (DocPic str)
   DocAName str -> return (DocAName str)
+  DocProperty p -> return (DocProperty p)
   DocExamples e -> return (DocExamples e)
 
 

@@ -432,6 +432,7 @@ markup m (DocCodeBlock d)            = markupCodeBlock m (markup m d)
 markup m (DocHyperlink l)            = markupHyperlink m l
 markup m (DocAName ref)              = markupAName m ref
 markup m (DocPic img)                = markupPic m img
+markup m (DocProperty p)             = markupProperty m p
 markup m (DocExamples e)             = markupExample m e
 
 
@@ -459,6 +460,7 @@ idMarkup = Markup {
   markupHyperlink            = DocHyperlink,
   markupAName                = DocAName,
   markupPic                  = DocPic,
+  markupProperty             = DocProperty,
   markupExample              = DocExamples
   }
 

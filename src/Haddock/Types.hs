@@ -306,6 +306,7 @@ data Doc id
   | DocHyperlink Hyperlink
   | DocPic String
   | DocAName String
+  | DocProperty String
   | DocExamples [Example]
   deriving (Functor)
 
@@ -350,6 +351,7 @@ data DocMarkup id a = Markup
   , markupHyperlink            :: Hyperlink -> a
   , markupAName                :: String -> a
   , markupPic                  :: String -> a
+  , markupProperty             :: String -> a
   , markupExample              :: [Example] -> a
   }
 

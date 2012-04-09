@@ -256,6 +256,7 @@ markupTag dflags = Markup {
   markupCodeBlock            = box TagPre,
   markupHyperlink            = \(Hyperlink url mLabel) -> (box (TagInline "a") . str) (fromMaybe url mLabel),
   markupAName                = const $ str "",
+  markupProperty             = box TagPre . str,
   markupExample              = box TagPre . str . unlines . map exampleToString
   }
 
