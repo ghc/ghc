@@ -1,10 +1,12 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}              -- to declare the kinds
+{-# LANGUAGE KindSignatures #-}         -- (used all over)
+{-# LANGUAGE MultiParamTypeClasses #-}  -- for <=
+{-# LANGUAGE TypeFamilies #-}           -- for declaring operators + sing family
+{-# LANGUAGE TypeOperators #-}          -- for declaring operator
+{-# LANGUAGE EmptyDataDecls #-}         -- for declaring the kinds
+{-# LANGUAGE GADTs #-}                  -- for examining type nats
+{-# LANGUAGE PolyKinds #-}              -- for Sing family
+{-# LANGUAGE UndecidableInstances #-}   -- for Read and Show instances
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -14,15 +16,11 @@ module GHC.TypeLits
   ( -- * Kinds
     Nat, Symbol
 
-    -- * Singleton types
-  , TNat(..), TSymbol(..)
-
     -- * Linking type and value level
-  , NatI(..), SymbolI(..)
+  , Sing, SingI, sing, SingRep, fromSing
 
     -- * Working with singletons
-  , tNatInteger, withTNat, tNatThat
-  , tSymbolString, withTSymbol, tSymbolThat
+  , withSing, singThat
 
     -- * Functions on type nats
   , type (<=), type (+), type (*), type (^)
@@ -32,7 +30,7 @@ module GHC.TypeLits
   , isEven, IsEven(..)
   ) where
 
-import GHC.Base(Bool(..), ($), otherwise, (==), (.))
+import GHC.Base(Eq((==)), Bool(..), ($), otherwise, (.))
 import GHC.Num(Integer, (-))
 import GHC.Base(String)
 import GHC.Read(Read(..))
@@ -51,49 +49,28 @@ data Symbol
 
 --------------------------------------------------------------------------------
 
--- | The type @TNat n@ is m \"singleton\" type containing only the value @n@.
--- (Technically, there is also a bottom element).
--- This type relates type-level naturals to run-time values.
-newtype TNat (n :: Nat) = TNat Integer
+-- | A family of singleton types, used to link the type-level literals
+-- to run-time values.
+type family SingRep a
 
--- | The type @TSymbol s@ is m \"singleton\" type containing only the value @s@.
--- (Technically, there is also a bottom element).
--- This type relates type-level symbols to run-time values.
-newtype TSymbol (n :: Symbol) = TSymbol String
+-- | Type-level natural numbers are linked to (positive) integers.
+type instance SingRep (n :: Nat)    = Integer
 
+-- | Type-level symbols are linked to strings.
+type instance SingRep (n :: Symbol) = String
 
+newtype Sing n = Sing (SingRep n)
 
 --------------------------------------------------------------------------------
 
--- | The class 'NatI' provides a \"smart\" constructor for values
--- of type @Nat n@.  There are built-in instances for all natural numbers
--- that fit in a 'Word'.  The 'Word' restriction can be lifted but that
--- would require a bunch of code in "deSugar/DsBinds" to be monadified,
--- because making integer expression is a monadic operation.  Not hard,
--- but not yet done.
---
--- NOTE: The instances for 'NatI' are provided directly by GHC.
--- The built-in instances use the number corresponding to the instance
--- as evidence.  This works because of the following two details about GHC:
---   * The "dictionary" for classes with a single method is the method itself,
---     so GHC simply coerces the dictionary into the value, and
---   * Newtype use the same representation as their definition types.
--- (This is a bit of a hack but it seems to work pretty well.
---  It is also possible to implement the same API in a different way.)
+-- | The class 'SingI' provides a \"smart\" constructor for singleton types.
+-- There are built-in instances for the singleton types corresponding
+-- to type literals.
 
-class NatI (n :: Nat) where
+class SingI a where
 
-  -- | The only defined element of type @TNat n@.
-  tNat :: TNat n
-
-
-
-class SymbolI (n :: Symbol) where
-
-  -- | The only defined element of type @TSymbol n@.
-  tSymbol :: TSymbol n
-
-
+  -- | The only value of type @Sing a@
+  sing :: Sing a
 
 
 -- | Comparsion of type-level naturals.
@@ -111,50 +88,25 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 --------------------------------------------------------------------------------
 
-{-# INLINE tNatInteger #-}
-{-# INLINE withTNat #-}
-{-# INLINE tNatThat #-}
+fromSing :: Sing a -> SingRep a
+fromSing (Sing n) = n
 
+withSing :: SingI a => (Sing a -> b) -> b
+withSing f = f sing
 
-tNatInteger :: TNat n -> Integer
-tNatInteger (TNat n) = n
+singThat :: SingI a => (SingRep a -> Bool) -> Maybe (Sing a)
+singThat p = withSing $ \x -> if p (fromSing x) then Just x else Nothing
 
-withTNat :: NatI n => (TNat n -> a) -> a
-withTNat f = f tNat
+instance Show (SingRep a) => Show (Sing a) where
+  showsPrec p = showsPrec p . fromSing
 
-tNatThat :: NatI n => (Integer -> Bool) -> Maybe (TNat n)
-tNatThat p = withTNat $ \x -> if p (tNatInteger x) then Just x else Nothing
-
-instance Show (TNat n) where
-  showsPrec p = showsPrec p . tNatInteger
-
-instance NatI n => Read (TNat n) where
+instance (SingI a, Read (SingRep a), Eq (SingRep a)) => Read (Sing a) where
   readsPrec p cs = do (x,ys) <- readsPrec p cs
-                      case tNatThat (== x) of
+                      case singThat (== x) of
                         Just y  -> [(y,ys)]
                         Nothing -> []
 
 
---------------------------------------------------------------------------------
-
-tSymbolString :: TSymbol s -> String
-tSymbolString (TSymbol s) = s
-
-withTSymbol :: SymbolI s => (TSymbol s -> a) -> a
-withTSymbol f = f tSymbol
-
-tSymbolThat :: SymbolI s => (String -> Bool) -> Maybe (TSymbol s)
-tSymbolThat p = withTSymbol $ \x -> if p (tSymbolString x) then Just x
-                                                           else Nothing
-
-instance Show (TSymbol n) where
-  showsPrec p = showsPrec p . tSymbolString
-
-instance SymbolI n => Read (TSymbol n) where
-  readsPrec p cs = do (x,ys) <- readsPrec p cs
-                      case tSymbolThat (== x) of
-                        Just y  -> [(y,ys)]
-                        Nothing -> []
 
 
 
@@ -162,11 +114,11 @@ instance SymbolI n => Read (TSymbol n) where
 
 data IsZero :: Nat -> * where
   IsZero :: IsZero 0
-  IsSucc :: !(TNat n) -> IsZero (n + 1)
+  IsSucc :: !(Sing n) -> IsZero (n + 1)
 
-isZero :: TNat n -> IsZero n
-isZero (TNat n) | n == 0    = unsafeCoerce IsZero
-                | otherwise = unsafeCoerce (IsSucc (TNat (n-1)))
+isZero :: Sing n -> IsZero n
+isZero (Sing n) | n == 0    = unsafeCoerce IsZero
+                | otherwise = unsafeCoerce (IsSucc (Sing (n-1)))
 
 instance Show (IsZero n) where
   show IsZero     = "0"
@@ -174,13 +126,13 @@ instance Show (IsZero n) where
 
 data IsEven :: Nat -> * where
   IsEvenZero :: IsEven 0
-  IsEven     :: !(TNat (n+1)) -> IsEven (2 * n + 2)
-  IsOdd      :: !(TNat n)     -> IsEven (2 * n + 1)
+  IsEven     :: !(Sing (n+1)) -> IsEven (2 * n + 2)
+  IsOdd      :: !(Sing n)     -> IsEven (2 * n + 1)
 
-isEven :: TNat n -> IsEven n
-isEven (TNat n) | n == 0      = unsafeCoerce IsEvenZero
-                | testBit n 0 = unsafeCoerce (IsOdd  (TNat (n `shiftR` 1)))
-                | otherwise   = unsafeCoerce (IsEven (TNat (n `shiftR` 1)))
+isEven :: Sing n -> IsEven n
+isEven (Sing n) | n == 0      = unsafeCoerce IsEvenZero
+                | testBit n 0 = unsafeCoerce (IsOdd  (Sing (n `shiftR` 1)))
+                | otherwise   = unsafeCoerce (IsEven (Sing (n `shiftR` 1)))
 
 instance Show (IsEven n) where
   show IsEvenZero = "0"
