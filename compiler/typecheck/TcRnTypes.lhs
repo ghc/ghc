@@ -831,10 +831,15 @@ instance Outputable WhereFrom where
 
 
 \begin{code}
--- Types without any type functions inside.  However, note that xi
--- types CAN contain unexpanded type synonyms; however, the
--- (transitive) expansions of those type synonyms will not contain any
--- type functions.
+-- The syntax of xi types:
+-- xi ::= a | T xis | xis -> xis | ... | forall a. tau
+-- Two important notes:
+--      (i) No type families, unless we are under a ForAll
+--      (ii) Note that xi types can contain unexpanded type synonyms; 
+--           however, the (transitive) expansions of those type synonyms 
+--           will not contain any type functions, unless we are under a ForAll.
+-- We enforce the structure of Xi types when we flatten (TcCanonical)
+
 type Xi = Type       -- In many comments, "xi" ranges over Xi
 
 type Cts = Bag Ct
