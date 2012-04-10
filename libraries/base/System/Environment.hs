@@ -20,6 +20,7 @@ module System.Environment
       getArgs,       -- :: IO [String]
       getProgName,   -- :: IO String
       getEnv,        -- :: String -> IO String
+      lookupEnv,     -- :: String -> IO (Maybe String)
 #ifndef __NHC__
       withArgs,
       withProgName,
@@ -189,19 +190,14 @@ basename f = go f f
 --    does not exist.
 
 getEnv :: String -> IO String
-#ifdef mingw32_HOST_OS
-getEnv name = withCWString name $ \s -> try_size s 256
+getEnv name = lookupEnv name >>= maybe handleError return
   where
-    try_size s size = allocaArray (fromIntegral size) $ \p_value -> do
-      res <- c_GetEnvironmentVariable s p_value size
-      case res of
-        0 -> do
-                  err <- c_GetLastError
-                  if err == eRROR_ENVVAR_NOT_FOUND
-                   then ioe_missingEnvVar name
-                   else throwGetLastError "getEnv"
-        _ | res > size -> try_size s res -- Rare: size increased between calls to GetEnvironmentVariable
-          | otherwise  -> peekCWString p_value
+#ifdef mingw32_HOST_OS
+    handleError = do
+        err <- c_GetLastError
+        if err == eRROR_ENVVAR_NOT_FOUND
+            then ioe_missingEnvVar name
+            else throwGetLastError "getEnv"
 
 eRROR_ENVVAR_NOT_FOUND :: DWORD
 eRROR_ENVVAR_NOT_FOUND = 203
@@ -209,15 +205,36 @@ eRROR_ENVVAR_NOT_FOUND = 203
 foreign import stdcall unsafe "windows.h GetLastError"
   c_GetLastError:: IO DWORD
 
+#else
+    handleError = ioe_missingEnvVar name
+#endif
+
+-- | Return the value of the environment variable @var@, or @Nothing@ if
+-- there is no such value.
+--
+-- For POSIX users, this is equivalent to 'System.Posix.Env.getEnv'.
+lookupEnv :: String -> IO (Maybe String)
+#ifdef mingw32_HOST_OS
+lookupEnv name = withCWString name $ \s -> try_size s 256
+  where
+    try_size s size = allocaArray (fromIntegral size) $ \p_value -> do
+      res <- c_GetEnvironmentVariable s p_value size
+      case res of
+        0 -> return Nothing
+        _ | res > size -> try_size s res -- Rare: size increased between calls to GetEnvironmentVariable
+          | otherwise  -> peekCWString p_value >>= return . Just
+
 foreign import stdcall unsafe "windows.h GetEnvironmentVariableW"
   c_GetEnvironmentVariable :: LPTSTR -> LPTSTR -> DWORD -> IO DWORD
 #else
-getEnv name =
+lookupEnv name =
     withCString name $ \s -> do
       litstring <- c_getenv s
       if litstring /= nullPtr
-        then getFileSystemEncoding >>= \enc -> GHC.peekCString enc litstring
-        else ioe_missingEnvVar name
+        then do enc <- getFileSystemEncoding
+                result <- GHC.peekCString enc litstring
+                return $ Just result
+        else return Nothing
 
 foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
