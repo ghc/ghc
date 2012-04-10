@@ -74,3 +74,5 @@ test('T5439', normal, compile_fail, [''])
 test('T5515', normal, compile_fail, [''])
 test('T5763', expect_broken(5673), compile_fail, [''])
 
+test('T5934', normal, compile_fail, [''])
+
