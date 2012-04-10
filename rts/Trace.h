@@ -352,6 +352,7 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_GC_DONE(cap)
 #define dtraceGcGlobalSync(cap)                         \
     HASKELLEVENT_GC_GLOBAL_SYNC(cap)
+/* FIXME: leads to a validate failure on OS X (Lion)
 #define dtraceEventGcStats(heap_capset, gens,           \
                            copies, slop, fragmentation, \
                            par_n_threads,               \
@@ -373,10 +374,23 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_HEAP_ALLOCATED(cap, heap_capset,       \
                                 allocated)
 #define dtraceEventHeapSize(heap_capset, size)          \
-    HASKELLEVENT_HEAP_LIVE(heap_capset, size)
+    HASKELLEVENT_HEAP_SIZE(heap_capset, size)
 #define dtraceEventHeapLive(heap_capset, live)          \
     HASKELLEVENT_HEAP_LIVE(heap_capset, live)
-
+ */
+#define dtraceEventGcStats(heap_capset, gens,           \
+                           copies, slop, fragmentation, \
+                           par_n_threads,               \
+                           par_max_copied,              \
+                           par_tot_copied)              
+#define dtraceHeapInfo(heap_capset, gens,               \
+                       maxHeapSize, allocAreaSize,      \
+                       mblockSize, blockSize)           
+#define dtraceEventHeapAllocated(cap, heap_capset,      \
+                                 allocated)             
+#define dtraceEventHeapSize(heap_capset, size)          
+#define dtraceEventHeapLive(heap_capset, live)          
+ 
 #define dtraceCapsetCreate(capset, capset_type)         \
     HASKELLEVENT_CAPSET_CREATE(capset, capset_type)
 #define dtraceCapsetDelete(capset)                      \
@@ -517,7 +531,9 @@ INLINE_HEADER void traceEventMigrateThread(Capability *cap     STG_UNUSED,
 INLINE_HEADER void traceCapCreate(Capability *cap STG_UNUSED)
 {
     traceCapEvent(cap, EVENT_CAP_CREATE);
+/* FIXME: leads to a validate failure on OS X (Lion)
     dtraceCapCreate((EventCapNo)cap->no);
+    */
 }
 
 INLINE_HEADER void traceCapDelete(Capability *cap STG_UNUSED)
@@ -616,7 +632,9 @@ INLINE_HEADER void traceEventGcDone(Capability *cap STG_UNUSED)
 INLINE_HEADER void traceEventGcGlobalSync(Capability *cap STG_UNUSED)
 {
     traceGcEvent(cap, EVENT_GC_GLOBAL_SYNC);
+/* FIXME: leads to a validate failure on OS X (Lion)
     dtraceGcGlobalSync((EventCapNo)cap->no);
+    */
 }
 
 INLINE_HEADER void traceEventGcStats(Capability *cap            STG_UNUSED,

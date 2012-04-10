@@ -56,12 +56,13 @@ provider HaskellEvent {
   probe gc__work (EventCapNo);
   probe gc__done (EventCapNo);
   probe gc__sync (EventCapNo);
+/* FIXME: leads to a validate failure on OS X (Lion)
   probe gc__stats (CapsetID, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord, StgWord);
   probe heap__info (CapsetID, StgWord, StgWord, StgWord, StgWord, StgWord);
   probe heap__allocated (EventCapNo, CapsetID, StgWord64);
   probe heap__size (CapsetID, StgWord);
   probe heap__live (CapsetID, StgWord);
-
+ */
   /* capability events */
   probe startup (EventCapNo);
   probe cap__create (EventCapNo);
