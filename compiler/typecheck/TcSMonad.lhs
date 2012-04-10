@@ -1545,12 +1545,10 @@ deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2)
                               ; let ev_binds = TcEvBinds ev_binds_var
                               ; lcl_env <- wrapTcS $ TcM.getLclTypeEnv
                               ; loc <- wrapTcS $ TcM.getCtLoc skol_info
-                              ; untch <- getUntouchables
                               ; let wc = WC { wc_flat  = singleCt new_ct 
                                             , wc_impl  = emptyBag
                                             , wc_insol = emptyCts }
-                                    imp = Implic { ic_untch  = fst untch
-                                                     -- What about TcS touchables?
+                                    imp = Implic { ic_untch  = all_untouchables
                                                  , ic_env    = lcl_env
                                                  , ic_skols  = skol_tvs
                                                  , ic_given  = []
@@ -1564,6 +1562,8 @@ deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2)
         ; setEvBind orig_ev $
           EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs)
         }
+ where all_untouchables = TouchableRange u u
+       u = idUnique orig_ev -- HACK: empty range
 
 \end{code}
 
