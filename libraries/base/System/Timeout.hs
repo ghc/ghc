@@ -25,12 +25,8 @@
 module System.Timeout ( timeout ) where
 
 #ifdef __GLASGOW_HASKELL__
-import Prelude             (Show(show), IO, Ord((<)), Eq((==)), Int,
-                            otherwise, fmap)
-import Data.Maybe          (Maybe(..))
-import Control.Monad       (Monad(..))
-import Control.Concurrent  (forkIO, threadDelay, myThreadId, killThread)
-import Control.Exception   (Exception, handleJust, throwTo, bracket)
+import Control.Concurrent
+import Control.Exception   (Exception, handleJust, bracket)
 import Data.Typeable
 import Data.Unique         (Unique, newUnique)
 
@@ -86,7 +82,8 @@ timeout n f
         ex  <- fmap Timeout newUnique
         handleJust (\e -> if e == ex then Just () else Nothing)
                    (\_ -> return Nothing)
-                   (bracket (forkIO (threadDelay n >> throwTo pid ex))
+                   (bracket (forkIOWithUnmask $ \unmask ->
+                                 unmask $ threadDelay n >> throwTo pid ex)
                             (killThread)
                             (\_ -> fmap Just f))
 #else
