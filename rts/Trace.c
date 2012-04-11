@@ -97,7 +97,8 @@ void initTracing (void)
     // -Dg turns on gc tracing too
     TRACE_gc =
         RtsFlags.TraceFlags.gc ||
-        RtsFlags.DebugFlags.gc;
+        RtsFlags.DebugFlags.gc ||
+        RtsFlags.DebugFlags.scheduler;
     if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
         RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
     }
