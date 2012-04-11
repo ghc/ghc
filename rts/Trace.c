@@ -325,8 +325,14 @@ void traceHeapEvent_ (Capability   *cap,
                       CapsetID      heap_capset,
                       lnat          info1)
 {
-    /* no stderr equivalent for these ones */
-    postHeapEvent(cap, tag, heap_capset, info1);
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postHeapEvent(cap, tag, heap_capset, info1);
+    }
 }
 
 void traceEventHeapInfo_ (CapsetID    heap_capset,
@@ -336,10 +342,16 @@ void traceEventHeapInfo_ (CapsetID    heap_capset,
                           lnat        mblockSize,
                           lnat        blockSize)
 {
-    /* no stderr equivalent for this one */
-    postEventHeapInfo(heap_capset, gens,
-                      maxHeapSize, allocAreaSize,
-                      mblockSize, blockSize);
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postEventHeapInfo(heap_capset, gens,
+                          maxHeapSize, allocAreaSize,
+                          mblockSize, blockSize);
+    }
 }
 
 void traceEventGcStats_  (Capability *cap,
@@ -352,10 +364,16 @@ void traceEventGcStats_  (Capability *cap,
                           lnat        par_max_copied,
                           lnat        par_tot_copied)
 {
-    /* no stderr equivalent for this one */
-    postEventGcStats(cap, heap_capset, gen,
-                     copied, slop, fragmentation,
-                     par_n_threads, par_max_copied, par_tot_copied);
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postEventGcStats(cap, heap_capset, gen,
+                         copied, slop, fragmentation,
+                         par_n_threads, par_max_copied, par_tot_copied);
+    }
 }
 
 void traceCapEvent (Capability   *cap,
