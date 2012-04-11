@@ -318,7 +318,7 @@ instance Monoid (Doc id) where
 data Hyperlink = Hyperlink
   { hyperlinkUrl   :: String
   , hyperlinkLabel :: Maybe String
-  }
+  } deriving (Eq, Show)
 
 
 data Example = Example

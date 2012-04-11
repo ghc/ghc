@@ -107,7 +107,7 @@ seq1	:: { Doc RdrName }
 elem1	:: { Doc RdrName }
 	: STRING		{ DocString $1 }
 	| '/../'                { DocEmphasis (DocString $1) }
-	| URL			{ DocHyperlink (Hyperlink $1 Nothing) }
+	| URL			{ DocHyperlink (makeHyperlink $1) }
 	| PIC                   { DocPic $1 }
 	| ANAME			{ DocAName $1 }
 	| IDENT			{ DocIdentifier $1 }
@@ -120,6 +120,15 @@ strings  :: { String }
 {
 happyError :: [LToken] -> Maybe a
 happyError toks = Nothing
+
+-- | Create a `Hyperlink` from given string.
+--
+-- A hyperlink consists of a URL and an optional label.  The label is separated
+-- from the url by one or more whitespace characters.
+makeHyperlink :: String -> Hyperlink
+makeHyperlink input = case break isSpace $ strip input of
+  (url, "")    -> Hyperlink url Nothing
+  (url, label) -> Hyperlink url (Just . dropWhile isSpace $ label)
 
 -- | Create an 'Example', stripping superfluous characters as appropriate
 makeExample :: String -> String -> [String] -> Example
