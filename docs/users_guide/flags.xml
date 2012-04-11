@@ -493,6 +493,12 @@
             <entry>-</entry>
           </row>
           <row>
+            <entry><option>-ghci-script</option></entry>
+            <entry>Read additional <filename>.ghci</filename> files</entry>
+            <entry>dynamic</entry>
+            <entry>-</entry>
+          </row>
+          <row>
             <entry><option>-read-dot-ghci</option></entry>
             <entry>Enable reading of <filename>.ghci</filename> files</entry>
             <entry>static</entry>

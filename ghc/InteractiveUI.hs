@@ -432,8 +432,9 @@ runGHCi paths maybe_exprs = do
 
   setGHCContextFromGHCiState
 
+  dflags <- getDynFlags
   when (read_dot_files) $ do
-    mcfgs0 <- sequence [ current_dir, app_user_dir, home_dir ]
+    mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ] ++ map (return . Just ) (ghciScripts dflags)
     mcfgs <- liftIO $ mapM canonicalizePath' (catMaybes mcfgs0)
     mapM_ sourceConfigFile $ nub $ catMaybes mcfgs
         -- nub, because we don't want to read .ghci twice if the
@@ -455,7 +456,6 @@ runGHCi paths maybe_exprs = do
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
   is_tty <- liftIO (hIsTerminalDevice stdin)
-  dflags <- getDynFlags
   let show_prompt = verbosity dflags > 0 || is_tty
 
   -- reset line number
