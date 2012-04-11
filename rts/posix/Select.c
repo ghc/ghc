@@ -218,12 +218,12 @@ awaitEvent(rtsBool wait)
 	       the RTS won't loop.
 	    */
 	    if ( errno == EBADF ) {
-	      unblock_all = rtsTrue;
-	      break;
+                unblock_all = rtsTrue;
+                break;
 	    } else {
- 	      perror("select");
-	      barf("select failed");
-	    }
+                sysErrorBelch("select");
+                stg_exit(EXIT_FAILURE);
+            }
 	  }
 
 	  /* We got a signal; could be one of ours.  If so, we need
