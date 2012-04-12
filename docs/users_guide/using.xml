@@ -1771,8 +1771,8 @@ f "2"    = 2
       described above, and as such, you shouldn't need to set any of
       them explicitly (indeed, doing so could lead to unexpected
       results).  A flag <option>-fwombat</option> can be negated by 
-     saying <option>-fno-wombat</option>.  The flags below are off by default,
-     except where noted below.
+      saying <option>-fno-wombat</option>.  The flags below are off
+      by default, except where noted below.
      </para>
 
       <variablelist>
@@ -1797,7 +1797,17 @@ f "2"    = 2
           <listitem>
             <para> <emphasis>On by default.</emphasis>.  
             Switch on the strictness analyser. There is a very old paper about GHC's 
-           strictness analyser, <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/simple-strictnes-analyser.ps.gz">Measuring the effectiveness of a simple strictness analyser</ulink>, but the current one is quite a bit different.
+            strictness analyser, <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/simple-strictnes-analyser.ps.gz">
+              Measuring the effectiveness of a simple strictness analyser</ulink>,
+            but the current one is quite a bit different.
+            </para>
+
+            <para>The strictness analyser figures out when arguments and
+            variables in a function can be treated 'strictly' (that is they
+            are always evaluated in the function at some point). This allow
+            GHC to apply certain optimisations such as unboxing that
+            otherwise don't apply as they change the semantics of the program
+            when applied to lazy arguments.
             </para>
           </listitem>
         </varlistentry>
@@ -1833,7 +1843,40 @@ f "2"    = 2
           </term>
           <listitem>
             <para><emphasis>Off by default, but enabled by -O2.</emphasis>
-            Turn on call-pattern specialisation; see <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm">Call-pattern specialisation for Haskell programs</ulink>.</para>
+            Turn on call-pattern specialisation; see
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm">
+              Call-pattern specialisation for Haskell programs</ulink>.
+            </para>
+
+            <para>This optimisation specializes recursive functions according to
+            their argument "shapes". This is best explained by example so
+            consider:
+<programlisting>
+last :: [a] -> a
+last [] = error "last"
+last (x : []) = x
+last (x : xs) = last xs
+</programlisting>
+            In this code, once we pass the initial check for an empty list we
+            know that in the recursive case this pattern match is redundant. As
+            such <option>-fspec-constr</option> will transform the above code
+            to:
+<programlisting>
+last :: [a] -> a
+last []       = error "last"
+last (x : xs) = last' x xs
+    where
+      last' x []       = x
+      last' x (y : ys) = last' y ys
+</programlisting>
+            </para>
+
+            <para>As well avoid unnecessary pattern matching it also helps avoid
+            unnecessary allocation. This applies when a argument is strict in
+            the recursive call to itself but not on the initial entry. As
+            strict recursive branch of the function is created similar to the
+            above example.
+            </para>
           </listitem>
         </varlistentry>
 
@@ -1844,9 +1887,12 @@ f "2"    = 2
           </term>
           <listitem>
             <para><emphasis>On by default.</emphasis>
-            Specialise each type-class-overloaded function defined in this module for the types at which 
-            it is called in this module.  Also specialise imported functions that have an INLINABLE pragma
-            (<xref linkend="inlinable-pragma"/>) for the types at which they are called in this module.</para>
+            Specialise each type-class-overloaded function defined in this
+            module for the types at which it is called in this module.  Also
+            specialise imported functions that have an INLINABLE pragma
+            (<xref linkend="inlinable-pragma"/>) for the types at which they
+            are called in this module.
+            </para>
           </listitem>
         </varlistentry>
 
@@ -1856,7 +1902,12 @@ f "2"    = 2
             <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
           </term>
           <listitem>
-            <para>Turn on the static argument transformation, which turns a recursive function into a non-recursive one with a local recursive loop. See Chapter 7 of <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz">Andre Santos's PhD thesis</ulink></para>
+            <para>Turn on the static argument transformation, which turns a
+            recursive function into a non-recursive one with a local
+            recursive loop. See Chapter 7 of
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz">
+              Andre Santos's PhD thesis</ulink>
+            </para>
           </listitem>
         </varlistentry>
 
@@ -1866,8 +1917,25 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para> <emphasis>On by default.</emphasis>
-            Float let-bindings inwards, nearer their binding site.  See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">Let-floating: moving bindings to give faster programs (ICFP'96)</ulink>.
+            <para><emphasis>On by default.</emphasis>
+            Float let-bindings inwards, nearer their binding site.  See
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">
+              Let-floating: moving bindings to give faster programs (ICFP'96)</ulink>.
+            </para>
+
+            <para>This optimisation moves let bindings closer to their use
+            site. The benefit here is that this may avoid unnecessary
+            allocation if the branch the let is now on is never executed. It
+            also enables other optimisation passes to work more effectively
+            as they have more information locally.
+            </para>
+
+            <para>This optimisation isn't always beneficial though (so GHC
+            applies some heuristics to decide when to apply it). The details
+            get complicated but a simple example is that it is often beneficial
+            to move let bindings outwards so that multiple let bindings can be
+            grouped into a larger single let binding, effectively batching
+            their allocation and helping the garbage collector and allocator.
             </para>
           </listitem>
         </varlistentry>
@@ -1879,20 +1947,23 @@ f "2"    = 2
           </term>
           <listitem>
             <para><emphasis>On by default.</emphasis>
-              Run the full laziness optimisation (also known as
-              let-floating), which floats let-bindings outside enclosing lambdas, in the hope they will be thereby be computed less often. 
-              See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">Let-floating: moving bindings to give faster programs (ICFP'96)</ulink>.
-             Full laziness increases sharing, which can lead
-              to increased memory residency.</para>
+            Run the full laziness optimisation (also known as let-floating),
+            which floats let-bindings outside enclosing lambdas, in the hope
+            they will be thereby be computed less often.  See
+            <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/float.ps.gz">Let-floating:
+              moving bindings to give faster programs (ICFP'96)</ulink>.
+            Full laziness increases sharing, which can lead to increased memory
+            residency.
+            </para>
+
             <para>NOTE: GHC doesn't implement complete full-laziness.
-            When optimisation in on, and
-            <option>-fno-full-laziness</option> is not given, some
-            transformations that increase sharing are performed, such
-            as extracting repeated computations from a loop.  These
-            are the same transformations that a fully lazy
-            implementation would do, the difference is that GHC
-            doesn't consistently apply full-laziness, so don't rely on
-            it.</para>
+            When optimisation in on, and <option>-fno-full-laziness</option>
+            is not given, some transformations that increase sharing are
+            performed, such as extracting repeated computations from a loop.
+            These are the same transformations that a fully lazy
+            implementation would do, the difference is that GHC doesn't
+            consistently apply full-laziness, so don't rely on it.
+            </para>
           </listitem>
         </varlistentry>
 
@@ -1901,7 +1972,9 @@ f "2"    = 2
             <option>-fdo-lambda-eta-expansion</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-          <listitem><para> <emphasis>On by default.</emphasis> Eta-expand let-bindings to increase their arity.
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Eta-expand let-bindings to increase their arity.
             </para>
           </listitem>
         </varlistentry>
@@ -1911,8 +1984,10 @@ f "2"    = 2
             <option>-fdo-eta-reduction</option>
             <indexterm><primary><option></option></primary></indexterm>
           </term>
-          <listitem> <para> <emphasis>On by default.</emphasis> 
-            Eta-reduce lambda expressions, if doing so gets rid of a whole group of lambdas.
+          <listitem>
+            <para><emphasis>On by default.</emphasis>
+            Eta-reduce lambda expressions, if doing so gets rid of a whole
+            group of lambdas.
             </para>
           </listitem>
         </varlistentry>
@@ -1948,9 +2023,12 @@ f "2"    = 2
           </term>
           <listitem>
             <para><emphasis>Off by default, but enabled by -O2.</emphasis> 
-            Turn on the liberate-case transformation.  This unrolls recursive function once in its own RHS, to
-            avoid repeated case analysis of free variables.  It's a bit like the call-pattern specialiser
-            (<option>-fspec-constr</option>) but for free variables rather than arguments.</para>
+            Turn on the liberate-case transformation.  This unrolls recursive
+            function once in its own RHS, to avoid repeated case analysis of
+            free variables.  It's a bit like the call-pattern specialiser
+            (<option>-fspec-constr</option>) but for free variables rather than
+            arguments.
+            </para>
           </listitem>
         </varlistentry>
 
@@ -1960,7 +2038,8 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para> A very experimental flag that makes dictionary-valued expressions seem cheap to the optimiser.
+            <para>A very experimental flag that makes dictionary-valued
+            expressions seem cheap to the optimiser.
             </para>
           </listitem>
         </varlistentry>
@@ -1971,8 +2050,10 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para> Usually GHC black-holes a thunk only when it switches threads.  This flag makes it do so
-            as soon as the thunk is entered.  See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/">Haskell on a shared-memory multiprocessor</ulink>.
+            <para>Usually GHC black-holes a thunk only when it switches
+            threads. This flag makes it do so as soon as the thunk is
+            entered. See <ulink url="http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/">
+              Haskell on a shared-memory multiprocessor</ulink>.
             </para>
           </listitem>
         </varlistentry>
@@ -1987,7 +2068,8 @@ f "2"    = 2
             <literal>State#</literal> token as argument is considered to be
             single-entry, hence it is considered OK to inline things inside
             it. This can improve performance of IO and ST monad code, but it
-            runs the risk of reducing sharing.</para>
+            runs the risk of reducing sharing.
+            </para>
           </listitem>
         </varlistentry>
 
@@ -2001,7 +2083,8 @@ f "2"    = 2
             <option>-fno-state-hack</option>). In particular, stop GHC
             eta-expanding through a case expression, which is good for
             performance, but bad if you are using <literal>seq</literal> on
-            partial applications.</para>
+            partial applications.
+            </para>
           </listitem>
         </varlistentry>
 
@@ -2011,19 +2094,24 @@ f "2"    = 2
             <indexterm><primary><option>-fsimpl-tick-factor</option></primary></indexterm>
           </term>
           <listitem>
-            <para>GHC's optimiser can diverge if you write rewrite rules (<xref linkend="rewrite-rules"/>) 
-            that don't terminate, or (less satisfactorily) if you
-            code up recursion through data types
-            (<xref linkend="bugs-ghc"/>).  To avoid making the compiler fall into an infinite
-            loop, the optimiser carries a "tick count" and stops inlining and applying rewrite rules
-            when this count is exceeded.  The limit is set as a multiple of the program size, so 
-            bigger programs get more ticks. The <option>-fsimpl-tick-factor</option> flag lets
-            you change the multiplier. The default is 100; numbers larger than 100 give more ticks,
-            and numbers smaller than 100 give fewer.</para>
+            <para>GHC's optimiser can diverge if you write rewrite rules (
+              <xref linkend="rewrite-rules"/>) that don't terminate, or (less
+            satisfactorily) if you code up recursion through data types
+            (<xref linkend="bugs-ghc"/>).  To avoid making the compiler fall
+            into an infinite loop, the optimiser carries a "tick count" and
+            stops inlining and applying rewrite rules when this count is
+            exceeded.  The limit is set as a multiple of the program size, so
+            bigger programs get more ticks. The
+            <option>-fsimpl-tick-factor</option> flag lets you change the
+            multiplier. The default is 100; numbers larger than 100 give more
+            ticks, and numbers smaller than 100 give fewer.
+            </para>
 
-            <para>If the tick-count expires, GHC summarises what simplifier steps it has done; 
-            you can use <option>-fddump-simpl-stats</option> to generate a much more detailed list.
-            Usually that identifies the loop quite accurately, because some numbers are very large.
+            <para>If the tick-count expires, GHC summarises what simplifier
+            steps it has done; you can use
+            <option>-fddump-simpl-stats</option> to generate a much more
+            detailed list.  Usually that identifies the loop quite
+            accurately, because some numbers are very large.
             </para>
           </listitem>
         </varlistentry>
@@ -2040,12 +2128,13 @@ f "2"    = 2
             function unfolding to be. (An unfolding has a &ldquo;size&rdquo;
             that reflects the cost in terms of &ldquo;code bloat&rdquo; of
             expanding (aka inlining) that unfolding at a call site. A bigger
-            function would be assigned a bigger cost.) </para>
+            function would be assigned a bigger cost.)
+            </para>
 
-            <para>Consequences: (a) nothing larger than this will be
-            inlined (unless it has an INLINE pragma); (b) nothing
-            larger than this will be spewed into an interface
-            file. </para>
+            <para>Consequences: (a) nothing larger than this will be inlined
+            (unless it has an INLINE pragma); (b) nothing larger than this
+            will be spewed into an interface file.
+            </para>
 
             <para>Increasing this figure is more likely to result in longer
             compile times than faster code. The
@@ -2067,13 +2156,16 @@ f "2"    = 2
             unfolded at the call-site, any bigger and it won't. The size
             computed for a function depends on two things: the actual size of
             the expression minus any discounts that
-            apply (see <option>-funfolding-con-discount</option>).</para>
+            apply (see <option>-funfolding-con-discount</option>).
+            </para>
 
             <para>The difference between this and
             <option>-funfolding-creation-threshold</option> is that this one
-            determines if a function definition will be inlined <emphasis>at a call
-            site</emphasis>. The other option determines if a function definition will
-            be kept around at all for potential inlining.</para>
+            determines if a function definition will be inlined <emphasis>at
+              a call site</emphasis>. The other option determines if a
+            function definition will be kept around at all for potential
+            inlining.
+            </para>
           </listitem>
         </varlistentry>
 
@@ -2083,7 +2175,9 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>An experimental flag to expose all unfoldings, even for very large or recursive functions.
+            <para>An experimental flag to expose all unfoldings, even for very
+            large or recursive functions. This allows for all functions to be
+            inlined while usually GHC would avoid inlining larger functions.
             </para>
           </listitem>
         </varlistentry>
@@ -2118,9 +2212,13 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para><emphasis>Off by default, but enabled by -O2. Only applies in
+              combination with the native code generator.</emphasis>
+            Use the graph colouring register allocator for register allocation
+            in the native code generator. By default, GHC uses a simpler,
+            faster linear register allocator. The downside being that the
+            linear register allocator usually generates worse code.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
@@ -2130,9 +2228,13 @@ f "2"    = 2
             <indexterm><primary><option></option></primary></indexterm>
           </term>
           <listitem>
-            <para>
+            <para><emphasis>Off by default, only applies in combination with
+              the native code generator.</emphasis>
+            Use the iterative coalescing graph colouring register allocator for
+            register allocation in the native code generator. This is the same
+            register allocator as the <option>-freg-graph</option> one but also
+            enables iterative coalescing during register allocation.
             </para>
-            TODO: Document optimisation
           </listitem>
         </varlistentry>
 
