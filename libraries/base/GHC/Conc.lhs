@@ -51,6 +51,7 @@ module GHC.Conc
         , runSparks
         , yield         -- :: IO ()
         , labelThread   -- :: ThreadId -> String -> IO ()
+        , mkWeakThreadId -- :: ThreadId -> IO (Weak ThreadId)
 
         , ThreadStatus(..), BlockReason(..)
         , threadStatus  -- :: ThreadId -> IO ThreadStatus

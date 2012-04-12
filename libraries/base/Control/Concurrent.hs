@@ -89,6 +89,9 @@ module Control.Concurrent (
         runInUnboundThread,
 #endif
 
+        -- * Weak references to ThreadIds
+        mkWeakThreadId,
+
         -- * GHC's implementation of concurrency
 
         -- |This section describes features specific to GHC's

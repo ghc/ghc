@@ -104,14 +104,6 @@ foreign import ccall unsafe
 	-> IO CInt			-- (ret) old action code
 #endif
 
--- make a weak pointer to a ThreadId: holding the weak pointer doesn't
--- keep the thread alive and prevent it from being identified as
--- deadlocked.  Vitally important for the main thread.
-mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
-mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
-   case mkWeak# t# t (unsafeCoerce# 0#) s of 
-      (# s1, w #) -> (# s1, Weak w #)
-
 -- | 'runIO' is wrapped around every @foreign export@ and @foreign
 -- import \"wrapper\"@ to mop up any uncaught exceptions.  Thus, the
 -- result of running 'System.Exit.exitWith' in a foreign-exported

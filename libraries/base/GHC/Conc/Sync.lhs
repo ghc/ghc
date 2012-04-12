@@ -61,6 +61,7 @@ module GHC.Conc.Sync
         , runSparks
         , yield         -- :: IO ()
         , labelThread   -- :: ThreadId -> String -> IO ()
+        , mkWeakThreadId -- :: ThreadId -> IO (Weak ThreadId)
 
         , ThreadStatus(..), BlockReason(..)
         , threadStatus  -- :: ThreadId -> IO ThreadStatus
@@ -119,6 +120,7 @@ import GHC.MVar
 import GHC.Real         ( fromIntegral )
 import GHC.Pack         ( packCString# )
 import GHC.Show         ( Show(..), showString )
+import GHC.Weak
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -514,6 +516,26 @@ threadCapability :: ThreadId -> IO (Int, Bool)
 threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
      (# s', _, cap#, locked# #) -> (# s', (I# cap#, locked# /=# 0#) #)
+
+-- | make a weak pointer to a 'ThreadId'.  It can be important to do
+-- this if you want to hold a reference to a 'ThreadId' while still
+-- allowing the thread to receive the @BlockedIndefinitely@ family of
+-- exceptions (e.g. 'BlockedIndefinitelyOnMVar').  Holding a normal
+-- 'ThreadId' reference will prevent the delivery of
+-- @BlockedIndefinitely@ exceptions because the reference could be
+-- used as the target of 'throwTo' at any time, which would unblock
+-- the thread.
+--
+-- Holding a @Weak ThreadId@, on the other hand, will not prevent the
+-- thread from receiving @BlockedIndefinitely@ exceptions.  It is
+-- still possible to throw an exception to a @Weak ThreadId@, but the
+-- caller must use @deRefWeak@ first to determine whether the thread
+-- still exists.
+--
+mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
+mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
+   case mkWeak# t# t (unsafeCoerce# 0#) s of 
+      (# s1, w #) -> (# s1, Weak w #)
 \end{code}
 
 
