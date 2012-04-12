@@ -66,8 +66,8 @@ createThread(Capability *cap, nat size)
     /* sched_mutex is *not* required */
 
     /* catch ridiculously small stack sizes */
-    if (size < MIN_STACK_WORDS + sizeofW(StgStack)) {
-        size = MIN_STACK_WORDS + sizeofW(StgStack);
+    if (size < MIN_STACK_WORDS + sizeofW(StgStack) + sizeofW(StgTSO)) {
+        size = MIN_STACK_WORDS + sizeofW(StgStack) + sizeofW(StgTSO);
     }
 
     /* The size argument we are given includes all the per-thread
