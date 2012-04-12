@@ -836,7 +836,7 @@ mkMethIds sig_fn clas tyvars dfun_ev_vars inst_tys sel_id
             ; inst_sigs <- xoptM Opt_InstanceSigs
             ; if inst_sigs then 
                 checkTc (sig_ty `eqType` local_meth_ty)
-                        (badInstSigErr sel_name sig_ty) 
+                        (badInstSigErr sel_name local_meth_ty)
               else
                 addErrTc (misplacedInstSig sel_name hs_ty)
             ; return sig_ty }
