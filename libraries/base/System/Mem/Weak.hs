@@ -139,8 +139,9 @@ The behaviour is simply this:
 This behaviour depends on what it means for a key to be reachable.
 Informally, something is reachable if it can be reached by following
 ordinary pointers from the root set, but not following weak pointers.
-We define reachability more precisely as follows A heap object is
-reachable if:
+We define reachability more precisely as follows.
+
+A heap object is /reachable/ if:
 
  * It is a member of the /root set/.
 
@@ -149,6 +150,6 @@ reachable if:
 
  * It is a weak pointer object whose key is reachable.
 
- * It is the value or finalizer of an object whose key is reachable.
+ * It is the value or finalizer of a weak pointer object whose key is reachable.
 -}
 
