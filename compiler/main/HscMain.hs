@@ -62,7 +62,6 @@ module HscMain
     , hscTcRnGetInfo
     , hscCheckSafe
 #ifdef GHCI
-    , hscIsGHCiMonad
     , hscGetModuleInterface
     , hscRnImportDecls
     , hscTcRnLookupRdrName
@@ -312,11 +311,6 @@ hscTcRnGetInfo hsc_env0 name = runInteractiveHsc hsc_env0 $ do
   ioMsgMaybe' $ tcRnGetInfo hsc_env name
 
 #ifdef GHCI
-hscIsGHCiMonad :: HscEnv -> String -> IO Name
-hscIsGHCiMonad hsc_env name =
-    let icntxt   = hsc_IC hsc_env
-    in runHsc hsc_env $ ioMsgMaybe $ isGHCiMonad hsc_env icntxt name
-
 hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
 hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv

@@ -90,7 +90,6 @@ module GHC (
         findModule, lookupModule,
 #ifdef GHCI
         isModuleTrusted,
-        setGHCiMonad,
         setContext, getContext, 
         getNamesInScope,
         getRdrNamesInScope,
@@ -1330,18 +1329,6 @@ lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
 isModuleTrusted :: GhcMonad m => Module -> m Bool
 isModuleTrusted m = withSession $ \hsc_env ->
     liftIO $ hscCheckSafe hsc_env m noSrcSpan
-
--- | Set the monad GHCi lifts user statements into.
---
--- Checks that a type (in string form) is an instance of the
--- @GHC.GHCi.GHCiSandboxIO@ type class. Sets it to be the GHCi monad if it is,
--- throws an error otherwise.
-setGHCiMonad :: GhcMonad m => String -> m ()
-setGHCiMonad name = withSession $ \hsc_env -> do
-    ty <- liftIO $ hscIsGHCiMonad hsc_env name
-    modifySession $ \s ->
-        let ic = (hsc_IC s) { ic_monad = ty }
-        in s { hsc_IC = ic }
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
 getHistorySpan h = withSession $ \hsc_env ->

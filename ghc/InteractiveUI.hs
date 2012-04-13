@@ -144,7 +144,6 @@ builtin_commands = [
   ("quit",      quit,                           noCompletion),
   ("reload",    keepGoing' reloadModule,        noCompletion),
   ("run",       keepGoing runRun,               completeFilename),
-  ("runmonad",  keepGoing setRunMonad,          noCompletion),
   ("script",    keepGoing' scriptCmd,           completeFilename),
   ("set",       keepGoing setCmd,               completeSetOptions),
   ("seti",      keepGoing setiCmd,              completeSeti),
@@ -1486,14 +1485,6 @@ isSafeModule m = do
     tallyPkgs dflags deps = partition part deps
         where state = pkgState dflags
               part pkg = trusted $ getPackageDetails state pkg
-
------------------------------------------------------------------------------
--- :runmonad
-
--- Set the monad GHCi should execute in
-
-setRunMonad :: String -> GHCi ()
-setRunMonad name = GHC.setGHCiMonad name
 
 -----------------------------------------------------------------------------
 -- :browse

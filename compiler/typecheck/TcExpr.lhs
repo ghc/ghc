@@ -939,7 +939,7 @@ tcSyntaxOp :: CtOrigin -> HsExpr Name -> TcType -> TcM (HsExpr TcId)
 -- This version assumes res_ty is a monotype
 tcSyntaxOp orig (HsVar op) res_ty = do { (expr, rho) <- tcInferIdWithOrig orig op
                                        ; tcWrapResult expr rho res_ty }
-tcSyntaxOp _ other 	   _      = pprPanic "tcSyntaxOp: " (ppr other) 
+tcSyntaxOp _ other 	   _      = pprPanic "tcSyntaxOp" (ppr other) 
 \end{code}
 
 
