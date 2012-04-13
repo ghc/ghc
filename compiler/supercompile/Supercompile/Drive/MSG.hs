@@ -93,11 +93,13 @@ instance MonadFix MSG where
 
 msgFlexiVar :: Var -> Var -> MSG Var
 msgFlexiVar x_l x_r = MSG $ \s -> Right $ case M.lookup (x_l, x_r) (msgKnownFlexiPairs s) of
-  Nothing -> if x == x_r && not (isGlobalId x)
-              then pprPanic "msgFlexiVar" (ppr x) -- FIXME: I don't know why global vars are showing up here, this indicates a bug elsewehre
-              else (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
-                    msgKnownFlexiPairs = M.insert (x_l, x_r) x (msgKnownFlexiPairs s),
-                    msgPending = (x, (x_l, x_r)) : msgPending s }, x)
+  Nothing -> if isGlobalId x_l && isGlobalId x_r && x_l == x_r -- FIXME: I don't know why global vars are showing up here, this indicates a bug elsewehre. If we don't skip them then msg loops :(
+              then (s, x)
+              else if x == x_r
+                    then pprPanic "msgFlexiVar" (ppr (x_l, x_r))
+                    else (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
+                              msgKnownFlexiPairs = M.insert (x_l, x_r) x (msgKnownFlexiPairs s),
+                              msgPending = (x, (x_l, x_r)) : msgPending s }, x)
     where x = uniqAway (msgInScopeSet s) x_r
   Just x  -> (s, x)
 
@@ -146,6 +148,14 @@ msg :: {- MSGMode -- ^ How to match
     -> Maybe MSGResult -- ^ Renaming from left to right
 msg {- mm -} s_l s_r = runMSG' (msgWithReason {- mm -} s_l s_r)
 
+maybeToList :: String -> Maybe a -> [a]
+maybeToList msg Nothing  = trace ("maybeToList: " ++ msg) []
+maybeToList _   (Just x) = [x]
+
+msgToList :: MSG' a -> [a]
+msgToList (Left msg) = trace ("maybeToList: " ++ msg) []
+msgToList (Right x)  = [x]
+
 msgWithReason :: {- MSGMode -> -} State -> State -> MSG' MSGResult
 msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
   do
@@ -161,10 +171,10 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
         msg_s = MSGState ids M.empty []
     case [ ((deeds_l, Heap h_l ids_l, mkRenaming (M.toList rn_l), k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, mkRenaming (M.toList rn_r), k_r))
          | (rn2, mk) <- mfix $ \(~(rn2, _)) -> msgEC init_rn2 rn2 k_l k_r
-         , Right (msg_s, (qa, (k_l, k, k_r))) <- [unMSG (liftM2 (,) (msgAnned (msgQA rn2) qa_l qa_r) mk) msg_s]
+         , (msg_s, (qa, (k_l, k, k_r))) <- msgToList $ unMSG (liftM2 (,) (msgAnned (msgQA rn2) qa_l qa_r) mk) msg_s
          , (rn_l, (h_l, heap, h_r), rn_r) <- msgPureHeap {- mm -} rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)
          ] of
-      []      -> fail "msgWithReason: no acceptable combination"
+      []      -> Left "msgWithReason: no acceptable combination"
       (res:_) -> return res -- TODO: test for multiple solutions? Attempt to choose best?
 
 msgAnned :: (a -> a -> MSG b)
@@ -402,33 +412,31 @@ msgIn :: (InScopeSet -> Renaming -> a -> a)
 msgIn rnm fvs mtch rn2 (rn_l, x_l) (rn_r, x_r) = liftM (\b -> (mkIdentityRenaming (fvs b), b)) $ mtch rn2 (rnm iss rn_l x_l) (rnm iss rn_r x_r)
   where iss = rnInScopeSet rn2 -- NB: this line is one of the few things that relies on the RnEnv2 InScopeSet being correct
 
-msgEC :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Stack -> Stack -> [(RnEnv2, MSG (Stack, Stack, Stack))]
+msgEC :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Stack -> Stack -> [MSG' (RnEnv2, MSG (Stack, Stack, Stack))]
 msgEC init_rn2 rn2 = go init_rn2
   where
     go rn2' k_l k_r
-      = (case () of
-           _ | Car kf_l k_l <- k_l
-             , Car kf_r k_r <- k_r
-             , Just (rn2'', mkf') <- msgECFrame rn2' rn2 kf_l kf_r
-             -> map (second (liftM2 (\kf (k_l, k, k_r) -> (k_l, kf `Car` k, k_r)) mkf')) $ go rn2'' k_l k_r
-           _ -> []) ++
-        [(rn2', return (k_l, Loco False, k_r))]
+      = prod (do (kf_l, k_l) <- splitCons "left" k_l
+                 (kf_r, k_r) <- splitCons "right" k_r
+                 (rn2'', mkf') <- msgECFrame rn2' rn2 kf_l kf_r
+                 return (map (second (liftM2 (\kf (k_l, k, k_r) -> (k_l, kf `Car` k, k_r)) mkf')) $ go rn2'' k_l k_r)) ++
+        [return (rn2', return (k_l, Loco False, k_r))]
 
-msgECFrame :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Tagged StackFrame -> Tagged StackFrame -> Maybe (RnEnv2, MSG (Tagged StackFrame))
+msgECFrame :: RnEnv2 -> RnEnv2 {- knot-tied -} -> Tagged StackFrame -> Tagged StackFrame -> MSG' (RnEnv2, MSG (Tagged StackFrame))
 msgECFrame init_rn2 rn2 kf_l kf_r = liftM (second (liftM $ Tagged (tag kf_r))) $ go (tagee kf_l) (tagee kf_r) -- Right biased
   where
-    go :: StackFrame -> StackFrame -> Maybe (RnEnv2, MSG StackFrame)
-    go (Apply x_l')                          (Apply x_r')                          = Just (init_rn2, liftM Apply $ msgVar rn2 x_l' x_r')
-    go (TyApply ty_l')                       (TyApply ty_r')                       = Just (init_rn2, liftM TyApply $ msgType rn2 ty_l' ty_r')
-    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = Just (init_rn2, liftM2 (\ty (x, in_alts) -> Scrutinise x ty in_alts) (msgType rn2 ty_l' ty_r') (msgIdCoVarBndr (,) rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedAlts annedAltsFreeVars msgAlts rn2 in_alts_l in_alts_r))
-    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = Just (init_rn2, guard "msgECFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned (msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r))
-    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = Just (init_rn2, msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r)
-    go (CastIt co_l')                        (CastIt co_r')                        = Just (init_rn2, liftM CastIt $ msgCoercion rn2 co_l' co_r')
-    go (Update x_l')                         (Update x_r')                         = Just (second (liftM Update) $ msgIdCoVarBndr' init_rn2 rn2 x_l' x_r')
-    go _ _ = Nothing
+    go :: StackFrame -> StackFrame -> MSG' (RnEnv2, MSG StackFrame)
+    go (Apply x_l')                          (Apply x_r')                          = return (init_rn2, liftM Apply $ msgVar rn2 x_l' x_r')
+    go (TyApply ty_l')                       (TyApply ty_r')                       = return (init_rn2, liftM TyApply $ msgType rn2 ty_l' ty_r')
+    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2, liftM2 (\ty (x, in_alts) -> Scrutinise x ty in_alts) (msgType rn2 ty_l' ty_r') (msgIdCoVarBndr (,) rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedAlts annedAltsFreeVars msgAlts rn2 in_alts_l in_alts_r))
+    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, guard "msgECFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned (msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r))
+    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2, msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r)
+    go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2, liftM CastIt $ msgCoercion rn2 co_l' co_r')
+    go (Update x_l')                         (Update x_r')                         = return (second (liftM Update) $ msgIdCoVarBndr' init_rn2 rn2 x_l' x_r')
+    go _ _ = Left "msgECFrame"
 
 -- NB: we must enforce invariant that stuff "outside" cannot refer to stuff bound "inside" (heap *and* stack)
-msgPureHeap :: {- MSGMode -> -} RnEnv2 -> MSGState -> PureHeap -> PureHeap -> (BoundVars, FreeVars) -> (BoundVars, FreeVars) -> [(M.Map Var Var, (PureHeap, Heap, PureHeap), M.Map Var Var)]
+msgPureHeap :: {- MSGMode -> -} RnEnv2 -> MSGState -> PureHeap -> PureHeap -> (BoundVars, FreeVars) -> (BoundVars, FreeVars) -> [MSG' (M.Map Var Var, (PureHeap, Heap, PureHeap), M.Map Var Var)]
 msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
   = [ solution
     | Just (used_l, h_l) <- [sucks init_h_l k_bvs_l M.empty S.empty k_fvs_l]
@@ -443,56 +451,58 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
        -> PureHeap             -- Right heap
        -> PureHeap             -- Common heap
        -> MSGState             -- Pending matches etc. MSGState is also used to ensure we never match a var pair more than once (they get the same common name)
-       -> [(M.Map Var Var, (PureHeap, Heap, PureHeap), M.Map Var Var)]
+       -> [MSG' (M.Map Var Var, (PureHeap, Heap, PureHeap), M.Map Var Var)]
     go rn_l rn_r _      _      h_l h_r h       (MSGState { msgPending = [], msgInScopeSet = ids }) = [(rn_l, (h_l, Heap h ids, h_r), rn_r)]
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((x_common, (x_l, x_r)):rest) })
+      | pprTrace "msgPureHeap" (ppr (x_common, x_l, x_r)) False = undefined
+
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
       | Right (msg_s, x_common) <- flip unMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
-      = (case () of
-          _ | Just (used_l', hb_l) <- mb_common_l
-            , Just (used_r', hb_r) <- mb_common_r
-            , Just (msg_s, hb) <- case (inject hb_l, inject hb_r) of
-                                    (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
-                                      | let_bound_l == let_bound_r
-                                      , Right (msg_s, in_e) <- flip unMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
-                                      -> Just (msg_s, (if let_bound_r then letBound else internallyBound) in_e)
-                                    (Just Nothing, Just Nothing)
-                                      | x_l == x_r
-                                      -> Just (msg_s, hb_r) -- Right biased
-                                    (Nothing, Nothing)
-                                      -> Just (msg_s, lambdaBound)
-                                    _ -> Nothing
-            -- If they match, we need to make a common heap binding
-            -> go rn_l rn_r used_l' used_r'
-                  h_l h_r (M.insert x_common hb h) msg_s
-          _ -> []) ++
+      = prod (do (used_l', hb_l) <- mb_common_l
+                 (used_r', hb_r) <- mb_common_r
+                 (msg_s, hb) <- case (inject hb_l, inject hb_r) of
+                                  (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
+                                    | let_bound_l == let_bound_r
+                                    , Right (msg_s, in_e) <- flip unMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
+                                    -> return (msg_s, (if let_bound_r then letBound else internallyBound) in_e)
+                                  (Just Nothing, Just Nothing)
+                                    | x_l == x_r
+                                    -> return (msg_s, hb_r) -- Right biased
+                                  (Nothing, Nothing)
+                                    -> Just (msg_s, lambdaBound)
+                                  _ -> Left "msgPureHeap: non-unifiable heap bindings"
+                 -- If they match, we need to make a common heap binding
+                 return (go rn_l rn_r used_l' used_r'
+                            h_l h_r (M.insert x_common hb h) msg_s)) ++
         -- If they don't match, we need to generalise
-        [ solution
-        -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
-        -- that binding refers to. If that is not possible, we have to fail.
-        | Just (used_l', h_l') <- [mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l]
-        , Just (used_r', h_r') <- [mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r]
-        , solution <- go (M.insert x_common x_l rn_l) (M.insert x_common x_r rn_r) used_l' used_r'
-                         h_l' h_r' (M.insert x_common lambdaBound h) msg_s
-        ]
+        prod (do -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
+                 -- that binding refers to. If that is not possible, we have to fail.
+                 (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
+                 (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
+                 return $ go (M.insert x_common x_l rn_l) (M.insert x_common x_r rn_r) used_l' used_r'
+                              h_l' h_r' (M.insert x_common lambdaBound h) msg_s)
       | otherwise
-      = []
+      = [Left "msgPureHeap: non-unifiable heap binders"]
       where
         (mb_common_l, mb_individual_l) = find init_h_l k_bvs_l h_l used_l x_l
         (mb_common_r, mb_individual_r) = find init_h_r k_bvs_r h_r used_r x_r
 
+    prod :: MSG' [MSG' a] -> [MSG' a]
+    prod (Left msg)  = [Left msg]
+    prod (Right mxs) = mxs
+
     find :: PureHeap -> BoundVars -> PureHeap -> S.Set Var
-         -> Var -> (Maybe (S.Set Var, HeapBinding),
+         -> Var -> (MSG' (S.Set Var, HeapBinding),
                       -- Nothing ==> unavailable for common heap
                       -- Just    ==> available for common heap with this usage
-                    Maybe (S.Set Var, Maybe HeapBinding))
+                    MSG' (S.Set Var, Maybe HeapBinding))
                       -- Nothing      ==> unavailable for individual heap
                       -- Just Nothing ==> available for individual heap but already in it
                       -- Just Just    ==> available for individual heap and not in it yet
     find init_h k_bvs h used x = case M.lookup x init_h of
          -- Variable bound by the heap (vastly common case):
-        Just hb | S.notMember x used -> (Just (used', hb), if x `M.member` h then Just (used, Nothing) else Just (used', Just hb))
-                | otherwise          -> (Nothing,          if x `M.member` h then Just (used, Nothing) else Nothing)
+        Just hb | S.notMember x used -> (return (used', hb),  if x `M.member` h then return (used, Nothing) else return (used', Just hb))
+                | otherwise          -> (Left "used heap binding", if x `M.member` h then return (used, Nothing) else Left "used heap binding")
           where used' | Just (_, e) <- heapBindingTerm hb
                       , not (termIsCheap e)
                       = S.insert x used
@@ -501,13 +511,13 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
          -- By a process of elimination, variable must be bound be the stack. Normally it will in fact be bound by the "instance" portion
          -- of the stack because matches involving the common portion variables either already failed or were discharged by RnEnv2, but
          -- if "find" is called by "sucks" then this may not necessarily be the case
-        Nothing -> (Nothing, if x `elemVarSet` k_bvs then Just (used, Nothing) else Nothing)
+        Nothing -> (Left "used stack binding", if x `elemVarSet` k_bvs then return (used, Nothing) else Left "used stack binding")
 
-    suck :: PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> Maybe (S.Set Var, PureHeap)
-    suck _      _     h _ (used, Nothing) = Just (used, h)                                                                                     -- Already copied in
+    suck :: PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> MSG' (S.Set Var, PureHeap)
+    suck _      _     h _ (used, Nothing) = return (used, h)                                                                                   -- Already copied in
     suck init_h k_bvs h x (used, Just hb) = sucks init_h k_bvs (M.insert x hb h) used (heapBindingFreeVars hb `unionVarSet` varBndrFreeVars x) -- Not yet copied: put in and consider FVs
 
-    sucks :: PureHeap -> BoundVars -> PureHeap -> S.Set Var -> FreeVars -> Maybe (S.Set Var, PureHeap)
+    sucks :: PureHeap -> BoundVars -> PureHeap -> S.Set Var -> FreeVars -> MSG' (S.Set Var, PureHeap)
     sucks init_h k_bvs h used fvs = foldM (\(used, h) x -> snd (find init_h k_bvs h used x) >>= suck init_h k_bvs h x) (used, h) (varSetElems fvs)
 
     inject :: HeapBinding -> Maybe (Maybe (Bool, In AnnedTerm))
