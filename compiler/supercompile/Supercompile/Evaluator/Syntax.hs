@@ -86,6 +86,9 @@ annedTerm  tg e = Comp (Tagged tg (Comp (Sized (annedTermSize' e)  (FVed (annedT
 annedValue :: Tag -> ValueF Anned -> Anned AnnedValue
 annedValue tg v = Comp (Tagged tg (Comp (Sized (annedValueSize' v) (FVed (annedValueFreeVars' v) v))))
 
+annedVar :: Tag -> Out Var -> Anned Var
+annedVar tg x = Comp (Tagged tg (Comp (Sized 1 (FVed (annedVarFreeVars' x) x))))
+
 annedAnswer :: Tag -> Answer -> Anned Answer
 annedAnswer tg a = Comp (Tagged tg (Comp (Sized (answerSize' a) (FVed (answerFreeVars' a) a))))
 

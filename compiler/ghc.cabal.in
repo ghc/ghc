@@ -453,6 +453,7 @@ Library
         Supercompile.Core.Syntax
         Supercompile.Core.Tag
         Supercompile.Drive.Match
+        Supercompile.Drive.MSG
         Supercompile.Drive.Process
         Supercompile.Drive.Process1
         Supercompile.Drive.Process2

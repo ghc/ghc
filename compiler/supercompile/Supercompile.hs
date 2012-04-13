@@ -70,7 +70,7 @@ partitionBinds should_sc initial_binds = go initial_inside initial_undecided
         (inside', undecided') = partition (\(x, _) -> x `elemVarSet` inside_fvs) undecided
 
 coreBindsFVs :: FlatCoreBinds -> S.FreeVars
-coreBindsFVs bs = unionVarSets [S.idFreeVars x `unionVarSet` exprFreeVars e | (x, e) <- bs]
+coreBindsFVs bs = unionVarSets [S.idBndrFreeVars x `unionVarSet` exprFreeVars e | (x, e) <- bs]
 
 coreBindsToCoreTerm :: (Id -> Bool) -> FlatCoreBinds -> (CoreExpr, Var -> FlatCoreBinds)
 coreBindsToCoreTerm should_sc binds
@@ -128,7 +128,7 @@ coreBindsToCoreTerm should_sc binds
        | null exported' = exported
        | otherwise      = go (exported' ++ exported) exported'' undecided'
       where (exported'', undecided') = partition (\(x, _) -> x `elemVarSet` exported_xs') undecided
-            exported_xs' = unionVarSets (map (S.idFreeVars . fst) exported')
+            exported_xs' = unionVarSets (map (S.idBndrFreeVars . fst) exported')
     sc_xs_internal_xs = uncurry (go []) (partition (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` zappedBindersOfBinds internal_sc_binds))
     sc_internal_xs = map snd sc_xs_internal_xs
 

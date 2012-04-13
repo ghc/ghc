@@ -3,7 +3,7 @@
 module Supercompile.Core.FreeVars (
     module Supercompile.Core.FreeVars,
     module VarSet,
-    idFreeVars, tyVarsOfType, tyVarsOfTypes, tyCoVarsOfCo
+    tyVarsOfType, tyVarsOfTypes, tyCoVarsOfCo
   ) where
 
 import Supercompile.Core.Syntax
@@ -11,9 +11,12 @@ import Supercompile.Core.Syntax
 import Supercompile.Utilities
 
 import CoreFVs
+import CoreSyn  (CoreRule(..))
 import VarSet
 import Coercion (tyCoVarsOfCo)
-import Id       (isId)
+import Var      (Id, TyVar)
+import Id       (isId, idSpecialisation, realIdUnfolding)
+import IdInfo   (specInfoRules)
 import Type     (tyVarsOfType, tyVarsOfTypes)
 
 
@@ -22,8 +25,25 @@ type BoundVars = VarSet
 
 
 varBndrFreeVars :: Var -> FreeVars
-varBndrFreeVars x | isId x    = idFreeVars x
-                  | otherwise = emptyVarSet
+varBndrFreeVars x | isId x    = idBndrFreeVars x
+                  | otherwise = tyVarBndrFreeVars x
+
+-- We have our own version of idFreeVars so we can treat global variables as free
+idBndrFreeVars :: Id -> FreeVars
+idBndrFreeVars x = varTypeTyVars x `unionVarSet` -- No global tyvars, so no problem
+                   rulesFreeVars (specInfoRules (idSpecialisation x)) `unionVarSet`
+                   (stableUnfoldingVars (const True) (realIdUnfolding x) `orElse` emptyVarSet)
+  where
+    rulesFreeVars :: [CoreRule] -> VarSet
+    rulesFreeVars rules = foldr (unionVarSet . ruleFreeVars) emptyVarSet rules
+
+    ruleFreeVars :: CoreRule -> VarSet
+    ruleFreeVars (BuiltinRule {}) = emptyVarSet
+    ruleFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
+      = nonRecBindersFreeVars bndrs (exprsSomeFreeVars (const True) (rhs:args))
+
+tyVarBndrFreeVars :: TyVar -> FreeVars
+tyVarBndrFreeVars = varTypeTyVars -- No global tyvars, so no problem
 
 
 (varFreeVars',                termFreeVars,                termFreeVars',                altsFreeVars,                valueFreeVars,                valueFreeVars')                = mkFreeVars (\f (I e) -> f e)

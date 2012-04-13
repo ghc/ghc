@@ -423,7 +423,7 @@ oneBracketed' :: Type -> a -> Bracketed a
 oneBracketed' ty x = TailsKnown ty (\_ -> Shell { shellExtraTags = IM.empty, shellExtraFvs = emptyVarSet, shellWrapper = \[e] -> e }) [TailishHole True (Hole [] x)]
 
 zipBracketeds :: Bracketed (Bracketed a)
-               -> Bracketed a
+              -> Bracketed a
 zipBracketeds (TailsUnknown bshell bholes) = TailsUnknown (Shell shell_tags shell_fvs (\es -> shell_wrapper es [])) holes
   where (shell_tags, shell_fvs, shell_wrapper, holes) = foldr go (shellExtraTags bshell, shellExtraFvs bshell, \[] rev_es' -> shellWrapper bshell (reverse rev_es'), []) bholes
         go (Hole bvs bracketed) (shell_extra_tags, shell_extra_fvs, shell_wrapper, holes)
@@ -540,10 +540,8 @@ optimiseSplit :: MonadStatics m
 optimiseSplit opt deeds bracketeds_heap bracketed_focus = {-# SCC "optimiseSplit'" #-}do
     -- 0) The "process tree" splits at this point. We can choose to distribute the deeds between the children in a number of ways
     let (deeds_initial, BracketedStuff bracketed_deeded_focus bracketeds_deeded_heap) = flip traverseAll (BracketedStuff bracketed_focus bracketeds_heap) $
-          \states -> case dEEDS_POLICY of
-                       Proportional -> case apportionDeeds deeds (1 : map stateSize states) of (deeds_initial:deeds_rest) -> (deeds_initial, zipWithEqual "optimiseSplit" addStateDeeds deeds_rest states)
-                                                                                               _ -> panic "optimiseSplit: empty apportioned deeds"
-                       _            -> (deeds, states)
+          \states -> let (deeds_initial:deedss) = splitDeeds deeds (1:map stateSize states)
+                     in (deeds_initial, zipWithEqual "optimiseSplit" addStateDeeds deedss states)
     
     MASSERT2(noChange (sumMapMonoid (sumMapMonoid releaseStateDeed) bracketeds_heap        `plusDeeds` sumMapMonoid releaseStateDeed bracketed_focus        `plusDeeds` deeds)
                       (sumMapMonoid (sumMapMonoid releaseStateDeed) bracketeds_deeded_heap `plusDeeds` sumMapMonoid releaseStateDeed bracketed_deeded_focus `plusDeeds` deeds_initial),

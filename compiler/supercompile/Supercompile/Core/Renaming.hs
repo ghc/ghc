@@ -3,7 +3,7 @@
 module Supercompile.Core.Renaming (
     -- | Renamings
     Renaming, emptyRenaming,
-    mkInScopeIdentityRenaming, mkIdentityRenaming, mkTyVarRenaming,
+    mkInScopeIdentityRenaming, mkIdentityRenaming, mkRenaming, mkTyVarRenaming,
     InScopeSet, emptyInScopeSet, mkInScopeSet,
     
     -- | Extending the renaming
@@ -126,6 +126,13 @@ mkIdentityRenaming fvs = foldVarlikes (\f -> foldVarSet (\x -> f x x)) fvs
                                       (\a -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a)))
                                       (\q -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q)))
                                       (emptyVarEnv, emptyVarEnv, emptyVarEnv)
+
+mkRenaming :: [(Var, Var)] -> Renaming
+mkRenaming xys = foldVarlikes (\f -> foldr (\(x, y) -> f x (x, y))) xys
+                              (\(x, y) -> first3  (\id_subst -> extendVarEnv id_subst x (varToCoreSyn y)))
+                              (\(a, b) -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy b)))
+                              (\(q, v) -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo v)))
+                              (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
 mkInScopeIdentityRenaming :: InScopeSet -> Renaming
 mkInScopeIdentityRenaming = mkIdentityRenaming . getInScopeVars

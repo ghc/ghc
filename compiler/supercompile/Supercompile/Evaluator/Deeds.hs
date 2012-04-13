@@ -45,6 +45,12 @@ releaseDeeds deeds release = deeds { sizeLimit = sizeLimit deeds + release }
 apportionDeeds :: Deeds -> [Int] -> [Deeds]
 apportionDeeds deeds weights = zipWith Deeds (apportion (sizeLimit deeds) weights) (apportion (stepLimit deeds) weights)
 
+splitDeeds :: Deeds -> [Size] -> [Deeds]
+splitDeeds _     []           = error "splitDeeds: no sizes"
+splitDeeds deeds (size:sizes) = case dEEDS_POLICY of
+    Proportional -> apportionDeeds deeds (size:sizes)
+    FCFS         -> deeds : map (const emptyDeeds) sizes
+
 
 noChange, noGain :: Deeds -> Deeds -> Bool
 noChange = (==)

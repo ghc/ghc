@@ -2,10 +2,12 @@
 module Supercompile.Drive.Process3 (supercompile) where
 
 import Supercompile.Drive.Match
+import Supercompile.Drive.MSG
 import Supercompile.Drive.Split
 import Supercompile.Drive.Process
 
 import Supercompile.Core.FreeVars
+import Supercompile.Core.Renaming (renameFVedTerm)
 import Supercompile.Core.Size (fvedTermSize)
 import Supercompile.Core.Syntax
 import Supercompile.Core.Tag
@@ -25,6 +27,7 @@ import Supercompile.Utilities
 
 import Var        (varName)
 import Id         (mkLocalId)
+import MkId       (nullAddrId)
 import Name       (Name, mkSystemVarName, getOccString)
 import FastString (mkFastString)
 import Util       (sndOf3)
@@ -249,15 +252,23 @@ speculateM state mcont = ScpM $ StateT $ \s -> ReaderT $ \env -> case speculate 
 sc :: State -> ScpM (Deeds, FVedTerm)
 sc = memo sc' . gc -- Garbage collection necessary because normalisation might have made some stuff dead
 
-sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm))
+sc' :: Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)) -- Bool records whether generalisation occurred, for debug printing
 sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
   Nothing -> speculateM (reduce state) $ \state -> -- traceRenderM "!sc" (PrettyDoc (pPrintFullState quietStatePrettiness state)) >>
                                                    my_split state sc
   Just h  -> flip catchM try_generalise $ \rb ->
                terminateM h state rb
-                 (speculateM (reduce state) $ \state -> my_split state sc)
+                 (speculateM (reduce state) $ \state -> (if mb_h == Just "h44" then pprTrace "sc'" (pPrintFullState quietStatePrettiness state) else id) $ my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
-                                                         (if sC_ROLLBACK then (\gen -> shallow_rb gen >> my_split state sc) else try_generalise) ({-# SCC "mK_GENERALISER'" #-} mK_GENERALISER shallow_state state))
+                                                         case msg shallow_state state of 
+                                                           -- FIXME: better?
+                                                           Just (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r))
+                                                            -> pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
+                                                                                       pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $
+                                                               do (deeds', e) <- sc (deeds, heap, k, qa)
+                                                                  liftM ((,) True) $ insertTagsM $ instanceSplit (deeds' `plusDeeds` deeds_r', heap_r, k_r, renameFVedTerm ids rn_r e) sc
+                                                            where [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
+                                                           _ -> (if sC_ROLLBACK then (\gen -> shallow_rb gen >> my_split state sc) else try_generalise) ({-# SCC "mK_GENERALISER'" #-} mK_GENERALISER shallow_state state))
   where
     try_generalise gen = maybe (trace "sc-stop(split)" $ my_split state)
                                (trace "sc-stop(gen)")
