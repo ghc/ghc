@@ -129,3 +129,4 @@ test('T5423',
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
+test('5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])

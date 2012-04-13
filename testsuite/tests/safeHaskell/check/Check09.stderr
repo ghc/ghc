@@ -1,3 +1,4 @@
 
 Check09.hs:4:1:
-    bytestring-0.10.0.0:Data.ByteString.Char8 can't be safely imported! The package (bytestring-0.10.0.0) the module resides in isn't trusted.
+    Data.ByteString.Char8: Can't be safely imported!
+    The package (bytestring-0.10.0.0) the module resides in isn't trusted.

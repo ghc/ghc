@@ -1,0 +1,8 @@
+
+T5934.hs:10:7:
+    No instance for (Num ((forall s. GenST s) -> Int))
+      arising from the literal `0'
+    Possible fix:
+      add an instance declaration for (Num ((forall s. GenST s) -> Int))
+    In the expression: 0
+    In an equation for `run': run = 0
