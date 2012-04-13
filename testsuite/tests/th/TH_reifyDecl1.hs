@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module TH_reifyDecl1 where
 
+import System.IO
 import Language.Haskell.TH
 import Text.PrettyPrint.HughesPJ
 
@@ -62,7 +63,7 @@ data instance DF2 Bool = DBool
 test :: ()
 test = $(let 
 	  display :: Name -> Q ()
-	  display q = do { i <- reify q; report False (pprint i) }
+	  display q = do { i <- reify q; runIO $ hPutStrLn stderr (pprint i) }
 	in do { display ''T
 	      ; display ''R
 	      ; display ''List

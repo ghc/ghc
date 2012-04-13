@@ -87,3 +87,6 @@ test('5149', omit_ways(['ghci']), multi_compile_and_run,
                  ['5149', [('5149_cmm.cmm', '')], ''])
 test('5129', normal, compile_and_run, [''])
 test('5626', exit_code(1), compile_and_run, [''])
+test('5747', if_arch('i386', extra_hc_opts('-msse2')), compile_and_run, ['-O2'])
+test('5785', normal, compile_and_run, [''])
+

@@ -125,7 +125,7 @@ test('TH_dataD1', normal, compile_fail, ['-v0'])
 test('TH_ppr1', normal, compile_and_run, [''])
 
 test('TH_fail', normal, compile_fail, ['-v0'])
-test('TH_scopedTvs', normal, compile_fail, ['-v0'])
+test('TH_scopedTvs', normal, compile, ['-v0'])
 
 test('TH_runIO', normal, compile_fail, ['-v0'])
 
@@ -213,3 +213,24 @@ test('TH_Depends',
                    'TH_Depends_external.txt'])],
      run_command,
      ['$MAKE -s --no-print-directory TH_Depends'])
+test('T5597', extra_clean(['T5597a.hi','T5597a.o']), 
+              multimod_compile, ['T5597','-v0'])
+test('T5665', extra_clean(['T5665a.hi','T5665a.o']), 
+              multimod_compile, ['T5665','-v0'])
+test('T5700', extra_clean(['T5700a.hi','T5700a.o']), 
+              multimod_compile, ['T5700','-v0 -ddump-splices'])
+test('T5721', normal, compile, ['-v0'])
+test('T1541', normal, compile, ['-v0'])
+test('T5883', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
+test('T5882', normal, compile, ['-v0'])
+test('T5886', extra_clean(['T5886a.hi','T5886a.o']), 
+              multimod_compile, ['T5886','-v0'])
+test('T4135', normal, compile, ['-v0'])
+test('T5971', normal, compile_fail, ['-v0 -dsuppress-uniques'])
+test('T5968', normal, compile, ['-v0'])
+test('T5984', extra_clean(['T5984_Lib.hi', 'T5984_Lib.o']),
+              multimod_compile, ['T5984', '-v0 -ddump-splices'])
+test('T5555', extra_clean(['T5555_Lib.hi', 'T5555_Lib.o']),
+              multimod_compile, ['T5555', '-v0'])
+test('T5976', normal, compile_fail, ['-v0'])
+test('T5795', normal, compile_fail, ['-v0'])

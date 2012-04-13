@@ -1,7 +1,5 @@
 test('ghcilink001',
-     [ if_os('mingw32', skip), # crashes; see #5371
-       extra_clean(['dir001/*','dir001'])
-     ],
+     extra_clean(['dir001/*','dir001']),
      run_command,
      ['$MAKE -s --no-print-directory ghcilink001'])
 
@@ -20,9 +18,7 @@ test('ghcilink003',
      ['$MAKE -s --no-print-directory ghcilink003'])
 
 test('ghcilink004',
-     [ if_os('mingw32', skip), # crashes; see #5371
-       extra_clean(['dir004/*','dir004'])
-     ],
+     extra_clean(['dir004/*','dir004']),
      run_command,
      ['$MAKE -s --no-print-directory ghcilink004'])
 

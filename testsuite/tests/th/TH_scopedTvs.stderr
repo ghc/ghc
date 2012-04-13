@@ -1,4 +1,0 @@
-
-TH_scopedTvs.hs:6:13:
-    Illegal lexically-scoped type variable `a'
-    Lexically scoped type variables are not supported by Template Haskell

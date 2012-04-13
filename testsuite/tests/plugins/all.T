@@ -10,9 +10,15 @@ test('plugins02', normal, compile_fail, ['-package-conf simple-plugin/local.pack
 test('plugins03', normal, compile_fail, ['-package-conf simple-plugin/local.package.conf -fplugin Simple.NonExistantPlugin -package simple-plugin'])
 
 test('plugins04', extra_clean(['HomePackagePlugin.hi', 'HomePackagePlugin.o']), multimod_compile_fail, ['plugins04', '-package ghc -fplugin HomePackagePlugin'])
-test('plugins05', extra_clean(['HomePackagePlugin.hi', 'HomePackagePlugin.o']), multimod_compile_and_run, ['plugins05', '-package ghc'])
+test('plugins05',
+     [ extra_clean(['HomePackagePlugin.hi', 'HomePackagePlugin.o']),
+       expect_fail_for(['dyn'] + prof_ways) ],
+     multimod_compile_and_run, ['plugins05', '-package ghc'])
 
-test('plugins06', extra_clean(['LinkerTicklingPlugin.hi', 'LinkerTicklingPlugin.o']), multimod_compile_and_run, ['plugins06', '-package ghc'])
+test('plugins06',
+     [ extra_clean(['LinkerTicklingPlugin.hi', 'LinkerTicklingPlugin.o']),
+       expect_fail_for(['dyn'] + prof_ways) ],
+     multimod_compile_and_run, ['plugins06', '-package ghc'])
 
 if default_testopts.cleanup != '':
     runCmd('$MAKE -C ' + in_testdir('') + ' clean')

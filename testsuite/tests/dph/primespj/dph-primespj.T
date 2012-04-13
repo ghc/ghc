@@ -1,5 +1,5 @@
 
-test    ('dph-primespj-opt' 
+test    ('dph-primespj-copy-opt' 
         , [ alone
           , skip_if_fast
           , extra_clean(['Main.hi', 'Main.o', 'PrimesVect.hi', 'PrimesVect.o'])
@@ -10,12 +10,14 @@ test    ('dph-primespj-opt'
         , [ 'Main'
           , '-Odph -package dph-lifted-copy'])
 
-test    ('dph-primespj-fast' 
-        , [ extra_clean(['Main.hi', 'Main.o', 'PrimesVect.hi', 'PrimesVect.o'])
+test    ('dph-primespj-copy-fast' 
+        , [ alone
+          , extra_clean(['Main.hi', 'Main.o', 'PrimesVect.hi', 'PrimesVect.o'])
           , reqlib('dph-lifted-copy')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
           , '-O -fno-enable-rewrite-rules -package dph-lifted-copy'])
+
 

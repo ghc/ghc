@@ -37,7 +37,7 @@ test('SafeFlags14', normal, compile_fail, [''])
 test('SafeFlags15', normal, compile, [''])
 test('SafeFlags16', normal, compile, [''])
 test('SafeFlags17', normal, compile_fail, ['-distrust base'])
-test('SafeFlags18', normal, compile, ['-trust base'])
+test('SafeFlags18', normal, compile_fail, ['-trust base -Werror'])
 test('SafeFlags19', normal, compile_fail, [''])
 test('SafeFlags20', normal, compile, ['-trust base'])
 
@@ -53,6 +53,10 @@ test('SafeFlags26', normal, compile_fail, [''])
 
 # test -fno-safe-infer
 test('SafeFlags27', normal, compile, [''])
+
+# test package flags don't work
+test('SafeFlags28', normal, compile_fail, [''])
+test('SafeFlags29', normal, compile_fail, [''])
 
 # test certain flags are still allowed under -XSafe
 test('Flags01', normal, compile, ['-XSafe'])

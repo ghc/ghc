@@ -1,8 +1,8 @@
 
 tcfail115.hs:9:24:
-    Couldn't match kind `??' against `(#)'
+    Couldn't match kind `ArgKind' against `(#)'
     Kind incompatibility when matching types:
-      t0 :: ??
+      t0 :: ArgKind
       (# Int, Int #) :: (#)
     In the expression: (r :: (# Int, Int #))
     In a case alternative: r -> (r :: (# Int, Int #))

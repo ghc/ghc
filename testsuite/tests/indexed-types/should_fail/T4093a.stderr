@@ -3,10 +3,10 @@ T4093a.hs:8:8:
     Could not deduce (e ~ ())
     from the context (Foo e ~ Maybe e)
       bound by the type signature for hang :: Foo e ~ Maybe e => Foo e
-      at T4093a.hs:8:1-14
+      at T4093a.hs:7:9-34
       `e' is a rigid type variable bound by
           the type signature for hang :: Foo e ~ Maybe e => Foo e
-          at T4093a.hs:8:1
+          at T4093a.hs:7:9
     Expected type: Foo e
       Actual type: Maybe ()
     In the return type of a call of `Just'

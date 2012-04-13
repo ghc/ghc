@@ -351,3 +351,6 @@ test('spacesInArgs',
 
 test('T5584', normal, run_command,
         ['$MAKE -s --no-print-directory T5584'])
+test('T5198', extra_clean(['T5198dump/T5198.dump-simpl', 'T5198dump']),
+     run_command,
+     ['$MAKE -s --no-print-directory T5198'])

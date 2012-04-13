@@ -2,4 +2,6 @@
 SafeFlags22.hs:1:16:
     Warning: `SafeFlags22' has been infered as unsafe!
     Reason:
-        base:System.IO.Unsafe can't be safely imported! The module itself isn't safe.
+        SafeFlags22.hs:7:1:
+            System.IO.Unsafe: Can't be safely imported!
+            The module itself isn't safe.

@@ -1,6 +1,6 @@
 
 tcfail104.hs:16:19:
-    Couldn't match expected type `a0 -> a0'
+    Couldn't match expected type `Char -> Char'
                 with actual type `forall a. a -> a'
     In the expression: x
     In the expression: (\ x -> x)

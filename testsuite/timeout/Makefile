@@ -7,6 +7,7 @@ TOP = ..
 # being defined.
 ifneq "$(MAKECMDGOALS)" "clean"
 ifneq "$(MAKECMDGOALS)" "distclean"
+ifneq "$(MAKECMDGOALS)" "maintainer-clean"
 
 include $(TOP)/mk/boilerplate.mk
 
@@ -56,6 +57,7 @@ calibrate.out:
 # with, but it's really the performance of the machine that we're
 # interested in
 
+endif
 endif
 endif
 

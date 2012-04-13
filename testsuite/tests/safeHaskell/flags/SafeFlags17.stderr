@@ -1,3 +1,4 @@
 
 SafeFlags17.hs:4:8:
-    base:Prelude can't be safely imported! The package (base) the module resides in isn't trusted.
+    Prelude: Can't be safely imported!
+    The package (base) the module resides in isn't trusted.

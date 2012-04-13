@@ -87,6 +87,9 @@ class TestConfig:
         # Do we have shared libraries?
         self.have_shared_libs = False
 
+        # Do we have SMP support?
+        self.have_smp = False
+
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 
@@ -123,6 +126,8 @@ class TestRun:
        self.expected_passes = {}
        self.n_expected_failures = 0
        self.expected_failures = {}
+       self.n_missing_libs = 0
+       self.missing_libs = {}
        self.n_unexpected_passes = 0
        self.unexpected_passes = {}
        self.n_unexpected_failures = 0
@@ -174,6 +179,11 @@ class TestOptions:
        # compile this test to .hc only
        self.compile_to_hc = 0
 
+       # We sometimes want to modify the compiler_always_flags, so
+       # they are copied from config.compiler_always_flags when we
+       # make a new instance of TestOptions.
+       self.compiler_always_flags = []
+
        # extra compiler opts for this test
        self.extra_hc_opts = ''
 
@@ -189,6 +199,18 @@ class TestOptions:
        # extra files to clean afterward
        self.clean_files = []
 
+       # which -t numeric fields do we want to look at, and what bounds must
+       # they fall within?
+       # Elements of these lists should be things like
+       # ('bytes allocated',
+       #   9300000000,
+       #   10)
+       # To allow a 10% deviation from 9300000000.
+       self.compiler_stats_range_fields = {}
+       self.stats_range_fields = {}
+
+       # TODO: deprecate this in favour of compiler_stats_range_fields
+       #
        # which -t numeric fields do we want to look at, and what bounds must
        # they fall within?
        # Elements of these lists should be things like

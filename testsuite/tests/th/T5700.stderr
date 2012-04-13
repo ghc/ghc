@@ -1,0 +1,7 @@
+T5700.hs:1:1: Splicing declarations
+    mkC ''D
+  ======>
+    T5700.hs:8:3-9
+    instance C D where
+      {-# INLINE inlinable #-}
+      inlinable _ = GHC.Tuple.()

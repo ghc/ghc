@@ -7,7 +7,7 @@ import re
 #
 config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
-config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint', '-dno-debug-output', '-no-user-package-conf', '-rtsopts']
+config.compiler_always_flags = ghc_compiler_always_flags.split()
 
 config.hp2ps                 = 'hp2ps'
 config.hpc                   = 'hpc'
@@ -26,7 +26,7 @@ config.other_ways         = ['extcore','optextcore',
                              'prof_hc_hb','prof_hb',
                              'prof_hd','prof_hy','prof_hr',
                              'threaded1_ls', 'threaded2_hT',
-                             'llvm', 'debugllvm']
+                             'llvm', 'debugllvm', 'optllvm']
 
 if (ghc_with_native_codegen == 1):
     config.compile_ways.append('optasm')
@@ -46,6 +46,7 @@ config.unregisterised = (ghc_unregisterised == 1)
 if (ghc_with_threaded_rts == 1):
     config.run_ways.append('threaded1')
     if (ghc_with_smp == 1):
+        config.have_smp = True
         config.run_ways.append('threaded2')
 
 if (ghc_with_dynamic_rts == 1):
@@ -65,27 +66,27 @@ config.clean_only       = clean_only
 config.way_flags = {
     'normal'       : [],
     'g1'           : [],
-    'optasm'       : ['-O -fasm'],
+    'optasm'       : ['-O', '-fasm'],
     'llvm'         : ['-fllvm'],
-    'optllvm'      : ['-O -fllvm'],
-    'debugllvm'    : ['-fllvm -keep-llvm-files'],
-    'prof'         : ['-prof -auto-all -fasm'],
-    'profasm'      : ['-O -prof -auto-all'],
-    'profthreaded' : ['-O -prof -auto-all -threaded'],
+    'optllvm'      : ['-O', '-fllvm'],
+    'debugllvm'    : ['-fllvm', '-keep-llvm-files'],
+    'prof'         : ['-prof', '-auto-all', '-fasm'],
+    'profasm'      : ['-O', '-prof', '-auto-all'],
+    'profthreaded' : ['-O', '-prof', '-auto-all', '-threaded'],
     'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
     'extcore'      : ['-fext-core'],
-    'optextcore'   : ['-O -fext-core'],
+    'optextcore'   : ['-O', '-fext-core'],
     'threaded1'    : ['-threaded', '-debug'],
     'threaded1_ls' : ['-threaded', '-debug'],
     'threaded2'    : ['-O', '-threaded', '-eventlog'],
     'threaded2_hT' : ['-O', '-threaded'],
     'hpc'          : ['-O', '-fhpc' ],
-    'prof_hc_hb'   : ['-O -prof -auto-all'],
-    'prof_hb'      : ['-O -prof -auto-all'],
-    'prof_hd'      : ['-O -prof -auto-all'],
-    'prof_hy'      : ['-O -prof -auto-all'],
-    'prof_hr'      : ['-O -prof -auto-all'],
-    'dyn'          : ['-O -dynamic']
+    'prof_hc_hb'   : ['-O', '-prof', '-auto-all'],
+    'prof_hb'      : ['-O', '-prof', '-auto-all'],
+    'prof_hd'      : ['-O', '-prof', '-auto-all'],
+    'prof_hy'      : ['-O', '-prof', '-auto-all'],
+    'prof_hr'      : ['-O', '-prof', '-auto-all'],
+    'dyn'          : ['-O', '-dynamic']
    }
 
 config.way_rts_flags = { 
@@ -114,13 +115,20 @@ config.way_rts_flags = {
     'dyn'          : []
    }
 
-# Useful classes of ways:
+# Useful classes of ways that can be used with only_ways() and
+# expect_broken_for().
 
-prof_ways = filter(lambda x: x in config.run_ways, 
-                   ['prof', 'profasm','profthreaded'])
+prof_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-prof' in x[1], \
+                        config.way_flags.items()))
 
-threaded_ways = filter(lambda x: x in config.run_ways, 
-                       ['threaded1','threaded2','ghci','profthreaded'])
+threaded_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-threaded' in x[1] or 'ghci' == x[0], \
+                        config.way_flags.items()))
+
+opt_ways = map (lambda x: x[0], \
+                 filter(lambda x: '-O' in x[1], \
+                        config.way_flags.items()))
 
 def get_compiler_info():
 # This should really not go through the shell

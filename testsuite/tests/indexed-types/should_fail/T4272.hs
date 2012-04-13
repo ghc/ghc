@@ -10,7 +10,7 @@ class Family (TermFamily a) => TermLike a where
 laws :: forall a b. TermLike a => TermFamily a a -> b  
 laws t = prune t (terms (undefined :: TermFamily a a))
 
-prune :: TermLike a => TermFamily a a -> TermFamily a a -> b
+prune :: TermLike x => TermFamily x x -> TermFamily x x -> b
 prune = undefined  
 
 -- terms :: Family f => f a -> a

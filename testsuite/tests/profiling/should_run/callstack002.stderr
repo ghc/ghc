@@ -1,0 +1,16 @@
+f: 42
+Stack trace:
+  Main.f (callstack002.hs:10:7-43)
+  Main.map.go (callstack002.hs:15:21-23)
+  Main.map.go (callstack002.hs:15:21-34)
+  Main.map (callstack002.hs:13:12-16)
+  Main.main.xs (callstack002.hs:18:12-24)
+  Main.CAF (<entire-module>)
+f: 43
+Stack trace:
+  Main.f (callstack002.hs:10:7-43)
+  Main.map.go (callstack002.hs:15:21-23)
+  Main.map.go (callstack002.hs:15:21-34)
+  Main.map (callstack002.hs:13:12-16)
+  Main.main.xs (callstack002.hs:18:12-24)
+  Main.CAF (<entire-module>)

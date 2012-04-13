@@ -27,21 +27,18 @@ CONFIG       = $(CONFIGDIR)/$(COMPILER)
 
 # TEST_HC_OPTS is passed to every invocation of TEST_HC 
 # in nested Makefiles
-TEST_HC_OPTS = -dno-debug-output $(EXTRA_HC_OPTS)
+TEST_HC_OPTS = -fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-conf -rtsopts $(EXTRA_HC_OPTS)
 
 RUNTEST_OPTS =
 
-$(eval $(call get-ghc-rts-field,WORDSIZE,Word size))
-$(eval $(call get-ghc-rts-field,TARGETPLATFORM,Target platform))
-$(eval $(call get-ghc-rts-field,TargetOS_CPP,Target OS))
-$(eval $(call get-ghc-rts-field,TargetARCH_CPP,Target architecture))
 ifeq "$(filter $(TargetOS_CPP), cygwin32 mingw32)" ""
 exeext =
 else
 exeext = .exe
 endif
 
-$(eval $(call get-ghc-feature-bool,GhcWithNativeCodeGen,Have native code generator))
+RUNTEST_OPTS += -e ghc_compiler_always_flags="'$(TEST_HC_OPTS)'"
+
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 RUNTEST_OPTS += -e ghc_with_native_codegen=1
 else
@@ -49,7 +46,7 @@ RUNTEST_OPTS += -e ghc_with_native_codegen=0
 endif
 
 HASKELL98_LIBDIR := $(shell "$(GHC_PKG)" field haskell98 library-dirs | sed 's/^[^:]*: *//')
-HAVE_PROFILING := $(shell if [ -f $(HASKELL98_LIBDIR)/libHShaskell98-*_p.a ]; then echo YES; else echo NO; fi)
+HAVE_PROFILING := $(shell if [ -f $(subst \,/,$(HASKELL98_LIBDIR))/libHShaskell98-*_p.a ]; then echo YES; else echo NO; fi)
 
 ifeq "$(HAVE_PROFILING)" "YES"
 RUNTEST_OPTS += -e ghc_with_profiling=1
@@ -69,8 +66,6 @@ else
 RUNTEST_OPTS += -e ghc_with_dynamic_rts=0
 endif
 
-$(eval $(call get-ghc-field,GhcStage,Stage))
-$(eval $(call get-ghc-feature-bool,GhcWithInterpreter,Have interpreter))
 ifeq "$(GhcWithInterpreter)" "NO"
 RUNTEST_OPTS += -e ghc_with_interpreter=0
 else ifeq "$(GhcStage)" "1"
@@ -79,21 +74,19 @@ else
 RUNTEST_OPTS += -e ghc_with_interpreter=1
 endif
 
-$(eval $(call get-ghc-feature-bool,GhcUnregisterised,Unregisterised))
 ifeq "$(GhcUnregisterised)" "YES"
 RUNTEST_OPTS += -e ghc_unregisterised=1
 else
 RUNTEST_OPTS += -e ghc_unregisterised=0
 endif
 
-$(eval $(call get-ghc-feature-bool,GhcWithSMP,Support SMP))
 ifeq "$(GhcWithSMP)" "YES"
 RUNTEST_OPTS += -e ghc_with_smp=1
 else
 RUNTEST_OPTS += -e ghc_with_smp=0
 endif
 
-ifneq "$(shell $(SHELL) -c 'llvmc --version | grep version' 2> /dev/null)" ""
+ifneq "$(shell $(SHELL) -c 'llc --version | grep version' 2> /dev/null)" ""
 RUNTEST_OPTS += -e ghc_with_llvm=1
 else
 RUNTEST_OPTS += -e ghc_with_llvm=0

@@ -1,0 +1,4 @@
+:set -XPackageImports
+import "nonexisting" Control.Monad.State
+import "mtl" Control.Monad.State
+import "mtl" Control.Monad.Reader

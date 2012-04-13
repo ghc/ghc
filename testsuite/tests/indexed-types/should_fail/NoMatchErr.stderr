@@ -3,10 +3,10 @@ NoMatchErr.hs:20:5:
     Could not deduce (Memo d ~ Memo d0)
     from the context (Fun d)
       bound by the type signature for f :: Fun d => Memo d a -> Memo d a
-      at NoMatchErr.hs:20:1-15
+      at NoMatchErr.hs:19:7-37
     NB: `Memo' is a type function, and may not be injective
-    Expected type: Memo d a
-      Actual type: Memo d0 a
+    The type variable `d0' is ambiguous
+    Possible fix: add a type signature that fixes these type variable(s)
     Expected type: Memo d a -> Memo d a
       Actual type: Memo d0 a -> Memo d0 a
     In the expression: abst . appl

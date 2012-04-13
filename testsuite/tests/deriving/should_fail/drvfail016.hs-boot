@@ -3,5 +3,5 @@
 
 module A where
 
-data D
+data D = D
     deriving Show

@@ -28,5 +28,20 @@ integerConstantFolding:
 	$(call CHECK,\<196\>,divModInteger)
 	$(call CHECK,\<1600976\>,shiftLInteger)
 	$(call CHECK,\<6253\>,shiftRInteger)
+	$(call CHECK,\<641\>,quotInteger)
+	$(call CHECK,\<68\>,remInteger)
+	$(call CHECK,\<200131.0\>,doubleFromInteger)
+	$(call CHECK,\<200135.0\>,floatFromInteger)
+	$(call CHECK,\<400276.0\>,encodeIntegerDouble)
+	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
 	./integerConstantFolding
+
+.PHONY: fromToInteger
+fromToInteger:
+	'$(TEST_HC)' -Wall -v0 -O -c fromToInteger.hs -fforce-recomp -ddump-simpl > fromToInteger.simpl
+# Rules should eliminate all functions
+	-grep integerToInt fromToInteger.simpl
+	-grep smallInteger fromToInteger.simpl
+	-grep integerToWord fromToInteger.simpl
+	-grep wordToInteger fromToInteger.simpl
 

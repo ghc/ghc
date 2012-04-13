@@ -1,0 +1,2 @@
+instance Bug.C (Data.Maybe.Maybe a_0)
+    where type Bug.T (Data.Maybe.Maybe a_0) = GHC.Types.Char

@@ -1,8 +1,13 @@
 
 T5300.hs:15:9:
-    Ambiguous type variable `c0' in the constraint:
-      (C1 a1 b2 c0) arising from a use of `f1'
-    Probable fix: add a type signature that fixes these type variable(s)
+    Could not deduce (C1 a1 b2 c0) arising from a use of `f1'
+    from the context (Monad m, C1 a1 b1 c1, C2 a2 b2 c2)
+      bound by the type signature for
+                 f2 :: (Monad m, C1 a1 b1 c1, C2 a2 b2 c2) =>
+                       a1 -> StateT (T b2) m a2
+      at T5300.hs:14:7-69
+    The type variable `c0' is ambiguous
+    Possible fix: add a type signature that fixes these type variable(s)
     In the first argument of `(>>=)', namely `f1 fm'
     In the expression: f1 fm >>= return . undefined
     In an equation for `f2': f2 fm = f1 fm >>= return . undefined

@@ -1,0 +1,10 @@
+
+T5684.hs:53:12:
+    No instance for (A Bool)
+      arising from a use of `op'
+    Possible fix: add an instance declaration for (A Bool)
+    In the expression: op False False
+    In the expression:
+      [op True undefined, op False False, op 'c' undefined]
+    In an equation for `flop6':
+        flop6 = [op True undefined, op False False, op 'c' undefined]

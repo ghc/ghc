@@ -1,5 +1,5 @@
 
-PolyKinds02.hs:12:16:
+PolyKinds02.hs:13:16:
     Kind mis-match
     The second argument of `Vec' should have kind `Nat',
     but `Nat' has kind `*'

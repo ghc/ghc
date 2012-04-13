@@ -7,6 +7,7 @@ TOP = .
 # being defined.
 ifneq "$(MAKECMDGOALS)" "clean"
 ifneq "$(MAKECMDGOALS)" "distclean"
+ifneq "$(MAKECMDGOALS)" "maintainer-clean"
 
 include $(TOP)/mk/boilerplate.mk
 
@@ -18,7 +19,8 @@ all:
 
 endif
 endif
+endif
 
 clean distclean maintainer-clean:
 	$(MAKE) -C $(TOP)/timeout $@
-
+	$(RM) -f mk/*.o mk/*.hi mk/ghc-config mk/ghc-config.exe mk/ghcconfig*.mk

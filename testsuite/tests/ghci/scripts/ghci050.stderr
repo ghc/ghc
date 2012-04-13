@@ -1,8 +1,9 @@
 
 <interactive>:6:49:
-    Couldn't match type `a' with `ListableElem (a, a)'
+    Couldn't match expected type `a'
+                with actual type `ListableElem (a, a)'
       `a' is a rigid type variable bound by
-          the instance declaration at <interactive>:6:20
+          the instance declaration at <interactive>:6:10
     In the expression: a
     In the expression: [a, b]
     In an equation for `asList': asList (a, b) = [a, b]

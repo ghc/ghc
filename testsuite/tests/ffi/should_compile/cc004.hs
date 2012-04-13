@@ -26,10 +26,10 @@ foreign import stdcall "m2" m16 :: IO Int16
 foreign import stdcall "m3" m32 :: IO Int32
 foreign import stdcall "m4" m64 :: IO Int64
 
-foreign import stdcall "dynamic" d8  :: Ptr a -> IO Int8
-foreign import stdcall "dynamic" d16 :: Ptr a -> IO Int16
-foreign import stdcall "dynamic" d32 :: Ptr a -> IO Int32
-foreign import stdcall "dynamic" d64 :: Ptr a -> IO Int64
+foreign import stdcall "dynamic" d8  :: FunPtr (IO Int8) -> IO Int8
+foreign import stdcall "dynamic" d16 :: FunPtr (IO Int16) -> IO Int16
+foreign import stdcall "dynamic" d32 :: FunPtr (IO Int32) -> IO Int32
+foreign import stdcall "dynamic" d64 :: FunPtr (IO Int64) -> IO Int64
 
 foreign import ccall unsafe "kitchen"
    sink :: Ptr a
@@ -49,19 +49,20 @@ foreign import ccall unsafe "kitchen"
 	-> IO ()
 
 
+type Sink2 b = Ptr b
+            -> ByteArray#
+            -> MutableByteArray# RealWorld
+            -> Int
+            -> Int8
+            -> Int16
+            -> Int32
+            -> Word8
+            -> Word16
+            -> Word32
+            -> Float
+            -> Double
+            -> IO ()
+
 foreign import ccall unsafe "dynamic"
-  sink2 :: Ptr a
-        -> (Ptr b
-        -> ByteArray#
-	-> MutableByteArray# RealWorld
-	-> Int
-	-> Int8
-	-> Int16
-	-> Int32
-	-> Word8
-	-> Word16
-	-> Word32
-	-> Float
-	-> Double
-	-> IO ())
+  sink2 :: Ptr (Sink2 b) -> Sink2 b
 

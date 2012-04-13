@@ -23,4 +23,4 @@ Note the 2 entries for yan.\, the lambda expression inside yan.
 big :: Int -> Int
 big x = (array (0,1000000) [(0,x)] :: UArray Int Int) ! 0
 
-yan = {-# SCC "yan" #-} let e = big 20 in \x -> {-# SCC "yan1" #-} x + e
+yan = let e = big 20 in \x -> {-# SCC yan1 #-} x + e

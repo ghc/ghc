@@ -1,3 +1,4 @@
 
 BadImport09.hs:5:1:
-    base:Foreign.Marshal can't be safely imported! The module itself isn't safe.
+    Foreign.Marshal: Can't be safely imported!
+    The module itself isn't safe.

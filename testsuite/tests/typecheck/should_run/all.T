@@ -11,6 +11,7 @@ test('tcrun002', only_compiler_types(['ghc']), compile_and_run, [''])
 test('tcrun003', normal, compile_and_run, [''])
 test('tcrun004', normal, compile_and_run, [''])
 test('tcrun005', normal, compile_and_run, [''])
+test('Defer01', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # Skip everything else if fast is on
@@ -85,3 +86,4 @@ test('T3500b', normal, compile_and_run, [''])
 test('T4809', reqlib('mtl'), compile_and_run, [''])
 test('T2722', normal, compile_and_run, [''])
 test('mc17', normal, compile_and_run, [''])
+test('T5759', normal, compile_and_run, [''])

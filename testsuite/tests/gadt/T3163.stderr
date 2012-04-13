@@ -2,4 +2,4 @@
 T3163.hs:8:5:
     Illegal polymorphic or qualified type: forall s. s
     In the definition of data constructor `Unreached'
-    In the data type declaration for `Taker'
+    In the data declaration for `Taker'

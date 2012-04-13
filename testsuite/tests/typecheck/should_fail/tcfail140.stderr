@@ -1,22 +1,24 @@
 
 tcfail140.hs:10:7:
+    Couldn't match expected type `a0 -> t0' with actual type `Int'
     The function `f' is applied to two arguments,
     but its type `Int -> Int' has only one
     In the expression: f 3 9
     In an equation for `bar': bar = f 3 9
 
 tcfail140.hs:12:10:
+    Couldn't match expected type `a0 -> t0' with actual type `Int'
     The operator `f' takes two arguments,
     but its type `Int -> Int' has only one
     In the expression: 3 `f` 4
     In an equation for `rot': rot xs = 3 `f` 4
 
 tcfail140.hs:14:15:
+    Couldn't match expected type `a0 -> b0' with actual type `Int'
     The operator `f' takes two arguments,
     but its type `Int -> Int' has only one
     In the first argument of `map', namely `(3 `f`)'
     In the expression: map (3 `f`) xs
-    In an equation for `bot': bot xs = map (3 `f`) xs
 
 tcfail140.hs:16:8:
     Constructor `Just' should have 1 argument, but has been given none
@@ -25,5 +27,6 @@ tcfail140.hs:16:8:
     In the expression: ((\ Just x -> x) :: Maybe a -> a) (Just 1)
 
 tcfail140.hs:19:1:
+    Couldn't match expected type `t0 -> Bool' with actual type `Int'
     The equation(s) for `g' have two arguments,
     but its type `Int -> Int' has only one

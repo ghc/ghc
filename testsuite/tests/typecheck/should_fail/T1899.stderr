@@ -1,10 +1,9 @@
 
-T1899.hs:14:36:
-    Couldn't match type `a' with `Proposition a0'
+T1899.hs:12:29:
+    Couldn't match expected type `a' with actual type `Proposition a0'
       `a' is a rigid type variable bound by
           the type signature for transRHS :: [a] -> Int -> Constraint a
-          at T1899.hs:10:2
-    Expected type: [Proposition a0]
-      Actual type: [a]
-    In the first argument of `Auxiliary', namely `varSet'
-    In the first argument of `Prop', namely `(Auxiliary varSet)'
+          at T1899.hs:9:14
+    In the return type of a call of `Auxiliary'
+    In the first argument of `Prop', namely `(Auxiliary undefined)'
+    In the expression: Prop (Auxiliary undefined)

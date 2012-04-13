@@ -164,3 +164,73 @@ test('T5549',
      compile_and_run,
      ['-O'])
 
+test('T4474a',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 1600000000,
+                                             2000000000)),
+                           # expected value: 1879095912 (i386/OSX)
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: 3766493912 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+test('T4474b',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 1600000000,
+                                             2000000000)),
+                           # expected value: 1879095912 (i386/OSX)
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: 3766493912 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+test('T4474c',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 1600000000,
+                                             2000000000)),
+                           # expected value: 1879095912 (i386/OSX)
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 3500000000,
+                                             3900000000)),
+                           # expected value: 3766493912 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+
+test('T5237',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated',  70000,
+                                              90000)),
+                           # expected value: 78328 (i386/Linux)
+      if_wordsize(64,
+          stats_num_field('bytes allocated',  90000,
+                                             130000)),
+                           # expected value: 110888 (amd64/Linux)
+     only_ways(['normal'])
+     ],
+    compile_and_run,
+    ['-O ' + sse2_opts])
+
+test('T5536',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 1150000000,
+                                             1250000000)),
+                           # expected value: 1246287228 (i386/Linux)
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 2480000000,
+                                             2510000000)),
+                           # expected value: 2492589480 (amd64/Linux)
+     extra_clean(['T5536.data']),
+     ignore_output,
+     only_ways(['normal'])
+     ],
+    compile_and_run,
+    ['-O'])
+

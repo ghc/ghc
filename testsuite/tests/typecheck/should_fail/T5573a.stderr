@@ -1,16 +1,16 @@
 
 T5573a.hs:11:16:
-    Couldn't match kind `??' against `(#)'
+    Couldn't match kind `ArgKind' against `(#)'
     Kind incompatibility when matching types:
-      t0 :: ??
-      (# t1, t2 #) :: (#)
+      t0 :: ArgKind
+      (# t0, t1 #) :: (#)
     In the expression: (# True, False #)
     In the expression: (# x, (# True, False #) #)
 
 T5573a.hs:14:6:
-    Couldn't match kind `??' against `(#)'
+    Couldn't match kind `ArgKind' against `(#)'
     Kind incompatibility when matching types:
-      t0 :: ??
-      (# t1, t2 #) :: (#)
+      t0 :: ArgKind
+      (# t0, t1 #) :: (#)
     In the pattern: (# x, y #)
     In an equation for `foo3': foo3 (# x, y #) = x

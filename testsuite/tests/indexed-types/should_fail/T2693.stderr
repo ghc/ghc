@@ -1,7 +1,9 @@
 
 T2693.hs:10:7:
-    Couldn't match type `TFn a' with `TFn a0'
+    Couldn't match expected type `TFn a' with actual type `TFn a0'
     NB: `TFn' is a type function, and may not be injective
+    The type variable `a0' is ambiguous
+    Possible fix: add a type signature that fixes these type variable(s)
     When checking that `x' has the inferred type `forall a. TFn a'
     Probable cause: the inferred type is ambiguous
     In the expression:
@@ -12,22 +14,3 @@ T2693.hs:10:7:
         f = do { let Just x = ...;
                  let n = ...;
                  return () }
-
-T2693.hs:18:15:
-    Couldn't match type `TFn a3' with `(a2, b0)'
-    In the first argument of `fst', namely `x'
-    In the first argument of `(+)', namely `fst x'
-    In the expression: fst x + snd x
-
-T2693.hs:18:23:
-    Couldn't match type `TFn a5' with `(a4, a2)'
-    In the first argument of `snd', namely `x'
-    In the second argument of `(+)', namely `snd x'
-    In the expression: fst x + snd x
-
-T2693.hs:28:20:
-    Couldn't match type `TFn a0' with `PVR a1'
-    Expected type: () -> Maybe (PVR a1)
-      Actual type: () -> Maybe (TFn a0)
-    In the first argument of `mapM', namely `g'
-    In a stmt of a 'do' block: pvs <- mapM g undefined

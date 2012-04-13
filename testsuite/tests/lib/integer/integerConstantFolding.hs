@@ -44,6 +44,12 @@ main = do p "plusInteger"        plusInteger
           p "divModInteger"     divModInteger
           p "shiftLInteger"     shiftLInteger
           p "shiftRInteger"     shiftRInteger
+          p "quotInteger"       quotInteger
+          p "remInteger"        remInteger
+          p "doubleFromInteger" doubleFromInteger
+          p "floatFromInteger"  floatFromInteger
+          p "encodeIntegerDouble" encodeIntegerDouble
+          p "encodeIntegerFloat"  encodeIntegerFloat
 
     where p :: Show a => String -> a -> IO ()
           p str x = putStrLn (str ++ ": " ++ show x)
@@ -150,4 +156,26 @@ shiftLInteger = 100061 `shiftL` 4
 
 shiftRInteger :: Integer
 shiftRInteger = 100062 `shiftR` 4
+
+quotInteger :: Integer
+quotInteger = 100063 `quot` 156
+
+remInteger :: Integer
+remInteger = 100064 `rem` 156
+
+-- For the conversion functions, we can't just check that e.g. 100065
+-- is in the resulting core, because it will be regardless of whether
+-- the rules fire or not. So we add 100066, and thus rely on the
+-- Double addition rule also firing.
+doubleFromInteger :: Double
+doubleFromInteger = fromInteger 100065 + 100066
+
+floatFromInteger :: Float
+floatFromInteger = fromInteger 100067 + 100068
+
+encodeIntegerDouble :: Double
+encodeIntegerDouble = encodeFloat 100069 2
+
+encodeIntegerFloat :: Float
+encodeIntegerFloat = encodeFloat 100070 2
 

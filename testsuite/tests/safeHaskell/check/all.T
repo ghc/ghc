@@ -39,3 +39,28 @@ test('Check04', normal, multi_compile, ['Check04', [
                                        ('Check04_1.hs', '-trust base')
                                        ], '-fpackage-trust'])
 
+# Check -fpackage-trust with no safe haskell flag is an error
+test('Check05', normal, compile, [''])
+
+# Check safe-infered modules have correct pkg trust requirements
+test('Check06',
+     extra_clean(['Check06_A.hi', 'Check06_A.o']),
+     multimod_compile_fail, ['Check06', ''])
+
+# Check selective safe imports bring in correct pkg trust requirements
+test('Check07',
+     extra_clean(['Check07_A.hi', 'Check07_A.o', 'Check07_B.hi', 'Check07_B.o']),
+     multimod_compile, ['Check07', ''])
+
+# Check selective safe imports bring in correct pkg trust requirements
+test('Check08',
+     extra_clean(['Check08_A.hi', 'Check08_A.o', 'Check08_B.hi', 'Check08_B.o']),
+     multimod_compile_fail, ['Check08', ''])
+
+# check -distrust-all-packages flag works
+test('Check09', normal, compile_fail, ['-fpackage-trust -distrust-all-packages'])
+
+# as above but trust this time
+test('Check10', normal, compile,
+     ['-fpackage-trust -distrust-all-packages -trust bytestring -trust base'])
+

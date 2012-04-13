@@ -1,0 +1,7 @@
+
+T5689.hs:10:36:
+    Couldn't match expected type `t' with actual type `Bool'
+    In the expression: v
+    In the expression: if v then False else True
+    In the second argument of `writeIORef', namely
+      `(\ v -> if v then False else True)'

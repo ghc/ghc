@@ -27,11 +27,10 @@ test('2910a', normal, compile_and_run, [''])
 test('3279', normal, compile_and_run, [''])
 
 # This test takes a long time with the default context switch interval
-test('3429', extra_run_opts('+RTS -i0.001 -RTS'), compile_and_run, [''])
+test('3429', extra_run_opts('+RTS -C0.001 -RTS'), compile_and_run, [''])
 
 # without -O, goes into an infinite loop
-# GHCi cannot deterct the infinite loop, because the thread is always reachable
-# (see also conc033 and others).  We should really fix this.
+# GHCi does not detect the infinite loop.  We should really fix this.
 test('4030', omit_ways('ghci'), compile_and_run, ['-O'])
 
 # each of these runs for about a second
@@ -41,8 +40,7 @@ test('throwto002', [reqlib('random')], compile_and_run, [''])
 test('throwto003', normal, compile_and_run, [''])
 
 test('mask001', normal, compile_and_run, [''])
-# ghci does not generate the BlockedIndefinitely exceptions, so omit:
-test('mask002', omit_ways(['ghci']), compile_and_run, [''])
+test('mask002', normal, compile_and_run, [''])
 
 test('async001', normal, compile_and_run, [''])
 
@@ -68,6 +66,7 @@ test('5558',
 test('5421', normal, compile_and_run, [''])
 test('5611', normal, compile_and_run, [''])
 test('5238', normal, compile_and_run, [''])
+test('5866', exit_code(1), compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
@@ -109,8 +108,7 @@ test('conc019', compose(only_compiler_types(['ghc']),
 			extra_run_opts('+RTS -K16m -RTS')),
 		compile_and_run, [''])
 test('conc020', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc021', compose(omit_ways(['ghci']), exit_code(1)),
-	compile_and_run, [''])
+test('conc021', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 test('conc022', only_compiler_types(['ghc']), compile_and_run, [''])
 
 # On Windows, the non-threaded RTS creates a real OS thread for each 
@@ -140,9 +138,7 @@ test('conc030', compose(only_compiler_types(['ghc']),
 test('conc031', normal, compile_and_run, [''])
 
 test('conc032', only_compiler_types(['ghc']), compile_and_run, [''])
-
-# Omit for GHCi, because it just sits there waiting for you to press ^C
-test('conc033', omit_ways(['ghci']), compile_and_run, [''])
+test('conc033', normal, compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
 test('conc034', compose(only_compiler_types(['ghc']),
@@ -152,18 +148,29 @@ test('conc034', compose(only_compiler_types(['ghc']),
 
 test('conc035', only_compiler_types(['ghc']), compile_and_run, [''])
 
-# Omit for GHCi: firstly GHCi doesn't have unsafe FFI calls, and secondly
-# the main thread cannot receive the deadlock exception because it can be
-# woken up by ^C.
-# Omit for threaded2: this test is really bogus and fails to do anything
-# sensible for more than one CPU.
-test('conc036', compose(skip_if_fast,
-		  compose(omit_ways(['ghci','threaded2']),
-		    only_compiler_types(['ghc']))), compile_and_run, [''])
+# conc036: now skipped entirely.  This test attempts to check that
+# unsafe foreign calls block other threads, but doing that reliably is
+# probably impossible.  The last straw was when it started failing on
+# Windows around 7.4.x.
+#
+# OLD comments about hacks we tried to make it work:
+#   Omit for GHCi: firstly GHCi doesn't have unsafe FFI calls, and secondly
+#   the main thread cannot receive the deadlock exception because it can be
+#   woken up by ^C.
+#   Omit for threaded2: this test is really bogus and fails to do anything
+#   sensible for more than one CPU.
+#
+test('conc036', skip, compile_and_run, [''])
+
+
 # Interrupting foreign calls only makes sense if we are threaded
-test('foreignInterruptible', composes([skip_if_fast,
-			               only_threaded_ways,
-				       only_compiler_types(['ghc'])]), compile_and_run, [''])
+test('foreignInterruptible', [skip_if_fast,
+                              if_os('mingw32',expect_fail),
+                              # I don't think we support interrupting Sleep()
+                              # on Windows.  --SDM
+                              only_threaded_ways,
+                              only_compiler_types(['ghc'])],
+      compile_and_run, [''])
 
 test('conc037', only_ways(['threaded1','threaded2']), compile_and_run, [''])
 test('conc038', only_ways(['threaded1','threaded2']), compile_and_run, [''])
@@ -210,3 +217,14 @@ test('conc067', ignore_output, compile_and_run, [''])
 # than one CPU.
 test('conc068', [ omit_ways('threaded2'), exit_code(1) ], compile_and_run, [''])
 
+if (ghc_with_smp == 0):
+   skip_if_not_smp = skip
+else:
+   skip_if_not_smp = normal
+
+test('setnumcapabilities001',
+     [ only_ways(['threaded1','threaded2']),
+       extra_run_opts('4 12 2000'),
+       reqlib('parallel'),
+       skip_if_not_smp ],
+     compile_and_run, [''])

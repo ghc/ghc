@@ -7,7 +7,7 @@ import GHC.Exts
 
 foo = [ ()
       | x <- [1..10]
-      , then group by x
+      , then group by x using groupWith
       , then group by x using groupWith
       , then group using inits
       ]

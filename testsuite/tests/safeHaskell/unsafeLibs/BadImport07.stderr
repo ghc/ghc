@@ -1,3 +1,4 @@
 
 BadImport07.hs:5:1:
-    base:Unsafe.Coerce can't be safely imported! The module itself isn't safe.
+    Unsafe.Coerce: Can't be safely imported!
+    The module itself isn't safe.

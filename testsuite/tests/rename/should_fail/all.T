@@ -95,3 +95,10 @@ test('T5513', normal, compile_fail, [''])
 test('T5533', normal, compile_fail, [''])
 test('T5589', normal, compile_fail, [''])
 test('Misplaced', normal, compile_fail, [''])
+test('T5657', normal, compile_fail, [''])
+test('T5745',
+     extra_clean(['T5745a.hi', 'T5745a.o', 'T5745b.hi', 'T5745b.o']),
+     multimod_compile_fail, ['T5745', '-v0'])
+test('T5892a', normal, compile_fail, [''])
+test('T5892b', normal, compile_fail, [''])
+test('T5951', normal, compile_fail, [''])

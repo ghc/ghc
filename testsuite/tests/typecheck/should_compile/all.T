@@ -352,6 +352,7 @@ test('tc257', normal, compile, [''])
 test('tc258', normal, compile, [''])
 test('tc259', normal, compile, [''])
 test('tc260', normal, compile, [''])
+test('tc261', normal, compile, [''])
 
 test('GivenOverlapping', normal, compile, [''])
 test('SilentParametersOverlapping', normal, compile, [''])
@@ -365,3 +366,14 @@ test('T3743', normal, compile, [''])
 test('T5490', normal, compile, [''])
 test('T5514', normal, compile, [''])
 test('T5581', normal, compile, [''])
+test('T5655', normal, compile, [''])
+test('T5643', normal, compile, [''])
+test('T5595', normal, compile, [''])
+test('T5676', normal, compile, [''])
+test('T4310', normal, compile, [''])
+test('T3108', normal, compile, [''])
+
+test('T5792',normal,run_command,
+     ['$MAKE -s --no-print-directory T5792'])
+
+test('PolytypeDecomp', normal, compile, [''])

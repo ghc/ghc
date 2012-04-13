@@ -5,7 +5,7 @@
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE PolyKinds                  #-}
+{-# LANGUAGE DataKinds                  #-}
 
 module Main where
 

@@ -73,6 +73,9 @@ test('3424', # it's slow:
 # Test for out-of-range heap size
 test('rtsflags001', [ only_ways(['normal']), exit_code(1), extra_run_opts('+RTS -H0m -RTS') ], compile_and_run, [''])
 
+# Crashed with 7.2 and earlier
+test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts="-B -B -B"'])
+
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [ if_platform('i386-unknown-mingw32',skip),
@@ -116,7 +119,7 @@ def config_5250(opts):
 
 test('5250', [ config_5250,
                # stack ptr is not 16-byte aligned on 32-bit Windows
-               if_os('mingw32', expect_fail),
+               if_platform('i386-unknown-mingw32', expect_fail),
                extra_clean(['spalign.o']),
                omit_ways(['ghci']) ],
              compile_and_run, ['spalign.c'])
@@ -126,3 +129,4 @@ test('T5423',
      run_command,
      ['$MAKE -s --no-print-directory T5423'])
 
+test('5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])

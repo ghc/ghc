@@ -1,10 +1,1 @@
-
-SkolemOccursLoop.hs:18:0:
-    Couldn't match expected type `F a'
-           against inferred type `[T (F (T (F a)))]'
-    When generalising the type(s) for `test1'
-
-SkolemOccursLoop.hs:31:0:
-    Couldn't match expected type `S (G (a, a))'
-           against inferred type `G [S (G (a, a))]'
-    When generalising the type(s) for `test2'
+Skolem occurs loop 

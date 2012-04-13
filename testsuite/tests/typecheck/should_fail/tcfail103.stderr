@@ -1,11 +1,12 @@
 
-tcfail103.hs:15:13:
+tcfail103.hs:15:23:
     Couldn't match type `t' with `s'
       `t' is a rigid type variable bound by
-          the type signature for f :: ST t Int at tcfail103.hs:11:1
+          the type signature for f :: ST t Int at tcfail103.hs:10:5
       `s' is a rigid type variable bound by
-          the type signature for g :: ST s Int at tcfail103.hs:15:9
-    Expected type: ST s Int
-      Actual type: ST t Int
-    In the return type of a call of `readSTRef'
+          the type signature for g :: ST s Int at tcfail103.hs:13:14
+    Expected type: STRef s Int
+      Actual type: STRef t Int
+    In the first argument of `readSTRef', namely `v'
     In the expression: readSTRef v
+    In an equation for `g': g = readSTRef v

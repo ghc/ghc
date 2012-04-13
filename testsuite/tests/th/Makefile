@@ -26,13 +26,8 @@ TH_Depends:
 	echo "first run" > TH_Depends_external.txt
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 TH_Depends
 	./TH_Depends
-# Remove the executable, as GHC won't relink if the timestamps seem to
-# be the same
-	$(RM) TH_Depends TH_Depends.exe
+	sleep 2
 	echo "second run" > TH_Depends_external.txt
-# Give TH_Depends_external.txt a future date in case it gets the same
-# timestamp again
-	touch --date="now + 3 seconds" TH_Depends_external.txt
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 TH_Depends
 	./TH_Depends
 

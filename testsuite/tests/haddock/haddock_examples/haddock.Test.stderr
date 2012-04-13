@@ -36,8 +36,8 @@ import Hidden
 import Visible
 <document comment>
 data T a b
-    = <document comment> A Int Maybe Float |
-      <document comment> B (T a b, T Int Float)
+  = <document comment> A Int Maybe Float |
+    <document comment> B (T a b, T Int Float)
 <document comment>
 data T2 a b = T2 a b
 <document comment>
@@ -46,9 +46,9 @@ data T4 a b = A2 a | B2 b
 data T5 a b = <document comment> A3 a | <document comment> B3 b
 <document comment>
 data T6
-    = <document comment> A4 |
-      <document comment> B4 |
-      <document comment> C4
+  = <document comment> A4 |
+    <document comment> B4 |
+    <document comment> C4
 <document comment>
 newtype N1 a = N1 a
 <document comment>
@@ -83,22 +83,22 @@ class F a where
   ff :: a
 <document comment>
 data R
-    = <document comment>
-      C1 {p :: Int <document comment>,
-          q :: forall a. a -> a <document comment>,
-          r :: Int <document comment>,
-          s :: Int <document comment>} |
-      <document comment>
-      C2 {t :: T1
-               -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
-          u :: Int,
-          v :: Int}
+  = <document comment>
+    C1 {p :: Int <document comment>,
+        q :: forall a. a -> a <document comment>,
+        r :: Int <document comment>,
+        s :: Int <document comment>} |
+    <document comment>
+    C2 {t :: T1
+             -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
+        u :: Int,
+        v :: Int}
 <document comment>
 data R1
-    = <document comment>
-      C3 {s1 :: Int <document comment>,
-          s2 :: Int <document comment>,
-          s3 :: Int <document comment>}
+  = <document comment>
+    C3 {s1 :: Int <document comment>,
+        s2 :: Int <document comment>,
+        s3 :: Int <document comment>}
 <document comment>
 <document comment>
 <document comment>
@@ -123,10 +123,10 @@ h = 42
 <document comment>
 <document comment>
 data Ex a
-    = forall b. C b => Ex1 b |
-      forall b. Ex2 b |
-      forall b. C a => Ex3 b |
-      Ex4 forall a. a -> a
+  = forall b. C b => Ex1 b |
+    forall b. Ex2 b |
+    forall b. C a => Ex3 b |
+    Ex4 forall a. a -> a
 <document comment>
 k ::
   T () () <document comment>
@@ -147,7 +147,7 @@ newp :: Int
 newp = undefined
 <document comment>
 f' :: Int
-data T1 =
+data T1
 f = undefined
 f' = undefined
 type CInt = Int

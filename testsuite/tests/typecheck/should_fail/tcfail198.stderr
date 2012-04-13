@@ -1,10 +1,10 @@
 
 tcfail198.hs:6:36:
-    Couldn't match type `a' with `a1'
-      `a' is a rigid type variable bound by
-          the inferred type of f3 :: [a] -> [a] at tcfail198.hs:6:1
+    Couldn't match expected type `a1' with actual type `a'
       `a1' is a rigid type variable bound by
            an expression type signature: a1 at tcfail198.hs:6:36
+      `a' is a rigid type variable bound by
+          the inferred type of f3 :: [a] -> [a] at tcfail198.hs:6:1
     In the expression: x :: a
     In the second argument of `(++)', namely `[x :: a]'
     In the expression: xs ++ [x :: a]

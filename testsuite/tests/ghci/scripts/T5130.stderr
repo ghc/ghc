@@ -1,6 +1,6 @@
 
 <interactive>:3:27:
-    Couldn't match type `a' with `[Char]'
+    Couldn't match expected type `a' with actual type `[Char]'
     In the expression: "hi"
     In the expression: [x, "hi"]
     In the expression: (\ (x :: a, y :: a) -> [x, "hi"])

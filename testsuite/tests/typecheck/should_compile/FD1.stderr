@@ -4,9 +4,9 @@ FD1.hs:16:1:
     from the context (E a (Int -> Int))
       bound by the type signature for
                  plus :: E a (Int -> Int) => Int -> a
-      at FD1.hs:16:1-16
+      at FD1.hs:15:9-38
       `a' is a rigid type variable bound by
           the type signature for plus :: E a (Int -> Int) => Int -> a
-          at FD1.hs:16:1
+          at FD1.hs:15:9
     The equation(s) for `plus' have two arguments,
     but its type `Int -> a' has only one

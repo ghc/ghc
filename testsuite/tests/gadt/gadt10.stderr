@@ -1,7 +1,6 @@
 
 gadt10.hs:6:24:
-    `RInt' is not applied to enough type arguments
-    Expected kind `??', but `RInt' has kind `k0 -> *'
+    Expecting one more argument to `RInt'
     In the type `RInt'
     In the definition of data constructor `R'
-    In the data type declaration for `RInt'
+    In the data declaration for `RInt'

@@ -3,6 +3,10 @@
 -- With GHC 6.10 it took hours!  After fixing the bug (which
 -- was too much inlining) it went down to 30s.
 
+-- This also tests Trac #5652, a complexity issue with the LLVM
+-- backend for this module. Compile time down from 10 min to
+-- 12 seconds.
+
 module T3016 where
 
 newtype F = F Integer

@@ -1,0 +1,10 @@
+-- Test restricted functionality: RULES
+:unset +s
+:set -XSafe
+
+:set -fenable-rewrite-rules
+
+let f x = x - 1
+
+{-# RULES "id/Int" id = f #-}
+

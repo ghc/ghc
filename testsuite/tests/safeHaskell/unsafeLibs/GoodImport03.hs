@@ -22,12 +22,10 @@ import Control.Concurrent.QSemN
 import Control.Concurrent.SampleVar
 
 import Control.Exception
-import Control.OldException
 import Control.Exception.Base
 
 import Control.Monad
 import Control.Monad.Fix
-import Control.Monad.Group
 import Control.Monad.Instances
 import Control.Monad.Zip
 
