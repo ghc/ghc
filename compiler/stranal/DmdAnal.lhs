@@ -592,7 +592,7 @@ mkSigTy top_lvl rec_flag id rhs dmd_ty
     maybe_id_dmd = idDemandInfo_maybe id
 	-- Is Nothing the first time round
 
-    thunk_cpr_ok
+    thunk_cpr_ok   -- See Note [CPR for thunks]
 	| isTopLevel top_lvl       = False	-- Top level things don't get
 						-- their demandInfo set at all
 	| isRec rec_flag	   = False	-- Ditto recursive things
@@ -601,8 +601,8 @@ mkSigTy top_lvl rec_flag id rhs dmd_ty
 						-- See notes below
 \end{code}
 
-The thunk_cpr_ok stuff [CPR-AND-STRICTNESS]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [CPR for thunks]
+~~~~~~~~~~~~~~~~~~~~~
 If the rhs is a thunk, we usually forget the CPR info, because
 it is presumably shared (else it would have been inlined, and 
 so we'd lose sharing if w/w'd it into a function).  E.g.
@@ -662,8 +662,8 @@ have a CPR in it or not.  Simple solution:
 
 NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
 
-The Nothing case in thunk_cpr_ok [CPR-AND-STRICTNESS]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Optimistic in the Nothing case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Demand info now has a 'Nothing' state, just like strictness info.
 The analysis works from 'dangerous' towards a 'safe' state; so we 
 start with botSig for 'Nothing' strictness infos, and we start with
@@ -1010,8 +1010,7 @@ extendSigsWithLam :: AnalEnv -> Id -> AnalEnv
 extendSigsWithLam env id
   = case idDemandInfo_maybe id of
 	Nothing	             -> extendAnalEnv NotTopLevel env id cprSig
-		-- Optimistic in the Nothing case;
-		-- See notes [CPR-AND-STRICTNESS]
+		-- See Note [Optimistic in the Nothing case]
 	Just (Eval (Prod _)) -> extendAnalEnv NotTopLevel env id cprSig
 	_                    -> env
 \end{code}
