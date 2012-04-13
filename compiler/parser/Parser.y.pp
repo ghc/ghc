@@ -729,7 +729,7 @@ data_or_newtype :: { Located NewOrData }
 
 opt_kind_sig :: { Located (Maybe (HsBndrSig (LHsKind RdrName))) }
         :                               { noLoc Nothing }
-        | '::' kind                     { LL (Just (HsBSig $2 placeHolderBndrs)) }
+        | '::' kind                     { LL (Just (mkHsBSig $2)) }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
@@ -876,7 +876,7 @@ rule_var_list :: { [RuleBndr RdrName] }
 
 rule_var :: { RuleBndr RdrName }
         : varid                                 { RuleBndr $1 }
-        | '(' varid '::' ctype ')'              { RuleBndrSig $2 (HsBSig $4 placeHolderBndrs) }
+        | '(' varid '::' ctype ')'              { RuleBndrSig $2 (mkHsBSig $4) }
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations (c.f. rules)
@@ -1109,7 +1109,7 @@ tv_bndrs :: { [LHsTyVarBndr RdrName] }
 
 tv_bndr :: { LHsTyVarBndr RdrName }
         : tyvar                         { L1 (UserTyVar (unLoc $1)) }
-        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) (HsBSig $4 placeHolderBndrs)) }
+        | '(' tyvar '::' kind ')'       { LL (KindedTyVar (unLoc $2) (mkHsBSig $4)) }
 
 fds :: { Located [Located (FunDep RdrName)] }
         : {- empty -}                   { noLoc [] }

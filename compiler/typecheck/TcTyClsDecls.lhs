@@ -431,8 +431,11 @@ kcResultKind Nothing res_k
   = discardResult (unifyKind res_k liftedTypeKind)
       --             type family F a 
       -- defaults to type family F a :: *
-kcResultKind (Just (HsBSig k ns)) res_k
-  = do { let kvs = map mkKindSigVar ns 
+kcResultKind (Just (HsBSig k (ss, ns))) res_k
+  = ASSERT( null ss )      -- Parser ensures that 
+                           --   type family F a :: (k :: s)
+                           -- is illegal
+    do { let kvs = map mkKindSigVar ns 
        ; k' <- tcExtendTyVarEnv kvs (tcLHsKind k)
        ; discardResult (unifyKind k' res_k) }
 \end{code}
@@ -734,7 +737,7 @@ tcFamTyPats :: TyCon
 -- In that case, the type variable 'a' will *already be in scope*
 -- (and, if C is poly-kinded, so will its kind parameter).
 
-tcFamTyPats fam_tc (HsBSig arg_pats tyvars) kind_checker thing_inside
+tcFamTyPats fam_tc (HsBSig arg_pats (kvars, tvars)) kind_checker thing_inside
   = do { -- A family instance must have exactly the same number of type
          -- parameters as the family declaration.  You can't write
          --     type family F a :: * -> *
@@ -753,8 +756,9 @@ tcFamTyPats fam_tc (HsBSig arg_pats tyvars) kind_checker thing_inside
 
          -- Kind-check and quantify
          -- See Note [Quantifying over family patterns]
-       ; (tkvs, typats) <- tcHsTyVarBndrsGen (map (noLoc . UserTyVar) tyvars) $ do
-                { typats <- tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds
+        ; (tkvs, typats) <- tcExtendTyVarEnv (map mkKindSigVar kvars) $
+                            tcHsTyVarBndrsGen (map (noLoc . UserTyVar) tvars) $ 
+             do { typats <- tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds
                 ; kind_checker res_kind
                 ; return (tyVarsOfTypes typats, typats) }
 
@@ -769,7 +773,8 @@ Note [Quantifying over family patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to quantify over two different lots of kind variables:
 
-First, the ones that come from tcTyVarBndrsKindGen, as usual
+First, the ones that come from the kinds of the tyvar args of 
+tcTyVarBndrsKindGen, as usual
   data family Dist a 
 
   -- Proxy :: forall k. k -> *
@@ -779,12 +784,33 @@ First, the ones that come from tcTyVarBndrsKindGen, as usual
   -- The 'k' comes from the tcTyVarBndrsKindGen (a::k)
 
 Second, the ones that come from the kind argument of the type family
-which we pick up using kindGeneralizeKinds:
+which we pick up using the (tyVarsOfTypes typats) in the result of 
+the thing_inside of tcHsTyvarBndrsGen.
   -- Any :: forall k. k
   data instance Dist Any = DA
   -- Generates  data DistAny k = DA
   --            ax7 k :: Dist k (Any k) ~ DistAny k 
   -- The 'k' comes from kindGeneralizeKinds (Any k)
+
+Note [Quantified kind variables of a family pattern]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   type family KindFam (p :: k1) (q :: k1)
+           data T :: Maybe k1 -> k2 -> *
+           type instance KindFam (a :: Maybe k) b = T a b -> Int
+The HsBSig for the family patterns will be ([k], [a])
+
+Then in the family instance we want to
+  * Bring into scope [ "k" -> k:BOX, "a" -> a:k ]
+  * Kind-check the RHS
+  * Quantify the type instance over k and k', as well as a,b, thus
+       type instance [k, k', a:Maybe k, b:k'] 
+                     KindFam (Maybe k) k' a b = T k k' a b -> Int
+
+Notice that in the third step we quantify over all the visibly-mentioned
+type variables (a,b), but also over the implicitly mentioned kind varaibles
+(k, k').  In this case one is bound explicitly but often there will be 
+none. The rold of the kind signature (a :: Maybe k) is to add a constraint
+that 'a' must have that kind, and to bring 'k' into scope.
 
 Note [Associated type instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

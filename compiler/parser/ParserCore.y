@@ -377,7 +377,7 @@ ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
 toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOccFS tv)) bsig
                   where
-                    bsig = HsBSig (toHsKind k) placeHolderBndrs
+                    bsig = mkHsBSig (toHsKind k)
 
 ifaceExtRdrName :: Name -> RdrName
 ifaceExtRdrName name = mkOrig (nameModule name) (nameOccName name)

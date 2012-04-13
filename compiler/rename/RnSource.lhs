@@ -24,7 +24,6 @@ import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
 
 import HsSyn
 import RdrName	
-import RdrHsSyn		( extractHsTysRdrTyVars )
 import RnTypes
 import RnBinds
 import RnEnv
@@ -490,10 +489,13 @@ rnFamInstDecl mb_cls (FamInstDecl { fid_tycon = tycon, fid_pats = HsBSig pats _,
                      []             -> pprPanic "rnFamInstDecl" (ppr tycon)
                      (L loc _ : []) -> loc
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
-       ; tv_names <- mkTyVarBndrNames mb_cls (map (L loc) (extractHsTysRdrTyVars pats))
+             (kv_rdr_names, tv_rdr_names) = extractHsTysRdrTyVars pats
+       ; kv_names <- mkTyVarBndrNames mb_cls (map (L loc) kv_rdr_names)
+       ; tv_names <- mkTyVarBndrNames mb_cls (map (L loc) tv_rdr_names)
        	     -- All the free vars of the family patterns
              -- with a sensible binding location
-       ; bindLocalNamesFV tv_names $ 
+       ; bindLocalNamesFV kv_names $ 
+         bindLocalNamesFV tv_names $ 
     do { (pats', pat_fvs) <- rnLHsTypes (TyDataCtx tycon) pats
        ; (defn', rhs_fvs) <- rnTyDefn tycon defn
 
@@ -505,7 +507,7 @@ rnFamInstDecl mb_cls (FamInstDecl { fid_tycon = tycon, fid_pats = HsBSig pats _,
        ; unless (null bad_tvs) (badAssocRhs bad_tvs)
 
        ; return ( FamInstDecl { fid_tycon = tycon'
-                              , fid_pats = HsBSig pats' tv_names
+                              , fid_pats = HsBSig pats' (kv_names, tv_names)
                               , fid_defn = defn' }
                 , (rhs_fvs `plusFV` pat_fvs) `addOneFV` unLoc tycon') } }
        	     -- type instance => use, hence addOneFV
@@ -1092,7 +1094,7 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
                   fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
  where
     doc = ConDeclCtx name
-    get_rdr_tvs tys = extractHsTysRdrTyVars (cxt ++ tys)
+    get_rdr_tvs tys = snd (extractHsTysRdrTyVars (cxt ++ tys))
 
 rnConResult :: HsDocContext -> Name
             -> HsConDetails (LHsType Name) [ConDeclField Name]

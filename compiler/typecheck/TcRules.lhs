@@ -23,8 +23,11 @@ import TcType
 import TcHsType
 import TcExpr
 import TcEnv
+import Type
 import Id
 import Name
+import Var
+import VarSet
 import SrcLoc
 import Outputable
 import FastString
@@ -58,16 +61,16 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 
     	-- Note [Typechecking rules]
        ; vars <- tcRuleBndrs hs_bndrs
-       ; let (id_bndrs, tv_bndrs) = partition isId vars
-       ; (lhs', lhs_lie, rhs', rhs_lie, _rule_ty)
-            <- tcExtendTyVarEnv tv_bndrs $
-               tcExtendIdEnv id_bndrs $
+       ; let (id_bndrs, tv_bndrs) = partition (isId . snd) vars
+       ; (lhs', lhs_lie, rhs', rhs_lie, rule_ty)
+            <- tcExtendTyVarEnv2 tv_bndrs $
+               tcExtendIdEnv2    id_bndrs $
                do { ((lhs', rule_ty), lhs_lie) <- captureConstraints (tcInferRho lhs)
                   ; (rhs', rhs_lie) <- captureConstraints (tcMonoExpr rhs rule_ty)
                   ; return (lhs', lhs_lie, rhs', rhs_lie, rule_ty) }
 
        ; (lhs_dicts, lhs_ev_binds, rhs_ev_binds) 
-             <- simplifyRule name tv_bndrs lhs_lie rhs_lie
+             <- simplifyRule name (map snd tv_bndrs) lhs_lie rhs_lie
 
 	-- IMPORTANT!  We *quantify* over any dicts that appear in the LHS
 	-- Reason: 
@@ -89,49 +92,42 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 	-- We also need to get the free tyvars of the LHS; but we do that
 	-- during zonking (see TcHsSyn.zonkRule)
 
-       ; let tpl_ids    = lhs_dicts ++ id_bndrs
-{-
+       ; let tpl_ids    = lhs_dicts ++ map snd id_bndrs
              forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
 
 	     -- Now figure out what to quantify over
 	     -- c.f. TcSimplify.simplifyInfer
        ; zonked_forall_tvs <- zonkTyVarsAndFV forall_tvs
        ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
-       ; let extra_bound_tvs = zonked_forall_tvs 	     
-       	     		       `minusVarSet` gbl_tvs
-       	     		       `delVarSetList` tv_bndrs
-       ; qtvs <- zonkQuantifiedTyVars (varSetElems extra_bound_tvs)
-       ; let all_tvs = tv_bndrs ++ qtvs
-       ; (kvs, _kinds) <- kindGeneralizeKinds $ map tyVarKind all_tvs
--}
+       ; let tvs_to_quantify = varSetElems (zonked_forall_tvs `minusVarSet` gbl_tvs)
+       ; qkvs <- kindGeneralize $ tyVarsOfTypes (map tyVarKind tvs_to_quantify)
+       ; qtvs <- zonkQuantifiedTyVars tvs_to_quantify
 
        	      -- The tv_bndrs are already skolems, so no need to zonk them
        ; return (HsRule name act
-		    (map (RuleBndr . noLoc) (tv_bndrs ++ tpl_ids))
+		    (map (RuleBndr . noLoc) (qkvs ++ qtvs ++ tpl_ids))
 		    (mkHsDictLet lhs_ev_binds lhs') fv_lhs
 		    (mkHsDictLet rhs_ev_binds rhs') fv_rhs) }
 
-tcRuleBndrs :: [RuleBndr Name] -> TcM [Var]
+tcRuleBndrs :: [RuleBndr Name] -> TcM [(Name, Var)]
 tcRuleBndrs [] 
   = return []
-tcRuleBndrs (RuleBndr var : rule_bndrs)
+tcRuleBndrs (RuleBndr (L _ name) : rule_bndrs)
   = do 	{ ty <- newFlexiTyVarTy openTypeKind
         ; vars <- tcRuleBndrs rule_bndrs
-	; return (mkLocalId (unLoc var) ty : vars) }
-tcRuleBndrs (RuleBndrSig var rn_ty : rule_bndrs)
+	; return ((name, mkLocalId name ty) : vars) }
+tcRuleBndrs (RuleBndrSig (L _ name) rn_ty : rule_bndrs)
 --  e.g 	x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --		a::*, x :: a->a
-  = do	{ let ctxt = FunSigCtxt (unLoc var)
-	; (tyvars, ty) <- tcHsPatSigType ctxt rn_ty
-        ; let (subst, skol_tvs) = tcSuperSkolTyVars tyvars
-	      id_ty = substTy subst ty
-	      id = mkLocalId (unLoc var) id_ty
+  = do	{ let ctxt = RuleSigCtxt name
+	; (id_ty, skol_tvs) <- tcHsPatSigType ctxt rn_ty
+        ; let id = mkLocalId name id_ty
 
 	      -- The type variables scope over subsequent bindings; yuk
-        ; vars <- tcExtendTyVarEnv skol_tvs $ 
+        ; vars <- tcExtendTyVarEnv2 skol_tvs $ 
                   tcRuleBndrs rule_bndrs 
-	; return (skol_tvs ++ id : vars) }
+	; return (skol_tvs ++ (name, id) : vars) }
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = ptext (sLit "When checking the transformation rule") <+> 
