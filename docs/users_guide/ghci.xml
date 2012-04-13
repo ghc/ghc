@@ -3105,6 +3105,10 @@ warning settings:
     wiki page: <ulink
       url="http://haskell.org/haskellwiki/GHC/GHCi">GHC/GHCi</ulink></para>
 
+	<para>Additionally, any files specified with
+    <literal>-ghci-script</literal> flags will be read after the
+    standard files, allowing the use of custom .ghci files.</para>
+
     <para>Two command-line options control whether the
     startup files files are read:</para>
 
@@ -3131,12 +3135,16 @@ warning settings:
 	  be used to override a previous
 	  <option>-ignore-dot-ghci</option> option.</para>
 	</listitem>
+	<term>
+         <option>-ghci-script</option>
+         <indexterm><primary><option>-ghci-script</option></primary></indexterm>
+    </term>
+	<listitem>
+	  <para>Read a specific file after the usual startup files.
+	  Maybe be specified repeatedly for multiple inputs.</para>
+	</listitem>
       </varlistentry>
     </variablelist>
-
-    <para>Additional <filename>.ghci</filename> files can be added
-    through the <option>-ghci-script</option> option. These are
-    loaded after the normal <filename>.ghci</filename> files.</para>
 
   </sect1>
 

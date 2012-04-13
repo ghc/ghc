@@ -18,6 +18,8 @@ module TcSMonad (
 
     getTcSWorkList, updWorkListTcS, updWorkListTcS_return, keepWanted,
     getTcSWorkListTvs, 
+    
+    getTcSImplics, updTcSImplics, emitTcSImplication, 
 
     Ct(..), Xi, tyVarsOfCt, tyVarsOfCts, tyVarsOfCDicts, 
     emitFrozenError,
@@ -42,6 +44,7 @@ module TcSMonad (
     -- Getting and setting the flattening cache
     getFlatCache, updFlatCache, addToSolved, 
     
+    deferTcSForAllEq, 
     
     setEvBind,
     XEvTerm(..),
@@ -135,6 +138,7 @@ import TcRnTypes
 import Unique 
 import UniqFM
 import Maybes ( orElse )
+
 
 import Control.Monad( when )
 import StaticFlags( opt_PprStyle_Debug )
@@ -783,8 +787,11 @@ data TcSEnv
       tcs_count      :: IORef Int, -- Global step count
 
       tcs_inerts   :: IORef InertSet, -- Current inert set
-      tcs_worklist :: IORef WorkList  -- Current worklist
-
+      tcs_worklist :: IORef WorkList, -- Current worklist
+      
+      -- Residual implication constraints that are generated 
+      -- while solving the current worklist.
+      tcs_implics  :: IORef (Bag Implication)
     }
 
 type TcsUntouchables = (Untouchables,TcTyVarSet)
@@ -884,6 +891,7 @@ runTcS :: SimplContext
 runTcS context untouch is wl tcs 
   = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
        ; ev_binds_var <- TcM.newTcEvBinds
+       ; impl_var <- TcM.newTcRef emptyBag
        ; step_count <- TcM.newTcRef 0
 
        ; inert_var <- TcM.newTcRef is 
@@ -896,7 +904,8 @@ runTcS context untouch is wl tcs
 			  , tcs_count    = step_count
 			  , tcs_ic_depth = 0
                           , tcs_inerts   = inert_var
-                          , tcs_worklist = wl_var }
+                          , tcs_worklist = wl_var 
+                          , tcs_implics  = impl_var }
 
 	     -- Run the computation
        ; res <- unTcS tcs env
@@ -930,7 +939,8 @@ nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
                    , tcs_ic_depth = idepth
                    , tcs_context = ctxt
                    , tcs_inerts = inert_var
-                   , tcs_worklist = wl_var } -> 
+                   , tcs_worklist = wl_var 
+                   , tcs_implics = _impl_var } -> 
     do { let inner_untch = (inner_range, outer_tcs `unionVarSet` inner_tcs)
        		   -- The inner_range should be narrower than the outer one
 		   -- (thus increasing the set of untouchables) but 
@@ -940,6 +950,10 @@ nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
          -- Inherit the inerts from the outer scope
        ; orig_inerts <- TcM.readTcRef inert_var
        ; new_inert_var <- TcM.newTcRef orig_inerts
+         -- Inherit residual implications from outer scope (?) or create
+         -- fresh var?                 
+--     ; orig_implics <- TcM.readTcRef impl_var                   
+       ; new_implics_var <- TcM.newTcRef emptyBag
                            
        ; let nest_env = TcSEnv { tcs_ev_binds    = ref
                                , tcs_ty_binds    = ty_binds
@@ -951,6 +965,7 @@ nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
                                , tcs_worklist    = wl_var 
                                -- NB: worklist is going to be empty anyway, 
                                -- so reuse the same ref cell
+                               , tcs_implics     = new_implics_var
                                }
        ; thing_inside nest_env } 
 
@@ -996,6 +1011,13 @@ getTcSWorkListRef = TcS (return . tcs_worklist)
 getTcSInerts :: TcS InertSet 
 getTcSInerts = getTcSInertsRef >>= wrapTcS . (TcM.readTcRef) 
 
+
+getTcSImplicsRef :: TcS (IORef (Bag Implication))
+getTcSImplicsRef = TcS (return . tcs_implics) 
+
+getTcSImplics :: TcS (Bag Implication)
+getTcSImplics = getTcSImplicsRef >>= wrapTcS . (TcM.readTcRef)
+
 getTcSWorkList :: TcS WorkList
 getTcSWorkList = getTcSWorkListRef >>= wrapTcS . (TcM.readTcRef) 
 
@@ -1020,6 +1042,18 @@ updWorkListTcS_return f
        ; let (res,new_work) = f wl_curr
        ; wrapTcS (TcM.writeTcRef wl_var new_work)
        ; return res }
+    
+
+updTcSImplics :: (Bag Implication -> Bag Implication) -> TcS ()
+updTcSImplics f 
+ = do { impl_ref <- getTcSImplicsRef
+      ; implics <- wrapTcS (TcM.readTcRef impl_ref)
+      ; let new_implics = f implics
+      ; wrapTcS (TcM.writeTcRef impl_ref new_implics) }
+
+emitTcSImplication :: Implication -> TcS ()
+emitTcSImplication imp = updTcSImplics (consBag imp)
+
 
 emitFrozenError :: CtFlavor -> SubGoalDepth -> TcS ()
 -- Emits a non-canonical constraint that will stand for a frozen error in the inerts. 
@@ -1485,6 +1519,54 @@ matchClass clas tys
 matchFam :: TyCon -> [Type] -> TcS (Maybe (FamInst, [Type]))
 matchFam tycon args = wrapTcS $ tcLookupFamInst tycon args
 \end{code}
+
+\begin{code}
+-- Deferring forall equalities as implications
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+deferTcSForAllEq :: (WantedLoc,EvVar)  -- Original wanted equality flavor
+                 -> ([TyVar],TcType)   -- ForAll tvs1 body1
+                 -> ([TyVar],TcType)   -- ForAll tvs2 body2
+                 -> TcS ()
+-- Some of this functionality is repeated from TcUnify, 
+-- consider having a single place where we create fresh implications. 
+deferTcSForAllEq (loc,orig_ev) (tvs1,body1) (tvs2,body2)
+ = do { (subst1, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
+      ; let tys  = mkTyVarTys skol_tvs
+            phi1 = Type.substTy subst1 body1
+            phi2 = Type.substTy (zipTopTvSubst tvs2 tys) body2
+            skol_info = UnifyForAllSkol skol_tvs phi1
+        ; mev <- newWantedEvVar (mkTcEqPred phi1 phi2)
+        ; let new_fl = Wanted loc (mn_thing mev)
+              new_ct = mkNonCanonical new_fl
+              new_co = mkTcCoVarCo (mn_thing mev)
+        ; coe_inside <- if isFresh mev then
+                           do { ev_binds_var <- wrapTcS $ TcM.newTcEvBinds
+                              ; let ev_binds = TcEvBinds ev_binds_var
+                              ; lcl_env <- wrapTcS $ TcM.getLclTypeEnv
+                              ; loc <- wrapTcS $ TcM.getCtLoc skol_info
+                              ; let wc = WC { wc_flat  = singleCt new_ct 
+                                            , wc_impl  = emptyBag
+                                            , wc_insol = emptyCts }
+                                    imp = Implic { ic_untch  = all_untouchables
+                                                 , ic_env    = lcl_env
+                                                 , ic_skols  = skol_tvs
+                                                 , ic_given  = []
+                                                 , ic_wanted = wc 
+                                                 , ic_insol  = False
+                                                 , ic_binds  = ev_binds_var
+                                                 , ic_loc    = loc }
+                           ; updTcSImplics (consBag imp) 
+                           ; return (TcLetCo ev_binds new_co) }
+                        else (return new_co)
+        ; setEvBind orig_ev $
+          EvCoercion (foldr mkTcForAllCo coe_inside skol_tvs)
+        }
+ where all_untouchables = TouchableRange u u
+       u = idUnique orig_ev -- HACK: empty range
+
+\end{code}
+
 
 
 -- Rewriting with respect to the inert equalities 

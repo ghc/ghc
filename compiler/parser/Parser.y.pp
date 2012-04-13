@@ -1053,6 +1053,9 @@ typedoc :: { LHsType RdrName }
         | btype '->'     ctypedoc        { LL $ HsFunTy $1 $3 }
         | btype docprev '->' ctypedoc    { LL $ HsFunTy (L (comb2 $1 $2) (HsDocTy $1 $2)) $4 }
         | btype '~'      btype           { LL $ HsEqTy $1 $3 }
+                                        -- see Note [Promotion]
+        | btype SIMPLEQUOTE qconop type     { LL $ mkHsOpTy $1 $3 $4 }
+        | btype SIMPLEQUOTE varop  type     { LL $ mkHsOpTy $1 $3 $4 }
 
 btype :: { LHsType RdrName }
         : btype atype                   { LL $ HsAppTy $1 $2 }

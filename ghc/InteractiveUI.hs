@@ -432,9 +432,9 @@ runGHCi paths maybe_exprs = do
 
   setGHCContextFromGHCiState
 
+  dflags <- getDynFlags
   when (read_dot_files) $ do
-    mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ]
-                         ++ map (return . Just) opt_GhciScripts
+    mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ] ++ map (return . Just ) (ghciScripts dflags)
     mcfgs <- liftIO $ mapM canonicalizePath' (catMaybes mcfgs0)
     mapM_ sourceConfigFile $ nub $ catMaybes mcfgs
         -- nub, because we don't want to read .ghci twice if the
@@ -446,17 +446,14 @@ runGHCi paths maybe_exprs = do
   when (not (null paths)) $ do
      ok <- ghciHandle (\e -> do showException e; return Failed) $
                 -- TODO: this is a hack.
-                runInputTWithPrefs defaultPrefs defaultSettings $ do
-                    let (filePaths, phases) = unzip paths
-                    filePaths' <- mapM (Encoding.decode . BS.pack) filePaths
-                    loadModule (zip filePaths' phases)
+                runInputTWithPrefs defaultPrefs defaultSettings $
+                    loadModule paths
      when (isJust maybe_exprs && failed ok) $
         liftIO (exitWith (ExitFailure 1))
 
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
   is_tty <- liftIO (hIsTerminalDevice stdin)
-  dflags <- getDynFlags
   let show_prompt = verbosity dflags > 0 || is_tty
 
   -- reset line number
@@ -2885,10 +2882,7 @@ isHomeModule m = GHC.modulePackageId m == mainPackageId
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
 expandPath :: MonadIO m => String -> InputT m String
-expandPath p = do
-    exp_path <- liftIO $ expandPathIO p
-    e <- fmap BS.unpack $ Encoding.encode exp_path
-    return e
+expandPath = liftIO . expandPathIO
 
 expandPathIO :: String -> IO String
 expandPathIO p =

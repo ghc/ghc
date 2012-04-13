@@ -384,8 +384,9 @@ simplifyWithApprox wanted
  = do { traceTcS "simplifyApproxLoop" (ppr wanted)
 
       ; let all_flats = wc_flat wanted `unionBags` keepWanted (wc_insol wanted) 
-      ; solveInteractCts $ bagToList all_flats
-      ; unsolved_implics <- simpl_loop 1 (wc_impl wanted)
+      ; implics_from_flats <- solveInteractCts $ bagToList all_flats
+      ; unsolved_implics <- simpl_loop 1 (wc_impl wanted `unionBags` 
+                                               implics_from_flats)
 
       ; let (residual_implics,floats) = approximateImplications unsolved_implics
 
@@ -777,11 +778,11 @@ solve_wanteds wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = insols
                  -- wrong anyway!
 
        ; let all_flats = flats `unionBags` keepWanted insols
-       ; solveInteractCts $ bagToList all_flats
+       ; impls_from_flats <- solveInteractCts $ bagToList all_flats
 
        -- solve_wanteds iterates when it is able to float equalities 
        -- out of one or more of the implications. 
-       ; unsolved_implics <- simpl_loop 1 implics
+       ; unsolved_implics <- simpl_loop 1 (implics `unionBags` impls_from_flats)
 
        ; (insoluble_flats,unsolved_flats) <- extractUnsolvedTcS 
 
@@ -832,8 +833,9 @@ simpl_loop n implics
                   , text "unsolved_implics =" <+> ppr unsolved_implics ]
 
        ; if isEmptyBag improve_eqs then return unsolved_implics 
-         else do { solveInteractCts $ bagToList improve_eqs
-                 ; simpl_loop (n+1) unsolved_implics } }
+         else do { impls_from_eqs <- solveInteractCts $ bagToList improve_eqs
+                 ; simpl_loop (n+1) (unsolved_implics `unionBags` 
+                                                 impls_from_eqs)} }
 
 solveNestedImplications :: Bag Implication
                         -> TcS (Cts, Bag Implication)
@@ -855,7 +857,9 @@ solveNestedImplications implics
 	         -- Push the unsolved wanteds inwards, but as givens
                  ; traceTcS "solveWanteds: preparing inerts for implications {" $ 
                    vcat [ppr tcs_untouchables, ppr pushed_givens]
-                 ; solveInteractCts pushed_givens 
+                 ; impls_from_givens <- solveInteractCts pushed_givens 
+                 ; MASSERT (isEmptyBag impls_from_givens)
+                   
                  ; traceTcS "solveWanteds: } now doing nested implications {" empty
                  ; flatMapBagPairM (solveImplication tcs_untouchables) implics }
 
@@ -904,8 +908,9 @@ solveImplication tcs_untouchables
     do { traceTcS "solveImplication {" (ppr imp) 
 
          -- Solve flat givens
-       ; solveInteractGiven loc givens 
-
+       ; impls_from_givens <- solveInteractGiven loc givens 
+       ; MASSERT (isEmptyBag impls_from_givens)
+         
          -- Simplify the wanteds
        ; WC { wc_flat = unsolved_flats
             , wc_impl = unsolved_implics
@@ -1395,8 +1400,13 @@ disambigGroup (default_ty:default_tys) group
                                       in return [ CNonCanonical { cc_flavor = dfl, cc_depth = 0 } ] }
                             
                        ; traceTcS "disambigGroup (solving) {" 
-                                  (text "trying to solve constraints along with default equations ...") 
-                       ; solveInteractCts (derived_eq ++ wanteds)
+                                  (text "trying to solve constraints along with default equations ...")
+                       ; implics_from_defaulting <- 
+                                    solveInteractCts (derived_eq ++ wanteds)
+                       ; MASSERT (isEmptyBag implics_from_defaulting)
+                                     -- Ignore implics: I don't think that a defaulting equation can cause
+                                     -- new implications to be emitted. Maybe we have to revisit this.
+                                     
                        ; (_,unsolved) <- extractUnsolvedTcS 
                        ; traceTcS "disambigGroup (solving) }"
                                   (text "disambigGroup unsolved =" <+> ppr (keepWanted unsolved))

@@ -26,7 +26,7 @@ import Id
 import Var
 
 import TcType
-import PrelNames (typeNatClassName, typeStringClassName)
+import PrelNames (singIClassName)
 
 import Class
 import TyCon
@@ -91,12 +91,21 @@ If in Step 1 no such element exists, we have exceeded our context-stack
 depth and will simply fail.
 \begin{code}
 
-solveInteractCts :: [Ct] -> TcS ()
+solveInteractCts :: [Ct] -> TcS (Bag Implication)
+-- Returns a bag of residual implications that have arisen while solving
+-- this particular worklist.
 solveInteractCts cts 
   = do { traceTcS "solveInteractCtS" (vcat [ text "cts =" <+> ppr cts ]) 
-       ; updWorkListTcS (appendWorkListCt cts) >> solveInteract }
+       ; updWorkListTcS (appendWorkListCt cts) >> solveInteract 
+       ; impls <- getTcSImplics
+       ; updTcSImplics (const emptyBag) -- Nullify residual implications
+       ; return impls }
 
-solveInteractGiven :: GivenLoc -> [EvVar] -> TcS () 
+solveInteractGiven :: GivenLoc -> [EvVar] -> TcS (Bag Implication)
+-- In principle the givens can kick out some wanteds from the inert
+-- resulting in solving some more wanted goals here which could emit
+-- implications. That's why I return a bag of implications. Not sure
+-- if this can happen in practice though.
 solveInteractGiven gloc evs
   = solveInteractCts (map mk_noncan evs)
   where mk_noncan ev = CNonCanonical { cc_flavor = Given gloc ev
@@ -1614,9 +1623,9 @@ lkpFunEqCache fam_head
                                            , cc_fun = tc, cc_tyargs = xis
                                            , cc_rhs = xi}))
           = ASSERT (isSolved fl)
-            do { (xis_subst,cos) <- flattenMany d fl xis 
+            do { (xis_subst,cos) <- flattenMany d FMFullFlatten fl xis 
                                     -- cos :: xis_subst ~ xis 
-               ; (xi_subst,co) <- flatten d fl xi
+               ; (xi_subst,co) <- flatten d FMFullFlatten fl xi
                                     -- co :: xi_subst ~ xi
                ; let flat_fam_head = mkTyConApp tc xis_subst 
 
@@ -1865,11 +1874,11 @@ data LookupInstResult
 
 matchClassInst :: InertSet -> Class -> [Type] -> WantedLoc -> TcS LookupInstResult
 
-matchClassInst _ clas [ ty ] _
-  | className clas == typeNatClassName
+matchClassInst _ clas [ _, ty ] _
+  | className clas == singIClassName
   , Just n <- isNumLitTy ty = return $ GenInst [] $ EvLit $ EvNum n
 
-  | className clas == typeStringClassName
+  | className clas == singIClassName
   , Just s <- isStrLitTy ty = return $ GenInst [] $ EvLit $ EvStr s
 
 

@@ -1838,11 +1838,7 @@ stg_delayzh
 #else
 
 
-    W_ time;
-    (time) = foreign "C" getourtimeofday() [R1];
-    // getourtimeofday() returns a value in units of 10ms
-    // R1 is in microseconds, we need to (/ 10000), rounding up
-    target = time + 1 + (R1 + 10000-1) / 10000;
+    (target) = foreign "C" getDelayTarget(R1) [R1];
 
     StgTSO_block_info(CurrentTSO) = target;
 

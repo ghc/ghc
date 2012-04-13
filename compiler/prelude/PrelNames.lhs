@@ -276,8 +276,7 @@ basicKnownKeyNames
         -- Type-level naturals
         typeNatKindConName,
         typeStringKindConName,
-        typeNatClassName,
-        typeStringClassName,
+        singIClassName,
         typeNatLeqClassName,
         typeNatAddTyFamName,
         typeNatMulTyFamName,
@@ -1052,14 +1051,12 @@ isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
 -- Type-level naturals
 typeNatKindConName, typeStringKindConName,
-  typeNatClassName, typeStringClassName, typeNatLeqClassName,
+  singIClassName, typeNatLeqClassName,
   typeNatAddTyFamName, typeNatMulTyFamName, typeNatExpTyFamName :: Name
 typeNatKindConName    = tcQual gHC_TYPELITS (fsLit "Nat")  typeNatKindConNameKey
 typeStringKindConName = tcQual gHC_TYPELITS (fsLit "Symbol")
                                                         typeStringKindConNameKey
-typeNatClassName    = clsQual gHC_TYPELITS (fsLit "NatI") typeNatClassNameKey
-typeStringClassName = clsQual gHC_TYPELITS (fsLit "SymbolI")
-                                                         typeStringClassNameKey
+singIClassName      = clsQual gHC_TYPELITS (fsLit "SingI") singIClassNameKey
 typeNatLeqClassName = clsQual gHC_TYPELITS (fsLit "<=")  typeNatLeqClassNameKey
 typeNatAddTyFamName = tcQual  gHC_TYPELITS (fsLit "+")   typeNatAddTyFamNameKey
 typeNatMulTyFamName = tcQual  gHC_TYPELITS (fsLit "*")   typeNatMulTyFamNameKey
@@ -1179,10 +1176,9 @@ datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
 selectorClassKey    = mkPreludeClassUnique 41
 
-typeNatClassNameKey, typeStringClassNameKey, typeNatLeqClassNameKey :: Unique
-typeNatClassNameKey     = mkPreludeClassUnique 42
-typeStringClassNameKey  = mkPreludeClassUnique 43
-typeNatLeqClassNameKey  = mkPreludeClassUnique 44
+singIClassNameKey, typeNatLeqClassNameKey :: Unique
+singIClassNameKey       = mkPreludeClassUnique 42
+typeNatLeqClassNameKey  = mkPreludeClassUnique 43
 \end{code}
 
 %************************************************************************
