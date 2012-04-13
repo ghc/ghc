@@ -1883,7 +1883,9 @@ matchClassInst _ clas [ _, ty ] _
 
 
 matchClassInst inerts clas tys loc
-   = do { let pred = mkClassPred clas tys 
+   = do { dflags <- getDynFlags
+        ; let pred = mkClassPred clas tys 
+              incoherent_ok = xopt Opt_IncoherentInstances  dflags
         ; mb_result <- matchClass clas tys
         ; untch <- getUntouchables
         ; traceTcS "matchClassInst" $ vcat [ text "pred =" <+> ppr pred
@@ -1894,11 +1896,12 @@ matchClassInst inerts clas tys loc
             MatchInstMany -> return NoInstance -- defer any reactions of a multitude until
                                                -- we learn more about the reagent 
             MatchInstSingle (_,_)
-              | given_overlap untch -> 
-                  do { traceTcS "Delaying instance application" $ 
+              | not incoherent_ok && given_overlap untch 
+              -> -- see Note [Instance and Given overlap]
+                 do { traceTcS "Delaying instance application" $ 
                        vcat [ text "Workitem=" <+> pprType (mkClassPred clas tys)
                             , text "Relevant given dictionaries=" <+> ppr givens_for_this_clas ]
-                     ; return NoInstance -- see Note [Instance and Given overlap]
+                     ; return NoInstance
                      }
 
             MatchInstSingle (dfun_id, mb_inst_tys) ->
@@ -1976,6 +1979,9 @@ This is arguably not easy to appear in practice due to our aggressive prioritiza
 of equality solving over other constraints, but it is possible. I've added a test case 
 in typecheck/should-compile/GivenOverlapping.hs
 
+We ignore the overlap problem if -XIncoherentInstances is in force: see
+Trac #6002 for a worked-out example where this makes a difference.
+
 Moreover notice that our goals here are different than the goals of the top-level 
 overlapping checks. There we are interested in validating the following principle:
  
@@ -1985,7 +1991,3 @@ overlapping checks. There we are interested in validating the following principl
 
 But for the Given Overlap check our goal is just related to completeness of 
 constraint solving. 
-
-
-
-
