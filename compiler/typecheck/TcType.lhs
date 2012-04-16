@@ -784,12 +784,18 @@ mkTcEqPred :: TcType -> TcType -> Type
 -- During type checking we build equalities between 
 -- type variables with OpenKind or ArgKind.  Ultimately
 -- they will all settle, but we want the equality predicate
--- itself to have kind '*'.  I think.  
+-- itself to have kind '*'.  I think.
+--
+-- But for now we call mkTyConApp, not mkEqPred, because the invariants
+-- of the latter might not be satisfied during type checking.
+-- Notably when we form an equalty   (a : OpenKind) ~ (Int : *)
 --
 -- But this is horribly delicate: what about type variables
 -- that turn out to be bound to Int#?
 mkTcEqPred ty1 ty2
-  = mkNakedEqPred (defaultKind (typeKind ty1)) ty1 ty2
+  = mkTyConApp eqTyCon [k, ty1, ty2]
+  where
+    k = defaultKind (typeKind ty1)
 \end{code}
 
 @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
