@@ -147,20 +147,15 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
         | isLarge n_insns0 = (inspectAsm True initial_offset asm, True)
         | otherwise = ((n_insns0, lbl_map0), False)
 
-      findLabel :: Word16 -> Word
-      findLabel lbl = fromMaybe
+      env :: Word16 -> Word
+      env lbl = fromMaybe
         (pprPanic "assembleBCO.findLabel" (ppr lbl))
         (Map.lookup lbl lbl_map)
-
-      env :: Word16 -> Operand
-      env
-        | long_jumps = LargeOp . findLabel
-        | otherwise  = SmallOp . fromIntegral . findLabel
 
   -- pass 2: run assembler and generate instructions, literals and pointers
   let initial_insns = addListToSS emptySS $ largeArg n_insns
   let initial_state = (initial_insns, emptySS, emptySS)
-  (final_insns, final_lits, final_ptrs) <- execState initial_state $ runAsm env asm
+  (final_insns, final_lits, final_ptrs) <- execState initial_state $ runAsm long_jumps env asm
 
   -- precomputed size should be equal to final size
   ASSERT (n_insns == sizeSS final_insns) return ()
@@ -245,39 +240,45 @@ label w = AllocLabel w (return ())
 emit :: Word16 -> [Operand] -> Assembler ()
 emit w ops = Emit w ops (return ())
 
-type LabelEnv = Word16 -> Operand
+type LabelEnv = Word16 -> Word
 
-runAsm :: LabelEnv -> Assembler a -> State AsmState IO a
-runAsm _ (NullAsm x) = return x
-runAsm e (AllocPtr p_io k) = do
-  p <- lift p_io
-  w <- State $ \(st_i0,st_l0,st_p0) -> do
-    let st_p1 = addToSS st_p0 p
-    return ((st_i0,st_l0,st_p1), sizeSS st_p0)
-  runAsm e $ k w
-runAsm e (AllocLit lits k) = do
-  w <- State $ \(st_i0,st_l0,st_p0) -> do
-    let st_l1 = addListToSS st_l0 lits
-    return ((st_i0,st_l1,st_p0), sizeSS st_l0)
-  runAsm e $ k w
-runAsm e (AllocLabel _ k) = runAsm e k
-runAsm e (Emit w ops k) = do
-  let (large, words) = expand False ops []
-      opcode
-        | large     = largeArgInstr w
-        | otherwise = w
-      expand l [] r_ws = (l, reverse r_ws)
-      expand l (op : ops) r_ws = case op of
-        SmallOp w -> expand l ops (w : r_ws)
-        LargeOp w -> expand True ops (reverse (largeArg w) ++ r_ws)
-        LabelOp lbl -> expand l (e lbl : ops) r_ws
-        Op w
-          | l || isLarge w -> expand l (LargeOp w : ops) r_ws
-          | otherwise      -> expand l (SmallOp (fromIntegral w) : ops) r_ws
-  State $ \(st_i0,st_l0,st_p0) -> do
-    let st_i1 = addListToSS st_i0 (opcode : words)
-    return ((st_i1,st_l0,st_p0), ())
-  runAsm e k
+largeOp :: Bool -> Operand -> Bool
+largeOp long_jumps op = case op of
+  LargeOp _ -> True
+  SmallOp _ -> False
+  Op w      -> isLarge w
+  LabelOp _ -> long_jumps
+
+runAsm :: Bool -> LabelEnv -> Assembler a -> State AsmState IO a
+runAsm long_jumps e = go
+  where
+    go (NullAsm x) = return x
+    go (AllocPtr p_io k) = do
+      p <- lift p_io
+      w <- State $ \(st_i0,st_l0,st_p0) -> do
+        let st_p1 = addToSS st_p0 p
+        return ((st_i0,st_l0,st_p1), sizeSS st_p0)
+      go $ k w
+    go (AllocLit lits k) = do
+      w <- State $ \(st_i0,st_l0,st_p0) -> do
+        let st_l1 = addListToSS st_l0 lits
+        return ((st_i0,st_l1,st_p0), sizeSS st_l0)
+      go $ k w
+    go (AllocLabel _ k) = go k
+    go (Emit w ops k) = do
+      let largeOps = any (largeOp long_jumps) ops
+          opcode
+            | largeOps = largeArgInstr w
+            | otherwise = w
+          words = concatMap expand ops
+          expand (SmallOp w) = [w]
+          expand (LargeOp w) = largeArg w
+          expand (LabelOp w) = expand (Op (e w))
+          expand (Op w) = if largeOps then largeArg w else [fromIntegral w]
+      State $ \(st_i0,st_l0,st_p0) -> do
+        let st_i1 = addListToSS st_i0 (opcode : words)
+        return ((st_i1,st_l0,st_p0), ())
+      go k
 
 type LabelEnvMap = Map Word16 Word
 
@@ -302,22 +303,12 @@ inspectAsm long_jumps initial_offset
     go s (Emit _ ops k) = go s' k
       where
         s' = s { instrCount = instrCount s + size }
-        size = count False ops 0 + 1
-        count _ [] n = n
-        count l (op : ops) n
-          | is_large  = count True ops (n + largeArg16s)
-          | otherwise = count l ops (n + 1)
-          where
-            is_large = case op of
-              SmallOp _          -> False
-              LabelOp _
-                | long_jumps     -> True
-                | otherwise      -> False
-              LargeOp _          -> True
-              Op n
-                | l || isLarge n -> True
-                | otherwise      -> False
-
+        size = sum (map count ops) + 1
+        largeOps = any (largeOp long_jumps) ops
+        count (SmallOp _) = 1
+        count (LargeOp _) = largeArg16s
+        count (LabelOp _) = count (Op 0)
+        count (Op _) = if largeOps then largeArg16s else 1
 
 -- Bring in all the bci_ bytecode constants.
 #include "rts/Bytecodes.h"
