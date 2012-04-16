@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface, CApiFFI #-}
 
-module GHC.Event.Clock (getMonotonicTime) where
+module GHC.Event.Clock (getMonotonicTime, initializeTimer) where
 
 #include "HsBase.h"
 
@@ -18,6 +18,8 @@ import GHC.Num
 
 -- TODO: Implement this for Windows.
 
+initializeTimer :: IO ()
+
 -- | Return monotonic time in seconds, since some unspecified starting point
 getMonotonicTime :: IO Double
 
@@ -25,6 +27,8 @@ getMonotonicTime :: IO Double
 -- FFI binding
 
 #if HAVE_CLOCK_GETTIME
+
+initializeTimer = return ()
 
 getMonotonicTime = do
     tv <- with (CTimespec 0 0) $ \tvptr -> do
@@ -66,7 +70,12 @@ getMonotonicTime = do
 foreign import capi unsafe "HsBase.h absolute_time" absolute_time ::
     Ptr CDouble -> IO ()
 
+foreign import capi unsafe "HsBase.h initialize_timer"
+  initializeTimer :: IO ()
+
 #else
+
+initializeTimer = return ()
 
 getMonotonicTime = do
     tv <- with (CTimeval 0 0) $ \tvptr -> do
