@@ -107,7 +107,7 @@ module Foreign.C.Error (
 import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.String
-import Foreign.Marshal.Error    ( void )
+import Control.Monad            ( void )
 import Data.Maybe
 
 #if __GLASGOW_HASKELL__
