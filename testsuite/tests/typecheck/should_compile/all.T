@@ -377,3 +377,4 @@ test('T5792',normal,run_command,
      ['$MAKE -s --no-print-directory T5792'])
 
 test('PolytypeDecomp', normal, compile, [''])
+test('T6011', normal, compile, [''])
