@@ -482,8 +482,11 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
                                   (Just Nothing, Just Nothing)
                                     | x_l == x_r
                                     -> return (msg_s, hb_r) -- Right biased
-                                  (Nothing, Nothing)
-                                    -> return (msg_s, lambdaBound)
+                                  -- NB: we reject two lambda bound things as not matching so that we go into the "generalise"
+                                  -- code path. By doing it this way, we ensure we not only add the common lambdaBound heap binding,
+                                  -- but also appropriate renamings to both rn_l and rn_r.
+                                  --(Nothing, Nothing)
+                                  --  -> return (msg_s, lambdaBound)
                                   _ -> Left "msgPureHeap: non-unifiable heap bindings"
                  -- If they match, we need to make a common heap binding
                  return (go rn_l rn_r used_l' used_r'
@@ -494,7 +497,7 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
                  (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
                  return $ go (M.insert x_common x_l rn_l) (M.insert x_common x_r rn_r) used_l' used_r'
-                              h_l' h_r' (M.insert x_common lambdaBound h) msg_s)
+                             h_l' h_r' (M.insert x_common lambdaBound h) msg_s)
       | otherwise
       = [Left "msgPureHeap: non-unifiable heap binders"]
       where
