@@ -524,7 +524,7 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
          -- By a process of elimination, variable must be bound be the stack. Normally it will in fact be bound by the "instance" portion
          -- of the stack because matches involving the common portion variables either already failed or were discharged by RnEnv2, but
          -- if "find" is called by "sucks" then this may not necessarily be the case
-        Nothing -> (Left "used stack binding in common", if x `elemVarSet` k_bvs then return (used, Nothing) else Left $ "used stack binding (individual) " ++ showPpr x)
+        Nothing -> (Left "used stack binding", if x `elemVarSet` k_bvs then return (used, Nothing) else Left $ "used stack binding")
 
     suck :: PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> MSG' (S.Set Var, PureHeap)
     suck _      _     h _ (used, Nothing) = return (used, h)                                                                                   -- Already copied in
