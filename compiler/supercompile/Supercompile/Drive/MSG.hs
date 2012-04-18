@@ -24,8 +24,6 @@ import VarEnv
 import TypeRep    (Kind, Type(..))
 import Rules      (mkSpecInfo, roughTopNames)
 
-import Control.Monad.Fix
-
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -85,11 +83,6 @@ instance Monad MSG where
       (s, x) <- unMSG mx s
       unMSG (fxmy x) s
     fail msg = MSG $ \_ -> Left msg
-
-instance MonadFix MSG where
-    mfix xmy = MSG $ \s -> let res = unMSG (xmy x) s
-                               Right (_, x) = res
-                           in res
 
 msgFlexiVar :: Var -> Var -> MSG Var
 msgFlexiVar x_l x_r = MSG $ \s -> Right $ case M.lookup (x_l, x_r) (msgKnownFlexiPairs s) of
