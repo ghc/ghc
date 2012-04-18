@@ -18,7 +18,7 @@ import qualified CoreSyn as Core
 import Util
 import Coercion
 import Var        (TyVar, isTyVar, isId, tyVarKind, setVarType, setTyVarKind)
-import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, isGlobalId)
+import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation)
 import IdInfo     (SpecInfo(..))
 import VarEnv
 import TypeRep    (Kind, Type(..))
@@ -171,7 +171,7 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
     firstSuccess :: [MSG' a] -> MSG' a
     firstSuccess []   = Left "firstSuccess: no elements at all"
     firstSuccess (Left _:next:nexts) = firstSuccess (next:nexts)
-    firstSuccess [Left msg] | trace ("firstSuccess: " ++ msg) False = undefined
+    --firstSuccess [Left msg] | trace ("firstSuccess: " ++ msg) False = undefined
     firstSuccess (it:_) = it
 
 msgAnned :: (a -> a -> MSG b)
@@ -468,7 +468,7 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
        -> [MSG' (M.Map Var Var, (PureHeap, Heap, PureHeap), M.Map Var Var)]
     go rn_l rn_r _      _      h_l h_r h       (MSGState { msgPending = [], msgInScopeSet = ids }) = [return (rn_l, (h_l, Heap h ids, h_r), rn_r)]
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((x_common, (x_l, x_r)):rest) })
-      | pprTrace "msgPureHeap" (ppr (x_common, x_l, x_r)) False = undefined
+      -- | pprTrace "msgPureHeap" (ppr (x_common, x_l, x_r)) False = undefined
 
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
       | Right (msg_s, x_common) <- flip unMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
