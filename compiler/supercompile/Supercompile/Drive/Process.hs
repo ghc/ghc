@@ -323,16 +323,16 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         -- I think it would also be OK to zap the IdInfo of environmentally bound stuff, but that isn't
         -- optimal because the simplifier won't be able to restore the IdInfo of *global* Ids, so we might
         -- pessimisize all later simplifications.
-        h_fvs = go tag_ids2 emptyVarSet input_fvs
+        (input_fvs', h_fvs) = (closure emptyVarSet input_fvs, M.fromDistinctAscList $ snd $ foldToMapAccumL foldVarSet add_one_fv tag_ids2 input_fvs')
+          -- NB: foldVarSet is a right fold, so this use of fromDistinctAscList is justified
           where
-            go tag_ids all_input_fvs these_fvs
-              | M.null h_these_binds = M.empty
-              | otherwise            = h_these_binds `M.union` go tag_ids' (all_input_fvs `unionVarSet` these_fvs) these_fvs'
-              where -- NB: foldVarSet is a right fold, so this use of fromDistinctAscList is justified
-                    ((these_fvs', tag_ids'), h_these_binds) = second M.fromDistinctAscList $ foldToMapAccumL foldVarSet add_one_fv (emptyVarSet, tag_ids) (these_fvs `minusVarSet` all_input_fvs)
-            add_one_fv (these_fvs, tag_ids) x' = ((these_fvs', tag_ids'), (x', environmentallyBound (mkTag (getKey i))))
+            closure all_input_fvs new_fvs
+              | isEmptyVarSet new_fvs = all_input_fvs
+              | otherwise             = closure all_input_fvs' new_fvs'
+                where all_input_fvs' = all_input_fvs `unionVarSet` new_fvs
+                      new_fvs' = foldVarSet (\x' -> (varBndrFreeVars x' `unionVarSet`)) emptyVarSet new_fvs `minusVarSet` all_input_fvs'
+            add_one_fv tag_ids x' = (tag_ids', (x', environmentallyBound (mkTag (getKey i))))
               where !(i, tag_ids') = takeUniqFromSupply tag_ids
-                    these_fvs' = these_fvs `unionVarSet` varBndrFreeVars x'
 
         unfolding_bvs = S.fromDistinctAscList (map fst h_unfoldings)
         deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
@@ -340,8 +340,8 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         -- FIXME: use speculated
 
         -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
-        rn = mkIdentityRenaming input_fvs
-        ids = mkInScopeSet input_fvs
+        rn = mkIdentityRenaming input_fvs'
+        ids = mkInScopeSet input_fvs'
         {-# INLINE heap_binding_is_value #-}
         heap_binding_is_value = maybe True (termIsValue . snd) . heapBindingTerm
 
