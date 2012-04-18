@@ -261,7 +261,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                  (speculateM (reduce state) $ \state -> (if mb_h == Just "h44" then pprTrace "sc'" (pPrintFullState quietStatePrettiness state) else id) $ my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
                                                          case msg shallow_state state of 
-                                                           -- FIXME: better?
+                                                           -- FIXME: better? In particular, could rollback and then MSG
                                                            Just (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r))
                                                             -> pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
                                                                                        pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $
