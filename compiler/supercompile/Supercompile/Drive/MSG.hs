@@ -384,7 +384,7 @@ msgManyRec mtch_flexi f rn2 xs_l xs_r k = liftM (uncurry f . snd) $ go rn2 xs_l 
   where go :: RnEnv2 -> [v] -> [v] -> MSG (RnEnv2, ([Var], b))
         go rn2 []         []         = liftM ((,) rn2 . (,) []) $ k rn2
         go rn2 (x_l:xs_l) (x_r:xs_r) = liftM (\(x, (rn2, (xs, b))) -> (rn2, (x:xs, b))) $ mtch_flexi (,) rn2 x_l x_r $ \rn2 -> liftM (\(rn, res) -> (rn, (rn, res))) $ go rn2 xs_l xs_r
-        go _ _ _ = fail "msgMany"
+        go _ _ _ = fail "msgManyRec"
 
 msgVar :: RnEnv2 -> Out Var -> Out Var -> MSG Var
 msgVar rn2 x_l x_r = case (rnOccL_maybe rn2 x_l, rnOccR_maybe rn2 x_r) of
