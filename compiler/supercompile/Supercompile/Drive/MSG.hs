@@ -86,11 +86,9 @@ instance Monad MSG where
 
 msgFlexiVar :: Var -> Var -> MSG Var
 msgFlexiVar x_l x_r = MSG $ \s -> Right $ case M.lookup (x_l, x_r) (msgKnownFlexiPairs s) of
-  Nothing -> if x == x_r
-             then pprPanic "msgFlexiVar" (ppr (x_l, x_r))
-             else (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
-                       msgKnownFlexiPairs = M.insert (x_l, x_r) x (msgKnownFlexiPairs s),
-                       msgPending = (x, (x_l, x_r)) : msgPending s }, x)
+  Nothing -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
+                  msgKnownFlexiPairs = M.insert (x_l, x_r) x (msgKnownFlexiPairs s),
+                  msgPending = (x, (x_l, x_r)) : msgPending s }, x)
     where x = uniqAway (msgInScopeSet s) x_r
   Just x  -> (s, x)
 
@@ -157,7 +155,7 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
                       return ((deeds_l, Heap h_l ids_l, mkRenaming (M.toList rn_l), k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, mkRenaming (M.toList rn_r), k_r))
                  | mrn2mk <- msgEC init_rn2 k_l k_r
                  , mres <- prod (do (rn2, mk) <- mrn2mk
-                                    (msg_s, res@(_, (k_l, _, k_r))) <- unMSG (liftM2 (,) (msgAnned (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
+                                    (msg_s, res@(_, (k_l, _, k_r))) <- unMSG (liftM2 (,) (msgAnned annedQA (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
                                     return (map (liftM ((,) res)) $ msgPureHeap {- mm -} rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
                  ]
   where
@@ -167,9 +165,9 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
     --firstSuccess [Left msg] | trace ("firstSuccess: " ++ msg) False = undefined
     firstSuccess (it:_) = it
 
-msgAnned :: (a -> a -> MSG b)
+msgAnned :: (Tag -> b -> Anned b) -> (a -> a -> MSG b)
          -> Anned a -> Anned a -> MSG (Anned b)
-msgAnned f a_l a_r = flip traverse a_r $ f (annee a_l) -- Right biased
+msgAnned anned f a_l a_r = liftM (anned (annedTag a_r)) $ f (annee a_l) (annee a_r) -- Right biased
 
 msgQA :: RnEnv2 -> QA -> QA -> MSG QA
 msgQA rn2 (Question x_l') (Question x_r') = liftM Question $ msgVar rn2 x_l' x_r'
@@ -214,7 +212,7 @@ msgCoercion rn2 (InstCo co_l ty_l)       (InstCo co_r ty_r)       = liftM2 InstC
 msgCoercion _ _ _ = fail "msgCoercion"
 
 msgTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> MSG AnnedTerm
-msgTerm rn2 = msgAnned (msgTerm' rn2)
+msgTerm rn2 = msgAnned annedTerm (msgTerm' rn2)
 
 -- TODO: allow lets on only one side? Useful for msging e.g. (let x = 2 in y + x) with (z + 2)
 msgTerm' :: RnEnv2 -> TermF Anned -> TermF Anned -> MSG (TermF Anned)
@@ -437,7 +435,7 @@ msgECFrame init_rn2 kf_l kf_r = liftM (second (liftM (Tagged (tag kf_r)) .)) $ g
     go (Apply x_l')                          (Apply x_r')                          = return (init_rn2, \rn2 -> liftM Apply $ msgVar rn2 x_l' x_r')
     go (TyApply ty_l')                       (TyApply ty_r')                       = return (init_rn2, \rn2 -> liftM TyApply $ msgType rn2 ty_l' ty_r')
     go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2, \rn2 -> liftM2 (\ty (x, in_alts) -> Scrutinise x ty in_alts) (msgType rn2 ty_l' ty_r') (msgIdCoVarBndr (,) rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedAlts annedAltsFreeVars msgAlts rn2 in_alts_l in_alts_r))
-    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, \rn2 -> guard "msgECFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned (msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r))
+    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, \rn2 -> guard "msgECFrame: primop" (pop_l == pop_r) >> liftM3 (PrimApply pop_r) (zipWithEqualM (msgType rn2) tys_l' tys_r') (zipWithEqualM (msgAnned annedAnswer (msgAnswer rn2)) as_l as_r) (zipWithEqualM (msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2) in_es_l in_es_r))
     go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2, \rn2 -> msgIdCoVarBndr StrictLet rn2 x_l' x_r' $ \rn2 -> msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r)
     go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2, \rn2 -> liftM CastIt $ msgCoercion rn2 co_l' co_r')
     go (Update x_l')                         (Update x_r')                         = return (second (liftM Update .) $ msgIdCoVarBndr' init_rn2 x_l' x_r')

@@ -92,6 +92,10 @@ annedVar tg x = Comp (Tagged tg (Comp (Sized 1 (FVed (annedVarFreeVars' x) x))))
 annedAnswer :: Tag -> Answer -> Anned Answer
 annedAnswer tg a = Comp (Tagged tg (Comp (Sized (answerSize' a) (FVed (answerFreeVars' a) a))))
 
+annedQA :: Tag -> QA -> Anned QA
+annedQA tg (Question x) = fmap Question (annedVar tg x)
+annedQA tg (Answer a)   = fmap Answer (annedAnswer tg a)
+
 
 toAnnedTerm :: UniqSupply -> Term -> AnnedTerm
 toAnnedTerm tag_ids = tagFVedTerm tag_ids . reflect
