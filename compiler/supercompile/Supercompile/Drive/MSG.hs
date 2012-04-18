@@ -435,7 +435,7 @@ msgEC init_rn2 = go init_rn2
                  (kf_r, k_r) <- splitCar "right" k_r
                  (rn2'', mkf') <- msgECFrame rn2' kf_l kf_r
                  return (map (liftM (second (\it rn2 -> liftM2 (\kf (k_l, k, k_r) -> (k_l, kf `Car` k, k_r)) (mkf' rn2) (it rn2)))) $ go rn2'' k_l k_r)) ++
-        [return (rn2', \_ -> return (k_l, Loco (not (nullTrain k_r)), k_r))] -- Right biased generalisation flag
+        [return (rn2', \_ -> return (k_l, Loco (case k_r of Loco gen -> gen; _ -> True), k_r))] -- Right biased generalisation flag
 
 msgECFrame :: RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> MSG' (RnEnv2, RnEnv2 -> MSG (Tagged StackFrame))
 msgECFrame init_rn2 kf_l kf_r = liftM (second (liftM (Tagged (tag kf_r)) .)) $ go (tagee kf_l) (tagee kf_r) -- Right biased
