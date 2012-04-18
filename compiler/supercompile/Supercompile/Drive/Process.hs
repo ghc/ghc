@@ -306,10 +306,33 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                           anned_e = toAnnedTerm tag_unf_ids e
                           input_fvs'' = input_fvs' `unionVarSet` varBndrFreeVars x' `unionVarSet` annedFreeVars anned_e
         
-        -- NB: foldVarSet is a right fold, so this use of fromDistinctAscList is justified
-        h_fvs = M.fromDistinctAscList $ snd $ foldToMapAccumL foldVarSet add_one_fv tag_ids2 input_fvs
-          where add_one_fv tag_ids2 x' = (tag_ids3, (x', environmentallyBound (mkTag (getKey i))))
-                    where !(i, tag_ids3) = takeUniqFromSupply tag_ids2
+        -- A funny thing can happen here. We can have an unfolding like foo:
+        --  foo = Just bar
+        -- Which mentions a variable bar which (when used as a *binder*, not an *occurrence*) would
+        -- have free variables, like:
+        --  {-# INLINE bar #-}
+        --  bar = .. bar .. baz
+        -- But we might not necessarily have a bar binding in the unfoldings. So we might end up
+        -- adding an environmentallyBound binding for bar to h_fvs which then has an unbound free
+        -- variable baz. This would violate our heap invariant!
+        --
+        -- My solution is to make the construction of h_fvs into a fixed point where the set of
+        -- variables to make environmentally bound grows until it encompasses all the FVs of those
+        -- variables themselves.
+        --
+        -- I think it would also be OK to zap the IdInfo of environmentally bound stuff, but that isn't
+        -- optimal because the simplifier won't be able to restore the IdInfo of *global* Ids, so we might
+        -- pessimisize all later simplifications.
+        h_fvs = go tag_ids2 emptyVarSet input_fvs
+          where
+            go tag_ids all_input_fvs these_fvs
+              | M.null h_these_binds = M.empty
+              | otherwise            = h_these_binds `M.union` go tag_ids' (all_input_fvs `unionVarSet` these_fvs) these_fvs'
+              where -- NB: foldVarSet is a right fold, so this use of fromDistinctAscList is justified
+                    ((these_fvs', tag_ids'), h_these_binds) = second M.fromDistinctAscList $ foldToMapAccumL foldVarSet add_one_fv (emptyVarSet, tag_ids) (these_fvs `minusVarSet` all_input_fvs)
+            add_one_fv (these_fvs, tag_ids) x' = ((these_fvs', tag_ids'), (x', environmentallyBound (mkTag (getKey i))))
+              where !(i, tag_ids') = takeUniqFromSupply tag_ids
+                    these_fvs' = these_fvs `unionVarSet` varBndrFreeVars x'
 
         unfolding_bvs = S.fromDistinctAscList (map fst h_unfoldings)
         deeds = Deeds { sizeLimit = (bLOAT_FACTOR - 1) * annedSize anned_e, stepLimit = (bLOAT_FACTOR - 1) * annedSize anned_e }
