@@ -153,12 +153,12 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
         init_rn2 = mkRnEnv2 ids
         msg_s = MSGState ids M.empty []
     -- TODO: test for multiple solutions? Attempt to choose best?
-    firstSuccess [ do (k, qa, (rn_l, (h_l, heap, h_r), rn_r)) <- mres
+    firstSuccess [ do ((qa, (k_l, k, k_r)), (rn_l, (h_l, heap, h_r), rn_r)) <- mres
                       return ((deeds_l, Heap h_l ids_l, mkRenaming (M.toList rn_l), k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, mkRenaming (M.toList rn_r), k_r))
                  | mrn2mk <- msgEC init_rn2 k_l k_r
                  , mres <- prod (do (rn2, mk) <- mrn2mk
-                                    (msg_s, (qa, (k_l, k, k_r))) <- unMSG (liftM2 (,) (msgAnned (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
-                                    return (map (liftM ((,,) k qa)) $ msgPureHeap {- mm -} rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
+                                    (msg_s, res@(_, (k_l, _, k_r))) <- unMSG (liftM2 (,) (msgAnned (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
+                                    return (map (liftM ((,) res)) $ msgPureHeap {- mm -} rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
                  ]
   where
     firstSuccess :: [MSG' a] -> MSG' a
