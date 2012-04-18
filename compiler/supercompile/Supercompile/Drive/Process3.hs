@@ -258,7 +258,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                                                    my_split state sc
   Just h  -> flip catchM try_generalise $ \rb ->
                terminateM h state rb
-                 (speculateM (reduce state) $ \state -> (if mb_h == Just "h44" then pprTrace "sc'" (pPrintFullState quietStatePrettiness state) else id) $ my_split state sc)
+                 (speculateM (reduce state) $ \state -> my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
                                                          case msg shallow_state state of 
                                                            -- FIXME: better? In particular, could rollback and then MSG
