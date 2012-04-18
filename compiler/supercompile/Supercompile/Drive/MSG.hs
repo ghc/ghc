@@ -435,7 +435,7 @@ msgEC init_rn2 = go init_rn2
                  (kf_r, k_r) <- splitCar "right" k_r
                  (rn2'', mkf') <- msgECFrame rn2' kf_l kf_r
                  return (map (liftM (second (\it rn2 -> liftM2 (\kf (k_l, k, k_r) -> (k_l, kf `Car` k, k_r)) (mkf' rn2) (it rn2)))) $ go rn2'' k_l k_r)) ++
-        [return (rn2', \_ -> return (k_l, Loco False, k_r))]
+        [return (rn2', \_ -> return (k_l, Loco (not (nullTrain k_r)), k_r))] -- Right biased generalisation flag
 
 msgECFrame :: RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> MSG' (RnEnv2, RnEnv2 -> MSG (Tagged StackFrame))
 msgECFrame init_rn2 kf_l kf_r = liftM (second (liftM (Tagged (tag kf_r)) .)) $ go (tagee kf_l) (tagee kf_r) -- Right biased
@@ -472,24 +472,21 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
 
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
       | Right (msg_s, x_common) <- flip unMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
-      = prod (do (used_l', hb_l) <- mb_common_l
-                 (used_r', hb_r) <- mb_common_r
-                 (msg_s, hb) <- case (inject hb_l, inject hb_r) of
-                                  (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
-                                    | let_bound_l == let_bound_r
-                                    , Right (msg_s, in_e) <- flip unMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
-                                    -> return (msg_s, (if let_bound_r then letBound else internallyBound) in_e)
-                                  (Just Nothing, Just Nothing)
-                                    | x_l == x_r
-                                    -> return (msg_s, hb_r) -- Right biased
-                                  -- NB: we reject two lambda bound things as not matching so that we go into the "generalise"
-                                  -- code path. By doing it this way, we ensure we not only add the common lambdaBound heap binding,
-                                  -- but also appropriate renamings to both rn_l and rn_r.
-                                  --(Nothing, Nothing)
-                                  --  -> return (msg_s, lambdaBound)
-                                  _ -> Left "msgPureHeap: non-unifiable heap bindings"
+      = prod (do (used_l, hb_l) <- mb_common_l
+                 (used_r, hb_r) <- mb_common_r
+                 (rn_l, rn_r, msg_s, hb) <- case (inject hb_l, inject hb_r) of
+                   (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
+                     | let_bound_l == let_bound_r
+                     , Right (msg_s, in_e) <- flip unMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
+                     -> return (rn_l, rn_r, msg_s, (if let_bound_r then letBound else internallyBound) in_e)
+                   (Just Nothing, Just Nothing)
+                     | x_l == x_r
+                     -> return (rn_l, rn_r, msg_s, hb_r) -- Right biased
+                   (Nothing, Nothing)
+                     -> return (M.insert x_common x_l rn_l, M.insert x_common x_r rn_r, msg_s, lambdaBound)
+                   _ -> Left "msgPureHeap: non-unifiable heap bindings"
                  -- If they match, we need to make a common heap binding
-                 return (go rn_l rn_r used_l' used_r'
+                 return (go rn_l rn_r used_l used_r
                             h_l h_r (M.insert x_common hb h) msg_s)) ++
         -- If they don't match, we need to generalise
         prod (do -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
@@ -497,7 +494,7 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
                  (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
                  return $ go (M.insert x_common x_l rn_l) (M.insert x_common x_r rn_r) used_l' used_r'
-                             h_l' h_r' (M.insert x_common lambdaBound h) msg_s)
+                             h_l' h_r' (M.insert x_common generalised h) msg_s) -- FIXME: only mark as generalised if *right hand side* was not e.g. a lambda bound
       | otherwise
       = [Left "msgPureHeap: non-unifiable heap binders"]
       where
