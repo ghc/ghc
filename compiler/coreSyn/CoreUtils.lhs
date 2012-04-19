@@ -31,7 +31,7 @@ module CoreUtils (
         CoreStats(..), coreBindsStats,
 
         -- * Hashing
-        hashExpr, hashType,
+        hashExpr, hashType, hashCoercion,
 
         -- * Equality
         cheapEqExpr, eqExpr, eqExprX,
@@ -1512,6 +1512,10 @@ hashExpr = runHash . flip hash_expr
 hashType :: Type -> Int
 -- ^ Same properties as 'hashExpr', but for types
 hashType = runHash . flip fast_hash_type
+
+hashCoercion :: Coercion -> Int
+-- ^ Same properties as 'hashExpr', but for coercions
+hashCoercion = runHash . flip fast_hash_co
 
 type HashEnv = (Int, VarEnv Int)  -- Hash code for bound variables
 

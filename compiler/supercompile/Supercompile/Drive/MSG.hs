@@ -17,17 +17,17 @@ import qualified CoreSyn as Core
 
 import Util
 import Coercion
-import CoreUtils  (hashType)
+import CoreUtils  (hashCoercion, hashType)
 import Name       (mkSystemVarName)
 import Var        (TyVar, mkTyVar, isTyVar, isId, tyVarKind, setVarType, setTyVarKind)
-import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation)
+import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal)
 import IdInfo     (SpecInfo(..))
 import VarEnv
 import Type       (typeKind, mkTyConApp, mkAppTy)
 import TysWiredIn (pairTyCon)
 import TysPrim    (funTyCon)
 import TypeRep    (Kind, Type(..))
-import TrieMap    (TrieMap(..), TypeMap)
+import TrieMap    (TrieMap(..), CoercionMap, TypeMap)
 import Rules      (mkSpecInfo, roughTopNames)
 import Unique     (mkUniqueGrimily)
 import FastString (fsLit)
@@ -93,35 +93,42 @@ data MSGEnv = MSGEnv {
 --      b |-> Bool   b |-> Char
 --      (:) ((,) a b) x ([] ((,) a b))
 --    Now everything is cool!
-data Pending = PendingVar  Var  Var
-             | PendingType Type Type
+data Pending = PendingVar      Var      Var
+             | PendingType     Type     Type
+             | PendingCoercion Coercion Coercion
 
 data MSGState = MSGState {
-    msgInScopeSet        :: InScopeSet,              -- We have to ensure all new vars are distinct from *each other* AND *top level vars*
-    msgKnownPendingVars  :: VarEnv (VarEnv Var),     -- INVARIANT: the "known"
-    msgKnownPendingTypes :: TypeMap (TypeMap TyVar), -- maps are inverse to
-    msgPending           :: [(Var, Pending)]         -- the pending list
+    msgInScopeSet            :: InScopeSet,                      -- We have to ensure all new vars are distinct from *each other* AND *top level vars*
+    msgKnownPendingVars      :: VarEnv (VarEnv Var),             -- INVARIANT: the 
+    msgKnownPendingTypes     :: TypeMap (TypeMap TyVar),         -- "known" maps are
+    msgKnownPendingCoercions :: CoercionMap (CoercionMap CoVar), -- inverse to
+    msgPending               :: [(Var, Pending)]                 -- the pending list
   }
 
 msgPend :: Var -> Pending -> MSG Var
-msgPend x_base pending = MSG $ \_ s -> Right $ case ei_s_x s of
+msgPend x_base pending = MSG $ \_ s -> Right $ case lookupUpdatePending s of
     Left mk_s -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
                       msgPending = (x, pending) : msgPending s }, x)
       where s = mk_s x
             x = uniqAway (msgInScopeSet s) x_base
     Right x   -> (s, x)
   where
-    ei_s_x s = case pending of
+    lookupUpdatePending s = case pending of
       PendingVar x_l x_r -> case mb_x_l_map >>= flip lookupVarEnv x_r of
           Nothing -> Left (\x -> s { msgKnownPendingVars = extendVarEnv (msgKnownPendingVars s) x_l (maybe (unitVarEnv x_r x) (\x_l_map -> extendVarEnv x_l_map x_r x) mb_x_l_map) })
           Just x  -> Right x
         where mb_x_l_map = lookupVarEnv (msgKnownPendingVars s) x_l
-      PendingType ty_l ty_r -> case mb_ty_l_map >>= lookupTM ty_r of
-          Nothing -> Left (\a -> s { msgKnownPendingTypes = extendTM ty_l (extendTM ty_r a (mb_ty_l_map `orElse` emptyTM)) (msgKnownPendingTypes s) })
+      PendingType     ty_l ty_r -> fmapLeft (\upd x -> s { msgKnownPendingTypes     = upd x }) $ lookupUpdateTM (msgKnownPendingTypes s)     ty_l ty_r
+      PendingCoercion co_l co_r -> fmapLeft (\upd q -> s { msgKnownPendingCoercions = upd q }) $ lookupUpdateTM (msgKnownPendingCoercions s) co_l co_r
+
+    fmapLeft f = either (Left . f) Right
+
+    lookupUpdateTM :: TrieMap m => m (m Var) -> Key m -> Key m -> Either (Var -> m (m Var)) Var
+    lookupUpdateTM mp it_l it_r = case mb_it_l_map >>= lookupTM it_r of
+          Nothing -> Left (\a -> extendTM it_l (extendTM it_r a (mb_it_l_map `orElse` emptyTM)) mp)
           Just a  -> Right a
-        where mb_ty_l_map = lookupTM ty_l (msgKnownPendingTypes s)
+        where mb_it_l_map = lookupTM it_l mp
               extendTM k v m = alterTM k (\_ -> Just v) m
-        -- (/\a -> f (Maybe a)) `msg` (/\b -> f ([] b))
 
 -- INVARIANTs:
 --   1. All the Vars are *not* rigidly bound (i.e. they are bound by a "let")
@@ -156,6 +163,11 @@ msgFlexiVar x_l x_r = msgPend x_r (PendingVar x_l x_r)
 msgGeneraliseType :: Type -> Type -> MSG TyVar
 msgGeneraliseType ty_l ty_r = msgPend (mkTyVar (mkSystemVarName uniq (fsLit "genty")) (typeKind ty_r)) (PendingType ty_l ty_r)
   where uniq = mkUniqueGrimily (hashType (mkTyConApp pairTyCon [ty_l, ty_r])) -- NB: pair might not be kind correct, but who cares?
+
+-- INVARIANT: neither incoming Coercion can refer to something bound rigidly (can't float out things that reference rigids)
+msgGeneraliseCoercion :: Coercion -> Coercion -> MSG TyVar
+msgGeneraliseCoercion co_l co_r = msgPend (mkSysLocal (fsLit "genco") uniq (coercionType co_r)) (PendingCoercion co_l co_r)
+  where uniq = mkUniqueGrimily (hashCoercion (mkTyConAppCo pairTyCon [co_l, co_r]))
 
 {-
 newtype MSG a = MSG { unMSG :: Either String (MSG' a) }
@@ -215,7 +227,7 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
     -- This was the source of a very confusing bug :-(
     let ids = ids_l `unionInScope` ids_r
         init_rn2 = mkRnEnv2 ids
-        msg_s = MSGState ids emptyVarEnv emptyTM []
+        msg_s = MSGState ids emptyVarEnv emptyTM emptyTM []
     -- TODO: test for multiple solutions? Attempt to choose best?
     firstSuccess [ do ((qa, (k_l, k, k_r)), (rn_l, (h_l, heap, h_r), rn_r)) <- mres
                       return ((deeds_l, Heap h_l ids_l, rn_l, k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, rn_r, k_r))
@@ -269,7 +281,7 @@ msgKind = msgType
 -- at the superkind level is Box, which always MSGes into itself.
 msgType, msgType' :: RnEnv2 -> Type -> Type -> MSG Type
 msgType rn2 ty_l ty_r = msgType' rn2 ty_l ty_r `mplus` do
-    guard "msgType: unfloatable" (canFloatType (rnOccL_maybe rn2) ty_l && canFloatType (rnOccR_maybe rn2) ty_r)
+    guardFloatable "msgType" tyVarsOfType rn2 ty_l ty_r
     liftM TyVarTy $ msgGeneraliseType ty_l ty_r
 
 msgType' rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r
@@ -280,20 +292,24 @@ msgType' rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType rn2 ((TyConAp
 msgType' rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType rn2 ty_l ty_r
 msgType' _ _ _ = fail "msgType"
 
--- TODO: msg coercion instantiation?
-msgCoercion :: RnEnv2 -> Coercion -> Coercion -> MSG Coercion
-msgCoercion rn2 (Refl ty_l)              (Refl ty_r)              = liftM Refl $ msgType rn2 ty_l ty_r
-msgCoercion rn2 (TyConAppCo tc_l cos_l)  (TyConAppCo tc_r cos_r)  = guard "msgCoercion: TyConAppCo" (tc_l == tc_r) >> liftM (TyConAppCo tc_r) (zipWithEqualM (msgCoercion rn2) cos_l cos_r)
-msgCoercion rn2 (AppCo co1_l co2_l)      (AppCo co1_r co2_r)      = liftM2 AppCo (msgCoercion rn2 co1_l co1_r) (msgCoercion rn2 co2_l co2_r)
-msgCoercion rn2 (ForAllCo a_l co_l)      (ForAllCo a_r co_r)      = msgTyVarBndr ForAllCo rn2 a_l a_r $ \rn2 -> msgCoercion rn2 co_l co_r
-msgCoercion rn2 (CoVarCo a_l)            (CoVarCo a_r)            = liftM CoVarCo $ msgVar rn2 a_l a_r
-msgCoercion rn2 (AxiomInstCo ax_l cos_l) (AxiomInstCo ax_r cos_r) = guard "msgCoercion: AxiomInstCo" (ax_l == ax_r) >> liftM (AxiomInstCo ax_r) (zipWithEqualM (msgCoercion rn2) cos_l cos_r)
-msgCoercion rn2 (UnsafeCo ty1_l ty2_l)   (UnsafeCo ty1_r ty2_r)   = liftM2 UnsafeCo (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
-msgCoercion rn2 (SymCo co_l)             (SymCo co_r)             = liftM SymCo $ msgCoercion rn2 co_l co_r
-msgCoercion rn2 (TransCo co1_l co2_l)    (TransCo co1_r co2_r)    = liftM2 TransCo (msgCoercion rn2 co1_l co1_r) (msgCoercion rn2 co2_l co2_r)
-msgCoercion rn2 (NthCo i_l co_l)         (NthCo i_r co_r)         = guard "msgCoercion: NthCo" (i_l == i_r) >> liftM (NthCo i_r) (msgCoercion rn2 co_l co_r)
-msgCoercion rn2 (InstCo co_l ty_l)       (InstCo co_r ty_r)       = liftM2 InstCo (msgCoercion rn2 co_l co_r) (msgType rn2 ty_l ty_r)
-msgCoercion _ _ _ = fail "msgCoercion"
+msgCoercion, msgCoercion' :: RnEnv2 -> Coercion -> Coercion -> MSG Coercion
+msgCoercion rn2 co_l co_r = msgCoercion' rn2 co_l co_r `mplus` do
+    guardFloatable "msgCoercion" tyCoVarsOfCo rn2 co_l co_r
+    liftM CoVarCo $ msgGeneraliseCoercion co_l co_r
+
+msgCoercion' rn2 (Refl ty_l)              (Refl ty_r)              = liftM Refl $ msgType rn2 ty_l ty_r
+msgCoercion' _   (TyConAppCo tc_l [])     (TyConAppCo tc_r [])     = guard "msgCoercion: TyConAppCo" (tc_l == tc_r) >> return (TyConAppCo tc_r [])
+msgCoercion' rn2 (TyConAppCo tc_l cos_l)  (TyConAppCo tc_r cos_r)  = msgCoercion rn2 (foldl AppCo (TyConAppCo tc_l []) cos_l) (foldl AppCo (TyConAppCo tc_r []) cos_r)
+msgCoercion' rn2 (AppCo co1_l co2_l)      (AppCo co1_r co2_r)      = liftM2 mkAppCo (msgCoercion rn2 co1_l co1_r) (msgCoercion rn2 co2_l co2_r)
+msgCoercion' rn2 (ForAllCo a_l co_l)      (ForAllCo a_r co_r)      = msgTyVarBndr ForAllCo rn2 a_l a_r $ \rn2 -> msgCoercion rn2 co_l co_r
+msgCoercion' rn2 (CoVarCo a_l)            (CoVarCo a_r)            = liftM CoVarCo $ msgVar rn2 a_l a_r
+msgCoercion' rn2 (AxiomInstCo ax_l cos_l) (AxiomInstCo ax_r cos_r) = guard "msgCoercion: AxiomInstCo" (ax_l == ax_r) >> liftM (AxiomInstCo ax_r) (zipWithEqualM (msgCoercion rn2) cos_l cos_r)
+msgCoercion' rn2 (UnsafeCo ty1_l ty2_l)   (UnsafeCo ty1_r ty2_r)   = liftM2 UnsafeCo (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
+msgCoercion' rn2 (SymCo co_l)             (SymCo co_r)             = liftM SymCo $ msgCoercion rn2 co_l co_r
+msgCoercion' rn2 (TransCo co1_l co2_l)    (TransCo co1_r co2_r)    = liftM2 TransCo (msgCoercion rn2 co1_l co1_r) (msgCoercion rn2 co2_l co2_r)
+msgCoercion' rn2 (NthCo i_l co_l)         (NthCo i_r co_r)         = guard "msgCoercion: NthCo" (i_l == i_r) >> liftM (NthCo i_r) (msgCoercion rn2 co_l co_r)
+msgCoercion' rn2 (InstCo co_l ty_l)       (InstCo co_r ty_r)       = liftM2 InstCo (msgCoercion rn2 co_l co_r) (msgType rn2 ty_l ty_r)
+msgCoercion' _ _ _ = fail "msgCoercion"
 
 msgTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> MSG AnnedTerm
 msgTerm rn2 = msgAnned annedTerm (msgTerm' rn2)
@@ -572,13 +588,21 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
         (mb_common_l, mb_individual_l) = find init_h_l k_bvs_l h_l used_l x_l
         (mb_common_r, mb_individual_r) = find init_h_r k_bvs_r h_r used_r x_r
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
-      -- Match binders themselves, but in this case we can't resue msgTyVarBndrExtras, which is annoying :-(
+      -- Match binders themselves, but in this case we can't reuse msgTyVarBndrExtras, which is annoying :-(
       | Right (msg_s, a_common) <- flip runMSG (msg_s { msgPending = rest }) (liftM (a_common `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r))
-      -- We already know the types don't match are we are going to generalise
+      -- We already know the types don't match so we are going to generalise
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyVarsOfType ty_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyVarsOfType ty_r)
                  return (go (insertTypeSubst rn_l a_common ty_l) (insertTypeSubst rn_r a_common ty_r) used_l' used_r'
                              h_l' h_r' (M.insert a_common generalised h) msg_s))
+    go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((q_common, PendingCoercion co_l co_r):rest) })
+      -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that q_common always has no IdInfo.
+      | Right (msg_s, q_common) <- flip runMSG (msg_s { msgPending = rest }) (liftM (q_common `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r))
+      -- We already know the coercions don't match so we are going to generalise
+      = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyCoVarsOfCo co_l)
+                 (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyCoVarsOfCo co_r)
+                 return (go (insertCoercionSubst rn_l q_common co_l) (insertCoercionSubst rn_r q_common co_r) used_l' used_r'
+                             h_l' h_r' (M.insert q_common generalised h) msg_s))
     go _ _ _ _ _ _ _ _ = [Left "msgPureHeap: non-unifiable heap binders"]
 
     find :: PureHeap -> BoundVars -> PureHeap -> S.Set Var
@@ -631,8 +655,8 @@ prod :: MSG' [MSG' a] -> [MSG' a]
 prod (Left msg)  = [Left msg]
 prod (Right mxs) = mxs
 
-canFloatType :: (TyVar -> Maybe a) -> Type -> Bool
-canFloatType = canFloat tyVarsOfType
+guardFloatable :: String -> (a -> FreeVars) -> RnEnv2 -> a -> a -> MSG ()
+guardFloatable msg fvs rn2 x_l x_r = guard (msg ++ ": unfloatable") (canFloat fvs (rnOccL_maybe rn2) x_l && canFloat fvs (rnOccR_maybe rn2) x_r)
 
 canFloat :: (b -> FreeVars) -> (Var -> Maybe a) -> b -> Bool
 canFloat fvs lkup = foldVarSet (\a rest_ok -> maybe rest_ok (const False) (lkup a)) True . fvs
