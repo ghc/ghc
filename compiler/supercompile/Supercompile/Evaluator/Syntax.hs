@@ -306,7 +306,7 @@ stackFrameType' kf hole_ty = case kf of
 qaType :: Anned QA -> Type
 qaType anned_qa = case caseAnnedQA anned_qa of
     Left  anned_q -> idType (extract anned_q)
-    Right anned_a ->answerType anned_a
+    Right anned_a -> answerType anned_a
 
 answerType :: Anned Answer -> Type
 answerType a = case annee a of
