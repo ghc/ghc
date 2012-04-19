@@ -17,12 +17,20 @@ import qualified CoreSyn as Core
 
 import Util
 import Coercion
-import Var        (TyVar, isTyVar, isId, tyVarKind, setVarType, setTyVarKind)
+import CoreUtils  (hashType)
+import Name       (mkSystemVarName)
+import Var        (TyVar, mkTyVar, isTyVar, isId, tyVarKind, setVarType, setTyVarKind)
 import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation)
 import IdInfo     (SpecInfo(..))
 import VarEnv
+import Type       (typeKind, mkTyConApp, mkAppTy)
+import TysWiredIn (pairTyCon)
+import TysPrim    (funTyCon)
 import TypeRep    (Kind, Type(..))
+import TrieMap    (TrieMap(..), TypeMap)
 import Rules      (mkSpecInfo, roughTopNames)
+import Unique     (mkUniqueGrimily)
+import FastString (fsLit)
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -58,17 +66,73 @@ instance Monad MSG' where
 
 type MSG' = Either String
 
-data MSGState = MSGState {
-    msgInScopeSet      :: InScopeSet,           -- We have to ensure all new vars are distinct from *each other* AND *top level vars*
-    msgKnownFlexiPairs :: M.Map (Var, Var) Var, -- INVARIANT: inverse
-    msgPending         :: [(Var, (Var, Var))]   -- of each other
+-- Information on the context which we are currently in (FIXME: currently unused)
+data MSGEnv = MSGEnv {
   }
+
+-- We want to create as few new "common" vars as possible when MSGing. This state helps to achieve this:
+--  * When MSG encounters the same pair of two (heap or stack bound) things, we reuse the same "common" var
+--    to refer to them.
+--- * This is good because it doesn't make sense for a pair to match in one place but fail to match in another.
+--    By reusing the same common var in both places we ensure the same generalisation decision applies to all
+--    identical use sites.
+--  * We ensure we only create a finite number of common variables because there are only finitely many possible
+--    pairs.
+--  * When MSGing *type* information it is critical for correctness that all similar type pairs get generalised
+--    to a single type lambda. Consider:
+--      (:) ((,) Int  Bool) x ([] ((,) Int  Bool)) `msg`
+--      (:) ((,) Word Char) x ([] ((,) Word Char))
+--    We *can't* generalise to this:
+--      a |-> Int    a |-> Word
+--      b |-> Bool   b |-> Char
+--      c |-> Int    c |-> Word
+--      d |-> Bool   d |-> Char
+--      (:) ((,) a b) x ([] ((,) c d))
+--    Since the generalised term wouldn't type-check. Instead we must generalise to:
+--      a |-> Int    a |-> Word
+--      b |-> Bool   b |-> Char
+--      (:) ((,) a b) x ([] ((,) a b))
+--    Now everything is cool!
+data Pending = PendingVar  Var  Var
+             | PendingType Type Type
+
+data MSGState = MSGState {
+    msgInScopeSet        :: InScopeSet,              -- We have to ensure all new vars are distinct from *each other* AND *top level vars*
+    msgKnownPendingVars  :: VarEnv (VarEnv Var),     -- INVARIANT: the "known"
+    msgKnownPendingTypes :: TypeMap (TypeMap TyVar), -- maps are inverse to
+    msgPending           :: [(Var, Pending)]         -- the pending list
+  }
+
+msgPend :: Var -> Pending -> MSG Var
+msgPend x_base pending = MSG $ \_ s -> Right $ case ei_s_x s of
+    Left mk_s -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
+                      msgPending = (x, pending) : msgPending s }, x)
+      where s = mk_s x
+            x = uniqAway (msgInScopeSet s) x_base
+    Right x   -> (s, x)
+  where
+    ei_s_x s = case pending of
+      PendingVar x_l x_r -> case mb_x_l_map >>= flip lookupVarEnv x_r of
+          Nothing -> Left (\x -> s { msgKnownPendingVars = extendVarEnv (msgKnownPendingVars s) x_l (maybe (unitVarEnv x_r x) (\x_l_map -> extendVarEnv x_l_map x_r x) mb_x_l_map) })
+          Just x  -> Right x
+        where mb_x_l_map = lookupVarEnv (msgKnownPendingVars s) x_l
+      PendingType ty_l ty_r -> case mb_ty_l_map >>= lookupTM ty_r of
+          Nothing -> Left (\a -> s { msgKnownPendingTypes = extendTM ty_l (extendTM ty_r a (mb_ty_l_map `orElse` emptyTM)) (msgKnownPendingTypes s) })
+          Just a  -> Right a
+        where mb_ty_l_map = lookupTM ty_l (msgKnownPendingTypes s)
+              extendTM k v m = alterTM k (\_ -> Just v) m
+        -- (/\a -> f (Maybe a)) `msg` (/\b -> f ([] b))
 
 -- INVARIANTs:
 --   1. All the Vars are *not* rigidly bound (i.e. they are bound by a "let")
 --   2. The terms *may* contain free variables of any kind, rigidly bound or not
 --   3. The Vars in VarL/VarR are always CoVars/Ids, NEVER TyVars (might change this in the future)
-newtype MSG a = MSG { unMSG :: MSGState -> MSG' (MSGState, a) }
+newtype MSG a = MSG { unMSG :: MSGEnv -> MSGState -> MSG' (MSGState, a) }
+
+-- Don't need to specify MSGEnv because every site that needs to run a MSG
+-- computation occurs in basically the same context:
+runMSG :: MSG a -> MSGState -> MSG' (MSGState, a)
+runMSG mx = unMSG mx (MSGEnv {})
 
 instance Functor MSG where
     fmap = liftM
@@ -78,19 +142,20 @@ instance Applicative MSG where
     (<*>) = ap
 
 instance Monad MSG where
-    return x = MSG $ \s -> return (s, x)
-    mx >>= fxmy = MSG $ \s -> do
-      (s, x) <- unMSG mx s
-      unMSG (fxmy x) s
-    fail msg = MSG $ \_ -> Left msg
+    return x = MSG $ \_ s -> return (s, x)
+    mx >>= fxmy = MSG $ \e s -> do
+      (s, x) <- unMSG mx e s
+      unMSG (fxmy x) e s
+    fail msg = MSG $ \_ _ -> Left msg
 
+-- INVARIANT: neither incoming Var may be bound rigidly (rigid only matches against rigid)
 msgFlexiVar :: Var -> Var -> MSG Var
-msgFlexiVar x_l x_r = MSG $ \s -> Right $ case M.lookup (x_l, x_r) (msgKnownFlexiPairs s) of
-  Nothing -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
-                  msgKnownFlexiPairs = M.insert (x_l, x_r) x (msgKnownFlexiPairs s),
-                  msgPending = (x, (x_l, x_r)) : msgPending s }, x)
-    where x = uniqAway (msgInScopeSet s) x_r
-  Just x  -> (s, x)
+msgFlexiVar x_l x_r = msgPend x_r (PendingVar x_l x_r)
+
+-- INVARIANT: neither incoming Type can refer to something bound rigidly (can't float out things that reference rigids)
+msgGeneraliseType :: Type -> Type -> MSG TyVar
+msgGeneraliseType ty_l ty_r = msgPend (mkTyVar (mkSystemVarName uniq (fsLit "genty")) (typeKind ty_r)) (PendingType ty_l ty_r)
+  where uniq = mkUniqueGrimily (hashType (mkTyConApp pairTyCon [ty_l, ty_r])) -- NB: pair might not be kind correct, but who cares?
 
 {-
 newtype MSG a = MSG { unMSG :: Either String (MSG' a) }
@@ -149,13 +214,13 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
     -- This was the source of a very confusing bug :-(
     let ids = ids_l `unionInScope` ids_r
         init_rn2 = mkRnEnv2 ids
-        msg_s = MSGState ids M.empty []
+        msg_s = MSGState ids emptyVarEnv emptyTM []
     -- TODO: test for multiple solutions? Attempt to choose best?
     firstSuccess [ do ((qa, (k_l, k, k_r)), (rn_l, (h_l, heap, h_r), rn_r)) <- mres
-                      return ((deeds_l, Heap h_l ids_l, mkRenaming (M.toList rn_l), k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, mkRenaming (M.toList rn_r), k_r))
+                      return ((deeds_l, Heap h_l ids_l, rn_l, k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, rn_r, k_r))
                  | mrn2mk <- msgEC init_rn2 k_l k_r
                  , mres <- prod (do (rn2, mk) <- mrn2mk
-                                    (msg_s, res@(_, (k_l, _, k_r))) <- unMSG (liftM2 (,) (msgAnned annedQA (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
+                                    (msg_s, res@(_, (k_l, _, k_r))) <- runMSG (liftM2 (,) (msgAnned annedQA (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
                                     return (map (liftM ((,) res)) $ msgPureHeap {- mm -} rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
                  ]
   where
@@ -187,14 +252,32 @@ msgCoerced _ _ _ _ = fail "msgCoerced"
 msgKind :: RnEnv2 -> Kind -> Kind -> MSG Kind
 msgKind = msgType
 
--- TODO: msg type instantiation?
+-- NB: we don't match FunTy and TyConApp literally because
+-- we can do better MSG for combinations like:
+--   Either Int Char `msg` Maybe Char
+-- We get:
+--   a |-> Either Int        a |-> Maybe
+--   a Char
+-- Rather than the trivial MSG we would otherwise get if we insisted
+-- on matching TyConApp constructors exactly:
+--   a |-> Either Int Char   a |-> Maybe Char
+--   a
+--
+-- NB: we don't do anything stupid like introduce a TyVar due to
+-- generalisation at the superkind level because the only term
+-- at the superkind level is Box, which always MSGes into itself.
 msgType :: RnEnv2 -> Type -> Type -> MSG Type
 msgType rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r
-msgType rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 AppTy (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
-msgType rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = guard "msgType: TyConApp" (tc_l == tc_r) >> liftM (TyConApp tc_r) (zipWithEqualM (msgType rn2) tys_l tys_r)
-msgType rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = liftM2 FunTy (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
+msgType rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 mkAppTy (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
+msgType _   (TyConApp tc_l [])    (TyConApp tc_r [])    = guard "msgType: TyConApp" (tc_l == tc_r) >> return (TyConApp tc_r [])
+msgType rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = msgType rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
+msgType rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType rn2 ((TyConApp funTyCon [] `AppTy` ty1_l) `AppTy` ty2_l) ((TyConApp funTyCon [] `AppTy` ty1_r) `AppTy` ty2_r)
 msgType rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType rn2 ty_l ty_r
-msgType _ _ _ = fail "msgType"
+msgType rn2 ty_l ty_r | canFloatType (rnOccL_maybe rn2) ty_l, canFloatType (rnOccR_maybe rn2) ty_r = liftM TyVarTy $ msgGeneraliseType ty_l ty_r
+msgType _ _ _ = fail "msgType" -- FIXME: succeed in all cases, even with trivial gen?
+
+canFloatType :: (TyVar -> Maybe a) -> Type -> Bool
+canFloatType lkup = foldVarSet (\a rest_ok -> maybe rest_ok (const False) (lkup a)) True . tyVarsOfType
 
 -- TODO: msg coercion instantiation?
 msgCoercion :: RnEnv2 -> Coercion -> Coercion -> MSG Coercion
@@ -442,39 +525,37 @@ msgECFrame init_rn2 kf_l kf_r = liftM (second (liftM (Tagged (tag kf_r)) .)) $ g
     go _ _ = Left "msgECFrame"
 
 -- NB: we must enforce invariant that stuff "outside" cannot refer to stuff bound "inside" (heap *and* stack)
-msgPureHeap :: {- MSGMode -> -} RnEnv2 -> MSGState -> PureHeap -> PureHeap -> (BoundVars, FreeVars) -> (BoundVars, FreeVars) -> [MSG' (M.Map Var Var, (PureHeap, Heap, PureHeap), M.Map Var Var)]
+msgPureHeap :: {- MSGMode -> -} RnEnv2 -> MSGState -> PureHeap -> PureHeap -> (BoundVars, FreeVars) -> (BoundVars, FreeVars) -> [MSG' (Renaming, (PureHeap, Heap, PureHeap), Renaming)]
 msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
   = prod (do (used_l, h_l) <- sucks init_h_l k_bvs_l M.empty S.empty k_fvs_l
              (used_r, h_r) <- sucks init_h_r k_bvs_r M.empty S.empty k_fvs_r
-             return $ go M.empty M.empty used_l used_r h_l h_r M.empty msg_s)
+             return $ go emptyRenaming emptyRenaming used_l used_r h_l h_r M.empty msg_s)
   where
-    go :: M.Map Var Var        -- Renaming that should be applied to common stuff when instantiated on the left
-       -> M.Map Var Var        -- Renaming that should be applied to common stuff when instantiated on the right
-       -> S.Set Var            -- Binding in left heap already copied into one of the heaps
-       -> S.Set Var            -- Binding in left heap already copied into one of the heaps
-       -> PureHeap             -- Left heap
-       -> PureHeap             -- Right heap
-       -> PureHeap             -- Common heap
-       -> MSGState             -- Pending matches etc. MSGState is also used to ensure we never match a var pair more than once (they get the same common name)
-       -> [MSG' (M.Map Var Var, (PureHeap, Heap, PureHeap), M.Map Var Var)]
+    go :: Renaming  -- Renaming that should be applied to common stuff when instantiated on the left
+       -> Renaming  -- Renaming that should be applied to common stuff when instantiated on the right
+       -> S.Set Var -- Binding in left heap already copied into one of the heaps
+       -> S.Set Var -- Binding in left heap already copied into one of the heaps
+       -> PureHeap  -- Left heap
+       -> PureHeap  -- Right heap
+       -> PureHeap  -- Common heap
+       -> MSGState  -- Pending matches etc. MSGState is also used to ensure we never match a var pair more than once (they get the same common name)
+       -> [MSG' (Renaming, (PureHeap, Heap, PureHeap), Renaming)]
     go rn_l rn_r _      _      h_l h_r h       (MSGState { msgPending = [], msgInScopeSet = ids }) = [return (rn_l, (h_l, Heap h ids, h_r), rn_r)]
-    go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((x_common, (x_l, x_r)):rest) })
-      -- | pprTrace "msgPureHeap" (ppr (x_common, x_l, x_r)) False = undefined
-
+    go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((x_common, PendingVar x_l x_r):rest) })
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
-      | Right (msg_s, x_common) <- flip unMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
+      | Right (msg_s, x_common) <- flip runMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
       = prod (do (used_l, hb_l) <- mb_common_l
                  (used_r, hb_r) <- mb_common_r
                  (rn_l, rn_r, msg_s, hb) <- case (inject hb_l, inject hb_r) of
                    (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
                      | let_bound_l == let_bound_r
-                     , Right (msg_s, in_e) <- flip unMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
+                     , Right (msg_s, in_e) <- flip runMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
                      -> return (rn_l, rn_r, msg_s, (if let_bound_r then letBound else internallyBound) in_e)
                    (Just Nothing, Just Nothing)
                      | x_l == x_r
                      -> return (rn_l, rn_r, msg_s, hb_r) -- Right biased
                    (Nothing, Nothing)
-                     -> return (M.insert x_common x_l rn_l, M.insert x_common x_r rn_r, msg_s, lambdaBound)
+                     -> return (insertIdRenaming rn_l x_common x_l, insertIdRenaming rn_r x_common x_r, msg_s, lambdaBound)
                    _ -> Left "msgPureHeap: non-unifiable heap bindings"
                  -- If they match, we need to make a common heap binding
                  return (go rn_l rn_r used_l used_r
@@ -484,13 +565,20 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
                  -- that binding refers to. If that is not possible, we have to fail.
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
                  (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
-                 return $ go (M.insert x_common x_l rn_l) (M.insert x_common x_r rn_r) used_l' used_r'
+                 return $ go (insertIdRenaming rn_l x_common x_l) (insertIdRenaming rn_r x_common x_r) used_l' used_r'
                              h_l' h_r' (M.insert x_common generalised h) msg_s) -- FIXME: only mark as generalised if *right hand side* was not e.g. a lambda bound
-      | otherwise
-      = [Left "msgPureHeap: non-unifiable heap binders"]
       where
         (mb_common_l, mb_individual_l) = find init_h_l k_bvs_l h_l used_l x_l
         (mb_common_r, mb_individual_r) = find init_h_r k_bvs_r h_r used_r x_r
+    go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
+      -- Match binders themselves, but in this case we can't resue msgTyVarBndrExtras, which is annoying :-(
+      | Right (msg_s, a_common) <- flip runMSG (msg_s { msgPending = rest }) (liftM (a_common `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r))
+      -- We already know the types don't match are we are going to generalise
+      = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyVarsOfType ty_l)
+                 (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyVarsOfType ty_r)
+                 return (go (insertTypeSubst rn_l a_common ty_l) (insertTypeSubst rn_r a_common ty_r) used_l' used_r'
+                             h_l' h_r' (M.insert a_common generalised h) msg_s))
+    go _ _ _ _ _ _ _ _ = [Left "msgPureHeap: non-unifiable heap binders"]
 
     find :: PureHeap -> BoundVars -> PureHeap -> S.Set Var
          -> Var -> (MSG' (S.Set Var, HeapBinding),

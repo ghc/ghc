@@ -31,7 +31,7 @@ module CoreUtils (
         CoreStats(..), coreBindsStats,
 
         -- * Hashing
-        hashExpr,
+        hashExpr, hashType,
 
         -- * Equality
         cheapEqExpr, eqExpr, eqExprX,
@@ -1507,11 +1507,17 @@ hashExpr :: CoreExpr -> Int
 --
 -- We must be careful that @\\x.x@ and @\\y.y@ map to the same hash code,
 -- (at least if we want the above invariant to be true).
+hashExpr = runHash . flip hash_expr
 
-hashExpr e = fromIntegral (hash_expr (1,emptyVarEnv) e .&. 0x7fffffff)
-             -- UniqFM doesn't like negative Ints
+hashType :: Type -> Int
+-- ^ Same properties as 'hashExpr', but for types
+hashType = runHash . flip fast_hash_type
 
 type HashEnv = (Int, VarEnv Int)  -- Hash code for bound variables
+
+runHash :: (HashEnv -> Word32) -> Int
+runHash f = fromIntegral (f (1,emptyVarEnv) .&. 0x7fffffff)
+             -- UniqFM doesn't like negative Ints
 
 hash_expr :: HashEnv -> CoreExpr -> Word32
 -- Word32, because we're expecting overflows here, and overflowing
@@ -1555,7 +1561,7 @@ fast_hash_co env co
                                                 in foldr (\c n -> fast_hash_co env c + n) hash_tc cos
   | otherwise                                 = 1
 
-extend_env :: HashEnv -> Var -> (Int, VarEnv Int)
+extend_env :: HashEnv -> Var -> HashEnv
 extend_env (n,env) b = (n+1, extendVarEnv env b n)
 
 hashVar :: HashEnv -> Var -> Word32
