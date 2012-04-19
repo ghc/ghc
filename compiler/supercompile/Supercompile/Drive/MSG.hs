@@ -326,7 +326,7 @@ msgTerm' rn2 (Let x_l e1_l e2_l)        (Let x_r e1_r e2_r)        = liftM2 (\e1
 msgTerm' rn2 (LetRec xes_l e_l)         (LetRec xes_r e_r)         = msgIdCoVarBndrsRec (\xs (es, e) -> LetRec (zipEqual "msgTerm: letrec" xs es) e) rn2 xs_l xs_r $ \rn2 -> liftM2 (,) (zipWithEqualM (msgTerm rn2) es_l es_r) (msgTerm rn2 e_l e_r)
   where (xs_l, es_l) = unzip xes_l
         (xs_r, es_r) = unzip xes_r
-msgTerm' rn2 (Cast e_l co_l)            (Cast e_r co_r)            = liftM2 Cast (msgTerm rn2 (e_l) (e_r)) (msgCoercion rn2 (co_l) (co_r))
+msgTerm' rn2 (Cast e_l co_l)            (Cast e_r co_r)            = liftM2 Cast (msgTerm rn2 e_l e_r) (msgCoercion rn2 (co_l) (co_r))
 msgTerm' _ _ _ = fail "msgTerm"
 
 msgValue :: RnEnv2 -> AnnedValue -> AnnedValue -> MSG AnnedValue
