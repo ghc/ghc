@@ -193,10 +193,11 @@ coreAltConToAltCon (DataAlt dc) xs = S.DataAlt dc as qs zs
             (qs, zs) = span isCoVar ys
 coreAltConToAltCon altcon       xs = pprPanic "coreAltConToAltCon" (ppr (altcon, xs))
 
-termToCoreExpr :: S.Term -> CoreExpr
+{-# INLINABLE termToCoreExpr #-}
+termToCoreExpr :: Copointed ann => ann (S.TermF ann) -> CoreExpr
 termToCoreExpr = term
   where
-    term e = case unI e of
+    term e = case extract e of
         S.Var x             -> Var x
         S.Value v           -> value v
         S.TyApp e ty        -> term e `App` Type ty
