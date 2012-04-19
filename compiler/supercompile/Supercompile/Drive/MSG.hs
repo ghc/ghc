@@ -104,7 +104,7 @@ data Pending = PendingVar      Var       Var
              | PendingTerm     AnnedTerm AnnedTerm
 
 data MSGState = MSGState {
-    msgInScopeSet            :: InScopeSet,                      -- We have to ensure all new vars are distinct from *each other* AND *top level vars*
+    msgInScopeSet            :: InScopeSet,                      -- We have to ensure all new vars introduced by MSG are distinct from each other
     msgKnownPendingVars      :: VarEnv (VarEnv Var),             -- INVARIANT: the "known" maps are inverse to the pending list,
     msgKnownPendingTypes     :: TypeMap (TypeMap TyVar),         -- except that PendingTerms are not recorded in a "known" map at all.
     msgKnownPendingCoercions :: CoercionMap (CoercionMap CoVar), -- We don't *want* them in one because we don't mant MSGing to increase work sharing!
@@ -267,7 +267,11 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
     -- This was the source of a very confusing bug :-(
     let ids = ids_l `unionInScope` ids_r
         init_rn2 = mkRnEnv2 ids
-        msg_s = MSGState ids emptyVarEnv emptyTM emptyTM []
+        -- NB: I've started to use emptyInScopeSet here rather than ids. The effect this has is that variable names from ids_l
+        -- and ids_r will actually occur in the common heap. This is perfectly OK for our purposes because we never try to bind
+        -- names from the common and individual heaps at the same time. Doing this also helps debugging because we minimise
+        -- the creation of brand new names as far as possible.
+        msg_s = MSGState emptyInScopeSet emptyVarEnv emptyTM emptyTM []
     -- TODO: test for multiple solutions? Attempt to choose best?
     firstSuccess [ do ((qa, (k_l, k, k_r)), (rn_l, (h_l, heap, h_r), rn_r)) <- mres
                       return ((deeds_l, Heap h_l ids_l, rn_l, k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, rn_r, k_r))
