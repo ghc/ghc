@@ -111,12 +111,14 @@ data MSGState = MSGState {
     msgPending               :: [(Var, Pending)]                 -- the pending list
   }
 
-msgPend :: Var -> Pending -> MSG Var
-msgPend x_base pending = MSG $ \_ s -> Right $ case lookupUpdatePending s of
-    Left mk_s -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
-                      msgPending = (x, pending) : msgPending s }, x)
-      where s = mk_s x
-            x = uniqAway (msgInScopeSet s) x_base
+msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
+msgPend rn2 x0 pending = MSG $ \_ s -> Right $ case lookupUpdatePending s of
+    Left mk_s -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x2,
+                      msgPending = (x2, pending) : msgPending s }, x2)
+      where s = mk_s x2
+            -- This use of rn2 is necessary to ensure new common vars don't clash with rigid binders
+            x1 = uniqAway (rnInScopeSet rn2) x0
+            x2 = uniqAway (msgInScopeSet s) x1
     Right x   -> (s, x)
   where
     lookupUpdatePending s = case pending of
@@ -177,28 +179,28 @@ instance Monad MSG where
     fail msg = MSG $ \_ _ -> Left msg
 
 -- INVARIANT: neither incoming Var may be bound rigidly (rigid only matches against rigid)
-msgFlexiVar :: Var -> Var -> MSG Var
-msgFlexiVar x_l x_r = msgPend x_r (PendingVar x_l x_r)
+msgFlexiVar :: RnEnv2 -> Var -> Var -> MSG Var
+msgFlexiVar rn2 x_l x_r = msgPend rn2 x_r (PendingVar x_l x_r)
 
 -- INVARIANT: neither incoming Type can refer to something bound rigidly (can't float out things that reference rigids)
-msgGeneraliseType :: Type -> Type -> MSG TyVar
-msgGeneraliseType ty_l ty_r = msgPend a (PendingType ty_l ty_r)
+msgGeneraliseType :: RnEnv2 -> Type -> Type -> MSG TyVar
+msgGeneraliseType rn2 ty_l ty_r = msgPend rn2 a (PendingType ty_l ty_r)
   where 
     -- Unbiased choice of base variable: only one side may be a variable, kind is MSGed at binding site
     a = (getTyVar_maybe ty_l `mplus` getTyVar_maybe ty_r) `orElse` mkTyVar (mkSystemVarName uniq (fsLit "genty")) (typeKind ty_r)
     uniq = mkUniqueGrimily (hashType (mkTyConApp pairTyCon [ty_l, ty_r])) -- NB: pair might not be kind correct, but who cares?
 
 -- INVARIANT: neither incoming Coercion can refer to something bound rigidly (don't want to lambda-abstract to float out things that reference rigids)
-msgGeneraliseCoercion :: Coercion -> Coercion -> MSG CoVar
-msgGeneraliseCoercion co_l co_r = msgPend q (PendingCoercion co_l co_r)
+msgGeneraliseCoercion :: RnEnv2 -> Coercion -> Coercion -> MSG CoVar
+msgGeneraliseCoercion rn2 co_l co_r = msgPend rn2 q (PendingCoercion co_l co_r)
   where
     -- Unbiased choice of base variable: only one side may be a variable, type is MSGed at binding site
     q = (getCoVar_maybe co_l `mplus` getCoVar_maybe co_r) `orElse` mkSysLocal (fsLit "genco") uniq (coercionType co_r)
     uniq = mkUniqueGrimily (hashCoercion (mkTyConAppCo pairTyCon [co_l, co_r])) -- NB: pair might not be type correct, but who cares?
 
 -- INVARIANT: neither incoming AnnedTerm can refer to something bound rigidly (don't want to lambda-abstract to float out things that reference rigids)
-msgGeneraliseTerm :: AnnedTerm -> AnnedTerm -> MSG Id
-msgGeneraliseTerm e_l e_r = msgPend x (PendingTerm e_l e_r)
+msgGeneraliseTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> MSG Id
+msgGeneraliseTerm rn2 e_l e_r = msgPend rn2 x (PendingTerm e_l e_r)
   where
     -- Unbiased choice of base variable: only one side may be a variable, type is MSGed at binding site
     x = (getVar_maybe e_l `mplus` getVar_maybe e_r) `orElse` mkSysLocal (fsLit "genterm") uniq (termType e_r)
@@ -257,22 +259,8 @@ msg {- mm -} s_l s_r = runMSG' (msgWithReason {- mm -} s_l s_r)
 
 msgWithReason :: {- MSGMode -> -} State -> State -> MSG' MSGResult
 msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
-  do
-    -- It's very important that we don't just use the state free variables from both sides to construct the initial in scope set,
-    -- because we use it to msg the stack and QA on each side *without* first extending it with variables bound by the PureHeap!
-    --
-    -- The InScopeSets from the Heap are guaranteed to take these into account (along with the stuff bound by the stack, but that
-    -- doesn't matter too much) so we just use those instead.
-    --
-    -- This was the source of a very confusing bug :-(
-    let ids = ids_l `unionInScope` ids_r
-        init_rn2 = mkRnEnv2 ids
-        -- NB: I've started to use emptyInScopeSet here rather than ids. The effect this has is that variable names from ids_l
-        -- and ids_r will actually occur in the common heap. This is perfectly OK for our purposes because we never try to bind
-        -- names from the common and individual heaps at the same time. Doing this also helps debugging because we minimise
-        -- the creation of brand new names as far as possible.
-        msg_s = MSGState emptyInScopeSet emptyVarEnv emptyTM emptyTM []
     -- TODO: test for multiple solutions? Attempt to choose best?
+    -- FIXME: use the deterministic algorithm w/ unmarking
     firstSuccess [ do ((qa, (k_l, k, k_r)), (rn_l, (h_l, heap, h_r), rn_r)) <- mres
                       return ((deeds_l, Heap h_l ids_l, rn_l, k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, rn_r, k_r))
                  | mrn2mk <- msgEC init_rn2 k_l k_r
@@ -281,6 +269,17 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
                                     return (map (liftM ((,) res)) $ msgPureHeap {- mm -} rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
                  ]
   where
+    -- NB: it is not necessary to include the ids_l/ids_r in these InScopeSets because the
+    -- binders allocated for rigid binders are *allowed* to shadow things bound in h_l/h_r.
+    -- The only things they may not shadow are things bound in the eventual common heap,
+    -- but we will ensure that when we are choosing those binders in msgPend.
+    --
+    -- Indeed it is better to not include ids_l/ids_r so that the new common heap/stack
+    -- binders often often have exactly the same uniques as their counterparts in the
+    -- incoming states. This aids debugging.
+    init_rn2 = mkRnEnv2 emptyInScopeSet
+    msg_s = MSGState emptyInScopeSet emptyVarEnv emptyTM emptyTM []
+
     firstSuccess :: [MSG' a] -> MSG' a
     firstSuccess []   = Left "firstSuccess: no elements at all"
     firstSuccess (Left _:next:nexts) = firstSuccess (next:nexts)
@@ -294,7 +293,7 @@ msgAnned anned f a_l a_r = liftM (anned (annedTag a_r)) $ f (annedTag a_l) (anne
 msgQA, msgQA' :: RnEnv2 -> Tag -> QA -> Tag -> QA -> MSG QA
 msgQA rn2 tg_l qa_l tg_r qa_r = msgQA' rn2 tg_l qa_l tg_r qa_r `mplus` do
     guardFloatable "msgQA" qaFreeVars rn2 qa_l qa_r
-    liftM Question $ msgGeneraliseTerm (annedTerm tg_l (qaToAnnedTerm' (rnInScopeSet rn2) qa_l)) (annedTerm tg_r (qaToAnnedTerm' (rnInScopeSet rn2) qa_r))
+    liftM Question $ msgGeneraliseTerm rn2 (annedTerm tg_l (qaToAnnedTerm' (rnInScopeSet rn2) qa_l)) (annedTerm tg_r (qaToAnnedTerm' (rnInScopeSet rn2) qa_r))
 
 msgQA' rn2 _    (Question x_l') _    (Question x_r') = liftM Question $ msgVar rn2 x_l' x_r'
 msgQA' rn2 tg_l (Answer in_v_l) tg_r (Answer in_v_r) = liftM Answer $ msgAnswer rn2 tg_l in_v_l tg_r in_v_r
@@ -330,7 +329,7 @@ msgKind = msgType
 msgType, msgType' :: RnEnv2 -> Type -> Type -> MSG Type
 msgType rn2 ty_l ty_r = msgType' rn2 ty_l ty_r `mplus` do
     guardFloatable "msgType" tyVarsOfType rn2 ty_l ty_r
-    liftM TyVarTy $ msgGeneraliseType ty_l ty_r
+    liftM TyVarTy $ msgGeneraliseType rn2 ty_l ty_r
 
 msgType' rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r
 msgType' rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 mkAppTy (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
@@ -343,7 +342,7 @@ msgType' _ _ _ = fail "msgType"
 msgCoercion, msgCoercion' :: RnEnv2 -> Coercion -> Coercion -> MSG Coercion
 msgCoercion rn2 co_l co_r = msgCoercion' rn2 co_l co_r `mplus` do
     guardFloatable "msgCoercion" tyCoVarsOfCo rn2 co_l co_r
-    liftM CoVarCo $ msgGeneraliseCoercion co_l co_r
+    liftM CoVarCo $ msgGeneraliseCoercion rn2 co_l co_r
 
 msgCoercion' rn2 (Refl ty_l)              (Refl ty_r)              = liftM Refl $ msgType rn2 ty_l ty_r
 msgCoercion' _   (TyConAppCo tc_l [])     (TyConAppCo tc_r [])     = guard "msgCoercion: TyConAppCo" (tc_l == tc_r) >> return (TyConAppCo tc_r [])
@@ -362,7 +361,7 @@ msgCoercion' _ _ _ = fail "msgCoercion"
 msgTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> MSG AnnedTerm
 msgTerm rn2 e_l e_r = msgAnned annedTerm (msgTerm' rn2) e_l e_r `mplus` do
     guardFloatable "msgTerm" annedTermFreeVars rn2 e_l e_r
-    liftM (fmap Var . annedVar (annedTag e_r)) $ msgGeneraliseTerm e_l e_r -- Right biased
+    liftM (fmap Var . annedVar (annedTag e_r)) $ msgGeneraliseTerm rn2 e_l e_r -- Right biased
 
 -- TODO: allow lets on only one side? Useful for msging e.g. (let x = 2 in y + x) with (z + 2)
 msgTerm' :: RnEnv2 -> Tag -> TermF Anned -> Tag -> TermF Anned -> MSG (TermF Anned)
@@ -382,7 +381,7 @@ msgTerm' _ _ _ _ _ = fail "msgTerm"
 msgValue :: RnEnv2 -> Tag -> AnnedValue -> Tag -> AnnedValue -> MSG AnnedValue
 msgValue rn2 tg_l v_l tg_r v_r = msgValue' rn2 v_l v_r `mplus` do
     guardFloatable "msgValue" annedValueFreeVars' rn2 v_l v_r
-    liftM Indirect $ msgGeneraliseTerm (fmap Value $ annedValue tg_l v_l) (fmap Value $ annedValue tg_r v_r)
+    liftM Indirect $ msgGeneraliseTerm rn2 (fmap Value $ annedValue tg_l v_l) (fmap Value $ annedValue tg_r v_r)
 
 msgValue' :: RnEnv2 -> AnnedValue -> AnnedValue -> MSG AnnedValue
 msgValue' rn2 (Indirect x_l)               (Indirect x_r)               = liftM Indirect $ msgVar rn2 x_l x_r
@@ -537,7 +536,7 @@ msgVar rn2 x_l x_r = case (rnOccL_maybe rn2 x_l, rnOccR_maybe rn2 x_r) of
      -- Both rigidly bound: msg iff they rename to the same thing
     (Just x_l', Just x_r') -> pprTraceSC "msgVar_maybe(rigid)" (ppr (x_l, x_r)) $ guard "msgVar: rigid" (x_l' == x_r') >> return x_l'
      -- Both bound by let: defer decision about msging
-    (Nothing, Nothing)     -> pprTraceSC "msgVar_maybe(flexi)" (ppr (x_l, x_r)) $ msgFlexiVar x_l x_r
+    (Nothing, Nothing)     -> pprTraceSC "msgVar_maybe(flexi)" (ppr (x_l, x_r)) $ msgFlexiVar rn2 x_l x_r
      -- One bound by let and one bound rigidly: don't msg
     _                      -> fail "msgVar: mismatch"
 
@@ -612,7 +611,11 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
        -> PureHeap  -- Common heap
        -> MSGState  -- Pending matches etc. MSGState is also used to ensure we never match a var pair more than once (they get the same common name)
        -> [MSG' (Renaming, (PureHeap, Heap, PureHeap), Renaming)]
-    go rn_l rn_r _      _      h_l h_r h       (MSGState { msgPending = [], msgInScopeSet = ids }) = [return (rn_l, (h_l, Heap h ids, h_r), rn_r)]
+    go rn_l rn_r _      _      h_l h_r h       (MSGState { msgPending = [], msgInScopeSet = ids })
+      -- NB: it is very important that the final InScopeSet includes not only the InScopeSet from the MSGState (which
+      -- will include all of the common *heap* bound variables) but also that from the RnEnv2 (which will include
+      -- all of the common *stack* bound variables).
+      = [return (rn_l, (h_l, Heap h (ids `unionInScope` rnInScopeSet rn2), h_r), rn_r)]
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((x_common, PendingVar x_l x_r):rest) })
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
       | Right (msg_s, x_common) <- flip runMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
