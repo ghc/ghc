@@ -267,6 +267,37 @@ data MSGMode = MM {
 
 type MSGResult = ((Deeds, Heap, Renaming, Stack), (Heap, Stack, Anned QA), (Deeds, Heap, Renaming, Stack))
 
+-- Note [Renaming via MSG]
+-- ~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- If s1 can be renamed/instantiated to s2, then taking the MSG of the two should yield:
+--  1. On the left:
+--    a) An empty stack
+--    b) A heap containing only lambdaBounds
+--    c) A Renaming that maps TyVar->TyVar and CoVar->CoVar, and which is invertible
+--       (we can't accept [x |-> z, y |-> z] because the right part of the MSG might
+--        instantiate x and y to two different things)
+--  2. On the right:
+--    a) An empty stack, or one which is an allowed instantiation
+--    b) A heap containing only lambdaBounds, or one which is an allowed instantiation
+--    c) A Renaming. We can always allow TyVar->Type and CoVar->Coercion mappings because
+--       they are not computationally relevant. We could optionally forbid non-invertible
+--       renamings like [x |-> z, y |-> z] because it means that two variables are shared
+--       here which weren't in the original term. However, this is likely not important in practice.
+--
+-- If s1 and s2 match to give type generalisation info, we expect this from the MSG:
+--  1. On the left:
+--    a) An empty stack
+--    b) A heap containing only lambdaBounds
+--  2. On the right:
+--    a) An empty stack
+--    b) A heap containing only lambdaBounds
+--
+-- The form of the Renaming is unimportant (as long as we don't care about whether 2 variables
+-- are shared or not) because we are always happy to generalise away Type/Coercion info, and
+-- we're going to satisfy the demand for the States on both sides by driving the (instantiable)
+-- common State.
+
 msg :: {- MSGMode -- ^ How to match
     -> -} State   -- ^ Tieback semantics
     -> State   -- ^ This semantics
@@ -638,7 +669,7 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
                    (Just Nothing, Just Nothing)
                      | x_l == x_r
                      -> return (rn_l, rn_r, msg_s, hb_r) -- Right biased
-                   (Nothing, Nothing)
+                   (Nothing, Nothing) -- FIXME: I should possibly be adding lambdaBound bindings for x_l and x_r to h_l and h_r respectively
                      -> return (insertIdRenaming rn_l x_common x_l, insertIdRenaming rn_r x_common x_r, msg_s, lambdaBound)
                    _ -> Left "msgPureHeap: non-unifiable heap bindings"
                  -- If they match, we need to make a common heap binding

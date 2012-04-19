@@ -4,6 +4,7 @@ module Supercompile.Core.Renaming (
     -- | Renamings
     Renaming, emptyRenaming,
     mkInScopeIdentityRenaming, mkIdentityRenaming, mkTyVarRenaming,
+    invertRenaming,
     InScopeSet, emptyInScopeSet, mkInScopeSet,
     
     -- | Extending the renaming
@@ -38,10 +39,15 @@ import Supercompile.Utilities
 
 import CoreSubst
 import OptCoercion (optCoercion)
-import Coercion    (CvSubst(..), CvSubstEnv, isCoVar, mkCoVarCo)
+import Coercion    (CvSubst(..), CvSubstEnv, isCoVar, mkCoVarCo, getCoVar_maybe)
 import qualified CoreSyn as CoreSyn (CoreExpr, Expr(Var))
-import Type        (mkTyVarTy)
-import Var         (Id, TyVar, CoVar, isTyVar)
+import Type        (mkTyVarTy, getTyVar_maybe)
+import Id          (mkSysLocal)
+import Var         (Id, TyVar, CoVar, isTyVar, mkTyVar, varType)
+import OccName     (occNameFS)
+import Name        (getOccName, mkSysTvName)
+import FastString  (FastString)
+import UniqFM      (ufmToList)
 import VarEnv
 
 
@@ -133,12 +139,28 @@ mkInScopeIdentityRenaming = mkIdentityRenaming . getInScopeVars
 mkTyVarRenaming :: [(TyVar, Type)] -> Renaming
 mkTyVarRenaming aas = (emptyVarEnv, mkVarEnv aas, emptyVarEnv)
 
+invertRenaming :: Renaming -> Maybe Renaming
+invertRenaming (id_subst, tv_subst, co_subst)
+  = liftM3 (,,) (traverse coreSynToVar_maybe id_subst >>= invertVarEnv (\fs uniq -> varToCoreSyn . mkSysLocal fs uniq))
+                (traverse getTyVar_maybe     tv_subst >>= invertVarEnv (\fs uniq -> mkTyVarTy    . mkTyVar (mkSysTvName uniq fs)))
+                (traverse getCoVar_maybe     co_subst >>= invertVarEnv (\fs uniq -> mkCoVarCo    . mkSysLocal fs uniq))
+  where
+    -- FIXME: this inversion relies on something of a hack because the domain of the mapping is not stored (only its Unique)
+    invertVarEnv :: (FastString -> Unique -> Type -> a)
+                 -> VarEnv Var -> Maybe (VarEnv a)
+    invertVarEnv mk env
+      | distinct (varEnvElts env) = Just (mkVarEnv [(x, mk (occNameFS (getOccName x)) u (varType x)) | (u, x) <- ufmToList env])
+      | otherwise                 = Nothing
+
 varToCoreSyn :: Var -> CoreSyn.CoreExpr
 varToCoreSyn = CoreSyn.Var
 
+coreSynToVar_maybe :: CoreSyn.CoreExpr -> Maybe Var
+coreSynToVar_maybe (CoreSyn.Var x') = Just x'
+coreSynToVar_maybe _                = Nothing
+
 coreSynToVar :: CoreSyn.CoreExpr -> Var
-coreSynToVar (CoreSyn.Var x') = x'
-coreSynToVar e                = panic "renameId" (ppr e)
+coreSynToVar = fromMaybe (panic "renameId" empty) . coreSynToVar_maybe
 
 insertIdRenaming :: Renaming -> Id -> Out Id -> Renaming
 insertIdRenaming (id_subst, tv_subst, co_subst) x x'

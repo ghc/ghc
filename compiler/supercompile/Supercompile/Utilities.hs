@@ -500,6 +500,9 @@ runs f g (x:xs) = go (f x) [g x] xs
           | otherwise = (b, reverse pending) : go b' [g x] xs
           where b' = f x
 
+distinct :: Ord a => [a] -> Bool
+distinct xs = length xs /= S.size (S.fromList xs)
+
 
 -- | Orders elements of a map into dependency order insofar as that is possible.
 --
