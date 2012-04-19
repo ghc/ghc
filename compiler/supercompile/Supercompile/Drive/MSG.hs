@@ -183,9 +183,10 @@ runMSG' (Right x)   = Just x
 runMSG' (Left _msg) = {- trace ("msg " ++ _msg) -} Nothing
 --runMSG = unMSG
 
--- instance MonadPlus MSG where
---     mzero = fail "mzero"
---     mx1 `mplus` mx2 = MSG $ unMSG mx1 `mplus` unMSG mx2
+instance MonadPlus MSG where
+    mzero = fail "mzero"
+    mx1 `mplus` mx2 = MSG $ \e s -> case unMSG mx1 e s of Right res -> Right res
+                                                          Left _    -> unMSG mx2 e s
 
 
 {-
@@ -266,18 +267,18 @@ msgKind = msgType
 -- NB: we don't do anything stupid like introduce a TyVar due to
 -- generalisation at the superkind level because the only term
 -- at the superkind level is Box, which always MSGes into itself.
-msgType :: RnEnv2 -> Type -> Type -> MSG Type
-msgType rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r
-msgType rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 mkAppTy (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
-msgType _   (TyConApp tc_l [])    (TyConApp tc_r [])    = guard "msgType: TyConApp" (tc_l == tc_r) >> return (TyConApp tc_r [])
-msgType rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = msgType rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
-msgType rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType rn2 ((TyConApp funTyCon [] `AppTy` ty1_l) `AppTy` ty2_l) ((TyConApp funTyCon [] `AppTy` ty1_r) `AppTy` ty2_r)
-msgType rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType rn2 ty_l ty_r
-msgType rn2 ty_l ty_r | canFloatType (rnOccL_maybe rn2) ty_l, canFloatType (rnOccR_maybe rn2) ty_r = liftM TyVarTy $ msgGeneraliseType ty_l ty_r
-msgType _ _ _ = fail "msgType" -- FIXME: succeed in all cases, even with trivial gen?
+msgType, msgType' :: RnEnv2 -> Type -> Type -> MSG Type
+msgType rn2 ty_l ty_r = msgType' rn2 ty_l ty_r `mplus` do
+    guard "msgType: unfloatable" (canFloatType (rnOccL_maybe rn2) ty_l && canFloatType (rnOccR_maybe rn2) ty_r)
+    liftM TyVarTy $ msgGeneraliseType ty_l ty_r
 
-canFloatType :: (TyVar -> Maybe a) -> Type -> Bool
-canFloatType lkup = foldVarSet (\a rest_ok -> maybe rest_ok (const False) (lkup a)) True . tyVarsOfType
+msgType' rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r
+msgType' rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 mkAppTy (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
+msgType' _   (TyConApp tc_l [])    (TyConApp tc_r [])    = guard "msgType: TyConApp" (tc_l == tc_r) >> return (TyConApp tc_r [])
+msgType' rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = msgType rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
+msgType' rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType rn2 ((TyConApp funTyCon [] `AppTy` ty1_l) `AppTy` ty2_l) ((TyConApp funTyCon [] `AppTy` ty1_r) `AppTy` ty2_r)
+msgType' rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType rn2 ty_l ty_r
+msgType' _ _ _ = fail "msgType"
 
 -- TODO: msg coercion instantiation?
 msgCoercion :: RnEnv2 -> Coercion -> Coercion -> MSG Coercion
@@ -629,3 +630,9 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
 prod :: MSG' [MSG' a] -> [MSG' a]
 prod (Left msg)  = [Left msg]
 prod (Right mxs) = mxs
+
+canFloatType :: (TyVar -> Maybe a) -> Type -> Bool
+canFloatType = canFloat tyVarsOfType
+
+canFloat :: (b -> FreeVars) -> (Var -> Maybe a) -> b -> Bool
+canFloat fvs lkup = foldVarSet (\a rest_ok -> maybe rest_ok (const False) (lkup a)) True . fvs
