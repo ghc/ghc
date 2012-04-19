@@ -68,9 +68,25 @@ instance Monad MSG' where
 
 type MSG' = Either String
 
--- Information on the context which we are currently in (FIXME: currently unused)
+-- Information on the context which we are currently in
 data MSGEnv = MSGEnv {
+    msgLostWorkSharing :: Bool
   }
+
+msgLoseWorkSharing :: MSG a -> MSG a
+msgLoseWorkSharing mx = MSG $ \e -> unMSG mx (e { msgLostWorkSharing = True })
+
+-- I'm not sure if we want to float arbitrary stuff out of lambdas. Doing so does reduce
+-- worst case allocation behaviour, but it does so at the cost of increased upfront allocations
+-- and GC lifetimes.
+--
+-- At the moment my poor compromise is to only float out cheap looking stuff.
+msgCheckFloatable :: Bool -> Bool -> MSG ()
+msgCheckFloatable cheap_l cheap_r
+  | cheap_l, cheap_r = return ()
+  | otherwise        = MSG $ \e s -> if msgLostWorkSharing e
+                                      then Left "msgCheckFloatable"
+                                      else Right (s, ())
 
 -- We want to create as few new "common" vars as possible when MSGing. This state helps to achieve this:
 --  * When MSG encounters the same pair of two (heap or stack bound) things, we reuse the same "common" var
@@ -162,7 +178,7 @@ newtype MSG a = MSG { unMSG :: MSGEnv -> MSGState -> MSG' (MSGState, a) }
 -- Don't need to specify MSGEnv because every site that needs to run a MSG
 -- computation occurs in basically the same context:
 runMSG :: MSG a -> MSGState -> MSG' (MSGState, a)
-runMSG mx = unMSG mx (MSGEnv {})
+runMSG mx = unMSG mx (MSGEnv { msgLostWorkSharing = False })
 
 instance Functor MSG where
     fmap = liftM
@@ -293,6 +309,7 @@ msgAnned anned f a_l a_r = liftM (anned (annedTag a_r)) $ f (annedTag a_l) (anne
 msgQA, msgQA' :: RnEnv2 -> Tag -> QA -> Tag -> QA -> MSG QA
 msgQA rn2 tg_l qa_l tg_r qa_r = msgQA' rn2 tg_l qa_l tg_r qa_r `mplus` do
     guardFloatable "msgQA" qaFreeVars rn2 qa_l qa_r
+    -- NB: a QA is always cheap, so no floatability check
     liftM Question $ msgGeneraliseTerm rn2 (annedTerm tg_l (qaToAnnedTerm' (rnInScopeSet rn2) qa_l)) (annedTerm tg_r (qaToAnnedTerm' (rnInScopeSet rn2) qa_r))
 
 msgQA' rn2 _    (Question x_l') _    (Question x_r') = liftM Question $ msgVar rn2 x_l' x_r'
@@ -361,6 +378,7 @@ msgCoercion' _ _ _ = fail "msgCoercion"
 msgTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> MSG AnnedTerm
 msgTerm rn2 e_l e_r = msgAnned annedTerm (msgTerm' rn2) e_l e_r `mplus` do
     guardFloatable "msgTerm" annedTermFreeVars rn2 e_l e_r
+    msgCheckFloatable (termIsCheap e_l) (termIsCheap e_r)
     liftM (fmap Var . annedVar (annedTag e_r)) $ msgGeneraliseTerm rn2 e_l e_r -- Right biased
 
 -- TODO: allow lets on only one side? Useful for msging e.g. (let x = 2 in y + x) with (z + 2)
@@ -381,12 +399,13 @@ msgTerm' _ _ _ _ _ = fail "msgTerm"
 msgValue :: RnEnv2 -> Tag -> AnnedValue -> Tag -> AnnedValue -> MSG AnnedValue
 msgValue rn2 tg_l v_l tg_r v_r = msgValue' rn2 v_l v_r `mplus` do
     guardFloatable "msgValue" annedValueFreeVars' rn2 v_l v_r
+    -- NB: values are always cheap, so no floatability check
     liftM Indirect $ msgGeneraliseTerm rn2 (fmap Value $ annedValue tg_l v_l) (fmap Value $ annedValue tg_r v_r)
 
 msgValue' :: RnEnv2 -> AnnedValue -> AnnedValue -> MSG AnnedValue
 msgValue' rn2 (Indirect x_l)               (Indirect x_r)               = liftM Indirect $ msgVar rn2 x_l x_r
-msgValue' rn2 (TyLambda a_l e_l)           (TyLambda a_r e_r)           = msgTyVarBndr TyLambda rn2 a_l a_r $ \rn2 -> msgTerm rn2 e_l e_r
-msgValue' rn2 (Lambda x_l e_l)             (Lambda x_r e_r)             = msgIdCoVarBndr Lambda rn2 x_l x_r $ \rn2 -> msgTerm rn2 e_l e_r
+msgValue' rn2 (TyLambda a_l e_l)           (TyLambda a_r e_r)           = msgTyVarBndr TyLambda rn2 a_l a_r $ \rn2 ->                     msgTerm rn2 e_l e_r
+msgValue' rn2 (Lambda x_l e_l)             (Lambda x_r e_r)             = msgIdCoVarBndr Lambda rn2 x_l x_r $ \rn2 -> msgLoseWorkSharing (msgTerm rn2 e_l e_r)
 msgValue' rn2 (Data dc_l tys_l cos_l xs_l) (Data dc_r tys_r cos_r xs_r) = guard "msgValue: datacon" (dc_l == dc_r) >> liftM3 (Data dc_r) (zipWithEqualM (msgType rn2) tys_l tys_r) (zipWithEqualM (msgCoercion rn2) cos_l cos_r) (zipWithEqualM (msgVar rn2) xs_l xs_r)
 msgValue' _   (Literal l_l)                (Literal l_r)                = guard "msgValue: literal" (l_l == l_r) >> return (Literal l_r)
 msgValue' rn2 (Coercion co_l)              (Coercion co_r)              = liftM Coercion $ msgCoercion rn2 co_l co_r
@@ -422,16 +441,6 @@ msgIdCoVarBndrFlexible f rn2 x_l x_r k = do
     (chosen_rn2, b) <- k rn2'
     x <- mx chosen_rn2
     return (f x b)
-
-{-
-checkMSGLR :: Bool -> Id -> Id -> MSGLR -> MSG MSGLR
-checkMSGLR lambdaish x_l x_r lr = case lr of
-    VarL _ e_r | x_r `elemVarSet` annedTermFreeVars e_r -> fail "checkMSGLR: deferred term mentioned rigid right variable"
-               | lambdaish, not (termIsCheap e_r)       -> fail "checkMSGLR: expensive deferred (right) term escaping lambda"
-    VarR e_l _ | x_l `elemVarSet` annedTermFreeVars e_l -> fail "checkMSGLR: deferred term mentioned rigid left variable"
-               | lambdaish, not (termIsCheap e_l)       -> fail "checkMSGLR: expensive deferred (left) term escaping lambda"
-    _ -> return lr
--}
 
 msgIdCoVarBndr' :: RnEnv2 -> Id -> Id -> (RnEnv2, RnEnv2 -> MSG Id)
 msgIdCoVarBndr' init_rn2 x_l x_r = (pprTraceSC "msgIdCoVarBndr'" (ppr (x_l, x_r)) init_rn2', \rn2 -> msgIdCoVarBndrExtras rn2 x x_l x_r)
@@ -483,7 +492,7 @@ msgCore :: RnEnv2 -> Core.CoreExpr -> Core.CoreExpr -> MSG Core.CoreExpr
 msgCore rn2 (Core.Var x_l)       (Core.Var x_r)       = liftM Core.Var $ msgVar rn2 x_l x_r
 msgCore _   (Core.Lit l_l)       (Core.Lit l_r)       = guard "msgCore: Lit" (l_l == l_r) >> return (Core.Lit l_r)
 msgCore rn2 (Core.App e1_l e2_l) (Core.App e1_r e2_r) = liftM2 Core.App (msgCore rn2 e1_l e1_r) (msgCore rn2 e2_l e2_r)
-msgCore rn2 (Core.Lam x_l e_l)   (Core.Lam x_r e_r)   = msgVarBndr Core.Lam rn2 x_l x_r $ \rn2 -> msgCore rn2 e_l e_r
+msgCore rn2 (Core.Lam x_l e_l)   (Core.Lam x_r e_r)   = msgVarBndr Core.Lam rn2 x_l x_r $ \rn2 -> (if isId x_r then msgLoseWorkSharing else id) $ msgCore rn2 e_l e_r
 msgCore rn2 (Core.Let (Core.NonRec x_l e1_l) e2_l) (Core.Let (Core.NonRec x_r e1_r) e2_r)
   = liftM2 (\e1 (x, e2) -> Core.Let (Core.NonRec x e1) e2) (msgCore rn2 e1_l e1_r) $ msgVarBndr (,) rn2 x_l x_r $ \rn2 -> msgCore rn2 e2_l e2_r
 msgCore rn2 (Core.Let (Core.Rec xes_l) e_l) (Core.Let (Core.Rec xes_r) e_r)
