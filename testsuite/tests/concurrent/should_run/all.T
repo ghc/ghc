@@ -242,4 +242,4 @@ test('setnumcapabilities001',
      compile_and_run, [''])
 
 # omit ghci, which can't handle unboxed tuples:
-test('compareAndSwap', omit_ways(['ghci']), compile_and_run, [''])
+test('compareAndSwap', omit_ways(['ghci','hpc']), compile_and_run, [''])
