@@ -1,5 +1,5 @@
 module Supercompile.Drive.MSG (
-    msg
+    MSGMode(..), msg
   ) where
 
 #include "HsVersions.h"
@@ -36,6 +36,7 @@ import BasicTypes (TupleSort(..))
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Foldable as Foldable
 
 
 pprTraceSC :: String -> SDoc -> a -> a
@@ -259,11 +260,9 @@ instance MonadPlus MSG where
                                                           Left _    -> unMSG mx2 e s
 
 
-{-
-data MSGMode = MM {
+data MSGMode = MSGMode {
     msgCommonHeapVars :: S.Set Var
   }
--}
 
 type MSGResult = ((Deeds, Heap, Renaming, Stack), (Heap, Stack, Anned QA), (Deeds, Heap, Renaming, Stack))
 
@@ -298,14 +297,14 @@ type MSGResult = ((Deeds, Heap, Renaming, Stack), (Heap, Stack, Anned QA), (Deed
 -- we're going to satisfy the demand for the States on both sides by driving the (instantiable)
 -- common State.
 
-msg :: {- MSGMode -- ^ How to match
-    -> -} State   -- ^ Tieback semantics
+msg :: MSGMode -- ^ How to match
+    -> State   -- ^ Tieback semantics
     -> State   -- ^ This semantics
     -> Maybe MSGResult -- ^ Renaming from left to right
-msg {- mm -} s_l s_r = runMSG' (msgWithReason {- mm -} s_l s_r)
+msg mm s_l s_r = runMSG' (msgWithReason mm s_l s_r)
 
-msgWithReason :: {- MSGMode -> -} State -> State -> MSG' MSGResult
-msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
+msgWithReason :: MSGMode -> State -> State -> MSG' MSGResult
+msgWithReason mm (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r ids_r, k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
     -- TODO: test for multiple solutions? Attempt to choose best?
     -- FIXME: use the deterministic algorithm w/ unmarking
     firstSuccess [ do ((qa, (k_l, k, k_r)), (rn_l, (h_l, heap, h_r), rn_r)) <- mres
@@ -313,7 +312,7 @@ msgWithReason {- mm -} (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r i
                  | mrn2mk <- msgEC init_rn2 k_l k_r
                  , mres <- prod (do (rn2, mk) <- mrn2mk
                                     (msg_s, res@(_, (k_l, _, k_r))) <- runMSG (liftM2 (,) (msgAnned annedQA (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
-                                    return (map (liftM ((,) res)) $ msgPureHeap {- mm -} rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
+                                    return (map (liftM ((,) res)) $ msgPureHeap mm rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
                  ]
   where
     -- NB: it is not necessary to include the ids_l/ids_r in these InScopeSets because the
@@ -636,8 +635,8 @@ msgECFrame init_rn2 kf_l kf_r = liftM (second (liftM (Tagged (tag kf_r)) .)) $ g
     go _ _ = Left "msgECFrame"
 
 -- NB: we must enforce invariant that stuff "outside" cannot refer to stuff bound "inside" (heap *and* stack)
-msgPureHeap :: {- MSGMode -> -} RnEnv2 -> MSGState -> PureHeap -> PureHeap -> (BoundVars, FreeVars) -> (BoundVars, FreeVars) -> [MSG' (Renaming, (PureHeap, Heap, PureHeap), Renaming)]
-msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
+msgPureHeap :: MSGMode -> RnEnv2 -> MSGState -> PureHeap -> PureHeap -> (BoundVars, FreeVars) -> (BoundVars, FreeVars) -> [MSG' (Renaming, (PureHeap, Heap, PureHeap), Renaming)]
+msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
   = prod (do (used_l, h_l) <- sucks init_h_l k_bvs_l M.empty S.empty k_fvs_l
              (used_r, h_r) <- sucks init_h_r k_bvs_r M.empty S.empty k_fvs_r
              return $ go emptyRenaming emptyRenaming used_l used_r h_l h_r M.empty msg_s)
@@ -664,7 +663,24 @@ msgPureHeap {- mm -} rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_
                  (rn_l, rn_r, msg_s, hb) <- case (inject hb_l, inject hb_r) of
                    (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
                      | let_bound_l == let_bound_r
-                     , Right (msg_s, in_e) <- flip runMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
+                     , Right (msg_s, in_e) <- case () of
+                          -- Optimisation: attempt to match using the "common heap vars" trick.
+                          -- If this fails we can always try to match in a legit manner, but I
+                          -- expect this to shortcut the full term matching route almost all of
+                          -- the time if this guard succeeds.
+                          --
+                          -- The reason that this hack should almost always work is because I
+                          -- expect common-heap stuff to be mostly matched against *itself*
+                          -- first, so the assigned "common" var will be the same as the *input*
+                          -- variable. This allows us to safely use the *right hand* term as the
+                          -- *common* HeapBinding without any sort of changes to variables.
+                          _ | x_l == x_r, x_r `S.member` msgCommonHeapVars mm
+                            , Right res <- flip runMSG msg_s $ do Foldable.mapM_ (\x -> msgFlexiVar rn2 x x >>= \x' -> guard "msgPureHeap: shortcut" (x' == x) >> return ())
+                                                                                 (inFreeVars annedTermFreeVars in_e_r)
+                                                                  return in_e_r -- Right biased
+                            -> Right res
+                            | otherwise
+                            -> flip runMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
                      -> return (rn_l, rn_r, msg_s, (if let_bound_r then letBound else internallyBound) in_e)
                    (Just Nothing, Just Nothing)
                      | x_l == x_r

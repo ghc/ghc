@@ -260,7 +260,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
-                                                         case msg shallow_state state of 
+                                                         case msg (MSGMode { msgCommonHeapVars = S.empty }) shallow_state state of 
                                                            -- FIXME: better? In particular, could rollback and then MSG
                                                            Just (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r))
                                                             -> pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
