@@ -29,11 +29,11 @@ tc141.hs:13:13:
       in v
 
 tc141.hs:15:18:
-    Couldn't match expected type `a1' with actual type `t1'
-      `a1' is a rigid type variable bound by
-           the type signature for v :: a1 at tc141.hs:14:19
-      `t1' is a rigid type variable bound by
-           the inferred type of g :: t -> t1 -> a at tc141.hs:13:1
+    Couldn't match expected type `a2' with actual type `t'
+      `a2' is a rigid type variable bound by
+           the type signature for v :: a2 at tc141.hs:14:19
+      `t' is a rigid type variable bound by
+          the inferred type of g :: a -> t -> a1 at tc141.hs:13:1
     In the expression: b
     In an equation for `v': v = b
     In the expression:
