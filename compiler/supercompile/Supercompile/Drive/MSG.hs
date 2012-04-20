@@ -132,13 +132,13 @@ data MSGState = MSGState {
 -- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
 msgPend rn2 x0 pending = MSG $ \_ s -> Right $ case lookupUpdatePending s of
+    Right x   -> (s, x)
     Left mk_s -> (s { msgInScopeSet = extendInScopeSet ids' x2,
                       msgPending = (x2, pending) : msgPending s }, x2)
       where s = mk_s x2
             -- This use of rn2 is necessary to ensure new common vars don't clash with rigid binders
             x1 = uniqAway (rnInScopeSet rn2) x0
             (ids', x2) = uniqAway' (msgInScopeSet s) x1
-    Right x   -> (s, x)
   where
     lookupUpdatePending s = case pending of
       PendingVar x_l x_r -> case mb_x_l_map >>= flip lookupVarEnv x_r of
@@ -307,6 +307,12 @@ type MSGResult = ((Deeds, Heap, Renaming, Stack), (Heap, Stack, Anned QA), (Deed
 -- are shared or not) because we are always happy to generalise away Type/Coercion info, and
 -- we're going to satisfy the demand for the States on both sides by driving the (instantiable)
 -- common State.
+
+-- FIXME: MSG is currently breaking the "common heap vars" optimisation
+-- To make sure that it continues to work we need the property that:
+--  1. For every variable bound in the outgoing heap/stack of the {left,right} and common outgoing states..
+--  2. ..IF it is in the {left,right} incoming InScopeSet..
+--  3. ..then the thing it is bound in the {left,right} incoming state MUST have the same meaning as the new binding.
 
 msg :: MSGMode -- ^ How to match
     -> State   -- ^ Tieback semantics

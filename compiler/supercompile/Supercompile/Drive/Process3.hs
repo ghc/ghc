@@ -261,6 +261,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                  (speculateM (reduce state) $ \state -> my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
                                                          case msg (MSGMode { msgCommonHeapVars = S.empty }) shallow_state state of 
+                                                           -- FIXME: use common heap vars once I fix the MSG issue preventing this optimisation (just supply shallow_state InScopeSet!)
                                                            -- FIXME: better? In particular, could rollback and then MSG
                                                            Just (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r))
                                                             -> pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
@@ -363,7 +364,10 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
              | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
              , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
                                                   | (p_parent, p_siblings) <- parented_ps
-                                                  , let common_h_vars = case meaning p_parent of (_, Heap h _, _, _) -> M.keysSet h
+                                                  , let common_h_vars = S.empty
+                                                                        -- FIXME: the use of MSG prevents this optimisation (for now)
+                                                                        -- FIXME: shouldn't I just use the parent InScopeSet anyway??
+                                                                        -- case meaning p_parent of (_, Heap h _, _, _) -> M.keysSet h
                                                   , p_sibling <- p_parent:p_siblings ] ++
                                                   [ (p_root,    False,                         S.empty)
                                                   | p_root <- unparented_ps ]
