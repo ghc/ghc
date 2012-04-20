@@ -5,8 +5,6 @@ Functions over HsSyn specialised to RdrName.
 
 \begin{code}
 module RdrHsSyn (
-        extractHsTyRdrTyVars, extractHsTysRdrTyVars,
-
         mkHsOpApp,
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkHsSplice, mkTopSpliceDecl,
@@ -78,74 +76,12 @@ import Bag              ( Bag, emptyBag, consBag )
 import Outputable
 import FastString
 import Maybes
-import Util             ( filterOut )
 import Control.Applicative ((<$>))
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
-import Data.List        ( nub )
 import Data.Char
 
 #include "HsVersions.h"
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{A few functions over HsSyn at RdrName}
-%*                                                                    *
-%************************************************************************
-
-extractHsTyRdrNames finds the free variables of a HsType
-It's used when making the for-alls explicit.
-
-\begin{code}
-extractHsTyRdrTyVars :: LHsType RdrName -> [RdrName]
-extractHsTyRdrTyVars ty = nub (extract_lty ty [])
-
-extractHsTysRdrTyVars :: [LHsType RdrName] -> [RdrName]
-extractHsTysRdrTyVars ty = nub (extract_ltys ty [])
-
-extract_lctxt :: LHsContext RdrName -> [RdrName] -> [RdrName]
-extract_lctxt ctxt acc = foldr extract_lty acc (unLoc ctxt)
-
-extract_ltys :: [LHsType RdrName] -> [RdrName] -> [RdrName]
-extract_ltys tys acc = foldr extract_lty acc tys
-
--- IA0_NOTE: Should this function also return kind variables?
--- (explicit kind poly)
-extract_lty :: LHsType RdrName -> [RdrName] -> [RdrName]
-extract_lty (L _ ty) acc
-  = case ty of
-      HsTyVar tv                -> extract_tv tv acc
-      HsBangTy _ ty             -> extract_lty ty acc
-      HsRecTy flds              -> foldr (extract_lty . cd_fld_type) acc flds
-      HsAppTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
-      HsListTy ty               -> extract_lty ty acc
-      HsPArrTy ty               -> extract_lty ty acc
-      HsTupleTy _ tys           -> extract_ltys tys acc
-      HsFunTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
-      HsIParamTy _ ty           -> extract_lty ty acc
-      HsEqTy ty1 ty2            -> extract_lty ty1 (extract_lty ty2 acc)
-      HsOpTy ty1 (_, (L _ tv)) ty2 -> extract_tv tv (extract_lty ty1 (extract_lty ty2 acc))
-      HsParTy ty                -> extract_lty ty acc
-      HsCoreTy {}               -> acc  -- The type is closed
-      HsQuasiQuoteTy {}         -> acc  -- Quasi quotes mention no type variables
-      HsSpliceTy {}             -> acc  -- Type splices mention no type variables
-      HsKindSig ty _            -> extract_lty ty acc
-      HsForAllTy _ [] cx ty     -> extract_lctxt cx (extract_lty ty acc)
-      HsForAllTy _ tvs cx ty    -> acc ++ (filterOut (`elem` locals) $
-                                           extract_lctxt cx (extract_lty ty []))
-                                where
-                                   locals = hsLTyVarNames tvs
-      HsDocTy ty _              -> extract_lty ty acc
-      HsExplicitListTy _ tys    -> extract_ltys tys acc
-      HsExplicitTupleTy _ tys   -> extract_ltys tys acc
-      HsTyLit _                 -> acc
-      HsWrapTy _ _              -> panic "extract_lty"
-
-extract_tv :: RdrName -> [RdrName] -> [RdrName]
-extract_tv tv acc | isRdrTyVar tv = tv : acc
-                  | otherwise     = acc
 \end{code}
 
 
@@ -179,7 +115,8 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
        ; tyvars <- checkTyVars tycl_hdr tparams      -- Only type vars allowed
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars,
                                     tcdFDs = unLoc fds, tcdSigs = sigs, tcdMeths = binds,
-                                    tcdATs   = ats, tcdATDefs = at_defs, tcdDocs  = docs })) }
+                                    tcdATs = ats, tcdATDefs = at_defs, tcdDocs  = docs,
+                                    tcdFVs = placeHolderNames })) }
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -194,7 +131,8 @@ mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
        ; tyvars <- checkTyVars tycl_hdr tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = defn, tcdFVs = placeHolderNames })) }
+                                 tcdTyDefn = defn,
+                                 tcdFVs = placeHolderNames })) }
 
 mkFamInstData :: SrcSpan
          -> NewOrData
@@ -234,7 +172,8 @@ mkTySynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars lhs tparams
        ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = TySynonym rhs, tcdFVs = placeHolderNames })) }
+                                 tcdTyDefn = TySynonym { td_synRhs = rhs },
+                                 tcdFVs = placeHolderNames })) }
 
 mkFamInstSynonym :: SrcSpan
             -> LHsType RdrName  -- LHS
@@ -243,7 +182,7 @@ mkFamInstSynonym :: SrcSpan
 mkFamInstSynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsBSig tparams
-                                    , fid_defn = TySynonym rhs })) }
+                                    , fid_defn = TySynonym { td_synRhs = rhs }})) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour
@@ -326,7 +265,7 @@ cvBindsAndSigs  fb = go (fromOL fb)
                                  (bs, ss, ts, fis, docs) = go ds'
     go (L l (TyClD t@(TyFamily {})) : ds) = (bs, ss, L l t : ts, fis, docs)
                            where (bs, ss, ts, fis, docs) = go ds
-    go (L l (InstD (FamInstD fi)) : ds) = (bs, ss, ts, L l fi : fis, docs)
+    go (L l (InstD (FamInstD { lid_inst = fi })) : ds) = (bs, ss, ts, L l fi : fis, docs)
                            where (bs, ss, ts, fis, docs) = go ds
     go (L l (DocD d) : ds) =  (bs, ss, ts, fis, (L l d) : docs)
                            where (bs, ss, ts, fis, docs) = go ds

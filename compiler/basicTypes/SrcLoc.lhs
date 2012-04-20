@@ -78,7 +78,7 @@ module SrcLoc (
 	-- ** Combining and comparing Located values
 	eqLocated, cmpLocated, combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost, 
-        spans, isSubspanOf
+        spans, isSubspanOf, sortLocated
     ) where
 
 #include "Typeable.h"
@@ -180,6 +180,11 @@ instance Ord SrcLoc where
 
 instance Ord RealSrcLoc where
   compare = cmpRealSrcLoc
+
+sortLocated :: [Located a] -> [Located a]
+sortLocated things = sortLe le things
+  where
+    le (L l1 _) (L l2 _) = l1 <= l2
 
 cmpSrcLoc :: SrcLoc -> SrcLoc -> Ordering
 cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2

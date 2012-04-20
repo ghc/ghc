@@ -125,9 +125,15 @@ type LHsTyVarBndr name = Located (HsTyVarBndr name)
 
 data HsBndrSig sig 
   = HsBSig 
-       sig 
-       [Name]   -- The *binding* type/kind names of this signature
+       sig                -- The signature; typically a type
+       ([Name], [Name])   -- The *binding* (kind, type) names of 
+                          -- this signature
+                          -- See Note [HsBSig binder lists]
+                          
   deriving (Data, Typeable)
+
+-- Note [HsBSig binder lists]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Consider a binder (or pattern) decoarated with a type or kind, 
 --    \ (x :: a -> a). blah
 --    forall (a :: k -> *) (b :: k). blah
@@ -135,6 +141,7 @@ data HsBndrSig sig
 -- renamer can decorate it with the variables bound
 -- by the pattern ('a' in the first example, 'k' in the second),
 -- assuming that neither of them is in scope already
+-- See also Note [Kind and type-variable binders] in RnTypes
 
 placeHolderBndrs :: [Name]
 -- Used for the NameSet in FunBind and PatBind prior to the renamer
@@ -571,7 +578,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
     sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
-ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr ty
+ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty pREC_CON ty
 ppr_mono_ty _    (HsQuasiQuoteTy qq) = ppr qq
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
 ppr_mono_ty _    (HsTyVar name)      = ppr name

@@ -39,7 +39,7 @@ module TcSMonad (
     tryTcS, nestImplicTcS, recoverTcS,
     wrapErrTcS, wrapWarnTcS,
 
-    SimplContext(..), isInteractive, simplEqsOnly, performDefaulting,
+    SimplContext(..), isInteractive, performDefaulting,
 
     -- Getting and setting the flattening cache
     getFlatCache, updFlatCache, addToSolved, 
@@ -803,30 +803,20 @@ type TcsUntouchables = (Untouchables,TcTyVarSet)
 \begin{code}
 data SimplContext
   = SimplInfer SDoc	   -- Inferring type of a let-bound thing
-  | SimplRuleLhs RuleName  -- Inferring type of a RULE lhs
   | SimplInteractive	   -- Inferring type at GHCi prompt
   | SimplCheck SDoc	   -- Checking a type signature or RULE rhs
 
 instance Outputable SimplContext where
   ppr (SimplInfer d)   = ptext (sLit "SimplInfer") <+> d
   ppr (SimplCheck d)   = ptext (sLit "SimplCheck") <+> d
-  ppr (SimplRuleLhs n) = ptext (sLit "SimplRuleLhs") <+> doubleQuotes (ftext n)
   ppr SimplInteractive = ptext (sLit "SimplInteractive")
 
 isInteractive :: SimplContext -> Bool
 isInteractive SimplInteractive = True
 isInteractive _                = False
 
-simplEqsOnly :: SimplContext -> Bool
--- Simplify equalities only, not dictionaries
--- This is used for the LHS of rules; ee
--- Note [Simplifying RULE lhs constraints] in TcSimplify
-simplEqsOnly (SimplRuleLhs {}) = True
-simplEqsOnly _                 = False
-
 performDefaulting :: SimplContext -> Bool
 performDefaulting (SimplInfer {})   = False
-performDefaulting (SimplRuleLhs {}) = False
 performDefaulting SimplInteractive  = True
 performDefaulting (SimplCheck {})   = True
 
@@ -960,7 +950,7 @@ nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
                                , tcs_untch       = inner_untch
                                , tcs_count       = count
                                , tcs_ic_depth    = idepth+1
-                               , tcs_context     = ctxtUnderImplic ctxt 
+                               , tcs_context     = ctxt 
                                , tcs_inerts      = new_inert_var
                                , tcs_worklist    = wl_var 
                                -- NB: worklist is going to be empty anyway, 
@@ -973,12 +963,6 @@ recoverTcS :: TcS a -> TcS a -> TcS a
 recoverTcS (TcS recovery_code) (TcS thing_inside)
   = TcS $ \ env ->
     TcM.recoverM (recovery_code env) (thing_inside env)
-
-ctxtUnderImplic :: SimplContext -> SimplContext
--- See Note [Simplifying RULE lhs constraints] in TcSimplify
-ctxtUnderImplic (SimplRuleLhs n) = SimplCheck (ptext (sLit "lhs of rule") 
-                                               <+> doubleQuotes (ftext n))
-ctxtUnderImplic ctxt              = ctxt
 
 tryTcS :: TcS a -> TcS a
 -- Like runTcS, but from within the TcS monad 

@@ -70,7 +70,6 @@ import TysWiredIn
 import BasicTypes
 import SrcLoc
 import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
-import Util
 import UniqSupply
 import Outputable
 import FastString
@@ -793,7 +792,7 @@ bindScopedKindVars hs_tvs thing_inside
   where
     kvs :: [KindVar]   -- All skolems
     kvs = [ mkKindSigVar kv 
-          | L _ (KindedTyVar _ (HsBSig _ kvs)) <- hs_tvs
+          | L _ (KindedTyVar _ (HsBSig _ (_, kvs))) <- hs_tvs
           , kv <- kvs ]
 
 tcHsTyVarBndrs :: [LHsTyVarBndr Name] 
@@ -1071,23 +1070,33 @@ Historical note:
 \begin{code}
 tcHsPatSigType :: UserTypeCtxt
 	       -> HsBndrSig (LHsType Name)  -- The type signature
-	       -> TcM ([TyVar], 	    -- Newly in-scope type variables
-			Type)		    -- The signature
+	      -> TcM ( Type                 -- The signature
+                      , [(Name, TcTyVar)] ) -- The new bit of type environment, binding
+				            -- the scoped type variables
 -- Used for type-checking type signatures in
 -- (a) patterns 	  e.g  f (x::Int) = e
 -- (b) result signatures  e.g. g x :: Int = e
 -- (c) RULE forall bndrs  e.g. forall (x::Int). f x = x
 
-tcHsPatSigType ctxt (HsBSig hs_ty sig_tvs)
+tcHsPatSigType ctxt (HsBSig hs_ty (sig_kvs, sig_tvs))
   = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
-    do	{ let new_tv name = do { kind <- newMetaKindVar
-                               ; return (mkTyVar name kind) }
+    do	{ kvs <- mapM new_kv sig_kvs
         ; tvs <- mapM new_tv sig_tvs
-	; sig_ty <- tcExtendTyVarEnv tvs $
+        ; let ktv_binds = (sig_kvs `zip` kvs) ++ (sig_tvs `zip` tvs)
+	; sig_ty <- tcExtendTyVarEnv2 ktv_binds $
                     tcHsLiftedType hs_ty
         ; sig_ty <- zonkTcType sig_ty
 	; checkValidType ctxt sig_ty 
-	; return (tvs, sig_ty) }
+	; return (sig_ty, ktv_binds) }
+  where
+    new_kv name = new_tkv name superKind
+    new_tv name = do { kind <- newMetaKindVar
+                     ; new_tkv name kind }
+
+    new_tkv name kind   -- See Note [Pattern signature binders]
+      = case ctxt of
+          RuleSigCtxt {} -> return (mkTcTyVar name kind (SkolemTv False))
+          _              -> newSigTyVar name kind  -- See Note [Unifying SigTvs]
 
 tcPatSig :: UserTypeCtxt
 	 -> HsBndrSig (LHsType Name)
@@ -1098,7 +1107,7 @@ tcPatSig :: UserTypeCtxt
                  HsWrapper)         -- Coercion due to unification with actual ty
                                     -- Of shape:  res_ty ~ sig_ty
 tcPatSig ctxt sig res_ty
-  = do	{ (sig_tvs, sig_ty) <- tcHsPatSigType ctxt sig
+  = do	{ (sig_ty, sig_tvs) <- tcHsPatSigType ctxt sig
     	-- sig_tvs are the type variables free in 'sig', 
 	-- and not already in scope. These are the ones
 	-- that should be brought into scope
@@ -1125,44 +1134,64 @@ tcPatSig ctxt sig res_ty
 		--	f :: Int -> Int
 		-- 	f (x :: T a) = ...
 		-- Here 'a' doesn't get a binding.  Sigh
-	; let bad_tvs = filterOut (`elemVarSet` exactTyVarsOfType sig_ty) sig_tvs
+	; let bad_tvs = [ tv | (_, tv) <- sig_tvs
+                             , not (tv `elemVarSet` exactTyVarsOfType sig_ty) ]
 	; checkTc (null bad_tvs) (badPatSigTvs sig_ty bad_tvs)
 
 	-- Now do a subsumption check of the pattern signature against res_ty
-        ; (subst, sig_tvs') <- tcInstSigTyVars sig_tvs
-        ; let sig_ty' = substTy subst sig_ty
-	; wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty'
+	; wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty
 
-	-- Check that each is bound to a distinct type variable,
-	-- and one that is not already in scope
-        ; binds_in_scope <- getScopedTyVarBinds
-	; let tv_binds :: [(Name,TcTyVar)]
-              tv_binds = map tyVarName sig_tvs `zip` sig_tvs'
-	; check binds_in_scope tv_binds
-	
 	-- Phew!
-        ; return (sig_ty', tv_binds, wrap)
+        ; return (sig_ty, sig_tvs, wrap)
         } }
-  where
-    check :: [(Name,TcTyVar)] -> [(Name, TcTyVar)] -> TcM ()
-    check _        []            = return ()
-    check in_scope ((n,tv):rest) = do { check_one in_scope n tv
-				      ; check ((n,tv):in_scope) rest }
 
-    check_one :: [(Name,TcTyVar)] -> Name -> TcTyVar -> TcM ()
-    check_one in_scope n tv
-	= checkTc (null dups) (dupInScope n (head dups) tv)
-		-- Must not bind to the same type variable
-		-- as some other in-scope type variable
-	where
-	  dups = [n' | (n',tv') <- in_scope, tv' == tv]
-
-patBindSigErr :: [TyVar] -> SDoc
+patBindSigErr :: [(Name, TcTyVar)] -> SDoc
 patBindSigErr sig_tvs 
   = hang (ptext (sLit "You cannot bind scoped type variable") <> plural sig_tvs
-          <+> pprQuotedList sig_tvs)
+          <+> pprQuotedList (map fst sig_tvs))
        2 (ptext (sLit "in a pattern binding signature"))
 \end{code}
+
+Note [Pattern signature binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   data T = forall a. T a (a->Int)
+   f (T x (f :: a->Int) = blah)
+
+Here 
+ * The pattern (T p1 p2) creates a *skolem* type variable 'a_sk', 
+   It must be a skolem so that that it retains its identity, and    
+   TcErrors.getSkolemInfo can therreby find the binding site for the skolem.
+
+ * The type signature pattern (f :: a->Int) binds "a" -> a_sig in the envt
+
+ * Then unificaiton makes a_sig := a_sk
+
+That's why we must make a_sig a SigTv, not a SkolemTv, so that it can unify to a_sk.
+
+For RULE binders, though, things are a bit different (yuk).  
+  RULE "foo" forall (x::a) (y::[a]).  f x y = ...
+Here this really is the binding site of the type variable so we'd like
+to use a skolem, so that we get a complaint if we unify two of them
+together.
+
+Note [Unifying SigTvs]
+~~~~~~~~~~~~~~~~~~~~~~
+ALAS we have no decent way of avoiding two SigTvs getting unified.  
+Consider
+  f (x::(a,b)) (y::c)) = [fst x, y]
+Here we'd really like to complain that 'a' and 'c' are unified. But
+for the reasons above we can't make a,b,c into skolems, so they
+are just SigTvs that can unify.  And indeed, this would be ok,
+  f x (y::c) = case x of
+                 (x1 :: a1, True) -> [x,y]
+                 (x1 :: a2, False) -> [x,y,y]
+Here the type of x's first component is called 'a1' in one branch and
+'a2' in the other.  We could try insisting on the same OccName, but
+they definitely won't have the sane lexical Name. 
+
+I think we could solve this by recording in a SigTv a list of all the 
+in-scope varaibles that it should not unify with, but it's fiddly.
 
 
 %************************************************************************
@@ -1394,11 +1423,5 @@ badPatSigTvs sig_ty bad_tvs
 	  	 ptext (sLit "but are actually discarded by a type synonym") ]
          , ptext (sLit "To fix this, expand the type synonym") 
          , ptext (sLit "[Note: I hope to lift this restriction in due course]") ]
-
-dupInScope :: Name -> Name -> TcTyVar -> SDoc
-dupInScope n n' _
-  = hang (ptext (sLit "The scoped type variables") <+> quotes (ppr n) <+> ptext (sLit "and") <+> quotes (ppr n'))
-       2 (vcat [ptext (sLit "are bound to the same type (variable)"),
-		ptext (sLit "Distinct scoped type variables must be distinct")])
 \end{code}
 

@@ -477,7 +477,7 @@ deriveTyDecl _ = return []
 
 ------------------------------------------------------------------
 deriveInstDecl :: LInstDecl Name -> TcM [EarlyDerivSpec]
-deriveInstDecl (L _ (FamInstD fam_inst))
+deriveInstDecl (L _ (FamInstD { lid_inst = fam_inst }))
   = deriveFamInst fam_inst
 deriveInstDecl (L _ (ClsInstD { cid_fam_insts = fam_insts }))
   = concatMapM (deriveFamInst . unLoc) fam_insts

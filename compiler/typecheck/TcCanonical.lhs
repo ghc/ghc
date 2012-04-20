@@ -27,7 +27,7 @@ import Name ( Name )
 import Var
 import VarEnv
 import Outputable
-import Control.Monad    ( when, unless )
+import Control.Monad    ( when )
 import MonadUtils
 import Control.Applicative ( (<|>) )
 
@@ -325,9 +325,7 @@ emitSuperclasses ct@(CDictCan { cc_depth = d, cc_flavor = fl
                               , cc_tyargs = xis_new, cc_class = cls })
             -- Add superclasses of this one here, See Note [Adding superclasses]. 
             -- But only if we are not simplifying the LHS of a rule. 
- = do { sctxt <- getTcSContext
-      ; unless (simplEqsOnly sctxt) $ 
-               newSCWorkFromFlavored d fl cls xis_new
+ = do { newSCWorkFromFlavored d fl cls xis_new
       -- Arguably we should "seq" the coercions if they are derived, 
       -- as we do below for emit_kind_constraint, to allow errors in
       -- superclasses to be executed if deferred to runtime! 
@@ -906,7 +904,7 @@ emitKindConstraint ct
        | otherwise
        = ASSERT( isKind k1 && isKind k2 )
          do { kev <- 
-                 do { mw <- newWantedEvVar (mkNakedEqPred superKind k1 k2) 
+                 do { mw <- newWantedEvVar (mkEqPred k1 k2) 
                     ; case mw of
                          Cached x -> return x
                          Fresh x  -> addToWork (canEq d (kind_co_fl x) k1 k2) >> return x }
