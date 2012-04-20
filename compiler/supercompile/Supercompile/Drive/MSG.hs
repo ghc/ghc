@@ -20,8 +20,8 @@ import Util
 import Coercion
 import CoreUtils  (hashCoercion, hashType, hashExpr)
 import Name       (mkSystemVarName)
-import Var        (TyVar, mkTyVar, isTyVar, isId, tyVarKind, setVarType, setTyVarKind)
-import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal)
+import Var        (TyVar, mkTyVar, isTyVar, isId, tyVarKind, setVarType, setTyVarKind, varName)
+import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal, mkLocalId)
 import IdInfo     (SpecInfo(..))
 import VarEnv
 import Type       (typeKind, mkTyConApp, mkAppTy, getTyVar_maybe)
@@ -114,20 +114,22 @@ msgCheckFloatable cheap_l cheap_r
 --    Now everything is cool!
 --
 -- INVARIANT: none of the stuff in Pending is bound rigidly
-data Pending = PendingVar      Var       Var
-             -- INVARIANT: none of the following three have variables on *both* sides
+data Pending = -- INVARIANT: the Vars on both sides are either both TyVars or both Ids
+               PendingVar      Var       Var
+               -- INVARIANT: none of the following three have variables on *both* sides
              | PendingType     Type      Type
              | PendingCoercion Coercion  Coercion
              | PendingTerm     AnnedTerm AnnedTerm
 
 data MSGState = MSGState {
     msgInScopeSet            :: InScopeSet,                      -- We have to ensure all new vars introduced by MSG are distinct from each other
-    msgKnownPendingVars      :: VarEnv (VarEnv Var),             -- INVARIANT: the "known" maps are inverse to the pending list,
-    msgKnownPendingTypes     :: TypeMap (TypeMap TyVar),         -- except that PendingTerms are not recorded in a "known" map at all.
-    msgKnownPendingCoercions :: CoercionMap (CoercionMap CoVar), -- We don't *want* them in one because we don't mant MSGing to increase work sharing!
-    msgPending               :: [(Var, Pending)]                 -- the pending list
+    msgKnownPendingVars      :: VarEnv (VarEnv Var),             -- INVARIANT: the "known" maps are inverse to the pending list, except that PendingTerms are not recorded in
+    msgKnownPendingTypes     :: TypeMap (TypeMap TyVar),         -- a "known" map at all. We don't *want* them in one because we don't mant MSGing to increase work sharing!
+    msgKnownPendingCoercions :: CoercionMap (CoercionMap CoVar), -- INVARIANT: all Vars in the range have *no* extra information beyond their Name and Type/Kind
+    msgPending               :: [(Var, Pending)]                 -- The pending list
   }
 
+-- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
 msgPend rn2 x0 pending = MSG $ \_ s -> Right $ case lookupUpdatePending s of
     Left mk_s -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x2,
@@ -178,8 +180,13 @@ newtype MSG a = MSG { unMSG :: MSGEnv -> MSGState -> MSG' (MSGState, a) }
 
 -- Don't need to specify MSGEnv because every site that needs to run a MSG
 -- computation occurs in basically the same context:
-runMSG :: MSG a -> MSGState -> MSG' (MSGState, a)
-runMSG mx = unMSG mx (MSGEnv { msgLostWorkSharing = False })
+runMSG :: MSGState -> MSG a -> MSG' (MSGState, a)
+runMSG s mx = unMSG mx (MSGEnv { msgLostWorkSharing = False }) s
+
+runMSGNF :: MSGState -> MSG a -> (MSGState, a)
+runMSGNF s mx = case runMSG s mx of
+    Left  msg -> panic "runMSGNF" (text msg)
+    Right res -> res
 
 instance Functor MSG where
     fmap = liftM
@@ -197,13 +204,14 @@ instance Monad MSG where
 
 -- INVARIANT: neither incoming Var may be bound rigidly (rigid only matches against rigid)
 msgFlexiVar :: RnEnv2 -> Var -> Var -> MSG Var
-msgFlexiVar rn2 x_l x_r = msgPend rn2 x_r (PendingVar x_l x_r)
+msgFlexiVar rn2 x_l x_r = msgPend rn2 (zapIdExtraInfo x_r) (PendingVar x_l x_r)
 
 -- INVARIANT: neither incoming Type can refer to something bound rigidly (can't float out things that reference rigids)
 msgGeneraliseType :: RnEnv2 -> Type -> Type -> MSG TyVar
 msgGeneraliseType rn2 ty_l ty_r = msgPend rn2 a (PendingType ty_l ty_r)
   where 
     -- Unbiased choice of base variable: only one side may be a variable, kind is MSGed at binding site
+    -- NB: TyVars have no extra information, so there is nothing to zap!
     a = (getTyVar_maybe ty_l `mplus` getTyVar_maybe ty_r) `orElse` mkTyVar (mkSystemVarName uniq (fsLit "genty")) (typeKind ty_r)
     uniq = mkUniqueGrimily (hashType (mkTyConApp pairTyCon [ty_l, ty_r])) -- NB: pair might not be kind correct, but who cares?
 
@@ -212,7 +220,7 @@ msgGeneraliseCoercion :: RnEnv2 -> Coercion -> Coercion -> MSG CoVar
 msgGeneraliseCoercion rn2 co_l co_r = msgPend rn2 q (PendingCoercion co_l co_r)
   where
     -- Unbiased choice of base variable: only one side may be a variable, type is MSGed at binding site
-    q = (getCoVar_maybe co_l `mplus` getCoVar_maybe co_r) `orElse` mkSysLocal (fsLit "genco") uniq (coercionType co_r)
+    q = (fmap zapIdExtraInfo (getCoVar_maybe co_l `mplus` getCoVar_maybe co_r)) `orElse` mkSysLocal (fsLit "genco") uniq (coercionType co_r)
     uniq = mkUniqueGrimily (hashCoercion (mkTyConAppCo pairTyCon [co_l, co_r])) -- NB: pair might not be type correct, but who cares?
 
 -- INVARIANT: neither incoming AnnedTerm can refer to something bound rigidly (don't want to lambda-abstract to float out things that reference rigids)
@@ -220,13 +228,16 @@ msgGeneraliseTerm :: RnEnv2 -> AnnedTerm -> AnnedTerm -> MSG Id
 msgGeneraliseTerm rn2 e_l e_r = msgPend rn2 x (PendingTerm e_l e_r)
   where
     -- Unbiased choice of base variable: only one side may be a variable, type is MSGed at binding site
-    x = (getVar_maybe e_l `mplus` getVar_maybe e_r) `orElse` mkSysLocal (fsLit "genterm") uniq (termType e_r)
+    x = (fmap zapIdExtraInfo (getVar_maybe e_l `mplus` getVar_maybe e_r)) `orElse` mkSysLocal (fsLit "genterm") uniq (termType e_r)
     uniq = mkUniqueGrimily (hashExpr (Core.mkConApp (tupleCon BoxedTuple 2) [GHC.termToCoreExpr e_l, GHC.termToCoreExpr e_r])) -- NB: pair might not be type correct, but who cares?
 
     getVar_maybe e = case extract e of
       Var x              -> Just x
       Value (Indirect x) -> Just x -- Because we sneakily reuse msgGeneraliseTerm for values as well
       _                  -> Nothing
+
+zapIdExtraInfo :: Id -> Id
+zapIdExtraInfo x = mkLocalId (varName x) (idType x)
 
 {-
 newtype MSG a = MSG { unMSG :: Either String (MSG' a) }
@@ -311,7 +322,7 @@ msgWithReason mm (deeds_l, Heap h_l ids_l, k_l, qa_l) (deeds_r, Heap h_r ids_r, 
                       return ((deeds_l, Heap h_l ids_l, rn_l, k_l), (heap, k, qa), (deeds_r, Heap h_r ids_r, rn_r, k_r))
                  | mrn2mk <- msgEC init_rn2 k_l k_r
                  , mres <- prod (do (rn2, mk) <- mrn2mk
-                                    (msg_s, res@(_, (k_l, _, k_r))) <- runMSG (liftM2 (,) (msgAnned annedQA (msgQA rn2) qa_l qa_r) (mk rn2)) msg_s
+                                    (msg_s, res@(_, (k_l, _, k_r))) <- runMSG msg_s (liftM2 (,) (msgAnned annedQA (msgQA rn2) qa_l qa_r) (mk rn2))
                                     return (map (liftM ((,) res)) $ msgPureHeap mm rn2 msg_s h_l h_r (stackOpenFreeVars k_l) (stackOpenFreeVars k_r)))
                  ]
   where
@@ -416,7 +427,7 @@ msgTerm' :: RnEnv2 -> Tag -> TermF Anned -> Tag -> TermF Anned -> MSG (TermF Ann
 msgTerm' rn2 _    (Var x_l)                  _    (Var x_r)                  = liftM Var $ msgVar rn2 x_l x_r
 msgTerm' rn2 tg_l (Value v_l)                tg_r (Value v_r)                = liftM Value $ msgValue rn2 tg_l v_l tg_r v_r
 msgTerm' rn2 _    (TyApp e_l ty_l)           _    (TyApp e_r ty_r)           = liftM2 TyApp (msgTerm rn2 e_l e_r) (msgType rn2 ty_l ty_r)
-msgTerm' rn2 _    (App e_l x_l)              _    (App e_r x_r)              = liftM2 App (msgTerm rn2 e_l e_r) (msgVar   rn2 x_l x_r)
+msgTerm' rn2 _    (App e_l x_l)              _    (App e_r x_r)              = liftM2 App   (msgTerm rn2 e_l e_r) (msgVar  rn2 x_l  x_r)
 msgTerm' rn2 _    (PrimOp pop_l tys_l es_l)  _    (PrimOp pop_r tys_r es_r)  = guard "msgTerm: primop" (pop_l == pop_r) >> liftM2 (PrimOp pop_r) (zipWithEqualM (msgType rn2) tys_l tys_r) (zipWithEqualM (msgTerm rn2) es_l es_r)
 msgTerm' rn2 _    (Case e_l x_l ty_l alts_l) _    (Case e_r x_r ty_r alts_r) = liftM3 (\e ty (x, alts) -> Case e x ty alts) (msgTerm rn2 e_l e_r) (msgType rn2 ty_l ty_r) (msgIdCoVarBndr (,) rn2 x_l x_r $ \rn2 -> msgAlts rn2 alts_l alts_r)
 msgTerm' rn2 _    (Let x_l e1_l e2_l)        _    (Let x_r e1_r e2_r)        = liftM2 (\e1 (x, e2) -> Let x e1 e2) (msgTerm rn2 e1_l e1_r) $ msgIdCoVarBndr (,) rn2 x_l x_r $ \rn2 -> msgTerm rn2 e2_l e2_r
@@ -657,10 +668,16 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
       = [return (rn_l, (h_l, Heap h (ids `unionInScope` rnInScopeSet rn2), h_r), rn_r)]
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((x_common, PendingVar x_l x_r):rest) })
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
-      -- FIXME: this can legitimately fail, in which case we should create a common "vanilla" binder and leave the
-      -- distinct specs/rules to the generalised versions.
-      | Right (msg_s, x_common) <- flip runMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
-      = prod (do (used_l, hb_l) <- mb_common_l
+      -- NB: binder matching can legitimately fail, in which case we want to *force* generalisation, creating a common "vanilla"
+      -- binder with no non-MSGable info, leaving the non-unifiable specs/rules to the generalised versions.
+      | msg_s <- msg_s { msgPending = rest }
+      , (mb_common_x, mb_individual_x) <- case runMSG msg_s (msgBndrExtras rn2 x_common x_l x_r) of
+          Right res -> (Right res, Right res)
+          Left  msg -> (Left  msg, Right (runMSGNF msg_s (liftM (x_common `setVarType`) $ msgType rn2 (idType x_l) (idType x_r))))
+            -- NB: the only way that can fail is if x_l and x_r are Ids (it always succeeds with TyVars), so idType is legitimate here
+            -- NB: x_common is guaranteed not to have any extra information, so all we need to do is override the Type
+      = prod (do (msg_s, x_common) <- mb_common_x
+                 (used_l, hb_l) <- mb_common_l
                  (used_r, hb_r) <- mb_common_r
                  (rn_l, rn_r, msg_s, hb) <- case (inject hb_l, inject hb_r) of
                    (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
@@ -680,11 +697,11 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
                             , let l_fvs = inFreeVars annedTermFreeVars in_e_l
                                   r_fvs = inFreeVars annedTermFreeVars in_e_r
                             , l_fvs == r_fvs
-                            , Right res <- flip runMSG msg_s $ do Foldable.mapM_ (\x -> msgFlexiVar rn2 x x >>= \x' -> guard "msgPureHeap: shortcut" (x' == x) >> return ()) r_fvs
-                                                                  return in_e_r -- Right biased
+                            , Right res <- runMSG msg_s $ do Foldable.mapM_ (\x -> msgFlexiVar rn2 x x >>= \x' -> guard "msgPureHeap: shortcut" (x' == x) >> return ()) r_fvs
+                                                             return in_e_r -- Right biased
                             -> Right res
                             | otherwise
-                            -> flip runMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
+                            -> runMSG msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
                      -> return (rn_l, rn_r, msg_s, (if let_bound_r then letBound else internallyBound) in_e)
                    (Just Nothing, Just Nothing)
                      | x_l == x_r
@@ -696,7 +713,8 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
                  return (go rn_l rn_r used_l used_r
                             h_l h_r (M.insert x_common hb h) msg_s)) ++
         -- If they don't match, we need to generalise
-        prod (do -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
+        prod (do (msg_s, x_common) <- mb_individual_x
+                 -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
                  -- that binding refers to. If that is not possible, we have to fail.
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
                  (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
@@ -708,7 +726,7 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
       -- Match binders themselves, but in this case we can't reuse msgTyVarBndrExtras, which is annoying :-(
       -- NB: binder matching here never fails because kind matching never fails.
-      | Right (msg_s, a_common) <- flip runMSG (msg_s { msgPending = rest }) (liftM (a_common `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r))
+      | (msg_s, a_common) <- runMSGNF (msg_s { msgPending = rest }) (liftM (a_common `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r))
       -- We already know the types don't match so we are going to generalise. Note that these particular "sucks" can never fail:
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyVarsOfType ty_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyVarsOfType ty_r)
@@ -716,14 +734,13 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
                              h_l' h_r' (M.insert a_common generalised h) msg_s))
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((q_common, PendingCoercion co_l co_r):rest) })
       -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that q_common always has no IdInfo.
-      -- NB: binder matching here never fails because type matching never fails.
-      | Right (msg_s, q_common) <- flip runMSG (msg_s { msgPending = rest }) (liftM (q_common `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r))
+      -- NB: binder matching here never fails because type matching never fails, and q_common is guaranteed created with no extra info.
+      | (msg_s, q_common) <- runMSGNF (msg_s { msgPending = rest }) (liftM (q_common `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r))
       -- We already know the coercions don't match so we are going to generalise
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyCoVarsOfCo co_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyCoVarsOfCo co_r)
                  return (go (insertCoercionSubst rn_l q_common co_l) (insertCoercionSubst rn_r q_common co_r) used_l' used_r'
                              h_l' h_r' (M.insert q_common generalised h) msg_s))
-    go _ _ _ _ _ _ _ _ = [Left "msgPureHeap: non-unifiable heap binders"]
 
     find :: PureHeap -> BoundVars -> PureHeap -> S.Set Var
          -> Var -> (MSG' (S.Set Var, HeapBinding),
