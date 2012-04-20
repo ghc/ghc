@@ -52,7 +52,7 @@ traceSC _ = id
 --
 --  let x = v[x] in v
 --
--- Note that the new term matches against the previous one if we can do instance matching, so
+-- Note that the new term matches against the previous one ([v/x]) if we can do instance matching, so
 -- if we are not careful we immediately build a loop. This really sucks.
 
 
