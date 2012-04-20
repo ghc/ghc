@@ -269,6 +269,7 @@ primtype Word#
 primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+-- Returns (# high, low #) (or equivalently, (# carry, low #))
 primop   WordAdd2Op  "plusWord2#"  GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
    with commutable = True
@@ -278,6 +279,7 @@ primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
 primop   WordMulOp   "timesWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+-- Returns (# high, low #)
 primop   WordMul2Op  "timesWord2#"   GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
    with commutable = True
