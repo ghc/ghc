@@ -728,6 +728,59 @@ msgPureHeap mm rn2 msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_ids_r) (
     go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((x_common, PendingTerm e_l e_r):rest) })
       -- NB: I can try to avoid generalisation when e_l or e_r is just a heap-bound variable. We do this by floating the non-variable into a new heap binding
       -- which looks just like it was in the inital heap on the left/right and then matching the variable pair we are left with as normal.
+      --
+      -- We need to carefully avoid termination issues that arise from terms like:
+      --  x |-> y
+      --  y |-> x  `msg`  a |-> True
+      --  x               a
+      --
+      -- Where we might go:
+      --  Does x match a?    It does if y matches True!
+      --  Does y match True? It does if x matches True!
+      --  Does x match True? It does if y matches True!
+      --  Does y match True? ...
+      --
+      -- That would be an infinite loop. In fact, instead we are floating the expression
+      -- (i.e. True) to a new (named) heap binding, but that *doesn't* mean that we benefit from
+      -- the standard termination benefits of the PendingVar memoisation stuff. We get:
+      --  Does x match a? It does if y matches True!
+      --  Give True the name b.
+      --  Does y match b? It does if x matches True!
+      --  Give True the name c.
+      --  Does x match c? It does if y matches True!
+      --  Give True the name d
+      --  Does y match d? ...
+      --
+      -- This is still an infinite loop :-(
+      --
+      -- You might think any loop like this must go through at least 1 cheap term, because for it to continue
+      -- we have to repeatedly copy a heap binding to the common heap under many different names. This *is* true
+      -- but it's not so easy to see -- don't forget that only a *portion* of a heap binding needs to be copied
+      -- up to the common heap many times, so we might potentially have a loop where we repeatedly give distinct
+      -- names to the (expensive) term (fib 100) from the heap-bound term (/\a -> fib 100). (Examples with a value
+      -- lambda won't demonstrate this because we don't float expensive stuff from those). This is still OK though,
+      -- because to float that portion out an infinite number of times we have to copy the enclosing cheap binding
+      -- an infinite number of times too.
+      --
+      -- Since the loop *does* always go through at least 1 cheap term, you might think a suitable solution to the
+      -- problem is to memoise PendingTerm pairs *iff* both sides of the pair are cheap (we CANNOT memoise these
+      -- pairs in general or we may increase sharing). Although that solves the termination issue, it isn't much
+      -- better. We get:
+      --  Does x match a? It does if y matches True!
+      --  Give True the name b.
+      --  Does y match b? It does if x matches True!
+      --  Give True the name c.
+      --  Does x match c? It does if y matches True, AND we've seen this before - reuse that decision.
+      --
+      -- So the MSGed term is:
+      --  d |-> e
+      --  e |-> d
+      --  d
+      --
+      -- This is clearly not instantiable to derive the RHS!
+      --
+      -- FIXME: I don't have a good solution at the moment. For now, I've patched it so we don't use these branches
+      -- if the term we would give a new name to is cheap.
       | Just (x_l, e_r) <- varTermPair e_l e_r
       , let (ids_r', x_r) = uniqAway' ids_r x_common
       = go rn_l rn_r used_l used_r init_h_l (M.insert x_r (internallyBound (renamedTerm e_r)) init_h_r) (Heap h_l ids_l) (Heap h_r ids_r') h (msg_s { msgPending = (x_common, PendingVar x_l x_r):rest })
@@ -803,7 +856,9 @@ msgPureHeap mm rn2 msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_ids_r) (
     sucks init_h k_bvs h used fvs = foldM (\(used, h) x -> snd (find init_h k_bvs h used x) >>= suck init_h k_bvs h x) (used, h) (varSetElems fvs)
 
     varTermPair :: AnnedTerm -> AnnedTerm -> Maybe (Var, AnnedTerm)
-    varTermPair e_l e_r = case extract e_l of
+    varTermPair e_l e_r
+      | termIsCheap e_r = Nothing -- Ensure termination of the match loop (see comments above)
+      | otherwise = case extract e_l of
         Var   x_l                                     -> Just (x_l, e_r)
         Value (Indirect x_l) | Value _ <- extract e_r -> Just (x_l, e_r) -- We also (sneakily) use PendingTerm to deal with indirection/value mismatches
         _ -> Nothing
