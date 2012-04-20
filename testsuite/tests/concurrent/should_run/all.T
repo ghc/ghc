@@ -240,3 +240,6 @@ test('setnumcapabilities001',
        reqlib('parallel'),
        skip_if_not_smp ],
      compile_and_run, [''])
+
+# omit ghci, which can't handle unboxed tuples:
+test('compareAndSwap', omit_ways(['ghci']), compile_and_run, [''])

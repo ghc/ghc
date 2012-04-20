@@ -1,0 +1,6 @@
+Perform a CAS within a MutableArray#
+  1st try should succeed: (True,33)
+  2nd should fail: (False,44)
+Printing array:
+  33  33  33  44  33
+Done.
