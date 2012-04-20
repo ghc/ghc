@@ -578,7 +578,7 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
     sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
-ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr ty
+ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty pREC_CON ty
 ppr_mono_ty _    (HsQuasiQuoteTy qq) = ppr qq
 ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
 ppr_mono_ty _    (HsTyVar name)      = ppr name

@@ -653,7 +653,7 @@ hsTyClDeclBinders (TyDecl { tcdLName = name, tcdTyDefn = defn })
 -------------------
 hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
 hsInstDeclBinders (ClsInstD { cid_fam_insts = fis }) = concatMap (hsFamInstBinders . unLoc) fis
-hsInstDeclBinders (FamInstD fi) = hsFamInstBinders fi
+hsInstDeclBinders (FamInstD { lid_inst = fi }) = hsFamInstBinders fi
 
 -------------------
 hsFamInstBinders :: Eq name => FamInstDecl name -> [Located name]

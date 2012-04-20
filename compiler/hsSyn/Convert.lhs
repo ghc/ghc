@@ -165,8 +165,7 @@ cvtDec (TySynD tc tvs rhs)
 	; rhs' <- cvtType rhs
 	; returnL $ TyClD (TyDecl { tcdLName = tc' 
                                   , tcdTyVars = tvs' 
-                                  , tcdTyDefn = TySynonym rhs'
-                                  , tcdFVs = placeHolderNames }) }
+                                  , tcdTyDefn = TySynonym rhs' placeHolderNames }) }
 
 cvtDec (DataD ctxt tc tvs constrs derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
@@ -175,9 +174,10 @@ cvtDec (DataD ctxt tc tvs constrs derivs)
        ; let defn = TyData { td_ND = DataType, td_cType = Nothing
                            , td_ctxt = ctxt'
                            , td_kindSig = Nothing
-                           , td_cons = cons', td_derivs = derivs' } 
+                           , td_cons = cons', td_derivs = derivs'
+                           , td_fvs = placeHolderNames } 
 	; returnL $ TyClD (TyDecl { tcdLName = tc', tcdTyVars = tvs'
-                                  , tcdTyDefn = defn, tcdFVs = placeHolderNames }) }
+                                  , tcdTyDefn = defn }) }
 
 cvtDec (NewtypeD ctxt tc tvs constr derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
@@ -186,9 +186,10 @@ cvtDec (NewtypeD ctxt tc tvs constr derivs)
         ; let defn = TyData { td_ND = NewType, td_cType = Nothing
                             , td_ctxt = ctxt'
                             , td_kindSig = Nothing
-                            , td_cons = [con'], td_derivs = derivs' } 
+                            , td_cons = [con'], td_derivs = derivs'
+                            , td_fvs = placeHolderNames } 
 	; returnL $ TyClD (TyDecl { tcdLName = tc', tcdTyVars = tvs'
-                                  , tcdTyDefn = defn, tcdFVs = placeHolderNames }) }
+                                  , tcdTyDefn = defn }) }
 
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do	{ (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs

@@ -436,9 +436,8 @@ data TyClDecl name
   | -- | @type/data declaration
     TyDecl { tcdLName  :: Located name            -- ^ Type constructor
            , tcdTyVars :: [LHsTyVarBndr name]
-           , tcdTyDefn :: HsTyDefn name 
-           , tcdFVs    :: NameSet }               -- ^ Free tycons of the decl
-                                                  -- (Used for cycle detection)
+           , tcdTyDefn :: HsTyDefn name
+           , tcdFVs    :: NameSet }
 
   | ClassDecl { tcdCtxt    :: LHsContext name,          -- ^ Context...
                 tcdLName   :: Located name,             -- ^ Name of the class
@@ -450,7 +449,8 @@ data TyClDecl name
                                                         --   only 'TyFamily'
                 tcdATDefs  :: [LFamInstDecl name],      -- ^ Associated type defaults; ie
                                                         --   only 'TySynonym'
-                tcdDocs    :: [LDocDecl]                -- ^ Haddock docs
+                tcdDocs    :: [LDocDecl],               -- ^ Haddock docs
+                tcdFVs     :: NameSet
     }
   deriving (Data, Typeable)
 
@@ -458,7 +458,7 @@ data TyClDecl name
 data HsTyDefn name   -- The payload of a type synonym or data type defn
                      -- Used *both* for vanialla type/data declarations,
                      --       *and* for type/data family instances
-  = TySynonym { td_synRhs :: LHsType name }         -- ^ Synonym expansion
+  = TySynonym { td_synRhs :: LHsType name }   -- ^ Synonym expansion
 
   | -- | Declares a data type or newtype, giving its construcors
     -- @
@@ -645,7 +645,7 @@ pp_ty_defn :: OutputableBndr name
            -> HsTyDefn name
            -> SDoc 
 
-pp_ty_defn pp_hdr (TySynonym rhs)
+pp_ty_defn pp_hdr (TySynonym { td_synRhs = rhs })
   = hang (ptext (sLit "type") <+> pp_hdr [] <+> equals)
        4 (ppr rhs)
 
@@ -776,7 +776,7 @@ pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
   = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details details]
   where
     ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc (unLoc con), ppr t2]
-    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc (unLoc con) : map ppr tys)
+    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc (unLoc con) : map (pprParendHsType . unLoc) tys)
     ppr_details (RecCon fields)  = ppr con <+> pprConDeclFields fields
 
 pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
@@ -820,11 +820,12 @@ data InstDecl name  -- Both class and family instances
                                        -- figures out the quantified type variables for us.
       , cid_binds :: LHsBinds name
       , cid_sigs  :: [LSig name]                -- User-supplied pragmatic info
-      , cid_fam_insts :: [LFamInstDecl name] }  -- Family instances for associated types
+      , cid_fam_insts :: [LFamInstDecl name]    -- Family instances for associated types
+      , lid_fvs       :: NameSet }
 
   | FamInstD              -- type/data family instance
-      (FamInstDecl name)
-
+      { lid_inst :: FamInstDecl name
+      , lid_fvs  :: NameSet }
   deriving (Data, Typeable)
 \end{code}
 
@@ -855,7 +856,8 @@ instance (OutputableBndr name) => Outputable (FamInstDecl name) where
     = pp_ty_defn (pp_fam_inst_head tycon pats) defn
 
 instance (OutputableBndr name) => Outputable (InstDecl name) where
-    ppr (ClsInstD inst_ty binds sigs ats)
+    ppr (ClsInstD { cid_poly_ty = inst_ty, cid_binds = binds
+                  , cid_sigs = sigs, cid_fam_insts = ats })
       | null sigs && null ats && isEmptyBag binds  -- No "where" part
       = top_matter
 
@@ -866,7 +868,7 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
       where
         top_matter = ptext (sLit "instance") <+> ppr inst_ty
 
-    ppr (FamInstD decl) = ppr decl
+    ppr (FamInstD { lid_inst = decl }) = ppr decl
 
 -- Extract the declarations of associated types from an instance
 
@@ -874,8 +876,8 @@ instDeclFamInsts :: [LInstDecl name] -> [FamInstDecl name]
 instDeclFamInsts inst_decls 
   = concatMap do_one inst_decls
   where
-    do_one (L _ (ClsInstD _ _ _ fam_insts)) = map unLoc fam_insts
-    do_one (L _ (FamInstD fam_inst))        = [fam_inst]
+    do_one (L _ (ClsInstD { cid_fam_insts = fam_insts })) = map unLoc fam_insts
+    do_one (L _ (FamInstD { lid_inst = fam_inst }))       = [fam_inst]
 \end{code}
 
 %************************************************************************

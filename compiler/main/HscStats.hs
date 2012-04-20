@@ -133,9 +133,10 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
                (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
     class_info _ = (0,0)
 
-    inst_info (FamInstD d) = case countATDecl d of
-                                  (tyd, dtd) -> (0,0,0,tyd,dtd)
-    inst_info (ClsInstD _ inst_meths inst_sigs ats)
+    inst_info (FamInstD { lid_inst = d }) 
+        = case countATDecl d of
+           (tyd, dtd) -> (0,0,0,tyd,dtd)
+    inst_info (ClsInstD { cid_binds = inst_meths, cid_sigs = inst_sigs, cid_fam_insts = ats })
         = case count_sigs (map unLoc inst_sigs) of
             (_,_,ss,is,_) ->
               case foldr add2 (0, 0) (map (countATDecl . unLoc) ats) of

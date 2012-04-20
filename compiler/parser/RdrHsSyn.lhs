@@ -115,7 +115,8 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
        ; tyvars <- checkTyVars tycl_hdr tparams      -- Only type vars allowed
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars,
                                     tcdFDs = unLoc fds, tcdSigs = sigs, tcdMeths = binds,
-                                    tcdATs   = ats, tcdATDefs = at_defs, tcdDocs  = docs })) }
+                                    tcdATs = ats, tcdATDefs = at_defs, tcdDocs  = docs,
+                                    tcdFVs = placeHolderNames })) }
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -130,7 +131,8 @@ mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
        ; tyvars <- checkTyVars tycl_hdr tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = defn, tcdFVs = placeHolderNames })) }
+                                 tcdTyDefn = defn,
+                                 tcdFVs = placeHolderNames })) }
 
 mkFamInstData :: SrcSpan
          -> NewOrData
@@ -170,7 +172,8 @@ mkTySynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; tyvars <- checkTyVars lhs tparams
        ; return (L loc (TyDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                 tcdTyDefn = TySynonym rhs, tcdFVs = placeHolderNames })) }
+                                 tcdTyDefn = TySynonym { td_synRhs = rhs },
+                                 tcdFVs = placeHolderNames })) }
 
 mkFamInstSynonym :: SrcSpan
             -> LHsType RdrName  -- LHS
@@ -179,7 +182,7 @@ mkFamInstSynonym :: SrcSpan
 mkFamInstSynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsBSig tparams
-                                    , fid_defn = TySynonym rhs })) }
+                                    , fid_defn = TySynonym { td_synRhs = rhs }})) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour
@@ -262,7 +265,7 @@ cvBindsAndSigs  fb = go (fromOL fb)
                                  (bs, ss, ts, fis, docs) = go ds'
     go (L l (TyClD t@(TyFamily {})) : ds) = (bs, ss, L l t : ts, fis, docs)
                            where (bs, ss, ts, fis, docs) = go ds
-    go (L l (InstD (FamInstD fi)) : ds) = (bs, ss, ts, L l fi : fis, docs)
+    go (L l (InstD (FamInstD { lid_inst = fi })) : ds) = (bs, ss, ts, L l fi : fis, docs)
                            where (bs, ss, ts, fis, docs) = go ds
     go (L l (DocD d) : ds) =  (bs, ss, ts, fis, (L l d) : docs)
                            where (bs, ss, ts, fis, docs) = go ds

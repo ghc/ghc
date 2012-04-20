@@ -700,7 +700,8 @@ tcDefaultAssocDecl fam_tc (L loc decl)
 tcSynFamInstDecl :: TyCon -> FamInstDecl Name -> TcM ([TyVar], [Type], Type)
 -- Placed here because type family instances appear as 
 -- default decls in class declarations 
-tcSynFamInstDecl fam_tc (FamInstDecl { fid_pats = pats, fid_defn = defn@(TySynonym hs_ty) })
+tcSynFamInstDecl fam_tc 
+    (FamInstDecl { fid_pats = pats, fid_defn = defn@(TySynonym { td_synRhs = hs_ty }) })
   = do { checkTc (isSynTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
        ; tcFamTyPats fam_tc pats (kcTyDefn defn) $ \tvs' pats' res_kind -> 
@@ -1720,11 +1721,6 @@ recClsErr cycles
   = addErr (sep [ptext (sLit "Cycle in class declaration (via superclasses):"),
                  nest 2 (hsep (intersperse (text "->") (map ppr cycles)))])
 
-sortLocated :: [Located a] -> [Located a]
-sortLocated things = sortLe le things
-  where
-    le (L l1 _) (L l2 _) = l1 <= l2
-
 badDataConTyCon :: DataCon -> Type -> Type -> SDoc
 badDataConTyCon data_con res_ty_tmpl actual_res_ty
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
@@ -1793,12 +1789,7 @@ wrongATArgErr ty instTy =
       , ptext (sLit "Found") <+> quotes (ppr ty)
         <+> ptext (sLit "but expected") <+> quotes (ppr instTy)
       ]
-{-
-tooManyParmsErr :: Name -> SDoc
-tooManyParmsErr tc_name
-  = ptext (sLit "Family instance has too many parameters:") <+>
-    quotes (ppr tc_name)
--}
+
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr exp_arity
   = ptext (sLit "Number of parameters must match family declaration; expected")

@@ -651,20 +651,22 @@ ty_decl :: { LTyClDecl RdrName }
 inst_decl :: { LInstDecl RdrName }
         : 'instance' inst_type where_inst
                  { let (binds, sigs, _, ats, _) = cvBindsAndSigs (unLoc $3)
-                   in L (comb3 $1 $2 $3) (ClsInstD $2 binds sigs ats) }
+                   in L (comb3 $1 $2 $3) (ClsInstD { cid_poly_ty = $2, cid_binds = binds
+                                                   , cid_sigs = sigs, cid_fam_insts = ats
+                                                   , lid_fvs = placeHolderNames }) }
 
            -- type instance declarations
         | 'type' 'instance' type '=' ctype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
                 {% do { L loc d <- mkFamInstSynonym (comb2 $1 $5) $3 $5
-                      ; return (L loc (FamInstD d)) } }
+                      ; return (L loc (FamInstD { lid_inst = d, lid_fvs = placeHolderNames })) } }
 
           -- data/newtype instance declaration
         | data_or_newtype 'instance' tycl_hdr constrs deriving
                 {% do { L loc d <- mkFamInstData (comb4 $1 $3 $4 $5) (unLoc $1) Nothing $3
                                       Nothing (reverse (unLoc $4)) (unLoc $5)
-                      ; return (L loc (FamInstD d)) } }
+                      ; return (L loc (FamInstD { lid_inst = d, lid_fvs = placeHolderNames })) } }
 
           -- GADT instance declaration
         | data_or_newtype 'instance' tycl_hdr opt_kind_sig 
@@ -672,7 +674,7 @@ inst_decl :: { LInstDecl RdrName }
                  deriving
                 {% do { L loc d <- mkFamInstData (comb4 $1 $3 $5 $6) (unLoc $1) Nothing $3
                                             (unLoc $4) (unLoc $5) (unLoc $6)
-                      ; return (L loc (FamInstD d)) } }
+                      ; return (L loc (FamInstD { lid_inst = d, lid_fvs = placeHolderNames })) } }
         
 -- Associated type family declarations
 --
@@ -700,7 +702,7 @@ at_decl_cls :: { LHsDecl RdrName }
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
                 {% do { L loc fid <- mkFamInstSynonym (comb2 $1 $4) $2 $4
-                      ; return (L loc (InstD (FamInstD fid))) } }
+                      ; return (L loc (InstD (FamInstD { lid_inst = fid, lid_fvs = placeHolderNames }))) } }
 
 -- Associated type instances
 --
@@ -791,7 +793,7 @@ where_cls :: { Located (OrdList (LHsDecl RdrName)) }    -- Reversed
 -- Declarations in instance bodies
 --
 decl_inst  :: { Located (OrdList (LHsDecl RdrName)) }
-decl_inst  : at_decl_inst               { LL (unitOL (L1 (InstD (FamInstD (unLoc $1))))) }
+decl_inst  : at_decl_inst               { LL (unitOL (L1 (InstD (FamInstD { lid_inst = unLoc $1, lid_fvs = placeHolderNames })))) }
            | decl                       { $1 }
 
 decls_inst :: { Located (OrdList (LHsDecl RdrName)) }   -- Reversed
