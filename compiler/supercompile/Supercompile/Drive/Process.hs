@@ -342,8 +342,8 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
         rn = mkIdentityRenaming input_fvs'
         ids = mkInScopeSet input_fvs'
-        {-# INLINE heap_binding_is_value #-}
-        heap_binding_is_value = maybe True (termIsValue . snd) . heapBindingTerm
+        {-# INLINE heap_binding_is_cheap #-}
+        heap_binding_is_cheap = maybe True (termIsCheap . snd) . heapBindingTerm
 
         -- When *not* doing memocache preinitialization, we still want to be able to speculate the unfoldings to
         -- discover more values (after all, the evaluator can only inline LetBound values). But this might cause
@@ -352,7 +352,7 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         -- The speculated heap' contain *internally bound* top level bindings (or the speculator won't do anything
         -- to them) so we must be careful to change them to *let bound* before we put them in the user-visible heap.
         
-        -- First, eliminate any non-value unfolding bindings and any value binding that refers to any one
+        -- First, eliminate any non-cheap unfolding bindings and any cheap binding that refers to any one
         -- of them *that is not one of the original bindings*
         --
         -- Consider these unfoldings:
@@ -360,15 +360,15 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         --  meth2 = fib 100
         --  dict = D meth1 meth2
         --
-        -- We don't want to make the whole dict unavailable just because meth2 isn't a value
+        -- We don't want to make the whole dict unavailable just because meth2 isn't cheap
         --
         -- However in this case:
         --  foo = let a = fib 100 in D a
         --
-        -- We do want to make "foo" unavailable as there is no value unfolding we can give it
+        -- We do want to make "foo" unavailable as there is no cheap unfolding we can give it
         -- that ensures that we share the work of "fib 100" with all other modules.
-        (eliminate_set_nonvalue, h'_value) = funny_partition (\hb -> hb { howBound = LetBound }) (not . heap_binding_is_value) h'
-        h'' = go eliminate_set_nonvalue h'_value
+        (eliminate_set_noncheap, h'_cheap) = funny_partition (\hb -> hb { howBound = LetBound }) (not . heap_binding_is_cheap) h'
+        h'' = go eliminate_set_noncheap h'_cheap
           where go eliminate_set h
                   | isEmptyVarSet eliminate_set' = h_trimmed
                   | otherwise                    = go eliminate_set' h_trimmed
@@ -387,7 +387,7 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
                            else (extendVarSet killed x', kept)
                  | otherwise = (killed, M.insert x' (fiddle hb) kept)
 
-        -- Secondly, pull out any remaining bindings (which must be values) that didn't exist in the
+        -- Secondly, pull out any remaining bindings (which must be cheap) that didn't exist in the
         -- unspeculated heap. These will be our new top-level bindings.
         h''_must_be_bound = [ (x', annedTermToFVedTerm (renameIn (renameAnnedTerm ids') in_e))
                             | (x', hb) <- M.toList h''
@@ -399,7 +399,7 @@ prepareTerm unfoldings e = {-# SCC "prepareTerm" #-}
         -- When doing memocache preinitialization, we don't want to include in the final heap any binding originating
         -- from evaluating the top-level that cannot be proven to be a value, or else we risk work duplication
         preinit_state = normalise (deeds', preinit_heap, Loco False, (rn, anned_e))
-        preinit_heap = Heap (M.filter heap_binding_is_value h' `M.union` h_fvs) ids'
+        preinit_heap = Heap (M.filter heap_binding_is_cheap h' `M.union` h_fvs) ids'
 
         -- NB: we assume that unfoldings are guaranteed to be cheap and hence duplicatiable. I think this is reasonable.
         preinit_with = [(gc (normalise (maxBound, heap', Loco False, anned_e')), accessor_e)
