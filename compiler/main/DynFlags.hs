@@ -213,6 +213,7 @@ data DynFlag
    | Opt_D_dump_splices
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
+   | Opt_D_dump_avoid_vect
    | Opt_D_dump_ticked
    | Opt_D_dump_rtti
    | Opt_D_source_stats
@@ -1639,6 +1640,7 @@ dynamic_flags = [
   , Flag "ddump-hi"                (setDumpFlag Opt_D_dump_hi)
   , Flag "ddump-minimal-imports"   (setDumpFlag Opt_D_dump_minimal_imports)
   , Flag "ddump-vect"              (setDumpFlag Opt_D_dump_vect)
+  , Flag "ddump-avoid-vect"        (setDumpFlag Opt_D_dump_avoid_vect)
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)

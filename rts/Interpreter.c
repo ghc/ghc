@@ -848,9 +848,9 @@ run_BCO:
             int i;
             int size_words;
 
-            arg1_brk_array      = BCO_NEXT;  // 1st arg of break instruction
-            arg2_array_index    = BCO_NEXT;  // 2nd arg of break instruction
-            arg3_freeVars       = BCO_NEXT;  // 3rd arg of break instruction
+            arg1_brk_array      = BCO_GET_LARGE_ARG;  // 1st arg of break instruction
+            arg2_array_index    = BCO_NEXT;           // 2nd arg of break instruction
+            arg3_freeVars       = BCO_GET_LARGE_ARG;  // 3rd arg of break instruction
 
             // check if we are returning from a breakpoint - this info
             // is stored in the flags field of the current TSO
@@ -969,14 +969,14 @@ run_BCO:
 	}
 
 	case bci_PUSH_G: {
-	    int o1 = BCO_NEXT;
+	    int o1 = BCO_GET_LARGE_ARG;
 	    Sp[-1] = BCO_PTR(o1);
 	    Sp -= 1;
 	    goto nextInsn;
 	}
 
 	case bci_PUSH_ALTS: {
-	    int o_bco  = BCO_NEXT;
+	    int o_bco  = BCO_GET_LARGE_ARG;
 	    Sp[-2] = (W_)&stg_ctoi_R1p_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
@@ -984,7 +984,7 @@ run_BCO:
 	}
 
 	case bci_PUSH_ALTS_P: {
-	    int o_bco  = BCO_NEXT;
+	    int o_bco  = BCO_GET_LARGE_ARG;
 	    Sp[-2] = (W_)&stg_ctoi_R1unpt_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
@@ -992,7 +992,7 @@ run_BCO:
 	}
 
 	case bci_PUSH_ALTS_N: {
-	    int o_bco  = BCO_NEXT;
+	    int o_bco  = BCO_GET_LARGE_ARG;
 	    Sp[-2] = (W_)&stg_ctoi_R1n_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
@@ -1000,7 +1000,7 @@ run_BCO:
 	}
 
 	case bci_PUSH_ALTS_F: {
-	    int o_bco  = BCO_NEXT;
+	    int o_bco  = BCO_GET_LARGE_ARG;
 	    Sp[-2] = (W_)&stg_ctoi_F1_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
@@ -1008,7 +1008,7 @@ run_BCO:
 	}
 
 	case bci_PUSH_ALTS_D: {
-	    int o_bco  = BCO_NEXT;
+	    int o_bco  = BCO_GET_LARGE_ARG;
 	    Sp[-2] = (W_)&stg_ctoi_D1_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
@@ -1016,7 +1016,7 @@ run_BCO:
 	}
 
 	case bci_PUSH_ALTS_L: {
-	    int o_bco  = BCO_NEXT;
+	    int o_bco  = BCO_GET_LARGE_ARG;
 	    Sp[-2] = (W_)&stg_ctoi_L1_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
@@ -1024,7 +1024,7 @@ run_BCO:
 	}
 
 	case bci_PUSH_ALTS_V: {
-	    int o_bco  = BCO_NEXT;
+	    int o_bco  = BCO_GET_LARGE_ARG;
 	    Sp[-2] = (W_)&stg_ctoi_V_info;
 	    Sp[-1] = BCO_PTR(o_bco);
 	    Sp -= 2;
@@ -1067,7 +1067,7 @@ run_BCO:
 	    
 	case bci_PUSH_UBX: {
 	    int i;
-	    int o_lits = BCO_NEXT;
+	    int o_lits = BCO_GET_LARGE_ARG;
 	    int n_words = BCO_NEXT;
 	    Sp -= n_words;
 	    for (i = 0; i < n_words; i++) {
@@ -1181,7 +1181,7 @@ run_BCO:
 
 	case bci_PACK: {
 	    int i;
-	    int o_itbl         = BCO_NEXT;
+	    int o_itbl         = BCO_GET_LARGE_ARG;
 	    int n_words        = BCO_NEXT;
 	    StgInfoTable* itbl = INFO_PTR_TO_STRUCT(BCO_LIT(o_itbl));
 	    int request        = CONSTR_sizeW( itbl->layout.payload.ptrs, 
@@ -1224,7 +1224,7 @@ run_BCO:
 
 	case bci_TESTLT_I: {
 	    // There should be an Int at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    I_ stackInt = (I_)Sp[1];
 	    if (stackInt >= (I_)BCO_LIT(discr))
@@ -1234,7 +1234,7 @@ run_BCO:
 
 	case bci_TESTEQ_I: {
 	    // There should be an Int at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    I_ stackInt = (I_)Sp[1];
 	    if (stackInt != (I_)BCO_LIT(discr)) {
@@ -1245,7 +1245,7 @@ run_BCO:
 
 	case bci_TESTLT_W: {
 	    // There should be an Int at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    W_ stackWord = (W_)Sp[1];
 	    if (stackWord >= (W_)BCO_LIT(discr))
@@ -1255,7 +1255,7 @@ run_BCO:
 
 	case bci_TESTEQ_W: {
 	    // There should be an Int at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    W_ stackWord = (W_)Sp[1];
 	    if (stackWord != (W_)BCO_LIT(discr)) {
@@ -1266,7 +1266,7 @@ run_BCO:
 
 	case bci_TESTLT_D: {
 	    // There should be a Double at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    StgDouble stackDbl, discrDbl;
 	    stackDbl = PK_DBL( & Sp[1] );
@@ -1279,7 +1279,7 @@ run_BCO:
 
 	case bci_TESTEQ_D: {
 	    // There should be a Double at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    StgDouble stackDbl, discrDbl;
 	    stackDbl = PK_DBL( & Sp[1] );
@@ -1292,7 +1292,7 @@ run_BCO:
 
 	case bci_TESTLT_F: {
 	    // There should be a Float at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    StgFloat stackFlt, discrFlt;
 	    stackFlt = PK_FLT( & Sp[1] );
@@ -1305,7 +1305,7 @@ run_BCO:
 
 	case bci_TESTEQ_F: {
 	    // There should be a Float at Sp[1], and an info table at Sp[0].
-	    int discr   = BCO_NEXT;
+	    int discr   = BCO_GET_LARGE_ARG;
 	    int failto  = BCO_GET_LARGE_ARG;
 	    StgFloat stackFlt, discrFlt;
 	    stackFlt = PK_FLT( & Sp[1] );
@@ -1369,7 +1369,7 @@ run_BCO:
 	case bci_CCALL: {
 	    void *tok;
 	    int stk_offset            = BCO_NEXT;
-	    int o_itbl                = BCO_NEXT;
+	    int o_itbl                = BCO_GET_LARGE_ARG;
 	    int interruptible         = BCO_NEXT;
 	    void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
 	    int ret_dyn_size = 
