@@ -1433,10 +1433,18 @@ rewriteCtFlavor :: CtFlavor
                 -> TcPredType   -- new predicate
                 -> TcCoercion   -- new ~ old     
                 -> TcS (Maybe CtFlavor)
+--      rewriteCtFlavor old_fl new_pred co
+-- Main purpose: create a new identity (flavor) for new_pred;
+--               unless new_pred is cached already
+-- * Returns a new_fl : new_pred, with same wanted/given/derived flag as old_fl
+-- * If old_fl was wanted, create a binding for old_fl, in terms of new_fl
+-- * If old_fl was given, AND not cached, create a binding for new_fl, in terms of old_fl
+-- * Returns Nothing if new_fl is already cached
+
 rewriteCtFlavor = rewriteCtFlavor_cache True
--- Returns Nothing only if rewriting has happened and the rewritten constraint is cached
--- Returns Just if either (i) we rewrite by reflexivity or 
---                        (ii) we rewrite and original not cached
+-- Returns Just new_fl iff either (i)  'co' is reflexivity
+--                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
+-- In either case, there is nothing new to do with new_fl
 
 rewriteCtFlavor_cache :: Bool 
                 -> CtFlavor
