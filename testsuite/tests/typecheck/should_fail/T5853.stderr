@@ -1,0 +1,14 @@
+
+T5853.hs:15:52:
+    Could not deduce (fb ~ Subst fa1 (Elem fb))
+    from the context (F fa,
+                      Subst fa (Elem fb) ~ fb,
+                      Subst fb (Elem fa) ~ fa,
+                      F fa1,
+                      Subst fa1 (Elem fa) ~ fa,
+                      Subst fa (Elem fa1) ~ fa1)
+      bound by the RULE "map/map" at T5853.hs:15:2-57
+      `fb' is a rigid type variable bound by
+           the RULE "map/map" at T5853.hs:15:2
+    In the expression: (f . g) <$> xs
+    When checking the transformation rule "map/map"
