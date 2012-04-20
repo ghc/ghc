@@ -675,8 +675,10 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
                           -- variable. This allows us to safely use the *right hand* term as the
                           -- *common* HeapBinding without any sort of changes to variables.
                           _ | x_l == x_r, x_r `S.member` msgCommonHeapVars mm
-                            , Right res <- flip runMSG msg_s $ do Foldable.mapM_ (\x -> msgFlexiVar rn2 x x >>= \x' -> guard "msgPureHeap: shortcut" (x' == x) >> return ())
-                                                                                 (inFreeVars annedTermFreeVars in_e_r)
+                            , let l_fvs = inFreeVars annedTermFreeVars in_e_l
+                                  r_fvs = inFreeVars annedTermFreeVars in_e_r
+                            , l_fvs == r_fvs
+                            , Right res <- flip runMSG msg_s $ do Foldable.mapM_ (\x -> msgFlexiVar rn2 x x >>= \x' -> guard "msgPureHeap: shortcut" (x' == x) >> return ()) r_fvs
                                                                   return in_e_r -- Right biased
                             -> Right res
                             | otherwise
