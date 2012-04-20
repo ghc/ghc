@@ -313,6 +313,30 @@ type MSGResult = ((Deeds, Heap, Renaming, Stack), (Heap, Stack, Anned QA), (Deed
 --  1. For every variable bound in the outgoing heap/stack of the {left,right} and common outgoing states..
 --  2. ..IF it is in the {left,right} incoming InScopeSet..
 --  3. ..then the thing it is bound in the {left,right} incoming state MUST have the same meaning as the new binding.
+--
+-- Things which are definitely safe in my current approach:
+--  1. New left/right binders introduced for floated terms: they are chosen to be distinct from the existing left/right InScopeSets
+--  2. Elements of the left/right heap copied into each individual heap: clearly these are already in scope
+--  3. Suffixes of the left/right stack copied into each individual stack: clearly these are already in scope
+--
+-- Things which are problematic:
+--  1. Common heap variables chosen for PendingVars/PendingTerms
+--  2. Common stack variables resulting from coupling update frames
+--
+-- In both of the problematic cases, it is sufficient to ensure that either:
+--  1. The common variable gets a name not present in *either* input InScopeSet, OR
+--  2. If the common name *is* present in the left/right InScopeSet, then it is *identical* to the
+--     left/right occurrence from which it was derived (because this is sufficient for us to be satisified
+--     that the meanings of what they will get bound to will be the same)
+--
+-- So if I have {f, g, x} InScope in the left input and {f, g, a} on the right, and:
+--   a) I (msgFlexiVar f f) to f, then everything is kosher
+--   b) I (msgFlexiVar f g) to f/g, then I have to choose a brand new name instead (e.g. b)
+--   c) I (msgFlexiVar x a) to x/a, then things are OK (because each of x and a are only InScope on one side)
+--   d) msgFlexiVar returns anything outside the set {f, g, x, a}, then everything is OK
+--
+-- Basically we have to watch out for the case where the returned name is present in *both* input
+-- InScopeSets *and* the left/right + common vars are not all identical.
 
 msg :: MSGMode -- ^ How to match
     -> State   -- ^ Tieback semantics
