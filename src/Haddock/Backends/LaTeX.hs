@@ -464,7 +464,8 @@ ppClassDecl :: [DocInstance DocName] -> SrcSpan
             -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> LaTeX
 ppClassDecl instances loc mbDoc subdocs
-  (ClassDecl lctxt lname ltyvars lfds lsigs _ ats at_defs _) unicode
+  (ClassDecl { tcdCtxt = lctxt, tcdLName = lname, tcdTyVars = ltyvars, tcdFDs = lfds 
+             , tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs }) unicode
   = declWithDoc classheader (if null body then Nothing else Just (vcat body)) $$
     instancesBit
   where

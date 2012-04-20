@@ -51,25 +51,26 @@ tyThingToLHsDecl t = noLoc $ case t of
   ATyCon tc
     | Just cl <- tyConClass_maybe tc -- classes are just a little tedious
     -> TyClD $ ClassDecl
-         (synifyCtx (classSCTheta cl))
-         (synifyName cl)
-         (synifyTyVars (classTyVars cl))
-         (map (\ (l,r) -> noLoc
-                    (map getName l, map getName r) ) $
-            snd $ classTvsFds cl)
-         (map (noLoc . synifyIdSig DeleteTopLevelQuantification)
-              (classMethods cl))
-         emptyBag --ignore default method definitions, they don't affect signature
+         { tcdCtxt = synifyCtx (classSCTheta cl)
+         , tcdLName = synifyName cl
+         , tcdTyVars = synifyTyVars (classTyVars cl)
+         , tcdFDs = map (\ (l,r) -> noLoc
+                        (map getName l, map getName r) ) $
+                         snd $ classTvsFds cl
+         , tcdSigs = map (noLoc . synifyIdSig DeleteTopLevelQuantification)
+                         (classMethods cl)
+         , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
          -- class associated-types are a subset of TyCon:
-         [noLoc (synifyTyCon at_tc) | (at_tc, _) <- classATItems cl]
-         [] --ignore associated type defaults
-         [] --we don't have any docs at this point
+         , tcdATs = [noLoc (synifyTyCon at_tc) | (at_tc, _) <- classATItems cl]
+         , tcdATDefs = [] --ignore associated type defaults
+         , tcdDocs = [] --we don't have any docs at this point
+         , tcdFVs = placeHolderNames }
     | otherwise
     -> TyClD (synifyTyCon tc)
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
-  ACoAxiom ax -> InstD (FamInstD (synifyAxiom ax))
+  ACoAxiom ax -> InstD (FamInstD { lid_inst = synifyAxiom ax })
 
   -- a data-constructor alone just gets rendered as a function:
   ADataCon dc -> SigD (TypeSig [synifyName dc]
@@ -86,8 +87,8 @@ synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
         typats    = map (synifyType WithinType) args
         hs_rhs_ty = synifyType WithinType rhs
     in FamInstDecl { fid_tycon = name 
-                   , fid_pats = HsBSig typats (map tyVarName tvs)
-                   , fid_defn = TySynonym hs_rhs_ty }
+                   , fid_pats = HsBSig typats ([], map tyVarName tvs)
+                   , fid_defn = TySynonym hs_rhs_ty, fid_fvs = placeHolderNames }
   | otherwise
   = error "synifyAxiom" 
 
@@ -311,7 +312,7 @@ synifyTyLit (NumTyLit n) = HsNumTy n
 synifyTyLit (StrTyLit s) = HsStrTy s
 
 synifyKindSig :: Kind -> HsBndrSig (LHsKind Name)
-synifyKindSig k = HsBSig (synifyType (error "synifyKind") k) placeHolderBndrs
+synifyKindSig k = mkHsBSig (synifyType (error "synifyKind") k)
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
                   ([HsType Name], Name, [HsType Name])

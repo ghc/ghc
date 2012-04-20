@@ -333,7 +333,8 @@ renameTyClD d = case d of
     defn'     <- renameTyDefn defn
     return (TyDecl { tcdLName = lname', tcdTyVars = tyvars', tcdTyDefn = defn', tcdFVs = fvs })
 
-  ClassDecl lcontext lname ltyvars lfundeps lsigs _ ats at_defs _ -> do
+  ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars
+            , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
     lcontext' <- renameLContext lcontext
     lname'    <- renameL lname
     ltyvars'  <- mapM renameLTyVarBndr ltyvars
@@ -342,7 +343,9 @@ renameTyClD d = case d of
     ats'      <- mapM renameLTyClD ats
     at_defs'  <- mapM (mapM renameFamInstD) at_defs
     -- we don't need the default methods or the already collected doc entities
-    return (ClassDecl lcontext' lname' ltyvars' lfundeps' lsigs' emptyBag ats' at_defs' [])
+    return (ClassDecl { tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
+                      , tcdFDs = lfundeps', tcdSigs = lsigs', tcdMeths= emptyBag
+                      , tcdATs = ats', tcdATDefs = at_defs', tcdDocs = [], tcdFVs = placeHolderNames })
 
   where
     renameLFunDep (L loc (xs, ys)) = do
@@ -417,21 +420,23 @@ renameForD (ForeignExport lname ltype co x) = do
 
 
 renameInstD :: InstDecl Name -> RnM (InstDecl DocName)
-renameInstD (ClsInstD ltype _ _ lATs) = do
+renameInstD (ClsInstD { cid_poly_ty =ltype, cid_fam_insts = lATs }) = do
   ltype' <- renameLType ltype
   lATs' <- mapM (mapM renameFamInstD) lATs
-  return (ClsInstD ltype' emptyBag [] lATs')
+  return (ClsInstD { cid_poly_ty = ltype', cid_binds = emptyBag, cid_sigs = []
+                   , cid_fam_insts = lATs' })
 
-renameInstD (FamInstD d) = do
+renameInstD (FamInstD { lid_inst = d }) = do
   d' <- renameFamInstD d
-  return (FamInstD d')
+  return (FamInstD { lid_inst = d' })
 
 renameFamInstD :: FamInstDecl Name -> RnM (FamInstDecl DocName)
 renameFamInstD (FamInstDecl { fid_tycon = tc, fid_pats = HsBSig pats fvs, fid_defn = defn })
   = do { tc' <- renameL tc
        ; pats' <- mapM renameLType pats
        ; defn' <- renameTyDefn defn 
-       ; return (FamInstDecl { fid_tycon = tc', fid_pats = HsBSig pats' fvs, fid_defn = defn' }) }
+       ; return (FamInstDecl { fid_tycon = tc', fid_pats = HsBSig pats' fvs
+                             , fid_defn = defn', fid_fvs = placeHolderNames }) }
 
 
 renameExportItem :: ExportItem Name -> RnM (ExportItem DocName)
