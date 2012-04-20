@@ -762,7 +762,7 @@ absVarLambdas :: Symantics ann => [AbsVar] -> ann (TermF ann) -> ann (TermF ann)
 absVarLambdas xs = tyVarIdLambdas (map absVarBinder xs)
 
 applyAbsVars :: Symantics ann => Var -> Maybe (M.Map Var Var) -> [AbsVar] -> ann (TermF ann)
-applyAbsVars x mb_xs_rn xs = snd $ snd $ foldl go (unitVarSet x, (emptyRenaming, var x)) xs
+applyAbsVars x mb_xs_rn xs = snd $ snd $ foldl go (mkInScopeSet (unitVarSet x), (emptyRenaming, var x)) xs
   where
    go (fvs, (ty_rn, e)) absx = case absVarDead absx of
     True -> (fvs, case () of
@@ -820,9 +820,9 @@ applyAbsVars x mb_xs_rn xs = snd $ snd $ foldl go (unitVarSet x, (emptyRenaming,
          -> (ty_rn, let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x)))
          where -- NB: dead binders are not present in the renaming, so don't attempt to look them up
                shadowy_x = renameAbsVarType ty_rn (absVarBinder absx)
-               x = uniqAway (mkInScopeSet fvs) shadowy_x
+               x = uniqAway fvs shadowy_x
                ty = idType x
-    False -> (fvs `extendVarSet` x', case () of
+    False -> (fvs `extendInScopeSet` x', case () of
       () | isTyVar x
          -> (insertTypeSubst ty_rn x (mkTyVarTy x'), e `tyApp` mkTyVarTy x')
    
