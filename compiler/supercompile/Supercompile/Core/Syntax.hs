@@ -139,6 +139,7 @@ type TaggedAlt = AltF Tagged
 type AltF ann = (AltCon, ann (TermF ann))
 
 -- FIXME: I should probably implement a correct operational semantics for TyLambdas!
+-- FIXME: I can probably eliminate Indirect without too much bother
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
 data ValueF ann = Indirect Id -- NB: for the avoidance of doubt, these cannot be CoVars
