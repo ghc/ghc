@@ -657,6 +657,8 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
       = [return (rn_l, (h_l, Heap h (ids `unionInScope` rnInScopeSet rn2), h_r), rn_r)]
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((x_common, PendingVar x_l x_r):rest) })
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
+      -- FIXME: this can legitimately fail, in which case we should create a common "vanilla" binder and leave the
+      -- distinct specs/rules to the generalised versions.
       | Right (msg_s, x_common) <- flip runMSG (msg_s { msgPending = rest }) (msgBndrExtras rn2 x_common x_l x_r)
       = prod (do (used_l, hb_l) <- mb_common_l
                  (used_r, hb_r) <- mb_common_r
@@ -705,6 +707,7 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
         (mb_common_r, mb_individual_r) = find init_h_r k_bvs_r h_r used_r x_r
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
       -- Match binders themselves, but in this case we can't reuse msgTyVarBndrExtras, which is annoying :-(
+      -- NB: binder matching here never fails because kind matching never fails.
       | Right (msg_s, a_common) <- flip runMSG (msg_s { msgPending = rest }) (liftM (a_common `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r))
       -- We already know the types don't match so we are going to generalise. Note that these particular "sucks" can never fail:
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyVarsOfType ty_l)
@@ -713,6 +716,7 @@ msgPureHeap mm rn2 msg_s init_h_l init_h_r (k_bvs_l, k_fvs_l) (k_bvs_r, k_fvs_r)
                              h_l' h_r' (M.insert a_common generalised h) msg_s))
     go rn_l rn_r used_l used_r h_l h_r h msg_s@(MSGState { msgPending = ((q_common, PendingCoercion co_l co_r):rest) })
       -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that q_common always has no IdInfo.
+      -- NB: binder matching here never fails because type matching never fails.
       | Right (msg_s, q_common) <- flip runMSG (msg_s { msgPending = rest }) (liftM (q_common `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r))
       -- We already know the coercions don't match so we are going to generalise
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyCoVarsOfCo co_l)
