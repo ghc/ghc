@@ -724,6 +724,7 @@ msgPureHeap mm rn2 msg_s (Heap  init_h_l init_ids_l) (Heap init_h_r init_ids_r) 
         (mb_common_l, mb_individual_l) = find init_h_l k_bvs_l h_l used_l x_l
         (mb_common_r, mb_individual_r) = find init_h_r k_bvs_r h_r used_r x_r
     go rn_l rn_r used_l used_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((x_common, PendingTerm e_l e_r):rest) })
+      -- FIXME: I could try to avoid generalisation when e_l or e_r is just a heap-bound variable
       -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that x_common always has no extra info.
       -- NB: binder matching here never fails because type matching never fails, and x_common is guaranteed created with no extra info.
       | (msg_s, x_common) <- runMSGNF (msg_s { msgPending = rest }) (liftM (x_common `setVarType`) $ msgType rn2 (termType e_l) (termType e_r))
@@ -735,6 +736,7 @@ msgPureHeap mm rn2 msg_s (Heap  init_h_l init_ids_l) (Heap init_h_r init_ids_r) 
                  return (go (insertIdRenaming rn_l x_common x_common_l) (insertIdRenaming rn_r x_common x_common_r) used_l' used_r'
                             (Heap h_l' ids_l') (Heap h_r' ids_r') (M.insert x_common generalised h) msg_s))
     go rn_l rn_r used_l used_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
+      -- NB: the heap only ever maps TyVars to lambdaBound/generalised, so there is no point trying to detect TyVars on either side
       -- Match binders themselves, but in this case we can't reuse msgTyVarBndrExtras, which is annoying :-(
       -- NB: binder matching here never fails because kind matching never fails.
       | (msg_s, a_common) <- runMSGNF (msg_s { msgPending = rest }) (liftM (a_common `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r))
@@ -744,6 +746,7 @@ msgPureHeap mm rn2 msg_s (Heap  init_h_l init_ids_l) (Heap init_h_r init_ids_r) 
                  return (go (insertTypeSubst rn_l a_common ty_l) (insertTypeSubst rn_r a_common ty_r) used_l' used_r'
                             (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert a_common generalised h) msg_s))
     go rn_l rn_r used_l used_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((q_common, PendingCoercion co_l co_r):rest) })
+      -- FIXME: I could try to avoid generalisation when co_l or co_r is just a heap-bound variable
       -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that q_common always has no extra info.
       -- NB: binder matching here never fails because type matching never fails, and q_common is guaranteed created with no extra info.
       | (msg_s, q_common) <- runMSGNF (msg_s { msgPending = rest }) (liftM (q_common `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r))
