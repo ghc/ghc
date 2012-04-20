@@ -24,7 +24,6 @@ import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
 
 import HsSyn
 import RdrName	
-import RdrHsSyn		( extractHsTysRdrTyVars )
 import RnTypes
 import RnBinds
 import RnEnv
@@ -423,9 +422,9 @@ patchCCallTarget packageId callTarget
 
 \begin{code}
 rnSrcInstDecl :: InstDecl RdrName -> RnM (InstDecl Name, FreeVars)
-rnSrcInstDecl (FamInstD fi) 
+rnSrcInstDecl (FamInstD { lid_inst = fi }) 
   = do { (fi', fvs) <- rnFamInstDecl Nothing fi
-       ; return (FamInstD fi', fvs) }
+       ; return (FamInstD { lid_inst = fi', lid_fvs = fvs }, fvs) }
 
 rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
                         , cid_sigs = uprags, cid_fam_insts = ats })
@@ -433,7 +432,8 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
   = do { (inst_ty', inst_fvs) <- rnLHsInstType (text "In an instance declaration") inst_ty
        ; case splitLHsInstDeclTy_maybe inst_ty' of {
            Nothing -> return (ClsInstD { cid_poly_ty = inst_ty', cid_binds = emptyLHsBinds
-                                       , cid_sigs = [], cid_fam_insts = [] }, inst_fvs) ;
+                                       , cid_sigs = [], cid_fam_insts = []
+                                       , lid_fvs = inst_fvs }, inst_fvs) ;
            Just (inst_tyvars, _, L _ cls,_) ->
 
     do { let (spec_inst_prags, other_sigs) = partition isSpecInstLSig uprags
@@ -467,11 +467,13 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
 	     <- renameSigs (InstDeclCtxt cls) spec_inst_prags
 
        ; let uprags' = spec_inst_prags' ++ other_sigs'
-       ; return (ClsInstD { cid_poly_ty = inst_ty', cid_binds = mbinds'
-                          , cid_sigs = uprags', cid_fam_insts = ats' },
-	         meth_fvs `plusFV` more_fvs
+             all_fvs = meth_fvs `plusFV` more_fvs
                           `plusFV` spec_inst_fvs
-		      	  `plusFV` inst_fvs) } } }
+		      	  `plusFV` inst_fvs
+       ; return (ClsInstD { cid_poly_ty = inst_ty', cid_binds = mbinds'
+                          , cid_sigs = uprags', cid_fam_insts = ats'
+                          , lid_fvs = all_fvs },
+	         all_fvs) } } }
              -- We return the renamed associated data type declarations so
              -- that they can be entered into the list of type declarations
              -- for the binding group, but we also keep a copy in the instance.
@@ -490,10 +492,13 @@ rnFamInstDecl mb_cls (FamInstDecl { fid_tycon = tycon, fid_pats = HsBSig pats _,
                      []             -> pprPanic "rnFamInstDecl" (ppr tycon)
                      (L loc _ : []) -> loc
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
-       ; tv_names <- mkTyVarBndrNames mb_cls (map (L loc) (extractHsTysRdrTyVars pats))
+             (kv_rdr_names, tv_rdr_names) = extractHsTysRdrTyVars pats
+       ; kv_names <- mkTyVarBndrNames mb_cls (map (L loc) kv_rdr_names)
+       ; tv_names <- mkTyVarBndrNames mb_cls (map (L loc) tv_rdr_names)
        	     -- All the free vars of the family patterns
              -- with a sensible binding location
-       ; bindLocalNamesFV tv_names $ 
+       ; bindLocalNamesFV kv_names $ 
+         bindLocalNamesFV tv_names $ 
     do { (pats', pat_fvs) <- rnLHsTypes (TyDataCtx tycon) pats
        ; (defn', rhs_fvs) <- rnTyDefn tycon defn
 
@@ -505,7 +510,7 @@ rnFamInstDecl mb_cls (FamInstDecl { fid_tycon = tycon, fid_pats = HsBSig pats _,
        ; unless (null bad_tvs) (badAssocRhs bad_tvs)
 
        ; return ( FamInstDecl { fid_tycon = tycon'
-                              , fid_pats = HsBSig pats' tv_names
+                              , fid_pats = HsBSig pats' (kv_names, tv_names)
                               , fid_defn = defn' }
                 , (rhs_fvs `plusFV` pat_fvs) `addOneFV` unLoc tycon') } }
        	     -- type instance => use, hence addOneFV
@@ -906,11 +911,12 @@ rnTyClDecl _ (ClassDecl {tcdCtxt = context, tcdLName = lcls,
   -- Haddock docs 
 	; docs' <- mapM (wrapLocM rnDocDecl) docs
 
+        ; let all_fvs = meth_fvs `plusFV` stuff_fvs
 	; return (ClassDecl { tcdCtxt = context', tcdLName = lcls', 
 			      tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
 			      tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs'},
-	     	  meth_fvs `plusFV` stuff_fvs) }
+                              tcdDocs = docs', tcdFVs = all_fvs },
+	     	  all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls
 
@@ -937,11 +943,12 @@ rnTyDefn tycon (TyData { td_ND = new_or_data, td_cType = cType
            -- No need to check for duplicate constructor decls
 	   -- since that is done by RnNames.extendGlobalRdrEnvRn
 
+        ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
+                        con_fvs `plusFV` sig_fvs
 	; return ( TyData { td_ND = new_or_data, td_cType = cType
                           , td_ctxt = context', td_kindSig = sig'
-			  , td_cons = condecls', td_derivs = derivs'} 
-                 , fvs1 `plusFV` fvs3 `plusFV`
-	     	   con_fvs `plusFV` sig_fvs )
+			  , td_cons = condecls', td_derivs = derivs' }
+                 , all_fvs )
         }
   where
     h98_style = case condecls of	 -- Note [Stupid theta]
@@ -957,7 +964,8 @@ rnTyDefn tycon (TyData { td_ND = new_or_data, td_cType = cType
 -- "type" and "type instance" declarations
 rnTyDefn tycon (TySynonym { td_synRhs = ty })
   = do { (ty', rhs_fvs) <- rnLHsType syn_doc ty
-       ; return (TySynonym { td_synRhs = ty' }, rhs_fvs) }
+       ; return ( TySynonym { td_synRhs = ty' }
+                , rhs_fvs) }
   where
     syn_doc = TySynCtx tycon
 
@@ -997,9 +1005,9 @@ depAnalTyClDecls ds_w_fvs
       (L _ d, _) <- ds_w_fvs
       case d of
         ClassDecl { tcdLName = L _ cls_name
-                  , tcdATs = ats } -> do
-                       L _ assoc_decl <- ats
-                       return (tcdName assoc_decl, cls_name)
+                  , tcdATs = ats } 
+          -> do L _ assoc_decl <- ats
+                return (tcdName assoc_decl, cls_name)
         TyDecl { tcdLName = L _ data_name
                , tcdTyDefn = TyData { td_cons = cons } } 
           -> do L _ dc <- cons
@@ -1092,7 +1100,7 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
                   fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
  where
     doc = ConDeclCtx name
-    get_rdr_tvs tys = extractHsTysRdrTyVars (cxt ++ tys)
+    get_rdr_tvs tys = snd (extractHsTysRdrTyVars (cxt ++ tys))
 
 rnConResult :: HsDocContext -> Name
             -> HsConDetails (LHsType Name) [ConDeclField Name]

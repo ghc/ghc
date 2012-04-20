@@ -352,6 +352,8 @@ data UserTypeCtxt
 			-- 	f (x::t) = ...
   | BindPatSigCtxt	-- Type sig in pattern binding pattern
 			--	(x::t, y) = e
+  | RuleSigCtxt Name    -- LHS of a RULE forall
+                        --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | ResSigCtxt		-- Result type sig
 			-- 	f x :: t = ....
   | ForSigCtxt Name	-- Foreign import or export signature
@@ -417,6 +419,7 @@ pprTcTyVarDetails (MetaTv SigTv _) = ptext (sLit "sig")
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
 pprUserTypeCtxt (FunSigCtxt n)    = ptext (sLit "the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n)    = ptext (sLit "a RULE for") <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
@@ -781,12 +784,18 @@ mkTcEqPred :: TcType -> TcType -> Type
 -- During type checking we build equalities between 
 -- type variables with OpenKind or ArgKind.  Ultimately
 -- they will all settle, but we want the equality predicate
--- itself to have kind '*'.  I think.  
+-- itself to have kind '*'.  I think.
+--
+-- But for now we call mkTyConApp, not mkEqPred, because the invariants
+-- of the latter might not be satisfied during type checking.
+-- Notably when we form an equalty   (a : OpenKind) ~ (Int : *)
 --
 -- But this is horribly delicate: what about type variables
 -- that turn out to be bound to Int#?
 mkTcEqPred ty1 ty2
-  = mkNakedEqPred (defaultKind (typeKind ty1)) ty1 ty2
+  = mkTyConApp eqTyCon [k, ty1, ty2]
+  where
+    k = defaultKind (typeKind ty1)
 \end{code}
 
 @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.

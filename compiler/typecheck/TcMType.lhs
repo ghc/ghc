@@ -40,7 +40,7 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  tcInstTyVars, tcInstSigTyVars,
+  tcInstTyVars, tcInstSigTyVars, newSigTyVar,
   tcInstType, 
   tcInstSkolTyVars, tcInstSuperSkolTyVars,
   tcInstSkolTyVarsX, tcInstSuperSkolTyVarsX,
@@ -61,7 +61,7 @@ module TcMType (
   -- Zonking
   zonkType, zonkKind, zonkTcPredType, 
   skolemiseSigTv, skolemiseUnboundMetaTyVar,
-  zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, zonkSigTyVar,
+  zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, 
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
 
@@ -270,14 +270,17 @@ tcInstSigTyVars = mapAccumLM tcInstSigTyVar (mkTopTvSubst [])
 
 tcInstSigTyVar :: TvSubst -> TyVar -> TcM (TvSubst, TcTyVar)
 tcInstSigTyVar subst tv
+  = do { new_tv <- newSigTyVar (tyVarName tv) (substTy subst (tyVarKind tv))
+       ; return (extendTvSubst subst tv (mkTyVarTy new_tv), new_tv) }
+
+newSigTyVar :: Name -> Kind -> TcM TcTyVar
+newSigTyVar name kind
   = do { uniq <- newMetaUnique
        ; ref <- newMutVar Flexi
-       ; let name   = setNameUnique (tyVarName tv) uniq
+       ; let name' = setNameUnique name uniq
                       -- Use the same OccName so that the tidy-er
                       -- doesn't rename 'a' to 'a0' etc
-             kind   = substTy subst (tyVarKind tv)
-             new_tv = mkTcTyVar name kind (MetaTv SigTv ref)
-       ; return (extendTvSubst subst tv (mkTyVarTy new_tv), new_tv) }
+       ; return (mkTcTyVar name' kind (MetaTv SigTv ref)) }
 \end{code}
 
 Note [Kind substitution when instantiating]
@@ -446,27 +449,6 @@ tcInstTyVarX subst tyvar
               new_tv = mkTcTyVar name kind (MetaTv TauTv ref)
         ; return (extendTvSubst subst tyvar (mkTyVarTy new_tv), new_tv) }
 \end{code}
-
-
-%************************************************************************
-%*									*
-	MetaTvs: SigTvs
-%*									*
-%************************************************************************
-
-\begin{code}
-zonkSigTyVar :: TcTyVar -> TcM TcTyVar
-zonkSigTyVar sig_tv 
-  | isSkolemTyVar sig_tv 
-  = return sig_tv	-- Happens in the call in TcBinds.checkDistinctTyVars
-  | otherwise
-  = ASSERT( isSigTyVar sig_tv )
-    do { ty <- zonkTcTyVar sig_tv
-       ; return (tcGetTyVar "zonkSigTyVar" ty) }
-	-- 'ty' is bound to be a type variable, because SigTvs
-	-- can only be unified with type variables
-\end{code}
-
 
 
 %************************************************************************
@@ -931,6 +913,7 @@ checkValidType ctxt ty
 	     	 ResSigCtxt	-> MustBeMonoType
 	     	 LamPatSigCtxt	-> rank0
 	     	 BindPatSigCtxt	-> rank0
+	     	 RuleSigCtxt _  -> rank1
 	     	 TySynCtxt _    -> rank0
 
 	     	 ExprSigCtxt 	-> rank1

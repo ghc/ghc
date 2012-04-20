@@ -530,7 +530,7 @@ getLocalNonValBinders fixity_env
              ; return (AvailTC main_name names) }
 
     new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
-    new_assoc (L _ (FamInstD d)) 
+    new_assoc (L _ (FamInstD { lid_inst = d })) 
       = do { avail <- new_ti Nothing d
            ; return [avail] }
     new_assoc (L _ (ClsInstD { cid_poly_ty = inst_ty, cid_fam_insts = ats }))

@@ -352,8 +352,12 @@ repInstD (L loc (ClsInstD ty binds prags ats))
    Just (tvs, cxt, cls, tys) = splitHsInstDeclTy_maybe (unLoc ty)
 
 repFamInstD :: FamInstDecl Name -> DsM (Core TH.DecQ)
-repFamInstD (FamInstDecl { fid_tycon = tc_name, fid_pats = HsBSig tys tv_names, fid_defn = defn })
-  = do { tc <- lookupLOcc tc_name 		-- See note [Binders and occurrences]  
+repFamInstD (FamInstDecl { fid_tycon = tc_name
+                         , fid_pats = HsBSig tys (kv_names, tv_names)
+                         , fid_defn = defn })
+  = WARN( not (null kv_names), ppr kv_names )   -- We have not yet dealt with kind 
+                                                -- polymorphism in Template Haskell (sigh)
+    do { tc <- lookupLOcc tc_name 		-- See note [Binders and occurrences]  
        ; let loc = getLoc tc_name
              hs_tvs = [ L loc (UserTyVar n) | n <- tv_names]   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ bndrs ->

@@ -20,6 +20,7 @@
 #include "Select.h"
 #include "AwaitEvent.h"
 #include "Stats.h"
+#include "GetTime.h"
 
 # ifdef HAVE_SYS_SELECT_H
 #  include <sys/select.h>
@@ -29,16 +30,10 @@
 #  include <sys/types.h>
 # endif
 
-# ifdef HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# endif
-
 #include <errno.h>
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
+#include "Clock.h"
 
 #if !defined(THREADED_RTS)
 
@@ -64,7 +59,7 @@
  */
 static LowResTime getLowResTimeOfDay(void)
 {
-    return TimeToLowResTimeRoundDown(stat_getElapsedTime());
+    return TimeToLowResTimeRoundDown(getProcessElapsedTime());
 }
 
 /*
@@ -74,7 +69,7 @@ LowResTime getDelayTarget (HsInt us)
 {
     // round up the target time, because we never want to sleep *less*
     // than the desired amount.
-    return TimeToLowResTimeRoundUp(stat_getElapsedTime() + USToTime(us));
+    return TimeToLowResTimeRoundUp(getProcessElapsedTime() + USToTime(us));
 }
 
 /* There's a clever trick here to avoid problems when the time wraps
@@ -277,7 +272,7 @@ awaitEvent(rtsBool wait)
 	  /* check for threads that need waking up 
 	   */
           wakeUpSleepingThreads(getLowResTimeOfDay());
-	  
+
 	  /* If new runnable threads have arrived, stop waiting for
 	   * I/O and run them.
 	   */

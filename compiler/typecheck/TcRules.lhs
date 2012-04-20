@@ -23,8 +23,13 @@ import TcType
 import TcHsType
 import TcExpr
 import TcEnv
+import TcEvidence( TcEvBinds(..) )
+import Type
 import Id
+import NameEnv( emptyNameEnv )
 import Name
+import Var
+import VarSet
 import SrcLoc
 import Outputable
 import FastString
@@ -47,6 +52,82 @@ an example (test simplCore/should_compile/rule2.hs) produced by Roman:
 
 He wanted the rule to typecheck.
 
+Note [Simplifying RULE constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On the LHS of transformation rules we only simplify only equalities,
+but not dictionaries.  We want to keep dictionaries unsimplified, to
+serve as the available stuff for the RHS of the rule.  We *do* want to
+simplify equalities, however, to detect ill-typed rules that cannot be
+applied.
+
+Implementation: the TcSFlags carried by the TcSMonad controls the
+amount of simplification, so simplifyRuleLhs just sets the flag
+appropriately.
+
+Example.  Consider the following left-hand side of a rule
+	f (x == y) (y > z) = ...
+If we typecheck this expression we get constraints
+	d1 :: Ord a, d2 :: Eq a
+We do NOT want to "simplify" to the LHS
+	forall x::a, y::a, z::a, d1::Ord a.
+	  f ((==) (eqFromOrd d1) x y) ((>) d1 y z) = ...
+Instead we want	
+	forall x::a, y::a, z::a, d1::Ord a, d2::Eq a.
+	  f ((==) d2 x y) ((>) d1 y z) = ...
+
+Here is another example:
+	fromIntegral :: (Integral a, Num b) => a -> b
+	{-# RULES "foo"  fromIntegral = id :: Int -> Int #-}
+In the rule, a=b=Int, and Num Int is a superclass of Integral Int. But
+we *dont* want to get
+	forall dIntegralInt.
+	   fromIntegral Int Int dIntegralInt (scsel dIntegralInt) = id Int
+because the scsel will mess up RULE matching.  Instead we want
+	forall dIntegralInt, dNumInt.
+	  fromIntegral Int Int dIntegralInt dNumInt = id Int
+
+Even if we have 
+	g (x == y) (y == z) = ..
+where the two dictionaries are *identical*, we do NOT WANT
+	forall x::a, y::a, z::a, d1::Eq a
+	  f ((==) d1 x y) ((>) d1 y z) = ...
+because that will only match if the dict args are (visibly) equal.
+Instead we want to quantify over the dictionaries separately.
+
+In short, simplifyRuleLhs must *only* squash equalities, leaving
+all dicts unchanged, with absolutely no sharing.  
+
+Also note that we can't solve the LHS constraints in isolation:
+Example   foo :: Ord a => a -> a
+	  foo_spec :: Int -> Int
+          {-# RULE "foo"  foo = foo_spec #-}
+Here, it's the RHS that fixes the type variable
+
+HOWEVER, under a nested implication things are different
+Consider
+  f :: (forall a. Eq a => a->a) -> Bool -> ...
+  {-# RULES "foo" forall (v::forall b. Eq b => b->b).
+       f b True = ...
+    #-}
+Here we *must* solve the wanted (Eq a) from the given (Eq a)
+resulting from skolemising the agument type of g.  So we 
+revert to SimplCheck when going under an implication.  
+
+
+------------------------ So the plan is this -----------------------
+
+* Step 1: Simplify the LHS and RHS constraints all together in one bag
+          We do this to discover all unification equalities
+
+* Step 2: Zonk the ORIGINAL lhs constraints, and partition them into
+          the ones we will quantify over, and the others
+
+* Step 3: Decide on the type varialbes to quantify over
+
+* Step 4: Simplify the LHS and RHS constraints separately, using the
+          quantified constraint sas givens
+
+
 \begin{code}
 tcRules :: [LRuleDecl Name] -> TcM [LRuleDecl TcId]
 tcRules decls = mapM (wrapLocM tcRule) decls
@@ -58,80 +139,92 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 
     	-- Note [Typechecking rules]
        ; vars <- tcRuleBndrs hs_bndrs
-       ; let (id_bndrs, tv_bndrs) = partition isId vars
-       ; (lhs', lhs_lie, rhs', rhs_lie, _rule_ty)
-            <- tcExtendTyVarEnv tv_bndrs $
-               tcExtendIdEnv id_bndrs $
-               do { ((lhs', rule_ty), lhs_lie) <- captureConstraints (tcInferRho lhs)
-                  ; (rhs', rhs_lie) <- captureConstraints (tcMonoExpr rhs rule_ty)
-                  ; return (lhs', lhs_lie, rhs', rhs_lie, rule_ty) }
+       ; let (id_bndrs, tv_bndrs) = partition (isId . snd) vars
+       ; (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty)
+            <- tcExtendTyVarEnv2 tv_bndrs $
+               tcExtendIdEnv2    id_bndrs $
+               do { ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
+                  ; (rhs', rhs_wanted) <- captureConstraints (tcMonoExpr rhs rule_ty)
+                  ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
 
-       ; (lhs_dicts, lhs_ev_binds, rhs_ev_binds) 
-             <- simplifyRule name tv_bndrs lhs_lie rhs_lie
+       ; (lhs_evs, other_lhs_wanted) <- simplifyRule name lhs_wanted rhs_wanted
 
-	-- IMPORTANT!  We *quantify* over any dicts that appear in the LHS
-	-- Reason: 
-	--	(a) The particular dictionary isn't important, because its value
-	--	   depends only on the type
-	--		e.g	gcd Int $fIntegralInt
-	--         Here we'd like to match against (gcd Int any_d) for any 'any_d'
-	--
-	--	(b) We'd like to make available the dictionaries bound 
-	--	    on the LHS in the RHS, so quantifying over them is good
-	--	    See the 'lhs_dicts' in tcSimplifyAndCheck for the RHS
-
+	-- Now figure out what to quantify over
+	-- c.f. TcSimplify.simplifyInfer
 	-- We quantify over any tyvars free in *either* the rule
 	--  *or* the bound variables.  The latter is important.  Consider
 	--	ss (x,(y,z)) = (x,z)
 	--	RULE:  forall v. fst (ss v) = fst v
 	-- The type of the rhs of the rule is just a, but v::(a,(b,c))
 	--
-	-- We also need to get the free tyvars of the LHS; but we do that
+	-- We also need to get the completely-uconstrained tyvars of
+	-- the LHS, lest they otherwise get defaulted to Any; but we do that
 	-- during zonking (see TcHsSyn.zonkRule)
 
-       ; let tpl_ids    = lhs_dicts ++ id_bndrs
-{-
+       ; let tpl_ids    = lhs_evs ++ map snd id_bndrs
              forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
-
-	     -- Now figure out what to quantify over
-	     -- c.f. TcSimplify.simplifyInfer
        ; zonked_forall_tvs <- zonkTyVarsAndFV forall_tvs
        ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
-       ; let extra_bound_tvs = zonked_forall_tvs 	     
-       	     		       `minusVarSet` gbl_tvs
-       	     		       `delVarSetList` tv_bndrs
-       ; qtvs <- zonkQuantifiedTyVars (varSetElems extra_bound_tvs)
-       ; let all_tvs = tv_bndrs ++ qtvs
-       ; (kvs, _kinds) <- kindGeneralizeKinds $ map tyVarKind all_tvs
--}
+       ; let tvs_to_quantify = varSetElems (zonked_forall_tvs `minusVarSet` gbl_tvs)
+       ; qkvs <- kindGeneralize $ tyVarsOfTypes (map tyVarKind tvs_to_quantify)
+       ; qtvs <- zonkQuantifiedTyVars tvs_to_quantify
+       ; let qtkvs = qkvs ++ qtvs
+       ; traceTc "tcRule" (vcat [ doubleQuotes (ftext name)
+                                , ppr forall_tvs
+                                , ppr qtvs
+                                , ppr rule_ty
+                                , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ] 
+                  ])
 
-       	      -- The tv_bndrs are already skolems, so no need to zonk them
+           -- Simplify the RHS constraints
+       ; loc           <- getCtLoc (RuleSkol name)
+       ; rhs_binds_var <- newTcEvBinds
+       ; emitImplication $ Implic { ic_untch  = NoUntouchables
+                                  , ic_env    = emptyNameEnv
+                                  , ic_skols  = qtkvs
+                                  , ic_given  = lhs_evs
+                                  , ic_wanted = rhs_wanted
+                                  , ic_insol  = insolubleWC rhs_wanted
+                                  , ic_binds  = rhs_binds_var
+                                  , ic_loc    = loc } 
+
+           -- For the LHS constraints we must solve the remaining constraints
+           -- (a) so that we report insoluble ones
+           -- (b) so that we bind any soluble ones
+       ; lhs_binds_var <- newTcEvBinds
+       ; emitImplication $ Implic { ic_untch  = NoUntouchables
+                                  , ic_env    = emptyNameEnv
+                                  , ic_skols  = qtkvs
+                                  , ic_given  = lhs_evs
+                                  , ic_wanted = other_lhs_wanted
+                                  , ic_insol  = insolubleWC other_lhs_wanted
+                                  , ic_binds  = lhs_binds_var
+                                  , ic_loc    = loc } 
+
        ; return (HsRule name act
-		    (map (RuleBndr . noLoc) (tv_bndrs ++ tpl_ids))
-		    (mkHsDictLet lhs_ev_binds lhs') fv_lhs
-		    (mkHsDictLet rhs_ev_binds rhs') fv_rhs) }
+		    (map (RuleBndr . noLoc) (qtkvs ++ tpl_ids))
+		    (mkHsDictLet (TcEvBinds lhs_binds_var) lhs') fv_lhs
+		    (mkHsDictLet (TcEvBinds rhs_binds_var) rhs') fv_rhs) }
 
-tcRuleBndrs :: [RuleBndr Name] -> TcM [Var]
+tcRuleBndrs :: [RuleBndr Name] -> TcM [(Name, Var)]
 tcRuleBndrs [] 
   = return []
-tcRuleBndrs (RuleBndr var : rule_bndrs)
+tcRuleBndrs (RuleBndr (L _ name) : rule_bndrs)
   = do 	{ ty <- newFlexiTyVarTy openTypeKind
         ; vars <- tcRuleBndrs rule_bndrs
-	; return (mkLocalId (unLoc var) ty : vars) }
-tcRuleBndrs (RuleBndrSig var rn_ty : rule_bndrs)
+	; return ((name, mkLocalId name ty) : vars) }
+tcRuleBndrs (RuleBndrSig (L _ name) rn_ty : rule_bndrs)
 --  e.g 	x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --		a::*, x :: a->a
-  = do	{ let ctxt = FunSigCtxt (unLoc var)
-	; (tyvars, ty) <- tcHsPatSigType ctxt rn_ty
-        ; let (subst, skol_tvs) = tcSuperSkolTyVars tyvars
-	      id_ty = substTy subst ty
-	      id = mkLocalId (unLoc var) id_ty
+  = do	{ let ctxt = RuleSigCtxt name
+	; (id_ty, skol_tvs) <- tcHsPatSigType ctxt rn_ty
+        ; let id = mkLocalId name id_ty
 
 	      -- The type variables scope over subsequent bindings; yuk
-        ; vars <- tcExtendTyVarEnv skol_tvs $ 
+        ; vars <- tcExtendTyVarEnv2 skol_tvs $ 
                   tcRuleBndrs rule_bndrs 
-	; return (skol_tvs ++ id : vars) }
+	; return (skol_tvs ++ (name, id) : vars) }
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = ptext (sLit "When checking the transformation rule") <+> 
