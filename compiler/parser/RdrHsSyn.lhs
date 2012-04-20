@@ -146,7 +146,7 @@ mkFamInstData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsBSig tparams
-                                    , fid_defn = defn })) }
+                                    , fid_defn = defn, fid_fvs = placeHolderNames })) }
 
 mkDataDefn :: NewOrData
            -> Maybe CType
@@ -182,7 +182,8 @@ mkFamInstSynonym :: SrcSpan
 mkFamInstSynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
        ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsBSig tparams
-                                    , fid_defn = TySynonym { td_synRhs = rhs }})) }
+                                    , fid_defn = TySynonym { td_synRhs = rhs }
+                                    , fid_fvs = placeHolderNames })) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour

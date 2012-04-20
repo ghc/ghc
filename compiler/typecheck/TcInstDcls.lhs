@@ -482,7 +482,9 @@ calcInstDeclCycles decls
 
     -- get_uses extracts the *tycon or constructor* uses of the declaration
     get_uses :: LInstDecl Name -> [Name]
-    get_uses decl = nameSetToList (lid_fvs (unLoc decl))
+    get_uses (L _ (FamInstD { lid_inst = fid })) = nameSetToList (fid_fvs fid)
+    get_uses (L _ (ClsInstD { cid_fam_insts = fids })) 
+        = nameSetToList (foldr (unionNameSets . fid_fvs . unLoc) emptyNameSet fids)
 
 cyclicDeclErr :: Outputable d => [Located d] -> TcRn ()
 cyclicDeclErr inst_decls

@@ -323,11 +323,12 @@ repFamilyFlavour DataFamily = rep2 dataFamName []
 -- Represent instance declarations
 --
 repInstD :: LInstDecl Name -> DsM (SrcSpan, Core TH.DecQ)
-repInstD (L loc (FamInstD fi_decl))
+repInstD (L loc (FamInstD { lid_inst = fi_decl }))
   = do { dec <- repFamInstD fi_decl
        ; return (loc, dec) }
 
-repInstD (L loc (ClsInstD ty binds prags ats))
+repInstD (L loc (ClsInstD { cid_poly_ty = ty, cid_binds = binds
+                          , cid_sigs = prags, cid_fam_insts = ats }))
   = do { dec <- addTyVarBinds tvs $ \_ ->
 	    -- We must bring the type variables into scope, so their
 	    -- occurrences don't fail, even though the binders don't 

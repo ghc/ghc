@@ -809,7 +809,8 @@ data FamInstDecl name
   = FamInstDecl
        { fid_tycon :: Located name
        , fid_pats  :: HsBndrSig [LHsType name]  -- ^ Type patterns (with bndrs)
-       , fid_defn  :: HsTyDefn name }           -- Type or data family instance
+       , fid_defn  :: HsTyDefn name             -- Type or data family instance
+       , fid_fvs   :: NameSet  } 
   deriving( Typeable, Data )
 
 type LInstDecl name = Located (InstDecl name)
@@ -821,11 +822,10 @@ data InstDecl name  -- Both class and family instances
       , cid_binds :: LHsBinds name
       , cid_sigs  :: [LSig name]                -- User-supplied pragmatic info
       , cid_fam_insts :: [LFamInstDecl name]    -- Family instances for associated types
-      , lid_fvs       :: NameSet }
+      }
 
   | FamInstD              -- type/data family instance
-      { lid_inst :: FamInstDecl name
-      , lid_fvs  :: NameSet }
+      { lid_inst :: FamInstDecl name }
   deriving (Data, Typeable)
 \end{code}
 

@@ -424,7 +424,7 @@ patchCCallTarget packageId callTarget
 rnSrcInstDecl :: InstDecl RdrName -> RnM (InstDecl Name, FreeVars)
 rnSrcInstDecl (FamInstD { lid_inst = fi }) 
   = do { (fi', fvs) <- rnFamInstDecl Nothing fi
-       ; return (FamInstD { lid_inst = fi', lid_fvs = fvs }, fvs) }
+       ; return (FamInstD { lid_inst = fi' }, fvs) }
 
 rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
                         , cid_sigs = uprags, cid_fam_insts = ats })
@@ -432,8 +432,8 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
   = do { (inst_ty', inst_fvs) <- rnLHsInstType (text "In an instance declaration") inst_ty
        ; case splitLHsInstDeclTy_maybe inst_ty' of {
            Nothing -> return (ClsInstD { cid_poly_ty = inst_ty', cid_binds = emptyLHsBinds
-                                       , cid_sigs = [], cid_fam_insts = []
-                                       , lid_fvs = inst_fvs }, inst_fvs) ;
+                                       , cid_sigs = [], cid_fam_insts = [] }
+                             , inst_fvs) ;
            Just (inst_tyvars, _, L _ cls,_) ->
 
     do { let (spec_inst_prags, other_sigs) = partition isSpecInstLSig uprags
@@ -471,8 +471,7 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
                           `plusFV` spec_inst_fvs
 		      	  `plusFV` inst_fvs
        ; return (ClsInstD { cid_poly_ty = inst_ty', cid_binds = mbinds'
-                          , cid_sigs = uprags', cid_fam_insts = ats'
-                          , lid_fvs = all_fvs },
+                          , cid_sigs = uprags', cid_fam_insts = ats' },
 	         all_fvs) } } }
              -- We return the renamed associated data type declarations so
              -- that they can be entered into the list of type declarations
@@ -493,26 +492,33 @@ rnFamInstDecl mb_cls (FamInstDecl { fid_tycon = tycon, fid_pats = HsBSig pats _,
                      (L loc _ : []) -> loc
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
              (kv_rdr_names, tv_rdr_names) = extractHsTysRdrTyVars pats
+
+
        ; kv_names <- mkTyVarBndrNames mb_cls (map (L loc) kv_rdr_names)
        ; tv_names <- mkTyVarBndrNames mb_cls (map (L loc) tv_rdr_names)
        	     -- All the free vars of the family patterns
              -- with a sensible binding location
-       ; bindLocalNamesFV kv_names $ 
-         bindLocalNamesFV tv_names $ 
-    do { (pats', pat_fvs) <- rnLHsTypes (TyDataCtx tycon) pats
-       ; (defn', rhs_fvs) <- rnTyDefn tycon defn
+       ; ((pats', defn'), fvs) 
+              <- bindLocalNamesFV kv_names $ 
+                 bindLocalNamesFV tv_names $ 
+    	 	 do { (pats', pat_fvs) <- rnLHsTypes (TyDataCtx tycon) pats
+    		    ; (defn', rhs_fvs) <- rnTyDefn tycon defn
 
-            -- See Note [Renaming associated types] 
-       ; let bad_tvs = case mb_cls of
-                         Nothing          -> []
-                         Just (_,cls_tvs) -> filter is_bad cls_tvs
-             is_bad tv = not (tv `elem` tv_names) && tv `elemNameSet` rhs_fvs
-       ; unless (null bad_tvs) (badAssocRhs bad_tvs)
+                         -- See Note [Renaming associated types] 
+                    ; let bad_tvs = case mb_cls of
+                                      Nothing          -> []
+                                      Just (_,cls_tvs) -> filter is_bad cls_tvs
+                          is_bad tv = not (tv `elem` tv_names) && tv `elemNameSet` rhs_fvs
 
+                    ; unless (null bad_tvs) (badAssocRhs bad_tvs)
+                    ; return ((pats', defn'), rhs_fvs `plusFV` pat_fvs) }
+                              
+
+       ; let all_fvs = fvs `addOneFV` unLoc tycon'
        ; return ( FamInstDecl { fid_tycon = tycon'
                               , fid_pats = HsBSig pats' (kv_names, tv_names)
-                              , fid_defn = defn' }
-                , (rhs_fvs `plusFV` pat_fvs) `addOneFV` unLoc tycon') } }
+                              , fid_defn = defn', fid_fvs = all_fvs }
+                , all_fvs ) }
        	     -- type instance => use, hence addOneFV
 \end{code}
 
