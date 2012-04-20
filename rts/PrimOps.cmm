@@ -223,12 +223,10 @@ stg_casArrayzh
         RET_NP(1,h);
     } else {
         // Compare and Swap Succeeded:
-        if (GET_INFO(arr) == stg_MUT_ARR_PTRS_CLEAN_info) {
-           SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
-           len = StgMutArrPtrs_ptrs(arr);
-           // The write barrier.  We must write a byte into the mark table:
-           I8[arr + SIZEOF_StgMutArrPtrs + WDS(len) + (ind >> MUT_ARR_PTRS_CARD_BITS )] = 1;
-        }
+	SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, CCCS);
+	len = StgMutArrPtrs_ptrs(arr);
+	// The write barrier.  We must write a byte into the mark table:
+	I8[arr + SIZEOF_StgMutArrPtrs + WDS(len) + (ind >> MUT_ARR_PTRS_CARD_BITS )] = 1;
         RET_NP(0,h);
     }
 }
