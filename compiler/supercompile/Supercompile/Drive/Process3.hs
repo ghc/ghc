@@ -324,6 +324,7 @@ insertTagsM mx = do
 -- So we should probably work out why the existing supercompiler never builds dumb loops like this, so
 -- we can carefully preserve that property when making the Arjan modification.
 
+-- FIXME: use MSG while matching to detect opportunities to do type despecialisation
 memo :: (Maybe String -> State -> ScpM (Bool, (Deeds, FVedTerm)))
      ->  State -> ScpM (Deeds, FVedTerm)
 memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
