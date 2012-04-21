@@ -473,12 +473,13 @@ cmmPrimOpFunctions env mop
 
     (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
 
-    MO_S_QuotRem {} -> unsupported
-    MO_U_QuotRem {} -> unsupported
-    MO_Add2 {}      -> unsupported
-    MO_U_Mul2 {}    -> unsupported
-    MO_WriteBarrier -> unsupported
-    MO_Touch        -> unsupported
+    MO_S_QuotRem {}  -> unsupported
+    MO_U_QuotRem {}  -> unsupported
+    MO_U_QuotRem2 {} -> unsupported
+    MO_Add2 {}       -> unsupported
+    MO_U_Mul2 {}     -> unsupported
+    MO_WriteBarrier  -> unsupported
+    MO_Touch         -> unsupported
 
     where
         intrinTy1 = (if getLlvmVer env >= 28
