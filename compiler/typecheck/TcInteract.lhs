@@ -22,9 +22,7 @@ import Unify
 import FamInstEnv
 import Coercion( mkAxInstRHS )
 
-import Id 
 import Var
-
 import TcType
 import PrelNames (singIClassName)
 
@@ -1326,8 +1324,8 @@ instFunDepEqn :: WantedLoc -> Equation -> TcS [(Int,(EvVar,WantedLoc))]
 instFunDepEqn wl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
                         , fd_pred1 = d1, fd_pred2 = d2 })
   = do { let tvs = varSetElems qtvs
-       ; tvs' <- mapM instFlexiTcS tvs  -- IA0_TODO: we might need to do kind substitution
-       ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs')
+       ; tys' <- mapM instFlexiTcS tvs  -- IA0_TODO: we might need to do kind substitution
+       ; let subst = zipTopTvSubst tvs tys'
        ; foldM (do_one subst) [] eqs }
   where 
     do_one subst ievs (FDEq { fd_pos = i, fd_ty_left = ty1, fd_ty_right = ty2 })
@@ -1868,14 +1866,11 @@ matchClassInst inerts clas tys loc
             MatchInstSingle (dfun_id, mb_inst_tys) ->
               do { checkWellStagedDFun pred dfun_id loc
 
- 	-- It's possible that not all the tyvars are in
-	-- the substitution, tenv. For example:
-	--	instance C X a => D X where ...
-	-- (presumably there's a functional dependency in class C)
-	-- Hence mb_inst_tys :: Either TyVar TcType 
+                       -- mb_inst_tys :: Maybe TcType 
+                       -- See Note [DFunInstType: instantiating types] in InstEnv
 
-                 ; tys <- instDFunTypes mb_inst_tys
-                 ; let (theta, _) = tcSplitPhiTy (applyTys (idType dfun_id) tys)
+                 ; (tys, dfun_phi) <- instDFunType dfun_id mb_inst_tys
+                 ; let (theta, _) = tcSplitPhiTy dfun_phi
                  ; if null theta then
                        return (GenInst [] (EvDFunApp dfun_id tys []))
                    else do

@@ -76,8 +76,7 @@ module TcSMonad (
     pprCtTypeMap, partCtFamHeadMap,
 
 
-    instDFunTypes,                              -- Instantiation
-    -- instDFunConstraints,          
+    instDFunType,                              -- Instantiation
     newFlexiTcSTy, instFlexiTcS,
 
     compatKind, mkKindErrorCtxtTcS,
@@ -1245,19 +1244,30 @@ newFlattenSkolemTyVar ty
 -- Instantiations 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-instDFunTypes :: [Either TyVar TcType] -> TcS [TcType] 
-instDFunTypes mb_inst_tys 
-  = mapM inst_tv mb_inst_tys
+instDFunType :: DFunId -> [DFunInstType] -> TcS ([TcType], TcType)
+instDFunType dfun_id mb_inst_tys 
+  = wrapTcS $ go dfun_tvs mb_inst_tys (mkTopTvSubst [])
   where
-    inst_tv :: Either TyVar TcType -> TcS Type
-    inst_tv (Left tv)  = mkTyVarTy <$> instFlexiTcS tv
-    inst_tv (Right ty) = return ty 
+    (dfun_tvs, dfun_phi) = tcSplitForAllTys (idType dfun_id)
 
-instFlexiTcS :: TyVar -> TcS TcTyVar 
+    go :: [TyVar] -> [DFunInstType] -> TvSubst -> TcM ([TcType], TcType)
+    go [] [] subst = return ([], substTy subst dfun_phi)
+    go (tv:tvs) (Just ty : mb_tys) subst
+      = do { (tys, phi) <- go tvs mb_tys (extendTvSubst subst tv ty)
+           ; return (ty : tys, phi) }
+    go (tv:tvs) (Nothing : mb_tys) subst
+      = do { ty <- instFlexiTcSHelper (tyVarName tv) (substTy subst (tyVarKind tv))
+                         -- Don't forget to instantiate the kind!
+                         -- cf TcMType.tcInstTyVarX
+           ; (tys, phi) <- go tvs mb_tys (extendTvSubst subst tv ty)
+           ; return (ty : tys, phi) }
+    go _ _ _ = pprPanic "instDFunTypes" (ppr dfun_id $$ ppr mb_inst_tys)
+
+instFlexiTcS :: TyVar -> TcS TcType 
 -- Like TcM.instMetaTyVar but the variable that is created is 
 -- always touchable; we are supposed to guess its instantiation.
 -- See Note [Touchable meta type variables] 
-instFlexiTcS tv = instFlexiTcSHelper (tyVarName tv) (tyVarKind tv) 
+instFlexiTcS tv = wrapTcS (instFlexiTcSHelper (tyVarName tv) (tyVarKind tv) )
 
 newFlexiTcSTy :: Kind -> TcS TcType  
 newFlexiTcSTy knd 
@@ -1273,14 +1283,13 @@ isFlexiTcsTv tv
   | MetaTv TcsTv _ <- tcTyVarDetails tv = True
   | otherwise                           = False
 
-instFlexiTcSHelper :: Name -> Kind -> TcS TcTyVar
+instFlexiTcSHelper :: Name -> Kind -> TcM TcType
 instFlexiTcSHelper tvname tvkind
-  = wrapTcS $ 
-    do { uniq <- TcM.newUnique 
+  = do { uniq <- TcM.newUnique 
        ; ref  <- TcM.newMutVar  Flexi 
        ; let name = setNameUnique tvname uniq 
              kind = tvkind 
-       ; return (mkTcTyVar name kind (MetaTv TcsTv ref)) }
+       ; return (mkTyVarTy (mkTcTyVar name kind (MetaTv TcsTv ref))) }
 
 
 -- Creating and setting evidence variables and CtFlavors
@@ -1361,8 +1370,7 @@ newDerived pty
 newKindConstraint :: TcTyVar -> Kind -> TcS (MaybeNew EvVar)
 -- Create new wanted CoVar that constrains the type to have the specified kind. 
 newKindConstraint tv knd
-  = do { tv_k <- instFlexiTcSHelper (tyVarName tv) knd 
-       ; let ty_k = mkTyVarTy tv_k
+  = do { ty_k <- wrapTcS (instFlexiTcSHelper (tyVarName tv) knd)
        ; newWantedEvVar (mkTcEqPred (mkTyVarTy tv) ty_k) }
 
 instDFunConstraints :: TcThetaType -> TcS [MaybeNew EvVar]
@@ -1476,7 +1484,7 @@ data MatchInstResult mi
   | MatchInstMany       -- Multiple matching instances
 
 
-matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Either TyVar TcType])) 
+matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Maybe TcType])) 
 -- Look up a class constraint in the instance environment
 matchClass clas tys
   = do	{ let pred = mkClassPred clas tys 

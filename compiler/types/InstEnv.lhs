@@ -9,7 +9,7 @@ The bits common to TcInstDcls and TcDeriv.
 \begin{code}
 module InstEnv (
         DFunId, OverlapFlag(..), InstMatch, ClsInstLookupResult,
-        ClsInst(..), pprInstance, pprInstanceHdr, pprInstances, 
+        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances, 
         instanceHead, mkLocalInstance, mkImportedInstance,
         instanceDFunId, setInstanceDFunId, instanceRoughTcs,
 
@@ -428,11 +428,12 @@ the env is kept ordered, the first match must be the only one.  The
 thing we are looking up can have an arbitrary "flexi" part.
 
 \begin{code}
-type InstTypes = [Either TyVar Type]
-        -- Right ty     => Instantiate with this type
-        -- Left tv      => Instantiate with any type of this tyvar's kind
+type DFunInstType = Maybe Type
+        -- Just ty   => Instantiate with this type
+        -- Nothing   => Instantiate with any type of this tyvar's kind
+        -- See Note [DFunInstType: instantiating types]
 
-type InstMatch = (ClsInst, InstTypes)
+type InstMatch = (ClsInst, [DFunInstType])
 
 type ClsInstLookupResult 
      = ( [InstMatch]     -- Successful matches
@@ -441,16 +442,16 @@ type ClsInstLookupResult
                          -- SafeHaskell condition.
 \end{code}
 
-Note [InstTypes: instantiating types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [DFunInstType: instantiating types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A successful match is an ClsInst, together with the types at which
         the dfun_id in the ClsInst should be instantiated
 The instantiating types are (Either TyVar Type)s because the dfun
 might have some tyvars that *only* appear in arguments
         dfun :: forall a b. C a b, Ord b => D [a]
 When we match this against D [ty], we return the instantiating types
-        [Right ty, Left b]
-where the 'Left b' indicates that 'b' can be freely instantiated.  
+        [Just ty, Nothing]
+where the 'Nothing' indicates that 'b' can be freely instantiated.  
 (The caller instantiates it to a flexi type variable, which will 
  presumably later become fixed via functional dependencies.)
 
@@ -469,12 +470,9 @@ lookupUniqueInstEnv instEnv cls tys
              | otherwise  -> Left $ ptext (sLit "flexible type variable:") <+>
                                     (ppr $ mkTyConApp (classTyCon cls) tys)
              where
-               inst_tys'  = [ty | Right ty <- inst_tys]
-               noFlexiVar = all isRight inst_tys
+               inst_tys'  = [ty | Just ty <- inst_tys]
+               noFlexiVar = all isJust inst_tys
       _other -> Left $ ptext (sLit "instance not found") <+> (ppr $ mkTyConApp (classTyCon cls) tys)
-  where
-    isRight (Left  _) = False
-    isRight (Right _) = True
 
 lookupInstEnv' :: InstEnv          -- InstEnv to look in
                -> Class -> [Type]  -- What we are looking for
@@ -533,11 +531,11 @@ lookupInstEnv' ie cls tys
             Nothing  -> find ms us        rest
 
     ----------------
-    lookup_tv :: TvSubst -> TyVar -> Either TyVar Type  
-        -- See Note [InstTypes: instantiating types]
+    lookup_tv :: TvSubst -> TyVar -> DFunInstType
+        -- See Note [DFunInstType: instantiating types]
     lookup_tv subst tv = case lookupTyVar subst tv of
-                                Just ty -> Right ty
-                                Nothing -> Left tv
+                                Just ty -> Just ty
+                                Nothing -> Nothing
 
 ---------------
 -- This is the common way to call this function.
