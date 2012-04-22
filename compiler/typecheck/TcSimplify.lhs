@@ -37,6 +37,7 @@ import PrelNames
 import Class		( classKey )
 import BasicTypes       ( RuleName )
 import Control.Monad    ( when )
+import Data.List        ( partition )
 import Outputable
 import FastString
 import TrieMap () -- DV: for now
@@ -324,22 +325,21 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
          else do
 
             -- Step 4, zonk quantified variables 
-       { let minimal_flat_preds = mkMinimalBySCs $ 
-                                  map ctPred $ bagToList bound
+       { qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
+
+            -- Step 5
+            -- Minimize `bound' and emit an implication
+       ; let minimal_flat_preds = predsToQuantify bound
              skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
                                    | (name, ty) <- name_taus ]
                         -- Don't add the quantified variables here, because
                         -- they are also bound in ic_skols and we want them to be
                         -- tidied uniformly
 
-       ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
-
-            -- Step 5
-            -- Minimize `bound' and emit an implication
        ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
        ; ev_binds_var <- newTcEvBinds
        ; mapBagM_ (\(EvBind evar etrm) -> addTcEvBind ev_binds_var evar etrm) 
-           tc_binds
+                  tc_binds
        ; lcl_env <- getLclTypeEnv
        ; gloc <- getCtLoc skol_info
        ; let implic = Implic { ic_untch    = NoUntouchables
@@ -362,12 +362,22 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
        ; return ( qtvs_to_return, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } }
+
+predsToQuantify :: Cts -> [PredType]
+-- From a bunch of (non-insoluble) flat constraints, pick the ones to generalise
+-- an inferred type over.  In particular:
+--    * Omit superclasses:         (Eq a, Ord a) --->  Ord a
+--    * Reject non-tyvar clases:   (Eq a, Show (Tree b)) --> Eq a
+predsToQuantify bound
+  = non_cls_preds ++ mkMinimalBySCs (filter isTyVarClassPred cls_preds)
+  where
+    (cls_preds, non_cls_preds) = partition isClassPred $
+                                 map ctPred $ bagToList bound
 \end{code}
 
 
 Note [Minimize by Superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-
 When we quantify over a constraint, in simplifyInfer we need to
 quantify over a constraint that is minimal in some sense: For
 instance, if the final wanted constraint is (Eq alpha, Ord alpha),
