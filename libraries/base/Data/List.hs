@@ -416,7 +416,8 @@ unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
 -- > [1,2,2,3,4] `intersect` [6,4,4,2] == [2,2,4]
 --
 -- It is a special case of 'intersectBy', which allows the programmer to
--- supply their own equality test.
+-- supply their own equality test. If the element is found in both the first
+-- and the second list, the element from the first list will be used.
 
 intersect               :: (Eq a) => [a] -> [a] -> [a]
 intersect               =  intersectBy (==)
