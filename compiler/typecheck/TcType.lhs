@@ -1128,7 +1128,7 @@ mkMinimalBySCs ptys = [ ploc |  ploc <- ptys
                              ,  ploc `not_in_preds` rec_scs ]
  where
    rec_scs = concatMap trans_super_classes ptys
-   not_in_preds p ps = null (filter (eqPred p) ps)
+   not_in_preds p ps = not (any (eqPred p) ps)
 
    trans_super_classes pred   -- Superclasses of pred, excluding pred itself
      = case classifyPredType pred of
