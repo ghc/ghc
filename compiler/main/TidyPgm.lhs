@@ -504,21 +504,29 @@ mustExposeTyCon no_trim_types exports tc
 
   | isEnumerationTyCon tc	-- For an enumeration, exposing the constructors
   = True			-- won't lead to the need for further exposure
-				-- (This includes data types with no constructors.)
 
   | isFamilyTyCon tc		-- Open type family
   = True
 
-  | otherwise			-- Newtype, datatype
-  = any exported_con (tyConDataCons tc)
-	-- Expose rep if any datacon or field is exported
+  -- Below here we just have data/newtype decls or family instances
 
-  || (isNewTyCon tc && isFFITy (snd (newTyConRhs tc)))
-	-- Expose the rep for newtypes if the rep is an FFI type.  
-	-- For a very annoying reason.  'Foreign import' is meant to
-	-- be able to look through newtypes transparently, but it
-	-- can only do that if it can "see" the newtype representation
+  | null data_cons              -- Ditto if there are no data constructors
+  = True                        -- (NB: empty data types do not count as enumerations
+                                -- see Note [Enumeration types] in TyCon
+
+  | any exported_con data_cons  -- Expose rep if any datacon or field is exported
+  = True
+
+  | isNewTyCon tc && isFFITy (snd (newTyConRhs tc))
+  = True   -- Expose the rep for newtypes if the rep is an FFI type.  
+	   -- For a very annoying reason.  'Foreign import' is meant to
+	   -- be able to look through newtypes transparently, but it
+	   -- can only do that if it can "see" the newtype representation
+
+  | otherwise
+  = False
   where
+    data_cons = tyConDataCons tc
     exported_con con = any (`elemNameSet` exports) 
 			   (dataConName con : dataConFieldLabels con)
 
