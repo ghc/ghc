@@ -39,7 +39,7 @@ module VarEnv (
         unionInScope, elemInScopeSet, uniqAway,
 
 	-- * The RnEnv2 type
-	RnEnv2, 
+	RnEnv2(..), 
 	
 	-- ** Operations on RnEnv2s
 	mkRnEnv2, rnBndr2, rnBndrs2,
