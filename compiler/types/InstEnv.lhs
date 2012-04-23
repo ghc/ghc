@@ -34,7 +34,6 @@ import BasicTypes
 import UniqFM
 import Id
 import FastString
-
 import Data.Data        ( Data, Typeable )
 import Data.Maybe       ( isJust, isNothing )
 \end{code}
