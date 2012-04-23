@@ -51,7 +51,7 @@ module Type (
 	-- Pred types
         mkFamilyTyConApp,
 	isDictLikeTy,
-        mkNakedEqPred, mkEqPred, mkPrimEqPred,
+        mkEqPred, mkPrimEqPred,
         mkClassPred,
 	mkIPPred,
         noParenPred, isClassPred, isEqPred, isIPPred,
@@ -861,13 +861,6 @@ Make PredTypes
 --------------------- Equality types ---------------------------------
 \begin{code}
 -- | Creates a type equality predicate
-mkNakedEqPred :: Kind -> Type -> Type -> PredType
-mkNakedEqPred k ty1 ty2
-  = WARN( not (typeKind ty1 `isSubKind` k) || not (typeKind ty2 `isSubKind` k), 
-          ppr k $$ (ppr ty1 <+> dcolon <+> ppr (typeKind ty1)) 
-                $$ (ppr ty2 <+> dcolon <+> ppr (typeKind ty2)) )
-    TyConApp eqTyCon [k, ty1, ty2]
-
 mkEqPred :: Type -> Type -> PredType
 mkEqPred ty1 ty2
   = WARN( not (k `eqKind` typeKind ty2), ppr ty1 $$ ppr ty2 )
@@ -1576,7 +1569,7 @@ type SimpleKind = Kind
 \begin{code}
 typeKind :: Type -> Kind
 typeKind (TyConApp tc tys)
-  | isPromotedTypeTyCon tc
+  | isPromotedTyCon tc
   = ASSERT( tyConArity tc == length tys ) superKind
   | otherwise
   = kindAppResult (tyConKind tc) tys

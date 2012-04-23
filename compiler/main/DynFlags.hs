@@ -48,6 +48,7 @@ module DynFlags (
         safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
         packageTrustOn,
         safeDirectImpsReq, safeImplicitImpsReq,
+        unsafeFlags,
 
         -- ** System tool settings and locations
         Settings(..),
@@ -212,6 +213,7 @@ data DynFlag
    | Opt_D_dump_splices
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
+   | Opt_D_dump_avoid_vect
    | Opt_D_dump_ticked
    | Opt_D_dump_rtti
    | Opt_D_source_stats
@@ -596,6 +598,7 @@ data DynFlags = DynFlags {
   flushErr              :: FlushErr,
 
   haddockOptions        :: Maybe String,
+  ghciScripts           :: [String],
 
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
@@ -940,6 +943,7 @@ defaultDynFlags mySettings =
         haddockOptions = Nothing,
         flags = IntSet.fromList (map fromEnum defaultFlags),
         warningFlags = IntSet.fromList (map fromEnum standardWarnings),
+        ghciScripts = [],
         language = Nothing,
         safeHaskell = Sf_SafeInfered,
         thOnLoc = noSrcSpan,
@@ -1151,6 +1155,19 @@ combineSafeFlags a b | a == Sf_SafeInfered = return b
     where errm = "Incompatible Safe Haskell flags! ("
                     ++ showPpr a ++ ", " ++ showPpr b ++ ")"
 
+-- | A list of unsafe flags under Safe Haskell. Tuple elements are:
+--     * name of the flag
+--     * function to get srcspan that enabled the flag
+--     * function to test if the flag is on
+--     * function to turn the flag off
+unsafeFlags :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
+unsafeFlags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
+                   xopt Opt_GeneralizedNewtypeDeriving,
+                   flip xopt_unset Opt_GeneralizedNewtypeDeriving),
+               ("-XTemplateHaskell", thOnLoc,
+                   xopt Opt_TemplateHaskell,
+                   flip xopt_unset Opt_TemplateHaskell)]
+
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
         -> (DynFlags -> [a])    -- ^ Relevant record accessor: one of the @opt_*@ accessors
@@ -1169,7 +1186,7 @@ setObjectDir, setHiDir, setStubDir, setDumpDir, setOutputDir,
          setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
          setPgmP, addOptl, addOptP,
-         addCmdlineFramework, addHaddockOpts
+         addCmdlineFramework, addHaddockOpts, addGhciScript
    :: String -> DynFlags -> DynFlags
 setOutputFile, setOutputHi, setDumpPrefixForce
    :: Maybe String -> DynFlags -> DynFlags
@@ -1240,6 +1257,8 @@ deOptDep x = case stripPrefix "-optdep" x of
 addCmdlineFramework f d = d{ cmdlineFrameworks = f : cmdlineFrameworks d}
 
 addHaddockOpts f d = d{ haddockOptions = Just f}
+
+addGhciScript f d = d{ ghciScripts = f : ghciScripts d}
 
 -- -----------------------------------------------------------------------------
 -- Command-line options
@@ -1364,12 +1383,13 @@ safeFlagCheck :: Bool -> DynFlags -> (DynFlags, [Located String])
 safeFlagCheck _  dflags | not (safeLanguageOn dflags || safeInferOn dflags)
                         = (dflags, [])
 
+-- safe or safe-infer ON
 safeFlagCheck cmdl dflags =
     case safeLanguageOn dflags of
         True -> (dflags', warns)
 
         -- throw error if -fpackage-trust by itself with no safe haskell flag
-        False | not cmdl && safeInferOn dflags && packageTrustOn dflags
+        False | not cmdl && packageTrustOn dflags
               -> (dopt_unset dflags' Opt_PackageTrust,
                   [L (pkgTrustOnLoc dflags') $
                       "-fpackage-trust ignored;" ++
@@ -1387,24 +1407,16 @@ safeFlagCheck cmdl dflags =
         -- TODO: Can we do better than this for inference?
         safeInfOk = not $ xopt Opt_OverlappingInstances dflags
 
-        (dflags', warns) = foldl check_method (dflags, []) bad_flags
+        (dflags', warns) = foldl check_method (dflags, []) unsafeFlags
 
         check_method (df, warns) (str,loc,test,fix)
-            | test df   = (apFix fix df, warns ++ safeFailure loc str)
+            | test df   = (apFix fix df, warns ++ safeFailure (loc dflags) str)
             | otherwise = (df, warns)
 
         apFix f = if safeInferOn dflags then id else f
 
         safeFailure loc str 
            = [L loc $ str ++ " is not allowed in Safe Haskell; ignoring " ++ str]
-
-        bad_flags = [("-XGeneralizedNewtypeDeriving", newDerivOnLoc dflags,
-                         xopt Opt_GeneralizedNewtypeDeriving,
-                         flip xopt_unset Opt_GeneralizedNewtypeDeriving),
-                     ("-XTemplateHaskell", thOnLoc dflags,
-                         xopt Opt_TemplateHaskell,
-                         flip xopt_unset Opt_TemplateHaskell)]
-
 
 {- **********************************************************************
 %*                                                                      *
@@ -1538,6 +1550,7 @@ dynamic_flags = [
   , Flag "haddock"        (NoArg (setDynFlag Opt_Haddock))
   , Flag "haddock-opts"   (hasArg addHaddockOpts)
   , Flag "hpcdir"         (SepArg setOptHpcDir)
+  , Flag "ghci-script"    (hasArg addGhciScript)
 
         ------- recompilation checker --------------------------------------
   , Flag "recomp"         (NoArg (do unSetDynFlag Opt_ForceRecomp
@@ -1627,6 +1640,7 @@ dynamic_flags = [
   , Flag "ddump-hi"                (setDumpFlag Opt_D_dump_hi)
   , Flag "ddump-minimal-imports"   (setDumpFlag Opt_D_dump_minimal_imports)
   , Flag "ddump-vect"              (setDumpFlag Opt_D_dump_vect)
+  , Flag "ddump-avoid-vect"        (setDumpFlag Opt_D_dump_avoid_vect)
   , Flag "ddump-hpc"               (setDumpFlag Opt_D_dump_ticked) -- back compat
   , Flag "ddump-ticked"            (setDumpFlag Opt_D_dump_ticked)
   , Flag "ddump-mod-cycles"        (setDumpFlag Opt_D_dump_mod_cycles)

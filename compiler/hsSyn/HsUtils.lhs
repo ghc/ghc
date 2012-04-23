@@ -66,7 +66,6 @@ module HsUtils(
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
-  collectSigTysFromPats, collectSigTysFromPat,
 
   hsLTyClDeclBinders, hsTyClDeclBinders, hsTyClDeclsBinders, 
   hsForeignDeclsBinders, hsGroupBinders, hsFamInstBinders,
@@ -266,7 +265,7 @@ mkHsString :: String -> HsLit
 mkHsString s = HsString (mkFastString s)
 
 mkHsBSig :: a -> HsBndrSig a
-mkHsBSig x = HsBSig x placeHolderBndrs
+mkHsBSig x = HsBSig x (placeHolderBndrs, placeHolderBndrs)
 
 -------------
 userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]
@@ -654,7 +653,7 @@ hsTyClDeclBinders (TyDecl { tcdLName = name, tcdTyDefn = defn })
 -------------------
 hsInstDeclBinders :: Eq name => InstDecl name -> [Located name]
 hsInstDeclBinders (ClsInstD { cid_fam_insts = fis }) = concatMap (hsFamInstBinders . unLoc) fis
-hsInstDeclBinders (FamInstD fi) = hsFamInstBinders fi
+hsInstDeclBinders (FamInstD { lid_inst = fi }) = hsFamInstBinders fi
 
 -------------------
 hsFamInstBinders :: Eq name => FamInstDecl name -> [Located name]
@@ -768,35 +767,4 @@ lPatImplicits = hs_lpat
                                                     , let pat = hsRecFieldArg fld
                                                           pat_explicit = maybe True (i<) (rec_dotdot fs)]
     details (InfixCon p1 p2) = hs_lpat p1 `unionNameSets` hs_lpat p2
-\end{code}
-
-
-%************************************************************************
-%*									*
-	Collecting type signatures from patterns
-%*									*
-%************************************************************************
-
-\begin{code}
-collectSigTysFromPats :: [InPat name] -> [HsBndrSig (LHsType name)]
-collectSigTysFromPats pats = foldr collect_sig_lpat [] pats
-
-collectSigTysFromPat :: InPat name -> [HsBndrSig (LHsType name)]
-collectSigTysFromPat pat = collect_sig_lpat pat []
-
-collect_sig_lpat :: InPat name -> [HsBndrSig (LHsType name)] -> [HsBndrSig (LHsType name)]
-collect_sig_lpat pat acc = collect_sig_pat (unLoc pat) acc
-
-collect_sig_pat :: Pat name -> [HsBndrSig (LHsType name)] -> [HsBndrSig (LHsType name)]
-collect_sig_pat (SigPatIn pat ty)   acc = collect_sig_lpat pat (ty:acc)
-
-collect_sig_pat (LazyPat pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (BangPat pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (AsPat _ pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (ParPat  pat)       acc = collect_sig_lpat pat acc
-collect_sig_pat (ListPat pats _)    acc = foldr collect_sig_lpat acc pats
-collect_sig_pat (PArrPat pats _)    acc = foldr collect_sig_lpat acc pats
-collect_sig_pat (TuplePat pats _ _) acc = foldr collect_sig_lpat acc pats
-collect_sig_pat (ConPatIn _ ps)     acc = foldr collect_sig_lpat acc (hsConPatArgs ps)
-collect_sig_pat _                   acc = acc       -- Literals, vars, wildcard
 \end{code}

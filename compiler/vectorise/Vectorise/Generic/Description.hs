@@ -289,3 +289,4 @@ The type constructor corresponding to the instance will be named 'PDataSum2',
 and this is what we will get in the repr_psum_tc field of SumRepr.Sum.
 
 -}
+

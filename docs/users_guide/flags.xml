@@ -494,8 +494,8 @@
           </row>
           <row>
             <entry><option>-ghci-script</option></entry>
-            <entry>Load the given additional <filename>.ghci</filename> file</entry>
-            <entry>static</entry>
+            <entry>Read additional <filename>.ghci</filename> files</entry>
+            <entry>dynamic</entry>
             <entry>-</entry>
           </row>
           <row>
@@ -1571,15 +1571,6 @@
           </row>
 
           <row>
-            <entry><option>-fllvm-tbaa</option></entry>
-            <entry>Turn on Typed Based Alias Analysis information in the LLVM
-              backend. This enables more accurate and alias information in the LLVM
-              backend for better optimisation. (default: enabled)</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-llvm-tbaa</option></entry>
-          </row>
-
-          <row>
             <entry><option>-fmax-simplifier-iterations</option></entry>
             <entry>Set the max iterations for the simplifier</entry>
             <entry>dynamic</entry>
@@ -1630,23 +1621,6 @@
             <entry>Don't generate interface pragmas</entry>
             <entry>dynamic</entry>
             <entry><option>-fno-omit-interface-pragmas</option></entry>
-          </row>
-
-          <row>
-            <entry><option>-freg-liveness</option></entry>
-            <entry>Track STG register liveness to avoid saving and restoring
-              dead registers, as well as freeing the dead ones for use in
-              intermediate code. (LLVM backend only, default: enabled).
-              
-              Traditionally GHC has reserved a set of machine registers for the
-              exclusive use of storing a stack pointer, heap pointer and
-              general purpose function argument registers (these are the so
-              called STG registers). This optimisation tracks the liveness of
-              the machine registers the STG registers are mapped to so that the
-              machine register can be used for other purposes when the STG
-              register are dead.</entry>
-            <entry>dynamic</entry>
-            <entry><option>-fno-reg-liveness</option></entry>
           </row>
 
           <row>

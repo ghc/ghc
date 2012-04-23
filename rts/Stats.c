@@ -40,7 +40,7 @@ static StgWord64 GC_tot_alloc      = 0;
 static StgWord64 GC_tot_copied     = 0;
 
 static StgWord64 GC_par_max_copied = 0;
-static StgWord64 GC_par_avg_copied = 0;
+static StgWord64 GC_par_tot_copied = 0;
 
 #ifdef PROFILING
 static Time RP_start_time  = 0, RP_tot_time  = 0;  // retainer prof user time
@@ -140,7 +140,7 @@ initStats0(void)
     GC_tot_alloc     = 0;
     GC_tot_copied    = 0;
     GC_par_max_copied = 0;
-    GC_par_avg_copied = 0;
+    GC_par_tot_copied = 0;
     GC_tot_cpu  = 0;
 
 #ifdef PROFILING
@@ -256,7 +256,7 @@ stat_endExit(void)
 static nat rub_bell = 0;
 
 void
-stat_startGC (gc_thread *gct)
+stat_startGC (Capability *cap, gc_thread *gct)
 {
     nat bell = RtsFlags.GcFlags.ringBell;
 
@@ -278,7 +278,16 @@ stat_startGC (gc_thread *gct)
 #endif
 
     getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
-    gct->gc_start_thread_cpu  = getThreadCPUTime();
+
+    // Post EVENT_GC_START with the same timestamp as used for stats
+    // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
+    // Here, as opposed to other places, the event is emitted on the cap
+    // that initiates the GC and external tools expect it to have the same
+    // timestamp as used in +RTS -s calculcations.
+    traceEventGcStartAtT(cap,
+                         TimeToNS(gct->gc_start_elapsed - start_init_elapsed));
+
+    gct->gc_start_thread_cpu = getThreadCPUTime();
 
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
     {
@@ -330,19 +339,45 @@ stat_gcWorkerThreadDone (gc_thread *gct STG_UNUSED)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (gc_thread *gct,
-            lnat alloc, lnat live, lnat copied, nat gen,
-            lnat max_copied, lnat avg_copied, lnat slop)
+stat_endGC (Capability *cap, gc_thread *gct,
+            lnat alloc, lnat live, lnat copied, lnat slop, nat gen,
+            nat par_n_threads, lnat par_max_copied, lnat par_tot_copied)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
         RtsFlags.ProfFlags.doHeapProfile)
         // heap profiling needs GC_tot_time
     {
         Time cpu, elapsed, gc_cpu, gc_elapsed;
-	
-        getProcessTimes(&cpu, &elapsed);
-        gc_elapsed    = elapsed - gct->gc_start_elapsed;
 
+        // Has to be emitted while all caps stopped for GC, but before GC_END.
+        // See trac.haskell.org/ThreadScope/wiki/RTSsummaryEvents
+        // for a detailed design rationale of the current setup
+        // of GC eventlog events.
+        traceEventGcGlobalSync(cap);
+	
+        // Emitted before GC_END on all caps, which simplifies tools code.
+        traceEventGcStats(cap,
+                          CAPSET_HEAP_DEFAULT,
+                          gen,
+                          copied * sizeof(W_),
+                          slop   * sizeof(W_),
+                          /* current loss due to fragmentation */
+                          (mblocks_allocated * BLOCKS_PER_MBLOCK - n_alloc_blocks)
+                                 * BLOCK_SIZE_W * sizeof(W_),
+                          par_n_threads,
+                          par_max_copied * sizeof(W_),
+                          par_tot_copied * sizeof(W_));
+
+        getProcessTimes(&cpu, &elapsed);
+
+        // Post EVENT_GC_END with the same timestamp as used for stats
+        // (though converted from Time=StgInt64 to EventTimestamp=StgWord64).
+        // Here, as opposed to other places, the event is emitted on the cap
+        // that initiates the GC and external tools expect it to have the same
+        // timestamp as used in +RTS -s calculcations.
+        traceEventGcEndAtT(cap, TimeToNS(elapsed - start_init_elapsed));
+
+        gc_elapsed = elapsed - gct->gc_start_elapsed;
         gc_cpu = cpu - gct->gc_start_cpu;
 
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
@@ -372,9 +407,31 @@ stat_endGC (gc_thread *gct,
 
 	GC_tot_copied += (StgWord64) copied;
 	GC_tot_alloc  += (StgWord64) alloc;
-        GC_par_max_copied += (StgWord64) max_copied;
-        GC_par_avg_copied += (StgWord64) avg_copied;
+        GC_par_max_copied += (StgWord64) par_max_copied;
+        GC_par_tot_copied += (StgWord64) par_tot_copied;
 	GC_tot_cpu   += gc_cpu;
+        
+        /* For the moment we calculate both per-HEC and total allocation.
+	 * There is thus redundancy here, but for the moment we will calculate
+	 * it both the old and new way and assert they're the same.
+	 * When we're sure it's working OK then we can simplify things.
+	 * TODO: simplify calcAllocated and clearNurseries so they don't have
+	 *       to calculate the total
+	 */
+        {
+            lnat tot_alloc = 0;
+            lnat n;
+            for (n = 0; n < n_capabilities; n++) {
+                tot_alloc += capabilities[n].total_allocated;
+                traceEventHeapAllocated(&capabilities[n],
+                                        CAPSET_HEAP_DEFAULT,
+                                        capabilities[n].total_allocated * sizeof(W_));
+            }
+            ASSERT(GC_tot_alloc == tot_alloc);
+        }
+        traceEventHeapSize(cap,
+	                   CAPSET_HEAP_DEFAULT,
+			   mblocks_allocated * MBLOCK_SIZE_W * sizeof(W_));
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
 	    if (live > max_residency) {
@@ -383,6 +440,9 @@ stat_endGC (gc_thread *gct,
             current_residency = live;
 	    residency_samples++;
 	    cumulative_residency += live;
+	    traceEventHeapLive(cap, 
+    	    	    	       CAPSET_HEAP_DEFAULT,
+	                       live * sizeof(W_));
 	}
 
         if (slop > max_slop) max_slop = slop;
@@ -552,6 +612,12 @@ stat_exit(int alloc)
 
 	GC_tot_alloc += alloc;
 
+        for (i = 0; i < n_capabilities; i++) {
+            traceEventHeapAllocated(&capabilities[i],
+                                    CAPSET_HEAP_DEFAULT,
+                                    capabilities[i].total_allocated * sizeof(W_));
+        }
+
 	/* Count total garbage collections */
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
 	    total_collections += generations[g].collections;
@@ -626,11 +692,10 @@ stat_exit(int alloc)
             }
 
 #if defined(THREADED_RTS)
-            if (RtsFlags.ParFlags.parGcEnabled) {
-                statsPrintf("\n  Parallel GC work balance: %.2f (%ld / %ld, ideal %d)\n", 
-                            (double)GC_par_avg_copied / (double)GC_par_max_copied,
-                            (lnat)GC_par_avg_copied, (lnat)GC_par_max_copied,
-                            n_capabilities
+            if (RtsFlags.ParFlags.parGcEnabled && n_capabilities > 1) {
+                statsPrintf("\n  Parallel GC work balance: %.2f%% (serial 0%%, perfect 100%%)\n", 
+                            100 * (((double)GC_par_tot_copied / (double)GC_par_max_copied) - 1)
+                                / (n_capabilities - 1)
                     );
             }
 #endif
@@ -897,7 +962,7 @@ extern void getGCStats( GCStats *s )
     /* EZY: Being consistent with incremental output, but maybe should also discount init */
     s->cpu_seconds = TimeToSecondsDbl(current_cpu);
     s->wall_seconds = TimeToSecondsDbl(current_elapsed - end_init_elapsed);
-    s->par_avg_bytes_copied = GC_par_avg_copied*(StgWord64)sizeof(W_);
+    s->par_tot_bytes_copied = GC_par_tot_copied*(StgWord64)sizeof(W_);
     s->par_max_bytes_copied = GC_par_max_copied*(StgWord64)sizeof(W_);
 }
 // extern void getTaskStats( TaskStats **s ) {}

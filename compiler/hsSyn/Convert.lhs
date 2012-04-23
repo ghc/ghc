@@ -164,9 +164,8 @@ cvtDec (TySynD tc tvs rhs)
   = do	{ (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
 	; rhs' <- cvtType rhs
 	; returnL $ TyClD (TyDecl { tcdLName = tc' 
-                                  , tcdTyVars = tvs' 
-                                  , tcdTyDefn = TySynonym rhs'
-                                  , tcdFVs = placeHolderNames }) }
+                                  , tcdTyVars = tvs', tcdFVs = placeHolderNames 
+                                  , tcdTyDefn = TySynonym rhs' }) }
 
 cvtDec (DataD ctxt tc tvs constrs derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
@@ -183,7 +182,7 @@ cvtDec (NewtypeD ctxt tc tvs constr derivs)
   = do	{ (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
 	; con' <- cvtConstr constr
 	; derivs' <- cvtDerivs derivs
-        ; let defn = TyData { td_ND = DataType, td_cType = Nothing
+        ; let defn = TyData { td_ND = NewType, td_cType = Nothing
                             , td_ctxt = ctxt'
                             , td_kindSig = Nothing
                             , td_cons = [con'], td_derivs = derivs' } 
@@ -197,7 +196,8 @@ cvtDec (ClassD ctxt cl tvs fds decs)
 	; returnL $ TyClD $
           ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
 	    	    , tcdFDs = fds', tcdSigs = sigs', tcdMeths = binds'
-		    , tcdATs = fams', tcdATDefs = ats', tcdDocs = [] }
+		    , tcdATs = fams', tcdATDefs = ats', tcdDocs = []
+                    , tcdFVs = placeHolderNames }
                               -- no docs in TH ^^
 	}
 	
@@ -231,8 +231,9 @@ cvtDec (DataInstD ctxt tc tys constrs derivs)
                            , td_kindSig = Nothing
                            , td_cons = cons', td_derivs = derivs' } 
 
-       ; returnL $ InstD $ FamInstD $
-         FamInstDecl { fid_tycon = tc', fid_pats = typats', fid_defn = defn } }
+       ; returnL $ InstD $ FamInstD
+           { lid_inst = FamInstDecl { fid_tycon = tc', fid_pats = typats'
+                                    , fid_defn = defn, fid_fvs = placeHolderNames } }}
 
 cvtDec (NewtypeInstD ctxt tc tys constr derivs)
   = do { (ctxt', tc', typats') <- cvt_tyinst_hdr ctxt tc tys
@@ -242,14 +243,16 @@ cvtDec (NewtypeInstD ctxt tc tys constr derivs)
                            , td_ctxt = ctxt'
                            , td_kindSig = Nothing
                            , td_cons = [con'], td_derivs = derivs' } 
-       ; returnL $ InstD $ FamInstD $
-         FamInstDecl { fid_tycon = tc', fid_pats = typats', fid_defn = defn } }
+       ; returnL $ InstD $ FamInstD 
+           { lid_inst = FamInstDecl { fid_tycon = tc', fid_pats = typats'
+                                    , fid_defn = defn, fid_fvs = placeHolderNames } } }
 
 cvtDec (TySynInstD tc tys rhs)
   = do	{ (_, tc', tys') <- cvt_tyinst_hdr [] tc tys
 	; rhs' <- cvtType rhs
-	; returnL $ InstD $ FamInstD $ 
-          FamInstDecl { fid_tycon = tc', fid_pats = tys', fid_defn = TySynonym rhs' } }
+	; returnL $ InstD $ FamInstD 
+            { lid_inst = FamInstDecl { fid_tycon = tc', fid_pats = tys'
+                                     , fid_defn = TySynonym rhs', fid_fvs = placeHolderNames } } }
 
 ----------------
 cvt_ci_decs :: MsgDoc -> [TH.Dec]
@@ -299,8 +302,8 @@ is_fam_decl (L loc (TyClD d@(TyFamily {}))) = Left (L loc d)
 is_fam_decl decl = Right decl
 
 is_fam_inst :: LHsDecl RdrName -> Either (LFamInstDecl RdrName) (LHsDecl RdrName)
-is_fam_inst (L loc (Hs.InstD (FamInstD d))) = Left (L loc d)
-is_fam_inst decl                            = Right decl
+is_fam_inst (L loc (Hs.InstD (FamInstD { lid_inst = d }))) = Left (L loc d)
+is_fam_inst decl                                           = Right decl
 
 is_sig :: LHsDecl RdrName -> Either (LSig RdrName) (LHsDecl RdrName)
 is_sig (L loc (Hs.SigD sig)) = Left (L loc sig)

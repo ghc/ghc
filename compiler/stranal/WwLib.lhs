@@ -133,15 +133,10 @@ mkWwBodies fun_ty demands res_info one_shots
 	; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs emptyTvSubst fun_ty arg_info
 	; (work_args, wrap_fn_str,  work_fn_str) <- mkWWstr wrap_args
 
-        -- Don't do CPR if the worker doesn't have any value arguments
-        -- Then the worker is just a constant, so we don't want to unbox it.
-	; (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty)
-	       <- if any isId work_args then
-	             mkWWcpr res_ty res_info
-	          else
-	             return (id, id, res_ty)
+        -- Do CPR w/w.  See Note [Always do CPR w/w]
+	; (wrap_fn_cpr, work_fn_cpr,  cpr_res_ty) <- mkWWcpr res_ty res_info
 
-	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
+	; let (work_lam_args, work_call_args) = mkWorkerArgs work_args cpr_res_ty
 	; return ([idDemandInfo v | v <- work_call_args, isId v],
                   wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
                   mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args) }
@@ -153,6 +148,18 @@ mkWwBodies fun_ty demands res_info one_shots
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
 \end{code}
+
+Note [Always do CPR w/w]
+~~~~~~~~~~~~~~~~~~~~~~~~
+At one time we refrained from doing CPR w/w for thunks, on the grounds that
+we might duplicate work.  But that is already handled by the demand analyser,
+which doesn't give the CPR proprety if w/w might waste work: see
+Note [CPR for thunks] in DmdAnal.    
+
+And if something *has* been given the CPR property and we don't w/w, it's
+a disaster, because then the enclosing function might say it has the CPR
+property, but now doesn't and there a cascade of disaster.  A good example
+is Trac #5920.
 
 
 %************************************************************************

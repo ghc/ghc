@@ -122,6 +122,8 @@ struct Capability_ {
     // Stats on spark creation/conversion
     SparkCounters spark_stats;
 #endif
+    // Total words allocated by this cap since rts start
+    lnat total_allocated;
 
     // Per-capability STM-related data
     StgTVarWatchQueue *free_tvar_watch_queues;

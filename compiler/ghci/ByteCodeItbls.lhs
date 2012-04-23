@@ -15,6 +15,7 @@ ByteCodeItbls: Generate infotables for interpreter-made bytecodes
 
 module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
                      , StgInfoTable(..)
+                     , State(..), runState, evalState, execState, MonadT(..)
                      ) where
 
 #include "HsVersions.h"
@@ -30,6 +31,8 @@ import Util
 
 import Foreign
 import Foreign.C
+
+import Control.Monad    ( liftM )
 
 import GHC.Exts         ( Int(I#), addr2Int# )
 import GHC.Ptr          ( Ptr(..) )
@@ -286,7 +289,7 @@ instance Storable StgConInfoTable where
             , sizeOf (infoTable conInfoTable) ]
    alignment _ = SIZEOF_VOID_P
    peek ptr 
-      = runState (castPtr ptr) $ do
+      = evalState (castPtr ptr) $ do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
            desc <- load
 #endif
@@ -310,7 +313,7 @@ instance Storable StgConInfoTable where
 pokeConItbl :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
             -> IO ()
 pokeConItbl wr_ptr ex_ptr itbl 
-      = runState (castPtr wr_ptr) $ do
+      = evalState (castPtr wr_ptr) $ do
 #ifdef GHCI_TABLES_NEXT_TO_CODE
            store (conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB))
 #endif
@@ -353,7 +356,7 @@ instance Storable StgInfoTable where
       = SIZEOF_VOID_P
 
    poke a0 itbl
-      = runState (castPtr a0)
+      = evalState (castPtr a0)
       $ do
 #ifndef GHCI_TABLES_NEXT_TO_CODE
            store (entry  itbl)
@@ -367,7 +370,7 @@ instance Storable StgInfoTable where
 #endif
 
    peek a0
-      = runState (castPtr a0)
+      = evalState (castPtr a0)
       $ do
 #ifndef GHCI_TABLES_NEXT_TO_CODE
            entry'  <- load
@@ -409,8 +412,14 @@ class (Monad m, Monad (t m)) => MonadT t m where
 instance Monad m => MonadT (State s) m where
   lift m        = State (\s -> m >>= \a -> return (s, a))
 
-runState :: (Monad m) => s -> State s m a -> m a
-runState s (State m) = m s >>= return . snd
+runState :: Monad m => s -> State s m a -> m (s, a)
+runState s (State m) = m s
+
+evalState :: Monad m => s -> State s m a -> m a
+evalState s m = liftM snd (runState s m)
+
+execState :: Monad m => s -> State s m a -> m s
+execState s m = liftM fst (runState s m)
 
 type PtrIO = State (Ptr Word8) IO
 

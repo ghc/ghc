@@ -22,17 +22,17 @@ module Panic (
 
      panic, sorry, panicFastInt, assertPanic, trace,
      
-     Exception.Exception(..), showException, try, tryMost, throwTo,
+     Exception.Exception(..), showException, safeShowException, try, tryMost, throwTo,
 
-     installSignalHandlers, interruptTargetThread
+     installSignalHandlers,
+     pushInterruptTargetThread, popInterruptTargetThread
 ) where
 #include "HsVersions.h"
 
 import Config
 import FastTypes
 import Exception
-import Control.Concurrent ( MVar, ThreadId, withMVar, newMVar, modifyMVar_,
-                            myThreadId )
+import Control.Concurrent
 import Data.Dynamic
 import Debug.Trace	  ( trace )
 import System.IO.Unsafe
@@ -51,7 +51,11 @@ import GHC.ConsoleHandler
 import GHC.Stack
 #endif
 
--- | GHC's own exception type 
+#if __GLASGOW_HASKELL__ >= 705
+import System.Mem.Weak  ( Weak, deRefWeak )
+#endif
+
+-- | GHC's own exception type
 --   error messages all take the form:
 --
 --  @
@@ -113,6 +117,18 @@ short_usage = "Usage: For basic information, try the `--help' option."
 showException :: Exception e => e -> String
 showException = show
 
+-- | Show an exception which can possibly throw other exceptions.
+-- Used when displaying exception thrown within TH code.
+safeShowException :: Exception e => e -> IO String
+safeShowException e = do
+    -- ensure the whole error message is evaluated inside try
+    r <- try (return $! forceList (showException e))
+    case r of
+        Right msg -> return msg
+        Left e' -> safeShowException (e' :: SomeException)
+    where
+        forceList [] = []
+        forceList xs@(x : xt) = x `seq` forceList xt `seq` xs
 
 -- | Append a description of the given exception to this string.
 showGhcException :: GhcException -> String -> String
@@ -221,16 +237,16 @@ tryMost action = do r <- try action
 installSignalHandlers :: IO ()
 installSignalHandlers = do
   main_thread <- myThreadId
-  modifyMVar_ interruptTargetThread (return . (main_thread :))
+  pushInterruptTargetThread main_thread
 
   let
       interrupt_exn = (toException UserInterrupt)
 
       interrupt = do
-	withMVar interruptTargetThread $ \targets ->
-	  case targets of
-	   [] -> return ()
-	   (thread:_) -> throwTo thread interrupt_exn
+        mt <- popInterruptTargetThread
+        case mt of
+          Nothing -> return ()
+          Just t  -> throwTo t interrupt_exn
 
   --
 #if !defined(mingw32_HOST_OS)
@@ -256,8 +272,41 @@ installSignalHandlers = do
   return ()
 #endif
 
+#if __GLASGOW_HASKELL__ >= 705
+{-# NOINLINE interruptTargetThread #-}
+interruptTargetThread :: MVar [Weak ThreadId]
+interruptTargetThread = unsafePerformIO (newMVar [])
+
+pushInterruptTargetThread :: ThreadId -> IO ()
+pushInterruptTargetThread tid = do
+ wtid <- mkWeakThreadId tid
+ modifyMVar_ interruptTargetThread $
+   return . (wtid :)
+
+popInterruptTargetThread :: IO (Maybe ThreadId)
+popInterruptTargetThread =
+  modifyMVar interruptTargetThread $ loop
+ where
+   loop [] = return ([], Nothing)
+   loop (t:ts) = do
+     r <- deRefWeak t
+     case r of
+       Nothing -> loop ts
+       Just t  -> return (ts, Just t)
+#else
 {-# NOINLINE interruptTargetThread #-}
 interruptTargetThread :: MVar [ThreadId]
 interruptTargetThread = unsafePerformIO (newMVar [])
 
+pushInterruptTargetThread :: ThreadId -> IO ()
+pushInterruptTargetThread tid = do
+ modifyMVar_ interruptTargetThread $
+   return . (tid :)
+
+popInterruptTargetThread :: IO (Maybe ThreadId)
+popInterruptTargetThread =
+  modifyMVar interruptTargetThread $
+   \tids -> return $! case tids of [] -> ([], Nothing)
+                                   (t:ts) -> (ts, Just t)
+#endif
 \end{code}

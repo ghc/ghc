@@ -160,12 +160,12 @@ blockSize = 1024
 lazyGetToks :: DynFlags -> FilePath -> Handle -> IO [Located Token]
 lazyGetToks dflags filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
-  unsafeInterleaveIO $ lazyLexBuf handle (pragState dflags buf loc) False
+  unsafeInterleaveIO $ lazyLexBuf handle (pragState dflags buf loc) False blockSize
  where
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
-  lazyLexBuf :: Handle -> PState -> Bool -> IO [Located Token]
-  lazyLexBuf handle state eof = do
+  lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
+  lazyLexBuf handle state eof size = do
     case unP (lexer return) state of
       POk state' t -> do
         -- pprTrace "lazyLexBuf" (text (show (buffer state'))) (return ())
@@ -173,22 +173,26 @@ lazyGetToks dflags filename handle = do
            -- if this token reached the end of the buffer, and we haven't
            -- necessarily read up to the end of the file, then the token might
            -- be truncated, so read some more of the file and lex it again.
-           then getMore handle state
+           then getMore handle state size
            else case t of
                   L _ ITeof -> return [t]
-                  _other    -> do rest <- lazyLexBuf handle state' eof
+                  _other    -> do rest <- lazyLexBuf handle state' eof size
                                   return (t : rest)
-      _ | not eof   -> getMore handle state
+      _ | not eof   -> getMore handle state size
         | otherwise -> return [L (RealSrcSpan (last_loc state)) ITeof]
                          -- parser assumes an ITeof sentinel at the end
 
-  getMore :: Handle -> PState -> IO [Located Token]
-  getMore handle state = do
+  getMore :: Handle -> PState -> Int -> IO [Located Token]
+  getMore handle state size = do
      -- pprTrace "getMore" (text (show (buffer state))) (return ())
-     nextbuf <- hGetStringBufferBlock handle blockSize
-     if (len nextbuf == 0) then lazyLexBuf handle state True else do
+     let new_size = size * 2
+       -- double the buffer size each time we read a new block.  This
+       -- counteracts the quadratic slowdown we otherwise get for very
+       -- large module names (#5981)
+     nextbuf <- hGetStringBufferBlock handle new_size
+     if (len nextbuf == 0) then lazyLexBuf handle state True new_size else do
      newbuf <- appendStringBuffers (buffer state) nextbuf
-     unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False
+     unsafeInterleaveIO $ lazyLexBuf handle state{buffer=newbuf} False new_size
 
 
 getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]

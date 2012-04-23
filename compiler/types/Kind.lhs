@@ -212,7 +212,7 @@ isSubKind (FunTy a1 r1) (FunTy a2 r2)
   = (isSubKind a2 a1) && (isSubKind r1 r2)
 
 isSubKind k1@(TyConApp kc1 k1s) k2@(TyConApp kc2 k2s)
-  | isPromotedTypeTyCon kc1 || isPromotedTypeTyCon kc2
+  | isPromotedTyCon kc1 || isPromotedTyCon kc2
     -- handles promoted kinds (List *, Nat, etc.)
   = eqKind k1 k2
 

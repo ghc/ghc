@@ -102,8 +102,7 @@ module TcType (
   isFFIImportResultTy, -- :: DynFlags -> Type -> Bool
   isFFIExportResultTy, -- :: Type -> Bool
   isFFIExternalTy,     -- :: Type -> Bool
-  isFFIDynArgumentTy,  -- :: Type -> Bool
-  isFFIDynResultTy,    -- :: Type -> Bool
+  isFFIDynTy,          -- :: Type -> Type -> Bool
   isFFIPrimArgumentTy, -- :: DynFlags -> Type -> Bool
   isFFIPrimResultTy,   -- :: DynFlags -> Type -> Bool
   isFFILabelTy,        -- :: Type -> Bool
@@ -353,6 +352,8 @@ data UserTypeCtxt
 			-- 	f (x::t) = ...
   | BindPatSigCtxt	-- Type sig in pattern binding pattern
 			--	(x::t, y) = e
+  | RuleSigCtxt Name    -- LHS of a RULE forall
+                        --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
   | ResSigCtxt		-- Result type sig
 			-- 	f x :: t = ....
   | ForSigCtxt Name	-- Foreign import or export signature
@@ -418,6 +419,7 @@ pprTcTyVarDetails (MetaTv SigTv _) = ptext (sLit "sig")
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (InfSigCtxt n)    = ptext (sLit "the inferred type for") <+> quotes (ppr n)
 pprUserTypeCtxt (FunSigCtxt n)    = ptext (sLit "the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n)    = ptext (sLit "a RULE for") <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = ptext (sLit "an expression type signature")
 pprUserTypeCtxt (ConArgCtxt c)    = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
@@ -782,12 +784,18 @@ mkTcEqPred :: TcType -> TcType -> Type
 -- During type checking we build equalities between 
 -- type variables with OpenKind or ArgKind.  Ultimately
 -- they will all settle, but we want the equality predicate
--- itself to have kind '*'.  I think.  
+-- itself to have kind '*'.  I think.
+--
+-- But for now we call mkTyConApp, not mkEqPred, because the invariants
+-- of the latter might not be satisfied during type checking.
+-- Notably when we form an equalty   (a : OpenKind) ~ (Int : *)
 --
 -- But this is horribly delicate: what about type variables
 -- that turn out to be bound to Int#?
 mkTcEqPred ty1 ty2
-  = mkNakedEqPred (defaultKind (typeKind ty1)) ty1 ty2
+  = mkTyConApp eqTyCon [k, ty1, ty2]
+  where
+    k = defaultKind (typeKind ty1)
 \end{code}
 
 @isTauTy@ tests for nested for-alls.  It should not be called on a boxy type.
@@ -1338,19 +1346,24 @@ isFFIImportResultTy dflags ty
 isFFIExportResultTy :: Type -> Bool
 isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
-isFFIDynArgumentTy :: Type -> Bool
--- The argument type of a foreign import dynamic must be Ptr, FunPtr, Addr,
--- or a newtype of either.
-isFFIDynArgumentTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
-
-isFFIDynResultTy :: Type -> Bool
--- The result type of a foreign export dynamic must be Ptr, FunPtr, Addr,
--- or a newtype of either.
-isFFIDynResultTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
+isFFIDynTy :: Type -> Type -> Bool
+-- The type in a foreign import dynamic must be Ptr, FunPtr, or a newtype of
+-- either, and the wrapped function type must be equal to the given type.
+-- We assume that all types have been run through normalizeFfiType, so we don't
+-- need to worry about expanding newtypes here.
+isFFIDynTy expected ty
+    -- Note [Foreign import dynamic]
+    -- In the example below, expected would be 'CInt -> IO ()', while ty would
+    -- be 'FunPtr (CDouble -> IO ())'.
+    | Just (tc, [ty']) <- splitTyConApp_maybe ty
+    , tyConUnique tc `elem` [ptrTyConKey, funPtrTyConKey]
+    , eqType ty' expected
+    = True
+    | otherwise
+    = False
 
 isFFILabelTy :: Type -> Bool
--- The type of a foreign label must be Ptr, FunPtr, Addr,
--- or a newtype of either.
+-- The type of a foreign label must be Ptr, FunPtr, or a newtype of either.
 isFFILabelTy = checkRepTyConKey [ptrTyConKey, funPtrTyConKey]
 
 isFFIPrimArgumentTy :: DynFlags -> Type -> Bool
@@ -1400,6 +1413,21 @@ checkRepTyConKey :: [Unique] -> Type -> Bool
 checkRepTyConKey keys
   = checkRepTyCon (\tc -> tyConUnique tc `elem` keys)
 \end{code}
+
+Note [Foreign import dynamic]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A dynamic stub must be of the form 'FunPtr ft -> ft' where ft is any foreign
+type.  Similarly, a wrapper stub must be of the form 'ft -> IO (FunPtr ft)'.
+
+We use isFFIDynTy to check whether a signature is well-formed. For example,
+given a (illegal) declaration like:
+
+foreign import ccall "dynamic"
+  foo :: FunPtr (CDouble -> IO ()) -> CInt -> IO ()
+
+isFFIDynTy will compare the 'FunPtr' type 'CDouble -> IO ()' with the curried
+result type 'CInt -> IO ()', and return False, as they are not equal.
+
 
 ----------------------------------------------
 These chaps do the work; they are not exported

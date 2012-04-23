@@ -323,11 +323,12 @@ repFamilyFlavour DataFamily = rep2 dataFamName []
 -- Represent instance declarations
 --
 repInstD :: LInstDecl Name -> DsM (SrcSpan, Core TH.DecQ)
-repInstD (L loc (FamInstD fi_decl))
+repInstD (L loc (FamInstD { lid_inst = fi_decl }))
   = do { dec <- repFamInstD fi_decl
        ; return (loc, dec) }
 
-repInstD (L loc (ClsInstD ty binds prags ats))
+repInstD (L loc (ClsInstD { cid_poly_ty = ty, cid_binds = binds
+                          , cid_sigs = prags, cid_fam_insts = ats }))
   = do { dec <- addTyVarBinds tvs $ \_ ->
 	    -- We must bring the type variables into scope, so their
 	    -- occurrences don't fail, even though the binders don't 
@@ -352,8 +353,12 @@ repInstD (L loc (ClsInstD ty binds prags ats))
    Just (tvs, cxt, cls, tys) = splitHsInstDeclTy_maybe (unLoc ty)
 
 repFamInstD :: FamInstDecl Name -> DsM (Core TH.DecQ)
-repFamInstD (FamInstDecl { fid_tycon = tc_name, fid_pats = HsBSig tys tv_names, fid_defn = defn })
-  = do { tc <- lookupLOcc tc_name 		-- See note [Binders and occurrences]  
+repFamInstD (FamInstDecl { fid_tycon = tc_name
+                         , fid_pats = HsBSig tys (kv_names, tv_names)
+                         , fid_defn = defn })
+  = WARN( not (null kv_names), ppr kv_names )   -- We have not yet dealt with kind 
+                                                -- polymorphism in Template Haskell (sigh)
+    do { tc <- lookupLOcc tc_name 		-- See note [Binders and occurrences]  
        ; let loc = getLoc tc_name
              hs_tvs = [ L loc (UserTyVar n) | n <- tv_names]   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ bndrs ->

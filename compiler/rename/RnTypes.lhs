@@ -26,7 +26,9 @@ module RnTypes (
 	rnSplice, checkTH,
 
         -- Binding related stuff
-        bindSigTyVarsFV, bindHsTyVars, bindTyVarsRn, rnHsBndrSig
+        bindSigTyVarsFV, bindHsTyVars, bindTyVarsRn, rnHsBndrSig,
+        extractHsTyRdrTyVars, extractHsTysRdrTyVars
+
   ) where
 
 import {-# SOURCE #-} RnExpr( rnLExpr )
@@ -36,7 +38,6 @@ import {-# SOURCE #-} TcSplice( runQuasiQuoteType )
 
 import DynFlags
 import HsSyn
-import RdrHsSyn		( extractHsTyRdrTyVars, extractHsTysRdrTyVars )
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
 import TcRnMonad
@@ -53,6 +54,7 @@ import BasicTypes	( IPName(..), ipNameName, compareFixity, funTyFixity, negateFi
 			  Fixity(..), FixityDirection(..) )
 import Outputable
 import FastString
+import Data.List        ( nub )
 import Control.Monad	( unless )
 
 #include "HsVersions.h"
@@ -129,7 +131,11 @@ rnHsTyKi isType doc (HsForAllTy Implicit _ lctxt@(L _ ctxt) ty)
     name_env <- getLocalRdrEnv
     loc <- getSrcSpanM
     let
-	mentioned = extractHsTysRdrTyVars (ty:ctxt)
+	(_kvs, mentioned) = extractHsTysRdrTyVars (ty:ctxt)
+           -- In for-all types we don't bring in scope
+           -- kind variables mentioned in kind signatures
+           -- (Well, not yet anyway....)
+           --    f :: Int -> T (a::k)    -- Not allowed
 
 	-- Don't quantify over type variables that are in scope;
 	-- when GlasgowExts is off, there usually won't be any, except for
@@ -144,7 +150,7 @@ rnHsTyKi isType doc ty@(HsForAllTy Explicit forall_tyvars lctxt@(L _ ctxt) tau)
   = ASSERT ( isType ) do { 	-- Explicit quantification.
          -- Check that the forall'd tyvars are actually 
 	 -- mentioned in the type, and produce a warning if not
-         let mentioned   = extractHsTysRdrTyVars (tau:ctxt)
+         let (_kvs, mentioned) = extractHsTysRdrTyVars (tau:ctxt)
              in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
        ; warnUnusedForAlls (in_type_doc $$ docOfHsDocContext doc) forall_tyvars mentioned
 
@@ -383,15 +389,17 @@ rnHsBndrSig :: Bool    -- True <=> type sig, False <=> kind sig
             -> (HsBndrSig (LHsType Name) -> RnM (a, FreeVars))
             -> RnM (a, FreeVars)
 rnHsBndrSig is_type doc (HsBSig ty@(L loc _) _) thing_inside
-  = do { name_env <- getLocalRdrEnv
-       ; let tv_bndrs  = [ tv | tv <- extractHsTyRdrTyVars ty
-			      , not (tv `elemLocalRdrEnv` name_env) ]
-
+  = do { let (kv_bndrs, tv_bndrs) = extractHsTyRdrTyVars ty
        ; checkHsBndrFlags is_type doc ty tv_bndrs 
-       ; tv_names <- newLocalBndrsRn [L loc tv | tv <- tv_bndrs]
-       ; bindLocalNamesFV tv_names $ do
-       { (ty', fvs1) <- rnLHsTyKi is_type doc ty
-       ; (res, fvs2) <- thing_inside (HsBSig ty' tv_names)
+       ; name_env <- getLocalRdrEnv
+       ; tv_names <- newLocalBndrsRn [L loc tv | tv <- tv_bndrs
+                                               , not (tv `elemLocalRdrEnv` name_env) ]
+       ; kv_names <- newLocalBndrsRn [L loc kv | kv <- kv_bndrs
+                                               , not (kv `elemLocalRdrEnv` name_env) ]
+       ; bindLocalNamesFV kv_names $ 
+         bindLocalNamesFV tv_names $ 
+    do { (ty', fvs1) <- rnLHsTyKi is_type doc ty
+       ; (res, fvs2) <- thing_inside (HsBSig ty' (kv_names, tv_names))
        ; return (res, fvs1 `plusFV` fvs2) } }
 
 checkHsBndrFlags :: Bool -> HsDocContext 
@@ -852,4 +860,105 @@ checkTH e what 	-- Raise an error in a stage-1 compiler
                   ptext (sLit "Perhaps you are using a stage-1 compiler?"),
 	          nest 2 (ppr e)])
 #endif   
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+      Finding the free type variables of a (HsType RdrName)
+%*                                                                    *
+%************************************************************************
+
+extractHsTyRdrNames finds the free variables of a HsType
+It's used when making the for-alls explicit.
+
+Note [Kind and type-variable binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a type signature we may implicitly bind type varaible and, more
+recently, kind variables.  For example:
+  *   f :: a -> a
+      f = ...
+    Here we need to find the free type variables of (a -> a),
+    so that we know what to quantify
+
+  *   class C (a :: k) where ...
+    This binds 'k' in ..., as well as 'a'
+
+  *   f (x :: a -> [a]) = ....
+    Here we bind 'a' in ....
+
+  *   f (x :: T a -> T (b :: k)) = ...
+    Here we bind both 'a' and the kind variable 'k'
+
+  *   type instance F (T (a :: Maybe k)) = ...a...k...
+    Here we want to constrain the kind of 'a', and bind 'k'.
+
+In general we want to walk over a type, and find 
+  * Its free type variables
+  * The free kind variables of any kind signatures in the type
+
+Hence we returns a pair (kind-vars, type vars)
+See also Note [HsBSig binder lists] in HsTypes
+
+\begin{code}
+type FreeKiTyVars = ([RdrName], [RdrName])
+
+extractHsTyRdrTyVars :: LHsType RdrName -> FreeKiTyVars
+-- See Note [Kind and type-variable binders]
+extractHsTyRdrTyVars ty 
+  = case extract_lty ty ([],[]) of
+     (kvs, tvs) -> (nub kvs, nub tvs)
+
+extractHsTysRdrTyVars :: [LHsType RdrName] -> FreeKiTyVars
+-- See Note [Kind and type-variable binders]
+extractHsTysRdrTyVars ty 
+  = case extract_ltys ty ([],[]) of
+     (kvs, tvs) -> (nub kvs, nub tvs)
+
+extract_lctxt :: LHsContext RdrName -> FreeKiTyVars -> FreeKiTyVars
+extract_lctxt ctxt acc = foldr extract_lty acc (unLoc ctxt)
+
+extract_ltys :: [LHsType RdrName] -> FreeKiTyVars -> FreeKiTyVars
+extract_ltys tys acc = foldr extract_lty acc tys
+
+extract_lty :: LHsType RdrName -> FreeKiTyVars -> FreeKiTyVars
+extract_lty (L _ ty) acc
+  = case ty of
+      HsTyVar tv                -> extract_tv tv acc
+      HsBangTy _ ty             -> extract_lty ty acc
+      HsRecTy flds              -> foldr (extract_lty . cd_fld_type) acc flds
+      HsAppTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
+      HsListTy ty               -> extract_lty ty acc
+      HsPArrTy ty               -> extract_lty ty acc
+      HsTupleTy _ tys           -> extract_ltys tys acc
+      HsFunTy ty1 ty2           -> extract_lty ty1 (extract_lty ty2 acc)
+      HsIParamTy _ ty           -> extract_lty ty acc
+      HsEqTy ty1 ty2            -> extract_lty ty1 (extract_lty ty2 acc)
+      HsOpTy ty1 (_, (L _ tv)) ty2 -> extract_tv tv (extract_lty ty1 (extract_lty ty2 acc))
+      HsParTy ty                -> extract_lty ty acc
+      HsCoreTy {}               -> acc  -- The type is closed
+      HsQuasiQuoteTy {}         -> acc  -- Quasi quotes mention no type variables
+      HsSpliceTy {}             -> acc  -- Type splices mention no type variables
+      HsDocTy ty _              -> extract_lty ty acc
+      HsExplicitListTy _ tys    -> extract_ltys tys acc
+      HsExplicitTupleTy _ tys   -> extract_ltys tys acc
+      HsTyLit _                 -> acc
+      HsWrapTy _ _              -> panic "extract_lty"
+      HsKindSig ty ki           -> case extract_lty ty acc of { (kvs1, tvs) ->
+                                   case extract_lty ki ([],kvs1) of { (_, kvs2) -> 
+                                        -- Kinds shouldn't have sort signatures!
+                                   (kvs2, tvs) }}
+      HsForAllTy _ [] cx ty     -> extract_lctxt cx (extract_lty ty acc)
+      HsForAllTy _ tvs cx ty    -> (acc_kvs ++ body_kvs, 
+                                    acc_tvs ++ filterOut (`elem` locals_tvs) body_tvs)
+                                where
+                                   (body_kvs, body_tvs) = extract_lctxt cx (extract_lty ty ([],[]))
+                                   (acc_kvs, acc_tvs) = acc
+                                   locals_tvs = hsLTyVarNames tvs
+                                        -- Currently we don't have a syntax to explicity bind 
+                                        -- kind variables, so these are all type variables
+
+extract_tv :: RdrName -> FreeKiTyVars -> FreeKiTyVars
+extract_tv tv acc
+  | isRdrTyVar tv = case acc of (kvs,tvs) -> (kvs, tv : tvs)
+  | otherwise     = acc
 \end{code}

@@ -46,7 +46,7 @@ import RdrName          ( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps	( findDupsEq )
 import BasicTypes	( RecFlag(..) )
-import Digraph		( SCC(..), stronglyConnCompFromEdgedVertices )
+import Digraph		( SCC(..) )
 import Bag
 import Outputable
 import FastString
@@ -506,17 +506,9 @@ depAnalBinds :: Bag (LHsBind Name, [Name], Uses)
 depAnalBinds binds_w_dus
   = (map get_binds sccs, map get_du sccs)
   where
-    sccs = stronglyConnCompFromEdgedVertices edges
-
-    keyd_nodes = bagToList binds_w_dus `zip` [0::Int ..]
-
-    edges = [ (node, key, [key | n <- nameSetToList uses,
-			         Just key <- [lookupNameEnv key_map n] ])
-	    | (node@(_,_,uses), key) <- keyd_nodes ]
-
-    key_map :: NameEnv Int	-- Which binding it comes from
-    key_map = mkNameEnv [(bndr, key) | ((_, bndrs, _), key) <- keyd_nodes
-				     , bndr <- bndrs ]
+    sccs = depAnal (\(_, defs, _) -> defs)
+                   (\(_, _, uses) -> nameSetToList uses)
+                   (bagToList binds_w_dus)
 
     get_binds (AcyclicSCC (bind, _, _)) = (NonRecursive, unitBag bind)
     get_binds (CyclicSCC  binds_w_dus)  = (Recursive, listToBag [b | (b,_,_) <- binds_w_dus])
@@ -526,7 +518,6 @@ depAnalBinds binds_w_dus
 	where
 	  defs = mkNameSet [b | (_,bs,_) <- binds_w_dus, b <- bs]
 	  uses = unionManyNameSets [u | (_,_,u) <- binds_w_dus]
-
 
 ---------------------
 -- Bind the top-level forall'd type variables in the sigs.

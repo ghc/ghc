@@ -97,7 +97,11 @@ void initTracing (void)
     // -Dg turns on gc tracing too
     TRACE_gc =
         RtsFlags.TraceFlags.gc ||
-        RtsFlags.DebugFlags.gc;
+        RtsFlags.DebugFlags.gc ||
+        RtsFlags.DebugFlags.scheduler;
+    if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
+        RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
+    }
 
     TRACE_spark_sampled =
         RtsFlags.TraceFlags.sparks_sampled;
@@ -228,9 +232,6 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
                        cap->no, (lnat)tso->id, thread_stop_reasons[info1]);
         }
         break;
-    case EVENT_SHUTDOWN:        // (cap)
-        debugBelch("cap %d: shutting down\n", cap->no);
-        break;
     default:
         debugBelch("cap %d: thread %lu: event %d\n\n", 
                    cap->no, (lnat)tso->id, tag);
@@ -282,6 +283,9 @@ static void traceGcEvent_stderr (Capability *cap, EventTypeNum tag)
       case EVENT_GC_DONE:         // (cap)
           debugBelch("cap %d: GC done\n", cap->no);
           break;
+      case EVENT_GC_GLOBAL_SYNC:  // (cap)
+          debugBelch("cap %d: all caps stopped for GC\n", cap->no);
+          break;
       default:
           barf("traceGcEvent: unknown event tag %d", tag);
           break;
@@ -304,9 +308,110 @@ void traceGcEvent_ (Capability *cap, EventTypeNum tag)
     }
 }
 
-void traceCapsetEvent_ (EventTypeNum tag,
-                        CapsetID capset,
-                        StgWord info)
+void traceGcEventAtT_ (Capability *cap, StgWord64 ts, EventTypeNum tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceGcEvent_stderr(cap, tag);
+    } else
+#endif
+    {
+        /* assuming nullary events and explicitly inserting a timestamp */
+        postEventAtTimestamp(cap, ts, tag);
+    }
+}
+
+void traceHeapEvent_ (Capability   *cap,
+                      EventTypeNum  tag,
+                      CapsetID      heap_capset,
+                      lnat          info1)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postHeapEvent(cap, tag, heap_capset, info1);
+    }
+}
+
+void traceEventHeapInfo_ (CapsetID    heap_capset,
+                          nat         gens,
+                          lnat        maxHeapSize,
+                          lnat        allocAreaSize,
+                          lnat        mblockSize,
+                          lnat        blockSize)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postEventHeapInfo(heap_capset, gens,
+                          maxHeapSize, allocAreaSize,
+                          mblockSize, blockSize);
+    }
+}
+
+void traceEventGcStats_  (Capability *cap,
+                          CapsetID    heap_capset,
+                          nat         gen,
+                          lnat        copied,
+                          lnat        slop,
+                          lnat        fragmentation,
+                          nat         par_n_threads,
+                          lnat        par_max_copied,
+                          lnat        par_tot_copied)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* no stderr equivalent for these ones */
+    } else
+#endif
+    {
+        postEventGcStats(cap, heap_capset, gen,
+                         copied, slop, fragmentation,
+                         par_n_threads, par_max_copied, par_tot_copied);
+    }
+}
+
+void traceCapEvent (Capability   *cap,
+                    EventTypeNum  tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        ACQUIRE_LOCK(&trace_utx);
+
+        tracePreface();
+        switch (tag) {
+        case EVENT_CAP_CREATE:   // (cap)
+            debugBelch("cap %d: initialised\n", cap->no);
+            break;
+        case EVENT_CAP_DELETE:   // (cap)
+            debugBelch("cap %d: shutting down\n", cap->no);
+            break;
+        case EVENT_CAP_ENABLE:   // (cap)
+            debugBelch("cap %d: enabling capability\n", cap->no);
+            break;
+        case EVENT_CAP_DISABLE:  // (cap)
+            debugBelch("cap %d: disabling capability\n", cap->no);
+            break;
+        }
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        if (eventlog_enabled) {
+            postCapEvent(tag, (EventCapNo)cap->no);
+        }
+    }
+}
+
+void traceCapsetEvent (EventTypeNum tag,
+                       CapsetID     capset,
+                       StgWord      info)
 {
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR && TRACE_sched)

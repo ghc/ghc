@@ -30,7 +30,7 @@ module TyCon(
         mkTupleTyCon,
         mkSynTyCon,
         mkForeignTyCon,
-        mkPromotedDataTyCon,
+        mkPromotedDataCon,
         mkPromotedTyCon,
 
         -- ** Predicates on TyCons
@@ -42,7 +42,7 @@ module TyCon(
         isSynTyCon, isClosedSynTyCon,
         isDecomposableTyCon,
         isForeignTyCon, 
-        isPromotedDataTyCon, isPromotedTypeTyCon,
+        isPromotedDataCon, isPromotedTyCon,
 
         isInjectiveTyCon,
         isDataTyCon, isProductTyCon, isEnumerationTyCon,
@@ -393,7 +393,7 @@ data TyCon
     }
 
   -- | Represents promoted data constructor.
-  | PromotedDataTyCon {         -- See Note [Promoted data constructors]
+  | PromotedDataCon {         -- See Note [Promoted data constructors]
         tyConUnique :: Unique, -- ^ Same Unique as the data constructor
         tyConName   :: Name,   -- ^ Same Name as the data constructor
         tyConArity  :: Arity,
@@ -402,7 +402,7 @@ data TyCon
     }
 
   -- | Represents promoted type constructor.
-  | PromotedTypeTyCon {
+  | PromotedTyCon {
         tyConUnique :: Unique, -- ^ Same Unique as the type constructor
         tyConName   :: Name,   -- ^ Same Name as the type constructor
         tyConArity  :: Arity,  -- ^ n if ty_con :: * -> ... -> *  n times
@@ -588,7 +588,7 @@ data SynTyConRhs
 Note [Promoted data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A data constructor can be promoted to become a type constructor,
-via the PromotedDataTyCon alternative in TyCon.
+via the PromotedTyCon alternative in TyCon.
 
 * Only "vanilla" data constructors are promoted; ones with no GADT
   stuff, no existentials, etc.  We might generalise this later.
@@ -602,7 +602,7 @@ via the PromotedDataTyCon alternative in TyCon.
     kind of (promoted) tycon  Just :: forall (a:box). a -> Maybe a
   The kind is not identical to the type, because of the */box
   kind signature on the forall'd variable; so the tc_kind field of
-  PromotedDataTyCon is not identical to the dataConUserType of the
+  PromotedTyCon is not identical to the dataConUserType of the
   DataCon.  But it's the same modulo changing the variable kinds,
   done by Kind.promoteType.
 
@@ -945,10 +945,11 @@ mkSynTyCon name kind tyvars rhs parent
 
 -- | Create a promoted data constructor 'TyCon'
 -- Somewhat dodgily, we give it the same Name
--- as the data constructor itself
-mkPromotedDataTyCon :: DataCon -> Name -> Unique -> Kind -> Arity -> TyCon
-mkPromotedDataTyCon con name unique kind arity
-  = PromotedDataTyCon {
+-- as the data constructor itself; when we pretty-print
+-- the TyCon we add a quote; see the Outputable TyCon instance
+mkPromotedDataCon :: DataCon -> Name -> Unique -> Kind -> Arity -> TyCon
+mkPromotedDataCon con name unique kind arity
+  = PromotedDataCon {
         tyConName   = name,
         tyConUnique = unique,
         tyConArity  = arity,
@@ -961,7 +962,7 @@ mkPromotedDataTyCon con name unique kind arity
 -- as the type constructor itself
 mkPromotedTyCon :: TyCon -> Kind -> TyCon
 mkPromotedTyCon tc kind
-  = PromotedTypeTyCon {
+  = PromotedTyCon {
         tyConName   = getName tc,
         tyConUnique = getUnique tc,
         tyConArity  = tyConArity tc,
@@ -1038,7 +1039,7 @@ isDistinctTyCon (AlgTyCon {algTcRhs = rhs}) = isDistinctAlgRhs rhs
 isDistinctTyCon (FunTyCon {})               = True
 isDistinctTyCon (TupleTyCon {})             = True
 isDistinctTyCon (PrimTyCon {})              = True
-isDistinctTyCon (PromotedDataTyCon {})      = True
+isDistinctTyCon (PromotedDataCon {})        = True
 isDistinctTyCon _                           = False
 
 isDistinctAlgRhs :: AlgTyConRhs -> Bool
@@ -1196,15 +1197,15 @@ isForeignTyCon :: TyCon -> Bool
 isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
 isForeignTyCon _                                   = False
 
--- | Is this a PromotedDataTyCon?
-isPromotedDataTyCon :: TyCon -> Bool
-isPromotedDataTyCon (PromotedDataTyCon {}) = True
-isPromotedDataTyCon _                      = False
+-- | Is this a PromotedDataCon?
+isPromotedDataCon :: TyCon -> Bool
+isPromotedDataCon (PromotedDataCon {}) = True
+isPromotedDataCon _                    = False
 
--- | Is this a PromotedTypeTyCon?
-isPromotedTypeTyCon :: TyCon -> Bool
-isPromotedTypeTyCon (PromotedTypeTyCon {}) = True
-isPromotedTypeTyCon _                      = False
+-- | Is this a PromotedTyCon?
+isPromotedTyCon :: TyCon -> Bool
+isPromotedTyCon (PromotedTyCon {}) = True
+isPromotedTyCon _                  = False
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
@@ -1480,9 +1481,10 @@ instance Outputable TyCon where
   ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
 
 pprPromotionQuote :: TyCon -> SDoc
-pprPromotionQuote (PromotedTypeTyCon {}) = char '\''
-pprPromotionQuote (PromotedDataTyCon {}) = char '\''
-pprPromotionQuote _                      = empty
+pprPromotionQuote (PromotedDataCon {}) = char '\''   -- Quote promoted DataCons in types
+pprPromotionQuote _                    = empty       -- However, we don't quote TyCons in kinds
+                                                     -- e.g.   type family T a :: Bool -> *
+                                                     -- cf Trac #5952
 
 instance NamedThing TyCon where
     getName = tyConName

@@ -66,8 +66,8 @@ createThread(Capability *cap, nat size)
     /* sched_mutex is *not* required */
 
     /* catch ridiculously small stack sizes */
-    if (size < MIN_STACK_WORDS + sizeofW(StgStack)) {
-        size = MIN_STACK_WORDS + sizeofW(StgStack);
+    if (size < MIN_STACK_WORDS + sizeofW(StgStack) + sizeofW(StgTSO)) {
+        size = MIN_STACK_WORDS + sizeofW(StgStack) + sizeofW(StgTSO);
     }
 
     /* The size argument we are given includes all the per-thread
@@ -424,12 +424,16 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
 
     updateWithIndirection(cap, thunk, val);
 
+    // sometimes the TSO is locked when we reach here, so its header
+    // might be WHITEHOLE.  Hence check for the correct owner using
+    // pointer equality first.
+    if ((StgTSO*)v == tso) {
+        return;
+    }
+
     i = v->header.info;
     if (i == &stg_TSO_info) {
-        owner = (StgTSO*)v;
-        if (owner != tso) {
-            checkBlockingQueues(cap, tso);
-        }
+        checkBlockingQueues(cap, tso);
         return;
     }
 
