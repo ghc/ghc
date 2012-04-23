@@ -462,7 +462,7 @@ memo opt speculated state0 = do
     let state1 = gc state0 -- Necessary because normalisation might have made some stuff dead
     
     ps <- getPromises
-    case [ (p, (releaseStateDeed state0, applyAbsVars (fun p) (Just rn_lr) (abstracted p)))
+    case [ (p, (releaseStateDeed state0, applyAbsVars (fun p) (Just (mkRenaming rn_lr)) (abstracted p)))
          | p <- ps
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                            match (meaning p) state1]

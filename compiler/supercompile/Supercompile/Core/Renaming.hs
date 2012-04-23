@@ -3,7 +3,7 @@
 module Supercompile.Core.Renaming (
     -- | Renamings
     Renaming, emptyRenaming,
-    mkInScopeIdentityRenaming, mkIdentityRenaming, mkTyVarRenaming,
+    mkInScopeIdentityRenaming, mkIdentityRenaming, mkTyVarRenaming, mkRenaming,
     invertRenaming,
     InScopeSet, emptyInScopeSet, mkInScopeSet,
     
@@ -49,6 +49,8 @@ import Name        (getOccName, mkSysTvName)
 import FastString  (FastString)
 import UniqFM      (ufmToList)
 import VarEnv
+
+import qualified Data.Map as M
 
 
 -- We are going to use GHC's substitution type in a rather stylised way, and only
@@ -138,6 +140,13 @@ mkInScopeIdentityRenaming = mkIdentityRenaming . getInScopeVars
 
 mkTyVarRenaming :: [(TyVar, Type)] -> Renaming
 mkTyVarRenaming aas = (emptyVarEnv, mkVarEnv aas, emptyVarEnv)
+
+mkRenaming :: M.Map Var Var -> Renaming
+mkRenaming rn = foldVarlikes (\f -> M.foldWithKey (\x x' -> f x (x, x'))) rn
+                             (\(x, x') -> first3  (\id_subst -> extendVarEnv id_subst x (varToCoreSyn x')))
+                             (\(a, a') -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a')))
+                             (\(q, q') -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q')))
+                             (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
 invertRenaming :: Renaming -> Maybe Renaming
 invertRenaming (id_subst, tv_subst, co_subst)

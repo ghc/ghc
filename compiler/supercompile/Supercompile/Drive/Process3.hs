@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, RankNTypes, ImpredicativeTypes #-}
 module Supercompile.Drive.Process3 (supercompile) where
 
-import Supercompile.Drive.Match
+--import Supercompile.Drive.Match
 import Supercompile.Drive.MSG
 import Supercompile.Drive.Split
 import Supercompile.Drive.Process
@@ -283,7 +283,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                                               ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
                                                hang (text "Before:") 2 (trce1 shallow_state) $$
                                                hang (text "After:")  2 (trce1 state) $$
-                                               (case unMatch (matchWithReason (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state))) of Left why -> text why; Right _ -> text "!!! could have tied back"))
+                                               (case msgWithReason (MSGMode { msgCommonHeapVars = emptyInScopeSet }) (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state)) of Left why -> text why; Right res -> case msgMatch AllInstances res of Nothing -> text "msg, not instance"; Just _ -> text "!!! could have tied back?"))
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
@@ -368,12 +368,14 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                                   , p_sibling <- p_parent:p_siblings ] ++
                                                   [ (p_root,    False,                         emptyInScopeSet)
                                                   | p_root <- unparented_ps ]
-             , let mm = MM { matchInstanceMatching = case () of () | not iNSTANCE_MATCHING -> NoInstances
-                                                                   | is_ancestor           -> AllInstances
-                                                                   | otherwise             -> InstancesOfGeneralised,
-                             matchCommonHeapVars = common_h_vars }
-             , Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
-                                                   match' mm (meaning p) reduced_state]
+             , let inst_mtch | not iNSTANCE_MATCHING = NoInstances
+                             | is_ancestor           = AllInstances
+                             | otherwise             = InstancesOfGeneralised
+                   mm = MSGMode { msgCommonHeapVars = common_h_vars }
+             --      mm = MM { matchInstanceMatching = inst_mtch, matchCommonHeapVars = common_h_vars }
+             --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
+             --                                      match' mm (meaning p) reduced_state]
+             , Just (RightIsInstance heap_inst rn_lr k_inst) <- [msg mm (meaning p) reduced_state >>= msgMatch inst_mtch]
              , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                    Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
                -- FIXME: prefer "more exact" matches

@@ -1,5 +1,7 @@
 module Supercompile.Drive.MSG (
-    MSGMode(..), msg
+    MSGMode(..), msg, msgWithReason,
+
+    InstanceMatching(..), MSGMatchResult(..), msgMatch
   ) where
 
 #include "HsVersions.h"
@@ -364,6 +366,50 @@ msg :: MSGMode -- ^ How to match
     -> State   -- ^ This semantics
     -> Maybe MSGResult -- ^ Renaming from left to right
 msg mm s_l s_r = runMSG' (msgWithReason mm s_l s_r)
+
+
+data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
+
+mayInstantiate :: InstanceMatching -> Generalised -> Bool
+mayInstantiate NoInstances            _   = False
+mayInstantiate InstancesOfGeneralised gen = gen
+mayInstantiate AllInstances           _   = True
+
+data MSGMatchResult = RightIsInstance   Heap Renaming Stack
+                    | RightGivesTypeGen Renaming State Renaming
+
+msgMatch :: InstanceMatching -> MSGResult -> Maybe MSGMatchResult
+msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap, k, qa), (deeds_r, heap_r@(Heap h_r _), rn_r, k_r))
+  -- Try to detect instantiation first
+  --  1) Is the left-hand renaming invertible?
+  | Just rn_l_inv <- invertRenaming rn_l
+  --  2) Is the left-hand stack empty, and if has been instantiated on the right, was that valid?
+  , Loco gen_k_l <- k_l
+  , case k_r of Loco _ -> True
+                _      -> mayInstantiate inst_mtch gen_k_l
+  --  3) Is the left-hand heap empty of anything except lambdaBounds, and if it has been instantiated on the right, was that valid?
+  --     NB: we can safely ignore stack-bound variables because stack-bound vars are only matched against stack-bound vars, heap-bound
+  --     ones are only matched against heap-bound ones, and we don't have any generalisation flag to check on update frames.
+  , Just h_is_gen <- forM (M.toList h_l) $ \(x_l, hb_l) -> case heapBindingLambdaBoundness hb_l of
+                                                             Nothing -> Nothing
+                                                             Just gen_l -> Just (renameId rn_l_inv x_l, gen_l)
+  , all (\(x, gen_l) -> case M.lookup (renameId rn_r x) h_r of
+                          Nothing   -> error "(FIXME) msgMatch: Probably shouldn't happen"
+                          Just hb_r -> isJust (heapBindingLambdaBoundness hb_r) || mayInstantiate inst_mtch gen_l) h_is_gen
+  = Just (RightIsInstance heap_r rn_r k_r)
+
+  -- Now look for type generalisation information
+  --  1) Are both stacks empty?
+  | Loco _ <- k_l
+  , Loco _ <- k_r
+  --  2) Do both heaps only contain lambdaBounds?
+  , Foldable.all (isJust . heapBindingLambdaBoundness) h_l
+  , Foldable.all (isJust . heapBindingLambdaBoundness) h_r
+  = Just (RightGivesTypeGen rn_l (deeds_r, heap, k, qa) rn_r)
+
+  -- No information gained in this case :-(
+  | otherwise
+  = Nothing
 
 msgWithReason :: MSGMode -> State -> State -> MSG' MSGResult
 msgWithReason mm (deeds_l, heap_l@(Heap _ ids_l), k_l, qa_l) (deeds_r, heap_r@(Heap _ ids_r), k_r, qa_r) = -- (\res -> traceRender ("msg", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $

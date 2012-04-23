@@ -761,10 +761,11 @@ localiseVar x | isId x    = localiseId x
 absVarLambdas :: Symantics ann => [AbsVar] -> ann (TermF ann) -> ann (TermF ann)
 absVarLambdas xs = tyVarIdLambdas (map absVarBinder xs)
 
-applyAbsVars :: Symantics ann => Var -> Maybe (M.Map Var Var) -> [AbsVar] -> ann (TermF ann)
+applyAbsVars :: Symantics ann => Var -> Maybe Renaming -> [AbsVar] -> ann (TermF ann)
 applyAbsVars x mb_xs_rn xs = snd $ snd $ foldl go (mkInScopeSet (unitVarSet x), (emptyRenaming, var x)) xs
   where
    go (fvs, (ty_rn, e)) absx = case absVarDead absx of
+    -- NB: rather than faff around trying to rename IdInfo free variables for dead Ids, I'm just going to zap the info
     True -> (fvs, case () of
       () -- We can encounter TyVars, where we should be able to instantiate them any way:
          | isTyVar x
@@ -773,20 +774,20 @@ applyAbsVars x mb_xs_rn xs = snd $ snd $ foldl go (mkInScopeSet (unitVarSet x), 
          
          -- Dead CoVars are easy:
          | isCoVar x, let (ty1, ty2) = coVarKind x
-         -> (ty_rn, let_ x (coercion (mkUnsafeCo ty1 ty2)) (e `app` x))
+         -> (ty_rn, let_ (zapFragileIdInfo x) (coercion (mkUnsafeCo ty1 ty2)) (e `app` x))
          
          -- A pretty cute hack for lifted bindings, though potentially quite confusing!
          -- If you want to put "undefined" here instead then watch out: this counts
          -- as an extra free variable, so it might trigger the assertion in Process.hs
          -- that checks that the output term has no more FVs than the input.
          | not (isUnLiftedType ty)
-         -> (ty_rn, letRec [(x, var x)] (e `app` x))
+         -> (ty_rn, letRec [(zapFragileIdInfo x, var x)] (e `app` x))
          
          -- We have to be more creative for *unlifted* bindings, since building a loop
          -- changes the meaning of the program. Literals first:
          | Just (tc, []) <- splitTyConApp_maybe ty
          , Just lit <- absentLiteralOf tc
-         -> (ty_rn, let_ x (literal lit) (e `app` x))
+         -> (ty_rn, let_ (zapFragileIdInfo x) (literal lit) (e `app` x))
          
          -- Special-case RealWorld# because it occurs so often and we can save a "let" and
          -- "cast" in the output syntax by doing so:
@@ -816,26 +817,32 @@ applyAbsVars x mb_xs_rn xs = snd $ snd $ foldl go (mkInScopeSet (unitVarSet x), 
                  PtrRep    -> (threadIdPrimTy,       case_ (var (mkPrimOpId MyThreadIdOp) `app` realWorldPrimId)
                                                            (mkWildValBinder (unboxedPairTyCon `mkTyConApp` [realWorldStatePrimTy, threadIdPrimTy]))
                                                            threadIdPrimTy [(DataAlt unboxedPairDataCon [] [] [mkWildValBinder realWorldStatePrimTy, x_tid], var x_tid)])
-                   where x_tid = x `setVarType` threadIdPrimTy
-         -> (ty_rn, let_ x (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x)))
+                   where x_tid = zapFragileIdInfo x `setVarType` threadIdPrimTy
+         -> (ty_rn, let_ (zapFragileIdInfo x) (e_repr `cast` mkUnsafeCo e_repr_ty ty) (e `app` x)))
          where -- NB: dead binders are not present in the renaming, so don't attempt to look them up
                shadowy_x = renameAbsVarType ty_rn (absVarBinder absx)
                x = uniqAway fvs shadowy_x
                ty = idType x
-    False -> (fvs `extendInScopeSet` x', case () of
+    -- NB: for live AbsVars we don't need to sweat about making sure we zap the "fragile" info or setting
+    -- the correct type on any Ids, because we assume that the correct info will be set up on the *binding*
+    -- sites and propagated down here by a simplifier run.
+    --
+    -- We still need to extend the ty_rn if the AbsVar is a TyVar because we create *binding* sites for
+    -- dead variables and if we have the renaming [a |-> Bool, y :: a |-> z] with a live and y dead, we want
+    -- to ensure that new the binding site is attributed type Bool.
+    False -> case () of
       () | isTyVar x
-         -> (insertTypeSubst ty_rn x (mkTyVarTy x'), e `tyApp` mkTyVarTy x')
+         , let ty = maybe (mkTyVarTy x) (flip lookupTyVarSubst x) mb_xs_rn
+         -> (fvs `extendInScopeSetSet` tyVarsOfType ty, (insertTypeSubst ty_rn x ty, e `tyApp` ty))
    
          | isCoVar x
-         -> (ty_rn, e `coApp` mkCoVarCo x'_zapped)
+         , let co = maybe (mkCoVarCo x) (flip lookupCoVarSubst x) mb_xs_rn
+         -> (fvs `extendInScopeSetSet` tyCoVarsOfCo co, (ty_rn, e `coApp` co))
    
          | otherwise
-         -> (ty_rn, e `app` x'_zapped))
+         , let y = maybe x (flip renameId x) mb_xs_rn
+         -> (fvs `extendInScopeSet` y, (ty_rn, e `app` y))
          where x = absVarVar absx
-               x' = renameAbsVarType ty_rn (maybe x (M.findWithDefault (pprPanic "renameAbsVar" (ppr x)) x) mb_xs_rn)
-               x'_zapped = zapFragileIdInfo x'
-               -- NB: make sure we zap the "fragile" info because the FVs of the unfolding are
-               -- not necessarily in scope.
 
 -- NB: if there are no arguments, we abstract over RealWorld# as well (cf WwLib). Two reasons:
 --  1. If the h-function is unlifted, this delays its evaluation (so its effects, if any, do not happen too early).

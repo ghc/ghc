@@ -253,7 +253,7 @@ memo opt state = do
   mb_res <- lift $ StateT $ \ms ->
     -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that
      -- I can't rename, so "rename" will cause an error. Not observed in practice yet.
-    case [ (p, (releaseStateDeed state, applyAbsVars (fun p) (Just rn_lr) (abstracted p)))
+    case [ (p, (releaseStateDeed state, applyAbsVars (fun p) (Just (mkRenaming rn_lr)) (abstracted p)))
          | p <- promises ms
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                           match (meaning p) state]
