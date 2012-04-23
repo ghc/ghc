@@ -1145,12 +1145,13 @@ genCCall' gcp target dest_regs argsAndHints
 
                     MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
 
-                    MO_S_QuotRem {} -> unsupported
-                    MO_U_QuotRem {} -> unsupported
-                    MO_Add2 {}      -> unsupported
-                    MO_U_Mul2 {}    -> unsupported
-                    MO_WriteBarrier -> unsupported
-                    MO_Touch        -> unsupported
+                    MO_S_QuotRem {}  -> unsupported
+                    MO_U_QuotRem {}  -> unsupported
+                    MO_U_QuotRem2 {} -> unsupported
+                    MO_Add2 {}       -> unsupported
+                    MO_U_Mul2 {}     -> unsupported
+                    MO_WriteBarrier  -> unsupported
+                    MO_Touch         -> unsupported
                 unsupported = panic ("outOfLineCmmOp: " ++ show mop
                                   ++ " not supported")
 

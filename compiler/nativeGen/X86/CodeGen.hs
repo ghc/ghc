@@ -1676,8 +1676,9 @@ genCCall32 target dest_regs args =
               = panic $ "genCCall32.actuallyInlineFloatOp: bad number of arguments! ("
                       ++ show (length args) ++ ")"
 
-    (CmmPrim (MO_S_QuotRem width) _, _) -> divOp True  width dest_regs args
-    (CmmPrim (MO_U_QuotRem width) _, _) -> divOp False width dest_regs args
+    (CmmPrim (MO_S_QuotRem  width) _, _) -> divOp1 True  width dest_regs args
+    (CmmPrim (MO_U_QuotRem  width) _, _) -> divOp1 False width dest_regs args
+    (CmmPrim (MO_U_QuotRem2 width) _, _) -> divOp2 False width dest_regs args
     (CmmPrim (MO_Add2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
         case args of
         [CmmHinted arg_x _, CmmHinted arg_y _] ->
@@ -1712,8 +1713,18 @@ genCCall32 target dest_regs args =
 
     _ -> genCCall32' target dest_regs args
 
-  where divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
-                           [CmmHinted arg_x _, CmmHinted arg_y _]
+  where divOp1 signed width results [CmmHinted arg_x _, CmmHinted arg_y _]
+            = divOp signed width results Nothing arg_x arg_y
+        divOp1 _ _ _ _
+            = panic "genCCall32: Wrong number of arguments for divOp1"
+        divOp2 signed width results [CmmHinted arg_x_high _,
+                                     CmmHinted arg_x_low _,
+                                     CmmHinted arg_y _]
+            = divOp signed width results (Just arg_x_high) arg_x_low arg_y
+        divOp2 _ _ _ _
+            = panic "genCCall64: Wrong number of arguments for divOp2"
+        divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
+                           m_arg_x_high arg_x_low arg_y
             = do let size = intSize width
                      reg_q = getRegisterReg True (CmmLocal res_q)
                      reg_r = getRegisterReg True (CmmLocal res_r)
@@ -1722,15 +1733,20 @@ genCCall32 target dest_regs args =
                      instr | signed    = IDIV
                            | otherwise = DIV
                  (y_reg, y_code) <- getRegOrMem arg_y
-                 x_code <- getAnyReg arg_x
+                 x_low_code <- getAnyReg arg_x_low
+                 x_high_code <- case m_arg_x_high of
+                                Just arg_x_high ->
+                                    getAnyReg arg_x_high
+                                Nothing ->
+                                    return $ const $ unitOL widen
                  return $ y_code `appOL`
-                          x_code rax `appOL`
-                          toOL [widen,
-                                instr size y_reg,
+                          x_low_code rax `appOL`
+                          x_high_code rdx `appOL`
+                          toOL [instr size y_reg,
                                 MOV size (OpReg rax) (OpReg reg_q),
                                 MOV size (OpReg rdx) (OpReg reg_r)]
-        divOp _ _ _ _
-            = panic "genCCall32: Wrong number of arguments/results for divOp"
+        divOp _ _ _ _ _ _
+            = panic "genCCall32: Wrong number of results for divOp"
 
 genCCall32' :: CmmCallTarget            -- function to call
             -> [HintedCmmFormal]        -- where to put the result
@@ -1896,8 +1912,9 @@ genCCall64 target dest_regs args =
         -- we only cope with a single result for foreign calls
         outOfLineCmmOp op (Just res) args
 
-    (CmmPrim (MO_S_QuotRem width) _, _) -> divOp True  width dest_regs args
-    (CmmPrim (MO_U_QuotRem width) _, _) -> divOp False width dest_regs args
+    (CmmPrim (MO_S_QuotRem  width) _, _) -> divOp1 True  width dest_regs args
+    (CmmPrim (MO_U_QuotRem  width) _, _) -> divOp1 False width dest_regs args
+    (CmmPrim (MO_U_QuotRem2 width) _, _) -> divOp2 False width dest_regs args
     (CmmPrim (MO_Add2 width) _, [CmmHinted res_h _, CmmHinted res_l _]) ->
         case args of
         [CmmHinted arg_x _, CmmHinted arg_y _] ->
@@ -1935,8 +1952,18 @@ genCCall64 target dest_regs args =
            let platform = targetPlatform dflags
            genCCall64' platform target dest_regs args
 
-  where divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
-                           [CmmHinted arg_x _, CmmHinted arg_y _]
+  where divOp1 signed width results [CmmHinted arg_x _, CmmHinted arg_y _]
+            = divOp signed width results Nothing arg_x arg_y
+        divOp1 _ _ _ _
+            = panic "genCCall64: Wrong number of arguments for divOp1"
+        divOp2 signed width results [CmmHinted arg_x_high _,
+                                     CmmHinted arg_x_low _,
+                                     CmmHinted arg_y _]
+            = divOp signed width results (Just arg_x_high) arg_x_low arg_y
+        divOp2 _ _ _ _
+            = panic "genCCall64: Wrong number of arguments for divOp2"
+        divOp signed width [CmmHinted res_q _, CmmHinted res_r _]
+                           m_arg_x_high arg_x_low arg_y
             = do let size = intSize width
                      reg_q = getRegisterReg True (CmmLocal res_q)
                      reg_r = getRegisterReg True (CmmLocal res_r)
@@ -1945,15 +1972,18 @@ genCCall64 target dest_regs args =
                      instr | signed    = IDIV
                            | otherwise = DIV
                  (y_reg, y_code) <- getRegOrMem arg_y
-                 x_code <- getAnyReg arg_x
+                 x_low_code <- getAnyReg arg_x_low
+                 x_high_code <- case m_arg_x_high of
+                                Just arg_x_high -> getAnyReg arg_x_high
+                                Nothing -> return $ const $ unitOL widen
                  return $ y_code `appOL`
-                          x_code rax `appOL`
-                          toOL [widen,
-                                instr size y_reg,
+                          x_low_code rax `appOL`
+                          x_high_code rdx `appOL`
+                          toOL [instr size y_reg,
                                 MOV size (OpReg rax) (OpReg reg_q),
                                 MOV size (OpReg rdx) (OpReg reg_r)]
-        divOp _ _ _ _
-            = panic "genCCall64: Wrong number of arguments/results for divOp"
+        divOp _ _ _ _ _ _
+            = panic "genCCall64: Wrong number of results for divOp"
 
 genCCall64' :: Platform
             -> CmmCallTarget            -- function to call
@@ -2225,12 +2255,13 @@ outOfLineCmmOp mop res args
 
               MO_PopCnt _  -> fsLit "popcnt"
 
-              MO_S_QuotRem {} -> unsupported
-              MO_U_QuotRem {} -> unsupported
-              MO_Add2 {}      -> unsupported
-              MO_U_Mul2 {}    -> unsupported
-              MO_WriteBarrier -> unsupported
-              MO_Touch        -> unsupported
+              MO_S_QuotRem {}  -> unsupported
+              MO_U_QuotRem {}  -> unsupported
+              MO_U_QuotRem2 {} -> unsupported
+              MO_Add2 {}       -> unsupported
+              MO_U_Mul2 {}     -> unsupported
+              MO_WriteBarrier  -> unsupported
+              MO_Touch         -> unsupported
         unsupported = panic ("outOfLineCmmOp: " ++ show mop
                           ++ "not supported here")
 
