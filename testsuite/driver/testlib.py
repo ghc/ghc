@@ -141,6 +141,9 @@ def ignore_output( opts ):
 def no_stdin( opts ):
     opts.no_stdin = 1
 
+def combined_output( opts ):
+    opts.combined_output = True
+
 # -----
 
 def expect_fail_for( ways ):
@@ -1155,11 +1158,18 @@ def simple_run( name, way, prog, args ):
         stdin_comes_from = ''
     else:
         stdin_comes_from = ' <' + use_stdin
+
+    if opts.combined_output:
+        redirection = ' >' + run_stdout \
+                    + ' 2>&1'
+    else:
+        redirection = ' >' + run_stdout \
+                    + ' 2>' + run_stderr
+
     cmd = prog + ' ' + args + ' '  \
         + my_rts_flags + ' '       \
         + stdin_comes_from         \
-        + ' >' + run_stdout        \
-        + ' 2>' + run_stderr
+        + redirection
 
     if getTestOpts().cmd_wrapper != None:
         cmd = getTestOpts().cmd_wrapper(cmd);
@@ -1183,7 +1193,7 @@ def simple_run( name, way, prog, args ):
     check_prof = my_rts_flags.find("-p") != -1
 
     if not opts.ignore_output:
-        if not check_stderr_ok(name):
+        if not opts.combined_output and not check_stderr_ok(name):
             return failBecause('bad stderr')
         if not check_stdout_ok(name):
             return failBecause('bad stdout')
@@ -1445,7 +1455,7 @@ def check_stderr_ok( name ):
       if platform_specific:
          return str
       else:
-         return normalise_output(str)
+         return normalise_errmsg(str)
 
    return compare_outputs('stderr', \
                           two_normalisers(norm, getTestOpts().extra_normaliser), \
