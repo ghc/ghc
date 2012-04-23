@@ -65,8 +65,9 @@ module TcType (
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
   isSynFamilyTyConApp,
-  isPredTy, isTyVarClassPred,
-  shallowPredTypePredTree,
+  isPredTy, 
+  isTyVarClassPred, isTyVarClassApp, isTyVarHeadClassPred, isTyVarHeadClassApp, 
+  classTyArgs, shallowPredTypePredTree,
   
   ---------------------------------
   -- Misc type manipulators
@@ -1102,8 +1103,33 @@ shallowPredTypePredTree ev_ty
 
 isTyVarClassPred :: PredType -> Bool
 isTyVarClassPred ty = case getClassPredTys_maybe ty of
-    Just (_, tys) -> all isTyVarTy tys
-    _             -> False
+    Just (cls, tks) -> isTyVarClassApp cls tks
+    _               -> False
+
+isTyVarClassApp :: Class -> [KindOrType] -> Bool
+isTyVarClassApp cls tks
+  = all tcIsTyVarTy (classTyArgs cls tks)
+
+isTyVarHeadClassPred :: PredType -> Bool
+isTyVarHeadClassPred ty = case getClassPredTys_maybe ty of
+    Just (cls, tks) -> isTyVarHeadClassApp cls tks
+    _               -> False
+
+isTyVarHeadClassApp :: Class -> [KindOrType] -> Bool
+isTyVarHeadClassApp cls tks
+  = all hasTyVarHead (classTyArgs cls tks)
+
+classTyArgs :: Class -> [KindOrType] -> [Type]
+-- Drop the initial kind arguments of a class
+classTyArgs cls kts = drop (count isKindVar (classTyVars cls)) kts  
+
+hasTyVarHead :: Type -> Bool
+hasTyVarHead ty			-- Haskell 98 allows predicates of form 
+  | tcIsTyVarTy ty = True	-- 	C (a ty1 .. tyn)
+  | otherwise			-- where a is a type variable
+  = case tcSplitAppTy_maybe ty of
+	Just (ty, _) -> hasTyVarHead ty
+	Nothing	     -> False
 
 evVarPred_maybe :: EvVar -> Maybe PredType
 evVarPred_maybe v = if isPredTy ty then Just ty else Nothing

@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
+{-# OPTIONS -fno-warn-tabs -Wwarn #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and
 -- detab the module (please do the detabbing in a separate patch). See
@@ -20,9 +20,10 @@ import TcMType
 import TcType 
 import TcSMonad 
 import TcInteract 
+import InstEnv  ( lookupInstEnv )
 import Inst
 import Unify	( niFixTvSubst, niSubstTvSet )
-import Type     ( classifyPredType, PredTree(..) )
+import Type     ( classifyPredType, getClassPredTys, getClassPredTys_maybe, PredTree(..) )
 import Var
 import VarSet
 import VarEnv 
@@ -42,7 +43,6 @@ import Outputable
 import FastString
 import TrieMap () -- DV: for now
 import DynFlags
-
 \end{code}
 
 
@@ -236,7 +236,7 @@ simplifyInfer :: Bool
 		      		    --   so the results type is not as general as
 				    --   it could be
                       TcEvBinds)    -- ... binding these evidence variables
-simplifyInfer _top_lvl apply_mr name_taus wanteds
+simplifyInfer top_lvl apply_mr name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs     <- tcGetGlobalTyVars            -- Already zonked
        ; zonked_taus <- zonkTcTypes (map snd name_taus)
@@ -257,11 +257,72 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
              , ptext (sLit "taus =") <+> ppr (map snd name_taus)
              , ptext (sLit "tau_tvs (zonked) =") <+> ppr zonked_tau_tvs
              , ptext (sLit "gbl_tvs =") <+> ppr gbl_tvs
-             , ptext (sLit "closed =") <+> ppr _top_lvl
+             , ptext (sLit "closed =") <+> ppr top_lvl
              , ptext (sLit "apply_mr =") <+> ppr apply_mr
              , ptext (sLit "wanted =") <+> ppr zonked_wanteds
              ]
 
+
+            -- Step 2 
+            -- Now simplify the possibly-bound constraints
+       ; let ctxt = SimplInfer (ppr (map fst name_taus))
+       ; (simpl_results, _binds)
+             <- runTcS ctxt NoUntouchables emptyInert emptyWorkList $ 
+                simplifyWithApprox zonked_wanteds
+
+            -- Step 3 
+            -- Split again simplified_perhaps_bound, because some unifications 
+            -- may have happened, and emit the free constraints. 
+       ; gbl_tvs        <- tcGetGlobalTyVars
+       ; zonked_tau_tvs <- zonkTyVarsAndFV zonked_tau_tvs
+       ; zonked_results <- zonkWC simpl_results
+       ; (quantifiable_preds, rest_wc) <- quantifiablePreds apply_mr zonked_results
+       ; let full_gbl_tvs = gbl_tvs `unionVarSet` tyVarsOfWC rest_wc
+             init_tvs = zonked_tau_tvs `minusVarSet` full_gbl_tvs
+             qtvs     = growPreds1 full_gbl_tvs quantifiable_preds init_tvs
+	     minimal_flat_preds = filter (quantifyMe qtvs) quantifiable_preds
+
+	     -- Monomorphism restriction bites if the natural polymorphsim
+             --   (tau_tvs - gbl_tvs) is not the same as the actual polymorphism
+	     mr_bites = not ((zonked_tau_tvs `minusVarSet` gbl_tvs) `subVarSet` qtvs)
+
+       ; let  skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
+                                   | (name, ty) <- name_taus ]
+                        -- Don't add the quantified variables here, because
+                        -- they are also bound in ic_skols and we want them to be
+                        -- tidied uniformly
+
+       ; qtvs_to_return <- zonkQuantifiedTyVars (varSetElems qtvs)
+       ; minimal_bound_ev_vars <- mapM TcMType.newEvVar minimal_flat_preds
+       ; ev_binds_var <- newTcEvBinds
+       ; lcl_env <- getLclTypeEnv
+       ; gloc <- getCtLoc skol_info
+       ; let implic = Implic { ic_untch    = NoUntouchables
+                             , ic_env      = lcl_env
+                             , ic_skols    = qtvs_to_return
+                             , ic_given    = minimal_bound_ev_vars
+                             , ic_wanted   = wanteds
+                             , ic_insol    = False
+                             , ic_binds    = ev_binds_var
+                             , ic_loc      = gloc }
+       ; emitImplication implic
+       ; traceTc "} simplifyInfer/produced residual implication for quantification" $
+             vcat [ ptext (sLit "implic =") <+> ppr implic
+                       -- ic_skols, ic_given give rest of result
+                  , ptext (sLit "qtvs =") <+> ppr qtvs
+                  , ptext (sLit "qtvs_to_return =") <+> ppr qtvs_to_return
+                  , ptext (sLit "init_tvs =") <+> ppr init_tvs
+                  , ptext (sLit "full_gbl_tvs =") <+> ppr full_gbl_tvs
+                  , ptext (sLit "rest_wc =") <+> ppr rest_wc
+                  , ptext (sLit "spb =") <+> ppr quantifiable_preds
+                  , ptext (sLit "bound =") <+> ppr minimal_flat_preds ]
+
+
+
+       ; return ( qtvs_to_return, minimal_bound_ev_vars
+                , mr_bites,  TcEvBinds ev_binds_var) } 
+------------
+{-
              -- Step 1
              -- Make a guess at the quantified type variables
 	     -- Then split the constraints on the baisis of those tyvars
@@ -329,8 +390,9 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
             -- Step 5
             -- Minimize `bound' and emit an implication
-       ; let minimal_flat_preds = predsToQuantify bound
-             skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
+       ; minimal_flat_preds <- predsToQuantify bound
+}
+       ; let  skol_info = InferSkol [ (name, mkSigmaTy [] minimal_flat_preds ty)
                                    | (name, ty) <- name_taus ]
                         -- Don't add the quantified variables here, because
                         -- they are also bound in ic_skols and we want them to be
@@ -362,19 +424,31 @@ simplifyInfer _top_lvl apply_mr name_taus wanteds
 
        ; return ( qtvs_to_return, minimal_bound_ev_vars
                 , mr_bites,  TcEvBinds ev_binds_var) } }
+-}
 
-predsToQuantify :: Cts -> [PredType]
+quantifiablePreds :: Bool -> WantedConstraints -> TcM ([PredType], WantedConstraints)
 -- From a bunch of (non-insoluble) flat constraints, pick the ones to generalise
 -- an inferred type over.  In particular:
 --    * Omit superclasses:         (Eq a, Ord a) --->  Ord a
 --    * Reject non-tyvar clases:   (Eq a, Show (Tree b)) --> Eq a
-predsToQuantify bound
-  = non_cls_preds ++ mkMinimalBySCs (filter isTyVarClassPred cls_preds)
-  where
-    (cls_preds, non_cls_preds) = partition isClassPred $
-                                 map ctPred $ bagToList bound
-\end{code}
+quantifiablePreds apply_mr wc
+  | apply_mr 
+  = return ([], wc)
+  | otherwise
+  = do { inst_envs <- tcGetInstEnvs
+       ; let (quant_flats, non_quant_flats) = partitionBag quantifiable (wc_flat wc)
 
+             quantifiable ct
+               | Just (cls, tys) <- getClassPredTys_maybe (ctPred ct)
+               = isTyVarClassApp cls tys 
+                 || case lookupInstEnv inst_envs cls tys of
+                      ([], [], _) -> False
+                      (_,  _,  _) -> True
+               | otherwise
+               = True
+
+       ; return (map ctPred (bagToList quant_flats), wc { wc_flat = non_quant_flats }) }
+\end{code}
 
 Note [Minimize by Superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
@@ -476,15 +550,20 @@ growPreds gbl_tvs get_pred items tvs
     extend item tvs = tvs `unionVarSet`
                       (growPredTyVars (get_pred item) tvs `minusVarSet` gbl_tvs)
 
+growPreds1 :: TyVarSet -> [PredType] -> TyVarSet -> TyVarSet
+growPreds1 gbl_tvs items tvs
+  = foldr extend tvs items
+  where
+    extend item tvs = tvs `unionVarSet`
+                      (growPredTyVars item tvs `minusVarSet` gbl_tvs)
+
 --------------------
 quantifyMe :: TyVarSet      -- Quantifying over these
-	   -> Ct
+	   -> PredType
 	   -> Bool	    -- True <=> quantify over this wanted
-quantifyMe qtvs ct
+quantifyMe qtvs pred
   | isIPPred pred = True  -- Note [Inheriting implicit parameters]
   | otherwise	  = tyVarsOfType pred `intersectsVarSet` qtvs
-  where
-    pred = ctPred ct
 \end{code}
 
 Note [Avoid unecessary constraint simplification]

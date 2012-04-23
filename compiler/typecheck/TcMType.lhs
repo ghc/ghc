@@ -1212,7 +1212,7 @@ check_pred_ty' dflags ctxt (ClassPred cls tys)
 
 		-- Check the form of the argument types
        ; mapM_ checkValidMonoType tys
-       ; checkTc (check_class_pred_tys dflags ctxt tys)
+       ; checkTc (check_class_pred_tys dflags ctxt cls tys)
 		 (predTyVarErr (mkClassPred cls tys) $$ how_to_allow)
        }
   where
@@ -1285,16 +1285,15 @@ check_pred_ty' dflags ctxt (IrredPred pred)
                      (predIrredBadCtxtErr pred)
 
 -------------------------
-check_class_pred_tys :: DynFlags -> UserTypeCtxt -> [KindOrType] -> Bool
-check_class_pred_tys dflags ctxt kts
+check_class_pred_tys :: DynFlags -> UserTypeCtxt -> Class -> [KindOrType] -> Bool
+check_class_pred_tys dflags ctxt cls kts
   = case ctxt of
 	SpecInstCtxt -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
-	InstDeclCtxt -> flexible_contexts || undecidable_ok || all tcIsTyVarTy tys
+	InstDeclCtxt -> flexible_contexts || undecidable_ok || isTyVarClassApp cls kts
 				-- Further checks on head and theta in
 				-- checkInstTermination
-	_             -> flexible_contexts || all tyvar_head tys
+	_             -> flexible_contexts || isTyVarHeadClassApp cls kts
   where
-    (_, tys) = span isKind kts  -- see Note [Kind polymorphic type classes]
     flexible_contexts = xopt Opt_FlexibleContexts dflags
     undecidable_ok = xopt Opt_UndecidableInstances dflags
 
@@ -1309,7 +1308,6 @@ class C f where
 
 MultiParam:
 ~~~~~~~~~~~
-
 instance C Maybe where
   empty = Nothing
 
@@ -1318,7 +1316,6 @@ type class.
 
 Flexible:
 ~~~~~~~~~
-
 data D a = D
 -- D :: forall k. k -> *
 
@@ -1329,15 +1326,6 @@ The dictionary gets type [C * (D *)]. IA0_TODO it should be
 generalized actually.
 
 -}
-
--------------------------
-tyvar_head :: Type -> Bool
-tyvar_head ty			-- Haskell 98 allows predicates of form 
-  | tcIsTyVarTy ty = True	-- 	C (a ty1 .. tyn)
-  | otherwise			-- where a is a type variable
-  = case tcSplitAppTy_maybe ty of
-	Just (ty, _) -> tyvar_head ty
-	Nothing	     -> False
 \end{code}
 
 Check for ambiguity
@@ -1504,10 +1492,14 @@ checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags <- getDynFlags
 
-           -- Check language restrictions; 
-           -- but not for SPECIALISE isntance pragmas
-       ; let ty_args = dropWhile isKind cls_args
-       ; unless spec_inst_prag $
+       ; let ty_args = classTyArgs clas cls_args
+              --     class C f where { empty :: f a }
+              --     instance C Maybe where ...
+              -- So C :: forall k. k -> Constraint
+              -- The dictionary gets type [C * Maybe] which is ok even if it's 
+              -- not a MultiParam type class.
+
+       ; unless spec_inst_prag $  -- Not for SPECIALISE instance pragmas
          do { checkTc (xopt Opt_TypeSynonymInstances dflags ||
                        all tcInstHeadTyNotSynonym ty_args)
                  (instTypeErr pp_pred head_type_synonym_msg)
