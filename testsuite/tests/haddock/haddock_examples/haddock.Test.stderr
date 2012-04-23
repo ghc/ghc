@@ -36,7 +36,7 @@ import Hidden
 import Visible
 <document comment>
 data T a b
-  = <document comment> A Int Maybe Float |
+  = <document comment> A Int (Maybe Float) |
     <document comment> B (T a b, T Int Float)
 <document comment>
 data T2 a b = T2 a b
@@ -126,7 +126,7 @@ data Ex a
   = forall b. C b => Ex1 b |
     forall b. Ex2 b |
     forall b. C a => Ex3 b |
-    Ex4 forall a. a -> a
+    Ex4 (forall a. a -> a)
 <document comment>
 k ::
   T () () <document comment>

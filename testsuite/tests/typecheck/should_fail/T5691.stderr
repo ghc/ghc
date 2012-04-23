@@ -1,11 +1,11 @@
 
-T5691.hs:15:24:
+T5691.hs:14:9:
     Couldn't match type `p' with `PrintRuleInterp'
-    Expected type: PrintRuleInterp a
-      Actual type: p a
-    In the first argument of `printRule_', namely `f'
-    In the second argument of `($)', namely `printRule_ f'
-    In the expression: MkPRI $ printRule_ f
+    Expected type: p a
+      Actual type: PrintRuleInterp a
+    In the pattern: f :: p a
+    In an equation for `test': test (f :: p a) = MkPRI $ printRule_ f
+    In the instance declaration for `Test PrintRuleInterp'
 
 T5691.hs:24:10:
     No instance for (Monad RecDecParser)

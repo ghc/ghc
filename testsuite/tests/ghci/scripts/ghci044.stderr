@@ -7,7 +7,7 @@
        Use -XFlexibleInstances if you want to disable this.)
     In the instance declaration for `C [Int]'
 
-<interactive>:8:10:
+<interactive>:7:10:
     Overlapping instance declarations:
-      instance C a => C [a] -- Defined at <interactive>:8:10
       instance C [Int] -- Defined at <interactive>:7:10
+      instance C a => C [a] -- Defined at <interactive>:8:10

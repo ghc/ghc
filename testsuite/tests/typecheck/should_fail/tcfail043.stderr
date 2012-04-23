@@ -29,8 +29,8 @@ tcfail043.hs:40:25:
     Probable fix: give these definition(s) an explicit type signature
                   or use -XNoMonomorphismRestriction
     Note: there are several potential instances:
-      instance Eq_ a => Eq_ [a] -- Defined at tcfail043.hs:23:10
       instance Eq_ Int -- Defined at tcfail043.hs:20:10
+      instance Eq_ a => Eq_ [a] -- Defined at tcfail043.hs:23:10
     In the expression: eq a (hd bs)
     In the expression: if eq a (hd bs) then True else search a (tl bs)
     In the expression:
