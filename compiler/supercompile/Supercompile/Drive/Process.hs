@@ -53,6 +53,7 @@ import MkId       (voidArgId, realWorldPrimId, mkPrimOpId)
 import Coercion   (isCoVar, mkCoVarCo, mkUnsafeCo, coVarKind)
 import TyCon      (PrimRep(..))
 import Type       (Kind, isUnLiftedType, mkTyVarTy, eqType, mkFunTy, mkPiTypes, mkTyConApp, typePrimRep, splitTyConApp_maybe)
+import Kind       (isUnliftedTypeKind)
 import TysPrim
 import TysWiredIn (unboxedPairDataCon, unboxedPairTyCon)
 import MkCore     (mkWildValBinder, quantVarLe)
@@ -734,8 +735,12 @@ mkLiveAbsVar x = AbsVar { absVarDead = False, absVarVar = x }
 -- We map *all* occurrences of dead TyVars to this type, to ensure that dead TyVars in the
 -- type of applied Ids match the applied dead TyVars. This type can be any closed type, as long
 -- as we use it consistently!
+--
+-- NB: we can't use anyTypeOfKind for the unlifted kind because Any# is hardcoded as having Ptr
+-- representation, which causes us to make some weird unsafeCoerces
 deadTy :: Kind -> Type
-deadTy = anyTypeOfKind
+deadTy k | isUnliftedTypeKind k = realWorldStatePrimTy
+         | otherwise            = anyTypeOfKind k
 
 renameAbsVarType :: Renaming -> Var -> Var
 renameAbsVarType rn x = x `setVarType` renameType (mkInScopeSet as) rn ty
