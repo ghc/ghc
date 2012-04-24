@@ -2,6 +2,8 @@
 
 module Main where
 
+-- Stack overflow if the tail recursion does not work out properly
+
 incompleteBetaWorker :: Double -> Double
 incompleteBetaWorker _ = loop 1 1 1 1
   where
