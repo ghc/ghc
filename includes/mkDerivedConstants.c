@@ -21,6 +21,7 @@
 #define PROFILING
 #define THREADED_RTS
 
+#include "PosixSource.h"
 #include "Rts.h"
 #include "Stable.h"
 #include "Capability.h"
