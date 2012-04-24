@@ -280,7 +280,7 @@ encapsulateScalar (VITNode vi [vit]) (fvs, AnnTick tck expr)
 encapsulateScalar _ (_fvs, AnnTick _tck _expr)
   = panic "encapsulateScalar AnnTick doesn't match up"
   
-encapsulateScalar (VITNode vi [vit]) ce@(fvs, AnnLam	bndr expr) 
+encapsulateScalar (VITNode vi [vit]) ce@(fvs, AnnLam bndr expr) 
   = do { varsS <- varsSimple fvs 
        ; case (vi, varsS) of
            (VISimple, True) -> do { let (e', vit') = encaps vit ce
@@ -291,11 +291,11 @@ encapsulateScalar (VITNode vi [vit]) ce@(fvs, AnnLam	bndr expr)
                                   }
        }
 
-encapsulateScalar _ (_fvs, AnnLam	_bndr _expr) 
+encapsulateScalar _ (_fvs, AnnLam _bndr _expr) 
   = panic "encapsulateScalar AnnLam doesn't match up"
 
 
-encapsulateScalar vt@(VITNode vi [vit1, vit2])  ce@(fvs, AnnApp ce1 ce2) 
+encapsulateScalar vt@(VITNode vi [vit1, vit2]) ce@(fvs, AnnApp ce1 ce2) 
   = do { varsS <- varsSimple fvs 
        ; case (vi, varsS) of
            (VISimple, True) -> do { let (e', vt') = encaps vt ce
@@ -311,7 +311,7 @@ encapsulateScalar vt@(VITNode vi [vit1, vit2])  ce@(fvs, AnnApp ce1 ce2)
 encapsulateScalar _  (_fvs, AnnApp _ce1 _ce2)                           
   = panic "encapsulateScalar AnnApp doesn't match up"
   
-encapsulateScalar vt@(VITNode vi (scrutVit : altVits))  ce@(fvs, AnnCase scrut bndr ty alts) 
+encapsulateScalar vt@(VITNode vi (scrutVit : altVits)) ce@(fvs, AnnCase scrut bndr ty alts) 
   = do { varsS <- varsSimple fvs 
        ; case (vi, varsS) of
            (VISimple, True) -> return $ encaps vt ce
@@ -330,20 +330,20 @@ encapsulateScalar vt@(VITNode vi (scrutVit : altVits))  ce@(fvs, AnnCase scrut b
 encapsulateScalar _ (_fvs, AnnCase _scrut _bndr _ty _alts) 
   = panic "encapsulateScalar AnnCase doesn't match up"
   
-encapsulateScalar vt@(VITNode vi [vt1, vt2]) ce@(fvs, AnnLet	(AnnNonRec bndr expr1) expr2) 
+encapsulateScalar vt@(VITNode vi [vt1, vt2]) ce@(fvs, AnnLet (AnnNonRec bndr expr1) expr2) 
   = do { varsS <- varsSimple fvs 
        ; case (vi, varsS) of
            (VISimple, True) -> return $ encaps vt ce
            _                -> do { (extExpr1, vt1') <- encapsulateScalar vt1 expr1
                                   ; (extExpr2, vt2') <- encapsulateScalar vt2 expr2
-                                  ; return ((fvs, AnnLet	(AnnNonRec bndr extExpr1) extExpr2), VITNode vi [vt1', vt2'])
+                                  ; return ((fvs, AnnLet (AnnNonRec bndr extExpr1) extExpr2), VITNode vi [vt1', vt2'])
                                   }
        }
 
-encapsulateScalar _ (_fvs, AnnLet	(AnnNonRec _bndr _expr1) _expr2)       
+encapsulateScalar _ (_fvs, AnnLet (AnnNonRec _bndr _expr1) _expr2)       
   = panic "encapsulateScalar AnnLet nonrec doesn't match up"
          
-encapsulateScalar vt@(VITNode vi (vtB : vtBnds)) ce@(fvs, AnnLet	(AnnRec bndngs) expr) 
+encapsulateScalar vt@(VITNode vi (vtB : vtBnds)) ce@(fvs, AnnLet (AnnRec bndngs) expr) 
   = do { varsS <- varsSimple fvs 
        ; case (vi, varsS) of 
            (VISimple, True) -> return $ encaps vt ce
@@ -360,7 +360,7 @@ encapsulateScalar vt@(VITNode vi (vtB : vtBnds)) ce@(fvs, AnnLet	(AnnRec bndngs)
              ; return  ((bndr, extExpr), vit')
              }
        
-encapsulateScalar _ (_fvs, AnnLet	(AnnRec _) _expr2)       
+encapsulateScalar _ (_fvs, AnnLet (AnnRec _) _expr2)       
   = panic "encapsulateScalar AnnLet rec doesn't match up"
 
 
@@ -383,9 +383,9 @@ encapsulateScalar _ _
 --  CoreExprWithFVs,        -- = AnnExpr Id VarSet
 --  AnnExpr bndr VarSet = (annot, AnnExpr' bndr VarSet)
 --  AnnLam :: bndr -> (AnnExpr bndr VarSet) -> AnnExpr' bndr VarSet
---  AnnLam	bndr (AnnExpr bndr annot)      
+--  AnnLam bndr (AnnExpr bndr annot)      
 encaps :: VITree -> CoreExprWithFVs -> (CoreExprWithFVs, VITree)
-encaps (VITNode vi (scrutVit : altVits)) (fvs, AnnCase	expr bndr t alts) 
+encaps (VITNode vi (scrutVit : altVits)) (fvs, AnnCase expr bndr t alts) 
   | Just (c,_) <- splitTyConApp_maybe (exprType $ deAnnotate $ expr),  
     (not $ elem c [boolTyCon, intTyCon, doubleTyCon, floatTyCon])   -- TODO: globalScalarTyCons
      = ((fvs, AnnCase expr bndr t alts'), VITNode vi (scrutVit : altVits'))
@@ -1200,7 +1200,7 @@ checkTree (VITNode _ [vit]) (Tick _ expr)
 
   
   
-checkTree (VITNode _ [vit]) (Lam	_ expr) 
+checkTree (VITNode _ [vit]) (Lam _ expr) 
   = checkTree vit expr
 
   
@@ -1215,12 +1215,12 @@ checkTree (VITNode _ (scrutVit : altVits)) (Case scrut _ _ alts)
     checkAlt vt (_, _, expr) = checkTree vt expr
     
 
-checkTree (VITNode _ [vt1, vt2]) (Let	(NonRec _ expr1) expr2) 
+checkTree (VITNode _ [vt1, vt2]) (Let (NonRec _ expr1) expr2) 
   = (checkTree vt1 expr1) && (checkTree vt2 expr2) 
 
 
 
-checkTree (VITNode _ (vtB : vtBnds))  (Let	(Rec bndngs) expr) 
+checkTree (VITNode _ (vtB : vtBnds))  (Let (Rec bndngs) expr) 
   = (and $ zipWith checkBndr vtBnds bndngs) && 
     (checkTree vtB expr)
  where 
