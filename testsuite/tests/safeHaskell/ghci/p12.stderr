@@ -1,3 +1,5 @@
+don't know how to reverse -XSafe
+Some flags have not been recognized: -fno-package-trust
 
 <no location info>:
     Data.ByteString: Can't be safely imported!

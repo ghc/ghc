@@ -2,15 +2,15 @@
 
 setTestOpts(if_compiler_profiled(skip))
 
-test('ghci001', normal, ghci_script, ['ghci001.script'])
-test('ghci002', normal, ghci_script, ['ghci002.script'])
-test('ghci003', normal, ghci_script, ['ghci003.script'])
-test('ghci004', normal, ghci_script, ['ghci004.script'])
-test('ghci005', normal, ghci_script, ['ghci005.script'])
-test('ghci006', normal, ghci_script, ['ghci006.script'])
-test('ghci007', normal, ghci_script, ['ghci007.script'])
-test('ghci008', normal, ghci_script, ['ghci008.script'])
-test('ghci009', normal, ghci_script, ['ghci009.script'])
+test('ghci001', combined_output, ghci_script, ['ghci001.script'])
+test('ghci002', combined_output, ghci_script, ['ghci002.script'])
+test('ghci003', combined_output, ghci_script, ['ghci003.script'])
+test('ghci004', combined_output, ghci_script, ['ghci004.script'])
+test('ghci005', combined_output, ghci_script, ['ghci005.script'])
+test('ghci006', combined_output, ghci_script, ['ghci006.script'])
+test('ghci007', combined_output, ghci_script, ['ghci007.script'])
+test('ghci008', combined_output, ghci_script, ['ghci008.script'])
+test('ghci009', combined_output, ghci_script, ['ghci009.script'])
 
 # Skip this test: deadlock can't be detected now, because we wait for
 # signals to arrive if there are signal handlers installed, and GHCi
@@ -72,7 +72,7 @@ test('ghci051', normal, ghci_script, ['ghci051.script'])
 test('ghci052', normal, ghci_script, ['ghci052.script'])
 test('ghci053', normal, ghci_script, ['ghci053.script'])
 test('ghci054', normal, ghci_script, ['ghci054.script'])
-test('ghci055', normal, ghci_script, ['ghci055.script'])
+test('ghci055', combined_output, ghci_script, ['ghci055.script'])
 
 test('ghci056',
      [
@@ -107,7 +107,7 @@ test('T5045', normal, ghci_script, ['T5045.script'])
 test('T5130', normal, ghci_script, ['T5130.script'])
 test('T5417', normal, ghci_script, ['T5417.script'])
 test('T5545', normal, ghci_script, ['T5545.script'])
-test('T5557', normal, ghci_script, ['T5557.script'])
+test('T5557', combined_output, ghci_script, ['T5557.script'])
 test('T5566', normal, ghci_script, ['T5566.script'])
 test('GhciKinds', normal, ghci_script, ['GhciKinds.script'])
 test('T5564', normal, ghci_script, ['T5564.script'])

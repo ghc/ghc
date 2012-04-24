@@ -144,7 +144,6 @@ def getTestRun():
 
 class TestOptions:
    def __init__(self):
-
        # if not None then we look for namebase.stderr etc rather than
        # using the test name
        self.with_namebase = None
@@ -252,6 +251,9 @@ class TestOptions:
 
        # The directory the test is in
        self.testdir = '.'
+
+       # Should we redirect stdout and stderr to a single file?
+       self.combined_output = False
 
 # The default set of options
 global default_testopts
