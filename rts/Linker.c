@@ -1060,7 +1060,8 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(__muldi3)                        \
       SymI_NeedsProto(__ashldi3)                       \
       SymI_NeedsProto(__ashrdi3)                       \
-      SymI_NeedsProto(__lshrdi3)
+      SymI_NeedsProto(__lshrdi3)                       \
+      SymI_NeedsProto(__fixunsdfdi)
 #else
 #define RTS_LIBGCC_SYMBOLS
 #endif
