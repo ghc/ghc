@@ -588,7 +588,7 @@ msgAltCon _ _ _ _ = fail "msgAltCon"
 msgVarBndr :: (Var -> b -> c) -> RnEnv2 -> Var -> Var -> (RnEnv2 -> MSG b) -> MSG c
 msgVarBndr f rn2 v_l v_r | isId v_l,    isId v_r    = msgIdCoVarBndr f rn2 v_l v_r
                          | isTyVar v_l, isTyVar v_r = msgTyVarBndr   f rn2 v_l v_r
-                         | otherwise                = fail "msgVarBndr"
+                         | otherwise                = \_ -> fail "msgVarBndr"
 
 msgTyVarBndr :: (TyVar -> b -> c) -> RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> MSG b) -> MSG c
 msgTyVarBndr f rn2 a_l a_r k = do
