@@ -48,7 +48,7 @@ void vbarf(const char *s, va_list ap)
  * errorBelch() invokes (*errorMsgFn)().
  */
 void errorBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (printf, 1, 2));
+   GNUC3_ATTRIBUTE(format (gnu_printf, 1, 2));
 
 void verrorBelch(const char *s, va_list ap);
 
@@ -62,7 +62,7 @@ void verrorBelch(const char *s, va_list ap);
  * sysErrorBelch() invokes (*sysErrorMsgFn)().
  */
 void sysErrorBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (printf, 1, 2));
+   GNUC3_ATTRIBUTE(format (gnu_printf, 1, 2));
 
 void vsysErrorBelch(const char *s, va_list ap);
 
@@ -74,7 +74,7 @@ void vsysErrorBelch(const char *s, va_list ap);
  * debugBelch() invokes (*debugMsgFn)().
  */
 void debugBelch(const char *s, ...)
-   GNUC3_ATTRIBUTE(format (printf, 1, 2));
+   GNUC3_ATTRIBUTE(format (gnu_printf, 1, 2));
 
 void vdebugBelch(const char *s, va_list ap);
 
