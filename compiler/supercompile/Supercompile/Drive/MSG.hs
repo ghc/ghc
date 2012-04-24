@@ -41,6 +41,9 @@ import qualified Data.Set as S
 import qualified Data.Foldable as Foldable
 
 
+-- FIXME: we probably need to enforce the kind invariant explicitly
+
+
 pprTraceSC :: String -> SDoc -> a -> a
 --pprTraceSC _ _ = id
 --pprTraceSC = pprTrace
@@ -367,13 +370,6 @@ msg :: MSGMode -- ^ How to match
     -> Maybe MSGResult -- ^ Renaming from left to right
 msg mm s_l s_r = runMSG' (msgWithReason mm s_l s_r)
 
-
-data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
-
-mayInstantiate :: InstanceMatching -> Generalised -> Bool
-mayInstantiate NoInstances            _   = False
-mayInstantiate InstancesOfGeneralised gen = gen
-mayInstantiate AllInstances           _   = True
 
 data MSGMatchResult = RightIsInstance   Heap Renaming Stack
                     | RightGivesTypeGen Renaming State Renaming

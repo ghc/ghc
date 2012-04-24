@@ -183,6 +183,13 @@ qaToAnswer qa = case qa of Answer a -> Just a; Question _ -> Nothing
 
 type Generalised = Bool
 
+data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
+
+mayInstantiate :: InstanceMatching -> Generalised -> Bool
+mayInstantiate NoInstances            _   = False
+mayInstantiate InstancesOfGeneralised gen = gen
+mayInstantiate AllInstances           _   = True
+
 
 type UnnormalisedState = (Deeds, Heap, Stack, In AnnedTerm)
 type State = (Deeds, Heap, Stack, Anned QA)
@@ -254,6 +261,9 @@ letBound :: In AnnedTerm -> HeapBinding
 letBound in_e = HB LetBound (Right in_e)
 
 -- INVARIANT: the Heap might contain bindings for TyVars as well, but will only map them to lambdaBound/generalised
+-- TODO: when we lambda-abstract over lambdaBounds, we implicitly rely on the fact that the lambdaBound IdInfo will work
+-- out properly (unfortunately lambda-bounds can't be brought into scope all at the same time). We should probably fix
+-- this -- perhaps by zapping all lambdaBound IdInfo when we abstract.
 type PureHeap = M.Map (Out Var) HeapBinding
 data Heap = Heap PureHeap InScopeSet
 

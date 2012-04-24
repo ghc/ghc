@@ -87,13 +87,6 @@ matchRnEnv2 f x y = mkRnEnv2 (mkInScopeSet (f x `unionVarSet` f y))
 --     mx1 `mplus` mx2 = Match $ unMatch mx1 `mplus` unMatch mx2
 
 
-data InstanceMatching = NoInstances | InstancesOfGeneralised | AllInstances
-
-mayInstantiate :: InstanceMatching -> Generalised -> Bool
-mayInstantiate NoInstances            _   = False
-mayInstantiate InstancesOfGeneralised gen = gen
-mayInstantiate AllInstances           _   = True
-
 data MatchMode = MM {
     matchInstanceMatching :: InstanceMatching,
     matchCommonHeapVars :: InScopeSet
