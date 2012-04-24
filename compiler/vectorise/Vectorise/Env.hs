@@ -32,7 +32,7 @@ import NameEnv
 import FastString
 import TysPrim
 import TysWiredIn
-import DataCon
+
 
 import Data.Maybe
 
