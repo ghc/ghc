@@ -1,0 +1,4 @@
+
+T5716a.hs:10:1:
+    Cycle in type declarations: data constructor used (in a type) before it is defined
+      T5716a.hs:10:1-32: data instance DF a = Bar (Bar a)
