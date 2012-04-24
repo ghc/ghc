@@ -2837,14 +2837,16 @@ showException :: SomeException -> GHCi ()
 showException se =
   liftIO $ case fromException se of
            -- omit the location for CmdLineError:
-           Just (CmdLineError s)    -> putStrLn s
+           Just (CmdLineError s)    -> putException s
            -- ditto:
-           Just ph@(PhaseFailed {}) -> putStrLn (showGhcException ph "")
-           Just other_ghc_ex        -> print other_ghc_ex
+           Just ph@(PhaseFailed {}) -> putException (showGhcException ph "")
+           Just other_ghc_ex        -> putException (show other_ghc_ex)
            Nothing                  ->
                case fromException se of
-               Just UserInterrupt -> putStrLn "Interrupted."
-               _                  -> putStrLn ("*** Exception: " ++ show se)
+               Just UserInterrupt -> putException "Interrupted."
+               _                  -> putException ("*** Exception: " ++ show se)
+  where
+    putException = hPutStrLn stderr
 
 
 -----------------------------------------------------------------------------

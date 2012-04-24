@@ -661,11 +661,12 @@ pprCallishMachOp_for_C mop
         MO_Memmove      -> ptext (sLit "memmove")
         (MO_PopCnt w)   -> ptext (sLit $ popCntLabel w)
 
-        MO_S_QuotRem {} -> unsupported
-        MO_U_QuotRem {} -> unsupported
-        MO_Add2      {} -> unsupported
-        MO_U_Mul2    {} -> unsupported
-        MO_Touch        -> unsupported
+        MO_S_QuotRem  {} -> unsupported
+        MO_U_QuotRem  {} -> unsupported
+        MO_U_QuotRem2 {} -> unsupported
+        MO_Add2       {} -> unsupported
+        MO_U_Mul2     {} -> unsupported
+        MO_Touch         -> unsupported
     where unsupported = panic ("pprCallishMachOp_for_C: " ++ show mop
                             ++ " not supported!")
 

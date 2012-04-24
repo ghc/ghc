@@ -24,12 +24,11 @@ import TyCon
 import DynFlags
 import Name
 import Module
-import SrcLoc
 import Outputable
 import UniqFM
 import VarSet
 import FastString
-import Util( filterOut )
+import Util( filterOut, sortWith )
 import Maybes
 import Control.Monad
 import Data.Map (Map)
@@ -308,15 +307,18 @@ checkForConflicts inst_envs fam_inst
 
 conflictInstErr :: FamInst -> FamInst -> TcRn ()
 conflictInstErr famInst conflictingFamInst
-  = addFamInstLoc famInst $
-    addErr (hang (ptext (sLit "Conflicting family instance declarations:"))
-	       2 (pprFamInsts [famInst, conflictingFamInst]))
+  = addFamInstsErr (ptext (sLit "Conflicting family instance declarations:"))
+                   [famInst, conflictingFamInst]
 
-addFamInstLoc :: FamInst -> TcRn a -> TcRn a
-addFamInstLoc famInst thing_inside
-  = setSrcSpan (mkSrcSpan loc loc) thing_inside
-  where
-    loc = getSrcLoc famInst
+addFamInstsErr :: SDoc -> [FamInst] -> TcRn ()
+addFamInstsErr herald insts
+  = setSrcSpan (getSrcSpan (head sorted)) $
+    addErr (hang herald 2 (pprFamInsts sorted))
+ where
+   sorted = sortWith getSrcLoc insts
+   -- The sortWith just arranges that instances are dislayed in order
+   -- of source location, which reduced wobbling in error messages,
+   -- and is better for users
 
 tcGetFamInstEnvs :: TcM FamInstEnvs
 -- Gets both the external-package inst-env

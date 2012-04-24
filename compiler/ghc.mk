@@ -27,8 +27,6 @@ endef
 # The 'echo' commands simply spit the values of various make variables
 # into Config.hs, whence they can be compiled and used by GHC itself
 
-compiler_CONFIG_HS = compiler/main/Config.hs
-
 # This is just to avoid generating a warning when generating deps
 # involving RtsFlags.h
 compiler_stage1_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES

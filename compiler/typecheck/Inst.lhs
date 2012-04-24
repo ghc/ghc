@@ -474,25 +474,28 @@ traceDFuns ispecs
 
 funDepErr :: ClsInst -> [ClsInst] -> TcRn ()
 funDepErr ispec ispecs
-  = addDictLoc ispec $
-    addErr (hang (ptext (sLit "Functional dependencies conflict between instance declarations:"))
-	       2 (pprInstances (ispec:ispecs)))
+  = addClsInstsErr (ptext (sLit "Functional dependencies conflict between instance declarations:"))
+                    (ispec : ispecs)
+
 dupInstErr :: ClsInst -> ClsInst -> TcRn ()
 dupInstErr ispec dup_ispec
-  = addDictLoc ispec $
-    addErr (hang (ptext (sLit "Duplicate instance declarations:"))
-	       2 (pprInstances [ispec, dup_ispec]))
+  = addClsInstsErr (ptext (sLit "Duplicate instance declarations:"))
+	            [ispec, dup_ispec]
+
 overlappingInstErr :: ClsInst -> ClsInst -> TcRn ()
 overlappingInstErr ispec dup_ispec
-  = addDictLoc ispec $
-    addErr (hang (ptext (sLit "Overlapping instance declarations:"))
-	       2 (pprInstances [ispec, dup_ispec]))
+  = addClsInstsErr (ptext (sLit "Overlapping instance declarations:")) 
+                    [ispec, dup_ispec]
 
-addDictLoc :: ClsInst -> TcRn a -> TcRn a
-addDictLoc ispec thing_inside
-  = setSrcSpan (mkSrcSpan loc loc) thing_inside
-  where
-   loc = getSrcLoc ispec
+addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
+addClsInstsErr herald ispecs
+  = setSrcSpan (getSrcSpan (head sorted)) $
+    addErr (hang herald 2 (pprInstances sorted))
+ where
+   sorted = sortWith getSrcLoc ispecs
+   -- The sortWith just arranges that instances are dislayed in order
+   -- of source location, which reduced wobbling in error messages,
+   -- and is better for users
 \end{code}
 
 %************************************************************************
