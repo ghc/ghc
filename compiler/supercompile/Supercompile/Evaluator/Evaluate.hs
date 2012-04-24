@@ -158,7 +158,7 @@ step' normalising ei_state = {-# SCC "step'" #-}
     (\res@(_reduced, stepped_state) -> let _deeds = either releaseStateDeed releaseUnnormalisedStateDeed ei_state
                                            _doc = either (pPrintFullState quietStatePrettiness) (pPrintFullUnnormalisedState quietStatePrettiness) ei_state
                                            _fvs = either stateFreeVars unnormalisedStateFreeVars ei_state in
-                                       ASSERT2(noChange _deeds (releaseStateDeed stepped_state),
+                                       ASSERT2(not dEEDS || noChange _deeds (releaseStateDeed stepped_state),
                                                hang (text "step': deeds lost or gained:") 2 (_doc $$ pPrintFullState quietStatePrettiness stepped_state))
                                        ASSERT2(subVarSet (stateFreeVars stepped_state) _fvs,
                                                text "step': FVs" $$ hang (text "Before:") 2 (pPrint _fvs $$ _doc) $$
