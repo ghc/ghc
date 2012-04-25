@@ -1720,12 +1720,11 @@ setGHCContextFromGHCiState = do
       -- the actual exception thrown by checkAdd, using tryBool to
       -- turn it into a Bool.
   iidecls <- filterM (tryBool.checkAdd) (transient_ctx st ++ remembered_ctx st)
-  GHC.setContext (maybeAddPrelude iidecls)
- where
-  maybeAddPrelude :: [InteractiveImport] -> [InteractiveImport]
-  maybeAddPrelude iidecls
-    | any isPreludeImport iidecls = iidecls
-    | otherwise                   = iidecls ++ [implicitPreludeImport]
+  dflags <- GHC.getSessionDynFlags
+  GHC.setContext $
+     if xopt Opt_ImplicitPrelude dflags && not (any isPreludeImport iidecls)
+        then iidecls ++ [implicitPreludeImport]
+        else iidecls
     -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
 
 
