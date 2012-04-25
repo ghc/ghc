@@ -736,7 +736,7 @@ warnIfDeprecated _ = return ()   -- No deprecations for things defined locally
 lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
 lookupImpDeprec iface gre
   = mi_warn_fn iface (gre_name gre) `mplus`  -- Bleat if the thing,
-    case gre_par gre of                       -- *or its parent*, is warn'd
+    case gre_par gre of                      -- or its parent, is warn'd
        ParentIs p -> mi_warn_fn iface p 
        NoParent   -> Nothing
 \end{code}
