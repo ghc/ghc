@@ -12,3 +12,4 @@ instance (Id x y, Id y z) => Test x z
 
 test :: Test True True => ()
 test = ()
+

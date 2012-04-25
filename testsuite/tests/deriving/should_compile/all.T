@@ -30,5 +30,4 @@ test('T4966', normal, compile, [''])
 test('drv-functor1', normal, compile, [''])
 test('drv-functor2', normal, compile, [''])
 test('drv-foldable-traversable1', normal, compile, [''])
-
-test('T6031', extra_clean(['T6031.o', 'T6031.hi']), multimod_compile, ['T6031', '-v0'])
+test('T6031', extra_clean(['T6031a.o', 'T6031a.hi']), multimod_compile, ['T6031', '-v0'])
