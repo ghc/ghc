@@ -81,7 +81,7 @@
 #if HAVE_TIME_H
 #include <time.h>
 #endif
-#if HAVE_SYS_TIMEB_H
+#if HAVE_SYS_TIMEB_H && !defined(__FreeBSD__)
 #include <sys/timeb.h>
 #endif
 #if HAVE_WINDOWS_H
