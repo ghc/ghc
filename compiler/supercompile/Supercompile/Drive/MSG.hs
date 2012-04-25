@@ -595,9 +595,10 @@ msgAltCon rn2 DefaultAlt                    DefaultAlt                    k = li
 msgAltCon _ _ _ _ = fail "msgAltCon"
 
 msgVarBndr :: (Var -> b -> c) -> RnEnv2 -> Var -> Var -> (RnEnv2 -> MSG b) -> MSG c
-msgVarBndr f rn2 v_l v_r | isId v_l,    isId v_r    = msgIdCoVarBndr f rn2 v_l v_r
-                         | isTyVar v_l, isTyVar v_r = msgTyVarBndr   f rn2 v_l v_r
-                         | otherwise                = \_ -> fail "msgVarBndr"
+msgVarBndr f rn2 v_l v_r k | isId      v_l = guard "msgVarBndr: Id"      (isId v_r)      >> msgIdCoVarBndr f rn2 v_l v_r k
+                           | isKindVar v_l = guard "msgVarBndr: KindVar" (isKindVar v_r) >> msgTyVarBndr   f rn2 v_l v_r k
+                           | isTyVar   v_l = guard "msgVarBndr: TyVar"   (isTyVar v_r)   >> msgTyVarBndr   f rn2 v_l v_r k
+                           | otherwise     = panic "msgVarBndr"
 
 msgTyVarBndr :: (TyVar -> b -> c) -> RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> MSG b) -> MSG c
 msgTyVarBndr f rn2 a_l a_r k = do
@@ -622,9 +623,10 @@ msgIdCoVarBndr' init_rn2 x_l x_r = (pprTraceSC "msgIdCoVarBndr'" (ppr (x_l, x_r)
 
 msgBndrExtras :: RnEnv2 -> Var -> Var -> Var -> MSG Var
 msgBndrExtras rn2 v v_l v_r
-  | isId v_l,    isId v_r    = msgIdCoVarBndrExtras rn2 v v_l v_r
-  | isTyVar v_l, isTyVar v_r = msgTyVarBndrExtras   rn2 v v_l v_r
-  | otherwise                = fail "msgBndrExtras"
+  | isId      v_l = guard "msgBndrExtras: Id"      (isId      v_r) >> msgIdCoVarBndrExtras rn2 v v_l v_r
+  | isKindVar v_l = guard "msgBndrExtras: KindVar" (isKindVar v_r) >> msgTyVarBndrExtras   rn2 v v_l v_r
+  | isTyVar   v_l = guard "msgBndrExtras: TyVar"   (isTyVar   v_r) >> msgTyVarBndrExtras   rn2 v v_l v_r
+  | otherwise     = panic "msgBndrExtras"
 
 msgTyVarBndrExtras :: RnEnv2 -> TyVar -> TyVar -> TyVar -> MSG TyVar
 msgTyVarBndrExtras rn2 a a_l a_r = liftM (a `setTyVarKind`) $ msgKind rn2 (tyVarKind a_l) (tyVarKind a_r)
