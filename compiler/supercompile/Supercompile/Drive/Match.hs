@@ -23,7 +23,7 @@ import Var        (TyVar, isTyVar, isId, tyVarKind, setVarType)
 import Id         (Id, idType, realIdUnfolding, idSpecialisation, zapFragileIdInfo)
 import IdInfo     (SpecInfo(..), emptySpecInfo)
 import VarEnv
-import TypeRep    (Kind, Type(..))
+import TypeRep    (Kind, Type(..), isKindVar)
 
 import qualified Control.Monad
 import Control.Monad.Fix
@@ -240,9 +240,10 @@ matchAltCon rn2 DefaultAlt                    DefaultAlt                    k = 
 matchAltCon _ _ _ _ = fail "matchAltCon"
 
 matchVarBndr :: Bool -> RnEnv2 -> Var -> Var -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
-matchVarBndr lambdaish rn2 v_l v_r | isId v_l,    isId v_r    = matchIdCoVarBndr lambdaish rn2 v_l v_r
-                                   | isTyVar v_l, isTyVar v_r = matchTyVarBndr             rn2 v_l v_r -- Type variable binders never lose work sharing
-                                   | otherwise                = fail "matchVarBndr"
+matchVarBndr lambdaish rn2 v_l v_r k | isId      v_l = guard "matchVarBndr: Id"      (isId      v_r) >> matchIdCoVarBndr lambdaish rn2 v_l v_r k
+                                     | isKindVar v_l = guard "matchVarBndr: KindVar" (isKindVar v_r) >> matchTyVarBndr             rn2 v_l v_r k -- Type variable binders never
+                                     | isTyVar   v_l = guard "matchVarBndr: TyVar"   (isTyVar   v_r) >> matchTyVarBndr             rn2 v_l v_r k -- lose work sharing
+                                     | otherwise     = panic "matchVarBndr"
 
 matchTyVarBndr :: RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> Match [MatchLR]) -> Match [MatchLR]
 matchTyVarBndr rn2 a_l a_r k = liftM2 (++) (matchKind rn2 (tyVarKind a_l) (tyVarKind a_r)) (k (rnBndr2 rn2 a_l a_r))
@@ -273,9 +274,10 @@ matchIdCoVarBndr' init_rn2 x_l x_r = (pprTraceSC "matchIdCoVarBndr'" (ppr (x_l, 
 
 matchBndrExtras :: RnEnv2 -> Var -> Var -> Match [MatchLR]
 matchBndrExtras rn2 v_l v_r
-  | isId v_l,    isId v_r    = matchIdCoVarBndrExtras rn2 v_l v_r
-  | isTyVar v_l, isTyVar v_r = matchTyVarBndrExtras   rn2 v_l v_r
-  | otherwise                = fail "matchBndrExtras"
+  | isId      v_l = guard "matchBndrExtras: Id"      (isId      v_r) >> matchIdCoVarBndrExtras rn2 v_l v_r
+  | isKindVar v_l = guard "matchBndrExtras: KindVar" (isKindVar v_r) >> matchTyVarBndrExtras   rn2 v_l v_r
+  | isTyVar   v_l = guard "matchBndrExtras: TyVar"   (isTyVar   v_r) >> matchTyVarBndrExtras   rn2 v_l v_r
+  | otherwise     = panic "matchBndrExtras"
 
 matchTyVarBndrExtras :: RnEnv2 -> TyVar -> TyVar -> Match [MatchLR]
 matchTyVarBndrExtras rn2 a_l a_r = matchKind rn2 (tyVarKind a_l) (tyVarKind a_r)
