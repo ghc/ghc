@@ -1365,7 +1365,7 @@ tc_kind_var_app name arg_kis
   	   Just (ATyVar _ kind_var) 
              | not (isKindVar kind_var) 
              -> failWithTc (ptext (sLit "Type variable") <+> quotes (ppr kind_var)
-                            <+> ptext (sLit "used bas a kind"))
+                            <+> ptext (sLit "used as a kind"))
              | not (null arg_kis) -- Kind variables always have kind BOX, 
                                   -- so cannot be applied to anything
              -> failWithTc (ptext (sLit "Kind variable") <+> quotes (ppr name)
