@@ -940,6 +940,12 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
       --  ...
       --
       -- FIXME: I don't have a good solution at the moment. For now, I've patched it so we don't use these branches.
+      -- FIXME: carefully document the basis (if any) by which I believe it is OK to MSG stuff out like this
+      --        Naively it seems rather dangerous. Consider:
+      --        1. Supercompile (let f = \x. x in f)
+      --        2. Split to (\x. x)
+      --        3. MSG against the simple variable b (with the same tag, presumably)
+      --        4. Instance-split will drive (\x. x) as the next term, so we might tieback to get a loop :(
       {-
       | Just (x_l, e_r) <- varTermPair e_l e_r
       , let (ids_r', x_r) = uniqAway' ids_r x_common
