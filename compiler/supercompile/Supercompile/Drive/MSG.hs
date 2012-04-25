@@ -413,7 +413,7 @@ msgMatch :: InstanceMatching -> MSGResult -> Maybe MSGMatchResult
 msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (deeds_r, heap_r@(Heap h_r _), rn_r, k_r))
   -- Try to detect instantiation first
   --  1) Is the left-hand renaming invertible?
-  | Just rn_l_inv <- invertRenaming rn_l
+  | Just rn_l_inv <- invertRenaming ids rn_l
   --  2) Is the left-hand stack empty, and if has been instantiated on the right, was that valid?
   , Loco gen_k_l <- k_l
   , case k_r of Loco _ -> True

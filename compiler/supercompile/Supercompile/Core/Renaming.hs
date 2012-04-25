@@ -50,6 +50,8 @@ import FastString  (FastString)
 import UniqFM      (ufmToList)
 import VarEnv
 
+import Control.Monad.Fix (mfix)
+
 import qualified Data.Map as M
 
 
@@ -148,22 +150,24 @@ mkRenaming rn = foldVarlikes (\f -> M.foldWithKey (\x x' -> f x (x, x'))) rn
                              (\(q, q') -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q')))
                              (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
-invertRenaming :: Renaming -> Maybe Renaming
-invertRenaming (id_subst, tv_subst, co_subst)
-  = liftM3 (,,) (traverse coreSynToVar_maybe id_subst >>= invertVarEnv varToCoreSyn mkSysLocal)
-                (traverse getTyVar_maybe     tv_subst >>= invertVarEnv mkTyVarTy    (\fs uniq -> mkTyVar (mkSysTvName uniq fs)))
-                (traverse getCoVar_maybe     co_subst >>= invertVarEnv mkCoVarCo    mkSysLocal)
-  where
-    -- FIXME: this inversion relies on something of a hack because the domain of the mapping is not stored (only its Unique)
-    invertVarEnv :: (Var -> a)
-                 -> (FastString -> Unique -> Type -> Var)
-                 -> VarEnv Var -> Maybe (VarEnv a)
-    invertVarEnv promote mk env
-      | distinct (varEnvElts env) = Just (mkVarEnv [ (x, promote $ if isGlobalId x && u == varUnique x
-                                                                    then x -- So we don't replace global Ids with new local Ids!
-                                                                    else mk (occNameFS (getOccName x)) u (varType x))
-                                                   | (u, x) <- ufmToList env])
-      | otherwise                 = Nothing
+-- NB: the InScopeSet should be that of the *domain* of the renaming (I think!)
+invertRenaming :: InScopeSet -> Renaming -> Maybe Renaming
+invertRenaming ids (id_subst, tv_subst, co_subst)
+  = mfix $ \rn -> let -- FIXME: this inversion relies on something of a hack because the domain of the mapping is not stored (only its Unique)
+                      -- Furthermore, we want to carefully rename the *types* (and extra info, if we actually preserved any) as well when doing
+                      -- this inversion so that the renaming {a |-> b, y |-> x :: b} is inverted to {b |-> a, x |-> y :: a}
+                      invertVarEnv :: (Var -> a)
+                                   -> (FastString -> Unique -> Type -> Var)
+                                   -> VarEnv Var -> Maybe (VarEnv a)
+                      invertVarEnv promote mk env
+                        | distinct (varEnvElts env) = Just (mkVarEnv [ (x, promote $ if isGlobalId x && u == varUnique x
+                                                                                      then x -- So we don't replace global Ids with new local Ids!
+                                                                                      else mk (occNameFS (getOccName x)) u (renameType ids rn (varType x)))
+                                                                     | (u, x) <- ufmToList env])
+                        | otherwise                 = Nothing
+                  in liftM3 (,,) (traverse coreSynToVar_maybe id_subst >>= invertVarEnv varToCoreSyn mkSysLocal)
+                                 (traverse getTyVar_maybe     tv_subst >>= invertVarEnv mkTyVarTy    (\fs uniq -> mkTyVar (mkSysTvName uniq fs)))
+                                 (traverse getCoVar_maybe     co_subst >>= invertVarEnv mkCoVarCo    mkSysLocal)
 
 -- NB: we want the set of things in scope in the range of the first renaming / domain of the second renaming
 composeRenamings :: InScopeSet -> Renaming -> Renaming -> Renaming
