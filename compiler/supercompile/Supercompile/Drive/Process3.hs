@@ -261,7 +261,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state sc)
                  (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
-                                                         case msg (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state of 
+                                                         case msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state of 
                                                            -- FIXME: better? In particular, could rollback and then MSG
                                                            Just (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r))
                                                             -> pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
@@ -283,7 +283,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                                               ({- ppr (stateTags shallow_state) <+> text "<|" <+> ppr (stateTags state) $$ -}
                                                hang (text "Before:") 2 (trce1 shallow_state) $$
                                                hang (text "After:")  2 (trce1 state) $$
-                                               (case msgWithReason (MSGMode { msgCommonHeapVars = emptyInScopeSet }) (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state)) of Left why -> text why; Right res -> case msgMatch AllInstances res of Nothing -> text "msg, not instance"; Just _ -> text "!!! could have tied back?"))
+                                               (case msg (MSGMode { msgCommonHeapVars = emptyInScopeSet }) (snd (reduceForMatch shallow_state)) (snd (reduceForMatch state)) of Left why -> text why; Right res -> case msgMatch AllInstances res of Nothing -> text "msg, not instance"; Just _ -> text "!!! could have tied back?"))
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
@@ -375,7 +375,7 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
              --      mm = MM { matchInstanceMatching = inst_mtch, matchCommonHeapVars = common_h_vars }
              --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
              --                                      match' mm (meaning p) reduced_state]
-             , Just (RightIsInstance heap_inst rn_lr k_inst) <- [msg mm (meaning p) reduced_state >>= msgMatch inst_mtch]
+             , Just (RightIsInstance heap_inst rn_lr k_inst) <- [msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch]
              , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
                    Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
                -- FIXME: prefer "more exact" matches

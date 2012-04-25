@@ -501,7 +501,7 @@ runs f g (x:xs) = go (f x) [g x] xs
           where b' = f x
 
 distinct :: Ord a => [a] -> Bool
-distinct xs = length xs /= S.size (S.fromList xs)
+distinct xs = length xs == S.size (S.fromList xs)
 
 
 -- | Orders elements of a map into dependency order insofar as that is possible.
@@ -739,6 +739,9 @@ trainLeftExtensionBy f_car f_loco xs ys = do
     go (x_car:xs_cars) (y_car:ys_cars) train = do
         car <- f_car x_car y_car
         go xs_cars ys_cars (Car car train)
+
+trainLength :: Train a b -> Int
+trainLength = trainCarFoldl' (\n _ -> n + 1) 0
 
 
 data Stream a = a :< Stream a
