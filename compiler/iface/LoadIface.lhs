@@ -63,7 +63,7 @@ import Control.Monad
 
 %************************************************************************
 %*                                                                      *
-        loadSrcInterface, loadOrphanModules, loadHomeInterface
+        loadSrcInterface, loadOrphanModules, loadInterfaceForName
 
                 These three are called from TcM-land    
 %*                                                                      *

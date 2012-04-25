@@ -8,7 +8,7 @@ module RnNames (
         rnImports, getLocalNonValBinders,
         rnExports, extendGlobalRdrEnvRn,
         gresFromAvails, 
-        reportUnusedNames, finishWarnings,
+        reportUnusedNames, 
     ) where
 
 #include "HsVersions.h"
@@ -904,7 +904,11 @@ rnExports explicit_mod exports
           tcg_env@(TcGblEnv { tcg_mod     = this_mod,
                               tcg_rdr_env = rdr_env,
                               tcg_imports = imports })
- = do   {
+ = unsetWOptM Opt_WarnWarningsDeprecations $
+       -- Do not report deprecations arising from the export
+       -- list, to avoid bleating about re-exporting a deprecated
+       -- thing (especially via 'module Foo' export item)
+   do   {
         -- If the module header is omitted altogether, then behave
         -- as if the user had written "module Main(main) where..."
         -- EXCEPT in interactive mode, when we behave as if he had
@@ -1174,96 +1178,6 @@ dupExport_ok n ie1 ie2
     single (IEThingAbs {}) = True
     single _               = False
 \end{code}
-
-%*********************************************************
-%*                                                       *
-\subsection{Deprecations}
-%*                                                       *
-%*********************************************************
-
-\begin{code}
-finishWarnings :: DynFlags -> Maybe WarningTxt
-               -> TcGblEnv -> RnM TcGblEnv
--- (a) Report usage of imports that are deprecated or have other warnings
--- (b) If the whole module is warned about or deprecated, update tcg_warns
---     All this happens only once per module
-finishWarnings dflags mod_warn tcg_env
-  = do  { (eps,hpt) <- getEpsAndHpt
-        ; ifWOptM Opt_WarnWarningsDeprecations $
-          mapM_ (check hpt (eps_PIT eps)) all_gres
-                -- By this time, typechecking is complete,
-                -- so the PIT is fully populated
-
-        -- Deal with a module deprecation; it overrides all existing warns
-        ; let new_warns = case mod_warn of
-                                Just txt -> WarnAll txt
-                                Nothing  -> tcg_warns tcg_env
-        ; return (tcg_env { tcg_warns = new_warns }) }
-  where
-    used_names = allUses (tcg_dus tcg_env)
-        -- Report on all deprecated uses; hence allUses
-    all_gres   = globalRdrEnvElts (tcg_rdr_env tcg_env)
-
-    check hpt pit gre@(GRE {gre_name = name, gre_prov = Imported (imp_spec:_)})
-      | name `elemNameSet` used_names
-      , Just deprec_txt <- lookupImpDeprec dflags hpt pit gre
-      = addWarnAt (importSpecLoc imp_spec)
-                  (sep [ptext (sLit "In the use of") <+>
-                        pprNonVarNameSpace (occNameSpace (nameOccName name)) <+>
-                        quotes (ppr name),
-                      (parens imp_msg) <> colon,
-                      (ppr deprec_txt) ])
-        where
-          name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-          imp_mod  = importSpecModule imp_spec
-          imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
-          extra | imp_mod == moduleName name_mod = empty
-                | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
-
-    check _ _ _ = return ()        -- Local, or not used, or not deprectated
-            -- The Imported pattern-match: don't deprecate locally defined names
-            -- For a start, we may be exporting a deprecated thing
-            -- Also we may use a deprecated thing in the defn of another
-            -- deprecated things.  We may even use a deprecated thing in
-            -- the defn of a non-deprecated thing, when changing a module's
-            -- interface
-
-lookupImpDeprec :: DynFlags -> HomePackageTable -> PackageIfaceTable
-                -> GlobalRdrElt -> Maybe WarningTxt
--- The name is definitely imported, so look in HPT, PIT
-lookupImpDeprec dflags hpt pit gre
-  = case lookupIfaceByModule dflags hpt pit mod of
-        Just iface -> mi_warn_fn iface name `mplus`    -- Bleat if the thing, *or
-                      case gre_par gre of
-                        ParentIs p -> mi_warn_fn iface p    -- its parent*, is warn'd
-                        NoParent   -> Nothing
-
-        Nothing -> Nothing    -- See Note [Used names with interface not loaded]
-  where
-    name = gre_name gre
-    mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-\end{code}
-
-Note [Used names with interface not loaded]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-By now all the interfaces should have been loaded,
-because reportDeprecations happens after typechecking.
-However, it's still (just) possible to to find a used
-Name whose interface hasn't been loaded:
-
-a) It might be a WiredInName; in that case we may not load
-   its interface (although we could).
-
-b) It might be GHC.Real.fromRational, or GHC.Num.fromInteger
-   These are seen as "used" by the renamer (if -XRebindableSyntax)
-   is on), but the typechecker may discard their uses
-   if in fact the in-scope fromRational is GHC.Read.fromRational,
-   (see tcPat.tcOverloadedLit), and the typechecker sees that the type
-   is fixed, say, to GHC.Base.Float (see Inst.lookupSimpleInst).
-   In that obscure case it won't force the interface in.
-
-In both cases we simply don't permit deprecations;
-this is, after all, wired-in stuff.
 
 
 %*********************************************************

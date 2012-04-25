@@ -150,7 +150,16 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
         tcg_env <- {-# SCC "tcRnImports" #-}
                    tcRnImports hsc_env this_mod (prel_imports ++ import_decls) ;
-        setGblEnv tcg_env               $ do {
+
+          -- If the whole module is warned about or deprecated 
+          -- (via mod_deprec) record that in tcg_warns. If we do thereby add
+          -- a WarnAll, it will override any subseqent depracations added to tcg_warns
+        let { tcg_env1 = case mod_deprec of 
+                         Just txt -> tcg_env { tcg_warns = WarnAll txt } 
+                         Nothing  -> tcg_env 
+            } ;
+ 
+        setGblEnv tcg_env1 $ do {
 
                 -- Load the hi-boot interface for this module, if any
                 -- We do this now so that the boot_names can be passed
@@ -170,16 +179,6 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                         {-# SCC "tcRnSrcDecls" #-}
                         tcRnSrcDecls boot_iface local_decls ;
         setGblEnv tcg_env               $ do {
-
-                -- Report the use of any deprecated things
-                -- We do this *before* processsing the export list so
-                -- that we don't bleat about re-exporting a deprecated
-                -- thing (especially via 'module Foo' export item)
-                -- That is, only uses in the *body* of the module are complained about
-        traceRn (text "rn3") ;
-        failIfErrsM ;   -- finishWarnings crashes sometimes
-                        -- as a result of typechecker repairs (e.g. unboundNames)
-        tcg_env <- finishWarnings (hsc_dflags hsc_env) mod_deprec tcg_env ;
 
                 -- Process the export list
         traceRn (text "rn4a: before exports");

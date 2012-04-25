@@ -663,28 +663,111 @@ lookupGreRn_help rdr_name lookup
                         ; return (Just gre) }
 	    gres  -> do { addNameClashErrRn rdr_name gres
 			; return (Just (head gres)) } }
+\end{code}
 
+%*********************************************************
+%*							*
+		Deprecations
+%*							*
+%*********************************************************
+
+Note [Handling of deprecations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* We report deprecations at each *occurrence* of the deprecated thing
+  (see Trac #5867)
+
+* We do not report deprectations for locally-definded names. For a
+  start, we may be exporting a deprecated thing. Also we may use a
+  deprecated thing in the defn of another deprecated things.  We may
+  even use a deprecated thing in the defn of a non-deprecated thing,
+  when changing a module's interface.
+
+* addUsedRdrNames: we do not report deprecations for sub-binders:
+     - the ".." completion for records
+     - the ".." in an export item 'T(..)'
+     - the things exported by a module export 'module M'
+
+\begin{code}
 addUsedRdrName :: GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
 addUsedRdrName gre rdr
-  | isLocalGRE gre = return ()
+  | isLocalGRE gre = return ()  -- No call to warnIfDeprecated
+                                -- See Note [Handling of deprecations]
   | otherwise      = do { env <- getGblEnv
-       			; updMutVar (tcg_used_rdrnames env)
+       			; warnIfDeprecated gre
+                        ; updMutVar (tcg_used_rdrnames env)
 		                    (\s -> Set.insert rdr s) }
 
 addUsedRdrNames :: [RdrName] -> RnM ()
 -- Record used sub-binders
 -- We don't check for imported-ness here, because it's inconvenient
 -- and not stritly necessary.
+-- NB: no call to warnIfDeprecated; see Note [Handling of deprecations]
 addUsedRdrNames rdrs
   = do { env <- getGblEnv
        ; updMutVar (tcg_used_rdrnames env)
 	 	   (\s -> foldr Set.insert s rdrs) }
 
-------------------------------
---	GHCi support
-------------------------------
+warnIfDeprecated :: GlobalRdrElt -> RnM ()
+warnIfDeprecated gre@(GRE { gre_name = name, gre_prov = Imported (imp_spec : _) })
+  = do { dflags <- getDynFlags
+       ; when (wopt Opt_WarnWarningsDeprecations dflags) $
+         do { iface <- loadInterfaceForName doc name
+            ; case lookupImpDeprec iface gre of
+                Just txt -> addWarn (mk_msg txt) 
+                Nothing  -> return () } }
+  where
+    mk_msg txt = sep [ sep [ ptext (sLit "In the use of")
+                             <+> pprNonVarNameSpace (occNameSpace (nameOccName name))
+                             <+> quotes (ppr name)
+                           , parens imp_msg <> colon ]
+                     , ppr txt ]
 
+    name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    imp_mod  = importSpecModule imp_spec
+    imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
+    extra | imp_mod == moduleName name_mod = empty
+          | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
+
+    doc = ptext (sLit "The name") <+> quotes (ppr name) <+> ptext (sLit "is mentioned explicitly")
+
+warnIfDeprecated _ = return ()   -- No deprecations for things defined locally
+
+lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
+lookupImpDeprec iface gre
+  = mi_warn_fn iface (gre_name gre) `mplus`  -- Bleat if the thing,
+    case gre_par gre of                       -- *or its parent*, is warn'd
+       ParentIs p -> mi_warn_fn iface p 
+       NoParent   -> Nothing
+\end{code}
+
+Note [Used names with interface not loaded]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's (just) possible to to find a used
+Name whose interface hasn't been loaded:
+
+a) It might be a WiredInName; in that case we may not load
+   its interface (although we could).
+
+b) It might be GHC.Real.fromRational, or GHC.Num.fromInteger
+   These are seen as "used" by the renamer (if -XRebindableSyntax)
+   is on), but the typechecker may discard their uses
+   if in fact the in-scope fromRational is GHC.Read.fromRational,
+   (see tcPat.tcOverloadedLit), and the typechecker sees that the type
+   is fixed, say, to GHC.Base.Float (see Inst.lookupSimpleInst).
+   In that obscure case it won't force the interface in.
+
+In both cases we simply don't permit deprecations;
+this is, after all, wired-in stuff.
+
+
+%*********************************************************
+%*							*
+		GHCi support
+%*							*
+%*********************************************************
+
+\begin{code}
 -- A qualified name on the command line can refer to any module at all: we
 -- try to load the interface if we don't already have it.
 lookupQualifiedName :: RdrName -> RnM (Maybe Name)
