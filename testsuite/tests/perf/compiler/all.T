@@ -24,8 +24,10 @@ test('T1969',
                              #                 5717704 (x86/Windows 17/05/10)
                              #                 6149572 (x86/Linux, 31/12/09)
       if_wordsize(64,
-          compiler_stats_range_field('max_bytes_used', 12000000, 10)),
-                                   # expected value: 11178376 (amd64/Linux)
+          compiler_stats_range_field('max_bytes_used', 11000000, 15)),
+                                  # expected value: 11178376 (amd64/Linux)
+                                  # varies quite a lot with CLEANUP and BINDIST,
+                                  # hence 15% range.
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 210000000,
                                                       270000000)),
