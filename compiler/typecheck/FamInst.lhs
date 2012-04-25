@@ -254,14 +254,15 @@ addLocalFamInst :: (FamInstEnv,[FamInst]) -> FamInst -> TcM (FamInstEnv, [FamIns
 addLocalFamInst (home_fie, my_fis) fam_inst 
         -- home_fie includes home package and this module
         -- my_fies is just the ones from this module
-  = do { isGHCi <- getIsGHCi
+  = do { traceTc "addLocalFamInst" (ppr fam_inst)
+       ; isGHCi <- getIsGHCi
  
            -- In GHCi, we *override* any identical instances
            -- that are also defined in the interactive context
-      ; let (home_fie', my_fis') 
-              | isGHCi    = (deleteFromFamInstEnv home_fie fam_inst, 
-                             filterOut (identicalFamInst fam_inst) my_fis)
-              | otherwise = (home_fie, my_fis)
+       ; let (home_fie', my_fis') 
+               | isGHCi    = ( deleteFromFamInstEnv home_fie fam_inst 
+                             , filterOut (identicalFamInst fam_inst) my_fis)
+               | otherwise = (home_fie, my_fis)
 
            -- Load imported instances, so that we report
            -- overlaps correctly

@@ -757,17 +757,27 @@ tcFamTyPats fam_tc (HsBSig arg_pats (kvars, tvars)) kind_checker thing_inside
 
          -- Kind-check and quantify
          -- See Note [Quantifying over family patterns]
-        ; (tkvs, typats) <- tcExtendTyVarEnv (map mkKindSigVar kvars) $
-                            tcHsTyVarBndrsGen (map (noLoc . UserTyVar) tvars) $ 
-             do { typats <- tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds
-                ; kind_checker res_kind
-                ; return (tyVarsOfTypes typats, typats) }
+       ; typats <- tcExtendTyVarEnv (map mkKindSigVar kvars)      $
+                   tcHsTyVarBndrs (map (noLoc . UserTyVar) tvars) $ \ _ ->
+                   do { kind_checker res_kind
+                      ; tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds }
+       ; let all_args = fam_arg_kinds ++ typats
 
-       ; all_args' <- zonkTcTypeToTypes emptyZonkEnv (fam_arg_kinds ++ typats)
-       ; res_kind' <- zonkTcTypeToType emptyZonkEnv res_kind
-       ; traceTc "tcFamPats" (ppr tkvs $$ ppr all_args' $$ ppr res_kind')
-       ; tcExtendTyVarEnv tkvs $
-         thing_inside tkvs all_args' res_kind' }
+            -- Find free variables (after zonking)
+       ; tkvs <- zonkTyVarsAndFV (tyVarsOfTypes all_args)
+
+            -- Turn them into skolems, so that we don't subsequently 
+            -- replace a meta kind var with AnyK
+       ; qtkvs <- zonkQuantifiedTyVars (varSetElems tkvs)
+
+            -- Zonk the patterns etc into the Type world
+       ; (ze, qtkvs') <- zonkTyBndrsX emptyZonkEnv qtkvs
+       ; all_args'    <- zonkTcTypeToTypes ze all_args
+       ; res_kind'    <- zonkTcTypeToType  ze res_kind
+
+       ; traceTc "tcFamPats" (ppr qtkvs' $$ ppr all_args' $$ ppr res_kind')
+       ; tcExtendTyVarEnv qtkvs' $
+         thing_inside qtkvs' all_args' res_kind' }
 \end{code}
 
 Note [Quantifying over family patterns]
@@ -810,7 +820,7 @@ Then in the family instance we want to
 Notice that in the third step we quantify over all the visibly-mentioned
 type variables (a,b), but also over the implicitly mentioned kind varaibles
 (k, k').  In this case one is bound explicitly but often there will be 
-none. The rold of the kind signature (a :: Maybe k) is to add a constraint
+none. The role of the kind signature (a :: Maybe k) is to add a constraint
 that 'a' must have that kind, and to bring 'k' into scope.
 
 Note [Associated type instances]
@@ -867,18 +877,18 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
 	   -- Check that the stupid theta is empty for a GADT-style declaration
        ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
 
-	-- Check that a newtype has exactly one constructor
-	-- Do this before checking for empty data decls, so that
-	-- we don't suggest -XEmptyDataDecls for newtypes
-      ; checkTc (new_or_data == DataType || isSingleton cons) 
+	 -- Check that a newtype has exactly one constructor
+	 -- Do this before checking for empty data decls, so that
+	 -- we don't suggest -XEmptyDataDecls for newtypes
+       ; checkTc (new_or_data == DataType || isSingleton cons) 
 	        (newtypeConError tc_name (length cons))
 
- 	-- Check that there's at least one condecl,
-	-- or else we're reading an hs-boot file, or -XEmptyDataDecls
-      ; empty_data_decls <- xoptM Opt_EmptyDataDecls
-      ; is_boot <- tcIsHsBoot	-- Are we compiling an hs-boot file?
-      ; checkTc (not (null cons) || empty_data_decls || is_boot)
-                (emptyConDeclsErr tc_name) }
+        	-- Check that there's at least one condecl,
+         -- or else we're reading an hs-boot file, or -XEmptyDataDecls
+       ; empty_data_decls <- xoptM Opt_EmptyDataDecls
+       ; is_boot <- tcIsHsBoot	-- Are we compiling an hs-boot file?
+       ; checkTc (not (null cons) || empty_data_decls || is_boot)
+                 (emptyConDeclsErr tc_name) }
     
 -----------------------------------
 tcConDecls :: NewOrData -> Bool -> TyCon -> ([TyVar], Type)
@@ -895,46 +905,50 @@ tcConDecl :: NewOrData
 
 tcConDecl new_or_data existential_ok rep_tycon res_tmpl 	-- Data types
 	  con@(ConDecl { con_name = name
-                       , con_qvars = tvs, con_cxt = ctxt
-                       , con_details = details, con_res = res_ty })
+                       , con_qvars = hs_tvs, con_cxt = hs_ctxt
+                       , con_details = details, con_res = hs_res_ty })
   = addErrCtxt (dataConCtxt name) $
     do { traceTc "tcConDecl 1" (ppr name)
-       ; (tvs', (ctxt', arg_tys', res_ty', is_infix, field_lbls, stricts)) 
-           <- tcHsTyVarBndrsGen tvs $ 
-              do { ctxt'    <- tcHsContext ctxt
+       ; (tvs, ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) 
+           <- tcHsTyVarBndrs hs_tvs $ \ tvs ->
+              do { ctxt    <- tcHsContext hs_ctxt
                  ; details' <- tcConArgs new_or_data details
-                 ; res_ty'  <- tcConRes res_ty
+                 ; res_ty   <- tcConRes hs_res_ty
                  ; let (is_infix, field_lbls, btys') = details'
-                       (arg_tys', stricts)           = unzip btys'
-                       ftvs = tyVarsOfTypes ctxt'     `unionVarSet`
-                              tyVarsOfTypes arg_tys'  `unionVarSet`
-                              case res_ty' of
-                                 ResTyH98     -> emptyVarSet
-                                 ResTyGADT ty -> tyVarsOfType ty
-                 ; return (ftvs, (ctxt', arg_tys', res_ty', is_infix, field_lbls, stricts)) }
+                       (arg_tys, stricts)           = unzip btys'
+                 ; return (tvs, ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
 
+       ; let pretend_res_ty = case res_ty of
+                                ResTyH98     -> unitTy
+                                ResTyGADT ty -> ty
+             pretend_con_ty = mkSigmaTy tvs ctxt (mkFunTys arg_tys pretend_res_ty)
+                -- This pretend_con_ty stuff is just a convenient way to get the
+                -- free kind variables of the type, for kindGeneralize to work on
 
-             -- Substitute, to account for the kind 
-             -- unifications done by tcHsTyVarBndrsGen
-       ; traceTc "tcConDecl 2" (ppr name)
-       ; let ze = mkTyVarZonkEnv tvs'
-       ; arg_tys' <- zonkTcTypeToTypes ze arg_tys'
-       ; ctxt'    <- zonkTcTypeToTypes ze ctxt'
-       ; res_ty'  <- case res_ty' of
-                           ResTyH98     -> return ResTyH98
-                           ResTyGADT ty -> ResTyGADT <$> zonkTcTypeToType ze ty
+             -- Generalise the kind variables (returning quantifed TcKindVars)
+             -- and quanify the type variables (substiting their kinds)
+       ; kvs <- kindGeneralize (tyVarsOfType pretend_con_ty)
+       ; tvs <- zonkQuantifiedTyVars tvs
+
+             -- Zonk to Types
+       ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv (kvs ++ tvs)
+       ; arg_tys <- zonkTcTypeToTypes ze arg_tys
+       ; ctxt    <- zonkTcTypeToTypes ze ctxt
+       ; res_ty  <- case res_ty of
+                      ResTyH98     -> return ResTyH98
+                      ResTyGADT ty -> ResTyGADT <$> zonkTcTypeToType ze ty
 
        ; checkTc (existential_ok || conRepresentibleWithH98Syntax con)
 	         (badExistential name)
 
-       ; let (univ_tvs, ex_tvs, eq_preds, res_ty'')
-                = rejigConRes res_tmpl tvs' res_ty'
+       ; let (univ_tvs, ex_tvs, eq_preds, res_ty')
+                = rejigConRes res_tmpl qtkvs res_ty
 
        ; traceTc "tcConDecl 3" (ppr name)
        ; buildDataCon (unLoc name) is_infix
     		      stricts field_lbls
-    		      univ_tvs ex_tvs eq_preds ctxt' arg_tys'
-		      res_ty'' rep_tycon
+    		      univ_tvs ex_tvs eq_preds ctxt arg_tys
+		      res_ty' rep_tycon
 		-- NB:	we put data_tc, the type constructor gotten from the
 		--	constructor type signature into the data constructor;
 		--	that way checkValidDataCon can complain if it's wrong.
@@ -1418,9 +1432,9 @@ checkValidClass cls
 		-- type variable.  What a mess!
 
     check_at_defs (fam_tc, defs)
-      = do mapM_ (\(ATD _tvs pats rhs _loc) -> checkValidFamInst pats rhs) defs
-           tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
-             mapM_ (check_loc_at_def fam_tc) defs
+      = do { mapM_ (\(ATD _tvs pats rhs _loc) -> checkValidFamInst pats rhs) defs
+           ; tcAddDefaultAssocDeclCtxt (tyConName fam_tc) $ 
+             mapM_ (check_loc_at_def fam_tc) defs }
 
     check_loc_at_def fam_tc (ATD _tvs pats _rhs loc)
       -- Set the location for each of the default declarations
