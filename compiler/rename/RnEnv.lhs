@@ -238,7 +238,14 @@ lookupExactOcc name
   = return name
   | otherwise           
   = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_Name env name
+       ; let -- See Note [Splicing Exact names] 
+             main_occ =  nameOccName name
+             demoted_occs = case demoteOccName main_occ of
+                              Just occ -> [occ]
+                              Nothing  -> []
+             gres = [ gre | occ <- main_occ : demoted_occs
+                          , gre <- lookupGlobalRdrEnv env occ
+	                  , gre_name gre == name ]
        ; case gres of
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
@@ -471,6 +478,19 @@ otherwise the type checker will get confused.  To do this we need to
 keep track of all the Names in scope, and the LocalRdrEnv does just that;
 we consult it with RdrName.inLocalRdrEnvScope.
 
+There is another wrinkle.  With TH and -XDataKinds, consider
+   $( [d| data Nat = Zero 
+          data T = MkT (Proxy 'Zero)  |] )
+After splicing, but before renaming we get this:
+   data Nat_77{tc} = Zero_78{d}
+   data T_79{tc} = MkT_80{d} (Proxy 'Zero_78{tc})  |] )
+THe occurrence of 'Zero in the data type for T has the right unique,
+but it has a TcClsName name-space in its OccName.  (This is set by
+the ctxt_ns argument of Convert.thRdrName.)  When we check that is 
+in scope in the GlobalRdrEnv, we need to look up the DataName namespace
+too.  (An alternative would be to make the GlobalRdrEnv also have
+a Name -> GRE mapping.)
+
 Note [Usage for sub-bndrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 If you have this
@@ -531,18 +551,23 @@ lookupTypeOccRn rdr_name
   = do { mb_name <- lookupOccRn_maybe rdr_name 
        ; case mb_name of {
              Just name -> return name ;
-             Nothing   -> 
+             Nothing   -> lookup_demoted rdr_name } }
 
-    do { -- Maybe it's the name of a *data* constructor
-         data_kinds <- xoptM Opt_DataKinds
-       ; mb_demoted_name <- case demoteRdrName rdr_name of
-                              Just demoted_rdr -> lookupOccRn_maybe demoted_rdr
-                              Nothing          -> return Nothing
+lookup_demoted :: RdrName -> RnM Name
+lookup_demoted rdr_name
+  | Just demoted_rdr <- demoteRdrName rdr_name
+    -- Maybe it's the name of a *data* constructor
+  = do { data_kinds <- xoptM Opt_DataKinds
+       ; mb_demoted_name <- lookupOccRn_maybe demoted_rdr
        ; case mb_demoted_name of
            Nothing -> unboundName WL_Any rdr_name
            Just demoted_name 
              | data_kinds -> return demoted_name
-             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }}}
+             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }
+ 
+  | otherwise
+  = unboundName WL_Any rdr_name 
+
   where 
     suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
 \end{code}
