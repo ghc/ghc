@@ -1234,6 +1234,7 @@ checkValidTyCon tc
   = case synTyConRhs tc of
       SynFamilyTyCon {} -> return ()
       SynonymTyCon ty   -> checkValidType syn_ctxt ty
+
   | otherwise
   = do { -- Check the context on the data decl
        ; traceTc "cvtc1" (ppr tc)
@@ -1309,6 +1310,7 @@ checkValidDataCon tc con
         ; let tc_tvs = tyConTyVars tc
 	      res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
 	      actual_res_ty = dataConOrigResTy con
+        ; traceTc "checkValidDataCon" (ppr con $$ ppr tc $$ ppr tc_tvs $$ ppr res_ty_tmpl)
 	; checkTc (isJust (tcMatchTy (mkVarSet tc_tvs)
 				res_ty_tmpl
 				actual_res_ty))
