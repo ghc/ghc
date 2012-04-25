@@ -1,0 +1,5 @@
+
+T6021.hs:5:22:
+    Type variable `b' used as a kind
+    In the kind `b'
+    In the instance declaration for `Panic (a :: b) b'
