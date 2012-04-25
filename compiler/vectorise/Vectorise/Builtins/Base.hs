@@ -57,7 +57,7 @@ mAX_DPH_COMBINE :: Int
 mAX_DPH_COMBINE = 2
 
 mAX_DPH_SCALAR_ARGS :: Int
-mAX_DPH_SCALAR_ARGS = 3
+mAX_DPH_SCALAR_ARGS = 8
 
 -- Types from 'GHC.Prim' supported by DPH
 --
