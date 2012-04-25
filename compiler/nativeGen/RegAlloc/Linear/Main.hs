@@ -180,13 +180,13 @@ linearRegAlloc
 linearRegAlloc dflags first_id block_live sccs
  = let platform = targetPlatform dflags
    in case platformArch platform of
-      ArchX86     -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
-      ArchX86_64  -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
-      ArchSPARC   -> linearRegAlloc' platform (frInitFreeRegs :: SPARC.FreeRegs) first_id block_live sccs
-      ArchPPC     -> linearRegAlloc' platform (frInitFreeRegs :: PPC.FreeRegs)   first_id block_live sccs
-      ArchARM _ _ -> panic "linearRegAlloc ArchARM"
-      ArchPPC_64  -> panic "linearRegAlloc ArchPPC_64"
-      ArchUnknown -> panic "linearRegAlloc ArchUnknown"
+      ArchX86       -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
+      ArchX86_64    -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
+      ArchSPARC     -> linearRegAlloc' platform (frInitFreeRegs :: SPARC.FreeRegs) first_id block_live sccs
+      ArchPPC       -> linearRegAlloc' platform (frInitFreeRegs :: PPC.FreeRegs)   first_id block_live sccs
+      ArchARM _ _ _ -> panic "linearRegAlloc ArchARM"
+      ArchPPC_64    -> panic "linearRegAlloc ArchPPC_64"
+      ArchUnknown   -> panic "linearRegAlloc ArchUnknown"
 
 linearRegAlloc'
         :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
