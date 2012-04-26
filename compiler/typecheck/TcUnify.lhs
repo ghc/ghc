@@ -1119,7 +1119,7 @@ uKVar isFlipped unify_kind eq_res kv1 k2
   | TyVarTy kv2 <- k2, kv1 == kv2 
   = return eq_res
 
-  | TyVarTy kv2 <- k2, isTcTyVar kv1, isMetaTyVar kv2
+  | TyVarTy kv2 <- k2, isTcTyVar kv2, isMetaTyVar kv2
   = uKVar (not isFlipped) unify_kind eq_res kv2 (TyVarTy kv1)
 
   | otherwise = if isFlipped 
