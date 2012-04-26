@@ -240,3 +240,14 @@ test('T5642',
           compiler_stats_range_field('bytes allocated', 3361296144, 10))
       ],
       compile,['-O'])
+
+test('T5837',
+     [ only_ways(['normal']),
+      if_wordsize(32, # sample from x86/Linux
+          compiler_stats_range_field('bytes allocated', 40000000, 10)),
+
+      # sample: 3926235424 (amd64/Linux, 15/2/2012)
+      if_wordsize(64,
+          compiler_stats_range_field('bytes allocated', 79110184, 10))
+      ],
+      compile_fail,['-fcontext-stack=50'])
