@@ -62,6 +62,7 @@ rnBndr2' rn2 x_l x_r = MSG $ \_ s -> Right (s, rnBndr2'' (uniqAway (msgInScopeSe
   -- BUT I don't want to just put ids_l/ids_r in the RnEnv2 because that will force common occurrence sites to rename (in msgPend) which
   -- which will make things drastically worse! Instead, rnBndr2' does the uniqAway manually.)
 
+-- FIXME: rigid variable occurrences do not get correct type/info
 rnBndr2'' :: (Var -> Var)
           -> RnEnv2 -> Var -> Var -> (RnEnv2, Var)
 rnBndr2'' f rn2 x_l x_r = (rn2', x')
