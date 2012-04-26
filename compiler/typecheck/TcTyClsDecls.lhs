@@ -775,7 +775,7 @@ tcFamTyPats fam_tc (HsBSig arg_pats (kvars, tvars)) kind_checker thing_inside
        ; all_args'    <- zonkTcTypeToTypes ze all_args
        ; res_kind'    <- zonkTcTypeToType  ze res_kind
 
-       ; traceTc "tcFamPats" (ppr qtkvs' $$ ppr all_args' $$ ppr res_kind')
+       ; traceTc "tcFamPats" (pprTvBndrs qtkvs' $$ ppr all_args' $$ ppr res_kind')
        ; tcExtendTyVarEnv qtkvs' $
          thing_inside qtkvs' all_args' res_kind' }
 \end{code}
