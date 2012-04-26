@@ -263,18 +263,20 @@ tc_mkRepTyCon tycon metaDts mod =
   do { -- `rep0` = GHC.Generics.Rep (type family)
        rep0 <- tcLookupTyCon repTyConName
 
+     ; let -- `tyvars` = [a,b]
+           tyvars     = tyConTyVars tycon
+           tyvar_args = mkTyVarTys tyvars
+
+           -- `appT` = D a b
+           appT = [mkTyConApp tycon tyvar_args]
+
        -- `rep0Ty` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-     ; rep0Ty <- tc_mkRepTy tycon metaDts
+     ; rep0Ty <- tc_mkRepTy tycon tyvar_args metaDts
     
        -- `rep_name` is a name we generate for the synonym
      ; rep_name <- newGlobalBinder mod (mkGenR (nameOccName (tyConName tycon)))
                      (nameSrcSpan (tyConName tycon))
 
-     ; let -- `tyvars` = [a,b]
-           tyvars  = tyConTyVars tycon
-
-           -- `appT` = D a b
-           appT = [mkTyConApp tycon (mkTyVarTys tyvars)]
      ; return $ mkSynFamInst rep_name tyvars rep0 appT rep0Ty
      }
 
@@ -284,13 +286,13 @@ tc_mkRepTyCon tycon metaDts mod =
 -- Type representation
 --------------------------------------------------------------------------------
 
-tc_mkRepTy :: -- The type to generate representation for
-               TyCon 
+tc_mkRepTy :: -- The type to generate representation for, and instantiating types
+               TyCon -> [Type]    
                -- Metadata datatypes to refer to
             -> MetaTyCons 
                -- Generated representation0 type
             -> TcM Type
-tc_mkRepTy tycon metaDts = 
+tc_mkRepTy tycon ty_args metaDts = 
   do
     d1    <- tcLookupTyCon d1TyConName
     c1    <- tcLookupTyCon c1TyConName
@@ -308,7 +310,7 @@ tc_mkRepTy tycon metaDts =
         mkRec0 a   = mkTyConApp rec0  [a]
         mkPar0 a   = mkTyConApp par0  [a]
         mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
-        mkC  i d a = mkTyConApp c1    [d, prod i (dataConOrigArgTys a) 
+        mkC  i d a = mkTyConApp c1    [d, prod i (dataConInstOrigArgTys a ty_args) 
                                                  (null (dataConFieldLabels a))]
         -- This field has no label
         mkS True  _ a = mkTyConApp s1 [mkTyConTy nS1, a]
