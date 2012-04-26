@@ -976,7 +976,7 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 
 def checkStats(stats_file, range_fields, num_fields):
     result = passed()
-    if len(num_fields) > 0:
+    if len(num_fields) + len(range_fields) > 0:
         f = open(in_testdir(stats_file))
         contents = f.read()
         f.close()
@@ -1068,7 +1068,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
         to_do = '-c' # just compile
 
     stats_file = name + '.comp.stats'
-    if len(opts.compiler_stats_num_fields) > 0:
+    if len(opts.compiler_stats_num_fields) + len(opts.compiler_stats_range_fields) > 0:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
 
     # Required by GHC 7.3+, harmless for earlier versions:
