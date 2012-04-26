@@ -29,7 +29,7 @@ import VarEnv
 import Type       (typeKind, mkTyConApp, mkAppTy, getTyVar_maybe)
 import TysWiredIn (pairTyCon, tupleCon)
 import TysPrim    (funTyCon)
-import TypeRep    (Kind, Type(..))
+import TypeRep    (Kind, Type(..), isKindVar)
 import TrieMap    (TrieMap(..), CoercionMap, TypeMap)
 import Rules      (mkSpecInfo, roughTopNames)
 import Unique     (mkUniqueGrimily)
@@ -636,7 +636,7 @@ msgIdCoVarBndrExtras :: RnEnv2 -> Id -> Id -> Id -> MSG Id
 msgIdCoVarBndrExtras rn2 x x_l x_r = liftM3 (\unf spec ty -> x `setVarType` ty `setIdUnfolding` unf `setIdSpecialisation` spec)
                                             (msgUnfolding rn2 (realIdUnfolding x_l) (realIdUnfolding x_r))
                                             (msgSpecInfo rn2 x (idSpecialisation x_l) (idSpecialisation x_r))
-                                            (msgType rn2 (idType x_l) (idType x_r))
+                                            (msgType rn2 (idType x_l) (idType x_r)) -- NB: cheating a bit to use the same renaming for type info, but probably OK
 
 msgSpecInfo :: RnEnv2 -> Id -> SpecInfo -> SpecInfo -> MSG SpecInfo
 msgSpecInfo rn2 x (SpecInfo rules_l _) (SpecInfo rules_r _) = liftM mkSpecInfo $ zipWithEqualM (msgRule rn2 x) rules_l rules_r
@@ -941,7 +941,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
       --  Does a match b? It does if a matches fib 100!
       --  ...
       --
-      -- FIXME: I don't have a good solution at the moment. For now, I've patched it so we don't use these branches.
+      -- TODO: I don't have a good solution at the moment. For now, I've patched it so we don't use these branches.
       -- FIXME: carefully document the basis (if any) by which I believe it is OK to MSG stuff out like this
       --        Naively it seems rather dangerous. Consider:
       --        1. Supercompile (let f = \x. x in f)
