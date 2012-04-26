@@ -148,33 +148,46 @@ data MSGState = MSGState {
     msgInScopeSet            :: InScopeSet,                      -- We have to ensure all new vars introduced by MSG are distinct from each other
     msgKnownPendingVars      :: VarEnv (VarEnv Var),             -- INVARIANT: the "known" maps are inverse to the pending list, except that PendingTerms are not recorded in
     msgKnownPendingTypes     :: TypeMap (TypeMap TyVar),         -- a "known" map at all. We don't *want* them in one because we don't mant MSGing to increase work sharing!
-    msgKnownPendingCoercions :: CoercionMap (CoercionMap CoVar), -- INVARIANT: all Vars in the range have *no* extra information beyond their Name and Type/Kind (which may be overriden at the eventual binding site)
+    msgKnownPendingCoercions :: CoercionMap (CoercionMap CoVar), -- INVARIANT: all Vars in the range have extra information that has *already* been MSGed
     msgPending               :: [(Var, Pending)]                 -- The pending list
   }
 
--- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind
+-- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind (which will be anyway overwritten)
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
-msgPend rn2 x0 pending = MSG $ \e s -> Right $ case lookupUpdatePending s of
-    Right x            -> (s, x)
-    Left (mb_eq, mk_s) -> (s { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x,
-                               msgPending = (x, pending) : msgPending s }, x)
-      where s = mk_s x
-            -- This use of rn2 is 1/2 of the story necessary to ensure new common vars don't clash with rigid binders
+msgPend rn2 x0 pending = MSG $ \e s -> case lookupUpdatePending s of
+    Right x                       -> Right (s, x)
+    Left (mb_eq, binderise, mk_s) -> res
+      where -- This use of rn2 is 1/2 of the story necessary to ensure new common vars don't clash with rigid binders
             x1 = uniqAway (rnInScopeSet rn2) x0
             -- The use of s here is necessary to ensure we only allocate a given common var once
-            x | Just eq <- mb_eq
-              , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
-              = eq
-              | otherwise
-              = uniqAway (msgInScopeSet s) x1
+            x2 | Just eq <- mb_eq
+               , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
+               = eq
+               | otherwise
+               = uniqAway (msgInScopeSet s) x1
             -- We *don't* need to uniqAway with the set of common variables (in e) because the msgInScopeSet
             -- was initialized to contain them all.
+
+            -- NB: we make use of lazy programming to ensure that we can see the currently-pended common variable
+            -- in the state even as we are binderising it. This is important since the variable's IdInfo might mention itself,
+            -- as x_l and x_r will in fact be bound by the top-level letrec.
+            s = (mk_s x) { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x2, -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
+                           msgPending = (x, pending) : msgPending s }
+            res = unMSG (binderise x2) (e { msgLostWorkSharing = False }) s -- This thing will be bound in the top letrec, outside any lambdas
+            Right (_, x) = res
   where
+    lookupUpdatePending :: MSGState
+                        -> Either (Maybe Var,       -- Are both sides equal vars, and if so what are they equal to?
+                                   Var -> MSG Var,  -- Produce a version of the variable suitable for use as a heap binder (with generalised info/type/kind)
+                                   Var -> MSGState) -- How to update the initial state with the variable for this pending item
+                                  Var
     lookupUpdatePending s = case pending of
-      PendingVar      x_l  x_r  -> fmapLeft (\upd -> (if x_l == x_r then Just x_r else Nothing, \x -> s { msgKnownPendingVars      = upd x })) $ lookupUpdateVE (msgKnownPendingVars s)      x_l  x_r
-      PendingType     ty_l ty_r -> fmapLeft (\upd -> (Nothing,                                  \a -> s { msgKnownPendingTypes     = upd a })) $ lookupUpdateTM (msgKnownPendingTypes s)     ty_l ty_r
-      PendingCoercion co_l co_r -> fmapLeft (\upd -> (Nothing,                                  \q -> s { msgKnownPendingCoercions = upd q })) $ lookupUpdateTM (msgKnownPendingCoercions s) co_l co_r
-      PendingTerm     _    _    -> Left (Nothing, \_ -> s)
+      -- TODO: binder matching can legitimately fail, in which case we might want to create a common "vanilla"
+      -- binder with no non-MSGable info, leaving the non-unifiable specs/rules to the generalised versions?
+      PendingVar      x_l  x_r  -> fmapLeft (\upd -> (if x_l == x_r then Just x_r else Nothing, \x -> msgBndrExtras rn2 x x_l x_r,                                                    \x -> s { msgKnownPendingVars      = upd x })) $ lookupUpdateVE (msgKnownPendingVars s)      x_l  x_r
+      PendingType     ty_l ty_r -> fmapLeft (\upd -> (Nothing,                                  \a -> liftM (a `setTyVarKind`) $ msgKind rn2 (typeKind ty_l)     (typeKind ty_r),     \a -> s { msgKnownPendingTypes     = upd a })) $ lookupUpdateTM (msgKnownPendingTypes s)     ty_l ty_r
+      PendingCoercion co_l co_r -> fmapLeft (\upd -> (Nothing,                                  \q -> liftM (q `setVarType`)   $ msgType rn2 (coercionType co_l) (coercionType co_r), \q -> s { msgKnownPendingCoercions = upd q })) $ lookupUpdateTM (msgKnownPendingCoercions s) co_l co_r
+      PendingTerm     e_l  e_r  -> Left              (Nothing,                                  \x -> liftM (x `setVarType`)   $ msgType rn2 (termType e_l)      (termType e_r),      \_ -> s)
       -- NB: the fact that we don't memoise multiple occurrences of identical (term, term) pairs is very delicate from a termination
       -- perspective. You might imagine that you can easily make the PureHeap matcher get into a loop where the work list continually
       -- adds as many or more PendingTerm work items than it discharges.
@@ -213,11 +226,6 @@ newtype MSG a = MSG { unMSG :: MSGEnv -> MSGState -> MSG' (MSGState, a) }
 
 runMSG :: MSGEnv -> MSGState -> MSG a -> MSG' (MSGState, a)
 runMSG e s mx = unMSG mx e s
-
-runMSGNF :: MSGEnv -> MSGState -> MSG a -> (MSGState, a)
-runMSGNF e s mx = case runMSG e s mx of
-    Left  msg -> panic "runMSGNF" (text msg)
-    Right res -> res
 
 instance Functor MSG where
     fmap = liftM
@@ -811,18 +819,8 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
     -}
     go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((x_common, PendingVar x_l x_r):rest) })
       -- Just like an internal binder, we have to be sure to match the binders themselves (for e.g. type variables)
-      -- NB: binder matching can legitimately fail, in which case we want to *force* generalisation, creating a common "vanilla"
-      -- binder with no non-MSGable info, leaving the non-unifiable specs/rules to the generalised versions.
       | msg_s <- msg_s { msgPending = rest }
-       -- FIXME: possibly dangerous to use MSG types of x_l/x_r here because they are not *binders* and so may have bad info!
-       -- Could use laziness to supply correct types to use sites? Or extract "up to date" info from the left/right heaps
-      , (mb_common_x, mb_individual_x) <- case runMSG msg_e msg_s (msgBndrExtras rn2 x_common x_l x_r) of
-          Right res -> (Right res, Right res)
-          Left  msg -> (Left  msg, Right (runMSGNF msg_e msg_s (liftM (x_common `setVarType`) $ msgType rn2 (idType x_l) (idType x_r))))
-            -- NB: the only way that can fail is if x_l and x_r are Ids (it always succeeds with TyVars), so idType is legitimate here
-            -- NB: x_common is guaranteed not to have any extra information, so all we need to do is override the Type
-      = prod (do (msg_s, x_common) <- mb_common_x
-                 (used_l, hb_l) <- mb_common_l
+      = prod (do (used_l, hb_l) <- mb_common_l
                  (used_r, hb_r) <- mb_common_r
                  (h_l, h_r, rn_l, rn_r, msg_s, hb) <- case (inject hb_l, inject hb_r) of
                    (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
@@ -861,8 +859,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
                  return (go rn_l rn_r used_l used_r init_h_l init_h_r
                             (Heap h_l ids_l) (Heap h_r ids_r) (M.insert x_common hb h) msg_s)) ++
         -- If they don't match, we need to generalise
-        prod (do (msg_s, x_common) <- mb_individual_x
-                 -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
+        prod (do -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
                  -- that binding refers to. If that is not possible, we have to fail.
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
                  (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
@@ -960,7 +957,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
 
       -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that x_common always has no extra info.
       -- NB: binder matching here never fails because type matching never fails, and x_common is guaranteed created with no extra info.
-      | (msg_s, x_common) <- runMSGNF msg_e (msg_s { msgPending = rest }) (liftM (x_common `setVarType`) $ msgType rn2 (termType e_l) (termType e_r))
+      | msg_s <- msg_s { msgPending = rest }
       -- We already know the terms don't match so we are going to generalise
       = prod (do let (ids_l', x_common_l) = uniqAway' ids_l x_common
                      (ids_r', x_common_r) = uniqAway' ids_r x_common
@@ -970,25 +967,22 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
                             (Heap h_l' ids_l') (Heap h_r' ids_r') (M.insert x_common generalised h) msg_s))
     go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
       -- NB: the heap only ever maps TyVars to lambdaBound/generalised, so there is no point trying to detect TyVars on either side
-      -- Match binders themselves, but in this case we can't reuse msgTyVarBndrExtras, which is annoying :-(
-      -- NB: binder matching here never fails because kind matching never fails.
-      | (msg_s, a_common) <- runMSGNF msg_e (msg_s { msgPending = rest }) (liftM (a_common `setTyVarKind`) $ msgKind rn2 (typeKind ty_l) (typeKind ty_r))
+      | msg_s <- msg_s { msgPending = rest }
       -- We already know the types don't match so we are going to generalise. Note that these particular "sucks" can never fail:
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyVarsOfType ty_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyVarsOfType ty_r)
                  return (go (insertTypeSubst rn_l a_common ty_l) (insertTypeSubst rn_r a_common ty_r) used_l' used_r' init_h_l init_h_r
                             (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert a_common generalised h) msg_s))
     go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((q_common, PendingCoercion co_l co_r):rest) })
-      -- FIXME: I could try to avoid generalisation when co_l or co_r is just a heap-bound variable. We could do this (in the same way as PendingTerm) by floating
+      -- TODO: I could try to avoid generalisation when co_l or co_r is just a heap-bound variable. We could do this (in the same way as PendingTerm) by floating
       -- the non-variable into a new heap binding which looks just like it was in the initial heap on the left/right and then matching the variable pair we are
       -- left with as normal.
       --
       -- The only problem with this plan is that co_l and co_r are untagged, so I wouldn't know how to tag the new heap bindings. The best I can do given the current
       -- supercompiler data types is to tag the new coercion HeapBindings with the tags of the *thing that they coerce*, which doesn't seem cool at all!
-
-      -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that q_common always has no extra info.
-      -- NB: binder matching here never fails because type matching never fails, and q_common is guaranteed created with no extra info.
-      | (msg_s, q_common) <- runMSGNF msg_e (msg_s { msgPending = rest }) (liftM (q_common `setVarType`) $ msgType rn2 (coercionType co_l) (coercionType co_r))
+      --
+      -- Doing this may also suffer from the standard problems with instance matching (see PendingTerm)
+      | msg_s <- msg_s { msgPending = rest }
       -- We already know the coercions don't match so we are going to generalise
       = prod (do (used_l', h_l') <- sucks init_h_l k_bvs_l h_l used_l (tyCoVarsOfCo co_l)
                  (used_r', h_r') <- sucks init_h_r k_bvs_l h_r used_r (tyCoVarsOfCo co_r)
