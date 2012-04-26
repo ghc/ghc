@@ -123,3 +123,4 @@ test('T5975b',
      [pre_cmd('touch föøbàr.hs'),
       clean_cmd('rm föøbàr.hs')],
      ghci_script, ['T5975b.script'])
+test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
