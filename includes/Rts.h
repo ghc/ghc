@@ -144,27 +144,21 @@ void _assertFail(const char *filename, unsigned int linenum)
 #endif
 
 #if SIZEOF_VOID_P == 8
-# if SIZEOF_LONG == 8
-#  define FMT_SizeT    "lu"
-#  define FMT_HexSizeT "lx"
-#  define FMT_Word     "lu"
-#  define FMT_Int      "ld"
-# elif SIZEOF_LONG_LONG == 8
-#  define FMT_SizeT    "llu"
-#  define FMT_HexSizeT "llx"
-#  define FMT_Word     "llu"
-#  define FMT_Int      "lld"
-# else
-#  error Cannot find format specifier for size_t size type
-# endif
+# define FMT_SizeT    "zu"
+# define FMT_HexSizeT "zx"
+# define FMT_Word     "zu"
+# define FMT_Int      "zd"
 #elif SIZEOF_VOID_P == 4
-# if SIZEOF_INT == 4
+# if defined(mingw32_HOST_OS)
 #  define FMT_SizeT    "u"
 #  define FMT_HexSizeT "x"
 #  define FMT_Word     "u"
 #  define FMT_Int      "d"
 # else
-#  error Cannot find format specifier for size_t size type
+#  define FMT_SizeT    "zu"
+#  define FMT_HexSizeT "zx"
+#  define FMT_Word     "zu"
+#  define FMT_Int      "zd"
 # endif
 #else
 # error Cannot handle this word size
