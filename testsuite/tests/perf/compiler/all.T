@@ -215,7 +215,7 @@ test('T5321Fun',
           compiler_stats_range_field('bytes allocated', 341591280, 10)),
       # expected value: 669165280 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 669165280, 10))
+          compiler_stats_range_field('bytes allocated', 585521080, 10))
       ],
       compile,[''])
 
@@ -226,7 +226,7 @@ test('T5321FD',
           compiler_stats_range_field('bytes allocated', 257175456, 10)),
       # expected value: 500642456 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 500642456, 10))
+          compiler_stats_range_field('bytes allocated', 418306336, 10))
       ],
       compile,[''])
 
@@ -237,6 +237,6 @@ test('T5642',
 
       # sample: 3926235424 (amd64/Linux, 15/2/2012)
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 3926235424, 10))
+          compiler_stats_range_field('bytes allocated', 3361296144, 10))
       ],
       compile,['-O'])
