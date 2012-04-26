@@ -15,7 +15,7 @@ OutOfHeapHook (lnat request_size, lnat heap_size) /* both sizes in bytes */
 
   (void)request_size;   /* keep gcc -Wall happy */
   if (heap_size > 0) {
-      errorBelch("Heap exhausted;\nCurrent maximum heap size is %lu bytes (%lu MB);\nuse `+RTS -M<size>' to increase it.",
+      errorBelch("Heap exhausted;\nCurrent maximum heap size is %" FMT_SizeT " bytes (%" FMT_SizeT " MB);\nuse `+RTS -M<size>' to increase it.",
           heap_size, heap_size / (1024*1024));
   } else {
       errorBelch("out of memory");

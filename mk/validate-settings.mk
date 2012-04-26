@@ -1,20 +1,22 @@
 # DO NOT EDIT!  Instead, create a file mk/validate.mk, whose settings will
 # override these.  See also mk/custom-settings.mk.
 
-WERROR          = -Werror
+WERROR              = -Werror
+SRC_CC_WARNING_OPTS =
+SRC_HC_WARNING_OPTS =
 
 HADDOCK_DOCS    = YES
 
-SRC_CC_OPTS     += -Wall $(WERROR)
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
 # we turn it on explicitly for consistency with other users
 ifeq "$(GccLT46)" "NO"
-SRC_CC_OPTS     += -Werror=unused-but-set-variable
+SRC_CC_WARNING_OPTS += -Werror=unused-but-set-variable
 # gcc 4.6 gives 3 warning for giveCapabilityToTask not being inlined
-SRC_CC_OPTS     += -Wno-error=inline
+SRC_CC_WARNING_OPTS += -Wno-error=inline
 endif
 
-SRC_HC_OPTS     += -Wall $(WERROR) -H64m -O0
+SRC_CC_OPTS     += $(WERROR) -Wall
+SRC_HC_OPTS     += $(WERROR) -Wall -H64m -O0
 
 GhcStage1HcOpts += -O -fwarn-tabs
 

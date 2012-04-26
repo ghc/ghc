@@ -64,7 +64,7 @@ Time stat_getElapsedTime(void);
 
 /* Only exported for Papi.c */
 void statsPrintf( char *s, ... ) 
-    GNUC3_ATTRIBUTE(format (printf, 1, 2));
+    GNUC3_ATTRIBUTE(format (gnu_printf, 1, 2));
 
 #include "EndPrivate.h"
 
