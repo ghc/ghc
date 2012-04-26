@@ -217,7 +217,7 @@ PrintTickyInfo(void)
   fprintf(tf,"%7ld (%5.1f%%) normal indirections\n",
 	tot_ind_enters,
 	PC(INTAVG(tot_ind_enters,tot_enters)));
-  fprintf(tf,"%7ld (%5.1f%%) permanent indirections\n",
+  fprintf(tf,"%7" FMT_Int " (%5.1f%%) permanent indirections\n",
 	ENT_PERM_IND_ctr,
 	PC(INTAVG(ENT_PERM_IND_ctr,tot_enters)));
 
@@ -228,13 +228,13 @@ PrintTickyInfo(void)
 	  tot_tail_calls, tot_known_calls,
 	  PC(INTAVG(tot_known_calls,tot_tail_calls)));
 
-  fprintf(tf, "\nSLOW APPLICATIONS: %ld evaluated, %ld unevaluated\n",
+  fprintf(tf, "\nSLOW APPLICATIONS: %" FMT_Int " evaluated, %" FMT_Int " unevaluated\n",
 	  SLOW_CALL_ctr, SLOW_CALL_UNEVALD_ctr);
   fprintf(tf, "\n");
   fprintf(tf, "         Too few args   Correct args   Too many args\n");
-  fprintf(tf, "   FUN     %8ld       %8ld        %8ld\n", 
+  fprintf(tf, "   FUN     %8" FMT_Int "       %8" FMT_Int "        %8" FMT_Int "\n", 
 	  SLOW_CALL_FUN_TOO_FEW_ctr, SLOW_CALL_FUN_CORRECT_ctr, SLOW_CALL_FUN_TOO_MANY_ctr);
-  fprintf(tf, "   PAP     %8ld       %8ld        %8ld\n", 
+  fprintf(tf, "   PAP     %8" FMT_Int "       %8" FMT_Int "        %8" FMT_Int "\n", 
 	  SLOW_CALL_PAP_TOO_FEW_ctr, SLOW_CALL_PAP_CORRECT_ctr, SLOW_CALL_PAP_TOO_MANY_ctr);
   fprintf(tf, "\n");
 
@@ -261,27 +261,27 @@ PrintTickyInfo(void)
   fprintf(tf, "\n");
   */
 
-  fprintf(tf,"\nUPDATE FRAMES: %ld (%ld omitted from thunks)",
+  fprintf(tf,"\nUPDATE FRAMES: %" FMT_Int " (%" FMT_Int " omitted from thunks)",
 	UPDF_PUSHED_ctr,
 	UPDF_OMITTED_ctr);
 
-  fprintf(tf,"\nCATCH FRAMES:  %ld", CATCHF_PUSHED_ctr);
+  fprintf(tf,"\nCATCH FRAMES:  %" FMT_Int "", CATCHF_PUSHED_ctr);
 
   if (UPDF_RCC_PUSHED_ctr != 0)
-     fprintf(tf,"%7ld restore cost centre frames (%ld omitted)\n",
+     fprintf(tf,"%7" FMT_Int " restore cost centre frames (%" FMT_Int " omitted)\n",
 	UPDF_RCC_PUSHED_ctr,
 	UPDF_RCC_OMITTED_ctr);
 
   fprintf(tf,"\nUPDATES: %ld\n", tot_updates);
-  fprintf(tf,"%7ld (%5.1f%%) data values\n\t\t  [%ld in place, %ld allocated new space]\n",
+  fprintf(tf,"%7ld (%5.1f%%) data values\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
 	con_updates,
 	PC(INTAVG(con_updates,tot_updates)),
 	UPD_CON_IN_PLACE_ctr, UPD_CON_IN_NEW_ctr);
-  fprintf(tf,"%7ld (%5.1f%%) partial applications\n\t\t  [%ld in place, %ld allocated new space]\n",
+  fprintf(tf,"%7ld (%5.1f%%) partial applications\n\t\t  [%" FMT_Int " in place, %" FMT_Int " allocated new space]\n",
 	pap_updates,
 	PC(INTAVG(pap_updates,tot_updates)),
 	UPD_PAP_IN_PLACE_ctr, UPD_PAP_IN_NEW_ctr);
-  fprintf(tf,"%7ld (%5.1f%%) updates by squeezing\n",
+  fprintf(tf,"%7" FMT_Int " (%5.1f%%) updates by squeezing\n",
 	UPD_SQUEEZED_ctr,
 	PC(INTAVG(UPD_SQUEEZED_ctr, tot_updates)));
 
@@ -317,10 +317,10 @@ PrintTickyInfo(void)
   */
 
 #define PR_CTR(ctr) \
-  do { fprintf(tf,"%7ld " #ctr "\n", ctr); } while(0)
+  do { fprintf(tf,"%7" FMT_Int " " #ctr "\n", ctr); } while(0)
 /* COND_PR_CTR takes a boolean; if false then msg is the printname rather than ctr */
 #define COND_PR_CTR(ctr,b,msg) \
-    if (b) { fprintf(tf,"%7ld " #ctr "\n", ctr); } else { fprintf(tf,"%7ld " msg "\n", ctr); }
+    if (b) { fprintf(tf,"%7" FMT_Int " " #ctr "\n", ctr); } else { fprintf(tf,"%7" FMT_Int " " msg "\n", ctr); }
 #define PR_HST(hst,i) \
   do { fprintf(tf,"%7ld " #hst "_" #i "\n", hst[i]); } while(0)
 
@@ -582,7 +582,7 @@ printRegisteredCounterInfo (FILE *tf)
     /* Function name at the end so it doesn't mess up the tabulation */
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-	fprintf(tf, "%11ld%11ld %6lu%6lu    %-11s%-30s",
+	fprintf(tf, "%11" FMT_Int "%11" FMT_Int " %6lu%6lu    %-11s%-30s",
 		p->entry_count,
 		p->allocs,
 		(unsigned long)p->arity,

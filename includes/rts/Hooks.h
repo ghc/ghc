@@ -18,9 +18,9 @@ extern char *ghc_rts_opts;
 
 extern void OnExitHook (void);
 extern int  NoRunnableThreadsHook (void);
-extern void StackOverflowHook (unsigned long stack_size);
-extern void OutOfHeapHook (unsigned long request_size, unsigned long heap_size);
-extern void MallocFailHook (unsigned long request_size /* in bytes */, char *msg);
+extern void StackOverflowHook (lnat stack_size);
+extern void OutOfHeapHook (lnat request_size, lnat heap_size);
+extern void MallocFailHook (lnat request_size /* in bytes */, char *msg);
 extern void defaultsHook (void);
 
 #endif /* RTS_HOOKS_H */
