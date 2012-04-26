@@ -155,8 +155,8 @@ data MSGState = MSGState {
 
 -- INVARIANT: incoming base variable has *no* extra information beyond Name and Type/Kind (which will be anyway overwritten)
 msgPend :: RnEnv2 -> Var -> Pending -> MSG Var
-msgPend rn2 x0 pending = MSG $ \e s -> case lookupUpdatePending s of
-    Right x                       -> Right (s, x)
+msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
+    Right x                       -> Right (s0, x)
     Left (mb_eq, binderise, mk_s) -> res
       where -- This use of rn2 is 1/2 of the story necessary to ensure new common vars don't clash with rigid binders
             x1 = uniqAway (rnInScopeSet rn2) x0
@@ -165,22 +165,23 @@ msgPend rn2 x0 pending = MSG $ \e s -> case lookupUpdatePending s of
                , eq `elemInScopeSet` msgCommonHeapVars (msgMode e)
                = eq
                | otherwise
-               = uniqAway (msgInScopeSet s) x1
+               = uniqAway (msgInScopeSet s0) x1
             -- We *don't* need to uniqAway with the set of common variables (in e) because the msgInScopeSet
             -- was initialized to contain them all.
 
             -- NB: we make use of lazy programming to ensure that we can see the currently-pended common variable
             -- in the state even as we are binderising it. This is important since the variable's IdInfo might mention itself,
             -- as x_l and x_r will in fact be bound by the top-level letrec.
-            s = (mk_s x) { msgInScopeSet = extendInScopeSet (msgInScopeSet s) x2, -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
-                           msgPending = (x, pending) : msgPending s }
-            res = unMSG (binderise x2) (e { msgLostWorkSharing = False }) s -- This thing will be bound in the top letrec, outside any lambdas
-            Right (_, x) = res
+            s1 = mk_s x
+            s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x2, -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
+                      msgPending = (x, pending) : msgPending s1 }
+            res = unMSG (binderise x2) (e { msgLostWorkSharing = False }) s2 -- This thing will be bound in the top letrec, outside any lambdas
+            Right (_, x) = trace "forcing knot" res
   where
     lookupUpdatePending :: MSGState
                         -> Either (Maybe Var,       -- Are both sides equal vars, and if so what are they equal to?
                                    Var -> MSG Var,  -- Produce a version of the variable suitable for use as a heap binder (with generalised info/type/kind)
-                                   Var -> MSGState) -- How to update the initial state with the variable for this pending item
+                                   Var -> MSGState) -- How to update the initial state with the variable for this pending item (only the "known" maps change)
                                   Var
     lookupUpdatePending s = case pending of
       -- TODO: binder matching can legitimately fail, in which case we might want to create a common "vanilla"
