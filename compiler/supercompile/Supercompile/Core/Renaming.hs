@@ -106,7 +106,7 @@ joinSubst iss (id_subst, tv_subst, co_subst) = mkSubst iss tv_subst co_subst id_
 splitSubst :: Subst -> [(Var, Var)] -> (InScopeSet, Renaming)
 splitSubst (Subst iss id_subst tv_subst co_subst) extend
   = (iss, foldVarlikes (\f -> foldr (\x_x' -> f (fst x_x') x_x')) extend
-                       (\(x, x') -> first3  (\id_subst -> extendVarEnv id_subst x (varToCoreSyn x')))
+                       (\(x, x') -> first3  (\id_subst -> extendVarEnv id_subst x (mkIdExpr x')))
                        (\(a, a') -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a')))
                        (\(q, q') -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q')))
                        (id_subst, tv_subst, co_subst))
@@ -132,7 +132,7 @@ emptyRenaming = (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
 mkIdentityRenaming :: FreeVars -> Renaming
 mkIdentityRenaming fvs = foldVarlikes (\f -> foldVarSet (\x -> f x x)) fvs
-                                      (\x -> first3  (\id_subst -> extendVarEnv id_subst x (varToCoreSyn x)))
+                                      (\x -> first3  (\id_subst -> extendVarEnv id_subst x (mkIdExpr x)))
                                       (\a -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a)))
                                       (\q -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q)))
                                       (emptyVarEnv, emptyVarEnv, emptyVarEnv)
@@ -145,7 +145,7 @@ mkTyVarRenaming aas = (emptyVarEnv, mkVarEnv aas, emptyVarEnv)
 
 mkRenaming :: M.Map Var Var -> Renaming
 mkRenaming rn = foldVarlikes (\f -> M.foldWithKey (\x x' -> f x (x, x'))) rn
-                             (\(x, x') -> first3  (\id_subst -> extendVarEnv id_subst x (varToCoreSyn x')))
+                             (\(x, x') -> first3  (\id_subst -> extendVarEnv id_subst x (mkIdExpr x')))
                              (\(a, a') -> second3 (\tv_subst -> extendVarEnv tv_subst a (mkTyVarTy a')))
                              (\(q, q') -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q')))
                              (emptyVarEnv, emptyVarEnv, emptyVarEnv)
@@ -165,30 +165,30 @@ invertRenaming ids (id_subst, tv_subst, co_subst)
                                                                                       else mk (occNameFS (getOccName x)) u (renameType ids rn (varType x)))
                                                                      | (u, x) <- ufmToList env])
                         | otherwise                 = Nothing
-                  in liftM3 (,,) (traverse coreSynToVar_maybe id_subst >>= invertVarEnv varToCoreSyn mkSysLocal)
-                                 (traverse getTyVar_maybe     tv_subst >>= invertVarEnv mkTyVarTy    (\fs uniq -> mkTyVar (mkSysTvName uniq fs)))
-                                 (traverse getCoVar_maybe     co_subst >>= invertVarEnv mkCoVarCo    mkSysLocal)
+                  in liftM3 (,,) (traverse getId_maybe    id_subst >>= invertVarEnv mkIdExpr  mkSysLocal)
+                                 (traverse getTyVar_maybe tv_subst >>= invertVarEnv mkTyVarTy (\fs uniq -> mkTyVar (mkSysTvName uniq fs)))
+                                 (traverse getCoVar_maybe co_subst >>= invertVarEnv mkCoVarCo mkSysLocal)
 
 -- NB: we want the set of things in scope in the range of the first renaming / domain of the second renaming
 composeRenamings :: InScopeSet -> Renaming -> Renaming -> Renaming
 composeRenamings ids (id_subst1, tv_subst1, co_subst1) rn2
-  = (mapVarEnv (varToCoreSyn . renameId rn2 . coreSynToVar) id_subst1,
+  = (mapVarEnv (mkIdExpr . renameId rn2 . coreSynToVar) id_subst1,
      mapVarEnv (renameType     ids rn2) tv_subst1,
      mapVarEnv (renameCoercion ids rn2) co_subst1)
 
-varToCoreSyn :: Var -> CoreSyn.CoreExpr
-varToCoreSyn = CoreSyn.Var
+mkIdExpr :: Id -> CoreSyn.CoreExpr
+mkIdExpr = CoreSyn.Var
 
-coreSynToVar_maybe :: CoreSyn.CoreExpr -> Maybe Var
-coreSynToVar_maybe (CoreSyn.Var x') = Just x'
-coreSynToVar_maybe _                = Nothing
+getId_maybe :: CoreSyn.CoreExpr -> Maybe Id
+getId_maybe (CoreSyn.Var x') = Just x'
+getId_maybe _                = Nothing
 
 coreSynToVar :: CoreSyn.CoreExpr -> Var
-coreSynToVar = fromMaybe (panic "renameId" empty) . coreSynToVar_maybe
+coreSynToVar = fromMaybe (panic "renameId" empty) . getId_maybe
 
 insertIdRenaming :: Renaming -> Id -> Out Id -> Renaming
 insertIdRenaming (id_subst, tv_subst, co_subst) x x'
-  = (extendVarEnv id_subst x (varToCoreSyn x'), tv_subst, co_subst)
+  = (extendVarEnv id_subst x (mkIdExpr x'), tv_subst, co_subst)
 
 insertIdRenamings :: Renaming -> [(Id, Out Id)] -> Renaming
 insertIdRenamings = foldr (\(x, x') rn -> insertIdRenaming rn x x')
