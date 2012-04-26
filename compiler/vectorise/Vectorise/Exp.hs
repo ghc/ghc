@@ -689,14 +689,13 @@ vectDictExpr (Coercion coe)
 -- instead they become dictionaries of vectorised methods).  We treat them differently, though see
 -- "Note [Scalar dfuns]" in 'Vectorise'.
 --
-vectScalarFun :: Bool       -- ^ Was the function marked as scalar by the user?
-              -> [Var]      -- ^ Functions names in same recursive binding group
+vectScalarFun :: [Var]      -- ^ Functions names in same recursive binding group
               -> CoreExpr   -- ^ Expression to be vectorised
               -> VM VExpr
-vectScalarFun forceScalar recFns expr 
- = vectScalarFunVT forceScalar recFns expr (VITNode VISimple [])
-
-
+vectScalarFun recFns expr 
+ -- this is an external call to vectScalarFun, so we pass a dummy vt tree. The only
+ -- relevant bit is that the node info is *not* VIEncaps
+ = vectScalarFunVT True recFns expr (VITNode VISimple []) 
 
 
 vectScalarFunVT :: Bool       -- ^ Was the function marked as scalar by the user?
@@ -715,34 +714,24 @@ vectScalarFunVT forceScalar recFns expr (VITNode vi _)
                    "\n\tresult  scalar?    : " ++ (show $is_scalar_ty scalarTyCons res_ty) ++
                    "\n\tscalar body?       : " ++ (show $is_scalar scalarVars (is_scalar_ty scalarTyCons) expr) ++
                    "\n\tuses vars?         : " ++ (show $uses scalarVars expr) ++
-                   "\n\t is encaps?        : " ++ (show vi)
+                   "\n\t is encaps? (same as & of all prev cond): " ++ (show vi)
                   )
            (ppr expr)
        ; onlyIfV (ptext (sLit "not a scalar function"))
                  (forceScalar                              -- user asserts the functions is scalar
                   ||
-                  (vi == VIEncaps)                         -- should only be true if all the foll. cond are hold
-                  ||
+                  (vi == VIEncaps))                         -- should only be true if all the foll. cond are hold
+
+{-                  ||
                   all (is_scalar_ty scalarTyCons) arg_tys  -- check whether the function is scalar
                    && is_scalar_ty scalarTyCons res_ty
                    && is_scalar scalarVars (is_scalar_ty scalarTyCons) expr
                    && uses scalarVars expr)
+ -}
          $ do { traceVt  "vectScalarFun - is scalar"  (ppr expr) 
               ;  mkScalarFun arg_tys res_ty expr
               }
        }      
-{-
-      ; onlyIfV (ptext (sLit "not a scalar function"))
-                (forceScalar                                 -- user asserts the functions is scalar
-                 ||
-                 all is_primitive_ty arg_tys                 -- check whether the function is scalar
-                  && is_primitive_ty res_ty
-                  && is_scalar scalarVars (is_scalar_ty scalarTyCons) expr
-                  && uses scalarVars expr
-                  && length arg_tys <= mAX_DPH_SCALAR_ARGS)
-        $ mkScalarFun arg_tys res_ty expr
-      }
-      -}
   where
     {-
     -- !!!FIXME: We would like to allow scalar functions with arguments and results that can be
@@ -912,7 +901,7 @@ vectScalarDFun var recFns
              dict           = Var var `mkTyApps` (mkTyVarTys tvs) `mkVarApps` thetaVars
              scsOps         = map (\selId -> varToCoreExpr selId `mkTyApps` tys `mkApps` [dict])
                                   selIds
-       ; vScsOps <- mapM (\e -> vectorised <$> vectScalarFun True recFns e) scsOps
+       ; vScsOps <- mapM (\e -> vectorised <$> vectScalarFun recFns e) scsOps
 
            -- vectorised applications of the class-dictionary data constructor
        ; Just vDataCon <- lookupDataCon dataCon
@@ -1181,8 +1170,8 @@ vectAlgCase tycon _ty_args scrut bndr ty alts (VITNode _ (scrutVit : altVits))
 vectAlgCase tycon _ty_args _scrut _bndr _ty _alts (VITNode _ [])
   = pprPanic "vectAlgCase (mismatched node information)" (ppr tycon)
 
----- Sanity check  of the 
 {-
+---- Sanity check  of the tree, for debugging only
 checkTree :: VITree -> CoreExpr -> Bool
 checkTree  (VITNode _ []) (Type _ty) 
   = True

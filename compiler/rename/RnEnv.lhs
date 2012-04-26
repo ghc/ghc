@@ -19,7 +19,7 @@ module RnEnv (
         lookupTypeOccRn, lookupKindOccRn, 
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 
-	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
+	HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
 
 	lookupFixityRn, lookupTyFixityRn, 
 	lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
@@ -238,7 +238,14 @@ lookupExactOcc name
   = return name
   | otherwise           
   = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_Name env name
+       ; let -- See Note [Splicing Exact names] 
+             main_occ =  nameOccName name
+             demoted_occs = case demoteOccName main_occ of
+                              Just occ -> [occ]
+                              Nothing  -> []
+             gres = [ gre | occ <- main_occ : demoted_occs
+                          , gre <- lookupGlobalRdrEnv env occ
+	                  , gre_name gre == name ]
        ; case gres of
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
@@ -471,6 +478,19 @@ otherwise the type checker will get confused.  To do this we need to
 keep track of all the Names in scope, and the LocalRdrEnv does just that;
 we consult it with RdrName.inLocalRdrEnvScope.
 
+There is another wrinkle.  With TH and -XDataKinds, consider
+   $( [d| data Nat = Zero 
+          data T = MkT (Proxy 'Zero)  |] )
+After splicing, but before renaming we get this:
+   data Nat_77{tc} = Zero_78{d}
+   data T_79{tc} = MkT_80{d} (Proxy 'Zero_78{tc})  |] )
+THe occurrence of 'Zero in the data type for T has the right unique,
+but it has a TcClsName name-space in its OccName.  (This is set by
+the ctxt_ns argument of Convert.thRdrName.)  When we check that is 
+in scope in the GlobalRdrEnv, we need to look up the DataName namespace
+too.  (An alternative would be to make the GlobalRdrEnv also have
+a Name -> GRE mapping.)
+
 Note [Usage for sub-bndrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 If you have this
@@ -531,18 +551,23 @@ lookupTypeOccRn rdr_name
   = do { mb_name <- lookupOccRn_maybe rdr_name 
        ; case mb_name of {
              Just name -> return name ;
-             Nothing   -> 
+             Nothing   -> lookup_demoted rdr_name } }
 
-    do { -- Maybe it's the name of a *data* constructor
-         data_kinds <- xoptM Opt_DataKinds
-       ; mb_demoted_name <- case demoteRdrName rdr_name of
-                              Just demoted_rdr -> lookupOccRn_maybe demoted_rdr
-                              Nothing          -> return Nothing
+lookup_demoted :: RdrName -> RnM Name
+lookup_demoted rdr_name
+  | Just demoted_rdr <- demoteRdrName rdr_name
+    -- Maybe it's the name of a *data* constructor
+  = do { data_kinds <- xoptM Opt_DataKinds
+       ; mb_demoted_name <- lookupOccRn_maybe demoted_rdr
        ; case mb_demoted_name of
            Nothing -> unboundName WL_Any rdr_name
            Just demoted_name 
              | data_kinds -> return demoted_name
-             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }}}
+             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }
+ 
+  | otherwise
+  = unboundName WL_Any rdr_name 
+
   where 
     suggest_dk = ptext (sLit "A data constructor of that name is in scope; did you mean -XDataKinds?")
 \end{code}
@@ -663,28 +688,111 @@ lookupGreRn_help rdr_name lookup
                         ; return (Just gre) }
 	    gres  -> do { addNameClashErrRn rdr_name gres
 			; return (Just (head gres)) } }
+\end{code}
 
+%*********************************************************
+%*							*
+		Deprecations
+%*							*
+%*********************************************************
+
+Note [Handling of deprecations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* We report deprecations at each *occurrence* of the deprecated thing
+  (see Trac #5867)
+
+* We do not report deprectations for locally-definded names. For a
+  start, we may be exporting a deprecated thing. Also we may use a
+  deprecated thing in the defn of another deprecated things.  We may
+  even use a deprecated thing in the defn of a non-deprecated thing,
+  when changing a module's interface.
+
+* addUsedRdrNames: we do not report deprecations for sub-binders:
+     - the ".." completion for records
+     - the ".." in an export item 'T(..)'
+     - the things exported by a module export 'module M'
+
+\begin{code}
 addUsedRdrName :: GlobalRdrElt -> RdrName -> RnM ()
 -- Record usage of imported RdrNames
 addUsedRdrName gre rdr
-  | isLocalGRE gre = return ()
+  | isLocalGRE gre = return ()  -- No call to warnIfDeprecated
+                                -- See Note [Handling of deprecations]
   | otherwise      = do { env <- getGblEnv
-       			; updMutVar (tcg_used_rdrnames env)
+       			; warnIfDeprecated gre
+                        ; updMutVar (tcg_used_rdrnames env)
 		                    (\s -> Set.insert rdr s) }
 
 addUsedRdrNames :: [RdrName] -> RnM ()
 -- Record used sub-binders
 -- We don't check for imported-ness here, because it's inconvenient
 -- and not stritly necessary.
+-- NB: no call to warnIfDeprecated; see Note [Handling of deprecations]
 addUsedRdrNames rdrs
   = do { env <- getGblEnv
        ; updMutVar (tcg_used_rdrnames env)
 	 	   (\s -> foldr Set.insert s rdrs) }
 
-------------------------------
---	GHCi support
-------------------------------
+warnIfDeprecated :: GlobalRdrElt -> RnM ()
+warnIfDeprecated gre@(GRE { gre_name = name, gre_prov = Imported (imp_spec : _) })
+  = do { dflags <- getDynFlags
+       ; when (wopt Opt_WarnWarningsDeprecations dflags) $
+         do { iface <- loadInterfaceForName doc name
+            ; case lookupImpDeprec iface gre of
+                Just txt -> addWarn (mk_msg txt) 
+                Nothing  -> return () } }
+  where
+    mk_msg txt = sep [ sep [ ptext (sLit "In the use of")
+                             <+> pprNonVarNameSpace (occNameSpace (nameOccName name))
+                             <+> quotes (ppr name)
+                           , parens imp_msg <> colon ]
+                     , ppr txt ]
 
+    name_mod = ASSERT2( isExternalName name, ppr name ) nameModule name
+    imp_mod  = importSpecModule imp_spec
+    imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
+    extra | imp_mod == moduleName name_mod = empty
+          | otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
+
+    doc = ptext (sLit "The name") <+> quotes (ppr name) <+> ptext (sLit "is mentioned explicitly")
+
+warnIfDeprecated _ = return ()   -- No deprecations for things defined locally
+
+lookupImpDeprec :: ModIface -> GlobalRdrElt -> Maybe WarningTxt
+lookupImpDeprec iface gre
+  = mi_warn_fn iface (gre_name gre) `mplus`  -- Bleat if the thing,
+    case gre_par gre of                      -- or its parent, is warn'd
+       ParentIs p -> mi_warn_fn iface p 
+       NoParent   -> Nothing
+\end{code}
+
+Note [Used names with interface not loaded]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's (just) possible to to find a used
+Name whose interface hasn't been loaded:
+
+a) It might be a WiredInName; in that case we may not load
+   its interface (although we could).
+
+b) It might be GHC.Real.fromRational, or GHC.Num.fromInteger
+   These are seen as "used" by the renamer (if -XRebindableSyntax)
+   is on), but the typechecker may discard their uses
+   if in fact the in-scope fromRational is GHC.Read.fromRational,
+   (see tcPat.tcOverloadedLit), and the typechecker sees that the type
+   is fixed, say, to GHC.Base.Float (see Inst.lookupSimpleInst).
+   In that obscure case it won't force the interface in.
+
+In both cases we simply don't permit deprecations;
+this is, after all, wired-in stuff.
+
+
+%*********************************************************
+%*							*
+		GHCi support
+%*							*
+%*********************************************************
+
+\begin{code}
 -- A qualified name on the command line can refer to any module at all: we
 -- try to load the interface if we don't already have it.
 lookupQualifiedName :: RdrName -> RnM (Maybe Name)
@@ -819,30 +927,32 @@ lookupBindGroupOcc ctxt what rdr_name
 
 
 ---------------
-lookupLocalDataTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
--- GHC extension: look up both the tycon and data con 
--- for con-like things.  Used for top-level fixity signatures
--- Complain if neither is in scope
-lookupLocalDataTcNames bndr_set what rdr_name
+lookupLocalTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
+-- GHC extension: look up both the tycon and data con or variable.
+-- Used for top-level fixity signatures. Complain if neither is in scope.
+-- See Note [Fixity signature lookup]
+lookupLocalTcNames bndr_set what rdr_name
   | Just n <- isExact_maybe rdr_name	
 	-- Special case for (:), which doesn't get into the GlobalRdrEnv
   = do { n' <- lookupExactOcc n; return [n'] }	-- For this we don't need to try the tycon too
   | otherwise
-  = do	{ mb_gres <- mapM (lookupBindGroupOcc (LocalBindCtxt bndr_set) what)
-			  (dataTcOccs rdr_name)
-	; let (errs, names) = splitEithers mb_gres
-	; when (null names) (addErr (head errs))	-- Bleat about one only
-	; return names }
+  = do { mb_gres <- mapM lookup (dataTcOccs rdr_name)
+       ; let (errs, names) = splitEithers mb_gres
+       ; when (null names) $ addErr (head errs) -- Bleat about one only
+       ; return names }
+  where
+    lookup = lookupBindGroupOcc (LocalBindCtxt bndr_set) what
 
 dataTcOccs :: RdrName -> [RdrName]
--- If the input is a data constructor, return both it and a type
--- constructor.  This is useful when we aren't sure which we are
--- looking at.
+-- Return both the given name and the same name promoted to the TcClsName
+-- namespace.  This is useful when we aren't sure which we are looking at.
 dataTcOccs rdr_name
-  | isDataOcc occ 	      = [rdr_name, rdr_name_tc]
-  | otherwise 	  	      = [rdr_name]
-  where    
-    occ 	= rdrNameOcc rdr_name
+  | isDataOcc occ || isVarOcc occ
+  = [rdr_name, rdr_name_tc]
+  | otherwise
+  = [rdr_name]
+  where
+    occ = rdrNameOcc rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
 \end{code}
 
@@ -852,6 +962,26 @@ dataTcOccs rdr_name
 		Fixities
 %*							*
 %*********************************************************
+
+Note [Fixity signature lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A fixity declaration like
+
+    infixr 2 ?
+
+can refer to a value-level operator, e.g.:
+
+    (?) :: String -> String -> String
+
+or a type-level operator, like:
+
+    data (?) a b = A a | B b
+
+so we extend the lookup of the reader name '?' to the TcClsName namespace, as
+well as the original namespace.
+
+The extended lookup is also used in other places, like resolution of
+deprecation declarations, and lookup of names in GHCi.
 
 \begin{code}
 --------------------------------

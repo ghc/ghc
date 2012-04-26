@@ -24,7 +24,7 @@ module TcHsType (
 
 		-- Kind-checking types
                 -- No kind generalisation, no checkValidType
-	tcHsTyVarBndrs, tcHsTyVarBndrsGen ,
+	tcHsTyVarBndrs, 
         tcHsLiftedType, 
 	tcLHsType, tcCheckLHsType, 
         tcHsContext, tcInferApps, tcHsArgTys,
@@ -177,8 +177,8 @@ tcHsSigTypeNC ctxt (L loc hs_ty)
           -- The kind is checked by checkValidType, and isn't necessarily
           -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
+          -- Generalise here: see Note [ generalisation]
         ; ty <- tcCheckHsTypeAndGen hs_ty kind
-                -- Generalise here: see Note [Kind generalisation]
 
           -- Zonk to expose kind information to checkValidType
         ; ty <- zonkTcType ty
@@ -826,28 +826,9 @@ tcHsTyVarBndr (L _ hs_tv)
        { kind <- case hs_tv of
                    UserTyVar {} -> newMetaKindVar
                    KindedTyVar _ (HsBSig kind _) -> tcLHsKind kind
-       ; return (mkTyVar name kind) } } }
+       ; return (mkTcTyVar name kind (SkolemTv False)) } } }
 
 ------------------
-tcHsTyVarBndrsGen :: [LHsTyVarBndr Name] 
-	          -> TcM (TcTyVarSet, r)  -- Result + free tyvars of thing inside
-	          -> TcM ([TyVar], r)     -- Generalised kind variables 
-                                          -- + zonked tyvars + result result
--- tcHsTyVarBndrsGen [(f :: ?k -> *), (a :: ?k)] thing_inside
--- Returns with tyvars [(k :: BOX), (f :: k -> *), (a :: k)]
-tcHsTyVarBndrsGen hs_tvs thing_inside
-  = do { traceTc "tcHsTyVarBndrsGen" (ppr hs_tvs) 
-       ; (tvs, (ftvs, res)) <- tcHsTyVarBndrs hs_tvs $ \ tvs ->
-                       do { res <- thing_inside
-                          ; return (tvs, res) }
-       ; let kinds = map tyVarKind tvs
-       ; kvs' <- kindGeneralize (tyVarsOfTypes kinds `unionVarSet` 
-                                        (ftvs `delVarSetList` tvs))
-       ; zonked_kinds <- mapM zonkTcKind kinds
-       ; let tvs' = zipWith setTyVarKind tvs zonked_kinds
-                     -- See Note [Kinds of quantified type variables]
-       ; traceTc "tcTyVarBndrsGen" (ppr (hs_tvs, kvs', tvs))
-       ; return (kvs' ++ tvs', res) }
 
 -------------------
 kindGeneralize :: TyVarSet -> TcM [KindVar]
@@ -856,6 +837,9 @@ kindGeneralize tkvs
        ; tidy_env <- tcInitTidyEnv
        ; tkvs     <- zonkTyVarsAndFV tkvs
        ; let kvs_to_quantify = varSetElems (tkvs `minusVarSet` gbl_tvs)
+                -- Any type varaibles in tkvs will be in scope,
+                -- and hence in gbl_tvs, so after removing gbl_tvs
+                -- we should only have kind variables left
 
              (_, tidy_kvs_to_quantify) = tidyTyVarBndrs tidy_env kvs_to_quantify
                            -- We do not get a later chance to tidy!
@@ -1317,8 +1301,8 @@ tc_lhs_kind (L span ki) = setSrcSpan span (tc_hs_kind ki)
 
 -- The main worker
 tc_hs_kind :: HsKind Name -> TcM Kind
-tc_hs_kind k@(HsTyVar _)   = tc_app k []
-tc_hs_kind k@(HsAppTy _ _) = tc_app k []
+tc_hs_kind k@(HsTyVar _)   = tc_kind_app k []
+tc_hs_kind k@(HsAppTy _ _) = tc_kind_app k []
 
 tc_hs_kind (HsParTy ki) = tc_lhs_kind ki
 
@@ -1343,18 +1327,17 @@ tc_hs_kind (HsTupleTy _ kis) =
 tc_hs_kind k = panic ("tc_hs_kind: " ++ showPpr k)
 
 -- Special case for kind application
-tc_app :: HsKind Name -> [LHsKind Name] -> TcM Kind
-tc_app (HsAppTy ki1 ki2) kis = tc_app (unLoc ki1) (ki2:kis)
-tc_app (HsTyVar tc)      kis =
-  do arg_kis <- mapM tc_lhs_kind kis
-     tc_var_app tc arg_kis
-tc_app ki                _   = failWithTc (quotes (ppr ki) <+> 
+tc_kind_app :: HsKind Name -> [LHsKind Name] -> TcM Kind
+tc_kind_app (HsAppTy ki1 ki2) kis = tc_kind_app (unLoc ki1) (ki2:kis)
+tc_kind_app (HsTyVar tc)      kis = do { arg_kis <- mapM tc_lhs_kind kis
+                                       ; tc_kind_var_app tc arg_kis }
+tc_kind_app ki                _   = failWithTc (quotes (ppr ki) <+> 
                                     ptext (sLit "is not a kind constructor"))
 
-tc_var_app :: Name -> [Kind] -> TcM Kind
+tc_kind_var_app :: Name -> [Kind] -> TcM Kind
 -- Special case for * and Constraint kinds
 -- They are kinds already, so we don't need to promote them
-tc_var_app name arg_kis
+tc_kind_var_app name arg_kis
   |  name == liftedTypeKindTyConName
   || name == constraintKindTyConName
   = do { unless (null arg_kis)
@@ -1362,39 +1345,48 @@ tc_var_app name arg_kis
        ; thing <- tcLookup name
        ; case thing of
            AGlobal (ATyCon tc) -> return (mkTyConApp tc [])
-           _                   -> panic "tc_var_app 1" }
+           _                   -> panic "tc_kind_var_app 1" }
 
 -- General case
-tc_var_app name arg_kis = do
-  (_errs, mb_thing) <- tryTc (tcLookup name)
-  case mb_thing of
-    Just (AGlobal (ATyCon tc))
-      | isAlgTyCon tc || isTupleTyCon tc -> do
-      data_kinds <- xoptM Opt_DataKinds
-      unless data_kinds $ addErr (dataKindsErr name)
-      case isPromotableTyCon tc of
-        Just n | n == length arg_kis ->
-          return (mkTyConApp (buildPromotedTyCon tc) arg_kis)
-        Just _  -> err tc "is not fully applied"
-        Nothing -> err tc "is not promotable"
+tc_kind_var_app name arg_kis
+  = do { (_errs, mb_thing) <- tryTc (tcLookup name)
+       ;  case mb_thing of
+  	   Just (AGlobal (ATyCon tc))
+  	     | isAlgTyCon tc || isTupleTyCon tc
+  	     -> do { data_kinds <- xoptM Opt_DataKinds
+  	           ; unless data_kinds $ addErr (dataKindsErr name)
+  	     	   ; case isPromotableTyCon tc of
+  	     	       Just n | n == length arg_kis ->
+  	     	         return (mkTyConApp (buildPromotedTyCon tc) arg_kis)
+  	     	       Just _  -> err tc "is not fully applied"
+  	     	       Nothing -> err tc "is not promotable" }
 
-    -- A lexically scoped kind variable
-    Just (ATyVar _ kind_var) -> return (mkAppTys (mkTyVarTy kind_var) arg_kis)
+  	   -- A lexically scoped kind variable
+  	   Just (ATyVar _ kind_var) 
+             | not (isKindVar kind_var) 
+             -> failWithTc (ptext (sLit "Type variable") <+> quotes (ppr kind_var)
+                            <+> ptext (sLit "used as a kind"))
+             | not (null arg_kis) -- Kind variables always have kind BOX, 
+                                  -- so cannot be applied to anything
+             -> failWithTc (ptext (sLit "Kind variable") <+> quotes (ppr name)
+                            <+> ptext (sLit "cannot appear in a function position"))
+             | otherwise 
+             -> return (mkAppTys (mkTyVarTy kind_var) arg_kis)
 
-    -- It is in scope, but not what we expected
-    Just thing -> wrongThingErr "promoted type" thing name
+  	   -- It is in scope, but not what we expected
+  	   Just thing -> wrongThingErr "promoted type" thing name
 
-    -- It is not in scope, but it passed the renamer: staging error
-    Nothing    -> -- ASSERT2 ( isTyConName name, ppr name )
-              do  env <- getLclEnv
-                  traceTc "tc_var_app" (ppr name $$ ppr (tcl_env env))
-                  failWithTc (ptext (sLit "Promoted kind") <+> 
-                              quotes (ppr name) <+>
-                              ptext (sLit "used in a mutually recursive group"))
+  	   -- It is not in scope, but it passed the renamer: staging error
+  	   Nothing    
+             -> -- ASSERT2 ( isTyConName name, ppr name )
+  	        do { env <- getLclEnv
+  	           ; traceTc "tc_kind_var_app" (ppr name $$ ppr (tcl_env env))
+  	           ; failWithTc (ptext (sLit "Promoted kind") <+> 
+  	                          quotes (ppr name) <+>
+  	                          ptext (sLit "used in a mutually recursive group")) } }
   where 
    err tc msg = failWithTc (quotes (ppr tc) <+> ptext (sLit "of kind")
                         <+> quotes (ppr (tyConKind tc)) <+> ptext (sLit msg))
-
 \end{code}
 
 %************************************************************************

@@ -59,16 +59,15 @@ module TcMType (
 
   --------------------------------
   -- Zonking
-  zonkType, zonkKind, zonkTcPredType, 
+  zonkTcPredType, 
   skolemiseSigTv, skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTyVarsAndFV, 
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
 
   zonkTcKind, defaultKindVarToStar, zonkCt, zonkCts,
-  zonkImplication, zonkEvVar, zonkWC, 
+  zonkImplication, zonkEvVar, zonkWC, zonkId,
 
-  zonkTcTypeAndSubst,
   tcGetGlobalTyVars, 
   ) where
 
@@ -491,49 +490,9 @@ zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
 
 -----------------  Types
-zonkTcType :: TcType -> TcM TcType
--- Simply look through all Flexis
-zonkTcType ty = zonkType zonkTcTyVar ty
-
-zonkTcTyVar :: TcTyVar -> TcM TcType
--- Simply look through all Flexis
-zonkTcTyVar tv
-  = ASSERT2( isTcTyVar tv, ppr tv ) do
-    case tcTyVarDetails tv of
-      SkolemTv {}   -> zonk_kind_and_return
-      RuntimeUnk {} -> zonk_kind_and_return
-      FlatSkol ty   -> zonkTcType ty
-      MetaTv _ ref  -> do { cts <- readMutVar ref
-                          ; case cts of
-		               Flexi       -> zonk_kind_and_return
-			       Indirect ty -> zonkTcType ty }
-  where
-    zonk_kind_and_return = do { z_tv <- zonkTyVarKind tv
-                              ; return (TyVarTy z_tv) }
-
 zonkTyVarKind :: TyVar -> TcM TyVar
 zonkTyVarKind tv = do { kind' <- zonkTcKind (tyVarKind tv)
                       ; return (setTyVarKind tv kind') }
-
-zonkTcTypeAndSubst :: TvSubst -> TcType -> TcM TcType
--- Zonk, and simultaneously apply a non-necessarily-idempotent substitution
-zonkTcTypeAndSubst subst ty = zonkType zonk_tv ty
-  where
-    zonk_tv tv
-      = do { z_tv <- updateTyVarKindM zonkTcKind tv
-           ; ASSERT ( isTcTyVar tv )
-             case tcTyVarDetails tv of
-                SkolemTv {}   -> return (TyVarTy z_tv)
-                RuntimeUnk {} -> return (TyVarTy z_tv)
-                FlatSkol ty   -> zonkType zonk_tv ty
-                MetaTv _ ref  -> do { cts <- readMutVar ref
-                                    ; case cts of
-      			           Flexi       -> zonk_flexi z_tv
-      			           Indirect ty -> zonkType zonk_tv ty } }
-    zonk_flexi tv
-      = case lookupTyVar subst tv of
-          Just ty -> zonkType zonk_tv ty
-          Nothing -> return (TyVarTy tv)
 
 zonkTcTypes :: [TcType] -> TcM [TcType]
 zonkTcTypes tys = mapM zonkTcType tys
@@ -777,23 +736,25 @@ simplifier knows how to deal with.
 
 %************************************************************************
 %*									*
-\subsection{Zonking -- the main work-horses: zonkType, zonkTyVar}
+\subsection{Zonking -- the main work-horses: zonkTcType, zonkTcTyVar}
 %*									*
 %*		For internal use only!					*
 %*									*
 %************************************************************************
 
 \begin{code}
+-- zonkId is used *during* typechecking just to zonk the Id's type
+zonkId :: TcId -> TcM TcId
+zonkId id
+  = do { ty' <- zonkTcType (idType id)
+       ; return (Id.setIdType id ty') }
+
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --	type variable and zonks the kind too
 
-zonkKind :: (TcTyVar -> TcM Kind) -> TcKind -> TcM Kind
-zonkKind = zonkType
-
-zonkType :: (TcTyVar -> TcM Type)  -- What to do with TcTyVars
-         -> TcType -> TcM Type
-zonkType zonk_tc_tyvar ty
+zonkTcType :: TcType -> TcM TcType
+zonkTcType ty
   = go ty
   where
     go (TyConApp tc tys) = do tys' <- mapM go tys
@@ -813,7 +774,7 @@ zonkType zonk_tc_tyvar ty
 		-- to pull the TyConApp to the top.
 
 	-- The two interesting cases!
-    go (TyVarTy tyvar) | isTcTyVar tyvar = zonk_tc_tyvar tyvar
+    go (TyVarTy tyvar) | isTcTyVar tyvar = zonkTcTyVar tyvar
 		       | otherwise	 = TyVarTy <$> updateTyVarKindM go tyvar
 		-- Ordinary (non Tc) tyvars occur inside quantified types
 
@@ -821,6 +782,22 @@ zonkType zonk_tc_tyvar ty
                              ty' <- go ty
                              tyvar' <- updateTyVarKindM go tyvar
                              return (ForAllTy tyvar' ty')
+
+zonkTcTyVar :: TcTyVar -> TcM TcType
+-- Simply look through all Flexis
+zonkTcTyVar tv
+  = ASSERT2( isTcTyVar tv, ppr tv ) do
+    case tcTyVarDetails tv of
+      SkolemTv {}   -> zonk_kind_and_return
+      RuntimeUnk {} -> zonk_kind_and_return
+      FlatSkol ty   -> zonkTcType ty
+      MetaTv _ ref  -> do { cts <- readMutVar ref
+                          ; case cts of
+		               Flexi       -> zonk_kind_and_return
+			       Indirect ty -> zonkTcType ty }
+  where
+    zonk_kind_and_return = do { z_tv <- zonkTyVarKind tv
+                              ; return (TyVarTy z_tv) }
 \end{code}
 
 

@@ -117,7 +117,7 @@ repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
 repTopDs group
  = do { let { tv_bndrs = hsSigTvBinders (hs_valds group)
             ; bndrs = tv_bndrs ++ hsGroupBinders group } ;
-	ss <- pprTrace "reptop" (ppr bndrs $$ ppr tv_bndrs) $ mkGenSyms bndrs ;
+	ss <- mkGenSyms bndrs ;
 
 	-- Bind all the names mainly to avoid repeated use of explicit strings.
 	-- Thus	we get

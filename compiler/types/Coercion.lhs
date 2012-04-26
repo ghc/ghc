@@ -441,7 +441,8 @@ ppr_forall_co p ty
 \begin{code}
 pprCoAxiom :: CoAxiom -> SDoc
 pprCoAxiom ax
-  = sep [ ptext (sLit "axiom") <+> ppr ax <+> ppr (co_ax_tvs ax)
+  = sep [ ptext (sLit "axiom") <+> 
+            sep [ ppr ax, nest 2 (pprTvBndrs (co_ax_tvs ax)) ]
         , nest 2 (dcolon <+> pprEqPred (Pair (co_ax_lhs ax) (co_ax_rhs ax))) ]
 \end{code}
 

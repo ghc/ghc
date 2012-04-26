@@ -26,9 +26,10 @@ module TcHsSyn (
 	-- re-exported from TcMonad
 	TcId, TcIdSet, 
 
-	zonkTopDecls, zonkTopExpr, zonkTopLExpr, mkZonkTcTyVar,
-	zonkId, zonkTopBndrs,
-        emptyZonkEnv, mkTyVarZonkEnv, zonkTcTypeToType, zonkTcTypeToTypes
+	zonkTopDecls, zonkTopExpr, zonkTopLExpr, 
+	zonkTopBndrs, zonkTyBndrsX,
+        emptyZonkEnv, mkEmptyZonkEnv, mkTyVarZonkEnv, 
+        zonkTcTypeToType, zonkTcTypeToTypes
   ) where
 
 #include "HsVersions.h"
@@ -37,8 +38,9 @@ import HsSyn
 import Id
 import TcRnMonad
 import PrelNames
+import TypeRep     -- We can see the representation of types
 import TcType
-import TcMType
+import TcMType ( defaultKindVarToStar, zonkQuantifiedTyVar, writeMetaTyVar )
 import TcEvidence
 import TysPrim
 import TysWiredIn
@@ -161,14 +163,6 @@ hsOverLitName (HsIsString {})   = fromStringName
 %*									*
 %************************************************************************
 
-\begin{code}
--- zonkId is used *during* typechecking just to zonk the Id's type
-zonkId :: TcId -> TcM TcId
-zonkId id
-  = zonkTcType (idType id) `thenM` \ ty' ->
-    returnM (Id.setIdType id ty')
-\end{code}
-
 The rest of the zonking is done *after* typechecking.
 The main zonking pass runs over the bindings
 
@@ -195,7 +189,7 @@ data ZonkEnv
   = ZonkEnv 
       UnboundTyVarZonker
       (TyVarEnv TyVar)          -- 
-      (IdEnv Var)		-- What variables are in scope
+      (IdEnv    Var)		-- What variables are in scope
 	-- Maps an Id or EvVar to its zonked version; both have the same Name
 	-- Note that all evidence (coercion variables as well as dictionaries)
 	-- 	are kept in the ZonkEnv
@@ -207,7 +201,10 @@ instance Outputable ZonkEnv where
 
 
 emptyZonkEnv :: ZonkEnv
-emptyZonkEnv = ZonkEnv zonkTypeZapping emptyVarEnv emptyVarEnv
+emptyZonkEnv = mkEmptyZonkEnv zonkTypeZapping
+
+mkEmptyZonkEnv :: UnboundTyVarZonker -> ZonkEnv
+mkEmptyZonkEnv zonker = ZonkEnv zonker emptyVarEnv emptyVarEnv
 
 extendIdZonkEnv :: ZonkEnv -> [Var] -> ZonkEnv
 extendIdZonkEnv (ZonkEnv zonk_ty ty_env id_env) ids 
@@ -1041,7 +1038,7 @@ zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
 
        ; let final_bndrs :: [RuleBndr Var]
              final_bndrs = map (RuleBndr . noLoc)
-                             (varSetElemsKvsFirst unbound_tkvs)
+                               (varSetElemsKvsFirst unbound_tkvs)
                            ++ new_bndrs
 
        ; return $ 
@@ -1249,37 +1246,58 @@ DV, TODO: followup on this note mentioning new examples I will add to perf/
 
 
 \begin{code}
-mkZonkTcTyVar :: (TcTyVar -> TcM Type)	-- What to do for an *mutable Flexi* var
-	      -> (TcTyVar -> Type)	-- What to do for an immutable var
- 	      -> TcTyVar -> TcM TcType
-mkZonkTcTyVar unbound_mvar_fn unbound_ivar_fn
-  = zonk_tv
-  where
-    zonk_tv tv 
-     = ASSERT( isTcTyVar tv )
-       case tcTyVarDetails tv of
-         SkolemTv {}    -> return (unbound_ivar_fn tv)
-         RuntimeUnk {}  -> return (unbound_ivar_fn tv)
-         FlatSkol ty    -> zonkType zonk_tv ty
+zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
+zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
+  | isTcTyVar tv
+  = case tcTyVarDetails tv of
+         SkolemTv {}    -> lookup_in_env
+         RuntimeUnk {}  -> lookup_in_env
+         FlatSkol ty    -> zonkTcTypeToType env ty
          MetaTv _ ref   -> do { cts <- readMutVar ref
            		      ; case cts of    
            		           Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
-                                                         zonkType zonk_tv (tyVarKind tv)
-                                               ; unbound_mvar_fn (setTyVarKind tv kind) }
-           		           Indirect ty -> do { zty <- zonkType zonk_tv ty 
+                                                         zonkTcTypeToType env (tyVarKind tv)
+                                               ; zonk_unbound_tyvar (setTyVarKind tv kind) }
+           		           Indirect ty -> do { zty <- zonkTcTypeToType env ty 
                                                      -- Small optimisation: shortern-out indirect steps
                                                      -- so that the old type may be more easily collected.
                                                      ; writeMutVar ref (Indirect zty)
                                                      ; return zty } }
+  | otherwise
+  = lookup_in_env
+  where
+    lookup_in_env    -- Look up in the env just as we do for Ids
+      = case lookupVarEnv tv_env tv of
+          Nothing  -> return (mkTyVarTy tv)
+          Just tv' -> return (mkTyVarTy tv')
 
 zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type
-zonkTcTypeToType (ZonkEnv zonk_unbound_tyvar tv_env _id_env)
-  = zonkType (mkZonkTcTyVar zonk_unbound_tyvar zonk_bound_tyvar)
+zonkTcTypeToType env ty
+  = go ty
   where
-    zonk_bound_tyvar tv    -- Look up in the env just as we do for Ids
-      = case lookupVarEnv tv_env tv of
-          Nothing  -> mkTyVarTy tv
-          Just tv' -> mkTyVarTy tv'
+    go (TyConApp tc tys) = do tys' <- mapM go tys
+                              return (TyConApp tc tys')
+
+    go (LitTy n)         = return (LitTy n)
+
+    go (FunTy arg res)   = do arg' <- go arg
+                              res' <- go res
+                              return (FunTy arg' res')
+
+    go (AppTy fun arg)   = do fun' <- go fun
+                              arg' <- go arg
+                              return (mkAppTy fun' arg')
+		-- NB the mkAppTy; we might have instantiated a
+		-- type variable to a type constructor, so we need
+		-- to pull the TyConApp to the top.
+
+	-- The two interesting cases!
+    go (TyVarTy tv) = zonkTyVarOcc env tv
+
+    go (ForAllTy tv ty) = ASSERT( isImmutableTyVar tv ) do
+                          do { (env', tv') <- zonkTyBndrX env tv
+                             ; ty' <- zonkTcTypeToType env' ty
+                             ; return (ForAllTy tv' ty') }
 
 zonkTcTypeToTypes :: ZonkEnv -> [TcType] -> TcM [Type]
 zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys
