@@ -235,3 +235,4 @@ test('T5555', extra_clean(['T5555_Lib.hi', 'T5555_Lib.o']),
 test('T5976', normal, compile_fail, ['-v0'])
 test('T5795', normal, compile_fail, ['-v0'])
 test('T6005', normal, compile, ['-v0'])
+test('T6005a', normal, compile, ['-v0'])
