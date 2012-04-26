@@ -14,6 +14,8 @@
 #ifndef RTS_TYPES_H
 #define RTS_TYPES_H
 
+#include <stddef.h>
+
 typedef unsigned int    nat;           /* at least 32 bits (like int) */
 typedef          size_t lnat;          /* at least 32 bits            */
 
