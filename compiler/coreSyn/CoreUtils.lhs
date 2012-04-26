@@ -1329,50 +1329,9 @@ locallyBoundR rn_env v = inRnEnvR rn_env v
 %************************************************************************
 
 \begin{code}
-coreBindsSize :: [CoreBind] -> Int
-coreBindsSize bs = foldr ((+) . bindSize) 0 bs
-
-exprSize :: CoreExpr -> Int
--- ^ A measure of the size of the expressions, strictly greater than 0
--- It also forces the expression pretty drastically as a side effect
--- Counts *leaves*, not internal nodes. Types and coercions are not counted.
-exprSize (Var v)         = v `seq` 1
-exprSize (Lit lit)       = lit `seq` 1
-exprSize (App f a)       = exprSize f + exprSize a
-exprSize (Lam b e)       = varSize b + exprSize e
-exprSize (Let b e)       = bindSize b + exprSize e
-exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
-exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
-exprSize (Tick n e)      = tickSize n + exprSize e
-exprSize (Type t)        = seqType t `seq` 1
-exprSize (Coercion co)   = seqCo co `seq` 1
-
-tickSize :: Tickish Id -> Int
-tickSize (ProfNote cc _ _) = cc `seq` 1
-tickSize _ = 1 -- the rest are strict
-
-varSize :: Var -> Int
-varSize b  | isTyVar b = 1
-           | otherwise = seqType (idType b)             `seq`
-                         megaSeqIdInfo (idInfo b)       `seq`
-                         1
-
-varsSize :: [Var] -> Int
-varsSize = sum . map varSize
-
-bindSize :: CoreBind -> Int
-bindSize (NonRec b e) = varSize b + exprSize e
-bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
-
-pairSize :: (Var, CoreExpr) -> Int
-pairSize (b,e) = varSize b + exprSize e
-
-altSize :: CoreAlt -> Int
-altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
-\end{code}
-
-\begin{code}
-data CoreStats = CS { cs_tm, cs_ty, cs_co :: Int }
+data CoreStats = CS { cs_tm :: Int    -- Terms
+                    , cs_ty :: Int    -- Types
+                    , cs_co :: Int }  -- Coercions
 
 
 instance Outputable CoreStats where 
@@ -1427,6 +1386,54 @@ tyStats ty = zeroCS { cs_ty = typeSize ty }
 coStats :: Coercion -> CoreStats
 coStats co = zeroCS { cs_co = coercionSize co }
 \end{code}
+
+
+\begin{code}
+coreBindsSize :: [CoreBind] -> Int
+-- We use coreBindStats for user printout
+-- but this one is a quick and dirty basis for
+-- the simplifier's tick limit
+coreBindsSize bs = foldr ((+) . bindSize) 0 bs
+
+exprSize :: CoreExpr -> Int
+-- ^ A measure of the size of the expressions, strictly greater than 0
+-- It also forces the expression pretty drastically as a side effect
+-- Counts *leaves*, not internal nodes. Types and coercions are not counted.
+exprSize (Var v)         = v `seq` 1
+exprSize (Lit lit)       = lit `seq` 1
+exprSize (App f a)       = exprSize f + exprSize a
+exprSize (Lam b e)       = varSize b + exprSize e
+exprSize (Let b e)       = bindSize b + exprSize e
+exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
+exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
+exprSize (Tick n e)      = tickSize n + exprSize e
+exprSize (Type t)        = seqType t `seq` 1
+exprSize (Coercion co)   = seqCo co `seq` 1
+
+tickSize :: Tickish Id -> Int
+tickSize (ProfNote cc _ _) = cc `seq` 1
+tickSize _ = 1 -- the rest are strict
+
+varSize :: Var -> Int
+varSize b  | isTyVar b = 1
+           | otherwise = seqType (idType b)             `seq`
+                         megaSeqIdInfo (idInfo b)       `seq`
+                         1
+
+varsSize :: [Var] -> Int
+varsSize = sum . map varSize
+
+bindSize :: CoreBind -> Int
+bindSize (NonRec b e) = varSize b + exprSize e
+bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
+
+pairSize :: (Var, CoreExpr) -> Int
+pairSize (b,e) = varSize b + exprSize e
+
+altSize :: CoreAlt -> Int
+altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
+\end{code}
+
 
 %************************************************************************
 %*                                                                      *
