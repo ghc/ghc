@@ -176,7 +176,7 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
             s2 = s1 { msgInScopeSet = extendInScopeSet (msgInScopeSet s1) x2, -- NB: binderization *never* changes the unique -- exploit that to avoid a loop
                       msgPending = (x, pending) : msgPending s1 }
             res = unMSG (binderise x2) (e { msgLostWorkSharing = False }) s2 -- This thing will be bound in the top letrec, outside any lambdas
-            Right (_, x) = trace "forcing knot" res
+            Right (_, x) = res
   where
     lookupUpdatePending :: MSGState
                         -> Either (Maybe Var,       -- Are both sides equal vars, and if so what are they equal to?
