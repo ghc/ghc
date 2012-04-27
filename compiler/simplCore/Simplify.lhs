@@ -1657,7 +1657,7 @@ check that
 or
         (b) the scrutinee is a variable and 'x' is used strictly
 or
-        (c) 'x' is not used at all and e is ok-for-speculation
+        (c) 'x' is not used at all and e certainly terminates
 
 For the (c), consider
    case (case a ># b of { True -> (p,q); False -> (q,p) }) of
@@ -1794,19 +1794,22 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
               -- The case binder is going to be evaluated later,
               -- and the scrutinee is a simple variable
 
-     || (is_plain_seq && ok_for_spec)
+     || (is_plain_seq && expr_terminates)
               -- Note: not the same as exprIsHNF
 
     elim_unlifted 
-      | is_plain_seq = exprOkForSideEffects scrut
-            -- The entire case is dead, so we can drop it,
-            -- _unless_ the scrutinee has side effects
-      | otherwise    = exprOkForSpeculation scrut
+      | is_plain_seq
+      = if opt_AggressivePrimOps then expr_terminates
+        else exprOkForSideEffects scrut
+            -- The entire case is dead, so we can drop it
+            -- But if AggressivePrimOps isn't on, only drop it
+            -- if it has no side effects. See See Note [Aggressive PrimOps] in PrimOp
+      | otherwise = exprOkForSpeculation scrut
             -- The case-binder is alive, but we may be able
             -- turn the case into a let, if the expression is ok-for-spec
             -- See Note [Case elimination: unlifted case]
 
-    ok_for_spec      = exprOkForSpeculation scrut
+    expr_terminates  = exprCertainlyTerminates scrut
     is_plain_seq     = isDeadBinder case_bndr	-- Evaluation *only* for effect
     strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
 
