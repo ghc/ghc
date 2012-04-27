@@ -45,7 +45,6 @@ import TysPrim          ( realWorldStatePrimTy )
 import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
 import MonadUtils	( foldlM, mapAccumLM )
 import Maybes           ( orElse, isNothing )
-import StaticFlags      ( opt_AggressivePrimOps )
 import Data.List        ( mapAccumL )
 import Outputable
 import FastString
@@ -478,7 +477,7 @@ prepareRhs top_lvl env0 _ rhs0
     go n_val_args env (Var fun)
         = return (is_exp, env, Var fun)
         where
-          is_exp = isConLikeApp fun n_val_args   -- The fun a constructor or PAP
+          is_exp = isExpandableApp fun n_val_args   -- The fun a constructor or PAP
 		        -- See Note [CONLIKE pragma] in BasicTypes
 			-- The definition of is_exp should match that in
 	                -- OccurAnal.occAnalApp
