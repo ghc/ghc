@@ -1171,9 +1171,11 @@ findArity dflags bndr rhs old_arity
       | cur_arity <= old_arity = cur_arity	
       | new_arity == cur_arity = cur_arity
       | otherwise = ASSERT( new_arity < cur_arity )
+#ifdef DEBUG
                     pprTrace "Exciting arity" 
                        (vcat [ ppr bndr <+> ppr cur_arity <+> ppr new_arity
                              , ppr rhs])
+#endif
                     go new_arity
       where
         new_arity = exprEtaExpandArity dflags cheap_app rhs
