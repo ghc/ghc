@@ -821,7 +821,7 @@ dumpCensus( Census *census )
 	}
 #endif
 
-	fprintf(hp_file, "\t%lu\n", (unsigned long)count * sizeof(W_));
+	fprintf(hp_file, "\t%" FMT_SizeT "\n", (lnat)count * sizeof(W_));
     }
 
     printSample(rtsFalse, census->time);

@@ -50,35 +50,35 @@ import qualified SPARC.Regs     as SPARC
 targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> FastInt
 targetVirtualRegSqueeze platform
     = case platformArch platform of
-      ArchX86     -> X86.virtualRegSqueeze
-      ArchX86_64  -> X86.virtualRegSqueeze
-      ArchPPC     -> PPC.virtualRegSqueeze
-      ArchSPARC   -> SPARC.virtualRegSqueeze
-      ArchPPC_64  -> panic "targetVirtualRegSqueeze ArchPPC_64"
-      ArchARM _ _ -> panic "targetVirtualRegSqueeze ArchARM"
-      ArchUnknown -> panic "targetVirtualRegSqueeze ArchUnknown"
+      ArchX86       -> X86.virtualRegSqueeze
+      ArchX86_64    -> X86.virtualRegSqueeze
+      ArchPPC       -> PPC.virtualRegSqueeze
+      ArchSPARC     -> SPARC.virtualRegSqueeze
+      ArchPPC_64    -> panic "targetVirtualRegSqueeze ArchPPC_64"
+      ArchARM _ _ _ -> panic "targetVirtualRegSqueeze ArchARM"
+      ArchUnknown   -> panic "targetVirtualRegSqueeze ArchUnknown"
 
 targetRealRegSqueeze :: Platform -> RegClass -> RealReg -> FastInt
 targetRealRegSqueeze platform
     = case platformArch platform of
-      ArchX86     -> X86.realRegSqueeze
-      ArchX86_64  -> X86.realRegSqueeze
-      ArchPPC     -> PPC.realRegSqueeze
-      ArchSPARC   -> SPARC.realRegSqueeze
-      ArchPPC_64  -> panic "targetRealRegSqueeze ArchPPC_64"
-      ArchARM _ _ -> panic "targetRealRegSqueeze ArchARM"
-      ArchUnknown -> panic "targetRealRegSqueeze ArchUnknown"
+      ArchX86       -> X86.realRegSqueeze
+      ArchX86_64    -> X86.realRegSqueeze
+      ArchPPC       -> PPC.realRegSqueeze
+      ArchSPARC     -> SPARC.realRegSqueeze
+      ArchPPC_64    -> panic "targetRealRegSqueeze ArchPPC_64"
+      ArchARM _ _ _ -> panic "targetRealRegSqueeze ArchARM"
+      ArchUnknown   -> panic "targetRealRegSqueeze ArchUnknown"
 
 targetClassOfRealReg :: Platform -> RealReg -> RegClass
 targetClassOfRealReg platform
     = case platformArch platform of
-      ArchX86     -> X86.classOfRealReg
-      ArchX86_64  -> X86.classOfRealReg
-      ArchPPC     -> PPC.classOfRealReg
-      ArchSPARC   -> SPARC.classOfRealReg
-      ArchPPC_64  -> panic "targetClassOfRealReg ArchPPC_64"
-      ArchARM _ _ -> panic "targetClassOfRealReg ArchARM"
-      ArchUnknown -> panic "targetClassOfRealReg ArchUnknown"
+      ArchX86       -> X86.classOfRealReg
+      ArchX86_64    -> X86.classOfRealReg
+      ArchPPC       -> PPC.classOfRealReg
+      ArchSPARC     -> SPARC.classOfRealReg
+      ArchPPC_64    -> panic "targetClassOfRealReg ArchPPC_64"
+      ArchARM _ _ _ -> panic "targetClassOfRealReg ArchARM"
+      ArchUnknown   -> panic "targetClassOfRealReg ArchUnknown"
 
 -- TODO: This should look at targetPlatform too
 targetWordSize :: Size
@@ -87,24 +87,24 @@ targetWordSize = intSize wordWidth
 targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
 targetMkVirtualReg platform
     = case platformArch platform of
-      ArchX86     -> X86.mkVirtualReg
-      ArchX86_64  -> X86.mkVirtualReg
-      ArchPPC     -> PPC.mkVirtualReg
-      ArchSPARC   -> SPARC.mkVirtualReg
-      ArchPPC_64  -> panic "targetMkVirtualReg ArchPPC_64"
-      ArchARM _ _ -> panic "targetMkVirtualReg ArchARM"
-      ArchUnknown -> panic "targetMkVirtualReg ArchUnknown"
+      ArchX86       -> X86.mkVirtualReg
+      ArchX86_64    -> X86.mkVirtualReg
+      ArchPPC       -> PPC.mkVirtualReg
+      ArchSPARC     -> SPARC.mkVirtualReg
+      ArchPPC_64    -> panic "targetMkVirtualReg ArchPPC_64"
+      ArchARM _ _ _ -> panic "targetMkVirtualReg ArchARM"
+      ArchUnknown   -> panic "targetMkVirtualReg ArchUnknown"
 
 targetRegDotColor :: Platform -> RealReg -> SDoc
 targetRegDotColor platform
     = case platformArch platform of
-      ArchX86     -> X86.regDotColor platform
-      ArchX86_64  -> X86.regDotColor platform
-      ArchPPC     -> PPC.regDotColor
-      ArchSPARC   -> SPARC.regDotColor
-      ArchPPC_64  -> panic "targetRegDotColor ArchPPC_64"
-      ArchARM _ _ -> panic "targetRegDotColor ArchARM"
-      ArchUnknown -> panic "targetRegDotColor ArchUnknown"
+      ArchX86       -> X86.regDotColor platform
+      ArchX86_64    -> X86.regDotColor platform
+      ArchPPC       -> PPC.regDotColor
+      ArchSPARC     -> SPARC.regDotColor
+      ArchPPC_64    -> panic "targetRegDotColor ArchPPC_64"
+      ArchARM _ _ _ -> panic "targetRegDotColor ArchARM"
+      ArchUnknown   -> panic "targetRegDotColor ArchUnknown"
 
 
 targetClassOfReg :: Platform -> Reg -> RegClass

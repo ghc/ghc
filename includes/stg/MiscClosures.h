@@ -426,6 +426,7 @@ RTS_FUN_DECL(stg_isCurrentThreadBoundzh);
 RTS_FUN_DECL(stg_threadStatuszh);
 
 RTS_FUN_DECL(stg_mkWeakzh);
+RTS_FUN_DECL(stg_mkWeakNoFinalizzerzh);
 RTS_FUN_DECL(stg_mkWeakForeignzh);
 RTS_FUN_DECL(stg_mkWeakForeignEnvzh);
 RTS_FUN_DECL(stg_finalizzeWeakzh);

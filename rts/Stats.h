@@ -13,6 +13,15 @@
 
 #include "BeginPrivate.h"
 
+#if defined(mingw32_HOST_OS)
+/* On Win64, if we say "printf" then gcc thinks we are going to use
+   MS format specifiers like %I64d rather than %llu */
+#define PRINTF gnu_printf
+#else
+/* However, on OS X, "gnu_printf" isn't recognised */
+#define PRINTF printf
+#endif
+
 struct gc_thread_;
 
 void      stat_startInit(void);
@@ -64,7 +73,7 @@ Time stat_getElapsedTime(void);
 
 /* Only exported for Papi.c */
 void statsPrintf( char *s, ... ) 
-    GNUC3_ATTRIBUTE(format (printf, 1, 2));
+    GNUC3_ATTRIBUTE(format (PRINTF, 1, 2));
 
 #include "EndPrivate.h"
 

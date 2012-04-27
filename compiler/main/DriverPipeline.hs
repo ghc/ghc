@@ -1372,7 +1372,8 @@ runPhase LlvmLlc input_fn dflags
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
                 ++ map SysTools.Option lc_opts
                 ++ [SysTools.Option tbaa]
-                ++ map SysTools.Option fpOpts)
+                ++ map SysTools.Option fpOpts
+                ++ map SysTools.Option abiOpts)
 
     return (next_phase, output_fn)
   where
@@ -1384,12 +1385,19 @@ runPhase LlvmLlc input_fn dflags
         -- while compiling GHC source code. It's probably due to fact that it
         -- does not enable VFP by default. Let's do this manually here
         fpOpts = case platformArch (targetPlatform dflags) of 
-                   ArchARM ARMv7 ext -> if (elem VFPv3 ext)
+                   ArchARM ARMv7 ext _ -> if (elem VFPv3 ext)
                                       then ["-mattr=+v7,+vfp3"]
                                       else if (elem VFPv3D16 ext)
                                            then ["-mattr=+v7,+vfp3,+d16"]
                                            else []
                    _                 -> []
+        -- On Ubuntu/Debian with ARM hard float ABI, LLVM's llc still
+        -- compiles into soft-float ABI. We need to explicitly set abi
+        -- to hard
+        abiOpts = case platformArch (targetPlatform dflags) of
+                    ArchARM ARMv7 _ HARD -> ["-float-abi=hard"]
+                    ArchARM ARMv7 _ _    -> []
+                    _                    -> []
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
@@ -1538,8 +1546,8 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 
             elfSectionNote :: String
             elfSectionNote = case platformArch (targetPlatform dflags) of
-                               ArchARM _ _ -> "%note"
-                               _           -> "@note"
+                               ArchARM _ _ _ -> "%note"
+                               _             -> "@note"
 
 -- The "link info" is a string representing the parameters of the
 -- link.  We save this information in the binary, and the next time we

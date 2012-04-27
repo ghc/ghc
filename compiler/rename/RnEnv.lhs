@@ -19,7 +19,7 @@ module RnEnv (
         lookupTypeOccRn, lookupKindOccRn, 
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 
-	HsSigCtxt(..), lookupLocalDataTcNames, lookupSigOccRn,
+	HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
 
 	lookupFixityRn, lookupTyFixityRn, 
 	lookupInstDeclBndr, lookupSubBndrOcc, lookupFamInstName,
@@ -927,30 +927,32 @@ lookupBindGroupOcc ctxt what rdr_name
 
 
 ---------------
-lookupLocalDataTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
--- GHC extension: look up both the tycon and data con 
--- for con-like things.  Used for top-level fixity signatures
--- Complain if neither is in scope
-lookupLocalDataTcNames bndr_set what rdr_name
+lookupLocalTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
+-- GHC extension: look up both the tycon and data con or variable.
+-- Used for top-level fixity signatures. Complain if neither is in scope.
+-- See Note [Fixity signature lookup]
+lookupLocalTcNames bndr_set what rdr_name
   | Just n <- isExact_maybe rdr_name	
 	-- Special case for (:), which doesn't get into the GlobalRdrEnv
   = do { n' <- lookupExactOcc n; return [n'] }	-- For this we don't need to try the tycon too
   | otherwise
-  = do	{ mb_gres <- mapM (lookupBindGroupOcc (LocalBindCtxt bndr_set) what)
-			  (dataTcOccs rdr_name)
-	; let (errs, names) = splitEithers mb_gres
-	; when (null names) (addErr (head errs))	-- Bleat about one only
-	; return names }
+  = do { mb_gres <- mapM lookup (dataTcOccs rdr_name)
+       ; let (errs, names) = splitEithers mb_gres
+       ; when (null names) $ addErr (head errs) -- Bleat about one only
+       ; return names }
+  where
+    lookup = lookupBindGroupOcc (LocalBindCtxt bndr_set) what
 
 dataTcOccs :: RdrName -> [RdrName]
--- If the input is a data constructor, return both it and a type
--- constructor.  This is useful when we aren't sure which we are
--- looking at.
+-- Return both the given name and the same name promoted to the TcClsName
+-- namespace.  This is useful when we aren't sure which we are looking at.
 dataTcOccs rdr_name
-  | isDataOcc occ 	      = [rdr_name, rdr_name_tc]
-  | otherwise 	  	      = [rdr_name]
-  where    
-    occ 	= rdrNameOcc rdr_name
+  | isDataOcc occ || isVarOcc occ
+  = [rdr_name, rdr_name_tc]
+  | otherwise
+  = [rdr_name]
+  where
+    occ = rdrNameOcc rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
 \end{code}
 
@@ -960,6 +962,26 @@ dataTcOccs rdr_name
 		Fixities
 %*							*
 %*********************************************************
+
+Note [Fixity signature lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A fixity declaration like
+
+    infixr 2 ?
+
+can refer to a value-level operator, e.g.:
+
+    (?) :: String -> String -> String
+
+or a type-level operator, like:
+
+    data (?) a b = A a | B b
+
+so we extend the lookup of the reader name '?' to the TcClsName namespace, as
+well as the original namespace.
+
+The extended lookup is also used in other places, like resolution of
+deprecation declarations, and lookup of names in GHCi.
 
 \begin{code}
 --------------------------------
