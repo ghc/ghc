@@ -48,10 +48,10 @@ stackFrameOpenFreeVars kf = case kf of
     TyApply ty'              -> (emptyVarSet, tyVarsOfType ty')
     CoApply co'              -> (emptyVarSet, tyCoVarsOfCo co')
     Apply x'                 -> (emptyVarSet, unitVarSet x')
-    Scrutinise x' ty in_alts -> (emptyVarSet, (inFreeVars annedAltsFreeVars in_alts `delVarSet` x') `unionVarSet` tyVarsOfType ty)
+    Scrutinise x' ty in_alts -> (emptyVarSet, (nonRecBinderFreeVars x' (inFreeVars annedAltsFreeVars in_alts)) `unionVarSet` tyVarsOfType ty)
     PrimApply _ tys as in_es -> (emptyVarSet, unionVarSets (map tyVarsOfType tys) `unionVarSet` unionVarSets (map annedFreeVars as) `unionVarSet` unionVarSets (map (inFreeVars annedTermFreeVars) in_es))
-    StrictLet x' in_e2       -> (emptyVarSet, inFreeVars annedTermFreeVars in_e2 `delVarSet` x')
-    Update x'                -> (unitVarSet x', emptyVarSet)
+    StrictLet x' in_e2       -> (emptyVarSet, nonRecBinderFreeVars x' (inFreeVars annedTermFreeVars in_e2))
+    Update x'                -> (unitVarSet x', varBndrFreeVars x')
     CastIt co'               -> (emptyVarSet, tyCoVarsOfCo co')
 
 

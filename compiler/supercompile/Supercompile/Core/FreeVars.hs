@@ -77,7 +77,7 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     
     value = rec value'
     value' (Indirect x)        = unitVarSet x
-    value' (TyLambda x e)      = term e `delVarSet` x
+    value' (TyLambda x e)      = nonRecBinderFreeVars x (term e)
     value' (Lambda x e)        = nonRecBinderFreeVars x (term e)
     value' (Data _ tys cos xs) = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map tyCoVarsOfCo cos) `unionVarSet` mkVarSet xs
     value' (Literal _)         = emptyVarSet
