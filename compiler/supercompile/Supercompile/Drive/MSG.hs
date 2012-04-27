@@ -433,10 +433,22 @@ msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (dee
   --     ones are only matched against heap-bound ones, and we don't have any generalisation flag to check on update frames.
   , Just h_is_gen <- forM (M.toList h_l) $ \(x_l, hb_l) -> case heapBindingLambdaBoundness hb_l of
                                                              Nothing -> Nothing
-                                                             Just gen_l -> Just (renameId rn_l_inv x_l, gen_l)
-  , all (\(x, gen_l) -> case M.lookup (renameId rn_r x) h_r of
-                          Nothing   -> error "(FIXME) msgMatch: Probably shouldn't happen"
-                          Just hb_r -> isJust (heapBindingLambdaBoundness hb_r) || mayInstantiate inst_mtch gen_l) h_is_gen
+                                                             Just gen_l -> Just (case () of
+                                                                                   () | isCoVar x_l, Just q_r <- getCoVar_maybe (lookupCoVarSubst rn_l_inv x_l) -> q_r
+                                                                                      | isId    x_l                                                             -> renameId rn_l_inv x_l
+                                                                                      | isTyVar x_l, Just a_r <- getTyVar_maybe (lookupTyVarSubst rn_l_inv x_l) -> a_r
+                                                                                      | otherwise   -> panic "msgMatch: impossible variable type/non-invertible renaming", gen_l)
+  , let k_r_bvs = stackBoundVars k_r
+        heap_non_instantiating x_r = case M.lookup x_r h_r of
+                         Nothing | x_r `elemVarSet` k_r_bvs -> True -- Instantiating with an update-frame bound thing is *probably* OK
+                         Just hb_r -> isJust (heapBindingLambdaBoundness hb_r)
+                         _ -> panic "msgMatch: variable unbound on right" -- (ppr rn_l $$ ppr rn_r $$ ppr x $$ ppr (renameId rn_l x) $$ ppr x_r)
+  , all (\(x, gen_l) -> mayInstantiate inst_mtch gen_l || case () of
+                          () | isCoVar x, let co_r = lookupCoVarSubst rn_r x -> maybe False heap_non_instantiating (getCoVar_maybe co_r)
+                             | isId x,    let x_r  = renameId rn_r x         -> heap_non_instantiating x_r
+                             | isTyVar x, let ty_r = lookupTyVarSubst rn_r x -> isJust (getTyVar_maybe ty_r)
+                             | otherwise -> panic "msgMatch: impossible variable type") -- TODO: perhaps type/covar instantiation should be unconditonally allowed?
+        h_is_gen
   = Just (RightIsInstance heap_r (composeRenamings ids rn_l_inv rn_r) k_r)
 
   -- Now look for type generalisation information
