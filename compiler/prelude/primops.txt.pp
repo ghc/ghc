@@ -1821,6 +1821,12 @@ primop  MkWeakOp "mkWeak#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
+primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
+   o -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   with
+   has_side_effects = True
+   out_of_line      = True
+
 primop  MkWeakForeignEnvOp "mkWeakForeignEnv#" GenPrimOp
    o -> b -> Addr# -> Addr# -> Int# -> Addr# -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
