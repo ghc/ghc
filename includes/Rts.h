@@ -145,19 +145,6 @@ void _assertFail(const char *filename, unsigned int linenum)
 
 #define FMT_SizeT    "zu"
 #define FMT_HexSizeT "zx"
-#define FMT_Word     "zu"
-#define FMT_Int      "zd"
-
-/*
- * Getting printf formats right for platform-dependent typedefs
- */
-#if SIZEOF_LONG == 8
-#define FMT_Word64 "lu"
-#define FMT_Int64  "ld"
-#else
-#define FMT_Word64 "llu"
-#define FMT_Int64  "lld"
-#endif
 
 /* -----------------------------------------------------------------------------
    Time values in the RTS
