@@ -94,7 +94,7 @@ mkWeak  :: k                            -- ^ key
 mkWeak key val (Just finalizer) = IO $ \s ->
    case mkWeak# key val finalizer s of { (# s1, w #) -> (# s1, Weak w #) }
 mkWeak key val Nothing = IO $ \s ->
-   case mkWeak# key val (unsafeCoerce# 0#) s of { (# s1, w #) -> (# s1, Weak w #) }
+   case mkWeakNoFinalizer# key val s of { (# s1, w #) -> (# s1, Weak w #) }
 
 {-|
 Dereferences a weak pointer.  If the key is still alive, then

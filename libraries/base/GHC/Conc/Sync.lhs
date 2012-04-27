@@ -531,7 +531,7 @@ threadCapability (ThreadId t) = IO $ \s ->
 --
 mkWeakThreadId :: ThreadId -> IO (Weak ThreadId)
 mkWeakThreadId t@(ThreadId t#) = IO $ \s ->
-   case mkWeak# t# t (unsafeCoerce# 0#) s of 
+   case mkWeakNoFinalizer# t# t s of
       (# s1, w #) -> (# s1, Weak w #)
 \end{code}
 
