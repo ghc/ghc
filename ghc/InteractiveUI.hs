@@ -1600,7 +1600,7 @@ moduleCmd str
     starred m       = Right m
 
 addModulesToContext :: [String] -> [String] -> GHCi ()
-addModulesToContext as bs = do
+addModulesToContext as bs = restoreContextOnFailure $ do
    mapM_ (add True)  as
    mapM_ (add False) bs
    setGHCContextFromGHCiState
@@ -1613,6 +1613,9 @@ addModulesToContext as bs = do
 
 remModulesFromContext :: [String] -> [String] -> GHCi ()
 remModulesFromContext as bs = do
+   -- we do *not* call restoreContextOnFailure here.  If the user
+   -- is trying to fix up a context that contains errors by removing
+   -- modules, we don't want GHC to silently put them back in again.
    mapM_ rem (as ++ bs)
    setGHCContextFromGHCiState
  where
@@ -1625,7 +1628,7 @@ remModulesFromContext as bs = do
            , transient_ctx  = filt (transient_ctx st) }
 
 addImportToContext :: String -> GHCi ()
-addImportToContext str = do
+addImportToContext str = restoreContextOnFailure $ do
   idecl <- GHC.parseImportDecl str
   _ <- GHC.lookupModule (unLoc (ideclName idecl)) (ideclPkgQual idecl)  -- #5836
   modifyGHCiState $ \st ->
@@ -1636,7 +1639,7 @@ addImportToContext str = do
   setGHCContextFromGHCiState
 
 setContext :: [String] -> [String] -> GHCi ()
-setContext starred not_starred = do
+setContext starred not_starred = restoreContextOnFailure $ do
   is1 <- mapM (checkAdd True)  starred
   is2 <- mapM (checkAdd False) not_starred
   let iss = foldr addNotSubsumed [] (is1++is2)
@@ -1672,6 +1675,25 @@ setGHCContextFromGHCiState = do
   iidecls <- filterM (tryBool . ok) (transient_ctx st ++ remembered_ctx st)
   setGHCContext iidecls
 
+-- Sometimes we can't tell whether an import is valid or not until
+-- we finally call 'GHC.setContext'.  e.g.
+--
+--   import System.IO (foo)
+--
+-- will fail because System.IO does not export foo.  In this case we
+-- don't want to store the import in the context permanently, so we
+-- catch the failure from 'setGHCContextFromGHCiState' and set the
+-- context back to what it was.
+--
+-- See #6007
+--
+restoreContextOnFailure :: GHCi a -> GHCi a
+restoreContextOnFailure do_this = do
+  st <- getGHCiState
+  let rc = remembered_ctx st; tc = transient_ctx st
+  do_this `gonException` (modifyGHCiState $ \st' ->
+     st' { remembered_ctx = rc, transient_ctx = tc })
+
 
 -- | Sets the GHC contexts to the given set of imports, adding a Prelude
 -- import if there isn't an explicit one already.
@@ -1694,13 +1716,21 @@ setGHCContext iidecls = GHC.setContext (iidecls ++ prel)
 -- because e.g. a module might export a name that is only available
 -- qualified within the module itself.
 --
+-- Note that 'import M' does not necessarily subsume 'import M(foo)',
+-- because M might not export foo and we want an error to be produced
+-- in that case.
+--
 iiSubsumes :: InteractiveImport -> InteractiveImport -> Bool
 iiSubsumes (IIModule m1) (IIModule m2) = m1==m2
 iiSubsumes (IIDecl d1) (IIDecl d2)      -- A bit crude
   =  unLoc (ideclName d1) == unLoc (ideclName d2)
      && ideclAs d1 == ideclAs d2
      && (not (ideclQualified d1) || ideclQualified d2)
-     && (isNothing (ideclHiding d1) || ideclHiding d1 == ideclHiding d2)
+     && (ideclHiding d1 `hidingSubsumes` ideclHiding d2)
+  where
+     _                `hidingSubsumes` Just (False,[]) = True
+     Just (False, xs) `hidingSubsumes` Just (False,ys) = all (`elem` xs) ys
+     h1               `hidingSubsumes` h2              = h1 == h2
 iiSubsumes _ _ = False
 
 iiModules :: [InteractiveImport] -> [Module]
