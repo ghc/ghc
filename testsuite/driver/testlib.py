@@ -1466,9 +1466,15 @@ def dump_stderr( name ):
    print read_no_crs(qualify(name, 'run.stderr'))
 
 def read_no_crs(file):
-    h = open(file)
-    str = h.read()
-    h.close
+    str = ''
+    try:
+        h = open(file)
+        str = h.read()
+        h.close
+    except:
+        # On Windows, if the program fails very early, it seems the
+        # files stdout/stderr are redirected to may not get created
+        pass
     return re.sub('\r', '', str)
 
 def write_file(file, str):
