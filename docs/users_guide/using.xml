@@ -989,9 +989,10 @@ test.hs:(5,4)-(6,7):
             <option>-fwarn-incomplete-uni-patterns</option>,
             <option>-fwarn-incomplete-record-updates</option>,
             <option>-fwarn-monomorphism-restriction</option>,
-            <option>-fwarn-unrecognised-pragmas</option>,
             <option>-fwarn-auto-orphans</option>,
-            <option>-fwarn-implicit-prelude</option>.</para>
+            <option>-fwarn-implicit-prelude</option>,
+            <option>-fwarn-missing-local-sigs</option>,
+            <option>-fwarn-missing-import-lists</option>.</para>
         </listitem>
       </varlistentry>
 
