@@ -964,14 +964,18 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
       = go rn_l rn_r used_l used_r (M.insert x_l (internallyBound (renamedTerm e_l)) init_h_l) init_h_r (Heap h_l ids_l') (Heap h_r ids_r) h (msg_s { msgPending = (x_common, PendingVar x_l x_r):rest })
       -}
 
-      -- Match binders themselves, but in this case we can't reuse msgIdCoVarBndrExtras, which is annoying :-(. We rely on the fact that x_common always has no extra info.
-      -- NB: binder matching here never fails because type matching never fails, and x_common is guaranteed created with no extra info.
       | msg_s <- msg_s { msgPending = rest }
       -- We already know the terms don't match so we are going to generalise
-      = prod (do let (ids_l', x_common_l) = uniqAway' ids_l x_common
-                     (ids_r', x_common_r) = uniqAway' ids_r x_common
-                 (used_l', h_l') <- sucks init_h_l k_bvs_l (M.insert x_common_l (internallyBound (renamedTerm e_l)) h_l) used_l (annedTermFreeVars e_l)
-                 (used_r', h_r') <- sucks init_h_r k_bvs_l (M.insert x_common_r (internallyBound (renamedTerm e_r)) h_r) used_r (annedTermFreeVars e_r)
+      --
+      -- NB: we rely on the fact that x_common always has no extra info here, because we need to effectively apply the left/right
+      -- hand side renaming to the Id extra info. If we don't then we end up having binders like (x :: genty) in the left/right heaps
+      -- when the left/right renaming contains a mapping like (genty |-> Int).
+      --
+      -- We can just barely get away with this in the type/coercion cases because the types/coercions don't get bindings per-se, they are just added to the renaming
+      = prod (do let (ids_l', x_common_l) = uniqAway' ids_l (x_common `setVarType` termType e_l)
+                     (ids_r', x_common_r) = uniqAway' ids_r (x_common `setVarType` termType e_r)
+                 (used_l', h_l') <- sucks init_h_l k_bvs_l (M.insert x_common_l (internallyBound (renamedTerm e_l)) h_l) used_l (annedTermFreeVars e_l `unionVarSet` varBndrFreeVars x_common_l)
+                 (used_r', h_r') <- sucks init_h_r k_bvs_l (M.insert x_common_r (internallyBound (renamedTerm e_r)) h_r) used_r (annedTermFreeVars e_r `unionVarSet` varBndrFreeVars x_common_r)
                  return (go (insertIdRenaming rn_l x_common x_common_l) (insertIdRenaming rn_r x_common x_common_r) used_l' used_r' init_h_l init_h_r
                             (Heap h_l' ids_l') (Heap h_r' ids_r') (M.insert x_common generalised h) msg_s))
     go rn_l rn_r used_l used_r init_h_l init_h_r (Heap h_l ids_l) (Heap h_r ids_r) h msg_s@(MSGState { msgPending = ((a_common, PendingType ty_l ty_r):rest) })
