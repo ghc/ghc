@@ -980,8 +980,10 @@ ghc -c Foo.hs</screen>
             <option>-fwarn-incomplete-record-updates</option>,
             <option>-fwarn-monomorphism-restriction</option>,
             <option>-fwarn-auto-orphans</option>,
-            <option>-fwarn-implicit-prelude</option>.</para>
-	</listitem>
+            <option>-fwarn-implicit-prelude</option>,
+            <option>-fwarn-missing-local-sigs</option>,
+            <option>-fwarn-missing-import-lists</option>.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
