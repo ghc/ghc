@@ -1494,7 +1494,8 @@ matchClass clas tys
             ([], unifs, _)               -- Nothing matches  
                 -> do { traceTcS "matchClass not matching"
                                  (vcat [ text "dict" <+> ppr pred, 
-                                         text "unifs" <+> ppr unifs ]) 
+                                         text "unifs" <+> ppr unifs,
+                                         ppr instEnvs ]) 
                       ; return MatchInstNo  
                       } ;  
 	    ([(ispec, inst_tys)], [], _) -- A single match 
