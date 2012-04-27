@@ -85,7 +85,8 @@ reportUnsolved runtimeCoercionErrors wanted
                             , cec_tidy  = tidy_env
                             , cec_defer = defer }
 
-       ; traceTc "reportUnsolved" (ppr free_tvs $$ ppr wanted)
+       ; traceTc "reportUnsolved:" (vcat [ pprTvBndrs (varSetElems free_tvs)
+                                         , ppr wanted ])
 
        ; reportWanteds err_ctxt wanted
 

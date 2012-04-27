@@ -153,12 +153,8 @@ pprInstance ispec
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
-pprInstanceHdr ispec@(ClsInst { is_flag = flag })
-  = ptext (sLit "instance") <+> ppr flag
-       <+> sep [pprThetaArrowTy theta, ppr res_ty]
-  where
-    dfun = is_dfun ispec
-    (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)
+pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
+  = ptext (sLit "instance") <+> ppr flag <+> pprSigmaType (idType dfun)
         -- Print without the for-all, which the programmer doesn't write
 
 pprInstances :: [ClsInst] -> SDoc

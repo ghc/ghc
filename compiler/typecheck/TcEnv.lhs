@@ -7,7 +7,7 @@ module TcEnv(
         TyThing(..), TcTyThing(..), TcId,
 
         -- Instance environment, and InstInfo type
-        InstInfo(..), iDFunId, pprInstInfo, pprInstInfoDetails,
+        InstInfo(..), iDFunId, pprInstInfoDetails,
         simpleInstInfoClsTy, simpleInstInfoTy, simpleInstInfoTyCon, 
         InstBindings(..),
 
@@ -669,17 +669,10 @@ data InstBindings a
                         -- See Note [Newtype deriving and unused constructors]
                         -- in TcDeriv
 
-pprInstInfo :: InstInfo a -> SDoc
-pprInstInfo info = hang (ptext (sLit "instance"))
-                      2 (sep [ ifPprDebug (pprForAll tvs)
-                             , pprThetaArrowTy theta, ppr tau
-                             , ptext (sLit "where")])
-  where
-    (tvs, theta, tau) = tcSplitSigmaTy (idType (iDFunId info))
-
-
 pprInstInfoDetails :: OutputableBndr a => InstInfo a -> SDoc
-pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
+pprInstInfoDetails info 
+   = hang (pprInstanceHdr (iSpec info) <+> ptext (sLit "where"))
+        2 (details (iBinds info))
   where
     details (VanillaInst b _ _) = pprLHsBinds b
     details (NewTypeDerived {}) = text "Derived from the representation type"
