@@ -294,6 +294,7 @@ typedef struct _RtsSymbolVal {
 } RtsSymbolVal;
 
 #define Maybe_Stable_Names      SymI_HasProto(stg_mkWeakzh)                     \
+                                SymI_HasProto(stg_mkWeakNoFinalizzerzh)         \
                                 SymI_HasProto(stg_mkWeakForeignEnvzh)           \
                                 SymI_HasProto(stg_makeStableNamezh)             \
                                 SymI_HasProto(stg_finalizzeWeakzh)
