@@ -130,3 +130,12 @@ test('T5423',
      ['$MAKE -s --no-print-directory T5423'])
 
 test('5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
+
+test('T6006', [ omit_ways(['ghci']),
+                 extra_clean(['T6006_c.o']),
+                 compile_cmd_prefix('$MAKE T6006_setup && ') ],
+                 # The T6006_setup hack is to ensure that we generate
+                 # T6006_stub.h before compiling T6006_c.c, which
+                 # needs it.
+               compile_and_run, ['T6006_c.c -no-hs-main'])
+
