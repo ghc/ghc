@@ -473,7 +473,7 @@ vanillaArityType = ATop []	-- Totally uninformative
 
 -- ^ The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
-exprEtaExpandArity :: DynFlags -> CheapAppFun -> CoreExpr -> Arity
+exprEtaExpandArity :: DynFlags -> FunAppAnalyser -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
 -- 	e  ==>  \xy -> e x y
 exprEtaExpandArity dflags cheap_app e
@@ -497,7 +497,7 @@ getBotArity :: ArityType -> Maybe Arity
 getBotArity (ABot n) = Just n
 getBotArity _        = Nothing
 
-mk_cheap_fn :: DynFlags -> CheapAppFun -> CheapFun
+mk_cheap_fn :: DynFlags -> FunAppAnalyser -> CheapFun
 mk_cheap_fn dflags cheap_app
   | not (dopt Opt_DictsCheap dflags)
   = \e _     -> exprIsCheap' cheap_app e
