@@ -75,7 +75,7 @@ disInstr ( StgBCO *bco, int pc )
                          instrs[pc], (signed int)instrs[pc+1]);
          pc += 2; break;
       case bci_CCALL:
-         debugBelch("CCALL    marshaller at 0x%" FMT_HexSizeT "\n", 
+         debugBelch("CCALL    marshaller at 0x%" FMT_Word "\n", 
                          literals[instrs[pc]] );
          pc += 1; break;
      case bci_STKCHECK:  {
@@ -130,7 +130,7 @@ disInstr ( StgBCO *bco, int pc )
       case bci_PUSH_UBX:
          debugBelch("PUSH_UBX ");
          for (i = 0; i < instrs[pc+1]; i++) 
-            debugBelch("0x%" FMT_HexSizeT " ", literals[i + instrs[pc]] );
+            debugBelch("0x%" FMT_Word " ", literals[i + instrs[pc]] );
          debugBelch("\n");
          pc += 2; break;
       case bci_PUSH_APPLY_N:
