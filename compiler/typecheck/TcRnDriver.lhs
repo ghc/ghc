@@ -1795,7 +1795,7 @@ pprModGuts (ModGuts { mg_tcs = tcs
 
 ppr_types :: [ClsInst] -> TypeEnv -> SDoc
 ppr_types insts type_env
-  = text "TYPE SIGNATURES" $$ nest 4 (ppr_sigs ids)
+  = text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
   where
     dfun_ids = map instanceDFunId insts
     ids = [id | id <- typeEnvIds type_env, want_sig id]
@@ -1837,7 +1837,7 @@ ppr_sigs ids
   = vcat (map ppr_sig (sortLe le_sig ids))
   where
     le_sig id1 id2 = getOccName id1 <= getOccName id2
-    ppr_sig id = ppr id <+> dcolon <+> ppr (tidyTopType (idType id))
+    ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 
 ppr_tydecls :: [TyCon] -> SDoc
 ppr_tydecls tycons
