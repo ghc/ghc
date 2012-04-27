@@ -2461,8 +2461,8 @@ addSection ( ObjectCode* oc, SectionKind kind,
    s->next      = oc->sections;
    oc->sections = s;
 
-   IF_DEBUG(linker, debugBelch("addSection: %p-%p (size %" FMT_Int "), kind %d\n",
-                               start, ((char*)end)-1, (StgInt)end - (StgInt)start + 1, kind ));
+   IF_DEBUG(linker, debugBelch("addSection: %p-%p (size %lld), kind %d\n",
+                               start, ((char*)end)-1, ((long long)(size_t)end) - ((long long)(size_t)start) + 1, kind ));
 }
 
 
