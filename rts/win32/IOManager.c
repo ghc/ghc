@@ -143,7 +143,7 @@ IOWorkerProc(PVOID param)
 				 * i.e., for all others, an error is raised.
 				 */
 				HANDLE h  = (HANDLE)GetStdHandle(STD_INPUT_HANDLE);
-				if ( _get_osfhandle(work->workData.ioData.fd) == (long)h ) {
+				if ( _get_osfhandle(work->workData.ioData.fd) == (intptr_t)h ) {
 				    if (rts_waitConsoleHandlerCompletion()) {
 					/* If the Scheduler has set work->abandonOp, the Haskell thread has 
 					 * been thrown an exception (=> the worker must abandon this request.)

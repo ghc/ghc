@@ -143,41 +143,8 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define USED_IF_NOT_THREADS
 #endif
 
-#if SIZEOF_VOID_P == 8
-# if SIZEOF_LONG == 8
-#  define FMT_SizeT "lu"
-# elif SIZEOF_LONG_LONG == 8
-#  define FMT_SizeT "llu"
-# else
-#  error Cannot find format specifier for size_t size type
-# endif
-#elif SIZEOF_VOID_P == 4
-# if SIZEOF_INT == 4
-#  define FMT_SizeT "u"
-# else
-#  error Cannot find format specifier for size_t size type
-# endif
-#else
-# error Cannot handle this word size
-#endif
-
-/*
- * Getting printf formats right for platform-dependent typedefs
- */
-#if SIZEOF_LONG == 8
-#define FMT_Word64 "lu"
-#define FMT_Int64  "ld"
-#else
-#if defined(mingw32_HOST_OS)
-/* mingw doesn't understand %llu/%lld - it treats them as 32-bit
-   rather than 64-bit */
-#define FMT_Word64 "I64u"
-#define FMT_Int64  "I64d"
-#else
-#define FMT_Word64 "llu"
-#define FMT_Int64  "lld"
-#endif
-#endif
+#define FMT_SizeT    "zu"
+#define FMT_HexSizeT "zx"
 
 /* -----------------------------------------------------------------------------
    Time values in the RTS

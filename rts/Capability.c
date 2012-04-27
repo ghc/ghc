@@ -419,7 +419,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
     ASSERT(task->cap == cap);
     debugTrace(DEBUG_sched, "passing capability %d to %s %p",
                cap->no, task->incall->tso ? "bound task" : "worker",
-               (void *)task->id);
+               (void *)(size_t)task->id);
     ACQUIRE_LOCK(&task->lock);
     if (task->wakeup == rtsFalse) {
         task->wakeup = rtsTrue;
@@ -887,7 +887,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
             for (t = cap->spare_workers; t != NULL; t = t->next) {
                 if (!osThreadIsAlive(t->id)) {
                     debugTrace(DEBUG_sched, 
-                               "worker thread %p has died unexpectedly", (void *)t->id);
+                               "worker thread %p has died unexpectedly", (void *)(size_t)t->id);
                     cap->n_spare_workers--;
                     if (!prev) {
                         cap->spare_workers = t->next;

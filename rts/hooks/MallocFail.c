@@ -12,6 +12,6 @@
 void
 MallocFailHook (lnat request_size /* in bytes */, char *msg)
 {
-    fprintf(stderr, "malloc: failed on request for %lu bytes; message: %s\n", request_size, msg);
+    fprintf(stderr, "malloc: failed on request for %" FMT_SizeT " bytes; message: %s\n", request_size, msg);
 }
 

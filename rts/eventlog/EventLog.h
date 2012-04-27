@@ -106,7 +106,7 @@ void postThreadLabel(Capability    *cap,
 void postHeapEvent (Capability    *cap,
                     EventTypeNum   tag,
                     EventCapsetID  heap_capset,
-                    StgWord        info1);
+                    lnat           info1);
 
 void postEventHeapInfo (EventCapsetID heap_capset,
                         nat           gens,

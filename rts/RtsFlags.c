@@ -1542,7 +1542,7 @@ decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
     if (m < 0 || val < min || val > max) {
         // printf doesn't like 64-bit format specs on Windows
         // apparently, so fall back to unsigned long.
-        errorBelch("error in RTS option %s: size outside allowed range (%lu - %lu)", flag, (lnat)min, (lnat)max);
+        errorBelch("error in RTS option %s: size outside allowed range (%" FMT_SizeT " - %" FMT_SizeT ")", flag, (lnat)min, (lnat)max);
         stg_exit(EXIT_FAILURE);
     }
 

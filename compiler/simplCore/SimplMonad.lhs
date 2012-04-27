@@ -65,7 +65,8 @@ data SimplTopEnv
 \begin{code}
 initSmpl :: DynFlags -> RuleBase -> (FamInstEnv, FamInstEnv) 
 	 -> UniqSupply		-- No init count; set to 0
-	 -> Int			-- Size of the bindings
+	 -> Int			-- Size of the bindings, used to limit
+                                -- the number of ticks we allow
 	 -> SimplM a
 	 -> (a, SimplCount)
 

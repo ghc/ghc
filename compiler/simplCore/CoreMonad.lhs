@@ -161,14 +161,15 @@ dumpPassResult dflags mb_flag hdr extra_info binds rules
   = Err.dumpSDoc dflags dflag (showSDoc hdr) dump_doc
 
   | otherwise
-  = Err.debugTraceMsg dflags 2 $
-    (sep [text "Result size of" <+> hdr, nest 2 (equals <+> ppr (coreBindsStats binds))])
+  = Err.debugTraceMsg dflags 2 size_doc
           -- Report result size 
 	  -- This has the side effect of forcing the intermediate to be evaluated
 
   where
+    size_doc = sep [text "Result size of" <+> hdr, nest 2 (equals <+> ppr (coreBindsStats binds))]
+
     dump_doc  = vcat [ nest 2 extra_info
-		     , nest 2 (text "Result size =" <+> int (coreBindsSize binds))
+		     , size_doc
                      , blankLine
                      , pprCoreBindings binds 
                      , ppUnless (null rules) pp_rules ]

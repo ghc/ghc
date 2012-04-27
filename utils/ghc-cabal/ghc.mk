@@ -28,7 +28,7 @@ $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/C
 $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) --make $(GHC_CABAL_DIR)/Main.hs -o $@ \
 	       -no-user-package-conf \
-	       -Wall $(WERROR) \
+	       -Wall \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \

@@ -320,7 +320,7 @@ discardTasksExcept (Task *keep)
     for (task = all_tasks; task != NULL; task=next) {
         next = task->all_next;
         if (task != keep) {
-            debugTrace(DEBUG_sched, "discarding task %ld", (long)TASK_ID(task));
+            debugTrace(DEBUG_sched, "discarding task %" FMT_SizeT "", (size_t)TASK_ID(task));
             freeTask(task);
         }
     }
@@ -393,7 +393,7 @@ workerTaskStop (Task *task)
 static void *taskId(Task *task)
 {
 #ifdef THREADED_RTS
-    return (void *)task->id;
+    return (void *)(size_t)task->id;
 #else
     return (void *)task;
 #endif
