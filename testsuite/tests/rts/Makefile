@@ -45,3 +45,5 @@ T5423:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T5423.o T5423_cmm.o -o T5423$(exeext)
 	./T5423
 
+T6006_setup :
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6006.hs
