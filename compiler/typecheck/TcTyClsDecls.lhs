@@ -269,31 +269,30 @@ kcTyClGroup decls
 	  -- Step 1: Bind kind variables for non-synonyms
         ; let (syn_decls, non_syn_decls) = partition (isSynDecl . unLoc) decls
 	; initial_kinds <- concatMapM getInitialKinds non_syn_decls
-	; tcExtendTcTyThingEnv initial_kinds $  do
 
-	   -- Step 2: kind-check the synonyms, and extend envt
-        { tcl_env <- kcSynDecls (calcSynCycles syn_decls)
-        ; setLclEnv tcl_env $  do
-
-	   -- Step 3: kind-check the synonyms
-        { mapM_ kcLTyClDecl non_syn_decls
+	; tcl_env <- tcExtendTcTyThingEnv initial_kinds $  do
+                     do { -- Step 2: kind-check the synonyms, and extend envt
+                          tcl_env <- kcSynDecls (calcSynCycles syn_decls)
+                            -- Step 3: kind-check the synonyms
+                        ; setLclEnv tcl_env $
+                          do { mapM_ kcLTyClDecl non_syn_decls
+                             ; getLclTypeEnv } }
 
 	     -- Step 4: generalisation
 	     -- Kind checking done for this group
              -- Now we have to kind generalize the flexis
-        ; res <- mapM generalise (tyClsBinders decls) 
+        ; res <- mapM (generalise tcl_env) (tyClsBinders decls) 
 
         ; traceTc "kcTyClGroup result" (ppr res)
-        ; return res }}}
+        ; return res }
 
   where
-    generalise :: Name -> TcM (Name, Kind)
-    generalise name
+    generalise :: TcTypeEnv -> Name -> TcM (Name, Kind)
+    generalise kind_env name
       = do { traceTc "Generalise type of" (ppr name)
-           ; thing <- tcLookup name
-           ; let kc_kind = case thing of
-                               AThing k -> k
-                               _ -> pprPanic "kcTyClGroup" (ppr thing)
+           ; let kc_kind = case lookupNameEnv kind_env name of
+                               Just (AThing k) -> k
+                               _ -> pprPanic "kcTyClGroup" (ppr name $$ ppr kind_env)
            ; kvs <- kindGeneralize (tyVarsOfType kc_kind)
            ; kc_kind' <- zonkTcKind kc_kind
            ; return (name, mkForAllTys kvs kc_kind') }
@@ -342,7 +341,7 @@ getInitialKinds (L _ decl)
     get_tvs (ForeignType {})                = []
  
 ----------------
-kcSynDecls :: [SCC (LTyClDecl Name)] -> TcM (TcLclEnv)	-- Kind bindings
+kcSynDecls :: [SCC (LTyClDecl Name)] -> TcM TcLclEnv	-- Kind bindings
 kcSynDecls [] = getLclEnv
 kcSynDecls (group : groups)
   = do	{ nk <- kcSynDecl1 group
@@ -408,9 +407,15 @@ kcTyClDecl (TyFamily { tcdLName = L _ name, tcdTyVars = hs_tvs
 kcTyDefn :: HsTyDefn Name -> Kind -> TcM ()
 kcTyDefn (TyData { td_ND = new_or_data, td_ctxt = ctxt
                  , td_cons = cons, td_kindSig = mb_kind }) res_k
-  = do	{ _ <- tcHsContext ctxt
+  = do	{ traceTc "kcTyDefn1" (ppr cons)
+        ; _ <- tcHsContext ctxt
+--	; let h98_syntax = consUseH98Syntax cons
+--      ; when h98_syntax $ mapM_ (wrapLocM (kcConDecl new_or_data)) cons 
 	; mapM_ (wrapLocM (kcConDecl new_or_data)) cons 
-        ; kcResultKind mb_kind res_k }
+        ; traceTc "kcTyDefn2" (ppr cons)
+        ; kcResultKind mb_kind res_k
+        ; traceTc "kcTyDefn3" (ppr cons)
+        }
 kcTyDefn (TySynonym { td_synRhs = rhs_ty }) res_k
   = discardResult (tcCheckLHsType rhs_ty res_k)
 
@@ -775,7 +780,7 @@ tcFamTyPats fam_tc (HsBSig arg_pats (kvars, tvars)) kind_checker thing_inside
        ; all_args'    <- zonkTcTypeToTypes ze all_args
        ; res_kind'    <- zonkTcTypeToType  ze res_kind
 
-       ; traceTc "tcFamPats" (ppr qtkvs' $$ ppr all_args' $$ ppr res_kind')
+       ; traceTc "tcFamPats" (pprTvBndrs qtkvs' $$ ppr all_args' $$ ppr res_kind')
        ; tcExtendTyVarEnv qtkvs' $
          thing_inside qtkvs' all_args' res_kind' }
 \end{code}
@@ -906,16 +911,16 @@ tcConDecl :: NewOrData
 tcConDecl new_or_data existential_ok rep_tycon res_tmpl 	-- Data types
 	  con@(ConDecl { con_name = name
                        , con_qvars = hs_tvs, con_cxt = hs_ctxt
-                       , con_details = details, con_res = hs_res_ty })
+                       , con_details = hs_details, con_res = hs_res_ty })
   = addErrCtxt (dataConCtxt name) $
     do { traceTc "tcConDecl 1" (ppr name)
        ; (tvs, ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) 
            <- tcHsTyVarBndrs hs_tvs $ \ tvs ->
               do { ctxt    <- tcHsContext hs_ctxt
-                 ; details' <- tcConArgs new_or_data details
-                 ; res_ty   <- tcConRes hs_res_ty
-                 ; let (is_infix, field_lbls, btys') = details'
-                       (arg_tys, stricts)           = unzip btys'
+                 ; details <- tcConArgs new_or_data hs_details
+                 ; res_ty  <- tcConRes hs_res_ty
+                 ; let (is_infix, field_lbls, btys) = details
+                       (arg_tys, stricts)           = unzip btys
                  ; return (tvs, ctxt, arg_tys, res_ty, is_infix, field_lbls, stricts) }
 
        ; let pretend_res_ty = case res_ty of
@@ -1336,7 +1341,14 @@ checkValidDataCon tc con
 		-- Reason: it's really the argument of an equality constraint
 	; checkValidType ctxt (dataConUserType con)
 	; when (isNewTyCon tc) (checkNewDataCon con)
+
         ; mapM_ check_bang (dataConStrictMarks con `zip` [1..])
+
+        ; ASSERT2( not (any (isKindVar . fst) (dataConEqSpec con)), 
+                   ppr con $$ ppr (dataConEqSpec con) )
+               -- We don't support kind equalities, and shoud not be any
+          return ()
+
         ; traceTc "Done validity of data con" (ppr con <+> ppr (dataConRepType con))
     }
   where

@@ -954,7 +954,8 @@ test.hs:(5,4)-(6,7):
     <option>-fwarn-missing-fields</option>,
     <option>-fwarn-missing-methods</option>,
     <option>-fwarn-lazy-unlifted-bindings</option>,
-    <option>-fwarn-wrong-do-bind</option>, and
+    <option>-fwarn-wrong-do-bind</option>,
+    <option>-fwarn-unsupported-calling-conventions</option>, and
     <option>-fwarn-dodgy-foreign-imports</option>.  The following
     flags are
     simple ways to select standard &ldquo;packages&rdquo; of warnings:
@@ -988,9 +989,10 @@ test.hs:(5,4)-(6,7):
             <option>-fwarn-incomplete-uni-patterns</option>,
             <option>-fwarn-incomplete-record-updates</option>,
             <option>-fwarn-monomorphism-restriction</option>,
-            <option>-fwarn-unrecognised-pragmas</option>,
             <option>-fwarn-auto-orphans</option>,
-            <option>-fwarn-implicit-prelude</option>.</para>
+            <option>-fwarn-implicit-prelude</option>,
+            <option>-fwarn-missing-local-sigs</option>,
+            <option>-fwarn-missing-import-lists</option>.</para>
         </listitem>
       </varlistentry>
 
@@ -1099,6 +1101,19 @@ test.hs:(5,4)-(6,7):
           commandline flag is used.</para>
 
           <para>This option is on by default.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-fwarn-unsupported-calling-conventions</option>:</term>
+        <listitem>
+          <indexterm><primary><option>-fwarn-unsupported-calling-conventions</option></primary>
+          </indexterm>
+          <para>Causes a warning to be emitted for foreign declarations
+          that use unsupported calling conventions. In particular,
+          if the <literal>stdcall</literal> calling convention is used
+          on an architecture other than i386 then it will be treated
+          as <literal>ccall</literal>.</para>
         </listitem>
       </varlistentry>
 

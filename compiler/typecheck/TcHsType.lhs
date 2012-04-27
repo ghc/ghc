@@ -829,8 +829,6 @@ tcHsTyVarBndr (L _ hs_tv)
        ; return (mkTcTyVar name kind (SkolemTv False)) } } }
 
 ------------------
-
--------------------
 kindGeneralize :: TyVarSet -> TcM [KindVar]
 kindGeneralize tkvs
   = do { gbl_tvs  <- tcGetGlobalTyVars -- Already zonked

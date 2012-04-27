@@ -383,10 +383,10 @@ stat_endGC (Capability *cap, gc_thread *gct,
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
 	    nat faults = getPageFaults();
 	    
-	    statsPrintf("%9ld %9ld %9ld",
+	    statsPrintf("%9" FMT_SizeT " %9" FMT_SizeT " %9" FMT_SizeT,
 		    alloc*sizeof(W_), copied*sizeof(W_), 
 			live*sizeof(W_));
-            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2d)\n",
+            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4" FMT_SizeT " %4" FMT_SizeT "  (Gen: %2d)\n",
                     TimeToSecondsDbl(gc_cpu),
 		    TimeToSecondsDbl(gc_elapsed),
 		    TimeToSecondsDbl(cpu),
@@ -627,7 +627,7 @@ stat_exit(int alloc)
 	if (tot_elapsed == 0.0) tot_elapsed = 1;
 	
 	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-	    statsPrintf("%9ld %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
+	    statsPrintf("%9" FMT_SizeT " %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
 	    statsPrintf(" %5.2f %5.2f\n\n", 0.0, 0.0);
 	}
 
@@ -666,16 +666,16 @@ stat_exit(int alloc)
             if ( residency_samples > 0 ) {
 		showStgWord64(max_residency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
-		statsPrintf("%16s bytes maximum residency (%ld sample(s))\n",
+		statsPrintf("%16s bytes maximum residency (%" FMT_SizeT " sample(s))\n",
 			temp, residency_samples);
 	    }
 
 	    showStgWord64(max_slop*sizeof(W_), temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes maximum slop\n", temp);
 
-	    statsPrintf("%16ld MB total memory in use (%ld MB lost due to fragmentation)\n\n", 
+	    statsPrintf("%16" FMT_SizeT " MB total memory in use (%" FMT_SizeT " MB lost due to fragmentation)\n\n", 
                         peak_mblocks_allocated * MBLOCK_SIZE_W / (1024 * 1024 / sizeof(W_)),
-                        (peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
+                        (lnat)(peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
 
 	    /* Print garbage collections in each gen */
             statsPrintf("                                    Tot time (elapsed)  Avg pause  Max pause\n");
@@ -721,7 +721,7 @@ stat_exit(int alloc)
                     sparks.fizzled   += capabilities[i].spark_stats.fizzled;
                 }
 
-                statsPrintf("  SPARKS: %ld (%ld converted, %ld overflowed, %ld dud, %ld GC'd, %ld fizzled)\n\n",
+                statsPrintf("  SPARKS: %" FMT_Word " (%" FMT_Word " converted, %" FMT_Word " overflowed, %" FMT_Word " dud, %" FMT_Word " GC'd, %" FMT_Word " fizzled)\n\n",
                             sparks.created + sparks.dud + sparks.overflowed,
                             sparks.converted, sparks.overflowed, sparks.dud,
                             sparks.gcd, sparks.fizzled);
@@ -896,17 +896,18 @@ statDescribeGens(void)
           gen_blocks += gcThreadLiveBlocks(i,g);
       }
 
-      debugBelch("%5d %7ld %9d", g, (lnat)gen->max_blocks, mut);
+      debugBelch("%5d %7" FMT_SizeT " %9d", g, (lnat)gen->max_blocks, mut);
 
       gen_slop = gen_blocks * BLOCK_SIZE_W - gen_live;
 
-      debugBelch("%8ld %8d %8ld %8ld\n", gen_blocks, lge,
+      debugBelch("%8" FMT_SizeT " %8d %8" FMT_SizeT " %8" FMT_SizeT "\n", gen_blocks, lge,
                  gen_live*sizeof(W_), gen_slop*sizeof(W_));
       tot_live += gen_live;
       tot_slop += gen_slop;
   }
   debugBelch("----------------------------------------------------------\n");
-  debugBelch("%41s%8ld %8ld\n","",tot_live*sizeof(W_),tot_slop*sizeof(W_));
+  debugBelch("%41s%8" FMT_SizeT " %8" FMT_SizeT "\n",
+             "",tot_live*sizeof(W_),tot_slop*sizeof(W_));
   debugBelch("----------------------------------------------------------\n");
   debugBelch("\n");
 }

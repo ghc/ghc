@@ -25,7 +25,7 @@ import Rules            ( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 import PprCore          ( pprCoreBindings, pprCoreExpr )
 import OccurAnal        ( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo
-import CoreUtils        ( coreBindsSize, exprSize )
+import CoreUtils        ( coreBindsSize, coreBindsStats, exprSize )
 import Simplify         ( simplTopBinds, simplExpr )
 import SimplUtils       ( simplEnvForGHCi, activeRule )
 import SimplEnv
@@ -585,7 +585,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
               <+> ptext (sLit "iterations")
               <+> (brackets $ hsep $ punctuate comma $
                    map (int . simplCountN) (reverse counts_so_far))
-              <+> ptext (sLit "Size =") <+> int (coreBindsSize binds) )
+              <+> ptext (sLit "Size =") <+> ppr (coreBindsStats binds) )
 
                 -- Subtract 1 from iteration_no to get the
                 -- number of iterations we actually completed

@@ -147,7 +147,7 @@ printClosure( StgClosure *obj )
     case FUN_1_0: case FUN_0_1: 
     case FUN_1_1: case FUN_0_2: case FUN_2_0:
     case FUN_STATIC:
-	debugBelch("FUN/%d(",itbl_to_fun_itbl(info)->f.arity);
+	debugBelch("FUN/%d(",(int)itbl_to_fun_itbl(info)->f.arity);
 	printPtr((StgPtr)obj->header.info);
 #ifdef PROFILING
 	debugBelch(", %s", obj->header.prof.ccs->cc->label);
@@ -199,7 +199,7 @@ printClosure( StgClosure *obj )
         {
 	    StgPAP* pap = (StgPAP*)obj;
             StgWord i;
-            debugBelch("PAP/%d(",pap->arity); 
+            debugBelch("PAP/%d(",(int)pap->arity); 
 	    printPtr((StgPtr)pap->fun);
             for (i = 0; i < pap->n_args; ++i) {
                 debugBelch(", ");
@@ -299,21 +299,21 @@ printClosure( StgClosure *obj )
             StgWord i;
             debugBelch("ARR_WORDS(\"");
 	    for (i=0; i<arr_words_words((StgArrWords *)obj); i++)
-	      debugBelch("%lu", (lnat)((StgArrWords *)obj)->payload[i]);
+	      debugBelch("%" FMT_SizeT, (lnat)((StgArrWords *)obj)->payload[i]);
             debugBelch("\")\n");
             break;
         }
 
     case MUT_ARR_PTRS_CLEAN:
-	debugBelch("MUT_ARR_PTRS_CLEAN(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_CLEAN(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_DIRTY:
-	debugBelch("MUT_ARR_PTRS_DIRTY(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_DIRTY(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_FROZEN:
-	debugBelch("MUT_ARR_PTRS_FROZEN(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_SizeT ")\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MVAR_CLEAN:
@@ -366,7 +366,7 @@ printClosure( StgClosure *obj )
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
             debugBelch("*** printClosure: unknown type %d ****\n",
-                    get_itbl(obj)->type );
+                    (int)get_itbl(obj)->type );
             barf("printClosure %d",get_itbl(obj)->type);
             return;
     }
@@ -426,7 +426,7 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 	    printPtr((P_)payload[i]);
 	    debugBelch("\n");
 	} else {
-	    debugBelch("Word# %lu\n", (lnat)payload[i]);
+	    debugBelch("Word# %" FMT_SizeT "\n", (lnat)payload[i]);
 	}
     }
 }
@@ -442,12 +442,12 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
 	StgWord bitmap = large_bitmap->bitmap[bmp];
 	j = 0;
 	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
-	    debugBelch("   stk[%lu] (%p) = ", (lnat)(spBottom-(payload+i)), payload+i);
+	    debugBelch("   stk[%" FMT_SizeT "] (%p) = ", (lnat)(spBottom-(payload+i)), payload+i);
 	    if ((bitmap & 1) == 0) {
 		printPtr((P_)payload[i]);
 		debugBelch("\n");
 	    } else {
-		debugBelch("Word# %lu\n", (lnat)payload[i]);
+		debugBelch("Word# %" FMT_SizeT "\n", (lnat)payload[i]);
 	    }
 	}
     }
@@ -532,7 +532,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 	    ret_fun = (StgRetFun *)sp;
 	    fun_info = get_fun_itbl(ret_fun->fun);
-	    debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, fun_info->f.fun_type);
+	    debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, (int)fun_info->f.fun_type);
 	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
 		printSmallBitmap(spBottom, sp+2,
@@ -554,7 +554,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	}
 	   
 	default:
-	    debugBelch("unknown object %d\n", info->type);
+	    debugBelch("unknown object %d\n", (int)info->type);
 	    barf("printStackChunk");
 	}
     }

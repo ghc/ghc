@@ -48,6 +48,8 @@ import Platform
 import SrcLoc
 import Bag
 import FastString
+
+import Control.Monad
 \end{code}
 
 \begin{code}
@@ -454,7 +456,8 @@ checkCConv StdCallConv  = do dflags <- getDynFlags
                              if platformArch platform == ArchX86
                                  then return StdCallConv
                                  else do -- This is a warning, not an error. see #3336
-                                         addWarnTc (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
+                                         when (wopt Opt_WarnUnsupportedCallingConventions dflags) $
+                                             addWarnTc (text "the 'stdcall' calling convention is unsupported on this platform," $$ text "treating as ccall")
                                          return CCallConv
 checkCConv PrimCallConv = do addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
                              return PrimCallConv

@@ -170,10 +170,9 @@ mkUnfolding src top_lvl is_bottoming expr
 		    uf_is_value   = exprIsHNF        expr,
                     uf_is_conlike = exprIsConLike    expr,
 		    uf_expandable = exprIsExpandable expr,
-		    uf_is_cheap   = is_cheap,
+		    uf_is_cheap   = exprIsCheap      expr,
 		    uf_guidance   = guidance }
   where
-    is_cheap = exprIsCheap expr
     (arity, guidance) = calcUnfoldingGuidance expr
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains

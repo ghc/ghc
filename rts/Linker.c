@@ -294,6 +294,7 @@ typedef struct _RtsSymbolVal {
 } RtsSymbolVal;
 
 #define Maybe_Stable_Names      SymI_HasProto(stg_mkWeakzh)                     \
+                                SymI_HasProto(stg_mkWeakNoFinalizzerzh)         \
                                 SymI_HasProto(stg_mkWeakForeignEnvzh)           \
                                 SymI_HasProto(stg_makeStableNamezh)             \
                                 SymI_HasProto(stg_finalizzeWeakzh)
@@ -2428,6 +2429,7 @@ addProddableBlock ( ObjectCode* oc, void* start, int size )
    oc->proddables = pb;
 }
 
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 static void
 checkProddableBlock (ObjectCode *oc, void *addr )
 {
@@ -2444,6 +2446,7 @@ checkProddableBlock (ObjectCode *oc, void *addr )
    }
    barf("checkProddableBlock: invalid fixup in runtime linker");
 }
+#endif
 
 /* -----------------------------------------------------------------------------
  * Section management.
@@ -2459,8 +2462,8 @@ addSection ( ObjectCode* oc, SectionKind kind,
    s->next      = oc->sections;
    oc->sections = s;
 
-   IF_DEBUG(linker, debugBelch("addSection: %p-%p (size %ld), kind %d\n",
-                               start, ((char*)end)-1, (long)end - (long)start + 1, kind ));
+   IF_DEBUG(linker, debugBelch("addSection: %p-%p (size %lld), kind %d\n",
+                               start, ((char*)end)-1, ((long long)(size_t)end) - ((long long)(size_t)start) + 1, kind ));
 }
 
 
@@ -2473,6 +2476,7 @@ addSection ( ObjectCode* oc, SectionKind kind,
  */
 
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 
 /*
   ocAllocateSymbolExtras
@@ -2551,6 +2555,7 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
   return 1;
 }
 
+#endif
 #endif // defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) || defined(arm_HOST_ARCH)
 
 #if defined(arm_HOST_ARCH)
@@ -2567,6 +2572,7 @@ ocFlushInstructionCache( ObjectCode *oc )
 #endif
 
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 
 static SymbolExtra* makeSymbolExtra( ObjectCode* oc,
                                      unsigned long symbolNumber,
@@ -2604,6 +2610,7 @@ static SymbolExtra* makeSymbolExtra( ObjectCode* oc,
   return extra;
 }
 
+#endif
 #endif // defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 
 #ifdef arm_HOST_ARCH
@@ -2887,6 +2894,7 @@ printName ( UChar* name, UChar* strtab )
 }
 
 
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 static void
 copyName ( UChar* name, UChar* strtab, UChar* dst, int dstSize )
 {
@@ -2905,6 +2913,7 @@ copyName ( UChar* name, UChar* strtab, UChar* dst, int dstSize )
       dst[i] = 0;
    }
 }
+#endif
 
 
 static UChar *
@@ -2960,6 +2969,7 @@ cstring_from_section_name (UChar* name, UChar* strtab)
     }
 }
 
+#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 /* Just compares the short names (first 8 chars) */
 static COFF_section *
 findPEi386SectionCalled ( ObjectCode* oc,  UChar* name )
@@ -2988,7 +2998,7 @@ findPEi386SectionCalled ( ObjectCode* oc,  UChar* name )
 
    return NULL;
 }
-
+#endif
 
 static void
 zapTrailingAtSign ( UChar* sym )
@@ -3099,9 +3109,9 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    IF_DEBUG(linker, i=1);
    if (i == 0) return 1;
 
-   debugBelch( "sectab offset = %d\n", ((UChar*)sectab) - ((UChar*)hdr) );
-   debugBelch( "symtab offset = %d\n", ((UChar*)symtab) - ((UChar*)hdr) );
-   debugBelch( "strtab offset = %d\n", ((UChar*)strtab) - ((UChar*)hdr) );
+   debugBelch( "sectab offset = %" FMT_Int "\n", ((UChar*)sectab) - ((UChar*)hdr) );
+   debugBelch( "symtab offset = %" FMT_Int "\n", ((UChar*)symtab) - ((UChar*)hdr) );
+   debugBelch( "strtab offset = %" FMT_Int "\n", ((UChar*)strtab) - ((UChar*)hdr) );
 
    debugBelch("\n" );
    debugBelch( "Machine:           0x%x\n", (UInt32)(hdr->Machine) );
@@ -3451,8 +3461,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
 
 static int
-ocResolve_PEi386 ( ObjectCode* oc )
+ocResolve_PEi386 ( ObjectCode* oc
+#if !defined(i386_HOST_ARCH)
+                                  STG_UNUSED
+#endif
+                                             )
 {
+#if defined(i386_HOST_ARCH)
    COFF_header*  hdr;
    COFF_section* sectab;
    COFF_symbol*  symtab;
@@ -3534,7 +3549,6 @@ ocResolve_PEi386 ( ObjectCode* oc )
         noRelocs = sectab_i->NumberOfRelocations;
         j = 0;
       }
-
 
       for (; j < noRelocs; j++) {
          COFF_symbol* sym;
@@ -3627,6 +3641,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
    IF_DEBUG(linker, debugBelch("completed %" PATH_FMT, oc->fileName));
    return 1;
+#else
+   barf("ocResolve_PEi386: Not supported on this arch");
+#endif
 }
 
 #endif /* defined(OBJFORMAT_PEi386) */

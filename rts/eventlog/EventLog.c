@@ -237,7 +237,10 @@ initEventLogging(void)
         // Forked process, eventlog already started by the parent
         // before fork
         event_log_pid = getpid();
-        sprintf(event_log_filename, "%s.%d.eventlog", prog, event_log_pid);
+        // We don't have a FMT* symbol for pid_t, so we go via Word64
+        // to be sure of not losing range. It would be nicer to have a
+        // FMT* symbol or similar, though.
+        sprintf(event_log_filename, "%s.%" FMT_Word64 ".eventlog", prog, (StgWord64)event_log_pid);
     }
     stgFree(prog);
 

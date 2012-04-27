@@ -154,7 +154,8 @@ data TcSigInfo
 
 instance Outputable TcSigInfo where
     ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
-        = ppr id <+> ptext (sLit "::") <+> ppr tyvars <+> pprThetaArrowTy theta <+> ppr tau
+        = ppr id <+> dcolon <+> vcat [ pprSigmaType (mkSigmaTy (map snd tyvars) theta tau)
+                                     , ppr (map fst tyvars) ]
 \end{code}
 
 Note [Kind vars in sig_tvs]

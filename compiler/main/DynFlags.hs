@@ -357,6 +357,7 @@ data WarningFlag =
    | Opt_WarnUnsafe
    | Opt_WarnSafe
    | Opt_WarnPointlessPragmas
+   | Opt_WarnUnsupportedCallingConventions
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -1842,7 +1843,8 @@ fWarningFlags = [
   ( "warn-alternative-layout-rule-transitional", Opt_WarnAlternativeLayoutRuleTransitional, nop ),
   ( "warn-unsafe",                      Opt_WarnUnsafe, setWarnUnsafe ),
   ( "warn-safe",                        Opt_WarnSafe, setWarnSafe ),
-  ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ) ]
+  ( "warn-pointless-pragmas",           Opt_WarnPointlessPragmas, nop ),
+  ( "warn-unsupported-calling-conventions", Opt_WarnUnsupportedCallingConventions, nop ) ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fFlags :: [FlagSpec DynFlag]
@@ -2174,7 +2176,8 @@ standardWarnings
         Opt_WarnDodgyForeignImports,
         Opt_WarnWrongDoBind,
         Opt_WarnAlternativeLayoutRuleTransitional,
-        Opt_WarnPointlessPragmas
+        Opt_WarnPointlessPragmas,
+        Opt_WarnUnsupportedCallingConventions
       ]
 
 minusWOpts :: [WarningFlag]

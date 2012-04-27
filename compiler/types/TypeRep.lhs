@@ -38,7 +38,7 @@ module TypeRep (
         
         -- Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
-	pprTyThing, pprTyThingCategory, 
+	pprTyThing, pprTyThingCategory, pprSigmaType,
 	pprEqPred, pprTheta, pprForAll, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
 	Prec(..), maybeParen, pprTcApp, pprTypeNameApp, 
@@ -564,11 +564,11 @@ ppr_type :: Prec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
 ppr_type p (TyConApp tc tys)  = pprTcApp p ppr_type tc tys
 ppr_type p (LitTy l)          = ppr_tylit p l
+ppr_type p ty@(ForAllTy {})   = ppr_forall_type p ty
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
 			   pprType t1 <+> ppr_type TyConPrec t2
 
-ppr_type p ty@(ForAllTy {})        = ppr_forall_type p ty
 ppr_type p fun_ty@(FunTy ty1 ty2)
   | isPredTy ty1
   = ppr_forall_type p fun_ty
@@ -580,19 +580,10 @@ ppr_type p fun_ty@(FunTy ty1 ty2)
       | not (isPredTy ty1) = ppr_type FunPrec ty1 : ppr_fun_tail ty2
     ppr_fun_tail other_ty = [ppr_type TopPrec other_ty]
 
+
 ppr_forall_type :: Prec -> Type -> SDoc
 ppr_forall_type p ty
-  = maybeParen p FunPrec $
-    sep [pprForAll tvs, pprThetaArrowTy ctxt, pprType tau]
-  where
-    (tvs,  rho) = split1 [] ty
-    (ctxt, tau) = split2 [] rho
-
-    split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
-    split1 tvs ty          = (reverse tvs, ty)
- 
-    split2 ps (ty1 `FunTy` ty2) | isPredTy ty1 = split2 (ty1:ps) ty2
-    split2 ps ty                               = (reverse ps, ty)
+  = maybeParen p FunPrec $ (ppr_sigma_type True ty)
 
 ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
@@ -605,6 +596,26 @@ ppr_tylit _ tl =
     StrTyLit s -> text (show s)
 
 -------------------
+ppr_sigma_type :: Bool -> Type -> SDoc
+-- Bool <=> Show the foralls
+ppr_sigma_type show_foralls ty
+  =  sep [ if show_foralls then pprForAll tvs else empty
+        , pprThetaArrowTy ctxt
+        , pprType tau ]
+  where
+    (tvs,  rho) = split1 [] ty
+    (ctxt, tau) = split2 [] rho
+
+    split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
+    split1 tvs ty          = (reverse tvs, ty)
+ 
+    split2 ps (ty1 `FunTy` ty2) | isPredTy ty1 = split2 (ty1:ps) ty2
+    split2 ps ty                               = (reverse ps, ty)
+
+
+pprSigmaType :: Type -> SDoc
+pprSigmaType ty = ppr_sigma_type opt_PprStyle_Debug ty
+
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
 pprForAll tvs = ptext (sLit "forall") <+> pprTvBndrs tvs <> dot
