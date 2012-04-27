@@ -1010,9 +1010,9 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
                       -- Nothing      ==> unavailable for individual heap
                       -- Just Nothing ==> available for individual heap but already in it
                       -- Just Just    ==> available for individual heap and not in it yet
-    find init_h k_bvs h used x = second (\individual -> if x `M.member` h then return (used, Nothing) else individual) $ case M.lookup x init_h of
+    find init_h k_bvs h used x = second (\individual -> if x `M.member` h then return (used, Nothing) else liftM (second Just) individual) $ case M.lookup x init_h of
          -- Variable bound by the heap (vastly common case):
-        Just hb | S.notMember x used -> (return (used', hb),       return (used', Just hb))
+        Just hb | S.notMember x used -> (return (used', hb),               return (used', hb))
                 | otherwise          -> (lft "used heap binding (common)", lft "used heap binding (individual)")
           where used' | Just (_, e) <- heapBindingTerm hb
                       , not (termIsCheap e)
@@ -1022,7 +1022,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
          -- By a process of elimination, variable must be bound be the stack. Normally it will in fact be bound by the "instance" portion
          -- of the stack because matches involving the common portion variables either already failed or were discharged by RnEnv2, but
          -- if "find" is called by "sucks" then this may not necessarily be the case
-        Nothing -> (lft "used stack binding (common)", if x `elemVarSet` k_bvs then return (used, Just lambdaBound) else lft "used stack binding (individual)")
+        Nothing -> (lft "used stack binding (common)", if x `elemVarSet` k_bvs then return (used, lambdaBound) else lft "used stack binding (individual)")
      where lft msg = Left (msg ++ ": " ++ showPpr x)
 
     suck :: PureHeap -> BoundVars -> PureHeap -> Var -> (S.Set Var, Maybe HeapBinding) -> MSG' (S.Set Var, PureHeap)
