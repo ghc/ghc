@@ -485,13 +485,13 @@ data MemoHow = Skip | CheckOnly | CheckAndRemember
 -- If you do then you can start with this term:
 --   [1] let $dNum = ww3 in * a $dNum
 --
--- Looks like this after reduction+GC:
+-- Looks like this after reduction+GC (the update for $dNum is dead):
 --   [2] case ww3 of Num ...
 --
--- And if we reduce+split [1] instead we get:
+-- And if we reduce+split [1] instead we get (the update for $dNum is residualised):
 --   [3] case $dNum of Num ...
 --
--- Reducing+GCing [3] term gives us [3] again, and that is alpha equivalent to [2],
+-- Reducing+GCing [3] gives us [3] again, and that is alpha equivalent to [2],
 -- so we tie back to it rather than continuing. But that means our code is:
 --   let h @a ww3 = let $dNum = ww3
 --                  in h a $dNum
