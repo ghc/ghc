@@ -450,6 +450,8 @@ primOpIsCheap op
      -- This is vital; see Note [PrimOp can_fail and has_side_effects]
  && not (primOpOutOfLine op)
 -- && primOpCodeSize op <= primOpCodeSizeDefault 
+-- Omitting; it makes fft2 run a lot slower by preventing
+--           eta expansion in an inner loop, with a primop cosDouble#
      -- The latter two conditions are a HACK; we should 
      -- really have a proper property on primops that says
      -- when they are cheap to execute.  For now we are using
