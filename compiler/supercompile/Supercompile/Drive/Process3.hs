@@ -7,7 +7,7 @@ import Supercompile.Drive.Split
 import Supercompile.Drive.Process
 
 import Supercompile.Core.FreeVars
-import Supercompile.Core.Renaming (renameFVedTerm)
+import Supercompile.Core.Renaming
 import Supercompile.Core.Size (fvedTermSize)
 import Supercompile.Core.Syntax
 import Supercompile.Core.Tag
@@ -175,6 +175,11 @@ runScpM tag_anns me = fvedTermSize e' `seq` trace ("Deepest path:\n" ++ showSDoc
         e' = letRec fulfils e
 
 
+mkOutRenaming :: Renaming -> ScpM Renaming
+mkOutRenaming rn = ScpM $ StateT $ \s -> let (pss, ps) = trainToList (promises (scpMemoState s))
+                                             hs = concatMap (\(p, ps) -> fun p : map fun ps) pss ++ map fun ps
+                                         in return (foldr (\x rn -> insertIdRenaming rn x x) rn hs, s)
+
 callCCM :: ((a -> ScpM ()) -> ScpM a) -> ScpM a
 callCCM act = ScpM $ StateT $ \s -> ReaderT $ \env -> callCC (\jump_back -> unReaderT (unStateT (unScpM (act (\a -> ScpM $ StateT $ \s' -> ReaderT $ \_ -> case s' `rolledBackTo` s of Just s'' -> jump_back (a, s''); Nothing -> return ((), s')))) s) env)
 
@@ -267,6 +272,7 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
                                                             -> pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
                                                                                        pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $
                                                                do (deeds', e) <- sc (deeds, heap, k, qa)
+                                                                  rn_r <- mkOutRenaming rn_r -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
                                                                   liftM ((,) True) $ insertTagsM $ instanceSplit (deeds' `plusDeeds` deeds_r', heap_r, k_r, renameFVedTerm ids rn_r e) sc
                                                             where [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
                                                            _ -> (if sC_ROLLBACK then (\gen -> shallow_rb gen >> my_split state sc) else try_generalise) ({-# SCC "mK_GENERALISER'" #-} mK_GENERALISER shallow_state state))
