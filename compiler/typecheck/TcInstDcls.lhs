@@ -386,8 +386,12 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                         -- more errors still
 
        ; traceTc "tcDeriving" empty
+       ; th_stage <- getStage   -- See Note [Deriving inside TH brackets ]
        ; (gbl_env, deriv_inst_info, deriv_binds)
-              <- tcDeriving tycl_decls inst_decls deriv_decls
+              <- if isBrackStage th_stage 
+                 then return (gbl_env, emptyBag, emptyValBindsOut)
+                 else tcDeriving tycl_decls inst_decls deriv_decls
+
 
        -- Check that if the module is compiled with -XSafe, there are no
        -- hand written instances of Typeable as then unsafe casts could be
@@ -442,6 +446,23 @@ addFamInsts fam_insts thing_inside
     tycons = famInstsRepTyCons fam_insts
     things = map ATyCon tycons ++ map ACoAxiom axioms 
 \end{code}
+
+Note [Deriving inside TH brackets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given a declaration bracket
+  [d| data T = A | B deriving( Show ) |]
+
+there is really no point in generating the derived code for deriving(
+Show) and then type-checking it. This will happen at the call site
+anyway, and the type check should never fail!  Moreover (Trac #6005)
+the scoping of the generated code inside the bracket does not seem to 
+work out.  
+
+The easy solution is simply not to generate the derived instances at
+all.  (A less brutal solution would be to generate them with no
+bindings.)  This will become moot when we shift to the new TH plan, so 
+the brutal solution will do.
+
 
 Note [Instance declaration cycles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -203,37 +203,37 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     tracePreface();
     switch (tag) {
     case EVENT_CREATE_THREAD:   // (cap, thread)
-        debugBelch("cap %d: created thread %lu\n", 
+        debugBelch("cap %d: created thread %" FMT_SizeT "\n", 
                    cap->no, (lnat)tso->id);
         break;
     case EVENT_RUN_THREAD:      //  (cap, thread)
-        debugBelch("cap %d: running thread %lu (%s)\n", 
+        debugBelch("cap %d: running thread %" FMT_SizeT " (%s)\n", 
                    cap->no, (lnat)tso->id, what_next_strs[tso->what_next]);
         break;
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        debugBelch("cap %d: thread %lu appended to run queue\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT " appended to run queue\n", 
                    cap->no, (lnat)tso->id);
         break;
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-        debugBelch("cap %d: thread %lu migrating to cap %d\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT " migrating to cap %d\n", 
                    cap->no, (lnat)tso->id, (int)info1);
         break;
     case EVENT_THREAD_WAKEUP:   // (cap, thread, info1_cap)
-        debugBelch("cap %d: waking up thread %lu on cap %d\n", 
+        debugBelch("cap %d: waking up thread %" FMT_SizeT " on cap %d\n", 
                    cap->no, (lnat)tso->id, (int)info1);
         break;
         
     case EVENT_STOP_THREAD:     // (cap, thread, status)
         if (info1 == 6 + BlockedOnBlackHole) {
-            debugBelch("cap %d: thread %lu stopped (blocked on black hole owned by thread %lu)\n",
+            debugBelch("cap %d: thread %" FMT_SizeT " stopped (blocked on black hole owned by thread %lu)\n",
                        cap->no, (lnat)tso->id, (long)info2);
         } else {
-            debugBelch("cap %d: thread %lu stopped (%s)\n",
+            debugBelch("cap %d: thread %" FMT_SizeT " stopped (%s)\n",
                        cap->no, (lnat)tso->id, thread_stop_reasons[info1]);
         }
         break;
     default:
-        debugBelch("cap %d: thread %lu: event %d\n\n", 
+        debugBelch("cap %d: thread %" FMT_SizeT ": event %d\n\n", 
                    cap->no, (lnat)tso->id, tag);
         break;
     }
@@ -423,17 +423,17 @@ void traceCapsetEvent (EventTypeNum tag,
         tracePreface();
         switch (tag) {
         case EVENT_CAPSET_CREATE:   // (capset, capset_type)
-            debugBelch("created capset %lu of type %d\n", (lnat)capset, (int)info);
+            debugBelch("created capset %" FMT_SizeT " of type %d\n", (lnat)capset, (int)info);
             break;
         case EVENT_CAPSET_DELETE:   // (capset)
-            debugBelch("deleted capset %lu\n", (lnat)capset);
+            debugBelch("deleted capset %" FMT_SizeT "\n", (lnat)capset);
             break;
         case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
-            debugBelch("assigned cap %lu to capset %lu\n",
+            debugBelch("assigned cap %" FMT_SizeT " to capset %" FMT_SizeT "\n",
                        (lnat)info, (lnat)capset);
             break;
         case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
-            debugBelch("removed cap %lu from capset %lu\n",
+            debugBelch("removed cap %" FMT_SizeT " from capset %" FMT_SizeT "\n",
                        (lnat)info, (lnat)capset);
             break;
         }
@@ -670,7 +670,7 @@ void traceThreadLabel_(Capability *cap,
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
         ACQUIRE_LOCK(&trace_utx);
         tracePreface();
-        debugBelch("cap %d: thread %lu has label %s\n",
+        debugBelch("cap %d: thread %" FMT_SizeT " has label %s\n",
                    cap->no, (lnat)tso->id, label);
         RELEASE_LOCK(&trace_utx);
     } else

@@ -181,7 +181,7 @@ pprIfaceTvBndr (tv, IfaceTyConApp tc [])
 pprIfaceTvBndr (tv, kind) = parens (ppr tv <> dcolon <> ppr kind)
 
 pprIfaceTvBndrs :: [IfaceTvBndr] -> SDoc
-pprIfaceTvBndrs tyvars = hsep (map pprIfaceTvBndr tyvars)
+pprIfaceTvBndrs tyvars = sep (map pprIfaceTvBndr tyvars)
 \end{code}
 
 ----------------------------- Printing IfaceType ------------------------------------

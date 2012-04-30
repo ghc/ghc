@@ -152,7 +152,16 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
         tcg_env <- {-# SCC "tcRnImports" #-}
                    tcRnImports hsc_env this_mod (prel_imports ++ import_decls) ;
-        setGblEnv tcg_env               $ do {
+
+          -- If the whole module is warned about or deprecated 
+          -- (via mod_deprec) record that in tcg_warns. If we do thereby add
+          -- a WarnAll, it will override any subseqent depracations added to tcg_warns
+        let { tcg_env1 = case mod_deprec of 
+                         Just txt -> tcg_env { tcg_warns = WarnAll txt } 
+                         Nothing  -> tcg_env 
+            } ;
+ 
+        setGblEnv tcg_env1 $ do {
 
                 -- Load the hi-boot interface for this module, if any
                 -- We do this now so that the boot_names can be passed
@@ -172,16 +181,6 @@ tcRnModule hsc_env hsc_src save_rn_syntax
                         {-# SCC "tcRnSrcDecls" #-}
                         tcRnSrcDecls boot_iface local_decls ;
         setGblEnv tcg_env               $ do {
-
-                -- Report the use of any deprecated things
-                -- We do this *before* processsing the export list so
-                -- that we don't bleat about re-exporting a deprecated
-                -- thing (especially via 'module Foo' export item)
-                -- That is, only uses in the *body* of the module are complained about
-        traceRn (text "rn3") ;
-        failIfErrsM ;   -- finishWarnings crashes sometimes
-                        -- as a result of typechecker repairs (e.g. unboundNames)
-        tcg_env <- finishWarnings (hsc_dflags hsc_env) mod_deprec tcg_env ;
 
                 -- Process the export list
         traceRn (text "rn4a: before exports");
@@ -1796,7 +1795,7 @@ pprModGuts (ModGuts { mg_tcs = tcs
 
 ppr_types :: [ClsInst] -> TypeEnv -> SDoc
 ppr_types insts type_env
-  = text "TYPE SIGNATURES" $$ nest 4 (ppr_sigs ids)
+  = text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
   where
     dfun_ids = map instanceDFunId insts
     ids = [id | id <- typeEnvIds type_env, want_sig id]
@@ -1838,7 +1837,7 @@ ppr_sigs ids
   = vcat (map ppr_sig (sortLe le_sig ids))
   where
     le_sig id1 id2 = getOccName id1 <= getOccName id2
-    ppr_sig id = ppr id <+> dcolon <+> ppr (tidyTopType (idType id))
+    ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 
 ppr_tydecls :: [TyCon] -> SDoc
 ppr_tydecls tycons

@@ -384,13 +384,9 @@ stg_mkWeakzh
 {
   /* R1 = key
      R2 = value
-     R3 = finalizer (or NULL)
+     R3 = finalizer (or stg_NO_FINALIZER_closure)
   */
   W_ w;
-
-  if (R3 == NULL) {
-    R3 = stg_NO_FINALIZER_closure;
-  }
 
   ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, stg_mkWeakzh );
 
@@ -414,6 +410,16 @@ stg_mkWeakzh
   IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w) []);
 
   RET_P(w);
+}
+
+stg_mkWeakNoFinalizzerzh
+{
+  /* R1 = key
+     R2 = value
+   */
+  R3 = stg_NO_FINALIZER_closure;
+
+  jump stg_mkWeakzh;
 }
 
 stg_mkWeakForeignEnvzh

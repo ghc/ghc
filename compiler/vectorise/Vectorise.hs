@@ -361,7 +361,7 @@ vectTopRhs recFs var expr
     rhs _globalScalar _isDFun (Just (_, expr'))               -- Case (1)
       = return (inlineMe, False, expr')
     rhs True          False   Nothing                         -- Case (2)
-      = do { expr' <- vectScalarFun True recFs expr
+      = do { expr' <- vectScalarFun recFs expr
            ; return (inlineMe, True, vectorised expr')
            }
     rhs True          True    Nothing                         -- Case (3)

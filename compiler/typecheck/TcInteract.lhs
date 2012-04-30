@@ -1463,6 +1463,7 @@ doTopReact inerts workItem@(CDictCan { cc_flavor = fl@(Wanted loc dict_id)
        ; let fd_eqns = improveFromInstEnv instEnvs 
                             (mkClassPred cls xis, pprArisingAt loc)
 
+       ; traceTcS "improve" (vcat [ppr cls <+> ppr xis, vcat (map pprEquation fd_eqns), ppr (snd instEnvs)])
        ; any_fundeps <- rewriteWithFunDeps fd_eqns xis loc
        ; case any_fundeps of
            -- No Functional Dependencies

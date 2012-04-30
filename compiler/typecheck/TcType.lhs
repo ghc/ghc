@@ -152,7 +152,7 @@ module TcType (
   tyVarsOfType, tyVarsOfTypes,
   tcTyVarsOfType, tcTyVarsOfTypes,
 
-  pprKind, pprParendKind,
+  pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,
   pprTheta, pprThetaArrowTy, pprClassPred
 

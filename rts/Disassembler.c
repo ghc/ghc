@@ -75,12 +75,12 @@ disInstr ( StgBCO *bco, int pc )
                          instrs[pc], (signed int)instrs[pc+1]);
          pc += 2; break;
       case bci_CCALL:
-         debugBelch("CCALL    marshaller at 0x%lx\n", 
+         debugBelch("CCALL    marshaller at 0x%" FMT_Word "\n", 
                          literals[instrs[pc]] );
          pc += 1; break;
      case bci_STKCHECK:  {
          StgWord stk_words_reqd = BCO_GET_LARGE_ARG + 1;
-         debugBelch("STKCHECK %lu\n", (lnat)stk_words_reqd );
+         debugBelch("STKCHECK %" FMT_SizeT "\n", (lnat)stk_words_reqd );
          break;
      }
       case bci_PUSH_L: 
@@ -130,7 +130,7 @@ disInstr ( StgBCO *bco, int pc )
       case bci_PUSH_UBX:
          debugBelch("PUSH_UBX ");
          for (i = 0; i < instrs[pc+1]; i++) 
-            debugBelch("0x%lx ", literals[i + instrs[pc]] );
+            debugBelch("0x%" FMT_Word " ", literals[i + instrs[pc]] );
          debugBelch("\n");
          pc += 2; break;
       case bci_PUSH_APPLY_N:
@@ -199,29 +199,29 @@ disInstr ( StgBCO *bco, int pc )
       case bci_TESTLT_I: {
           unsigned int discr  = BCO_NEXT;
           int failto = BCO_GET_LARGE_ARG;
-          debugBelch("TESTLT_I  %ld, fail to %d\n", literals[discr], failto);
+          debugBelch("TESTLT_I  %" FMT_Int ", fail to %d\n", literals[discr], failto);
           break;
       }
       case bci_TESTEQ_I:
-         debugBelch("TESTEQ_I  %ld, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTEQ_I  %" FMT_Int ", fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
       case bci_TESTLT_F:
-         debugBelch("TESTLT_F  %ld, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTLT_F  %" FMT_Int ", fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_F:
-         debugBelch("TESTEQ_F  %ld, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTEQ_F  %" FMT_Int ", fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 
       case bci_TESTLT_D:
-         debugBelch("TESTLT_D  %ld, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTLT_D  %" FMT_Int ", fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
       case bci_TESTEQ_D:
-         debugBelch("TESTEQ_D  %ld, fail to %d\n", literals[instrs[pc]],
+         debugBelch("TESTEQ_D  %" FMT_Int ", fail to %d\n", literals[instrs[pc]],
                                                       instrs[pc+1]);
          pc += 2; break;
 

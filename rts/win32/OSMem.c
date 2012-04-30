@@ -124,7 +124,7 @@ findFreeBlocks(nat n) {
     /* TODO: Don't just take first block, find smallest sufficient block */
     for( ; it!=0 && it->size<required_size; prev=it, it=it->next ) {}
     if(it!=0) {
-        if( (((unsigned long)it->base) & MBLOCK_MASK) == 0) { /* MBlock aligned */
+        if( (((lnat)it->base) & MBLOCK_MASK) == 0) { /* MBlock aligned */
             ret = (void*)it->base;
             if(it->size==required_size) {
                 prev->next=it->next;
@@ -137,7 +137,7 @@ findFreeBlocks(nat n) {
             char* need_base;
             block_rec* next;
             int new_size;
-            need_base = (char*)(((unsigned long)it->base) & ((unsigned long)~MBLOCK_MASK)) + MBLOCK_SIZE;
+            need_base = (char*)(((lnat)it->base) & ((lnat)~MBLOCK_MASK)) + MBLOCK_SIZE;
             next = (block_rec*)stgMallocBytes(
                     sizeof(block_rec)
                     , "getMBlocks: findFreeBlocks: splitting");
