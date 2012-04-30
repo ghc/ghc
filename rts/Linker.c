@@ -1684,7 +1684,7 @@ mmap_again:
                     MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
 
    if (result == MAP_FAILED) {
-       sysErrorBelch("mmap %lu bytes at %p",(lnat)size,map_addr);
+       sysErrorBelch("mmap %" FMT_SizeT " bytes at %p",(lnat)size,map_addr);
        errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
        stg_exit(EXIT_FAILURE);
    }
@@ -1727,7 +1727,7 @@ mmap_again:
    }
 #endif
 
-   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %lu bytes starting at %p\n", (lnat)size, result));
+   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %" FMT_SizeT " bytes starting at %p\n", (lnat)size, result));
    IF_DEBUG(linker, debugBelch("mmapForLinker: done\n"));
    return result;
 }
@@ -4668,7 +4668,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #        endif // arm_HOST_ARCH
 
          default:
-            errorBelch("%s: unhandled ELF relocation(Rel) type %lu\n",
+            errorBelch("%s: unhandled ELF relocation(Rel) type %" FMT_SizeT "\n",
                   oc->fileName, (lnat)ELF_R_TYPE(info));
             return 0;
       }
@@ -4962,7 +4962,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 
          default:
-            errorBelch("%s: unhandled ELF relocation(RelA) type %lu\n",
+            errorBelch("%s: unhandled ELF relocation(RelA) type %" FMT_SizeT "\n",
                   oc->fileName, (lnat)ELF_R_TYPE(info));
             return 0;
       }
