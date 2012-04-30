@@ -414,9 +414,15 @@ typedef struct _RtsSymbolVal {
 #endif
 
 #if defined(i386_HOST_ARCH)
-#define RTS_MINGW32_ONLY(X) X
+#define RTS_WIN32_ONLY(X) X
 #else
-#define RTS_MINGW32_ONLY(X) /**/
+#define RTS_WIN32_ONLY(X) /**/
+#endif
+
+#if defined(x86_64_HOST_ARCH)
+#define RTS_WIN64_ONLY(X) X
+#else
+#define RTS_WIN64_ONLY(X) /**/
 #endif
 
 /* These are statically linked from the mingw libraries into the ghc
@@ -448,7 +454,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(strcpy)                              \
       SymI_HasProto(strncpy)                             \
       SymI_HasProto(abort)                               \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_alloca))         \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_alloca))           \
       SymI_HasProto(isxdigit)                            \
       SymI_HasProto(isupper)                             \
       SymI_HasProto(ispunct)                             \
@@ -499,43 +505,43 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_NeedsProto(mktime)                            \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___timezone)) \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___tzname))   \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp__tzname))    \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___iob))      \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___osver))    \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___timezone))   \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___tzname))     \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp__tzname))      \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___iob))        \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___osver))      \
       SymI_NeedsProto(localtime)                         \
       SymI_NeedsProto(gmtime)                            \
       SymI_NeedsProto(opendir)                           \
       SymI_NeedsProto(readdir)                           \
       SymI_NeedsProto(rewinddir)                         \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp____mb_cur_max)) \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___pctype))   \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(__chkstk))        \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp____mb_cur_max)) \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___pctype))     \
+      RTS_WIN32_ONLY(SymI_NeedsProto(__chkstk))          \
       SymI_NeedsProto(__imp___iob_func)                  \
       SymI_NeedsProto(___chkstk_ms)                      \
       SymI_NeedsProto(__imp_localeconv)                  \
       SymI_NeedsProto(__imp_islower)                     \
       SymI_NeedsProto(__imp_isspace)                     \
       SymI_NeedsProto(__imp_isxdigit)                    \
-      SymI_HasProto(close)                               \
-      SymI_HasProto(read)                                \
-      SymI_HasProto(dup)                                 \
-      SymI_HasProto(dup2)                                \
-      SymI_HasProto(write)                               \
+      RTS_WIN64_ONLY(SymI_HasProto(close))               \
+      RTS_WIN64_ONLY(SymI_HasProto(read))                \
+      RTS_WIN64_ONLY(SymI_HasProto(dup))                 \
+      RTS_WIN64_ONLY(SymI_HasProto(dup2))                \
+      RTS_WIN64_ONLY(SymI_HasProto(write))               \
       SymI_NeedsProto(getpid)                            \
-      SymI_HasProto(access)                              \
+      RTS_WIN64_ONLY(SymI_HasProto(access))              \
       SymI_HasProto(chmod)                               \
-      SymI_HasProto(creat)                               \
-      SymI_HasProto(umask)                               \
+      RTS_WIN64_ONLY(SymI_HasProto(creat))               \
+      RTS_WIN64_ONLY(SymI_HasProto(umask))               \
       SymI_HasProto(unlink)                              \
       SymI_NeedsProto(__imp__errno)                      \
       SymI_NeedsProto(ftruncate64)                       \
-      SymI_HasProto(setmode)                             \
+      RTS_WIN64_ONLY(SymI_HasProto(setmode))             \
       SymI_NeedsProto(__imp__wstat64)                    \
       SymI_NeedsProto(__imp__fstat64)                    \
       SymI_NeedsProto(__imp__wsopen)                     \
-      SymI_HasProto(__imp__environ)                      \
+      RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
       SymI_NeedsProto(__imp_GetFileType)                 \
       SymI_NeedsProto(__imp_GetLastError)                \
       SymI_NeedsProto(__imp_QueryPerformanceFrequency)   \
@@ -547,7 +553,7 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(__imp_PeekNamedPipe)               \
       SymI_NeedsProto(__imp__isatty)                     \
       SymI_NeedsProto(__imp_select)                      \
-      SymI_HasProto(isatty)                              \
+      RTS_WIN64_ONLY(SymI_HasProto(isatty))              \
       SymI_NeedsProto(__imp__get_osfhandle)              \
       SymI_NeedsProto(__imp_GetConsoleMode)              \
       SymI_NeedsProto(__imp_SetConsoleMode)              \
