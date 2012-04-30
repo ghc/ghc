@@ -1986,28 +1986,19 @@ def platform_wordsize_qualify( name, suff ):
 
     basepath = qualify(name, suff)
 
-    fns = [ lambda x: x + '-' + config.compiler_type,
-            lambda x: x + '-' + config.compiler_maj_version,
-            lambda x: x + '-ws-' + config.wordsize ]
-
-    paths = [ basepath ]
-    for fn in fns:
-        paths = paths + map(fn, paths)
-
-    paths.reverse()
-
-    plat_paths = map (lambda x: x + '-' + config.platform, paths)
+    paths = [(platformSpecific, basepath + comp + vers + ws + plat)
+             for (platformSpecific, plat) in [(1, '-' + config.platform),
+                                              (0, '')]
+             for ws   in ['-ws-' + config.wordsize, '']
+             for comp in ['-' + config.compiler_type, '']
+             for vers in ['-' + config.compiler_maj_version, '']]
 
     dir = glob.glob(basepath + '*')
     dir = map (lambda d: normalise_slashes_(d), dir)
 
-    for f in plat_paths:
+    for (platformSpecific, f) in paths:
        if f in dir:
-            return (1,f)
-
-    for f in paths:
-       if f in dir:
-            return (0,f)
+            return (platformSpecific,f)
 
     return (0, basepath)
 
