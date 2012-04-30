@@ -1988,6 +1988,7 @@ def platform_wordsize_qualify( name, suff ):
 
     paths = [(platformSpecific, basepath + comp + vers + ws + plat)
              for (platformSpecific, plat) in [(1, '-' + config.platform),
+                                              (1, '-' + config.os),
                                               (0, '')]
              for ws   in ['-ws-' + config.wordsize, '']
              for comp in ['-' + config.compiler_type, '']
