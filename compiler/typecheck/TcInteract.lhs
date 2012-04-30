@@ -233,7 +233,7 @@ lookupInInertsStage ct
   = do { is <- getTcSInerts
        ; case lookupInInerts is (ctPred ct) of
            Just ct_cached 
-             |  not (isDerivedCt ct)
+             |  not (isDerivedCt ct_cached)
              -> setEvBind (ctId ct) (EvId (ctId ct_cached)) >> 
                 return Stop
            _ -> continueWith ct }
