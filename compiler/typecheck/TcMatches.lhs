@@ -31,7 +31,6 @@ import TcMType
 import TcType
 import TcBinds
 import TcUnify
-import TcErrors         ( misMatchMsg )
 import Name
 import TysWiredIn
 import Id
@@ -398,21 +397,21 @@ tcLcStmt _ _ (ExprStmt rhs _ _ _) elt_ty thing_inside
 	; return (ExprStmt rhs' noSyntaxExpr noSyntaxExpr boolTy, thing) }
 
 -- ParStmt: See notes with tcMcStmt
-tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _ _) elt_ty thing_inside
+tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _) elt_ty thing_inside
   = do	{ (pairs', thing) <- loop bndr_stmts_s
-	; return (ParStmt pairs' noSyntaxExpr noSyntaxExpr noSyntaxExpr, thing) }
+	; return (ParStmt pairs' noSyntaxExpr noSyntaxExpr, thing) }
   where
     -- loop :: [([LStmt Name], [Name])] -> TcM ([([LStmt TcId], [TcId])], thing)
     loop [] = do { thing <- thing_inside elt_ty
 		 ; return ([], thing) }		-- matching in the branches
 
-    loop ((stmts, names) : pairs)
+    loop (ParStmtBlock stmts names _ : pairs)
       = do { (stmts', (ids, pairs', thing))
 		<- tcStmtsAndThen ctxt (tcLcStmt m_tc) stmts elt_ty $ \ _elt_ty' ->
 		   do { ids <- tcLookupLocalIds names
 		      ; (pairs', thing) <- loop pairs
 		      ; return (ids, pairs', thing) }
-	   ; return ( (stmts', ids) : pairs', thing ) }
+	   ; return ( ParStmtBlock stmts' ids noSyntaxExpr : pairs', thing ) }
 
 tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                               , trS_bndrs =  bindersMap
@@ -675,7 +674,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 --        -> (m st2 -> m st3 -> m (st2, st3))   -- recursive call
 --        -> m (st1, (st2, st3))
 --
-tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op return_op) res_ty thing_inside
+tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op) res_ty thing_inside
   = do { let star_star_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
        ; m_ty   <- newFlexiTyVarTy star_star_kind
 
@@ -687,14 +686,10 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op return_op) res_ty thing_insi
                         (m_ty `mkAppTy` mkBoxedTupleTy [alphaTy, betaTy])
        ; mzip_op' <- unLoc `fmap` tcPolyExpr (noLoc mzip_op) mzip_ty
 
-       ; return_op' <- fmap unLoc . tcPolyExpr (noLoc return_op) $
-                       mkForAllTy alphaTyVar $
-                       alphaTy `mkFunTy` (m_ty `mkAppTy` alphaTy)
-
-       ; (pairs', thing) <- loop m_ty bndr_stmts_s
+       ; (blocks', thing) <- loop m_ty bndr_stmts_s
 
        -- Typecheck bind:
-       ; let tys      = map (mkBigCoreVarTupTy . snd) pairs'
+       ; let tys      = [ mkBigCoreVarTupTy bs | ParStmtBlock _ bs _ <- blocks']
              tuple_ty = mk_tuple_ty tys
 
        ; bind_op' <- tcSyntaxOp MCompOrigin bind_op $
@@ -702,7 +697,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op return_op) res_ty thing_insi
                         `mkFunTy` (tuple_ty `mkFunTy` res_ty)
                         `mkFunTy` res_ty
 
-       ; return (ParStmt pairs' mzip_op' bind_op' return_op', thing) }
+       ; return (ParStmt blocks' mzip_op' bind_op', thing) }
 
   where 
     mk_tuple_ty tys = foldr1 (\tn tm -> mkBoxedTupleTy [tn, tm]) tys
@@ -713,31 +708,19 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op return_op) res_ty thing_insi
     loop _ [] = do { thing <- thing_inside res_ty
                    ; return ([], thing) }           -- matching in the branches
 
-    loop m_ty ((stmts, names) : pairs)
+    loop m_ty (ParStmtBlock stmts names return_op : pairs)
       = do { -- type dummy since we don't know all binder types yet
-             ty_dummy <- newFlexiTyVarTy liftedTypeKind
-           ; (stmts', (ids, pairs', thing))
-                <- tcStmtsAndThen ctxt tcMcStmt stmts ty_dummy $ \res_ty' ->
+             id_tys <- mapM (const (newFlexiTyVarTy liftedTypeKind)) names
+           ; let m_tup_ty = m_ty `mkAppTy` mkBigCoreTupTy id_tys
+           ; (stmts', (ids, return_op', pairs', thing))
+                <- tcStmtsAndThen ctxt tcMcStmt stmts m_tup_ty $ \m_tup_ty' ->
                    do { ids <- tcLookupLocalIds names
-    		      ; let m_tup_ty = m_ty `mkAppTy` mkBigCoreVarTupTy ids
-
-    		      ; check_same m_tup_ty res_ty'
-    		      ; check_same m_tup_ty ty_dummy
-    							 
+    		      ; let tup_ty = mkBigCoreVarTupTy ids
+                      ; return_op' <- tcSyntaxOp MCompOrigin return_op
+                                          (tup_ty `mkFunTy` m_tup_ty')
                       ; (pairs', thing) <- loop m_ty pairs
-                      ; return (ids, pairs', thing) }
-           ; return ( (stmts', ids) : pairs', thing ) }
-
-	-- Check that the types match up.
-	-- This is a grevious hack.  They always *will* match 
-	-- If (>>=) and (>>) are polymorpic in the return type,
-	-- but we don't have any good way to incorporate the coercion
-	-- so for now we just check that it's the identity
-    check_same actual expected
-      = do { co <- unifyType actual expected
-	   ; unless (isTcReflCo co) $
-             failWithMisMatch [UnifyOrigin { uo_expected = expected
-                                           , uo_actual = actual }] }
+                      ; return (ids, return_op', pairs', thing) }
+           ; return (ParStmtBlock stmts' ids return_op' : pairs', thing) }
 
 tcMcStmt _ stmt _ _
   = pprPanic "tcMcStmt: unexpected Stmt" (ppr stmt)
@@ -877,22 +860,5 @@ checkArgs fun (MatchGroup (match1:matches) _)
     args_in_match :: LMatch Name -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
 checkArgs fun _ = pprPanic "TcPat.checkArgs" (ppr fun) -- Matches always non-empty
-
-failWithMisMatch :: [EqOrigin] -> TcM a
--- Generate the message when two types fail to match,
--- going to some trouble to make it helpful.
--- We take the failing types from the top of the origin stack
--- rather than reporting the particular ones we are looking 
--- at right now
-failWithMisMatch (item:origin)
-  = wrapEqCtxt origin $
-    do	{ ty_act <- zonkTcType (uo_actual item)
-        ; ty_exp <- zonkTcType (uo_expected item)
-        ; env0 <- tcInitTidyEnv
-        ; let (env1, pp_exp) = tidyOpenType env0 ty_exp
-              (env2, pp_act) = tidyOpenType env1 ty_act
-        ; failWithTcM (env2, misMatchMsg True pp_exp pp_act) }
-failWithMisMatch [] 
-  = panic "failWithMisMatch"
 \end{code}
 

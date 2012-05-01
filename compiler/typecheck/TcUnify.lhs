@@ -31,7 +31,6 @@ module TcUnify (
   matchExpectedFunTys,
   matchExpectedFunKind,
   wrapFunResCoercion,
-  wrapEqCtxt,
 
   --------------------------------
   -- Errors
@@ -43,7 +42,6 @@ module TcUnify (
 
 import HsSyn
 import TypeRep
-import TcErrors	( unifyCtxt )
 import TcMType
 import TcIface
 import TcRnMonad
@@ -1005,15 +1003,6 @@ we return a made-up TcTyVarDetails, but I think it works smoothly.
 pushOrigin :: TcType -> TcType -> [EqOrigin] -> [EqOrigin]
 pushOrigin ty_act ty_exp origin
   = UnifyOrigin { uo_actual = ty_act, uo_expected = ty_exp } : origin
-
----------------
-wrapEqCtxt :: [EqOrigin] -> TcM a -> TcM a
--- Build a suitable error context from the origin and do the thing inside
--- The "couldn't match" error comes from the innermost item on the stack,
--- and, if there is more than one item, the "Expected/inferred" part
--- comes from the outermost item
-wrapEqCtxt []    thing_inside = thing_inside
-wrapEqCtxt items thing_inside = addErrCtxtM (unifyCtxt (last items)) thing_inside
 \end{code}
 
 

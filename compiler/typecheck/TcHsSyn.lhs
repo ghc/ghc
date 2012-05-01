@@ -770,19 +770,18 @@ zonkStmts env (s:ss) = do { (env1, s')  <- wrapLocSndM (zonkStmt env) s
 			  ; return (env2, s' : ss') }
 
 zonkStmt :: ZonkEnv -> Stmt TcId -> TcM (ZonkEnv, Stmt Id)
-zonkStmt env (ParStmt stmts_w_bndrs mzip_op bind_op return_op)
-  = mappM zonk_branch stmts_w_bndrs	`thenM` \ new_stmts_w_bndrs ->
-    let 
-	new_binders = concat (map snd new_stmts_w_bndrs)
-	env1 = extendIdZonkEnv env new_binders
-    in
-    zonkExpr env1 mzip_op   `thenM` \ new_mzip ->
-    zonkExpr env1 bind_op   `thenM` \ new_bind ->
-    zonkExpr env1 return_op `thenM` \ new_return ->
-    return (env1, ParStmt new_stmts_w_bndrs new_mzip new_bind new_return)
+zonkStmt env (ParStmt stmts_w_bndrs mzip_op bind_op)
+  = do { new_stmts_w_bndrs <- mapM zonk_branch stmts_w_bndrs
+       ; let new_binders = [b | ParStmtBlock _ bs _ <- new_stmts_w_bndrs, b <- bs]
+	     env1 = extendIdZonkEnv env new_binders
+       ; new_mzip <- zonkExpr env1 mzip_op
+       ; new_bind <- zonkExpr env1 bind_op
+       ; return (env1, ParStmt new_stmts_w_bndrs new_mzip new_bind) }
   where
-    zonk_branch (stmts, bndrs) = zonkStmts env stmts	`thenM` \ (env1, new_stmts) ->
-				 returnM (new_stmts, zonkIdOccs env1 bndrs)
+    zonk_branch (ParStmtBlock stmts bndrs return_op) 
+       = do { (env1, new_stmts) <- zonkStmts env stmts
+            ; new_return <- zonkExpr env1 return_op
+	    ; return (ParStmtBlock new_stmts (zonkIdOccs env1 bndrs) new_return) }
 
 zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_ids = rvs
                       , recS_ret_fn = ret_id, recS_mfix_fn = mfix_id, recS_bind_fn = bind_id

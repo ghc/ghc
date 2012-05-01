@@ -10,8 +10,6 @@
 module TcErrors( 
        reportUnsolved, ErrEnv,
        warnDefaulting,
-       unifyCtxt,
-       misMatchMsg,
 
        flattenForAllErrorTcS,
        solverDepthErrorTcS
@@ -641,12 +639,6 @@ kindErrorMsg ty1 ty2
     k2 = typeKind ty2
 
 --------------------
-unifyCtxt :: EqOrigin -> TidyEnv -> TcM (TidyEnv, SDoc)
-unifyCtxt (UnifyOrigin { uo_actual = act_ty, uo_expected = exp_ty }) tidy_env
-  = do  { (env1, act_ty') <- zonkTidyTcType tidy_env act_ty
-        ; (env2, exp_ty') <- zonkTidyTcType env1 exp_ty
-        ; return (env2, mkExpectedActualMsg exp_ty' act_ty') }
-
 misMatchMsg :: Bool -> TcType -> TcType -> SDoc	   -- Types are already tidy
 -- If oriented then ty1 is expected, ty2 is actual
 misMatchMsg oriented ty1 ty2 
