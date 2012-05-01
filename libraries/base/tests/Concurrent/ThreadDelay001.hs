@@ -8,8 +8,10 @@ import Control.Concurrent
 import Control.Monad
 import System.Time
 
+main :: IO ()
 main = mapM_ delay (0 : take 11 (iterate (*5) 1))
 
+delay :: Int -> IO ()
 delay n = do
   tS <- getClockTime
   threadDelay n
@@ -17,10 +19,12 @@ delay n = do
 
   let req = fromIntegral n * 10 ^ (6 :: Int)
       obs = case normalizeTimeDiff (diffClockTimes tE tS) of
-                TimeDiff 0 0 0 0 0 s ps -> 10^12 * fromIntegral s + ps
+                TimeDiff 0 0 0 0 0 s ps -> 10 ^ (12 :: Int) * fromIntegral s + ps
+                td ->
+                    error ("Bad TimeDiff: " ++ show td)
       diff = obs - req
       diff' :: Double
-      diff' = fromIntegral diff /  10^(12 :: Int)
+      diff' = fromIntegral diff /  10 ^ (12 :: Int)
 
   when (obs < req) $ print (tS, tE, req, obs, diff, diff')
 
