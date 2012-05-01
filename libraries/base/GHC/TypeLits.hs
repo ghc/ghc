@@ -23,7 +23,7 @@ module GHC.TypeLits
   , withSing, singThat
 
     -- * Functions on type nats
-  , type (<=), type (+), type (*), type (^)
+  , type (<=), type (<=?), type (+), type (*), type (^)
 
     -- * Destructing type-nats.
   , isZero, IsZero(..)
@@ -75,6 +75,8 @@ class SingI a where
 
 -- | Comparsion of type-level naturals.
 class (m :: Nat) <= (n :: Nat)
+
+type family (m :: Nat) <=? (n :: Nat) :: Bool
 
 -- | Addition of type-level naturals.
 type family (m :: Nat) + (n :: Nat) :: Nat
