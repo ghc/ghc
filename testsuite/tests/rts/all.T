@@ -78,7 +78,7 @@ test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts=
 
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
-     [ if_platform('i386-unknown-mingw32',skip),
+     [ if_os('mingw32', skip),
        # OS X doesn't seem to support linker scripts
        if_os('darwin', skip),
        # Solaris' linker does not support GNUish linker scripts
@@ -103,7 +103,7 @@ test('T4059',
 
 # Test for #4274
 test('exec_signals', [
-     if_platform('i386-unknown-mingw32',skip),
+     if_os('mingw32', skip),
      cmd_prefix('$MAKE exec_signals-prep && ./exec_signals_prepare'),
      extra_clean(['exec_signals_child', 'exec_signals_prepare'])
     ], compile_and_run, [''])
