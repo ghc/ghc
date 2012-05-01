@@ -1099,9 +1099,7 @@ pprStmt (LastStmt expr _)         = ifPprDebug (ptext (sLit "[last]")) <+> ppr e
 pprStmt (BindStmt pat expr _ _)   = hsep [ppr pat, ptext (sLit "<-"), ppr expr]
 pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _ _)     = ppr expr
-pprStmt (ParStmt stmtss _ _)      = sep (map doStmts stmtss)
-  where 
-    doStmts stmts = ptext (sLit "|") <+> ppr stmts
+pprStmt (ParStmt stmtss _ _)      = sep (punctuate (ptext (sLit " | ")) (map ppr stmtss))
 
 pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form = form })
   = sep $ punctuate comma (map ppr stmts ++ [pprTransStmt by using form])
