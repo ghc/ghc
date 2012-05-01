@@ -2493,23 +2493,15 @@ addProddableBlock ( ObjectCode* oc, void* start, int size )
 }
 
 static void
-checkProddableBlock (ObjectCode *oc, void *addr )
+checkProddableBlock (ObjectCode *oc, void *addr, size_t size )
 {
    ProddableBlock* pb;
 
    for (pb = oc->proddables; pb != NULL; pb = pb->next) {
       char* s = (char*)(pb->start);
-      char* e = s + pb->size - 1;
+      char* e = s + pb->size;
       char* a = (char*)addr;
-#if WORD_SIZE_IN_BITS == 32
-      /* Assumes that the biggest fixup involves a 4-byte write */
-      if (a >= s && (a+3) <= e) return;
-#elif WORD_SIZE_IN_BITS == 64
-      /* Assumes that the biggest fixup involves a 4-byte write */
-      if (a >= s && (a+7) <= e) return;
-#else
-#error
-#endif
+      if (a >= s && (a+size) <= e) return;
    }
    barf("checkProddableBlock: invalid fixup in runtime linker: %p", addr);
 }
@@ -3670,7 +3662,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
             return 0;
            foundit:;
          }
-         checkProddableBlock(oc, pP);
+         /* All supported relocations write at least 4 bytes */
+         checkProddableBlock(oc, pP, 4);
          switch (reltab_j->Type) {
 #if defined(i386_HOST_ARCH)
             case MYIMAGE_REL_I386_DIR32:
@@ -3715,6 +3708,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             case 1: /* R_X86_64_64 */
                {
                  UInt64 A;
+                 checkProddableBlock(oc, pP, 8);
                  A = *(UInt64*)pP;
                  *(UInt64 *)pP = ((UInt64)S) + ((UInt64)A);
                  break;
@@ -4466,7 +4460,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
       IF_DEBUG(linker,debugBelch( "Reloc: P = %p   S = %p   A = %p\n",
                              (void*)P, (void*)S, (void*)A ));
-      checkProddableBlock ( oc, pP );
+      checkProddableBlock ( oc, pP, sizeof(Elf_Word) );
 
 #ifdef i386_HOST_ARCH
       value = S + A;
@@ -5233,7 +5227,7 @@ resolveImports(
 
 #if i386_HOST_ARCH
         if (isJumpTable) {
-            checkProddableBlock(oc,image + sect->offset + i*itemSize);
+            checkProddableBlock(oc,image + sect->offset + i*itemSize, 5);
 
             *(image + sect->offset + i * itemSize) = 0xe9; // jmp opcode
             *(unsigned*)(image + sect->offset + i*itemSize + 1)
@@ -5242,7 +5236,9 @@ resolveImports(
         else
 #endif
         {
-            checkProddableBlock(oc,((void**)(image + sect->offset)) + i);
+            checkProddableBlock(oc,
+                                ((void**)(image + sect->offset)) + i,
+                                sizeof(void *));
             ((void**)(image + sect->offset))[i] = addr;
         }
     }
@@ -5323,22 +5319,25 @@ relocateSection(
 	IF_DEBUG(linker, debugBelch("               : extern    = %d\n", reloc->r_extern));
 	IF_DEBUG(linker, debugBelch("               : type      = %d\n", reloc->r_type));
 
-        checkProddableBlock(oc,thingPtr);
         switch(reloc->r_length)
         {
             case 0:
+                checkProddableBlock(oc,thingPtr,1);
                 thing = *(uint8_t*)thingPtr;
                 baseValue = (uint64_t)thingPtr + 1;
                 break;
             case 1:
+                checkProddableBlock(oc,thingPtr,2);
                 thing = *(uint16_t*)thingPtr;
                 baseValue = (uint64_t)thingPtr + 2;
                 break;
             case 2:
+                checkProddableBlock(oc,thingPtr,4);
                 thing = *(uint32_t*)thingPtr;
                 baseValue = (uint64_t)thingPtr + 4;
                 break;
             case 3:
+                checkProddableBlock(oc,thingPtr,8);
                 thing = *(uint64_t*)thingPtr;
                 baseValue = (uint64_t)thingPtr + 8;
                 break;
@@ -5506,7 +5505,10 @@ relocateSection(
                 {
                     unsigned long word = 0;
                     unsigned long* wordPtr = (unsigned long*) (image + sect->offset + scat->r_address);
-                    checkProddableBlock(oc,wordPtr);
+
+                    /* In this check we assume that sizeof(unsigned long) = 2 * sizeof(unsigned short)
+                       on powerpc_HOST_ARCH */
+                    checkProddableBlock(oc,wordPtr,sizeof(unsigned long));
 
                     // Note on relocation types:
                     // i386 uses the GENERIC_RELOC_* types,
@@ -5676,7 +5678,10 @@ relocateSection(
 #endif
 
                 unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
-                checkProddableBlock(oc,wordPtr);
+
+                /* In this check we assume that sizeof(unsigned long) = 2 * sizeof(unsigned short)
+                   on powerpc_HOST_ARCH */
+                checkProddableBlock(oc,wordPtr, sizeof(unsigned long));
 
                 if (reloc->r_type == GENERIC_RELOC_VANILLA) {
                     word = *wordPtr;
