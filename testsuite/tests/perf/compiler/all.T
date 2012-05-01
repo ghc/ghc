@@ -128,21 +128,20 @@ test('T3064',
      [# expect_broken( 3064 ),
       # expected value: 9 (x86/Linux 30-03-2011):
       if_wordsize(32,
-          compiler_stats_num_field('peak_megabytes_allocated', 7, 12)),
+          compiler_stats_range_field('peak_megabytes_allocated', 14, 15)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 30, 38)),
       # expected value: 56380288 (x86/Linux) (28/6/2011)
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 39800820, 10)),
+          compiler_stats_range_field('bytes allocated', 124952112, 10)),
       # expected value: 73259544 (amd64/Linux) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 200000000,
                                                       280000000)),
       # expected value: 2247016 (x86/Linux) (28/6/2011):
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 2000000,
-                                                     3000000)),
+          compiler_stats_range_field('max_bytes_used', 5511604, 10)),
       # expected value: 4032024 (amd64/Linux, intree) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('max_bytes_used', 10000000,
@@ -160,7 +159,7 @@ test('T4007',
 test('T5030',
      [# expected value: 449368924 (x86/Linux)
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 176193448, 10)),
+          compiler_stats_range_field('bytes allocated', 196457520, 10)),
       # expected value: 346750856 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 300000000,
@@ -185,8 +184,7 @@ test('T5631',
 test('parsing001',
      [# expected value: ?
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 280000000,
-                                                      320000000)),
+          compiler_stats_range_field('bytes allocated', 274000576, 10)),
       # expected value: 587079016 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 540000000,
@@ -212,8 +210,7 @@ test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
       # sample from x86/Linux
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 341591280, 10)),
-      # expected value: 669165280 (amd64/Linux):
+          compiler_stats_range_field('bytes allocated', 296657384, 10)),
       if_wordsize(64,
           compiler_stats_range_field('bytes allocated', 585521080, 10))
       ],
@@ -223,8 +220,7 @@ test('T5321FD',
      [ only_ways(['normal']),  # no optimisation for this one
       # sample from x86/Linux
       if_wordsize(32,
-          compiler_stats_range_field('bytes allocated', 257175456, 10)),
-      # expected value: 500642456 (amd64/Linux):
+          compiler_stats_range_field('bytes allocated', 213380256, 10)),
       if_wordsize(64,
           compiler_stats_range_field('bytes allocated', 418306336, 10))
       ],
@@ -233,9 +229,7 @@ test('T5321FD',
 test('T5642',
      [ only_ways(['normal']),
       if_wordsize(32, # sample from x86/Linux
-          compiler_stats_range_field('bytes allocated', 1893427932, 10)),
-
-      # sample: 3926235424 (amd64/Linux, 15/2/2012)
+          compiler_stats_range_field('bytes allocated', 1682508520, 10)),
       if_wordsize(64,
           compiler_stats_range_field('bytes allocated', 3361296144, 10))
       ],
