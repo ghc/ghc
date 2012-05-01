@@ -1,5 +1,6 @@
 import System.Environment
 import System.Process
+import Data.Maybe
 
 main = do
   [ghc] <- getArgs
@@ -14,6 +15,7 @@ main = do
 
   info <- readProcess ghc ["--info"] ""
   let fields = read info :: [(String,String)]
+
   getGhcField fields "GhcStage" "Stage"
   getGhcField fields "GhcWithNativeCodeGen" "Have native code generator"
   getGhcField fields "GhcWithInterpreter" "Have interpreter"
@@ -28,8 +30,16 @@ getGhcField fields mkvar key =
       Nothing  -> fail ("No field: " ++ key)
       Just val -> putStrLn (mkvar ++ '=':val)
 
-getGhcFieldWithDefault :: [(String,String)] -> String -> String -> String -> IO ()
+getGhcFieldWithDefault :: [(String,String)]
+                       -> String -> String -> String -> IO ()
 getGhcFieldWithDefault fields mkvar key deflt = do
    case lookup key fields of
       Nothing  -> putStrLn (mkvar ++ '=':deflt)
-      Just val -> putStrLn (mkvar ++ '=':val)
+      Just val -> putStrLn (mkvar ++ '=': fixTopdir topdir val)
+ where
+  topdir = fromMaybe "" (lookup "LibDir" fields)
+
+fixTopdir :: String -> String -> String
+fixTopdir t "" = ""
+fixTopdir t ('$':'t':'o':'p':'d':'i':'r':s) = t ++ s
+fixTopdir t (c:s) = c : fixTopdir t s
