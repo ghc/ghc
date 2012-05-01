@@ -796,7 +796,7 @@ allocatePinned (Capability *cap, lnat n)
             if (bd->link != NULL) {
                 bd->link->u.back = cap->r.rCurrentNursery;
             }
-            cap->r.rNursery->n_blocks--;
+            cap->r.rNursery->n_blocks -= bd->blocks;
         }
 
         cap->pinned_object_block = bd;

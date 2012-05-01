@@ -414,9 +414,15 @@ typedef struct _RtsSymbolVal {
 #endif
 
 #if defined(i386_HOST_ARCH)
-#define RTS_MINGW32_ONLY(X) X
+#define RTS_WIN32_ONLY(X) X
 #else
-#define RTS_MINGW32_ONLY(X) /**/
+#define RTS_WIN32_ONLY(X) /**/
+#endif
+
+#if defined(x86_64_HOST_ARCH)
+#define RTS_WIN64_ONLY(X) X
+#else
+#define RTS_WIN64_ONLY(X) /**/
 #endif
 
 /* These are statically linked from the mingw libraries into the ghc
@@ -448,7 +454,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(strcpy)                              \
       SymI_HasProto(strncpy)                             \
       SymI_HasProto(abort)                               \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_alloca))         \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_alloca))           \
       SymI_HasProto(isxdigit)                            \
       SymI_HasProto(isupper)                             \
       SymI_HasProto(ispunct)                             \
@@ -499,19 +505,59 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_NeedsProto(mktime)                            \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___timezone)) \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___tzname))   \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp__tzname))    \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___iob))      \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___osver))    \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___timezone))   \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___tzname))     \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp__tzname))      \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___iob))        \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___osver))      \
       SymI_NeedsProto(localtime)                         \
       SymI_NeedsProto(gmtime)                            \
       SymI_NeedsProto(opendir)                           \
       SymI_NeedsProto(readdir)                           \
       SymI_NeedsProto(rewinddir)                         \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp____mb_cur_max)) \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(_imp___pctype))   \
-      RTS_MINGW32_ONLY(SymI_NeedsProto(__chkstk))        \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp____mb_cur_max)) \
+      RTS_WIN32_ONLY(SymI_NeedsProto(_imp___pctype))     \
+      RTS_WIN32_ONLY(SymI_NeedsProto(__chkstk))          \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp___iob_func))  \
+      RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_localeconv))  \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_islower))     \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_isspace))     \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_isxdigit))    \
+      RTS_WIN64_ONLY(SymI_HasProto(close))               \
+      RTS_WIN64_ONLY(SymI_HasProto(read))                \
+      RTS_WIN64_ONLY(SymI_HasProto(dup))                 \
+      RTS_WIN64_ONLY(SymI_HasProto(dup2))                \
+      RTS_WIN64_ONLY(SymI_HasProto(write))               \
+      SymI_NeedsProto(getpid)                            \
+      RTS_WIN64_ONLY(SymI_HasProto(access))              \
+      SymI_HasProto(chmod)                               \
+      RTS_WIN64_ONLY(SymI_HasProto(creat))               \
+      RTS_WIN64_ONLY(SymI_HasProto(umask))               \
+      SymI_HasProto(unlink)                              \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp__errno))      \
+      RTS_WIN64_ONLY(SymI_NeedsProto(ftruncate64))       \
+      RTS_WIN64_ONLY(SymI_HasProto(setmode))             \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp__wstat64))    \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp__fstat64))    \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp__wsopen))     \
+      RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetFileType))                 \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetLastError))                \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_QueryPerformanceFrequency))   \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_QueryPerformanceCounter))     \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetTickCount))                \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_WaitForSingleObject))         \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_PeekConsoleInputA))           \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_ReadConsoleInputA))           \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_PeekNamedPipe))               \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp__isatty))                     \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_select))                      \
+      RTS_WIN64_ONLY(SymI_HasProto(isatty))                              \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp__get_osfhandle))              \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetConsoleMode))              \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_SetConsoleMode))              \
+      RTS_WIN64_ONLY(SymI_NeedsProto(__imp_FlushConsoleInputBuffer))     \
       RTS_MINGW_GETTIMEOFDAY_SYM                         \
       SymI_NeedsProto(closedir)
 
@@ -1638,7 +1684,7 @@ mmap_again:
                     MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
 
    if (result == MAP_FAILED) {
-       sysErrorBelch("mmap %lu bytes at %p",(lnat)size,map_addr);
+       sysErrorBelch("mmap %" FMT_SizeT " bytes at %p",(lnat)size,map_addr);
        errorBelch("Try specifying an address with +RTS -xm<addr> -RTS");
        stg_exit(EXIT_FAILURE);
    }
@@ -1681,7 +1727,7 @@ mmap_again:
    }
 #endif
 
-   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %lu bytes starting at %p\n", (lnat)size, result));
+   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %" FMT_SizeT " bytes starting at %p\n", (lnat)size, result));
    IF_DEBUG(linker, debugBelch("mmapForLinker: done\n"));
    return result;
 }
@@ -2217,8 +2263,22 @@ loadObj( pathchar *path )
 #   if defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-    image = VirtualAlloc(NULL, fileSize, MEM_RESERVE | MEM_COMMIT,
-                             PAGE_EXECUTE_READWRITE);
+    {
+        int offset;
+#if defined(x86_64_HOST_ARCH)
+        /* We get back 8-byte aligned memory (is that guaranteed?), but
+           the offsets to the sections within the file are all 4 mod 8
+           (is that guaranteed?). We therefore need to offset the image
+           by 4, so that all the pointers are 8-byte aligned, so that
+           pointer tagging works. */
+        offset = 4;
+#else
+        offset = 0;
+#endif
+      image = VirtualAlloc(NULL, fileSize + offset, MEM_RESERVE | MEM_COMMIT,
+                           PAGE_EXECUTE_READWRITE);
+      image += offset;
+    }
 #   elif defined(darwin_HOST_OS)
     // In a Mach-O .o file, all sections can and will be misaligned
     // if the total size of the headers is not a multiple of the
@@ -2385,6 +2445,9 @@ unloadObj( pathchar *path )
             // We're going to leave this in place, in case there are
             // any pointers from the heap into it:
                 // #ifdef mingw32_HOST_OS
+                // If uncommenting, note that currently oc->image is
+                // not the right address to free on Win64, as we added
+                // 4 bytes of padding at the start
                 //  VirtualFree(oc->image);
                 // #else
             //  stgFree(oc->image);
@@ -2429,7 +2492,6 @@ addProddableBlock ( ObjectCode* oc, void* start, int size )
    oc->proddables = pb;
 }
 
-#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 static void
 checkProddableBlock (ObjectCode *oc, void *addr )
 {
@@ -2439,14 +2501,18 @@ checkProddableBlock (ObjectCode *oc, void *addr )
       char* s = (char*)(pb->start);
       char* e = s + pb->size - 1;
       char* a = (char*)addr;
-      /* Assumes that the biggest fixup involves a 4-byte write.  This
-         probably needs to be changed to 8 (ie, +7) on 64-bit
-         plats. */
+#if WORD_SIZE_IN_BITS == 32
+      /* Assumes that the biggest fixup involves a 4-byte write */
       if (a >= s && (a+3) <= e) return;
-   }
-   barf("checkProddableBlock: invalid fixup in runtime linker");
-}
+#elif WORD_SIZE_IN_BITS == 64
+      /* Assumes that the biggest fixup involves a 4-byte write */
+      if (a >= s && (a+7) <= e) return;
+#else
+#error
 #endif
+   }
+   barf("checkProddableBlock: invalid fixup in runtime linker: %p", addr);
+}
 
 /* -----------------------------------------------------------------------------
  * Section management.
@@ -2771,10 +2837,11 @@ ocFlushInstructionCache( ObjectCode *oc )
 
 
 
-typedef unsigned char  UChar;
-typedef unsigned short UInt16;
-typedef unsigned int   UInt32;
-typedef          int   Int32;
+typedef unsigned char          UChar;
+typedef unsigned short         UInt16;
+typedef unsigned int           UInt32;
+typedef          int           Int32;
+typedef unsigned long long int UInt64;
 
 
 typedef
@@ -2894,7 +2961,6 @@ printName ( UChar* name, UChar* strtab )
 }
 
 
-#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 static void
 copyName ( UChar* name, UChar* strtab, UChar* dst, int dstSize )
 {
@@ -2913,7 +2979,6 @@ copyName ( UChar* name, UChar* strtab, UChar* dst, int dstSize )
       dst[i] = 0;
    }
 }
-#endif
 
 
 static UChar *
@@ -2969,7 +3034,6 @@ cstring_from_section_name (UChar* name, UChar* strtab)
     }
 }
 
-#if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 /* Just compares the short names (first 8 chars) */
 static COFF_section *
 findPEi386SectionCalled ( ObjectCode* oc,  UChar* name )
@@ -2998,7 +3062,6 @@ findPEi386SectionCalled ( ObjectCode* oc,  UChar* name )
 
    return NULL;
 }
-#endif
 
 static void
 zapTrailingAtSign ( UChar* sym )
@@ -3068,10 +3131,20 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    strtab = ((UChar*)symtab)
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
+#if defined(i386_HOST_ARCH)
    if (hdr->Machine != 0x14c) {
       errorBelch("%" PATH_FMT ": Not x86 PEi386", oc->fileName);
       return 0;
    }
+#elif defined(x86_64_HOST_ARCH)
+   if (hdr->Machine != 0x8664) {
+      errorBelch("%" PATH_FMT ": Not x86_64 PEi386", oc->fileName);
+      return 0;
+   }
+#else
+   errorBelch("PEi386 not supported on this arch");
+#endif
+
    if (hdr->SizeOfOptionalHeader != 0) {
       errorBelch("%" PATH_FMT ": PEi386 with nonempty optional header", oc->fileName);
       return 0;
@@ -3352,6 +3425,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
              information. */
           && 0 != strcmp(".stab", (char*)secname)
           && 0 != strcmp(".stabstr", (char*)secname)
+          /* Ignore sections called which contain exception information. */
+          && 0 != strcmp(".pdata", (char*)secname)
+          && 0 != strcmp(".xdata", (char*)secname)
           /* ignore constructor section for now */
           && 0 != strcmp(".ctors", (char*)secname)
           /* ignore section generated from .ident */
@@ -3461,21 +3537,16 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
 
 static int
-ocResolve_PEi386 ( ObjectCode* oc
-#if !defined(i386_HOST_ARCH)
-                                  STG_UNUSED
-#endif
-                                             )
+ocResolve_PEi386 ( ObjectCode* oc )
 {
-#if defined(i386_HOST_ARCH)
    COFF_header*  hdr;
    COFF_section* sectab;
    COFF_symbol*  symtab;
    UChar*        strtab;
 
    UInt32        A;
-   UInt32        S;
-   UInt32*       pP;
+   size_t        S;
+   void *        pP;
 
    int i;
    UInt32 j, noRelocs;
@@ -3513,6 +3584,8 @@ ocResolve_PEi386 ( ObjectCode* oc
          information. */
       if (0 == strcmp(".stab", (char*)secname)
           || 0 == strcmp(".stabstr", (char*)secname)
+          || 0 == strcmp(".pdata", (char*)secname)
+          || 0 == strcmp(".xdata", (char*)secname)
           || 0 == strcmp(".ctors", (char*)secname)
           || 0 == strncmp(".debug", (char*)secname, 6)
           || 0 == strcmp(".rdata$zzz", (char*)secname)) {
@@ -3557,14 +3630,14 @@ ocResolve_PEi386 ( ObjectCode* oc
               myindex ( sizeof_COFF_reloc, reltab, j );
 
          /* the location to patch */
-         pP = (UInt32*)(
+         pP = (
                  ((UChar*)(oc->image))
                  + (sectab_i->PointerToRawData
                     + reltab_j->VirtualAddress
                     - sectab_i->VirtualAddress )
               );
          /* the existing contents of pP */
-         A = *pP;
+         A = *(UInt32*)pP;
          /* the symbol to connect to */
          sym = (COFF_symbol*)
                myindex ( sizeof_COFF_symbol,
@@ -3586,12 +3659,12 @@ ocResolve_PEi386 ( ObjectCode* oc
                errorBelch("%" PATH_FMT ": can't find section `%s'", oc->fileName, sym->Name);
                return 0;
             }
-            S = ((UInt32)(oc->image))
-                + (section_sym->PointerToRawData
-                   + sym->Value);
+            S = ((size_t)(oc->image))
+              + ((size_t)(section_sym->PointerToRawData))
+              + ((size_t)(sym->Value));
          } else {
             copyName ( sym->Name, strtab, symbol, 1000-1 );
-            S = (UInt32) lookupSymbol( (char*)symbol );
+            S = (size_t) lookupSymbol( (char*)symbol );
             if ((void*)S != NULL) goto foundit;
             errorBelch("%" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
             return 0;
@@ -3599,8 +3672,9 @@ ocResolve_PEi386 ( ObjectCode* oc
          }
          checkProddableBlock(oc, pP);
          switch (reltab_j->Type) {
+#if defined(i386_HOST_ARCH)
             case MYIMAGE_REL_I386_DIR32:
-               *pP = A + S;
+               *(UInt32 *)pP = ((UInt32)S) + A;
                break;
             case MYIMAGE_REL_I386_REL32:
                /* Tricky.  We have to insert a displacement at
@@ -3628,8 +3702,24 @@ ocResolve_PEi386 ( ObjectCode* oc
                   relocations with non-zero values. Adding the displacement is
                   the right thing to do.
                */
-               *pP = S - ((UInt32)pP) - 4 + A;
+               *(UInt32 *)pP = ((UInt32)S) + A - ((UInt32)(size_t)pP) - 4;
                break;
+#elif defined(x86_64_HOST_ARCH)
+            case 2:  /* R_X86_64_32 */
+            case 17: /* R_X86_64_32S */
+               *(UInt32 *)pP = ((UInt32)S) + A;
+               break;
+            case 4: /* R_X86_64_PC32 */
+               *(UInt32 *)pP = ((UInt32)S) + A - ((UInt32)(size_t)pP) - 4;
+               break;
+            case 1: /* R_X86_64_64 */
+               {
+                 UInt64 A;
+                 A = *(UInt64*)pP;
+                 *(UInt64 *)pP = ((UInt64)S) + ((UInt64)A);
+                 break;
+               }
+#endif
             default:
                debugBelch("%" PATH_FMT ": unhandled PEi386 relocation type %d",
                      oc->fileName, reltab_j->Type);
@@ -3641,9 +3731,6 @@ ocResolve_PEi386 ( ObjectCode* oc
 
    IF_DEBUG(linker, debugBelch("completed %" PATH_FMT, oc->fileName));
    return 1;
-#else
-   barf("ocResolve_PEi386: Not supported on this arch");
-#endif
 }
 
 #endif /* defined(OBJFORMAT_PEi386) */
@@ -4581,7 +4668,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #        endif // arm_HOST_ARCH
 
          default:
-            errorBelch("%s: unhandled ELF relocation(Rel) type %lu\n",
+            errorBelch("%s: unhandled ELF relocation(Rel) type %" FMT_SizeT "\n",
                   oc->fileName, (lnat)ELF_R_TYPE(info));
             return 0;
       }
@@ -4875,7 +4962,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 
          default:
-            errorBelch("%s: unhandled ELF relocation(RelA) type %lu\n",
+            errorBelch("%s: unhandled ELF relocation(RelA) type %" FMT_SizeT "\n",
                   oc->fileName, (lnat)ELF_R_TYPE(info));
             return 0;
       }
