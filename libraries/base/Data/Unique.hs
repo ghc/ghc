@@ -33,8 +33,8 @@ import System.IO.Unsafe (unsafePerformIO)
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num
-import GHC.Conc
 import Data.Typeable
+import Data.IORef
 #endif
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
@@ -45,8 +45,8 @@ newtype Unique = Unique Integer deriving (Eq,Ord
 #endif
    )
 
-uniqSource :: TVar Integer
-uniqSource = unsafePerformIO (newTVarIO 0)
+uniqSource :: IORef Integer
+uniqSource = unsafePerformIO (newIORef 0)
 {-# NOINLINE uniqSource #-}
 
 -- | Creates a new object of type 'Unique'.  The value returned will
@@ -54,11 +54,9 @@ uniqSource = unsafePerformIO (newTVarIO 0)
 -- previous calls to 'newUnique'.  There is no limit on the number of
 -- times 'newUnique' may be called.
 newUnique :: IO Unique
-newUnique = atomically $ do
-  val <- readTVar uniqSource
-  let next = val+1
-  writeTVar uniqSource $! next
-  return (Unique next)
+newUnique = do
+  r <- atomicModifyIORef uniqSource $ \x -> let z = x+1 in (z,z)
+  r `seq` return (Unique r)
 
 -- SDM (18/3/2010): changed from MVar to STM.  This fixes
 --  1. there was no async exception protection
@@ -66,6 +64,14 @@ newUnique = atomically $ do
 --  3. using atomicModifyIORef would be slightly quicker, but can
 --     suffer from adverse scheduling issues (see #3838)
 --  4. also, the STM version is faster.
+
+-- SDM (30/4/2012): changed to IORef using atomicModifyIORef.  Reasons:
+--  1. STM version could not be used inside unsafePerformIO, if it
+--     happened to be poked inside an STM transaction.
+--  2. IORef version can be used with unsafeIOToSTM inside STM,
+--     because if the transaction retries then we just get a new
+--     Unique.
+--  3. IORef version is very slightly faster.
 
 -- | Hashes a 'Unique' into an 'Int'.  Two 'Unique's may hash to the
 -- same value, although in practice this is unlikely.  The 'Int'
