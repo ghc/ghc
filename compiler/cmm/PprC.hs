@@ -203,9 +203,6 @@ pprStmt platform stmt = case stmt of
                         pprCFunType (pprCLabel platform lbl) cconv results args <>
                         noreturn_attr <> semi
 
-        fun_proto lbl = ptext (sLit ";EF_(") <>
-                         pprCLabel platform lbl <> char ')' <> semi
-
         noreturn_attr = case ret of
                           CmmNeverReturns -> text "__attribute__ ((noreturn))"
                           CmmMayReturn    -> empty
@@ -226,12 +223,7 @@ pprStmt platform stmt = case stmt of
                     let myCall = pprCall platform (pprCLabel platform lbl) cconv results args
                     in (real_fun_proto lbl, myCall)
                 | not (isMathFun lbl) ->
-                    let myCall = braces (
-                                     pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
-                                  $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
-                                  $$ pprCall platform (text "ghcFunPtr") cconv results args <> semi
-                                 )
-                    in (fun_proto lbl, myCall)
+                    pprForeignCall platform (pprCLabel platform lbl) cconv results args
               _ ->
                    (empty {- no proto -},
                     pprCall platform cast_fn cconv results args <> semi)
@@ -241,18 +233,35 @@ pprStmt platform stmt = case stmt of
         vcat $ map (pprStmt platform) stmts
 
     CmmCall (CmmPrim op _) results args _ret ->
-        pprCall platform ppr_fn CCallConv results args'
-        where
-        ppr_fn = pprCallishMachOp_for_C op
-        -- The mem primops carry an extra alignment arg, must drop it.
-        -- We could maybe emit an alignment directive using this info.
-        args'  | op == MO_Memcpy || op == MO_Memset || op == MO_Memmove = init args
-               | otherwise = args
+        proto $$ fn_call
+      where
+        cconv = CCallConv
+        fn = pprCallishMachOp_for_C op
+        (proto, fn_call)
+          -- The mem primops carry an extra alignment arg, must drop it.
+          -- We could maybe emit an alignment directive using this info.
+          -- We also need to cast mem primops to prevent conflicts with GCC
+          -- builtins (see bug #5967).
+          | op `elem` [MO_Memcpy, MO_Memset, MO_Memmove]
+          = pprForeignCall platform fn cconv results (init args)
+          | otherwise
+          = (empty, pprCall platform fn cconv results args)
 
     CmmBranch ident          -> pprBranch ident
     CmmCondBranch expr ident -> pprCondBranch platform expr ident
     CmmJump lbl _            -> mkJMP_(pprExpr platform lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch platform arg ids
+
+pprForeignCall :: Platform -> SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> (SDoc, SDoc)
+pprForeignCall platform fn cconv results args = (proto, fn_call)
+  where
+    fn_call = braces (
+                 pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
+              $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi
+              $$ pprCall platform (text "ghcFunPtr") cconv results args <> semi
+             )
+    cast_fn = parens (parens (pprCFunType (char '*') cconv results args) <> fn)
+    proto = ptext (sLit ";EF_(") <> fn <> char ')' <> semi
 
 pprCFunType :: SDoc -> CCallConv -> [HintedCmmFormal] -> [HintedCmmActual] -> SDoc
 pprCFunType ppr_fn cconv ress args

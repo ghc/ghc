@@ -115,8 +115,8 @@ data SimplCont
 	SimplCont
 
   | Select   		-- case C of alts
-	DupFlag 	        -- See Note [DupFlag invariants]
-	InId [InAlt] StaticEnv	-- The case binder, alts, and subst-env
+	DupFlag 	                -- See Note [DupFlag invariants]
+	InId InType [InAlt] StaticEnv	-- The case binder, alts type, alts, and subst-env
 	SimplCont
 
   -- The two strict forms have no DupFlag, because we never duplicate them
@@ -157,15 +157,15 @@ addArgTo :: ArgInfo -> OutExpr -> ArgInfo
 addArgTo ai arg = ai { ai_args = arg : ai_args ai }
 
 instance Outputable SimplCont where
-  ppr (Stop interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting)
-  ppr (ApplyTo dup arg _ cont)       = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
-					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
-  ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg ai _ cont)          = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
-  ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
-				       (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
-  ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
-  ppr (TickIt t cont)                = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
+  ppr (Stop interesting)    	       = ptext (sLit "Stop") <> brackets (ppr interesting)
+  ppr (ApplyTo dup arg _ cont)         = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
+				       	  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
+  ppr (StrictBind b _ _ _ cont)        = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
+  ppr (StrictArg ai _ cont)            = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
+  ppr (Select dup bndr ty alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr <+> ppr ty) $$ 
+				         (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
+  ppr (CoerceIt co cont)	       = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
+  ppr (TickIt t cont)                  = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
 
 data DupFlag = NoDup       -- Unsimplified, might be big
              | Simplified  -- Simplified
@@ -211,11 +211,11 @@ contIsRhsOrArg _               = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop {})                  = True
-contIsDupable (ApplyTo  OkToDup _ _ _)   = True	-- See Note [DupFlag invariants]
-contIsDupable (Select   OkToDup _ _ _ _) = True -- ...ditto...
-contIsDupable (CoerceIt _ cont)          = contIsDupable cont
-contIsDupable _                          = False
+contIsDupable (Stop {})                    = True
+contIsDupable (ApplyTo  OkToDup _ _ _)     = True	-- See Note [DupFlag invariants]
+contIsDupable (Select   OkToDup _ _ _ _ _) = True -- ...ditto...
+contIsDupable (CoerceIt _ cont)            = contIsDupable cont
+contIsDupable _                            = False
 
 -------------------
 contIsTrivial :: SimplCont -> Bool
@@ -237,7 +237,7 @@ contResultType env ty cont
     go (CoerceIt co cont)             _  = go cont (pSnd (coercionKind co))
     go (StrictBind _ bs body se cont) _  = go cont (subst_ty se (exprType (mkLams bs body)))
     go (StrictArg ai _ cont)          _  = go cont (funResultTy (argInfoResultTy ai))
-    go (Select _ _ alts se cont)      _  = go cont (subst_ty se (coreAltsType alts))
+    go (Select _ _ ty _ se cont)      _  = go cont (subst_ty se ty)
     go (ApplyTo _ arg se cont)        ty = go cont (apply_to_arg ty arg se)
     go (TickIt _ cont)                ty = go cont ty
 
@@ -328,7 +328,7 @@ interestingCallContext :: SimplCont -> CallCtxt
 interestingCallContext cont
   = interesting cont
   where
-    interesting (Select _ bndr _ _ _)
+    interesting (Select _ bndr _ _ _ _)
 	| isDeadBinder bndr = CaseCtxt
 	| otherwise	    = ArgCtxt False	-- If the binder is used, this
 						-- is like a strict let
@@ -1589,14 +1589,14 @@ and similarly in cascade for all the join points!
 mkCase, mkCase1, mkCase2 
    :: DynFlags 
    -> OutExpr -> OutId
-   -> [OutAlt]		-- Alternatives in standard (increasing) order
+   -> OutType -> [OutAlt]		-- Alternatives in standard (increasing) order
    -> SimplM OutExpr
 
 --------------------------------------------------
 --	1. Merge Nested Cases
 --------------------------------------------------
 
-mkCase dflags scrut outer_bndr ((DEFAULT, _, deflt_rhs) : outer_alts)
+mkCase dflags scrut outer_bndr alts_ty ((DEFAULT, _, deflt_rhs) : outer_alts)
   | dopt Opt_CaseMerge dflags
   , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
   , inner_scrut_var == outer_bndr
@@ -1622,7 +1622,7 @@ mkCase dflags scrut outer_bndr ((DEFAULT, _, deflt_rhs) : outer_alts)
 		-- When we merge, we must ensure that e1 takes 
 		-- precedence over e2 as the value for A!  
 
-	; mkCase1 dflags scrut outer_bndr merged_alts
+	; mkCase1 dflags scrut outer_bndr alts_ty merged_alts
 	}
     	-- Warning: don't call mkCase recursively!
     	-- Firstly, there's no point, because inner alts have already had
@@ -1630,13 +1630,13 @@ mkCase dflags scrut outer_bndr ((DEFAULT, _, deflt_rhs) : outer_alts)
     	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
     	-- in munge_rhs may put a case into the DEFAULT branch!
 
-mkCase dflags scrut bndr alts = mkCase1 dflags scrut bndr alts
+mkCase dflags scrut bndr alts_ty alts = mkCase1 dflags scrut bndr alts_ty alts
 
 --------------------------------------------------
 --	2. Eliminate Identity Case
 --------------------------------------------------
 
-mkCase1 _dflags scrut case_bndr alts	-- Identity case
+mkCase1 _dflags scrut case_bndr _ alts	-- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (re_cast scrut rhs1) }
@@ -1673,24 +1673,24 @@ mkCase1 _dflags scrut case_bndr alts	-- Identity case
 --------------------------------------------------
 --	3. Merge Identical Alternatives
 --------------------------------------------------
-mkCase1 dflags scrut case_bndr ((_con1,bndrs1,rhs1) : con_alts)
+mkCase1 dflags scrut case_bndr alts_ty ((_con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1			-- Remember the default 
   , length filtered_alts < length con_alts	-- alternative comes first
 	-- Also Note [Dead binders]
   = do	{ tick (AltMerge case_bndr)
-	; mkCase2 dflags scrut case_bndr alts' }
+	; mkCase2 dflags scrut case_bndr alts_ty alts' }
   where
     alts' = (DEFAULT, [], rhs1) : filtered_alts
     filtered_alts	  = filter keep con_alts
     keep (_con,bndrs,rhs) = not (all isDeadBinder bndrs && rhs `cheapEqExpr` rhs1)
 
-mkCase1 dflags scrut bndr alts = mkCase2 dflags scrut bndr alts
+mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
-mkCase2 _dflags scrut bndr alts 
-  = return (Case scrut bndr (coreAltsType alts) alts)
+mkCase2 _dflags scrut bndr alts_ty alts 
+  = return (Case scrut bndr alts_ty alts)
 \end{code}
 
 Note [Dead binders]

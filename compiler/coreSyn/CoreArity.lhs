@@ -663,7 +663,7 @@ arityType env (App fun arg )
 	-- The difference is observable using 'seq'
 	--
 arityType env (Case scrut _ _ alts)
-  | exprIsBottom scrut 
+  | exprIsBottom scrut || null alts
   = ABot 0     -- Do not eta expand
                -- See Note [Dealing with bottom (1)]
   | otherwise
@@ -829,14 +829,18 @@ etaInfoApp subst (Cast e co1) eis
   where
     co' = CoreSubst.substCo subst co1
 
-etaInfoApp subst (Case e b _ alts) eis 
-  = Case (subst_expr subst e) b1 (coreAltsType alts') alts'
+etaInfoApp subst (Case e b ty alts) eis 
+  = Case (subst_expr subst e) b1 (mk_alts_ty (CoreSubst.substTy subst ty) eis) alts'
   where
     (subst1, b1) = substBndr subst b
     alts' = map subst_alt alts
     subst_alt (con, bs, rhs) = (con, bs', etaInfoApp subst2 rhs eis) 
     	      where
 	      	 (subst2,bs') = substBndrs subst1 bs
+
+    mk_alts_ty ty []               = ty
+    mk_alts_ty ty (EtaVar v : eis) = mk_alts_ty (applyTypeToArg ty (varToCoreExpr v)) eis
+    mk_alts_ty _  (EtaCo co : eis) = mk_alts_ty (pSnd (coercionKind co)) eis
     
 etaInfoApp subst (Let b e) eis 
   = Let b' (etaInfoApp subst' e eis)

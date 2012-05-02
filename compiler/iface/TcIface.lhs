@@ -32,6 +32,7 @@ import CoreUtils
 import CoreUnfold
 import CoreLint
 import WorkWrap
+import MkCore( castBottomExpr )
 import Id
 import MkId
 import IdInfo
@@ -1018,6 +1019,11 @@ tcIfaceExpr (IfaceLam bndr body)
 
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
+
+tcIfaceExpr (IfaceECase scrut ty) 
+  = do { scrut' <- tcIfaceExpr scrut 
+       ; ty' <- tcIfaceType ty
+       ; return (castBottomExpr scrut' ty') }
 
 tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     scrut' <- tcIfaceExpr scrut

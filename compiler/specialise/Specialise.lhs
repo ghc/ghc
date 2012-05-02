@@ -1037,12 +1037,12 @@ specCalls subst rules_for_me calls_for_me fn rhs
   = WARN( notNull calls_for_me, ptext (sLit "Missed specialisation opportunity for") 
                                  <+> ppr fn $$ _trace_doc )
 	  -- Note [Specialisation shape]
-    -- pprTrace "specDefn: none" (ppr fn $$ ppr calls_for_me) $
+    -- pprTrace "specDefn: none" (ppr fn <+> ppr calls_for_me) $
     return ([], [], emptyUDs)
   where
-    _trace_doc = vcat [ ppr rhs_tyvars, ppr n_tyvars
-                      , ppr rhs_ids, ppr n_dicts
-                      , ppr (idInlineActivation fn) ]
+    _trace_doc = sep [ ppr rhs_tyvars, ppr n_tyvars
+                     , ppr rhs_ids, ppr n_dicts
+                     , ppr (idInlineActivation fn) ]
 
     fn_type	       = idType fn
     fn_arity	       = idArity fn

@@ -391,8 +391,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
     size_up (Case (Var v) _ _ alts) 
 	| v `elem` top_args		-- We are scrutinising an argument variable
-	= alts_size (foldr1 addAltSize alt_sizes)
-		    (foldr1 maxSize alt_sizes)
+	= alts_size (foldr addAltSize sizeZero alt_sizes)
+		    (foldr maxSize    sizeZero alt_sizes)
 		-- Good to inline if an arg is scrutinised, because
 		-- that may eliminate allocation in the caller
 		-- And it eliminates the case itself
