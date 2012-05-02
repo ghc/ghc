@@ -1023,7 +1023,7 @@ scExpr' env (Case scrut b ty alts)
   where
     sc_con_app con args scrut' 	-- Known constructor; simplify
 	= do { let (_, bs, rhs) = findAlt con alts
-	       	   	          `orElse` (DEFAULT, [], mkImpossibleExpr (coreAltsType alts))
+	       	   	          `orElse` (DEFAULT, [], mkImpossibleExpr ty)
 		   alt_env'  = extendScSubstList env ((b,scrut') : bs `zip` trimConArgs con args)
 	     ; scExpr alt_env' rhs }
 				
@@ -1034,7 +1034,7 @@ scExpr' env (Case scrut b ty alts)
 	  ; (alt_usgs, alt_occs, alts')
 		<- mapAndUnzip3M (sc_alt alt_env scrut' b') alts
 
-	  ; let scrut_occ  = foldr1 combineOcc alt_occs	-- Never empty
+	  ; let scrut_occ  = foldr combineOcc NoOcc alt_occs
 		scrut_usg' = setScrutOcc env scrut_usg scrut' scrut_occ
 	  	-- The combined usage of the scrutinee is given
 	  	-- by scrut_occ, which is passed to scScrut, which

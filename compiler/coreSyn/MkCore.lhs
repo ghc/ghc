@@ -13,7 +13,7 @@ module MkCore (
         mkCoreApp, mkCoreApps, mkCoreConApps,
         mkCoreLams, mkWildCase, mkIfThenElse,
         mkWildValBinder, mkWildEvBinder,
-        sortQuantVars,
+        sortQuantVars, castBottomExpr,
         
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
@@ -209,6 +209,16 @@ mkIfThenElse guard then_expr else_expr
   = mkWildCase guard boolTy (exprType then_expr) 
 	 [ (DataAlt falseDataCon, [], else_expr),	-- Increasing order of tag!
     	   (DataAlt trueDataCon,  [], then_expr) ]
+
+castBottomExpr :: CoreExpr -> Type -> CoreExpr
+-- (castBottomExpr e ty), assuming that 'e' diverges, 
+-- return an expression of type 'ty'
+-- See Note [Empty case alternatives] in CoreSyn
+castBottomExpr e res_ty
+  | e_ty `eqType` res_ty = e
+  | otherwise            = Case e (mkWildValBinder e_ty) res_ty []
+  where
+    e_ty = exprType e
 \end{code}
 
 The functions from this point don't really do anything cleverer than

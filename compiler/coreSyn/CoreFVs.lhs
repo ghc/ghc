@@ -486,7 +486,7 @@ freeVars (Case scrut bndr ty alts)
     scrut2 = freeVars scrut
 
     (alts_fvs_s, alts2) = mapAndUnzip fv_alt alts
-    alts_fvs            = foldr1 unionFVs alts_fvs_s
+    alts_fvs            = foldr unionFVs noFVs alts_fvs_s
 
     fv_alt (con,args,rhs) = (delBindersFV args (freeVarsOf rhs2),
                              (con, args, rhs2))
