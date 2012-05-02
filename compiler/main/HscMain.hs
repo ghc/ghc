@@ -1403,7 +1403,7 @@ IO monad as explained in Note [Interactively-bound Ids in GHCi] in TcRnDriver
 --
 -- We return Nothing to indicate an empty statement (or comment only), not a
 -- parse error.
-hscStmt :: HscEnv -> String -> IO (Maybe ([Id], IO [HValue]))
+hscStmt :: HscEnv -> String -> IO (Maybe ([Id], IO [HValue], FixityEnv))
 hscStmt hsc_env stmt = hscStmtWithLocation hsc_env stmt "<interactive>" 1
 
 -- | Compile a stmt all the way to an HValue, but don't run it
@@ -1414,7 +1414,7 @@ hscStmtWithLocation :: HscEnv
                     -> String -- ^ The statement
                     -> String -- ^ The source
                     -> Int    -- ^ Starting line
-                    -> IO (Maybe ([Id], IO [HValue]))
+                    -> IO (Maybe ([Id], IO [HValue], FixityEnv))
 hscStmtWithLocation hsc_env0 stmt source linenumber =
  runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
@@ -1431,7 +1431,7 @@ hscStmtWithLocation hsc_env0 stmt source linenumber =
             -- Rename and typecheck it
             -- Here we lift the stmt into the IO monad, see Note
             -- [Interactively-bound Ids in GHCi] in TcRnDriver
-            (ids, tc_expr) <- ioMsgMaybe $ tcRnStmt hsc_env icntxt parsed_stmt
+            (ids, tc_expr, fix_env) <- ioMsgMaybe $ tcRnStmt hsc_env icntxt parsed_stmt
 
             -- Desugar it
             ds_expr <- ioMsgMaybe $
@@ -1443,7 +1443,7 @@ hscStmtWithLocation hsc_env0 stmt source linenumber =
             hval    <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
             let hval_io = unsafeCoerce# hval :: IO [HValue]
 
-            return $ Just (ids, hval_io)
+            return $ Just (ids, hval_io, fix_env)
 
 -- | Compile a decls
 hscDecls :: HscEnv

@@ -942,6 +942,9 @@ data InteractiveContext
              -- time we update the context, we just take the results
              -- from the instance code that already does that.
 
+         ic_fix_env :: FixityEnv,
+            -- ^ Fixities declared in let statements
+
 #ifdef GHCI
           ic_resume :: [Resume],
              -- ^ The stack of breakpoint contexts
@@ -983,6 +986,7 @@ emptyInteractiveContext dflags
                          ic_tythings   = [],
                          ic_sys_vars   = [],
                          ic_instances  = ([],[]),
+                         ic_fix_env    = emptyNameEnv,
 #ifdef GHCI
                          ic_resume     = [],
 #endif
