@@ -558,6 +558,7 @@ typedef struct _RtsSymbolVal {
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_GetConsoleMode))              \
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_SetConsoleMode))              \
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_FlushConsoleInputBuffer))     \
+      RTS_WIN64_ONLY(SymI_HasProto(free))                                \
       RTS_MINGW_GETTIMEOFDAY_SYM                         \
       SymI_NeedsProto(closedir)
 
