@@ -35,6 +35,7 @@ extra-libraries:
 #endif
 #ifdef mingw32_HOST_OS
 			      ,"wsock32"	/* for the linker */
+			      ,"gdi32"	    /* for the linker */
 #endif
 #if defined(DEBUG) && defined(HAVE_LIBBFD)
 			      ,"bfd", "iberty"	/* for debugging */
