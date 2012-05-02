@@ -559,6 +559,33 @@ typedef struct _RtsSymbolVal {
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_SetConsoleMode))              \
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_FlushConsoleInputBuffer))     \
       RTS_WIN64_ONLY(SymI_HasProto(free))                                \
+      RTS_WIN64_ONLY(SymI_NeedsProto(raise))                             \
+      RTS_WIN64_ONLY(SymI_HasProto(getc))                                \
+      RTS_WIN64_ONLY(SymI_HasProto(ungetc))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(puts))                                \
+      RTS_WIN64_ONLY(SymI_HasProto(putc))                                \
+      RTS_WIN64_ONLY(SymI_HasProto(putchar))                             \
+      RTS_WIN64_ONLY(SymI_HasProto(fputc))                               \
+      RTS_WIN64_ONLY(SymI_HasProto(fread))                               \
+      RTS_WIN64_ONLY(SymI_HasProto(fwrite))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(ferror))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(printf))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(fprintf))                             \
+      RTS_WIN64_ONLY(SymI_HasProto(sprintf))                             \
+      RTS_WIN64_ONLY(SymI_HasProto(vsprintf))                            \
+      RTS_WIN64_ONLY(SymI_HasProto(sscanf))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(ldexp))                               \
+      RTS_WIN64_ONLY(SymI_HasProto(strlen))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(strnlen))                             \
+      RTS_WIN64_ONLY(SymI_HasProto(strchr))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(strtol))                              \
+      RTS_WIN64_ONLY(SymI_HasProto(strerror))                            \
+      RTS_WIN64_ONLY(SymI_HasProto(_lseeki64))                           \
+      RTS_WIN64_ONLY(SymI_HasProto(closesocket))                         \
+      RTS_WIN64_ONLY(SymI_HasProto(send))                                \
+      RTS_WIN64_ONLY(SymI_HasProto(recv))                                \
+      RTS_WIN64_ONLY(SymI_HasProto(bsearch))                             \
+      RTS_WIN64_ONLY(SymI_HasProto(CommandLineToArgvW))                  \
       RTS_MINGW_GETTIMEOFDAY_SYM                         \
       SymI_NeedsProto(closedir)
 
@@ -3701,11 +3728,29 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #elif defined(x86_64_HOST_ARCH)
             case 2:  /* R_X86_64_32 */
             case 17: /* R_X86_64_32S */
-               *(UInt32 *)pP = ((UInt32)S) + A;
-               break;
+               {
+                   size_t v;
+                   v = S + ((size_t)A);
+                   if (v >> 32) {
+                       copyName ( sym->Name, strtab, symbol, 1000-1 );
+                       barf("R_X86_64_32[S]: High bits are set in %zx for %s",
+                            v, (char *)symbol);
+                   }
+                   *(UInt32 *)pP = (UInt32)v;
+                   break;
+               }
             case 4: /* R_X86_64_PC32 */
-               *(UInt32 *)pP = ((UInt32)S) + A - ((UInt32)(size_t)pP) - 4;
-               break;
+               {
+                   intptr_t v;
+                   v = ((intptr_t)S) + ((intptr_t)(Int32)A) - ((intptr_t)pP) - 4;
+                   if ((v >> 32) && ((-v) >> 32)) {
+                       copyName ( sym->Name, strtab, symbol, 1000-1 );
+                       barf("R_X86_64_PC32: High bits are set in %zx for %s",
+                            v, (char *)symbol);
+                   }
+                   *(UInt32 *)pP = (UInt32)v;
+                   break;
+               }
             case 1: /* R_X86_64_64 */
                {
                  UInt64 A;
