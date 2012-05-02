@@ -288,7 +288,8 @@ withProgArgv new_args act = do
 freeProgArgv :: Ptr CString -> IO ()
 freeProgArgv argv = do
   size <- lengthArray0 nullPtr argv
-  sequence_ [peek (argv `advancePtr` i) >>= free | i <- [size, size-1 .. 0]]
+  sequence_ [ peek (argv `advancePtr` i) >>= free
+            | i <- [size - 1, size - 2 .. 0]]
   free argv
 
 setProgArgv :: [String] -> IO (Ptr CString)
