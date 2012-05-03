@@ -1636,7 +1636,7 @@ mkCase dflags scrut bndr alts_ty alts = mkCase1 dflags scrut bndr alts_ty alts
 --	2. Eliminate Identity Case
 --------------------------------------------------
 
-mkCase1 _dflags scrut case_bndr _ alts	-- Identity case
+mkCase1 _dflags scrut case_bndr _ alts@((_,_,rhs1) : _)      -- Identity case
   | all identity_alt alts
   = do { tick (CaseIdentity case_bndr)
        ; return (re_cast scrut rhs1) }
@@ -1664,8 +1664,6 @@ mkCase1 _dflags scrut case_bndr _ alts	-- Identity case
 	-- if (all identity_alt alts) holds.
 	-- 
 	-- Don't worry about nested casts, because the simplifier combines them
-
-    ((_,_,rhs1):_) = alts
 
     re_cast scrut (Cast rhs co) = Cast (re_cast scrut rhs) co
     re_cast scrut _             = scrut
