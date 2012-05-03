@@ -38,6 +38,7 @@ module DynFlags (
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..),
+        PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fWarningFlags, fLangFlags, xFlags,
@@ -275,6 +276,7 @@ data DynFlag
    | Opt_ForceRecomp
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
+   | Opt_ReadGlobalPackageConf
    | Opt_ReadUserPackageConf
    | Opt_NoHsMain
    | Opt_SplitObjs
@@ -548,7 +550,7 @@ data DynFlags = DynFlags {
   depSuffixes           :: [String],
 
   --  Package flags
-  extraPkgConfs         :: [FilePath],
+  extraPkgConfs         :: [PkgConfRef],
         -- ^ The @-package-conf@ flags given on the command line, in the order
         -- they appeared.
 
@@ -1755,8 +1757,13 @@ dynamic_flags = [
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
         ------- Packages ----------------------------------------------------
-    Flag "package-conf"          (HasArg extraPkgConf_)
+    Flag "package-conf"          (HasArg (extraPkgConf_ . PkgConfFile))
+  , Flag "clear-package-conf"    (NoArg clearPkgConf)
+  , Flag "no-global-package-conf" (NoArg (unSetDynFlag Opt_ReadGlobalPackageConf))
   , Flag "no-user-package-conf"  (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
+  , Flag "global-package-conf"   (NoArg (extraPkgConf_ GlobalPkgConf))
+  , Flag "user-package-conf"     (NoArg (extraPkgConf_ UserPkgConf))
+
   , Flag "package-name"          (hasArg setPackageName)
   , Flag "package-id"            (HasArg exposePackageId)
   , Flag "package"               (HasArg exposePackage)
@@ -2066,6 +2073,7 @@ xFlags = [
 defaultFlags :: [DynFlag]
 defaultFlags
   = [ Opt_AutoLinkPackages,
+      Opt_ReadGlobalPackageConf,
       Opt_ReadUserPackageConf,
 
       Opt_SharedImplib,
@@ -2404,8 +2412,18 @@ setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 addCmdlineHCInclude :: String -> DynP ()
 addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 
-extraPkgConf_ :: FilePath -> DynP ()
+data PkgConfRef
+  = GlobalPkgConf
+  | UserPkgConf
+  | PkgConfFile FilePath
+
+extraPkgConf_ :: PkgConfRef -> DynP ()
 extraPkgConf_  p = upd (\s -> s{ extraPkgConfs = p : extraPkgConfs s })
+
+clearPkgConf :: DynP ()
+clearPkgConf = do
+  unSetDynFlag Opt_ReadGlobalPackageConf
+  unSetDynFlag Opt_ReadUserPackageConf
 
 exposePackage, exposePackageId, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
