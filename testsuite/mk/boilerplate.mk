@@ -116,10 +116,6 @@ ifeq "$(shell test -x '$(HPC)' && echo exists)" ""
 $(error Cannot find hpc: $(HPC))
 endif
 
-ifeq "$(AR)" ""
-AR = ar
-endif
-
 # Be careful when using this. On Windows it ends up looking like
 # c:/foo/bar which confuses make, as make thinks that the : is Makefile
 # syntax
