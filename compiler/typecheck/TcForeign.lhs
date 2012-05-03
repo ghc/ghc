@@ -203,12 +203,14 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 \begin{code}
 tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ _ _ (CLabel _))
+tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh l@(CLabel _))
   = ASSERT( null arg_tys )
-    do { checkCg checkCOrAsmOrLlvmOrInterp
-       ; check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
-       ; return idecl }      -- NB check res_ty not sig_ty!
-                             --    In case sig_ty is (forall a. ForeignPtr a)
+    do checkCg checkCOrAsmOrLlvmOrInterp
+       -- NB check res_ty not sig_ty!
+       --    In case sig_ty is (forall a. ForeignPtr a)
+       check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
+       cconv' <- checkCConv cconv
+       return (CImport cconv' safety mh l)
 
 tcCheckFIType sig_ty arg_tys res_ty (CImport cconv safety mh CWrapper) = do
         -- Foreign wrapper (former f.e.d.)
