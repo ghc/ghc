@@ -560,6 +560,7 @@ typedef struct _RtsSymbolVal {
       RTS_WIN64_ONLY(SymI_NeedsProto(__imp_FlushConsoleInputBuffer))     \
       RTS_WIN64_ONLY(SymI_HasProto(free))                                \
       RTS_WIN64_ONLY(SymI_NeedsProto(raise))                             \
+      RTS_WIN64_ONLY(SymI_NeedsProto(_getpid))                           \
       RTS_WIN64_ONLY(SymI_HasProto(getc))                                \
       RTS_WIN64_ONLY(SymI_HasProto(ungetc))                              \
       RTS_WIN64_ONLY(SymI_HasProto(puts))                                \
