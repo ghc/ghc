@@ -35,6 +35,9 @@ libffi_STATIC_LIB  = libffi/build/inst/lib/libffi.a
 libffi_HEADERS     = rts/dist/build/ffi.h \
                      rts/dist/build/ffitarget.h
 
+LIBFFI_WINDOWS_LIB = ffi-6
+LIBFFI_DLL = lib$(LIBFFI_WINDOWS_LIB).dll
+
 ifeq "$(OSTYPE)" "cygwin"
 LIBFFI_PATH_MANGLE = PATH=$$(cygpath "$(TOP)")/libffi:$$PATH; export PATH;
 endif

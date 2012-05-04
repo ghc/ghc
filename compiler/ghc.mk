@@ -497,7 +497,7 @@ ifeq  "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 define windowsDynLinkToFfi
 # $1 = way
 ifneq "$$(findstring dyn, $1)" ""
-compiler_stage2_$1_ALL_HC_OPTS += -lffi-5
+compiler_stage2_$1_ALL_HC_OPTS += -l$$(LIBFFI_WINDOWS_LIB)
 endif
 endef
 $(foreach way,$(GhcLibWays),$(eval $(call windowsDynLinkToFfi,$(way))))
