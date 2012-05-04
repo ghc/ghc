@@ -24,7 +24,8 @@ module SimplUtils (
 	-- The continuation type
 	SimplCont(..), DupFlag(..), ArgInfo(..),
         isSimplified,
-	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
+	contIsDupable, contResultType, contInputType,
+        contIsTrivial, contArgs, dropArgs, 
 	pushSimplifiedArgs, countValArgs, countArgs, addArgTo,
 	mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
 	interestingCallContext, 
@@ -54,7 +55,7 @@ import Var
 import Demand
 import SimplMonad
 import Type	hiding( substTy )
-import Coercion hiding( substCo )
+import Coercion hiding( substCo, substTy )
 import DataCon          ( dataConWorkId )
 import VarSet
 import BasicTypes
@@ -96,7 +97,8 @@ Key points:
 
 \begin{code}
 data SimplCont	
-  = Stop		-- An empty context, or hole, []     
+  = Stop		-- An empty context, or <hole>
+        OutType         -- Type of the <hole>
 	CallCtxt	-- True <=> There is something interesting about
 			--          the context, and hence the inliner
 			--	    should be a bit keener (see interestingCallContext)
@@ -104,41 +106,43 @@ data SimplCont
 			--     This is an argument of a function that has RULES
 			--     Inlining the call might allow the rule to fire
 
-  | CoerceIt 		-- C `cast` co
+  | CoerceIt 		-- <hole> `cast` co
 	OutCoercion		-- The coercion simplified
 				-- Invariant: never an identity coercion
 	SimplCont
 
-  | ApplyTo  		-- C arg
+  | ApplyTo  		-- <hole> arg
 	DupFlag			-- See Note [DupFlag invariants]
 	InExpr StaticEnv	-- The argument and its static env
 	SimplCont
 
-  | Select   		-- case C of alts
-	DupFlag 	                -- See Note [DupFlag invariants]
-	InId InType [InAlt] StaticEnv	-- The case binder, alts type, alts, and subst-env
+  | Select   		-- case <hole> of alts
+	DupFlag 	        -- See Note [DupFlag invariants]
+	InId [InAlt] StaticEnv	-- The case binder, alts type, alts, and subst-env
 	SimplCont
 
   -- The two strict forms have no DupFlag, because we never duplicate them
-  | StrictBind 		-- (\x* \xs. e) C
-	InId [InBndr]		-- let x* = [] in e 	
+  | StrictBind 		        -- (\x* \xs. e) <hole>
+	InId [InBndr]		-- let x* = <hole> in e 	
 	InExpr StaticEnv	--	is a special case 
 	SimplCont	
 
-  | StrictArg 		-- f e1 ..en C
+  | StrictArg 		-- f e1 ..en <hole>
  	ArgInfo		-- Specifies f, e1..en, Whether f has rules, etc
 			--     plus strictness flags for *further* args
         CallCtxt        -- Whether *this* argument position is interesting
 	SimplCont		
 
   | TickIt
-        (Tickish Id)    -- Tick tickish []
+        (Tickish Id)    -- Tick tickish <hole>
         SimplCont
 
 data ArgInfo
   = ArgInfo {
-        ai_fun   :: Id,		-- The function
+        ai_fun   :: OutId,	-- The function
 	ai_args  :: [OutExpr],	-- ...applied to these args (which are in *reverse* order)
+        ai_type  :: OutType,    -- Type of (f a1 ... an)
+
 	ai_rules :: [CoreRule],	-- Rules for this function
 
 	ai_encl :: Bool,	-- Flag saying whether this function 
@@ -154,18 +158,19 @@ data ArgInfo
     }
 
 addArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addArgTo ai arg = ai { ai_args = arg : ai_args ai }
+addArgTo ai arg = ai { ai_args = arg : ai_args ai
+                     , ai_type = applyTypeToArg (ai_type ai) arg  }
 
 instance Outputable SimplCont where
-  ppr (Stop interesting)    	       = ptext (sLit "Stop") <> brackets (ppr interesting)
-  ppr (ApplyTo dup arg _ cont)         = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
+  ppr (Stop _ interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting)
+  ppr (ApplyTo dup arg _ cont)       = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
 				       	  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
-  ppr (StrictBind b _ _ _ cont)        = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg ai _ cont)            = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
-  ppr (Select dup bndr ty alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr <+> ppr ty) $$ 
+  ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont
+  ppr (StrictArg ai _ cont)          = (ptext (sLit "StrictArg") <+> ppr (ai_fun ai)) $$ ppr cont
+  ppr (Select dup bndr alts se cont) = (ptext (sLit "Select") <+> ppr dup <+> ppr bndr) $$ 
 				         (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont 
-  ppr (CoerceIt co cont)	       = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
-  ppr (TickIt t cont)                  = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
+  ppr (CoerceIt co cont)	     = (ptext (sLit "CoerceIt") <+> ppr co) $$ ppr cont
+  ppr (TickIt t cont)                = (ptext (sLit "TickIt") <+> ppr t) $$ ppr cont
 
 data DupFlag = NoDup       -- Unsimplified, might be big
              | Simplified  -- Simplified
@@ -193,14 +198,14 @@ the following invariants hold
 
 \begin{code}
 -------------------
-mkBoringStop :: SimplCont
-mkBoringStop = Stop BoringCtxt
+mkBoringStop :: OutType -> SimplCont
+mkBoringStop ty = Stop ty BoringCtxt
 
-mkRhsStop :: SimplCont	-- See Note [RHS of lets] in CoreUnfold
-mkRhsStop = Stop (ArgCtxt False)
+mkRhsStop :: OutType -> SimplCont	-- See Note [RHS of lets] in CoreUnfold
+mkRhsStop ty = Stop ty (ArgCtxt False)
 
-mkLazyArgStop :: CallCtxt -> SimplCont
-mkLazyArgStop cci = Stop cci
+mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
+mkLazyArgStop ty cci = Stop ty cci
 
 -------------------
 contIsRhsOrArg :: SimplCont -> Bool
@@ -211,11 +216,11 @@ contIsRhsOrArg _               = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
-contIsDupable (Stop {})                    = True
-contIsDupable (ApplyTo  OkToDup _ _ _)     = True	-- See Note [DupFlag invariants]
-contIsDupable (Select   OkToDup _ _ _ _ _) = True -- ...ditto...
-contIsDupable (CoerceIt _ cont)            = contIsDupable cont
-contIsDupable _                            = False
+contIsDupable (Stop {})                  = True
+contIsDupable (ApplyTo  OkToDup _ _ _)   = True	-- See Note [DupFlag invariants]
+contIsDupable (Select   OkToDup _ _ _ _) = True -- ...ditto...
+contIsDupable (CoerceIt _ cont)          = contIsDupable cont
+contIsDupable _                          = False
 
 -------------------
 contIsTrivial :: SimplCont -> Bool
@@ -226,28 +231,28 @@ contIsTrivial (CoerceIt _ cont)           = contIsTrivial cont
 contIsTrivial _                           = False
 
 -------------------
-contResultType :: SimplEnv -> OutType -> SimplCont -> OutType
-contResultType env ty cont
-  = go cont ty
-  where
-    subst_ty se ty = SimplEnv.substTy (se `setInScope` env) ty
-    subst_co se co = SimplEnv.substCo (se `setInScope` env) co
+contResultType :: SimplCont -> OutType
+contResultType (Stop ty _)            = ty
+contResultType (CoerceIt _ k)         = contResultType k
+contResultType (StrictBind _ _ _ _ k) = contResultType k
+contResultType (StrictArg _ _ k)      = contResultType k
+contResultType (Select _ _ _ _ k)     = contResultType k
+contResultType (ApplyTo _ _ _ k)      = contResultType k
+contResultType (TickIt _ k)           = contResultType k
 
-    go (Stop {})                      ty = ty
-    go (CoerceIt co cont)             _  = go cont (pSnd (coercionKind co))
-    go (StrictBind _ bs body se cont) _  = go cont (subst_ty se (exprType (mkLams bs body)))
-    go (StrictArg ai _ cont)          _  = go cont (funResultTy (argInfoResultTy ai))
-    go (Select _ _ ty _ se cont)      _  = go cont (subst_ty se ty)
-    go (ApplyTo _ arg se cont)        ty = go cont (apply_to_arg ty arg se)
-    go (TickIt _ cont)                ty = go cont ty
+contInputType :: SimplCont -> OutType
+contInputType (Stop ty _)             = ty
+contInputType (CoerceIt co _)         = pFst (coercionKind co)
+contInputType (Select d b _ se _)     = perhapsSubstTy d se (idType b)
+contInputType (StrictBind b _ _ se _) = substTy se (idType b)
+contInputType (StrictArg ai _ _)      = funArgTy (ai_type ai)
+contInputType (ApplyTo d e se k)      = mkFunTy (perhapsSubstTy d se (exprType e)) (contInputType k)
+contInputType (TickIt _ k)            = contInputType k
 
-    apply_to_arg ty (Type ty_arg)     se = applyTy ty (subst_ty se ty_arg)
-    apply_to_arg ty (Coercion co_arg) se = applyCo ty (subst_co se co_arg)
-    apply_to_arg ty _                 _  = funResultTy ty
-
-argInfoResultTy :: ArgInfo -> OutType
-argInfoResultTy (ArgInfo { ai_fun = fun, ai_args = args })
-  = foldr (\arg fn_ty -> applyTypeToArg fn_ty arg) (idType fun) args
+perhapsSubstTy :: DupFlag -> SimplEnv -> InType -> OutType
+perhapsSubstTy dup_flag se ty 
+  | isSimplified dup_flag = ty
+  | otherwise             = substTy se ty
 
 -------------------
 countValArgs :: SimplCont -> Int
@@ -328,7 +333,7 @@ interestingCallContext :: SimplCont -> CallCtxt
 interestingCallContext cont
   = interesting cont
   where
-    interesting (Select _ bndr _ _ _ _)
+    interesting (Select _ bndr _ _ _)
 	| isDeadBinder bndr = CaseCtxt
 	| otherwise	    = ArgCtxt False	-- If the binder is used, this
 						-- is like a strict let
@@ -343,7 +348,7 @@ interestingCallContext cont
 
     interesting (StrictArg _ cci _) = cci
     interesting (StrictBind {})	    = BoringCtxt
-    interesting (Stop cci)   	    = cci
+    interesting (Stop _ cci)  	    = cci
     interesting (TickIt _ cci)      = interesting cci
     interesting (CoerceIt _ cont)   = interesting cont
 	-- If this call is the arg of a strict function, the context
@@ -371,16 +376,19 @@ mkArgInfo :: Id
 
 mkArgInfo fun rules n_val_args call_cont
   | n_val_args < idArity fun		-- Note [Unsaturated functions]
-  = ArgInfo { ai_fun = fun, ai_args = [], ai_rules = rules
-            , ai_encl = False
+  = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
+            , ai_rules = rules, ai_encl = False
 	    , ai_strs = vanilla_stricts 
 	    , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_fun = fun, ai_args = [], ai_rules = rules
+  = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
+            , ai_rules = rules
             , ai_encl = interestingArgContext rules call_cont
-	    , ai_strs  = add_type_str (idType fun) arg_stricts
+	    , ai_strs  = add_type_str fun_ty arg_stricts
 	    , ai_discs = arg_discounts }
   where
+    fun_ty = idType fun
+
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
     arg_discounts = case idUnfolding fun of
@@ -466,7 +474,7 @@ interestingArgContext rules call_cont
     go (StrictArg _ cci _) = interesting cci
     go (StrictBind {})	   = False	-- ??
     go (CoerceIt _ c)	   = go c
-    go (Stop cci)          = interesting cci
+    go (Stop _ cci)        = interesting cci
     go (TickIt _ c)        = go c
 
     interesting (ArgCtxt rules) = rules
