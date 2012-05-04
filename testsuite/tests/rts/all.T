@@ -120,6 +120,8 @@ def config_5250(opts):
 test('5250', [ config_5250,
                # stack ptr is not 16-byte aligned on 32-bit Windows
                if_platform('i386-unknown-mingw32', expect_fail),
+               if_platform('i386-unknown-linux',
+                           expect_broken_for(4211,['llvm'])),
                extra_clean(['spalign.o']),
                omit_ways(['ghci']) ],
              compile_and_run, ['spalign.c'])
