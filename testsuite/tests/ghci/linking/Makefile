@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-LOCAL_GHC_PKG = '$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF)
+LOCAL_GHC_PKG = '$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF)
 
 # Test 1: ghci -Ldir -lfoo
 #   with dir/libfoo.a
@@ -63,12 +63,11 @@ ghcilink004 :
 	echo 'library-dirs: $${pkgroot}' >>$(PKG004)
 	echo 'extra-libraries: foo' >>$(PKG004)
 	echo '[]' >$(LOCAL_PKGCONF004)
-	'$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF004) register $(PKG004) -v0
+	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF004) register $(PKG004) -v0
 	#
 	"$(TEST_HC)" -c f.c -o dir004/foo.o
 	"$(AR)" cqs dir004/libfoo.a dir004/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF004) -package test TestLink.hs
-
+	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF004) -package test TestLink.hs
 
 # Test 5: 
 #   package P
@@ -91,11 +90,11 @@ ghcilink005 :
 	echo 'library-dirs: $${pkgroot}' >>$(PKG005)
 	echo 'extra-libraries: foo' >>$(PKG005)
 	echo '[]' >$(LOCAL_PKGCONF005)
-	'$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF005) register $(PKG005) -v0
+	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF005) register $(PKG005) -v0
 	#
 	"$(TEST_HC)" -c -dynamic f.c -o dir005/foo.o
 	"$(TEST_HC)" -shared -o dir005/$(call DLL,foo) dir005/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF005) -package test TestLink.hs
+	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF005) -package test TestLink.hs
 
 # Test 6: 
 #   package P
@@ -114,7 +113,7 @@ ghcilink006 :
 	echo "id: test-XXX" >>$(PKG006)
 	echo "extra-libraries: stdc++" >>$(PKG006)
 	echo "[]" >$(LOCAL_PKGCONF006)
-	'$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
+	'$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
 	#
-	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF006) -package test
+	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-db $(LOCAL_PKGCONF006) -package test
 
