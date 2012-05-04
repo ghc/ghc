@@ -1808,7 +1808,7 @@ AC_MSG_NOTICE(Building in-tree ghc-pwd)
     dnl except we don't want to have to know what make is called. Sigh.
     rm -rf utils/ghc-pwd/dist-boot
     mkdir  utils/ghc-pwd/dist-boot
-    if ! "$WithGhc" -v0 -no-user-package-conf -hidir utils/ghc-pwd/dist-boot -odir utils/ghc-pwd/dist-boot -stubdir utils/ghc-pwd/dist-boot --make utils/ghc-pwd/Main.hs -o utils/ghc-pwd/dist-boot/ghc-pwd
+    if ! "$WithGhc" -v0 -no-user-$GHC_PACKAGE_DB_FLAG -hidir utils/ghc-pwd/dist-boot -odir utils/ghc-pwd/dist-boot -stubdir utils/ghc-pwd/dist-boot --make utils/ghc-pwd/Main.hs -o utils/ghc-pwd/dist-boot/ghc-pwd
     then
         AC_MSG_ERROR([Building ghc-pwd failed])
     fi

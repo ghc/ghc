@@ -551,7 +551,7 @@ data DynFlags = DynFlags {
 
   --  Package flags
   extraPkgConfs         :: [PkgConfRef],
-        -- ^ The @-package-conf@ flags given on the command line, in the order
+        -- ^ The @-package-db@ flags given on the command line, in the order
         -- they appeared.
 
   packageFlags          :: [PackageFlag],
@@ -1342,7 +1342,7 @@ parseDynamicFlagsCmdLine :: Monad m =>
 parseDynamicFlagsCmdLine dflags args = parseDynamicFlags dflags args True
 
 -- | Like 'parseDynamicFlagsCmdLine' but does not allow the package flags
--- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-conf).
+-- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
 parseDynamicFilePragma :: Monad m =>
                      DynFlags -> [Located String]
@@ -1757,12 +1757,12 @@ dynamic_flags = [
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
         ------- Packages ----------------------------------------------------
-    Flag "package-conf"          (HasArg (extraPkgConf_ . PkgConfFile))
-  , Flag "clear-package-conf"    (NoArg clearPkgConf)
-  , Flag "no-global-package-conf" (NoArg (unSetDynFlag Opt_ReadGlobalPackageConf))
-  , Flag "no-user-package-conf"  (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
-  , Flag "global-package-conf"   (NoArg (extraPkgConf_ GlobalPkgConf))
-  , Flag "user-package-conf"     (NoArg (extraPkgConf_ UserPkgConf))
+    Flag "package-db"            (HasArg (extraPkgConf_ . PkgConfFile))
+  , Flag "clear-package-db"      (NoArg clearPkgConf)
+  , Flag "no-global-package-db"  (NoArg (unSetDynFlag Opt_ReadGlobalPackageConf))
+  , Flag "no-user-package-db"    (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
+  , Flag "global-package-db"     (NoArg (extraPkgConf_ GlobalPkgConf))
+  , Flag "user-package-db"       (NoArg (extraPkgConf_ UserPkgConf))
 
   , Flag "package-name"          (hasArg setPackageName)
   , Flag "package-id"            (HasArg exposePackageId)

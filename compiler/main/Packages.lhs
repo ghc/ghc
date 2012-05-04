@@ -184,10 +184,10 @@ initPackages dflags = do
 
 readPackageConfigs :: DynFlags -> IO [PackageConfig]
 readPackageConfigs dflags = do
-  let -- Read global package db, unless the -no-user-package-conf flag was given
+  let -- Read global package db, unless the -no-user-package-db flag was given
       global_conf_refs = [GlobalPkgConf | dopt Opt_ReadGlobalPackageConf dflags]
       -- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
-      -- unless the -no-user-package-conf flag was given.
+      -- unless the -no-user-package-db flag was given.
       user_conf_refs = [UserPkgConf | dopt Opt_ReadUserPackageConf dflags]
 
       system_conf_refs = global_conf_refs ++ user_conf_refs

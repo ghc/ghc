@@ -119,11 +119,11 @@ flags = [
         "use the current user's package database",
   Option [] ["global"] (NoArg FlagGlobal)
         "use the global package database",
-  Option ['f'] ["package-conf"] (ReqArg FlagConfig "FILE")
+  Option ['f'] ["package-db"] (ReqArg FlagConfig "FILE")
         "use the specified package config file",
-  Option [] ["global-conf"] (ReqArg FlagGlobalConfig "FILE")
+  Option [] ["global-package-db"] (ReqArg FlagGlobalConfig "FILE")
         "location of the global package config",
-  Option [] ["no-user-package-conf"] (NoArg FlagNoUserDb)
+  Option [] ["no-user-package-db"] (NoArg FlagNoUserDb)
         "never read the user package database",
   Option [] ["force"] (NoArg FlagForce)
          "ignore missing dependencies, directories, and libraries",
@@ -177,8 +177,8 @@ usageHeader prog = substProg prog $
   "  $p init {path}\n" ++
   "    Create and initialise a package database at the location {path}.\n" ++
   "    Packages can be registered in the new database using the register\n" ++
-  "    command with --package-conf={path}.  To use the new database with GHC,\n" ++
-  "    use GHC's -package-conf flag.\n" ++
+  "    command with --package-db={path}.  To use the new database with GHC,\n" ++
+  "    use GHC's -package-db flag.\n" ++
   "\n" ++
   "  $p register {filename | -}\n" ++
   "    Register the package using the specified installed package\n" ++
@@ -247,7 +247,7 @@ usageHeader prog = substProg prog $
   "    Regenerate the package database cache.  This command should only be\n" ++
   "    necessary if you added a package to the database by dropping a file\n" ++
   "    into the database directory manually.  By default, the global DB\n" ++
-  "    is recached; to recache a different DB use --user or --package-conf\n" ++
+  "    is recached; to recache a different DB use --user or --package-db\n" ++
   "    as appropriate.\n" ++
   "\n" ++
   " Substring matching is supported for {module} in find-module and\n" ++
@@ -257,13 +257,13 @@ usageHeader prog = substProg prog $
   "  When asked to modify a database (register, unregister, update,\n"++
   "  hide, expose, and also check), ghc-pkg modifies the global database by\n"++
   "  default.  Specifying --user causes it to act on the user database,\n"++
-  "  or --package-conf can be used to act on another database\n"++
+  "  or --package-db can be used to act on another database\n"++
   "  entirely. When multiple of these options are given, the rightmost\n"++
   "  one is used as the database to act upon.\n"++
   "\n"++
   "  Commands that query the package database (list, tree, latest, describe,\n"++
   "  field) operate on the list of databases specified by the flags\n"++
-  "  --user, --global, and --package-conf.  If none of these flags are\n"++
+  "  --user, --global, and --package-db.  If none of these flags are\n"++
   "  given, the default is --global --user.\n"++
   "\n" ++
   " The following optional flags are also accepted:\n"
@@ -471,9 +471,9 @@ getPkgDatabases :: Verbosity
 getPkgDatabases verbosity modify use_cache expand_vars my_flags = do
   -- first we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
-  -- location is passed to the binary using the --global-config flag by the
+  -- location is passed to the binary using the --global-package-db flag by the
   -- wrapper script.
-  let err_msg = "missing --global-conf option, location of global package.conf unknown\n"
+  let err_msg = "missing --global-package-db option, location of global package database unknown\n"
   global_conf <-
      case [ f | FlagGlobalConfig f <- my_flags ] of
         [] -> do mb_dir <- getLibDir
