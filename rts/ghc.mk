@@ -81,13 +81,12 @@ rts/libs.depend : $(GHC_PKG_INPLACE)
 # 	These are made from rts/win32/libHS*.def which contain lists of
 # 	all the symbols in those libraries used by the RTS.
 #
-ifeq  "$(HOSTPLATFORM)" "i386-unknown-mingw32" 
+ifeq "$(HostOS_CPP)" "mingw32" 
 
 ALL_RTS_DEF_LIBNAMES 	= base ghc-prim
 ALL_RTS_DEF_LIBS	= \
 	rts/dist/build/win32/libHSbase.dll.a \
-	rts/dist/build/win32/libHSghc-prim.dll.a \
-	libffi/build/inst/lib/libffi.dll.a
+	rts/dist/build/win32/libHSghc-prim.dll.a
 
 # -- import libs for the regular Haskell libraries
 define make-importlib-def # args $1 = lib name
@@ -171,7 +170,7 @@ rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
-ifeq "$$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifeq "$$(HostOS_CPP)" "mingw32" 
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend rts/dist/build/$$(LIBFFI_DLL)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
