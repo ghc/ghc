@@ -9,6 +9,7 @@ test('testblockalloc', compose(c_src,
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
      composes([
+             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
              # LLVM Optimiser considers dereference of a null pointer
              # undefined and marks the code as unreachable which means
              # that later optimisations remove it altogether.
@@ -22,17 +23,18 @@ test('derefnull',
              # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
              if_platform('i386-apple-darwin', exit_code(138)),
              if_platform('powerpc-apple-darwin', exit_code(138)),
-             if_platform('i386-unknown-mingw32', exit_code(1))]),
+             if_os('mingw32', exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
      composes([
+             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
              # SIGFPE on Linux
              exit_code(136),
              # Apparently the output can be different on different
              # Linux setups, so just ignore it. As long as we get
              # the right exit code we're OK.
              if_os('linux', ignore_output),
-             if_platform('i386-unknown-mingw32', exit_code(1))]),
+             if_os('mingw32', exit_code(1))]),
      compile_and_run, [''])
 
 test('outofmem', if_os('darwin', skip), 
