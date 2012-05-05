@@ -12,7 +12,7 @@ ghcilink001 :
 	$(RM) -rf dir001
 	mkdir dir001
 	"$(TEST_HC)" -c f.c -o dir001/foo.o
-	$(AR) cqs dir001/libfoo.a dir001/foo.o
+	"$(AR)" cqs dir001/libfoo.a dir001/foo.o
 	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -Ldir001 -lfoo TestLink.hs
 
 # Test 2: ghci -Ldir -lfoo
@@ -66,7 +66,7 @@ ghcilink004 :
 	'$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF004) register $(PKG004) -v0
 	#
 	"$(TEST_HC)" -c f.c -o dir004/foo.o
-	$(AR) cqs dir004/libfoo.a dir004/foo.o
+	"$(AR)" cqs dir004/libfoo.a dir004/foo.o
 	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF004) -package test TestLink.hs
 
 
