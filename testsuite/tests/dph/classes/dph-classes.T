@@ -1,5 +1,6 @@
 test    ('dph-classes-vseg-fast' 
         , [ alone
+          , expect_broken(6080)
           , extra_clean(['Main.o', 'Main.hi', 'DefsVect.hi', 'DefsVect.o'])
           , reqlib('dph-lifted-vseg')
           , reqlib('dph-prim-par')
