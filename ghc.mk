@@ -799,7 +799,7 @@ install_libs: $(INSTALL_LIBS)
 		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
 		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
 		  *.dll) \
-		    $(call INSTALL_DATA,-s $(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
+		    $(call INSTALL_PROGRAM,-s $(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
 		  *.so) \
 		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
 		  *.dylib) \
