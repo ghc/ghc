@@ -186,7 +186,7 @@ keepGoing' a str = a str >> return False
 keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi Bool)
 keepGoingPaths a str
  = do case toArgs str of
-          Left err -> hPutStrLn stderr err
+          Left err -> liftIO $ hPutStrLn stderr err
           Right args -> a args
       return False
 
