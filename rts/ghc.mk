@@ -134,6 +134,12 @@ rts_dist_$1_HC_OPTS = $$(GhcRtsHcOpts)
 rts_dist_$1_CC_OPTS = $$(GhcRtsCcOpts)
 endif
 
+ifneq "$$(findstring dyn, $1)" ""
+ifeq "$$(HostOS_CPP)" "mingw32" 
+rts_dist_$1_CC_OPTS += -DCOMPILING_WINDOWS_DLL
+endif
+endif
+
 ifneq "$$(findstring thr, $1)" ""
 rts_$1_EXTRA_C_SRCS  =  rts/dist/build/sm/Evac_thr.c rts/dist/build/sm/Scav_thr.c
 endif

@@ -555,7 +555,7 @@ loop:
   //
   case CONSTR_0_1:
   {   
-#if defined(__PIC__) && defined(mingw32_HOST_OS) 
+#if defined(COMPILING_WINDOWS_DLL)
       copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
 #else
       StgWord w = (StgWord)q->payload[0];

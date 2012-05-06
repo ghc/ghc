@@ -576,7 +576,7 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
    replace them with references to the static objects.
    ------------------------------------------------------------------------- */
 
-#if defined(__PIC__) && defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
+#if defined(COMPILING_WINDOWS_DLL)
 /*
  * When sticking the RTS in a Windows DLL, we delay populating the
  * Charlike and Intlike tables until load-time, which is only
@@ -601,7 +601,7 @@ INFO_TABLE_CONSTR(stg_MVAR_TSO_QUEUE,2,0,0,PRIM,"MVAR_TSO_QUEUE","MVAR_TSO_QUEUE
  * on the fact that static closures live in the data section.
  */
 
-#if !(defined(__PIC__) && defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH))
+#if !(defined(COMPILING_WINDOWS_DLL))
 section "data" {
  stg_CHARLIKE_closure:
     CHARLIKE_HDR(0)
@@ -899,4 +899,4 @@ section "data" {
     INTLIKE_HDR(16)  /* MAX_INTLIKE == 16 */
 }
 
-#endif // !(defined(__PIC__) && defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH))
+#endif

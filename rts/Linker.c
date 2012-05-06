@@ -986,7 +986,7 @@ typedef struct _RtsSymbolVal {
 // We don't do this when compiling to Windows DLLs at the moment because
 //      it doesn't support cross package data references well.
 //
-#if defined(__PIC__) && defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
+#if defined(COMPILING_WINDOWS_DLL)
 #define RTS_INTCHAR_SYMBOLS
 #else
 #define RTS_INTCHAR_SYMBOLS                             \
@@ -1314,7 +1314,7 @@ typedef struct _RtsSymbolVal {
 
 /* entirely bogus claims about types of these symbols */
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
-#if defined(__PIC__) && defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
+#if defined(COMPILING_WINDOWS_DLL)
 #define SymE_HasProto(vvv)    SymE_HasProto(vvv);
 #define SymE_NeedsProto(vvv)    extern void _imp__ ## vvv (void);
 #else
