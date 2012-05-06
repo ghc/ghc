@@ -1316,7 +1316,11 @@ typedef struct _RtsSymbolVal {
 #define SymI_NeedsProto(vvv)  extern void vvv(void);
 #if defined(COMPILING_WINDOWS_DLL)
 #define SymE_HasProto(vvv)    SymE_HasProto(vvv);
-#define SymE_NeedsProto(vvv)    extern void _imp__ ## vvv (void);
+#  if defined(x86_64_HOST_ARCH)
+#    define SymE_NeedsProto(vvv)    extern void __imp_ ## vvv (void);
+#  else
+#    define SymE_NeedsProto(vvv)    extern void _imp__ ## vvv (void);
+#  endif
 #else
 #define SymE_NeedsProto(vvv)  SymI_NeedsProto(vvv);
 #define SymE_HasProto(vvv)    SymI_HasProto(vvv)

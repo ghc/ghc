@@ -15,13 +15,22 @@
 #define __STGDLL_H__ 1
 
 #if defined(COMPILING_WINDOWS_DLL)
-#  define DLL_IMPORT_DATA_REF(x) (_imp__##x)
-#  define DLL_IMPORT_DATA_VARNAME(x) *_imp__##x
+#  if defined(x86_64_HOST_ARCH)
+#    define DLL_IMPORT_DATA_REF(x) (__imp_##x)
+#    define DLL_IMPORT_DATA_VARNAME(x) *__imp_##x
+#  else
+#    define DLL_IMPORT_DATA_REF(x) (_imp__##x)
+#    define DLL_IMPORT_DATA_VARNAME(x) *_imp__##x
+#  endif
 #  if __GNUC__ && !defined(__declspec)
 #    define DLLIMPORT
 #  else
 #    define DLLIMPORT __declspec(dllimport)
-#    define DLLIMPORT_DATA(x) _imp__##x
+#    if defined(x86_64_HOST_ARCH)
+#      define DLLIMPORT_DATA(x) __imp_##x
+#    else
+#      define DLLIMPORT_DATA(x) _imp__##x
+#    endif
 #  endif
 #else
 #  define DLL_IMPORT_DATA_REF(x) (&(x))
@@ -46,7 +55,11 @@
 #define DLL_IMPORT
 #define DLL_IMPORT_RTS DLLIMPORT
 # if defined(COMPILING_WINDOWS_DLL)
-#  define DLL_IMPORT_DATA_VAR(x) _imp__##x
+#  if defined(x86_64_HOST_ARCH)
+#   define DLL_IMPORT_DATA_VAR(x) __imp_##x
+#  else
+#   define DLL_IMPORT_DATA_VAR(x) _imp__##x
+#  endif
 # else
 #  define DLL_IMPORT_DATA_VAR(x) x
 # endif
