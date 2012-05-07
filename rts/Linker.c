@@ -3628,6 +3628,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       }
 
       if (kind != SECTIONKIND_OTHER && end >= start) {
+          if ((((size_t)(start)) % (size_t)sizeof(void *)) != 0) {
+              barf("Misaligned section: %p", start);
+          }
+
          addSection(oc, kind, start, end);
          addProddableBlock(oc, start, end - start + 1);
       }
