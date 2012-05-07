@@ -2283,8 +2283,23 @@ loadArchive( pathchar *path )
 #elif defined(mingw32_HOST_OS)
         // TODO: We would like to use allocateExec here, but allocateExec
         //       cannot currently allocate blocks large enough.
-            image = VirtualAlloc(NULL, memberSize, MEM_RESERVE | MEM_COMMIT,
-                                 PAGE_EXECUTE_READWRITE);
+            {
+                int offset;
+#if defined(x86_64_HOST_ARCH)
+                /* We get back 8-byte aligned memory (is that guaranteed?), but
+                   the offsets to the sections within the file are all 4 mod 8
+                   (is that guaranteed?). We therefore need to offset the image
+                   by 4, so that all the pointers are 8-byte aligned, so that
+                   pointer tagging works. */
+                offset = 4;
+#else
+                offset = 0;
+#endif
+                image = VirtualAlloc(NULL, memberSize + offset,
+                                     MEM_RESERVE | MEM_COMMIT,
+                                     PAGE_EXECUTE_READWRITE);
+                image += offset;
+            }
 #elif defined(darwin_HOST_OS)
             /* See loadObj() */
             misalignment = machoGetMisalignment(f);
