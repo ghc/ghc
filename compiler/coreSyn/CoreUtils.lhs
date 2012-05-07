@@ -187,15 +187,7 @@ mkCast (Coercion e_co) co
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
-  = Coercion new_co
-  where
-       -- g :: (s1 ~# s2) ~# (t1 ~#  t2)
-       -- g1 :: s1 ~# t1
-       -- g2 :: s2 ~# t2
-       new_co = mkSymCo g1 `mkTransCo` e_co `mkTransCo` g2
-       [_reflk, g1, g2] = decomposeCo 3 co
-            -- Remember, (~#) :: forall k. k -> k -> *
-            -- so it takes *three* arguments, not two
+  = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
   = ASSERT(let { Pair  from_ty  _to_ty  = coercionKind co;

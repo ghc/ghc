@@ -726,39 +726,51 @@ sccEvBinds bs = stronglyConnCompFromEdgedVertices edges
     edges = foldrBag ((:) . mk_node) [] bs 
 
     mk_node :: EvBind -> (EvBind, EvVar, [EvVar])
-    mk_node b@(EvBind var term) = (b, var, evVarsOfTerm term)
+    mk_node b@(EvBind var term) = (b, var, varSetElems (evVarsOfTerm term))
 
 
 ---------------------------------------
 dsEvTerm :: MonadThings m => EvTerm -> m CoreExpr
 dsEvTerm (EvId v) = return (Var v)
 
-dsEvTerm (EvCast v co) 
-  = return $ dsTcCoercion co $ mkCast (Var v) -- 'v' is always a lifted evidence variable so it is
-                                     -- unnecessary to call varToCoreExpr v here.
-dsEvTerm (EvKindCast v co)
-  = return $ dsTcCoercion co $ (\_ -> Var v)
+dsEvTerm (EvCast tm co) 
+  = do { tm' <- dsEvTerm tm
+       ; return $ dsTcCoercion co $ mkCast tm' }
+                        -- 'v' is always a lifted evidence variable so it is
+                        -- unnecessary to call varToCoreExpr v here.
 
-dsEvTerm (EvDFunApp df tys vars) = return (Var df `mkTyApps` tys `mkVarApps` vars)
+dsEvTerm (EvKindCast v co)
+  = do { v' <- dsEvTerm v
+       ; return $ dsTcCoercion co $ (\_ -> v') }
+
+dsEvTerm (EvDFunApp df tys tms) = do { tms' <- mapM dsEvTerm tms
+                                     ; return (Var df `mkTyApps` tys `mkApps` tms') }
 dsEvTerm (EvCoercion co)         = return $ dsTcCoercion co mkEqBox
 dsEvTerm (EvTupleSel v n)
-   = ASSERT( isTupleTyCon tc )
-     return $
-     Case (Var v) (mkWildValBinder (varType v)) (tys !! n) [(DataAlt dc, xs, Var v')]
-  where
-    (tc, tys) = splitTyConApp (evVarPred v)
-    Just [dc] = tyConDataCons_maybe tc
-    v' = v `setVarType` ty_want
-    xs = map mkWildValBinder tys_before ++ v' : map mkWildValBinder tys_after
-    (tys_before, ty_want:tys_after) = splitAt n tys
-dsEvTerm (EvTupleMk vs) = return $ Var (dataConWorkId dc) `mkTyApps` tys `mkVarApps` vs
-  where dc = tupleCon ConstraintTuple (length vs)
-        tys = map varType vs
+   = do { tm' <- dsEvTerm v
+        ; let scrut_ty = exprType tm'
+              (tc, tys) = splitTyConApp scrut_ty
+    	      Just [dc] = tyConDataCons_maybe tc
+    	      xs = mkTemplateLocals tys
+              the_x = xs !! n
+        ; ASSERT( isTupleTyCon tc )
+          return $
+          Case tm' (mkWildValBinder scrut_ty) (idType the_x) [(DataAlt dc, xs, Var the_x)] }
+
+dsEvTerm (EvTupleMk tms) 
+  = do { tms' <- mapM dsEvTerm tms
+       ; let tys = map exprType tms'
+       ; return $ Var (dataConWorkId dc) `mkTyApps` tys `mkApps` tms' }
+  where 
+    dc = tupleCon ConstraintTuple (length tms)
+
 dsEvTerm (EvSuperClass d n)
-  = return $ Var sc_sel_id `mkTyApps` tys `App` Var d
+  = do { d' <- dsEvTerm d
+       ; let (cls, tys) = getClassPredTys (exprType d')
+             sc_sel_id  = classSCSelId cls n	-- Zero-indexed
+       ; return $ Var sc_sel_id `mkTyApps` tys `App` d' }
   where
-    sc_sel_id  = classSCSelId cls n	-- Zero-indexed
-    (cls, tys) = getClassPredTys (evVarPred d)   
+
 dsEvTerm (EvDelayedError ty msg) = return $ Var errorId `mkTyApps` [ty] `mkApps` [litMsg]
   where 
     errorId = rUNTIME_ERROR_ID
@@ -816,6 +828,7 @@ ds_tc_coercion subst tc_co
     go (TcNthCo n co)         = mkNthCo n (go co)
     go (TcInstCo co ty)       = mkInstCo (go co) ty
     go (TcLetCo bs co)        = ds_tc_coercion (ds_co_binds bs) co
+    go (TcCastCo co1 co2)     = mkCoCast (go co1) (go co2)
     go (TcCoVarCo v)          = ds_ev_id subst v
 
     ds_co_binds :: TcEvBinds -> CvSubst

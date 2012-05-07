@@ -840,7 +840,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              mk_sc_ev_term sc
                | null inst_tv_tys
                , null dfun_ev_vars = EvId sc
-               | otherwise         = EvDFunApp sc inst_tv_tys dfun_ev_vars
+               | otherwise         = EvDFunApp sc inst_tv_tys (map EvId dfun_ev_vars)
 
              inst_tv_tys    = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
@@ -1141,7 +1141,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
            ; self_dict <- newDict clas inst_tys
            ; let self_ev_bind = EvBind self_dict
-                                (EvDFunApp dfun_id (mkTyVarTys tyvars) dfun_ev_vars)
+                                (EvDFunApp dfun_id (mkTyVarTys tyvars) (map EvId dfun_ev_vars))
 
            ; (meth_id, local_meth_sig) <- mkMethIds sig_fn clas tyvars dfun_ev_vars
                                                    inst_tys sel_id
