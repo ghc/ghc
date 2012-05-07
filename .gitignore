@@ -74,6 +74,7 @@ _darcs/
 /libraries/stm/
 /libraries/template-haskell/
 /libraries/terminfo/
+/libraries/transformers
 /libraries/unix/
 /libraries/utf8-string/
 /libraries/vector/
