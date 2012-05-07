@@ -361,18 +361,18 @@ vectTopRhs recFs var expr
     rhs _globalScalar _isDFun (Just (_, expr'))               -- Case (1)
       = return (inlineMe, False, expr')
     rhs True          False   Nothing                         -- Case (2)
-      = do { expr' <- vectScalarFun recFs expr
+      = do { expr' <- vectScalarFun expr
            ; return (inlineMe, True, vectorised expr')
            }
     rhs True          True    Nothing                         -- Case (3)
-      = do { expr' <- vectScalarDFun var recFs
+      = do { expr' <- vectScalarDFun var
            ; return (DontInline, True, expr')
            }
     rhs False         False   Nothing                         -- Case (4) — not a dfun
       = do { let exprFvs = freeVars expr
            ; (inline, isScalar, vexpr) 
                <- inBind var $
-                    vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs exprFvs
+                    vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs exprFvs Nothing
            ; return (inline, isScalar, vectorised vexpr)
            }
     rhs False         True    Nothing                         -- Case (4) — is a dfun
