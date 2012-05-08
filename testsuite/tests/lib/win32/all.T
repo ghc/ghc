@@ -1,7 +1,6 @@
 def win_only(opts):
-    if config.platform != "i386-unknown-mingw32" and \
-       config.platform != "i386-unknown-cygwin32":
-	opts.skip = 1
+    if config.os != "mingw32" and config.os != "cygwin32":
+        opts.skip = 1
 
 # This isn't a very good test to run automatically at the moment, since
 # it doesn't terminate
