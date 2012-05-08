@@ -529,10 +529,10 @@ extern void __hscore_set_saved_termios(int fd, void* ts);
 #ifdef __MINGW32__
 INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
-	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYRW,mode);
+	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
           // _O_NOINHERIT: see #2650
 	else
-	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYWR,mode);
+	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);
           // _O_NOINHERIT: see #2650
 }
 #else
