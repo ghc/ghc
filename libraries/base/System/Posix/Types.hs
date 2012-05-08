@@ -136,7 +136,7 @@ import Control.Monad
 #include "CTypes.h"
 
 #if defined(HTYPE_DEV_T)
-ARITHMETIC_TYPE(CDev,tyConCDev,"CDev",HTYPE_DEV_T)
+INTEGRAL_TYPE(CDev,tyConCDev,"CDev",HTYPE_DEV_T)
 #endif
 #if defined(HTYPE_INO_T)
 INTEGRAL_TYPE(CIno,tyConCIno,"CIno",HTYPE_INO_T)

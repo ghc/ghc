@@ -266,7 +266,7 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
 
 getUniqueFileInfo :: CInt -> CDev -> CIno -> IO (Word64, Word64)
 #ifndef mingw32_HOST_OS
-getUniqueFileInfo _ dev ino = return (fromInteger dev, fromInteger ino)
+getUniqueFileInfo _ dev ino = return (fromIntegral dev, fromIntegral ino)
 #else
 getUniqueFileInfo fd _ _ = do
   with 0 $ \devptr -> do
@@ -658,5 +658,7 @@ foreign import ccall unsafe "lockFile"
 foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
 
+#ifdef mingw32_HOST_OS
 foreign import ccall unsafe "get_unique_file_info"
   c_getUniqueFileInfo :: CInt -> Ptr Word64 -> Ptr Word64 -> IO ()
+#endif
