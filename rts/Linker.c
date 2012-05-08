@@ -304,8 +304,6 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(__hscore_get_saved_termios) \
       SymI_HasProto(__hscore_set_saved_termios) \
       SymI_HasProto(shutdownHaskellAndSignal)   \
-      SymI_HasProto(lockFile)                   \
-      SymI_HasProto(unlockFile)                 \
       SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
@@ -1283,6 +1281,9 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(n_capabilities)                     \
       SymI_HasProto(stg_traceCcszh)                     \
       SymI_HasProto(stg_traceEventzh)                   \
+      SymI_HasProto(getMonotonicNSec)                   \
+      SymI_HasProto(lockFile)                           \
+      SymI_HasProto(unlockFile)                         \
       RTS_USER_SIGNALS_SYMBOLS                          \
       RTS_INTCHAR_SYMBOLS
 

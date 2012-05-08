@@ -769,6 +769,42 @@ EOF
         chdir($pwd);
     }
 
+    message "== Checking for old mtl repo";
+    if (-d "libraries/mtl/.git") {
+        chdir("libraries/mtl");
+        if ((system "git log -1 c67d8f7247c612dc35242bc67e616f7ea35eadb9 > /dev/null 2> /dev/null") == 0) {
+            print <<EOF;
+============================
+ATTENTION!
+
+You have an old mtl repository in your GHC tree!
+
+Please remove it (e.g. "rm -r libraries/mtl"), and then run
+"./sync-all get" to get the new repository.
+============================
+EOF
+        }
+        chdir($pwd);
+    }
+
+    message "== Checking for old Cabal repo";
+    if (-d "libraries/Cabal/.git") {
+        chdir("libraries/Cabal");
+        if ((system "git log -1 c8ebd66a32865f72ae03ee0663c62df3d77f08fe > /dev/null 2> /dev/null") == 0) {
+            print <<EOF;
+============================
+ATTENTION!
+
+You have an old Cabal repository in your GHC tree!
+
+Please remove it (e.g. "rm -r libraries/Cabal"), and then run
+"./sync-all get" to get the new repository.
+============================
+EOF
+        }
+        chdir($pwd);
+    }
+
     $? = $ec;
 }
 

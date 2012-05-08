@@ -19,10 +19,13 @@ import MonadUtils       ( liftIO )
 import SrcLoc
 
 -- Every GHC comes with Cabal anyways, so this is not a bad new dependency
-import Distribution.Simple.GHC ( ghcOptions )
+import Distribution.Simple.GHC ( componentGhcOptions )
 import Distribution.Simple.Configure ( getPersistBuildConfig )
+import Distribution.Simple.Compiler ( compilerVersion )
+import Distribution.Simple.Program.GHC ( renderGhcOptions )
 import Distribution.PackageDescription ( library, libBuildInfo )
-import Distribution.Simple.LocalBuildInfo ( localPkgDescr, buildDir, libraryConfig )
+import Distribution.Simple.LocalBuildInfo ( localPkgDescr, buildDir, libraryConfig, compiler )
+import qualified Distribution.Verbosity as V
 
 import Control.Monad hiding (mapM)
 import System.Environment
@@ -184,8 +187,9 @@ flagsFromCabal distPref = do
     (Just lib, Just clbi) ->
       let bi = libBuildInfo lib
           odir = buildDir lbi
-          opts = ghcOptions lbi bi clbi odir
-      in return opts
+          opts = componentGhcOptions V.normal lbi bi clbi odir
+          version = compilerVersion (compiler lbi)
+      in return $ renderGhcOptions version opts
     _ -> error "no library"
 
 ----------------------------------------------------------------

@@ -14,11 +14,9 @@
 #ifndef RTS_FILELOCK_H
 #define RTS_FILELOCK_H
 
-#ifdef HAVE_SYS_TYPES_H
-#include <sys/types.h>
-#endif
+#include "Stg.h"
 
-int  lockFile(int fd, dev_t dev, ino_t ino, int for_writing);
+int  lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing);
 int  unlockFile(int fd);
 
 #endif /* RTS_FILELOCK_H */

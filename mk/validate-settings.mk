@@ -95,8 +95,14 @@ libraries/hoopl/src/Compiler/Hoopl/XUtil_HC_OPTS += -Wwarn
 libraries/hoopl/src/Compiler/Hoopl/Pointed_HC_OPTS += -Wwarn
 libraries/hoopl/src/Compiler/Hoopl/Passes/Dominator_HC_OPTS += -Wwarn
 
+# temporarily turn off -Werror for mtl
+libraries/mtl_dist-install_EXTRA_HC_OPTS += -Wwarn
+
 # primitive has a warning about deprecated use of GHC.IOBase
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
+
+# temporarily turn off -Werror for transformers
+libraries/transformers_dist-install_EXTRA_HC_OPTS += -Wwarn
 
 # vector has some unused match warnings
 libraries/vector_dist-install_EXTRA_HC_OPTS += -Wwarn
