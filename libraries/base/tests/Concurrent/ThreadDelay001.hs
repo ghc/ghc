@@ -9,7 +9,7 @@ import Control.Monad
 import System.Time
 
 main :: IO ()
-main = mapM_ delay (0 : take 11 (iterate (*5) 1))
+main = mapM_ delay (0 : take 7 (iterate (*5) 100))
 
 delay :: Int -> IO ()
 delay n = do

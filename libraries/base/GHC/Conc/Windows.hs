@@ -167,13 +167,8 @@ foreign import ccall unsafe "getOrSetGHCConcWindowsIOManagerThreadStore"
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning
-  | threaded  = initializeIOManager
+  | threaded  = startIOManagerThread
   | otherwise = return ()
-
-initializeIOManager :: IO ()
-initializeIOManager = do
-    initializeTimer
-    startIOManagerThread
 
 startIOManagerThread :: IO ()
 startIOManagerThread = do
@@ -199,12 +194,13 @@ delayTime (Delay t _) = t
 delayTime (DelaySTM t _) = t
 
 type USecs = Word64
+type NSecs = Word64
 
-foreign import ccall unsafe "getMonotonicUSec"
-  getMonotonicUSec :: IO USecs
+foreign import ccall unsafe "getMonotonicNSec"
+  getMonotonicNSec :: IO NSecs
 
-foreign import ccall unsafe "initializeTimer"
-  initializeTimer :: IO ()
+getMonotonicUSec :: IO USecs
+getMonotonicUSec = fmap (`div` 1000) getMonotonicNSec
 
 {-# NOINLINE prodding #-}
 prodding :: IORef Bool
