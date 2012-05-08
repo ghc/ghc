@@ -229,7 +229,7 @@ pprStmt platform stmt = case stmt of
                     pprCall platform cast_fn cconv results args <> semi)
                         -- for a dynamic call, no declaration is necessary.
 
-    CmmCall (CmmPrim op _) results args _ret ->
+    CmmCall (CmmPrim op) results args _ret ->
         proto $$ fn_call
       where
         cconv = CCallConv
