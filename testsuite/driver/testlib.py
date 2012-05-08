@@ -1706,8 +1706,8 @@ def rawSystem(cmd_and_args):
 def runCmd( cmd ):
     if_verbose( 1, cmd )
     r = 0
-    if config.platform == 'i386-unknown-mingw32':
-   # On MinGW, we will always have timeout
+    if config.os == 'mingw32':
+        # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
@@ -1719,8 +1719,8 @@ def runCmd( cmd ):
 def runCmdFor( name, cmd ):
     if_verbose( 1, cmd )
     r = 0
-    if config.platform == 'i386-unknown-mingw32':
-   # On MinGW, we will always have timeout
+    if config.os == 'mingw32':
+        # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
