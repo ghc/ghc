@@ -162,7 +162,7 @@ addArgTo ai arg = ai { ai_args = arg : ai_args ai
                      , ai_type = applyTypeToArg (ai_type ai) arg  }
 
 instance Outputable SimplCont where
-  ppr (Stop _ interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting)
+  ppr (Stop ty interesting)    	     = ptext (sLit "Stop") <> brackets (ppr interesting) <+> ppr ty
   ppr (ApplyTo dup arg _ cont)       = ((ptext (sLit "ApplyTo") <+> ppr dup <+> pprParendExpr arg)
 				       	  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext (sLit "StrictBind") <+> ppr b) $$ ppr cont

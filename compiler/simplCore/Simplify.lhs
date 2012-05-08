@@ -339,13 +339,13 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 			--    f = /\a. \x. g a x  
 			-- should eta-reduce
 
-                body_out_ty :: OutType
-                body_out_ty = substTy env (exprType body)
 
         ; (body_env, tvs') <- simplBinders rhs_env tvs
                 -- See Note [Floating and type abstraction] in SimplUtils
 
         -- Simplify the RHS
+        ; let   body_out_ty :: OutType
+                body_out_ty = substTy body_env (exprType body)
         ; (body_env1, body1) <- simplExprF body_env body (mkRhsStop body_out_ty)
         -- ANF-ise a constructor or PAP rhs
         ; (body_env2, body2) <- prepareRhs top_lvl body_env1 bndr1 body1
