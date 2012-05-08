@@ -12,7 +12,7 @@ test('2589',    just_ghci, compile_and_run, [''])
 test('2881',    just_ghci, compile_and_run, [''])
 
 test('3171',
-     [if_platform('i386-unknown-mingw32',skip),
+     [if_os('mingw32',skip),
       req_interp,
       combined_output],
      run_command,
