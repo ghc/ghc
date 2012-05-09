@@ -140,7 +140,7 @@ import UniqFM
 import Maybes ( orElse, catMaybes )
 
 
-import Control.Monad( when )
+import Control.Monad( when, zipWithM )
 import StaticFlags( opt_PprStyle_Debug )
 import Data.IORef
 import TrieMap
@@ -1399,6 +1399,15 @@ setEvBind the_ev t
           | otherwise                                    = False
 #endif
 
+newGivenEvVar :: GivenLoc -> TcPredType -> EvTerm -> TcS CtEvidence
+-- Make a new variable of the given PredType, 
+-- immediately bind it to the given term
+-- and return its CtEvidence
+newGivenEvVar gloc pred rhs
+  = do { new_ev <- wrapTcS $ TcM.newEvVar pred
+       ; setEvBind new_ev rhs
+       ; return (Given { ctev_gloc = gloc, ctev_pred = pred, ctev_evtm = EvId new_ev }) }
+
 newWantedEvVar :: WantedLoc -> TcPredType -> TcS MaybeNew
 newWantedEvVar loc pty
   = do { is <- getTcSInerts
@@ -1471,10 +1480,18 @@ xCtFlavor_cache :: Bool            -- True = if wanted add to the solved bag!
           -> [TcPredType]          -- New predicate types
           -> XEvTerm               -- Instructions about how to manipulate evidence
           -> TcS [CtEvidence]
+
 xCtFlavor_cache _ (Given { ctev_gloc = gl, ctev_evtm = tm }) ptys xev
-  = return [ Given { ctev_gloc = gl, ctev_pred = pred, ctev_evtm = sub_tm } 
-           | (pred, sub_tm) <- zipEqual "xCtFlavor" ptys (ev_decomp xev tm) ]
-    -- ToDo: consider creating new evidence variables for superclasses
+  = ASSERT( equalLength ptys (ev_decomp xev tm) )
+    zipWithM (newGivenEvVar gl) ptys (ev_decomp xev tm)
+    -- For Givens we make new EvVars and bind them immediately. We don't worry
+    -- about caching, but we don't expect complicated calculations among Givens.
+    -- It is important to bind each given:
+    --       class (a~b) => C a b where ....
+    --       f :: C a b => ....
+    -- Then in f's Givens we have g:(C a b) and the superclass sc(g,0):a~b.
+    -- But that superclass selector can't (yet) appear in a coercion
+    -- (see evTermCoercion), so the easy thing is to bind it to an Id
   
 xCtFlavor_cache cache ctev@(Wanted { ctev_wloc = wl, ctev_evar = evar }) ptys xev
   = do { new_evars <- mapM (newWantedEvVar wl) ptys
