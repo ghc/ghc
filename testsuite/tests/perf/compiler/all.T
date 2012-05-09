@@ -128,10 +128,10 @@ test('T3064',
      [# expect_broken( 3064 ),
       # expected value: 9 (x86/Linux 30-03-2011):
       if_wordsize(32,
-          compiler_stats_range_field('peak_megabytes_allocated', 14, 15)),
+          compiler_stats_range_field('peak_megabytes_allocated', 10, 14)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 30, 38)),
+          compiler_stats_num_field('peak_megabytes_allocated', 20, 28)),
       # expected value: 56380288 (x86/Linux) (28/6/2011)
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 124952112, 10)),
@@ -144,7 +144,7 @@ test('T3064',
           compiler_stats_range_field('max_bytes_used', 5511604, 10)),
       # expected value: 4032024 (amd64/Linux, intree) (28/6/2011):
       if_wordsize(64,
-          compiler_stats_num_field('max_bytes_used', 10000000,
+          compiler_stats_num_field('max_bytes_used', 8000000,
                                                      14000000)),
        only_ways(['normal'])
       ],
@@ -157,7 +157,8 @@ test('T4007',
      ['$MAKE -s --no-print-directory T4007'])
 
 test('T5030',
-     [# expected value: 449368924 (x86/Linux)
+     [expect_broken(5030),
+      # expected value: 449368924 (x86/Linux)
       if_wordsize(32,
           compiler_stats_range_field('bytes allocated', 196457520, 10)),
       # expected value: 346750856 (amd64/Linux):
