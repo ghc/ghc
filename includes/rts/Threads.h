@@ -15,6 +15,10 @@
 #ifndef RTS_THREADS_H
 #define RTS_THREADS_H
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
 // 
 // Creating threads
 //
