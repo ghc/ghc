@@ -1095,21 +1095,24 @@ zonkEvTerm env (EvId v)           = ASSERT2( isId v, ppr v )
                                     return (EvId (zonkIdOcc env v))
 zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcLCoToLCo env co
                                        ; return (EvCoercion co') }
-zonkEvTerm env (EvCast v co)      = ASSERT( isId v) 
-                                    do { co' <- zonkTcLCoToLCo env co
-                                       ; return (mkEvCast (zonkIdOcc env v) co') }
+zonkEvTerm env (EvCast tm co)     = do { tm' <- zonkEvTerm env tm
+                                       ; co' <- zonkTcLCoToLCo env co
+                                       ; return (mkEvCast tm' co') }
 
-zonkEvTerm env (EvKindCast v co) = ASSERT( isId v) 
-                                    do { co' <- zonkTcLCoToLCo env co
-                                       ; return (mkEvKindCast (zonkIdOcc env v) co') }
+zonkEvTerm env (EvKindCast v co)  = do { v'  <- zonkEvTerm env v
+                                       ; co' <- zonkTcLCoToLCo env co
+                                       ; return (mkEvKindCast v' co') }
 
-zonkEvTerm env (EvTupleSel v n)   = return (EvTupleSel (zonkIdOcc env v) n)
-zonkEvTerm env (EvTupleMk vs)     = return (EvTupleMk (map (zonkIdOcc env) vs))
+zonkEvTerm env (EvTupleSel tm n)  = do { tm' <- zonkEvTerm env tm
+                                       ; return (EvTupleSel tm' n) }
+zonkEvTerm env (EvTupleMk tms)    = do { tms' <- mapM (zonkEvTerm env) tms
+                                       ; return (EvTupleMk tms') }
 zonkEvTerm _   (EvLit l)          = return (EvLit l)
-zonkEvTerm env (EvSuperClass d n) = return (EvSuperClass (zonkIdOcc env d) n)
+zonkEvTerm env (EvSuperClass d n) = do { d' <- zonkEvTerm env d
+                                       ; return (EvSuperClass d' n) }
 zonkEvTerm env (EvDFunApp df tys tms)
   = do { tys' <- zonkTcTypeToTypes env tys
-       ; let tms' = map (zonkEvVarOcc env) tms
+       ; tms' <- mapM (zonkEvTerm env) tms
        ; return (EvDFunApp (zonkIdOcc env df) tys' tms') }
 zonkEvTerm env (EvDelayedError ty msg)
   = do { ty' <- zonkTcTypeToType env ty
@@ -1344,6 +1347,8 @@ zonkTcLCoToLCo env co
     go (TcAxiomInstCo ax tys) = do { tys' <- zonkTcTypeToTypes env tys; return (TcAxiomInstCo ax tys') }
     go (TcAppCo co1 co2)      = do { co1' <- go co1; co2' <- go co2
                                    ; return (mkTcAppCo co1' co2') }
+    go (TcCastCo co1 co2)     = do { co1' <- go co1; co2' <- go co2
+                                   ; return (TcCastCo co1' co2') }
     go (TcSymCo co)           = do { co' <- go co; return (mkTcSymCo co')  }
     go (TcNthCo n co)         = do { co' <- go co; return (mkTcNthCo n co')  }
     go (TcTransCo co1 co2)    = do { co1' <- go co1; co2' <- go co2
