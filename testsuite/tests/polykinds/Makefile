@@ -9,9 +9,15 @@ T5881:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5881a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5881.hs
 
-# T6025 is like T5881; needs separat compile
+# T6025 is like T5881; needs separate compile
 T6025:
 	$(RM) -f T6025.hi T6025.o T6025a.hi T6025a.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6025a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6025.hs
 
+# T6054 is like T5881; needs separate compile
+# The second compile fails, and should do so, hence leading "-"
+T6054:
+	$(RM) -f T6054.hi T6054.o T6054a.hi T6054a.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T6054a.hs
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -c T6054.hs

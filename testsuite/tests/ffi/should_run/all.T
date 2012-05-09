@@ -81,7 +81,7 @@ test('ffi011', normal, compile_and_run, [''])
 # because it's difficult to discover whether a given Linux supports
 # it.
 
-if config.platform == 'i386-unknown-mingw32':
+if config.os == 'mingw32':
 	skip_if_not_windows = normal
 else:
 	skip_if_not_windows = skip
@@ -161,7 +161,7 @@ test('ffi021', normal, compile_and_run, [''])
 
 test('ffi022', normal, compile_and_run, [''])
 
-if config.platform == 'i386-unknown-mingw32':
+if config.os == 'mingw32':
     # This test needs a larger C stack than we get by default on Windows
 	flagsFor4038 = ['-optl-Wl,--stack,10485760']
 else:

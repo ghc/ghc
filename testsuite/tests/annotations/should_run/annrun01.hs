@@ -4,7 +4,7 @@ module Main where
 
 import GHC
 import MonadUtils  ( liftIO )
-import DynFlags    ( defaultLogAction )
+import DynFlags    ( defaultLogAction, defaultFlushOut )
 import Annotations ( AnnTarget(..), CoreAnnTarget )
 import Serialized  ( deserializeWithData )
 import Panic
@@ -17,7 +17,7 @@ import Data.List
 import Data.Function
 
 main :: IO ()
-main = defaultErrorHandler defaultLogAction
+main = defaultErrorHandler defaultLogAction defaultFlushOut
      $ runGhc (Just cTop) $ do
     liftIO $ putStrLn "Initializing Package Database"
     dflags <- getSessionDynFlags

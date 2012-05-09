@@ -1,3 +1,3 @@
 
-const int i;
+extern int i;
 #define j 24

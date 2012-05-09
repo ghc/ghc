@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 139, types: 54, coercions: 2}
+Result size of Tidy Core = {terms: 140, types: 55, coercions: 0}
 
 Roman.foo3 :: GHC.Types.Int
 [GblId, Str=DmdType b]
@@ -52,10 +52,7 @@ Roman.$wgo =
   \ (w :: Data.Maybe.Maybe GHC.Types.Int)
     (w1 :: Data.Maybe.Maybe GHC.Types.Int) ->
     case w1 of _ {
-      Data.Maybe.Nothing ->
-        Roman.foo3
-        `cast` (UnsafeCo GHC.Types.Int GHC.Prim.Int#
-                :: GHC.Types.Int ~# GHC.Prim.Int#);
+      Data.Maybe.Nothing -> case Roman.foo3 of wild1 { };
       Data.Maybe.Just x ->
         case x of _ { GHC.Types.I# ipv ->
         let {

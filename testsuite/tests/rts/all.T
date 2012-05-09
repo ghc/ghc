@@ -9,6 +9,7 @@ test('testblockalloc', compose(c_src,
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
 test('derefnull',
      composes([
+             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
              # LLVM Optimiser considers dereference of a null pointer
              # undefined and marks the code as unreachable which means
              # that later optimisations remove it altogether.
@@ -22,17 +23,18 @@ test('derefnull',
              # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
              if_platform('i386-apple-darwin', exit_code(138)),
              if_platform('powerpc-apple-darwin', exit_code(138)),
-             if_platform('i386-unknown-mingw32', exit_code(1))]),
+             if_os('mingw32', exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
      composes([
+             if_platform('x86_64-unknown-mingw32', expect_broken(6079)),
              # SIGFPE on Linux
              exit_code(136),
              # Apparently the output can be different on different
              # Linux setups, so just ignore it. As long as we get
              # the right exit code we're OK.
              if_os('linux', ignore_output),
-             if_platform('i386-unknown-mingw32', exit_code(1))]),
+             if_os('mingw32', exit_code(1))]),
      compile_and_run, [''])
 
 test('outofmem', if_os('darwin', skip), 
@@ -78,7 +80,7 @@ test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts=
 
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
-     [ if_platform('i386-unknown-mingw32',skip),
+     [ if_os('mingw32', skip),
        # OS X doesn't seem to support linker scripts
        if_os('darwin', skip),
        # Solaris' linker does not support GNUish linker scripts
@@ -103,7 +105,7 @@ test('T4059',
 
 # Test for #4274
 test('exec_signals', [
-     if_platform('i386-unknown-mingw32',skip),
+     if_os('mingw32', skip),
      cmd_prefix('$MAKE exec_signals-prep && ./exec_signals_prepare'),
      extra_clean(['exec_signals_child', 'exec_signals_prepare'])
     ], compile_and_run, [''])
@@ -120,6 +122,8 @@ def config_5250(opts):
 test('5250', [ config_5250,
                # stack ptr is not 16-byte aligned on 32-bit Windows
                if_platform('i386-unknown-mingw32', expect_fail),
+               if_platform('i386-unknown-linux',
+                           expect_broken_for(4211,['llvm'])),
                extra_clean(['spalign.o']),
                omit_ways(['ghci']) ],
              compile_and_run, ['spalign.c'])
@@ -131,7 +135,7 @@ test('T5423',
 
 test('5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
-test('T6006', [ omit_ways(['ghci']),
+test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  extra_clean(['T6006_c.o']),
                  compile_cmd_prefix('$MAKE T6006_setup && ') ],
                  # The T6006_setup hack is to ensure that we generate

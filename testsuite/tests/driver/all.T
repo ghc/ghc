@@ -295,7 +295,7 @@ test('2499', normal, compile_fail, [''])
 test('mode001', normal, run_command,
      ['$MAKE -s --no-print-directory mode001'])
 
-if config.platform == 'i386-unknown-mingw32':
+if config.os == 'mingw32':
      only_windows = normal
 else:
      only_windows = skip

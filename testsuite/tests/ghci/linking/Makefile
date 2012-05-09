@@ -12,7 +12,7 @@ ghcilink001 :
 	$(RM) -rf dir001
 	mkdir dir001
 	"$(TEST_HC)" -c f.c -o dir001/foo.o
-	$(AR) cqs dir001/libfoo.a dir001/foo.o
+	"$(AR)" cqs dir001/libfoo.a dir001/foo.o
 	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -Ldir001 -lfoo TestLink.hs
 
 # Test 2: ghci -Ldir -lfoo
@@ -57,16 +57,16 @@ ghcilink004 :
 	mkdir dir004
 	#
 	rm -f $(PKG004)
-	echo "name: test" >>$(PKG004)
-	echo "version: 1.0" >>$(PKG004)
-	echo "id: test-XXX" >>$(PKG004)
-	echo "library-dirs: `pwd`/dir004" >>$(PKG004)
-	echo "extra-libraries: foo" >>$(PKG004)
-	echo "[]" >$(LOCAL_PKGCONF004)
+	echo 'name: test' >>$(PKG004)
+	echo 'version: 1.0' >>$(PKG004)
+	echo 'id: test-XXX' >>$(PKG004)
+	echo 'library-dirs: $${pkgroot}' >>$(PKG004)
+	echo 'extra-libraries: foo' >>$(PKG004)
+	echo '[]' >$(LOCAL_PKGCONF004)
 	'$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF004) register $(PKG004) -v0
 	#
 	"$(TEST_HC)" -c f.c -o dir004/foo.o
-	$(AR) cqs dir004/libfoo.a dir004/foo.o
+	"$(AR)" cqs dir004/libfoo.a dir004/foo.o
 	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF004) -package test TestLink.hs
 
 
@@ -85,12 +85,12 @@ ghcilink005 :
 	mkdir dir005
 	#
 	rm -f $(PKG005)
-	echo "name: test" >>$(PKG005)
-	echo "version: 1.0" >>$(PKG005)
-	echo "id: test-XXX" >>$(PKG005)
-	echo "library-dirs: `pwd`/dir005" >>$(PKG005)
-	echo "extra-libraries: foo" >>$(PKG005)
-	echo "[]" >$(LOCAL_PKGCONF005)
+	echo 'name: test' >>$(PKG005)
+	echo 'version: 1.0' >>$(PKG005)
+	echo 'id: test-XXX' >>$(PKG005)
+	echo 'library-dirs: $${pkgroot}' >>$(PKG005)
+	echo 'extra-libraries: foo' >>$(PKG005)
+	echo '[]' >$(LOCAL_PKGCONF005)
 	'$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF005) register $(PKG005) -v0
 	#
 	"$(TEST_HC)" -c -dynamic f.c -o dir005/foo.o

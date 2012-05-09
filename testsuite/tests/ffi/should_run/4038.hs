@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface, CPP #-}
 import Foreign
 import Foreign.C
 
@@ -21,7 +21,7 @@ foreign import ccall "dynamic" f_io :: FunPtr IOF -> IOF
 --
 -- On *nix systems, the C stack size can be examined and changed by
 -- the "ulimit -s" command.
---
+
 n = 300
 
 f :: Int -> IO Int

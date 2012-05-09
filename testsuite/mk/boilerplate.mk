@@ -116,10 +116,6 @@ ifeq "$(shell test -x '$(HPC)' && echo exists)" ""
 $(error Cannot find hpc: $(HPC))
 endif
 
-ifeq "$(AR)" ""
-AR = ar
-endif
-
 # Be careful when using this. On Windows it ends up looking like
 # c:/foo/bar which confuses make, as make thinks that the : is Makefile
 # syntax
@@ -149,7 +145,9 @@ $(ghc-config-mk) : $(TOP)/mk/ghc-config
 	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
 # If the ghc-config fails, remove $@, and fail
 
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include $(ghc-config-mk)
+endif
 
 # -----------------------------------------------------------------------------
 

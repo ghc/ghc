@@ -1466,9 +1466,15 @@ def dump_stderr( name ):
    print read_no_crs(qualify(name, 'run.stderr'))
 
 def read_no_crs(file):
-    h = open(file)
-    str = h.read()
-    h.close
+    str = ''
+    try:
+        h = open(file)
+        str = h.read()
+        h.close
+    except:
+        # On Windows, if the program fails very early, it seems the
+        # files stdout/stderr are redirected to may not get created
+        pass
     return re.sub('\r', '', str)
 
 def write_file(file, str):
@@ -1700,8 +1706,8 @@ def rawSystem(cmd_and_args):
 def runCmd( cmd ):
     if_verbose( 1, cmd )
     r = 0
-    if config.platform == 'i386-unknown-mingw32':
-   # On MinGW, we will always have timeout
+    if config.os == 'mingw32':
+        # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
@@ -1713,8 +1719,8 @@ def runCmd( cmd ):
 def runCmdFor( name, cmd ):
     if_verbose( 1, cmd )
     r = 0
-    if config.platform == 'i386-unknown-mingw32':
-   # On MinGW, we will always have timeout
+    if config.os == 'mingw32':
+        # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
@@ -1980,28 +1986,20 @@ def platform_wordsize_qualify( name, suff ):
 
     basepath = qualify(name, suff)
 
-    fns = [ lambda x: x + '-' + config.compiler_type,
-            lambda x: x + '-' + config.compiler_maj_version,
-            lambda x: x + '-ws-' + config.wordsize ]
-
-    paths = [ basepath ]
-    for fn in fns:
-        paths = paths + map(fn, paths)
-
-    paths.reverse()
-
-    plat_paths = map (lambda x: x + '-' + config.platform, paths)
+    paths = [(platformSpecific, basepath + comp + vers + ws + plat)
+             for (platformSpecific, plat) in [(1, '-' + config.platform),
+                                              (1, '-' + config.os),
+                                              (0, '')]
+             for ws   in ['-ws-' + config.wordsize, '']
+             for comp in ['-' + config.compiler_type, '']
+             for vers in ['-' + config.compiler_maj_version, '']]
 
     dir = glob.glob(basepath + '*')
     dir = map (lambda d: normalise_slashes_(d), dir)
 
-    for f in plat_paths:
+    for (platformSpecific, f) in paths:
        if f in dir:
-            return (1,f)
-
-    for f in paths:
-       if f in dir:
-            return (0,f)
+            return (platformSpecific,f)
 
     return (0, basepath)
 

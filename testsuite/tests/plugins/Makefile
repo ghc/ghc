@@ -12,7 +12,7 @@ plugins01:
 	#
 	# Suggestions to make this better gratefully recieved.
 	(cd simple-plugin; make package)
-	@$(RM) plugins01.hi plugins01.o
+	$(RM) plugins01.hi plugins01.o
 	"$(TEST_HC)" $(HC_OPTS) --make -v0 plugins01.hs -package-conf simple-plugin/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -package simple-plugin
 	./plugins01
 
