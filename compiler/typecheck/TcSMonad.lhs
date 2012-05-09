@@ -517,11 +517,11 @@ data InertSet
        , inert_solved        :: PredMap    CtEvidence  -- All others
        	      -- These two fields constitute a cache of solved (only!) constraints
               -- See Note [Solved constraints]
-       	      -- * Constraints of form (F xis ~ xi) live in inert_solved_funeqs, 
+       	      -- - Constraints of form (F xis ~ xi) live in inert_solved_funeqs, 
        	      --   all the others are in inert_solved
-       	      -- * Used to avoid creating a new EvVar when we have a new goal that we
+       	      -- - Used to avoid creating a new EvVar when we have a new goal that we
        	      --   have solvedin the past
-       	      -- * Stored not necessarily as fully rewritten 
+       	      -- - Stored not necessarily as fully rewritten 
        	      --   (ToDo: rewrite lazily when we lookup)
        }
 
