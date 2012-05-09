@@ -251,3 +251,13 @@ test('T5837',
           compiler_stats_range_field('bytes allocated', 79110184, 10))
       ],
       compile_fail,['-fcontext-stack=50'])
+
+test('T6048',
+     [ only_ways(['optasm']),
+      if_wordsize(32, # sample from x86/Linux
+          compiler_stats_range_field('bytes allocated', 38000000, 10)),
+
+      if_wordsize(64,
+          compiler_stats_range_field('bytes allocated', 77000000, 10))
+      ],
+      compile,[''])
