@@ -600,7 +600,7 @@ data Unfolding
 		      			--	a `seq` on this variable
         uf_is_conlike :: Bool,          -- True <=> applicn of constructor or CONLIKE function
                                         --      Cached version of exprIsConLike
-	uf_is_cheap   :: Bool,		-- True <=> doesn't waste (much) work to expand 
+	uf_is_work_free :: Bool,		-- True <=> doesn't waste (much) work to expand 
                                         --          inside an inlining
 					-- 	Cached version of exprIsCheap
 	uf_expandable :: Bool,		-- True <=> can expand in RULE matching
@@ -618,8 +618,8 @@ data Unfolding
   --  uf_is_value: 'exprIsHNF' template (cached); it is ok to discard a 'seq' on
   --     this variable
   --
-  --  uf_is_cheap:  Does this waste only a little work if we expand it inside an inlining?
-  --     Basically this is a cached version of 'exprIsCheap'
+  --  uf_is_work_free:  Does this waste only a little work if we expand it inside an inlining?
+  --     Basically this is a cached version of 'exprIsWorkFree'
   --
   --  uf_guidance:  Tells us about the /size/ of the unfolding template
 
@@ -738,7 +738,7 @@ mkOtherCon = OtherCon
 
 seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top, 
-		uf_is_value = b1, uf_is_cheap = b2, 
+		uf_is_value = b1, uf_is_work_free = b2, 
 	   	uf_expandable = b3, uf_is_conlike = b4,
                 uf_arity = a, uf_guidance = g})
   = seqExpr e `seq` top `seq` b1 `seq` a `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
@@ -801,8 +801,8 @@ isConLikeUnfolding _                                        = False
 
 -- | Is the thing we will unfold into certainly cheap?
 isCheapUnfolding :: Unfolding -> Bool
-isCheapUnfolding (CoreUnfolding { uf_is_cheap = is_cheap }) = is_cheap
-isCheapUnfolding _                                          = False
+isCheapUnfolding (CoreUnfolding { uf_is_work_free = is_wf }) = is_wf
+isCheapUnfolding _                                           = False
 
 isExpandableUnfolding :: Unfolding -> Bool
 isExpandableUnfolding (CoreUnfolding { uf_expandable = is_expable }) = is_expable

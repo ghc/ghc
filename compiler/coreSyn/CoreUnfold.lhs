@@ -145,15 +145,15 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> Arity -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr arity guidance 
-  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
-    		    uf_src        = src,
-    		    uf_arity      = arity,
-		    uf_is_top 	  = top_lvl,
-		    uf_is_value   = exprIsHNF        expr,
-                    uf_is_conlike = exprIsConLike    expr,
-		    uf_is_cheap   = exprIsCheap      expr,
-		    uf_expandable = exprIsExpandable expr,
-		    uf_guidance   = guidance }
+  = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
+    		    uf_src          = src,
+    		    uf_arity        = arity,
+		    uf_is_top 	    = top_lvl,
+		    uf_is_value     = exprIsHNF        expr,
+                    uf_is_conlike   = exprIsConLike    expr,
+		    uf_is_work_free = exprIsWorkFree   expr,
+		    uf_expandable   = exprIsExpandable expr,
+		    uf_guidance     = guidance }
 
 mkUnfolding :: UnfoldingSource -> Bool -> Bool -> CoreExpr -> Unfolding
 -- Calculates unfolding guidance
@@ -163,15 +163,15 @@ mkUnfolding src top_lvl is_bottoming expr
   , not (exprIsTrivial expr)
   = NoUnfolding    -- See Note [Do not inline top-level bottoming functions]
   | otherwise
-  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
-    		    uf_src        = src,
-    		    uf_arity      = arity,
-		    uf_is_top 	  = top_lvl,
-		    uf_is_value   = exprIsHNF        expr,
-                    uf_is_conlike = exprIsConLike    expr,
-		    uf_expandable = exprIsExpandable expr,
-		    uf_is_cheap   = exprIsCheap      expr,
-		    uf_guidance   = guidance }
+  = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
+    		    uf_src          = src,
+    		    uf_arity        = arity,
+		    uf_is_top 	    = top_lvl,
+		    uf_is_value     = exprIsHNF        expr,
+                    uf_is_conlike   = exprIsConLike    expr,
+		    uf_expandable   = exprIsExpandable expr,
+		    uf_is_work_free = exprIsWorkFree   expr,
+		    uf_guidance     = guidance }
   where
     (arity, guidance) = calcUnfoldingGuidance expr
 	-- Sometimes during simplification, there's a large let-bound thing	
@@ -918,11 +918,11 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
       -- Things with an INLINE pragma may have an unfolding *and* 
       -- be a loop breaker  (maybe the knot is not yet untied)
 	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top 
-		      , uf_is_cheap = is_cheap, uf_arity = uf_arity
+		      , uf_is_work_free = is_wf, uf_arity = uf_arity
                       , uf_guidance = guidance, uf_expandable = is_exp }
           | active_unfolding -> tryUnfolding dflags id lone_variable 
                                     arg_infos cont_info unf_template is_top 
-                                    is_cheap is_exp uf_arity guidance
+                                    is_wf is_exp uf_arity guidance
           | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
           -> pprTrace "Inactive unfolding:" (ppr id) Nothing
           | otherwise -> Nothing
@@ -935,7 +935,7 @@ tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
 	     -> Maybe CoreExpr	
 tryUnfolding dflags id lone_variable 
              arg_infos cont_info unf_template is_top 
-             is_cheap is_exp uf_arity guidance
+             is_wf is_exp uf_arity guidance
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
@@ -945,7 +945,7 @@ tryUnfolding dflags id lone_variable
 			text "interesting continuation" <+> ppr cont_info,
 			text "some_benefit" <+> ppr some_benefit,
                         text "is exp:" <+> ppr is_exp,
-                        text "is cheap:" <+> ppr is_cheap,
+                        text "is work-free:" <+> ppr is_wf,
 			text "guidance" <+> ppr guidance,
 			extra_doc,
 			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
@@ -979,7 +979,7 @@ tryUnfolding dflags id lone_variable
     interesting_saturated_call 
       = case cont_info of
           BoringCtxt -> not is_top && uf_arity > 0	  -- Note [Nested functions]
-          CaseCtxt   -> not (lone_variable && is_cheap)   -- Note [Lone variables]
+          CaseCtxt   -> not (lone_variable && is_wf)      -- Note [Lone variables]
           ArgCtxt {} -> uf_arity > 0     		  -- Note [Inlining in ArgCtxt]
           ValAppCtxt -> True			          -- Note [Cast then apply]
 
@@ -993,7 +993,7 @@ tryUnfolding dflags id lone_variable
                enough_args = saturated || (unsat_ok && n_val_args > 0)
 
           UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-      	     -> ( is_cheap && some_benefit && small_enough
+      	     -> ( is_wf && some_benefit && small_enough
                 , (text "discounted size =" <+> int discounted_size) )
     	     where
     	       discounted_size = size - discount
@@ -1105,7 +1105,7 @@ call is at least CONLIKE.  At least for the cases where we use ArgCtxt
 for the RHS of a 'let', we only profit from the inlining if we get a 
 CONLIKE thing (modulo lets).
 
-Note [Lone variables]	See also Note [Interaction of exprIsCheap and lone variables]
+Note [Lone variables]	See also Note [Interaction of exprIsWorkFree and lone variables]
 ~~~~~~~~~~~~~~~~~~~~~   which appears below
 The "lone-variable" case is important.  I spent ages messing about
 with unsatisfactory varaints, but this is nice.  The idea is that if a
@@ -1152,7 +1152,7 @@ However, watch out:
 
    So the non-inlining of lone_variables should only apply if the
    unfolding is regarded as cheap; because that is when exprIsConApp_maybe
-   looks through the unfolding.  Hence the "&& is_cheap" in the
+   looks through the unfolding.  Hence the "&& is_wf" in the
    InlineRule branch.
 
  * Even a type application or coercion isn't a lone variable.
@@ -1167,7 +1167,7 @@ However, watch out:
    There's no advantage in inlining f here, and perhaps
    a significant disadvantage.  Hence some_val_args in the Stop case
 
-Note [Interaction of exprIsCheap and lone variables]
+Note [Interaction of exprIsWorkFree and lone variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The lone-variable test says "don't inline if a case expression
 scrutines a lone variable whose unfolding is cheap".  It's very 
@@ -1178,9 +1178,9 @@ consider
 to be cheap, and that's good because exprIsConApp_maybe doesn't
 think that expression is a constructor application.
 
-I used to test is_value rather than is_cheap, which was utterly
-wrong, because the above expression responds True to exprIsHNF, 
-which is what sets is_value.
+In the 'not (lone_variable && is_wf)' test, I used to test is_value
+rather than is_wf, which was utterly wrong, because the above
+expression responds True to exprIsHNF, which is what sets is_value.
 
 This kind of thing can occur if you have
 
