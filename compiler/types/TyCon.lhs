@@ -1482,9 +1482,10 @@ instance Outputable TyCon where
 
 pprPromotionQuote :: TyCon -> SDoc
 pprPromotionQuote (PromotedDataCon {}) = char '\''   -- Quote promoted DataCons in types
+pprPromotionQuote (PromotedTyCon {})   = ifPprDebug (char '\'') 
 pprPromotionQuote _                    = empty       -- However, we don't quote TyCons in kinds
                                                      -- e.g.   type family T a :: Bool -> *
-                                                     -- cf Trac #5952
+                                                     -- cf Trac #5952.  Except with -dppr-debug
 
 instance NamedThing TyCon where
     getName = tyConName

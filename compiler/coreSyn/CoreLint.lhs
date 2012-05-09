@@ -498,9 +498,6 @@ checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 --     the simplifer correctly eliminates case that can't 
 --     possibly match.
 
-checkCaseAlts e _ []
-  = addErrL (mkNullAltsMsg e)
-
 checkCaseAlts e ty alts = 
   do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
      ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
@@ -1115,11 +1112,6 @@ pp_binder b | isId b    = hsep [ppr b, dcolon, ppr (idType b)]
 \begin{code}
 ------------------------------------------------------
 --	Messages for case expressions
-
-mkNullAltsMsg :: CoreExpr -> MsgDoc
-mkNullAltsMsg e 
-  = hang (text "Case expression with no alternatives:")
-	 4 (ppr e)
 
 mkDefaultArgsMsg :: [Var] -> MsgDoc
 mkDefaultArgsMsg args 

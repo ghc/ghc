@@ -973,14 +973,17 @@ getClassPredTys_maybe ty = case splitTyConApp_maybe ty of
         _ -> Nothing
 
 getEqPredTys :: PredType -> (Type, Type)
-getEqPredTys ty = case getEqPredTys_maybe ty of
-        Just (ty1, ty2) -> (ty1, ty2)
-        Nothing         -> pprPanic "getEqPredTys" (ppr ty)
+getEqPredTys ty 
+  = case splitTyConApp_maybe ty of 
+      Just (tc, (_ : ty1 : ty2 : tys)) -> ASSERT( tc `hasKey` eqTyConKey && null tys )
+                                          (ty1, ty2)
+      _ -> pprPanic "getEqPredTys" (ppr ty)
 
 getEqPredTys_maybe :: PredType -> Maybe (Type, Type)
-getEqPredTys_maybe ty = case splitTyConApp_maybe ty of 
-        Just (tc, [_, ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
-        _ -> Nothing
+getEqPredTys_maybe ty 
+  = case splitTyConApp_maybe ty of 
+      Just (tc, [_, ty1, ty2]) | tc `hasKey` eqTyConKey -> Just (ty1, ty2)
+      _ -> Nothing
 
 getIPPredTy_maybe :: PredType -> Maybe (IPName Name, Type)
 getIPPredTy_maybe ty = case splitTyConApp_maybe ty of 

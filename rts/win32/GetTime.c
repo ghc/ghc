@@ -47,37 +47,57 @@ getProcessCPUTime(void)
     return fileTimeToRtsTime(userTime);
 }
 
-// getProcessElapsedTime relies on QueryPerformanceFrequency 
-// which should be available on any Windows computer thay you
-// would want to run Haskell on. Satnam Singh, 5 July 2010.
+// Number of ticks per second used by the QueryPerformanceFrequency
+// implementaiton, represented by a 64-bit union type.
+static LARGE_INTEGER qpc_frequency = {.QuadPart = 0};
+
+// Initialize qpc_frequency. This function should be called before any call to
+// getMonotonicNSec.  If QPC is not supported on this system, qpc_frequency is
+// set to 0.
+void initializeTimer()
+{
+    BOOL qpc_supported = QueryPerformanceFrequency(&qpc_frequency);
+    if (!qpc_supported)
+    {
+        qpc_frequency.QuadPart = 0;
+    }
+}
+
+HsWord64
+getMonotonicNSec()
+{
+    if (qpc_frequency.QuadPart)
+    {
+        // system_time is a 64-bit union type used to represent the
+        // tick count returned by QueryPerformanceCounter
+        LARGE_INTEGER system_time;
+
+        // get the tick count.
+        QueryPerformanceCounter(&system_time);
+
+        // compute elapsed seconds as double
+        double secs = (double)system_time.QuadPart /
+                      (double)qpc_frequency.QuadPart;
+
+        // return elapsed time in nanoseconds
+        return (HsWord64)(secs * 1e9);
+    }
+    else // fallback to GetTickCount
+    {
+        // NOTE: GetTickCount is a 32-bit millisecond value, so it wraps around
+        // every 49 days.
+        DWORD count = GetTickCount();
+
+        // getTickCount is in milliseconds, so multiply it by 1000000 to get
+        // nanoseconds.
+        return (HsWord64)count * 1000000;
+    }
+}
 
 Time
 getProcessElapsedTime(void)
 {
-    // frequency represents the number of ticks per second
-    // used by the QueryPerformanceFrequency implementaiton
-    // and is represented by a 64-bit union type initially set to 0
-    // and updated just once (hence use of static).
-    static LARGE_INTEGER frequency = {.QuadPart = 0} ;  
-
-    // system_time is a 64-bit union type used to represent the
-    // tick count returned by QueryPerformanceCounter
-    LARGE_INTEGER system_time ;
-
-    // If this is the first time we are calling getProcessElapsedTime
-    // then record the ticks per second used by QueryPerformanceCounter
-    if (frequency.QuadPart == 0) {
-      QueryPerformanceFrequency(&frequency);
-    }
-    
-    // Get the tick count.
-    QueryPerformanceCounter(&system_time) ;
-
-    // Return the tick count as a Time value.
-    // Using double to compute the intermediate value, because a 64-bit
-    // int would overflow when multiplied by TICK_RESOLUTION in about 81 days.
-    return fsecondsToTime((double)system_time.QuadPart /
-                          (double)frequency.QuadPart) ;
+    return NSToTime(getMonotonicNSec());
 }
 
 Time

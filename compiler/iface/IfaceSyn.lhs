@@ -249,6 +249,7 @@ data IfaceExpr
   | IfaceLam 	IfaceBndr IfaceExpr
   | IfaceApp 	IfaceExpr IfaceExpr
   | IfaceCase	IfaceExpr IfLclName [IfaceAlt]
+  | IfaceECase  IfaceExpr IfaceType     -- See Note [Empty case alternatives]
   | IfaceLet	IfaceBinding  IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
@@ -278,6 +279,12 @@ data IfaceBinding
 -- See Note [IdInfo on nested let-bindings]
 data IfaceLetBndr = IfLetBndr IfLclName IfaceType IfaceIdInfo
 \end{code}
+
+Note [Empty case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In IfaceSyn an IfaceCase does not record the types of the alternatives,
+unlike CorSyn Case.  But we need this type if the alternatives are empty.
+Hence IfaceECase.  See Note [Empty case alternatives] in CoreSyn.
 
 Note [Expose recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -621,6 +628,11 @@ pprIfaceExpr add_par i@(IfaceLam _ _)
     collect bs (IfaceLam b e) = collect (b:bs) e
     collect bs e              = (reverse bs, e)
 
+pprIfaceExpr add_par (IfaceECase scrut ty)
+  = add_par (sep [ ptext (sLit "case") <+> pprIfaceExpr noParens scrut 
+                 , ptext (sLit "ret_ty") <+> pprParendIfaceType ty
+                 , ptext (sLit "of {}") ])
+
 pprIfaceExpr add_par (IfaceCase scrut bndr [(con, bs, rhs)])
   = add_par (sep [ptext (sLit "case") 
 			<+> pprIfaceExpr noParens scrut <+> ptext (sLit "of") 
@@ -856,7 +868,7 @@ freeNamesIfExpr (IfaceLam b body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)    = freeNamesIfExpr f &&& freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfType co
 freeNamesIfExpr (IfaceTick _ e)   = freeNamesIfExpr e
-
+freeNamesIfExpr (IfaceECase e ty) = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)
   = freeNamesIfExpr s 
     &&& fnList fn_alt alts &&& fn_cons alts

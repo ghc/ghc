@@ -1124,6 +1124,10 @@ instance Binary IfaceExpr where
         putByte bh 12
         put_ bh ie
         put_ bh ico
+    put_ bh (IfaceECase a b) = do
+        putByte bh 13
+        put_ bh a
+        put_ bh b
     get bh = do
         h <- getByte bh
         case h of
@@ -1162,6 +1166,9 @@ instance Binary IfaceExpr where
             12 -> do ie <- get bh
                      ico <- get bh
                      return (IfaceCast ie ico)
+            13 -> do a <- get bh
+                     b <- get bh
+                     return (IfaceECase a b)
             _ -> panic ("get IfaceExpr " ++ show h)
 
 instance Binary IfaceConAlt where

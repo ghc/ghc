@@ -1477,8 +1477,8 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     {- Desugar it -}
     -- We use a basically null location for iNTERACTIVE
     let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
-                                      ml_hi_file   = undefined,
-                                      ml_obj_file  = undefined}
+                                      ml_hi_file   = panic "hsDeclsWithLocation:ml_hi_file",
+                                      ml_obj_file  = panic "hsDeclsWithLocation:ml_hi_file"}
     ds_result <- hscDesugar' iNTERACTIVELoc tc_gblenv
 
     {- Simplify -}

@@ -493,11 +493,11 @@ compiler/main/Constants_HC_OPTS  += -fforce-recomp
 # LibFFI.hs #includes ffi.h
 compiler/stage2/build/LibFFI.hs : $(libffi_HEADERS)
 # On Windows it seems we also need to link directly to libffi
-ifeq  "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(HostOS_CPP)" "mingw32"
 define windowsDynLinkToFfi
 # $1 = way
 ifneq "$$(findstring dyn, $1)" ""
-compiler_stage2_$1_ALL_HC_OPTS += -lffi-5
+compiler_stage2_$1_ALL_HC_OPTS += -l$$(LIBFFI_WINDOWS_LIB)
 endif
 endef
 $(foreach way,$(GhcLibWays),$(eval $(call windowsDynLinkToFfi,$(way))))

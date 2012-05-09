@@ -277,7 +277,7 @@ dmdAnal env dmd (Case scrut case_bndr ty alts)
   = let
 	(alt_tys, alts')        = mapAndUnzip (dmdAnalAlt env dmd) alts
 	(scrut_ty, scrut')      = dmdAnal env evalDmd scrut
-	(alt_ty, case_bndr')	= annotateBndr (foldr1 lubType alt_tys) case_bndr
+	(alt_ty, case_bndr')	= annotateBndr (foldr lubType botDmdType alt_tys) case_bndr
         res_ty                  = alt_ty `bothType` scrut_ty
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut

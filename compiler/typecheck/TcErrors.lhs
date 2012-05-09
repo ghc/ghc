@@ -10,8 +10,6 @@
 module TcErrors( 
        reportUnsolved, ErrEnv,
        warnDefaulting,
-       unifyCtxt,
-       misMatchMsg,
 
        flattenForAllErrorTcS,
        solverDepthErrorTcS
@@ -160,17 +158,15 @@ reportTidyWanteds ctxt insols flats implics
 deferToRuntime :: EvBindsVar -> ReportErrCtxt -> (ReportErrCtxt -> Ct -> TcM ErrMsg) 
                -> Ct -> TcM ()
 deferToRuntime ev_binds_var ctxt mk_err_msg ct 
-  | fl <- cc_flavor ct
-  , Wanted loc _ <- fl
+  | Wanted { ctev_wloc = loc, ctev_pred = pred, ctev_evar = ev_id } <- cc_ev ct
   = do { err <- setCtLoc loc $
                 mk_err_msg ctxt ct
-       ; let ev_id   = ctId ct -- Prec satisfied: Wanted
-             err_msg = pprLocErrMsg err
+       ; let err_msg = pprLocErrMsg err
              err_fs  = mkFastString $ showSDoc $ 
                        err_msg $$ text "(deferred type error)"
 
          -- Create the binding
-       ; addTcEvBind ev_binds_var ev_id (EvDelayedError (idType ev_id) err_fs)
+       ; addTcEvBind ev_binds_var ev_id (EvDelayedError pred err_fs)
 
          -- And emit a warning
        ; reportWarning (makeIntoWarning err) }
@@ -233,7 +229,7 @@ type Reporter = [Ct] -> TcM ()
 
 mkReporter :: (Ct -> TcM ErrMsg) -> [Ct] -> TcM ()
 -- Reports errors one at a time
-mkReporter mk_err = mapM_ (\ct -> do { err <- setCtFlavorLoc (cc_flavor ct) $
+mkReporter mk_err = mapM_ (\ct -> do { err <- setCtFlavorLoc (cc_ev ct) $
                                               mk_err ct; 
                                      ; reportError err })
 
@@ -318,15 +314,15 @@ groupErrs mk_err (ct1 : rest)
         ; reportError err
         ; groupErrs mk_err others }
   where
-   flavor            = cc_flavor ct1
+   flavor            = cc_ev ct1
    cts               = ct1 : friends
    (friends, others) = partition is_friend rest
-   is_friend friend  = cc_flavor friend `same_group` flavor
+   is_friend friend  = cc_ev friend `same_group` flavor
 
-   same_group :: CtFlavor -> CtFlavor -> Bool
-   same_group (Given l1 _) (Given l2 _) = same_loc l1 l2
-   same_group (Derived l1 _) (Derived l2 _) = same_loc l1 l2
-   same_group (Wanted l1 _)  (Wanted l2 _)  = same_loc l1 l2
+   same_group :: CtEvidence -> CtEvidence -> Bool
+   same_group (Given   {ctev_gloc = l1}) (Given   {ctev_gloc = l2}) = same_loc l1 l2
+   same_group (Wanted  {ctev_wloc = l1}) (Wanted  {ctev_wloc = l2}) = same_loc l1 l2
+   same_group (Derived {ctev_wloc = l1}) (Derived {ctev_wloc = l2}) = same_loc l1 l2
    same_group _ _ = False
 
    same_loc :: CtLoc o -> CtLoc o -> Bool
@@ -427,7 +423,7 @@ mkEqErr _ [] = panic "mkEqErr"
 mkEqErr1 :: ReportErrCtxt -> Ct -> TcM ErrMsg
 -- Wanted constraints only!
 mkEqErr1 ctxt ct
-  = if isGivenOrSolved flav then 
+  = if isGiven flav then 
       let ctx2 = ctxt { cec_extra = cec_extra ctxt $$ inaccessible_msg flav }
       in mkEqErr_help ctx2 ct False ty1 ty2
     else
@@ -436,10 +432,11 @@ mkEqErr1 ctxt ct
          ; mk_err ctxt1 orig' }
   where
 
-    flav = cc_flavor ct
+    flav = cc_ev ct
 
-    inaccessible_msg (Given loc _) = hang (ptext (sLit "Inaccessible code in"))
-                                        2 (ppr (ctLocOrigin loc))
+    inaccessible_msg (Given { ctev_gloc = loc }) 
+       = hang (ptext (sLit "Inaccessible code in"))
+            2 (ppr (ctLocOrigin loc))
     -- If a Solved then we should not report inaccessible code
     inaccessible_msg _ = empty
 
@@ -573,7 +570,7 @@ misMatchOrCND :: ReportErrCtxt -> Ct -> Bool -> TcType -> TcType -> SDoc
 misMatchOrCND ctxt ct oriented ty1 ty2
   | null givens || 
     (isRigid ty1 && isRigid ty2) || 
-    isGivenOrSolved (cc_flavor ct)
+    isGiven (cc_ev ct)
        -- If the equality is unconditionally insoluble
        -- or there is no context, don't report the context
   = misMatchMsg oriented ty1 ty2
@@ -641,12 +638,6 @@ kindErrorMsg ty1 ty2
     k2 = typeKind ty2
 
 --------------------
-unifyCtxt :: EqOrigin -> TidyEnv -> TcM (TidyEnv, SDoc)
-unifyCtxt (UnifyOrigin { uo_actual = act_ty, uo_expected = exp_ty }) tidy_env
-  = do  { (env1, act_ty') <- zonkTidyTcType tidy_env act_ty
-        ; (env2, exp_ty') <- zonkTidyTcType env1 exp_ty
-        ; return (env2, mkExpectedActualMsg exp_ty' act_ty') }
-
 misMatchMsg :: Bool -> TcType -> TcType -> SDoc	   -- Types are already tidy
 -- If oriented then ty1 is expected, ty2 is actual
 misMatchMsg oriented ty1 ty2 
@@ -1074,7 +1065,7 @@ solverDepthErrorTcS depth stack
   | null stack	    -- Shouldn't happen unless you say -fcontext-stack=0
   = failWith msg
   | otherwise
-  = setCtFlavorLoc (cc_flavor top_item) $
+  = setCtFlavorLoc (cc_ev top_item) $
     do { zstack <- mapM zonkCt stack
        ; env0 <- tcInitTidyEnv
        ; let zstack_tvs = foldr (unionVarSet . tyVarsOfCt) emptyVarSet zstack
@@ -1087,7 +1078,7 @@ solverDepthErrorTcS depth stack
                , ptext (sLit "Use -fcontext-stack=N to increase stack size to N") ]
 
 {- DV: Changing this because Derived's no longer have ids ... Kind of a corner case ...
-  = setCtFlavorLoc (cc_flavor top_item) $
+  = setCtFlavorLoc (cc_ev top_item) $
     do { ev_vars <- mapM (zonkEvVar . cc_id) stack
        ; env0 <- tcInitTidyEnv
        ; let tidy_env = tidyFreeTyVars env0 (tyVarsOfEvVars ev_vars)
@@ -1100,7 +1091,7 @@ solverDepthErrorTcS depth stack
 -}
 
 
-flattenForAllErrorTcS :: CtFlavor -> TcType -> TcM a
+flattenForAllErrorTcS :: CtEvidence -> TcType -> TcM a
 flattenForAllErrorTcS fl ty
   = setCtFlavorLoc fl $ 
     do { env0 <- tcInitTidyEnv
@@ -1117,11 +1108,10 @@ flattenForAllErrorTcS fl ty
 %************************************************************************
 
 \begin{code}
-setCtFlavorLoc :: CtFlavor -> TcM a -> TcM a
-setCtFlavorLoc (Wanted  loc _) thing = setCtLoc loc thing
-setCtFlavorLoc (Derived loc _) thing = setCtLoc loc thing
-setCtFlavorLoc (Given loc _)   thing = setCtLoc loc thing
-setCtFlavorLoc (Solved loc _)  thing = setCtLoc loc thing
+setCtFlavorLoc :: CtEvidence -> TcM a -> TcM a
+setCtFlavorLoc (Wanted  { ctev_wloc = loc }) thing = setCtLoc loc thing
+setCtFlavorLoc (Derived { ctev_wloc = loc }) thing = setCtLoc loc thing
+setCtFlavorLoc (Given   { ctev_gloc = loc }) thing = setCtLoc loc thing
 \end{code}
 
 %************************************************************************

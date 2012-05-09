@@ -1124,8 +1124,8 @@ collectStmtBinders (BindStmt pat _ _ _) = collectPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
 collectStmtBinders (ExprStmt {})        = []
 collectStmtBinders (LastStmt {})        = []
-collectStmtBinders (ParStmt xs _ _ _)   = collectLStmtsBinders
-                                        $ concatMap fst xs
+collectStmtBinders (ParStmt xs _ _)     = collectLStmtsBinders
+                                        $ [ s | ParStmtBlock ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_later_ids = later_ids }) = later_ids
 

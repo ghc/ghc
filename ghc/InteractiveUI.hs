@@ -55,7 +55,6 @@ import Util ( on, global, toArgs, toCmdArgs, removeSpaces, getCmd,
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
-import qualified System.Console.Haskeline.Encoding as Encoding
 
 import Control.Applicative hiding (empty)
 import Control.Monad as Monad
@@ -187,7 +186,7 @@ keepGoing' a str = a str >> return False
 keepGoingPaths :: ([FilePath] -> InputT GHCi ()) -> (String -> InputT GHCi Bool)
 keepGoingPaths a str
  = do case toArgs str of
-          Left err -> Encoding.encode err >>= liftIO . BS.hPutStrLn stderr
+          Left err -> liftIO $ hPutStrLn stderr err
           Right args -> a args
       return False
 

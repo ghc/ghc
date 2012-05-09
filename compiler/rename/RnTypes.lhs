@@ -432,7 +432,7 @@ badSigErr is_type doc (L loc ty)
   where
     what | is_type   = ptext (sLit "type")
          | otherwise = ptext (sLit "kind")
-    flag | is_type   = ptext (sLit "-XScopedTypeVariable")
+    flag | is_type   = ptext (sLit "-XScopedTypeVariables")
          | otherwise = ptext (sLit "-XKindSignatures")
 \end{code}
 

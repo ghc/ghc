@@ -366,7 +366,7 @@ find_srt( stackPos *info )
 	bitmap = info->next.srt.srt_bitmap;
 	while (bitmap != 0) {
 	    if ((bitmap & 1) != 0) {
-#if defined(__PIC__) && defined(mingw32_HOST_OS)
+#if defined(COMPILING_WINDOWS_DLL)
 		if ((unsigned long)(*(info->next.srt.srt)) & 0x1)
 		    c = (* (StgClosure **)((unsigned long)*(info->next.srt.srt)) & ~0x1);
 		else
@@ -1235,7 +1235,7 @@ retainSRT (StgClosure **srt, nat srt_bitmap, StgClosure *c, retainer c_child_r)
 
   while (bitmap != 0) {
       if ((bitmap & 1) != 0) {
-#if defined(__PIC__) && defined(mingw32_HOST_OS)
+#if defined(COMPILING_WINDOWS_DLL)
 	  if ( (unsigned long)(*srt) & 0x1 ) {
 	      retainClosure(* (StgClosure**) ((unsigned long) (*srt) & ~0x1), 
 			    c, c_child_r);

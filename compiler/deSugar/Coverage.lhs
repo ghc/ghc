@@ -620,12 +620,11 @@ addTickStmt isGuard (ExprStmt e bind' guard' ty) = do
 addTickStmt _isGuard (LetStmt binds) = do
 	liftM LetStmt
 		(addTickHsLocalBinds binds)
-addTickStmt isGuard (ParStmt pairs mzipExpr bindExpr returnExpr) = do
-    liftM4 ParStmt 
+addTickStmt isGuard (ParStmt pairs mzipExpr bindExpr) = do
+    liftM3 ParStmt 
         (mapM (addTickStmtAndBinders isGuard) pairs)
         (addTickSyntaxExpr hpcSrcSpan mzipExpr)
         (addTickSyntaxExpr hpcSrcSpan bindExpr)
-        (addTickSyntaxExpr hpcSrcSpan returnExpr)
 
 addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
                                     , trS_by = by, trS_using = using
@@ -652,12 +651,13 @@ addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
                   | otherwise          = addTickLHsExprRHS e
 
-addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ([LStmt Id], a) 
-                      -> TM ([LStmt Id], a)
-addTickStmtAndBinders isGuard (stmts, ids) = 
-    liftM2 (,) 
+addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock Id Id
+                      -> TM (ParStmtBlock Id Id)
+addTickStmtAndBinders isGuard (ParStmtBlock stmts ids returnExpr) = 
+    liftM3 ParStmtBlock 
         (addTickLStmts isGuard stmts)
         (return ids)
+        (addTickSyntaxExpr hpcSrcSpan returnExpr)
 
 addTickHsLocalBinds :: HsLocalBinds Id -> TM (HsLocalBinds Id)
 addTickHsLocalBinds (HsValBinds binds) = 

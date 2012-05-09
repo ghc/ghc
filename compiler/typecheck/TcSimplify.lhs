@@ -558,7 +558,7 @@ simplifyRule name lhs_wanted rhs_wanted
 		 -- variables; hence NoUntouchables
 
        ; (resid_wanted, _) <- runTcS (SimplInfer doc) untch emptyInert emptyWorkList $
-              solveWanteds zonked_all
+                              solveWanteds zonked_all
 
        ; zonked_lhs <- zonkWC lhs_wanted
 
@@ -579,7 +579,8 @@ simplifyRule name lhs_wanted rhs_wanted
          vcat [ text "zonked_lhs" <+> ppr zonked_lhs 
               , text "q_cts"      <+> ppr q_cts ]
 
-       ; return (map ctId (bagToList q_cts), zonked_lhs { wc_flat = non_q_cts }) }
+       ; return ( map (ctEvId . ctEvidence) (bagToList q_cts)
+                , zonked_lhs { wc_flat = non_q_cts }) }
 \end{code}
 
 
@@ -784,10 +785,11 @@ solveNestedImplications implics
   where givens_from_wanteds = foldrBag get_wanted []
         get_wanted cc rest_givens
             | pushable_wanted cc
-            = let fl = cc_flavor cc
-                  wloc = flav_wloc fl
-                  gfl = Given (mkGivenLoc wloc UnkSkol) (flav_evar fl) 
-                  this_given = cc { cc_flavor = gfl }
+            = let fl   = ctEvidence cc
+                  gfl  = Given { ctev_gloc = setCtLocOrigin (ctev_wloc fl) UnkSkol
+                               , ctev_evtm = EvId (ctev_evar fl)
+                               , ctev_pred = ctev_pred fl }
+                  this_given = cc { cc_ev = gfl }
               in this_given : rest_givens
             | otherwise = rest_givens 
 
@@ -1025,20 +1027,20 @@ solveCTyFunEqs cts
 
       ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
   where
-    solve_one (Wanted _ cv,tv,ty) 
+    solve_one (Wanted { ctev_evar = cv }, tv, ty) 
       = setWantedTyBind tv ty >> setEvBind cv (EvCoercion (mkTcReflCo ty))
     solve_one (Derived {}, tv, ty)
       = setWantedTyBind tv ty
     solve_one arg
       = pprPanic "solveCTyFunEqs: can't solve a /given/ family equation!" $ ppr arg
 ------------
-type FunEqBinds = (TvSubstEnv, [(CtFlavor, TcTyVar, TcType)])
+type FunEqBinds = (TvSubstEnv, [(CtEvidence, TcTyVar, TcType)])
   -- The TvSubstEnv is not idempotent, but is loop-free
   -- See Note [Non-idempotent substitution] in Unify
 emptyFunEqBinds :: FunEqBinds
 emptyFunEqBinds = (emptyVarEnv, [])
 
-extendFunEqBinds :: FunEqBinds -> CtFlavor -> TcTyVar -> TcType -> FunEqBinds
+extendFunEqBinds :: FunEqBinds -> CtEvidence -> TcTyVar -> TcType -> FunEqBinds
 extendFunEqBinds (tv_subst, cv_binds) fl tv ty
   = (extendVarEnv tv_subst tv ty, (fl, tv, ty):cv_binds)
 
@@ -1052,7 +1054,7 @@ getSolvableCTyFunEqs untch cts
     dflt_funeq :: (Cts, FunEqBinds) -> Ct
                -> (Cts, FunEqBinds)
     dflt_funeq (cts_in, feb@(tv_subst, _))
-               (CFunEqCan { cc_flavor = fl
+               (CFunEqCan { cc_ev = fl
                           , cc_fun = tc
                           , cc_tyargs = xis
                           , cc_rhs = xi })
@@ -1071,7 +1073,7 @@ getSolvableCTyFunEqs untch cts
 
       , not (tv `elemVarSet` niSubstTvSet tv_subst (tyVarsOfTypes xis))
            -- Occurs check: see Note [Solving Family Equations], Point 2
-      = ASSERT ( not (isGivenOrSolved fl) )
+      = ASSERT ( not (isGiven fl) )
         (cts_in, extendFunEqBinds feb fl tv (mkTyConApp tc xis))
 
     dflt_funeq (cts_in, fun_eq_binds) ct
@@ -1210,16 +1212,16 @@ defaultTyVar untch the_tv
   , not (k `eqKind` default_k)
   = tryTcS $ -- Why tryTcS? See Note [tryTcS in defaulting]
     do { let loc = CtLoc DefaultOrigin (getSrcSpan the_tv) [] -- Yuk
-       ; eqv <- TcSMonad.newKindConstraint the_tv default_k
+       ; eqv <- TcSMonad.newKindConstraint loc the_tv default_k
        ; case eqv of
            Fresh x -> 
              return $ unitBag $
-             CNonCanonical { cc_flavor = Wanted loc x, cc_depth = 0 }
+             CNonCanonical { cc_ev = x, cc_depth = 0 }
            Cached _ -> return emptyBag }
 {- DELETEME
          if isNewEvVar eqv then 
              return $ unitBag (CNonCanonical { cc_id = evc_the_evvar eqv
-                                             , cc_flavor = fl, cc_depth = 0 })
+                                             , cc_ev = fl, cc_depth = 0 })
          else return emptyBag }
 -}
 
@@ -1300,13 +1302,12 @@ disambigGroup (default_ty:default_tys) group
        ; success <- tryTcS $ -- Why tryTcS? See Note [tryTcS in defaulting]
                     do { derived_eq <- tryTcS $
                                        -- I need a new tryTcS because we will call solveInteractCts below!
-                            do { md <- newDerived (mkTcEqPred (mkTyVarTy the_tv) default_ty)
+                            do { md <- newDerived (ctev_wloc the_fl) 
+                                                  (mkTcEqPred (mkTyVarTy the_tv) default_ty)
+                                                  -- ctev_wloc because constraint is not Given!
                                ; case md of 
-                                    Cached _ -> return []
-                                    Fresh pty -> 
-                                      -- flav_wloc because constraint is not Given/Solved!
-                                      let dfl = Derived (flav_wloc the_fl) pty
-                                      in return [ CNonCanonical { cc_flavor = dfl, cc_depth = 0 } ] }
+                                    Nothing   -> return []
+                                    Just ctev -> return [ mkNonCanonical ctev ] }
                             
                        ; traceTcS "disambigGroup (solving) {" 
                                   (text "trying to solve constraints along with default equations ...")
@@ -1335,7 +1336,7 @@ disambigGroup (default_ty:default_tys) group
                        ; disambigGroup default_tys group } }
   where
     ((the_ct,the_tv):_) = group
-    the_fl              = cc_flavor the_ct
+    the_fl              = cc_ev the_ct
     wanteds             = map fst group
 \end{code}
 
@@ -1365,9 +1366,12 @@ newFlatWanteds :: CtOrigin -> ThetaType -> TcM [Ct]
 newFlatWanteds orig theta
   = do { loc <- getCtLoc orig
        ; mapM (inst_to_wanted loc) theta }
-  where inst_to_wanted loc pty 
+  where 
+    inst_to_wanted loc pty 
           = do { v <- TcMType.newWantedEvVar pty 
                ; return $ 
-                 CNonCanonical { cc_flavor = Wanted loc v
+                 CNonCanonical { cc_ev = Wanted { ctev_evar = v
+                                                , ctev_wloc = loc
+                                                , ctev_pred = pty }
                                , cc_depth = 0 } }
 \end{code}

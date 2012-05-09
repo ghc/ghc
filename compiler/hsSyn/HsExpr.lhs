@@ -875,11 +875,9 @@ data StmtLR idL idR
   | LetStmt  (HsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
-  | ParStmt  [([LStmt idL], [idR])]
+  | ParStmt  [ParStmtBlock idL idR]
              (SyntaxExpr idR)           -- Polymorphic `mzip` for monad comprehensions
              (SyntaxExpr idR)           -- The `>>=` operator
-             (SyntaxExpr idR)           -- Polymorphic `return` operator
-	     		 		-- with type (forall a. a -> m a)
                                         -- See notes [Monad Comprehensions]
   	    -- After renaming, the ids are the binders 
   	    -- bound by the stmts and used after themp
@@ -943,6 +941,13 @@ data TransForm	 -- The 'f' below is the 'using' function, 'e' is the by function
   = ThenForm     -- then f               or    then f by e             (depending on trS_by)
   | GroupForm	   -- then group using f   or    then group by e using f (depending on trS_by)
   deriving (Data, Typeable)
+
+data ParStmtBlock idL idR
+  = ParStmtBlock 
+        [LStmt idL] 
+        [idR]              -- The variables to be returned
+        (SyntaxExpr idR)   -- The return operator
+  deriving( Data, Typeable )
 \end{code}
 
 Note [The type of bind in Stmts]
@@ -1082,6 +1087,10 @@ In any other context than 'MonadComp', the fields for most of these
 
 
 \begin{code}
+instance (OutputableBndr idL, OutputableBndr idR) 
+      => Outputable (ParStmtBlock idL idR) where
+  ppr (ParStmtBlock stmts _ _) = interpp'SP stmts
+
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (StmtLR idL idR) where
     ppr stmt = pprStmt stmt
 
@@ -1090,11 +1099,10 @@ pprStmt (LastStmt expr _)         = ifPprDebug (ptext (sLit "[last]")) <+> ppr e
 pprStmt (BindStmt pat expr _ _)   = hsep [ppr pat, ptext (sLit "<-"), ppr expr]
 pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _ _)     = ppr expr
-pprStmt (ParStmt stmtss _ _ _)    = hsep (map doStmts stmtss)
-  where doStmts stmts = ptext (sLit "| ") <> ppr stmts
+pprStmt (ParStmt stmtss _ _)      = sep (punctuate (ptext (sLit " | ")) (map ppr stmtss))
 
 pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form = form })
-  = sep (ppr_lc_stmts stmts ++ [pprTransStmt by using form])
+  = sep $ punctuate comma (map ppr stmts ++ [pprTransStmt by using form])
 
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
@@ -1138,16 +1146,17 @@ ppr_do_stmts stmts
   = lbrace <+> pprDeeperList vcat (punctuate semi (map ppr stmts))
            <+> rbrace
 
-ppr_lc_stmts :: OutputableBndr id => [LStmt id] -> [SDoc]
-ppr_lc_stmts stmts = [ppr s <> comma | s <- stmts]
-
 pprComp :: OutputableBndr id => [LStmt id] -> SDoc
 pprComp quals	  -- Prints:  body | qual1, ..., qualn 
   | not (null quals)
   , L _ (LastStmt body _) <- last quals
-  = hang (ppr body <+> char '|') 2 (interpp'SP (dropTail 1 quals))
+  = hang (ppr body <+> char '|') 2 (pprQuals (dropTail 1 quals))
   | otherwise
-  = pprPanic "pprComp" (interpp'SP quals)
+  = pprPanic "pprComp" (pprQuals quals)
+
+pprQuals :: OutputableBndr id => [LStmt id] -> SDoc
+-- Show list comprehension qualifiers separated by commas
+pprQuals quals = interpp'SP quals
 \end{code}
 
 %************************************************************************

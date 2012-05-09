@@ -363,6 +363,18 @@ coreToStgExpr (Cast expr _)
 
 -- Cases require a little more real work.
 
+coreToStgExpr (Case scrut _ _ []) 
+  = coreToStgExpr scrut   
+    -- See Note [Empty case alternatives] in CoreSyn If the case
+    -- alternatives are empty, the scrutinee must diverge or raise an
+    -- exception, so we can just dive into it.
+    --
+    -- Of course this may seg-fault if the scrutinee *does* return.  A
+    -- belt-and-braces approach would be to move this case into the
+    -- code generator, and put a return point anyway that calls a
+    -- runtime system error function.
+        
+
 coreToStgExpr (Case scrut bndr _ alts) = do
     (alts2, alts_fvs, alts_escs)
        <- extendVarEnvLne [(bndr, LambdaBound)] $ do

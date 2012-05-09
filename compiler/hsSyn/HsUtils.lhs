@@ -93,7 +93,7 @@ import SrcLoc
 import FastString
 import Util
 import Bag
-
+import Outputable
 import Data.Either
 \end{code}
 
@@ -216,7 +216,8 @@ mkGroupUsingStmt   :: [LStmt idL]                -> LHsExpr idR -> StmtLR idL id
 mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 
 emptyTransStmt :: StmtLR idL idR
-emptyTransStmt = TransStmt { trS_form = undefined, trS_stmts = [], trS_bndrs = [] 
+emptyTransStmt = TransStmt { trS_form = panic "emptyTransStmt: form"
+                           , trS_stmts = [], trS_bndrs = [] 
                            , trS_by = Nothing, trS_using = noLoc noSyntaxExpr
                            , trS_ret = noSyntaxExpr, trS_bind = noSyntaxExpr
                            , trS_fmap = noSyntaxExpr }
@@ -538,8 +539,8 @@ collectStmtBinders (BindStmt pat _ _ _) = collectPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
 collectStmtBinders (ExprStmt {})        = []
 collectStmtBinders (LastStmt {})        = []
-collectStmtBinders (ParStmt xs _ _ _)   = collectLStmtsBinders
-                                        $ concatMap fst xs
+collectStmtBinders (ParStmt xs _ _)     = collectLStmtsBinders
+                                        $ [s | ParStmtBlock ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
 
@@ -714,8 +715,7 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (LetStmt binds)      = hs_local_binds binds
     hs_stmt (ExprStmt {})        = emptyNameSet
     hs_stmt (LastStmt {})        = emptyNameSet
-    hs_stmt (ParStmt xs _ _ _)   = hs_lstmts $ concatMap fst xs
-    
+    hs_stmt (ParStmt xs _ _)     = hs_lstmts [s | ParStmtBlock ss _ _ <- xs, s <- ss]
     hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = ss })     = hs_lstmts ss
     

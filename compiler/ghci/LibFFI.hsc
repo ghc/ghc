@@ -57,7 +57,7 @@ prepForeignCall cconv arg_types result_type
     
 convToABI :: CCallConv -> C_ffi_abi
 convToABI CCallConv   = fFI_DEFAULT_ABI
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
 convToABI StdCallConv = fFI_STDCALL
 #endif
 -- unknown conventions are mapped to the default, (#3336)
@@ -111,7 +111,7 @@ fFI_OK            = (#const FFI_OK)
 
 fFI_DEFAULT_ABI :: C_ffi_abi
 fFI_DEFAULT_ABI = (#const FFI_DEFAULT_ABI)
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS) && defined(i386_HOST_ARCH)
 fFI_STDCALL     :: C_ffi_abi
 fFI_STDCALL     = (#const FFI_STDCALL)
 #endif

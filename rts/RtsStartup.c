@@ -35,6 +35,7 @@
 #include "Profiling.h"
 #include "Timer.h"
 #include "Globals.h"
+#include "FileLock.h"
 void exitLinker( void );	// there is no Linker.h file to include
 
 #if defined(RTS_GTK_FRONTPANEL)
@@ -52,7 +53,6 @@ void exitLinker( void );	// there is no Linker.h file to include
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/TTY.h"
-#include "posix/FileLock.h"
 #endif
 
 #ifdef HAVE_UNISTD_H
@@ -127,6 +127,9 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 
     /* Initialise the stats department, phase 0 */
     initStats0();
+
+    /* Initialize system timer before starting to collect stats */
+    initializeTimer();
 
     /* Next we do is grab the start time...just in case we're
      * collecting timing statistics.
@@ -212,9 +215,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initGlobalStore();
 
     /* initialise file locking, if necessary */
-#if !defined(mingw32_HOST_OS)    
     initFileLocking();
-#endif
 
 #if defined(DEBUG)
     /* initialise thread label table (tso->char*) */
@@ -373,9 +374,7 @@ hs_exit_(rtsBool wait_foreign)
     exitLinker();
 
     /* free file locking tables, if necessary */
-#if !defined(mingw32_HOST_OS)    
     freeFileLocking();
-#endif
 
     /* free the stable pointer table */
     exitStablePtrTable();

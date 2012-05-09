@@ -107,16 +107,30 @@ main = do args &lt;- getArgs
   <sect3 id="infelicities-exprs-pats">
       <title>Expressions and patterns</title>
 
-	<para>None known.</para>
+    <para>In its default mode, GHC makes some programs sligtly more defined 
+    than they should be. For example, consider
+    <programlisting>
+f :: [a] -> b -> b
+f [] = error "urk"
+f (x:xs) = \v -> v
+
+main = print (f [] `seq` True)
+    </programlisting>
+This should call <literal>error</literal> but actually prints <literal>True</literal>.
+Reason: GHC eta-expands <literal>f</literal> to
+    <programlisting>
+f :: [a] -> b -> b
+f []     v = error "urk"
+f (x:xs) v = v
+    </programlisting>
+This improves efficiency slightly but significantly for most programs, and
+is bad for only a few.  To suppress this bogus "optimisation" use <option>-fpedantic-bottoms</option>.
+</para>
+
     </sect3>
 
     <sect3 id="infelicities-decls">
       <title>Declarations and bindings</title>
-
-      <para>GHC's typechecker makes all pattern bindings monomorphic
-      by default; this behaviour can be disabled with
-      <option>-XNoMonoPatBinds</option>.  See <xref
-      linkend="options-language" />.</para>
 
       <para>In its default mode, GHC does not accept datatype contexts,
       as it has been decided to remove them from the next version of the

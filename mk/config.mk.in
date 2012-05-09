@@ -119,7 +119,7 @@ SharedLibsPlatformList =                        \
     i386-unknown-freebsd x86_64-unknown-freebsd \
     i386-unknown-openbsd x86_64-unknown-openbsd \
     i386-unknown-netbsd  x86_64-unknown-netbsd  \
-    i386-unknown-mingw32                        \
+    i386-unknown-mingw32 x86_64-unknown-mingw32 \
     i386-apple-darwin    x86_64-apple-darwin    powerpc-apple-darwin
 
 ifeq "$(SOLARIS_BROKEN_SHLD)" "NO"
@@ -632,7 +632,11 @@ endif
 # Mingwex Library
 #
 HaveLibMingwEx	= @HaveLibMingwEx@
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 DLLTOOL			= inplace/mingw/bin/dlltool.exe
+else ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
+DLLTOOL			= inplace/mingw/bin/x86_64-w64-mingw32-dlltool.exe
+endif
 
 #-----------------------------------------------------------------------------
 # Flex (currently unused, could be moved to glafp-utils)
@@ -764,7 +768,11 @@ endif
 #
 REAL_SHELL     = $(SHELL)
 
+ifeq "$(TARGETPLATFORM)" "x86_64-unknown-mingw32"
+STRIP_CMD      = $(TOP)/inplace/mingw/bin/x86_64-w64-mingw32-strip.exe
+else
 STRIP_CMD      = strip
+endif
 PATCH_CMD      = @PatchCmd@
 TAR_CMD        = @TarCmd@
 BZIP2_CMD      = bzip2

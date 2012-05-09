@@ -544,8 +544,8 @@ methodNamesStmt (LastStmt cmd _)                 = methodNamesLCmd cmd
 methodNamesStmt (ExprStmt cmd _ _ _)             = methodNamesLCmd cmd
 methodNamesStmt (BindStmt _ cmd _ _)             = methodNamesLCmd cmd
 methodNamesStmt (RecStmt { recS_stmts = stmts }) = methodNamesStmts stmts `addOneFV` loopAName
-methodNamesStmt (LetStmt _)                      = emptyFVs
-methodNamesStmt (ParStmt _ _ _ _)                = emptyFVs
+methodNamesStmt (LetStmt {})                     = emptyFVs
+methodNamesStmt (ParStmt {})                     = emptyFVs
 methodNamesStmt (TransStmt {})                   = emptyFVs
    -- ParStmt and TransStmt can't occur in commands, but it's not convenient to error 
    -- here so we just do what's convenient
@@ -767,12 +767,12 @@ rnStmt ctxt (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
 
 	; return ((rec_stmts', thing), fvs `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) } }
 
-rnStmt ctxt (L loc (ParStmt segs _ _ _)) thing_inside
+rnStmt ctxt (L loc (ParStmt segs _ _)) thing_inside
   = do	{ (mzip_op, fvs1)   <- lookupStmtName ctxt mzipName
         ; (bind_op, fvs2)   <- lookupStmtName ctxt bindMName
         ; (return_op, fvs3) <- lookupStmtName ctxt returnMName
-	; ((segs', thing), fvs4) <- rnParallelStmts (ParStmtCtxt ctxt) segs thing_inside
-	; return ( ([L loc (ParStmt segs' mzip_op bind_op return_op)], thing)
+	; ((segs', thing), fvs4) <- rnParallelStmts (ParStmtCtxt ctxt) return_op segs thing_inside
+	; return ( ([L loc (ParStmt segs' mzip_op bind_op)], thing)
                  , fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4) }
 
 rnStmt ctxt (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = form
@@ -810,27 +810,26 @@ rnStmt ctxt (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = form
                                     , trS_ret = return_op, trS_bind = bind_op
                                     , trS_fmap = fmap_op })], thing), all_fvs) }
 
-type ParSeg id = ([LStmt id], [id])	   -- The Names are bound by the Stmts
-
 rnParallelStmts :: forall thing. HsStmtContext Name 
-                -> [ParSeg RdrName]
+                -> SyntaxExpr Name
+                -> [ParStmtBlock RdrName RdrName]
                 -> ([Name] -> RnM (thing, FreeVars))
-                -> RnM (([ParSeg Name], thing), FreeVars)
+                -> RnM (([ParStmtBlock Name Name], thing), FreeVars)
 -- Note [Renaming parallel Stmts]
-rnParallelStmts ctxt segs thing_inside
+rnParallelStmts ctxt return_op segs thing_inside
   = do { orig_lcl_env <- getLocalRdrEnv
        ; rn_segs orig_lcl_env [] segs }
   where
     rn_segs :: LocalRdrEnv
-            -> [Name] -> [ParSeg RdrName]
-            -> RnM (([ParSeg Name], thing), FreeVars)
+            -> [Name] -> [ParStmtBlock RdrName RdrName]
+            -> RnM (([ParStmtBlock Name Name], thing), FreeVars)
     rn_segs _ bndrs_so_far [] 
       = do { let (bndrs', dups) = removeDups cmpByOcc bndrs_so_far
            ; mapM_ dupErr dups
            ; (thing, fvs) <- bindLocalNames bndrs' (thing_inside bndrs')
            ; return (([], thing), fvs) }
 
-    rn_segs env bndrs_so_far ((stmts,_) : segs) 
+    rn_segs env bndrs_so_far (ParStmtBlock stmts _ _ : segs) 
       = do { ((stmts', (used_bndrs, segs', thing)), fvs)
                     <- rnStmts ctxt stmts $ \ bndrs ->
                        setLocalRdrEnv env       $ do
@@ -838,7 +837,7 @@ rnParallelStmts ctxt segs thing_inside
 		       ; let used_bndrs = filter (`elemNameSet` fvs) bndrs
                        ; return ((used_bndrs, segs', thing), fvs) }
 		       
-           ; let seg' = (stmts', used_bndrs)
+           ; let seg' = ParStmtBlock stmts' used_bndrs return_op
            ; return ((seg':segs', thing), fvs) }
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
@@ -973,7 +972,7 @@ rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds)))
 rn_rec_stmt_lhs fix_env (L _ (RecStmt { recS_stmts = stmts }))	-- Flatten Rec inside Rec
     = rn_rec_stmts_lhs fix_env stmts
 
-rn_rec_stmt_lhs _ stmt@(L _ (ParStmt _ _ _ _))	-- Syntactically illegal in mdo
+rn_rec_stmt_lhs _ stmt@(L _ (ParStmt {}))	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
   
 rn_rec_stmt_lhs _ stmt@(L _ (TransStmt {}))	-- Syntactically illegal in mdo
