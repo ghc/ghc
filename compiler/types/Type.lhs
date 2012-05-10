@@ -285,7 +285,7 @@ expandTypeSynonyms ty
       = TyConApp tc (map go tys)
     go (LitTy l)       = LitTy l
     go (TyVarTy tv)    = TyVarTy tv
-    go (AppTy t1 t2)   = AppTy (go t1) (go t2)
+    go (AppTy t1 t2)   = mkAppTy (go t1) (go t2)
     go (FunTy t1 t2)   = FunTy (go t1) (go t2)
     go (ForAllTy tv t) = ForAllTy tv (go t)
 \end{code}
