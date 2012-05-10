@@ -976,8 +976,10 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
       | msg_s <- msg_s { msgPending = rest }
       = prod (do (used_l, hb_l) <- mb_common_l
                  (used_r, hb_r) <- mb_common_r
-                 (h_l, h_r, rn_l, rn_r, msg_s, hb) <- case (inject hb_l, inject hb_r) of
-                   (Just (Just (let_bound_l, in_e_l)), Just (Just (let_bound_r, in_e_r)))
+                 hb_l_inj <- inject hb_l
+                 hb_r_inj <- inject hb_r
+                 (msg_s, hb) <- case (hb_l_inj, hb_r_inj) of
+                   (Just (let_bound_l, in_e_l), Just (let_bound_r, in_e_r))
                      | let_bound_l == let_bound_r
                      , not let_bound_r || (x_l == x_r && x_r == x_common) -- Note [MSGing let-bounds] (we have to check this even if matching RHSs because we need to choose a common binder that will be in scope on both sides)
                      , Right (msg_s, in_e) <- case () of
@@ -1000,19 +1002,15 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
                             -> Right res
                             | otherwise
                             -> runMSG msg_e msg_s $ msgIn renameAnnedTerm annedTermFreeVars msgTerm rn2 in_e_l in_e_r
-                     -> return (h_l, h_r, rn_l, rn_r, msg_s, (if let_bound_r then letBound else internallyBound) in_e)
-                   (Just Nothing, Just Nothing)
+                     -> return (msg_s, (if let_bound_r then letBound else internallyBound) in_e)
+                   (Nothing, Nothing)
                      | x_l == x_r && x_r == x_common -- Note [MSGing let-bounds]
-                     -> return (h_l, h_r, rn_l, rn_r, msg_s, hb_r) -- Right biased
-                   (Nothing, Nothing) -- NB: this branch is only different from *not* generalising because we don't generalise the binder IdInfo
-                     -> return (M.insert x_l hb_l h_l, M.insert x_r hb_r h_r,
-                                insertIdRenaming rn_l x_common x_l, insertIdRenaming rn_r x_common x_r,
-                                msg_s, lambdaBound)
+                     -> return (msg_s, hb_r) -- Right biased
                    _ -> Left "msgPureHeap: non-unifiable heap bindings"
                  -- If they match, we need to make a common heap binding
                  return (go rn_l rn_r used_l used_r init_h_l init_h_r
                             (Heap h_l ids_l) (Heap h_r ids_r) (M.insert x_common hb h) msg_s)) ++
-        -- If they don't match, we need to generalise
+        -- If they don't match/either side is lambda-bound, we need to generalise
         prod (do -- Whenever we add a new "outside" binding like this we have to transitively copy in all the things
                  -- that binding refers to. If that is not possible, we have to fail.
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
@@ -1185,20 +1183,20 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
         _ -> Nothing
     -}
 
-    inject :: HeapBinding -> Maybe (Maybe (Bool, In AnnedTerm))
+    inject :: HeapBinding -> MSG' (Maybe (Bool, In AnnedTerm))
     inject (HB { howBound = how_bound, heapBindingMeaning = meaning })
       | LambdaBound <- how_bound
       , Left _ <- meaning
-      = Nothing
+      = Left "msgPureHeap: lambda-bounds must be generalised"
       | LetBound <- how_bound
       , Left _ <- meaning
-      = Just Nothing
+      = return Nothing
       | Just let_bound <- case how_bound of
           LetBound        -> Just True
           InternallyBound -> Just False
           LambdaBound     -> Nothing
       , Right in_e <- meaning
-      = Just $ Just (let_bound, in_e)
+      = return $ Just (let_bound, in_e)
       | otherwise
       = pprPanic "msgPureHeap: unhandled heap binding format" (ppr how_bound $$ (case meaning of Left _ -> text "Left"; Right _ -> text "Right"))
 
