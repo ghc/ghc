@@ -601,13 +601,13 @@
           </row>
           <row>
             <entry><option>-clear-package-db</option></entry>
-            <entry>Use an empty initial package db stack.</entry>
+            <entry>Clear the package db stack.</entry>
             <entry>static</entry>
             <entry>-</entry>
           </row>
           <row>
             <entry><option>-no-global-package-db</option></entry>
-            <entry>Don't add the global db to the initial package db stack.</entry>
+            <entry>Remove the global package db from the stack.</entry>
             <entry>static</entry>
             <entry>-</entry>
           </row>
@@ -619,7 +619,7 @@
           </row>
           <row>
             <entry><option>-no-user-package-db</option></entry>
-            <entry>Don't add the user's package db to the initial package db stack.</entry>
+            <entry>Remove the user's package db from the stack.</entry>
             <entry>static</entry>
             <entry>-</entry>
           </row>

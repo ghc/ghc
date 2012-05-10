@@ -408,7 +408,7 @@ _ZCMain_main_closure
       see GHC's package table by running GHC with the <option>-v</option>
       flag.</para>
 
-    <para>Package databases mayb overlap, and they are arranged in a stack
+    <para>Package databases may overlap, and they are arranged in a stack
       structure. Packages closer to the top of the stack will override
       (<emphasis>shadow</emphasis>) those below them. By default, the stack
       contains just the global and the user's package databases, in that
@@ -425,9 +425,9 @@ _ZCMain_main_closure
         </term>
         <listitem>
           <para>Add the package database <replaceable>file</replaceable> on top
-            of the current stack. Packages in additional databases read this
-            way will override those in the initial stack and those in
-            previously specified databases.</para>
+              of the current stack. Packages in additional databases read this
+              way will override those in the initial stack and those in
+              previously specified databases.</para>
         </listitem>
       </varlistentry>
 
@@ -437,7 +437,8 @@ _ZCMain_main_closure
           </indexterm>
         </term>
         <listitem>
-          <para>Prevent loading of the global package database in the initial stack.</para>
+          <para>Remove the global package database from the package database
+              stack.</para>
         </listitem>
       </varlistentry>
 
@@ -447,7 +448,8 @@ _ZCMain_main_closure
           </indexterm>
         </term>
         <listitem>
-          <para>Prevent loading of the user's local package database in the initial stack.</para>
+          <para>Prevent loading of the user's local package database in the
+              initial stack.</para>
         </listitem>
       </varlistentry>
 
@@ -457,10 +459,10 @@ _ZCMain_main_closure
           </indexterm>
         </term>
         <listitem>
-          <para>Start with an empty initial package database stack. This option
-            is equivalent to the combination of
-            <literal>-no-global-package-db</literal> and
-            <literal>-no-user-package-db.</literal></para>
+            <para>Reset the current package database stack. This option removes
+                every previously specified package database (including those
+                read from the <literal>GHC_PACKAGE_PATH</literal> environment
+                variable) from the package database stack.</para>
         </listitem>
       </varlistentry>
 
@@ -508,7 +510,7 @@ _ZCMain_main_closure
         packages.</para>
 
       <para>If <literal>GHC_PACKAGE_PATH</literal> ends in a separator, then
-        the initial package database stack (by default, the user and global
+        the default package database stack (i.e. the user and global
         package databases, in that order) is appended. For example, to augment
         the usual set of packages with a database of your own, you could say
         (on Unix):

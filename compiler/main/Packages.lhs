@@ -184,13 +184,7 @@ initPackages dflags = do
 
 readPackageConfigs :: DynFlags -> IO [PackageConfig]
 readPackageConfigs dflags = do
-  let -- Read global package db, unless the -no-user-package-db flag was given
-      global_conf_refs = [GlobalPkgConf | dopt Opt_ReadGlobalPackageConf dflags]
-      -- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
-      -- unless the -no-user-package-db flag was given.
-      user_conf_refs = [UserPkgConf | dopt Opt_ReadUserPackageConf dflags]
-
-      system_conf_refs = global_conf_refs ++ user_conf_refs
+  let system_conf_refs = [UserPkgConf, GlobalPkgConf]
 
   e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
   let base_conf_refs = case e_pkg_path of
@@ -202,9 +196,9 @@ readPackageConfigs dflags = do
          -> map PkgConfFile cs
          where cs = parseSearchPath path
          -- if the path ends in a separator (eg. "/foo/bar:")
-         -- the we tack on the base paths.
+         -- then we tack on the system paths.
 
-  let conf_refs = base_conf_refs ++ reverse (extraPkgConfs dflags)
+  let conf_refs = reverse (extraPkgConfs dflags base_conf_refs)
   -- later packages shadow earlier ones.  extraPkgConfs
   -- is in the opposite order to the flags on the
   -- command line.

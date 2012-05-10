@@ -276,8 +276,6 @@ data DynFlag
    | Opt_ForceRecomp
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
-   | Opt_ReadGlobalPackageConf
-   | Opt_ReadUserPackageConf
    | Opt_NoHsMain
    | Opt_SplitObjs
    | Opt_StgStats
@@ -550,7 +548,7 @@ data DynFlags = DynFlags {
   depSuffixes           :: [String],
 
   --  Package flags
-  extraPkgConfs         :: [PkgConfRef],
+  extraPkgConfs         :: [PkgConfRef] -> [PkgConfRef],
         -- ^ The @-package-db@ flags given on the command line, in the order
         -- they appeared.
 
@@ -925,7 +923,7 @@ defaultDynFlags mySettings =
 
         hpcDir                  = ".hpc",
 
-        extraPkgConfs           = [],
+        extraPkgConfs           = id,
         packageFlags            = [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
@@ -1757,12 +1755,12 @@ dynamic_flags = [
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
         ------- Packages ----------------------------------------------------
-    Flag "package-db"            (HasArg (extraPkgConf_ . PkgConfFile))
+    Flag "package-db"            (HasArg (addPkgConfRef . PkgConfFile))
   , Flag "clear-package-db"      (NoArg clearPkgConf)
-  , Flag "no-global-package-db"  (NoArg (unSetDynFlag Opt_ReadGlobalPackageConf))
-  , Flag "no-user-package-db"    (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
-  , Flag "global-package-db"     (NoArg (extraPkgConf_ GlobalPkgConf))
-  , Flag "user-package-db"       (NoArg (extraPkgConf_ UserPkgConf))
+  , Flag "no-global-package-db"  (NoArg removeGlobalPkgConf)
+  , Flag "no-user-package-db"    (NoArg removeUserPkgConf)
+  , Flag "global-package-db"     (NoArg (addPkgConfRef GlobalPkgConf))
+  , Flag "user-package-db"       (NoArg (addPkgConfRef UserPkgConf))
 
   , Flag "package-name"          (hasArg setPackageName)
   , Flag "package-id"            (HasArg exposePackageId)
@@ -2073,8 +2071,6 @@ xFlags = [
 defaultFlags :: [DynFlag]
 defaultFlags
   = [ Opt_AutoLinkPackages,
-      Opt_ReadGlobalPackageConf,
-      Opt_ReadUserPackageConf,
 
       Opt_SharedImplib,
 
@@ -2417,13 +2413,23 @@ data PkgConfRef
   | UserPkgConf
   | PkgConfFile FilePath
 
-extraPkgConf_ :: PkgConfRef -> DynP ()
-extraPkgConf_  p = upd (\s -> s{ extraPkgConfs = p : extraPkgConfs s })
+addPkgConfRef :: PkgConfRef -> DynP ()
+addPkgConfRef p = upd $ \s -> s { extraPkgConfs = (p:) . extraPkgConfs s }
+
+removeUserPkgConf :: DynP ()
+removeUserPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotUser . extraPkgConfs s }
+  where
+    isNotUser UserPkgConf = False
+    isNotUser _ = True
+
+removeGlobalPkgConf :: DynP ()
+removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extraPkgConfs s }
+  where
+    isNotGlobal GlobalPkgConf = False
+    isNotGlobal _ = True
 
 clearPkgConf :: DynP ()
-clearPkgConf = do
-  unSetDynFlag Opt_ReadGlobalPackageConf
-  unSetDynFlag Opt_ReadUserPackageConf
+clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
 exposePackage, exposePackageId, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()
