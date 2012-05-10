@@ -102,7 +102,7 @@ sortWith :: Ord b => (a -> b) -> [a] -> [a]
 sortWith f = sortBy (\x y -> compare (f x) (f y))
 
 -- | The 'groupWith' function uses the user supplied function which
--- projects an element out of every list element in order to to first sort the 
+-- projects an element out of every list element in order to first sort the
 -- input list and then to form groups by equality on these projected elements
 {-# INLINE groupWith #-}
 groupWith :: Ord b => (a -> b) -> [a] -> [[a]]
