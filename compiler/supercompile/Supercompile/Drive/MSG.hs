@@ -26,10 +26,11 @@ import Var        (TyVar, mkTyVar, isTyVar, isId, tyVarKind, setVarType, setTyVa
 import Id         (Id, idType, idName, realIdUnfolding, setIdUnfolding, idSpecialisation, setIdSpecialisation, mkSysLocal, mkLocalId)
 import IdInfo     (SpecInfo(..))
 import VarEnv
-import Type       (typeKind, mkTyConApp, mkAppTy, getTyVar_maybe)
+import Type       (mkTyConApp, mkAppTy, splitAppTys, getTyVar_maybe, isKindTy)
+import Kind
 import TysWiredIn (pairTyCon, tupleCon)
 import TysPrim    (funTyCon)
-import TypeRep    (Kind, Type(..), isKindVar)
+import TypeRep    (Type(..))
 import TrieMap    (TrieMap(..), CoercionMap, TypeMap)
 import Rules      (mkSpecInfo, roughTopNames)
 import Unique     (mkUniqueGrimily)
@@ -39,9 +40,6 @@ import BasicTypes (TupleSort(..))
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Foldable as Foldable
-
-
--- FIXME: we probably need to enforce the kind invariant explicitly
 
 
 pprTraceSC :: String -> SDoc -> a -> a
@@ -525,9 +523,122 @@ msgCoerced f rn2  out_tg_l (Uncast,           x_l)  out_tg_r (Uncast,           
 msgCoerced f rn2 _out_tg_l (CastBy co_l tg_l, x_l) _out_tg_r (CastBy co_r tg_r, x_r) = liftM2 (\co b -> (CastBy co tg_r, b)) (msgCoercion rn2 co_l co_r) (f rn2 tg_l x_l tg_r x_r) -- Right biased
 msgCoerced _ _ _ _ _ _ = fail "msgCoerced"
 
--- TODO: I don't know how complete support for polykinds actually *is* in the supercompiler, so this is a bit speculative:
+-- Note [Kind MSG and subkinding]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Perhaps suprisingly, we have:
+--
+--  (\(x :: Int) -> x) `msg` (\(y :: Num Int) -> y)
+-- =/=
+-- [*/k,Int/a]  k :: BOX |-> \lambda  [Constraint/k, Num Int/a]
+--              a :: k |-> \lambda
+--              ((\x :: a) -> x)
+--
+-- In this case there is no code generation problem (both * and
+-- Constraint are represented by a pointer) but Lint rightly rejects
+-- it on the basis that the kind of the first argument to (->) must
+-- be a subkind of OpenTypeKind, not a raw variable!
+--
+-- If there was a kind which was the lub of * and Constraint I
+-- think we could solve this by returning that lub when they mismatch.
+-- But in the absence of that we will have to just fail.
+--
+-- Not being able to MSG * and Constraint has far-reaching consequences.
+-- Imagine that we want (* -> *) `msg` (* -> Constraint).
+-- If we have that * `msg` Constraint fails then the result will be
+--   [* -> */k] k [* -> Constraint/k]
+-- But this is BAD since we might be doing:
+--   /\(a :: * -> *) (b :: *) -> f @(a b -> Int)
+--    `msg`
+--   /\(a :: * -> Constraint) (b :: *) -> f @(a b -> Int)
+-- And if the result is:
+--   /\(k :: BOX) (a :: k) (b :: *) -> f @(a b -> Int)
+-- Then the result will be ill-kinded!
+--
+-- CONCLUSION: kind MSG is just too hard to get right because subkinding
+-- and the kind invariant screws everything up. Don't do it.
+--
+-- Note [Kind MSG and the kind invariant]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- It is illegal to MSG to a state that requires us to abstract over a
+-- kind that does not satisfy the kind invariant (see TypeRep.lhs,
+-- the Note [The kind invariant]). Examples would be:
+--
+--  (\(x :: Int#) -> x) `msg` (\(y :: Char#) -> y)
+-- =/=
+--  [Int#/a]  a :: # |-> \lambda  [Char#/a]
+--            (\(x :: a) -> x)
+--
+--  (\(x :: State# Int) -> x) `msg` (\(y :: Array# Int) -> x)
+-- =/=
+--  [State#/a]  a :: * -> # |-> \lambda  [Array#/a]
+--              ((\x :: a Int) -> x)
+--
+-- The above two examples don't even require kind abstraction to
+-- screw things up. Things can get worse though:
+--
+--  (\(x :: Int#) -> x) `msg` (\(y :: (# #)) -> y)
+-- =/=
+--  [#/k,Int#/a]  k :: BOX |-> \lambda  [(#)/k,Char#/a]
+--                a :: k |-> \lambda
+--                ((\x :: a) -> x)
+--
+-- To solve this, I check in msgType that the MSG result satisfied the
+-- predicate 'canInstantiateKindVarWithKind'. Furthermore, when I did
+-- kind-MSG, I would check 'canAbstractOverTyVarOfKind' (a synonym) in
+-- msgTyVarBndrExtras', to ensure that kind variables were never
+-- instantiated with a bad kind.
+--
+-- Note [Kind MSG and coupling types]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We clearly cannot construct a generalisation that maps the same type
+-- variable to two types which are "similar" at the root. For example:
+--  (\(x :: Int -> Int) (y :: Int) -> x y) `msg` (\(x :: Bool -> Bool) (y :: Bool) -> x y)
+-- =/=
+--  [Int->Int/a,Int/b]  a :: * |-> \lambda  [Bool->Bool/a,Bool/b]
+--                      b :: * |-> \lambda
+--                      (\(x :: a) (y :: b) -> x y)
+--
+-- Since the resulting generalised term is not necessarily type correct.
+-- According to my proof (see the thesis), these pairs of types are "similar":
+--  (T, T)                         [for all type constructors T]
+--  (ty1l ty2l, ty1r ty2r)         [for all types ty1l ty2l ty1r ty2r]
+--  (forall a. tyl, forall b. tyr) [for all types tyl tyr]
+--
+-- You might think we can ensure that the first two pairs are never generated by simply
+-- always including the tycon/tyapp in the generalised part of the term. However,
+-- the last case screws everything up because we can't unconditionally include the "forall"
+-- part of the type into the generalised part (for variable capture reasons), which
+-- means that things like this must be true:
+--  T (forall a. a) `msg` T (forall a. Int)
+-- =/=
+--  [forall a. a/b]  b :: * |-> \lambda  [forall a. Int/b]
+--                   T b
+-- =/= 
+--  [T (forall a. a)/b]  b :: * |-> \lambda  [T (forall a. Int)/b]
+--                       b
+--
+-- In order to ensure we don't inadvertently return the last possibility, we need to check
+-- for coupling type applications etc before allows generalisation as well.
 msgKind :: RnEnv2 -> Kind -> Kind -> MSG Kind
 msgKind = msgType
+
+canAbstractOverTyVarOfKind :: Kind -> Bool
+canAbstractOverTyVarOfKind = ok
+  where
+    -- TODO: I'm not 100% sure of the correctness of this check
+    -- In particular, I don't think we need to check for non-conforming
+    -- kinds in "negative" positions since they would only appear if the
+    -- definition site had erroneously abstracted over a non-conforming
+    -- kind. For example, this *should* never be allowed:
+    --   data Foo (a :: * -> #) = Bar (a Int)
+    --   Foo :: (* -> #) -> *
+    --   Bar :: forall (a :: * -> #). a Int -> Foo a
+    ok k | isOpenTypeKind k || isUbxTupleKind k || isArgTypeKind k || isUnliftedTypeKind k = False
+    ok (TyVarTy _)     = True -- This is OK because kinds dont get generalised, and we assume all incoming kind instantiations satisfy the kind invariant
+    ok (AppTy k1 k2)   = ok k1 && ok k2
+    ok (TyConApp _ ks) = all ok ks
+    ok (FunTy k1 k2)   = ok k1 && ok k2
+    ok (ForAllTy _ k)  = ok k
 
 -- NB: we don't match FunTy and TyConApp literally because
 -- we can do better MSG for combinations like:
@@ -543,18 +654,39 @@ msgKind = msgType
 -- NB: we don't do anything stupid like introduce a TyVar due to
 -- generalisation at the superkind level because the only term
 -- at the superkind level is Box, which always MSGes into itself.
-msgType, msgType' :: RnEnv2 -> Type -> Type -> MSG Type
-msgType rn2 ty_l ty_r = msgType' rn2 ty_l ty_r `mplus` do
-    guardFloatable "msgType" tyVarsOfType rn2 ty_l ty_r
-    liftM TyVarTy $ msgGeneraliseType rn2 ty_l ty_r
+msgType :: RnEnv2 -> Type -> Type -> MSG Type
+msgType rn2 ty_l ty_r = case checkEqual (isKindTy ty_l) (isKindTy ty_r) of
+   -- Ensures that we don't try to match kinds vs types or vice-versa.
+   -- Note that because of some punning, MSGing them together won't necessarily
+   -- fail at the root. For example, MSGing (* -> *) and (Int -> Int) will give
+   -- (a -> a) since FunTy is a pun (similar with promoted DataCons/TyCons).
+  Nothing -> fail "msgType: mismatched kinds/superkinds"
+   -- We can MSG as normal now: msgType' itself will decide when generalisation is
+   -- allowable, making use of the boolean argument to prevent any kind generalisation.
+   -- We decided to never generalise kinds, because it leads to various issues:
+   -- see Note [Kind MSG and subkinding] and Note [Kind MSG and the kind invariant]
+  Just are_kinds -> msgType' are_kinds rn2 ty_l ty_r
 
-msgType' rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r
-msgType' rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 mkAppTy (msgType rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r)
-msgType' _   (TyConApp tc_l [])    (TyConApp tc_r [])    = guard "msgType: TyConApp" (tc_l == tc_r) >> return (TyConApp tc_r [])
-msgType' rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = msgType rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
-msgType' rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType rn2 ((TyConApp funTyCon [] `AppTy` ty1_l) `AppTy` ty2_l) ((TyConApp funTyCon [] `AppTy` ty1_r) `AppTy` ty2_r)
-msgType' rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType rn2 ty_l ty_r
-msgType' _ _ _ = fail "msgType"
+
+-- INVARIANT: both sides are at the same level (i.e. both types or both kinds)
+msgType' :: Bool -> RnEnv2 -> Type -> Type -> MSG Type
+msgType' _         rn2 (TyVarTy x_l)         (TyVarTy x_r)         = liftM TyVarTy $ msgVar rn2 x_l x_r -- NB: if this fails, one of the two sides is unfloatable, so don't try to generalise
+msgType' are_kinds rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 mkAppTy (msgType' are_kinds rn2 ty1_l ty1_r) (msgType rn2 ty2_l ty2_r) -- NB: arguments not necessarily at same level, but type constructor must be
+msgType' _         _   (TyConApp tc_l [])    (TyConApp tc_r [])    | tc_l == tc_r = return (TyConApp tc_r [])
+msgType' are_kinds rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) | not (null tys_l) || not (null tys_r) = msgType' are_kinds rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
+msgType' are_kinds rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType' are_kinds rn2 ((TyConApp funTyCon [] `AppTy` ty1_l) `AppTy` ty2_l) ((TyConApp funTyCon [] `AppTy` ty1_r) `AppTy` ty2_r)
+msgType' are_kinds rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType' are_kinds rn2 ty_l ty_r
+msgType' are_kinds rn2 ty_l ty_r
+  | are_kinds = fail "msgType: no generalisation at kind level"
+  | not (canAbstractOverTyVarOfKind (typeKind ty_l')) = fail "msgType: bad kind for type generalisation" -- NB: legit to just check left hand side because kinds are ungeneralised, so it will eventualy be checked that it exactly matches the right
+  | otherwise = do guardFloatable "msgType" tyVarsOfType rn2 ty_l' ty_r'
+                   liftM TyVarTy (msgGeneraliseType rn2 ty_l' ty_r')
+  where ty_l' = repair ty_l
+        ty_r' = repair ty_r
+        -- I intentionally call msgType' with types that do not obey the Type invariants.
+        -- However, if I let these broken types leak out Bad Things will happens!
+        repair ty | (TyConApp tc [], tys) <- splitAppTys ty = mkTyConApp tc tys
+                  | otherwise                               = ty
 
 msgCoercion, msgCoercion' :: RnEnv2 -> Coercion -> Coercion -> MSG Coercion
 msgCoercion rn2 co_l co_r = msgCoercion' rn2 co_l co_r `mplus` do

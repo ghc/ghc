@@ -383,6 +383,14 @@ extractJusts p = foldr step ([], [])
                     | otherwise     = second (x:) rest
 
 
+checkEqual :: Eq a => a -> a -> Maybe a
+checkEqual = checkEqualBy (==)
+
+checkEqualBy :: (a -> a -> Bool) -> a -> a -> Maybe a
+checkEqualBy eq x y | x `eq` y  = Just y
+                    | otherwise = Nothing
+
+
 secondM :: Functor f => (b -> f c) -> (a, b) -> f (a, c)
 secondM f (x, y) = fmap ((,) x) (f y)
 
