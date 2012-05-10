@@ -57,7 +57,7 @@ module Coercion (
 	isEmptyCvSubst, zapCvSubstEnv, getCvInScope,
         substCo, substCos, substCoVar, substCoVars,
         substCoWithTy, substCoWithTys, 
-	cvTvSubst, tvCvSubst, mkCvSubst, zipOpenCvSubst,
+	cvTvSubst, tvCvSubst, zipOpenCvSubst,
         substTy, extendTvSubst, extendCvSubstAndInScope,
 	substTyVarBndr, substCoVarBndr,
 
