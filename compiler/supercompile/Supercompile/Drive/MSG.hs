@@ -186,7 +186,7 @@ msgPend rn2 x0 pending = MSG $ \e s0 -> case lookupUpdatePending s0 of
     lookupUpdatePending s = case pending of
       -- TODO: binder matching can legitimately fail, in which case we might want to create a common "vanilla"
       -- binder with no non-MSGable info, leaving the non-unifiable specs/rules to the generalised versions?
-      PendingVar      x_l  x_r  -> fmapLeft (\upd -> (if x_l == x_r then Just x_r else Nothing, \x -> msgBndrExtras rn2 x x_l x_r,                                                    \x -> s { msgKnownPendingVars      = upd x })) $ lookupUpdateVE (msgKnownPendingVars s)      x_l  x_r
+      PendingVar      x_l  x_r  -> fmapLeft (\upd -> (if x_l == x_r then Just x_r else Nothing, \x -> msgBndrExtras rn2 x                    x_l                 x_r,                 \x -> s { msgKnownPendingVars      = upd x })) $ lookupUpdateVE (msgKnownPendingVars s)      x_l  x_r
       PendingType     ty_l ty_r -> fmapLeft (\upd -> (Nothing,                                  \a -> liftM (a `setTyVarKind`) $ msgKind rn2 (typeKind ty_l)     (typeKind ty_r),     \a -> s { msgKnownPendingTypes     = upd a })) $ lookupUpdateTM (msgKnownPendingTypes s)     ty_l ty_r
       PendingCoercion co_l co_r -> fmapLeft (\upd -> (Nothing,                                  \q -> liftM (q `setVarType`)   $ msgType rn2 (coercionType co_l) (coercionType co_r), \q -> s { msgKnownPendingCoercions = upd q })) $ lookupUpdateTM (msgKnownPendingCoercions s) co_l co_r
       PendingTerm     e_l  e_r  -> Left              (Nothing,                                  \x -> liftM (x `setVarType`)   $ msgType rn2 (termType e_l)      (termType e_r),      \_ -> s)
@@ -791,6 +791,7 @@ msgBndrExtras rn2 v v_l v_r
 
 msgTyVarBndrExtras :: RnEnv2 -> TyVar -> TyVar -> TyVar -> MSG TyVar
 msgTyVarBndrExtras rn2 a a_l a_r = liftM (a `setTyVarKind`) $ msgKind rn2 (tyVarKind a_l) (tyVarKind a_r)
+
 
 -- We have to be careful to msg the "fragile" IdInfo for binders as well as the obvious type information
 msgIdCoVarBndrExtras :: RnEnv2 -> Id -> Id -> Id -> MSG Id
