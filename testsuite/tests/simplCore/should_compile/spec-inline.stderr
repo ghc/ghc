@@ -46,7 +46,7 @@ Roman.$wgo
  Arity=2,
  Str=DmdType SS,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [60 30] 253 0}]
 Roman.$wgo =
   \ (w :: Data.Maybe.Maybe GHC.Types.Int)
@@ -94,7 +94,7 @@ Roman.foo_go [InlPrag=INLINE[0]]
  Arity=2,
  Str=DmdType SSm,
  Unf=Unf{Src=Worker=Roman.$wgo, TopLvl=True, Arity=2, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once] :: Data.Maybe.Maybe GHC.Types.Int)
                  (w1 [Occ=Once] :: Data.Maybe.Maybe GHC.Types.Int) ->
@@ -109,7 +109,7 @@ Roman.foo2 :: GHC.Types.Int
  Caf=NoCafRefs,
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=False, Expandable=True,
          Guidance=IF_ARGS [] 10 110}]
 Roman.foo2 = GHC.Types.I# 6
 
@@ -118,7 +118,7 @@ Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
  Caf=NoCafRefs,
  Str=DmdType,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=False, Expandable=True,
          Guidance=IF_ARGS [] 10 110}]
 Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
 
@@ -128,7 +128,7 @@ Roman.foo :: GHC.Types.Int -> GHC.Types.Int
  Caf=NoCafRefs,
  Str=DmdType S(A)m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
                  case n of n1 { GHC.Types.I# _ ->

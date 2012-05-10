@@ -29,7 +29,7 @@ T4908.$wf
  Caf=NoCafRefs,
  Str=DmdType LL,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=IF_ARGS [30 20] 101 20}]
 T4908.$wf =
   \ (ww :: GHC.Prim.Int#) (w :: (GHC.Types.Int, GHC.Types.Int)) ->
@@ -54,7 +54,7 @@ T4908.f [InlPrag=INLINE[0]]
  Caf=NoCafRefs,
  Str=DmdType U(L)L,
  Unf=Unf{Src=Worker=T4908.$wf, TopLvl=True, Arity=2, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int)
                  (w1 [Occ=Once] :: (GHC.Types.Int, GHC.Types.Int)) ->

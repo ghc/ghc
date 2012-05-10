@@ -19,7 +19,7 @@ T3717.foo [InlPrag=INLINE[0]] :: GHC.Types.Int -> GHC.Types.Int
  Caf=NoCafRefs,
  Str=DmdType U(L)m,
  Unf=Unf{Src=Worker=T3717.$wfoo, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int) ->
                  case w of _ { GHC.Types.I# ww [Occ=Once] ->

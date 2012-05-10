@@ -15,7 +15,7 @@ T4930.foo :: GHC.Types.Int -> GHC.Types.Int
  Arity=1,
  Str=DmdType U(L)m,
  Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
+         ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
                  case n of _ { GHC.Types.I# x ->
