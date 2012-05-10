@@ -455,10 +455,10 @@ evBindMapBinds bs
 data EvBind = EvBind EvVar EvTerm
 
 data EvTerm
-  = EvId EvId                    -- Term-level variable-to-variable bindings
-                                 -- (no coercion variables! they come via EvCoercion)
+  = EvId EvId                    -- Any sort of evidence Id, including coercions
 
-  | EvCoercion TcCoercion        -- (Boxed) coercion bindings
+  | EvCoercion TcCoercion        -- (Boxed) coercion bindings 
+                                 -- See Note [Coercion evidence terms]
 
   | EvCast EvTerm TcCoercion     -- d |> co
 
@@ -491,6 +491,29 @@ data EvLit
     deriving( Data.Data, Data.Typeable)
 
 \end{code}
+
+Note [Coecion evidence terms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Notice that a coercion variable (v :: t1 ~ t2) can be represented as an EvTerm
+in two different ways:
+   EvId v
+   EvCoercion (TcCoVarCo v)
+
+An alternative would be 
+
+* To establish the invariant that coercions are represented only 
+   by EvCoercion
+
+* To maintain the invariant by smart constructors.  Eg
+     mkEvCast (EvCoercion c1) c2 = EvCoercion (TcCastCo c1 c2)
+     mkEvCast t c = EvCast t c
+
+We do quite often need to get a TcCoercion from an EvTerm; see
+'evTermCoercion'.  Notice that as well as EvId and EvCoercion it may see
+an EvCast.
+
+I don't think it matters much... but maybe we'll find a good reason to
+do one or the other.
 
 Note [EvKindCast] 
 ~~~~~~~~~~~~~~~~~ 
@@ -581,6 +604,7 @@ isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 
 evTermCoercion :: EvTerm -> TcCoercion
 -- Applied only to EvTerms of type (s~t)
+-- See Note [Coercion evidence terms]
 evTermCoercion (EvId v)        = mkTcCoVarCo v
 evTermCoercion (EvCoercion co) = co
 evTermCoercion (EvCast tm co)  = TcCastCo (evTermCoercion tm) co
