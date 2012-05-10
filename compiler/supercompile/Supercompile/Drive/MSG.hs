@@ -425,7 +425,7 @@ msgMatch :: InstanceMatching -> MSGResult -> Maybe MSGMatchResult
 msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (deeds_r, heap_r@(Heap h_r _), rn_r, k_r))
   -- Try to detect instantiation first
   --  1) Is the left-hand renaming invertible?
-  | Just rn_l_inv <- invertRenaming ids rn_l
+  | Just rn_l_inv@(rn_l_inv_xs, rn_l_inv_as, rn_l_inv_qs) <- invertRenaming ids rn_l
   --  2) Is the left-hand stack empty, and if has been instantiated on the right, was that valid?
   , Loco gen_k_l <- k_l
   , case k_r of Loco _ -> True
@@ -437,16 +437,26 @@ msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (dee
         heap_non_instantiating x_r = case M.lookup x_r h_r of
                          Nothing | x_r `elemVarSet` k_r_bvs -> True -- Instantiating with an update-frame bound thing is *probably* OK
                          Just hb_r -> isJust (heapBindingLambdaBoundness hb_r)
-                         _ -> panic "msgMatch: variable unbound on right" -- (ppr rn_l $$ ppr rn_r $$ ppr x $$ ppr (renameId rn_l x) $$ ppr x_r)
+                         _ -> panic "msgMatch: variable unbound on right" -- (ppr rn_l_inv $$ ppr x_r $$ pPrintFullState fullStatePrettiness (maxBound, heap, k, qa) $$ ppr (h_l, rn_l, k_l) $$ ppr (h_r, rn_r, k_r))
+  -- NB: just because we have (x_l, hb_l) in the heap *DOESN'T MEAN* there is a x/x_r corresponding to this x_l because we might have:
+  --  x |-> 1
+  --  y |-> Just x   `msg`  a |-> Just b
+  --  Just y                Just a
+  -- Note that the left-hand heap binder x_l will not be in the range of the rn_l (and hence not in the domain of the rn_l_inv).
   , flip all (M.toList h_l) $ \(x_l, hb_l) -> case heapBindingLambdaBoundness hb_l of
                                                 Nothing -> False
                                                 Just gen_l -> mayInstantiate inst_mtch gen_l || case () of
-                                                                      () | isCoVar x_l, Just q <- getCoVar_maybe (lookupCoVarSubst rn_l_inv x_l), let co_r = lookupCoVarSubst rn_r q -> maybe False heap_non_instantiating (getCoVar_maybe co_r)
-                                                                         | isId    x_l, let x = renameId rn_l_inv x_l,                            let x_r  = renameId rn_r x         -> heap_non_instantiating x_r
-                                                                         | isTyVar x_l, Just a <- getTyVar_maybe (lookupTyVarSubst rn_l_inv x_l), let ty_r = lookupTyVarSubst rn_r a -> isJust (getTyVar_maybe ty_r)
-                                                                         | otherwise   -> panic "msgMatch: impossible variable type/non-invertible renaming"
+                                                                      () | isCoVar x_l, Just q <- lookupVarEnv rn_l_inv_qs x_l, let co_r = lookupCoVarSubst rn_r q -> maybe False heap_non_instantiating (getCoVar_maybe co_r)
+                                                                         | isId    x_l, Just x <- lookupVarEnv rn_l_inv_xs x_l, let x_r  = renameId rn_r x         -> heap_non_instantiating x_r
+                                                                         | isTyVar x_l, Just a <- lookupVarEnv rn_l_inv_as x_l, let ty_r = lookupTyVarSubst rn_r a -> isJust (getTyVar_maybe ty_r)
+                                                                         -- This case occurs when a heap binding is pulled in on one side by "sucks" but without
+                                                                         -- being paired with one on the other side (e.g. 'x' in the example above). If this happens
+                                                                         -- we'll just say True, though we'll probably reject the instantiation eventuall when we come
+                                                                         -- to the binding on this side that caused the pulling-in to happen.
+                                                                         | otherwise -> True
                                                                          -- TODO: perhaps type/covar instantiation should be unconditonally allowed?
-  = Just (RightIsInstance heap_r (composeRenamings ids rn_l_inv rn_r) k_r)
+                                                                         -- TODO: what if we "instantiate" with some IdInfo on the left? Should that be disallowed?
+  = Just (RightIsInstance heap_r (composeRenamings rn_l_inv rn_r) k_r)
 
   -- Now look for type generalisation information
   --  1) Are both stacks empty?

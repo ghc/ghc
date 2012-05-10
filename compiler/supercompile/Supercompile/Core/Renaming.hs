@@ -4,9 +4,11 @@ module Supercompile.Core.Renaming (
     -- | Renamings
     Renaming, emptyRenaming,
     mkInScopeIdentityRenaming, mkIdentityRenaming, mkTyVarRenaming, mkRenaming,
-    invertRenaming, composeRenamings,
     InScopeSet, emptyInScopeSet, mkInScopeSet,
     
+    -- | PreRenamings
+    PreRenaming, invertRenaming, composeRenamings,
+
     -- | Extending the renaming
     insertIdRenaming, insertIdRenamings,
     insertTypeSubst, insertTypeSubsts,
@@ -150,31 +152,43 @@ mkRenaming rn = foldVarlikes (\f -> M.foldWithKey (\x x' -> f x (x, x'))) rn
                              (\(q, q') -> third3  (\co_subst -> extendVarEnv co_subst q (mkCoVarCo q')))
                              (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
+type PreRenaming = (VarEnv Id, VarEnv TyVar, VarEnv CoVar)
+
+-- NB: the output Vars in the range of the mappings are dodgy and should really only be used for
+-- their Uniques. I turn them into full Ids mostly for convenience.
+--
 -- NB: the InScopeSet should be that of the *domain* of the renaming (I think!)
-invertRenaming :: InScopeSet -> Renaming -> Maybe Renaming
+--
+-- NB: I used to return a real *Renaming* as the result, but that wasn't very convenient for the MSG caller:
+--  1. It hides the fact that looking up a CoVar/TyVar always yields a variable
+--  2. It doesn't let us easily test if a variable is actually present in the domain of the inverted renaming
+invertRenaming :: InScopeSet -> Renaming -> Maybe PreRenaming
 invertRenaming ids (id_subst, tv_subst, co_subst)
   = mfix $ \rn -> let -- FIXME: this inversion relies on something of a hack because the domain of the mapping is not stored (only its Unique)
                       -- Furthermore, we want to carefully rename the *types* (and extra info, if we actually preserved any) as well when doing
                       -- this inversion so that the renaming {a |-> b, y |-> x :: b} is inverted to {b |-> a, x |-> y :: a}
-                      invertVarEnv :: (Var -> a)
-                                   -> (FastString -> Unique -> Type -> Var)
-                                   -> VarEnv Var -> Maybe (VarEnv a)
-                      invertVarEnv promote mk env
-                        | distinct (varEnvElts env) = Just (mkVarEnv [ (x, promote $ if isGlobalId x && u == varUnique x
-                                                                                      then x -- So we don't replace global Ids with new local Ids!
-                                                                                      else mk (occNameFS (getOccName x)) u (renameType ids rn (varType x)))
+                      invertVarEnv :: (FastString -> Unique -> Type -> Var)
+                                   -> VarEnv Var -> Maybe (VarEnv Var)
+                      invertVarEnv mk env
+                        | distinct (varEnvElts env) = Just (mkVarEnv [ (x, if isGlobalId x && u == varUnique x
+                                                                            then x -- So we don't replace global Ids with new local Ids!
+                                                                            else mk (occNameFS (getOccName x)) u (renameType ids (mkRenaming' rn) (varType x)))
                                                                      | (u, x) <- ufmToList env])
                         | otherwise                 = Nothing
-                  in liftM3 (,,) (traverse getId_maybe    id_subst >>= invertVarEnv mkIdExpr  mkSysLocal)
-                                 (traverse getTyVar_maybe tv_subst >>= invertVarEnv mkTyVarTy (\fs uniq -> mkTyVar (mkSysTvName uniq fs)))
-                                 (traverse getCoVar_maybe co_subst >>= invertVarEnv mkCoVarCo mkSysLocal)
+                  in liftM3 (,,) (traverse getId_maybe    id_subst >>= invertVarEnv  mkSysLocal)
+                                 (traverse getTyVar_maybe tv_subst >>= invertVarEnv (\fs uniq -> mkTyVar (mkSysTvName uniq fs)))
+                                 (traverse getCoVar_maybe co_subst >>= invertVarEnv mkSysLocal)
+  where
+    mkRenaming' :: PreRenaming -> Renaming
+    mkRenaming' (xxs, aas, qqs) = (mapVarEnv mkIdExpr  xxs,
+                                   mapVarEnv mkTyVarTy aas,
+                                   mapVarEnv mkCoVarCo qqs)
 
--- NB: we want the set of things in scope in the range of the first renaming / domain of the second renaming
-composeRenamings :: InScopeSet -> Renaming -> Renaming -> Renaming
-composeRenamings ids (id_subst1, tv_subst1, co_subst1) rn2
-  = (mapVarEnv (mkIdExpr . renameId rn2 . coreSynToVar) id_subst1,
-     mapVarEnv (renameType     ids rn2) tv_subst1,
-     mapVarEnv (renameCoercion ids rn2) co_subst1)
+composeRenamings :: PreRenaming -> Renaming -> Renaming
+composeRenamings (id_subst1, tv_subst1, co_subst1) rn2
+  = (mapVarEnv (mkIdExpr . renameId rn2) id_subst1,
+     mapVarEnv (lookupTyVarSubst    rn2) tv_subst1,
+     mapVarEnv (lookupCoVarSubst    rn2) co_subst1)
 
 mkIdExpr :: Id -> CoreSyn.CoreExpr
 mkIdExpr = CoreSyn.Var
