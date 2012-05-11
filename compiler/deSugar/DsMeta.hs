@@ -150,7 +150,8 @@ repTopDs group
 hsSigTvBinders :: HsValBinds Name -> [Name]
 -- See Note [Scoped type variables in bindings]
 hsSigTvBinders binds
-  = [hsLTyVarName tv | L _ (TypeSig _ (L _ (HsForAllTy Explicit tvs _ _))) <- sigs, tv <- tvs]
+  = [hsLTyVarName tv | L _ (TypeSig _ (L _ (HsForAllTy Explicit qtvs _ _))) <- sigs
+                     , tv <- hsQTvBndrs qtvs]
   where
     sigs = case binds of
      	     ValBindsIn  _ sigs -> sigs
@@ -214,9 +215,8 @@ repTyClD (L loc (TyFamily { tcdFlavour = flavour,
            do { flav   <- repFamilyFlavour flavour
 	      ; case opt_kind of 
                   Nothing -> repFamilyNoKind flav tc1 bndrs
-                  Just (HsBSig ki _) 
-                    -> do { ki1 <- repKind ki 
-                          ; repFamilyKind flav tc1 bndrs ki1 }
+                  Just ki -> do { ki1 <- repKind ki 
+                                ; repFamilyKind flav tc1 bndrs ki1 }
               }
        ; return $ Just (loc, dec)
        }
@@ -272,15 +272,15 @@ repTyDefn tc bndrs opt_tys _ (TySynonym { td_synRhs = ty })
        ; repTySyn tc bndrs opt_tys ty1 }
 
 -------------------------
-mk_extra_tvs :: Located Name -> [LHsTyVarBndr Name] 
-             -> HsTyDefn Name -> DsM [LHsTyVarBndr Name]
+mk_extra_tvs :: Located Name -> LHsTyVarBndrs Name 
+             -> HsTyDefn Name -> DsM (LHsTyVarBndrs Name)
 -- If there is a kind signature it must be of form
 --    k1 -> .. -> kn -> *
 -- Return type variables [tv1:k1, tv2:k2, .., tvn:kn]
 mk_extra_tvs tc tvs defn
-  | TyData { td_kindSig = Just (HsBSig hs_kind _) } <- defn
+  | TyData { td_kindSig = Just hs_kind } <- defn
   = do { extra_tvs <- go hs_kind
-       ; return (tvs ++ extra_tvs) }
+       ; return (mkHsQTvs (hsQTvBndrs tvs ++ extra_tvs)) }
   | otherwise
   = return tvs
   where
@@ -289,7 +289,7 @@ mk_extra_tvs tc tvs defn
       = do { uniq <- newUnique
            ; let { occ = mkTyVarOccFS (fsLit "t")
                  ; nm = mkInternalName uniq occ loc
-                 ; hs_tv = L loc (KindedTyVar nm (mkHsBSig kind)) }
+                 ; hs_tv = L loc (KindedTyVar nm kind) }
            ; hs_tvs <- go rest
            ; return (hs_tv : hs_tvs) }
 
@@ -340,7 +340,7 @@ repInstD (L loc (ClsInstD { cid_poly_ty = ty, cid_binds = binds
 	    -- the selector Ids, not to fresh names (Trac #5410)
 	    --
             do { cxt1 <- repContext cxt
-               ; cls_tcon <- repTy (HsTyVar cls)
+               ; cls_tcon <- repTy (HsTyVar (unLoc cls))
                ; cls_tys <- repLTys tys
                ; inst_ty1 <- repTapps cls_tcon cls_tys
                ; binds1 <- rep_binds binds
@@ -350,17 +350,17 @@ repInstD (L loc (ClsInstD { cid_poly_ty = ty, cid_binds = binds
                ; repInst cxt1 inst_ty1 decls }
        ; return (loc, dec) }
  where
-   Just (tvs, cxt, cls, tys) = splitHsInstDeclTy_maybe (unLoc ty)
+   Just (tvs, cxt, cls, tys) = splitLHsInstDeclTy_maybe ty
 
 repFamInstD :: FamInstDecl Name -> DsM (Core TH.DecQ)
 repFamInstD (FamInstDecl { fid_tycon = tc_name
-                         , fid_pats = HsBSig tys (kv_names, tv_names)
+                         , fid_pats = HsWB { hswb_cts = tys, hswb_kvs = kv_names, hswb_tvs = tv_names }
                          , fid_defn = defn })
   = WARN( not (null kv_names), ppr kv_names )   -- We have not yet dealt with kind 
                                                 -- polymorphism in Template Haskell (sigh)
     do { tc <- lookupLOcc tc_name 		-- See note [Binders and occurrences]  
        ; let loc = getLoc tc_name
-             hs_tvs = [ L loc (UserTyVar n) | n <- tv_names]   -- Yuk
+             hs_tvs = mkHsQTvs (userHsTyVarBndrs loc tv_names)   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ bndrs ->
          do { tys1 <- repLTys tys
             ; tys2 <- coreList typeQTyConName tys1
@@ -419,8 +419,9 @@ ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
 -------------------------------------------------------
 
 repC :: [Name] -> LConDecl Name -> DsM (Core TH.ConQ)
-repC _ (L _ (ConDecl { con_name = con, con_qvars = [], con_cxt = L _ []
+repC _ (L _ (ConDecl { con_name = con, con_qvars = con_tvs, con_cxt = L _ []
                        , con_details = details, con_res = ResTyH98 }))
+  | null (hsQTvBndrs con_tvs)
   = do { con1 <- lookupLOcc con 	-- See note [Binders and occurrences] 
        ; repConstr con1 details  }
 repC tvs (L _ (ConDecl { con_name = con
@@ -428,7 +429,7 @@ repC tvs (L _ (ConDecl { con_name = con
                        , con_details = details
                        , con_res = res_ty }))
   = do { (eq_ctxt, con_tv_subst) <- mkGadtCtxt tvs res_ty
-       ; let ex_tvs = [ tv | tv <- con_tvs, not (hsLTyVarName tv `in_subst` con_tv_subst)]
+       ; let ex_tvs = mkHsQTvs [ tv | tv <- hsQTvBndrs con_tvs, not (hsLTyVarName tv `in_subst` con_tv_subst)]
        ; binds <- mapM dupBinder con_tv_subst 
        ; dsExtendMetaEnv (mkNameEnv binds) $     -- Binds some of the con_tvs
          addTyVarBinds ex_tvs $ \ ex_bndrs ->   -- Binds the remaining con_tvs
@@ -552,7 +553,7 @@ rep_ty_sig loc (L _ ty) nm
     rep_ty (HsForAllTy Explicit tvs ctxt ty)
       = do { let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                          ; repTyVarBndrWithKind tv name }
-           ; bndrs1 <- mapM rep_in_scope_tv tvs
+           ; bndrs1 <- mapM rep_in_scope_tv (hsQTvBndrs tvs)
            ; bndrs2 <- coreList tyVarBndrTyConName bndrs1
            ; ctxt1  <- repLContext ctxt
            ; ty1    <- repLTy ty
@@ -616,7 +617,7 @@ rep_InlinePrag (InlinePragma { inl_act = activation, inl_rule = match, inl_inlin
 -- 			Types
 -------------------------------------------------------
 
-addTyVarBinds :: [LHsTyVarBndr Name]	                       -- the binders to be added
+addTyVarBinds :: LHsTyVarBndrs Name	                       -- the binders to be added
               -> (Core [TH.TyVarBndr] -> DsM (Core (TH.Q a)))  -- action in the ext env
               -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
@@ -626,14 +627,14 @@ addTyVarBinds :: [LHsTyVarBndr Name]	                       -- the binders to be
 addTyVarBinds tvs m
   = do { freshNames <- mkGenSyms (hsLTyVarNames tvs)
        ; term <- addBinds freshNames $ 
-	    	 do { kbs1 <- mapM mk_tv_bndr (tvs `zip` freshNames)
+	    	 do { kbs1 <- mapM mk_tv_bndr (hsQTvBndrs tvs `zip` freshNames)
                     ; kbs2 <- coreList tyVarBndrTyConName kbs1
 	    	    ; m kbs2 }
        ; wrapGenSyms freshNames term }
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
-addTyClTyVarBinds :: [LHsTyVarBndr Name]
+addTyClTyVarBinds :: LHsTyVarBndrs Name
                   -> (Core [TH.TyVarBndr] -> DsM (Core (TH.Q a)))
                   -> DsM (Core (TH.Q a))
 
@@ -650,7 +651,7 @@ addTyClTyVarBinds tvs m
             -- This makes things work for family declarations
 
        ; term <- addBinds freshNames $ 
-	    	 do { kbs1 <- mapM mk_tv_bndr tvs
+	    	 do { kbs1 <- mapM mk_tv_bndr (hsQTvBndrs tvs)
                     ; kbs2 <- coreList tyVarBndrTyConName kbs1
 	    	    ; m kbs2 }
 
@@ -665,7 +666,7 @@ repTyVarBndrWithKind :: LHsTyVarBndr Name
                      -> Core TH.Name -> DsM (Core TH.TyVarBndr)
 repTyVarBndrWithKind (L _ (UserTyVar {})) nm
   = repPlainTV nm
-repTyVarBndrWithKind (L _ (KindedTyVar _ (HsBSig ki _))) nm
+repTyVarBndrWithKind (L _ (KindedTyVar _ ki)) nm
   = repKind ki >>= repKindedTV nm
 
 -- represent a type context

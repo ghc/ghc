@@ -539,7 +539,7 @@ mkSigTvFn sigs
   = \n -> lookupNameEnv env n `orElse` []
   where
     env :: NameEnv [Name]
-    env = mkNameEnv [ (name, map hsLTyVarName ltvs)
+    env = mkNameEnv [ (name, hsLTyVarNames ltvs)
 		    | L _ (TypeSig names
 			           (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs
                     , (L _ name) <- names]

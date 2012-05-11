@@ -128,14 +128,14 @@ tdefs	:: { [TyClDecl RdrName] }
 tdef	:: { TyClDecl RdrName }
 	: '%data' q_tc_name tv_bndrs '=' '{' cons '}' ';'
 	{ TyDecl { tcdLName = noLoc (ifaceExtRdrName $2)
-                 , tcdTyVars = map toHsTvBndr $3
+                 , tcdTyVars = mkHsQTvs (map toHsTvBndr $3)
                  , tcdTyDefn = TyData { td_ND = DataType, td_ctxt = noLoc [] 
      	                              , td_kindSig = Nothing
                                       , td_cons = $6, td_derivs = Nothing } } }
 	| '%newtype' q_tc_name tv_bndrs trep ';'
 	{ let tc_rdr = ifaceExtRdrName $2 in
           TyDecl { tcdLName = noLoc tc_rdr
-		 , tcdTyVars = map toHsTvBndr $3
+	         , tcdTyVars = mkHsQTvs (map toHsTvBndr $3)
                  , tcdTyDefn = TyData { td_ND = NewType, td_ctxt = noLoc []
 		                      , td_kindSig = Nothing
                                       , td_cons = $4 (rdrNameOcc tc_rdr), td_derivs = Nothing } } }
@@ -377,16 +377,16 @@ ifaceArrow ifT1 ifT2 = IfaceFunTy ifT1 ifT2
 toHsTvBndr :: IfaceTvBndr -> LHsTyVarBndr RdrName
 toHsTvBndr (tv,k) = noLoc $ KindedTyVar (mkRdrUnqual (mkTyVarOccFS tv)) bsig
                   where
-                    bsig = mkHsBSig (toHsKind k)
+                    bsig = toHsKind k
 
 ifaceExtRdrName :: Name -> RdrName
 ifaceExtRdrName name = mkOrig (nameModule name) (nameOccName name)
 ifaceExtRdrName other = pprPanic "ParserCore.ifaceExtRdrName" (ppr other)
 
 add_forall tv (L _ (HsForAllTy exp tvs cxt t))
-  = noLoc $ HsForAllTy exp (tv:tvs) cxt t
+  = noLoc $ HsForAllTy exp (mkHsQTvs (tv : hsQTvBndrs tvs)) cxt t
 add_forall tv t
-  = noLoc $ HsForAllTy Explicit [tv] (noLoc []) t
+  = noLoc $ HsForAllTy Explicit (mkHsQTvs [tv]) (noLoc []) t
   
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l

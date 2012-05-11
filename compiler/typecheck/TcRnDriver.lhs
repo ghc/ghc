@@ -1430,10 +1430,13 @@ getGhciStepIO = do
     let a_tv   = mkTcTyVarName fresh_a (fsLit "a")
         ghciM  = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM    = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
+
+        stepTy :: LHsType Name    -- Renamed, so needs all binders in place
         stepTy = noLoc $ HsForAllTy Implicit
-                      ([noLoc $ UserTyVar a_tv])
-                      (noLoc [])
-                      (nlHsFunTy ghciM ioM)
+                            (HsQTvs { hsq_tvs = [noLoc (UserTyVar a_tv)]
+                                    , hsq_kvs = [] })
+                            (noLoc [])
+                            (nlHsFunTy ghciM ioM)
         step   = noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy
     return step
 

@@ -137,6 +137,9 @@ import TcRnTypes
 
 import Unique 
 import UniqFM
+#ifdef DEBUG
+import Digraph
+#endif
 import Maybes ( orElse, catMaybes )
 
 
@@ -960,10 +963,32 @@ runTcS context untouch is wl tcs
          }
              -- And return
        ; ev_binds <- TcM.getTcEvBinds ev_binds_var
+       ; checkForCyclicBinds ev_binds
        ; return (res, ev_binds) }
   where
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
 
+checkForCyclicBinds :: Bag EvBind -> TcM ()
+#ifndef DEBUG
+checkForCyclicBinds _ = return ()
+#else
+checkForCyclicBinds ev_binds
+  | null cycles 
+  = return ()
+  | null coercion_cycles
+  = TcM.traceTc "Cycle in evidence binds" $ ppr cycles
+  | otherwise
+  = pprPanic "Cycle in coercion bindings" $ ppr coercion_cycles
+  where
+    cycles :: [[EvBind]]
+    cycles = [c | CyclicSCC c <- stronglyConnCompFromEdgedVertices edges]
+
+    coercion_cycles = [c | c <- cycles, any is_co_bind c]
+    is_co_bind (EvBind b _) = isEqVar b
+
+    edges :: [(EvBind, EvVar, [EvVar])]
+    edges = [(bind, bndr, varSetElems (evVarsOfTerm rhs)) | bind@(EvBind bndr rhs) <- bagToList ev_binds]
+#endif       
 
 doWithInert :: InertSet -> TcS a -> TcS a 
 doWithInert inert (TcS action)
@@ -1368,36 +1393,11 @@ freshGoals :: [MaybeNew] -> [CtEvidence]
 freshGoals mns = [ ctev | Fresh ctev <- mns ]
 
 setEvBind :: EvVar -> EvTerm -> TcS ()
-setEvBind the_ev t
-  = do { tc_evbinds <- getTcEvBinds
-       ; wrapTcS $ TcM.addTcEvBind tc_evbinds the_ev t
-
-       ; traceTcS "setEvBind" $ vcat [ text "ev =" <+> ppr the_ev
-                                     , text "t  =" <+> ppr t ]
-
-#ifndef DEBUG
-       ; return () }
-#else
-       ; binds <- getTcEvBindsMap
-       ; let cycle = reaches_tm binds t
-       ; when cycle (fail_if_co_loop binds) }
-
-  where fail_if_co_loop binds
-          = do { traceTcS "Cycle in evidence binds" $ vcat [ text "evvar =" <+> ppr the_ev
-                                                           , ppr (evBindMapBinds binds) ]
-               ; when (isEqVar the_ev) (pprPanic "setEvBind" (text "BUG: Coercion loop!")) }
-
-        reaches_tm :: EvBindMap -> EvTerm -> Bool
-        -- Does any free variable of 'tm' reach 'the_ev'
-        reaches_tm ebm tm = foldVarSet ((||) . reaches ebm) False (evVarsOfTerm tm)
-
-        reaches :: EvBindMap -> Var -> Bool 
-        -- Does this evvar reach the_ev? 
-        reaches ebm ev 
-          | ev == the_ev                                 = True
-          | Just (EvBind _ evtrm) <- lookupEvBind ebm ev = reaches_tm ebm evtrm
-          | otherwise                                    = False
-#endif
+setEvBind the_ev tm
+  = do { traceTcS "setEvBind" $ vcat [ text "ev =" <+> ppr the_ev
+                                     , text "tm  =" <+> ppr tm ]
+       ; tc_evbinds <- getTcEvBinds
+       ; wrapTcS $ TcM.addTcEvBind tc_evbinds the_ev tm }
 
 newGivenEvVar :: GivenLoc -> TcPredType -> EvTerm -> TcS CtEvidence
 -- Make a new variable of the given PredType, 
@@ -1684,6 +1684,7 @@ getCtCoercion _bs ct
   = ASSERT( not (isDerivedCt ct) )
     evTermCoercion (ctEvTerm (ctEvidence ct))
 {-       ToDo: check with Dimitrios that we can dump this stuff
+         WARNING: if we *do* need this stuff, we need to think again about cyclic bindings.
   = case lookupEvBind bs cc_id of
         -- Given and bound to a coercion term
       Just (EvBind _ (EvCoercion co)) -> co

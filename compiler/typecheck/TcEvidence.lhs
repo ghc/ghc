@@ -242,7 +242,8 @@ coVarsOfTcCo tc_co
     go (TcNthCo _ co)            = go co
     go (TcLetCo (EvBinds bs) co) = foldrBag (unionVarSet . go_bind) (go co) bs
                                    `minusVarSet` get_bndrs bs
-    go (TcLetCo {}) = pprPanic "coVarsOfTcCo called on non-zonked TcCoercion" (ppr tc_co)
+    go (TcLetCo {}) = emptyVarSet    -- Harumph. This does legitimately happen in the call
+                                     -- to evVarsOfTerm in the DEBUG check of setEvBind
 
     -- We expect only coercion bindings
     go_bind :: EvBind -> VarSet

@@ -783,24 +783,19 @@ then we'd also need
                           since we only have BOX for a super kind)
 
 \begin{code}
-bindScopedKindVars :: [LHsTyVarBndr Name] -> TcM a -> TcM a
+bindScopedKindVars :: [Name] -> TcM a -> TcM a
 -- Given some tyvar binders like [a (b :: k -> *) (c :: k)]
 -- bind each scoped kind variable (k in this case) to a fresh
 -- kind skolem variable
-bindScopedKindVars hs_tvs thing_inside
-  = tcExtendTyVarEnv kvs thing_inside
-  where
-    kvs :: [KindVar]   -- All skolems
-    kvs = [ mkKindSigVar kv 
-          | L _ (KindedTyVar _ (HsBSig _ (_, kvs))) <- hs_tvs
-          , kv <- kvs ]
+bindScopedKindVars kvs thing_inside 
+  = tcExtendTyVarEnv (map mkKindSigVar kvs) thing_inside
 
-tcHsTyVarBndrs :: [LHsTyVarBndr Name] 
+tcHsTyVarBndrs :: LHsTyVarBndrs Name 
 	       -> ([TyVar] -> TcM r)
 	       -> TcM r
 -- Bind the type variables to skolems, each with a meta-kind variable kind
-tcHsTyVarBndrs hs_tvs thing_inside
-  = bindScopedKindVars hs_tvs $
+tcHsTyVarBndrs (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
+  = bindScopedKindVars kvs $
     do { tvs <- mapM tcHsTyVarBndr hs_tvs
        ; traceTc "tcHsTyVarBndrs" (ppr hs_tvs $$ ppr tvs)
        ; tcExtendTyVarEnv tvs (thing_inside tvs) }
@@ -825,7 +820,7 @@ tcHsTyVarBndr (L _ hs_tv)
            _ -> do
        { kind <- case hs_tv of
                    UserTyVar {} -> newMetaKindVar
-                   KindedTyVar _ (HsBSig kind _) -> tcLHsKind kind
+                   KindedTyVar _ kind -> tcLHsKind kind
        ; return (mkTcTyVar name kind (SkolemTv False)) } } }
 
 ------------------
@@ -896,11 +891,11 @@ kcLookupKind nm
            AGlobal (ATyCon tc) -> return (tyConKind tc)
            _                   -> pprPanic "kcLookupKind" (ppr tc_ty_thing) }
 
-kcTyClTyVars :: Name -> [LHsTyVarBndr Name] -> (TcKind -> TcM a) -> TcM a
+kcTyClTyVars :: Name -> LHsTyVarBndrs Name -> (TcKind -> TcM a) -> TcM a
 -- Used for the type variables of a type or class decl,
 -- when doing the initial kind-check.  
-kcTyClTyVars name hs_tvs thing_inside
-  = bindScopedKindVars hs_tvs $
+kcTyClTyVars name (HsQTvs { hsq_kvs = kvs, hsq_tvs = hs_tvs }) thing_inside
+  = bindScopedKindVars kvs $
     do 	{ tc_kind <- kcLookupKind name
 	; let (arg_ks, res_k) = splitKindFunTysN (length hs_tvs) tc_kind
                      -- There should be enough arrows, because
@@ -912,7 +907,7 @@ kcTyClTyVars name hs_tvs thing_inside
     kc_tv (L _ (UserTyVar n)) exp_k 
       = do { check_in_scope n exp_k
            ; return (n, exp_k) }
-    kc_tv (L _ (KindedTyVar n (HsBSig hs_k _))) exp_k
+    kc_tv (L _ (KindedTyVar n hs_k)) exp_k
       = do { k <- tcLHsKind hs_k
            ; _ <- unifyKind k exp_k
            ; check_in_scope n exp_k
@@ -930,7 +925,7 @@ kcTyClTyVars name hs_tvs thing_inside
                Just thing      -> pprPanic "check_in_scope" (ppr thing) }
 
 -----------------------
-tcTyClTyVars :: Name -> [LHsTyVarBndr Name]	-- LHS of the type or class decl
+tcTyClTyVars :: Name -> LHsTyVarBndrs Name	-- LHS of the type or class decl
              -> ([TyVar] -> Kind -> TcM a) -> TcM a
 -- Used for the type variables of a type or class decl,
 -- on the second pass when constructing the final result
@@ -1051,16 +1046,16 @@ Historical note:
 
 \begin{code}
 tcHsPatSigType :: UserTypeCtxt
-	       -> HsBndrSig (LHsType Name)  -- The type signature
-	      -> TcM ( Type                 -- The signature
-                      , [(Name, TcTyVar)] ) -- The new bit of type environment, binding
-				            -- the scoped type variables
+	       -> HsWithBndrs (LHsType Name)  -- The type signature
+	      -> TcM ( Type                   -- The signature
+                      , [(Name, TcTyVar)] )   -- The new bit of type environment, binding
+				              -- the scoped type variables
 -- Used for type-checking type signatures in
 -- (a) patterns 	  e.g  f (x::Int) = e
 -- (b) result signatures  e.g. g x :: Int = e
 -- (c) RULE forall bndrs  e.g. forall (x::Int). f x = x
 
-tcHsPatSigType ctxt (HsBSig hs_ty (sig_kvs, sig_tvs))
+tcHsPatSigType ctxt (HsWB { hswb_cts = hs_ty, hswb_kvs = sig_kvs, hswb_tvs = sig_tvs })
   = addErrCtxt (pprHsSigCtxt ctxt hs_ty) $
     do	{ kvs <- mapM new_kv sig_kvs
         ; tvs <- mapM new_tv sig_tvs
@@ -1081,7 +1076,7 @@ tcHsPatSigType ctxt (HsBSig hs_ty (sig_kvs, sig_tvs))
           _              -> newSigTyVar name kind  -- See Note [Unifying SigTvs]
 
 tcPatSig :: UserTypeCtxt
-	 -> HsBndrSig (LHsType Name)
+	 -> HsWithBndrs (LHsType Name)
 	 -> TcSigmaType
 	 -> TcM (TcType,	    -- The type to use for "inside" the signature
 		 [(Name, TcTyVar)], -- The new bit of type environment, binding
