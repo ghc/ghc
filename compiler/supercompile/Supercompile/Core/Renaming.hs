@@ -203,8 +203,8 @@ coreSynToVar = fromMaybe (panic "renameId" empty) . getId_maybe
 
 insertVarRenaming :: Renaming -> Var -> Out Var -> Renaming
 insertVarRenaming rn x y
-  | isTyVar x = insertTypeSubst     rn x (mkTyVarTy x)
-  | isCoVar x = insertCoercionSubst rn x (mkCoVarCo x)
+  | isTyVar x = insertTypeSubst     rn x (mkTyVarTy y)
+  | isCoVar x = insertCoercionSubst rn x (mkCoVarCo y)
   | otherwise = insertIdRenaming    rn x y
 
 insertIdRenaming :: Renaming -> Id -> Out Id -> Renaming
