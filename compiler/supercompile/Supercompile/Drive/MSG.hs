@@ -245,7 +245,7 @@ instance Monad MSG where
 
 -- INVARIANT: neither incoming Var may be bound rigidly (rigid only matches against rigid)
 msgFlexiVar :: RnEnv2 -> Var -> Var -> MSG Var
-msgFlexiVar rn2 x_l x_r = msgPend rn2 (zapIdExtraInfo x_r) (PendingVar x_l x_r)
+msgFlexiVar rn2 x_l x_r = msgPend rn2 (zapVarExtraInfo x_r) (PendingVar x_l x_r)
 
 -- INVARIANT: neither incoming Type can refer to something bound rigidly (can't float out things that reference rigids)
 msgGeneraliseType :: RnEnv2 -> Type -> Type -> MSG TyVar
@@ -276,6 +276,10 @@ msgGeneraliseTerm rn2 e_l e_r = msgPend rn2 x (PendingTerm e_l e_r)
       Var x              -> Just x
       Value (Indirect x) -> Just x -- Because we sneakily reuse msgGeneraliseTerm for values as well
       _                  -> Nothing
+
+zapVarExtraInfo :: Var -> Var
+zapVarExtraInfo x | isId x    = zapIdExtraInfo x
+                  | otherwise = x
 
 zapIdExtraInfo :: Id -> Id
 zapIdExtraInfo x = mkLocalId (varName x) (idType x)
