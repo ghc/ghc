@@ -639,6 +639,7 @@ canAbstractOverTyVarOfKind = ok
     ok (TyConApp _ ks) = all ok ks
     ok (FunTy k1 k2)   = ok k1 && ok k2
     ok (ForAllTy _ k)  = ok k
+    ok (LitTy _)       = True
 
 -- NB: we don't match FunTy and TyConApp literally because
 -- we can do better MSG for combinations like:
@@ -676,6 +677,7 @@ msgType' _         _   (TyConApp tc_l [])    (TyConApp tc_r [])    | tc_l == tc_
 msgType' are_kinds rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) | not (null tys_l) || not (null tys_r) = msgType' are_kinds rn2 (foldl AppTy (TyConApp tc_l []) tys_l) (foldl AppTy (TyConApp tc_r []) tys_r)
 msgType' are_kinds rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = msgType' are_kinds rn2 ((TyConApp funTyCon [] `AppTy` ty1_l) `AppTy` ty2_l) ((TyConApp funTyCon [] `AppTy` ty1_r) `AppTy` ty2_r)
 msgType' are_kinds rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = msgTyVarBndr ForAllTy rn2 a_l a_r $ \rn2 -> msgType' are_kinds rn2 ty_l ty_r
+msgType' _         _   (LitTy l_l)           (LitTy l_r)           | l_l == l_r = return (LitTy l_r)
 msgType' are_kinds rn2 ty_l ty_r
   | are_kinds = fail "msgType: no generalisation at kind level"
   | not (canAbstractOverTyVarOfKind (typeKind ty_l')) = fail "msgType: bad kind for type generalisation" -- NB: legit to just check left hand side because kinds are ungeneralised, so it will eventualy be checked that it exactly matches the right

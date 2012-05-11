@@ -179,6 +179,7 @@ matchType rn2 (AppTy ty1_l ty2_l)   (AppTy ty1_r ty2_r)   = liftM2 (++) (matchTy
 matchType rn2 (TyConApp tc_l tys_l) (TyConApp tc_r tys_r) = guard "matchType: TyConApp" (tc_l == tc_r) >> matchList (matchType rn2) tys_l tys_r
 matchType rn2 (FunTy ty1_l ty2_l)   (FunTy ty1_r ty2_r)   = liftM2 (++) (matchType rn2 ty1_l ty1_r) (matchType rn2 ty2_l ty2_r)
 matchType rn2 (ForAllTy a_l ty_l)   (ForAllTy a_r ty_r)   = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchType rn2 ty_l ty_r
+matchType _   (LitTy l_l)           (LitTy l_r)           = guard "matchType: LitTy" (l_l == l_r) >> return []
 matchType _ _ _ = fail "matchType"
 
 -- TODO: match coercion instantiation?
