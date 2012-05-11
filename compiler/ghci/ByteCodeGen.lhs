@@ -482,6 +482,9 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
 -- ignore other kinds of tick
 schemeE d s p (AnnTick _ (_, rhs)) = schemeE d s p rhs
 
+schemeE d s p (AnnCase (_,scrut) _ _ []) = schemeE d s p scrut
+        -- no alts: scrut is guaranteed to diverge
+
 schemeE d s p (AnnCase scrut _ _ [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind1)
         -- Convert
