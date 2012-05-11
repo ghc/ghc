@@ -17,7 +17,8 @@ module GHC.TypeLits
     Nat, Symbol
 
     -- * Linking type and value level
-  , Sing, SingI, sing, SingRep, fromSing
+  , Sing, SingI, Kind, sing, SingRep, fromSing
+  , unsafeMakeSing
 
     -- * Working with singletons
   , withSing, singThat
@@ -35,10 +36,15 @@ import GHC.Num(Integer, (-))
 import GHC.Base(String)
 import GHC.Read(Read(..))
 import GHC.Show(Show(..))
+import GHC.Prim(Any)
 import Unsafe.Coerce(unsafeCoerce)
 import Data.Bits(testBit,shiftR)
 import Data.Maybe(Maybe(..))
 import Data.List((++))
+
+-- | A type synonym useful for passing kinds as parameters.
+type Kind = Any
+
 
 -- | This is the *kind* of type-level natural numbers.
 data Nat
@@ -54,12 +60,12 @@ data Symbol
 type family SingRep a
 
 -- | Type-level natural numbers are linked to (positive) integers.
-type instance SingRep (n :: Nat)    = Integer
+type instance SingRep (Kind :: Nat)    = Integer
 
 -- | Type-level symbols are linked to strings.
-type instance SingRep (n :: Symbol) = String
+type instance SingRep (Kind :: Symbol) = String
 
-newtype Sing n = Sing (SingRep n)
+newtype Sing (n :: k) = Sing (SingRep (Kind :: k))
 
 --------------------------------------------------------------------------------
 
@@ -90,19 +96,30 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 --------------------------------------------------------------------------------
 
-fromSing :: Sing a -> SingRep a
+{- | Turn a value into it's corresponding singleton.
+WARNING: There is no checking that the value matches the singleton!
+Use this only when you are sugre that the representation matches the
+singleton, or there will be lots of confusion!
+In general, the safe way to create singleton values is by using
+the 'SingI' class, so 'unsafeMakeSing' should be used only to define
+these instances. -}
+unsafeMakeSing :: SingRep (Kind :: k) -> Sing (a :: k)
+unsafeMakeSing = Sing
+
+fromSing :: Sing (a :: k) -> SingRep (Kind :: k)
 fromSing (Sing n) = n
 
 withSing :: SingI a => (Sing a -> b) -> b
 withSing f = f sing
 
-singThat :: SingI a => (SingRep a -> Bool) -> Maybe (Sing a)
+singThat :: SingI (a :: k) => (SingRep (Kind :: k) -> Bool) -> Maybe (Sing a)
 singThat p = withSing $ \x -> if p (fromSing x) then Just x else Nothing
 
-instance Show (SingRep a) => Show (Sing a) where
+instance Show (SingRep (Kind :: k)) => Show (Sing (a :: k)) where
   showsPrec p = showsPrec p . fromSing
 
-instance (SingI a, Read (SingRep a), Eq (SingRep a)) => Read (Sing a) where
+instance (SingI a, Read (SingRep (Kind :: k))
+                 , Eq   (SingRep (Kind :: k))) => Read (Sing (a :: k)) where
   readsPrec p cs = do (x,ys) <- readsPrec p cs
                       case singThat (== x) of
                         Just y  -> [(y,ys)]
