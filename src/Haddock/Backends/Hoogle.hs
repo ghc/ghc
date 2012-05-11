@@ -141,10 +141,10 @@ ppClass x = out x{tcdSigs=[]} :
         addContext _ = error "expected TypeSig"
 
         f (HsForAllTy a b con d) = HsForAllTy a b (reL (context : unLoc con)) d
-        f t = HsForAllTy Implicit [] (reL [context]) (reL t)
+        f t = HsForAllTy Implicit (mkHsQTvs []) (reL [context]) (reL t)
 
         context = nlHsTyConApp (unL $ tcdLName x)
-            (map (reL . HsTyVar . hsTyVarName . unL) (tcdTyVars x))
+            (map (reL . HsTyVar . hsTyVarName . unL) (hsQTvBndrs (tcdTyVars x)))
 
 
 ppInstance :: ClsInst -> [String]
@@ -193,7 +193,8 @@ ppCtor dat subdocs con = doc (lookupCon subdocs (con_name con))
         name = out $ unL $ con_name con
 
         resType = case con_res con of
-            ResTyH98 -> apps $ map (reL . HsTyVar) $ unL (tcdLName dat) : [hsTyVarName v | v@UserTyVar {} <- map unL $ tcdTyVars dat]
+            ResTyH98 -> apps $ map (reL . HsTyVar) $ 
+                        unL (tcdLName dat) : [hsTyVarName v | L _ (v@UserTyVar {}) <- hsQTvBndrs $ tcdTyVars dat]
             ResTyGADT x -> x
 
 

@@ -206,17 +206,17 @@ renameLType = mapM renameType
 renameLKind :: LHsKind Name -> RnM (LHsKind DocName)
 renameLKind = renameLType
 
-renameMaybeLKind :: Maybe (HsBndrSig (LHsKind Name)) 
-                 -> RnM (Maybe (HsBndrSig (LHsKind DocName)))
+renameMaybeLKind :: Maybe (LHsKind Name)
+                 -> RnM (Maybe (LHsKind DocName))
 renameMaybeLKind Nothing = return Nothing
-renameMaybeLKind (Just (HsBSig ki fvs))
+renameMaybeLKind (Just ki)
   = do { ki' <- renameLKind ki
-       ; return (Just (HsBSig ki' fvs)) }
+       ; return (Just ki') }
 
 renameType :: HsType Name -> RnM (HsType DocName)
 renameType t = case t of
   HsForAllTy expl tyvars lcontext ltype -> do
-    tyvars'   <- mapM renameLTyVarBndr tyvars
+    tyvars'   <- renameLTyVarBndrs tyvars
     lcontext' <- renameLContext lcontext
     ltype'    <- renameLType ltype
     return (HsForAllTy expl tyvars' lcontext' ltype')
@@ -264,14 +264,19 @@ renameType t = case t of
   _ -> error "renameType"
 
 
+renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
+renameLTyVarBndrs qtvs
+  = do { tvs' <- mapM renameLTyVarBndr (hsQTvBndrs qtvs) 
+       ; return (mkHsQTvs tvs') }
+
 renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
 renameLTyVarBndr (L loc (UserTyVar n))
   = do { n' <- rename n
        ; return (L loc (UserTyVar n')) }
-renameLTyVarBndr (L loc (KindedTyVar n (HsBSig k fvs)))
+renameLTyVarBndr (L loc (KindedTyVar n k))
   = do { n' <- rename n
        ; k' <- renameLKind k
-       ; return (L loc (KindedTyVar n' (HsBSig k' fvs))) }
+       ; return (L loc (KindedTyVar n' k')) }
 
 renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
@@ -321,7 +326,7 @@ renameTyClD d = case d of
 --  TyFamily flav lname ltyvars kind tckind -> do
   TyFamily flav lname ltyvars tckind -> do
     lname'   <- renameL lname
-    ltyvars' <- mapM renameLTyVarBndr ltyvars
+    ltyvars' <- renameLTyVarBndrs ltyvars
 --    kind'    <- renameMaybeLKind kind
     tckind'    <- renameMaybeLKind tckind
 --    return (TyFamily flav lname' ltyvars' kind' tckind)
@@ -329,7 +334,7 @@ renameTyClD d = case d of
 
   TyDecl { tcdLName = lname, tcdTyVars = tyvars, tcdTyDefn = defn, tcdFVs = fvs } -> do
     lname'    <- renameL lname
-    tyvars'  <- mapM renameLTyVarBndr tyvars
+    tyvars'   <- renameLTyVarBndrs tyvars
     defn'     <- renameTyDefn defn
     return (TyDecl { tcdLName = lname', tcdTyVars = tyvars', tcdTyDefn = defn', tcdFVs = fvs })
 
@@ -337,7 +342,7 @@ renameTyClD d = case d of
             , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
     lcontext' <- renameLContext lcontext
     lname'    <- renameL lname
-    ltyvars'  <- mapM renameLTyVarBndr ltyvars
+    ltyvars'  <- renameLTyVarBndrs ltyvars
     lfundeps' <- mapM renameLFunDep lfundeps
     lsigs'    <- mapM renameLSig lsigs
     ats'      <- mapM renameLTyClD ats
@@ -374,7 +379,7 @@ renameCon decl@(ConDecl { con_name = lname, con_qvars = ltyvars
                         , con_cxt = lcontext, con_details = details
                         , con_res = restype, con_doc = mbldoc }) = do
       lname'    <- renameL lname
-      ltyvars'  <- mapM renameLTyVarBndr ltyvars
+      ltyvars'  <- renameLTyVarBndrs ltyvars
       lcontext' <- renameLContext lcontext
       details'  <- renameDetails details
       restype'  <- renameResType restype
@@ -431,11 +436,11 @@ renameInstD (FamInstD { lid_inst = d }) = do
   return (FamInstD { lid_inst = d' })
 
 renameFamInstD :: FamInstDecl Name -> RnM (FamInstDecl DocName)
-renameFamInstD (FamInstDecl { fid_tycon = tc, fid_pats = HsBSig pats fvs, fid_defn = defn })
+renameFamInstD (FamInstDecl { fid_tycon = tc, fid_pats = pats_w_bndrs, fid_defn = defn })
   = do { tc' <- renameL tc
-       ; pats' <- mapM renameLType pats
+       ; pats' <- mapM renameLType (hswb_cts pats_w_bndrs)
        ; defn' <- renameTyDefn defn 
-       ; return (FamInstDecl { fid_tycon = tc', fid_pats = HsBSig pats' fvs
+       ; return (FamInstDecl { fid_tycon = tc', fid_pats = pats_w_bndrs { hswb_cts = pats' }
                              , fid_defn = defn', fid_fvs = placeHolderNames }) }
 
 

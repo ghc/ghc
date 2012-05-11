@@ -99,12 +99,12 @@ ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep)
       = (leader <+> ppType unicode qual t, argDoc n, []) : []
 
 
-ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
+ppTyVars :: LHsTyVarBndrs DocName -> [Html]
 ppTyVars tvs = map ppTyName (tyvarNames tvs)
 
 
-tyvarNames :: [LHsTyVarBndr DocName] -> [Name]
-tyvarNames = map (getName . hsTyVarName . unLoc)
+tyvarNames :: LHsTyVarBndrs DocName -> [Name]
+tyvarNames = map getName . hsLTyVarNames
 
 
 ppFor :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName
@@ -162,8 +162,8 @@ ppTyFamHeader summary associated decl unicode qual =
   ppTyClBinderWithVars summary decl <+>
 
   case tcdKindSig decl of
-    Just (HsBSig kind _) -> dcolon unicode  <+> ppLKind unicode qual kind
-    Nothing -> noHtml
+    Just kind -> dcolon unicode  <+> ppLKind unicode qual kind
+    Nothing   -> noHtml
 
 
 ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
@@ -275,7 +275,7 @@ pp_hs_context cxt unicode qual = parenList (map (ppType unicode qual) cxt)
 
 
 ppClassHdr :: Bool -> Located [LHsType DocName] -> DocName
-           -> [Located (HsTyVarBndr DocName)] -> [Located ([DocName], [DocName])]
+           -> LHsTyVarBndrs DocName -> [Located ([DocName], [DocName])]
            -> Bool -> Qualification -> Html
 ppClassHdr summ lctxt n tvs fds unicode qual =
   keyword "class"
@@ -646,13 +646,13 @@ ppKind unicode qual ki = ppr_mono_ty pREC_TOP ki unicode qual
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
-ppForAll :: HsExplicitFlag -> [Located (HsTyVarBndr DocName)]
+ppForAll :: HsExplicitFlag -> LHsTyVarBndrs DocName
          -> Located (HsContext DocName) -> Bool -> Qualification -> Html
 ppForAll expl tvs cxt unicode qual
   | show_forall = forall_part <+> ppLContext cxt unicode qual
   | otherwise   = ppLContext cxt unicode qual
   where
-    show_forall = not (null tvs) && is_explicit
+    show_forall = not (null (hsQTvBndrs tvs)) && is_explicit
     is_explicit = case expl of {Explicit -> True; Implicit -> False}
     forall_part = hsep (forallSymbol unicode : ppTyVars tvs) +++ dot
 

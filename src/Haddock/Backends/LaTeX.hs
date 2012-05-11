@@ -388,12 +388,12 @@ ppTypeSig nms ty unicode =
     <+> ppType unicode ty
 
 
-ppTyVars :: [LHsTyVarBndr DocName] -> [LaTeX]
+ppTyVars :: LHsTyVarBndrs DocName -> [LaTeX]
 ppTyVars tvs = map ppSymName (tyvarNames tvs)
 
 
-tyvarNames :: [LHsTyVarBndr DocName] -> [Name]
-tyvarNames = map (getName . hsTyVarName . unLoc)
+tyvarNames :: LHsTyVarBndrs DocName -> [Name]
+tyvarNames = map getName . hsLTyVarNames
 
 
 declWithDoc :: LaTeX -> Maybe LaTeX -> LaTeX
@@ -442,7 +442,7 @@ rDoc = maybeDoc . fmap latexStripTrailingWhitespace
 
 
 ppClassHdr :: Bool -> Located [LHsType DocName] -> DocName
-           -> [Located (HsTyVarBndr DocName)] -> [Located ([DocName], [DocName])]
+           -> LHsTyVarBndrs DocName -> [Located ([DocName], [DocName])]
            -> Bool -> LaTeX
 ppClassHdr summ lctxt n tvs fds unicode =
   keyword "class"
@@ -826,13 +826,13 @@ ppKind unicode ki = ppr_mono_ty pREC_TOP ki unicode
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
-ppForAll :: HsExplicitFlag -> [Located (HsTyVarBndr DocName)]
+ppForAll :: HsExplicitFlag -> LHsTyVarBndrs DocName
          -> Located (HsContext DocName) -> Bool -> LaTeX
 ppForAll expl tvs cxt unicode
   | show_forall = forall_part <+> ppLContext cxt unicode
   | otherwise   = ppLContext cxt unicode
   where
-    show_forall = not (null tvs) && is_explicit
+    show_forall = not (null (hsQTvBndrs tvs)) && is_explicit
     is_explicit = case expl of {Explicit -> True; Implicit -> False}
     forall_part = hsep (forallSymbol unicode : ppTyVars tvs) <> dot
 

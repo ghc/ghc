@@ -87,7 +87,7 @@ synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
         typats    = map (synifyType WithinType) args
         hs_rhs_ty = synifyType WithinType rhs
     in FamInstDecl { fid_tycon = name 
-                   , fid_pats = HsBSig typats ([], map tyVarName tvs)
+                   , fid_pats = HsWB { hswb_cts = typats, hswb_kvs = [], hswb_tvs = map tyVarName tvs }
                    , fid_defn = TySynonym hs_rhs_ty, fid_fvs = placeHolderNames }
   | otherwise
   = error "synifyAxiom" 
@@ -97,7 +97,7 @@ synifyTyCon tc
   | isFunTyCon tc || isPrimTyCon tc 
   = TyDecl { tcdLName = synifyName tc
            , tcdTyVars =       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
-                         zipWith
+                         mkHsQTvs $ zipWith
                             (\fakeTyVar realKind -> noLoc $
                                 KindedTyVar (getName fakeTyVar) 
                                             (synifyKindSig realKind))
@@ -230,8 +230,8 @@ synifyCtx :: [PredType] -> LHsContext Name
 synifyCtx = noLoc . map (synifyType WithinType)
 
 
-synifyTyVars :: [TyVar] -> [LHsTyVarBndr Name]
-synifyTyVars = map synifyTyVar
+synifyTyVars :: [TyVar] -> LHsTyVarBndrs Name
+synifyTyVars tvs = mkHsQTvs (map synifyTyVar tvs)
   where
     synifyTyVar tv = noLoc $ let
       kind = tyVarKind tv
@@ -311,8 +311,8 @@ synifyTyLit :: TyLit -> HsTyLit
 synifyTyLit (NumTyLit n) = HsNumTy n
 synifyTyLit (StrTyLit s) = HsStrTy s
 
-synifyKindSig :: Kind -> HsBndrSig (LHsKind Name)
-synifyKindSig k = mkHsBSig (synifyType (error "synifyKind") k)
+synifyKindSig :: Kind -> LHsKind Name
+synifyKindSig k = synifyType (error "synifyKind") k
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
                   ([HsType Name], Name, [HsType Name])
