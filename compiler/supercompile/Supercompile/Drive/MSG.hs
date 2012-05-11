@@ -1015,7 +1015,7 @@ msgPureHeap mm rn2 msg_e msg_s (Heap init_h_l init_ids_l) (Heap init_h_r init_id
                  -- that binding refers to. If that is not possible, we have to fail.
                  (used_l', h_l') <- mb_individual_l >>= suck init_h_l k_bvs_l h_l x_l
                  (used_r', h_r') <- mb_individual_r >>= suck init_h_r k_bvs_r h_r x_r
-                 return $ go (insertIdRenaming rn_l x_common x_l) (insertIdRenaming rn_r x_common x_r) used_l' used_r' init_h_l init_h_r
+                 return $ go (insertVarRenaming rn_l x_common x_l) (insertVarRenaming rn_r x_common x_r) used_l' used_r' init_h_l init_h_r
                              (Heap h_l' ids_l) (Heap h_r' ids_r) (M.insert x_common generalised h) msg_s) -- FIXME: only mark as generalised if *right hand side* was not e.g. a lambda bound
       where
         (mb_common_l, mb_individual_l) = find init_h_l k_bvs_l h_l used_l x_l

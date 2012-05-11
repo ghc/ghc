@@ -10,6 +10,7 @@ module Supercompile.Core.Renaming (
     PreRenaming, invertRenaming, composeRenamings,
 
     -- | Extending the renaming
+    insertVarRenaming,
     insertIdRenaming, insertIdRenamings,
     insertTypeSubst, insertTypeSubsts,
     insertCoercionSubst, insertCoercionSubsts,
@@ -199,6 +200,12 @@ getId_maybe _                = Nothing
 
 coreSynToVar :: CoreSyn.CoreExpr -> Var
 coreSynToVar = fromMaybe (panic "renameId" empty) . getId_maybe
+
+insertVarRenaming :: Renaming -> Var -> Out Var -> Renaming
+insertVarRenaming rn x y
+  | isTyVar x = insertTypeSubst     rn x (mkTyVarTy x)
+  | isCoVar x = insertCoercionSubst rn x (mkCoVarCo x)
+  | otherwise = insertIdRenaming    rn x y
 
 insertIdRenaming :: Renaming -> Id -> Out Id -> Renaming
 insertIdRenaming (id_subst, tv_subst, co_subst) x x'
