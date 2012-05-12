@@ -1,12 +1,16 @@
 {-# LANGUAGE DataKinds #-}              -- to declare the kinds
 {-# LANGUAGE KindSignatures #-}         -- (used all over)
-{-# LANGUAGE MultiParamTypeClasses #-}  -- for <=
 {-# LANGUAGE TypeFamilies #-}           -- for declaring operators + sing family
 {-# LANGUAGE TypeOperators #-}          -- for declaring operator
 {-# LANGUAGE EmptyDataDecls #-}         -- for declaring the kinds
 {-# LANGUAGE GADTs #-}                  -- for examining type nats
 {-# LANGUAGE PolyKinds #-}              -- for Sing family
-{-# LANGUAGE UndecidableInstances #-}   -- for Read and Show instances
+{-# LANGUAGE UndecidableInstances #-}   -- for a bunch of the instances
+{-# LANGUAGE FlexibleInstances #-}      -- for kind parameters
+{-# LANGUAGE FlexibleContexts #-}       -- for kind parameters
+{-# LANGUAGE ScopedTypeVariables #-}    -- for kind parameters
+{-# LANGUAGE MultiParamTypeClasses #-}  -- for <=, singRep, SingE
+{-# LANGUAGE FunctionalDependencies #-} -- for SingRep and SingE
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -17,8 +21,9 @@ module GHC.TypeLits
     Nat, Symbol
 
     -- * Linking type and value level
-  , Sing, SingI, Kind, sing, SingRep, fromSing
-  , unsafeMakeSing
+  , Sing, SingI, SingE, SingRep, sing, fromSing
+  , unsafeSingNat, unsafeSingSymbol
+  , Kind
 
     -- * Working with singletons
   , withSing, singThat
@@ -54,18 +59,17 @@ data Symbol
 
 
 --------------------------------------------------------------------------------
+data family Sing n
 
--- | A family of singleton types, used to link the type-level literals
--- to run-time values.
-type family SingRep a
+newtype instance Sing (n :: Nat)    = SNat Integer
 
--- | Type-level natural numbers are linked to (positive) integers.
-type instance SingRep (Kind :: Nat)    = Integer
+newtype instance Sing (n :: Symbol) = SSym String
 
--- | Type-level symbols are linked to strings.
-type instance SingRep (Kind :: Symbol) = String
+unsafeSingNat :: Integer -> Sing (n :: Nat)
+unsafeSingNat = SNat
 
-newtype Sing (n :: k) = Sing (SingRep (Kind :: k))
+unsafeSingSymbol :: String -> Sing (n :: Symbol)
+unsafeSingSymbol = SSym
 
 --------------------------------------------------------------------------------
 
@@ -78,7 +82,7 @@ class SingI a where
   -- | The only value of type @Sing a@
   sing :: Sing a
 
-
+--------------------------------------------------------------------------------
 -- | Comparsion of type-level naturals.
 class (m :: Nat) <= (n :: Nat)
 
@@ -96,30 +100,55 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 
 --------------------------------------------------------------------------------
 
-{- | Turn a value into it's corresponding singleton.
-WARNING: There is no checking that the value matches the singleton!
-Use this only when you are sugre that the representation matches the
-singleton, or there will be lots of confusion!
-In general, the safe way to create singleton values is by using
-the 'SingI' class, so 'unsafeMakeSing' should be used only to define
-these instances. -}
-unsafeMakeSing :: SingRep (Kind :: k) -> Sing (a :: k)
-unsafeMakeSing = Sing
+{- | A class that converts singletons of a given kind into values of some
+representation type (i.e., we "forget" the extra information carried
+by the singletons, and convert them to ordinary values).
 
-fromSing :: Sing (a :: k) -> SingRep (Kind :: k)
-fromSing (Sing n) = n
+Note that 'fromSing' is overloaded based on the /kind/ of the values
+and not their type---all types of a given kind are processed by the
+same instances.
+-}
+
+class (kparam ~ Kind) => SingE (kparam :: k) rep | kparam -> rep where
+  fromSing :: Sing (a :: k) -> rep
+
+instance SingE (Kind :: Nat) Integer where
+  fromSing (SNat n) = n
+
+instance SingE (Kind :: Symbol) String where
+  fromSing (SSym s) = s
+
+
+{- | A convenience class, useful when we need to both introduce and eliminate
+a given singleton value. Users should never need to define instances of
+this classes. -}
+class    (SingI a, SingE (Kind :: k) rep) => SingRep (a :: k) rep | a -> rep
+instance (SingI a, SingE (Kind :: k) rep) => SingRep (a :: k) rep
+
+
+{- | A convenience function useful when we need to name a singleton value
+multiple times.  Without this function, each use of 'sing' could potentially
+refer to a different singleton, and one has to use type signatures to
+ensure that they are the same. -}
 
 withSing :: SingI a => (Sing a -> b) -> b
 withSing f = f sing
 
-singThat :: SingI (a :: k) => (SingRep (Kind :: k) -> Bool) -> Maybe (Sing a)
+
+{- | A convenience function that names a singleton satisfying a certain
+property.  If the singleton does not satisfy the property, then the function
+returns 'Nothing'. The property is expressed in terms of the underlying
+representation of the singleton. -}
+
+singThat :: (SingRep a rep) => (rep -> Bool) -> Maybe (Sing a)
 singThat p = withSing $ \x -> if p (fromSing x) then Just x else Nothing
 
-instance Show (SingRep (Kind :: k)) => Show (Sing (a :: k)) where
+
+
+instance (SingE (Kind :: k) rep, Show rep) => Show (Sing (a :: k)) where
   showsPrec p = showsPrec p . fromSing
 
-instance (SingI a, Read (SingRep (Kind :: k))
-                 , Eq   (SingRep (Kind :: k))) => Read (Sing (a :: k)) where
+instance (SingRep a rep, Read rep, Eq rep) => Read (Sing a) where
   readsPrec p cs = do (x,ys) <- readsPrec p cs
                       case singThat (== x) of
                         Just y  -> [(y,ys)]
@@ -127,17 +156,14 @@ instance (SingI a, Read (SingRep (Kind :: k))
 
 
 
-
-
 --------------------------------------------------------------------------------
-
 data IsZero :: Nat -> * where
   IsZero :: IsZero 0
   IsSucc :: !(Sing n) -> IsZero (n + 1)
 
 isZero :: Sing n -> IsZero n
-isZero (Sing n) | n == 0    = unsafeCoerce IsZero
-                | otherwise = unsafeCoerce (IsSucc (Sing (n-1)))
+isZero (SNat n) | n == 0    = unsafeCoerce IsZero
+                | otherwise = unsafeCoerce (IsSucc (SNat (n-1)))
 
 instance Show (IsZero n) where
   show IsZero     = "0"
@@ -149,14 +175,13 @@ data IsEven :: Nat -> * where
   IsOdd      :: !(Sing n)     -> IsEven (2 * n + 1)
 
 isEven :: Sing n -> IsEven n
-isEven (Sing n) | n == 0      = unsafeCoerce IsEvenZero
-                | testBit n 0 = unsafeCoerce (IsOdd  (Sing (n `shiftR` 1)))
-                | otherwise   = unsafeCoerce (IsEven (Sing (n `shiftR` 1)))
+isEven (SNat n) | n == 0      = unsafeCoerce IsEvenZero
+                | testBit n 0 = unsafeCoerce (IsOdd  (SNat (n `shiftR` 1)))
+                | otherwise   = unsafeCoerce (IsEven (SNat (n `shiftR` 1)))
 
 instance Show (IsEven n) where
   show IsEvenZero = "0"
   show (IsEven x) = "(2 * " ++ show x ++ ")"
   show (IsOdd  x) = "(2 * " ++ show x ++ " + 1)"
-
 
 
