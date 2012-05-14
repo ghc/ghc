@@ -766,13 +766,17 @@ pop_and act span buf len = do _ <- popLexState
 nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
 nextCharIs buf p = not (atEnd buf) && p (currentChar buf)
 
+{-# INLINE nextCharIsNot #-}
+nextCharIsNot :: StringBuffer -> (Char -> Bool) -> Bool
+nextCharIsNot buf p = not (nextCharIs buf p)
+
 notFollowedBy :: Char -> AlexAccPred Int
 notFollowedBy char _ _ _ (AI _ buf)
-  = nextCharIs buf (/=char)
+  = nextCharIsNot buf (== char)
 
 notFollowedBySymbol :: AlexAccPred Int
 notFollowedBySymbol _ _ _ (AI _ buf)
-  = nextCharIs buf (`notElem` "!#$%&*+./<=>?@\\^|-~")
+  = nextCharIsNot buf (`elem` "!#$%&*+./<=>?@\\^|-~")
 
 -- We must reject doc comments as being ordinary comments everywhere.
 -- In some cases the doc comment will be selected as the lexeme due to
@@ -782,13 +786,16 @@ notFollowedBySymbol _ _ _ (AI _ buf)
 isNormalComment :: AlexAccPred Int
 isNormalComment bits _ _ (AI _ buf)
   | haddockEnabled bits = notFollowedByDocOrPragma
-  | otherwise           = nextCharIs buf (/='#')
+  | otherwise           = nextCharIsNot buf (== '#')
   where
     notFollowedByDocOrPragma
-       = not $ spaceAndP buf (`nextCharIs` (`elem` "|^*$#"))
+       = afterOptionalSpace buf (\b -> nextCharIsNot b (`elem` "|^*$#"))
 
-spaceAndP :: StringBuffer -> (StringBuffer -> Bool) -> Bool
-spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
+afterOptionalSpace :: StringBuffer -> (StringBuffer -> Bool) -> Bool
+afterOptionalSpace buf p
+    = if nextCharIs buf (== ' ')
+      then p (snd (nextChar buf))
+      else p buf
 
 atEOL :: AlexAccPred Int
 atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
@@ -2341,7 +2348,7 @@ dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToStr
 
 known_pragma :: Map String Action -> AlexAccPred Int
 known_pragma prags _ _ len (AI _ buf) = (isJust $ Map.lookup (clean_pragma (lexemeToString (offsetBytes (- len) buf) len)) prags)
-                                          && (nextCharIs buf (\c -> not (isAlphaNum c || c == '_')))
+                                          && (nextCharIsNot buf (\c -> isAlphaNum c || c == '_'))
 
 clean_pragma :: String -> String
 clean_pragma prag = canon_ws (map toLower (unprefix prag))
