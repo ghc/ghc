@@ -48,6 +48,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   let ms            = pm_mod_summary . tm_parsed_module $ tm
       mi            = moduleInfo tm
+      safety        = modInfoSafe mi
       mdl           = ms_mod ms
       dflags        = ms_hspp_opts ms
       instances     = modInfoInstances mi
@@ -70,7 +71,7 @@ createInterface tm flags modMap instIfaceMap = do
         | otherwise = opts0
 
   (info, mbDoc) <- do
-    (i, d) <- liftErrMsg $ processModuleHeader dflags gre mayDocHeader
+    (i, d) <- liftErrMsg $ processModuleHeader dflags gre safety mayDocHeader
     return (i, addModuleWarning warnings d)
 
   let declsWithDocs = topDecls group_
