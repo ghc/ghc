@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 PKGCONF01=local01.package.conf
-LOCAL_GHC_PKG01 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF01)
+LOCAL_GHC_PKG01 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF01)
 
 STRIP_PKGROOT=sed 's/^pkgroot: .*$$/pkgroot: /'
 
@@ -49,7 +49,7 @@ ghcpkg01 :
 	if $(LOCAL_GHC_PKG01) register test3.pkg; then false; else true; fi
 
 PKGCONF03=local03.package.conf
-LOCAL_GHC_PKG03 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF03)
+LOCAL_GHC_PKG03 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF03)
 
 ghcpkg03 :
 	@rm -rf $(PKGCONF03)
@@ -67,7 +67,7 @@ ghcpkg03 :
 	$(LOCAL_GHC_PKG03) update --force test.pkg
 
 PKGCONF04=local04.package.conf
-LOCAL_GHC_PKG04 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF04)
+LOCAL_GHC_PKG04 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF04)
 
 # Test that importing a module exposed by two packages reports a conflict
 ghcpkg04 :
@@ -77,13 +77,13 @@ ghcpkg04 :
 	$(LOCAL_GHC_PKG04) update --force test5.pkg >/dev/null 2>&1 
 	$(LOCAL_GHC_PKG04) expose testpkg-1.2.3.4  >/dev/null 2>&1
 	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(PKGCONF04) -c ghcpkg04.hs || true
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONF04) -c ghcpkg04.hs || true
 
 # Test stacking of package.confs (also #2441)
 PKGCONF05a=local05a.package.conf
 PKGCONF05b=local05b.package.conf
-LOCAL_GHC_PKG05a = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF05a)
-LOCAL_GHC_PKG05b = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF05a) -f $(PKGCONF05b)
+LOCAL_GHC_PKG05a = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF05a)
+LOCAL_GHC_PKG05b = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF05a) -f $(PKGCONF05b)
 
 ghcpkg05 :
 	rm -rf $(PKGCONF05a) $(PKGCONF05b)
@@ -101,7 +101,7 @@ ghcpkg05 :
 
 # Test for #2330: reject duplicate dependencies
 PKGCONF06=local06.package.conf
-LOCAL_GHC_PKG06 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF06)
+LOCAL_GHC_PKG06 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF06)
 
 ghcpkg06 :
 	rm -rf $(PKGCONF06)
@@ -111,25 +111,25 @@ ghcpkg06 :
 	$(LOCAL_GHC_PKG06) register --force testdup.pkg
 
 PKGCONF1750=local1750.package.conf
-LOCAL_GHC_PKG1750 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF1750)
+LOCAL_GHC_PKG1750 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONF1750)
 
 1750:
 	rm -rf $(PKGCONF1750) 1750.hs 1750.o 1750.hi 1750.out
 	$(LOCAL_GHC_PKG1750) init $(PKGCONF1750)
 	$(LOCAL_GHC_PKG1750) register --force 1750A.pkg >1750.out 2>&1
 	$(LOCAL_GHC_PKG1750) register --force 1750B.pkg >1750.out 2>&1
-	GHC_PACKAGE_PATH=$(PKGCONF1750) '$(GHC_PKG)' --no-user-package-conf list
+	GHC_PACKAGE_PATH=$(PKGCONF1750) '$(GHC_PKG)' --no-user-package-db list
 # GHC_PACKAGE_PATH trick is to make this work with 6.8.2 which doesn't have
 # the patch "Change the command-line semantics for query commands" to
 # ghc-pkg
 	echo "main = return ()" >1750.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(PKGCONF1750) -package 1750A 1750.hs || true
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONF1750) -package 1750A 1750.hs || true
 
 PKGCONFSHADOW1=localshadow1.package.conf
 PKGCONFSHADOW2=localshadow2.package.conf
-LOCAL_GHC_PKGSHADOW1 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONFSHADOW1)
-LOCAL_GHC_PKGSHADOW2 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONFSHADOW2)
-LOCAL_GHC_PKGSHADOW3 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONFSHADOW1) -f $(PKGCONFSHADOW2)
+LOCAL_GHC_PKGSHADOW1 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFSHADOW1)
+LOCAL_GHC_PKGSHADOW2 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFSHADOW2)
+LOCAL_GHC_PKGSHADOW3 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFSHADOW1) -f $(PKGCONFSHADOW2)
 
 # Test package shadowing behaviour.
 #
@@ -152,18 +152,18 @@ shadow:
 # shadowdep-1-XXX to be unavailable:
 #
 	@echo "should FAIL:"
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code || true
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW1) -package-db $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code || true
 # 
 # Reversing the order of the package.conf files should fix the problem:
 #
 	@echo "should SUCCEED:"
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(PKGCONFSHADOW2) -package-conf $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code || true
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW2) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code || true
 #
 # We can also fix the problem by using an explicit -package-id flag to
 # specify a package we really want to use:
 #
 	@echo "should SUCCEED:"
-	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(PKGCONFSHADOW1) -package-conf $(PKGCONFSHADOW2) -package-id shadowdep-1-XXX -c shadow.hs -fno-code
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW1) -package-db $(PKGCONFSHADOW2) -package-id shadowdep-1-XXX -c shadow.hs -fno-code
 
 
 # -----------------------------------------------------------------------------
@@ -172,7 +172,7 @@ shadow:
 # of InstalledPackageInfo.
 
 PACKAGE_CONF_ghcpkg02 = package.conf.ghcpkg02
-GHC_PKG_ghcpkg02 = '$(GHC_PKG)' --no-user-package-conf --global-conf=$(PACKAGE_CONF_ghcpkg02)
+GHC_PKG_ghcpkg02 = '$(GHC_PKG)' --no-user-package-db --global-package-db=$(PACKAGE_CONF_ghcpkg02)
 
 ghcpkg02:
 	rm -rf $(PACKAGE_CONF_ghcpkg02)

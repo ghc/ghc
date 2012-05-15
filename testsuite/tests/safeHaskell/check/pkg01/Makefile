@@ -18,7 +18,7 @@ PREFIX := $(abspath install)
 $(eval $(call canonicalise,PREFIX))
 
 PKGCONF = local.db
-LGHC_PKG = '$(GHC_PKG)' --no-user-package-conf -f '$(PKGCONF)'
+LGHC_PKG = '$(GHC_PKG)' --no-user-package-db -f '$(PKGCONF)'
 
 safePkg01:
 	'$(MAKE)' cleanSafePkg01
