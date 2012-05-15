@@ -1,7 +1,0 @@
-
-tcfail087.hs:6:14:
-    Kind mis-match
-    Expected kind `ArgKind', but `(# Int, Int #)' has kind `(#)'
-    In the type `(# Int, Int #)'
-    In the definition of data constructor `Ex'
-    In the data declaration for `Ex'
