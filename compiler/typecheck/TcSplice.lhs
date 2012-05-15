@@ -1353,10 +1353,27 @@ reifyKind  ki
   = do { let (kis, ki') = splitKindFunTys ki
        ; ki'_rep <- reifyNonArrowKind ki'
        ; kis_rep <- mapM reifyKind kis
-       ; return (foldr TH.ArrowK ki'_rep kis_rep) }
+       ; return (foldr (TH.AppT . TH.AppT TH.ArrowT) ki'_rep kis_rep) }
   where
-    reifyNonArrowKind k | isLiftedTypeKind k = return TH.StarK 
-                        | otherwise          = noTH (sLit "this kind") (ppr k)
+    reifyNonArrowKind k | isLiftedTypeKind k = return TH.StarT
+                        | isConstraintKind k = return TH.ConstraintT
+    reifyNonArrowKind (TyVarTy v)            = return (TH.VarT (reifyName v))
+    reifyNonArrowKind (ForAllTy _ k)         = reifyKind k
+    reifyNonArrowKind (TyConApp kc kis)      = reify_kc_app kc kis
+    reifyNonArrowKind (AppTy k1 k2)          = do { k1' <- reifyKind k1
+                                                  ; k2' <- reifyKind k2
+                                                  ; return (TH.AppT k1' k2')
+                                                  }
+    reifyNonArrowKind k                      = noTH (sLit "this kind") (ppr k)
+
+reify_kc_app :: TyCon -> [TypeRep.Kind] -> TcM TH.Kind
+reify_kc_app kc kis
+  = fmap (foldl TH.AppT r_kc) (mapM reifyKind kis)
+  where
+    r_kc | isPromotedTyCon kc &&
+           isTupleTyCon (promotedTyCon kc)  = TH.TupleT (tyConArity kc)
+         | kc `hasKey` listTyConKey         = TH.ListT
+         | otherwise                        = TH.ConT (reifyName kc)
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
@@ -1371,7 +1388,7 @@ reifyFamFlavour tc | isSynFamilyTyCon tc = TH.TypeFam
                    = panic "TcSplice.reifyFamFlavour: not a type family"
 
 reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr]
-reifyTyVars = mapM reifyTyVar
+reifyTyVars = mapM reifyTyVar . filter isTypeVar
   where
     reifyTyVar tv | isLiftedTypeKind kind = return (TH.PlainTV  name)
                   | otherwise             = do kind' <- reifyKind kind
@@ -1382,12 +1399,25 @@ reifyTyVars = mapM reifyTyVar
 
 reify_tc_app :: TyCon -> [TypeRep.Type] -> TcM TH.Type
 reify_tc_app tc tys
-  = do { tys' <- reifyTypes tys
+  = do { tys' <- reifyTypes (removeKinds (tyConKind tc) tys)
        ; return (foldl TH.AppT r_tc tys') }
   where
-    r_tc | isTupleTyCon tc          = TH.TupleT (tyConArity tc)
-         | tc `hasKey` listTyConKey = TH.ListT
-         | otherwise                = TH.ConT (reifyName tc)
+    arity = tyConArity tc
+    r_tc | isTupleTyCon tc            = if isPromotedDataCon tc
+                                          then TH.PromotedTupleT arity
+                                          else TH.TupleT arity
+         | tc `hasKey` listTyConKey   = TH.ListT
+         | tc `hasKey` nilDataConKey  = TH.PromotedNilT
+         | tc `hasKey` consDataConKey = TH.PromotedConsT
+         | otherwise                  = TH.ConT (reifyName tc)
+    removeKinds :: Kind -> [TypeRep.Type] -> [TypeRep.Type]
+    removeKinds (FunTy k1 k2) (h:t)
+      | isSuperKind k1          = removeKinds k2 t
+      | otherwise               = h : removeKinds k2 t
+    removeKinds (ForAllTy v k) (h:t)
+      | isSuperKind (varType v) = removeKinds k t
+      | otherwise               = h : removeKinds k t
+    removeKinds _ tys           = tys
 
 reifyPred :: TypeRep.PredType -> TcM TH.Pred
 reifyPred ty = case classifyPredType ty of

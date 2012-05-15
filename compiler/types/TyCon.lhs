@@ -71,6 +71,7 @@ module TyCon(
         algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe,
         tupleTyConBoxity, tupleTyConSort, tupleTyConArity,
+        promotedDataCon, promotedTyCon,
 
         -- ** Manipulating TyCons
         tcExpandTyCon_maybe, coreExpandTyCon_maybe,
@@ -1200,6 +1201,16 @@ isPromotedDataCon _                    = False
 isPromotedTyCon :: TyCon -> Bool
 isPromotedTyCon (PromotedTyCon {}) = True
 isPromotedTyCon _                  = False
+
+-- | Retrieves the promoted DataCon if this is a PromotedDataTyCon;
+-- Panics otherwise
+promotedDataCon :: TyCon -> DataCon
+promotedDataCon = dataCon
+
+-- | Retrieves the promoted TypeCon if this is a PromotedTypeTyCon;
+-- Panics otherwise
+promotedTyCon :: TyCon -> TyCon
+promotedTyCon = ty_con
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
