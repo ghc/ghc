@@ -17,7 +17,7 @@ module TcEvidence (
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, 
 
   EvTerm(..), mkEvCast, evVarsOfTerm, mkEvKindCast,
-  EvLit(..),
+  EvLit(..), evTermCoercion,
 
   -- TcCoercion
   TcCoercion(..), 
@@ -36,7 +36,7 @@ import Var
 import PprCore ()   -- Instance OutputableBndr TyVar
 import TypeRep  -- Knows type representation
 import TcType
-import Type( tyConAppArgN, getEqPredTys_maybe, tyConAppTyCon_maybe )
+import Type( tyConAppArgN, getEqPredTys_maybe, tyConAppTyCon_maybe, getEqPredTys )
 import TysPrim( funTyCon )
 import TyCon
 import PrelNames
@@ -102,6 +102,7 @@ data TcCoercion
   | TcSymCo TcCoercion
   | TcTransCo TcCoercion TcCoercion
   | TcNthCo Int TcCoercion
+  | TcCastCo TcCoercion TcCoercion     -- co1 |> co2
   | TcLetCo TcEvBinds TcCoercion
   deriving (Data.Data, Data.Typeable)
 
@@ -199,6 +200,8 @@ tcCoercionKind co = go co
   where 
     go (TcRefl ty)            = Pair ty ty
     go (TcLetCo _ co)         = go co
+    go (TcCastCo _ co)        = case getEqPredTys (pSnd (go co)) of
+                                   (ty1,ty2) -> Pair ty1 ty2
     go (TcTyConAppCo tc cos)  = mkTyConApp tc <$> (sequenceA $ map go cos)
     go (TcAppCo co1 co2)      = mkAppTy <$> go co1 <*> go co2
     go (TcForAllCo tv co)     = mkForAllTy tv <$> go co
@@ -206,8 +209,8 @@ tcCoercionKind co = go co
     go (TcCoVarCo cv)         = eqVarKind cv
     go (TcAxiomInstCo ax tys) = Pair (substTyWith (co_ax_tvs ax) tys (co_ax_lhs ax)) 
                                      (substTyWith (co_ax_tvs ax) tys (co_ax_rhs ax))
-    go (TcSymCo co)           = swap $ go co
-    go (TcTransCo co1 co2)    = Pair (pFst $ go co1) (pSnd $ go co2)
+    go (TcSymCo co)           = swap (go co)
+    go (TcTransCo co1 co2)    = Pair (pFst (go co1)) (pSnd (go co2))
     go (TcNthCo d co)         = tyConAppArgN d <$> go co
 
     -- c.f. Coercion.coercionKind
@@ -219,7 +222,7 @@ eqVarKind cv
  | Just (tc, [_kind,ty1,ty2]) <- tcSplitTyConApp_maybe (varType cv)
  = ASSERT (tc `hasKey` eqTyConKey)
    Pair ty1 ty2
- | otherwise = panic "eqVarKind, non coercion variable"
+ | otherwise = pprPanic "eqVarKind, non coercion variable" (ppr cv <+> dcolon <+> ppr (varType cv))
 
 coVarsOfTcCo :: TcCoercion -> VarSet
 -- Only works on *zonked* coercions, because of TcLetCo
@@ -229,6 +232,7 @@ coVarsOfTcCo tc_co
     go (TcRefl _)                = emptyVarSet
     go (TcTyConAppCo _ cos)      = foldr (unionVarSet . go) emptyVarSet cos
     go (TcAppCo co1 co2)         = go co1 `unionVarSet` go co2
+    go (TcCastCo co1 co2)        = go co1 `unionVarSet` go co2
     go (TcForAllCo _ co)         = go co
     go (TcInstCo co _)           = go co
     go (TcCoVarCo v)             = unitVarSet v
@@ -238,7 +242,8 @@ coVarsOfTcCo tc_co
     go (TcNthCo _ co)            = go co
     go (TcLetCo (EvBinds bs) co) = foldrBag (unionVarSet . go_bind) (go co) bs
                                    `minusVarSet` get_bndrs bs
-    go (TcLetCo {}) = pprPanic "coVarsOfTcCo called on non-zonked TcCoercion" (ppr tc_co)
+    go (TcLetCo {}) = emptyVarSet    -- Harumph. This does legitimately happen in the call
+                                     -- to evVarsOfTerm in the DEBUG check of setEvBind
 
     -- We expect only coercion bindings
     go_bind :: EvBind -> VarSet
@@ -289,6 +294,8 @@ ppr_co p (TcLetCo bs co)         = maybeParen p TopPrec $
                                    sep [ptext (sLit "let") <+> braces (ppr bs), ppr co]
 ppr_co p (TcAppCo co1 co2)       = maybeParen p TyConPrec $
                                    pprTcCo co1 <+> ppr_co TyConPrec co2
+ppr_co p (TcCastCo co1 co2)      = maybeParen p FunPrec $
+                                   ppr_co FunPrec co1 <+> ptext (sLit "|>") <+> ppr_co FunPrec co2
 ppr_co p co@(TcForAllCo {})      = ppr_forall_co p co
 ppr_co p (TcInstCo co ty)        = maybeParen p TyConPrec $
                                    pprParendTcCo co <> ptext (sLit "@") <> pprType ty
@@ -449,29 +456,29 @@ evBindMapBinds bs
 data EvBind = EvBind EvVar EvTerm
 
 data EvTerm
-  = EvId EvId                    -- Term-level variable-to-variable bindings
-                                 -- (no coercion variables! they come via EvCoercion)
+  = EvId EvId                    -- Any sort of evidence Id, including coercions
 
-  | EvCoercion TcCoercion        -- (Boxed) coercion bindings
+  | EvCoercion TcCoercion        -- (Boxed) coercion bindings 
+                                 -- See Note [Coercion evidence terms]
 
-  | EvCast EvVar TcCoercion      -- d |> co
+  | EvCast EvTerm TcCoercion     -- d |> co
 
   | EvDFunApp DFunId             -- Dictionary instance application
-       [Type] [EvVar]
+       [Type] [EvTerm]
 
-  | EvTupleSel EvId  Int         -- n'th component of the tuple
+  | EvTupleSel EvTerm  Int       -- n'th component of the tuple, 0-indexed
 
-  | EvTupleMk [EvId]             -- tuple built from this stuff
+  | EvTupleMk [EvTerm]           -- tuple built from this stuff
 
   | EvDelayedError Type FastString  -- Used with Opt_DeferTypeErrors
                                -- See Note [Deferring coercion errors to runtime]
                                -- in TcSimplify
 
-  | EvSuperClass DictId Int      -- n'th superclass. Used for both equalities and
+  | EvSuperClass EvTerm Int      -- n'th superclass. Used for both equalities and
                                  -- dictionaries, even though the former have no
                                  -- selector Id.  We count up from _0_
 
-  | EvKindCast EvVar TcCoercion  -- See Note [EvKindCast]
+  | EvKindCast EvTerm TcCoercion  -- See Note [EvKindCast]
 
   | EvLit EvLit                  -- Dictionary for class "SingI" for type lits.
                                  -- Note [EvLit]
@@ -485,6 +492,29 @@ data EvLit
     deriving( Data.Data, Data.Typeable)
 
 \end{code}
+
+Note [Coecion evidence terms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Notice that a coercion variable (v :: t1 ~ t2) can be represented as an EvTerm
+in two different ways:
+   EvId v
+   EvCoercion (TcCoVarCo v)
+
+An alternative would be 
+
+* To establish the invariant that coercions are represented only 
+   by EvCoercion
+
+* To maintain the invariant by smart constructors.  Eg
+     mkEvCast (EvCoercion c1) c2 = EvCoercion (TcCastCo c1 c2)
+     mkEvCast t c = EvCast t c
+
+We do quite often need to get a TcCoercion from an EvTerm; see
+'evTermCoercion'.  Notice that as well as EvId and EvCoercion it may see
+an EvCast.
+
+I don't think it matters much... but maybe we'll find a good reason to
+do one or the other.
 
 Note [EvKindCast] 
 ~~~~~~~~~~~~~~~~~ 
@@ -555,14 +585,14 @@ and another to make it into "SingI" evidence.
 
 
 \begin{code}
-mkEvCast :: EvVar -> TcCoercion -> EvTerm
+mkEvCast :: EvTerm -> TcCoercion -> EvTerm
 mkEvCast ev lco
-  | isTcReflCo lco = EvId ev
+  | isTcReflCo lco = ev
   | otherwise      = EvCast ev lco
 
-mkEvKindCast :: EvVar -> TcCoercion -> EvTerm
+mkEvKindCast :: EvTerm -> TcCoercion -> EvTerm
 mkEvKindCast ev lco
-  | isTcReflCo lco = EvId ev
+  | isTcReflCo lco = ev
   | otherwise      = EvKindCast ev lco
 
 emptyTcEvBinds :: TcEvBinds
@@ -573,17 +603,28 @@ isEmptyTcEvBinds (EvBinds b)    = isEmptyBag b
 isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 
 
-evVarsOfTerm :: EvTerm -> [EvVar]
-evVarsOfTerm (EvId v) = [v]
-evVarsOfTerm (EvCoercion co)      = varSetElems (coVarsOfTcCo co)
-evVarsOfTerm (EvDFunApp _ _ evs)  = evs
-evVarsOfTerm (EvTupleSel v _)     = [v]
-evVarsOfTerm (EvSuperClass v _)   = [v]
-evVarsOfTerm (EvCast v co)        = v : varSetElems (coVarsOfTcCo co)
-evVarsOfTerm (EvTupleMk evs)      = evs
-evVarsOfTerm (EvDelayedError _ _) = []
-evVarsOfTerm (EvKindCast v co)   = v : varSetElems (coVarsOfTcCo co)
-evVarsOfTerm (EvLit _)            = []
+evTermCoercion :: EvTerm -> TcCoercion
+-- Applied only to EvTerms of type (s~t)
+-- See Note [Coercion evidence terms]
+evTermCoercion (EvId v)        = mkTcCoVarCo v
+evTermCoercion (EvCoercion co) = co
+evTermCoercion (EvCast tm co)  = TcCastCo (evTermCoercion tm) co
+evTermCoercion tm = pprPanic "evTermCoercion" (ppr tm)
+
+evVarsOfTerm :: EvTerm -> VarSet
+evVarsOfTerm (EvId v)             = unitVarSet v
+evVarsOfTerm (EvCoercion co)      = coVarsOfTcCo co
+evVarsOfTerm (EvDFunApp _ _ evs)  = evVarsOfTerms evs
+evVarsOfTerm (EvTupleSel v _)     = evVarsOfTerm v
+evVarsOfTerm (EvSuperClass v _)   = evVarsOfTerm v
+evVarsOfTerm (EvCast tm co)       = evVarsOfTerm tm `unionVarSet` coVarsOfTcCo co
+evVarsOfTerm (EvTupleMk evs)      = evVarsOfTerms evs
+evVarsOfTerm (EvDelayedError _ _) = emptyVarSet
+evVarsOfTerm (EvKindCast v co)    = coVarsOfTcCo co `unionVarSet` evVarsOfTerm v
+evVarsOfTerm (EvLit _)            = emptyVarSet
+
+evVarsOfTerms :: [EvTerm] -> VarSet
+evVarsOfTerms = foldr (unionVarSet . evVarsOfTerm) emptyVarSet 
 \end{code}
 
 

@@ -122,7 +122,7 @@ mkTyData :: SrcSpan
          -> NewOrData
          -> Maybe CType
          -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
-         -> Maybe (HsBndrSig (LHsKind RdrName))
+         -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LTyClDecl RdrName)
@@ -138,20 +138,20 @@ mkFamInstData :: SrcSpan
          -> NewOrData
          -> Maybe CType
          -> Located (Maybe (LHsContext RdrName), LHsType RdrName)
-         -> Maybe (HsBndrSig (LHsKind RdrName))
+         -> Maybe (LHsKind RdrName)
          -> [LConDecl RdrName]
          -> Maybe [LHsType RdrName]
          -> P (LFamInstDecl RdrName)
 mkFamInstData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams) <- checkTyClHdr tycl_hdr
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsBSig tparams
+       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsWithBndrs tparams
                                     , fid_defn = defn, fid_fvs = placeHolderNames })) }
 
 mkDataDefn :: NewOrData
            -> Maybe CType
            -> Maybe (LHsContext RdrName)
-           -> Maybe (HsBndrSig (LHsKind RdrName))
+           -> Maybe (LHsKind RdrName)
            -> [LConDecl RdrName]
            -> Maybe [LHsType RdrName]
            -> P (HsTyDefn RdrName)
@@ -181,14 +181,14 @@ mkFamInstSynonym :: SrcSpan
             -> P (LFamInstDecl RdrName)
 mkFamInstSynonym loc lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsBSig tparams
+       ; return (L loc (FamInstDecl { fid_tycon = tc, fid_pats = mkHsWithBndrs tparams
                                     , fid_defn = TySynonym { td_synRhs = rhs }
                                     , fid_fvs = placeHolderNames })) }
 
 mkTyFamily :: SrcSpan
            -> FamilyFlavour
            -> LHsType RdrName   -- LHS
-           -> Maybe (HsBndrSig (LHsKind RdrName)) -- Optional kind signature
+           -> Maybe (LHsKind RdrName) -- Optional kind signature
            -> P (LTyClDecl RdrName)
 mkTyFamily loc flavour lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
@@ -367,7 +367,7 @@ mkDeprecatedGadtRecordDecl loc (L con_loc con) flds res_ty
        ; return (L loc (ConDecl { con_old_rec  = True
                                 , con_name     = data_con
                                 , con_explicit = Implicit
-                                , con_qvars    = []
+                                , con_qvars    = mkHsQTvs []
                                 , con_cxt      = noLoc []
                                 , con_details  = RecCon flds
                                 , con_res      = ResTyGADT res_ty
@@ -381,7 +381,7 @@ mkSimpleConDecl name qvars cxt details
   = ConDecl { con_old_rec  = False
             , con_name     = name
             , con_explicit = Explicit
-            , con_qvars    = qvars
+            , con_qvars    = mkHsQTvs qvars
             , con_cxt      = cxt
             , con_details  = details
             , con_res      = ResTyH98
@@ -444,17 +444,18 @@ we can bring x,y into scope.  So:
    * For RecCon we do not
 
 \begin{code}
-checkTyVars :: LHsType RdrName -> [LHsType RdrName] -> P [LHsTyVarBndr RdrName]
+checkTyVars :: LHsType RdrName -> [LHsType RdrName] -> P (LHsTyVarBndrs RdrName)
 -- Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).  If the second argument is `False',
 -- only type variables are allowed and we raise an error on encountering a
 -- non-variable; otherwise, we allow non-variable arguments and return the
 -- entire list of parameters.
-checkTyVars tycl_hdr tparms = mapM chk tparms
+checkTyVars tycl_hdr tparms = do { tvs <- mapM chk tparms
+                                 ; return (mkHsQTvs tvs) }
   where
         -- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar tv (mkHsBSig k)))
+        | isRdrTyVar tv    = return (L l (KindedTyVar tv k))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv))
     chk t@(L l _)
@@ -579,7 +580,7 @@ checkAPat dynflags loc e0 = case e0 of
                             let t' = case t of
                                        L _ (HsForAllTy Implicit _ (L _ []) ty) -> ty
                                        other -> other
-                            return (SigPatIn e (mkHsBSig t'))
+                            return (SigPatIn e (mkHsWithBndrs t'))
 
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _

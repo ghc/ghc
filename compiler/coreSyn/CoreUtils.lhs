@@ -22,7 +22,7 @@ module CoreUtils (
         exprType, coreAltType, coreAltsType,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
         exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
-        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects,
+        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
 
@@ -187,15 +187,7 @@ mkCast (Coercion e_co) co
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
-  = Coercion new_co
-  where
-       -- g :: (s1 ~# s2) ~# (t1 ~#  t2)
-       -- g1 :: s1 ~# t1
-       -- g2 :: s2 ~# t2
-       new_co = mkSymCo g1 `mkTransCo` e_co `mkTransCo` g2
-       [_reflk, g1, g2] = decomposeCo 3 co
-            -- Remember, (~#) :: forall k. k -> k -> *
-            -- so it takes *three* arguments, not two
+  = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
   = ASSERT(let { Pair  from_ty  _to_ty  = coercionKind co;
@@ -639,6 +631,68 @@ dupAppSize = 8   -- Size of term we are prepared to duplicate
              exprIsCheap, exprIsExpandable
 %*                                                                      *
 %************************************************************************
+
+Note [exprIsWorkFree]
+~~~~~~~~~~~~~~~~~~~~~
+exprIsWorkFree is used when deciding whether to inline something; we
+don't inline it if doing so might duplicate work, by peeling off a
+complete copy of the expression.  Here we do not want even to
+duplicate a primop (Trac #5623):
+   eg   let x = a #+ b in x +# x
+   we do not want to inline/duplicate x
+
+Previously we were a bit more liberal, which led to the primop-duplicating
+problem.  However, being more conservative did lead to a big regression in
+one nofib benchmark, wheel-sieve1.  The situation looks like this:
+
+   let noFactor_sZ3 :: GHC.Types.Int -> GHC.Types.Bool
+       noFactor_sZ3 = case s_adJ of _ { GHC.Types.I# x_aRs ->
+         case GHC.Prim.<=# x_aRs 2 of _ {
+           GHC.Types.False -> notDivBy ps_adM qs_adN;
+           GHC.Types.True -> lvl_r2Eb }}
+       go = \x. ...(noFactor (I# y))....(go x')...
+
+The function 'noFactor' is heap-allocated and then called.  Turns out
+that 'notDivBy' is strict in its THIRD arg, but that is invisible to
+the caller of noFactor, which therefore cannot do w/w and
+heap-allocates noFactor's argument.  At the moment (May 12) we are just
+going to put up with this, because the previous more aggressive inlining 
+(which treated 'noFactor' as work-free) was duplicating primops, which 
+in turn was making inner loops of array calculations runs slow (#5623)
+
+\begin{code}
+exprIsWorkFree :: CoreExpr -> Bool
+-- See Note [exprIsWorkFree]
+exprIsWorkFree e = go 0 e
+  where    -- n is the number of value arguments
+    go _ (Lit {})                     = True
+    go _ (Type {})                    = True
+    go _ (Coercion {})                = True
+    go n (Cast e _)                   = go n e
+    go n (Case scrut _ _ alts)        = foldl (&&) (exprIsWorkFree scrut) 
+                                              [ go n rhs | (_,_,rhs) <- alts ]
+         -- See Note [Case expressions are work-free]
+    go _ (Let {})                     = False
+    go n (Var v)                      = n==0 || n < idArity v
+    go n (Tick t e) | tickishCounts t = False
+                    | otherwise       = go n e
+    go n (Lam x e)  | isRuntimeVar x = n==0 || go (n-1) e
+                    | otherwise      = go n e
+    go n (App f e)  | isRuntimeArg e = exprIsWorkFree e && go (n+1) f
+                    | otherwise      = go n f
+\end{code}
+
+Note [Case expressions are work-free]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Are case-expressions work-free?  Consider
+    let v = case x of (p,q) -> p
+        go = \y -> ...case v of ...
+Should we inline 'v' at its use site inside the loop?  At the moment
+we do.  I experimented with saying that case are *not* work-free, but
+that increased allocation slightly.  It's a fairly small effect, and at
+the moment we go for the slightly more aggressive version which treats
+(case x of ....) as work-free if the alterantives are.
+
 
 Note [exprIsCheap]   See also Note [Interaction of exprIsCheap and lone variables]
 ~~~~~~~~~~~~~~~~~~   in CoreUnfold.lhs

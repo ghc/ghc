@@ -993,7 +993,7 @@ pprInfo pefas (thing, fixity, insts)
   where
     show_fixity fix
         | fix == GHC.defaultFixity = empty
-        | otherwise                = ppr fix <+> ppr (GHC.getName thing)
+        | otherwise                = ppr fix <+> pprInfixName (GHC.getName thing)
 
 -----------------------------------------------------------------------------
 -- :main

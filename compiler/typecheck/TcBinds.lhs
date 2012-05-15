@@ -379,7 +379,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
         -- Set up main recover; take advantage of any type sigs
 
     { traceTc "------------------------------------------------" empty
-    ; traceTc "Bindings for" (ppr binder_names)
+    ; traceTc "Bindings for {" (ppr binder_names)
 
 --    -- Instantiate the polytypes of any binders that have signatures
 --    -- (as determined by sig_fn), returning a TcSigInfo for each
@@ -390,7 +390,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
     ; let plan = decideGeneralisationPlan dflags type_env 
                          binder_names bind_list sig_fn
     ; traceTc "Generalisation plan" (ppr plan)
-    ; result@(_, poly_ids, _) <- case plan of
+    ; result@(tc_binds, poly_ids, _) <- case plan of
          NoGen          -> tcPolyNoGen sig_fn prag_fn rec_tc bind_list
          InferGen mn cl -> tcPolyInfer mn cl sig_fn prag_fn rec_tc bind_list
          CheckGen sig   -> tcPolyCheck sig prag_fn rec_tc bind_list
@@ -398,7 +398,10 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
         -- Check whether strict bindings are ok
         -- These must be non-recursive etc, and are not generalised
         -- They desugar to a case expression in the end
-    ; checkStrictBinds top_lvl rec_group bind_list poly_ids
+    ; checkStrictBinds top_lvl rec_group bind_list tc_binds poly_ids
+    ; traceTc "} End of bindings for" (vcat [ ppr binder_names, ppr rec_group
+                                            , vcat [ppr id <+> ppr (idType id) | id <- poly_ids]
+                                          ])
 
     ; return result }
   where
@@ -1242,21 +1245,32 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
 
 -------------------
 checkStrictBinds :: TopLevelFlag -> RecFlag
-                 -> [LHsBind Name] -> [Id]
+                 -> [LHsBind Name]
+                 -> LHsBinds TcId -> [Id]
                  -> TcM ()
 -- Check that non-overloaded unlifted bindings are
 --      a) non-recursive,
 --      b) not top level, 
 --      c) not a multiple-binding group (more or less implied by (a))
 
-checkStrictBinds top_lvl rec_group binds poly_ids
+checkStrictBinds top_lvl rec_group orig_binds tc_binds poly_ids
   | unlifted || bang_pat
   = do  { checkTc (isNotTopLevel top_lvl)
-                  (strictBindErr "Top-level" unlifted binds)
+                  (strictBindErr "Top-level" unlifted orig_binds)
         ; checkTc (isNonRec rec_group)
-                  (strictBindErr "Recursive" unlifted binds)
-        ; checkTc (isSingleton binds)
-                  (strictBindErr "Multiple" unlifted binds)
+                  (strictBindErr "Recursive" unlifted orig_binds)
+
+        ; checkTc (all is_monomorphic (bagToList tc_binds))
+                  (polyBindErr orig_binds)
+            -- data Ptr a = Ptr Addr#
+            -- f x = let p@(Ptr y) = ... in ...
+            -- Here the binding for 'p' is polymorphic, but does 
+            -- not mix with an unlifted binding for 'y'.  You should
+            -- use a bang pattern.  Trac #6078.
+        
+        ; checkTc (isSingleton orig_binds)
+                  (strictBindErr "Multiple" unlifted orig_binds)
+
         -- This should be a checkTc, not a warnTc, but as of GHC 6.11
         -- the versions of alex and happy available have non-conforming
         -- templates, so the GHC build fails if it's an error:
@@ -1267,31 +1281,40 @@ checkStrictBinds top_lvl rec_group binds poly_ids
                  -- Warn about this, but not about
                  --      x# = 4# +# 1#
                  --      (# a, b #) = ...
-                 (unliftedMustBeBang binds) }
+                 (unliftedMustBeBang orig_binds) }
   | otherwise
-  = return ()
+  = traceTc "csb2" (ppr poly_ids) >>
+    return ()
   where
     unlifted    = any is_unlifted poly_ids
-    bang_pat    = any (isBangHsBind . unLoc) binds
-    lifted_pat  = any (isLiftedPatBind . unLoc) binds
+    bang_pat    = any (isBangHsBind    . unLoc) orig_binds
+    lifted_pat  = any (isLiftedPatBind . unLoc) orig_binds
+
     is_unlifted id = case tcSplitForAllTys (idType id) of
                        (_, rho) -> isUnLiftedType rho
+
+    is_monomorphic (L _ (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs }))
+                     = null tvs && null evs
+    is_monomorphic _ = True
 
 unliftedMustBeBang :: [LHsBind Name] -> SDoc
 unliftedMustBeBang binds
   = hang (text "Pattern bindings containing unlifted types should use an outermost bang pattern:")
-       2 (pprBindList binds)
+       2 (vcat (map ppr binds))
+
+polyBindErr :: [LHsBind Name] -> SDoc
+polyBindErr binds
+  = hang (ptext (sLit "You can't mix polymorphic and unlifted bindings"))
+       2 (vcat [vcat (map ppr binds), 
+                ptext (sLit "Probable fix: use a bang pattern")])
 
 strictBindErr :: String -> Bool -> [LHsBind Name] -> SDoc
 strictBindErr flavour unlifted binds
   = hang (text flavour <+> msg <+> ptext (sLit "aren't allowed:")) 
-       2 (pprBindList binds)
+       2 (vcat (map ppr binds))
   where
     msg | unlifted  = ptext (sLit "bindings for unlifted types")
         | otherwise = ptext (sLit "bang-pattern bindings")
-
-pprBindList :: [LHsBind Name] -> SDoc
-pprBindList binds = vcat (map ppr binds)
 \end{code}
 
 

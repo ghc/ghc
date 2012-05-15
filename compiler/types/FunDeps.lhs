@@ -216,6 +216,10 @@ data Equation
 data FDEq = FDEq { fd_pos      :: Int -- We use '0' for the first position
                  , fd_ty_left  :: Type
                  , fd_ty_right :: Type }
+
+instance Outputable FDEq where
+  ppr (FDEq { fd_pos = p, fd_ty_left = tyl, fd_ty_right = tyr })
+    = parens (int p <> comma <+> ppr tyl <> comma <+> ppr tyr)
 \end{code}
 
 Given a bunch of predicates that must hold, such as

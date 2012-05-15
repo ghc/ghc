@@ -33,7 +33,7 @@ module HsUtils(
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
-  mkLHsTupleExpr, mkLHsVarTuple, missingTupArg, mkHsBSig, 
+  mkLHsTupleExpr, mkLHsVarTuple, missingTupArg, 
 
   -- Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
@@ -264,9 +264,6 @@ unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
 
 mkHsString :: String -> HsLit
 mkHsString s = HsString (mkFastString s)
-
-mkHsBSig :: a -> HsBndrSig a
-mkHsBSig x = HsBSig x (placeHolderBndrs, placeHolderBndrs)
 
 -------------
 userHsTyVarBndrs :: SrcSpan -> [name] -> [Located (HsTyVarBndr name)]

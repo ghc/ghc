@@ -36,7 +36,7 @@ module RnEnv (
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	extendTyVarEnvFVRn,
 
-	checkDupRdrNames, checkDupAndShadowedRdrNames,
+	checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, 
 	addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
 	warnUnusedMatches,
@@ -1185,7 +1185,8 @@ bindLocatedLocalsRn :: [Located RdrName]
 	    	    -> ([Name] -> RnM a)
 	    	    -> RnM a
 bindLocatedLocalsRn rdr_names_w_loc enclosed_scope
-  = do { checkDupAndShadowedRdrNames rdr_names_w_loc
+  = do { checkDupRdrNames rdr_names_w_loc
+       ; checkShadowedRdrNames rdr_names_w_loc
 
 	-- Make fresh Names and extend the environment
        ; names <- newLocalBndrsRn rdr_names_w_loc
@@ -1243,11 +1244,10 @@ checkDupNames names
 		-- See Note [Binders in Template Haskell] in Convert
 
 ---------------------
-checkDupAndShadowedRdrNames :: [Located RdrName] -> RnM ()
-checkDupAndShadowedRdrNames loc_rdr_names
-  = do	{ checkDupRdrNames loc_rdr_names
-	; envs <- getRdrEnvs
-	; checkShadowedOccs envs loc_occs }
+checkShadowedRdrNames :: [Located RdrName] -> RnM ()
+checkShadowedRdrNames loc_rdr_names
+  = do { envs <- getRdrEnvs
+       ; checkShadowedOccs envs loc_occs }
   where
     loc_occs = [(loc,rdrNameOcc rdr) | L loc rdr <- loc_rdr_names]
 
@@ -1645,8 +1645,10 @@ data HsDocContext
   | SpliceTypeCtx (LHsType RdrName)
   | ClassInstanceCtx
   | VectDeclCtx (Located RdrName)
+  | GenericCtx SDoc   -- Maybe we want to use this more!
 
 docOfHsDocContext :: HsDocContext -> SDoc
+docOfHsDocContext (GenericCtx doc) = doc
 docOfHsDocContext (TypeSigCtx doc) = text "In the type signature for" <+> doc
 docOfHsDocContext PatCtx = text "In a pattern type-signature"
 docOfHsDocContext SpecInstSigCtx = text "In a SPECIALISE instance pragma"
@@ -1666,5 +1668,4 @@ docOfHsDocContext GHCiCtx = ptext (sLit "In GHCi input")
 docOfHsDocContext (SpliceTypeCtx hs_ty) = ptext (sLit "In the spliced type") <+> ppr hs_ty
 docOfHsDocContext ClassInstanceCtx = ptext (sLit "TcSplice.reifyInstances")
 docOfHsDocContext (VectDeclCtx tycon) = ptext (sLit "In the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
-
 \end{code}

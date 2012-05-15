@@ -419,7 +419,7 @@ instance Outputable Unfolding where
                                    <+> ppr con <+> brackets (pprWithCommas ppr ops)
   ppr (CoreUnfolding { uf_src = src
                      , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
-                     , uf_is_conlike=conlike, uf_is_cheap=cheap
+                     , uf_is_conlike=conlike, uf_is_work_free=wf
       		     , uf_expandable=exp, uf_guidance=g, uf_arity=arity}) 
 	= ptext (sLit "Unf") <> braces (pp_info $$ pp_rhs)
     where
@@ -429,7 +429,7 @@ instance Outputable Unfolding where
                 , ptext (sLit "Arity=")      <> int arity
                 , ptext (sLit "Value=")      <> ppr hnf
                 , ptext (sLit "ConLike=")    <> ppr conlike
-                , ptext (sLit "Cheap=")      <> ppr cheap
+                , ptext (sLit "WorkFree=")   <> ppr wf
                 , ptext (sLit "Expandable=") <> ppr exp
                 , ptext (sLit "Guidance=")   <> ppr g ]
       pp_tmpl = ptext (sLit "Tmpl=") <+> ppr rhs

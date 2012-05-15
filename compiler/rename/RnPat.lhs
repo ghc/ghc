@@ -162,9 +162,9 @@ matchNameMaker ctxt = LamMk report_unused
                       StmtCtxt GhciStmt -> False
                       _                 -> True
 
-rnHsSigCps :: HsBndrSig (LHsType RdrName) -> CpsRn (HsBndrSig (LHsType Name))
+rnHsSigCps :: HsWithBndrs (LHsType RdrName) -> CpsRn (HsWithBndrs (LHsType Name))
 rnHsSigCps sig 
-  = CpsRn (rnHsBndrSig True PatCtx sig)
+  = CpsRn (rnHsBndrSig PatCtx sig)
 
 newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name

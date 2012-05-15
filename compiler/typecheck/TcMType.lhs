@@ -627,29 +627,24 @@ zonkWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
 zonkCt :: Ct -> TcM Ct 
 -- Zonking a Ct conservatively gives back a CNonCanonical
 zonkCt ct 
-  = do { fl' <- zonkFlavor (cc_flavor ct)
+  = do { fl' <- zonkCtEvidence (cc_ev ct)
        ; return $ 
-         CNonCanonical { cc_flavor = fl'
+         CNonCanonical { cc_ev = fl'
                        , cc_depth = cc_depth ct } }
 zonkCts :: Cts -> TcM Cts
 zonkCts = mapBagM zonkCt
 
-zonkFlavor :: CtFlavor -> TcM CtFlavor
-zonkFlavor (Given loc evar) 
+zonkCtEvidence :: CtEvidence -> TcM CtEvidence
+zonkCtEvidence ctev@(Given { ctev_gloc = loc, ctev_pred = pred }) 
   = do { loc' <- zonkGivenLoc loc
-       ; evar' <- zonkEvVar evar
-       ; return (Given loc' evar') }
-zonkFlavor (Solved loc evar) 
-  = do { loc' <- zonkGivenLoc loc
-       ; evar' <- zonkEvVar evar
-       ; return (Solved loc' evar') }
-zonkFlavor (Wanted loc evar)
-  = do { evar' <- zonkEvVar evar
-       ; return (Wanted loc evar') }
-zonkFlavor (Derived loc pty)
-  = do { pty' <- zonkTcType pty
-       ; return (Derived loc pty') }
-
+       ; pred' <- zonkTcType pred
+       ; return (ctev { ctev_gloc = loc', ctev_pred = pred'}) }
+zonkCtEvidence ctev@(Wanted { ctev_pred = pred })
+  = do { pred' <- zonkTcType pred
+       ; return (ctev { ctev_pred = pred' }) }
+zonkCtEvidence ctev@(Derived { ctev_pred = pred })
+  = do { pred' <- zonkTcType pred
+       ; return (ctev { ctev_pred = pred' }) }
 
 zonkGivenLoc :: GivenLoc -> TcM GivenLoc
 -- GivenLocs may have unification variables inside them!

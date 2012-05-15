@@ -22,7 +22,6 @@ module TyCon(
         -- ** Constructing TyCons
         mkAlgTyCon,
         mkClassTyCon,
-        mkIParamTyCon,
         mkFunTyCon,
         mkPrimTyCon,
         mkKindTyCon,
@@ -858,11 +857,6 @@ mkAlgTyCon name kind tyvars cType stupid rhs parent is_rec gadt_syn
 mkClassTyCon :: Name -> Kind -> [TyVar] -> AlgTyConRhs -> Class -> RecFlag -> TyCon
 mkClassTyCon name kind tyvars rhs clas is_rec =
   mkAlgTyCon name kind tyvars Nothing [] rhs (ClassTyCon clas) is_rec False
-
--- | Simpler specialization of 'mkAlgTyCon' for implicit paramaters
-mkIParamTyCon :: Name -> Kind -> TyVar -> AlgTyConRhs -> RecFlag -> TyCon
-mkIParamTyCon name kind tyvar rhs is_rec =
-  mkAlgTyCon name kind [tyvar] Nothing [] rhs NoParentTyCon is_rec False
 
 mkTupleTyCon :: Name
              -> Kind    -- ^ Kind of the resulting 'TyCon'

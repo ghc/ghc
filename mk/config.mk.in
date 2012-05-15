@@ -543,6 +543,8 @@ compiler/cmm/Bitmap_HC_OPTS += -ffull-laziness
 # for some unknown reason, so turn full-laziness back on for this module.
 endif
 
+GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
+
 #-----------------------------------------------------------------------------
 # C compiler
 #

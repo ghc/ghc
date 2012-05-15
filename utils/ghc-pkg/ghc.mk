@@ -24,7 +24,7 @@ else
 	$(call removeFiles,$@)
 	echo "#!/bin/sh" >>$@
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
-	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
+	echo '$(TOP)/$< --global-package-db $$PKGCONF $${1+"$$@"}' >> $@
 	chmod +x $@
 endif
 
@@ -38,7 +38,7 @@ else
 	$(call removeFiles,$@)
 	echo "#!/bin/sh" >>$@
 	echo "PKGCONF=$(TOP)/$(INPLACE_PACKAGE_CONF)" >>$@
-	echo '$(TOP)/$< --global-conf $$PKGCONF $${1+"$$@"}' >> $@
+	echo '$(TOP)/$< --global-package-db $$PKGCONF $${1+"$$@"}' >> $@
 	chmod +x $@
 endif
 
@@ -53,7 +53,7 @@ endif
 #
 utils/ghc-pkg/dist/build/tmp/$(utils/ghc-pkg_dist_PROG)$(exeext): utils/ghc-pkg/Main.hs utils/ghc-pkg/Version.hs | bootstrapping/. $$(dir $$@)/. $(GHC_CABAL_INPLACE) 
 	"$(GHC)" $(SRC_HC_OPTS) --make utils/ghc-pkg/Main.hs -o $@ \
-	       -no-user-package-conf \
+	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
 	       $(SRC_HC_WARNING_OPTS) \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \

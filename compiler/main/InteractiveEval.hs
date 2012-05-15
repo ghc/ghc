@@ -176,6 +176,12 @@ findEnclosingDecls hsc_env inf =
        mb = getModBreaks hmi
    in modBreaks_decls mb ! breakInfo_number inf
 
+-- | Update fixity environment in the current interactive context.
+updateFixityEnv :: GhcMonad m => FixityEnv -> m ()
+updateFixityEnv fix_env = do
+  hsc_env <- getSession
+  let ic = hsc_IC hsc_env
+  setSession $ hsc_env { hsc_IC = ic { ic_fix_env = fix_env } }
 
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
@@ -206,7 +212,9 @@ runStmtWithLocation source linenumber expr step =
       -- empty statement / comment
       Nothing -> return (RunOk [])
 
-      Just (tyThings, hval) -> do
+      Just (tyThings, hval, fix_env) -> do
+        updateFixityEnv fix_env
+
         status <-
           withVirtualCWD $
             withBreakAction (isStep step) idflags' breakMVar statusMVar $ do
@@ -947,7 +955,8 @@ typeKind normalise str = withSession $ \hsc_env -> do
 
 compileExpr :: GhcMonad m => String -> m HValue
 compileExpr expr = withSession $ \hsc_env -> do
-  Just (ids, hval) <- liftIO $ hscStmt hsc_env ("let __cmCompileExpr = "++expr)
+  Just (ids, hval, fix_env) <- liftIO $ hscStmt hsc_env ("let __cmCompileExpr = "++expr)
+  updateFixityEnv fix_env
   hvals <- liftIO hval
   case (ids,hvals) of
     ([_],[hv]) -> return hv
@@ -971,9 +980,11 @@ dynCompileExpr expr = do
                      }
     setContext (IIDecl importDecl : iis)
     let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
-    Just (ids, hvals) <- withSession $ \hsc_env ->
+    Just (ids, hvals, fix_env) <- withSession $ \hsc_env ->
                            liftIO $ hscStmt hsc_env stmt
     setContext iis
+    updateFixityEnv fix_env
+
     vals <- liftIO (unsafeCoerce# hvals :: IO [Dynamic])
     case (ids,vals) of
         (_:[], v:[]) -> return v

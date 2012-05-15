@@ -190,7 +190,7 @@ doInstall ghc ghcpkg strip topdir directory distDir
                     programPostConf = \_ _ -> return ["-B" ++ topdir],
                     programFindLocation = \_ -> return (Just ghc) }
                 ghcPkgProgram' = ghcPkgProgram {
-                    programPostConf = \_ _ -> return $ ["--global-conf", ghcpkgconf]
+                    programPostConf = \_ _ -> return $ ["--global-package-db", ghcpkgconf]
                                                     ++ ["--force" | not (null myDestDir) ],
                     programFindLocation = \_ -> return (Just ghcpkg) }
                 stripProgram' = stripProgram {

@@ -275,7 +275,7 @@ cvt_ci_decs doc decs
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
              -> CvtM ( LHsContext RdrName
                      , Located RdrName
-                     , [LHsTyVarBndr RdrName])
+                     , LHsTyVarBndrs RdrName)
 cvt_tycl_hdr cxt tc tvs
   = do { cxt' <- cvtContext cxt
        ; tc'  <- tconNameL tc
@@ -286,12 +286,12 @@ cvt_tycl_hdr cxt tc tvs
 cvt_tyinst_hdr :: TH.Cxt -> TH.Name -> [TH.Type]
                -> CvtM ( LHsContext RdrName
                        , Located RdrName
-                       , HsBndrSig [LHsType RdrName])
+                       , HsWithBndrs [LHsType RdrName])
 cvt_tyinst_hdr cxt tc tys
   = do { cxt' <- cvtContext cxt
        ; tc'  <- tconNameL tc
        ; tys' <- mapM cvtType tys
-       ; return (cxt', tc', mkHsBSig tys') }
+       ; return (cxt', tc', mkHsWithBndrs tys') }
 
 -------------------------------------------------------------------
 --		Partitioning declarations
@@ -348,7 +348,7 @@ cvtConstr (ForallC tvs ctxt con)
   = do	{ tvs'  <- cvtTvs tvs
 	; L loc ctxt' <- cvtContext ctxt
 	; L _ con' <- cvtConstr con
-	; returnL $ con' { con_qvars = tvs' ++ con_qvars con'
+	; returnL $ con' { con_qvars = mkHsQTvs (hsQTvBndrs tvs' ++ hsQTvBndrs (con_qvars con'))
                          , con_cxt = L loc (ctxt' ++ (unLoc $ con_cxt con')) } }
 
 cvt_arg :: (TH.Strict, TH.Type) -> CvtM (LHsType RdrName)
@@ -759,7 +759,7 @@ cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
 		       	    ; return $ ConPatIn c' $ Hs.RecCon (HsRecFields fs' Nothing) }
 cvtp (ListP ps)        = do { ps' <- cvtPats ps; return $ ListPat ps' void }
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
-                            ; return $ SigPatIn p' (mkHsBSig t') }
+                            ; return $ SigPatIn p' (mkHsWithBndrs t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p; return $ ViewPat e' p' void }
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (HsRecField RdrName (LPat RdrName))
@@ -784,8 +784,8 @@ cvtOpAppP x op y
 -----------------------------------------------------------
 --	Types and type variables
 
-cvtTvs :: [TH.TyVarBndr] -> CvtM [LHsTyVarBndr RdrName]
-cvtTvs tvs = mapM cvt_tv tvs
+cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsTyVarBndrs RdrName)
+cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv (TH.PlainTV nm) 
@@ -794,7 +794,7 @@ cvt_tv (TH.PlainTV nm)
 cvt_tv (TH.KindedTV nm ki) 
   = do { nm' <- tName nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar nm' (mkHsBSig ki') }
+       ; returnL $ KindedTyVar nm' ki' }
 
 cvtContext :: TH.Cxt -> CvtM (LHsContext RdrName)
 cvtContext tys = do { preds' <- mapM cvtPred tys; returnL preds' }
@@ -845,7 +845,7 @@ cvtType ty
              -> do { tvs' <- cvtTvs tvs
                    ; cxt' <- cvtContext cxt
                    ; ty'  <- cvtType ty
-                   ; returnL $ mkExplicitHsForAllTy tvs' cxt' ty' 
+                   ; returnL $ mkExplicitHsForAllTy (hsQTvBndrs tvs') cxt' ty' 
                    }
 
            SigT ty ki
@@ -875,10 +875,10 @@ cvtKind (ArrowK k1 k2) = do
   k2' <- cvtKind k2
   returnL (HsFunTy k1' k2')
 
-cvtMaybeKind :: Maybe TH.Kind -> CvtM (Maybe (HsBndrSig (LHsKind RdrName)))
+cvtMaybeKind :: Maybe TH.Kind -> CvtM (Maybe (LHsKind RdrName))
 cvtMaybeKind Nothing = return Nothing
 cvtMaybeKind (Just ki) = do { ki' <- cvtKind ki
-                            ; return (Just (mkHsBSig ki')) }
+                            ; return (Just ki') }
 
 -----------------------------------------------------------
 cvtFixity :: TH.Fixity -> Hs.Fixity

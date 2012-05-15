@@ -38,6 +38,7 @@ module DynFlags (
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..),
+        PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fWarningFlags, fLangFlags, xFlags,
@@ -275,7 +276,6 @@ data DynFlag
    | Opt_ForceRecomp
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
-   | Opt_ReadUserPackageConf
    | Opt_NoHsMain
    | Opt_SplitObjs
    | Opt_StgStats
@@ -548,8 +548,8 @@ data DynFlags = DynFlags {
   depSuffixes           :: [String],
 
   --  Package flags
-  extraPkgConfs         :: [FilePath],
-        -- ^ The @-package-conf@ flags given on the command line, in the order
+  extraPkgConfs         :: [PkgConfRef] -> [PkgConfRef],
+        -- ^ The @-package-db@ flags given on the command line, in the order
         -- they appeared.
 
   packageFlags          :: [PackageFlag],
@@ -923,7 +923,7 @@ defaultDynFlags mySettings =
 
         hpcDir                  = ".hpc",
 
-        extraPkgConfs           = [],
+        extraPkgConfs           = id,
         packageFlags            = [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
@@ -1340,7 +1340,7 @@ parseDynamicFlagsCmdLine :: Monad m =>
 parseDynamicFlagsCmdLine dflags args = parseDynamicFlags dflags args True
 
 -- | Like 'parseDynamicFlagsCmdLine' but does not allow the package flags
--- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-conf).
+-- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
 parseDynamicFilePragma :: Monad m =>
                      DynFlags -> [Located String]
@@ -1755,8 +1755,13 @@ dynamic_flags = [
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
         ------- Packages ----------------------------------------------------
-    Flag "package-conf"          (HasArg extraPkgConf_)
-  , Flag "no-user-package-conf"  (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
+    Flag "package-db"            (HasArg (addPkgConfRef . PkgConfFile))
+  , Flag "clear-package-db"      (NoArg clearPkgConf)
+  , Flag "no-global-package-db"  (NoArg removeGlobalPkgConf)
+  , Flag "no-user-package-db"    (NoArg removeUserPkgConf)
+  , Flag "global-package-db"     (NoArg (addPkgConfRef GlobalPkgConf))
+  , Flag "user-package-db"       (NoArg (addPkgConfRef UserPkgConf))
+
   , Flag "package-name"          (hasArg setPackageName)
   , Flag "package-id"            (HasArg exposePackageId)
   , Flag "package"               (HasArg exposePackage)
@@ -2066,7 +2071,6 @@ xFlags = [
 defaultFlags :: [DynFlag]
 defaultFlags
   = [ Opt_AutoLinkPackages,
-      Opt_ReadUserPackageConf,
 
       Opt_SharedImplib,
 
@@ -2404,8 +2408,28 @@ setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 addCmdlineHCInclude :: String -> DynP ()
 addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 
-extraPkgConf_ :: FilePath -> DynP ()
-extraPkgConf_  p = upd (\s -> s{ extraPkgConfs = p : extraPkgConfs s })
+data PkgConfRef
+  = GlobalPkgConf
+  | UserPkgConf
+  | PkgConfFile FilePath
+
+addPkgConfRef :: PkgConfRef -> DynP ()
+addPkgConfRef p = upd $ \s -> s { extraPkgConfs = (p:) . extraPkgConfs s }
+
+removeUserPkgConf :: DynP ()
+removeUserPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotUser . extraPkgConfs s }
+  where
+    isNotUser UserPkgConf = False
+    isNotUser _ = True
+
+removeGlobalPkgConf :: DynP ()
+removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extraPkgConfs s }
+  where
+    isNotGlobal GlobalPkgConf = False
+    isNotGlobal _ = True
+
+clearPkgConf :: DynP ()
+clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
 
 exposePackage, exposePackageId, hidePackage, ignorePackage,
         trustPackage, distrustPackage :: String -> DynP ()

@@ -131,8 +131,8 @@ data Pat id
                     (SyntaxExpr id)     -- Name of '-' (see RnEnv.lookupSyntaxName)
 
         ------------ Pattern type signatures ---------------
-  | SigPatIn        (LPat id)           -- Pattern with a type signature
-                    (HsBndrSig (LHsType id))
+  | SigPatIn        (LPat id)                   -- Pattern with a type signature
+                    (HsWithBndrs (LHsType id))  -- Signature can bind both kind and type vars
 
   | SigPatOut       (LPat id)           -- Pattern with a type signature
                     Type

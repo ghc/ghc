@@ -61,7 +61,7 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #   
 #  $1_$2_EXTRA_HC_OPTS   GHC options for this dir/distdir  mk/build.mk
 #   
-#  $1_$2_HC_PKGCONF      -package-conf flag if necessary   rules/package-config.mk
+#  $1_$2_HC_PKGCONF      -package-db flag if necessary   rules/package-config.mk
 #   
 #  $1_$2_HS_SRC_DIRS     dirs relative to $1 containing    $1/$2/package-data.mk
 #                        source files   

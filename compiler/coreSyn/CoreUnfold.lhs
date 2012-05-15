@@ -145,15 +145,15 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> Arity -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr arity guidance 
-  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
-    		    uf_src        = src,
-    		    uf_arity      = arity,
-		    uf_is_top 	  = top_lvl,
-		    uf_is_value   = exprIsHNF        expr,
-                    uf_is_conlike = exprIsConLike    expr,
-		    uf_is_cheap   = exprIsCheap      expr,
-		    uf_expandable = exprIsExpandable expr,
-		    uf_guidance   = guidance }
+  = CoreUnfolding { uf_tmpl   	    = occurAnalyseExpr expr,
+    		    uf_src          = src,
+    		    uf_arity        = arity,
+		    uf_is_top 	    = top_lvl,
+		    uf_is_value     = exprIsHNF        expr,
+                    uf_is_conlike   = exprIsConLike    expr,
+		    uf_is_work_free = exprIsWorkFree   expr,
+		    uf_expandable   = exprIsExpandable expr,
+		    uf_guidance     = guidance }
 
 mkUnfolding :: UnfoldingSource -> Bool -> Bool -> CoreExpr -> Unfolding
 -- Calculates unfolding guidance
@@ -163,17 +163,18 @@ mkUnfolding src top_lvl is_bottoming expr
   , not (exprIsTrivial expr)
   = NoUnfolding    -- See Note [Do not inline top-level bottoming functions]
   | otherwise
-  = CoreUnfolding { uf_tmpl   	  = occurAnalyseExpr expr,
-    		    uf_src        = src,
-    		    uf_arity      = arity,
-		    uf_is_top 	  = top_lvl,
-		    uf_is_value   = exprIsHNF        expr,
-                    uf_is_conlike = exprIsConLike    expr,
-		    uf_expandable = exprIsExpandable expr,
-		    uf_is_cheap   = exprIsCheap      expr,
-		    uf_guidance   = guidance }
+  = CoreUnfolding { uf_tmpl   	    = occ_anald_expr,
+    		    uf_src          = src,
+    		    uf_arity        = arity,
+		    uf_is_top 	    = top_lvl,
+		    uf_is_value     = exprIsHNF        expr,
+                    uf_is_conlike   = exprIsConLike    expr,
+		    uf_expandable   = exprIsExpandable expr,
+		    uf_is_work_free = exprIsWorkFree   expr,
+		    uf_guidance     = guidance }
   where
-    (arity, guidance) = calcUnfoldingGuidance expr
+    occ_anald_expr    = occurAnalyseExpr expr
+    (arity, guidance) = calcUnfoldingGuidance occ_anald_expr
 	-- Sometimes during simplification, there's a large let-bound thing	
 	-- which has been substituted, and so is now dead; so 'expr' contains
 	-- two copies of the thing while the occurrence-analysed expression doesn't
@@ -501,80 +502,6 @@ sizeExpr bOMB_OUT_SIZE top_args expr
                                  d2  -- Ignore d1
 \end{code}
 
-Note [Function application discount]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-I noticed that the output of the supercompiler generates a lot of code
-with this form:
-
-"""
-module Inlining where
-
-h1 k = k undefined undefined undefined
-        undefined undefined undefined
-        undefined undefined undefined
-        undefined undefined undefined
-        undefined undefined undefined
-        undefined undefined undefined
-
-a = h1 (\x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
-b = h1 (\_ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
-c = h1 (\_ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
-d = h1 (\_ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
-e = h1 (\_ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ _ -> x)
-f = h1 (\_ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ _ -> x)
-g = h1 (\_ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ _ -> x)
-h = h1 (\_ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ _ -> x)
-i = h1 (\_ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ _ -> x)
-j = h1 (\_ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ _ -> x)
-k = h1 (\_ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ _ -> x)
-l = h1 (\_ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ _ -> x)
-m = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ _ -> x)
-n = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ _ -> x)
-o = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ _ -> x)
-p = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ _ -> x)
-q = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x _ -> x)
-r = h1 (\_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ x -> x)
-"""
-
-With GHC head the applications of h1 are not inlined, which hurts the
-quality of the generated code a bit. I was wondering why h1 wasn't
-getting inlined into each of "a" to "i" - after all, it has a manifest
-lambda argument.
-
-It turns out that the code in CoreUnfold gives a fixed discount of
-opt_UF_FunAppDiscount to a function argument such as "k" if it applied
-to any arguments. This is enough to ensure that h1 is inlined if the number
-of arguments applied to k is below a certain limit, but if many arguments are
-applied to k then the fixed discount can't overcome the size of the
-chain of apps, and h1 is never inlined.
-
-My proposed solution is to change CoreUnfold.funSize so that longer
-chains of arguments being applied to a lambda-bound function give a
-bigger discount. The motivation for this is that we would *generally*
-expect that the lambda at the callsite has enough lambdas such that
-all of the applications within the body can be beta-reduced away. This
-change might lead to over eager inlining in cases like this, though:
-
-{{{
-h1 k = k x y z
-
-{-# NOINLINE g #-}
-g = ...
-
-main = ... h1 (\x -> g x) ...
-}}}
-
-In this case we aren't able to beta-reduce away all of the
-applications in the body of h1 because the lambda at the call site
-only binds 1 argument, not the 3 allowed by the type. I don't expect
-this case to be particularly common, however.
-
-I chose the bonus to be (size - 20) so that application to 1 arg got
-same bonus as the old fixed bonus (i.e. opt_UF_FunAppDiscount, which is 60).
-If you have the bonus being (size - 40) then $fMonad[]_$c>>= with interesting
-2nd arg doesn't inline in cryptarithm2 so we lose some deforestation, and
-overall binary size hardly falls.
 
 \begin{code}
 -- | Finds a nominal size of a string literal.
@@ -615,23 +542,29 @@ funSize top_args fun n_val_args
   where
     some_val_args = n_val_args > 0
 
-        -- See Note [Function application discount]
-    arg_discount | some_val_args && fun `elem` top_args
-    		 = unitBag (fun, opt_UF_FunAppDiscount + (size - 20))
-		 | otherwise = emptyBag
-	-- If the function is an argument and is applied
-	-- to some values, give it an arg-discount
-
-        -- See Note [Function application discount]
-    res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount + (size - 20)
-    		 | otherwise   	 	    = 0
-        -- If the function is partially applied, show a result discount
     size | some_val_args = 10 * (1 + n_val_args)
          | otherwise     = 0
 	-- The 1+ is for the function itself
 	-- Add 1 for each non-trivial arg;
 	-- the allocation cost, as in let(rec)
   
+        --                  DISCOUNTS
+        --  See Note [Function application discounts]
+    arg_discount | some_val_args && one_call fun top_args
+    		 = unitBag (fun, opt_UF_FunAppDiscount)
+		 | otherwise = emptyBag
+	-- If the function is an argument and is applied
+	-- to some values, give it an arg-discount
+
+    res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount
+    		 | otherwise   	 	    = 0
+        -- If the function is partially applied, show a result discount
+
+    one_call _   []                     = False
+    one_call fun (arg:args) | fun==arg  = case idOccInfo arg of
+                                           OneOcc _ one_branch _ -> one_branch
+                                           _                     -> False
+                            | otherwise = one_call fun args
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
@@ -647,6 +580,21 @@ conSize dc n_val_args
      -- REALLY like unfolding constructors that get scrutinised.
      -- [SDM, 25/5/11]
 \end{code}
+
+Note [Function application discount]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want a discount if the function is applied. A good example is
+monadic combinators with continuation arguments, where inlining is
+quite important.
+
+But we don't want a big discount when a function is called many times
+(see the detailed comments with Trac #6048) because if the function is 
+big it won't be inlined at its many call sites and no benefit results.
+Indeed, we can get exponentially big inlinings this way; that is what
+Trac #6048 is about.
+
+So, we only give a function-application discount when the function appears
+textually once, albeit possibly inside a lambda.
 
 Note [Literal integer size]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -918,11 +866,11 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
       -- Things with an INLINE pragma may have an unfolding *and* 
       -- be a loop breaker  (maybe the knot is not yet untied)
 	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top 
-		      , uf_is_cheap = is_cheap, uf_arity = uf_arity
+		      , uf_is_work_free = is_wf, uf_arity = uf_arity
                       , uf_guidance = guidance, uf_expandable = is_exp }
           | active_unfolding -> tryUnfolding dflags id lone_variable 
                                     arg_infos cont_info unf_template is_top 
-                                    is_cheap is_exp uf_arity guidance
+                                    is_wf is_exp uf_arity guidance
           | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
           -> pprTrace "Inactive unfolding:" (ppr id) Nothing
           | otherwise -> Nothing
@@ -935,7 +883,7 @@ tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
 	     -> Maybe CoreExpr	
 tryUnfolding dflags id lone_variable 
              arg_infos cont_info unf_template is_top 
-             is_cheap is_exp uf_arity guidance
+             is_wf is_exp uf_arity guidance
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
@@ -945,7 +893,7 @@ tryUnfolding dflags id lone_variable
 			text "interesting continuation" <+> ppr cont_info,
 			text "some_benefit" <+> ppr some_benefit,
                         text "is exp:" <+> ppr is_exp,
-                        text "is cheap:" <+> ppr is_cheap,
+                        text "is work-free:" <+> ppr is_wf,
 			text "guidance" <+> ppr guidance,
 			extra_doc,
 			text "ANSWER =" <+> if yes_or_no then text "YES" else text "NO"])
@@ -979,7 +927,7 @@ tryUnfolding dflags id lone_variable
     interesting_saturated_call 
       = case cont_info of
           BoringCtxt -> not is_top && uf_arity > 0	  -- Note [Nested functions]
-          CaseCtxt   -> not (lone_variable && is_cheap)   -- Note [Lone variables]
+          CaseCtxt   -> not (lone_variable && is_wf)      -- Note [Lone variables]
           ArgCtxt {} -> uf_arity > 0     		  -- Note [Inlining in ArgCtxt]
           ValAppCtxt -> True			          -- Note [Cast then apply]
 
@@ -993,7 +941,7 @@ tryUnfolding dflags id lone_variable
                enough_args = saturated || (unsat_ok && n_val_args > 0)
 
           UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-      	     -> ( is_cheap && some_benefit && small_enough
+      	     -> ( is_wf && some_benefit && small_enough
                 , (text "discounted size =" <+> int discounted_size) )
     	     where
     	       discounted_size = size - discount
@@ -1105,7 +1053,7 @@ call is at least CONLIKE.  At least for the cases where we use ArgCtxt
 for the RHS of a 'let', we only profit from the inlining if we get a 
 CONLIKE thing (modulo lets).
 
-Note [Lone variables]	See also Note [Interaction of exprIsCheap and lone variables]
+Note [Lone variables]	See also Note [Interaction of exprIsWorkFree and lone variables]
 ~~~~~~~~~~~~~~~~~~~~~   which appears below
 The "lone-variable" case is important.  I spent ages messing about
 with unsatisfactory varaints, but this is nice.  The idea is that if a
@@ -1152,7 +1100,7 @@ However, watch out:
 
    So the non-inlining of lone_variables should only apply if the
    unfolding is regarded as cheap; because that is when exprIsConApp_maybe
-   looks through the unfolding.  Hence the "&& is_cheap" in the
+   looks through the unfolding.  Hence the "&& is_wf" in the
    InlineRule branch.
 
  * Even a type application or coercion isn't a lone variable.
@@ -1167,7 +1115,7 @@ However, watch out:
    There's no advantage in inlining f here, and perhaps
    a significant disadvantage.  Hence some_val_args in the Stop case
 
-Note [Interaction of exprIsCheap and lone variables]
+Note [Interaction of exprIsWorkFree and lone variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The lone-variable test says "don't inline if a case expression
 scrutines a lone variable whose unfolding is cheap".  It's very 
@@ -1178,9 +1126,9 @@ consider
 to be cheap, and that's good because exprIsConApp_maybe doesn't
 think that expression is a constructor application.
 
-I used to test is_value rather than is_cheap, which was utterly
-wrong, because the above expression responds True to exprIsHNF, 
-which is what sets is_value.
+In the 'not (lone_variable && is_wf)' test, I used to test is_value
+rather than is_wf, which was utterly wrong, because the above
+expression responds True to exprIsHNF, which is what sets is_value.
 
 This kind of thing can occur if you have
 

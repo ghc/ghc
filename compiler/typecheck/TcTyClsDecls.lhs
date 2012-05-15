@@ -335,9 +335,9 @@ getInitialKinds (L _ decl)
 	    --	 data T :: *->* where { ... }
             -- with *no* tvs in the HsTyDefn
 
-    get_tvs (TyFamily    {tcdTyVars = tvs}) = tvs
-    get_tvs (ClassDecl   {tcdTyVars = tvs}) = tvs    
-    get_tvs (TyDecl      {tcdTyVars = tvs}) = tvs
+    get_tvs (TyFamily    {tcdTyVars = tvs}) = hsQTvBndrs tvs
+    get_tvs (ClassDecl   {tcdTyVars = tvs}) = hsQTvBndrs tvs    
+    get_tvs (TyDecl      {tcdTyVars = tvs}) = hsQTvBndrs tvs
     get_tvs (ForeignType {})                = []
  
 ----------------
@@ -431,17 +431,13 @@ kcConDecl new_or_data (ConDecl { con_name = name, con_qvars = ex_tvs
        ; return () }
 
 ------------------
-kcResultKind :: Maybe (HsBndrSig (LHsKind Name)) -> Kind -> TcM ()
+kcResultKind :: Maybe (LHsKind Name) -> Kind -> TcM ()
 kcResultKind Nothing res_k
   = discardResult (unifyKind res_k liftedTypeKind)
       --             type family F a 
       -- defaults to type family F a :: *
-kcResultKind (Just (HsBSig k (ss, ns))) res_k
-  = ASSERT( null ss )      -- Parser ensures that 
-                           --   type family F a :: (k :: s)
-                           -- is illegal
-    do { let kvs = map mkKindSigVar ns 
-       ; k' <- tcExtendTyVarEnv kvs (tcLHsKind k)
+kcResultKind (Just k ) res_k
+  = do { k' <- tcLHsKind k
        ; discardResult (unifyKind k' res_k) }
 \end{code}
 
@@ -727,7 +723,7 @@ tcSynFamInstDecl _ decl = pprPanic "tcSynFamInstDecl" (ppr decl)
 
 -----------------
 tcFamTyPats :: TyCon
-            -> HsBndrSig [LHsType Name] -- Patterns
+            -> HsWithBndrs [LHsType Name] -- Patterns
             -> (TcKind -> TcM ())       -- Kind checker for RHS
                                         -- result is ignored
             -> ([TKVar] -> [TcType] -> Kind -> TcM a)
@@ -743,7 +739,8 @@ tcFamTyPats :: TyCon
 -- In that case, the type variable 'a' will *already be in scope*
 -- (and, if C is poly-kinded, so will its kind parameter).
 
-tcFamTyPats fam_tc (HsBSig arg_pats (kvars, tvars)) kind_checker thing_inside
+tcFamTyPats fam_tc (HsWB { hswb_cts = arg_pats, hswb_kvs = kvars, hswb_tvs = tvars }) 
+            kind_checker thing_inside
   = do { -- A family instance must have exactly the same number of type
          -- parameters as the family declaration.  You can't write
          --     type family F a :: * -> *
@@ -756,14 +753,16 @@ tcFamTyPats fam_tc (HsBSig arg_pats (kvars, tvars)) kind_checker thing_inside
 
          -- Instantiate with meta kind vars
        ; fam_arg_kinds <- mapM (const newMetaKindVar) fam_kvs
+       ; loc <- getSrcSpanM
        ; let (arg_kinds, res_kind) 
                  = splitKindFunTysN fam_arity $
                    substKiWith fam_kvs fam_arg_kinds fam_body
+             hs_tvs = HsQTvs { hsq_kvs = kvars
+                             , hsq_tvs = userHsTyVarBndrs loc tvars }
 
          -- Kind-check and quantify
          -- See Note [Quantifying over family patterns]
-       ; typats <- tcExtendTyVarEnv (map mkKindSigVar kvars)      $
-                   tcHsTyVarBndrs (map (noLoc . UserTyVar) tvars) $ \ _ ->
+       ; typats <- tcHsTyVarBndrs hs_tvs $ \ _ ->
                    do { kind_checker res_kind
                       ; tcHsArgTys (quotes (ppr fam_tc)) arg_pats arg_kinds }
        ; let all_args = fam_arg_kinds ++ typats
@@ -1106,10 +1105,10 @@ consUseH98Syntax _                                             = True
 conRepresentibleWithH98Syntax :: ConDecl Name -> Bool
 conRepresentibleWithH98Syntax
     (ConDecl {con_qvars = tvs, con_cxt = ctxt, con_res = ResTyH98 })
-        = null tvs && null (unLoc ctxt)
+        = null (hsQTvBndrs tvs) && null (unLoc ctxt)
 conRepresentibleWithH98Syntax
     (ConDecl {con_qvars = tvs, con_cxt = ctxt, con_res = ResTyGADT (L _ t) })
-        = null (unLoc ctxt) && f t (map (hsTyVarName . unLoc) tvs)
+        = null (unLoc ctxt) && f t (hsLTyVarNames tvs)
     where -- Each type variable should be used exactly once in the
           -- result type, and the result type must just be the type
           -- constructor applied to type variables
