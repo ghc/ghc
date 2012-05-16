@@ -57,6 +57,16 @@ import GHC.Show (Show)
 import GHC.Word (Word32, Word64)
 import GHC.Windows
 
+#ifdef mingw32_HOST_OS
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
+#endif
+
 -- ----------------------------------------------------------------------------
 -- Thread waiting
 
@@ -326,6 +336,6 @@ foreign import ccall unsafe "readIOManagerEvent" -- in the RTS (ThrIOManager.c)
 foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
   c_sendIOManagerEvent :: Word32 -> IO ()
 
-foreign import stdcall "WaitForSingleObject"
+foreign import WINDOWS_CCONV "WaitForSingleObject"
    c_WaitForSingleObject :: HANDLE -> DWORD -> IO DWORD
 

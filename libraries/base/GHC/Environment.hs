@@ -11,6 +11,14 @@ import Foreign.C
 import GHC.IO (finally)
 import GHC.Windows
 
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
+
 -- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
 getFullArgs :: IO [String]
 getFullArgs = do
@@ -24,13 +32,13 @@ getFullArgs = do
        p_argvs <- peekArray (fromIntegral argc) p_argv
        mapM peekCWString p_argvs
 
-foreign import stdcall unsafe "windows.h GetCommandLineW"
+foreign import WINDOWS_CCONV unsafe "windows.h GetCommandLineW"
     c_GetCommandLine :: IO (Ptr CWString)
 
-foreign import stdcall unsafe "windows.h CommandLineToArgvW"
+foreign import WINDOWS_CCONV unsafe "windows.h CommandLineToArgvW"
     c_CommandLineToArgv :: Ptr CWString -> Ptr CInt -> IO (Ptr CWString)
 
-foreign import stdcall unsafe "Windows.h LocalFree"
+foreign import WINDOWS_CCONV unsafe "Windows.h LocalFree"
     c_LocalFree :: Ptr a -> IO (Ptr a)
 #else
 import Control.Monad
