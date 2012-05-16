@@ -17,7 +17,7 @@ import Supercompile.Evaluator.Residualise
 import Supercompile.Evaluator.Syntax
 import Supercompile.Evaluator.FreeVars
 
-import Supercompile.Termination.Generaliser (Generaliser)
+--import Supercompile.Termination.Generaliser (Generaliser)
 import Supercompile.Termination.TagBag (stateTags)
 import Supercompile.Termination.Combinators hiding (generatedKey)
 import qualified Supercompile.Termination.Combinators as Combinators
@@ -26,7 +26,6 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities
 
 import Var        (varName)
-import VarEnv     (emptyInScopeSet)
 import Id         (mkLocalId)
 import MkId       (nullAddrId)
 import Name       (Name, mkSystemVarName, getOccString)
@@ -42,7 +41,8 @@ import Data.Monoid (mempty)
 
 
 {--}
-type ProcessHistory = GraphicalHistory (NodeKey, (String, State, Generaliser -> ScpM ()))
+type RollbackState = ((State -> ScpM (Deeds, Out FVedTerm)) -> ScpM (ResidTags, Deeds, Out FVedTerm))
+type ProcessHistory = GraphicalHistory (NodeKey, (String, State, RollbackState -> ScpM ()))
 
 pROCESS_HISTORY :: ProcessHistory
 pROCESS_HISTORY = mkGraphicalHistory (cofmap sndOf3 wQO)
@@ -203,7 +203,7 @@ rolledBackTo s' s = case on leftExtension (promises . scpMemoState) s' s of
 
       pruneFulfilments :: FulfilmentState -> VarSet -> (FulfilmentState, VarSet)
       pruneFulfilments (FS fulfilments) rolled_back
-        | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " fulfilments:") (ppr rolled_back))
+        | null dump = (if isEmptyVarSet rolled_back then id else pprTraceSC ("dumping " ++ show (sizeVarSet rolled_back) ++ " promises/fulfilments:") (ppr (map fun spine_rolled_back, rolled_back)))
                       (FS fulfilments, rolled_back)
         | otherwise = pruneFulfilments (FS keep) (rolled_back `unionVarSet` mkVarSet (map fst dump))
         where (dump, keep) = partition (\(_, e) -> fvedTermFreeVars e `intersectsVarSet` rolled_back) fulfilments
@@ -242,7 +242,7 @@ addParentM p opt state = ScpM $ StateT $ \s -> ReaderT $ add_parent s
 fulfillM :: (Deeds, FVedTerm) -> ScpM (Deeds, FVedTerm)
 fulfillM res = ScpM $ StateT $ \s -> case fulfill res (scpFulfilmentState s) (scpMemoState s) of (res', fs', ms') -> return (res', s { scpFulfilmentState = fs', scpMemoState = ms' })
 
-terminateM :: String -> State -> (Generaliser -> ScpM ()) -> ScpM a -> (String -> State -> (Generaliser -> ScpM ()) -> ScpM a) -> ScpM a
+terminateM :: String -> State -> (RollbackState -> ScpM ()) -> ScpM a -> (String -> State -> (RollbackState -> ScpM ()) -> ScpM a) -> ScpM a
 terminateM h state rb mcont mstop = ScpM $ StateT $ \s -> ReaderT $ \env -> case ({-# SCC "terminate" #-} terminate (if hISTORY_TREE then scpProcessHistoryEnv env else scpProcessHistoryState s) (scpNodeKey env, (h, state, rb))) of
         Stop (_, (shallow_h, shallow_state, shallow_rb))
           -> trace ("stops: " ++ show (scpStopCount env)) $
@@ -265,23 +265,14 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
   Just h  -> flip catchM try_generalise $ \rb ->
                terminateM h state rb
                  (speculateM (reduce state) $ \state -> my_split state sc)
-                 (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $
-                                                         case msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state of 
-                                                           -- FIXME: better? In particular, could rollback and then MSG
-                                                           Just (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r))
-                                                            -> pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
-                                                                                       pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $
-                                                               do (deeds', e) <- sc (deeds, heap, k, qa)
-                                                                  rn_r <- mkOutRenaming rn_r -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
-                                                                  liftM ((,) True) $ insertTagsM $ instanceSplit (deeds' `plusDeeds` deeds_r', heap_r, k_r, renameFVedTerm ids rn_r e) sc
-                                                            where [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
-                                                           _ -> (if sC_ROLLBACK then (\gen -> shallow_rb gen >> my_split state sc) else try_generalise) ({-# SCC "mK_GENERALISER'" #-} mK_GENERALISER shallow_state state))
+                 (\shallow_h shallow_state shallow_rb -> trce shallow_h shallow_state $ do
+                                                           let gen = fmap (trace "sc-stop(msg)") (tryMSG shallow_state state) `mplus`
+                                                                     fmap (trace "sc-stop(tag)") (tryTaG shallow_state state) `orElse`
+                                                                          trace "sc-stop(split)" (split shallow_state, split state)
+                                                           when sC_ROLLBACK $ shallow_rb (fst gen)
+                                                           try_generalise (snd gen))
   where
-    try_generalise gen = maybe (trace "sc-stop(split)" $ my_split state)
-                               (trace "sc-stop(gen)")
-                               (my_generalise gen state)
-                               sc
-
+    try_generalise gen = my_generalise gen sc
 
     -- FIXME: the "could have tied back" case is reachable (e.g. exp3_8 with unfoldings as internal bindings), and it doesn't appear to be
     -- because of dumped promises (no "dumped" in output). I'm reasonably sure this should not happen :(
@@ -293,8 +284,30 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
-    my_generalise gen = liftM (\splt -> liftM ((,) True)  . insertTagsM . splt) . generalise gen
-    my_split      opt =                 liftM ((,) False) . insertTagsM . split opt
+    my_generalise splt  = liftM ((,) True)  . insertTagsM . splt
+    my_split      state = liftM ((,) False) . insertTagsM . split state
+
+tryTaG, tryMSG :: State -> State
+               -> Maybe ((State -> ScpM (Deeds, Out FVedTerm)) -> ScpM (ResidTags, Deeds, Out FVedTerm),
+                         (State -> ScpM (Deeds, Out FVedTerm)) -> ScpM (ResidTags, Deeds, Out FVedTerm))
+tryTaG shallow_state state = bothWays (\_ -> generalise gen) shallow_state state
+  where gen = mK_GENERALISER shallow_state state
+
+tryMSG = bothWays $ \shallow_state state -> do
+  -- FIXME: better? In particular, could rollback and then MSG
+  (_, (heap@(Heap _ ids), k, qa), (deeds_r, heap_r, rn_r, k_r)) <- msgMaybe (MSGMode { msgCommonHeapVars = case shallow_state of (_, Heap _ ids, _, _) -> ids }) shallow_state state
+  let [deeds, deeds_r'] = splitDeeds deeds_r [heapSize heap + stackSize k + annedSize qa, heapSize heap_r + stackSize k_r]
+  pprTrace "MSG success" (pPrintFullState quietStatePrettiness (deeds, heap, k, qa) $$
+                          pPrintFullState quietStatePrettiness (deeds_r', heap_r, k_r, fmap Question (annedVar (mkTag 0) nullAddrId))) $ Just $ \opt -> do
+    (deeds', e) <- sc (deeds, heap, k, qa)
+    rn_r <- mkOutRenaming rn_r -- Just to suppress warnings from renameId (since output term may mention h functions). Alternatively, I could rename the State I pass to "sc"
+    instanceSplit (deeds' `plusDeeds` deeds_r', heap_r, k_r, renameFVedTerm ids rn_r e) opt
+
+-- NB: in the case of both callers, if "f" fails one way then it fails the other way as well (and likewise for success).
+-- Therefore we can return a single Maybe rather than a pair of two Maybes.
+bothWays :: (a -> a -> Maybe b)
+         -> a -> a -> Maybe (b, b)
+bothWays f shallow_state state = zipMaybeWithEqual "bothWays" (,) (f state shallow_state) (f shallow_state state)
 
 insertTagsM :: ScpM (ResidTags, a, b) -> ScpM (a, b)
 insertTagsM mx = do

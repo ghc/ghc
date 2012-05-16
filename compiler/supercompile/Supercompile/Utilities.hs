@@ -618,6 +618,14 @@ foldZipEqualM f = go
    go _ _ _ = fail "foldZipEqualM"
 
 
+zipMaybeWithEqual :: String
+                  -> (a -> b -> c)
+                  -> Maybe a -> Maybe b -> Maybe c
+zipMaybeWithEqual _ f Nothing Nothing = Nothing
+zipMaybeWithEqual _ f (Just x) (Just y) = Just (f x y)
+zipMaybeWithEqual msg _ _ _ = error ("zipMaybeWithEqual:" ++ msg)
+
+
 -- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.
 --
 -- > sum (apportion n weights) == n

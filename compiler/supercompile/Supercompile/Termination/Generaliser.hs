@@ -20,7 +20,7 @@ data Generaliser = Generaliser {
 
 generaliseNothing :: Generaliser
 generaliseNothing = Generaliser (\_ -> False) (\_ _ -> False)
-    
+
 generaliserFromGrowing :: (a -> FinMap Nat) -> a -> a -> Generaliser
 generaliserFromGrowing extract x y | IS.null generalise_what = pprTrace "no growth" (ppr generalise_what) generaliseNothing
                                    | otherwise               = generaliserFromFinSet generalise_what
