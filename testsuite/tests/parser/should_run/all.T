@@ -1,7 +1,7 @@
 test('readRun001', normal, compile_and_run, [''])
 test('readRun002', normal, compile_and_run, [''])
 test('readRun003', normal, compile_and_run, [''])
-test('readRun004', expect_broken_for(1257, ['ghci']), compile_and_run, [''])
+test('readRun004', normal, compile_and_run, ['-fobject-code'])
 test('T1344', normal, compile_and_run, [''])
 test('operator', normal, compile_and_run, [''])
 test('operator2', normal, compile_and_run, [''])
