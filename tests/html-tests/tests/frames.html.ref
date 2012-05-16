@@ -3,6 +3,7 @@
      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
+<title></title>
 <script src="haddock-util.js" type="text/javascript"></script>
 <script type="text/javascript"><!--
 /*
@@ -18,11 +19,12 @@ function load() {
   postReframe();
 }
 --></script>
+</head>
 <frameset id="outer-fs" cols="25%,75%" onload="load()">
   <frameset id="inner-fs" rows="100%,0%">
-    <frame src="index-frames.html" name="modules">
-    <frame src="" name="synopsis">
+    <frame src="index-frames.html" name="modules" />
+    <frame src="" name="synopsis" />
   </frameset>
-  <frame src="index.html" name="main">
+  <frame src="index.html" name="main" />
 </frameset>
 </html>
