@@ -308,7 +308,7 @@
 
       <listitem>
         <para>
-          An <literal>haddock</literal> bug (<ulink
+          A <literal>haddock</literal> bug (<ulink
             url="http://hackage.haskell.org/trac/ghc/ticket/5989">#5989</ulink>)
           where modules were being incorrectly inferred safe has been fixed.
         </para>
