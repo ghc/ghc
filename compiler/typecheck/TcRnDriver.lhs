@@ -1159,6 +1159,7 @@ setInteractiveContext hsc_env icxt thing_inside
                                        (mkNameSet (concatMap snd con_fields))
              -- setting tcg_field_env is necessary to make RecordWildCards work
              -- (test: ghci049)
+        , tcg_fix_env      = ic_fix_env icxt
         }) $
 
         tcExtendGhciEnv visible_tmp_ids $ -- Note [GHCi temporary Ids]
@@ -1171,13 +1172,13 @@ setInteractiveContext hsc_env icxt thing_inside
 -- The returned TypecheckedHsExpr is of type IO [ () ], a list of the bound
 -- values, coerced to ().
 tcRnStmt :: HscEnv -> InteractiveContext -> LStmt RdrName
-         -> IO (Messages, Maybe ([Id], LHsExpr Id))
+         -> IO (Messages, Maybe ([Id], LHsExpr Id, FixityEnv))
 tcRnStmt hsc_env ictxt rdr_stmt
   = initTcPrintErrors hsc_env iNTERACTIVE $
     setInteractiveContext hsc_env ictxt $ do {
 
     -- The real work is done here
-    (bound_ids, tc_expr) <- tcUserStmt rdr_stmt ;
+    ((bound_ids, tc_expr), fix_env) <- tcUserStmt rdr_stmt ;
     zonked_expr <- zonkTopLExpr tc_expr ;
     zonked_ids  <- zonkTopBndrs bound_ids ;
 
@@ -1212,7 +1213,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
         (vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
                text "Typechecked expr" <+> ppr zonked_expr]) ;
 
-    return (global_ids, zonked_expr)
+    return (global_ids, zonked_expr, fix_env)
     }
   where
     bad_unboxed id = addErr (sep [ptext (sLit "GHCi can't bind a variable of unlifted type:"),
@@ -1281,7 +1282,7 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 -- for more details. We do this lifting by trying different ways ('plans') of
 -- lifting the code into the IO monad and type checking each plan until one
 -- succeeds.
-tcUserStmt :: LStmt RdrName -> TcM PlanResult
+tcUserStmt :: LStmt RdrName -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
 tcUserStmt (L loc (ExprStmt expr _ _ _))
@@ -1319,7 +1320,7 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
         -- naked expression. Deferring type errors here is unhelpful because the
         -- expression gets evaluated right away anyway. It also would potentially
         -- emit two redundant type-error warnings, one from each plan.
-        ; unsetDOptM Opt_DeferTypeErrors $ runPlans [
+        ; plan <- unsetDOptM Opt_DeferTypeErrors $ runPlans [
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
@@ -1336,14 +1337,17 @@ tcUserStmt (L loc (ExprStmt expr _ _ _))
                         -- This two-step story is very clunky, alas
                     do { _ <- checkNoErrs (tcGhciStmts [let_stmt])
                                 --- checkNoErrs defeats the error recovery of let-bindings
-                       ; tcGhciStmts [let_stmt, print_it] }
-          ]}
+                       ; tcGhciStmts [let_stmt, print_it] } ]
+
+        ; fix_env <- getFixityEnv
+        ; return (plan, fix_env) }
 
 tcUserStmt rdr_stmt@(L loc _)
-  = do { (([rn_stmt], _), fvs) <- checkNoErrs $
-                                  rnStmts GhciStmt [rdr_stmt] $ \_ ->
-                                  return ((), emptyFVs) ;
-               -- Don't try to typecheck if the renamer fails!
+  = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
+           rnStmts GhciStmt [rdr_stmt] $ \_ -> do
+             fix_env <- getFixityEnv
+             return (fix_env, emptyFVs)
+            -- Don't try to typecheck if the renamer fails!
        ; traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
        ; rnDump (ppr rn_stmt) ;
 
@@ -1363,7 +1367,8 @@ tcUserStmt rdr_stmt@(L loc _)
         -- The plans are:
         --      [stmt; print v]         if one binder and not v::()
         --      [stmt]                  otherwise
-       ; runPlans (print_result_plan ++ [tcGhciStmts [gi_stmt]]) }
+       ; plan <- runPlans (print_result_plan ++ [tcGhciStmts [gi_stmt]])
+       ; return (plan, fix_env) }
   where
     mk_print_result_plan stmt v
       = do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]

@@ -594,14 +594,38 @@
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-package-conf</option> <replaceable>file</replaceable></entry>
-            <entry>Load more packages from <replaceable>file</replaceable></entry>
+            <entry><option>-package-db</option> <replaceable>file</replaceable></entry>
+            <entry>Add <replaceable>file</replaceable> to the package db stack.</entry>
             <entry>static</entry>
             <entry>-</entry>
           </row>
           <row>
-            <entry><option>-no-user-package-conf</option></entry>
-            <entry>Don't load the user's package config file.</entry>
+            <entry><option>-clear-package-db</option></entry>
+            <entry>Clear the package db stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-no-global-package-db</option></entry>
+            <entry>Remove the global package db from the stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-global-package-db</option></entry>
+            <entry>Add the global package db to the stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-no-user-package-db</option></entry>
+            <entry>Remove the user's package db from the stack.</entry>
+            <entry>static</entry>
+            <entry>-</entry>
+          </row>
+          <row>
+            <entry><option>-user-package-db</option></entry>
+            <entry>Add the user's package db to the stack.</entry>
             <entry>static</entry>
             <entry>-</entry>
           </row>

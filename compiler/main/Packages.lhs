@@ -152,10 +152,10 @@ getPackageDetails :: PackageState -> PackageId -> PackageConfig
 getPackageDetails ps pid = expectJust "getPackageDetails" (lookupPackage (pkgIdMap ps) pid)
 
 -- ----------------------------------------------------------------------------
--- Loading the package config files and building up the package state
+-- Loading the package db files and building up the package state
 
 -- | Call this after 'DynFlags.parseDynFlags'.  It reads the package
--- configuration files, and sets up various internal tables of package
+-- database files, and sets up various internal tables of package
 -- information, according to the package-related flags on the
 -- command-line (@-package@, @-hide-package@ etc.)
 --
@@ -184,46 +184,37 @@ initPackages dflags = do
 
 readPackageConfigs :: DynFlags -> IO [PackageConfig]
 readPackageConfigs dflags = do
-   e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
-   system_pkgconfs <- getSystemPackageConfigs dflags
+  let system_conf_refs = [UserPkgConf, GlobalPkgConf]
 
-   let pkgconfs = case e_pkg_path of
-                    Left _   -> system_pkgconfs
-                    Right path
-                     | last cs == "" -> init cs ++ system_pkgconfs
-                     | otherwise     -> cs
-                     where cs = parseSearchPath path
-                     -- if the path ends in a separator (eg. "/foo/bar:")
-                     -- the we tack on the system paths.
+  e_pkg_path <- tryIO (getEnv "GHC_PACKAGE_PATH")
+  let base_conf_refs = case e_pkg_path of
+        Left _ -> system_conf_refs
+        Right path
+         | null (last cs)
+         -> map PkgConfFile (init cs) ++ system_conf_refs
+         | otherwise
+         -> map PkgConfFile cs
+         where cs = parseSearchPath path
+         -- if the path ends in a separator (eg. "/foo/bar:")
+         -- then we tack on the system paths.
 
-   pkgs <- mapM (readPackageConfig dflags)
-                (pkgconfs ++ reverse (extraPkgConfs dflags))
-                -- later packages shadow earlier ones.  extraPkgConfs
-                -- is in the opposite order to the flags on the
-                -- command line.
+  let conf_refs = reverse (extraPkgConfs dflags base_conf_refs)
+  -- later packages shadow earlier ones.  extraPkgConfs
+  -- is in the opposite order to the flags on the
+  -- command line.
+  confs <- liftM catMaybes $ mapM (resolvePackageConfig dflags) conf_refs
 
-   return (concat pkgs)
+  liftM concat $ mapM (readPackageConfig dflags) confs
 
-
-getSystemPackageConfigs :: DynFlags -> IO [FilePath]
-getSystemPackageConfigs dflags = do
-   -- System one always comes first
-   let system_pkgconf = systemPackageConfig dflags
-
-   -- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
-   -- unless the -no-user-package-conf flag was given.
-   user_pkgconf <- do
-      if not (dopt Opt_ReadUserPackageConf dflags) then return [] else do
-      appdir <- getAppUserDataDirectory "ghc"
-      let
-         dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
-         pkgconf = dir </> "package.conf.d"
-      --
-      exist <- doesDirectoryExist pkgconf
-      if exist then return [pkgconf] else return []
-    `catchIO` (\_ -> return [])
-
-   return (system_pkgconf : user_pkgconf)
+resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
+resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
+resolvePackageConfig _ UserPkgConf = handleIO (\_ -> return Nothing) $ do
+  appdir <- getAppUserDataDirectory "ghc"
+  let dir = appdir </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+      pkgconf = dir </> "package.conf.d"
+  exist <- doesDirectoryExist pkgconf
+  return $ if exist then Just pkgconf else Nothing
+resolvePackageConfig _ (PkgConfFile name) = return $ Just name
 
 readPackageConfig :: DynFlags -> FilePath -> IO [PackageConfig]
 readPackageConfig dflags conf_file = do
