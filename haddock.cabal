@@ -104,8 +104,6 @@ executable haddock
 
   main-is:              Main.hs
   hs-source-dirs:       src
-  default-extensions:   CPP, DeriveDataTypeable,
-                        ScopedTypeVariables, MagicHash
   ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
   other-modules:
@@ -165,8 +163,6 @@ library
     build-depends: QuickCheck >= 2.1 && < 3
 
   hs-source-dirs:       src
-  default-extensions:   CPP, DeriveDataTypeable,
-                        ScopedTypeVariables, MagicHash
   ghc-options:          -funbox-strict-fields -O2 -Wall -fwarn-tabs
 
   exposed-modules:
