@@ -26,7 +26,6 @@ import Haddock.Backends.Xhtml.Utils
 import Haddock.GhcUtils
 import Haddock.Types
 
-import           Control.Monad         ( join )
 import           Data.List             ( intersperse )
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -589,8 +588,7 @@ ppSideBySideConstr subdocs unicode qual (L _ con) = (decl, mbDoc, fieldPart)
     forall_ = con_explicit con
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    -- 'join' is in Maybe.
-    mbDoc = join $ fmap fst $ lookup (unLoc $ con_name con) subdocs
+    mbDoc = lookup (unLoc $ con_name con) subdocs >>= fst
     mkFunTy a b = noLoc (HsFunTy a b)
 
 
@@ -602,7 +600,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField (L _ name) ltype _) =
     [])
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
-    mbDoc = join $ fmap fst $ lookup name subdocs
+    mbDoc = lookup name subdocs >>= fst
 
 
 ppShortField :: Bool -> Bool -> Qualification -> ConDeclField DocName -> Html
