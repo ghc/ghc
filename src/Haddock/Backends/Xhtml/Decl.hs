@@ -71,9 +71,9 @@ ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> [DocName] -> HsType DocName
                -> DocForDecl DocName -> (Html, Html, Html) -> Bool -> Qualification -> Html
 ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep) unicode qual
   | summary = pref1
-  | Map.null argDocs = topDeclElem links loc docnames pref1 +++ maybeDocSection qual doc
+  | Map.null argDocs = topDeclElem links loc docnames pref1 +++ docSection qual doc
   | otherwise = topDeclElem links loc docnames pref2 +++
-      subArguments qual (do_args 0 sep typ) +++ maybeDocSection qual doc
+      subArguments qual (do_args 0 sep typ) +++ docSection qual doc
   where
     argDoc n = Map.lookup n argDocs
 
@@ -166,12 +166,12 @@ ppTyFamHeader summary associated decl unicode qual =
     Nothing -> noHtml
 
 
-ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
+ppTyFam :: Bool -> Bool -> LinksInfo -> SrcSpan -> Documentation DocName ->
               TyClDecl DocName -> Bool -> Qualification -> Html
-ppTyFam summary associated links loc mbDoc decl unicode qual
+ppTyFam summary associated links loc doc decl unicode qual
 
   | summary   = ppTyFamHeader True associated decl unicode qual
-  | otherwise = header_ +++ maybeDocSection qual mbDoc +++ instancesBit
+  | otherwise = header_ +++ docSection qual doc +++ instancesBit
 
   where
     docname = tcdName decl
@@ -206,12 +206,12 @@ ppDataInst = undefined
 --------------------------------------------------------------------------------
 
 
-ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Maybe (Doc DocName) ->
+ppTyInst :: Bool -> Bool -> LinksInfo -> SrcSpan -> Documentation DocName ->
             TyClDecl DocName -> Bool -> Qualification -> Html
-ppTyInst summary associated links loc mbDoc decl unicode qual
+ppTyInst summary associated links loc doc decl unicode qual
 
   | summary   = ppTyInstHeader True associated decl unicode qual
-  | otherwise = header_ +++ maybeDocSection qual mbDoc
+  | otherwise = header_ +++ docSection qual doc
 
   where
     docname = tcdName decl
@@ -367,12 +367,12 @@ ppShortClassDecl _ _ _ _ _ _ _ = error "declaration type not supported by ppShor
 
 
 ppClassDecl :: Bool -> LinksInfo -> [DocInstance DocName] -> SrcSpan
-            -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
+            -> Documentation DocName -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> Qualification -> Html
-ppClassDecl summary links instances loc mbDoc subdocs
+ppClassDecl summary links instances loc d subdocs
         decl@(ClassDecl lctxt lname ltyvars lfds lsigs _ ats _ _) unicode qual
   | summary = ppShortClassDecl summary links decl loc subdocs unicode qual
-  | otherwise = classheader +++ maybeDocSection qual mbDoc
+  | otherwise = classheader +++ docSection qual d
                   +++ atBit +++ methodBit  +++ instancesBit
   where
     classheader
@@ -449,12 +449,12 @@ ppShortDataDecl summary _links _loc dataDecl unicode qual
 
 ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] ->
               [(DocName, DocForDecl DocName)] ->
-              SrcSpan -> Maybe (Doc DocName) -> TyClDecl DocName -> Bool ->
+              SrcSpan -> Documentation DocName -> TyClDecl DocName -> Bool ->
               Qualification -> Html
-ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode qual
+ppDataDecl summary links instances subdocs loc doc dataDecl unicode qual
 
   | summary   = ppShortDataDecl summary links loc dataDecl unicode qual
-  | otherwise = header_ +++ maybeDocSection qual mbDoc +++ constrBit +++ instancesBit
+  | otherwise = header_ +++ docSection qual doc +++ constrBit +++ instancesBit
 
   where
     docname   = unLoc . tcdLName $ dataDecl
@@ -588,7 +588,7 @@ ppSideBySideConstr subdocs unicode qual (L _ con) = (decl, mbDoc, fieldPart)
     forall_ = con_explicit con
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    mbDoc = lookup (unLoc $ con_name con) subdocs >>= fst
+    mbDoc = lookup (unLoc $ con_name con) subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
     mkFunTy a b = noLoc (HsFunTy a b)
 
 
@@ -600,7 +600,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField (L _ name) ltype _) =
     [])
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
-    mbDoc = lookup name subdocs >>= fst
+    mbDoc = lookup name subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
 
 
 ppShortField :: Bool -> Bool -> Qualification -> ConDeclField DocName -> Html

@@ -117,8 +117,8 @@ createInterface tm flags modMap instIfaceMap = do
     ifaceMod             = mdl,
     ifaceOrigFilename    = msHsFilePath ms,
     ifaceInfo            = info,
-    ifaceDoc             = mbDoc,
-    ifaceRnDoc           = Nothing,
+    ifaceDoc             = Documentation mbDoc,
+    ifaceRnDoc           = Documentation Nothing,
     ifaceOptions         = opts,
     ifaceDocMap          = docMap,
     ifaceArgMap          = argMap,
@@ -609,10 +609,12 @@ hiValExportItem name doc = do
 lookupDocs :: Name -> DocMap Name -> ArgMap Name -> SubMap -> (DocForDecl Name, [(Name, DocForDecl Name)])
 lookupDocs n docMap argMap subMap =
   let lookupArgDoc x = M.findWithDefault M.empty x argMap in
-  let doc = (M.lookup n docMap, lookupArgDoc n) in
+  let doc = (lookupDoc n, lookupArgDoc n) in
   let subs = M.findWithDefault [] n subMap in
-  let subDocs = [ (s, (M.lookup s docMap, lookupArgDoc s)) | s <- subs ] in
+  let subDocs = [ (s, (lookupDoc s, lookupArgDoc s)) | s <- subs ] in
   (doc, subDocs)
+  where
+    lookupDoc = Documentation . (`M.lookup` docMap)
 
 
 -- | Return all export items produced by an exported module. That is, we're
@@ -772,7 +774,7 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
 pruneExportItems :: [ExportItem Name] -> [ExportItem Name]
 pruneExportItems = filter hasDoc
   where
-    hasDoc (ExportDecl{expItemMbDoc = (d, _)}) = isJust d
+    hasDoc (ExportDecl{expItemMbDoc = (Documentation d, _)}) = isJust d
     hasDoc _ = True
 
 

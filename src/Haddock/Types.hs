@@ -67,10 +67,10 @@ data Interface = Interface
   , ifaceInfo            :: !(HaddockModInfo Name)
 
     -- | Documentation header.
-  , ifaceDoc             :: !(Maybe (Doc Name))
+  , ifaceDoc             :: !(Documentation Name)
 
     -- | Documentation header with cross-reference information.
-  , ifaceRnDoc           :: Maybe (Doc DocName)
+  , ifaceRnDoc           :: Documentation DocName
 
     -- | Haddock options for this module (prune, ignore-exports, etc).
   , ifaceOptions         :: ![DocOption]
@@ -214,19 +214,23 @@ data ExportItem name
   | ExportModule Module
 
 
+newtype Documentation name = Documentation (Maybe (Doc name))
+  deriving Functor
+
+
 -- | Arguments and result are indexed by Int, zero-based from the left,
 -- because that's the easiest to use when recursing over types.
 type FnArgsDoc name = Map Int (Doc name)
-type DocForDecl name = (Maybe (Doc name), FnArgsDoc name)
+type DocForDecl name = (Documentation name, FnArgsDoc name)
 
 
 noDocForDecl :: DocForDecl name
-noDocForDecl = (Nothing, Map.empty)
+noDocForDecl = (Documentation Nothing, Map.empty)
 
 
 unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name
-unrenameDocForDecl (mbDoc, fnArgsDoc) =
-    (fmap unrenameDoc mbDoc, fmap unrenameDoc fnArgsDoc)
+unrenameDocForDecl (doc, fnArgsDoc) =
+    (fmap getName doc, (fmap . fmap) getName fnArgsDoc)
 
 
 -----------------------------------------------------------------------------
@@ -302,10 +306,6 @@ data Doc id
 instance Monoid (Doc id) where
   mempty  = DocEmpty
   mappend = DocAppend
-
-
-unrenameDoc :: Doc DocName -> Doc Name
-unrenameDoc = fmap getName
 
 
 data Example = Example

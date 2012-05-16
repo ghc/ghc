@@ -508,18 +508,16 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
 
     -- todo: if something has only sub-docs, or fn-args-docs, should
     -- it be measured here and thus prevent omitting the synopsis?
-    has_doc (ExportDecl _ doc _ _) = isJust (fst doc)
+    has_doc (ExportDecl _ (Documentation mDoc, _) _ _) = isJust mDoc
     has_doc (ExportNoDecl _ _) = False
     has_doc (ExportModule _) = False
     has_doc _ = True
 
     no_doc_at_all = not (any has_doc exports)
 
-    description
-          = case ifaceRnDoc iface of
-              Nothing -> noHtml
-              Just doc -> divDescription $
-                            sectionName << "Description" +++ docSection qual doc
+    description | isNoHtml doc = doc
+                | otherwise    = divDescription $ sectionName << "Description" +++ doc
+                where doc = docSection qual (ifaceRnDoc iface)
 
         -- omit the synopsis if there are no documentation annotations at all
     synopsis
@@ -639,7 +637,7 @@ processExport summary _ _ qual (ExportNoDecl y subs)
   = processDeclOneLiner summary $
       ppDocName qual y +++ parenList (map (ppDocName qual) subs)
 processExport summary _ _ qual (ExportDoc doc)
-  = nothingIf summary $ docSection qual doc
+  = nothingIf summary $ docSection_ qual doc
 processExport summary _ _ _ (ExportModule mdl)
   = processDeclOneLiner summary $ toHtml "module" <+> ppModule mdl
 

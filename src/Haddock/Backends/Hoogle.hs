@@ -48,7 +48,7 @@ ppHoogle package version synopsis prologue ifaces odir = do
     hClose h
 
 ppModule :: Interface -> [String]
-ppModule iface = "" : doc (ifaceDoc iface) ++
+ppModule iface = "" : ppDocumentation (ifaceDoc iface) ++
                  ["module " ++ moduleString (ifaceMod iface)] ++
                  concatMap ppExport (ifaceExportItems iface) ++
                  concatMap ppInstance (ifaceInstances iface)
@@ -109,7 +109,7 @@ operator x = x
 -- How to print each export
 
 ppExport :: ExportItem Name -> [String]
-ppExport (ExportDecl decl dc subdocs _) = doc (fst dc) ++ f (unL decl)
+ppExport (ExportDecl decl dc subdocs _) = ppDocumentation (fst dc) ++ f (unL decl)
     where
         f (TyClD d@TyData{}) = ppData d subdocs
         f (TyClD d@ClassDecl{}) = ppClass d
@@ -167,19 +167,19 @@ ppData x subdocs = showData x{tcdCons=[],tcdDerivs=Nothing} :
                 f w = if w == nam then operator nam else w
 
 -- | for constructors, and named-fields...
-lookupCon :: [(Name, DocForDecl Name)] -> Located Name -> Maybe (Doc Name)
+lookupCon :: [(Name, DocForDecl Name)] -> Located Name -> [String]
 lookupCon subdocs (L _ name) = case lookup name subdocs of
-  Just (d, _) -> d
-  _ -> Nothing
+  Just (d, _) -> ppDocumentation d
+  _ -> []
 
 ppCtor :: TyClDecl Name -> [(Name, DocForDecl Name)] -> ConDecl Name -> [String]
-ppCtor dat subdocs con = doc (lookupCon subdocs (con_name con))
+ppCtor dat subdocs con = lookupCon subdocs (con_name con)
                          ++ f (con_details con)
     where
         f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
         f (RecCon recs) = f (PrefixCon $ map cd_fld_type recs) ++ concat
-                          [doc (lookupCon subdocs (cd_fld_name r)) ++
+                          [lookupCon subdocs (cd_fld_name r) ++
                            [out (unL $ cd_fld_name r) `typeSig` [resType, cd_fld_type r]]
                           | r <- recs]
 
@@ -196,6 +196,10 @@ ppCtor dat subdocs con = doc (lookupCon subdocs (con_name con))
 
 ---------------------------------------------------------------------
 -- DOCUMENTATION
+
+ppDocumentation :: Outputable o => Documentation o -> [String]
+ppDocumentation (Documentation d) = doc d
+
 
 doc :: Outputable o => Maybe (Doc o) -> [String]
 doc = docWith ""

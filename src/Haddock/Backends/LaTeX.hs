@@ -158,9 +158,7 @@ ppLaTeXModule _title odir iface = do
        ]
 
       description
-          = case ifaceRnDoc iface of
-              Nothing -> empty
-              Just doc -> docToLaTeX doc
+          = (fromMaybe empty . documentationToLaTeX . ifaceRnDoc) iface
 
       body = processExports exports
   --
@@ -210,7 +208,7 @@ processExports (e : es) =
 
 isSimpleSig :: ExportItem DocName -> Maybe ([DocName], HsType DocName)
 isSimpleSig (ExportDecl (L _ (SigD (TypeSig lnames (L _ t))))
-                        (Nothing, argDocs) _ _)
+                        (Documentation Nothing, argDocs) _ _)
   | Map.null argDocs = Just (map unLoc lnames, t)
 isSimpleSig _ = Nothing
 
@@ -276,24 +274,24 @@ ppDecl :: LHsDecl DocName
        -> [(DocName, DocForDecl DocName)]
        -> LaTeX
 
-ppDecl (L loc decl) (mbDoc, fnArgsDoc) instances subdocs = case decl of
-  TyClD d@(TyFamily {})          -> ppTyFam False loc mbDoc d unicode
+ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs = case decl of
+  TyClD d@(TyFamily {})          -> ppTyFam False loc doc d unicode
   TyClD d@(TyData {})
-    | Nothing <- tcdTyPats d     -> ppDataDecl instances subdocs loc mbDoc d unicode
-    | Just _  <- tcdTyPats d     -> ppDataInst loc mbDoc d
+    | Nothing <- tcdTyPats d     -> ppDataDecl instances subdocs loc doc d unicode
+    | Just _  <- tcdTyPats d     -> ppDataInst loc doc d
   TyClD d@(TySynonym {})
-    | Nothing <- tcdTyPats d     -> ppTySyn loc (mbDoc, fnArgsDoc) d unicode
-    | Just _  <- tcdTyPats d     -> ppTyInst False loc mbDoc d unicode
-  TyClD d@(ClassDecl {})         -> ppClassDecl instances loc mbDoc subdocs d unicode
-  SigD (TypeSig lnames (L _ t))  -> ppFunSig loc (mbDoc, fnArgsDoc) (map unLoc lnames) t unicode
-  ForD d                         -> ppFor loc (mbDoc, fnArgsDoc) d unicode
+    | Nothing <- tcdTyPats d     -> ppTySyn loc (doc, fnArgsDoc) d unicode
+    | Just _  <- tcdTyPats d     -> ppTyInst False loc doc d unicode
+  TyClD d@(ClassDecl {})         -> ppClassDecl instances loc doc subdocs d unicode
+  SigD (TypeSig lnames (L _ t))  -> ppFunSig loc (doc, fnArgsDoc) (map unLoc lnames) t unicode
+  ForD d                         -> ppFor loc (doc, fnArgsDoc) d unicode
   InstD _                        -> empty
   _                              -> error "declaration not supported by ppDecl"
   where
     unicode = False
 
 
-ppTyFam :: Bool -> SrcSpan -> Maybe (Doc DocName) ->
+ppTyFam :: Bool -> SrcSpan -> Documentation DocName ->
               TyClDecl DocName -> Bool -> LaTeX
 ppTyFam _ _ _ _ _ =
   error "type family declarations are currently not supported by --latex"
@@ -304,7 +302,7 @@ ppDataInst =
   error "data instance declarations are currently not supported by --latex"
 
 
-ppTyInst :: Bool -> SrcSpan -> Maybe (Doc DocName) ->
+ppTyInst :: Bool -> SrcSpan -> Documentation DocName ->
             TyClDecl DocName -> Bool -> LaTeX
 ppTyInst _ _ _ _ _ =
   error "type instance declarations are currently not supported by --latex"
@@ -355,13 +353,13 @@ ppTypeOrFunSig :: SrcSpan -> [DocName] -> HsType DocName
 ppTypeOrFunSig _ _ typ (doc, argDocs) (pref1, pref2, sep0)
                unicode
   | Map.null argDocs =
-      declWithDoc pref1 (fmap docToLaTeX doc)
+      declWithDoc pref1 (documentationToLaTeX doc)
   | otherwise        =
       declWithDoc pref2 $ Just $
         text "\\haddockbeginargs" $$
         do_args 0 sep0 typ $$
         text "\\end{tabulary}\\par" $$
-        maybe empty docToLaTeX doc
+        fromMaybe empty (documentationToLaTeX doc)
   where
      do_largs n leader (L _ t) = do_args n leader t
 
@@ -469,9 +467,9 @@ ppFds fds unicode =
 
 
 ppClassDecl :: [DocInstance DocName] -> SrcSpan
-            -> Maybe (Doc DocName) -> [(DocName, DocForDecl DocName)]
+            -> Documentation DocName -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocName -> Bool -> LaTeX
-ppClassDecl instances loc mbDoc subdocs
+ppClassDecl instances loc doc subdocs
   (ClassDecl lctxt lname ltyvars lfds lsigs _ ats at_defs _) unicode
   = declWithDoc classheader (if null body then Nothing else Just (vcat body)) $$
     instancesBit
@@ -482,7 +480,7 @@ ppClassDecl instances loc mbDoc subdocs
 
     hdr = ppClassHdr False lctxt (unLoc lname) ltyvars lfds
 
-    body = catMaybes [fmap docToLaTeX mbDoc, body_]
+    body = catMaybes [documentationToLaTeX doc, body_]
 
     body_
       | null lsigs, null ats, null at_defs = Nothing
@@ -523,8 +521,8 @@ isUndocdInstance _ = Nothing
 -- an 'argBox'. The comment is printed to the right of the box in normal comment
 -- style.
 ppDocInstance :: Bool -> DocInstance DocName -> LaTeX
-ppDocInstance unicode (instHead, mbDoc) =
-  declWithDoc (ppInstDecl unicode instHead) (fmap docToLaTeX mbDoc)
+ppDocInstance unicode (instHead, doc) =
+  declWithDoc (ppInstDecl unicode instHead) (fmap docToLaTeX doc)
 
 
 ppInstDecl :: Bool -> InstHead DocName -> LaTeX
@@ -550,9 +548,9 @@ lookupAnySubdoc n subdocs = case lookup n subdocs of
 
 ppDataDecl :: [DocInstance DocName] ->
               [(DocName, DocForDecl DocName)] ->
-              SrcSpan -> Maybe (Doc DocName) -> TyClDecl DocName -> Bool ->
+              SrcSpan -> Documentation DocName -> TyClDecl DocName -> Bool ->
               LaTeX
-ppDataDecl instances subdocs _loc mbDoc dataDecl unicode
+ppDataDecl instances subdocs _loc doc dataDecl unicode
 
    =  declWithDoc (ppDataHeader dataDecl unicode <+> whereBit)
                   (if null body then Nothing else Just (vcat body))
@@ -562,7 +560,7 @@ ppDataDecl instances subdocs _loc mbDoc dataDecl unicode
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons
 
-    body = catMaybes [constrBit, fmap docToLaTeX mbDoc]
+    body = catMaybes [constrBit, documentationToLaTeX doc]
 
     (whereBit, leaders)
       | null cons = (empty,[])
@@ -642,7 +640,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     forall  = con_explicit con
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    mbDoc = lookup (unLoc $ con_name con) subdocs >>= fst
+    mbDoc = lookup (unLoc $ con_name con) subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
     mkFunTy a b = noLoc (HsFunTy a b)
 
 
@@ -652,7 +650,7 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
-    mbDoc = lookup name subdocs >>= fst
+    mbDoc = lookup name subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
 
 -- {-
 -- ppHsFullConstr :: HsConDecl -> LaTeX
@@ -1040,6 +1038,10 @@ rdrLatexMarkup = parLatexMarkup ppVerbRdrName
 
 docToLaTeX :: Doc DocName -> LaTeX
 docToLaTeX doc = markup latexMarkup doc Plain
+
+
+documentationToLaTeX :: Documentation DocName -> Maybe LaTeX
+documentationToLaTeX (Documentation mDoc) = docToLaTeX `fmap` mDoc
 
 
 rdrDocToLaTeX :: Doc RdrName -> LaTeX

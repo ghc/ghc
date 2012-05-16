@@ -47,7 +47,7 @@ renameInterface renamingEnv warnings iface =
       (rnArgMap, missingNames3) = runRnFM localEnv (mapM (mapM renameDoc) (ifaceArgMap iface))
 
       (finalModuleDoc, missingNames4)
-        = runRnFM localEnv (renameMaybeDoc (ifaceDoc iface))
+        = runRnFM localEnv (renameDocumentation (ifaceDoc iface))
 
       -- combine the missing names and filter out the built-ins, which would
       -- otherwise allways be missing.
@@ -142,15 +142,13 @@ renameExportItems :: [ExportItem Name] -> RnM [ExportItem DocName]
 renameExportItems = mapM renameExportItem
 
 
-renameDocForDecl :: (Maybe (Doc Name), FnArgsDoc Name) -> RnM (Maybe (Doc DocName), FnArgsDoc DocName)
-renameDocForDecl (mbDoc, fnArgsDoc) = do
-  mbDoc' <- renameMaybeDoc mbDoc
-  fnArgsDoc' <- renameFnArgsDoc fnArgsDoc
-  return (mbDoc', fnArgsDoc')
+renameDocForDecl :: DocForDecl Name -> RnM (DocForDecl DocName)
+renameDocForDecl (doc, fnArgsDoc) =
+  (,) `fmap` renameDocumentation doc `ap` renameFnArgsDoc fnArgsDoc
 
 
-renameMaybeDoc :: Maybe (Doc Name) -> RnM (Maybe (Doc DocName))
-renameMaybeDoc = mapM renameDoc
+renameDocumentation :: Documentation Name -> RnM (Documentation DocName)
+renameDocumentation (Documentation mDoc) = Documentation <$> mapM renameDoc mDoc
 
 
 renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
