@@ -10,7 +10,10 @@ Changes in version 2.11.0
 
  * Fix a case where we were generating invalid xhtml 
 
- * Better behaviour of the --qual option (no crashes, proper error messages)
+ * Improved --qual option (no crashes, proper error messages)
+
+ * A new --qual option "aliased" which qualifies identifers by the module alias
+   used in the source code
 
  * The Haddock API restores GHC's static flags after invocation
 
