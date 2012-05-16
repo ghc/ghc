@@ -1320,11 +1320,9 @@ rewriteWithFunDeps eqn_pred_locs xis wloc
 
 instFunDepEqn :: WantedLoc -> Equation -> TcS [(Int,CtEvidence)]
 -- Post: Returns the position index as well as the corresponding FunDep equality
-instFunDepEqn wl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
+instFunDepEqn wl (FDEqn { fd_qtvs = tvs, fd_eqs = eqs
                         , fd_pred1 = d1, fd_pred2 = d2 })
-  = do { let tvs = varSetElems qtvs
-       ; tys' <- mapM instFlexiTcS tvs  -- IA0_TODO: we might need to do kind substitution
-       ; let subst = zipTopTvSubst tvs tys'
+  = do { (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
        ; foldM (do_one subst) [] eqs }
   where 
     do_one subst ievs (FDEq { fd_pos = i, fd_ty_left = ty1, fd_ty_right = ty2 })
