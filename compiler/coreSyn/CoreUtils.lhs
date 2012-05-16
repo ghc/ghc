@@ -1350,10 +1350,11 @@ eqExprX id_unfolding_fun env e1 e2
         (bs2,rs2) = unzip ps2
         env' = rnBndrs2 env bs1 bs2
 
-    go env (Case e1 b1 _ a1) (Case e2 b2 _ a2)
-      =  go env e1 e2
-      && eqTypeX env (idType b1) (idType b2)
-      && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
+    go env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
+      | null a1   -- See Note [Empty case alternatives] in TrieMap
+      = null a2 && go env e1 e2 && eqTypeX env t1 t2
+      | otherwise
+      =  go env e1 e2 && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
 
     go _ _ _ = False
 
