@@ -173,6 +173,26 @@
           has been fixed.
         </para>
       </listitem>
+
+      <listitem>
+        <para>
+          A performance bug causing functions to lose the tail-recursive
+          property after optimization (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5920">#5920</ulink>,
+          <ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5997">#5997</ulink>)
+          has been fixed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          <literal>hs_init</literal> can now be called with
+          <literal>NULL</literal> pointers as arguments (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/6006">#6006</ulink>).
+        </para>
+      </listitem>
+
     </itemizedlist>
   </sect2>
 
@@ -216,10 +236,12 @@
 
       <listitem>
         <para>
-          Fixed bug (<ulink
-            url="http://hackage.haskell.org/trac/ghc/ticket/5979">#5979</ulink>)
-          where a failed import in GHCi with -XPackageImport would cause
-          successive imports to fail.
+          A GHCi bug (<ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/5979">#5979</ulink>,
+          <ulink
+            url="http://hackage.haskell.org/trac/ghc/ticket/6007">#6007</ulink>)
+          where a failed import would cause successive imports to fail has been
+          fixed.
         </para>
       </listitem>
     </itemizedlist>
