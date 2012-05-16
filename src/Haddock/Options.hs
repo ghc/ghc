@@ -126,7 +126,7 @@ options backwardsCompat =
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
       "page heading",
     Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUAL")
-      "qualification of names, one of \n'none' (default), 'full', 'local'\n'relative' or 'abbreviate'",
+      "qualification of names, one of \n'none' (default), 'full', 'local'\n'relative' or 'aliased'",
     Option ['?']  ["help"]  (NoArg Flag_Help)
       "display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
@@ -237,7 +237,7 @@ qualification flags =
       ["full"]       -> Right OptFullQual
       ["local"]      -> Right OptLocalQual
       ["relative"]   -> Right OptRelativeQual
-      ["abbreviate"] -> Right OptAbbreviateQual
+      ["aliased"]    -> Right OptAliasedQual
       [arg]          -> Left $ "unknown qualification type " ++ show arg
       _:_            -> Left "qualification option given multiple times"
 

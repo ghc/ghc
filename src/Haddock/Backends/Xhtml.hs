@@ -468,9 +468,9 @@ ppHtmlModule odir doctitle themes
   maybe_contents_url maybe_index_url unicode qual debug iface = do
   let
       mdl = ifaceMod iface
-      abbrevs = ifaceModuleAbbrevs iface
+      aliases = ifaceModuleAliases iface
       mdl_str = moduleString mdl
-      real_qual = makeModuleQual qual abbrevs mdl
+      real_qual = makeModuleQual qual aliases mdl
       html =
         headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes +++
         bodyHtml doctitle (Just iface)

@@ -103,8 +103,8 @@ data Interface = Interface
     -- module.
   , ifaceVisibleExports  :: ![Name]
 
-    -- | Abbreviations of module imports as in @import A.B.C as C@.
-  , ifaceModuleAbbrevs   :: AbbreviationMap
+    -- | Aliases of module imports as in @import A.B.C as C@.
+  , ifaceModuleAliases   :: AliasMap
 
     -- | Instances exported by the module.
   , ifaceInstances       :: ![Instance]
@@ -383,21 +383,21 @@ data QualOption
   | OptLocalQual      -- ^ Qualify all imported names fully.
   | OptRelativeQual   -- ^ Like local, but strip module prefix
                       --   from modules in the same hierarchy.
-  | OptAbbreviateQual -- ^ Uses abbreviations of module names
+  | OptAliasedQual    -- ^ Uses aliases of module names
                       --   as suggested by module import renamings.
                       --   However, we are unfortunately not able
                       --   to maintain the original qualifications.
                       --   Image a re-export of a whole module,
                       --   how could the re-exported identifiers be qualified?
 
-type AbbreviationMap = Map ModuleName ModuleName
+type AliasMap = Map Module ModuleName
 
 data Qualification
   = NoQual
   | FullQual
   | LocalQual Module
   | RelativeQual Module
-  | AbbreviateQual AbbreviationMap Module
+  | AliasedQual AliasMap Module
        -- ^ @Module@ contains the current module.
        --   This way we can distinguish imported and local identifiers.
 
@@ -407,12 +407,12 @@ makeContentsQual qual =
     OptNoQual -> NoQual
     _         -> FullQual
 
-makeModuleQual :: QualOption -> AbbreviationMap -> Module -> Qualification
-makeModuleQual qual abbrevs mdl =
+makeModuleQual :: QualOption -> AliasMap -> Module -> Qualification
+makeModuleQual qual aliases mdl =
   case qual of
     OptLocalQual      -> LocalQual mdl
     OptRelativeQual   -> RelativeQual mdl
-    OptAbbreviateQual -> AbbreviateQual abbrevs mdl
+    OptAliasedQual    -> AliasedQual aliases mdl
     OptFullQual       -> FullQual
     OptNoQual         -> NoQual
 
