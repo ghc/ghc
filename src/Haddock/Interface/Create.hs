@@ -164,15 +164,17 @@ lookupModuleDyn dflags Nothing mdlName =
 -------------------------------------------------------------------------------
 
 
--- FIXME: simplify
 lookupWarning :: Warnings -> GlobalRdrEnv -> Name -> Maybe (Doc id)
 lookupWarning NoWarnings  _ _ = Nothing
 lookupWarning (WarnAll _) _ _ = Nothing
-lookupWarning (WarnSome ws) gre name = M.lookup name wm
-  where
-    wm = M.fromList
-      [ (n, warnToDoc w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
-      , let n = gre_name elt, n == name ]
+lookupWarning (WarnSome ws) gre name =
+  -- there is at most one warning for each name, so it's fine to use
+  -- listToMaybe here
+  listToMaybe [warnToDoc w
+              | (occ, w) <- ws
+              , elt <- lookupGlobalRdrEnv gre occ
+              , gre_name elt == name
+              ]
 
 
 moduleWarning :: Warnings -> Maybe (Doc id)
