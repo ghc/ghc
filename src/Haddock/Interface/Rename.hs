@@ -148,7 +148,8 @@ renameDocForDecl (doc, fnArgsDoc) =
 
 
 renameDocumentation :: Documentation Name -> RnM (Documentation DocName)
-renameDocumentation (Documentation mDoc) = Documentation <$> mapM renameDoc mDoc
+renameDocumentation (Documentation mDoc mWarning) =
+  Documentation `fmap` mapM renameDoc mDoc `ap` mapM renameDoc mWarning
 
 
 renameLDocHsSyn :: LHsDocString -> RnM LHsDocString

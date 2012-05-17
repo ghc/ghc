@@ -24,6 +24,7 @@ import Control.Exception
 import Control.Arrow
 import Data.Typeable
 import Data.Map (Map)
+import Data.Maybe
 import qualified Data.Map as Map
 import Data.Monoid
 import GHC hiding (NoLink)
@@ -213,9 +214,15 @@ data ExportItem name
   -- | A cross-reference to another module.
   | ExportModule Module
 
+data Documentation name = Documentation
+  { documentationDoc :: Maybe (Doc name)
+  , documentationWarning :: Maybe (Doc name)
+  } deriving Functor
 
-newtype Documentation name = Documentation (Maybe (Doc name))
-  deriving Functor
+
+combineDocumentation :: Documentation name -> Maybe (Doc name)
+combineDocumentation (Documentation Nothing Nothing) = Nothing
+combineDocumentation (Documentation mDoc mWarning)   = Just (fromMaybe mempty mWarning `mappend` fromMaybe mempty mDoc)
 
 
 -- | Arguments and result are indexed by Int, zero-based from the left,
@@ -225,7 +232,7 @@ type DocForDecl name = (Documentation name, FnArgsDoc name)
 
 
 noDocForDecl :: DocForDecl name
-noDocForDecl = (Documentation Nothing, Map.empty)
+noDocForDecl = (Documentation Nothing Nothing, Map.empty)
 
 
 unrenameDocForDecl :: DocForDecl DocName -> DocForDecl Name

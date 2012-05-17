@@ -508,7 +508,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
 
     -- todo: if something has only sub-docs, or fn-args-docs, should
     -- it be measured here and thus prevent omitting the synopsis?
-    has_doc (ExportDecl _ (Documentation mDoc, _) _ _) = isJust mDoc
+    has_doc (ExportDecl _ (Documentation mDoc mWarning, _) _ _) = isJust mDoc || isJust mWarning
     has_doc (ExportNoDecl _ _) = False
     has_doc (ExportModule _) = False
     has_doc _ = True

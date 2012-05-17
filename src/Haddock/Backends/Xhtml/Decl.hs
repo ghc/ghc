@@ -588,7 +588,7 @@ ppSideBySideConstr subdocs unicode qual (L _ con) = (decl, mbDoc, fieldPart)
     forall_ = con_explicit con
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    mbDoc = lookup (unLoc $ con_name con) subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
+    mbDoc = lookup (unLoc $ con_name con) subdocs >>= combineDocumentation . fst
     mkFunTy a b = noLoc (HsFunTy a b)
 
 
@@ -600,7 +600,7 @@ ppSideBySideField subdocs unicode qual (ConDeclField (L _ name) ltype _) =
     [])
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
-    mbDoc = lookup name subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
+    mbDoc = lookup name subdocs >>= combineDocumentation . fst
 
 
 ppShortField :: Bool -> Bool -> Qualification -> ConDeclField DocName -> Html

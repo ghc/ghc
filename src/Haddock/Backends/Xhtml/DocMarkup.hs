@@ -86,7 +86,7 @@ docElement el content_ =
 
 
 docSection :: Qualification -> Documentation DocName -> Html
-docSection qual (Documentation doc) = maybe noHtml (docSection_ qual) doc
+docSection qual = maybe noHtml (docSection_ qual) . combineDocumentation
 
 
 docSection_ :: Qualification -> Doc DocName -> Html

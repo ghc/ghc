@@ -198,7 +198,7 @@ ppCtor dat subdocs con = lookupCon subdocs (con_name con)
 -- DOCUMENTATION
 
 ppDocumentation :: Outputable o => Documentation o -> [String]
-ppDocumentation (Documentation d) = doc d
+ppDocumentation (Documentation d w) = doc d ++ doc w
 
 
 doc :: Outputable o => Maybe (Doc o) -> [String]

@@ -208,7 +208,7 @@ processExports (e : es) =
 
 isSimpleSig :: ExportItem DocName -> Maybe ([DocName], HsType DocName)
 isSimpleSig (ExportDecl (L _ (SigD (TypeSig lnames (L _ t))))
-                        (Documentation Nothing, argDocs) _ _)
+                        (Documentation Nothing Nothing, argDocs) _ _)
   | Map.null argDocs = Just (map unLoc lnames, t)
 isSimpleSig _ = Nothing
 
@@ -640,7 +640,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
     forall  = con_explicit con
     -- don't use "con_doc con", in case it's reconstructed from a .hi file,
     -- or also because we want Haddock to do the doc-parsing, not GHC.
-    mbDoc = lookup (unLoc $ con_name con) subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
+    mbDoc = lookup (unLoc $ con_name con) subdocs >>= combineDocumentation . fst
     mkFunTy a b = noLoc (HsFunTy a b)
 
 
@@ -650,7 +650,7 @@ ppSideBySideField subdocs unicode (ConDeclField (L _ name) ltype _) =
     <+> dcolon unicode <+> ppLType unicode ltype) <-> rDoc mbDoc
   where
     -- don't use cd_fld_doc for same reason we don't use con_doc above
-    mbDoc = lookup name subdocs >>= (\(Documentation mDoc) -> mDoc) . fst
+    mbDoc = lookup name subdocs >>= combineDocumentation . fst
 
 -- {-
 -- ppHsFullConstr :: HsConDecl -> LaTeX
@@ -1041,7 +1041,7 @@ docToLaTeX doc = markup latexMarkup doc Plain
 
 
 documentationToLaTeX :: Documentation DocName -> Maybe LaTeX
-documentationToLaTeX (Documentation mDoc) = docToLaTeX `fmap` mDoc
+documentationToLaTeX = fmap docToLaTeX . combineDocumentation
 
 
 rdrDocToLaTeX :: Doc RdrName -> LaTeX
