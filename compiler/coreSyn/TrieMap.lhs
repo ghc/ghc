@@ -239,22 +239,37 @@ Note [Binders]
      - the binders in an alternative
    because they are totally fixed by the context
 
+Note [Empty case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* For a key (Case e b ty (alt:alts))  we don't need to look the return type
+  'ty', because every alternative has that type.
+
+* For a key (Case e b ty []) we MUST look at the return type 'ty', because
+  otherwise (Case (error () "urk") _ Int  []) would compare equal to 
+            (Case (error () "urk") _ Bool [])
+  which is utterly wrong (Trac #6097)
+
+We could compare the return type regardless, but the wildly common case
+is that it's unnecesary, so we have two fields (cm_case and cm_ecase)
+for the two possibilities.  Only cm_ecase looks at the type.
+
+See also Note [Empty case alternatives] in CoreSyn.
 
 \begin{code}
 data CoreMap a
   = EmptyCM
-  | CM { cm_var  :: VarMap a
-       , cm_lit  :: LiteralMap a
-       , cm_co   :: CoercionMap a
-       , cm_type :: TypeMap a
-       , cm_cast :: CoreMap (CoercionMap a)
-       , cm_source :: CoreMap (TickishMap a)
-       , cm_app  :: CoreMap (CoreMap a)
-       , cm_lam  :: CoreMap (TypeMap a)
-       , cm_letn :: CoreMap (CoreMap (BndrMap a))
-       , cm_letr :: ListMap CoreMap (CoreMap (ListMap BndrMap a))
-       , cm_case :: CoreMap (ListMap AltMap a)
-       	 -- Note [Binders]
+  | CM { cm_var   :: VarMap a
+       , cm_lit   :: LiteralMap a
+       , cm_co    :: CoercionMap a
+       , cm_type  :: TypeMap a
+       , cm_cast  :: CoreMap (CoercionMap a)
+       , cm_tick :: CoreMap (TickishMap a)
+       , cm_app   :: CoreMap (CoreMap a)
+       , cm_lam   :: CoreMap (TypeMap a)    -- Note [Binders]
+       , cm_letn  :: CoreMap (CoreMap (BndrMap a))
+       , cm_letr  :: ListMap CoreMap (CoreMap (ListMap BndrMap a))
+       , cm_case  :: CoreMap (ListMap AltMap a)
+       , cm_ecase :: CoreMap (TypeMap a)    -- Note [Empty case alternatives]
      }
 
 
@@ -264,7 +279,7 @@ wrapEmptyCM = CM { cm_var = emptyTM, cm_lit = emptyLiteralMap
  		 , cm_cast = emptyTM, cm_app = emptyTM 
  		 , cm_lam = emptyTM, cm_letn = emptyTM 
  		 , cm_letr = emptyTM, cm_case = emptyTM
-                 , cm_source = emptyTM }
+                 , cm_ecase = emptyTM, cm_tick = emptyTM }
 
 instance TrieMap CoreMap where
    type Key CoreMap = CoreExpr
@@ -298,12 +313,13 @@ fdE k m
   . foldTM k (cm_co m)
   . foldTM k (cm_type m)
   . foldTM (foldTM k) (cm_cast m)
-  . foldTM (foldTM k) (cm_source m)
+  . foldTM (foldTM k) (cm_tick m)
   . foldTM (foldTM k) (cm_app m)
   . foldTM (foldTM k) (cm_lam m)
   . foldTM (foldTM (foldTM k)) (cm_letn m)
   . foldTM (foldTM (foldTM k)) (cm_letr m)
   . foldTM (foldTM k) (cm_case m)
+  . foldTM (foldTM k) (cm_ecase m)
 
 lkE :: CmEnv -> CoreExpr -> CoreMap a -> Maybe a
 -- lkE: lookup in trie for expressions
@@ -316,9 +332,9 @@ lkE env expr cm
     go (Type t) 	    = cm_type >.> lkT env t
     go (Coercion c)         = cm_co   >.> lkC env c
     go (Cast e c)           = cm_cast >.> lkE env e >=> lkC env c
-    go (Tick tickish e)   = cm_source >.> lkE env e >=> lkTickish tickish
-    go (App e1 e2)          = cm_app >.> lkE env e2 >=> lkE env e1
-    go (Lam v e)            = cm_lam >.> lkE (extendCME env v) e >=> lkBndr env v
+    go (Tick tickish e)     = cm_tick >.> lkE env e >=> lkTickish tickish
+    go (App e1 e2)          = cm_app  >.> lkE env e2 >=> lkE env e1
+    go (Lam v e)            = cm_lam  >.> lkE (extendCME env v) e >=> lkBndr env v
     go (Let (NonRec b r) e) = cm_letn >.> lkE env r 
                               >=> lkE (extendCME env b) e >=> lkBndr env b
     go (Let (Rec prs) e)    = let (bndrs,rhss) = unzip prs
@@ -326,7 +342,9 @@ lkE env expr cm
                               in cm_letr
                                  >.> lkList (lkE env1) rhss >=> lkE env1 e
                                  >=> lkList (lkBndr env1) bndrs
-    go (Case e b _ as)      = cm_case >.> lkE env e 
+    go (Case e b ty as)     -- See Note [Empty case alternatives]
+               | null as    = cm_ecase >.> lkE env e >=> lkT env ty
+               | otherwise  = cm_case >.> lkE env e 
                               >=> lkList (lkA (extendCME env b)) as
 
 xtE :: CmEnv -> CoreExpr -> XT a -> CoreMap a -> CoreMap a
@@ -337,7 +355,7 @@ xtE env (Coercion c)         f m = m { cm_co   = cm_co m   |> xtC env c f }
 xtE _   (Lit l)              f m = m { cm_lit  = cm_lit m  |> xtLit l f }
 xtE env (Cast e c)           f m = m { cm_cast = cm_cast m |> xtE env e |>>
                                                  xtC env c f }
-xtE env (Tick t e)         f m = m { cm_source = cm_source m |> xtE env e |>> xtTickish t f }
+xtE env (Tick t e)           f m = m { cm_tick = cm_tick m |> xtE env e |>> xtTickish t f }
 xtE env (App e1 e2)          f m = m { cm_app = cm_app m |> xtE env e2 |>> xtE env e1 f }
 xtE env (Lam v e)            f m = m { cm_lam = cm_lam m |> xtE (extendCME env v) e
                                                  |>> xtBndr env v f }
@@ -350,7 +368,9 @@ xtE env (Let (Rec prs) e)    f m = m { cm_letr = let (bndrs,rhss) = unzip prs
                                                     |>  xtList (xtE env1) rhss 
                                                     |>> xtE env1 e 
                                                     |>> xtList (xtBndr env1) bndrs f }
-xtE env (Case e b _ as)      f m = m { cm_case = cm_case m |> xtE env e 
+xtE env (Case e b ty as)     f m 
+                     | null as   = m { cm_ecase = cm_ecase m |> xtE env e |>> xtT env ty f }
+                     | otherwise = m { cm_case = cm_case m |> xtE env e 
                                                  |>> let env1 = extendCME env b
                                                      in xtList (xtA env1) as f }
 

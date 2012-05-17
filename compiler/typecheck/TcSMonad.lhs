@@ -1337,11 +1337,15 @@ instDFunType dfun_id mb_inst_tys
            ; return (ty : tys, phi) }
     go _ _ _ = pprPanic "instDFunTypes" (ppr dfun_id $$ ppr mb_inst_tys)
 
-instFlexiTcS :: TyVar -> TcS TcType 
+instFlexiTcS :: [TKVar] -> TcS (TvSubst, [TcType])
 -- Like TcM.instMetaTyVar but the variable that is created is 
 -- always touchable; we are supposed to guess its instantiation.
 -- See Note [Touchable meta type variables] 
-instFlexiTcS tv = wrapTcS (instFlexiTcSHelper (tyVarName tv) (tyVarKind tv) )
+instFlexiTcS tvs = wrapTcS (mapAccumLM inst_one emptyTvSubst tvs)
+  where
+     inst_one subst tv = do { ty' <- instFlexiTcSHelper (tyVarName tv) 
+                                                        (substTy subst (tyVarKind tv))
+                            ; return (extendTvSubst subst tv ty', ty') }
 
 newFlexiTcSTy :: Kind -> TcS TcType  
 newFlexiTcSTy knd 

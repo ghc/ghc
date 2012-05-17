@@ -665,6 +665,11 @@ stg_forkOnzh
 
 stg_yieldzh
 {
+  // when we yield to the scheduler, we have to tell it to put the
+  // current thread to the back of the queue by setting the
+  // context_switch flag.  If we don't do this, it will run the same
+  // thread again.
+  Capability_context_switch(MyCapability()) = 1 :: CInt;
   jump stg_yield_noregs;
 }
 
