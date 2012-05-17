@@ -462,11 +462,11 @@ msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (dee
 
   -- Now look for type generalisation information
   --  1) Are both stacks empty?
-  | Loco _ <- k_l
-  , Loco _ <- k_r
+  | isStackEmpty k_l
+  , isStackEmpty k_r
   --  2) Do both heaps only contain lambdaBounds?
-  , Foldable.all (isJust . heapBindingLambdaBoundness) h_l
-  , Foldable.all (isJust . heapBindingLambdaBoundness) h_r
+  , isPureHeapEmpty h_l
+  , isPureHeapEmpty h_r
   = Just (RightGivesTypeGen rn_l (deeds_r, heap, k, qa) rn_r)
 
   -- No information gained in this case :-(

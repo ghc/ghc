@@ -621,7 +621,7 @@ foldZipEqualM f = go
 zipMaybeWithEqual :: String
                   -> (a -> b -> c)
                   -> Maybe a -> Maybe b -> Maybe c
-zipMaybeWithEqual _ f Nothing Nothing = Nothing
+zipMaybeWithEqual _ _ Nothing   Nothing = Nothing
 zipMaybeWithEqual _ f (Just x) (Just y) = Just (f x y)
 zipMaybeWithEqual msg _ _ _ = error ("zipMaybeWithEqual:" ++ msg)
 

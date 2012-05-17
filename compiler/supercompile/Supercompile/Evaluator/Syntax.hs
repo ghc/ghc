@@ -20,6 +20,7 @@ import Pair     (pSnd)
 import Coercion (coercionType, coercionKind)
 
 import qualified Data.Map as M
+import qualified Data.Foldable as Foldable
 
 
 type Anned = O Tagged (O Sized FVed)
@@ -352,7 +353,10 @@ stackFrameSize kf = 1 + case kf of
     CastIt _                 -> 0
 
 heapSize :: Heap -> Size
-heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
+heapSize (Heap h _) = pureHeapSize h
+
+pureHeapSize :: PureHeap -> Size
+pureHeapSize = sum . map heapBindingSize . M.elems
 
 stackSize :: Stack -> Size
 stackSize = trainCarFoldl' (\size kf -> size + stackFrameSize (tagee kf)) 0
@@ -362,6 +366,14 @@ stateSize (_, h, k, qa) = heapSize h + stackSize k + annedSize qa
 
 unnormalisedStateSize :: UnnormalisedState -> Size
 unnormalisedStateSize (_, h, k, (_, e)) = heapSize h + stackSize k + annedSize e
+
+
+isStackEmpty :: Stack -> Bool
+isStackEmpty (Loco _) = True
+isStackEmpty _        = False
+
+isPureHeapEmpty :: PureHeap -> Bool
+isPureHeapEmpty = Foldable.all (isJust . heapBindingLambdaBoundness)
 
 
 addStateDeeds :: Deeds -> (Deeds, a, b, c) -> (Deeds, a, b, c)

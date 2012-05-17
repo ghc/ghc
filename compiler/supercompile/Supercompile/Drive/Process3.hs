@@ -379,40 +379,116 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
         --     that we match to reduce before matching in the first place
         --  2. Suprisingly, terms that match *before* reduction may not match *after* reduction! This occurs because
         --     two terms with different distributions of tag may match, but may roll back in different ways in reduce.
-        case [ (p, instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt)
-             | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
-             , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
-                                                  | (p_parent, p_siblings) <- parented_ps
-                                                  , let common_h_vars = case meaning p_parent of (_, Heap _ ids, _, _) -> ids
-                                                  , p_sibling <- p_parent:p_siblings ] ++
-                                                  [ (p_root,    False,                         emptyInScopeSet)
-                                                  | p_root <- unparented_ps ]
-             , let inst_mtch | not iNSTANCE_MATCHING = NoInstances
-                             | is_ancestor           = AllInstances
-                             | otherwise             = InstancesOfGeneralised
-                   mm = MSGMode { msgCommonHeapVars = common_h_vars }
-             --      mm = MM { matchInstanceMatching = inst_mtch, matchCommonHeapVars = common_h_vars }
-             --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
-             --                                      match' mm (meaning p) reduced_state]
-             , Just (RightIsInstance heap_inst rn_lr k_inst) <- [msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch]
-             , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
-                   Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
-               -- FIXME: prefer "more exact" matches
-             , if dumped p
-                then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
-                else True
-             ] of (p, res):_ -> pure (do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                         ; insertTagsM res }, s)
-                  _          | CheckOnly <- memo_how
-                             -> pure (liftM snd $ opt Nothing state, s)
-                             | otherwise
-                             -> pure (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
-                                         ; res <- addParentM p (opt (Just (getOccString (varName (fun p))))) state
-                                         ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
-                                         ; fulfillM res }, s { scpMemoState = ms' })
-                    where (ms', p) = promise (scpMemoState s) (state, reduced_state)
+
+        -- Note [Instance matching and loops]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        --
+        -- If we aren't careful, instance matching can easily cause the supercompiler to loop. What if we have this tieback:
+        --
+        --   \_ -> f x
+        --
+        -- And we are asked to supercompile:
+        --
+        --   let a = \_ -> f a
+        --   in \_ -> f a
+        --
+        -- If we aren't careful, we will detect an instance match, and hence recursively supercompile the "remaining" term:
+        --
+        --   let a = \_ -> f a
+        --   in \_ -> f a
+        --
+        -- We ran into a very similar situation in practice with exp3_8, where the recursive structure was actually an instance
+        -- dictionary which contained several methods (lambdas), each of which selected methods from that same dictionary. i.e.
+        -- we had something like this in the memo table:
+        --
+        --  let $cnegate = \x y -> ...[$fNumNat]
+        --      $c+ = \x y -> ...[$fNumNat]
+        --      $fNumNat = D:Num Nat $cnegate $c+
+        --  in $c+ x y
+        --
+        -- And we were compiling:
+        --
+        --  let $cnegate = \x y -> ...[$fNumNat]
+        --      $c+ = \x y -> ...[$fNumNat]
+        --      $fNumNat = D:Num Nat $cnegate $c+
+        --      a = fromInteger Nat $fNumNat c
+        --      b = negate Nat $fNumNat d
+        --      c = __integer 0
+        --  in $c+ a b
+        --
+        -- So one of the "remaining" terms was:
+        --
+        --  let $cnegate = \x y -> ...[$fNumNat]
+        --      $c+ = \x y -> ...[$fNumNat]
+        --      $fNumNat = D:Num Nat $cnegate $c+
+        --  in negate Nat $fNumNat d
+        --
+        -- And after inlining of the negate selector+body we just get a call to ($c+) which is identical to what we began with,
+        -- since in the class defaults (negate x) is defined as (0 - x) and (a - b) is defined as (a + negate b).
+        --
+        -- Of course, this particular program will most likely cause a runtime loop, but the compiler shouldn't diverge too!
+        --
+        -- I think a reasonable fix is twofold:
+        --  1. Record instance matches in the memotable (!). Still no need to do it for truly *exact* matches.
+        --  2. When tying back, always prefer exact matches over instance matches.
+        --     This is something I want to do anyway because we should also be able to detect instance matches that are strictly
+        --     better than other possible instance matches, and we should prefer those as well with the same code.
+        --
+        -- BUT we have to be so so careful if we do this that we don't introduce accidental extra loops.
+
+        -- FIXME: this code is all super-horrible how
+        let remember what = (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
+                                ; res <- addParentM p (what (Just (getOccString (varName (fun p))))) state
+                                ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
+                                ; fulfillM res }, s { scpMemoState = ms' })
+              where (ms', p) = promise (scpMemoState s) (state, reduced_state)
+        in case fmap (\(exact, (remaining_deeds, heap_inst, rn_lr, p, k_inst)) -> (p, exact, instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt)) $
+                     bestChoice [ (remaining_deeds, heap_inst, rn_lr, p, k_inst)
+                                | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
+                                , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
+                                                                     | (p_parent, p_siblings) <- parented_ps
+                                                                     , let common_h_vars = case meaning p_parent of (_, Heap _ ids, _, _) -> ids
+                                                                     , p_sibling <- p_parent:p_siblings ] ++
+                                                                     [ (p_root,    False,                         emptyInScopeSet)
+                                                                     | p_root <- unparented_ps ]
+                                , let inst_mtch | not iNSTANCE_MATCHING = NoInstances
+                                                | is_ancestor           = AllInstances
+                                                | otherwise             = InstancesOfGeneralised
+                                      mm = MSGMode { msgCommonHeapVars = common_h_vars }
+                                --      mm = MM { matchInstanceMatching = inst_mtch, matchCommonHeapVars = common_h_vars }
+                                --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
+                                --                                      match' mm (meaning p) reduced_state]
+                                , Just (RightIsInstance heap_inst rn_lr k_inst) <- [msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch]
+                                , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
+                                      Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
+                                  -- FIXME: prefer "more exact" matches
+                                , if dumped p
+                                   then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
+                                   else True
+                                ] of Just (p, exact, res) -> pure $ if exact then (it, s) else remember (\_ _ -> liftM ((,) False) it)
+                                       where it = do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                                                     ; insertTagsM res }
+                                     Nothing              | CheckOnly <- memo_how
+                                                          -> pure (liftM snd $ opt Nothing state, s)
+                                                          | otherwise
+                                                          -> pure (remember opt)
       where (state_did_reduce, reduced_state) = reduceForMatch state
             
+            bestChoice :: [(Deeds, Heap, Renaming, Promise, Stack)]
+                       -> Maybe (Bool, (Deeds, Heap, Renaming, Promise, Stack))
+            bestChoice = go Nothing
+              where go mb_best [] = fmap ((,) False) mb_best
+                    go mb_best (it:rest)
+                      | mostSpecific it = Just (True, it) -- Stop early upon exact match (as an optimisation)
+                      | otherwise       = go (Just (maybe it (\best -> if it `moreSpecific` best then it else best) mb_best)) rest
+
+                    mostSpecific :: (a, Heap, b, c, Stack) -> Bool
+                    mostSpecific (_, Heap h _, _, _, k) = isPureHeapEmpty h && isStackEmpty k
+
+                    moreSpecific :: (a, Heap, b, c, Stack) -> (a, Heap, b, c, Stack) -> Bool
+                    moreSpecific (_, Heap h_l _, _, _, k_l) (_, Heap h_r _, _, _, k_r)
+                      = (pureHeapSize h_l + stackSize k_l) <= (pureHeapSize h_r + stackSize k_r) -- Just a heuristic!
+
             -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
             -- this, we tend to do things like:
             --
