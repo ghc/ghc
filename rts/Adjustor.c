@@ -1194,9 +1194,21 @@ freeHaskellFunctionPtr(void* ptr)
  }
 #elif defined(x86_64_HOST_ARCH)
  if ( *(StgWord16 *)ptr == 0x894d ) {
-     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x20));
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+
+#if defined(mingw32_HOST_OS)
+                                                   0x28
+#else
+                                                   0x20
+#endif
+                                                       ));
  } else if ( *(StgWord16 *)ptr == 0x5141 ) {
-     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x30));
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+
+#if defined(mingw32_HOST_OS)
+                                                   0x38
+#else
+                                                   0x30
+#endif
+                                                       ));
  } else {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
