@@ -433,12 +433,13 @@ cvtInlineSpec (Just (TH.InlineSpec inline conlike opt_activation))
     cvtRuleMatchInfo False = FunLike
     cvtRuleMatchInfo True  = ConLike
 
-    inl_spec | inline    = Inline
-             | otherwise = NoInline
- 	     -- Currently we have no way to say Inlinable
+    inl_spec = case inline of
+                 TH.NoInline  -> Hs.NoInline
+                 TH.Inline    -> Hs.Inline
+                 TH.Inlinable -> Hs.Inlinable
 
-    cvtActivation Nothing | inline      = AlwaysActive
-                          | otherwise   = NeverActive
+    cvtActivation Nothing | inline == TH.NoInline = NeverActive
+                          | otherwise             = AlwaysActive
     cvtActivation (Just (False, phase)) = ActiveBefore phase
     cvtActivation (Just (True , phase)) = ActiveAfter  phase
 

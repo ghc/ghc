@@ -44,7 +44,7 @@ import PrelNames
 -- OccName.varName we do this by removing varName from the import of
 -- OccName above, making a qualified instance of OccName and using
 -- OccNameAlias.varName where varName ws previously used in this file.
-import qualified OccName( isDataOcc, isVarOcc, isTcOcc, varName, tcName )
+import qualified OccName( isDataOcc, isVarOcc, isTcOcc, varName, tcName, dataName )
 
 import Module
 import Id
@@ -585,23 +585,26 @@ rep_specialise nm ty ispec loc
        ; return [(loc, pragma)]
        }
 
+repInline :: InlineSpec -> DsM (Core TH.Inline)
+repInline NoInline  = dataCon noInlineDataConName
+repInline Inline    = dataCon inlineDataConName
+repInline Inlinable = dataCon inlinableDataConName
+repInline spec      = notHandled "repInline" (ppr spec)
+
 -- Extract all the information needed to build a TH.InlinePrag
 --
 rep_InlinePrag :: InlinePragma	-- Never defaultInlinePragma
                -> DsM (Core TH.InlineSpecQ)
 rep_InlinePrag (InlinePragma { inl_act = activation, inl_rule = match, inl_inline = inline })
   | Just (flag, phase) <- activation1
-  = repInlineSpecPhase inline1 match1 flag phase
+  = do { inline1 <- repInline inline
+       ; repInlineSpecPhase inline1 match1 flag phase }
   | otherwise
-  = repInlineSpecNoPhase inline1 match1
+  = do { inline1 <- repInline inline
+       ; repInlineSpecNoPhase inline1 match1 }
   where
       match1      = coreBool (rep_RuleMatchInfo match)
       activation1 = rep_Activation activation
-      inline1     = case inline of
-                       Inline -> coreBool True
- 		       _other -> coreBool False
-		       -- We have no representation for Inlinable
-
       rep_RuleMatchInfo FunLike = False
       rep_RuleMatchInfo ConLike = True
 
@@ -1379,6 +1382,10 @@ rep2 :: Name -> [ CoreExpr ] -> DsM (Core a)
 rep2 n xs = do { id <- dsLookupGlobalId n
                ; return (MkC (foldl App (Var id) xs)) }
 
+dataCon :: Name -> DsM (Core a)
+dataCon n = do { id <- dsLookupDataCon n
+               ; return $ MkC $ mkConApp id [] }
+
 -- Then we make "repConstructors" which use the phantom types for each of the
 -- smart constructors of the Meta.Meta datatypes.
 
@@ -1605,11 +1612,12 @@ repFamilyKind :: Core TH.FamFlavour -> Core TH.Name -> Core [TH.TyVarBndr]
 repFamilyKind (MkC flav) (MkC nm) (MkC tvs) (MkC ki)
     = rep2 familyKindDName [flav, nm, tvs, ki]
 
-repInlineSpecNoPhase :: Core Bool -> Core Bool -> DsM (Core TH.InlineSpecQ)
+repInlineSpecNoPhase :: Core TH.Inline -> Core Bool
+                     -> DsM (Core TH.InlineSpecQ)
 repInlineSpecNoPhase (MkC inline) (MkC conlike)
   = rep2 inlineSpecNoPhaseName [inline, conlike]
 
-repInlineSpecPhase :: Core Bool -> Core Bool -> Core Bool -> Core Int
+repInlineSpecPhase :: Core TH.Inline -> Core Bool -> Core Bool -> Core Int
                    -> DsM (Core TH.InlineSpecQ)
 repInlineSpecPhase (MkC inline) (MkC conlike) (MkC beforeFrom) (MkC phase)
   = rep2 inlineSpecPhaseName [inline, conlike, beforeFrom, phase]
@@ -1934,6 +1942,8 @@ templateHaskellNames = [
     unsafeName,
     safeName,
     interruptibleName,
+    -- Inline
+    noInlineDataConName, inlineDataConName, inlinableDataConName,
     -- InlineSpec
     inlineSpecNoPhaseName, inlineSpecPhaseName,
     -- FunDep
@@ -1961,12 +1971,13 @@ qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 mkTHModule :: FastString -> Module
 mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
 
-libFun, libTc, thFun, thTc, qqFun :: FastString -> Unique -> Name
-libFun = mk_known_key_name OccName.varName thLib
-libTc  = mk_known_key_name OccName.tcName  thLib
-thFun  = mk_known_key_name OccName.varName thSyn
-thTc   = mk_known_key_name OccName.tcName  thSyn
-qqFun  = mk_known_key_name OccName.varName qqLib
+libFun, libTc, thFun, thTc, thCon, qqFun :: FastString -> Unique -> Name
+libFun = mk_known_key_name OccName.varName  thLib
+libTc  = mk_known_key_name OccName.tcName   thLib
+thFun  = mk_known_key_name OccName.varName  thSyn
+thTc   = mk_known_key_name OccName.tcName   thSyn
+thCon  = mk_known_key_name OccName.dataName thSyn
+qqFun  = mk_known_key_name OccName.varName  qqLib
 
 -------------------- TH.Syntax -----------------------
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
@@ -2209,6 +2220,12 @@ unsafeName, safeName, interruptibleName :: Name
 unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
 safeName       = libFun (fsLit "safe") safeIdKey
 interruptibleName = libFun (fsLit "interruptible") interruptibleIdKey
+
+-- data Inline = ...
+noInlineDataConName, inlineDataConName, inlinableDataConName :: Name
+noInlineDataConName  = thCon (fsLit "NoInline")  noInlineDataConKey
+inlineDataConName    = thCon (fsLit "Inline")    inlineDataConKey
+inlinableDataConName = thCon (fsLit "Inlinable") inlinableDataConKey
 
 -- data InlineSpec = ...
 inlineSpecNoPhaseName, inlineSpecPhaseName :: Name
@@ -2514,6 +2531,12 @@ unsafeIdKey, safeIdKey, interruptibleIdKey :: Unique
 unsafeIdKey        = mkPreludeMiscIdUnique 408
 safeIdKey          = mkPreludeMiscIdUnique 409
 interruptibleIdKey = mkPreludeMiscIdUnique 411
+
+-- data Inline = ...
+noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
+noInlineDataConKey  = mkPreludeDataConUnique 40
+inlineDataConKey    = mkPreludeDataConUnique 41
+inlinableDataConKey = mkPreludeDataConUnique 42
 
 -- data InlineSpec =
 inlineSpecNoPhaseIdKey, inlineSpecPhaseIdKey :: Unique
