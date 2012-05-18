@@ -40,8 +40,6 @@ import Foreign.C.String
 # else
 #  error Unknown mingw32 arch
 # endif
-#else
-# define WINDOWS_CCONV
 #endif
 
 main :: IO ()
