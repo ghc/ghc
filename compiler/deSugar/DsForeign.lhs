@@ -715,12 +715,24 @@ insertRetAddr :: DynFlags -> CCallConv
               -> [(SDoc, SDoc, Type, CmmType)]
               -> [(SDoc, SDoc, Type, CmmType)]
 insertRetAddr dflags CCallConv args
-    = case platformArch (targetPlatform dflags) of
-      ArchX86_64 ->
-          -- On x86_64 we insert the return address after the 6th
-          -- integer argument, because this is the point at which we
-          -- need to flush a register argument to the stack (See
-          -- rts/Adjustor.c for details).
+    = case platformArch platform of
+      ArchX86_64
+       | platformOS platform == OSMinGW32 ->
+          -- On other Windows x86_64 we insert the return address
+          -- after the 4th argument, because this is the point
+          -- at which we need to flush a register argument to the stack
+          -- (See rts/Adjustor.c for details).
+          let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
+                        -> [(SDoc, SDoc, Type, CmmType)]
+              go 4 args = ret_addr_arg : args
+              go n (arg:args) = arg : go (n+1) args
+              go _ [] = []
+          in go 0 args
+       | otherwise ->
+          -- On other x86_64 platforms we insert the return address
+          -- after the 6th integer argument, because this is the point
+          -- at which we need to flush a register argument to the stack
+          -- (See rts/Adjustor.c for details).
           let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
                         -> [(SDoc, SDoc, Type, CmmType)]
               go 6 args = ret_addr_arg : args
@@ -731,6 +743,7 @@ insertRetAddr dflags CCallConv args
           in go 0 args
       _ ->
           ret_addr_arg : args
+    where platform = targetPlatform dflags
 insertRetAddr _ _ args = args
 
 ret_addr_arg :: (SDoc, SDoc, Type, CmmType)
