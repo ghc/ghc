@@ -5,5 +5,6 @@ TH_RichKinds2.hs:23:4: Warning:
     = forall . t_2 ~ 'Data.Maybe.Nothing => SNothing_3
     | forall a_4 . t_2 ~ 'Data.Maybe.Just a_4 => SJust_5 (t_1 a_4)
 type instance TH_RichKinds2.Map f_6 '[] = '[]
-type instance TH_RichKinds2.Map f_7 ((':) h_8 t_9) = (':) (f_7 h_8)
-                                                          (TH_RichKinds2.Map f_7 t_9)
+type instance TH_RichKinds2.Map f_7
+                                ('GHC.Types.: h_8 t_9) = 'GHC.Types.: (f_7 h_8)
+                                                                      (TH_RichKinds2.Map f_7 t_9)
