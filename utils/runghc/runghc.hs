@@ -32,12 +32,16 @@ import Foreign
 import Foreign.C.String
 #endif
 
-#if defined(i386_HOST_ARCH)
-# define WINDOWS_CCONV stdcall
-#elif defined(x86_64_HOST_ARCH)
-# define WINDOWS_CCONV ccall
+#if defined(mingw32_HOST_OS)
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
 #else
-# error Unknown mingw32 arch
+# define WINDOWS_CCONV
 #endif
 
 main :: IO ()
