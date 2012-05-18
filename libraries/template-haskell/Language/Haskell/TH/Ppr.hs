@@ -388,15 +388,22 @@ pprStrictType (Unpacked, t) = text "{-# UNPACK #-} !" <> pprParendType t
 
 ------------------------------
 pprParendType :: Type -> Doc
-pprParendType (VarT v)   = ppr v
-pprParendType (ConT c)   = ppr c
-pprParendType (TupleT 0) = text "()"
-pprParendType (TupleT n) = parens (hcat (replicate (n-1) comma))
-pprParendType (UnboxedTupleT n) = hashParens $ hcat $ replicate (n-1) comma
-pprParendType ArrowT     = parens (text "->")
-pprParendType ListT      = text "[]"
-pprParendType (LitT l)   = pprTyLit l
-pprParendType other      = parens (ppr other)
+pprParendType (VarT v)            = ppr v
+pprParendType (ConT c)            = ppr c
+pprParendType (TupleT 0)          = text "()"
+pprParendType (TupleT n)          = parens (hcat (replicate (n-1) comma))
+pprParendType (UnboxedTupleT n)   = hashParens $ hcat $ replicate (n-1) comma
+pprParendType ArrowT              = parens (text "->")
+pprParendType ListT               = text "[]"
+pprParendType (LitT l)            = pprTyLit l
+pprParendType (PromotedT c)       = text "'" <> ppr c
+pprParendType (PromotedTupleT 0)  = text "'()"
+pprParendType (PromotedTupleT n)  = quoteParens (hcat (replicate (n-1) comma))
+pprParendType PromotedNilT        = text "'[]"
+pprParendType PromotedConsT       = text "(':)"
+pprParendType StarT               = char '*'
+pprParendType ConstraintT         = text "Constraint"
+pprParendType other               = parens (ppr other)
 
 instance Ppr Type where
     ppr (ForallT tvars ctxt ty)
@@ -410,6 +417,8 @@ pprTyApp (ArrowT, [arg1,arg2]) = sep [pprFunArgType arg1 <+> text "->", ppr arg2
 pprTyApp (ListT, [arg]) = brackets (ppr arg)
 pprTyApp (TupleT n, args)
  | length args == n = parens (sep (punctuate comma (map ppr args)))
+pprTyApp (PromotedTupleT n, args)
+ | length args == n = quoteParens (sep (punctuate comma (map ppr args)))
 pprTyApp (fun, args) = pprParendType fun <+> sep (map pprParendType args)
 
 pprFunArgType :: Type -> Doc	-- Should really use a precedence argument
@@ -435,14 +444,6 @@ instance Ppr TyLit where
 instance Ppr TyVarBndr where
     ppr (PlainTV nm)    = ppr nm
     ppr (KindedTV nm k) = parens (ppr nm <+> text "::" <+> ppr k)
-
-instance Ppr Kind where
-    ppr StarK          = char '*'
-    ppr (ArrowK k1 k2) = pprArrowArgKind k1 <+> text "->" <+> ppr k2
-
-pprArrowArgKind :: Kind -> Doc
-pprArrowArgKind k@(ArrowK _ _) = parens (ppr k)
-pprArrowArgKind k              = ppr k
 
 ------------------------------
 pprCxt :: Cxt -> Doc
@@ -477,4 +478,7 @@ showtextl = text . map toLower . show
 
 hashParens :: Doc -> Doc
 hashParens d = text "(# " <> d <> text " #)"
+
+quoteParens :: Doc -> Doc
+quoteParens d = text "'(" <> d <> text ")"
 

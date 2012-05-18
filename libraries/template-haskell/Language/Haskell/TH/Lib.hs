@@ -470,8 +470,8 @@ arrowT = return ArrowT
 listT :: TypeQ
 listT = return ListT
 
-litT :: TyLit -> TypeQ
-litT l = return (LitT l)
+litT :: TyLitQ -> TypeQ
+litT l = fmap LitT l
 
 tupleT :: Int -> TypeQ
 tupleT i = return (TupleT i)
@@ -484,6 +484,18 @@ sigT t k
   = do
       t' <- t
       return $ SigT t' k
+
+promotedT :: Name -> TypeQ
+promotedT = return . PromotedT
+
+promotedTupleT :: Int -> TypeQ
+promotedTupleT i = return (PromotedTupleT i)
+
+promotedNilT :: TypeQ
+promotedNilT = return PromotedNilT
+
+promotedConsT :: TypeQ
+promotedConsT = return PromotedConsT
 
 isStrict, notStrict, unpacked :: Q Strict
 isStrict = return $ IsStrict
@@ -517,11 +529,29 @@ plainTV = PlainTV
 kindedTV :: Name -> Kind -> TyVarBndr
 kindedTV = KindedTV
 
-starK :: Kind
-starK = StarK
+varK :: Name -> Kind
+varK = VarT
 
-arrowK :: Kind -> Kind -> Kind
-arrowK = ArrowK
+conK :: Name -> Kind
+conK = ConT
+
+tupleK :: Int -> Kind
+tupleK = TupleT
+
+arrowK :: Kind
+arrowK = ArrowT
+
+listK :: Kind
+listK = ListT
+
+appK :: Kind -> Kind -> Kind
+appK = AppT
+
+starK :: Kind
+starK = StarT
+
+constraintK :: Kind
+constraintK = ConstraintT
 
 -------------------------------------------------------------------------------
 -- *   Callconv

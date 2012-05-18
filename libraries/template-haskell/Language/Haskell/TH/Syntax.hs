@@ -986,14 +986,22 @@ type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)
 
 data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall <vars>. <ctxt> -> <type>@
+          | AppT Type Type                -- ^ @T a b@
+          | SigT Type Kind                -- ^ @t :: k@
           | VarT Name                     -- ^ @a@
           | ConT Name                     -- ^ @T@
+          | PromotedT Name                -- ^ @'T@
+
+          -- See Note [Representing concrete syntax in types]
           | TupleT Int                    -- ^ @(,), (,,), etc.@
           | UnboxedTupleT Int             -- ^ @(#,#), (#,,#), etc.@
           | ArrowT                        -- ^ @->@
           | ListT                         -- ^ @[]@
-          | AppT Type Type                -- ^ @T a b@
-          | SigT Type Kind                -- ^ @t :: k@
+          | PromotedTupleT Int            -- ^ @'(), '(,), '(,,), etc.@
+          | PromotedNilT                  -- ^ @'[]@
+          | PromotedConsT                 -- ^ @(':)@
+          | StarT                         -- ^ @*@
+          | ConstraintT                   -- ^ @Constraint@
           | LitT TyLit                    -- ^ @0,1,2, etc.@
       deriving( Show, Eq, Data, Typeable )
 
@@ -1001,13 +1009,49 @@ data TyVarBndr = PlainTV  Name            -- ^ @a@
                | KindedTV Name Kind       -- ^ @(a :: k)@
       deriving( Show, Eq, Data, Typeable )
 
-data TyLit = NumTyLit Integer
-           | StrTyLit String
+data TyLit = NumTyLit Integer             -- ^ @2@
+           | StrTyLit String              -- ^ @"Hello"@
   deriving ( Show, Eq, Data, Typeable )
 
-data Kind = StarK                         -- ^ @'*'@
-          | ArrowK Kind Kind              -- ^ @k1 -> k2@
-      deriving( Show, Eq, Data, Typeable )
+-- | To avoid duplication between kinds and types, they
+-- are defined to be the same. Naturally, you would never
+-- have a type be 'StarT' and you would never have a kind
+-- be 'SigT', but many of the other constructors are shared.
+-- Note that the kind @Bool@ is denoted with 'ConT', not
+-- 'PromotedT'. Similarly, tuple kinds are made with 'TupleT',
+-- not 'PromotedTupleT'.
+
+type Kind = Type     
+
+{- Note [Representing concrete syntax in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Haskell has a rich concrete syntax for types, including
+  t1 -> t2, (t1,t2), [t], and so on
+In TH we represent all of this using AppT, with a distinguished
+type construtor at the head.  So,
+  Type              TH representation
+  -----------------------------------------------
+  t1 -> t2          ArrowT `AppT` t2 `AppT` t2
+  [t]               ListT `AppT` t
+  (t1,t2)	    TupleT 2 `AppT` t1 `AppT` t2
+  '(t1,t2)          PromotedTupleT 2 `AppT` t1 `AppT` t2
+
+But if the original HsSyn used prefix application, we won't use
+these special TH constructors.  For example
+  [] t              ConT "[]" `AppT` t
+  (->) t            ConT "->" `AppT` t
+In this way we can faithfully represent in TH whether the original
+HsType used concrete syntax or not.
+
+The one case that doesn't fit this pattern is that of promoted lists
+  '[ Maybe, IO ]    PromotedListT 2 `AppT` t1 `AppT` t2
+but it's very smelly because there really is no type constructor
+corresponding to PromotedListT. So we encode HsExplicitListTy with
+PromotedConsT and PromotedNilT (which *do* have underlying type
+constructors):
+  '[ Maybe, IO ]    PromotedConsT `AppT` Maybe `AppT` 
+                    (PromotedConsT  `AppT` IO `AppT` PromotedNilT)
+-}
 
 -----------------------------------------------------
 --		Internal helper functions
