@@ -35,13 +35,13 @@ module Language.Haskell.TH.Syntax(
 
 	-- * The algebraic data types
 	-- $infix
-	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..),Cxt,
+	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind, Cxt,
         TyLit(..),
 	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
 	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	InlineSpec(..),	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
-	Info(..), Loc(..), CharPos,
+	Inline(..), InlineSpec(..), StrictType, VarStrictType, FunDep(..),
+	FamFlavour(..), Info(..), Loc(..), CharPos,
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- * Internal functions
@@ -956,8 +956,13 @@ data Pragma = InlineP     Name InlineSpec
             | SpecialiseP Name Type (Maybe InlineSpec)
         deriving( Show, Eq, Data, Typeable )
 
+data Inline = NoInline
+            | Inline
+            | Inlinable
+            deriving (Show, Eq, Data, Typeable)
+
 data InlineSpec 
-  = InlineSpec Bool                 -- False: no inline; True: inline 
+  = InlineSpec Inline
                Bool                 -- False: fun-like; True: constructor-like
                (Maybe (Bool, Int))  -- False: before phase; True: from phase
   deriving( Show, Eq, Data, Typeable )

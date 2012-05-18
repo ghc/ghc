@@ -22,22 +22,22 @@ module Language.Haskell.TH(
 	nameBase,	-- :: Name -> String
 	nameModule,	-- :: Name -> Maybe String
 	tupleTypeName, tupleDataName,	-- Int -> Name
-	
+
     -- * The algebraic data types
     -- | The lowercase versions (/syntax operators/) of these constructors are
     -- preferred to these constructors, since they compose better with
     -- quotations (@[| |]@) and splices (@$( ... )@)
-	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..), Cxt,
+	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt,
 	Pred(..), Match(..), Clause(..), Body(..), Guard(..), Stmt(..),
-	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
+	Range(..), Lit(..), Pat(..), FieldExp, FieldPat,
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
+	Inline(..), InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
     -- * Library functions
     -- ** Abbreviations
-	InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, CxtQ, PredQ, MatchQ, ClauseQ, BodyQ,
-	GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
+        InfoQ, ExpQ, DecQ, DecsQ, ConQ, TypeQ, TyLitQ, CxtQ, PredQ, MatchQ, ClauseQ,
+        BodyQ, GuardQ, StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ, PatQ, FieldPatQ,
         InlineSpecQ,
 
     -- ** Constructors lifted to 'Q'

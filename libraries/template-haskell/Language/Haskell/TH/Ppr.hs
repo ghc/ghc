@@ -326,7 +326,10 @@ instance Ppr Foreign where
 instance Ppr Pragma where
     ppr (InlineP n (InlineSpec inline conlike activation))
        = text "{-#"
-     <+> (if inline then text "INLINE" else text "NOINLINE")
+     <+> text (case inline of
+                 NoInline  -> "NOINLINE"
+                 Inline    -> "INLINE"
+                 Inlinable -> "INLINABLE")
      <+> (if conlike then text "CONLIKE" else empty)
      <+> ppr_activation activation 
      <+> ppr n
@@ -339,7 +342,10 @@ instance Ppr Pragma where
              ]
     ppr (SpecialiseP n ty (Just (InlineSpec inline _conlike activation)))
        = sep [ text "{-# SPECIALISE" <+> 
-               (if inline then text "INLINE" else text "NOINLINE") <+>
+               text (case inline of
+                       NoInline  -> "NOINLINE"
+                       Inline    -> "INLINE"
+                       Inlinable -> "INLINABLE") <+>
                ppr_activation activation
              , ppr n <+> text "::"
              , ppr ty

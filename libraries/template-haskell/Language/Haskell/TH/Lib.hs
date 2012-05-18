@@ -541,11 +541,11 @@ interruptible = Interruptible
 -------------------------------------------------------------------------------
 -- *   InlineSpec
 
-inlineSpecNoPhase :: Bool -> Bool -> InlineSpecQ
+inlineSpecNoPhase :: Inline -> Bool -> InlineSpecQ
 inlineSpecNoPhase inline conlike
   = return $ InlineSpec inline conlike Nothing
 
-inlineSpecPhase :: Bool -> Bool -> Bool -> Int -> InlineSpecQ
+inlineSpecPhase :: Inline -> Bool -> Bool -> Int -> InlineSpecQ
 inlineSpecPhase inline conlike beforeFrom phase
   = return $ InlineSpec inline conlike (Just (beforeFrom, phase))
 
