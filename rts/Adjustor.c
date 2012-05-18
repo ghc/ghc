@@ -448,21 +448,30 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
 
   And the version for >=4 integer arguments:
-  (note: replace 2-6 with nops if the 4th argument is not a floating
-  point argument).
 
-   0:   41 51                   push   %r9
-   2:   f2 0f 11 1c 24          movsd  %xmm3,(%rsp)
-   7:   ff 35 23 00 00 00       pushq  0x23(%rip)        # 30 <.text+0x30>
-   d:   4d 89 c1                mov    %r8,%r9
-  10:   49 89 d0                mov    %rdx,%r8
-  13:   48 89 ca                mov    %rcx,%rdx
-  16:   f2 0f 10 da             movsd  %xmm2,%xmm3
-  1a:   f2 0f 10 d1             movsd  %xmm1,%xmm2
-  1e:   f2 0f 10 c8             movsd  %xmm0,%xmm1
-  22:   48 8b 0d 0f 00 00 00    mov    0xf(%rip),%rcx    # 38 <.text+0x38>
-  29:   ff 25 11 00 00 00       jmpq   *0x11(%rip)       # 40 <.text+0x40>
-  2f:   90                      nop
+[we want to push the 4th argument, either %r9 or %xmm3 (depending on
+ whether arg 4 is a floating arg or not).
+ But the stack has 4 stack slots that are allocated for the values in
+ the 4 arg registers (rcx, rdx, r8, r9) for use by varargs functions.
+ Therefore we can't just push to the bottom of the stack, but have
+ to increase the size by 1 slot, and write to the 5th slot.]
+   0:   48 83 ec 08             sub    $0x08,%rsp
+[if non-floating arg, then do this:]
+   4:   90                      nop
+   5:   4c 89 4c 24 20          mov    %r9,0x20(%rsp)
+[else if floating arg then do this:]
+   4:   f2 0f 11 5c 24 20       movsd  %xmm3,0x20(%rsp)
+[end if]
+   a:   ff 35 28 00 00 00       pushq  0x28(%rip)        # 38 <.text+0x38>
+  10:   4d 89 c1                mov    %r8,%r9
+  13:   49 89 d0                mov    %rdx,%r8
+  16:   48 89 ca                mov    %rcx,%rdx
+  19:   f2 0f 10 da             movsd  %xmm2,%xmm3
+  1d:   f2 0f 10 d1             movsd  %xmm1,%xmm2
+  21:   f2 0f 10 c8             movsd  %xmm0,%xmm1
+  25:   48 8b 0d 14 00 00 00    mov    0x14(%rip),%rcx        # 40 <.text+0x40>
+  2c:   ff 25 16 00 00 00       jmpq   *0x16(%rip)        # 48 <.text+0x48>
+  32:   90                      nop
   [...]
 
     */
@@ -501,31 +510,26 @@ createAdjustor(int cconv, StgStablePtr hptr,
         }
         else
         {
-            adjustor = allocateExec(0x48,&code);
+            adjustor = allocateExec(0x50,&code);
             adj_code = (StgWord8*)adjustor;
-
-            if (fourthFloating) {
-                *(StgInt32 *)adj_code        = 0x0ff25141;
-                *(StgInt32 *)(adj_code+0x4)  = 0xff241c11;
-            }
-            else {
-                *(StgInt32 *)adj_code        = 0x90905141;
-                *(StgInt32 *)(adj_code+0x4)  = 0xff909090;
-            }
-            *(StgInt32 *)(adj_code+0x8)  = 0x00002335;
-            *(StgInt32 *)(adj_code+0xc)  = 0xc1894d00;
-            *(StgInt32 *)(adj_code+0x10) = 0x48d08949;
-            *(StgInt32 *)(adj_code+0x14) = 0x0ff2ca89;
-            *(StgInt32 *)(adj_code+0x18) = 0x0ff2da10;
-            *(StgInt32 *)(adj_code+0x1c) = 0x0ff2d110;
-            *(StgInt32 *)(adj_code+0x20) = 0x8b48c810;
-            *(StgInt32 *)(adj_code+0x24) = 0x00000f0d;
-            *(StgInt32 *)(adj_code+0x28) = 0x1125ff00;
-            *(StgInt32 *)(adj_code+0x2c) = 0x00000000;
-            
-            *(StgInt64 *)(adj_code+0x30) = (StgInt64)obscure_ccall_ret_code;
-            *(StgInt64 *)(adj_code+0x38) = (StgInt64)hptr;
-            *(StgInt64 *)(adj_code+0x40) = (StgInt64)wptr;
+            *(StgInt32 *)adj_code        = 0x08ec8348;
+            *(StgInt32 *)(adj_code+0x4)  = fourthFloating ? 0x5c110ff2
+                                                          : 0x4c894c90;
+            *(StgInt32 *)(adj_code+0x8)  = 0x35ff2024;
+            *(StgInt32 *)(adj_code+0xc)  = 0x00000028;
+            *(StgInt32 *)(adj_code+0x10) = 0x49c1894d;
+            *(StgInt32 *)(adj_code+0x14) = 0x8948d089;
+            *(StgInt32 *)(adj_code+0x18) = 0x100ff2ca;
+            *(StgInt32 *)(adj_code+0x1c) = 0x100ff2da;
+            *(StgInt32 *)(adj_code+0x20) = 0x100ff2d1;
+            *(StgInt32 *)(adj_code+0x24) = 0x0d8b48c8;
+            *(StgInt32 *)(adj_code+0x28) = 0x00000014;
+            *(StgInt32 *)(adj_code+0x2c) = 0x001625ff;
+            *(StgInt32 *)(adj_code+0x30) = 0x90900000;
+            *(StgInt32 *)(adj_code+0x34) = 0x90909090;
+            *(StgInt64 *)(adj_code+0x38) = (StgInt64)obscure_ccall_ret_code;
+            *(StgInt64 *)(adj_code+0x40) = (StgInt64)hptr;
+            *(StgInt64 *)(adj_code+0x48) = (StgInt64)wptr;
         }
     }
 # else
@@ -1201,14 +1205,14 @@ freeHaskellFunctionPtr(void* ptr)
                                                    0x20
 #endif
                                                        ));
+#if !defined(mingw32_HOST_OS)
  } else if ( *(StgWord16 *)ptr == 0x5141 ) {
-     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+
-#if defined(mingw32_HOST_OS)
-                                                   0x38
-#else
-                                                   0x30
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x30));
 #endif
-                                                       ));
+#if defined(mingw32_HOST_OS)
+ } else if ( *(StgWord16 *)ptr == 0x8348 ) {
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x40));
+#endif
  } else {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
