@@ -876,9 +876,12 @@ cvtTypeKind ty_str ty
            PromotedNilT
              -> returnL (HsExplicitListTy placeHolderKind [])
 
-           PromotedConsT
-             | [ty1, ty2] <- tys'
-             -> mk_apps (HsTyVar (getRdrName consDataCon)) [ty1, ty2]
+           PromotedConsT  -- See Note [Representing concrete syntax in types] 
+                          -- in Language.Haskell.TH.Syntax
+             | [ty1, L _ (HsExplicitListTy _ tys2)] <- tys'
+             -> returnL (HsExplicitListTy placeHolderKind (ty1:tys2))
+             | otherwise 
+             -> mk_apps (HsTyVar (getRdrName consDataCon)) tys'
 
            StarT
              -> returnL (HsTyVar (getRdrName liftedTypeKindTyCon))

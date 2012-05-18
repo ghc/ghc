@@ -722,19 +722,15 @@ repTy (HsForAllTy _ tvs ctxt ty)  =
     repTForall bndrs ctxt1 ty1
 
 repTy (HsTyVar n)
-  | isTvOcc occ = do
-			        tv1 <- lookupOcc n
-			        repTvar tv1
-  | n == consDataConName = repPromotedConsTyCon
-  | isDataOcc occ = do
-                      tc1 <- lookupOcc n
-                      repPromotedTyCon tc1
-  | otherwise		    = do
-			        tc1 <- lookupOcc n
-			        repNamedTyCon tc1
-
+  | isTvOcc occ   = do tv1 <- lookupOcc n
+		       repTvar tv1
+  | isDataOcc occ = do tc1 <- lookupOcc n
+                       repPromotedTyCon tc1
+  | otherwise	  = do tc1 <- lookupOcc n
+		       repNamedTyCon tc1
   where
     occ = nameOccName n
+
 repTy (HsAppTy f a)         = do
 			        f1 <- repLTy f
 			        a1 <- repLTy a
