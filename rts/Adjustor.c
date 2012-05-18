@@ -177,6 +177,12 @@ static void GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
    ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
    UNDERSCORE "obscure_ccall_ret_code:\n\t"
    "addq $0x8, %rsp\n\t"
+#if defined(mingw32_HOST_OS)
+   /* On Win64, we had to put the original return address after the
+      arg 1-4 spill slots, ro now we have to move it back */
+   "movq 0x20(%rsp), %rcx\n"
+   "movq %rcx, (%rsp)\n"
+#endif
    "ret"
   );
 }
@@ -448,21 +454,39 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
 
   And the version for >=4 integer arguments:
-  (note: replace 2-6 with nops if the 4th argument is not a floating
-  point argument).
 
-   0:   41 51                   push   %r9
-   2:   f2 0f 11 1c 24          movsd  %xmm3,(%rsp)
-   7:   ff 35 23 00 00 00       pushq  0x23(%rip)        # 30 <.text+0x30>
-   d:   4d 89 c1                mov    %r8,%r9
-  10:   49 89 d0                mov    %rdx,%r8
-  13:   48 89 ca                mov    %rcx,%rdx
-  16:   f2 0f 10 da             movsd  %xmm2,%xmm3
-  1a:   f2 0f 10 d1             movsd  %xmm1,%xmm2
-  1e:   f2 0f 10 c8             movsd  %xmm0,%xmm1
-  22:   48 8b 0d 0f 00 00 00    mov    0xf(%rip),%rcx    # 38 <.text+0x38>
-  29:   ff 25 11 00 00 00       jmpq   *0x11(%rip)       # 40 <.text+0x40>
-  2f:   90                      nop
+[we want to push the 4th argument (either %r9 or %xmm3, depending on
+ whether it is a floating arg or not) and the return address onto the
+ stack. However, slots 1-4 are reserved for code we call to spill its
+ args 1-4 into, so we can't just push them onto the bottom of the stack.
+ So first put the 4th argument onto the stack, above what will be the
+ spill slots.]
+   0:   48 83 ec 08             sub    $0x8,%rsp
+[if non-floating arg, then do this:]
+   4:   90                      nop
+   5:   4c 89 4c 24 20          mov    %r9,0x20(%rsp)
+[else if floating arg then do this:]
+   4:   f2 0f 11 5c 24 20       movsd  %xmm3,0x20(%rsp)
+[end if]
+[Now push the new return address onto the stack]
+   a:   ff 35 30 00 00 00       pushq  0x30(%rip)        # 40 <.text+0x40>
+[But the old return address has been moved up into a spill slot, so
+ we need to move it above them]
+  10:   4c 8b 4c 24 10          mov    0x10(%rsp),%r9
+  15:   4c 89 4c 24 30          mov    %r9,0x30(%rsp)
+[Now we do the normal register shuffle-up etc]
+  1a:   4d 89 c1                mov    %r8,%r9
+  1d:   49 89 d0                mov    %rdx,%r8
+  20:   48 89 ca                mov    %rcx,%rdx
+  23:   f2 0f 10 da             movsd  %xmm2,%xmm3
+  27:   f2 0f 10 d1             movsd  %xmm1,%xmm2
+  2b:   f2 0f 10 c8             movsd  %xmm0,%xmm1
+  2f:   48 8b 0d 12 00 00 00    mov    0x12(%rip),%rcx        # 48 <.text+0x48>
+  36:   ff 25 14 00 00 00       jmpq   *0x14(%rip)        # 50 <.text+0x50>
+  3c:   90                      nop
+  3d:   90                      nop
+  3e:   90                      nop
+  3f:   90                      nop
   [...]
 
     */
@@ -501,33 +525,31 @@ createAdjustor(int cconv, StgStablePtr hptr,
         }
         else
         {
-            adjustor = allocateExec(0x48,&code);
+            adjustor = allocateExec(0x58,&code);
             adj_code = (StgWord8*)adjustor;
-
-            if (fourthFloating) {
-                *(StgInt32 *)adj_code        = 0x0ff25141;
-                *(StgInt32 *)(adj_code+0x4)  = 0xff241c11;
-            }
-            else {
-                *(StgInt32 *)adj_code        = 0x90905141;
-                *(StgInt32 *)(adj_code+0x4)  = 0xff909090;
-            }
-            *(StgInt32 *)(adj_code+0x8)  = 0x00002335;
-            *(StgInt32 *)(adj_code+0xc)  = 0xc1894d00;
-            *(StgInt32 *)(adj_code+0x10) = 0x48d08949;
-            *(StgInt32 *)(adj_code+0x14) = 0x0ff2ca89;
-            *(StgInt32 *)(adj_code+0x18) = 0x0ff2da10;
-            *(StgInt32 *)(adj_code+0x1c) = 0x0ff2d110;
-            *(StgInt32 *)(adj_code+0x20) = 0x8b48c810;
-            *(StgInt32 *)(adj_code+0x24) = 0x00000f0d;
-            *(StgInt32 *)(adj_code+0x28) = 0x1125ff00;
-            *(StgInt32 *)(adj_code+0x2c) = 0x00000000;
-            
-            *(StgInt64 *)(adj_code+0x30) = (StgInt64)obscure_ccall_ret_code;
-            *(StgInt64 *)(adj_code+0x38) = (StgInt64)hptr;
-            *(StgInt64 *)(adj_code+0x40) = (StgInt64)wptr;
+            *(StgInt32 *)adj_code        = 0x08ec8348;
+            *(StgInt32 *)(adj_code+0x4)  = fourthFloating ? 0x5c110ff2
+                                                          : 0x4c894c90;
+            *(StgInt32 *)(adj_code+0x8)  = 0x35ff2024;
+            *(StgInt32 *)(adj_code+0xc)  = 0x00000030;
+            *(StgInt32 *)(adj_code+0x10) = 0x244c8b4c;
+            *(StgInt32 *)(adj_code+0x14) = 0x4c894c10;
+            *(StgInt32 *)(adj_code+0x18) = 0x894d3024;
+            *(StgInt32 *)(adj_code+0x1c) = 0xd08949c1;
+            *(StgInt32 *)(adj_code+0x20) = 0xf2ca8948;
+            *(StgInt32 *)(adj_code+0x24) = 0xf2da100f;
+            *(StgInt32 *)(adj_code+0x28) = 0xf2d1100f;
+            *(StgInt32 *)(adj_code+0x2c) = 0x48c8100f;
+            *(StgInt32 *)(adj_code+0x30) = 0x00120d8b;
+            *(StgInt32 *)(adj_code+0x34) = 0x25ff0000;
+            *(StgInt32 *)(adj_code+0x38) = 0x00000014;
+            *(StgInt32 *)(adj_code+0x3c) = 0x90909090;
+            *(StgInt64 *)(adj_code+0x40) = (StgInt64)obscure_ccall_ret_code;
+            *(StgInt64 *)(adj_code+0x48) = (StgInt64)hptr;
+            *(StgInt64 *)(adj_code+0x50) = (StgInt64)wptr;
         }
     }
+
 # else
     /*
       stack at call:
@@ -1194,9 +1216,21 @@ freeHaskellFunctionPtr(void* ptr)
  }
 #elif defined(x86_64_HOST_ARCH)
  if ( *(StgWord16 *)ptr == 0x894d ) {
-     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x20));
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+
+#if defined(mingw32_HOST_OS)
+                                                   0x28
+#else
+                                                   0x20
+#endif
+                                                       ));
+#if !defined(mingw32_HOST_OS)
  } else if ( *(StgWord16 *)ptr == 0x5141 ) {
      freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x30));
+#endif
+#if defined(mingw32_HOST_OS)
+ } else if ( *(StgWord16 *)ptr == 0x8348 ) {
+     freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x48));
+#endif
  } else {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
