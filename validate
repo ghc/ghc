@@ -106,8 +106,9 @@ if [ $speed != "FAST" ]; then
     $make test_bindist TEST_PREP=YES
 
     #
-    # Install the mtl package into the bindist, because it is used by some
-    # tests.  It isn't essential that we do this (the failing tests will
+    # Install the transformers package into the bindist, because it is
+    # used by some tests.
+    # It isn't essential that we do this (the failing tests will
     # be treated as expected failures), but we get a bit more test
     # coverage, and also verify that we can install a package into the
     # bindist with Cabal.
@@ -126,7 +127,7 @@ if [ $speed != "FAST" ]; then
         DO_HADDOCK=YES
     fi
 
-    cd libraries/mtl
+    cd libraries/transformers
     "$thisdir/$bindistdir/bin/ghc" --make Setup
 
     ./Setup configure --with-ghc="$thisdir/$bindistdir/bin/ghc" ${WITH_HADDOCK+"$WITH_HADDOCK"} --global --builddir=dist-bindist --prefix="$thisdir/$bindistdir"
