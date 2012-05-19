@@ -1,7 +1,7 @@
 {-# LANGUAGE FunctionalDependencies, MultiParamTypeClasses #-}
 module T5300 where
 
-import Control.Monad.State (StateT)
+import Control.Monad.Trans.State (StateT)
 
 class C1 a b c | a -> b
 class C2 a b c

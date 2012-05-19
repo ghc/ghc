@@ -31,7 +31,8 @@ import Debug.Trace (trace)
 
 import Control.Exception (assert)
 import Control.Monad
-import Control.Monad.State.Strict
+import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans.Class
 import GHC.Exts
 import GHC.ST hiding (liftST)
 import Prelude hiding (length, read)
