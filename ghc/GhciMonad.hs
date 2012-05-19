@@ -53,7 +53,8 @@ import GHC.Exts
 
 import System.Console.Haskeline (CompletionFunc, InputT)
 import qualified System.Console.Haskeline as Haskeline
-import Control.Monad.Trans as Trans
+import Control.Monad.Trans.Class as Trans
+import Control.Monad.IO.Class as Trans
 
 -----------------------------------------------------------------------------
 -- GHCi monad

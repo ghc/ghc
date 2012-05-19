@@ -44,7 +44,7 @@ Executable ghc
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing
         Other-Modules: InteractiveUI, GhciMonad, GhciTags
-        Build-Depends: mtl, haskeline
+        Build-Depends: transformers, haskeline
         Extensions: ForeignFunctionInterface,
                     UnboxedTuples,
                     FlexibleInstances,
