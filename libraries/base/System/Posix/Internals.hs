@@ -435,10 +435,12 @@ foreign import ccall unsafe "HsBase.h __hscore_open"
 foreign import ccall safe "HsBase.h __hscore_open"
    c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
 
-foreign import ccall unsafe "HsBase.h read" 
+-- See Note: CSsize
+foreign import capi unsafe "HsBase.h read"
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
-foreign import ccall safe "HsBase.h read"
+-- See Note: CSsize
+foreign import capi safe "HsBase.h read"
    c_safe_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h __hscore_stat"
@@ -447,10 +449,12 @@ foreign import ccall unsafe "HsBase.h __hscore_stat"
 foreign import ccall unsafe "HsBase.h umask"
    c_umask :: CMode -> IO CMode
 
-foreign import ccall unsafe "HsBase.h write" 
+-- See Note: CSsize
+foreign import capi unsafe "HsBase.h write"
    c_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
-foreign import ccall safe "HsBase.h write"
+-- See Note: CSsize
+foreign import capi safe "HsBase.h write"
    c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
 foreign import ccall unsafe "HsBase.h __hscore_ftruncate"
@@ -582,4 +586,16 @@ foreign import ccall unsafe "__hscore_bufsiz"  dEFAULT_BUFFER_SIZE :: Int
 foreign import capi  unsafe "stdio.h value SEEK_CUR" sEEK_CUR :: CInt
 foreign import capi  unsafe "stdio.h value SEEK_SET" sEEK_SET :: CInt
 foreign import capi  unsafe "stdio.h value SEEK_END" sEEK_END :: CInt
+
+{-
+Note: CSsize
+
+On Win64, ssize_t is 64 bit, but functions like read return 32 bit
+ints. The CAPI wrapper means the C compiler takes care of doing all
+the necessary casting.
+
+When using ccall instead, when the functions failed with -1, we thought
+they were returning with 4294967295, and so didn't throw an exception.
+This lead to a segfault in echo001(ghci).
+-}
 
