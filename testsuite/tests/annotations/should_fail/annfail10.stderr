@@ -22,7 +22,8 @@ annfail10.hs:9:11:
     Note: there are several potential instances:
       instance Num Double -- Defined in `GHC.Float'
       instance Num Float -- Defined in `GHC.Float'
-      instance Num Int -- Defined in `GHC.Num'
+      instance Integral a => Num (GHC.Real.Ratio a)
+        -- Defined in `GHC.Real'
       ...plus 11 others
     In the expression: 1
     In the annotation: {-# ANN f 1 #-}

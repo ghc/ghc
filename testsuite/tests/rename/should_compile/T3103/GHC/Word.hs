@@ -5,10 +5,9 @@ module GHC.Word (
     ) where
 
 import GHC.Base
+import GHC.Types
 
 import {-# SOURCE #-} GHC.Unicode ()
-
-data Word = W# Word# deriving Eq
 
 instance Num Word where
     signum 0               = 0

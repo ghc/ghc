@@ -8,10 +8,10 @@ tcfail072.hs:23:13:
     The type variable `q0' is ambiguous
     Possible fix: add a type signature that fixes these type variable(s)
     Note: there are several potential instances:
+      instance Integral a => Ord (GHC.Real.Ratio a)
+        -- Defined in `GHC.Real'
       instance Ord () -- Defined in `GHC.Classes'
       instance (Ord a, Ord b) => Ord (a, b) -- Defined in `GHC.Classes'
-      instance (Ord a, Ord b, Ord c) => Ord (a, b, c)
-        -- Defined in `GHC.Classes'
-      ...plus 23 others
+      ...plus 25 others
     In the expression: g A
     In an equation for `g': g (B _ _) = g A
