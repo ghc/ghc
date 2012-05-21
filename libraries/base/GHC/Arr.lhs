@@ -47,6 +47,7 @@ import GHC.Num
 import GHC.ST
 import GHC.Base
 import GHC.List
+import GHC.Real
 import GHC.Show
 
 infixl 9  !, //
@@ -227,6 +228,11 @@ instance  Ix Int  where
 
     {-# INLINE inRange #-}
     inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
+
+instance Ix Word where
+    range (m,n)         = [m..n]
+    unsafeIndex (m,_) i = fromIntegral (i - m)
+    inRange (m,n) i     = m <= i && i <= n
 
 ----------------------------------------------------------------------
 instance  Ix Integer  where

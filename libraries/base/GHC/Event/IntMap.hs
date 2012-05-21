@@ -78,9 +78,7 @@ import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (Show(showsPrec), showParen, shows, showString)
 
-#if __GLASGOW_HASKELL__
-import GHC.Word (Word(..))
-#else
+#if !defined(__GLASGOW_HASKELL__)
 import Data.Word
 #endif
 

@@ -206,6 +206,16 @@ instance  Show Char  where
 instance Show Int where
     showsPrec = showSignedInt
 
+instance Show Word where
+    showsPrec _ (W# w) = showWord w
+
+showWord :: Word# -> ShowS
+showWord w# cs
+ | w# `ltWord#` 10## = C# (chr# (ord# '0'# +# word2Int# w#)) : cs
+ | otherwise = case chr# (ord# '0'# +# word2Int# (w# `remWord#` 10##)) of
+               c# ->
+                   showWord (w# `quotWord#` 10##) (C# c# : cs)
+
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s
     showsPrec p (Just x) s

@@ -488,6 +488,9 @@ instance Read Int where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
+instance Read Word where
+    readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
+
 instance Read Integer where
   readPrec     = readNumber convertInt
   readListPrec = readListPrecDefault

@@ -623,6 +623,26 @@ efdtIntDnFB c n x1 x2 y    -- Be careful about underflow!
 
 %*********************************************************
 %*                                                      *
+\subsection{Type @Word@}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+instance Bounded Word where
+    minBound = 0
+
+    -- use unboxed literals for maxBound, because GHC doesn't optimise
+    -- (fromInteger 0xffffffff :: Word).
+#if WORD_SIZE_IN_BITS == 32
+    maxBound = W# (int2Word# 0xFFFFFFFF#)
+#else
+    maxBound = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
+#endif
+\end{code}
+
+
+%*********************************************************
+%*                                                      *
 \subsection{The @Integer@ instance for @Enum@}
 %*                                                      *
 %*********************************************************

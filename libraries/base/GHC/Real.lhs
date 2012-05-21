@@ -1,6 +1,7 @@
 \begin{code}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, BangPatterns #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -292,6 +293,64 @@ instance  Integral Int  where
 
 %*********************************************************
 %*                                                      *
+\subsection{Instances for @Word@}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+instance Real Word where
+    toRational x = toInteger x % 1
+
+instance Integral Word where
+    quot    (W# x#) y@(W# y#)
+        | y /= 0                = W# (x# `quotWord#` y#)
+        | otherwise             = divZeroError
+    rem     (W# x#) y@(W# y#)
+        | y /= 0                = W# (x# `remWord#` y#)
+        | otherwise             = divZeroError
+    div     (W# x#) y@(W# y#)
+        | y /= 0                = W# (x# `quotWord#` y#)
+        | otherwise             = divZeroError
+    mod     (W# x#) y@(W# y#)
+        | y /= 0                = W# (x# `remWord#` y#)
+        | otherwise             = divZeroError
+    quotRem (W# x#) y@(W# y#)
+        | y /= 0                = case x# `quotRemWord#` y# of
+                                  (# q, r #) ->
+                                      (W# q, W# r)
+        | otherwise             = divZeroError
+    divMod  (W# x#) y@(W# y#)
+        | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
+        | otherwise             = divZeroError
+    toInteger (W# x#)
+        | i# >=# 0#             = smallInteger i#
+        | otherwise             = wordToInteger x#
+        where
+        !i# = word2Int# x#
+
+instance Enum Word where
+    succ x
+        | x /= maxBound = x + 1
+        | otherwise     = succError "Word"
+    pred x
+        | x /= minBound = x - 1
+        | otherwise     = predError "Word"
+    toEnum i@(I# i#)
+        | i >= 0        = W# (int2Word# i#)
+        | otherwise     = toEnumError "Word" i (minBound::Word, maxBound::Word)
+    fromEnum x@(W# x#)
+        | x <= fromIntegral (maxBound::Int)
+                        = I# (word2Int# x#)
+        | otherwise     = fromEnumError "Word" x
+    enumFrom            = integralEnumFrom
+    enumFromThen        = integralEnumFromThen
+    enumFromTo          = integralEnumFromTo
+    enumFromThenTo      = integralEnumFromThenTo
+\end{code}
+
+
+%*********************************************************
+%*                                                      *
 \subsection{Instances for @Integer@}
 %*                                                      *
 %*********************************************************
@@ -401,6 +460,12 @@ fromIntegral = fromInteger . toInteger
 
 {-# RULES
 "fromIntegral/Int->Int" fromIntegral = id :: Int -> Int
+    #-}
+
+{-# RULES
+"fromIntegral/Int->Word"  fromIntegral = \(I# x#) -> W# (int2Word# x#)
+"fromIntegral/Word->Int"  fromIntegral = \(W# x#) -> I# (word2Int# x#)
+"fromIntegral/Word->Word" fromIntegral = id :: Word -> Word
     #-}
 
 -- | general coercion to fractional types

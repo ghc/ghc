@@ -66,9 +66,6 @@ import GHC.Read
 import GHC.Real
 import GHC.Show
 import GHC.Enum
-import GHC.Word         ( Word(..) )
-
-import Data.Word
 #else
 import Control.Monad    ( liftM )
 import Foreign.C.Types

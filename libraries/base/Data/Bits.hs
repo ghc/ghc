@@ -54,6 +54,7 @@ module Data.Bits (
 #endif
 
 #ifdef __GLASGOW_HASKELL__
+import GHC.Enum
 import GHC.Num
 import GHC.Base
 #endif
@@ -345,6 +346,37 @@ foreign import ccall nhc_primIntLsh :: Int -> Int -> Int
 foreign import ccall nhc_primIntRsh :: Int -> Int -> Int
 foreign import ccall nhc_primIntCompl :: Int -> Int
 #endif /* __NHC__ */
+
+#if defined(__GLASGOW_HASKELL__)
+instance Bits Word where
+    {-# INLINE shift #-}
+    {-# INLINE bit #-}
+    {-# INLINE testBit #-}
+
+    (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
+    (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
+    (W# x#) `xor` (W# y#)    = W# (x# `xor#` y#)
+    complement (W# x#)       = W# (x# `xor#` mb#)
+        where !(W# mb#) = maxBound
+    (W# x#) `shift` (I# i#)
+        | i# >=# 0#          = W# (x# `shiftL#` i#)
+        | otherwise          = W# (x# `shiftRL#` negateInt# i#)
+    (W# x#) `shiftL` (I# i#) = W# (x# `shiftL#` i#)
+    (W# x#) `unsafeShiftL` (I# i#) = W# (x# `uncheckedShiftL#` i#)
+    (W# x#) `shiftR` (I# i#) = W# (x# `shiftRL#` i#)
+    (W# x#) `unsafeShiftR` (I# i#) = W# (x# `uncheckedShiftRL#` i#)
+    (W# x#) `rotate` (I# i#)
+        | i'# ==# 0# = W# x#
+        | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` (x# `uncheckedShiftRL#` (wsib -# i'#)))
+        where
+        !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
+        !wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
+    bitSize  _               = WORD_SIZE_IN_BITS
+    isSigned _               = False
+    popCount (W# x#)         = I# (word2Int# (popCnt# x#))
+    bit                      = bitDefault
+    testBit                  = testBitDefault
+#endif
 
 instance Bits Integer where
 #if defined(__GLASGOW_HASKELL__)
