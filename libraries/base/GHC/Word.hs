@@ -124,9 +124,9 @@ instance Bounded Word where
     -- use unboxed literals for maxBound, because GHC doesn't optimise
     -- (fromInteger 0xffffffff :: Word).
 #if WORD_SIZE_IN_BITS == 32
-    maxBound = W# (int2Word# 0xFFFFFFFF#)
+    maxBound = W# 0xFFFFFFFF##
 #else
-    maxBound = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
+    maxBound = W# 0xFFFFFFFFFFFFFFFF##
 #endif
 
 instance Ix Word where
@@ -275,7 +275,7 @@ instance Bits Word8 where
         | otherwise  = W8# (narrow8Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                           (x# `uncheckedShiftRL#` (8# -# i'#))))
         where
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
+        !i'# = word2Int# (int2Word# i# `and#` 7##)
     bitSize  _                = 8
     isSigned _                = False
     popCount (W8# x#)         = I# (word2Int# (popCnt8# x#))
@@ -418,7 +418,7 @@ instance Bits Word16 where
         | otherwise  = W16# (narrow16Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                             (x# `uncheckedShiftRL#` (16# -# i'#))))
         where
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
+        !i'# = word2Int# (int2Word# i# `and#` 15##)
     bitSize  _                = 16
     isSigned _                = False
     popCount (W16# x#)        = I# (word2Int# (popCnt16# x#))
@@ -602,7 +602,7 @@ instance Bits Word32 where
         | otherwise  = W32# (narrow32Word# ((x# `uncheckedShiftL#` i'#) `or#`
                                             (x# `uncheckedShiftRL#` (32# -# i'#))))
         where
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
+        !i'# = word2Int# (int2Word# i# `and#` 31##)
     bitSize  _                = 32
     isSigned _                = False
     popCount (W32# x#)        = I# (word2Int# (popCnt32# x#))
@@ -735,7 +735,7 @@ instance Bits Word64 where
         | otherwise  = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
                              (x# `uncheckedShiftRL64#` (64# -# i'#)))
         where
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        !i'# = word2Int# (int2Word# i# `and#` 63##)
     bitSize  _                = 64
     isSigned _                = False
     popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))
@@ -749,10 +749,10 @@ instance Bits Word64 where
 
 shiftL64#, shiftRL64# :: Word64# -> Int# -> Word64#
 
-a `shiftL64#` b  | b >=# 64#  = wordToWord64# (int2Word# 0#)
+a `shiftL64#` b  | b >=# 64#  = wordToWord64# 0##
                  | otherwise  = a `uncheckedShiftL64#` b
 
-a `shiftRL64#` b | b >=# 64#  = wordToWord64# (int2Word# 0#)
+a `shiftRL64#` b | b >=# 64#  = wordToWord64# 0##
                  | otherwise  = a `uncheckedShiftRL64#` b
 
 {-# RULES
@@ -850,7 +850,7 @@ instance Bits Word64 where
         | otherwise  = W64# ((x# `uncheckedShiftL#` i'#) `or#`
                              (x# `uncheckedShiftRL#` (64# -# i'#)))
         where
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        !i'# = word2Int# (int2Word# i# `and#` 63##)
     bitSize  _                = 64
     isSigned _                = False
     popCount (W64# x#)        = I# (word2Int# (popCnt64# x#))

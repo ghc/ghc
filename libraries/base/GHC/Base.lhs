@@ -776,13 +776,13 @@ Similarly for Float (#5178):
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 shiftL# :: Word# -> Int# -> Word#
-a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
+a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = 0##
                 | otherwise                = a `uncheckedShiftL#` b
 
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
 shiftRL# :: Word# -> Int# -> Word#
-a `shiftRL#` b  | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
+a `shiftRL#` b  | b >=# WORD_SIZE_IN_BITS# = 0##
                 | otherwise                = a `uncheckedShiftRL#` b
 
 -- | Shift the argument left by the specified number of bits

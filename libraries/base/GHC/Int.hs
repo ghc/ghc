@@ -155,7 +155,7 @@ instance Bits Int8 where
                                        (x'# `uncheckedShiftRL#` (8# -# i'#)))))
         where
         !x'# = narrow8Word# (int2Word# x#)
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
+        !i'# = word2Int# (int2Word# i# `and#` 7##)
     bitSize  _                = 8
     isSigned _                = True
     popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
@@ -310,7 +310,7 @@ instance Bits Int16 where
                                          (x'# `uncheckedShiftRL#` (16# -# i'#)))))
         where
         !x'# = narrow16Word# (int2Word# x#)
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
+        !i'# = word2Int# (int2Word# i# `and#` 15##)
     bitSize  _                 = 16
     isSigned _                 = True
     popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
@@ -471,7 +471,7 @@ instance Bits Int32 where
                                          (x'# `uncheckedShiftRL#` (32# -# i'#)))))
         where
         !x'# = narrow32Word# (int2Word# x#)
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
+        !i'# = word2Int# (int2Word# i# `and#` 31##)
     bitSize  _                 = 32
     isSigned _                 = True
     popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
@@ -661,7 +661,7 @@ instance Bits Int64 where
                                 (x'# `uncheckedShiftRL64#` (64# -# i'#))))
         where
         !x'# = int64ToWord64# x#
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        !i'# = word2Int# (int2Word# i# `and#` 63##)
     bitSize  _                 = 64
     isSigned _                 = True
     popCount (I64# x#)         =
@@ -798,7 +798,7 @@ instance Bits Int64 where
                            (x'# `uncheckedShiftRL#` (64# -# i'#))))
         where
         !x'# = int2Word# x#
-        !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
+        !i'# = word2Int# (int2Word# i# `and#` 63##)
     bitSize  _                 = 64
     isSigned _                 = True
     popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
