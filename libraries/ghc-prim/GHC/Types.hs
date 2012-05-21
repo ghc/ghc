@@ -16,7 +16,7 @@
 -----------------------------------------------------------------------------
 
 module GHC.Types (
-        Bool(..), Char(..), Int(..),
+        Bool(..), Char(..), Int(..), Word(..),
         Float(..), Double(..),
         Ordering(..), IO(..)
     ) where
@@ -47,6 +47,9 @@ data {-# CTYPE "HsChar" #-} Char = C# Char#
 -- The exact range for a given implementation can be determined by using
 -- 'Prelude.minBound' and 'Prelude.maxBound' from the 'Prelude.Bounded' class.
 data {-# CTYPE "HsInt" #-} Int = I# Int#
+
+-- |A 'Word' is an unsigned integral type, with the same size as 'Int'.
+data {-# CTYPE "HsWord" #-} Word = W# Word#
 
 -- | Single-precision floating point numbers.
 -- It is desirable that this type be at least equal in range and precision

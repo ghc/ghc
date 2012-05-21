@@ -92,6 +92,7 @@ instance (Eq a) => Eq [a] where
 
 deriving instance Eq Bool
 deriving instance Eq Ordering
+deriving instance Eq Word
 
 instance Eq Char where
     (C# c1) == (C# c2) = c1 `eqChar#` c2
@@ -191,6 +192,7 @@ instance (Ord a) => Ord [a] where
 
 deriving instance Ord Bool
 deriving instance Ord Ordering
+deriving instance Ord Word
 
 -- We don't use deriving for Ord Char, because for Ord the derived
 -- instance defines only compare, which takes two primops.  Then
