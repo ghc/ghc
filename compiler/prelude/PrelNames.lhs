@@ -540,7 +540,7 @@ unpackCStringUtf8_RDR   = nameRdrName unpackCStringUtf8Name
 
 newStablePtr_RDR, wordDataCon_RDR :: RdrName
 newStablePtr_RDR        = nameRdrName newStablePtrName
-wordDataCon_RDR         = dataQual_RDR gHC_WORD (fsLit "W#")
+wordDataCon_RDR         = dataQual_RDR gHC_TYPES (fsLit "W#")
 
 bindIO_RDR, returnIO_RDR :: RdrName
 bindIO_RDR              = nameRdrName bindIOName
@@ -1008,8 +1008,8 @@ word8TyConName    = tcQual  gHC_WORD (fsLit "Word8")  word8TyConKey
 word16TyConName   = tcQual  gHC_WORD (fsLit "Word16") word16TyConKey
 word32TyConName   = tcQual  gHC_WORD (fsLit "Word32") word32TyConKey
 word64TyConName   = tcQual  gHC_WORD (fsLit "Word64") word64TyConKey
-wordTyConName     = tcQual  gHC_WORD (fsLit "Word")   wordTyConKey
-wordDataConName   = conName gHC_WORD (fsLit "W#") wordDataConKey
+wordTyConName     = tcQual  gHC_TYPES (fsLit "Word")   wordTyConKey
+wordDataConName   = conName gHC_TYPES (fsLit "W#") wordDataConKey
 
 -- PrelPtr module
 ptrTyConName, funPtrTyConName :: Name
