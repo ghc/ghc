@@ -486,10 +486,7 @@ eqString _        _        = False
 %*********************************************************
 
 \begin{code}
-zeroInt, oneInt, twoInt, maxInt, minInt :: Int
-zeroInt = I# 0#
-oneInt  = I# 1#
-twoInt  = I# 2#
+maxInt, minInt :: Int
 
 {- Seems clumsy. Should perhaps put minInt and MaxInt directly into MachDeps.h -}
 #if WORD_SIZE_IN_BITS == 31

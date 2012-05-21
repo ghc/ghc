@@ -106,8 +106,8 @@ class  Enum a   where
     -- | Used in Haskell's translation of @[n,n'..m]@.
     enumFromThenTo      :: a -> a -> a -> [a]
 
-    succ                   = toEnum . (`plusInt` oneInt)  . fromEnum
-    pred                   = toEnum . (`minusInt` oneInt) . fromEnum
+    succ                   = toEnum . (+ 1)  . fromEnum
+    pred                   = toEnum . (subtract 1) . fromEnum
     enumFrom x             = map toEnum [fromEnum x ..]
     enumFromThen x y       = map toEnum [fromEnum x, fromEnum y ..]
     enumFromTo x y         = map toEnum [fromEnum x .. fromEnum y]
@@ -174,10 +174,10 @@ instance Enum () where
     succ _      = error "Prelude.Enum.().succ: bad argument"
     pred _      = error "Prelude.Enum.().pred: bad argument"
 
-    toEnum x | x == zeroInt = ()
-             | otherwise    = error "Prelude.Enum.().toEnum: bad argument"
+    toEnum x | x == 0    = ()
+             | otherwise = error "Prelude.Enum.().toEnum: bad argument"
 
-    fromEnum () = zeroInt
+    fromEnum () = 0
     enumFrom ()         = [()]
     enumFromThen () ()  = let many = ():many in many
     enumFromTo () ()    = [()]
@@ -294,12 +294,12 @@ instance Enum Bool where
   pred True  = False
   pred False  = error "Prelude.Enum.Bool.pred: bad argument"
 
-  toEnum n | n == zeroInt = False
-           | n == oneInt  = True
-           | otherwise    = error "Prelude.Enum.Bool.toEnum: bad argument"
+  toEnum n | n == 0    = False
+           | n == 1    = True
+           | otherwise = error "Prelude.Enum.Bool.toEnum: bad argument"
 
-  fromEnum False = zeroInt
-  fromEnum True  = oneInt
+  fromEnum False = 0
+  fromEnum True  = 1
 
   -- Use defaults for the rest
   enumFrom     = boundedEnumFrom
@@ -326,14 +326,14 @@ instance Enum Ordering where
   pred EQ = LT
   pred LT = error "Prelude.Enum.Ordering.pred: bad argument"
 
-  toEnum n | n == zeroInt = LT
-           | n == oneInt  = EQ
-           | n == twoInt  = GT
+  toEnum n | n == 0 = LT
+           | n == 1 = EQ
+           | n == 2 = GT
   toEnum _ = error "Prelude.Enum.Ordering.toEnum: bad argument"
 
-  fromEnum LT = zeroInt
-  fromEnum EQ = oneInt
-  fromEnum GT = twoInt
+  fromEnum LT = 0
+  fromEnum EQ = 1
+  fromEnum GT = 2
 
   -- Use defaults for the rest
   enumFrom     = boundedEnumFrom
@@ -471,8 +471,6 @@ Be careful about these instances.
         (b) be careful of Int overflow
         (c) remember that Int is bounded, so [1..] terminates at maxInt
 
-Also NB that the Num class isn't available in this module.
-        
 \begin{code}
 instance  Bounded Int where
     minBound =  minInt
@@ -481,10 +479,10 @@ instance  Bounded Int where
 instance  Enum Int  where
     succ x  
        | x == maxBound  = error "Prelude.Enum.succ{Int}: tried to take `succ' of maxBound"
-       | otherwise      = x `plusInt` oneInt
+       | otherwise      = x + 1
     pred x
        | x == minBound  = error "Prelude.Enum.pred{Int}: tried to take `pred' of minBound"
-       | otherwise      = x `minusInt` oneInt
+       | otherwise      = x - 1
 
     toEnum   x = x
     fromEnum x = x

@@ -315,7 +315,7 @@ show_tuple ss = showChar '('
 \begin{code}
 -- | equivalent to 'showsPrec' with a precedence of 0.
 shows           :: (Show a) => a -> ShowS
-shows           =  showsPrec zeroInt
+shows           =  showsPrec 0
 
 -- | utility function converting a 'Char' to a show function that
 -- simply prepends the character unchanged.
