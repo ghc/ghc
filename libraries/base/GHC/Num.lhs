@@ -83,13 +83,13 @@ subtract x y = y - x
 
 \begin{code}
 instance  Num Int  where
-    (+)    = plusInt
-    (-)    = minusInt
-    negate = negateInt
-    (*)    = timesInt
-    abs n  = if n `geInt` 0 then n else negateInt n
+    I# x + I# y = I# (x +# y)
+    I# x - I# y = I# (x -# y)
+    negate (I# x) = I# (negateInt# x)
+    I# x * I# y = I# (x *# y)
+    abs n  = if n `geInt` 0 then n else negate n
 
-    signum n | n `ltInt` 0 = negateInt 1
+    signum n | n `ltInt` 0 = negate 1
              | n `eqInt` 0 = 0
              | otherwise   = 1
 

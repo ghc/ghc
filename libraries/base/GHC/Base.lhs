@@ -680,17 +680,10 @@ Definitions of the boxed PrimOps; these will be
 used in the case of partial applications, etc.
 
 \begin{code}
-{-# INLINE plusInt #-}
-{-# INLINE minusInt #-}
-{-# INLINE timesInt #-}
 {-# INLINE quotInt #-}
 {-# INLINE remInt #-}
-{-# INLINE negateInt #-}
 
-plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt :: Int -> Int -> Int
-(I# x) `plusInt`  (I# y) = I# (x +# y)
-(I# x) `minusInt` (I# y) = I# (x -# y)
-(I# x) `timesInt` (I# y) = I# (x *# y)
+quotInt, remInt, divInt, modInt :: Int -> Int -> Int
 (I# x) `quotInt`  (I# y) = I# (x `quotInt#` y)
 (I# x) `remInt`   (I# y) = I# (x `remInt#`  y)
 (I# x) `divInt`   (I# y) = I# (x `divInt#`  y)
@@ -723,9 +716,6 @@ x# `divModInt#` y#
 "x# *# 1#" forall x#. x# *# 1# = x#
 "1# *# x#" forall x#. 1# *# x# = x#
   #-}
-
-negateInt :: Int -> Int
-negateInt (I# x) = I# (negateInt# x)
 
 {-# RULES
 "x# ># x#"  forall x#. x# >#  x# = False
