@@ -310,6 +310,6 @@ popInterruptTargetThread :: IO ()
 popInterruptTargetThread =
   modifyMVar_ interruptTargetThread $
    \tids -> return $! case tids of []     -> []
-                                   (t:ts) -> ts
+                                   (_:ts) -> ts
 
 \end{code}
