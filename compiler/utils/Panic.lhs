@@ -34,6 +34,9 @@ import FastTypes
 import Exception
 import Control.Concurrent
 import Data.Dynamic
+#if __GLASGOW_HASKELL__ < 705
+import Data.Maybe
+#endif
 import Debug.Trace	  ( trace )
 import System.IO.Unsafe
 import System.Exit
@@ -243,7 +246,7 @@ installSignalHandlers = do
       interrupt_exn = (toException UserInterrupt)
 
       interrupt = do
-        mt <- popInterruptTargetThread
+        mt <- peekInterruptTargetThread
         case mt of
           Nothing -> return ()
           Just t  -> throwTo t interrupt_exn
@@ -280,19 +283,18 @@ interruptTargetThread = unsafePerformIO (newMVar [])
 pushInterruptTargetThread :: ThreadId -> IO ()
 pushInterruptTargetThread tid = do
  wtid <- mkWeakThreadId tid
- modifyMVar_ interruptTargetThread $
-   return . (wtid :)
+ modifyMVar_ interruptTargetThread $ return . (wtid :)
 
-popInterruptTargetThread :: IO (Maybe ThreadId)
-popInterruptTargetThread =
-  modifyMVar interruptTargetThread $ loop
+peekInterruptTargetThread :: IO (Maybe ThreadId)
+peekInterruptTargetThread =
+  withMVar interruptTargetThread $ loop
  where
-   loop [] = return ([], Nothing)
+   loop [] = return Nothing
    loop (t:ts) = do
      r <- deRefWeak t
      case r of
        Nothing -> loop ts
-       Just t  -> return (ts, Just t)
+       Just t  -> return (Just t)
 #else
 {-# NOINLINE interruptTargetThread #-}
 interruptTargetThread :: MVar [ThreadId]
@@ -300,13 +302,17 @@ interruptTargetThread = unsafePerformIO (newMVar [])
 
 pushInterruptTargetThread :: ThreadId -> IO ()
 pushInterruptTargetThread tid = do
- modifyMVar_ interruptTargetThread $
-   return . (tid :)
+ modifyMVar_ interruptTargetThread $ return . (tid :)
 
-popInterruptTargetThread :: IO (Maybe ThreadId)
-popInterruptTargetThread =
-  modifyMVar interruptTargetThread $
-   \tids -> return $! case tids of [] -> ([], Nothing)
-                                   (t:ts) -> (ts, Just t)
+peekInterruptTargetThread :: IO (Maybe ThreadId)
+peekInterruptTargetThread =
+  withMVar interruptTargetThread $ return . listToMaybe
 #endif
+
+popInterruptTargetThread :: IO ()
+popInterruptTargetThread =
+  modifyMVar_ interruptTargetThread $
+   \tids -> return $! case tids of []     -> []
+                                   (_:ts) -> ts
+
 \end{code}

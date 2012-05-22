@@ -337,7 +337,7 @@ then
     CC="${mingwbin}gcc.exe"
     LD="${mingwbin}ld.exe"
     NM="${mingwbin}nm.exe"
-    fp_prog_ar_raw="${mingwbin}ar.exe"
+    fp_prog_ar="${mingwbin}ar.exe"
 
     if ! test -d inplace/perl ||
          test inplace/perl -ot ghc-tarballs/perl/ghc-perl*.tar.gz

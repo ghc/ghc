@@ -63,7 +63,6 @@ libraries/hoopl                 -           packages/hoopl.git                  
 libraries/hpc                   -           packages/hpc.git                    git
 libraries/integer-gmp           -           packages/integer-gmp.git            git
 libraries/integer-simple        -           packages/integer-simple.git         git
-libraries/mtl                   -           packages/mtl.git                    git
 libraries/old-locale            -           packages/old-locale.git             git
 libraries/old-time              -           packages/old-time.git               git
 libraries/pretty                -           packages/pretty.git                 git

@@ -8,7 +8,6 @@ EXPORTS
 	base_GHCziInt_I32zh_con_info
 	base_GHCziInt_I64zh_con_info
 
-	base_GHCziWord_Wzh_con_info
 	base_GHCziWord_W8zh_con_info
 	base_GHCziWord_W16zh_con_info
 	base_GHCziWord_W32zh_con_info

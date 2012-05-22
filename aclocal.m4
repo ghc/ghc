@@ -475,6 +475,21 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 ])
 
 
+AC_DEFUN([FP_PATH_PROG],[
+    AC_PATH_PROG($1,$2,$3,$4,$5,$6)
+    # If we have a cygwin path for something, and we try to run it
+    # from cabal or python, then it'll fail. So we convert to a
+    # native path.
+    if test "$HostOS"     = "mingw32" && \
+       test "${OSTYPE}"  != "msys"    && \
+       test "${$1}" != ""
+    then
+        # Canonicalise to <drive>:/path/to/gcc
+        $1=`cygpath -m "${$1}"`
+    fi
+])
+
+
 # FP_VISIBILITY_HIDDEN
 # ----------------------------------
 # Is the visibility hidden attribute supported?
@@ -781,16 +796,7 @@ dnl at least Happy version 1.14.  If there's no installed Happy, we look
 dnl for a happy source tree and point the build system at that instead.
 dnl
 AC_DEFUN([FPTOOLS_HAPPY],
-[AC_PATH_PROG(HappyCmd,happy,)
-# Happy is passed to Cabal, so we need a native path
-if test "$HostOS"      = "mingw32" && \
-   test "${OSTYPE}"   != "msys"    && \
-   test "${HappyCmd}" != ""
-then
-    # Canonicalise to <drive>:/path/to/gcc
-    HappyCmd=`cygpath -m "${HappyCmd}"`
-    AC_MSG_NOTICE([normalized happy command to $HappyCmd])
-fi
+[FP_PATH_PROG(HappyCmd,happy,)
 
 AC_CACHE_CHECK([for version of happy], fptools_cv_happy_version,
 changequote(, )dnl
@@ -817,15 +823,7 @@ dnl at least Alex version 2.0.1.
 dnl
 AC_DEFUN([FPTOOLS_ALEX],
 [
-AC_PATH_PROG(AlexCmd,alex,)
-# Alex is passed to Cabal, so we need a native path
-if test "$HostOS"     = "mingw32" && \
-   test "${OSTYPE}"  != "msys"    && \
-   test "${AlexCmd}" != ""
-then
-    # Canonicalise to <drive>:/path/to/gcc
-    AlexCmd=`cygpath -m "${AlexCmd}"`
-fi
+FP_PATH_PROG(AlexCmd,alex,)
 
 AC_CACHE_CHECK([for version of alex], fptools_cv_alex_version,
 changequote(, )dnl
@@ -969,21 +967,12 @@ AC_SUBST([LdHasNoCompactUnwind])
 
 # FP_PROG_AR
 # ----------
-# Sets fp_prog_ar_raw to the full path of ar and fp_prog_ar to a non-Cygwin
-# version of it. Exits if no ar can be found
+# Sets fp_prog_ar to a (non-Cygwin) path to ar. Exits if no ar can be found
 AC_DEFUN([FP_PROG_AR],
-[AC_PATH_PROG([fp_prog_ar_raw], [ar])
-if test -z "$fp_prog_ar_raw"; then
+[FP_PATH_PROG([fp_prog_ar], [ar])
+if test -z "$fp_prog_ar"; then
   AC_MSG_ERROR([cannot find ar in your PATH, no idea how to make a library])
 fi
-fp_prog_ar="$fp_prog_ar_raw"
-case $HostPlatform in
-  *mingw32) if test x${OSTYPE} != xmsys; then
- 	      fp_prog_ar="`cygpath -w "${fp_prog_ar_raw}" | sed -e 's@\\\\@/@g'`"
-              AC_MSG_NOTICE([normalized ar command to $fp_prog_ar])
-            fi
-            ;;
-esac
 ])# FP_PROG_AR
 
 
@@ -992,8 +981,8 @@ esac
 # Sets fp_prog_ar_is_gnu to yes or no, depending on whether it is GNU ar or not.
 AC_DEFUN([FP_PROG_AR_IS_GNU],
 [AC_REQUIRE([FP_PROG_AR])
-AC_CACHE_CHECK([whether $fp_prog_ar_raw is GNU ar], [fp_cv_prog_ar_is_gnu],
-[if "$fp_prog_ar_raw" --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
+AC_CACHE_CHECK([whether $fp_prog_ar is GNU ar], [fp_cv_prog_ar_is_gnu],
+[if "$fp_prog_ar" --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
   fp_cv_prog_ar_is_gnu=yes
 else
   fp_cv_prog_ar_is_gnu=no
@@ -1010,14 +999,14 @@ AC_SUBST([ArIsGNUAr], [`echo $fp_prog_ar_is_gnu | tr 'a-z' 'A-Z'`])
 AC_DEFUN([FP_PROG_AR_SUPPORTS_ATFILE],
 [AC_REQUIRE([FP_PROG_AR])
  AC_REQUIRE([FP_PROG_AR_ARGS])
-AC_CACHE_CHECK([whether $fp_prog_ar_raw supports @file], [fp_cv_prog_ar_supports_atfile],
+AC_CACHE_CHECK([whether $fp_prog_ar supports @file], [fp_cv_prog_ar_supports_atfile],
 [
 rm -f conftest*
 touch conftest.file
 echo conftest.file  > conftest.atfile
 echo conftest.file >> conftest.atfile
-"$fp_prog_ar_raw" $fp_prog_ar_args conftest.a @conftest.atfile > /dev/null 2>&1
-fp_prog_ar_supports_atfile_tmp=`"$fp_prog_ar_raw" t conftest.a 2> /dev/null | grep -c conftest.file`
+"$fp_prog_ar" $fp_prog_ar_args conftest.a @conftest.atfile > /dev/null 2>&1
+fp_prog_ar_supports_atfile_tmp=`"$fp_prog_ar" t conftest.a 2> /dev/null | grep -c conftest.file`
 rm -f conftest*
 if test "$fp_prog_ar_supports_atfile_tmp" -eq 2
 then
@@ -1046,14 +1035,14 @@ else
   touch conftest.dummy
   for fp_var in clqsZ clqs cqs clq cq ; do
      rm -f conftest.a
-     if "$fp_prog_ar_raw" $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null; then
+     if "$fp_prog_ar" $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null; then
         fp_cv_prog_ar_args=$fp_var
         break
      fi
   done
   rm -f conftest*
   if test -z "$fp_cv_prog_ar_args"; then
-    AC_MSG_ERROR([cannot figure out how to use your $fp_prog_ar_raw])
+    AC_MSG_ERROR([cannot figure out how to use your $fp_prog_ar])
   fi
 fi])
 fp_prog_ar_args=$fp_cv_prog_ar_args
@@ -1354,7 +1343,7 @@ EOF
 # which we use for building PDF and PS docs.
 # DblatexCmd is empty if dblatex could not be found.
 AC_DEFUN([FP_PROG_DBLATEX],
-[AC_PATH_PROG([DblatexCmd], [dblatex])
+[FP_PATH_PROG([DblatexCmd], [dblatex])
 if test -z "$DblatexCmd"; then
   AC_MSG_WARN([cannot find dblatex in your PATH, you will not be able to build the PDF and PS documentation])
 fi
@@ -1366,7 +1355,7 @@ fi
 # Sets the output variable XsltprocCmd to the full path of the XSLT processor
 # xsltproc. XsltprocCmd is empty if xsltproc could not be found.
 AC_DEFUN([FP_PROG_XSLTPROC],
-[AC_PATH_PROG([XsltprocCmd], [xsltproc])
+[FP_PATH_PROG([XsltprocCmd], [xsltproc])
 if test -z "$XsltprocCmd"; then
   AC_MSG_WARN([cannot find xsltproc in your PATH, you will not be able to build the HTML documentation])
 fi
@@ -1402,7 +1391,7 @@ AC_SUBST([HAVE_DOCBOOK_XSL])
 # Sets the output variable XmllintCmd to the full path of the XSLT processor
 # xmllint. XmllintCmd is empty if xmllint could not be found.
 AC_DEFUN([FP_PROG_XMLLINT],
-[AC_PATH_PROG([XmllintCmd], [xmllint])
+[FP_PATH_PROG([XmllintCmd], [xmllint])
 if test -z "$XmllintCmd"; then
   AC_MSG_WARN([cannot find xmllint in your PATH, you will not be able to validate your documentation])
 fi

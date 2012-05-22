@@ -58,7 +58,8 @@ import System.Console.Haskeline as Haskeline
 
 import Control.Applicative hiding (empty)
 import Control.Monad as Monad
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 
 import Data.Array
 import qualified Data.ByteString.Char8 as BS
