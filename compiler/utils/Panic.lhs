@@ -34,6 +34,9 @@ import FastTypes
 import Exception
 import Control.Concurrent
 import Data.Dynamic
+#if __GLASGOW_HASKELL__ < 705
+import Data.Maybe
+#endif
 import Debug.Trace	  ( trace )
 import System.IO.Unsafe
 import System.Exit
