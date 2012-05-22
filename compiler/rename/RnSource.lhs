@@ -436,13 +436,14 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
            Just (inst_tyvars, _, L _ cls,_) ->
 
     do { let (spec_inst_prags, other_sigs) = partition isSpecInstLSig uprags
-             tv_names = hsLTyVarNames inst_tyvars
+             ktv_names = hsLKiTyVarNames inst_tyvars
 
        -- Rename the associated types, and type signatures
        -- Both need to have the instance type variables in scope
+       ; traceRn (text "rnSrcInstDecl"  <+> ppr inst_ty' $$ ppr inst_tyvars $$ ppr ktv_names)
        ; ((ats', other_sigs'), more_fvs) 
-             <- extendTyVarEnvFVRn tv_names $
-                do { (ats', at_fvs) <- rnATInstDecls cls tv_names ats
+             <- extendTyVarEnvFVRn ktv_names $
+                do { (ats', at_fvs) <- rnATInstDecls cls inst_tyvars ats
                    ; (other_sigs', sig_fvs) <- renameSigs (InstDeclCtxt cls) other_sigs
                    ; return ( (ats', other_sigs')
                             , at_fvs `plusFV` sig_fvs) }
@@ -452,7 +453,7 @@ rnSrcInstDecl (ClsInstD { cid_poly_ty = inst_ty, cid_binds = mbinds
 	-- the bindings are for the right class
 	-- (Slightly strangely) when scoped type variables are on, the 
         -- forall-d tyvars scope over the method bindings too
-       ; (mbinds', meth_fvs) <- extendTyVarEnvForMethodBinds inst_tyvars $
+       ; (mbinds', meth_fvs) <- extendTyVarEnvForMethodBinds ktv_names $
                                 rnMethodBinds cls (mkSigTvFn other_sigs')
 					          mbinds    
 
@@ -527,9 +528,19 @@ rnFamInstDecl mb_cls (FamInstDecl { fid_tycon = tycon
 Renaming of the associated types in instances.  
 
 \begin{code}
-rnATInstDecls :: Name        -- Class
-              -> [Name]      -- Type variable binders (but NOT kind variables)
-                         -- See Note [Renaming associated types] in RnTypes
+rnATDecls :: Name      -- Class
+          -> LHsTyVarBndrs Name
+          -> [LTyClDecl RdrName] 
+          -> RnM ([LTyClDecl Name], FreeVars)
+rnATDecls cls hs_tvs at_decls
+  = rnList (rnTyClDecl (Just (cls, tv_ns))) at_decls
+  where
+    tv_ns = hsLTyVarNames hs_tvs
+    -- Type variable binders (but NOT kind variables)
+    -- See Note [Renaming associated types] in RnTypes
+
+rnATInstDecls :: Name      -- Class
+              -> LHsTyVarBndrs Name
               -> [LFamInstDecl RdrName] 
               -> RnM ([LFamInstDecl Name], FreeVars)
 -- Used for the family declarations and defaults in a class decl
@@ -537,21 +548,25 @@ rnATInstDecls :: Name        -- Class
 -- 
 -- NB: We allow duplicate associated-type decls; 
 --     See Note [Associated type instances] in TcInstDcls
-rnATInstDecls cls tvs atDecls 
-  = rnList (rnFamInstDecl (Just (cls, tvs))) atDecls
+rnATInstDecls cls hs_tvs at_insts
+  = rnList (rnFamInstDecl (Just (cls, tv_ns))) at_insts
+  where
+    tv_ns = hsLTyVarNames hs_tvs
+    -- Type variable binders (but NOT kind variables)
+    -- See Note [Renaming associated types] in RnTypes
 \end{code}
 
 For the method bindings in class and instance decls, we extend the 
 type variable environment iff -fglasgow-exts
 
 \begin{code}
-extendTyVarEnvForMethodBinds :: LHsTyVarBndrs Name
+extendTyVarEnvForMethodBinds :: [Name]
                              -> RnM (Bag (LHsBind Name), FreeVars)
                              -> RnM (Bag (LHsBind Name), FreeVars)
-extendTyVarEnvForMethodBinds tyvars thing_inside
+extendTyVarEnvForMethodBinds ktv_names thing_inside
   = do	{ scoped_tvs <- xoptM Opt_ScopedTypeVariables
 	; if scoped_tvs then
-		extendTyVarEnvFVRn (hsLTyVarNames tyvars) thing_inside
+		extendTyVarEnvFVRn ktv_names thing_inside
 	  else
 		thing_inside }
 \end{code}
@@ -882,9 +897,8 @@ rnTyClDecl mb_cls (ClassDecl {tcdCtxt = context, tcdLName = lcls,
 	     { (context', cxt_fvs) <- rnContext cls_doc context
 	     ; fds'  <- rnFds (docOfHsDocContext cls_doc) fds
 			 -- The fundeps have no free variables
-             ; let tv_ns = hsLTyVarNames tyvars'
-             ; (ats',     fv_ats)     <- rnList (rnTyClDecl (Just (cls', tv_ns))) ats
-             ; (at_defs', fv_at_defs) <- rnATInstDecls cls' tv_ns at_defs
+             ; (ats',     fv_ats)     <- rnATDecls cls' tyvars' ats
+             ; (at_defs', fv_at_defs) <- rnATInstDecls cls' tyvars' at_defs
 	     ; (sigs', sig_fvs) <- renameSigs (ClsDeclCtxt cls') sigs
 	     ; let fvs = cxt_fvs     `plusFV`
 	                 sig_fvs     `plusFV`
@@ -913,7 +927,7 @@ rnTyClDecl mb_cls (ClassDecl {tcdCtxt = context, tcdLName = lcls,
 	-- we want to name both "x" tyvars with the same unique, so that they are
 	-- easy to group together in the typechecker.  
 	; (mbinds', meth_fvs) 
-	    <- extendTyVarEnvForMethodBinds tyvars' $
+	    <- extendTyVarEnvForMethodBinds (hsLKiTyVarNames tyvars') $
 		-- No need to check for duplicate method signatures
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 		-- and the methods are already in scope
