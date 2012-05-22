@@ -1669,15 +1669,6 @@ def if_verbose_dump( n, f ):
         except:
             print ''
 
-# Guess flags suitable for the compiler.
-def guess_compiler_flags():
-   if config.compiler_type == 'ghc':
-       return ['-fforce-recomp', '-dcore-lint', '-no-user-package-db']
-   elif config.compiler_type == 'nhc':
-       return ['-an-nhc-specific-flag']
-   else:
-        return []
-
 def rawSystem(cmd_and_args):
     # We prefer subprocess.call to os.spawnv as the latter
     # seems to send its arguments through a shell or something
