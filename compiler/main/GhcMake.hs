@@ -1190,16 +1190,14 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
    = do
         let location = ms_location old_summary
 
-                -- return the cached summary if the source didn't change
-        src_timestamp <- case maybe_buf of
-                           Just (_,t) -> return t
-                           Nothing    -> liftIO $ getModificationUTCTime file
+        src_timestamp <- get_src_timestamp
                 -- The file exists; we checked in getRootSummary above.
                 -- If it gets removed subsequently, then this 
                 -- getModificationUTCTime may fail, but that's the right
                 -- behaviour.
 
-        if ms_hs_date old_summary == src_timestamp 
+                -- return the cached summary if the source didn't change
+        if ms_hs_date old_summary == src_timestamp
            then do -- update the object-file timestamp
                   obj_timestamp <-
                     if isObjectTarget (hscTarget (hsc_dflags hsc_env)) 
@@ -1208,12 +1206,18 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                         else return Nothing
                   return old_summary{ ms_obj_date = obj_timestamp }
            else
-                new_summary
+                new_summary src_timestamp
 
    | otherwise
-   = new_summary
+   = do src_timestamp <- get_src_timestamp
+        new_summary src_timestamp
   where
-    new_summary = do
+    get_src_timestamp = case maybe_buf of
+                           Just (_,t) -> return t
+                           Nothing    -> liftIO $ getModificationUTCTime file
+                        -- getMofificationUTCTime may fail
+
+    new_summary src_timestamp = do
         let dflags = hsc_dflags hsc_env
 
         (dflags', hspp_fn, buf)
@@ -1227,11 +1231,6 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
         mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
-
-        src_timestamp <- case maybe_buf of
-                           Just (_,t) -> return t
-                           Nothing    -> liftIO $ getModificationUTCTime file
-                        -- getMofificationTime may fail
 
         -- when the user asks to load a source file by name, we only
         -- use an object file if -fobject-code is on.  See #1205.
