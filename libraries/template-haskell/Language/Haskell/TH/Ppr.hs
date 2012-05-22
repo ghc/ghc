@@ -326,10 +326,7 @@ instance Ppr Foreign where
 instance Ppr Pragma where
     ppr (InlineP n (InlineSpec inline conlike activation))
        = text "{-#"
-     <+> text (case inline of
-                 NoInline  -> "NOINLINE"
-                 Inline    -> "INLINE"
-                 Inlinable -> "INLINABLE")
+     <+> ppr inline
      <+> (if conlike then text "CONLIKE" else empty)
      <+> ppr_activation activation 
      <+> ppr n
@@ -342,11 +339,7 @@ instance Ppr Pragma where
              ]
     ppr (SpecialiseP n ty (Just (InlineSpec inline _conlike activation)))
        = sep [ text "{-# SPECIALISE" <+> 
-               text (case inline of
-                       NoInline  -> "NOINLINE"
-                       Inline    -> "INLINE"
-                       Inlinable -> "INLINABLE") <+>
-               ppr_activation activation
+               ppr inline <+> ppr_activation activation
              , ppr n <+> text "::"
              , ppr ty
              , text "#-}"
@@ -357,6 +350,12 @@ ppr_activation :: Maybe (Bool, Int) -> Doc
 ppr_activation (Just (beforeFrom, i))
   = brackets $ (if beforeFrom then empty else char '~') <+> int i
 ppr_activation Nothing = empty
+
+------------------------------
+instance Ppr Inline where
+    ppr NoInline  = text "NOINLINE"
+    ppr Inline    = text "INLINE"
+    ppr Inlinable = text "INLINABLE"
 
 ------------------------------
 instance Ppr Clause where
