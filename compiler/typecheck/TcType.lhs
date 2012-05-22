@@ -609,8 +609,8 @@ tidyCos env = map (tidyCo env)
 %************************************************************************
 
 \begin{code}
-
--- | Finds type family instances occuring in a type after expanding synonyms.
+-- | Finds outermost type-family applications occuring in a type,
+-- after expanding synonyms.
 tcTyFamInsts :: Type -> [(TyCon, [Type])]
 tcTyFamInsts ty 
   | Just exp_ty <- tcView ty    = tcTyFamInsts exp_ty

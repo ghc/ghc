@@ -1659,7 +1659,7 @@ checkValidFamInst typats rhs
 	   mapM_ addErrTc (checkFamInstRhs typats (tcTyFamInsts rhs))
        }
 
--- Make sure that each type family instance is 
+-- Make sure that each type family application is 
 --   (1) strictly smaller than the lhs,
 --   (2) mentions no type variable more often than the lhs, and
 --   (3) does not contain any further type family instances.
