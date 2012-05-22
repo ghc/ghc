@@ -576,7 +576,8 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
            && all bco_ok scc
 
         object_ok ms
-          | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms 
+          | dopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+          | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
                                          && same_as_prev t
           | otherwise = False
           where
@@ -595,7 +596,8 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
                 -- a problem.
 
         bco_ok ms
-          = case lookupUFM hpt (ms_mod_name ms) of
+          | dopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+          | otherwise = case lookupUFM hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) && 
                         linkableTime l >= ms_hs_date ms
