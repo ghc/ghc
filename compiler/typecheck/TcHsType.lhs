@@ -829,15 +829,24 @@ kindGeneralize tkvs
   = do { gbl_tvs  <- tcGetGlobalTyVars -- Already zonked
        ; tidy_env <- tcInitTidyEnv
        ; tkvs     <- zonkTyVarsAndFV tkvs
-       ; let kvs_to_quantify = varSetElems (tkvs `minusVarSet` gbl_tvs)
+       ; let kvs_to_quantify = filter isKindVar (varSetElems (tkvs `minusVarSet` gbl_tvs))
                 -- Any type varaibles in tkvs will be in scope,
                 -- and hence in gbl_tvs, so after removing gbl_tvs
                 -- we should only have kind variables left
+		--
+ 		-- BUT there is a smelly case (to be fixed when TH is reorganised)
+		--     f t = [| e :: $t |]
+                -- When typechecking the body of the bracket, we typecheck $t to a
+                -- unification variable 'alpha', with no biding forall.  We don't
+                -- want to kind-quantify it!
 
              (_, tidy_kvs_to_quantify) = tidyTyVarBndrs tidy_env kvs_to_quantify
                            -- We do not get a later chance to tidy!
 
        ; ASSERT2 (all isKindVar kvs_to_quantify, ppr kvs_to_quantify $$ ppr tkvs)
+             -- This assertion is obviosy true because of the filter isKindVar
+             -- but we'll remove that when reorganising TH, and then the assertion
+             -- will mean something
          zonkQuantifiedTyVars tidy_kvs_to_quantify }
 \end{code}
 
