@@ -190,3 +190,4 @@ test('T5867',
      extra_clean(['T5867a.hi', 'T5867a.o']),
      multimod_compile, ['T5867', '-v0'])
 test('T6027', normal, compile, [''])
+test('T6120', normal, compile, [''])
