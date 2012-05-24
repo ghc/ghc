@@ -114,9 +114,9 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
    --     It uses the fixity env from (A) to bind fixities for view patterns.
    new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
    -- bind the LHSes (and their fixities) in the global rdr environment
-   let { val_binders  = collectHsValBinders new_lhs ;
-         all_bndr_set = addListToNameSet tc_bndrs val_binders ;
-         val_avails   = map Avail val_binders  } ;
+   let { val_binders = collectHsValBinders new_lhs ;
+         all_bndrs   = addListToNameSet tc_bndrs val_binders ;
+         val_avails  = map Avail val_binders  } ;
    (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
    traceRn (ptext (sLit "Val binders") <+> (ppr val_binders)) ;
    setEnvs (tcg_env, tcl_env) $ do {
@@ -138,19 +138,19 @@ rnSrcDecls extra_deps group@(HsGroup { hs_valds   = val_decls,
 
    -- (F) Rename Value declarations right-hand sides
    traceRn (text "Start rnmono") ;
-   (rn_val_decls, bind_dus) <- rnTopBindsRHS new_lhs ;
+   (rn_val_decls, bind_dus) <- rnTopBindsRHS all_bndrs new_lhs ;
    traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
 
    -- (G) Rename Fixity and deprecations
    
    -- Rename fixity declarations and error if we try to
    -- fix something from another module (duplicates were checked in (A))
-   rn_fix_decls <- rnSrcFixityDecls all_bndr_set fix_decls ;
+   rn_fix_decls <- rnSrcFixityDecls all_bndrs fix_decls ;
 
    -- Rename deprec decls;
    -- check for duplicates and ensure that deprecated things are defined locally
    -- at the moment, we don't keep these around past renaming
-   rn_warns <- rnSrcWarnDecls all_bndr_set warn_decls ;
+   rn_warns <- rnSrcWarnDecls all_bndrs warn_decls ;
 
    -- (H) Rename Everything else
 
@@ -260,6 +260,9 @@ rnSrcFixityDecls bndr_set fix_decls
   = do fix_decls <- mapM rn_decl fix_decls
        return (concat fix_decls)
   where
+    sig_ctxt = TopSigCtxt bndr_set True  
+       -- True <=> can give fixity for class decls and record selectors
+
     rn_decl :: LFixitySig RdrName -> RnM [LFixitySig Name]
         -- GHC extension: look up both the tycon and data con 
 	-- for con-like things; hence returning a list
@@ -268,7 +271,7 @@ rnSrcFixityDecls bndr_set fix_decls
     rn_decl (L loc (FixitySig (L name_loc rdr_name) fixity))
       = setSrcSpan name_loc $
                     -- this lookup will fail if the definition isn't local
-        do names <- lookupLocalTcNames bndr_set what rdr_name
+        do names <- lookupLocalTcNames sig_ctxt what rdr_name
            return [ L loc (FixitySig (L name_loc name) fixity)
                   | name <- names ]
     what = ptext (sLit "fixity signature")
@@ -301,9 +304,12 @@ rnSrcWarnDecls bndr_set decls
        ; pairs_s <- mapM (addLocM rn_deprec) decls
        ; return (WarnSome ((concat pairs_s))) }
  where
+   sig_ctxt = TopSigCtxt bndr_set True
+      -- True <=> Can give deprecations for class ops and record sels
+
    rn_deprec (Warning rdr_name txt)
        -- ensures that the names are defined locally
-     = do { names <- lookupLocalTcNames bndr_set what rdr_name
+     = do { names <- lookupLocalTcNames sig_ctxt what rdr_name
           ; return [(nameOccName name, txt) | name <- names] }
    
    what = ptext (sLit "deprecation")

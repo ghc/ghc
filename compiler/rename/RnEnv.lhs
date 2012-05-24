@@ -837,13 +837,36 @@ We don't want to say 'f' is out of scope; instead, we want to
 return the imported 'f', so that later on the reanamer will
 correctly report "misplaced type sig".
 
+Note [Signatures for top level things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+data HsSigCtxt = ... | TopSigCtxt NameSet Bool | ....
+
+* The NameSet says what is bound in this group of bindings.
+  We can't use isLocalGRE from the GlobalRdrEnv, because of this:
+       f x = x
+       $( ...some TH splice... )
+       f :: Int -> Int
+  When we encounter the signature for 'f', the binding for 'f'
+  will be in the GlobalRdrEnv, and will be a LocalDef. Yet the
+  signature is mis-placed
+
+* The Bool says whether the signature is ok for a class method
+  or record selector.  Consider
+      infix 3 `f`          -- Yes, ok
+      f :: C a => a -> a   -- No, not ok
+      class C a where
+        f :: a -> a
+
 \begin{code}
 data HsSigCtxt 
-  = HsBootCtxt		     -- Top level of a hs-boot file
-  | TopSigCtxt		     -- At top level
+  = TopSigCtxt NameSet Bool  -- At top level, binding these names
+                             -- See Note [Signatures for top level things]
+                             -- Bool <=> ok to give sig for
+                             --          class method or record selctor
   | LocalBindCtxt NameSet    -- In a local binding, binding these names
   | ClsDeclCtxt   Name	     -- Class decl for this class
   | InstDeclCtxt  Name	     -- Intsance decl for this class
+  | HsBootCtxt		     -- Top level of a hs-boot file
 
 lookupSigOccRn :: HsSigCtxt
 	       -> Sig RdrName
@@ -875,11 +898,11 @@ lookupBindGroupOcc ctxt what rdr_name
 
   | otherwise
   = case ctxt of 
-      HsBootCtxt       -> lookup_top		    
-      TopSigCtxt       -> lookup_top
-      LocalBindCtxt ns -> lookup_group ns
-      ClsDeclCtxt  cls -> lookup_cls_op cls
-      InstDeclCtxt cls -> lookup_cls_op cls
+      HsBootCtxt            -> lookup_top (const True)       True
+      TopSigCtxt ns meth_ok -> lookup_top (`elemNameSet` ns) meth_ok
+      LocalBindCtxt ns 	    -> lookup_group ns
+      ClsDeclCtxt  cls 	    -> lookup_cls_op cls
+      InstDeclCtxt cls 	    -> lookup_cls_op cls
   where
     lookup_cls_op cls
       = do { env <- getGlobalRdrEnv 
@@ -893,21 +916,22 @@ lookupBindGroupOcc ctxt what rdr_name
       where
         doc = ptext (sLit "method of class") <+> quotes (ppr cls)
 
-    lookup_top
+    lookup_top keep_me meth_ok
       = do { env <- getGlobalRdrEnv 
-           ; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-           ; case filter isLocalGRE gres of
-               [] | null gres -> bale_out_with empty
-                  | otherwise -> bale_out_with (bad_msg (ptext (sLit "an imported value")))
+           ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+           ; case filter (keep_me . gre_name) all_gres of
+               [] | null all_gres -> bale_out_with empty
+                  | otherwise -> bale_out_with local_msg
                (gre:_) 
-                  | ParentIs {} <- gre_par gre
-		  -> bale_out_with (bad_msg (ptext (sLit "a record selector or class method")))
+                  | ParentIs {} <- gre_par gre 
+                  , not meth_ok
+		  -> bale_out_with sub_msg
 		  | otherwise
                   -> return (Right (gre_name gre)) }
 
-    lookup_group bound_names
-      = do { mb_name <- lookupOccRn_maybe rdr_name
-           ; case mb_name of
+    lookup_group bound_names  -- Look in the local envt (not top level)
+      = do { local_env <- getLocalRdrEnv
+           ; case lookupLocalRdrEnv local_env rdr_name of
                Just n  
                  | n `elemNameSet` bound_names -> return (Right n)
                  | otherwise                   -> bale_out_with local_msg
@@ -922,31 +946,31 @@ lookupBindGroupOcc ctxt what rdr_name
     local_msg = parens $ ptext (sLit "The")  <+> what <+> ptext (sLit "must be given where")
   			   <+> quotes (ppr rdr_name) <+> ptext (sLit "is declared")
 
-    bad_msg thing = parens $ ptext (sLit "You cannot give a") <+> what
-    			  <+> ptext (sLit "for") <+> thing
+    sub_msg = parens $ ptext (sLit "You cannot give a") <+> what
+     	               <+> ptext (sLit "for a record selector or class method")
 
 
 ---------------
-lookupLocalTcNames :: NameSet -> SDoc -> RdrName -> RnM [Name]
+lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [Name]
 -- GHC extension: look up both the tycon and data con or variable.
--- Used for top-level fixity signatures. Complain if neither is in scope.
+-- Used for top-level fixity signatures and deprecations. 
+-- Complain if neither is in scope.
 -- See Note [Fixity signature lookup]
-lookupLocalTcNames bndr_set what rdr_name
-  | Just n <- isExact_maybe rdr_name	
-	-- Special case for (:), which doesn't get into the GlobalRdrEnv
-  = do { n' <- lookupExactOcc n; return [n'] }	-- For this we don't need to try the tycon too
-  | otherwise
+lookupLocalTcNames ctxt what rdr_name
   = do { mb_gres <- mapM lookup (dataTcOccs rdr_name)
        ; let (errs, names) = splitEithers mb_gres
        ; when (null names) $ addErr (head errs) -- Bleat about one only
        ; return names }
   where
-    lookup = lookupBindGroupOcc (LocalBindCtxt bndr_set) what
+    lookup = lookupBindGroupOcc ctxt what
 
 dataTcOccs :: RdrName -> [RdrName]
 -- Return both the given name and the same name promoted to the TcClsName
 -- namespace.  This is useful when we aren't sure which we are looking at.
 dataTcOccs rdr_name
+  | Just n <- isExact_maybe rdr_name	
+  , not (isBuiltInSyntax n)   -- See Note [dataTcOccs and Exact Names]
+  = [rdr_name] 
   | isDataOcc occ || isVarOcc occ
   = [rdr_name, rdr_name_tc]
   | otherwise
@@ -956,6 +980,17 @@ dataTcOccs rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
 \end{code}
 
+Note [dataTcOccs and Exact Names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Exact RdrNames can occur in code generated by Template Haskell, and generally
+those references are, well, exact, so it's wrong to return the TyClsName too.
+But there is an awkward exception for built-in syntax. Example in GHCi
+   :info []
+This parses as the Exact RdrName for nilDataCon, but we also want
+the list type constructor.
+
+Note that setRdrNameSpace on an Exact name requires the Name to be External,
+which it always is for built in syntax.
 
 %*********************************************************
 %*							*
