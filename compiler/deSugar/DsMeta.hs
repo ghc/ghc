@@ -280,7 +280,7 @@ mk_extra_tvs :: Located Name -> LHsTyVarBndrs Name
 mk_extra_tvs tc tvs defn
   | TyData { td_kindSig = Just hs_kind } <- defn
   = do { extra_tvs <- go hs_kind
-       ; return (mkHsQTvs (hsQTvBndrs tvs ++ extra_tvs)) }
+       ; return (tvs { hsq_tvs = hsq_tvs tvs ++ extra_tvs }) }
   | otherwise
   = return tvs
   where
@@ -360,7 +360,7 @@ repFamInstD (FamInstDecl { fid_tycon = tc_name
                                                 -- polymorphism in Template Haskell (sigh)
     do { tc <- lookupLOcc tc_name 		-- See note [Binders and occurrences]  
        ; let loc = getLoc tc_name
-             hs_tvs = mkHsQTvs (userHsTyVarBndrs loc tv_names)   -- Yuk
+             hs_tvs = HsQTvs { hsq_kvs = kv_names, hsq_tvs = userHsTyVarBndrs loc tv_names }   -- Yuk
        ; addTyClTyVarBinds hs_tvs $ \ bndrs ->
          do { tys1 <- repLTys tys
             ; tys2 <- coreList typeQTyConName tys1
@@ -420,27 +420,30 @@ ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
 
 repC :: [Name] -> LConDecl Name -> DsM (Core TH.ConQ)
 repC _ (L _ (ConDecl { con_name = con, con_qvars = con_tvs, con_cxt = L _ []
-                       , con_details = details, con_res = ResTyH98 }))
+                     , con_details = details, con_res = ResTyH98 }))
   | null (hsQTvBndrs con_tvs)
-  = do { con1 <- lookupLOcc con 	-- See note [Binders and occurrences] 
+  = do { con1 <- lookupLOcc con 	-- See Note [Binders and occurrences] 
        ; repConstr con1 details  }
+
 repC tvs (L _ (ConDecl { con_name = con
                        , con_qvars = con_tvs, con_cxt = L _ ctxt
                        , con_details = details
                        , con_res = res_ty }))
   = do { (eq_ctxt, con_tv_subst) <- mkGadtCtxt tvs res_ty
-       ; let ex_tvs = mkHsQTvs [ tv | tv <- hsQTvBndrs con_tvs, not (hsLTyVarName tv `in_subst` con_tv_subst)]
+       ; let ex_tvs = HsQTvs { hsq_kvs = filterOut (in_subst con_tv_subst) (hsq_kvs con_tvs)
+                             , hsq_tvs = filterOut (in_subst con_tv_subst . hsLTyVarName) (hsq_tvs con_tvs) }
+
        ; binds <- mapM dupBinder con_tv_subst 
        ; dsExtendMetaEnv (mkNameEnv binds) $     -- Binds some of the con_tvs
          addTyVarBinds ex_tvs $ \ ex_bndrs ->   -- Binds the remaining con_tvs
-    do { con1      <- lookupLOcc con 	-- See note [Binders and occurrences] 
+    do { con1      <- lookupLOcc con 	-- See Note [Binders and occurrences] 
        ; c'        <- repConstr con1 details
        ; ctxt'     <- repContext (eq_ctxt ++ ctxt)
        ; rep2 forallCName [unC ex_bndrs, unC ctxt', unC c'] } }
 
-in_subst :: Name -> [(Name,Name)] -> Bool
-in_subst _ []          = False
-in_subst n ((n',_):ns) = n==n' || in_subst n ns
+in_subst :: [(Name,Name)] -> Name -> Bool
+in_subst []          _ = False
+in_subst ((n',_):ns) n = n==n' || in_subst ns n
 
 mkGadtCtxt :: [Name]		-- Tyvars of the data type
            -> ResType (LHsType Name)
@@ -472,7 +475,7 @@ mkGadtCtxt data_tvs (ResTyGADT res_ty)
     go cxt subst ((data_tv, ty) : rest)
        | Just con_tv <- is_hs_tyvar ty
        , isTyVarName con_tv
-       , not (in_subst con_tv subst)
+       , not (in_subst subst con_tv)
        = go cxt ((con_tv, data_tv) : subst) rest
        | otherwise
        = go (eq_pred : cxt) subst rest
@@ -628,7 +631,7 @@ addTyVarBinds :: LHsTyVarBndrs Name	                       -- the binders to be 
 -- meta environment and gets the *new* names on Core-level as an argument
 
 addTyVarBinds tvs m
-  = do { freshNames <- mkGenSyms (hsLTyVarNames tvs)
+  = do { freshNames <- mkGenSyms (hsLKiTyVarNames tvs)
        ; term <- addBinds freshNames $ 
 	    	 do { kbs1 <- mapM mk_tv_bndr (hsQTvBndrs tvs `zip` freshNames)
                     ; kbs2 <- coreList tyVarBndrTyConName kbs1
@@ -647,7 +650,7 @@ addTyClTyVarBinds :: LHsTyVarBndrs Name
 --      type W (T a) = blah
 -- The 'a' in the type instance is the one bound by the instance decl
 addTyClTyVarBinds tvs m
-  = do { let tv_names = hsLTyVarNames tvs
+  = do { let tv_names = hsLKiTyVarNames tvs
        ; env <- dsGetMetaEnv
        ; freshNames <- mkGenSyms (filterOut (`elemNameEnv` env) tv_names)
        	    -- Make fresh names for the ones that are not already in scope
