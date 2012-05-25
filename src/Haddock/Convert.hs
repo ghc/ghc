@@ -31,6 +31,7 @@ import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, eqTyCon )
 import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc, unLoc )
+import Data.List( partition )
 
 
 -- the main function here! yay!
@@ -97,12 +98,14 @@ synifyTyCon tc
   | isFunTyCon tc || isPrimTyCon tc 
   = TyDecl { tcdLName = synifyName tc
            , tcdTyVars =       -- tyConTyVars doesn't work on fun/prim, but we can make them up:
-                         mkHsQTvs $ zipWith
-                            (\fakeTyVar realKind -> noLoc $
-                                KindedTyVar (getName fakeTyVar) 
-                                            (synifyKindSig realKind))
-                            alphaTyVars --a, b, c... which are unfortunately all kind *
-                            (fst . splitKindFunTys $ tyConKind tc)
+                         let mk_hs_tv realKind fakeTyVar 
+                                = noLoc $ KindedTyVar (getName fakeTyVar) 
+                                                      (synifyKindSig realKind)
+                         in HsQTvs { hsq_kvs = []   -- No kind polymorhism
+                                   , hsq_tvs = zipWith mk_hs_tv (fst (splitKindFunTys (tyConKind tc)))
+                                                                alphaTyVars --a, b, c... which are unfortunately all kind *
+                                   }
+                            
            , tcdTyDefn = TyData { td_ND = DataType  -- arbitrary lie, they are neither 
                                                     -- algebraic data nor newtype:
                                 , td_ctxt = noLoc []
@@ -231,15 +234,16 @@ synifyCtx = noLoc . map (synifyType WithinType)
 
 
 synifyTyVars :: [TyVar] -> LHsTyVarBndrs Name
-synifyTyVars tvs = mkHsQTvs (map synifyTyVar tvs)
+synifyTyVars ktvs = HsQTvs { hsq_kvs = map tyVarName kvs
+                           , hsq_tvs = map synifyTyVar tvs }
   where
-    synifyTyVar tv = noLoc $ let
-      kind = tyVarKind tv
-      name = getName tv
-     in if isLiftedTypeKind kind
-        then UserTyVar name
-        else KindedTyVar name (synifyKindSig kind)
-
+    (kvs, tvs) = partition isKindVar ktvs
+    synifyTyVar tv 
+      | isLiftedTypeKind kind = noLoc (UserTyVar name)
+      | otherwise             = noLoc (KindedTyVar name (synifyKindSig kind))
+      where
+        kind = tyVarKind tv
+        name = getName tv
 
 --states of what to do with foralls:
 data SynifyTypeState

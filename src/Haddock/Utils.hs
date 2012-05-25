@@ -13,7 +13,7 @@
 module Haddock.Utils (
 
   -- * Misc utilities
-  restrictTo,
+  restrictTo, emptyHsQTvs,
   toDescription, toInstalledDescription,
 
   -- * Filename utilities
@@ -171,6 +171,12 @@ restrictDecls names decls = mapMaybe (filterLSigNames (`elem` names)) decls
 
 restrictATs :: [Name] -> [LTyClDecl Name] -> [LTyClDecl Name]
 restrictATs names ats = [ at | at <- ats , tcdName (unL at) `elem` names ]
+
+emptyHsQTvs :: LHsTyVarBndrs Name
+-- This function is here, rather than in HsTypes, because it *renamed*, but
+-- does not necessarily have all the rigt kind variables.  It is used
+-- in Haddock just for printing, so it doesn't matter
+emptyHsQTvs = HsQTvs { hsq_kvs = error "haddock:emptyHsQTvs", hsq_tvs = [] }
 
 
 --------------------------------------------------------------------------------

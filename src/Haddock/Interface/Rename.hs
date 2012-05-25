@@ -265,9 +265,10 @@ renameType t = case t of
 
 
 renameLTyVarBndrs :: LHsTyVarBndrs Name -> RnM (LHsTyVarBndrs DocName)
-renameLTyVarBndrs qtvs
-  = do { tvs' <- mapM renameLTyVarBndr (hsQTvBndrs qtvs) 
-       ; return (mkHsQTvs tvs') }
+renameLTyVarBndrs (HsQTvs { hsq_kvs = _, hsq_tvs = tvs })
+  = do { tvs' <- mapM renameLTyVarBndr tvs
+       ; return (HsQTvs { hsq_kvs = error "haddock:renameLTyVarBndrs", hsq_tvs = tvs' }) }
+                -- This is rather bogus, but I'm not sure what else to do
 
 renameLTyVarBndr :: LHsTyVarBndr Name -> RnM (LHsTyVarBndr DocName)
 renameLTyVarBndr (L loc (UserTyVar n))

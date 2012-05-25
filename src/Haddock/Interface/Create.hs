@@ -660,7 +660,7 @@ extractClassDecl :: Name -> [Located Name] -> LSig Name -> LSig Name
 extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
   L _ (HsForAllTy expl tvs (L _ preds) ty) ->
     L pos (TypeSig lname (noLoc (HsForAllTy expl tvs (lctxt preds) ty)))
-  _ -> L pos (TypeSig lname (noLoc (mkImplicitHsForAllTy (lctxt []) ltype)))
+  _ -> L pos (TypeSig lname (noLoc (HsForAllTy Implicit emptyHsQTvs (lctxt []) ltype)))
   where
     lctxt = noLoc . ctxt
     ctxt preds = nlHsTyConApp c (map toTypeNoLoc tvs0) : preds
