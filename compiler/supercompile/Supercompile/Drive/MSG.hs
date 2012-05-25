@@ -15,6 +15,7 @@ import Supercompile.Evaluator.Syntax
 
 import qualified Supercompile.GHC as GHC
 import Supercompile.Utilities hiding (guard)
+import Supercompile.StaticFlags
 
 import qualified CoreSyn as Core
 
@@ -448,15 +449,14 @@ msgMatch inst_mtch ((_, Heap h_l _, rn_l, k_l), (heap@(Heap _ ids), k, qa), (dee
   , flip all (M.toList h_l) $ \(x_l, hb_l) -> case heapBindingLambdaBoundness hb_l of
                                                 Nothing -> False
                                                 Just gen_l -> mayInstantiate inst_mtch gen_l || case () of
-                                                                      () | isCoVar x_l, Just q <- lookupVarEnv rn_l_inv_qs x_l, let co_r = lookupCoVarSubst rn_r q -> maybe False heap_non_instantiating (getCoVar_maybe co_r)
+                                                                      () | isCoVar x_l, Just q <- lookupVarEnv rn_l_inv_qs x_l, let co_r = lookupCoVarSubst rn_r q -> tYPE_GEN || maybe False heap_non_instantiating (getCoVar_maybe co_r)
                                                                          | isId    x_l, Just x <- lookupVarEnv rn_l_inv_xs x_l, let x_r  = renameId rn_r x         -> heap_non_instantiating x_r
-                                                                         | isTyVar x_l, Just a <- lookupVarEnv rn_l_inv_as x_l, let ty_r = lookupTyVarSubst rn_r a -> isJust (getTyVar_maybe ty_r)
+                                                                         | isTyVar x_l, Just a <- lookupVarEnv rn_l_inv_as x_l, let ty_r = lookupTyVarSubst rn_r a -> tYPE_GEN || isJust (getTyVar_maybe ty_r)
                                                                          -- This case occurs when a heap binding is pulled in on one side by "sucks" but without
                                                                          -- being paired with one on the other side (e.g. 'x' in the example above). If this happens
                                                                          -- we'll just say True, though we'll probably reject the instantiation eventuall when we come
                                                                          -- to the binding on this side that caused the pulling-in to happen.
                                                                          | otherwise -> True
-                                                                         -- TODO: perhaps type/covar instantiation should be unconditonally allowed?
                                                                          -- TODO: what if we "instantiate" with some IdInfo on the left? Should that be disallowed?
   = Just (RightIsInstance heap_r (composeRenamings rn_l_inv rn_r) k_r)
 

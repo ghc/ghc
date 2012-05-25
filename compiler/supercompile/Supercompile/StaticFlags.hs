@@ -201,6 +201,8 @@ gENERALISATION = parseEnum "-fsupercompiler-generalisation" StackFirst [("none",
 oCCURRENCE_GENERALISATION :: Bool
 oCCURRENCE_GENERALISATION = not $ lookUp $ fsLit "-fsupercompiler-no-occurrence-generalisation"
 
+tYPE_GEN :: Bool
+tYPE_GEN = True
 
 eVALUATE_PRIMOPS :: Bool
 eVALUATE_PRIMOPS = not $ lookUp $ fsLit "-fsupercompiler-no-primops"
