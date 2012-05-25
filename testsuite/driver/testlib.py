@@ -97,7 +97,7 @@ def _reqlib( opts, lib ):
         if have_subprocess:
             # By preference we use subprocess, as the alternative uses
             # /dev/null which mingw doesn't have.
-            p = subprocess.Popen([config.ghc_pkg, '--no-user-package-conf', 'describe', lib],
+            p = subprocess.Popen([config.ghc_pkg, '--no-user-package-db', 'describe', lib],
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
             # read from stdout and stderr to avoid blocking due to
@@ -1668,15 +1668,6 @@ def if_verbose_dump( n, f ):
             print open(f).read()
         except:
             print ''
-
-# Guess flags suitable for the compiler.
-def guess_compiler_flags():
-   if config.compiler_type == 'ghc':
-       return ['-fforce-recomp', '-dcore-lint', '-no-user-package-conf']
-   elif config.compiler_type == 'nhc':
-       return ['-an-nhc-specific-flag']
-   else:
-        return []
 
 def rawSystem(cmd_and_args):
     # We prefer subprocess.call to os.spawnv as the latter

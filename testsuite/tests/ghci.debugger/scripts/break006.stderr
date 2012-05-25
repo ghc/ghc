@@ -6,8 +6,9 @@
     Note: there are several potential instances:
       instance Show Double -- Defined in `GHC.Float'
       instance Show Float -- Defined in `GHC.Float'
-      instance Show () -- Defined in `GHC.Show'
-      ...plus 24 others
+      instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
+        -- Defined in `GHC.Real'
+      ...plus 26 others
     In a stmt of an interactive GHCi command: print it
 
 <interactive>:8:1:
@@ -17,6 +18,7 @@
     Note: there are several potential instances:
       instance Show Double -- Defined in `GHC.Float'
       instance Show Float -- Defined in `GHC.Float'
-      instance Show () -- Defined in `GHC.Show'
-      ...plus 24 others
+      instance (Integral a, Show a) => Show (GHC.Real.Ratio a)
+        -- Defined in `GHC.Real'
+      ...plus 26 others
     In a stmt of an interactive GHCi command: print it

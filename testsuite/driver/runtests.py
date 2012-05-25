@@ -10,6 +10,17 @@ import platform
 import time
 import re
 
+# We don't actually need subprocess in runtests.py, but:
+# * We do need it in testlibs.py
+# * We can't import testlibs.py until after we have imported ctypes
+# * If we import ctypes before subprocess on cygwin, then sys.exit(0)
+#   says "Aborted" and we fail with exit code 134.
+# So we import it here first, so that the testsuite doesn't appear to fail.
+try:
+    import subprocess
+except:
+    pass
+
 from testutil import *
 from testglobals import *
 

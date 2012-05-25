@@ -1,0 +1,10 @@
+
+T6123.hs:10:14:
+    Couldn't match expected type `a0' with actual type `Id a0'
+    The type variable `a0' is ambiguous
+    Possible cause: the monomorphism restriction applied to the following:
+      cundefined :: a0 (bound at T6123.hs:10:1)
+    Probable fix: give these definition(s) an explicit type signature
+                  or use -XNoMonomorphismRestriction
+    In the expression: cid undefined
+    In an equation for `cundefined': cundefined = cid undefined

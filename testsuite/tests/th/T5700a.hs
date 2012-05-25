@@ -10,6 +10,6 @@ mkC :: Name -> Q [Dec]
 mkC n = return
   [InstanceD [] (AppT (ConT ''C) (ConT n))
     [ FunD 'inlinable [Clause [WildP] (NormalB (ConE '())) []],
-      PragmaD (InlineP 'inlinable (InlineSpec True False Nothing))    
+      PragmaD (InlineP 'inlinable (InlineSpec Inline False Nothing))    
     ] 
   ]

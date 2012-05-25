@@ -144,7 +144,7 @@ test('T2386', extra_clean(['T2386_Lib.hi', 'T2386_Lib.o']),
 	      run_command,
 	      ['$MAKE -s --no-print-directory T2386'] )
 
-test('T2685', extra_clean(['T2685a.hi','T2685a.o']), 
+test('T2685', extra_clean(['T2685a.hi','T2685a.o']),
               multimod_compile, ['T2685','-v0'])
 
 test('TH_sections', normal, compile, ['-v0'])
@@ -166,10 +166,10 @@ test('T3572', normal, compile_and_run, [''])
 test('T3100', normal, compile, ['-v0'])
 test('T3920', normal, compile_and_run, ['-v0'])
 
-test('T3600', extra_clean(['T3600a.hi','T3600a.o']), 
+test('T3600', extra_clean(['T3600a.hi','T3600a.o']),
               multimod_compile, ['T3600','-v0'])
 test('T3845', normal, compile, ['-v0'])
-test('T3899', extra_clean(['T3899a.hi','T3899a.o']), 
+test('T3899', extra_clean(['T3899a.hi','T3899a.o']),
               multimod_compile, ['T3899','-v0 -ddump-splices -dsuppress-uniques'])
 test('T4056', normal, compile, ['-v0'])
 test('T4188', normal, compile, ['-v0'])
@@ -200,12 +200,12 @@ test('T5358', normal, compile_fail, [''])
 test('T5379', normal, compile_and_run, [''])
 test('T5404', normal, compile, ['-v0'])
 test('T5410', normal, compile_and_run, ['-v0'])
-test('TH_lookupName', 
+test('TH_lookupName',
      extra_clean(['TH_lookupName_Lib.hi', 'TH_lookupName_Lib.o']),
      multimod_compile_and_run,
      ['TH_lookupName.hs', ''])
 test('T5452', normal, compile, ['-v0'])
-test('T5434', extra_clean(['T5434a.hi','T5434a.o']), 
+test('T5434', extra_clean(['T5434a.hi','T5434a.o']),
               multimod_compile, ['T5434','-v0 -Wall'])
 test('T5508', normal, compile, ['-v0 -ddump-splices'])
 test('TH_Depends',
@@ -213,17 +213,24 @@ test('TH_Depends',
                    'TH_Depends_external.txt'])],
      run_command,
      ['$MAKE -s --no-print-directory TH_Depends'])
-test('T5597', extra_clean(['T5597a.hi','T5597a.o']), 
+test('T5597', extra_clean(['T5597a.hi','T5597a.o']),
               multimod_compile, ['T5597','-v0'])
-test('T5665', extra_clean(['T5665a.hi','T5665a.o']), 
+test('T5665', extra_clean(['T5665a.hi','T5665a.o']),
               multimod_compile, ['T5665','-v0'])
-test('T5700', extra_clean(['T5700a.hi','T5700a.o']), 
+test('T5700', extra_clean(['T5700a.hi','T5700a.o']),
               multimod_compile, ['T5700','-v0 -ddump-splices'])
 test('T5721', normal, compile, ['-v0'])
+
+test('TH_PromotedTuple', normal, compile, ['-v0 -ddump-splices'])
+test('TH_PromotedList', normal, compile, ['-v0'])
+test('TH_Promoted1Tuple', normal, compile_fail, ['-v0'])
+test('TH_RichKinds', normal, compile, ['-v0'])
+test('TH_RichKinds2', normal, compile, ['-v0'])
+
 test('T1541', normal, compile, ['-v0'])
 test('T5883', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T5882', normal, compile, ['-v0'])
-test('T5886', extra_clean(['T5886a.hi','T5886a.o']), 
+test('T5886', extra_clean(['T5886a.hi','T5886a.o']),
               multimod_compile, ['T5886','-v0'])
 test('T4135', normal, compile, ['-v0'])
 test('T5971', normal, compile_fail, ['-v0 -dsuppress-uniques'])

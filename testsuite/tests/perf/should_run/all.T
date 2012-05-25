@@ -50,7 +50,9 @@ if config.arch == 'i386':
 else:
    sse2_opts = ''
 
-test('T4321', omit_ways(['ghci']), compile_and_run, ['-O ' + sse2_opts])
+test('T4321',
+     [omit_ways(['ghci']), expect_broken(4321)],
+     compile_and_run, ['-O ' + sse2_opts])
 
 test('T3736',
      extra_clean(['T3736.speed.f32']),

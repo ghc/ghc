@@ -4,7 +4,7 @@ module GHCBug where
 
 import Control.Applicative as Ap
 import Control.Monad (MonadPlus, mplus, mzero)
-import Control.Monad.Identity (Identity, runIdentity)
+import Data.Functor.Identity (Identity, runIdentity)
 
 newtype PrintRuleInterp v = MkPRI { printRule_ :: Int -> String }
 class Test p where
