@@ -25,12 +25,15 @@ import qualified Supercompile.Termination.Combinators as Combinators
 import Supercompile.StaticFlags
 import Supercompile.Utilities
 
+import Type       (typeSize, isTyVarTy)
+import Coercion   (coercionSize, getCoVar_maybe)
 import Var        (varName)
 import Id         (mkLocalId)
 import MkId       (nullAddrId)
 import Name       (Name, mkSystemVarName, getOccString)
 import FastString (mkFastString)
 import Util       (sndOf3)
+import VarEnv     (varEnvElts)
 
 import Control.Monad (join)
 
@@ -122,9 +125,18 @@ newtype FulfilmentState = FS {
 fulfill :: (Deeds, FVedTerm) -> FulfilmentState -> MemoState -> ((Deeds, FVedTerm), FulfilmentState, MemoState)
 fulfill (deeds, e_body) fs ms
   = ((deeds, applyAbsVars (fun p) Nothing (abstracted p)),
-     FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : fulfilments fs },
+     refulfill e_body fs p,
      ms { promises = appendHead (p:children) promises' })
   where (p, children) `Car` promises' = promises ms
+
+-- NB: we filter out from the existing fulfilments because if we are doing type generalisation during
+-- matching then we will fulfill the same promise twice. Either:
+--  1. We fulfil an on-stack promise from the type generalisation, and then later when unrolling the stack
+--  2. OR we fulfil a promise from supercompilation, and then later overwrite it when we find a type generalisation
+--
+-- FIXME: should prefer the existing promise in case 1 for slightly better code.
+refulfill :: FVedTerm -> FulfilmentState -> Promise -> FulfilmentState
+refulfill e_body fs p = FS { fulfilments = (fun p, absVarLambdas (abstracted p) e_body) : filter ((/= fun p) . fst) (fulfilments fs) }
 
 
 type StopCount = Int
@@ -284,8 +296,8 @@ sc' mb_h state = {-# SCC "sc'" #-} case mb_h of
     trce1 state = pPrintFullState quietStatePrettiness state $$ pPrintFullState quietStatePrettiness (snd (reduceForMatch state))
 
     -- NB: we could try to generalise against all embedded things in the history, not just one. This might make a difference in rare cases.
-    my_generalise splt  = liftM ((,) True)  . insertTagsM . splt
-    my_split      state = liftM ((,) False) . insertTagsM . split state
+    my_generalise splt  = liftM ((,) True)  . (>>= insertTagsM) . splt
+    my_split      state = liftM ((,) False) . (>>= insertTagsM) . split state
 
 tryTaG, tryMSG :: State -> State
                -> Maybe ((State -> ScpM (Deeds, Out FVedTerm)) -> ScpM (ResidTags, Deeds, Out FVedTerm),
@@ -309,13 +321,11 @@ bothWays :: (a -> a -> Maybe b)
          -> a -> a -> Maybe (b, b)
 bothWays f shallow_state state = zipMaybeWithEqual "bothWays" (,) (f state shallow_state) (f shallow_state state)
 
-insertTagsM :: ScpM (ResidTags, a, b) -> ScpM (a, b)
-insertTagsM mx = do
-  (resid_tags, deeds, e') <- mx
+insertTagsM :: (ResidTags, a, b) -> ScpM (a, b)
+insertTagsM (resid_tags, deeds, e') =
   ScpM $ StateT $ \s -> ReaderT $ \env -> let resid_tags' = scpResidTags s `plusResidTags` resid_tags
                                           in trace (tagSummary (scpTagAnnotations env) 1 30 resid_tags' ++ "\n" ++ childrenSummary (scpParentChildren s)) $
-                                             return ((), s { scpResidTags = resid_tags' })
-  return (deeds, e')
+                                             return ((deeds, e'), s { scpResidTags = resid_tags' })
 
 -- Note [Prevent rollback loops by only rolling back when generalising]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -436,14 +446,86 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
         --
         -- BUT we have to be so so careful if we do this that we don't introduce accidental extra loops.
 
+        -- Note [Type generalisation and rollback]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        --
+        -- When doing type generalisation, we can end up in the situation where a fulfilled promise in another part of the tree
+        -- refers to an as-yet unfulfilled promise we place newly onto the stack. If we then rollback that promise, what do we
+        -- do with that overwritten fulfilment?
+        --
+        -- This problem doesn't occur without type generalisation because the h functions mentioned freely by the fulfilments/
+        -- partial fulfilments (latent on the stack) at the time we made the promise we are rolling back to can *only* mention
+        -- promises that we have already made!
+        --
+        -- WITH type generalisation we go and modify those existing fulfilments to point into the portion of the stack which
+        -- is in danger of rollback.
+        --
+        -- A formalisation of this idea is below:
+        --
+        -- Imagine there is a quantity "time" which ticks forward by at least 1 unit whenever a new promise{-/fulfilment-} occurs. Call:
+        --  * tp(h) the time at which h was promised
+        -- {-
+        --  * tf(h) the time at which h was fulfilled
+        -- -}
+        --  * fvs(h)(t) the h-function FVs for the fulfilment for h as of time t
+        --
+        -- Then we have:
+        --  1. P-before-F-use: if h' \elem fvs(h)(t) then tp(h') <= t
+        -- {-
+        --  2. Monotonicity: fvs(h)(t) `subVarSet` fvs(h)(t+1)
+        --  3. Fix: if t >= tf(h) then fvs(h)(t) = fvs(h)(tf(h))
+        --
+        -- Due to monotonicity and fix, we can usefully define fvs(h) = fvs(h)(tf(h))
+        -- where if h' \elem fvs(h)(t) then h' \elem fvs(h)
+        --
+        --  3. P-before-F: tp(h) < tf(h)
+        --  4. Depth-first: if h' \elem fvs(h) and tf(h') > tf(h) then tp(h') < tp(h)
+        -- 
+        -- We can derive a simple lemma immediately:
+        --  3. Dependent-P-before-F: if h' \elem fvs(h) then tp(h') < tf(h)
+        --     Proof: by cases on tf(h') `compare` tf(h):
+        --      Case (==): then h == h' and by P-before-F, (tp(h') = tp(h)) < tf(h)
+        --      Case (<): using P-before-F, tp(h') < tf(h') < tf(h)
+        --      Case (>): tf(h') > tf(h) so using depth-first and P-before-F, tp(h') < tp(h) < tf(h)
+        -- -}
+        --
+        -- Rollback to tp(h) from time t (tp(h) < t, tf(h) > t) relies on:
+        --  forall h'. tp(h') < tp(h) ==> if h'' \elem fvs(h')(t) then tp(h'') <= tp(h)
+        -- Because h' is *not* on the top of the stack at t, we know that we don't *add* any new FVs to it:
+        --  fvs(h')(t) `subVarSet` fvs(h')(tp(h))
+        -- (In fact it will be completely invariant, but it is more general to insist only on shrinkage). It follows that since:
+        --  h'' \elem fvs(h')(t)
+        -- Then by the subset relation:
+        --  h'' \elem fvs(h')(tp(h))
+        -- And so by P-before-F-use:
+        --  tp(h'') <= tp(h)
+        -- Which is what we wanted.
+        --
+        --
+        -- All that said, what are we going to do about this problem?
+        --  * It would be safe to only do type generalisation if the older promise is on the stack, because in that case
+        --    we could easily code it to only add normal fulfilments to the state if one isn't already present, and it wouldn't
+        --    cause any rollback issues
+        --  * But if it's on the stack anyway, we would get better results by just rolling back immediately with the normal MSG
+        --    doing the work of dumping the type information for us (albeit this will likely immediately terminate b/c types aren't tagged)
+        --
+        -- I think the simplest thing to do is just treat it as a normal instance match, and not worry about overwriting the older code!
+
         -- FIXME: this code is all super-horrible how
         let remember what = (do { traceRenderM ">sc {" (fun p, stateTags state, PrettyDoc (pPrintFullState quietStatePrettiness state))
                                 ; res <- addParentM p (what (Just (getOccString (varName (fun p))))) state
                                 ; traceRenderM "<sc }" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), res)
                                 ; fulfillM res }, s { scpMemoState = ms' })
               where (ms', p) = promise (scpMemoState s) (state, reduced_state)
-        in case fmap (\(exact, (remaining_deeds, heap_inst, rn_lr, p, k_inst)) -> (p, exact, instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt)) $
-                     bestChoice [ (remaining_deeds, heap_inst, rn_lr, p, k_inst)
+        in case fmap (\(exact, (p, mr)) -> case mr of
+                       RightIsInstance heap_inst rn_lr k_inst -> (exact, do { traceRenderM ("=sc" ++ if exact then "" else "(inst)") (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
+                                                                            ; stuff <- instanceSplit (remaining_deeds, heap_inst, k_inst, applyAbsVars (fun p) (Just rn_lr) (abstracted p)) memo_opt
+                                                                            ; insertTagsM stuff })
+                         where
+                          -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
+                          Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
+                       RightGivesTypeGen rn_l s rn_r -> error "FIXME: RightGivesTypeGen unimplemented") $
+                     bestChoice [ (p, mr)
                                 | let (parented_ps, unparented_ps) = trainToList (promises (scpMemoState s))
                                 , (p, is_ancestor, common_h_vars) <- [ (p_sibling, fun p_parent == fun p_sibling, common_h_vars)
                                                                      | (p_parent, p_siblings) <- parented_ps
@@ -458,36 +540,48 @@ memo opt init_state = {-# SCC "memo'" #-} memo_opt init_state
                                 --      mm = MM { matchInstanceMatching = inst_mtch, matchCommonHeapVars = common_h_vars }
                                 --, Just (heap_inst, k_inst, rn_lr) <- [-- (\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res   else   pprTraceSC "match!" (ppr (fun p)) res) $
                                 --                                      match' mm (meaning p) reduced_state]
-                                , Just (RightIsInstance heap_inst rn_lr k_inst) <- [msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch]
-                                , let -- This will always succeed because the state had deeds for everything in its heap/stack anyway:
-                                      Just remaining_deeds = claimDeeds (releaseStateDeed state) (heapSize heap_inst + stackSize k_inst)
-                                  -- FIXME: prefer "more exact" matches
+                                , Just mr <- [msgMaybe mm (meaning p) reduced_state >>= msgMatch inst_mtch]
+                                {-
                                 , if dumped p
                                    then pprTraceSC "tieback-to-dumped" (ppr (fun p)) False
                                    else True
-                                ] of Just (p, exact, res) -> pure $ if exact then (it, s) else remember (\_ _ -> liftM ((,) False) it)
-                                       where it = do { traceRenderM "=sc" (fun p, PrettyDoc (pPrintFullState quietStatePrettiness state), PrettyDoc (pPrintFullState quietStatePrettiness reduced_state), PrettyDoc (pPrintFullState quietStatePrettiness (meaning p)) {-, res-})
-                                                     ; insertTagsM res }
-                                     Nothing              | CheckOnly <- memo_how
-                                                          -> pure (liftM snd $ opt Nothing state, s)
-                                                          | otherwise
-                                                          -> pure (remember opt)
+                                -}
+                                ] of Just (exact, res) -> pure $ if exact then (res, s) else remember (\_ _ -> liftM ((,) False) res)
+                                     Nothing           | CheckOnly <- memo_how
+                                                       -> pure (liftM snd $ opt Nothing state, s)
+                                                       | otherwise
+                                                       -> pure (remember opt)
       where (state_did_reduce, reduced_state) = reduceForMatch state
             
-            bestChoice :: [(Deeds, Heap, Renaming, Promise, Stack)]
-                       -> Maybe (Bool, (Deeds, Heap, Renaming, Promise, Stack))
+            -- Prefer more exact matches (see Note [Instance matching and loops]: it is essential to choose exact matches over instances)
+            bestChoice :: [(Promise, MSGMatchResult)]
+                       -> Maybe (Bool, (Promise, MSGMatchResult))
             bestChoice = go Nothing
               where go mb_best [] = fmap ((,) False) mb_best
-                    go mb_best (it:rest)
-                      | mostSpecific it = Just (True, it) -- Stop early upon exact match (as an optimisation)
-                      | otherwise       = go (Just (maybe it (\best -> if it `moreSpecific` best then it else best) mb_best)) rest
+                    go mb_best (this@(_, mr):rest)
+                      | mostSpecific mr = Just (True, this) -- Stop early upon exact match (as an optimisation)
+                      | otherwise       = go (Just (maybe this (\best@(_, best_mr) -> if mr `moreSpecific` best_mr then this else best) mb_best)) rest
 
-                    mostSpecific :: (a, Heap, b, c, Stack) -> Bool
-                    mostSpecific (_, Heap h _, _, _, k) = isPureHeapEmpty h && isStackEmpty k
+                    mostSpecific :: MSGMatchResult -> Bool
+                    mostSpecific (RightIsInstance (Heap h _) rn k) = isPureHeapEmpty h && isStackEmpty k && isEmptyRenaming rn
+                    mostSpecific (RightGivesTypeGen _ _ _)         = False
 
-                    moreSpecific :: (a, Heap, b, c, Stack) -> (a, Heap, b, c, Stack) -> Bool
-                    moreSpecific (_, Heap h_l _, _, _, k_l) (_, Heap h_r _, _, _, k_r)
-                      = (pureHeapSize h_l + stackSize k_l) <= (pureHeapSize h_r + stackSize k_r) -- Just a heuristic!
+                    moreSpecific :: MSGMatchResult -> MSGMatchResult -> Bool
+                    -- Just a heuristic to decide between different instance matches: try to discard *least* stuff
+                    moreSpecific (RightIsInstance (Heap h_l _) _ k_l) (RightIsInstance (Heap h_r _) _ k_r)
+                      = (pureHeapSize h_l + stackSize k_l) <= (pureHeapSize h_r + stackSize k_r)
+                    -- Another heuristic: try to discard *most* type information (this is only more specific in the sense that it is more specific about what can be thrown away)
+                    moreSpecific (RightGivesTypeGen _ _ rn_l) (RightGivesTypeGen _ _ rn_r)
+                      = renamingSize rn_r <= renamingSize rn_l
+                    -- Prefer instance matches to type generalisation (don't have a good sense about what is best here):
+                    moreSpecific (RightIsInstance _ _ _) _ = True
+                    moreSpecific _ (RightIsInstance _ _ _) = False
+
+                    renamingSize (_, tv_subst, co_subst) = sumMap typeSize (varEnvElts tv_subst) + sumMap coercionSize (varEnvElts co_subst)
+
+                    -- TODO: it might be OK to insist the incoming renaming is invertible, but this should definitely work:
+                    isEmptyRenaming (_, tv_subst, co_subst) = all isTyVarTy (varEnvElts tv_subst) && all isCoVarCo (varEnvElts co_subst)
+                    isCoVarCo = isJust . getCoVar_maybe
 
             -- The idea here is to prevent the supercompiler from building loops when doing instance matching. Without
             -- this, we tend to do things like:
