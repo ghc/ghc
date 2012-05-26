@@ -34,7 +34,8 @@
 // separately, using getrusage() and gettimeofday() respectively
 
 #ifdef darwin_HOST_OS
-static double timer_scaling_factor_ns = 0.0;
+static uint64_t timer_scaling_factor_numer = 0;
+static uint64_t timer_scaling_factor_denom = 0;
 #endif
 
 void initializeTimer()
@@ -42,7 +43,8 @@ void initializeTimer()
 #ifdef darwin_HOST_OS
     mach_timebase_info_data_t info;
     (void) mach_timebase_info(&info);
-    timer_scaling_factor_ns = (double)info.numer / (double)info.denom * 1e9;
+    timer_scaling_factor_numer = (uint64_t)info.numer;
+    timer_scaling_factor_denom = (uint64_t)info.denom;
 #endif
 }
 
@@ -87,7 +89,7 @@ StgWord64 getMonotonicNSec(void)
            (StgWord64)ts.tv_nsec;
 #elif defined(darwin_HOST_OS)
     uint64_t time = mach_absolute_time();
-    return (double)time * timer_scaling_factor_ns;
+    return (time * timer_scaling_factor_numer) / timer_scaling_factor_denom;
 #else
     struct timeval tv;
 
