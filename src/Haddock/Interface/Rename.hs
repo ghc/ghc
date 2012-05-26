@@ -97,6 +97,10 @@ instance Monad (GenRnM n) where
 instance Functor (GenRnM n) where
   fmap f x = do a <- x; return (f a)
 
+instance Applicative (GenRnM n) where
+  pure = return
+  (<*>) = ap
+
 returnRn :: a -> GenRnM n a
 returnRn a   = RnM (const (a,[]))
 thenRn :: GenRnM n a -> (a -> GenRnM n b) -> GenRnM n b
@@ -144,12 +148,12 @@ renameExportItems = mapM renameExportItem
 
 renameDocForDecl :: DocForDecl Name -> RnM (DocForDecl DocName)
 renameDocForDecl (doc, fnArgsDoc) =
-  (,) `fmap` renameDocumentation doc `ap` renameFnArgsDoc fnArgsDoc
+  (,) <$> renameDocumentation doc <*> renameFnArgsDoc fnArgsDoc
 
 
 renameDocumentation :: Documentation Name -> RnM (Documentation DocName)
 renameDocumentation (Documentation mDoc mWarning) =
-  Documentation `fmap` mapM renameDoc mDoc `ap` mapM renameDoc mWarning
+  Documentation <$> mapM renameDoc mDoc <*> mapM renameDoc mWarning
 
 
 renameLDocHsSyn :: LHsDocString -> RnM LHsDocString
