@@ -88,7 +88,8 @@ createInterface tm flags modMap instIfaceMap = do
 
   liftErrMsg $ warnAboutFilteredDecls mdl decls
 
-  exportItems <- mkExportItems modMap mdl warnings gre exportedNames decls maps exports
+  let warningMap = mkWarningMap warnings gre exportedNames
+  exportItems <- mkExportItems modMap mdl warningMap gre exportedNames decls maps exports
                    instances instIfaceMap dflags
 
   let visibleNames = mkVisibleNames exportItems opts
@@ -163,18 +164,14 @@ lookupModuleDyn dflags Nothing mdlName =
 -- Warnings
 -------------------------------------------------------------------------------
 
+type WarningMap = DocMap Name
 
-lookupWarning :: Warnings -> GlobalRdrEnv -> Name -> Maybe (Doc id)
-lookupWarning NoWarnings  _ _ = Nothing
-lookupWarning (WarnAll _) _ _ = Nothing
-lookupWarning (WarnSome ws) gre name =
-  -- there is at most one warning for each name, so it's fine to use
-  -- listToMaybe here
-  listToMaybe [warnToDoc w
-              | (occ, w) <- ws
-              , elt <- lookupGlobalRdrEnv gre occ
-              , gre_name elt == name
-              ]
+mkWarningMap :: Warnings -> GlobalRdrEnv -> [Name] -> WarningMap
+mkWarningMap NoWarnings  _ _ = M.empty
+mkWarningMap (WarnAll _) _ _ = M.empty
+mkWarningMap (WarnSome ws) gre exps = M.fromList
+      [ (n, warnToDoc w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
+      , let n = gre_name elt, n `elem` exps ]
 
 
 moduleWarning :: Warnings -> Maybe (Doc id)
@@ -454,7 +451,7 @@ collectDocs = go Nothing []
 mkExportItems
   :: IfaceMap
   -> Module             -- this module
-  -> Warnings
+  -> WarningMap
   -> GlobalRdrEnv
   -> [Name]             -- exported names (orig)
   -> [LHsDecl Name]
@@ -555,7 +552,7 @@ mkExportItems
                    let subs_ = [ (n, noDocForDecl) | (n, _, _) <- subordinates (unLoc decl) ]
                    return [ mkExportDecl t decl (noDocForDecl, subs_) ]
                 Just iface ->
-                   return [ mkExportDecl t decl (lookupDocs t warnings gre (instDocMap iface) (instArgMap iface) (instSubMap iface)) ]
+                   return [ mkExportDecl t decl (lookupDocs t warnings (instDocMap iface) (instArgMap iface) (instSubMap iface)) ]
 
         _ -> return []
 
@@ -575,9 +572,9 @@ mkExportItems
     findDecl :: Name -> ([LHsDecl Name], (DocForDecl Name, [(Name, DocForDecl Name)]))
     findDecl n
       | m == thisMod, Just ds <- M.lookup n declMap =
-          (ds, lookupDocs n warnings gre docMap argMap subMap)
+          (ds, lookupDocs n warnings docMap argMap subMap)
       | Just iface <- M.lookup m modMap, Just ds <- M.lookup n (ifaceDeclMap iface) =
-          (ds, lookupDocs n warnings gre (ifaceDocMap iface) (ifaceArgMap iface) (ifaceSubMap iface))
+          (ds, lookupDocs n warnings (ifaceDocMap iface) (ifaceArgMap iface) (ifaceSubMap iface))
       | otherwise = ([], (noDocForDecl, []))
       where
         m = nameModule n
@@ -602,15 +599,15 @@ hiValExportItem name doc = do
 
 
 -- | Lookup docs for a declaration from maps.
-lookupDocs :: Name -> Warnings -> GlobalRdrEnv -> DocMap Name -> ArgMap Name -> SubMap -> (DocForDecl Name, [(Name, DocForDecl Name)])
-lookupDocs n warnings gre docMap argMap subMap =
+lookupDocs :: Name -> WarningMap -> DocMap Name -> ArgMap Name -> SubMap -> (DocForDecl Name, [(Name, DocForDecl Name)])
+lookupDocs n warnings docMap argMap subMap =
   let lookupArgDoc x = M.findWithDefault M.empty x argMap in
   let doc = (lookupDoc n, lookupArgDoc n) in
   let subs = M.findWithDefault [] n subMap in
   let subDocs = [ (s, (lookupDoc s, lookupArgDoc s)) | s <- subs ] in
   (doc, subDocs)
   where
-    lookupDoc name = Documentation (M.lookup name docMap) (lookupWarning warnings gre name)
+    lookupDoc name = Documentation (M.lookup name docMap) (M.lookup name warnings)
 
 
 -- | Return all export items produced by an exported module. That is, we're
@@ -629,7 +626,7 @@ lookupDocs n warnings gre docMap argMap subMap =
 moduleExports :: Module           -- ^ Module A
               -> ModuleName       -- ^ The real name of B, the exported module
               -> DynFlags         -- ^ The flags used when typechecking A
-              -> Warnings
+              -> WarningMap
               -> GlobalRdrEnv     -- ^ The renaming environment used for A
               -> [Name]           -- ^ All the exports of A
               -> [LHsDecl Name]   -- ^ All the declarations in A
@@ -676,7 +673,7 @@ moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfa
 -- (For more information, see Trac #69)
 
 
-fullModuleContents :: DynFlags -> Warnings -> GlobalRdrEnv -> Maps -> [LHsDecl Name] -> ErrMsgGhc [ExportItem Name]
+fullModuleContents :: DynFlags -> WarningMap -> GlobalRdrEnv -> Maps -> [LHsDecl Name] -> ErrMsgGhc [ExportItem Name]
 fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap) decls =
   liftM catMaybes $ mapM mkExportItem (expandSig decls)
   where
@@ -702,12 +699,12 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap) decls =
     mkExportItem (L _ (ValD d))
       | name:_ <- collectHsBindBinders d, Just [L _ (ValD _)] <- M.lookup name declMap =
           -- Top-level binding without type signature.
-          let (doc, _) = lookupDocs name warnings gre docMap argMap subMap in
+          let (doc, _) = lookupDocs name warnings docMap argMap subMap in
           fmap Just (hiValExportItem name doc)
       | otherwise = return Nothing
     mkExportItem decl
       | name:_ <- getMainDeclBinder (unLoc decl) =
-        let (doc, subs) = lookupDocs name warnings gre docMap argMap subMap in
+        let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
         return $ Just (ExportDecl decl doc subs [])
       | otherwise = return Nothing
 
