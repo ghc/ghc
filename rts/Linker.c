@@ -1290,7 +1290,7 @@ typedef struct _RtsSymbolVal {
 
 
 // 64-bit support functions in libgcc.a
-#if defined(__GNUC__) && SIZEOF_VOID_P <= 4
+#if defined(__GNUC__) && SIZEOF_VOID_P <= 4 && !defined(_ABIN32)
 #define RTS_LIBGCC_SYMBOLS                             \
       SymI_NeedsProto(__divdi3)                        \
       SymI_NeedsProto(__udivdi3)                       \
