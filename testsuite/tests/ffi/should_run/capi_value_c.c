@@ -1,4 +1,4 @@
 
 #include "capi_value_c.h"
 
-int i = 23;
+const int i = 23;
