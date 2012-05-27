@@ -611,7 +611,7 @@ schedulePreLoop(void)
 {
   // initialisation for scheduler - what cannot go into initScheduler()  
 
-#if defined(mingw32_HOST_OS) && !defined(GhcUnregisterised)
+#if defined(mingw32_HOST_OS) && !defined(USE_MINIINTERPRETER)
     win32AllocStack();
 #endif
 }
