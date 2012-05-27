@@ -23,6 +23,7 @@ import TyCon      (TyCon, tyConName, tupleTyConSort, tupleTyConArity, isTupleTyC
 import DataCon    (dataConName, dataConWorkId, dataConTyCon)
 import PrelInfo   (wiredInThings, basicKnownKeyNames)
 import Id         (idName, isDataConWorkId_maybe)
+import CoreSyn    (DFunArg(..))
 import TysWiredIn
 import IfaceEnv
 import HscTypes
@@ -1180,13 +1181,21 @@ instance Binary IfaceBinding where
 instance Binary IfaceIdDetails where
     put_ bh IfVanillaId      = putByte bh 0
     put_ bh (IfRecSelId a b) = putByte bh 1 >> put_ bh a >> put_ bh b
-    put_ bh IfDFunId         = putByte bh 2
+    put_ bh (IfDFunId n)     = do { putByte bh 2; put_ bh n }
     get bh = do
         h <- getByte bh
         case h of
             0 -> return IfVanillaId
             1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
-            _ -> return IfDFunId
+            _ -> do { n <- get bh; return (IfDFunId n) }
+
+instance Binary (DFunArg IfaceExpr) where
+    put_ bh (DFunPolyArg  e) = putByte bh 0 >> put_ bh e
+    put_ bh (DFunLamArg i)   = putByte bh 1 >> put_ bh i
+    get bh = do { h <- getByte bh
+                ; case h of
+                    0 -> do { a <- get bh; return (DFunPolyArg a) }
+                    _ -> do { a <- get bh; return (DFunLamArg a) } }
 
 instance Binary IfaceIdInfo where
     put_ bh NoInfo      = putByte bh 0
