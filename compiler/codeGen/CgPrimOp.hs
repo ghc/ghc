@@ -404,12 +404,14 @@ emitPrimOp res WriteByteArrayOp_Word16    args _ = doWriteByteArrayOp (Just mo_W
 emitPrimOp res WriteByteArrayOp_Word32    args _ = doWriteByteArrayOp (Just mo_WordTo32) b32  res args
 emitPrimOp res WriteByteArrayOp_Word64    args _ = doWriteByteArrayOp Nothing b64  res args
 
--- Copying byte arrays
+-- Copying and setting byte arrays
 
 emitPrimOp [] CopyByteArrayOp [src,src_off,dst,dst_off,n] live =
     doCopyByteArrayOp src src_off dst dst_off n live
 emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] live =
     doCopyMutableByteArrayOp src src_off dst dst_off n live
+emitPrimOp [] SetByteArrayOp [ba,off,len,c] live =
+    doSetByteArrayOp ba off len c live
 
 -- Population count
 emitPrimOp [res] PopCnt8Op [w] live = emitPopCntCall res w W8 live
@@ -906,6 +908,18 @@ emitCopyByteArray copy src src_off dst dst_off n live = do
     dst_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB dst arrWordsHdrSize) dst_off
     src_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB src arrWordsHdrSize) src_off
     copy src dst dst_p src_p n live
+
+-- ----------------------------------------------------------------------------
+-- Setting byte arrays
+
+-- | Takes a 'MutableByteArray#', an offset into the array, a length,
+-- and a byte, and sets each of the selected bytes in the array to the
+-- character.
+doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                 -> StgLiveVars -> Code
+doSetByteArrayOp ba off len c live
+    = do p <- assignTemp $ cmmOffsetExpr (cmmOffsetB ba arrWordsHdrSize) off
+         emitMemsetCall p c len (CmmLit (mkIntCLit 1)) live
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
