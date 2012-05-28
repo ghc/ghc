@@ -345,7 +345,12 @@ opt_UF_CreationThreshold, opt_UF_UseThreshold :: Int
 opt_UF_DearOp, opt_UF_FunAppDiscount, opt_UF_DictDiscount :: Int
 opt_UF_KeenessFactor :: Float
 
-opt_UF_CreationThreshold = lookup_def_int "-funfolding-creation-threshold" (450::Int)
+opt_UF_CreationThreshold = lookup_def_int "-funfolding-creation-threshold" (750::Int)
+  -- This threshold must be reasonably high to take 
+  -- account of possible discounts.  
+  -- E.g. 450 is not enough in 'fulsom' for Interval.sqr to inline into Csg.calc
+  --      (The unfolding for sqr never makes it into the interface file.)
+
 opt_UF_UseThreshold      = lookup_def_int "-funfolding-use-threshold"      (60::Int)
 opt_UF_FunAppDiscount    = lookup_def_int "-funfolding-fun-discount"       (60::Int)
 
