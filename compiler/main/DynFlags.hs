@@ -66,6 +66,7 @@ module DynFlags (
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
         defaultLogAction,
+        defaultLogActionHPrintDoc,
         defaultFlushOut,
         defaultFlushErr,
 
@@ -114,6 +115,7 @@ import Constants        ( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic
 import Util
 import Maybes           ( orElse )
+import qualified Pretty
 import SrcLoc
 import FastString
 import Outputable
@@ -965,15 +967,22 @@ type LogAction = Severity -> SrcSpan -> PprStyle -> MsgDoc -> IO ()
 
 defaultLogAction :: LogAction
 defaultLogAction severity srcSpan style msg
- = case severity of
-   SevOutput -> printSDoc msg style
-   SevInfo   -> printErrs msg style
-   SevFatal  -> printErrs msg style
-   _         -> do hPutChar stderr '\n'
-                   printErrs (mkLocMessage severity srcSpan msg) style
-                   -- careful (#2302): printErrs prints in UTF-8, whereas
-                   -- converting to string first and using hPutStr would
-                   -- just emit the low 8 bits of each unicode char.
+    = case severity of
+      SevOutput -> printSDoc msg style
+      SevInfo   -> printErrs msg style
+      SevFatal  -> printErrs msg style
+      _         -> do hPutChar stderr '\n'
+                      printErrs (mkLocMessage severity srcSpan msg) style
+                      -- careful (#2302): printErrs prints in UTF-8, whereas
+                      -- converting to string first and using hPutStr would
+                      -- just emit the low 8 bits of each unicode char.
+    where printSDoc = defaultLogActionHPrintDoc stdout
+          printErrs = defaultLogActionHPrintDoc stderr
+
+defaultLogActionHPrintDoc :: Handle -> SDoc -> PprStyle -> IO ()
+defaultLogActionHPrintDoc h d sty
+    = do Pretty.printDoc Pretty.PageMode h (runSDoc d (initSDocContext sty))
+         hFlush h
 
 newtype FlushOut = FlushOut (IO ())
 
