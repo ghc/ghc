@@ -39,7 +39,7 @@ module Outputable (
         colBinder, bold, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
-        printOutput, hPrintDump, printDump,
+        hPrintDump, printDump,
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
@@ -318,9 +318,6 @@ ifPprDebug d = SDoc $ \ctx ->
 \end{code}
 
 \begin{code}
-printOutput :: Doc -> IO ()
-printOutput doc = Pretty.printDoc PageMode stdout doc
-
 printDump :: SDoc -> IO ()
 printDump doc = hPrintDump stdout doc
 
