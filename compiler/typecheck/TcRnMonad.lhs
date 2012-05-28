@@ -1216,7 +1216,8 @@ failIfM :: MsgDoc -> IfL a
 failIfM msg
   = do  { env <- getLclEnv
         ; let full_msg = (if_loc env <> colon) $$ nest 2 msg
-        ; liftIO (printErrs full_msg defaultErrStyle)
+        ; dflags <- getDynFlags
+        ; liftIO (log_action dflags SevFatal noSrcSpan defaultErrStyle full_msg)
         ; failM }
 
 --------------------
@@ -1243,15 +1244,15 @@ forkM_maybe doc thing_inside
                     -- Bleat about errors in the forked thread, if -ddump-if-trace is on
                     -- Otherwise we silently discard errors. Errors can legitimately
                     -- happen when compiling interface signatures (see tcInterfaceSigs)
-                      ifDOptM Opt_D_dump_if_trace
-                             (print_errs (hang (text "forkM failed:" <+> doc)
-                                             2 (text (show exn))))
+                      ifDOptM Opt_D_dump_if_trace $ do
+                          dflags <- getDynFlags
+                          let msg = hang (text "forkM failed:" <+> doc)
+                                       2 (text (show exn))
+                          liftIO $ log_action dflags SevFatal noSrcSpan defaultErrStyle msg
 
                     ; traceIf (text "} ending fork (badly)" <+> doc)
                     ; return Nothing }
         }}
-  where
-    print_errs sdoc = liftIO (printErrs sdoc defaultErrStyle)
 
 forkM :: SDoc -> IfL a -> IfL a
 forkM doc thing_inside
