@@ -85,7 +85,7 @@ readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
 readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     let printer :: SDoc -> IO ()
         printer = case traceBinIFaceReading of
-                      TraceBinIFaceReading -> \sd -> printSDoc sd defaultDumpStyle
+                      TraceBinIFaceReading -> \sd -> log_action dflags SevOutput noSrcSpan defaultDumpStyle sd
                       QuietBinIFaceReading -> \_ -> return ()
         wantedGot :: Outputable a => String -> a -> a -> IO ()
         wantedGot what wanted got =
