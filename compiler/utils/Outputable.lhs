@@ -39,7 +39,7 @@ module Outputable (
         colBinder, bold, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
-        printSDoc, printErrs, printOutput, hPrintDump, printDump,
+        printErrs, printOutput, hPrintDump, printDump,
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
@@ -318,12 +318,6 @@ ifPprDebug d = SDoc $ \ctx ->
 \end{code}
 
 \begin{code}
--- Unused [7/02 sof]
-printSDoc :: SDoc -> PprStyle -> IO ()
-printSDoc d sty = do
-  Pretty.printDoc PageMode stdout (runSDoc d (initSDocContext sty))
-  hFlush stdout
-
 -- I'm not sure whether the direct-IO approach of Pretty.printDoc
 -- above is better or worse than the put-big-string approach here
 printErrs :: SDoc -> PprStyle -> IO ()
