@@ -88,7 +88,7 @@ import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word
-import System.IO        ( Handle, stderr, stdout, hFlush )
+import System.IO        ( Handle, stdout, hFlush )
 import System.FilePath
 
 
