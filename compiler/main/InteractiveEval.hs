@@ -84,7 +84,6 @@ import GHC.Exts
 import Data.Array
 import Exception
 import Control.Concurrent
-import System.IO
 import System.IO.Unsafe
 
 -- -----------------------------------------------------------------------------
@@ -707,8 +706,9 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                         WARN(True, text (":print failed to calculate the "
                                            ++ "improvement for a type")) hsc_env
                Just subst -> do
-                 when (dopt Opt_D_dump_rtti (hsc_dflags hsc_env)) $
-                      printForUser stderr alwaysQualify $
+                 let dflags = hsc_dflags hsc_env
+                 when (dopt Opt_D_dump_rtti dflags) $
+                      printInfoForUser dflags alwaysQualify $
                       fsep [text "RTTI Improvement for", ppr id, equals, ppr subst]
 
                  let ic' = extendInteractiveContext

@@ -44,6 +44,8 @@ module DynFlags (
         fFlags, fWarningFlags, fLangFlags, xFlags,
         wayNames, dynFlagDependencies,
 
+        printOutputForUser, printInfoForUser,
+
         -- ** Safe Haskell
         SafeHaskellMode(..),
         safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
@@ -994,6 +996,16 @@ newtype FlushErr = FlushErr (IO ())
 
 defaultFlushErr :: FlushErr
 defaultFlushErr = FlushErr $ hFlush stderr
+
+printOutputForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printOutputForUser = printSevForUser SevOutput
+
+printInfoForUser :: DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printInfoForUser = printSevForUser SevInfo
+
+printSevForUser :: Severity -> DynFlags -> PrintUnqualified -> SDoc -> IO ()
+printSevForUser sev dflags unqual doc
+    = log_action dflags sev noSrcSpan (mkUserStyle unqual AllTheWay) doc
 
 {-
 Note [Verbosity levels]

@@ -49,7 +49,6 @@ import FastString
 import Panic
 import Util
 
-import System.IO
 import Data.IORef
 import qualified Data.Set as Set
 import Control.Monad
@@ -444,7 +443,8 @@ traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 traceOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
 traceOptIf flag doc = ifDOptM flag $
-                      liftIO (printForUser stderr alwaysQualify doc)
+                          do dflags <- getDynFlags
+                             liftIO (printInfoForUser dflags alwaysQualify doc)
 
 traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
@@ -459,7 +459,7 @@ traceOptTcRn flag doc = ifDOptM flag $ do
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv
                   ; dflags <- getDynFlags
-                  ; liftIO (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
+                  ; liftIO (printInfoForUser dflags (mkPrintUnqualified dflags rdr_env) doc) }
 
 debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()
