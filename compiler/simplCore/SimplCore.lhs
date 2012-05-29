@@ -47,6 +47,7 @@ import DmdAnal          ( dmdAnalPgm )
 import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
 import FastString
+import SrcLoc
 import Util
 
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
@@ -419,15 +420,17 @@ doCorePass pass = pprPanic "doCorePass" (ppr pass)
 %************************************************************************
 
 \begin{code}
-printCore :: a -> CoreProgram -> IO ()
-printCore _ binds = Err.dumpIfSet True "Print Core" (pprCoreBindings binds)
+printCore :: DynFlags -> CoreProgram -> IO ()
+printCore dflags binds
+    = Err.dumpIfSet dflags True "Print Core" (pprCoreBindings binds)
 
 ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
 ruleCheckPass current_phase pat guts = do
     rb <- getRuleBase
     dflags <- getDynFlags
     liftIO $ Err.showPass dflags "RuleCheck"
-    liftIO $ printDump (ruleCheckProgram current_phase pat rb (mg_binds guts))
+    liftIO $ log_action dflags Err.SevDump noSrcSpan defaultDumpStyle
+                 (ruleCheckProgram current_phase pat rb (mg_binds guts))
     return guts
 
 
@@ -492,8 +495,8 @@ simplifyExpr dflags expr
               (expr', counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us sz $
 				 simplExprGently (simplEnvForGHCi dflags) expr
 
-	; Err.dumpIfSet (dopt Opt_D_dump_simpl_stats dflags)
-		  "Simplifier statistics" (pprSimplCount counts)
+        ; Err.dumpIfSet dflags (dopt Opt_D_dump_simpl_stats dflags)
+                  "Simplifier statistics" (pprSimplCount counts)
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
 			(pprCoreExpr expr')
@@ -555,7 +558,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
   = do { (termination_msg, it_count, counts_out, guts')
            <- do_iteration us 1 [] binds rules
 
-        ; Err.dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
+        ; Err.dumpIfSet dflags (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
                   "Simplifier statistics for following pass"
                   (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
                          blankLine,

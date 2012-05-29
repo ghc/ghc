@@ -1706,7 +1706,7 @@ hscCompileCoreExpr hsc_env srcspan ds_expr
 dumpIfaceStats :: HscEnv -> IO ()
 dumpIfaceStats hsc_env = do
     eps <- readIORef (hsc_EPS hsc_env)
-    dumpIfSet (dump_if_trace || dump_rn_stats)
+    dumpIfSet dflags (dump_if_trace || dump_rn_stats)
               "Interface statistics"
               (ifaceStats eps)
   where

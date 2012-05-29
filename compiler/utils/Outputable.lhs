@@ -39,7 +39,7 @@ module Outputable (
         colBinder, bold, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
-        hPrintDump, printDump,
+        hPrintDump,
         printForC, printForAsm, printForUser, printForUserPartWay,
         pprCode, mkCodeStyle,
         showSDoc, showSDocOneLine,
@@ -88,7 +88,7 @@ import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Word
-import System.IO        ( Handle, stdout, hFlush )
+import System.IO        ( Handle, hFlush )
 import System.FilePath
 
 
@@ -318,9 +318,6 @@ ifPprDebug d = SDoc $ \ctx ->
 \end{code}
 
 \begin{code}
-printDump :: SDoc -> IO ()
-printDump doc = hPrintDump stdout doc
-
 hPrintDump :: Handle -> SDoc -> IO ()
 hPrintDump h doc = do
    Pretty.printDoc PageMode h

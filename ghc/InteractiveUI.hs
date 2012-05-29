@@ -2078,7 +2078,9 @@ showCmd str = do
         ["imports"]  -> showImports
         ["modules" ] -> showModules
         ["bindings"] -> showBindings
-        ["linker"]   -> liftIO showLinkerState
+        ["linker"]   ->
+            do dflags <- getDynFlags
+               liftIO $ showLinkerState dflags
         ["breaks"]   -> showBkptTable
         ["context"]  -> showContext
         ["packages"]  -> showPackages

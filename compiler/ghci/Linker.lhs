@@ -231,10 +231,11 @@ filterNameMap mods env
 
 
 -- | Display the persistent linker state.
-showLinkerState :: IO ()
-showLinkerState
+showLinkerState :: DynFlags -> IO ()
+showLinkerState dflags
   = do pls <- readIORef v_PersistentLinkerState >>= readMVar
-       printDump (vcat [text "----- Linker state -----",
+       log_action dflags SevDump noSrcSpan defaultDumpStyle
+                 (vcat [text "----- Linker state -----",
                         text "Pkgs:" <+> ppr (pkgs_loaded pls),
                         text "Objs:" <+> ppr (objs_loaded pls),
                         text "BCOs:" <+> ppr (bcos_loaded pls)])

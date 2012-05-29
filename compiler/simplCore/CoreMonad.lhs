@@ -91,6 +91,7 @@ import FastString
 import qualified ErrUtils as Err
 import Bag
 import Maybes
+import SrcLoc
 import UniqSupply
 import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
@@ -145,9 +146,9 @@ endPass dflags pass binds rules
                            | dopt Opt_D_verbose_core2core dflags -> Just dflag
                 _ -> Nothing
 
-dumpIfSet :: Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
-dumpIfSet dump_me pass extra_info doc
-  = Err.dumpIfSet dump_me (showSDoc (ppr pass <+> extra_info)) doc
+dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
+dumpIfSet dflags dump_me pass extra_info doc
+  = Err.dumpIfSet dflags dump_me (showSDoc (ppr pass <+> extra_info)) doc
 
 dumpPassResult :: DynFlags 
                -> Maybe DynFlag		-- Just df => show details in a file whose
@@ -189,10 +190,11 @@ displayLintResults :: DynFlags -> CoreToDo
                    -> IO ()
 displayLintResults dflags pass warns errs binds
   | not (isEmptyBag errs)
-  = do { printDump (vcat [ banner "errors", Err.pprMessageBag errs
-			 , ptext (sLit "*** Offending Program ***")
-			 , pprCoreBindings binds
-			 , ptext (sLit "*** End of Offense ***") ])
+  = do { log_action dflags Err.SevDump noSrcSpan defaultDumpStyle
+           (vcat [ banner "errors", Err.pprMessageBag errs
+                 , ptext (sLit "*** Offending Program ***")
+                 , pprCoreBindings binds
+                 , ptext (sLit "*** End of Offense ***") ])
        ; Err.ghcExit dflags 1 }
 
   | not (isEmptyBag warns)
@@ -203,7 +205,8 @@ displayLintResults dflags pass warns errs binds
 	-- group.  Only afer a round of simplification are they unravelled.
   , not opt_NoDebugOutput
   , showLintWarnings pass
-  = printDump (banner "warnings" $$ Err.pprMessageBag warns)
+  = log_action dflags Err.SevDump noSrcSpan defaultDumpStyle
+        (banner "warnings" $$ Err.pprMessageBag warns)
 
   | otherwise = return ()
   where

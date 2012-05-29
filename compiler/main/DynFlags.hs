@@ -969,6 +969,7 @@ defaultLogAction :: LogAction
 defaultLogAction severity srcSpan style msg
     = case severity of
       SevOutput -> printSDoc msg style
+      SevDump   -> hPrintDump stdout msg
       SevInfo   -> printErrs msg style
       SevFatal  -> printErrs msg style
       _         -> do hPutChar stderr '\n'

@@ -51,8 +51,10 @@ import Packages( isDllName )
 import HscTypes
 import Maybes
 import UniqSupply
+import ErrUtils (Severity(..))
 import Outputable
 import FastBool hiding ( fastOr )
+import SrcLoc
 import Util
 import FastString
 
@@ -372,7 +374,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
-	; dumpIfSet (dopt Opt_D_dump_rules dflags 
+	; dumpIfSet dflags (dopt Opt_D_dump_rules dflags
                      && (not (dopt Opt_D_dump_simpl dflags))) 
 		    CoreTidy
                     (ptext (sLit "rules"))
@@ -381,7 +383,8 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
         ; when (dopt Opt_D_dump_core_stats dflags)
-	       (printDump (ptext (sLit "Tidy size (terms,types,coercions)") 
+               (log_action dflags SevDump noSrcSpan defaultDumpStyle
+                          (ptext (sLit "Tidy size (terms,types,coercions)")
                            <+> ppr (moduleName mod) <> colon 
                            <+> int (cs_tm cs) 
                            <+> int (cs_ty cs) 

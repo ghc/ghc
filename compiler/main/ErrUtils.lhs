@@ -71,6 +71,7 @@ type MsgDoc = SDoc
 
 data Severity
   = SevOutput
+  | SevDump
   | SevInfo
   | SevWarning
   | SevError
@@ -193,10 +194,10 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 -- -----------------------------------------------------------------------------
 -- Dumping
 
-dumpIfSet :: Bool -> String -> SDoc -> IO ()
-dumpIfSet flag hdr doc
+dumpIfSet :: DynFlags -> Bool -> String -> SDoc -> IO ()
+dumpIfSet dflags flag hdr doc
   | not flag   = return ()
-  | otherwise  = printDump (mkDumpDoc hdr doc)
+  | otherwise  = log_action dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
@@ -247,7 +248,7 @@ dumpSDoc dflags dflag hdr doc
 
             -- write the dump to stdout
             Nothing
-                 -> printDump (mkDumpDoc hdr doc)
+                 -> log_action dflags SevDump noSrcSpan defaultDumpStyle (mkDumpDoc hdr doc)
 
 
 -- | Choose where to put a dump file based on DynFlags

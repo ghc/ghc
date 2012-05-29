@@ -49,6 +49,7 @@ import Maybes
 import ErrUtils
 import Finder
 import UniqFM
+import SrcLoc
 import StaticFlags
 import Outputable
 import BinIface
@@ -643,7 +644,8 @@ showIface hsc_env filename = do
    -- non-profiled interfaces, for example.
    iface <- initTcRnIf 's' hsc_env () () $
        readBinIface IgnoreHiWay TraceBinIFaceReading filename
-   printDump (pprModIface iface)
+   let dflags = hsc_dflags hsc_env
+   log_action dflags SevDump noSrcSpan defaultDumpStyle (pprModIface iface)
 \end{code}
 
 \begin{code}
