@@ -20,7 +20,7 @@ module DsMonad (
         mkPrintUnqualifiedDs,
         newUnique, 
         UniqSupply, newUniqueSupply,
-        getGhcModeDs, doptDs, woptDs,
+        getGhcModeDs,
         dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
         
         PArrBuiltin(..), 
@@ -346,12 +346,6 @@ We can also reach out and either set/grab location information from
 the @SrcSpan@ being carried around.
 
 \begin{code}
-doptDs :: DynFlag -> TcRnIf gbl lcl Bool
-doptDs = doptM
-
-woptDs :: WarningFlag -> TcRnIf gbl lcl Bool
-woptDs = woptM
-
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 

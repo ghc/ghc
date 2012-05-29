@@ -32,6 +32,7 @@ import HsSyn
 --     needs to see source types
 import TcType
 import TcEvidence
+import TcRnMonad
 import Type
 import CoreSyn
 import CoreUtils
@@ -219,7 +220,7 @@ dsExpr (HsOverLit lit)        = dsOverLit lit
 dsExpr (HsWrap co_fn e)
   = do { e' <- dsExpr e
        ; wrapped_e <- dsHsWrapper co_fn e'
-       ; warn_id <- woptDs Opt_WarnIdentities
+       ; warn_id <- woptM Opt_WarnIdentities
        ; when warn_id $ warnAboutIdentities e' wrapped_e
        ; return wrapped_e }
 
@@ -311,7 +312,7 @@ dsExpr (ExplicitTuple tup_args boxity)
 
 dsExpr (HsSCC cc expr@(L loc _)) = do
     mod_name <- getModuleDs
-    count <- doptDs Opt_ProfCountEntries
+    count <- doptM Opt_ProfCountEntries
     uniq <- newUnique
     Tick (ProfNote (mkUserCC cc mod_name loc uniq) count True) <$> dsLExpr expr
 
@@ -843,13 +844,13 @@ warnDiscardedDoBindings :: LHsExpr Id -> Type -> DsM ()
 warnDiscardedDoBindings rhs rhs_ty
   | Just (m_ty, elt_ty) <- tcSplitAppTy_maybe rhs_ty
   = do {  -- Warn about discarding non-() things in 'monadic' binding
-       ; warn_unused <- woptDs Opt_WarnUnusedDoBind
+       ; warn_unused <- woptM Opt_WarnUnusedDoBind
        ; if warn_unused && not (isUnitTy elt_ty)
          then warnDs (unusedMonadBind rhs elt_ty)
          else 
          -- Warn about discarding m a things in 'monadic' binding of the same type,
          -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
-    do { warn_wrong <- woptDs Opt_WarnWrongDoBind
+    do { warn_wrong <- woptM Opt_WarnWrongDoBind
        ; case tcSplitAppTy_maybe elt_ty of
            Just (elt_m_ty, _) | warn_wrong, m_ty `eqType` elt_m_ty
                               -> warnDs (wrongMonadBind rhs elt_ty)
