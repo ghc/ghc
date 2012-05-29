@@ -1493,8 +1493,9 @@ mkExtraObjToLinkIntoBinary dflags = do
                                         _ -> True
 
    when (dopt Opt_NoHsMain dflags && have_rts_opts_flags) $ do
-      hPutStrLn stderr $ "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main.\n" ++
-                         "    Call hs_init_ghc() from your main() function to set these options."
+      log_action dflags SevInfo noSrcSpan defaultUserStyle
+          (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
+           text "    Call hs_init_ghc() from your main() function to set these options.")
 
    mkExtraObj dflags "c" (showSDoc main)
 

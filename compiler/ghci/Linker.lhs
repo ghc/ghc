@@ -295,7 +295,7 @@ reallyInitDynLinker dflags =
           -- (d) Link .o files from the command-line
         ; cmdline_ld_inputs <- readIORef v_Ld_inputs
 
-        ; classified_ld_inputs <- mapM classifyLdInput cmdline_ld_inputs
+        ; classified_ld_inputs <- mapM (classifyLdInput dflags) cmdline_ld_inputs
 
           -- (e) Link any MacOS frameworks
         ; let framework_paths
@@ -321,12 +321,13 @@ reallyInitDynLinker dflags =
         ; return pls
         }}
 
-classifyLdInput :: FilePath -> IO (Maybe LibrarySpec)
-classifyLdInput f
+classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
+classifyLdInput dflags f
   | isObjectFilename f = return (Just (Object f))
   | isDynLibFilename f = return (Just (DLLPath f))
   | otherwise          = do
-        hPutStrLn stderr ("Warning: ignoring unrecognised input `" ++ f ++ "'")
+        log_action dflags SevInfo noSrcSpan defaultUserStyle
+            (text ("Warning: ignoring unrecognised input `" ++ f ++ "'"))
         return Nothing
 
 preloadLib :: DynFlags -> [String] -> [String] -> LibrarySpec -> IO ()
