@@ -4,13 +4,6 @@
 \section{Tidying up Core}
 
 \begin{code}
-{-# OPTIONS -fno-warn-tabs #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and
--- detab the module (please do the detabbing in a separate patch). See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#TabsvsSpaces
--- for details
-
 module TidyPgm (
        mkBootModDetailsTc, tidyProgram, globaliseAndTidyId
    ) where
@@ -27,7 +20,7 @@ import CoreMonad
 import CoreUtils
 import Literal
 import Rules
-import CoreArity	( exprArity, exprBotStrictness_maybe )
+import CoreArity        ( exprArity, exprBotStrictness_maybe )
 import VarEnv
 import VarSet
 import Var
@@ -58,9 +51,9 @@ import SrcLoc
 import Util
 import FastString
 
-import Control.Monad	( when )
-import Data.List	( sortBy )
-import Data.IORef	( IORef, readIORef, writeIORef )
+import Control.Monad    ( when )
+import Data.List        ( sortBy )
+import Data.IORef       ( IORef, readIORef, writeIORef )
 \end{code}
 
 
@@ -75,7 +68,7 @@ important for *this* module, but it's essential for ghc --make:
 subsequent compilations must not see (e.g.) the arity if the interface
 file does not contain arity If they do, they'll exploit the arity;
 then the arity might change, but the iface file doesn't change =>
-recompilation does not happen => disaster. 
+recompilation does not happen => disaster.
 
 For data types, the final TypeEnv will have a TyThing for the TyCon,
 plus one for each DataCon; the interface file will contain just one
@@ -83,9 +76,9 @@ data type declaration, but it is de-serialised back into a collection
 of TyThings.
 
 %************************************************************************
-%*				 					*
-		Plan A: simpleTidyPgm
-%*				 					* 
+%*                                                                      *
+                Plan A: simpleTidyPgm
+%*                                                                      *
 %************************************************************************
 
 
@@ -93,19 +86,19 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Ignore the bindings
 
-* Drop all WiredIn things from the TypeEnv 
-	(we never want them in interface files)
+* Drop all WiredIn things from the TypeEnv
+        (we never want them in interface files)
 
 * Retain all TyCons and Classes in the TypeEnv, to avoid
-	having to find which ones are mentioned in the
-	types of exported Ids
+        having to find which ones are mentioned in the
+        types of exported Ids
 
 * Trim off the constructors of non-exported TyCons, both
-	from the TyCon and from the TypeEnv
+        from the TyCon and from the TypeEnv
 
 * Drop non-exported Ids from the TypeEnv
 
-* Tidy the types of the DFunIds of Instances, 
+* Tidy the types of the DFunIds of Instances,
   make them into GlobalIds, (they already have External Names)
   and add them to the TypeEnv
 
@@ -115,7 +108,7 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 * Drop rules altogether
 
 * Tidy the bindings, to ensure that the Caf and Arity
-  information is correct for each top-level binder; the 
+  information is correct for each top-level binder; the
   code generator needs it. And to ensure that local names have
   distinct OccNames in case of object-file splitting
 
@@ -127,7 +120,7 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 -- for hs-boot files
 
 mkBootModDetailsTc :: HscEnv -> TcGblEnv -> IO ModDetails
-mkBootModDetailsTc hsc_env 
+mkBootModDetailsTc hsc_env
         TcGblEnv{ tcg_exports   = exports,
                   tcg_type_env  = type_env, -- just for the Ids
                   tcg_tcs       = tcs,
@@ -135,23 +128,23 @@ mkBootModDetailsTc hsc_env
                   tcg_fam_insts = fam_insts
                 }
   = do  { let dflags = hsc_dflags hsc_env
-	; showPass dflags CoreTidy
+        ; showPass dflags CoreTidy
 
-	; let { insts'     = tidyInstances globaliseAndTidyId insts
-	      ; dfun_ids   = map instanceDFunId insts'
+        ; let { insts'     = tidyInstances globaliseAndTidyId insts
+              ; dfun_ids   = map instanceDFunId insts'
               ; type_env1  = mkBootTypeEnv (availsToNameSet exports)
                                 (typeEnvIds type_env) tcs fam_insts
-	      ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
-	      }
-	; return (ModDetails { md_types     = type_env'
-			     , md_insts     = insts'
-			     , md_fam_insts = fam_insts
-			     , md_rules     = []
-			     , md_anns      = []
-			     , md_exports   = exports
+              ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
+              }
+        ; return (ModDetails { md_types     = type_env'
+                             , md_insts     = insts'
+                             , md_fam_insts = fam_insts
+                             , md_rules     = []
+                             , md_anns      = []
+                             , md_exports   = exports
                              , md_vect_info = noVectInfo
                              })
-	}
+        }
   where
 
 mkBootTypeEnv :: NameSet -> [Id] -> [TyCon] -> [FamInst] -> TypeEnv
@@ -160,12 +153,12 @@ mkBootTypeEnv exports ids tcs fam_insts
        typeEnvFromEntities final_ids tcs fam_insts
   where
         -- Find the LocalIds in the type env that are exported
-	-- Make them into GlobalIds, and tidy their types
-	--
-	-- It's very important to remove the non-exported ones
-	-- because we don't tidy the OccNames, and if we don't remove
-	-- the non-exported ones we'll get many things with the
-	-- same name in the interface file, giving chaos.
+        -- Make them into GlobalIds, and tidy their types
+        --
+        -- It's very important to remove the non-exported ones
+        -- because we don't tidy the OccNames, and if we don't remove
+        -- the non-exported ones we'll get many things with the
+        -- same name in the interface file, giving chaos.
         --
         -- Do make sure that we keep Ids that are already Global.
         -- When typechecking an .hs-boot file, the Ids come through as
@@ -183,12 +176,12 @@ mkBootTypeEnv exports ids tcs fam_insts
 
 
 globaliseAndTidyId :: Id -> Id
--- Takes an LocalId with an External Name, 
--- makes it into a GlobalId 
+-- Takes an LocalId with an External Name,
+-- makes it into a GlobalId
 --     * unchanged Name (might be Internal or External)
 --     * unchanged details
 --     * VanillaIdInfo (makes a conservative assumption about Caf-hood)
-globaliseAndTidyId id	
+globaliseAndTidyId id
   = Id.setIdType (globaliseId id) tidy_type
   where
     tidy_type = tidyTopType (idType id)
@@ -196,18 +189,18 @@ globaliseAndTidyId id
 
 
 %************************************************************************
-%*				 					*
-	Plan B: tidy bindings, make TypeEnv full of IdInfo
-%*				 					* 
+%*                                                                      *
+        Plan B: tidy bindings, make TypeEnv full of IdInfo
+%*                                                                      *
 %************************************************************************
 
-Plan B: include pragmas, make interfaces 
+Plan B: include pragmas, make interfaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Figure out which Ids are externally visible
 
 * Tidy the bindings, externalising appropriate Ids
 
-* Drop all Ids from the TypeEnv, and add all the External Ids from 
+* Drop all Ids from the TypeEnv, and add all the External Ids from
   the bindings.  (This adds their IdInfo to the TypeEnv; and adds
   floated-out Ids that weren't even in the TypeEnv before.)
 
@@ -223,7 +216,7 @@ First we figure out which Ids are "external" Ids.  An
 "external" Id is one that is visible from outside the compilation
 unit.  These are
   a) the user exported ones
-  b) ones mentioned in the unfoldings, workers, 
+  b) ones mentioned in the unfoldings, workers,
      rules of externally-visible ones ,
      or vectorised versions of externally-visible ones
 
@@ -258,8 +251,8 @@ Step 2: Tidy the program
 Next we traverse the bindings top to bottom.  For each *top-level*
 binder
 
- 1. Make it into a GlobalId; its IdDetails becomes VanillaGlobal, 
-    reflecting the fact that from now on we regard it as a global, 
+ 1. Make it into a GlobalId; its IdDetails becomes VanillaGlobal,
+    reflecting the fact that from now on we regard it as a global,
     not local, Id
 
  2. Give it a system-wide Unique.
@@ -270,7 +263,7 @@ binder
     source of such system-wide uniques.
 
     For external Ids, use the original-name cache in the NameCache
-    to ensure that the unique assigned is the same as the Id had 
+    to ensure that the unique assigned is the same as the Id had
     in any previous compilation run.
 
  3. Rename top-level Ids according to the names we chose in step 1.
@@ -278,14 +271,14 @@ binder
     make it have an Internal Name.  This is used by the code generator
     to decide whether to make the label externally visible
 
- 4. Give it its UTTERLY FINAL IdInfo; in ptic, 
-  	* its unfolding, if it should have one
-	
-	* its arity, computed from the number of visible lambdas
+ 4. Give it its UTTERLY FINAL IdInfo; in ptic,
+        * its unfolding, if it should have one
 
-	* its CAF info, computed from what is free in its RHS
+        * its arity, computed from the number of visible lambdas
 
-		
+        * its CAF info, computed from what is free in its RHS
+
+
 Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
@@ -301,10 +294,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_rules     = imp_rules
                               , mg_vect_info = vect_info
                               , mg_anns      = anns
-                              , mg_deps      = deps 
+                              , mg_deps      = deps
                               , mg_foreign   = foreign_stubs
                               , mg_hpc_info  = hpc_info
-                              , mg_modBreaks = modBreaks 
+                              , mg_modBreaks = modBreaks
                               })
 
   = do  { let { dflags     = hsc_dflags hsc_env
@@ -312,7 +305,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; expose_all = dopt Opt_ExposeAllUnfoldings  dflags
               ; th         = xopt Opt_TemplateHaskell      dflags
               ; data_kinds = xopt Opt_DataKinds            dflags
-              ; no_trim_types = th || data_kinds  
+              ; no_trim_types = th || data_kinds
                                 -- See Note [When we can't trim types]
               }
         ; showPass dflags CoreTidy
@@ -325,29 +318,29 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               }
 
         ; (unfold_env, tidy_occ_env)
-              <- chooseExternalIds hsc_env mod omit_prags expose_all 
+              <- chooseExternalIds hsc_env mod omit_prags expose_all
                                    binds implicit_binds imp_rules (vectInfoVar vect_info)
         ; let { ext_rules = findExternalRules omit_prags binds imp_rules unfold_env }
                 -- Glom together imp_rules and rules currently attached to binders
                 -- Then pick just the ones we need to expose
                 -- See Note [Which rules to expose]
 
-	; let { (tidy_env, tidy_binds)
+        ; let { (tidy_env, tidy_binds)
                  = tidyTopBinds hsc_env unfold_env tidy_occ_env binds }
 
-	; let { export_set = availsToNameSet exports
-	      ; final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
-				    isExternalName (idName id)]
+        ; let { export_set = availsToNameSet exports
+              ; final_ids  = [ id | id <- bindersOfBinds tidy_binds,
+                                    isExternalName (idName id)]
 
               ; tidy_type_env = tidyTypeEnv omit_prags no_trim_types export_set
                                       (extendTypeEnvWithIds type_env final_ids)
 
               ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
-		-- A DFunId will have a binding in tidy_binds, and so
-		-- will now be in final_env, replete with IdInfo
-		-- Its name will be unchanged since it was born, but
-		-- we want Global, IdInfo-rich (or not) DFunId in the
-		-- tidy_insts
+                -- A DFunId will have a binding in tidy_binds, and so
+                -- will now be in final_env, replete with IdInfo
+                -- Its name will be unchanged since it was born, but
+                -- we want Global, IdInfo-rich (or not) DFunId in the
+                -- tidy_insts
 
               ; tidy_rules = tidyRules tidy_env ext_rules
                 -- You might worry that the tidy_env contains IdInfo-rich stuff
@@ -374,9 +367,9 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
           -- If the endPass didn't print the rules, but ddump-rules is
           -- on, print now
-	; dumpIfSet dflags (dopt Opt_D_dump_rules dflags
-                     && (not (dopt Opt_D_dump_simpl dflags))) 
-		    CoreTidy
+        ; dumpIfSet dflags (dopt Opt_D_dump_rules dflags
+                     && (not (dopt Opt_D_dump_simpl dflags)))
+                    CoreTidy
                     (ptext (sLit "rules"))
                     (pprRulesForUser tidy_rules)
 
@@ -385,9 +378,9 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; when (dopt Opt_D_dump_core_stats dflags)
                (log_action dflags SevDump noSrcSpan defaultDumpStyle
                           (ptext (sLit "Tidy size (terms,types,coercions)")
-                           <+> ppr (moduleName mod) <> colon 
-                           <+> int (cs_tm cs) 
-                           <+> int (cs_ty cs) 
+                           <+> ppr (moduleName mod) <> colon
+                           <+> int (cs_tm cs)
+                           <+> int (cs_ty cs)
                            <+> int (cs_co cs) ))
 
         ; return (CgGuts { cg_module   = mod,
@@ -396,23 +389,23 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                            cg_foreign  = foreign_stubs,
                            cg_dep_pkgs = map fst $ dep_pkgs deps,
                            cg_hpc_info = hpc_info,
-                           cg_modBreaks = modBreaks }, 
+                           cg_modBreaks = modBreaks },
 
                    ModDetails { md_types     = tidy_type_env,
-				md_rules     = tidy_rules,
-				md_insts     = tidy_insts,
+                                md_rules     = tidy_rules,
+                                md_insts     = tidy_insts,
                                 md_vect_info = tidy_vect_info,
                                 md_fam_insts = fam_insts,
-				md_exports   = exports,
-				md_anns      = anns      -- are already tidy
+                                md_exports   = exports,
+                                md_anns      = anns      -- are already tidy
                               })
-	}
+        }
 
 lookup_dfun :: TypeEnv -> Var -> Id
 lookup_dfun type_env dfun_id
   = case lookupTypeEnv type_env (idName dfun_id) of
-	Just (AnId dfun_id') -> dfun_id'
-	_other -> pprPanic "lookup_dfun" (ppr dfun_id)
+        Just (AnId dfun_id') -> dfun_id'
+        _other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
 --------------------------
 tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
@@ -422,11 +415,11 @@ tidyTypeEnv :: Bool       -- Compiling without -O, so omit prags
 -- The competed type environment is gotten from
 --      a) the types and classes defined here (plus implicit things)
 --      b) adding Ids with correct IdInfo, including unfoldings,
---		gotten from the bindings
+--              gotten from the bindings
 -- From (b) we keep only those Ids with External names;
---	    the CoreTidy pass makes sure these are all and only
---	    the externally-accessible ones
--- This truncates the type environment to include only the 
+--          the CoreTidy pass makes sure these are all and only
+--          the externally-accessible ones
+-- This truncates the type environment to include only the
 -- exported Ids and things needed from them, which saves space
 
 tidyTypeEnv omit_prags no_trim_types exports type_env
@@ -444,13 +437,13 @@ trimThing :: Bool -> NameSet -> TyThing -> TyThing
 -- Trim off inessentials, for boot files and no -O
 trimThing no_trim_types exports (ATyCon tc)
    | not (mustExposeTyCon no_trim_types exports tc)
-   = ATyCon (makeTyConAbstract tc)	-- Note [When we can't trim types]
+   = ATyCon (makeTyConAbstract tc)      -- Note [When we can't trim types]
 
 trimThing _th _exports (AnId id)
-   | not (isImplicitId id) 
+   | not (isImplicitId id)
    = AnId (id `setIdInfo` vanillaIdInfo)
 
-trimThing _th _exports other_thing 
+trimThing _th _exports other_thing
   = other_thing
 
 
@@ -458,7 +451,7 @@ trimThing _th _exports other_thing
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea of type trimming is to export algebraic data types
 abstractly (without their data constructors) when compiling without
--O, unless of course they are explicitly exported by the user.  
+-O, unless of course they are explicitly exported by the user.
 
 We always export synonyms, because they can be mentioned in the type
 of an exported Id.  We could do a full dependency analysis starting
@@ -468,15 +461,15 @@ now.
 But there are some times we can't do that, indicated by the 'no_trim_types' flag.
 
 First, Template Haskell.  Consider (Trac #2386) this
-	module M(T, makeOne) where
-	  data T = Yay String
-	  makeOne = [| Yay "Yep" |]
+        module M(T, makeOne) where
+          data T = Yay String
+          makeOne = [| Yay "Yep" |]
 Notice that T is exported abstractly, but makeOne effectively exports it too!
 A module that splices in $(makeOne) will then look for a declartion of Yay,
 so it'd better be there.  Hence, brutally but simply, we switch off type
 constructor trimming if TH is enabled in this module.
 
-Second, data kinds.  Consider (Trac #5912) 
+Second, data kinds.  Consider (Trac #5912)
      {-# LANGUAGE DataKinds #-}
      module M() where
      data UnaryTypeC a = UnaryDataC a
@@ -489,26 +482,26 @@ to see what data constructors are mentioned.  But we don't do that yet.
 In these two cases we just switch off type trimming altogether.
  -}
 
-mustExposeTyCon :: Bool         -- Type-trimming flag 
-                -> NameSet	-- Exports
-		-> TyCon	-- The tycon
-		-> Bool 	-- Can its rep be hidden?
--- We are compiling without -O, and thus trying to write as little as 
+mustExposeTyCon :: Bool         -- Type-trimming flag
+                -> NameSet      -- Exports
+                -> TyCon        -- The tycon
+                -> Bool         -- Can its rep be hidden?
+-- We are compiling without -O, and thus trying to write as little as
 -- possible into the interface file.  But we must expose the details of
 -- any data types whose constructors or fields are exported
 mustExposeTyCon no_trim_types exports tc
   | no_trim_types               -- See Note [When we can't trim types]
   = True
 
-  | not (isAlgTyCon tc) 	-- Always expose synonyms (otherwise we'd have to
+  | not (isAlgTyCon tc)         -- Always expose synonyms (otherwise we'd have to
                                 -- figure out whether it was mentioned in the type
                                 -- of any other exported thing)
   = True
 
-  | isEnumerationTyCon tc	-- For an enumeration, exposing the constructors
-  = True			-- won't lead to the need for further exposure
+  | isEnumerationTyCon tc       -- For an enumeration, exposing the constructors
+  = True                        -- won't lead to the need for further exposure
 
-  | isFamilyTyCon tc		-- Open type family
+  | isFamilyTyCon tc            -- Open type family
   = True
 
   -- Below here we just have data/newtype decls or family instances
@@ -521,24 +514,24 @@ mustExposeTyCon no_trim_types exports tc
   = True
 
   | isNewTyCon tc && isFFITy (snd (newTyConRhs tc))
-  = True   -- Expose the rep for newtypes if the rep is an FFI type.  
-	   -- For a very annoying reason.  'Foreign import' is meant to
-	   -- be able to look through newtypes transparently, but it
-	   -- can only do that if it can "see" the newtype representation
+  = True   -- Expose the rep for newtypes if the rep is an FFI type.
+           -- For a very annoying reason.  'Foreign import' is meant to
+           -- be able to look through newtypes transparently, but it
+           -- can only do that if it can "see" the newtype representation
 
   | otherwise
   = False
   where
     data_cons = tyConDataCons tc
-    exported_con con = any (`elemNameSet` exports) 
-			   (dataConName con : dataConFieldLabels con)
+    exported_con con = any (`elemNameSet` exports)
+                           (dataConName con : dataConFieldLabels con)
 
 tidyInstances :: (DFunId -> DFunId) -> [ClsInst] -> [ClsInst]
 tidyInstances tidy_dfun ispecs
   = map tidy ispecs
   where
     tidy ispec = setInstanceDFunId ispec $
-		 tidy_dfun (instanceDFunId ispec)
+                 tidy_dfun (instanceDFunId ispec)
 \end{code}
 
 \begin{code}
@@ -561,18 +554,18 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
                          , isDataConWorkId var || not (isImplicitId var)
                          ]
 
-    tidy_scalarVars = mkVarSet [ lookup_var var 
+    tidy_scalarVars = mkVarSet [ lookup_var var
                                | var <- varSetElems scalarVars
                                , isGlobalId var || isExportedId var]
-      
+
     lookup_var var = lookupWithDefaultVarEnv var_env var var
 \end{code}
 
 
 %************************************************************************
-%*									*
-	Implicit bindings
-%*									*
+%*                                                                      *
+        Implicit bindings
+%*                                                                      *
 %************************************************************************
 
 Note [Injecting implicit bindings]
@@ -580,9 +573,9 @@ Note [Injecting implicit bindings]
 We inject the implict bindings right at the end, in CoreTidy.
 Some of these bindings, notably record selectors, are not
 constructed in an optimised form.  E.g. record selector for
-	data T = MkT { x :: {-# UNPACK #-} !Int }
+        data T = MkT { x :: {-# UNPACK #-} !Int }
 Then the unfolding looks like
-	x = \t. case t of MkT x1 -> let x = I# x1 in x
+        x = \t. case t of MkT x1 -> let x = I# x1 in x
 This generates bad code unless it's first simplified a bit.  That is
 why CoreUnfold.mkImplicitUnfolding uses simleExprOpt to do a bit of
 optimisation first.  (Only matters when the selector is used curried;
@@ -607,15 +600,15 @@ Oh: two other reasons for injecting them late:
   - If implicit Ids are already in the bindings when we start TidyPgm,
     we'd have to be careful not to treat them as external Ids (in
     the sense of findExternalIds); else the Ids mentioned in *their*
-    RHSs will be treated as external and you get an interface file 
+    RHSs will be treated as external and you get an interface file
     saying      a18 = <blah>
-    but nothing refererring to a18 (because the implicit Id is the 
+    but nothing refererring to a18 (because the implicit Id is the
     one that does, and implicit Ids don't appear in interface files).
 
   - More seriously, the tidied type-envt will include the implicit
     Id replete with a18 in its unfolding; but we won't take account
     of a18 when computing a fingerprint for the class; result chaos.
-    
+
 There is one sort of implicit binding that is injected still later,
 namely those for data constructor workers. Reason (I think): it's
 really just a code generation trick.... binding itself makes no sense.
@@ -634,9 +627,9 @@ get_defn id = NonRec id (unfoldingTemplate (realIdUnfolding id))
 
 
 %************************************************************************
-%*				 					*
+%*                                                                      *
 \subsection{Step 1: finding externals}
-%*				 					* 
+%*                                                                      *
 %************************************************************************
 
 See Note [Choosing external names].
@@ -645,7 +638,7 @@ See Note [Choosing external names].
 type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
   -- Maps each top-level Id to its new Name (the Id is tidied in step 2)
   -- The Unique is unchanged.  If the new Name is external, it will be
-  -- visible in the interface file.  
+  -- visible in the interface file.
   --
   -- Bool => expose unfolding or not.
 
@@ -664,13 +657,13 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
  where
-  nc_var = hsc_NC hsc_env 
+  nc_var = hsc_NC hsc_env
 
   -- init_ext_ids is the intial list of Ids that should be
   -- externalised.  It serves as the starting point for finding a
   -- deterministic, tidy, renaming for all external Ids in this
   -- module.
-  -- 
+  --
   -- It is sorted, so that it has adeterministic order (i.e. it's the
   -- same list every time this module is compiled), in contrast to the
   -- bindings, which are ordered non-deterministically.
@@ -693,32 +686,32 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   avoids   = [getOccName name | bndr <- binders ++ implicit_binders,
                                 let name = idName bndr,
                                 isExternalName name ]
-		-- In computing our "avoids" list, we must include
-		--	all implicit Ids
-		--	all things with global names (assigned once and for
-		--					all by the renamer)
-		-- since their names are "taken".
-		-- The type environment is a convenient source of such things.
+                -- In computing our "avoids" list, we must include
+                --      all implicit Ids
+                --      all things with global names (assigned once and for
+                --                                      all by the renamer)
+                -- since their names are "taken".
+                -- The type environment is a convenient source of such things.
                 -- In particular, the set of binders doesn't include
                 -- implicit Ids at this stage.
 
-	-- We also make sure to avoid any exported binders.  Consider
-	--	f{-u1-} = 1	-- Local decl
-	--	...
-	--	f{-u2-} = 2	-- Exported decl
-	--
-	-- The second exported decl must 'get' the name 'f', so we
-	-- have to put 'f' in the avoids list before we get to the first
-	-- decl.  tidyTopId then does a no-op on exported binders.
+        -- We also make sure to avoid any exported binders.  Consider
+        --      f{-u1-} = 1     -- Local decl
+        --      ...
+        --      f{-u2-} = 2     -- Exported decl
+        --
+        -- The second exported decl must 'get' the name 'f', so we
+        -- have to put 'f' in the avoids list before we get to the first
+        -- decl.  tidyTopId then does a no-op on exported binders.
   init_occ_env = initTidyOccEnv avoids
 
 
   search :: [(Id,Id)]    -- The work-list: (external id, referrring id)
-  	    		 -- Make a tidy, external Name for the external id,
+                         -- Make a tidy, external Name for the external id,
                          --   add it to the UnfoldEnv, and do the same for the
                          --   transitive closure of Ids it refers to
-  	    		 -- The referring id is used to generate a tidy
-			 ---  name for the external id
+                         -- The referring id is used to generate a tidy
+                         ---  name for the external id
          -> UnfoldEnv    -- id -> (new Name, show_unfold)
          -> TidyOccEnv   -- occ env for choosing new Names
          -> IO (UnfoldEnv, TidyOccEnv)
@@ -729,13 +722,13 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
     | idocc `elemVarEnv` unfold_env = search rest unfold_env occ_env
     | otherwise = do
       (occ_env', name') <- tidyTopName mod nc_var (Just referrer) occ_env idocc
-      let 
+      let
           (new_ids, show_unfold)
                 | omit_prags = ([], False)
                 | otherwise  = addExternal expose_all refined_id
 
-		-- 'idocc' is an *occurrence*, but we need to see the
-		-- unfolding in the *definition*; so look up in binder_set
+                -- 'idocc' is an *occurrence*, but we need to see the
+                -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
                          Just id -> id
                          Nothing -> WARN( True, ppr idocc ) idocc
@@ -758,35 +751,35 @@ addExternal :: Bool -> Id -> ([Id], Bool)
 addExternal expose_all id = (new_needed_ids, show_unfold)
   where
     new_needed_ids = bndrFvsInOrder show_unfold id
-    idinfo	   = idInfo id
+    idinfo         = idInfo id
     show_unfold    = show_unfolding (unfoldingInfo idinfo)
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
     loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (strictnessInfo idinfo `orElse` topSig)
 
-	-- Stuff to do with the Id's unfolding
-	-- We leave the unfolding there even if there is a worker
-	-- In GHCi the unfolding is used by importers
+        -- Stuff to do with the Id's unfolding
+        -- We leave the unfolding there even if there is a worker
+        -- In GHCi the unfolding is used by importers
 
     show_unfolding (CoreUnfolding { uf_src = src, uf_guidance = guidance })
-       =  expose_all 	     -- 'expose_all' says to expose all 
-			     -- unfoldings willy-nilly
+       =  expose_all         -- 'expose_all' says to expose all
+                             -- unfoldings willy-nilly
 
-       || isStableSource src	 -- Always expose things whose 
-       	  		    	 -- source is an inline rule
+       || isStableSource src     -- Always expose things whose
+                                 -- source is an inline rule
 
-       || not (bottoming_fn	 -- No need to inline bottom functions
-	   || never_active	 -- Or ones that say not to
-	   || loop_breaker	 -- Or that are loop breakers
-	   || neverUnfoldGuidance guidance)
+       || not (bottoming_fn      -- No need to inline bottom functions
+           || never_active       -- Or ones that say not to
+           || loop_breaker       -- Or that are loop breakers
+           || neverUnfoldGuidance guidance)
     show_unfolding (DFunUnfolding {}) = True
     show_unfolding _                  = False
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
                Deterministic free variables
-%*									*
+%*                                                                      *
 %************************************************************************
 
 We want a deterministic free-variable list.  exprFreeVars gives us
@@ -805,10 +798,10 @@ run :: DFFV () -> [Id]
 run (DFFV m) = case m emptyVarSet (emptyVarSet, []) of
                  ((_,ids),_) -> ids
 
-newtype DFFV a 
-  = DFFV (VarSet	      -- Envt: non-top-level things that are in scope
+newtype DFFV a
+  = DFFV (VarSet              -- Envt: non-top-level things that are in scope
                               -- we don't want to record these as free vars
-      -> (VarSet, [Var])      -- Input State: (set, list) of free vars so far 
+      -> (VarSet, [Var])      -- Input State: (set, list) of free vars so far
       -> ((VarSet,[Var]),a))  -- Output state
 
 instance Monad DFFV where
@@ -825,22 +818,22 @@ extendScopeList :: [Var] -> DFFV a -> DFFV a
 extendScopeList vs (DFFV f) = DFFV (\env st -> f (extendVarSetList env vs) st)
 
 insert :: Var -> DFFV ()
-insert v = DFFV $ \ env (set, ids) -> 
-           let keep_me = isLocalId v && 
+insert v = DFFV $ \ env (set, ids) ->
+           let keep_me = isLocalId v &&
                          not (v `elemVarSet` env) &&
-	   		   not (v `elemVarSet` set)
-           in if keep_me 
+                           not (v `elemVarSet` set)
+           in if keep_me
               then ((extendVarSet set v, v:ids), ())
               else ((set,                ids),   ())
 
 
 dffvExpr :: CoreExpr -> DFFV ()
 dffvExpr (Var v)              = insert v
-dffvExpr (App e1 e2) 	      = dffvExpr e1 >> dffvExpr e2
-dffvExpr (Lam v e)   	      = extendScope v (dffvExpr e)
+dffvExpr (App e1 e2)          = dffvExpr e1 >> dffvExpr e2
+dffvExpr (Lam v e)            = extendScope v (dffvExpr e)
 dffvExpr (Tick (Breakpoint _ ids) e) = mapM_ insert ids >> dffvExpr e
 dffvExpr (Tick _other e)    = dffvExpr e
-dffvExpr (Cast e _)  	      = dffvExpr e
+dffvExpr (Cast e _)           = dffvExpr e
 dffvExpr (Let (NonRec x r) e) = dffvBind (x,r) >> extendScope x (dffvExpr e)
 dffvExpr (Let (Rec prs) e)    = extendScopeList (map fst prs) $
                                 (mapM_ dffvBind prs >> dffvExpr e)
@@ -851,11 +844,11 @@ dffvAlt :: (t, [Var], CoreExpr) -> DFFV ()
 dffvAlt (_,xs,r) = extendScopeList xs (dffvExpr r)
 
 dffvBind :: (Id, CoreExpr) -> DFFV ()
-dffvBind(x,r) 
+dffvBind(x,r)
   | not (isId x) = dffvExpr r
   | otherwise    = dffvLetBndr False x >> dffvExpr r
-	      	-- Pass False because we are doing the RHS right here
-		-- If you say True you'll get *exponential* behaviour!
+                -- Pass False because we are doing the RHS right here
+                -- If you say True you'll get *exponential* behaviour!
 
 dffvLetBndr :: Bool -> Id -> DFFV ()
 -- Gather the free vars of the RULES and unfolding of a binder
@@ -877,12 +870,12 @@ dffvLetBndr vanilla_unfold id
        = case src of
            InlineRhs | vanilla_unfold -> dffvExpr rhs
                      | otherwise      -> return ()
-           InlineWrapper v 	      -> insert v    
-           _               	      -> dffvExpr rhs
-	    -- For a wrapper, externalise the wrapper id rather than the
-	    -- fvs of the rhs.  The two usually come down to the same thing
-	    -- but I've seen cases where we had a wrapper id $w but a
-	    -- rhs where $w had been inlined; see Trac #3922
+           InlineWrapper v            -> insert v
+           _                          -> dffvExpr rhs
+            -- For a wrapper, externalise the wrapper id rather than the
+            -- fvs of the rhs.  The two usually come down to the same thing
+            -- but I've seen cases where we had a wrapper id $w but a
+            -- rhs where $w had been inlined; see Trac #3922
 
     go_unf (DFunUnfolding _ _ args) = mapM_ dffvExpr args
     go_unf _ = return ()
@@ -894,57 +887,57 @@ dffvLetBndr vanilla_unfold id
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
                tidyTopName
-%*									*
+%*                                                                      *
 %************************************************************************
 
-This is where we set names to local/global based on whether they really are 
+This is where we set names to local/global based on whether they really are
 externally visible (see comment at the top of this module).  If the name
 was previously local, we have to give it a unique occurrence name if
 we intend to externalise it.
 
 \begin{code}
 tidyTopName :: Module -> IORef NameCache -> Maybe Id -> TidyOccEnv
-	    -> Id -> IO (TidyOccEnv, Name)
+            -> Id -> IO (TidyOccEnv, Name)
 tidyTopName mod nc_var maybe_ref occ_env id
   | global && internal = return (occ_env, localiseName name)
 
   | global && external = return (occ_env, name)
-	-- Global names are assumed to have been allocated by the renamer,
-	-- so they already have the "right" unique
-	-- And it's a system-wide unique too
+        -- Global names are assumed to have been allocated by the renamer,
+        -- so they already have the "right" unique
+        -- And it's a system-wide unique too
 
   -- Now we get to the real reason that all this is in the IO Monad:
   -- we have to update the name cache in a nice atomic fashion
 
   | local  && internal = do { nc <- readIORef nc_var
-			    ; let (nc', new_local_name) = mk_new_local nc
-			    ; writeIORef nc_var nc'
-			    ; return (occ_env', new_local_name) }
-	-- Even local, internal names must get a unique occurrence, because
-	-- if we do -split-objs we externalise the name later, in the code generator
-	--
-	-- Similarly, we must make sure it has a system-wide Unique, because
-	-- the byte-code generator builds a system-wide Name->BCO symbol table
+                            ; let (nc', new_local_name) = mk_new_local nc
+                            ; writeIORef nc_var nc'
+                            ; return (occ_env', new_local_name) }
+        -- Even local, internal names must get a unique occurrence, because
+        -- if we do -split-objs we externalise the name later, in the code generator
+        --
+        -- Similarly, we must make sure it has a system-wide Unique, because
+        -- the byte-code generator builds a system-wide Name->BCO symbol table
 
   | local  && external = do { nc <- readIORef nc_var
-			    ; let (nc', new_external_name) = mk_new_external nc
-			    ; writeIORef nc_var nc'
-			    ; return (occ_env', new_external_name) }
+                            ; let (nc', new_external_name) = mk_new_external nc
+                            ; writeIORef nc_var nc'
+                            ; return (occ_env', new_external_name) }
 
   | otherwise = panic "tidyTopName"
   where
-    name	= idName id
+    name        = idName id
     external    = isJust maybe_ref
-    global	= isExternalName name
-    local	= not global
-    internal	= not external
-    loc		= nameSrcSpan name
+    global      = isExternalName name
+    local       = not global
+    internal    = not external
+    loc         = nameSrcSpan name
 
     old_occ     = nameOccName name
     new_occ
-      | Just ref <- maybe_ref, ref /= id = 
+      | Just ref <- maybe_ref, ref /= id =
           mkOccName (occNameSpace old_occ) $
              let
                  ref_str = occNameString (getOccName ref)
@@ -966,42 +959,42 @@ tidyTopName mod nc_var maybe_ref occ_env id
     (occ_env', occ') = tidyOccName occ_env new_occ
 
     mk_new_local nc = (nc { nsUniqs = us }, mkInternalName uniq occ' loc)
- 		    where
-		      (uniq, us) = takeUniqFromSupply (nsUniqs nc)
+                    where
+                      (uniq, us) = takeUniqFromSupply (nsUniqs nc)
 
     mk_new_external nc = allocateGlobalBinder nc mod occ' loc
-	-- If we want to externalise a currently-local name, check
-	-- whether we have already assigned a unique for it.
-	-- If so, use it; if not, extend the table.
-	-- All this is done by allcoateGlobalBinder.
-	-- This is needed when *re*-compiling a module in GHCi; we must
-	-- use the same name for externally-visible things as we did before.
+        -- If we want to externalise a currently-local name, check
+        -- whether we have already assigned a unique for it.
+        -- If so, use it; if not, extend the table.
+        -- All this is done by allcoateGlobalBinder.
+        -- This is needed when *re*-compiling a module in GHCi; we must
+        -- use the same name for externally-visible things as we did before.
 \end{code}
 
 \begin{code}
-findExternalRules :: Bool	-- Omit pragmas
+findExternalRules :: Bool       -- Omit pragmas
                   -> [CoreBind]
-		  -> [CoreRule]	-- Local rules for imported fns
-	          -> UnfoldEnv	-- Ids that are exported, so we need their rules
-	          -> [CoreRule]
+                  -> [CoreRule] -- Local rules for imported fns
+                  -> UnfoldEnv  -- Ids that are exported, so we need their rules
+                  -> [CoreRule]
   -- The complete rules are gotten by combining
-  --	a) local rules for imported Ids
-  --	b) rules embedded in the top-level Ids
+  --    a) local rules for imported Ids
+  --    b) rules embedded in the top-level Ids
 findExternalRules omit_prags binds imp_id_rules unfold_env
   | omit_prags = []
   | otherwise  = filterOut internal_rule (imp_id_rules ++ local_rules)
   where
     local_rules  = [ rule
- 		   | id <- bindersOfBinds binds,
+                   | id <- bindersOfBinds binds,
                      external_id id,
-		     rule <- idCoreRules id
-		   ]
+                     rule <- idCoreRules id
+                   ]
 
     internal_rule rule
-	=  any (not . external_id) (varSetElems (ruleLhsFreeIds rule))
-		-- Don't export a rule whose LHS mentions a locally-defined
-		--  Id that is completely internal (i.e. not visible to an
-		-- importing module)
+        =  any (not . external_id) (varSetElems (ruleLhsFreeIds rule))
+                -- Don't export a rule whose LHS mentions a locally-defined
+                --  Id that is completely internal (i.e. not visible to an
+                -- importing module)
 
     external_id id
       | Just (name,_) <- lookupVarEnv unfold_env id = isExternalName name
@@ -1010,40 +1003,40 @@ findExternalRules omit_prags binds imp_id_rules unfold_env
 
 Note [Which rules to expose]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-findExternalRules filters imp_rules to avoid binders that 
-aren't externally visible; but the externally-visible binders 
+findExternalRules filters imp_rules to avoid binders that
+aren't externally visible; but the externally-visible binders
 are computed (by findExternalIds) assuming that all orphan
-rules are externalised (see init_ext_ids in function 
-'search'). So in fact we may export more than we need. 
+rules are externalised (see init_ext_ids in function
+'search'). So in fact we may export more than we need.
 (It's a sort of mutual recursion.)
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Step 2: top-level tidying}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 
 \begin{code}
 -- TopTidyEnv: when tidying we need to know
---   * nc_var: The NameCache, containing a unique supply and any pre-ordained Names.  
---	  These may have arisen because the
---	  renamer read in an interface file mentioning M.$wf, say,
---	  and assigned it unique r77.  If, on this compilation, we've
---	  invented an Id whose name is $wf (but with a different unique)
---	  we want to rename it to have unique r77, so that we can do easy
---	  comparisons with stuff from the interface file
+--   * nc_var: The NameCache, containing a unique supply and any pre-ordained Names.
+--        These may have arisen because the
+--        renamer read in an interface file mentioning M.$wf, say,
+--        and assigned it unique r77.  If, on this compilation, we've
+--        invented an Id whose name is $wf (but with a different unique)
+--        we want to rename it to have unique r77, so that we can do easy
+--        comparisons with stuff from the interface file
 --
---   * occ_env: The TidyOccEnv, which tells us which local occurrences 
+--   * occ_env: The TidyOccEnv, which tells us which local occurrences
 --     are 'used'
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
 tidyTopBinds :: HscEnv
-	     -> UnfoldEnv
+             -> UnfoldEnv
              -> TidyOccEnv
-	     -> CoreProgram
-	     -> (TidyEnv, CoreProgram)
+             -> CoreProgram
+             -> (TidyEnv, CoreProgram)
 
 tidyTopBinds hsc_env unfold_env init_occ_env binds
   = tidy init_env binds
@@ -1054,16 +1047,16 @@ tidyTopBinds hsc_env unfold_env init_occ_env binds
 
     tidy env []     = (env, [])
     tidy env (b:bs) = let (env1, b')  = tidyTopBind this_pkg unfold_env env b
-			  (env2, bs') = tidy env1 bs
+                          (env2, bs') = tidy env1 bs
                       in
-			  (env2, b':bs')
+                          (env2, b':bs')
 
 ------------------------
 tidyTopBind  :: PackageId
              -> UnfoldEnv
-	     -> TidyEnv
+             -> TidyEnv
              -> CoreBind
-	     -> (TidyEnv, CoreBind)
+             -> (TidyEnv, CoreBind)
 
 tidyTopBind this_pkg unfold_env (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
@@ -1079,7 +1072,7 @@ tidyTopBind this_pkg unfold_env (occ_env,subst1) (Rec prs)
   where
     prs' = [ tidyTopPair show_unfold tidy_env2 caf_info name' (id,rhs)
            | (id,rhs) <- prs,
-             let (name',show_unfold) = 
+             let (name',show_unfold) =
                     expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
            ]
 
@@ -1088,70 +1081,70 @@ tidyTopBind this_pkg unfold_env (occ_env,subst1) (Rec prs)
 
     bndrs = map fst prs
 
-	-- the CafInfo for a recursive group says whether *any* rhs in
-	-- the group may refer indirectly to a CAF (because then, they all do).
-    caf_info 
-	| or [ mayHaveCafRefs (hasCafRefs this_pkg subst1 (idArity bndr) rhs)
-	     | (bndr,rhs) <- prs ] = MayHaveCafRefs
-	| otherwise 		   = NoCafRefs
+        -- the CafInfo for a recursive group says whether *any* rhs in
+        -- the group may refer indirectly to a CAF (because then, they all do).
+    caf_info
+        | or [ mayHaveCafRefs (hasCafRefs this_pkg subst1 (idArity bndr) rhs)
+             | (bndr,rhs) <- prs ] = MayHaveCafRefs
+        | otherwise                = NoCafRefs
 
 -----------------------------------------------------------
 tidyTopPair :: Bool  -- show unfolding
-	    -> TidyEnv 	-- The TidyEnv is used to tidy the IdInfo
-			-- It is knot-tied: don't look at it!
-	    -> CafInfo
-	    -> Name		-- New name
-	    -> (Id, CoreExpr) 	-- Binder and RHS before tidying
-	    -> (Id, CoreExpr)
-	-- This function is the heart of Step 2
-	-- The rec_tidy_env is the one to use for the IdInfo
-	-- It's necessary because when we are dealing with a recursive
-	-- group, a variable late in the group might be mentioned
-	-- in the IdInfo of one early in the group
+            -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
+                        -- It is knot-tied: don't look at it!
+            -> CafInfo
+            -> Name             -- New name
+            -> (Id, CoreExpr)   -- Binder and RHS before tidying
+            -> (Id, CoreExpr)
+        -- This function is the heart of Step 2
+        -- The rec_tidy_env is the one to use for the IdInfo
+        -- It's necessary because when we are dealing with a recursive
+        -- group, a variable late in the group might be mentioned
+        -- in the IdInfo of one early in the group
 
 tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
   = (bndr1, rhs1)
   where
     bndr1    = mkGlobalId details name' ty' idinfo'
-    details  = idDetails bndr	-- Preserve the IdDetails
-    ty'	     = tidyTopType (idType bndr)
+    details  = idDetails bndr   -- Preserve the IdDetails
+    ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo rhs_tidy_env name' rhs rhs1 (idInfo bndr) 
+    idinfo'  = tidyTopIdInfo rhs_tidy_env name' rhs rhs1 (idInfo bndr)
                              show_unfold caf_info
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
 -- binders.  There are two delicate pieces:
 --
 --  * Arity.  After CoreTidy, this arity must not change any more.
---	Indeed, CorePrep must eta expand where necessary to make
---	the manifest arity equal to the claimed arity.
+--      Indeed, CorePrep must eta expand where necessary to make
+--      the manifest arity equal to the claimed arity.
 --
 --  * CAF info.  This must also remain valid through to code generation.
--- 	We add the info here so that it propagates to all
--- 	occurrences of the binders in RHSs, and hence to occurrences in
--- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
---	CoreToStg makes use of this when constructing SRTs.
-tidyTopIdInfo :: TidyEnv -> Name -> CoreExpr -> CoreExpr 
+--      We add the info here so that it propagates to all
+--      occurrences of the binders in RHSs, and hence to occurrences in
+--      unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
+--      CoreToStg makes use of this when constructing SRTs.
+tidyTopIdInfo :: TidyEnv -> Name -> CoreExpr -> CoreExpr
               -> IdInfo -> Bool -> CafInfo -> IdInfo
 tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
-  | not is_external	-- For internal Ids (not externally visible)
-  = vanillaIdInfo	-- we only need enough info for code generation
-			-- Arity and strictness info are enough;
-			--	c.f. CoreTidy.tidyLetBndr
-	`setCafInfo` 	    caf_info
-	`setArityInfo`	    arity
-	`setStrictnessInfo` final_sig
+  | not is_external     -- For internal Ids (not externally visible)
+  = vanillaIdInfo       -- we only need enough info for code generation
+                        -- Arity and strictness info are enough;
+                        --      c.f. CoreTidy.tidyLetBndr
+        `setCafInfo`        caf_info
+        `setArityInfo`      arity
+        `setStrictnessInfo` final_sig
 
-  | otherwise		-- Externally-visible Ids get the whole lot
+  | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
-	`setCafInfo` 	       caf_info
-	`setArityInfo`	       arity
-	`setStrictnessInfo`    final_sig
+        `setCafInfo`           caf_info
+        `setArityInfo`         arity
+        `setStrictnessInfo`    final_sig
         `setOccInfo`           robust_occ_info
-	`setInlinePragInfo`    (inlinePragInfo idinfo)
-	`setUnfoldingInfo`     unfold_info
-		-- NB: we throw away the Rules
-		-- They have already been extracted by findExternalRules
+        `setInlinePragInfo`    (inlinePragInfo idinfo)
+        `setUnfoldingInfo`     unfold_info
+                -- NB: we throw away the Rules
+                -- They have already been extracted by findExternalRules
   where
     is_external = isExternalName name
 
@@ -1177,9 +1170,9 @@ tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
     unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
-		| otherwise   = noUnfolding
+                | otherwise   = noUnfolding
     unf_from_rhs = mkTopUnfolding is_bot tidy_rhs
-    is_bot = case final_sig of 
+    is_bot = case final_sig of
                 Just sig -> isBottomingSig sig
                 Nothing  -> False
     -- NB: do *not* expose the worker if show_unfold is off,
@@ -1188,17 +1181,17 @@ tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
     -- This is important: if you expose the worker for a loop-breaker
     -- then you can make the simplifier go into an infinite loop, because
     -- in effect the unfolding is exposed.  See Trac #1709
-    -- 
+    --
     -- You might think that if show_unfold is False, then the thing should
     -- not be w/w'd in the first place.  But a legitimate reason is this:
-    -- 	  the function returns bottom
+    --    the function returns bottom
     -- In this case, show_unfold will be false (we don't expose unfoldings
     -- for bottoming functions), but we might still have a worker/wrapper
     -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
 
     --------- Arity ------------
     -- Usually the Id will have an accurate arity on it, because
-    -- the simplifier has just run, but not always. 
+    -- the simplifier has just run, but not always.
     -- One case I found was when the last thing the simplifier
     -- did was to let-bind a non-atomic argument and then float
     -- it to the top level. So it seems more robust just to
@@ -1207,9 +1200,9 @@ tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Figuring out CafInfo for an expression}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 hasCafRefs decides whether a top-level closure can point into the dynamic heap.
@@ -1218,45 +1211,45 @@ used to decide whether a particular closure needs to be referenced
 in an SRT or not.
 
 There are two reasons for setting MayHaveCafRefs:
-	a) The RHS is a CAF: a top-level updatable thunk.
-	b) The RHS refers to something that MayHaveCafRefs
+        a) The RHS is a CAF: a top-level updatable thunk.
+        b) The RHS refers to something that MayHaveCafRefs
 
-Possible improvement: In an effort to keep the number of CAFs (and 
-hence the size of the SRTs) down, we could also look at the expression and 
-decide whether it requires a small bounded amount of heap, so we can ignore 
+Possible improvement: In an effort to keep the number of CAFs (and
+hence the size of the SRTs) down, we could also look at the expression and
+decide whether it requires a small bounded amount of heap, so we can ignore
 it as a CAF.  In these cases however, we would need to use an additional
-CAF list to keep track of non-collectable CAFs.  
+CAF list to keep track of non-collectable CAFs.
 
 \begin{code}
 hasCafRefs  :: PackageId -> VarEnv Var -> Arity -> CoreExpr -> CafInfo
-hasCafRefs this_pkg p arity expr 
+hasCafRefs this_pkg p arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
-  | otherwise 		    = NoCafRefs
+  | otherwise               = NoCafRefs
  where
   mentions_cafs = isFastTrue (cafRefsE p expr)
-  is_dynamic_name = isDllName this_pkg 
+  is_dynamic_name = isDllName this_pkg
   is_caf = not (arity > 0 || rhsIsStatic is_dynamic_name expr)
 
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
-  -- knows how much eta expansion is going to be done by 
+  -- knows how much eta expansion is going to be done by
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
 cafRefsE :: VarEnv Id -> Expr a -> FastBool
 cafRefsE p (Var id)            = cafRefsV p id
-cafRefsE p (Lit lit) 	       = cafRefsL p lit
-cafRefsE p (App f a) 	       = fastOr (cafRefsE p f) (cafRefsE p) a
-cafRefsE p (Lam _ e) 	       = cafRefsE p e
-cafRefsE p (Let b e) 	       = fastOr (cafRefsEs p (rhssOfBind b)) (cafRefsE p) e
+cafRefsE p (Lit lit)           = cafRefsL p lit
+cafRefsE p (App f a)           = fastOr (cafRefsE p f) (cafRefsE p) a
+cafRefsE p (Lam _ e)           = cafRefsE p e
+cafRefsE p (Let b e)           = fastOr (cafRefsEs p (rhssOfBind b)) (cafRefsE p) e
 cafRefsE p (Case e _bndr _ alts) = fastOr (cafRefsE p e) (cafRefsEs p) (rhssOfAlts alts)
 cafRefsE p (Tick _n e)         = cafRefsE p e
-cafRefsE p (Cast e _co)         = cafRefsE p e
-cafRefsE _ (Type _) 	       = fastBool False
-cafRefsE _ (Coercion _)         = fastBool False
+cafRefsE p (Cast e _co)        = cafRefsE p e
+cafRefsE _ (Type _)            = fastBool False
+cafRefsE _ (Coercion _)        = fastBool False
 
 cafRefsEs :: VarEnv Id -> [Expr a] -> FastBool
-cafRefsEs _ [] 	  = fastBool False
+cafRefsEs _ []    = fastBool False
 cafRefsEs p (e:es) = fastOr (cafRefsE p e) (cafRefsEs p) es
 
 cafRefsL :: VarEnv Id -> Literal -> FastBool
@@ -1266,7 +1259,7 @@ cafRefsL p (LitInteger _ mk_integer) = cafRefsV p mk_integer
 cafRefsL _ _                         = fastBool False
 
 cafRefsV :: VarEnv Id -> Id -> FastBool
-cafRefsV p id 
+cafRefsV p id
   | not (isLocalId id)            = fastBool (mayHaveCafRefs (idCafInfo id))
   | Just id' <- lookupVarEnv p id = fastBool (mayHaveCafRefs (idCafInfo id'))
   | otherwise                     = fastBool False
