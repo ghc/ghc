@@ -856,15 +856,6 @@ compileToCoreModule = compileCore False
 -- as to return simplified and tidied Core.
 compileToCoreSimplified :: GhcMonad m => FilePath -> m CoreModule
 compileToCoreSimplified = compileCore True
-{-
--- | Provided for backwards-compatibility: compileToCore returns just the Core
--- bindings, but for most purposes, you probably want to call
--- compileToCoreModule.
-compileToCore :: GhcMonad m => FilePath -> m [CoreBind]
-compileToCore fn = do
-   mod <- compileToCoreModule session fn
-   return $ cm_binds mod
--}
 -- | Takes a CoreModule and compiles the bindings therein
 -- to object code. The first argument is a bool flag indicating
 -- whether to run the simplifier.
