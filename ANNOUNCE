@@ -1,43 +1,15 @@
 
    =============================================================
-    The (Interactive) Glasgow Haskell Compiler -- version 7.4.1
+    The (Interactive) Glasgow Haskell Compiler -- version 7.4.2
    =============================================================
 
-The GHC Team is pleased to announce a new major release of GHC, 7.4.1.
+The GHC Team is pleased to announce a new patchlevel release of GHC.
+This release contains a number of bugfixes relative to 7.4.1, so we
+recommend upgrading.
 
-Here are some of the highlights of the 7.4 branch since 7.2 and 7.0:
+The release notes are here:
 
-  * The Num class no longer has Eq or Show superclasses.
-
-  * There is a new feature Safe Haskell (-XSafe, -XTrustworthy, -XUnsafe).
-    The design has changed since 7.2.
-
-  * There is a new feature kind polymorphism (-XPolyKinds).
-    A side-effect of this is that, when the extension is not enabled, in
-    certain circumstances kinds are now defaulted to * rather than being
-    inferred.
-
-  * There is a new feature constraint kinds (-XConstraintKinds).
-
-  * It is now possible to give any sort of declaration at the ghci prompt.
-    For example, you can now declare datatypes within ghci.
-
-  * The profiling and hpc implementations have been merged and overhauled.
-    Visible changes include renaming of profiling flags, and a new
-    semantics for the cost-centre stacks (which should in most cases
-    result in more useful and intuitive profiles). The +RTS -xc flag now
-    also gives a stack trace.
-
-  * It is now possible to write compiler plugins.
-
-  * DPH support has been significantly improved.
-
-  * There is now preliminary support for registerised compilation using
-    LLVM on the ARM platform.
-
-Full release notes are here:
-
-  http://www.haskell.org/ghc/docs/7.4.1/html/users_guide/release-7-4-1.html
+  http://www.haskell.org/ghc/docs/7.4.2/html/users_guide/release-7-4-2.html
 
 How to get it
 ~~~~~~~~~~~~~
