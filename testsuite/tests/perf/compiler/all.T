@@ -253,6 +253,6 @@ test('T6048',
           compiler_stats_range_field('bytes allocated', 38000000, 10)),
 
       if_wordsize(64,
-          compiler_stats_range_field('bytes allocated', 77000000, 10))
+          compiler_stats_range_field('bytes allocated', 67328320, 10))
       ],
       compile,[''])
