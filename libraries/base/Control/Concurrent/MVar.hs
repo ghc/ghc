@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, UnboxedTuples, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -138,6 +138,7 @@ module Control.Concurrent.MVar
         , modifyMVar_   -- :: MVar a -> (a -> IO a) -> IO ()
         , modifyMVar    -- :: MVar a -> (a -> IO (a,b)) -> IO b
 #ifndef __HUGS__
+        , mkWeakMVar
         , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 #endif
     ) where
@@ -149,9 +150,11 @@ import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.MVar ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
-                  tryTakeMVar, tryPutMVar, isEmptyMVar, addMVarFinalizer
+import GHC.MVar ( MVar(..), newEmptyMVar, newMVar, takeMVar, putMVar,
+                  tryTakeMVar, tryPutMVar, isEmptyMVar
                 )
+import qualified GHC.MVar
+import GHC.Weak
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -232,3 +235,13 @@ modifyMVar m io =
     (a',b) <- restore (io a) `onException` putMVar m a
     putMVar m a'
     return b
+
+{-# DEPRECATED addMVarFinalizer "use mkWeakMVar instead" #-}
+addMVarFinalizer :: MVar a -> IO () -> IO ()
+addMVarFinalizer = GHC.MVar.addMVarFinalizer
+
+-- | Make a 'Weak' pointer to an 'MVar', using the second argument as
+-- a finalizer to run when 'MVar' is garbage-collected
+mkWeakMVar :: MVar a -> IO () -> IO (Weak (MVar a))
+mkWeakMVar m@(MVar m#) f = IO $ \s ->
+  case mkWeak# m# m f s of (# s1, w #) -> (# s1, Weak w #)
