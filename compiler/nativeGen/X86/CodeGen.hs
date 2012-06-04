@@ -54,6 +54,7 @@ import FastString
 import FastBool         ( isFastTrue )
 import Constants        ( wORD_SIZE )
 import DynFlags
+import Util
 
 import Control.Monad
 import Data.Bits

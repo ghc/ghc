@@ -63,6 +63,7 @@ import BasicTypes
 import MonadUtils
 import Outputable
 import FastString
+import Util
 
 import Data.List
 \end{code}

@@ -48,6 +48,7 @@ import Maybes
 import BasicTypes
 import Bag
 import FastString
+import Util
 
 import Control.Monad
 \end{code}

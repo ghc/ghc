@@ -96,6 +96,7 @@ import Outputable
 import FastString
 import Constants
 import DynFlags
+import Util
 \end{code}
 
 

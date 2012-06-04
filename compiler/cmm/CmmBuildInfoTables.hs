@@ -32,7 +32,7 @@ import Constants
 import Digraph
 import qualified Prelude as P
 import Prelude hiding (succ)
-import Util (sortLe)
+import Util
 
 import BlockId
 import Bitmap

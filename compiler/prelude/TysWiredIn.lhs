@@ -104,6 +104,7 @@ import Data.Array
 import FastString
 import Outputable
 import Config
+import Util
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]

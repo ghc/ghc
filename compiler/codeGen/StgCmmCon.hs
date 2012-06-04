@@ -41,7 +41,7 @@ import PrelInfo
 import Outputable
 import Platform
 import StaticFlags
-import Util             ( lengthIs )
+import Util
 
 import Control.Monad
 import Data.Char

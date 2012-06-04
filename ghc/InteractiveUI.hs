@@ -50,8 +50,7 @@ import Maybes ( orElse, expectJust )
 import NameSet
 import Panic hiding ( showException )
 import StaticFlags
-import Util ( on, global, toArgs, toCmdArgs, removeSpaces, getCmd,
-              filterOut, seqList, looksLikeModuleName, partitionWith )
+import Util
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline

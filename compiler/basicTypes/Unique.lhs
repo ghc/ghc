@@ -71,6 +71,7 @@ import FastTypes
 import FastString
 import Outputable
 -- import StaticFlags
+import Util
 
 #if defined(__GLASGOW_HASKELL__)
 --just for implementing a fast [0,61) -> Char function

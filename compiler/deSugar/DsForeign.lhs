@@ -47,6 +47,8 @@ import Config
 import Constants
 import OrdList
 import Pair
+import Util
+
 import Data.Maybe
 import Data.List
 \end{code}

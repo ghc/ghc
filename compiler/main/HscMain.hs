@@ -147,6 +147,7 @@ import UniqFM           ( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag
 import Exception
+import Util
 
 import Data.List
 import Control.Monad

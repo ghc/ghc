@@ -46,6 +46,7 @@ import TyCon
 import Module
 import ErrUtils
 import Outputable
+import Util
 
 codeGen :: DynFlags
 	 -> Module

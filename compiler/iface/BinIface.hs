@@ -51,6 +51,7 @@ import Outputable
 import Platform
 import FastString
 import Constants
+import Util
 
 import Data.Bits
 import Data.Char

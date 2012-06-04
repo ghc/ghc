@@ -55,7 +55,7 @@ import Name
 import NameSet
 import RdrName
 import BasicTypes
-import Util		( notNull )
+import Util
 import ListSetOps	( removeDups )
 import Outputable
 import SrcLoc

@@ -43,6 +43,7 @@ import Module
 import FastString
 import Outputable
 import StaticFlags
+import Util
 
 ------------------------------------------------------------------------
 --	Primitive operations and foreign calls

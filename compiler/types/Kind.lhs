@@ -63,6 +63,7 @@ import TyCon
 import VarSet
 import PrelNames
 import Outputable
+import Util
 \end{code}
 
 %************************************************************************

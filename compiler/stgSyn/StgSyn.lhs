@@ -67,6 +67,7 @@ import Type        ( Type )
 import Type        ( typePrimRep )
 import UniqSet
 import Unique      ( Unique )
+import Util
 import VarSet      ( IdSet, isEmptyVarSet )
 \end{code}
 

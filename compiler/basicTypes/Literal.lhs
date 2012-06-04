@@ -62,6 +62,8 @@ import BasicTypes
 import Binary
 import Constants
 import UniqFM
+import Util
+
 import Data.Int
 import Data.Ratio
 import Data.Word

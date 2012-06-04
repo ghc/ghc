@@ -90,6 +90,7 @@ import Outputable
 import Platform
 import Constants
 import DynFlags
+import Util
 
 -----------------------------------------------------------------------------
 --		Representations

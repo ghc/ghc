@@ -71,6 +71,7 @@ import Outputable
 import FastString
 import Pair
 import StaticFlags( opt_PprStyle_Debug )
+import Util
 
 -- libraries
 import qualified Data.Data        as Data hiding ( TyCon )

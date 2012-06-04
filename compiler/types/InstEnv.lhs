@@ -32,6 +32,7 @@ import Outputable
 import ErrUtils
 import BasicTypes
 import UniqFM
+import Util
 import Id
 import FastString
 import Data.Data        ( Data, Typeable )

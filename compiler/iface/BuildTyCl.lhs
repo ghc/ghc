@@ -38,7 +38,7 @@ import Type
 import Coercion
 
 import TcRnMonad
-import Util		( isSingleton )
+import Util
 import Outputable
 \end{code}
 	

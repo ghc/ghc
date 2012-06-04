@@ -48,6 +48,7 @@ import Platform
 import SrcLoc
 import Bag
 import FastString
+import Util
 
 import Control.Monad
 \end{code}

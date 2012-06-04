@@ -41,6 +41,7 @@ import FastString
 import StaticFlags ( opt_SimplExcessPrecision )
 import Constants
 import BasicTypes
+import Util
 
 import Data.Bits as Bits
 import Data.Int    ( Int64 )

@@ -85,7 +85,7 @@ import Outputable
 import FastString
 import UniqSupply
 import BasicTypes
-import Util             ( notNull, zipEqual, sortLe )
+import Util
 import Pair
 import Constants
 

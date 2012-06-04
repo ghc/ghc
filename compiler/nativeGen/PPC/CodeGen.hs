@@ -57,6 +57,7 @@ import Data.Word
 
 import BasicTypes
 import FastString
+import Util
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector

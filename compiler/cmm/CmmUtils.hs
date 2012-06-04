@@ -83,6 +83,7 @@ import OptimizationFuel as F
 import Unique
 import UniqSupply
 import Constants( wORD_SIZE, tAG_MASK )
+import Util
 
 import Data.Word
 import Data.Maybe

@@ -77,6 +77,7 @@ import VarEnv
 import OrdList
 import Unique
 import UniqSupply
+import Util
 import Outputable
 
 import Control.Monad

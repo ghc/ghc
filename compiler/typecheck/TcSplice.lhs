@@ -66,7 +66,7 @@ import Serialized
 import ErrUtils
 import SrcLoc
 import Outputable
-import Util             ( dropList )
+import Util
 import Data.List        ( mapAccumL )
 import Pair
 import Unique

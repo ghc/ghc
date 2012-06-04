@@ -73,6 +73,8 @@ import DynFlags ( ExtensionFlag( Opt_DataKinds ) )
 import UniqSupply
 import Outputable
 import FastString
+import Util
+
 import Control.Monad ( unless, when, zipWithM )
 \end{code}
 

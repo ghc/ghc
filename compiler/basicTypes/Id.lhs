@@ -126,7 +126,7 @@ import Outputable
 import Unique
 import UniqSupply
 import FastString
-import Util( count )
+import Util
 import StaticFlags
 
 -- infixl so you can say (id `set` a `set` b)
