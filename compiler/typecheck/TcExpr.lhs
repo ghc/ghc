@@ -184,7 +184,7 @@ tcExpr (HsIPVar ip) res_ty
 		-- type scheme.  We enforce this by creating a fresh
 		-- type variable as its type.  (Because res_ty may not
 		-- be a tau-type.)
-	; ip_ty <- newFlexiTyVarTy argTypeKind	-- argTypeKind: it can't be an unboxed tuple
+	; ip_ty <- newFlexiTyVarTy openTypeKind
 	; ip_var <- emitWanted origin (mkIPPred ip ip_ty)
 	; tcWrapResult (HsIPVar (IPName ip_var)) ip_ty res_ty }
 
@@ -344,7 +344,7 @@ tcExpr (ExplicitTuple tup_args boxity) res_ty
   | otherwise
   = -- The tup_args are a mixture of Present and Missing (for tuple sections)
     do { let kind = case boxity of { Boxed   -> liftedTypeKind
-                                   ; Unboxed -> argTypeKind }
+                                   ; Unboxed -> openTypeKind }
              arity = length tup_args 
              tup_tc = tupleTyCon (boxityNormalTupleSort boxity) arity
 

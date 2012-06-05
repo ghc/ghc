@@ -223,7 +223,7 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
         -- Consider     ?x = 4
         --              ?y = ?x + 1
     tc_ip_bind (IPBind ip expr) 
-       = do { ty <- newFlexiTyVarTy argTypeKind
+       = do { ty <- newFlexiTyVarTy openTypeKind
             ; ip_id <- newIP ip ty
             ; expr' <- tcMonoExpr expr ty
             ; return (ip_id, (IPBind (IPName ip_id) expr')) }
@@ -946,7 +946,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matc
   = do  { mono_id <- newSigLetBndr no_gen name sig
         ; return (TcFunBind (name, Just sig, mono_id) nm_loc inf matches) }
   | otherwise
-  = do  { mono_ty <- newFlexiTyVarTy argTypeKind
+  = do  { mono_ty <- newFlexiTyVarTy openTypeKind
         ; mono_id <- newNoSigLetBndr no_gen name mono_ty
         ; return (TcFunBind (name, Nothing, mono_id) nm_loc inf matches) }
 
