@@ -258,8 +258,8 @@ lookupExactOcc name
 
   where
     exact_nm_err = hang (ptext (sLit "The exact Name") <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
-                      2 (vcat [ ptext (sLit "Probable cause: you used a unique name (NameU), perhaps via newName,")
-                              , ptext (sLit "in Template Haskell, but did not bind it")
+                      2 (vcat [ ptext (sLit "Probable cause: you used a unique Template Haskell name (NameU), ")
+                              , ptext (sLit "perhaps via newName, but did not bind it")
                               , ptext (sLit "If that's it, then -ddump-splices might be useful") ])
 
 -----------------------------------------------

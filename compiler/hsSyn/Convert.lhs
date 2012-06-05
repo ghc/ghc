@@ -861,7 +861,8 @@ cvtTypeKind ty_str ty
            LitT lit
              -> returnL (HsTyLit (cvtTyLit lit))
 
-           PromotedT nm -> do { nm' <- tconName nm; mk_apps (HsTyVar nm') tys' }
+           PromotedT nm -> do { nm' <- cName nm; mk_apps (HsTyVar nm') tys' }
+                 -- Promoted data constructor; hence cName
 
            PromotedTupleT n
              | n == 1
